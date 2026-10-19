@@ -23,7 +23,7 @@ import { // #1589 (Keeps K1): the shelf's tiers — stage membership, crown rout
   deriveStageIds, sanitizeStageIds, routeCrown, swapSlots, admitToStage,
   crownHistoryRecord, swapHistoryRecord, fillHistoryRecord, sanitizeHistoryRecord,
   exportHistoryRecord, importHistoryRecord, shelfRow,
-  ON_SHELF_COPY, favoritesTrimCopy,
+  ON_SHELF_COPY, favoritesTrimCopy, shelfLoadLine, shelfSaveLine,
 } from '../../curator/shelf.mjs';
 import { dealFill } from '../../curator/shelfFill.mjs'; // #1590 (Keeps K2): the Kinetic fill
 import { DEFAULT_SHELF_PREFS, tableName } from '../../curator/shelfPrefs.mjs'; // #1590: preferences.json
@@ -191,24 +191,99 @@ export function sanitizeFavorite(raw) {
   };
 }
 
-function readFavorites() {
+/** #1642 — shelf persistence speaks; nothing is silently lost at the
+ * storage layer either. Two channels, both landing on shelfNotice (the
+ * shelf's own visible line):
+ *
+ * LOAD — the read* functions below run once, at slice creation. A record
+ * the sanitizer leaves out is COUNTED; a blob that cannot be read at all
+ * (or a read storage refuses) is named; and the raw string is stashed
+ * under `<key>:quarantine` — the boot document's quarantine shape —
+ * BEFORE any persist can overwrite the shortened list, so what was lost
+ * stays recoverable by hand. The factory drains the report into the
+ * shelf's initial notice.
+ *
+ * SAVE — the five persist* functions share one failure path. A refused
+ * write records ONE pending line per failure EPISODE (an episode ends
+ * at the next successful shelf persist; the line informs, it never
+ * nags). The factory wraps `set` so the pending line rides the very
+ * update whose persist failed, appended to any notice that update
+ * already carries — no persist failure is ever only a console line. */
+const bootLoadLosses = [];
+function noteLoadLoss(one, many, loss) { bootLoadLosses.push(shelfLoadLine(one, many, loss)); }
+function drainBootLoadNotice() {
+  if (!bootLoadLosses.length) return null;
+  const lines = bootLoadLosses.slice();
+  bootLoadLosses.length = 0;
+  return lines.join(' — ');
+}
+function quarantineShelfRaw(key, raw, reason) {
   try {
-    const raw = localStorage.getItem(FAVORITES_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_MAX)
-      : [];
+    localStorage.setItem(`${key}:quarantine`, JSON.stringify({
+      quarantinedAt: new Date().toISOString(), reason, raw,
+    }));
+  } catch { /* storage is already unhappy; the notice still speaks */ }
+}
+/** Read one stored shelf part with its losses accounted. `load` maps the
+ * parsed array to the loaded list; anything left behind is reported. */
+function readShelfPart(key, one, many, load) {
+  let raw;
+  try {
+    raw = localStorage.getItem(key);
   } catch {
-    return [];
+    noteLoadLoss(one, many, { refused: true });
+    return null;
   }
+  if (!raw) return null;
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    quarantineShelfRaw(key, raw, 'unparseable JSON');
+    noteLoadLoss(one, many, { unreadable: true });
+    return null;
+  }
+  if (!Array.isArray(parsed)) {
+    quarantineShelfRaw(key, raw, 'stored value is not a list');
+    noteLoadLoss(one, many, { unreadable: true });
+    return null;
+  }
+  const loaded = load(parsed);
+  const dropped = parsed.length - loaded.length;
+  if (dropped > 0) {
+    quarantineShelfRaw(key, raw, `${dropped} stored record(s) could not be read`);
+    noteLoadLoss(one, many, { dropped });
+  }
+  return loaded;
+}
+
+let persistEpisodeOpen = false;
+let pendingPersistLine = null;
+function notePersistFailure() {
+  if (persistEpisodeOpen) return;
+  persistEpisodeOpen = true;
+  pendingPersistLine = shelfSaveLine('the shelf');
+}
+function notePersistSuccess() { persistEpisodeOpen = false; }
+function drainPersistLine(partial) {
+  if (!pendingPersistLine || !partial || typeof partial !== 'object') return partial;
+  const line = pendingPersistLine;
+  pendingPersistLine = null;
+  return { ...partial, shelfNotice: partial.shelfNotice ? `${partial.shelfNotice} — ${line}` : line };
+}
+
+function readFavorites() {
+  return readShelfPart(FAVORITES_KEY, 'favorite', 'favorites',
+    (parsed) => parsed.map(sanitizeFavorite).filter(Boolean).slice(0, FAVORITES_MAX)) || [];
 }
 
 function persistFavorites(list) {
   try {
     localStorage.setItem(FAVORITES_KEY, JSON.stringify(list));
+    notePersistSuccess();
   } catch (e) {
     console.warn('[favorites] save failed', e);
+    notePersistFailure();
   }
 }
 
@@ -219,31 +294,27 @@ function persistFavorites(list) {
  * record shapes, and a read-path trim would be the old silent eviction
  * wearing a new coat. */
 function readKeeps() {
-  try {
-    const raw = localStorage.getItem(KEEPS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.map(sanitizeFavorite).filter(Boolean)
-      : [];
-  } catch {
-    return [];
-  }
+  return readShelfPart(KEEPS_KEY, 'keep', 'keeps',
+    (parsed) => parsed.map(sanitizeFavorite).filter(Boolean)) || [];
 }
 
 function persistKeeps(list) {
   try {
     localStorage.setItem(KEEPS_KEY, JSON.stringify(list));
+    notePersistSuccess();
   } catch (e) {
     console.warn('[keeps] save failed', e);
+    notePersistFailure();
   }
 }
 
 function persistStage(ids) {
   try {
     localStorage.setItem(STAGE_KEY, JSON.stringify(ids));
+    notePersistSuccess();
   } catch (e) {
     console.warn('[keeps] stage save failed', e);
+    notePersistFailure();
   }
 }
 
@@ -271,23 +342,17 @@ function readStage(keeps) {
 }
 
 function readShelfHistory() {
-  try {
-    const raw = localStorage.getItem(SHELF_HISTORY_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed)
-      ? parsed.map(sanitizeHistoryRecord).filter(Boolean).slice(-SHELF_HISTORY_MAX)
-      : [];
-  } catch {
-    return [];
-  }
+  return readShelfPart(SHELF_HISTORY_KEY, 'shelf history record', 'shelf history records',
+    (parsed) => parsed.map(sanitizeHistoryRecord).filter(Boolean).slice(-SHELF_HISTORY_MAX)) || [];
 }
 
 function persistShelfHistory(list) {
   try {
     localStorage.setItem(SHELF_HISTORY_KEY, JSON.stringify(list));
+    notePersistSuccess();
   } catch (e) {
     console.warn('[keeps] shelf history save failed', e);
+    notePersistFailure();
   }
 }
 
@@ -311,8 +376,10 @@ function readDiskIndex() {
 function persistDiskIndex(root, stubs) {
   try {
     localStorage.setItem(DISK_KEY, JSON.stringify({ v: 1, root: root || null, stubs }));
+    notePersistSuccess();
   } catch (e) {
     console.warn('[keeps] disk index save failed', e);
+    notePersistFailure();
   }
 }
 
@@ -414,10 +481,23 @@ export const createDavisSlice = (set) => {
   // #1589 — boot the shelf once: the collection first, then the stage
   // read against it (which migrates on first sight; see readStage).
   const bootKeeps = readKeeps();
+  const bootFavorites = readFavorites();
+  const bootHistory = readShelfHistory();
+  // #1642 — whatever the boot reads could not load was counted above;
+  // the shelf opens with the loss spoken, not buried.
+  const bootNotice = drainBootLoadNotice();
   // #1591 — the disk index boots with the shelf: the listing knows its
   // disk keeps (as stubs) before any folder read; their records load
   // when the loot surface scans (loot/shelfDiskRun.mjs).
   const bootDisk = readDiskIndex();
+  // #1642 — every update this slice applies passes through the persist
+  // drain: when the update's own persist was refused, the failure line
+  // rides that update (see notePersistFailure above).
+  const rawSet = set;
+  set = (update, ...rest) => rawSet(
+    typeof update === 'function' ? (state) => drainPersistLine(update(state)) : drainPersistLine(update),
+    ...rest,
+  );
   return {
   evolveMode: false,
   // #616 EVOLVE progress: live run, last finished run, candidates seen this session.
@@ -429,7 +509,7 @@ export const createDavisSlice = (set) => {
   evolveInterval: 2000,
   autoSnapshot: false,
   lastEvolveTs: 0,
-  favorites: readFavorites(),
+  favorites: bootFavorites,
   // #996 — keeps without the star. A favorite implies a keep (addFavorite
   // appends both); un-favoriting leaves the keep. Session-persisted like
   // favorites; the HITS export carries them for hits_bridge.py bold.
@@ -442,8 +522,8 @@ export const createDavisSlice = (set) => {
   // session-only — what is performing is a live fact, not shelf data.
   keeps: bootKeeps,
   keepStage: readStage(bootKeeps),
-  shelfHistory: readShelfHistory(),
-  shelfNotice: null,
+  shelfHistory: bootHistory,
+  shelfNotice: bootNotice,
   setShelfNotice: (msg) => set({ shelfNotice: typeof msg === 'string' && msg ? msg : null }),
   performingKeepId: null,
   // #1590 — the preferences.json state (curator/shelfPrefs.mjs): the
