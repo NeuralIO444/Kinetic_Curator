@@ -24,7 +24,9 @@ function boot() {
 }
 const rec = (seed) => ({ seed, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
 const reset = () => { mem.clear(); failWrites = false; failReads = false; mem.set(STAGE_KEY, '[]'); };
-const SAVE_LINE = 'the shelf did not save — storage refused the write';
+// #1643 extended the blocked-crown line: the same refused write also loses
+// the crown's ledger label, and both losses speak in the one notice.
+const SAVE_LINE = 'the shelf did not save — storage refused the write — the keeps ledger would not save — export from PIPELINE';
 
 // ── 1. the happy path stays silent ──
 {

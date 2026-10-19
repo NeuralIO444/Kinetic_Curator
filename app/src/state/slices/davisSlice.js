@@ -24,6 +24,7 @@ import { // #1589 (Keeps K1): the shelf's tiers — stage membership, crown rout
   crownHistoryRecord, swapHistoryRecord, fillHistoryRecord, sanitizeHistoryRecord,
   exportHistoryRecord, importHistoryRecord, shelfRow,
   ON_SHELF_COPY, favoritesTrimCopy, shelfLoadLine, shelfSaveLine,
+  plateNotCapturedLine, ledgerNotRecordedLine, ledgerSaveLine,
 } from '../../curator/shelf.mjs';
 import { dealFill } from '../../curator/shelfFill.mjs'; // #1590 (Keeps K2): the Kinetic fill
 import { DEFAULT_SHELF_PREFS, tableName } from '../../curator/shelfPrefs.mjs'; // #1590: preferences.json
@@ -258,18 +259,43 @@ function readShelfPart(key, one, many, load) {
 }
 
 let persistEpisodeOpen = false;
-let pendingPersistLine = null;
+let ledgerEpisodeOpen = false;
+const pendingNoticeLines = [];
+function pushNoticeLine(line) { pendingNoticeLines.push(line); }
 function notePersistFailure() {
   if (persistEpisodeOpen) return;
   persistEpisodeOpen = true;
-  pendingPersistLine = shelfSaveLine('the shelf');
+  pushNoticeLine(shelfSaveLine('the shelf'));
 }
 function notePersistSuccess() { persistEpisodeOpen = false; }
+/** #1643 — the ledger's storage failures ride the same drain, under
+ * their own episode: a stuck ledger store speaks once, recovers
+ * silently, and a later failure is a new episode that speaks again. */
+function noteLedgerFailure(kind) {
+  if (ledgerEpisodeOpen) return;
+  ledgerEpisodeOpen = true;
+  pushNoticeLine(ledgerSaveLine(kind));
+}
+function noteLedgerSuccess() { ledgerEpisodeOpen = false; }
 function drainPersistLine(partial) {
-  if (!pendingPersistLine || !partial || typeof partial !== 'object') return partial;
-  const line = pendingPersistLine;
-  pendingPersistLine = null;
-  return { ...partial, shelfNotice: partial.shelfNotice ? `${partial.shelfNotice} — ${line}` : line };
+  if (!pendingNoticeLines.length || !partial || typeof partial !== 'object') return partial;
+  const lines = pendingNoticeLines.splice(0).join(' — ');
+  return { ...partial, shelfNotice: partial.shelfNotice ? `${partial.shelfNotice} — ${lines}` : lines };
+}
+
+/** #1643 — one ledger append, spoken. The three doors (F, J, X) append
+ * through here so a lost label always answers at press time: a rejected
+ * row (no usable seed or timestamp) pushes the per-press line; a refused
+ * save pushes the episode line above. The append's row still returns. */
+function appendLedgerSpoken(kind, rec, projectRef, noun) {
+  const row = appendToLedger(kind, rec, projectRef, {
+    report: (why) => {
+      if (why === 'storage') noteLedgerFailure(kind);
+      else if (why === 'saved') noteLedgerSuccess();
+    },
+  });
+  if (!row) pushNoticeLine(ledgerNotRecordedLine(noun));
+  return row;
 }
 
 function readFavorites() {
@@ -836,7 +862,7 @@ export const createDavisSlice = (set) => {
 
   addFavorite: (fav) => set((state) => {
     const entry = sanitizeFavorite({ ...fav, id: genId() });
-    if (!entry) return {};
+    if (!entry) return { shelfNotice: plateNotCapturedLine };
     const favNext = [...state.favorites, entry];
     const favDropped = Math.max(0, favNext.length - FAVORITES_MAX);
     const favorites = favNext.slice(-FAVORITES_MAX);
@@ -850,6 +876,7 @@ export const createDavisSlice = (set) => {
     let keepStage = state.keepStage;
     let shelfHistory = state.shelfHistory;
     let crownLine = null;
+    let lostLine = null;
     if (keepEntry) {
       const at = new Date().getTime();
       const routed = crownIntoShelf(state, keepEntry, at);
@@ -860,10 +887,14 @@ export const createDavisSlice = (set) => {
       persistStage(keepStage);
       if (routed.landed === 'collection') crownLine = ON_SHELF_COPY;
       // #1173 — the keep is a deliberate act: one line in the keeps ledger.
-      appendToLedger('keeps', routed.entry, state.projectTitle);
+      appendLedgerSpoken('keeps', routed.entry, state.projectTitle, 'keep');
+    } else {
+      // #1643 — the favorite landed, but its implied keep could not be
+      // captured: say so on the same line the crown speaks on.
+      lostLine = plateNotCapturedLine;
     }
     // Audit S2 rider: a favorites-cap trim is no longer silent either.
-    const lines = [favDropped ? favoritesTrimCopy(favDropped) : null, crownLine].filter(Boolean);
+    const lines = [favDropped ? favoritesTrimCopy(favDropped) : null, crownLine, lostLine].filter(Boolean);
     return { favorites, keeps, keepStage, shelfHistory, ...(lines.length ? { shelfNotice: lines.join(' — ') } : {}) };
   }),
   removeFavorite: (id) => set((state) => {
@@ -902,13 +933,13 @@ export const createDavisSlice = (set) => {
    * collection with the line). Never refused, never evicting. */
   addKeep: (keep) => set((state) => {
     const entry = sanitizeFavorite({ ...keep, id: genId() });
-    if (!entry) return {};
+    if (!entry) return { shelfNotice: plateNotCapturedLine };
     const at = new Date().getTime();
     const routed = crownIntoShelf(state, entry, at);
     const shelfHistory = withShelfHistory(state, crownHistoryRecord(entry.id, routed.landed, at));
     persistKeeps(routed.keeps);
     persistStage(routed.keepStage);
-    appendToLedger('keeps', routed.entry, state.projectTitle); // #1173
+    appendLedgerSpoken('keeps', routed.entry, state.projectTitle, 'keep'); // #1173
     return {
       keeps: routed.keeps, keepStage: routed.keepStage, shelfHistory,
       ...(routed.landed === 'collection' ? { shelfNotice: ON_SHELF_COPY } : {}),
@@ -1070,7 +1101,11 @@ export const createDavisSlice = (set) => {
    */
   addPass: (rec) => set((state) => {
     const entry = sanitizeFavorite({ ...rec, id: genId() });
-    if (entry) appendToLedger('passes', entry, state.projectTitle);
+    // #1643 — a pass changes nothing on screen BY DESIGN, so a swallowed
+    // press was indistinguishable from a landed one. Both failure shapes
+    // now answer: an uncapturable plate, and a rejected/refused append.
+    if (!entry) return { shelfNotice: plateNotCapturedLine };
+    appendLedgerSpoken('passes', entry, state.projectTitle, 'pass');
     return {};
   }),
   /**
