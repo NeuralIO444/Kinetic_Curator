@@ -224,6 +224,16 @@ export function ensureEntryTrails(session, entry) {
   if (!entry.trailOwn) {
     entry.trailOwn = createDishTrailField();
     entry._trailStep = entry.sys ? entry.sys._step : 0;
+    // #1367 — a session restored from a snapshot parks each stratum's trail field by
+    // enrolment key (restoreDishSession); the first enrolment under that key adopts
+    // the parked cells + step marker instead of starting empty, and consumes the
+    // parking — a later fresh enrolment under the same key starts clean.
+    const parked = session._trailRestore && session._trailRestore.get(entry.key);
+    if (parked) {
+      entry.trailOwn.cells.set(parked.cells);
+      entry._trailStep = parked.step;
+      session._trailRestore.delete(entry.key);
+    }
   }
   return entry.trailOwn;
 }
@@ -301,4 +311,6 @@ export function clearDishTrails(session) {
   for (const e of session.entries || []) {
     if (e.trailOwn) e.trailOwn.cells.fill(0);
   }
+  // #1367 — a reseed starts a new ground: parked restore fields belong to the old one.
+  if (session._trailRestore) session._trailRestore.clear();
 }

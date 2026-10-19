@@ -143,5 +143,17 @@ export function createKinemeClock() {
       }
       return anchorMotion + (t - anchorLoop) * rate;
     },
+    // #1367 — the anchors ARE the clock's whole state (the census: a deterministic fold of
+    // recorded loop times, carried rather than re-derived). Plain numbers, JSON-safe.
+    snapshotState() {
+      return { anchorLoop, anchorMotion, rate };
+    },
+    restoreState(s) {
+      if (!s || !Number.isFinite(s.anchorLoop) || !Number.isFinite(s.anchorMotion) || !Number.isFinite(s.rate)) return false;
+      anchorLoop = s.anchorLoop;
+      anchorMotion = s.anchorMotion;
+      rate = s.rate;
+      return true;
+    },
   };
 }

@@ -53,6 +53,7 @@ import {
   resolveSeekGain, resolveBehave,
 } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
+import { snapshotParticleSystem, restoreParticleSystem } from './particlesSnapshot.mjs'; // #1367 — state snapshot (the surface lives in its own module)
 import { registerCostTier } from '../gl/costTiers.mjs';
 
 /**
@@ -333,6 +334,19 @@ export class ParticleSystem {
 
   physicsCount() {
     return this.n;
+  }
+
+  // #1367 — mid-session state snapshot/restore (see particlesSnapshot.mjs for the
+  // surface and its exclusions). Restore is atomic and fail-closed (false = refused,
+  // system untouched). The wiring init() would have done (noise, trig) is re-derived
+  // from the snapshot itself, so a restored system never needs an init() call — and
+  // must not get one: init() scatters a fresh population over the restored state.
+  snapshotState() {
+    return snapshotParticleSystem(this);
+  }
+
+  restoreState(snap) {
+    return restoreParticleSystem(this, snap, { createNoise, createScentField, resolveTrig });
   }
 
   resetPhase() {

@@ -23,6 +23,7 @@
  */
 
 import { registerCostTier } from '../costRegistry.mjs';
+import { encodeTyped, decodeTypedInto } from '../stateCodec.mjs';
 // #1304: Rust/wasm is the default step engine when it has loaded; the JS loop
 // below stays the permanent reference and the fallback for every other case.
 import { ensureFieldsWasm, getFieldsWasm, wasmBackendFor, fieldsScentStep } from './fieldsWasm.mjs';
@@ -118,7 +119,17 @@ export function createScentField(cols = SCENT_COLS, rows = SCENT_ROWS) {
     cells.fill(0);
   }
 
-  return { kind: 'scent', cols, rows, sample, deposit, gradient, step, clear };
+  // #1367 — the cells are the field's whole accumulative state (scratch is intra-step).
+  // Encoded via the state codec; restore is fail-closed and fills the existing buffer.
+  function snapshotCells() {
+    return encodeTyped(cells);
+  }
+
+  function restoreCells(rec) {
+    return decodeTypedInto(rec, cells);
+  }
+
+  return { kind: 'scent', cols, rows, sample, deposit, gradient, step, clear, snapshotCells, restoreCells };
 }
 
 registerCostTier('engine/scent-field', {

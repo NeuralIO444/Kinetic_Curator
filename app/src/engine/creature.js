@@ -515,6 +515,18 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       if (extra.length) top.items = [...top.items, ...extra];
     },
     /** #1469 — the last appended frame's wing beat (0..1 openness), or null when no moths are on stage. */
+    // #1367 — the builder's accumulative state: per-pin grow-in ages, second-pair
+    // growth, and its own frame count. (wingBeat/skeletons/poses are per-frame
+    // publications, re-earned by the next append; assetCache is derived.)
+    snapshotState() { return { ages: [...ages], pair2: [...pair2], frame }; },
+    restoreState(s) {
+      if (!s || !Array.isArray(s.ages) || !Array.isArray(s.pair2) || !Number.isInteger(s.frame) || s.frame < 0) return false;
+      if (!s.ages.every(Number.isFinite) || !s.pair2.every(Number.isFinite)) return false;
+      ages.length = 0; ages.push(...s.ages);
+      pair2.length = 0; pair2.push(...s.pair2);
+      frame = s.frame;
+      return true;
+    },
     lastWingBeat() { return wingBeat; },
     /** Phase 2 S1 — the last appended frame's skeletons in world (scene) space, per pin; null where no moth. */
     lastSkeletons() { return frameSkeletons; },
