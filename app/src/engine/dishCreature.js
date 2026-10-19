@@ -32,8 +32,21 @@
 // the same quantized density the formation rule judged) is the limb's growth target. Growth is counted
 // in frames toward that target and never runs backward in this slice: pressure 0 grows nothing (the
 // control), half pressure grows half a limb, full pressure the whole chain. Withering is slice 4.
+//
+// SLICE 4 — THE BAND'S MATERIAL + DAVIS'S BIRTH TRAITS: the dish family joins the moth's two standing
+// systems. (1) THE BAND, read as MATERIAL (the ruling: the reaction leads with material): the frame's
+// pose (engine/creaturePose.js — the same blend the moth poses by, thresholds in curator/stress.js)
+// drives the slime's body: its bodyScale plumps the drawn discs (1.10 at the Relax flourish, 0.93
+// withered) and its dim dries them — colour mixed toward the ink, the gloss core going matte. The
+// solver's declared rests do not move: a starved creature's discs shrink inside their spacing, which
+// is what starving looks like. No band on the input (every older take) = no pose = the neutral
+// material, byte-identical. (2) DAVIS'S TRAITS, stamped at birth like the moth's: the pin's
+// `dishTraits` are read ONCE when the creature is born — body scales the disc radii the compound is
+// declared from, swatch shifts the palette ranks the slime wears. A trait that changes mid-life
+// changes nothing: the stamp is the animal.
 import { solveDishLinks } from './dishLinks.mjs';
-import { hoverPose, groundTreatment } from './creature.js';
+import { hoverPose, groundTreatment, normalizeTraits } from './creature.js';
+import { creaturePose } from './creaturePose.js';
 import { attachPointsFor } from './autoAttach.js';
 import { hashU01 } from './kernel/rng.js';
 import { hexToRgb255, rgb255ToHex } from './colorHex.mjs';
@@ -59,6 +72,8 @@ export const DISH_CREATURE = Object.freeze({
   limbRootDamp: 0.75, // velocity kept per frame by a limb root (it clings)
   limbDamp: 0.88, // velocity kept per frame by a limb disc (a little whip behind the root)
   limbMass: 0.6, // a limb disc in the solve: lighter than a body disc, it is carried
+  dryMix: 0.45, // slice 4: at full wither (pose dim 0.5), the slime's colour dries this far toward the ink
+  coreMatte: 0.35, // slice 4: the gloss core's alpha floor factor — a withered slime goes matte, never fully dull
 });
 
 /** One limb's disc radii, root first (slice 3). */
@@ -79,15 +94,19 @@ export const DISH_CHAIN_RESTS = Object.freeze(
  * then the skip-one braces. Indices are the creature's own disc slots. Rests are DECLARED data, computed
  * from the radii — never latched from live positions (dishLinks' purity rule).
  */
-export function dishCompoundLinks() {
+/** The compound's links declared from a radii set (slice 4: a trait-stamped body declares its own). */
+function compoundLinks(radii) {
+  const rests = radii.slice(1).map((r, i) => (radii[i] + r) * DISH_CREATURE.restOverlap);
   const out = [];
-  for (let i = 0; i < N_DISCS - 1; i++) out.push({ a: i, b: i + 1, rest: DISH_CHAIN_RESTS[i], stiffness: 1 });
-  for (let i = 0; i < N_DISCS - 2; i++) {
-    out.push({ a: i, b: i + 2, rest: (DISH_CHAIN_RESTS[i] + DISH_CHAIN_RESTS[i + 1]) * DISH_CREATURE.braceRest, stiffness: DISH_CREATURE.braceStiffness });
+  for (let i = 0; i < radii.length - 1; i++) out.push({ a: i, b: i + 1, rest: rests[i], stiffness: 1 });
+  for (let i = 0; i < radii.length - 2; i++) {
+    out.push({ a: i, b: i + 2, rest: (rests[i] + rests[i + 1]) * DISH_CREATURE.braceRest, stiffness: DISH_CREATURE.braceStiffness });
   }
   return out;
 }
-const LINKS = dishCompoundLinks();
+export function dishCompoundLinks() {
+  return compoundLinks(DISH_RADII);
+}
 
 const easeOut = (t) => 1 - (1 - t) * (1 - t) * (1 - t);
 
@@ -106,6 +125,14 @@ function shade(hex, f) {
   return rgb255ToHex([m(c[0]), m(c[1]), m(c[2])]);
 }
 
+/** Mix two #rrggbb colours, t of the second (slice 4: the slime drying toward the ink as the band dims). */
+function mixHex(a, b, t) {
+  if (!(t > 0)) return a;
+  const ca = hexToRgb255(a); const cb = hexToRgb255(b);
+  const k = Math.min(1, t);
+  return rgb255ToHex([0, 1, 2].map((i) => Math.round(ca[i] + (cb[i] - ca[i]) * k)));
+}
+
 const TAU = Math.PI * 2;
 
 /**
@@ -113,10 +140,11 @@ const TAU = Math.PI * 2;
  * limb j's slots at N_DISCS + j*LIMB_N): the root link onto the head, then the chain. Declared data like
  * the body's — rests from the radii, never latched from live positions.
  */
-export function dishLimbLinks(limbIndex) {
+/** One limb's links declared from a head radius and a limb radii set (slice 4: trait-stamped sets). */
+function limbLinks(limbIndex, headR, limbRadii) {
   const base = N_DISCS + limbIndex * LIMB_N;
-  const rootRest = (DISH_CREATURE.headR + DISH_LIMB_RADII[0]) * DISH_CREATURE.limbRootRest;
-  const chain = DISH_LIMB_RADII.slice(1).map((r, k) => (DISH_LIMB_RADII[k] + r) * DISH_CREATURE.restOverlap);
+  const rootRest = (headR + limbRadii[0]) * DISH_CREATURE.limbRootRest;
+  const chain = limbRadii.slice(1).map((r, k) => (limbRadii[k] + r) * DISH_CREATURE.restOverlap);
   const out = [{ a: 0, b: base, rest: rootRest, stiffness: 0.9 }];
   for (let k = 0; k < LIMB_N - 1; k++) out.push({ a: base + k, b: base + k + 1, rest: chain[k], stiffness: 1 });
   // The body's own trick, reused: skip-one braces hold the chain's extension (a fold compresses a brace
@@ -127,28 +155,38 @@ export function dishLimbLinks(limbIndex) {
   out.push({ a: 0, b: base + 1, rest: (rootRest + chain[0]) * DISH_CREATURE.braceRest, stiffness: 0.7 });
   return out;
 }
+export function dishLimbLinks(limbIndex) {
+  return limbLinks(limbIndex, DISH_CREATURE.headR, DISH_LIMB_RADII);
+}
 
 /** One creature's state: the discs as a tiny particle system the D3 solver can read directly. */
-function birthState(seed, pinIndex, pin, limbDirs, sig) {
+function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits) {
+  // Slice 4 — Davis's stamp, taken once, here: body scales the radii the compound is declared from,
+  // swatch shifts the colour ranks. The defaults are exactly the unstamped animal.
+  const tr = normalizeTraits(rawTraits);
+  const radii = DISH_RADII.map((r) => r * tr.body);
+  const limbRadii = DISH_LIMB_RADII.map((r) => r * tr.body);
+  const rests = radii.slice(1).map((r, i) => (radii[i] + r) * DISH_CREATURE.restOverlap);
   const ang = hashU01(seed >>> 0, 'dishbody', pinIndex) * TAU; // the seeded direction the spine trails at birth
   const dx = Math.cos(ang); const dy = Math.sin(ang);
   const nSlots = N_DISCS + limbDirs.length * LIMB_N;
   const x = new Float64Array(nSlots); const y = new Float64Array(nSlots);
   let back = 0;
   for (let k = 0; k < N_DISCS; k++) {
-    if (k > 0) back += DISH_CHAIN_RESTS[k - 1];
+    if (k > 0) back += rests[k - 1];
     x[k] = pin.x - dx * back; y[k] = pin.y - dy * back;
   }
   for (let s = N_DISCS; s < nSlots; s++) { x[s] = pin.x; y[s] = pin.y; } // unborn limb discs wait at the pin
   const mass = new Float64Array(nSlots);
   for (let s = 0; s < nSlots; s++) mass[s] = s === 0 ? DISH_CREATURE.headMass : s < N_DISCS ? 1 : DISH_CREATURE.limbMass;
-  let links = LINKS;
+  let links = compoundLinks(radii);
   if (limbDirs.length) {
-    links = LINKS.slice();
-    for (let j = 0; j < limbDirs.length; j++) links.push(...dishLimbLinks(j));
+    links = links.slice();
+    for (let j = 0; j < limbDirs.length; j++) links.push(...limbLinks(j, radii[0], limbRadii));
   }
   return {
     pinX: pin.x, pinY: pin.y, age: 0, headingDeg: (ang * 180) / Math.PI + 180, sig, links,
+    radii, limbRadii, swatch: tr.swatch,
     limbDirs, grown: new Float64Array(limbDirs.length), // per limb: growth 0..1, toward the pressure target
     sys: {
       n: nSlots, x, y,
@@ -190,6 +228,7 @@ export function dishLimbDirs(pool, assetAttach) {
 export function createDishCreatureBuilder() {
   const states = []; // per pin: birthState() | null
   let frameBodies = []; // the last appended frame's discs, per pin: [{ x, y, r, head }] | null
+  let frame = 0; // slice 4 — the builder's own frame count (the pose's time), like the moth's: every append counts
 
   const growthOf = (st, k) => {
     const t = (st.age - k * DISH_CREATURE.stagger) / DISH_CREATURE.growFrames;
@@ -198,6 +237,7 @@ export function createDishCreatureBuilder() {
 
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
+      const myFrame = frame; frame += 1; // every resolver frame counts, even one that appends nothing
       frameBodies = [];
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
@@ -219,8 +259,15 @@ export function createDishCreatureBuilder() {
       const pick = (r) => ranked[Math.min(ranked.length - 1, Math.max(0, r))] || ink;
       // Slime's colours, all from the palette (the 4x4x4 discipline: no ad-hoc picks): the head wears the
       // most vivid swatch, the spine the next rank down; shades are derived from those two, never chosen.
-      const headBase = pick(0);
-      const bodyBase = pick(1);
+      // (Slice 4: each pin's ranks shift by its birth-stamped swatch trait — the picks happen per pin.)
+      // Slice 4 — the frame's material, from the band's pose: bodyScale plumps or starves the drawn
+      // discs, dim dries the slime (colour toward the ink, the gloss core matte). No band on the input:
+      // no pose, the neutral material — the stage is byte-identical to the pre-slice animal.
+      const pose = creaturePose({ band: input.band, stress: input.smoothed, frame: myFrame });
+      const matScale = pose ? pose.bodyScale : 1;
+      const matDim = pose ? pose.dim : 1;
+      const dryT = (1 - matDim) * DISH_CREATURE.dryMix;
+      const coreAlpha = Math.round(100 * (DISH_CREATURE.coreMatte + (1 - DISH_CREATURE.coreMatte) * matDim));
       const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
       const ground = typeof groundFor === 'function' ? groundFor(top) : null;
       // Slice 3: the host asset's L anchors for this frame. A change in the set rebirths the creature,
@@ -233,7 +280,9 @@ export function createDishCreatureBuilder() {
         const live = !!(hosted[i] && formed[i] && pin && Number.isFinite(pin.x) && Number.isFinite(pin.y));
         if (!live) { states[i] = null; frameBodies[i] = null; continue; }
         let st = states[i];
-        if (!st || st.pinX !== pin.x || st.pinY !== pin.y || st.sig !== limbSig) { st = birthState(input.seed, i, pin, limbDirs, limbSig); states[i] = st; }
+        if (!st || st.pinX !== pin.x || st.pinY !== pin.y || st.sig !== limbSig) { st = birthState(input.seed, i, pin, limbDirs, limbSig, input.dishTraits && input.dishTraits[i]); states[i] = st; }
+        const headBase = pick(st.swatch);
+        const bodyBase = pick(st.swatch + 1);
         st.age += 1;
         const sys = st.sys;
         // Born discs are alive for the solver; unborn ones wait at the head, weightless to the gate.
@@ -265,8 +314,8 @@ export function createDishCreatureBuilder() {
             const j = ((s - N_DISCS) / LIMB_N) | 0; const k = (s - N_DISCS) % LIMB_N;
             if (k === 0) {
               const d = st.limbDirs[j];
-              const ax = sys.x[0] + (d.x * cosH - d.y * sinH) * DISH_CREATURE.headR * DISH_CREATURE.anchorEmbed;
-              const ay = sys.y[0] + (d.x * sinH + d.y * cosH) * DISH_CREATURE.headR * DISH_CREATURE.anchorEmbed;
+              const ax = sys.x[0] + (d.x * cosH - d.y * sinH) * st.radii[0] * DISH_CREATURE.anchorEmbed;
+              const ay = sys.y[0] + (d.x * sinH + d.y * cosH) * st.radii[0] * DISH_CREATURE.anchorEmbed;
               sys.vx[s] = (sys.vx[s] + (ax - sys.x[s]) * DISH_CREATURE.limbRootPull) * DISH_CREATURE.limbRootDamp;
               sys.vy[s] = (sys.vy[s] + (ay - sys.y[s]) * DISH_CREATURE.limbRootPull) * DISH_CREATURE.limbRootDamp;
             } else { sys.vx[s] *= DISH_CREATURE.limbDamp; sys.vy[s] *= DISH_CREATURE.limbDamp; }
@@ -290,11 +339,12 @@ export function createDishCreatureBuilder() {
         const discs = [];
         for (let k = 0; k < N_DISCS; k++) {
           const g = growthOf(st, k);
-          discs.push({ x: sys.x[k], y: sys.y[k], r: DISH_RADII[k], head: k === 0 });
+          discs.push({ x: sys.x[k], y: sys.y[k], r: st.radii[k], head: k === 0 });
           if (g <= 0) continue;
           const base = k === 0 ? headBase : bodyBase;
-          const [color] = gt.recolor(base, ink);
-          const s = (2 * DISH_RADII[k] / 100) * g * hover.scale;
+          const [wet] = gt.recolor(base, ink);
+          const color = mixHex(wet, ink, dryT); // slice 4: the band dries the slime toward the ink
+          const s = (2 * st.radii[k] / 100) * g * hover.scale * matScale;
           const rot = k === 0 ? st.headingDeg : (Math.atan2(sys.y[k] - sys.y[k - 1], sys.x[k] - sys.x[k - 1]) * 180) / Math.PI;
           const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
             x: sys.x[k] + ox, y: sys.y[k] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
@@ -303,10 +353,10 @@ export function createDishCreatureBuilder() {
           });
           put(1.14, shade(color, 0.55), 96, 'rim');
           put(1, color, 98, 'body');
-          put(0.52, shade(color, 1.5), 100, 'core', -DISH_RADII[k] * 0.16 * g, -DISH_RADII[k] * 0.16 * g);
+          put(0.52, shade(color, 1.5), coreAlpha, 'core', -st.radii[k] * 0.16 * g, -st.radii[k] * 0.16 * g);
           if (k === 0) {
             mine.push({
-              x: sys.x[0] + Math.cos(headRad) * DISH_RADII[0] * 0.38 * g, y: sys.y[0] + Math.sin(headRad) * DISH_RADII[0] * 0.38 * g,
+              x: sys.x[0] + Math.cos(headRad) * st.radii[0] * 0.38 * g, y: sys.y[0] + Math.sin(headRad) * st.radii[0] * 0.38 * g,
               scale: s * 0.17, scaleY: s * 0.17, rotation: 0, alpha: 100,
               assetId: DISH_CREATURE.asset, color: ink, accent: ink, key: `dish:${i}:0:eye`, zTier: 0, seedOffset: 0,
               glass: false, _creature: true,
@@ -316,13 +366,14 @@ export function createDishCreatureBuilder() {
         // Slice 3 — DRAW the limbs: the same slime trio per disc (rim, body, gloss core), smaller and
         // wearing the spine's colour rank. A disc draws once growth has crossed its band, easing out.
         for (let j = 0; j < st.limbDirs.length; j++) {
-          const [lcolor] = gt.recolor(bodyBase, ink);
+          const [lwet] = gt.recolor(bodyBase, ink);
+          const lcolor = mixHex(lwet, ink, dryT);
           for (let k = 0; k < LIMB_N; k++) {
             const p = st.grown[j] * LIMB_N - k;
             if (p <= 0) continue;
             const sIdx = N_DISCS + j * LIMB_N + k;
             const g = easeOut(Math.min(1, p));
-            const s = (2 * DISH_LIMB_RADII[k] / 100) * g * hover.scale;
+            const s = (2 * st.limbRadii[k] / 100) * g * hover.scale * matScale;
             const px = k === 0 ? sys.x[0] : sys.x[sIdx - 1];
             const py = k === 0 ? sys.y[0] : sys.y[sIdx - 1];
             const rot = (Math.atan2(sys.y[sIdx] - py, sys.x[sIdx] - px) * 180) / Math.PI;
@@ -333,7 +384,7 @@ export function createDishCreatureBuilder() {
             });
             put(1.14, shade(lcolor, 0.55), 96, 'rim');
             put(1, lcolor, 98, 'body');
-            put(0.52, shade(lcolor, 1.5), 100, 'core', -DISH_LIMB_RADII[k] * 0.16 * g, -DISH_LIMB_RADII[k] * 0.16 * g);
+            put(0.52, shade(lcolor, 1.5), coreAlpha, 'core', -st.limbRadii[k] * 0.16 * g, -st.limbRadii[k] * 0.16 * g);
           }
         }
         frameBodies[i] = discs;
