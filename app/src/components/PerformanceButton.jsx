@@ -12,6 +12,8 @@ import { createFormationRecorder } from '../curator/formation.js';
 import { resetFormation, setFormationTap, setShiftTap } from '../curator/formationLive.js';
 import { createShiftRecorder } from '../curator/davisShift.js';
 import { createClockRecorder } from '../curator/clockRecord.js';
+import { createSpectrumRecorder } from '../curator/spectrumRecord.js';
+import { setSpectrumTap } from '../gl/spectrumLive.mjs';
 import { createMindRecorder } from '../curator/mindRecord.js';
 import { setMindTap, getMindSystem } from '../curator/mindLive.js';
 import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
@@ -48,6 +50,22 @@ const clockSection = (getFrame) => {
   const rec = createClockRecorder({ initialBpm: useStore.getState().beatBpm, getFrame });
   const off = useStore.subscribe((s, prev) => { if (s.beatBpm !== prev.beatBpm) rec.set(s.beatBpm); });
   return { stop() { off(); return rec.finish(); } };
+};
+
+// #1534 — the take carries its spectrum (decision 2 of the spectral path): every live spectrum step offers
+// its smoothed bins to the recorder, annotated by the take's frame. Stored as `spectrum` — but only when
+// the marks were up for at least one frame (any of SCALE / DISPLACE / COLOUR above 0, read from the same
+// layout params the loop resolves with). Dials at 0 for the whole take: no section, the file unchanged.
+const spectrumSection = (getFrame) => {
+  const rec = createSpectrumRecorder({ getFrame });
+  const audible = () => {
+    const lp = useStore.getState().layoutParams || {};
+    return (Number(lp.spectrumScale) || 0) + (Number(lp.spectrumDisplace) || 0) + (Number(lp.spectrumColour) || 0) > 0;
+  };
+  rec.note(audible());
+  setSpectrumTap((state) => rec.sample(state.smooth));
+  const off = useStore.subscribe(() => rec.note(audible()));
+  return { stop() { setSpectrumTap(null); off(); return rec.finish(); } };
 };
 
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
@@ -98,7 +116,7 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection, mind: mindSection } })) { setFrames(0); setRecording(true); }
+      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection, mind: mindSection, spectrum: spectrumSection } })) { setFrames(0); setRecording(true); }
       return;
     }
     setRecording(false);

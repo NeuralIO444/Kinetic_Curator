@@ -42,6 +42,7 @@ import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: th
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
+import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
@@ -201,8 +202,9 @@ function AppInner() {
       },
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
-    setPlaybackFrameTap((frame, perf, o) => replayMindFrame(frame, perf && perf.mind, o));
-    const offPlayback = subscribePlayback(() => { endMindReplay(); resetMindFaces(); resetGhost(); }); // a take starts or ends: fresh faces
+    // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
+    setPlaybackFrameTap((frame, perf, o) => { replayMindFrame(frame, perf && perf.mind, o); replaySpectrumFrame(frame, perf && perf.spectrum, o); });
+    const offPlayback = subscribePlayback(() => { endMindReplay(); endSpectrumReplay(); resetMindFaces(); resetGhost(); }); // a take starts or ends: fresh faces
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({

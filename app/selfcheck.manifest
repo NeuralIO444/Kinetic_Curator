@@ -435,6 +435,7 @@ node src/curator/setLive.selfcheck.mjs
 node src/gl/routesStartEmpty.selfcheck.mjs
 node src/hooks/motionMeterTap.selfcheck.mjs
 node src/curator/clockRecord.selfcheck.mjs
+node src/curator/spectrumRecord.selfcheck.mjs
 node src/gl/playback.selfcheck.mjs
 node src/gl/masterGain.selfcheck.mjs
 node src/curator/mind.selfcheck.mjs

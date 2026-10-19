@@ -263,7 +263,7 @@ await ok('wired: a take records the mind section and playback replays it', () =>
   assert.match(btn, /mind: mindSection/);
   const app = src('../App.jsx');
   assert.match(app, /isReplaying: isPlaybackActive/);
-  assert.match(app, /setPlaybackFrameTap\(\(frame, perf, o\) => replayMindFrame\(frame, perf && perf\.mind, o\)\)/);
+  assert.match(app, /setPlaybackFrameTap\(\(frame, perf, o\) => \{ replayMindFrame\(frame, perf && perf\.mind, o\); replaySpectrumFrame\(frame, perf && perf\.spectrum, o\); \}\)/);
   for (const e of ['MIND_REQUEST', 'MIND_STATUS']) assert.ok(EVENT_REGISTRY[e], `${e} is registered`);
 });
 
