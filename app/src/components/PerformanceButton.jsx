@@ -3,7 +3,7 @@
 // downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); `▶ take` plays one back
 // through the instrument (#1461). The frame count in the tooltip is a measurement, read from the recorder.
 import { useEffect, useRef, useState } from 'react';
-import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance } from '../gl/performanceCapture.mjs';
+import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance, startRetroCapture, saveRetroPerformance } from '../gl/performanceCapture.mjs';
 import { unpackPerformance } from '../gl/performanceFile.mjs';
 import { startPlayback, stopPlayback, isPlaybackActive, subscribePlayback } from '../gl/playback.mjs';
 import { getStressState, setStressTap } from '../curator/stressLive.js';
@@ -96,6 +96,16 @@ export function PerformanceButton() {
   const [playNote, setPlayNote] = useState('');
   const fileRef = useRef(null);
   useEffect(() => subscribePlayback(() => setPlaying(isPlaybackActive())), []);
+  // #1367 — retroactive capture is always on: the ring starts with the footer and keeps the
+  // last minutes, so a moment can be saved after it happens. A deliberate take suspends it
+  // (performanceCapture restarts it on the take's fresh scene).
+  const [retroNote, setRetroNote] = useState('');
+  useEffect(() => { startRetroCapture(); }, []);
+  const onRetro = async () => {
+    const take = await saveRetroPerformance(3);
+    if (take) { downloadBytes(take.bytes, take.filename); setRetroNote(''); }
+    else setRetroNote('Nothing to save yet: give the ring a few seconds of playing first.');
+  };
   const onFile = async (e) => {
     const file = e.target.files && e.target.files[0];
     e.target.value = '';
@@ -149,6 +159,15 @@ export function PerformanceButton() {
         onClick={() => { if (playing) { stopPlayback(); setPlayNote(''); } else if (fileRef.current) fileRef.current.click(); }}
       >
         {playing ? '■ take' : '▶ take'}
+      </button>
+      <button
+        type="button"
+        className="perf-btn retro"
+        disabled={recording || playing}
+        title={retroNote || 'Save the last 3 minutes as a take: it begins from a snapshot inside the session and replays to the same frames.'}
+        onClick={onRetro}
+      >
+        ↺ last 3m
       </button>
       <input ref={fileRef} type="file" accept=".kcperf,application/gzip" onChange={onFile} style={{ display: 'none' }} aria-label="Load a take" />
     </>

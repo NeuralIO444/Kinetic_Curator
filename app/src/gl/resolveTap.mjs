@@ -153,6 +153,43 @@ export function getDishPressure() {
   }
 }
 
+let swapListener = null;
+
+/**
+ * #1367 — register the one resolver-SWAP listener (or null): it fires whenever withResolveTap replaces
+ * the inner resolver (a requested reset, a playback rewind), BEFORE the next frame is resolved by the
+ * new one. A listener that carries resolver history (the retroactive capture ring) clears itself here:
+ * a snapshot taken from the old resolver can never seed a take across the swap. Same rule as the other
+ * taps: a throwing listener is dropped, never fatal.
+ */
+export function setResolverSwapListener(fn) {
+  const prev = swapListener;
+  swapListener = typeof fn === 'function' ? fn : null;
+  return prev;
+}
+
+function notifyResolverSwap() {
+  if (swapListener === null) return;
+  try {
+    swapListener();
+  } catch (e) {
+    swapListener = null;
+    console.warn('[resolveTap] swap listener threw and was removed:', e && e.message ? e.message : e);
+  }
+}
+
+let snapshotter = null;
+
+/** #1367 — a snapshot of the live resolver's state, or null when no loop is running / it cannot. */
+export function snapshotLiveResolver() {
+  if (snapshotter === null) return null;
+  try {
+    return snapshotter();
+  } catch {
+    return null;
+  }
+}
+
 let resetRequested = false;
 
 /**
@@ -173,6 +210,8 @@ export function requestResolverReset() {
 export function withResolveTap(createResolver) {
   if (typeof createResolver !== 'function') throw new TypeError('[resolveTap] withResolveTap needs the resolver factory');
   let inner = createResolver();
+  // #1367 — snapshot whoever is current: the delegate reads `inner` at call time, so it follows swaps.
+  snapshotter = () => (inner && typeof inner.snapshotState === 'function' ? inner.snapshotState() : null);
   return {
     resolveLayers(liveInput) {
       // #1461 step 2 — playing a take: the recorded input replaces the live one, one per resolved frame. After a seek
@@ -185,6 +224,7 @@ export function withResolveTap(createResolver) {
           if (typeof inner.dispose === 'function') inner.dispose();
           inner = createResolver();
           resetRequested = false;
+          notifyResolverSwap();
           for (const f of pb.catchUp) inner.resolveLayers(f);
         }
       }
@@ -192,6 +232,7 @@ export function withResolveTap(createResolver) {
         resetRequested = false;
         if (typeof inner.dispose === 'function') inner.dispose();
         inner = createResolver();
+        notifyResolverSwap();
       }
       if (!pb) tapResolveInput(input); // a take being played is never re-recorded
       const output = inner.resolveLayers(input);
