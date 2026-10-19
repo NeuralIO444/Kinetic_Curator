@@ -172,4 +172,81 @@ function session(frames, opts = {}) {
   assert.equal(verifyPerformance(await unpackPerformance(bytes)).ok, true, 'and a full minute replays to every checkpoint');
 }
 
+// 8. #1367 — a take that begins mid-session: the initialState section (snapshot + chain seed) verifies
+{
+  // Drive one resolver directly, feeding two recorders the same frames: A from launch, B from a snapshot
+  // boundary at frame 60, its chain seeded with A's chain value at that boundary.
+  const stable = {
+    canvasW: 1000, canvasH: 700,
+    layers: [L('lyr-a'), L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }), L('fx', { type: 'fx' }), L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })],
+    activeLayerId: 'lyr-a', layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) }, seed: 1234, seedOffsets: null,
+    paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
+    customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1,
+    alphaBoost: 0, effectiveScaleY: undefined, phraseWrapGen: 0, reducedMotion: false,
+  };
+  let params = lp({ mode: 'swarm', behave: 'scatter' });
+  const resolver = createLiveResolver();
+  const a = createPerformanceRecorder({ checkpointEvery: 10 });
+  let b = null;
+  let t = 0;
+  const FRAMES = 130, AT = 60;
+  for (let f = 0; f < FRAMES; f++) {
+    const dt = DT_MS[f % DT_MS.length];
+    t += dt;
+    if (f === 90) params = { ...params, count: 320 };
+    const input = {
+      ...stable, layoutParams: params, seed: 1234,
+      effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)], effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
+      attractor: f % 40 < 20 ? { x: 400 + (f % 7), y: 300, strength: 1 } : null,
+      loopTimeMs: t, dtSec: dt / 1000,
+    };
+    if (f === AT) {
+      b = createPerformanceRecorder({
+        checkpointEvery: 10,
+        initialState: { atFrame: AT, chainSeed: a.chainValue(), snapshot: resolver.snapshotState() },
+      });
+    }
+    a.onInput(input); if (b) b.onInput(input);
+    const out = resolver.resolveLayers(input);
+    a.onOutput(out); if (b) b.onOutput(out);
+  }
+  resolver.dispose();
+
+  const perfA = a.finish();
+  assert.ok(!('initialState' in perfA), 'a from-launch take carries no initialState section');
+  assert.equal(verifyPerformance(perfA).ok, true, 'the from-launch take still verifies');
+
+  const perfB = b.finish();
+  assert.equal(perfB.initialState.atFrame, AT);
+  assert.equal(perfB.frames, 61, 'B ends on its last checkpoint (70 frames fed, every 10)');
+  const vB = verifyPerformance(perfB);
+  assert.equal(vB.ok, true, 'the mid-session take verifies from its snapshot');
+  assert.equal(vB.checked, perfB.checkpoints.length, 'every B checkpoint was compared');
+  // the seeded chain is continuous with the live one: B's checkpoints ARE A's chain at the same absolute frames
+  for (const c of perfB.checkpoints) {
+    const abs = perfA.checkpoints.find((x) => x.frame === AT + c.frame);
+    assert.equal(c.hash, abs.hash, `B checkpoint at rel ${c.frame} continues A's chain at absolute ${AT + c.frame}`);
+  }
+  // the section survives the file itself: pack → unpack → verify
+  const backB = await unpackPerformance(await packPerformance(perfB));
+  assert.equal(verifyPerformance(backB).ok, true, 'the mid-session take verifies after a file round-trip');
+  // a wrong seed is caught at B's first checkpoint
+  const badSeed = JSON.parse(JSON.stringify(perfB));
+  badSeed.initialState.chainSeed = (badSeed.initialState.chainSeed[0] === '0' ? '1' : '0') + badSeed.initialState.chainSeed.slice(1);
+  const vBad = verifyPerformance(badSeed);
+  assert.equal(vBad.ok, false);
+  assert.equal(vBad.firstMismatchFrame, 0, 'a wrong seed fails at the first checkpoint');
+  // a tampered snapshot is refused at restore — fail closed, never replayed
+  const forged = JSON.parse(JSON.stringify(perfB));
+  const layerId = Object.keys(forged.initialState.snapshot.swarm)[0];
+  forged.initialState.snapshot.swarm[layerId].system.cols.x.b64 = 'AAAA';
+  assert.throws(() => verifyPerformance(forged), /refused/, 'a tampered snapshot refuses verification');
+  // malformed sections are refused at validation, and the recorder refuses one up front
+  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: -1, chainSeed: perfB.initialState.chainSeed, snapshot: perfB.initialState.snapshot } }), /atFrame/);
+  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot } }), /chainSeed/);
+  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: AT, chainSeed: perfB.initialState.chainSeed, snapshot: null } }), /snapshot/);
+  assert.throws(() => createPerformanceRecorder({ initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot } }), /chainSeed/);
+  console.log('  [ok] #1367 mid-session take: snapshot + seeded chain verifies, round-trips, and fails closed');
+}
+
 console.log('performanceFile.selfcheck: ok (#1353 step 3)');
