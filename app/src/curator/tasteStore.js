@@ -2,6 +2,7 @@
 // project files. A module holder (not the zustand store) so curate.js can read
 // it without an import cycle; globalSlice mirrors a summary for the UI.
 import { validateTaste, clearRetrainNudge } from './tasteHead.js';
+import { noteSessionOnly } from '../state/sessionOnly.mjs';
 
 export const TASTE_KEY = 'kc:taste:v1';
 
@@ -30,7 +31,8 @@ export function importTaste(raw) {
   try {
     localStorage.setItem(TASTE_KEY, JSON.stringify(r.taste));
   } catch {
-    // private window / quota: the session still curates with it, it just won't be remembered.
+    // #1641: the session still curates with it — and now says it won't be remembered.
+    noteSessionOnly();
   }
   clearRetrainNudge(); // #925 — a fresh import re-baselines the retrain nudge
   return { ok: true, taste: r.taste };
@@ -41,6 +43,8 @@ export function clearTaste() {
   try {
     localStorage.removeItem(TASTE_KEY);
   } catch {
-    // deliberately silent
+    // #1641: was "deliberately silent" — a refused remove means the
+    // cleared taste can resurrect next boot, and that is said out loud.
+    noteSessionOnly();
   }
 }

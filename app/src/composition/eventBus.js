@@ -58,6 +58,16 @@ const pending = { beat: [], bar: [] };
 export const PENDING_CAP = 64;
 
 /**
+ * #1641 — events the cap has eaten, counted. The cap is right (a
+ * stopped clock must not grow a queue without bound), but the drops
+ * used to leave no trace even in the bus's own record. Backstage
+ * data — a counter for the DEV/census surface, not a performer line.
+ * Reset by clearPending (a fresh take starts a fresh count).
+ */
+let dropsPastCap = 0;
+export function droppedPastCap() { return dropsPastCap; }
+
+/**
  * @param unit 'beat' | 'bar'
  * @returns false when the unit is unknown (nothing queued)
  */
@@ -65,7 +75,7 @@ export function emitOn(unit, event, payload, opts = {}) {
   const q = pending[unit];
   if (!q) return false;
   q.push({ event, payload, opts: { ...opts, quantized: unit } });
-  while (q.length > PENDING_CAP) q.shift();
+  while (q.length > PENDING_CAP) { q.shift(); dropsPastCap++; }
   return true;
 }
 
@@ -81,6 +91,7 @@ export function releaseTick(unit) {
 /** Drop everything waiting (tests, a fresh take). */
 export function clearPending() {
   pending.beat.length = 0; pending.bar.length = 0;
+  dropsPastCap = 0; // #1641: a fresh take starts a fresh count
 }
 
 export function once(event, fn) {

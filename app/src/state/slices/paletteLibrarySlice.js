@@ -1,6 +1,7 @@
 // User palette library (#55) + palette FADE seconds (#278).
 // FADE is a feel pref, not project JSON.
 import { getCatalogPalette, normalizeHex } from '../../data/palettes.js';
+import { noteSessionOnly } from '../sessionOnly.mjs';
 import { validWeights } from '../../data/swatchWeights.js';
 import { sanitizeMixSeconds, MIX_DEFAULT } from '../../gl/paletteMix.mjs';
 
@@ -51,8 +52,8 @@ function readStored() {
 function persist(list) {
   try {
     localStorage.setItem(USER_PALETTES_KEY, JSON.stringify(list));
-  } catch (e) {
-    console.warn('[palette library] save failed', e);
+  } catch {
+    noteSessionOnly(); // #1641: was console.warn only — the console is not a surface
   }
 }
 

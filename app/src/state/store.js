@@ -10,6 +10,7 @@ import { createPaletteLibrarySlice } from './slices/paletteLibrarySlice.js';
 import { createVoiceSlice } from './slices/voiceSlice.js';
 import { createMidiSlice } from './slices/midiSlice.js';
 import { createMathMacrosSlice } from './slices/mathMacrosSlice.js';
+import { onSessionOnly } from './sessionOnly.mjs';
 
 export const useStore = create((set, get) => ({
   ...createAudioSlice(set, get),
@@ -23,6 +24,11 @@ export const useStore = create((set, get) => ({
   ...createMidiSlice(set, get),
   ...createMathMacrosSlice(set, get),
 }));
+
+// #1641 — the session-only tuning flag: when any of the small
+// persist surfaces (sessionOnly.mjs) reports that storage refused,
+// the store mirrors it beside persistStatus for MasterBar.
+onSessionOnly(() => useStore.setState({ tuningSessionOnly: true }));
 
 // Test hook (#964): e2e sets `window.__KC_EXPOSE_STORE = true` in an init
 // script so Playwright can read roll-scope and roll state through

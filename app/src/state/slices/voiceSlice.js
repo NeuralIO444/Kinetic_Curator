@@ -23,6 +23,7 @@ import {
   VOICE_SWATCH_COUNT,
 } from '../../data/voices.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
+import { noteSessionOnly } from '../sessionOnly.mjs';
 import { stackOf, expandStack } from '../recipeStack.js'; // #1153: a voice can carry the layer stack
 import { EARNED_SLOTS, isEarned, earnedName, earnedCaption, mintEarned, sanitizeEarned } from '../earnedVoices.js';
 import { loopClock } from '../../gl/loopClock.js';
@@ -94,19 +95,25 @@ function readStored() {
     const raw = ls.getItem(USER_VOICES_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return (Array.isArray(parsed) ? parsed : []).map(sanitizeUserVoice).filter(Boolean);
+    const list = Array.isArray(parsed) ? parsed : [];
+    const kept = list.map(sanitizeUserVoice).filter(Boolean);
+    // #1641: stored voices that no longer read were dropped uncounted;
+    // the loss is reported on the shared flag, like every refusal here.
+    if (kept.length < list.length) noteSessionOnly();
+    return kept;
   } catch {
+    noteSessionOnly(); // #1641: a refused or unreadable read is not an empty shelf
     return [];
   }
 }
 
 function persist(list) {
   const ls = storage();
-  if (!ls) return;
+  if (!ls) { noteSessionOnly(); return; } // #1641: no storage at all is still a refusal worth saying
   try {
     ls.setItem(USER_VOICES_KEY, JSON.stringify(list));
-  } catch (e) {
-    console.warn('[voices] save failed', e);
+  } catch {
+    noteSessionOnly(); // #1641: was console.warn only — the console is not a surface
   }
 }
 

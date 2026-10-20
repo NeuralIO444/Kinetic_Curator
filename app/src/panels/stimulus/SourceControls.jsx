@@ -32,7 +32,7 @@ function LootAudioPick() {
   );
 }
 
-export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, audioSidecar, audioSidecarNote, audioLost = null }) {
+export function SourceControls({ audioSource, audioLastFile, audioGain, audioMonitor, devices, devicesError = false, audioSidecar, audioSidecarNote, audioLost = null }) {
   const status = sourceStatus(audioSource, audioSidecar, audioSidecarNote);
   // UX-7: the last loaded file survives a switch to mic (the store stashes
   // it instead of revoking the URL), so the dropdown's File: option can
@@ -99,6 +99,13 @@ export function SourceControls({ audioSource, audioLastFile, audioGain, audioMon
         {selectedInputMissing(audioSource, devices) && <option value={audioSource.id}>(not connected)</option>}
         {fileOpt && fileOpt.url && <option value="file">File: {fileOpt.name}</option>}
       </select>
+
+      {devicesError && (
+        <div className="stim-source-status" role="alert" title="The browser would not list the audio inputs.">
+          <span className="stim-source-tag">NO LIST</span>
+          <span>audio inputs unavailable</span>
+        </div>
+      )}
 
       {audioLost && (
         <div className="stim-source-status" role="alert" title="The chosen input is gone. Switch AUDIO on to reconnect it; KC-1 never switches to a different input by itself.">

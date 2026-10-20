@@ -10,6 +10,20 @@ import {
   getBiologyPolicy, importBiologyPolicy, resetBiologyPolicy, exportBiologyPolicy,
 } from './policy.js';
 import { assessAggregate, decideLifecycle, fadeForAge } from './lifecycle.js';
+import { sessionOnlyNoted } from '../state/sessionOnly.mjs';
+
+// ── #1641: a refused policy persist reports on the shared flag ──
+{
+  assert.strictEqual(sessionOnlyNoted(), false, 'nothing noted yet');
+  globalThis.localStorage = {
+    getItem: () => null,
+    setItem: () => { throw new Error('private mode'); },
+    removeItem: () => {},
+  };
+  assert.ok(importBiologyPolicy(defaultBiologyPolicy()).ok, 'the policy still imports for the session');
+  assert.strictEqual(sessionOnlyNoted(), true, 'the refusal is on the shared session-only flag, not only a comment');
+  delete globalThis.localStorage;
+}
 import {
   ensureAggregate, cellsPerTick, liveCount, liveCell, GrowthHooks,
 } from '../engine/kernel/sample/growth.js';

@@ -36,6 +36,7 @@ export function StimulusPanel() {
   } = state;
 
   const [devices, setDevices] = useState([]);
+  const [devicesError, setDevicesError] = useState(false); // #1641: the list failed to load — the row says why
 
   // #1053: keep the list current. A device plugged in after the panel opened
   // used to be missing until a reload, and an unplugged one stayed listed.
@@ -44,7 +45,9 @@ export function StimulusPanel() {
     if (!md) return undefined;
     let alive = true;
     const refresh = () => {
-      md.enumerateDevices().then(devs => { if (alive) setDevices(audioInputs(devs)); }).catch(() => {});
+      md.enumerateDevices()
+        .then(devs => { if (alive) { setDevices(audioInputs(devs)); setDevicesError(false); } })
+        .catch(() => { if (alive) setDevicesError(true); }); // #1641: was .catch(() => {}) — an empty list with no reason
     };
     refresh();
     md.addEventListener?.('devicechange', refresh);
@@ -102,6 +105,7 @@ export function StimulusPanel() {
               audioSidecarNote={audioSidecarNote}
               audioLost={audioLost}
               devices={devices}
+              devicesError={devicesError}
             />
           )}
 

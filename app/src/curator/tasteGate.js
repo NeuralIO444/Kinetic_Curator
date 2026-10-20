@@ -6,6 +6,8 @@
 // every readout says "experimental" for as long as it does. It exists so a thin first model can be felt and iterated
 // on without lowering the bar for anyone else. A head that is not even positively correlated (fidelity <= 0) never
 // steers, switch or no switch: that would be noise wearing a taste's name.
+import { noteSessionOnly } from '../state/sessionOnly.mjs';
+
 export const EXPERIMENTAL_KEY = 'kc:taste:experimental:v1';
 
 function read() {
@@ -28,7 +30,8 @@ export function setExperimental(value) {
     if (on) localStorage.setItem(EXPERIMENTAL_KEY, '1');
     else localStorage.removeItem(EXPERIMENTAL_KEY);
   } catch {
-    // private window / quota: the switch still holds for this session
+    // #1641: the switch still holds for this session — and says it will revert at reload.
+    noteSessionOnly();
   }
   return on;
 }
