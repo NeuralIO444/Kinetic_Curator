@@ -30,6 +30,7 @@ node src/panels/pipeline/paletteImportCopy.selfcheck.mjs
 node src/panels/pipeline/pipelineNotices.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
+node src/hooks/governorCreatureShed.selfcheck.mjs
 node src/hooks/governorHostileScene.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
 node src/hooks/usePhraseLoop.selfcheck.mjs
@@ -88,6 +89,7 @@ node src/engine/kernel/purity.selfcheck.mjs
 node src/engine/kernel/worker/kernelWorker.selfcheck.mjs
 node src/engine/kernel/beatChoreo.selfcheck.mjs
 node src/state/projectDocument.selfcheck.mjs
+node src/state/poolCitizenship.selfcheck.mjs
 node src/state/shelfPersist.selfcheck.mjs
 node src/state/sessionOnly.selfcheck.mjs
 node src/state/allEraGolden.selfcheck.mjs
@@ -283,6 +285,7 @@ node src/gl/tintInject.selfcheck.mjs
 node src/gl/exportStill.selfcheck.mjs
 node src/gl/phase6.selfcheck.mjs
 node src/gl/costTiers.selfcheck.mjs
+node src/engine/kernel/creatureCost.selfcheck.mjs
 node src/gl/governorEventLog.selfcheck.mjs
 node src/assets/ingest.selfcheck.mjs
 node src/assets/gradient.selfcheck.mjs
