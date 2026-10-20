@@ -150,13 +150,20 @@ async function appendToAppData(kind, line) {
 
 /**
  * Append one record to a ledger. Returns the row written, or null when the
- * record has no usable seed. A storage failure is reported, never swallowed.
- * `opts.storage` / `opts.fileSink` are for selfcheck; the app uses defaults.
+ * record has no usable seed (or no timestamp — a ledger line without one is
+ * a weaker label than the ledger promises). A storage failure is reported
+ * to BOTH the warn channel and `opts.report` — never swallowed, never only
+ * warned. `opts.report(why)` hears the outcome: 'rejected' | 'storage' |
+ * 'saved'. The row still returns when the local save failed (the desktop
+ * mirror may yet land it); a null return always means nothing was written.
+ * `opts.storage` / `opts.fileSink` / `opts.warn` are for selfcheck; the app
+ * uses defaults.
  */
 export function appendToLedger(kind, rec, projectRef, opts = {}) {
   if (!LEDGER_KINDS.includes(kind)) throw new Error(`unknown ledger: ${kind}`);
+  const report = opts.report || (() => {});
   const row = ledgerRow(rec, projectRef);
-  if (!row) return null;
+  if (!row) { report('rejected'); return null; }
   const line = serializeRow(row);
   const storage = 'storage' in opts ? opts.storage : defaultStorage();
   const warn = opts.warn || ((m, e) => console.warn(m, e));
@@ -164,9 +171,13 @@ export function appendToLedger(kind, rec, projectRef, opts = {}) {
     try {
       const key = LEDGER_STORAGE_KEYS[kind];
       storage.setItem(key, (storage.getItem(key) || '') + line);
+      report('saved');
     } catch (e) {
       warn(`[ledger] ${kind}: local save failed — export the ledgers from PIPELINE`, e);
+      report('storage');
     }
+  } else {
+    report('saved');
   }
   const sink = 'fileSink' in opts ? opts.fileSink : (isTauri() ? appendToAppData : null);
   if (sink) {

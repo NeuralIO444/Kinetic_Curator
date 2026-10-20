@@ -70,6 +70,20 @@ export const shelfLoadLine = (one, many, loss) => {
  * failure episode (the episode ends at the next successful save). */
 export const shelfSaveLine = (label) => `${label} did not save — storage refused the write`;
 
+/** #1643 — the press lines: a taste label that did not land answers at
+ * press time, on the same shelfNotice surface.
+ *
+ * plateNotCapturedLine — the plate itself could not be captured, so the
+ * press had nothing to record (F, J, and X share the capture).
+ * ledgerNotRecordedLine — the record was rejected at the ledger door
+ * (no usable seed or timestamp); per-press, because it is a fact about
+ * this press. noun is 'keep' or 'pass'.
+ * ledgerSaveLine — the ledger's own storage write was refused; once per
+ * ledger episode (#1642's throttle law), kind is 'keeps' or 'passes'. */
+export const plateNotCapturedLine = "this plate can't be kept";
+export const ledgerNotRecordedLine = (noun) => `that ${noun} was not recorded`;
+export const ledgerSaveLine = (kind) => `the ${kind} ledger would not save — export from PIPELINE`;
+
 /**
  * Spec §2.2: the collection's soft bound. In K1 it is soft in fact — past
  * it, keeps still land; the bound only becomes an export trigger in K3,

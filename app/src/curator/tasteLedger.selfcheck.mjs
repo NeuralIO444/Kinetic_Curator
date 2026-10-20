@@ -179,4 +179,81 @@ await ok('wiring: X is bound in App.jsx and documented on the help line', () => 
   assert.match(help, /key: 'J', desc: 'Keep/);
 });
 
+// ── #1643: a lost label answers at press time ─────────────────────────
+// The append reports its outcome; the three doors speak through the
+// slice's notice drain — a refused ledger save once per episode, a
+// rejected record per press, an uncapturable plate per press.
+const withLedgerKeysBlocked = (fn) => {
+  const plain = globalThis.localStorage;
+  const keys = new Set(Object.values(LEDGER_STORAGE_KEYS));
+  const ctl = { blocked: true };
+  globalThis.localStorage = {
+    getItem: (k) => plain.getItem(k),
+    setItem: (k, v) => { if (ctl.blocked && keys.has(k)) throw new Error('denied'); plain.setItem(k, v); },
+    removeItem: (k) => plain.removeItem(k),
+  };
+  try { fn(ctl); } finally { globalThis.localStorage = plain; }
+};
+
+await ok('#1643: appendToLedger reports rejected / storage / saved — its returns do not change', () => {
+  const seen = [];
+  const report = (w) => seen.push(w);
+  const good = { getItem: () => null, setItem: () => {} };
+  assert.ok(appendToLedger('keeps', rec(1), '', { storage: good, fileSink: null, report }));
+  assert.deepEqual(seen, ['saved']);
+  seen.length = 0;
+  assert.strictEqual(appendToLedger('keeps', { seed: NaN, timestamp: 't' }, '', { storage: good, fileSink: null, report }), null);
+  assert.deepEqual(seen, ['rejected']);
+  seen.length = 0;
+  const bad = { getItem: () => '', setItem: () => { throw new Error('denied'); } };
+  assert.ok(appendToLedger('keeps', rec(2), '', { storage: bad, fileSink: null, warn: () => {}, report }),
+    'the row still returns when the local save fails — the desktop mirror may yet land it');
+  assert.deepEqual(seen, ['storage']);
+});
+
+await ok('#1643: a blocked ledger save answers at the J press — once per episode', () => {
+  reset();
+  withLedgerKeysBlocked((ctl) => {
+    const a = boot();
+    a.call('addKeep', rec(501));
+    assert.equal(a.get().keeps.length, 1, 'the keep lands on the shelf');
+    assert.equal(lines('keeps').length, 0, 'but the training line does not exist');
+    assert.ok((a.get().shelfNotice || '').includes('the keeps ledger would not save — export from PIPELINE'), 'and the press says so');
+    a.call('setShelfNotice', null);
+    a.call('addKeep', rec(502));
+    assert.equal(a.get().shelfNotice, null, 'the same episode does not nag');
+    ctl.blocked = false;
+    a.call('addKeep', rec(503));
+    assert.equal(lines('keeps').length, 1, 'recovery: appends land again (and close the episode)');
+  });
+});
+
+await ok('#1643: F with a blocked ledger — the favorite lands, the lost label speaks', () => {
+  reset();
+  withLedgerKeysBlocked((ctl) => {
+    const a = boot();
+    a.call('addFavorite', rec(601));
+    assert.equal(a.get().favorites.length, 1, 'the favorite lands');
+    assert.equal(a.get().keeps.length, 1, 'the implied keep lands too');
+    assert.equal(lines('keeps').length, 0, 'only the ledger line is missing');
+    assert.ok((a.get().shelfNotice || '').includes('the keeps ledger would not save — export from PIPELINE'));
+    ctl.blocked = false;
+    a.call('addKeep', rec(602)); // close the episode for later blocks
+  });
+});
+
+await ok("#1643: an uncapturable plate and a rejected record answer at the press", () => {
+  reset();
+  const a = boot();
+  a.call('addPass', { seed: NaN, timestamp: 't' });
+  assert.equal(a.get().shelfNotice, "this plate can't be kept", 'X on an unsanitizable plate says so');
+  assert.equal(lines('passes').length, 0);
+  a.call('addPass', { seed: 777, config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  assert.equal(a.get().shelfNotice, 'that pass was not recorded', 'a capture with no timestamp is rejected at the ledger door — and says so');
+  assert.equal(lines('passes').length, 0, 'still nothing in the passes ledger');
+  a.call('addKeep', { seed: NaN });
+  assert.equal(a.get().shelfNotice, "this plate can't be kept", 'J on an unsanitizable plate says so');
+  assert.equal(a.get().keeps.length, 0, 'and nothing landed');
+});
+
 console.log(`tasteLedger selfcheck: ${passed} ok`);
