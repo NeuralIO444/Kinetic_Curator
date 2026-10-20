@@ -70,6 +70,11 @@ export const STAGE_KEY = 'kc:keeps-stage:v1';
  * cached on the records themselves (stagedCount / lastStagedAt). */
 export const SHELF_HISTORY_KEY = 'kc:keeps-history:v1';
 const SHELF_HISTORY_MAX = 1000;
+/** #1645 — the history cap sheds silently no longer: a companion
+ * counter totals every record the cap has ever trimmed (at append
+ * time and at the boot load), persisted beside the history and shown
+ * by the census shelf readout. */
+export const SHELF_HISTORY_SHED_KEY = 'kc:keeps-history-shed:v1';
 /** #719 — cap on a kept cast (ids, not the full enabled map). */
 export const FAVORITE_CAST_MAX = 256;
 
@@ -227,7 +232,7 @@ function quarantineShelfRaw(key, raw, reason) {
 }
 /** Read one stored shelf part with its losses accounted. `load` maps the
  * parsed array to the loaded list; anything left behind is reported. */
-function readShelfPart(key, one, many, load) {
+function readShelfPart(key, one, many, load, capOf) {
   let raw;
   try {
     raw = localStorage.getItem(key);
@@ -250,7 +255,11 @@ function readShelfPart(key, one, many, load) {
     return null;
   }
   const loaded = load(parsed);
-  const dropped = parsed.length - loaded.length;
+  // #1645 — a loader whose cap trimmed says so via capOf: those
+  // records WERE read, then shed by the cap, and they belong to the
+  // cap's own counter — not to this "could not be read" loss.
+  const capDropped = typeof capOf === 'function' ? capOf() : 0;
+  const dropped = parsed.length - loaded.length - capDropped;
   if (dropped > 0) {
     quarantineShelfRaw(key, raw, `${dropped} stored record(s) could not be read`);
     noteLoadLoss(one, many, { dropped });
@@ -278,6 +287,16 @@ function noteLedgerFailure(kind) {
 }
 function noteLedgerSuccess() { ledgerEpisodeOpen = false; }
 function drainPersistLine(partial) {
+  // #1645 — an update that appended history carries the cap's trims
+  // into the counter: the total moves with the update that caused it
+  // and persists alongside. A refused counter write pushes the shelf's
+  // failure line into this same update via notePersistFailure.
+  if (partial && typeof partial === 'object' && pendingHistoryShed > 0 && partial.shelfHistory !== undefined) {
+    historyShedTotal += pendingHistoryShed;
+    pendingHistoryShed = 0;
+    partial = { ...partial, shelfHistoryShed: historyShedTotal };
+    persistHistoryShed(historyShedTotal);
+  }
   if (!pendingNoticeLines.length || !partial || typeof partial !== 'object') return partial;
   const lines = pendingNoticeLines.splice(0).join(' — ');
   return { ...partial, shelfNotice: partial.shelfNotice ? `${partial.shelfNotice} — ${lines}` : lines };
@@ -367,10 +386,48 @@ function readStage(keeps) {
   }
 }
 
+/** #1645 — records the history cap trimmed at the boot load. Set by
+ * readShelfHistory's loader below; the factory folds it into the
+ * shed counter's opening total. Invalid records the sanitizer drops
+ * are NOT counted here — #1642's load line already names those; this
+ * counter is the cap's alone. */
+let bootHistoryCapShed = 0;
+
 function readShelfHistory() {
   return readShelfPart(SHELF_HISTORY_KEY, 'shelf history record', 'shelf history records',
-    (parsed) => parsed.map(sanitizeHistoryRecord).filter(Boolean).slice(-SHELF_HISTORY_MAX)) || [];
+    (parsed) => {
+      const clean = parsed.map(sanitizeHistoryRecord).filter(Boolean);
+      bootHistoryCapShed = Math.max(0, clean.length - SHELF_HISTORY_MAX);
+      return clean.slice(-SHELF_HISTORY_MAX);
+    }, () => bootHistoryCapShed) || [];
 }
+
+/** #1645 — the shed counter's own persistence. A refused write joins
+ * the shelf's failure episode (#1642): the history did save, the
+ * count did not — the shelf still did not fully save. */
+function persistHistoryShed(total) {
+  try {
+    localStorage.setItem(SHELF_HISTORY_SHED_KEY, JSON.stringify(total));
+  } catch {
+    notePersistFailure();
+  }
+}
+
+function readStoredHistoryShed() {
+  try {
+    const n = JSON.parse(localStorage.getItem(SHELF_HISTORY_SHED_KEY) || '0');
+    return Number.isInteger(n) && n >= 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** #1645 — cap trims recorded by the append helpers, drained into
+ * the updating action's state by the factory's wrapped set. The
+ * running total lives here (the store field mirrors it) because the
+ * drain sees the update, not the state it lands on. */
+let pendingHistoryShed = 0;
+let historyShedTotal = 0;
 
 function persistShelfHistory(list) {
   try {
@@ -428,7 +485,9 @@ function crownIntoShelf(state, entry, at) {
 
 /** Append one shelf-history record, capped, persisted. Returns the list. */
 function withShelfHistory(state, record) {
+  const before = (state.shelfHistory || []).length;
   const list = [...(state.shelfHistory || []), record].slice(-SHELF_HISTORY_MAX);
+  if (before + 1 - list.length > 0) pendingHistoryShed += before + 1 - list.length; // #1645: the cap's trim is counted, not silent
   persistShelfHistory(list);
   return list;
 }
@@ -437,7 +496,9 @@ function withShelfHistory(state, record) {
  * caused), capped, persisted once. Returns the list. */
 function withShelfHistoryMany(state, records) {
   if (!records.length) return state.shelfHistory || [];
+  const before = (state.shelfHistory || []).length;
   const list = [...(state.shelfHistory || []), ...records].slice(-SHELF_HISTORY_MAX);
+  if (before + records.length - list.length > 0) pendingHistoryShed += before + records.length - list.length; // #1645
   persistShelfHistory(list);
   return list;
 }
@@ -509,6 +570,19 @@ export const createDavisSlice = (set) => {
   const bootKeeps = readKeeps();
   const bootFavorites = readFavorites();
   const bootHistory = readShelfHistory();
+  // #1645 — the shed counter opens at what storage kept plus what
+  // this boot's load just trimmed. When the boot itself shed, the
+  // trimmed history is written back capped (the stage migration's
+  // boot-write precedent) and only then the merged total persists:
+  // the write-back is what stops a reload counting the same trims
+  // twice, and if it is refused the counter stays stale so the next
+  // boot recounts from the still-fat blob — self-healing either way.
+  historyShedTotal = readStoredHistoryShed() + bootHistoryCapShed;
+  if (bootHistoryCapShed > 0) {
+    const episodeWasOpen = persistEpisodeOpen;
+    persistShelfHistory(bootHistory);
+    if (persistEpisodeOpen === episodeWasOpen) persistHistoryShed(historyShedTotal);
+  }
   // #1642 — whatever the boot reads could not load was counted above;
   // the shelf opens with the loss spoken, not buried.
   const bootNotice = drainBootLoadNotice();
@@ -549,6 +623,7 @@ export const createDavisSlice = (set) => {
   keeps: bootKeeps,
   keepStage: readStage(bootKeeps),
   shelfHistory: bootHistory,
+  shelfHistoryShed: historyShedTotal, // #1645 — the cap's all-time trim count (census readout)
   shelfNotice: bootNotice,
   setShelfNotice: (msg) => set({ shelfNotice: typeof msg === 'string' && msg ? msg : null }),
   performingKeepId: null,

@@ -15,6 +15,7 @@
 import { useRef, useState } from 'react';
 import { useStore } from '../state/store.js';
 import { coverageView, censusView, yieldByCornerView, shelfCensusView, COVERAGE_KIND, CENSUS_KIND } from '../curator/censusReadout.mjs';
+import { readCrowns, readCrownShed } from '../curator/diceCrowns.js';
 import { shelfRow } from '../curator/shelf.mjs';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
@@ -31,6 +32,7 @@ function ShelfSection() {
   const keeps = useStore((s) => s.keeps) || [];
   const keepStage = useStore((s) => s.keepStage) || [];
   const shelfHistory = useStore((s) => s.shelfHistory) || [];
+  const shelfHistoryShed = useStore((s) => s.shelfHistoryShed) || 0;
   const shelfDiskStubs = useStore((s) => s.shelfDiskStubs) || {};
   const shelfDiskRecords = useStore((s) => s.shelfDiskRecords) || {};
   const shelfPrefs = useStore((s) => s.shelfPrefs);
@@ -44,10 +46,16 @@ function ShelfSection() {
     if (!labels[id] && stub?.label) labels[id] = stub.label;
   }
   const v = shelfCensusView({
-    keeps, stageIds: keepStage, history: shelfHistory,
+    keeps, stageIds: keepStage, history: shelfHistory, historyShed: shelfHistoryShed,
     stubs: shelfDiskStubs, diskRecords: shelfDiskRecords,
     prefs: shelfPrefs, exportPrefs: shelfExportPrefs, labels,
   });
+  // #1645 — the dice's crown log (its learned-compatibility training
+  // data) states its own window too: kept vs shed at the cap. Read
+  // from storage on render — the panel re-renders on store changes,
+  // and a crown is a store change, so the count stays current.
+  const crownLogCount = readCrowns().length;
+  const crownShed = readCrownShed();
 
   return (
     <>
@@ -64,7 +72,11 @@ function ShelfSection() {
           <p style={{ margin: '2px 0' }}>
             soft bound {v.tiers.softBound}: {v.tiers.overBy > 0 ? `${v.tiers.overBy} over` : 'under'} ·
             ledger: {v.moves.crowns} crowns · {v.moves.swaps} swaps · {v.moves.exports} exports · {v.moves.imports} imports ·
+            history {v.historyCount} kept · {v.historyShed} shed ·
             anchor {v.anchor.partial ? `partial — ${v.anchor.unread} on disk unread` : 'full weight'}
+          </p>
+          <p style={{ margin: '2px 0' }}>
+            crown log: {crownLogCount} kept · {crownShed} shed
           </p>
 
           <h3 style={h3}>FILL RULES — last {v.fills.window} fills</h3>

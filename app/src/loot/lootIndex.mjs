@@ -58,6 +58,10 @@ export function sanitizeIndexCounted(raw) {
     if (!rel) { tally.logUnreadable++; continue; }
     out.log.push({ rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) });
   }
+  // #1645 — the log's all-time trim count rides the index (absent =
+  // nothing shed yet, the house idiom for optional fields).
+  const lt = num(raw.logTrimmed);
+  if (Number.isInteger(lt) && lt > 0) out.logTrimmed = lt;
   return { index: out, tally };
 }
 
@@ -106,7 +110,9 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
   for (const s of plan.skipped || []) rows.push(row(s.rel, s.kind, 'skipped', s.reason));
   rows.reverse(); // newest first
   const log = [...rows, ...base.log].slice(0, LOG_MAX);
-  return { index: { ...base, items, log, scannedAt: num(nowMs) ?? base.scannedAt }, rows };
+  // #1645 — rows the cap shed join the index's trim count.
+  const logTrimmed = (base.logTrimmed || 0) + (rows.length + base.log.length - log.length);
+  return { index: { ...base, items, log, scannedAt: num(nowMs) ?? base.scannedAt, ...(logTrimmed > 0 ? { logTrimmed } : {}) }, rows };
 }
 
 /** Point the index at a folder. A different folder starts a clean index (its items were another folder's). */
@@ -205,5 +211,8 @@ export function markTaken(index, id, { status, reason = null, assetId = null } =
 export function addRows(index, rows) {
   const base = sanitizeIndex(index);
   const clean = (Array.isArray(rows) ? rows : []).filter((r) => r && OUTCOMES.includes(r.outcome) && str(r.rel, 512));
-  return { ...base, log: [...clean.map((r) => ({ rel: r.rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) })), ...base.log].slice(0, LOG_MAX) };
+  const log = [...clean.map((r) => ({ rel: r.rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) })), ...base.log].slice(0, LOG_MAX);
+  // #1645 — same count as applyPlan: the tail the cap shed is totalled.
+  const logTrimmed = (base.logTrimmed || 0) + (clean.length + base.log.length - log.length);
+  return { ...base, log, ...(logTrimmed > 0 ? { logTrimmed } : {}) };
 }

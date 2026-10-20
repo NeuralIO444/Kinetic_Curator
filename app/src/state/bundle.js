@@ -140,8 +140,12 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1173 training labels, append-only: saved on their own as passes.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history",
   "kc:dice-crowns:v1":
     "dice affinity index; the crowns themselves persist in the keeps ledger",
+  "kc:dice-crowns:v1:shed":
+    "#1645 the crown log's shed counter — it totals what a log that stays out of the bundle has shed; the count means nothing without that log beside it",
   "kc:keeps-history:v1":
     "#1589 K1's shelf-history staging area (crown/swap records) — a working cache whose facts are also stamped on the keep records themselves; the durable shelf ledger lands in K2 (#1590) and takes its own bundle decision then",
+  "kc:keeps-history-shed:v1":
+    "#1645 the shelf history's cap counter — it totals trims of a working cache that stays out of the bundle, and means nothing without the history itself",
   "kc:keeps-disk:v1":
     "#1591 the disk tier's stub index: this machine's loot-folder layout (which keeps live as files under looks/, bound to this machine's folder root). The keep records themselves ride the folder, not the bundle — like the loot index, the index is rebuilt from the folder's own files and means nothing on another Mac",
   "kc:worker": "developer flag for the render worker",
