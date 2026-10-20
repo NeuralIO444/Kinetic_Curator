@@ -106,6 +106,31 @@ export function createShiftTracker() {
       return { traits, born };
     },
     reset() { slots = []; ordinals.length = 0; },
+    // #1694 slice 1 — snapshot/restore for the resolver-owned spawn state (#1367's law, fail-closed).
+    // The ordinals ride along: a restored pin's NEXT birth must keep counting from where it left off.
+    snapshotState() {
+      return {
+        v: 1,
+        slots: slots.map((s) => (s ? { x: s.x, y: s.y, traits: { ...s.traits } } : null)),
+        ordinals: Array.from(ordinals, (n) => (Number.isFinite(n) ? n : null)),
+      };
+    },
+    restoreState(snap) {
+      if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots) || !Array.isArray(snap.ordinals)) return false;
+      const next = [];
+      for (const s of snap.slots) {
+        if (s === null) { next.push(null); continue; }
+        const t = s && typeof s === 'object' ? s.traits : null;
+        if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !t || typeof t !== 'object'
+          || !Number.isFinite(t.spread) || !Number.isFinite(t.wing) || !Number.isFinite(t.body) || !Number.isFinite(t.swatch)) return false;
+        next.push({ x: s.x, y: s.y, traits: { spread: t.spread, wing: t.wing, body: t.body, swatch: t.swatch } });
+      }
+      for (const n of snap.ordinals) if (!(n === null || (Number.isInteger(n) && n >= 0))) return false;
+      slots = next;
+      ordinals.length = 0;
+      for (const n of snap.ordinals) ordinals.push(n === null ? 0 : n);
+      return true;
+    },
   };
 }
 

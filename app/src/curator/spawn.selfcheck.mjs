@@ -151,11 +151,18 @@ const inRegion = (p) => p.x >= SPAWN_REGION.x0 * W - 1e-6 && p.x <= SPAWN_REGION
   assert.equal(getSpawnHomes().length, 1, 'a living creature keeps its home');
 }
 
-// 7. wired: the app feeds the picker from the frame tap, publishes homes as dishPins, and the count is the DIRECTORS row
+// 7. wired: the picker is fed (the count rides the resolver input, stamped by the loop; the resolver's spawn
+// state observes the frame), homes are published as dishPins (the loop writes them back when they move),
+// and the count is the DIRECTORS row
 {
+  // #1694 slice 1 — the wiring moved: App's frame tap no longer calls observeSpawn; these pins follow it.
+  const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
+  assert.ok(/creatureCount: s\.creatureCount/.test(loop), 'the loop stamps the count on the resolver input');
+  assert.ok(/s\.setDishPins\(spawnNow\.dishPins\)/.test(loop), 'the loop publishes the homes as dishPins');
+  const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
+  assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver observes the frame');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.ok(/observeSpawn\(input, output, \{ count: st\.creatureCount, formed: getFormedPins\(\), band: getStressState\(\)\.band \}\)/.test(app));
-  assert.ok(/st\.setDishPins\(homes\)/.test(app));
+  assert.ok(!/observeSpawn\(input, output/.test(app), 'the tap channel is retired');
   const dav = readFileSync(new URL('../panels/DavisPanel.jsx', import.meta.url), 'utf8');
   assert.ok(/data-testid=\{`creatures-\$\{n\}`\}/.test(dav) && /\[0, 1, 2, 3, 4\]\.map/.test(dav), 'a 0 to 4 row in the DIRECTORS panel');
   assert.ok(/<PanelHeader tag="P07" title="DIRECTORS" subtitle=\{subtitle\}>[\s\S]*?creatures-\$\{n\}/.test(dav), 'in the panel HEADER, so the body keeps its height and its five section labels');

@@ -156,8 +156,10 @@ const roll = (n, over = {}) => Array.from({ length: n }, (_, i) => shiftFor({ se
 // 7. wiring: the loop carries the traits (so a take replays the moths), the app supplies them, the take records them
 {
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  assert.ok(/dishTraits: getPinTraits\(\)/.test(loop));
-  assert.ok(/setTraitsProvider\(getPinTraits\)/.test(readFileSync(new URL('../App.jsx', import.meta.url), 'utf8')));
+  assert.ok(/dishTraits: spawnDecisions \? spawnDecisions\.dishTraits/.test(loop));
+  // #1694 slice 1 — the traits' source moved: the resolver publishes them (no provider registered by App any more)
+  assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8')), 'the resolver publishes the spawn decisions');
+  assert.ok(!/setTraitsProvider/.test(readFileSync(new URL('../App.jsx', import.meta.url), 'utf8')), 'the provider channel is retired');
   assert.ok(/davis: davisSection/.test(readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8')));
 }
 

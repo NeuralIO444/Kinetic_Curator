@@ -166,10 +166,14 @@ const run = (t, frames, u) => { const ev = []; for (let i = 0; i < frames; i++) 
   resetFormation();
 }
 
-// 7. wiring: one frame tap feeds dish pressure then formation; the take carries a `formation` section
+// 7. wiring: the take carries a `formation` section; the channel is the resolver's now (#1694 slice 1) —
+// it observes each resolved frame after the creature appends (dish pressure is counted inside, from the
+// frame's own output, before the rule judges), and App's tap no longer feeds it.
 {
+  const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
+  assert.match(resolve, /dishCreatures\.append[\s\S]*?lastSpawnDecisions = spawnState\.observe\(input, out\);/);
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.match(app, /setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeDish\(input, output\);[\s\S]*?observeFormation\(input, output\);/);
+  assert.ok(!/observeFormation\(input, output\)/.test(app) && !/observeSpawn\(input, output/.test(app), 'the tap channel is retired');
   const btn = readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8');
   assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection(, \w+: \w+)* \}/);
   assert.match(btn, /resetFormation\(\);/, 'a take starts from fresh formation state');

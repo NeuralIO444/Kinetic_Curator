@@ -63,95 +63,10 @@ export function setResolveFrameTap(fn) {
   return prev;
 }
 
-let formedProvider = null;
-
-/** Register where the loop reads which pins have formed (curator/formationLive.js): keeps gl/ free of curator/. */
-export function setFormedProvider(fn) {
-  formedProvider = typeof fn === 'function' ? fn : null;
-}
-
-/** [bool] per pin, from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
-export function getFormedPins() {
-  if (formedProvider === null) return [];
-  try {
-    const f = formedProvider();
-    return Array.isArray(f) ? f : [];
-  } catch {
-    return [];
-  }
-}
-
-let limbsProvider = null;
-
-/** Register where the loop reads each pin's pairs of wings (curator/formationLive.js getLimbPairs). */
-export function setLimbsProvider(fn) {
-  limbsProvider = typeof fn === 'function' ? fn : null;
-}
-
-/** [1|2] per pin from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
-export function getLimbPairs() {
-  if (limbsProvider === null) return [];
-  try {
-    const l = limbsProvider();
-    return Array.isArray(l) ? l : [];
-  } catch {
-    return [];
-  }
-}
-
-let traitsProvider = null;
-
-/** Register where the loop reads each moth's traits (curator/formationLive.js getPinTraits). */
-export function setTraitsProvider(fn) {
-  traitsProvider = typeof fn === 'function' ? fn : null;
-}
-
-/** [traits|null] per pin from the last resolved frame; [] with no provider. A bad provider reads as none. */
-export function getPinTraits() {
-  if (traitsProvider === null) return [];
-  try {
-    const t = traitsProvider();
-    return Array.isArray(t) ? t : [];
-  } catch {
-    return [];
-  }
-}
-
-let dishHostedProvider = null;
-
-/** Register where the loop reads which pin hosts the dish creature (curator/formationLive.js getDishHosted). */
-export function setDishHostedProvider(fn) {
-  dishHostedProvider = typeof fn === 'function' ? fn : null;
-}
-
-/** [bool] per pin from the last resolved frame's decision; [] with no provider. A bad provider reads as none. */
-export function getDishHosted() {
-  if (dishHostedProvider === null) return [];
-  try {
-    const h = dishHostedProvider();
-    return Array.isArray(h) ? h : [];
-  } catch {
-    return [];
-  }
-}
-
-let dishPressureProvider = null;
-
-/** Register where the loop reads each pin's dish pressure (curator/formationLive.js getDishPressures). */
-export function setDishPressureProvider(fn) {
-  dishPressureProvider = typeof fn === 'function' ? fn : null;
-}
-
-/** [0..1] per pin from the last resolved frame; [] with no provider. A bad provider reads as none. */
-export function getDishPressure() {
-  if (dishPressureProvider === null) return [];
-  try {
-    const p = dishPressureProvider();
-    return Array.isArray(p) ? p : [];
-  } catch {
-    return [];
-  }
-}
+// #1694 slice 1 — the creature decision providers that used to live here (formed / limbs / traits /
+// hosted / pressure, registered by App from curator/formationLive.js) are RETIRED: the resolver owns
+// the spawn channel now and publishes its decisions itself (gl/liveResolve.mjs getLastSpawnDecisions),
+// and the loop stamps them on the next frame's input. Nothing registers or reads providers any more.
 
 let swapListener = null;
 

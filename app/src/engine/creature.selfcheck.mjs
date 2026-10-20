@@ -171,9 +171,12 @@ const full = MOTH.growFrames + 1;
 // 10. wiring: the loop carries the decision and the attach points; the app supplies the decision
 {
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  assert.ok(/dishFormed: getFormedPins\(\)/.test(loop) && /assetAttach: s\.assetAttach/.test(loop));
+  assert.ok(/dishFormed: spawnDecisions \? spawnDecisions\.dishFormed/.test(loop) && /assetAttach: s\.assetAttach/.test(loop));
+  // #1694 slice 1 — the decision's source moved: the resolver publishes it (no provider registered by App any more)
+  const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
+  assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver publishes the spawn decisions');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.ok(/setFormedProvider\(getFormedPins\)/.test(app));
+  assert.ok(!/setFormedProvider/.test(app), 'the provider channel is retired');
   const src = readFileSync(new URL('./creature.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random|from '\.\.\/curator/.test(src), 'no clock, no chance, no curator import');
 }

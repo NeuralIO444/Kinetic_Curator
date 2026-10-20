@@ -38,6 +38,7 @@ import { assessAggregate, decideLifecycle, recordLifecycleState } from '../biolo
 import { getBiologyPolicy } from '../biology/policy.js';
 import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
 import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
+import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnState.js'; // #1694 slice 1: the spawn channel, resolver-owned
 
 const HOP_MAX_PX = 4;
 
@@ -179,6 +180,19 @@ export function getLastSkeletons() { return lastSkeletons; }
  */
 let lastPoses = [];
 export function getLastPoses() { return lastPoses; }
+
+/**
+ * #1694 slice 1 — the last resolved frame's SPAWN decisions, published by the resolver that owns the
+ * channel (curator/spawnState.js): the standing homes, and what formation decided on the frame just
+ * resolved. The loop stamps them on the NEXT frame's input (dishPins / dishFormed / dishLimbs /
+ * dishTraits / dishHosted / dishPressure), exactly as the App-side tap channel used to hand them over —
+ * a take records decisions, never recomputes them. Module-level, last-resolver-wins, like the motion
+ * read above; null until the first resolve completes. `homesChanged` is the store write-back signal:
+ * the homes moved on this frame (the old tap wrote the store on exactly this condition).
+ * Shape: { dishPins, dishFormed, dishLimbs, dishTraits, dishHosted, dishPressure, homesChanged }.
+ */
+let lastSpawnDecisions = null;
+export function getLastSpawnDecisions() { return lastSpawnDecisions; }
 
 export function createLiveResolver() {
   const placementCaches = new Map();
@@ -453,8 +467,11 @@ export function createLiveResolver() {
   // downstream — the overlay reads getLastSkeletons(), which this builder now always fills for formed moths.
   const creatures = createCreatureBuilder({ skinning: true });
   const dishCreatures = createDishCreatureBuilder(); // #1634 slice 2: the second family's body, after the moths
+  const spawnState = createCreatureSpawnState(); // #1694 slice 1: formation + spawn, owned by this resolver
+  registerSpawnState(spawnState);
 
   function resolveLayers(input) {
+    registerSpawnState(spawnState); // #1694 slice 1 — whichever resolver ran last owns the live channel (the getLastFrameMotion law)
     W = input.canvasW || CANVAS_W;
     H = input.canvasH || CANVAS_H;
     const caps = getQualityCaps(input.quality || 'balanced');
@@ -1032,6 +1049,12 @@ export function createLiveResolver() {
     lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
     lastSkeletons = creatures.lastSkeletons(); // S1 — the frame's bone graphs, for ?debug=skeleton
     lastPoses = creatures.lastPoses(); // S5 — the frame's band poses, for S2/S4 to consume
+    // #1694 slice 1 — the spawn channel observes the resolved frame (formation judges it, then spawn
+    // reads the verdicts — App's tap order, the rules unchanged in curator/spawnState.js) and the
+    // decisions are published for the loop to stamp on the next frame's input. On a replay this state
+    // advances on the recorded inputs like every other resolver state, and cannot move the outputs:
+    // the builders read the recorded decision fields, never this state.
+    lastSpawnDecisions = spawnState.observe(input, out);
     return out;
   }
 
@@ -1087,6 +1110,7 @@ export function createLiveResolver() {
       densityTickSeen,
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
+      spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
     };
   }
 
@@ -1102,6 +1126,7 @@ export function createLiveResolver() {
     if (!checkDishSessionSnapshot(snap.dishSession)) return false;
     if (!createCreatureBuilder().restoreState(snap.creatures)) return false;
     if (!createDishCreatureBuilder().restoreState(snap.dishCreatures)) return false;
+    if (snap.spawn !== undefined && !createCreatureSpawnState().restoreState(snap.spawn)) return false; // #1694 slice 1
     if (!createDriverClock().restoreState(snap.driverClock)) return false;
     // Phase 2 — apply (the same restores just validated; they cannot refuse now).
     W = snap.W;
@@ -1146,6 +1171,9 @@ export function createLiveResolver() {
     densityTickSeen = snap.densityTickSeen;
     creatures.restoreState(snap.creatures);
     dishCreatures.restoreState(snap.dishCreatures);
+    // #1694 slice 1 — a pre-repipe snapshot carries no spawn state: the channel starts fresh, as a fresh
+    // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
+    if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn); else spawnState.reset();
     return true;
   }
 
@@ -1228,5 +1256,7 @@ export function checkResolverSnapshot(snap) {
   if (!Number.isFinite(snap.densityTickSeen)) return false;
   if (!snap.creatures || typeof snap.creatures !== 'object') return false;
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
+  // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
+  if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn))) return false;
   return true;
 }

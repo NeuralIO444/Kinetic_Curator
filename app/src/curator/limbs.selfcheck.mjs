@@ -82,9 +82,12 @@ const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(
   const src = readFileSync(new URL('./limbs.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(src), 'no clock, no chance');
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  assert.ok(/dishLimbs: getLimbPairs\(\)/.test(loop), 'the loop passes dishLimbs in the resolver input');
+  assert.ok(/dishLimbs: spawnDecisions \? spawnDecisions\.dishLimbs/.test(loop), 'the loop passes dishLimbs in the resolver input');
+  // #1694 slice 1 — the decision's source moved: the resolver publishes it (no provider registered by App any more)
+  const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
+  assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver publishes the spawn decisions');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  assert.ok(/setLimbsProvider\(getLimbPairs\)/.test(app));
+  assert.ok(!/setLimbsProvider/.test(app), 'the provider channel is retired');
 }
 
 console.log('limbs.selfcheck: ok (#1355 step 5)');

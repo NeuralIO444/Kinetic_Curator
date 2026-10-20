@@ -93,6 +93,21 @@ export function createFormationTracker() {
       return { states: slots.map((s) => (s ? { ...s } : null)), events };
     },
     states() { return slots.map((s) => (s ? { ...s } : null)); },
+    // #1694 slice 1 — the resolver's spawn state snapshots its trackers with the rest of the resolver
+    // (#1367's law): a take that begins mid-session continues with the same holds. Fail-closed, like the
+    // builders': a malformed payload restores nothing and says so.
+    snapshotState() { return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) }; },
+    restoreState(snap) {
+      if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots)) return false;
+      const next = [];
+      for (const s of snap.slots) {
+        if (s === null) { next.push(null); continue; }
+        if (!s || typeof s !== 'object' || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.hold) || typeof s.formed !== 'boolean') return false;
+        next.push({ x: s.x, y: s.y, hold: s.hold, formed: s.formed });
+      }
+      slots = next;
+      return true;
+    },
   };
 }
 

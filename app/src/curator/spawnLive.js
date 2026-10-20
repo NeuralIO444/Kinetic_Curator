@@ -1,31 +1,24 @@
-// curator/spawnLive.js — #1355: the live side of AUTO SPAWN. A module singleton fed by the resolver frame tap.
+// curator/spawnLive.js — #1355: the live side of AUTO SPAWN.
 //
-// Steady homes: a home is kept exactly where it was chosen until the DISH changes (a new seed, offsets, canvas size, or
-// a lower count), so a creature never wanders off its spot. While fewer homes stand than the artist asked for, it looks
-// again every RETRY_FRAMES for a spot that qualifies. A home whose creature has not formed within PATIENCE_FRAMES
-// (the crowd moved away) is given up and chosen again. Every window is a count of frames, never a clock.
-import { chooseHomes, marksOf, sanitizeCount } from './spawn.js';
-import { fertilityField } from './formation.js';
+// #1694 slice 1 — this module is now the FACADE over the resolver-owned spawn state (curator/spawnState.js),
+// where the steady-homes logic lives (transcribed unchanged: a home is kept exactly where it was chosen
+// until the DISH changes; while fewer homes stand than the artist asked for, it looks again every
+// RETRY_FRAMES; a home whose creature has not formed within PATIENCE_FRAMES is given up and chosen again;
+// every window is a count of frames, never a clock). The live instrument no longer calls observeSpawn —
+// the resolver observes its own frames and the loop writes the homes to the store when they change —
+// but the surface below stays for the suites and any non-resolver caller, driving the ACTIVE spawn state.
+import { activeSpawnState } from './spawnState.js';
 
-export const RETRY_FRAMES = 30;
-export const PATIENCE_FRAMES = 180;
+export { SPAWN_RETRY_FRAMES as RETRY_FRAMES, SPAWN_PATIENCE_FRAMES as PATIENCE_FRAMES } from './spawnState.js';
 
-let homes = []; // [{ x, y, age }]
-let key = '';
-let sinceTry = RETRY_FRAMES;
-let field = null;
-let fieldKey = '';
-
-const same = (a, b) => a.length === b.length && a.every((p, i) => p.x === b[i].x && p.y === b[i].y);
-
-/** The standing homes, [{x, y}]. */
+/** The standing homes, [{x, y}] (a copy, as the singleton's getter always handed out). */
 export function getSpawnHomes() {
-  return homes.map(({ x, y }) => ({ x, y }));
+  return activeSpawnState().getDecisions().dishPins.map((p) => ({ ...p }));
 }
 
 /** Start over (a fresh document, tests). */
 export function resetSpawn() {
-  homes = []; key = ''; sinceTry = RETRY_FRAMES; field = null; fieldKey = '';
+  activeSpawnState().resetSpawnHalf();
 }
 
 /**
@@ -34,25 +27,5 @@ export function resetSpawn() {
  * Returns the new homes [{x, y}] when they changed, else null.
  */
 export function observeSpawn(input, output, { count = 0, formed = [], band = null } = {}) {
-  const want = sanitizeCount(count);
-  const W = input && input.canvasW; const H = input && input.canvasH;
-  const k = `${(input && input.seed) >>> 0}|${JSON.stringify((input && input.seedOffsets) ?? null)}|${W}x${H}`;
-  const before = getSpawnHomes();
-  if (k !== key) { key = k; homes = []; field = null; sinceTry = RETRY_FRAMES; } // a new dish: start again
-  if (homes.length > want) homes = homes.slice(0, want);
-  for (let i = 0; i < homes.length; i++) {
-    homes[i].age += 1;
-    if (!formed[i] && homes[i].age >= PATIENCE_FRAMES) { homes.splice(i, 1); i--; sinceTry = RETRY_FRAMES; }
-  }
-  if (homes.length < want) {
-    sinceTry += 1;
-    if (sinceTry >= RETRY_FRAMES) {
-      sinceTry = 0;
-      if (!field || fieldKey !== k) { field = fertilityField(input.seed, input.seedOffsets, W, H).at; fieldKey = k; }
-      const next = chooseHomes({ count: want, existing: homes, marks: marksOf(output), field, band, canvasW: W, canvasH: H });
-      for (let i = homes.length; i < next.length; i++) homes.push({ x: next[i].x, y: next[i].y, age: 0 });
-    }
-  }
-  const after = getSpawnHomes();
-  return same(before, after) ? null : after;
+  return activeSpawnState().observeSpawnOnly(input, output, { count, formed, band });
 }

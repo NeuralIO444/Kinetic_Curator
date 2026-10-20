@@ -54,5 +54,18 @@ export function createLimbTracker() {
       return out;
     },
     reset() { slots = []; },
+    // #1694 slice 1 — snapshot/restore for the resolver-owned spawn state (#1367's law, fail-closed).
+    snapshotState() { return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) }; },
+    restoreState(snap) {
+      if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots)) return false;
+      const next = [];
+      for (const s of snap.slots) {
+        if (s === null) { next.push(null); continue; }
+        if (!s || typeof s !== 'object' || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.run) || (s.pairs !== 1 && s.pairs !== 2)) return false;
+        next.push({ pairs: s.pairs, run: s.run, x: s.x, y: s.y });
+      }
+      slots = next;
+      return true;
+    },
   };
 }
