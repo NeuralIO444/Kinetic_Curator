@@ -429,6 +429,13 @@ export const createGlobalSlice = (set) => ({
    * resolver input. Restores whole when pressure clears (governorCuts' restore table). */
   creatureShed: 0,
   setCreatureShed: (n) => set({ creatureShed: Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0 }),
+  /** #1574 — the governor's travel shed: while true, liveLoop stamps
+   * travelShed on the resolver input and FLOW marks settle home. A
+   * render-only overlay in the creatureShed class — never serialized
+   * into a document; the artist's transport params never move. Restores
+   * whole when pressure clears (governorCuts' restore table). */
+  travelShed: false,
+  setTravelShed: (on) => set({ travelShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) => set({
@@ -832,6 +839,8 @@ export const createGlobalSlice = (set) => ({
       qualityShedFrom: null,
       // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
       creatureShed: 0,
+      // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
+      travelShed: false,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,

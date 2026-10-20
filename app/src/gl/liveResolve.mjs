@@ -1,6 +1,6 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
-import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js'; // #1128: the living-motion floor
+import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern, createTravelStore, pruneTravelStore } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -208,6 +208,14 @@ export function createLiveResolver() {
   // #1128: ONE anchored clock for the living-motion floor. RATE 0 freezes it where it is, a RATE change re-anchors it
   // (no jump), and a held loop clock (pause) holds it: the same contract as the library kinemes.
   const driverClock = createDriverClock();
+  // #1574: ONE travel store for every placement layer of this resolver —
+  // per-instance sim state keyed by scene (layer) id + instance index +
+  // seed, surviving placement rebuilds. The frame delta is measured once
+  // per resolve (high-water, like warpPhase: a rolled-back frame credits
+  // nothing, and a frozen frame's span is never lump-credited on thaw
+  // because slowRender frames still advance the mark — see travelFrameMs).
+  const travelStore = createTravelStore();
+  let travelLastMs = null;
 
   // Item-level morph (chip clicks): per content layer, the last shown
   // (post-morph) items + the signature they were shown for, and any
@@ -297,6 +305,7 @@ export function createLiveResolver() {
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
     for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
+    pruneTravelStore(travelStore, documentIds); // #1574 — a removed layer's roam goes with it
     // #822 — FEED slots follow the document, not visibility. Freeing a slot
     // on hide let the next layer reuse it and read the hidden track's
     // delay-1 buffer (a snap, and a partner the picture did not have).
@@ -484,6 +493,14 @@ export function createLiveResolver() {
         .map((a) => [String(a.id), hashStr(String(a.svg || ''))]));
     }
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
+    // #1574 — this frame's travel delta on the spine-A clock, measured once
+    // for every layer (high-water: a rolled-back frame credits nothing).
+    // slowRender frames advance the mark without travelling, so a freeze
+    // never banks sim time and a thaw never lump-credits the frozen span.
+    const travelNowMs = input.loopTimeMs ?? 0;
+    const travelFrameMs = travelLastMs == null ? 0 : Math.max(0, travelNowMs - travelLastMs);
+    travelLastMs = travelLastMs == null ? travelNowMs : Math.max(travelLastMs, travelNowMs);
+    const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed };
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
@@ -709,6 +726,11 @@ export function createLiveResolver() {
           growthTick, audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme,
+          // #1574 — the travel input: the resolver's store + this frame's
+          // spine-A delta + the governor's shed. Mode/leash/strength ride
+          // layoutParams (recipe data); buildPlacements gates on them, so
+          // a 'still' scene never steps the sim.
+          travel: travelBase ? { ...travelBase, sceneId: layer.id } : null,
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
             dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,

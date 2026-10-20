@@ -15,6 +15,16 @@
 //          those cost the picture nothing. One creature per governor step,
 //          off the creatureShed overlay — the artist's count never moves —
 //          and the population restores whole when pressure clears.
+//   cut 1.6: travel (#1574) — FLOW transport sheds AFTER the creature count
+//          (cut 1.5 is not moved; Matt's population-first ruling stands) and
+//          ahead of the quality tier step and the motion freeze: velocities
+//          zero, marks settle home, and the frame degrades to exactly the
+//          still behaviour. One boolean step off the travelShed overlay —
+//          the artist's transport params never move — restoring whole when
+//          pressure clears. Fires only when the caller says travel is
+//          live (travelActive: the scene's transport is 'flow', leash > 0,
+//          and the rung is not already shed), so older callers and their
+//          pinned ladder walks see the ladder exactly as it was.
 //   cut 2: quality tier step high → balanced → performance
 //   cut 3: mirror/gloss/ACCUM shed (perfTier1 — independent, lower FPS floor)
 //   cut 4: cost-aware asset thinning
@@ -91,6 +101,13 @@ export const GOVERNOR_RESTORE_CUTS = [
     // the whole population back in one pass (this table's convention).
     needsRestore: (s, ctx) => ctx.healthy && (s.creatureShed | 0) > 0,
     restoredLabel: 'creatures back — full cast',
+  },
+  {
+    kind: 'travel',
+    // #1574 — travel sheds after the population and before the tier; the
+    // restore brings the roam back whole (this table's convention).
+    needsRestore: (s, ctx) => ctx.healthy && !!s.travelShed,
+    restoredLabel: 'travel back — marks roam again',
   },
   {
     kind: 'quality',
@@ -192,6 +209,14 @@ export function nextGovernorCut(s) {
     return { kind: 'creatureCount', creatureShed: creatureShed + 1, label: `CREATURES → ${creatureCount - creatureShed - 1}` };
   }
 
+  // Cut 1.6 (#1574): travel. After the population (cut 1.5 stands), ahead
+  // of the quality tier and the motion freeze. Opt-in per caller
+  // (`travelActive === true` = a live FLOW scene, not already shed) so
+  // older callers and their pinned ladder walks keep the pre-#1574 ladder.
+  if (s.travelActive === true && !s.travelShed) {
+    return { kind: 'travel', travelShed: true, label: 'TRAVEL HELD — marks settle home' };
+  }
+
   // Cut 2: quality tier step (placement + particle budgets).
   if (s.quality === 'high') {
     return { kind: 'quality', quality: 'balanced', label: 'TIER DROP → BALANCED' };
@@ -239,6 +264,8 @@ export function shedSummary(s) {
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);
   }
+  // #1574 — and about a travel shed: held marks read as settled home.
+  if (s.travelShed) out.push('travel held');
   // #264 — governor-shed quality is a shed like any other: the badge shows
   // it. qualityShedFrom is only set by the governor's own shed, so a
   // user-chosen tier never appears here.

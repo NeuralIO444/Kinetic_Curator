@@ -19,6 +19,7 @@
 import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js';
 import { createNoise } from './noise.js'; // #1198 — ORGANIC rhythm samples this Perlin field
 import { ACCENT_OFFSET } from './kernel/color/index.js';
+import { registerCostTier } from './kernel/costRegistry.mjs'; // #1574 — the travel pass declares its cost like every module
 
 /** Boil default: the classic hand-drawn rate (Matt decision 2). */
 /**
@@ -569,6 +570,274 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
   // dWobble: no consumer on main — brush mode (#894/#897) applies it when
   // it lands. Evaluated and tested here, wired defensively (no-op absent).
 }
+
+// ── Travel kinemes P1 (#1574) — the transport core ──────────────────────
+// FLOW transport: marks leave home, roam the curl of the shared noise
+// field, and are held by a leash. This is the production build of the
+// #1573 spike's verdict (KEEP, Matt 2026-10-16), written in this family's
+// own style — the spike branch is evidence, not a source.
+//
+// The sim differs from every driver above in one way: it has STATE.
+// Per-instance { ox, oy, vx, vy } lives in a store the CALLER owns
+// (liveResolve creates one per resolver), keyed by scene identity +
+// instance index + seed, so it survives placement rebuilds — the
+// geometry/bind caches may come and go, the roam continues. Base
+// placement is HOME: the presented position is home + offset, and the
+// offset is folded into the SoA exactly like the drivers above (an undo
+// restores the cached positions once the frame's items are built).
+//
+// Replay law (creatures-spec §2, applied to a sim): nothing reads a
+// clock or a random source. Integration runs on the spine-A dt clock at
+// a LOCKED step, accumulated from the frame time the resolver hands in;
+// the field's time is the step count, never a timestamp. Same seed +
+// same step count = same positions, bit for bit — takeHash exactness is
+// a gate (engine/travel.selfcheck.mjs), not a goal.
+//
+// PARITY: transport 'still' (the layout default) or a leash of 0 never
+// reaches this code — buildPlacements gates on both — so an off scene
+// produces a bit-identical SoA to the pre-#1574 pipeline.
+// P1 ships FLOW only. PATH (P2) and SURGE (P3) are not built here.
+// Q2 (the traveler budget) is UNRULED: no budget mechanism is built —
+// every placed mark travels. See STAGING-REPORT.md.
+
+/** The transport vocabulary: 'still' (the default — home is home) and 'flow'. */
+export const TRANSPORT_MODES = Object.freeze(['still', 'flow']);
+
+/** The locked integration step (spine-A): 60 steps per sim second. */
+export const TRAVEL_STEP_SEC = 1 / 60;
+/** Steps banked per presented frame at most; a longer hitch drops the
+ *  excess instead of spiralling (the spike's law, and liveLoop clamps
+ *  frame dt to 50 ms, so a live frame never legitimately needs > 3). */
+export const TRAVEL_MAX_STEPS = 8;
+
+const TRAVEL_FLOW_FREQ = 2.5; // noise cycles across the canvas (the rhythm layer's scale, the spike's field)
+const TRAVEL_FLOW_TIME = 0.5; // field z advance per sim second — fast enough that a mark parked at a shell equilibrium (outward curl cancelling the spring) is un-parked within seconds as the field turns; the spike masked the same trap with its phase machine's ≤3 s re-picks. Bench: at 0.12 the outer-10px shell held 62% of roam time; at 0.5 it holds 27% and the radius distribution spreads (p50 91 px at L = 112)
+const TRAVEL_SPEED = 0.11; // cruise speed at flow strength 1, fraction of the smaller dimension / s
+const TRAVEL_STEER_TAU = 0.28; // s — velocity eases toward the flow target (the ease-in IS the arc)
+const TRAVEL_DAMP_TAU = 1.1; // s — velocity damping: the lag cuts corners across the field's streamlines, so marks wander through the interior instead of locking onto one contour at the leash shell
+const TRAVEL_SPRING_HZ = 1.3; // leash spring natural frequency — stiff enough that its underdamped return survives the steer ease's velocity damping (measured: at 0.85 Hz a mark released at r=200 crossed only to r=107; at 1.3 Hz it crosses to r=75.5 and settles inside at rest)
+const TRAVEL_SPRING_ZETA = 0.3; // < 1 → the anime-timing overshoot on return
+const TRAVEL_SETTLE_TAU = 0.25; // s — the governor shed's settle-home decay
+
+/**
+ * The travel store: one per resolver (the caller owns it; buildPlacements
+ * never allocates one). scenes: sceneId → { seed, acc, steps, states },
+ * states: instance index → { ox, oy, vx, vy }. A scene whose seed changes
+ * starts over — the roam belongs to the seed that dealt the homes.
+ */
+export function createTravelStore() {
+  return { scenes: new Map() };
+}
+
+/** Drop scenes the document no longer has (liveResolve's prune law). */
+export function pruneTravelStore(store, keepSceneIds) {
+  if (!store || !(store.scenes instanceof Map)) return;
+  for (const k of [...store.scenes.keys()]) if (!keepSceneIds.has(k)) store.scenes.delete(k);
+}
+
+/** A scene's sim record for tests/debug: { seed, steps, states } with the
+ *  states sorted by instance index, or null when the scene never travelled. */
+export function travelSceneSnapshot(store, sceneId) {
+  const sc = store && store.scenes instanceof Map ? store.scenes.get(sceneId) : null;
+  if (!sc) return null;
+  return {
+    seed: sc.seed,
+    steps: sc.steps,
+    states: [...sc.states.entries()]
+      .sort((a, b) => a[0] - b[0])
+      .map(([index, s]) => ({ index, ox: s.ox, oy: s.oy, vx: s.vx, vy: s.vy })),
+  };
+}
+
+const TRAVEL_TMP = { x: 0, y: 0 }; // curl scratch — one call at a time, never re-entered
+const TRAVEL_CURL_EPS = 0.35; // finite-difference step in field units
+
+/**
+ * The curl of the shared noise field at (x, y, z): finite differences of
+ * the same single-level noise the rhythm layer samples (noise.js's curl2
+ * runs a 3-octave fBm — four 3-octave evaluations per mark per step
+ * measured ~0.93 ms at the 800-mark cap; the single-level field is the
+ * shared field's own grain and measures ~3× cheaper, see the cost block).
+ * Divergence-free by construction: (∂N/∂y, −∂N/∂x).
+ */
+function travelCurl(noise, x, y, z, out) {
+  const e = TRAVEL_CURL_EPS;
+  const n1 = noise.noise3D(x, y + e, z);
+  const n2 = noise.noise3D(x, y - e, z);
+  const n3 = noise.noise3D(x + e, y, z);
+  const n4 = noise.noise3D(x - e, y, z);
+  out.x = (n1 - n2) / (2 * e);
+  out.y = (n4 - n3) / (2 * e);
+  return out;
+}
+
+function stepTravelMark(s, hx, hy, env) {
+  if (env.shed) {
+    // The governor's travel shed: velocities zero, marks settle home.
+    // What remains on screen is the placed picture, honestly at rest —
+    // never a roam frozen mid-stride.
+    s.vx = 0; s.vy = 0;
+    const d = Math.exp(-TRAVEL_STEP_SEC / TRAVEL_SETTLE_TAU);
+    s.ox *= d; s.oy *= d;
+    if (Math.abs(s.ox) < 0.01) s.ox = 0;
+    if (Math.abs(s.oy) < 0.01) s.oy = 0;
+    return;
+  }
+  // FLOW: steer toward the curl of the shared noise field, sampled at the
+  // mark's CURRENT position every step, so the path bends with the field.
+  travelCurl(env.noise,
+    ((hx + s.ox) / env.W) * TRAVEL_FLOW_FREQ,
+    ((hy + s.oy) / env.H) * TRAVEL_FLOW_FREQ,
+    env.simSec * TRAVEL_FLOW_TIME, TRAVEL_TMP);
+  const mag = Math.hypot(TRAVEL_TMP.x, TRAVEL_TMP.y);
+  let tvx = 0, tvy = 0;
+  if (mag > 1e-6) {
+    // Target speed scales with the field's strength at the mark: strong
+    // currents carry, slack water dawdles — no floor, so the roam's
+    // density varies with the field instead of saturating at the leash.
+    const f = Math.min(1, mag) * env.cruise;
+    tvx = (TRAVEL_TMP.x / mag) * f;
+    tvy = (TRAVEL_TMP.y / mag) * f;
+  }
+  const a = 1 - Math.exp(-TRAVEL_STEP_SEC / TRAVEL_STEER_TAU);
+  s.vx += (tvx - s.vx) * a;
+  s.vy += (tvy - s.vy) * a;
+  const damp = Math.exp(-TRAVEL_STEP_SEC / TRAVEL_DAMP_TAU);
+  s.vx *= damp; s.vy *= damp;
+  // The leash: no home force inside radius L; outside it a spring toward
+  // the leash circle, damped along the radial velocity only — slightly
+  // underdamped, so a returning mark overshoots home before it settles.
+  const r = Math.hypot(s.ox, s.oy);
+  if (r > env.leash) {
+    const wn = 2 * Math.PI * TRAVEL_SPRING_HZ;
+    const nx = s.ox / r, ny = s.oy / r;
+    const pull = wn * wn * (r - env.leash);
+    const vr = s.vx * nx + s.vy * ny;
+    const c = 2 * TRAVEL_SPRING_ZETA * wn;
+    s.vx += (-pull * nx - c * vr * nx) * TRAVEL_STEP_SEC;
+    s.vy += (-pull * ny - c * vr * ny) * TRAVEL_STEP_SEC;
+  }
+  s.ox += s.vx * TRAVEL_STEP_SEC;
+  s.oy += s.vy * TRAVEL_STEP_SEC;
+}
+
+const TRAVEL_BASE_XY = new WeakMap();
+
+/**
+ * Stage-C applier for FLOW transport: advance the scene's sim by the
+ * frame time accumulated since the last call, then fold each mark's
+ * offset into the SoA. Called last in buildPlacements (after rhythm,
+ * drivers and the ground nudge), so home is the presented placement.
+ *
+ * ctx.travel: {
+ *   mode,            // 'flow' — anything else is identity (the gate)
+ *   leash,           // px; <= 0 is identity
+ *   flow,            // 0..1 strength (recipe data, from layoutParams)
+ *   store,           // createTravelStore() — caller-owned, required
+ *   sceneId,         // the scene identity half of the state key
+ *   frameMs,         // spine-A frame time to accumulate (0 on a held frame)
+ *   shed,            // governor travel shed: settle home, no drive
+ * }
+ * ctx also carries { seed, canvasW, canvasH } like the driver ctx.
+ *
+ * Returns an undo restoring the cached positions, or null when nothing
+ * is displaced. still[k] marks (artist-pinned) neither step nor displace:
+ * their state holds exactly where the artist left it.
+ */
+export function applyTransport(soa, ctx, still = null) {
+  if (!soa || !ctx) return null;
+  const tr = ctx.travel;
+  if (!tr || !tr.store || !(tr.store.scenes instanceof Map)) return null;
+  if (tr.mode !== 'flow') return null;
+  const leash = Number(tr.leash);
+  if (!(leash > 0)) return null;
+  const W = Number(ctx.canvasW), H = Number(ctx.canvasH);
+  const m = Math.min(W, H);
+  if (!(m > 0)) return null;
+  const seed = ctx.seed | 0;
+  const sceneId = String(tr.sceneId ?? '');
+  let sc = tr.store.scenes.get(sceneId);
+  if (!sc) {
+    sc = { seed, acc: 0, steps: 0, states: new Map() };
+    tr.store.scenes.set(sceneId, sc);
+  } else if (sc.seed !== seed) {
+    sc.seed = seed; sc.acc = 0; sc.steps = 0; sc.states.clear();
+  }
+  const flowRaw = Number(tr.flow);
+  const flow = Number.isFinite(flowRaw) ? Math.min(1, Math.max(0, flowRaw)) : 0;
+
+  // Fixed-step accumulation on the spine-A clock: bank the frame time,
+  // spend whole steps, never bank a spiral of death.
+  const frameMs = Number(tr.frameMs);
+  if (Number.isFinite(frameMs) && frameMs > 0) sc.acc += frameMs * 0.001;
+  let stepsDue = Math.floor(sc.acc / TRAVEL_STEP_SEC);
+  if (stepsDue > TRAVEL_MAX_STEPS) stepsDue = TRAVEL_MAX_STEPS;
+  if (stepsDue > 0) {
+    sc.acc -= stepsDue * TRAVEL_STEP_SEC;
+    if (sc.acc > TRAVEL_STEP_SEC) sc.acc = 0;
+    const env = {
+      shed: !!tr.shed,
+      noise: noiseFor(seed),
+      W, H, leash,
+      cruise: TRAVEL_SPEED * m * flow,
+      simSec: 0,
+    };
+    const n = soa.n | 0;
+    for (let sIdx = 0; sIdx < stepsDue; sIdx++) {
+      env.simSec = sc.steps * TRAVEL_STEP_SEC;
+      for (let k = 0; k < n; k++) {
+        if (still && still[k]) continue;
+        const index = soa.index ? soa.index[k] : k;
+        let s = sc.states.get(index);
+        if (!s) { s = { ox: 0, oy: 0, vx: 0, vy: 0 }; sc.states.set(index, s); }
+        if (!env.shed && flow <= 0 && s.ox === 0 && s.oy === 0 && s.vx === 0 && s.vy === 0) continue;
+        stepTravelMark(s, soa.x[k], soa.y[k], env);
+      }
+      sc.steps++;
+    }
+  }
+
+  // Present: home + offset. Nothing displaced → no undo, channels untouched.
+  const n = soa.n | 0;
+  let any = false;
+  for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue;
+    const s = sc.states.get(soa.index ? soa.index[k] : k);
+    if (s && (s.ox !== 0 || s.oy !== 0)) { any = true; break; }
+  }
+  if (!any) return null;
+  let base = TRAVEL_BASE_XY.get(soa);
+  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
+  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue;
+    const s = sc.states.get(soa.index ? soa.index[k] : k);
+    if (!s) continue;
+    soa.x[k] += s.ox;
+    soa.y[k] += s.oy;
+  }
+  return () => {
+    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+  };
+}
+
+// The travel pass's declared cost (the governor thesis: no module runs
+// undeclared). Tier 0 — structural, never shed by the effect ladder: the
+// pass adds NO GPU pass, shader or FBO (its marks ride the structural
+// item pass), and it sheds by the governor's own travel rung
+// (hooks/governorCuts.js cut 1.6), the creature-citizen doctrine. Tier 0
+// is exempt from the measured-costs sweep by contract (that sweep times
+// FX shader passes); timeMs here is the MEASURED resolver-CPU figure:
+// applyTransport at the 800-mark cap, one locked step + present, median
+// of 7 runs × 200 calls, sandbox node 2026-10-20 —
+// engine/travel.selfcheck.mjs re-measures it on every run and prints it.
+// Sandbox-indicative only; real hardware authoritative.
+registerCostTier('travel/flow', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.39,
+  notes: '#1574 P1 — FLOW transport: fixed-step curl-flow sim + leash on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+});
 
 /**
  * Seed-derived still instant (Matt decision 5): hash the project seed into

@@ -73,8 +73,10 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // The table is in shed order (recovery iterates it reversed).
   // #1694 S2 — 'creatureCount' joins the table between renderScale and quality:
   // the population sheds first among content cuts (Matt's ruling, #1694 Q2).
+  // #1574 — 'travel' joins between creatureCount and quality (cut 1.6):
+  // the population still sheds first; travel sheds ahead of the tier step.
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'creatureCount', 'quality', 'assetThin', 'countClamp', 'slowRender']);
+  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'creatureCount', 'travel', 'quality', 'assetThin', 'countClamp', 'slowRender']);
   console.log('[selfcheck] governorCuts (#264 restore coverage):',
     `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
 }
