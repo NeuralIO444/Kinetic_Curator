@@ -6,6 +6,7 @@
 // - Shed load in a DEFINED ORDER — the cut list. Order is the contract
 //   (see ./governorCuts.js, pure and unit-tested):
 //     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
+//     cut 1.5: creature count (#1694 S2 — population sheds before finishes)
 //     cut 2: quality tier step HIGH → BALANCED → PERF
 //     cut 3: mirror/gloss/ACCUM shed (independent perfTier1 mechanism, lower FPS floor)
 //     cut 4: cost-aware asset thinning (drop highest-cost assets first)
@@ -99,6 +100,10 @@ export function usePerformanceGovernor() {
   const fxaa = useStore(s => s.fxaa);
   const fxaaShed = useStore(s => s.fxaaShed);
   const setFxaaShed = useStore(s => s.setFxaaShed);
+  // #1694 S2 — the creature rung: the artist's count and the shed overlay.
+  const creatureCount = useStore(s => s.creatureCount);
+  const creatureShed = useStore(s => s.creatureShed);
+  const setCreatureShed = useStore(s => s.setCreatureShed);
   const layoutParams = useStore(s => s.layoutParams);
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
@@ -233,13 +238,14 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource,
+      slowRender, slowRenderSource, creatureShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
       switch (cut.kind) {
         case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
+        case 'creatureCount': setCreatureShed(0); break;
         case 'quality':
           // #264 M1 — restore the tier the governor stepped down from,
           // then release the claim. A manual quality change clears
@@ -292,6 +298,8 @@ export function usePerformanceGovernor() {
       assetThin,
       perfClampOverride,
       effectiveCount: layoutParams.count,
+      creatureCount,
+      creatureShed,
       slowRender,
       gpuSaturated,
     });
@@ -300,6 +308,7 @@ export function usePerformanceGovernor() {
     switch (cut.kind) {
       case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
+      case 'creatureCount': setCreatureShed(cut.creatureShed); break;
       case 'quality':
         // #264 — record the tier being stepped down from, once per shed
         // episode, so recovery restores exactly it (never the operator's
@@ -323,5 +332,6 @@ export function usePerformanceGovernor() {
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
   }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
+    creatureCount, creatureShed, setCreatureShed,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }

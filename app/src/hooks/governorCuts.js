@@ -9,6 +9,12 @@
 //   cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //          gated on the gpuSaturated signal (#259): fires only when the GPU
 //          is the bottleneck — otherwise it only pixelates.
+//   cut 1.5: creature count (#1694 slice 2, Matt's ruling Q2) — the population
+//          sheds FIRST among content cuts, before the quality tier and every
+//          finish below it; only edge AA and the pixel trim precede it, and
+//          those cost the picture nothing. One creature per governor step,
+//          off the creatureShed overlay — the artist's count never moves —
+//          and the population restores whole when pressure clears.
 //   cut 2: quality tier step high → balanced → performance
 //   cut 3: mirror/gloss/ACCUM shed (perfTier1 — independent, lower FPS floor)
 //   cut 4: cost-aware asset thinning
@@ -78,6 +84,13 @@ export const GOVERNOR_RESTORE_CUTS = [
     kind: 'renderScale',
     needsRestore: (s, ctx) => ctx.healthy && Number(s.renderScale) < 1 - 1e-9,
     restoredLabel: 'PIXEL TRIM off — full pixels back',
+  },
+  {
+    kind: 'creatureCount',
+    // #1694 S2 — the shed stepped one creature at a time; the restore brings
+    // the whole population back in one pass (this table's convention).
+    needsRestore: (s, ctx) => ctx.healthy && (s.creatureShed | 0) > 0,
+    restoredLabel: 'creatures back — full cast',
   },
   {
     kind: 'quality',
@@ -167,6 +180,18 @@ export function nextGovernorCut(s) {
     };
   }
 
+  // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
+  // sheds FIRST among content cuts — population before finishes. One
+  // creature per step, off the creatureShed overlay; the artist's count is
+  // never written. Both fields default to 0 when absent, so callers that
+  // predate the citizen (and their pinned ladder walks) see the ladder
+  // exactly as it was.
+  const creatureCount = s.creatureCount | 0;
+  const creatureShed = s.creatureShed | 0;
+  if (creatureCount - creatureShed > 0) {
+    return { kind: 'creatureCount', creatureShed: creatureShed + 1, label: `CREATURES → ${creatureCount - creatureShed - 1}` };
+  }
+
   // Cut 2: quality tier step (placement + particle budgets).
   if (s.quality === 'high') {
     return { kind: 'quality', quality: 'balanced', label: 'TIER DROP → BALANCED' };
@@ -209,6 +234,10 @@ export function shedSummary(s) {
   const out = [];
   if (Number(s.renderScale) < 1 - 1e-9) {
     out.push(`pixel trim ${Math.round(Number(s.renderScale) * 100)}%`);
+  }
+  // #1694 S2 — the badge is honest about a population shed.
+  if ((s.creatureShed | 0) > 0) {
+    out.push(`creatures −${s.creatureShed | 0}`);
   }
   // #264 — governor-shed quality is a shed like any other: the badge shows
   // it. qualityShedFrom is only set by the governor's own shed, so a

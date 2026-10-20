@@ -232,3 +232,37 @@ registerCostTier('creature:glitch', {
   timeMs: 0,
   notes: 'Phase 2 S8 — glitch corruption: seeded item-stream math (strip slip, seam drift, channel-split ghosts, hatch sort); no GPU pass, no FBOs. Cost lives in item count and resolver CPU, measured via resolverProbe lineage.',
 });
+
+// --- #1694 S2: the creature citizen's families (curator/creatureCitizen.js) ---
+// APPEND-ONLY BLOCK (this slice's own; do not edit another slice's block).
+// ONE pool citizen (`creature`), TWO families with different bodies and
+// costs — so the declarations are per family, while pool identity stays the
+// single citizen. Both tier 0 (structural, never shed by the effect ladder):
+// neither family adds a GPU pass, shader or FBO — their items ride the
+// structural item pass — and the citizen sheds as an ASSET, by the
+// governor's creatureCount count cut (hooks/governorCuts.js cut 1.5), the
+// same doctrine the blocks above state for their sub-features.
+// timeMs is MEASURED resolver CPU at each family's population cap, the
+// weather way (scripts' resolver-probe pattern, child process): the live
+// resolver driven on a 300-mark scene, per-frame median of 600 warm frames,
+// median of 7 runs, sandbox node 2026-10-19 — moth = the 4-pin stage minus
+// the empty stage (+1.18 ms; 440 creature items), dish = one hosted pin,
+// pressure 1, limbs grown, minus the empty stage (+0.05 ms; 16 items, the
+// XPBD body solve). Sandbox-indicative only; real hardware authoritative
+// (re-measure on device — #1578/#1639). The full stage (3 moths + the dish
+// creature) measured +0.88 ms in the same runs. Judged against the 2.0 ms
+// creature allowance (data/quality.js CREATURE_FRAME_ALLOWANCE_MS) by
+// scripts/costBudgetReport.mjs; the standing proof is
+// engine/kernel/creatureCost.selfcheck.mjs, which re-measures and compares.
+registerCostTier('creature/moth', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 1.18,
+  notes: '#1694 S2 — the moth family at the 4-creature cap: skeleton + mirrored part fan + skinning on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
+});
+registerCostTier('creature/dish', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes: '#1694 S2 — the dish creature (one hosted pin at most, by the formation rule): XPBD disc body + grown limbs on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
+});
