@@ -1,264 +1,185 @@
-# STAGING REPORT — #1694 slice S2: pool citizenship
+# STAGING REPORT — #1694 slice S3: controls fold-in (LOCAL ONLY — no push, no PR)
 
-Branch `ember/1694-s2-pool-citizenship` on S1 tip `11efdac8`. LOCAL COMMITS ONLY — nothing pushed, no PR, no GitHub writes.
+Branch `ember/1694-s3-controls-fold-in`, base = S2 tip `e8fa9792`. This is the last
+slice of the creature repipe. It implements Q3 as ruled: **the creature count becomes
+a BUILD param; the DIRECTORS stepper retires.** (This file replaces S2's staging
+report at the worktree root; S2's remains in git history at `e8fa9792`.)
 
 ## What was built
 
-The creature families are now citizens of the asset pool: ONE pool entry, `creature`
-(category `creature`), standing for both live families — the field-formed moths and the dish
-creature — per Matt's rulings on #1694 (Q4: one entry, family as a tile option; Q1: pin-still =
-the anchor holds, the animal keeps living; Q2: the creature count sheds FIRST). The count
-control itself did not move (that is S3's Q3 work). Robots and L-system growths were not
-staged (no stage path exists; out of scope per the brief).
+1. **The count's new home.** `creatures` joins the BUILD layout-param family in
+   `app/src/data/layout-modes.js`:
+   - `DEFAULT_LAYOUT_PARAMS.creatures = 0` (the pre-fold-in store default — an
+     untouched stage spawns nothing).
+   - `PARAM_SPEC.creatures = { min: 0, max: 4, int: true }` — the bounds are
+     `sanitizeCount`'s bounds (`curator/spawn.js`, `MAX_CREATURES`), so the trust
+     boundary and the spawn sanitizer clamp to the same 0..4.
+   - Deliberately **not** in `RANDOMIZABLE_KEYS` / `MORPHABLE_KEYS`: the dice,
+     Evolve and morphs never write the count. It is quantized hand input only.
+2. **The surface.** BUILD §3 Motion & Behavior's hype/moth block gains a **CREATURES**
+   ValueButton (SliderEditor 0..4, step 1, `Math.round` on write) at the top of the
+   stack, written through the block's existing `set()` → `Events.LAYOUT_PARAM
+   {key:'creatures'}` door. Not mode-gated — the stepper never was. The block is
+   renamed to what it is: file `CreatureSliders.jsx` → **`HypeSliders.jsx`**
+   (component `HypeSliders`, subheader "hype / moth", the 🦋 gone). BODY / flap /
+   TIGHT / breath / wind / METABOLISM did not move.
+3. **The old home retired end-to-end.** Store field `creatureCount` + `setCreatureCount`
+   (`state/slices/globalSlice.js`), the `creature:count` bus event
+   (`composition/eventBus.js`, `eventRegistry.js`, `wireEventBus.js`), the
+   `SET_CREATURE_COUNT` action (`state/actions.js`, `state/applyAction.js`), and the
+   DavisPanel header stepper (chips 0–4, `data-testid creatures-N`). `PanelHeader` in
+   DIRECTORS is self-closing again — the header returns to its pre-#1355 height.
+4. **Resolver contract unchanged in shape.** `gl/liveLoop.mjs` still stamps
+   `creatureCount` on the resolver input every frame; the source is now
+   `layoutParams.creatures` (the same spring-damped params object every slider
+   rides; `| 0` keeps the stamp the integer the spawn channel has always read),
+   still net of the S2 `creatureShed` overlay. Spawn machinery untouched.
+5. **Governor.** `hooks/usePerformanceGovernor.js` derives its `creatureCount`
+   from the existing `layoutParams` selection (`layoutParams?.creatures ?? 0`).
+   The assembled governor state's shape is unchanged, so `governorCuts` cut 1.5
+   (count sheds first) and its restore table are untouched, byte for byte.
+6. **Autosave watch.** `state/projectWatch.mjs` drops `'creatureCount'` from
+   `PROJECT_STATE_KEYS` — the count rides `layoutParams`, already watched
+   wholesale. (The suite derives the list from `serializeProject`'s source both
+   ways; it agrees.)
+7. **Mind snapshot readout** (`App.jsx`) reads `st.layoutParams?.creatures ?? 0`.
 
-**The citizen record** (`app/src/data/assets/index.js`) is appended to `ASSETS` after the
-region bake, so `ASSETS_AUTHORED` — what the bake reads — never sees it and it carries no
-regions. Its tile art is the moth body's own pod glyph (`org_pod_02`'s svg). It declares the
-tile option `options: [{ key: 'family', choices: ['both','moth','dish'], default: 'both' }]`.
-`'creature'` joined `ALL_CATEGORIES`, so the pool panel gets a CREATURE filter chip through
-the existing generic chip code.
+## Storage shape + document migration
 
-**The mechanism is generic, end to end — no creature branch in the panel, no creature case
-in the store:**
+- **New shape:** the count lives only in `layoutParams.creatures` — in the store,
+  in layer snapshots, and in saved documents (serialized inside `layoutParams`
+  like every other param). `serializeProject` writes **no** top-level field.
+  `PROJECT_VERSION` stays 1.
+- **Old shape:** pre-S3 documents carry a top-level `creatureCount` (written only
+  when > 0) and no `creatures` key anywhere.
+- **Migration** (`landLegacyCreatureCount` in `state/projectDocument.js`, called by
+  BOTH parse branches — legacy/versionless and v1): if the raw doc has a top-level
+  `creatureCount`, its `sanitizeCount` value lands in `layoutParams.creatures` —
+  root and per-snapshot. Rules: an explicit `creatures` key in a raw params object
+  always wins (it is the new home); a snapshot whose raw params lack the key takes
+  the legacy value; a snapshot with no params of its own (which `normalizeSnapshots`
+  fills from the raw root) takes the landed root value. Post-migration documents
+  are parse fixed points (verified). Hostile legacy values clamp through the old
+  sanitizer (99 → 4, `'lots'` → 0).
 
-- **Options mechanism (new, generic):** any asset record may declare `options`; the store's
-  `cycleAssetOption(assetId, key)` walks the declared choices and REMOVES the key when the
-  cycle lands back on the default (the codebase's written-only-when-set discipline, the
-  assetKineme pattern); the pool panel renders one cycle chip per declared option for any
-  record carrying them (`Events.ASSETS_OPTION_CYCLE` → eventBus/eventRegistry/wireEventBus →
-  applyAction → store, wired exactly like the weight cycle; a `.tile-opt` style joins
-  pool.css in the still chip's register). State lives in a new document map `assetOptions`,
-  sanitized against the records' own declarations (`sanitizeAssetOptions` in
-  projectNormalize.js: unknown assets, undeclared keys, out-of-choices values and
-  default-valued entries are all dropped), serialized only when non-empty, added to the
-  autosave watch list (`projectWatch.mjs` — caught by its suite, see below), and stamped on
-  the resolver input by liveLoop beside `assetStill` — recorded in takes, replayed from
-  takes (the take format diffs whole inputs; no whitelist to extend).
-- **Enable:** the existing `enabledAssets` map. The resolver-side read lives in
-  `app/src/curator/creatureCitizen.js`: `enabledAssets['creature'] === false` is the only
-  "off" — absence reads ENABLED, because creatures predate the pool switch (the count alone
-  governed them), so every pre-slice document, take and the gate fixture reads exactly as it
-  behaved when recorded. In `spawnState.observe` the citizen-off folds into the count the
-  spawn half sees (0), so the population and its homes clear exactly as dialing the count to
-  0 does today, and the spawn half seeks no homes while off; the builders' appends are
-  additionally gated in `liveResolve` (both families). The default document's map
-  materializes `creature: true` (in `initialEnabledAssets`, shared by the layer snapshots),
-  so the tile tells the truth at boot; soloing the citizen leaves it alone on, soloing a mark
-  writes it off explicitly, toggle-all includes it — all through the existing generic
-  actions, verified against the store in the new suite.
-  - *Documented consequence (honest wart):* after loading a document/voice/cast/shape-union
-    whose enabled map never mentions the citizen, the tile shows the citizen off while it
-    remains enabled-by-absence at the resolver — the same silence the shape-mixer law
-    already accepts for its pool. The first tile tap adopts the citizen into the document
-    explicitly and the tile tells the truth from then on. Materializing the key inside
-    `applyProject` was tried and REVERTED: it broke the deliberate #1062 law ("what the
-    document lists IS the set", pinned by `enabledAssetsRoundTrip`), which outranks the
-    cosmetic wart.
-- **Family:** `creatureFamily(input)` gates the two appends in `liveResolve` — `moth`
-  births no dish creature, `dish` births no moths, `both`/absent is exactly today. (A hosted
-  pin is the dish creature's alone; moths grow on the other formed pins — the families
-  partition by pin, which the new suite's partition check encodes.)
-- **Solo:** no new state — `soloAsset` rewrites the map; see Enable.
-- **Pin-still (Q1):** `hoverPose` (`app/src/engine/creature.js`) — the one function both
-  families read — consults the floor ctx's `stillAssets` set (which `livingMotion` already
-  builds from `input.assetStill`): with `'creature'` in the set, the drift terms (dx, dy,
-  rot) are zeroed and the breath scale is untouched. The dish creature's head steers to its
-  pin (pin + zero offsets) while its body, limbs and band reactions keep living.
-  Byte-identical when `assetStill` is empty or lacks the citizen.
-- **Resolver pool exclusion:** `liveResolve` excludes the citizen from the placeable pool BY
-  ID at the single filter point, BEFORE `assetSig` is computed — so placements, the pool
-  signature, transitions and the swarm are untouched, and **no pool-identity pin event
-  occurs in the live path at all** (see the strip test below). By id, not category: a user
-  duplicate of the citizen sanitizes (via the overlay field whitelist, which carries no
-  `options`) into a plain placeable mark — correct, since citizenship belongs to the one
-  canon entry. The builders keep receiving the full pool (their part lookups); the atlas
-  only ever bakes demanded combos, so the citizen's svg in the loop's svg map is never
-  demanded. The stills baker (`studio/render.mjs`) builds its own pool with the same filter
-  shape and got the same exclusion — see "Sweep findings" below.
+## The §3 pin event — STOPPED before any re-record, as instructed
 
-## The weight semantics (defined here, per the brief)
+Adding `creatures` to the hashed layout params moved the whole-output pins, by
+exactly the weather-slice mechanism: `liveResolve.mjs` merges input params over
+`DEFAULT_LAYOUT_PARAMS` and embeds the merged params object in each layer result,
+which the frame hash walks. **No pin was re-recorded. No fixture was touched.**
 
-The citizen's pool weight is the existing `assetWeightOverrides['creature']`, read by
-`spawnState` from the resolver input and passed to `chooseHomes` (curator/spawn.js) — the
-spawn-side analogue of how `buildPlacements` reads the same map for marks:
+**Strip proof** (scripts kept at `~/workspace/scratch-1694-s3/strip-proof.mjs` and
+`strip-wingwarp.mjs` — they delete the `creatures` key from the shared
+`DEFAULT_LAYOUT_PARAMS` object before the resolver is created, then replay):
 
-- **absent / `'medium'`** (the citizen's native weight): the picker's ranking is literally
-  the pre-citizenship code path — candidates ranked by squared distance to centre, ties in
-  reading order. Byte-identical by construction.
-- **`'heavy'`:** within each search stage, qualifying candidates rank by **fertility
-  descending**, ties by the centrality order — the citizen claims the strongest ground
-  first.
-- **`'light'`:** **fertility ascending**, ties by centrality — the citizen takes the
-  marginal qualifying ground first.
+- creatureGate fixture (`gl/fixtures/creatureRepipe.kcperf`, unmodified): stripped →
+  **ok: true, 901 frames, 16/16 checkpoints, firstMismatch null**.
+- replayGate fixture (`gl/fixtures/replayGate.kcperf`, unmodified): stripped →
+  **ok: true, 3601 frames, 61/61 checkpoints, firstMismatch null**.
+- wingWarp suite with the key stripped → **fully green**, BENT_RESOLVER golden
+  `9f0043e7` restored.
 
-The bias only re-ranks candidates inside a stage: the qualification bars (fertility +
-density, never relaxed), the stage widening, the separation gap, the retry throttle and
-the already-standing homes are all untouched, and standing homes are never re-ranked — the
-weight speaks only when a NEW home is chosen. Fertility is read through the picker's
-`field` only on weighted searches (zero cost when untouched).
+So with the one key removed, this branch's frames are byte-identical to S2's.
+The divergence is the key, and only the key.
 
-**§5 risk (iii) fallback — INVOKED for the dish host, stated plainly:** the weight does NOT
-directly bias which formed pin hosts the dish creature. The host rule (first formed pin)
-lives in the formation half and is unchanged; weight reaches the host only indirectly,
-through the order homes were claimed in (pin order). Inventing a direct host bias would
-have meant new machinery in the formation path for a second-order effect; per the plan this
-is the defined fallback, not a failure.
+**Pins awaiting Matt's re-record ruling (exact list — these three suites fail ONLY
+on the new key):**
 
-## Cost — declarations, measurements, budget
-
-**Registry shape (my call, per the brief):** ONE citizen in the pool, TWO declarations in
-`app/src/engine/kernel/costRegistry.mjs` — `creature/moth` and `creature/dish` — appended
-as a new marked block ("#1694 S2", the file's append-only convention; the existing tier-0
-creature blocks for feather-fan / engraving / glitch are untouched). Declarations are
-per-family because the families have different bodies and costs; pool identity stays the
-one citizen. **Both are tier 0**, and that is forced by the gate, not chosen for
-convenience: `gl/costTiers.selfcheck.mjs` §B requires every non-tier-0 declaration to carry
-a committed entry in `gl/effects/measuredCosts.mjs`, which is GPU-sweep-generated
-(hand-writing one is forbidden) — and neither family HAS a GPU pass to sweep (their items
-ride the structural item pass). Tier 0 is also the file's standing creature doctrine: the
-citizen sheds by the governor's count cut, never by the effect-pass ladder.
-
-**Measurements** (the weather way — resolver probe, child process, 300-mark scene,
-per-frame median of 600 warm frames, median of 7 runs, this sandbox, 2026-10-19):
-
-| arm | delta vs empty stage |
+| Suite | Unstripped failure |
 |---|---|
-| 4 moths (4 pins formed, unhosted, limbs 2) | **+1.18 ms** (runs 1.13–1.34) |
-| 1 dish creature (1 hosted pin, pressure 1, limbs grown) | **+0.05 ms** (runs 0.02–0.08) |
-| full stage (3 moths + dish creature) | +0.88 ms (consistency arm) |
+| `src/gl/creatureGate.selfcheck.mjs` | first checkpoint divergence (frame 0) on the unmodified pre-repipe fixture |
+| `src/gl/replayGate.selfcheck.mjs` | first checkpoint divergence (frame 0) |
+| `src/engine/wingWarp.selfcheck.mjs` | BENT_RESOLVER golden: expected `9f0043e7`, got `dc0897fb` |
 
-Item counts verified per arm (moth 110 items ×4 = 440; dish creature 16 items). Declared
-`timeMs`: moth **1.18**, dish **0.05** — the measured medians, sandbox-labelled in the
-registry notes (the standing re-measurement proof is the new `creatureCost` suite).
-**Budget:** the allowance got a code home — `CREATURE_FRAME_ALLOWANCE_MS = 2.0` exported
-from `app/src/data/quality.js` beside FRAME_BUDGETS (until now the 2.0 ms figure existed
-only as prose in that file's budget comment). `app/scripts/costBudgetReport.mjs` gained a
-Creatures section reading the declarations from the registry (failing loud if a family
-declaration is missing) and judging them by #1639's 80% rule:
+Note on the gate: the brief expected the gate could not move because its fixture's
+inputs carry the count as a stamped field. Empirically it moves for the same reason
+replayGate does — the hash covers the resolver's output, and the output embeds the
+defaults-merged `layoutParams`, which gains the key regardless of the input. The
+fixture file itself is untouched and never re-recorded by me; if Matt rules
+re-record (the weather precedent, `63da9b44`), the coordinator records the new
+checkpoints from the pre-S3 code path exactly as S1's Step 0 did, preserving the
+fixture's provenance property.
 
-| family | declared | share of 2.0 ms allowance | verdict |
-|---|---|---|---|
-| creature/moth | 1.18 ms | 59% | ok |
-| creature/dish | 0.05 ms | 3% | ok |
-| combined (conservative sum — the caps cannot co-occur under the 4-pin cap) | 1.23 ms | 62% | ok |
+## Census suite (new)
 
-**No family is near the allowance; no near-bust to report** (near-bust would be ≥1.6 ms).
-Sandbox CPU numbers — the 2026-10-13 Mac baseline for the same scene was far faster;
-re-measure on device via #1578/#1639 before treating the absolute figures as device truth.
+`app/src/panels/layout/foldInCensus.selfcheck.mjs`, registered in
+`app/selfcheck.manifest` after `unlockTree`. 11 checks, all green: the param's
+home + bounds ≡ `sanitizeCount`; machine key lists exclude it; the old home is
+gone (store field/setter behaviourally absent, event/registry/wiring/action
+source-absent); DIRECTORS carries no creature control and no `header-tools`;
+BUILD's block sets the count 0..4 through the shared door, ungated, in §3; every
+pre-slice param still reachable; `setLayoutParam` clamps like the stepper did;
+the migration (root + both snapshot shapes, explicit-wins, hostile clamps,
+fixed point, round-trip); and the claim's boundary — `?debug=skeleton`
+(CanvasPanel, `isSkeletonDebug()` gate) and `?debug=stress` (App,
+`DEBUG_STRESS` gate) named as dev surfaces outside the claim, Wet Lab pinned
+count-free.
 
-## Governor (Q2)
+## Suite re-points (in-slice, stated per §3 item 4 / wiring-pin class)
 
-`hooks/governorCuts.js` gained cut **1.5** — kind `creatureCount` — after cut 0 (FXAA) and
-the cut-1 pixel-trim steps and BEFORE cut 2 (quality) and every finish below it:
-population before finishes; only edge AA and pixel trim precede it because they cost the
-picture nothing. One creature per governor step, off a new store overlay `creatureShed`
-(perfClampOverride class: render-only, never serialized — the project serializer picks
-named fields and never reads it; `applyProject` resets it like `qualityShedFrom`).
-`usePerformanceGovernor` subscribes count/shed/setter, passes them into `nextGovernorCut`
-and the restore snapshot, applies `setCreatureShed(cut.creatureShed)` on the cut and
-`setCreatureShed(0)` on restore. The restore table gained the matching entry between
-renderScale and quality — `needsRestore = healthy && shed > 0` — restoring the whole
-population in one pass (the table's convention). `liveLoop` stamps
-`creatureCount: max(0, artistCount − creatureShed)` on the resolver input, so a take
-records the count its frames actually ran with and a shed frame replays shed.
-`shedSummary` gained the honest badge line (`creatures −N`). Every pre-existing ladder
-walk is unchanged because the rung reads state fields that default to 0 when absent —
-states that predate the citizen walk the historical ladder untouched (pinned in the new
-suite).
+- `curator/spawn.selfcheck.mjs` §7 — stamp regex re-pointed to the new source;
+  the DIRECTORS-row pins replaced by retirement pins + the BUILD home pin; the
+  save pin replaced by the migration mechanism (both parse branches call
+  `landLegacyCreatureCount`; no `doc.creatureCount =` write remains).
+- `composition/busChain.selfcheck.mjs` — the count now writes through
+  `LAYOUT_PARAM {key:'creatures'}`. Found on the way: `SET_LAYOUT_PARAM` is a
+  coalesced per-frame action (`dispatchPipe` HIGH_FREQ), so the checks emit →
+  `await tick()` → assert, the suite's own flush idiom; the hostile `'lots'`
+  write is asserted after a flush, so the refusal is genuinely exercised.
+- `state/projectDocument.fuzz.selfcheck.mjs` — was passing **vacuously**: its
+  count assertions were guarded by `'creatureCount' in good`, never true once
+  serialize stopped writing the field. Re-pointed to set the count via
+  `layoutParams` and assert `doc.layoutParams.creatures` unconditionally
+  (exempting the `layoutParams`-is-the-bad-field case, where the count
+  legitimately goes with its own field).
+- `state/poolCitizenship.selfcheck.mjs` §3 — store setups/assertions via
+  `layoutParams.creatures`; added pins: the doc carries the count inside
+  `layoutParams` and has no top-level field. Its resolver-input stamps
+  (`creatureCount: 4` on inputs) are the stamped contract and are unchanged.
+- `state/projectWatch.selfcheck.mjs` — behaviour fixture: `creatureCount`
+  entries removed; the `layoutParams` change case now changes `creatures`,
+  which is the real-world wake case.
+- `panels/layout/unlockTree.selfcheck.mjs` + `components/motionGlyph.selfcheck.mjs`
+  — slider-file lists / source path follow the rename (pure wiring pins).
 
-## Byte-identity at rest + proofs
+Untouched and green unmodified: `governorCreatureShed`, `governorCuts`,
+`performanceCreatures`, `creatureCost`, `spawnState`, `census`,
+`projectDocument.selfcheck`, `unlockTree` (catalogue + gates unchanged — the
+count is not a gated param).
 
-- **creatureGate: GREEN, unmodified, never re-recorded.** The Step-0 fixture (901 frames,
-  recorded on pre-repipe code) replays identically with the full S2 implementation in
-  place. The fixture's recorded inputs carry no citizen keys, so defaults (enabled, family
-  both, unweighted, unstilled) reproduce S1's output exactly — the strongest form of the
-  strip test.
-- **Strip test, executable form** (in `poolCitizenship`): a creature-bearing scene (4
-  formed pins, one hosted) resolved with citizen keys ABSENT vs with the citizen at
-  explicit defaults (`creature: true`, `family: 'both'`) produces deep-equal items AND
-  deep-equal spawn decisions. The all-era golden (below) is the same proof for the stills
-  path: with the citizen correctly excluded, its pinned hash matches byte for byte.
-  **No pin or golden embedding pool identity was re-recorded in this slice.**
-- Citizen off → zero creature items and zero homes sought. Family partition: with a hosted
-  pin + a formed pin, `both` = moth items + dish items exactly; each family alone produces
-  only its own.
+## Proofs
 
-## New suites (all registered in `app/selfcheck.manifest`)
-
-- `app/src/state/poolCitizenship.selfcheck.mjs` — 14 checks: pool shape; store semantics
-  (toggle/solo/all, weight cycle, still, family cycle + sanitizer); document round-trip
-  (family rides, shed doesn't, applyProject ends a shed claim); the strip test; citizen-off;
-  family partition; weight semantics on `chooseHomes`; pin-still (anchor zeroed, breath
-  scale exactly preserved).
-- `app/src/engine/kernel/creatureCost.selfcheck.mjs` — declarations present/tier 0/
-  positive; allowance verdicts printed (a bust fails); child-process re-measurement of both
-  families asserted inside the declared sandbox band; budget-report wiring pinned.
-- `app/src/hooks/governorCreatureShed.selfcheck.mjs` — 7 checks: the ruled rung order
-  under forced pressure; the historical ladder for pre-citizen states; restore semantics;
-  the badge; the store overlay's clamping.
-
-## Pin / census / wiring updates in-slice (all flagged; no behaviour golden re-recorded)
-
-1. `governorCuts.selfcheck.mjs` — the restore-table order census gains `'creatureCount'`
-   in its ruled position (§3 item-4 class: the table's contents are the contract being
-   extended).
-2. `regionBake.selfcheck.mjs` §4 — the pool-contents census: `ASSETS.length` is now
-   `ASSETS_AUTHORED.length + 1`, with the citizen asserted explicitly (last entry, no baked
-   mattes); every authored-asset invariant in the section is unchanged (§3 item-4 class).
-3. `spawn.selfcheck.mjs` — S1's wiring pin for the loop's count stamp re-pointed to the
-   stamp's new text (`creatureCount: Math.max(0, (s.creatureCount | 0) − (s.creatureShed | 0))`);
-   the behaviour it pins (the loop stamps the count the resolver runs with) is unchanged in
-   kind — the stamp now nets the shed. Same class as S1's roomWidth pin re-point.
-
-## Sweep findings (three real gaps the sweep caught, all fixed in-slice)
-
-1. **`allEraGolden`** — the all-era golden renders the FULL catalog through the stills
-   baker (`studio/render.mjs`), whose pool filter did not exclude the citizen, so the
-   citizen was placed as a mark and the pinned first-render hash moved. The fix completes
-   the slice's own semantics in the second resolver (same by-id exclusion at its single
-   filter point); the golden then matches byte for byte — **the pin was NOT re-recorded**
-   and the §3 STOP did not need to fire. Also noted there: the stills path has never baked
-   creatures (no spawn channel) — that predates citizenship and is unchanged by it.
-2. **`regionBake`** — the §4 census above.
-3. **`projectWatch`** — `assetOptions` was saved but not on the autosave watch list, so a
-   family toggle alone would not have woken the autosave. Added; suite green.
-
-## Deviations from the brief's letter (each deliberate, each stated)
-
-1. **Citizen record home:** the brief allowed canon or an overlay-side module ("your
-   call"). The record lives in canon (`ASSETS`, appended post-bake) — the alternative
-   would have forced special cases into `findAsset`, the sanitizer's known-id set, the
-   serializer and the panel's pool merge; in canon, all of that machinery works untouched,
-   which is the point of citizenship. One cost: the tile's Wet Lab "edit" button can store
-   attach points under the citizen's id that no builder reads by that id — the generic
-   tile's uniform behaviour for every asset (most marks' attach points are equally inert
-   until a builder reads them); noted here rather than branched around in the panel.
-2. **`wholeEnabledAssets` materialization reverted** (see Enable): #1062's set law
-   outranks tile cosmetics on legacy documents; absence-means-enabled at the resolver
-   carries the behaviour truth.
-3. **Weight → dish host:** §5 (iii) fallback invoked (see the weight section).
-4. **Cost declarations are tier 0** (see Cost): the §B measured-costs gate makes a higher
-   tier impossible without a GPU pass to sweep; tier 0 is also the file's standing
-   creature doctrine.
-
-## Verification
-
-- **Full manifest sweep** (the copied method; 483 commands, `swarmWasm` excluded by the
-  method itself): 482 run — 477 PASS as recorded, 5 FAIL, each dispositioned:
-  `allEraGolden`, `regionBake`, `projectWatch` were real S2 gaps, fixed in-slice and
-  re-verified green standalone; `resolverProbe` failed under sweep contention on its
-  3 ms timing bound (3.454 ms) and passes standalone (4 creatures 2.63 ms, delta inside
-  the bound — verified twice); `rollSafety` is the standing sandbox exception (the headless
-  browser died mid-suite — `Target page, context or browser has been closed` — in fx code
-  this slice does not touch; proven base-identical on clean main). `swarmWasm` is the other
-  standing exception, excluded by the sweep method. Final state: **every suite green except
-  the two standing sandbox exceptions.**
-- Headline suites re-run after all fixes: creatureGate, replayGate, costTiers,
-  governorCuts, poolCitizenship, creatureCost, governorCreatureShed, allEraGolden,
-  projectWatch — all PASS. Family suites (spawn, formation, limbs, davisShift, dishPins,
-  dishPressure, creature, dishCreature, spawnState, resolverProbe, enabledAssetsRoundTrip,
-  exportStill, projectDocument) green.
-- Budget report: creature rows render from the registry (verified end-to-end against a
-  synthetic dataset: moth 1.18 ms 59% ok · dish 0.05 ms 3% ok · combined 1.23 ms 62% ok).
-- Lint: **0 errors / 11 warnings** — the exact baseline.
+- Baseline before edits: 16/16 relevant suites green on the untouched base.
+- After the build: every suite above green except the three §3 pins listed.
+- Lint: **0 errors / 11 warnings** (exact baseline).
 - Production build: green.
+- Full manifest sweep: **483 run / 479 PASS / 4 FAIL**. The four failures are
+  exactly the sanctioned set: `rollSafety` (standing sandbox exception,
+  base-identical) and the three §3 pins above (`creatureGate`, `replayGate`,
+  `wingWarp`) — failing only on the new key, per the strip proof. `swarmWasm`
+  excluded by the sweep script per the standing method (sandbox, base-identical).
+- `creatureGate` fixture: untouched (no fixture path appears in the diff).
+
+## Deviations and flags
+
+1. **§3 stop taken on creatureGate as well as replayGate/wingWarp** (see the pin
+   section above for the mechanism and the strip proof). Nothing re-recorded.
+2. **Count changes are now undoable.** Writes go through `setLayoutParam`,
+   which pushes undo history like every layout param; the retired stepper wrote
+   a plain store field and was not undoable. This is the generic BUILD-param
+   behaviour Q3's ruling implies ("joins the BUILD param family"), flagged
+   rather than special-cased away.
+3. **Keeps now carry the count.** `captureFavorite` copies `layoutParams`
+   wholesale and never carried the count before; post-S3 keeps carry it inside
+   the layout, automatically. Pre-S3 keeps load with count 0 (no key → default).
+   No code change was needed or made.
+4. **Spring glide.** `liveLoop`'s slider springs damp every numeric param,
+   `creatures` included (the int `count` already behaves this way); the stamp
+   truncates with `| 0`, so a 0→4 change steps creatures in as the glide
+   crosses integers — the same fade-in class as `count`-driven items. Takes
+   record the stamped per-frame count, so replay stays exact.
+5. **Historical docs left alone.** `docs/research/strata-quantized/qa-report.md`
+   still names `CreatureSliders.jsx` — it is a dated audit record, not wiring.
+6. Robots / L-system growths: not staged (no stage path exists; out of scope,
+   untouched).

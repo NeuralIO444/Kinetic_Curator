@@ -140,13 +140,9 @@ ok('PATTERN track: mode and params change; a new track is added as ground; selec
   assert.equal(S().layers.length, count + 1);
 });
 
-ok('the rest of the controls Matt exercised: canvas, creature count, MIDI, startup, queue, macros', () => {
+ok('the rest of the controls Matt exercised: canvas, MIDI, startup, queue, macros', () => {
   emit(Events.CANVAS_SIZE, { w: 1080, h: 1920, presetId: 'custom' });
   assert.deepEqual([S().canvasW, S().canvasH], [1080, 1920]);
-  emit(Events.CREATURE_COUNT, { n: 3 });
-  assert.equal(S().creatureCount, 3);
-  emit(Events.CREATURE_COUNT, { n: 99 });
-  assert.equal(S().creatureCount, 4, 'the TE four');
   emit(Events.MIDI_ENABLED, { on: true });
   assert.equal(S().midiEnabled, true);
   emit(Events.MIDI_ENABLED, { on: false });
@@ -158,6 +154,21 @@ ok('the rest of the controls Matt exercised: canvas, creature count, MIDI, start
   assert.equal(S().mathMacros.find((m) => m.id === id).name, 'swell');
   emit(Events.MACRO_REMOVE, { id });
   assert.equal((S().mathMacros || []).length, macros);
+});
+
+// #1694 S3 — the creature count is a BUILD layout param now: it rides the generic
+// LAYOUT_PARAM door the sliders use (the creature-only CREATURE_COUNT event retired
+// with the DIRECTORS stepper it fed). SET_LAYOUT_PARAM is a coalesced per-frame
+// action, so each write is read after a tick — the same flush section A uses.
+emit(Events.LAYOUT_PARAM, { key: 'creatures', value: 3 });
+await tick();
+ok('the creature count writes through the layout-param door', () => {
+  assert.equal(S().layoutParams.creatures, 3);
+});
+emit(Events.LAYOUT_PARAM, { key: 'creatures', value: 99 });
+await tick();
+ok('the creature count clamps at the trust boundary', () => {
+  assert.equal(S().layoutParams.creatures, 4, 'the TE four');
 });
 
 ok('project title (clamped to 80), the experimental taste switch, and clear taste', () => {
@@ -199,11 +210,16 @@ ok('hostile payloads (a persona or a model reply) cannot corrupt the stage', () 
   assert.ok(Number.isFinite(S().beatBpm), 'BPM stays finite');
   emit(Events.CANVAS_SIZE, { w: -5, h: 'wide', presetId: 'custom' });
   assert.ok(S().canvasW > 0 && S().canvasH > 0 && Number.isFinite(S().canvasW), 'canvas size stays valid');
-  emit(Events.CREATURE_COUNT, { n: 'lots' });
-  assert.ok(Number.isInteger(S().creatureCount) && S().creatureCount >= 0 && S().creatureCount <= 4);
+  emit(Events.LAYOUT_PARAM, { key: 'creatures', value: 'lots' }); // refused at the boundary — asserted after the flush below
   // the layer list is still structurally the session's (no layer lost, none invented by the junk above)
   assert.deepEqual(S().layers.map((l) => l.id).filter((id) => layersBefore.some((l) => l.id === id)), layersBefore.map((l) => l.id));
   assert.deepEqual(errors.filter((e) => /\[eventBus\]/.test(e)), [], 'nothing threw');
+});
+
+await tick(); // flush the coalesced hostile write, so the refusal below is real and not just pending
+ok('a hostile creature count is refused at the trust boundary', () => {
+  assert.ok(Number.isInteger(S().layoutParams.creatures) && S().layoutParams.creatures >= 0 && S().layoutParams.creatures <= 4);
+  assert.equal(S().layoutParams.creatures, 4, 'the refused write left the count where the clamped write put it');
 });
 
 console.warn = realWarn; console.error = realError;

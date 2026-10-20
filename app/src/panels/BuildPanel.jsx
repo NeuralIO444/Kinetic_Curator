@@ -20,7 +20,7 @@ import { SymmetryRow, BehaveRow } from './layout/ChipRows.jsx';
 import { StructureToggles } from './layout/StructureToggles.jsx';
 import { AccumFamily } from './layout/AccumFamily.jsx';
 import { SwarmSliders } from './layout/SwarmSliders.jsx';
-import { CreatureSliders } from './layout/CreatureSliders.jsx';
+import { HypeSliders } from './layout/HypeSliders.jsx'; // #1694 S3 — the hype/moth block (CREATURES + motion params); was CreatureSliders
 import { AppearanceSliders } from './layout/AppearanceSliders.jsx';
 import { MaterialSliders } from './layout/MaterialSliders.jsx'; // #1585 — material body tunables (Materials M4)
 import { ChiaroscuroSection } from './layout/ChiaroscuroSection.jsx';
@@ -119,7 +119,7 @@ export function BuildPanel() {
           <MotionShelf layoutParams={layoutParams} />
           <BehaveRow layoutParams={layoutParams} />
           <SwarmSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <CreatureSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+          <HypeSliders layoutParams={layoutParams} lockedParams={lockedParams} />
           <AccumFamily layoutParams={layoutParams} />
         </BuildSection>
 

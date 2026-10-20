@@ -13,7 +13,6 @@ import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS } from '../engine/kineme.js';
-import { useStore } from '../state/store.js';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -51,8 +50,6 @@ export function DavisPanel() {
     audioBands, hitCount,
   } = state;
   const { palette } = useApp();
-  // #1355 AUTO SPAWN — the artist's creature count (a store field, set directly: a count, not a reduced param)
-  const creatureCount = useStore((s) => s.creatureCount);
 
   // #719: the one keep capture — seed, offsets (#305), layout, palette, cast.
   const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
@@ -99,22 +96,10 @@ export function DavisPanel() {
 
   return (
     <div className="panel panel-davis">
-      <PanelHeader tag="P07" title="DIRECTORS" subtitle={subtitle}>
-        {/* #1355 AUTO SPAWN — how many creatures: a discrete count (the TE four). Each finds its own home in the middle of
-            the dish, where it can live. 0 is the default: nothing spawns until it is raised. In the HEADER, not the body,
-            so the panel's content height (it fits a 720 px window without a scroll) is untouched. */}
-        <div className="header-tools" role="group" aria-label="creatures"
-          title="How many moths live in the dish. Each finds its own home in the middle, where the ground is fertile and crowded.">
-          <span className="lbl" aria-hidden="true">moths</span>
-          {[0, 1, 2, 3, 4].map((n) => (
-            <button key={n} type="button" className={`chip-btn act${creatureCount === n ? ' active' : ''}`} aria-pressed={creatureCount === n}
-              aria-label={n === 0 ? 'no creatures' : `${n} ${n === 1 ? 'creature' : 'creatures'}`} data-testid={`creatures-${n}`}
-              onClick={() => emit(Events.CREATURE_COUNT, { n })}>
-              {n}
-            </button>
-          ))}
-        </div>
-      </PanelHeader>
+      {/* #1694 S3 — the header is back to its pre-#1355 height: the "moths" stepper that
+          lived here retired with the fold-in. The creature count is a BUILD param now
+          (CREATURES in BUILD's hype/moth block), beside the motion params it belongs with. */}
+      <PanelHeader tag="P07" title="DIRECTORS" subtitle={subtitle} />
       <div className="davis-body">
           {/* #248 Phase 5 — MORPH EVOLVE and PHRASE LOOP moved to PLAY.
               The phrase- and morph-related state above stays selected here:

@@ -29,7 +29,6 @@ import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
-import { sanitizeCount } from '../../curator/spawn.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -420,14 +419,14 @@ export const createGlobalSlice = (set) => ({
   }),
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
-  // #1355 AUTO SPAWN: the artist sets how many creatures (0 to 4); each finds its own home in the middle of the dish and
-  // the homes are published here as `dishPins`, which the resolver reads (so a take records them). Not set by hand.
-  creatureCount: 0,
-  setCreatureCount: (n) => set({ creatureCount: sanitizeCount(n) }),
+  // #1355 AUTO SPAWN homes are published here as `dishPins`, which the resolver reads (so a
+  // take records them). Not set by hand. (#1694 S3 — the artist's creature COUNT left this
+  // slice with the fold-in: it is the BUILD layout param `creatures` now, set from BUILD's
+  // hype/moth block; the DIRECTORS stepper and this field retired together.)
   /** #1694 S2 — the governor's creature shed: how many of the artist's creatures the governor is
    * currently holding back. A render-only overlay in the perfClampOverride class — never
-   * serialized into a document; liveLoop stamps creatureCount − creatureShed on the resolver
-   * input. Restores whole when pressure clears (governorCuts' restore table). */
+   * serialized into a document; liveLoop stamps the `creatures` param − creatureShed on the
+   * resolver input. Restores whole when pressure clears (governorCuts' restore table). */
   creatureShed: 0,
   setCreatureShed: (n) => set({ creatureShed: Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0 }),
   dishPins: [],
@@ -866,7 +865,9 @@ export const createGlobalSlice = (set) => ({
     next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
     next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
     next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
-    next.creatureCount = sanitizeCount(doc.creatureCount); // #1355 AUTO SPAWN: homes are found again for the new dish
+    // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
+    // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
+    // there). Homes are found again for the new dish either way.
     next.dishPins = [];
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
     next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone

@@ -1,7 +1,15 @@
-// Creature / moth as amber TE value buttons (#1202).
-// The hype/moth family: BODY, flap, TIGHT, breath, wind, METABOLISM.
+// The hype/moth family as amber TE value buttons (#1202): CREATURES, BODY,
+// flap, TIGHT, breath, wind, METABOLISM.
+// #1694 S3 — this block is the creature family's BUILD home after the controls
+// fold-in: CREATURES (how many live in the dish, 0..4) is a layout param like
+// the rest and is set here, at the top of its family's stack. The DIRECTORS
+// "moths" stepper and the creature-only framing (the butterfly header this
+// block used to wear) retired; the motion params did not move — only the
+// count joined them, in the home the Q3 ruling named.
 // (CROOKED / OPEN / SQUASH are mark-shape — they live in APPEARANCE.)
-// Mode-gated per #272; locks ride on the button.
+// Mode-gated per #272; locks ride on the button. CREATURES itself is not
+// mode-gated: the stepper never was — a count set in any mode is the count
+// the dish gets.
 // #716 — wind/breath/flap keep the MotionTile glyph (the tile visualizes
 // the value); the rest are TE value buttons.
 import { MotionTile } from '../../components/MotionTile.jsx';
@@ -11,7 +19,7 @@ import { SliderEditor } from '../build/te/editors.jsx';
 
 const fmt2 = (v) => (Math.round(v * 100) / 100).toString();
 
-export function CreatureSliders({ layoutParams, lockedParams }) {
+export function HypeSliders({ layoutParams, lockedParams }) {
   const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
   const mode = layoutParams.mode;
@@ -36,8 +44,14 @@ export function CreatureSliders({ layoutParams, lockedParams }) {
 
   return (
     <div className="param-block">
-      <div className="param-subheader ttl">🦋 moth / hype</div>
+      <div className="param-subheader ttl">hype / moth</div>
       <div className="slider-stack">
+        {/* #1694 S3 — the count, at home: a quantized hand input with the same
+            0..4 range and 0 default the retired stepper had, written through
+            the same LAYOUT_PARAM door as every neighbour. */}
+        {btn('CREATURES', 'creatures', `${layoutParams.creatures ?? 0}`,
+          <SliderEditor ariaLabel="Creatures" value={layoutParams.creatures ?? 0}
+            min={0} max={4} step={1} onChange={(v) => set('creatures', Math.round(v))} />)}
         {btn('BODY', 'body', `${layoutParams.body ?? 3}`,
           <SliderEditor ariaLabel="Body" value={layoutParams.body ?? 3}
             min={1} max={7} step={1} onChange={(v) => set('body', Math.round(v))} />,

@@ -101,10 +101,13 @@ export function usePerformanceGovernor() {
   const fxaaShed = useStore(s => s.fxaaShed);
   const setFxaaShed = useStore(s => s.setFxaaShed);
   // #1694 S2 — the creature rung: the artist's count and the shed overlay.
-  const creatureCount = useStore(s => s.creatureCount);
+  // S3 — the count is the BUILD param `creatures`; it derives from the layoutParams
+  // selection below (the governor state's creatureCount field keeps its shape, so
+  // governorCuts' shed/restore contract is untouched).
   const creatureShed = useStore(s => s.creatureShed);
   const setCreatureShed = useStore(s => s.setCreatureShed);
   const layoutParams = useStore(s => s.layoutParams);
+  const creatureCount = layoutParams?.creatures ?? 0;
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.

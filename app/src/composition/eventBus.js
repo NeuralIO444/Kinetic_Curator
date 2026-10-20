@@ -230,7 +230,6 @@ export const Events = {
   MACRO_RENAME: 'macro:rename', // { id, name }
   FEEL_APPLY: 'feel:apply', // { id } a FEEL preset
   LIGHT_SET: 'light:set', // the CHIAROSCURO sun patch itself (an object, or a boolean for on/off)
-  CREATURE_COUNT: 'creature:count', // { n } how many moths (0..4)
   ATTACH_CLEAR: 'attach:clear', // { assetId } drop an asset's edited ATTACH points
   BEAT_BPM: 'beat:bpm', // { bpm } the BEAT master BPM
   BEAT_METRO: 'beat:metro', // { on } the metro click

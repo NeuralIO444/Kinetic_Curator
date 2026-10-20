@@ -35,13 +35,13 @@ ok('by behaviour: changing each watched field changes the saved document, and wa
   const base = {
     seed: 1, seedOffsets: {}, paletteId: 'praystation', layoutParams: {}, enabledAssets: {}, quality: 'balanced', autoQuality: true,
     assetWeightOverrides: {}, projectTitle: '', paletteOverrides: null, paletteLocks: {}, customAssets: [], light: null,
-    assetKineme: {}, assetStill: {}, assetAttach: {}, creatureCount: 0, audioRoutes: null, midiMap: {}, mathMacros: [],
+    assetKineme: {}, assetStill: {}, assetAttach: {}, audioRoutes: null, midiMap: {}, mathMacros: [],
     layers: null, activeLayerId: null, layerSnapshots: {},
     canvasW: 1000, canvasH: 700, canvasFps: 60, canvasPresetId: 'custom', stageMode: 'preview',
   };
   const changed = {
-    seed: 2, seedOffsets: { spatial: 3 }, paletteId: 'bone', layoutParams: { count: 99 }, enabledAssets: { a: true }, quality: 'performance',
-    autoQuality: false, assetWeightOverrides: { a: 'heavy' }, projectTitle: 'Night', paletteLocks: { 0: true }, creatureCount: 4,
+    seed: 2, seedOffsets: { spatial: 3 }, paletteId: 'bone', layoutParams: { creatures: 2 }, enabledAssets: { a: true }, quality: 'performance',
+    autoQuality: false, assetWeightOverrides: { a: 'heavy' }, projectTitle: 'Night', paletteLocks: { 0: true },
     canvasW: 1920, canvasH: 1080, canvasFps: 30, stageMode: 'fullscreen', midiMap: { 'note:1:36': { target: 'evolve' } },
   };
   const woke = [];

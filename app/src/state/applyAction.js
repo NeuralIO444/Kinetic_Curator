@@ -212,7 +212,6 @@ export function applyAction(action, store = useStore.getState()) {
     case A.RENAME_MATH_MACRO: return store.renameMathMacro(action.id, action.name);
     case A.APPLY_FEEL: return store.applyFeel(action.id);
     case A.SET_LIGHT: return store.setLight(action.patch);
-    case A.SET_CREATURE_COUNT: return store.setCreatureCount(action.n);
     case A.CLEAR_ASSET_ATTACH: return store.clearAssetAttach(action.assetId);
     case A.SET_BEAT_BPM: return store.setBeatBpm(action.bpm);
     case A.SET_BEAT_METRO: return store.setBeatMetro(action.on);

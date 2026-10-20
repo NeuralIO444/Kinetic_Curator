@@ -173,7 +173,6 @@ export function wireEventBus(rawDispatch) {
   on(Events.MACRO_RENAME, (p = {}) => dispatch({ type: A.RENAME_MATH_MACRO, id: p.id, name: p.name }));
   on(Events.FEEL_APPLY, (p = {}) => dispatch({ type: A.APPLY_FEEL, id: p.id }));
   on(Events.LIGHT_SET, (patch) => dispatch({ type: A.SET_LIGHT, patch }));
-  on(Events.CREATURE_COUNT, (p = {}) => dispatch({ type: A.SET_CREATURE_COUNT, n: p.n }));
   on(Events.ATTACH_CLEAR, (p = {}) => dispatch({ type: A.CLEAR_ASSET_ATTACH, assetId: p.assetId }));
   on(Events.BEAT_BPM, (p = {}) => dispatch({ type: A.SET_BEAT_BPM, bpm: p.bpm }));
   on(Events.BEAT_METRO, (p = {}) => dispatch({ type: A.SET_BEAT_METRO, on: p.on }));

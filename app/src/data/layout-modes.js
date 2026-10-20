@@ -159,6 +159,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
 
   body: 3,
   flap: 0.35,
+  // #1694 S3 — how many creatures live in the dish (0..4, the old DIRECTORS
+  // stepper's exact range). The count is a BUILD param since the fold-in:
+  // quantized hand input beside its neighbours, read by liveLoop, which
+  // stamps it on the resolver input as `creatureCount`. Default 0 is the
+  // pre-fold-in store default — an untouched stage spawns nothing. A saved
+  // project from before the move carries the count as a top-level
+  // `creatureCount` field instead; projectDocument lands it here on load.
+  creatures: 0,
   kinemeRate: 1, // #781 KINEME RATE: 1 = each kineme's own tempo, 0 freezes
   // #1127 ROTATE spin: every mark that has no kineme of its own turns this many revolutions per second, on top of
   // its static angle (the ROTATE range stays the spread of starting angles). Off by default since #1128: the
@@ -364,6 +372,10 @@ export const PARAM_SPEC = {
   damping: { min: 0.80, max: 0.99 },
   body: { min: 1, max: 7, int: true },
   flap: { min: 0, max: 1 },
+  // #1694 S3 — the creature count's bounds ARE sanitizeCount's bounds
+  // (curator/spawn.js, MAX_CREATURES): the trust boundary and the spawn
+  // sanitizer clamp to the same 0..4, so no door can land a fifth creature.
+  creatures: { min: 0, max: 4, int: true },
   // #594 PR3 squash-and-stretch: how much a moving mark thins across its
   // motion while the #309 smear stretches it along — 1 holds its area.
   squash: { min: 0, max: 1 },

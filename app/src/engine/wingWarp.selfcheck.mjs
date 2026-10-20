@@ -103,9 +103,15 @@ function builderRun(skinning, bentT, over = {}) {
 // weatherAir layout param, so the resolver's hashed output gained exactly one key (weatherAir: 0,
 // dial off). Proven before re-pinning: branch resolver output minus that key is byte-identical to
 // the base tree's output, and the builder pins did not move — no behaviour changed.)
+// (Re-pinned again 2026-10-19 for #1694 S3, Matt's ruling: the two RESOLVER pins only. S3 made the
+// creature count a BUILD layout param (creatures: 0), so the hashed output gained exactly one more
+// key — the same mechanism as #1183. Proven before re-pinning: with the creatures key stripped from
+// the shared defaults this whole suite reproduces the pins above exactly, and the builder pins did
+// not move — no behaviour changed.)
 const REST_BUILDER = '1dc2d9bb';
-const REST_RESOLVER = '9f0043e7'; // re-based at the S3 integration (was c9a243c9 — see the note below);
-                                  // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below)
+const REST_RESOLVER = 'dc0897fb'; // re-based at the S3 integration (was c9a243c9 — see the note below);
+                                  // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below);
+                                  // re-pinned 2026-10-19 for #1694 S3 (was 9f0043e7 — see the note below)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
@@ -118,8 +124,9 @@ const REST_RESOLVER = '9f0043e7'; // re-based at the S3 integration (was c9a243c
 
 // 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
 const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
-const BENT_RESOLVER = '7b1c87a6'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
-                                  // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note)
+const BENT_RESOLVER = '017f6b2a'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
+                                  // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note);
+                                  // re-pinned 2026-10-19 for #1694 S3 (was 7b1c87a6 — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);
