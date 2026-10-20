@@ -604,8 +604,79 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
 // desktop scene travels exactly as P1 built it; tighter classes travel a
 // deterministic subset. See STAGING-REPORT.md.
 
-/** The transport vocabulary: 'still' (the default — home is home) and 'flow'. */
-export const TRANSPORT_MODES = Object.freeze(['still', 'flow']);
+/** The transport vocabulary: 'still' (the default — home is home), 'flow'
+ *  (P1's curl-field roam) and 'path' (P2 #1575's pure-function anchors). */
+export const TRANSPORT_MODES = Object.freeze(['still', 'flow', 'path']);
+
+/** The PATH families (#1575): the anchor as a pure function of (t, seed, params). */
+export const PATH_FAMILIES = Object.freeze(['orbit', 'spiral', 'sweep', 'lissajous']);
+
+// ── Family assignment (#1575, Q1 — RULED by Matt, 2026-10-14) ──────────
+// Linework and glyphs roam by default (FLOW/PATH as the family declares);
+// heavy solids anchor (still). The #1434 pattern: the family table is a
+// deterministic function of the asset record — no ML, no taste verdicts —
+// and the artist's per-mark override tames it (the assetStill pin, which
+// buildPlacements already feeds the transport pass: a pinned mark of any
+// family stays home). A family earns a default by being named here, not
+// by analogy: unnamed families return null (no declaration) and follow
+// the stratum's own transport word, exactly as P1 shipped.
+//
+//   linework  → 'flow'  (the curl field suits strokes: they bend as they roam)
+//   glyphs    → 'path'  (stamps/letters/type travel dealt lanes and orbits)
+//   heavy solid (weight 'heavy' AND density 'solid' — the org_blob class)
+//             → 'still' (anchored, whatever the stratum's word — see
+//               isFamilyAnchored; the artist's pin is the taming override
+//               in the other direction for every other family)
+const GLYPH_TAGS = new Set(['glyph', 'letter', 'type']);
+
+/** True when the asset is a heavy solid — the anchored family class. */
+export function isFamilyAnchored(asset) {
+  return !!asset && asset.weight === 'heavy' && asset.density === 'solid';
+}
+
+/**
+ * The transport mode one asset's family declares, or null when its family
+ * declares nothing. Heavy solids declare 'still' (checked first: a heavy
+ * solid glyph still anchors — the anchor class is the ruling's own words).
+ */
+export function familyDefaultTransport(asset) {
+  if (!asset) return null;
+  if (isFamilyAnchored(asset)) return 'still';
+  if (asset.category === 'linework') return 'flow';
+  const tags = Array.isArray(asset.tags) ? asset.tags : [];
+  if (asset.category === 'stamps' || tags.some((t) => GLYPH_TAGS.has(t))) return 'path';
+  return null;
+}
+
+/**
+ * The family default for a whole cast (the stratum block chip's readout):
+ * the most-declared roam mode among the cast (ties break in declaration
+ * order flow → path, deterministically), 'still' when the cast declares
+ * nothing or anchors only.
+ */
+export function defaultTransportForCast(assets) {
+  if (!Array.isArray(assets) || !assets.length) return 'still';
+  const counts = { flow: 0, path: 0 };
+  for (const a of assets) {
+    const d = familyDefaultTransport(a);
+    if (d === 'flow' || d === 'path') counts[d]++;
+  }
+  if (!counts.flow && !counts.path) return 'still';
+  return counts.flow >= counts.path ? 'flow' : 'path';
+}
+
+/** The mode chip's cycle: still → flow → path → still. Unknown reads as still (so it cycles to flow). */
+export function nextTransportMode(mode) {
+  const i = TRANSPORT_MODES.indexOf(mode);
+  return TRANSPORT_MODES[((i < 0 ? 0 : i) + 1) % TRANSPORT_MODES.length];
+}
+
+/** The stratum chip's one line: the stratum's mode + the family default shown. */
+export function transportChipLabel(mode, familyDefault) {
+  const m = TRANSPORT_MODES.includes(mode) ? mode : 'still';
+  const f = TRANSPORT_MODES.includes(familyDefault) ? familyDefault : 'still';
+  return `travel ${m} · fam ${f}`;
+}
 
 /** The locked integration step (spine-A): 60 steps per sim second. */
 export const TRAVEL_STEP_SEC = 1 / 60;
@@ -727,6 +798,165 @@ function stepTravelMark(s, hx, hy, env) {
 
 const TRAVEL_BASE_XY = new WeakMap();
 
+// #1575 — the PATH present's offset scratch: grown to the largest
+// placement set seen and reused (the airFade scratch discipline in
+// buildPlacements). Fully rewritten for k < n on every path present
+// before anything reads it, and applyTransport never re-enters itself.
+let _pathOffX = new Float64Array(0);
+let _pathOffY = new Float64Array(0);
+function pathOffScratch(n) { if (_pathOffX.length < n) _pathOffX = new Float64Array(n); return _pathOffX; }
+function pathOffScratchY(n) { if (_pathOffY.length < n) _pathOffY = new Float64Array(n); return _pathOffY; }
+
+// ── PATH transport (#1575 P2) ───────────────────────────────────────────
+// The anchor as a PURE function of (t, seed, params): no state, no store
+// entries per mark — the same step count always deals the same anchor, so
+// replay exactness is by construction, not by discipline. Per-instance
+// phase/speed come from the instance seed (the kinemePhase hash family,
+// domain-separated 'path:' keys — copies never move in lockstep).
+//
+// The anime timing law (Matt, 2026-10-14) is in the shapes themselves:
+//   arcs            — orbit/spiral/lissajous ARE arcs; sweep's lane bows
+//                     (a sine arc across the crossing, never a straight glide)
+//   anticipation    — every family leans back against its departure for
+//                     the first ~0.45 s (orbit/spiral: a counter-angle dip;
+//                     sweep: a backward dip at each cycle's departure;
+//                     lissajous: a lean opposite the initial velocity)
+//   held extremes   — sinusoidal/eased progress: velocity falls to zero
+//                     at the extremes instead of reversing at full speed
+//                     (sweep's progress is p − sin(2πp)/2π, derivative 0
+//                     at both lane ends — no linear CG glide anywhere)
+//   depart ease     — orbit/spiral angles integrate a departure envelope
+//                     (θ grows through te(t) = t − τ(1−e^(−t/τ))), so a
+//                     mark leaves home slowly and settles into its rate.
+//
+// Families (params: radius = px amplitude, speed = rate multiplier):
+//   orbit     the home ROTATES around the dish centre (the canvas centre
+//             in placement coordinates — the default centre the issue
+//             names): the mark keeps its own radius, so the composition
+//             turns instead of collapsing onto a shared ring.
+//   spiral    the same centre, the radius BREATHING by ±radius px on a
+//             slow sine while the angle drifts — a breathing spiral.
+//   sweep     a cross-canvas lane with wrap: x runs the eased lane at the
+//             mark's own home y, bowed by an arc; the phase deals where
+//             in the lane each mark starts.
+//   lissajous a two-sine weave around home (decorrelated axis rates and
+//             phases), anchored: offset(t=0) is exactly 0, like every
+//             kineme driver.
+// Orbit/spiral/lissajous are anchored at t=0 (anchor = home); sweep is
+// phase-dealt (its lane position at t=0 is the deal, like a placement).
+
+const PATH_ORBIT_HZ = 0.05; // revolutions per sim second at speed 1 — stately, a 20 s turn
+const PATH_SPIRAL_HZ = 0.07; // breathing cycles per sim second at speed 1
+const PATH_SWEEP_RATE = 0.08; // lane cycles per sim second at speed 1 (~12.5 s a crossing)
+const PATH_LISS_HZ_X = 0.21;
+const PATH_LISS_HZ_Y = 0.29; // decorrelated from X — the weave never closes into a line
+const PATH_DEPART_TAU = 0.45; // s — the departure envelope's time constant
+const PATH_LEAN_SEC = 0.45; // s — the anticipation window at a departure
+const PATH_LEAN_RAD = 0.05; // orbit/spiral anticipation dip, radians
+const PATH_LEAN_PX = 10; // sweep anticipation dip, px
+const PATH_LEAN_WEAVE_PX = 6; // lissajous anticipation lean, px
+
+const departEnv = (t) => (t <= 0 ? 0 : 1 - Math.exp(-t / PATH_DEPART_TAU));
+const departTime = (t) => (t <= 0 ? 0 : t - PATH_DEPART_TAU * (1 - Math.exp(-t / PATH_DEPART_TAU)));
+const leanAmt = (t) => (t <= 0 || t >= PATH_LEAN_SEC ? 0 : Math.sin(Math.PI * (t / PATH_LEAN_SEC)));
+
+/**
+ * The PATH anchor for one mark at sim time tSec. Pure.
+ *
+ * home: { x, y } the presented placement (the mark's home).
+ * opts: { family, seed, index, canvasW, canvasH, radius, speed, lean }
+ *   radius — px amplitude (spiral breathing / sweep arc / lissajous reach)
+ *   speed  — rate multiplier (0 freezes the path at its t=0 anchor)
+ *   lean   — anticipation scale, 1 by default (tests turn it off to
+ *            measure the lean itself; not a recipe key)
+ * Returns { x, y } — a fresh object per call (the caller is hot-path
+ * aware: applyTransport reuses one scratch per mark present).
+ */
+export function pathAnchor(home, tSec, opts) {
+  const W = Number(opts?.canvasW), H = Number(opts?.canvasH);
+  const t = Math.max(0, Number(tSec) || 0);
+  const seed = opts?.seed | 0;
+  const index = opts?.index | 0;
+  const speedMul = 0.75 + 0.5 * hashPhase(seed, `path:v:${index}`);
+  const speed = (Number(opts?.speed) || 0) * speedMul;
+  const radius = Math.max(0, Number(opts?.radius) || 0);
+  const lean = opts?.lean === undefined ? 1 : Number(opts.lean) || 0;
+  const family = opts?.family;
+  const cx = W / 2, cy = H / 2;
+
+  if (family === 'orbit' || family === 'spiral') {
+    if (t <= 0) return { x: home.x, y: home.y }; // the anchored deal is home, bit-exact (no polar round-trip)
+    const vx = home.x - cx, vy = home.y - cy;
+    const r0 = Math.hypot(vx, vy);
+    if (!(r0 > 0.5)) return { x: home.x, y: home.y };
+    const ang0 = Math.atan2(vy, vx);
+    const dir = hashPhase(seed, `path:s:${index}`) > 0.5 ? -1 : 1;
+    const driftHz = family === 'orbit' ? PATH_ORBIT_HZ : PATH_ORBIT_HZ * 0.6;
+    let ang = ang0 + dir * TAU * driftHz * speed * departTime(t);
+    ang -= dir * PATH_LEAN_RAD * lean * leanAmt(t); // anticipation: lean back against the turn
+    let r = r0;
+    if (family === 'spiral') {
+      const ph = hashPhase(seed, `path:b:${index}`);
+      r = r0 + radius * (Math.sin(TAU * (PATH_SPIRAL_HZ * speed * t) + TAU * ph) - Math.sin(TAU * ph)) * departEnv(t);
+      if (r < 0) r = 0;
+    }
+    return { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
+  }
+
+  if (family === 'sweep') {
+    const ph = hashPhase(seed, `path:w:${index}`);
+    const cyc = t * PATH_SWEEP_RATE * speed + ph;
+    const p = cyc - Math.floor(cyc);
+    const pe = p - Math.sin(TAU * p) / TAU; // eased progress: held at both lane ends
+    let x = -0.05 * W + pe * 1.1 * W;
+    if (p < 0.07) x -= PATH_LEAN_PX * lean * Math.sin(Math.PI * (p / 0.07)); // anticipation at each departure
+    const phY = hashPhase(seed, `path:y:${index}`);
+    const y = home.y + radius * 0.35 * Math.sin(TAU * p + TAU * phY);
+    return { x, y };
+  }
+
+  // lissajous (the default family for an unknown name — the weave is the
+  // gentlest path, and an unknown family name must never throw mid-frame)
+  const ux = hashPhase(seed, `path:x:${index}`);
+  const uy = hashPhase(seed, `path:y:${index}`);
+  const raw = (tt) => [
+    radius * (Math.sin(TAU * (PATH_LISS_HZ_X * speed * tt) + TAU * ux) - Math.sin(TAU * ux)),
+    radius * 0.7 * (Math.sin(TAU * (PATH_LISS_HZ_Y * speed * tt) + TAU * uy) - Math.sin(TAU * uy)),
+  ];
+  const [ox, oy] = raw(t);
+  const env = departEnv(t);
+  let lx = 0, ly = 0;
+  const la = leanAmt(t) * lean;
+  if (la > 0) {
+    const [dx, dy] = raw(0.05); // the initial departure direction
+    const dl = Math.hypot(dx, dy);
+    if (dl > 1e-9) { lx = -(dx / dl) * PATH_LEAN_WEAVE_PX * la; ly = -(dy / dl) * PATH_LEAN_WEAVE_PX * la; }
+  }
+  return { x: home.x + ox * env + lx, y: home.y + oy * env + ly };
+}
+
+// ── Stretch along velocity (#1575) ───────────────────────────────────────
+// Where the deform channel (a_def) can express it: a fast mark elongates
+// ALONG its travel direction. The a_def shader squashes along its axis
+// and bulges across it by the reciprocal (area-preserving, dishDeform's
+// law), so the axis that elongates a mark along its velocity is the
+// PERPENDICULAR of the velocity — buildPlacements stamps
+// { deformAmt, deformAxisX/Y = perp(v) } on the item and the scene
+// contract carries it as `deform`, exactly like a dish dent. Capped at
+// TRAVEL_STRETCH_CAP; below TRAVEL_STRETCH_MIN_SPEED nothing is stamped
+// (a slow mark is a round mark, and an unstamped item is bit-identical
+// to today). Off when it fights the mark's own deform: buildPlacements
+// never overwrites an item that already carries deformAmt > 0.
+export const TRAVEL_STRETCH_CAP = 0.3;
+export const TRAVEL_STRETCH_MIN_SPEED = 45; // px/s — below this, no stretch
+
+/** The stretch amount for a speed in px/s: 0 under the floor, capped. */
+export function travelStretchAmount(speedPxSec) {
+  const s = Number(speedPxSec);
+  if (!Number.isFinite(s) || s <= TRAVEL_STRETCH_MIN_SPEED) return 0;
+  return Math.min(TRAVEL_STRETCH_CAP, (s - TRAVEL_STRETCH_MIN_SPEED) / 600);
+}
+
 /**
  * Stage-C applier for FLOW transport: advance the scene's sim by the
  * frame time accumulated since the last call, then fold each mark's
@@ -734,9 +964,12 @@ const TRAVEL_BASE_XY = new WeakMap();
  * drivers and the ground nudge), so home is the presented placement.
  *
  * ctx.travel: {
- *   mode,            // 'flow' — anything else is identity (the gate)
+ *   mode,            // 'flow' | 'path' — anything else is identity (the gate)
  *   leash,           // px; <= 0 is identity
  *   flow,            // 0..1 strength (recipe data, from layoutParams)
+ *   path,            // #1575: the PATH family ('orbit'|'spiral'|'sweep'|'lissajous')
+ *   speed, radius,   // #1575: PATH rate multiplier / px amplitude (recipe data)
+ *   deform,          // #1575: optional stretch scratch { amt, ax, ay } sized to n
  *   store,           // createTravelStore() — caller-owned, required
  *   sceneId,         // the scene identity half of the state key
  *   frameMs,         // spine-A frame time to accumulate (0 on a held frame)
@@ -755,7 +988,7 @@ export function applyTransport(soa, ctx, still = null) {
   if (!soa || !ctx) return null;
   const tr = ctx.travel;
   if (!tr || !tr.store || !(tr.store.scenes instanceof Map)) return null;
-  if (tr.mode !== 'flow') return null;
+  if (tr.mode !== 'flow' && tr.mode !== 'path') return null;
   const leash = Number(tr.leash);
   if (!(leash > 0)) return null;
   const W = Number(ctx.canvasW), H = Number(ctx.canvasH);
@@ -772,6 +1005,18 @@ export function applyTransport(soa, ctx, still = null) {
   }
   const flowRaw = Number(tr.flow);
   const flow = Number.isFinite(flowRaw) ? Math.min(1, Math.max(0, flowRaw)) : 0;
+  const n = soa.n | 0;
+  // #1575 — the stretch scratch the caller hands in (tr.deform = { amt,
+  // ax, ay }, sized to n): zeroed on entry, filled at present time for
+  // marks fast enough to stretch. Absent → no stretch is computed.
+  const deform = tr.deform && tr.deform.amt && tr.deform.amt.length >= n ? tr.deform : null;
+  if (deform) { deform.amt.fill(0); if (deform.ax) deform.ax.fill(0); if (deform.ay) deform.ay.fill(0); }
+
+  // #1575 — PATH shed: the governor's travel shed presents home and the
+  // path clock FREEZES (steps do not advance), so a shed path resumes
+  // where it left instead of jumping to where its clock would have been.
+  // (FLOW shed differs by design: its sim keeps stepping and settles.)
+  if (tr.mode === 'path' && tr.shed) return null;
 
   // #1574 Q2 — the governor's traveler selection for this scene: a FLOW
   // scene requests travel for every placed mark (the authored ceiling);
@@ -790,6 +1035,7 @@ export function applyTransport(soa, ctx, still = null) {
     for (const idx of [...sc.states.keys()]) if (idx >= travelers) sc.states.delete(idx);
   }
 
+
   // Fixed-step accumulation on the spine-A clock: bank the frame time,
   // spend whole steps, never bank a spiral of death.
   const frameMs = Number(tr.frameMs);
@@ -799,32 +1045,87 @@ export function applyTransport(soa, ctx, still = null) {
   if (stepsDue > 0) {
     sc.acc -= stepsDue * TRAVEL_STEP_SEC;
     if (sc.acc > TRAVEL_STEP_SEC) sc.acc = 0;
-    const env = {
-      shed: !!tr.shed,
-      noise: noiseFor(seed),
-      W, H, leash,
-      cruise: TRAVEL_SPEED * m * flow,
-      simSec: 0,
-    };
-    const n = soa.n | 0;
-    for (let sIdx = 0; sIdx < stepsDue; sIdx++) {
-      env.simSec = sc.steps * TRAVEL_STEP_SEC;
-      for (let k = 0; k < n; k++) {
-        if (still && still[k]) continue;
-        const index = soa.index ? soa.index[k] : k;
-        if (index >= travelers) continue; // #1574 Q2 — beyond the budget: not a traveler, no state
-        let s = sc.states.get(index);
-        if (!s) { s = { ox: 0, oy: 0, vx: 0, vy: 0 }; sc.states.set(index, s); }
-        if (!env.shed && flow <= 0 && s.ox === 0 && s.oy === 0 && s.vx === 0 && s.vy === 0) continue;
-        stepTravelMark(s, soa.x[k], soa.y[k], env);
+    if (tr.mode === 'path') {
+      // Stateless: the steps are the clock, nothing per mark is stepped.
+      sc.steps += stepsDue;
+    } else {
+      const env = {
+        shed: !!tr.shed,
+        noise: noiseFor(seed),
+        W, H, leash,
+        cruise: TRAVEL_SPEED * m * flow,
+        simSec: 0,
+      };
+      for (let sIdx = 0; sIdx < stepsDue; sIdx++) {
+        env.simSec = sc.steps * TRAVEL_STEP_SEC;
+        for (let k = 0; k < n; k++) {
+          if (still && still[k]) continue;
+          const index = soa.index ? soa.index[k] : k;
+          if (index >= travelers) continue; // #1574 Q2 — beyond the budget: not a traveler, no state
+          let s = sc.states.get(index);
+          if (!s) { s = { ox: 0, oy: 0, vx: 0, vy: 0 }; sc.states.set(index, s); }
+          if (!env.shed && flow <= 0 && s.ox === 0 && s.oy === 0 && s.vx === 0 && s.vy === 0) continue;
+          stepTravelMark(s, soa.x[k], soa.y[k], env);
+        }
+        sc.steps++;
       }
-      sc.steps++;
     }
+  }
+
+  if (tr.mode === 'path') {
+    // Present: the anchor is a pure function of the step count. The leash
+    // caps the offset of the centred/weave families (orbit/spiral/
+    // lissajous) radially, as it caps FLOW's roam; sweep's lane IS its
+    // geometry (a radial cap would plateau the wrap), so the leash caps
+    // only its arc (the y offset) — the Q4 leash-scope question stays
+    // exactly as open as P1 left it, and this split is recorded in the
+    // staging report as the builder's call under that open fork.
+    const tSec = sc.steps * TRAVEL_STEP_SEC;
+    if (!(tSec > 0)) return null;
+    const pathOpts = {
+      family: PATH_FAMILIES.includes(tr.path) ? tr.path : 'orbit',
+      seed, canvasW: W, canvasH: H,
+      radius: Number(tr.radius), speed: Number(tr.speed),
+    };
+    let any = false;
+    const offX = pathOffScratch(n), offY = pathOffScratchY(n);
+    const homeScratch = { x: 0, y: 0 };
+    for (let k = 0; k < n; k++) {
+      if (still && still[k]) continue;
+      const index = soa.index ? soa.index[k] : k;
+      homeScratch.x = soa.x[k]; homeScratch.y = soa.y[k];
+      const a = pathAnchor(homeScratch, tSec, { ...pathOpts, index });
+      let ox = a.x - soa.x[k], oy = a.y - soa.y[k];
+      if (pathOpts.family === 'sweep') {
+        if (oy > leash) oy = leash; else if (oy < -leash) oy = -leash;
+      } else {
+        const r = Math.hypot(ox, oy);
+        if (r > leash) { const f = leash / r; ox *= f; oy *= f; }
+      }
+      offX[k] = ox; offY[k] = oy;
+      if (ox !== 0 || oy !== 0) any = true;
+      if (deform) {
+        // Velocity by finite difference of the pure function itself —
+        // pure in, pure out, no state to disagree with the anchor.
+        const prev = pathAnchor(homeScratch, Math.max(0, tSec - TRAVEL_STEP_SEC), { ...pathOpts, index });
+        const vx = (a.x - prev.x) / TRAVEL_STEP_SEC, vy = (a.y - prev.y) / TRAVEL_STEP_SEC;
+        const sp = Math.hypot(vx, vy);
+        const amt = travelStretchAmount(sp);
+        if (amt > 0 && sp > 1e-9) { deform.amt[k] = amt; deform.ax[k] = -vy / sp; deform.ay[k] = vx / sp; }
+      }
+    }
+    if (!any) return null;
+    let base = TRAVEL_BASE_XY.get(soa);
+    if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
+    for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+    for (let k = 0; k < n; k++) { soa.x[k] += offX[k]; soa.y[k] += offY[k]; }
+    return () => {
+      for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+    };
   }
 
   // Present: home + offset. Nothing displaced → no undo, channels untouched.
   // Non-travelers hold no state (pruned above), so they present at home.
-  const n = soa.n | 0;
   let any = false;
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
@@ -841,6 +1142,11 @@ export function applyTransport(soa, ctx, still = null) {
     if (!s) continue;
     soa.x[k] += s.ox;
     soa.y[k] += s.oy;
+    if (deform && !tr.shed) {
+      const sp = Math.hypot(s.vx, s.vy);
+      const amt = travelStretchAmount(sp);
+      if (amt > 0 && sp > 1e-9) { deform.amt[k] = amt; deform.ax[k] = -s.vy / sp; deform.ay[k] = s.vx / sp; }
+    }
   }
   return () => {
     for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
@@ -863,6 +1169,18 @@ registerCostTier('travel/flow', {
   memoryBytes: 0,
   timeMs: 0.39,
   notes: '#1574 P1 — FLOW transport: fixed-step curl-flow sim + leash on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+});
+
+// #1575 P2 — PATH transport's declared cost, same doctrine as FLOW's:
+// tier 0 (structural — no GPU pass; marks ride the structural item pass),
+// sheds by the governor's travel rung (cut 1.6). timeMs is the MEASURED
+// resolver-CPU figure (path present at the 800-mark cap, sandbox node
+// 2026-10-20; engine/travel.selfcheck.mjs re-measures it on every run).
+registerCostTier('travel/path', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.66,
+  notes: '#1575 P2 — PATH transport: pure-function anchors on the step-count clock + leash cap + stretch finite-difference, resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
 });
 
 // ── #1574 Q2 — the traveler budget: governor-selected within a device-class cap ──

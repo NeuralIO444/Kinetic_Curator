@@ -27,7 +27,7 @@ globalThis.localStorage = {
 globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
 
 const {
-  paramCensus, dishMatrix, renderReachability, formatCensusReport,
+  paramCensus, dishMatrix, renderReachability, formatCensusReport, jelloMetric,
   tasteAgreement, formatTasteAgreement,
   fingerprintItems, place, assetInk, mulberry32, CENSUS_SEED, CAST, CAST_IDS,
 } = await import('./censusReport.mjs');
@@ -56,13 +56,14 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 const paramRows = paramCensus();
 const dishRows = dishMatrix();
 const reach = renderReachability();
+const jello = jelloMetric();
 
 {
   // The standard cast must be whole — a mistyped id must fail here,
   // never silently shrink the company the census measures with.
   assert.strictEqual(CAST.length, CAST_IDS.length, `census cast shrank: ${CAST.length}/${CAST_IDS.length} ids resolved`);
   // Completeness: every key in the universe has exactly one row.
-  const expected = Object.keys(PARAM_SPEC).length + Object.keys(RANGE_SPEC).length + 22; // 21 structural + #1574's transport
+  const expected = Object.keys(PARAM_SPEC).length + Object.keys(RANGE_SPEC).length + 23; // 21 structural + #1574's transport + #1575's transportPath
   assert.strictEqual(paramRows.length, expected, `census rows ${paramRows.length} != key universe ${expected}`);
   const seen = new Set(paramRows.map((r) => r.key));
   assert.strictEqual(seen.size, paramRows.length, 'duplicate census rows');
@@ -653,5 +654,24 @@ assert.strictEqual(oneSide.present, true);
 assert.strictEqual(oneSide.keeps.mean, null, 'no keeps: mean is null, not 0');
 assert.strictEqual(oneSide.auc, null, 'no keeps: no separation to report');
 
-console.log(formatCensusReport({ paramRows, dishRows, reach, store: storeLines }));
+// ── #1575 — the Jell-O metric: present, honest, steering nothing ────
+{
+  const byScene = new Map(jello.map((r) => [r.scene, r]));
+  const still = byScene.get('still');
+  assert.strictEqual(still.travelling, 0, 'Jell-O: a still scene travels nothing');
+  assert.strictEqual(still.meanHomePx, 0, 'Jell-O: a still scene is 0px from home');
+  for (const name of ['flow', 'path/orbit', 'path/spiral', 'path/sweep', 'path/lissajous']) {
+    const r = byScene.get(name);
+    assert.ok(r && r.marks > 0, `Jell-O: scene ${name} measured`);
+    assert.ok(r.travelling > 0, `Jell-O: ${name} travels (got ${r?.travelling}/${r?.marks})`);
+    assert.ok(r.meanHomePx > 1, `Jell-O: ${name} mean distance-from-home is real (${r?.meanHomePx}px)`);
+    assert.ok(r.travelling <= r.marks, `Jell-O: ${name} travelling never exceeds the cast`);
+  }
+  const report = formatCensusReport({ paramRows, dishRows, reach, store: storeLines, jello });
+  assert.ok(report.includes('Jell-O metric'), 'the formatted census carries the Jell-O section');
+  assert.ok(report.includes('path/lissajous:'), 'the formatted census names the PATH scenes');
+  storeLines.push(`Jell-O (#1575): ${jello.map((r) => `${r.scene} ${r.travelling}/${r.marks} @ ${r.meanHomePx}px`).join(' · ')}`);
+}
+
+console.log(formatCensusReport({ paramRows, dishRows, reach, store: storeLines, jello }));
 console.log('census.selfcheck: OK (#1505 — RA3 census + dish matrix + write-path doors, RA5 reachability, RA6 round-trip, PA3 crown integrity)');

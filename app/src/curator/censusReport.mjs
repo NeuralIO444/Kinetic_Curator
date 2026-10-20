@@ -280,6 +280,8 @@ const KEY_FIXTURES = {
   kinemeBrushWobble: { driver: 'kineme', ctx: { mode: 'brush' }, note: 'livingMotion populates amounts.brushWobble from this param since #1516 and the driver evaluates dWobble — but no stage-C consumer applies dWobble to placements yet (#894/#897, by design), so the measured picture delta is still zero — measured through the production-shaped driver context' },
   transportLeash: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow', transportFlow: 1 }, note: 'measured through the travel context (fresh store, one frozen 100 ms frame = 6 locked steps): leash 0 is the still parity gate, so the sweep is off vs the widest roam' },
   transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow', transportLeash: 200 }, note: 'measured through the travel context (fresh store, one frozen 100 ms frame = 6 locked steps) at a working leash' },
+  transportSpeed: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportRadius: 200 }, note: '#1575 — measured through the travel context at a working leash/radius: speed 0 freezes the path at its anchored deal (offset exactly 0), so the sweep is frozen vs travelling' },
+  transportRadius: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportSpeed: 1 }, note: '#1575 — measured through the travel context: radius 0 is a zero-amplitude path (marks home), so the sweep is home vs the widest weave the leash allows' },
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
@@ -349,6 +351,7 @@ const STRUCT_FIXTURES = {
   trail: { driver: 'none', reason: 'accumulation trail style (GL trail surface); no headless consumer' },
   kinemePattern: { driver: 'kineme', ctx: { mode: 'fibonacci' }, values: ['DRIFT', 'ORGANIC'], note: 'ORGANIC routes to the rhythm layer — a placement-layer modulation that survives into stills when the driver context is present' },
   transport: { driver: 'travel', ctx: { mode: 'fibonacci', transportLeash: 200, transportFlow: 1 }, values: ['still', 'flow'], note: 'still is the parity gate (bit-identical placements); flow roams through the travel context (fresh store, one frozen 100 ms frame)' },
+  transportPath: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path', transportLeash: 300, transportSpeed: 1, transportRadius: 200 }, values: ['orbit', 'lissajous'], note: '#1575 — the PATH family is recipe data: two families through the same travel context deal different anchors at the same step count' },
   symmetry: { driver: 'swarm', ctx: { mode: 'hype' }, values: ['none', 'bilateral'], note: 'symmetry fans live in the organism item builder (wings/fans on a hype cast); placements have no symmetry channel' },
   behave: { driver: 'swarm', ctx: { ...HYPE_CTX }, values: ['cruise', 'flock'] },
   material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'wash'], note: 'the material vocabulary is complete in GL (#1547 M1 glass, #1548 M2 plate, #1549 M3 wash + stipple): every value engages a placement flag here (the flags ride the place fingerprint and the scene contract; the renderer carries them as one body code) — the delta below is plate↔wash on this fixture, the two colour-ramp bodies. The bodies themselves are render-level and measured by their leaf suites (plateBody / washBody / stippleBody raster deltas), not here; glass additionally moves the placed alpha + sort. One seam stays disclosed, not hidden: plate and wash render flat in the GL export (studio.py still — no channel decomposition there), which sceneContract.warnUnsupportedMaterials names; stipple\'s screen and glass\'s body survive the export' },
@@ -444,6 +447,59 @@ function pxDiffCount(a, b) {
     if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) d++;
   }
   return d;
+}
+
+// ── #1575 — the Jell-O metric ───────────────────────────────────────
+// Per scene: how many marks travel, and their mean distance-from-home
+// over a window. This is the census's answer to the travel lane's
+// founding diagnosis (#1573: marks read as "trapped in Jell-O" when
+// every motion is an oscillator around a fixed anchor) — a readout,
+// steering nothing: no consumer reads it, no governor rung consults
+// it, it is reported because the number is the lane's reason to exist.
+// Window: 90 presented frames at 60 fps (1.5 sim seconds) through the
+// real placement path, one fresh travel store per scene; a mark
+// "travels" when its mean distance-from-home over the window exceeds
+// 1 px (under that it is micro-motion, not travel). Homes are the same
+// scene with transport still — same seed, same cast, same order.
+const JELLO_FRAMES = 90;
+const JELLO_TRAVEL_PX = 1;
+export function jelloMetric() {
+  const base = { mode: 'fibonacci', count: 60 };
+  const scenes = [
+    { name: 'still', params: { transport: 'still' } },
+    { name: 'flow', params: { transport: 'flow', transportLeash: 200, transportFlow: 1 } },
+    { name: 'path/orbit', params: { transport: 'path', transportPath: 'orbit', transportLeash: 300, transportSpeed: 1, transportRadius: 140 } },
+    { name: 'path/spiral', params: { transport: 'path', transportPath: 'spiral', transportLeash: 300, transportSpeed: 1, transportRadius: 140 } },
+    { name: 'path/sweep', params: { transport: 'path', transportPath: 'sweep', transportLeash: 300, transportSpeed: 1, transportRadius: 140 } },
+    { name: 'path/lissajous', params: { transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportSpeed: 1, transportRadius: 140 } },
+  ];
+  return scenes.map(({ name, params }) => {
+    const full = { ...base, ...params };
+    const homes = new Map(place({ ...full, transport: 'still' }).map((it) => [it.index, it]));
+    const store = createTravelStore();
+    const sums = new Map();
+    for (let f = 0; f < JELLO_FRAMES; f++) {
+      const items = place(full, { travel: { store, sceneId: 'jello', frameMs: 1000 / 60, shed: false } });
+      for (const it of items) {
+        const h = homes.get(it.index);
+        if (!h) continue;
+        sums.set(it.index, (sums.get(it.index) || 0) + Math.hypot(it.x - h.x, it.y - h.y));
+      }
+    }
+    let travelling = 0;
+    let travellerSum = 0;
+    for (const s of sums.values()) {
+      const mean = s / JELLO_FRAMES;
+      if (mean > JELLO_TRAVEL_PX) { travelling++; travellerSum += mean; }
+    }
+    return {
+      scene: name,
+      marks: homes.size,
+      travelling,
+      meanHomePx: travelling ? +(travellerSum / travelling).toFixed(2) : 0,
+      windowFrames: JELLO_FRAMES,
+    };
+  });
 }
 
 export function paramCensus() {
@@ -1079,7 +1135,7 @@ export function renderReachability() {
 }
 
 // ── formatting ──────────────────────────────────────────────────────
-export function formatCensusReport({ paramRows, dishRows, reach, store }) {
+export function formatCensusReport({ paramRows, dishRows, reach, store, jello }) {
   const L = [];
   const moves = paramRows.filter((r) => r.class === 'moves');
   const zero = paramRows.filter((r) => r.class === 'zero-in-context');
@@ -1097,6 +1153,13 @@ export function formatCensusReport({ paramRows, dishRows, reach, store }) {
       L.push(`  ${r.key}: DISH MATRIX — ${r.reason}`);
     } else {
       L.push(`  ${r.key}: ${r.class}${r.reason ? ` — ${r.reason}` : ''}`);
+    }
+  }
+  if (jello) {
+    L.push('');
+    L.push('RA3 Jell-O metric — travel per scene (reported, steering nothing)');
+    for (const r of jello) {
+      L.push(`  ${r.scene}: ${r.travelling}/${r.marks} marks travel, mean ${r.meanHomePx}px from home over ${r.windowFrames} frames`);
     }
   }
   L.push('');

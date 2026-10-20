@@ -34,6 +34,8 @@ import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
 import { strataSummary, trimNum } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
+import { ASSETS } from '../../data/assets/index.js';
+import { defaultTransportForCast, nextTransportMode, transportChipLabel } from '../../engine/kineme.js'; // #1575 — the travel mode chip's pure helpers
 
 // #716 Part 2 — black block + white numeral heads every block. The edited
 // block inverts (white block, black numeral). #1203: the numeral is the
@@ -317,8 +319,8 @@ function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, o
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId, layoutParams: s.layoutParams }));
-  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId, layoutParams } = state;
+  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId, layoutParams: s.layoutParams, layerSnapshots: s.layerSnapshots, enabledAssets: s.enabledAssets, customAssets: s.customAssets }));
+  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId, layoutParams, layerSnapshots, enabledAssets, customAssets } = state;
   // #1409 (petri dish A3) — the DISH controls. The switch and the two
   // contact knobs are layout params (scene/Look state, PARAM_SPEC is the
   // trust boundary), edited through the same LAYOUT_PARAM bus event as
@@ -468,6 +470,26 @@ export function LayerStack() {
     const summary = expanded ? '' : strataSummary(layer, fine, wetPct,
       (!adj && !pat) ? { on: dishOn, armed: dishRadius > 0 } : undefined);
     const selectIt = () => (pat ? emit(Events.PATTERN_SELECT, { id: layer.id }) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
+    // #1575 — the travel mode chip (Matt's controls ruling, 2026-10-14:
+    // the per-stratum mode is recipe data riding the stratum, and BUILD
+    // gets at most this minimal chip — still/flow/path + the family
+    // default shown; amounts and leash edit from the Directors motion
+    // group, never a cluster here). The stratum's params live in its
+    // snapshot (the active stratum's are the live layoutParams). A tap
+    // on an inactive stratum's chip selects the stratum first — the
+    // mode edits the active stratum's recipe, like every BUILD control;
+    // a tap on the active stratum cycles its mode.
+    const snapForChip = !adj && !pat ? (isActive ? null : (layerSnapshots || {})[layer.id]) : null;
+    const chipLp = !adj && !pat ? (isActive ? layoutParams : (snapForChip?.layoutParams || {})) : null;
+    const chipMode = chipLp ? (chipLp.transport || 'still') : null;
+    const chipCast = !adj && !pat
+      ? (() => {
+        const enabled = isActive ? enabledAssets : (snapForChip?.enabledAssets || {});
+        const byId = new Map([...ASSETS, ...(customAssets || [])].map((a) => [a.id, a]));
+        return Object.keys(enabled || {}).filter((id) => enabled[id]).map((id) => byId.get(id)).filter(Boolean);
+      })()
+      : null;
+    const chipFam = chipCast ? defaultTransportForCast(chipCast) : null;
     const color = STRATA_COLORS[fine];
     // #1019 — the PATCH one-liner lives under the first KC block's PATCH
     // section, and only once that block is open (the flag is consumed on
@@ -511,6 +533,22 @@ export function LayerStack() {
           >
             {label}
           </button>
+          {/* #1575 — the minimal travel mode chip: the stratum's mode +
+              its cast's family default. Tap cycles the ACTIVE stratum's
+              mode (still → flow → path); tap an inactive stratum's chip
+              to select that stratum first. No amounts here by ruling. */}
+          {chipMode && (
+            <button className="micro-btn" aria-label={`travel mode ${chipMode}, family default ${chipFam}`}
+              title={isActive
+                ? `Travel — this stratum's marks ${chipMode === 'still' ? 'stay home' : chipMode === 'flow' ? 'roam the noise field' : 'travel a dealt path'}. Family default for its cast: ${chipFam} (linework roams flow, glyphs roam path, heavy solids anchor). Tap cycles still → flow → path. Amounts + leash live in DIRECTORS.`
+                : `Travel ${chipMode} · family default ${chipFam}. Tap to select this stratum, then tap again to cycle its mode.`}
+              onClick={() => {
+                if (!isActive) { selectIt(); return; }
+                emit(Events.LAYOUT_PARAM, { key: 'transport', value: nextTransportMode(chipMode) });
+              }}>
+              {transportChipLabel(chipMode, chipFam)}
+            </button>
+          )}
           <button className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>dup</button>
           <button className="micro-btn" title="Remove track (undoable)" disabled={isKcLayer(layer) && kcCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
         </div>

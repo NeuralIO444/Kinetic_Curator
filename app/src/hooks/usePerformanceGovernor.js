@@ -121,9 +121,11 @@ export function usePerformanceGovernor() {
   const creatureCount = layoutParams?.creatures ?? 0;
   // #1574 — the travel rung: the shed overlay, and whether travel is live
   // on the scene (FLOW with a leash — the same gate buildPlacements runs).
+  // #1575 — PATH scenes are travel too: the same rung sheds them (marks
+  // settle/freeze home) ahead of quality and the motion freeze.
   const travelShed = useStore(s => s.travelShed);
   const setTravelShed = useStore(s => s.setTravelShed);
-  const travelActive = layoutParams?.transport === 'flow' && (layoutParams?.transportLeash ?? 0) > 0;
+  const travelActive = (layoutParams?.transport === 'flow' || layoutParams?.transport === 'path') && (layoutParams?.transportLeash ?? 0) > 0;
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.

@@ -38,6 +38,9 @@ import { buildPlacements } from './buildPlacements.js';
 import {
   createTravelStore, pruneTravelStore, travelSceneSnapshot, applyTransport,
   TRAVEL_STEP_SEC, TRANSPORT_MODES, selectTravelers, TRAVEL_COST_REFERENCE_MARKS,
+  PATH_FAMILIES, pathAnchor, familyDefaultTransport, isFamilyAnchored,
+  defaultTransportForCast, nextTransportMode, transportChipLabel,
+  travelStretchAmount, TRAVEL_STRETCH_CAP,
 } from './kineme.js';
 import { TRAVEL_BUDGETS, travelBudgetForDevice } from '../data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, normalizeLayoutParams, validateLayoutParams } from '../data/layout-modes.js';
@@ -307,7 +310,7 @@ const frameHash = (items) => createHash('sha256')
   assert.deepEqual(PARAM_SPEC.transportLeash, { min: 0, max: 400 });
   assert.deepEqual(PARAM_SPEC.transportFlow, { min: 0, max: 1 });
   checks += 2;
-  assert.deepEqual(TRANSPORT_MODES, ['still', 'flow']);
+  assert.deepEqual(TRANSPORT_MODES, ['still', 'flow', 'path']); // #1575 — 'path' joins the vocabulary
   checks++;
   const n = normalizeLayoutParams({ transport: 'flow', transportLeash: 9999, transportFlow: -2 });
   assert.equal(n.transport, 'flow'); assert.equal(n.transportLeash, 400); assert.equal(n.transportFlow, 0);
@@ -321,7 +324,334 @@ const frameHash = (items) => createHash('sha256')
   console.log('travel.selfcheck H params: spec, clamp, enum and trust boundary all hold');
 }
 
-// ── I. Q2 — the traveler budget ──────────────────────────────────────────
+// ── I. PATH — the pure function (#1575) ──────────────────────────────────
+{
+  const home = { x: 800, y: 200 };
+  const opts = (over = {}) => ({ family: 'lissajous', seed: 42, index: 3, canvasW: W, canvasH: H, radius: 140, speed: 1, ...over });
+  // Anchored families: at t=0 the anchor IS home, exactly.
+  for (const family of ['orbit', 'spiral', 'lissajous']) {
+    for (const h of [home, { x: 100, y: 600 }, { x: 500, y: 350 }]) {
+      assert.deepEqual(pathAnchor(h, 0, opts({ family })), h, `${family}: t=0 anchor is home`);
+      checks++;
+    }
+  }
+  // Pure: same (t, seed, params) → same anchor, bit for bit; a different
+  // instance index deals a different weave.
+  const a1 = pathAnchor(home, 3.7, opts());
+  const a2 = pathAnchor(home, 3.7, opts());
+  assert.deepEqual(a1, a2, 'pathAnchor is a pure function of (t, seed, params)');
+  checks++;
+  const other = pathAnchor(home, 3.7, opts({ index: 4 }));
+  ok(a1.x !== other.x || a1.y !== other.y, 'per-instance phase: copies never move in lockstep');
+  // Orbit is an arc, not a glide: the anchor stays on the home's own
+  // circle around the dish centre at every t.
+  for (const t of [0.3, 1.7, 5.25, 19.9]) {
+    const a = pathAnchor(home, t, opts({ family: 'orbit' }));
+    const r = Math.hypot(a.x - W / 2, a.y - H / 2);
+    ok(Math.abs(r - Math.hypot(home.x - W / 2, home.y - H / 2)) < 1e-9, `orbit keeps its radius (t=${t})`);
+  }
+  // Spiral breathes: the radius from centre actually varies with t.
+  const radii = new Set();
+  for (let t = 0; t < 14; t += 0.7) {
+    const a = pathAnchor(home, t, opts({ family: 'spiral' }));
+    radii.add(Math.round(Math.hypot(a.x - W / 2, a.y - H / 2)));
+  }
+  ok(radii.size > 5, `spiral radius breathes (${radii.size} distinct radii over 14 s)`);
+  // Sweep stays in its lane band and wraps the canvas width.
+  let sawLeft = false, sawRight = false;
+  for (let t = 0; t < 40; t += 0.25) {
+    const a = pathAnchor(home, t, opts({ family: 'sweep' }));
+    ok(a.x >= -0.05 * W - 11 && a.x <= 1.05 * W + 1, 'sweep x stays in the lane span');
+    ok(Math.abs(a.y - home.y) <= 140 * 0.35 + 1e-9, 'sweep arc stays within its bow');
+    if (a.x < 100) sawLeft = true;
+    if (a.x > 900) sawRight = true;
+  }
+  ok(sawLeft && sawRight, 'sweep crosses the whole canvas (and wraps)');
+  // Held extremes: the weave's speed collapses somewhere in its cycle
+  // (velocity → 0 at the extremes) instead of reversing at full speed.
+  {
+    let maxSp = 0, minSp = Infinity;
+    for (let t = 0.2; t < 12; t += 0.05) {
+      const p0 = pathAnchor(home, t, opts());
+      const p1 = pathAnchor(home, t + 0.01, opts());
+      const sp = Math.hypot(p1.x - p0.x, p1.y - p0.y) / 0.01;
+      if (sp > maxSp) maxSp = sp;
+      if (sp < minSp) minSp = sp;
+    }
+    ok(minSp < 0.35 * maxSp, `held extremes: weave speed falls to ${minSp.toFixed(1)} from a ${maxSp.toFixed(1)} px/s peak`);
+  }
+  // Anticipation: the lean measurably bends the departure backwards —
+  // sweep dips against its +x travel inside the departure window, and
+  // the lissajous lean displaces its first half-second.
+  {
+    let sweepLean = 0;
+    for (let t = 0; t < 30; t += 0.01) {
+      const withLean = pathAnchor(home, t, opts({ family: 'sweep', lean: 1 }));
+      const noLean = pathAnchor(home, t, opts({ family: 'sweep', lean: 0 }));
+      if (noLean.x - withLean.x > sweepLean) sweepLean = noLean.x - withLean.x;
+    }
+    ok(sweepLean > 3, `sweep anticipation dip is real (${sweepLean.toFixed(1)} px against departure)`);
+    let weaveLean = 0;
+    for (let t = 0.02; t < 0.45; t += 0.01) {
+      const withLean = pathAnchor(home, t, opts({ lean: 1 }));
+      const noLean = pathAnchor(home, t, opts({ lean: 0 }));
+      weaveLean = Math.max(weaveLean, Math.hypot(withLean.x - noLean.x, withLean.y - noLean.y));
+    }
+    ok(weaveLean > 1, `lissajous anticipation lean is real (${weaveLean.toFixed(1)} px)`);
+  }
+  console.log('travel.selfcheck I path-pure: anchored deal, arcs, breathing, wrap, held extremes, anticipation lean');
+}
+
+// ── J. PATH through the real placement path ──────────────────────────────
+const PATH_LP = lp({ transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportSpeed: 1, transportRadius: 140 });
+{
+  const homes = place(lp(), null);
+  // Leash 0 is still for PATH too, and never touches the store.
+  const store0 = createTravelStore();
+  const zero = place(lp({ transport: 'path', transportLeash: 0, transportPath: 'sweep', transportSpeed: 2, transportRadius: 300 }),
+    { store: store0, sceneId: 'a', frameMs: 1000, shed: false });
+  assert.equal(frameHash(zero), frameHash(homes), 'PATH + leash 0 is bit-identical');
+  checks++;
+  assert.equal(store0.scenes.size, 0, 'PATH + leash 0 never creates state');
+  checks++;
+  // Replay-exact across two fresh stores over uneven frames; the store
+  // holds NO per-mark state (stateless by construction).
+  const DT = [16.7, 16.7, 33.3, 8, 16.7, 50, 12.5];
+  const run = () => {
+    const store = createTravelStore();
+    const hashes = [];
+    for (let f = 0; f < 300; f++) hashes.push(frameHash(place(PATH_LP, { store, sceneId: 'p', frameMs: DT[f % DT.length], shed: false })));
+    return { hashes, snap: travelSceneSnapshot(store, 'p') };
+  };
+  const a = run(); const b = run();
+  assert.deepEqual(a.hashes, b.hashes, 'PATH: two fresh stores, one uneven input sequence — every frame identical');
+  checks++;
+  assert.equal(a.snap.states.length, 0, 'PATH keeps no per-mark sim state (the store holds only the step clock)');
+  checks++;
+  ok(new Set(a.hashes).size > 250, 'the PATH run actually travels');
+  // Roam is real and the leash caps the centred/weave families radially.
+  const store = createTravelStore();
+  let items = null;
+  for (let f = 0; f < 240; f++) items = place(PATH_LP, { store, sceneId: 'p2', frameMs: 1000 / 60, shed: false });
+  const homeByIndex = new Map(homes.map((it) => [it.index, it]));
+  let sum = 0, max = 0;
+  for (const it of items) {
+    const h = homeByIndex.get(it.index);
+    const d = Math.hypot(it.x - h.x, it.y - h.y);
+    sum += d; if (d > max) max = d;
+  }
+  ok(sum / items.length > 10, `PATH roam is real: mean ${(sum / items.length).toFixed(1)} px from home`);
+  ok(max <= 300 + 1e-9, `the leash caps the weave: max ${max.toFixed(1)} px vs leash 300`);
+  // Sweep's lane is its geometry: marks travel far beyond the leash
+  // radially (the leash caps only its arc) — cross-canvas by definition.
+  const sweepStore = createTravelStore();
+  let sweepItems = null;
+  for (let f = 0; f < 240; f++) sweepItems = place(lp({ ...PATH_LP, transportPath: 'sweep' }), { store: sweepStore, sceneId: 'sw', frameMs: 1000 / 60, shed: false });
+  let maxDx = 0;
+  for (const it of sweepItems) maxDx = Math.max(maxDx, Math.abs(it.x - homeByIndex.get(it.index).x));
+  ok(maxDx > 150, `sweep travels its lane: max |dx| ${maxDx.toFixed(0)} px`);
+  // Speed 0 freezes the path at its deal; radius 0 is home. Both exact
+  // after the departure window has passed.
+  const frozenStore = createTravelStore();
+  let frozen = null;
+  for (let f = 0; f < 180; f++) frozen = place(lp({ ...PATH_LP, transportSpeed: 0 }), { store: frozenStore, sceneId: 'fz', frameMs: 1000 / 60, shed: false });
+  assert.equal(frameHash(frozen), frameHash(homes), 'PATH speed 0 = the still frame, bit for bit');
+  checks++;
+  const flatStore = createTravelStore();
+  let flat = null;
+  for (let f = 0; f < 180; f++) flat = place(lp({ ...PATH_LP, transportRadius: 0 }), { store: flatStore, sceneId: 'fl', frameMs: 1000 / 60, shed: false });
+  assert.equal(frameHash(flat), frameHash(homes), 'PATH radius 0 (lissajous) = the still frame, bit for bit');
+  checks++;
+  console.log('travel.selfcheck J path-live: replay-exact, stateless, leashed weave, cross-canvas sweep, frozen at speed/radius 0');
+}
+
+// ── K. PATH shed — home now, clock frozen, resume continues ──────────────
+{
+  const homes = place(lp(), null);
+  const store = createTravelStore();
+  for (let f = 0; f < 120; f++) place(PATH_LP, { store, sceneId: 'ps', frameMs: 1000 / 60, shed: false });
+  const stepsBefore = travelSceneSnapshot(store, 'ps').steps;
+  const shedItems = place(PATH_LP, { store, sceneId: 'ps', frameMs: 1000 / 60, shed: true });
+  assert.equal(frameHash(shedItems), frameHash(homes), 'a shed PATH frame is the still frame, bit for bit');
+  checks++;
+  assert.equal(travelSceneSnapshot(store, 'ps').steps, stepsBefore, 'the PATH clock freezes under shed (no jump on resume)');
+  checks++;
+  let resumed = null;
+  for (let f = 0; f < 30; f++) resumed = place(PATH_LP, { store, sceneId: 'ps', frameMs: 1000 / 60, shed: false });
+  ok(frameHash(resumed) !== frameHash(homes), 'resume travels again from where the clock froze');
+  console.log('travel.selfcheck K path-shed: home immediately, clock frozen, resume continues');
+}
+
+// ── L. family assignment (#1575 Q1) ──────────────────────────────────────
+{
+  const line = { id: 'l', category: 'linework', tags: ['squiggle'], weight: 'light', density: 'sparse' };
+  const glyph = { id: 'g', category: 'stamps', tags: ['glyph'], weight: 'medium', density: 'sparse' };
+  const letter = { id: 't', category: 'geometric', tags: ['type', 'letter'], weight: 'medium', density: 'solid' };
+  const blob = { id: 'b', category: 'organic', tags: ['blob'], weight: 'heavy', density: 'solid' };
+  assert.equal(familyDefaultTransport(line), 'flow', 'linework roams by FLOW (its declaration)');
+  assert.equal(familyDefaultTransport(glyph), 'path', 'glyphs roam by PATH (their declaration)');
+  assert.equal(familyDefaultTransport(letter), 'path', 'letterforms are glyphs');
+  assert.equal(familyDefaultTransport(blob), 'still', 'heavy solids anchor');
+  assert.equal(familyDefaultTransport({ id: 'x', category: 'geometric', tags: ['shape'], weight: 'medium', density: 'medium' }), null, 'an unnamed family declares nothing (the #1434 silence)');
+  assert.equal(familyDefaultTransport(null), null);
+  checks += 6;
+  ok(isFamilyAnchored(blob) && !isFamilyAnchored({ ...blob, density: 'medium' }) && !isFamilyAnchored({ ...blob, weight: 'medium' }),
+    'the anchor class is heavy AND solid — either alone still roams');
+  assert.equal(defaultTransportForCast([line, line, glyph]), 'flow', 'the cast default is its most-declared roam');
+  assert.equal(defaultTransportForCast([glyph, glyph, line]), 'path');
+  assert.equal(defaultTransportForCast([blob]), 'still', 'an anchoring cast defaults still');
+  assert.equal(defaultTransportForCast([]), 'still');
+  checks += 4;
+  assert.equal(nextTransportMode('still'), 'flow');
+  assert.equal(nextTransportMode('flow'), 'path');
+  assert.equal(nextTransportMode('path'), 'still');
+  assert.equal(nextTransportMode('warp'), 'flow', 'an unknown mode cycles from still');
+  checks += 4;
+  assert.equal(transportChipLabel('path', 'flow'), 'travel path · fam flow', 'the chip shows mode + family default');
+  checks++;
+
+  // Through the pipeline: in a FLOW scene the heavy-solid marks stay
+  // home bit-exact while the linework roams; the artist's pin tames
+  // the linework too.
+  const cast = [
+    { id: 'line_a', category: 'linework', tags: [], weight: 'light', density: 'sparse' },
+    { id: 'blob_a', category: 'organic', tags: [], weight: 'heavy', density: 'solid' },
+  ];
+  const castLp = (over = {}) => ({
+    mode: 'grid', composition: 'default', count: 120, scale: [0.4, 0.8], rotate: [0, 45],
+    alpha: [60, 100], jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
+    overlap: true, displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5, ...over,
+  });
+  const castPlace = (params, travel, extra = {}) => buildPlacements({
+    layoutParams: params, seed: 42, activeAssets: cast, palette: PALETTE, caps: CAPS,
+    canvasW: W, canvasH: H, travel, ...extra,
+  }).items;
+  const castHomes = castPlace(castLp(), null);
+  const homeOf = new Map(castHomes.map((it) => [it.key, it]));
+  const store = createTravelStore();
+  let roamed = null;
+  for (let f = 0; f < 240; f++) roamed = castPlace(castLp(FLOW_LP), { store, sceneId: 'fam', frameMs: 1000 / 60, shed: false });
+  let blobMoved = 0, lineSum = 0, lineN = 0;
+  for (const it of roamed) {
+    const h = homeOf.get(it.key);
+    const d = Math.hypot(it.x - h.x, it.y - h.y);
+    if (it.assetId === 'blob_a') { if (d !== 0) blobMoved++; }
+    else { lineSum += d; lineN++; }
+  }
+  ok(lineN > 0 && blobMoved === 0, `heavy solids anchor in a FLOW scene (${blobMoved} blob marks moved)`);
+  ok(lineSum / lineN > 5, `linework roams beside them (mean ${(lineSum / lineN).toFixed(1)} px)`);
+  const pinStore = createTravelStore();
+  let pinned = null;
+  const kinemePin = { seed: 42, driverSec: 0, boilStep: 0, amounts: {}, canvasW: W, canvasH: H, shedTier: 0, stillAssets: new Set(['line_a']) };
+  for (let f = 0; f < 240; f++) pinned = castPlace(castLp(FLOW_LP), { store: pinStore, sceneId: 'pin', frameMs: 1000 / 60, shed: false }, { kineme: kinemePin });
+  ok(pinned.every((it) => { const h = homeOf.get(it.key); return it.x === h.x && it.y === h.y; }),
+    "the artist's per-asset pin tames every mark home (the #1434 override)");
+  console.log('travel.selfcheck L assignment: family table, cast default, chip cycle, anchor + pin through the pipeline');
+}
+
+// ── M. stretch along velocity ────────────────────────────────────────────
+{
+  assert.equal(travelStretchAmount(45), 0, 'at the floor: no stretch');
+  assert.equal(travelStretchAmount(20), 0);
+  ok(Math.abs(travelStretchAmount(200) - 155 / 600) < 1e-12, 'stretch grows with speed');
+  assert.equal(travelStretchAmount(100000), TRAVEL_STRETCH_CAP, 'stretch is capped');
+  checks += 3;
+  // A fast PATH scene stamps the deform triple; the axis is the
+  // velocity's perpendicular (that is what elongates along travel in
+  // the a_def shader), and one frame's displacement proves it.
+  const fastLp = lp({ transport: 'path', transportPath: 'lissajous', transportLeash: 400, transportSpeed: 2, transportRadius: 300 });
+  const store = createTravelStore();
+  let prev = null, items = null;
+  for (let f = 0; f < 120; f++) { prev = items; items = place(fastLp, { store, sceneId: 'st', frameMs: 1000 / 60, shed: false }); }
+  let stamped = 0;
+  for (const it of items) {
+    if (!(it.deformAmt > 0)) continue;
+    stamped++;
+    ok(it.deformAmt <= TRAVEL_STRETCH_CAP + 1e-6, 'stamped stretch never exceeds the cap (float32 scratch epsilon)');
+    ok(Math.abs(Math.hypot(it.deformAxisX, it.deformAxisY) - 1) < 1e-5, 'the deform axis is a unit vector');
+  }
+  ok(stamped > 0, `fast PATH marks stretch (${stamped}/${items.length} stamped at this frame)`);
+  // The axis is the velocity's perpendicular, exactly: one mark through
+  // applyTransport, its deform axis against the pure function's own
+  // finite-difference velocity at the same step count.
+  {
+    const store = createTravelStore();
+    const deform = { amt: new Float32Array(1), ax: new Float32Array(1), ay: new Float32Array(1) };
+    const soa = { n: 1, x: new Float64Array([500]), y: new Float64Array([350]), index: new Uint32Array([0]) };
+    const ctx = { seed: 9, canvasW: W, canvasH: H, travel: { mode: 'path', path: 'lissajous', leash: 400, speed: 2, radius: 300, deform, store, sceneId: 'perp', frameMs: 100, shed: false } };
+    for (let i = 0; i < 20; i++) { const u = applyTransport(soa, ctx); if (u) u(); }
+    const tSec = 120 * TRAVEL_STEP_SEC; // 20 calls × 6 locked steps
+    const home = { x: 500, y: 350 };
+    const o = { family: 'lissajous', seed: 9, index: 0, canvasW: W, canvasH: H, radius: 300, speed: 2 };
+    const aNow = pathAnchor(home, tSec, o);
+    const aPrev = pathAnchor(home, tSec - TRAVEL_STEP_SEC, o);
+    const vx = aNow.x - aPrev.x, vy = aNow.y - aPrev.y;
+    const vl = Math.hypot(vx, vy);
+    ok(deform.amt[0] > 0, 'the single fast mark carries stretch');
+    ok(Math.abs((deform.ax[0] * vx + deform.ay[0] * vy) / vl) < 1e-6, 'the deform axis is perpendicular to the travel direction (to float32 scratch precision)');
+  }
+  // A still scene stamps nothing — items are field-for-field pre-P2.
+  ok(place(lp(), null).every((it) => !('deformAmt' in it)), 'still items carry no deform fields');
+  // A slow path (under the speed floor) stamps nothing either.
+  const slowStore = createTravelStore();
+  let slow = null;
+  for (let f = 0; f < 60; f++) slow = place(lp({ transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportSpeed: 0.2, transportRadius: 20 }), { store: slowStore, sceneId: 'sl', frameMs: 1000 / 60, shed: false });
+  ok(slow.every((it) => !('deformAmt' in it)), 'slow marks stay round — no deform fields under the floor');
+  console.log('travel.selfcheck M stretch: capped, perpendicular-axis, stamped only while fast');
+}
+
+// ── N. PATH cost ─────────────────────────────────────────────────────────
+{
+  const decl = getCostTier('travel/path');
+  ok(!!decl && decl.tier === 0 && decl.timeMs > 0, 'travel/path is declared, tier 0, with a measured timeMs');
+  const n = 800;
+  const soa = { n, x: new Float64Array(n), y: new Float64Array(n), index: new Uint32Array(n) };
+  for (let k = 0; k < n; k++) { soa.x[k] = (k % 40) * 25; soa.y[k] = Math.floor(k / 40) * 35; soa.index[k] = k; }
+  const medians = [];
+  for (let run = 0; run < 7; run++) {
+    const store = createTravelStore();
+    const deform = { amt: new Float32Array(n), ax: new Float32Array(n), ay: new Float32Array(n) };
+    const ctx = { seed: 7, canvasW: W, canvasH: H, travel: { mode: 'path', path: 'lissajous', leash: 300, speed: 1, radius: 140, deform, store, sceneId: 'costp', frameMs: 1000 / 60, shed: false } };
+    for (let i = 0; i < 60; i++) { const u = applyTransport(soa, ctx); if (u) u(); }
+    const times = [];
+    for (let i = 0; i < 200; i++) {
+      const t0 = performance.now();
+      const u = applyTransport(soa, ctx);
+      times.push(performance.now() - t0);
+      if (u) u();
+    }
+    times.sort((a, b) => a - b);
+    medians.push(times[100]);
+  }
+  medians.sort((a, b) => a - b);
+  const measured = medians[3];
+  ok(measured < 2.0, `PATH measured ${measured.toFixed(3)} ms at the 800-mark cap sits inside the 2.0 ms class allowance`);
+  console.log(`travel.selfcheck N path-cost: declared ${decl.timeMs} ms; re-measured median-of-medians ${measured.toFixed(3)} ms @800 marks, 1 step + present (sandbox)`);
+}
+
+// ── O. PATH params ───────────────────────────────────────────────────────
+{
+  assert.deepEqual(PARAM_SPEC.transportSpeed, { min: 0, max: 2 });
+  assert.deepEqual(PARAM_SPEC.transportRadius, { min: 0, max: 300 });
+  checks += 2;
+  assert.deepEqual(PATH_FAMILIES, ['orbit', 'spiral', 'sweep', 'lissajous']);
+  checks++;
+  const n = normalizeLayoutParams({ transport: 'path', transportPath: 'sweep', transportSpeed: 99, transportRadius: -5 });
+  assert.equal(n.transport, 'path'); assert.equal(n.transportPath, 'sweep');
+  assert.equal(n.transportSpeed, 2); assert.equal(n.transportRadius, 0);
+  checks += 4;
+  assert.equal(normalizeLayoutParams({ transportPath: 'warp' }).transportPath, 'orbit', 'an unknown family is orbit');
+  checks++;
+  const d = normalizeLayoutParams({});
+  assert.equal(d.transportPath, 'orbit'); assert.equal(d.transportSpeed, 1); assert.equal(d.transportRadius, 140);
+  checks += 3;
+  const v = validateLayoutParams({ transportSpeed: 'abc', transportRadius: null });
+  ok(v.rejected.includes('transportSpeed') && v.rejected.includes('transportRadius'), 'non-numeric PATH params are rejected at the trust boundary');
+  console.log('travel.selfcheck O path-params: spec, clamp, enum and trust boundary all hold');
+}
+
+
+// ── P. Q2 — the traveler budget ──────────────────────────────────────────
 {
   // The cap table lives with the other device budgets and reads honestly:
   // desktop is the measured point, iPad is tighter, and each entry's timeMs
@@ -361,7 +691,7 @@ const frameHash = (items) => createHash('sha256')
   // every time (no clock, no live readings, no randomness anywhere near it).
   for (let i = 0; i < 100; i++) assert.deepEqual(selectTravelers({ requested: 640, ipadClass: true }), selectTravelers({ requested: 640, ipadClass: true }));
   checks++;
-  console.log('travel.selfcheck I budget table + selection: ceiling honoured, cap binds, cost terms hold, selection pure');
+  console.log('travel.selfcheck P budget table + selection: ceiling honoured, cap binds, cost terms hold, selection pure');
 
   // The selection's own cost: declared at registration, measured here.
   const bdecl = getCostTier('travel/budget');
@@ -374,7 +704,7 @@ const frameHash = (items) => createHash('sha256')
   assert.equal(acc, TRAVEL_BUDGETS.ipad.maxTravelers * CALLS);
   checks++;
   ok(perCallMs < 0.005, `selection cost ${perCallMs.toFixed(6)} ms/call is far below the registry's ms currency`);
-  console.log(`travel.selfcheck I selection cost: ${(perCallMs * 1e6).toFixed(0)} ns/call over ${CALLS} calls (sandbox), once per scene/resolve`);
+  console.log(`travel.selfcheck P selection cost: ${(perCallMs * 1e6).toFixed(0)} ns/call over ${CALLS} calls (sandbox), once per scene/resolve`);
 
   // Live through the real placement path, on the tighter class: an
   // 800-mark FLOW scene travels only its first 500 instance indices.
@@ -417,7 +747,7 @@ const frameHash = (items) => createHash('sha256')
   const legacyRun = runBig(undefined);
   assert.deepEqual(legacyRun.hashes, deskRun.hashes, 'no ipadClass on the travel input = the desktop run, bit for bit');
   checks++;
-  console.log('travel.selfcheck I live: iPad class travels the budgeted subset, non-travelers at home, desktop/absent = P1');
+  console.log('travel.selfcheck P live: iPad class travels the budgeted subset, non-travelers at home, desktop/absent = P1');
 
   // A budget shrink under a live scene drops the excess state and the
   // excess marks present at home from that frame on.
@@ -429,7 +759,8 @@ const frameHash = (items) => createHash('sha256')
   ok(shrinkSnap.states.length === TRAVEL_BUDGETS.ipad.maxTravelers, 'the shrink drops state beyond the budget');
   ok(shrunk.every((it) => it.index < TRAVEL_BUDGETS.ipad.maxTravelers || (it.x === bigHomeByIndex.get(it.index).x && it.y === bigHomeByIndex.get(it.index).y)),
     'after the shrink, non-travelers present exactly at home');
-  console.log('travel.selfcheck I shrink: excess state dropped, excess marks home');
+  console.log('travel.selfcheck P shrink: excess state dropped, excess marks home');
 }
 
-console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1 + Q2)`);
+
+console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1 + Q2 + #1575 P2)`);
