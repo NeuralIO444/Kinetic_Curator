@@ -1,300 +1,341 @@
-# STAGING REPORT — #1575 Travel kinemes P2 (PATH transports + assignment) (LOCAL ONLY — no push, no PR)
+# STAGING REPORT — #1576 Travel kinemes P3 (SURGE: z-approach + parallax drift) (LOCAL ONLY — no push, no PR)
 
-Branch: `ember/1575-travel-paths` (local only — not pushed, no PR)
-Base: stage-1 branch tip `9d6fb42c` (#1574 P1, committed locally on `ember/1574-travel-core`)
-(This file replaces stage 1's staging report at the worktree root; stage 1's remains in git history.)
+Branch: `ember/1576-travel-surge` (local only — not pushed, no PR)
+Base: stage-2 branch tip `0c631d9e` (#1575 P2, committed locally)
+(This file replaces stage 2's staging report at the worktree root; stage 2's remains in git history.)
 
 ## What was built, in plain language
 
-Marks can now travel a **dealt path**, not just roam the noise field.
-Where P1's FLOW is a little physics sim (each mark carries offset +
-velocity in a store), PATH is a **pure function**: give it the sim time
-(the same locked step count P1's clock already counts), the mark's seed
-and the path params, and it returns where the mark's anchor is — no
-per-mark state at all, so a replay lands on the same frame by
-construction, not by discipline. Four families live behind the params:
+Two quiet ways for a scene to move in depth, both behind amounts that
+ship at **0 (off)**:
 
-- **orbit** — the mark turns around the dish centre (the canvas centre
-  in placement coordinates), keeping its own radius, so the whole
-  composition rotates instead of collapsing onto one shared ring.
-- **spiral** — the same centre, but the radius breathes ±radius px on a
-  slow sine while the angle drifts.
-- **sweep** — a cross-canvas lane with wrap: the mark crosses the full
-  width at its own home height, bowed into an arc, held at both ends
-  (its progress is eased, never a linear glide), and wraps.
-- **lissajous** — a two-sine weave around home, anchored: at t=0 the
-  offset is exactly zero, like every kineme driver.
+- **SURGE** — a z-approach. When a surge fires, every unpinned mark
+  first **settles away** — it shrinks a touch, sinks a touch, softens —
+  for about half a second (the anticipation; anime timing law, and a
+  surge that starts at full speed is a bug by the issue's own words).
+  Then it approaches: it grows to 1.55×, rises 26 px, and its alpha
+  sharpens toward solid, holds the peak briefly, and eases home.
+  The whole flight is 96 locked steps (1.6 s). z is a driver channel:
+  a pure read (`surgeZRead`) folds z into scale / rise / alpha at
+  placement time, exactly the way the kineme drivers fold breath and
+  drift — placements are never rewritten, and the packer packs the
+  folded values it always packs.
+- **Parallax drift** — surge's quiet sibling. A slow, constant anchor
+  drift: each mark slides +x at **2.5 px/s × amount × its zTier**.
+  Ground (tier 0) never moves; tier 3 moves three times tier 1. Calm
+  (even fully still-transport) scenes drift through space,
+  foreground faster than ground. It is a pure function of the scene's
+  banked step count — no per-mark state at all.
 
-The anime timing law is in the shapes: arcs everywhere, an
-**anticipation lean** against every departure (measured below), held
-extremes (sinusoidal velocity falls to zero at the extremes), and a
-departure ease so marks leave home slowly instead of snapping to full
-speed.
+Both ride the **locked step clock** and resolver-owned stores exactly
+as P1/P2 established (same seed + same input sequence = same frames,
+bit for bit, proven in the suites). Both are **travel** to the
+governor: the existing cut 1.6 now also arms on either amount, and
+under its shed surge **dies** (envelope killed mid-flight, frame is
+home, a held trigger cannot re-fire on restore) while parallax
+**presents home with its clock frozen** (the PATH shed's law — resume
+continues, never jumps). No rung moved; `governorCuts.js` is
+untouched — only the hook's `travelActive` derivation gained the two
+amounts.
 
-**Assignment (Q1, Matt's ruling 2026-10-14) is family data**, a pure
-table in `kineme.js` in the #1434 pattern: linework declares FLOW,
-glyphs (stamps + glyph/letter/type-tagged assets) declare PATH, heavy
-solids (weight `heavy` AND density `solid` — the org_blob class)
-declare still, and unnamed families declare nothing and follow the
-stratum's own word (which is exactly how P1 shipped, so P1 scenes are
-untouched). Two parts bite behaviourally today: a heavy-solid mark
-**anchors** — it stays home bit-exact inside FLOW and PATH scenes —
-and the artist's existing per-asset pin (`assetStill`) tames any mark
-home, as it already did for FLOW. The family's declared mode is also
-what the new BUILD chip shows (below).
+The **surge amount** control lives where stage 1's ruling put it:
+the **Directors motion group** in DavisPanel, beside a matching
+parallax amount row. Both rows show in every transport mode (surge
+and drift compose on still scenes too). No new panel, nothing in BUILD.
 
-**Controls split (Matt's ruling, comment 2026-10-14) is honoured
-exactly:** BUILD gets one minimal chip on each KC stratum block —
-`travel <mode> · fam <family default>` — which selects the stratum on
-first tap and cycles its mode (still → flow → path) on the next; no
-amounts, no clusters in BUILD. Everything richer lives in the
-**Directors motion group**, extended from P1's group: `path` joins the
-mode row, and under it the family chips (orbit/spiral/sweep/
-lissajous, TE) plus speed (%) and radius (px) on the house slider; the
-leash row now shows for PATH as well as FLOW.
+## ⚠ OPEN FORK — Q3, the surge trigger, is NOT built (awaiting Matt's ruling)
 
-**The Jell-O metric is in the census output**: per scene (still, flow,
-and the four path families on the census cast), how many marks travel
-and their mean distance-from-home over a 90-frame window. Reported,
-steering nothing — no consumer reads it. Measured sample below.
+**Q3 has no ruling from Matt**: what fires a surge — the beat, the
+Queen (unnamed, effect-only, as always), a manual perform control, or
+all three with a pecking order — is undecided, and per the dispatch
+**no trigger surface was chosen or built**: no beat wiring, no Queen
+wiring, no perform button, no panel control that fires anything.
 
-**Stretch-along-velocity**: fast FLOW/PATH marks elongate along their
-travel direction through the deform channel (`a_def`). The shader
-squashes along its axis and bulges across it, area-preserving, so the
-stamped axis is the velocity's *perpendicular* — that is what
-elongation along travel means in this channel. Capped at 0.3, nothing
-stamped under 45 px/s, and buildPlacements never overwrites an item
-that already carries its own deform (placement items carry none today;
-the guard stands for any future producer). Verified end-to-end: a fast
-lissajous scene's items reach the scene contract as `deform` triples.
+What exists is the machinery behind an **input signal**: the resolver
+input field **`surgeTrigger`** (0..1 demand), threaded by liveResolve
+into the surge pass like `travelShed` is threaded for P1. **Nothing
+stamps it** — liveLoop is untouched — so it defaults to 0 and the
+machinery is **inert in the live instrument**: amount up, no trigger,
+no surge, forever (the suite pins this). The trigger law the
+machinery implements (and Q3's surface will inherit): a rising edge
+while idle fires **one** envelope at the demand's strength; a trigger
+mid-flight is ignored; a held trigger fires once. Selfchecks drive
+the machinery with synthetic trigger envelopes and prove
+anticipation + the z read that way; the census exercises it the same
+honest way (its surge fixture carries a synthetic trigger of 1).
 
-Under the governor, PATH is travel: `travelActive` now includes
-`transport === 'path'`, so cut 1.6 sheds it with FLOW. A shed PATH
-frame presents home immediately and its step clock **freezes** (steps
-do not advance), so a shed path resumes where it left instead of
-jumping to where its clock would have been.
+Inherited open forks, still unruled, also not built (unchanged from
+stages 1–2): **Q2** traveler budget, **Q4** per-stratum leash.
 
-## ⚠ OPEN FORKS — not built, by the dispatch's explicit carve-out
+## The kill-criterion split (separability, structural)
 
-- **Q4, leash scope (global vs per-stratum): NO ruling from Matt.**
-  Nothing per-stratum was built: P1's single scene-level
-  `transportLeash` stands exactly as it was. Two builder's calls were
-  made *under* that open fork and are recorded here, not hidden:
-  (1) the leash radially caps the centred/weave PATH families
-  (orbit/spiral/lissajous), as it caps FLOW's roam; (2) sweep's lane is
-  its defining geometry — a radial cap would plateau its wrap — so
-  the leash caps only sweep's arc (its y offset). If Matt rules
-  per-stratum leashes, both calls revisit with that ruling.
-- **Q2, the traveler budget (inherited from #1574): still no ruling.**
-  No budget mechanism of any kind was built in this stage either: in a
-  FLOW/PATH scene every non-anchored, non-pinned mark travels.
+The issue's kill criterion — surge reads as a cheap zoom gimmick →
+parallax ships, surge comes out — is built as a file boundary:
+
+- **Surge is `app/src/engine/surge.js`, entire.** It imports only the
+  step constants from kineme.js (one-way); **kineme.js itself has a
+  ZERO-LINE diff against the stage-2 base** (verified with
+  `git diff 0c631d9e`), and `parallaxDrift.js` never imports surge.
+- **Parallax is `app/src/engine/parallaxDrift.js`, entire**, with its
+  own store, suite and cost registration.
+- Each has its **own selfcheck suite** (`surge.selfcheck.mjs`,
+  `parallaxDrift.selfcheck.mjs`), so the split is provable by suite:
+  deleting surge's suite cannot touch parallax's.
+- The removal surface for surge is exactly: `engine/surge.js`, its
+  suite + manifest line, the surge pass in `buildPlacements.js`, the
+  surge store + `surgeTrigger` thread in `liveResolve.mjs`, the
+  `transportSurge` key, the surge RangeRow in DavisPanel, the surge
+  term of the governor hook's `travelActive`, and the census surge
+  fixture/driver. Nothing else knows surge exists.
 
 ## New recipe keys (named exactly — for the coordinator's strip-proof)
 
-This stage adds exactly **three** new layoutParams keys, plus one new
-value on an existing key:
+This stage adds exactly **two** new layoutParams keys:
 
-- `transportPath` — enum, `orbit | spiral | sweep | lissajous`, default `'orbit'` (inert unless transport is 'path')
-- `transportSpeed` — numeric, 0..2, default `1`
-- `transportRadius` — numeric, 0..300 px, default `140`
-- `transport` (existing P1 key) gains the value `'path'`
+- `transportSurge` — numeric, 0..1, default `0` (off — the parity gate)
+- `transportParallax` — numeric, 0..1, default `0` (off — the parity gate)
 
-Like P1's three keys, these ride defaults-merged layoutParams, so the
+Both ride defaults-merged layoutParams like P1/P2's keys, so the
 resolver output echoes them and the recorded fixtures behind
 `gl/replayGate`, `gl/creatureGate` and `engine/wingWarp` move again —
-the same documented, strip-provable mechanism as stage 1, now with
-these three additional keys to strip. No pin or fixture was re-recorded
-in this stage.
+the same documented, strip-provable mechanism as stages 1–2, now with
+these **two additional keys** to strip (`transportSurge`,
+`transportParallax`). No pin or fixture was re-recorded in this stage.
 
 ## Files touched
 
 Implementation:
-- `app/src/engine/kineme.js` — `TRANSPORT_MODES` gains `'path'`;
-  `PATH_FAMILIES`; the family-assignment table (`familyDefaultTransport`,
-  `isFamilyAnchored`, `defaultTransportForCast`, `nextTransportMode`,
-  `transportChipLabel`); the PATH core (`pathAnchor` — pure, with the
-  timing-law shapes; `travelStretchAmount`, cap/floor constants);
-  `applyTransport` extended: PATH present on the shared step clock
-  (stateless — the store holds only steps/acc for the scene), leash
-  cap, shed freeze, and the stretch scratch filled for FLOW and PATH;
-  the `travel/path` cost-tier declaration (tier 0, measured — below).
-- `app/src/engine/buildPlacements.js` — the transport gate takes
-  'path'; the per-mark assignment (family anchor ∪ artist pin) rides
-  the pass's still array; PATH params (path/speed/radius) and the
-  deform scratch ride the travel input; items are stamped with the
-  deform triple only while stretched (pool path sets/clears per call,
-  fresh path stamps only when > 0 — resting items are field-for-field
-  the pre-P2 items).
-- `app/src/data/layout-modes.js` — the three new keys: defaults,
-  `PARAM_SPEC` bounds (speed 0..2, radius 0..300), the `transportPath`
-  enum (absent/unknown → 'orbit').
-- `app/src/hooks/usePerformanceGovernor.js` — `travelActive` includes
-  'path' (one line + comment; the rung itself is P1's, unmoved).
-- `app/src/panels/DavisPanel.jsx` — the Directors motion group extended
-  (mode row gains 'path' from the vocabulary; family chips + speed +
-  radius rows under PATH; leash row shared). No new panel.
-- `app/src/panels/build/LayerStack.jsx` — the minimal mode chip on KC
-  stratum blocks (mode + family default from the stratum's snapshot
-  cast; select-then-cycle). No control clusters.
-- `app/src/curator/censusReport.mjs` — the Jell-O metric
-  (`jelloMetric()` + a formatted census section); KEY_FIXTURES for
-  `transportSpeed` / `transportRadius` (travel driver, lissajous ctx —
-  both measure as MOVES); a STRUCT_FIXTURES row for `transportPath`.
+- `app/src/engine/surge.js` — **NEW.** The whole surge machinery:
+  `surgeEnvelope` (pure; anticipation dip → approach → held peak →
+  eased release over `SURGE_STEPS` 96), `surgeZRead` (z → scaleMul /
+  risePx / alphaLerp), the resolver-owned store
+  (`createSurgeStore` / `pruneSurgeStore` / `surgeSceneSnapshot`),
+  `applySurge` (step banking, trigger edge law, shed kill, the fold
+  into scale/scaleY/y/alpha with a y undo), and the `travel/surge`
+  cost-tier declaration (tier 0, measured — below).
+- `app/src/engine/parallaxDrift.js` — **NEW.** The whole drift:
+  `parallaxDriftOffset` (pure), its store, `applyParallaxDrift`
+  (frozen-clock shed), and the `travel/parallax` declaration.
+- `app/src/engine/buildPlacements.js` — two new ephemeral inputs
+  (`surge`, `parallaxDrift`, never in geometrySignature) and the two
+  passes after transport (drift, then surge), each gated on its own
+  amount > 0 with the artist's pin (`stillMarks`) as the taming set;
+  undos run in reverse. Nothing else in the pipeline moved.
+- `app/src/gl/liveResolve.mjs` — owns one surge store + one parallax
+  store per resolver (pruned with the document, like the travel
+  store); both bases ride the already-measured high-water
+  `travelFrameMs` and `input.travelShed`; the surge base also reads
+  `input.surgeTrigger ?? 0` (inert — see Q3). slowRender frames get
+  neither base (the travel precedent: a frozen frame travels nothing).
+- `app/src/data/layout-modes.js` — the two keys: defaults (0),
+  `PARAM_SPEC` bounds (0..1), comments. No enum, no normalize change.
+- `app/src/hooks/usePerformanceGovernor.js` — `travelActive` gains
+  `transportSurge > 0 || transportParallax > 0` (the rung, its order,
+  its restore and its badge are P1's, unmoved).
+- `app/src/panels/DavisPanel.jsx` — two RangeRows in the Directors
+  motion group (`surge`, `parallax`), shown in every transport mode.
+  No trigger control (Q3). No new panel.
+- `app/src/curator/censusReport.mjs` — `place()` threads the two new
+  ephemeral inputs; `surgeCtxFor()` / `parallaxCtxFor()` (fresh store,
+  one frozen 100 ms frame; the surge ctx carries the synthetic
+  trigger); KEY_FIXTURES for both keys (drivers `surge` / `pdrift`);
+  `runFixture` cases for both drivers. Both keys measure as **MOVES**;
+  the census dead-knob set is unchanged (`kinemeBrushWobble` only).
 
 Tests:
-- `app/src/engine/travel.selfcheck.mjs` — extended, sections I–O
-  (P1's A–H untouched except the H vocabulary pin, 'still'/'flow' →
-  + 'path', which is this stage's own change): PATH pure-function
-  laws (anchored deal, purity, orbit radius, spiral breathing, sweep
-  wrap + lane band, held extremes, anticipation lean measured against
-  lean-off), PATH through the pipeline (replay-exact over 300 uneven
-  frames, stateless store, leash cap, sweep cross-canvas, speed 0 /
-  radius 0 bit-identical to still, leash 0 parity + store untouched),
-  PATH shed (home + frozen clock + resume), family assignment (table,
-  cast default, chip cycle/label, heavy-solid anchor and artist pin
-  through the pipeline), stretch (cap, floor, exact perpendicular
-  axis, stamped-only-while-fast), PATH cost re-measurement, PATH
-  params. **685 checks passed** (P1's 50-check suite grew; the count is
-  the harness's own ok()+assert tally).
-- `app/src/curator/census.selfcheck.mjs` — the key-universe constant
-  22 → 23 structural keys (the `transportPath` enum is the new
-  structural key — the same pin P1 updated for `transport`); a Jell-O
-  assertion block (still travels nothing; every travel scene travels
-  with a real mean; the formatted report carries the section).
-- `app/selfcheck.manifest` — **unchanged**: no new suite file was
-  added (P2 extends the existing travel suite, already registered).
+- `app/src/engine/surge.selfcheck.mjs` — **NEW, 1385 checks:**
+  envelope laws, anticipation measured step-by-step through the
+  applier, the z read exact, live through buildPlacements (parity at
+  amount 0 / store untouched, inert-by-default, determinism over 300
+  uneven frames with a synthetic trigger pattern, the peak
+  presentation per item, release home bit-exact, trigger edge law,
+  shed kill + swallowed held trigger, artist pin), cost
+  re-measurement, params.
+- `app/src/engine/parallaxDrift.selfcheck.mjs` — **NEW, 270
+  checks:** offset laws (exact proportionality to zTier / amount /
+  time; zero at amount 0, t 0 and tier 0; constant velocity), live
+  through buildPlacements (parity, per-tier drift exact against the
+  banked step count, foreground-faster ordering tier by tier,
+  determinism, step-chunking, shed freeze + resume-from-frozen, pin),
+  cost re-measurement, params.
+- `app/selfcheck.manifest` — two lines registering the new suites.
+- No existing suite file was modified. In particular
+  `travel.selfcheck.mjs` (P1+P2) is byte-unchanged and green.
 
 ## Feel / behaviour numbers (sandbox, this build)
 
-Jell-O metric, census cast (48 placed marks), 90 frames at 60 fps:
+Anticipation, measured by the surge suite stepping one mark through
+a full envelope at amount 1, strength 1:
 
-| scene | travelling | mean distance-from-home |
-|---|---|---|
-| still | 0/48 | 0 px |
-| flow (leash 200, flow 1) | 38/48 | 26.47 px |
-| path/orbit (leash 300) | 38/48 | 30.12 px |
-| path/spiral (leash 300) | 38/48 | 27.75 px |
-| path/sweep (leash 300) | 38/48 | 240.02 px |
-| path/lissajous (leash 300) | 38/48 | 123.75 px |
+- z dips to **−0.220** (the declared `SURGE_ANTICIPATION_Z`), and z
+  stays ≤ 0 for the first **29 locked steps (~0.48 s)** before
+  crossing zero — the settle-away is a quarter of the flight's rise.
+- In presentation the settle reads as scale dipping to **0.879×**
+  (with the matching sink and softening) before the approach.
+- No full-speed start: **|z| one step in < 0.03**, and every envelope
+  joint is slope-continuous (the approach itself eases in-out,
+  decelerating into the peak — held extremes).
+- Peak: z exactly **+1** (steps 53–67 of 96); presented scale
+  **1.55×**, rise **26 px**, alpha lerped **45%** of its headroom
+  toward 100. After step 96 the frame is the still frame, bit for bit.
 
-(38/48, not 48/48, is the assignment working: the cast's heavy-solid
-and slow marks anchor or stay under the 1 px travel threshold — the
-metric reports the cast as dealt, it does not grade it.)
+Parallax drift at amount 1 (exact, from the pure function): tier 1
+**2.5 px/s**, tier 2 **5.0 px/s**, tier 3 **7.5 px/s**, tier 0
+**0** — through the real placement path the suite verifies each
+item's displacement equals the function of its own tier and the
+banked step count to 1e-9.
 
-PATH in the travel suite's own scene (120 marks, lissajous, leash
-300): mean roam > 10 px with the leash as the hard max (suite
-asserts both). Anticipation measured against the same function with
-the lean switched off (suite-pinned bounds): sweep's departure dip
-**> 3 px** against its travel direction, the weave's lean **> 1 px**
-in its first half-second. Held extremes: the weave's speed falls
-under 35% of its peak inside its cycle (suite-pinned bound).
+Census Jell-O (unchanged scenes, no new amounts): bit-identical to
+stage 2's table (flow 38/48 @ 26.47 px; orbit 30.12; spiral 27.75;
+sweep 240.02; lissajous 123.75) — P1/P2 behaviour untouched.
 
 ## Cost (measured, not estimated)
 
-`travel/path` is registered at **tier 0** on the same doctrine as
-`travel/flow` (structural, no GPU pass, sheds by the governor's own
-rung). Declared `timeMs: 0.66` is the measured resolver-CPU figure:
-`applyTransport` in PATH mode (lissajous present + stretch
-finite-difference) at the 800-mark cap, one locked step + present,
-median of 7 runs × 200 calls = **0.662 ms** (the suite re-measures on
-every run; latest print 0.662 ms). FLOW's declaration is unchanged
-(re-measured 0.39 ms this run). Sandbox-indicative only.
+Both siblings register at **tier 0** on the travel doctrine
+(structural, no GPU pass, shed by the governor's own rung):
+
+- `travel/surge` — declared `timeMs: 0.01`, the measured figure:
+  `applySurge` at the 800-mark cap with the envelope live, median of
+  7 runs × 200 calls = **0.010 ms** (the suite re-measures on every
+  run; latest print 0.010 ms).
+- `travel/parallax` — declared `timeMs: 0.006`, measured the same
+  way = **0.006 ms** (latest print 0.006 ms).
+
+Sandbox-indicative only; real hardware authoritative.
 
 ## Acceptance evidence
 
-- **Four path families behind params with Q1 defaults** — orbit /
-  spiral / sweep / lissajous behind `transportPath` (+ speed/radius),
-  family defaults per the Q1 table (`familyDefaultTransport`).
-- **Parity suite green for still scenes** — travel.selfcheck A
-  (P1's, unchanged) plus P2's own gates: PATH + leash 0 bit-identical
-  with the store untouched; PATH speed 0 and radius 0 bit-identical
-  to the still frame; still items carry no deform fields.
-- **Jell-O metric in the census output** — `jelloMetric()` rows +
-  the formatted "RA3 Jell-O metric" section; census suite pins it.
+- **Surge + parallax behind params** — both amounts default 0; the
+  passes, stores and panel rows are as above.
+- **Anticipation present and measured** — the suite's step trace
+  (above): dip depth, 29-step settle, presentation scale dip, gentle
+  departure, held peak. **The issue's recorded-clip acceptance is
+  review-lane QA for Matt at publish** — no clip is claimed here;
+  this staging evidence is the measured anticipation + the
+  machinery's live-path proof, per the dispatch.
+- **The z→packer read proven** — `surgeZRead` pinned exactly, and the
+  peak test verifies per item, through the real placement path, the
+  scale / y / alpha values the packer receives.
+- **Parallax live** — drift proportional to zTier, foreground faster
+  than ground tier by tier, exactly zero at amount 0 (and the store
+  untouched — parity).
+- **Parity green when off** — both suites' parity sections (amount 0
+  bit-identical, store never created), plus the untouched P1/P2
+  travel suite green (685 checks) and the census Jell-O table
+  bit-identical to stage 2.
 - **`npm run build` green**; ESLint clean on every touched file.
-- **No golden hash was weakened or re-pinned.** The one pin updated is
-  enumerative, not measured: the census key-universe constant
-  (22 → 23 structural) — a new enum key must appear in it, exactly as
-  P1's `transport` did.
+- **No golden hash was weakened or re-pinned.** No pin enumerates
+  these keys (both are numeric PARAM_SPEC keys — the census row count
+  is computed from the spec, and it balances; the structural-key
+  constant is untouched).
 
 ## Deviations from the issue, and why
 
-1. **Orbit's centre.** The issue names "orbit (dish center default)".
-   Placement coordinates have no separate dish-centre value — the
-   dish is the canvas — so orbit/spiral turn around the canvas
-   centre, each mark keeping its own radius/phase. Recorded here as
-   the reading the build stands on.
-2. **Roam defaults are assignment, not a new default mode.** P1's
-   parity law (a document with no transport word opens still, exactly
-   as saved) forbids silently flipping existing scenes to a family
-   mode, so the roam half of Q1 lands as (a) the family table itself,
-   (b) the stratum chip's shown family default +
-   `defaultTransportForCast`, and (c) the behavioural anchor half
-   (heavy solids) which applies inside any live transport. The
-   stratum's explicit recipe word remains the artist's — choosing
-   'path' for a glyph-led stratum is one tap on the chip the ruling
-   itself specified. Flagged plainly so Matt can rule otherwise.
-3. **Sweep vs the leash.** See the Q4 fork above: the lane is not
-   radially capped (its arc is), because a radial cap plateaus the
-   wrap the family is defined by. Under the unresolved Q4 this is a
-   builder's call, recorded, not a ruling.
-4. **PATH shed freezes its clock** where FLOW's shed settles through
-   the sim: a pure function has no velocity to settle, so the honest
-   shed is home-now + a frozen clock (no jump on resume). The badge
-   and rung are P1's, unchanged.
+1. **Where z is read.** The issue says "the packer reads z". In this
+   codebase z is a driver channel (the dispatch's own words), and
+   driver channels fold into the stage-C channels at placement time
+   (breath/drift/pulse precedent) — the packer
+   (`packInstanceData`) packs the folded scale/alpha/positions, it
+   does not interpret driver state. So the read lives in
+   `surgeZRead` + `applySurge`, proven at the item level (the exact
+   values the packer packs). Giving z a contract field + stride slot
+   instead would move the replayGate/creatureGate pins and the
+   45-float stride for machinery whose trigger is not yet ruled —
+   tendrils the kill criterion forbids. Recorded as the reading this
+   build stands on.
+2. **One envelope for the whole scene; no per-mark stagger.** The
+   envelope fires scene-wide at the trigger's strength; marks differ
+   only by the artist's pin (which holds them home). Stagger /
+   subset choreography is part of the trigger's design space (Q3)
+   and none was invented.
+3. **Surge ignores the family anchor.** Heavy solids anchor against
+   *roam* (anchor position); surge moves no anchor — it is a z event,
+   and the whole cast approaches together. The artist's pin still
+   tames (z stays 0). Recorded as a builder's call under Q3's open
+   choreography space.
+4. **Parallax direction and shape.** +x only, linear, **no wrap**:
+   at full amount the top tier crosses a 1000 px canvas in ~2.2
+   minutes; whether and how a drifted mark wraps is an
+   edge-behaviour call with no ruling, so the machinery is the
+   provable linear core and the wrap question is recorded here, not
+   invented. The zTier factor is the **raw tier** (tier 0 = ground =
+   exactly still — the issue's "proportional to zTier" read
+   literally), not #796's normalized camera factor; #796's
+   `parallax` param and `gl/parallax.mjs` are untouched and the two
+   compose independently.
+5. **Shed shapes differ per sibling, by their natures.** Surge has
+   state and dies with it (FLOW's settle has no analogue for a
+   1.6 s envelope — a half-surged hold would be a frozen pose, the
+   dishonest frame P1's shed law forbids). Parallax is a pure
+   function and takes PATH's shed law verbatim (home + frozen
+   clock). Both present home under shed; neither jumps on restore
+   beyond PATH's own accepted resume behaviour.
 
 ## Not built (by design)
 
-- **Q4 per-stratum leashes** — see the open fork.
-- **Q2 traveler budget** — see the open fork (inherited).
-- **SURGE (P3, #1576)** — the next stage; no hooks built for it.
-- A per-asset "force roam" override for anchored heavy solids: the
-  issue's override word is *tames* (roam → still, which the existing
-  pin does); forcing an anchored mark to roam has no ruled surface
-  and none was invented.
+- **Q3 trigger surface** — see the open fork. No beat wiring, no
+  Queen wiring, no perform control, no `surgeTrigger` producer
+  anywhere (liveLoop untouched).
+- **Q2 traveler budget, Q4 per-stratum leash** — inherited forks.
+- A parallax wrap, per-mark surge stagger, per-stratum surge/drift
+  amounts — unruled surfaces, none invented.
+- Swarm/organism items: both passes apply to the placement path
+  (buildPlacements), where the travel contract puts them.
 
 ## Selfcheck results
 
-- `app/src/engine/travel.selfcheck.mjs` (extended): **685 checks
-  passed** — P1's A–H (parity, determinism, live FLOW, leash law, shed
-  settle, governor order, cost, params) plus P2's I–O (PATH pure
-  function, PATH live, PATH shed, family assignment, stretch, PATH
-  cost, PATH params).
-- `app/src/curator/census.selfcheck.mjs`: **green**, including the new
-  Jell-O assertions and the three new keys measuring as MOVES through
-  their fixtures (the dead-knob set is unchanged: only
-  `kinemeBrushWobble`).
+- `app/src/engine/surge.selfcheck.mjs` (NEW): **1385 checks passed**
+  (envelope, measured anticipation, z read, live path, cost, params).
+- `app/src/engine/parallaxDrift.selfcheck.mjs` (NEW): **270 checks
+  passed** (offset laws, live path, cost, params).
+- `app/src/engine/travel.selfcheck.mjs` (P1+P2, unmodified): **685
+  checks passed** — including its parity sections, on this tree.
+- `app/src/curator/census.selfcheck.mjs`: **green** — both new keys
+  measure as MOVES through their fixtures; the dead-knob set is
+  unchanged; Jell-O table bit-identical to stage 2.
 - Affected existing suites, run individually, all green:
   buildPlacements, kineme, governorCuts, governorCreatureShed,
-  governorHostileScene, costTiers, governorEventLog, censusReadout,
-  normalize, goldenPlacement, liveResolve, liveResolve.determinism,
-  livingMotion, materialParams, bundle / bundleKeys / bundleParts.
+  governorHostileScene, costTiers, censusReadout, liveResolve,
+  liveResolve.determinism, goldenPlacement, livingMotion,
+  materialParams, normalize, voices, firewall, rangeRow,
+  governorEventLog, bundle / bundleKeys / bundleParts / bundleFile.
 - `npm run build`: **green**. ESLint on every touched file: **clean**.
-- Full manifest sweep, stated exactly: the manifest holds 485 suites.
-  `npm run selfcheck` ran the first **76 suites green** and stopped at
-  `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` (command 77), which
-  fails with **`cargo not found on PATH`** — environmental, identical
-  to stage 1 (no Rust/WASM file is touched by this stage). Every one
-  of the remaining **408 suites was then run individually**: **403
-  passed, 5 failed**. Total: **479 of 485 suites green**. The 5
-  individual-run failures (+ swarmWasm = 6 non-green of 485):
+- Full manifest sweep, stated exactly: the manifest holds **487
+  suites** (stage 2's 485 + this stage's 2). **Every suite was run
+  individually: 480 passed, 7 failed.** Total: **480 of 487 suites
+  green.** The 7 failures:
   - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the three
-    suites stage 1's report documents as failing on this stack's base
-    for the key-echo reason (P1's three recipe keys move the recorded
-    checkpoint hashes / resolver pins; strip-proven by the coordinator
-    in stage 1). Their failure shapes here are the same assertions
-    ("no checkpoint diverges" at checkpoint 0; "the resolver at rest
-    is the pinned output"). This stage adds three more keys of the
-    same kind (`transportPath`, `transportSpeed`, `transportRadius`),
-    named above for the coordinator's separate strip-proof. No pin or
-    fixture was re-recorded.
-  - `fx/rollSafety` — sandbox-environment: the headless browser dies
-    mid-suite ("Target page, context or browser has been closed");
-    documented as failing identically on clean main.
-  - `gl/accum` — sandbox-environment: progresses through its [ok]
-    checks and dies at its browser stage in this sandbox; documented
-    as failing identically on clean main.
-  No other suite failed, and no suite was skipped: 76 + 1 + 408 = 485,
+    suites stages 1–2 document as failing on this stack's base for
+    the key-echo reason (recorded fixtures predate the travel recipe
+    keys; strip-proven by the coordinator in stage 1). Their failure
+    shapes here are the same assertions ("no checkpoint diverges";
+    "the resolver at rest is the pinned output"). This stage adds two
+    more keys of the same kind (`transportSurge`,
+    `transportParallax`), named above for the coordinator's separate
+    strip-proof. No pin or fixture was re-recorded.
+  - `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` — fails with
+    **`cargo not found on PATH`** (no Rust toolchain in this
+    sandbox) — environmental, identical on main.
+  - `fx/rollSafety` — sandbox-environment: in this sweep it ground
+    in software GL past the sweep driver's 600 s per-suite cap and
+    was recorded failed on timeout; stage 2 recorded the same suite
+    failing in this sandbox with the headless browser dying
+    mid-suite ("Target page, context or browser has been closed").
+    Failing identically-class on clean main per stages 1–2.
+  - `gl/accum` — sandbox-environment: aborted at its browser stage
+    in this sandbox; documented as failing identically on clean main.
+  - `gl/resolverProbe` — a wall-clock perf probe (resolve-time
+    budgets). It failed in this sweep at 8.056 ms vs its 5 ms
+    four-creature mean budget under sweep load, and standalone on
+    this tree at 5.04–5.69 ms. **The pristine stage-2 base fails it
+    standalone in the same sandbox today too** (verified from a
+    `git archive` export of `0c631d9e`: "four creatures add 3.245 ms
+    (budget 3)") — the sandbox's current CPU cannot meet the probe's
+    budgets with or without this stage's change, whose per-resolve
+    additions are two small gated objects. Reported as
+    sandbox-timing, not as a regression this stage introduced; the
+    coordinator may wish to re-run it on real hardware.
+  No other suite failed, and no suite was skipped: 480 + 7 = 487,
   every manifest suite accounted for above.
 
 ---

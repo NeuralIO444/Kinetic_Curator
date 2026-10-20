@@ -1,6 +1,8 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
 import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern, createTravelStore, pruneTravelStore } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
+import { createSurgeStore, pruneSurgeStore } from '../engine/surge.js'; // #1576: the surge envelope store
+import { createParallaxStore, pruneParallaxStore } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -215,6 +217,11 @@ export function createLiveResolver() {
   // nothing, and a frozen frame's span is never lump-credited on thaw
   // because slowRender frames still advance the mark — see travelFrameMs).
   const travelStore = createTravelStore();
+  // #1576 — P3's stores, one per resolver like the travel store: the
+  // surge envelope state and the parallax drift clock. Both advance on
+  // the same high-water frame delta travelFrameMs measures below.
+  const surgeStore = createSurgeStore();
+  const parallaxStore = createParallaxStore();
   let travelLastMs = null;
 
   // Item-level morph (chip clicks): per content layer, the last shown
@@ -306,6 +313,8 @@ export function createLiveResolver() {
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
     for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
     pruneTravelStore(travelStore, documentIds); // #1574 — a removed layer's roam goes with it
+    pruneSurgeStore(surgeStore, documentIds); // #1576 — a removed layer's envelope goes with it
+    pruneParallaxStore(parallaxStore, documentIds); // #1576 — a removed layer's drift clock goes with it
     // #822 — FEED slots follow the document, not visibility. Freeing a slot
     // on hide let the next layer reuse it and read the hidden track's
     // delay-1 buffer (a snap, and a partner the picture did not have).
@@ -506,6 +515,13 @@ export function createLiveResolver() {
     // Absent — every take recorded before Q2 — it reads false (desktop
     // class), whose cap is the full placement cap: P1's behaviour exactly.
     const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed, ipadClass: input.travelIpadClass === true };
+    // #1576 — P3's bases ride the same measured frame delta and the same
+    // travel shed. The surge TRIGGER is an input signal only: it reads
+    // input.surgeTrigger, which NOTHING stamps (no beat wiring, no Queen
+    // wiring, no perform control — Q3 is unruled), so it defaults to 0
+    // and the machinery is inert until Matt rules the trigger surface.
+    const surgeBase = input.slowRender ? null : { store: surgeStore, frameMs: travelFrameMs, shed: !!input.travelShed, trigger: input.surgeTrigger ?? 0 };
+    const parallaxBase = input.slowRender ? null : { store: parallaxStore, frameMs: travelFrameMs, shed: !!input.travelShed };
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
@@ -736,6 +752,13 @@ export function createLiveResolver() {
           // layoutParams (recipe data); buildPlacements gates on them, so
           // a 'still' scene never steps the sim.
           travel: travelBase ? { ...travelBase, sceneId: layer.id } : null,
+          // #1576 — P3's inputs: the resolver's surge/drift stores + this
+          // frame's delta + the travel shed (+ the inert-by-default surge
+          // trigger signal). Amounts ride layoutParams (recipe data);
+          // buildPlacements gates on them, so an off scene never steps
+          // either store.
+          surge: surgeBase ? { ...surgeBase, sceneId: layer.id } : null,
+          parallaxDrift: parallaxBase ? { ...parallaxBase, sceneId: layer.id } : null,
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
             dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,

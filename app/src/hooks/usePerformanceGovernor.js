@@ -133,11 +133,16 @@ export function usePerformanceGovernor() {
   // strata, so the snapshot scan is the non-active strata by construction.)
   const travelShed = useStore(s => s.travelShed);
   const setTravelShed = useStore(s => s.setTravelShed);
+  // #1576 — P3's siblings are travel too: a scene whose only travel is
+  // surge or parallax drift (either amount up, any transport mode) is
+  // live for this rung, and the same shed holds them (surge dies,
+  // drift presents home — engine/surge.js, engine/parallaxDrift.js).
   const layerSnapshots = useStore(s => s.layerSnapshots);
   const activeLayerId = useStore(s => s.activeLayerId);
   const stratumTravels = (p) => !!p
-    && (p.transport === 'flow' || p.transport === 'path')
-    && (p.transportLeash ?? 112) > 0;
+    && (((p.transport === 'flow' || p.transport === 'path') && (p.transportLeash ?? 112) > 0)
+      || (p.transportSurge ?? 0) > 0
+      || (p.transportParallax ?? 0) > 0);
   const travelActive = stratumTravels(layoutParams)
     || Object.entries(layerSnapshots || {}).some(([id, snap]) => id !== activeLayerId && stratumTravels(snap?.layoutParams));
   // #263 — while a context restore is in flight the FPS reading is
