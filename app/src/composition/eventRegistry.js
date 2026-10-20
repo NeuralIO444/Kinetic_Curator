@@ -162,7 +162,6 @@ export const EVENT_REGISTRY = {
   MACRO_RENAME: { handler: 'wire' },
   FEEL_APPLY: { handler: 'wire' },
   LIGHT_SET: { handler: 'wire' },
-  CREATURE_COUNT: { handler: 'wire' },
   ATTACH_CLEAR: { handler: 'wire' },
   BEAT_BPM: { handler: 'wire' },
   BEAT_METRO: { handler: 'wire' },

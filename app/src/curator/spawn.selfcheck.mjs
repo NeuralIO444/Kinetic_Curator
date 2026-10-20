@@ -153,27 +153,33 @@ const inRegion = (p) => p.x >= SPAWN_REGION.x0 * W - 1e-6 && p.x <= SPAWN_REGION
 
 // 7. wired: the picker is fed (the count rides the resolver input, stamped by the loop; the resolver's spawn
 // state observes the frame), homes are published as dishPins (the loop writes them back when they move),
-// and the count is the DIRECTORS row
+// and the count is set from BUILD
 {
   // #1694 slice 1 — the wiring moved: App's frame tap no longer calls observeSpawn; these pins follow it.
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  // #1694 slice 2 — the stamp now nets the governor's creature shed off the artist's count
+  // #1694 slice 2 — the stamp nets the governor's creature shed off the artist's count
   // (the overlay never writes the count itself); the wiring pin follows the stamp.
-  assert.ok(/creatureCount: Math\.max\(0, \(s\.creatureCount \| 0\) - \(s\.creatureShed \| 0\)\)/.test(loop), 'the loop stamps the count (net of the governor shed) on the resolver input');
+  // #1694 slice 3 — the artist's count is the BUILD param `creatures` (layoutParams); the pin follows it home.
+  assert.ok(/creatureCount: Math\.max\(0, \(\(layoutParams\.creatures \?\? 0\) \| 0\) - \(s\.creatureShed \| 0\)\)/.test(loop), 'the loop stamps the count (the BUILD param, net of the governor shed) on the resolver input');
   assert.ok(/s\.setDishPins\(spawnNow\.dishPins\)/.test(loop), 'the loop publishes the homes as dishPins');
   const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
   assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver observes the frame');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(!/observeSpawn\(input, output/.test(app), 'the tap channel is retired');
+  // #1694 slice 3 — the DIRECTORS stepper retired with the fold-in (Q3 ruling): the header carries
+  // no creature control, and the count's one surface is BUILD's hype/moth block.
   const dav = readFileSync(new URL('../panels/DavisPanel.jsx', import.meta.url), 'utf8');
-  assert.ok(/data-testid=\{`creatures-\$\{n\}`\}/.test(dav) && /\[0, 1, 2, 3, 4\]\.map/.test(dav), 'a 0 to 4 row in the DIRECTORS panel');
-  assert.ok(/<PanelHeader tag="P07" title="DIRECTORS" subtitle=\{subtitle\}>[\s\S]*?creatures-\$\{n\}/.test(dav), 'in the panel HEADER, so the body keeps its height and its five section labels');
+  assert.ok(!/creatures-\$\{n\}/.test(dav) && !/CREATURE_COUNT/.test(dav), 'no creature stepper left in DIRECTORS');
+  assert.ok(/<PanelHeader tag="P07" title="DIRECTORS" subtitle=\{subtitle\} \/>/.test(dav), 'the header is back to its pre-#1355 shape (no header tools)');
   assert.ok(!/davis-section-label ttl">creatures/.test(dav), 'no sixth section label');
+  const hype = readFileSync(new URL('../panels/layout/HypeSliders.jsx', import.meta.url), 'utf8');
+  assert.ok(/btn\('CREATURES', 'creatures'/.test(hype) && /min=\{0\} max=\{4\} step=\{1\}/.test(hype), 'the count is settable 0..4 from BUILD (the stepper range, unchanged)');
   const src = readFileSync(new URL('./spawn.js', import.meta.url), 'utf8') + readFileSync(new URL('./spawnLive.js', import.meta.url), 'utf8');
   const code = src.split('\n').filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*')).join('\n');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(code), 'frames, not a clock; no chance');
   const doc = readFileSync(new URL('../state/projectDocument.js', import.meta.url), 'utf8');
-  assert.ok(/doc\.creatureCount = creatures/.test(doc), 'the count is saved with the project (only when set)');
+  assert.ok(!/doc\.creatureCount =/.test(doc), 'the count is no longer saved as a top-level field (it rides layoutParams)');
+  assert.ok((doc.match(/landLegacyCreatureCount\(raw, doc\);/g) || []).length === 2, 'both parse branches land a pre-fold-in document\u2019s top-level count in the param');
 }
 
 void DISH_RADIUS; void DISH_SATURATE;

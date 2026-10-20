@@ -128,9 +128,10 @@ export function serializeProject(state) {
   // #1355 — wet-lab attach points, per asset. Written only when set.
   const attach = sanitizeAssetAttach(state.assetAttach);
   if (attach) doc.assetAttach = attach;
-  // #1355 AUTO SPAWN — how many creatures. Written only when set: an untouched project saves as before.
-  const creatures = sanitizeCount(state.creatureCount);
-  if (creatures > 0) doc.creatureCount = creatures;
+  // #1694 S3 — the creature count has no top-level field any more: it is the BUILD layout
+  // param `creatures`, written above inside layoutParams like every other param (the
+  // pre-fold-in top-level `creatureCount` field is read back only by parseProject's
+  // migration, below).
   // #790 — the scene's audio routes. Written only when customised (null = the
   // default table), so an untouched piece exports exactly as before. [] is saved.
   const audioRoutes = sanitizeAudioRoutes(state.audioRoutes);
@@ -161,6 +162,36 @@ export function serializeProject(state) {
     doc.layerSnapshots = normalizeSnapshots(snaps, overlay);
   }
   return doc;
+}
+
+/**
+ * #1694 S3 — the creature count's home moved from a top-level document field to the BUILD
+ * layout param `creatures`. A document written before the move carries `creatureCount` at
+ * the top level and no `creatures` key anywhere in its layout params: land the old field in
+ * the param — root and layer snapshots alike — so a saved project's population survives
+ * the move intact. The old field's own sanitizer stays the law for its value. An explicit
+ * `creatures` param always wins (it is the new home); a snapshot without params of its own
+ * inherited the root's, so it takes the root's landed value.
+ */
+function landLegacyCreatureCount(raw, doc) {
+  if (raw.creatureCount === undefined) return;
+  const n = sanitizeCount(raw.creatureCount);
+  const rawParams = raw.layoutParams || raw.layout;
+  if (!(rawParams && typeof rawParams === 'object' && 'creatures' in rawParams)) {
+    doc.layoutParams = { ...doc.layoutParams, creatures: n };
+  }
+  const rawSnaps = raw.layerSnapshots && typeof raw.layerSnapshots === 'object' ? raw.layerSnapshots : {};
+  for (const [id, snap] of Object.entries(doc.layerSnapshots || {})) {
+    const rawSnap = rawSnaps[id];
+    if (!rawSnap || typeof rawSnap !== 'object') continue;
+    if (rawSnap.layoutParams && typeof rawSnap.layoutParams === 'object') {
+      if (!('creatures' in rawSnap.layoutParams)) {
+        snap.layoutParams = { ...snap.layoutParams, creatures: n };
+      }
+    } else {
+      snap.layoutParams = { ...snap.layoutParams, creatures: doc.layoutParams.creatures };
+    }
+  }
 }
 
 export function parseProject(raw) {
@@ -204,7 +235,6 @@ export function parseProject(raw) {
         assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
         assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
         assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
-        creatureCount: sanitizeCount(raw.creatureCount), // #1355
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
         midiMap: sanitizeMidiMap(raw.midiMap), // #617
         mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -219,6 +249,7 @@ export function parseProject(raw) {
           layoutParams: raw.layoutParams || raw.layout,
         }, layerIds),
     };
+    landLegacyCreatureCount(raw, doc);
     return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
   }
 
@@ -255,7 +286,6 @@ export function parseProject(raw) {
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
-      creatureCount: sanitizeCount(raw.creatureCount), // #1355
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
       midiMap: sanitizeMidiMap(raw.midiMap), // #617
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
@@ -275,6 +305,7 @@ export function parseProject(raw) {
         layoutParams: raw.layoutParams,
       }, layerIds),
     };
+    landLegacyCreatureCount(raw, doc);
     return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
 }
 

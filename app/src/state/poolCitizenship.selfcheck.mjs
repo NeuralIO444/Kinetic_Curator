@@ -119,17 +119,20 @@ ok('sanitizeAssetOptions keeps only declared options at non-default values', () 
 
 // ── 3. the document round-trip ──────────────────────────────────────────────
 ok('the family option and the citizen switch ride the project document; the governor shed does not', () => {
-  useStore.setState({ assetOptions: { creature: { family: 'dish' } }, creatureShed: 2, creatureCount: 3 });
+  // #1694 S3 — the count is set through its BUILD param home (layoutParams.creatures)
+  useStore.setState({ assetOptions: { creature: { family: 'dish' } }, creatureShed: 2, layoutParams: { ...S().layoutParams, creatures: 3 } });
   const doc = serializeProject(S());
   assert.deepEqual(doc.assetOptions, { creature: { family: 'dish' } });
+  assert.equal(doc.layoutParams.creatures, 3, 'the count rides the document inside layoutParams');
+  assert.ok(!('creatureCount' in doc), 'no top-level count field since the fold-in');
   assert.ok(!('creatureShed' in doc), 'the shed is a governor overlay — never serialized');
   const parsed = parseProject(clone(doc));
   assert.ok(parsed.ok);
   S().applyProject(parsed.doc);
   assert.deepEqual(S().assetOptions, { creature: { family: 'dish' } });
-  assert.equal(S().creatureCount, 3);
+  assert.equal(S().layoutParams.creatures, 3);
   assert.equal(S().creatureShed, 0, 'a fresh document ends any governor shed claim');
-  useStore.setState({ assetOptions: {}, creatureCount: 0 });
+  useStore.setState({ assetOptions: {}, layoutParams: { ...S().layoutParams, creatures: 0 } });
   const clean = parseProject(clone(serializeProject(S())));
   S().applyProject(clean.doc);
   assert.deepEqual(S().assetOptions, {}, 'a doc without options applies as all-defaults');

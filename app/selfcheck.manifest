@@ -167,6 +167,7 @@ node src/state/diceLanding.selfcheck.mjs
 node src/panels/layout/kineticHeat.selfcheck.mjs
 node src/panels/layout/chiaroscuro.selfcheck.mjs
 node src/panels/layout/unlockTree.selfcheck.mjs
+node src/panels/layout/foldInCensus.selfcheck.mjs
 node src/panels/layout/shiftLayer.selfcheck.mjs
 node src/state/startupChaos.selfcheck.mjs
 node src/state/layersPatch.selfcheck.mjs

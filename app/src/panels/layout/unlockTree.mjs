@@ -13,7 +13,7 @@
 //     still set them).
 //   · the material knobs mirror MaterialSliders' per-material gate; the
 //     mode gates mirror the #272 visible-but-inert conditions in
-//     LayoutSliders / SwarmSliders / CreatureSliders / AppearanceSliders,
+//     LayoutSliders / SwarmSliders / HypeSliders / AppearanceSliders,
 //     predicate for predicate, including the two reasons whose wording
 //     depends on the current mode (COHESION and DAMPING in hype).
 //   · the voice-shelf node mirrors VoicesShelf's shelfFull condition.

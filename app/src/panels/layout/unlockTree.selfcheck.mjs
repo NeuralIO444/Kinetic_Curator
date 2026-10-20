@@ -91,7 +91,7 @@ ok('his settings: voice-only nodes never read lit or dark, and MATERIAL names th
 
 ok('the voice-only params exist in PARAM_SPEC and no performer slider writes them', () => {
   for (const key of ['zTiers', 'noiseFreq', 'displacement']) assert.ok(PARAM_SPEC[key], `${key} in PARAM_SPEC`);
-  const sliders = ['AppearanceSliders.jsx', 'LayoutSliders.jsx', 'SwarmSliders.jsx', 'CreatureSliders.jsx', 'MaterialSliders.jsx']
+  const sliders = ['AppearanceSliders.jsx', 'LayoutSliders.jsx', 'SwarmSliders.jsx', 'HypeSliders.jsx', 'MaterialSliders.jsx']
     .map((f) => read(`./${f}`)).join('\n');
   for (const key of ['zTiers', 'noiseFreq', 'displacement']) {
     assert.ok(!sliders.includes(`set('${key}'`), `no slider sets ${key}`);
@@ -156,7 +156,7 @@ ok('the pattern-ground family follows hasGround, and the voice shelf follows its
 });
 
 ok('catalogue-from-code: the pinned set of lock reasons across the gating sources', () => {
-  const files = ['AppearanceSliders.jsx', 'CreatureSliders.jsx', 'SwarmSliders.jsx', 'LayoutSliders.jsx', 'MaterialSliders.jsx'];
+  const files = ['AppearanceSliders.jsx', 'HypeSliders.jsx', 'SwarmSliders.jsx', 'LayoutSliders.jsx', 'MaterialSliders.jsx'];
   const reasons = new Set();
   for (const f of files) {
     for (const line of read(`./${f}`).split('\n')) {

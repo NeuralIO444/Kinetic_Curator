@@ -187,7 +187,7 @@ function AppInner() {
           layers: st.layers, enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
           paletteId: st.paletteId, room: roomCodes(), band: getStressState().band, keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
           bpm: st.beatBpm, audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
-          creatures: st.creatureCount, director: getMindRoom(), show: trio.showBlock(),
+          creatures: st.layoutParams?.creatures ?? 0, director: getMindRoom(), show: trio.showBlock(),
         };
       },
     });

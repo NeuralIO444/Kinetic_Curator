@@ -15,7 +15,8 @@ const rnd = mulberry32(0x5eed1234);
 const pick = (arr) => arr[Math.floor(rnd() * arr.length)];
 
 // a document the app itself writes, with the newer fields set so they are exercised too
-useStore.setState({ creatureCount: 3, assetAttach: { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }], geo_tri_01: [] } });
+// (#1694 S3 — the creature count is set through its BUILD param home now, layoutParams.creatures)
+useStore.setState({ layoutParams: { ...useStore.getState().layoutParams, creatures: 3 }, assetAttach: { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }], geo_tri_01: [] } });
 const good = JSON.parse(JSON.stringify(serializeProject(useStore.getState())));
 
 // 5. the app's own document is a fixed point of its own parser
@@ -24,7 +25,7 @@ const good = JSON.parse(JSON.stringify(serializeProject(useStore.getState())));
   assert.equal(p.ok, true, JSON.stringify(p).slice(0, 200));
   assert.deepEqual(parseProject(p.doc).doc, p.doc, 'parse of a parsed document changes nothing');
   assert.deepEqual(p.doc.assetAttach, good.assetAttach, 'attach points survive');
-  if ('creatureCount' in good) assert.equal(p.doc.creatureCount, good.creatureCount, 'the creature count survives');
+  assert.equal(p.doc.layoutParams.creatures, good.layoutParams.creatures, 'the creature count survives (in its param home)');
 }
 
 const JUNK = [
@@ -93,7 +94,8 @@ for (const j of [null, undefined, 0, 1, 'x', [], [1, 2], true, NaN, () => 1, Sym
     const p = parseProject(bad);
     if (!p.ok) continue; // refused outright is allowed; silently corrupting the rest is not
     assert.deepEqual(p.doc.assetAttach, good.assetAttach, `a bad ${k} left the attach points alone`);
-    if ('creatureCount' in good) assert.equal(p.doc.creatureCount, good.creatureCount, `a bad ${k} left the creature count alone`);
+    // the count lives inside layoutParams now, so a bad layoutParams is the one field allowed to cost it
+    if (k !== 'layoutParams') assert.equal(p.doc.layoutParams.creatures, good.layoutParams.creatures, `a bad ${k} left the creature count alone`);
   }
 }
 
