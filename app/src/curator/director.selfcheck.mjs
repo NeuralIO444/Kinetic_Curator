@@ -167,6 +167,8 @@ ok('no UI-surface file references the director scheduler', () => {
     // deliberate wiring: the pick path and the candidate count (logic, not surface)
     'curator/taste.js',
     'curator/curate.js',
+    'curator/readDuel.mjs', // #1627 S3: the duel's tolerance reads the single temperature source (pick path, logic, not surface)
+    'curator/readDuel.selfcheck.mjs',
     'curator/roomWidth.js', // #1145 step 3: the room's own kin_weight sets how far Davis may shift a moth (logic, not surface)
     'curator/roomWidth.selfcheck.mjs',
     'state/slices/layoutSlice.js',

@@ -436,6 +436,14 @@ export const createGlobalSlice = (set) => ({
    * whole when pressure clears (governorCuts' restore table). */
   travelShed: false,
   setTravelShed: (on) => set({ travelShed: !!on }),
+  /** #1627 S1 — the governor's mark-weather shed: while true, the mote
+   * store clears and nothing spawns (engine/markWeather.mjs reads the
+   * shed through its frame input). A render-only overlay in the
+   * travelShed class — never serialized into a document; weather is
+   * derived state and no recipe ever carried it. Restores whole when
+   * pressure clears (governorCuts' restore table, cut 1.4). */
+  weatherShed: false,
+  setWeatherShed: (on) => set({ weatherShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) => set({
@@ -841,6 +849,8 @@ export const createGlobalSlice = (set) => ({
       creatureShed: 0,
       // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
       travelShed: false,
+      // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.
+      weatherShed: false,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,

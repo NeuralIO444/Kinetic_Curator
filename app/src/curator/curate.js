@@ -22,6 +22,7 @@ import { makeMlxCurator, getDavisCitation } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
 import { experimentalOn } from './tasteGate.js';
 import { getLoisVerdict } from './loisRank.js';
+import { duelPick } from './readDuel.mjs'; // #1627 S3 — the duel (rides this loop, gated by S2's proof)
 
 export const CURATE_CANDIDATES = 8;
 
@@ -63,7 +64,15 @@ export function getActiveCurator() {
  * must be the ones in this array. A profile bug never breaks the button —
  * shaping failure falls back to the unshaped candidates.
  */
-export function pickCurated(candidates, curator, rng = null, { refine = false } = {}) {
+// #1627 S3 — the last duel this loop ran, for the hint. Set only by a
+// pick that carried measured reads + a Queen anchor; a pick without
+// them clears it, so the hint can never quote a stale judgment.
+let lastDuel = null;
+export function getLastDuel() {
+  return lastDuel;
+}
+
+export function pickCurated(candidates, curator, rng = null, { refine = false, reads = null, anchor = null, temperature } = {}) {
   // Audit fix 3f — no Math.random default (the 3a contract): a
   // missing/non-function rng rolls 0, so the fallback deals candidate 0
   // and the persona machinery receives the zero stream. Production
@@ -88,7 +97,25 @@ export function pickCurated(candidates, curator, rng = null, { refine = false } 
     idx = -1;
   }
   if (!Number.isInteger(idx) || idx < 0 || idx >= n) {
+    lastDuel = null;
     return { index: Math.floor(draw() * n), curated: false };
+  }
+  // #1627 S3 — the duel, ridden on this same draft → gate → tilt loop:
+  // Davis has picked (the draft); when the caller supplies MEASURED
+  // reads (S2's meter) and the Queen's anchor, LOIS gates the pick and
+  // tilts it to the anchor when it sits outside the temperature's
+  // tolerance. No reads or no anchor → no duel, and the return is
+  // exactly yesterday's { index, curated } — the duel never fakes a
+  // judgment it did not measure.
+  if (reads && anchor) {
+    const duel = duelPick({ reads, anchor, davisIndex: idx, temperature });
+    lastDuel = duel.dueled ? duel : null;
+    if (duel.dueled && duel.index !== idx) {
+      return { index: duel.index, curated: true, duel };
+    }
+    if (duel.dueled) return { index: idx, curated: true, duel };
+  } else {
+    lastDuel = null;
   }
   return { index: idx, curated: true };
 }
@@ -101,17 +128,20 @@ export function pickCurated(candidates, curator, rng = null, { refine = false } 
  */
 export function curatorHint(curator, { chainFallback = false } = {}) {
   const chain = chainFallback ? ' · chain: uniform' : '';
-  if (curator.status() !== 'active') return `curator untrained · dice roll${chain}`;
+  // #1627 S3 — a duel that ran is said out loud (honest signals): the
+  // tilt and LOIS's demand ride the hint; no duel, no line.
+  const duelLine = lastDuel ? ` · duel: ${lastDuel.tilted ? `tilted — ${lastDuel.fromLine ?? lastDuel.line}` : lastDuel.line}` : '';
+  if (curator.status() !== 'active') return `curator untrained · dice roll${duelLine}${chain}`;
   if (curator.heuristic) {
     const line = getLoisVerdict() || 'Walk in. Show me something.';
-    return `heuristic pick: LOIS · ${line}${chain}`;
+    return `heuristic pick: LOIS · ${line}${duelLine}${chain}`;
   }
-  if (curator.personaName) return `persona pick: ${curator.personaName}${chain}`;
+  if (curator.personaName) return `persona pick: ${curator.personaName}${duelLine}${chain}`;
   if (curator.name === 'mlx') {
     // T3: a tree head's last pick is quoted — Davis cites the splits that
     // won it. No citation (linear head, or no pick yet) = the line as it was.
     const cite = getDavisCitation();
-    return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${cite ? ` — ${cite}` : ''}${chain}`;
+    return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${cite ? ` — ${cite}` : ''}${duelLine}${chain}`;
   }
-  return `curated pick${chain}`;
+  return `curated pick${duelLine}${chain}`;
 }

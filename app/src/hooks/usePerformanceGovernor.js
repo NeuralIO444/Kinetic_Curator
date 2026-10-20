@@ -145,6 +145,17 @@ export function usePerformanceGovernor() {
       || (p.transportParallax ?? 0) > 0);
   const travelActive = stratumTravels(layoutParams)
     || Object.entries(layerSnapshots || {}).some(([id, snap]) => id !== activeLayerId && stratumTravels(snap?.layoutParams));
+  // #1627 S1 — the mark-weather rung (cut 1.4, FIRST): the shed overlay,
+  // and whether weather can be live on this scene — a measured spawn
+  // source is present: the sun's spec pool (a lit sun with spec up),
+  // the dish (density peaks + contacts), or traveling marks (travel
+  // live). No source, no weather, no rung.
+  const weatherShed = useStore(s => s.weatherShed);
+  const setWeatherShed = useStore(s => s.setWeatherShed);
+  const light = useStore(s => s.light);
+  const weatherActive = (!!(light && (light.spec ?? 0) > 0 && (light.intensity ?? 0) > 0)
+    || layoutParams?.dish === true
+    || travelActive);
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.
@@ -278,13 +289,14 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource, creatureShed, travelShed,
+      slowRender, slowRenderSource, creatureShed, travelShed, weatherShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
       switch (cut.kind) {
         case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
+        case 'markWeather': setWeatherShed(false); break;
         case 'creatureCount': setCreatureShed(0); break;
         case 'travel': setTravelShed(false); break;
         case 'quality':
@@ -341,6 +353,8 @@ export function usePerformanceGovernor() {
       effectiveCount: layoutParams.count,
       creatureCount,
       creatureShed,
+      weatherActive,
+      weatherShed,
       travelActive,
       travelShed,
       slowRender,
@@ -351,6 +365,7 @@ export function usePerformanceGovernor() {
     switch (cut.kind) {
       case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
+      case 'markWeather': setWeatherShed(true); break;
       case 'creatureCount': setCreatureShed(cut.creatureShed); break;
       case 'travel': setTravelShed(true); break;
       case 'quality':
@@ -377,6 +392,7 @@ export function usePerformanceGovernor() {
   }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     creatureCount, creatureShed, setCreatureShed,
+    weatherActive, weatherShed, setWeatherShed,
     travelActive, travelShed, setTravelShed,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }
