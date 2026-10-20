@@ -12,8 +12,10 @@
 //
 // SHELF_SESSION_START_MS is this session's start: the planner never
 // exports a keep staged since it began ("never exported under the
-// artist"). The runner speaks its own stops on the shelf's line;
-// this wire stays silent.
+// artist"). The runner speaks its own (planned) stops on the shelf's
+// line; an unplanned throw anywhere in the check is spoken by the
+// wire itself (#1646) — once per episode, the episode closing when
+// a run completes.
 
 import { useStore } from '../state/store.js';
 import { runShelfExports } from './shelfDiskRun.mjs';
@@ -29,21 +31,36 @@ let port = null; // { backend, root } — the connected folder
 let running = false;
 let unsubscribe = null;
 
-async function kick() {
+let wireStopSpoken = false; // #1646 — the open episode: an unplanned stop already named
+
+async function kick(runner = runShelfExports) {
   if (running || !port) return;
   running = true;
   try {
-    await runShelfExports(useStore.getState, {
+    await runner(useStore.getState, {
       backend: port.backend, root: port.root,
       sessionStartMs: SHELF_SESSION_START_MS,
       assetsById: ASSETS_BY_ID, palettesById: PALETTES_BY_ID,
     });
-  } catch { /* the runner names its stops on the shelf line */ }
+    wireStopSpoken = false; // a completed run closes the episode
+  } catch {
+    // #1646 — the runner names its planned stops (a refused write, a
+    // bad read-back) and returns; anything else that throws — the
+    // planner, the serializer, the store update — used to vanish
+    // here, leaving a keep un-exported past its bound with no line,
+    // under a header claiming the wire's silence was safe. One line
+    // per episode, like the runner's own stops.
+    if (!wireStopSpoken) {
+      wireStopSpoken = true;
+      useStore.getState().setShelfNotice('export check stopped early — a keep may be waiting to move to the disk; nothing was half-moved');
+    }
+  }
   finally { running = false; }
 }
 
-/** Ask the runner to check the overflow now (after a prefs read). */
-export function kickShelfExports() { void kick(); }
+/** Ask the runner to check the overflow now (after a prefs read).
+ * The runner is injectable so the port's own behaviour is checkable. */
+export function kickShelfExports(runner) { return kick(runner); }
 
 /** Register (or re-point) the connected folder and arm the watch. */
 export function registerShelfDiskPort(backend, root) {

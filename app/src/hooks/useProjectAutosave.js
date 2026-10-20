@@ -115,6 +115,11 @@ export function useProjectAutosave() {
     if (restored.current || bootFired) return;
     restored.current = true;
     bootFired = true;
+    // #1646 — narrowed by progress below: a throw while the saved
+    // document is still at risk (the flag read, the hash, the
+    // autosave read, the apply) is a lost session and must say so;
+    // a throw after the document landed is not, and stays quiet.
+    let restoreAtRisk = true;
     try {
       // #946 — in START: CHAOS mode (the default) every cold page load
       // gets its opening roll, even on a same-session reload or second tab
@@ -133,6 +138,7 @@ export function useProjectAutosave() {
       if (hashBoot === 'applied') return;
       const st = useStore.getState();
       const { doc, quarantined } = readPipelineAutosave();
+      restoreAtRisk = !!doc; // no document, nothing left to lose
       const decision = decideBoot({
         shareApplied: false,
         factoryRequested: bootFactoryRequested(),
@@ -151,6 +157,7 @@ export function useProjectAutosave() {
         // yesterday. ?boot=factory keeps its historical meaning: restore,
         // no roll.)
         st.applyProject(doc);
+        restoreAtRisk = false; // the session landed; what follows is not its loss
         sessionStorage.setItem(RESTORED_FLAG, '1');
       }
       if (decision.action === 'roll' || decision.action === 'restore-roll') {
@@ -166,7 +173,14 @@ export function useProjectAutosave() {
       // 'factory' — do nothing: the initial store state is the known,
       // deterministic opener.
     } catch {
-      // ignore
+      // #1646 — the catch-all stays as the last resort, but it is no
+      // longer the only record: a boot that could not apply the saved
+      // document says so on the channel the quarantine path proved
+      // (MasterBar: RESTORE FAILED — "Last autosave could not be
+      // read"). Reachable via the session flag's storage access,
+      // the hash parse, a parseProject throw inside the autosave
+      // read, and applyProject itself — verified, not assumed.
+      if (restoreAtRisk) useStore.getState().setPersistStatus('quarantined');
     }
   }, []);
 
