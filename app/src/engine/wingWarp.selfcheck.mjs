@@ -99,8 +99,13 @@ function builderRun(skinning, bentT, over = {}) {
 // the Poisson scale marks with the feather fan, so the stream's surface children changed — the new
 // plumage is pinned by featherFan.selfcheck. The warp mechanism is untouched by S3: wingWarp.mjs is
 // not in S3's diff and section 1 above proves it unchanged.)
+// (Re-pinned 2026-10-19 for #1183, Matt's ruling: the two RESOLVER pins only. The slice added the
+// weatherAir layout param, so the resolver's hashed output gained exactly one key (weatherAir: 0,
+// dial off). Proven before re-pinning: branch resolver output minus that key is byte-identical to
+// the base tree's output, and the builder pins did not move — no behaviour changed.)
 const REST_BUILDER = '1dc2d9bb';
-const REST_RESOLVER = '7d901919'; // re-based at the S3 integration (was c9a243c9 — see the note below)
+const REST_RESOLVER = '9f0043e7'; // re-based at the S3 integration (was c9a243c9 — see the note below);
+                                  // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
@@ -113,7 +118,8 @@ const REST_RESOLVER = '7d901919'; // re-based at the S3 integration (was c9a243c
 
 // 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
 const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
-const BENT_RESOLVER = '03421894'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note)
+const BENT_RESOLVER = '7b1c87a6'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
+                                  // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);
