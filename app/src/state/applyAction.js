@@ -71,6 +71,7 @@ export function applyAction(action, store = useStore.getState()) {
     case A.SET_CATEGORY_WEIGHT: return store.setCategoryWeight(action.category, action.weight);
     case A.CLEAR_WEIGHT_OVERRIDES: return store.clearWeightOverrides();
     case 'CYCLE_ASSET_WEIGHT': return store.cycleAssetWeight(action.id);
+    case 'CYCLE_ASSET_OPTION': return store.cycleAssetOption(action.id, action.key); // #1694 S2
     case 'TOGGLE_ASSET_STILL': return store.toggleAssetStill(action.id); // #1128
     case 'DUPLICATE_ASSET': return store.duplicateAsset(action.id);
     case 'INGEST_ASSET': return store.ingestAsset(action.svg, action.hint, { category: action.category, source: action.source });

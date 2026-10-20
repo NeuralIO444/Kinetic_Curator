@@ -37,6 +37,7 @@ export const EVENT_REGISTRY = {
   ASSETS_SEARCH: { handler: 'wire' },
   ASSETS_CAT_FILTER: { handler: 'wire' },
   ASSETS_WEIGHT_CYCLE: { handler: 'wire' },
+  ASSETS_OPTION_CYCLE: { handler: 'wire' },
   ASSETS_STILL_TOGGLE: { handler: 'wire' },
   ASSETS_WEIGHT_SET: { handler: 'wire', note: "reserved: a persona (Davis) may set pool weights later; the slice setter exists" },
   ASSETS_CATEGORY_WEIGHT: { handler: 'wire', note: "reserved: same" },

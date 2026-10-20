@@ -39,6 +39,7 @@ import { getBiologyPolicy } from '../biology/policy.js';
 import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: the moth, on formed pins
 import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
 import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnState.js'; // #1694 slice 1: the spawn channel, resolver-owned
+import { CREATURE_ASSET_ID, mothsAllowed, dishAllowed } from '../curator/creatureCitizen.js'; // #1694 slice 2: the pool citizen's reads
 
 const HOP_MAX_PX = 4;
 
@@ -610,8 +611,12 @@ export function createLiveResolver() {
       // #733 — shape mixer: normalized per-asset pick weights, live only
       // while the pool is exactly the on-chips' union (liveShapeLevels).
       const mixW = shapeMixWeights(liveShapeLevels(input.shapeLevels, src.enabledAssets));
+      // #1694 slice 2 — the creature citizen is a pool member, never a placeable mark: excluded
+      // here, by id, BEFORE the pool signature is computed, so placements, assetSig and the swarm
+      // are exactly as they were before the citizen joined the pool. By id, not by category: a
+      // user duplicate of the citizen is an ordinary mark and stays placeable.
       let activeAssets = pool
-        .filter((a) => !src.enabledAssets || src.enabledAssets[a.id])
+        .filter((a) => a.id !== CREATURE_ASSET_ID && (!src.enabledAssets || src.enabledAssets[a.id]))
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a))
         .map((a) => (mixW && mixW[a.id] ? { ...a, mixWeight: mixW[a.id] } : a));
       // #564 — identity of the pool this layer actually draws: which assets,
@@ -1029,7 +1034,9 @@ export function createLiveResolver() {
     publishDishDensity(dishSession.densityTick > densityTickSeen ? dishSession.density : EMPTY_DISH_DENSITY);
     densityTickSeen = dishSession.densityTick;
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
-    creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
+    // #1694 slice 2 — the citizen's switch + family option gate the append: citizen off (or family
+    // set to dish-only) and no moth is born. The builders keep the full pool (their part lookups).
+    if (mothsAllowed(input)) creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
       // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
       (e) => creatureGround({
         dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
@@ -1038,7 +1045,8 @@ export function createLiveResolver() {
       }));
     // #1634 slice 2 — the dish creature on the hosted pin (input.dishHosted), on the same motion floor and
     // the same ground. No pin hosted: nothing happens, the stage is the moths' alone.
-    dishCreatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
+    // #1694 slice 2 — same citizen gate, other family (family moth-only or citizen off: no dish creature).
+    if (dishAllowed(input)) dishCreatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
       (e) => creatureGround({
         dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
         getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),

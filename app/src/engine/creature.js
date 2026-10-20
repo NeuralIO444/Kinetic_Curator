@@ -151,7 +151,13 @@ export function hoverPose(motion, seed, pinIndex) {
   const u = (tag) => kinemePhase(seed, `moth:${tag}${pinIndex}`);
   // anchored: each wave is measured from where it stood at driver time 0, so the creature is on its pin at rest
   const wave = (hz, tag) => { const p = u(tag); return Math.sin(TAU * (hz * t + p)) - Math.sin(TAU * p); };
-  if (drift > 0 && m > 0) {
+  // #1694 slice 2, Q1 (Matt's ruling): the citizen pinned still — the ANCHOR holds, the animal keeps
+  // living. assetStill names the citizen ('creature', the pool entry's id — curator/creatureCitizen.js),
+  // and the floor ctx already carries the still set: the home stops drifting (no dx/dy/rot) while the
+  // breath scale below still breathes. Wings, limbs and band reactions live outside this pose and are
+  // untouched. Both families read this one function, so one check stills both.
+  const citizenStill = !!(motion.stillAssets && motion.stillAssets.has('creature'));
+  if (drift > 0 && m > 0 && !citizenStill) {
     rest.dx = drift * HOVER.reach * m * wave(HOVER.hzX, 'x');
     rest.dy = drift * HOVER.reach * m * wave(HOVER.hzY, 'y');
     rest.rot = drift * HOVER.tilt * wave(HOVER.hzTilt, 'r');

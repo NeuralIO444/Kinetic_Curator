@@ -48,9 +48,16 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
 
 // 4. every built-in carries the exact shape overlay.js validates for user imports: nothing is dropped or invented
 {
-  assert.equal(ASSETS.length, ASSETS_AUTHORED.length);
+  // #1694 S2 — the pool holds ONE entry beyond the authored library: the creature citizen,
+  // appended after the bake (it is not a mark and carries no mattes). It is the single,
+  // asserted exception to the equality below; every authored asset keeps the invariant.
+  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + 1);
+  const citizen = ASSETS[ASSETS.length - 1];
+  assert.equal(citizen.id, 'creature');
+  assert.ok(!('regions' in citizen) && !('regionSlots' in citizen), 'the citizen carries no baked mattes');
   let withRegions = 0;
   for (const a of ASSETS) {
+    if (a.id === 'creature') continue; // the citizen, asserted above — the bake never sees it
     const base = byId(a.id);
     assert.equal(a.svg, base.svg, `${a.id}: the art itself is untouched`);
     if (!a.regions) { assert.ok(!('regionSlots' in a), `${a.id}: no empty keys`); assert.equal(a, base, 'an asset with no matte is the same object'); continue; }

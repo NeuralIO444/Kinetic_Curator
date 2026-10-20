@@ -41,9 +41,10 @@ export function AssetPoolPanel() {
     poolView: s.poolView,
     weightOverrides: s.assetWeightOverrides || {},
     still: s.assetStill || {},
+    assetOptions: s.assetOptions || {},
     ingestError: s.ingestError,
   }));
-  const { enabled, search, catFilter, poolView, weightOverrides, still, ingestError } = state;
+  const { enabled, search, catFilter, poolView, weightOverrides, still, assetOptions, ingestError } = state;
 
   const openStudio = async (seed) => {
     setStudioError(null);
@@ -188,6 +189,21 @@ export function AssetPoolPanel() {
                           onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_STILL_TOGGLE, { id: a.id }); }}>
                           <i aria-hidden="true" />still
                         </button>
+                        {/* #1694 S2 — record-declared tile options (the citizen's family): a cycle chip
+                            per declared option, rendered for ANY asset that declares options — no
+                            per-asset branch. The value shown is the artist's set value or the
+                            declared default. */}
+                        {(Array.isArray(a.options) ? a.options : []).map((opt) => {
+                          const cur = assetOptions[a.id]?.[opt.key] ?? opt.default ?? opt.choices?.[0];
+                          return (
+                            <button key={opt.key} type="button" className="tile-opt"
+                              aria-label={`${a.id} ${opt.key}: ${cur}. Tap to cycle`}
+                              title={`${opt.key}: ${cur} — tap to cycle (${(opt.choices || []).join(' · ')})`}
+                              onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_OPTION_CYCLE, { id: a.id, key: opt.key }); }}>
+                              {opt.key} {cur}
+                            </button>
+                          );
+                        })}
                         <button type="button" className="tile-dup" aria-label={`Duplicate ${a.id}`} title="Duplicate overlay copy"
                           onClick={(e) => { e.stopPropagation(); emit(Events.ASSETS_DUPLICATE, { id: a.id }); }}>dup</button>
                         <button type="button" className={`tile-edit${Array.isArray(attach?.[a.id]) ? ' on' : ''}`} aria-label={`Edit ${a.id} in the wet lab${Array.isArray(attach?.[a.id]) ? ': attach points edited by hand' : ''}`}

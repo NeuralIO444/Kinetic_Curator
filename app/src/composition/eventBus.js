@@ -125,6 +125,7 @@ export const Events = {
   ASSETS_SEARCH: 'assets:search',
   ASSETS_CAT_FILTER: 'assets:catFilter',
   ASSETS_WEIGHT_CYCLE: 'assets:weightCycle',
+  ASSETS_OPTION_CYCLE: 'assets:optionCycle', // #1694 S2 — cycle a record-declared tile option ({ id, key })
   ASSETS_STILL_TOGGLE: 'assets:stillToggle', // #1128
   ASSETS_WEIGHT_SET: 'assets:weightSet',
   ASSETS_CATEGORY_WEIGHT: 'assets:categoryWeight',

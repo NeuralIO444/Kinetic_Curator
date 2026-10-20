@@ -157,7 +157,9 @@ const inRegion = (p) => p.x >= SPAWN_REGION.x0 * W - 1e-6 && p.x <= SPAWN_REGION
 {
   // #1694 slice 1 — the wiring moved: App's frame tap no longer calls observeSpawn; these pins follow it.
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  assert.ok(/creatureCount: s\.creatureCount/.test(loop), 'the loop stamps the count on the resolver input');
+  // #1694 slice 2 — the stamp now nets the governor's creature shed off the artist's count
+  // (the overlay never writes the count itself); the wiring pin follows the stamp.
+  assert.ok(/creatureCount: Math\.max\(0, \(s\.creatureCount \| 0\) - \(s\.creatureShed \| 0\)\)/.test(loop), 'the loop stamps the count (net of the governor shed) on the resolver input');
   assert.ok(/s\.setDishPins\(spawnNow\.dishPins\)/.test(loop), 'the loop publishes the homes as dishPins');
   const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
   assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver observes the frame');

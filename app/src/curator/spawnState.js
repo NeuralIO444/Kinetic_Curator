@@ -25,6 +25,7 @@ import { sanitizePins } from './dishPins.js';
 import { createLimbTracker } from './limbs.js';
 import { createShiftTracker } from './davisShift.js';
 import { chooseHomes, marksOf, sanitizeCount } from './spawn.js';
+import { creatureEnabled, CREATURE_ASSET_ID } from './creatureCitizen.js';
 import { birthCentre } from './director.js'; // the nudge toward the recent keeps (hosted there, never a surface)
 import { TRAIT_DEFAULTS } from '../engine/creature.js';
 
@@ -155,7 +156,7 @@ export function createCreatureSpawnState() {
   // spawnLive.observeSpawn, transcribed: steady homes until the dish changes; a home whose creature
   // never forms is given up after PATIENCE_FRAMES; the search retries every RETRY_FRAMES.
   // Returns true when the standing homes changed (App's tap wrote the store on exactly this condition).
-  function observeSpawnHalf(input, output, { count = 0, formed = [], band = null } = {}) {
+  function observeSpawnHalf(input, output, { count = 0, formed = [], band = null, weight = null } = {}) {
     const want = sanitizeCount(count);
     const W = input && input.canvasW; const H = input && input.canvasH;
     const k = `${(input && input.seed) >>> 0}|${JSON.stringify((input && input.seedOffsets) ?? null)}|${W}x${H}`;
@@ -171,7 +172,7 @@ export function createCreatureSpawnState() {
       if (sinceTry >= SPAWN_RETRY_FRAMES) {
         sinceTry = 0;
         if (!spawnField || spawnFieldKey !== k) { spawnField = fertilityField(input.seed, input.seedOffsets, W, H).at; spawnFieldKey = k; }
-        const next = chooseHomes({ count: want, existing: homes, marks: marksOf(output), field: spawnField, band, canvasW: W, canvasH: H });
+        const next = chooseHomes({ count: want, existing: homes, marks: marksOf(output), field: spawnField, band, canvasW: W, canvasH: H, weight });
         for (let i = homes.length; i < next.length; i++) homes.push({ x: next[i].x, y: next[i].y, age: 0 });
       }
     }
@@ -189,9 +190,15 @@ export function createCreatureSpawnState() {
       const band = input && input.band !== undefined ? input.band : null;
       observeFormationHalf(input, output, band);
       const changed = observeSpawnHalf(input, output, {
-        count: input && input.creatureCount,
+        // #1694 slice 2 — the citizen's pool switch folds into the count the spawn half sees:
+        // citizen off reads as a count of 0 (the population and its homes clear, exactly as
+        // dialing the count to 0 does), and the citizen's pool weight rides to the home choice.
+        // An input that never mentions the citizen (every pre-slice take, the gate fixture)
+        // reads enabled and unweighted — this frame logic is then unchanged.
+        count: creatureEnabled(input) ? (input && input.creatureCount) : 0,
         formed: latest.states.map((s) => !!(s && s.formed)),
         band,
+        weight: input && input.assetWeightOverrides ? input.assetWeightOverrides[CREATURE_ASSET_ID] : undefined,
       });
       decisions = freshDecisions(changed);
       return decisions;
