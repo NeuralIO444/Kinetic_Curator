@@ -9,6 +9,7 @@ import { SliderEditor, DualEditor } from '../build/te/editors.jsx';
 import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 import { useStore } from '../../state/store.js';
 import { nearestPatternBelow } from '../../pattern/ground.js'; // #1183: is there ground under this layer?
+import { nearestWeatherAbove } from '../../gl/dishWeather.mjs'; // #1183 weather: is there haze over this layer?
 
 const fmt1 = (v) => (Math.round(v * 10) / 10).toString();
 
@@ -35,6 +36,8 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
   const mode = layoutParams.mode;
   // #1183 — GROUND only does something when a PATTERN layer sits below this one in the stack.
   const hasGround = useStore((st) => !!nearestPatternBelow(st.layers, st.activeLayerId));
+  // #1183 weather — WEATHER only does something when an FX layer with HAZE sits above this one.
+  const hasWeather = useStore((st) => !!nearestWeatherAbove(st.layers, st.activeLayerId));
 
   const { x: sx, y: sy, linked } = scaleRanges(layoutParams.scale);
   const setScale = (x, y) => set('scale', { x, y });
@@ -269,6 +272,27 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
               min={0} max={100} step={1}
               unit="%"
               onChange={(v) => set('groundSnap', Math.round(v) / 100)}
+            />
+          )}
+        />
+
+        {/* #1183 weather slice 1 (FX as weather): this layer's marks fade into the haze of the nearest FX
+            layer above them — colour toward the veil, alpha thinning in the thick mist. Per layer; 0 is
+            today's frame exactly. Inert without a hazy FX layer above (#272). */}
+        <ValueButton
+          label="WEATHER"
+          display={`${Math.round((layoutParams.weatherAir ?? 0) * 100)}%`}
+          locked={lockedParams.weatherAir}
+          onToggleLock={() => lock('weatherAir')}
+          disabled={!hasWeather}
+          disabledReason="Needs an FX layer with HAZE above this one"
+          onOpen={() => (
+            <SliderEditor
+              ariaLabel="Weather: how far marks fade into the haze above them"
+              value={Math.round((layoutParams.weatherAir ?? 0) * 100)}
+              min={0} max={100} step={1}
+              unit="%"
+              onChange={(v) => set('weatherAir', Math.round(v) / 100)}
             />
           )}
         />

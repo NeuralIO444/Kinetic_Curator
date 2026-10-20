@@ -23,6 +23,17 @@ import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
+import { applyWeatherFade, weatherAlphaScale } from './weatherAir.mjs'; // #1183 weather slice 1: haze as air
+
+// #1183 weather — the per-call fade scratch: grown to the largest placement set seen and reused,
+// never per-frame allocated (the #1250 scratch discipline). It is fully rewritten for k < soa.n on
+// every active call before anything reads it, and buildPlacements never re-enters itself, so one
+// shared buffer across calls is safe.
+let _airFadeScratch = new Float32Array(0);
+function airFadeScratch(n) {
+  if (_airFadeScratch.length < n) _airFadeScratch = new Float32Array(n);
+  return _airFadeScratch;
+}
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
 import { getQualityCaps } from '../data/quality.js';
@@ -172,6 +183,12 @@ export function buildPlacements({
   // #1183 palette snap (0..1): the SHARE of marks that take the exact colours of the tile beneath them
   // (dish.groundRoles). Snapped marks are not leaned. 0 = off.
   snap = 0,
+  // #1183 weather slice 1 — haze as air. `air` (0..1) is the EFFECTIVE strength (the haze amount of
+  // the nearest FX layer above × this layer's WEATHER dial, resolved by gl/dishWeather.mjs);
+  // dish.air(x, y) samples the mist field and airVeil is the veil colour marks fade toward.
+  // air = 0 (or no dish.air) → today's path exactly.
+  air = 0,
+  airVeil = null,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -365,6 +382,9 @@ export function buildPlacements({
   // lean = 0 (or no dish.ground) is byte-identical to the old path —
   // applyLean returns the input untouched. The dish holds the unmirrored
   // placement set; mirror is a render-time reflection applied below.
+  // #1183 weather: this call's per-mark fade (strength × mist under the mark), consumed by the
+  // item build below; null whenever the weather is inactive, which keeps both item paths exact.
+  let airFade = null;
   if (dish) {
     const entities = new Array(soa.n);
     for (let k = 0; k < soa.n; k++) {
@@ -388,6 +408,19 @@ export function buildPlacements({
     }
     if (dish.ground && lean > 0) {
       colors = colors.map((c, k) => (snapped && snapped[k] ? c : applyLean(c, dish.ground(soa.x[k], soa.y[k]), lean)));
+    }
+    // #1183 weather slice 1 — after snap and lean: the marks fade in the mist of the FX layer
+    // above them. fade[k] = effective strength × the field under the mark, into the shared
+    // scratch; colours mix toward the veil on fresh arrays (weatherAir), and the item build
+    // below thins alpha by the same fade. Sampled at the placement position, like the lean.
+    if (dish.air && air > 0) {
+      airFade = airFadeScratch(soa.n);
+      for (let k = 0; k < soa.n; k++) airFade[k] = air * dish.air(soa.x[k], soa.y[k]);
+      if (airVeil) {
+        const faded = applyWeatherFade({ colors, accents, fade: airFade, veil: airVeil });
+        colors = faded.colors;
+        accents = faded.accents;
+      }
     }
   }
 
@@ -441,6 +474,9 @@ export function buildPlacements({
       item.scaleY = soa.scaleY[k]; // #1202 — equals scale when X/Y linked
       item.rotation = soa.rotation[k];
       item.alpha = soa.alpha[k];
+      // #1183 weather: thin by this call's fade — multiplied into the alpha just assigned from
+      // stage C, never accumulated across pooled frames (the fieldMap no-accumulation rule).
+      if (airFade) item.alpha *= weatherAlphaScale(airFade[k]);
     }
   } else {
     mapped = new Array(soa.n);
@@ -451,7 +487,7 @@ export function buildPlacements({
         scale: soa.scale[k],
         scaleY: soa.scaleY[k], // #1202
         rotation: soa.rotation[k],
-        alpha: soa.alpha[k],
+        alpha: airFade ? soa.alpha[k] * weatherAlphaScale(airFade[k]) : soa.alpha[k], // #1183 weather: mist thins
         index: soa.index[k],
         t: soa.t[k],
         zTier: soa.zTier[k],

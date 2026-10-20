@@ -2,7 +2,7 @@
 
 - **What:** one scripted 60-second performance, recorded through the app's real recording taps
   (the performance recorder on the resolve taps, the spectrum recorder on the spectrum tap).
-- **File:** `replayGate.kcperf` — 144164 bytes, sha256 `5730ed50dfd5cb827d039662aee6ce6719232feabcc034662a5d58ab7188285b`.
+- **File:** `replayGate.kcperf` — 144185 bytes, sha256 `a6cc8821b9dcba938c663586030354986819d49947afc219c6d717c3feb2e963`.
 - **Frames:** 3601 (0..3600), 61 checkpoints (every 60 frames).
 - **Seed:** 1234 (changed to 77 at frame 3001, as the script's artist changes it).
 - **Look:** layout params from the generator script: swarm/scatter, count 220→260 at frame 900,
@@ -13,7 +13,7 @@
   the hearing playback will reproduce. The gate's checkpoint comparison covers the resolver
   chain, which is what a take's hashes are made of; the marks ride the render contract, not
   the resolver, and never entered the chain.
-- **Recorded with:** `node scripts/recordReplayGateFixture.mjs` on commit `47802e7a`.
+- **Recorded with:** `node scripts/recordReplayGateFixture.mjs` on commit `807f81e0`.
 - **Re-record:** run the same command. It is deterministic — the sha256 must be identical unless
   behaviour changed. When an intentional behaviour change moves the replay, re-record in the same
   PR and say so in its body, with the reason. Never re-record just to make a red gate green.

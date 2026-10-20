@@ -220,6 +220,7 @@ node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs
 node src/gl/resolveTap.selfcheck.mjs
 node src/gl/dishGround.selfcheck.mjs
+node src/gl/dishWeather.selfcheck.mjs
 node src/gl/uniformLocations.selfcheck.mjs
 node src/gl/dishContacts.selfcheck.mjs
 node src/gl/performanceFile.selfcheck.mjs
@@ -420,6 +421,7 @@ node src/engine/groundNudge.selfcheck.mjs
 node src/curator/curatePalette.selfcheck.mjs
 node src/gl/contactShadow.selfcheck.mjs
 node src/engine/groundSnap.selfcheck.mjs
+node src/engine/weatherAir.selfcheck.mjs
 node src/curator/formation.selfcheck.mjs
 node src/curator/refineColor.selfcheck.mjs
 node src/state/projectDocument.fuzz.selfcheck.mjs

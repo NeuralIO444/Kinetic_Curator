@@ -179,6 +179,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   groundShadow: 0,
   // #1183 — palette snap: the share of marks that take the exact colours of the PATTERN tile beneath them. 0 = off.
   groundSnap: 0,
+  // #1183 weather — how far this layer's marks fade into the haze of the nearest FX layer above them
+  // (the WEATHER dial). 0 = today's frame exactly; absent in a saved project loads as 0.
+  weatherAir: 0,
   kinemeBreath: 0.3,
   kinemeDrift: 0.5,
   kinemePulse: 0,
@@ -375,6 +378,7 @@ export const PARAM_SPEC = {
   groundNudge: { min: 0, max: 1 },
   groundShadow: { min: 0, max: 1 },
   groundSnap: { min: 0, max: 1 },
+  weatherAir: { min: 0, max: 1 }, // #1183 weather — the WEATHER dial (haze as air)
   kinemeBreath: { min: 0, max: 1 },
   kinemeDrift: { min: 0, max: 1 },
   kinemePulse: { min: 0, max: 1 },

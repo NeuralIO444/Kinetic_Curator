@@ -12,6 +12,7 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../../state/store.js';
 import { nearestPatternBelow } from '../../pattern/ground.js';
+import { nearestWeatherAbove } from '../../gl/dishWeather.mjs'; // #1183 weather: is there haze over this layer?
 import { isEarned } from '../../state/earnedVoices.js';
 import { MAX_USER_VOICES } from '../../state/slices/voiceSlice.js';
 import { getPresenceView, subscribePresence } from '../../curator/mindPresenceLive.js';
@@ -24,6 +25,7 @@ export function UnlockTreeSection({ layoutParams }) {
   const [view, setView] = useState(getPresenceView);
   useEffect(() => subscribePresence(() => setView(getPresenceView())), []);
   const hasGround = useStore((st) => !!nearestPatternBelow(st.layers, st.activeLayerId));
+  const hasWeather = useStore((st) => !!nearestWeatherAbove(st.layers, st.activeLayerId));
   const voiceCount = useStore((s) => s.userVoices).filter((v) => !isEarned(v)).length;
 
   const davisRow = view && Array.isArray(view.rows) ? view.rows.find((r) => r.label === 'DAVIS') : null;
@@ -32,6 +34,7 @@ export function UnlockTreeSection({ layoutParams }) {
     symmetry: layoutParams.symmetry,
     material: layoutParams.material,
     hasGround,
+    hasWeather,
     voiceCount,
     voiceCap: MAX_USER_VOICES,
     davis: davisRow ? { tier: davisRow.tier, cool: davisRow.cool } : null,

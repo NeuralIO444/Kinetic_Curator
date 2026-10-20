@@ -56,16 +56,20 @@ assert.strictEqual(FIELDS.get('scent').costTier, 0, 'scent is tier 0 (structural
   assert.ok(v >= 0 && v <= 1, `quadtree field out of range: ${v}`);
 }
 
-// --- weather + feature registries: shape defined, ready for their modules ---
-for (const [reg, family, payloadKey] of [[WEATHER, 'weather', 'create'], [FEATURES, 'feature', 'create']]) {
+// --- weather + feature registries: the shape holds --- weather carries its first module
+//     (haze-air, #1183 weather slice 1); feature is still empty, awaiting its own.
+for (const [reg, family, payloadKey, baseline] of [
+  [WEATHER, 'weather', 'create', ['haze-air']],
+  [FEATURES, 'feature', 'create', []],
+]) {
   assert.strictEqual(reg.family, family);
-  assert.deepStrictEqual(reg.list(), [], `${family} starts empty — no modules migrated yet`);
+  assert.deepStrictEqual(reg.list(), baseline, `${family} baseline`);
   const decl = { id: `__dish_${family}_test`, reads: ['scalars'], writes: ['fields'], costTier: 1, create: () => ({}) };
   reg.register(decl);
   const got = reg.get(`__dish_${family}_test`);
   assert.strictEqual(got.family, family);
   assert.strictEqual(typeof got[payloadKey], 'function');
-  assert.deepStrictEqual(reg.list(), [`__dish_${family}_test`]);
+  assert.deepStrictEqual(reg.list(), [...baseline, `__dish_${family}_test`]);
 }
 
 // --- fail-closed ---
