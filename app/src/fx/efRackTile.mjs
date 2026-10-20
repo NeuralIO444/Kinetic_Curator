@@ -24,6 +24,7 @@ export const KIND_FACE = {
   invert: { abbr: 'INV', word: 'invert' },
   grade: { abbr: 'GRD', word: 'grade' },
   grain: { abbr: 'GRN', word: 'grain' },
+  feedbackWarp: { abbr: 'FBW', word: 'feedback' },
   scanlines: { abbr: 'SCN', word: 'scan' },
   halo: { abbr: 'HAL', word: 'halo' },
 };

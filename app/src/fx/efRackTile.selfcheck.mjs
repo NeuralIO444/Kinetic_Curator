@@ -64,6 +64,7 @@ test('#1046 an effect with almost nothing to set says so, and an empty slot offe
   const countOf = (k) => Object.keys(FX_EFFECT_DEFS[k].params).length;
   const kinds = Object.keys(FX_EFFECT_DEFS);
   assert.deepEqual(kinds.filter((k) => countOf(k) === 0).sort(), ['edge', 'invert', 'solarize'], 'these read "no controls"');
-  assert.deepEqual(kinds.filter((k) => countOf(k) === 1).sort(), ['grain', 'posterize', 'rgbSplit'], 'these read "no other controls"');
+  // #1490 — feedbackWarp has exactly one control (its amount) on purpose: it joins this list deliberately.
+  assert.deepEqual(kinds.filter((k) => countOf(k) === 1).sort(), ['feedbackWarp', 'grain', 'posterize', 'rgbSplit'], 'these read "no other controls"');
   assert.ok(kinds.filter((k) => countOf(k) > 1).length >= 6, 'everything else shows its sliders and no note');
 });

@@ -39,6 +39,9 @@ export const FX_KIND_TO_COST_ID = {
   sharpen: 'fx/sharpen',
   haze: 'fx/haze',
   grade: 'fx/grade',
+  // #1490 — the feedback warp is not a chain pass: its cost is the spectral
+  // warp's CPU step, registered as gl/spectrum-warp (gl/spectrumWarp.mjs).
+  feedbackWarp: 'gl/spectrum-warp',
   // #1010 — math ops register as math/<kind> (mathShaders.mjs).
   gain: 'math/gain',
   lift: 'math/lift',

@@ -22,6 +22,19 @@
 //          older callers and their pinned ladder walks see the ladder
 //          exactly as it was. NOT the #1183 WEATHER dial (haze-as-air):
 //          that response is weather/haze-air, tier 1, a different cut.
+//   cut 1.45: spectral feedback warp (#1490) — the FX stratum's feedback
+//          warp sheds after mark weather (cut 1.4 still dies first: weather
+//          before marks stands) and BEFORE the creature count (cut 1.5 is
+//          not moved): the issue's law is "a cost tier the governor sheds
+//          before body counts", and 1.45 is the rung that makes both laws
+//          literally true at once. One boolean step off the
+//          feedbackWarpShed overlay — the artist's FX item amount never
+//          moves — restoring whole when pressure clears. Fires only when
+//          the caller says the warp is live (feedbackWarpActive: an FX
+//          layer carries a feedbackWarp item with amount > 0, ACCUM is on
+//          — no feedback buffer, no warp — and the rung is not already
+//          shed), so older callers and their pinned ladder walks see the
+//          ladder exactly as it was.
 //   cut 1.5: creature count (#1694 slice 2, Matt's ruling Q2) — the population
 //          sheds FIRST among content cuts, before the quality tier and every
 //          finish below it; only edge AA and the pixel trim precede it, and
@@ -115,6 +128,13 @@ export const GOVERNOR_RESTORE_CUTS = [
     // last thing to come back, like edge AA at the other end.
     needsRestore: (s, ctx) => ctx.healthy && !!s.weatherShed,
     restoredLabel: 'weather back — motes return',
+  },
+  {
+    kind: 'feedbackWarp',
+    // #1490 — cut 1.45: the warp restores after the population in the
+    // reverse walk (it shed before it): finer sacrifices come back later.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.feedbackWarpShed,
+    restoredLabel: 'feedback warp back — the music bends the trails again',
   },
   {
     kind: 'creatureCount',
@@ -228,6 +248,17 @@ export function nextGovernorCut(s) {
     return { kind: 'markWeather', weatherShed: true, label: 'WEATHER CLEAR — motes shed' };
   }
 
+  // Cut 1.45 (#1490): the spectral feedback warp. After mark weather
+  // (cut 1.4 stands — weather still dies before marks) and ahead of the
+  // creature count: the warp is a finish the music drives, and finishes
+  // shed before body counts. Opt-in per caller (`feedbackWarpActive ===
+  // true` = an FX feedbackWarp item is up with ACCUM on, not already
+  // shed) so older callers and their pinned ladder walks keep the ladder
+  // exactly as it was.
+  if (s.feedbackWarpActive === true && !s.feedbackWarpShed) {
+    return { kind: 'feedbackWarp', feedbackWarpShed: true, label: 'FEEDBACK WARP OFF — trails run straight' };
+  }
+
   // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
   // sheds FIRST among content cuts — population before finishes. One
   // creature per step, off the creatureShed overlay; the artist's count is
@@ -293,6 +324,8 @@ export function shedSummary(s) {
   }
   // #1627 S1 — the badge is honest about a weather shed.
   if (s.weatherShed) out.push('weather clear');
+  // #1490 — and about a warp shed: the trails run straight, the badge says so.
+  if (s.feedbackWarpShed) out.push('feedback warp off');
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);

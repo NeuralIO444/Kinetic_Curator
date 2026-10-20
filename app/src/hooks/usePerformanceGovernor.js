@@ -6,6 +6,7 @@
 // - Shed load in a DEFINED ORDER — the cut list. Order is the contract
 //   (see ./governorCuts.js, pure and unit-tested):
 //     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
+//     cut 1.45: spectral feedback warp (#1490 — after mark weather, before the population)
 //     cut 1.5: creature count (#1694 S2 — population sheds before finishes)
 //     cut 1.6: travel (#1574 — FLOW marks settle home; after the population, ahead of the tier)
 //     cut 2: quality tier step HIGH → BALANCED → PERF
@@ -29,10 +30,12 @@ import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
+import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 
 // #1574 — the event log's ladder map (gl/governorEventLog.mjs SHED_STEPS)
 // predates the content rungs: it knows neither 'creatureCount' (cut 1.5)
-// nor 'travel' (cut 1.6), and recordGovernorEvent throws on an unknown
+// nor 'travel' (cut 1.6) — nor 'feedbackWarp' (cut 1.45, #1490) or
+// 'markWeather' (cut 1.4) — and recordGovernorEvent throws on an unknown
 // kind — inside this effect, at the moment a shed fires. Guard the two
 // generic record sites below so a rung the log has not learned can never
 // crash the governor; the shed itself, the badge (shedSummary) and the
@@ -152,6 +155,16 @@ export function usePerformanceGovernor() {
   // live). No source, no weather, no rung.
   const weatherShed = useStore(s => s.weatherShed);
   const setWeatherShed = useStore(s => s.setWeatherShed);
+  // #1490 — the feedback warp rung (cut 1.45): the shed overlay, and whether
+  // the warp is live on this scene — an FX layer carries a feedbackWarp item
+  // with amount > 0 (gl/spectrumWarp.mjs reads the FX strata), ACCUM is on
+  // (no feedback buffer, no warp), and the tier-1 shed has not already
+  // killed the feedback chain the warp rides.
+  const feedbackWarpShed = useStore(s => s.feedbackWarpShed);
+  const setFeedbackWarpShed = useStore(s => s.setFeedbackWarpShed);
+  const layers = useStore(s => s.layers);
+  const feedbackWarpActive = feedbackWarpAmount(layers, false) > 0
+    && !!layoutParams?.accumulation && !perfTier1;
   const light = useStore(s => s.light);
   const weatherActive = (!!(light && (light.spec ?? 0) > 0 && (light.intensity ?? 0) > 0)
     || layoutParams?.dish === true
@@ -289,7 +302,7 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource, creatureShed, travelShed, weatherShed,
+      slowRender, slowRenderSource, creatureShed, travelShed, weatherShed, feedbackWarpShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -297,6 +310,7 @@ export function usePerformanceGovernor() {
         case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
         case 'markWeather': setWeatherShed(false); break;
+        case 'feedbackWarp': setFeedbackWarpShed(false); break;
         case 'creatureCount': setCreatureShed(0); break;
         case 'travel': setTravelShed(false); break;
         case 'quality':
@@ -355,6 +369,8 @@ export function usePerformanceGovernor() {
       creatureShed,
       weatherActive,
       weatherShed,
+      feedbackWarpActive,
+      feedbackWarpShed,
       travelActive,
       travelShed,
       slowRender,
@@ -366,6 +382,7 @@ export function usePerformanceGovernor() {
       case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
       case 'markWeather': setWeatherShed(true); break;
+      case 'feedbackWarp': setFeedbackWarpShed(true); break;
       case 'creatureCount': setCreatureShed(cut.creatureShed); break;
       case 'travel': setTravelShed(true); break;
       case 'quality':
@@ -393,6 +410,7 @@ export function usePerformanceGovernor() {
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     creatureCount, creatureShed, setCreatureShed,
     weatherActive, weatherShed, setWeatherShed,
+    feedbackWarpActive, feedbackWarpShed, setFeedbackWarpShed,
     travelActive, travelShed, setTravelShed,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }

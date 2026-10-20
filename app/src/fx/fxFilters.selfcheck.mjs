@@ -184,7 +184,9 @@ ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
   // explicit gate (a curated subset of the roster), so additions are a
   // deliberate edit here rather than something a data change does quietly.
   // #1022 — sharpen and haze join: the Blur / Focus slot must offer something.
-  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze']);
+  // #1490 — feedbackWarp joins: the spectral feedback warp's amount must be
+  // reachable from the add surfaces or the warp could never be turned on.
+  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze', 'feedbackWarp']);
   assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
   for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
   // The five demoted effects stay renderable: they compile, they just leave the menu.

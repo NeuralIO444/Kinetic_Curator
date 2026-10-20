@@ -444,6 +444,14 @@ export const createGlobalSlice = (set) => ({
    * pressure clears (governorCuts' restore table, cut 1.4). */
   weatherShed: false,
   setWeatherShed: (on) => set({ weatherShed: !!on }),
+  /** #1490 — the governor's spectral feedback warp shed (cut 1.45): while
+   * true, liveLoop reads the FX strata's feedbackWarp amount as 0 and the
+   * ACCUM trails run straight. A render-only overlay in the travelShed
+   * class — never serialized into a document; the artist's FX item amount
+   * never moves. Restores whole when pressure clears (governorCuts'
+   * restore table). */
+  feedbackWarpShed: false,
+  setFeedbackWarpShed: (on) => set({ feedbackWarpShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) => set({
@@ -851,6 +859,8 @@ export const createGlobalSlice = (set) => ({
       travelShed: false,
       // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.
       weatherShed: false,
+      // #1490 — the warp shed is likewise a governor claim on the OLD document's FX strata.
+      feedbackWarpShed: false,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,
