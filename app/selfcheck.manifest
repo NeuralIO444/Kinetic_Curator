@@ -225,6 +225,7 @@ node src/gl/uniformLocations.selfcheck.mjs
 node src/gl/dishContacts.selfcheck.mjs
 node src/gl/performanceFile.selfcheck.mjs
 node src/gl/replayGate.selfcheck.mjs
+node src/gl/creatureGate.selfcheck.mjs
 node src/gl/performanceCapture.selfcheck.mjs
 node src/gl/liveResolve.determinism.selfcheck.mjs
 node src/gl/resolverSnapshot.selfcheck.mjs
