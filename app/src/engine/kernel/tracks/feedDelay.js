@@ -1,5 +1,6 @@
 import { MAX_TRACKS } from './trackGraph.js';
 import { lumaToFlowInto } from './feedOps.js';
+import { encodeTyped, decodeTyped } from '../stateCodec.mjs';
 
 export function createFeedDelay(w, h) {
   const width = Math.max(1, w | 0);
@@ -107,6 +108,47 @@ export function createFeedDelay(w, h) {
         cached[i] = null;
         dirty[i] = 0;
       }
+    },
+    // #1367 — the delay's true state is `prev` + `ready` only: the stage buffers are
+    // intra-frame (fully overwritten by rasterize before every swap), and the flow
+    // columns/cache are a pure recompute of prev. Snapshot carries ready slots' prev
+    // buffers; restore refills the existing buffers, zeroes the stage, and marks every
+    // ready slot dirty so field() re-encodes from the restored luma, bit-identically.
+    snapshotState() {
+      return {
+        prev: prev.map((buf, i) => (ready[i] ? encodeTyped(buf) : null)),
+        ready: Array.from(ready),
+      };
+    },
+    restoreState(s) {
+      if (!s || !Array.isArray(s.prev) || !Array.isArray(s.ready)) return false;
+      // Validate every record before touching a buffer: a refused restore leaves the
+      // delay exactly as it was (atomic, fail-closed).
+      const decoded = prev.map((buf, i) => {
+        const rec = s.prev[i];
+        if (rec == null) return null;
+        const fresh = decodeTyped(rec);
+        return fresh && fresh.length === buf.length && fresh.constructor === buf.constructor ? fresh : undefined;
+      });
+      if (decoded.some((d) => d === undefined)) return false;
+      for (let i = 0; i < MAX_TRACKS; i++) {
+        if (decoded[i] == null) {
+          prev[i].fill(0);
+          ready[i] = 0;
+        } else {
+          prev[i].set(decoded[i]);
+          ready[i] = s.ready[i] ? 1 : 0;
+        }
+        stage[i].fill(0);
+        flowU[i][0].fill(0);
+        flowU[i][1].fill(0);
+        flowV[i][0].fill(0);
+        flowV[i][1].fill(0);
+        flowFront[i] = 0;
+        cached[i] = null;
+        dirty[i] = ready[i] ? 1 : 0;
+      }
+      return true;
     },
   };
 }

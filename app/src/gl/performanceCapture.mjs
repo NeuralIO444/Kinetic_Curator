@@ -6,12 +6,70 @@
 // mid-session could not replay, because the resolver carries state from before it). Stop detaches the recorder and
 // returns the finished performance.
 // One take at a time. The take's seed is read from the first recorded frame, for the file name only.
-import { setResolveTap, setResolveOutputTap, requestResolverReset } from './resolveTap.mjs';
+import { setResolveTap, setResolveOutputTap, requestResolverReset, setResolverSwapListener, snapshotLiveResolver } from './resolveTap.mjs';
 import { createPerformanceRecorder, packPerformance } from './performanceFile.mjs';
+import { createRetroCapture } from './retroCapture.mjs';
 
 let recorder = null;
 let seed = 0;
 let sections = null; // name -> { stop() => data }: extra tracks a caller records alongside the take
+
+// ── #1367 — retroactive capture: the always-on ring ─────────────────────────────────────────────
+// The ring records every frame from when it starts, so a moment can be saved after it happens
+// (retroCapture.mjs). It owns the two taps while it runs. A deliberate take PRE-EMPTS it: rec
+// restarts the scene, which would invalidate the ring's history anyway, so startPerformance
+// suspends the ring and stopPerformance restarts it fresh on the new scene. A resolver swap
+// from anywhere else (a playback rewind) clears the ring through the swap listener.
+let retro = null;
+let retroOpts = null;
+let suspendedRetroOpts = null;
+
+setResolverSwapListener(() => { if (retro) retro.clear(); });
+
+/** Begin retroactive capture. Returns false when the ring or a take is already running. */
+export function startRetroCapture(opts = {}) {
+  if (retro || recorder) return false;
+  retroOpts = opts;
+  retro = createRetroCapture({ snapshotProvider: snapshotLiveResolver, ...opts });
+  const ring = retro;
+  setResolveTap((input) => ring.onInput(input));
+  setResolveOutputTap((output) => ring.onOutput(output));
+  return true;
+}
+
+/** Stop retroactive capture and release the taps. Returns false when it was not running. */
+export function stopRetroCapture() {
+  if (!retro) return false;
+  retro = null;
+  retroOpts = null;
+  if (!recorder) {
+    setResolveTap(null);
+    setResolveOutputTap(null);
+  }
+  return true;
+}
+
+export function isRetroCapturing() {
+  return retro !== null;
+}
+
+/** The ring's window state (frames held, snapshots retained), or null when it is not running. */
+export function retroCaptureStats() {
+  return retro ? retro.stats() : null;
+}
+
+/**
+ * Save the last `minutes` (nominal, at 60 fps — frames are the ring's currency) as a take that
+ * begins mid-session. Resolves to { perf, bytes, filename }, or null when the ring is not
+ * running or holds nothing takeable yet.
+ */
+export async function saveRetroPerformance(minutes = 3) {
+  if (!retro) return null;
+  const perf = retro.saveLast(Math.max(1, Math.round(minutes * 60 * 60)));
+  if (!perf) return null;
+  const bytes = await packPerformance(perf);
+  return { perf, bytes, filename: `kc-performance-retro-${perf.frames}f.kcperf` };
+}
 
 export function isRecordingPerformance() {
   return recorder !== null;
@@ -30,6 +88,10 @@ export function performanceFrames() {
  */
 export function startPerformance(opts = {}) {
   if (recorder) return false;
+  // #1367 — a deliberate take pre-empts the ring (its scene restart invalidates the ring's
+  // history); the ring restarts fresh when the take stops.
+  suspendedRetroOpts = retro ? retroOpts : null;
+  if (retro) stopRetroCapture();
   const { sections: makers, ...recOpts } = opts;
   const r = createPerformanceRecorder(recOpts);
   let first = true;
@@ -59,6 +121,12 @@ export async function stopPerformance() {
   recorder = null;
   setResolveTap(null);
   setResolveOutputTap(null);
+  // #1367 — restart the ring the take pre-empted, fresh on the take's scene.
+  if (suspendedRetroOpts) {
+    const o = suspendedRetroOpts;
+    suspendedRetroOpts = null;
+    startRetroCapture(o);
+  }
   const extra = sections || {};
   sections = null;
   const data = {};

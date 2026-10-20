@@ -23,7 +23,8 @@ import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
-import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata
+import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius, snapshotDishSession, restoreDishSession, checkDishSessionSnapshot, restoreDishEntries } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
+import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
 import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mjs'; // #1412: the shared grid's density field, published per frame
 import { tickDishTrails, clearDishTrails } from '../engine/dishTrails.mjs'; // #1415: the trail substrate's tick + seed-change wipe (the law lives in the module)
@@ -1039,5 +1040,186 @@ export function createLiveResolver() {
     worldNoiseSeed = null;
   }
 
-  return { resolveLayers, dispose };
+  // ── #1367 — mid-session state snapshot ─────────────────────────────────────
+  // The whole accumulative state of this resolver as one JSON-safe object, so a take
+  // can begin mid-session: snapshot at a frame boundary, restore into a fresh
+  // resolver, and the continuation is bit-identical to the uninterrupted run (the
+  // resolverSnapshot proof). The census behind this surface is recorded on #1367.
+  // What is deliberately NOT here: placementCaches + the dish ground + growth
+  // aggregates + the ecology ledger + coalesce fields (all derived — a cold cache /
+  // refill / recount reproduces identical output), the module-level publications
+  // (per-frame outputs), and any wall-clock or RNG stream (the resolve path has
+  // none: time is a recorded input, RNG is index-addressed).
+  function snapshotState() {
+    const swarm = {};
+    for (const [layerId, st] of swarmState) {
+      swarm[layerId] = { initKey: st.initKey, phraseGen: st.phraseGen, system: st.system.snapshotState() };
+    }
+    const lastShownSnap = {};
+    for (const [layerId, v] of lastShown) lastShownSnap[layerId] = { sig: v.sig, items: deepCopyData(v.items) };
+    const morphSnap = {};
+    for (const [layerId, v] of morphState) morphSnap[layerId] = snapshotMorphEntry(v);
+    return {
+      v: 1,
+      W,
+      H,
+      worldNoiseSeed,
+      driverClock: driverClock.snapshotState(),
+      swarm,
+      feedDelay: feedLive.delay.snapshotState(),
+      feedSlots: [...feedSlots.entries()],
+      feedSlotFree: [...feedSlotFree],
+      feedSlotNext,
+      scent: sharedScent.snapshotCells(),
+      dishSession: snapshotDishSession(dishSession),
+      lastShown: lastShownSnap,
+      morphState: morphSnap,
+      modSteer: [...modSteerByLayer.entries()].map(([k, v]) => [k, { ...v }]),
+      warpPhase: [...warpPhase.entries()].map(([k, v]) => [k, { ...v }]),
+      growthTick: [...growthTickByLayer.entries()].map(([k, v]) => [k, { ...v }]),
+      densityTickSeen,
+      creatures: creatures.snapshotState(),
+      dishCreatures: dishCreatures.snapshotState(),
+    };
+  }
+
+  function restoreState(snap) {
+    if (!checkResolverSnapshot(snap)) return false;
+    // Phase 1 — validate every system payload against a THROWAWAY instance, so a
+    // refused restore leaves this resolver exactly as it was (fail-closed, atomic).
+    for (const layerId of Object.keys(snap.swarm)) {
+      if (!new ParticleSystem().restoreState(snap.swarm[layerId].system)) return false;
+    }
+    if (!createFeedDelay(feedLive.w, feedLive.h).restoreState(snap.feedDelay)) return false;
+    if (!createScentField().restoreCells(snap.scent)) return false;
+    if (!checkDishSessionSnapshot(snap.dishSession)) return false;
+    if (!createCreatureBuilder().restoreState(snap.creatures)) return false;
+    if (!createDishCreatureBuilder().restoreState(snap.dishCreatures)) return false;
+    if (!createDriverClock().restoreState(snap.driverClock)) return false;
+    // Phase 2 — apply (the same restores just validated; they cannot refuse now).
+    W = snap.W;
+    H = snap.H;
+    worldNoiseSeed = snap.worldNoiseSeed;
+    worldNoise = worldNoiseSeed == null ? null : createNoise(worldNoiseSeed || 444);
+    driverClock.restoreState(snap.driverClock);
+    for (const k of [...swarmState.keys()]) releaseDishBody(dishSession, swarmState.get(k).system);
+    swarmState.clear();
+    for (const [layerId, rec] of Object.entries(snap.swarm)) {
+      const system = new ParticleSystem();
+      system.restoreState(rec.system);
+      swarmState.set(layerId, { system, initKey: rec.initKey, phraseGen: rec.phraseGen });
+    }
+    feedLive.delay.restoreState(snap.feedDelay);
+    feedSlots.clear();
+    for (const [k, v] of snap.feedSlots) feedSlots.set(k, v);
+    feedSlotFree.length = 0;
+    feedSlotFree.push(...snap.feedSlotFree);
+    feedSlotNext = snap.feedSlotNext;
+    sharedScent.restoreCells(snap.scent);
+    restoreDishSession(dishSession, snap.dishSession);
+    // #1367 — recreate the snapshot's enrolments: entry EXISTENCE is session state
+    // (see snapshotDishSession). Without this, the first restored frame re-enrols
+    // mid-frame and its cross-strata pass fires empty — the pass reads the entries
+    // enrolled by previous frames. The next resolveLayers refreshes every record
+    // from the live input, exactly as it refreshes a live session's entries.
+    restoreDishEntries(dishSession, snap.dishSession.entries, (key) => {
+      const st = swarmState.get(key);
+      return st ? st.system : null;
+    });
+    lastShown.clear();
+    for (const [k, v] of Object.entries(snap.lastShown)) lastShown.set(k, { sig: v.sig, items: deepCopyData(v.items) });
+    morphState.clear();
+    for (const [k, v] of Object.entries(snap.morphState)) morphState.set(k, restoreMorphEntry(v));
+    modSteerByLayer.clear();
+    for (const [k, v] of snap.modSteer) modSteerByLayer.set(k, { ...v });
+    warpPhase.clear();
+    for (const [k, v] of snap.warpPhase) warpPhase.set(k, { ...v });
+    growthTickByLayer.clear();
+    for (const [k, v] of snap.growthTick) growthTickByLayer.set(k, { ...v });
+    densityTickSeen = snap.densityTickSeen;
+    creatures.restoreState(snap.creatures);
+    dishCreatures.restoreState(snap.dishCreatures);
+    return true;
+  }
+
+  return { resolveLayers, dispose, snapshotState, restoreState };
+}
+
+// Snapshot data copy. A plain JSON round-trip silently DROPS keys whose value
+// is undefined — but the warm resolver carries such keys (buildPlacements
+// stamps `matParams = undefined` on default items), and the checkpoint canon
+// counts key presence. Normalizing undefined -> null keeps the key, and the
+// canon reads null and undefined identically, so a restored continuation
+// hashes exactly like the uninterrupted run.
+const deepCopyData = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v, (_k, val) => (val === undefined ? null : val))));
+
+// #1367 — the morph plan's pairings point INTO fromItems by object identity
+// (blendItems ranks partners through an identity map over fromItems), and JSON
+// cannot carry identity: a round-trip duplicates the shared items, every
+// identity lookup misses, and the blend's depth order scrambles. The snapshot
+// form therefore stores each pairing's from-item as its INDEX in fromItems
+// (and onlyFrom as indices); restore re-links them to the restored copies.
+function snapshotMorphEntry(v) {
+  if (!v || !v.plan || !Array.isArray(v.fromItems)) return deepCopyData(v);
+  const out = deepCopyData(v);
+  out.plan = {
+    ...out.plan,
+    pairs: v.plan.pairs.map((p) => ({ i: v.fromItems.indexOf(p.f), g: p.g, j: p.j })),
+    onlyFrom: v.plan.onlyFrom.map((it) => v.fromItems.indexOf(it)),
+  };
+  return out;
+}
+function restoreMorphEntry(snap) {
+  const v = deepCopyData(snap);
+  if (!v || !v.plan || !Array.isArray(v.fromItems)) return v;
+  v.plan = {
+    ...v.plan,
+    pairs: v.plan.pairs.map((p) => ({ f: v.fromItems[p.i], g: p.g, j: p.j })),
+    onlyFrom: v.plan.onlyFrom.map((i) => v.fromItems[i]),
+  };
+  return v;
+}
+
+/**
+ * #1367 — structural validation of a resolver snapshot (the deep decode validation
+ * lives in restoreState's phase 1, which runs every system's own fail-closed
+ * restore against a throwaway instance). Returns true only for a snapshot whose
+ * shape snapshotState could have produced.
+ */
+export function checkResolverSnapshot(snap) {
+  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return false;
+  if (snap.v !== 1) return false;
+  if (!Number.isFinite(snap.W) || !Number.isFinite(snap.H)) return false;
+  if (!(snap.worldNoiseSeed === null || Number.isFinite(snap.worldNoiseSeed))) return false;
+  if (!snap.driverClock || typeof snap.driverClock !== 'object') return false;
+  if (!snap.swarm || typeof snap.swarm !== 'object' || Array.isArray(snap.swarm)) return false;
+  for (const rec of Object.values(snap.swarm)) {
+    if (!rec || typeof rec !== 'object' || !rec.system || typeof rec.system !== 'object') return false;
+    if (!Number.isInteger(rec.system.cap) || rec.system.cap < 0) return false;
+  }
+  if (!snap.feedDelay || typeof snap.feedDelay !== 'object') return false;
+  if (!Array.isArray(snap.feedSlots) || !Array.isArray(snap.feedSlotFree) || !Number.isInteger(snap.feedSlotNext)) return false;
+  if (!snap.scent || typeof snap.scent !== 'object') return false;
+  if (!snap.dishSession || typeof snap.dishSession !== 'object') return false;
+  if (!snap.lastShown || typeof snap.lastShown !== 'object' || Array.isArray(snap.lastShown)) return false;
+  if (!snap.morphState || typeof snap.morphState !== 'object' || Array.isArray(snap.morphState)) return false;
+  for (const entry of Object.values(snap.morphState)) {
+    if (!entry || typeof entry !== 'object' || !Array.isArray(entry.fromItems)) return false;
+    if (!Number.isFinite(entry.startMs) || !Number.isFinite(entry.dur)) return false;
+    const plan = entry.plan;
+    if (!plan || typeof plan !== 'object' || !Array.isArray(plan.pairs) || !Array.isArray(plan.onlyFrom)) return false;
+    if (!Number.isFinite(plan.seed)) return false;
+    for (const p of plan.pairs) {
+      if (!p || !Number.isInteger(p.i) || p.i < 0 || p.i >= entry.fromItems.length) return false;
+      if (typeof p.g !== 'string' || !Number.isInteger(p.j) || p.j < 0) return false;
+    }
+    for (const i of plan.onlyFrom) {
+      if (!Number.isInteger(i) || i < 0 || i >= entry.fromItems.length) return false;
+    }
+  }
+  if (!Array.isArray(snap.modSteer) || !Array.isArray(snap.warpPhase) || !Array.isArray(snap.growthTick)) return false;
+  if (!Number.isFinite(snap.densityTickSeen)) return false;
+  if (!snap.creatures || typeof snap.creatures !== 'object') return false;
+  if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
+  return true;
 }

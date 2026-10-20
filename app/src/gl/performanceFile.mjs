@@ -13,7 +13,7 @@
 // passes `slowRender || !running`), so a future playback has to record `running` separately before it can split them.
 //
 // The stored form is gzip of JSON text, through the Web Streams API (the same code in the browser and in Node).
-import { createLiveResolver } from './liveResolve.mjs';
+import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { createInputLog, replayInputs, INPUT_LOG_VERSION } from '../engine/kernel/replay/inputLog.js';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
 
@@ -83,10 +83,21 @@ export function frameHash(output) {
 /**
  * A running chain over EVERY frame: chain' = mix(chain, frame). A checkpoint stores the chain, so one differing
  * frame anywhere before it changes it. Sampling a hash only every N frames would miss a one-frame difference.
+ *
+ * The chain's whole state is its two 32-bit lanes, so a chain VALUE is also a chain SEED (#1367): pass one to
+ * resume the chain exactly where another run left it. That is what lets a take begin mid-session — its first
+ * checkpoint covers every frame before it, through the seed, without storing them.
  */
-export function createHashChain() {
+export function createHashChain(seedValue = null) {
   let ca = 0x2545f491;
   let cb = 0x6c62272e;
+  if (seedValue != null) {
+    if (typeof seedValue !== 'string' || !/^[0-9a-f]{16}$/.test(seedValue)) {
+      throw new PerformanceFileError(`chain seed must be a chain value (16 hex chars), got ${String(seedValue)}`);
+    }
+    ca = parseInt(seedValue.slice(0, 8), 16) | 0;
+    cb = parseInt(seedValue.slice(8, 16), 16) | 0;
+  }
   return {
     /** Fold one resolver output into the chain. */
     push(output) {
@@ -101,18 +112,39 @@ export function createHashChain() {
 }
 
 /**
+ * #1367 — the optional take section that lets a performance begin mid-session: the resolver snapshot at the
+ * frame boundary where the take's input log begins, the chain value at that boundary (the seed the take's
+ * checkpoints continue from), and the session frame the boundary sat at. Validated fail-closed, shared by
+ * the recorder (which refuses to build a malformed section) and checkPerformance (which refuses to read one).
+ */
+function checkInitialState(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) throw new PerformanceFileError('initialState must be an object');
+  if (!Number.isInteger(s.atFrame) || s.atFrame < 0) throw new PerformanceFileError('initialState.atFrame must be a non-negative integer');
+  if (typeof s.chainSeed !== 'string' || !/^[0-9a-f]{16}$/.test(s.chainSeed)) throw new PerformanceFileError('initialState.chainSeed must be a chain value (16 hex chars)');
+  if (!checkResolverSnapshot(s.snapshot)) throw new PerformanceFileError('initialState.snapshot is not a resolver snapshot');
+  return s;
+}
+
+/**
  * Recorder. Feed it every frame's input, then that frame's output, in order (the two taps in resolveTap.mjs do
  * exactly that). `finish()` returns the performance object.
+ *
+ * With `initialState` (#1367) the recorder begins mid-session: its chain resumes from the section's seed, and
+ * `finish()` emits the section, so the take verifies from the snapshot instead of from launch. Without it the
+ * recorder is exactly the from-launch recorder it always was, and the file carries no section.
  */
-export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, maxFrames = MAX_FRAMES } = {}) {
+export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, maxFrames = MAX_FRAMES, initialState = null } = {}) {
+  if (initialState != null) checkInitialState(initialState);
   const log = createInputLog();
   const checkpoints = [];
-  const chain = createHashChain();
+  const chain = createHashChain(initialState ? initialState.chainSeed : null);
   let truncated = false;
   let pending = false; // an input was recorded and its output has not arrived yet
   return {
     get frames() { return log.frames; },
     get truncated() { return truncated; },
+    /** The chain's current value — the seed a snapshot taken at this frame boundary would carry (#1367). */
+    chainValue() { return chain.value(); },
     onInput(input) {
       if (log.frames >= maxFrames) { truncated = true; pending = false; return; }
       log.record(input);
@@ -145,6 +177,8 @@ export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, 
         checkpointEvery,
         checkpoints: checkpoints.slice(),
         inputs: { ...inputs, frames, steps: inputs.steps.slice(0, frames) },
+        // #1367 — absent for a from-launch take (the file is exactly what it was before this section existed).
+        ...(initialState ? { initialState: { atFrame: initialState.atFrame, chainSeed: initialState.chainSeed, snapshot: initialState.snapshot } } : {}),
       };
     },
   };
@@ -165,6 +199,7 @@ export function checkPerformance(p) {
     }
   }
   if (typeof p.kernelVersion !== 'string') throw new PerformanceFileError('kernelVersion must be a string');
+  if (p.initialState != null) checkInitialState(p.initialState);
   return p;
 }
 
@@ -178,7 +213,13 @@ export function verifyPerformance(perf, { resolverFactory = createLiveResolver }
   const p = checkPerformance(perf);
   const want = new Map(p.checkpoints.map((c) => [c.frame, c.hash]));
   const resolver = resolverFactory();
-  const chain = createHashChain();
+  // #1367 — a mid-session take: the fresh resolver starts from the snapshot, and the chain from the seed,
+  // so the take's checkpoints (relative to its own input log) compare exactly like a from-launch take's.
+  // A snapshot the resolver refuses makes the take unverifiable — fail closed, like a malformed file.
+  if (p.initialState && !resolver.restoreState(p.initialState.snapshot)) {
+    throw new PerformanceFileError('initialState snapshot refused by the resolver');
+  }
+  const chain = createHashChain(p.initialState ? p.initialState.chainSeed : null);
   let f = 0;
   let checked = 0;
   let firstMismatchFrame = null;

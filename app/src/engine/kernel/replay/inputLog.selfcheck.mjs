@@ -1,7 +1,7 @@
 // node src/engine/kernel/replay/inputLog.selfcheck.mjs
 // #1353 step 2 — the input log is EXACT: values, undefined vs null vs absent, typed arrays, and identity.
 import assert from 'node:assert/strict';
-import { encode, decode, createInputLog, replayInputs, INPUT_LOG_VERSION } from './inputLog.js';
+import { encode, decode, createInputLog, replayInputs, rebaseInputLog, INPUT_LOG_VERSION } from './inputLog.js';
 
 // 1. every value round-trips bit for bit through JSON text
 {
@@ -80,6 +80,55 @@ import { encode, decode, createInputLog, replayInputs, INPUT_LOG_VERSION } from 
   assert.ok(Object.is(f1.a, f0.a), 'same identity as live (the object was shared)');
   assert.throws(() => [...replayInputs({ version: 99, steps: [] })], /unsupported log/);
   assert.throws(() => createInputLog().record([]), /plain object/);
+}
+
+// #1367 — rebase: a log cut at a frame boundary replays exactly the original's suffix
+{
+  // a stream exercising every step kind: full values, shallow patches, identity-only changes,
+  // key removals, undefined values, typed arrays
+  const shared = { deep: [1, 2, 3] };
+  const frames = [];
+  for (let f = 0; f < 40; f++) {
+    const input = {
+      n: f * 1.5, s: `f${f >> 2}`, keep: shared, u: undefined,
+      patch: { a: f, b: 'x', c: f % 3 },
+      f32: new Float32Array([f, -0]),
+    };
+    if (f % 5 === 4) input.patch = { a: f, b: 'x' }; // sub-key deleted via patch
+    if (f >= 20) delete input.s; // top-level key removed mid-stream
+    if (f === 25) input.extra = { late: true }; // and one added
+    frames.push(input);
+  }
+  const log = createInputLog();
+  for (const fr of frames) log.record(fr);
+  const fin = log.finish();
+  const canon = (v) => JSON.stringify(encode(v));
+  const whole = [...replayInputs(fin)].map(canon);
+  for (const at of [1, 7, 19, 20, 25, 39]) {
+    const rebased = rebaseInputLog(fin, at);
+    assert.equal(rebased.frames, 40 - at, `rebased at ${at}: frame count`);
+    const suffix = [...replayInputs(rebased)].map(canon);
+    assert.deepEqual(suffix, whole.slice(at), `rebased at ${at}: the suffix replays exactly`);
+  }
+  assert.deepEqual([...replayInputs(rebaseInputLog(fin, 0))].map(canon), whole, 'rebase at 0 is the whole log');
+  assert.throws(() => rebaseInputLog(fin, 40), /cannot rebase/, 'past the end refuses');
+  assert.throws(() => rebaseInputLog(fin, -1), /cannot rebase/);
+  assert.throws(() => rebaseInputLog({ version: 99, steps: [] }, 0), /unsupported log/);
+
+  // dropBefore: the same cut, in place, and recording continues seamlessly afterwards
+  const live = createInputLog();
+  for (const fr of frames) live.record(fr);
+  live.dropBefore(20);
+  assert.equal(live.frames, 20, 'the ring bound: history before the cut is gone');
+  const more = { ...frames[39], n: 999, patch: { a: 100, b: 'y', c: 1 } };
+  live.record(more);
+  const reference = createInputLog();
+  for (const fr of [...frames.slice(20), more]) reference.record(fr);
+  const gotLive = [...replayInputs(live.finish())].map(canon);
+  const gotRef = [...replayInputs(reference.finish())].map(canon);
+  assert.deepEqual(gotLive, gotRef, 'after dropBefore, recording continues as if the log began at the cut');
+  live.dropBefore(0);
+  assert.equal(live.frames, 21, 'dropBefore(0) is a no-op');
 }
 
 console.log('inputLog.selfcheck: ok (#1353 step 2)');

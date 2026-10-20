@@ -79,6 +79,64 @@ export function decode(e) {
 const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
 
 /**
+ * #1367 — fold the ENCODED state through steps[0..upto]: the full encoded input as of that frame.
+ * Mirrors replayInputs' step application, but stays in encoded space (nothing is decoded), so a log
+ * can be cut at a frame boundary: the folded state becomes a single full-state step, and every later
+ * step applies to it exactly as it applied to the state the fold reproduces.
+ */
+function foldEnc(steps, upto) {
+  let enc = {};
+  for (let i = 0; i <= upto; i++) {
+    const step = steps[i];
+    const nextEnc = { ...enc };
+    if (step.x) for (const key of step.x) delete nextEnc[key];
+    if (step.k) {
+      for (const key of Object.keys(step.k)) {
+        const e = step.k[key];
+        if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$s === 1 && Object.keys(e).length === 1) {
+          nextEnc[key] = enc[key]; // same value, new identity: the encoding is unchanged
+        } else if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$p && Array.isArray(e.$d) && Object.keys(e).length === 2) {
+          const full = { ...enc[key], ...e.$p };
+          for (const sub of e.$d) delete full[sub];
+          nextEnc[key] = full;
+        } else {
+          nextEnc[key] = e;
+        }
+      }
+    }
+    enc = nextEnc;
+  }
+  return enc;
+}
+
+/** Steps for a log that starts at `fromFrame`: the folded full state as step 0, later steps verbatim. */
+function rebaseSteps(steps, fromFrame) {
+  const enc = foldEnc(steps, fromFrame);
+  const k = {};
+  for (const key of Object.keys(enc)) k[key] = enc[key];
+  const first = Object.keys(k).length ? { k } : {};
+  return [first, ...steps.slice(fromFrame + 1)];
+}
+
+/**
+ * #1367 — a finished log cut at a frame boundary: frame `fromFrame` becomes frame 0 (as a full-state
+ * step), and the frames after it follow unchanged. Replaying the result yields exactly the original
+ * replay's inputs from `fromFrame` on. This is what lets a take begin mid-session: its input log starts
+ * at the snapshot boundary instead of at launch.
+ */
+export function rebaseInputLog(log, fromFrame) {
+  if (!log || log.version !== INPUT_LOG_VERSION || !Array.isArray(log.steps)) {
+    throw new TypeError(`[inputLog] unsupported log (want version ${INPUT_LOG_VERSION})`);
+  }
+  if (!Number.isInteger(fromFrame) || fromFrame < 0 || fromFrame >= log.steps.length) {
+    throw new RangeError(`[inputLog] cannot rebase at frame ${String(fromFrame)} of ${log.steps.length}`);
+  }
+  if (fromFrame === 0) return { version: INPUT_LOG_VERSION, frames: log.steps.length, steps: log.steps.slice() };
+  const steps = rebaseSteps(log.steps, fromFrame);
+  return { version: INPUT_LOG_VERSION, frames: steps.length, steps };
+}
+
+/**
  * Recorder. `record(input)` once per resolver call. `finish()` returns the log:
  *   { version, frames: N, keys: [...], steps: [ { k: { key: enc | {$s:1} | {$p:{...}, $d:[...]} }, x: [removedKeys] } ] }
  * A step lists only the keys whose identity or value changed since the previous frame:
@@ -129,6 +187,20 @@ export function createInputLog() {
       steps.push(step);
       prevRaw = { ...input };
       prevEnc = enc;
+    },
+    /**
+     * #1367 — drop the history before `fromFrame` IN PLACE (the ring's bound): the log restarts at that
+     * frame as a full-state step and keeps recording. The recorder's prev-frame state describes the
+     * LATEST frame, which a history rewrite does not touch, so the next record() diffs exactly as it
+     * would have without the drop.
+     */
+    dropBefore(fromFrame) {
+      if (!Number.isInteger(fromFrame) || fromFrame <= 0) return;
+      const at = Math.min(fromFrame, steps.length - 1);
+      if (at <= 0) return;
+      const rebased = rebaseSteps(steps, at);
+      steps.length = 0;
+      steps.push(...rebased);
     },
     finish() {
       return { version: INPUT_LOG_VERSION, frames: steps.length, steps };

@@ -49,6 +49,7 @@ import { hoverPose, groundTreatment, normalizeTraits } from './creature.js';
 import { creaturePose } from './creaturePose.js';
 import { attachPointsFor } from './autoAttach.js';
 import { hashU01 } from './kernel/rng.js';
+import { encodeTyped, decodeTyped } from './kernel/stateCodec.mjs'; // #1367 — birth-state snapshots
 import { hexToRgb255, rgb255ToHex } from './colorHex.mjs';
 
 export const DISH_CREATURE = Object.freeze({
@@ -225,6 +226,51 @@ export function dishLimbDirs(pool, assetAttach) {
  * adds the dish creature's discs to the TOP content layer's items, after the moths. It acts only on pins the
  * input marks hosted (`input.dishHosted`); with none, it does nothing at all (byte-identical stage).
  */
+
+// #1367 — birth-state snapshot helpers. A birth state is plain data plus typed arrays
+// (disc positions/velocities/mass/alive, per-limb growth): typed arrays ride the state
+// codec (recognised on restore by the record's {kind, length, b64} shape), everything
+// else deep-copies as JSON data. Restore builds a whole new state or returns null —
+// the caller's swap is the commit point, so a refused restore changes nothing.
+const isCodecRecord = (v) => v != null && typeof v === 'object' && typeof v.b64 === 'string' && Number.isInteger(v.length) && typeof v.kind === 'string';
+const deepCopyData = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
+
+function snapDishCreatureState(st) {
+  if (!st) return null;
+  const out = {};
+  for (const [k, v] of Object.entries(st)) {
+    if (k === 'sys') continue;
+    out[k] = ArrayBuffer.isView(v) ? encodeTyped(v) : deepCopyData(v);
+  }
+  const sys = {};
+  for (const [k, v] of Object.entries(st.sys || {})) sys[k] = ArrayBuffer.isView(v) ? encodeTyped(v) : deepCopyData(v);
+  out.sys = sys;
+  return out;
+}
+
+function restoreDishCreatureState(rec) {
+  if (!rec || typeof rec !== 'object' || !rec.sys || typeof rec.sys !== 'object') return null;
+  const build = (src) => {
+    const out = {};
+    for (const [k, v] of Object.entries(src)) {
+      if (isCodecRecord(v)) {
+        const arr = decodeTyped(v);
+        if (!arr) return null;
+        out[k] = arr;
+      } else {
+        out[k] = deepCopyData(v);
+      }
+    }
+    return out;
+  };
+  const sys = build(rec.sys);
+  if (!sys) return null;
+  const st = build(Object.fromEntries(Object.entries(rec).filter(([k]) => k !== 'sys')));
+  if (!st) return null;
+  st.sys = sys;
+  return st;
+}
+
 export function createDishCreatureBuilder() {
   const states = []; // per pin: birthState() | null
   let frameBodies = []; // the last appended frame's discs, per pin: [{ x, y, r, head }] | null
@@ -395,6 +441,24 @@ export function createDishCreatureBuilder() {
       if (extra.length) top.items = [...top.items, ...extra];
     },
     /** The last appended frame's discs per pin ([{ x, y, r, head }] | null): the suite's and a debugger's read. */
+    // #1367 — the builder's accumulative state: the per-pin birth states (XPBD disc
+    // positions/velocities, growth, links, traits) and its own frame count. Typed
+    // arrays ride the state codec; everything else in a birth state is plain data.
+    // (frameBodies is a per-frame publication, re-earned by the next append.)
+    snapshotState() { return { states: states.map(snapDishCreatureState), frame }; },
+    restoreState(s) {
+      if (!s || !Array.isArray(s.states) || !Number.isInteger(s.frame) || s.frame < 0) return false;
+      const built = [];
+      for (const rec of s.states) {
+        if (rec == null) { built.push(null); continue; }
+        const st = restoreDishCreatureState(rec);
+        if (!st) return false; // nothing applied yet — the swap below is the commit point
+        built.push(st);
+      }
+      states.length = 0; states.push(...built);
+      frame = s.frame;
+      return true;
+    },
     lastBodies() { return frameBodies; },
     dispose() { states.length = 0; frameBodies = []; },
   };

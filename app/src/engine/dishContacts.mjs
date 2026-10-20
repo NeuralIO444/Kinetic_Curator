@@ -49,7 +49,8 @@
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
-import { ensureEntryTrails } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
+import { ensureEntryTrails, createDishTrailField, TRAIL_CELLS } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
+import { encodeTyped, decodeTyped } from './kernel/stateCodec.mjs'; // #1367 — session snapshots
 import { ensureEcologyEntry, removeEcologyEntry } from './dishEcology.mjs'; // #1416 — the ecology ledger's enrolment (the law lives in the module)
 import { clampWetness, dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX } from './dishMedium.mjs'; // #1413 — the medium across the seam; #1595 (D1) — its friction
 import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega } from './dishSpin.mjs'; // #1596 (D2) — spin: torque from D1's jt across the seam
@@ -122,6 +123,122 @@ export function createDishSession() {
     _fill: null,
     _order: null,
   };
+}
+
+/**
+ * #1367 — the session's accumulative state, for a mid-session take snapshot.
+ * What is NOT here, and why: the arm (order/armed — re-dealt by the resolver every
+ * frame), the contact grid scratch, the density field (built and consumed inside
+ * one frame's pass), and the ecology ledger's records — recounted from the systems'
+ * alive columns at every enrolment (dishEcology.mjs: ensureEcologyEntry recomputes
+ * cap/alive from the entry + system), so they are a fold of the particle snapshots.
+ * What IS state: the enrolment sequence counter, the trail total field, each
+ * stratum's own trail field + step marker — and the ENROLMENT RECORDS themselves.
+ * Entry existence is load-bearing across frames: the cross-strata pass runs inside
+ * the first enrolled system's update and reads the entries enrolled by PREVIOUS
+ * frames; a session restored without its entries spends its first frame re-enrolling
+ * mid-frame and the pass fires empty (proven by resolverSnapshot's dish scenario —
+ * every body moved). The records below carry enrolDishBody's input fields (it
+ * re-derives mode/restitution/cap exactly as a live enrolment does); `accum` is
+ * recorded as trailOwn's existence, the observable the restore must reproduce.
+ */
+export function snapshotDishSession(session) {
+  const trailsByKey = {};
+  for (const e of session.entries) {
+    if (e.trailOwn) trailsByKey[e.key] = { cells: encodeTyped(e.trailOwn.cells), step: e._trailStep ?? 0 };
+  }
+  return {
+    seq: session._seq,
+    entries: session.entries.map((e) => ({
+      key: e.key, seq: e.seq, radius: e.radius, restitution: e.restitution,
+      contactMode: e.mode, umask: e.umask, organism: e.organism, wetness: e.wetness,
+      accum: !!e.trailOwn, ecology: e.ecology, cap: e.cap,
+    })),
+    trailTotal: session.trailTotal ? encodeTyped(session.trailTotal.cells) : null,
+    trailsByKey,
+  };
+}
+
+/**
+ * #1367 — structural validation of a snapshotDishSession record, with the same
+ * decode checks restoreDishSession applies. Pure (nothing is written anywhere),
+ * so the resolver's restore can fail closed in its validation phase without
+ * standing up a throwaway session — the session has exactly one creation site
+ * in the resolver, and it is the resolver's own.
+ */
+export function checkDishSessionSnapshot(snap) {
+  if (!snap || typeof snap !== 'object' || !Number.isInteger(snap.seq) || snap.seq < 0) return false;
+  if (snap.trailTotal != null) {
+    const total = decodeTyped(snap.trailTotal);
+    if (!total || total.length !== TRAIL_CELLS || total.constructor !== Float64Array) return false;
+  }
+  if (snap.trailsByKey != null) {
+    if (typeof snap.trailsByKey !== 'object' || Array.isArray(snap.trailsByKey)) return false;
+    for (const rec of Object.values(snap.trailsByKey)) {
+      const cells = rec && decodeTyped(rec.cells);
+      if (!cells || cells.length !== TRAIL_CELLS || cells.constructor !== Float64Array) return false;
+    }
+  }
+  if (!Array.isArray(snap.entries)) return false;
+  for (const rec of snap.entries) {
+    if (!rec || typeof rec !== 'object' || typeof rec.key !== 'string') return false;
+    if (!Number.isInteger(rec.seq) || rec.seq < 0) return false;
+  }
+  return true;
+}
+
+/**
+ * #1367 — recreate a restored session's enrolments from the snapshot records.
+ * Entry existence is session state (see snapshotDishSession): the resolver
+ * calls this once at restore, after restoreDishSession has parked the trail
+ * fields (enrolment adopts them) and after its swarm systems exist again —
+ * `sysForKey` resolves each record's stratum key to its live system, and a
+ * record whose system is gone is skipped. The recorded per-entry seq is
+ * re-stamped after enrolment (enrolDishBody deals fresh seqs from the
+ * counter; the snapshot's are the ones the take's history dealt).
+ */
+export function restoreDishEntries(session, records, sysForKey) {
+  if (!Array.isArray(records) || typeof sysForKey !== 'function') return;
+  for (const rec of records) {
+    const sys = sysForKey(rec.key);
+    if (!sys) continue;
+    const e = enrolDishBody(session, {
+      key: rec.key, sys, radius: rec.radius, restitution: rec.restitution,
+      contactMode: rec.contactMode, umask: rec.umask, organism: rec.organism,
+      wetness: rec.wetness, accum: rec.accum, ecology: rec.ecology, cap: rec.cap,
+    });
+    if (e) e.seq = rec.seq;
+  }
+}
+
+/**
+ * Restore a snapshotDishSession record. Atomic + fail-closed: every field decodes
+ * before anything is written. Per-stratum trail fields are parked on the session
+ * (`_trailRestore`, keyed by enrolment key) and adopted by ensureEntryTrails as the
+ * strata re-enrol — entries themselves are recreated by restoreDishEntries.
+ */
+export function restoreDishSession(session, snap) {
+  if (!snap || typeof snap !== 'object' || !Number.isInteger(snap.seq) || snap.seq < 0) return false;
+  let total = null;
+  if (snap.trailTotal != null) {
+    total = decodeTyped(snap.trailTotal);
+    if (!total || total.length !== TRAIL_CELLS || total.constructor !== Float64Array) return false;
+  }
+  const byKey = new Map();
+  for (const [key, rec] of Object.entries(snap.trailsByKey || {})) {
+    const cells = rec && decodeTyped(rec.cells);
+    if (!cells || cells.length !== TRAIL_CELLS || cells.constructor !== Float64Array) return false;
+    byKey.set(key, { cells, step: Number.isFinite(rec.step) ? rec.step : 0 });
+  }
+  session._seq = snap.seq;
+  if (total) {
+    if (!session.trailTotal) session.trailTotal = createDishTrailField();
+    session.trailTotal.cells.set(total);
+  } else {
+    session.trailTotal = null;
+  }
+  session._trailRestore = byKey;
+  return true;
 }
 
 /**
