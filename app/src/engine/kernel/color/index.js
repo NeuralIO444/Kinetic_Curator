@@ -56,7 +56,7 @@ export function resolveStrategy(layoutParams, preset) {
   return preset?.paletteShift || 'band';
 }
 
-function toHexColor(r, g, b) {
+export function toHexColor(r, g, b) {
   const h = (v) => Math.min(255, Math.max(0, Math.round(v))).toString(16).padStart(2, '0');
   return `#${h(r)}${h(g)}${h(b)}`;
 }

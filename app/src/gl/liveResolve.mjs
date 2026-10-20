@@ -14,6 +14,7 @@ import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { createResolverDish, creatureGround, groundArgs } from './dishGround.mjs'; // #1183: the dish, and the ground a layer rests on
+import { weatherArgs } from './dishWeather.mjs'; // #1183 weather: the haze in the air over a layer
 import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
 // #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
 // bit-identical to the map-based path they replace — see the module header).
@@ -690,6 +691,12 @@ export function createLiveResolver() {
           ...groundArgs({
             dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,
             getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+            tSec: (input.loopTimeMs ?? 0) / 1000,
+          }),
+          // #1183 weather — the air: { dish, air, airVeil } when an FX layer above carries haze and this
+          // layer's WEATHER dial is up, else nothing (byte-identical). Same dish, same frame time.
+          ...weatherArgs({
+            dish, layers: input.layers, layerId: layer.id, air: layoutParams.weatherAir, W, H, seed, seedOffsets,
             tSec: (input.loopTimeMs ?? 0) / 1000,
           }),
         }).items;

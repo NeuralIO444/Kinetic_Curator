@@ -19,12 +19,19 @@ import {
   probeField,
 } from './kernelTiles.mjs';
 
-// --- the live roster: six fields, one row ---
+// --- the live roster: six fields + the first weather module, two rows ---
 {
   const rows = registryTileRows();
-  assert.strictEqual(rows.length, 1, `expected only the field row, got ${rows.map((r) => r.family)}`);
-  const [row] = rows;
+  assert.strictEqual(rows.length, 2, `expected the field + weather rows, got ${rows.map((r) => r.family)}`);
+  const [row, weatherRow] = rows;
   assert.strictEqual(row.family, 'field');
+  assert.strictEqual(weatherRow.family, 'weather');
+  assert.deepStrictEqual(weatherRow.tiles.map((t) => t.id), ['haze-air'], 'weather row carries its first module (#1183)');
+  for (const t of weatherRow.tiles) {
+    assert.strictEqual(t.face, 'HAZE');
+    assert.strictEqual(t.tier, 1, 'haze-air declares cost tier 1');
+    assert.ok(t.decl && typeof t.decl.create === 'function', 'haze-air: tile must carry the registry declaration');
+  }
   assert.deepStrictEqual(row.tiles.map((t) => t.id), ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor']);
   for (const t of row.tiles) {
     assert.ok(t.face.length > 0 && t.face.length <= 4, `${t.id}: face "${t.face}" must be 1–4 chars`);
@@ -40,12 +47,12 @@ import {
 {
   const empty = createRegistry('weather', { payloadKey: 'create', defaults: { reads: [], writes: [], costTier: 1 } });
   assert.deepStrictEqual(tileRowsFor([empty]), [], 'empty registry must yield no rows');
-  assert.deepStrictEqual(WEATHER.list(), [], 'weather registry starts empty');
+  assert.deepStrictEqual(WEATHER.list(), ['haze-air'], 'weather registry carries its first module (#1183)');
   assert.deepStrictEqual(FEATURES.list(), [], 'feature registry starts empty');
   const counts = registryCounts();
   assert.deepStrictEqual(counts, [
     { family: 'field', n: 6 },
-    { family: 'weather', n: 0 },
+    { family: 'weather', n: 1 },
     { family: 'feature', n: 0 },
   ]);
 }

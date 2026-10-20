@@ -24,6 +24,7 @@ import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
 import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxFilters.js';
 import { recipeFeatures } from '../app/src/curator/recipeFeatures.js';
 import { createResolverDish, groundArgs } from '../app/src/gl/dishGround.mjs'; // #1183: the still leans on the ground exactly as the live frame does
+import { weatherArgs } from '../app/src/gl/dishWeather.mjs'; // #1183 weather: the still breathes the same air as the live frame
 
 export const CANVAS_W = 1000;
 export const CANVAS_H = 700;
@@ -210,6 +211,11 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
             dish: stillDish, layers: stackLayers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W: CANVAS_W, H: CANVAS_H,
             seed: src.seed >>> 0, tSec: Number(doc.patternTime) || 0,
             getPalette: () => resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null),
+          }),
+          // #1183 weather — the same air call as gl/liveResolve.mjs, frozen at the still's pattern time.
+          ...weatherArgs({
+            dish: stillDish, layers: stackLayers, layerId: layer.id, air: layoutParams.weatherAir, W: CANVAS_W, H: CANVAS_H,
+            seed: src.seed >>> 0, seedOffsets: src.seedOffsets, tSec: Number(doc.patternTime) || 0,
           }),
         }).items;
 

@@ -44,7 +44,7 @@ ok('the catalogue is complete and stable (5 groups, every node present in every 
     'voice-material', 'voice-ztiers', 'voice-noisefreq', 'voice-displace',
     'mat-glass', 'mat-plate', 'mat-wash', 'mat-stipple',
     'gate-swarm-family', 'gate-cohesion', 'gate-damping', 'gate-moth',
-    'gate-flap', 'gate-growth', 'gate-ground', 'gate-divergence',
+    'gate-flap', 'gate-growth', 'gate-ground', 'gate-weather', 'gate-divergence',
     'shelf-voice',
   ]);
   for (const mode of ['grid', 'swarm', 'murmuration', 'hype', 'dla', 'eden', 'phyllotaxis']) {
@@ -147,6 +147,9 @@ ok('FLAP needs hype AND a symmetric body (bilateral, radial-N, kaleido-N — the
 ok('the pattern-ground family follows hasGround, and the voice shelf follows its cap', () => {
   assert.equal(stateIn({ hasGround: true }, 'gate-ground'), 'lit');
   assert.equal(stateIn({ hasGround: false }, 'gate-ground'), 'dark');
+  assert.equal(stateIn({ hasWeather: true }, 'gate-weather'), 'lit');
+  assert.equal(stateIn({ hasWeather: false }, 'gate-weather'), 'dark');
+  assert.match(lineIn({ hasWeather: false }, 'gate-weather'), /FX layer with HAZE sits above/);
   assert.equal(stateIn({ voiceCount: 11, voiceCap: 12 }, 'shelf-voice'), 'lit');
   assert.equal(stateIn({ voiceCount: 12, voiceCap: 12 }, 'shelf-voice'), 'dark');
   assert.match(lineIn({ voiceCount: 12, voiceCap: 12 }, 'shelf-voice'), /delete a voice/);
@@ -168,6 +171,7 @@ ok('catalogue-from-code: the pinned set of lock reasons across the gating source
     'Moth bodies only (hype mode)',
     'Moth bodies pin damping ≥ 0.97 for stability',
     'Needs a PATTERN layer below this one',
+    'Needs an FX layer with HAZE above this one',
     'Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)',
     'Phyllotaxis mode only',
     'Swarm mode only',
@@ -183,7 +187,7 @@ ok('catalogue-from-code: the pinned set of lock reasons across the gating source
   const named = tree().flatMap((g) => g.nodes.map((x) => x.name)).join(' · ');
   for (const label of ['GROWTH RATE', 'BRANCHING', 'BODY', 'TIGHT', 'WIND', 'METABOLISM',
     'PARTICLES', 'GRAVITY', 'COHESION', 'DAMPING',
-    'GROUND', 'EDGE', 'SHADOW', 'SNAP', 'DIVERGENCE',
+    'GROUND', 'EDGE', 'SHADOW', 'SNAP', 'WEATHER', 'DIVERGENCE',
     'GLASS', 'PLATE', 'WASH', 'STIPPLE']) {
     assert.ok(named.includes(label), `tree names ${label}`);
   }

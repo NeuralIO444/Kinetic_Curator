@@ -51,7 +51,7 @@ function opsAddedAt(t) {
 
 /**
  * The whole tree for one live snapshot.
- * @param input { mode, symmetry, material, hasGround, voiceCount, voiceCap,
+ * @param input { mode, symmetry, material, hasGround, hasWeather, voiceCount, voiceCap,
  *                davis: { tier, cool } | null }
  * @returns [{ id, title, note?, nodes: [{ id, name, state, line }] }]
  *   state: 'lit' | 'dark' | 'his'
@@ -61,6 +61,7 @@ export function buildUnlockTree(input = {}) {
   const symmetry = input.symmetry ?? 'none';
   const material = typeof input.material === 'string' ? input.material : null;
   const hasGround = !!input.hasGround;
+  const hasWeather = !!input.hasWeather;
   const voiceCap = Number.isFinite(input.voiceCap) ? input.voiceCap : 12;
   const voiceCount = Number.isFinite(input.voiceCount) ? input.voiceCount : 0;
   const davis = input.davis && Number.isFinite(input.davis.tier) ? input.davis : null;
@@ -139,6 +140,9 @@ export function buildUnlockTree(input = {}) {
     gate('gate-ground', 'GROUND · EDGE · SHADOW · SNAP', hasGround,
       'A PATTERN layer sits below the active one — live.',
       'Lights when a PATTERN layer sits below the active layer.'),
+    gate('gate-weather', 'WEATHER', hasWeather,
+      'An FX layer with HAZE sits above the active one — live.',
+      'Lights when an FX layer with HAZE sits above the active layer.'),
     gate('gate-divergence', 'DIVERGENCE', mode === 'phyllotaxis',
       'Live in this mode.',
       'Lights in phyllotaxis mode.'),
