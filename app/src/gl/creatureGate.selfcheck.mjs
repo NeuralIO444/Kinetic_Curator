@@ -7,6 +7,11 @@
 // traits, limb growth and dish hosting all exercised. Slice 1 moves spawning inside the resolver; this suite is
 // the contract that the move changed nothing: the fixture replays through the repiped resolver, unmodified,
 // every checkpoint. If it ever goes red, the slice stops — the fixture is never re-recorded to make it green.
+// (Checkpoint re-record, 2026-10-19, #1694 S3, Matt's ruling — the provenance file beside the fixture has the
+// full record: S3 made the count a BUILD layout param, the hashed output gained the `creatures` key, and all
+// 16 checkpoints moved. The fixture's INPUTS are still the pristine pre-repipe take, byte-identical; only the
+// checkpoint hashes were re-recorded, after proving the original checkpoints verify 16/16 on S3 code with the
+// key stripped. The contract below is unchanged: the recorded decisions in the take are the creatures.)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
