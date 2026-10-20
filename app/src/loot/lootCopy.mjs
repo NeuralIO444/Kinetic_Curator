@@ -71,4 +71,7 @@ export const LABELS = Object.freeze({
   starterHint: 'unzip it anywhere, add your files, then point at it (this browser reads it for one visit)',
   logTitle: 'ingest log',
   empty: 'nothing in the log yet',
+  // #1644 — the two storage truths the row now says out loud.
+  indexUnreadable: 'the saved loot index could not be read — starting fresh',
+  indexUnsaved: 'the index would not save on this machine — it will not survive a reload',
 });

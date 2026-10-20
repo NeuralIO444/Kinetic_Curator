@@ -21,19 +21,26 @@ export const emptyIndex = () => ({ v: 1, root: null, scannedAt: null, items: {},
 const num = (v) => (Number.isFinite(v) ? v : null);
 const str = (v, max) => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : null);
 
-/** A stored or received index as a clean one. Never throws; hostile or half-written JSON becomes the empty index. */
-export function sanitizeIndex(raw) {
-  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1) return emptyIndex();
+/**
+ * A stored or received index as a clean one — counted. Never throws; hostile or half-written JSON becomes the empty
+ * index. #1644: the tally says what the clean-up left behind (entries that could not be read, and entries past the
+ * caps), because applyPlan's own standard — "logged as skipped rather than silently dropped" — applies to the load
+ * path too. `sanitizeIndex` below stays the pure, tally-free face the reducers use.
+ */
+export function sanitizeIndexCounted(raw) {
+  const tally = { itemsUnreadable: 0, itemsOverflow: 0, logUnreadable: 0, logOverflow: 0 };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1) return { index: emptyIndex(), tally };
   const out = emptyIndex();
   out.root = str(raw.root, 1024);
   out.scannedAt = num(raw.scannedAt);
   const entries = raw.items && typeof raw.items === 'object' && !Array.isArray(raw.items) ? Object.entries(raw.items) : [];
-  for (const [id, it] of entries) {
-    if (Object.keys(out.items).length >= ITEMS_MAX) break;
-    if (!ID.test(id) || !it || typeof it !== 'object') continue;
+  for (let i = 0; i < entries.length; i++) {
+    const [id, it] = entries[i];
+    if (Object.keys(out.items).length >= ITEMS_MAX) { tally.itemsOverflow = entries.length - i; break; }
+    if (!ID.test(id) || !it || typeof it !== 'object') { tally.itemsUnreadable++; continue; }
     const segs = relSegments(it.rel);
     const hash = typeof it.hash === 'string' && HASH.test(it.hash) ? it.hash : null;
-    if (!segs || !hash || !KINDS.includes(it.kind)) continue;
+    if (!segs || !hash || !KINDS.includes(it.kind)) { tally.itemsUnreadable++; continue; }
     out.items[id] = {
       kind: it.kind, rel: segs.join('/'), size: num(it.size) ?? 0, mtimeMs: num(it.mtimeMs) ?? 0, hash,
       state: STATES.includes(it.state) ? it.state : 'ok',
@@ -43,14 +50,20 @@ export function sanitizeIndex(raw) {
     };
   }
   const log = Array.isArray(raw.log) ? raw.log : [];
-  for (const r of log) {
-    if (out.log.length >= LOG_MAX) break;
-    if (!r || typeof r !== 'object' || !OUTCOMES.includes(r.outcome)) continue;
+  for (let i = 0; i < log.length; i++) {
+    const r = log[i];
+    if (out.log.length >= LOG_MAX) { tally.logOverflow = log.length - i; break; }
+    if (!r || typeof r !== 'object' || !OUTCOMES.includes(r.outcome)) { tally.logUnreadable++; continue; }
     const rel = str(r.rel, 512);
-    if (!rel) continue;
+    if (!rel) { tally.logUnreadable++; continue; }
     out.log.push({ rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) });
   }
-  return out;
+  return { index: out, tally };
+}
+
+/** A stored or received index as a clean one. Never throws; hostile or half-written JSON becomes the empty index. */
+export function sanitizeIndex(raw) {
+  return sanitizeIndexCounted(raw).index;
 }
 
 const row = (rel, kind, outcome, reason = null) => ({ rel, kind: kind || null, outcome, reason });
@@ -118,12 +131,51 @@ export function countItems(index) {
 /** The plan's `prev` argument: just what lootScan reads. */
 export const asPrev = (index) => ({ items: sanitizeIndex(index).items });
 
-/** Load from a Storage-like. Never throws: private mode, a blocked or corrupt store is the empty index. */
-export function loadIndex(storage) {
+const zeroTally = () => ({ itemsUnreadable: 0, itemsOverflow: 0, logUnreadable: 0, logOverflow: 0 });
+const counted = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+
+/**
+ * Load from a Storage-like, saying what happened (#1644). Never throws. `status` separates the three truths the old
+ * loader folded into one empty index: 'empty' — nothing was ever stored; 'unreadable' — something WAS stored and
+ * could not be read (corrupt, the wrong version, or the store refused the read), so the empty index is a fresh
+ * start after a loss, not a first run; 'ok' — an index loaded. On 'ok', entries the sanitizer left behind are
+ * counted in `tally` and logged as skipped rows in the loaded index's own log — the same standard applyPlan keeps —
+ * so the trim is real AND has a record. The rows ride the saved index, so the loss is logged once, not per boot.
+ */
+export function loadIndexDetailed(storage) {
+  let raw = null;
   try {
-    const raw = storage && storage.getItem(LOOT_KEY);
-    return raw ? sanitizeIndex(JSON.parse(raw)) : emptyIndex();
-  } catch { return emptyIndex(); }
+    raw = storage && storage.getItem(LOOT_KEY);
+  } catch {
+    return { index: emptyIndex(), status: 'unreadable', tally: zeroTally() };
+  }
+  if (!raw) return { index: emptyIndex(), status: 'empty', tally: zeroTally() };
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return { index: emptyIndex(), status: 'unreadable', tally: zeroTally() };
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed) || parsed.v !== 1) {
+    return { index: emptyIndex(), status: 'unreadable', tally: zeroTally() };
+  }
+  const { index, tally } = sanitizeIndexCounted(parsed);
+  const rel = index.root || '';
+  const rows = [];
+  if (tally.itemsUnreadable) rows.push(row(rel, null, 'skipped', `${counted(tally.itemsUnreadable, 'stored item', 'stored items')} could not be read`));
+  if (tally.itemsOverflow) rows.push(row(rel, null, 'skipped', `${counted(tally.itemsOverflow, 'stored item', 'stored items')} over the cap, left out`));
+  if (tally.logUnreadable) rows.push(row(rel, null, 'skipped', `${counted(tally.logUnreadable, 'stored log row', 'stored log rows')} could not be read`));
+  if (tally.logOverflow) rows.push(row(rel, null, 'skipped', `${counted(tally.logOverflow, 'stored log row', 'stored log rows')} over the cap, left out`));
+  return {
+    index: rows.length ? { ...index, log: [...rows, ...index.log].slice(0, LOG_MAX) } : index,
+    status: 'ok',
+    tally,
+  };
+}
+
+/** Load from a Storage-like. Never throws. The detailed face above says whether an empty result is a first run or a loss. */
+export function loadIndex(storage) {
+  return loadIndexDetailed(storage).index;
 }
 
 /** Save; false when storage refused (quota, private mode). The scan result still stands in memory. */
