@@ -52,6 +52,24 @@ export const favoritesTrimCopy = (n) => (n === 1
   ? 'favorites full — the oldest favorite was let go'
   : `favorites full — the oldest ${n} favorites were let go`);
 
+/** #1642 — the load line: a stored shelf part that loses records on the
+ * way in says so once, at boot, on the shelf's own surface. `one`/`many`
+ * name the part ('keep'/'keeps'); loss is { dropped: n } for records the
+ * sanitizer left out, { unreadable: true } for a blob that could not be
+ * read at all (the reader quarantines its raw string first), or
+ * { refused: true } when storage would not hand the value over. */
+export const shelfLoadLine = (one, many, loss) => {
+  if (loss.refused) return `the stored ${many} could not be read — storage refused`;
+  if (loss.unreadable) return `the stored ${many} could not be read — the original was set aside`;
+  return loss.dropped === 1
+    ? `1 stored ${one} could not be read and was left out`
+    : `${loss.dropped} stored ${many} could not be read and were left out`;
+};
+
+/** #1642 — the save line: a persist storage refused speaks once per
+ * failure episode (the episode ends at the next successful save). */
+export const shelfSaveLine = (label) => `${label} did not save — storage refused the write`;
+
 /**
  * Spec §2.2: the collection's soft bound. In K1 it is soft in fact — past
  * it, keeps still land; the bound only becomes an export trigger in K3,
