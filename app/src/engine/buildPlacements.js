@@ -171,11 +171,14 @@ export function buildPlacements({
   audioEnergy = null,
   kineme = null,
   // #1574 — travel transport (P1, FLOW). Ephemeral per-frame input like
-  // kineme — NEVER in geometrySignature: { store, sceneId, frameMs, shed }.
-  // The mode/leash/strength are recipe data and ride layoutParams
-  // (transport / transportLeash / transportFlow). No travel input, mode
-  // 'still' or leash 0 → the pass never runs and the SoA is bit-identical
-  // to the pre-#1574 pipeline (the parity gate, engine/travel.selfcheck).
+  // kineme — NEVER in geometrySignature: { store, sceneId, frameMs, shed,
+  // ipadClass }. The mode/leash/strength are recipe data and ride
+  // layoutParams (transport / transportLeash / transportFlow). ipadClass
+  // (#1574 Q2) is the device class the governor's traveler budget reads —
+  // machine state from the resolver input, absent = desktop class = the
+  // P1 behaviour. No travel input, mode 'still' or leash 0 → the pass
+  // never runs and the SoA is bit-identical to the pre-#1574 pipeline
+  // (the parity gate, engine/travel.selfcheck).
   travel = null,
   // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
   // geoParams below and down to getSampler. Optional; null reads as '?'.
@@ -471,6 +474,7 @@ export function buildPlacements({
         sceneId: travel.sceneId ?? layerId,
         frameMs: travel.frameMs,
         shed: travel.shed,
+        ipadClass: travel.ipadClass, // #1574 Q2 — the traveler budget's device class (undefined = desktop)
       },
     }, stillMarks)
     : null;

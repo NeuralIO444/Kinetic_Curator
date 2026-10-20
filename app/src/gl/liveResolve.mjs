@@ -500,7 +500,12 @@ export function createLiveResolver() {
     const travelNowMs = input.loopTimeMs ?? 0;
     const travelFrameMs = travelLastMs == null ? 0 : Math.max(0, travelNowMs - travelLastMs);
     travelLastMs = travelLastMs == null ? travelNowMs : Math.max(travelLastMs, travelNowMs);
-    const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed };
+    // #1574 Q2 — the traveler budget's device class rides the same base:
+    // input.travelIpadClass is a MACHINE key (stamped by liveLoop from the
+    // device, recorded in a take's input log like every resolver input).
+    // Absent — every take recorded before Q2 — it reads false (desktop
+    // class), whose cap is the full placement cap: P1's behaviour exactly.
+    const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed, ipadClass: input.travelIpadClass === true };
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).

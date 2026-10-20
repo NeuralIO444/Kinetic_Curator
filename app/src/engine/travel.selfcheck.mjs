@@ -25,13 +25,21 @@
 //      2.0 ms creature-class allowance it shares the frame with.
 //   H. PARAMS — the recipe keys normalize/clamp/validate like every other
 //      layout param; a pre-#1574 document (no keys) opens still.
+//   I. Q2 BUDGET — the traveler budget (ruled 2026-10-20, governor-selected
+//      within a device-class cap): the selection is a pure function of
+//      recorded state (mark count + device class), the effective amount is
+//      at or below the authored ceiling and at or below the class cap in
+//      cost terms, non-travelers hold no state and present exactly at
+//      home, a budget shrink drops their state, the desktop class is P1
+//      bit-for-bit, and the selection's own cost is declared + measured.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { buildPlacements } from './buildPlacements.js';
 import {
   createTravelStore, pruneTravelStore, travelSceneSnapshot, applyTransport,
-  TRAVEL_STEP_SEC, TRANSPORT_MODES,
+  TRAVEL_STEP_SEC, TRANSPORT_MODES, selectTravelers, TRAVEL_COST_REFERENCE_MARKS,
 } from './kineme.js';
+import { TRAVEL_BUDGETS, travelBudgetForDevice } from '../data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, normalizeLayoutParams, validateLayoutParams } from '../data/layout-modes.js';
 import { nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS } from '../hooks/governorCuts.js';
 import { getCostTier } from './kernel/costRegistry.mjs';
@@ -313,4 +321,115 @@ const frameHash = (items) => createHash('sha256')
   console.log('travel.selfcheck H params: spec, clamp, enum and trust boundary all hold');
 }
 
-console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1)`);
+// ── I. Q2 — the traveler budget ──────────────────────────────────────────
+{
+  // The cap table lives with the other device budgets and reads honestly:
+  // desktop is the measured point, iPad is tighter, and each entry's timeMs
+  // is the traveler count's cost equivalence against the declared cost.
+  const declared = getCostTier('travel/flow');
+  assert.equal(TRAVEL_BUDGETS.desktop.maxTravelers, TRAVEL_COST_REFERENCE_MARKS, 'the desktop cap is the count the FLOW cost was measured at');
+  checks++;
+  assert.equal(TRAVEL_BUDGETS.desktop.timeMs, declared.timeMs, 'the desktop cap costs exactly the declared travel cost');
+  checks++;
+  ok(TRAVEL_BUDGETS.ipad.maxTravelers < TRAVEL_BUDGETS.desktop.maxTravelers, 'the iPad class is the tighter cap');
+  const perMark = declared.timeMs / TRAVEL_COST_REFERENCE_MARKS;
+  ok(Math.abs(TRAVEL_BUDGETS.ipad.timeMs - TRAVEL_BUDGETS.ipad.maxTravelers * perMark) < 1e-9,
+    'the iPad cap timeMs is its traveler count at the declared per-mark cost (a cost allowance, not a guess)');
+  assert.equal(travelBudgetForDevice(true), TRAVEL_BUDGETS.ipad);
+  assert.equal(travelBudgetForDevice(false), TRAVEL_BUDGETS.desktop);
+  assert.equal(travelBudgetForDevice(undefined), TRAVEL_BUDGETS.desktop, 'an absent class reads desktop (the pre-Q2 behaviour)');
+  checks += 3;
+
+  // The selection itself: at or below the authored ceiling (requested),
+  // at or below the class cap, and within the cap in cost terms.
+  const under = selectTravelers({ requested: 120, ipadClass: false });
+  assert.equal(under.travelers, 120, 'under the cap, the ceiling is honoured whole');
+  checks++;
+  const desk = selectTravelers({ requested: 5000, ipadClass: false });
+  assert.equal(desk.travelers, 800, 'the desktop selection caps at the placement cap');
+  checks++;
+  ok(desk.estimatedMs <= desk.budgetMs + 1e-12, 'the desktop selection spends at most the budget in cost terms');
+  const pad = selectTravelers({ requested: 5000, ipadClass: true });
+  assert.equal(pad.travelers, TRAVEL_BUDGETS.ipad.maxTravelers, 'the iPad selection caps at the iPad travelers');
+  checks++;
+  ok(pad.estimatedMs <= pad.budgetMs + 1e-12, `the iPad selection spends at most its budget (${pad.estimatedMs.toFixed(5)} ≤ ${pad.budgetMs} ms)`);
+  assert.equal(selectTravelers({ requested: 0, ipadClass: true }).travelers, 0);
+  assert.equal(selectTravelers({ requested: -5, ipadClass: true }).travelers, 0);
+  assert.equal(selectTravelers({ requested: NaN, ipadClass: true }).travelers, 0, 'a non-finite request selects nothing');
+  checks += 3;
+  // Purity / replay safety: identical recorded inputs → identical selection,
+  // every time (no clock, no live readings, no randomness anywhere near it).
+  for (let i = 0; i < 100; i++) assert.deepEqual(selectTravelers({ requested: 640, ipadClass: true }), selectTravelers({ requested: 640, ipadClass: true }));
+  checks++;
+  console.log('travel.selfcheck I budget table + selection: ceiling honoured, cap binds, cost terms hold, selection pure');
+
+  // The selection's own cost: declared at registration, measured here.
+  const bdecl = getCostTier('travel/budget');
+  ok(!!bdecl && bdecl.tier === 0 && bdecl.timeMs === 0, 'travel/budget is declared, tier 0, timeMs 0 (below the registry ms scale)');
+  const CALLS = 20000;
+  let acc = 0;
+  const t0 = performance.now();
+  for (let i = 0; i < CALLS; i++) acc += selectTravelers({ requested: 800, ipadClass: true }).travelers;
+  const perCallMs = (performance.now() - t0) / CALLS;
+  assert.equal(acc, TRAVEL_BUDGETS.ipad.maxTravelers * CALLS);
+  checks++;
+  ok(perCallMs < 0.005, `selection cost ${perCallMs.toFixed(6)} ms/call is far below the registry's ms currency`);
+  console.log(`travel.selfcheck I selection cost: ${(perCallMs * 1e6).toFixed(0)} ns/call over ${CALLS} calls (sandbox), once per scene/resolve`);
+
+  // Live through the real placement path, on the tighter class: an
+  // 800-mark FLOW scene travels only its first 500 instance indices.
+  const BIG = lp({ count: 800, transport: 'flow', transportLeash: 112, transportFlow: 0.8 });
+  const bigHomes = place(lp({ count: 800 }), null);
+  const bigHomeByIndex = new Map(bigHomes.map((it) => [it.index, it]));
+  const runBig = (ipadClass) => {
+    const store = createTravelStore();
+    const hashes = [];
+    let items = null;
+    for (let f = 0; f < 90; f++) {
+      items = place(BIG, { store, sceneId: 'big', frameMs: 1000 / 60, shed: false, ipadClass });
+      hashes.push(frameHash(items));
+    }
+    return { store, items, hashes };
+  };
+  const padRun = runBig(true);
+  const snap = travelSceneSnapshot(padRun.store, 'big');
+  ok(snap.states.length === TRAVEL_BUDGETS.ipad.maxTravelers, `exactly the budgeted travelers hold sim state (${snap.states.length})`);
+  ok(snap.states.every((s) => s.index < TRAVEL_BUDGETS.ipad.maxTravelers), 'travelers are the first instance indices, ascending');
+  let roamed = 0, homeExact = 0;
+  for (const it of padRun.items) {
+    const h = bigHomeByIndex.get(it.index);
+    const d = Math.hypot(it.x - h.x, it.y - h.y);
+    if (it.index < TRAVEL_BUDGETS.ipad.maxTravelers) { if (d > 0.5) roamed++; }
+    else if (it.x === h.x && it.y === h.y) homeExact++;
+  }
+  ok(roamed > 250, `the budgeted travelers actually roam (${roamed} moved)`);
+  ok(homeExact === 800 - TRAVEL_BUDGETS.ipad.maxTravelers, `every non-traveler presents exactly at home (${homeExact})`);
+  // Replay safety under the budget: a fresh run of the same recorded inputs
+  // lands on the same frames, bit for bit.
+  const padRun2 = runBig(true);
+  assert.deepEqual(padRun2.hashes, padRun.hashes, 'two fresh iPad-class runs: every frame identical');
+  checks++;
+  // The desktop class on the same scene is P1 exactly: every mark travels.
+  const deskRun = runBig(false);
+  const deskSnap = travelSceneSnapshot(deskRun.store, 'big');
+  ok(deskSnap.states.length === 800, 'desktop class: all 800 marks hold state (P1 behaviour)');
+  // Absent class (a pre-Q2 caller) is the desktop class, bit for bit.
+  const legacyRun = runBig(undefined);
+  assert.deepEqual(legacyRun.hashes, deskRun.hashes, 'no ipadClass on the travel input = the desktop run, bit for bit');
+  checks++;
+  console.log('travel.selfcheck I live: iPad class travels the budgeted subset, non-travelers at home, desktop/absent = P1');
+
+  // A budget shrink under a live scene drops the excess state and the
+  // excess marks present at home from that frame on.
+  const shrinkStore = createTravelStore();
+  for (let f = 0; f < 30; f++) place(BIG, { store: shrinkStore, sceneId: 'shrink', frameMs: 1000 / 60, shed: false, ipadClass: false });
+  ok(travelSceneSnapshot(shrinkStore, 'shrink').states.length === 800, 'the scene roams whole on desktop first');
+  const shrunk = place(BIG, { store: shrinkStore, sceneId: 'shrink', frameMs: 1000 / 60, shed: false, ipadClass: true });
+  const shrinkSnap = travelSceneSnapshot(shrinkStore, 'shrink');
+  ok(shrinkSnap.states.length === TRAVEL_BUDGETS.ipad.maxTravelers, 'the shrink drops state beyond the budget');
+  ok(shrunk.every((it) => it.index < TRAVEL_BUDGETS.ipad.maxTravelers || (it.x === bigHomeByIndex.get(it.index).x && it.y === bigHomeByIndex.get(it.index).y)),
+    'after the shrink, non-travelers present exactly at home');
+  console.log('travel.selfcheck I shrink: excess state dropped, excess marks home');
+}
+
+console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1 + Q2)`);

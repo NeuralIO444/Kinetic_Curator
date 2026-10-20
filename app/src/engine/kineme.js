@@ -19,7 +19,8 @@
 import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js';
 import { createNoise } from './noise.js'; // #1198 — ORGANIC rhythm samples this Perlin field
 import { ACCENT_OFFSET } from './kernel/color/index.js';
-import { registerCostTier } from './kernel/costRegistry.mjs'; // #1574 — the travel pass declares its cost like every module
+import { registerCostTier, getCostTier } from './kernel/costRegistry.mjs'; // #1574 — the travel pass declares its cost like every module
+import { travelBudgetForDevice } from '../data/quality.js'; // #1574 Q2 — the device-class traveler budgets live with the other device budgets
 
 /** Boil default: the classic hand-drawn rate (Matt decision 2). */
 /**
@@ -597,8 +598,11 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
 // reaches this code — buildPlacements gates on both — so an off scene
 // produces a bit-identical SoA to the pre-#1574 pipeline.
 // P1 ships FLOW only. PATH (P2) and SURGE (P3) are not built here.
-// Q2 (the traveler budget) is UNRULED: no budget mechanism is built —
-// every placed mark travels. See STAGING-REPORT.md.
+// Q2 (the traveler budget) was RULED 2026-10-20 — governor-selected within
+// a device-class cap — and its mechanism is built below (selectTravelers):
+// on the desktop class the cap is the full 800-mark placement cap, so a
+// desktop scene travels exactly as P1 built it; tighter classes travel a
+// deterministic subset. See STAGING-REPORT.md.
 
 /** The transport vocabulary: 'still' (the default — home is home) and 'flow'. */
 export const TRANSPORT_MODES = Object.freeze(['still', 'flow']);
@@ -737,6 +741,9 @@ const TRAVEL_BASE_XY = new WeakMap();
  *   sceneId,         // the scene identity half of the state key
  *   frameMs,         // spine-A frame time to accumulate (0 on a held frame)
  *   shed,            // governor travel shed: settle home, no drive
+ *   ipadClass,       // #1574 Q2 — the device class the traveler budget reads
+ *                    // (machine state, resolver input travelIpadClass);
+ *                    // absent/false = desktop class = the P1 behaviour
  * }
  * ctx also carries { seed, canvasW, canvasH } like the driver ctx.
  *
@@ -766,6 +773,23 @@ export function applyTransport(soa, ctx, still = null) {
   const flowRaw = Number(tr.flow);
   const flow = Number.isFinite(flowRaw) ? Math.min(1, Math.max(0, flowRaw)) : 0;
 
+  // #1574 Q2 — the governor's traveler selection for this scene: a FLOW
+  // scene requests travel for every placed mark (the authored ceiling);
+  // the selection is the effective amount the device-class budget affords.
+  // Marks are selected by instance index, ascending — the index is the
+  // identity the store already keys state by, so the selection is stable
+  // across placement rebuilds. A mark beyond the selection never travels:
+  // no state is created for it, and any state it already holds (the budget
+  // shrank under it — a class change, or a count change that moved the
+  // selection) is dropped, so it presents exactly at home, the 'still'
+  // parity position. On the desktop class the cap is the full placement
+  // cap (800), so nothing is pruned and the sim is P1's, bit for bit.
+  const nAll = soa.n | 0;
+  const travelers = selectTravelers({ requested: nAll, ipadClass: tr.ipadClass }).travelers;
+  if (travelers < nAll) {
+    for (const idx of [...sc.states.keys()]) if (idx >= travelers) sc.states.delete(idx);
+  }
+
   // Fixed-step accumulation on the spine-A clock: bank the frame time,
   // spend whole steps, never bank a spiral of death.
   const frameMs = Number(tr.frameMs);
@@ -788,6 +812,7 @@ export function applyTransport(soa, ctx, still = null) {
       for (let k = 0; k < n; k++) {
         if (still && still[k]) continue;
         const index = soa.index ? soa.index[k] : k;
+        if (index >= travelers) continue; // #1574 Q2 — beyond the budget: not a traveler, no state
         let s = sc.states.get(index);
         if (!s) { s = { ox: 0, oy: 0, vx: 0, vy: 0 }; sc.states.set(index, s); }
         if (!env.shed && flow <= 0 && s.ox === 0 && s.oy === 0 && s.vx === 0 && s.vy === 0) continue;
@@ -798,6 +823,7 @@ export function applyTransport(soa, ctx, still = null) {
   }
 
   // Present: home + offset. Nothing displaced → no undo, channels untouched.
+  // Non-travelers hold no state (pruned above), so they present at home.
   const n = soa.n | 0;
   let any = false;
   for (let k = 0; k < n; k++) {
@@ -837,6 +863,80 @@ registerCostTier('travel/flow', {
   memoryBytes: 0,
   timeMs: 0.39,
   notes: '#1574 P1 — FLOW transport: fixed-step curl-flow sim + leash on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+});
+
+// ── #1574 Q2 — the traveler budget: governor-selected within a device-class cap ──
+//
+// Ruled by Matt, 2026-10-20: the governor picks the scene's travel amount,
+// bounded by a hard per-device-class cap; the author sets the ceiling, not
+// the amount. The mechanism is THIS selection, and nothing else: there is
+// no panel control for it and no new surface — the Directors motion-group
+// controls stay exactly as P1 shipped them, and their values (transport /
+// transportLeash / transportFlow, plus the scene's mark count) are the
+// ceiling/request the selection reads.
+
+/** The mark count the travel/flow cost declaration was measured at (the
+ *  800-mark placement cap — see the registration above and quality.js). */
+export const TRAVEL_COST_REFERENCE_MARKS = 800;
+
+/**
+ * The governor's traveler selection: the EFFECTIVE number of a scene's
+ * placed marks that may travel.
+ *
+ *   travelers = min(requested, the device-class cap's maxTravelers)
+ *
+ * bounded in cost terms by construction: the cap's timeMs (quality.js
+ * TRAVEL_BUDGETS) is the desktop-measured cost equivalence of its traveler
+ * count against the declared travel/flow cost (0.39 ms at the 800-mark
+ * reference), so a scene at the selection spends at most
+ * travelers × (declared / reference) ≤ the class's timeMs of travel cost.
+ *
+ * Replay safety (the #1367 contract): the selection is a pure function of
+ * recorded/resolver state, and of nothing else —
+ *   requested:  the scene's placed-mark count — census/geometry state the
+ *               recipe dealt (applyTransport reads soa.n; a take's inputs
+ *               carry the layout params that deal it);
+ *   ipadClass:  the recording machine's device class, a MACHINE key (the
+ *               performanceFile doctrine: detail is per machine) carried
+ *               on the resolver input as travelIpadClass and recorded in
+ *               the take's input log like every resolver input; absent —
+ *               every pre-Q2 take — it reads as the desktop class, whose
+ *               cap is the full placement cap, i.e. P1's behaviour exactly.
+ * No wall-clock time, no live performance readings, no Math.random: the
+ * live-pressure mechanism remains the governor's cut 1.6 shed, unchanged.
+ * Same inputs → same selection, on any run, on any machine of the class.
+ *
+ * Runs once per scene per resolve (scalar arithmetic), never per mark per
+ * frame; applyTransport calls it beside its store lookup.
+ */
+export function selectTravelers({ requested, ipadClass } = {}) {
+  const req = Number.isFinite(requested) ? Math.max(0, Math.floor(Number(requested))) : 0;
+  const budget = travelBudgetForDevice(!!ipadClass);
+  const travelers = Math.min(req, budget.maxTravelers);
+  const declared = getCostTier('travel/flow');
+  const perMarkMs = declared && declared.timeMs > 0 ? declared.timeMs / TRAVEL_COST_REFERENCE_MARKS : 0;
+  return {
+    travelers,
+    requested: req,
+    capTravelers: budget.maxTravelers,
+    budgetMs: budget.timeMs,
+    estimatedMs: travelers * perMarkMs,
+  };
+}
+
+// The selection's own declared cost, per the house pattern. Tier 0 —
+// structural, like travel/flow: it is scalar arithmetic at the resolver's
+// scene seam, no GPU pass, and it sheds nothing itself (the budget is a
+// ceiling, not a rung). timeMs is 0 as the honest figure: the selection
+// measures in the low hundreds of ns per call in node (the travel suite
+// re-measures it on every run and prints it), below the registry's ms
+// currency; the budget's real cost control is the cap it enforces on
+// travel/flow's measured cost, declared above.
+registerCostTier('travel/budget', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes: '#1574 Q2 — the governor traveler selection (min of requested marks vs the device-class cap in data/quality.js TRAVEL_BUDGETS): scalar arithmetic once per scene/resolve, measured in the low hundreds of ns/call (sandbox node) — 0 is the honest figure at the registry\'s ms scale. Structural; the cost it controls is travel/flow\'s, declared above.',
 });
 
 /**
