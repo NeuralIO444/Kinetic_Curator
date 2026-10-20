@@ -77,6 +77,34 @@ lines.push(`- **Near-busts:** desktop — ${c.nearBusts.desktop.join(', ') || 'n
 const un = c.rows.filter((r) => r.desktop.verdict === 'unmeasured');
 lines.push(`- **Unmeasured in this environment:** ${un.length ? un.map((r) => `${r.id} (${r.failed || 'no label'})`).join('; ') : 'none'}`);
 lines.push('');
+
+// #1694 S2 — the creature citizen's families. Not recipes in the dataset: per-family cost
+// DECLARATIONS read from the cost registry (engine/kernel/costRegistry.mjs — the numbers live
+// there, never hard-coded here), judged against the creature allowance inside the frame
+// budgets (data/quality.js CREATURE_FRAME_ALLOWANCE_MS, spending from the iPad cap). The
+// declarations are resolver-CPU measurements at each family's population cap, sandbox-labelled
+// in the registry; the standing re-measurement proof is engine/kernel/creatureCost.selfcheck.mjs.
+const { allCostTiers } = await import('../src/engine/kernel/costRegistry.mjs');
+const { CREATURE_FRAME_ALLOWANCE_MS } = await import('../src/data/quality.js');
+const nearBustFrom = CREATURE_FRAME_ALLOWANCE_MS * FRAME_BUDGETS.ipad.nearBustRatio;
+const creatureVerdict = (ms) => (ms > CREATURE_FRAME_ALLOWANCE_MS ? 'BUST' : ms >= nearBustFrom ? 'near-bust' : 'ok');
+const familyRows = ['creature/moth', 'creature/dish'].map((id) => {
+  const d = allCostTiers().find((t) => t.id === id);
+  if (!d) throw new Error(`cost registry is missing the citizen family declaration '${id}'`);
+  return d;
+});
+lines.push('## Creatures — the citizen\u2019s families (registry declarations)');
+lines.push('');
+lines.push(`Allowance: **${fmt(CREATURE_FRAME_ALLOWANCE_MS, 2)} ms** at the population cap (near-bust from ${fmt(nearBustFrom, 2)} ms, the budgets' 80% rule).`);
+lines.push('');
+lines.push('| family | declared (ms) | share of allowance | verdict |');
+lines.push('|---|---|---|---|');
+for (const d of familyRows) {
+  lines.push(`| ${d.id} | ${fmt(d.timeMs, 2)} | ${fmt((d.timeMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(d.timeMs)} |`);
+}
+const combinedMs = familyRows.reduce((s2, d) => s2 + d.timeMs, 0);
+lines.push(`| both families at their own caps (conservative sum — the 4-pin cap means they cannot co-occur; the measured full stage is lower) | ${fmt(combinedMs, 2)} | ${fmt((combinedMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(combinedMs)} |`);
+lines.push('');
 lines.push('## Worked example');
 lines.push('');
 lines.push('<!-- Authored in the committed report: name the heaviest measured recipe, its label against');

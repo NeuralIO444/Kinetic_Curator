@@ -18,6 +18,7 @@ import { sanitizeMathMacros } from '../curator/mathMacros.js';
 import {
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
+  sanitizeAssetOptions,
   sanitizeQuality,
   sanitizePaletteLocks,
 } from './projectNormalize.js';
@@ -120,6 +121,10 @@ export function serializeProject(state) {
   // #1128 — assets pinned still (the living-motion floor skips them). Written only when set.
   const still = sanitizeAssetStill(state.assetStill);
   if (still) doc.assetStill = still;
+  // #1694 S2 — tile options (the citizen's family). Written only when set: a piece with no
+  // option touched exports exactly as before.
+  const assetOptions = sanitizeAssetOptions(state.assetOptions, overlay);
+  if (assetOptions) doc.assetOptions = assetOptions;
   // #1355 — wet-lab attach points, per asset. Written only when set.
   const attach = sanitizeAssetAttach(state.assetAttach);
   if (attach) doc.assetAttach = attach;
@@ -197,6 +202,7 @@ export function parseProject(raw) {
         assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
         regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
         assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
+        assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
         assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
         creatureCount: sanitizeCount(raw.creatureCount), // #1355
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
@@ -247,6 +253,7 @@ export function parseProject(raw) {
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
+      assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
       creatureCount: sanitizeCount(raw.creatureCount), // #1355
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790

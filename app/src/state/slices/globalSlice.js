@@ -9,6 +9,7 @@ import {
   normalizeSnapshots,
   sanitizeEnabledAssets,
   sanitizeAssetWeightOverrides,
+  sanitizeAssetOptions,
   sanitizeQuality,
   sanitizePaletteLocks,
   MAX_LAYERS,
@@ -34,6 +35,11 @@ import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../en
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
 const initialEnabledAssets = Object.fromEntries(DEFAULT_4_ASSETS.map((id) => [id, true]));
+// #1694 S2 — the creature citizen starts ENABLED in the default document: creatures were never
+// gated by this map (the artist's count alone governed them), so citizenship must not unbirth
+// them at rest. Only an explicit off — the tile toggle, or a solo of another asset — ever
+// writes `creature: false` (see curator/creatureCitizen.js for the resolver-side read).
+initialEnabledAssets.creature = true;
 
 /**
  * #1062 — a document's asset map, taken as the WHOLE set rather than an overlay
@@ -299,6 +305,10 @@ export const createGlobalSlice = (set) => ({
   regionKinemes: {},
   /** #1128 — { assetId: true }: assets pinned still. The living-motion floor (breath, drift) leaves their marks where they were placed. */
   assetStill: {},
+  /** #1694 S2 — { assetId: { key: choice } }: tile options a record declares (the creature citizen's
+   * `family`). Generic like assetKineme: written only when set (cycling back to the declared
+   * default removes the key), ridden by the document, read by the resolver off the input. */
+  assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   customAssets: [],
   ingestError: null,
@@ -414,6 +424,12 @@ export const createGlobalSlice = (set) => ({
   // the homes are published here as `dishPins`, which the resolver reads (so a take records them). Not set by hand.
   creatureCount: 0,
   setCreatureCount: (n) => set({ creatureCount: sanitizeCount(n) }),
+  /** #1694 S2 — the governor's creature shed: how many of the artist's creatures the governor is
+   * currently holding back. A render-only overlay in the perfClampOverride class — never
+   * serialized into a document; liveLoop stamps creatureCount − creatureShed on the resolver
+   * input. Restores whole when pressure clears (governorCuts' restore table). */
+  creatureShed: 0,
+  setCreatureShed: (n) => set({ creatureShed: Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0 }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) => set({
@@ -766,6 +782,29 @@ export const createGlobalSlice = (set) => ({
     return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW } };
   }),
 
+  /**
+   * #1694 S2 — cycle one declared tile option on an asset (the citizen's family). Fully generic,
+   * the assetKineme pattern: the record declares its options ({ key, choices, default }); this
+   * walks the choices and REMOVES the key when the cycle lands back on the default, so the map
+   * only ever holds what the artist actually set. Unknown assets, undeclared keys and
+   * single-choice options are no-ops.
+   */
+  cycleAssetOption: (assetId, key) => set((state) => {
+    const asset = findAsset(assetId, sanitizeOverlay(state.customAssets));
+    const opt = (asset && Array.isArray(asset.options) ? asset.options : []).find((o) => o && o.key === key);
+    if (!opt || !Array.isArray(opt.choices) || opt.choices.length < 2) return {};
+    const dflt = opt.default !== undefined ? opt.default : opt.choices[0];
+    const cur = (state.assetOptions && state.assetOptions[assetId] && state.assetOptions[assetId][key]) ?? dflt;
+    const idx = opt.choices.indexOf(cur);
+    const nextV = opt.choices[((idx < 0 ? 0 : idx) + 1) % opt.choices.length];
+    const forAsset = { ...(state.assetOptions && state.assetOptions[assetId] ? state.assetOptions[assetId] : {}) };
+    if (nextV === dflt) delete forAsset[key]; else forAsset[key] = nextV;
+    const assetOptions = { ...(state.assetOptions || {}) };
+    if (Object.keys(forAsset).length) assetOptions[assetId] = forAsset;
+    else delete assetOptions[assetId];
+    return { assetOptions };
+  }),
+
   setCategoryWeight: (category, weight) => set((state) => {
     if (!WEIGHT_CYCLE.includes(weight)) return {};
     const next = { ...state.assetWeightOverrides };
@@ -792,6 +831,8 @@ export const createGlobalSlice = (set) => ({
       autoQuality: doc.autoQuality !== false,
       // #264 — a fresh document owns its quality; any governor shed claim ends here.
       qualityShedFrom: null,
+      // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
+      creatureShed: 0,
       layoutParams: normalizeLayoutParams(doc.layoutParams),
       customAssets: sanitizeOverlay(doc.customAssets),
       ingestError: null,
@@ -829,6 +870,7 @@ export const createGlobalSlice = (set) => ({
     next.dishPins = [];
     next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
     next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
+    next.assetOptions = sanitizeAssetOptions(doc.assetOptions, next.customAssets) || {}; // #1694 S2 — a doc without tile options is all-defaults (citizen family: both)
     next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
     {
       const canvas = sanitizeCanvasSpec(doc);

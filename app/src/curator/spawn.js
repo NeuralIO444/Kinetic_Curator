@@ -65,9 +65,21 @@ export function marksOf(entries) {
  * @param marks     flat [x0, y0, x1, y1, …] of the placed marks (marksOf)
  * @param field     (x, y) => fertility 0..1 (formation.js fertilityField().at)
  * @param band      the stress band (null reads as NORMAL)
+ * @param weight    #1694 slice 2 — the citizen's pool weight (assetWeightOverrides.creature), the
+ *                  spawn-side analogue of how buildPlacements reads the same map for marks. Absent
+ *                  or 'medium' (the citizen's native weight): candidates rank nearest-the-centre
+ *                  first, exactly as before. 'heavy': within each search stage the citizen claims
+ *                  the STRONGEST ground first — qualifying candidates rank by fertility descending,
+ *                  ties by the centrality order. 'light': the MARGINAL ground first — fertility
+ *                  ascending, ties by centrality. The bias only re-ranks candidates inside a stage:
+ *                  the qualification bars, the stage widening, the separation gap and the standing
+ *                  homes are untouched, and homes already standing are never re-ranked — the weight
+ *                  speaks only when a NEW home is chosen. (The dish family's host is not chosen
+ *                  here: the host is the first FORMED pin, a formation rule — weight reaches it only
+ *                  through the order homes were claimed in. Plan §5 risk (iii) fallback.)
  * @returns [{x, y}] the homes, existing first, at most `count`
  */
-export function chooseHomes({ count, existing = [], marks = [], field, band = null, canvasW = 1000, canvasH = 700 }) {
+export function chooseHomes({ count, existing = [], marks = [], field, band = null, canvasW = 1000, canvasH = 700, weight = null }) {
   const want = sanitizeCount(count);
   const homes = existing.slice(0, want).map((p) => ({ x: p.x, y: p.y }));
   if (homes.length >= want || typeof field !== 'function') return homes;
@@ -103,13 +115,23 @@ export function chooseHomes({ count, existing = [], marks = [], field, band = nu
     if (homes.length >= want) break;
     const gap2 = (SPAWN_GAP * stage.gap * short) ** 2;
     const R = stage.region;
+    const weighted = weight === 'heavy' || weight === 'light';
     const cands = [];
     for (let y = R.y0 * H; y <= R.y1 * H + 1e-9; y += step) {
       for (let x = R.x0 * W; x <= R.x1 * W + 1e-9; x += step) {
-        if (qualifies(x, y)) cands.push({ x, y, d: (x - cx) ** 2 + (y - cy) ** 2 });
+        if (qualifies(x, y)) {
+          const c = { x, y, d: (x - cx) ** 2 + (y - cy) ** 2 };
+          if (weighted) c.f = clamp01(field(x, y)); // the ranking's key — read only on weighted searches
+          cands.push(c);
+        }
       }
     }
-    cands.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x); // nearest the centre first; ties in reading order
+    if (weighted) {
+      const dir = weight === 'heavy' ? -1 : 1; // heavy: strongest first · light: most marginal first
+      cands.sort((a, b) => (dir * (a.f - b.f)) || (a.d - b.d) || (a.y - b.y) || (a.x - b.x));
+    } else {
+      cands.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x); // nearest the centre first; ties in reading order
+    }
     for (const c of cands) {
       if (homes.length >= want) break;
       if (homes.every((h) => (h.x - c.x) ** 2 + (h.y - c.y) ** 2 >= gap2)) homes.push({ x: c.x, y: c.y });

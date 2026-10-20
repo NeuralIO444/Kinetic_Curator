@@ -65,6 +65,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_SEARCH, (q) => dispatch({ type: A.SET_SEARCH, payload: q }));
   on(Events.ASSETS_CAT_FILTER, (cat) => dispatch({ type: A.SET_CAT_FILTER, payload: cat }));
   on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
+  on(Events.ASSETS_OPTION_CYCLE, ({ id, key }) => dispatch({ type: 'CYCLE_ASSET_OPTION', id, key })); // #1694 S2
   on(Events.ASSETS_STILL_TOGGLE, ({ id }) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
   on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
   on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) => dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }));

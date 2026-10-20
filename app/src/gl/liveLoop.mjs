@@ -678,7 +678,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
       assetStill: s.assetStill, // #1128: assets the artist pinned still
-      creatureCount: s.creatureCount, // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there
+      creatureCount: Math.max(0, (s.creatureCount | 0) - (s.creatureShed | 0)), // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there · slice 2: net of the governor's creature shed (the overlay never writes the artist's count; a take records the count the frame actually ran with, so a shed frame replays shed)
+      assetOptions: s.assetOptions, // #1694 slice 2: tile options (the citizen's family) ride the input like assetStill — recorded in takes, replayed from takes
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take
       dishTraits: spawnDecisions ? spawnDecisions.dishTraits : [], // #1356 step 2: each moth's traits, shifted once at birth by Davis; recorded with the take
       dishLimbs: spawnDecisions ? spawnDecisions.dishLimbs : [], // #1355 step 5: pairs of wings per pin (the crowd decides); recorded with the take

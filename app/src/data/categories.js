@@ -9,4 +9,5 @@ export const EXPERIMENTAL_CATEGORIES = [
   'crystalline', 'biosynthetic', 'fragments', 'scanlines',
 ];
 
-export const ALL_CATEGORIES = [...CORE_CATEGORIES, ...EXPERIMENTAL_CATEGORIES];
+// 'creature' (#1694 slice 2): the pool citizen's category — its own filter chip in the pool panel.
+export const ALL_CATEGORIES = [...CORE_CATEGORIES, ...EXPERIMENTAL_CATEGORIES, 'creature'];

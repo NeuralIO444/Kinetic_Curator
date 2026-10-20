@@ -122,6 +122,17 @@ export function frameBudgetForDevice(ipadClass) {
   return ipadClass ? FRAME_BUDGETS.ipad : FRAME_BUDGETS.desktop;
 }
 
+/**
+ * The creature system's allowance inside the frame budgets above: 2.0 ms of the frame at the
+ * population cap (the skeleton-creature ruling, 2026-10-16; it spends from the iPad class's
+ * 5.0 ms render cap). Until #1694 slice 2 this number lived only in this file's prose and the
+ * design record; the citizen's cost declarations (engine/kernel/costRegistry.mjs, ids
+ * creature/moth and creature/dish) are judged against it by scripts/costBudgetReport.mjs —
+ * a family at ≥80% of it (FRAME_BUDGETS' nearBustRatio) is a near-bust. Read it here, never
+ * hard-code it at a call site.
+ */
+export const CREATURE_FRAME_ALLOWANCE_MS = 2.0;
+
 /** Caps used when RENDER · UNCAPPED is on — no interactivity to protect. */
 export const FINAL_CAPS = {
   id: 'final',

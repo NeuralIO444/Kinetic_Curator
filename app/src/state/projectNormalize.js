@@ -100,6 +100,36 @@ export function sanitizeAssetWeightOverrides(raw, customAssets = []) {
   return out;
 }
 
+/**
+ * #1694 S2 — tile options ({ assetId: { key: choice } }), the generic per-asset option map
+ * (the creature citizen's `family`). Validated against the options the record itself declares:
+ * unknown assets, undeclared keys and out-of-choices values are dropped, and a value equal to
+ * the declared default is dropped too — the map only ever holds what the artist actually set
+ * (the store's cycle removes the key on returning to the default, so a stored default is
+ * indistinguishable from a hand-forged one). Null when nothing survives.
+ */
+export function sanitizeAssetOptions(raw, customAssets = []) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const byId = new Map(ASSETS.map((a) => [a.id, a]));
+  for (const a of Array.isArray(customAssets) ? customAssets : []) {
+    if (a && typeof a.id === 'string') byId.set(a.id, a);
+  }
+  const out = {};
+  for (const [assetId, opts] of Object.entries(raw)) {
+    const rec = byId.get(assetId);
+    if (!rec || !Array.isArray(rec.options) || !opts || typeof opts !== 'object' || Array.isArray(opts)) continue;
+    const clean = {};
+    for (const opt of rec.options) {
+      if (!opt || typeof opt.key !== 'string' || !Array.isArray(opt.choices)) continue;
+      const v = opts[opt.key];
+      const dflt = opt.default !== undefined ? opt.default : opt.choices[0];
+      if (typeof v === 'string' && opt.choices.includes(v) && v !== dflt) clean[opt.key] = v;
+    }
+    if (Object.keys(clean).length) out[assetId] = clean;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
 /** Unknown quality ids fall back; a dangling key must never reach the caps lookup. */
 export function sanitizeQuality(raw, fallback = 'balanced') {
   return typeof raw === 'string' && QUALITY_PRESETS[raw] ? raw : fallback;
