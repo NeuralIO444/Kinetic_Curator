@@ -70,7 +70,8 @@ import { BAND_NORMAL, BAND_RELAX } from './stress.js';
 {
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(/const roomNow = \(\) => \{[\s\S]*?loisActivity\.snapshot\(\)[\s\S]*?roomWidthFromCodes\([\s\S]*?setRoomProvider\(roomNow\)/.test(app));
-  const live = readFileSync(new URL('./formationLive.js', import.meta.url), 'utf8');
+  // #1694 slice 1 — the birth's room read moved with the channel into the resolver-owned spawn state
+  const live = readFileSync(new URL('./spawnState.js', import.meta.url), 'utf8');
   assert.ok(/room: \(\) => \{ try \{ return roomProvider \? roomProvider\(\) : null; \} catch \{ return null; \} \}/.test(live), 'a broken room is no room, never a broken frame');
 }
 
