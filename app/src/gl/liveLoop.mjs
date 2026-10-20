@@ -27,9 +27,8 @@
 
 import { createLiveRenderer } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
-import { createLiveResolver } from './liveResolve.mjs';
+import { createLiveResolver, getLastSpawnDecisions } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
-import { getFormedPins, getLimbPairs, getPinTraits, getDishHosted, getDishPressure } from './resolveTap.mjs'; // #1355: which pins formed, how many wings each has, and its traits
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
@@ -636,6 +635,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
     }
 
+    // #1694 slice 1 — the spawn channel's decisions from the last resolved frame, published by the
+    // resolver itself (they ride this frame's input below, like every recorded decision).
+    const spawnDecisions = getLastSpawnDecisions();
     const resolved = resolver.resolveLayers({
       canvasW, canvasH,
       layers: s.layers,
@@ -676,12 +678,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
       assetStill: s.assetStill, // #1128: assets the artist pinned still
+      creatureCount: s.creatureCount, // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take
-      dishTraits: getPinTraits(), // #1356 step 2: each moth's traits, shifted once at birth by Davis; recorded with the take
-      dishLimbs: getLimbPairs(), // #1355 step 5: pairs of wings per pin (the crowd decides); recorded with the take
-      dishFormed: getFormedPins(), // #1355: which pins formed (decided from the previous frame); recorded, so a take replays its creatures
-      dishHosted: getDishHosted(), // #1634 slice 2: which pin hosts the dish creature (the first formed); recorded like the rest
-      dishPressure: getDishPressure(), // #1634 slice 3: each pin's dish pressure (0..1); the limb grows by it; recorded like the rest
+      dishTraits: spawnDecisions ? spawnDecisions.dishTraits : [], // #1356 step 2: each moth's traits, shifted once at birth by Davis; recorded with the take
+      dishLimbs: spawnDecisions ? spawnDecisions.dishLimbs : [], // #1355 step 5: pairs of wings per pin (the crowd decides); recorded with the take
+      dishFormed: spawnDecisions ? spawnDecisions.dishFormed : [], // #1355: which pins formed (decided from the previous frame); recorded, so a take replays its creatures
+      dishHosted: spawnDecisions ? spawnDecisions.dishHosted : [], // #1634 slice 2: which pin hosts the dish creature (the first formed); recorded like the rest
+      dishPressure: spawnDecisions ? spawnDecisions.dishPressure : [], // #1634 slice 3: each pin's dish pressure (0..1); the limb grows by it; recorded like the rest
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,
@@ -698,6 +701,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // use. mixSeconds<=0 means "instant", same as before.
       mixSeconds,
     });
+
+    // #1694 slice 1 — the homes write-back: the resolver's spawn state moved the standing homes on
+    // this frame (homesChanged — the exact condition App's frame tap used to write on), so the store's
+    // dishPins follow them and the next frame's input carries the new homes.
+    const spawnNow = getLastSpawnDecisions();
+    if (spawnNow && spawnNow.homesChanged) {
+      try { s.setDishPins(spawnNow.dishPins); } catch { /* store gone */ }
+    }
 
     // Node-count instrumentation (footer readout), store-owned.
     let nodes = 0;

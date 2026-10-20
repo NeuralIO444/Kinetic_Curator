@@ -3,13 +3,15 @@
 // rule forms moths, the crowd grows a second pair of wings, Davis shifts each moth at its birth and the moth hovers; write
 // the file, read it back, replay it through a fresh resolver, and every checkpoint matches the live run. Tampering with a
 // moth's traits (or its limbs) is caught: the creatures are in the take, not recomputed.
+// #1694 slice 1 — the session is wired as App + liveLoop wire it NOW: the resolver owns the spawn channel, observes its
+// own frames and publishes the decisions (getLastSpawnDecisions); the loop stamps them on the next frame's input, the
+// artist's count rides the input, and the homes are written back to the store's dishPins when they move. No frame tap,
+// no providers: a fresh resolver is a fresh channel.
 import assert from 'node:assert/strict';
-import { createLiveResolver } from './liveResolve.mjs';
-import { withResolveTap, setResolveTap, setResolveOutputTap, setFormedProvider, setLimbsProvider, setTraitsProvider, getFormedPins, getLimbPairs, getPinTraits } from './resolveTap.mjs';
+import { createLiveResolver, getLastSpawnDecisions } from './liveResolve.mjs';
+import { withResolveTap, setResolveTap, setResolveOutputTap } from './resolveTap.mjs';
 import { createPerformanceRecorder, verifyPerformance, packPerformance, unpackPerformance, createHashChain, CHECKPOINT_EVERY } from './performanceFile.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
-import { observeFormation, resetFormation, getFormedPins as liveFormed, getLimbPairs as liveLimbs, getPinTraits as liveTraits } from '../curator/formationLive.js';
-import { observeSpawn, resetSpawn } from '../curator/spawnLive.js';
 import { BAND_NORMAL } from '../curator/stress.js';
 import { FORM_HOLD_FRAMES } from '../curator/formation.js';
 import { LIMB_GROW_FRAMES } from '../curator/limbs.js';
@@ -17,18 +19,16 @@ import { LIMB_GROW_FRAMES } from '../curator/limbs.js';
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
 const FRAMES = 420;
 
-/** A live session wired as App + liveLoop wire it: the frame tap feeds the spawner and the formation rule, the providers
- *  hand their decisions to the NEXT frame's input, and the recorder sits on both taps. */
+/** A live session wired as App + liveLoop wire it: the resolver's spawn state decides, the loop stamps the
+ *  publication on the next frame's input, and the recorder sits on both taps. */
 function session({ count = 2, seed = 4242 } = {}) {
-  resetFormation(); resetSpawn();
-  setFormedProvider(liveFormed); setLimbsProvider(liveLimbs); setTraitsProvider(liveTraits);
   const recorder = createPerformanceRecorder();
   const resolver = withResolveTap(createLiveResolver);
   setResolveTap((i) => recorder.onInput(i));
   setResolveOutputTap((o) => recorder.onOutput(o));
   const chain = createHashChain();
   const liveHashes = [];
-  let pins = []; // the store's dishPins, written by the spawner
+  let pins = []; // the store's dishPins, written by the loop when the homes move
   const stable = {
     canvasW: 1000, canvasH: 700, layers: [L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seedOffsets: null,
     paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
@@ -40,20 +40,21 @@ function session({ count = 2, seed = 4242 } = {}) {
   let t = 0; let last = null;
   for (let f = 0; f < FRAMES; f++) {
     t += 16.7;
+    const d = getLastSpawnDecisions(); // the previous frame's decisions, as the loop reads them
     const input = {
-      ...stable, seed, loopTimeMs: t, dtSec: 1 / 60,
-      dishPins: pins, dishFormed: getFormedPins(), dishLimbs: getLimbPairs(), dishTraits: getPinTraits(),
+      ...stable, seed, loopTimeMs: t, dtSec: 1 / 60, band: BAND_NORMAL, smoothed: 0.5, creatureCount: count,
+      dishPins: pins,
+      dishFormed: d ? d.dishFormed : [], dishLimbs: d ? d.dishLimbs : [], dishTraits: d ? d.dishTraits : [],
+      dishHosted: d ? d.dishHosted : [], dishPressure: d ? d.dishPressure : [],
     };
     const out = resolver.resolveLayers(input);
     chain.push(out); liveHashes.push(chain.value());
-    // the frame tap, as App wires it
-    observeFormation(input, out, () => BAND_NORMAL);
-    const homes = observeSpawn(input, out, { count, formed: liveFormed(), band: BAND_NORMAL });
-    if (homes) pins = homes;
+    // the loop's homes write-back: the store's dishPins follow when the resolver's homes move
+    const nd = getLastSpawnDecisions();
+    if (nd && nd.homesChanged) pins = nd.dishPins;
     last = out;
   }
   setResolveTap(null); setResolveOutputTap(null);
-  setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null);
   resolver.dispose();
   const creature = last.flatMap((e) => (e.items || []).filter((i) => i._creature));
   return { perf: recorder.finish(), liveHashes, pins, creature };
@@ -89,9 +90,17 @@ const { perf, liveHashes, pins, creature } = session();
 // 3. the creatures are in the take, not recomputed: edit a moth's traits, or its limbs, and the replay says so
 {
   const forged = JSON.parse(JSON.stringify(perf));
-  const i = forged.inputs.steps.findIndex((s, f) => f > 0 && s.k && Array.isArray(s.k.dishTraits) && s.k.dishTraits.some(Boolean));
-  assert.ok(i > 0);
-  const k = forged.inputs.steps[i].k.dishTraits.findIndex(Boolean);
+  // The tamper target is a MOTH's traits: the birth step records every pin's traits together with the
+  // hosting verdict, and the hosted pin's belong to the dish creature — stamped once at its birth, and
+  // `spread` is a wing trait its body never reads. The moth reads its traits every frame.
+  let i = -1; let k = -1;
+  for (let f = 1; f < forged.inputs.steps.length && i < 0; f++) {
+    const s = forged.inputs.steps[f];
+    if (!s.k || !Array.isArray(s.k.dishTraits) || !Array.isArray(s.k.dishHosted)) continue;
+    const pin = s.k.dishTraits.findIndex((tr, p) => !!tr && !s.k.dishHosted[p]);
+    if (pin >= 0) { i = f; k = pin; }
+  }
+  assert.ok(i > 0 && k >= 0, 'a step records a moth\u2019s traits beside the hosting verdict');
   forged.inputs.steps[i].k.dishTraits[k].spread += 6;
   const v = verifyPerformance(forged);
   assert.equal(v.ok, false, 'a changed trait is caught');

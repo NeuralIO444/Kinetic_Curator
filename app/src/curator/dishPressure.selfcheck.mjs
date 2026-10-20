@@ -115,8 +115,11 @@ const ring = (cx, cy, n, r) => Array.from({ length: n }, (_, i) => ({ x: cx + r 
   const src = readFileSync(new URL('./dishPressure.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(src));
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
-  // #1355 step 3: the one frame tap feeds dish pressure, then the formation rule (the clock, #1458, also rides it)
-  assert.ok(/setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeDish\(input, output\);[\s\S]*?observeFormation\(input, output\);/.test(app) && /getDish: getDishPressure/.test(app), 'App feeds dish pressure to the stress tracker');
+  // #1355 step 3: the one frame tap feeds dish pressure (the clock, #1458, also rides it). #1694 slice 1:
+  // the formation rule is fed by the resolver now — it counts this same pressure inside its own observe,
+  // from the frame's own output — so the pin follows the rule to its new home.
+  assert.ok(/setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeDish\(input, output\);/.test(app) && /getDish: getDishPressure/.test(app), 'App feeds dish pressure to the stress tracker');
+  assert.ok(/pinPressures\(pins, output/.test(readFileSync(new URL('./spawnState.js', import.meta.url), 'utf8')), 'the resolver-owned channel counts the pressure per pin');
 }
 
 console.log('dishPressure.selfcheck: ok (#1355 step 2, dish pressure)');
