@@ -65,13 +65,32 @@ test('with less motion he does not turn, and the label still says what he is doi
   await ctx.close();
 });
 
-test('the panel fits without a scroll at common window heights, and the room closes it', async ({ page }) => {
+// Reachability (Matt's ruling, 2026-10-20, PR #1714): the Davis panel MAY scroll.
+// #1576's surge + parallax sliders took the body past its box at short window heights
+// (540 in 484 at 1280x720); rather than crush the panel or move the ruled controls,
+// the body scrolls — it has been overflow-y:auto all along — and the contract becomes:
+// the body really is a scroller, and its last section can be scrolled fully into view.
+// (Supersedes the no-scroll fit premise of #1604/#1713 for this panel; those margin
+// repairs stay in the CSS — they bought real headroom at taller windows.)
+async function lastSectionReachable(page) {
+  return page.locator('.davis-body').evaluate((el) => {
+    if (getComputedStyle(el).overflowY !== 'auto') return { ok: false, why: 'the body is not a scroller' };
+    el.scrollTop = el.scrollHeight;
+    const last = el.lastElementChild;
+    if (!last) return { ok: false, why: 'the body is empty' };
+    const bodyBox = el.getBoundingClientRect();
+    const box = last.getBoundingClientRect();
+    return { ok: box.bottom <= bodyBox.bottom + 1 && box.top >= bodyBox.top - 1, why: `the last section stops ${Math.round(box.bottom - bodyBox.bottom)}px past the fold` };
+  });
+}
+
+test('the panel scrolls: the room closes it and stays reachable at common window heights', async ({ page }) => {
   for (const [w, h] of [[1280, 720], [1366, 768], [1280, 800], [1440, 900]]) {
     await page.setViewportSize({ width: w, height: h });
     await boot(page);
-    const fit = await page.locator('.davis-body').evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight }));
-    expect(fit.scroll, `${w}x${h}: content ${fit.scroll} in ${fit.client}`).toBeLessThanOrEqual(fit.client + 1);
     await expect(page.locator('.panel-davis .davis-section-label').last()).toHaveText('the room');
+    const reach = await lastSectionReachable(page);
+    expect(reach.ok, `${w}x${h}: ${reach.why}`).toBe(true);
   }
 });
 
@@ -92,14 +111,14 @@ test('the room: both in a state, each says the matrix line and the strip names t
   expect(await page.locator('.directors-duel button, .directors-duel [role="button"]').count()).toBe(0); // still only a readout
 });
 
-test('with the room talking the panel still fits without a scroll', async ({ page }) => {
+test('with the room talking the panel still scrolls and the duel stays reachable', async ({ page }) => {
   for (const [w, h] of [[1280, 720], [1366, 768], [1280, 800]]) {
     await page.setViewportSize({ width: w, height: h });
     await boot(page);
     for (let i = 0; i < 3; i++) { await curator(page).click(); await page.waitForTimeout(120); }
     await page.keyboard.press('f');
     await expect(page.locator('.duel-verdict')).toBeVisible();
-    const fit = await page.locator('.davis-body').evaluate((el) => ({ client: el.clientHeight, scroll: el.scrollHeight }));
-    expect(fit.scroll, `${w}x${h}: content ${fit.scroll} in ${fit.client}`).toBeLessThanOrEqual(fit.client + 1);
+    const reach = await lastSectionReachable(page);
+    expect(reach.ok, `${w}x${h}: ${reach.why}`).toBe(true);
   }
 });
