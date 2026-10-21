@@ -76,3 +76,18 @@ travel keys echo in the hashed resolver output (see the replayGate provenance no
 of the same date). Control: the same refresh on clean main `307253a7` reproduces
 main's fixture byte-for-byte (sha256 e54eab5d…); the branch refresh is
 deterministic (two runs, identical sha256).
+
+## 2026-10-21 — #1356 publish finish: F1/F2 checkpoint re-record (Matt's re-record ruling)
+
+The finishing look pass landed the layered part-pool art (F1, both creature
+families) and the dish accent split (F2). Resolver items embed the full asset
+record, so every take drawing the enriched parts rehashes: this fixture's
+recorded INPUTS are untouched (deep diff: inputs byte-identical; 15 of 16
+checkpoint hashes re-stamped, checkpoint 0 stands — frame 0 precedes any
+creature draw; nothing else changed). sha256 046638ae… → 8500ab22… (17764
+bytes). Control: the same refresh on clean main `bd9a181d` reproduces main's
+fixture byte-for-byte; the branch refresh is deterministic (two runs,
+identical sha256), and the #1718 refresh tool and the verify-mirror refresh
+agree byte-for-byte. A first re-record staged 2026-10-20 against the
+pre-travel fixture was superseded by the publish rebase and re-done here; the
+staged dish-golden re-pins (dishCreature suite) reproduced exactly.

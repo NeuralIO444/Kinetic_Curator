@@ -1,90 +1,319 @@
-# STAGING REPORT — #1490 STIMULI: FX feedback warp (spectral path P4) (LOCAL ONLY — no push, no PR)
+# STAGING REPORT — #1356: the finishing look pass, both creature families (LOCAL ONLY — no push, no PR)
 
-Branch: `ember/1490-feedback-warp` (local only — not pushed, no PR)
-Base: verified stack tip `6f6fc387` (travel P1–P3 + the three reads)
-(This file replaces the #1627 staging report at the worktree root; theirs remains in git history — the stack convention.)
+Branch `ember/1356-finishing-look-pass`, base = origin/main `6946f393` (chain-independent
+stage, per ruling). This file replaces the S3 staging report at the worktree root; S3's
+remains in git history on main. Date: 2026-10-20.
 
-**What was built:** the MilkDrop move from #1482's decision 5, as its own stage. The FX strata read the spectrum and the previous-frame feedback (the ACCUM recipe — the instrument's only previous-frame machinery) is warped by the music: **zoom from bass deviation** (the core's relative mode), **rotation from attenuated mids** (MilkDrop's `mid_att`), **decay mapped into 0.92–0.985**, **treble to chromatic aberration (prism) and grain** (the glow pass's stipple/chroma, lifted headroom-relative). One new pure module, one new FX item kind as the amount's address, one governor rung, and a three-line seam in the live loop's ACCUM step. No new panels (the item rides the existing FX rack editor), no new layout key, no contract key, no extra render pass.
+## Bottom line
 
----
+- **Shipped (presentation layer only):** the engraving finish gains its second body-space
+  line family — the longitudinal **SEAMS** the creature-system plan names (§1.3: lines of
+  constant "along" are seams), in `app/src/engine/engraveBody.mjs`, JS mirror and GLSL in
+  lockstep. The moth body goes from contour-only line work to a contour × seam crosshatch.
+  No resolver output moves: packed per-instance data is unchanged, no key was added
+  anywhere, and all three pin suites pass unmodified.
+- **The both-family layered part art is a FORK, not shipped — with the mechanism proven,
+  not asserted.** Resolver items embed the full asset record (`item.asset` — the SVG
+  string and the baked regions), and the replay/creature gates hash the whole resolver
+  output. Any part-art change therefore rehashes every recorded take that draws the part,
+  and re-recording a pin needs Matt's ruling (the S3 precedent). The designed art was
+  built, verified against both guardrails (attach points and governor cost scores
+  bit-identical), rendered as previews, and then reverted. Forks F1/F2 below specify it
+  exactly; one ruling lands both.
+- **Honest placement against "very layered":** the shipped build closes the engraving
+  half of the finishing pass — the body finish is now two line families, still not the
+  Haeckel density of the reference plates. The layered wings/fan/dish bodies exist as
+  designed, guardrail-verified, previewed art in fork F1 (+F2 for the dish). This report
+  does not claim the "not Davis moths yet" gap is closed; it stages its closing behind
+  one pin ruling, with the eye evidence attached.
 
-## The core — `app/src/gl/spectrumWarp.mjs` (new)
+## What was built, per family
 
-- **`createSpectrumWarp()`** — the driver. Owns a per-bin attenuated state (`att`, 128 Float32 bins) stepped from the spectrum core's `smooth` levels with one frame-rate-independent exponential per bin (τ = 600 ms, the core's own coef form, dt clamped 0..200 ms like the core, silence snapped to exactly 0 with the core's SNAP). Derives per frame: `bassDev` (mean of the core's per-bin `rel` over the bass bins — centres < 250 Hz, the meter's sub+bass edges — **gated on bass actually sounding**: silent bass reads deviation 0, so a stale 6 s average can never hold the zoom off identity), `attMids` (500–2000 Hz), `attTreble` (≥ 4000 Hz), `attAll`, and `keep` = 0.92 + 0.065 × attAll.
-- **`applySpectrumWarp(p, warp, amount)`** — the recipe combinator, sibling of `accum.applyAudioEnvelope` with the same contract (pure; null/zero amount returns the input field-for-field). Zoom and spin **add** onto the recipe's own transform (the artist's TUNNEL slider and the band envelope keep their say), decay **blends** keep toward the warp target by amount, treble lifts prism (≤ +0.0015 UV) and grain (optics lifted headroom-relative, recomputed through accum's `opticsDerived` — exported from accum.mjs for this, its only change there). Hard clamps: zoom ∈ [0.95, 1.05], spin ∈ [−0.05, 0.05], prism ∈ [0, 0.004], keep ∈ [0, 0.99]; `assertRecipeFinite` passes on hostile inputs.
-- **`feedbackWarpAmount(layers, shed)`** — the amount's read: the largest `feedbackWarp` amount among visible FX layers, 0 when absent/0/hidden/shed, fail-closed on junk.
+### Field-formed moth line — SHIPPED: engraving seams
 
-**Per-bin smoothing proof (suite §B):** the attenuated state is per bin and private to this pass — a hot bin's neighbours stay **exactly 0** after repeated steps (a block-smoothed variant, computed inline in the suite, leaks and would fail); an alternating hot/silent bin pattern survives 30 frames; the core's state arrays are byte-unchanged after a step (read, never written — spectrumMarks and every other consumer still see the unsmoothed analysis); 2×50 ms ≡ 1×100 ms to Float32 storage.
+- `engraveBody.mjs`: the field now tracks the signed lateral distance (`bestLat`) of the
+  closest spine point alongside the arc position it already tracked. Two seams at fixed
+  lateral offsets `ENGRAVE_SEAM_OFFSETS = [5.5, 11]` (asset units) are drawn at
+  `ENGRAVE_SEAM_REL = 0.55` of the contour strength, sharing the contour line width and
+  the same end fade: `lineAll = max(line, seam * 0.55)`. Because the seams are level sets
+  of the spine's lateral frame, they bend with the spine exactly as the contours do
+  (proven on a bent path in the new suite).
+- JS mirror (`engraveFactorAt`) and the GLSL chunk (`ENGRAVE_GLSL`, inlined into the
+  shared quad shader) carry the same constants — parity asserted in the new suite, the
+  S4 pattern. The caller gate is unchanged: only engraved instances enter the branch,
+  and exactly one item per moth is engraved (the true body stamp, not its halo).
+- On-spine probes are the S4 field exactly (contour centre dark, between contours
+  untouched — no seam reaches the spine), and the S4 packed-data golden `59289882`
+  stands: `engraving.selfcheck` passes untouched, golden included.
 
-**Relax-to-neutral (suite §C/D):** at silence the driver returns bassDev 0, att* exactly 0, keep exactly 0.92 — so `applySpectrumWarp` at full amount changes **only** keep (blended to the band floor): identity warp, decay only, never frozen mid-zoom, exactly the brief's neutral.
+### Dish family — no shipped visual change, and the reason is evidence, not omission
 
-## The address — why there is no dial and no new key
+- The dish discs' interior detail cannot render today: `dishCreature.js` stamps every
+  body/limb item with `accent === colour`, and within-asset detail marks read the accent
+  slot — with the two slots equal, detail is invisible no matter what art the disc
+  carries. Proof on the bench: the dish rendered with fork F1's enriched disc art but
+  without the accent split was **pixel-identical** to the before render.
+- The shipped build therefore changes nothing on the dish path, and pins the contract
+  instead: the new suite asserts `accent === colour` on real dish items, so fork F2's
+  PR must change that contract deliberately, in the open.
+- The dish's finishing layer is fully designed and previewed under forks F1+F2
+  (`renders/fork-dish.png`): concentric strata rings + pore ticks on the disc, visible
+  only once the accent split lands.
 
-The amount lives on the FX stratum's existing item-param surface: an FX layer effect `{ kind: 'feedbackWarp', params: { amount } }` (`app/src/fx/fxFilters.js`: catalog entry with amount 0..1 def 0, EF-2 Distort rack slot, add-menu, `KIND_FACE` in efRackTile). Consequences, all suite-proven (§A):
+### Both families — the fork guardrails, pinned in a new suite
 
-- **Off-state documents never serialize it** — no `DEFAULT_LAYOUT_PARAMS` entry (asserted), `normalizeLayoutParams({})` invents nothing (asserted), and a scene contract built without the item contains no warp string at all (asserted). The key exists only inside a document that carries the item, where FX params have always lived.
-- **No extra pass** — the kind registers **no GL shader** (`compileFxShaders` returns [] for it, asserted) and its SVG builder is the identity pass-through (asserted), with the live-only limit stated on the item, in the builder, and here: a baked export has no live spectrum to warp by — the spectrum COLOUR precedent (spectral-path.md P3). The warp's shader surface is the accum fade pass's *existing* transform branch, fed new uniform values.
-- **Cost id** — `hooks/sceneCost.js` maps the kind to `gl/spectrum-warp` (its suite's both-ways coverage now passes; the suite's registration imports gained the module, its own stated convention).
+`app/src/engine/finishingLook.selfcheck.mjs` (new; registered in `app/selfcheck.manifest`,
+append-only) covers:
 
-## The live seam — `app/src/gl/liveLoop.mjs` (3 touch points)
-
-1. One driver instance per loop (beside the ACCUM session state).
-2. In `buildFrame`, beside the spectrum-marks read: `feedbackWarp = feedbackWarpAmount(s.layers, !!s.feedbackWarpShed)`, carried on the frame object like `accumAudio`.
-3. In the ACCUM step, after `applyAudioEnvelope`: `if (feedbackWarp > 0) rp = applySpectrumWarp(rp, warpDriver.step(readSpectrum(), clampedDtMs), feedbackWarp);`
-
-Amount 0 never steps the driver and never touches the recipe. The warp's only audio input is `readSpectrum()` — the spectrum core's state, which during a take is stepped from the recorded section by spectrumLive's playback path. **Determinism proof (suite §E):** a 240-frame analysis sequence warps identically across two fresh core+driver runs (exact deepEqual), and the take's path end-to-end — record 32-bin rows the way the take does (`quantizeSpectrum`), play them back through the real `beginSpectrumPlayback`/`stepSpectrumPlayback`/`readSpectrum` calls — produces an identical warp sequence on two independent playbacks, with the warp demonstrably live in playback (keep leaves the floor).
-
-## Shed placement — cut 1.45, and why the laws all hold
-
-Final governor order around the new rung: … renderScale (1) → **markWeather (1.4)** → **feedbackWarp (1.45)** → **creatureCount (1.5)** → travel (1.6) → quality (2) …
-
-- "Sheds before body counts" — the warp (1.45) precedes the creature count (1.5) and the count clamp (5). ✔
-- "Weather still dies before marks" — cut 1.4 is untouched and still precedes the warp; the warp is a finish, weather is the finer sacrifice. ✔
-- "Creature count still sheds at 1.5" — its rung, code and label are unmoved; 1.45 slots *before* it without renumbering anything. ✔
-
-Suite §F walks the full ladder under pressure and pins the sequence `[renderScale ×3, markWeather, feedbackWarp, creatureCount, creatureCount, travel, …]`. The rung is opt-in (`feedbackWarpActive`: item up + ACCUM on + not perfTier1 — no feedback buffer, no warp to shed), so callers that never raise it walk the pre-#1490 ladder exactly (asserted). Wiring: `feedbackWarpShed` overlay in `state/slices/globalSlice.js` (+ doc-load reset in `applyProject`, the other rungs' pattern), hook wiring in `usePerformanceGovernor.js` (active/shed/restore + deps), restore-table entry in `governorCuts.js`, badge line `feedback warp off` in `shedSummary`. **Event log:** `feedbackWarp` is not in `SHED_STEPS` — the table is known-incomplete (it also lacks 1.4/1.5/1.6) and was **not** "fixed"; the hook's existing guarded pattern (`recordCutEvent` drops kinds the log doesn't know) covers the new kind, the suite asserts the guard and both hook cases are present in the source, and the shed/restore/badge all happen regardless.
-
-## Cost
-
-Registered at the module: `gl/spectrum-warp`, **tier 1**, memoryBytes 0 (no pass, no texture, no FBO — four uniforms' worth of numbers into a recipe that already runs). `timeMs` declared 0.01, erring up: the CPU step **measured 0.002–0.003 ms/step** (per-step hrtime, median of 7 runs of 2000-step medians over a hot state, sandbox node 2026-10-20 — at timer resolution, so the honest statement is "a few microseconds"; the suite benches and prints it every run, asserting only the declared class). iPad: the step is 128 exponentials + 3 band means; the GPU increment is zero; the rung sheds it before the population under pressure.
-
-## Byte-identity proof (the headline acceptance)
-
-The three pin suites were run before and after this stage, untouched and un-re-recorded:
-
-| suite | before (base tip `6f6fc387`) | after this stage |
-|---|---|---|
-| `engine/wingWarp` | FAIL — resolver rest pin: actual `dfb2915f` vs pinned `dc0897fb` | FAIL — **actual still exactly `dfb2915f`** |
-| `gl/replayGate` | FAIL — firstMismatchFrame actual 0 | FAIL — **actual 0, same assertion, same shape** |
-| `gl/creatureGate` | FAIL — firstMismatchFrame actual 0 | FAIL — **actual 0, same assertion, same shape** |
-
-The failures are the inherited travel-key state from the brief; this stage moved none of them by a byte. Structural reasons, suite-asserted in §A: no layout default key, no contract key, no recipe key, no FX chain step, and the recipe combinator is a field-for-field identity at amount 0 / null warp.
+1. **F1 guardrails at pre-pass values** — for the seven part assets both families are
+   skinned from (`org_pod_02` moth body, `org_leaf_02` wing, `org_petal_02` /
+   `org_petal_01` / `org_pod_01` fan, `geo_chev_01` chevron ornament, `org_blob_01` dish
+   disc): the auto-attach points (anatomy) and the governor cost score
+   (`assets/ingest.js assetCostScore`, the `assetThin` ranking input in
+   `gl/liveResolve.mjs`) are pinned to their pre-pass values. The fork's designed art
+   was measured passing both before it was reverted (the suite passes on today's art;
+   the fork PR re-runs it against the new art).
+2. **The seam behaviour** above, including GLSL/JS constant parity.
+3. **F2's dish contract** (`accent === colour`), as described.
 
 ## Files touched
 
-**New:** `app/src/gl/spectrumWarp.mjs`, `app/src/gl/spectrumWarp.selfcheck.mjs` (88 checks), `STAGING-REPORT.md` (this file, replacing #1627's per stack convention).
+| File | Change |
+|---|---|
+| `app/src/engine/engraveBody.mjs` | Seam line family (JS + GLSL), header note. |
+| `app/src/engine/finishingLook.selfcheck.mjs` | New suite (above). |
+| `app/selfcheck.manifest` | One appended line registering the new suite. The `package.json` selfcheck script untouched. |
+| `renders/` | Paired-render evidence (below). |
+| `STAGING-REPORT.md` | This report. |
 
-**Edited:** `app/src/gl/accum.mjs` (`opticsDerived` exported + comment — nothing else), `app/src/gl/liveLoop.mjs` (imports, driver, frame field, gated accum-step seam), `app/src/fx/fxFilters.js` (kind def, EF-2 slot, menu, identity SVG builder), `app/src/fx/efRackTile.mjs` (tile face), `app/src/hooks/governorCuts.js` (cut 1.45 + restore + badge), `app/src/hooks/usePerformanceGovernor.js` (rung wiring + log-guard comment extended to 1.45), `app/src/state/slices/globalSlice.js` (`feedbackWarpShed` overlay + doc-load reset), `app/src/hooks/sceneCost.js` (kind → `gl/spectrum-warp`), `app/selfcheck.manifest` (1 line appended — package.json untouched).
+(Code + manifest diff vs base: 37 insertions / 4 deletions.) Nothing else: no asset
+SVGs, no region bakes, no fixtures, no panels, no resolver or builder code, no new
+recipe/layout keys (no `DEFAULT_LAYOUT_PARAMS` or normalize lines — there is nothing
+for a strip proof to strip; the pins never moved).
 
-**Selfcheck re-pins (deliberate, each commented in place — the suites are designed to force the decision):** `hooks/governorCuts.selfcheck.mjs` (restore-table order gains `feedbackWarp` between `markWeather` and `creatureCount` — the same re-pin #1694/#1574/#1627 each made), `fx/fxFilters.selfcheck.mjs` (add-menu pin gains `feedbackWarp`), `fx/efRackTile.selfcheck.mjs` (the ≤1-control list gains `feedbackWarp` — "must be added here on purpose"), `hooks/sceneCost.selfcheck.mjs` (registration-import list gains the warp module).
+## Budget (allowance: 2.0 ms GPU/frame @1080p iPad-class, creature-system plan)
 
-**Not touched:** the spectrum core/live/marks modules, the renderer, sceneContract, any layout-param defaults or bounds, the pin suites and their fixtures, Q2/Q3/Q4, #1567, #1627 S1.
+Method, stated plainly: this sandbox has no iPad-class GPU, so the budget is judged the
+repo's own way — the cost registry declarations against the allowance, plus the shape
+of the change — and the sandbox CPU numbers are labelled as such.
+
+- **No new cost surface.** The shipped change adds no draw pass, no item, no packed
+  float, and no CPU work: `engraveDataFor` packing is byte-identical (the S4 golden
+  stands), and its bench is 0.0118 ms/frame for 4 creatures standalone (0.0385 under
+  3-way parallel sweep load; sandbox node, print-only, the suite's own bench). The seam
+  term is a handful of extra ALU ops inside the existing `engraveShade` branch, which
+  runs only on engraved fragments — one body item per moth.
+- **Registry verdict (`creatureCost`, in the sweep):** declarations `creature/moth`
+  1.18 ms (59% of the 2.0 ms allowance) and `creature/dish` 0.05 ms (3%), combined
+  conservative 1.23 ms — all "ok", declarations honest and in band on re-measurement.
+  (The suite's sandbox re-measure of the moth family read 3.404 ms under parallel
+  sweep load; the suite judges that in band — a shared sandbox CPU is not the device,
+  and the declarations are sandbox-labelled in the registry. The shipped change adds
+  no resolver or packing work for that number to grow from.)
+- **Resolver probe (standalone, no parallel load):** PASS — 0 creatures 0.61 ms;
+  4 creatures 1.99 ms mean, p95 3.34 ms; heap growth 0.09 / 0.28 MB. (In the parallel
+  sweep it tripped its 5 ms budget at 5.171 ms mean — the brief's load-sensitivity
+  warning, verbatim; the standalone run is the verdict.)
 
 ## Verification
 
-- `npm run build` — green. ESLint clean on every touched file.
-- New suite: `gl/spectrumWarp` — **88 checks green** (A address/off-identity, B per-bin, C mapping/neutral, D recipe composition, E replay determinism, F governor order, G cost + bench print 0.0025 ms).
-- Affected families (run individually): spectrum core/live/marks ✓ · spectrumRecord ✓ · accum inventory/seam/guard ✓ · governorCuts ✓ · governorCreatureShed ✓ · governorHostileScene ✓ · governorEventLog ✓ · costTiers ✓ · sceneCost ✓ (after the mapping above) · fxFilters ✓ (after re-pin) · fxShaders ✓ · fx.upSlots ✓ · efRackTile ✓ (after re-pin) · markWeather ✓ · phase6 ✓ · mlxExport ✓ · sceneContract ✓ · liveResolve.determinism ✓ · projectDocument ✓ · overlayRoundtrip ✓ · layerOrder ✓ · undoLayers ✓ · director ✓ · grainFinish ✓ · bridge/fxUniforms ✓.
-- `gl/accum` — all node-side recipe/mirror checks pass, then the suite **aborts (exit 134) in its headless-browser section**: the known sandbox browser signature from the brief (baseline-proven both ways). This stage's accum.mjs diff is the `export` keyword on `opticsDerived` plus a comment — shown in the diff, incapable of the abort.
-- Full manifest sweep (every manifest line run individually, 2026-10-20): **490 pass / 6 fail of 496 suites**. The 6 failures are exactly the brief's known set: the 3 inherited pins (`gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — shapes unchanged, see the pins table), the known sandbox set (`fx/rollSafety` browser signature, `gl/accum` browser abort, `engine/kernel/bake/swarmWasm` missing cargo). The new suite passes inside the sweep. No other failure is mine.
+- `npm run build`: **green** (vite, built in 4.90 s at the final tree state).
+- **Pins (the acceptance core): all green, unmodified.** `gl/replayGate` PASS
+  (3601 frames, 61/61 checkpoints), `gl/creatureGate` PASS (901 frames, 16/16
+  checkpoints), `engine/wingWarp` PASS (bent golden intact). The influences are
+  replay-identical because the resolver's outputs are: presentation only, decisions
+  unchanged (creatures-spec §2 — no clock/random reads added anywhere; the seam field
+  is a pure function of the posed skeleton, and the determinism guard pattern is
+  unchanged).
+- **#1188 deniability guard: green untouched.** `queenDeniability` PASS (7 checks);
+  `queenChannel` PASS (13), `queenLean` PASS (24). Nothing of the Queen is rendered or
+  named by this build.
+- **Creature/replay families:** `creature`, `dishCreature`, `skeleton`, `creaturePose`,
+  `featherFan`, `glitch`, `robot`, `lsystem`, `creatureCost`, `costTiers`,
+  `performanceCreatures`, `governorCreatureShed`, `poolCitizenship` (14 checks),
+  `engraving`, `finishingLook` — all PASS. Pin-still, governor shed order (count
+  first), and the hand-only `creatures` BUILD param are untouched code paths and their
+  suites pass unmodified.
+- **Full manifest sweep:** all 485 manifest suites on this branch (484 from base + the
+  1 new suite) run individually, 3-way parallel with a 240 s per-suite cap:
+  **478 PASS / 7 FAIL** raw. Every failure classified:
+  - `engine/kernel/bake/swarmWasm` — FAIL: `build-wasm: cargo not found on PATH`.
+    Base-identical sandbox failure, as briefed; no Rust/wasm file touched.
+  - `fx/rollSafety` — hit the 240 s cap in its browser stage after its pure-helper
+    checks passed. Baseline failure on clean main in this sandbox (browser
+    signature), as briefed; no fx code touched.
+  - `gl/accum` — hit the 240 s cap in the parallel sweep; standalone re-run with the
+    repo runner's own heap setting (`--max-old-space-size=4096`) **PASS** (49 cases).
+    A first standalone attempt under the default 2 GB heap died OOM after every
+    mirror/probe check it reached had passed — the brief's baseline behaviour for
+    this suite ("sandbox timeout… also passes on favourable variance"); no gl code
+    touched.
+  - `gl/composite` — hit the 240 s cap under parallel load; standalone re-run
+    **PASS** (15 cases, 171 s). Parallel-load artifact, not a build failure.
+  - `gl/canvasSizes` — same shape; standalone **PASS** (58 cases, 110 s).
+  - `pattern/patternRender` — same shape; standalone **PASS** (19 checks, 138 s).
+  - `gl/resolverProbe` — load-sensitive timing assertion under parallel load
+    (5.171 ms vs the 5 ms budget); standalone **PASS** (numbers in Budget above).
+  Net after classification: **483 PASS / 2 FAIL**, and the 2 failures are the brief's
+  baseline sandbox set — `swarmWasm` (missing cargo) and `fx/rollSafety` (browser
+  signature) — each base-identical and in code this build does not touch.
+  `gl/accum`, the brief's other baseline-named suite, passes standalone here on
+  favourable variance, exactly as the brief says it can.
 
-## Exceptions
+## Paired-render evidence (`renders/`)
 
-1. **Three deliberate selfcheck re-pins** (governor restore order, FX add-menu, EF ≤1-control list) + one registration-import addition (sceneCost) — listed under Files touched, each commented in place with its reason. No golden was weakened; no pin suite was re-recorded.
-2. `gl/accum` sandbox-browser abort — classified above, not chased, per the brief's known state.
+Harness: a scratch node harness driving the repo's real builders
+(`createCreatureBuilder({ skinning: true })` and `createDishCreatureBuilder`), seed 77,
+the Haeckel teal/orange/slate palette; warp meshes drawn as per-triangle affine-clipped
+asset copies; the engraving panel samples the real `engraveFactorAt` field on a body
+quad. Sheets were rendered by headless Chromium via `page.setContent` (no localhost
+navigation — the sandbox blocks it, and the live app's watchdog would need the Space
+resume dance; the harness path was used instead, per the brief's fallback). The `.svg`
+files beside the `.png`s are the harness's vector source for each sheet. The harness
+itself was scratch and is not committed; the sheets are its direct output.
+
+| Pair | Files | What it shows |
+|---|---|---|
+| Moth, shipped finish | `before-engrave.png` → `after-engrave.png` (+ `.svg`) | The shipped delta: the body engraving field, contour-only → contour × seam crosshatch. |
+| Moth, full creature | `before-moth.png` / `before-moth-zoom.png` (main) vs `fork-moth.png` / `fork-moth-zoom.png` (fork F1 preview) | Main's moth today vs the fork's layered art: wing cross-vein lattice, denser fan, crest marks on the body. The shipped seam finish rides the body item under the wings and is shown at field level in the engraving pair. |
+| Dish | `before-dish.png` / `before-dish-zoom.png` (main = shipped; no dish code or asset changed, so the shipped after is this frame) vs `fork-dish.png` / `fork-dish-zoom.png` (fork F1+F2 preview) | Main's smooth discs vs the fork's strata-ringed discs — visible only with F2's accent split, which the preview simulates with the palette cream as the detail slot. |
 
 ## Forks
 
-1. **Exports/stills do not warp.** The warp is live-only (its input is the live/recorded spectrum; `renderAccumSequence` takes no spectrum). This matches the spectral path's own stated limit for COLOUR ("live-path only… stated on the section") and the item's hint says so. If Matt wants warped stills, the follow-up is one opts field on `renderAccumSequence` carrying a recorded spectrum section — the driver's step is already pure and replay-proven, so that PR is plumbing, not design.
-2. **No dedicated STIMULI dial.** The amount's address is the FX item (the brief's binding interpretation: ride the FX item-param surface; a layout key would have moved the resolver pins, which the brief forbids). The SPECTRUM section in STIMULI is unchanged; if Matt wants a STIMULI-side amount as well, it must write the FX item's param (the layer-editor path), not a layout key — recorded here so the next stage doesn't re-derive the constraint.
-3. No other forks: every scope checkbox has a built, suite-proven mechanism — FX strata read the spectrum (amount + live seam), zoom/spin/decay/treble mappings (suite §C/D), per-bin smoothing in the feedback pass only (§B), a cost tier the governor sheds before body counts (cut 1.45, §F), byte-identical when off (pins table + §A).
+### F1 — part-pool art enrichment, both families (needs a pin re-record ruling)
+
+The finishing layer the plans specify — layered marks inside the parts themselves —
+designed as **element-count-neutral** art: new detail appended as subpaths of the
+assets' existing elements (no new elements, so no silhouette, matte, or element-count
+change). Per part: cross-vein lattice in the wing leaf (`org_leaf_02`); vein/strata
+marks in the fan feather, leaf, and plate (`org_petal_02`, `org_petal_01`, `org_pod_01`);
+inner chevron echo (`geo_chev_01`); crest + segment marks on the moth body
+(`org_pod_02`); concentric strata rings + pore ticks on the dish disc (`org_blob_01`).
+Region mattes re-bake from the same SVGs.
+
+- **Guardrails verified on the designed art before reverting:** every part's
+  auto-attach points bit-identical to the pre-pass table, and every part's
+  `assetCostScore` identical (5/2/2/1/2/1/1 in the asset order above) — anatomy and
+  the governor's thinning ranking provably unmoved. Both tables are pinned in
+  `finishingLook.selfcheck.mjs`.
+- **Why it cannot ship in this build:** bisecting `replayGate` on this branch showed
+  the gates hash the whole resolver output **including the embedded full asset
+  record** (`item.asset`, SVG + baked regions). Element-neutral, attach-invariant,
+  cost-invariant art still moved `replayGate` at frame 0. Landing F1 rehashes
+  `replayGate` and `creatureGate` (and the `wingWarp` resolver golden) for every
+  take drawing these parts. Under the standing rule — never re-record a pin without
+  a ruling — F1 stopped here instead.
+- **The ruling that lands it:** a re-record ruling on the S3 precedent (inputs
+  byte-identical; the re-recorded diff is checkpoints/hashes only, deep-diffed and
+  reported). F1 + F2 should land as **one** PR under that one ruling, with the
+  guardrail suite re-run against the new art and the fork previews above replaced by
+  true before/after pairs for Matt's eye.
+
+### F2 — the dish accent split (same ruling; F1's dish half is invisible without it)
+
+`dishCreature.js` stamps dish body/limb items with `accent: col` where `color: col` —
+the detail slot equals the fill slot, so within-asset detail can never show on a disc
+(evidence: F1 art without the split rendered pixel-identical to before). The fork:
+dish discs carry a **distinct accent** (the preview uses the palette cream, `#f5ead2`,
+as the detail slot — the exact slot value is part of the fork PR's eye pass). This
+changes resolver item fields, so it rehashes the same takes and rides F1's ruling.
+The shipped build pins today's contract (`accent === colour`) in the new suite so the
+change is deliberate when it comes.
+
+## F1/F2 landing (2026-10-20, under Matt's re-record ruling)
+
+F1 and F2 landed as one change in two commits: `e0aa5cb1` (the art + the split) and
+this finish commit (the re-records only). What follows is the evidence, including
+where the fork's own record above proved wrong.
+
+- **Recovery.** The fork implementation was reverted during staging without ever
+  being committed: it is NOT recoverable from git (verified — branch reflog, stash,
+  and a scan of all dangling/unreachable objects; none carries it). The art was
+  instead recovered **stamp for stamp from the fork's committed preview sheets**
+  (`renders/fork-moth.svg`, `renders/fork-dish.svg`), whose unwrapped
+  identity-transform stamps carry each asset's designed markup in asset-local
+  coordinates — the same source this report's fork spec was written from. Per part:
+  `org_leaf_02` +5 vein pairs and a closed inner vein loop; `org_petal_02` +8 barb
+  pairs; `org_petal_01` +10 vein marks merged into the fill path (element-count
+  neutral) plus an accent stroke; `geo_chev_01` inner echo + centre dot plus an
+  accent stroke; `org_blob_01` strata ring, arc and 5 pore ticks appended to the
+  outline path plus an accent stroke. Two corrections to the fork record above:
+  (1) `org_pod_02`'s "crest + segment marks" never existed as asset art — the fork
+  sheets stamp the baseline body verbatim; its body detail is this branch's shipped
+  engraving seam. The strata rings the sheets DO show on the body ride a **detail
+  path echoing the engraving arc**: outline line → two closed ellipse-outline rings
+  (rx13 ry34, rx6.5 ry22 — the seam arc's own proportions) + two seam ticks,
+  stroked in the accent slot; verified to keep the part's attach points and cost
+  bit-identical before adoption. (2) `org_pod_01`'s "vein/strata marks" are not in
+  its asset markup either — the fork stamps show the fan plate's rings rendered
+  **through the dish disc** (the plate drawn as a disc under `roleColors`'
+  accent-cream notation), so pod_01's asset is unchanged by construction and its
+  matte does not move. The landing is faithful to the fork's rendered evidence,
+  not to the fork text where the two disagree.
+- **Guardrails.** `finishingLook.selfcheck.mjs` re-run against the landed art:
+  §1 passes **unmodified** — every part's auto-attach points and `assetCostScore`
+  bit-identical to the pre-pass pins (5/2/2/1/2/1/1). Region mattes re-baked
+  (`npm run bake:regions`): exactly the six changed assets' entries move
+  (blob 1→2 regions, petal_01 1→10, leaf_02 7→12 at the cap, pod_02 2→12,
+  chev 1→4, petal_02 3→3 re-segmented); pod_01's entry is byte-identical.
+  Engraving suite green, golden `59289882` stands.
+- **F2's slot value.** The fork text left the exact accent open ("part of the fork
+  PR's eye pass"). Landed: **accent = the palette ink** (`accent: ink` in both
+  `dishCreature.js` put sites). The preview's `#f5ead2` was that preview palette's
+  ink slot; ink is the palette-native form of the split, matches the module law
+  (palette-derived, no ad-hoc picks), and holds for any palette size. The suite's
+  dish contract was re-pinned in the open to `accent === ink` (discs only — the
+  eye is ink-on-ink by design, before and after).
+- **Re-record (this finish commit; no production code).** S3 discipline, S3 tools:
+  - `creatureGate` fixture: checkpoints refreshed by replaying the fixture's own
+    inputs. Control: the same refresh against the pre-art tree (`d7f58f20`)
+    reproduces the prior fixture byte-for-byte (sha256 `7e99c5b5…`). Branch
+    refresh deterministic across two runs (sha256 `1c76714d…`, 17757 bytes).
+    Deep diff old vs new: **15 differing leaves, all checkpoint hashes** —
+    checkpoint 0 stands (frame 0 precedes any creature draw). Inputs
+    byte-identical. Suite green.
+  - `replayGate` fixture: re-recorded with its own recorder (deterministic across
+    two runs; sha256 `23bd414f…` → `3e5c6687…`, 144195 → 144173 bytes). Deep diff:
+    **61 differing leaves, all checkpoint hashes** — every checkpoint moves
+    because the take's swatch assets include enriched parts (frame 0's layout
+    already embeds them). Inputs byte-identical. Suite green.
+  - `dishCreature` scene goldens re-pinned (the scenes' inputs are the suites'
+    own constants — unchanged): GOLDEN_300 `75c6829a` → `20b33fcd`, GOLDEN_LIMB
+    `a9918074` → `2937f8ad`, GOLDEN_BAND `57dc1ef4` → `e5e30d44`. Suite green.
+  - `wingWarp` resolver pins did NOT move (suite green unmodified) — contrary to
+    the fork text's expectation; the warp goldens hash warp geometry, not the
+    wing's vein detail. Recorded here so the expectation is closed.
+  - Both fixtures' PROVENANCE files carry the re-record paragraphs; the creature
+    gate's suite header notes the second re-record.
+- **Verification of the landed tree:** `npm run build` green. Full manifest
+  sweep (485 suites, 3-way parallel, 300 s cap): 475 PASS / 10 FAIL raw; the
+  eight load-class failures (`gl/accum`, `gl/composite`, `gl/canvasSizes`,
+  `gl/resolverProbe`, `gl/retroCapture`, `gl/vortex`, `pattern/patternRender`,
+  `kernel/creatureCost`) all PASS on serial standalone re-runs. Net
+  **483 PASS / 2 FAIL** — the standing sandbox pair, each proven base-identical
+  against clean main `6946f393` in this session: `swarmWasm` (exit 1 both
+  trees, `build-wasm: cargo not found on PATH`, output identical apart from
+  worktree paths) and `fx/rollSafety` (exit 124 at the 300 s cap both trees,
+  `Protocol error (Runtime.evaluate): Target closed` in the GL parity driver —
+  the browser-closed signature). The engraving seams shipped at `d7f58f20`
+  remain intact underneath: the engraving suite passes with its golden
+  `59289882` unmodified, and the seams' §2 pins in `finishingLook` pass as
+  written.
+- **Still owed at publish:** true before/after render pairs for Matt's eye (the
+  staging fork previews stand as the "after" reference until then), and the PR
+  itself — this landing is local commits only, per the staging rule.
+
+## Exceptions and deviations
+
+- No pin moved; no golden weakened; no fixture touched; no key added — nothing to
+  strip-prove.
+- The brief's baseline sandbox set reproduces as classified in the sweep section:
+  `fx/rollSafety` and `swarmWasm` (missing cargo) fail base-identically; `gl/accum`
+  is sandbox-fragile under load and passes standalone with the runner's heap
+  setting. None is in a file this build touches.
+- Live-app screenshots were not used for the evidence pairs (sandbox localhost
+  block + watchdog); the builder-harness sheets above were used instead, as the
+  brief allows, with the method stated.
+- Robots and L-system growths have no stage path (verified in the repipe planning)
+  and are untouched; "both families" is the moth line + the dish family, as
+  re-scoped.

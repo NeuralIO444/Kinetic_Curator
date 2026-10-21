@@ -21,6 +21,15 @@
  *   spine's local direction, so when a pose bends the spine (S5's wither curls
  *   the chains; any future pose that moves the joints) the line field bends
  *   with it, because the field is a function of the joints, not of the box.
+ * - #1356 (the finishing look pass) adds the second body-space line family the
+ *   creature-system plan names (§1.3: lines of constant "along" are SEAMS):
+ *   two longitudinal seams at fixed lateral offsets from the spine
+ *   (ENGRAVE_SEAM_OFFSETS), drawn at ENGRAVE_SEAM_REL of the contour strength.
+ *   They ride the same closest-point walk (the signed lateral distance of the
+ *   closest point), so they bend with the spine exactly as the contours do.
+ *   The packed per-instance data is UNCHANGED (same joints, same params, the
+ *   S4 golden stands): the seams are a shader/mirror term, not new data — a
+ *   presentation-layer finish that moves no resolver output and no pin.
  * - Antialiasing is by `fwidth` on the line-distance field (core in GLSL ES
  *   3.00 — no extension), so line edges are one screen pixel wide on every
  *   device instead of a baked-in asset-unit width.
@@ -64,6 +73,11 @@ export const ENGRAVE_DEFAULTS = Object.freeze({
   width: 1.5, // asset units, full width of a line at its centre
   strength: 0.55, // 0 = no finish, 1 = lines multiply to black
 });
+
+/** #1356 — the longitudinal seam offsets (asset units of signed lateral distance from the spine)
+ *  and their strength relative to the contour lines. Constants of the finish, not packed data. */
+export const ENGRAVE_SEAM_OFFSETS = Object.freeze([5.5, 11]);
+export const ENGRAVE_SEAM_REL = 0.55;
 
 const rad = (deg) => (deg * Math.PI) / 180;
 const finite = (v, d) => (Number.isFinite(v) ? v : d);
@@ -143,6 +157,7 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
   if (!Array.isArray(joints) || joints.length < 2 || !(spacing > 0)) return 1;
   let bestD2 = Infinity;
   let bestS = 0;
+  let bestLat = 0;
   let acc = 0;
   let a = joints[0];
   for (let k = 1; k < joints.length; k++) {
@@ -158,7 +173,11 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
     const qx = a.x + abx * t;
     const qy = a.y + aby * t;
     const d2 = (au.x - qx) * (au.x - qx) + (au.y - qy) * (au.y - qy);
-    if (d2 < bestD2) { bestD2 = d2; bestS = acc + len * t; }
+    if (d2 < bestD2) {
+      bestD2 = d2; bestS = acc + len * t;
+      // the signed lateral distance from the spine: cross(segment dir, au - closest point)
+      bestLat = len > 1e-6 ? (abx * (au.y - qy) - aby * (au.x - qx)) / len : 0;
+    }
     acc += len;
     a = b;
   }
@@ -167,8 +186,14 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
   const AA = 0.8; // asset units; the shader derives its band from fwidth instead
   const half = width * 0.5;
   const line = 1 - smooth(dl, half - AA, half + AA);
+  // #1356 — the longitudinal seams: level sets of |lateral distance| at the seam offsets,
+  // at ENGRAVE_SEAM_REL of the contour strength, sharing the contour line width.
+  let dSeam = Infinity;
+  for (const off of ENGRAVE_SEAM_OFFSETS) dSeam = Math.min(dSeam, Math.abs(Math.abs(bestLat) - off));
+  const seam = 1 - smooth(dSeam, half - AA, half + AA);
+  const lineAll = Math.max(line, seam * ENGRAVE_SEAM_REL);
   const endFade = smooth(bestS, -0.3 * spacing, 0.1 * spacing) * (1 - smooth(bestS, total - 0.1 * spacing, total + 0.3 * spacing));
-  return 1 - strength * line * endFade;
+  return 1 - strength * lineAll * endFade;
 }
 
 function smooth(x, lo, hi) {
@@ -192,6 +217,7 @@ float engraveShade(vec2 au, vec4 eA, vec4 eB, vec4 eC, vec4 eP) {
   float strength = eP.w;
   float bestD2 = 1e12;
   float bestS = 0.0;
+  float bestLat = 0.0;
   float acc = 0.0;
   vec2 a = J[0];
   for (int k = 1; k < 6; k++) {
@@ -203,7 +229,10 @@ float engraveShade(vec2 au, vec4 eA, vec4 eB, vec4 eC, vec4 eP) {
     vec2 q = a + ab * t;
     vec2 dp = au - q;
     float d2 = dot(dp, dp);
-    if (d2 < bestD2) { bestD2 = d2; bestS = acc + len * t; }
+    if (d2 < bestD2) {
+      bestD2 = d2; bestS = acc + len * t;
+      bestLat = len > 1e-6 ? (ab.x * dp.y - ab.y * dp.x) / len : 0.0;
+    }
     acc += len;
     a = b;
   }
@@ -212,8 +241,11 @@ float engraveShade(vec2 au, vec4 eA, vec4 eB, vec4 eC, vec4 eP) {
   float dl = abs(fract(ph + 0.5) - 0.5) * spacing;
   float aa = fwidth(dl) * 0.75 + 1e-4;
   float line = 1.0 - smoothstep(width * 0.5 - aa, width * 0.5 + aa, dl);
+  float dSeam = min(abs(abs(bestLat) - 5.5), abs(abs(bestLat) - 11.0));
+  float seam = 1.0 - smoothstep(width * 0.5 - aa, width * 0.5 + aa, dSeam);
+  float lineAll = max(line, seam * 0.55);
   float endFade = smoothstep(-0.3 * spacing, 0.1 * spacing, bestS)
     * (1.0 - smoothstep(total - 0.1 * spacing, total + 0.3 * spacing, bestS));
-  return 1.0 - strength * line * endFade;
+  return 1.0 - strength * lineAll * endFade;
 }
 `;

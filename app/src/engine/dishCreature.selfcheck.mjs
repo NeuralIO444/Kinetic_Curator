@@ -64,7 +64,7 @@ function run(n, over = {}) {
 }
 
 // 4 — replay: two fresh builders fed the same 300 frames produce the identical animal, byte for byte.
-const GOLDEN_300 = '75c6829a';
+const GOLDEN_300 = '20b33fcd'; // re-pinned 2026-10-21 (#1356 F1/F2 publish finish, Matt's re-record ruling): F1's blob art + F2's accent split move the scene; inputs unchanged (staged 2026-10-20 pin reproduced exactly at the rebased tip)
 {
   const a = run(300); const b2 = run(300);
   assert.equal(JSON.stringify(a.e[0].items), JSON.stringify(b2.e[0].items), 'same frames in, same items out');
@@ -159,7 +159,7 @@ const itemAt = (e, key) => e[0].items.find((i) => i.key === key);
 }
 
 // 12 — replay with a limb: identical frames in, identical animal out; the scene is golden-pinned.
-const GOLDEN_LIMB = 'a9918074';
+const GOLDEN_LIMB = '2937f8ad'; // re-pinned 2026-10-21 (#1356 F1/F2 publish finish, Matt's re-record ruling)
 {
   const a = run(300, { assetAttach: L1, dishPressure: [1, 0] });
   const b2 = run(300, { assetAttach: L1, dishPressure: [1, 0] });
@@ -213,7 +213,7 @@ import { DISH_RADII as RADII4 } from './dishCreature.js';
 // 16 — the proof-pack scene: 480 frames (8 s at 60 fps) crossing Relax → Normal → Tighten, with a
 // limb and full pressure. The material ratio is read against a bandless twin at the same frames, so
 // the hover's own breathing cancels: what remains is the band, visible without narration.
-const GOLDEN_BAND = '57dc1ef4';
+const GOLDEN_BAND = 'e5e30d44'; // re-pinned 2026-10-21 (#1356 F1/F2 publish finish, Matt's re-record ruling)
 {
   const script = (f) => (f < 160 ? { band: 'relax', smoothed: 0.1 } : f < 320 ? { band: 'normal', smoothed: 0.5 } : { band: 'tighten', smoothed: 0.9 });
   const runScript = (banded) => {

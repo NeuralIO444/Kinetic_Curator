@@ -12,6 +12,12 @@
 // 16 checkpoints moved. The fixture's INPUTS are still the pristine pre-repipe take, byte-identical; only the
 // checkpoint hashes were re-recorded, after proving the original checkpoints verify 16/16 on S3 code with the
 // key stripped. The contract below is unchanged: the recorded decisions in the take are the creatures.)
+// (Second checkpoint re-record, 2026-10-21 at publish, #1356, Matt's ruling — the provenance file has the
+// record: the finishing look pass landed the layered part art (F1) and the dish accent split (F2); items
+// embed the full asset record, so 15 of 16 checkpoints moved — checkpoint 0 stands, frame 0 precedes any
+// creature draw. Inputs byte-identical, deep diff hashes-only, same refresh discipline as S3. A first
+// re-record staged 2026-10-20 against the pre-travel fixture was superseded by the publish rebase and
+// re-done against main bd9a181d; the staged dish-golden re-pins reproduced exactly.)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
