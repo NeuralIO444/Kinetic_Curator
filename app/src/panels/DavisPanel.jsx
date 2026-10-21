@@ -12,7 +12,8 @@ import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
-import { KINEME_PATTERNS } from '../engine/kineme.js';
+import { KINEME_PATTERNS, TRANSPORT_MODES } from '../engine/kineme.js';
+import { RangeRow } from '../components/RangeRow.jsx';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -225,6 +226,43 @@ export function DavisPanel() {
               );
             })}
           </div>
+
+          {/* #1574 — travel kinemes P1: the scene-level travel controls live in this motion group
+              (Matt's ruling, 2026-10-14), beside the DIRECTOR pattern selector above — never in BUILD,
+              never a new panel. The mode is a discrete choice, so it renders TE; leash and flow are
+              digits on the one slider. The keys stay recipe data (layoutParams); only the editing
+              surface is here. 'still' is the default: marks stay home. FLOW sets them roaming the
+              noise field inside the leash. Q2 (a traveler budget) is unruled and is NOT built. */}
+          <div className="davis-actions davis-actions-motion" role="group" aria-label="travel transport">
+            <i className="lbl" title="travel: marks roam from home inside a leash, on the noise field's curl">travel</i>
+            {TRANSPORT_MODES.map((t) => {
+              const on = (layoutParams.transport || 'still') === t;
+              return (
+                <button key={t} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${t} transport`}
+                  title={t === 'still' ? 'still: marks stay where they were placed'
+                    : 'flow: marks roam the curl of the noise field, held by the leash'}
+                  onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transport', value: t })}>
+                  {t}
+                </button>
+              );
+            })}
+          </div>
+          {(layoutParams.transport || 'still') === 'flow' && (
+            <>
+              <RangeRow label="leash" tone="ink" min={0} max={400} step={1}
+                value={Math.round(layoutParams.transportLeash ?? 112)}
+                readout={`${Math.round(layoutParams.transportLeash ?? 112)}px`}
+                defaultValue={112}
+                hint="leash: how far a mark may roam from home, in px — no pull inside it, a spring outside it. 0 is still."
+                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportLeash', value: Math.round(v) })} />
+              <RangeRow label="flow" tone="ink" min={0} max={100} step={1}
+                value={Math.round((layoutParams.transportFlow ?? 0.8) * 100)}
+                readout={`${Math.round((layoutParams.transportFlow ?? 0.8) * 100)}%`}
+                defaultValue={80}
+                hint="flow: how hard the noise field's curl carries the marks"
+                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportFlow', value: Math.round(v) / 100 })} />
+            </>
+          )}
 
           {/* #1126 — the two Directors, at the foot of the panel (Matt): readout only, what the honest feed says each is doing */}
           <div className="davis-section-label ttl">the room</div>

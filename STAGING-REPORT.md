@@ -1,185 +1,238 @@
-# STAGING REPORT — #1694 slice S3: controls fold-in (LOCAL ONLY — no push, no PR)
+# STAGING REPORT — #1574 Q2 amendment: the traveler budget (LOCAL ONLY — no push, no PR)
 
-Branch `ember/1694-s3-controls-fold-in`, base = S2 tip `e8fa9792`. This is the last
-slice of the creature repipe. It implements Q3 as ruled: **the creature count becomes
-a BUILD param; the DIRECTORS stepper retires.** (This file replaces S2's staging
-report at the worktree root; S2's remains in git history at `e8fa9792`.)
+Branch: `ember/1574-travel-core` (local only — not pushed, no PR)
+Base of this amendment: `9d6fb42c` (#1574 P1 — travel kinemes transport core)
+(This file replaces the P1 staging report in the branch's report slot;
+P1's report remains in git history at `9d6fb42c`.)
 
-## What was built
+## The ruling implemented
 
-1. **The count's new home.** `creatures` joins the BUILD layout-param family in
-   `app/src/data/layout-modes.js`:
-   - `DEFAULT_LAYOUT_PARAMS.creatures = 0` (the pre-fold-in store default — an
-     untouched stage spawns nothing).
-   - `PARAM_SPEC.creatures = { min: 0, max: 4, int: true }` — the bounds are
-     `sanitizeCount`'s bounds (`curator/spawn.js`, `MAX_CREATURES`), so the trust
-     boundary and the spawn sanitizer clamp to the same 0..4.
-   - Deliberately **not** in `RANDOMIZABLE_KEYS` / `MORPHABLE_KEYS`: the dice,
-     Evolve and morphs never write the count. It is quantized hand input only.
-2. **The surface.** BUILD §3 Motion & Behavior's hype/moth block gains a **CREATURES**
-   ValueButton (SliderEditor 0..4, step 1, `Math.round` on write) at the top of the
-   stack, written through the block's existing `set()` → `Events.LAYOUT_PARAM
-   {key:'creatures'}` door. Not mode-gated — the stepper never was. The block is
-   renamed to what it is: file `CreatureSliders.jsx` → **`HypeSliders.jsx`**
-   (component `HypeSliders`, subheader "hype / moth", the 🦋 gone). BODY / flap /
-   TIGHT / breath / wind / METABOLISM did not move.
-3. **The old home retired end-to-end.** Store field `creatureCount` + `setCreatureCount`
-   (`state/slices/globalSlice.js`), the `creature:count` bus event
-   (`composition/eventBus.js`, `eventRegistry.js`, `wireEventBus.js`), the
-   `SET_CREATURE_COUNT` action (`state/actions.js`, `state/applyAction.js`), and the
-   DavisPanel header stepper (chips 0–4, `data-testid creatures-N`). `PanelHeader` in
-   DIRECTORS is self-closing again — the header returns to its pre-#1355 height.
-4. **Resolver contract unchanged in shape.** `gl/liveLoop.mjs` still stamps
-   `creatureCount` on the resolver input every frame; the source is now
-   `layoutParams.creatures` (the same spring-damped params object every slider
-   rides; `| 0` keeps the stamp the integer the spawn channel has always read),
-   still net of the S2 `creatureShed` overlay. Spawn machinery untouched.
-5. **Governor.** `hooks/usePerformanceGovernor.js` derives its `creatureCount`
-   from the existing `layoutParams` selection (`layoutParams?.creatures ?? 0`).
-   The assembled governor state's shape is unchanged, so `governorCuts` cut 1.5
-   (count sheds first) and its restore table are untouched, byte for byte.
-6. **Autosave watch.** `state/projectWatch.mjs` drops `'creatureCount'` from
-   `PROJECT_STATE_KEYS` — the count rides `layoutParams`, already watched
-   wholesale. (The suite derives the list from `serializeProject`'s source both
-   ways; it agrees.)
-7. **Mind snapshot readout** (`App.jsx`) reads `st.layoutParams?.creatures ?? 0`.
+Q2 RULED (Matt, 2026-10-20, on #1574): traveler budget is
+**governor-selected within a device-class cap** — the governor picks the
+scene's travel amount, bounded by a hard per-device-class cap; the author
+sets the ceiling, not the amount. P1 was built without the mechanism
+under the Q2 carve-out; this amendment is the follow-on mechanism, and
+nothing else (no Q4 per-stratum leashes, no P3 surge, no #1356 work).
 
-## Storage shape + document migration
+## What shipped, in plain language
 
-- **New shape:** the count lives only in `layoutParams.creatures` — in the store,
-  in layer snapshots, and in saved documents (serialized inside `layoutParams`
-  like every other param). `serializeProject` writes **no** top-level field.
-  `PROJECT_VERSION` stays 1.
-- **Old shape:** pre-S3 documents carry a top-level `creatureCount` (written only
-  when > 0) and no `creatures` key anywhere.
-- **Migration** (`landLegacyCreatureCount` in `state/projectDocument.js`, called by
-  BOTH parse branches — legacy/versionless and v1): if the raw doc has a top-level
-  `creatureCount`, its `sanitizeCount` value lands in `layoutParams.creatures` —
-  root and per-snapshot. Rules: an explicit `creatures` key in a raw params object
-  always wins (it is the new home); a snapshot whose raw params lack the key takes
-  the legacy value; a snapshot with no params of its own (which `normalizeSnapshots`
-  fills from the raw root) takes the landed root value. Post-migration documents
-  are parse fixed points (verified). Hostile legacy values clamp through the old
-  sanitizer (99 → 4, `'lots'` → 0).
+A FLOW scene still *requests* travel for every placed mark — that request
+is the authored ceiling, and it is exactly what the Directors motion-group
+controls already express (transport / leash / flow, plus how many marks
+the scene deals). The governor now *selects* the effective travel amount:
+how many marks actually travel.
 
-## The §3 pin event — STOPPED before any re-record, as instructed
+```
+travelers = min(marks the scene dealt, the device-class cap)
+```
 
-Adding `creatures` to the hashed layout params moved the whole-output pins, by
-exactly the weather-slice mechanism: `liveResolve.mjs` merges input params over
-`DEFAULT_LAYOUT_PARAMS` and embeds the merged params object in each layer result,
-which the frame hash walks. **No pin was re-recorded. No fixture was touched.**
+Marks are selected by instance index, ascending (index 0 first) — the
+index is the identity the travel store already keys its per-mark state
+by, so the selection is stable across placement rebuilds. A mark beyond
+the selection never travels: no sim state is created for it, and if the
+budget shrinks under a live scene (a class change) its state is dropped
+and it presents exactly at home — the 'still' parity position, not a
+roam frozen mid-stride.
 
-**Strip proof** (scripts kept at `~/workspace/scratch-1694-s3/strip-proof.mjs` and
-`strip-wingwarp.mjs` — they delete the `creatures` key from the shared
-`DEFAULT_LAYOUT_PARAMS` object before the resolver is created, then replay):
+There is **no new panel control and no new surface**: the budget is
+governor-selected, so nothing edits it. The Directors motion group is
+byte-for-byte as P1 shipped it. There are **no new layoutParams keys**
+(see Pins below).
 
-- creatureGate fixture (`gl/fixtures/creatureRepipe.kcperf`, unmodified): stripped →
-  **ok: true, 901 frames, 16/16 checkpoints, firstMismatch null**.
-- replayGate fixture (`gl/fixtures/replayGate.kcperf`, unmodified): stripped →
-  **ok: true, 3601 frames, 61/61 checkpoints, firstMismatch null**.
-- wingWarp suite with the key stripped → **fully green**, BENT_RESOLVER golden
-  `9f0043e7` restored.
+## Files touched
 
-So with the one key removed, this branch's frames are byte-identical to S2's.
-The divergence is the key, and only the key.
+- `app/src/data/quality.js` — `TRAVEL_BUDGETS` { desktop, ipad } and the
+  `travelBudgetForDevice(ipadClass)` accessor, in the house pattern
+  beside `REGION_BUDGETS` / `FRAME_BUDGETS` (device class is the same
+  `ipadClass` boolean the other budgets read).
+- `app/src/engine/kineme.js` — `selectTravelers({ requested, ipadClass })`
+  (the selection), `TRAVEL_COST_REFERENCE_MARKS`, the budget's cost
+  registration (`travel/budget`, tier 0), and `applyTransport`'s use of
+  it: the selection is computed once per scene per resolve beside the
+  store lookup, excess state is pruned there, and the step loop skips
+  non-travelers. `ctx.travel` gains the optional `ipadClass` field.
+- `app/src/engine/buildPlacements.js` — passes `travel.ipadClass` through
+  to the transport pass (comment updated; nothing else).
+- `app/src/gl/liveResolve.mjs` — the travel base gains
+  `ipadClass: input.travelIpadClass === true`.
+- `app/src/gl/liveLoop.mjs` — stamps `travelIpadClass:
+  isIpadClassDevice()` on the resolver input, beside `travelShed`, using
+  the same device sniff the region budget uses.
+- `app/src/gl/performanceFile.mjs` — `travelIpadClass` added to
+  `MACHINE_KEYS` (it describes the recording machine, not the artist's
+  intent — the file's own doctrine).
+- `app/src/engine/travel.selfcheck.mjs` — new section **I** (29 checks;
+  suite total 50 → 79). No manifest change: the suite was already
+  registered by P1, and no new suite was added.
 
-**Pins awaiting Matt's re-record ruling (exact list — these three suites fail ONLY
-on the new key):**
+## Selection inputs — and why each is recorded state (#1367)
 
-| Suite | Unstripped failure |
-|---|---|
-| `src/gl/creatureGate.selfcheck.mjs` | first checkpoint divergence (frame 0) on the unmodified pre-repipe fixture |
-| `src/gl/replayGate.selfcheck.mjs` | first checkpoint divergence (frame 0) |
-| `src/engine/wingWarp.selfcheck.mjs` | BENT_RESOLVER golden: expected `9f0043e7`, got `dc0897fb` |
+`selectTravelers` is a pure function of exactly two inputs:
 
-Note on the gate: the brief expected the gate could not move because its fixture's
-inputs carry the count as a stamped field. Empirically it moves for the same reason
-replayGate does — the hash covers the resolver's output, and the output embeds the
-defaults-merged `layoutParams`, which gains the key regardless of the input. The
-fixture file itself is untouched and never re-recorded by me; if Matt rules
-re-record (the weather precedent, `63da9b44`), the coordinator records the new
-checkpoints from the pre-S3 code path exactly as S1's Step 0 did, preserving the
-fixture's provenance property.
+1. **requested** — the scene's placed-mark count. Census/geometry state:
+   the recipe's layout params deal it, a take's input log carries those
+   params, and `applyTransport` reads it as `soa.n`.
+2. **ipadClass** — the recording machine's device class. It rides the
+   resolver input as `travelIpadClass`, so the input log records it like
+   every resolver input; liveLoop stamps it from the device. It is a
+   MACHINE key (performanceFile doctrine: detail is per machine).
 
-## Census suite (new)
+Nothing else is consulted: **no wall-clock time, no live performance
+readings, no Math.random**. The live-pressure mechanism remains the
+governor's cut 1.6 shed in `hooks/governorCuts.js`, whose behaviour is
+untouched by this amendment. Proof is in the suite (section I): the
+selection returns deep-identical results over 100 repeated calls, and
+two fresh iPad-class runs of an 800-mark FLOW scene land on identical
+frame hashes for every one of 90 frames.
 
-`app/src/panels/layout/foldInCensus.selfcheck.mjs`, registered in
-`app/selfcheck.manifest` after `unlockTree`. 11 checks, all green: the param's
-home + bounds ≡ `sanitizeCount`; machine key lists exclude it; the old home is
-gone (store field/setter behaviourally absent, event/registry/wiring/action
-source-absent); DIRECTORS carries no creature control and no `header-tools`;
-BUILD's block sets the count 0..4 through the shared door, ungated, in §3; every
-pre-slice param still reachable; `setLayoutParam` clamps like the stepper did;
-the migration (root + both snapshot shapes, explicit-wins, hostile clamps,
-fixed point, round-trip); and the claim's boundary — `?debug=skeleton`
-(CanvasPanel, `isSkeletonDebug()` gate) and `?debug=stress` (App,
-`DEBUG_STRESS` gate) named as dev surfaces outside the claim, Wet Lab pinned
-count-free.
+**Absent input = P1.** A take recorded before Q2 carries no
+`travelIpadClass`; the resolver reads absent as the desktop class, whose
+cap is the full placement cap — so pre-Q2 takes replay with every mark
+travelling, exactly as recorded. The suite pins this: a run with no
+`ipadClass` on the travel input is bit-identical to the desktop run.
 
-## Suite re-points (in-slice, stated per §3 item 4 / wiring-pin class)
+## Cap values, with derivations
 
-- `curator/spawn.selfcheck.mjs` §7 — stamp regex re-pointed to the new source;
-  the DIRECTORS-row pins replaced by retirement pins + the BUILD home pin; the
-  save pin replaced by the migration mechanism (both parse branches call
-  `landLegacyCreatureCount`; no `doc.creatureCount =` write remains).
-- `composition/busChain.selfcheck.mjs` — the count now writes through
-  `LAYOUT_PARAM {key:'creatures'}`. Found on the way: `SET_LAYOUT_PARAM` is a
-  coalesced per-frame action (`dispatchPipe` HIGH_FREQ), so the checks emit →
-  `await tick()` → assert, the suite's own flush idiom; the hostile `'lots'`
-  write is asserted after a flush, so the refusal is genuinely exercised.
-- `state/projectDocument.fuzz.selfcheck.mjs` — was passing **vacuously**: its
-  count assertions were guarded by `'creatureCount' in good`, never true once
-  serialize stopped writing the field. Re-pointed to set the count via
-  `layoutParams` and assert `doc.layoutParams.creatures` unconditionally
-  (exempting the `layoutParams`-is-the-bad-field case, where the count
-  legitimately goes with its own field).
-- `state/poolCitizenship.selfcheck.mjs` §3 — store setups/assertions via
-  `layoutParams.creatures`; added pins: the doc carries the count inside
-  `layoutParams` and has no top-level field. Its resolver-input stamps
-  (`creatureCount: 4` on inputs) are the stamped contract and are unchanged.
-- `state/projectWatch.selfcheck.mjs` — behaviour fixture: `creatureCount`
-  entries removed; the `layoutParams` change case now changes `creatures`,
-  which is the real-world wake case.
-- `panels/layout/unlockTree.selfcheck.mjs` + `components/motionGlyph.selfcheck.mjs`
-  — slider-file lists / source path follow the rename (pure wiring pins).
+`TRAVEL_BUDGETS` (each entry `{ maxTravelers, timeMs }`; timeMs is the
+entry's cost equivalence — see below):
 
-Untouched and green unmodified: `governorCreatureShed`, `governorCuts`,
-`performanceCreatures`, `creatureCost`, `spawnState`, `census`,
-`projectDocument.selfcheck`, `unlockTree` (catalogue + gates unchanged — the
-count is not a gated param).
+- **desktop: 800 travelers, timeMs 0.39 — derived directly from the
+  measured number.** 800 is the placement count cap at which P1 measured
+  FLOW travel (0.387 ms sandbox; declared `travel/flow` timeMs 0.39 in
+  the kernel cost registry). A desktop scene at its maximum authored
+  count therefore costs exactly the declared travel cost, the selection
+  never trims a desktop scene, and desktop behaviour is bit-identical
+  to P1 (suite sections A–G unchanged and green, trajectory hash
+  `8b46bbc0cb58d3d6` identical before and after this amendment).
+- **ipad: 500 travelers, timeMs 0.24375 — BUILDER CALL, flagged.** No
+  iPad-class travel measurement exists yet; the Q2 ruling itself
+  records the iPad cap as pending the device bench. The tightness ratio
+  is `FRAME_BUDGETS`' iPad/desktop render-cap ratio, 5.0 / 8.0 — the
+  frame-cost budget, the nearest budget in kind to travel's per-frame
+  CPU cost — applied to the desktop cap: 800 × 5/8 = 500. Its timeMs is
+  not an iPad measurement: it is 500 marks at the declared desktop
+  per-mark cost (0.39 / 800), i.e. the allowance expressed in cost
+  terms. **Re-derive from a measured iPad number when the bench
+  lands; do not tune by eye.**
 
-## Proofs
+Cost-terms bound, by construction and asserted in the suite:
+`estimatedMs = travelers × (declared travel/flow timeMs / 800)` and
+`estimatedMs ≤ the class's budgetMs` for both classes, at any request.
 
-- Baseline before edits: 16/16 relevant suites green on the untouched base.
-- After the build: every suite above green except the three §3 pins listed.
-- Lint: **0 errors / 11 warnings** (exact baseline).
-- Production build: green.
-- Full manifest sweep: **483 run / 479 PASS / 4 FAIL**. The four failures are
-  exactly the sanctioned set: `rollSafety` (standing sandbox exception,
-  base-identical) and the three §3 pins above (`creatureGate`, `replayGate`,
-  `wingWarp`) — failing only on the new key, per the strip proof. `swarmWasm`
-  excluded by the sweep script per the standing method (sandbox, base-identical).
-- `creatureGate` fixture: untouched (no fixture path appears in the diff).
+## Builder calls (all of them)
 
-## Deviations and flags
+1. **iPad cap = 500** via the FRAME_BUDGETS 5/8 ratio — flagged above;
+   no iPad measurement exists on this branch.
+2. **Selection order = instance index, ascending.** The store already
+   keys state by index; any deterministic order satisfies the contract,
+   and this one needs no new state and survives rebuilds.
+3. **Selection cost declared as timeMs 0** for `travel/budget` — the
+   honest figure at the registry's ms scale: the selection measured
+   **119–245 ns/call** across suite runs in this sandbox (suite
+   re-measures and prints it on every run). The cost the budget actually
+   controls is `travel/flow`'s declared 0.39 ms, unchanged.
+4. **A non-traveler's state is dropped, not settled**, when the budget
+   shrinks under it: the budget is a scene property, not a pressure
+   event — the mark was never selected in this configuration, so it
+   presents at home exactly. (The cut 1.6 shed keeps its own settle
+   behaviour, untouched.)
 
-1. **§3 stop taken on creatureGate as well as replayGate/wingWarp** (see the pin
-   section above for the mechanism and the strip proof). Nothing re-recorded.
-2. **Count changes are now undoable.** Writes go through `setLayoutParam`,
-   which pushes undo history like every layout param; the retired stepper wrote
-   a plain store field and was not undoable. This is the generic BUILD-param
-   behaviour Q3's ruling implies ("joins the BUILD param family"), flagged
-   rather than special-cased away.
-3. **Keeps now carry the count.** `captureFavorite` copies `layoutParams`
-   wholesale and never carried the count before; post-S3 keeps carry it inside
-   the layout, automatically. Pre-S3 keeps load with count 0 (no key → default).
-   No code change was needed or made.
-4. **Spring glide.** `liveLoop`'s slider springs damp every numeric param,
-   `creatures` included (the int `count` already behaves this way); the stamp
-   truncates with `| 0`, so a 0→4 change steps creatures in as the glide
-   crosses integers — the same fade-in class as `count`-driven items. Takes
-   record the stamped per-frame count, so replay stays exact.
-5. **Historical docs left alone.** `docs/research/strata-quantized/qa-report.md`
-   still names `CreatureSliders.jsx` — it is a dated audit record, not wiring.
-6. Robots / L-system growths: not staged (no stage path exists; out of scope,
-   untouched).
+## Cost
+
+- Selection: scalar arithmetic, **once per scene per resolve** — never
+  per mark per frame. Measured **119–245 ns/call** (median over 20,000
+  calls per run, sandbox node; suite section I). The only per-mark work
+  it adds is one integer comparison in `applyTransport`'s existing step
+  loop, plus a state-prune that runs only when the budget actually trims.
+- Declared at registration per the house pattern: `travel/budget`,
+  **tier 0** (structural, like `travel/flow` — no GPU pass, sheds by the
+  governor's travel rung), `timeMs: 0` (builder call 3 above).
+  `costTiers` suite green.
+- The pass itself re-measured with the budget active (suite G):
+  `applyTransport` at the 800-mark cap, one locked step + present —
+  median-of-medians **0.390 / 0.407 / 0.434 ms** across three
+  post-amendment suite runs (declared 0.39; my pre-amendment baseline
+  run measured 0.384 ms, inside P1's recorded 0.383–0.389 band — the
+  spread is sandbox load, the suite's own gate is the 2.0 ms class
+  allowance, and the figure stays sandbox-indicative as with every CPU
+  number in the registry).
+
+## Pins / fixtures — no re-records, no new keys
+
+- **New layoutParams keys: NONE.** The authored keys are P1's unchanged
+  three (`transport`, `transportLeash`, `transportFlow`). Census pins,
+  key-universe counts and PARAM_SPEC are untouched; the census suite is
+  green unmodified.
+- The one new input is a **resolver input**, not a layoutParam:
+  `travelIpadClass` (boolean, machine key), plus its plumbing fields
+  (`travel.ipadClass` in buildPlacements, `travel.ipadClass` in
+  `ctx.travel`). Pre-Q2 takes don't carry it and read it as desktop.
+- The three pin suites already failed on this branch before this
+  amendment (P1's additive keys predate their fixtures). I measured
+  their actuals **before and after** my change; they are identical —
+  the amendment moves no pin:
+  - `engine/wingWarp`: unstripped actual **`41d885e1`** before and after
+    (expected REST pin `dc0897fb`).
+  - `gl/replayGate`: fails at the same first checkpoint (the gate's
+    `firstMismatchFrame` actual **0**) before and after.
+  - `gl/creatureGate`: fails at the same first checkpoint (actual **0**)
+    before and after.
+  Since no layoutParams keys were added, there is nothing to strip; the
+  before/after-identical actuals are the strip-proof equivalent for
+  this amendment, and the stronger in-suite proof is section I's
+  absent-class run, bit-identical to the desktop (P1) run. **No fixture
+  was re-recorded.**
+
+## Selfcheck results (my runs, exact)
+
+- `app/src/engine/travel.selfcheck.mjs`: **79 checks passed** (P1's 50
+  unchanged + 29 new in section I: budget table + derivations, selection
+  bounds in count and cost terms, purity ×100, selection cost, live
+  iPad-class subset travel with non-travelers bit-exact at home, fresh-run
+  replay determinism under the budget, desktop = P1, absent class =
+  desktop bit-for-bit, budget shrink).
+- Affected existing suites, run individually, all green:
+  governorCuts, governorCreatureShed (7 checks), governorHostileScene
+  (16 cuts, 71 passes), costTiers, census, liveResolve.determinism,
+  liveResolve, buildPlacements, kineme, performanceFile,
+  parity/deviceBudgets, spawn.
+- `npm run build`: **green**.
+- ESLint on every touched file: **clean**.
+- Full manifest sweep: `npm run selfcheck` ran the first 81 manifest
+  lines green (76 suites, including the travel suite) and stopped at
+  line 82, `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` —
+  **`cargo not found on PATH`**, the same pre-existing environmental
+  failure P1 recorded (no Rust/WASM file is touched by this amendment).
+  The remaining 408 manifest suites (lines 83–end) were then run
+  individually, stdin detached per suite: **404 passed, 4 failed**.
+  Total across the manifest: **480 of 485 suites green**; the 5 failures
+  are the swarmWasm environment failure, the three pre-existing pin
+  gates below, and one bulk-only failure:
+  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the pin
+    gates, failing exactly as they did at `9d6fb42c` (identical actuals,
+    see Pins above).
+  - `gl/clock.inventory` — failed inside both bulk sweep runs, and
+    passes standalone every time (5 consecutive runs, 9/9, including
+    immediately after its manifest neighbours). Reported as observed,
+    not explained away: nothing in this amendment touches a clock, a
+    wall-clock read, or a file that suite inventories, and its
+    standalone result is green. (An earlier bulk run of mine also
+    silently skipped 2 suites through a shared-stdin bug in my own
+    sweep script; those counts were discarded and the range re-run
+    with stdin detached — the numbers above are the corrected run.)
+
+## Not built (by design)
+
+- **Q4 per-stratum leashes** (#1575 amendment) — not this slice; the
+  scene leash is exactly as P1 built it.
+- **P3 surge** (#1576) — untouched; no trigger work of any kind.
+- **PATH transport (P2)** — not built; the downstream measured PATH
+  figure (0.662 ms) is not on this branch and no cap here anticipates
+  it. When PATH lands it declares its own cost and the same budget
+  arithmetic reads it — no mechanism change needed.
+- **An iPad-measured cap** — impossible on this branch by the ruling's
+  own record (device bench pending); the iPad cap is the flagged
+  builder call above.
+- The resolver snapshot still does not serialize travel state (a P1
+  property, unchanged): mid-session takes resume travel from a fresh
+  store, as they did at `9d6fb42c`.

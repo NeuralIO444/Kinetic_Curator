@@ -25,6 +25,7 @@ export const MAX_FRAMES = 60 * 60 * 20;
 /** Inputs that describe the recording MACHINE, not the performance. A note, never an instruction (see header). */
 export const MACHINE_KEYS = Object.freeze([
   'quality', 'perfTier1', 'assetThin', 'perfClampOverride', 'slowRender', 'reducedMotion', 'canvasW', 'canvasH',
+  'travelIpadClass', // #1574 Q2 — the recording machine's device class, which the traveler budget reads
 ]);
 
 export class PerformanceFileError extends Error {

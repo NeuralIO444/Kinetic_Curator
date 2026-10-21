@@ -133,6 +133,43 @@ export function frameBudgetForDevice(ipadClass) {
  */
 export const CREATURE_FRAME_ALLOWANCE_MS = 2.0;
 
+/**
+ * #1574 Q2 (ruled by Matt, 2026-10-20) — the traveler budget: how many of a
+ * FLOW scene's placed marks the governor may let travel, per device class.
+ * The author sets the ceiling, not the amount: a FLOW scene requests travel
+ * for every placed mark (the P1 behaviour), and the governor's selection
+ * (engine/kineme.js selectTravelers) is the effective amount — at or below
+ * that request, and at or below what the class cap affords in cost terms.
+ * Governor-selected, never a panel control: no surface edits these numbers.
+ *
+ * Derivation — the cap is a cost budget in traveler units. Desktop: 800,
+ * exactly the placement count cap at which FLOW travel was measured
+ * (0.387 ms in the P1 sandbox bench; declared travel/flow timeMs 0.39 in
+ * the kernel cost registry), so a desktop scene at its maximum authored
+ * count costs exactly the declared travel cost and desktop behaviour is
+ * bit-identical to P1. Each entry's timeMs is the desktop-measured cost
+ * equivalence of its traveler count (the declared 0.39 at 800 marks,
+ * linear in marks: per-mark = 0.39 / 800).
+ *
+ * iPad: 500 — BUILDER CALL, flagged as such: no iPad-class travel
+ * measurement exists yet (the Q2 ruling itself records the iPad cap as
+ * pending the device bench). The tightness ratio is FRAME_BUDGETS'
+ * iPad/desktop render-cap ratio, 5.0 / 8.0 — the frame-cost budget, the
+ * nearest budget in kind to travel's per-frame CPU cost — so the iPad
+ * class affords 800 × 5/8 = 500 travelers, 0.24375 ms of desktop-equivalent
+ * travel cost. Re-derive from a measured iPad number when the bench lands;
+ * do not tune this by eye.
+ */
+export const TRAVEL_BUDGETS = Object.freeze({
+  desktop: Object.freeze({ maxTravelers: 800, timeMs: 0.39 }),
+  ipad: Object.freeze({ maxTravelers: 500, timeMs: 0.24375 }),
+});
+
+/** The traveler budget for a device class (iPad-class = true). */
+export function travelBudgetForDevice(ipadClass) {
+  return ipadClass ? TRAVEL_BUDGETS.ipad : TRAVEL_BUDGETS.desktop;
+}
+
 /** Caps used when RENDER · UNCAPPED is on — no interactivity to protect. */
 export const FINAL_CAPS = {
   id: 'final',

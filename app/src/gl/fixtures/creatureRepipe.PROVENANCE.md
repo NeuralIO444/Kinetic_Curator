@@ -39,3 +39,19 @@
   behaviour change ever moves creature replay, that change re-records in its own PR and says so, with the
   reason — the gate's rule since #1638. (The 2026-10-19 checkpoint re-record above is that sanctioned path,
   taken once the repipe was complete.)
+
+## Checkpoint refresh — 2026-10-20, #1574 publish (Matt's re-record ruling)
+
+Checkpoints refreshed on the #1574 branch tip `2c8661be` under the publish re-record
+ruling recorded on #1574 (2026-10-20), following the #1356 F1/F2 finish discipline: the
+fixture's recorded INPUTS are untouched (deep diff: inputs byte-identical; all 16
+checkpoint hashes re-stamped, nothing else). The refresh replays the fixture's own
+inputs through the current resolver and harvests the checkpoint chain — the same loop
+verifyPerformance runs. Cause: the travel layout keys' echo in the hashed resolver
+output (see the replayGate provenance note of the same date; wingWarp's strip proof
+there is the resolver-level evidence). Control: the same refresh on clean main
+`6946f393` reproduces the prior fixture byte-for-byte (sha256 7e99c5b5…); the branch
+refresh is deterministic (two runs, identical sha256). Note: the session recorder
+script (scripts/recordCreatureRepipeFixture.mjs) no longer runs on main — the repipe
+removed a resolveTap export it imports; the refresh path above is the working route
+for this fixture until that script is repaired.

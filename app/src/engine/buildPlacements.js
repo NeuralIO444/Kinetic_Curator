@@ -18,7 +18,7 @@
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { makeHeroInfo } from './kernel/field/attractors.js';
-import { applyKinemeDrivers, applyRhythm } from './kineme.js';
+import { applyKinemeDrivers, applyRhythm, applyTransport } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
@@ -170,6 +170,16 @@ export function buildPlacements({
   growthTick = 0,
   audioEnergy = null,
   kineme = null,
+  // #1574 — travel transport (P1, FLOW). Ephemeral per-frame input like
+  // kineme — NEVER in geometrySignature: { store, sceneId, frameMs, shed,
+  // ipadClass }. The mode/leash/strength are recipe data and ride
+  // layoutParams (transport / transportLeash / transportFlow). ipadClass
+  // (#1574 Q2) is the device class the governor's traveler budget reads —
+  // machine state from the resolver input, absent = desktop class = the
+  // P1 behaviour. No travel input, mode 'still' or leash 0 → the pass
+  // never runs and the SoA is bit-identical to the pre-#1574 pipeline
+  // (the parity gate, engine/travel.selfcheck).
+  travel = null,
   // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
   // geoParams below and down to getSampler. Optional; null reads as '?'.
   layerId = null,
@@ -449,6 +459,25 @@ export function buildPlacements({
   // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
   const undoNudge = dish && dish.groundCell && nudge > 0 ? applyGroundNudge(soa, dish.groundCell, nudge, stillMarks) : null;
+  // #1574 — the transport pass runs LAST: home is the presented placement
+  // (post rhythm/drivers/nudge), and the sim's offsets fold on top. The
+  // gate is the parity contract: no ephemeral input, 'still', or leash 0
+  // never calls the sim, so an off scene's SoA is today's, bit for bit.
+  const undoTravel = travel && layoutParams.transport === 'flow' && layoutParams.transportLeash > 0
+    ? applyTransport(soa, {
+      seed, canvasW, canvasH,
+      travel: {
+        mode: 'flow',
+        leash: layoutParams.transportLeash,
+        flow: layoutParams.transportFlow,
+        store: travel.store,
+        sceneId: travel.sceneId ?? layerId,
+        frameMs: travel.frameMs,
+        shed: travel.shed,
+        ipadClass: travel.ipadClass, // #1574 Q2 — the traveler budget's device class (undefined = desktop)
+      },
+    }, stillMarks)
+    : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
@@ -628,6 +657,7 @@ export function buildPlacements({
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
 
+  if (undoTravel) undoTravel(); // #1574 — reverse of application
   if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();
   if (undoRhythm) undoRhythm(); // #1198 — reverse of application

@@ -34,7 +34,7 @@ import { createGrid, stepGrid } from '../engine/ca-engine.js';
 import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
-import { patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js';
+import { patternAmounts, rhythmTypeForPattern, createTravelStore } from '../engine/kineme.js';
 import { GrowthHooks, ensureAggregate } from '../engine/kernel/sample/growth.js';
 import { createDish } from '../engine/kernel/dish.js';
 import { patternGround } from '../pattern/ground.js';
@@ -113,7 +113,7 @@ export function fpDelta(a, b, fields) {
 // for the channel it rides.
 export function place(params, {
   seed = CENSUS_SEED, cast = CAST, paletteId = 'hydra', seedOffsets = null,
-  growthTick = 0, kineme = null, ground = null, rawParams = null, clearGrowth = false, caGrid = null,
+  growthTick = 0, kineme = null, ground = null, rawParams = null, clearGrowth = false, caGrid = null, travel = null,
 } = {}) {
   const lp = normalizeLayoutParams(params);
   if (rawParams) Object.assign(lp, rawParams);
@@ -126,7 +126,7 @@ export function place(params, {
   const { items } = buildPlacements({
     layoutParams: lp, seed, activeAssets: cast,
     palette: resolvePalette(paletteId, null, []), caps: CAPS,
-    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid,
+    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid, travel,
     ...(ground ? { dish: ground.dish, lean: ground.lean, nudge: ground.nudge, snap: ground.snap } : {}),
   });
   return items;
@@ -158,6 +158,15 @@ export function kinemeCtxFor(lp, seed = CENSUS_SEED) {
   const rhythm = rt ? { type: rt } : null;
   if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
   return { seed, driverSec: 3.7, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm };
+}
+
+// #1574 — the travel context, built exactly as liveResolve builds it
+// (the resolver's store, this frame's spine-A delta, the governor's shed
+// flag): a fresh store and a frozen 100 ms frame (6 locked steps), so a
+// sweep end is one deterministic roam from home. The mode/leash/strength
+// themselves ride the layout params (recipe data), not this context.
+export function travelCtxFor() {
+  return { store: createTravelStore(), sceneId: 'census', frameMs: 100, shed: false };
 }
 
 // The ground a content layer rests on, built exactly as
@@ -269,6 +278,8 @@ const KEY_FIXTURES = {
   kinemePaletteBreath: { driver: 'kineme', ctx: { mode: 'fibonacci' }, note: 'measured through the livingMotion driver context, driver time frozen at 3.7 s' },
   fieldMapAmount: { driver: 'place', ctx: { ...FIELDMAP_CTX } },
   kinemeBrushWobble: { driver: 'kineme', ctx: { mode: 'brush' }, note: 'livingMotion populates amounts.brushWobble from this param since #1516 and the driver evaluates dWobble — but no stage-C consumer applies dWobble to placements yet (#894/#897, by design), so the measured picture delta is still zero — measured through the production-shaped driver context' },
+  transportLeash: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow', transportFlow: 1 }, note: 'measured through the travel context (fresh store, one frozen 100 ms frame = 6 locked steps): leash 0 is the still parity gate, so the sweep is off vs the widest roam' },
+  transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow', transportLeash: 200 }, note: 'measured through the travel context (fresh store, one frozen 100 ms frame = 6 locked steps) at a working leash' },
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
@@ -337,6 +348,7 @@ const STRUCT_FIXTURES = {
   accumulation: { driver: 'dish', reason: 'measured in the dish matrix (trail field deposits + read)' },
   trail: { driver: 'none', reason: 'accumulation trail style (GL trail surface); no headless consumer' },
   kinemePattern: { driver: 'kineme', ctx: { mode: 'fibonacci' }, values: ['DRIFT', 'ORGANIC'], note: 'ORGANIC routes to the rhythm layer — a placement-layer modulation that survives into stills when the driver context is present' },
+  transport: { driver: 'travel', ctx: { mode: 'fibonacci', transportLeash: 200, transportFlow: 1 }, values: ['still', 'flow'], note: 'still is the parity gate (bit-identical placements); flow roams through the travel context (fresh store, one frozen 100 ms frame)' },
   symmetry: { driver: 'swarm', ctx: { mode: 'hype' }, values: ['none', 'bilateral'], note: 'symmetry fans live in the organism item builder (wings/fans on a hype cast); placements have no symmetry channel' },
   behave: { driver: 'swarm', ctx: { ...HYPE_CTX }, values: ['cruise', 'flock'] },
   material: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['plate', 'wash'], note: 'the material vocabulary is complete in GL (#1547 M1 glass, #1548 M2 plate, #1549 M3 wash + stipple): every value engages a placement flag here (the flags ride the place fingerprint and the scene contract; the renderer carries them as one body code) — the delta below is plate↔wash on this fixture, the two colour-ramp bodies. The bodies themselves are render-level and measured by their leaf suites (plateBody / washBody / stippleBody raster deltas), not here; glass additionally moves the placed alpha + sort. One seam stays disclosed, not hidden: plate and wash render flat in the GL export (studio.py still — no channel decomposition there), which sceneContract.warnUnsupportedMaterials names; stipple\'s screen and glass\'s body survive the export' },
@@ -389,6 +401,11 @@ function runFixture(driver, params, fx = {}, key = null, value = null) {
   if (driver === 'kineme') {
     const lp = normalizeLayoutParams(params);
     return { items: place(params, { kineme: kinemeCtxFor(lp) }), fields: PLACE_FIELDS };
+  }
+  if (driver === 'travel') {
+    // A fresh store per run: the sweep ends and the repeat all start from
+    // home, so the delta is the knob's roam and the repeat is identical.
+    return { items: place(params, { travel: travelCtxFor() }), fields: PLACE_FIELDS };
   }
   if (driver === 'ground') {
     return { items: place(params, { ground: groundFor(key, value) }), fields: PLACE_FIELDS };

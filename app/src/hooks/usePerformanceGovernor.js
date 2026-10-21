@@ -7,6 +7,7 @@
 //   (see ./governorCuts.js, pure and unit-tested):
 //     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //     cut 1.5: creature count (#1694 S2 — population sheds before finishes)
+//     cut 1.6: travel (#1574 — FLOW marks settle home; after the population, ahead of the tier)
 //     cut 2: quality tier step HIGH → BALANCED → PERF
 //     cut 3: mirror/gloss/ACCUM shed (independent perfTier1 mechanism, lower FPS floor)
 //     cut 4: cost-aware asset thinning (drop highest-cost assets first)
@@ -27,7 +28,17 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
-import { recordGovernorEvent } from '../gl/governorEventLog.mjs';
+import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
+
+// #1574 — the event log's ladder map (gl/governorEventLog.mjs SHED_STEPS)
+// predates the content rungs: it knows neither 'creatureCount' (cut 1.5)
+// nor 'travel' (cut 1.6), and recordGovernorEvent throws on an unknown
+// kind — inside this effect, at the moment a shed fires. Guard the two
+// generic record sites below so a rung the log has not learned can never
+// crash the governor; the shed itself, the badge (shedSummary) and the
+// restore all still happen. Extending the log's map is a follow-up.
+const LOG_KNOWN_KINDS = new Set(CUT_KINDS);
+const recordCutEvent = (e) => { if (LOG_KNOWN_KINDS.has(e.cutKind)) recordGovernorEvent(e); };
 
 // Hysteresis defaults (#259 — the permanent-shed-trap fix). Shed below 28,
 // recover at/above 30: the two thresholds must never coincide above a
@@ -108,6 +119,11 @@ export function usePerformanceGovernor() {
   const setCreatureShed = useStore(s => s.setCreatureShed);
   const layoutParams = useStore(s => s.layoutParams);
   const creatureCount = layoutParams?.creatures ?? 0;
+  // #1574 — the travel rung: the shed overlay, and whether travel is live
+  // on the scene (FLOW with a leash — the same gate buildPlacements runs).
+  const travelShed = useStore(s => s.travelShed);
+  const setTravelShed = useStore(s => s.setTravelShed);
+  const travelActive = layoutParams?.transport === 'flow' && (layoutParams?.transportLeash ?? 0) > 0;
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.
@@ -241,7 +257,7 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource, creatureShed,
+      slowRender, slowRenderSource, creatureShed, travelShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -249,6 +265,7 @@ export function usePerformanceGovernor() {
         case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
         case 'creatureCount': setCreatureShed(0); break;
+        case 'travel': setTravelShed(false); break;
         case 'quality':
           // #264 M1 — restore the tier the governor stepped down from,
           // then release the claim. A manual quality change clears
@@ -264,7 +281,7 @@ export function usePerformanceGovernor() {
       }
       // Event-log only: the cut cleared (FPS recovered past RECOVER —
       // hysteresis, #259; countClamp also clears on tier change).
-      recordGovernorEvent({
+      recordCutEvent({
         type: 'restore', cutKind: cut.kind,
         label: cut.kind === 'quality' ? `tier restored → ${qualityShedFrom}` : cut.restoredLabel,
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
@@ -303,6 +320,8 @@ export function usePerformanceGovernor() {
       effectiveCount: layoutParams.count,
       creatureCount,
       creatureShed,
+      travelActive,
+      travelShed,
       slowRender,
       gpuSaturated,
     });
@@ -312,6 +331,7 @@ export function usePerformanceGovernor() {
       case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
       case 'creatureCount': setCreatureShed(cut.creatureShed); break;
+      case 'travel': setTravelShed(true); break;
       case 'quality':
         // #264 — record the tier being stepped down from, once per shed
         // episode, so recovery restores exactly it (never the operator's
@@ -325,7 +345,7 @@ export function usePerformanceGovernor() {
       default: break;
     }
     // Event-log only: steps 1–2 / 4–6 of the shed ladder fire here.
-    recordGovernorEvent({
+    recordCutEvent({
       type: 'shed', cutKind: cut.kind, label: cut.label,
       fps: { at: effFps, threshold: shedFps, sustainedMs: SUSTAIN_MS },
       detail: `FPS ${effFps} < ${shedFps} sustained ${SUSTAIN_MS / 1000}s${gpuNote}`,
@@ -336,5 +356,6 @@ export function usePerformanceGovernor() {
   }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
     creatureCount, creatureShed, setCreatureShed,
+    travelActive, travelShed, setTravelShed,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }
