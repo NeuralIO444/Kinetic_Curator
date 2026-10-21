@@ -6,8 +6,9 @@
   channel wired exactly as the app wires it today: App's frame tap feeding the singleton trackers
   (curator/formationLive.js / curator/spawnLive.js), their decisions riding the next frame's resolver input
   through the resolveTap providers.
-- **File:** `creatureRepipe.kcperf` — 17750 bytes, sha256 `7e99c5b58ea07a8c4d38c23a6825e5e21a727bfe0485c9a4120bcc9f76428cd3`
-  (originally 17762 bytes, sha256 `f2da28316587552fe204aa79b67545b3ee758fbb94ad60b29acf169218bd1b01` — see the
+- **File:** `creatureRepipe.kcperf` — 17766 bytes, sha256 `f50eea1384ade8651e5132024e350ce70f0bbcdf34dc359ce08b6754b4d65edd`
+  (before the 2026-10-20 travel re-record: 17750 bytes, sha256 `7e99c5b58ea07a8c4d38c23a6825e5e21a727bfe0485c9a4120bcc9f76428cd3`;
+  originally 17762 bytes, sha256 `f2da28316587552fe204aa79b67545b3ee758fbb94ad60b29acf169218bd1b01` — see the
   checkpoint re-record below; the recorded inputs are unchanged).
 - **Frames:** 901 (0..900), 16 checkpoints (every 60 frames).
 - **Seed:** 4242, constant. Canvas 1000x700, one content layer, layout mode 'random', count 380 marks,
@@ -39,3 +40,11 @@
   behaviour change ever moves creature replay, that change re-records in its own PR and says so, with the
   reason — the gate's rule since #1638. (The 2026-10-19 checkpoint re-record above is that sanctioned path,
   taken once the repipe was complete.)
+- **Checkpoint re-record (2026-10-20, travel kinemes #1574–#1576, Matt's publish ruling on #1574):** the same
+  sanctioned path as the S3 re-record. The stack added seven layout params (transport, transportPath,
+  transportLeash, transportFlow, transportCeiling, transportParallax, transportSurge; the shared default keeps
+  transport 'still'), so the resolver's hashed output gained exactly those keys and all 16 checkpoints moved.
+  Proven first: with the seven keys stripped from the shared defaults the ORIGINAL checkpoints verify 16/16 on
+  the stack's code; the refresh run on the base tree reproduces the previous file byte-for-byte; the refresh is
+  deterministic across runs; a deep diff of old vs new shows exactly 16 differing leaves — the checkpoint
+  hashes. The recorded inputs are byte-identical.
