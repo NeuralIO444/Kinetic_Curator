@@ -608,10 +608,6 @@ export function createLiveResolver() {
           });
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
-      // #1575 — travel's default for a NEW scene is 'auto' (family defaults), but a layout that never named a
-      // transport predates travel kinemes (a take recorded before them, a fixture, an old snapshot): it keeps
-      // every mark home, exactly as it was recorded. The store's own layout always names one (normalize).
-      if (!src.layoutParams || !Object.prototype.hasOwnProperty.call(src.layoutParams, 'transport')) layoutParams.transport = 'still';
       // #1202 — mirror is a 4-state enum; 'off' is truthy, so compare explicitly.
       if (input.perfTier1 && layoutParams.mirror !== 'off') layoutParams.mirror = 'off';
       // #425 — life drift per layer (see applyLifeDrift): own base, own

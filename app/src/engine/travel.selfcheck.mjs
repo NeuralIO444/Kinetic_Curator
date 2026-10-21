@@ -8,7 +8,7 @@ import { createNoise } from './noise.js';
 import { ASSETS } from '../data/assets/index.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getQualityCaps } from '../data/quality.js';
-import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, NEW_SCENE_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import {
   TRAVEL_STEP, TRAVEL_MAX_STEPS, createTravelStore, travelLayer, advanceTravelClock, travelParams, applyTravel,
   snapshotTravelStore, restoreTravelStore, checkTravelSnapshot, pruneTravelStore,
@@ -25,8 +25,7 @@ const palette = resolvePalette('hydra', null, []);
 const caps = getQualityCaps('high');
 const noise = createNoise(SEED);
 
-// 'still' unless a case asks otherwise: the baseline these checks compare against is today's build (the NEW-scene
-// default is 'auto' since #1575 — family defaults — and has its own suite, travelPath.selfcheck.mjs)
+// 'still' unless a case asks otherwise: the baseline these checks compare against is today's build
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 80, mode: DEFAULT_LAYOUT_PARAMS.mode, transport: 'still', ...over });
 const build = (layoutParams, travel = null, cache = undefined) => buildPlacements({
   layoutParams, seed: SEED, activeAssets: CAST, palette, caps, canvasW: W, canvasH: H, travel, cache,
@@ -42,7 +41,8 @@ function ctxFor(store, layoutParams, nowMs, frozen = false) {
 
 // ── params + the hard gate ─────────────────────────────────────────────────────────────────────────────────────
 {
-  assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'auto', 'a new scene: family defaults (#1575 Q1)');
+  assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'still', 'the shared default: still (everything saved opens as saved)');
+  assert.strictEqual(NEW_SCENE_LAYOUT_PARAMS.transport, 'auto', 'a fresh scene: family defaults (#1575 Q1)');
   assert.strictEqual(normalizeLayoutParams({}).transport, 'still', 'a document that predates travel opens as saved');
   assert.strictEqual(travelParams(lp(), W, H).active, false, 'still is inactive');
   assert.strictEqual(travelParams(lp({ transport: 'flow' }), W, H).active, true, 'flow is active');

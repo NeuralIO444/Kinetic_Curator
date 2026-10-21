@@ -9,7 +9,7 @@ import { createNoise } from './noise.js';
 import { ASSETS } from '../data/assets/index.js';
 import { resolvePalette } from '../data/palettes.js';
 import { getQualityCaps } from '../data/quality.js';
-import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, NEW_SCENE_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import {
   PATH_KINDS, TRANSPORT_MODES, TRAVEL_STEP, STRETCH_CAP, familyTransport, pathDisplacement, segmentShape, pathProgress,
   createTravelStore, travelLayer, advanceTravelClock, travelParams, jelloReadout, snapshotTravelStore, restoreTravelStore,
@@ -51,7 +51,8 @@ const homeOf = (p, cast = CAST) => new Map(build({ ...p, transport: 'still' }, n
 // ── vocabulary ─────────────────────────────────────────────────────────────────────────────────────────────────
 assert.deepStrictEqual([...TRANSPORT_MODES], ['auto', 'still', 'flow', 'path']);
 assert.deepStrictEqual([...PATH_KINDS], ['orbit', 'spiral', 'sweep', 'lissajous']);
-assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'auto');
+assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'still', 'saved things open as saved');
+assert.strictEqual(NEW_SCENE_LAYOUT_PARAMS.transport, 'auto', 'a fresh scene starts on the family defaults');
 assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transportPath, 'orbit');
 
 // ── Q1 family defaults: linework + glyphs roam, heavy solids anchor, the unnamed rest is still ──────────────────

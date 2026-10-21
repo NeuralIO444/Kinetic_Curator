@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT_PARAMS, BLEND_MODES } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, NEW_SCENE_LAYOUT_PARAMS, BLEND_MODES } from '../../data/layout-modes.js';
 import { initialEnabledAssets } from './globalSlice.js';
 import { defaultFxEffects, defaultFxParams, isFxLayer, FX_EFFECT_DEFS, FX_MENU_KINDS, availableFxKinds, fxEffectInsertIndex } from '../../fx/fxFilters.js';
 import { kindsForFxOrdinal } from '../../fx/fxTrack.js';
@@ -38,7 +38,7 @@ function freshSnapshot(seed, seedOffsets) {
     seedOffsets: normalizeSeedOffsets(seedOffsets),
     paletteId: 'praystation',
     paletteOverrides: null,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
+    layoutParams: { ...NEW_SCENE_LAYOUT_PARAMS }, // #1575 — a new stratum starts on travel's family defaults
     lockedParams: {},
     caGrid: null,
     enabledAssets: { ...initialEnabledAssets },

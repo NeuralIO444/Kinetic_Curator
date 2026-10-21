@@ -1,4 +1,4 @@
-import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, NEW_SCENE_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, shelfRestoreFields, trimUndoStack, UNDO_KIND_LAYERS, UNDO_KIND_SHELF } from '../history.js';
 import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, DISK_KEY } from './davisSlice.js';
@@ -185,7 +185,7 @@ export const createLayoutSlice = (set) => ({
    * Session state: not saved. Re-anchored whenever something other than refine changed the palette, or a keep landed.
    */
   refinePaletteAnchor: null,
-  layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
+  layoutParams: { ...NEW_SCENE_LAYOUT_PARAMS }, // #1575 — a fresh scene starts on travel's family defaults
   lockedParams: {},
   /**
    * Render-only overlay for the performance governor's last-resort density

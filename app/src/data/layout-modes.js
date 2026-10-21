@@ -203,10 +203,11 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // on a leash back to its placed home. Leash = free-roam radius as a fraction of the small canvas dimension (no
   // home force inside it, a spring with overshoot outside); flow = travel speed (0.5 ⇒ the #1573 spike's cruise).
   // Recipe data: saved, crowned, replayed, censused. Edited from the DIRECTORS motion group (Matt, 2026-10-14).
-  // #1575 — 'auto' (a NEW scene's default): each mark's family declares its transport (engine/travel.js
-  // familyTransport — linework flows, glyphs travel their path, heavy solids and the unnamed rest stay home; Q1
-  // RULED 2026-10-14). A document or link saved before travel existed loads as 'still': it opens as it was saved.
-  transport: 'auto',
+  // #1575 — the shared default stays 'still' (every document, link, take and fixture that predates travel opens
+  // exactly as saved). A FRESH scene or stratum in the app starts on 'auto' instead — NEW_SCENE_LAYOUT_PARAMS
+  // below: each mark's family declares its transport (engine/travel.js familyTransport — linework flows, glyphs
+  // travel their path, heavy solids and the unnamed rest stay home; Q1 RULED 2026-10-14, defaults ship ON).
+  transport: 'still',
   transportPath: 'orbit', // #1575 — the PATH family: orbit (the dish centre) | spiral | sweep | lissajous
   transportLeash: 0.16,
   transportFlow: 0.5,
@@ -328,6 +329,13 @@ export const DEFAULT_LAYOUT_PARAMS = {
   fieldMapAmount: 0,
   fieldMapCurve: 'smooth',
 };
+
+/**
+ * #1575 — the layout a FRESH scene or stratum starts from in the app (store init, a new stratum): the shared
+ * defaults with travel's family defaults switched ON (Q1 RULED 2026-10-14). Everything that loads a saved thing
+ * reads DEFAULT_LAYOUT_PARAMS instead, so nothing saved before travel ever starts to move.
+ */
+export const NEW_SCENE_LAYOUT_PARAMS = Object.freeze({ ...DEFAULT_LAYOUT_PARAMS, transport: 'auto' });
 
 /** #306 — audio envelope response-curve shapes. */
 export const AUDIO_RESPONSE_IDS = BALLISTICS_CURVES;
@@ -718,8 +726,6 @@ export function normalizeLayoutParams(partial) {
   // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
   // #1151 — palette-breath likewise: absent means 0, not the new default.
   for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
-  // #1575 — travel likewise: a document that predates travel kinemes keeps every mark home (absent = 'still').
-  if (!Object.prototype.hasOwnProperty.call(src, 'transport')) next.transport = 'still';
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
@@ -749,7 +755,7 @@ export function normalizeLayoutParams(partial) {
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
-  next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: unknown is today's still (absent: above)
+  next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: absent or unknown is today's still
   next.transportPath = pickEnum(next.transportPath, PATH_KINDS, 'orbit'); // #1575
   // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
   // clamp rides PARAM_SPEC above. A document that predates #1199 opens with

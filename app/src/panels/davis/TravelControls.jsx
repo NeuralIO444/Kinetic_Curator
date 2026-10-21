@@ -19,6 +19,8 @@ const MODE_TITLE = {
   flow: 'FLOW: each mark leaves home along the shared field, holds, and comes back on its leash',
   path: 'PATH: every mark travels the path family below — orbit, spiral, sweep or lissajous',
 };
+const MODE_LABEL = { auto: 'AUTO', still: 'STILL', flow: 'FLOW', path: 'PATH' };
+const PATH_LABEL = { orbit: 'ORBIT', spiral: 'SPIRAL', sweep: 'SWEEP', lissajous: 'LISSAJOUS' };
 const PATH_TITLE = {
   orbit: 'ORBIT: the stratum swirls around the dish centre',
   spiral: 'SPIRAL: each mark circles on a breathing radius',
@@ -56,7 +58,7 @@ export function TravelControls() {
             <button key={m} type="button" className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on}
               aria-label={`${m} travel`} title={MODE_TITLE[m]}
               onClick={() => set('transport', m)}>
-              {m.toUpperCase()}
+              {MODE_LABEL[m]}
             </button>
           );
         })}
@@ -70,7 +72,7 @@ export function TravelControls() {
             <button key={k} type="button" className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on}
               aria-label={`${k} path`} title={pathOff ? 'Pick PATH or AUTO to use a path family' : PATH_TITLE[k]}
               disabled={pathOff} onClick={() => set('transportPath', k)}>
-              {k.toUpperCase()}
+              {PATH_LABEL[k]}
             </button>
           );
         })}
