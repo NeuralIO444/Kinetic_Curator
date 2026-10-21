@@ -494,3 +494,4 @@ node src/loot/lootWrite.selfcheck.mjs
 node src/loot/shelfDiskRun.selfcheck.mjs
 node src/loot/shelfDiskPort.selfcheck.mjs
 node src/engine/engraving.selfcheck.mjs
+node src/gl/spectrumWarp.selfcheck.mjs

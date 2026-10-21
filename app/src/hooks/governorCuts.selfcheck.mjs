@@ -78,8 +78,11 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // #1627 S1 — 'markWeather' joins between renderScale and creatureCount
   // (cut 1.4): weather dies before marks — ahead of the population and
   // travel alike (the full walk is pinned in markWeather.selfcheck F).
+  // #1490 — 'feedbackWarp' joins between markWeather and creatureCount
+  // (cut 1.45): the warp sheds before body counts, weather still first
+  // (the full walk is pinned in spectrumWarp.selfcheck G).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'markWeather', 'creatureCount', 'travel', 'quality', 'assetThin', 'countClamp', 'slowRender']);
+  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'markWeather', 'feedbackWarp', 'creatureCount', 'travel', 'quality', 'assetThin', 'countClamp', 'slowRender']);
   console.log('[selfcheck] governorCuts (#264 restore coverage):',
     `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
 }

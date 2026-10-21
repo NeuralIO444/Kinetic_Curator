@@ -89,6 +89,21 @@ export const FX_EFFECT_DEFS = {
       lift: { label: 'Lift', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'How light the mist is: low is smoke, high is fog.' },
     },
   },
+  // #1490 — spectral path P4: the feedback warp's carrier. This item is NOT a chain filter: it registers
+  // no GL shader (gl/effects/fxShaders.mjs has no entry, so the GL chain compiles no step and no extra
+  // pass runs) and its SVG builder below is the identity pass-through. The amount is the warp's address:
+  // the live loop reads it off the FX stratum (gl/spectrumWarp.mjs feedbackWarpAmount) and lets the
+  // spectrum drive the ACCUM feedback recipe (zoom from bass deviation, spin from attenuated mids, decay
+  // 0.92..0.985, treble to chromatic aberration / grain). Live only — a baked export has no live spectrum
+  // to warp by, the spectrum COLOUR precedent (docs/design/spectral-path.md, P3). A document without this
+  // item carries no warp key anywhere, so off is byte-identical by construction.
+  feedbackWarp: {
+    label: 'Feedback Warp',
+    hint: 'Previous-frame feedback warped by the music: bass deviation zooms, mids spin, treble fringes. Live only — needs ACCUM on. Amount 0 is the layer untouched.',
+    params: {
+      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0, hint: 'How hard the spectrum warps the feedback. 0 is off.' },
+    },
+  },
   tear: {
     label: 'Tear',
     hint: 'Horizontal scanline slice-tears: banded rows shear left/right. X-only displacement (Y is flattened).',
@@ -154,7 +169,7 @@ export const GRAIN_FAMILY_KINDS = ['grain'];
 export const FX_RACK = [
   // #1022 — EF-1 holds real effects again; the two stubs it promised are built.
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
-  { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge'], stubs: [] },
+  { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal',        kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
   { slot: 'EF-4', label: 'Finish',       kinds: ['grain', 'scanlines', 'halo'],          stubs: ['dither', 'stipple'] },
 ];
@@ -171,7 +186,9 @@ export const FX_RACK = [
 // and it is the only effect in the set tuned for a dark ground.
 // #1022 — sharpen and haze join: the Blur / Focus slot must offer something
 // from every add surface (section +, family chooser, slot editor).
-export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze'];
+// #1490 — feedbackWarp joins: the spectral feedback warp must be reachable from every add surface or
+// its amount could never be raised (the #1022 rule for sharpen/haze).
+export const FX_MENU_KINDS = ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze', 'feedbackWarp'];
 
 export function isFxLayer(layer) {
   return !!layer && layer.type === 'fx';
@@ -537,7 +554,17 @@ function buildHaze(params, ctx, rid, src) {
   }];
 }
 
-const BUILDERS = { sharpen: buildSharpen, haze: buildHaze, rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge };
+// #1490 — the SVG half of FEEDBACK WARP is the identity, honestly: the warp is temporal (previous-frame
+// feedback driven by a live spectrum) and a still has neither a previous frame nor a spectrum to warp
+// by — the same live-only limit the spectral path states for COLOUR (spectral-path.md, P3). What this
+// builder guarantees is the print path never silently drops the item: the layer compiles, the chain
+// hands on untouched, and the amount stays in the document for the live instrument. Emitting the
+// pass-through the other identity cases use keeps a warp-only layer's filter byte-stable.
+function buildFeedbackWarp(params, ctx, rid, src) {
+  return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+}
+
+const BUILDERS = { sharpen: buildSharpen, haze: buildHaze, rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge, feedbackWarp: buildFeedbackWarp };
 
 /**
  * Compile an effects array into filter primitives.

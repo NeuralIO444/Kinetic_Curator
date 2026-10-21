@@ -7,6 +7,7 @@ import '../gl/effects/fxShaders.mjs';
 import '../gl/bridge/builtinEffects.mjs';
 import '../gl/accum.mjs';
 import '../gl/renderer.mjs';
+import '../gl/spectrumWarp.mjs'; // #1490 — registers gl/spectrum-warp (the feedbackWarp kind's cost id)
 import { MEASURED_COSTS } from '../gl/effects/measuredCosts.mjs';
 import { FX_EFFECT_DEFS } from '../fx/fxFilters.js';
 import { MATH_EFFECT_DEFS } from '../fx/mathFilters.js';

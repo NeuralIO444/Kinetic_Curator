@@ -95,8 +95,11 @@ const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
  *  modulation (applyAudioEnvelope) recomputes exactly what the base params
  *  carry. o = 0 is exactly the old path (no glow). There are no blur
  *  sigmas here (#308): the glow is mip-chain bloom + stipple diffusion +
- *  chromatic offset, and nothing in this module can ask for a gaussian. */
-function opticsDerived(o) {
+ *  chromatic offset, and nothing in this module can ask for a gaussian.
+ *  Exported for #1490: the spectral warp (gl/spectrumWarp.mjs) lifts the
+ *  glow's grain from treble through this same recompute, so a warped frame
+ *  can never carry optics fields that disagree with each other. */
+export function opticsDerived(o) {
   return {
     optics: o,
     // Mip-chain bloom (#308): which mip level of the glow target to read.

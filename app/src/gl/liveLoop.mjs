@@ -36,6 +36,8 @@ import { getStressState } from '../curator/stressLive.js'; // Phase 2 S5: the ba
 import { nextSurgeStamp } from '../curator/director.js'; // #1576 Q3: the Queen's surge stamp decision, hosted with the pull — read at the frame input below; the stamp is recorded input data, never a surface
 import { spectrumMarksShed } from './sceneContract.js';
 import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
+import { createSpectrumWarp, feedbackWarpAmount, applySpectrumWarp } from './spectrumWarp.mjs'; // #1490 P4: the FX feedback warp
+import { readSpectrum } from './spectrumLive.mjs'; // #1490: the warp reads the same recorded-input spectrum the marks read
 import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469: the loop notes its LIFE reading for the STIMULI readout
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
@@ -314,6 +316,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   let accumActive = false;
   let accumFrozen = false;
   let lastAccumOn = false;
+  // #1490 — the spectral feedback warp's driver: its per-bin attenuated state lives here, private to
+  // the feedback pass (the spectrum core is never smoothed for anyone else's sake).
+  const warpDriver = createSpectrumWarp();
   // #309 velocity smear: per-instance position history (layer|key) for the
   // frame-to-frame displacement attached as vx/vy. Cleared whenever the
   // ACCUM session ends so re-enabling starts at zero velocity.
@@ -797,6 +802,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // absent, so the frame is exactly what it was. The texture bytes are the live spectrum (gl/spectrumLive), packed once.
     const spectrumMarks = spectrumMarksFor(layoutParams, spectrumMarksShed({ perfTier1: s.perfTier1, quality: s.quality }));
     if (spectrumMarks) contract.spectrum = spectrumMarks;
+    // #1490 — the FX feedback warp's amount, read off the FX strata's feedbackWarp items (the existing
+    // { kind, params } surface: no layout key, no contract key, nothing serialized when the item is
+    // absent). 0 — no item, amount 0, or the governor's cut 1.45 — leaves the ACCUM step below running
+    // exactly today's recipe, and no warp state is stepped.
+    const feedbackWarp = feedbackWarpAmount(s.layers, !!s.feedbackWarpShed);
     // #790 (color.hue): the assignable hue-rotation route's output, in
     // degrees. Rides on top of each layer's layout hueRotate (the #262
     // uniform path — never the palette). 0 on the default table (routes.hue
@@ -969,6 +979,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // #790 PR5: the assignable render.accum route's output (0..40, hundredths
       // of trail keep). Undefined on the default table → 0 → today's gesture exactly.
       accumAudio: routes.accum ?? 0,
+      // #1490 — the feedback warp amount for this frame (0 = off; see buildFrame's read).
+      feedbackWarp,
       paused: !s.running,
       // #278 — the pixel dissolve now backs only manual voice-MIX
       // scrubbing (dragging the MIX control by hand). Auto chip-triggered
@@ -1119,7 +1131,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
         return;
       }
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, accumAudio, glow, paused, mix } = frame;
+      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, accumAudio, glow, paused, mix, feedbackWarp } = frame;
 
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
@@ -1203,11 +1215,19 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
               // #306: the bands are already shaped by the ballistics follower
               // (useAudioInput); swell scales the glow gesture only.
               // #287 fade-to-paper: the fade target follows the scene bg.
-              const rp = applyAudioEnvelope(accumRecipeParams({ ...accumParams, background: bgCss }), {
+              let rp = applyAudioEnvelope(accumRecipeParams({ ...accumParams, background: bgCss }), {
                 rms: audioOn ? bands.rms || 0 : 0,
                 flux: 0,
                 beatPulse: audioOn ? bands.beatPulse || 0 : 0,
               }, { swell: audioSwell ?? 1, accumAudio });
+              // #1490 — the spectral feedback warp rides the same recipe, after the band envelope:
+              // the spectrum state the core analysed (during a take, the recorded rows — the same
+              // recorded-input path the marks hear, so a replay warps identically) bends the
+              // feedback's zoom/spin/decay/prism/grain through the driver's own per-bin attenuated
+              // state. Amount 0 never reaches here: no step, no state, today's recipe exactly.
+              if (feedbackWarp > 0) {
+                rp = applySpectrumWarp(rp, warpDriver.step(readSpectrum(), clampedDtMs), feedbackWarp);
+              }
               if (accumParams.flowField) rp.flowField = accumParams.flowField;
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
