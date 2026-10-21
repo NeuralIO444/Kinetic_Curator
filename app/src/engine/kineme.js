@@ -869,10 +869,23 @@ const leanAmt = (t) => (t <= 0 || t >= PATH_LEAN_SEC ? 0 : Math.sin(Math.PI * (t
  *   speed  — rate multiplier (0 freezes the path at its t=0 anchor)
  *   lean   — anticipation scale, 1 by default (tests turn it off to
  *            measure the lean itself; not a recipe key)
- * Returns { x, y } — a fresh object per call (the caller is hot-path
- * aware: applyTransport reuses one scratch per mark present).
+ * Returns { x, y }. pathAnchor allocates a fresh one per call; the hot
+ * caller (applyTransport's PATH step, 800 marks × 2 calls per step)
+ * uses pathAnchorInto with reused scratch instead — the step's only
+ * per-mark allocations were the opts spread, the two return objects
+ * and the lissajous pair arrays (~3,200 short-lived objects a step),
+ * where the FLOW step allocates nothing per mark. On PR #1713's
+ * selfcheck-browser CI run the PATH pass measured 3.24 ms against
+ * 0.66 ms in node on the same code, while FLOW measured at its
+ * declared figure on the same box; the churn is the difference the
+ * step itself controls. Same math, same order — only the
+ * allocation is gone.
  */
 export function pathAnchor(home, tSec, opts) {
+  return pathAnchorInto(home, tSec, opts, { x: 0, y: 0 });
+}
+
+function pathAnchorInto(home, tSec, opts, out) {
   const W = Number(opts?.canvasW), H = Number(opts?.canvasH);
   const t = Math.max(0, Number(tSec) || 0);
   const seed = opts?.seed | 0;
@@ -885,10 +898,10 @@ export function pathAnchor(home, tSec, opts) {
   const cx = W / 2, cy = H / 2;
 
   if (family === 'orbit' || family === 'spiral') {
-    if (t <= 0) return { x: home.x, y: home.y }; // the anchored deal is home, bit-exact (no polar round-trip)
+    if (t <= 0) { out.x = home.x; out.y = home.y; return out; } // the anchored deal is home, bit-exact (no polar round-trip)
     const vx = home.x - cx, vy = home.y - cy;
     const r0 = Math.hypot(vx, vy);
-    if (!(r0 > 0.5)) return { x: home.x, y: home.y };
+    if (!(r0 > 0.5)) { out.x = home.x; out.y = home.y; return out; }
     const ang0 = Math.atan2(vy, vx);
     const dir = hashPhase(seed, `path:s:${index}`) > 0.5 ? -1 : 1;
     const driftHz = family === 'orbit' ? PATH_ORBIT_HZ : PATH_ORBIT_HZ * 0.6;
@@ -900,7 +913,7 @@ export function pathAnchor(home, tSec, opts) {
       r = r0 + radius * (Math.sin(TAU * (PATH_SPIRAL_HZ * speed * t) + TAU * ph) - Math.sin(TAU * ph)) * departEnv(t);
       if (r < 0) r = 0;
     }
-    return { x: cx + r * Math.cos(ang), y: cy + r * Math.sin(ang) };
+    out.x = cx + r * Math.cos(ang); out.y = cy + r * Math.sin(ang); return out;
   }
 
   if (family === 'sweep') {
@@ -912,27 +925,25 @@ export function pathAnchor(home, tSec, opts) {
     if (p < 0.07) x -= PATH_LEAN_PX * lean * Math.sin(Math.PI * (p / 0.07)); // anticipation at each departure
     const phY = hashPhase(seed, `path:y:${index}`);
     const y = home.y + radius * 0.35 * Math.sin(TAU * p + TAU * phY);
-    return { x, y };
+    out.x = x; out.y = y; return out;
   }
 
   // lissajous (the default family for an unknown name — the weave is the
   // gentlest path, and an unknown family name must never throw mid-frame)
   const ux = hashPhase(seed, `path:x:${index}`);
   const uy = hashPhase(seed, `path:y:${index}`);
-  const raw = (tt) => [
-    radius * (Math.sin(TAU * (PATH_LISS_HZ_X * speed * tt) + TAU * ux) - Math.sin(TAU * ux)),
-    radius * 0.7 * (Math.sin(TAU * (PATH_LISS_HZ_Y * speed * tt) + TAU * uy) - Math.sin(TAU * uy)),
-  ];
-  const [ox, oy] = raw(t);
+  const rawX = (tt) => radius * (Math.sin(TAU * (PATH_LISS_HZ_X * speed * tt) + TAU * ux) - Math.sin(TAU * ux));
+  const rawY = (tt) => radius * 0.7 * (Math.sin(TAU * (PATH_LISS_HZ_Y * speed * tt) + TAU * uy) - Math.sin(TAU * uy));
+  const ox = rawX(t), oy = rawY(t);
   const env = departEnv(t);
   let lx = 0, ly = 0;
   const la = leanAmt(t) * lean;
   if (la > 0) {
-    const [dx, dy] = raw(0.05); // the initial departure direction
+    const dx = rawX(0.05), dy = rawY(0.05); // the initial departure direction
     const dl = Math.hypot(dx, dy);
     if (dl > 1e-9) { lx = -(dx / dl) * PATH_LEAN_WEAVE_PX * la; ly = -(dy / dl) * PATH_LEAN_WEAVE_PX * la; }
   }
-  return { x: home.x + ox * env + lx, y: home.y + oy * env + ly };
+  out.x = home.x + ox * env + lx; out.y = home.y + oy * env + ly; return out;
 }
 
 // ── Stretch along velocity (#1575) ───────────────────────────────────────
@@ -1096,11 +1107,16 @@ export function applyTransport(soa, ctx, still = null) {
     let any = false;
     const offX = pathOffScratch(n), offY = pathOffScratchY(n);
     const homeScratch = { x: 0, y: 0 };
+    // One reused opts object and two reused anchor outs for the whole
+    // step — no per-mark allocation (see pathAnchor's note).
+    const anchorOpts = { ...pathOpts, index: 0 };
+    const aOut = { x: 0, y: 0 }, prevOut = { x: 0, y: 0 };
     for (let k = 0; k < n; k++) {
       if (still && still[k]) continue;
       const index = soa.index ? soa.index[k] : k;
       homeScratch.x = soa.x[k]; homeScratch.y = soa.y[k];
-      const a = pathAnchor(homeScratch, tSec, { ...pathOpts, index });
+      anchorOpts.index = index;
+      const a = pathAnchorInto(homeScratch, tSec, anchorOpts, aOut);
       let ox = a.x - soa.x[k], oy = a.y - soa.y[k];
       if (pathOpts.family === 'sweep') {
         if (oy > leash) oy = leash; else if (oy < -leash) oy = -leash;
@@ -1113,7 +1129,7 @@ export function applyTransport(soa, ctx, still = null) {
       if (deform) {
         // Velocity by finite difference of the pure function itself —
         // pure in, pure out, no state to disagree with the anchor.
-        const prev = pathAnchor(homeScratch, Math.max(0, tSec - TRAVEL_STEP_SEC), { ...pathOpts, index });
+        const prev = pathAnchorInto(homeScratch, Math.max(0, tSec - TRAVEL_STEP_SEC), anchorOpts, prevOut);
         const vx = (a.x - prev.x) / TRAVEL_STEP_SEC, vy = (a.y - prev.y) / TRAVEL_STEP_SEC;
         const sp = Math.hypot(vx, vy);
         const amt = travelStretchAmount(sp);
