@@ -710,6 +710,50 @@ export function pruneTravelStore(store, keepSceneIds) {
   for (const k of [...store.scenes.keys()]) if (!keepSceneIds.has(k)) store.scenes.delete(k);
 }
 
+/**
+ * The whole travel store as JSON-safe data, for the resolver's mid-session snapshot (#1367): without it a take
+ * that begins mid-session restores every traveller at home and replays a different roam. Scenes and states are
+ * emitted in a stable order (scene insertion order, instance index ascending); numbers round-trip exactly.
+ */
+export function snapshotTravelStore(store) {
+  const scenes = [];
+  if (store && store.scenes instanceof Map) {
+    for (const [id, sc] of store.scenes) {
+      const states = [...sc.states.entries()].sort((a, b) => a[0] - b[0]).map(([i, s]) => [i, s.ox, s.oy, s.vx, s.vy]);
+      scenes.push([id, { seed: sc.seed, acc: sc.acc, steps: sc.steps, states }]);
+    }
+  }
+  return { v: 1, scenes };
+}
+
+/** Structural check of a travel snapshot (fail-closed). */
+export function checkTravelStoreSnapshot(snap) {
+  if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.scenes)) return false;
+  for (const e of snap.scenes) {
+    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string') return false;
+    const sc = e[1];
+    if (!sc || typeof sc !== 'object' || !Number.isInteger(sc.seed) || !Number.isFinite(sc.acc) || !Number.isInteger(sc.steps) || sc.steps < 0) return false;
+    if (!Array.isArray(sc.states)) return false;
+    for (const r of sc.states) {
+      if (!Array.isArray(r) || r.length !== 5 || !Number.isInteger(r[0])) return false;
+      for (let k = 1; k < 5; k++) if (!Number.isFinite(r[k])) return false;
+    }
+  }
+  return true;
+}
+
+/** Replace the store's contents with a snapshot; false (store untouched) when malformed. */
+export function restoreTravelStore(store, snap) {
+  if (!store || !(store.scenes instanceof Map) || !checkTravelStoreSnapshot(snap)) return false;
+  store.scenes.clear();
+  for (const [id, sc] of snap.scenes) {
+    const states = new Map();
+    for (const [i, ox, oy, vx, vy] of sc.states) states.set(i, { ox, oy, vx, vy });
+    store.scenes.set(id, { seed: sc.seed, acc: sc.acc, steps: sc.steps, states });
+  }
+  return true;
+}
+
 /** A scene's sim record for tests/debug: { seed, steps, states } with the
  *  states sorted by instance index, or null when the scene never travelled. */
 export function travelSceneSnapshot(store, sceneId) {
