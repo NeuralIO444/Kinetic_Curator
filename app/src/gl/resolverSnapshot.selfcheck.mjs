@@ -108,6 +108,16 @@ const SCENARIOS = [
   // continuation roams elsewhere. Fifty frames of roam are banked when the snapshot lands.
   { ...single('random', { transport: 'flow', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:flow' },
   { ...single('random', { transport: 'path', transportPath: 'lissajous', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:path' },
+  // #1576 — P3's accumulative state: the surge envelope store (a trigger pulse at frame 40 starts an envelope that is
+  // mid-flight at the frame-50 snapshot) and the parallax drift clock (zTiers > 1 so the front tiers move)
+  {
+    name: 'travel:surge+parallax',
+    at: (f) => ({
+      layoutParams: lp({ mode: 'random', zTiers: 4, transportSurge: 1, transportParallax: 1, kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }),
+      surgeTrigger: f >= 40 && f < 44 ? 1 : 0,
+      ...breathe(f),
+    }),
+  },
   {
     name: 'shared-scent:mold',
     at: (f) => ({

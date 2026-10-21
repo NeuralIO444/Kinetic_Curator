@@ -27,6 +27,7 @@ import {
   M7_CONFIDENCE, M7_STEP, M7_DEADBAND, M7_RANGE, tempoEaseOpen, tempoEase,
   M8_WET_STEP, M8_WET_DEADBAND, M8_EVOLVE_RANGE, M8_EVOLVE_STEP, M8_EVOLVE_DEADBAND,
   wetnessLeanOpen, wetnessLean, evolveLeanOpen, evolveLean,
+  surgeCallOpen, surgeCall,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
@@ -307,6 +308,35 @@ ok('M8: the gate decides: open reads through, on both dials', () => {
   const evo = { current: 2000, lean: 1, nKeeps: MIN_KEEPS, allowance: 1 };
   assert.equal(wetnessLean(wet), GATE_OPEN ? wetnessLeanOpen(wet) : null);
   assert.equal(evolveLean(evo), GATE_OPEN ? evolveLeanOpen(evo) : null);
+});
+
+// ─── M9: the surge call (#1576 Q3) — a keep landing near her centroid is answered ─────────────
+const layoutB = {
+  count: 40, scale: [0.15, 0.3], rotate: [150, 320], alpha: [8, 20],
+  jitter: 85, displacement: 90, density: 6, zTiers: 1,
+  noiseSpeed: 3.2, noiseFreq: 0.08, swarmCohesion: 0.1, gravityWells: 0.02,
+  particleCount: 900, damping: 0.4, wind: 0.02, breath: 0.95, lifeDrift: 0.9, flap: 0.95,
+};
+ok('M9: below MIN_KEEPS priors she does not call, however near the keep lands', () => {
+  assert.equal(surgeCallOpen({ priorKeeps: sevenKeeps, newKeep: keep('n', 'tidepool') }), 0);
+});
+ok('M9: a keep landing on her centroid is answered at the proximity strength', () => {
+  const s = surgeCallOpen({ priorKeeps: eightKeeps, newKeep: keep('n', 'tidepool') });
+  assert.ok(s > M1_PROXIMITY && s <= 1, `strength ${s}`);
+});
+ok('M9: a far keep is not answered, however established the anchor', () => {
+  assert.equal(surgeCallOpen({ priorKeeps: eightKeeps, newKeep: keep('n', 'ember', layoutB) }), 0);
+});
+ok('M9: nothing to judge, or nothing to judge against: no call', () => {
+  assert.equal(surgeCallOpen({ priorKeeps: eightKeeps, newKeep: null }), 0);
+  assert.equal(surgeCallOpen({ priorKeeps: eightKeeps, newKeep: { config: {} } }), 0);
+  assert.equal(surgeCallOpen({ priorKeeps: Array.from({ length: 8 }, () => ({})), newKeep: keep('n', 'tidepool') }), 0);
+  assert.equal(surgeCallOpen({}), 0);
+  assert.equal(surgeCallOpen(), 0);
+});
+ok('M9: the gate decides: the public call is the open mechanic while the gate stands open', () => {
+  const args = { priorKeeps: eightKeeps, newKeep: keep('n', 'tidepool') };
+  assert.equal(surgeCall(args), GATE_OPEN ? surgeCallOpen(args) : 0);
 });
 
 console.log(`\nqueenLean: ${n} checks passed`);

@@ -35,6 +35,8 @@ import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
 import { patternAmounts, rhythmTypeForPattern, createTravelStore } from '../engine/kineme.js';
+import { createSurgeStore } from '../engine/surge.js'; // #1576 — the census surge context
+import { createParallaxStore } from '../engine/parallaxDrift.js'; // #1576 — the census drift context
 import { GrowthHooks, ensureAggregate } from '../engine/kernel/sample/growth.js';
 import { createDish } from '../engine/kernel/dish.js';
 import { patternGround } from '../pattern/ground.js';
@@ -114,6 +116,7 @@ export function fpDelta(a, b, fields) {
 export function place(params, {
   seed = CENSUS_SEED, cast = CAST, paletteId = 'hydra', seedOffsets = null,
   growthTick = 0, kineme = null, ground = null, rawParams = null, clearGrowth = false, caGrid = null, travel = null,
+  surge = null, parallaxDrift = null,
 } = {}) {
   const lp = normalizeLayoutParams(params);
   if (rawParams) Object.assign(lp, rawParams);
@@ -126,7 +129,7 @@ export function place(params, {
   const { items } = buildPlacements({
     layoutParams: lp, seed, activeAssets: cast,
     palette: resolvePalette(paletteId, null, []), caps: CAPS,
-    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid, travel,
+    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid, travel, surge, parallaxDrift,
     ...(ground ? { dish: ground.dish, lean: ground.lean, nudge: ground.nudge, snap: ground.snap } : {}),
   });
   return items;
@@ -167,6 +170,20 @@ export function kinemeCtxFor(lp, seed = CENSUS_SEED) {
 // themselves ride the layout params (recipe data), not this context.
 export function travelCtxFor() {
   return { store: createTravelStore(), sceneId: 'census', frameMs: 100, shed: false };
+}
+
+// #1576 — the surge and drift contexts, built exactly as liveResolve
+// builds them (the resolver's store, this frame's delta, the travel
+// shed flag): a fresh store and a frozen 100 ms frame (6 locked
+// steps). The surge context carries a synthetic trigger demand of 1 —
+// the census is how the unbuilt trigger (Q3) is honestly exercised:
+// the envelope fires on the frame and its anticipation dip is what
+// the sweep measures.
+export function surgeCtxFor() {
+  return { store: createSurgeStore(), sceneId: 'census', frameMs: 100, shed: false, trigger: 1 };
+}
+export function parallaxCtxFor() {
+  return { store: createParallaxStore(), sceneId: 'census', frameMs: 100, shed: false };
 }
 
 // The ground a content layer rests on, built exactly as
@@ -282,6 +299,8 @@ const KEY_FIXTURES = {
   transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow', transportLeash: 200 }, note: 'measured through the travel context (fresh store, one frozen 100 ms frame = 6 locked steps) at a working leash' },
   transportSpeed: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportRadius: 200 }, note: '#1575 — measured through the travel context at a working leash/radius: speed 0 freezes the path at its anchored deal (offset exactly 0), so the sweep is frozen vs travelling' },
   transportRadius: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path', transportPath: 'lissajous', transportLeash: 300, transportSpeed: 1 }, note: '#1575 — measured through the travel context: radius 0 is a zero-amplitude path (marks home), so the sweep is home vs the widest weave the leash allows' },
+  transportSurge: { driver: 'surge', ctx: { mode: 'fibonacci' }, note: '#1576 — measured through the surge context (fresh store, one frozen 100 ms frame = 6 locked steps, synthetic trigger 1): amount 0 never runs the pass (the parity gate), amount 1 presents the envelope 6 steps in — inside the anticipation dip, so the sweep is home vs settled-away' },
+  transportParallax: { driver: 'pdrift', ctx: { mode: 'fibonacci' }, note: '#1576 — measured through the drift context (fresh store, one frozen 100 ms frame = 6 locked steps = 0.1 s): amount 0 is the parity gate, amount 1 has drifted the top tier 0.75 px' },
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
@@ -409,6 +428,17 @@ function runFixture(driver, params, fx = {}, key = null, value = null) {
     // A fresh store per run: the sweep ends and the repeat all start from
     // home, so the delta is the knob's roam and the repeat is identical.
     return { items: place(params, { travel: travelCtxFor() }), fields: PLACE_FIELDS };
+  }
+  if (driver === 'surge') {
+    // #1576 — a fresh surge store per run, synthetic trigger 1 (the
+    // census exercises the machinery Q3 will one day fire): the delta
+    // is the amount's anticipation dip at 6 locked steps.
+    return { items: place(params, { surge: surgeCtxFor() }), fields: PLACE_FIELDS };
+  }
+  if (driver === 'pdrift') {
+    // #1576 — a fresh drift store per run: the delta is the amount's
+    // zTier-proportional drift at 6 locked steps.
+    return { items: place(params, { parallaxDrift: parallaxCtxFor() }), fields: PLACE_FIELDS };
   }
   if (driver === 'ground') {
     return { items: place(params, { ground: groundFor(key, value) }), fields: PLACE_FIELDS };

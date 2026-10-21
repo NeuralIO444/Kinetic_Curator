@@ -274,6 +274,25 @@ export function DavisPanel() {
               })}
             </div>
           )}
+          {/* #1576 — travel kinemes P3: the surge amount lives in this motion group
+              (ruled, #1574's comment: "surge amount when P3 lands"), beside the
+              parallax drift amount. Both are amounts on the house slider, shown
+              in EVERY transport mode — surge and drift compose on still scenes
+              too. What FIRES a surge is Q3, unruled: there is deliberately no
+              trigger control here or anywhere — the machinery reads an inert
+              input signal until Matt rules the trigger surface. */}
+          <RangeRow label="surge" tone="ink" min={0} max={100} step={1}
+            value={Math.round((layoutParams.transportSurge ?? 0) * 100)}
+            readout={`${Math.round((layoutParams.transportSurge ?? 0) * 100)}%`}
+            defaultValue={0}
+            hint="surge: how deep a surge approaches (z) when one fires — scale-up, rise, sharper alpha, with the anticipation settle first. What fires it is not ruled yet; the amount waits here."
+            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSurge', value: Math.round(v) / 100 })} />
+          <RangeRow label="parallax" tone="ink" min={0} max={100} step={1}
+            value={Math.round((layoutParams.transportParallax ?? 0) * 100)}
+            readout={`${Math.round((layoutParams.transportParallax ?? 0) * 100)}%`}
+            defaultValue={0}
+            hint="parallax: a slow constant anchor drift, proportional to z tier — foreground strata travel faster than ground. (Not the #796 camera parallax; this drifts the anchors.) 0 is still."
+            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportParallax', value: Math.round(v) / 100 })} />
           {((layoutParams.transport || 'still') === 'flow' || (layoutParams.transport || 'still') === 'path') && (
             <>
               <RangeRow label="leash" tone="ink" min={0} max={400} step={1}

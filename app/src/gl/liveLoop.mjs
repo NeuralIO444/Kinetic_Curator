@@ -33,6 +33,7 @@ import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; /
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
 import { getStressState } from '../curator/stressLive.js'; // Phase 2 S5: the band reader's latest filtered reading, stamped on the frame input below
+import { nextSurgeStamp } from '../curator/director.js'; // #1576 Q3: the Queen's surge stamp decision, hosted with the pull — read at the frame input below; the stamp is recorded input data, never a surface
 import { spectrumMarksShed } from './sceneContract.js';
 import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
 import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469: the loop notes its LIFE reading for the STIMULI readout
@@ -376,6 +377,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   let lastErrTs = 0;
   let lastNodeCount = -1;
 
+  // #1576 Q3 — the counted keeps the Queen's surge stamp has evaluated
+  // (director.nextSurgeStamp holds the decision; this loop holds only the
+  // scalar). -1 = not yet observed: the ledger found on the first frame is
+  // history, and history does not call.
+  let queenSeenKeeps = -1;
+
   // #266 — deterministic render-fault tracking. A single transient throw is
   // not a fault: the RENDER FAULT pill trips only after consecutive failed
   // ticks, and clears only after a sustained run of clean presents (or a
@@ -638,6 +645,23 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // #1694 slice 1 — the spawn channel's decisions from the last resolved frame, published by the
     // resolver itself (they ride this frame's input below, like every recorded decision).
     const spawnDecisions = getLastSpawnDecisions();
+    // #1576 Q3 — the Queen's surge stamp: when a new counted keep has landed
+    // since the last presented frame, her call is stamped on this frame's
+    // input as surgeTrigger (director.nextSurgeStamp → the curation layer's
+    // M9 mechanic: the new keep judged against her kept-taste anchor). The
+    // stamp is data in the recorded input stream, never a surface (KC-1 DS
+    // rule 10). Only presented frames evaluate it: a paused or travel-shed
+    // frame must not consume a call the resolver would never see (its
+    // surgeBase is null under slowRender), so the keep stays pending until
+    // the instrument is alive. No growth — the overwhelming majority of
+    // frames — stamps 0, and the resolver reads the frame exactly as it
+    // did before Q3.
+    let surgeTrigger = 0;
+    if (!s.slowRender && s.running) {
+      const nx = nextSurgeStamp(queenSeenKeeps, s.keeps);
+      surgeTrigger = nx.stamp;
+      queenSeenKeeps = nx.seen;
+    }
     const resolved = resolver.resolveLayers({
       canvasW, canvasH,
       layers: s.layers,
@@ -681,6 +705,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       creatureCount: Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)), // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there · slice 2: net of the governor's creature shed (the overlay never writes the artist's count; a take records the count the frame actually ran with, so a shed frame replays shed) · slice 3: the artist's number is the BUILD param `creatures` — the same spring-damped layoutParams every slider rides (| 0 keeps the stamp the integer the spawn channel has always read); the retired store field and DIRECTORS stepper are gone
       travelShed: !!s.travelShed, // #1574: the governor's travel shed (cut 1.6) rides the input like the creature shed — a take records the shed the frame actually ran with, so a shed frame replays shed (marks settled home)
       travelIpadClass: isIpadClassDevice(), // #1574 Q2: the device class the governor's traveler budget (data/quality.js TRAVEL_BUDGETS) reads — a machine key, stamped from the device like the region budget's class; a take records the class it ran on, so it replays with the same traveler selection
+      surgeTrigger, // #1576 Q3: the Queen's surge call — 0 on every frame but the one a counted keep lands on (see the stamp above buildFrame's resolver call); a taste call stamped from the recorded keeps ledger, recorded with the take like every input, so a take that surged replays the surge exactly
       assetOptions: s.assetOptions, // #1694 slice 2: tile options (the citizen's family) ride the input like assetStill — recorded in takes, replayed from takes
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take
       dishTraits: spawnDecisions ? spawnDecisions.dishTraits : [], // #1356 step 2: each moth's traits, shifted once at birth by Davis; recorded with the take

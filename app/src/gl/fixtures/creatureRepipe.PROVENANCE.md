@@ -65,3 +65,14 @@ checkpoint hashes re-stamped, nothing else). Cause: P2's travel keys echo in the
 hashed resolver output (see the replayGate provenance note of the same date). Control:
 the same refresh on clean main `c5fc8758` reproduces main's fixture byte-for-byte
 (sha256 7b2dcd02…); the branch refresh is deterministic (two runs, identical sha256).
+
+## Checkpoint refresh — 2026-10-20, #1576 publish (Matt's re-record ruling)
+
+Checkpoints refreshed on the rebased #1576 branch tip `dfdbb82a` under the publish
+re-record ruling recorded on #1574 (2026-10-20), same discipline as the #1574/#1575
+finishes: the fixture's recorded INPUTS are untouched (deep diff: inputs
+byte-identical; all 16 checkpoint hashes re-stamped, nothing else). Cause: P3's
+travel keys echo in the hashed resolver output (see the replayGate provenance note
+of the same date). Control: the same refresh on clean main `307253a7` reproduces
+main's fixture byte-for-byte (sha256 e54eab5d…); the branch refresh is
+deterministic (two runs, identical sha256).

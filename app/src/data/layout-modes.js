@@ -218,6 +218,21 @@ export const DEFAULT_LAYOUT_PARAMS = {
   transportPath: 'orbit',
   transportSpeed: 1,
   transportRadius: 140, // px — under the leash's 400 max, over the rhythm layer's ±5.6 px by design
+  // #1576 — travel kinemes P3: SURGE + parallax drift. Both are amounts
+  // (0..1) and 0 is OFF — the parity gate: a document that predates P3
+  // carries neither key and opens with both sitting inert at 0, exactly
+  // as it was saved, whatever its transport mode (surge and drift are
+  // independent of the FLOW/PATH modes — they compose on top of any
+  // scene, still scenes included). transportSurge is the surge AMOUNT
+  // (ruled to the Directors motion group, #1574's comment); what FIRES
+  // a surge is Q3, unruled — no trigger surface exists, and the
+  // machinery's trigger input stays inert (engine/surge.js).
+  // transportParallax is the drift amount — NOT the #796 camera
+  // parallax (the `parallax` key below): this one drifts the anchors
+  // themselves, proportional to zTier, on the step clock
+  // (engine/parallaxDrift.js).
+  transportSurge: 0,
+  transportParallax: 0,
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
@@ -428,6 +443,10 @@ export const PARAM_SPEC = {
   // the amplitude in px (spiral breathing / sweep arc / lissajous reach).
   transportSpeed: { min: 0, max: 2 },
   transportRadius: { min: 0, max: 300 },
+  // #1576 — P3 amounts: the surge z-approach depth and the parallax
+  // drift rate, both fractions of their modules' full travel.
+  transportSurge: { min: 0, max: 1 },
+  transportParallax: { min: 0, max: 1 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the
