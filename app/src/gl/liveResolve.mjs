@@ -1,8 +1,8 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
-import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern, createTravelStore, pruneTravelStore } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
-import { createSurgeStore, pruneSurgeStore } from '../engine/surge.js'; // #1576: the surge envelope store
-import { createParallaxStore, pruneParallaxStore } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
+import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern, createTravelStore, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelStoreSnapshot } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
+import { createSurgeStore, pruneSurgeStore, snapshotSurgeStore, restoreSurgeStore, checkSurgeStoreSnapshot } from '../engine/surge.js'; // #1576: the surge envelope store
+import { createParallaxStore, pruneParallaxStore, snapshotParallaxStore, restoreParallaxStore, checkParallaxStoreSnapshot } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -1172,6 +1172,9 @@ export function createLiveResolver() {
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
       spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
+      // travel kinemes (#1574/#1575) — the roam is accumulative state: each mark's offset + velocity, each scene's
+      // step bank, and the clock's last frame. OPTIONAL key: a pre-travel snapshot restores with every mark home.
+      travel: { store: snapshotTravelStore(travelStore), lastMs: travelLastMs, surge: snapshotSurgeStore(surgeStore), parallax: snapshotParallaxStore(parallaxStore) },
     };
   }
 
@@ -1188,6 +1191,7 @@ export function createLiveResolver() {
     if (!createCreatureBuilder().restoreState(snap.creatures)) return false;
     if (!createDishCreatureBuilder().restoreState(snap.dishCreatures)) return false;
     if (snap.spawn !== undefined && !createCreatureSpawnState().restoreState(snap.spawn)) return false; // #1694 slice 1
+    if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes
     if (!createDriverClock().restoreState(snap.driverClock)) return false;
     // Phase 2 — apply (the same restores just validated; they cannot refuse now).
     W = snap.W;
@@ -1235,6 +1239,14 @@ export function createLiveResolver() {
     // #1694 slice 1 — a pre-repipe snapshot carries no spawn state: the channel starts fresh, as a fresh
     // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
     if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn); else spawnState.reset();
+    // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
+    if (snap.travel !== undefined) {
+      restoreTravelStore(travelStore, snap.travel.store);
+      travelLastMs = snap.travel.lastMs;
+      // #1576 — P3's envelope store and drift clock ride the same section (optional inside it: a P1/P2-era snapshot has neither)
+      if (snap.travel.surge !== undefined) restoreSurgeStore(surgeStore, snap.travel.surge); else surgeStore.scenes.clear();
+      if (snap.travel.parallax !== undefined) restoreParallaxStore(parallaxStore, snap.travel.parallax); else parallaxStore.scenes.clear();
+    } else { travelStore.scenes.clear(); surgeStore.scenes.clear(); parallaxStore.scenes.clear(); travelLastMs = null; }
     return true;
   }
 
@@ -1282,6 +1294,12 @@ function restoreMorphEntry(snap) {
  * restore against a throwaway instance). Returns true only for a snapshot whose
  * shape snapshotState could have produced.
  */
+/** Travel kinemes — the snapshot's travel section: the store plus the clock's last frame (null = unanchored). */
+function checkTravelSnapshot(t) {
+  return !!t && typeof t === 'object' && !Array.isArray(t) && (t.lastMs === null || Number.isFinite(t.lastMs)) && checkTravelStoreSnapshot(t.store)
+    && (t.surge === undefined || checkSurgeStoreSnapshot(t.surge)) && (t.parallax === undefined || checkParallaxStoreSnapshot(t.parallax));
+}
+
 export function checkResolverSnapshot(snap) {
   if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return false;
   if (snap.v !== 1) return false;
@@ -1319,5 +1337,6 @@ export function checkResolverSnapshot(snap) {
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn))) return false;
+  if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
   return true;
 }

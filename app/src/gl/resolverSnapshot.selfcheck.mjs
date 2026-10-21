@@ -103,6 +103,21 @@ const SCENARIOS = [
   single('random', { displacement: 0.6, noiseSpeed: 0.8 }), // the warp phase integral
   twoLayer('patch:feed', { mode: 'feed', to: 'lyr-a', strength: 1 }),
   twoLayer('patch:mod', { mode: 'mod', to: 'lyr-a', strength: 1 }),
+  // travel kinemes (#1574 FLOW, #1575 PATH): the roam is accumulative (per-mark offset + velocity, the scene's
+  // step bank, the travel clock's last frame) — a missed field restores every traveller at home and the
+  // continuation roams elsewhere. Fifty frames of roam are banked when the snapshot lands.
+  { ...single('random', { transport: 'flow', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:flow' },
+  { ...single('random', { transport: 'path', transportPath: 'lissajous', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:path' },
+  // #1576 — P3's accumulative state: the surge envelope store (a trigger pulse at frame 40 starts an envelope that is
+  // mid-flight at the frame-50 snapshot) and the parallax drift clock (zTiers > 1 so the front tiers move)
+  {
+    name: 'travel:surge+parallax',
+    at: (f) => ({
+      layoutParams: lp({ mode: 'random', zTiers: 4, transportSurge: 1, transportParallax: 1, kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }),
+      surgeTrigger: f >= 40 && f < 44 ? 1 : 0,
+      ...breathe(f),
+    }),
+  },
   {
     name: 'shared-scent:mold',
     at: (f) => ({

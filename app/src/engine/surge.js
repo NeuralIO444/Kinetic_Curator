@@ -137,6 +137,33 @@ export function createSurgeStore() {
   return { scenes: new Map() };
 }
 
+// Resolver mid-session snapshot (#1367, #1715): the store is accumulative, so a take beginning mid-session must carry
+// it. Each scene is a flat record of finite numbers (seed, acc, steps, envStart, strength, prevTrig); emitted in insertion order, exact.
+const SURGE_FIELDS = ['seed', 'acc', 'steps', 'envStart', 'strength', 'prevTrig'];
+export function snapshotSurgeStore(store) {
+  const scenes = [];
+  if (store && store.scenes instanceof Map) for (const [id, sc] of store.scenes) scenes.push([id, SURGE_FIELDS.map((f) => sc[f])]);
+  return { v: 1, scenes };
+}
+export function checkSurgeStoreSnapshot(snap) {
+  if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.scenes)) return false;
+  for (const e of snap.scenes) {
+    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !Array.isArray(e[1]) || e[1].length !== SURGE_FIELDS.length) return false;
+    if (!e[1].every((v) => Number.isFinite(v))) return false;
+  }
+  return true;
+}
+export function restoreSurgeStore(store, snap) {
+  if (!store || !(store.scenes instanceof Map) || !checkSurgeStoreSnapshot(snap)) return false;
+  store.scenes.clear();
+  for (const [id, vals] of snap.scenes) {
+    const sc = {};
+    SURGE_FIELDS.forEach((f, i) => { sc[f] = vals[i]; });
+    store.scenes.set(id, sc);
+  }
+  return true;
+}
+
 /** Drop scenes the document no longer has (liveResolve's prune law). */
 export function pruneSurgeStore(store, keepSceneIds) {
   if (!store || !(store.scenes instanceof Map)) return;

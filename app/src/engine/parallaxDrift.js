@@ -55,6 +55,33 @@ export function createParallaxStore() {
   return { scenes: new Map() };
 }
 
+// Resolver mid-session snapshot (#1367, #1715): the store is accumulative, so a take beginning mid-session must carry
+// it. Each scene is a flat record of finite numbers (seed, acc, steps); emitted in insertion order, exact.
+const PARALLAX_FIELDS = ['seed', 'acc', 'steps'];
+export function snapshotParallaxStore(store) {
+  const scenes = [];
+  if (store && store.scenes instanceof Map) for (const [id, sc] of store.scenes) scenes.push([id, PARALLAX_FIELDS.map((f) => sc[f])]);
+  return { v: 1, scenes };
+}
+export function checkParallaxStoreSnapshot(snap) {
+  if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.scenes)) return false;
+  for (const e of snap.scenes) {
+    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !Array.isArray(e[1]) || e[1].length !== PARALLAX_FIELDS.length) return false;
+    if (!e[1].every((v) => Number.isFinite(v))) return false;
+  }
+  return true;
+}
+export function restoreParallaxStore(store, snap) {
+  if (!store || !(store.scenes instanceof Map) || !checkParallaxStoreSnapshot(snap)) return false;
+  store.scenes.clear();
+  for (const [id, vals] of snap.scenes) {
+    const sc = {};
+    PARALLAX_FIELDS.forEach((f, i) => { sc[f] = vals[i]; });
+    store.scenes.set(id, sc);
+  }
+  return true;
+}
+
 /** Drop scenes the document no longer has (liveResolve's prune law). */
 export function pruneParallaxStore(store, keepSceneIds) {
   if (!store || !(store.scenes instanceof Map)) return;
