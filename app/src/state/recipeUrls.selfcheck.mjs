@@ -59,7 +59,8 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   const payload = url.slice(RECIPE_URL_PREFIX.length);
   const json = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
   // rotateSpin is the one exception (#1127): always written, because a link without it predates spin and means 0
-  assert.deepStrictEqual(Object.keys(json.l).filter((k) => !['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath'].includes(k)).sort(), [...changedKeys].sort(), 'only non-default params encoded');
+  // #1575: transport too — a link without it predates travel kinemes and means 'still'
+  assert.deepStrictEqual(Object.keys(json.l).filter((k) => !['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath', 'transport'].includes(k)).sort(), [...changedKeys].sort(), 'only non-default params encoded');
   // #1128: the living-motion floor is always written too: a link without it predates the floor and means 0
   assert.deepStrictEqual([json.l.kinemeBreath, json.l.kinemeDrift], [FIELDS.layoutParams.kinemeBreath, FIELDS.layoutParams.kinemeDrift]);
   // #1151: palette-breath likewise
@@ -81,7 +82,7 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   });
-  assert.ok(tiny.length < 140, `minimal link tiny, got ${tiny.length}`); // #1151: +1 always-written field (was <120 with 3)
+  assert.ok(tiny.length < 170, `minimal link tiny, got ${tiny.length}`); // #1151: +1 always-written field (was <120 with 3); #1575: +transport (was <140)
 }
 
 // --- alphabet: base64url, no padding, no +/= --------------------------------

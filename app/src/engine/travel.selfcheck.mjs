@@ -25,7 +25,9 @@ const palette = resolvePalette('hydra', null, []);
 const caps = getQualityCaps('high');
 const noise = createNoise(SEED);
 
-const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 80, mode: DEFAULT_LAYOUT_PARAMS.mode, ...over });
+// 'still' unless a case asks otherwise: the baseline these checks compare against is today's build (the NEW-scene
+// default is 'auto' since #1575 — family defaults — and has its own suite, travelPath.selfcheck.mjs)
+const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 80, mode: DEFAULT_LAYOUT_PARAMS.mode, transport: 'still', ...over });
 const build = (layoutParams, travel = null, cache = undefined) => buildPlacements({
   layoutParams, seed: SEED, activeAssets: CAST, palette, caps, canvasW: W, canvasH: H, travel, cache,
 }).items;
@@ -40,7 +42,8 @@ function ctxFor(store, layoutParams, nowMs, frozen = false) {
 
 // ── params + the hard gate ─────────────────────────────────────────────────────────────────────────────────────
 {
-  assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'still', 'P1 default: still (today)');
+  assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transport, 'auto', 'a new scene: family defaults (#1575 Q1)');
+  assert.strictEqual(normalizeLayoutParams({}).transport, 'still', 'a document that predates travel opens as saved');
   assert.strictEqual(travelParams(lp(), W, H).active, false, 'still is inactive');
   assert.strictEqual(travelParams(lp({ transport: 'flow' }), W, H).active, true, 'flow is active');
   assert.strictEqual(travelParams(lp({ transport: 'flow', transportLeash: 0 }), W, H).active, false, 'leash 0 = still');
@@ -49,7 +52,8 @@ function ctxFor(store, layoutParams, nowMs, frozen = false) {
   const p = travelParams(lp({ transport: 'flow' }), W, H);
   assert.ok(Math.abs(p.L - 0.16 * 700) < 1e-9, 'leash in px of the small dimension');
   assert.ok(Math.abs(p.cruise - 0.11 * 700) < 1e-9, 'flow 0.5 = the spike cruise (0.11·m/s)');
-  const norm = normalizeLayoutParams({ transport: 'warp', transportLeash: 9, transportFlow: -1 });
+  const norm = normalizeLayoutParams({ transport: 'warp', transportLeash: 9, transportFlow: -1, transportPath: 'zigzag' });
+  assert.strictEqual(norm.transportPath, 'orbit');
   assert.strictEqual(norm.transport, 'still');
   assert.strictEqual(norm.transportLeash, 0.4);
   assert.strictEqual(norm.transportFlow, 0);

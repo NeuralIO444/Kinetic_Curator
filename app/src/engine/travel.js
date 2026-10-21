@@ -37,8 +37,38 @@ const STEP_TICKS = 1000; // the clock bank's integer unit is 1/60 ms, so one TRA
 /** At most this many steps per presented frame (the loop's 50 ms dt clamp ⇒ 3). Never bank a spiral of death. */
 export const TRAVEL_MAX_STEPS = 4;
 
-/** The layoutParams transport modes. 'still' is today's behaviour exactly. */
-export const TRANSPORT_MODES = Object.freeze(['still', 'flow']);
+/**
+ * The layoutParams transport modes. 'still' is today's behaviour exactly; 'flow' and 'path' are the two transports;
+ * 'auto' (#1575, the default for a new scene) lets each mark's FAMILY declare its transport (familyTransport).
+ */
+export const TRANSPORT_MODES = Object.freeze(['auto', 'still', 'flow', 'path']);
+/** #1575 — the PATH families: the anchor as a pure function of (t, seed, params). */
+export const PATH_KINDS = Object.freeze(['orbit', 'spiral', 'sweep', 'lissajous']);
+
+// ── family defaults (#1575 Q1, RULED by Matt 2026-10-14) ────────────────────────────────────────────────────────
+// Linework and glyphs roam by default; heavy solids anchor. The artist's per-stratum mode overrides (the #1434
+// pattern: defaults ship ON, the override tames). Following data/regionDefaults.js's discipline, a family earns a
+// default by being NAMED here, not by analogy — everything unnamed is still (silence is a valid state):
+//   linework  → FLOW: hairlines drift along the shared field, the medium they read best in
+//   glyphs    → PATH: letters and pictograms (tags 'glyph' / 'letter') travel the stratum's path family
+//   heavy solids (density 'solid' + weight 'heavy'), and every other family → still
+// A heavy solid that is also tagged a glyph anchors: the anchor rule wins, as the ruling words it.
+const FAMILY_CACHE = new WeakMap();
+/** The transport a mark's asset declares by family: 'flow' | 'path' | 'still'. Pure, cached per asset object. */
+export function familyTransport(asset) {
+  if (!asset || typeof asset !== 'object') return 'still';
+  const hit = FAMILY_CACHE.get(asset);
+  if (hit) return hit;
+  let mode = 'still';
+  const tags = Array.isArray(asset.tags) ? asset.tags : [];
+  const heavySolid = asset.density === 'solid' && asset.weight === 'heavy';
+  if (!heavySolid) {
+    if (asset.category === 'linework') mode = 'flow';
+    else if (tags.includes('glyph') || tags.includes('letter')) mode = 'path';
+  }
+  FAMILY_CACHE.set(asset, mode);
+  return mode;
+}
 
 // ── FLOW constants (the #1573 spike's v1 numbers — the feel test Matt kept, 2026-10-16) ─────────────────────────
 // Distances are fractions of the smaller canvas dimension m; times in seconds.
@@ -59,6 +89,8 @@ const CURL_EPS = 0.5;
 
 // Settle: a mark that stops travelling (mode off, budget withdrawn, governor shed) glides home on the same spring
 // with a zero-radius leash, and is dropped — exactly home — once it is there and at rest.
+const SETTLE_HZ = 0.42; // softer than the leash: going home is a glide with a small follow-through, never a snap
+const SETTLE_ZETA = 0.62;
 const SETTLE_EPS_PX = 0.05;
 const SETTLE_EPS_V = 0.5; // px/s
 
@@ -110,11 +142,17 @@ export function travelParams(layoutParams, W, H, { deviceCap = null, shed = 0 } 
   const lp = layoutParams || {};
   const m = Math.min(num(W), num(H));
   const mode = TRANSPORT_MODES.includes(lp.transport) ? lp.transport : 'still';
+  const pathKind = PATH_KINDS.includes(lp.transportPath) ? lp.transportPath : 'orbit';
+  // #1575 Q4 (RULED 2026-10-20): the leash is PER STRATUM — it lives in this stratum's own layoutParams, so the
+  // bottom exposure can stay tight while the top roams, or the reverse.
   const leash = Math.max(0, num(lp.transportLeash));
   const flow = clamp01(lp.transportFlow);
   const budget = travelBudget(lp.transportCeiling ?? DEFAULT_CEILING, deviceCap, shed);
   const active = m > 0 && mode !== 'still' && leash > 0 && flow > 0 && budget > 0;
-  return { active, mode, m, L: leash * m, cruise: flow * FLOW_CRUISE_AT_1 * m, flow, budget };
+  return {
+    active, mode, pathKind, m, L: leash * m, cruise: flow * FLOW_CRUISE_AT_1 * m, flow, budget,
+    rate: flow * PATH_RATE_AT_1, // PATH: segments per second
+  };
 }
 /** The author's default ceiling: the desktop cap (data/quality.js), so a fresh scene travels at full measure. */
 export const DEFAULT_CEILING = 400;
@@ -178,6 +216,10 @@ function freshMark(seed, index) {
     dx: 1, dy: 0,
     len: lerp(TRAVEL_S[0], TRAVEL_S[1], travelHash(seed, index, 2)),
     n: 0,
+    // #1575 PATH: the engage ramp (0..1), the carry offset it blends from (where the mark was when it joined its
+    // path), and which integrator owned the last step (1 physics: FLOW + settle, 2 path).
+    e: 0, cx: 0, cy: 0, pm: 1,
+    a: 1, // #1575 the sweep's wrap-seam alpha (1 = unfaded)
   };
 }
 
@@ -193,15 +235,13 @@ function curlAt(noise, x, y, W, H, tSec) {
  * → TRAVEL (velocity steered toward the curl of the shared field, re-sampled where the mark IS, so paths bend).
  */
 export function stepFlowMark(s, hx, hy, L, cruise, W, H, tSec, noise, seed, index) {
-  const wn = 2 * Math.PI * SPRING_HZ;
+  const wn = 2 * Math.PI * (s.ph === PH_SETTLE ? SETTLE_HZ : SPRING_HZ);
   const k = wn * wn;
-  const c = 2 * ZETA * wn;
+  const c = 2 * (s.ph === PH_SETTLE ? SETTLE_ZETA : ZETA) * wn;
   let tvx = 0;
   let tvy = 0;
   let tau = STEER_TAU;
-  if (s.ph === PH_SETTLE) {
-    tau = HOLD_TAU;
-  } else {
+  if (s.ph !== PH_SETTLE) {
     s.t -= TRAVEL_STEP;
     if (s.t <= 0) {
       if (s.ph === PH_HOLD) {
@@ -232,12 +272,18 @@ export function stepFlowMark(s, hx, hy, L, cruise, W, H, tSec, noise, seed, inde
       tau = HOLD_TAU;
     }
   }
-  // semi-implicit: steer toward the target velocity, then the leash spring outside L
-  const a = 1 - Math.exp(-TRAVEL_STEP / tau);
+  // semi-implicit: steer toward the target velocity, then the leash spring outside L. Settling, nothing steers:
+  // the soft spring and its own damping alone carry the mark home (a held steer would turn it into a crawl).
+  const a = s.ph === PH_SETTLE ? 0 : 1 - Math.exp(-TRAVEL_STEP / tau);
   s.vx += (tvx - s.vx) * a;
   s.vy += (tvy - s.vy) * a;
   const r = Math.hypot(s.ox, s.oy);
-  if (r > L && r > 0) {
+  if (s.ph === PH_SETTLE) {
+    // going home: a plain damped spring toward home (the whole velocity is damped — an orbit about home would
+    // never arrive)
+    s.vx += (-k * s.ox - c * s.vx) * TRAVEL_STEP;
+    s.vy += (-k * s.oy - c * s.vy) * TRAVEL_STEP;
+  } else if (r > L && r > 0) {
     const nx = s.ox / r;
     const ny = s.oy / r;
     const pull = k * (r - L);
@@ -254,6 +300,182 @@ export function settled(s) {
   return s.ph === PH_SETTLE && Math.hypot(s.ox, s.oy) < SETTLE_EPS_PX && Math.hypot(s.vx, s.vy) < SETTLE_EPS_V;
 }
 
+// ── PATH (#1575): the anchor as a pure function of (t, seed, params) ───────────────────────────────────────────
+// Stateless → replay-exact by construction. Per-instance phase and speed come from the instance seed. The timing
+// law shapes the clock itself: progress moves in SEGMENTS, each one a held extreme, an anticipation lean back, an
+// eased travel that overshoots, and a follow-through settle — never a linear CG glide.
+/** transportFlow 0.5 ⇒ one path segment every 4 s. */
+export const PATH_RATE_AT_1 = 0.5;
+const ENGAGE_S = 0.8; // joining a path: the blend from where the mark was to the path, with its own anticipation
+const SEG_HOLD = 0.16; // held extreme at the start of each segment
+const SEG_ANTIC_END = 0.27; // anticipation lean (backward) ends here
+const SEG_TRAVEL_END = 0.84; // the travel overshoots to here, then follows through
+const SEG_ANTIC = 0.06; // anticipation depth, in segments
+const SEG_OVER = 0.05; // overshoot, in segments
+const LEASH_FILL = 0.95; // the centred families use this much of the leash (the radial cap)
+const SWEEP_SAG = 0.12; // the sweep lane's arc sag, fraction of L
+const SWEEP_REACH = 0.97; // the sweep's along-lane cap, fraction of L (capped only along its arc)
+const SWEEP_FADE = 0.2; // the wrap seam fades over this fraction of the lane
+const LISSAJOUS = [[1, 2], [3, 2], [2, 3], [1, 3]];
+
+const easeInOutCubic = (a) => (a < 0.5 ? 4 * a * a * a : 1 - Math.pow(-2 * a + 2, 3) / 2);
+const easeOutCubic = (a) => 1 - Math.pow(1 - a, 3);
+const smooth01 = (a) => { const t = Math.min(1, Math.max(0, a)); return t * t * (3 - 2 * t); };
+
+/** One segment's shape over f ∈ [0,1): hold → anticipation (backward) → eased travel with overshoot → settle. */
+export function segmentShape(f) {
+  if (f < SEG_HOLD) return 0;
+  if (f < SEG_ANTIC_END) { const a = Math.sin(Math.PI * (f - SEG_HOLD) / (SEG_ANTIC_END - SEG_HOLD)); return -SEG_ANTIC * a * a; }
+  if (f < SEG_TRAVEL_END) return easeInOutCubic((f - SEG_ANTIC_END) / (SEG_TRAVEL_END - SEG_ANTIC_END)) * (1 + SEG_OVER);
+  return 1 + SEG_OVER * (1 - easeOutCubic((f - SEG_TRAVEL_END) / (1 - SEG_TRAVEL_END)));
+}
+/** Continuous segment count → shaped progress (whole segments advance; within one, the shape). */
+export function pathProgress(x) {
+  const k = Math.floor(x);
+  return k + segmentShape(x - k);
+}
+
+/** The engage curve: a small lean back (anticipation), then an ease into the path. 0 → 0, 1 → 1. */
+function engageCurve(e) {
+  if (e <= 0) return 0;
+  if (e >= 1) return 1;
+  if (e < 0.18) { const a = Math.sin(Math.PI * e / 0.18); return -0.08 * a * a; }
+  return easeInOutCubic((e - 0.18) / 0.82);
+}
+
+const _p = { x: 0, y: 0, a: 1 };
+/**
+ * A PATH family's displacement from home at travel time tSec. Every family starts at 0 (P = 0 is home) and stays
+ * inside the leash: the centred families (orbit, spiral, lissajous) by a radial cap, the sweep along its arc only.
+ * `a` is the sweep's wrap-seam alpha (1 elsewhere).
+ */
+export function pathDisplacement(kind, hx, hy, tSec, seed, index, L, rate, W, H, out = _p) {
+  out.x = 0; out.y = 0; out.a = 1;
+  if (!(L > 0) || !(rate > 0)) return out;
+  const sp = 0.8 + 0.4 * travelHash(seed, index, 21); // per-mark speed
+  const u = travelHash(seed, index, 22); // per-mark phase, in segments
+  const P = pathProgress(tSec * rate * sp + u) - pathProgress(u); // home at t = 0
+  if (kind === 'orbit') {
+    // around the dish centre: every mark rides the circle through its home, centred on the dish, one way (the
+    // stratum's own direction) — the whole stratum swirls. The leash bounds the ARC (the chord is shorter), and
+    // the lane wraps like the sweep's, its seam faded, so a mark that reached its leash slips back without a pop.
+    const rx = hx - W / 2;
+    const ry = hy - H / 2;
+    const d = Math.hypot(rx, ry);
+    const reach = SWEEP_REACH * L;
+    const span = 2 * reach;
+    const raw = 0.5 * L * P;
+    const sAl = ((((raw + reach) % span) + span) % span) - reach;
+    out.a = smooth01((reach - Math.abs(sAl)) / (SWEEP_FADE * reach));
+    const dir = travelHash(seed, 0, 24) < 0.5 ? 1 : -1;
+    if (d < 1e-6) { // at the very centre the circle degenerates: drift along a seeded heading instead
+      const a0 = travelHash(seed, index, 23) * 2 * Math.PI;
+      out.x = Math.cos(a0) * sAl; out.y = Math.sin(a0) * sAl;
+      return out;
+    }
+    const phi = dir * Math.max(-Math.PI, Math.min(Math.PI, sAl / d));
+    const c = Math.cos(phi); const sn = Math.sin(phi);
+    out.x = rx * c - ry * sn - rx;
+    out.y = rx * sn + ry * c - ry;
+    return out;
+  }
+  if (kind === 'spiral') {
+    // a breathing orbit: the radius swells and draws in over three segments
+    const a0 = travelHash(seed, index, 25) * 2 * Math.PI;
+    const wx = Math.cos(a0); const wy = Math.sin(a0);
+    const r = (LEASH_FILL * L) / 2;
+    const dir = travelHash(seed, index, 26) < 0.5 ? 1 : -1;
+    const rho = r * (1 - 0.45 * (0.5 - 0.5 * Math.cos((2 * Math.PI * P) / 3)));
+    const th = Math.atan2(-wy, -wx) + dir * (Math.PI / 2) * P;
+    out.x = wx * r + rho * Math.cos(th);
+    out.y = wy * r + rho * Math.sin(th);
+    return out;
+  }
+  if (kind === 'lissajous') {
+    const [fa, fb] = LISSAJOUS[Math.floor(travelHash(seed, index, 27) * LISSAJOUS.length)];
+    const A = (LEASH_FILL * L) / Math.SQRT2;
+    const ph = (Math.PI / 2) * P;
+    const lx = A * Math.sin(fa * ph);
+    const ly = A * Math.sin(fb * ph);
+    const rot = travelHash(seed, index, 28) * 2 * Math.PI;
+    const c = Math.cos(rot); const sn = Math.sin(rot);
+    out.x = lx * c - ly * sn;
+    out.y = lx * sn + ly * c;
+    return out;
+  }
+  // sweep: a lane across the stratum (one shared heading, ±0.3 rad per mark), travelled with wrap; the arc sags
+  // toward its ends, and the wrap seam fades so a mark leaving one end and entering the other never pops.
+  const base = travelHash(seed, 0, 29) * 2 * Math.PI;
+  const ang = base + (travelHash(seed, index, 30) - 0.5) * 0.6;
+  const lx = Math.cos(ang); const ly = Math.sin(ang);
+  const reach = SWEEP_REACH * L;
+  const raw = 0.5 * L * P;
+  const span = 2 * reach;
+  const sAl = ((((raw + reach) % span) + span) % span) - reach; // home at P = 0
+  const sag = SWEEP_SAG * L * (Math.sin((Math.PI * (sAl + reach)) / span) - 1);
+  out.x = lx * sAl - ly * sag;
+  out.y = ly * sAl + lx * sag;
+  out.a = smooth01((reach - Math.abs(sAl)) / (SWEEP_FADE * reach));
+  return out;
+}
+
+/** Advance one PATH mark one step: engage toward its path (blending from where it was), velocity by difference. */
+export function stepPathMark(s, hx, hy, kind, L, rate, W, H, tSec, seed, index) {
+  if (s.pm !== 2) { s.cx = s.ox; s.cy = s.oy; s.e = 0; s.pm = 2; }
+  if (s.e < 1) s.e = Math.min(1, s.e + TRAVEL_STEP / ENGAGE_S);
+  const d = pathDisplacement(kind, hx, hy, tSec, seed, index, L, rate, W, H);
+  const g = engageCurve(s.e);
+  const nx = s.cx + (d.x - s.cx) * g;
+  const ny = s.cy + (d.y - s.cy) * g;
+  s.vx = (nx - s.ox) / TRAVEL_STEP;
+  s.vy = (ny - s.oy) / TRAVEL_STEP;
+  s.ox = nx;
+  s.oy = ny;
+  s.a = 1 + (d.a - 1) * Math.min(1, Math.max(0, g));
+}
+
+// ── stretch along velocity (#1575) ──────────────────────────────────────────────────────────────────────────────
+// Fast travellers elongate along their direction, mass-preserving, through the deform channel (a_def): a squash
+// ACROSS the velocity (axis ⊥ v, amount a) stretches the mark along it by 1/(1−a). Capped; never on a mark that
+// carries its own deform (the dish's impact squash wins); shed with the dish deform rung by the contract.
+export const STRETCH_CAP = 0.22;
+const STRETCH_K = 0.6; // amount per (speed / m): the spike cruise (0.11·m/s) reads ≈0.066 — a lean, not a smear
+
+// ── the Jell-O metric (#1575): per stratum, how many marks travel and how far from home, over a window ──────────
+// Reported, steering nothing. Derived per frame, never snapshotted.
+export const JELLO_WINDOW = 120; // frames
+const JELLO_EPS_PX = 0.5;
+
+function jelloPush(layer, travelling, sumDist, n) {
+  let j = layer.jello;
+  if (!j) {
+    j = { t: new Float64Array(JELLO_WINDOW), d: new Float64Array(JELLO_WINDOW), c: new Float64Array(JELLO_WINDOW), i: 0, filled: 0 };
+    layer.jello = j;
+  }
+  j.t[j.i] = travelling; j.d[j.i] = sumDist; j.c[j.i] = n;
+  j.i = (j.i + 1) % JELLO_WINDOW;
+  j.filled = Math.min(JELLO_WINDOW, j.filled + 1);
+}
+
+/**
+ * The Jell-O readout for a stratum: { frames, travelling (mean count over the window), marks, meanDistance (px,
+ * mean over the travelling marks), meanDistanceFrac (of the small dimension) } — or null before any frame.
+ */
+export function jelloReadout(layer, m = 0) {
+  const j = layer && layer.jello;
+  if (!j || !j.filled) return null;
+  let t = 0; let d = 0; let c = 0;
+  for (let i = 0; i < j.filled; i++) { t += j.t[i]; d += j.d[i]; c += j.c[i]; }
+  const meanDistance = t > 0 ? d / t : 0;
+  return {
+    frames: j.filled,
+    travelling: t / j.filled,
+    marks: c / j.filled,
+    meanDistance,
+    meanDistanceFrac: m > 0 ? meanDistance / m : 0,
+  };
+}
+
 // ── the applier (stage C, beside applyRhythm) ───────────────────────────────────────────────────────────────────
 const TRAVEL_BASE_XY = new WeakMap();
 
@@ -263,27 +485,35 @@ const TRAVEL_BASE_XY = new WeakMap();
  * still[k] (artist-pinned) keeps its placed position. Returns an UNDO that restores the cached x/y (positions live
  * in the cached geometry SoA, the #1128 lesson), or null when nothing moved — the hard gate.
  */
-export function applyTravel(soa, ctx, still = null) {
+export function applyTravel(soa, ctx, still = null, assetIds = null, activeAssets = null) {
   if (!soa || !ctx || !ctx.layer) return null;
   const n = soa.n | 0;
   const layer = ctx.layer;
   const p = ctx.params || {};
   const marks = layer.marks;
-  if (!n || (!p.active && marks.size === 0)) return null;
+  ctx.frame = null;
+  if (!n || (!p.active && marks.size === 0)) { layer.steps = 0; return null; }
   if (!ctx.noise || typeof ctx.noise.curl2 !== 'function') return null;
   const steps = Math.max(0, Math.min(TRAVEL_MAX_STEPS, layer.steps | 0));
   const seed = ctx.seed | 0;
   const W = num(ctx.W);
   const H = num(ctx.H);
+  const m = Math.min(W, H);
 
   let base = TRAVEL_BASE_XY.get(soa);
   if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
   for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
 
-  const sel = p.active ? selectTravellers(layer, soa, n, seed, p.budget, still) : null;
+  const modes = p.active ? slotModes(layer, n, p.mode, assetIds, activeAssets) : null;
+  const sel = p.active ? selectTravellers(layer, soa, n, seed, p.budget, still, modes) : null;
+  const frame = framesFor(n);
   let moved = false;
+  let travelling = 0;
+  let sumDist = 0;
   const seen = new Set();
   for (let k = 0; k < n; k++) {
+    frame.amt[k] = 0;
+    frame.alpha[k] = 1;
     const index = soa.index[k];
     const travels = !!(sel && sel[k]);
     let s = marks.get(index);
@@ -293,29 +523,83 @@ export function applyTravel(soa, ctx, still = null) {
       marks.set(index, s);
     }
     seen.add(index);
-    if (!travels && s.ph !== PH_SETTLE) s.ph = PH_SETTLE;
-    else if (travels && s.ph === PH_SETTLE) { s.ph = PH_HOLD; s.t = 0; }
+    const mode = travels ? modes[k] : 0; // 1 flow, 2 path, 0 settle home
+    if (mode === 0) {
+      // leaving travel: physics takes over from wherever the mark is, at whatever speed it had (a PATH mark's
+      // velocity is its last finite difference), on a zero-radius leash — the follow-through brings it home.
+      if (s.pm === 2) s.pm = 1;
+      s.ph = PH_SETTLE;
+    } else if (mode === 1) {
+      if (s.pm === 2 || s.ph === PH_SETTLE) { s.pm = 1; s.ph = PH_HOLD; s.t = 0; }
+    } else if (s.ph === PH_SETTLE) {
+      s.ph = PH_HOLD; // a path re-engages from where the mark is (stepPathMark takes the carry)
+    }
     const hx = base.x[k];
     const hy = base.y[k];
-    const L = s.ph === PH_SETTLE ? 0 : p.L;
     for (let i = 0; i < steps; i++) {
       const tSec = (layer.stepBase + i + 1) * TRAVEL_STEP;
-      stepFlowMark(s, hx, hy, L, p.cruise, W, H, tSec, ctx.noise, seed, index);
+      if (mode === 2) stepPathMark(s, hx, hy, p.pathKind, p.L, p.rate, W, H, tSec, seed, index);
+      else stepFlowMark(s, hx, hy, mode === 1 ? p.L : 0, p.cruise, W, H, tSec, ctx.noise, seed, index);
     }
-    if (settled(s)) { marks.delete(index); continue; }
+    if (settled(s) && s.a >= 1) { marks.delete(index); continue; }
     if (s.ox !== 0 || s.oy !== 0) {
       soa.x[k] = hx + s.ox;
       soa.y[k] = hy + s.oy;
       moved = true;
+      const dist = Math.hypot(s.ox, s.oy);
+      if (dist > JELLO_EPS_PX) { travelling++; sumDist += dist; }
+      const speed = Math.hypot(s.vx, s.vy);
+      if (m > 0 && speed > 0) {
+        const amt = Math.min(STRETCH_CAP, (STRETCH_K * speed) / m);
+        if (amt >= 0.001) { frame.amt[k] = amt; frame.ax[k] = -s.vy / speed; frame.ay[k] = s.vx / speed; frame.any = true; }
+      }
     }
+    if (s.pm !== 2 && s.a < 1) s.a = Math.min(1, s.a + steps * TRAVEL_STEP * 4); // a faded sweep seam unfades as it leaves
+    if (s.a < 1) { frame.alpha[k] = s.a; frame.anyAlpha = true; }
   }
   // a mark whose slot vanished (count down, mode change) has no home to return to: drop it
   if (seen.size !== marks.size) for (const idx of [...marks.keys()]) if (!seen.has(idx)) marks.delete(idx);
+  if (steps > 0) jelloPush(layer, travelling, sumDist, n);
   layer.steps = 0; // a second build in the same frame (none today) must not step the marks twice
   if (!moved) return null;
+  if (frame.anyAlpha) for (let k = 0; k < n; k++) if (frame.alpha[k] < 1) soa.alpha[k] *= frame.alpha[k];
+  ctx.frame = frame;
   return () => {
     for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
   };
+}
+
+// The per-frame stretch / alpha scratch, grown to the largest set seen and reused (the #1250 scratch discipline);
+// fully rewritten for k < n on every call before anything reads it.
+let _frame = null;
+function framesFor(n) {
+  if (!_frame || _frame.amt.length < n) {
+    _frame = { amt: new Float32Array(n), ax: new Float32Array(n), ay: new Float32Array(n), alpha: new Float32Array(n), any: false, anyAlpha: false };
+  }
+  _frame.any = false;
+  _frame.anyAlpha = false;
+  return _frame;
+}
+
+/**
+ * The per-slot transport (0 still, 1 flow, 2 path) for the stratum's mode. 'auto' asks each mark's family
+ * (familyTransport); an explicit mode applies to every mark. Cached on the layer by (mode, bound asset ids,
+ * asset pool) identity — the bind cache hands out the same arrays while nothing changed.
+ */
+const MODE_CODE = { still: 0, flow: 1, path: 2 };
+function slotModes(layer, n, mode, assetIds, activeAssets) {
+  const c = layer.modes;
+  if (c && c.mode === mode && c.ids === assetIds && c.pool === activeAssets && c.on.length === n) return c.on;
+  const on = new Uint8Array(n);
+  if (mode === 'auto') {
+    const byId = new Map();
+    for (const a of activeAssets || []) if (a && typeof a.id === 'string') byId.set(a.id, a);
+    for (let k = 0; k < n; k++) on[k] = MODE_CODE[familyTransport(assetIds ? byId.get(assetIds[k]) : null)] || 0;
+  } else {
+    on.fill(MODE_CODE[mode] || 0);
+  }
+  layer.modes = { mode, ids: assetIds, pool: activeAssets, on };
+  return on;
 }
 
 /**
@@ -324,22 +608,23 @@ export function applyTravel(soa, ctx, still = null) {
  * keeps a SUBSET of the travellers it had (the rest settle home) and a restored one brings the same marks back.
  * Cached on the layer by a signature of (n, budget, eligibility): derived, never snapshotted.
  */
-function selectTravellers(layer, soa, n, seed, budget, still) {
+function selectTravellers(layer, soa, n, seed, budget, still, modes) {
+  const eligible = (k) => !(still && still[k]) && !(modes && !modes[k]);
   let elig = 0;
   let sum = 0;
   for (let k = 0; k < n; k++) {
-    if (still && still[k]) continue;
+    if (!eligible(k)) continue;
     elig++;
-    sum = (sum + Math.imul(soa.index[k] + 1, 0x9e3779b1)) | 0;
+    sum = (sum + Math.imul(soa.index[k] + 1, 0x9e3779b1) + (modes ? modes[k] : 0)) | 0;
   }
   const sig = `${n}|${budget}|${elig}|${sum}|${seed}`;
   if (layer.sel && layer.sel.sig === sig) return layer.sel.on;
   const on = new Uint8Array(n);
   if (elig <= budget) {
-    for (let k = 0; k < n; k++) if (!(still && still[k])) on[k] = 1;
+    for (let k = 0; k < n; k++) if (eligible(k)) on[k] = 1;
   } else if (budget > 0) {
     const ranked = [];
-    for (let k = 0; k < n; k++) if (!(still && still[k])) ranked.push(k);
+    for (let k = 0; k < n; k++) if (eligible(k)) ranked.push(k);
     const r = (k) => travelHash(seed, soa.index[k], 5);
     ranked.sort((a, b) => r(a) - r(b) || soa.index[a] - soa.index[b]);
     for (let i = 0; i < budget; i++) on[ranked[i]] = 1;
@@ -349,7 +634,7 @@ function selectTravellers(layer, soa, n, seed, budget, still) {
 }
 
 // ── snapshot (#1367: a take can begin mid-session) ─────────────────────────────────────────────────────────────
-const MARK_FIELDS = ['ox', 'oy', 'vx', 'vy', 'ph', 't', 'dx', 'dy', 'len', 'n'];
+const MARK_FIELDS = ['ox', 'oy', 'vx', 'vy', 'ph', 't', 'dx', 'dy', 'len', 'n', 'e', 'cx', 'cy', 'pm', 'a'];
 
 /** The store as JSON-safe data. Marks are packed as [index, ...MARK_FIELDS] rows, sorted by index. */
 export function snapshotTravelStore(store) {

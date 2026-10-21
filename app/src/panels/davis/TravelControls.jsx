@@ -10,12 +10,20 @@
 import { useApp } from '../../state/AppContext.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
-import { TRANSPORT_MODES } from '../../engine/travel.js';
+import { TRANSPORT_MODES, PATH_KINDS } from '../../engine/travel.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 
 const MODE_TITLE = {
+  auto: 'AUTO: each mark\'s family decides — linework flows, glyphs travel the path below, heavy solids stay home',
   still: 'STILL: marks stay where they were placed — today\'s motion exactly (breath and drift still ride on top)',
   flow: 'FLOW: each mark leaves home along the shared field, holds, and comes back on its leash',
+  path: 'PATH: every mark travels the path family below — orbit, spiral, sweep or lissajous',
+};
+const PATH_TITLE = {
+  orbit: 'ORBIT: the stratum swirls around the dish centre',
+  spiral: 'SPIRAL: each mark circles on a breathing radius',
+  sweep: 'SWEEP: marks run a shared lane across the stratum and wrap',
+  lissajous: 'LISSAJOUS: a two-sine weave',
 };
 
 const pct = (v) => `${Math.round(v * 100)}`;
@@ -28,6 +36,8 @@ export function TravelControls() {
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
   const mode = TRANSPORT_MODES.includes(lp.transport) ? lp.transport : 'still';
   const off = mode === 'still';
+  const pathKind = PATH_KINDS.includes(lp.transportPath) ? lp.transportPath : 'orbit';
+  const pathOff = mode === 'still' || mode === 'flow';
   const amount = (key, label, max, hint) => (
     <RangeRow layout="stack" label={label} ariaLabel={`travel ${label}`}
       value={lp[key] ?? DEFAULT_LAYOUT_PARAMS[key]} min={0} max={max} step={0.01}
@@ -51,8 +61,22 @@ export function TravelControls() {
           );
         })}
       </div>
+      {/* #1575 — the PATH family: used by PATH, and by AUTO for the glyph family */}
+      <div className="davis-actions davis-actions-travel" role="group" aria-label="travel path">
+        <i className="lbl" title="The path family PATH (and AUTO's glyphs) travel">path</i>
+        {PATH_KINDS.map((k) => {
+          const on = pathKind === k;
+          return (
+            <button key={k} type="button" className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on}
+              aria-label={`${k} path`} title={pathOff ? 'Pick PATH or AUTO to use a path family' : PATH_TITLE[k]}
+              disabled={pathOff} onClick={() => set('transportPath', k)}>
+              {k.toUpperCase()}
+            </button>
+          );
+        })}
+      </div>
       <div className="davis-travel-amounts">
-        {amount('transportLeash', 'leash', 0.4, 'How far a mark may roam before the leash pulls it home (fraction of the canvas). 0 keeps it home')}
+        {amount('transportLeash', 'leash', 0.4, 'How far this stratum\'s marks may roam before the leash pulls them home (fraction of the canvas). Per stratum: the ground can stay tight while the front roams. 0 keeps them home')}
         {amount('transportFlow', 'flow', 1, 'Travel speed along the field. 0 keeps every mark home')}
         <RangeRow layout="stack" label="travellers" ariaLabel="travel travellers"
           value={lp.transportCeiling ?? DEFAULT_LAYOUT_PARAMS.transportCeiling} min={0} max={800} step={1}

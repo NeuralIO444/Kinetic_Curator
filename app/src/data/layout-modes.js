@@ -6,7 +6,7 @@ import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
-import { TRANSPORT_MODES, DEFAULT_CEILING } from '../engine/travel.js'; // #1574 — travel kinemes
+import { TRANSPORT_MODES, PATH_KINDS, DEFAULT_CEILING } from '../engine/travel.js'; // #1574 — travel kinemes
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 import { GLASS_BODY_ALPHA } from '../engine/glassBody.mjs'; // #1585 (Materials M4) — the shipped glass tune is the param default
 import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 — ditto, plate geometry
@@ -203,7 +203,11 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // on a leash back to its placed home. Leash = free-roam radius as a fraction of the small canvas dimension (no
   // home force inside it, a spring with overshoot outside); flow = travel speed (0.5 ⇒ the #1573 spike's cruise).
   // Recipe data: saved, crowned, replayed, censused. Edited from the DIRECTORS motion group (Matt, 2026-10-14).
-  transport: 'still',
+  // #1575 — 'auto' (a NEW scene's default): each mark's family declares its transport (engine/travel.js
+  // familyTransport — linework flows, glyphs travel their path, heavy solids and the unnamed rest stay home; Q1
+  // RULED 2026-10-14). A document or link saved before travel existed loads as 'still': it opens as it was saved.
+  transport: 'auto',
+  transportPath: 'orbit', // #1575 — the PATH family: orbit (the dish centre) | spiral | sweep | lissajous
   transportLeash: 0.16,
   transportFlow: 0.5,
   // #1574 Q2 (RULED 2026-10-20) — the author's CEILING on how many marks of this stratum may travel; the governor
@@ -551,6 +555,7 @@ const ENUM_SPEC = {
   audioResponse: AUDIO_RESPONSE_IDS, // #306
   kinemePattern: KINEME_PATTERNS, // #1128
   transport: TRANSPORT_MODES, // #1574
+  transportPath: PATH_KINDS, // #1575
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -705,6 +710,8 @@ export function normalizeLayoutParams(partial) {
   // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
   // #1151 — palette-breath likewise: absent means 0, not the new default.
   for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
+  // #1575 — travel likewise: a document that predates travel kinemes keeps every mark home (absent = 'still').
+  if (!Object.prototype.hasOwnProperty.call(src, 'transport')) next.transport = 'still';
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);
@@ -734,7 +741,8 @@ export function normalizeLayoutParams(partial) {
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
-  next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: absent or unknown is today's still
+  next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: unknown is today's still (absent: above)
+  next.transportPath = pickEnum(next.transportPath, PATH_KINDS, 'orbit'); // #1575
   // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
   // clamp rides PARAM_SPEC above. A document that predates #1199 opens with
   // the map off exactly (defaults are already the no-op).

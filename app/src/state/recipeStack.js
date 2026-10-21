@@ -44,6 +44,8 @@ export function stackOf(src) {
     const lay = isObj(s.layoutParams) ? s.layoutParams : {};
     const delta = {};
     for (const k of new Set([...Object.keys(DEFAULT_LAYOUT_PARAMS), ...Object.keys(lay)])) if (!same(lay[k], DEFAULT_LAYOUT_PARAMS[k])) delta[k] = lay[k];
+    // #1575 — travel is always written: a stack without `transport` predates travel kinemes and means 'still'.
+    delta.transport = typeof lay.transport === 'string' ? lay.transport : 'still';
     const o = {};
     for (const [ch, v] of Object.entries(isObj(s.seedOffsets) ? s.seedOffsets : {})) if (Number.isFinite(v) && v !== 0) o[ch] = Math.trunc(v);
     n[l.id] = {
@@ -74,7 +76,7 @@ export function expandStack(compact) {
       seedOffsets: isObj(s.o) ? s.o : {},
       paletteId: typeof s.p === 'string' && s.p ? s.p : undefined,
       paletteOverrides: isObj(s.po) ? s.po : null,
-      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...(isObj(s.l) ? s.l : {}) },
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, transport: 'still', ...(isObj(s.l) ? s.l : {}) }, // #1575: absent = predates travel
       enabledAssets: Object.fromEntries((Array.isArray(s.e) ? s.e : []).filter((k) => typeof k === 'string').map((k) => [k, true])),
     };
   }

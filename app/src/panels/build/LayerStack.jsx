@@ -34,6 +34,7 @@ import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
 import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
 import { strataSummary, trimNum } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
+import { TRANSPORT_MODES } from '../../engine/travel.js'; // #1575 — the stratum's travel mode chip
 
 // #716 Part 2 — black block + white numeral heads every block. The edited
 // block inverts (white block, black numeral). #1203: the numeral is the
@@ -632,6 +633,19 @@ export function LayerStack() {
                   <span className="fx-param-readout">{trimNum(dishTempo)}</span>
                 </div>
               )}
+              {/* #1575 — the stratum's travel mode chip (ruled 2026-10-15: the BUILD side is this one chip, nothing
+                  more — amounts and leash edit from the DIRECTORS motion group). AUTO shows the family default:
+                  linework flows, glyphs travel their path, heavy solids and the rest stay home. */}
+              <div className="strata-composite" title="TRAVEL — how this stratum's marks move away from home. AUTO lets each mark's family decide (linework flows, glyphs travel a path, heavy solids anchor). Amounts and leash live in DIRECTORS.">
+                <span className="fx-param-readout lbl" style={{ width: 'auto' }}>travel</span>
+                <select className="blend-mode-select" aria-label="travel mode" value={TRANSPORT_MODES.includes(layoutParams?.transport) ? layoutParams.transport : 'still'}
+                  onChange={(e) => setParam('transport', e.target.value)}>
+                  <option value="auto">AUTO · by family</option>
+                  <option value="still">STILL</option>
+                  <option value="flow">FLOW</option>
+                  <option value="path">PATH</option>
+                </select>
+              </div>
               {dishOn && dishRadius === 0 && (
                 <div className="fx-note" title="The dish is on, but no stratum in this Look carries a contact radius — voices set the radius, and at radius 0 the grid never arms">idle — contact radius 0</div>
               )}

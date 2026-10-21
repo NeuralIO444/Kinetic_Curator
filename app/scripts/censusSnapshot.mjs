@@ -16,7 +16,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { diceTrayCoverage, keepsCoverage } from '../src/curator/coverageReport.mjs';
-import { paramCensus, renderReachability } from '../src/curator/censusReport.mjs';
+import { paramCensus, renderReachability, jelloCensus } from '../src/curator/censusReport.mjs';
 import { COVERAGE_KIND, CENSUS_KIND } from '../src/curator/censusReadout.mjs';
 
 const outDir = process.argv[2];
@@ -58,6 +58,7 @@ const census = {
     layoutsDistinct: reach.layouts.distinct,
     layoutsTotal: reach.layouts.rows.length,
   },
+  jello: jelloCensus(), // #1575 — the Jell-O metric: travelling marks + mean distance from home, per transport
 };
 writeFileSync(join(outDir, 'census.json'), JSON.stringify(census, null, 2));
 

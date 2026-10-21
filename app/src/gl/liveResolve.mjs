@@ -23,7 +23,7 @@ import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
-import { createTravelStore, travelLayer, advanceTravelClock, travelParams, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelSnapshot } from '../engine/travel.js'; // #1574 — travel kinemes
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelSnapshot, jelloReadout } from '../engine/travel.js'; // #1574 — travel kinemes; #1575 the Jell-O metric
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius, snapshotDishSession, restoreDishSession, checkDishSessionSnapshot, restoreDishEntries } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
@@ -166,6 +166,14 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
  */
 let lastFrameMotion = null;
 export function getLastFrameMotion() { return lastFrameMotion; }
+
+/**
+ * #1575 — the Jell-O metric, live: per travelling stratum, how many marks travel and their mean distance from
+ * home over the last JELLO_WINDOW frames ({ [layerId]: jelloReadout }). Reported, steering nothing — module-level,
+ * last-resolver-wins, like the motion read above; {} until a stratum travels.
+ */
+let lastFrameTravel = {};
+export function getLastFrameTravel() { return lastFrameTravel; }
 
 /**
  * Phase 2 S1 — the last resolved frame's creature skeletons (world/scene space, per pin, null where
@@ -600,6 +608,10 @@ export function createLiveResolver() {
           });
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
+      // #1575 — travel's default for a NEW scene is 'auto' (family defaults), but a layout that never named a
+      // transport predates travel kinemes (a take recorded before them, a fixture, an old snapshot): it keeps
+      // every mark home, exactly as it was recorded. The store's own layout always names one (normalize).
+      if (!src.layoutParams || !Object.prototype.hasOwnProperty.call(src.layoutParams, 'transport')) layoutParams.transport = 'still';
       // #1202 — mirror is a 4-state enum; 'off' is truthy, so compare explicitly.
       if (input.perfTier1 && layoutParams.mirror !== 'off') layoutParams.mirror = 'off';
       // #425 — life drift per layer (see applyLifeDrift): own base, own
@@ -1076,6 +1088,11 @@ export function createLiveResolver() {
     // #1469 — publish the frame's living-motion read (see getLastFrameMotion). Wind reads 0 on a
     // frozen frame (slowRender): nothing is carried then, and a stale strength would be a ghost.
     lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
+    { // #1575 — publish the Jell-O readouts (derived from the travel store; nothing reads them back)
+      const jt = {};
+      for (const [id, tl] of travelStore.layers) { const j = jelloReadout(tl, Math.min(W, H)); if (j) jt[id] = j; }
+      lastFrameTravel = jt;
+    }
     lastSkeletons = creatures.lastSkeletons(); // S1 — the frame's bone graphs, for ?debug=skeleton
     lastPoses = creatures.lastPoses(); // S5 — the frame's band poses, for S2/S4 to consume
     // #1694 slice 1 — the spawn channel observes the resolved frame (formation judges it, then spawn

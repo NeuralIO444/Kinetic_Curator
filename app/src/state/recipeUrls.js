@@ -177,6 +177,8 @@ export function encodeRecipeUrl(fields) {
   // #1128: so are the two living-motion amounts (breath, drift): a link without them predates the floor.
   // #1151: palette-breath likewise.
   for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) l[k] = Number.isFinite(layout[k]) ? layout[k] : 0;
+  // #1575 — travel too: a link without `transport` predates travel kinemes and means 'still'.
+  l.transport = typeof layout.transport === 'string' ? layout.transport : 'still';
   if (Object.keys(l).length) payload.l = l;
 
   if (stack) payload.k = stack;
@@ -238,7 +240,7 @@ export function decodeRecipeUrl(str) {
     if (!isPlainObject(json.po)) return fail('Bad recipe link: the palette overrides are malformed. Starting from a clean scene.');
     paletteOverrides = json.po;
   }
-  let layoutParams = { ...DEFAULT_LAYOUT_PARAMS, rotateSpin: 0, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 }; // #1127/#1128/#1151: absent in a link = it predates them
+  let layoutParams = { ...DEFAULT_LAYOUT_PARAMS, rotateSpin: 0, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, transport: 'still' }; // #1127/#1128/#1151/#1575: absent in a link = it predates them
   if (json.l !== undefined) {
     if (!isPlainObject(json.l)) return fail('Bad recipe link: the layout params are malformed. Starting from a clean scene.');
     layoutParams = { ...layoutParams, ...json.l };

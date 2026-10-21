@@ -35,7 +35,7 @@ import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
 import { patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js';
-import { createTravelStore, travelLayer, advanceTravelClock, travelParams } from '../engine/travel.js'; // #1574
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams, jelloReadout, PATH_KINDS, JELLO_WINDOW } from '../engine/travel.js'; // #1574 / #1575
 import { createNoise } from '../engine/noise.js';
 import { GrowthHooks, ensureAggregate } from '../engine/kernel/sample/growth.js';
 import { createDish } from '../engine/kernel/dish.js';
@@ -167,7 +167,7 @@ export function kinemeCtxFor(lp, seed = CENSUS_SEED) {
 // so the honest headless measure is the placement after `steps` locked steps — the still bake (slowRender) and every
 // non-live caller pass no travel context at all, by design.
 export const TRAVEL_CENSUS_STEPS = 120;
-export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS_SEED } = {}) {
+export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS_SEED, withLayer = false } = {}) {
   const lp = normalizeLayoutParams(params);
   const store = createTravelStore();
   const noise = createNoise(seed);
@@ -178,8 +178,36 @@ export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS
     advanceTravelClock(layer, (f * 1000) / 60);
     items = place(params, { seed, travel: { layer, seed, W, H, noise, params: travelParams(lp, W, H) } });
   }
-  return items;
+  return withLayer ? { items, layer } : items;
 }
+
+// ── #1575 — the Jell-O metric: per scene, how many marks travel and how far from home, over a window ──────────
+// Reported, steering nothing. One row per transport the census can name — the family defaults ('auto', the new
+// scene's default), each PATH family, FLOW, and STILL (the trapped-in-Jell-O baseline) — on the standard cast,
+// read over the last JELLO_WINDOW frames of a 6-second run.
+export const JELLO_STEPS = 360;
+export function jelloCensus() {
+  const m = Math.min(W, H);
+  const cases = [
+    { name: 'still', lp: { transport: 'still' } },
+    { name: 'auto (family defaults)', lp: { transport: 'auto' } },
+    { name: 'flow', lp: { transport: 'flow' } },
+    ...PATH_KINDS.map((k) => ({ name: `path/${k}`, lp: { transport: 'path', transportPath: k } })),
+  ];
+  return cases.map(({ name, lp }) => {
+    const { items, layer } = travelPlace({ ...PLACE_BASE, mode: 'fibonacci', ...lp }, { steps: JELLO_STEPS, withLayer: true });
+    const j = jelloReadout(layer, m); // null when nothing ran (still): no traveller, the whole cast home
+    return {
+      scene: name,
+      window: j ? j.frames : JELLO_WINDOW,
+      marks: j ? +j.marks.toFixed(1) : items.length,
+      travelling: j ? +j.travelling.toFixed(1) : 0,
+      meanDistancePx: j ? +j.meanDistance.toFixed(2) : 0,
+      meanDistanceFrac: j ? +j.meanDistanceFrac.toFixed(4) : 0,
+    };
+  });
+}
+export { JELLO_WINDOW };
 
 // The ground a content layer rests on, built exactly as
 // gl/dishGround.groundArgs builds it (a PATTERN ground below, the
@@ -353,6 +381,7 @@ const STRUCT_FIXTURES = {
   mode: { driver: 'reach', reason: 'swept exhaustively in render reachability (27 mode signatures)' },
   composition: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['praystation', 'chiaroscuro'] },
   transport: { driver: 'travel', ctx: { mode: 'fibonacci' }, values: ['still', 'flow'], note: '#1574 — still is today\'s placement exactly; flow measured after 120 locked steps through the live travel context' },
+  transportPath: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'path' }, values: ['orbit', 'lissajous'], note: '#1575 — the PATH family, measured after 120 locked steps with transport path' },
   bleed: { driver: 'place', ctx: { mode: 'grid' }, values: [false, true] },
   mirror: { driver: 'place', ctx: { mode: 'grid' }, values: ['off', 'x'] },
   overlap: { driver: 'place', ctx: { mode: 'grid' }, values: [false, true] },
@@ -1088,7 +1117,7 @@ export function renderReachability() {
 }
 
 // ── formatting ──────────────────────────────────────────────────────
-export function formatCensusReport({ paramRows, dishRows, reach, store }) {
+export function formatCensusReport({ paramRows, dishRows, reach, store, jello }) {
   const L = [];
   const moves = paramRows.filter((r) => r.class === 'moves');
   const zero = paramRows.filter((r) => r.class === 'zero-in-context');
@@ -1123,6 +1152,11 @@ export function formatCensusReport({ paramRows, dishRows, reach, store }) {
   L.push(`  layouts: ${reach.layouts.rows.length} modes, ${reach.layouts.distinct} distinct signatures; collisions: ${JSON.stringify(reach.layouts.collisions)}`);
   const sep = reach.layouts.separation;
   L.push(`  separation: noise is the grid sampler's alias even at displacement 120: ${sep.noiseIsGridAliasAtDisplacement}; ca!=random with a CA grid: ${sep.caVsRandomWithGrid}; phyllotaxis!=fibonacci at divergence -20: ${sep.phylloVsFibonacciAtDivergence}; live-mode bakes distinct: ${sep.liveModeBakesDistinct}/3`);
+  if (jello) {
+    L.push('');
+    L.push(`Jell-O metric (#1575) — travelling marks and mean distance from home, last ${JELLO_WINDOW} frames of ${JELLO_STEPS}`);
+    for (const r of jello) L.push(`  ${r.scene}: ${r.travelling}/${r.marks} travelling, mean ${r.meanDistancePx}px from home (${(r.meanDistanceFrac * 100).toFixed(1)}% of the small dimension)`);
+  }
   if (store) {
     L.push('');
     L.push('Store-level census (write path, evolve, RA6, PA3)');

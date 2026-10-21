@@ -459,7 +459,7 @@ export function buildPlacements({
     stillTravel = new Uint8Array(soa.n);
     for (let k = 0; k < soa.n; k++) if (travel.stillAssets.has(assetIds[k])) stillTravel[k] = 1;
   }
-  const undoTravel = travel ? applyTravel(soa, travel, stillTravel) : null;
+  const undoTravel = travel ? applyTravel(soa, travel, stillTravel, assetIds, activeAssets) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
   // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
@@ -512,6 +512,30 @@ export function buildPlacements({
         key: keys[k],
       };
     }
+  }
+
+  // #1575 — stretch along velocity: a fast traveller elongates along its direction through the deform channel
+  // (a_def — a mass-preserving squash ACROSS the velocity reads as a stretch along it; sceneContract carries it
+  // and sheds it on the dish-deform rung). Placement items carry no deform of their own, so nothing is fought.
+  // Written per slot before the sorts below reorder the array; on the pooled path a stale stretch from the last
+  // frame is deleted outright (key presence, not a zero: a still frame's items stay field-for-field today's).
+  const tf = travel ? travel.frame : null;
+  if (tf && tf.any) {
+    for (let k = 0; k < soa.n; k++) {
+      const it = mapped[k];
+      if (tf.amt[k] > 0) { it.deformAmt = tf.amt[k]; it.deformAxisX = tf.ax[k]; it.deformAxisY = tf.ay[k]; }
+      else if (it.deformAmt !== undefined) { delete it.deformAmt; delete it.deformAxisX; delete it.deformAxisY; }
+    }
+    if (cache) cache.travelStretched = true;
+  } else if (poolHit && cache.travelStretched) {
+    // the pool still carries last frame's stretch (travel ended, or this frame is still): strip it, once
+    for (let k = 0; k < soa.n; k++) {
+      const it = mapped[k];
+      if (it.deformAmt !== undefined) { delete it.deformAmt; delete it.deformAxisX; delete it.deformAxisY; }
+    }
+    cache.travelStretched = false;
+  } else if (cache) {
+    cache.travelStretched = false;
   }
 
   // #1199 — field→channel MAP (MATH stratum): sample the field at each
