@@ -85,6 +85,26 @@ export const QUALITY_PRESETS = {
  */
 export const REGION_BUDGETS = Object.freeze({ desktop: 12, ipad: 8 });
 
+/**
+ * #1574 Q2 (RULED by Matt, 2026-10-20) — the traveller caps: how many marks per stratum may TRAVEL (travel
+ * kinemes, engine/travel.js), per device class. Governor-selected within this cap: the author's ceiling
+ * (layoutParams.transportCeiling) bounds the scene from above, this table bounds the device, and the governor's
+ * travel rung (hooks/governorCuts.js) steps the amount down under load — travel sheds first.
+ *
+ * Derivation (the measured cost table, the #1639 frame budget's discipline). FLOW is the costly transport: a
+ * curl-noise sample + one semi-implicit step per traveller per locked step. Measured 0.885 µs per traveller-step
+ * (sandbox node, 400 travellers, 1 step/frame at 60 fps: mean 0.354 ms, p95 0.53 ms — #1574's P1 bench read
+ * 0.387 ms on desktop). Desktop gets a 0.35 ms CPU slice of its 16.7 ms frame → 400. iPad-class scales by the
+ * #1639 frame-budget ratio (5.0 / 8.0 ms) → 250, PENDING the device bench (Matt's iPad), which may only lower it.
+ * Read here — never hard-code at a call site.
+ */
+export const TRAVEL_BUDGETS = Object.freeze({ desktop: 400, ipad: 250 });
+
+/** The traveller cap for a device class (iPad-class = true). */
+export function travelBudgetForDevice(ipadClass) {
+  return ipadClass ? TRAVEL_BUDGETS.ipad : TRAVEL_BUDGETS.desktop;
+}
+
 /** The region-animation budget for a device class (iPad-class = true). */
 export function regionBudgetForDevice(ipadClass) {
   return ipadClass ? REGION_BUDGETS.ipad : REGION_BUDGETS.desktop;

@@ -45,7 +45,7 @@ import { createTintWash, applyWash, paletteIdentity } from './tintWash.mjs'; // 
 import { createTintInject, applyInject } from './tintInject.mjs'; // #625: INJECT field-first propagation
 import { bakeLiveAtlas, comboKey } from './liveAtlas.mjs';
 import { buildSceneContract } from './sceneContract.js';
-import { regionBudgetForDevice } from '../data/quality.js'; // #1433: the device-class region budget ceiling
+import { regionBudgetForDevice, travelBudgetForDevice } from '../data/quality.js'; // #1433: the device-class region budget ceiling; #1574 Q2: the traveller cap
 import { applyParallax } from './parallax.mjs';
 import { resolvePalette } from '../data/palettes.js';
 import { resolveLiveRenderState } from '../data/voices.js';
@@ -678,6 +678,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
       beatDrive: audioOn ? shapedAudio.beatPulse : null, // #1128 THUMP: a real beat or nothing
       assetStill: s.assetStill, // #1128: assets the artist pinned still
+      // #1574 Q2 — the traveller budget's two live inputs: the device-class cap (data/quality.js TRAVEL_BUDGETS)
+      // and the governor's travel rung (0..3). Both ride the input, so a take records the budget each frame ran
+      // with and replays it — a shed frame replays shed.
+      travelCap: travelBudgetForDevice(isIpadClassDevice()),
+      travelShed: s.travelShed | 0,
       creatureCount: Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)), // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there · slice 2: net of the governor's creature shed (the overlay never writes the artist's count; a take records the count the frame actually ran with, so a shed frame replays shed) · slice 3: the artist's number is the BUILD param `creatures` — the same spring-damped layoutParams every slider rides (| 0 keeps the stamp the integer the spawn channel has always read); the retired store field and DIRECTORS stepper are gone
       assetOptions: s.assetOptions, // #1694 slice 2: tile options (the citizen's family) ride the input like assetStill — recorded in takes, replayed from takes
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take

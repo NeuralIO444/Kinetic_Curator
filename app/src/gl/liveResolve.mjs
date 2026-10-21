@@ -711,7 +711,9 @@ export function createLiveResolver() {
         // state and the hard gate holding (still / leash 0 / flow 0) → null: today's build exactly. Reduced
         // motion withdraws travel (DS rule 7): marks glide home and stay there. A frozen frame (slowRender)
         // steps nothing and HOLDS the offsets — the instrument holds its last frame, it does not snap home.
-        const travelP = travelParams(layoutParams, W, H);
+        // #1574 Q2 — the budget: governor-selected (input.travelShed) within the device-class cap (input.travelCap);
+        // absent (fixtures, takes recorded before travel) → the author's ceiling alone, unshed.
+        const travelP = travelParams(layoutParams, W, H, { deviceCap: input.travelCap ?? null, shed: input.travelShed ?? 0 });
         if (input.reducedMotion) travelP.active = false;
         let travel = null;
         if (travelP.active || travelStore.layers.has(layer.id)) {

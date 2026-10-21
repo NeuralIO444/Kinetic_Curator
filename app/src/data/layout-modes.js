@@ -6,7 +6,7 @@ import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
-import { TRANSPORT_MODES } from '../engine/travel.js'; // #1574 — travel kinemes
+import { TRANSPORT_MODES, DEFAULT_CEILING } from '../engine/travel.js'; // #1574 — travel kinemes
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 import { GLASS_BODY_ALPHA } from '../engine/glassBody.mjs'; // #1585 (Materials M4) — the shipped glass tune is the param default
 import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 — ditto, plate geometry
@@ -206,6 +206,9 @@ export const DEFAULT_LAYOUT_PARAMS = {
   transport: 'still',
   transportLeash: 0.16,
   transportFlow: 0.5,
+  // #1574 Q2 (RULED 2026-10-20) — the author's CEILING on how many marks of this stratum may travel; the governor
+  // picks the amount under it, bounded by the device-class cap (data/quality.js TRAVEL_BUDGETS).
+  transportCeiling: DEFAULT_CEILING,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
   // #1482 P3 — spectrum marks (STIMULI → SPECTRUM). Which frequency a mark listens to: 0 INDEX, 1 ANGLE, 2 POSITION,
@@ -409,6 +412,7 @@ export const PARAM_SPEC = {
   kinemeBoilFps: { min: 6, max: 12 },
   transportLeash: { min: 0, max: 0.4 }, // #1574 — free-roam radius, fraction of the small dimension; 0 = still
   transportFlow: { min: 0, max: 1 }, // #1574 — travel speed; 0 = still
+  transportCeiling: { min: 0, max: 800, int: true }, // #1574 Q2 — the author's traveller ceiling; 0 = still
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the

@@ -12,7 +12,9 @@ import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-mod
 import {
   TRAVEL_STEP, TRAVEL_MAX_STEPS, createTravelStore, travelLayer, advanceTravelClock, travelParams, applyTravel,
   snapshotTravelStore, restoreTravelStore, checkTravelSnapshot, pruneTravelStore,
+  travelBudget, TRAVEL_SHED_FRACTIONS, DEFAULT_CEILING,
 } from './travel.js';
+import { TRAVEL_BUDGETS, travelBudgetForDevice } from '../data/quality.js';
 
 const W = 1000;
 const H = 700;
@@ -226,6 +228,63 @@ function runPaced(paceMs, totalMs) {
   assert.notStrictEqual(L1, L2, 'a reseed is a new scene');
   assert.strictEqual(L2.marks.size, 0);
   console.log('travel.selfcheck: ok (pins + reseed)');
+}
+
+// ── Q2: the budget — governor-selected within the device-class cap; the author sets the ceiling ────────────────
+{
+  assert.strictEqual(DEFAULT_LAYOUT_PARAMS.transportCeiling, DEFAULT_CEILING);
+  assert.strictEqual(DEFAULT_CEILING, TRAVEL_BUDGETS.desktop, 'a fresh scene asks for the full desktop measure');
+  assert.strictEqual(travelBudgetForDevice(false), TRAVEL_BUDGETS.desktop);
+  assert.strictEqual(travelBudgetForDevice(true), TRAVEL_BUDGETS.ipad);
+  assert.ok(TRAVEL_BUDGETS.ipad < TRAVEL_BUDGETS.desktop);
+  assert.strictEqual(travelBudget(400, null, 0), 400, 'no cap: the ceiling');
+  assert.strictEqual(travelBudget(400, 250, 0), 250, 'the device cap bounds the ceiling');
+  assert.strictEqual(travelBudget(100, 250, 0), 100, 'the ceiling bounds the device');
+  assert.deepStrictEqual([0, 1, 2, 3].map((l) => travelBudget(400, 400, l)), [400, 200, 100, 0], 'the rung');
+  assert.deepStrictEqual(TRAVEL_SHED_FRACTIONS, [1, 0.5, 0.25, 0]);
+  assert.strictEqual(travelBudget(400, 400, 99), 0, 'past the last level: home');
+  assert.strictEqual(travelParams(lp({ transport: 'flow' }), W, H, { shed: 3 }).active, false, 'shed home is the hard gate');
+  assert.strictEqual(travelParams(lp({ transport: 'flow', transportCeiling: 0 }), W, H).active, false, 'ceiling 0 = still');
+
+  // the selection: at most `budget` travellers, a NESTED subset as the budget tightens
+  const run = (budgetShed, cap, frames = 90) => {
+    const store = createTravelStore();
+    const p = lp({ transport: 'flow' });
+    for (let f = 1; f <= frames; f++) {
+      const params = travelParams(p, W, H, { deviceCap: cap, shed: budgetShed });
+      const layer = travelLayer(store, 'L1', SEED, W, H);
+      advanceTravelClock(layer, f * (1000 / 60));
+      build(p, { layer, seed: SEED, W, H, noise, params });
+    }
+    return new Set(travelLayer(store, 'L1', SEED, W, H).marks.keys());
+  };
+  const all = run(0, null);
+  const ten = run(0, 10);
+  const five = run(1, 10);
+  assert.ok(all.size > 10, `uncapped: every mark travels (${all.size})`);
+  assert.strictEqual(ten.size, 10, 'a cap of 10 → 10 travellers');
+  assert.strictEqual(five.size, 5, 'shed level 1 halves it');
+  for (const i of five) assert.ok(ten.has(i), 'nested: the tighter budget keeps a subset');
+
+  // shedding to home mid-scene: every traveller settles, and the build is today's again, bit for bit
+  {
+    const store = createTravelStore();
+    const p = lp({ transport: 'flow' });
+    let f = 0;
+    const frame = (shed) => {
+      f++;
+      const params = travelParams(p, W, H, { deviceCap: 400, shed });
+      const layer = travelLayer(store, 'L1', SEED, W, H);
+      advanceTravelClock(layer, f * (1000 / 60));
+      return build(p, { layer, seed: SEED, W, H, noise, params });
+    };
+    for (let i = 0; i < 200; i++) frame(0);
+    let items = null;
+    for (let i = 0; i < 900 && travelLayer(store, 'L1', SEED, W, H).marks.size; i++) items = frame(3);
+    assert.strictEqual(travelLayer(store, 'L1', SEED, W, H).marks.size, 0, 'shed home: every mark settled');
+    assert.strictEqual(fp(items), fp(build(lp())), 'shed home = today\'s output exactly');
+  }
+  console.log('travel.selfcheck: ok (Q2 budget: ceiling × device cap × governor rung, nested selection, shed home)');
 }
 
 void applyTravel;

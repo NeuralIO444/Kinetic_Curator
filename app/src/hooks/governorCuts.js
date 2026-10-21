@@ -15,6 +15,13 @@
 //          those cost the picture nothing. One creature per governor step,
 //          off the creatureShed overlay — the artist's count never moves —
 //          and the population restores whole when pressure clears.
+//   cut 1.75: travel (#1574, the travel-first shed) — while any stratum travels, the
+//          traveller budget steps 1 → ½ → ¼ → 0 (governor-selected within the
+//          device-class cap, Matt's Q2 ruling). At 0 every velocity dies and every
+//          mark settles home: the output is exactly today's before micro-motion or
+//          quality is touched. After the creature rung (#1694's ruling keeps the
+//          population first among content cuts), before everything else. Off the
+//          travelShed overlay; the author's ceiling never moves; restores whole.
 //   cut 2: quality tier step high → balanced → performance
 //   cut 3: mirror/gloss/ACCUM shed (perfTier1 — independent, lower FPS floor)
 //   cut 4: cost-aware asset thinning
@@ -46,6 +53,7 @@
 // and that no FX-culling cut exists.
 
 import { tier1ShedIds } from '../gl/costTiers.mjs';
+import { TRAVEL_SHED_FRACTIONS, TRAVEL_SHED_MAX } from '../engine/travel.js'; // #1574 — the travel rung's levels
 
 /**
  * #265 — when is the GPU the binding constraint? Cut 1 (resolution) may
@@ -93,6 +101,13 @@ export const GOVERNOR_RESTORE_CUTS = [
     restoredLabel: 'creatures back — full cast',
   },
   {
+    kind: 'travel',
+    // #1574 — the travel rung stepped one level at a time; the restore brings the
+    // full traveller budget back in one pass (this table's convention).
+    needsRestore: (s, ctx) => ctx.healthy && (s.travelShed | 0) > 0,
+    restoredLabel: 'travel back — marks roam again',
+  },
+  {
     kind: 'quality',
     // #264 M1 — quality restores only when the GOVERNOR shed it
     // (qualityShedFrom tracks the tier it stepped down from); a
@@ -120,6 +135,19 @@ export const GOVERNOR_RESTORE_CUTS = [
     restoredLabel: 'freeze frame off — motion back',
   },
 ];
+
+/**
+ * #1574 — does anything on stage travel? True when the active stratum's layout or any stored stratum snapshot
+ * asks for a transport other than 'still' (the travel rung only exists while this holds). Pure over the store
+ * shape; a malformed state reads false.
+ */
+export function anyTravel(s) {
+  const travels = (lp) => !!lp && typeof lp === 'object' && typeof lp.transport === 'string' && lp.transport !== 'still';
+  if (!s || typeof s !== 'object') return false;
+  if (travels(s.layoutParams)) return true;
+  const snaps = s.layerSnapshots && typeof s.layerSnapshots === 'object' ? Object.values(s.layerSnapshots) : [];
+  return snaps.some((snap) => snap && travels(snap.layoutParams));
+}
 
 /** Dynamic resolution ladder — the primary shed. GPU headroom means the
  *  live canvas can drop pixels before it drops anything visible. */
@@ -192,6 +220,15 @@ export function nextGovernorCut(s) {
     return { kind: 'creatureCount', creatureShed: creatureShed + 1, label: `CREATURES → ${creatureCount - creatureShed - 1}` };
   }
 
+  // Cut 1.75 (#1574 travel-first): only while something travels (travelLive),
+  // so callers that predate travel — and their pinned ladder walks — never see
+  // this rung. One level per step, off the travelShed overlay.
+  const travelShed = s.travelShed | 0;
+  if (s.travelLive === true && travelShed < TRAVEL_SHED_MAX) {
+    const next = travelShed + 1;
+    return { kind: 'travel', travelShed: next, label: next >= TRAVEL_SHED_MAX ? 'TRAVEL → HOME (marks settle)' : `TRAVEL → ${Math.round(TRAVEL_SHED_FRACTIONS[next] * 100)}%` };
+  }
+
   // Cut 2: quality tier step (placement + particle budgets).
   if (s.quality === 'high') {
     return { kind: 'quality', quality: 'balanced', label: 'TIER DROP → BALANCED' };
@@ -238,6 +275,10 @@ export function shedSummary(s) {
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);
+  }
+  // #1574 — the travel rung is a shed like any other.
+  if ((s.travelShed | 0) > 0) {
+    out.push((s.travelShed | 0) >= TRAVEL_SHED_MAX ? 'travel home' : `travel ${Math.round(TRAVEL_SHED_FRACTIONS[s.travelShed | 0] * 100)}%`);
   }
   // #264 — governor-shed quality is a shed like any other: the badge shows
   // it. qualityShedFrom is only set by the governor's own shed, so a

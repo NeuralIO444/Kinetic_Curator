@@ -74,7 +74,9 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // #1694 S2 — 'creatureCount' joins the table between renderScale and quality:
   // the population sheds first among content cuts (Matt's ruling, #1694 Q2).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'creatureCount', 'quality', 'assetThin', 'countClamp', 'slowRender']);
+  // #1574 — 'travel' joins after creatureCount (the travel-first shed: travel goes before micro-motion or quality
+  // is touched; #1694's ruling keeps the population first among content cuts).
+  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'creatureCount', 'travel', 'quality', 'assetThin', 'countClamp', 'slowRender']);
   console.log('[selfcheck] governorCuts (#264 restore coverage):',
     `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
 }
@@ -153,4 +155,40 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   assert.deepStrictEqual(shedSummary({ renderScale: 1, fxaaShed: true }), ['edge AA off']);
   assert.strictEqual(shedSummary({ renderScale: 1, fxaaShed: false }), null);
   console.log('[selfcheck] governorCuts (#740 cut 0 edge AA): 10 cases passed');
+}
+
+// #1574 — the travel rung (Q2: governor-selected within the device-class cap). Present only while something
+// travels; steps 1 → ½ → ¼ → home one level per cut, after the creature rung and before quality; restores whole;
+// the badge names it; anyTravel reads the store shape.
+{
+  const { anyTravel } = await import('./governorCuts.js');
+  const base = {
+    renderScale: 0.33, quality: 'high', assetThin: false, perfClampOverride: null, effectiveCount: 400,
+    slowRender: false, gpuSaturated: true, creatureCount: 1, creatureShed: 1,
+  };
+  assert.strictEqual(nextGovernorCut(base).kind, 'quality', 'no travelLive → the rung does not exist');
+  assert.strictEqual(nextGovernorCut({ ...base, travelLive: false }).kind, 'quality');
+  const walk = [];
+  let s = { ...base, travelLive: true, travelShed: 0 };
+  for (let i = 0; i < 6; i++) {
+    const c = nextGovernorCut(s);
+    walk.push(c.kind === 'travel' ? `travel:${c.travelShed}` : c.kind);
+    if (c.kind !== 'travel') break;
+    s = { ...s, travelShed: c.travelShed };
+  }
+  assert.deepStrictEqual(walk, ['travel:1', 'travel:2', 'travel:3', 'quality'], 'travel sheds in three steps, then quality');
+  assert.match(nextGovernorCut({ ...base, travelLive: true, travelShed: 2 }).label, /HOME/);
+  // creatures still go first
+  assert.strictEqual(nextGovernorCut({ ...base, creatureShed: 0, travelLive: true }).kind, 'creatureCount', 'the population sheds before travel (#1694)');
+  const tr = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'travel');
+  assert.strictEqual(tr.needsRestore({ travelShed: 2 }, { healthy: true }), true);
+  assert.strictEqual(tr.needsRestore({ travelShed: 2 }, { healthy: false }), false);
+  assert.strictEqual(tr.needsRestore({ travelShed: 0 }, { healthy: true }), false);
+  assert.deepStrictEqual(shedSummary({ renderScale: 1, travelShed: 1 }), ['travel 50%']);
+  assert.deepStrictEqual(shedSummary({ renderScale: 1, travelShed: 3 }), ['travel home']);
+  assert.strictEqual(anyTravel({ layoutParams: { transport: 'still' } }), false);
+  assert.strictEqual(anyTravel({ layoutParams: { transport: 'flow' } }), true);
+  assert.strictEqual(anyTravel({ layoutParams: { transport: 'still' }, layerSnapshots: { b: { layoutParams: { transport: 'flow' } } } }), true);
+  assert.strictEqual(anyTravel(null), false);
+  console.log('[selfcheck] governorCuts (#1574 travel rung): 15 cases passed');
 }

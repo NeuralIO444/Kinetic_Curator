@@ -26,7 +26,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
-import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
+import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS, anyTravel } from './governorCuts.js';
 import { recordGovernorEvent } from '../gl/governorEventLog.mjs';
 
 // Hysteresis defaults (#259 — the permanent-shed-trap fix). Shed below 28,
@@ -106,6 +106,10 @@ export function usePerformanceGovernor() {
   // governorCuts' shed/restore contract is untouched).
   const creatureShed = useStore(s => s.creatureShed);
   const setCreatureShed = useStore(s => s.setCreatureShed);
+  // #1574 — the travel rung: the overlay, and whether anything travels at all (a stratum not in 'still').
+  const travelShed = useStore(s => s.travelShed);
+  const setTravelShed = useStore(s => s.setTravelShed);
+  const travelLive = useStore(s => anyTravel(s));
   const layoutParams = useStore(s => s.layoutParams);
   const creatureCount = layoutParams?.creatures ?? 0;
   // #263 — while a context restore is in flight the FPS reading is
@@ -241,7 +245,7 @@ export function usePerformanceGovernor() {
 
     const snap = {
       fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource, creatureShed,
+      slowRender, slowRenderSource, creatureShed, travelShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -249,6 +253,7 @@ export function usePerformanceGovernor() {
         case 'fxaa': setFxaaShed(false); break;
         case 'renderScale': setRenderScale(1); break;
         case 'creatureCount': setCreatureShed(0); break;
+        case 'travel': setTravelShed(0); break;
         case 'quality':
           // #264 M1 — restore the tier the governor stepped down from,
           // then release the claim. A manual quality change clears
@@ -303,6 +308,8 @@ export function usePerformanceGovernor() {
       effectiveCount: layoutParams.count,
       creatureCount,
       creatureShed,
+      travelLive,
+      travelShed,
       slowRender,
       gpuSaturated,
     });
@@ -312,6 +319,7 @@ export function usePerformanceGovernor() {
       case 'fxaa': setFxaaShed(true); break;
       case 'renderScale': setRenderScale(cut.scale); break;
       case 'creatureCount': setCreatureShed(cut.creatureShed); break;
+      case 'travel': setTravelShed(cut.travelShed); break;
       case 'quality':
         // #264 — record the tier being stepped down from, once per shed
         // episode, so recovery restores exactly it (never the operator's
@@ -335,6 +343,6 @@ export function usePerformanceGovernor() {
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
   }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
     setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
-    creatureCount, creatureShed, setCreatureShed,
+    creatureCount, creatureShed, setCreatureShed, travelLive, travelShed, setTravelShed,
     slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
 }

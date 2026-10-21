@@ -54,6 +54,13 @@ export function TravelControls() {
       <div className="davis-travel-amounts">
         {amount('transportLeash', 'leash', 0.4, 'How far a mark may roam before the leash pulls it home (fraction of the canvas). 0 keeps it home')}
         {amount('transportFlow', 'flow', 1, 'Travel speed along the field. 0 keeps every mark home')}
+        <RangeRow layout="stack" label="travellers" ariaLabel="travel travellers"
+          value={lp.transportCeiling ?? DEFAULT_LAYOUT_PARAMS.transportCeiling} min={0} max={800} step={1}
+          defaultValue={DEFAULT_LAYOUT_PARAMS.transportCeiling} readout={`${lp.transportCeiling ?? DEFAULT_LAYOUT_PARAMS.transportCeiling}`}
+          hint="The most marks that may travel at once — a ceiling, not an amount: the governor decides how many actually roam under it (fewer on a busy frame or a smaller device)"
+          disabled={off} disabledReason="Pick a travel mode first — STILL keeps every mark home"
+          locked={locked.transportCeiling} onToggleLock={() => lock('transportCeiling')}
+          onChange={(v) => set('transportCeiling', Math.round(v))} />
       </div>
     </div>
   );

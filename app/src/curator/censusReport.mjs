@@ -293,6 +293,7 @@ const KEY_FIXTURES = {
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   transportLeash: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s); the still bake passes no travel context, so stills are home by design' },
   transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s)' },
+  transportCeiling: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: '#1574 Q2 — the author\'s traveller ceiling, measured with no device cap and no governor shed (the census has neither): 0 keeps every mark home, 800 lets the whole cast travel' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
   behaveSep: { driver: 'swarm', ctx: { ...HYPE_CTX } },

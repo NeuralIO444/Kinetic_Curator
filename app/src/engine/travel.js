@@ -17,6 +17,20 @@
 // Pure module (no React, no store, no GL). The store is plain data so a resolver snapshot can carry it (#1367).
 // Deterministic: integer hashes only, no Math.random, no wall clock.
 
+import { registerCostTier } from './kernel/costRegistry.mjs';
+
+// #1574 — the cost tier, declared at the registration site (the house pattern). Tier 0 on the GPU ladder: travel
+// adds NO pass, shader, target or byte — it moves instance positions the structural item pass already draws. Its
+// real cost is CPU, measured and priced where the governor reads it: data/quality.js TRAVEL_BUDGETS (0.885 µs per
+// traveller-step, 0.354 ms at the 400-traveller desktop cap) and the governor's own travel rung, which sheds it
+// FIRST (hooks/governorCuts.js cut 1.75) — never this registry's tier ladder.
+registerCostTier('engine/travel', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes: '#1574 travel kinemes: no GPU pass (positions only, inside the structural item pass). CPU: 0.885 us per traveller-step measured (sandbox node, FLOW, 400 travellers: mean 0.354 ms, p95 0.53 ms); capped by TRAVEL_BUDGETS (desktop 400 / iPad-class 250, pending device bench) and shed first by the governor travel rung (1 -> 1/2 -> 1/4 -> home).',
+});
+
 /** The locked integration step (spine A's 60 Hz). */
 export const TRAVEL_STEP = 1 / 60;
 const STEP_TICKS = 1000; // the clock bank's integer unit is 1/60 ms, so one TRAVEL_STEP is exactly 1000 ticks
@@ -67,20 +81,43 @@ const lerp = (a, b, t) => a + (b - a) * t;
 const num = (v, d = 0) => (Number.isFinite(Number(v)) ? Number(v) : d);
 const clamp01 = (v) => Math.min(1, Math.max(0, num(v)));
 
+// ── the traveller budget (Q2, RULED by Matt 2026-10-20) ─────────────────────────────────────────────────────────
+// Governor-selected within a device-class cap: the governor picks the scene's travel amount, bounded by a hard
+// per-device-class cap (data/quality.js TRAVEL_BUDGETS — the #1433 pattern); the author sets the CEILING
+// (transportCeiling), never the amount. The governor's travel rung steps through these fractions; the last one is
+// zero — every velocity dies, every mark settles home, and the output is exactly today's before micro-motion or
+// quality is touched (the travel-first shed, #1574).
+export const TRAVEL_SHED_FRACTIONS = Object.freeze([1, 0.5, 0.25, 0]);
+export const TRAVEL_SHED_MAX = TRAVEL_SHED_FRACTIONS.length - 1;
+
+/**
+ * How many marks of this stratum may travel this frame: the author's ceiling, bounded by the device-class cap
+ * (absent: no cap — stills, census, exports), scaled by the governor's shed level.
+ */
+export function travelBudget(ceiling, deviceCap = null, shed = 0) {
+  const c = Math.max(0, Math.floor(num(ceiling)));
+  const cap = deviceCap === null || deviceCap === undefined || !Number.isFinite(Number(deviceCap)) ? c : Math.max(0, Math.floor(Number(deviceCap)));
+  const level = Math.min(TRAVEL_SHED_MAX, Math.max(0, Math.floor(num(shed))));
+  return Math.floor(Math.min(c, cap) * TRAVEL_SHED_FRACTIONS[level]);
+}
+
 // ── params ──────────────────────────────────────────────────────────────────────────────────────────────────────
 /**
  * A stratum's travel params from its layoutParams, resolved to real units. `active` is false when the hard gate
  * holds (still mode, no leash, no flow): nothing is computed and nothing is touched.
  */
-export function travelParams(layoutParams, W, H) {
+export function travelParams(layoutParams, W, H, { deviceCap = null, shed = 0 } = {}) {
   const lp = layoutParams || {};
   const m = Math.min(num(W), num(H));
   const mode = TRANSPORT_MODES.includes(lp.transport) ? lp.transport : 'still';
   const leash = Math.max(0, num(lp.transportLeash));
   const flow = clamp01(lp.transportFlow);
-  const active = m > 0 && mode !== 'still' && leash > 0 && flow > 0;
-  return { active, mode, m, L: leash * m, cruise: flow * FLOW_CRUISE_AT_1 * m, flow };
+  const budget = travelBudget(lp.transportCeiling ?? DEFAULT_CEILING, deviceCap, shed);
+  const active = m > 0 && mode !== 'still' && leash > 0 && flow > 0 && budget > 0;
+  return { active, mode, m, L: leash * m, cruise: flow * FLOW_CRUISE_AT_1 * m, flow, budget };
 }
+/** The author's default ceiling: the desktop cap (data/quality.js), so a fresh scene travels at full measure. */
+export const DEFAULT_CEILING = 400;
 
 // ── the store ───────────────────────────────────────────────────────────────────────────────────────────────────
 /** One store per resolver: stratum id → layer state. */
@@ -243,11 +280,12 @@ export function applyTravel(soa, ctx, still = null) {
   if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
   for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
 
+  const sel = p.active ? selectTravellers(layer, soa, n, seed, p.budget, still) : null;
   let moved = false;
   const seen = new Set();
   for (let k = 0; k < n; k++) {
     const index = soa.index[k];
-    const travels = p.active && !(still && still[k]);
+    const travels = !!(sel && sel[k]);
     let s = marks.get(index);
     if (!s) {
       if (!travels) continue;
@@ -278,6 +316,36 @@ export function applyTravel(soa, ctx, still = null) {
   return () => {
     for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
   };
+}
+
+/**
+ * Which slots travel this frame: every eligible mark (not artist-pinned) when the budget covers them, otherwise the
+ * `budget` eligible marks with the lowest per-instance rank hash — a stable, nested choice, so a tighter budget
+ * keeps a SUBSET of the travellers it had (the rest settle home) and a restored one brings the same marks back.
+ * Cached on the layer by a signature of (n, budget, eligibility): derived, never snapshotted.
+ */
+function selectTravellers(layer, soa, n, seed, budget, still) {
+  let elig = 0;
+  let sum = 0;
+  for (let k = 0; k < n; k++) {
+    if (still && still[k]) continue;
+    elig++;
+    sum = (sum + Math.imul(soa.index[k] + 1, 0x9e3779b1)) | 0;
+  }
+  const sig = `${n}|${budget}|${elig}|${sum}|${seed}`;
+  if (layer.sel && layer.sel.sig === sig) return layer.sel.on;
+  const on = new Uint8Array(n);
+  if (elig <= budget) {
+    for (let k = 0; k < n; k++) if (!(still && still[k])) on[k] = 1;
+  } else if (budget > 0) {
+    const ranked = [];
+    for (let k = 0; k < n; k++) if (!(still && still[k])) ranked.push(k);
+    const r = (k) => travelHash(seed, soa.index[k], 5);
+    ranked.sort((a, b) => r(a) - r(b) || soa.index[a] - soa.index[b]);
+    for (let i = 0; i < budget; i++) on[ranked[i]] = 1;
+  }
+  layer.sel = { sig, on };
+  return on;
 }
 
 // ── snapshot (#1367: a take can begin mid-session) ─────────────────────────────────────────────────────────────
