@@ -220,6 +220,89 @@ changes resolver item fields, so it rehashes the same takes and rides F1's rulin
 The shipped build pins today's contract (`accent === colour`) in the new suite so the
 change is deliberate when it comes.
 
+## F1/F2 landing (2026-10-20, under Matt's re-record ruling)
+
+F1 and F2 landed as one change in two commits: `e0aa5cb1` (the art + the split) and
+this finish commit (the re-records only). What follows is the evidence, including
+where the fork's own record above proved wrong.
+
+- **Recovery.** The fork implementation was reverted during staging without ever
+  being committed: it is NOT recoverable from git (verified — branch reflog, stash,
+  and a scan of all dangling/unreachable objects; none carries it). The art was
+  instead recovered **stamp for stamp from the fork's committed preview sheets**
+  (`renders/fork-moth.svg`, `renders/fork-dish.svg`), whose unwrapped
+  identity-transform stamps carry each asset's designed markup in asset-local
+  coordinates — the same source this report's fork spec was written from. Per part:
+  `org_leaf_02` +5 vein pairs and a closed inner vein loop; `org_petal_02` +8 barb
+  pairs; `org_petal_01` +10 vein marks merged into the fill path (element-count
+  neutral) plus an accent stroke; `geo_chev_01` inner echo + centre dot plus an
+  accent stroke; `org_blob_01` strata ring, arc and 5 pore ticks appended to the
+  outline path plus an accent stroke. Two corrections to the fork record above:
+  (1) `org_pod_02`'s "crest + segment marks" never existed as asset art — the fork
+  sheets stamp the baseline body verbatim; its body detail is this branch's shipped
+  engraving seam. The strata rings the sheets DO show on the body ride a **detail
+  path echoing the engraving arc**: outline line → two closed ellipse-outline rings
+  (rx13 ry34, rx6.5 ry22 — the seam arc's own proportions) + two seam ticks,
+  stroked in the accent slot; verified to keep the part's attach points and cost
+  bit-identical before adoption. (2) `org_pod_01`'s "vein/strata marks" are not in
+  its asset markup either — the fork stamps show the fan plate's rings rendered
+  **through the dish disc** (the plate drawn as a disc under `roleColors`'
+  accent-cream notation), so pod_01's asset is unchanged by construction and its
+  matte does not move. The landing is faithful to the fork's rendered evidence,
+  not to the fork text where the two disagree.
+- **Guardrails.** `finishingLook.selfcheck.mjs` re-run against the landed art:
+  §1 passes **unmodified** — every part's auto-attach points and `assetCostScore`
+  bit-identical to the pre-pass pins (5/2/2/1/2/1/1). Region mattes re-baked
+  (`npm run bake:regions`): exactly the six changed assets' entries move
+  (blob 1→2 regions, petal_01 1→10, leaf_02 7→12 at the cap, pod_02 2→12,
+  chev 1→4, petal_02 3→3 re-segmented); pod_01's entry is byte-identical.
+  Engraving suite green, golden `59289882` stands.
+- **F2's slot value.** The fork text left the exact accent open ("part of the fork
+  PR's eye pass"). Landed: **accent = the palette ink** (`accent: ink` in both
+  `dishCreature.js` put sites). The preview's `#f5ead2` was that preview palette's
+  ink slot; ink is the palette-native form of the split, matches the module law
+  (palette-derived, no ad-hoc picks), and holds for any palette size. The suite's
+  dish contract was re-pinned in the open to `accent === ink` (discs only — the
+  eye is ink-on-ink by design, before and after).
+- **Re-record (this finish commit; no production code).** S3 discipline, S3 tools:
+  - `creatureGate` fixture: checkpoints refreshed by replaying the fixture's own
+    inputs. Control: the same refresh against the pre-art tree (`d7f58f20`)
+    reproduces the prior fixture byte-for-byte (sha256 `7e99c5b5…`). Branch
+    refresh deterministic across two runs (sha256 `1c76714d…`, 17757 bytes).
+    Deep diff old vs new: **15 differing leaves, all checkpoint hashes** —
+    checkpoint 0 stands (frame 0 precedes any creature draw). Inputs
+    byte-identical. Suite green.
+  - `replayGate` fixture: re-recorded with its own recorder (deterministic across
+    two runs; sha256 `23bd414f…` → `3e5c6687…`, 144195 → 144173 bytes). Deep diff:
+    **61 differing leaves, all checkpoint hashes** — every checkpoint moves
+    because the take's swatch assets include enriched parts (frame 0's layout
+    already embeds them). Inputs byte-identical. Suite green.
+  - `dishCreature` scene goldens re-pinned (the scenes' inputs are the suites'
+    own constants — unchanged): GOLDEN_300 `75c6829a` → `20b33fcd`, GOLDEN_LIMB
+    `a9918074` → `2937f8ad`, GOLDEN_BAND `57dc1ef4` → `e5e30d44`. Suite green.
+  - `wingWarp` resolver pins did NOT move (suite green unmodified) — contrary to
+    the fork text's expectation; the warp goldens hash warp geometry, not the
+    wing's vein detail. Recorded here so the expectation is closed.
+  - Both fixtures' PROVENANCE files carry the re-record paragraphs; the creature
+    gate's suite header notes the second re-record.
+- **Verification of the landed tree:** `npm run build` green. Full manifest
+  sweep (485 suites, 3-way parallel, 300 s cap): 475 PASS / 10 FAIL raw; the
+  eight load-class failures (`gl/accum`, `gl/composite`, `gl/canvasSizes`,
+  `gl/resolverProbe`, `gl/retroCapture`, `gl/vortex`, `pattern/patternRender`,
+  `kernel/creatureCost`) all PASS on serial standalone re-runs. Net
+  **483 PASS / 2 FAIL** — the standing sandbox pair, each proven base-identical
+  against clean main `6946f393` in this session: `swarmWasm` (exit 1 both
+  trees, `build-wasm: cargo not found on PATH`, output identical apart from
+  worktree paths) and `fx/rollSafety` (exit 124 at the 300 s cap both trees,
+  `Protocol error (Runtime.evaluate): Target closed` in the GL parity driver —
+  the browser-closed signature). The engraving seams shipped at `d7f58f20`
+  remain intact underneath: the engraving suite passes with its golden
+  `59289882` unmodified, and the seams' §2 pins in `finishingLook` pass as
+  written.
+- **Still owed at publish:** true before/after render pairs for Matt's eye (the
+  staging fork previews stand as the "after" reference until then), and the PR
+  itself — this landing is local commits only, per the staging rule.
+
 ## Exceptions and deviations
 
 - No pin moved; no golden weakened; no fixture touched; no key added — nothing to
