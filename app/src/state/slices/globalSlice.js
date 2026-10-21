@@ -24,7 +24,7 @@ import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
 import { tagImportedRegions } from '../../data/regionDefaults.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
-import { sanitizeMidiMap } from '../../midi/map.mjs';
+import { sanitizeMidiBanks, sanitizeMidiActiveBank, activeBankMap } from '../../midi/banks.mjs';
 import { sanitizeMathMacros } from '../../curator/mathMacros.js';
 import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../assets/regionSlots.js';
 import { queueRegionDetect } from '../../assets/regionRaster.js';
@@ -910,7 +910,15 @@ export const createGlobalSlice = (set) => ({
       next.canvasPresetId = canvas.canvasPresetId;
       next.stageMode = canvas.stageMode;
     }
-    next.midiMap = sanitizeMidiMap(doc.midiMap); // #617 — a doc without mappings maps nothing
+    { // #617 + #1720 — banks land together: the bank list, the active bank, and
+      // the active bank's map as the `midiMap` mirror. A doc without banks
+      // (the legacy midiMap shape) becomes the single MAIN bank.
+      const banks = sanitizeMidiBanks(doc.midiBanks, doc.midiMap);
+      const active = sanitizeMidiActiveBank(doc.midiActiveBank, banks);
+      next.midiBanks = banks;
+      next.midiActiveBank = active;
+      next.midiMap = activeBankMap(banks, active);
+    }
     next.mathMacros = sanitizeMathMacros(doc.mathMacros); // #724 — a doc without macros has none
     next.mathLearnArmed = null; // #724 — learn never survives a load; it is a gesture
     // #651 — reimported titles persist; a doc without a title clears it.

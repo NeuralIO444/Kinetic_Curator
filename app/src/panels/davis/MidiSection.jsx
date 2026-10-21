@@ -9,8 +9,10 @@ import { useStore } from '../../state/store.js';
 import { midiStatusView, describeMessage } from '../../midi/status.mjs';
 import { MIDI_TARGETS } from '../../midi/targets.mjs';
 import { keyFor } from '../../midi/map.mjs';
+import { legendEntries } from '../../midi/banks.mjs';
 import { describeKey } from '../../midi/message.mjs';
 import { learnPrompt } from '../../midi/learn.mjs';
+import { isEarned } from '../../state/earnedVoices.js';
 import { emit, Events } from '../../composition/eventBus.js';
 
 export function MidiSection() {
@@ -18,14 +20,35 @@ export function MidiSection() {
   const status = useStore((s) => s.midiStatus);
   const last = useStore((s) => s.midiLast);
   const map = useStore((s) => s.midiMap);
+  const banks = useStore((s) => s.midiBanks);
+  const activeBank = useStore((s) => s.midiActiveBank);
+  const userVoices = useStore((s) => s.userVoices);
   const learn = useStore((s) => s.midiLearn);
   const refused = useStore((s) => s.midiLearnRefused);
   const unbindMidi = useStore((s) => s.unbindMidi);
   const armMidiLearn = useStore((s) => s.armMidiLearn);
   const cancelMidiLearn = useStore((s) => s.cancelMidiLearn);
+  const switchMidiBank = useStore((s) => s.switchMidiBank);
+  const addMidiBank = useStore((s) => s.addMidiBank);
+  const removeMidiBank = useStore((s) => s.removeMidiBank);
+  const renameMidiBank = useStore((s) => s.renameMidiBank);
   const view = midiStatusView(status, enabled);
   const ready = enabled && status.state === 'ready';
   const armedTarget = learn?.armed ? MIDI_TARGETS.find((t) => t.id === learn.armed) : null;
+  // #1720 — the legend reads the ACTIVE bank (map is its mirror): bound keys in
+  // key order. A user-voice slot reads as the voice it will load, or as its
+  // slot name while the shelf slot is empty (an honest no-op, dimmed).
+  const myVoices = (userVoices || []).filter((v) => !isEarned(v));
+  const legend = legendEntries(map).map((e) => {
+    const slot = /^voice\.my\.(\d+)$/.exec(e.targetId);
+    if (!slot) return e;
+    const voice = myVoices[Number(slot[1]) - 1];
+    return voice ? { ...e, label: voice.name } : { ...e, empty: true };
+  });
+  const renameBank = () => {
+    const name = window.prompt('Bank name', banks[activeBank]?.name || '');
+    if (name != null) renameMidiBank(name);
+  };
 
   // Esc backs out of learn.
   useEffect(() => {
@@ -57,6 +80,31 @@ export function MidiSection() {
         <div className={`davis-midi-learn ${refused ? 'bad' : ''}`} role="status" aria-live="polite">
           {learnPrompt(armedTarget, refused)}
         </div>
+      )}
+      <div className="davis-midi-bank">
+        <i className="lbl">bank</i>
+        <select aria-label="Active MIDI bank" value={activeBank}
+          onChange={(e) => switchMidiBank(Number(e.target.value))}>
+          {banks.map((b, i) => <option key={i} value={i}>{b.name}</option>)}
+        </select>
+        <button type="button" className="micro-btn" title="Rename this bank" onClick={renameBank}>≡</button>
+        <button type="button" className="micro-btn" title="New bank" onClick={() => addMidiBank()}>+</button>
+        <button type="button" className="micro-btn" title="Delete this bank" aria-label="Delete this bank"
+          disabled={banks.length <= 1}
+          onClick={() => { if (window.confirm(`Delete bank "${banks[activeBank]?.name}" and its mappings?`)) removeMidiBank(); }}>×</button>
+      </div>
+      {legend.length > 0 && (
+        <>
+          <div className="davis-midi-legend-head">keys · {banks[activeBank]?.name}</div>
+          <ul className="davis-midi-map davis-midi-legend" aria-label="Key legend">
+            {legend.map((e) => (
+              <li key={e.key}>
+                <code>{e.keyLabel}</code>
+                <span className={e.empty ? 'empty' : ''}>{e.label}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
       <ul className="davis-midi-map" aria-label="MIDI mappings">
         {MIDI_TARGETS.map((t) => {
