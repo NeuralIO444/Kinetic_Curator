@@ -1,238 +1,462 @@
-# STAGING REPORT — #1574 Q2 amendment: the traveler budget (LOCAL ONLY — no push, no PR)
+# STAGING REPORT — #1575 Travel kinemes P2 (PATH transports + assignment) (LOCAL ONLY — no push, no PR)
 
-Branch: `ember/1574-travel-core` (local only — not pushed, no PR)
-Base of this amendment: `9d6fb42c` (#1574 P1 — travel kinemes transport core)
-(This file replaces the P1 staging report in the branch's report slot;
-P1's report remains in git history at `9d6fb42c`.)
+Branch: `ember/1575-travel-paths` (local only — not pushed, no PR)
+Base: stage-1 branch tip `9d6fb42c` (#1574 P1, committed locally on `ember/1574-travel-core`)
+(This file replaces stage 1's staging report at the worktree root; stage 1's remains in git history.)
 
-## The ruling implemented
+## What was built, in plain language
 
-Q2 RULED (Matt, 2026-10-20, on #1574): traveler budget is
-**governor-selected within a device-class cap** — the governor picks the
-scene's travel amount, bounded by a hard per-device-class cap; the author
-sets the ceiling, not the amount. P1 was built without the mechanism
-under the Q2 carve-out; this amendment is the follow-on mechanism, and
-nothing else (no Q4 per-stratum leashes, no P3 surge, no #1356 work).
+Marks can now travel a **dealt path**, not just roam the noise field.
+Where P1's FLOW is a little physics sim (each mark carries offset +
+velocity in a store), PATH is a **pure function**: give it the sim time
+(the same locked step count P1's clock already counts), the mark's seed
+and the path params, and it returns where the mark's anchor is — no
+per-mark state at all, so a replay lands on the same frame by
+construction, not by discipline. Four families live behind the params:
 
-## What shipped, in plain language
+- **orbit** — the mark turns around the dish centre (the canvas centre
+  in placement coordinates), keeping its own radius, so the whole
+  composition rotates instead of collapsing onto one shared ring.
+- **spiral** — the same centre, but the radius breathes ±radius px on a
+  slow sine while the angle drifts.
+- **sweep** — a cross-canvas lane with wrap: the mark crosses the full
+  width at its own home height, bowed into an arc, held at both ends
+  (its progress is eased, never a linear glide), and wraps.
+- **lissajous** — a two-sine weave around home, anchored: at t=0 the
+  offset is exactly zero, like every kineme driver.
 
-A FLOW scene still *requests* travel for every placed mark — that request
-is the authored ceiling, and it is exactly what the Directors motion-group
-controls already express (transport / leash / flow, plus how many marks
-the scene deals). The governor now *selects* the effective travel amount:
-how many marks actually travel.
+The anime timing law is in the shapes: arcs everywhere, an
+**anticipation lean** against every departure (measured below), held
+extremes (sinusoidal velocity falls to zero at the extremes), and a
+departure ease so marks leave home slowly instead of snapping to full
+speed.
 
-```
-travelers = min(marks the scene dealt, the device-class cap)
-```
+**Assignment (Q1, Matt's ruling 2026-10-14) is family data**, a pure
+table in `kineme.js` in the #1434 pattern: linework declares FLOW,
+glyphs (stamps + glyph/letter/type-tagged assets) declare PATH, heavy
+solids (weight `heavy` AND density `solid` — the org_blob class)
+declare still, and unnamed families declare nothing and follow the
+stratum's own word (which is exactly how P1 shipped, so P1 scenes are
+untouched). Two parts bite behaviourally today: a heavy-solid mark
+**anchors** — it stays home bit-exact inside FLOW and PATH scenes —
+and the artist's existing per-asset pin (`assetStill`) tames any mark
+home, as it already did for FLOW. The family's declared mode is also
+what the new BUILD chip shows (below).
 
-Marks are selected by instance index, ascending (index 0 first) — the
-index is the identity the travel store already keys its per-mark state
-by, so the selection is stable across placement rebuilds. A mark beyond
-the selection never travels: no sim state is created for it, and if the
-budget shrinks under a live scene (a class change) its state is dropped
-and it presents exactly at home — the 'still' parity position, not a
-roam frozen mid-stride.
+**Controls split (Matt's ruling, comment 2026-10-14) is honoured
+exactly:** BUILD gets one minimal chip on each KC stratum block —
+`travel <mode> · fam <family default>` — which selects the stratum on
+first tap and cycles its mode (still → flow → path) on the next; no
+amounts, no clusters in BUILD. Everything richer lives in the
+**Directors motion group**, extended from P1's group: `path` joins the
+mode row, and under it the family chips (orbit/spiral/sweep/
+lissajous, TE) plus speed (%) and radius (px) on the house slider; the
+leash row now shows for PATH as well as FLOW.
 
-There is **no new panel control and no new surface**: the budget is
-governor-selected, so nothing edits it. The Directors motion group is
-byte-for-byte as P1 shipped it. There are **no new layoutParams keys**
-(see Pins below).
+**The Jell-O metric is in the census output**: per scene (still, flow,
+and the four path families on the census cast), how many marks travel
+and their mean distance-from-home over a 90-frame window. Reported,
+steering nothing — no consumer reads it. Measured sample below.
+
+**Stretch-along-velocity**: fast FLOW/PATH marks elongate along their
+travel direction through the deform channel (`a_def`). The shader
+squashes along its axis and bulges across it, area-preserving, so the
+stamped axis is the velocity's *perpendicular* — that is what
+elongation along travel means in this channel. Capped at 0.3, nothing
+stamped under 45 px/s, and buildPlacements never overwrites an item
+that already carries its own deform (placement items carry none today;
+the guard stands for any future producer). Verified end-to-end: a fast
+lissajous scene's items reach the scene contract as `deform` triples.
+
+Under the governor, PATH is travel: `travelActive` now includes
+`transport === 'path'`, so cut 1.6 sheds it with FLOW. A shed PATH
+frame presents home immediately and its step clock **freezes** (steps
+do not advance), so a shed path resumes where it left instead of
+jumping to where its clock would have been.
+
+## ⚠ OPEN FORKS — not built, by the dispatch's explicit carve-out
+
+- **Q4, leash scope (global vs per-stratum): NO ruling from Matt.**
+  Nothing per-stratum was built: P1's single scene-level
+  `transportLeash` stands exactly as it was. Two builder's calls were
+  made *under* that open fork and are recorded here, not hidden:
+  (1) the leash radially caps the centred/weave PATH families
+  (orbit/spiral/lissajous), as it caps FLOW's roam; (2) sweep's lane is
+  its defining geometry — a radial cap would plateau its wrap — so
+  the leash caps only sweep's arc (its y offset). If Matt rules
+  per-stratum leashes, both calls revisit with that ruling.
+- **Q2, the traveler budget (inherited from #1574): still no ruling.**
+  No budget mechanism of any kind was built in this stage either: in a
+  FLOW/PATH scene every non-anchored, non-pinned mark travels.
+
+## New recipe keys (named exactly — for the coordinator's strip-proof)
+
+This stage adds exactly **three** new layoutParams keys, plus one new
+value on an existing key:
+
+- `transportPath` — enum, `orbit | spiral | sweep | lissajous`, default `'orbit'` (inert unless transport is 'path')
+- `transportSpeed` — numeric, 0..2, default `1`
+- `transportRadius` — numeric, 0..300 px, default `140`
+- `transport` (existing P1 key) gains the value `'path'`
+
+Like P1's three keys, these ride defaults-merged layoutParams, so the
+resolver output echoes them and the recorded fixtures behind
+`gl/replayGate`, `gl/creatureGate` and `engine/wingWarp` move again —
+the same documented, strip-provable mechanism as stage 1, now with
+these three additional keys to strip. No pin or fixture was re-recorded
+in this stage.
 
 ## Files touched
 
-- `app/src/data/quality.js` — `TRAVEL_BUDGETS` { desktop, ipad } and the
-  `travelBudgetForDevice(ipadClass)` accessor, in the house pattern
-  beside `REGION_BUDGETS` / `FRAME_BUDGETS` (device class is the same
-  `ipadClass` boolean the other budgets read).
-- `app/src/engine/kineme.js` — `selectTravelers({ requested, ipadClass })`
-  (the selection), `TRAVEL_COST_REFERENCE_MARKS`, the budget's cost
-  registration (`travel/budget`, tier 0), and `applyTransport`'s use of
-  it: the selection is computed once per scene per resolve beside the
-  store lookup, excess state is pruned there, and the step loop skips
-  non-travelers. `ctx.travel` gains the optional `ipadClass` field.
-- `app/src/engine/buildPlacements.js` — passes `travel.ipadClass` through
-  to the transport pass (comment updated; nothing else).
-- `app/src/gl/liveResolve.mjs` — the travel base gains
-  `ipadClass: input.travelIpadClass === true`.
-- `app/src/gl/liveLoop.mjs` — stamps `travelIpadClass:
-  isIpadClassDevice()` on the resolver input, beside `travelShed`, using
-  the same device sniff the region budget uses.
-- `app/src/gl/performanceFile.mjs` — `travelIpadClass` added to
-  `MACHINE_KEYS` (it describes the recording machine, not the artist's
-  intent — the file's own doctrine).
-- `app/src/engine/travel.selfcheck.mjs` — new section **I** (29 checks;
-  suite total 50 → 79). No manifest change: the suite was already
-  registered by P1, and no new suite was added.
+Implementation:
+- `app/src/engine/kineme.js` — `TRANSPORT_MODES` gains `'path'`;
+  `PATH_FAMILIES`; the family-assignment table (`familyDefaultTransport`,
+  `isFamilyAnchored`, `defaultTransportForCast`, `nextTransportMode`,
+  `transportChipLabel`); the PATH core (`pathAnchor` — pure, with the
+  timing-law shapes; `travelStretchAmount`, cap/floor constants);
+  `applyTransport` extended: PATH present on the shared step clock
+  (stateless — the store holds only steps/acc for the scene), leash
+  cap, shed freeze, and the stretch scratch filled for FLOW and PATH;
+  the `travel/path` cost-tier declaration (tier 0, measured — below).
+- `app/src/engine/buildPlacements.js` — the transport gate takes
+  'path'; the per-mark assignment (family anchor ∪ artist pin) rides
+  the pass's still array; PATH params (path/speed/radius) and the
+  deform scratch ride the travel input; items are stamped with the
+  deform triple only while stretched (pool path sets/clears per call,
+  fresh path stamps only when > 0 — resting items are field-for-field
+  the pre-P2 items).
+- `app/src/data/layout-modes.js` — the three new keys: defaults,
+  `PARAM_SPEC` bounds (speed 0..2, radius 0..300), the `transportPath`
+  enum (absent/unknown → 'orbit').
+- `app/src/hooks/usePerformanceGovernor.js` — `travelActive` includes
+  'path' (one line + comment; the rung itself is P1's, unmoved).
+- `app/src/panels/DavisPanel.jsx` — the Directors motion group extended
+  (mode row gains 'path' from the vocabulary; family chips + speed +
+  radius rows under PATH; leash row shared). No new panel.
+- `app/src/panels/build/LayerStack.jsx` — the minimal mode chip on KC
+  stratum blocks (mode + family default from the stratum's snapshot
+  cast; select-then-cycle). No control clusters.
+- `app/src/curator/censusReport.mjs` — the Jell-O metric
+  (`jelloMetric()` + a formatted census section); KEY_FIXTURES for
+  `transportSpeed` / `transportRadius` (travel driver, lissajous ctx —
+  both measure as MOVES); a STRUCT_FIXTURES row for `transportPath`.
 
-## Selection inputs — and why each is recorded state (#1367)
+Tests:
+- `app/src/engine/travel.selfcheck.mjs` — extended, sections I–O
+  (P1's A–H untouched except the H vocabulary pin, 'still'/'flow' →
+  + 'path', which is this stage's own change): PATH pure-function
+  laws (anchored deal, purity, orbit radius, spiral breathing, sweep
+  wrap + lane band, held extremes, anticipation lean measured against
+  lean-off), PATH through the pipeline (replay-exact over 300 uneven
+  frames, stateless store, leash cap, sweep cross-canvas, speed 0 /
+  radius 0 bit-identical to still, leash 0 parity + store untouched),
+  PATH shed (home + frozen clock + resume), family assignment (table,
+  cast default, chip cycle/label, heavy-solid anchor and artist pin
+  through the pipeline), stretch (cap, floor, exact perpendicular
+  axis, stamped-only-while-fast), PATH cost re-measurement, PATH
+  params. **685 checks passed** (P1's 50-check suite grew; the count is
+  the harness's own ok()+assert tally).
+- `app/src/curator/census.selfcheck.mjs` — the key-universe constant
+  22 → 23 structural keys (the `transportPath` enum is the new
+  structural key — the same pin P1 updated for `transport`); a Jell-O
+  assertion block (still travels nothing; every travel scene travels
+  with a real mean; the formatted report carries the section).
+- `app/selfcheck.manifest` — **unchanged**: no new suite file was
+  added (P2 extends the existing travel suite, already registered).
 
-`selectTravelers` is a pure function of exactly two inputs:
+## Feel / behaviour numbers (sandbox, this build)
 
-1. **requested** — the scene's placed-mark count. Census/geometry state:
-   the recipe's layout params deal it, a take's input log carries those
-   params, and `applyTransport` reads it as `soa.n`.
-2. **ipadClass** — the recording machine's device class. It rides the
-   resolver input as `travelIpadClass`, so the input log records it like
-   every resolver input; liveLoop stamps it from the device. It is a
-   MACHINE key (performanceFile doctrine: detail is per machine).
+Jell-O metric, census cast (48 placed marks), 90 frames at 60 fps:
 
-Nothing else is consulted: **no wall-clock time, no live performance
-readings, no Math.random**. The live-pressure mechanism remains the
-governor's cut 1.6 shed in `hooks/governorCuts.js`, whose behaviour is
-untouched by this amendment. Proof is in the suite (section I): the
-selection returns deep-identical results over 100 repeated calls, and
-two fresh iPad-class runs of an 800-mark FLOW scene land on identical
-frame hashes for every one of 90 frames.
+| scene | travelling | mean distance-from-home |
+|---|---|---|
+| still | 0/48 | 0 px |
+| flow (leash 200, flow 1) | 38/48 | 26.47 px |
+| path/orbit (leash 300) | 38/48 | 30.12 px |
+| path/spiral (leash 300) | 38/48 | 27.75 px |
+| path/sweep (leash 300) | 38/48 | 240.02 px |
+| path/lissajous (leash 300) | 38/48 | 123.75 px |
 
-**Absent input = P1.** A take recorded before Q2 carries no
-`travelIpadClass`; the resolver reads absent as the desktop class, whose
-cap is the full placement cap — so pre-Q2 takes replay with every mark
-travelling, exactly as recorded. The suite pins this: a run with no
-`ipadClass` on the travel input is bit-identical to the desktop run.
+(38/48, not 48/48, is the assignment working: the cast's heavy-solid
+and slow marks anchor or stay under the 1 px travel threshold — the
+metric reports the cast as dealt, it does not grade it.)
 
-## Cap values, with derivations
+PATH in the travel suite's own scene (120 marks, lissajous, leash
+300): mean roam > 10 px with the leash as the hard max (suite
+asserts both). Anticipation measured against the same function with
+the lean switched off (suite-pinned bounds): sweep's departure dip
+**> 3 px** against its travel direction, the weave's lean **> 1 px**
+in its first half-second. Held extremes: the weave's speed falls
+under 35% of its peak inside its cycle (suite-pinned bound).
 
-`TRAVEL_BUDGETS` (each entry `{ maxTravelers, timeMs }`; timeMs is the
-entry's cost equivalence — see below):
+## Cost (measured, not estimated)
 
-- **desktop: 800 travelers, timeMs 0.39 — derived directly from the
-  measured number.** 800 is the placement count cap at which P1 measured
-  FLOW travel (0.387 ms sandbox; declared `travel/flow` timeMs 0.39 in
-  the kernel cost registry). A desktop scene at its maximum authored
-  count therefore costs exactly the declared travel cost, the selection
-  never trims a desktop scene, and desktop behaviour is bit-identical
-  to P1 (suite sections A–G unchanged and green, trajectory hash
-  `8b46bbc0cb58d3d6` identical before and after this amendment).
-- **ipad: 500 travelers, timeMs 0.24375 — BUILDER CALL, flagged.** No
-  iPad-class travel measurement exists yet; the Q2 ruling itself
-  records the iPad cap as pending the device bench. The tightness ratio
-  is `FRAME_BUDGETS`' iPad/desktop render-cap ratio, 5.0 / 8.0 — the
-  frame-cost budget, the nearest budget in kind to travel's per-frame
-  CPU cost — applied to the desktop cap: 800 × 5/8 = 500. Its timeMs is
-  not an iPad measurement: it is 500 marks at the declared desktop
-  per-mark cost (0.39 / 800), i.e. the allowance expressed in cost
-  terms. **Re-derive from a measured iPad number when the bench
-  lands; do not tune by eye.**
+`travel/path` is registered at **tier 0** on the same doctrine as
+`travel/flow` (structural, no GPU pass, sheds by the governor's own
+rung). Declared `timeMs: 0.66` is the measured resolver-CPU figure:
+`applyTransport` in PATH mode (lissajous present + stretch
+finite-difference) at the 800-mark cap, one locked step + present,
+median of 7 runs × 200 calls = **0.662 ms** (the suite re-measures on
+every run; latest print 0.662 ms). FLOW's declaration is unchanged
+(re-measured 0.39 ms this run). Sandbox-indicative only.
 
-Cost-terms bound, by construction and asserted in the suite:
-`estimatedMs = travelers × (declared travel/flow timeMs / 800)` and
-`estimatedMs ≤ the class's budgetMs` for both classes, at any request.
+## Acceptance evidence
 
-## Builder calls (all of them)
+- **Four path families behind params with Q1 defaults** — orbit /
+  spiral / sweep / lissajous behind `transportPath` (+ speed/radius),
+  family defaults per the Q1 table (`familyDefaultTransport`).
+- **Parity suite green for still scenes** — travel.selfcheck A
+  (P1's, unchanged) plus P2's own gates: PATH + leash 0 bit-identical
+  with the store untouched; PATH speed 0 and radius 0 bit-identical
+  to the still frame; still items carry no deform fields.
+- **Jell-O metric in the census output** — `jelloMetric()` rows +
+  the formatted "RA3 Jell-O metric" section; census suite pins it.
+- **`npm run build` green**; ESLint clean on every touched file.
+- **No golden hash was weakened or re-pinned.** The one pin updated is
+  enumerative, not measured: the census key-universe constant
+  (22 → 23 structural) — a new enum key must appear in it, exactly as
+  P1's `transport` did.
 
-1. **iPad cap = 500** via the FRAME_BUDGETS 5/8 ratio — flagged above;
-   no iPad measurement exists on this branch.
-2. **Selection order = instance index, ascending.** The store already
-   keys state by index; any deterministic order satisfies the contract,
-   and this one needs no new state and survives rebuilds.
-3. **Selection cost declared as timeMs 0** for `travel/budget` — the
-   honest figure at the registry's ms scale: the selection measured
-   **119–245 ns/call** across suite runs in this sandbox (suite
-   re-measures and prints it on every run). The cost the budget actually
-   controls is `travel/flow`'s declared 0.39 ms, unchanged.
-4. **A non-traveler's state is dropped, not settled**, when the budget
-   shrinks under it: the budget is a scene property, not a pressure
-   event — the mark was never selected in this configuration, so it
-   presents at home exactly. (The cut 1.6 shed keeps its own settle
-   behaviour, untouched.)
+## Deviations from the issue, and why
 
-## Cost
-
-- Selection: scalar arithmetic, **once per scene per resolve** — never
-  per mark per frame. Measured **119–245 ns/call** (median over 20,000
-  calls per run, sandbox node; suite section I). The only per-mark work
-  it adds is one integer comparison in `applyTransport`'s existing step
-  loop, plus a state-prune that runs only when the budget actually trims.
-- Declared at registration per the house pattern: `travel/budget`,
-  **tier 0** (structural, like `travel/flow` — no GPU pass, sheds by the
-  governor's travel rung), `timeMs: 0` (builder call 3 above).
-  `costTiers` suite green.
-- The pass itself re-measured with the budget active (suite G):
-  `applyTransport` at the 800-mark cap, one locked step + present —
-  median-of-medians **0.390 / 0.407 / 0.434 ms** across three
-  post-amendment suite runs (declared 0.39; my pre-amendment baseline
-  run measured 0.384 ms, inside P1's recorded 0.383–0.389 band — the
-  spread is sandbox load, the suite's own gate is the 2.0 ms class
-  allowance, and the figure stays sandbox-indicative as with every CPU
-  number in the registry).
-
-## Pins / fixtures — no re-records, no new keys
-
-- **New layoutParams keys: NONE.** The authored keys are P1's unchanged
-  three (`transport`, `transportLeash`, `transportFlow`). Census pins,
-  key-universe counts and PARAM_SPEC are untouched; the census suite is
-  green unmodified.
-- The one new input is a **resolver input**, not a layoutParam:
-  `travelIpadClass` (boolean, machine key), plus its plumbing fields
-  (`travel.ipadClass` in buildPlacements, `travel.ipadClass` in
-  `ctx.travel`). Pre-Q2 takes don't carry it and read it as desktop.
-- The three pin suites already failed on this branch before this
-  amendment (P1's additive keys predate their fixtures). I measured
-  their actuals **before and after** my change; they are identical —
-  the amendment moves no pin:
-  - `engine/wingWarp`: unstripped actual **`41d885e1`** before and after
-    (expected REST pin `dc0897fb`).
-  - `gl/replayGate`: fails at the same first checkpoint (the gate's
-    `firstMismatchFrame` actual **0**) before and after.
-  - `gl/creatureGate`: fails at the same first checkpoint (actual **0**)
-    before and after.
-  Since no layoutParams keys were added, there is nothing to strip; the
-  before/after-identical actuals are the strip-proof equivalent for
-  this amendment, and the stronger in-suite proof is section I's
-  absent-class run, bit-identical to the desktop (P1) run. **No fixture
-  was re-recorded.**
-
-## Selfcheck results (my runs, exact)
-
-- `app/src/engine/travel.selfcheck.mjs`: **79 checks passed** (P1's 50
-  unchanged + 29 new in section I: budget table + derivations, selection
-  bounds in count and cost terms, purity ×100, selection cost, live
-  iPad-class subset travel with non-travelers bit-exact at home, fresh-run
-  replay determinism under the budget, desktop = P1, absent class =
-  desktop bit-for-bit, budget shrink).
-- Affected existing suites, run individually, all green:
-  governorCuts, governorCreatureShed (7 checks), governorHostileScene
-  (16 cuts, 71 passes), costTiers, census, liveResolve.determinism,
-  liveResolve, buildPlacements, kineme, performanceFile,
-  parity/deviceBudgets, spawn.
-- `npm run build`: **green**.
-- ESLint on every touched file: **clean**.
-- Full manifest sweep: `npm run selfcheck` ran the first 81 manifest
-  lines green (76 suites, including the travel suite) and stopped at
-  line 82, `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` —
-  **`cargo not found on PATH`**, the same pre-existing environmental
-  failure P1 recorded (no Rust/WASM file is touched by this amendment).
-  The remaining 408 manifest suites (lines 83–end) were then run
-  individually, stdin detached per suite: **404 passed, 4 failed**.
-  Total across the manifest: **480 of 485 suites green**; the 5 failures
-  are the swarmWasm environment failure, the three pre-existing pin
-  gates below, and one bulk-only failure:
-  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the pin
-    gates, failing exactly as they did at `9d6fb42c` (identical actuals,
-    see Pins above).
-  - `gl/clock.inventory` — failed inside both bulk sweep runs, and
-    passes standalone every time (5 consecutive runs, 9/9, including
-    immediately after its manifest neighbours). Reported as observed,
-    not explained away: nothing in this amendment touches a clock, a
-    wall-clock read, or a file that suite inventories, and its
-    standalone result is green. (An earlier bulk run of mine also
-    silently skipped 2 suites through a shared-stdin bug in my own
-    sweep script; those counts were discarded and the range re-run
-    with stdin detached — the numbers above are the corrected run.)
+1. **Orbit's centre.** The issue names "orbit (dish center default)".
+   Placement coordinates have no separate dish-centre value — the
+   dish is the canvas — so orbit/spiral turn around the canvas
+   centre, each mark keeping its own radius/phase. Recorded here as
+   the reading the build stands on.
+2. **Roam defaults are assignment, not a new default mode.** P1's
+   parity law (a document with no transport word opens still, exactly
+   as saved) forbids silently flipping existing scenes to a family
+   mode, so the roam half of Q1 lands as (a) the family table itself,
+   (b) the stratum chip's shown family default +
+   `defaultTransportForCast`, and (c) the behavioural anchor half
+   (heavy solids) which applies inside any live transport. The
+   stratum's explicit recipe word remains the artist's — choosing
+   'path' for a glyph-led stratum is one tap on the chip the ruling
+   itself specified. Flagged plainly so Matt can rule otherwise.
+3. **Sweep vs the leash.** See the Q4 fork above: the lane is not
+   radially capped (its arc is), because a radial cap plateaus the
+   wrap the family is defined by. Under the unresolved Q4 this is a
+   builder's call, recorded, not a ruling.
+4. **PATH shed freezes its clock** where FLOW's shed settles through
+   the sim: a pure function has no velocity to settle, so the honest
+   shed is home-now + a frozen clock (no jump on resume). The badge
+   and rung are P1's, unchanged.
 
 ## Not built (by design)
 
-- **Q4 per-stratum leashes** (#1575 amendment) — not this slice; the
-  scene leash is exactly as P1 built it.
-- **P3 surge** (#1576) — untouched; no trigger work of any kind.
-- **PATH transport (P2)** — not built; the downstream measured PATH
-  figure (0.662 ms) is not on this branch and no cap here anticipates
-  it. When PATH lands it declares its own cost and the same budget
-  arithmetic reads it — no mechanism change needed.
-- **An iPad-measured cap** — impossible on this branch by the ruling's
-  own record (device bench pending); the iPad cap is the flagged
-  builder call above.
-- The resolver snapshot still does not serialize travel state (a P1
-  property, unchanged): mid-session takes resume travel from a fresh
-  store, as they did at `9d6fb42c`.
+- **Q4 per-stratum leashes** — see the open fork.
+- **Q2 traveler budget** — see the open fork (inherited).
+- **SURGE (P3, #1576)** — the next stage; no hooks built for it.
+- A per-asset "force roam" override for anchored heavy solids: the
+  issue's override word is *tames* (roam → still, which the existing
+  pin does); forcing an anchored mark to roam has no ruled surface
+  and none was invented.
+
+## Selfcheck results
+
+- `app/src/engine/travel.selfcheck.mjs` (extended): **685 checks
+  passed** — P1's A–H (parity, determinism, live FLOW, leash law, shed
+  settle, governor order, cost, params) plus P2's I–O (PATH pure
+  function, PATH live, PATH shed, family assignment, stretch, PATH
+  cost, PATH params).
+- `app/src/curator/census.selfcheck.mjs`: **green**, including the new
+  Jell-O assertions and the three new keys measuring as MOVES through
+  their fixtures (the dead-knob set is unchanged: only
+  `kinemeBrushWobble`).
+- Affected existing suites, run individually, all green:
+  buildPlacements, kineme, governorCuts, governorCreatureShed,
+  governorHostileScene, costTiers, governorEventLog, censusReadout,
+  normalize, goldenPlacement, liveResolve, liveResolve.determinism,
+  livingMotion, materialParams, bundle / bundleKeys / bundleParts.
+- `npm run build`: **green**. ESLint on every touched file: **clean**.
+- Full manifest sweep, stated exactly: the manifest holds 485 suites.
+  `npm run selfcheck` ran the first **76 suites green** and stopped at
+  `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` (command 77), which
+  fails with **`cargo not found on PATH`** — environmental, identical
+  to stage 1 (no Rust/WASM file is touched by this stage). Every one
+  of the remaining **408 suites was then run individually**: **403
+  passed, 5 failed**. Total: **479 of 485 suites green**. The 5
+  individual-run failures (+ swarmWasm = 6 non-green of 485):
+  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the three
+    suites stage 1's report documents as failing on this stack's base
+    for the key-echo reason (P1's three recipe keys move the recorded
+    checkpoint hashes / resolver pins; strip-proven by the coordinator
+    in stage 1). Their failure shapes here are the same assertions
+    ("no checkpoint diverges" at checkpoint 0; "the resolver at rest
+    is the pinned output"). This stage adds three more keys of the
+    same kind (`transportPath`, `transportSpeed`, `transportRadius`),
+    named above for the coordinator's separate strip-proof. No pin or
+    fixture was re-recorded.
+  - `fx/rollSafety` — sandbox-environment: the headless browser dies
+    mid-suite ("Target page, context or browser has been closed");
+    documented as failing identically on clean main.
+  - `gl/accum` — sandbox-environment: progresses through its [ok]
+    checks and dies at its browser stage in this sandbox; documented
+    as failing identically on clean main.
+  No other suite failed, and no suite was skipped: 76 + 1 + 408 = 485,
+  every manifest suite accounted for above.
+
+---
+
+## Q4 amendment — per-stratum leashes (ruled by Matt, 2026-10-20; built on the rebased branch)
+
+The ruling (issue #1575, comment 6303045169): the travel leash becomes
+**per-stratum** — each CONTENT stratum is capped by its own leash. This
+amendment is built on top of the coordinator's rebase, in which the Q2
+traveler-budget amendment (#1574, `2c8661be`) now sits *under* P2 in
+this branch's history.
+
+### The premise, corrected by a fresh read
+
+The P2 sections above call `transportLeash` "single scene-level". Read
+fresh on the merged tree, the travel pass has always run **per scene**:
+`buildPlacements` is called per stratum with that stratum's
+defaults-merged layoutParams, `liveResolve` threads one shared store
+with `sceneId = layer.id`, and each stratum's params live in its
+snapshot (`captureSnapshot` in `state/slices/layersSlice.js`; the
+active stratum's are the live params). A resolver-level probe run
+*before* any edit confirmed two strata carrying different snapshot
+leashes already capped independently (PATH orbit, leash 280 vs 45 →
+max displacement 289 vs 55 px, symmetric under swap). So the leash
+value's per-stratum home already existed. What Q4 builds is everything
+that makes it a ruled mechanism rather than an emergent accident: the
+guarantee pinned in the suite at both seams, the one sensor that still
+read the leash scene-wide, the chip that now shows each stratum its own
+leash, and this record (the kineme.js comment that called the scope
+"exactly as open as P1 left it" is corrected).
+
+### Mechanism (chosen) and alternatives rejected
+
+- **Chosen:** the stratum's own `transportLeash`, riding its snapshot
+  params, *is* the per-stratum leash. No new layoutParams keys, no new
+  store, no change to the travel math. Consequences: the recorded pins
+  cannot move (verified below); old takes replay identically by
+  construction (their recorded snapshots carry their leashes exactly as
+  they did before Q4); a stratum whose snapshot predates the key falls
+  back through the existing defaults merge to the shipped default
+  (112 px) — the pre-Q4 behavior for such strata, proven bit-for-bit in
+  section Q.
+- **Rejected — a new per-stratum key** (a second leash, or a
+  stratum→leash map): duplicates the snapshot param system, creates two
+  sources of truth for one physical value, and — as a new layoutParams
+  key — moves the recorded pins for zero behavioral gain.
+- **Rejected — the leash on the layer object** (`layers[]` structure):
+  layers are structure, not recipe; the value would escape snapshots,
+  history (whose field list mirrors `captureSnapshot`) and take
+  recording, and would need new plumbing through all three to stay
+  replay-honest.
+- **Rejected — scene-global leash + per-stratum override:** keeps the
+  scene-wide value the ruling abolished, and an "unset override" fights
+  the defaults merge (an override key present in every stratum's params
+  is just a second leash with worse naming).
+
+### What was built
+
+1. `app/src/engine/kineme.js` — comments only, no code lines changed.
+   The PATH-present block now records the per-stratum ruling and the
+   kept sub-calls (below) instead of the open fork; the `applyTransport`
+   JSDoc states the leash is the calling stratum's own.
+2. `app/src/hooks/usePerformanceGovernor.js` — the one scene-wide
+   residue: `travelActive`, the travel rung's sensor, read only the
+   **active** stratum's params, so a scene whose background stratum
+   travels read as travel-inactive and cut 1.6 could never arm for it.
+   The sensor now reads every stratum — the live params (active) plus
+   each non-active stratum's snapshot params, the active id excluded
+   because its snapshot entry is a stale copy the live params supersede
+   — with the leash defaults-merged exactly as the resolver merges it.
+   The rung, its order (suite section F re-proves it) and the shed
+   overlay are unmoved; only the sensor's scope matches the mechanism.
+3. `app/src/panels/build/LayerStack.jsx` — P2's minimal BUILD stratum
+   chip is the natural vehicle: it gains the stratum's own leash as a
+   **readout** in its title/aria-label ("This stratum's leash: Npx —
+   each stratum carries its own"). No new control and no cluster:
+   editing stays in the Directors motion group per the standing
+   controls ruling — which, since Directors edits the active stratum's
+   params, *is* per-stratum editing.
+4. `app/src/engine/travel.selfcheck.mjs` — new **section Q** (27
+   checks; suite total 741). Two strata threaded through one store,
+   interleaved frame-by-frame, reproduce each stratum's solo run
+   hash-for-hash (per-scene state, per-scene leash, no bleed). FLOW
+   caps: leash 40 → max 44.9 px, leash 280 → 186.4 px. PATH orbit caps
+   exact per stratum: 60.0 px at leash 60, 280.0 px at leash 280.
+   Sweep: arc caps 50.0 px (leash 50) / 104.9 px (leash 200, the arc's
+   own amplitude) while the lane runs free (>150 px |dx| under both).
+   A zero-leash stratum creates no travel state and presents its still
+   frame bit-for-bit while its neighbour roams. Then the whole thing
+   again **through the real resolver** with snapshot-carried leashes:
+   45.8 px (leash 45) vs 280.0 px (leash 280); a snapshot carrying no
+   `transportLeash` at all resolves bit-identically to the explicit
+   shipped default; a zero-leash snapshot stratum is its still frame
+   while the active stratum roams. (One assertion was corrected during
+   the build: the still reference must run the same frame count as the
+   compared run, because the always-alive kineme drivers move items
+   with loop time even when travel is off — homes are only comparable
+   at the same final `loopTimeMs`. The section carries that note.)
+   Suite header: the Q2 summary's letter corrected I→P to match the
+   merged suite (the rebase renumbering the header had not caught up
+   with); the verdict line now reads `#1575 P2 + Q4`.
+
+### PATH sub-call dispositions (re-examined under per-stratum scope)
+
+- **Centred/weave families (orbit/spiral/lissajous) capped radially —
+  KEEP.** The cap is the family's geometry (offsets live in a disc
+  around home), independent of whose leash it is. Per-stratum scope
+  changes which *value* caps, never how; section Q proves the cap exact
+  at two different strata's leashes inside one scene.
+- **Sweep capped only on its arc (y), lane (x) free — KEEP.** The P2
+  reason is scope-independent: the lane is the family's defining
+  geometry, and a radial cap would plateau the wrap. Section Q proves
+  the arc obeys each stratum's own leash while the lane crosses the
+  canvas under both.
+
+### Parity and pins
+
+No layoutParams keys were added and no resolver/placement math
+changed, so the recorded pins cannot move — and they didn't:
+`engine/wingWarp` still fails with actual **`248580c4`**, bit-identical
+to this stage's pre-Q4 recorded value, and `gl/replayGate` /
+`gl/creatureGate` still fail on the same "no checkpoint diverges"
+assertion. The three remain exactly the P1+P2 key-echo state the
+publish re-record ruling covers; Q4 neither worsens nor re-records
+them, and no strip proof is owed by Q4 (there is nothing of Q4's in
+the pins to strip — the stages' own strip proofs stand as recorded).
+Sections A–P pass unmodified (714 checks) inside the amended suite.
+
+### Cost
+
+The travel pass's code is byte-identical (the kineme.js changes are
+comments), so its cost cannot change; the suite's standing
+re-measurement confirms it on this run: FLOW declared 0.39 ms,
+re-measured **0.396 ms** @800 marks; PATH declared 0.66 ms,
+re-measured **0.647 ms** (sandbox node — in line with the staging
+measurements). The governor sensor change is a few property reads per
+governor evaluation over a handful of snapshots — no per-frame or
+per-mark cost. The chip change is render-time string composition.
+
+### Sweep
+
+- `npm run build`: **green**. ESLint on the four touched files:
+  **clean**.
+- Full manifest sweep, stated exactly: the manifest holds 485 suites.
+  The serial runner (`npm run selfcheck`) ran the first **76 green**
+  and stopped at `swarmWasm` (#77), as in prior stages; **all 485
+  suites were then run individually: 479 passed, 6 failed** — the same
+  total and the same six as P2's own staging sweep, none of them new
+  and none of them Q4's:
+  - `engine/kernel/bake/swarmWasm` — `cargo not found on PATH`;
+    **proven base-identical on clean main `6946f393` this session**
+    (same message, exit 1).
+  - `fx/rollSafety` — sandbox browser death ("Target page, context or
+    browser has been closed"); **proven base-identical on clean main
+    this session** (same signature).
+  - `gl/accum` — sandbox environment death on both trees (heap OOM
+    abort, exit 134 on clean main this session; the branch run aborted
+    the same way); no assertion implicates travel code, and P2's
+    report documents the same class on main.
+  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the pin
+    suites, failing on the documented P1+P2 key-echo assertions with
+    shapes and the wingWarp actual identical to pre-Q4 (above);
+    covered by the publish re-record ruling.
+  No other suite failed and no suite was skipped: 485 individual runs,
+  each accounted for in the run tally.

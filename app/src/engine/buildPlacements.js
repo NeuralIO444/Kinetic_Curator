@@ -18,7 +18,7 @@
 
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { makeHeroInfo } from './kernel/field/attractors.js';
-import { applyKinemeDrivers, applyRhythm, applyTransport } from './kineme.js';
+import { applyKinemeDrivers, applyRhythm, applyTransport, isFamilyAnchored } from './kineme.js';
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
@@ -33,6 +33,17 @@ let _airFadeScratch = new Float32Array(0);
 function airFadeScratch(n) {
   if (_airFadeScratch.length < n) _airFadeScratch = new Float32Array(n);
   return _airFadeScratch;
+}
+// #1575 — the travel stretch scratch (the deform triple applyTransport
+// fills: amount + the perpendicular axis), same grown-and-reused
+// discipline. Fully rewritten by applyTransport on every call that hands
+// it in (it zeroes on entry), and read only for this call's items.
+let _travelDeform = { amt: new Float32Array(0), ax: new Float32Array(0), ay: new Float32Array(0) };
+function travelDeformScratch(n) {
+  if (_travelDeform.amt.length < n) {
+    _travelDeform = { amt: new Float32Array(n), ax: new Float32Array(n), ay: new Float32Array(n) };
+  }
+  return _travelDeform;
 }
 import { mkRng } from './prng.js';
 import { getPreset } from '../data/presets.js';
@@ -179,6 +190,8 @@ export function buildPlacements({
   // P1 behaviour. No travel input, mode 'still' or leash 0 → the pass
   // never runs and the SoA is bit-identical to the pre-#1574 pipeline
   // (the parity gate, engine/travel.selfcheck).
+  // #1575 — P2 adds the 'path' mode and its recipe keys (transportPath /
+  // transportSpeed / transportRadius) under the same gate and parity law.
   travel = null,
   // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
   // geoParams below and down to getSampler. Optional; null reads as '?'.
@@ -463,20 +476,49 @@ export function buildPlacements({
   // (post rhythm/drivers/nudge), and the sim's offsets fold on top. The
   // gate is the parity contract: no ephemeral input, 'still', or leash 0
   // never calls the sim, so an off scene's SoA is today's, bit for bit.
-  const undoTravel = travel && layoutParams.transport === 'flow' && layoutParams.transportLeash > 0
+  // #1575 — the pass now takes 'path' too (the pure-function anchors in
+  // kineme.js), and the per-mark assignment rides the still array: a mark
+  // is held home when the artist pinned its asset (stillMarks, the #1434
+  // taming override) OR when its family anchors it (heavy solids —
+  // familyDefaultTransport's 'still', Q1 ruled). Unnamed families follow
+  // the stratum's word, so P1's FLOW scenes roam exactly as they did.
+  const transportMode = layoutParams.transport;
+  const travelOn = !!travel && (transportMode === 'flow' || transportMode === 'path') && layoutParams.transportLeash > 0;
+  let travelStill = stillMarks;
+  let travelDeform = null;
+  if (travelOn) {
+    const byId = new Map(activeAssets.map((a) => [a.id, a]));
+    let anchored = null;
+    for (let k = 0; k < soa.n; k++) {
+      if (isFamilyAnchored(byId.get(assetIds[k]))) {
+        if (!anchored) anchored = new Uint8Array(soa.n);
+        anchored[k] = 1;
+      }
+    }
+    if (anchored) {
+      travelStill = new Uint8Array(soa.n);
+      for (let k = 0; k < soa.n; k++) travelStill[k] = (stillMarks && stillMarks[k]) || anchored[k] ? 1 : 0;
+    }
+    travelDeform = travelDeformScratch(soa.n);
+  }
+  const undoTravel = travelOn
     ? applyTransport(soa, {
       seed, canvasW, canvasH,
       travel: {
-        mode: 'flow',
+        mode: transportMode,
         leash: layoutParams.transportLeash,
         flow: layoutParams.transportFlow,
+        path: layoutParams.transportPath,
+        speed: layoutParams.transportSpeed,
+        radius: layoutParams.transportRadius,
+        deform: travelDeform,
         store: travel.store,
         sceneId: travel.sceneId ?? layerId,
         frameMs: travel.frameMs,
         shed: travel.shed,
         ipadClass: travel.ipadClass, // #1574 Q2 — the traveler budget's device class (undefined = desktop)
       },
-    }, stillMarks)
+    }, travelStill)
     : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
@@ -506,6 +548,19 @@ export function buildPlacements({
       // #1183 weather: thin by this call's fade — multiplied into the alpha just assigned from
       // stage C, never accumulated across pooled frames (the fieldMap no-accumulation rule).
       if (airFade) item.alpha *= weatherAlphaScale(airFade[k]);
+      // #1575 — travel stretch: the deform triple is this call's, never
+      // accumulated (the same rule). Placement items carry no deform of
+      // their own, so the fields are travel-owned here: set when the
+      // mark stretched, cleared when it did not.
+      if (travelDeform) {
+        if (travelDeform.amt[k] > 0) {
+          item.deformAmt = travelDeform.amt[k];
+          item.deformAxisX = travelDeform.ax[k];
+          item.deformAxisY = travelDeform.ay[k];
+        } else if (item.deformAmt) {
+          item.deformAmt = 0; item.deformAxisX = 0; item.deformAxisY = 0;
+        }
+      }
     }
   } else {
     mapped = new Array(soa.n);
@@ -525,6 +580,17 @@ export function buildPlacements({
         accent: accents[k],
         key: keys[k],
       };
+      // #1575 — travel stretch along velocity, where the deform channel
+      // can express it: present only while the mark is actually
+      // stretched (the deform elision discipline — a resting mark's
+      // item is field-for-field the pre-P2 item). A fresh placement
+      // item never carries its own deform, so nothing is overwritten;
+      // the guard stands for any future producer that does.
+      if (travelDeform && travelDeform.amt[k] > 0 && !(mapped[k].deformAmt > 0)) {
+        mapped[k].deformAmt = travelDeform.amt[k];
+        mapped[k].deformAxisX = travelDeform.ax[k];
+        mapped[k].deformAxisY = travelDeform.ay[k];
+      }
     }
   }
 

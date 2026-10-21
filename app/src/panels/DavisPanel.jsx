@@ -12,7 +12,7 @@ import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
-import { KINEME_PATTERNS, TRANSPORT_MODES } from '../engine/kineme.js';
+import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js';
 import { RangeRow } from '../components/RangeRow.jsx';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
@@ -232,7 +232,9 @@ export function DavisPanel() {
               never a new panel. The mode is a discrete choice, so it renders TE; leash and flow are
               digits on the one slider. The keys stay recipe data (layoutParams); only the editing
               surface is here. 'still' is the default: marks stay home. FLOW sets them roaming the
-              noise field inside the leash. Q2 (a traveler budget) is unruled and is NOT built. */}
+              noise field inside the leash. Q2 (a traveler budget) is unruled and is NOT built.
+              #1575 — P2 adds 'path' to the same row and its family/speed/radius controls below;
+              BUILD gets only the minimal mode chip on the stratum block (LayerStack). */}
           <div className="davis-actions davis-actions-motion" role="group" aria-label="travel transport">
             <i className="lbl" title="travel: marks roam from home inside a leash, on the noise field's curl">travel</i>
             {TRANSPORT_MODES.map((t) => {
@@ -240,14 +242,39 @@ export function DavisPanel() {
               return (
                 <button key={t} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${t} transport`}
                   title={t === 'still' ? 'still: marks stay where they were placed'
-                    : 'flow: marks roam the curl of the noise field, held by the leash'}
+                    : t === 'flow' ? 'flow: marks roam the curl of the noise field, held by the leash'
+                    : 'path: marks travel a dealt path — a pure function of time and seed, replay-exact'}
                   onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transport', value: t })}>
                   {t}
                 </button>
               );
             })}
           </div>
-          {(layoutParams.transport || 'still') === 'flow' && (
+          {/* #1575 — PATH's richer controls live here too (the same ruling:
+              amounts edit from this motion group, never BUILD). The family
+              is a discrete choice, so it renders TE; speed/radius are
+              digits on the one slider. Heavy solids anchor and the
+              artist's per-asset pin tames — assignment is family data
+              (engine/kineme.js), not another control cluster. */}
+          {(layoutParams.transport || 'still') === 'path' && (
+            <div className="davis-actions davis-actions-motion" role="group" aria-label="travel path family">
+              <i className="lbl" title="path family: orbit turns around the dish centre, spiral breathes, sweep crosses the canvas and wraps, lissajous weaves">path</i>
+              {PATH_FAMILIES.map((f) => {
+                const on = (layoutParams.transportPath || 'orbit') === f;
+                return (
+                  <button key={f} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${f} path`}
+                    title={f === 'orbit' ? 'orbit: marks turn around the dish centre, keeping their own radius'
+                      : f === 'spiral' ? 'spiral: the radius breathes while the angle drifts'
+                      : f === 'sweep' ? 'sweep: a cross-canvas lane with wrap, bowed into an arc'
+                      : 'lissajous: a two-sine weave around home'}
+                    onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transportPath', value: f })}>
+                    {f}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+          {((layoutParams.transport || 'still') === 'flow' || (layoutParams.transport || 'still') === 'path') && (
             <>
               <RangeRow label="leash" tone="ink" min={0} max={400} step={1}
                 value={Math.round(layoutParams.transportLeash ?? 112)}
@@ -255,12 +282,30 @@ export function DavisPanel() {
                 defaultValue={112}
                 hint="leash: how far a mark may roam from home, in px — no pull inside it, a spring outside it. 0 is still."
                 onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportLeash', value: Math.round(v) })} />
-              <RangeRow label="flow" tone="ink" min={0} max={100} step={1}
-                value={Math.round((layoutParams.transportFlow ?? 0.8) * 100)}
-                readout={`${Math.round((layoutParams.transportFlow ?? 0.8) * 100)}%`}
-                defaultValue={80}
-                hint="flow: how hard the noise field's curl carries the marks"
-                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportFlow', value: Math.round(v) / 100 })} />
+              {(layoutParams.transport || 'still') === 'flow' && (
+                <RangeRow label="flow" tone="ink" min={0} max={100} step={1}
+                  value={Math.round((layoutParams.transportFlow ?? 0.8) * 100)}
+                  readout={`${Math.round((layoutParams.transportFlow ?? 0.8) * 100)}%`}
+                  defaultValue={80}
+                  hint="flow: how hard the noise field's curl carries the marks"
+                  onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportFlow', value: Math.round(v) / 100 })} />
+              )}
+              {(layoutParams.transport || 'still') === 'path' && (
+                <>
+                  <RangeRow label="speed" tone="ink" min={0} max={200} step={1}
+                    value={Math.round((layoutParams.transportSpeed ?? 1) * 100)}
+                    readout={`${Math.round((layoutParams.transportSpeed ?? 1) * 100)}%`}
+                    defaultValue={100}
+                    hint="speed: how fast marks travel their path. 0 freezes the path at its deal."
+                    onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSpeed', value: Math.round(v) / 100 })} />
+                  <RangeRow label="radius" tone="ink" min={0} max={300} step={1}
+                    value={Math.round(layoutParams.transportRadius ?? 140)}
+                    readout={`${Math.round(layoutParams.transportRadius ?? 140)}px`}
+                    defaultValue={140}
+                    hint="radius: the path's reach in px — spiral breathing, sweep arc, lissajous weave. The leash still caps it."
+                    onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportRadius', value: Math.round(v) })} />
+                </>
+              )}
             </>
           )}
 

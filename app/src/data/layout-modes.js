@@ -5,7 +5,7 @@ import { COMPOSITION_PRESETS } from './presets.js';
 import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
-import { KINEME_PATTERNS, TRANSPORT_MODES } from '../engine/kineme.js'; // #1128; #1574: the transport vocabulary
+import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js'; // #1128; #1574: the transport vocabulary; #1575: the PATH families
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 import { GLASS_BODY_ALPHA } from '../engine/glassBody.mjs'; // #1585 (Materials M4) — the shipped glass tune is the param default
 import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 — ditto, plate geometry
@@ -206,6 +206,18 @@ export const DEFAULT_LAYOUT_PARAMS = {
   transport: 'still',
   transportLeash: 112, // px — the #1573 spike's proven radius (0.16 of a 700px-min canvas)
   transportFlow: 0.8,
+  // #1575 — travel kinemes P2: the PATH assignment. `transportPath` is the
+  // PATH family (orbit | spiral | sweep | lissajous); transportSpeed is
+  // its rate multiplier and transportRadius its amplitude in px. They
+  // matter only when transport is 'path'; a document that predates P2
+  // carries none of them and opens with these defaults sitting inert
+  // beside a 'still'/'flow' mode, exactly as it was saved. Editing
+  // surface: the Directors motion group (family chips + speed/radius
+  // rows), plus the minimal mode chip on the BUILD stratum block — the
+  // same split P1 shipped under Matt's 2026-10-14 controls ruling.
+  transportPath: 'orbit',
+  transportSpeed: 1,
+  transportRadius: 140, // px — under the leash's 400 max, over the rhythm layer's ±5.6 px by design
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
@@ -412,6 +424,10 @@ export const PARAM_SPEC = {
   // #1574 — travel: the leash radius in px (0 = still) and the FLOW strength.
   transportLeash: { min: 0, max: 400 },
   transportFlow: { min: 0, max: 1 },
+  // #1575 — PATH: the rate multiplier (0 freezes the path at its deal) and
+  // the amplitude in px (spiral breathing / sweep arc / lissajous reach).
+  transportSpeed: { min: 0, max: 2 },
+  transportRadius: { min: 0, max: 300 },
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the
@@ -550,6 +566,7 @@ const ENUM_SPEC = {
   audioResponse: AUDIO_RESPONSE_IDS, // #306
   kinemePattern: KINEME_PATTERNS, // #1128
   transport: TRANSPORT_MODES, // #1574
+  transportPath: PATH_FAMILIES, // #1575
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -734,6 +751,7 @@ export function normalizeLayoutParams(partial) {
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
   next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: absent or unknown is still — a pre-#1574 document opens exactly as saved
+  next.transportPath = pickEnum(next.transportPath, PATH_FAMILIES, 'orbit'); // #1575: absent or unknown is the orbit family, inert unless transport is 'path'
   // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
   // clamp rides PARAM_SPEC above. A document that predates #1199 opens with
   // the map off exactly (defaults are already the no-op).
