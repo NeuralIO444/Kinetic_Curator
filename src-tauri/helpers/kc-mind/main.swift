@@ -63,7 +63,8 @@ rarely says the word), STUCK (same seed, nothing kept), BLOOM (the sifting paid 
 
 let thirdVoice = """
 You read the mood of the room and nothing else. Choose one mood: calm, drive, lift, sparse, shift, weird. \
-Optionally two gentle leans between 0 and 1: wetness and evolve. You never speak and never set a face.
+Optionally two gentle leans between 0 and 1: wetness and evolve. Rarely, when the room swells toward you, \
+a surge between 0 and 1: the marks come forward and go home. You never speak and never set a face.
 """
 
 #if !KC_NO_FM
@@ -96,6 +97,8 @@ struct MoodReply {
     var wetness: Double?
     @Guide(description: "Optional lean toward evolving, 0 to 1")
     var evolve: Double?
+    @Guide(description: "Optional surge, 0 to 1: the marks come forward, then home. Rare; omit it most bars")
+    var surge: Double?
 }
 
 @available(macOS 26.0, *)
@@ -126,7 +129,9 @@ actor Minds {
                 var lean: [String: Any] = [:]
                 if let w = r.wetness { lean["wetness"] = w }
                 if let e = r.evolve { lean["evolve"] = e }
-                return ["mood": r.mood, "lean": lean]
+                var out: [String: Any] = ["mood": r.mood, "lean": lean]
+                if let sg = r.surge { out["surge"] = sg } // #1576 Q3 — validated (0..1) by mindContract before it acts
+                return out
             }
             let r = try await s.respond(to: prompt, generating: FaceReply.self, options: options).content
             var reply: [String: Any] = persona == "lois" ? ["critique": NSNull()] : ["propose": NSNull()]

@@ -23,7 +23,7 @@ import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
-import { createTravelStore, travelLayer, advanceTravelClock, travelParams, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelSnapshot, jelloReadout } from '../engine/travel.js'; // #1574 — travel kinemes; #1575 the Jell-O metric
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelSnapshot, jelloReadout, noteSurge } from '../engine/travel.js'; // #1574 — travel kinemes; #1575 the Jell-O metric
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius, snapshotDishSession, restoreDishSession, checkDishSessionSnapshot, restoreDishEntries } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
@@ -726,11 +726,15 @@ export function createLiveResolver() {
         // #1574 Q2 — the budget: governor-selected (input.travelShed) within the device-class cap (input.travelCap);
         // absent (fixtures, takes recorded before travel) → the author's ceiling alone, unshed.
         const travelP = travelParams(layoutParams, W, H, { deviceCap: input.travelCap ?? null, shed: input.travelShed ?? 0 });
-        if (input.reducedMotion) travelP.active = false;
+        if (input.reducedMotion) { travelP.active = false; travelP.parallax = 0; travelP.surge = 0; }
+        // #1576 Q3 — the surge trigger is stamped on the input (the Queen's taste call, recorded with the take);
+        // the resolver only notes it. A new trigger needs a surge depth on this stratum to matter.
+        const surgeTrigger = travelP.surge > 0 && input.surgeTrigger && typeof input.surgeTrigger === 'object' ? input.surgeTrigger : null;
         let travel = null;
-        if (travelP.active || travelStore.layers.has(layer.id)) {
+        if (travelP.active || travelP.parallax > 0 || surgeTrigger || travelStore.layers.has(layer.id)) {
           const tl = travelLayer(travelStore, layer.id, seed, W, H);
           advanceTravelClock(tl, input.loopTimeMs ?? 0, !!input.slowRender);
+          if (surgeTrigger) noteSurge(tl, surgeTrigger, travelP.surge, input.loopTimeMs ?? 0);
           const pinned = input.assetStill && typeof input.assetStill === 'object' ? Object.keys(input.assetStill) : null;
           travel = { layer: tl, seed, W, H, noise: worldNoise, params: travelP, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
         }

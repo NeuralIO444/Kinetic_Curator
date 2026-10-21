@@ -213,6 +213,12 @@ export const DEFAULT_LAYOUT_PARAMS = {
   // #1574 Q2 (RULED 2026-10-20) — the author's CEILING on how many marks of this stratum may travel; the governor
   // picks the amount under it, bounded by the device-class cap (data/quality.js TRAVEL_BUDGETS).
   transportCeiling: DEFAULT_CEILING,
+  // #1576 — parallax drift: a slow constant anchor drift by zTier (front tiers faster than ground). 0 = off.
+  transportParallax: 0,
+  // #1576 — the SURGE depth: how far a stratum answers a surge (the trigger is a taste call, Q3 — never a knob).
+  // 0 = this stratum never surges. Off by default: the surge has its own kill criterion (#1576), so it is dialled
+  // in, never sprung on a scene.
+  transportSurge: 0,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
   // #1482 P3 — spectrum marks (STIMULI → SPECTRUM). Which frequency a mark listens to: 0 INDEX, 1 ANGLE, 2 POSITION,
@@ -417,6 +423,8 @@ export const PARAM_SPEC = {
   transportLeash: { min: 0, max: 0.4 }, // #1574 — free-roam radius, fraction of the small dimension; 0 = still
   transportFlow: { min: 0, max: 1 }, // #1574 — travel speed; 0 = still
   transportCeiling: { min: 0, max: 800, int: true }, // #1574 Q2 — the author's traveller ceiling; 0 = still
+  transportParallax: { min: 0, max: 1 }, // #1576 — parallax drift; 0 = off
+  transportSurge: { min: 0, max: 1 }, // #1576 — surge depth; 0 = this stratum never surges
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the

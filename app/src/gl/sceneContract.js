@@ -33,6 +33,7 @@ import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow col
 import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
 import { sanitizePattern } from '../state/patternTrack.js';
 import { patternPalette } from '../pattern/patternSource.js';
+import { surgeInstance } from '../engine/travel.js'; // #1576 — the surge z driver's instance read
 
 export const GL_CONTRACT_VERSION = 1;
 
@@ -114,17 +115,23 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
   // #1202 — non-uniform scale: item.scaleY rides the Y range when X/Y are
   // unlinked, and falls back to the X scale when linked (or absent).
   const sy = Number(item.scaleY ?? s) || 0;
+  // #1576 — the surge z driver: buildPlacements stamps `surgeZ` only on a mark on its envelope; the contract reads
+  // it as scale-up + a slight rise + alpha sharpening (engine/travel.js surgeInstance). Absent (every mark at rest,
+  // every still, every pre-travel producer) the instance below is exactly the old one.
+  const z = Number(item.surgeZ) || 0;
+  const op = clamp01((Number(item.alpha) || 0) / 100);
+  const sg = z ? surgeInstance(z, mirrored ? -s : s, sy, Number(item.y), op) : null;
   return {
     asset: String(item.assetId),
     layer: layerId,
     x: r3(item.x),
-    y: r3(item.y),
-    scaleX: r3(mirrored ? -s : s),
-    scaleY: r3(sy),
+    y: r3(sg ? sg.y : item.y),
+    scaleX: r3(sg ? sg.scaleX : (mirrored ? -s : s)),
+    scaleY: r3(sg ? sg.scaleY : sy),
     rotation: r3(item.rotation), // degrees, clockwise (SVG convention)
     tint: hexColor(item.color),
     accent: hexColor(item.accent),
-    opacity: clamp01((Number(item.alpha) || 0) / 100),
+    opacity: sg ? clamp01(sg.opacity) : op,
     // #623: the smear move drives synthetic per-frame velocity from
     // blendItems; QUAD_VS (velocitySmear) stretches the quad along it.
     // Absent (the common case) reads as zero — exactly the old path.

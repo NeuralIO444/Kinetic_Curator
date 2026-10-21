@@ -17,6 +17,7 @@ node src/gl/glassStriation.selfcheck.mjs
 node src/engine/kineme.selfcheck.mjs
 node src/engine/travel.selfcheck.mjs
 node src/engine/travelPath.selfcheck.mjs
+node src/engine/travelSurge.selfcheck.mjs
 node src/engine/fieldMap.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs

@@ -85,6 +85,19 @@ export function TravelControls() {
           disabled={off} disabledReason="Pick a travel mode first — STILL keeps every mark home"
           locked={locked.transportCeiling} onToggleLock={() => lock('transportCeiling')}
           onChange={(v) => set('transportCeiling', Math.round(v))} />
+        {/* #1576 — parallax drift and the surge depth: independent of the travel mode (a STILL scene can drift) */}
+        <RangeRow layout="stack" label="drift" ariaLabel="travel drift"
+          value={lp.transportParallax ?? 0} min={0} max={1} step={0.01} defaultValue={0}
+          readout={pct(lp.transportParallax ?? 0)}
+          hint="Parallax drift: the whole stratum slides slowly through space, front tiers faster than the ground. 0 = off"
+          locked={locked.transportParallax} onToggleLock={() => lock('transportParallax')}
+          onChange={(v) => set('transportParallax', v)} />
+        <RangeRow layout="stack" label="surge" ariaLabel="travel surge"
+          value={lp.transportSurge ?? 0} min={0} max={1} step={0.01} defaultValue={0}
+          readout={pct(lp.transportSurge ?? 0)}
+          hint="How far this stratum answers a surge when one comes: marks draw back, come forward, and go home. 0 = never"
+          locked={locked.transportSurge} onToggleLock={() => lock('transportSurge')}
+          onChange={(v) => set('transportSurge', v)} />
       </div>
     </div>
   );

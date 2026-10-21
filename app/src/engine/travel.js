@@ -149,9 +149,15 @@ export function travelParams(layoutParams, W, H, { deviceCap = null, shed = 0 } 
   const flow = clamp01(lp.transportFlow);
   const budget = travelBudget(lp.transportCeiling ?? DEFAULT_CEILING, deviceCap, shed);
   const active = m > 0 && mode !== 'still' && leash > 0 && flow > 0 && budget > 0;
+  // #1576 — parallax drift and the surge depth ride the same rung: the travel-first shed's last level (home) and
+  // reduced motion (the caller) withdraw them with the transports.
+  const home = Math.floor(num(shed)) >= TRAVEL_SHED_MAX;
+  const parallax = home || !(m > 0) ? 0 : clamp01(lp.transportParallax);
+  const surge = home || !(m > 0) ? 0 : clamp01(lp.transportSurge);
   return {
     active, mode, pathKind, m, L: leash * m, cruise: flow * FLOW_CRUISE_AT_1 * m, flow, budget,
     rate: flow * PATH_RATE_AT_1, // PATH: segments per second
+    parallax, surge, zTiers: Math.max(1, Math.floor(num(lp.zTiers, 1))),
   };
 }
 /** The author's default ceiling: the desktop cap (data/quality.js), so a fresh scene travels at full measure. */
@@ -166,7 +172,7 @@ export function createTravelStore() {
 function freshLayer(key) {
   // stepN: locked steps taken since the stratum's scene began (travel time = stepN · TRAVEL_STEP).
   // stepBase: stepN before this frame's steps (derived per frame, never snapshotted).
-  return { key, lastMs: null, acc: 0, stepN: 0, stepBase: 0, steps: 0, marks: new Map(), sel: null };
+  return { key, lastMs: null, acc: 0, stepN: 0, stepBase: 0, steps: 0, marks: new Map(), sel: null, surge: null };
 }
 
 /**
@@ -476,6 +482,150 @@ export function jelloReadout(layer, m = 0) {
   };
 }
 
+// ── PARALLAX DRIFT (#1576, surge's quiet sibling) ──────────────────────────────────────────────────────────────
+// A slow CONSTANT anchor drift proportional to zTier — foreground tiers travel faster than ground — so a calm scene
+// still feels like it is moving through space. Stateless in travel time (the stratum's locked-step clock), one
+// heading per scene, wrapped across the canvas plus a margin; a mark fades only while it is OUTSIDE the canvas near
+// the wrap seam, so the wrap never pops. Every mark drifts (travellers too: their own travel rides on top).
+/** transportParallax 1 ⇒ the front tier drifts this fraction of the small dimension per second (the ground ¼ of it). */
+export const PARALLAX_FRONT = 0.02;
+const PARALLAX_GROUND = 0.25; // the back tier's share of the front's speed
+const PARALLAX_MARGIN = 0.1; // the wrap domain extends this fraction of the small dimension past each canvas edge
+
+/** One mark's drift at travel time tSec: { x, y, a } (a = the off-canvas seam fade). */
+export function parallaxDrift(hx, hy, zTier, tiers, amount, tSec, seed, W, H, out = _p) {
+  out.x = 0; out.y = 0; out.a = 1;
+  const amt = clamp01(amount);
+  if (!(amt > 0) || !(tSec > 0)) return out;
+  const m = Math.min(W, H);
+  const nT = Math.max(1, Math.floor(num(tiers, 1)));
+  const f = nT <= 1 ? 0.5 : Math.min(1, Math.max(0, num(zTier) / (nT - 1)));
+  const speed = amt * PARALLAX_FRONT * m * (PARALLAX_GROUND + (1 - PARALLAX_GROUND) * f);
+  const head = travelHash(seed, 0, 31) * 2 * Math.PI;
+  const M = PARALLAX_MARGIN * m;
+  const wrap = (v, lo, span) => ((((v - lo) % span) + span) % span) + lo;
+  const nx = wrap(hx + Math.cos(head) * speed * tSec, -M, W + 2 * M);
+  const ny = wrap(hy + Math.sin(head) * speed * tSec, -M, H + 2 * M);
+  out.x = nx - hx;
+  out.y = ny - hy;
+  const edge = Math.min(nx + M, W + M - nx, ny + M, H + M - ny); // distance to the wrap seam
+  out.a = smooth01(edge / M);
+  return out;
+}
+
+// ── SURGE (#1576): a z-approach driver ──────────────────────────────────────────────────────────────────────────
+// On its envelope a mark's z rises 0 → 1 → 0; the contract (gl/sceneContract toInstance) reads z as scale-up + a
+// slight rise + alpha sharpening, then releases it home. z is a DRIVER channel: placements, materials and the
+// governor are untouched (only the registered cost tier and the travel-first shed apply). ANTICIPATION IS
+// MANDATORY — a small settle AWAY (z < 0: the mark draws back and sinks) before the approach; a surge that starts at
+// full speed is a bug (the envelope leaves 0 with zero velocity, then goes negative first).
+// Trigger (Q3, RULED 2026-10-20): the Queen — a taste call stamped on the resolver input (`surgeTrigger`), recorded
+// with the take; the resolver never decides one. The decision stays invisible: the surge is the motion.
+export const SURGE_S = 2.4; // one mark's envelope
+const SURGE_STAGGER = 0.6; // the cascade: marks start within this window of the trigger
+const SURGE_ANTIC_END = 0.14; // anticipation: settle away …
+const SURGE_ANTIC = 0.14; // … this deep (z = −0.14 at its extreme)
+const SURGE_RISE_END = 0.45; // the approach, eased, overshooting
+const SURGE_OVER = 0.05;
+const SURGE_HOLD_END = 0.6; // the held extreme
+const SURGE_UNDER = 0.04; // the release follows through below 0 before it settles
+/** The envelope z(u), u = time / SURGE_S. Starts and ends at exactly 0 with zero slope. */
+export function surgeEnvelope(u) {
+  if (!(u > 0) || u >= 1) return 0;
+  if (u < SURGE_ANTIC_END) { const a = Math.sin(Math.PI * u / SURGE_ANTIC_END); return -SURGE_ANTIC * a * a; }
+  if (u < SURGE_RISE_END) {
+    const a = (u - SURGE_ANTIC_END) / (SURGE_RISE_END - SURGE_ANTIC_END);
+    return easeInOutCubic(a) * (1 + SURGE_OVER); // the eased approach, overshooting the extreme
+  }
+  if (u < SURGE_HOLD_END) {
+    const a = (u - SURGE_RISE_END) / (SURGE_HOLD_END - SURGE_RISE_END);
+    return 1 + SURGE_OVER * (1 - easeOutCubic(a)); // overshoot settles onto the held extreme
+  }
+  const a = (u - SURGE_HOLD_END) / (1 - SURGE_HOLD_END);
+  if (a < 0.8) return 1 - easeInOutCubic(a / 0.8) * (1 + SURGE_UNDER); // release, past home …
+  const b = Math.sin((Math.PI / 2) * ((a - 0.8) / 0.2));
+  return -SURGE_UNDER * (1 - b * b); // … and follow through back to 0
+}
+/** How the contract reads z (gl/sceneContract toInstance): scale-up, a slight rise (scene px), alpha sharpening. */
+export const SURGE_SCALE = 0.5;
+export const SURGE_RISE = 10;
+export const SURGE_SHARP = 0.5;
+/** The instance transform for a mark at z (z = 0 never reaches here: the contract skips it, bit for bit). */
+export function surgeInstance(z, scaleX, scaleY, y, opacity) {
+  const k = 1 + SURGE_SCALE * z;
+  return { scaleX: scaleX * k, scaleY: scaleY * k, y: y - SURGE_RISE * z, opacity: z > 0 ? opacity + (1 - opacity) * SURGE_SHARP * Math.min(1, z) : opacity };
+}
+/** The share of a stratum's marks one surge carries, from its intensity (0..1). */
+export const surgeShare = (intensity) => 0.15 + 0.35 * clamp01(intensity);
+
+/** One mark's z at travel time tSec, given the stratum's surge record { step, amount } (or null). */
+export function surgeZ(rec, seed, index, tSec) {
+  if (!rec || !(rec.amount > 0)) return 0;
+  if (travelHash(seed, index, 41 + (rec.id | 0) * 7) >= surgeShare(rec.amount)) return 0;
+  const t0 = rec.step * TRAVEL_STEP + travelHash(seed, index, 42 + (rec.id | 0) * 7) * SURGE_STAGGER;
+  return rec.amount * surgeEnvelope((tSec - t0) / SURGE_S);
+}
+
+/**
+ * Note a surge trigger stamped on the input ({ id, amount, atMs }: atMs = the loop time it was stamped at). A new
+ * trigger (a new id) records the stratum's step it landed on; the same trigger again is a no-op. A trigger first
+ * seen long after it was stamped (a stratum added later, a reseeded scene) is noted SPENT, so the store's standing
+ * last trigger never replays itself. Pure over the layer and the input; the record is snapshotted.
+ */
+export const SURGE_WINDOW_MS = (SURGE_S + SURGE_STAGGER) * 1000;
+export function noteSurge(layer, trigger, depth, nowMs = null) {
+  if (!trigger || typeof trigger !== 'object' || !Number.isInteger(trigger.id)) return;
+  if (layer.surge && layer.surge.id === trigger.id) return;
+  const stale = Number.isFinite(trigger.atMs) && Number.isFinite(nowMs) && nowMs - trigger.atMs > SURGE_WINDOW_MS;
+  const amount = stale ? 0 : clamp01(trigger.amount) * clamp01(depth);
+  layer.surge = { id: trigger.id, step: layer.stepN, amount };
+}
+
+/**
+ * The z-and-drift pass (#1576) for one stratum's SoA, after the transport pass. ctx carries params
+ * { parallax, surge, zTiers } (travelParams) and the stratum's layer. Writes the per-slot z (ctx.frame.z) and the
+ * seam fade into alpha; moves x/y by the drift. Returns an undo (positions are cached), or null when neither is on.
+ */
+export function applyDriftAndSurge(soa, ctx) {
+  if (!soa || !ctx || !ctx.layer) return null;
+  const p = ctx.params || {};
+  const n = soa.n | 0;
+  const layer = ctx.layer;
+  const tSec = layer.stepN * TRAVEL_STEP;
+  const drift = p.parallax > 0;
+  const rec = p.surge > 0 && layer.surge && layer.surge.amount > 0 ? layer.surge : null;
+  const surgeLive = rec && tSec < rec.step * TRAVEL_STEP + SURGE_STAGGER + SURGE_S;
+  if (!n || (!drift && !surgeLive)) { if (ctx.frame) ctx.frame.anyZ = false; return null; }
+  const seed = ctx.seed | 0;
+  const W = num(ctx.W);
+  const H = num(ctx.H);
+  const frame = ctx.frame || (ctx.frame = framesFor(n));
+  if (!frame.z || frame.z.length < frame.amt.length) frame.z = new Float32Array(frame.amt.length);
+  frame.anyZ = false;
+  let base = null;
+  if (drift) {
+    base = DRIFT_BASE_XY.get(soa);
+    if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; DRIFT_BASE_XY.set(soa, base); }
+    for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  }
+  for (let k = 0; k < n; k++) {
+    frame.z[k] = 0;
+    if (drift) {
+      const d = parallaxDrift(soa.x[k], soa.y[k], soa.zTier[k], p.zTiers, p.parallax, tSec, seed, W, H);
+      soa.x[k] += d.x;
+      soa.y[k] += d.y;
+      if (d.a < 1) soa.alpha[k] *= d.a;
+    }
+    if (surgeLive) {
+      const z = surgeZ(rec, seed, soa.index[k], tSec);
+      if (z !== 0) { frame.z[k] = z; frame.anyZ = true; }
+    }
+  }
+  if (!drift) return null;
+  return () => { for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; } };
+}
+const DRIFT_BASE_XY = new WeakMap();
+
 // ── the applier (stage C, beside applyRhythm) ───────────────────────────────────────────────────────────────────
 const TRAVEL_BASE_XY = new WeakMap();
 
@@ -578,6 +728,7 @@ function framesFor(n) {
   }
   _frame.any = false;
   _frame.anyAlpha = false;
+  _frame.anyZ = false;
   return _frame;
 }
 
@@ -643,7 +794,7 @@ export function snapshotTravelStore(store) {
     const rows = [];
     for (const [idx, s] of L.marks) rows.push([idx, ...MARK_FIELDS.map((f) => s[f])]);
     rows.sort((a, b) => a[0] - b[0]);
-    layers.push([id, { key: L.key, lastMs: L.lastMs, acc: L.acc, stepN: L.stepN, marks: rows }]);
+    layers.push([id, { key: L.key, lastMs: L.lastMs, acc: L.acc, stepN: L.stepN, marks: rows, ...(L.surge ? { surge: { ...L.surge } } : {}) }]);
   }
   return { v: 1, layers };
 }
@@ -658,6 +809,10 @@ export function checkTravelSnapshot(snap) {
     if (!(L.lastMs === null || Number.isFinite(L.lastMs))) return false;
     if (!Number.isInteger(L.acc) || L.acc < 0 || !Number.isInteger(L.stepN) || L.stepN < 0) return false;
     if (!Array.isArray(L.marks)) return false;
+    if (L.surge !== undefined) {
+      const sg = L.surge;
+      if (!sg || typeof sg !== 'object' || !Number.isInteger(sg.id) || !Number.isInteger(sg.step) || sg.step < 0 || !Number.isFinite(sg.amount)) return false;
+    }
     for (const row of L.marks) {
       if (!Array.isArray(row) || row.length !== MARK_FIELDS.length + 1) return false;
       if (!Number.isInteger(row[0])) return false;
@@ -677,6 +832,7 @@ export function restoreTravelStore(store, snap) {
     layer.acc = L.acc;
     layer.stepN = L.stepN;
     layer.stepBase = L.stepN;
+    if (L.surge) layer.surge = { ...L.surge };
     for (const row of L.marks) {
       const s = {};
       MARK_FIELDS.forEach((f, i) => { s[f] = row[i + 1]; });

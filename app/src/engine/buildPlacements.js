@@ -19,7 +19,7 @@
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm } from './kineme.js';
-import { applyTravel } from './travel.js'; // #1574 — travel kinemes: the transport pass
+import { applyTravel, applyDriftAndSurge } from './travel.js'; // #1574 — travel kinemes: the transport pass; #1576 drift + surge
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
@@ -460,6 +460,9 @@ export function buildPlacements({
     for (let k = 0; k < soa.n; k++) if (travel.stillAssets.has(assetIds[k])) stillTravel[k] = 1;
   }
   const undoTravel = travel ? applyTravel(soa, travel, stillTravel, assetIds, activeAssets) : null;
+  // #1576 — parallax drift (anchor drift by zTier) and the surge z driver, after the transports. Off (both dials
+  // 0, no live surge) → null, nothing touched.
+  const undoDrift = travel ? applyDriftAndSurge(soa, travel) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
   // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
@@ -536,6 +539,21 @@ export function buildPlacements({
     cache.travelStretched = false;
   } else if (cache) {
     cache.travelStretched = false;
+  }
+  // #1576 — the surge z: a driver channel the contract reads (scale-up, a slight rise, alpha sharpening). Same
+  // key-presence discipline as the stretch: present only while a mark is on its envelope.
+  if (tf && tf.anyZ) {
+    for (let k = 0; k < soa.n; k++) {
+      const it = mapped[k];
+      if (tf.z[k] !== 0) it.surgeZ = tf.z[k];
+      else if (it.surgeZ !== undefined) delete it.surgeZ;
+    }
+    if (cache) cache.travelSurged = true;
+  } else if (poolHit && cache.travelSurged) {
+    for (let k = 0; k < soa.n; k++) if (mapped[k].surgeZ !== undefined) delete mapped[k].surgeZ;
+    cache.travelSurged = false;
+  } else if (cache) {
+    cache.travelSurged = false;
   }
 
   // #1199 — field→channel MAP (MATH stratum): sample the field at each
@@ -669,6 +687,7 @@ export function buildPlacements({
 
   if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();
+  if (undoDrift) undoDrift(); // #1576 — reverse of application
   if (undoTravel) undoTravel(); // #1574 — reverse of application
   if (undoRhythm) undoRhythm(); // #1198 — reverse of application
   return { preset, items: mapped, safeCount };

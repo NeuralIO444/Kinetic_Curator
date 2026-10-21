@@ -433,6 +433,11 @@ export const createGlobalSlice = (set) => ({
    * A render-only overlay in the creatureShed class — never serialized; liveLoop stamps it on the resolver input
    * (a take records the level each frame ran at). Restores whole when pressure clears. */
   travelShed: 0,
+  /** #1576 Q3 — the standing surge trigger { id, amount, atMs } (the third persona's taste call, stamped by
+   * curator/surgeLive.js; never named on any surface). Render-only, never serialized; liveLoop stamps it on the
+   * resolver input so a take records — never recomputes — every surge. null until the first. */
+  surgeTrigger: null,
+  setSurgeTrigger: (t) => set({ surgeTrigger: t && Number.isInteger(t.id) ? { id: t.id, amount: Math.min(1, Math.max(0, Number(t.amount) || 0)), atMs: Number(t.atMs) || 0 } : null }),
   setTravelShed: (n) => set({ travelShed: Number.isFinite(n) ? Math.min(3, Math.max(0, Math.round(n))) : 0 }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),

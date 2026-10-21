@@ -35,7 +35,7 @@ import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
 import { patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js';
-import { createTravelStore, travelLayer, advanceTravelClock, travelParams, jelloReadout, PATH_KINDS, JELLO_WINDOW } from '../engine/travel.js'; // #1574 / #1575
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams, jelloReadout, noteSurge, PATH_KINDS, JELLO_WINDOW } from '../engine/travel.js'; // #1574 / #1575 / #1576
 import { createNoise } from '../engine/noise.js';
 import { GrowthHooks, ensureAggregate } from '../engine/kernel/sample/growth.js';
 import { createDish } from '../engine/kernel/dish.js';
@@ -167,7 +167,7 @@ export function kinemeCtxFor(lp, seed = CENSUS_SEED) {
 // so the honest headless measure is the placement after `steps` locked steps — the still bake (slowRender) and every
 // non-live caller pass no travel context at all, by design.
 export const TRAVEL_CENSUS_STEPS = 120;
-export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS_SEED, withLayer = false } = {}) {
+export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS_SEED, withLayer = false, surgeTrigger = null } = {}) {
   const lp = normalizeLayoutParams(params);
   const store = createTravelStore();
   const noise = createNoise(seed);
@@ -176,7 +176,9 @@ export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS
   let items = null;
   for (let f = 1; f <= steps; f++) {
     advanceTravelClock(layer, (f * 1000) / 60);
-    items = place(params, { seed, travel: { layer, seed, W, H, noise, params: travelParams(lp, W, H) } });
+    const tp = travelParams(lp, W, H);
+    if (surgeTrigger && tp.surge > 0) noteSurge(layer, surgeTrigger, tp.surge, (f * 1000) / 60);
+    items = place(params, { seed, travel: { layer, seed, W, H, noise, params: tp } });
   }
   return withLayer ? { items, layer } : items;
 }
@@ -321,6 +323,8 @@ const KEY_FIXTURES = {
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
   transportLeash: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s); the still bake passes no travel context, so stills are home by design' },
   transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s)' },
+  transportParallax: { driver: 'travel', ctx: { mode: 'fibonacci' }, note: '#1576 — parallax drift by zTier, measured after 120 locked steps through the live travel context (a still stratum drifts too)' },
+  transportSurge: { driver: 'surge', ctx: { mode: 'fibonacci' }, note: '#1576 — the surge depth, measured with a trigger stamped at the first frame (the live trigger is a taste call on the input, Q3); z mid-envelope at 120 steps' },
   transportCeiling: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: '#1574 Q2 — the author\'s traveller ceiling, measured with no device cap and no governor shed (the census has neither): 0 keeps every mark home, 800 lets the whole cast travel' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
@@ -448,6 +452,9 @@ function runFixture(driver, params, fx = {}, key = null, value = null) {
     return { items: place(params, { ground: groundFor(key, value) }), fields: PLACE_FIELDS };
   }
   if (driver === 'travel') return { items: travelPlace(params), fields: PLACE_FIELDS }; // #1574
+  // #1576 — the surge is a z driver: measured with a trigger stamped at the first frame (as the live input would
+  // carry one), and the z rides the fingerprint (the contract reads it; positions never move)
+  if (driver === 'surge') return { items: travelPlace(params, { surgeTrigger: { id: 1, amount: 1, atMs: 0 } }), fields: [...PLACE_FIELDS, 'surgeZ'] };
   if (driver === 'lifedrift') {
     return { items: applyDriftOffsets(place(params), value), fields: PLACE_FIELDS };
   }
@@ -457,6 +464,7 @@ function runFixture(driver, params, fx = {}, key = null, value = null) {
 function baseFor(driver) {
   if (driver === 'swarm') return { ...SWARM_BASE };
   if (driver === 'kineme') return { ...KINEME_BASE };
+  if (driver === 'surge') return { ...PLACE_BASE };
   return { ...PLACE_BASE };
 }
 

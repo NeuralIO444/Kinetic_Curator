@@ -683,6 +683,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // with and replays it — a shed frame replays shed.
       travelCap: travelBudgetForDevice(isIpadClassDevice()),
       travelShed: s.travelShed | 0,
+      surgeTrigger: s.surgeTrigger || null, // #1576 Q3 — the stamped surge trigger, recorded with the take
       creatureCount: Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)), // #1694 slice 1: the artist's number rides the input now — the resolver's spawn state reads it there · slice 2: net of the governor's creature shed (the overlay never writes the artist's count; a take records the count the frame actually ran with, so a shed frame replays shed) · slice 3: the artist's number is the BUILD param `creatures` — the same spring-damped layoutParams every slider rides (| 0 keeps the stamp the integer the spawn channel has always read); the retired store field and DIRECTORS stepper are gone
       assetOptions: s.assetOptions, // #1694 slice 2: tile options (the citizen's family) ride the input like assetStill — recorded in takes, replayed from takes
       dishPins: s.dishPins, // #1355: wet-lab pins (scene coords), recorded with the take

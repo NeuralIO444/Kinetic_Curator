@@ -54,6 +54,7 @@ import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
+import { startSurge } from './curator/surgeLive.js'; // #1576 Q3: the surge trigger, a taste call stamped on the input
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
@@ -134,6 +135,12 @@ function AppInner() {
       getEvolveInterval: () => useStore.getState().evolveInterval,
       context: roomNow,
     });
+    // #1576 Q3 — the surge trigger: a validated taste call becomes the stamped input the travel z driver waits on
+    const stopSurge = startSurge({
+      setTrigger: (t) => useStore.getState().setSurgeTrigger(t),
+      getLoopMs: () => loopClock.ms,
+      getLastId: () => (useStore.getState().surgeTrigger ? useStore.getState().surgeTrigger.id : 0),
+    });
     const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
@@ -212,7 +219,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopSurge(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

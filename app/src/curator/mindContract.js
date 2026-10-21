@@ -95,7 +95,8 @@ function lois(r) {
   return extra && { critique, ...extra };
 }
 
-/** The third: the mood heard in the room, and optional gentle leans (0..1). Nothing surface-facing. */
+/** The third: the mood heard in the room, optional gentle leans (0..1) and an optional surge (0..1, #1576 Q3).
+ * Nothing surface-facing. */
 function queen(r) {
   const mood = MOODS.includes(r.mood) ? r.mood : null;
   if (!mood) return null;
@@ -106,7 +107,9 @@ function queen(r) {
       if (r.lean[k] !== undefined) { const v = unit(r.lean[k]); if (v === null) return null; lean[k] = v; }
     }
   }
-  return { mood, lean };
+  let surge;
+  if (r.surge !== undefined && r.surge !== null) { surge = unit(r.surge); if (surge === null) return null; }
+  return { mood, lean, ...(surge > 0 ? { surge } : {}) };
 }
 
 const BY_PERSONA = { davis, lois, queen };
