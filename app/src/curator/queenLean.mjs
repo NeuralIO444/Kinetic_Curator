@@ -413,3 +413,49 @@ export function evolveLeanOpen(args = {}) {
 export function evolveLean(args) {
   return GATE_OPEN ? evolveLeanOpen(args) : null;
 }
+
+// ─── M9: the surge call (#1576 Q3 — the Queen calls the surge) ───────────────
+// Matt (2026-10-20, on #1576): what fires a surge is a TASTE CALL, hers — not
+// the beat, not a perform control, not a panel. She calls it the way she does
+// everything: from the keeps. When a new keep lands she judges it against her
+// kept-taste anchor — the centroid of the counted keeps BEFORE it (the same
+// anchor M1 leans on, keptAnchor's 'live' state): a keep that lands near what
+// the artist already keeps (proximity ≥ M1_PROXIMITY, her own nearness bar)
+// is answered with a surge at the proximity's strength; a keep far from the
+// centroid gets no answer. The call is a pure function of the recorded
+// ledger — no clock, no die, no live signal — so the same recorded state
+// always stamps the same demand, and the stamp rides the resolver input as
+// recorded data (liveLoop's input.surgeTrigger; the take's input log carries
+// it like every other input, so a take that surged replays the surge). It
+// never renders (rule 10): no surface reads it, and the envelope it fires is
+// surge's own presentation, not a signal about her. Identity — gate closed,
+// fewer than MIN_KEEPS counted keeps before it, no centroid (no counted keep
+// carries a layout), a new keep with no layout, or a far keep: 0, and an
+// unstamped frame is bit-identical to a build without her.
+
+/**
+ * Ungated: her surge call for one landed keep — the trigger demand 0..1, or
+ * 0 for no call. priorKeeps are the counted keeps BEFORE the new one (the
+ * host filters the ledger first: director's pullKeeps); newKeep is the keep
+ * that just landed, judged by its config.layout, the read every pull uses.
+ */
+export function surgeCallOpen({ priorKeeps = [], newKeep = null } = {}) {
+  const prior = Array.isArray(priorKeeps) ? priorKeeps : [];
+  if (prior.length < MIN_KEEPS) return 0;
+  const layout = newKeep && newKeep.config && newKeep.config.layout;
+  if (!layout || typeof layout !== 'object') return 0;
+  const centroid = keptCentroid(prior);
+  if (!centroid) return 0;
+  let p = 0;
+  try {
+    p = proximity(extractFeatures(layout), centroid);
+  } catch {
+    p = 0;
+  }
+  return p >= M1_PROXIMITY ? p : 0;
+}
+
+/** surgeCall(args) — the public, gated M9 call. 0 while the gate is closed. */
+export function surgeCall(args) {
+  return GATE_OPEN ? surgeCallOpen(args) : 0;
+}

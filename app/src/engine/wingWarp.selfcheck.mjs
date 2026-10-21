@@ -123,12 +123,21 @@ function builderRun(skinning, bentT, over = {}) {
 // from the shared defaults (scratch tree), this suite's resolver runs reproduce
 // dc0897fb / 017f6b2a exactly (the pre-#1574 pins), and the builder pins did not move —
 // no behaviour changed.)
+// (Re-pinned 2026-10-20 for #1576, under the same publish re-record ruling: the two RESOLVER
+// pins only. P3 completed the travel amounts (transportSurge / transportParallax, both
+// default 0 — inert at parity); Q3 added no keys (its surgeTrigger is recorded input data
+// stamped by the live loop, not a layout param). The hashed resolver output gained exactly
+// those two keys at their parity defaults. Proven before re-pinning: with all eight travel
+// keys stripped from the shared defaults (scratch tree), this suite's resolver runs
+// reproduce dc0897fb / 017f6b2a exactly (the pre-#1574 pins), and the builder pins did not
+// move — no behaviour changed.)
 const REST_BUILDER = '1dc2d9bb';
-const REST_RESOLVER = '248580c4'; // re-based at the S3 integration (was c9a243c9 — see the note below);
+const REST_RESOLVER = 'dfb2915f'; // re-based at the S3 integration (was c9a243c9 — see the note below);
                                   // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below);
                                   // re-pinned 2026-10-19 for #1694 S3 (was 9f0043e7 — see the note below);
                                   // re-pinned 2026-10-20 for #1574 (was dc0897fb — see the note above)
                                   // re-pinned 2026-10-20 for #1575 (was 41d885e1 — see the note above)
+                                  // re-pinned 2026-10-20 for #1576 (was 248580c4 — see the note above)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
@@ -141,11 +150,12 @@ const REST_RESOLVER = '248580c4'; // re-based at the S3 integration (was c9a243c
 
 // 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
 const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
-const BENT_RESOLVER = '9b978ad7'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
+const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
                                   // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note);
                                   // re-pinned 2026-10-19 for #1694 S3 (was 7b1c87a6 — see section 2's note);
                                   // re-pinned 2026-10-20 for #1574 (was 017f6b2a — see section 2's note)
                                   // re-pinned 2026-10-20 for #1575 (was 0287999c — see section 2's note)
+                                  // re-pinned 2026-10-20 for #1576 (was 9b978ad7 — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);

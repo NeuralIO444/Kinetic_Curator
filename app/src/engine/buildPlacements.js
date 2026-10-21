@@ -19,6 +19,8 @@
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm, applyTransport, isFamilyAnchored } from './kineme.js';
+import { applySurge } from './surge.js'; // #1576 P3 — SURGE (its own module: the kill-criterion split line)
+import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — parallax drift (surge's sibling, independently removable)
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
@@ -193,6 +195,17 @@ export function buildPlacements({
   // #1575 — P2 adds the 'path' mode and its recipe keys (transportPath /
   // transportSpeed / transportRadius) under the same gate and parity law.
   travel = null,
+  // #1576 — P3's two ephemeral inputs, same deal as travel: NEVER in
+  // geometrySignature. surge = { store, sceneId, frameMs, shed, trigger }
+  // (engine/surge.js; the trigger is the Queen's stamp — Q3, ruled
+  // 2026-10-20 — inert on every frame she does not call) gated on
+  // layoutParams.transportSurge > 0;
+  // parallaxDrift = { store, sceneId, frameMs, shed }
+  // (engine/parallaxDrift.js) gated on layoutParams.transportParallax > 0.
+  // Either amount at 0 (the defaults) → its pass never runs, its store is
+  // never touched, and the SoA is bit-identical to the stage-2 pipeline.
+  surge = null,
+  parallaxDrift = null,
   // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
   // geoParams below and down to getSampler. Optional; null reads as '?'.
   layerId = null,
@@ -521,6 +534,39 @@ export function buildPlacements({
     }, travelStill)
     : null;
 
+  // #1576 — P3's passes run after transport, in sibling order: parallax
+  // drift (an anchor drift, like transport) then surge (the z event,
+  // composing on the presented placement). Each is gated on its own
+  // amount > 0 with its own ephemeral input present — the parity gate
+  // above, per sibling, so either can be removed without the other
+  // noticing. The artist's pin (stillMarks) tames both; the family
+  // anchor does not apply — neither pass roams a mark from its stratum.
+  const undoParallaxDrift = parallaxDrift && layoutParams.transportParallax > 0
+    ? applyParallaxDrift(soa, {
+      seed,
+      drift: {
+        amount: layoutParams.transportParallax,
+        store: parallaxDrift.store,
+        sceneId: parallaxDrift.sceneId ?? layerId,
+        frameMs: parallaxDrift.frameMs,
+        shed: parallaxDrift.shed,
+      },
+    }, stillMarks)
+    : null;
+  const undoSurge = surge && layoutParams.transportSurge > 0
+    ? applySurge(soa, {
+      seed,
+      surge: {
+        amount: layoutParams.transportSurge,
+        store: surge.store,
+        sceneId: surge.sceneId ?? layerId,
+        frameMs: surge.frameMs,
+        shed: surge.shed,
+        trigger: surge.trigger,
+      },
+    }, stillMarks)
+    : null;
+
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
   // unpooled). On a full hit with overlap on, x/y/index/t/zTier/assetId/
@@ -723,6 +769,8 @@ export function buildPlacements({
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
 
+  if (undoSurge) undoSurge(); // #1576 — reverse of application
+  if (undoParallaxDrift) undoParallaxDrift(); // #1576 — reverse of application
   if (undoTravel) undoTravel(); // #1574 — reverse of application
   if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();

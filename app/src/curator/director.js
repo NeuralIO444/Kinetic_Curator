@@ -33,7 +33,7 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase, wetnessLean, evolveLean, M8_EVOLVE_RANGE } from './queenLean.mjs';
+import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase, wetnessLean, evolveLean, M8_EVOLVE_RANGE, surgeCall } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -473,6 +473,45 @@ export function paceStep({ current, target, confidence, keeps, allowance }) {
     return tempoEase({ current, target, confidence, nKeeps: pullKeeps(keeps).length, allowance });
   } catch {
     return null;
+  }
+}
+
+/**
+ * #1576 Q3 — her surge call for the keep that just landed, hosted like
+ * everything the pull touches: the ledger is pull-filtered here (pullKeeps —
+ * pattern-layer keeps do not teach her, so they neither build the anchor nor
+ * call), the newest counted keep is judged against the anchor of the counted
+ * keeps before it (queenLean M9), and a throw anywhere reads as no call.
+ * Pure in the ledger it is handed: the same recorded ledger, the same call.
+ */
+export function queenSurgeCall({ keeps = [] } = {}) {
+  try {
+    const counted = pullKeeps(keeps);
+    if (counted.length < 2) return 0;
+    return surgeCall({ priorKeeps: counted.slice(0, -1), newKeep: counted[counted.length - 1] });
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * #1576 Q3 — the frame seam's stamp decision, a pure function of (seen,
+ * ledger) so the live loop holds only the scalar: `seen` is the counted-keep
+ * length the stamp has already evaluated (−1 before the first frame — the
+ * ledger found there is history, and history does not call). A counted
+ * growth evaluates the newest keep exactly once: one pulse per keep, however
+ * many frames follow. A shrink just resyncs (keeps were cleared; nothing is
+ * owed). Returns { stamp, seen } — the trigger demand for this frame's
+ * resolver input (0 on almost every frame) and the next seen.
+ */
+export function nextSurgeStamp(seen, keeps) {
+  try {
+    const counted = pullKeeps(keeps).length;
+    if (!(seen >= 0)) return { stamp: 0, seen: counted };
+    if (counted <= seen) return { stamp: 0, seen: counted };
+    return { stamp: queenSurgeCall({ keeps }), seen: counted };
+  } catch {
+    return { stamp: 0, seen: Number.isFinite(seen) ? seen : -1 };
   }
 }
 
