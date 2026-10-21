@@ -62,7 +62,7 @@ const reach = renderReachability();
   // never silently shrink the company the census measures with.
   assert.strictEqual(CAST.length, CAST_IDS.length, `census cast shrank: ${CAST.length}/${CAST_IDS.length} ids resolved`);
   // Completeness: every key in the universe has exactly one row.
-  const expected = Object.keys(PARAM_SPEC).length + Object.keys(RANGE_SPEC).length + 21;
+  const expected = Object.keys(PARAM_SPEC).length + Object.keys(RANGE_SPEC).length + 22; // #1574: + transport
   assert.strictEqual(paramRows.length, expected, `census rows ${paramRows.length} != key universe ${expected}`);
   const seen = new Set(paramRows.map((r) => r.key));
   assert.strictEqual(seen.size, paramRows.length, 'duplicate census rows');

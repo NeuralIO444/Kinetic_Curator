@@ -19,6 +19,7 @@
 import { computeGeometrySoA, applyAttributes, geometrySignature } from './placement.js';
 import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm } from './kineme.js';
+import { applyTravel } from './travel.js'; // #1574 — travel kinemes: the transport pass
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
@@ -170,6 +171,11 @@ export function buildPlacements({
   growthTick = 0,
   audioEnergy = null,
   kineme = null,
+  // #1574 — travel kinemes (the transport pass). Ephemeral per-frame input like kineme — NEVER in
+  // geometrySignature. travel = { layer, seed, W, H, noise, params } (engine/travel.js): the resolver owns the
+  // per-stratum sim state and advances its fixed-step clock before this call. null (stills, bakes, census,
+  // every caller that predates travel) → today's path exactly.
+  travel = null,
   // #1245 — layer id for the unknown-sampler fallback diagnostic; rides into
   // geoParams below and down to getSampler. Optional; null reads as '?'.
   layerId = null,
@@ -445,6 +451,15 @@ export function buildPlacements({
   // Each applier undoes its own cached-x/y writes; undos run in reverse of
   // application below.
   const undoRhythm = kineme ? applyRhythm(soa, kineme, stillMarks) : null;
+  // #1574 — travel moves the ANCHOR: after the rhythm (the placement layer) and before the time drivers, so
+  // breath/drift micro-motion rides on top of a travelling mark. Artist-pinned marks stay home. Undone below,
+  // in reverse of application. The hard gate (still / leash 0 / flow 0, nothing settling) returns null.
+  let stillTravel = stillMarks;
+  if (travel && !stillTravel && travel.stillAssets && travel.stillAssets.size) {
+    stillTravel = new Uint8Array(soa.n);
+    for (let k = 0; k < soa.n; k++) if (travel.stillAssets.has(assetIds[k])) stillTravel[k] = 1;
+  }
+  const undoTravel = travel ? applyTravel(soa, travel, stillTravel) : null;
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
   // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
@@ -630,6 +645,7 @@ export function buildPlacements({
 
   if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();
+  if (undoTravel) undoTravel(); // #1574 — reverse of application
   if (undoRhythm) undoRhythm(); // #1198 — reverse of application
   return { preset, items: mapped, safeCount };
 }

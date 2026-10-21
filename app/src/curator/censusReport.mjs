@@ -35,6 +35,8 @@ import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
 import { patternAmounts, rhythmTypeForPattern } from '../engine/kineme.js';
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams } from '../engine/travel.js'; // #1574
+import { createNoise } from '../engine/noise.js';
 import { GrowthHooks, ensureAggregate } from '../engine/kernel/sample/growth.js';
 import { createDish } from '../engine/kernel/dish.js';
 import { patternGround } from '../pattern/ground.js';
@@ -113,7 +115,7 @@ export function fpDelta(a, b, fields) {
 // for the channel it rides.
 export function place(params, {
   seed = CENSUS_SEED, cast = CAST, paletteId = 'hydra', seedOffsets = null,
-  growthTick = 0, kineme = null, ground = null, rawParams = null, clearGrowth = false, caGrid = null,
+  growthTick = 0, kineme = null, ground = null, rawParams = null, clearGrowth = false, caGrid = null, travel = null,
 } = {}) {
   const lp = normalizeLayoutParams(params);
   if (rawParams) Object.assign(lp, rawParams);
@@ -126,7 +128,7 @@ export function place(params, {
   const { items } = buildPlacements({
     layoutParams: lp, seed, activeAssets: cast,
     palette: resolvePalette(paletteId, null, []), caps: CAPS,
-    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid,
+    canvasW: W, canvasH: H, seedOffsets, growthTick, kineme, caGrid, travel,
     ...(ground ? { dish: ground.dish, lean: ground.lean, nudge: ground.nudge, snap: ground.snap } : {}),
   });
   return items;
@@ -158,6 +160,25 @@ export function kinemeCtxFor(lp, seed = CENSUS_SEED) {
   const rhythm = rt ? { type: rt } : null;
   if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0)) return null;
   return { seed, driverSec: 3.7, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm };
+}
+
+// #1574 — the travel context, built exactly as liveResolve builds it per frame: a fresh stratum store, its fixed-
+// step clock advanced at a locked 60 Hz, the shared world noise. Travel is TEMPORAL (offsets integrate over steps),
+// so the honest headless measure is the placement after `steps` locked steps — the still bake (slowRender) and every
+// non-live caller pass no travel context at all, by design.
+export const TRAVEL_CENSUS_STEPS = 120;
+export function travelPlace(params, { steps = TRAVEL_CENSUS_STEPS, seed = CENSUS_SEED } = {}) {
+  const lp = normalizeLayoutParams(params);
+  const store = createTravelStore();
+  const noise = createNoise(seed);
+  const layer = travelLayer(store, 'census', seed, W, H);
+  advanceTravelClock(layer, 0);
+  let items = null;
+  for (let f = 1; f <= steps; f++) {
+    advanceTravelClock(layer, (f * 1000) / 60);
+    items = place(params, { seed, travel: { layer, seed, W, H, noise, params: travelParams(lp, W, H) } });
+  }
+  return items;
 }
 
 // The ground a content layer rests on, built exactly as
@@ -270,6 +291,8 @@ const KEY_FIXTURES = {
   fieldMapAmount: { driver: 'place', ctx: { ...FIELDMAP_CTX } },
   kinemeBrushWobble: { driver: 'kineme', ctx: { mode: 'brush' }, note: 'livingMotion populates amounts.brushWobble from this param since #1516 and the driver evaluates dWobble — but no stage-C consumer applies dWobble to placements yet (#894/#897, by design), so the measured picture delta is still zero — measured through the production-shaped driver context' },
   kinemeBoilFps: { driver: 'none', reason: 'boil is a frame-timing rate (6–12 fps re-deal cadence); no still-level consumer exists' },
+  transportLeash: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s); the still bake passes no travel context, so stills are home by design' },
+  transportFlow: { driver: 'travel', ctx: { mode: 'fibonacci', transport: 'flow' }, note: 'measured through the live travel context after 120 locked steps (2 s)' },
   tight: { driver: 'swarm', ctx: { ...HYPE_CTX }, note: 'spine follow-through in the organism integrator — hype mode only' },
   wind: { driver: 'dish', reason: 'currents live in the dish/swarm physics — measured in the dish matrix (mass-split drift)' },
   behaveSep: { driver: 'swarm', ctx: { ...HYPE_CTX } },
@@ -328,6 +351,7 @@ const KEY_FIXTURES = {
 const STRUCT_FIXTURES = {
   mode: { driver: 'reach', reason: 'swept exhaustively in render reachability (27 mode signatures)' },
   composition: { driver: 'place', ctx: { mode: 'fibonacci' }, values: ['praystation', 'chiaroscuro'] },
+  transport: { driver: 'travel', ctx: { mode: 'fibonacci' }, values: ['still', 'flow'], note: '#1574 — still is today\'s placement exactly; flow measured after 120 locked steps through the live travel context' },
   bleed: { driver: 'place', ctx: { mode: 'grid' }, values: [false, true] },
   mirror: { driver: 'place', ctx: { mode: 'grid' }, values: ['off', 'x'] },
   overlap: { driver: 'place', ctx: { mode: 'grid' }, values: [false, true] },
@@ -393,6 +417,7 @@ function runFixture(driver, params, fx = {}, key = null, value = null) {
   if (driver === 'ground') {
     return { items: place(params, { ground: groundFor(key, value) }), fields: PLACE_FIELDS };
   }
+  if (driver === 'travel') return { items: travelPlace(params), fields: PLACE_FIELDS }; // #1574
   if (driver === 'lifedrift') {
     return { items: applyDriftOffsets(place(params), value), fields: PLACE_FIELDS };
   }

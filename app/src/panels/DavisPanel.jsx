@@ -13,6 +13,7 @@ import { visibleQueue } from '../state/queueTransport.js';
 import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS } from '../engine/kineme.js';
+import { TravelControls } from './davis/TravelControls.jsx'; // #1574 — travel kinemes, ruled into the motion group
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -225,6 +226,9 @@ export function DavisPanel() {
               );
             })}
           </div>
+
+          {/* #1574 — travel kinemes: the motion group's travel row (controls home ruled here, 2026-10-14). */}
+          <TravelControls />
 
           {/* #1126 — the two Directors, at the foot of the panel (Matt): readout only, what the honest feed says each is doing */}
           <div className="davis-section-label ttl">the room</div>

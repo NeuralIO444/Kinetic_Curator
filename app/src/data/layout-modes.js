@@ -6,6 +6,7 @@ import { resolveLookId } from './taxonomy.js';
 import { BALLISTICS_CURVES } from '../gl/audioBallistics.mjs';
 import { TRAIL_MODES } from '../gl/trailMode.mjs'; // #560 — the trail vocabulary (resolveTrail's list)
 import { KINEME_PATTERNS } from '../engine/kineme.js'; // #1128
+import { TRANSPORT_MODES } from '../engine/travel.js'; // #1574 — travel kinemes
 import { FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES } from '../engine/fieldMap.mjs'; // #1199
 import { GLASS_BODY_ALPHA } from '../engine/glassBody.mjs'; // #1585 (Materials M4) — the shipped glass tune is the param default
 import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 — ditto, plate geometry
@@ -197,6 +198,14 @@ export const DEFAULT_LAYOUT_PARAMS = {
   kinemePattern: 'DRIFT', // #1128 DIRECTOR pattern: DRIFT | SWELL | THUMP (re-weight the amounts) | ORGANIC | CADENCE (#1198: switch on the rhythm placement layer; an unknown name is DRIFT)
   kinemeBrushWobble: 0,
   kinemeBoilFps: 8,
+  // #1574 — TRAVEL KINEMES (engine/travel.js): the stratum's transport. 'still' is today's frame exactly (the
+  // hard gate); 'flow' gives each mark an offset + velocity of its own, steered by the curl of the shared field,
+  // on a leash back to its placed home. Leash = free-roam radius as a fraction of the small canvas dimension (no
+  // home force inside it, a spring with overshoot outside); flow = travel speed (0.5 ⇒ the #1573 spike's cruise).
+  // Recipe data: saved, crowned, replayed, censused. Edited from the DIRECTORS motion group (Matt, 2026-10-14).
+  transport: 'still',
+  transportLeash: 0.16,
+  transportFlow: 0.5,
   squash: 0, // #594 PR3: 0 = the plain #309 smear (stretch only), byte-identical
   crooked: 0, // Crooked Hand. 0 is today's quad.
   // #1482 P3 — spectrum marks (STIMULI → SPECTRUM). Which frequency a mark listens to: 0 INDEX, 1 ANGLE, 2 POSITION,
@@ -398,6 +407,8 @@ export const PARAM_SPEC = {
   fieldMapAmount: { min: 0, max: 1 }, // #1199 — MAP row amount, dry/wet
   kinemeBrushWobble: { min: 0, max: 1 },
   kinemeBoilFps: { min: 6, max: 12 },
+  transportLeash: { min: 0, max: 0.4 }, // #1574 — free-roam radius, fraction of the small dimension; 0 = still
+  transportFlow: { min: 0, max: 1 }, // #1574 — travel speed; 0 = still
   tight: { min: 0.05, max: 0.95 },
   wind: { min: 0, max: 3 },
   // #479 Option B — BEHAVE override bounds, generous headroom over the
@@ -535,6 +546,7 @@ const ENUM_SPEC = {
   contactMode: CONTACT_MODES,
   audioResponse: AUDIO_RESPONSE_IDS, // #306
   kinemePattern: KINEME_PATTERNS, // #1128
+  transport: TRANSPORT_MODES, // #1574
 };
 
 /** True when `value` is a number we can meaningfully clamp. */
@@ -718,6 +730,7 @@ export function normalizeLayoutParams(partial) {
   next.contactMode = pickEnum(next.contactMode, CONTACT_MODES, 'none');
   next.audioResponse = pickEnum(next.audioResponse, AUDIO_RESPONSE_IDS, DEFAULT_LAYOUT_PARAMS.audioResponse); // #306
   next.kinemePattern = pickEnum(next.kinemePattern, KINEME_PATTERNS, 'DRIFT'); // #1128: absent or unknown is the floor
+  next.transport = pickEnum(next.transport, TRANSPORT_MODES, 'still'); // #1574: absent or unknown is today's still
   // #1199 — MAP row enums. Unknown/absent is the no-op ('off'); the amount
   // clamp rides PARAM_SPEC above. A document that predates #1199 opens with
   // the map off exactly (defaults are already the no-op).

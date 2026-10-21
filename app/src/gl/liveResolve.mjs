@@ -23,6 +23,7 @@ import { resolveFieldItems, resolveFeedItems } from './fieldFeedColumns.mjs';
 import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
+import { createTravelStore, travelLayer, advanceTravelClock, travelParams, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelSnapshot } from '../engine/travel.js'; // #1574 — travel kinemes
 import { createScentField } from '../engine/kernel/field/scent.js';
 import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius, snapshotDishSession, restoreDishSession, checkDishSessionSnapshot, restoreDishEntries } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
@@ -208,6 +209,9 @@ export function createLiveResolver() {
   // #1128: ONE anchored clock for the living-motion floor. RATE 0 freezes it where it is, a RATE change re-anchors it
   // (no jump), and a held loop clock (pause) holds it: the same contract as the library kinemes.
   const driverClock = createDriverClock();
+  // #1574 — travel kinemes: per-stratum sim state (offset + velocity per mark) on a fixed-step clock. Resolver-
+  // owned (a fresh resolver starts every mark home), carried by the #1367 snapshot, pruned with the document.
+  const travelStore = createTravelStore();
 
   // Item-level morph (chip clicks): per content layer, the last shown
   // (post-morph) items + the signature they were shown for, and any
@@ -297,6 +301,7 @@ export function createLiveResolver() {
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
     for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
+    pruneTravelStore(travelStore, documentIds); // #1574 — like warpPhase: a hidden stratum keeps its travellers
     // #822 — FEED slots follow the document, not visibility. Freeing a slot
     // on hide let the next layer reuse it and read the hidden track's
     // delay-1 buffer (a snap, and a partner the picture did not have).
@@ -702,6 +707,19 @@ export function createLiveResolver() {
         const kineme = livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion);
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;
+        // #1574 — travel: the stratum's transport params, and its fixed-step clock advanced to this frame. No
+        // state and the hard gate holding (still / leash 0 / flow 0) → null: today's build exactly. Reduced
+        // motion withdraws travel (DS rule 7): marks glide home and stay there. A frozen frame (slowRender)
+        // steps nothing and HOLDS the offsets — the instrument holds its last frame, it does not snap home.
+        const travelP = travelParams(layoutParams, W, H);
+        if (input.reducedMotion) travelP.active = false;
+        let travel = null;
+        if (travelP.active || travelStore.layers.has(layer.id)) {
+          const tl = travelLayer(travelStore, layer.id, seed, W, H);
+          advanceTravelClock(tl, input.loopTimeMs ?? 0, !!input.slowRender);
+          const pinned = input.assetStill && typeof input.assetStill === 'object' ? Object.keys(input.assetStill) : null;
+          travel = { layer: tl, seed, W, H, noise: worldNoise, params: travelP, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
+        }
         items = buildPlacements({
           layoutParams, seed, seedOffsets, activeAssets, palette,
           caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
@@ -709,6 +727,7 @@ export function createLiveResolver() {
           growthTick, audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme,
+          travel, // #1574
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
             dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,
@@ -1073,6 +1092,7 @@ export function createLiveResolver() {
     lastShown.clear();
     morphState.clear();
     warpPhase.clear();
+    travelStore.layers.clear(); // #1574
     feedLive.reset();
     worldNoise = null;
     worldNoiseSeed = null;
@@ -1119,6 +1139,7 @@ export function createLiveResolver() {
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
       spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
+      travel: snapshotTravelStore(travelStore), // #1574 — an OPTIONAL key: a pre-travel snapshot restores with every mark home
     };
   }
 
@@ -1136,6 +1157,7 @@ export function createLiveResolver() {
     if (!createDishCreatureBuilder().restoreState(snap.dishCreatures)) return false;
     if (snap.spawn !== undefined && !createCreatureSpawnState().restoreState(snap.spawn)) return false; // #1694 slice 1
     if (!createDriverClock().restoreState(snap.driverClock)) return false;
+    if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // #1574
     // Phase 2 — apply (the same restores just validated; they cannot refuse now).
     W = snap.W;
     H = snap.H;
@@ -1182,6 +1204,8 @@ export function createLiveResolver() {
     // #1694 slice 1 — a pre-repipe snapshot carries no spawn state: the channel starts fresh, as a fresh
     // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
     if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn); else spawnState.reset();
+    // #1574 — a pre-travel snapshot carries no travellers: every mark starts home, as on a fresh resolver.
+    if (snap.travel !== undefined) restoreTravelStore(travelStore, snap.travel); else travelStore.layers.clear();
     return true;
   }
 
@@ -1266,5 +1290,6 @@ export function checkResolverSnapshot(snap) {
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn))) return false;
+  if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // #1574 — optional, like spawn
   return true;
 }

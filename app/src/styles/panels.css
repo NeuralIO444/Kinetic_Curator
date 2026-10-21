@@ -998,6 +998,11 @@
 .panel-davis .davis-section-label:first-child { margin-top: 0; padding-top: 0; }
 .davis-actions-motion { grid-template-columns: auto repeat(3, 1fr); align-items: center; } /* #1128: the label shares the row, so the panel keeps its no-scroll fit */
 .davis-actions-motion .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
+/* #1574 — travel kinemes: the motion group's travel row. The mode chips share the label's row (no-scroll fit);
+   the amounts stack two to a row. */
+.davis-actions-travel { grid-template-columns: auto repeat(4, 1fr); align-items: center; }
+.davis-actions-travel .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
+.davis-travel-amounts { display: grid; grid-template-columns: 1fr 1fr; column-gap: 8px; row-gap: 4px; }
 .davis-perform-row { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; align-items: stretch; }
 
 /* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. Each side is a row:
