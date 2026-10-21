@@ -1,11 +1,16 @@
-// MIDI (#617) — connect a controller, see what it says, see what is mapped.
+// MIDI (#617) — connect a controller, see what it says, map what it controls.
 // Fail-out-loud: unsupported / refused / no device / unplugged all read in
-// words, never as a silent dead control. Learn mode (mapping a knob or pad)
-// arrives in the next PR; until then mappings load from the project file.
+// words, never as a silent dead control. Learn is a mode (Ableton pattern):
+// LEARN on a row arms it, the next pad or knob you touch binds to that row,
+// Esc or CANCEL backs out. Learn needs a connected device — with none there is
+// nothing to wiggle, so the button says so instead of waiting forever.
+import { useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { midiStatusView, describeMessage } from '../../midi/status.mjs';
 import { MIDI_TARGETS } from '../../midi/targets.mjs';
+import { keyFor } from '../../midi/map.mjs';
 import { describeKey } from '../../midi/message.mjs';
+import { learnPrompt } from '../../midi/learn.mjs';
 import { emit, Events } from '../../composition/eventBus.js';
 
 export function MidiSection() {
@@ -13,9 +18,28 @@ export function MidiSection() {
   const status = useStore((s) => s.midiStatus);
   const last = useStore((s) => s.midiLast);
   const map = useStore((s) => s.midiMap);
+  const learn = useStore((s) => s.midiLearn);
+  const refused = useStore((s) => s.midiLearnRefused);
   const unbindMidi = useStore((s) => s.unbindMidi);
+  const armMidiLearn = useStore((s) => s.armMidiLearn);
+  const cancelMidiLearn = useStore((s) => s.cancelMidiLearn);
   const view = midiStatusView(status, enabled);
-  const rows = Object.entries(map).map(([key, id]) => ({ key, id, target: MIDI_TARGETS.find((t) => t.id === id) })).filter((r) => r.target);
+  const ready = enabled && status.state === 'ready';
+  const armedTarget = learn?.armed ? MIDI_TARGETS.find((t) => t.id === learn.armed) : null;
+
+  // Esc backs out of learn.
+  useEffect(() => {
+    if (!armedTarget) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') cancelMidiLearn(); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [armedTarget, cancelMidiLearn]);
+
+  // The last device going away must not leave learn armed against nothing.
+  useEffect(() => {
+    if (armedTarget && !ready) cancelMidiLearn();
+  }, [armedTarget, ready, cancelMidiLearn]);
+
   return (
     <div className="davis-midi" role="group" aria-label="MIDI">
       <div className="davis-midi-head">
@@ -29,17 +53,30 @@ export function MidiSection() {
       <div className={`davis-midi-status ${view.tone}`} role="status">{view.line}</div>
       {view.note && <div className={`davis-midi-note ${view.tone}`}>{view.note}</div>}
       {enabled && last && <div className="davis-midi-last" title="The last message seen">{describeMessage(last)}</div>}
-      {rows.length > 0 && (
-        <ul className="davis-midi-map" aria-label="MIDI mappings">
-          {rows.map((r) => (
-            <li key={r.key}>
-              <span>{r.target.label}</span>
-              <code>{describeKey(r.key)}</code>
-              <button type="button" className="micro-btn" aria-label={`Unmap ${r.target.label}`} title="Remove this mapping" onClick={() => unbindMidi(r.id)}>×</button>
-            </li>
-          ))}
-        </ul>
+      {armedTarget && (
+        <div className={`davis-midi-learn ${refused ? 'bad' : ''}`} role="status" aria-live="polite">
+          {learnPrompt(armedTarget, refused)}
+        </div>
       )}
+      <ul className="davis-midi-map" aria-label="MIDI mappings">
+        {MIDI_TARGETS.map((t) => {
+          const key = keyFor(map, t.id);
+          const armed = armedTarget?.id === t.id;
+          return (
+            <li key={t.id} className={armed ? 'armed' : ''}>
+              <span>{t.label}</span>
+              <code>{key ? describeKey(key) : '—'}</code>
+              <button type="button" className={`micro-btn ${armed ? 'active' : ''}`} aria-pressed={armed}
+                disabled={!ready && !armed}
+                title={armed ? 'Cancel learn (Esc)' : ready ? `Learn: then touch a ${t.kind === 'cc' ? 'knob or fader' : 'pad or key'}` : 'Connect a MIDI device to learn'}
+                onClick={() => (armed ? cancelMidiLearn() : armMidiLearn(t.id))}>
+                {armed ? 'CANCEL' : 'LEARN'}
+              </button>
+              {key && <button type="button" className="micro-btn" aria-label={`Unmap ${t.label}`} title="Remove this mapping" onClick={() => unbindMidi(t.id)}>×</button>}
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

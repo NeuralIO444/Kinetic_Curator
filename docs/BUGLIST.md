@@ -46,7 +46,7 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | Item | Status |
 |------|--------|
 | **Dev-dependency advisories** (`@babel/core`, `browserslist`, `nanoid`, ...) | Low. `npm audit fix` when convenient; not applied to avoid lockfile churn. `npm audit --omit=dev` is clean. |
-| **Deferred seams** (`midi/learnDeferred.mjs`, `panels/pipeline/syphonDeferred.js`) | Intentional; wait on #617 / #608. |
+| **Deferred seam** (`panels/pipeline/syphonDeferred.js`) | Intentional; waits on #608. (`midi/learnDeferred.mjs` was un-deferred into `midi/learn.mjs` by the #617 learn build; hardware verification pending.) |
 
 ## Fixed in 0.8.0 (reference)
 
