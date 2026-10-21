@@ -46,6 +46,7 @@ import { composeStillSvg } from './miner.mjs'; // #1585 — the matstill driver'
 // XGBoost T2: the agreement readout scores ledger recipes with the taste
 // head — the same module the live instrument uses (tasteHead.scoreLayout).
 import { scoreLayout, headUsable, XGB_HEAD_KIND } from './tasteHead.js';
+import { readMeter } from './readMeter.mjs'; // #1627 S2 — the three-reads meter (pure half)
 
 export { mulberry32 };
 export const CENSUS_SEED = 0x1505;
@@ -529,6 +530,58 @@ export function jelloMetric() {
       meanHomePx: travelling ? +(travellerSum / travelling).toFixed(2) : 0,
       windowFrames: JELLO_FRAMES,
     };
+  });
+}
+
+// ── #1627 S2 — the three reads, on a named parity corpus ────────────
+// Four scenes chosen to sit at the meter's four corners, composed
+// through the same still pipeline the matstill driver uses (miner
+// SVG → Resvg raster at 500 px wide) and metered by readMeter.mjs.
+// The corpus is the S2 kill-criterion evidence: bald / mud / balanced
+// must separate by eye-checkable margins, or S3 has no honest judge
+// (see readMeter.selfcheck.mjs, which pins the separation).
+export const READ_SCENES = [
+  {
+    name: 'bald',
+    note: 'large flat marks, nothing at the fine level — all top',
+    deals: [
+      { params: { mode: 'fibonacci', count: 14, scale: [1.0, 1.6], material: 'plate' }, castIds: ['org_blob_04', 'geo_tri_01'] },
+    ],
+  },
+  {
+    name: 'mud',
+    note: 'a dense field of tiny specks, no silhouette — all dust',
+    deals: [
+      { params: { mode: 'random', count: 400, scale: [0.12, 0.25] }, castIds: ['dot_speckle_01'] },
+    ],
+  },
+  {
+    name: 'balanced',
+    note: 'a Look as Looks are built — three strata: plate heroes (big), a stipple-bodied company (mid + its dot screen), single-dot dust (fine)',
+    deals: [
+      { params: { mode: 'fibonacci', count: 6, scale: [1.8, 2.6], material: 'plate' }, castIds: ['org_blob_04', 'geo_tri_01'] },
+      { params: { ...PLACE_BASE, material: 'stipple' }, castIds: CAST_IDS },
+      { params: { mode: 'random', count: 400, scale: [0.3, 0.5] }, castIds: ['dot_single_01'] },
+    ],
+  },
+  {
+    name: 'top-heavy',
+    note: 'huge marks fill the frame — silhouette and almost nothing else',
+    deals: [
+      { params: { mode: 'grid', count: 3, scale: [2.8, 3.0], material: 'plate' }, castIds: ['org_blob_04'] },
+    ],
+  },
+];
+
+export function readsMetric() {
+  return READ_SCENES.map((scene) => {
+    const items = scene.deals.flatMap((deal) => place(deal.params, {
+      cast: deal.castIds.map((id) => byId.get(id)).filter(Boolean),
+    }));
+    const svg = composeStillSvg(items, resolvePalette('hydra', null, []));
+    const img = new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+    const m = readMeter(img.pixels, img.width, img.height);
+    return { scene: scene.name, note: scene.note, marks: items.length, ...m };
   });
 }
 
@@ -1165,7 +1218,7 @@ export function renderReachability() {
 }
 
 // ── formatting ──────────────────────────────────────────────────────
-export function formatCensusReport({ paramRows, dishRows, reach, store, jello }) {
+export function formatCensusReport({ paramRows, dishRows, reach, store, jello, reads }) {
   const L = [];
   const moves = paramRows.filter((r) => r.class === 'moves');
   const zero = paramRows.filter((r) => r.class === 'zero-in-context');
@@ -1190,6 +1243,13 @@ export function formatCensusReport({ paramRows, dishRows, reach, store, jello })
     L.push('RA3 Jell-O metric — travel per scene (reported, steering nothing)');
     for (const r of jello) {
       L.push(`  ${r.scene}: ${r.travelling}/${r.marks} marks travel, mean ${r.meanHomePx}px from home over ${r.windowFrames} frames`);
+    }
+  }
+  if (reads) {
+    L.push('');
+    L.push('RA3 three reads — scale-band shares per corpus scene (#1627 S2, reported, steering nothing yet)');
+    for (const r of reads) {
+      L.push(`  ${r.scene}: big ${r.shares.big} · mid ${r.shares.mid} · fine ${r.shares.fine} → ${r.verdict} (${r.marks} marks)`);
     }
   }
   L.push('');

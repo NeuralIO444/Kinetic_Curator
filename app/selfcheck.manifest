@@ -18,6 +18,7 @@ node src/engine/kineme.selfcheck.mjs
 node src/engine/travel.selfcheck.mjs
 node src/engine/surge.selfcheck.mjs
 node src/engine/parallaxDrift.selfcheck.mjs
+node src/engine/markWeather.selfcheck.mjs
 node src/engine/fieldMap.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
@@ -302,6 +303,7 @@ node src/assets/primitives.selfcheck.mjs
 node src/assets/silhouette.selfcheck.mjs
 node src/shimmer/shimmer.selfcheck.mjs
 node src/curator/curate.selfcheck.mjs
+node src/curator/readDuel.selfcheck.mjs
 node src/curator/stress.selfcheck.mjs
 node src/curator/stressLive.selfcheck.mjs
 node src/curator/stressRecord.selfcheck.mjs
@@ -335,6 +337,7 @@ node src/curator/diceCrowns.selfcheck.mjs
 node src/state/writePathHonesty.selfcheck.mjs
 node src/curator/coverage.selfcheck.mjs
 node src/curator/census.selfcheck.mjs
+node src/curator/readMeter.selfcheck.mjs
 node src/curator/miner.selfcheck.mjs
 node src/curator/candidateTray.selfcheck.mjs
 node src/curator/shelf.selfcheck.mjs

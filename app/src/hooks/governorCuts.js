@@ -9,6 +9,19 @@
 //   cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //          gated on the gpuSaturated signal (#259): fires only when the GPU
 //          is the bottleneck — otherwise it only pixelates.
+//   cut 1.4: mark weather (#1627 S1) — the mark-born motes shed FIRST
+//          among everything the picture can lose: weather dies before
+//          marks, before the population, before travel. Only edge AA
+//          and the pixel trim precede it, and those cost the picture
+//          nothing. One boolean step off the weatherShed overlay — no
+//          recipe ever carried weather, so nothing authored moves —
+//          restoring whole when pressure clears. Fires only when the
+//          caller says weather is live (weatherActive: a spawn source
+//          the engine measures is present — sun spec pool, dish, or
+//          traveling marks — and the rung is not already shed), so
+//          older callers and their pinned ladder walks see the ladder
+//          exactly as it was. NOT the #1183 WEATHER dial (haze-as-air):
+//          that response is weather/haze-air, tier 1, a different cut.
 //   cut 1.5: creature count (#1694 slice 2, Matt's ruling Q2) — the population
 //          sheds FIRST among content cuts, before the quality tier and every
 //          finish below it; only edge AA and the pixel trim precede it, and
@@ -94,6 +107,14 @@ export const GOVERNOR_RESTORE_CUTS = [
     kind: 'renderScale',
     needsRestore: (s, ctx) => ctx.healthy && Number(s.renderScale) < 1 - 1e-9,
     restoredLabel: 'PIXEL TRIM off — full pixels back',
+  },
+  {
+    kind: 'markWeather',
+    // #1627 S1 — weather restores after the population and travel in
+    // the reverse walk (it shed before them): the finest level is the
+    // last thing to come back, like edge AA at the other end.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.weatherShed,
+    restoredLabel: 'weather back — motes return',
   },
   {
     kind: 'creatureCount',
@@ -197,6 +218,16 @@ export function nextGovernorCut(s) {
     };
   }
 
+  // Cut 1.4 (#1627 S1): mark weather. FIRST among the picture's own
+  // cuts — the motes are the fine read, and the fine read is the
+  // designated first sacrifice (the issue's law: weather dies before
+  // marks). Opt-in per caller (`weatherActive === true` = a measured
+  // spawn source is live and the rung is not already shed) so older
+  // callers and their pinned ladder walks keep the pre-#1627 ladder.
+  if (s.weatherActive === true && !s.weatherShed) {
+    return { kind: 'markWeather', weatherShed: true, label: 'WEATHER CLEAR — motes shed' };
+  }
+
   // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
   // sheds FIRST among content cuts — population before finishes. One
   // creature per step, off the creatureShed overlay; the artist's count is
@@ -260,6 +291,8 @@ export function shedSummary(s) {
   if (Number(s.renderScale) < 1 - 1e-9) {
     out.push(`pixel trim ${Math.round(Number(s.renderScale) * 100)}%`);
   }
+  // #1627 S1 — the badge is honest about a weather shed.
+  if (s.weatherShed) out.push('weather clear');
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);

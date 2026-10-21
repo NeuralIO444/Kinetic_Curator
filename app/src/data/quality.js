@@ -91,6 +91,22 @@ export function regionBudgetForDevice(ipadClass) {
 }
 
 /**
+ * #1627 S1 — the mark-weather budgets: how many mark-born motes
+ * (engine/markWeather.mjs) may be alive at once per device class.
+ * Motes are the fine read made literal — pure decoration with a
+ * governor price — so the cap is a device budget in this file's
+ * sense, and the governor sheds weather FIRST (hooks/governorCuts.js
+ * cut 1.4): when pressure comes, the cap is not negotiated, the motes
+ * are simply gone. Read the numbers here, never at a call site.
+ */
+export const MARK_WEATHER_CAPS = Object.freeze({ desktop: 240, ipad: 120 });
+
+/** The mark-weather mote cap for a device class (iPad-class = true). */
+export function markWeatherCapForDevice(ipadClass) {
+  return ipadClass ? MARK_WEATHER_CAPS.ipad : MARK_WEATHER_CAPS.desktop;
+}
+
+/**
  * #1639 — the frame budgets: what one recipe's render is ALLOWED to cost, per device class, in the
  * cost harness's own terms (the label of costDataset.mjs: median of per-repetition p90 frame ms,
  * readback-forced renderScene through the real render path). Until now the harness measured and

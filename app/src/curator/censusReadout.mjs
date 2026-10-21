@@ -333,6 +333,34 @@ export function shelfCensusView({
 }
 
 /**
+ * #1627 S2 — the three-reads section model: censusReport.readsMetric's
+ * rows reshaped for display, nothing recomputed (this module's law).
+ * An absent reads artifact stays absent — the readout never invents a
+ * balance the meter did not measure.
+ */
+export function readsView(reads) {
+  if (!Array.isArray(reads) || reads.length === 0) {
+    return { present: false, reason: 'not measured', rows: [] };
+  }
+  const rows = reads.map((r) => ({
+    scene: r.scene,
+    verdict: r.verdict,
+    big: r.shares?.big ?? 0,
+    mid: r.shares?.mid ?? 0,
+    fine: r.shares?.fine ?? 0,
+    marks: r.marks ?? 0,
+  }));
+  return {
+    present: true,
+    rows,
+    bald: rows.filter((r) => r.verdict === 'bald').map((r) => r.scene),
+    mud: rows.filter((r) => r.verdict === 'mud').map((r) => r.scene),
+    balanced: rows.filter((r) => r.verdict === 'balanced').map((r) => r.scene),
+    topHeavy: rows.filter((r) => r.verdict === 'top-heavy').map((r) => r.scene),
+  };
+}
+
+/**
  * XGBoost T2 — the taste-agreement section model: censusReport's
  * tasteAgreement result reshaped for display, nothing recomputed
  * (this module's law). An absent agreement stays absent, with its
