@@ -394,7 +394,7 @@ export function createDishCreatureBuilder() {
           const rot = k === 0 ? st.headingDeg : (Math.atan2(sys.y[k] - sys.y[k - 1], sys.x[k] - sys.x[k - 1]) * 180) / Math.PI;
           const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
             x: sys.x[k] + ox, y: sys.y[k] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
-            assetId: DISH_CREATURE.asset, color: col, accent: col, key: `dish:${i}:${k}:${tag}`, zTier: 0, seedOffset: 0,
+            assetId: DISH_CREATURE.asset, color: col, accent: ink, key: `dish:${i}:${k}:${tag}`, zTier: 0, seedOffset: 0,
             glass: false, _creature: true,
           });
           put(1.14, shade(color, 0.55), 96, 'rim');
@@ -425,7 +425,7 @@ export function createDishCreatureBuilder() {
             const rot = (Math.atan2(sys.y[sIdx] - py, sys.x[sIdx] - px) * 180) / Math.PI;
             const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
               x: sys.x[sIdx] + ox, y: sys.y[sIdx] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
-              assetId: DISH_CREATURE.asset, color: col, accent: col, key: `dish:${i}:limb${j}:${k}:${tag}`, zTier: 0, seedOffset: 0,
+              assetId: DISH_CREATURE.asset, color: col, accent: ink, key: `dish:${i}:limb${j}:${k}:${tag}`, zTier: 0, seedOffset: 0,
               glass: false, _creature: true,
             });
             put(1.14, shade(lcolor, 0.55), 96, 'rim');

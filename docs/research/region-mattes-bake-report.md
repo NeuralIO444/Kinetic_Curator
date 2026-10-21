@@ -1,26 +1,26 @@
 # Region mattes: bake report (#1432)
 
 Assets in the library: 294. With regions: 294. Without (rasterize to nothing): 0.
-Region cap: 12. Regions in total: 1095.
-Count histogram (regions per asset: assets): 1: 131, 2: 37, 3: 23, 4: 13, 5: 23, 6: 7, 7: 8, 8: 5, 9: 13, 10: 4, 11: 1, 12: 29.
-Summed region bbox area (fractions of the 100-unit box): 119.362.
+Region cap: 12. Regions in total: 1123.
+Count histogram (regions per asset: assets): 1: 128, 2: 37, 3: 23, 4: 14, 5: 23, 6: 7, 7: 7, 8: 5, 9: 13, 10: 5, 11: 1, 12: 31.
+Summed region bbox area (fractions of the 100-unit box): 120.314.
 Family-default region kinemes (#1434): 292 regions assigned across 72 assets (floral: 15 assets / 53 regions, linework: 31 assets / 89 regions, radial: 26 assets / 150 regions).
 
 | asset | regions | bbox area | assigned |
 |---|---:|---:|---:|
-| org_blob_01 | 1 | 0.710 | 0 |
+| org_blob_01 | 2 | 1.058 | 0 |
 | org_blob_02 | 1 | 0.660 | 0 |
 | org_blob_03 | 1 | 0.578 | 0 |
 | org_blob_04 | 2 | 0.668 | 0 |
 | org_blob_05 | 1 | 0.569 | 0 |
-| org_petal_01 | 1 | 0.238 | 0 |
-| org_petal_02 | 3 | 0.350 | 0 |
+| org_petal_01 | 10 | 0.270 | 0 |
+| org_petal_02 | 3 | 0.351 | 0 |
 | org_petal_03 | 1 | 0.230 | 0 |
 | org_leaf_01 | 1 | 0.518 | 0 |
-| org_leaf_02 | 7 | 0.328 | 0 |
+| org_leaf_02 | 12 | 0.395 | 0 |
 | org_leaf_03 | 1 | 0.180 | 0 |
 | org_pod_01 | 2 | 0.434 | 0 |
-| org_pod_02 | 2 | 0.384 | 0 |
+| org_pod_02 | 12 | 0.528 | 0 |
 | org_drop_01 | 1 | 0.437 | 0 |
 | org_drop_02 | 2 | 0.498 | 0 |
 | org_blob_outline_01 | 1 | 0.761 | 0 |
@@ -42,7 +42,7 @@ Family-default region kinemes (#1434): 292 regions assigned across 72 assets (fl
 | geo_star5_01 | 1 | 0.756 | 0 |
 | geo_star6_01 | 1 | 0.826 | 0 |
 | geo_star8_01 | 1 | 0.828 | 0 |
-| geo_chev_01 | 1 | 0.313 | 0 |
+| geo_chev_01 | 4 | 0.673 | 0 |
 | geo_chev_02 | 2 | 0.461 | 0 |
 | geo_square_01 | 1 | 0.518 | 0 |
 | geo_square_02 | 2 | 0.722 | 0 |

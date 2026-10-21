@@ -6,18 +6,19 @@
 //     below: off-spine probes darken at the seam offsets, on-spine probes are the S4 field
 //     exactly (the S4 suite, its golden included, passes untouched), and the GLSL carries the
 //     same constants as the JS mirror.
-// Recorded as forks in STAGING-REPORT.md (NOT shipped — they move the recorded takes, because
+// Landed under Matt's re-record ruling (2026-10-20) — they move the recorded takes, because
 // resolver items embed the full asset record, item.asset, svg and baked regions included, so
-// any part-art change rehashes every take that draws the part):
-//   - F1, the part-pool art enrichment for both families. Its designed art was verified against
-//     the two guardrails pinned below BEFORE being forked: every part's auto-attach points
+// any part-art change rehashes every take that draws the part (the gates' checkpoints were
+// re-recorded in the finish commit; inputs byte-identical, diff hashes-only):
+//   - F1, the part-pool art enrichment for both families, recovered from the staging fork's
+//     own preview sheets (renders/fork-*.svg carry the designed art stamp for stamp). The two
+//     guardrails pinned below held on the landed art: every part's auto-attach points
 //     bit-identical (anatomy never moves) and every part's governor cost score identical
 //     (assets/ingest.js assetCostScore — the assetThin ranking in gl/liveResolve.mjs). The pins
-//     below state those guardrails at their pre-pass values: they pass on today's art, and the
-//     fork's art was measured passing them too (STAGING-REPORT.md has the table).
-//   - F2, the dish accent split. Pinned below as a contract: dish items still carry
-//     accent === colour, so within-asset detail cannot show on a disc until F2 lands under a
-//     pin ruling. This suite makes that fork's PR change the contract deliberately.
+//     below state those guardrails at their pre-pass values.
+//   - F2, the dish accent split, landed with F1: dish disc items now carry the palette ink as
+//     their accent (accent === ink, pinned below), so the disc's within-asset detail — F1's
+//     strata rings and pore ticks, drawn in the accent slot — renders at last.
 import assert from 'node:assert/strict';
 import { autoAttachPoints } from './autoAttach.js';
 import { assetCostScore } from '../assets/ingest.js';
@@ -27,7 +28,7 @@ import { createDishCreatureBuilder } from './dishCreature.js';
 
 const byId = (id) => ASSETS.find((a) => a.id === id);
 
-// 1. Fork F1's guardrails, at pre-pass values: anatomy (auto-attach points) and the governor's
+// 1. F1's guardrails, at pre-pass values: anatomy (auto-attach points) and the governor's
 //    cost score for every part the two families are skinned from.
 const PINNED_ATTACH = {
   org_pod_02: [{ x: 50, y: 8 }, { x: 70, y: 50 }, { x: 50, y: 92 }, { x: 30, y: 50 }], // moth body
@@ -74,9 +75,9 @@ for (const [id, want] of Object.entries(PINNED_COST)) {
   assert.equal(ENGRAVE_SEAM_REL, 0.55);
 }
 
-// 3. Fork F2's contract, pinned deliberately: every dish item's accent equals its colour today,
-//    so a disc's interior art renders only where a mark's two slots differ — on the dish it
-//    waits for the accent split (STAGING-REPORT.md, fork F2).
+// 3. F2's landed contract, pinned deliberately: every dish item's accent is the palette ink,
+//    never its own colour — the split that lets a disc's interior art (drawn in the asset's
+//    accent slot) show against the disc's swatch fill (STAGING-REPORT.md, fork F2, landed).
 {
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#e8762d', '#2a9d8f'] };
   const b = createDishCreatureBuilder();
@@ -89,7 +90,9 @@ for (const [id, want] of Object.entries(PINNED_COST)) {
   for (let i = 0; i < 200; i++) { e = [{ id: 'a', items: [], palette: PAL }]; b.append(input, e, ASSETS, null, null); }
   const items = e[0].items.filter((i) => i._creature);
   assert.ok(items.length > 0, 'the dish creature drew');
-  assert.ok(items.every((i) => i.accent === i.color), 'dish items: accent === colour (fork F2 changes this)');
+  assert.ok(items.every((i) => i.accent === PAL.ink), 'dish items: accent === palette ink (the F2 split)');
+  const discs = items.filter((i) => !i.key.endsWith(':eye')); // the eye is ink on ink by design, before and after
+  assert.ok(discs.length > 0 && discs.every((i) => i.accent !== i.color), 'dish discs: accent split from colour, so disc detail renders');
 }
 
-console.log('finishingLook.selfcheck: ok (F1 guardrails, engraving seams, F2 dish accent contract)');
+console.log('finishingLook.selfcheck: ok (F1 guardrails on landed art, engraving seams, F2 dish accent split)');
