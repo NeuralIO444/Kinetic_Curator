@@ -439,6 +439,7 @@ node src/curator/refineColor.selfcheck.mjs
 node src/state/projectDocument.fuzz.selfcheck.mjs
 node src/gl/resolverProbe.selfcheck.mjs
 node scripts/verifyPerformance.selfcheck.mjs
+node scripts/refreshFixtureCheckpoints.selfcheck.mjs
 node src/gl/performanceCreatures.selfcheck.mjs
 node src/composition/eventRegistry.selfcheck.mjs
 node src/composition/eventBus.selfcheck.mjs

@@ -67,7 +67,8 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   test.setTimeout(180_000);
   const midi = await boot(page);
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
-  await expect(midi.locator('.davis-midi-map li')).toHaveCount(3, { timeout: 3_000 });
+  // every target is a row now (learn needs them all); a MAPPED row is one with an Unmap button
+  await expect(midi.getByRole('button', { name: /^Unmap / })).toHaveCount(3, { timeout: 3_000 });
 
   await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('1 device: Test Pad', { timeout: 3_000 });
@@ -105,10 +106,10 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await expect(freeze).toHaveText('FREEZE', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-status')).toContainText('no MIDI device found', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-note')).toContainText('unplugged: Test Pad', { timeout: 3_000 });
-  await expect(midi.locator('.davis-midi-map li')).toHaveCount(3);
+  await expect(midi.getByRole('button', { name: /^Unmap / })).toHaveCount(3);
 
   await midi.getByRole('button', { name: 'Unmap FREEZE (hold)' }).click();
-  await expect(midi.locator('.davis-midi-map li')).toHaveCount(2);
+  await expect(midi.getByRole('button', { name: /^Unmap / })).toHaveCount(2);
   await midi.getByRole('button', { name: 'ON', exact: true }).click();
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
 });

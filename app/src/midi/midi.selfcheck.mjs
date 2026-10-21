@@ -8,6 +8,7 @@ import { MIDI_TARGETS, getMidiTarget } from './targets.mjs';
 import { sanitizeMidiMap, bindTarget, unbindTarget, keyFor, canBind, MAX_BINDINGS } from './map.mjs';
 import { dispatchMidi, releaseHolds, createMidiEngine } from './engine.mjs';
 import { midiStatusView, describeMessage } from './status.mjs';
+import { createLearnState, armLearn, cancelLearn, learnMessage, isLearnArmed, learnPrompt, routeLearnMessage } from './learn.mjs';
 import { PARAM_SPEC } from '../data/layout-modes.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
@@ -238,6 +239,117 @@ assert.strictEqual(describeMessage(M([0x80, 36, 0])), 'note 36 · ch 1 · off');
   assert.strictEqual(S().midiEnabled, false, 'MIDI is off until asked for (nothing connects at boot)');
 }
 
+// ── learn mode (#617): arm → touch → bound ───────────────────────────────
+{
+  const s0 = createLearnState();
+  assert.strictEqual(isLearnArmed(s0), false, 'starts disarmed');
+  const bad = armLearn(s0, 'not.a.target');
+  assert.strictEqual(bad, s0, 'an unknown target never arms (same state back)');
+  const armedPad = armLearn(s0, 'evolve.toggle');
+  assert.strictEqual(s0.armed, null, 'arm does not mutate');
+  assert.deepStrictEqual(learnMessage(armedPad, M([0x90, 36, 100])), { claimed: true, key: 'note:1:36', targetId: 'evolve.toggle', refused: null }, 'a pad binds a trigger');
+  assert.deepStrictEqual(learnMessage(armedPad, M([0xb0, 20, 127])), { claimed: true, key: 'cc:1:20', targetId: 'evolve.toggle', refused: null }, 'a CC pad binds a trigger too');
+  assert.strictEqual(learnMessage(armedPad, M([0x80, 36, 0])).claimed, false, 'a note-OFF is never the gesture (and never claimed, so a pre-held FREEZE pad still releases)');
+  assert.strictEqual(learnMessage(armedPad, M([0x90, 36, 0])).claimed, false, 'note-on velocity 0 is a note-off');
+  assert.strictEqual(learnMessage(s0, M([0x90, 36, 100])).claimed, false, 'disarmed: nothing is claimed');
+  assert.strictEqual(learnMessage(null, M([0x90, 36, 100])).claimed, false);
+  assert.strictEqual(learnMessage(armedPad, null).claimed, false);
+  const armedKnob = armLearn(s0, 'param.lifeDrift');
+  assert.deepStrictEqual(learnMessage(armedKnob, M([0xb0, 7, 64])), { claimed: true, key: 'cc:1:7', targetId: 'param.lifeDrift', refused: null }, 'a knob binds a param');
+  const refusedPad = learnMessage(armedKnob, M([0x90, 36, 100]));
+  assert.strictEqual(refusedPad.claimed, true, 'a pad aimed at a knob target is claimed…');
+  assert.strictEqual(refusedPad.key, null, '…but binds nothing');
+  assert.strictEqual(refusedPad.refused, 'wrong-kind', '…and says why');
+  assert.strictEqual(isLearnArmed(cancelLearn(armedKnob)), false, 'cancel disarms');
+  assert.match(learnPrompt(getMidiTarget('param.lifeDrift')), /knob or fader/, 'a knob target asks for a knob');
+  assert.match(learnPrompt(getMidiTarget('evolve.toggle')), /pad or key/, 'a trigger asks for a pad');
+  assert.match(learnPrompt(getMidiTarget('param.lifeDrift'), 'wrong-kind'), /can't drive it/, 'a refusal is said in words');
+  assert.strictEqual(learnPrompt(null), '');
+  // every target in the registry can be armed, and gets a gesture it accepts
+  for (const t of MIDI_TARGETS) {
+    const r = learnMessage(armLearn(createLearnState(), t.id), M([0xb0, 1, 100]));
+    assert.ok(r.claimed && r.key === 'cc:1:1', `a CC can learn ${t.id}`);
+  }
+}
+
+// ── learn mode through the real store + the real engine (fake MIDIAccess) ──
+(async () => {
+  const S = () => useStore.getState();
+  S().setMidiMap({}); S().cancelMidiLearn();
+  assert.deepStrictEqual(S().midiLearn, { armed: null }, 'learn state starts disarmed');
+  const ctx = fakeCtx(); const knob = fakeInput('Knobs'); const pad = fakeInput('Pad');
+  const engine = createMidiEngine({
+    requestAccess: async () => fakeAccess([knob, pad]), getMap: () => S().midiMap, ctx, onStatus: () => {},
+    onMessage: (msg) => routeLearnMessage(S(), msg), // exactly what hooks/useMidi.js passes
+  });
+  await engine.start();
+  // a knob: arm, wiggle → bound, and the claimed message did not also drive anything
+  S().armMidiLearn('param.lifeDrift');
+  assert.strictEqual(S().midiLearn.armed, 'param.lifeDrift');
+  send(knob, [0xb0, 7, 64]);
+  assert.deepStrictEqual(S().midiMap, { 'cc:1:7': 'param.lifeDrift' }, 'the wiggle bound the knob');
+  assert.strictEqual(S().midiLearn.armed, null, 'binding disarms');
+  assert.strictEqual(ctx.log.length, 0, 'the claimed wiggle did not also fire the target');
+  assert.deepStrictEqual(S().midiLast, { type: 'cc', channel: 1, number: 7, value: 64 }, 'the monitor still saw it');
+  // …and the very next movement of that knob drives the param
+  send(knob, [0xb0, 7, 127]);
+  assert.strictEqual(ctx.log.length, 1, 'the bound knob now drives its target');
+  assert.strictEqual(ctx.log[0][0], Events.LAYOUT_PARAM);
+  assert.strictEqual(ctx.log[0][1].key, 'lifeDrift');
+  assert.strictEqual(ctx.log[0][1].value, PARAM_SPEC.lifeDrift.max, 'full scale at CC 127');
+  // a pad: arm a trigger, press → bound; the release does nothing; the next press fires
+  ctx.log.length = 0;
+  S().armMidiLearn('seed.new');
+  send(pad, [0x90, 36, 100]); send(pad, [0x80, 36, 0]);
+  assert.deepStrictEqual(S().midiMap, { 'cc:1:7': 'param.lifeDrift', 'note:1:36': 'seed.new' }, 'the press bound the pad');
+  assert.strictEqual(ctx.log.length, 0, 'neither the claimed press nor its release fired anything');
+  send(pad, [0x90, 36, 100]);
+  assert.deepStrictEqual(ctx.log.at(-1), [Events.DAVIS_EVOLVE, { bumpSeed: true }], 'the bound pad fires NEW SEED');
+  // a pad aimed at a knob target is refused loudly, learn stays armed, nothing binds
+  ctx.log.length = 0;
+  S().armMidiLearn('param.audioModDepth');
+  send(pad, [0x90, 40, 100]);
+  assert.strictEqual(S().midiLearn.armed, 'param.audioModDepth', 'refused: learn stays armed');
+  assert.strictEqual(S().midiLearnRefused, 'wrong-kind', 'refused: the UI is told why');
+  assert.strictEqual(S().midiMap['note:1:40'], undefined, 'refused: nothing bound');
+  assert.strictEqual(ctx.log.length, 0, 'refused: nothing fired');
+  send(knob, [0xb0, 8, 10]);
+  assert.strictEqual(S().midiMap['cc:1:8'], 'param.audioModDepth', 'then a knob lands');
+  assert.strictEqual(S().midiLearnRefused, null, 'the refusal clears once bound');
+  // re-learning a bound target MOVES it; learning an occupied key moves the key
+  S().armMidiLearn('param.lifeDrift'); send(knob, [0xb0, 9, 1]);
+  assert.strictEqual(keyFor(S().midiMap, 'param.lifeDrift'), 'cc:1:9', 're-learn moves the target');
+  assert.strictEqual(S().midiMap['cc:1:7'], undefined, '…leaving no ghost on the old key');
+  S().armMidiLearn('param.audioScaleMod'); send(knob, [0xb0, 9, 1]);
+  assert.strictEqual(S().midiMap['cc:1:9'], 'param.audioScaleMod', 'one target per key: the key moved');
+  assert.strictEqual(keyFor(S().midiMap, 'param.lifeDrift'), null, '…and the earlier target lost it');
+  // a pad held BEFORE learn was armed still releases its hold while armed
+  S().bindMidi('note:1:38', 'accum.freeze');
+  ctx.log.length = 0;
+  send(pad, [0x90, 38, 100]);
+  assert.deepStrictEqual(ctx.log.at(-1), [Events.ACCUM_GESTURE, { action: 'freeze', value: true }]);
+  S().armMidiLearn('param.lifeDrift');
+  send(pad, [0x80, 38, 0]);
+  assert.deepStrictEqual(ctx.log.at(-1), [Events.ACCUM_GESTURE, { action: 'freeze', value: false }], 'arming learn never strands a FREEZE');
+  // cancel disarms, and a later gesture is just a gesture again
+  S().cancelMidiLearn();
+  assert.strictEqual(S().midiLearn.armed, null);
+  S().cancelMidiLearn(); // idempotent
+  ctx.log.length = 0;
+  send(knob, [0xb0, 8, 127]);
+  assert.strictEqual(ctx.log.length, 1, 'disarmed: the knob drives its target again');
+  // learn state is session state: it never reaches the project file
+  S().armMidiLearn('evolve.toggle');
+  const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams: {}, enabledAssets: {}, quality: 'balanced', autoQuality: true };
+  const doc = serializeProject({ ...base, midiMap: S().midiMap, midiLearn: S().midiLearn });
+  assert.ok(!('midiLearn' in doc) && !JSON.stringify(doc).includes('evolve.toggle'), 'the armed target is not saved');
+  // MIDI off: a stale armed target must not survive (the hook cancels on cleanup)
+  engine.stop(); S().cancelMidiLearn();
+  assert.strictEqual(S().midiLearn.armed, null);
+  S().setMidiMap({});
+  console.log('midi learn (store + engine): OK');
+})().catch((e) => { console.error(e); process.exit(1); });
+
 // ── wiring ───────────────────────────────────────────────────────────────
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
@@ -249,6 +361,9 @@ assert.strictEqual(describeMessage(M([0x80, 36, 0])), 'note 36 · ch 1 · off');
   assert.ok(/useMidi\(\)/.test(src('../App.jsx')), 'the engine runs from App');
   assert.ok(/if \(!enabled\) return undefined;/.test(src('../hooks/useMidi.js')), 'nothing connects until MIDI is enabled');
   assert.ok(/<MidiSection \/>/.test(src('../panels/DavisPanel.jsx')), 'DAVIS PERFORM hosts the MIDI section');
+  assert.ok(/routeLearnMessage\(useStore\.getState\(\), msg\)/.test(src('../hooks/useMidi.js')), 'the engine routes messages through learn');
+  assert.ok(/cancelMidiLearn\(\)/.test(src('../hooks/useMidi.js')), 'turning MIDI off disarms learn');
+  assert.ok(/armMidiLearn\(t\.id\)/.test(src('../panels/davis/MidiSection.jsx')), 'the section arms learn per target');
   assert.ok(/ACCUM_GESTURE[^]*setAccumFrozen/.test(src('../panels/DavisPanel.jsx')), 'the FREEZE button follows a MIDI hold');
 }
 console.log('midi.selfcheck: OK');

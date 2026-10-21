@@ -8,6 +8,7 @@ import { useEffect } from 'react';
 import { useStore } from '../state/store.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { createMidiEngine } from '../midi/engine.mjs';
+import { routeLearnMessage } from '../midi/learn.mjs';
 
 export function useMidi() {
   const enabled = useStore((s) => s.midiEnabled);
@@ -23,12 +24,15 @@ export function useMidi() {
       getMap: () => useStore.getState().midiMap,
       ctx: { emit, Events, getState: useStore.getState },
       onStatus: (status) => useStore.getState().setMidiStatus(status),
-      onMessage: (msg) => { useStore.getState().setMidiLast(msg); return false; },
+      // Learn mode claims the gesture: a claimed message binds (or is refused loudly)
+      // and never also fires a mapping — the engine honours the `true` return.
+      onMessage: (msg) => routeLearnMessage(useStore.getState(), msg),
     });
     engine.start();
     return () => {
       engine.stop();
       useStore.getState().setMidiLast(null);
+      useStore.getState().cancelMidiLearn(); // MIDI off: nothing stays armed
     };
   }, [enabled]);
 }
