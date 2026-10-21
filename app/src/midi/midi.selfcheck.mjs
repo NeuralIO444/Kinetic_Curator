@@ -10,6 +10,8 @@ import { dispatchMidi, releaseHolds, createMidiEngine } from './engine.mjs';
 import { midiStatusView, describeMessage } from './status.mjs';
 import { createLearnState, armLearn, cancelLearn, learnMessage, isLearnArmed, learnPrompt, routeLearnMessage } from './learn.mjs';
 import { PARAM_SPEC } from '../data/layout-modes.js';
+import { PALETTES } from '../data/palettes.js';
+import { FLAGSHIP_VOICES } from '../data/voices.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
 import { Events } from '../composition/eventBus.js';
@@ -42,6 +44,28 @@ assert.strictEqual(describeKey('cc:3:7'), 'CC 7 · ch 3');
     assert.ok(getMidiTarget(want), `${want} is mappable`);
   }
   assert.strictEqual(getMidiTarget('accum.freeze').kind, 'hold', 'FREEZE is momentary: hold a pad, release to thaw');
+}
+
+// ── picker targets + bank switch (#1720) ─────────────────────────────────
+{
+  // one target per palette, per flagship voice, per user-voice slot, plus the switch
+  for (const p of PALETTES) {
+    const t = getMidiTarget(`palette.${p.id}`);
+    assert.ok(t && t.kind === 'trigger', `palette.${p.id} is a picker target`);
+    assert.strictEqual(t.label, `PAL ${p.name}`);
+  }
+  for (const v of FLAGSHIP_VOICES) assert.ok(getMidiTarget(`voice.${v.id}`), `voice.${v.id} is a picker target`);
+  for (let i = 1; i <= 12; i++) assert.ok(getMidiTarget(`voice.my.${i}`), `voice.my.${i} is a picker target`);
+  assert.strictEqual(getMidiTarget('voice.my.13'), undefined, 'the shelf holds 12 hand-made voices, no 13th slot');
+  assert.ok(getMidiTarget('bank.next') && getMidiTarget('bank.next').kind === 'trigger', 'one bank-switch target');
+  assert.strictEqual(MIDI_TARGETS.length, 15 + PALETTES.length + FLAGSHIP_VOICES.length + 12 + 1, 'the registry is the 15 + pickers + slots + switch');
+  // the cap covers a whole registry bound into ONE bank, on legal keys
+  assert.strictEqual(MAX_BINDINGS, 128);
+  assert.ok(MAX_BINDINGS >= MIDI_TARGETS.length, 'the cap covers every target at once');
+  const all = {};
+  let note = 0; let cc = 0;
+  for (const t of MIDI_TARGETS) all[t.kind === 'cc' ? `cc:1:${cc++}` : `note:1:${note++}`] = t.id;
+  assert.strictEqual(Object.keys(sanitizeMidiMap(all)).length, MIDI_TARGETS.length, 'all targets survive one sanitizer pass in a single bank');
 }
 
 // ── mapping table ────────────────────────────────────────────────────────
@@ -138,6 +162,41 @@ const M = (bytes) => parseMidi(bytes);
   releaseHolds(c2, st2, new Set());
   assert.strictEqual(st2.held.size, 0);
   assert.deepStrictEqual(c2.log.at(-1), [Events.ACCUM_GESTURE, { action: 'freeze', value: false }], 'and is released when its device is gone');
+}
+
+// ── dispatch: pickers and the bank switch (#1720) ────────────────────────
+{
+  const pickCtx = (over = {}) => {
+    const log = [];
+    const fake = { userVoices: [], cycles: 0, ...over };
+    return {
+      log, fake, emit: (ev, p) => log.push([ev, p]), Events,
+      getState: () => ({ userVoices: fake.userVoices, cycleMidiBank: () => { fake.cycles++; } }),
+    };
+  };
+  const st = fresh();
+  // a bound key picks a palette, through the same event the palette strip emits
+  let ctx = pickCtx();
+  assert.strictEqual(dispatchMidi(M([0x90, 53, 100]), { 'note:1:53': 'palette.hydra' }, ctx, st), 'palette.hydra');
+  assert.deepStrictEqual(ctx.log, [[Events.PALETTE_SET_ID, { id: 'hydra' }]], 'a key picks a palette');
+  // a bound key picks a flagship voice, through the same event the tiles emit
+  ctx = pickCtx();
+  assert.strictEqual(dispatchMidi(M([0x90, 60, 100]), { 'note:1:60': 'voice.swarm' }, ctx, st), 'voice.swarm');
+  assert.deepStrictEqual(ctx.log, [[Events.VOICE_LOAD, { id: 'swarm' }]], 'a key picks a voice');
+  // a user-voice slot loads the Nth HAND-MADE voice: earned finds are not on the shelf
+  ctx = pickCtx({ userVoices: [{ id: 'uv-find', name: 'A FIND', earned: { rolls: 9 } }, { id: 'uv-a', name: 'VOICE 01' }, { id: 'uv-b', name: 'VOICE 02' }] });
+  dispatchMidi(M([0x90, 61, 100]), { 'note:1:61': 'voice.my.2' }, ctx, st);
+  assert.deepStrictEqual(ctx.log, [[Events.VOICE_LOAD, { id: 'uv-b' }]], 'slot 2 is the second hand-made voice');
+  // an empty slot is an honest no-op: the key is bound, nothing loads
+  ctx.log.length = 0;
+  dispatchMidi(M([0x90, 62, 100]), { 'note:1:62': 'voice.my.3' }, ctx, st);
+  assert.strictEqual(ctx.log.length, 0, 'an empty slot fires nothing');
+  // the bank switch target flips the bank (the store does the flipping)
+  ctx = pickCtx();
+  assert.strictEqual(dispatchMidi(M([0x90, 63, 100]), { 'note:1:63': 'bank.next' }, ctx, st), 'bank.next');
+  assert.strictEqual(ctx.fake.cycles, 1, 'a key flips the bank');
+  // a picker target learns like any trigger: pad or CC
+  assert.deepStrictEqual(learnMessage(armLearn(createLearnState(), 'palette.hydra'), M([0x90, 53, 100])), { claimed: true, key: 'note:1:53', targetId: 'palette.hydra', refused: null }, 'a pad learns a palette pick');
 }
 
 // ── engine against a fake MIDIAccess ─────────────────────────────────────
@@ -237,6 +296,69 @@ assert.strictEqual(describeMessage(M([0x80, 36, 0])), 'note 36 · ch 1 · off');
   S().applyProject({ ...parseProject({ version: 1, seed: 1 }).doc });
   assert.deepStrictEqual(S().midiMap, {}, 'a doc without mappings maps nothing');
   assert.strictEqual(S().midiEnabled, false, 'MIDI is off until asked for (nothing connects at boot)');
+}
+
+// ── banks in the document + the store (#1720) ────────────────────────────
+{
+  const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams: {}, enabledAssets: {}, quality: 'balanced', autoQuality: true };
+  // a single MAIN bank still exports as the legacy midiMap field, byte-shape unchanged
+  const oneBank = serializeProject({ ...base, midiBanks: [{ name: 'MAIN', map: { 'note:1:36': 'evolve.toggle' } }], midiActiveBank: 0, midiMap: { 'note:1:36': 'evolve.toggle' } });
+  assert.deepStrictEqual(oneBank.midiMap, { 'note:1:36': 'evolve.toggle' }, 'one MAIN bank = the legacy field');
+  assert.ok(!('midiBanks' in oneBank) && !('midiActiveBank' in oneBank), 'no bank fields for a one-bank project');
+  // a banked project writes the list in full; the legacy field stays out
+  const banked = serializeProject({
+    ...base,
+    midiBanks: [{ name: 'MAIN', map: { 'note:1:36': 'evolve.toggle' } }, { name: 'PAL B', map: { 'note:1:53': 'palette.hydra' } }],
+    midiActiveBank: 1, midiMap: { 'note:1:53': 'palette.hydra' },
+  });
+  assert.deepStrictEqual(banked.midiBanks, [{ name: 'MAIN', map: { 'note:1:36': 'evolve.toggle' } }, { name: 'PAL B', map: { 'note:1:53': 'palette.hydra' } }]);
+  assert.strictEqual(banked.midiActiveBank, 1);
+  assert.ok(!('midiMap' in banked), 'a banked project does not also write the legacy field');
+  // …and survives save + reload through the sanitizer, active bank included
+  const back = parseProject(JSON.parse(JSON.stringify(banked))).doc;
+  assert.deepStrictEqual(back.midiBanks, banked.midiBanks, 'banks survive the round trip');
+  assert.strictEqual(back.midiActiveBank, 1, 'the active bank survives');
+  assert.deepStrictEqual(back.midiMap, { 'note:1:53': 'palette.hydra' }, 'the doc midiMap is the ACTIVE bank’s map');
+  // when both shapes are present, the bank list wins
+  const both = parseProject({ version: 1, seed: 1, midiMap: { 'note:1:36': 'evolve.toggle' }, midiBanks: [{ name: 'MAIN', map: { 'note:1:40': 'seed.new' } }] }).doc;
+  assert.deepStrictEqual(both.midiMap, { 'note:1:40': 'seed.new' }, 'midiBanks wins over a stray midiMap');
+  // store behaviour: bindings land in the active bank; the mirror follows the bank
+  const S = () => useStore.getState();
+  S().applyProject({ ...parseProject({ version: 1, seed: 1 }).doc });
+  assert.strictEqual(S().midiBanks.length, 1, 'a fresh doc has the one MAIN bank');
+  S().bindMidi('note:1:36', 'evolve.toggle');
+  assert.deepStrictEqual(S().midiBanks[0].map, { 'note:1:36': 'evolve.toggle' }, 'a bind lands in the active bank');
+  S().addMidiBank();
+  assert.strictEqual(S().midiBanks.length, 2, 'a bank is added');
+  assert.strictEqual(S().midiBanks[1].name, 'BANK 2');
+  assert.strictEqual(S().midiActiveBank, 1, '…and landed on');
+  assert.deepStrictEqual(S().midiMap, {}, 'the new bank starts empty');
+  S().bindMidi('note:1:53', 'palette.hydra');
+  assert.deepStrictEqual(S().midiBanks[0].map, { 'note:1:36': 'evolve.toggle' }, 'bank 1 kept its binding');
+  // switching banks changes what the same key does (the engine reads the mirror)
+  S().switchMidiBank(0);
+  assert.deepStrictEqual(S().midiMap, { 'note:1:36': 'evolve.toggle' }, 'bank 1: note 53 does nothing, note 36 evolves');
+  S().switchMidiBank(1);
+  assert.deepStrictEqual(S().midiMap, { 'note:1:53': 'palette.hydra' }, 'bank 2: note 53 picks a palette');
+  S().switchMidiBank(9);
+  assert.strictEqual(S().midiActiveBank, 1, 'an out-of-range switch is refused');
+  S().cycleMidiBank();
+  assert.strictEqual(S().midiActiveBank, 0, 'BANK NEXT wraps to the first bank');
+  S().renameMidiBank('PAL B');
+  assert.strictEqual(S().midiBanks[0].name, 'PAL B', 'a bank renames');
+  S().renameMidiBank('BANK 2');
+  assert.strictEqual(S().midiBanks[0].name, 'PAL B', 'a duplicate name is refused');
+  S().removeMidiBank();
+  assert.strictEqual(S().midiBanks.length, 1, 'the active bank is removed');
+  assert.strictEqual(S().midiActiveBank, 0);
+  S().removeMidiBank();
+  assert.strictEqual(S().midiBanks.length, 1, 'the last bank is never removed');
+  // a banked document applies whole: banks, active bank, mirror
+  S().applyProject({ ...parseProject(JSON.parse(JSON.stringify(banked))).doc });
+  assert.strictEqual(S().midiBanks.length, 2, 'import applies the banks');
+  assert.strictEqual(S().midiActiveBank, 1);
+  assert.deepStrictEqual(S().midiMap, { 'note:1:53': 'palette.hydra' }, 'import lands on the saved bank');
+  S().applyProject({ ...parseProject({ version: 1, seed: 1 }).doc });
 }
 
 // ── learn mode (#617): arm → touch → bound ───────────────────────────────

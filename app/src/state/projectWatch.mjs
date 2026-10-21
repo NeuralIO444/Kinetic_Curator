@@ -11,7 +11,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'assetWeightOverrides', 'projectTitle', 'paletteOverrides', 'paletteLocks', 'customAssets', 'light',
   'assetKineme', 'regionKinemes', 'assetStill', 'assetOptions', 'assetAttach', 'audioRoutes',
   'canvasW', 'canvasH', 'canvasFps', 'canvasPresetId', 'stageMode',
-  'midiMap', 'mathMacros', 'layers', 'activeLayerId', 'layerSnapshots',
+  'midiMap', 'midiBanks', 'midiActiveBank', 'mathMacros', 'layers', 'activeLayerId', 'layerSnapshots',
 ]);
 
 /** True when any field the document saves changed between two store states (reference inequality, as zustand gives). */

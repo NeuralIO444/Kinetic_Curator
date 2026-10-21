@@ -11,7 +11,33 @@
 // and the store), so the engine is testable with a fake ctx.
 import { PARAM_SPEC } from '../data/layout-modes.js';
 import { FEEL_PRESETS } from '../data/feels.js';
+import { PALETTES } from '../data/palettes.js';
+import { FLAGSHIP_VOICES } from '../data/voices.js';
+import { MAX_USER_VOICES } from '../state/slices/voiceSlice.js';
+import { isEarned } from '../state/earnedVoices.js';
 import { captureFavorite } from '../state/slices/davisSlice.js';
+
+// #1720 — picker targets: one key selects one palette / one voice, through the
+// same events the on-screen pickers emit (PALETTE_SET_ID / VOICE_LOAD), so a
+// key press and a tap are the same act. User voices have runtime ids, so they
+// are reached by SLOT: voice.my.N loads the Nth voice on the performer's own
+// shelf (the hand-made list, in shelf order) at the moment the key lands; an
+// empty slot fires nothing.
+const palettePick = (p) => ({
+  id: `palette.${p.id}`, kind: 'trigger', label: `PAL ${p.name}`,
+  run: (ctx) => ctx.emit(ctx.Events.PALETTE_SET_ID, { id: p.id }),
+});
+const voicePick = (v) => ({
+  id: `voice.${v.id}`, kind: 'trigger', label: `VOICE ${v.title}`,
+  run: (ctx) => ctx.emit(ctx.Events.VOICE_LOAD, { id: v.id }),
+});
+const userVoiceSlot = (i) => ({
+  id: `voice.my.${i + 1}`, kind: 'trigger', label: `MY VOICE ${i + 1}`,
+  run: (ctx) => {
+    const mine = (ctx.getState().userVoices || []).filter((v) => !isEarned(v));
+    if (mine[i]) ctx.emit(ctx.Events.VOICE_LOAD, { id: mine[i].id });
+  },
+});
 
 const sliderCc = (key, label) => ({
   id: `param.${key}`, kind: 'cc', label,
@@ -48,6 +74,13 @@ export const MIDI_TARGETS = Object.freeze([
     // same 200–10000 ms range as the slider on DAVIS
     run: (ctx, v01) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { interval: Math.round((200 + 9800 * v01) / 100) * 100 }),
   },
+  // #1720 — the bank switch: one key flips the active bank (wrapping), so the
+  // same keys do different jobs per bank. Bound like any other target, in any
+  // bank; the legend shows which bank is live.
+  { id: 'bank.next', kind: 'trigger', label: 'BANK NEXT', run: (ctx) => ctx.getState().cycleMidiBank() },
+  ...PALETTES.map(palettePick),
+  ...FLAGSHIP_VOICES.map(voicePick),
+  ...Array.from({ length: MAX_USER_VOICES }, (_, i) => userVoiceSlot(i)),
 ].map(Object.freeze));
 
 const BY_ID = new Map(MIDI_TARGETS.map((t) => [t.id, t]));

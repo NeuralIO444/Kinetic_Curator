@@ -1,319 +1,49 @@
-# STAGING REPORT — #1356: the finishing look pass, both creature families (LOCAL ONLY — no push, no PR)
+# #1720 staging report — picker targets, bank layer, key legend
 
-Branch `ember/1356-finishing-look-pass`, base = origin/main `6946f393` (chain-independent
-stage, per ruling). This file replaces the S3 staging report at the worktree root; S3's
-remains in git history on main. Date: 2026-10-20.
+Branch `ember/1720-picker-banks-legend`, staged locally (not pushed, no PR — the coordinator publishes). Everything below was run and verified in this worktree. This file replaces the previous stage's report at the worktree root; that report remains in git history.
 
-## Bottom line
+## What was built, per work item
 
-- **Shipped (presentation layer only):** the engraving finish gains its second body-space
-  line family — the longitudinal **SEAMS** the creature-system plan names (§1.3: lines of
-  constant "along" are seams), in `app/src/engine/engraveBody.mjs`, JS mirror and GLSL in
-  lockstep. The moth body goes from contour-only line work to a contour × seam crosshatch.
-  No resolver output moves: packed per-instance data is unchanged, no key was added
-  anywhere, and all three pin suites pass unmodified.
-- **The both-family layered part art is a FORK, not shipped — with the mechanism proven,
-  not asserted.** Resolver items embed the full asset record (`item.asset` — the SVG
-  string and the baked regions), and the replay/creature gates hash the whole resolver
-  output. Any part-art change therefore rehashes every recorded take that draws the part,
-  and re-recording a pin needs Matt's ruling (the S3 precedent). The designed art was
-  built, verified against both guardrails (attach points and governor cost scores
-  bit-identical), rendered as previews, and then reverted. Forks F1/F2 below specify it
-  exactly; one ruling lands both.
-- **Honest placement against "very layered":** the shipped build closes the engraving
-  half of the finishing pass — the body finish is now two line families, still not the
-  Haeckel density of the reference plates. The layered wings/fan/dish bodies exist as
-  designed, guardrail-verified, previewed art in fork F1 (+F2 for the dish). This report
-  does not claim the "not Davis moths yet" gap is closed; it stages its closing behind
-  one pin ruling, with the eye evidence attached.
+**1. Picker targets.** The target registry (`app/src/midi/targets.mjs`) gains one trigger target per palette (37, ids `palette.<id>`, labels `PAL <name>`), one per flagship voice (4, `voice.<id>`), twelve user-voice slot targets (`voice.my.1` … `voice.my.12`), and the bank switch (below) — 54 new targets, 69 in total. A palette key fires the same `PALETTE_SET_ID` event the palette strip emits; a voice key fires the same `VOICE_LOAD` the voice tiles emit, so a key press and a tap are the same act.
 
-## What was built, per family
+User voices have runtime ids (`uv-…`), so they cannot be registry entries. A slot target resolves at press time: it loads the Nth voice on the performer's own shelf (the hand-made list, in shelf order — earned finds are not on that shelf). An empty slot fires nothing.
 
-### Field-formed moth line — SHIPPED: engraving seams
+**2. Bank layer.** New pure module `app/src/midi/banks.mjs`. A bank is `{ name, map }` — a named set of bindings, each map sanitized by the existing `sanitizeMidiMap`. One new target, `bank.next` (label `BANK NEXT`), flips the active bank, wrapping at the end. The store (`state/slices/midiSlice.js`) holds `midiBanks` + `midiActiveBank` and keeps `midiMap` as a mirror of the active bank's map, maintained in the same `set()` as every edit — so the engine, the monitor, learn, and the exporters keep reading the one field they already read, and switching banks changes what a key does because the mirror changes. Learn binds into the active bank. Bank actions: switch (panel chooser), cycle (the target), add (lands on the new bank), remove active (never the last), rename (empty/duplicate names refused).
 
-- `engraveBody.mjs`: the field now tracks the signed lateral distance (`bestLat`) of the
-  closest spine point alongside the arc position it already tracked. Two seams at fixed
-  lateral offsets `ENGRAVE_SEAM_OFFSETS = [5.5, 11]` (asset units) are drawn at
-  `ENGRAVE_SEAM_REL = 0.55` of the contour strength, sharing the contour line width and
-  the same end fade: `lineAll = max(line, seam * 0.55)`. Because the seams are level sets
-  of the spine's lateral frame, they bend with the spine exactly as the contours do
-  (proven on a bent path in the new suite).
-- JS mirror (`engraveFactorAt`) and the GLSL chunk (`ENGRAVE_GLSL`, inlined into the
-  shared quad shader) carry the same constants — parity asserted in the new suite, the
-  S4 pattern. The caller gate is unchanged: only engraved instances enter the branch,
-  and exactly one item per moth is engraved (the true body stamp, not its halo).
-- On-spine probes are the S4 field exactly (contour centre dark, between contours
-  untouched — no seam reaches the spine), and the S4 packed-data golden `59289882`
-  stands: `engraving.selfcheck` passes untouched, golden included.
+**3. Key legend.** In the DAVIS → MIDI section (`panels/davis/MidiSection.jsx`), under a new bank bar (native select + rename/add/delete): the active bank's bindings **by key**, in the order a hand meets them (channel, notes before CCs, then number — `legendEntries` in banks.mjs). It re-renders from the active bank, so it follows every switch, whether the switch came from a key or the chooser. A user-voice slot reads as the name of the voice it will actually load; while its shelf slot is empty it shows the slot name, dimmed. No legend renders when the active bank has no bindings.
 
-### Dish family — no shipped visual change, and the reason is evidence, not omission
+## Where banks live in the project doc
 
-- The dish discs' interior detail cannot render today: `dishCreature.js` stamps every
-  body/limb item with `accent === colour`, and within-asset detail marks read the accent
-  slot — with the two slots equal, detail is invisible no matter what art the disc
-  carries. Proof on the bench: the dish rendered with fork F1's enriched disc art but
-  without the accent split was **pixel-identical** to the before render.
-- The shipped build therefore changes nothing on the dish path, and pins the contract
-  instead: the new suite asserts `accent === colour` on real dish items, so fork F2's
-  PR must change that contract deliberately, in the open.
-- The dish's finishing layer is fully designed and previewed under forks F1+F2
-  (`renders/fork-dish.png`): concentric strata rings + pore ticks on the disc, visible
-  only once the accent split lands.
+Same trust boundary as `midiMap`, in `state/projectDocument.js`:
 
-### Both families — the fork guardrails, pinned in a new suite
+- **Write** (`serializeProject`): a project that never left the single MAIN bank exports *exactly* as before — a `midiMap` field, only when something is mapped, no new keys. A project using banks writes `midiBanks` (the full list) and, only when the active bank is not the first, `midiActiveBank`. The autosave path (full-state serialize) and the export-bundle path (PipelinePanel → DataExportRow → `buildProjectPayload`) both carry the fields; `midiBanks`/`midiActiveBank` were added to the autosave watch list (`state/projectWatch.mjs`), which the projectWatch selfcheck derives and enforces.
+- **Read** (`parseProject`, both branches, via one `midiDocFields` helper): a legacy doc's `midiMap` becomes the single MAIN bank; when both shapes are present the bank list wins. The normalized doc carries `midiBanks`, `midiActiveBank`, and `midiMap` = the active bank's map. `applyProject` (globalSlice) installs all three together.
+- **Sanitizer rules** (`sanitizeMidiBanks`): at most 8 banks; names trimmed, whitespace-collapsed, capped at 24 chars; empty names take a positional name (`MAIN`, `BANK 2`, …); duplicate names are dropped whole (first wins); junk entries skipped; every map passes `sanitizeMidiMap`. Sanitizing is a fixed point — the project-document fuzz suite (400 mutated docs) passes with banks in the field set.
 
-`app/src/engine/finishingLook.selfcheck.mjs` (new; registered in `app/selfcheck.manifest`,
-append-only) covers:
+## MAX_BINDINGS: 64 → 128
 
-1. **F1 guardrails at pre-pass values** — for the seven part assets both families are
-   skinned from (`org_pod_02` moth body, `org_leaf_02` wing, `org_petal_02` /
-   `org_petal_01` / `org_pod_01` fan, `geo_chev_01` chevron ornament, `org_blob_01` dish
-   disc): the auto-attach points (anatomy) and the governor cost score
-   (`assets/ingest.js assetCostScore`, the `assetThin` ranking input in
-   `gl/liveResolve.mjs`) are pinned to their pre-pass values. The fork's designed art
-   was measured passing both before it was reverted (the suite passes on today's art;
-   the fork PR re-runs it against the new art).
-2. **The seam behaviour** above, including GLSL/JS constant parity.
-3. **F2's dish contract** (`accent === colour`), as described.
+The old cap (64) predates pickers: the registry held 15 targets. It now holds **69** — 15 original (6 actions/holds + 3 feels + 5 slider CCs + evolve interval) + 37 palettes + 4 flagship voices + 12 user-voice slots + 1 bank switch. One binding per target means a single bank can legitimately hold 69 bindings; a cap below that would silently drop learned bindings at save time. 128 covers the whole registry in one bank with headroom for registry growth. The cap is per bank (it lives in `sanitizeMidiMap`); the bank count is capped separately at 8. A selfcheck binds all 69 targets into one map and asserts every one survives the sanitizer.
 
-## Files touched
+## Design-system citations
 
-| File | Change |
-|---|---|
-| `app/src/engine/engraveBody.mjs` | Seam line family (JS + GLSL), header note. |
-| `app/src/engine/finishingLook.selfcheck.mjs` | New suite (above). |
-| `app/selfcheck.manifest` | One appended line registering the new suite. The `package.json` selfcheck script untouched. |
-| `renders/` | Paired-render evidence (below). |
-| `STAGING-REPORT.md` | This report. |
-
-(Code + manifest diff vs base: 37 insertions / 4 deletions.) Nothing else: no asset
-SVGs, no region bakes, no fixtures, no panels, no resolver or builder code, no new
-recipe/layout keys (no `DEFAULT_LAYOUT_PARAMS` or normalize lines — there is nothing
-for a strip proof to strip; the pins never moved).
-
-## Budget (allowance: 2.0 ms GPU/frame @1080p iPad-class, creature-system plan)
-
-Method, stated plainly: this sandbox has no iPad-class GPU, so the budget is judged the
-repo's own way — the cost registry declarations against the allowance, plus the shape
-of the change — and the sandbox CPU numbers are labelled as such.
-
-- **No new cost surface.** The shipped change adds no draw pass, no item, no packed
-  float, and no CPU work: `engraveDataFor` packing is byte-identical (the S4 golden
-  stands), and its bench is 0.0118 ms/frame for 4 creatures standalone (0.0385 under
-  3-way parallel sweep load; sandbox node, print-only, the suite's own bench). The seam
-  term is a handful of extra ALU ops inside the existing `engraveShade` branch, which
-  runs only on engraved fragments — one body item per moth.
-- **Registry verdict (`creatureCost`, in the sweep):** declarations `creature/moth`
-  1.18 ms (59% of the 2.0 ms allowance) and `creature/dish` 0.05 ms (3%), combined
-  conservative 1.23 ms — all "ok", declarations honest and in band on re-measurement.
-  (The suite's sandbox re-measure of the moth family read 3.404 ms under parallel
-  sweep load; the suite judges that in band — a shared sandbox CPU is not the device,
-  and the declarations are sandbox-labelled in the registry. The shipped change adds
-  no resolver or packing work for that number to grow from.)
-- **Resolver probe (standalone, no parallel load):** PASS — 0 creatures 0.61 ms;
-  4 creatures 1.99 ms mean, p95 3.34 ms; heap growth 0.09 / 0.28 MB. (In the parallel
-  sweep it tripped its 5 ms budget at 5.171 ms mean — the brief's load-sensitivity
-  warning, verbatim; the standalone run is the verdict.)
+- **Rule 2 (discrete → TE):** the legend is a countable signal — flat rows, key digits, target labels; no breath, no shimmer.
+- **Rule 3 (honest signals):** the legend reads the live active-bank map, nothing cached; a filled voice slot shows the real voice name it will load.
+- **Rule 4 (silence is default):** no legend at all when the active bank binds nothing; an empty slot key loads nothing and says so by dimming, not by dressing up.
+- **Rule 8 (deadpan copy) + §5 casing:** section copy stays terse (`bank`, `keys · <NAME>`); palette and voice names render as authored (proper names).
 
 ## Verification
 
-- `npm run build`: **green** (vite, built in 4.90 s at the final tree state).
-- **Pins (the acceptance core): all green, unmodified.** `gl/replayGate` PASS
-  (3601 frames, 61/61 checkpoints), `gl/creatureGate` PASS (901 frames, 16/16
-  checkpoints), `engine/wingWarp` PASS (bent golden intact). The influences are
-  replay-identical because the resolver's outputs are: presentation only, decisions
-  unchanged (creatures-spec §2 — no clock/random reads added anywhere; the seam field
-  is a pure function of the posed skeleton, and the determinism guard pattern is
-  unchanged).
-- **#1188 deniability guard: green untouched.** `queenDeniability` PASS (7 checks);
-  `queenChannel` PASS (13), `queenLean` PASS (24). Nothing of the Queen is rendered or
-  named by this build.
-- **Creature/replay families:** `creature`, `dishCreature`, `skeleton`, `creaturePose`,
-  `featherFan`, `glitch`, `robot`, `lsystem`, `creatureCost`, `costTiers`,
-  `performanceCreatures`, `governorCreatureShed`, `poolCitizenship` (14 checks),
-  `engraving`, `finishingLook` — all PASS. Pin-still, governor shed order (count
-  first), and the hand-only `creatures` BUILD param are untouched code paths and their
-  suites pass unmodified.
-- **Full manifest sweep:** all 485 manifest suites on this branch (484 from base + the
-  1 new suite) run individually, 3-way parallel with a 240 s per-suite cap:
-  **478 PASS / 7 FAIL** raw. Every failure classified:
-  - `engine/kernel/bake/swarmWasm` — FAIL: `build-wasm: cargo not found on PATH`.
-    Base-identical sandbox failure, as briefed; no Rust/wasm file touched.
-  - `fx/rollSafety` — hit the 240 s cap in its browser stage after its pure-helper
-    checks passed. Baseline failure on clean main in this sandbox (browser
-    signature), as briefed; no fx code touched.
-  - `gl/accum` — hit the 240 s cap in the parallel sweep; standalone re-run with the
-    repo runner's own heap setting (`--max-old-space-size=4096`) **PASS** (49 cases).
-    A first standalone attempt under the default 2 GB heap died OOM after every
-    mirror/probe check it reached had passed — the brief's baseline behaviour for
-    this suite ("sandbox timeout… also passes on favourable variance"); no gl code
-    touched.
-  - `gl/composite` — hit the 240 s cap under parallel load; standalone re-run
-    **PASS** (15 cases, 171 s). Parallel-load artifact, not a build failure.
-  - `gl/canvasSizes` — same shape; standalone **PASS** (58 cases, 110 s).
-  - `pattern/patternRender` — same shape; standalone **PASS** (19 checks, 138 s).
-  - `gl/resolverProbe` — load-sensitive timing assertion under parallel load
-    (5.171 ms vs the 5 ms budget); standalone **PASS** (numbers in Budget above).
-  Net after classification: **483 PASS / 2 FAIL**, and the 2 failures are the brief's
-  baseline sandbox set — `swarmWasm` (missing cargo) and `fx/rollSafety` (browser
-  signature) — each base-identical and in code this build does not touch.
-  `gl/accum`, the brief's other baseline-named suite, passes standalone here on
-  favourable variance, exactly as the brief says it can.
+- `npm run build` — green.
+- `src/midi/midi.selfcheck.mjs` — green, extended: registry counts (69; every palette/flagship/slot present), the all-targets-in-one-bank cap test, dispatch of a palette pick, a flagship pick, slot resolution (earned voices skipped, empty slot silent), BANK NEXT dispatch, picker learn claims, bank round-trip through serialize/parse (incl. banks-win-over-legacy and the legacy byte-shape), and the store's bank actions end to end (bind per bank, switch changes the mirror, cycle wraps, rename/remove rules, banked applyProject).
+- `src/midi/banks.selfcheck.mjs` — **new suite**, registered in `app/selfcheck.manifest`: name rules, the sanitizer battery (duplicates, junk, positional naming, 8-bank cap, hostile maps, fixed point), active-index clamping, pure bank edits, legend ordering/labels.
+- Project-doc family — green: `projectDocument.selfcheck`, `projectDocument.fuzz.selfcheck` (fixed point holds with the new fields), `projectWatch.selfcheck` (watch list derivation passes with the two new keys), `bundleParts.selfcheck`.
+- Gates, because the change reaches the project document: `replayGate`, `creatureGate`, `wingWarp` selfchecks — all green, **unmoved**. No fixture was re-recorded, no golden re-pinned, no assertion weakened; `git diff` touches no fixture or golden file.
+- Full manifest sweep (each command run individually, ~494 commands): everything green except the standing sandbox baseline (swarmWasm exit 1; rollSafety / composite / accum / patternRender in the 124 timeout class — all pre-adjudicated on main, none touched by this change). One real catch along the way: the sweep flagged `styles/selects` — the bank chooser's CSS restyled a `<select>`, which the one-dropdown-style rule (#1033) forbids. The rule is now layout-only (flex/min-width) and the suite passes; the chooser takes the house dropdown style like every other select in the app.
 
-## Paired-render evidence (`renders/`)
+## Decisions taken inside the issue's text (flagged, not hidden)
 
-Harness: a scratch node harness driving the repo's real builders
-(`createCreatureBuilder({ skinning: true })` and `createDishCreatureBuilder`), seed 77,
-the Haeckel teal/orange/slate palette; warp meshes drawn as per-triangle affine-clipped
-asset copies; the engraving panel samples the real `engraveFactorAt` field on a body
-quad. Sheets were rendered by headless Chromium via `page.setContent` (no localhost
-navigation — the sandbox blocks it, and the live app's watchdog would need the Space
-resume dance; the harness path was used instead, per the brief's fallback). The `.svg`
-files beside the `.png`s are the harness's vector source for each sheet. The harness
-itself was scratch and is not committed; the sheets are its direct output.
-
-| Pair | Files | What it shows |
-|---|---|---|
-| Moth, shipped finish | `before-engrave.png` → `after-engrave.png` (+ `.svg`) | The shipped delta: the body engraving field, contour-only → contour × seam crosshatch. |
-| Moth, full creature | `before-moth.png` / `before-moth-zoom.png` (main) vs `fork-moth.png` / `fork-moth-zoom.png` (fork F1 preview) | Main's moth today vs the fork's layered art: wing cross-vein lattice, denser fan, crest marks on the body. The shipped seam finish rides the body item under the wings and is shown at field level in the engraving pair. |
-| Dish | `before-dish.png` / `before-dish-zoom.png` (main = shipped; no dish code or asset changed, so the shipped after is this frame) vs `fork-dish.png` / `fork-dish-zoom.png` (fork F1+F2 preview) | Main's smooth discs vs the fork's strata-ringed discs — visible only with F2's accent split, which the preview simulates with the palette cream as the detail slot. |
-
-## Forks
-
-### F1 — part-pool art enrichment, both families (needs a pin re-record ruling)
-
-The finishing layer the plans specify — layered marks inside the parts themselves —
-designed as **element-count-neutral** art: new detail appended as subpaths of the
-assets' existing elements (no new elements, so no silhouette, matte, or element-count
-change). Per part: cross-vein lattice in the wing leaf (`org_leaf_02`); vein/strata
-marks in the fan feather, leaf, and plate (`org_petal_02`, `org_petal_01`, `org_pod_01`);
-inner chevron echo (`geo_chev_01`); crest + segment marks on the moth body
-(`org_pod_02`); concentric strata rings + pore ticks on the dish disc (`org_blob_01`).
-Region mattes re-bake from the same SVGs.
-
-- **Guardrails verified on the designed art before reverting:** every part's
-  auto-attach points bit-identical to the pre-pass table, and every part's
-  `assetCostScore` identical (5/2/2/1/2/1/1 in the asset order above) — anatomy and
-  the governor's thinning ranking provably unmoved. Both tables are pinned in
-  `finishingLook.selfcheck.mjs`.
-- **Why it cannot ship in this build:** bisecting `replayGate` on this branch showed
-  the gates hash the whole resolver output **including the embedded full asset
-  record** (`item.asset`, SVG + baked regions). Element-neutral, attach-invariant,
-  cost-invariant art still moved `replayGate` at frame 0. Landing F1 rehashes
-  `replayGate` and `creatureGate` (and the `wingWarp` resolver golden) for every
-  take drawing these parts. Under the standing rule — never re-record a pin without
-  a ruling — F1 stopped here instead.
-- **The ruling that lands it:** a re-record ruling on the S3 precedent (inputs
-  byte-identical; the re-recorded diff is checkpoints/hashes only, deep-diffed and
-  reported). F1 + F2 should land as **one** PR under that one ruling, with the
-  guardrail suite re-run against the new art and the fork previews above replaced by
-  true before/after pairs for Matt's eye.
-
-### F2 — the dish accent split (same ruling; F1's dish half is invisible without it)
-
-`dishCreature.js` stamps dish body/limb items with `accent: col` where `color: col` —
-the detail slot equals the fill slot, so within-asset detail can never show on a disc
-(evidence: F1 art without the split rendered pixel-identical to before). The fork:
-dish discs carry a **distinct accent** (the preview uses the palette cream, `#f5ead2`,
-as the detail slot — the exact slot value is part of the fork PR's eye pass). This
-changes resolver item fields, so it rehashes the same takes and rides F1's ruling.
-The shipped build pins today's contract (`accent === colour`) in the new suite so the
-change is deliberate when it comes.
-
-## F1/F2 landing (2026-10-20, under Matt's re-record ruling)
-
-F1 and F2 landed as one change in two commits: `e0aa5cb1` (the art + the split) and
-this finish commit (the re-records only). What follows is the evidence, including
-where the fork's own record above proved wrong.
-
-- **Recovery.** The fork implementation was reverted during staging without ever
-  being committed: it is NOT recoverable from git (verified — branch reflog, stash,
-  and a scan of all dangling/unreachable objects; none carries it). The art was
-  instead recovered **stamp for stamp from the fork's committed preview sheets**
-  (`renders/fork-moth.svg`, `renders/fork-dish.svg`), whose unwrapped
-  identity-transform stamps carry each asset's designed markup in asset-local
-  coordinates — the same source this report's fork spec was written from. Per part:
-  `org_leaf_02` +5 vein pairs and a closed inner vein loop; `org_petal_02` +8 barb
-  pairs; `org_petal_01` +10 vein marks merged into the fill path (element-count
-  neutral) plus an accent stroke; `geo_chev_01` inner echo + centre dot plus an
-  accent stroke; `org_blob_01` strata ring, arc and 5 pore ticks appended to the
-  outline path plus an accent stroke. Two corrections to the fork record above:
-  (1) `org_pod_02`'s "crest + segment marks" never existed as asset art — the fork
-  sheets stamp the baseline body verbatim; its body detail is this branch's shipped
-  engraving seam. The strata rings the sheets DO show on the body ride a **detail
-  path echoing the engraving arc**: outline line → two closed ellipse-outline rings
-  (rx13 ry34, rx6.5 ry22 — the seam arc's own proportions) + two seam ticks,
-  stroked in the accent slot; verified to keep the part's attach points and cost
-  bit-identical before adoption. (2) `org_pod_01`'s "vein/strata marks" are not in
-  its asset markup either — the fork stamps show the fan plate's rings rendered
-  **through the dish disc** (the plate drawn as a disc under `roleColors`'
-  accent-cream notation), so pod_01's asset is unchanged by construction and its
-  matte does not move. The landing is faithful to the fork's rendered evidence,
-  not to the fork text where the two disagree.
-- **Guardrails.** `finishingLook.selfcheck.mjs` re-run against the landed art:
-  §1 passes **unmodified** — every part's auto-attach points and `assetCostScore`
-  bit-identical to the pre-pass pins (5/2/2/1/2/1/1). Region mattes re-baked
-  (`npm run bake:regions`): exactly the six changed assets' entries move
-  (blob 1→2 regions, petal_01 1→10, leaf_02 7→12 at the cap, pod_02 2→12,
-  chev 1→4, petal_02 3→3 re-segmented); pod_01's entry is byte-identical.
-  Engraving suite green, golden `59289882` stands.
-- **F2's slot value.** The fork text left the exact accent open ("part of the fork
-  PR's eye pass"). Landed: **accent = the palette ink** (`accent: ink` in both
-  `dishCreature.js` put sites). The preview's `#f5ead2` was that preview palette's
-  ink slot; ink is the palette-native form of the split, matches the module law
-  (palette-derived, no ad-hoc picks), and holds for any palette size. The suite's
-  dish contract was re-pinned in the open to `accent === ink` (discs only — the
-  eye is ink-on-ink by design, before and after).
-- **Re-record (this finish commit; no production code).** S3 discipline, S3 tools:
-  - `creatureGate` fixture: checkpoints refreshed by replaying the fixture's own
-    inputs. Control: the same refresh against the pre-art tree (`d7f58f20`)
-    reproduces the prior fixture byte-for-byte (sha256 `7e99c5b5…`). Branch
-    refresh deterministic across two runs (sha256 `1c76714d…`, 17757 bytes).
-    Deep diff old vs new: **15 differing leaves, all checkpoint hashes** —
-    checkpoint 0 stands (frame 0 precedes any creature draw). Inputs
-    byte-identical. Suite green.
-  - `replayGate` fixture: re-recorded with its own recorder (deterministic across
-    two runs; sha256 `23bd414f…` → `3e5c6687…`, 144195 → 144173 bytes). Deep diff:
-    **61 differing leaves, all checkpoint hashes** — every checkpoint moves
-    because the take's swatch assets include enriched parts (frame 0's layout
-    already embeds them). Inputs byte-identical. Suite green.
-  - `dishCreature` scene goldens re-pinned (the scenes' inputs are the suites'
-    own constants — unchanged): GOLDEN_300 `75c6829a` → `20b33fcd`, GOLDEN_LIMB
-    `a9918074` → `2937f8ad`, GOLDEN_BAND `57dc1ef4` → `e5e30d44`. Suite green.
-  - `wingWarp` resolver pins did NOT move (suite green unmodified) — contrary to
-    the fork text's expectation; the warp goldens hash warp geometry, not the
-    wing's vein detail. Recorded here so the expectation is closed.
-  - Both fixtures' PROVENANCE files carry the re-record paragraphs; the creature
-    gate's suite header notes the second re-record.
-- **Verification of the landed tree:** `npm run build` green. Full manifest
-  sweep (485 suites, 3-way parallel, 300 s cap): 475 PASS / 10 FAIL raw; the
-  eight load-class failures (`gl/accum`, `gl/composite`, `gl/canvasSizes`,
-  `gl/resolverProbe`, `gl/retroCapture`, `gl/vortex`, `pattern/patternRender`,
-  `kernel/creatureCost`) all PASS on serial standalone re-runs. Net
-  **483 PASS / 2 FAIL** — the standing sandbox pair, each proven base-identical
-  against clean main `6946f393` in this session: `swarmWasm` (exit 1 both
-  trees, `build-wasm: cargo not found on PATH`, output identical apart from
-  worktree paths) and `fx/rollSafety` (exit 124 at the 300 s cap both trees,
-  `Protocol error (Runtime.evaluate): Target closed` in the GL parity driver —
-  the browser-closed signature). The engraving seams shipped at `d7f58f20`
-  remain intact underneath: the engraving suite passes with its golden
-  `59289882` unmodified, and the seams' §2 pins in `finishingLook` pass as
-  written.
-- **Still owed at publish:** true before/after render pairs for Matt's eye (the
-  staging fork previews stand as the "after" reference until then), and the PR
-  itself — this landing is local commits only, per the staging rule.
-
-## Exceptions and deviations
-
-- No pin moved; no golden weakened; no fixture touched; no key added — nothing to
-  strip-prove.
-- The brief's baseline sandbox set reproduces as classified in the sweep section:
-  `fx/rollSafety` and `swarmWasm` (missing cargo) fail base-identically; `gl/accum`
-  is sandbox-fragile under load and passes standalone with the runner's heap
-  setting. None is in a file this build touches.
-- Live-app screenshots were not used for the evidence pairs (sandbox localhost
-  block + watchdog); the builder-harness sheets above were used instead, as the
-  brief allows, with the method stated.
-- Robots and L-system growths have no stage path (verified in the repipe planning)
-  and are untouched; "both families" is the moth line + the dish family, as
-  re-scoped.
+- **Voice set = 4 flagships + 12 user slots**, per FM1_REPORT §7's VOICE bank ("4 flagship voices, then up to 12 user voices") — the evidence the issue cites. The flagships are retired from the DAVIS tiles picker (#717); these targets don't reopen that surface — a flagship loads through MIDI exactly as it does when an old project names one. Earned voices are not slot targets: they are not on the performer's shelf the slots index.
+- **User palettes are not targets.** The registry enumerates the 37 shipped palettes, matching the issue's "43-plus targets" evidence. A palette saved at runtime has a runtime id, like a user voice; slot targets for palettes would be a follow-up if Matt wants them.
+- **One cycling switch target**, as the issue words it ("one bank-switch target flips the active bank") — not §7's four dedicated bank-select keys. The issue's own note stands: the FM-1 arrival-day results can still change the key layout.
+- **The switch key is an ordinary binding** — it flips the bank only while its own bank is active, so the working setup is BANK NEXT bound in every bank (§7's layout already assumes bank keys are "the same in every bank"). The panel's bank chooser always works regardless.
+- **The active bank is saved** (when it isn't the first) so a set reopens on the bank it was saved in.

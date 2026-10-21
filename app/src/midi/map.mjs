@@ -6,7 +6,11 @@
 import { isBindKey } from './message.mjs';
 import { getMidiTarget } from './targets.mjs';
 
-export const MAX_BINDINGS = 64;
+// #1720 — the cap covers the whole target registry in ONE bank: 15 original
+// targets + 37 palette pickers + 4 flagship voices + 12 user-voice slots +
+// the bank switch = 69. 128 leaves room for the registry to grow; it is a
+// per-bank cap (banks.mjs caps the bank count itself).
+export const MAX_BINDINGS = 128;
 
 /**
  * Can this kind of message drive this kind of target?

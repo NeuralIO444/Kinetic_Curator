@@ -49,6 +49,8 @@ export function PipelinePanel() {
     regionKinemes: s.regionKinemes, // #1434
     audioRoutes: s.audioRoutes, // #790
     midiMap: s.midiMap, // #617
+    midiBanks: s.midiBanks, // #1720
+    midiActiveBank: s.midiActiveBank, // #1720
     paletteOverrides: s.paletteOverrides,
     lockedParams: s.lockedParams,
     caGrid: s.caGrid,
@@ -78,6 +80,8 @@ export function PipelinePanel() {
     regionKinemes,
     audioRoutes,
     midiMap,
+    midiBanks,
+    midiActiveBank,
     paletteOverrides,
     lockedParams,
     caGrid,
@@ -202,6 +206,8 @@ export function PipelinePanel() {
           regionKinemes={regionKinemes}
           audioRoutes={audioRoutes}
           midiMap={midiMap}
+          midiBanks={midiBanks}
+          midiActiveBank={midiActiveBank}
           customAssets={customAssets}
           layers={layers}
           activeLayerId={activeLayerId}

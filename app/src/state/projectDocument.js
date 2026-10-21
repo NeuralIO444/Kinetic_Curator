@@ -13,7 +13,7 @@ import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCount } from '../curator/spawn.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { sanitizeCanvasSpec, isInstrumentCanvas } from '../data/canvasPresets.js';
-import { sanitizeMidiMap } from '../midi/map.mjs';
+import { DEFAULT_BANK_NAME, sanitizeMidiBanks, sanitizeMidiActiveBank, activeBankMap } from '../midi/banks.mjs';
 import { sanitizeMathMacros } from '../curator/mathMacros.js';
 import {
   sanitizeEnabledAssets,
@@ -144,10 +144,18 @@ export function serializeProject(state) {
     doc.canvasPresetId = canvas.canvasPresetId;
     doc.stageMode = canvas.stageMode;
   }
-  // #617 — MIDI mappings. Written only when something is mapped: an unmapped
-  // project exports exactly as before.
-  const midiMap = sanitizeMidiMap(state.midiMap);
-  if (Object.keys(midiMap).length) doc.midiMap = midiMap;
+  // #617 — MIDI mappings; #1720 — banks. A project that never left the single
+  // MAIN bank exports exactly as before (a `midiMap` field, only when something
+  // is mapped). A project using banks writes the bank list in full; the active
+  // bank is written only when it is not the first.
+  const midiBanks = sanitizeMidiBanks(state.midiBanks, state.midiMap);
+  const midiActiveBank = sanitizeMidiActiveBank(state.midiActiveBank, midiBanks);
+  if (midiBanks.length === 1 && midiBanks[0].name === DEFAULT_BANK_NAME) {
+    if (Object.keys(midiBanks[0].map).length) doc.midiMap = midiBanks[0].map;
+  } else {
+    doc.midiBanks = midiBanks;
+    if (midiActiveBank !== 0) doc.midiActiveBank = midiActiveBank;
+  }
   // #724 — math macro setups. Written only when a macro exists: a project
   // with no macros exports exactly as before.
   const mathMacros = sanitizeMathMacros(state.mathMacros);
@@ -194,6 +202,18 @@ function landLegacyCreatureCount(raw, doc) {
   }
 }
 
+/**
+ * #617 + #1720 — the document's MIDI fields, normalized once for both parse
+ * branches: the bank list (the legacy `midiMap` becomes the single MAIN bank;
+ * when both shapes are present the bank list wins), the active bank, and the
+ * active bank's map under the `midiMap` name the store mirrors.
+ */
+function midiDocFields(raw) {
+  const midiBanks = sanitizeMidiBanks(raw.midiBanks, raw.midiMap);
+  const midiActiveBank = sanitizeMidiActiveBank(raw.midiActiveBank, midiBanks);
+  return { midiBanks, midiActiveBank, midiMap: activeBankMap(midiBanks, midiActiveBank) };
+}
+
 export function parseProject(raw) {
   if (raw == null || typeof raw !== 'object') {
     return { ok: false, error: 'Not a JSON object' };
@@ -236,7 +256,7 @@ export function parseProject(raw) {
         assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
         assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
         audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
-        midiMap: sanitizeMidiMap(raw.midiMap), // #617
+        ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
         mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
         customAssets,
         layers,
@@ -287,7 +307,7 @@ export function parseProject(raw) {
       assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
       audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
-      midiMap: sanitizeMidiMap(raw.midiMap), // #617
+      ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
       mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
       paletteOverrides:
         raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
