@@ -296,3 +296,167 @@ every run; latest print 0.662 ms). FLOW's declaration is unchanged
     as failing identically on clean main.
   No other suite failed, and no suite was skipped: 76 + 1 + 408 = 485,
   every manifest suite accounted for above.
+
+---
+
+## Q4 amendment — per-stratum leashes (ruled by Matt, 2026-10-20; built on the rebased branch)
+
+The ruling (issue #1575, comment 6303045169): the travel leash becomes
+**per-stratum** — each CONTENT stratum is capped by its own leash. This
+amendment is built on top of the coordinator's rebase, in which the Q2
+traveler-budget amendment (#1574, `2c8661be`) now sits *under* P2 in
+this branch's history.
+
+### The premise, corrected by a fresh read
+
+The P2 sections above call `transportLeash` "single scene-level". Read
+fresh on the merged tree, the travel pass has always run **per scene**:
+`buildPlacements` is called per stratum with that stratum's
+defaults-merged layoutParams, `liveResolve` threads one shared store
+with `sceneId = layer.id`, and each stratum's params live in its
+snapshot (`captureSnapshot` in `state/slices/layersSlice.js`; the
+active stratum's are the live params). A resolver-level probe run
+*before* any edit confirmed two strata carrying different snapshot
+leashes already capped independently (PATH orbit, leash 280 vs 45 →
+max displacement 289 vs 55 px, symmetric under swap). So the leash
+value's per-stratum home already existed. What Q4 builds is everything
+that makes it a ruled mechanism rather than an emergent accident: the
+guarantee pinned in the suite at both seams, the one sensor that still
+read the leash scene-wide, the chip that now shows each stratum its own
+leash, and this record (the kineme.js comment that called the scope
+"exactly as open as P1 left it" is corrected).
+
+### Mechanism (chosen) and alternatives rejected
+
+- **Chosen:** the stratum's own `transportLeash`, riding its snapshot
+  params, *is* the per-stratum leash. No new layoutParams keys, no new
+  store, no change to the travel math. Consequences: the recorded pins
+  cannot move (verified below); old takes replay identically by
+  construction (their recorded snapshots carry their leashes exactly as
+  they did before Q4); a stratum whose snapshot predates the key falls
+  back through the existing defaults merge to the shipped default
+  (112 px) — the pre-Q4 behavior for such strata, proven bit-for-bit in
+  section Q.
+- **Rejected — a new per-stratum key** (a second leash, or a
+  stratum→leash map): duplicates the snapshot param system, creates two
+  sources of truth for one physical value, and — as a new layoutParams
+  key — moves the recorded pins for zero behavioral gain.
+- **Rejected — the leash on the layer object** (`layers[]` structure):
+  layers are structure, not recipe; the value would escape snapshots,
+  history (whose field list mirrors `captureSnapshot`) and take
+  recording, and would need new plumbing through all three to stay
+  replay-honest.
+- **Rejected — scene-global leash + per-stratum override:** keeps the
+  scene-wide value the ruling abolished, and an "unset override" fights
+  the defaults merge (an override key present in every stratum's params
+  is just a second leash with worse naming).
+
+### What was built
+
+1. `app/src/engine/kineme.js` — comments only, no code lines changed.
+   The PATH-present block now records the per-stratum ruling and the
+   kept sub-calls (below) instead of the open fork; the `applyTransport`
+   JSDoc states the leash is the calling stratum's own.
+2. `app/src/hooks/usePerformanceGovernor.js` — the one scene-wide
+   residue: `travelActive`, the travel rung's sensor, read only the
+   **active** stratum's params, so a scene whose background stratum
+   travels read as travel-inactive and cut 1.6 could never arm for it.
+   The sensor now reads every stratum — the live params (active) plus
+   each non-active stratum's snapshot params, the active id excluded
+   because its snapshot entry is a stale copy the live params supersede
+   — with the leash defaults-merged exactly as the resolver merges it.
+   The rung, its order (suite section F re-proves it) and the shed
+   overlay are unmoved; only the sensor's scope matches the mechanism.
+3. `app/src/panels/build/LayerStack.jsx` — P2's minimal BUILD stratum
+   chip is the natural vehicle: it gains the stratum's own leash as a
+   **readout** in its title/aria-label ("This stratum's leash: Npx —
+   each stratum carries its own"). No new control and no cluster:
+   editing stays in the Directors motion group per the standing
+   controls ruling — which, since Directors edits the active stratum's
+   params, *is* per-stratum editing.
+4. `app/src/engine/travel.selfcheck.mjs` — new **section Q** (27
+   checks; suite total 741). Two strata threaded through one store,
+   interleaved frame-by-frame, reproduce each stratum's solo run
+   hash-for-hash (per-scene state, per-scene leash, no bleed). FLOW
+   caps: leash 40 → max 44.9 px, leash 280 → 186.4 px. PATH orbit caps
+   exact per stratum: 60.0 px at leash 60, 280.0 px at leash 280.
+   Sweep: arc caps 50.0 px (leash 50) / 104.9 px (leash 200, the arc's
+   own amplitude) while the lane runs free (>150 px |dx| under both).
+   A zero-leash stratum creates no travel state and presents its still
+   frame bit-for-bit while its neighbour roams. Then the whole thing
+   again **through the real resolver** with snapshot-carried leashes:
+   45.8 px (leash 45) vs 280.0 px (leash 280); a snapshot carrying no
+   `transportLeash` at all resolves bit-identically to the explicit
+   shipped default; a zero-leash snapshot stratum is its still frame
+   while the active stratum roams. (One assertion was corrected during
+   the build: the still reference must run the same frame count as the
+   compared run, because the always-alive kineme drivers move items
+   with loop time even when travel is off — homes are only comparable
+   at the same final `loopTimeMs`. The section carries that note.)
+   Suite header: the Q2 summary's letter corrected I→P to match the
+   merged suite (the rebase renumbering the header had not caught up
+   with); the verdict line now reads `#1575 P2 + Q4`.
+
+### PATH sub-call dispositions (re-examined under per-stratum scope)
+
+- **Centred/weave families (orbit/spiral/lissajous) capped radially —
+  KEEP.** The cap is the family's geometry (offsets live in a disc
+  around home), independent of whose leash it is. Per-stratum scope
+  changes which *value* caps, never how; section Q proves the cap exact
+  at two different strata's leashes inside one scene.
+- **Sweep capped only on its arc (y), lane (x) free — KEEP.** The P2
+  reason is scope-independent: the lane is the family's defining
+  geometry, and a radial cap would plateau the wrap. Section Q proves
+  the arc obeys each stratum's own leash while the lane crosses the
+  canvas under both.
+
+### Parity and pins
+
+No layoutParams keys were added and no resolver/placement math
+changed, so the recorded pins cannot move — and they didn't:
+`engine/wingWarp` still fails with actual **`248580c4`**, bit-identical
+to this stage's pre-Q4 recorded value, and `gl/replayGate` /
+`gl/creatureGate` still fail on the same "no checkpoint diverges"
+assertion. The three remain exactly the P1+P2 key-echo state the
+publish re-record ruling covers; Q4 neither worsens nor re-records
+them, and no strip proof is owed by Q4 (there is nothing of Q4's in
+the pins to strip — the stages' own strip proofs stand as recorded).
+Sections A–P pass unmodified (714 checks) inside the amended suite.
+
+### Cost
+
+The travel pass's code is byte-identical (the kineme.js changes are
+comments), so its cost cannot change; the suite's standing
+re-measurement confirms it on this run: FLOW declared 0.39 ms,
+re-measured **0.396 ms** @800 marks; PATH declared 0.66 ms,
+re-measured **0.647 ms** (sandbox node — in line with the staging
+measurements). The governor sensor change is a few property reads per
+governor evaluation over a handful of snapshots — no per-frame or
+per-mark cost. The chip change is render-time string composition.
+
+### Sweep
+
+- `npm run build`: **green**. ESLint on the four touched files:
+  **clean**.
+- Full manifest sweep, stated exactly: the manifest holds 485 suites.
+  The serial runner (`npm run selfcheck`) ran the first **76 green**
+  and stopped at `swarmWasm` (#77), as in prior stages; **all 485
+  suites were then run individually: 479 passed, 6 failed** — the same
+  total and the same six as P2's own staging sweep, none of them new
+  and none of them Q4's:
+  - `engine/kernel/bake/swarmWasm` — `cargo not found on PATH`;
+    **proven base-identical on clean main `6946f393` this session**
+    (same message, exit 1).
+  - `fx/rollSafety` — sandbox browser death ("Target page, context or
+    browser has been closed"); **proven base-identical on clean main
+    this session** (same signature).
+  - `gl/accum` — sandbox environment death on both trees (heap OOM
+    abort, exit 134 on clean main this session; the branch run aborted
+    the same way); no assertion implicates travel code, and P2's
+    report documents the same class on main.
+  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the pin
+    suites, failing on the documented P1+P2 key-echo assertions with
+    shapes and the wingWarp actual identical to pre-Q4 (above);
+    covered by the publish re-record ruling.
+  No other suite failed and no suite was skipped: 485 individual runs,
+  each accounted for in the run tally.

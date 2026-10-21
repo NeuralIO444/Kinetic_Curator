@@ -123,9 +123,23 @@ export function usePerformanceGovernor() {
   // on the scene (FLOW with a leash — the same gate buildPlacements runs).
   // #1575 — PATH scenes are travel too: the same rung sheds them (marks
   // settle/freeze home) ahead of quality and the motion freeze.
+  // #1575 Q4 (ruled 2026-10-20) — travel is PER-STRATUM, so the rung's
+  // sensor reads every stratum, not just the active one: the live params
+  // (the active stratum's) plus each stratum's snapshot params. A stratum
+  // travels when its mode is flow/path and its leash — defaults-merged
+  // exactly as the resolver merges it — is above 0. The rung itself, its
+  // order and the shed overlay are unmoved; only the sensor's scope
+  // matches the per-stratum mechanism. (Snapshots exist only for KC
+  // strata, so the snapshot scan is the non-active strata by construction.)
   const travelShed = useStore(s => s.travelShed);
   const setTravelShed = useStore(s => s.setTravelShed);
-  const travelActive = (layoutParams?.transport === 'flow' || layoutParams?.transport === 'path') && (layoutParams?.transportLeash ?? 0) > 0;
+  const layerSnapshots = useStore(s => s.layerSnapshots);
+  const activeLayerId = useStore(s => s.activeLayerId);
+  const stratumTravels = (p) => !!p
+    && (p.transport === 'flow' || p.transport === 'path')
+    && (p.transportLeash ?? 112) > 0;
+  const travelActive = stratumTravels(layoutParams)
+    || Object.entries(layerSnapshots || {}).some(([id, snap]) => id !== activeLayerId && stratumTravels(snap?.layoutParams));
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.

@@ -965,7 +965,10 @@ export function travelStretchAmount(speedPxSec) {
  *
  * ctx.travel: {
  *   mode,            // 'flow' | 'path' — anything else is identity (the gate)
- *   leash,           // px; <= 0 is identity
+ *   leash,           // px; <= 0 is identity. #1575 Q4 (ruled 2026-10-20):
+ *                    // PER-STRATUM — this is the calling stratum's own
+ *                    // leash (its recipe value, threaded per scene by
+ *                    // buildPlacements); no scene-wide leash exists.
  *   flow,            // 0..1 strength (recipe data, from layoutParams)
  *   path,            // #1575: the PATH family ('orbit'|'spiral'|'sweep'|'lissajous')
  *   speed, radius,   // #1575: PATH rate multiplier / px amplitude (recipe data)
@@ -1077,9 +1080,12 @@ export function applyTransport(soa, ctx, still = null) {
     // caps the offset of the centred/weave families (orbit/spiral/
     // lissajous) radially, as it caps FLOW's roam; sweep's lane IS its
     // geometry (a radial cap would plateau the wrap), so the leash caps
-    // only its arc (the y offset) — the Q4 leash-scope question stays
-    // exactly as open as P1 left it, and this split is recorded in the
-    // staging report as the builder's call under that open fork.
+    // only its arc (the y offset). Q4 leash scope is RULED (Matt,
+    // 2026-10-20): PER-STRATUM — the leash arriving here is the calling
+    // stratum's own (buildPlacements threads that stratum's recipe per
+    // scene), and both sub-calls are KEPT under that scope: the cap
+    // semantics are the family's geometry, not the leash's provenance,
+    // so scope changes which value caps, never how it caps.
     const tSec = sc.steps * TRAVEL_STEP_SEC;
     if (!(tSec > 0)) return null;
     const pathOpts = {

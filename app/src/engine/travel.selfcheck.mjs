@@ -25,13 +25,23 @@
 //      2.0 ms creature-class allowance it shares the frame with.
 //   H. PARAMS — the recipe keys normalize/clamp/validate like every other
 //      layout param; a pre-#1574 document (no keys) opens still.
-//   I. Q2 BUDGET — the traveler budget (ruled 2026-10-20, governor-selected
+//   P. Q2 BUDGET — the traveler budget (ruled 2026-10-20, governor-selected
 //      within a device-class cap): the selection is a pure function of
 //      recorded state (mark count + device class), the effective amount is
 //      at or below the authored ceiling and at or below the class cap in
 //      cost terms, non-travelers hold no state and present exactly at
 //      home, a budget shrink drops their state, the desktop class is P1
 //      bit-for-bit, and the selection's own cost is declared + measured.
+//   Q. Q4 PER-STRATUM LEASHES — the leash is ruled per-stratum (Matt,
+//      2026-10-20): two strata threaded through one store (the resolver's
+//      own seam) are each capped by their OWN leash, FLOW and PATH alike;
+//      interleaving them reproduces each stratum's solo run hash-for-hash
+//      (no cross-talk, no shared leash state); sweep's arc reads its own
+//      stratum's leash while its lane runs free; a zero leash stills only
+//      its stratum; a stratum whose snapshot carries no leash falls back
+//      to the shipped default exactly as the pre-Q4 defaults merge did —
+//      and the caps are proven again through the real resolver, where the
+//      strata's leashes arrive via their per-stratum snapshots.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { buildPlacements } from './buildPlacements.js';
@@ -763,4 +773,177 @@ const PATH_LP = lp({ transport: 'path', transportPath: 'lissajous', transportLea
 }
 
 
-console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1 + Q2 + #1575 P2)`);
+// ── Q. Q4 — per-stratum leashes (#1575, ruled 2026-10-20) ────────────────
+{
+  const homes = place(lp(), null);
+  const homeByIndex = new Map(homes.map((it) => [it.index, it]));
+  const roam = (items) => {
+    let max = 0, maxDx = 0, maxDy = 0;
+    for (const it of items) {
+      const h = homeByIndex.get(it.index);
+      max = Math.max(max, Math.hypot(it.x - h.x, it.y - h.y));
+      maxDx = Math.max(maxDx, Math.abs(it.x - h.x));
+      maxDy = Math.max(maxDy, Math.abs(it.y - h.y));
+    }
+    return { max, maxDx, maxDy };
+  };
+  // Two strata threaded through ONE store — liveResolve's own seam (one
+  // store per resolver, sceneId per stratum) — interleaved frame by
+  // frame. Each stratum's interleaved frames must equal its solo run
+  // hash-for-hash: per-scene state, per-scene leash, no bleed either way.
+  const interleaved = (paramsA, paramsB, frames = 240) => {
+    const solo = (params, sceneId) => {
+      const store = createTravelStore();
+      const hashes = [];
+      for (let f = 0; f < frames; f++) hashes.push(frameHash(place(params, { store, sceneId, frameMs: 1000 / 60, shed: false })));
+      return hashes;
+    };
+    const store = createTravelStore();
+    const mixA = [], mixB = [];
+    let itemsA = null, itemsB = null;
+    for (let f = 0; f < frames; f++) {
+      itemsA = place(paramsA, { store, sceneId: 'qa', frameMs: 1000 / 60, shed: false });
+      mixA.push(frameHash(itemsA));
+      itemsB = place(paramsB, { store, sceneId: 'qb', frameMs: 1000 / 60, shed: false });
+      mixB.push(frameHash(itemsB));
+    }
+    assert.deepEqual(mixA, solo(paramsA, 'qa'), 'interleaved stratum A == solo stratum A, every frame');
+    checks++;
+    assert.deepEqual(mixB, solo(paramsB, 'qb'), 'interleaved stratum B == solo stratum B, every frame');
+    checks++;
+    return { itemsA, itemsB };
+  };
+
+  // FLOW: the tight stratum is held by the tight leash, the loose one by
+  // the loose — same field, same strength, only the leash differs.
+  {
+    const { itemsA, itemsB } = interleaved(
+      lp({ transport: 'flow', transportLeash: 40, transportFlow: 1 }),
+      lp({ transport: 'flow', transportLeash: 280, transportFlow: 1 }));
+    const rA = roam(itemsA), rB = roam(itemsB);
+    ok(rA.max > 3, `the tight stratum still roams (max ${rA.max.toFixed(1)} px)`);
+    ok(rA.max <= 40 * 1.5, `the tight leash holds FLOW: max ${rA.max.toFixed(1)} px vs leash 40 + spring allowance`);
+    ok(rB.max <= 280 * 1.25, `the loose leash holds FLOW: max ${rB.max.toFixed(1)} px vs leash 280 + overshoot allowance`);
+    ok(rB.max > rA.max + 40, `the leashes are really different laws: loose max ${rB.max.toFixed(1)} vs tight max ${rA.max.toFixed(1)}`);
+    console.log(`travel.selfcheck Q flow-strata: leash 40 caps at ${rA.max.toFixed(1)} px, leash 280 at ${rB.max.toFixed(1)} px, interleaved == solo`);
+  }
+
+  // PATH (orbit, a centred family): the radial cap is exact per stratum.
+  {
+    const { itemsA, itemsB } = interleaved(
+      lp({ transport: 'path', transportPath: 'orbit', transportRadius: 300, transportSpeed: 1, transportLeash: 60 }),
+      lp({ transport: 'path', transportPath: 'orbit', transportRadius: 300, transportSpeed: 1, transportLeash: 280 }));
+    const rA = roam(itemsA), rB = roam(itemsB);
+    ok(rA.max <= 60 + 1e-9, `orbit capped by its own stratum's leash: max ${rA.max.toFixed(2)} px vs 60`);
+    ok(rA.max > 45, `the tight cap binds (uncapped orbit reaches ~300): max ${rA.max.toFixed(2)} px`);
+    ok(rB.max <= 280 + 1e-9, `orbit capped by the loose stratum's leash: max ${rB.max.toFixed(2)} px vs 280`);
+    ok(rB.max > 200, `the loose stratum's orbit really travels: max ${rB.max.toFixed(2)} px`);
+    console.log(`travel.selfcheck Q path-strata: orbit caps at ${rA.max.toFixed(1)} px (leash 60) and ${rB.max.toFixed(1)} px (leash 280)`);
+  }
+
+  // Sweep: the arc (y) reads its own stratum's leash; the lane (x) is
+  // geometry and runs free under both leashes (the kept P2 sub-call).
+  {
+    const { itemsA, itemsB } = interleaved(
+      lp({ transport: 'path', transportPath: 'sweep', transportRadius: 300, transportSpeed: 1, transportLeash: 50 }),
+      lp({ transport: 'path', transportPath: 'sweep', transportRadius: 300, transportSpeed: 1, transportLeash: 200 }));
+    const rA = roam(itemsA), rB = roam(itemsB);
+    ok(rA.maxDy <= 50 + 1e-9, `sweep's arc capped by its own leash: max |dy| ${rA.maxDy.toFixed(2)} px vs 50`);
+    ok(rB.maxDy <= 200 + 1e-9, `sweep's arc capped by the loose leash: max |dy| ${rB.maxDy.toFixed(2)} px vs 200`);
+    ok(rB.maxDy > rA.maxDy + 30, `the arc really reads the stratum's leash: ${rB.maxDy.toFixed(1)} vs ${rA.maxDy.toFixed(1)} px`);
+    ok(rA.maxDx > 150 && rB.maxDx > 150, `the lane runs free under both leashes: max |dx| ${rA.maxDx.toFixed(0)} / ${rB.maxDx.toFixed(0)} px`);
+    console.log(`travel.selfcheck Q sweep-strata: arc caps ${rA.maxDy.toFixed(1)} px (leash 50) / ${rB.maxDy.toFixed(1)} px (leash 200); lane free`);
+  }
+
+  // A zero leash stills only its own stratum: no scene state is created
+  // for it, its frame is the still frame, and its neighbour roams on.
+  {
+    const store = createTravelStore();
+    let zeroItems = null, roamItems = null;
+    for (let f = 0; f < 240; f++) {
+      zeroItems = place(lp({ transport: 'flow', transportLeash: 0, transportFlow: 1 }), { store, sceneId: 'qz-a', frameMs: 1000 / 60, shed: false });
+      roamItems = place(FLOW_LP, { store, sceneId: 'qz-b', frameMs: 1000 / 60, shed: false });
+    }
+    assert.equal(frameHash(zeroItems), frameHash(homes), 'the zero-leash stratum presents the still frame, bit for bit');
+    checks++;
+    ok(!store.scenes.has('qz-a'), 'the zero-leash stratum never creates travel state');
+    ok(store.scenes.has('qz-b') && roam(roamItems).max > 20, `its neighbour stratum roams on the same store (max ${roam(roamItems).max.toFixed(1)} px)`);
+    console.log('travel.selfcheck Q zero-stratum: leash 0 stills only its own stratum');
+  }
+
+  // Through the real resolver: the strata's leashes arrive via their
+  // per-stratum snapshots (the active stratum's ride the live params) —
+  // the same caps, the unset fallback, and the zero stratum, end to end.
+  {
+    const { createLiveResolver } = await import('../gl/liveResolve.mjs');
+    const RLp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60, ...over });
+    const RSnap = (over = {}) => ({
+      seed: 1234, seedOffsets: null, paletteId: 'bone', paletteOverrides: null,
+      layoutParams: RLp(over), lockedParams: {}, caGrid: null, enabledAssets: null,
+    });
+    const RBase = (aOver, bSnap) => ({
+      canvasW: W, canvasH: H,
+      layers: [
+        { id: 'a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+        { id: 'b', name: 'b', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+      ],
+      activeLayerId: 'a', layerSnapshots: { b: bSnap }, seed: 1234, seedOffsets: null,
+      paletteId: 'bone', paletteOverrides: null, userPalettes: [], layoutParams: RLp(aOver), caGrid: null,
+      enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {},
+      batchPaused: false, focusSwap: false, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false, assetThin: false,
+      slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100],
+      phraseWrapGen: 0, attractor: null,
+    });
+    const RRun = (aOver, bSnap, frames = 30) => {
+      const r = createLiveResolver();
+      let out = null;
+      for (let i = 0; i <= frames; i++) out = r.resolveLayers({ ...RBase(aOver, bSnap), loopTimeMs: i * 100 });
+      r.dispose();
+      return out;
+    };
+    const layerItems = (out, id) => out.find((e) => (e.layerId || e.id) === id)?.items || [];
+    const layerHash = (out, id) => JSON.stringify(layerItems(out, id).map((i) => [i.x, i.y, i.key]));
+    const RMax = (out, stillOut, id) => {
+      const home = new Map(layerItems(stillOut, id).map((i) => [i.key, i]));
+      let max = 0;
+      for (const it of layerItems(out, id)) {
+        const h = home.get(it.key);
+        if (h) max = Math.max(max, Math.hypot(it.x - h.x, it.y - h.y));
+      }
+      return max;
+    };
+    const PATH = { transport: 'path', transportPath: 'orbit', transportRadius: 300, transportSpeed: 1 };
+    // The still reference runs the SAME frame count: the always-alive
+    // kineme drivers move items with loop time even when travel is off,
+    // so homes are only comparable at the same final loopTimeMs.
+    const stillOut = RRun({ transport: 'still' }, RSnap({ transport: 'still' }));
+    // Different leashes per stratum, end to end: each caps its own marks
+    // (the resolver adds the living-motion drivers on top of travel, so
+    // the bound carries their allowance; the placement seam above holds
+    // the exact cap).
+    const diff = RRun({ ...PATH, transportLeash: 280 }, RSnap({ ...PATH, transportLeash: 45 }));
+    const dA = RMax(diff, stillOut, 'a'), dB = RMax(diff, stillOut, 'b');
+    ok(dA > 150, `resolver: the loose stratum travels (max ${dA.toFixed(1)} px, leash 280)`);
+    ok(dB <= 45 * 1.45, `resolver: the tight stratum is held by its own leash (max ${dB.toFixed(1)} px, leash 45 + driver allowance)`);
+    ok(dB < dA * 0.45, `resolver: the strata obey different laws (${dB.toFixed(1)} vs ${dA.toFixed(1)} px)`);
+    // Unset per-stratum leash: a snapshot carrying no transportLeash at
+    // all resolves bit-identically to the explicit shipped default —
+    // the pre-Q4 defaults merge, unchanged.
+    const unsetSnap = RSnap({ ...PATH });
+    delete unsetSnap.layoutParams.transportLeash;
+    const unsetRun = RRun({ transport: 'still' }, unsetSnap);
+    const explicitRun = RRun({ transport: 'still' }, RSnap({ ...PATH, transportLeash: DEFAULT_LAYOUT_PARAMS.transportLeash }));
+    assert.equal(layerHash(unsetRun, 'b'), layerHash(explicitRun, 'b'), 'a snapshot with no leash == the explicit default leash, bit for bit');
+    checks++;
+    // Zero leash on the snapshot stratum: it presents its still frame
+    // while the active stratum roams.
+    const zeroRun = RRun({ ...PATH, transportLeash: 280 }, RSnap({ ...PATH, transportLeash: 0 }));
+    assert.equal(layerHash(zeroRun, 'b'), layerHash(stillOut, 'b'), 'resolver: the zero-leash stratum is its still frame, bit for bit');
+    checks++;
+    ok(RMax(zeroRun, stillOut, 'a') > 150, 'resolver: the roaming stratum is untouched by its neighbour\'s zero leash');
+    console.log(`travel.selfcheck Q resolver-strata: caps ${dB.toFixed(1)} px (leash 45) vs ${dA.toFixed(1)} px (leash 280); unset == default; zero stills one stratum`);
+  }
+  console.log('travel.selfcheck Q per-stratum: FLOW + PATH + sweep caps per stratum, zero stills one, unset = default — parity intact');
+}
+
+console.log(`travel.selfcheck: ok — ${checks} checks passed (#1574 P1 + Q2 + #1575 P2 + Q4)`);

@@ -19,7 +19,7 @@ import { useState, useEffect, useRef, Fragment } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
-import { BLEND_MODES } from '../../data/layout-modes.js';
+import { BLEND_MODES, DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { FX_EFFECT_DEFS, FX_MENU_KINDS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
 import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters.js';
 import { MathEffectEditor } from './MathEffectEditor.jsx';
@@ -490,6 +490,16 @@ export function LayerStack() {
       })()
       : null;
     const chipFam = chipCast ? defaultTransportForCast(chipCast) : null;
+    // #1575 Q4 (ruled 2026-10-20) — the leash is PER-STRATUM: this
+    // stratum's own value rides its params (live for the active stratum,
+    // its snapshot otherwise), the same home the chip's mode reads. The
+    // chip surfaces it as a readout only — amounts and leash still edit
+    // from the Directors motion group, never a cluster here (the P2
+    // controls ruling stands). Unset reads as the shipped default, which
+    // is what the resolver's defaults merge applies.
+    const chipLeash = chipLp && chipMode && chipMode !== 'still'
+      ? Math.round(chipLp.transportLeash ?? DEFAULT_LAYOUT_PARAMS.transportLeash)
+      : null;
     const color = STRATA_COLORS[fine];
     // #1019 — the PATCH one-liner lives under the first KC block's PATCH
     // section, and only once that block is open (the flag is consumed on
@@ -538,10 +548,10 @@ export function LayerStack() {
               mode (still → flow → path); tap an inactive stratum's chip
               to select that stratum first. No amounts here by ruling. */}
           {chipMode && (
-            <button className="micro-btn" aria-label={`travel mode ${chipMode}, family default ${chipFam}`}
+            <button className="micro-btn" aria-label={`travel mode ${chipMode}, family default ${chipFam}${chipLeash != null ? `, this stratum's leash ${chipLeash} pixels` : ''}`}
               title={isActive
-                ? `Travel — this stratum's marks ${chipMode === 'still' ? 'stay home' : chipMode === 'flow' ? 'roam the noise field' : 'travel a dealt path'}. Family default for its cast: ${chipFam} (linework roams flow, glyphs roam path, heavy solids anchor). Tap cycles still → flow → path. Amounts + leash live in DIRECTORS.`
-                : `Travel ${chipMode} · family default ${chipFam}. Tap to select this stratum, then tap again to cycle its mode.`}
+                ? `Travel — this stratum's marks ${chipMode === 'still' ? 'stay home' : chipMode === 'flow' ? 'roam the noise field' : 'travel a dealt path'}. Family default for its cast: ${chipFam} (linework roams flow, glyphs roam path, heavy solids anchor).${chipLeash != null ? ` This stratum's leash: ${chipLeash}px — each stratum carries its own.` : ''} Tap cycles still → flow → path. Amounts + leash live in DIRECTORS.`
+                : `Travel ${chipMode} · family default ${chipFam}.${chipLeash != null ? ` This stratum's leash: ${chipLeash}px.` : ''} Tap to select this stratum, then tap again to cycle its mode.`}
               onClick={() => {
                 if (!isActive) { selectIt(); return; }
                 emit(Events.LAYOUT_PARAM, { key: 'transport', value: nextTransportMode(chipMode) });
