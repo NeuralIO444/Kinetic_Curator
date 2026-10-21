@@ -501,3 +501,162 @@ per-mark cost. The chip change is render-time string composition.
     covered by the publish re-record ruling.
   No other suite failed and no suite was skipped: 485 individual runs,
   each accounted for in the run tally.
+
+## Q3 amendment — the Queen stamps the surge trigger (ruled by Matt, 2026-10-20; built on the rebased branch)
+
+The ruling (recorded on #1576, comment 6303858411): **the Queen calls
+it** — the surge trigger is a taste call stamped by the curation layer.
+Its three binding properties, and how the build honours each:
+
+1. **She stamps, nobody else.** No performer control, no panel
+   surface, no beat/audio wiring was added. The only producer of
+   `input.surgeTrigger` in the app is the stamp below.
+2. **Sway never renders (KC-1 DS rule 10).** The stamp is a number on
+   the resolver input — data in the recorded input stream. No readout,
+   no UI element, no log line names it; the Queen's identifier
+   tripwires (`queenChannel` / `queenLean` deniability scans) pass
+   unmodified, which required the stamp's comments outside `curator/`
+   to describe the mechanic without naming her modules.
+3. **Deterministic from recorded state.** The stamp is a pure function
+   of the recorded keeps ledger (below). It rides into the resolver as
+   a recorded input — the same doctrine as `travelIpadClass` — and the
+   input log records every input key, so a take's log carries the
+   stamp and a take that surged replays the surge exactly (suite
+   section I proves the round-trip). No wall-clock, no live
+   performance readings, no `Math.random` anywhere in the stamp path.
+
+### Where the Queen's recorded state lives at resolve time
+
+The **keeps ledger**: the store's `keeps` (davisSlice; persisted
+`kc:keeps:v1`) — recorded curation state, the same ledger her whole
+pull reads. The curation layer has no per-frame presence of its own
+(the Director runs at pick time, never in the live loop), and none was
+needed: liveLoop already reads the store fresh on every frame
+(`getState()`), so the ledger is present at the exact seam where the
+frame's input is built. The taste read over the ledger is the pull's
+own machinery, reused, not re-derived: `pullKeeps` (pattern-layer
+keeps do not teach her), `keptCentroid` / `proximity` (the kept-taste
+anchor the pick-time consumers lean on), `MIN_KEEPS`, and M1's
+nearness bar.
+
+### Mechanism (chosen) and alternatives rejected
+
+Chosen — a new sway mechanic in the M1–M8 family, in three layers:
+
+- **`curator/queenLean.mjs` — M9, the surge call** (`surgeCallOpen` /
+  `surgeCall`, the family's pure + gated pair). When a keep lands, she
+  judges it against the centroid of the counted keeps **before** it:
+  anchor not live (fewer than `MIN_KEEPS` priors, or no centroid) →
+  no call; proximity below `M1_PROXIMITY` (0.72, her own nearness bar)
+  → no call; otherwise the call's strength **is** the proximity
+  (0.72..1) — her demand is graded by how near the keep lands.
+- **`curator/director.js` — the hosts** (the `birthCentre` /
+  `paceStep` / `leanDialSteps` pattern: module-level, never throws).
+  `queenSurgeCall({ keeps })` does the ledger hygiene (pullKeeps,
+  split newest vs priors). `nextSurgeStamp(seen, keeps)` is the frame
+  seam's decision as a pure function of (seen, ledger), so the loop
+  holds only a scalar: a counted growth evaluates the newest keep
+  exactly once (**one pulse per keep**); the ledger found on the first
+  frame is history and does not call; a shrink just resyncs.
+- **`gl/liveLoop.mjs` — the stamp.** One closure scalar
+  (`queenSeenKeeps`); on **presented frames only** (`!s.slowRender &&
+  s.running`) it evaluates the seam against `s.keeps` and puts
+  `surgeTrigger` on the input beside `travelIpadClass`. Presented-only
+  matters: a paused/shed frame's resolver never sees a trigger (its
+  surgeBase is null under slowRender), so consuming the call there
+  would lose it — the keep stays pending and the call lands on the
+  first presented frame. If several keeps land between presented
+  frames, the newest is judged against all counted keeps before it.
+- **`gl/liveResolve.mjs` — no code change.** P3's thread already reads
+  `input.surgeTrigger ?? 0` into `surgeBase`; only its stale comment
+  (and the matching stale comments in `surge.js` /
+  `buildPlacements.js`) now describes the built mechanism.
+
+Alternatives rejected:
+
+- **A `*Live` holder module (the stressLive pattern)** — a second
+  module holding Queen state, written by a store subscription and
+  polled by the loop. Rejected: the ledger already lives in the store
+  the loop reads every frame; a holder would duplicate recorded state
+  and add a writer whose timing (subscription vs frame) the input log
+  could not reproduce as cleanly. The seam evaluation at input-build
+  time is a pure function of the ledger + one scalar — strictly less
+  machinery.
+- **Stamping inside liveResolve** — rejected on the replay law: the
+  resolver is a pure function of its input and is driven directly by
+  replays; a stamp computed there could not be recorded, so takes
+  would diverge. The stamp is a live-loop act (like the device-class
+  stamp), and the resolver stays untouched.
+- **Firing from a Director tick** — the Director does tick on keep
+  events, but its outputs reach picks and gains, never the frame
+  stream; a path from tick to resolver input does not exist, and
+  building one is the holder pattern above with worse timing.
+- **A level instead of a pulse** (stamp = f(current ledger) every
+  frame) — rejected: `applySurge` fires on a rising edge and swallows
+  holds, so a permanent level would call exactly one surge per
+  session and mask later keeps. The pulse-per-keep is the shape the
+  machinery's own trigger law asks for.
+
+### Parity and pins
+
+- **Parity:** no recorded Queen state (empty ledger, below the floor,
+  a far keep) → stamp 0 → frames bit-identical to the pre-Q3 build.
+  Suite I drives 150 frames at trigger 0 from an empty ledger: every
+  frame is the still frame, no envelope state is ever created. With a
+  stamp, the envelope fires and releases home bit-exact.
+- **No new layoutParams keys** (the trigger was already a resolver
+  input by P3's design); no resolver math changed — the liveResolve
+  diff is comment-only, so the strip-proof question does not arise.
+- **Pins, measured this session before and after:** `wingWarp`
+  actual **`dfb2915f`** before and after — unmoved (the inherited
+  chain value; the expected `dc0897fb` is the pre-travel pin, covered
+  by the publish re-record ruling). `replayGate` / `creatureGate`
+  fail in the identical inherited shape (first-divergence assertions,
+  actual 0) before and after. The travel suite passes **741** checks
+  before and after; the surge suite grows **1385 → 1415** (sections
+  G–J added; A–F unmodified).
+
+### Cost
+
+The stamp is curation-side scalar work at the frame-input seam — not
+a resolver or GPU path — so, honestly, **no cost-tier registration**:
+the surge pass's tier-0 declaration stands unchanged, and the stamp
+adds nothing to any costed path (buildPlacements, the resolver, and
+the governor sensor are untouched). Measured this session (suite J,
+sandbox node, median of 200): the call computation **0.036 ms** at a
+40-keep ledger, **once per keep landing** (a centroid + one proximity
+over the ledger); the per-frame seam **0.0002 ms** (a memoised
+pullKeeps length read + compare). Sandbox-indicative only.
+
+### Sweep
+
+- `npm run build`: **green** (final tree). ESLint on the eight touched
+  files: **clean**.
+- Full manifest sweep, stated exactly: the manifest holds 492 entries;
+  **all 492 were run individually: 484 passed, 8 failed.** Of the 8:
+  - `curator/queenChannel`, `curator/queenLean` — **this amendment's
+    own deniability tripwires, caught by the sweep**: the first draft
+    named her modules in comments/imports outside `curator/`, which
+    rule 10 forbids. Fixed during the run (the mechanic's pins moved
+    to its home suite — a new M9 block in `queenLean.selfcheck`, 24 →
+    29 checks — and the surge suite now proves the read through the
+    Director host); **both re-run green on the final tree** (13 and 29
+    checks), as is `queenDeniability` (7). In the final tree the sweep
+    therefore stands at **486 of 492**, the remaining 6 failures all
+    inherited:
+  - `gl/replayGate`, `gl/creatureGate`, `engine/wingWarp` — the pin
+    suites in their inherited key-echo shape (above), covered by the
+    publish re-record ruling.
+  - `engine/kernel/bake/swarmWasm` — `cargo not found on PATH`, exit
+    1; **proven base-identical on clean main `6946f393` this session**
+    (same message, same exit).
+  - `fx/rollSafety` — sandbox browser death (`page.evaluate: Target
+    page, context or browser has been closed`, then a hang to the
+    240 s timeout); **proven base-identical on clean main this
+    session** (same signature, same hang).
+  - `gl/accum` — sandbox heap-OOM abort, exit 134; **proven
+    base-identical on clean main this session** (same abort). Q4's
+    sweep on this chain documented the same death; no assertion
+    implicates the stamp (the suite never reaches the travel code).
+  No other suite failed and no suite was skipped: 492 individual runs,
+  each accounted for in the run tally.

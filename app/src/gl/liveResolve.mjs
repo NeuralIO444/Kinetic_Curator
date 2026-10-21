@@ -516,10 +516,13 @@ export function createLiveResolver() {
     // class), whose cap is the full placement cap: P1's behaviour exactly.
     const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed, ipadClass: input.travelIpadClass === true };
     // #1576 — P3's bases ride the same measured frame delta and the same
-    // travel shed. The surge TRIGGER is an input signal only: it reads
-    // input.surgeTrigger, which NOTHING stamps (no beat wiring, no Queen
-    // wiring, no perform control — Q3 is unruled), so it defaults to 0
-    // and the machinery is inert until Matt rules the trigger surface.
+    // travel shed. The surge TRIGGER is an input signal: input.surgeTrigger,
+    // which the Queen stamps (Q3, ruled by Matt 2026-10-20 — liveLoop stamps
+    // her call from the recorded keeps ledger: the curation layer's M9
+    // mechanic, hosted by the Director; no beat wiring, no perform control,
+    // no surface). Absent — every take recorded before Q3 — and 0 on every
+    // frame she does not call, the machinery is inert and frames are
+    // bit-identical to pre-P3.
     const surgeBase = input.slowRender ? null : { store: surgeStore, frameMs: travelFrameMs, shed: !!input.travelShed, trigger: input.surgeTrigger ?? 0 };
     const parallaxBase = input.slowRender ? null : { store: parallaxStore, frameMs: travelFrameMs, shed: !!input.travelShed };
     const weightOverrides = input.assetWeightOverrides || {};

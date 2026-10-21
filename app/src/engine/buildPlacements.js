@@ -197,8 +197,9 @@ export function buildPlacements({
   travel = null,
   // #1576 — P3's two ephemeral inputs, same deal as travel: NEVER in
   // geometrySignature. surge = { store, sceneId, frameMs, shed, trigger }
-  // (engine/surge.js; the trigger is an input signal only — Q3 unruled,
-  // inert by default) gated on layoutParams.transportSurge > 0;
+  // (engine/surge.js; the trigger is the Queen's stamp — Q3, ruled
+  // 2026-10-20 — inert on every frame she does not call) gated on
+  // layoutParams.transportSurge > 0;
   // parallaxDrift = { store, sceneId, frameMs, shed }
   // (engine/parallaxDrift.js) gated on layoutParams.transportParallax > 0.
   // Either amount at 0 (the defaults) → its pass never runs, its store is

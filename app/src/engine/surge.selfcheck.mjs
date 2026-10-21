@@ -1,8 +1,8 @@
 // node src/engine/surge.selfcheck.mjs
 // #1576 — travel kinemes P3: SURGE (engine/surge.js). The issue's
-// acceptance, pinned — with the Q3 carve-out: the trigger is an INPUT
-// SIGNAL here (synthetic envelopes), because what fires a surge in the
-// instrument has no ruling from Matt and no surface is built.
+// acceptance, pinned. P3 drove the trigger as an INPUT SIGNAL here
+// (synthetic envelopes); Q3 (ruled by Matt, 2026-10-20) made the
+// trigger the Queen's call — sections G–J pin her stamp.
 //   A. ENVELOPE LAWS — the pure envelope: anticipation dip, approach,
 //      held peak, eased release, exact zeros outside its life.
 //   B. ANTICIPATION, MEASURED — through the applier, step by step: the
@@ -18,6 +18,20 @@
 //      the trigger edge law, the artist's pin.
 //   E. COST — declared tier 0 with a measured timeMs, re-measured here.
 //   F. PARAMS — the recipe key normalizes/clamps like every other.
+//   G. THE QUEEN'S READ (M9, through her Director host) — below her
+//      keeps floor she is identity; a keep landing near her kept-taste
+//      centroid is answered at the proximity's strength; a far keep,
+//      no call. (The pure mechanic's own pins live in its home suite.)
+//   H. HOST + FRAME SEAM (director) — pull hygiene (pattern keeps
+//      neither build the anchor nor call), one pulse per keep, the
+//      found ledger is history and does not call, a shrink resyncs.
+//   I. END-TO-END + PARITY — her stamp on the resolver input fires the
+//      envelope through buildPlacements and releases home bit-exact;
+//      no recorded Queen state → trigger 0 and the frames are the
+//      still frames; the stamp rides the take's input log.
+//   J. DETERMINISM + COST OF THE STAMP — the same recorded ledger
+//      stamps the same demand (repeat calls, a JSON round-trip of the
+//      ledger, a rebuilt ledger); the stamp's measured cost.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { buildPlacements } from './buildPlacements.js';
@@ -29,6 +43,8 @@ import {
 import { TRAVEL_STEP_SEC } from './kineme.js';
 import { DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, normalizeLayoutParams, validateLayoutParams } from '../data/layout-modes.js';
 import { getCostTier } from './kernel/costRegistry.mjs';
+import { queenSurgeCall, nextSurgeStamp } from '../curator/director.js';
+import { createInputLog, replayInputs } from './kernel/replay/inputLog.js';
 
 let checks = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
@@ -283,4 +299,198 @@ const frameHash = (items) => createHash('sha256')
   console.log('surge.selfcheck F params: spec, default-off, clamp and trust boundary all hold');
 }
 
-console.log(`surge.selfcheck: ok — ${checks} checks passed (#1576 P3 surge)`);
+// ── Q3 fixtures: recorded keeps, in the pull's own shape ─────────────────
+// A keep is { config: { layout }, stack: { l: [...] } } (davisSlice's
+// ledger, kc:keeps:v1). NEAR keeps all carry the same layout, so their
+// centroid IS that layout's feature map and a new keep with the same
+// layout lands at proximity ~1; FAR_LAYOUT is its opposite on every
+// axis the features read (measured 0.63 against the NEAR centroid —
+// below her 0.72 bar).
+const keepOf = (layout, over = {}) => ({ config: { layout }, stack: { l: [] }, ...over });
+const NEAR_LAYOUT = lp();
+const FAR_LAYOUT = {
+  ...lp(), mode: 'swarm', composition: 'scatter', count: 700, scale: [1.6, 2.4],
+  rotate: [120, 360], alpha: [5, 30], jitter: 90, density: 8, zTiers: 6,
+  bleed: true, mirror: true, overlap: false, displacement: 0.9,
+  noiseFreq: 0.09, noiseSpeed: 3,
+};
+const nearKeeps = (n) => Array.from({ length: n }, () => keepOf({ ...NEAR_LAYOUT }));
+
+// ── G. the Queen's read (M9, through her Director host) ──────────────────
+// The host splits the counted ledger — newest judged against the rest —
+// so the floor reads here as: 8 counted keeps = the newest has only 7
+// priors, anchor not live, no call. (The mechanic's own pins — the
+// prior-count split at the function, the gate wrapper — live in its
+// home suite in curator/.)
+{
+  assert.equal(queenSurgeCall({ keeps: nearKeeps(8) }), 0);
+  checks++;
+  // The anchor live + a keep landing on her taste: answered at the
+  // proximity's strength (identical layout → proximity ~1).
+  const near = queenSurgeCall({ keeps: nearKeeps(9) });
+  ok(near > 0.99 && near <= 1, `a keep on her centroid is answered at strength ${near.toFixed(4)}`);
+  // A far keep is not answered, however established the anchor.
+  assert.equal(queenSurgeCall({ keeps: [...nearKeeps(8), keepOf({ ...FAR_LAYOUT })] }), 0);
+  checks++;
+  // Nothing to judge, or nothing to judge against: no call.
+  assert.equal(queenSurgeCall({ keeps: [...nearKeeps(8), { config: {}, stack: { l: [] } }] }), 0);
+  checks++;
+  assert.equal(queenSurgeCall({ keeps: Array.from({ length: 9 }, () => ({ stack: { l: [] } })) }), 0);
+  checks++;
+  console.log(`surge.selfcheck G queen-read: floor identity, near keep answered at ${near.toFixed(4)}, far keep silent`);
+}
+
+// ── H. host + frame seam (director) ──────────────────────────────────────
+{
+  // The host splits the counted ledger: newest judged against the rest.
+  const stamp = queenSurgeCall({ keeps: nearKeeps(9) });
+  ok(stamp > 0.99, `the host answers the 9th near keep at ${stamp.toFixed(4)}`);
+  // A pattern-layer keep neither builds the anchor nor calls: 8 plain
+  // keeps + a pattern keep on top still reads as an 8-ledger whose
+  // newest has only 7 priors — below the floor, no call.
+  const withPattern = [...nearKeeps(8), keepOf({ ...NEAR_LAYOUT }, { stack: { l: [{ type: 'pattern' }] } })];
+  assert.equal(queenSurgeCall({ keeps: withPattern }), 0);
+  checks++;
+  assert.equal(queenSurgeCall({ keeps: [] }), 0);
+  checks++;
+  assert.equal(queenSurgeCall({}), 0);
+  checks++;
+
+  // The seam script: (seen, ledger) → one pulse per counted keep.
+  // Keeps land the way the store lands them — a NEW array per append
+  // (davisSlice: keeps: [...state.keeps, entry]) — which is what the
+  // pull's identity memo reads; the script honours that shape.
+  const script = () => {
+    const out = [];
+    let ledger = nearKeeps(9);
+    let seen = -1;
+    let r = nextSurgeStamp(seen, ledger); out.push(r.stamp); seen = r.seen; // found ledger: history, no call
+    r = nextSurgeStamp(seen, ledger); out.push(r.stamp); seen = r.seen; // no growth: 0
+    ledger = [...ledger, keepOf({ ...FAR_LAYOUT })];
+    r = nextSurgeStamp(seen, ledger); out.push(r.stamp); seen = r.seen; // a far keep lands: no call
+    ledger = [...ledger, keepOf({ ...NEAR_LAYOUT })];
+    r = nextSurgeStamp(seen, ledger); out.push(r.stamp); seen = r.seen; // a near keep lands: THE call
+    r = nextSurgeStamp(seen, ledger); out.push(r.stamp); seen = r.seen; // same ledger again: never twice
+    r = nextSurgeStamp(seen, ledger.slice(0, 4)); out.push(r.stamp); seen = r.seen; // shrink: resync, no call
+    assert.equal(seen, 4);
+    return out;
+  };
+  const seq = script();
+  assert.deepEqual(seq.slice(0, 3), [0, 0, 0]);
+  checks++;
+  ok(seq[3] > 0.99, `the pulse fires exactly on the near keep's frame (${seq[3].toFixed(4)})`);
+  assert.deepEqual(seq.slice(4), [0, 0]);
+  checks++;
+  assert.deepEqual(script(), seq, 'the same recorded script replays to the same stamp sequence');
+  checks++;
+  console.log('surge.selfcheck H seam: one pulse per counted keep, history silent, shrink resyncs, script deterministic');
+}
+
+// ── I. end-to-end through the resolver input + parity + the input log ────
+{
+  const SURGE_LP = lp({ transportSurge: 1 });
+  const homes = place(lp(), null);
+  const stamp = queenSurgeCall({ keeps: nearKeeps(9) });
+  ok(stamp > 0, 'the fixture ledger produces a stamp');
+
+  // The stamped frame, driven exactly as liveResolve drives it: the
+  // surge base { store, frameMs, shed, trigger } + sceneId, the trigger
+  // on the landing frame only (the seam's one pulse).
+  const store = createSurgeStore();
+  const base = { store, sceneId: 'queen', frameMs: 1000 / 60, shed: false };
+  let items = null;
+  let peakRatio = 0;
+  for (let f = 0; f < 150; f++) {
+    items = place(SURGE_LP, { ...base, trigger: f === 0 ? stamp : 0 });
+    if (f === 53) {
+      const h0 = homes[0];
+      peakRatio = items[0].scale / h0.scale;
+    }
+  }
+  ok(Math.abs(peakRatio - (1 + SURGE_SCALE_PER_Z * stamp)) < 1e-6,
+    `at the peak the presentation is the declared read at her strength (scale ×${peakRatio.toFixed(4)} = 1 + ${SURGE_SCALE_PER_Z} × ${stamp.toFixed(4)})`);
+  assert.equal(frameHash(items), frameHash(homes), 'after her envelope, frames are the still frames, bit for bit');
+  checks++;
+
+  // Parity: no recorded Queen state → the stamp is 0, and 0 changes
+  // nothing, however long it runs — the pre-Q3 instrument, exactly.
+  const noStamp = queenSurgeCall({ keeps: [] });
+  assert.equal(noStamp, 0);
+  checks++;
+  const storeP = createSurgeStore();
+  let parity = null;
+  for (let f = 0; f < 150; f++) parity = place(SURGE_LP, { store: storeP, sceneId: 'queen0', frameMs: 1000 / 60, shed: false, trigger: noStamp });
+  assert.equal(frameHash(parity), frameHash(homes), 'no Queen state → trigger 0 → still frames, bit for bit');
+  checks++;
+  assert.equal(surgeSceneSnapshot(storeP, 'queen0').active, false, 'no envelope ever fired');
+  checks++;
+
+  // The take's input log carries the stamp: recorded like every other
+  // input key, replayed exactly; a pre-Q3 input (no key at all) stays
+  // keyless in the log — liveResolve's ?? 0 reads those takes inert.
+  const log = createInputLog();
+  const frameInput = (t) => (t === null ? { seed: 42, loopTimeMs: 0 } : { seed: 42, loopTimeMs: 0, surgeTrigger: t });
+  log.record(frameInput(0));
+  log.record(frameInput(0));
+  log.record(frameInput(stamp));
+  log.record(frameInput(0));
+  const replayed = [...replayInputs(log.finish())];
+  assert.equal(replayed.length, 4);
+  checks++;
+  assert.equal(replayed[2].surgeTrigger, stamp, 'the stamped frame replays with the stamp intact');
+  checks++;
+  assert.equal(replayed[0].surgeTrigger, 0);
+  checks++;
+  assert.equal(replayed[3].surgeTrigger, 0);
+  checks++;
+  const preLog = createInputLog();
+  preLog.record(frameInput(null));
+  const [pre] = [...replayInputs(preLog.finish())];
+  ok(!('surgeTrigger' in pre), 'a pre-Q3 take carries no stamp key (the resolver defaults it to 0)');
+  console.log('surge.selfcheck I end-to-end: stamp → envelope → home bit-exact; no state → parity; the input log carries the stamp');
+}
+
+// ── J. determinism + the stamp's cost ────────────────────────────────────
+{
+  const ledger = [...nearKeeps(9), keepOf({ ...FAR_LAYOUT }), keepOf({ ...NEAR_LAYOUT })];
+  const first = queenSurgeCall({ keeps: ledger });
+  ok(first > 0, 'the mixed ledger calls on its newest (near) keep');
+  for (let i = 0; i < 3; i++) assert.equal(queenSurgeCall({ keeps: ledger }), first);
+  checks++;
+  // The ledger AS RECORDED (JSON — kc:keeps:v1 is stored JSON) stamps
+  // the identical demand: the call reads recorded state, not identity.
+  const recorded = JSON.parse(JSON.stringify(ledger));
+  assert.equal(queenSurgeCall({ keeps: recorded }), first);
+  checks++;
+  // A rebuilt, structurally identical ledger: the same call again.
+  assert.equal(queenSurgeCall({ keeps: [...nearKeeps(9), keepOf({ ...FAR_LAYOUT }), keepOf({ ...NEAR_LAYOUT })] }), first);
+  checks++;
+
+  // Cost, measured like section E measures the pass: the stamp is
+  // once-per-keep curation work (a centroid + one proximity over the
+  // ledger), and the per-frame seam is a memoised length read. Neither
+  // is a resolver or GPU cost; the numbers are printed, the bounds are
+  // sanity rails only.
+  const big = nearKeeps(40);
+  const callTimes = [];
+  for (let i = 0; i < 200; i++) {
+    const t0 = performance.now();
+    queenSurgeCall({ keeps: big });
+    callTimes.push(performance.now() - t0);
+  }
+  callTimes.sort((a, b) => a - b);
+  const callMs = callTimes[100];
+  ok(callMs < 2.0, `the stamp computation at a 40-keep ledger: ${callMs.toFixed(3)} ms median, once per keep`);
+  const seamTimes = [];
+  for (let i = 0; i < 200; i++) {
+    const t0 = performance.now();
+    nextSurgeStamp(40, big);
+    seamTimes.push(performance.now() - t0);
+  }
+  seamTimes.sort((a, b) => a - b);
+  const seamMs = seamTimes[100];
+  ok(seamMs < 2.0, `the per-frame seam (no growth): ${seamMs.toFixed(4)} ms median`);
+  console.log(`surge.selfcheck J determinism + cost: identical stamps across repeats/records/rebuilds; stamp ${callMs.toFixed(3)} ms per keep, seam ${seamMs.toFixed(4)} ms per frame (sandbox)`);
+}
+
+console.log(`surge.selfcheck: ok — ${checks} checks passed (#1576 P3 surge + Q3 the Queen's stamp)`);

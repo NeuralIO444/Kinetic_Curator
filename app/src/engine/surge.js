@@ -11,7 +11,9 @@
 // in liveResolve.mjs, the two recipe keys' surge half in
 // data/layout-modes.js, the surge RangeRow in DavisPanel.jsx, the
 // surge term of the governor hook's travelActive, and the census
-// surge fixture. Nothing else knows surge exists.
+// surge fixture. Q3 adds exactly one more thread: the Queen's stamp
+// (the curation layer's M9 mechanic + the Director host + liveLoop's
+// surgeTrigger input thread). Nothing else knows surge exists.
 //
 // ── The contract (issue #1576) ────────────────────────────────────────
 // SURGE is a z-approach driver: on its envelope a mark's z rises
@@ -31,17 +33,23 @@
 // approaches. A surge that starts at full speed is a bug; the suite
 // measures the dip (depth + the zero-crossing step) on every run.
 //
-// ── Q3 — THE TRIGGER IS NOT BUILT (no ruling from Matt) ─────────────
-// What fires a surge — the beat, the Queen, a manual perform control,
-// or all three with a pecking order — has NO ruling. This module
-// therefore takes the trigger as an INPUT SIGNAL (ctx.surge.trigger,
-// a 0..1 demand handed in per frame by the resolver) and nothing in
-// the app produces one: liveResolve threads input.surgeTrigger, which
-// no caller sets, so the machinery is INERT in the live instrument
-// until Q3 is ruled. The AMOUNT is ruled (the Directors motion-group
-// control, #1574's comment) and is recipe data: layoutParams
-// .transportSurge. Selfchecks drive the machinery with synthetic
-// trigger envelopes and prove anticipation + the z read that way.
+// ── Q3 — THE TRIGGER IS THE QUEEN'S CALL (ruled 2026-10-20) ────────
+// What fires a surge is a TASTE CALL stamped by the curation layer
+// (Matt, on #1576): when a new keep lands, the Queen judges it against
+// her kept-taste anchor and stamps a demand if it lands near what the
+// artist already keeps (the curation layer's M9 mechanic, hosted by
+// the Director; liveLoop stamps it on the frame's resolver input).
+// Nobody else stamps it — no beat wiring, no perform control,
+// no panel — and the stamp never renders (KC-1 DS rule 10): it is data
+// in the recorded input stream, so a take that surged replays the
+// surge exactly. This module still takes the trigger as an INPUT
+// SIGNAL (ctx.surge.trigger, a 0..1 demand handed in per frame by the
+// resolver): on every frame she does not call it reads 0 and the
+// machinery is INERT, bit-identical to pre-P3. The AMOUNT is ruled
+// (the Directors motion-group control, #1574's comment) and is recipe
+// data: layoutParams.transportSurge. Selfchecks drive the machinery
+// with synthetic trigger envelopes, and with the Queen's own stamp
+// computed from fixture ledgers (suite sections G–J).
 //
 // ── Replay law (inherited, binding) ────────────────────────────────
 // Envelope state is resolver-owned (createSurgeStore, one per
@@ -170,7 +178,7 @@ function clamp01(v) {
  *   sceneId,  // the scene identity half of the state key
  *   frameMs,  // spine-A frame time to bank (0 on a held frame)
  *   shed,     // governor travel shed: the envelope dies, marks present home
- *   trigger,  // 0..1 demand — AN INPUT SIGNAL ONLY (Q3 unruled; inert by default)
+ *   trigger,  // 0..1 demand — the Queen's stamp (Q3); 0/absent = inert
  * } }
  *
  * Returns an undo restoring the cached y positions, or null when z is
@@ -264,5 +272,5 @@ registerCostTier('travel/surge', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.01,
-  notes: '#1576 P3 — SURGE: step-clocked z envelope folded into scale/rise/alpha on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder. Trigger surface unbuilt (Q3 unruled) — the machinery reads an inert-by-default input signal.',
+  notes: '#1576 P3 — SURGE: step-clocked z envelope folded into scale/rise/alpha on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder. The trigger is the Queen\'s stamp (Q3: the curation layer\'s M9 call, stamped by liveLoop on input.surgeTrigger) — inert on every frame she does not call.',
 });
