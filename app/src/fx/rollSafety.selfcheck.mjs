@@ -115,7 +115,11 @@ try {
     const GROWS = new Set(['dla', 'eden', 'ca']); // growth modes start empty at t=0 in a one-shot render
     const bad = []; const gaps = []; let dim = 0; let judged = 0;
     try {
-      for (let i = 0; i < 90 && judged < 36; i++) {
+      // The roll cap is a sample hunt, not a contract: the seeded stream's dark-palette yield moves
+      // whenever a roll menu grows (the FX menu gained feedbackWarp in #1490 and the yield in 90 rolls
+      // fell 34 -> 27, starving the >=30 floor below without a single frame failing). The contract is
+      // the floor and the frame assertions; the cap just has to leave the hunt room (36 reached at 114).
+      for (let i = 0; i < 180 && judged < 36; i++) {
         useStore.getState().kineticRoll();
         const s = useStore.getState();
         if (!dark.has(s.paletteId) || GROWS.has(s.layoutParams.mode) || ['swarm', 'hype'].includes(s.layoutParams.mode)) continue;
