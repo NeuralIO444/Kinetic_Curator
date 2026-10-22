@@ -348,6 +348,11 @@
 .davis-midi { display: flex; flex-direction: column; gap: 4px; padding: 4px 6px; border: 1px solid var(--line); font-size: 9px; }
 .davis-midi-head { display: flex; justify-content: space-between; align-items: center; }
 .davis-midi-head i { font-style: normal; font-size: 8px; letter-spacing: 0.1em; color: var(--dim); }
+/* #1725 — the panel row's one honest read: off, or on + the active bank; a
+   failed connection says its word in the status tones, never a bare "on". */
+.davis-midi-state { font-size: 9px; color: var(--dim); }
+.davis-midi-state.ok { color: var(--ink); }
+.davis-midi-state.warn, .davis-midi-state.bad { color: var(--ink); border-left: 2px solid var(--accent); padding-left: 4px; }
 .davis-midi-status.ok { color: var(--ink); }
 .davis-midi-status.idle { color: var(--dim); }
 .davis-midi-status.warn, .davis-midi-note.warn { color: var(--ink); border-left: 2px solid var(--accent); padding-left: 4px; }
@@ -1252,6 +1257,29 @@ details.ds-dev > summary:hover { color: var(--dim); }
 .chiaro-editor .map-tiles { flex-wrap: nowrap; }
 .chiaro-editor .map-tiles .te-matrix { display: flex; flex-wrap: nowrap; flex: 0 0 auto; }
 .chiaro-editor .map-tiles .te-cell { flex: 0 0 auto; min-width: 52px; }
+/* MIDI setup editor (#1725): the same floating-editor grammar as
+   CHIAROSCURO above — portaled to the body, position:fixed from the
+   canvas wrap's anchor (inline geometry), no backdrop, the canvas stays
+   live underneath, content-sized with the body scrolling internally
+   past the height bound. Flat per DS: border only. */
+.midi-editor {
+  position: fixed;
+  width: max-content;
+  background: var(--panel-2);
+  border: 1px solid var(--line);
+  z-index: 60;
+  display: flex; flex-direction: column;
+}
+.midi-editor-head {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line);
+  flex: 0 0 auto;
+}
+.midi-editor-title { font-size: 12px; font-weight: 800; letter-spacing: 0.06em; color: var(--kc-davis); }
+.midi-editor-body { padding: 12px; overflow-y: auto; flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; gap: 4px; }
+.midi-editor-body > * { max-width: 560px; }
+
 .chiaro-group { width: auto; margin-top: 2px; }
 .chiaro-group-row { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
 .chiaro-note { font-size: 9px; color: var(--dim); }
