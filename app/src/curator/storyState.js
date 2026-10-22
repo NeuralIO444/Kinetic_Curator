@@ -56,9 +56,11 @@ export const CLEVER_GATE = 0.1;
 export const TOPIC_COOLDOWN_BARS = 96;
 /** Bars between bed verdict-notes (the floor may repeat, not chatter). */
 export const NOTE_COOLDOWN_BARS = 8;
-/** Beat forms per kind. A form is a way of telling it, not a line: the referent fills it (rule 5). */
+/** Beat forms per kind. A form is a way of telling it, not a line: the referent fills it (rule 5).
+ * 'onthisday' (S4) is the lore cold open: its pattern is seeded by the driver from the lore bank, its
+ * referent is a lore entry id — this module stays free of the bank itself; it only knows the shape. */
 export const BEAT_FORMS = Object.freeze({
-  callback: Object.freeze(['last-ending', 'debt', 'grudge']),
+  callback: Object.freeze(['last-ending', 'debt', 'grudge', 'onthisday']),
   grudge: Object.freeze(['name-it', 'with-count']),
   streak: Object.freeze(['name-it', 'with-count']),
   reversal: Object.freeze(['noted', 'dry']),
@@ -472,7 +474,7 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
           return fire({
             ...base, kind: 'callback', cls: 'story', form, persona: form === 'grudge' ? 'lois' : 'davis',
             ...(p.topic ? { topic: p.topic } : {}),
-            referent: { ...(p.seed !== undefined ? { seed: p.seed } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), ...(p.topic ? { topic: p.topic } : {}) },
+            referent: { ...(p.seed !== undefined ? { seed: p.seed } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), ...(p.topic ? { topic: p.topic } : {}), ...(p.loreId ? { loreId: p.loreId } : {}) },
           });
         }
       }
