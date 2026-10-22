@@ -33,6 +33,20 @@ function fakeAccessScript() {
   `;
 }
 
+// #1725 — the panel keeps the slim row (MIDI button + status read) and the
+// key legend; the setup itself (ENABLE, the status line, the bank bar, the
+// LEARN rows) lives in the floating editor the button launches. Returns the
+// editor locator; the panel is `page.locator('.davis-midi')` when a test
+// needs the row or the legend.
+async function openEditor(page) {
+  const editor = page.locator('.midi-editor');
+  if (!(await editor.isVisible().catch(() => false))) {
+    await page.locator('.davis-midi').getByRole('button', { name: 'MIDI' }).click();
+    await expect(editor).toBeVisible({ timeout: 15_000 });
+  }
+  return editor;
+}
+
 async function boot(page, extraScript = '') {
   await page.addInitScript(({ doc, extra }) => {
     localStorage.setItem('kc:first-run-seen', '1');
@@ -47,10 +61,10 @@ async function boot(page, extraScript = '') {
   // stability hang further down.
   await page.locator('.app').waitFor({ timeout: 30_000 });
   await page.getByRole('tab', { name: /director/i }).click();
-  const midi = page.locator('.davis-midi');
-  await expect(midi).toBeVisible({ timeout: 15_000 });
-  await midi.scrollIntoViewIfNeeded();
-  return midi;
+  const panel = page.locator('.davis-midi');
+  await expect(panel).toBeVisible({ timeout: 15_000 });
+  await panel.scrollIntoViewIfNeeded();
+  return openEditor(page);
 }
 
 async function enable(midi) {
@@ -66,12 +80,19 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   // The other two tests are a third of its steps and stay on the default.
   test.setTimeout(180_000);
   const midi = await boot(page);
+  const panel = page.locator('.davis-midi');
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
   // every target is a row now (learn needs them all); a MAPPED row is one with an Unmap button
   await expect(midi.getByRole('button', { name: /^Unmap / })).toHaveCount(3, { timeout: 3_000 });
+  // #1725 — the panel row reads the truth at a glance, and the legend stayed
+  // in the panel: the seeded project's three bindings read there, not in the modal.
+  await expect(panel.locator('.davis-midi-state')).toContainText('off');
+  await expect(panel.locator('.davis-midi-legend-head')).toContainText('keys · MAIN');
+  await expect(panel.locator('.davis-midi-legend li')).toHaveCount(3);
 
   await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('1 device: Test Pad', { timeout: 3_000 });
+  await expect(panel.locator('.davis-midi-state')).toContainText('on · MAIN');
 
   const evolve = page.locator('.panel-davis').getByRole('button', { name: /^(EVOLVE|STOP)$/ });
   await expect(evolve).toHaveText('EVOLVE', { timeout: 3_000 });
@@ -100,6 +121,19 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await expect(depth).toHaveValue('0', { timeout: 3_000 });
 
   await page.getByRole('tab', { name: /director/i }).click();
+  // The tab switch may have closed the editor (a remounted panel starts
+  // shut); reopen it — the store kept everything.
+  await openEditor(page);
+  // #1725 — a bank switch made inside the modal: the panel legend follows.
+  // A new bank is empty, so the legend falls silent and the row names it.
+  await midi.locator('button[title="New bank"]').click();
+  await expect(panel.locator('.davis-midi-state')).toContainText('on · BANK 2');
+  await expect(panel.locator('.davis-midi-legend-head')).toHaveCount(0);
+  await expect(panel.locator('.davis-midi-legend li')).toHaveCount(0);
+  await midi.locator('.davis-midi-bank select').selectOption({ label: 'MAIN' });
+  await expect(panel.locator('.davis-midi-state')).toContainText('on · MAIN');
+  await expect(panel.locator('.davis-midi-legend li')).toHaveCount(3);
+
   await page.evaluate(() => window.__midi.send([0x90, 38, 100]));
   await expect(freeze).toHaveText('THAW', { timeout: 3_000 });
   await page.evaluate(() => window.__midi.unplug());
@@ -112,6 +146,8 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
   await expect(midi.getByRole('button', { name: /^Unmap / })).toHaveCount(2);
   await midi.getByRole('button', { name: 'ON', exact: true }).click();
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI off', { timeout: 3_000 });
+  // …and the panel row falls back to its one word for it.
+  await expect(panel.locator('.davis-midi-state')).toContainText('off');
 });
 
 test('MIDI: a refused permission says so', async ({ page }) => {
