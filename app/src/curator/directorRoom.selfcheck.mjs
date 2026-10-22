@@ -98,7 +98,7 @@ await ok('no mind moves a gain: wild replies and face overlays leave the Directo
 });
 
 await ok('wired and registered: the app starts it and feeds it to the snapshot; the helper knows the names', () => {
-  assert.deepEqual(EVENT_REGISTRY.DIRECTOR_ROOM.handler, ['curator/mindRoom.js', 'curator/roomFeed.js']);
+  assert.deepEqual(EVENT_REGISTRY.DIRECTOR_ROOM.handler, ['curator/mindRoom.js', 'curator/roomFeed.js', 'curator/storyLive.js']);
   const app = src('../App.jsx');
   assert.match(app, /const stopRoom = startMindRoom\(\)/);
   assert.match(app, /director: getMindRoom\(\)/);

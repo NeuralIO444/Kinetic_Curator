@@ -162,6 +162,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1203: per-machine UI preference — the stratum type the ADD STRATUM one-tap replays",
   "kc:mind:presence":
     "#1464: the personas' hidden engagement with the player on this machine; earned here, never carried in a project",
+  "kc:room:story:v1":
+    "#1560 S3: the room's story book — the personas' standings, grudges and episode ledger on this machine; earned here like the engagement scores, never carried in a project",
 });
 
 /**
