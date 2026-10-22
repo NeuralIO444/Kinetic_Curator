@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getPresenceView, subscribePresence } from '../curator/mindPresenceLive.js';
 import { getTrioView, subscribeTrio } from '../curator/trioLive.js'; // #1483: Davis's conducting
+import { getStoryView, subscribeStory } from '../curator/storyLive.js'; // #1560 S3: the room's story machine
 
 const cell = { padding: '2px 6px', borderBottom: '1px solid #333', textAlign: 'left', whiteSpace: 'nowrap' };
 const fmt = (v) => (Number.isFinite(v) ? (Math.round(v * 100) / 100).toString() : '—');
@@ -39,14 +40,64 @@ function Conducting() {
   );
 }
 
+/** #1560 S3 — the room's story: the two directed standings (with what each of them believes of them), the
+ * grudges on record, the episode the session is in, and the beats the machine has chosen. Dev only. */
+function Story() {
+  const [s, setS] = useState(getStoryView);
+  useEffect(() => subscribeStory(() => setS(getStoryView())), []);
+  if (!s) return <p style={{ opacity: 0.6 }}>Story: not running.</p>;
+  const rows = [
+    ['LOIS → DAVIS', s.esteem, 'esteem'],
+    ['DAVIS → LOIS', s.trust, 'trust'],
+  ];
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
+        Story: session {s.session} · {s.phase} · intensity {fmt(s.intensity)} · beats {s.storyBeats} of {s.budget}
+        {s.grudges.length ? ` · grudges: ${s.grudges.map((g) => `${g.topic} ×${g.count}${g.promoted ? ' (named)' : ''}`).join(', ')}` : ''}
+      </p>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <thead>
+          <tr>{['regard', 'mood', 'standing', 'as DAVIS reads it', 'as LOIS reads it'].map((h) => <th key={h} style={cell}>{h}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map(([label, v, key]) => (
+            <tr key={label}>
+              <td style={cell}>{label}</td>
+              <td style={cell}>{fmt(v.mood)}</td>
+              <td style={cell}>{fmt(v.standing)}</td>
+              <td style={cell}>{fmt(s.believed.davis[key])}</td>
+              <td style={cell}>{fmt(s.believed.lois[key])}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+        <tbody>
+          {s.beats.length === 0 && <tr><td style={cell}>no beats yet — a quiet room is a valid scene</td></tr>}
+          {s.beats.map((b, i) => (
+            <tr key={i}>
+              <td style={cell}>bar {b.bar}</td>
+              <td style={cell}>{b.kind}</td>
+              <td style={cell}>{b.persona}</td>
+              <td style={cell}>{b.form || ''}{b.topic ? ` · ${b.topic}` : ''}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 export function MindPanel() {
   const [view, setView] = useState(getPresenceView);
   useEffect(() => subscribePresence(() => setView(getPresenceView())), []);
-  if (!view) return <div style={{ padding: 12, fontSize: 12, opacity: 0.7 }}><Conducting />The personas have not thought yet. Play a bar.</div>;
+  if (!view) return <div style={{ padding: 12, fontSize: 12, opacity: 0.7 }}><Conducting /><Story />The personas have not thought yet. Play a bar.</div>;
   const r = view.reading;
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <Conducting />
+      <Story />
       <p style={{ opacity: 0.75 }}>
         Reading: {r ? `${r.moonPhase} moon (${Math.round(r.illumination * 100)}% lit), ${r.season}` : 'none this session (no modulation)'}
       </p>
