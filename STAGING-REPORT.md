@@ -1,63 +1,50 @@
-# #1725 staging report — MIDI setup as a popup modal
+# #1560 staging report — Slice 1: THE ROOM re-cut to the codec (panel + transcript)
 
-Branch `ember/1725-midi-modal`, staged locally (not pushed, no PR — the coordinator publishes). Everything below was run and verified in this worktree. This file replaces the previous stage's report at the worktree root; that report remains in git history.
+Branch `ember/1560-s1-room-codec`, staged locally (not pushed, no PR — the coordinator publishes). Everything below was run and verified in this worktree. This file replaces the previous stage's report at the worktree root; that report remains in git history.
 
-**What this is:** the DAVIS → MIDI setup (ENABLE, device status, bank bar, LEARN rows) moved off the PERFORM performance surface into a floating editor, per Matt's 2026-10-21 ruling on PR #1724's review. The key legend stays in the panel. A surface move only — no store, sanitizer, target, binding, bank, or learn-behaviour change.
+**What this is:** THE ROOM section at the foot of the DAVIS panel, re-cut from the two-column Directors duel to the codec layout of `docs/research/room-codec/03-transcript-and-panel.md` and the frozen mockup (`kc-room-codec-mockup-2026-10-14.png`, approved 2026-10-14, not revised): LOIS's face window left, Davis's face window right, the transcript column between them, the room's verdict as a full-width footer strip. Panel footprint unchanged; the panel still scrolls and the room still closes it.
 
-## What moved where (3 files)
+## What was built
 
-- `app/src/panels/davis/MidiSection.jsx` — restructured, same component, same file (the LEARN rows' JSX still lives here, so the midi selfcheck's source invariants hold unmodified):
-  - **Panel:** a slim row — `midi` label, the status read, and a **MIDI** button — plus the **key legend**, unchanged, under it.
-  - **Floating editor (new):** everything else — the ENABLE/ON chip, the full device status line + note, the last-message line, the learn prompt, the bank bar (chooser / rename / add / delete), and the LEARN rows for all 69 targets.
-- `app/src/styles/panels.css` — `.davis-midi-state` (the row's read, in the status tones) and `.midi-editor*` (the editor chrome).
-- `app/e2e/midi.spec.js` — the spec follows the surface (below).
-  `DavisPanel.jsx` is untouched: it still hosts `<MidiSection />`.
+- **`src/curator/roomFeed.js`** (new) — the retained bus window. It listens to the kc-voice/1 bus and keeps the last **60 records in arrival order**, each classified by 03's content law (below). `startRoomFeed()` is wired in `App.jsx` next to `startMindFaces()`; the window resets when a take starts or ends (the take's decisions are re-published on the bus as it plays, so a replay re-fills the transcript with the take's own records — the log wins, as it does for the faces). The event registry now lists the feed as a handler for `MIND_DECISION`, `DIRECTOR_ROOM`, `BLOOM` — and for `MIND_ROUTE`, which had no handler until now (its registry note always said "for the persona feed"; this is that feed).
+- **`src/panels/directors/RoomCodec.jsx`** (new, replaces `DirectorsDuel.jsx`, deleted) — the panel. Face windows at today's face size (84 px, 68 px on short windows), dressed as the mockup dresses them: name lowercase in the persona's colour (red LOIS / amber Davis, DS rule 6), state word bold in paper. The faces' data path is the duel's, unchanged: the change-gated 500 ms poll of the honest feed (`resolveLoisFace` / `resolveDavisState`), the mind overlays (`useMindFaces` + `loisLook` / `davisLook`, shown state flips at weight ≥ 0.5, Davis's sigil turns at a requested canonical state's tempo). The footer carries the room: verdict name + the matrix's verdict line, verbatim; with no room it reads just THE ROOM (silence, DS rule 4). Readout only — nothing in the room is a button, nothing emits.
+- **`src/panels/directors/RoomFaces.jsx`** (new) — **the slice-2 seam.** `LoisFaceNow` / `DavisFaceNow` are the only components that render inside the windows (today: LOIS's kaomoji with the mind blend; the seed-drawn `DavisSigil`). S2's generative dither faces replace these two components' internals; the panel, the dressing, the transcript and the feed do not change.
+- **`src/hooks/useRoomFeed.js`** (new) — the feed as React state, mirroring `useMindFaces`.
+- **Header readouts** (03 §Readouts): `CH kc-voice/1` · `TASTE` + 10 block bars · `BUS n`. TASTE reads the taste context honestly: the taste head's fidelity over 10 blocks, and below the house's own fidelity bar (0.3, the top bar's rule) it reads as absent — 0 blocks. BUS is the live depth of the retained window, capped at 60.
+- **CSS** (`styles/panels.css`): the duel block replaced by the codec block; `.davis-sigil` and its reduced-motion rule kept verbatim. On short windows the face slots give up height exactly as the duel's did.
 
-## How the floating editor was reused
+## The content law, as implemented (03 §Content law)
 
-The CHIAROSCURO editor (`ChiaroscuroSection.jsx`, #1629) is the precedent and the parts are the same, not a parallel system:
+- **Persona utterances** — a `MIND_DECISION` record for davis or lois whose validated reply carries a `line`. Rendered `bar NNN` (from the record) + the name in the persona's colour + the line, exactly as emitted. A decision with no line is silence: nothing renders. (Today the rules backend speaks no lines, so on rules alone the transcript's persona section is quiet and model-backed sessions fill it — that is the bus as it is, not a gap in the panel.)
+- **Room events** — neutral facts the bus already carries, worded plainly: `crown landed · N` (DICE_CAST, N = the cast size), `route landed · …` / `route dropped · reason` (MIND_ROUTE, in the route table's own words via `describeOp`), `bloom · a voice earned after N rolls` (BLOOM), and the room's verdict as the mockup's tail line — `— the room, working —` for THE ROOM, `— the room, the clash —` etc. for the others. A verdict that repeats standing (a warmer band, same room) is not kept twice in a row.
+- **Sway — NOT rendered.** 03 §Content law lists sway as a line kind, but DS rule 10 ("no surface value, label, or readout may expose the sway") and law 2 bind harder, and the brief for this slice rules it explicitly: the feed never classifies a sway record, and the third persona's decisions are dropped by the classifier even when they carry a line. The tension between 03 and DS rule 10 is flagged here for the design doc, not resolved by rendering.
+- **Two of 03's example room events have no bus record today** — a new seed (DAVIS_EVOLVE is a request, not a fact; `bumpSeed` dispatches straight to the store) and a governor shed (the registry's own note: governor writes "stay direct: telemetry, not user decisions"). They produce no transcript lines in S1. Inventing events for them would have meant new plumbing in the live loop and a dishonest line until it landed; if a later slice gives the bus those facts, the classifier takes them in one place (`roomLineFrom`).
 
-- `createPortal` to `document.body`, `position: fixed`, **no backdrop, no focus trap** — the canvas stays live and rendering underneath.
-- Placement from the same `shelfAnchor` (panels/shelfView.mjs): top-left of the canvas wrap's rect shrunk by the 16px inset, that rect as the size caps; the CSS hugs the window to its content (`width: max-content`) and the body scrolls internally past the height cap.
-- Same dismissal grammar: the row's button toggles (`aria-expanded` / `aria-haspopup="dialog"`), **Esc or click-away closes**, re-anchor on window resize and on pointer-up (the column divider resizes the canvas without a resize event).
-- Same chrome: `te-dock-kicker` ("CONTROLLER SETUP") + title + the `te-dock-close` × button; flat per DS — border only.
+## 08 defaults taken (flagged per the brief, not asked)
 
-**One divergence, forced by the room:** Chiaroscuro closes the TE value dock when it opens. The dock's provider wraps `BuildPanel` only — no DockProvider stands above the DAVIS panel, and no dock can be open while DAVIS is on screen — so there is nothing to close here and `useDock` is not called (it would throw). Recorded in the component header too.
+- **Q5 (live tail vs scrollable history): live tail.** The column shows the most recent 6 lines (its height is the face windows' height), newest at the bottom; the retained 60 stay in the feed. No scrollback UI in S1.
+- **Q6 (quiet-room filter): no filter.** The window shows the bus as it comes. If conducting routes flood the column in real play, filtering is the iteration point — the classifier is the one place it would land.
 
-**Learn-armed dismissal rule (new, deliberate):** while learn is armed the editor does not close — Esc still cancels learn exactly as before, and click-away / the row's button / the × are inert until it disarms. Learn's mode must never sit armed and invisible behind a closed editor. This changes dismissal only; learn's exits are unchanged (Esc, CANCEL, device loss, MIDI off), and no learn behaviour moved.
+## Verification
 
-## The panel row, state by state
+- `npm run build` — **passes**.
+- **New selfcheck** `src/curator/roomFeed.selfcheck.mjs` (added to `app/selfcheck.manifest`): the content law end to end — persona lines only from decisions carrying an utterance, the third persona never a line, room-event wording, the 60 cap in arrival order, verdict dedupe, the TASTE mapping — plus a live-wiring section that emits through the real bus and reads the real feed back.
+- **Touched families, all passing:** roomFeed, directorsMatrix, directorRoom, davisState, davisSigil, mind, mindFace, mindApple, topbarTaste, queenDeniability, casingInCss, eventRegistry (see Deviations), replayGate, creatureGate, wingWarp.
+- **The gates did not move.** replayGate PASS, creatureGate PASS, wingWarp probe `REST=dfb2915f BENT=981bdefe` — the standing pins, byte-identical. No fixture re-records, no golden re-pins, no weakened assertions anywhere in this slice.
+- **Full manifest sweep** (each of the 495 commands run individually on the final tree): **492 pass**. The 3 failures are the sandbox's standing, base-identical ones, each proven identical on clean main in earlier slices: `swarmWasm` (no Rust toolchain parity), `rollSafety` (browser harness timeout), `accum` (native abort). One more, `eventRegistry`, failed mid-sweep and passes on the final tree — see Deviations.
+- **Visual check** (headless, route-intercepted preview of this build, 1280×720): quiet state — LOIS VIBE window, Davis no state (`—`), BUS 0, no lines, footer without a verdict. Talking state (rolls → FLOW, keep → NOD) — windows show NOD / FLOW, footer reads `THE CLASH — the critic points, the generator rolls. Neither backs down.` Reachability: `.davis-body` scrolled to the bottom puts the whole codec in view (0 px past the fold) — the #1714 contract holds in the talking state. In that spec flow the transcript honestly stays empty: nothing ticks the Director (picks do) and no backend speaks, so the bus carries nothing — verified as the correct behaviour; the transcript's content is proven at the bus level by the selfcheck.
+- **e2e:** `directors-duel.spec.js` rewritten as `room-codec.spec.js` against the new surface (same boot, keep/roll/seed/reduced-motion/reachability coverage; the duel-desc matrix-line assertions became footer assertions, since §03 moves the words to the transcript; transcript-content assertions live in the node selfcheck, for the reason above). Playwright cannot execute in this sandbox — a 280 s attempt produced no output, the standing limitation from #1725 — so CI is the arbiter for the spec.
 
-The read is one honest line next to the MIDI button (tone follows `midiStatusView` — dim when idle, ink when ok, accent-ruled when warn/bad):
+## Deviations and notes (honest list)
 
-| State | Read |
-|---|---|
-| MIDI off | `off` |
-| On, connecting or ready | `on · MAIN` (the active bank's name) |
-| On, access denied | `refused` |
-| On, browser has no Web MIDI | `no midi` |
-| On, no device found | `no device` |
+- **Four wiring selfchecks were repointed, none weakened.** `directorsMatrix`, `mindFace`, `davisSigil`, `mindApple` read `DirectorsDuel.jsx` by path and asserted its wiring (roomFor call, looks, readout-only, no model controls). Those assertions now read `RoomCodec.jsx` (plus `RoomFaces.jsx` for the blend) with the same patterns. Two assertions in `directorsMatrix`'s wiring check — that each duel side renders its matrix line — were **replaced, not kept**: §03 removes the per-face paragraph by design ("No paragraph — the transcript carries the words now"), so the check now asserts the codec's footer wiring (verdict + verdictLine from `roomFor`) at the same strength. The matrix's copy assertions (20 rooms, verbatim) are untouched and pass.
+- **`eventRegistry` updated, and its selfcheck caught it first.** The feed is `MIND_ROUTE`'s first handler and a new handler on three other events; the registry entries now say so (DICE_CAST keeps `handler: 'wire'` — the wire stays its dispatch handler, as KEEP_ADD's entry already coexists with App's listener). The sweep recorded this one as a failure because the registry edit landed after its run started; re-run on the final tree it passes, and that is the verdict counted above.
+- **Two house tripwires fired on the first cut and were fixed, not silenced:** `queenDeniability` (her name may not appear in a surface file at all — even in a comment saying she is absent; the comment now says "the third of the trio") and `casingInCss` (no case calls in JSX — the transcript's persona name is uppercased in CSS now).
+- **Recon correction:** the pre-build summary described the duel's internals from memory (glyph tables in mindFace). The build follows the code as it actually is (`loisLook`/`davisLook`, change-gated poll); no behaviour difference resulted, but the summary was wrong and this report follows the code.
+- Nothing outside the slice was touched: no S2 dither work, no story/rapport/suspicion computation (S3), no lore (S4), no peephole, nothing MegaMind. The transcript renders records as they come.
 
-The full sentence (device names, the unplugged note, what to do about a refusal) lives in the editor's status line, word for word as before.
+## Files
 
-**The legend** renders exactly as #1720 built it — same markup, same classes, fed by the same store fields — so it follows the active bank whoever switches it: the modal's chooser, the modal's + button, or a BANK NEXT key on a controller. Silent when the active bank has no bindings (DS: silence is default).
-
-## Fit / reachability assertions
-
-- `app/e2e/directors-duel.spec.js` (the #1714 reachability contract: the davis body is a scroller, its last section scrolls fully into view, quiet and talking) needed **no changes** — its assertions measure the body and its last section and never named the MIDI section; the panel only got slimmer. This is the one place the build came in under the brief's expectation, and it is a measurement, not an omission.
-- `app/e2e/midi.spec.js` is where the surface assertions live, and it was updated: boot opens the editor after the panel row; the ENABLE / status / LEARN-row assertions now target the editor. New panel-side assertions cover the issue's acceptance directly: the row reads `off` → `on · MAIN` → `off` across the session; the legend sits **in the panel** with the seeded project's three bindings; a bank added inside the modal makes the legend fall silent and the row name `BANK 2`; choosing MAIN in the modal brings the legend back.
-
-## Verification (all run in this worktree)
-
-- `npm run build` — green.
-- `src/midi/midi.selfcheck.mjs` and `src/midi/banks.selfcheck.mjs` — **unmodified** (not in the diff) and green.
-- Gates: `replayGate` and `creatureGate` green; wingWarp probe REST `dfb2915f` / BENT `981bdefe` — main's pins, unmoved. No fixture or golden file is in the diff; no assertion was weakened anywhere.
-- Full manifest sweep, run command-by-command: **489 pass of 494**; the non-zero set is exactly the standing adjudicated sandbox baseline — swarmWasm exit 1, rollSafety / composite / patternRender exit 124, accum exit 134 (tally kept at `~/workspace/tally-1725.txt`).
-- **Browser smoke (the surface itself):** the repo's Playwright harness produced no output in ~25 minutes in this sandbox and was killed — the standing harness limitation; CI's e2e-smoke job remains the arbiter for the specs. In its place the new surface was driven in a real browser (route-interception pattern, dev build): **15/15 checks passed** — panel holds only the button + read (no status line, bank bar, or LEARN rows leak into it); the read says `off`; the legend is silent until a binding exists, then lists both test bindings under `keys · MAIN`; the MIDI button opens a dialog holding ENABLE, the status line, the bank bar, and all **69** LEARN rows; adding BANK 2 inside the modal silences the panel legend, choosing MAIN restores it; click-away and Esc both close. Screenshot: `~/workspace/kc-1725-smoke.png` (editor floating over the live canvas; the slim row + legend visible in PERFORM).
-
-## Deviations
-
-1. No `useDock` dock-close on open — impossible and unnecessary in the DAVIS room (above).
-2. The editor refuses to close while learn is armed (above) — a dismissal rule, not a learn-behaviour change.
-3. `directors-duel.spec.js` unchanged — its reachability assertions never touched this section (above).
-4. The Playwright specs were updated but not executed locally (sandbox harness, above); the behaviour they assert was verified by the browser smoke instead, and CI arbitrates the specs themselves.
+New: `app/src/curator/roomFeed.js`, `app/src/curator/roomFeed.selfcheck.mjs`, `app/src/hooks/useRoomFeed.js`, `app/src/panels/directors/RoomCodec.jsx`, `app/src/panels/directors/RoomFaces.jsx`, `app/e2e/room-codec.spec.js`.
+Changed: `app/src/App.jsx` (feed start/stop + take reset), `app/src/panels/DavisPanel.jsx` (the room section renders RoomCodec), `app/src/composition/eventRegistry.js`, `app/src/styles/panels.css`, `app/selfcheck.manifest` (+1 line), four wiring selfchecks (above).
+Deleted: `app/src/panels/directors/DirectorsDuel.jsx`, `app/e2e/directors-duel.spec.js`.

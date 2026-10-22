@@ -110,7 +110,7 @@ await ok('on-device only, no model UI, roadmap reads "no cloud AI"', () => {
   // no picker, wizard, download or endpoint setting: nothing in the UI calls the helper or names a model
   const app = read('../App.jsx');
   assert.match(app, /model: DEBUG_MIND \? demoModel : appleModel/);
-  for (const ui of ['../components/PerformanceButton.jsx', '../panels/directors/DirectorsDuel.jsx', '../components/LoisPill.jsx', '../panels/pipeline/DataExportRow.jsx']) {
+  for (const ui of ['../components/PerformanceButton.jsx', '../panels/directors/RoomCodec.jsx', '../components/LoisPill.jsx', '../panels/pipeline/DataExportRow.jsx']) {
     assert.ok(!/mind_status|mind_ask|desktopAppleModel|apple-foundation/.test(read(ui)), `${ui} has no model controls`);
   }
   const roadmap = read('../../../docs/ROADMAP_PETRI_DISH.md');

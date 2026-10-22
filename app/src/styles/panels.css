@@ -1011,10 +1011,7 @@
 .panel-davis .chip-btn { line-height: 1.1; }
 .panel-davis .davis-progress { padding: 2px 6px; }
 .panel-davis .davis-midi { padding: 2px 6px; gap: 2px; }
-.panel-davis .duel-verdict { padding: 2px 8px; }
-@media (max-height: 760px) {
-  .panel-davis .duel-side { padding-top: 2px; padding-bottom: 2px; }
-}
+.panel-davis .codec-footer { padding: 2px 8px; }
 .davis-actions-3 { grid-template-columns: repeat(3, 1fr); }
 .davis-actions-4 { grid-template-columns: repeat(4, 1fr); }
 /* #1128: the motion row costs 25px; the panel pays for it here, so it still fits 1280x720 with no scroll */
@@ -1025,36 +1022,51 @@
 .davis-actions-motion .lbl { font-size: 9px; letter-spacing: 0.14em; color: var(--dim); font-style: normal; text-transform: uppercase; padding-right: 4px; }
 .davis-perform-row { display: grid; grid-template-columns: 1fr 2fr; gap: 4px; align-items: stretch; }
 
-/* #1126 — the two Directors, readout only. Square corners, one border; Davis in his own colour. Each side is a row:
-   the face on the left, who and what on the right, so the whole room is about 100 px tall. */
-.directors-duel { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.duel-verdict { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 1px solid var(--line-2); }
-.duel-verdict-line { color: var(--dim); font-size: 10px; line-height: 1.35; }
-.duel-side {
-  display: grid; grid-template-columns: 112px 1fr; grid-template-rows: auto auto 1fr; column-gap: 8px; row-gap: 2px;
-  align-items: center; padding: 4px 8px; border: 1px solid var(--line-2); min-height: 96px; text-align: left;
-}
-.duel-who { grid-column: 2; grid-row: 1; color: var(--dim); align-self: end; }
-.duel-face, .davis-sigil { grid-column: 1; grid-row: 1 / span 3; justify-self: center; }
-.duel-state { grid-column: 2; grid-row: 2; min-height: 14px; }
-.duel-desc { grid-column: 2; grid-row: 3; align-self: start; color: var(--dim); font-size: 10px; line-height: 1.35; }
-.duel-davis .duel-who, .duel-davis .duel-state { color: var(--kc-davis); }
-/* the kaomoji, as large as the 112 px cell holds in one line (seven characters) */
-.duel-face { font-size: 24px; line-height: 84px; height: 84px; color: var(--ink); white-space: nowrap; }
+/* #1560 S1 — THE ROOM as a codec (docs/research/room-codec/03 + the frozen mockup): LOIS's face window left,
+   Davis's right, the transcript between them, the verdict as the footer strip. Square corners, one border per
+   box (M8). The windows carry today's faces at today's size (84 px); slice 2 replaces what renders inside them.
+   The name sits in the persona's colour (DS rule 6: red is LOIS's structure, amber is Davis's taste), the state
+   word bold in paper beside it. The transcript is a live tail: lines sit at the bottom, newest last, and simply
+   replace — no scroll, no arrival motion (law 5: stillness is first-class). */
+.room-codec { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; }
+.codec-window { display: flex; flex-direction: column; border: 1px solid var(--line-2); }
+.codec-face-slot { width: 84px; height: 84px; display: grid; place-items: center; }
+/* the kaomoji, as large as the 84 px cell holds in one line (seven characters); the mind blend stacks its two
+   layers itself (.mind-blend in layout.css) */
+.codec-face { font-size: 24px; line-height: 1; color: var(--ink); white-space: nowrap; }
+.codec-dressing { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 2px 6px 3px; border-top: 1px solid var(--line-2); }
+.codec-name { font-size: 10px; letter-spacing: 0.08em; }
+.codec-lois .codec-name { color: var(--kc-red); }
+.codec-davis .codec-name { color: var(--kc-davis); }
+.codec-state { font-size: 10px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink); }
+.codec-transcript { display: flex; flex-direction: column; border: 1px solid var(--line-2); min-width: 0; }
+.codec-head { display: flex; align-items: center; gap: 8px; padding: 3px 6px; border-bottom: 1px solid var(--line-2); font-size: 9px; letter-spacing: 0.1em; color: var(--dim); white-space: nowrap; }
+.codec-taste { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.codec-taste i { font-style: normal; margin-right: 2px; }
+.codec-taste-block { width: 5px; height: 8px; background: var(--line-2); }
+.codec-taste-block.on { background: var(--kc-davis); }
+.codec-lines { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; gap: 1px; padding: 4px 6px; overflow: hidden; }
+.codec-line { font-size: 10px; line-height: 1.35; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.codec-line .codec-bar { color: var(--dim); }
+.codec-line .codec-who { text-transform: uppercase; }
+.codec-line .codec-who.davis { color: var(--kc-davis); }
+.codec-line .codec-who.lois { color: var(--kc-red); }
+.codec-line.room { color: var(--dim); }
+.codec-footer { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 1px solid var(--line-2); }
+.codec-verdict { font-size: 10px; letter-spacing: 0.18em; white-space: nowrap; }
+.codec-verdict-line { color: var(--dim); font-size: 10px; line-height: 1.35; }
 /* square corners everywhere (M8): the canvas has no frame of its own, so only the round art turns, never a box */
 .davis-sigil { width: 84px; height: 84px; opacity: 0.55; }
 .davis-sigil.turning { opacity: 1; animation: davis-sigil-turn linear infinite; }
 @keyframes davis-sigil-turn { to { transform: rotate(360deg); } }
 /* stillness is a state (rule 7): with less motion he does not turn, and the label still says what he is doing */
 @media (prefers-reduced-motion: reduce) { .davis-sigil.turning { animation: none; } }
-/* #1124: on a short window (1280x720 and the like) DIRECTORS must still fit without a scroll now that the HITS row and the
-   motion row take their share. The room and the starter tile give up a little height; text wraps differ by platform font, so
-   the budget is generous (CI's Linux font was 19px taller than the Mac's). */
+/* Short windows (1280x720 and the like): the room gives up a little height, like the duel did — the panel
+   scrolls now (Matt's ruling, 2026-10-20), so the contract is reachability, and this buys headroom. */
 @media (max-height: 760px) {
-  .duel-side { grid-template-columns: 92px 1fr; min-height: 78px; padding: 3px 8px; }
-  .duel-face { font-size: 20px; line-height: 68px; height: 68px; }
+  .codec-face-slot { width: 68px; height: 68px; }
+  .codec-face { font-size: 20px; }
   .davis-sigil { width: 68px; height: 68px; }
-  .duel-desc { line-height: 1.25; }
   .voice-chip.starter, .voice-chip.earned { padding: 4px 4px 3px; gap: 1px; }
   .panel-davis .davis-section-label { font-size: 8px; padding-top: 2px; }
 }
