@@ -1061,6 +1061,12 @@
 .codec-footer { grid-column: 1 / -1; display: flex; align-items: baseline; gap: 8px; padding: 4px 8px; border: 1px solid var(--line-2); }
 .codec-verdict { font-size: 10px; letter-spacing: 0.18em; white-space: nowrap; }
 .codec-verdict-line { color: var(--dim); font-size: 10px; line-height: 1.35; }
+/* #1560 S2 — the generative dither faces (curator/roomDither.js): the backing store is cells × 6 px and the
+   window shows it at the face size with the matrix kept square (pixelated, never smoothed), so the tier's
+   resolution IS the picture's resolution. At rest Davis is dim, as the sigil was; stillness under reduced
+   motion is the components' law (they settle to a still dither), not a CSS animation's. */
+.codec-dither { width: 84px; height: 84px; display: block; image-rendering: pixelated; }
+.davis-dither[data-state='none'] { opacity: 0.55; }
 /* square corners everywhere (M8): the canvas has no frame of its own, so only the round art turns, never a box */
 .davis-sigil { width: 84px; height: 84px; opacity: 0.55; }
 .davis-sigil.turning { opacity: 1; animation: davis-sigil-turn linear infinite; }
@@ -1071,8 +1077,10 @@
    scrolls now (Matt's ruling, 2026-10-20), so the contract is reachability, and this buys headroom. */
 @media (max-height: 760px) {
   .codec-face-slot { width: 68px; height: 68px; }
-  /* same fit, smaller cell: the widest face ( five em ) at 65 of 68 px */
+  /* same fit, smaller cell: the widest face ( five em ) at 65 of 68 px (S1's frame law, PR #1727) */
   .codec-face { font-size: 13px; }
+  /* the dither backing store follows the slot down, exactly as the face does (S2) */
+  .codec-dither { width: 68px; height: 68px; }
   .davis-sigil { width: 68px; height: 68px; }
   .voice-chip.starter, .voice-chip.earned { padding: 4px 4px 3px; gap: 1px; }
   .panel-davis .davis-section-label { font-size: 8px; padding-top: 2px; }

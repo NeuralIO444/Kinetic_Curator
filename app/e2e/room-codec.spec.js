@@ -1,6 +1,10 @@
 // #1560 S1 — THE ROOM as a codec: LOIS's face window, Davis's face window, the transcript between them.
 // The faces and states are the honest feed's, as the duel's were (#1126); the transcript is the retained
 // kc-voice/1 bus window (roomFeed) — records in arrival order, newest at the bottom, never an invented line.
+// #1560 S2 — the faces are generative dither (curator/roomDither.js): Davis's rosette in colour Bayer dots,
+// LOIS's construction in glyphs, at the resolution of each persona's engagement tier. The face tests below
+// assert the same contract the sigil's did — still at rest, turning in a state, a new seed is a new face,
+// still under reduced motion — against the dither canvas's data-motion and its pixels.
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
@@ -13,7 +17,7 @@ async function boot(page) {
 const lois = (page) => page.locator('.codec-lois');
 const davis = (page) => page.locator('.codec-davis');
 const curator = (page) => page.locator('.kc-topbar-curator .randomize-btn');
-const face = (page) => page.locator('.davis-sigil').evaluate((cv) => cv.toDataURL());
+const face = (page) => page.locator('.codec-davis .davis-dither').evaluate((cv) => cv.toDataURL());
 
 test('the room opens quiet: LOIS is VIBE, Davis has no state and is not turning, the bus window is empty', async ({ page }) => {
   await boot(page);
@@ -23,7 +27,8 @@ test('the room opens quiet: LOIS is VIBE, Davis has no state and is not turning,
   await expect(davis(page)).toHaveAttribute('data-code', 'none');
   await expect(davis(page).locator('.codec-state')).toHaveText('—');
   await expect(davis(page).locator('.codec-name')).toHaveText('davis');
-  await expect(page.locator('.davis-sigil')).not.toHaveClass(/turning/);
+  await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
+  await expect(page.locator('.codec-lois .lois-dither')).toBeVisible(); // her glyph face is already up, watching
   await expect(page.locator('.codec-ch')).toHaveText('CH kc-voice/1');
   await expect(page.locator('.codec-bus')).toHaveText('BUS 0'); // nothing has happened on the bus yet: silence (DS rule 4)
   await expect(page.locator('.codec-line')).toHaveCount(0);
@@ -45,13 +50,16 @@ test('rolling at a clip puts Davis in FLOW, and the face turns at that tempo', a
   for (let i = 0; i < 3; i++) { await curator(page).click(); await page.waitForTimeout(150); }
   await expect(davis(page)).toHaveAttribute('data-code', 'FLOW');
   await expect(davis(page).locator('.codec-state')).toHaveText('FLOW');
-  const sig = page.locator('.davis-sigil');
-  await expect(sig).toHaveClass(/turning/);
-  expect(await sig.evaluate((cv) => cv.style.animationDuration)).toBe('14s');
-  expect(await sig.evaluate((cv) => getComputedStyle(cv).animationName)).toBe('davis-sigil-turn');
+  const sig = page.locator('.codec-davis .davis-dither');
+  await expect(sig).toHaveAttribute('data-motion', 'turning');
+  // FLOW's tempo is 14 s a turn (the sigil's table): the picture moves, but slowly — two samples a beat
+  // apart differ, and the face never jumps to a different picture wholesale.
+  const a = await face(page);
+  await page.waitForTimeout(600);
+  expect(await face(page)).not.toBe(a);
 });
 
-test('a new seed is a new face (the mandala is drawn from the scene seed)', async ({ page }) => {
+test('a new seed is a new face (the rosette is drawn from the scene seed)', async ({ page }) => {
   await boot(page);
   const a = await face(page);
   expect((await face(page))).toBe(a); // stable between redraws
@@ -71,7 +79,10 @@ test('with less motion he does not turn, and the label still says what he is doi
   const cur = curator(page);
   for (let i = 0; i < 3; i++) { await cur.click(); await page.waitForTimeout(150); }
   await expect(davis(page).locator('.codec-state')).toHaveText('FLOW');
-  expect(await page.locator('.davis-sigil').evaluate((cv) => getComputedStyle(cv).animationName)).toBe('none');
+  await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
+  const a = await face(page);
+  await page.waitForTimeout(600);
+  expect(await face(page)).toBe(a); // settled to a still dither: the same picture, held
   await ctx.close();
 });
 
