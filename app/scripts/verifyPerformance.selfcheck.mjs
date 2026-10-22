@@ -10,6 +10,8 @@ import { createLiveResolver } from '../src/gl/liveResolve.mjs';
 import { withResolveTap, setResolveTap, setResolveOutputTap } from '../src/gl/resolveTap.mjs';
 import { createPerformanceRecorder, packPerformance } from '../src/gl/performanceFile.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../src/data/layout-modes.js';
+import { createStressTracker } from '../src/curator/stress.js';
+import { createStressRecorder } from '../src/curator/stressRecord.js';
 
 const cli = fileURLToPath(new URL('./verifyPerformance.mjs', import.meta.url));
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
@@ -67,6 +69,46 @@ const run = (...a) => spawnSync(process.execPath, ['--no-warnings', cli, ...a], 
   assert.equal(run(junkPath).status, 2);
   assert.equal(run(join(dir, 'missing.kcperf')).status, 2);
   assert.equal(run().status, 2);
+}
+
+// 4. #1635 — a take carrying its stress record is summarised backstage: occupancy per band, crossings
+//    per minute, and the record's own verdict. The summary reports; the exit code stays the frames'.
+{
+  const j0 = JSON.parse(execFileSync(process.execPath, ['--no-warnings', cli, goodPath, '--json'], { encoding: 'utf8' }));
+  assert.equal(j0.stress, null, 'a take with no stress record summarises as none');
+  assert.ok(!run(goodPath).stdout.includes('stress:'), 'and prints no stress line');
+
+  const t = createStressTracker();
+  const rec = createStressRecorder({});
+  for (let f = 0; f < 130; f++) {
+    const v = f < 65 ? 0.1 : 0.95; // a quiet room, then a loud one: the readback crosses bands
+    rec.update({ activity: v, dish: v, taste: v, band: t.update({ activity: v, dish: v, taste: v }).band });
+  }
+  const perfS = take();
+  perfS.stress = rec.finish();
+  const stressPath = join(dir, 'stress.kcperf');
+  writeFileSync(stressPath, await packPerformance(perfS));
+  const r = run(stressPath);
+  assert.equal(r.status, 0, r.stdout + r.stderr);
+  assert.match(r.stdout, /stress: 130 updates — relax \d+ \(\d+%\) · normal \d+ \(\d+%\) · tighten \d+ \(\d+%\), \d+ crossings \(\d+(\.\d+)?\/min\), record verifies against its signals/);
+  const j = JSON.parse(execFileSync(process.execPath, ['--no-warnings', cli, stressPath, '--json'], { encoding: 'utf8' }));
+  assert.equal(j.stress.ok, true);
+  assert.equal(j.stress.updates, 130);
+  assert.equal(j.stress.occupancy.relax + j.stress.occupancy.normal + j.stress.occupancy.tighten, 130,
+    'occupancy sums to the session’s frame count');
+  assert.ok(j.stress.crossings >= 2 && j.stress.occupancy.tighten > 0, 'the loud half tightened');
+  assert.ok(j.stress.crossingsPerMinute > 0);
+
+  // forge the stress record only: the frames still replay (exit 0), the summary refuses to vouch for it
+  const perfF = JSON.parse(JSON.stringify(perfS));
+  perfF.stress.runs[1][1] = 0; perfF.stress.runs[1][2] = 0; perfF.stress.runs[1][3] = 0;
+  const forgedStressPath = join(dir, 'stress-forged.kcperf');
+  writeFileSync(forgedStressPath, await packPerformance(perfF));
+  const rf = run(forgedStressPath);
+  assert.equal(rf.status, 0, rf.stdout + rf.stderr);
+  assert.match(rf.stdout, /RECORD DOES NOT VERIFY/);
+  const jf = JSON.parse(execFileSync(process.execPath, ['--no-warnings', cli, forgedStressPath, '--json'], { encoding: 'utf8' }));
+  assert.equal(jf.stress.ok, false);
 }
 
 console.log('verifyPerformance.selfcheck: ok (good = 0, forged = 1, not a take = 2)');

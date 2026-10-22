@@ -3,7 +3,7 @@
 // (how long the session spent in each band) needed to retune the thresholds.
 import assert from 'node:assert/strict';
 import { createStressTracker, BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN, quantizeStress } from './stress.js';
-import { createStressRecorder, replayStress, verifyStressRecord, expandStressRecord, STRESS_RECORD_VERSION } from './stressRecord.js';
+import { createStressRecorder, replayStress, verifyStressRecord, expandStressRecord, summarizeStressRecord, STRESS_RECORD_VERSION } from './stressRecord.js';
 import { initStress, getStressState, setStressTap } from './stressLive.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { withResolveTap } from '../gl/resolveTap.mjs';
@@ -154,6 +154,38 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
   assert.deepEqual(expandStressRecord(null), []);
   assert.deepEqual(expandStressRecord({ version: 99, runs: [] }), []);
   assert.deepEqual(expandStressRecord({ version: STRESS_RECORD_VERSION, runs: 'x' }), []);
+}
+
+// 6. #1635 — the backstage summary: occupancy and crossings tallied from the per-frame readback agree
+//    with the record's own claims, and a forged record summarises as not-ok instead of lying smoothly.
+{
+  const all = (v) => ({ activity: v, dish: v, taste: v });
+  const t = createStressTracker();
+  const rec = createStressRecorder({});
+  const phases = [[0.1, 100], [0.5, 100], [0.95, 100], [0.5, 100]];
+  for (const [v, n] of phases) {
+    for (let i = 0; i < n; i++) rec.update({ ...all(v), band: t.update(all(v)).band });
+  }
+  const record = rec.finish();
+  const s = summarizeStressRecord(record);
+  assert.equal(s.ok, true);
+  assert.equal(s.updates, 400, 'the summary counts every recorded update');
+  assert.deepEqual(s.occupancy, record.occupancy, 'summary occupancy is the record’s occupancy');
+  assert.equal(s.occupancy.relax + s.occupancy.normal + s.occupancy.tighten, s.updates,
+    'occupancy sums to the session’s frame count');
+  // crossings are the band changes of the readback: one per entry in the record’s bands list after the opener
+  const changes = [];
+  for (const f of expandStressRecord(record)) if (changes[changes.length - 1] !== f.band) changes.push(f.band);
+  assert.equal(s.crossings, changes.length - 1, 'crossings counted between consecutive per-frame bands');
+  assert.equal(s.firstMismatch, null);
+  const forged = JSON.parse(JSON.stringify(record));
+  forged.runs[2][1] = 0; forged.runs[2][2] = 0; forged.runs[2][3] = 0; // silence the loud phase: its bands no longer follow
+  const fs = summarizeStressRecord(forged);
+  assert.equal(fs.ok, false, 'a record whose bands do not follow from its signals summarises as not-ok');
+  assert.ok(Number.isInteger(fs.firstMismatch));
+  assert.equal(summarizeStressRecord(null), null);
+  assert.equal(summarizeStressRecord({ version: 99, runs: [] }), null);
+  assert.equal(summarizeStressRecord({ version: STRESS_RECORD_VERSION, runs: 'x' }), null);
 }
 
 console.log('stressRecord.selfcheck: ok (#1354 exit)');

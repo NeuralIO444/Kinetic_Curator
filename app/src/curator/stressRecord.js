@@ -94,3 +94,23 @@ export function verifyStressRecord(record) {
     firstMismatch,
   };
 }
+
+/**
+ * Summarise a record for backstage reading (#1635): how many updates it holds, the frames spent in each
+ * band and the crossings between them — tallied from the per-frame readback (expandStressRecord), so the
+ * summary can never disagree with the frames it summarises — and whether the record verifies against its
+ * own signals. Crossings per minute is the caller's arithmetic: it needs the session's duration, which
+ * the record alone does not carry. A malformed record summarises to null.
+ */
+export function summarizeStressRecord(record) {
+  if (!record || record.version !== STRESS_RECORD_VERSION || !Array.isArray(record.runs)) return null;
+  const frames = expandStressRecord(record);
+  const occupancy = { relax: 0, normal: 0, tighten: 0 };
+  let crossings = 0;
+  frames.forEach((f, i) => {
+    if (f.band in occupancy) occupancy[f.band] += 1;
+    if (i > 0 && f.band !== frames[i - 1].band) crossings += 1;
+  });
+  const v = verifyStressRecord(record);
+  return { updates: frames.length, occupancy, crossings, ok: v.ok, firstMismatch: v.firstMismatch };
+}
