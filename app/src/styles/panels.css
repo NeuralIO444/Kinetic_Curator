@@ -1030,10 +1030,16 @@
    replace — no scroll, no arrival motion (law 5: stillness is first-class). */
 .room-codec { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 6px; }
 .codec-window { display: flex; flex-direction: column; border: 1px solid var(--line-2); }
-.codec-face-slot { width: 84px; height: 84px; display: grid; place-items: center; }
-/* the kaomoji, as large as the 84 px cell holds in one line (seven characters); the mind blend stacks its two
-   layers itself (.mind-blend in layout.css) */
-.codec-face { font-size: 24px; line-height: 1; color: var(--ink); white-space: nowrap; }
+/* The slot clips: the face is sized to fit (below), and the frame is still the frame — what renders inside a
+   window never paints outside it, whatever a different font stack measures and whatever slice 2 puts in here. */
+.codec-face-slot { width: 84px; height: 84px; display: grid; place-items: center; overflow: hidden; }
+/* The kaomoji, as large as the 84 px cell holds in one line — measured, not guessed (PR #1727 review): seven
+   glyphs at 24 px are 72 px for NOD, 87 px for AWAY, 101 px for VIBE, and 110-120 px for the micro-expressions
+   ( LOIS_EXTRA_FACES ), because the CJK/Kannada/box glyphs in them come back double-width through the fallback
+   fonts — every face but NOD crossed the window's right border into the transcript. 16 px holds the widest of
+   the set ( 120 px at 24 px, five em ) at 80 of 84 px; the mind blend stacks its two layers itself
+   (.mind-blend in layout.css), and both layers take this size. */
+.codec-face { font-size: 16px; line-height: 1; color: var(--ink); white-space: nowrap; }
 .codec-dressing { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; padding: 2px 6px 3px; border-top: 1px solid var(--line-2); }
 .codec-name { font-size: 10px; letter-spacing: 0.08em; }
 .codec-lois .codec-name { color: var(--kc-red); }
@@ -1065,7 +1071,8 @@
    scrolls now (Matt's ruling, 2026-10-20), so the contract is reachability, and this buys headroom. */
 @media (max-height: 760px) {
   .codec-face-slot { width: 68px; height: 68px; }
-  .codec-face { font-size: 20px; }
+  /* same fit, smaller cell: the widest face ( five em ) at 65 of 68 px */
+  .codec-face { font-size: 13px; }
   .davis-sigil { width: 68px; height: 68px; }
   .voice-chip.starter, .voice-chip.earned { padding: 4px 4px 3px; gap: 1px; }
   .panel-davis .davis-section-label { font-size: 8px; padding-top: 2px; }

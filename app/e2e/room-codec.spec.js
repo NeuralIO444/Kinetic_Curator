@@ -75,6 +75,53 @@ test('with less motion he does not turn, and the label still says what he is doi
   await ctx.close();
 });
 
+// PR #1727 review (Matt, 2026-10-22) — the frame is the frame. The kaomoji is seven glyphs, and the
+// CJK/Kannada glyphs in several of them come back double-width: at 24 px the set measures 72-120 px, so every
+// face but NOD crossed the window's right border into the transcript. The slot now sizes the face to the cell
+// (16 px / 13 px in the short-window query) and clips anything a different font stack might still push out —
+// the clip is asserted as the law it is, because it is what holds the frame for the faces this flow never
+// reaches (the mind's micro-expressions) and for slice 2's art. Davis's sigil is not box-measured here: a
+// turning square's bounding box exceeds the cell while his painted art stays inside its inscribed circle
+// (max painted radius 38.9 of 42 px), and the same clip holds it.
+async function faceInsideWindow(page) {
+  return page.locator('.codec-lois .codec-face-slot').evaluate((slot) => {
+    const win = slot.closest('.codec-window');
+    const face = slot.querySelector('.codec-face');
+    const f = face.getBoundingClientRect();
+    const w = win.getBoundingClientRect();
+    return {
+      left: f.left - w.left,
+      right: w.right - f.right,
+      top: f.top - w.top,
+      bottom: w.bottom - f.bottom,
+      spill: slot.scrollWidth - slot.clientWidth,
+      clip: getComputedStyle(slot).overflow,
+    };
+  });
+}
+
+test('LOIS’s face stays inside her window, tall windows and short ones', async ({ page }) => {
+  for (const [w, h] of [[1440, 900], [1280, 720]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await boot(page);
+    // VIBE (the quiet boot face), then NOD (a keep — the other honest face the flow can reach)
+    for (const code of ['VIBE', 'NOD']) {
+      if (code === 'NOD') {
+        await page.keyboard.press('f');
+        await expect(lois(page)).toHaveAttribute('data-code', 'NOD');
+      }
+      const m = await faceInsideWindow(page);
+      const at = `${w}x${h} ${code}:`;
+      expect(m.left, `${at} the face crosses the left border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.right, `${at} the face crosses the right border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.top, `${at} the face crosses the top border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.bottom, `${at} the face crosses the bottom border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.spill, `${at} the slot is scrolled by a face wider than it`).toBeLessThanOrEqual(0);
+      expect(m.clip, `${at} the window does not clip what renders in it`).toBe('hidden');
+    }
+  }
+});
+
 // Reachability (Matt's ruling, 2026-10-20, PR #1714): the Davis panel MAY scroll. The contract is: the body
 // really is a scroller, and its last section — the room — can be scrolled fully into view, quiet or talking.
 async function lastSectionReachable(page) {
