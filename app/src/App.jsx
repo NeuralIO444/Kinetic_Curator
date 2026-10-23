@@ -44,6 +44,7 @@ import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: wh
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
+import { startRoomFeed, resetRoomFeed } from './curator/roomFeed.js'; // #1560 S1: THE ROOM codec's retained bus window
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
@@ -138,6 +139,7 @@ function AppInner() {
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();
+    const stopFeed = startRoomFeed();
     const stopSpectrum = startSpectrum(getAudioMeterTap); // #1482 P2: steps once a frame, STIMULI open or not
     // #1463 — Apple Intelligence through the desktop helper is the default whenever it is available; until the
     // startup check answers (and always on the web) the rules answer, silently.
@@ -194,7 +196,7 @@ function AppInner() {
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
     setPlaybackFrameTap((frame, perf, o) => { replayMindFrame(frame, perf && perf.mind, o); replaySpectrumFrame(frame, perf && perf.spectrum, o); });
-    const offPlayback = subscribePlayback(() => { endMindReplay(); endSpectrumReplay(); resetMindFaces(); resetGhost(); }); // a take starts or ends: fresh faces
+    const offPlayback = subscribePlayback(() => { endMindReplay(); endSpectrumReplay(); resetMindFaces(); resetRoomFeed(); resetGhost(); }); // a take starts or ends: fresh faces, a fresh transcript window
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
@@ -212,7 +214,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopFeed(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({

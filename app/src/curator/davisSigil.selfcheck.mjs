@@ -64,10 +64,10 @@ ok('tempo per state, from the mockup; no state means he is not turning', () => {
 
 ok('wiring: a readout only, in his colour, still with less motion', () => {
   const r = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
-  const duel = r('../panels/directors/DirectorsDuel.jsx');
-  assert.match(duel, /resolveLoisFace\(feed\)/); assert.match(duel, /resolveDavisState\(feed\)/);
-  assert.ok(!/emit\(|dispatch|useStore\.getState\(\)\.\w+\(|onClick/.test(duel.replace(/\/\/.*$/gm, '')), 'READOUT ONLY: nothing in the duel acts');
-  assert.match(r('../panels/DavisPanel.jsx'), /<DirectorsDuel \/>/);
+  const codec = r('../panels/directors/RoomCodec.jsx');
+  assert.match(codec, /resolveLoisFace\(feed\)/); assert.match(codec, /resolveDavisState\(feed\)/);
+  assert.ok(!/emit\(|dispatch|useStore\.getState\(\)\.\w+\(|onClick/.test(codec.replace(/\/\/.*$/gm, '')), 'READOUT ONLY: nothing in the room acts');
+  assert.match(r('../panels/DavisPanel.jsx'), /<RoomCodec \/>/);
   const css = r('../styles/panels.css'); assert.match(css, /prefers-reduced-motion: reduce\) \{ \.davis-sigil\.turning \{ animation: none; \} \}/);
   assert.match(r('../styles/tokens.css'), /--kc-davis: #ffcd82;/);
 });

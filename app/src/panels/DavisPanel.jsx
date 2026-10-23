@@ -10,7 +10,7 @@ import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the s
 import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
-import { DirectorsDuel } from './directors/DirectorsDuel.jsx';
+import { RoomCodec } from './directors/RoomCodec.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js';
 import { RangeRow } from '../components/RangeRow.jsx';
@@ -328,9 +328,10 @@ export function DavisPanel() {
             </>
           )}
 
-          {/* #1126 — the two Directors, at the foot of the panel (Matt): readout only, what the honest feed says each is doing */}
+          {/* #1126 → #1560 S1 — THE ROOM at the foot of the panel (Matt): re-cut to the codec — two face windows
+              and the transcript between them, readout only (docs/research/room-codec/03) */}
           <div className="davis-section-label ttl">the room</div>
-          <DirectorsDuel />
+          <RoomCodec />
       </div>
     </div>
   );

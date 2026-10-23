@@ -107,8 +107,10 @@ await ok('the ?debug=mind demo drives the whole path: thinker → request on the
 await ok('wired: the faces draw the overlay; the demo is URL-gated; pure modules read no clock', () => {
   const pill = src('../components/LoisPill.jsx');
   assert.match(pill, /useMindFaces\(\)/); assert.match(pill, /loisLook\(mind\.id\)/);
-  const duel = src('../panels/directors/DirectorsDuel.jsx');
-  assert.match(duel, /loisLook\(mind\.lois\.id\)/); assert.match(duel, /davisLook\(mind\.davis\.id\)/);
+  const codec = src('../panels/directors/RoomCodec.jsx');
+  assert.match(codec, /loisLook\(mind\.lois\.id\)/); assert.match(codec, /davisLook\(mind\.davis\.id\)/);
+  const faces = src('../panels/directors/RoomFaces.jsx');
+  assert.match(faces, /loisLook\(overlay\.id\)/); // #1560 S1: the blend itself renders inside the face window
   const app = src('../App.jsx');
   assert.match(app, /model: DEBUG_MIND \? demoModel : appleModel/);
   assert.match(app, /const stopFaces = startMindFaces\(\)/);

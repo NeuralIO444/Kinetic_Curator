@@ -46,12 +46,12 @@ ok('no state, no room: with either Director silent nobody speaks (rule 4); junk 
   assert.equal(roomFor('NOD', undefined), null); assert.equal(roomFor('__proto__', 'FLOW'), null); assert.equal(roomFor('NOD', 'constructor'), null); assert.equal(roomFor('LEAN', 'FLOW'), null);
 });
 
-ok('wiring: the duel says the matrix\'s words and the strip only reads', () => {
-  const duel = readFileSync(new URL('../panels/directors/DirectorsDuel.jsx', import.meta.url), 'utf8');
-  assert.match(duel, /roomFor\(lois\.code, davis \? davis\.code : null\)/);
-  assert.match(duel, /talk \? \(talk\.lois \?\? ''\) : lois\.label/); assert.match(duel, /talk \? talk\.davis :/);
-  assert.match(duel, /className="duel-verdict" data-verdict=\{talk\.verdict\}/);
-  assert.match(duel, /\{talk\.verdictLine\}/);
+ok('wiring: the codec names the room with the matrix\'s words and the footer only reads', () => {
+  const codec = readFileSync(new URL('../panels/directors/RoomCodec.jsx', import.meta.url), 'utf8');
+  assert.match(codec, /roomFor\(lois\.code, davis \? davis\.code : null\)/);
+  assert.match(codec, /'data-verdict': talk\.verdict/);
+  assert.match(codec, /\{talk\.verdictLine\}/);
+  assert.match(codec, /talk \? talk\.verdict : 'THE ROOM'/);
 });
 
 ok('"ugly" is ultra rare (Matt, 2026-10-11): one spoken line in the whole matrix, never a label, never a verdict; the state reads SIFT', () => {
@@ -68,8 +68,8 @@ ok('"ugly" is ultra rare (Matt, 2026-10-11): one spoken line in the whole matrix
   for (const st of Object.values(DAVIS_STATES)) assert.ok(!/ugly/i.test(st.label), `${st.code}: the label does not say it`);
   assert.equal(DAVIS_STATES.UGLY.code, 'UGLY', 'the internal code is unchanged (tables, tempo and wildness key on it)');
   assert.equal(DAVIS_STATES.UGLY.name, 'SIFT', 'what the artist reads');
-  const duel = readFileSync(new URL('../panels/directors/DirectorsDuel.jsx', import.meta.url), 'utf8');
-  assert.match(duel, /\{davis \? \(davis\.name \?\? davis\.code\) : '—'\}/, 'the duel shows the name, not the code');
+  const codec = readFileSync(new URL('../panels/directors/RoomCodec.jsx', import.meta.url), 'utf8');
+  assert.match(codec, /davis \? \(davis\.name \?\? davis\.code\) : '—'/, 'the room shows the name, not the code');
 });
 
 console.log(`directorsMatrix.selfcheck: ${n} checks passed`);
