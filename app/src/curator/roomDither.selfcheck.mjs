@@ -5,11 +5,12 @@ import { readFileSync } from 'node:fs';
 import {
   BAYER4, orderedLevel, DITHER_GRIDS, gridTierFor, vibeBend, lerpParams,
   buildDavisSource, davisSampler, davisFaceParams, davisRamp, DAVIS_FACE_PARAMS, DAVIS_LEVELS,
-  loisSampler, loisFaceParams, loisInk, LOIS_GLYPHS, LOIS_FACE_PARAMS, LOIS_LEVELS, LOIS_FACE_CODES,
+  loisSampler, loisFaceParams, loisInk, LOIS_GLYPHS, LOIS_FACE_PARAMS, LOIS_LEVELS, LOIS_FACE_CODES, LOIS_EXTRA_EXPRS,
 } from './roomDither.js';
 import { sigilTempo } from './davisSigil.js';
 import { DAVIS_STATES } from './davisState.js';
 import { LOIS_FACES } from './loisFace.js';
+import { LOIS_EXTRA_FACES } from './mindFace.js';
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -116,27 +117,61 @@ ok('LOIS: every honest state (and CUT) has a parameter set and a fixed glyph voc
     const p = loisFaceParams(code);
     assert.ok(LOIS_GLYPHS[p.glyphs], `${code}: a glyph set`);
     assert.equal(LOIS_GLYPHS[p.glyphs].length, LOIS_LEVELS, 'one glyph per level');
-    assert.ok(p.tint >= 0 && p.tint <= 1 && p.dim > 0);
+    assert.ok(p.tint >= 0 && p.tint <= 1 && p.dim === 1, `${code}: full light — she never fades (Matt, 2026-10-23)`);
   }
   assert.deepEqual(Object.keys(LOIS_FACE_PARAMS).sort(), [...Object.keys(LOIS_FACES), 'CUT'].sort());
+  for (const f of LOIS_EXTRA_FACES) assert.ok(LOIS_EXTRA_EXPRS[f], `${f}: a micro-expression has a construction preset`);
   assert.ok(loisFaceParams('BURN').tint > loisFaceParams('VIBE').tint, 'her red floods a burn, barely touches a vibe');
   const inv1 = loisFaceParams('side-eye'); const inv2 = loisFaceParams('side-eye');
   assert.deepEqual(inv1, inv2, 'an invented state wears the same face every time');
 });
 
-ok('LOIS construction: features read — eyes and mouth are gaps in the lit face; AWAY honestly fades', () => {
+ok('LOIS construction: features read — eyes and mouth are gaps in the lit face; no state ever fades', () => {
   const vibe = loisSampler(loisFaceParams('VIBE'));
   assert.ok(vibe(-0.31, -0.05) < vibe(-0.36, 0.2) - 0.3, 'the eye slot is a gap beside the cheek');
   assert.ok(vibe(0, 0.46) < vibe(0, 0.62) - 0.3, 'the mouth is a gap above the chin');
   assert.ok(vibe(0, -0.72) < vibe(0, 0.05), 'hair masses darker than the lit face');
-  assert.ok(mean(loisSampler(loisFaceParams('AWAY'))) < mean(vibe) * 0.6, 'away is a faded face, not a performed one');
+  // Never fade to black (Matt, 2026-10-23: "always visible like Davis"): every honest state keeps the
+  // face's full light — AWAY reads as gone through her expression (no eyes, a flat line), not a dim.
+  for (const code of LOIS_FACE_CODES) {
+    assert.ok(mean(loisSampler(loisFaceParams(code))) > mean(vibe) * 0.75, `${code} keeps her light`);
+  }
   const burn = loisSampler(loisFaceParams('BURN'));
-  assert.ok(burn(-0.31, -0.05) !== vibe(-0.31, -0.05) || true, 'states differ somewhere');
   assert.notDeepEqual(
     Array.from({ length: 25 }, (_, k) => burn((k % 5) * 0.3 - 0.6, Math.floor(k / 5) * 0.3 - 0.6).toFixed(3)),
     Array.from({ length: 25 }, (_, k) => vibe((k % 5) * 0.3 - 0.6, Math.floor(k / 5) * 0.3 - 0.6).toFixed(3)),
     'BURN and VIBE are different faces',
   );
+});
+
+// PR #1728 review (Matt, 2026-10-23): "have multiple expression liek we had in Unicode" — the construction
+// now wears the Unicode era's faces as amplified presets (BURN's ◉ are wide open, AWAY's ── has no eyes at
+// all), and an invented state wears its micro-expression's preset. This pins the readings at the COARSEST
+// tier: the eyes' open/closed span, a smile and a frown on opposite sides of the mouth line, and every one
+// of the thirteen presets drawing a different tier-1 picture.
+ok('LOIS expressions: the Unicode faces read at dither resolution — ◉ open, ── absent, smiles and frowns', () => {
+  const at = (code, x, y) => loisSampler(loisFaceParams(code))(x, y);
+  assert.ok(at('BURN', 0.31, -0.05) < 0.1, "BURN's ◉ are wide open — the eye slot is a dark gap");
+  assert.ok(at('VIBE', 0.31, -0.05) < 0.15, "VIBE's ─ are slits, still there");
+  assert.ok(at('AWAY', 0.31, -0.05) > 0.45, "AWAY's ── has no eyes at all — the lit face shows through");
+  assert.ok(at('CUT', 0.3, 0.5) < 0.4, "CUT's frown drops its mouth corner below the line");
+  assert.ok(at('BURN', 0.3, 0.5) > 0.45, "BURN's grin keeps the corner clear of it");
+  const N = DITHER_GRIDS[1];
+  const tier1 = (p) => {
+    const s = loisSampler(p, {}); const g = LOIS_GLYPHS[p.glyphs];
+    return Array.from({ length: N * N }, (_, k) => {
+      const i = k % N; const j = Math.floor(k / N);
+      return g[orderedLevel(s(((i + 0.5) / N) * 2 - 1, ((j + 0.5) / N) * 2 - 1), i, j, g.length)];
+    }).join('');
+  };
+  const presets = LOIS_FACE_CODES.map((c) => [c, loisFaceParams(c)])
+    .concat(LOIS_EXTRA_FACES.map((f) => [f, { ...loisFaceParams('VIBE'), ...LOIS_EXTRA_EXPRS[f] }]));
+  const grids = presets.map(([name, p]) => [name, tier1(p)]);
+  for (let a = 0; a < grids.length; a++) for (let b = a + 1; b < grids.length; b++) {
+    let diff = 0;
+    for (let k = 0; k < N * N; k++) if (grids[a][1][k] !== grids[b][1][k]) diff++;
+    assert.ok(diff >= 2, `${grids[a][0]} and ${grids[b][0]} draw the same picture at tier 1 (${diff} cells apart)`);
+  }
 });
 
 ok('LOIS ink: paper scaled by level, her red mixed by tint — strongest in the darks', () => {

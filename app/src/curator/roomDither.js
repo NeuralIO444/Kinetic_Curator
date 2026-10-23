@@ -24,6 +24,7 @@
 // micro-motion (the honest-signals reading); Q12 — LOIS's glyph vocabulary is a FIXED set per state.
 import { sigilGeometry, sigilTempo, SIGIL_RINGS, SIGIL_SIZE } from './davisSigil.js';
 import { LOIS_FACES } from './loisFace.js';
+import { LOIS_EXTRA_FACES } from './mindFace.js';
 
 // ── the shared dither stage ──────────────────────────────────────────────────
 
@@ -225,19 +226,47 @@ export const LOIS_GLYPHS = Object.freeze({
 });
 
 /**
- * Per-state face parameters for LOIS — the shaded face construction's controls. Eye angle, mouth shape and
- * tint (how far her red enters — red = structure/verdict, so it floods BURN and CUT, barely touches VIBE)
- * are the expression; `dim` is AWAY's honesty (she is gone: the face fades, it does not perform); `breathS`
- * is her ambient cycle in seconds — the tempo of the breath that crosses the dither (BURN hurries, AWAY
- * drifts), her answer to Davis's per-state spin tempo (Matt, 2026-10-23: an idle animation like his).
+ * Per-state face parameters for LOIS — the shaded face construction's controls, one amplified preset per
+ * state's expression. The vocabulary is the Unicode era's own faces (Matt, 2026-10-23: "have multiple
+ * expression like we had in Unicode"): VIBE wears `─‿─` (soft slits, a smile), BURN `◉‿◉` (wide round
+ * eyes, a grin), AWAY `──` (no eyes at all, a flat line), CUT the glare — and the amplitudes are sized so
+ * each expression crosses a dither cell at the coarsest tier: eyes run from -0.02 (gone) to 0.135 (◉),
+ * the mouth's curve bends its corners past the line. Tint is how far her red enters — red = structure/
+ * verdict, so it floods BURN and CUT, barely touches VIBE. `dim` is floored at 1: she never fades (Matt,
+ * 2026-10-23: "always visible like Davis. never fade to black") — AWAY reads as gone through her
+ * expression, not through an absence of light. `breathS` is her ambient cycle in seconds — the tempo of
+ * the breath that crosses the dither (BURN hurries, AWAY drifts), her answer to Davis's per-state spin
+ * tempo (Matt, 2026-10-23: an idle animation like his).
  */
 export const LOIS_FACE_PARAMS = Object.freeze({
-  VIBE: Object.freeze({ eyeAngle: -4, eyeOpen: 0.05, browTilt: -3, mouthCurve: 0.15, mouthOpen: 0.03, tint: 0.1, dim: 1, glyphs: 'vibe', breathS: 6.5 }),
-  NOD: Object.freeze({ eyeAngle: -8, eyeOpen: 0.034, browTilt: -5, mouthCurve: 0.35, mouthOpen: 0.026, tint: 0.14, dim: 1, glyphs: 'nod', breathS: 6.0 }),
-  BURN: Object.freeze({ eyeAngle: 7, eyeOpen: 0.075, browTilt: 9, mouthCurve: -0.1, mouthOpen: 0.05, tint: 0.38, dim: 1, glyphs: 'burn', breathS: 4.2 }),
-  AWAY: Object.freeze({ eyeAngle: 0, eyeOpen: 0.02, browTilt: 0, mouthCurve: 0, mouthOpen: 0.02, tint: 0.03, dim: 0.35, glyphs: 'away', breathS: 9.5 }),
-  CUT: Object.freeze({ eyeAngle: 12, eyeOpen: 0.022, browTilt: 12, mouthCurve: 0, mouthOpen: 0.012, tint: 0.45, dim: 1, glyphs: 'cut', breathS: 4.8 }),
+  VIBE: Object.freeze({ eyeAngle: -4, eyeOpen: 0.045, browTilt: -3, mouthCurve: 0.35, mouthOpen: 0.03, tint: 0.1, dim: 1, glyphs: 'vibe', breathS: 6.5 }),
+  NOD: Object.freeze({ eyeAngle: -6, eyeOpen: 0.062, browTilt: -6, mouthCurve: 0.02, mouthOpen: 0.024, tint: 0.14, dim: 1, glyphs: 'nod', breathS: 6.0 }),
+  BURN: Object.freeze({ eyeAngle: 7, eyeOpen: 0.135, browTilt: 8, mouthCurve: 0.5, mouthOpen: 0.055, tint: 0.38, dim: 1, glyphs: 'burn', breathS: 4.2 }),
+  AWAY: Object.freeze({ eyeAngle: 0, eyeOpen: -0.02, browTilt: 0, mouthCurve: 0, mouthOpen: 0.014, tint: 0.03, dim: 1, glyphs: 'away', breathS: 9.5 }),
+  CUT: Object.freeze({ eyeAngle: 13, eyeOpen: 0.025, browTilt: 15, mouthCurve: -0.35, mouthOpen: 0.012, tint: 0.45, dim: 1, glyphs: 'cut', breathS: 4.8 }),
 });
+
+/**
+ * The mind's micro-expressions, in construction form: one preset per Unicode extra face, in
+ * LOIS_EXTRA_FACES' order (keyed by the kaomoji itself, so the pairing can't drift). An invented state
+ * wears the expression its kaomoji always named — hash-picked, stable — so the states the mind invents
+ * keep the face variety the kaomoji set gave her. Each preset owns one dominant axis (sly, lidded,
+ * level, skeptical, sad, wry, glare, flat) so all eight read apart at dither resolution. Tint, glyph
+ * set and breath stay hash-derived per state.
+ */
+const LOIS_EXTRA_EXPR_LIST = [
+  { eyeAngle: 10, eyeOpen: 0.032, browTilt: -8, mouthCurve: 0.55, mouthOpen: 0.022 }, // ( ¬‿¬ ) sly
+  { eyeAngle: -2, eyeOpen: 0.014, browTilt: 13, mouthCurve: -0.3, mouthOpen: 0.045 }, // ( ─_─ ) unimpressed
+  { eyeAngle: 0, eyeOpen: 0.055, browTilt: 0, mouthCurve: 0.02, mouthOpen: 0.022 }, // ( ・_・ ) level
+  { eyeAngle: -12, eyeOpen: 0.13, browTilt: -10, mouthCurve: -0.08, mouthOpen: 0.03 }, // ( ◔_◔ ) skeptical
+  { eyeAngle: -9, eyeOpen: 0.038, browTilt: 10, mouthCurve: -0.5, mouthOpen: 0.02 }, // ( ˘︹˘ ) sad
+  { eyeAngle: 8, eyeOpen: 0.07, browTilt: -6, mouthCurve: 0.22, mouthOpen: 0.04 }, // ( ‾ ʖ‾ ) wry
+  { eyeAngle: 13, eyeOpen: 0.028, browTilt: 16, mouthCurve: -0.42, mouthOpen: 0.014 }, // ( ಠ_ಠ ) glare
+  { eyeAngle: 0, eyeOpen: 0.008, browTilt: -2, mouthCurve: 0, mouthOpen: 0.012 }, // ( ¯ ³¯ ) flat
+];
+export const LOIS_EXTRA_EXPRS = Object.freeze(Object.fromEntries(
+  LOIS_EXTRA_EXPR_LIST.map((e, i) => [LOIS_EXTRA_FACES[i], Object.freeze(e)]),
+));
 
 const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
 
@@ -245,16 +274,16 @@ const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h
  * The parameter set for a LOIS state code. Canonical states (and CUT) wear their own set; an INVENTED state
  * (the mind may invent states — recorded as invented, never passed off as measured) derives a stable set
  * from its id's hash, the same trick mindFace's micro-expression pick uses: the same invented state always
- * wears the same face.
+ * wears the same face — and since 2026-10-23 that face is the micro-expression's own construction preset
+ * (LOIS_EXTRA_EXPRS), so invented states carry the kaomoji set's variety into the dither. Tint, glyph set
+ * and breath tempo stay hash-derived per state.
  */
 export function loisFaceParams(code) {
   if (LOIS_FACE_PARAMS[code]) return LOIS_FACE_PARAMS[code];
   const h = hash(String(code || ''));
-  const angles = [-10, -4, 2, 8]; const curves = [-0.3, 0, 0.3, 0.55];
   const sets = Object.keys(LOIS_GLYPHS);
   return {
-    eyeAngle: angles[h % angles.length], eyeOpen: 0.03 + (h % 4) * 0.01, browTilt: angles[(h >> 3) % angles.length],
-    mouthCurve: curves[(h >> 5) % curves.length], mouthOpen: 0.02 + (h % 3) * 0.012,
+    ...LOIS_EXTRA_EXPRS[LOIS_EXTRA_FACES[h % LOIS_EXTRA_FACES.length]],
     tint: 0.12 + (h % 5) * 0.05, dim: 1, glyphs: sets[h % sets.length],
     breathS: 5.5 + ((h >> 7) % 6) * 0.8, // the invented state breathes at its own hash-derived tempo (deterministic)
   };
