@@ -80,7 +80,19 @@ test('with less motion he does not turn, and the label still says what he is doi
   for (let i = 0; i < 3; i++) { await cur.click(); await page.waitForTimeout(150); }
   await expect(davis(page).locator('.codec-state')).toHaveText('FLOW');
   await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
-  const a = await face(page);
+  // The canvas repaints on its own tick (110 ms), lagging the DOM state the assertions above already saw —
+  // sampling before it lands made this a race (the picture A caught was the pre-FLOW frame), not a breach.
+  // Wait until the picture itself settles — three equal frames in a row IS the settle — then prove it HOLDS.
+  let prev = await face(page);
+  let held = 0;
+  for (let i = 0; i < 40 && held < 3; i++) {
+    await page.waitForTimeout(120);
+    const now = await face(page);
+    held = now === prev ? held + 1 : 0;
+    prev = now;
+  }
+  expect(held, 'the dither settles to one picture under less motion').toBeGreaterThanOrEqual(3);
+  const a = prev;
   await page.waitForTimeout(600);
   expect(await face(page)).toBe(a); // settled to a still dither: the same picture, held
   await ctx.close();
@@ -110,6 +122,27 @@ async function faceInsideWindow(page) {
     };
   });
 }
+
+// PR #1728 review (Matt, 2026-10-23): "the type under lois and davis change the frame size?" — it did: the
+// window was auto-width off the caption, so SEEDLING measured 107 px against the fixed 84 px face (a dead
+// strip beside the art) and a 12-char invented state about 130 px (shoving the whole codec around). The window
+// is locked to the face cell now; the words are content, never structure — a worst-case caption must measure
+// the same window as no caption at all.
+test('the caption never sizes the frame: a 12-char state keeps the window on the face cell', async ({ page }) => {
+  await boot(page);
+  const m = await page.evaluate(() => {
+    const real = document.querySelector('.codec-window');
+    const box = real.cloneNode(true);
+    box.querySelector('.codec-state').textContent = 'DISAPPOINTED'; // 12 — the invented-state cap (mindFace)
+    box.style.cssText = 'position:absolute;visibility:hidden;left:-9999px';
+    document.body.appendChild(box);
+    const probe = box.offsetWidth;
+    box.remove();
+    return { probe, real: real.offsetWidth, face: real.querySelector('.codec-face-slot').offsetWidth };
+  });
+  expect(m.probe, 'a long word widened the window').toBe(m.real);
+  expect(m.real, 'the window is not the face cell (plus its 1 px border each side)').toBe(m.face + 2);
+});
 
 test('LOIS’s face stays inside her window, tall windows and short ones', async ({ page }) => {
   for (const [w, h] of [[1440, 900], [1280, 720]]) {
