@@ -113,6 +113,16 @@ export function davisFaceParams(code) {
 
 const SRC_N = 128; // the source raster's samples across the unit square [-1, 1]^2
 const HALF_ART = SIGIL_SIZE / 2; // the sigil's art space: ornament radii/sizes are in these px
+/**
+ * His art is sampled zoomed IN by 1/0.6 — the rosette overflows the frame (PR #1728 review, Matt,
+ * 2026-10-23: "right now davis has an empty gap"). At zoom 1 the outer field was a circle on black: 21-30 of
+ * the 144 tier-1 cells sat dead in the frame band at every angle, while the frozen mockup carries dither to
+ * every edge. 0.6 magnifies the source 1.67× so ornaments, rings and glow reach past every edge: measured 0
+ * dead band cells across 32 rotation angles × every state × the harshest vibe contrast (1 and 1.25) — pinned
+ * by roomDither.selfcheck ("Davis fills his frame"). Composition's cost: the centre dot and rings read bigger,
+ * the outermost ring leaves the window — Matt's call, same review.
+ */
+const DAVIS_ZOOM = 0.6;
 
 /**
  * Rasterize the rosette source ONCE per seed: two fields over the unit square — the ornaments (with the
@@ -170,7 +180,7 @@ export function davisSampler(source, { angle = 0, breath = 1, density = 1, ringG
   const cos = Math.cos(-angle); const sin = Math.sin(-angle);
   const scale = breath > 0 ? 1 / breath : 1;
   return (x, y) => {
-    const rx = (x * cos - y * sin) * scale; const ry = (x * sin + y * cos) * scale;
+    const rx = (x * cos - y * sin) * scale * DAVIS_ZOOM; const ry = (x * sin + y * cos) * scale * DAVIS_ZOOM;
     const v = sampleField(source.orn, source.size, rx, ry) * density + sampleField(source.ring, source.size, rx, ry) * ringGain * 0.3;
     return clamp01((v - 0.5) * contrast + 0.5);
   };
@@ -217,14 +227,16 @@ export const LOIS_GLYPHS = Object.freeze({
 /**
  * Per-state face parameters for LOIS — the shaded face construction's controls. Eye angle, mouth shape and
  * tint (how far her red enters — red = structure/verdict, so it floods BURN and CUT, barely touches VIBE)
- * are the expression; `dim` is AWAY's honesty (she is gone: the face fades, it does not perform).
+ * are the expression; `dim` is AWAY's honesty (she is gone: the face fades, it does not perform); `breathS`
+ * is her ambient cycle in seconds — the tempo of the breath that crosses the dither (BURN hurries, AWAY
+ * drifts), her answer to Davis's per-state spin tempo (Matt, 2026-10-23: an idle animation like his).
  */
 export const LOIS_FACE_PARAMS = Object.freeze({
-  VIBE: Object.freeze({ eyeAngle: -4, eyeOpen: 0.05, browTilt: -3, mouthCurve: 0.15, mouthOpen: 0.03, tint: 0.1, dim: 1, glyphs: 'vibe' }),
-  NOD: Object.freeze({ eyeAngle: -8, eyeOpen: 0.034, browTilt: -5, mouthCurve: 0.35, mouthOpen: 0.026, tint: 0.14, dim: 1, glyphs: 'nod' }),
-  BURN: Object.freeze({ eyeAngle: 7, eyeOpen: 0.075, browTilt: 9, mouthCurve: -0.1, mouthOpen: 0.05, tint: 0.38, dim: 1, glyphs: 'burn' }),
-  AWAY: Object.freeze({ eyeAngle: 0, eyeOpen: 0.02, browTilt: 0, mouthCurve: 0, mouthOpen: 0.02, tint: 0.03, dim: 0.35, glyphs: 'away' }),
-  CUT: Object.freeze({ eyeAngle: 12, eyeOpen: 0.022, browTilt: 12, mouthCurve: 0, mouthOpen: 0.012, tint: 0.45, dim: 1, glyphs: 'cut' }),
+  VIBE: Object.freeze({ eyeAngle: -4, eyeOpen: 0.05, browTilt: -3, mouthCurve: 0.15, mouthOpen: 0.03, tint: 0.1, dim: 1, glyphs: 'vibe', breathS: 6.5 }),
+  NOD: Object.freeze({ eyeAngle: -8, eyeOpen: 0.034, browTilt: -5, mouthCurve: 0.35, mouthOpen: 0.026, tint: 0.14, dim: 1, glyphs: 'nod', breathS: 6.0 }),
+  BURN: Object.freeze({ eyeAngle: 7, eyeOpen: 0.075, browTilt: 9, mouthCurve: -0.1, mouthOpen: 0.05, tint: 0.38, dim: 1, glyphs: 'burn', breathS: 4.2 }),
+  AWAY: Object.freeze({ eyeAngle: 0, eyeOpen: 0.02, browTilt: 0, mouthCurve: 0, mouthOpen: 0.02, tint: 0.03, dim: 0.35, glyphs: 'away', breathS: 9.5 }),
+  CUT: Object.freeze({ eyeAngle: 12, eyeOpen: 0.022, browTilt: 12, mouthCurve: 0, mouthOpen: 0.012, tint: 0.45, dim: 1, glyphs: 'cut', breathS: 4.8 }),
 });
 
 const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
@@ -244,6 +256,7 @@ export function loisFaceParams(code) {
     eyeAngle: angles[h % angles.length], eyeOpen: 0.03 + (h % 4) * 0.01, browTilt: angles[(h >> 3) % angles.length],
     mouthCurve: curves[(h >> 5) % curves.length], mouthOpen: 0.02 + (h % 3) * 0.012,
     tint: 0.12 + (h % 5) * 0.05, dim: 1, glyphs: sets[h % sets.length],
+    breathS: 5.5 + ((h >> 7) % 6) * 0.8, // the invented state breathes at its own hash-derived tempo (deterministic)
   };
 }
 
@@ -304,11 +317,14 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
  * LOIS's ink for one level: her paper colour scaled by the level's weight, with her red mixed in by the
  * state's tint — strongest in the darks, where the structure of the face is (06: "her red enters here").
  * Warmth bends the paper toward cream (warm) or cool white.
+ * The floor is 0.3 of the paper, not 0.22 (Matt, 2026-10-23: her side was hardly visible): the darks were
+ * painting at a fifth of her paper colour, so the mass read as near-black — and the tint reaches a little
+ * further down the ramp for the same reason. The ramp still climbs (roomDither.selfcheck pins it).
  */
 export function loisInk(level, tint, warmth, inkRgb, redRgb) {
   const t = level / (LOIS_LEVELS - 1);
-  let r = inkRgb[0] * (0.22 + 0.78 * t); let g = inkRgb[1] * (0.22 + 0.78 * t); let b = inkRgb[2] * (0.22 + 0.78 * t);
-  const mixAmt = Math.min(1, Math.max(0, tint)) * (1 - t * 0.55);
+  let r = inkRgb[0] * (0.3 + 0.7 * t); let g = inkRgb[1] * (0.3 + 0.7 * t); let b = inkRgb[2] * (0.3 + 0.7 * t);
+  const mixAmt = Math.min(1, Math.max(0, tint)) * (1 - t * 0.45);
   r += (redRgb[0] - r) * mixAmt; g += (redRgb[1] - g) * mixAmt; b += (redRgb[2] - b) * mixAmt;
   if (warmth > 0) { r += (255 - r) * warmth * 0.08; g += (214 - g) * warmth * 0.06; }
   if (warmth < 0) { b += (255 - b) * -warmth * 0.08; r += (190 - r) * -warmth * 0.05; }
