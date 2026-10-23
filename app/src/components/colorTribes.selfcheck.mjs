@@ -35,7 +35,9 @@ ok('amber means one thing: only these files may use it, and a new one has to be 
   // (#1233: KernelPanel's field-probe readout is amber on purpose — the probe
   // value is a continuous signal sampled from a field at the project seed,
   // which is Davis's family per rule 5. The tile face and tier stay TE.)
-  assert.deepEqual(users, ['components/DavisSigil.jsx', 'panels/KernelPanel.jsx', 'panels/stimulus/MeterHero.jsx', 'styles/controls.css', 'styles/layout.css', 'styles/panels.css', 'styles/ux-polish.css'],
+  // (#1560 S2: RoomFaces reads Davis's token to paint his dithered face — the face IS Davis, amber's family
+  // by rule 6, the same reason the sigil component is on this list.)
+  assert.deepEqual(users, ['components/DavisSigil.jsx', 'panels/KernelPanel.jsx', 'panels/directors/RoomFaces.jsx', 'panels/stimulus/MeterHero.jsx', 'styles/controls.css', 'styles/layout.css', 'styles/panels.css', 'styles/ux-polish.css'],
     'amber is the probabilistic family (Davis, taste, time-based armed outlines, the spinner). If this list needs a new file, rule 5 has a question to answer first.');
   const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8'); const controls = readFileSync(join(SRC, 'styles/controls.css'), 'utf8');
   assert.match(panels, /\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/); assert.match(panels, /\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/);
