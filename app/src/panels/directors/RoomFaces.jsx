@@ -115,10 +115,16 @@ function useFaceCanvas({ target, draw }) {
       const spin = tgt.spinS && next.spinDir ? next.spinDir / tgt.spinS : 0; // radians/sec comes from the tempo
       if (!reduced && spin) st.angle += spin * Math.PI * 2 * dt;
       const t = now / 1000;
+      // Her breath, at an amplitude the dither can feel (Matt, 2026-10-23: LOIS was hardly visible — an idle
+      // animation like Davis's): the lift used to run ±0.006, under the glyph ramp's quantization step
+      // (~0.055 of shade), so the construction breathed on paper and sat still on screen. It now runs
+      // Davis's breath magnitude at HER per-state tempo (params.breathS — BURN hurries, AWAY drifts), and
+      // the cells at every contour flip as the face rises and settles. His draw reads `breath`; hers `lift`.
+      const liftS = Number.isFinite(next.breathS) && next.breathS > 0 ? next.breathS : 5.25;
       const phase = {
         angle: st.angle,
         breath: reduced ? 1 : 1 + 0.028 * Math.sin((t * Math.PI * 2) / 6.5),
-        lift: reduced ? 0 : 0.006 * Math.sin((t * Math.PI * 2) / 5.25),
+        lift: reduced ? 0 : 0.028 * Math.sin((t * Math.PI * 2) / liftS),
       };
       drawRef.current(cv, st.params, phase);
       const alive = !reduced && (!!spin || maxDelta > 0.002);

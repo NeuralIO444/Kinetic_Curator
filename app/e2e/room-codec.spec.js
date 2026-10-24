@@ -80,10 +80,90 @@ test('with less motion he does not turn, and the label still says what he is doi
   for (let i = 0; i < 3; i++) { await cur.click(); await page.waitForTimeout(150); }
   await expect(davis(page).locator('.codec-state')).toHaveText('FLOW');
   await expect(page.locator('.codec-davis .davis-dither')).toHaveAttribute('data-motion', 'still');
-  const a = await face(page);
+  // The canvas repaints on its own tick (110 ms), lagging the DOM state the assertions above already saw —
+  // sampling before it lands made this a race (the picture A caught was the pre-FLOW frame), not a breach.
+  // Wait until the picture itself settles — three equal frames in a row IS the settle — then prove it HOLDS.
+  let prev = await face(page);
+  let held = 0;
+  for (let i = 0; i < 40 && held < 3; i++) {
+    await page.waitForTimeout(120);
+    const now = await face(page);
+    held = now === prev ? held + 1 : 0;
+    prev = now;
+  }
+  expect(held, 'the dither settles to one picture under less motion').toBeGreaterThanOrEqual(3);
+  const a = prev;
   await page.waitForTimeout(600);
   expect(await face(page)).toBe(a); // settled to a still dither: the same picture, held
   await ctx.close();
+});
+
+// PR #1727 review (Matt, 2026-10-22) — the frame is the frame. The kaomoji is seven glyphs, and the
+// CJK/Kannada glyphs in several of them come back double-width: at 24 px the set measures 72-120 px, so every
+// face but NOD crossed the window's right border into the transcript. The slot now sizes the face to the cell
+// (16 px / 13 px in the short-window query) and clips anything a different font stack might still push out —
+// the clip is asserted as the law it is, because it is what holds the frame for the faces this flow never
+// reaches (the mind's micro-expressions) and for slice 2's art. Davis's sigil is not box-measured here: a
+// turning square's bounding box exceeds the cell while his painted art stays inside its inscribed circle
+// (max painted radius 38.9 of 42 px), and the same clip holds it.
+async function faceInsideWindow(page) {
+  return page.locator('.codec-lois .codec-face-slot').evaluate((slot) => {
+    const win = slot.closest('.codec-window');
+    const face = slot.querySelector('.codec-face');
+    const f = face.getBoundingClientRect();
+    const w = win.getBoundingClientRect();
+    return {
+      left: f.left - w.left,
+      right: w.right - f.right,
+      top: f.top - w.top,
+      bottom: w.bottom - f.bottom,
+      spill: slot.scrollWidth - slot.clientWidth,
+      clip: getComputedStyle(slot).overflow,
+    };
+  });
+}
+
+// PR #1728 review (Matt, 2026-10-23): "the type under lois and davis change the frame size?" — it did: the
+// window was auto-width off the caption, so SEEDLING measured 107 px against the fixed 84 px face (a dead
+// strip beside the art) and a 12-char invented state about 130 px (shoving the whole codec around). The window
+// is locked to the face cell now; the words are content, never structure — a worst-case caption must measure
+// the same window as no caption at all.
+test('the caption never sizes the frame: a 12-char state keeps the window on the face cell', async ({ page }) => {
+  await boot(page);
+  const m = await page.evaluate(() => {
+    const real = document.querySelector('.codec-window');
+    const box = real.cloneNode(true);
+    box.querySelector('.codec-state').textContent = 'DISAPPOINTED'; // 12 — the invented-state cap (mindFace)
+    box.style.cssText = 'position:absolute;visibility:hidden;left:-9999px';
+    document.body.appendChild(box);
+    const probe = box.offsetWidth;
+    box.remove();
+    return { probe, real: real.offsetWidth, face: real.querySelector('.codec-face-slot').offsetWidth };
+  });
+  expect(m.probe, 'a long word widened the window').toBe(m.real);
+  expect(m.real, 'the window is not the face cell (plus its 1 px border each side)').toBe(m.face + 2);
+});
+
+test('LOIS’s face stays inside her window, tall windows and short ones', async ({ page }) => {
+  for (const [w, h] of [[1440, 900], [1280, 720]]) {
+    await page.setViewportSize({ width: w, height: h });
+    await boot(page);
+    // VIBE (the quiet boot face), then NOD (a keep — the other honest face the flow can reach)
+    for (const code of ['VIBE', 'NOD']) {
+      if (code === 'NOD') {
+        await page.keyboard.press('f');
+        await expect(lois(page)).toHaveAttribute('data-code', 'NOD');
+      }
+      const m = await faceInsideWindow(page);
+      const at = `${w}x${h} ${code}:`;
+      expect(m.left, `${at} the face crosses the left border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.right, `${at} the face crosses the right border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.top, `${at} the face crosses the top border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.bottom, `${at} the face crosses the bottom border`).toBeGreaterThanOrEqual(-0.5);
+      expect(m.spill, `${at} the slot is scrolled by a face wider than it`).toBeLessThanOrEqual(0);
+      expect(m.clip, `${at} the window does not clip what renders in it`).toBe('hidden');
+    }
+  }
 });
 
 // Reachability (Matt's ruling, 2026-10-20, PR #1714): the Davis panel MAY scroll. The contract is: the body

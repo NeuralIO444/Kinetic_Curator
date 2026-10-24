@@ -2,7 +2,7 @@
 // It draws what the honest feed says (curator/loisActivity.js) and decides nothing itself: the feed owns
 // every signal, resolveLoisFace owns the priority, loisTicker.mjs owns the ticker's decisions, and this
 // only polls, measures, and paints. #1588: her verdict line rides in the place the kaomoji face held,
-// scrolling left to right when it overflows the slot; the face is gone, her state code stays.
+// scrolling right to left when it overflows the slot; the face is gone, her state code stays.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Events, on } from '../composition/eventBus.js';
 import { useStore } from '../state/store.js';
@@ -10,7 +10,7 @@ import { loisActivity } from '../curator/loisActivity.js';
 import { resolveLoisFace, LOIS_FACES } from '../curator/loisFace.js';
 import { loisLook } from '../curator/mindFace.js';
 import { useMindFaces } from '../hooks/useMindFaces.js';
-import { tickerLine, tickerMotion } from './loisTicker.mjs';
+import { tickerLine, tickerMotion, TICKER_DIVIDER } from './loisTicker.mjs';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
 
@@ -45,8 +45,9 @@ export function LoisPill() {
     };
   }, []);
 
-  // #1588 — measure the line's natural width against the slot's, honestly: a hidden twin of the line
-  // reports the text width, the slot reports its own, and the observer re-measures when either moves.
+  // #1588 — measure the TAPE's natural width against the slot's, honestly: a hidden twin of one
+  // line+divider unit reports the unit width, the slot reports its own, and the observer re-measures
+  // when either moves. The run paints two of those units and travels one per loop (loisTicker.mjs).
   const slotRef = useRef(null);
   const measureRef = useRef(null);
   const [widths, setWidths] = useState({ text: 0, slot: 0 });
@@ -67,6 +68,15 @@ export function LoisPill() {
   const motion = tickerMotion({ textWidth: widths.text, slotWidth: widths.slot, reducedMotion });
   const look = mind && mind.id ? loisLook(mind.id) : null;
   const code = look && mind.weight >= 0.5 ? look.code : face.code;
+  // One unit of tape: the verdict line and its divider. The second copy is what makes the wrap land on an
+  // identical frame (the run travels exactly one unit per loop), and it is aria-hidden — as is the divider,
+  // which is decoration — so the line is still said once.
+  const unit = (copy) => (
+    <span className="lois-ticker-unit" {...(copy ? { 'aria-hidden': 'true' } : {})}>
+      {line}
+      <span className="lois-ticker-div" aria-hidden="true">{TICKER_DIVIDER}</span>
+    </span>
+  );
   return (
     <div className="lois-pill" data-tone={face.tone} data-code={face.code} data-mind={look ? look.code : undefined}
       title={`LOIS · ${code} — ${(mind && mind.line) || (look && mind.weight >= 0.5 ? look.label : '') || face.label}`}>
@@ -76,9 +86,10 @@ export function LoisPill() {
             style={motion.mode === 'scroll'
               ? { '--tk-from': `${motion.from}px`, '--tk-to': `${motion.to}px`, animationDuration: `${motion.durationS.toFixed(2)}s` }
               : undefined}>
-            {line}
+            {unit(false)}
+            {unit(true)}
           </span>
-          <span className="lois-ticker-measure" ref={measureRef} aria-hidden="true">{line}</span>
+          <span className="lois-ticker-measure" ref={measureRef} aria-hidden="true">{unit(false)}</span>
         </span>
       )}
       <span className="lois-word">LOIS</span>

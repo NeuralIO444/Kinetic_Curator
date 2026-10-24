@@ -23,6 +23,12 @@ export const STORY_SAVE_EVERY = 16;
 export const STORY_BEAT_LOG = 12;
 
 let view = null;
+/** The session boundary fires once per page load, keyed on the storage object's identity (whisper's per-page
+ * module budgets, applied to the book's session counter): React StrictMode's second setup re-reads the saved
+ * book, and beginning a session on every start would count one dev boot as two — the backstage readout showed
+ * "session 2" on a virgin browser, and the suspicion arc's per-session rationing (§1.8.6) drifted with it. A
+ * genuine second run always arrives as a page reload, whose localStorage is a fresh object. */
+let begunFor;
 const listeners = new Set();
 const notify = () => { for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the loop */ } } };
 
@@ -55,7 +61,7 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
   let saved;
   try { saved = store ? store.getItem(STORY_STORAGE_KEY) : null; } catch { saved = null; }
   const book = saved ? decodeStoryBook(saved) : createStoryBook();
-  beginSession(book);
+  if (begunFor !== store) { begunFor = store; beginSession(book); }
   // the session-start sift of the artist's own ledgers: debts, streaks, the last ending (research §1.6.6)
   const patterns = siftFromStorage(store);
   const ep = createEpisode(book, patterns);

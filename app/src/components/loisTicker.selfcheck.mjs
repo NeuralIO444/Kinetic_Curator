@@ -1,10 +1,10 @@
 // loisTicker.selfcheck.mjs — #1588: LOIS's verdict line leaves the top bar and rides her footer
 // slot as a ticker, in the place the kaomoji face held. The line is loisRank's last verdict — the
-// exact string the top bar showed; the ticker scrolls it left to right only when it overflows the
-// slot, and reduced motion settles it static.
+// exact string the top bar showed; the tape runs it right to left (Matt, 2026-10-22), one line+divider
+// unit per loop, only when that unit overflows the slot, and reduced motion settles it static.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { tickerLine, tickerMotion, TICKER_SPEED_PX_S } from './loisTicker.mjs';
+import { tickerLine, tickerMotion, TICKER_SPEED_PX_S, TICKER_DIVIDER } from './loisTicker.mjs';
 import { rankLois, getLoisVerdict, clearLoisVerdict } from '../curator/loisRank.js';
 
 let n = 0;
@@ -41,13 +41,14 @@ ok('scrolls only on overflow: a line that fits sits still', () => {
   assert.equal(tickerMotion({ textWidth: 101, slotWidth: 100 }).mode, 'scroll');
 });
 
-ok('travels left to right at one constant speed, whatever the line\u2019s length', () => {
+ok('travels right to left by exactly one unit per loop, at one constant speed', () => {
   const m = tickerMotion({ textWidth: 260, slotWidth: 66 });
-  assert.equal(m.from, -260, 'starts fully left of the slot: it enters at the left edge');
-  assert.equal(m.to, 66, 'ends fully right of the slot: it leaves at the right edge');
-  assert.ok(Math.abs(m.durationS - 326 / TICKER_SPEED_PX_S) < 1e-9, 'duration is distance over speed');
+  assert.equal(m.from, 0, 'starts on the slot\u2019s left edge: the tape is already running, no blank frame');
+  assert.equal(m.to, -260, 'ends one whole unit to the left: the wrap lands on an identical frame');
+  assert.ok(m.to < m.from, 'right to left: the travel is negative');
+  assert.ok(Math.abs(m.durationS - 260 / TICKER_SPEED_PX_S) < 1e-9, 'one unit over the speed');
   const longer = tickerMotion({ textWidth: 520, slotWidth: 66 });
-  assert.ok(Math.abs((520 + 66) / longer.durationS - TICKER_SPEED_PX_S) < 1e-9, 'a longer line rides at the same speed');
+  assert.ok(Math.abs(520 / longer.durationS - TICKER_SPEED_PX_S) < 1e-9, 'a longer line rides at the same speed');
   assert.ok(TICKER_SPEED_PX_S > 0 && TICKER_SPEED_PX_S <= 40, 'slow and readable, not a marquee');
 });
 
@@ -61,6 +62,21 @@ ok('unmeasured is static: nothing animates on a guess', () => {
   assert.equal(tickerMotion().mode, 'static');
   assert.equal(tickerMotion({ textWidth: 0, slotWidth: 66 }).mode, 'static');
   assert.equal(tickerMotion({ textWidth: 300, slotWidth: 0 }).mode, 'static');
+});
+
+ok('the tape: caps, blocks divide the repeats, two units carry the loop, the slot fades the run', () => {
+  assert.equal(TICKER_DIVIDER, '■■■', 'solid blocks between repeats — the 80s tape\u2019s mark');
+  assert.ok(!/\s/.test(TICKER_DIVIDER), 'no spaces in the divider: the CSS owns its sides, so the unit the twin measures is the unit the run paints');
+  const pill = readFileSync(new URL('./LoisPill.jsx', import.meta.url), 'utf8');
+  assert.match(pill, /TICKER_DIVIDER/, 'the pill paints the divider beside the line');
+  assert.match(pill, /\{unit\(false\)\}[\s\S]{0,160}\{unit\(true\)\}/, 'the run carries two units: the second is what the wrap lands on');
+  assert.match(pill, /className="lois-ticker-measure"[\s\S]{0,160}\{unit\(false\)\}/, 'the hidden twin measures ONE unit — the width the motion maths runs on');
+  assert.match(pill, /'aria-hidden': 'true'/, 'the duplicate copy is aria-hidden: the verdict is said once');
+  const css = readFileSync(new URL('../styles/layout.css', import.meta.url), 'utf8');
+  assert.match(css, /\.lois-ticker \{[^}]*text-transform: uppercase/, 'the line rides in caps — on the slot, so the twin measures the painted width');
+  assert.ok(!/\.lois-ticker-run \{[^}]*text-shadow/.test(css), 'no glow on the run (Matt, 2026-10-22: lose the bloom)');
+  assert.match(css, /\.lois-ticker\[data-mode="scroll"\][^{]*\{[^}]*mask-image:/, 'the running tape fades at the slot\u2019s edges');
+  assert.match(css, /\.lois-ticker\[data-mode="static"\] \.lois-ticker-unit \+ \.lois-ticker-unit/, 'sitting still, the second copy is dropped: one line, one divider');
 });
 
 ok('the wiring: the sentence left the top bar, the face left the slot, the record stayed', () => {
