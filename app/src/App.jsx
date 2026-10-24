@@ -45,6 +45,7 @@ import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { startRoomFeed, resetRoomFeed } from './curator/roomFeed.js'; // #1560 S1: THE ROOM codec's retained bus window
+import { startStoryLive } from './curator/storyLive.js'; // #1560 S3: the room's story machine (backstage only)
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
@@ -193,6 +194,14 @@ function AppInner() {
         };
       },
     });
+    // #1560 S3 — the room's story machine: folds the bus into rapport/grudge standing, episodes and beats, and
+    // persists the book beside the engagement scores. Backstage only (the dev panel's MIND tab reads its view);
+    // the room shows nothing of it, and it asks nothing of the stage.
+    const stopStory = startStoryLive({
+      getSeed: () => useStore.getState().seed,
+      getTiers: () => Object.fromEntries(['davis', 'lois'].map((p) => [p, parseInt(String(presence.contextFor(p).tier).slice(1), 10) || 1])),
+      isReplaying: isPlaybackActive,
+    });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
     setPlaybackFrameTap((frame, perf, o) => { replayMindFrame(frame, perf && perf.mind, o); replaySpectrumFrame(frame, perf && perf.spectrum, o); });
@@ -214,7 +223,7 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopFeed(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopFeed(); stopStory(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
   }, []);
 
   const { state } = useApp(s => ({
