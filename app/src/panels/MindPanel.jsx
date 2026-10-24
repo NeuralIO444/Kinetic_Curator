@@ -80,7 +80,7 @@ function Story() {
               <td style={cell}>bar {b.bar}</td>
               <td style={cell}>{b.kind}</td>
               <td style={cell}>{b.persona}</td>
-              <td style={cell}>{b.form || ''}{b.topic ? ` · ${b.topic}` : ''}</td>
+              <td style={cell}>{b.form || ''}{b.topic ? ` · ${b.topic}` : ''}{b.loreFact ? ` · ${b.loreFact}` : ''}</td>
             </tr>
           ))}
         </tbody>

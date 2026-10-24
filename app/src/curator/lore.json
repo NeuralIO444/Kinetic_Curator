@@ -1,0 +1,970 @@
+{
+ "kind": "kc-lore",
+ "version": 1,
+ "bank_version": "2026-10-22.1",
+ "curated": "2026-10-22",
+ "entries": [
+  {
+   "id": "anc-haeckel",
+   "kind": "ancestor",
+   "fact": "Ernst Haeckel (1834–1919), biologist and artist, filled Kunstformen der Natur with organisms drawn as ornament. In the room's canon he is Davis's ancestor: the creatures are built the way he drew — many layered marks, symmetry as construction.",
+   "tags": {
+    "family": "bioform",
+    "movement": "naturalism",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q48246",
+   "source_url": "https://www.wikidata.org/wiki/Q48246",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "anc-lois",
+   "kind": "ancestor",
+   "fact": "George Lois (1931–2022), the advertising art director of the Big Idea. The room's judge works in his register; the maxims in this bank are paraphrases of his philosophy in KC-1's own words — the homage is the thinking, never a quotation.",
+   "tags": {
+    "family": "advertising",
+    "movement": "advertising",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q5541814",
+   "source_url": "https://www.wikidata.org/wiki/Q5541814",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "anc-thompson",
+   "kind": "ancestor",
+   "fact": "D'Arcy Wentworth Thompson (1860–1948), mathematician and biologist: On Growth and Form argued that a living shape is a diagram of the forces that made it. The room keeps it as its oldest book.",
+   "tags": {
+    "family": "bioform",
+    "movement": "science",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q739438",
+   "source_url": "https://www.wikidata.org/wiki/Q739438",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "anc-voronoy",
+   "kind": "ancestor",
+   "fact": "Georgy Voronoy (1868–1908), mathematician. His diagram gives every seed the territory nearest to it; the room's fields, dishes and weathers are drawn inside that idea.",
+   "tags": {
+    "family": "field",
+    "movement": "mathematics",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q268869",
+   "source_url": "https://www.wikidata.org/wiki/Q268869",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "fact-floyd-steinberg",
+   "kind": "fact",
+   "fact": "Floyd–Steinberg dithering diffuses each pixel's quantising error to its neighbours, so a coarse grid keeps a picture's tone. The room's faces take the other road — Bayer's — but the argument is the same.",
+   "tags": {
+    "family": "dither",
+    "movement": "imaging",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q1324107",
+   "source_url": "https://www.wikidata.org/wiki/Q1324107",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "fact-great-wave",
+   "kind": "fact",
+   "fact": "The Met's impression of Hokusai's Great Wave — Under the Wave off Kanagawa, from the series Thirty-six Views of Mount Fuji — is a woodblock print in ink and colour on paper, dated about 1830–32.",
+   "tags": {
+    "family": "print",
+    "movement": "ukiyo-e",
+    "mood": "surge"
+   },
+   "source_id": "met:45434",
+   "source_url": "https://www.metmuseum.org/art/collection/search/45434",
+   "rights": "CC0 — The Met Open Access (object data)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "fact-growth-and-form",
+   "kind": "fact",
+   "fact": "On Growth and Form, D'Arcy Thompson's study of shape in living things, was published in 1917 — biology written as mathematics, a century before the room's creatures.",
+   "tags": {
+    "family": "bioform",
+    "movement": "science",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q19902738",
+   "source_url": "https://www.wikidata.org/wiki/Q19902738",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "fact-ordered-dithering",
+   "kind": "fact",
+   "fact": "Ordered dithering tests each pixel against a repeating threshold pattern; Bayer's matrix is the pattern the room's faces are ground through — tone from almost nothing.",
+   "tags": {
+    "family": "dither",
+    "movement": "imaging",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q7100708",
+   "source_url": "https://www.wikidata.org/wiki/Q7100708",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "fact-voronoi-diagram",
+   "kind": "fact",
+   "fact": "A Voronoi diagram partitions a plane into cells, one around each seed, every point in a cell nearer its seed than any other. It is geometry the room computes with constantly.",
+   "tags": {
+    "family": "field",
+    "movement": "geometry",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q757267",
+   "source_url": "https://www.wikidata.org/wiki/Q757267",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "maxim-lois-1",
+   "kind": "maxim",
+   "fact": "Lois's first rule, in paraphrase: the big idea comes first — execution is only its delivery, and decoration standing where an idea should be is an apology.",
+   "tags": {
+    "family": "advertising",
+    "movement": "advertising",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q5541814",
+   "rights": "Original KC-1 wording paraphrasing the philosophy (05 homage boundary); no source text reproduced",
+   "source_url": "https://www.wikidata.org/wiki/Q5541814",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "maxim-lois-2",
+   "kind": "maxim",
+   "fact": "Lois's method, in paraphrase: creativity is not decoration but problem-solving — find the one true thing about the work and say it so plainly it cannot be unheard.",
+   "tags": {
+    "family": "advertising",
+    "movement": "advertising",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q5541814",
+   "rights": "Original KC-1 wording paraphrasing the philosophy (05 homage boundary); no source text reproduced",
+   "source_url": "https://www.wikidata.org/wiki/Q5541814",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "maxim-lois-3",
+   "kind": "maxim",
+   "fact": "Lois's test of the work, in paraphrase: if it makes nobody nervous, it is wallpaper — the room would rather be argued with than upholstered.",
+   "tags": {
+    "family": "advertising",
+    "movement": "advertising",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q5541814",
+   "rights": "Original KC-1 wording paraphrasing the philosophy (05 homage boundary); no source text reproduced",
+   "source_url": "https://www.wikidata.org/wiki/Q5541814",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-aicher-born-0513",
+   "kind": "onthisday",
+   "fact": "Otl Aicher — designer of pictograms that need no language — was born in Ulm on 13 May 1922.",
+   "month": 5,
+   "day": 13,
+   "tags": {
+    "family": "grid",
+    "movement": "modernism",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q61191",
+   "source_url": "https://www.wikidata.org/wiki/Q61191",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-aicher-died-0901",
+   "kind": "onthisday",
+   "fact": "Otl Aicher — designer of pictograms that need no language — died in Günzburg on 1 September 1991.",
+   "month": 9,
+   "day": 1,
+   "tags": {
+    "family": "grid",
+    "movement": "modernism",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q61191",
+   "source_url": "https://www.wikidata.org/wiki/Q61191",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-anni-albers-born-0612",
+   "kind": "onthisday",
+   "fact": "Anni Albers — weaver and printmaker, the Bauhaus's textile mind — was born in Berlin on 12 June 1899.",
+   "month": 6,
+   "day": 12,
+   "tags": {
+    "family": "weaving",
+    "movement": "bauhaus",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q86078",
+   "source_url": "https://www.wikidata.org/wiki/Q86078",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-anni-albers-died-0509",
+   "kind": "onthisday",
+   "fact": "Anni Albers — weaver and printmaker, the Bauhaus's textile mind — died on 9 May 1994.",
+   "month": 5,
+   "day": 9,
+   "tags": {
+    "family": "weaving",
+    "movement": "bauhaus",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q86078",
+   "source_url": "https://www.wikidata.org/wiki/Q86078",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-bass-born-0508",
+   "kind": "onthisday",
+   "fact": "Saul Bass — the designer who made film titles into cinema — was born in The Bronx on 8 May 1920.",
+   "month": 5,
+   "day": 8,
+   "tags": {
+    "family": "film",
+    "movement": "modernism",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q536884",
+   "source_url": "https://www.wikidata.org/wiki/Q536884",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-bayer-born-0815",
+   "kind": "onthisday",
+   "fact": "Bryce Bayer — physicist and inventor of the Bayer filter — was born on 15 August 1929.",
+   "month": 8,
+   "day": 15,
+   "tags": {
+    "family": "dither",
+    "movement": "imaging",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q84085",
+   "source_url": "https://www.wikidata.org/wiki/Q84085",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-beardsley-died-0316",
+   "kind": "onthisday",
+   "fact": "Aubrey Beardsley — the illustrator of the black line, dead at twenty-five — died in Menton on 16 March 1898.",
+   "month": 3,
+   "day": 16,
+   "tags": {
+    "family": "print",
+    "movement": "art nouveau",
+    "mood": "sombre"
+   },
+   "source_id": "wikidata:Q272566",
+   "source_url": "https://www.wikidata.org/wiki/Q272566",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-cezanne-born-0119",
+   "kind": "onthisday",
+   "fact": "Paul Cézanne — the painter who rebuilt seeing as geometry — was born in Aix-en-Provence on 19 January 1839.",
+   "month": 1,
+   "day": 19,
+   "tags": {
+    "family": "paint",
+    "movement": "post-impressionism",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q35548",
+   "source_url": "https://www.wikidata.org/wiki/Q35548",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-cohen-born-0501",
+   "kind": "onthisday",
+   "fact": "Harold Cohen — painter and programmer whose AARON drew on its own — was born in London on 1 May 1928.",
+   "month": 5,
+   "day": 1,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q92723",
+   "source_url": "https://www.wikidata.org/wiki/Q92723",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-duchamp-born-0728",
+   "kind": "onthisday",
+   "fact": "Marcel Duchamp — the artist who sent a urinal to do a painting's job — was born in Blainville-Crevon on 28 July 1887.",
+   "month": 7,
+   "day": 28,
+   "tags": {
+    "family": "idea",
+    "movement": "dada",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q5912",
+   "source_url": "https://www.wikidata.org/wiki/Q5912",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-fukuda-born-0204",
+   "kind": "onthisday",
+   "fact": "Shigeo Fukuda — the poster artist whose visual puns never needed a caption — was born in Tokyo on 4 February 1932.",
+   "month": 2,
+   "day": 4,
+   "tags": {
+    "family": "poster",
+    "movement": "japanese poster",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q981942",
+   "source_url": "https://www.wikidata.org/wiki/Q981942",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-fukuda-died-0111",
+   "kind": "onthisday",
+   "fact": "Shigeo Fukuda — the poster artist whose visual puns never needed a caption — died in Tokyo on 11 January 2009.",
+   "month": 1,
+   "day": 11,
+   "tags": {
+    "family": "poster",
+    "movement": "japanese poster",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q981942",
+   "source_url": "https://www.wikidata.org/wiki/Q981942",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-gropius-born-0518",
+   "kind": "onthisday",
+   "fact": "Walter Gropius — architect and founder of the Bauhaus — was born in Berlin on 18 May 1883.",
+   "month": 5,
+   "day": 18,
+   "tags": {
+    "family": "design",
+    "movement": "bauhaus",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q61071",
+   "source_url": "https://www.wikidata.org/wiki/Q61071",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-haeckel-born-0216",
+   "kind": "onthisday",
+   "fact": "Ernst Haeckel — the biologist who drew organisms as ornament — was born in Potsdam on 16 February 1834.",
+   "month": 2,
+   "day": 16,
+   "tags": {
+    "family": "bioform",
+    "movement": "naturalism",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q48246",
+   "source_url": "https://www.wikidata.org/wiki/Q48246",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-haeckel-died-0809",
+   "kind": "onthisday",
+   "fact": "Ernst Haeckel — the biologist who drew organisms as ornament — died in Jena on 9 August 1919.",
+   "month": 8,
+   "day": 9,
+   "tags": {
+    "family": "bioform",
+    "movement": "naturalism",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q48246",
+   "source_url": "https://www.wikidata.org/wiki/Q48246",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-hoch-born-1101",
+   "kind": "onthisday",
+   "fact": "Hannah Höch — the Dada collagist who cut with the kitchen knife — was born in Gotha on 1 November 1889.",
+   "month": 11,
+   "day": 1,
+   "tags": {
+    "family": "collage",
+    "movement": "dada",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q463411",
+   "source_url": "https://www.wikidata.org/wiki/Q463411",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-hofmann-born-0629",
+   "kind": "onthisday",
+   "fact": "Armin Hofmann — graphic designer and teacher of the Basel school — was born in Winterthur on 29 June 1920.",
+   "month": 6,
+   "day": 29,
+   "tags": {
+    "family": "type",
+    "movement": "swiss",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q3335167",
+   "source_url": "https://www.wikidata.org/wiki/Q3335167",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-hokusai-born-1031",
+   "kind": "onthisday",
+   "fact": "Katsushika Hokusai — the ukiyo-e master who signed himself the old man mad about art — was born in Honjo on 31 October 1760.",
+   "month": 10,
+   "day": 31,
+   "tags": {
+    "family": "print",
+    "movement": "ukiyo-e",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q5586",
+   "source_url": "https://www.wikidata.org/wiki/Q5586",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-itten-born-1111",
+   "kind": "onthisday",
+   "fact": "Johannes Itten — painter and the Bauhaus's first teacher of colour — was born in Thun on 11 November 1888.",
+   "month": 11,
+   "day": 11,
+   "tags": {
+    "family": "colour",
+    "movement": "bauhaus",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q123138",
+   "source_url": "https://www.wikidata.org/wiki/Q123138",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-josef-albers-born-0319",
+   "kind": "onthisday",
+   "fact": "Josef Albers — painter and teacher of colour's relativity — was born in Bottrop on 19 March 1888.",
+   "month": 3,
+   "day": 19,
+   "tags": {
+    "family": "colour",
+    "movement": "bauhaus",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q170071",
+   "source_url": "https://www.wikidata.org/wiki/Q170071",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-josef-albers-died-0325",
+   "kind": "onthisday",
+   "fact": "Josef Albers — painter and teacher of colour's relativity — died in New Haven on 25 March 1976.",
+   "month": 3,
+   "day": 25,
+   "tags": {
+    "family": "colour",
+    "movement": "bauhaus",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q170071",
+   "source_url": "https://www.wikidata.org/wiki/Q170071",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-kamekura-born-0406",
+   "kind": "onthisday",
+   "fact": "Yūsaku Kamekura — graphic designer, a voice of postwar Japanese design — was born in Tsubame on 6 April 1915.",
+   "month": 4,
+   "day": 6,
+   "tags": {
+    "family": "poster",
+    "movement": "modernism",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q834449",
+   "source_url": "https://www.wikidata.org/wiki/Q834449",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-lange-died-1011",
+   "kind": "onthisday",
+   "fact": "Dorothea Lange — the photojournalist of the Migrant Mother — died in San Francisco on 11 October 1965.",
+   "month": 10,
+   "day": 11,
+   "tags": {
+    "family": "photo",
+    "movement": "documentary",
+    "mood": "sombre"
+   },
+   "source_id": "wikidata:Q230673",
+   "source_url": "https://www.wikidata.org/wiki/Q230673",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-lissitzky-died-1230",
+   "kind": "onthisday",
+   "fact": "El Lissitzky — painter, typographer and maker of the Proun room — died in Moscow on 30 December 1941.",
+   "month": 12,
+   "day": 30,
+   "tags": {
+    "family": "type",
+    "movement": "suprematism",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q152233",
+   "source_url": "https://www.wikidata.org/wiki/Q152233",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-lois-born-0626",
+   "kind": "onthisday",
+   "fact": "George Lois — the advertising art director of the Big Idea — was born in Manhattan on 26 June 1931.",
+   "month": 6,
+   "day": 26,
+   "tags": {
+    "family": "advertising",
+    "movement": "advertising",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q5541814",
+   "source_url": "https://www.wikidata.org/wiki/Q5541814",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-malevich-died-0515",
+   "kind": "onthisday",
+   "fact": "Kazimir Malevich — the painter of the Black Square, founder of Suprematism — died in Saint Petersburg on 15 May 1935.",
+   "month": 5,
+   "day": 15,
+   "tags": {
+    "family": "paint",
+    "movement": "suprematism",
+    "mood": "sombre"
+   },
+   "source_id": "wikidata:Q130777",
+   "source_url": "https://www.wikidata.org/wiki/Q130777",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-man-ray-born-0827",
+   "kind": "onthisday",
+   "fact": "Man Ray — the Dada photographer who printed pictures without a camera — was born in Philadelphia on 27 August 1890.",
+   "month": 8,
+   "day": 27,
+   "tags": {
+    "family": "photo",
+    "movement": "dada",
+    "mood": "wry"
+   },
+   "source_id": "wikidata:Q46139",
+   "source_url": "https://www.wikidata.org/wiki/Q46139",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-moholy-nagy-born-0720",
+   "kind": "onthisday",
+   "fact": "László Moholy-Nagy — painter, photographer and Bauhaus teacher of light — was born in Bácsborsód on 20 July 1895.",
+   "month": 7,
+   "day": 20,
+   "tags": {
+    "family": "experiment",
+    "movement": "bauhaus",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q160448",
+   "source_url": "https://www.wikidata.org/wiki/Q160448",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-mohr-born-0608",
+   "kind": "onthisday",
+   "fact": "Manfred Mohr — algorithm artist of the plotted line — was born in Pforzheim on 8 June 1938.",
+   "month": 6,
+   "day": 8,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q872832",
+   "source_url": "https://www.wikidata.org/wiki/Q872832",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-molnar-born-0105",
+   "kind": "onthisday",
+   "fact": "Vera Molnár — pioneer of algorithm art — pictures from programs, drawn by plotter — was born in Budapest on 5 January 1924.",
+   "month": 1,
+   "day": 5,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q1658002",
+   "source_url": "https://www.wikidata.org/wiki/Q1658002",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-molnar-died-1207",
+   "kind": "onthisday",
+   "fact": "Vera Molnár — pioneer of algorithm art — pictures from programs, drawn by plotter — died in Paris on 7 December 2023.",
+   "month": 12,
+   "day": 7,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q1658002",
+   "source_url": "https://www.wikidata.org/wiki/Q1658002",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-mondrian-died-0201",
+   "kind": "onthisday",
+   "fact": "Piet Mondrian — the painter who reduced the world to line and primary colour — died in New York City on 1 February 1944.",
+   "month": 2,
+   "day": 1,
+   "tags": {
+    "family": "grid",
+    "movement": "de stijl",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q151803",
+   "source_url": "https://www.wikidata.org/wiki/Q151803",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-morris-born-0324",
+   "kind": "onthisday",
+   "fact": "William Morris — designer and poet who made craft a politics — was born in Walthamstow on 24 March 1834.",
+   "month": 3,
+   "day": 24,
+   "tags": {
+    "family": "pattern",
+    "movement": "arts-and-crafts",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q182589",
+   "source_url": "https://www.wikidata.org/wiki/Q182589",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-mucha-died-0714",
+   "kind": "onthisday",
+   "fact": "Alphonse Mucha — the poster artist whose line became Art Nouveau's signature — died in Prague on 14 July 1939.",
+   "month": 7,
+   "day": 14,
+   "tags": {
+    "family": "poster",
+    "movement": "art nouveau",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q146691",
+   "source_url": "https://www.wikidata.org/wiki/Q146691",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-muller-brockmann-born-0509",
+   "kind": "onthisday",
+   "fact": "Josef Müller-Brockmann — graphic designer, the grid system's grammarian — was born in Rapperswil on 9 May 1914.",
+   "month": 5,
+   "day": 9,
+   "tags": {
+    "family": "grid",
+    "movement": "swiss",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q123409",
+   "source_url": "https://www.wikidata.org/wiki/Q123409",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-nake-born-1216",
+   "kind": "onthisday",
+   "fact": "Frieder Nake — mathematician and pioneer of computer art — was born in Stuttgart on 16 December 1938.",
+   "month": 12,
+   "day": 16,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q92703",
+   "source_url": "https://www.wikidata.org/wiki/Q92703",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-rauschenberg-born-1022",
+   "kind": "onthisday",
+   "fact": "Robert Rauschenberg — artist of the combines — painting with the world stuck to it — was born in Port Arthur on 22 October 1925.",
+   "month": 10,
+   "day": 22,
+   "tags": {
+    "family": "collage",
+    "movement": "pop",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q164358",
+   "source_url": "https://www.wikidata.org/wiki/Q164358",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-riley-born-0424",
+   "kind": "onthisday",
+   "fact": "Bridget Riley — the painter of op art's vibrating fields — was born in South Norwood on 24 April 1931.",
+   "month": 4,
+   "day": 24,
+   "tags": {
+    "family": "field",
+    "movement": "op art",
+    "mood": "surge"
+   },
+   "source_id": "wikidata:Q234449",
+   "source_url": "https://www.wikidata.org/wiki/Q234449",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-ruder-born-0320",
+   "kind": "onthisday",
+   "fact": "Emil Ruder — typographer of the Swiss school, function first — was born in Zurich on 20 March 1914.",
+   "month": 3,
+   "day": 20,
+   "tags": {
+    "family": "type",
+    "movement": "swiss",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q116848",
+   "source_url": "https://www.wikidata.org/wiki/Q116848",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-scher-born-1006",
+   "kind": "onthisday",
+   "fact": "Paula Scher — graphic designer, painter of maps made of type — was born in Washington, D.C. on 6 October 1948.",
+   "month": 10,
+   "day": 6,
+   "tags": {
+    "family": "type",
+    "movement": "postmodernism",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q7154764",
+   "source_url": "https://www.wikidata.org/wiki/Q7154764",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-schwartz-born-0713",
+   "kind": "onthisday",
+   "fact": "Lillian Schwartz — artist who made the computer a drawing instrument — was born in Cincinnati on 13 July 1927.",
+   "month": 7,
+   "day": 13,
+   "tags": {
+    "family": "algorithm",
+    "movement": "computer art",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q15503703",
+   "source_url": "https://www.wikidata.org/wiki/Q15503703",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-taeuber-arp-born-0119",
+   "kind": "onthisday",
+   "fact": "Sophie Taeuber-Arp — painter, weaver and dancer of the Dada circle — was born in Davos on 19 January 1889.",
+   "month": 1,
+   "day": 19,
+   "tags": {
+    "family": "weaving",
+    "movement": "dada",
+    "mood": "bright"
+   },
+   "source_id": "wikidata:Q254395",
+   "source_url": "https://www.wikidata.org/wiki/Q254395",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-thompson-born-0502",
+   "kind": "onthisday",
+   "fact": "D'Arcy Wentworth Thompson — the mathematician-biologist of On Growth and Form — was born in Edinburgh on 2 May 1860.",
+   "month": 5,
+   "day": 2,
+   "tags": {
+    "family": "bioform",
+    "movement": "science",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q739438",
+   "source_url": "https://www.wikidata.org/wiki/Q739438",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-vignelli-born-0110",
+   "kind": "onthisday",
+   "fact": "Massimo Vignelli — graphic designer of grids, systems and signs — was born in Milan on 10 January 1931.",
+   "month": 1,
+   "day": 10,
+   "tags": {
+    "family": "grid",
+    "movement": "modernism",
+    "mood": "dry"
+   },
+   "source_id": "wikidata:Q2317903",
+   "source_url": "https://www.wikidata.org/wiki/Q2317903",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-weston-born-0324",
+   "kind": "onthisday",
+   "fact": "Edward Weston — the photographer of peppers, shells and straight seeing — was born in Highland Park on 24 March 1886.",
+   "month": 3,
+   "day": 24,
+   "tags": {
+    "family": "photo",
+    "movement": "modernism",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q346988",
+   "source_url": "https://www.wikidata.org/wiki/Q346988",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  },
+  {
+   "id": "otd-weston-died-0101",
+   "kind": "onthisday",
+   "fact": "Edward Weston — the photographer of peppers, shells and straight seeing — died in Carmel-by-the-Sea on 1 January 1958.",
+   "month": 1,
+   "day": 1,
+   "tags": {
+    "family": "photo",
+    "movement": "modernism",
+    "mood": "calm"
+   },
+   "source_id": "wikidata:Q346988",
+   "source_url": "https://www.wikidata.org/wiki/Q346988",
+   "rights": "CC0 — Wikidata structured facts (no Wikipedia text)",
+   "retrieved_date": "2026-10-22",
+   "bank_version": "2026-10-22.1"
+  }
+ ]
+}

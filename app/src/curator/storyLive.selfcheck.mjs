@@ -99,4 +99,20 @@ ok('wiring: App starts and stops the driver; the dev panel reads its view; subsc
   off(); stop();
 });
 
+ok('the cold open (S4): the driver seeds the day’s lore entry and the beat log reads its fact backstage', () => {
+  const storage = shim();
+  const stop = startStoryLive({ getSeed: () => 42, getDate: () => ({ month: 10, day: 22 }), storage });
+  const v0 = getStoryView();
+  assert.ok(v0.patterns.some((p) => p.kind === 'onthisday' && p.loreId === 'otd-rauschenberg-born-1022'),
+    'the session opened with the curation day’s entry seeded as a pattern');
+  emit(Events.CLOCK_BAR, { bar: 1 }, { cause: 'mind' });
+  const beat = getStoryView().beats.find((b) => b.form === 'onthisday');
+  assert.ok(beat && beat.kind === 'callback' && beat.persona === 'davis', 'the cold open fired as the callback');
+  assert.ok(beat.loreFact && beat.loreFact.includes('Rauschenberg'), 'the backstage log resolves the referent to the bank’s fact');
+  stop();
+  const bare = startStoryLive({ getSeed: () => 42, getDate: () => ({ month: 9, day: 15 }), storage: shim() });
+  assert.ok(!getStoryView().patterns.some((p) => p.kind === 'onthisday'), 'a day with no entry seeds nothing — honest absence');
+  bare();
+});
+
 console.log(`storyLive.selfcheck: ${n} checks passed`);

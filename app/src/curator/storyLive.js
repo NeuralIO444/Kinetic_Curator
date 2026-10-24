@@ -14,6 +14,7 @@ import {
   createStoryBook, decodeStoryBook, encodeStoryBook, beginSession, createEpisode,
   applyStoryEvent, selectStoryBeat, storyEventFromRecord, siftLedgers, STORY_BEAT_BUDGET,
 } from './storyState.js';
+import { getLoreBank, pickOnThisDay, loreById } from './loreBank.js'; // #1560 S4: the lore bank (offline artifact)
 
 export const STORY_STORAGE_KEY = 'kc:room:story:v1';
 /** Save the book every this many folded records (and when the driver stops). */
@@ -49,11 +50,13 @@ const siftFromStorage = (store) => {
 /**
  * @param getSeed  () => the document seed (the rolls' seed, as the minds use)
  * @param getTiers () => { davis, lois } engagement tiers 1..4 (the milestone gate; absent = milestone beats never arm a voice)
+ * @param getDate  () => { month, day } — the session's calendar date, an INPUT (S4): the lore cold open is
+ *                 daily truth, and the pure modules read no clock. Absent = this machine's real date.
  * @param isReplaying () => boolean: a take is playing back (the story idles — its history is already counted)
  * @param storage  { getItem, setItem } (localStorage by default; absent or throwing = this session only)
  * @returns stop()
  */
-export function startStoryLive({ getSeed = () => 0, getTiers = null, isReplaying = () => false, storage = undefined } = {}) {
+export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = null, isReplaying = () => false, storage = undefined } = {}) {
   const store = storage === undefined ? defaultStorage() : storage;
   let saved;
   try { saved = store ? store.getItem(STORY_STORAGE_KEY) : null; } catch { saved = null; }
@@ -73,6 +76,20 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, isReplaying
     try { seed = Number(getSeed()) >>> 0; } catch { seed = 0; }
     return hashU32(seed ^ Math.imul(book.sessions + 1, 0x9e3779b9), 'room-story', rollN) / 4294967296;
   };
+  // #1560 S4 — the day's cold open: the lore bank's on-this-day entry for the session's date, seeded into
+  // the episode as a callback pattern. It competes for the session's ONE callback slot under the same bag
+  // as the ledger callbacks (04's anti-repetition) — a day with no entry seeds nothing, and the room opens
+  // in silence, which is a valid scene. The pick takes a roll from the same seeded stream as the beats,
+  // so a given (seed, session, date) replays to the same cold open. No new transcript path: the beat, if
+  // it fires, is a normal callback beat whose referent is the lore entry's id (law 1).
+  const bank = getLoreBank();
+  try {
+    let date = null;
+    if (typeof getDate === 'function') date = getDate();
+    if (!date) { const now = new Date(); date = { month: now.getMonth() + 1, day: now.getDate() }; }
+    const otd = bank ? pickOnThisDay(bank, date, roll) : null;
+    if (otd) ep.patterns.push({ kind: 'onthisday', loreId: otd.id, fresh: true });
+  } catch { /* a dateless session simply has no cold open — absence, never invention */ }
   const save = () => { try { if (store) store.setItem(STORY_STORAGE_KEY, encodeStoryBook(book)); } catch { /* private mode: this session only */ } };
   const publish = () => {
     view = {
@@ -88,8 +105,13 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, isReplaying
         lois: { esteem: Math.round(book.believed.lois.esteem * 10) / 10, trust: Math.round(book.believed.lois.trust * 10) / 10 },
       },
       grudges: book.grudges.map((g) => ({ topic: g.topic, count: g.count, promoted: g.promoted })),
-      patterns: ep.patterns.map((p) => ({ kind: p.kind, ...(p.topic ? { topic: p.topic } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), fresh: !!p.fresh })),
-      beats: beatLog.slice(),
+      patterns: ep.patterns.map((p) => ({ kind: p.kind, ...(p.topic ? { topic: p.topic } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), ...(p.loreId ? { loreId: p.loreId } : {}), fresh: !!p.fresh })),
+      // a beat whose referent is a lore entry carries the entry's fact, resolved here — the beat itself
+      // stays a referent (storyState knows no text); the backstage log is where the cold open is read
+      beats: beatLog.map((b) => {
+        const entry = b.referent && b.referent.loreId ? loreById(bank, b.referent.loreId) : null;
+        return entry ? { ...b, loreFact: entry.fact } : b;
+      }),
     };
     notify();
   };

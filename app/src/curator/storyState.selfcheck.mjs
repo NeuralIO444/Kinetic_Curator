@@ -353,4 +353,16 @@ ok('siftLedgers finds the debt, the palette streak and the last ending — from 
     [{ kind: 'last-ending', seed: 5, paletteId: 'a' }], 'kept BEFORE the pass is no debt');
 });
 
+// ── the lore cold open (S4): a callback whose referent is a bank entry ─────────────────────────────────────────
+ok('the cold open: a seeded on-this-day pattern fires as the callback, carrying its lore id and nothing else', () => {
+  const { book, ep } = rig([{ kind: 'onthisday', loreId: 'otd-rauschenberg-born-1022' }]);
+  const beat = selectStoryBeat(book, ep, { roll: mid });
+  assert.ok(beat && beat.kind === 'callback' && beat.form === 'onthisday', 'the day opens the episode');
+  assert.equal(beat.cls, 'story', 'it spends from the same story budget as any callback');
+  assert.equal(beat.persona, 'davis', 'the generator hosts the opening');
+  assert.deepEqual(beat.referent, { loreId: 'otd-rauschenberg-born-1022' }, 'the referent is the entry id — text lives in the bank, never in the machine');
+  const quiet = rig();
+  assert.equal(selectStoryBeat(quiet.book, quiet.ep, { roll: mid }), null, 'no pattern seeded, no cold open — silence is a valid opening');
+});
+
 console.log(`storyState.selfcheck: ${n} checks passed`);
