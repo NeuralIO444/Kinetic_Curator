@@ -9,8 +9,7 @@ import { startStoryLive, getStoryView, subscribeStory, STORY_STORAGE_KEY } from 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 
-const shim = () => {
-  const m = new Map();
+const shim = (m = new Map()) => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), _map: m };
 };
 const row = (o) => `${JSON.stringify(o)}\n`;
@@ -45,11 +44,27 @@ ok('a second run on the same storage is a new session: standing carried, mood re
   const stop1 = startStoryLive({ getSeed: () => 7, storage });
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'hue', delta: 0.25 } }, 1), { cause: 'mind' });
   stop1();
-  const stop2 = startStoryLive({ getSeed: () => 7, storage });
+  // a second run comes with a page reload — a fresh storage object over the same backing store
+  const stop2 = startStoryLive({ getSeed: () => 7, storage: shim(storage._map) });
   const v = getStoryView();
   assert.equal(v.session, 2);
   assert.ok(Math.abs(v.esteem.standing - 1.2) < 1e-9, 'standing persisted across the runs');
   assert.equal(v.esteem.mood, 0, 'mood did not');
+  stop2();
+});
+
+ok('a same-page restart continues the session — StrictMode’s second setup begins no second', () => {
+  const r2 = (x) => Math.round(x * 100) / 100; // what the encode carries over
+  const storage = shim();
+  const stop1 = startStoryLive({ getSeed: () => 5, storage });
+  emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'hue', delta: 0.25 } }, 1), { cause: 'mind' });
+  const seen = getStoryView();
+  stop1(); // React's cleanup, immediately followed by its re-setup — same page, same storage object
+  const stop2 = startStoryLive({ getSeed: () => 5, storage });
+  const v = getStoryView();
+  assert.equal(v.session, seen.session, 'the page is one session');
+  assert.ok(Math.abs(v.esteem.mood - r2(seen.esteem.mood)) < 1e-9, 'mood continues the session it interrupted');
+  assert.ok(Math.abs(v.esteem.standing - r2(seen.esteem.standing)) < 1e-9, 'standing carries within the page too');
   stop2();
 });
 
