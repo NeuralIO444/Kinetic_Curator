@@ -118,3 +118,19 @@ Two rules make this replayable:
 | the whole thing, recorded and replayed | `gl/performanceCreatures.selfcheck.mjs` |
 | cost and leak | `gl/resolverProbe.selfcheck.mjs` |
 | worker parity | `gl/resolverInputParity.selfcheck.mjs` |
+
+## 9. Loot on file (not built)
+
+Filed 2026-10-24 from a reference reel (Justin Scott, game dev — the eight vector-math primitives under almost every
+game: https://www.instagram.com/reel/De2T_mYIsQp/). This section is a library record, not a plan: **nothing here is
+built, scheduled, or on the queue**, and §6's honesty rule applies to it — it is listed so the vocabulary is on file.
+
+The eight primitives in creature terms: **dot product** (facing/alignment), **length** (speed), **normalize**
+(direction without speed), **distance** (proximity, falloff), **reflection** (deflection off a surface), **clamp**
+(the governor's limits; skeleton joint limits), **lerp** (pose and material blending), **cross product** (turning
+direction). Most are already load-bearing in the engine. Two read as additive for creature *behaviour* and are filed
+as issues:
+
+- **Reflection** — creatures/motes deflect off the dish edge and stage bounds with speed preserved: #1731
+- **Dot-product facing** — a creature's facing derived from heading vs field flow / attractor direction, the
+  alignment value itself a behaviour input: #1732
