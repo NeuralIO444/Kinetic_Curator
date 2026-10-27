@@ -126,6 +126,9 @@ export function swellProgress(loopTimeMs, swellStartMs) {
 }
 
 export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {}) {
+  // #1734-#1738 — the ALife creature is opt-in while it is young: ?alife=1 turns the channel on (stamped on every
+  // input as creatureAlife, so a take records whether it ran). Read once: the page's URL does not change mid-run.
+  const alifeOn = typeof window !== 'undefined' && !!window.location && new URLSearchParams(window.location.search || '').get('alife') === '1';
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -718,6 +721,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       dishFormed: spawnDecisions ? spawnDecisions.dishFormed : [], // #1355: which pins formed (decided from the previous frame); recorded, so a take replays its creatures
       dishHosted: spawnDecisions ? spawnDecisions.dishHosted : [], // #1634 slice 2: which pin hosts the dish creature (the first formed); recorded like the rest
       dishPressure: spawnDecisions ? spawnDecisions.dishPressure : [], // #1634 slice 3: each pin's dish pressure (0..1); the limb grows by it; recorded like the rest
+      creatureFacing: true, // #1732: the dish creature's heading leans with the field's flow and the attractor (absent on older takes = the older heading)
+      creatureBounds: true, // #1731: the dish creature's discs reflect off the stage edge (absent on older takes = no bounds)
+      // #1734-#1738: the ALife channel (genome, chemistry, learning, dreaming, breeding) — ?alife=1. Keys present only
+      // when on, so a take recorded without it carries exactly the older input shape. dishGenomes: each pin's genome
+      // (bred from keeps or wild), decided by the spawn channel and recorded, so a take replays the animal without the
+      // pool; creatureKeeps: the keep serial — a rise consolidates what the creatures learned.
+      ...(alifeOn ? { creatureAlife: true, dishGenomes: (spawnDecisions && spawnDecisions.dishGenomes) || [], creatureKeeps: (spawnDecisions && spawnDecisions.creatureKeeps) || 0 } : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,

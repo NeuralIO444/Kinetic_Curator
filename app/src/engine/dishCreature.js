@@ -51,6 +51,65 @@ import { attachPointsFor } from './autoAttach.js';
 import { hashU01 } from './kernel/rng.js';
 import { encodeTyped, decodeTyped } from './kernel/stateCodec.mjs'; // #1367 — birth-state snapshots
 import { hexToRgb255, rgb255ToHex } from './colorHex.mjs';
+import { createNoise } from './noise.js';
+import { sanitizeGenome, expressGenome, MODES } from './creatureGenome.js'; // #1734
+import { createChem, tickChem, materialFor, CHEM_TICK_FRAMES } from './creatureChem.js'; // #1735
+import { POLICY_SIZE, chooseMode, reinforce, cellFor } from './creaturePolicy.js'; // #1736
+import { HATCH_FRAMES, HATCH_PASSES, rehearseInstincts, consolidate, creatureRecord } from './creatureDream.js'; // #1737
+
+// LOOT — FACING (#1732) and BOUNDS (#1731), both gated on input fields older takes do not carry
+// (`creatureFacing`, `creatureBounds`), so a recorded take replays byte-identical.
+//   FACING: the dot product as a facing test. The head's heading turns toward the field's flow (the seed's curl
+//   noise, the same divergence-free flow the field reads) by an amount that grows with the flow's strength, and
+//   toward the artist's attractor when there is one. The alignment cos(heading − flow) is kept on the state: the
+//   ALife policy reads it as part of the situation (with/against the current).
+//   BOUNDS: reflection, v' = v − 2(v·n)n, at the stage's edge: a disc that crosses the bound is mirrored back
+//   inside and its outward velocity flips — speed kept, never stuck, never wrapped. Dish discs only (the moth is
+//   kinematic: it hovers at its pin and has no velocity to reflect).
+export const FACING = Object.freeze({
+  flowTurn: 0.35, // share of the turn toward the flow at full flow strength
+  attractTurn: 0.5, // share of the turn toward the attractor
+  flowUnit: 0.5, // the curl flow's typical magnitude (measured p50 ≈ 0.498): strength = min(1, mag / this)
+  fieldScale: 6, // noise cells across the stage
+});
+
+// #1736 — what each behaviour mode does to the body: `reach` scales the hover wander, `ride` drifts the hover
+// point downstream along the flow (a share of the stage's short side at unit flow).
+export const MODE_EFFECTS = Object.freeze({
+  hover: Object.freeze({ reach: 1, ride: 0 }),
+  roam: Object.freeze({ reach: 1.8, ride: 0 }),
+  school: Object.freeze({ reach: 1, ride: 0.05 }),
+  rest: Object.freeze({ reach: 0.3, ride: 0 }),
+});
+const REST_MODE = MODES.indexOf('rest');
+
+const noiseBySeed = new Map();
+function flowAt(seed, x, y, W, H) {
+  const k = seed >>> 0;
+  let nz = noiseBySeed.get(k);
+  if (!nz) {
+    if (noiseBySeed.size > 8) noiseBySeed.clear();
+    nz = createNoise(k);
+    noiseBySeed.set(k, nz);
+  }
+  return nz.curl2((x / W) * FACING.fieldScale, (y / H) * FACING.fieldScale, 0);
+}
+const wrapDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
+
+/** #1731 — reflect disc s inside [r, W−r] × [r, H−r]: mirror the position, flip the outward velocity. */
+export function reflectInBounds(sys, s, r, W, H) {
+  const lo = r; const hx = W - r; const hy = H - r;
+  if (!(hx > lo) || !(hy > lo)) return false;
+  let hit = false;
+  if (sys.x[s] < lo) { sys.x[s] = 2 * lo - sys.x[s]; if (sys.vx[s] < 0) sys.vx[s] = -sys.vx[s]; hit = true; }
+  else if (sys.x[s] > hx) { sys.x[s] = 2 * hx - sys.x[s]; if (sys.vx[s] > 0) sys.vx[s] = -sys.vx[s]; hit = true; }
+  if (sys.y[s] < lo) { sys.y[s] = 2 * lo - sys.y[s]; if (sys.vy[s] < 0) sys.vy[s] = -sys.vy[s]; hit = true; }
+  else if (sys.y[s] > hy) { sys.y[s] = 2 * hy - sys.y[s]; if (sys.vy[s] > 0) sys.vy[s] = -sys.vy[s]; hit = true; }
+  // a far overshoot (a pin dropped outside the stage) is clamped, never mirrored past the other side
+  sys.x[s] = Math.min(hx, Math.max(lo, sys.x[s]));
+  sys.y[s] = Math.min(hy, Math.max(lo, sys.y[s]));
+  return hit;
+}
 
 export const DISH_CREATURE = Object.freeze({
   asset: 'org_blob_01', // the disc: a plump organic round, tinted by the palette like every mark
@@ -161,7 +220,17 @@ export function dishLimbLinks(limbIndex) {
 }
 
 /** One creature's state: the discs as a tiny particle system the D3 solver can read directly. */
-function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits) {
+function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits, rawGenome = null) {
+  // #1734 — an ALife creature carries a genome (riding the input as `dishGenomes`): its traits ARE the genome's
+  // (curator/spawnState.js already stamps them), and it hatches dreaming its instincts (#1737) into a fresh
+  // policy (#1736) beside a fresh chemistry (#1735). No genome: none of these keys exist (the older animal).
+  const genome = rawGenome ? sanitizeGenome(rawGenome) : null;
+  let alife = null;
+  if (genome) {
+    const pstw = new Float64Array(POLICY_SIZE); const pltw = new Float64Array(POLICY_SIZE); const pelig = new Float64Array(POLICY_SIZE);
+    rehearseInstincts({ stw: pstw, ltw: pltw, elig: pelig }, expressGenome(genome, 0).instincts, HATCH_PASSES);
+    alife = { genome, genomeJson: JSON.stringify(rawGenome), chem: createChem(), pstw, pltw, pelig, mode: REST_MODE, modeChanged: false, keeps: null, flare: 0 };
+  }
   // Slice 4 — Davis's stamp, taken once, here: body scales the radii the compound is declared from,
   // swatch shifts the colour ranks. The defaults are exactly the unstamped animal.
   const tr = normalizeTraits(rawTraits);
@@ -186,6 +255,7 @@ function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits) {
     for (let j = 0; j < limbDirs.length; j++) links.push(...limbLinks(j, radii[0], limbRadii));
   }
   return {
+    ...(alife || {}),
     pinX: pin.x, pinY: pin.y, age: 0, headingDeg: (ang * 180) / Math.PI + 180, sig, links,
     radii, limbRadii, swatch: tr.swatch,
     limbDirs, grown: new Float64Array(limbDirs.length), // per limb: growth 0..1, toward the pressure target
@@ -320,13 +390,28 @@ export function createDishCreatureBuilder() {
       // like a pin move does: the limb layout is birth data, not a live edit.
       const limbDirs = dishLimbDirs(pool, input.assetAttach);
       const limbSig = limbDirs.map((d) => `${d.x.toFixed(3)},${d.y.toFixed(3)}`).join(';');
+      // LOOT gates (#1731 #1732 #1734-#1738): each reads an input field older takes do not carry.
+      const alifeOn = !!input.creatureAlife;
+      const genomesIn = alifeOn && Array.isArray(input.dishGenomes) ? input.dishGenomes : null;
+      const keepsNow = alifeOn && Number.isInteger(input.creatureKeeps) ? input.creatureKeeps : 0;
+      const facingOn = !!input.creatureFacing;
+      const SW = Number.isFinite(input.canvasW) && input.canvasW > 0 ? input.canvasW : 0;
+      const SH = Number.isFinite(input.canvasH) && input.canvasH > 0 ? input.canvasH : 0;
+      const boundsOn = !!input.creatureBounds && SW > 0 && SH > 0;
+      const FW = SW || 1000; const FH = SH || 1000; // the flow's frame (an input without a canvas reads the default stage)
+      const attr = facingOn && input.attractor && Number.isFinite(input.attractor.x) && Number.isFinite(input.attractor.y) ? input.attractor : null;
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
         const live = !!(hosted[i] && formed[i] && pin && Number.isFinite(pin.x) && Number.isFinite(pin.y));
         if (!live) { states[i] = null; frameBodies[i] = null; continue; }
         let st = states[i];
-        if (!st || st.pinX !== pin.x || st.pinY !== pin.y || st.sig !== limbSig) { st = birthState(input.seed, i, pin, limbDirs, limbSig, input.dishTraits && input.dishTraits[i]); states[i] = st; }
+        const rawGenome = genomesIn && genomesIn[i] ? genomesIn[i] : null;
+        const gJson = rawGenome ? JSON.stringify(rawGenome) : null;
+        if (!st || st.pinX !== pin.x || st.pinY !== pin.y || st.sig !== limbSig || (st.genomeJson ?? null) !== gJson) {
+          st = birthState(input.seed, i, pin, limbDirs, limbSig, input.dishTraits && input.dishTraits[i], rawGenome);
+          states[i] = st;
+        }
         const headBase = pick(st.swatch);
         const bodyBase = pick(st.swatch + 1);
         st.age += 1;
@@ -336,7 +421,27 @@ export function createDishCreatureBuilder() {
         // Slice 3 — growth: each limb's grown fraction walks toward the pin's pressure (counted frames,
         // never backward in this slice), and a limb disc is alive once growth has crossed its band.
         const pressure = Array.isArray(input.dishPressure) ? input.dishPressure[i] : 0;
-        const pTarget = pressure > 0 ? Math.min(1, pressure) : 0;
+        // #1735-#1737 — the ALife tick, every CHEM_TICK_FRAMES of the creature's life: a keep (the serial rose)
+        // consolidates the day's learning and drops the approval drive; the chemistry turns the change in drive
+        // into reward or punishment; the policy is reinforced and picks the next mode (REST while it hatches);
+        // a paused instrument is deep sleep, so the instincts are rehearsed again.
+        const pol = st.genome ? { stw: st.pstw, ltw: st.pltw, elig: st.pelig } : null;
+        if (pol && st.age % CHEM_TICK_FRAMES === 0) {
+          const ex = expressGenome(st.genome, st.age);
+          st.flare = ex.flare;
+          const kept = st.keeps !== null && keepsNow > st.keeps;
+          st.keeps = keepsNow;
+          if (kept) consolidate(pol);
+          const made = tickChem(st.chem, { pressure, band: input.band, kept, modeChanged: st.modeChanged }, ex.drives);
+          reinforce(pol, made.reward, made.punishment);
+          if (input.slowRender) rehearseInstincts(pol, ex.instincts, 1);
+          const cell = cellFor({ band: input.band, pressure, alignment: st.alignment || 0 });
+          const m = st.age <= HATCH_FRAMES ? REST_MODE : chooseMode(pol, cell, { seed: input.seed, key: i, tick: st.age / CHEM_TICK_FRAMES, temper: ex.temper });
+          st.modeChanged = m !== st.mode;
+          st.mode = m;
+        }
+        // #1734 — the ornament gene flares the limbs past what the crowd alone would grow (only where it grows at all).
+        const pTarget = pressure > 0 ? Math.min(1, pressure + (pol ? st.flare : 0)) : 0;
         for (let j = 0; j < st.limbDirs.length; j++) {
           if (st.grown[j] < pTarget) st.grown[j] = Math.min(pTarget, st.grown[j] + 1 / DISH_CREATURE.limbGrowSpan);
           for (let k = 0; k < LIMB_N; k++) sys.alive[N_DISCS + j * LIMB_N + k] = st.grown[j] * LIMB_N - k > 0 ? 1 : 0;
@@ -344,8 +449,16 @@ export function createDishCreatureBuilder() {
         // The head's hover point: the pin, on the layer's living-motion floor, on the ground the marks obey.
         const hover = hoverPose(motion, top.morphSeed ?? input.seed, i);
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
-        const tx = pin.x + hover.dx + gt.dx;
-        const ty = pin.y + hover.dy + gt.dy;
+        let tx = pin.x + hover.dx + gt.dx;
+        let ty = pin.y + hover.dy + gt.dy;
+        // #1732 — the field's flow where the head is (read only when a loot channel wants it).
+        const flow = facingOn || pol ? flowAt(input.seed, sys.x[0], sys.y[0], FW, FH) : null;
+        if (pol) {
+          // #1736 — the mode's body: reach widens or narrows the hover wander, ride drifts it downstream.
+          const fx = MODE_EFFECTS[MODES[st.mode]] || MODE_EFFECTS.hover;
+          tx = pin.x + (hover.dx + gt.dx) * fx.reach + flow.x * fx.ride * Math.min(FW, FH);
+          ty = pin.y + (hover.dy + gt.dy) * fx.reach + flow.y * fx.ride * Math.min(FW, FH);
+        }
         // PREDICT: steer the head, spring each limb's root to its anchor on the head, damp the rest,
         // integrate. The solver does the rest.
         sys.vx[0] = (sys.vx[0] + (tx - sys.x[0]) * DISH_CREATURE.headPull) * DISH_CREATURE.headDamp;
@@ -367,20 +480,50 @@ export function createDishCreatureBuilder() {
             } else { sys.vx[s] *= DISH_CREATURE.limbDamp; sys.vy[s] *= DISH_CREATURE.limbDamp; }
           }
           sys.x[s] += sys.vx[s]; sys.y[s] += sys.vy[s];
+          if (boundsOn) reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH); // #1731
         }
         // SOLVE: D3's XPBD pass over the declared compound (body links + this state's limb links).
         // It folds its corrections back into velocity.
         solveDishLinks(sys, st.links, 1);
+        if (boundsOn) {
+          // #1731 — the solve can push a disc back across the edge: reflect again, so nothing ends the frame outside.
+          for (let s = 0; s < sys.n; s++) if (sys.alive[s]) reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH);
+        }
         // Heading: where the head is going, else where the spine says it faces. Turned toward, never snapped.
         const speed = Math.hypot(sys.vx[0], sys.vy[0]);
         let target = st.headingDeg;
         if (speed > 0.05) target = (Math.atan2(sys.vy[0], sys.vx[0]) * 180) / Math.PI;
         else if (sys.alive[1]) target = (Math.atan2(sys.y[0] - sys.y[1], sys.x[0] - sys.x[1]) * 180) / Math.PI;
+        let flowDeg = 0; let flowW = 0;
+        if (facingOn) {
+          // #1732 — facing: turn the target toward the flow (as strongly as the flow is strong), then toward the attractor.
+          const mag = Math.hypot(flow.x, flow.y);
+          if (mag > 1e-9) {
+            flowDeg = (Math.atan2(flow.y, flow.x) * 180) / Math.PI;
+            flowW = Math.min(1, mag / FACING.flowUnit);
+            target += wrapDeg(flowDeg - target) * FACING.flowTurn * flowW;
+          }
+          if (attr) {
+            const ad = Math.hypot(attr.x - sys.x[0], attr.y - sys.y[0]);
+            if (ad > 1e-6) target += wrapDeg((Math.atan2(attr.y - sys.y[0], attr.x - sys.x[0]) * 180) / Math.PI - target) * FACING.attractTurn;
+          }
+        }
         let turn = ((target - st.headingDeg + 540) % 360) - 180;
         st.headingDeg += turn * 0.18;
+        if (facingOn) st.alignment = flowW > 0 ? Math.cos(((st.headingDeg - flowDeg) * Math.PI) / 180) : 0; // the dot product
         const headRad = (st.headingDeg * Math.PI) / 180;
         // DRAW: three items a disc — a deepened underlay (the wet rim), the body, a bright core (the gloss) —
         // plus the head's eye. All _creature, so the animal never feeds the crowd that formed it.
+        // #1735 — an ALife creature wears its chemistry on top of the band's material; a hatching one is dim, eyes shut.
+        let pinScale = matScale; let pinDryT = dryT; let pinCore = coreAlpha;
+        const hatching = !!pol && st.age <= HATCH_FRAMES;
+        if (pol) {
+          const cm = materialFor(st.chem);
+          const d = matDim * cm.dim * (hatching ? 0.7 : 1);
+          pinScale = matScale * cm.bodyScale;
+          pinDryT = (1 - d) * DISH_CREATURE.dryMix;
+          pinCore = Math.round(100 * (DISH_CREATURE.coreMatte + (1 - DISH_CREATURE.coreMatte) * d));
+        }
         const mine = [];
         const discs = [];
         for (let k = 0; k < N_DISCS; k++) {
@@ -389,8 +532,8 @@ export function createDishCreatureBuilder() {
           if (g <= 0) continue;
           const base = k === 0 ? headBase : bodyBase;
           const [wet] = gt.recolor(base, ink);
-          const color = mixHex(wet, ink, dryT); // slice 4: the band dries the slime toward the ink
-          const s = (2 * st.radii[k] / 100) * g * hover.scale * matScale;
+          const color = mixHex(wet, ink, pinDryT); // slice 4: the band dries the slime toward the ink
+          const s = (2 * st.radii[k] / 100) * g * hover.scale * pinScale;
           const rot = k === 0 ? st.headingDeg : (Math.atan2(sys.y[k] - sys.y[k - 1], sys.x[k] - sys.x[k - 1]) * 180) / Math.PI;
           const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
             x: sys.x[k] + ox, y: sys.y[k] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
@@ -399,8 +542,8 @@ export function createDishCreatureBuilder() {
           });
           put(1.14, shade(color, 0.55), 96, 'rim');
           put(1, color, 98, 'body');
-          put(0.52, shade(color, 1.5), coreAlpha, 'core', -st.radii[k] * 0.16 * g, -st.radii[k] * 0.16 * g);
-          if (k === 0) {
+          put(0.52, shade(color, 1.5), pinCore, 'core', -st.radii[k] * 0.16 * g, -st.radii[k] * 0.16 * g);
+          if (k === 0 && !hatching) {
             mine.push({
               x: sys.x[0] + Math.cos(headRad) * st.radii[0] * 0.38 * g, y: sys.y[0] + Math.sin(headRad) * st.radii[0] * 0.38 * g,
               scale: s * 0.17, scaleY: s * 0.17, rotation: 0, alpha: 100,
@@ -413,13 +556,13 @@ export function createDishCreatureBuilder() {
         // wearing the spine's colour rank. A disc draws once growth has crossed its band, easing out.
         for (let j = 0; j < st.limbDirs.length; j++) {
           const [lwet] = gt.recolor(bodyBase, ink);
-          const lcolor = mixHex(lwet, ink, dryT);
+          const lcolor = mixHex(lwet, ink, pinDryT);
           for (let k = 0; k < LIMB_N; k++) {
             const p = st.grown[j] * LIMB_N - k;
             if (p <= 0) continue;
             const sIdx = N_DISCS + j * LIMB_N + k;
             const g = easeOut(Math.min(1, p));
-            const s = (2 * st.limbRadii[k] / 100) * g * hover.scale * matScale;
+            const s = (2 * st.limbRadii[k] / 100) * g * hover.scale * pinScale;
             const px = k === 0 ? sys.x[0] : sys.x[sIdx - 1];
             const py = k === 0 ? sys.y[0] : sys.y[sIdx - 1];
             const rot = (Math.atan2(sys.y[sIdx] - py, sys.x[sIdx] - px) * 180) / Math.PI;
@@ -430,9 +573,11 @@ export function createDishCreatureBuilder() {
             });
             put(1.14, shade(lcolor, 0.55), 96, 'rim');
             put(1, lcolor, 98, 'body');
-            put(0.52, shade(lcolor, 1.5), coreAlpha, 'core', -st.limbRadii[k] * 0.16 * g, -st.limbRadii[k] * 0.16 * g);
+            put(0.52, shade(lcolor, 1.5), pinCore, 'core', -st.limbRadii[k] * 0.16 * g, -st.limbRadii[k] * 0.16 * g);
           }
         }
+        if (facingOn) discs[0].facing = st.alignment; // #1732 — the head's alignment with the flow, for the suite and a debugger
+        if (pol) discs[0].mode = MODES[st.mode];
         frameBodies[i] = discs;
         extra.push(...mine);
       }
@@ -460,6 +605,10 @@ export function createDishCreatureBuilder() {
       return true;
     },
     lastBodies() { return frameBodies; },
+    /** #1737 — each living ALife creature's education as a portable kc-creature/1 record (genome + long-term weights), per pin; null elsewhere. */
+    getCreatureRecords() {
+      return states.map((st) => (st && st.genome ? creatureRecord(st.genome, { stw: st.pstw, ltw: st.pltw, elig: st.pelig }) : null));
+    },
     dispose() { states.length = 0; frameBodies = []; },
   };
 }
