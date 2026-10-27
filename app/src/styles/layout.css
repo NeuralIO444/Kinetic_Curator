@@ -184,7 +184,8 @@
     gap: 5px;
   }
   .curator-voice-btn .tb-micro,
-  .tb-start-key {
+  .tb-start-key,
+  .tb-start-deck {
     display: none;
   }
   .palette-harmony {
@@ -1493,7 +1494,7 @@
   }
 }
 
-/* ■ START marker — doubles as the mode indicator (accent in CHAOS) */
+/* ■ START marker — doubles as the scope indicator (fills OFF → KOZ, #1772) */
 .kc-topbar-curator .start-mode-btn::before {
   width: 11px;
   height: 11px;

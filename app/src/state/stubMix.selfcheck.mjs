@@ -8,7 +8,14 @@
 // asset pool or palette (color and shape chips are their own axes).
 import assert from 'node:assert';
 import { useStore } from './store.js';
-import { STUB_VOICES, MOTION_MODES, SHAPE_SETS, isMotionActive, isShapeSetActive } from '../data/voices.js';
+import {
+  STUB_VOICES,
+  MOTION_MODES,
+  SHAPE_SETS,
+  FLAGSHIP_VOICE_IDS,
+  isMotionActive,
+  isShapeSetActive,
+} from '../data/voices.js';
 import { ASSETS } from '../data/assets/index.js';
 import { COMPOSITION_PRESETS as PRESETS } from '../data/presets.js';
 import { validateLayoutParams, BEHAVE_MODES } from '../data/layout-modes.js';
@@ -113,7 +120,10 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
   const known = new Set(ASSETS.map((a) => a.id));
   assert.strictEqual(SHAPE_SETS.length, 19, '4 flagship (#704 dark glass) + 15 layout-tile shape sets'); // #1196: +voronoi-cells
   for (const x of SHAPE_SETS) {
-    assert.strictEqual(x.ids.length, 4, `${x.id}: exactly 4 shapes`);
+    // #1771: a flagship chip is its 4 curated shapes; a layout tile's chip is its promoted voice's full wardrobe (8)
+    const flagship = FLAGSHIP_VOICE_IDS.includes(x.id);
+    assert.strictEqual(x.ids.length, flagship ? 4 : 8, `${x.id}: ${flagship ? 4 : 8} shapes`);
+    assert.strictEqual(new Set(x.ids).size, x.ids.length, `${x.id}: no shape twice`);
     assert.ok(
       x.ids.every((i) => known.has(i)),
       `${x.id}: all ids are real assets`,

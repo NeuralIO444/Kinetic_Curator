@@ -25,6 +25,7 @@
     "parity": "node src/gl/parity/run.mjs",
     "verify:take": "node scripts/verifyPerformance.mjs",
     "evidence:stress": "node scripts/stressEvidence.mjs",
+    "audit:assets": "node scripts/assetCounts.mjs",
     "bake:regions": "node scripts/bakeRegionMattes.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."

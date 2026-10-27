@@ -50,9 +50,10 @@ for (let i = 1; i <= COUNT; i++) {
     layers: [kc(0)], activeLayerId: 'kc0', layerSnapshots: {}, lockedParams: {}, armedMode: null, armedMotion: null, historyUndoStack: [], historyRedoStack: [],
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS }, seed: Math.floor(Math.random() * 0xffffffff) >>> 0, paletteId: 'praystation', paletteOverrides: null,
   });
-  // alternate the two live verbs so the pool spans what each deals: a full chaos roll, and a calm rules pass on top
+  // alternate the two live verbs so the pool spans what each deals: a full chaos roll, and a calm look pass on top
+  // (#1772: the KIN tap's first stage; the RULES pass it replaced is retired)
   useStore.getState().kineticRoll();
-  if (i % 3 === 0) useStore.getState().kineticRulesPass();
+  if (i % 3 === 0) useStore.getState().kineticLookPass();
   const s = useStore.getState();
   const doc = serializeProject(s);
   const name = `${PREFIX}-${String(i).padStart(4, '0')}.png`;

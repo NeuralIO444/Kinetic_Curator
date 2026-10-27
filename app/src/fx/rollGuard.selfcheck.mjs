@@ -142,7 +142,8 @@ await ok('wired: every roll path announces itself, and the hook is mounted befor
   assert.match(r('../panels/layout/CuratorBar.jsx'), /emit\(Events\.ROLL_GUARD, \{ kind: 'curate' \}\)/);
   assert.match(
     r('../hooks/useProjectAutosave.js'),
-    /st\.kineticRoll\(\);\s*\n\s*st\.setRunning\(true\);\s*\n\s*emit\(Events\.ROLL_GUARD, \{ kind: 'chaos' \}\)/,
+    // #1772: START: WEAK / MED open on a look + voice pass, KOZ on the wild roll — both announce themselves
+    /else st\.kineticRoll\(\);\s*\n\s*st\.setRunning\(true\);\s*\n\s*emit\(Events\.ROLL_GUARD, \{ kind: open \? 'open' : 'chaos' \}\)/,
   );
   const app = r('../App.jsx');
   assert.ok(

@@ -60,50 +60,38 @@ lands(
   (d) => (d.layers || []).find((l) => l.id === patLayer().id)?.pattern?.seed,
 );
 
-// ── layoutSlice: kineticRulesPass pattern roll (die must observably fire) ───
-// The pass deals pattern layers from mkRng(die(0x7fffffff)). With the die
+// ── layoutSlice: kineticLookPass pattern roll (die must observably fire) ───
+// The look pass (#1772) deals pattern layers from mkRng(die(0x7fffffff)). With the die
 // stubbed, the dealt seeds are whatever the roll produced — the proof is
 // that they are in the document, not what they are.
 try {
   Math.random = () => 0.999;
-  S().kineticRulesPass();
+  S().kineticLookPass();
 } finally {
   Math.random = realRandom;
 }
 lands(
-  'kineticRulesPass -> pattern seeds',
+  'kineticLookPass -> pattern seeds',
   S().layers.map((l) => l.pattern?.seed ?? null),
   (d) => (d.layers || []).map((l) => l.pattern?.seed ?? null),
 );
 
-// ── layoutSlice: kineticWeatherPass (sun + optics dice, stubbed die) ────────
+// ── layoutSlice: kineticVoicePass (sun dice, stubbed die — the retired WEATHER pass's job, #1772) ──
 S().setLight({ x: 10, y: 20, intensity: 0.5, ambient: 0.4 });
 try {
   Math.random = () => 0.999;
-  S().kineticWeatherPass();
+  S().kineticVoicePass();
 } finally {
   Math.random = realRandom;
 }
-assert.ok(S().light, 'weather pass keeps a light');
-assert.strictEqual(S().light.x, -500 + ((0.999 * 2001) | 0), 'weather die moved the sun (x)');
+assert.ok(S().light, 'voice pass keeps a light');
+assert.strictEqual(S().light.x, -500 + ((0.999 * 2001) | 0), 'voice die moved the sun (x)');
 assert.ok(
   Math.abs(S().light.intensity - (0.3 + 0.999 * 0.7)) < 0.01,
-  `weather die set intensity, got ${S().light.intensity}`,
+  `voice die set intensity, got ${S().light.intensity}`,
 );
-assert.ok(
-  Math.abs(S().light.ambient - (0.2 + 0.999 * 0.5)) < 0.01,
-  `weather die set ambient, got ${S().light.ambient}`,
-);
-assert.ok(
-  Math.abs(S().layoutParams.accumulationOptics - 0.999 * 0.25) < 0.01,
-  `weather die set accumulationOptics, got ${S().layoutParams.accumulationOptics}`,
-);
-lands('kineticWeatherPass -> light', S().light, (d) => d.light);
-lands(
-  'kineticWeatherPass -> accumulationOptics',
-  S().layoutParams.accumulationOptics,
-  (d) => d.layoutParams?.accumulationOptics,
-);
+assert.ok(Math.abs(S().light.ambient - (0.2 + 0.999 * 0.5)) < 0.01, `voice die set ambient, got ${S().light.ambient}`);
+lands('kineticVoicePass -> light', S().light, (d) => d.light);
 
 // ── layersSlice: addLayer (id identity + snapshot seed) ─────────────────────
 const before = S().layers.length;

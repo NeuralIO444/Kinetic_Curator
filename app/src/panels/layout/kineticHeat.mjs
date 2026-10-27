@@ -11,13 +11,12 @@
 //   KINETIC_HEAT_PER_TAP (~3 rapid taps to max). Idle heat decays with
 //   KINETIC_HEAT_HALF_LIFE_MS half-life.
 // - Run: consecutive taps with gaps < KINETIC_WARM_MS (the #944 warm window).
-//   tapCount 1 → RULES, 2 → WEATHER, ≥3 → CHAOS once heat ≥ KINETIC_CHAOS_HEAT.
-//   A hot-but-not-chaotic third tap simmers at WEATHER — no regression vs #944.
-// - A stale tap (gap ≥ warm window) starts a fresh run: RULES, heat 0.
+//   #1772 — the run is a filter sweeping left to right (Matt, 2026-10-27): tap 1 → LOOK, 2 → VOICE, ≥3 → CURATOR
+//   (a small capped nudge); a ≥3rd tap at heat ≥ KINETIC_CHAOS_HEAT still breaks into CHAOS (hammering).
+//   Heat picks how far the run has swept, not how violent a re-roll is — until hammering.
+// - A stale tap (gap ≥ warm window) starts a fresh run: LOOK, heat 0.
 //
-// kineticWarm.mjs is left untouched — it remains the simple warm/fresh router
-// #944's selfcheck pins. This module is the full heat-aware superset the
-// button actually uses.
+// (#944's simple warm/fresh router, kineticWarm.mjs, retired with the RULES/WEATHER passes — #1772 cleanup.)
 
 /** A second KINETIC tap within this window finds the button "warm" (#944). */
 export const KINETIC_WARM_MS = 2000;
@@ -81,22 +80,30 @@ export function heatLevel(heat) {
  * @param {{ heat: number, taps: number, lastTapAt: number }} run — heat and
  *   tap count as of the previous tap (heat at last tap, not decayed).
  * @param {number} now — Date.now() at this tap.
- * @returns {{ layer: 'rules'|'weather'|'chaos', heat: number, taps: number,
+ * @param {{ chaos?: boolean }} [scope] — #1772: may hammering break into CHAOS? Only at START: KOZ
+ *   (kineticScope.mjs); below it a hot run keeps advancing the curator.
+ * @returns {{ layer: 'look'|'voice'|'curator'|'chaos', heat: number, taps: number,
  *   lastTapAt: number }} heat is post-tap heat (decayed then added); taps is
  *   the run length; lastTapAt echoes `now` so runs thread through calls.
  */
-export function routeKineticTapHeat(run, now) {
+export function routeKineticTapHeat(run, now, { chaos = true } = {}) {
   const lastTapAt = run.lastTapAt || 0;
   const dt = now - lastTapAt;
   if (dt >= KINETIC_WARM_MS || lastTapAt === 0) {
-    // Stale (or never tapped): fresh run, cool RULES cousin.
-    return { layer: 'rules', heat: 0, taps: 1, lastTapAt: now };
+    // Stale (or never tapped): a fresh run starts the sweep at the LOOK.
+    return { layer: 'look', heat: 0, taps: 1, lastTapAt: now };
   }
   let heat = decayHeat(run.heat || 0, dt);
   const taps = (run.taps || 0) + 1;
   if (dt < KINETIC_HEAT_TAP_MS) heat = addHeat(heat);
-  if (taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
+  if (chaos && taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
     return { layer: 'chaos', heat, taps, lastTapAt: now };
   }
-  return { layer: taps >= 2 ? 'weather' : 'rules', heat, taps, lastTapAt: now };
+  return { layer: taps >= 3 ? 'curator' : taps === 2 ? 'voice' : 'look', heat, taps, lastTapAt: now };
+}
+
+/** #1772 — the TE micro-label for the pass a tap actually ran (KC-1 DS: honest signals): L / V / C, and X for chaos. */
+export const KINETIC_LAYER_LABEL = Object.freeze({ look: 'L', voice: 'V', curator: 'C', chaos: 'X' });
+export function kineticLayerLabel(layer) {
+  return KINETIC_LAYER_LABEL[layer] ?? '';
 }

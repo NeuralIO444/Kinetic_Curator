@@ -183,18 +183,18 @@ ok(
 );
 
 ok(
-  'the real actions: KIN chaos / rules / weather and CURATOR deal the PATTERN tracks, in one undo, and a KC-only scene is untouched',
+  'the real actions: KIN chaos / look / voice and CURATOR deal the PATTERN tracks, in one undo, and a KC-only scene is untouched',
   () => {
     reset([PT('p1', { drift: 0.4 })]);
     const before = JSON.stringify(pat());
-    S().kineticRulesPass();
-    assert.notEqual(JSON.stringify(pat()), before, 'rules reseeds');
+    S().kineticLookPass();
+    assert.notEqual(JSON.stringify(pat()), before, 'the look pass reseeds (a new tessellation)');
     assert.equal(pat()[0].pattern.mode, 'QUILT');
     assert.equal(S().historyUndoStack.length, 1);
     S().undo();
     assert.equal(JSON.stringify(pat()), before, 'one undo restores the old pattern');
-    S().kineticWeatherPass();
-    assert.equal(pat()[0].pattern.seed, 5, 'weather keeps the picture');
+    S().kineticVoicePass();
+    assert.equal(pat()[0].pattern.seed, 5, 'the voice pass keeps the picture');
     assert.ok(pat()[0].pattern.drift > 0);
     S().undo();
     S().kineticRoll();
@@ -207,9 +207,9 @@ ok(
     assert.equal(JSON.stringify(pat()), before);
     reset();
     const kcOnly = S().layers;
-    S().kineticRulesPass();
+    S().kineticLookPass();
     assert.equal(S().layers, kcOnly, 'no PATTERN track: the layer list is the very same array');
-    S().kineticWeatherPass();
+    S().kineticVoicePass();
     assert.equal(S().layers, kcOnly);
     S().curateUnlocked();
     assert.equal(S().layers, kcOnly);

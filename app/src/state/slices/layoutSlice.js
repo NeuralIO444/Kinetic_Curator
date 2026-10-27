@@ -44,6 +44,9 @@ import {
   shapeMixIds,
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
+import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
+import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
+import { scopeDecks, CURATED_SETS } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -68,6 +71,19 @@ const editableOverrides = (ov) => {
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
+/** #1772 — a look pass under the START pill's ceiling (kineticScope.mjs): its look deck and its pool kind. */
+function scopedLook(state) {
+  const d = scopeDecks(state.startupMode);
+  return lookPass(state, dieRng, {
+    looks: d.looks,
+    pool: d.pool,
+    sets: CURATED_SETS,
+    records: dealableRecords(ASSETS, state.customAssets),
+  });
+}
+
+/** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
+const dieRng = () => die(0x40000000) / 0x40000000;
 
 /** Pick a random id from `ids`, preferring one that differs from `current`. */
 function pickOtherId(ids, current) {
@@ -83,32 +99,6 @@ function pickOtherPreset(presets, currentComposition) {
   const ids = presets.map((p) => p.id);
   const id = pickOtherId(ids, currentComposition);
   return presets.find((p) => p.id === id) || presets[0];
-}
-
-/**
- * #943 — modes whose layouts converge on a focal region (vs field modes that
- * cover the plate). A focal-mode brief naturally yields one clear hero with
- * a supporting cast; a field brief (flow, grid, rails…) breaks the
- * always-centered habit by construction.
- */
-const FOCAL_MODES = new Set(['fibonacci', 'phyllotaxis', 'radial', 'orbit']);
-
-/**
- * #943 — the RULES pass's compositional strategy, as a documented
- * distribution rather than a dice accident: half the passes land a
- * focal-mode brief (one clear focal region), half land a field brief
- * (off-center asymmetry allowed — the centering habit breaks across taps).
- * The current composition is always excluded: a RULES pass re-works, never
- * re-deals the same brief.
- */
-function pickRulesPreset(currentComposition) {
-  const pool = COMPOSITION_PRESETS.filter((p) => p.id !== currentComposition);
-  const src = pool.length ? pool : COMPOSITION_PRESETS;
-  const focal = src.filter((p) => FOCAL_MODES.has(p.params.mode));
-  const field = src.filter((p) => !FOCAL_MODES.has(p.params.mode));
-  const bucket = die(2) === 0 ? focal : field;
-  const list = bucket.length ? bucket : src;
-  return list[die(list.length)];
 }
 
 function shuffle(arr) {
@@ -200,6 +190,13 @@ export const createLayoutSlice = (set) => ({
   seedOffsets: defaultSeedOffsets(),
   /** CURATE press counter (#518) — session-only, never serialized. */
   curatePress: 0,
+  /** #1772 — the deck voice the last KINETIC voice pass dealt (so the next deals a different one). Session-only. */
+  kineticVoiceId: null,
+  /**
+   * #1772 — the last KINETIC curator pass, backstage and honest: { curator, index, moves: [{ key, from, to }] }.
+   * `moves: []` means the curator passed (kept the piece as it stood). Session-only, never serialized.
+   */
+  kineticNudge: null,
   // #592 — did the last CURATE press fall back to an unconditioned roll?
   curateChainFallback: false,
   paletteId: 'praystation',
@@ -884,12 +881,9 @@ export const createLayoutSlice = (set) => ({
       // #964: pin the armed roll scope over whatever the roll dealt.
       merged = pinRollScope(merged, state.armedMode, state.armedMotion);
 
-      // 4. assets — random shape set, mapped through known ids like loadShapeSet.
-      const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
-      const known = new Set(ASSETS.map((a) => a.id));
-      for (const c of state.customAssets || []) known.add(c.id);
-      const enabledAssets = {};
-      for (const assetId of shapeSet.ids) if (known.has(assetId)) enabledAssets[assetId] = true;
+      // 4. assets — #1767: a mixed-family pool dealt from the WHOLE library (+ the artist's imports), not one of the
+      // 19 shape sets (49 of 295 assets). Same size as a set, so density/count behave as before (state/rollPool.mjs).
+      const enabledAssets = poolToEnabled(dealMixedPool(dealableRecords(ASSETS, state.customAssets), dieRng).ids);
 
       // 5. FX + blend — one FX layer, 0–3 random menu effects with default
       // params; content layers get a random blend mode. Never strands the
@@ -947,140 +941,99 @@ export const createLayoutSlice = (set) => ({
     }),
 
   /**
-   * KINETIC button — RULES layer (#943). A calm tap runs a compositional
-   * RULES pass over the current piece instead of the naive full re-roll:
-   * order is imposed on what's on screen, not randomness dealt fresh.
-   *
-   * The DNA stays put — same seed, same asset pool, same FX chain and blend
-   * modes — so the result is recognizably related to what was on screen.
-   * The palette DOES roll (#952): every KIN tap deals a new palette from
-   * the full pool (all 37 system palettes + saved user palettes), so the
-   * roll is the review — every palette has to survive a tap.
-   * What changes is the compositional order, under four
-   * rules (each respecting lockedParams, like applyPreset):
-   *
-   *  1. separation — `overlap: false` (small-first paint order) plus density
-   *     clamped into 35..65 for breathing room between elements;
-   *  2. focal hierarchy — the new brief is drawn from a documented
-   *     focal/field distribution (see pickRulesPreset): focal-mode briefs
-   *     converge on one clear region with a supporting cast;
-   *  3. off-center allowed — field briefs (flow, grid, rails…) are eligible
-   *     picks, so the always-centered habit breaks across taps; nothing
-   *     here re-centers;
-   *  4. edge-bleed allowed — `bleed` is rolled fresh each pass (~half the
-   *     passes run elements off-canvas).
-   *
-   * One atomic store update = one undo entry (edit kind: only layoutParams
-   * move — layers, FX and blends are untouched). The honest die
-   * (Math.random) matches kineticRoll's convention: replayability comes
-   * from the stored state + seed (#710), not from the pass itself.
-   * kineticRoll stays for #945's heat ceiling.
+   * #1772 — KINETIC LOOK pass (tap 1 of the sweep): a fresh Look from the 64 + a pool coherent with its pairing.
+   * Structure and shapes move; motion, palette and seed hold. One undo step. Pure logic: state/kineticSweep.mjs.
    */
-  kineticRulesPass: () =>
+  kineticLookPass: () =>
     set((state) => {
-      // PATTERN tracks join the pass: a new tessellation of the same kind. The roll's own entry is a whole-document
-      // one when it touched a layer, an edit one otherwise (as before).
+      const r = scopedLook(state);
+      // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
+      // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
-      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
-
-      // #952 — every KIN tap deals a new palette from the full pool
-      // (37 system + saved user palettes), never the one already up.
-      // Overrides + swatch locks clear, exactly like setPaletteId.
-      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
-
-      const preset = pickRulesPreset(state.layoutParams.composition);
-      // #964: an armed MODE constrains RULES — keep the composition too. The
-      // rules themselves (separation, focal hierarchy, edge-bleed) still apply.
-      const scopeSkip = new Set(state.armedMode ? ['composition', 'mode'] : []);
-      const merged0 = { ...state.layoutParams };
-      if (!state.armedMode && !state.lockedParams.composition) merged0.composition = preset.id;
-      for (const [k, v] of Object.entries(preset.params)) {
-        if (scopeSkip.has(k)) continue;
-        if (!state.lockedParams[k] && merged0[k] !== v) merged0[k] = v;
-      }
-      // #964: pin the armed roll scope over whatever the pass dealt.
-      const merged = pinRollScope(merged0, state.armedMode, state.armedMotion);
-
-      // Rule 1 — separation.
-      if (!state.lockedParams.overlap) merged.overlap = false;
-      if (!state.lockedParams.density && merged.density > 65) {
-        merged.density = 35 + die(31); // 35..65
-      }
-      // Rule 4 — edge-bleed allowed: rolled fresh, ~half the passes bleed.
-      if (!state.lockedParams.bleed) merged.bleed = die(2) === 0;
-
       const next = {
-        ...undo,
+        ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
-        paletteId,
-        paletteOverrides: null,
-        paletteLocks: {},
-        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-        layoutParams: merged,
+        layoutParams: r.layoutParams,
+        enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         voiceMix: null,
         activeVoiceId: null,
       };
-      if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
+      if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
     }),
 
   /**
-   * KINETIC button — WEATHER layer (#944). A second tap while the button is
-   * still warm drifts the atmosphere over the SAME structure instead of
-   * re-working it: palette weather, light mood, atmospheric FX. Skeleton
-   * holds; air changes.
-   *
-   * What moves:
-   *  1. palette weather — paletteId rolls to a different catalog palette
-   *     (overrides + swatch locks clear, exactly like setPaletteId);
-   *  2. mood — the chiaroscuro sun, if it's on, moves to a new position and
-   *     intensity (a storm rolling in, golden hour…); off stays off;
-   *  3. atmospheric FX — accumulationOptics (bloom + halation, the GLOW
-   *     slider) rolls fresh, unless locked.
-   *
-   * What holds: seed (same DNA — the HUD readout keeps showing it),
-   * composition and every structural param, asset pool, layers, FX chain.
-   * One atomic store update = one undo entry (edit kind). The honest die
-   * matches kineticRulesPass/kineticRoll's convention: replayability comes
-   * from the stored state + seed (#710), not from the pass itself.
+   * #1772 — KINETIC VOICE pass (tap 2): a fresh voice from the 64-voice deck over the standing look. Motion + palette
+   * move, and the glow only when the voice declares accumulation (#1768). Structure and the pool hold. One undo step.
    */
-  kineticWeatherPass: () =>
+  kineticVoicePass: () =>
     set((state) => {
-      // PATTERN tracks join the pass: same picture, the air moves (DRIFT and MIX nudge; a still pattern stays still).
+      const r = voicePass(state, dieRng, { deck: scopeDecks(state.startupMode).voices });
+      // The air moves with the costume (what the retired WEATHER pass dealt): PATTERN tracks drift and mix over the
+      // same picture, and the chiaroscuro sun, if it is out, moves to a new position and intensity. Off stays off.
       const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
-      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
-
-      // 1. Palette weather — a different sky, never the one already up. Rolls
-      // from the full pool (#952: all 37 system palettes + saved user palettes).
-      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
-
-      // 2. Mood — move the sun if it's out.
-      let light = state.light;
-      if (light) {
-        light = sanitizeLight({
-          ...light,
-          x: -500 + die(2001),
-          y: -500 + die(1701),
-          intensity: 0.3 + Math.random() * 0.7,
-          ambient: 0.2 + Math.random() * 0.5,
-        });
-      }
-
-      // 3. Atmospheric FX — bloom + halation amount.
-      const merged = { ...state.layoutParams };
-      if (!state.lockedParams.accumulationOptics) {
-        merged.accumulationOptics = Math.random() * 0.25;
-      }
-
+      const light = state.light
+        ? sanitizeLight({
+            ...state.light,
+            x: -500 + die(2001),
+            y: -500 + die(1701),
+            intensity: 0.3 + dieRng() * 0.7,
+            ambient: 0.2 + dieRng() * 0.5,
+          })
+        : state.light;
       return {
-        ...undo,
+        ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
-        paletteId,
-        paletteOverrides: null,
+        light,
+        layoutParams: r.layoutParams,
+        paletteId: r.paletteId,
+        paletteOverrides: r.paletteOverrides,
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-        light,
-        layoutParams: merged,
+        kineticVoiceId: r.voiceId,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — the START pill's WEAK / MED launch opener: one look pass and one voice pass under that state's decks, in
+   * ONE store update — one undo entry, so a restored project stays one Ctrl+Z away (#33, #946).
+   */
+  kineticOpenPass: () =>
+    set((state) => {
+      const look = scopedLook(state);
+      const mid = { ...state, layoutParams: look.layoutParams };
+      const voice = voicePass(mid, dieRng, { deck: scopeDecks(state.startupMode).voices });
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: voice.layoutParams,
+        enabledAssets: Object.keys(look.enabledAssets).length ? look.enabledAssets : state.enabledAssets,
+        paletteId: voice.paletteId,
+        paletteOverrides: voice.paletteOverrides,
+        paletteLocks: {},
+        paletteChosen: false,
+        kineticVoiceId: voice.voiceId,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — KINETIC CURATOR pass (tap 3+): Davis weighs the piece as it stands against a few capped nudges
+   * (≤ NUDGE_MAX_KEYS params, each ≤ NUDGE_SPREAD of its dice range) and keeps one. Keeping the standing piece is a
+   * real outcome: no change, no undo entry, and `kineticNudge.moves` reads empty. The record is the backstage signal.
+   */
+  kineticCuratorPass: () =>
+    set((state) => {
+      const curator = getActiveCurator();
+      const r = curatorPass(state, curator, dieRng, pickCurated);
+      const kineticNudge = { curator: curator?.name ?? null, index: r.index, moves: r.moves };
+      if (!r.layoutParams) return { kineticNudge };
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: r.layoutParams,
+        kineticNudge,
         voiceMix: null,
         activeVoiceId: null,
       };

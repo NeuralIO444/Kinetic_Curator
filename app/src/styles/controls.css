@@ -461,7 +461,7 @@
   gap: 10px;
 }
 
-/* #946 — START: CHAOS / FIXED toggle. Sits next to the KIN button in the
+/* #946 / #1772 — START: OFF · WEAK · MED · KOZ cycle (was CHAOS / FIXED). Sits next to the KIN button in the
    top bar: plainly named, one click, remembered across sessions. CHAOS is
    the default (accent dot lit); FIXED reads quiet. */
 .start-mode-btn {
@@ -496,9 +496,21 @@
   border: 1px solid var(--dim);
   flex-shrink: 0;
 }
-.start-mode-btn[data-mode="chaos"]::before {
+/* #1772 — the marker fills with the scope: OFF hollow, WEAK a third, MED two thirds, KOZ solid accent (TE detents) */
+.start-mode-btn[data-mode="weak"]::before {
+  background: linear-gradient(to top, var(--accent) 34%, transparent 34%);
+}
+.start-mode-btn[data-mode="med"]::before {
+  background: linear-gradient(to top, var(--accent) 67%, transparent 67%);
+}
+.start-mode-btn[data-mode="koz"]::before {
   background: var(--accent);
   border-color: var(--accent);
+}
+.start-mode-btn .tb-start-deck {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 .curator-voice-wrap {
   position: relative;

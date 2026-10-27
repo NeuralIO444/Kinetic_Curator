@@ -10,8 +10,10 @@ const SETTLE_MS = 450;
 const CAPTURE = { width: 96, height: 67 };
 const REDEAL = {
   chaos: (s) => s.kineticRoll(),
-  rules: (s) => s.kineticRulesPass(),
-  weather: (s) => s.kineticWeatherPass(),
+  look: (s) => s.kineticLookPass(), // #1772 — the sweep's passes
+  voice: (s) => s.kineticVoicePass(),
+  curator: (s) => s.kineticCuratorPass(),
+  open: (s) => s.kineticOpenPass(), // #1772 — START: WEAK / MED's opener
   curate: (s) => s.curateUnlocked(),
 };
 const snap = () => {
