@@ -28,7 +28,10 @@ assert.strictEqual(bindKey(parseMidi([0x90, 36, 100])), bindKey(parseMidi([0x80,
 assert.notStrictEqual(bindKey(parseMidi([0x90, 36, 100])), bindKey(parseMidi([0x91, 36, 100])), 'channel-specific');
 assert.strictEqual(bindKey({ type: 'cc', channel: 1, number: 7 }), 'cc:1:7');
 for (const ok of ['note:1:0', 'note:16:127', 'cc:10:99', 'cc:1:100']) assert.ok(isBindKey(ok), ok);
-for (const bad of ['note:0:5', 'note:17:5', 'cc:1:128', 'cc:1:05', 'pad:1:5', '', null, 5, 'note:1:-1', 'note:1:1:1']) assert.ok(!isBindKey(bad), String(bad));
+// #1740: every number 0–127 binds, on notes and CCs, on the first and last channel (108/109/118/119 used to be refused).
+for (const kind of ['note', 'cc']) for (const ch of [1, 16]) for (let n = 0; n <= 127; n++) assert.ok(isBindKey(`${kind}:${ch}:${n}`), `${kind}:${ch}:${n}`);
+for (const n of [108, 109, 118, 119]) assert.strictEqual(describeKey(`cc:1:${n}`), `CC ${n} · ch 1`, `describeKey ${n}`);
+for (const bad of ['note:0:5', 'note:17:5', 'cc:1:128', 'cc:1:05', 'cc:1:00', 'cc:1:0127', 'cc:1:130', 'cc:1:200', 'pad:1:5', '', null, 5, 'note:1:-1', 'note:1:1:1']) assert.ok(!isBindKey(bad), String(bad));
 assert.strictEqual(describeKey('note:1:36'), 'note 36 · ch 1');
 assert.strictEqual(describeKey('cc:3:7'), 'CC 7 · ch 3');
 
