@@ -28,12 +28,23 @@ import { chooseHomes, marksOf, sanitizeCount } from './spawn.js';
 import { creatureEnabled, CREATURE_ASSET_ID } from './creatureCitizen.js';
 import { birthCentre } from './director.js'; // the nudge toward the recent keeps (hosted there, never a surface)
 import { TRAIT_DEFAULTS } from '../engine/creature.js';
+import { genomeFromTraits, traitsOf, sanitizeGenome } from '../engine/creatureGenome.js'; // #1734: genomes at birth
+import { breedFor } from './creatureBreeding.js'; // #1738: children of kept creatures
 
 /** Frames between home searches while fewer homes stand than asked (spawnLive's RETRY_FRAMES). */
 export const SPAWN_RETRY_FRAMES = 30;
 /** Frames a home's creature may fail to form before the home is given up (spawnLive's PATIENCE_FRAMES). */
 export const SPAWN_PATIENCE_FRAMES = 180;
 const KEEP_RING_CAP = 8;
+/** #1738 — keeps whose living genomes the breeding pool remembers (session-only, like the trait ring). */
+const GENOME_RING_CAP = 8;
+
+/** FNV-1a: a stable number for a birth's key (breeding and the wild type roll from it). */
+function birthKey(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
+  return h >>> 0;
+}
 
 // ── the channel's wiring (one listener each, as it was in formationLive) ─────────────────────────────
 
@@ -105,6 +116,15 @@ export function createCreatureSpawnState() {
   let spawnField = null; // chooseHomes' fertility probe (derived cache — never snapshotted)
   let spawnFieldKey = '';
   const keepRing = []; // session-only: the traits of the moths alive at each recent keep (never saved to a document)
+  // #1734 / #1738 — the ALife channel (only when the input carries creatureAlife): each formed pin's genome, the kept
+  // genomes the breeding pool draws from, the birth count, the last bred pair, and a keep serial the builder reads
+  // (a keep lands → the serial steps → the dish creature consolidates and its chemistry hears the keep).
+  let genomes = []; // per pin: { x, y, genome } | null
+  const genomeRing = [];
+  let breedOrdinal = 0;
+  let lastPair = null;
+  let keepSerial = 0;
+  let alifeOn = false;
   let decisions = freshDecisions(false);
 
   function freshDecisions(homesChanged) {
@@ -115,6 +135,8 @@ export function createCreatureSpawnState() {
       dishTraits: traits,
       dishHosted: hosted,
       dishPressure: latest.states.map((s) => (s ? s.density : 0)),
+      // #1734 — only when the ALife channel is on, so an older take's decisions keep their exact shape
+      ...(alifeOn ? { dishGenomes: genomes.map((g) => (g ? g.genome : null)), creatureKeeps: keepSerial } : {}),
       homesChanged,
     };
   }
@@ -145,12 +167,42 @@ export function createCreatureSpawnState() {
       centre: (r) => birthCentre({ ring: keepRing, keeps: r && r.keeps, allowance: r && r.allowance, defaults: TRAIT_DEFAULTS }),
     });
     traits = shifted.traits;
+    alifeOn = !!(input && input.creatureAlife);
+    if (alifeOn) observeGenomes(input, shifted.born);
+    else genomes = [];
     if (shifted.born.length && shiftTap) { try { shiftTap(shifted.born); } catch { shiftTap = null; } }
     if (formationTap) {
       // resolveTap's listener law, carried over: a throwing tap is dropped, never fatal to the frame.
       try { formationTap(u, r.events); } catch { formationTap = null; }
     }
     return r;
+  }
+
+  // #1734 / #1738 — a genome per formed pin, decided once at birth: a child of two kept genomes when the pool allows
+  // (breedFor), else the wild type of Davis's roll. A bred child's look is its genome's (genetics change looks AND
+  // behaviour, the Spore warning), so the pin's traits follow its genome for life — overriding the shift tracker's
+  // slot, every frame, not only at birth.
+  function observeGenomes(input, born) {
+    const seed = (input && input.seed) >>> 0;
+    const bornAt = new Map(born.map((e) => [e.pin, e]));
+    const next = new Array(latest.states.length).fill(null);
+    for (let i = 0; i < latest.states.length; i++) {
+      const s = latest.states[i];
+      if (!s || !s.formed || !traits[i]) continue;
+      const prev = genomes[i] && genomes[i].x === s.x && genomes[i].y === s.y ? genomes[i] : null;
+      if (prev && !bornAt.has(i)) { next[i] = prev; continue; }
+      breedOrdinal += 1;
+      const key = birthKey(`alife:${i}:${breedOrdinal}:${Math.round(s.x)}:${Math.round(s.y)}`);
+      const bred = breedFor({ ring: genomeRing, seed, key, ordinal: breedOrdinal, lastPair });
+      let genome;
+      if (bred) { genome = bred.genome; lastPair = bred.pair; }
+      else genome = genomeFromTraits(traits[i], seed, `wild:${key}`);
+      next[i] = { x: s.x, y: s.y, genome };
+      const e = bornAt.get(i);
+      if (e && bred) e.traits = traitsOf(genome); // the davis-shift log records the look this animal was born with
+    }
+    genomes = next;
+    traits = traits.map((t, i) => (genomes[i] ? traitsOf(genomes[i].genome) : t));
   }
 
   // spawnLive.observeSpawn, transcribed: steady homes until the dish changes; a home whose creature
@@ -221,6 +273,11 @@ export function createCreatureSpawnState() {
     getFormationView() { return latest; },
     /** A keep just landed: remember the traits of the moths alive now (a session ring; nothing without a moth). */
     noteKeep() {
+      if (alifeOn) {
+        keepSerial += 1; // #1736/#1737: the builder hears every keep (consolidation, the approval drive's drop)
+        const kept = genomes.filter(Boolean).map((g) => g.genome);
+        if (kept.length) { genomeRing.push(kept); while (genomeRing.length > GENOME_RING_CAP) genomeRing.shift(); } // #1738: the breeding pool
+      }
       const alive = traits.filter(Boolean).map((t) => ({ ...t }));
       if (!alive.length) return;
       keepRing.push(alive);
@@ -236,6 +293,7 @@ export function createCreatureSpawnState() {
       shiftTracker.reset();
       traits = [];
       keepRing.length = 0;
+      genomes = []; genomeRing.length = 0; breedOrdinal = 0; lastPair = null; keepSerial = 0; alifeOn = false;
       decisions = freshDecisions(false);
     },
     /** Start the spawn half over (a fresh document, tests). */
@@ -264,6 +322,9 @@ export function createCreatureSpawnState() {
         dishKey,
         sinceTry,
         keepRing: keepRing.map((list) => list.map(copyTraits)),
+        // #1734/#1738 — the ALife channel, only once it has run (a session without it snapshots exactly as before);
+        // absent from older snapshots, which restore it empty
+        ...(alifeOn || breedOrdinal > 0 || keepSerial > 0 ? { alife: { on: alifeOn, genomes: genomes.map((g) => (g ? { x: g.x, y: g.y, genome: g.genome } : null)), ring: genomeRing.map((l) => l.slice()), ordinal: breedOrdinal, lastPair, keepSerial } } : {}),
       };
     },
     /** Fail-closed, like the builders': validate everything (sub-trackers against throwaway instances) before applying anything. */
@@ -291,6 +352,13 @@ export function createCreatureSpawnState() {
       for (const list of snap.keepRing) {
         if (!Array.isArray(list) || !list.every(isTrait)) return false;
       }
+      const al = snap.alife;
+      if (al !== undefined) {
+        if (!al || typeof al !== 'object' || !Array.isArray(al.genomes) || !Array.isArray(al.ring) || !Number.isInteger(al.ordinal) || al.ordinal < 0
+          || !Number.isInteger(al.keepSerial) || al.keepSerial < 0 || !(al.lastPair === null || (Array.isArray(al.lastPair) && al.lastPair.length === 2))) return false;
+        for (const g of al.genomes) if (g !== null && (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y) || !sanitizeGenome(g.genome))) return false;
+        for (const l of al.ring) if (!Array.isArray(l) || !l.every((g) => sanitizeGenome(g))) return false;
+      }
       formationTracker.restoreState(snap.formation);
       limbTracker.restoreState(snap.limbs);
       shiftTracker.restoreState(snap.shift);
@@ -303,6 +371,11 @@ export function createCreatureSpawnState() {
       sinceTry = snap.sinceTry;
       keepRing.length = 0;
       for (const list of snap.keepRing) keepRing.push(list.map(copyTraits));
+      genomes = al ? al.genomes.map((g) => (g ? { x: g.x, y: g.y, genome: sanitizeGenome(g.genome) } : null)) : [];
+      genomeRing.length = 0;
+      if (al) for (const l of al.ring) genomeRing.push(l.map(sanitizeGenome));
+      breedOrdinal = al ? al.ordinal : 0; lastPair = al && al.lastPair ? al.lastPair.slice() : null;
+      keepSerial = al ? al.keepSerial : 0; alifeOn = !!(al && al.on);
       field = null; fieldKey = '';
       spawnField = null; spawnFieldKey = '';
       decisions = freshDecisions(false);
