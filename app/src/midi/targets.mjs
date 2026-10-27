@@ -24,15 +24,21 @@ import { captureFavorite } from '../state/slices/davisSlice.js';
 // shelf (the hand-made list, in shelf order) at the moment the key lands; an
 // empty slot fires nothing.
 const palettePick = (p) => ({
-  id: `palette.${p.id}`, kind: 'trigger', label: `PAL ${p.name}`,
+  id: `palette.${p.id}`,
+  kind: 'trigger',
+  label: `PAL ${p.name}`,
   run: (ctx) => ctx.emit(ctx.Events.PALETTE_SET_ID, { id: p.id }),
 });
 const voicePick = (v) => ({
-  id: `voice.${v.id}`, kind: 'trigger', label: `VOICE ${v.title}`,
+  id: `voice.${v.id}`,
+  kind: 'trigger',
+  label: `VOICE ${v.title}`,
   run: (ctx) => ctx.emit(ctx.Events.VOICE_LOAD, { id: v.id }),
 });
 const userVoiceSlot = (i) => ({
-  id: `voice.my.${i + 1}`, kind: 'trigger', label: `MY VOICE ${i + 1}`,
+  id: `voice.my.${i + 1}`,
+  kind: 'trigger',
+  label: `MY VOICE ${i + 1}`,
   run: (ctx) => {
     const mine = (ctx.getState().userVoices || []).filter((v) => !isEarned(v));
     if (mine[i]) ctx.emit(ctx.Events.VOICE_LOAD, { id: mine[i].id });
@@ -40,7 +46,9 @@ const userVoiceSlot = (i) => ({
 });
 
 const sliderCc = (key, label) => ({
-  id: `param.${key}`, kind: 'cc', label,
+  id: `param.${key}`,
+  kind: 'cc',
+  label,
   run: (ctx, v01) => {
     const { min, max } = PARAM_SPEC[key];
     ctx.emit(ctx.Events.LAYOUT_PARAM, { key, value: min + (max - min) * v01 });
@@ -48,47 +56,113 @@ const sliderCc = (key, label) => ({
 });
 
 // The plate as it stands, in the shape every keep/favorite/pass record is captured in.
-const capturePlate = (s) => captureFavorite({ seed: s.seed, seedOffsets: s.seedOffsets, layoutParams: s.layoutParams, enabledAssets: s.enabledAssets, layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots }, s.paletteId);
-
-export const MIDI_TARGETS = Object.freeze([
-  { id: 'evolve.toggle', kind: 'trigger', label: 'EVOLVE / STOP', run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { toggle: true }) },
-  { id: 'seed.new', kind: 'trigger', label: 'NEW SEED', run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { bumpSeed: true }) },
-  {
-    id: 'favorite.keep', kind: 'trigger', label: 'FAVORITE (keep)',
-    run: (ctx) => {
-      const s = ctx.getState();
-      ctx.emit(ctx.Events.DAVIS_FAVORITE, { action: 'add', favorite: capturePlate(s) });
+const capturePlate = (s) =>
+  captureFavorite(
+    {
+      seed: s.seed,
+      seedOffsets: s.seedOffsets,
+      layoutParams: s.layoutParams,
+      enabledAssets: s.enabledAssets,
+      layers: s.layers,
+      activeLayerId: s.activeLayerId,
+      layerSnapshots: s.layerSnapshots,
     },
-  },
-  // #617 — the rest of the spec's trigger list: keep (J), pass (X) and phrase reset, through the same paths the keys
-  // use (KEEP_ADD on the bus; addPass on the store, as the X key's ADD_PASS does), so a pad and a key are one act.
-  { id: 'taste.keep', kind: 'trigger', label: 'KEEP', run: (ctx) => ctx.emit(ctx.Events.KEEP_ADD, { keep: capturePlate(ctx.getState()) }) },
-  { id: 'taste.pass', kind: 'trigger', label: 'PASS', run: (ctx) => { const s = ctx.getState(); s.addPass(capturePlate(s)); } },
-  { id: 'phrase.reset', kind: 'trigger', label: 'PHRASE RESET', run: (ctx) => ctx.emit(ctx.Events.DAVIS_RESET_PHRASE) },
-  { id: 'accum.swell', kind: 'trigger', label: 'SWELL', run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'swell' }) },
-  { id: 'accum.clear', kind: 'trigger', label: 'CLEAR trails', run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'clear' }) },
-  { id: 'accum.freeze', kind: 'hold', label: 'FREEZE (hold)', run: (ctx, on) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'freeze', value: !!on }) },
-  ...FEEL_PRESETS.map((f) => ({ id: `feel.${f.id}`, kind: 'trigger', label: `FEEL ${f.name}`, run: (ctx) => ctx.getState().applyFeel(f.id) })),
-  sliderCc('audioModDepth', 'AUDIO DEPTH'),
-  sliderCc('audioScaleMod', 'AUDIO SCALE'),
-  sliderCc('audioAlphaMod', 'AUDIO ALPHA'),
-  sliderCc('audioSwell', 'AUDIO SWELL'),
-  sliderCc('lifeDrift', 'LIFE'),
-  // #617 — the vibe/preset morph: a fader on the MIX road between the loaded voices (VOICE_MIX { t } 0..1).
-  { id: 'voice.mix', kind: 'cc', label: 'VOICE MIX', run: (ctx, v01) => ctx.emit(ctx.Events.VOICE_MIX, { t: v01 }) },
-  {
-    id: 'evolve.interval', kind: 'cc', label: 'EVOLVE INTERVAL',
-    // same 200–10000 ms range as the slider on DAVIS
-    run: (ctx, v01) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { interval: Math.round((200 + 9800 * v01) / 100) * 100 }),
-  },
-  // #1720 — the bank switch: one key flips the active bank (wrapping), so the
-  // same keys do different jobs per bank. Bound like any other target, in any
-  // bank; the legend shows which bank is live.
-  { id: 'bank.next', kind: 'trigger', label: 'BANK NEXT', run: (ctx) => ctx.getState().cycleMidiBank() },
-  ...PALETTES.map(palettePick),
-  ...FLAGSHIP_VOICES.map(voicePick),
-  ...Array.from({ length: MAX_USER_VOICES }, (_, i) => userVoiceSlot(i)),
-].map(Object.freeze));
+    s.paletteId,
+  );
+
+export const MIDI_TARGETS = Object.freeze(
+  [
+    {
+      id: 'evolve.toggle',
+      kind: 'trigger',
+      label: 'EVOLVE / STOP',
+      run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { toggle: true }),
+    },
+    {
+      id: 'seed.new',
+      kind: 'trigger',
+      label: 'NEW SEED',
+      run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { bumpSeed: true }),
+    },
+    {
+      id: 'favorite.keep',
+      kind: 'trigger',
+      label: 'FAVORITE (keep)',
+      run: (ctx) => {
+        const s = ctx.getState();
+        ctx.emit(ctx.Events.DAVIS_FAVORITE, { action: 'add', favorite: capturePlate(s) });
+      },
+    },
+    // #617 — the rest of the spec's trigger list: keep (J), pass (X) and phrase reset, through the same paths the keys
+    // use (KEEP_ADD on the bus; addPass on the store, as the X key's ADD_PASS does), so a pad and a key are one act.
+    {
+      id: 'taste.keep',
+      kind: 'trigger',
+      label: 'KEEP',
+      run: (ctx) => ctx.emit(ctx.Events.KEEP_ADD, { keep: capturePlate(ctx.getState()) }),
+    },
+    {
+      id: 'taste.pass',
+      kind: 'trigger',
+      label: 'PASS',
+      run: (ctx) => {
+        const s = ctx.getState();
+        s.addPass(capturePlate(s));
+      },
+    },
+    {
+      id: 'phrase.reset',
+      kind: 'trigger',
+      label: 'PHRASE RESET',
+      run: (ctx) => ctx.emit(ctx.Events.DAVIS_RESET_PHRASE),
+    },
+    {
+      id: 'accum.swell',
+      kind: 'trigger',
+      label: 'SWELL',
+      run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'swell' }),
+    },
+    {
+      id: 'accum.clear',
+      kind: 'trigger',
+      label: 'CLEAR trails',
+      run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'clear' }),
+    },
+    {
+      id: 'accum.freeze',
+      kind: 'hold',
+      label: 'FREEZE (hold)',
+      run: (ctx, on) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'freeze', value: !!on }),
+    },
+    ...FEEL_PRESETS.map((f) => ({
+      id: `feel.${f.id}`,
+      kind: 'trigger',
+      label: `FEEL ${f.name}`,
+      run: (ctx) => ctx.getState().applyFeel(f.id),
+    })),
+    sliderCc('audioModDepth', 'AUDIO DEPTH'),
+    sliderCc('audioScaleMod', 'AUDIO SCALE'),
+    sliderCc('audioAlphaMod', 'AUDIO ALPHA'),
+    sliderCc('audioSwell', 'AUDIO SWELL'),
+    sliderCc('lifeDrift', 'LIFE'),
+    // #617 — the vibe/preset morph: a fader on the MIX road between the loaded voices (VOICE_MIX { t } 0..1).
+    { id: 'voice.mix', kind: 'cc', label: 'VOICE MIX', run: (ctx, v01) => ctx.emit(ctx.Events.VOICE_MIX, { t: v01 }) },
+    {
+      id: 'evolve.interval',
+      kind: 'cc',
+      label: 'EVOLVE INTERVAL',
+      // same 200–10000 ms range as the slider on DAVIS
+      run: (ctx, v01) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { interval: Math.round((200 + 9800 * v01) / 100) * 100 }),
+    },
+    // #1720 — the bank switch: one key flips the active bank (wrapping), so the
+    // same keys do different jobs per bank. Bound like any other target, in any
+    // bank; the legend shows which bank is live.
+    { id: 'bank.next', kind: 'trigger', label: 'BANK NEXT', run: (ctx) => ctx.getState().cycleMidiBank() },
+    ...PALETTES.map(palettePick),
+    ...FLAGSHIP_VOICES.map(voicePick),
+    ...Array.from({ length: MAX_USER_VOICES }, (_, i) => userVoiceSlot(i)),
+  ].map(Object.freeze),
+);
 
 const BY_ID = new Map(MIDI_TARGETS.map((t) => [t.id, t]));
 export const getMidiTarget = (id) => BY_ID.get(id);

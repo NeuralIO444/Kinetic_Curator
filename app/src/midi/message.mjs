@@ -15,10 +15,14 @@ export function parseMidi(bytes) {
   if (!(number >= 0 && number <= 127 && value >= 0 && value <= 127)) return null;
   const channel = (status & 0x0f) + 1;
   switch (status & 0xf0) {
-    case 0x90: return { type: value === 0 ? 'noteoff' : 'noteon', channel, number, value };
-    case 0x80: return { type: 'noteoff', channel, number, value };
-    case 0xb0: return { type: 'cc', channel, number, value };
-    default: return null;
+    case 0x90:
+      return { type: value === 0 ? 'noteoff' : 'noteon', channel, number, value };
+    case 0x80:
+      return { type: 'noteoff', channel, number, value };
+    case 0xb0:
+      return { type: 'cc', channel, number, value };
+    default:
+      return null;
   }
 }
 

@@ -36,7 +36,8 @@ export function dispatchMidi(msg, map, ctx, state, source = null) {
   if (target.kind === 'hold') {
     const was = state.held.has(id);
     if (on === was) return null;
-    if (on) state.held.set(id, source); else state.held.delete(id);
+    if (on) state.held.set(id, source);
+    else state.held.delete(id);
     target.run(ctx, on);
     return id;
   }
@@ -71,7 +72,10 @@ export function createMidiEngine({ requestAccess, getMap, ctx, onStatus = () => 
   let attached = new Set();
   let stopped = false;
   let last = { state: 'off', inputs: [], error: '' };
-  const publish = (next) => { last = { ...last, ...next }; onStatus(last); };
+  const publish = (next) => {
+    last = { ...last, ...next };
+    onStatus(last);
+  };
 
   const handle = (e) => {
     const msg = parseMidi(e.data);
@@ -85,7 +89,14 @@ export function createMidiEngine({ requestAccess, getMap, ctx, onStatus = () => 
     if (!access || stopped) return;
     const inputs = [...access.inputs.values()].filter((i) => i.state !== 'disconnected');
     const now = new Set(inputs);
-    for (const i of attached) if (!now.has(i)) { try { i.onmidimessage = null; } catch { /* gone */ } }
+    for (const i of attached)
+      if (!now.has(i)) {
+        try {
+          i.onmidimessage = null;
+        } catch {
+          /* gone */
+        }
+      }
     for (const i of inputs) i.onmidimessage = handle;
     const lost = [...attached].filter((i) => !now.has(i)).map((i) => i.name || 'MIDI device');
     attached = now;
@@ -93,15 +104,28 @@ export function createMidiEngine({ requestAccess, getMap, ctx, onStatus = () => 
     if (inputs.length === 0) {
       publish({ state: 'no-devices', inputs: [], error: lost.length ? `unplugged: ${lost.join(', ')}` : '' });
     } else {
-      publish({ state: 'ready', inputs: inputs.map((i) => i.name || 'MIDI device'), error: lost.length ? `unplugged: ${lost.join(', ')}` : '' });
+      publish({
+        state: 'ready',
+        inputs: inputs.map((i) => i.name || 'MIDI device'),
+        error: lost.length ? `unplugged: ${lost.join(', ')}` : '',
+      });
     }
   }
 
   return {
-    get status() { return last; },
+    get status() {
+      return last;
+    },
     async start() {
       stopped = false;
-      if (typeof requestAccess !== 'function') { publish({ state: 'unsupported', inputs: [], error: 'Web MIDI is not available in this browser (use Chrome or Edge)' }); return last; }
+      if (typeof requestAccess !== 'function') {
+        publish({
+          state: 'unsupported',
+          inputs: [],
+          error: 'Web MIDI is not available in this browser (use Chrome or Edge)',
+        });
+        return last;
+      }
       publish({ state: 'connecting', inputs: [], error: '' });
       try {
         access = await requestAccess({ sysex: false });
@@ -116,7 +140,13 @@ export function createMidiEngine({ requestAccess, getMap, ctx, onStatus = () => 
     },
     stop() {
       stopped = true;
-      for (const i of attached) { try { i.onmidimessage = null; } catch { /* gone */ } }
+      for (const i of attached) {
+        try {
+          i.onmidimessage = null;
+        } catch {
+          /* gone */
+        }
+      }
       attached = new Set();
       if (access) access.onstatechange = null;
       releaseHolds(ctx, state);
