@@ -12,34 +12,34 @@ import { PLATE_CENTER, PLATE_RADIUS } from '../engine/plateBody.mjs'; // #1585 �
 import { STIPPLE_DOT_SCALE } from '../engine/stippleBody.mjs'; // #1585 — ditto, Matt's dot scale
 
 export const LAYOUT_MODES = [
-  { id: 'random',    name: 'random',     glyph: 'rand'   },
-  { id: 'grid',      name: 'grid',       glyph: 'grid'   },
-  { id: 'fibonacci', name: 'fibonacci',  glyph: 'phi'    },
+  { id: 'random', name: 'random', glyph: 'rand' },
+  { id: 'grid', name: 'grid', glyph: 'grid' },
+  { id: 'fibonacci', name: 'fibonacci', glyph: 'phi' },
   // #585 — the golden-angle family with the divergence exposed; `fibonacci`
   // is its fixed point (see the sampler). Sibling, not duplicate.
   { id: 'phyllotaxis', name: 'phyllotaxis', glyph: 'phyllo' },
-  { id: 'radial',    name: 'radial',     glyph: 'rad'    },
-  { id: 'truchet',   name: 'truchet',    glyph: 'tile'   },
-  { id: 'swarm',     name: 'swarm boids', glyph: 'swarm'  },
-  { id: 'noise',     name: 'noise warp', glyph: 'noise'  },
-  { id: 'hype',      name: 'moth·hype', glyph: 'hype'   },
+  { id: 'radial', name: 'radial', glyph: 'rad' },
+  { id: 'truchet', name: 'truchet', glyph: 'tile' },
+  { id: 'swarm', name: 'swarm boids', glyph: 'swarm' },
+  { id: 'noise', name: 'noise warp', glyph: 'noise' },
+  { id: 'hype', name: 'moth·hype', glyph: 'hype' },
   { id: 'stratified', name: 'stratified', glyph: 'strat' },
-  { id: 'flow',      name: 'wave',       glyph: 'flow'   },
-  { id: 'brush',     name: 'brush line', glyph: 'brush'  },
-  { id: 'layers',    name: 'layers',     glyph: 'z'      },
-  { id: 'rails',     name: 'rails',      glyph: 'rail'   },
-  { id: 'ca',        name: 'cellular',   glyph: 'ca'     },
-  { id: 'voronoi',   name: 'voronoi',    glyph: 'vein'   },
-  { id: 'lsystem',   name: 'l-system',   glyph: 'frond'  },
-  { id: 'dla',       name: 'DLA growth', glyph: 'coral'  }, // #720
-  { id: 'eden',      name: 'Eden growth', glyph: 'bloom'  }, // #720
-  { id: 'orbit',     name: 'orbit',      glyph: 'orbit'  },
-  { id: 'abacus',    name: 'abacus',     glyph: 'abacus' },
-  { id: 'poisson',   name: 'poisson',    glyph: 'pois'   }, // #1193
-  { id: 'gaussian',  name: 'gaussian',   glyph: 'gaus'   }, // #1194
-  { id: 'circlepack', name: 'circle pack', glyph: 'pack'  }, // #1195
-  { id: 'colonize',  name: 'colonize',  glyph: 'branch' }, // #1197
-  { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell'  }, // #1196
+  { id: 'flow', name: 'wave', glyph: 'flow' },
+  { id: 'brush', name: 'brush line', glyph: 'brush' },
+  { id: 'layers', name: 'layers', glyph: 'z' },
+  { id: 'rails', name: 'rails', glyph: 'rail' },
+  { id: 'ca', name: 'cellular', glyph: 'ca' },
+  { id: 'voronoi', name: 'voronoi', glyph: 'vein' },
+  { id: 'lsystem', name: 'l-system', glyph: 'frond' },
+  { id: 'dla', name: 'DLA growth', glyph: 'coral' }, // #720
+  { id: 'eden', name: 'Eden growth', glyph: 'bloom' }, // #720
+  { id: 'orbit', name: 'orbit', glyph: 'orbit' },
+  { id: 'abacus', name: 'abacus', glyph: 'abacus' },
+  { id: 'poisson', name: 'poisson', glyph: 'pois' }, // #1193
+  { id: 'gaussian', name: 'gaussian', glyph: 'gaus' }, // #1194
+  { id: 'circlepack', name: 'circle pack', glyph: 'pack' }, // #1195
+  { id: 'colonize', name: 'colonize', glyph: 'branch' }, // #1197
+  { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell' }, // #1196
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
   // swarm engine (see isLiveSwarmMode below) with its own palette + motion
   // character. Kept out of the stub list so it never falls back to a bare
@@ -55,7 +55,17 @@ export function isOrganismMode(mode) {
   return mode === 'hype';
 }
 
-export const SYMMETRY_MODES = ['none', 'bilateral', 'radial-4', 'radial-6', 'radial-8', 'radial-12', 'kaleido-6', 'kaleido-8', 'kaleido-12'];
+export const SYMMETRY_MODES = [
+  'none',
+  'bilateral',
+  'radial-4',
+  'radial-6',
+  'radial-8',
+  'radial-12',
+  'kaleido-6',
+  'kaleido-8',
+  'kaleido-12',
+];
 export const BEHAVE_MODES = BEHAVE_IDS;
 
 /** #1202 — MIRROR is a 4-state reflection mode, not a boolean.
@@ -86,9 +96,7 @@ export const CONTACT_MODES = ['none', 'bounce', 'swap', 'stick', 'die', 'breed']
 
 export const PALETTE_SHIFTS = ['auto', 'band', 'zone', 'split'];
 
-export const BLEND_MODES = [
-  'normal', 'screen', 'multiply', 'overlay', 'difference', 'plus-lighter', 'soft-light',
-];
+export const BLEND_MODES = ['normal', 'screen', 'multiply', 'overlay', 'difference', 'plus-lighter', 'soft-light'];
 
 export const DEFAULT_LAYOUT_PARAMS = {
   composition: 'praystation',
@@ -140,7 +148,8 @@ export const DEFAULT_LAYOUT_PARAMS = {
   colonizeKill: 18,
   colonizeBranch: 0.25,
   colonizeStep: 7,
-  noiseFreq: 0.005,  noiseSpeed: 0.5,
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
   displacement: 0,
   // Brush line: nominal stamp diameter px, step as fraction of it,
   // simplex field scale per px, trail count.
@@ -407,7 +416,7 @@ export const PARAM_SPEC = {
   particleCount: { min: 10, max: 500, int: true },
   swarmCohesion: { min: 0, max: 5.0 },
   gravityWells: { min: 0, max: 5.0 },
-  damping: { min: 0.80, max: 0.99 },
+  damping: { min: 0.8, max: 0.99 },
   body: { min: 1, max: 7, int: true },
   flap: { min: 0, max: 1 },
   // #1694 S3 — the creature count's bounds ARE sanitizeCount's bounds
@@ -560,8 +569,7 @@ function clampNum(value, spec, fallback) {
   // and [] to 0, which would silently pin an absent field to the slider's
   // minimum instead of its default — `{"damping": null}` would render at
   // 0.80 rather than 0.95, and look like a deliberate authoring choice.
-  const isNumeric = typeof value === 'number'
-    || (typeof value === 'string' && value.trim() !== '');
+  const isNumeric = typeof value === 'number' || (typeof value === 'string' && value.trim() !== '');
   if (!isNumeric) return fallback;
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
@@ -616,7 +624,10 @@ export function validateLayoutParams(partial) {
   const rejected = [];
 
   for (const key of Object.keys(src)) {
-    if (UNSAFE_KEYS.has(key)) { rejected.push(key); continue; }
+    if (UNSAFE_KEYS.has(key)) {
+      rejected.push(key);
+      continue;
+    }
     const value = src[key];
     if (PARAM_SPEC[key]) {
       // #479 Option B — a field whose OWN default is null (the 9 BEHAVE
@@ -632,16 +643,15 @@ export function validateLayoutParams(partial) {
       // #1202 — scale validates as {x:[lo,hi], y:[lo,hi]}; a legacy array
       // still validates (normalize migrates it to a linked pair).
       const isPair = (p) => Array.isArray(p) && p.length >= 2 && isNumericish(p[0]) && isNumericish(p[1]);
-      const usable = key === 'scale'
-        ? (isPair(value) || (value && typeof value === 'object' && isPair(value.x) && isPair(value.y ?? value.x)))
-        : (Array.isArray(value) && value.length >= 2 && isNumericish(value[0]) && isNumericish(value[1]));
+      const usable =
+        key === 'scale'
+          ? isPair(value) || (value && typeof value === 'object' && isPair(value.x) && isPair(value.y ?? value.x))
+          : Array.isArray(value) && value.length >= 2 && isNumericish(value[0]) && isNumericish(value[1]);
       if (!usable) rejected.push(key);
     } else if (ENUM_SPEC[key]) {
       // #1202 — mirror accepts legacy booleans; normalize migrates them
       // (true→'x', false→'off'), so they are not rejections.
-      const ok = key === 'mirror' && typeof value === 'boolean'
-        ? true
-        : pickEnumOk(value, ENUM_SPEC[key]);
+      const ok = key === 'mirror' && typeof value === 'boolean' ? true : pickEnumOk(value, ENUM_SPEC[key]);
       if (!ok) rejected.push(key);
     }
     // Booleans coerce rather than reject; unknown keys are passed through
@@ -676,14 +686,12 @@ export function normalizeLayoutParams(partial) {
     // {scale:['a','b']} from a hand-edited or corrupted project JSON
     // passed through unchanged and fed NaN/strings into transform math
     // downstream instead of falling back to a safe default.
-    const usable = Array.isArray(v) && v.length >= 2
-      && Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1]));
+    const usable = Array.isArray(v) && v.length >= 2 && Number.isFinite(Number(v[0])) && Number.isFinite(Number(v[1]));
     next[key] = usable
-      // Ends are clamped but deliberately NOT reordered: a reversed range
-      // (hi < lo) runs the lerp backwards, which is a legitimate thing to
-      // author, so "fixing" the order would change existing compositions.
-      ? [clampNum(v[0], spec, DEFAULT_LAYOUT_PARAMS[key][0]),
-        clampNum(v[1], spec, DEFAULT_LAYOUT_PARAMS[key][1])]
+      ? // Ends are clamped but deliberately NOT reordered: a reversed range
+        // (hi < lo) runs the lerp backwards, which is a legitimate thing to
+        // author, so "fixing" the order would change existing compositions.
+        [clampNum(v[0], spec, DEFAULT_LAYOUT_PARAMS[key][0]), clampNum(v[1], spec, DEFAULT_LAYOUT_PARAMS[key][1])]
       : DEFAULT_LAYOUT_PARAMS[key].slice();
   }
 
@@ -692,13 +700,12 @@ export function normalizeLayoutParams(partial) {
   // behavior-identical to the old pair, provable no-op.
   {
     const v = next.scale;
-    const dx = DEFAULT_LAYOUT_PARAMS.scale.x, dy = DEFAULT_LAYOUT_PARAMS.scale.y;
+    const dx = DEFAULT_LAYOUT_PARAMS.scale.x,
+      dy = DEFAULT_LAYOUT_PARAMS.scale.y;
     const pair = (p, fb) => {
-      const usable = Array.isArray(p) && p.length >= 2
-        && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]));
-      return usable
-        ? [clampNum(p[0], RANGE_HARD.scale, fb[0]), clampNum(p[1], RANGE_HARD.scale, fb[1])]
-        : fb.slice();
+      const usable =
+        Array.isArray(p) && p.length >= 2 && Number.isFinite(Number(p[0])) && Number.isFinite(Number(p[1]));
+      return usable ? [clampNum(p[0], RANGE_HARD.scale, fb[0]), clampNum(p[1], RANGE_HARD.scale, fb[1])] : fb.slice();
     };
     if (Array.isArray(v)) {
       const p = pair(v, dx);
@@ -728,8 +735,7 @@ export function normalizeLayoutParams(partial) {
   // PARAM_SPEC clamp.
   {
     const v = next.accumulationFade;
-    const n = typeof v === 'number' ? v
-      : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN);
+    const n = typeof v === 'number' ? v : typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN;
     if (Number.isFinite(n) && n > 0 && n < 1) {
       const hl = -1 / Math.log2(n);
       next.accumulationFade = Math.min(40, Math.max(1, hl));
@@ -739,7 +745,8 @@ export function normalizeLayoutParams(partial) {
   // #1127 — a document that predates ROTATE spin keeps its static rotation: absent means 0, not the new default.
   // #1128 — the same rule for the living-motion floor: a document that predates it opens exactly as it was saved.
   // #1151 — palette-breath likewise: absent means 0, not the new default.
-  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath'])
+    if (!Object.prototype.hasOwnProperty.call(src, k)) next[k] = 0;
 
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     next[key] = clampNum(next[key], spec, DEFAULT_LAYOUT_PARAMS[key]);

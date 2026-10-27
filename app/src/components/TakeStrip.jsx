@@ -11,22 +11,41 @@ export function TakeStrip() {
   const [pb, setPb] = useState(getPlayback());
   const [frame, setFrame] = useState(pb ? pb.frame : 0);
   const [dragging, setDragging] = useState(false);
-  useEffect(() => subscribePlayback(() => { const p = getPlayback(); setPb(p); setFrame(p ? p.frame : 0); }), []);
+  useEffect(
+    () =>
+      subscribePlayback(() => {
+        const p = getPlayback();
+        setPb(p);
+        setFrame(p ? p.frame : 0);
+      }),
+    [],
+  );
   // the cursor moves every frame; sample it at 10 Hz (a strip does not need 60)
   useEffect(() => {
     if (!pb) return undefined;
-    const id = setInterval(() => { const p = getPlayback(); if (p && !dragging) setFrame(p.frame); }, 100);
+    const id = setInterval(() => {
+      const p = getPlayback();
+      if (p && !dragging) setFrame(p.frame);
+    }, 100);
     return () => clearInterval(id);
   }, [pb, dragging]);
   const model = useMemo(() => (pb ? takeStripModel(pb.perf) : null), [pb && pb.perf]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!pb || !model) return null;
   const pos = model.positionOf(frame);
   return (
-    <div className="take-strip" aria-label="take scrub"
+    <div
+      className="take-strip"
+      aria-label="take scrub"
       onPointerDown={() => setDragging(true)}
-      onPointerUp={() => setDragging(false)}>
+      onPointerUp={() => setDragging(false)}
+    >
       <span className="take-strip-label">{model.labelFor(frame)}</span>
-      <RangeRow layout="bare" className="take-strip-range" min={0} max={1000} step={1}
+      <RangeRow
+        layout="bare"
+        className="take-strip-range"
+        min={0}
+        max={1000}
+        step={1}
         value={Math.round(pos * 1000)}
         ariaLabel={model.hasBars ? 'Scrub by bar' : 'Scrub by time'}
         onChange={(v) => {

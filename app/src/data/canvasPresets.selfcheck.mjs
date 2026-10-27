@@ -1,8 +1,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  CANVAS_PRESETS, sanitizeCanvasSpec, isInstrumentCanvas, INSTRUMENT_CANVAS, authoredCanvas,
-  readUserPresets, writeUserPresets,
+  CANVAS_PRESETS,
+  sanitizeCanvasSpec,
+  isInstrumentCanvas,
+  INSTRUMENT_CANVAS,
+  authoredCanvas,
+  readUserPresets,
+  writeUserPresets,
 } from './canvasPresets.js';
 import { sessionOnlyNoted } from '../state/sessionOnly.mjs';
 import { serializeProject } from '../state/projectDocument.js';
@@ -91,7 +96,9 @@ test('#606 custom size is written', () => {
 test('#1641 user presets: an unreadable store and a refused write report on the session-only flag', () => {
   globalThis.localStorage = {
     getItem: () => '{not json',
-    setItem: () => { throw new Error('private mode'); },
+    setItem: () => {
+      throw new Error('private mode');
+    },
     removeItem: () => {},
   };
   assert.deepEqual(readUserPresets(), [], 'an unreadable store still reads as no presets');

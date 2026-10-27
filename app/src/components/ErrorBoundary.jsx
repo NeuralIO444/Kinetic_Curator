@@ -50,10 +50,7 @@ export class ErrorBoundary extends Component {
             <strong>Render error</strong>
             <span>{this.state.error.message}</span>
           </div>
-          <button
-            className="micro-btn"
-            onClick={retry}
-          >
+          <button className="micro-btn" onClick={retry}>
             ↻ RETRY
           </button>
         </div>

@@ -18,12 +18,14 @@ export function TourOverlay({ open, onClose }) {
   // Step reset happens in finish(), the single close path.
   useEffect(() => {
     if (open) activateTourTab(TOUR_STEPS[0].tab);
-  }, [open ]);
+  }, [open]);
 
   const finish = useCallback(() => {
     try {
       localStorage.setItem(TOUR_STORAGE_KEY, '1');
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
     setStep(0);
     onClose();
   }, [onClose]);

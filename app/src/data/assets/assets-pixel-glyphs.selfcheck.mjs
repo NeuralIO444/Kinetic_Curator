@@ -14,11 +14,21 @@ const PAIRS = [
   ['pxg_nest', 'pxg_nest_b'],
 ];
 const SPECKS = new Set(['pxg_speck', 'pxg_speck_ne', 'pxg_spark', 'pxg_dust']);
-const LETTERS = new Set(['pxg_stem', 'pxg_bowl', 'pxg_arch', 'pxg_fork', 'pxg_serif', 'pxg_counter', 'pxg_ligature', 'pxg_flag']);
+const LETTERS = new Set([
+  'pxg_stem',
+  'pxg_bowl',
+  'pxg_arch',
+  'pxg_fork',
+  'pxg_serif',
+  'pxg_counter',
+  'pxg_ligature',
+  'pxg_flag',
+]);
 
 function rects(svg) {
-  return [...svg.matchAll(/<rect x="(\d+)" y="(\d+)" width="10" height="10" fill="(var\(--ink\)|var\(--accent\))"/g)]
-    .map((m) => ({ x: Number(m[1]), y: Number(m[2]), fill: m[3] }));
+  return [
+    ...svg.matchAll(/<rect x="(\d+)" y="(\d+)" width="10" height="10" fill="(var\(--ink\)|var\(--accent\))"/g),
+  ].map((m) => ({ x: Number(m[1]), y: Number(m[2]), fill: m[3] }));
 }
 
 test('#702 pixel glyphs: 32 unique stamps, token paint, snapped lattice', () => {

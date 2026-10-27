@@ -2,14 +2,13 @@
 // #953 — the standalone palette file format round-trips, and hostile files
 // can't smuggle junk into the library.
 import assert from 'node:assert';
-import {
-  paletteToExportJson,
-  parseImportPalettes,
-  randomSeedHex,
-} from './paletteWing.mjs';
+import { paletteToExportJson, parseImportPalettes, randomSeedHex } from './paletteWing.mjs';
 
 const palette = {
-  id: 'user-abc', name: 'VOIDISH', bg: '#0b0b0b', ink: '#f0ead8',
+  id: 'user-abc',
+  name: 'VOIDISH',
+  bg: '#0b0b0b',
+  ink: '#f0ead8',
   swatches: ['#ff006e', '#00d9ff', '#ffd400'],
 };
 
@@ -39,9 +38,14 @@ assert.strictEqual(batch.length, 2);
 assert.notStrictEqual(batch[0].id, batch[1].id, 'id-less entries must not collapse to one');
 
 // Raw stored shape (no colors/meta wrapper) also imports
-const raw = parseImportPalettes(JSON.stringify({
-  name: 'RAW', bg: '#111111', ink: '#eeeeee', swatches: ['#123456'],
-}));
+const raw = parseImportPalettes(
+  JSON.stringify({
+    name: 'RAW',
+    bg: '#111111',
+    ink: '#eeeeee',
+    swatches: ['#123456'],
+  }),
+);
 assert.strictEqual(raw.length, 1);
 assert.strictEqual(raw[0].name, 'RAW');
 

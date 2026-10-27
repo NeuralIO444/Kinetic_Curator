@@ -31,16 +31,23 @@ export function deriveSwatchWeights(palette) {
   const bg = luma(parseHex(palette.bg || '#000000'));
   const c = rgb.map(chroma);
   const k = rgb.map((v) => Math.abs(luma(v) - bg));
-  const cMax = Math.max(...c); const kMax = Math.max(...k);
-  return rgb.map((_, i) => round2(
-    CHROMA_SHARE * (cMax > 0 ? c[i] / cMax : 0) + CONTRAST_SHARE * (kMax > 0 ? k[i] / kMax : 0),
-  ));
+  const cMax = Math.max(...c);
+  const kMax = Math.max(...k);
+  return rgb.map((_, i) =>
+    round2(CHROMA_SHARE * (cMax > 0 ? c[i] / cMax : 0) + CONTRAST_SHARE * (kMax > 0 ? k[i] / kMax : 0)),
+  );
 }
 
 /** True when `weights` is usable for this palette: one finite 0..1 value per swatch. */
 export function validWeights(palette) {
-  const w = palette?.weights; const n = swatchesOf(palette).length;
-  return Array.isArray(w) && n > 0 && w.length === n && w.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1);
+  const w = palette?.weights;
+  const n = swatchesOf(palette).length;
+  return (
+    Array.isArray(w) &&
+    n > 0 &&
+    w.length === n &&
+    w.every((v) => typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1)
+  );
 }
 
 /** The palette's own weights when they are usable, derived ones otherwise. Never throws. */

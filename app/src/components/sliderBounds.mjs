@@ -26,13 +26,24 @@ export function createBoundsStore() {
   const map = new Map();
   const listeners = new Set();
   let version = 0;
-  const bump = () => { version += 1; listeners.forEach((f) => f()); };
+  const bump = () => {
+    version += 1;
+    listeners.forEach((f) => f());
+  };
   return {
     get: (key, fallback) => map.get(key) || fallback,
-    set(key, min, max) { map.set(key, [min, max]); bump(); },
-    reset(key) { if (map.delete(key)) bump(); },
+    set(key, min, max) {
+      map.set(key, [min, max]);
+      bump();
+    },
+    reset(key) {
+      if (map.delete(key)) bump();
+    },
     has: (key) => map.has(key),
     version: () => version,
-    subscribe(fn) { listeners.add(fn); return () => listeners.delete(fn); },
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
   };
 }

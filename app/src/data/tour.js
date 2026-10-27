@@ -58,7 +58,9 @@ export function activateTourTab(tab) {
   if (!tab) return;
   try {
     document.getElementById(`kc-tab-${tab}`)?.click();
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function hasSeenTour() {

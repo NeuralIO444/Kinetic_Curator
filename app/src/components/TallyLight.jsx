@@ -9,9 +9,12 @@ export function TallyLight({ confidence = 0, active = false }) {
   if (!active) return null;
 
   // Hard cut thresholds — no interpolation, no gradients.
-  const color = confidence >= 0.85 ? '#00ff88'          // neon green — high confidence hit
-              : confidence >= 0.5  ? '#ffaa00'          // orange — interesting
-              : 'rgba(255, 255, 255, 0.15)';            // dim — nothing notable
+  const color =
+    confidence >= 0.85
+      ? '#00ff88' // neon green — high confidence hit
+      : confidence >= 0.5
+        ? '#ffaa00' // orange — interesting
+        : 'rgba(255, 255, 255, 0.15)'; // dim — nothing notable
 
   // Segmented block: [ ████░░░░░░ ] 42%
   const filled = Math.round(confidence * 8);
@@ -21,7 +24,9 @@ export function TallyLight({ confidence = 0, active = false }) {
   return (
     <div className="tally-light" title={`Curation confidence: ${pct}`}>
       <span className="tally-block" style={{ color }}>
-        {'[ '}{bar}{' ]'}
+        {'[ '}
+        {bar}
+        {' ]'}
       </span>
     </div>
   );

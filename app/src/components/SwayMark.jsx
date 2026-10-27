@@ -26,11 +26,7 @@ export function SwayMark() {
   const visible = Number.isFinite(mag) && mag > SWAY_VISIBLE_THRESHOLD;
   if (!visible) return null;
   return (
-    <span
-      className="sway-mark"
-      aria-hidden="true"
-      style={{ '--sway': mag.toFixed(3) }}
-    >
+    <span className="sway-mark" aria-hidden="true" style={{ '--sway': mag.toFixed(3) }}>
       👸🏽
     </span>
   );

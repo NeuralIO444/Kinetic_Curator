@@ -3,7 +3,14 @@
 // downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); `▶ take` plays one back
 // through the instrument (#1461). The frame count in the tooltip is a measurement, read from the recorder.
 import { useEffect, useRef, useState } from 'react';
-import { isRecordingPerformance, performanceFrames, startPerformance, stopPerformance, startRetroCapture, saveRetroPerformance } from '../gl/performanceCapture.mjs';
+import {
+  isRecordingPerformance,
+  performanceFrames,
+  startPerformance,
+  stopPerformance,
+  startRetroCapture,
+  saveRetroPerformance,
+} from '../gl/performanceCapture.mjs';
 import { unpackPerformance } from '../gl/performanceFile.mjs';
 import { startPlayback, stopPlayback, isPlaybackActive, subscribePlayback } from '../gl/playback.mjs';
 import { getStressState, setStressTap } from '../curator/stressLive.js';
@@ -23,9 +30,17 @@ import { useStore } from '../state/store.js';
 // tracker update, and stored on the performance as `stress`.
 const stressSection = (getFrame) => {
   const now = getStressState();
-  const rec = createStressRecorder({ initial: { smoothed: now.band === null ? null : now.smoothed, band: now.band }, getFrame });
+  const rec = createStressRecorder({
+    initial: { smoothed: now.band === null ? null : now.smoothed, band: now.band },
+    getFrame,
+  });
   setStressTap((u) => rec.update(u));
-  return { stop() { setStressTap(null); return rec.finish(); } };
+  return {
+    stop() {
+      setStressTap(null);
+      return rec.finish();
+    },
+  };
 };
 
 // #1355 step 3 — the take carries the formation rule's signals and every `hierarchy-form` event, stored as
@@ -34,22 +49,39 @@ const formationSection = (getFrame) => {
   resetFormation();
   const rec = createFormationRecorder({ getFrame });
   setFormationTap((u, events) => rec.update(u, events));
-  return { stop() { setFormationTap(null); return rec.finish(); } };
+  return {
+    stop() {
+      setFormationTap(null);
+      return rec.finish();
+    },
+  };
 };
 
 // #1356 step 2 — the take carries every `davis-shift` (a moth's traits, made once at birth), stored as `davis`.
 const davisSection = (getFrame) => {
   const rec = createShiftRecorder({ getFrame });
   setShiftTap((born) => rec.update(born));
-  return { stop() { setShiftTap(null); return rec.finish(); } };
+  return {
+    stop() {
+      setShiftTap(null);
+      return rec.finish();
+    },
+  };
 };
 
 // #1461 step 1 — the take carries its BEAT BPM sequence (the start and every change by frame), stored as `clock`: with
 // the loop time of each frame that is enough to rebuild every bar on playback.
 const clockSection = (getFrame) => {
   const rec = createClockRecorder({ initialBpm: useStore.getState().beatBpm, getFrame });
-  const off = useStore.subscribe((s, prev) => { if (s.beatBpm !== prev.beatBpm) rec.set(s.beatBpm); });
-  return { stop() { off(); return rec.finish(); } };
+  const off = useStore.subscribe((s, prev) => {
+    if (s.beatBpm !== prev.beatBpm) rec.set(s.beatBpm);
+  });
+  return {
+    stop() {
+      off();
+      return rec.finish();
+    },
+  };
 };
 
 // #1534 — the take carries its spectrum (decision 2 of the spectral path): every live spectrum step offers
@@ -65,7 +97,13 @@ const spectrumSection = (getFrame) => {
   rec.note(audible());
   setSpectrumTap((state) => rec.sample(state.smooth));
   const off = useStore.subscribe(() => rec.note(audible()));
-  return { stop() { setSpectrumTap(null); off(); return rec.finish(); } };
+  return {
+    stop() {
+      setSpectrumTap(null);
+      off();
+      return rec.finish();
+    },
+  };
 };
 
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
@@ -74,7 +112,13 @@ const mindSection = (getFrame) => {
   const rec = createMindRecorder({ getFrame, getSystem: getMindSystem });
   setMindTap((d, requested) => rec.update(d, requested));
   setConductTap((e) => rec.conduct(e));
-  return { stop() { setMindTap(null); setConductTap(null); return rec.finish(); } };
+  return {
+    stop() {
+      setMindTap(null);
+      setConductTap(null);
+      return rec.finish();
+    },
+  };
 };
 
 function downloadBytes(bytes, filename) {
@@ -100,11 +144,15 @@ export function PerformanceButton() {
   // last minutes, so a moment can be saved after it happens. A deliberate take suspends it
   // (performanceCapture restarts it on the take's fresh scene).
   const [retroNote, setRetroNote] = useState('');
-  useEffect(() => { startRetroCapture(); }, []);
+  useEffect(() => {
+    startRetroCapture();
+  }, []);
   const onRetro = async () => {
     const take = await saveRetroPerformance(3);
-    if (take) { downloadBytes(take.bytes, take.filename); setRetroNote(''); }
-    else setRetroNote('Nothing to save yet: give the ring a few seconds of playing first.');
+    if (take) {
+      downloadBytes(take.bytes, take.filename);
+      setRetroNote('');
+    } else setRetroNote('Nothing to save yet: give the ring a few seconds of playing first.');
   };
   const onFile = async (e) => {
     const file = e.target.files && e.target.files[0];
@@ -126,7 +174,21 @@ export function PerformanceButton() {
 
   const onClick = async () => {
     if (!recording) {
-      if (startPerformance({ sections: { stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection, mind: mindSection, spectrum: spectrumSection } })) { setFrames(0); setRecording(true); }
+      if (
+        startPerformance({
+          sections: {
+            stress: stressSection,
+            formation: formationSection,
+            davis: davisSection,
+            clock: clockSection,
+            mind: mindSection,
+            spectrum: spectrumSection,
+          },
+        })
+      ) {
+        setFrames(0);
+        setRecording(true);
+      }
       return;
     }
     setRecording(false);
@@ -141,22 +203,36 @@ export function PerformanceButton() {
         className={`perf-btn rec${recording ? ' on' : ''}`}
         aria-pressed={recording}
         disabled={playing}
-        title={playing
-          ? 'Playing a take: stop playback to record.'
-          : recording
-            ? `Recording a performance: ${frames} frames. Click to stop and download it.`
-            : 'Record a performance: your session as a small file that replays to the same frames.'}
+        title={
+          playing
+            ? 'Playing a take: stop playback to record.'
+            : recording
+              ? `Recording a performance: ${frames} frames. Click to stop and download it.`
+              : 'Record a performance: your session as a small file that replays to the same frames.'
+        }
         onClick={onClick}
       >
-        <span className="perf-dot" aria-hidden="true">●</span>{recording ? ' stop ↓' : ' rec'}
+        <span className="perf-dot" aria-hidden="true">
+          ●
+        </span>
+        {recording ? ' stop ↓' : ' rec'}
       </button>
       <button
         type="button"
         className={`perf-btn take${playing ? ' on' : ''}`}
         aria-pressed={playing}
         disabled={recording}
-        title={playing ? 'Playing a take back. Click to return to the live instrument.' : (playNote || 'Play a take (.kcperf) back through the instrument.')}
-        onClick={() => { if (playing) { stopPlayback(); setPlayNote(''); } else if (fileRef.current) fileRef.current.click(); }}
+        title={
+          playing
+            ? 'Playing a take back. Click to return to the live instrument.'
+            : playNote || 'Play a take (.kcperf) back through the instrument.'
+        }
+        onClick={() => {
+          if (playing) {
+            stopPlayback();
+            setPlayNote('');
+          } else if (fileRef.current) fileRef.current.click();
+        }}
       >
         {playing ? '■ take' : '▶ take'}
       </button>
@@ -164,12 +240,22 @@ export function PerformanceButton() {
         type="button"
         className="perf-btn retro"
         disabled={recording || playing}
-        title={retroNote || 'Save the last 3 minutes as a take: it begins from a snapshot inside the session and replays to the same frames.'}
+        title={
+          retroNote ||
+          'Save the last 3 minutes as a take: it begins from a snapshot inside the session and replays to the same frames.'
+        }
         onClick={onRetro}
       >
         ↺ last 3m
       </button>
-      <input ref={fileRef} type="file" accept=".kcperf,application/gzip" onChange={onFile} style={{ display: 'none' }} aria-label="Load a take" />
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".kcperf,application/gzip"
+        onChange={onFile}
+        style={{ display: 'none' }}
+        aria-label="Load a take"
+      />
     </>
   );
 }

@@ -18,7 +18,7 @@ assert.strictEqual(ov.dirty, true);
 
 const mutated = resolvePalette(id, { swatches: ['#111111'] });
 mutated.swatches[0] = '#dead00';
-assert.strictEqual(PALETTES.find(p => p.id === id).swatches[0], base.swatches[0]);
+assert.strictEqual(PALETTES.find((p) => p.id === id).swatches[0], base.swatches[0]);
 
 assert.strictEqual(normalizeHex('abc'), '#aabbcc');
 assert.strictEqual(normalizeHex('#FF00AA'), '#ff00aa');
@@ -37,7 +37,11 @@ for (const p of PALETTES) {
   assert.ok(typeof r.leak === 'number' && r.leak >= 0 && r.leak <= 1, `${p.id}: leak must be 0..1`);
 }
 // The three plate palettes exist with light grounds (fade-to-paper).
-for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHOGRAPH'], ['cyanotype', 'CYANOTYPE']]) {
+for (const [pid, name] of [
+  ['sepia-plate', 'SEPIA PLATE'],
+  ['lithograph', 'LITHOGRAPH'],
+  ['cyanotype', 'CYANOTYPE'],
+]) {
   const r = resolvePalette(pid, null);
   assert.strictEqual(r.name, name);
 }
@@ -50,15 +54,19 @@ for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHO
 
   const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
   const lum = (h) => {
-    const c = rgb(h).map((v) => v / 255).map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    const c = rgb(h)
+      .map((v) => v / 255)
+      .map((v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
     return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
   };
   const contrast = (h) => (lum(h) + 0.05) / (lum(cs.bg) + 0.05);
   const hueOf = (h) => {
     const [r, g, b] = rgb(h).map((v) => v / 255);
-    const mx = Math.max(r, g, b); const mn = Math.min(r, g, b); const d = mx - mn;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    const d = mx - mn;
     if (!d) return -1;
-    const deg = mx === r ? ((g - b) / d + (g < b ? 6 : 0)) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+    const deg = mx === r ? (g - b) / d + (g < b ? 6 : 0) : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
     return (deg * 60 + 360) % 360;
   };
 
@@ -73,8 +81,13 @@ for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHO
   assert.ok(inkHue >= 20 && inkHue <= 50, `the ink must be amber (hue ${inkHue.toFixed(0)})`);
 
   // A BLUE-VIOLET accent must be in the ramp — the only cool light here.
-  assert.ok(cs.swatches.some((sw) => { const h = hueOf(sw); return h >= 240 && h <= 285; }),
-    'chiaroscuro needs a blue-violet accent');
+  assert.ok(
+    cs.swatches.some((sw) => {
+      const h = hueOf(sw);
+      return h >= 240 && h <= 285;
+    }),
+    'chiaroscuro needs a blue-violet accent',
+  );
 
   // Chiaroscuro is a RANGE, not a flat poster: the ramp has to run from
   // something that recedes into the ground to something that catches light.
@@ -100,7 +113,11 @@ for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHO
 
   const pool = paletteRollPoolIds();
   assert.strictEqual(pool.length, 37, 'no user palettes → 37');
-  assert.deepStrictEqual(pool, PALETTES.map((p) => p.id), 'system ids, catalog order');
+  assert.deepStrictEqual(
+    pool,
+    PALETTES.map((p) => p.id),
+    'system ids, catalog order',
+  );
   assert.strictEqual(pool[0], 'praystation', 'ORIGIN first');
 
   const withUsers = paletteRollPoolIds([
@@ -108,7 +125,11 @@ for (const [pid, name] of [['sepia-plate', 'SEPIA PLATE'], ['lithograph', 'LITHO
     { id: 'user-def', name: 'YOURS' },
   ]);
   assert.strictEqual(withUsers.length, 39, '37 + 2 user palettes');
-  assert.deepStrictEqual(withUsers.slice(0, 37), PALETTES.map((p) => p.id), 'system first');
+  assert.deepStrictEqual(
+    withUsers.slice(0, 37),
+    PALETTES.map((p) => p.id),
+    'system first',
+  );
   assert.deepStrictEqual(withUsers.slice(37), ['user-abc', 'user-def'], 'user ids appended');
 
   const deduped = paletteRollPoolIds([

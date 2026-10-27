@@ -19,13 +19,7 @@ import { helpText } from '../data/helpCopy.js';
 import { ExpandLabel } from './ExpandLabel.jsx';
 import { useTapOpen } from '../hooks/useTapOpen.js';
 import { emit, Events } from '../composition/eventBus.js';
-import {
-  BEAT_DEFAULT_BPM,
-  BEAT_PRESETS,
-  sanitizeBeatBpm,
-  tapBpm,
-  beatDotLive,
-} from '../gl/beatClock.mjs';
+import { BEAT_DEFAULT_BPM, BEAT_PRESETS, sanitizeBeatBpm, tapBpm, beatDotLive } from '../gl/beatClock.mjs';
 
 export function BeatButton() {
   const beatBpm = useStore((s) => s.beatBpm) ?? BEAT_DEFAULT_BPM;
@@ -53,7 +47,7 @@ export function BeatButton() {
     place();
     window.addEventListener('resize', place);
     return () => window.removeEventListener('resize', place);
-  }, [open ]);
+  }, [open]);
 
   // Close the dropdown on outside click or Escape (the CuratorBar pattern).
   // The menu lives in a portal, so "outside" means outside both the button
@@ -74,7 +68,7 @@ export function BeatButton() {
       document.removeEventListener('pointerdown', onDown);
       document.removeEventListener('keydown', onKey);
     };
-  }, [open ]);
+  }, [open]);
 
   const pick = (bpm) => {
     emit(Events.BEAT_BPM, { bpm });
@@ -121,65 +115,64 @@ export function BeatButton() {
         />
         <ExpandLabel short="b" full={`beat · ${bpmLabel}`} />
       </button>
-      {open && menuPos && createPortal(
-        <div
-          className="beat-menu"
-          ref={menuRef}
-          role="menu"
-          aria-label="Beat tempo"
-          style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
-        >
-          <div className="beat-menu-label ttl">tempo</div>
-          <div className="beat-presets">
-            {BEAT_PRESETS.map((p) => (
-              <button
-                key={p}
-                type="button"
-                role="menuitem"
-                className={`beat-preset ${bpmLabel === p ? 'active' : ''}`}
-                onClick={() => pick(p)}
-              >
-                {p}
+      {open &&
+        menuPos &&
+        createPortal(
+          <div
+            className="beat-menu"
+            ref={menuRef}
+            role="menu"
+            aria-label="Beat tempo"
+            style={{ position: 'fixed', top: menuPos.top, left: menuPos.left }}
+          >
+            <div className="beat-menu-label ttl">tempo</div>
+            <div className="beat-presets">
+              {BEAT_PRESETS.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="menuitem"
+                  className={`beat-preset ${bpmLabel === p ? 'active' : ''}`}
+                  onClick={() => pick(p)}
+                >
+                  {p}
+                </button>
+              ))}
+            </div>
+            <button type="button" className="beat-tap" onClick={onTap} title="Tap 4× to set the tempo by feel">
+              TAP{taps.length > 1 ? ` · ${bpmLabel}` : ''}
+            </button>
+            <form className="beat-exact" onSubmit={onExact}>
+              <input
+                type="number"
+                min={30}
+                max={300}
+                value={exact}
+                placeholder="BPM"
+                aria-label="Exact BPM"
+                onChange={(e) => setExact(e.target.value)}
+              />
+              <button className="act" type="submit">
+                set
               </button>
-            ))}
-          </div>
-          <button
-            type="button"
-            className="beat-tap"
-            onClick={onTap}
-            title="Tap 4× to set the tempo by feel"
-          >
-            TAP{taps.length > 1 ? ` · ${bpmLabel}` : ''}
-          </button>
-          <form className="beat-exact" onSubmit={onExact}>
-            <input
-              type="number"
-              min={30}
-              max={300}
-              value={exact}
-              placeholder="BPM"
-              aria-label="Exact BPM"
-              onChange={(e) => setExact(e.target.value)}
-            />
-            <button className="act" type="submit">set</button>
-          </form>
-          <button
-            type="button"
-            className={`beat-metro ${beatMetro ? 'active' : ''}`}
-            aria-pressed={beatMetro}
-            onClick={() => emit(Events.BEAT_METRO, { on: !beatMetro })}
-            title="Pulse: the dialed tempo becomes a real beat the stage can feel when there is no audio. Audio always wins. Off by default."
-          >
-            pulse
-          </button>
-          <div className="beat-hint">
-            {bpmLabel > 160
-              ? 'past the glitch ceiling — transitions cut, they don\u2019t morph'
-              : `morphs are 2 beats · ${(120 / bpmLabel).toFixed(2)}s`}
-          </div>
-        </div>,
-        document.body,
-      )}
+            </form>
+            <button
+              type="button"
+              className={`beat-metro ${beatMetro ? 'active' : ''}`}
+              aria-pressed={beatMetro}
+              onClick={() => emit(Events.BEAT_METRO, { on: !beatMetro })}
+              title="Pulse: the dialed tempo becomes a real beat the stage can feel when there is no audio. Audio always wins. Off by default."
+            >
+              pulse
+            </button>
+            <div className="beat-hint">
+              {bpmLabel > 160
+                ? 'past the glitch ceiling — transitions cut, they don\u2019t morph'
+                : `morphs are 2 beats · ${(120 / bpmLabel).toFixed(2)}s`}
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

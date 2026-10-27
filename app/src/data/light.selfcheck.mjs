@@ -32,16 +32,34 @@ assert.strictEqual(sanitizeLight([LIGHT_DEFAULT, LIGHT_DEFAULT]), null, 'a list 
 
 // ── project document: omitted when off, round-trips when on ───────────────
 const base = {
-  seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
-  enabledAssets: {}, quality: 'balanced', autoQuality: true,
+  seed: 7,
+  seedOffsets: {},
+  paletteId: 'praystation',
+  layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
+  enabledAssets: {},
+  quality: 'balanced',
+  autoQuality: true,
 };
 const offDoc = serializeProject({ ...base, light: null });
 assert.ok(!('light' in offDoc), 'unlit piece: no light key (byte-identical export)');
 assert.strictEqual(parseProject(JSON.parse(JSON.stringify(offDoc))).doc.light, null, 'no key → off');
-const onDoc = serializeProject({ ...base, light: { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink' } });
+const onDoc = serializeProject({
+  ...base,
+  light: { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink' },
+});
 const back = parseProject(JSON.parse(JSON.stringify(onDoc)));
 assert.ok(back.ok);
-assert.deepStrictEqual(back.doc.light, { x: 900, y: 50, height: 120, intensity: 0.6, ambient: 0.2, slot: 'ink', bevel: LIGHT_DEFAULT.bevel, spec: LIGHT_DEFAULT.spec, pool: 0 });
+assert.deepStrictEqual(back.doc.light, {
+  x: 900,
+  y: 50,
+  height: 120,
+  intensity: 0.6,
+  ambient: 0.2,
+  slot: 'ink',
+  bevel: LIGHT_DEFAULT.bevel,
+  spec: LIGHT_DEFAULT.spec,
+  pool: 0,
+});
 
 // ── scene contract: key omitted when off; colour resolved when on ─────────
 const c0 = buildSceneContract({ doc: { seed: 1 }, resolvedLayers: [] });
@@ -49,7 +67,10 @@ assert.ok(!('light' in c0), 'unlit contract: no light key (hash stable)');
 const c1 = buildSceneContract({ doc: { seed: 1, light: { slot: 'ink' }, palette: pal }, resolvedLayers: [] });
 assert.deepStrictEqual(c1.light.color, [1, 0, 0], 'live path: pre-resolved palette');
 assert.strictEqual(c1.light.x, LIGHT_DEFAULT.x);
-const c2 = buildSceneContract({ doc: { seed: 1, light: { slot: 'white' }, paletteId: 'praystation' }, resolvedLayers: [] });
+const c2 = buildSceneContract({
+  doc: { seed: 1, light: { slot: 'white' }, paletteId: 'praystation' },
+  resolvedLayers: [],
+});
 assert.deepStrictEqual(c2.light.color, [1, 1, 1], 'export path: resolves from paletteId');
 assert.deepStrictEqual(JSON.parse(JSON.stringify(c1.light)), c1.light, 'JSON-safe');
 
@@ -71,7 +92,9 @@ assert.match(readFileSync(join(here, 'light.js'), 'utf8'), /ONE sun, never three
 // ── store: one undoable scene-level sun ──────────────────────────────────
 {
   let state = {};
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = { ...createLayoutSlice(set), activeLayerId: 'layer-1' };
   assert.strictEqual(state.light, null, 'starts off');
   state.setLight(true);
@@ -91,7 +114,11 @@ assert.match(readFileSync(join(here, 'light.js'), 'utf8'), /ONE sun, never three
   const c = contractLight({ bevel: 0.4, spec: 0.2 }, pal);
   assert.deepStrictEqual([c.bevel, c.spec], [0.4, 0.2], 'contract carries the material');
   assert.match(QUAD_FS, /if \(u_sunMat\.x > 0\.0\)/, 'bevel only when strength > 0');
-  assert.match(QUAD_FS, /\} else \{\s*o\.rgb = min\(o\.rgb \* v_light, vec3\(o\.a\)\);/, 'bevel 0 = exactly the PR1 path');
+  assert.match(
+    QUAD_FS,
+    /\} else \{\s*o\.rgb = min\(o\.rgb \* v_light, vec3\(o\.a\)\);/,
+    'bevel 0 = exactly the PR1 path',
+  );
   const taps = QUAD_FS.match(/texture\(u_atlas, clamp\(/g) || [];
   assert.strictEqual(taps.length, 4, 'four bevel taps, every one clamped to the cell');
   const fsBody = QUAD_FS.slice(QUAD_FS.indexOf('void main'));

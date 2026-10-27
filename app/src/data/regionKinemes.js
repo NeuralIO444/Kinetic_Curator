@@ -140,7 +140,7 @@ export function selectAnimatedRegions(records, assignment, budget) {
   const order = records
     .map((r, i) => ({ r, i }))
     .filter(({ r }) => assignment[r.id])
-    .sort((a, b) => (b.r.area - a.r.area) || (a.i - b.i));
+    .sort((a, b) => b.r.area - a.r.area || a.i - b.i);
   for (const { r } of order.slice(0, n)) picked.add(r.id);
   return picked;
 }
@@ -164,7 +164,7 @@ export function regionKinemePhase(assetId, regionId) {
  * the same record.
  */
 export const STROKE_MIN_LONG = 28;
-export const STROKE_MAX_FILL = 0.30;
+export const STROKE_MAX_FILL = 0.3;
 
 export function isStrokeRegion(record) {
   if (!record) return false;

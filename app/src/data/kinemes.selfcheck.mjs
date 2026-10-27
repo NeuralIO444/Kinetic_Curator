@@ -4,9 +4,7 @@
 // decorrelation that keeps copies from moving in lockstep.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import {
-  KINEMES, getKineme, sanitizeAssetKineme, kinemePhase, DEFAULT_ASSET_KINEME,
-} from './kinemes.js';
+import { KINEMES, getKineme, sanitizeAssetKineme, kinemePhase, DEFAULT_ASSET_KINEME } from './kinemes.js';
 
 test('#705 six micro-HUD defaults, all real library kinemes', () => {
   assert.deepStrictEqual(DEFAULT_ASSET_KINEME, {
@@ -26,7 +24,10 @@ test('#705 six micro-HUD defaults, all real library kinemes', () => {
 test('#705 library unchanged by the defaults', () => {
   // #1435 R4 appended 'bend' (the line bend, osc kind) — the five #705
   // kinemes keep their ids, order, and slots ahead of it.
-  assert.deepStrictEqual(KINEMES.map((k) => k.id), ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend']);
+  assert.deepStrictEqual(
+    KINEMES.map((k) => k.id),
+    ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend'],
+  );
   const bend = getKineme('bend');
   assert.deepStrictEqual({ kind: bend.kind, period: bend.period, amp: bend.amp }, { kind: 'osc', period: 3.6, amp: 6 });
 });
@@ -38,8 +39,5 @@ test('#705 phases decorrelate copies of one asset', () => {
 });
 
 test('#705 sanitize still drops unknown kineme ids', () => {
-  assert.deepStrictEqual(
-    sanitizeAssetKineme({ ...DEFAULT_ASSET_KINEME, junk: 'nope' }),
-    DEFAULT_ASSET_KINEME,
-  );
+  assert.deepStrictEqual(sanitizeAssetKineme({ ...DEFAULT_ASSET_KINEME, junk: 'nope' }), DEFAULT_ASSET_KINEME);
 });

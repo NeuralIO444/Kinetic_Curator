@@ -56,10 +56,20 @@ export function TapeCounter() {
     layers: s.layers,
   }));
   const {
-    fps = 0, stageTimings, renderScale = 1, quality = 'balanced',
-    qualityShedFrom = null, perfTier1 = false, fxaaShed = false, assetThin = false,
-    perfClampOverride = null, slowRender = false, slowRenderSource = null,
-    lastWatchdogReason = null, renderFault = false, renderFaultReason = null,
+    fps = 0,
+    stageTimings,
+    renderScale = 1,
+    quality = 'balanced',
+    qualityShedFrom = null,
+    perfTier1 = false,
+    fxaaShed = false,
+    assetThin = false,
+    perfClampOverride = null,
+    slowRender = false,
+    slowRenderSource = null,
+    lastWatchdogReason = null,
+    renderFault = false,
+    renderFaultReason = null,
     autoQuality = true,
   } = state;
 
@@ -70,8 +80,15 @@ export function TapeCounter() {
   }, []);
 
   const summary = shedSummary({
-    renderScale, perfTier1, fxaaShed, assetThin, perfClampOverride, slowRender,
-    watchdogTripped: !!lastWatchdogReason, quality, qualityShedFrom,
+    renderScale,
+    perfTier1,
+    fxaaShed,
+    assetThin,
+    perfClampOverride,
+    slowRender,
+    watchdogTripped: !!lastWatchdogReason,
+    quality,
+    qualityShedFrom,
   });
   const watchdog = slowRender && slowRenderSource === 'watchdog';
 
@@ -79,25 +96,30 @@ export function TapeCounter() {
   // signal the governor itself sheds on), rAF-implied frame time as the
   // fallback. Zero/unknown → no fill rather than a fake one.
   const gpuMs = Number(stageTimings?.gpuFrame) || 0;
-  const frameMs = gpuMs > 0 ? gpuMs : (fps > 0 ? 1000 / fps : 0);
+  const frameMs = gpuMs > 0 ? gpuMs : fps > 0 ? 1000 / fps : 0;
   const fillRatio = frameMs > 0 ? frameMs / FRAME_BUDGET_MS : 0;
   const fillPct = Math.round(fillRatio * 100);
 
   // #485 R4 — registry-driven FX-stack weight (bench ms, attribution only).
   const fxKinds = activeFxKinds(state.layers);
   const fxCost = sceneFxCost(fxKinds);
-  const fxNote = fxCost.count > 0
-    ? ` FX stack ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
-      `${fxCost.shedFirstMs > 0 ? `, ${fxCost.shedFirstMs.toFixed(1)}ms shed-first` : ''}).`
-    : '';
+  const fxNote =
+    fxCost.count > 0
+      ? ` FX stack ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
+        `${fxCost.shedFirstMs > 0 ? `, ${fxCost.shedFirstMs.toFixed(1)}ms shed-first` : ''}).`
+      : '';
 
   // --- state 1: render fault (hard-stop class, red, explicit) ---
   if (renderFault) {
     return (
-      <div className="status-pill" style={FAULT}
-        title={renderFaultReason
-          ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
-          : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'}
+      <div
+        className="status-pill"
+        style={FAULT}
+        title={
+          renderFaultReason
+            ? `Render fault: ${renderFaultReason}. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.`
+            : 'Render fault: a deterministic per-frame failure stopped presenting. The canvas is holding the last good frame. Clears after sustained clean rendering, or reload the page.'
+        }
       >
         <span className="status-dot" style={{ background: 'var(--kc-warn)' }} />
         RENDER FAULT
@@ -108,7 +130,9 @@ export function TapeCounter() {
   // --- state 2: watchdog hard stop (green: paused is safe to look away — never auto-resumes) ---
   if (watchdog) {
     return (
-      <div className="status-pill" style={GREEN}
+      <div
+        className="status-pill"
+        style={GREEN}
         title="Watchdog tripped: running and evolve are off and will not resume on their own. Press space or ▶ RUN to resume."
       >
         <span className="status-dot" style={{ background: 'var(--kc-ok)' }} />
@@ -127,7 +151,9 @@ export function TapeCounter() {
   // is what's load-bearing here. ---
   if (isTapeFull({ stageTimings, fps })) {
     return (
-      <div className="status-pill" style={FAULT}
+      <div
+        className="status-pill"
+        style={FAULT}
         title={`Tape full: measured frame cost ${frameMs.toFixed(1)}ms is already at ${fillPct}% of the ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) budget. A new track or FX slot is refused rather than silently degrading the render — drop the ceiling, free a track, or wait for headroom.`}
       >
         <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
@@ -142,13 +168,20 @@ export function TapeCounter() {
     // performed stage name), else the deepest active cut from the summary.
     const stageName = eventLabel || summary[summary.length - 1].toUpperCase();
     return (
-      <div className="status-pill" style={FAULT}
+      <div
+        className="status-pill"
+        style={FAULT}
         title={`Showrunner shed active: ${summary.join('; ')}.${fxNote} Auto-clears on recovery (watchdog needs manual resume). Tape fill: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : '—'} vs ${FRAME_BUDGET_MS.toFixed(1)}ms budget.`}
       >
         <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
-        <span key={stageName} className="tape-click">{stageName}</span>
+        <span key={stageName} className="tape-click">
+          {stageName}
+        </span>
         <span className="tape-bar" aria-hidden="true">
-          <span className="tape-bar-fill" style={{ width: `${Math.min(100, fillPct)}%`, background: 'var(--kc-red)' }} />
+          <span
+            className="tape-bar-fill"
+            style={{ width: `${Math.min(100, fillPct)}%`, background: 'var(--kc-red)' }}
+          />
         </span>
         <span className="meter-value">{fillPct}%</span>
       </div>
@@ -157,7 +190,8 @@ export function TapeCounter() {
 
   // --- state 4: clean — the tape, fill only, sitting quiet ---
   return (
-    <div className="status-pill"
+    <div
+      className="status-pill"
       title={`Budget tape: measured frame cost ${frameMs ? `${frameMs.toFixed(1)}ms` : 'no data yet'} vs a ${FRAME_BUDGET_MS.toFixed(1)}ms (60fps) frame budget.${fxNote} Fill is live-measured, never decorative.${autoQuality ? ' Governor armed — defending the budget.' : ' Governor off — nothing is defended (AUTO is off).'}`}
     >
       <span className="status-dot" style={{ background: autoQuality ? '#00ff88' : '#5a5a5a' }} />

@@ -2,17 +2,21 @@
 import { MICRO_HUD_STRIPS } from './assets/assets-micro-hud-strips.js';
 import { LINE_STRIPS } from './assets/assets-line-strips.js';
 
-export const CELL_KINEMES = Object.freeze([
-  { id: 'dial-sweep', cells: 8, period: 4, costCells: 8 },
-  { id: 'wave-scroll', cells: 6, period: 2.4, costCells: 6 },
-  { id: 'chevron-chase', cells: 4, period: 1.6, costCells: 4 },
-  { id: 'spec-chase', cells: 8, period: 2, costCells: 8 }, // #705 — 3-bar accent window slides and wraps
-  { id: 'line-boil', cells: 7, period: 2.8, costCells: 7 }, // #1435 R4 — the squiggle roll: 7 frames x 8 units = the 56-unit wave
-  { id: 'wave-roll', cells: 8, period: 3.2, costCells: 8 }, // #1435 R4 — the tight waveform roll: 8 frames x 4 units = the 32-unit wave
-].map(Object.freeze));
+export const CELL_KINEMES = Object.freeze(
+  [
+    { id: 'dial-sweep', cells: 8, period: 4, costCells: 8 },
+    { id: 'wave-scroll', cells: 6, period: 2.4, costCells: 6 },
+    { id: 'chevron-chase', cells: 4, period: 1.6, costCells: 4 },
+    { id: 'spec-chase', cells: 8, period: 2, costCells: 8 }, // #705 — 3-bar accent window slides and wraps
+    { id: 'line-boil', cells: 7, period: 2.8, costCells: 7 }, // #1435 R4 — the squiggle roll: 7 frames x 8 units = the 56-unit wave
+    { id: 'wave-roll', cells: 8, period: 3.2, costCells: 8 }, // #1435 R4 — the tight waveform roll: 8 frames x 4 units = the 32-unit wave
+  ].map(Object.freeze),
+);
 
 const BY_ID = new Map(CELL_KINEMES.map((k) => [k.id, k]));
-export function getCellKineme(id) { return BY_ID.get(id); }
+export function getCellKineme(id) {
+  return BY_ID.get(id);
+}
 
 /**
  * #705 — which assets animate *inside* the mark via a baked UV strip.
@@ -42,7 +46,7 @@ export function cellIndexAt(motionTime, { period = 1, cells = 4, shed = false } 
   if (shed) return 0;
   const p = period > 0 ? period : 1;
   const t = Number(motionTime) || 0;
-  return Math.floor(((t % p) + p) % p / p * n) % n;
+  return Math.floor(((((t % p) + p) % p) / p) * n) % n;
 }
 
 /** Horizontal strip: cell i of n inside a baked UV rect. Asset id never changes. */

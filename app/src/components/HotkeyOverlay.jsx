@@ -15,8 +15,7 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
   const topics = useMemo(() => {
     const s = q.trim().toLowerCase();
     if (!s) return HELP_TOPICS;
-    return HELP_TOPICS.filter((t) =>
-      `${t.group} ${t.title} ${t.text}`.toLowerCase().includes(s));
+    return HELP_TOPICS.filter((t) => `${t.group} ${t.title} ${t.text}`.toLowerCase().includes(s));
   }, [q]);
 
   if (!show) return null;
@@ -26,11 +25,19 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
       <div className="hotkey-card" role="dialog" aria-label="Help" onClick={(e) => e.stopPropagation()}>
         <div className="hotkey-card-header">
           <span className="ttl">help</span>
-          <button className="micro-btn hotkey-close" onClick={onClose} aria-label="Close help">×</button>
+          <button className="micro-btn hotkey-close" onClick={onClose} aria-label="Close help">
+            ×
+          </button>
         </div>
         <div className="hotkey-tabs" role="tablist">
           {TABS.map((id) => (
-            <button key={id} role="tab" aria-selected={tab === id} className={`chip-btn act ${tab === id ? 'active' : ''}`} onClick={() => setTab(id)}>
+            <button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              className={`chip-btn act ${tab === id ? 'active' : ''}`}
+              onClick={() => setTab(id)}
+            >
               {id}
             </button>
           ))}
@@ -60,7 +67,9 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
               {topics.map((t) => (
                 <div key={t.id} className="hotkey-row hotkey-row-top">
                   <kbd className="hotkey-key">{t.title}</kbd>
-                  <span className="hotkey-desc">{t.group} — {t.text}</span>
+                  <span className="hotkey-desc">
+                    {t.group} — {t.text}
+                  </span>
                 </div>
               ))}
               {topics.length === 0 && <div className="hotkey-desc hotkey-empty">No match.</div>}
@@ -79,8 +88,8 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
         )}
         {tab === 'settings' && (
           <div className="hotkey-desc hotkey-prose">
-            Quality lives on the MasterBar; audio lives on STIMULI.
-            There is no second prefs store — that would fight the project document and #107.
+            Quality lives on the MasterBar; audio lives on STIMULI. There is no second prefs store — that would fight
+            the project document and #107.
           </div>
         )}
         {tab === 'about' && (
@@ -89,19 +98,28 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
             <div className="hotkey-about-body">
               <h2 className="hotkey-about-title name">{ABOUT_TITLE}</h2>
               <p className="hotkey-about-tagline name">{ABOUT_TAGLINE}</p>
-              {ABOUT_BIO.map((p) => <p key={p} className="hotkey-desc hotkey-prose">{p}</p>)}
+              {ABOUT_BIO.map((p) => (
+                <p key={p} className="hotkey-desc hotkey-prose">
+                  {p}
+                </p>
+              ))}
               <div className="hotkey-about-links">
                 {ABOUT_LINKS.map((l) => (
                   <div key={l.label} className="hotkey-row">
                     <span className="hotkey-key lbl">{l.label}</span>
-                    <a className="hotkey-link name" href={l.href}
-                      {...(l.href.startsWith('https:') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}>
+                    <a
+                      className="hotkey-link name"
+                      href={l.href}
+                      {...(l.href.startsWith('https:') ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+                    >
                       {l.text}
                     </a>
                   </div>
                 ))}
               </div>
-              <div className="hotkey-desc hotkey-version">KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</div>
+              <div className="hotkey-desc hotkey-version">
+                KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}
+              </div>
             </div>
           </div>
         )}

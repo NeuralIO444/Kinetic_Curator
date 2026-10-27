@@ -15,9 +15,7 @@ export const PALETTE_EXPORT_VERSION = 1;
  * `name` is the wing's name field (first-class); falls back to the palette name.
  */
 export function paletteToExportJson(palette, name) {
-  const nm = typeof name === 'string' && name.trim()
-    ? name.trim().slice(0, 40)
-    : (palette?.name || 'UNTITLED');
+  const nm = typeof name === 'string' && name.trim() ? name.trim().slice(0, 40) : palette?.name || 'UNTITLED';
   return {
     name: nm,
     colors: [...(palette?.swatches || [])],

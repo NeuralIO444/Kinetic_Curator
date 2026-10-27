@@ -15,18 +15,40 @@ import { PerformanceButton } from './PerformanceButton.jsx'; // #1353 / #1461: r
 
 export function MasterBar() {
   const { history } = useApp();
-  const { state } = useApp(s => ({
-    running: s.running, fps: s.fps, stageTimings: s.stageTimings, governorShedFps: s.governorShedFps,
-    seed: s.seed, nodeCount: s.nodeCount, quality: s.quality,
-    isRecording: s.isRecording, persistStatus: s.persistStatus, tuningSessionOnly: s.tuningSessionOnly, frameLock: s.frameLock,
-    bootNotice: s.bootNotice, setBootNotice: s.setBootNotice,
-    setFrameLock: s.setFrameLock, audioDenied: s.audioDenied, audioLost: s.audioLost, glContext: s.glContext,
-    curatorConfidence: s.curatorConfidence, curatorActive: s.curatorActive,
+  const { state } = useApp((s) => ({
+    running: s.running,
+    fps: s.fps,
+    stageTimings: s.stageTimings,
+    governorShedFps: s.governorShedFps,
+    seed: s.seed,
+    nodeCount: s.nodeCount,
+    quality: s.quality,
+    isRecording: s.isRecording,
+    persistStatus: s.persistStatus,
+    tuningSessionOnly: s.tuningSessionOnly,
+    frameLock: s.frameLock,
+    bootNotice: s.bootNotice,
+    setBootNotice: s.setBootNotice,
+    setFrameLock: s.setFrameLock,
+    audioDenied: s.audioDenied,
+    audioLost: s.audioLost,
+    glContext: s.glContext,
+    curatorConfidence: s.curatorConfidence,
+    curatorActive: s.curatorActive,
     layers: s.layers,
   }));
   const {
-    running, fps, nodeCount = 0, quality = 'balanced', persistStatus = 'ok', tuningSessionOnly = false,
-    frameLock = false, audioDenied = false, audioLost = null, glContext = 'ok', governorShedFps = 28,
+    running,
+    fps,
+    nodeCount = 0,
+    quality = 'balanced',
+    persistStatus = 'ok',
+    tuningSessionOnly = false,
+    frameLock = false,
+    audioDenied = false,
+    audioLost = null,
+    glContext = 'ok',
+    governorShedFps = 28,
   } = state;
   const fpsClass = fps >= 50 ? 'good' : fps >= 30 ? 'mid' : 'bad';
   const fpsWidth = Math.min(100, (fps / 60) * 100);
@@ -37,7 +59,8 @@ export function MasterBar() {
   const needlePct = Math.max(0, Math.min(100, (effFps / 60) * 100));
   const headroomFps = effFps - shedFloor;
   const needleState = headroomFps <= 0 ? 'bad' : headroomFps <= 7 ? 'warn' : 'quiet';
-  const headroomTitle = `Effective frame rate ${effFps.toFixed(1)} fps — the worse of display fps and GPU-implied fps. ` +
+  const headroomTitle =
+    `Effective frame rate ${effFps.toFixed(1)} fps — the worse of display fps and GPU-implied fps. ` +
     `The governor sheds below ${shedFloor} fps: the needle shows the shed coming. ` +
     (needleState === 'quiet'
       ? 'Comfortably above the shed floor.'
@@ -51,7 +74,8 @@ export function MasterBar() {
   // the tape fill stays the only live truth.
   const fxKinds = activeFxKinds(state.layers);
   const fxCost = sceneFxCost(fxKinds);
-  const fxTitle = `FX-stack weight ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
+  const fxTitle =
+    `FX-stack weight ≈ ${fxCost.totalMs.toFixed(1)}ms bench (${fxCost.count} fx` +
     `${fxCost.shedFirstMs > 0 ? ` · ${fxCost.shedFirstMs.toFixed(1)}ms shed-first` : ''}` +
     `${fxCost.unknown.length ? ` · unknown: ${fxCost.unknown.join(',')}` : ''}). ` +
     `512²-bench estimates from the cost registry + measured costs — attribution, not frame math.`;
@@ -84,75 +108,110 @@ export function MasterBar() {
       <div className="master-left">
         <LoisPill />
         {state.isRecording ? (
-          <div className="status-pill" style={{ background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }}
-            title={helpText('output-webm')}>
-            <span className="status-dot beat-flash" style={{ background: 'var(--kc-live)', animationIterationCount: 'infinite' }} />
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }}
+            title={helpText('output-webm')}
+          >
+            <span
+              className="status-dot beat-flash"
+              style={{ background: 'var(--kc-live)', animationIterationCount: 'infinite' }}
+            />
             REC WEBM
           </div>
         ) : (
-          <div className="status-pill"
-            style={running
-              ? { background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }
-              : { background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }}
-            title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}>
-            <span className={`status-dot ${running ? 'live' : ''}`}
-              style={{ background: running ? 'var(--kc-live)' : 'var(--kc-ok)', boxShadow: running ? '0 0 5px rgba(255,45,111,0.7)' : 'none' }} />
+          <div
+            className="status-pill"
+            style={
+              running
+                ? { background: 'rgba(255, 45, 111, 0.2)', color: 'var(--kc-live)', borderColor: 'var(--kc-live)' }
+                : { background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }
+            }
+            title={running ? 'Live loop is running — Space pauses' : 'Live loop is paused — Space resumes'}
+          >
+            <span
+              className={`status-dot ${running ? 'live' : ''}`}
+              style={{
+                background: running ? 'var(--kc-live)' : 'var(--kc-ok)',
+                boxShadow: running ? '0 0 5px rgba(255,45,111,0.7)' : 'none',
+              }}
+            />
             {running ? 'LIVE' : 'PAUSED'}
           </div>
         )}
 
         {persistStatus !== 'ok' && (
-          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
-            title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}>
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            title={persistStatus === 'quarantined' ? 'Last autosave could not be read.' : 'Autosave is failing.'}
+          >
             <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             {persistStatus === 'quarantined' ? 'RESTORE FAILED' : 'UNSAVED'}
           </div>
         )}
 
         {tuningSessionOnly && (
-          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
-            title="Saved for this session only — this browser would not keep it.">
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            title="Saved for this session only — this browser would not keep it."
+          >
             <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             SESSION ONLY
           </div>
         )}
 
         {showSaved && (
-          <div className="status-pill" style={{ background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }}
-            title="Project autosaved to pipeline backup.">
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(0, 255, 136, 0.12)', color: 'var(--kc-ok)', borderColor: 'var(--kc-ok)' }}
+            title="Project autosaved to pipeline backup."
+          >
             <span className="status-dot" style={{ background: '#00ff88' }} />
             SAVED
           </div>
         )}
 
         {bootNotice && (
-          <div className="status-pill" style={{ background: 'rgba(0, 217, 255, 0.12)', color: '#00d9ff', borderColor: '#00d9ff' }}
-            title={bootNotice}>
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(0, 217, 255, 0.12)', color: '#00d9ff', borderColor: '#00d9ff' }}
+            title={bootNotice}
+          >
             <span className="status-dot" style={{ background: '#00d9ff' }} />
             {bootNotice.length > 48 ? `${bootNotice.slice(0, 47)}…` : bootNotice}
           </div>
         )}
 
         {glContext !== 'ok' && (
-          <div className="status-pill"
+          <div
+            className="status-pill"
             style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
-            title={glContext === 'lost' ? 'GPU context lost' : 'GPU context restored — rebuilding'}>
+            title={glContext === 'lost' ? 'GPU context lost' : 'GPU context restored — rebuilding'}
+          >
             <span className="status-dot" style={{ background: 'var(--kc-warn)' }} />
             {glContext === 'lost' ? 'GL CONTEXT LOST' : 'GL RESTORING'}
           </div>
         )}
 
         {audioDenied && (
-          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
-            title="Browser denied mic access.">
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            title="Browser denied mic access."
+          >
             <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             MIC BLOCKED
           </div>
         )}
 
         {audioLost && (
-          <div className="status-pill" style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
-            title={`${lostLine(audioLost.name)} — switch AUDIO on in STIMULI to reconnect.`}>
+          <div
+            className="status-pill"
+            style={{ background: 'rgba(255, 77, 0, 0.18)', color: 'var(--kc-warn)', borderColor: 'var(--kc-warn)' }}
+            title={`${lostLine(audioLost.name)} — switch AUDIO on in STIMULI to reconnect.`}
+          >
             <span className="status-dot" style={{ background: 'var(--kc-red)' }} />
             AUDIO INPUT LOST
           </div>
@@ -183,7 +242,9 @@ export function MasterBar() {
 
         <div className="meter" title={q.description}>
           <span className="meter-label">Q</span>
-          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>{q.budget || q.label}</span>
+          <span className="meter-value" style={{ letterSpacing: '0.06em' }}>
+            {q.budget || q.label}
+          </span>
         </div>
 
         <button
@@ -198,10 +259,20 @@ export function MasterBar() {
         <BudgetKnob />
 
         <div className="undo-group">
-          <button className={`undo-btn ${history.canUndo ? '' : 'disabled'}`} onClick={history.undo} disabled={!history.canUndo} title="Undo (Ctrl/⌘+Z)">
+          <button
+            className={`undo-btn ${history.canUndo ? '' : 'disabled'}`}
+            onClick={history.undo}
+            disabled={!history.canUndo}
+            title="Undo (Ctrl/⌘+Z)"
+          >
             ↶{history.undoDepth > 0 ? ` ${history.undoDepth}` : ''}
           </button>
-          <button className={`undo-btn ${history.canRedo ? '' : 'disabled'}`} onClick={history.redo} disabled={!history.canRedo} title="Redo (Ctrl/⌘+Shift+Z)">
+          <button
+            className={`undo-btn ${history.canRedo ? '' : 'disabled'}`}
+            onClick={history.redo}
+            disabled={!history.canRedo}
+            title="Redo (Ctrl/⌘+Shift+Z)"
+          >
             ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
           </button>
         </div>

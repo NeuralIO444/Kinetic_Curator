@@ -15,7 +15,7 @@
 // frames are exact translates of each other over the covered band, which
 // the regionLines selfcheck pins on rasters.
 export const LINE_STRIPS = {
-  'line_squiggle_01': [
+  line_squiggle_01: [
     `<path d="M6 50 Q20 20 34 50 T62 50 T90 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     `<path d="M-30 50 Q-16 80 -2 50 Q12 20 26 50 Q40 80 54 50 Q68 20 82 50 Q96 80 110 50 Q124 20 138 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     `<path d="M-38 50 Q-24 80 -10 50 Q4 20 18 50 Q32 80 46 50 Q60 20 74 50 Q88 80 102 50 Q116 20 130 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
@@ -24,7 +24,7 @@ export const LINE_STRIPS = {
     `<path d="M-34 50 Q-20 20 -6 50 Q8 80 22 50 Q36 20 50 50 Q64 80 78 50 Q92 20 106 50 Q120 80 134 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     `<path d="M-42 50 Q-28 20 -14 50 Q0 80 14 50 Q28 20 42 50 Q56 80 70 50 Q84 20 98 50 Q112 80 126 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
   ],
-  'line_squiggle_02': [
+  line_squiggle_02: [
     `<path d="M6 50 Q14 30 22 50 T38 50 T54 50 T70 50 T86 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     `<path d="M-30 50 Q-22 30 -14 50 Q-6 70 2 50 Q10 30 18 50 Q26 70 34 50 Q42 30 50 50 Q58 70 66 50 Q74 30 82 50 Q90 70 98 50 Q106 30 114 50 Q122 70 130 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,
     `<path d="M-34 50 Q-26 30 -18 50 Q-10 70 -2 50 Q6 30 14 50 Q22 70 30 50 Q38 30 46 50 Q54 70 62 50 Q70 30 78 50 Q86 70 94 50 Q102 30 110 50 Q118 70 126 50 Q134 30 142 50" stroke="var(--ink)" stroke-width="3" fill="none" stroke-linecap="round"/>`,

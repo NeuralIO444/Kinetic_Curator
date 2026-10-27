@@ -9,11 +9,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { emit, Events } from '../composition/eventBus.js';
 import { buildHarmony, applyWithLocks, SCHEME_IDS } from '../engine/harmony.js';
-import {
-  paletteToExportJson,
-  parseImportPalettes,
-  randomSeedHex,
-} from './paletteWing.mjs';
+import { paletteToExportJson, parseImportPalettes, randomSeedHex } from './paletteWing.mjs';
 
 const randomScheme = (rng = Math.random) => SCHEME_IDS[Math.floor(rng() * SCHEME_IDS.length)];
 
@@ -40,7 +36,9 @@ export function PaletteWing({ open, onClose }) {
 
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [open, onClose]);
@@ -68,7 +66,12 @@ export function PaletteWing({ open, onClose }) {
 
   const exportPalette = () => {
     const json = paletteToExportJson(palette, name);
-    const safe = json.name.replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').toLowerCase() || 'palette';
+    const safe =
+      json.name
+        .replace(/[^\w\- ]+/g, '')
+        .trim()
+        .replace(/\s+/g, '-')
+        .toLowerCase() || 'palette';
     downloadJson(`${safe}.palette.json`, json);
     setMsg(`Exported ${safe}.palette.json`);
   };
@@ -94,10 +97,14 @@ export function PaletteWing({ open, onClose }) {
     <div className="palette-wing" role="dialog" aria-label="Palette lab">
       <div className="palette-wing-head">
         <span className="palette-wing-title ttl">palette lab</span>
-        <button type="button" className="palette-wing-close" title="Close (Esc)" onClick={onClose}>×</button>
+        <button type="button" className="palette-wing-close" title="Close (Esc)" onClick={onClose}>
+          ×
+        </button>
       </div>
 
-      <label className="palette-wing-label" htmlFor="palette-wing-name">NAME IT — VOID didn't become real from hex values</label>
+      <label className="palette-wing-label" htmlFor="palette-wing-name">
+        NAME IT — VOID didn't become real from hex values
+      </label>
       <input
         id="palette-wing-name"
         className="palette-wing-name"
@@ -109,10 +116,19 @@ export function PaletteWing({ open, onClose }) {
       />
 
       <div className="palette-wing-row">
-        <button type="button" className="palette-wing-btn act primary" onClick={generate} title="Random harmony scheme + seed color → lands here unsaved">
+        <button
+          type="button"
+          className="palette-wing-btn act primary"
+          onClick={generate}
+          title="Random harmony scheme + seed color → lands here unsaved"
+        >
           ⚄ generate
         </button>
-        {lastGen && <span className="palette-wing-gen-note" title="Last generation">{lastGen}</span>}
+        {lastGen && (
+          <span className="palette-wing-gen-note" title="Last generation">
+            {lastGen}
+          </span>
+        )}
       </div>
 
       <div className="palette-wing-label lbl">swatches — click to edit, canvas follows live</div>
@@ -129,11 +145,21 @@ export function PaletteWing({ open, onClose }) {
         ))}
         <label className="palette-wing-sw meta" style={{ background: palette.bg }} title={`BG ${palette.bg}`}>
           <span className="palette-wing-sw-tag">BG</span>
-          <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => emit(Events.PALETTE_BG, { hex: e.target.value })} />
+          <input
+            type="color"
+            className="palette-color-input"
+            value={palette.bg}
+            onChange={(e) => emit(Events.PALETTE_BG, { hex: e.target.value })}
+          />
         </label>
         <label className="palette-wing-sw meta" style={{ background: palette.ink }} title={`INK ${palette.ink}`}>
           <span className="palette-wing-sw-tag">INK</span>
-          <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => emit(Events.PALETTE_INK, { hex: e.target.value })} />
+          <input
+            type="color"
+            className="palette-color-input"
+            value={palette.ink}
+            onChange={(e) => emit(Events.PALETTE_INK, { hex: e.target.value })}
+          />
         </label>
       </div>
 
@@ -143,23 +169,46 @@ export function PaletteWing({ open, onClose }) {
           className="palette-wing-btn act primary"
           onClick={save}
           disabled={!canSave}
-          title={canSave ? `Save “${name.trim()}” to your library` : 'Name it first — a palette without a name doesn’t save'}
+          title={
+            canSave ? `Save “${name.trim()}” to your library` : 'Name it first — a palette without a name doesn’t save'
+          }
         >
           ↓ save
         </button>
-        <button type="button" className="palette-wing-btn act" onClick={() => emit(Events.PALETTE_CLEAR_OVERRIDES)} title="Drop unsaved tweaks, back to the catalog">
+        <button
+          type="button"
+          className="palette-wing-btn act"
+          onClick={() => emit(Events.PALETTE_CLEAR_OVERRIDES)}
+          title="Drop unsaved tweaks, back to the catalog"
+        >
           ↻ reset
         </button>
       </div>
 
       <div className="palette-wing-row">
-        <button type="button" className="palette-wing-btn act" onClick={exportPalette} title="Download this palette as a standalone JSON file">
+        <button
+          type="button"
+          className="palette-wing-btn act"
+          onClick={exportPalette}
+          title="Download this palette as a standalone JSON file"
+        >
           ⤓ export
         </button>
-        <button type="button" className="palette-wing-btn act" onClick={() => fileRef.current?.click()} title="Import a palette JSON file">
+        <button
+          type="button"
+          className="palette-wing-btn act"
+          onClick={() => fileRef.current?.click()}
+          title="Import a palette JSON file"
+        >
           ⤒ import
         </button>
-        <input ref={fileRef} type="file" accept=".json,application/json" style={{ display: 'none' }} onChange={importFile} />
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".json,application/json"
+          style={{ display: 'none' }}
+          onChange={importFile}
+        />
       </div>
 
       {msg && <div className="palette-wing-msg">{msg}</div>}

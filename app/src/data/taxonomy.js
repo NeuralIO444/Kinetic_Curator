@@ -25,7 +25,9 @@ export const LOOK_ALIASES = Object.freeze({
 });
 
 export function parseSemver(s) {
-  const m = String(s ?? '').trim().match(/^(\d+)\.(\d+)\.(\d+)$/);
+  const m = String(s ?? '')
+    .trim()
+    .match(/^(\d+)\.(\d+)\.(\d+)$/);
   if (!m) return null;
   return { major: Number(m[1]), minor: Number(m[2]), patch: Number(m[3]) };
 }

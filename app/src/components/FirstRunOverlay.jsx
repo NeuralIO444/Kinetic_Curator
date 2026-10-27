@@ -17,13 +17,18 @@ export function FirstRunOverlay({ onPlay, onTour }) {
     }
   });
 
-  const dismiss = useCallback((play) => {
-    try {
-      localStorage.setItem(STORAGE_KEY, '1');
-    } catch { /* ignore */ }
-    setVisible(false);
-    if (play && typeof onPlay === 'function') onPlay();
-  }, [onPlay]);
+  const dismiss = useCallback(
+    (play) => {
+      try {
+        localStorage.setItem(STORAGE_KEY, '1');
+      } catch {
+        /* ignore */
+      }
+      setVisible(false);
+      if (play && typeof onPlay === 'function') onPlay();
+    },
+    [onPlay],
+  );
 
   const startTour = useCallback(() => {
     dismiss(false);
@@ -34,7 +39,9 @@ export function FirstRunOverlay({ onPlay, onTour }) {
   // not just the things App.jsx's central hotkey map already owns.
   useEffect(() => {
     if (!visible) return;
-    const onKey = (e) => { if (e.key === 'Escape') dismiss(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') dismiss(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [visible, dismiss]);
@@ -45,16 +52,13 @@ export function FirstRunOverlay({ onPlay, onTour }) {
     <div className="first-run-overlay" role="dialog" aria-modal="true" aria-labelledby="first-run-title">
       <div className="first-run-card">
         <div className="first-run-mark">◈</div>
-        <h2 id="first-run-title" className="first-run-title">KINETIC_CURATOR</h2>
+        <h2 id="first-run-title" className="first-run-title">
+          KINETIC_CURATOR
+        </h2>
         <p className="first-run-manifesto">
-          Curated chaos. Breed variations in a living terrarium —
-          listen, evolve, and hunt for hits.
+          Curated chaos. Breed variations in a living terrarium — listen, evolve, and hunt for hits.
         </p>
-        <button
-          type="button"
-          className="first-run-play"
-          onClick={() => dismiss(true)}
-        >
+        <button type="button" className="first-run-play" onClick={() => dismiss(true)}>
           ▶ PLAY ME
         </button>
         <button
@@ -66,11 +70,7 @@ export function FirstRunOverlay({ onPlay, onTour }) {
         >
           TAKE THE TOUR
         </button>
-        <button
-          type="button"
-          className="first-run-skip"
-          onClick={() => dismiss(false)}
-        >
+        <button type="button" className="first-run-skip" onClick={() => dismiss(false)}>
           Skip
         </button>
       </div>

@@ -15,7 +15,11 @@ export function ExpandLabel({ short, full, tailClass = '', mode }) {
         <span className="xl-head">{p.head}</span>
         {/* each letter of the tail is its own span so the word can retreat one letter at a time (--i of --n) */}
         <span className={`xl-tail ${tailClass}`.trim()}>
-          {[...p.tail].map((ch, i) => <span key={i} className="xl-ch" style={{ '--i': i, '--n': p.tail.length }}>{ch}</span>)}
+          {[...p.tail].map((ch, i) => (
+            <span key={i} className="xl-ch" style={{ '--i': i, '--n': p.tail.length }}>
+              {ch}
+            </span>
+          ))}
         </span>
       </span>
     );

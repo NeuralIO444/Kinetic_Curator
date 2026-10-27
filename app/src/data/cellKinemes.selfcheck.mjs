@@ -39,7 +39,15 @@ test('#705 spec-chase: 8 cells, 2.0s period', () => {
 test('#705 ASSET_CELL_KINEME: values name real cell kinemes, keys name animated assets', () => {
   const ids = new Set(CELL_KINEMES.map((k) => k.id));
   // #1435 R4 added the two waveform lines to the authored track.
-  const animated = new Set(['mic_dial', 'mic_chevrons', 'mic_specbar_h', 'mic_specbar_v', 'mic_wave', 'line_squiggle_01', 'line_squiggle_02']);
+  const animated = new Set([
+    'mic_dial',
+    'mic_chevrons',
+    'mic_specbar_h',
+    'mic_specbar_v',
+    'mic_wave',
+    'line_squiggle_01',
+    'line_squiggle_02',
+  ]);
   assert.deepEqual(new Set(Object.keys(ASSET_CELL_KINEME)), animated);
   for (const [asset, kineme] of Object.entries(ASSET_CELL_KINEME)) {
     assert.ok(ids.has(kineme), `${asset} -> unknown cell kineme ${kineme}`);

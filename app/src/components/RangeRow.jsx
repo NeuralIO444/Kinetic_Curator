@@ -15,9 +15,29 @@ import { useState, useRef, useEffect, useContext } from 'react';
 import { getTaper } from './taper.js';
 import { RANGE_TONES, RangeToneContext } from './rangeTones.js';
 
-export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange, readout,
-  defaultValue, locked, onToggleLock, hint, taper, taperOpts, disabled, disabledReason,
-  disabledLabel = 'Disabled', tone, layout = 'row', ariaLabel, className = '', onReset }) {
+export function RangeRow({
+  label,
+  value,
+  min = 0,
+  max = 100,
+  step = 1,
+  onChange,
+  readout,
+  defaultValue,
+  locked,
+  onToggleLock,
+  hint,
+  taper,
+  taperOpts,
+  disabled,
+  disabledReason,
+  disabledLabel = 'Disabled',
+  tone,
+  layout = 'row',
+  ariaLabel,
+  className = '',
+  onReset,
+}) {
   // the row's own tone wins; otherwise the panel's (BUILD yellow, STIMULI cyan), otherwise ink
   const panelTone = useContext(RangeToneContext);
   const wanted = tone ?? panelTone;
@@ -49,19 +69,24 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   }, [editing]);
 
   const commitEdit = () => {
-    if (locked || disabled) { setEditing(false); return; }
+    if (locked || disabled) {
+      setEditing(false);
+      return;
+    }
     const n = Number(editValue);
     if (!isNaN(n)) onChange(Math.max(min, Math.min(max, n)));
     setEditing(false);
   };
 
-  const labelTitle = [hint, defaultValue !== undefined ? `Double-click to reset (${defaultValue})` : null]
-    .filter(Boolean).join(' · ') || undefined;
+  const labelTitle =
+    [hint, defaultValue !== undefined ? `Double-click to reset (${defaultValue})` : null].filter(Boolean).join(' · ') ||
+    undefined;
   // #272: mode-gated controls stay visible but inert, with the reason in the
   // tooltip — a control that silently does nothing is a lie; a disabled one
   // with a reason is a label.
-  const title = [hint, disabled && disabledReason ? `${disabledLabel} — ${disabledReason}` : null]
-    .filter(Boolean).join(' · ') || undefined;
+  const title =
+    [hint, disabled && disabledReason ? `${disabledLabel} — ${disabledReason}` : null].filter(Boolean).join(' · ') ||
+    undefined;
 
   const slider = (
     <input
@@ -69,9 +94,11 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
       className={`single-slider ${className}`.trim()}
       data-tone={toneName}
       aria-label={ariaLabel ?? (typeof label === 'string' ? label : undefined)}
-      min={t ? 0 : min} max={t ? 1 : max} step={t ? 0.01 : step}
+      min={t ? 0 : min}
+      max={t ? 1 : max}
+      step={t ? 0.01 : step}
       value={t ? t.toSlider(value) : value}
-      onChange={e => onChange(t ? t.toParam(Number(e.target.value)) : Number(e.target.value))}
+      onChange={(e) => onChange(t ? t.toParam(Number(e.target.value)) : Number(e.target.value))}
       onDoubleClick={handleDoubleClick}
       disabled={locked || disabled}
       title={title}
@@ -92,21 +119,37 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
     </span>
   );
   const readoutEl = editing ? (
-    <input ref={inputRef} className="range-edit" type="text" value={editValue}
-      onChange={e => setEditValue(e.target.value)}
+    <input
+      ref={inputRef}
+      className="range-edit"
+      type="text"
+      value={editValue}
+      onChange={(e) => setEditValue(e.target.value)}
       onBlur={commitEdit}
-      onKeyDown={e => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false); }}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') commitEdit();
+        if (e.key === 'Escape') setEditing(false);
+      }}
     />
   ) : (
-    <span className="range-readout" onClick={startEdit} title="Click to type value">{readout ?? value}</span>
+    <span className="range-readout" onClick={startEdit} title="Click to type value">
+      {readout ?? value}
+    </span>
   );
 
   // label and readout above the slider
   if (layout === 'stack') {
     return (
-      <div className={`range-stack ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled range-waiting' : ''}`} data-tone={toneName} title={title}>
+      <div
+        className={`range-stack ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled range-waiting' : ''}`}
+        data-tone={toneName}
+        title={title}
+      >
         <div className="range-stack-head">
-          <div className="range-label-group">{lockButton}{labelEl}</div>
+          <div className="range-label-group">
+            {lockButton}
+            {labelEl}
+          </div>
           <div className="range-right">{readoutEl}</div>
         </div>
         {slider}
@@ -115,7 +158,11 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
   }
 
   return (
-    <div className={`range-row ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled' : ''}`} data-tone={toneName} title={title}>
+    <div
+      className={`range-row ${locked ? 'range-locked' : ''} ${disabled ? 'range-disabled' : ''}`}
+      data-tone={toneName}
+      title={title}
+    >
       <div className="range-label-group">
         {lockButton}
         {labelEl}
@@ -125,4 +172,3 @@ export function RangeRow({ label, value, min = 0, max = 100, step = 1, onChange,
     </div>
   );
 }
-

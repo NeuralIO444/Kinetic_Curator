@@ -46,9 +46,17 @@ export function FavoritesTray() {
   const openCard = useCallback((i, el) => {
     clearTimeout(cardTimer.current);
     const r = el.getBoundingClientRect();
-    setCard({ i, now: Date.now(), left: Math.max(4, Math.min(r.left, window.innerWidth - 238)), bottom: window.innerHeight - r.top + 6 });
+    setCard({
+      i,
+      now: Date.now(),
+      left: Math.max(4, Math.min(r.left, window.innerWidth - 238)),
+      bottom: window.innerHeight - r.top + 6,
+    });
   }, []);
-  const closeCard = useCallback(() => { clearTimeout(cardTimer.current); cardTimer.current = setTimeout(() => setCard(null), 160); }, []);
+  const closeCard = useCallback(() => {
+    clearTimeout(cardTimer.current);
+    cardTimer.current = setTimeout(() => setCard(null), 160);
+  }, []);
 
   // #534 — favorite-as-link: favorites carry the identical field set as
   // live state, so one shared function encodes them.
@@ -78,20 +86,29 @@ export function FavoritesTray() {
   const recall = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     // #966 — tap-to-jump: autoplay continues from the jumped-to hit.
-    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+    if (typeof i === 'number') {
+      setQueueIndex(i);
+      bumpQueueJump();
+    }
   }, []);
 
   const evolveFrom = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'recall', favorite: fav });
     emit(Events.DAVIS_EVOLVE, { mode: true });
     // #966 — tap-to-jump applies to shift-recall too.
-    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+    if (typeof i === 'number') {
+      setQueueIndex(i);
+      bumpQueueJump();
+    }
   }, []);
 
   const morphTo = useCallback((fav, i) => {
     emit(Events.DAVIS_FAVORITE, { action: 'morph', favorite: fav });
     // #966 — tap-to-jump applies to alt-morph too.
-    if (typeof i === 'number') { setQueueIndex(i); bumpQueueJump(); }
+    if (typeof i === 'number') {
+      setQueueIndex(i);
+      bumpQueueJump();
+    }
   }, []);
 
   const move = useCallback((fav, delta) => {
@@ -100,13 +117,16 @@ export function FavoritesTray() {
   }, []);
 
   // #1124 — drag a pill onto another to put it there: the reorder is a delta from where it is now, in the full list.
-  const dropOn = useCallback((targetId) => {
-    if (!dragId || !targetId || dragId === targetId) return;
-    const from = favorites.findIndex((x) => x.id === dragId);
-    const to = favorites.findIndex((x) => x.id === targetId);
-    if (from < 0 || to < 0) return;
-    emit(Events.DAVIS_FAVORITE, { action: 'reorder', id: dragId, delta: to - from });
-  }, [dragId, favorites]);
+  const dropOn = useCallback(
+    (targetId) => {
+      if (!dragId || !targetId || dragId === targetId) return;
+      const from = favorites.findIndex((x) => x.id === dragId);
+      const to = favorites.findIndex((x) => x.id === targetId);
+      if (from < 0 || to < 0) return;
+      emit(Events.DAVIS_FAVORITE, { action: 'reorder', id: dragId, delta: to - from });
+    },
+    [dragId, favorites],
+  );
 
   const advance = useCallback(() => {
     if (visible.length === 0) return;
@@ -115,50 +135,51 @@ export function FavoritesTray() {
     recall(visible[next], next);
   }, [visible, cur, recall]);
 
-  const onKeyDown = useCallback((e) => {
-    if (e.key >= '1' && e.key <= '9') {
-      const idx = parseInt(e.key, 10) - 1;
-      if (visible[idx]) {
-        e.preventDefault();
-        setCursor(idx);
-        recall(visible[idx], idx);
+  const onKeyDown = useCallback(
+    (e) => {
+      if (e.key >= '1' && e.key <= '9') {
+        const idx = parseInt(e.key, 10) - 1;
+        if (visible[idx]) {
+          e.preventDefault();
+          setCursor(idx);
+          recall(visible[idx], idx);
+        }
+        return;
       }
-      return;
-    }
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      advance();
-      return;
-    }
-    // Alt + arrow moves the hit under the cursor earlier / later in the setlist (the keyboard's drag)
-    if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && visible[cur]) {
-      e.preventDefault();
-      const delta = e.key === 'ArrowLeft' ? -1 : 1;
-      move(visible[cur], delta);
-      setCursor(Math.max(0, Math.min(visible.length - 1, cur + delta)));
-      return;
-    }
-    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
-      e.preventDefault();
-      advance();
-      return;
-    }
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
-      e.preventDefault();
-      if (visible.length === 0) return;
-      const next = (cur - 1 + visible.length) % visible.length;
-      setCursor(next);
-      recall(visible[next], next);
-    }
-  }, [visible, recall, advance, cur, move]);
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        advance();
+        return;
+      }
+      // Alt + arrow moves the hit under the cursor earlier / later in the setlist (the keyboard's drag)
+      if (e.altKey && (e.key === 'ArrowLeft' || e.key === 'ArrowRight') && visible[cur]) {
+        e.preventDefault();
+        const delta = e.key === 'ArrowLeft' ? -1 : 1;
+        move(visible[cur], delta);
+        setCursor(Math.max(0, Math.min(visible.length - 1, cur + delta)));
+        return;
+      }
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        advance();
+        return;
+      }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (visible.length === 0) return;
+        const next = (cur - 1 + visible.length) % visible.length;
+        setCursor(next);
+        recall(visible[next], next);
+      }
+    },
+    [visible, recall, advance, cur, move],
+  );
 
   if (visible.length === 0) {
     return (
       <div className="favorites-tray favorites-tray-empty" title="Press F to favorite a hit">
         <span className="favorites-tray-label ttl">hits</span>
-        <span className="favorites-tray-hint">
-          F to save · Enter advances setlist
-        </span>
+        <span className="favorites-tray-hint">F to save · Enter advances setlist</span>
       </div>
     );
   }
@@ -173,7 +194,11 @@ export function FavoritesTray() {
       aria-label="Favorite hits setlist"
     >
       <span className="favorites-tray-label ttl">hits</span>
-      {state.morphing && <span className="favorites-tray-hint lbl" style={{ color: 'var(--accent)' }}>morph…</span>}
+      {state.morphing && (
+        <span className="favorites-tray-hint lbl" style={{ color: 'var(--accent)' }}>
+          morph…
+        </span>
+      )}
       <div className="favorites-tray-chips">
         {visible.map((f, i) => {
           const isCurrent = f.seed === state.seed;
@@ -189,9 +214,20 @@ export function FavoritesTray() {
               data-playing={isQueueHit ? 'true' : undefined}
               draggable={!!f.id}
               data-dragging={dragId === f.id ? 'true' : undefined}
-              onDragStart={(e) => { if (!f.id) return; setDragId(f.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', f.id); }}
-              onDragOver={(e) => { if (dragId) e.preventDefault(); }}
-              onDrop={(e) => { e.preventDefault(); dropOn(f.id); setDragId(null); }}
+              onDragStart={(e) => {
+                if (!f.id) return;
+                setDragId(f.id);
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', f.id);
+              }}
+              onDragOver={(e) => {
+                if (dragId) e.preventDefault();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                dropOn(f.id);
+                setDragId(null);
+              }}
               onDragEnd={() => setDragId(null)}
               onMouseEnter={(e) => openCard(i, e.currentTarget)}
               onMouseLeave={closeCard}
@@ -215,55 +251,120 @@ export function FavoritesTray() {
                     renders (spec §5 marker law): provenance is on the
                     record, the mark is on the pill. */}
                 {f.provenance?.source === 'explorer' && (
-                  <span className="hit-mined" role="img" aria-label="mined keep"
-                    title={`mined keep — crowned from explorer run ${f.provenance.run ?? ''}`} />
+                  <span
+                    className="hit-mined"
+                    role="img"
+                    aria-label="mined keep"
+                    title={`mined keep — crowned from explorer run ${f.provenance.run ?? ''}`}
+                  />
                 )}
                 <span className="hit-bands" aria-hidden="true">
-                  {bands.c.map((c, k) => <span key={k} className="hit-band" style={{ background: c }} />)}
+                  {bands.c.map((c, k) => (
+                    <span key={k} className="hit-band" style={{ background: c }} />
+                  ))}
                   <span className={`hit-band heat h${bands.h}`} />
                 </span>
               </button>
               <span className="hit-pill-sep" aria-hidden="true" />
-              <button type="button" className="hit-pill-act" aria-label={`Duplicate hit ${i + 1}`} title="Duplicate (a setlist copy, not a new keep)"
-                disabled={!f.id} onClick={() => emit(Events.DAVIS_FAVORITE, { action: 'duplicate', id: f.id })}>⧉</button>
-              <button type="button" className="hit-pill-act del" aria-label={`Delete hit ${i + 1}`} title="Remove from the setlist (the keep stays)"
-                disabled={!f.id} onClick={() => emit(Events.DAVIS_FAVORITE_REMOVE, { id: f.id })}>×</button>
-              <span className="hit-pill-grip" aria-hidden="true" title="Drag to reorder (Alt+Left/Right from the keyboard)">⋮⋮</span>
+              <button
+                type="button"
+                className="hit-pill-act"
+                aria-label={`Duplicate hit ${i + 1}`}
+                title="Duplicate (a setlist copy, not a new keep)"
+                disabled={!f.id}
+                onClick={() => emit(Events.DAVIS_FAVORITE, { action: 'duplicate', id: f.id })}
+              >
+                ⧉
+              </button>
+              <button
+                type="button"
+                className="hit-pill-act del"
+                aria-label={`Delete hit ${i + 1}`}
+                title="Remove from the setlist (the keep stays)"
+                disabled={!f.id}
+                onClick={() => emit(Events.DAVIS_FAVORITE_REMOVE, { id: f.id })}
+              >
+                ×
+              </button>
+              <span
+                className="hit-pill-grip"
+                aria-hidden="true"
+                title="Drag to reorder (Alt+Left/Right from the keyboard)"
+              >
+                ⋮⋮
+              </span>
             </div>
           );
         })}
       </div>
       {/* every pill at once: the confirm states the count and that the keeps stay (components/hitsCopy.mjs) */}
-      <button type="button" className="favorites-tray-clear micro-btn" aria-label={`Clear all ${favorites.length} hits`}
+      <button
+        type="button"
+        className="favorites-tray-clear micro-btn"
+        aria-label={`Clear all ${favorites.length} hits`}
         title="Clear every hit from the setlist (your keeps stay)"
-        onClick={() => { if (window.confirm(confirmClearHitsMessage(favorites.length))) emit(Events.DAVIS_FAVORITE, { action: 'clear' }); }}>
+        onClick={() => {
+          if (window.confirm(confirmClearHitsMessage(favorites.length)))
+            emit(Events.DAVIS_FAVORITE, { action: 'clear' });
+        }}
+      >
         clear
       </button>
-      {card && visible[card.i] && (() => {
-        const f = visible[card.i];
-        const key = f.id ?? `${f.seed}-${f.timestamp || ''}`;
-        const nm = hitName(f.seed);
-        const bands = bandsFor(f, userPalettes);
-        const age = hitAge(parseFavoriteTimestamp(f.timestamp), card.now);
-        return createPortal(
-          <div className="hit-detail" role="group" aria-label={`Hit ${card.i + 1} details`}
-            style={{ left: card.left, bottom: card.bottom }}
-            onMouseEnter={() => clearTimeout(cardTimer.current)} onMouseLeave={closeCard}>
-            <div className="hit-detail-name">{nm.full}</div>
-            <div className="hit-detail-seed">seed {nm.hex}{age ? ` · captured ${age}` : ''}</div>
-            <ul className="hit-detail-legend">
-              {bands.c.map((c, k) => <li key={k}><i style={{ background: c }} />palette {k + 1}</li>)}
-              <li><i className={`heat h${bands.h}`} />{hasFrozenBands(f) ? `heat ${bands.h}/3 at capture` : 'heat not recorded — kept before bands'}</li>
-            </ul>
-            <div className="hit-detail-more">
-              <button type="button" onClick={() => copyLink(f)}>{copiedKey === key ? '✓ copied' : copyFailedKey === key ? "couldn't copy the link" : '⧉ share'}</button>
-              <button type="button" onClick={() => { setCursor(card.i); morphTo(f, card.i); }}>↔ morph</button>
-              <button type="button" onClick={() => evolveFrom(f, card.i)}>↻ evolve</button>
-            </div>
-          </div>,
-          document.body,
-        );
-      })()}
+      {card &&
+        visible[card.i] &&
+        (() => {
+          const f = visible[card.i];
+          const key = f.id ?? `${f.seed}-${f.timestamp || ''}`;
+          const nm = hitName(f.seed);
+          const bands = bandsFor(f, userPalettes);
+          const age = hitAge(parseFavoriteTimestamp(f.timestamp), card.now);
+          return createPortal(
+            <div
+              className="hit-detail"
+              role="group"
+              aria-label={`Hit ${card.i + 1} details`}
+              style={{ left: card.left, bottom: card.bottom }}
+              onMouseEnter={() => clearTimeout(cardTimer.current)}
+              onMouseLeave={closeCard}
+            >
+              <div className="hit-detail-name">{nm.full}</div>
+              <div className="hit-detail-seed">
+                seed {nm.hex}
+                {age ? ` · captured ${age}` : ''}
+              </div>
+              <ul className="hit-detail-legend">
+                {bands.c.map((c, k) => (
+                  <li key={k}>
+                    <i style={{ background: c }} />
+                    palette {k + 1}
+                  </li>
+                ))}
+                <li>
+                  <i className={`heat h${bands.h}`} />
+                  {hasFrozenBands(f) ? `heat ${bands.h}/3 at capture` : 'heat not recorded — kept before bands'}
+                </li>
+              </ul>
+              <div className="hit-detail-more">
+                <button type="button" onClick={() => copyLink(f)}>
+                  {copiedKey === key ? '✓ copied' : copyFailedKey === key ? "couldn't copy the link" : '⧉ share'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCursor(card.i);
+                    morphTo(f, card.i);
+                  }}
+                >
+                  ↔ morph
+                </button>
+                <button type="button" onClick={() => evolveFrom(f, card.i)}>
+                  ↻ evolve
+                </button>
+              </div>
+            </div>,
+            document.body,
+          );
+        })()}
     </div>
   );
 }

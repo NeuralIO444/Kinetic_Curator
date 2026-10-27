@@ -10,7 +10,8 @@
 
 /** @returns {{mode:'reveal'|'swap', head:string, tail:string, shortN:number, fullN:number}} */
 export function splitLabel(short, full) {
-  const s = String(short ?? ''); const f = String(full ?? '');
+  const s = String(short ?? '');
+  const f = String(full ?? '');
   const reveal = f.length > s.length && f.toLowerCase().startsWith(s.toLowerCase());
   return {
     mode: reveal ? 'reveal' : 'swap',

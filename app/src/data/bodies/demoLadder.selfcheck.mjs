@@ -1,7 +1,11 @@
 import assert from 'node:assert';
 import {
-  DEMO_LADDER_ID, DEMO_LADDER_STEPS, MOTH_LADDERS,
-  ladderById, ladderFrame, ladderSymbolId,
+  DEMO_LADDER_ID,
+  DEMO_LADDER_STEPS,
+  MOTH_LADDERS,
+  ladderById,
+  ladderFrame,
+  ladderSymbolId,
 } from './demoLadder.js';
 
 // Original single-ladder contract (#119 / #125) is unchanged.
@@ -15,11 +19,17 @@ assert.ok(!DEMO_LADDER_STEPS.some((s) => /<script/i.test(s)));
 
 // #109A — second ladder pair-2 (org_lobe_01 → org_petal_03), same pipeline.
 assert.strictEqual(MOTH_LADDERS.length, 2);
-assert.deepStrictEqual(MOTH_LADDERS.map((l) => l.id), ['wing-open', 'pair-2']);
+assert.deepStrictEqual(
+  MOTH_LADDERS.map((l) => l.id),
+  ['wing-open', 'pair-2'],
+);
 for (const ladder of MOTH_LADDERS) {
   assert.strictEqual(ladder.steps.length, 5, ladder.id);
   assert.ok(!ladder.steps.some((s) => /<script/i.test(s)), ladder.id);
-  assert.ok(ladder.steps.every((s) => s.includes('var(--ink)')), `${ladder.id} keeps var(--ink) paint`);
+  assert.ok(
+    ladder.steps.every((s) => s.includes('var(--ink)')),
+    `${ladder.id} keeps var(--ink) paint`,
+  );
 }
 assert.notStrictEqual(MOTH_LADDERS[0].steps[0], MOTH_LADDERS[1].steps[0], 'ladders differ');
 // ladderFrame selects per-ladder, clamps like before, falls back on bad id.
