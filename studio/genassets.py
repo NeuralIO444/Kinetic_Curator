@@ -214,7 +214,7 @@ def cmd_gate(a) -> None:
     pngs = [str(p) for _, p in pairs]
 
     emb = embed_images(pngs, a.clip_model, a.pretrained, log=lambda *_: None)
-    m = np.load(a.model, allow_pickle=True)
+    m = np.load(a.model, allow_pickle=False)
     w, b = m["w"], float(m["b"])
     scores = emb @ w + b
 
