@@ -46,11 +46,19 @@ pub struct MediaEngineStatus {
 
 // ── Helper: NSString from Rust str ───────────────────────────────────
 
+// #1744 part 6: `+stringWithBytes:length:encoding:` is not a documented NSString class method (it happened to
+// resolve on current macOS). The documented pair is alloc + `-initWithBytes:length:encoding:`; autorelease keeps
+// the old ownership (every caller treats the result as autoreleased, like any `+string…` convenience constructor).
 pub(crate) unsafe fn ns_string(s: &str) -> *mut Object {
     let cls = class!(NSString);
     let bytes = s.as_ptr();
     let len = s.len();
-    msg_send![cls, stringWithBytes:bytes length:len encoding:4usize] // NSUTF8StringEncoding = 4
+    let raw: *mut Object = msg_send![cls, alloc];
+    let ns: *mut Object = msg_send![raw, initWithBytes:bytes length:len encoding:4usize]; // NSUTF8StringEncoding = 4
+    if ns.is_null() {
+        return ns;
+    }
+    msg_send![ns, autorelease]
 }
 
 // ── Helper: NSNumber from i32 ────────────────────────────────────────
