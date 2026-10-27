@@ -3,18 +3,28 @@
 import { test, expect } from '@playwright/test';
 
 async function openHelp(page) {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.keyboard.press('?');
   await expect(page.locator('.hotkey-card')).toBeVisible();
 }
 
-for (const [w, h] of [[1280, 720], [1920, 1080], [900, 600]]) {
+for (const [w, h] of [
+  [1280, 720],
+  [1920, 1080],
+  [900, 600],
+]) {
   test(`the card is ~70% of a ${w}x${h} viewport, fits, and every row and tab is 44px`, async ({ page }) => {
     await page.setViewportSize({ width: w, height: h });
     await openHelp(page);
-    const card = (await page.locator('.hotkey-card').boundingBox());
+    const card = await page.locator('.hotkey-card').boundingBox();
     expect(card.width, 'about 70% wide').toBeGreaterThanOrEqual(Math.min(560, w * 0.92) - 1);
     expect(card.width).toBeLessThanOrEqual(w * 0.92 + 1);
     expect(Math.abs(card.width - w * 0.7), 'width tracks the viewport').toBeLessThan(w >= 1000 ? 4 : w * 0.25);
@@ -25,9 +35,13 @@ for (const [w, h] of [[1280, 720], [1920, 1080], [900, 600]]) {
     expect(card.height).toBeLessThanOrEqual(h * 0.9 + 1);
     for (const tab of ['help', 'keys', 'settings', 'about']) {
       await page.locator('.hotkey-tabs').getByRole('tab', { name: tab }).click();
-      const tabs = await page.locator('.hotkey-tabs [role=tab]').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      const tabs = await page
+        .locator('.hotkey-tabs [role=tab]')
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
       for (const t of tabs) expect(t, `tab height on ${tab}`).toBeGreaterThanOrEqual(43.5);
-      const rows = await page.locator('.hotkey-row, .hotkey-link').evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
+      const rows = await page
+        .locator('.hotkey-row, .hotkey-link')
+        .evaluateAll((els) => els.map((e) => e.getBoundingClientRect().height));
       for (const r of rows) expect(r, `row height on ${tab}`).toBeGreaterThanOrEqual(43.5);
     }
   });
@@ -36,9 +50,15 @@ for (const [w, h] of [[1280, 720], [1920, 1080], [900, 600]]) {
 test('type scales up with the card', async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 720 });
   await openHelp(page);
-  const small = await page.locator('.hotkey-row .hotkey-desc, .hotkey-row').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const small = await page
+    .locator('.hotkey-row .hotkey-desc, .hotkey-row')
+    .first()
+    .evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
   await page.setViewportSize({ width: 2560, height: 1440 });
-  const big = await page.locator('.hotkey-row .hotkey-desc, .hotkey-row').first().evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
+  const big = await page
+    .locator('.hotkey-row .hotkey-desc, .hotkey-row')
+    .first()
+    .evaluate((e) => parseFloat(getComputedStyle(e).fontSize));
   expect(small).toBeGreaterThanOrEqual(13);
   expect(big).toBeGreaterThan(small);
 });
@@ -47,7 +67,12 @@ test('the card has no shadow, no radius and no inline style; the scrim keeps its
   await openHelp(page);
   const card = await page.locator('.hotkey-card').evaluate((e) => {
     const cs = getComputedStyle(e);
-    return { shadow: cs.boxShadow, radius: cs.borderRadius, inline: [...e.querySelectorAll('[style]')].length + (e.getAttribute('style') ? 1 : 0), border: cs.borderTopWidth };
+    return {
+      shadow: cs.boxShadow,
+      radius: cs.borderRadius,
+      inline: [...e.querySelectorAll('[style]')].length + (e.getAttribute('style') ? 1 : 0),
+      border: cs.borderTopWidth,
+    };
   });
   expect(card.shadow).toBe('none');
   expect(card.radius).toBe('0px');
@@ -71,8 +96,11 @@ test('About: exact name, mailto email and https links, a photo, no emoji', async
   await expect(web).toHaveAttribute('rel', /noreferrer/);
   const hrefs = await page.locator('.hotkey-about a').evaluateAll((els) => els.map((e) => e.getAttribute('href')));
   expect(hrefs).toEqual([
-    'https://www.mattciaglia.com/', 'mailto:neural_io_444@icloud.com', 'https://www.instagram.com/prismthief',
-    'https://github.com/NeuralIO444', 'https://blockwalk.io',
+    'https://www.mattciaglia.com/',
+    'mailto:neural_io_444@icloud.com',
+    'https://www.instagram.com/prismthief',
+    'https://github.com/NeuralIO444',
+    'https://blockwalk.io',
   ]);
   const img = page.locator('.hotkey-about-photo');
   await expect(img).toBeVisible();

@@ -38,7 +38,10 @@ const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] };
 function run(Cls, mode, count, steps, attractor, extra = {}) {
   const sys = new Cls();
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode, particleCount: count, ...extra,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode,
+    particleCount: count,
+    ...extra,
   });
   sys.init(count, 1000, 700, assets, palette, 0x1a4f);
   for (let s = 0; s < steps; s++) {
@@ -55,10 +58,10 @@ function assertSameSwarm(got, want, label) {
     for (const f of FIELDS) {
       assert.ok(
         Object.is(got[i][f], want[i][f]),
-        `${label}: item[${i}].${f} — SoA ${got[i][f]} vs pre-SoA reference ${want[i][f]}.\n`
-        + '  The rewrite changed behaviour. Look for a reordered neighbour visit\n'
-        + '  or a rewritten arithmetic expression (f/mass vs f*(1/mass),\n'
-        + '  x/cellSize vs x*(1/cellSize)) — do not relax this assertion.',
+        `${label}: item[${i}].${f} — SoA ${got[i][f]} vs pre-SoA reference ${want[i][f]}.\n` +
+          '  The rewrite changed behaviour. Look for a reordered neighbour visit\n' +
+          '  or a rewritten arithmetic expression (f/mass vs f*(1/mass),\n' +
+          '  x/cellSize vs x*(1/cellSize)) — do not relax this assertion.',
       );
     }
     assert.strictEqual(got[i].asset?.id, want[i].asset?.id, `${label}: item[${i}].asset`);
@@ -89,7 +92,11 @@ for (const [name, args] of CASES) {
 {
   const sys = new ParticleSystem();
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 120, wind: 3, damping: 0.99,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'swarm',
+    particleCount: 120,
+    wind: 3,
+    damping: 0.99,
   });
   sys.init(120, 1000, 700, assets, palette, 0x1a4f);
   for (let s = 0; s < 150; s++) {
@@ -143,9 +150,15 @@ for (const [name, args] of CASES) {
   const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', particleCount: 30 });
   sys.init(30, 1000, 700, assets, palette, 0x1a4f);
   for (let s = 0; s < 20; s++) sys.update(lp, assets, palette, 0x1a4f, 1_000_000 + s * 16, null);
-  assert.ok(Array.from(sys.phase.subarray(0, sys.n)).some((p) => p !== 0), 'phase should advance');
+  assert.ok(
+    Array.from(sys.phase.subarray(0, sys.n)).some((p) => p !== 0),
+    'phase should advance',
+  );
   sys.resetPhase();
-  assert.ok(Array.from(sys.phase.subarray(0, sys.n)).every((p) => p === 0), 'resetPhase must clear');
+  assert.ok(
+    Array.from(sys.phase.subarray(0, sys.n)).every((p) => p === 0),
+    'resetPhase must clear',
+  );
 }
 
 // #509 phase 1 — MOD steering: identity is byte-identical, active bends.
@@ -164,13 +177,17 @@ for (const [name, args] of CASES) {
   const ident = run({ ali: 1, coh: 1, sep: 1 });
   assert.strictEqual(ident.length, base.length, 'steer identity keeps item count');
   for (let i = 0; i < base.length; i++) {
-    assert.ok(Object.is(ident[i].x, base[i].x) && Object.is(ident[i].y, base[i].y),
-      `identity steer must be byte-identical (item ${i})`);
+    assert.ok(
+      Object.is(ident[i].x, base[i].x) && Object.is(ident[i].y, base[i].y),
+      `identity steer must be byte-identical (item ${i})`,
+    );
   }
   const bent = run({ ali: 2, coh: 2, sep: 0.5 });
   assert.strictEqual(bent.length, base.length, 'active steer keeps item count');
-  assert.ok(bent.some((it, i) => !Object.is(it.x, base[i].x) || !Object.is(it.y, base[i].y)),
-    'active steering must move particles off the unsteered path');
+  assert.ok(
+    bent.some((it, i) => !Object.is(it.x, base[i].x) || !Object.is(it.y, base[i].y)),
+    'active steering must move particles off the unsteered path',
+  );
   for (const it of bent) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'steered positions stay finite');
 }
 
@@ -196,9 +213,12 @@ for (const [name, args] of CASES) {
   const bShared = runMold(shared);
   const bIso = runMold(null);
   assert.strictEqual(bShared.length, bIso.length, 'shared vs isolated keep count');
-  assert.ok(bShared.some((it, i) => !Object.is(it.x, bIso[i].x) || !Object.is(it.y, bIso[i].y)),
-    'a cast on shared ground must diverge from the identical isolated cast');
-  for (const it of bShared) assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'shared-ground positions stay finite');
+  assert.ok(
+    bShared.some((it, i) => !Object.is(it.x, bIso[i].x) || !Object.is(it.y, bIso[i].y)),
+    'a cast on shared ground must diverge from the identical isolated cast',
+  );
+  for (const it of bShared)
+    assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y), 'shared-ground positions stay finite');
 }
 
 // #454 — a non-finite attractor (a zero-size canvas rect divides to
@@ -211,12 +231,18 @@ for (const [name, args] of CASES) {
 // ignores a non-finite attractor defensively. This test exercises the
 // particles.js guard directly, regardless of what upstream sends it.
 {
-  for (const attractor of [{ x: Infinity, y: Infinity }, { x: NaN, y: 300 }, { x: -Infinity, y: -Infinity }]) {
+  for (const attractor of [
+    { x: Infinity, y: Infinity },
+    { x: NaN, y: 300 },
+    { x: -Infinity, y: -Infinity },
+  ]) {
     const items = run(ParticleSystem, 'swarm', 60, 30, attractor);
     assert.ok(items.length > 0, 'a non-finite attractor must not empty the swarm');
     for (const it of items) {
-      assert.ok(Number.isFinite(it.x) && Number.isFinite(it.y),
-        `non-finite attractor ${JSON.stringify(attractor)} must not poison item positions (got x=${it.x}, y=${it.y})`);
+      assert.ok(
+        Number.isFinite(it.x) && Number.isFinite(it.y),
+        `non-finite attractor ${JSON.stringify(attractor)} must not poison item positions (got x=${it.x}, y=${it.y})`,
+      );
     }
   }
 }
@@ -229,28 +255,37 @@ for (const [name, args] of CASES) {
   // is a true no-op, not just "close enough".
   const plainCruise = run(ParticleSystem, 'hype', 20, steps, null, { behave: 'cruise' });
   const explicitNullCruise = run(ParticleSystem, 'hype', 20, steps, null, {
-    behave: 'cruise', behaveSep: null, behaveCoh: null,
+    behave: 'cruise',
+    behaveSep: null,
+    behaveCoh: null,
   });
   for (let i = 0; i < plainCruise.length; i++) {
-    assert.ok(Object.is(plainCruise[i].x, explicitNullCruise[i].x) && Object.is(plainCruise[i].y, explicitNullCruise[i].y),
-      `item ${i}: an explicit null override must be bit-identical to no override at all`);
+    assert.ok(
+      Object.is(plainCruise[i].x, explicitNullCruise[i].x) && Object.is(plainCruise[i].y, explicitNullCruise[i].y),
+      `item ${i}: an explicit null override must be bit-identical to no override at all`,
+    );
   }
   // Overriding sep/coh must visibly change the resulting motion — the
   // whole point of #479 Option B (a chip alone can't do this; only the
   // table row could, until now).
   const overridden = run(ParticleSystem, 'hype', 20, steps, null, {
-    behave: 'cruise', behaveSep: 5.9, behaveCoh: 1.8,
+    behave: 'cruise',
+    behaveSep: 5.9,
+    behaveCoh: 1.8,
   });
-  const moved = overridden.some((it, i) =>
-    Math.abs(it.x - plainCruise[i].x) > 1e-6 || Math.abs(it.y - plainCruise[i].y) > 1e-6);
+  const moved = overridden.some(
+    (it, i) => Math.abs(it.x - plainCruise[i].x) > 1e-6 || Math.abs(it.y - plainCruise[i].y) > 1e-6,
+  );
   assert.ok(moved, 'a BEHAVE weight override must visibly change swarm motion vs the unedited table row');
   // Cloud (non-organism) modes never read the profile at all -- an override
   // must be silently inert there, same as swarmCohesion already is for hype.
   const cloudPlain = run(ParticleSystem, 'swarm', 20, steps, null);
   const cloudOverridden = run(ParticleSystem, 'swarm', 20, steps, null, { behaveSep: 5.9, behaveCoh: 1.8 });
   for (let i = 0; i < cloudPlain.length; i++) {
-    assert.ok(Object.is(cloudPlain[i].x, cloudOverridden[i].x) && Object.is(cloudPlain[i].y, cloudOverridden[i].y),
-      `item ${i}: BEHAVE overrides must be inert in cloud/swarm mode (organism-only)`);
+    assert.ok(
+      Object.is(cloudPlain[i].x, cloudOverridden[i].x) && Object.is(cloudPlain[i].y, cloudOverridden[i].y),
+      `item ${i}: BEHAVE overrides must be inert in cloud/swarm mode (organism-only)`,
+    );
   }
 }
 

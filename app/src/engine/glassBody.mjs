@@ -56,6 +56,9 @@ export function glassAlphaFrom(layoutParams) {
 }
 
 registerCostTier('engine/glass-body', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1547: material glass body — one alpha multiply per placed instance at build time; engages the existing #1129 sort + shader glass terms, no new pass or texture',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1547: material glass body — one alpha multiply per placed instance at build time; engages the existing #1129 sort + shader glass terms, no new pass or texture',
 });

@@ -23,7 +23,11 @@ async function snap(page) {
 test.describe('UX-4 roll scope + BEAT master clock', () => {
   test.beforeEach(async ({ page }) => {
     await page.addInitScript(() => {
-      try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('kc:first-run-seen', '1');
+      } catch {
+        /* ignore */
+      }
       window.__KC_EXPOSE_STORE = true;
     });
     await page.goto('/?boot=factory');

@@ -98,13 +98,29 @@ const wrapDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 
 /** #1731 — reflect disc s inside [r, W−r] × [r, H−r]: mirror the position, flip the outward velocity. */
 export function reflectInBounds(sys, s, r, W, H) {
-  const lo = r; const hx = W - r; const hy = H - r;
+  const lo = r;
+  const hx = W - r;
+  const hy = H - r;
   if (!(hx > lo) || !(hy > lo)) return false;
   let hit = false;
-  if (sys.x[s] < lo) { sys.x[s] = 2 * lo - sys.x[s]; if (sys.vx[s] < 0) sys.vx[s] = -sys.vx[s]; hit = true; }
-  else if (sys.x[s] > hx) { sys.x[s] = 2 * hx - sys.x[s]; if (sys.vx[s] > 0) sys.vx[s] = -sys.vx[s]; hit = true; }
-  if (sys.y[s] < lo) { sys.y[s] = 2 * lo - sys.y[s]; if (sys.vy[s] < 0) sys.vy[s] = -sys.vy[s]; hit = true; }
-  else if (sys.y[s] > hy) { sys.y[s] = 2 * hy - sys.y[s]; if (sys.vy[s] > 0) sys.vy[s] = -sys.vy[s]; hit = true; }
+  if (sys.x[s] < lo) {
+    sys.x[s] = 2 * lo - sys.x[s];
+    if (sys.vx[s] < 0) sys.vx[s] = -sys.vx[s];
+    hit = true;
+  } else if (sys.x[s] > hx) {
+    sys.x[s] = 2 * hx - sys.x[s];
+    if (sys.vx[s] > 0) sys.vx[s] = -sys.vx[s];
+    hit = true;
+  }
+  if (sys.y[s] < lo) {
+    sys.y[s] = 2 * lo - sys.y[s];
+    if (sys.vy[s] < 0) sys.vy[s] = -sys.vy[s];
+    hit = true;
+  } else if (sys.y[s] > hy) {
+    sys.y[s] = 2 * hy - sys.y[s];
+    if (sys.vy[s] > 0) sys.vy[s] = -sys.vy[s];
+    hit = true;
+  }
   // a far overshoot (a pin dropped outside the stage) is clamped, never mirrored past the other side
   sys.x[s] = Math.min(hx, Math.max(lo, sys.x[s]));
   sys.y[s] = Math.min(hy, Math.max(lo, sys.y[s]));
@@ -160,7 +176,12 @@ function compoundLinks(radii) {
   const out = [];
   for (let i = 0; i < radii.length - 1; i++) out.push({ a: i, b: i + 1, rest: rests[i], stiffness: 1 });
   for (let i = 0; i < radii.length - 2; i++) {
-    out.push({ a: i, b: i + 2, rest: (rests[i] + rests[i + 1]) * DISH_CREATURE.braceRest, stiffness: DISH_CREATURE.braceStiffness });
+    out.push({
+      a: i,
+      b: i + 2,
+      rest: (rests[i] + rests[i + 1]) * DISH_CREATURE.braceRest,
+      stiffness: DISH_CREATURE.braceStiffness,
+    });
   }
   return out;
 }
@@ -188,7 +209,8 @@ function shade(hex, f) {
 /** Mix two #rrggbb colours, t of the second (slice 4: the slime drying toward the ink as the band dims). */
 function mixHex(a, b, t) {
   if (!(t > 0)) return a;
-  const ca = hexToRgb255(a); const cb = hexToRgb255(b);
+  const ca = hexToRgb255(a);
+  const cb = hexToRgb255(b);
   const k = Math.min(1, t);
   return rgb255ToHex([0, 1, 2].map((i) => Math.round(ca[i] + (cb[i] - ca[i]) * k)));
 }
@@ -210,7 +232,12 @@ function limbLinks(limbIndex, headR, limbRadii) {
   // The body's own trick, reused: skip-one braces hold the chain's extension (a fold compresses a brace
   // and the solver pushes back), and one brace from the head holds the root segment's line.
   for (let k = 0; k < LIMB_N - 2; k++) {
-    out.push({ a: base + k, b: base + k + 2, rest: (chain[k] + chain[k + 1]) * DISH_CREATURE.braceRest, stiffness: DISH_CREATURE.braceStiffness });
+    out.push({
+      a: base + k,
+      b: base + k + 2,
+      rest: (chain[k] + chain[k + 1]) * DISH_CREATURE.braceRest,
+      stiffness: DISH_CREATURE.braceStiffness,
+    });
   }
   out.push({ a: 0, b: base + 1, rest: (rootRest + chain[0]) * DISH_CREATURE.braceRest, stiffness: 0.7 });
   return out;
@@ -227,9 +254,22 @@ function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits, rawGenome = n
   const genome = rawGenome ? sanitizeGenome(rawGenome) : null;
   let alife = null;
   if (genome) {
-    const pstw = new Float64Array(POLICY_SIZE); const pltw = new Float64Array(POLICY_SIZE); const pelig = new Float64Array(POLICY_SIZE);
+    const pstw = new Float64Array(POLICY_SIZE);
+    const pltw = new Float64Array(POLICY_SIZE);
+    const pelig = new Float64Array(POLICY_SIZE);
     rehearseInstincts({ stw: pstw, ltw: pltw, elig: pelig }, expressGenome(genome, 0).instincts, HATCH_PASSES);
-    alife = { genome, genomeJson: JSON.stringify(rawGenome), chem: createChem(), pstw, pltw, pelig, mode: REST_MODE, modeChanged: false, keeps: null, flare: 0 };
+    alife = {
+      genome,
+      genomeJson: JSON.stringify(rawGenome),
+      chem: createChem(),
+      pstw,
+      pltw,
+      pelig,
+      mode: REST_MODE,
+      modeChanged: false,
+      keeps: null,
+      flare: 0,
+    };
   }
   // Slice 4 — Davis's stamp, taken once, here: body scales the radii the compound is declared from,
   // swatch shifts the colour ranks. The defaults are exactly the unstamped animal.
@@ -238,17 +278,24 @@ function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits, rawGenome = n
   const limbRadii = DISH_LIMB_RADII.map((r) => r * tr.body);
   const rests = radii.slice(1).map((r, i) => (radii[i] + r) * DISH_CREATURE.restOverlap);
   const ang = hashU01(seed >>> 0, 'dishbody', pinIndex) * TAU; // the seeded direction the spine trails at birth
-  const dx = Math.cos(ang); const dy = Math.sin(ang);
+  const dx = Math.cos(ang);
+  const dy = Math.sin(ang);
   const nSlots = N_DISCS + limbDirs.length * LIMB_N;
-  const x = new Float64Array(nSlots); const y = new Float64Array(nSlots);
+  const x = new Float64Array(nSlots);
+  const y = new Float64Array(nSlots);
   let back = 0;
   for (let k = 0; k < N_DISCS; k++) {
     if (k > 0) back += rests[k - 1];
-    x[k] = pin.x - dx * back; y[k] = pin.y - dy * back;
+    x[k] = pin.x - dx * back;
+    y[k] = pin.y - dy * back;
   }
-  for (let s = N_DISCS; s < nSlots; s++) { x[s] = pin.x; y[s] = pin.y; } // unborn limb discs wait at the pin
+  for (let s = N_DISCS; s < nSlots; s++) {
+    x[s] = pin.x;
+    y[s] = pin.y;
+  } // unborn limb discs wait at the pin
   const mass = new Float64Array(nSlots);
-  for (let s = 0; s < nSlots; s++) mass[s] = s === 0 ? DISH_CREATURE.headMass : s < N_DISCS ? 1 : DISH_CREATURE.limbMass;
+  for (let s = 0; s < nSlots; s++)
+    mass[s] = s === 0 ? DISH_CREATURE.headMass : s < N_DISCS ? 1 : DISH_CREATURE.limbMass;
   let links = compoundLinks(radii);
   if (limbDirs.length) {
     links = links.slice();
@@ -256,13 +303,26 @@ function birthState(seed, pinIndex, pin, limbDirs, sig, rawTraits, rawGenome = n
   }
   return {
     ...(alife || {}),
-    pinX: pin.x, pinY: pin.y, age: 0, headingDeg: (ang * 180) / Math.PI + 180, sig, links,
-    radii, limbRadii, swatch: tr.swatch,
-    limbDirs, grown: new Float64Array(limbDirs.length), // per limb: growth 0..1, toward the pressure target
+    pinX: pin.x,
+    pinY: pin.y,
+    age: 0,
+    headingDeg: (ang * 180) / Math.PI + 180,
+    sig,
+    links,
+    radii,
+    limbRadii,
+    swatch: tr.swatch,
+    limbDirs,
+    grown: new Float64Array(limbDirs.length), // per limb: growth 0..1, toward the pressure target
     sys: {
-      n: nSlots, x, y,
-      vx: new Float64Array(nSlots), vy: new Float64Array(nSlots),
-      mass, alive: new Uint8Array(nSlots), spine: Array.from({ length: nSlots }, () => []),
+      n: nSlots,
+      x,
+      y,
+      vx: new Float64Array(nSlots),
+      vy: new Float64Array(nSlots),
+      mass,
+      alive: new Uint8Array(nSlots),
+      spine: Array.from({ length: nSlots }, () => []),
     },
   };
 }
@@ -284,7 +344,8 @@ export function dishLimbDirs(pool, assetAttach) {
   const out = [];
   for (const p of pts) {
     if (!p || p.role !== 'L' || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-    const dx = p.x - 50; const dy = p.y - 50;
+    const dx = p.x - 50;
+    const dy = p.y - 50;
     const m = Math.hypot(dx, dy);
     out.push(m > 1 ? { x: dx / m, y: dy / m } : { x: 0, y: 1 });
   }
@@ -302,7 +363,12 @@ export function dishLimbDirs(pool, assetAttach) {
 // codec (recognised on restore by the record's {kind, length, b64} shape), everything
 // else deep-copies as JSON data. Restore builds a whole new state or returns null —
 // the caller's swap is the commit point, so a refused restore changes nothing.
-const isCodecRecord = (v) => v != null && typeof v === 'object' && typeof v.b64 === 'string' && Number.isInteger(v.length) && typeof v.kind === 'string';
+const isCodecRecord = (v) =>
+  v != null &&
+  typeof v === 'object' &&
+  typeof v.b64 === 'string' &&
+  Number.isInteger(v.length) &&
+  typeof v.kind === 'string';
 const deepCopyData = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
 
 function snapDishCreatureState(st) {
@@ -353,7 +419,8 @@ export function createDishCreatureBuilder() {
 
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
-      const myFrame = frame; frame += 1; // every resolver frame counts, even one that appends nothing
+      const myFrame = frame;
+      frame += 1; // every resolver frame counts, even one that appends nothing
       frameBodies = [];
       const pins = input && input.dishPins;
       const formed = input && input.dishFormed;
@@ -365,13 +432,22 @@ export function createDishCreatureBuilder() {
       let top = null;
       for (let i = entries.length - 1; i >= 0; i--) {
         const e = entries[i];
-        if (e && !e.isFx && !e.isPattern && Array.isArray(e.items)) { top = e; break; }
+        if (e && !e.isFx && !e.isPattern && Array.isArray(e.items)) {
+          top = e;
+          break;
+        }
       }
-      if (!top) { states.length = 0; return; }
+      if (!top) {
+        states.length = 0;
+        return;
+      }
       const pal = top.palette || {};
       const swatches = pal.swatches || [];
       const ink = typeof pal.ink === 'string' ? pal.ink : '#101418';
-      const ranked = swatches.map((c, n) => ({ c, n })).sort((a, b) => chroma(b.c) - chroma(a.c) || a.n - b.n).map((e) => e.c);
+      const ranked = swatches
+        .map((c, n) => ({ c, n }))
+        .sort((a, b) => chroma(b.c) - chroma(a.c) || a.n - b.n)
+        .map((e) => e.c);
       const pick = (r) => ranked[Math.min(ranked.length - 1, Math.max(0, r))] || ink;
       // Slime's colours, all from the palette (the 4x4x4 discipline: no ad-hoc picks): the head wears the
       // most vivid swatch, the spine the next rank down; shades are derived from those two, never chosen.
@@ -398,13 +474,21 @@ export function createDishCreatureBuilder() {
       const SW = Number.isFinite(input.canvasW) && input.canvasW > 0 ? input.canvasW : 0;
       const SH = Number.isFinite(input.canvasH) && input.canvasH > 0 ? input.canvasH : 0;
       const boundsOn = !!input.creatureBounds && SW > 0 && SH > 0;
-      const FW = SW || 1000; const FH = SH || 1000; // the flow's frame (an input without a canvas reads the default stage)
-      const attr = facingOn && input.attractor && Number.isFinite(input.attractor.x) && Number.isFinite(input.attractor.y) ? input.attractor : null;
+      const FW = SW || 1000;
+      const FH = SH || 1000; // the flow's frame (an input without a canvas reads the default stage)
+      const attr =
+        facingOn && input.attractor && Number.isFinite(input.attractor.x) && Number.isFinite(input.attractor.y)
+          ? input.attractor
+          : null;
       const extra = [];
       for (let i = 0; i < pins.length; i++) {
         const pin = pins[i];
         const live = !!(hosted[i] && formed[i] && pin && Number.isFinite(pin.x) && Number.isFinite(pin.y));
-        if (!live) { states[i] = null; frameBodies[i] = null; continue; }
+        if (!live) {
+          states[i] = null;
+          frameBodies[i] = null;
+          continue;
+        }
         let st = states[i];
         const rawGenome = genomesIn && genomesIn[i] ? genomesIn[i] : null;
         const gJson = rawGenome ? JSON.stringify(rawGenome) : null;
@@ -436,7 +520,10 @@ export function createDishCreatureBuilder() {
           reinforce(pol, made.reward, made.punishment);
           if (input.slowRender) rehearseInstincts(pol, ex.instincts, 1);
           const cell = cellFor({ band: input.band, pressure, alignment: st.alignment || 0 });
-          const m = st.age <= HATCH_FRAMES ? REST_MODE : chooseMode(pol, cell, { seed: input.seed, key: i, tick: st.age / CHEM_TICK_FRAMES, temper: ex.temper });
+          const m =
+            st.age <= HATCH_FRAMES
+              ? REST_MODE
+              : chooseMode(pol, cell, { seed: input.seed, key: i, tick: st.age / CHEM_TICK_FRAMES, temper: ex.temper });
           st.modeChanged = m !== st.mode;
           st.mode = m;
         }
@@ -466,35 +553,53 @@ export function createDishCreatureBuilder() {
         const cosH = Math.cos((st.headingDeg * Math.PI) / 180);
         const sinH = Math.sin((st.headingDeg * Math.PI) / 180);
         for (let s = 0; s < sys.n; s++) {
-          if (!sys.alive[s]) { sys.x[s] = sys.x[0]; sys.y[s] = sys.y[0]; sys.vx[s] = 0; sys.vy[s] = 0; continue; }
-          if (s === 0) { /* the head: steered above */ }
-          else if (s < N_DISCS) { sys.vx[s] *= DISH_CREATURE.bodyDamp; sys.vy[s] *= DISH_CREATURE.bodyDamp; }
-          else {
-            const j = ((s - N_DISCS) / LIMB_N) | 0; const k = (s - N_DISCS) % LIMB_N;
+          if (!sys.alive[s]) {
+            sys.x[s] = sys.x[0];
+            sys.y[s] = sys.y[0];
+            sys.vx[s] = 0;
+            sys.vy[s] = 0;
+            continue;
+          }
+          if (s === 0) {
+            /* the head: steered above */
+          } else if (s < N_DISCS) {
+            sys.vx[s] *= DISH_CREATURE.bodyDamp;
+            sys.vy[s] *= DISH_CREATURE.bodyDamp;
+          } else {
+            const j = ((s - N_DISCS) / LIMB_N) | 0;
+            const k = (s - N_DISCS) % LIMB_N;
             if (k === 0) {
               const d = st.limbDirs[j];
               const ax = sys.x[0] + (d.x * cosH - d.y * sinH) * st.radii[0] * DISH_CREATURE.anchorEmbed;
               const ay = sys.y[0] + (d.x * sinH + d.y * cosH) * st.radii[0] * DISH_CREATURE.anchorEmbed;
               sys.vx[s] = (sys.vx[s] + (ax - sys.x[s]) * DISH_CREATURE.limbRootPull) * DISH_CREATURE.limbRootDamp;
               sys.vy[s] = (sys.vy[s] + (ay - sys.y[s]) * DISH_CREATURE.limbRootPull) * DISH_CREATURE.limbRootDamp;
-            } else { sys.vx[s] *= DISH_CREATURE.limbDamp; sys.vy[s] *= DISH_CREATURE.limbDamp; }
+            } else {
+              sys.vx[s] *= DISH_CREATURE.limbDamp;
+              sys.vy[s] *= DISH_CREATURE.limbDamp;
+            }
           }
-          sys.x[s] += sys.vx[s]; sys.y[s] += sys.vy[s];
-          if (boundsOn) reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH); // #1731
+          sys.x[s] += sys.vx[s];
+          sys.y[s] += sys.vy[s];
+          if (boundsOn)
+            reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH); // #1731
         }
         // SOLVE: D3's XPBD pass over the declared compound (body links + this state's limb links).
         // It folds its corrections back into velocity.
         solveDishLinks(sys, st.links, 1);
         if (boundsOn) {
           // #1731 — the solve can push a disc back across the edge: reflect again, so nothing ends the frame outside.
-          for (let s = 0; s < sys.n; s++) if (sys.alive[s]) reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH);
+          for (let s = 0; s < sys.n; s++)
+            if (sys.alive[s])
+              reflectInBounds(sys, s, s < N_DISCS ? st.radii[s] : st.limbRadii[(s - N_DISCS) % LIMB_N], SW, SH);
         }
         // Heading: where the head is going, else where the spine says it faces. Turned toward, never snapped.
         const speed = Math.hypot(sys.vx[0], sys.vy[0]);
         let target = st.headingDeg;
         if (speed > 0.05) target = (Math.atan2(sys.vy[0], sys.vx[0]) * 180) / Math.PI;
         else if (sys.alive[1]) target = (Math.atan2(sys.y[0] - sys.y[1], sys.x[0] - sys.x[1]) * 180) / Math.PI;
-        let flowDeg = 0; let flowW = 0;
+        let flowDeg = 0;
+        let flowW = 0;
         if (facingOn) {
           // #1732 — facing: turn the target toward the flow (as strongly as the flow is strong), then toward the attractor.
           const mag = Math.hypot(flow.x, flow.y);
@@ -505,7 +610,10 @@ export function createDishCreatureBuilder() {
           }
           if (attr) {
             const ad = Math.hypot(attr.x - sys.x[0], attr.y - sys.y[0]);
-            if (ad > 1e-6) target += wrapDeg((Math.atan2(attr.y - sys.y[0], attr.x - sys.x[0]) * 180) / Math.PI - target) * FACING.attractTurn;
+            if (ad > 1e-6)
+              target +=
+                wrapDeg((Math.atan2(attr.y - sys.y[0], attr.x - sys.x[0]) * 180) / Math.PI - target) *
+                FACING.attractTurn;
           }
         }
         let turn = ((target - st.headingDeg + 540) % 360) - 180;
@@ -515,7 +623,9 @@ export function createDishCreatureBuilder() {
         // DRAW: three items a disc — a deepened underlay (the wet rim), the body, a bright core (the gloss) —
         // plus the head's eye. All _creature, so the animal never feeds the crowd that formed it.
         // #1735 — an ALife creature wears its chemistry on top of the band's material; a hatching one is dim, eyes shut.
-        let pinScale = matScale; let pinDryT = dryT; let pinCore = coreAlpha;
+        let pinScale = matScale;
+        let pinDryT = dryT;
+        let pinCore = coreAlpha;
         const hatching = !!pol && st.age <= HATCH_FRAMES;
         if (pol) {
           const cm = materialFor(st.chem);
@@ -533,22 +643,45 @@ export function createDishCreatureBuilder() {
           const base = k === 0 ? headBase : bodyBase;
           const [wet] = gt.recolor(base, ink);
           const color = mixHex(wet, ink, pinDryT); // slice 4: the band dries the slime toward the ink
-          const s = (2 * st.radii[k] / 100) * g * hover.scale * pinScale;
-          const rot = k === 0 ? st.headingDeg : (Math.atan2(sys.y[k] - sys.y[k - 1], sys.x[k] - sys.x[k - 1]) * 180) / Math.PI;
-          const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
-            x: sys.x[k] + ox, y: sys.y[k] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
-            assetId: DISH_CREATURE.asset, color: col, accent: ink, key: `dish:${i}:${k}:${tag}`, zTier: 0, seedOffset: 0,
-            glass: false, _creature: true,
-          });
+          const s = ((2 * st.radii[k]) / 100) * g * hover.scale * pinScale;
+          const rot =
+            k === 0 ? st.headingDeg : (Math.atan2(sys.y[k] - sys.y[k - 1], sys.x[k] - sys.x[k - 1]) * 180) / Math.PI;
+          const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) =>
+            mine.push({
+              x: sys.x[k] + ox,
+              y: sys.y[k] + oy,
+              scale: s * scaleMul,
+              scaleY: s * scaleMul,
+              rotation: rot,
+              alpha,
+              assetId: DISH_CREATURE.asset,
+              color: col,
+              accent: ink,
+              key: `dish:${i}:${k}:${tag}`,
+              zTier: 0,
+              seedOffset: 0,
+              glass: false,
+              _creature: true,
+            });
           put(1.14, shade(color, 0.55), 96, 'rim');
           put(1, color, 98, 'body');
           put(0.52, shade(color, 1.5), pinCore, 'core', -st.radii[k] * 0.16 * g, -st.radii[k] * 0.16 * g);
           if (k === 0 && !hatching) {
             mine.push({
-              x: sys.x[0] + Math.cos(headRad) * st.radii[0] * 0.38 * g, y: sys.y[0] + Math.sin(headRad) * st.radii[0] * 0.38 * g,
-              scale: s * 0.17, scaleY: s * 0.17, rotation: 0, alpha: 100,
-              assetId: DISH_CREATURE.asset, color: ink, accent: ink, key: `dish:${i}:0:eye`, zTier: 0, seedOffset: 0,
-              glass: false, _creature: true,
+              x: sys.x[0] + Math.cos(headRad) * st.radii[0] * 0.38 * g,
+              y: sys.y[0] + Math.sin(headRad) * st.radii[0] * 0.38 * g,
+              scale: s * 0.17,
+              scaleY: s * 0.17,
+              rotation: 0,
+              alpha: 100,
+              assetId: DISH_CREATURE.asset,
+              color: ink,
+              accent: ink,
+              key: `dish:${i}:0:eye`,
+              zTier: 0,
+              seedOffset: 0,
+              glass: false,
+              _creature: true,
             });
           }
         }
@@ -562,15 +695,27 @@ export function createDishCreatureBuilder() {
             if (p <= 0) continue;
             const sIdx = N_DISCS + j * LIMB_N + k;
             const g = easeOut(Math.min(1, p));
-            const s = (2 * st.limbRadii[k] / 100) * g * hover.scale * pinScale;
+            const s = ((2 * st.limbRadii[k]) / 100) * g * hover.scale * pinScale;
             const px = k === 0 ? sys.x[0] : sys.x[sIdx - 1];
             const py = k === 0 ? sys.y[0] : sys.y[sIdx - 1];
             const rot = (Math.atan2(sys.y[sIdx] - py, sys.x[sIdx] - px) * 180) / Math.PI;
-            const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) => mine.push({
-              x: sys.x[sIdx] + ox, y: sys.y[sIdx] + oy, scale: s * scaleMul, scaleY: s * scaleMul, rotation: rot, alpha,
-              assetId: DISH_CREATURE.asset, color: col, accent: ink, key: `dish:${i}:limb${j}:${k}:${tag}`, zTier: 0, seedOffset: 0,
-              glass: false, _creature: true,
-            });
+            const put = (scaleMul, col, alpha, tag, ox = 0, oy = 0) =>
+              mine.push({
+                x: sys.x[sIdx] + ox,
+                y: sys.y[sIdx] + oy,
+                scale: s * scaleMul,
+                scaleY: s * scaleMul,
+                rotation: rot,
+                alpha,
+                assetId: DISH_CREATURE.asset,
+                color: col,
+                accent: ink,
+                key: `dish:${i}:limb${j}:${k}:${tag}`,
+                zTier: 0,
+                seedOffset: 0,
+                glass: false,
+                _creature: true,
+              });
             put(1.14, shade(lcolor, 0.55), 96, 'rim');
             put(1, lcolor, 98, 'body');
             put(0.52, shade(lcolor, 1.5), pinCore, 'core', -st.limbRadii[k] * 0.16 * g, -st.limbRadii[k] * 0.16 * g);
@@ -590,25 +735,38 @@ export function createDishCreatureBuilder() {
     // positions/velocities, growth, links, traits) and its own frame count. Typed
     // arrays ride the state codec; everything else in a birth state is plain data.
     // (frameBodies is a per-frame publication, re-earned by the next append.)
-    snapshotState() { return { states: states.map(snapDishCreatureState), frame }; },
+    snapshotState() {
+      return { states: states.map(snapDishCreatureState), frame };
+    },
     restoreState(s) {
       if (!s || !Array.isArray(s.states) || !Number.isInteger(s.frame) || s.frame < 0) return false;
       const built = [];
       for (const rec of s.states) {
-        if (rec == null) { built.push(null); continue; }
+        if (rec == null) {
+          built.push(null);
+          continue;
+        }
         const st = restoreDishCreatureState(rec);
         if (!st) return false; // nothing applied yet — the swap below is the commit point
         built.push(st);
       }
-      states.length = 0; states.push(...built);
+      states.length = 0;
+      states.push(...built);
       frame = s.frame;
       return true;
     },
-    lastBodies() { return frameBodies; },
+    lastBodies() {
+      return frameBodies;
+    },
     /** #1737 — each living ALife creature's education as a portable kc-creature/1 record (genome + long-term weights), per pin; null elsewhere. */
     getCreatureRecords() {
-      return states.map((st) => (st && st.genome ? creatureRecord(st.genome, { stw: st.pstw, ltw: st.pltw, elig: st.pelig }) : null));
+      return states.map((st) =>
+        st && st.genome ? creatureRecord(st.genome, { stw: st.pstw, ltw: st.pltw, elig: st.pelig }) : null,
+      );
     },
-    dispose() { states.length = 0; frameBodies = []; },
+    dispose() {
+      states.length = 0;
+      frameBodies = [];
+    },
   };
 }

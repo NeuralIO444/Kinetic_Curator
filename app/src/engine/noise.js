@@ -8,14 +8,23 @@ const F3 = 1.0 / 3.0;
 const G3 = 1.0 / 6.0;
 
 const grad3 = [
-  [1, 1, 0], [-1, 1, 0], [1, -1, 0], [-1, -1, 0],
-  [1, 0, 1], [-1, 0, 1], [1, 0, -1], [-1, 0, -1],
-  [0, 1, 1], [0, -1, 1], [0, 1, -1], [0, -1, -1],
+  [1, 1, 0],
+  [-1, 1, 0],
+  [1, -1, 0],
+  [-1, -1, 0],
+  [1, 0, 1],
+  [-1, 0, 1],
+  [1, 0, -1],
+  [-1, 0, -1],
+  [0, 1, 1],
+  [0, -1, 1],
+  [0, 1, -1],
+  [0, -1, -1],
 ];
 
 function buildPerm(seedValue) {
   const perm = Array.from({ length: 256 }, (_, i) => i);
-  let r = (seedValue | 0) || 1;
+  let r = seedValue | 0 || 1;
   for (let i = 255; i > 0; i--) {
     r = (Math.imul(r, 1103515245) + 12345) & 0x7fffffff;
     const j = r % (i + 1);
@@ -48,18 +57,48 @@ function noise3DWith(p, x, y, z) {
 
   if (x0 >= y0) {
     if (y0 >= z0) {
-      i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 1; k2 = 0;
+      i1 = 1;
+      j1 = 0;
+      k1 = 0;
+      i2 = 1;
+      j2 = 1;
+      k2 = 0;
     } else if (x0 >= z0) {
-      i1 = 1; j1 = 0; k1 = 0; i2 = 1; j2 = 0; k2 = 1;
+      i1 = 1;
+      j1 = 0;
+      k1 = 0;
+      i2 = 1;
+      j2 = 0;
+      k2 = 1;
     } else {
-      i1 = 0; j1 = 0; k1 = 1; i2 = 1; j2 = 0; k2 = 1;
+      i1 = 0;
+      j1 = 0;
+      k1 = 1;
+      i2 = 1;
+      j2 = 0;
+      k2 = 1;
     }
   } else if (y0 < z0) {
-    i1 = 0; j1 = 0; k1 = 1; i2 = 0; j2 = 1; k2 = 1;
+    i1 = 0;
+    j1 = 0;
+    k1 = 1;
+    i2 = 0;
+    j2 = 1;
+    k2 = 1;
   } else if (x0 < z0) {
-    i1 = 0; j1 = 1; k1 = 0; i2 = 0; j2 = 1; k2 = 1;
+    i1 = 0;
+    j1 = 1;
+    k1 = 0;
+    i2 = 0;
+    j2 = 1;
+    k2 = 1;
   } else {
-    i1 = 0; j1 = 1; k1 = 0; i2 = 1; j2 = 1; k2 = 0;
+    i1 = 0;
+    j1 = 1;
+    k1 = 0;
+    i2 = 1;
+    j2 = 1;
+    k2 = 0;
   }
 
   const x1 = x0 - i1 + G3;
@@ -171,12 +210,11 @@ export function permTableFor(seedValue) {
  */
 export function createNoise(seedValue) {
   const p = buildPerm(seedValue);
-  const seed = (seedValue | 0) || 1;
+  const seed = seedValue | 0 || 1;
   return {
     seed,
     noise3D: (x, y, z) => noise3DWith(p, x, y, z),
-    fBm3D: (x, y, z, octaves, lacunarity, gain) =>
-      fBm3DWith(p, x, y, z, octaves, lacunarity, gain),
+    fBm3D: (x, y, z, octaves, lacunarity, gain) => fBm3DWith(p, x, y, z, octaves, lacunarity, gain),
     curl2: (x, y, z, eps, out) => curl2With(p, x, y, z, eps, out),
   };
 }

@@ -24,7 +24,11 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // ── the switch ─────────────────────────────────────────────────────────
 ok('isGlassMaterial: only the glass material engages', () => {
@@ -51,10 +55,15 @@ ok('glass material: every item flagged, alpha attenuated exactly, sorted back-to
     const src = f.get(g.index);
     assert.ok(src, 'glass item has a flat counterpart');
     assert.equal(g.alpha, src.alpha * GLASS_BODY_ALPHA, 'alpha is the flat alpha times the body constant');
-    assert.equal(g.x, src.x); assert.equal(g.y, src.y); assert.equal(g.scale, src.scale);
+    assert.equal(g.x, src.x);
+    assert.equal(g.y, src.y);
+    assert.equal(g.scale, src.scale);
   }
   const zt = glass.map((i) => i.zTier ?? 0);
-  assert.ok(zt.every((v, k) => k === 0 || v >= zt[k - 1]), 'glass subsequence is back-to-front (z-tier ascending)');
+  assert.ok(
+    zt.every((v, k) => k === 0 || v >= zt[k - 1]),
+    'glass subsequence is back-to-front (z-tier ascending)',
+  );
 });
 
 ok('parity: plate and flat placements are identical; plate carries only its own flag (#1548)', () => {
@@ -67,7 +76,9 @@ ok('parity: plate and flat placements are identical; plate carries only its own 
     // #1548 (Materials M2): plate flags its items for the shader/still
     // ramp — geometry, alpha and colour are untouched by the flag.
     assert.equal(q.plate, true, 'plate item carries the plate flag since M2');
-    assert.equal(q.alpha, it.alpha); assert.equal(q.x, it.x); assert.equal(q.y, it.y);
+    assert.equal(q.alpha, it.alpha);
+    assert.equal(q.x, it.x);
+    assert.equal(q.y, it.y);
   }
 });
 
@@ -86,7 +97,10 @@ ok('the #1129 glass bool keeps its own alpha; bool + material attenuates once', 
 
 ok('repeat builds are identical (the multiply never compounds)', () => {
   const again = place({ ...BASE, material: 'glass' });
-  assert.deepEqual(again.map((i) => i.alpha), glass.map((i) => i.alpha));
+  assert.deepEqual(
+    again.map((i) => i.alpha),
+    glass.map((i) => i.alpha),
+  );
 });
 
 ok('#1585: glassAlpha is a live param; the shipped constant is its default', () => {
@@ -100,7 +114,10 @@ ok('#1585: glassAlpha is a live param; the shipped constant is its default', () 
     assert.equal(g.alpha, f.get(g.index).alpha * 0.5, 'the param, not the constant, attenuates');
   }
   const clear = place({ ...BASE, material: 'glass', glassAlpha: 0 });
-  assert.ok(clear.every((i) => i.alpha === 0), 'glassAlpha 0: the body keeps none of its rolled alpha');
+  assert.ok(
+    clear.every((i) => i.alpha === 0),
+    'glassAlpha 0: the body keeps none of its rolled alpha',
+  );
 });
 
 // ── the scene contract ─────────────────────────────────────────────────
@@ -108,11 +125,16 @@ const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
 function docWith(material) {
   return {
-    version: 1, seed: 1234, paletteId: 'praystation', paletteOverrides: null,
+    version: 1,
+    seed: 1234,
+    paletteId: 'praystation',
+    paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, count: 24, material },
-    enabledAssets, quality: 'balanced',
+    enabledAssets,
+    quality: 'balanced',
     layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'bg', layerSnapshots: {},
+    activeLayerId: 'bg',
+    layerSnapshots: {},
   };
 }
 const contractFor = (material) => {
@@ -124,11 +146,17 @@ ok('contract: glass instances carry the flag; non-glass contracts gain no key', 
   const g = contractFor('glass');
   const gInst = g.instances.filter((i) => i.layer === 'bg');
   assert.ok(gInst.length > 0, 'glass doc produced instances');
-  assert.ok(gInst.every((i) => i.glass === true), 'every instance of a glass stratum carries glass:true');
+  assert.ok(
+    gInst.every((i) => i.glass === true),
+    'every instance of a glass stratum carries glass:true',
+  );
   const p = contractFor('plate');
   const pInst = p.instances.filter((i) => i.layer === 'bg');
   assert.ok(pInst.length > 0, 'plate doc produced instances');
-  assert.ok(pInst.every((i) => !('glass' in i)), 'plate contract has no glass key anywhere (hash parity)');
+  assert.ok(
+    pInst.every((i) => !('glass' in i)),
+    'plate contract has no glass key anywhere (hash parity)',
+  );
 });
 
 // ── the export warning ─────────────────────────────────────────────────

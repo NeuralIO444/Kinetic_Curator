@@ -23,7 +23,7 @@ export function hexToHsl(hex) {
 }
 
 export function hslToHex({ h, s, l }) {
-  const hh = ((h % 360) + 360) % 360 / 360;
+  const hh = (((h % 360) + 360) % 360) / 360;
   const ss = Math.min(1, Math.max(0, s));
   const ll = Math.min(1, Math.max(0, l));
   let r, g, b;
@@ -41,9 +41,14 @@ export function hslToHex({ h, s, l }) {
       if (x < 2 / 3) return p + (q - p) * (2 / 3 - x) * 6;
       return p;
     };
-    r = seg(hh + 1 / 3); g = seg(hh); b = seg(hh - 1 / 3);
+    r = seg(hh + 1 / 3);
+    g = seg(hh);
+    b = seg(hh - 1 / 3);
   }
-  const to = (v) => Math.round(v * 255).toString(16).padStart(2, '0');
+  const to = (v) =>
+    Math.round(v * 255)
+      .toString(16)
+      .padStart(2, '0');
   return `#${to(r)}${to(g)}${to(b)}`;
 }
 
@@ -94,7 +99,7 @@ export function buildHarmony(baseHex, scheme, count = 8, rng = null) {
     const h = base.h + offsets[i % offsets.length];
     const span = count > 1 ? i / (count - 1) : 0;
     // walk lightness 0.30 → 0.72 across the set, jitter saturation a little
-    const l = 0.30 + span * 0.42 + (draw() - 0.5) * 0.06;
+    const l = 0.3 + span * 0.42 + (draw() - 0.5) * 0.06;
     const s = Math.min(1, Math.max(0.15, s0 + (draw() - 0.5) * 0.25));
     out.push(hslToHex({ h, s, l }));
   }

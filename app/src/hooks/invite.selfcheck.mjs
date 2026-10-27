@@ -2,6 +2,8 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { INVITE_IDLE_MS, inviteActive, createInvites } from './invite.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
@@ -89,9 +91,9 @@ ok("the sheen is the AUDIO button's, and it goes quiet in use, with reduced moti
     '[data-heat-level="warm"]',
     '[data-heat-level="hot"]',
   ])
-    assert.ok(quiet.includes(`.xl-shimmer${sel}::after`), `quiet on ${sel}`);
-  assert.match(css, /\.app-fullscreen \.xl-shimmer::after \{ display: none; \}/);
-  assert.match(css, /prefers-reduced-motion: reduce\) \{[\s\S]*?\.xl-shimmer::after \{ display: none; \}/);
+    assert.ok(flat(quiet).includes(flat(`.xl-shimmer${sel}::after`)), `quiet on ${sel}`);
+  assert.match(flat(css), fre(/\.app-fullscreen \.xl-shimmer::after \{ display: none; \}/));
+  assert.match(flat(css), fre(/prefers-reduced-motion: reduce\) \{[\s\S]*?\.xl-shimmer::after \{ display: none; \}/));
   assert.match(read('../styles/panels.css'), /@keyframes stim-shimmer/, 'the keyframes are the existing ones');
 });
 
@@ -104,7 +106,11 @@ ok(
       /\.xl-ch \{[^}]*calc\(\(var\(--n\) - 1 - var\(--i\)\) \* 40ms\)/,
       'cooling: reverse order, 40 ms apart',
     );
-    assert.match(css, /transition: max-width 120ms ease calc\(var\(--i\) \* 22ms\)/, 'opening: forward order, quick');
+    assert.match(
+      flat(css),
+      fre(/transition: max-width 120ms ease calc\(var\(--i\) \* 22ms\)/),
+      'opening: forward order, quick',
+    );
     assert.match(css, /\.xl-swap \{[^}]*width 420ms cubic-bezier/, 'cooling is slow and eased out');
     assert.match(css, /transition-duration: 180ms/, 'expanding is quick');
     assert.match(

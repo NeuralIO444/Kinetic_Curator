@@ -13,8 +13,8 @@ export default {
 
     const fx4 = page.locator('.layer-row-fx', { hasText: 'FX 4' });
     const fx1 = page.locator('.layer-row-fx', { hasText: 'FX 1' });
-    ctx.check('FX 4 row exists (ghost or live)', await fx4.count() > 0, 'no FX 4 row');
-    ctx.check('FX 1 row exists (ghost or live)', await fx1.count() > 0, 'no FX 1 row');
+    ctx.check('FX 4 row exists (ghost or live)', (await fx4.count()) > 0, 'no FX 4 row');
+    ctx.check('FX 1 row exists (ghost or live)', (await fx1.count()) > 0, 'no FX 1 row');
 
     if (await page.locator('.layer-row-fx:has-text("FX 4")').count()) {
       await page.locator('.layer-row-fx:has-text("FX 4") .layer-name').first().click();

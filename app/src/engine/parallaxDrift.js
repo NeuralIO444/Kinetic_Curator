@@ -60,13 +60,21 @@ export function createParallaxStore() {
 const PARALLAX_FIELDS = ['seed', 'acc', 'steps'];
 export function snapshotParallaxStore(store) {
   const scenes = [];
-  if (store && store.scenes instanceof Map) for (const [id, sc] of store.scenes) scenes.push([id, PARALLAX_FIELDS.map((f) => sc[f])]);
+  if (store && store.scenes instanceof Map)
+    for (const [id, sc] of store.scenes) scenes.push([id, PARALLAX_FIELDS.map((f) => sc[f])]);
   return { v: 1, scenes };
 }
 export function checkParallaxStoreSnapshot(snap) {
   if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.scenes)) return false;
   for (const e of snap.scenes) {
-    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !Array.isArray(e[1]) || e[1].length !== PARALLAX_FIELDS.length) return false;
+    if (
+      !Array.isArray(e) ||
+      e.length !== 2 ||
+      typeof e[0] !== 'string' ||
+      !Array.isArray(e[1]) ||
+      e[1].length !== PARALLAX_FIELDS.length
+    )
+      return false;
     if (!e[1].every((v) => Number.isFinite(v))) return false;
   }
   return true;
@@ -76,7 +84,9 @@ export function restoreParallaxStore(store, snap) {
   store.scenes.clear();
   for (const [id, vals] of snap.scenes) {
     const sc = {};
-    PARALLAX_FIELDS.forEach((f, i) => { sc[f] = vals[i]; });
+    PARALLAX_FIELDS.forEach((f, i) => {
+      sc[f] = vals[i];
+    });
     store.scenes.set(id, sc);
   }
   return true;
@@ -125,7 +135,9 @@ export function applyParallaxDrift(soa, ctx, still = null) {
     sc = { seed, acc: 0, steps: 0 };
     dr.store.scenes.set(sceneId, sc);
   } else if (sc.seed !== seed) {
-    sc.seed = seed; sc.acc = 0; sc.steps = 0;
+    sc.seed = seed;
+    sc.acc = 0;
+    sc.steps = 0;
   }
 
   // Shed: present home, clock frozen (no banking) — the PATH law.
@@ -147,11 +159,17 @@ export function applyParallaxDrift(soa, ctx, still = null) {
   let any = false;
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
-    if (parallaxDriftOffset(soa.zTier ? soa.zTier[k] : 0, amount, tSec) !== 0) { any = true; break; }
+    if (parallaxDriftOffset(soa.zTier ? soa.zTier[k] : 0, amount, tSec) !== 0) {
+      any = true;
+      break;
+    }
   }
   if (!any) return null;
   let base = PARALLAX_BASE_X.get(soa);
-  if (!base || base.x.length < n) { base = { x: new Float64Array(n) }; PARALLAX_BASE_X.set(soa, base); }
+  if (!base || base.x.length < n) {
+    base = { x: new Float64Array(n) };
+    PARALLAX_BASE_X.set(soa, base);
+  }
   for (let k = 0; k < n; k++) base.x[k] = soa.x[k];
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
@@ -172,5 +190,6 @@ registerCostTier('travel/parallax', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.006,
-  notes: '#1576 P3 — parallax drift: zTier-proportional anchor drift as a pure function of the banked step count, resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+  notes:
+    '#1576 P3 — parallax drift: zTier-proportional anchor drift as a pure function of the banked step count, resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
 });

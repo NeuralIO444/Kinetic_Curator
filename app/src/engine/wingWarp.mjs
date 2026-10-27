@@ -51,7 +51,10 @@ const QUAD_HALF = 99.75;
 const QUAD_SPAN = 199.5;
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
-const smooth = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
+const smooth = (t) => {
+  t = clamp01(t);
+  return t * t * (3 - 2 * t);
+};
 
 /**
  * The wing's span frame from its own attach points, in centred asset units: root = the base point (the
@@ -60,18 +63,24 @@ const smooth = (t) => { t = clamp01(t); return t * t * (3 - 2 * t); };
  * tip at the top centre — the same extremes autoAttach would have derived.
  */
 export function wingAxis(wingPoints) {
-  const pts = (Array.isArray(wingPoints) ? wingPoints : []).filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.y));
+  const pts = (Array.isArray(wingPoints) ? wingPoints : []).filter(
+    (p) => p && Number.isFinite(p.x) && Number.isFinite(p.y),
+  );
   if (!pts.length) return { root: { x: 0, y: 50 }, axis: { x: 0, y: -1 }, span: 100 };
   // the root is the recipe's own root: the point furthest toward the bottom of the box (creature.js's
   // pointToward 'bottom'), centred — recomputed here so this module imports nothing from creature.js
   let rootRaw = pts[0];
   for (const p of pts) if (p.y > rootRaw.y) rootRaw = p;
   const rootC = { x: rootRaw.x - 50, y: rootRaw.y - 50 };
-  let tip = null; let best = -1;
+  let tip = null;
+  let best = -1;
   for (const p of pts) {
     const c = { x: p.x - 50, y: p.y - 50 };
     const d = Math.hypot(c.x - rootC.x, c.y - rootC.y);
-    if (d > best) { best = d; tip = c; }
+    if (d > best) {
+      best = d;
+      tip = c;
+    }
   }
   if (!tip || best < 1) return { root: { x: 0, y: 50 }, axis: { x: 0, y: -1 }, span: 100 };
   return { root: rootC, axis: { x: (tip.x - rootC.x) / best, y: (tip.y - rootC.y) / best }, span: best };
@@ -82,7 +91,10 @@ export function chainJoints(bones) {
   const total = bones.reduce((a, b) => a + b.length, 0);
   const out = [0];
   let acc = 0;
-  for (const b of bones) { acc += total > 0 ? b.length / total : 0; out.push(acc); }
+  for (const b of bones) {
+    acc += total > 0 ? b.length / total : 0;
+    out.push(acc);
+  }
   if (out.length) out[out.length - 1] = 1;
   return out;
 }
@@ -116,10 +128,15 @@ export function boneTransform(ref, posed) {
   // M is the rotation by (posed angle - ref angle): cos/sin of the difference from the stored unit vectors.
   const cosD = posed.ux * ref.ux + posed.uy * ref.uy;
   const sinD = posed.uy * ref.ux - posed.ux * ref.uy;
-  const m00 = cosD; const m01 = -sinD;
-  const m10 = sinD; const m11 = cosD;
+  const m00 = cosD;
+  const m01 = -sinD;
+  const m10 = sinD;
+  const m11 = cosD;
   return {
-    m00, m01, m10, m11,
+    m00,
+    m01,
+    m10,
+    m11,
     tx: posed.base.x - (m00 * ref.base.x + m01 * ref.base.y),
     ty: posed.base.y - (m10 * ref.base.x + m11 * ref.base.y),
   };
@@ -137,11 +154,13 @@ export function chainTransforms(refBones, posedBones) {
 /** Skin one scene point: weights at span u, blended over the chain's bone transforms. */
 export function skinPoint(x, y, u, joints, transforms) {
   const w = spanWeights(u, joints);
-  let px = 0; let py = 0;
+  let px = 0;
+  let py = 0;
   for (let b = 0; b < transforms.length; b++) {
     if (!w[b]) continue;
     const [qx, qy] = applyTransform(transforms[b], x, y);
-    px += w[b] * qx; py += w[b] * qy;
+    px += w[b] * qx;
+    py += w[b] * qy;
   }
   return [px, py];
 }
@@ -168,20 +187,32 @@ export function buildWingWarp({ item, bones, refBones, wingPoints }) {
   const joints = chainJoints(refBones);
   const transforms = chainTransforms(refBones, bones);
   const rot = (item.rotation * Math.PI) / 180;
-  const co = Math.cos(rot); const si = Math.sin(rot);
-  const sx = item.scale; const sy = Number.isFinite(item.scaleY) ? item.scaleY : item.scale;
+  const co = Math.cos(rot);
+  const si = Math.sin(rot);
+  const sx = item.scale;
+  const sy = Number.isFinite(item.scaleY) ? item.scaleY : item.scale;
   // The grid in the wing's rotated local frame (root + axis*t + perp*q), spanning the quad's full extent so
   // the whole asset surface — padding included — follows the skin. Vertices are clamped back into the quad
   // rect (the rotated frame's corners overshoot it); UVs derive from the clamped position by the quad's own
   // affine mapping, so a clamped vertex still samples exactly where it sits.
   const perp = { x: -frame.axis.y, y: frame.axis.x };
-  const corners = [[-QUAD_HALF, -QUAD_HALF], [QUAD_HALF, -QUAD_HALF], [-QUAD_HALF, QUAD_HALF], [QUAD_HALF, QUAD_HALF]];
-  let tMin = Infinity; let tMax = -Infinity; let qMin = Infinity; let qMax = -Infinity;
+  const corners = [
+    [-QUAD_HALF, -QUAD_HALF],
+    [QUAD_HALF, -QUAD_HALF],
+    [-QUAD_HALF, QUAD_HALF],
+    [QUAD_HALF, QUAD_HALF],
+  ];
+  let tMin = Infinity;
+  let tMax = -Infinity;
+  let qMin = Infinity;
+  let qMax = -Infinity;
   for (const [cx, cy] of corners) {
     const t = (cx - frame.root.x) * frame.axis.x + (cy - frame.root.y) * frame.axis.y;
     const q = (cx - frame.root.x) * perp.x + (cy - frame.root.y) * perp.y;
-    if (t < tMin) tMin = t; if (t > tMax) tMax = t;
-    if (q < qMin) qMin = q; if (q > qMax) qMax = q;
+    if (t < tMin) tMin = t;
+    if (t > tMax) tMax = t;
+    if (q < qMin) qMin = q;
+    if (q > qMax) qMax = q;
   }
   const pos = [];
   const uv = [];
@@ -196,8 +227,8 @@ export function buildWingWarp({ item, bones, refBones, wingPoints }) {
       ly = Math.min(QUAD_HALF, Math.max(-QUAD_HALF, ly));
       const u = spanAt(lx, ly, frame);
       // the item's own transform, exactly as QUAD_VS applies it: scale, rotate (SVG, y-down), translate
-      const px = item.x + (lx * sx) * co - (ly * sy) * si;
-      const py = item.y + (lx * sx) * si + (ly * sy) * co;
+      const px = item.x + lx * sx * co - ly * sy * si;
+      const py = item.y + lx * sx * si + ly * sy * co;
       const [wx, wy] = skinPoint(px, py, u, joints, transforms);
       maxMove = Math.max(maxMove, Math.hypot(wx - px, wy - py));
       pos.push(wx, wy);
@@ -231,10 +262,12 @@ export function warpPoint({ x, y, wingItem, bones, refBones, wingPoints }) {
   const joints = chainJoints(refBones);
   const transforms = chainTransforms(refBones, bones);
   const rot = (wingItem.rotation * Math.PI) / 180;
-  const co = Math.cos(rot); const si = Math.sin(rot);
+  const co = Math.cos(rot);
+  const si = Math.sin(rot);
   const s = Number.isFinite(wingItem.scale) ? wingItem.scale : wingItem.scaleX;
   // invert the item's similarity: local = R^-1 * (P - pos) / scale
-  const dx = x - wingItem.x; const dy = y - wingItem.y;
+  const dx = x - wingItem.x;
+  const dy = y - wingItem.y;
   const lx = (dx * co + dy * si) / s;
   const ly = (-dx * si + dy * co) / s;
   const u = spanAt(lx, ly, frame);

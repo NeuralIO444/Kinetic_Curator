@@ -8,7 +8,9 @@ const a = createNoise(42);
 const b = createNoise(42);
 const c = createNoise(99);
 
-const x = 1.25, y = 2.5, z = 0.1;
+const x = 1.25,
+  y = 2.5,
+  z = 0.1;
 
 // AC2: same seed → identical samples
 assert.strictEqual(a.noise3D(x, y, z), b.noise3D(x, y, z));

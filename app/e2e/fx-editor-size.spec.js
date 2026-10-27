@@ -18,12 +18,21 @@ const PAD = 16;
 async function measure(editor) {
   return editor.evaluate((el) => {
     const panel = el.getBoundingClientRect();
-    const kids = [...el.querySelectorAll('.ef-tile > *')].map((k) => k.getBoundingClientRect()).filter((r) => r.width > 0 && r.height > 0);
-    const top = Math.min(...kids.map((r) => r.top)); const bottom = Math.max(...kids.map((r) => r.bottom));
-    const left = Math.min(...kids.map((r) => r.left)); const right = Math.max(...kids.map((r) => r.right));
+    const kids = [...el.querySelectorAll('.ef-tile > *')]
+      .map((k) => k.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0);
+    const top = Math.min(...kids.map((r) => r.top));
+    const bottom = Math.max(...kids.map((r) => r.bottom));
+    const left = Math.min(...kids.map((r) => r.left));
+    const right = Math.max(...kids.map((r) => r.right));
     const content = { w: right - left, h: bottom - top };
-    return { panelW: panel.width, panelH: panel.height, contentW: content.w, contentH: content.h,
-      filled: (content.w * content.h) / (panel.width * panel.height) };
+    return {
+      panelW: panel.width,
+      panelH: panel.height,
+      contentW: content.w,
+      contentH: content.h,
+      filled: (content.w * content.h) / (panel.width * panel.height),
+    };
   });
 }
 
@@ -56,12 +65,14 @@ test('every FX editor is as tall as its controls, and empty slots offer an actio
 
     // Every kind this slot can hold: add it, measure, remove it.
     const select = empty.locator('select');
-    const kinds = (await select.count()) ? await select.locator('option').evaluateAll((os) => os.map((o) => o.value)) : [null];
+    const kinds = (await select.count())
+      ? await select.locator('option').evaluateAll((os) => os.map((o) => o.value))
+      : [null];
     for (const kind of kinds) {
-      const ed = stack.locator(".strata-block.strata-fx .fx-editor").first();
+      const ed = stack.locator('.strata-block.strata-fx .fx-editor').first();
       if (kind) await ed.locator('select').selectOption(kind);
       await ed.locator('.chip-btn').click();
-      const filled = stack.locator(".strata-block.strata-fx .fx-editor").first();
+      const filled = stack.locator('.strata-block.strata-fx .fx-editor').first();
       await expect(filled.locator('.ef-bypass')).toBeVisible();
       const m = await measure(filled);
       const name = kind || `FX ${track} default`;
@@ -69,7 +80,7 @@ test('every FX editor is as tall as its controls, and empty slots offer an actio
       expect(m.panelH, `${name}: panel ${m.panelH}px vs content ${m.contentH}px`).toBeLessThanOrEqual(m.contentH + PAD);
       expect(m.filled, `${name}: panel is ${(100 - m.filled * 100).toFixed(0)}% empty`).toBeGreaterThanOrEqual(0.5);
       await filled.locator('.ef-bypass').click(); // back to the empty slot for the next kind
-      await expect(stack.locator(".strata-block.strata-fx .fx-editor").first().locator('.chip-btn')).toHaveCount(1);
+      await expect(stack.locator('.strata-block.strata-fx .fx-editor').first().locator('.chip-btn')).toHaveCount(1);
     }
     expect(block).toBeTruthy();
   }

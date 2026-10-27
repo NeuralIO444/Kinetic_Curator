@@ -9,16 +9,36 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import {
-  ROBOT_DETENT_STEP_DEG, ROBOT_SETTLE_FRAMES_NEAR, ROBOT_SETTLE_FRAMES_FAR,
-  ROBOT_SPINE_PLANS, ROBOT_CHAIN_PLANS, ROBOT_ORNAMENT_SETS, ROBOT_PART_POOL, ROBOT_ENGRAVING,
-  quantiseDetent, arcDeltaDeg, quantiseSkeletonPose, robotTargetAngles,
-  createRobotPoseState, stepRobotPose, robotJointAngle, settleRobotSkeleton,
-  robotPlanIndices, robotPlan, buildRobotSkeleton, buildRobotFrame,
+  ROBOT_DETENT_STEP_DEG,
+  ROBOT_SETTLE_FRAMES_NEAR,
+  ROBOT_SETTLE_FRAMES_FAR,
+  ROBOT_SPINE_PLANS,
+  ROBOT_CHAIN_PLANS,
+  ROBOT_ORNAMENT_SETS,
+  ROBOT_PART_POOL,
+  ROBOT_ENGRAVING,
+  quantiseDetent,
+  arcDeltaDeg,
+  quantiseSkeletonPose,
+  robotTargetAngles,
+  createRobotPoseState,
+  stepRobotPose,
+  robotJointAngle,
+  settleRobotSkeleton,
+  robotPlanIndices,
+  robotPlan,
+  buildRobotSkeleton,
+  buildRobotFrame,
 } from './robot.js';
 import { buildSkeleton, mirrorBone, fnv1a } from './skeleton.js';
 
 // A symmetric fixture body in box units, in autoAttachPoints' order: top, right, bottom, left (as S1).
-const FIXTURE = [{ x: 50, y: 5 }, { x: 95, y: 50 }, { x: 50, y: 95 }, { x: 5, y: 50 }];
+const FIXTURE = [
+  { x: 50, y: 5 },
+  { x: 95, y: 50 },
+  { x: 50, y: 95 },
+  { x: 5, y: 50 },
+];
 const byId = (skel, id) => skel.bones.find((b) => b.id === id);
 const isDetent = (deg) => Number.isInteger(deg / ROBOT_DETENT_STEP_DEG);
 
@@ -58,16 +78,32 @@ const isDetent = (deg) => Number.isInteger(deg / ROBOT_DETENT_STEP_DEG);
   const again = buildRobotSkeleton({ seed: 77, creatureId: 'r0', attach: FIXTURE });
   assert.deepEqual(again.skeleton.bones, g.skeleton.bones, 'two builds of the same inputs are identical');
   assert.equal(again.skeleton.hash, g.skeleton.hash);
-  assert.notEqual(buildRobotSkeleton({ seed: 78, creatureId: 'r0', attach: FIXTURE }).skeleton.hash, g.skeleton.hash, 'another seed, another robot');
-  assert.notEqual(buildRobotSkeleton({ seed: 77, creatureId: 'r1', attach: FIXTURE }).skeleton.hash, g.skeleton.hash, 'the creature is half the RNG key');
+  assert.notEqual(
+    buildRobotSkeleton({ seed: 78, creatureId: 'r0', attach: FIXTURE }).skeleton.hash,
+    g.skeleton.hash,
+    'another seed, another robot',
+  );
+  assert.notEqual(
+    buildRobotSkeleton({ seed: 77, creatureId: 'r1', attach: FIXTURE }).skeleton.hash,
+    g.skeleton.hash,
+    'the creature is half the RNG key',
+  );
   // quantising an already-quantised pose changes nothing, and quantising never changes a length
   assert.deepEqual(quantiseSkeletonPose(g.skeleton).bones, g.skeleton.bones, 'the quantiser is idempotent on a robot');
   const raw = buildSkeleton({ seed: 77, creatureId: 'r0', plan: g.plan, attach: FIXTURE });
   const q = quantiseSkeletonPose(raw);
   for (const b of raw.bones) assert.equal(byId(q, b.id).length, b.length, `${b.id} keeps its length exactly`);
   // the robot's bones are S1's bones — same ids, same structure, no forked bone kind (the kill line)
-  assert.deepEqual(q.bones.map((b) => b.id), raw.bones.map((b) => b.id), 'quantised ids = built ids, in order');
-  assert.deepEqual(robotTargetAngles(raw), Object.fromEntries(raw.bones.filter((b) => b.side !== 'R').map((b) => [b.id, quantiseDetent(b.angleDeg)])), 'targets are the raw angles, snapped');
+  assert.deepEqual(
+    q.bones.map((b) => b.id),
+    raw.bones.map((b) => b.id),
+    'quantised ids = built ids, in order',
+  );
+  assert.deepEqual(
+    robotTargetAngles(raw),
+    Object.fromEntries(raw.bones.filter((b) => b.side !== 'R').map((b) => [b.id, quantiseDetent(b.angleDeg)])),
+    'targets are the raw angles, snapped',
+  );
 }
 
 // 3. The mirror survives quantisation exactly: every right bone is mirrorBone of the posed left.
@@ -91,20 +127,36 @@ const isDetent = (deg) => Number.isInteger(deg / ROBOT_DETENT_STEP_DEG);
 //    arc), the change frame itself still shows the old angle, landing is exact, a parked target holds,
 //    and the whole sequence is a pure function of the frame index — replay is bit-identical, hash pinned.
 const IDX = { spine: 1, chains: 1, ornaments: 0 }; // column + arms-legs: a fore chain and a hind chain
-const poseAt = (f) => (f < 3
-  ? { foreDirDeg: 90, hindDirDeg: 135 }
-  : f < 7 ? { foreDirDeg: 45, hindDirDeg: 135 } : { foreDirDeg: 45, hindDirDeg: 45 });
+const poseAt = (f) =>
+  f < 3
+    ? { foreDirDeg: 90, hindDirDeg: 135 }
+    : f < 7
+      ? { foreDirDeg: 45, hindDirDeg: 135 }
+      : { foreDirDeg: 45, hindDirDeg: 45 };
 const q4 = (v) => Math.round(v * 10000) / 10000;
 function runSequence(frames = 12) {
   let state = createRobotPoseState();
   const lines = [];
   const track = [];
   for (let f = 0; f < frames; f++) {
-    const r = buildRobotFrame(state, { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseAt(f), planIndices: IDX }, f);
+    const r = buildRobotFrame(
+      state,
+      { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseAt(f), planIndices: IDX },
+      f,
+    );
     state = r.state;
-    assert.equal(byId(r.skeleton, 'fore/L/0').angleDeg, r.angles['fore/L/0'], 'the posed skeleton carries the settled angle');
+    assert.equal(
+      byId(r.skeleton, 'fore/L/0').angleDeg,
+      r.angles['fore/L/0'],
+      'the posed skeleton carries the settled angle',
+    );
     assert.equal(robotJointAngle(state, 'fore/L/0', f), r.angles['fore/L/0'], 'the state reads the same angle back');
-    lines.push(Object.keys(r.angles).sort().map((id) => `${id}=${q4(r.angles[id])}`).join(','));
+    lines.push(
+      Object.keys(r.angles)
+        .sort()
+        .map((id) => `${id}=${q4(r.angles[id])}`)
+        .join(','),
+    );
     track.push({ fore: r.angles['fore/L/0'], hind: r.angles['hind/L/0'] });
   }
   return { seq: lines.join(';'), track };
@@ -125,7 +177,11 @@ function runSequence(frames = 12) {
   assert.equal(track[10].hind, -135, 'landed exactly, 3 frames after the change');
   assert.equal(track[11].hind, -135, 'a parked target holds its detent — no drift, no oscillation');
   // mid-travel the bones are honestly between detents; at rest they are all on detents
-  const rest = buildRobotFrame(createRobotPoseState(), { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseAt(0), planIndices: IDX }, 0);
+  const rest = buildRobotFrame(
+    createRobotPoseState(),
+    { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseAt(0), planIndices: IDX },
+    0,
+  );
   for (const b of rest.skeleton.bones) assert.ok(isDetent(b.angleDeg), `${b.id} is born on its detent`);
   // replay: the same target sequence from a fresh state reproduces the sequence bit for bit
   assert.equal(runSequence().seq, seq, 'replay is identical');
@@ -144,12 +200,19 @@ function runSequence(frames = 12) {
   const angles = [];
   const poseFlip = (f) => ({ foreDirDeg: f < 3 ? 90 : f === 3 ? 45 : 90, hindDirDeg: 135 });
   for (let f = 0; f < 7; f++) {
-    const r = buildRobotFrame(state, { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseFlip(f), planIndices: IDX }, f);
+    const r = buildRobotFrame(
+      state,
+      { seed: 77, creatureId: 'r0', attach: FIXTURE, pose: poseFlip(f), planIndices: IDX },
+      f,
+    );
     state = r.state;
     angles.push(r.angles['fore/L/0']);
   }
-  assert.deepEqual(angles, [-180, -180, -180, -180, -157.5, -168.75, -180],
-    'out at frame 3, called back at frame 4 from mid-travel (-157.5), home in 2 frames for the 22.5° left');
+  assert.deepEqual(
+    angles,
+    [-180, -180, -180, -180, -157.5, -168.75, -180],
+    'out at frame 3, called back at frame 4 from mid-travel (-157.5), home in 2 frames for the 22.5° left',
+  );
 }
 
 // 6. The 4x4x4 data: four bodies, four limb plans, four hand sets — detent directions, no sweep, chain
@@ -169,7 +232,10 @@ function runSequence(frames = 12) {
     for (const spec of cp.chains) {
       assert.ok(isDetent(spec.dirDeg), `${cp.id}/${spec.id} direction sits on a detent`);
       assert.equal(spec.sweepDeg, 0, `${cp.id}/${spec.id} does not curve`);
-      assert.ok(Math.abs(spec.lenFrac.reduce((a, b) => a + b, 0) - 1) < 1e-9, `${cp.id}/${spec.id} fractions sum to the chain`);
+      assert.ok(
+        Math.abs(spec.lenFrac.reduce((a, b) => a + b, 0) - 1) < 1e-9,
+        `${cp.id}/${spec.id} fractions sum to the chain`,
+      );
     }
   }
   for (const os of ROBOT_ORNAMENT_SETS) {
@@ -185,11 +251,18 @@ function runSequence(frames = 12) {
   assert.deepEqual(robotPlan(99, -3), robotPlan(3, 0), 'plan indices clamp into range');
   for (let s = 0; s < 50; s++) {
     const idx = robotPlanIndices(s, `r${s % 5}`);
-    assert.ok(idx.spine >= 0 && idx.spine < 4 && idx.chains >= 0 && idx.chains < 4 && idx.ornaments >= 0 && idx.ornaments < 4, 'draws land in range');
+    assert.ok(
+      idx.spine >= 0 && idx.spine < 4 && idx.chains >= 0 && idx.chains < 4 && idx.ornaments >= 0 && idx.ornaments < 4,
+      'draws land in range',
+    );
     assert.deepEqual(robotPlanIndices(s, `r${s % 5}`), idx, 'the draw is deterministic');
   }
   // settleRobotSkeleton agrees with buildRobotFrame's plumbing on a single frame
-  const one = settleRobotSkeleton(createRobotPoseState(), buildSkeleton({ seed: 77, creatureId: 'r0', plan: robotPlan(1, 1), attach: FIXTURE, pose: poseAt(0) }), 0);
+  const one = settleRobotSkeleton(
+    createRobotPoseState(),
+    buildSkeleton({ seed: 77, creatureId: 'r0', plan: robotPlan(1, 1), attach: FIXTURE, pose: poseAt(0) }),
+    0,
+  );
   for (const b of one.skeleton.bones) assert.ok(isDetent(b.angleDeg), 'a single settled frame is all detents');
 }
 
@@ -198,11 +271,20 @@ function runSequence(frames = 12) {
 {
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'robot.js'), 'utf8');
   const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '');
-  const code = noBlock.split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
+  const code = noBlock
+    .split('\n')
+    .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
+    .join('\n');
   for (const banned of ['Math.random', 'Date.now', 'performance.now']) {
-    assert.ok(!code.includes(banned), `robot.js must not use ${banned} — seeded kernel channels and counted frames only`);
+    assert.ok(
+      !code.includes(banned),
+      `robot.js must not use ${banned} — seeded kernel channels and counted frames only`,
+    );
   }
-  assert.ok(code.includes("from './skeleton.js'") && code.includes('buildSkeleton'), 'robot.js parameterises S1\'s builder — no engine fork');
+  assert.ok(
+    code.includes("from './skeleton.js'") && code.includes('buildSkeleton'),
+    "robot.js parameterises S1's builder — no engine fork",
+  );
 }
 
 console.log('robot.selfcheck: OK (detents, golden hash, mirror, settle 2-3 frames, replay, 4x4x4 data, guard)');

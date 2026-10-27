@@ -7,13 +7,25 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { ASSETS } from '../data/assets/index.js';
-import { buildSkeleton, mirrorBone, resolveMarkers, skeletonHash, transformSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
+import {
+  buildSkeleton,
+  mirrorBone,
+  resolveMarkers,
+  skeletonHash,
+  transformSkeleton,
+  MOTH_SKELETON_PLAN,
+} from './skeleton.js';
 import { createCreatureBuilder, MOTH, pointToward } from './creature.js';
 import { FAN_COUNTS } from './featherFan.js';
 import { autoAttachPoints } from './autoAttach.js';
 
 // A symmetric fixture body in box units, in autoAttachPoints' order: top, right, bottom, left.
-const FIXTURE = [{ x: 50, y: 5 }, { x: 95, y: 50 }, { x: 50, y: 95 }, { x: 5, y: 50 }];
+const FIXTURE = [
+  { x: 50, y: 5 },
+  { x: 95, y: 50 },
+  { x: 50, y: 95 },
+  { x: 5, y: 50 },
+];
 const build = (over = {}) => buildSkeleton({ seed: 77, creatureId: 'm0', attach: FIXTURE, ...over });
 const byId = (skel, id) => skel.bones.find((b) => b.id === id);
 
@@ -70,10 +82,18 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   assert.deepEqual(byId(skel, 'fore/L/0').base, { x: -45, y: 0 }, 'the fore chain roots on the left point');
   assert.deepEqual(byId(skel, 'fore/R/0').base, { x: 45, y: 0 }, 'and its mirror on the right point');
 
-  const roled = [{ x: 50, y: 95, role: 'H' }, { x: 95, y: 50, role: 'L' }, { x: 50, y: 5 }];
+  const roled = [
+    { x: 50, y: 95, role: 'H' },
+    { x: 95, y: 50, role: 'L' },
+    { x: 50, y: 5 },
+  ];
   assert.deepEqual(resolveMarkers(roled), { head: 0, limbs: [1, 2] });
   const skel2 = buildSkeleton({ seed: 77, creatureId: 'm0', attach: roled });
-  assert.deepEqual(byId(skel2, skel2.headBone).tip, { x: 0, y: 45 }, 'a role-H at the bottom makes the bottom the head');
+  assert.deepEqual(
+    byId(skel2, skel2.headBone).tip,
+    { x: 0, y: 45 },
+    'a role-H at the bottom makes the bottom the head',
+  );
 }
 
 // 4. The skeleton describes the moth that is actually drawn: its fore roots are the recipe's own wing joins
@@ -82,14 +102,20 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   const bodyPts = autoAttachPoints(ASSETS.find((a) => a.id === 'org_pod_02').svg);
   const skel = buildSkeleton({ seed: 77, creatureId: 'm0', attach: bodyPts });
   assert.deepEqual(byId(skel, 'fore/L/0').base, pointToward(bodyPts, 'left'), 'left fore root = the left attach point');
-  assert.deepEqual(byId(skel, 'fore/R/0').base, pointToward(bodyPts, 'right'), 'right fore root = the right attach point');
+  assert.deepEqual(
+    byId(skel, 'fore/R/0').base,
+    pointToward(bodyPts, 'right'),
+    'right fore root = the right attach point',
+  );
 }
 
 // 5. Plans are data: any number of chains grows (every marked L a plan roots at), hind chains follow the
 //    pair amount, and a chainless plan is a spine alone.
 {
   const trio = {
-    id: 'trio', spineSegments: 3, hindAlong: 0.45,
+    id: 'trio',
+    spineSegments: 3,
+    hindAlong: 0.45,
     chains: [
       { id: 'a', root: 'side', dirDeg: 40, sweepDeg: 5, totalLen: 60, lenFrac: [0.5, 0.3, 0.2] },
       { id: 'b', root: 'hind', dirDeg: 100, sweepDeg: 5, totalLen: 60, lenFrac: [0.5, 0.3, 0.2] },
@@ -98,9 +124,18 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   };
   assert.equal(buildSkeleton({ seed: 1, creatureId: 'x', plan: trio, attach: FIXTURE }).bones.length, 3 + 3 * 3 * 2);
   assert.equal(build({ pose: { hindAmount: 0 } }).bones.length, 4 + 3 * 2, 'no hind pair, no hind bones');
-  const spineOnly = buildSkeleton({ seed: 1, creatureId: 'x', plan: { id: 's', spineSegments: 5, chains: [] }, attach: FIXTURE });
-  assert.equal(spineOnly.bones.length, 5, 'a 5-segment spine, at the top of the brief\'s range');
-  assert.equal(buildSkeleton({ seed: 1, creatureId: 'x', attach: [] }).bones.length, 16, 'no points: the box extremes still grow a frame');
+  const spineOnly = buildSkeleton({
+    seed: 1,
+    creatureId: 'x',
+    plan: { id: 's', spineSegments: 5, chains: [] },
+    attach: FIXTURE,
+  });
+  assert.equal(spineOnly.bones.length, 5, "a 5-segment spine, at the top of the brief's range");
+  assert.equal(
+    buildSkeleton({ seed: 1, creatureId: 'x', attach: [] }).bones.length,
+    16,
+    'no points: the box extremes still grow a frame',
+  );
   assert.equal(buildSkeleton({ seed: 1, creatureId: 'x', attach: null }).hash.length, 8);
 }
 
@@ -122,16 +157,32 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
   const input = (over = {}) => ({
-    dishPins: [{ x: 500, y: 350 }], dishFormed: [true], seed: 77, seedOffsets: null, loopTimeMs: 0, assetAttach: {}, ...over,
+    dishPins: [{ x: 500, y: 350 }],
+    dishFormed: [true],
+    seed: 77,
+    seedOffsets: null,
+    loopTimeMs: 0,
+    assetAttach: {},
+    ...over,
   });
   const b = createCreatureBuilder();
   let e;
-  for (let i = 0; i < MOTH.growFrames + 1; i++) { e = entry(); b.append(input({ wantSkeletons: true }), e, ASSETS); }
-  assert.equal(e[0].items.filter((it) => it._creature).length, 3 + 1 + 2 + 2 * FAN_PER_WING, 'the drawn moth: halos + body + wings + fans');
+  for (let i = 0; i < MOTH.growFrames + 1; i++) {
+    e = entry();
+    b.append(input({ wantSkeletons: true }), e, ASSETS);
+  }
+  assert.equal(
+    e[0].items.filter((it) => it._creature).length,
+    3 + 1 + 2 + 2 * FAN_PER_WING,
+    'the drawn moth: halos + body + wings + fans',
+  );
   const skels = b.lastSkeletons();
   assert.equal(skels.length, 1);
   assert.equal(skels[0].bones.length, 10, 'one pair grown in: spine + fore chains only');
-  assert.ok(skels[0].bones.every((bn) => Number.isFinite(bn.base.x + bn.base.y + bn.tip.x + bn.tip.y)), 'world bones are finite');
+  assert.ok(
+    skels[0].bones.every((bn) => Number.isFinite(bn.base.x + bn.base.y + bn.tip.x + bn.tip.y)),
+    'world bones are finite',
+  );
   const head = skels[0].bones.find((bn) => bn.marker === 'H');
   assert.ok(Math.hypot(head.tip.x - 500, head.tip.y - 350) < 100, 'the head stands over the pin');
   assert.match(skels[0].hash, /^[0-9a-f]{8}$/);
@@ -143,8 +194,15 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
   // way — the fan is the always-on consumer S1 anticipated (S3's staging report records the change).
   const b2 = createCreatureBuilder();
   let e2;
-  for (let i = 0; i < MOTH.growFrames + 1; i++) { e2 = entry(); b2.append(input(), e2, ASSETS); }
-  assert.equal(e2[0].items.filter((it) => it._creature).length, 3 + 1 + 2 + 2 * FAN_PER_WING, 'gate off: the drawn moth is whole');
+  for (let i = 0; i < MOTH.growFrames + 1; i++) {
+    e2 = entry();
+    b2.append(input(), e2, ASSETS);
+  }
+  assert.equal(
+    e2[0].items.filter((it) => it._creature).length,
+    3 + 1 + 2 + 2 * FAN_PER_WING,
+    'gate off: the drawn moth is whole',
+  );
   assert.deepEqual(b2.lastSkeletons(), [null], 'gate off: no skeleton is published');
 }
 
@@ -153,7 +211,10 @@ const byId = (skel, id) => skel.bones.find((b) => b.id === id);
 {
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'skeleton.js'), 'utf8');
   const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '');
-  const code = noBlock.split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
+  const code = noBlock
+    .split('\n')
+    .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
+    .join('\n');
   for (const banned of ['Math.random', 'Date.now', 'performance.now']) {
     assert.ok(!code.includes(banned), `skeleton.js must not use ${banned} — seeded kernel channels only`);
   }

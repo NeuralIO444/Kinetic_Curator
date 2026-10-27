@@ -23,16 +23,31 @@ import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { PLATE_CENTER, PLATE_RADIUS } from './plateBody.mjs';
 import { STIPPLE_DOT_SCALE } from './stippleBody.mjs';
 import {
-  DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, normalizeLayoutParams, validateLayoutParams,
+  DEFAULT_LAYOUT_PARAMS,
+  PARAM_SPEC,
+  normalizeLayoutParams,
+  validateLayoutParams,
 } from '../data/layout-modes.js';
 import { place, paramCensus } from '../curator/censusReport.mjs';
 import { composeStillSvg } from '../curator/miner.mjs';
 import { resolvePalette } from '../data/palettes.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
-const KNOBS = ['glassAlpha', 'plateRadius', 'plateCenterX', 'plateCenterY', 'washStrength', 'washSpread', 'stippleDotScale'];
+const KNOBS = [
+  'glassAlpha',
+  'plateRadius',
+  'plateCenterX',
+  'plateCenterY',
+  'washStrength',
+  'washSpread',
+  'stippleDotScale',
+];
 
 // ── registration + defaults ──────────────────────────────────────────
 ok('defaults are the shipped constants, exactly', () => {
@@ -57,8 +72,13 @@ ok('every knob is registered in PARAM_SPEC with sane bounds', () => {
 
 ok('normalize clamps to spec; the write-path door accepts the knobs', () => {
   const wild = normalizeLayoutParams({
-    glassAlpha: 7, plateRadius: 99, plateCenterX: -3, plateCenterY: 2,
-    washStrength: -1, washSpread: 100, stippleDotScale: 0,
+    glassAlpha: 7,
+    plateRadius: 99,
+    plateCenterX: -3,
+    plateCenterY: 2,
+    washStrength: -1,
+    washSpread: 100,
+    stippleDotScale: 0,
   });
   assert.equal(wild.glassAlpha, PARAM_SPEC.glassAlpha.max);
   assert.equal(wild.plateRadius, PARAM_SPEC.plateRadius.max);
@@ -77,9 +97,11 @@ ok('normalize clamps to spec; the write-path door accepts the knobs', () => {
 // ── defaults parity at the still surface ─────────────────────────────
 const BASE = { count: 60, kinemeBreath: 0.3, kinemeDrift: 0.5, kinemePaletteBreath: 0.12, mode: 'fibonacci' };
 const palette = resolvePalette('hydra', null, []);
-const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+const raster = (svg) =>
+  new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
 const diffPx = (a, b) => {
-  const ap = a.pixels; const bp = b.pixels; // cache once (#1564)
+  const ap = a.pixels;
+  const bp = b.pixels; // cache once (#1564)
   let d = 0;
   for (let i = 0; i < ap.length; i += 4) {
     if (ap[i] !== bp[i] || ap[i + 1] !== bp[i + 1] || ap[i + 2] !== bp[i + 2] || ap[i + 3] !== bp[i + 3]) d++;
@@ -102,7 +124,7 @@ ok('explicit defaults compose byte-identical stills to absent knobs (all four bo
 });
 
 // ── each knob moves its body, alone ──────────────────────────────────
-ok('each knob moved alone moves its body\'s still (differing pixels)', () => {
+ok("each knob moved alone moves its body's still (differing pixels)", () => {
   const cases = [
     ['glass', 'glassAlpha', { glassAlpha: 0.4 }],
     ['plate', 'plateRadius', { plateRadius: 0.6 }],

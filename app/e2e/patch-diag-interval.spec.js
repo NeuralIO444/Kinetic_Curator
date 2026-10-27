@@ -5,7 +5,11 @@ import { test, expect } from '@playwright/test';
 
 test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.addInitScript(() => {
-    try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
     window.__ivl1000 = 0;
     const orig = window.setInterval;
     window.setInterval = function (fn, ms, ...rest) {
@@ -21,7 +25,10 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.locator('.build-layer-stack .strata-add').click();
 
   // Patch the expanded block so its diag line is live.
-  const block = page.locator('.strata-block').filter({ has: page.locator('.strata-composite[title^="PATCH"]') }).first();
+  const block = page
+    .locator('.strata-block')
+    .filter({ has: page.locator('.strata-composite[title^="PATCH"]') })
+    .first();
   await block.locator('.strata-composite[title^="PATCH"] select').first().selectOption('field');
 
   const opacity = page.locator('.strata-block input[type="range"]').first();

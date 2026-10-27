@@ -10,7 +10,9 @@ export async function seedAddType(page, type) {
     try {
       localStorage.setItem('kc:first-run-seen', '1');
       localStorage.setItem('kc:strata-last-add', t);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, type);
 }
 

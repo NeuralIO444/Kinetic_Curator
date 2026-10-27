@@ -112,8 +112,11 @@ export function fieldMapActive(cfg) {
 // zero-import leaf, so no pattern/ or gl/ dependency is introduced.
 
 function rgbToHsl(r, g, b) {
-  r /= 255; g /= 255; b /= 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b);
+  r /= 255;
+  g /= 255;
+  b /= 255;
+  const max = Math.max(r, g, b),
+    min = Math.min(r, g, b);
   const l = (max + min) / 2;
   if (max === min) return [0, 0, l];
   const d = max - min;
@@ -135,15 +138,19 @@ function hslToHex(h, s, l) {
     return p;
   };
   let r, g, b;
-  if (s === 0) { r = g = b = l; }
-  else {
+  if (s === 0) {
+    r = g = b = l;
+  } else {
     const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
     const p = 2 * l - q;
     r = hue2rgb(p, q, h + 1 / 3);
     g = hue2rgb(p, q, h);
     b = hue2rgb(p, q, h - 1 / 3);
   }
-  const to2 = (v) => Math.min(255, Math.max(0, Math.round(v * 255))).toString(16).padStart(2, '0');
+  const to2 = (v) =>
+    Math.min(255, Math.max(0, Math.round(v * 255)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${to2(r)}${to2(g)}${to2(b)}`;
 }
 
@@ -237,11 +244,9 @@ export function applyFieldMap(items, cfg, ctx = {}) {
   let sample;
   if (cfg.field === 'noise') {
     noise = makeNoiseField(seed);
-    sample = (it) => noise.sample(
-      Math.min(1, Math.max(0, it.x / W)),
-      Math.min(1, Math.max(0, it.y / H)),
-    );
-  } else { // 'density'
+    sample = (it) => noise.sample(Math.min(1, Math.max(0, it.x / W)), Math.min(1, Math.max(0, it.y / H)));
+  } else {
+    // 'density'
     density = densityFieldFor(items, W, H);
     sample = (_, i) => density.sampleAt(i);
   }

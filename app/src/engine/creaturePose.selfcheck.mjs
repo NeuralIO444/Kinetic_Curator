@@ -7,12 +7,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import {
-  createStressTracker, BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN,
-} from '../curator/stress.js';
-import {
-  creaturePose, POSE_PARAMS, FLOURISH_FLAP_DEG, FLOURISH_PERIOD_FRAMES,
-} from './creaturePose.js';
+import { createStressTracker, BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN } from '../curator/stress.js';
+import { creaturePose, POSE_PARAMS, FLOURISH_FLAP_DEG, FLOURISH_PERIOD_FRAMES } from './creaturePose.js';
 import { createCreatureBuilder, MOTH } from './creature.js';
 import { fnv1a } from './skeleton.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -90,18 +86,37 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 {
   const deep = { band: BAND_RELAX, stress: 0 };
   assert.equal(creaturePose({ ...deep, frame: 0 }).foreDirDeg, 20);
-  assert.ok(near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 4 }).foreDirDeg, 20 + FLOURISH_FLAP_DEG), 'quarter period: full swing out');
-  assert.ok(near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 4 }).hindDirDeg, 12 - FLOURISH_FLAP_DEG * 0.7), 'the hind pair sways in counterphase');
-  assert.ok(near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 2 }).foreDirDeg, 20), 'half period: back through centre');
-  assert.ok(near(creaturePose({ ...deep, frame: (3 * FLOURISH_PERIOD_FRAMES) / 4 }).foreDirDeg, 20 - FLOURISH_FLAP_DEG), 'three quarters: full swing the other way');
-  assert.ok(near(
-    creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES }).foreDirDeg,
-    creaturePose({ ...deep, frame: 0 }).foreDirDeg,
-  ), 'the sway is periodic in the frame index');
+  assert.ok(
+    near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 4 }).foreDirDeg, 20 + FLOURISH_FLAP_DEG),
+    'quarter period: full swing out',
+  );
+  assert.ok(
+    near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 4 }).hindDirDeg, 12 - FLOURISH_FLAP_DEG * 0.7),
+    'the hind pair sways in counterphase',
+  );
+  assert.ok(
+    near(creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES / 2 }).foreDirDeg, 20),
+    'half period: back through centre',
+  );
+  assert.ok(
+    near(creaturePose({ ...deep, frame: (3 * FLOURISH_PERIOD_FRAMES) / 4 }).foreDirDeg, 20 - FLOURISH_FLAP_DEG),
+    'three quarters: full swing the other way',
+  );
+  assert.ok(
+    near(
+      creaturePose({ ...deep, frame: FLOURISH_PERIOD_FRAMES }).foreDirDeg,
+      creaturePose({ ...deep, frame: 0 }).foreDirDeg,
+    ),
+    'the sway is periodic in the frame index',
+  );
   // the same depth of stress with the band held at Normal (hysteresis holding): no flourish, no sway at all
   const held = creaturePose({ band: BAND_NORMAL, stress: 0, frame: FLOURISH_PERIOD_FRAMES / 4 });
   assert.equal(held.weights.flourish, 0);
-  assert.equal(held.foreDirDeg, creaturePose({ band: BAND_NORMAL, stress: 0, frame: 0 }).foreDirDeg, 'frame-free outside the flourish');
+  assert.equal(
+    held.foreDirDeg,
+    creaturePose({ band: BAND_NORMAL, stress: 0, frame: 0 }).foreDirDeg,
+    'frame-free outside the flourish',
+  );
   // and outside the flourish nothing anywhere depends on the frame
   assert.deepEqual(
     creaturePose({ band: BAND_TIGHTEN, stress: 0.95, frame: 0 }),
@@ -127,9 +142,15 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 {
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'creaturePose.js'), 'utf8');
   const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '');
-  const code = noBlock.split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
+  const code = noBlock
+    .split('\n')
+    .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
+    .join('\n');
   assert.ok(!/0\.28|0\.72/.test(code), 'no band-edge literals in the pose module: the edges live in stress.js');
-  assert.ok(/RELAX_BELOW/.test(code) && /TIGHTEN_ABOVE/.test(code) && /from '\.\.\/curator\/stress\.js'/.test(code), 'the edges are imported from the band reader');
+  assert.ok(
+    /RELAX_BELOW/.test(code) && /TIGHTEN_ABOVE/.test(code) && /from '\.\.\/curator\/stress\.js'/.test(code),
+    'the edges are imported from the band reader',
+  );
   assert.ok(!/bandFor|createStressTracker/.test(code), 'the pose never computes a band');
   for (const banned of ['Math.random', 'Date.now', 'performance.now']) {
     assert.ok(!code.includes(banned), `creaturePose.js must not use ${banned} — frame index and reader outputs only`);
@@ -150,22 +171,30 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   };
   // a slow sweep, hysteresis isolated (no smoothing): up through Tighten, back, down through Relax, back
   const t = createStressTracker({ smoothFrames: 1, hysteresis: 0.04 });
-  const ramp = (a, b, step) => { const vs = []; for (let v = a; step > 0 ? v <= b : v >= b; v += step) vs.push(v); return vs; };
+  const ramp = (a, b, step) => {
+    const vs = [];
+    for (let v = a; step > 0 ? v <= b : v >= b; v += step) vs.push(v);
+    return vs;
+  };
   const seen = [
     ...transitions(t, [0.6]),
     ...transitions(t, ramp(0.601, 0.85, 0.001)),
     ...transitions(t, ramp(0.849, 0.15, -0.001)),
     ...transitions(t, ramp(0.151, 0.4, 0.001)),
   ];
-  assert.deepEqual(seen, [BAND_NORMAL, BAND_TIGHTEN, BAND_NORMAL, BAND_RELAX, BAND_NORMAL],
-    'one transition per crossing, each way, at both edges — never two, never a flicker back');
+  assert.deepEqual(
+    seen,
+    [BAND_NORMAL, BAND_TIGHTEN, BAND_NORMAL, BAND_RELAX, BAND_NORMAL],
+    'one transition per crossing, each way, at both edges — never two, never a flicker back',
+  );
 
   // parked oscillating ±0.01 around the Tighten edge: the band holds, and so does the posture
   const parked = createStressTracker();
   for (let i = 0; i < 30; i++) parked.update(all(0.5));
   assert.equal(parked.band, BAND_NORMAL);
   let bandEvents = 0;
-  for (let i = 0; i < 120; i++) { // settle INTO the park first: the smoothed value climbs to the edge and stays
+  for (let i = 0; i < 120; i++) {
+    // settle INTO the park first: the smoothed value climbs to the edge and stays
     bandEvents += parked.update(all(i % 2 === 0 ? 0.71 : 0.73)).events.filter((e) => e.type === 'band').length;
   }
   assert.equal(parked.band, BAND_NORMAL, 'even settling onto the edge does not flip the band');
@@ -200,18 +229,31 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
   const input = (over = {}) => ({
-    dishPins: [{ x: 500, y: 350 }], dishFormed: [true], seed: 77, seedOffsets: null, loopTimeMs: 0, assetAttach: {}, ...over,
+    dishPins: [{ x: 500, y: 350 }],
+    dishFormed: [true],
+    seed: 77,
+    seedOffsets: null,
+    loopTimeMs: 0,
+    assetAttach: {},
+    ...over,
   });
   const grow = (over) => {
     const b = createCreatureBuilder();
     let e;
-    for (let i = 0; i < MOTH.growFrames + 1; i++) { e = entry(); b.append(input(over), e, ASSETS); }
+    for (let i = 0; i < MOTH.growFrames + 1; i++) {
+      e = entry();
+      b.append(input(over), e, ASSETS);
+    }
     return { b, e };
   };
 
   const S1_WORLD_HASH = '7944cd55'; // S1's recorded builder hash for this fixture (kc-s1-build STAGING-REPORT)
   const plain = grow({ wantSkeletons: true });
-  assert.equal(plain.b.lastSkeletons()[0].hash, S1_WORLD_HASH, 'no band on the input: the skeleton is S1’s, bit for bit');
+  assert.equal(
+    plain.b.lastSkeletons()[0].hash,
+    S1_WORLD_HASH,
+    'no band on the input: the skeleton is S1’s, bit for bit',
+  );
   assert.deepEqual(plain.b.lastPoses(), [null], 'and no pose is published');
   // 58, not the 26 this check was staged against: S3's feather fan replaced the scatter moth (26 → 58
   // items) before S5 published. S5 itself adds and removes no items — the count is S3's census; the
@@ -219,7 +261,11 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(plain.e[0].items.filter((it) => it._creature).length, 58, 'the drawn moth is unchanged');
 
   const neutral = grow({ wantSkeletons: true, band: BAND_NORMAL, smoothed: 0.5 });
-  assert.equal(neutral.b.lastSkeletons()[0].hash, S1_WORLD_HASH, 'a neutral band applies the identity pose: still S1’s frame');
+  assert.equal(
+    neutral.b.lastSkeletons()[0].hash,
+    S1_WORLD_HASH,
+    'a neutral band applies the identity pose: still S1’s frame',
+  );
   assert.equal(neutral.b.lastPoses()[0].name, 'neutral');
 
   const flourish = grow({ wantSkeletons: true, band: BAND_RELAX, smoothed: 0.04 });
@@ -227,7 +273,11 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(flourish.b.lastPoses()[0].name, 'flourish');
   assert.equal(flourish.b.lastPoses()[0].weights.flourish, 1);
   assert.notEqual(flourish.b.lastSkeletons()[0].hash, S1_WORLD_HASH, 'deep Relax opens the frame');
-  assert.equal(flourish.b.lastSkeletons()[0].hash, flourish2.b.lastSkeletons()[0].hash, 'and does so deterministically');
+  assert.equal(
+    flourish.b.lastSkeletons()[0].hash,
+    flourish2.b.lastSkeletons()[0].hash,
+    'and does so deterministically',
+  );
 
   const withered = grow({ wantSkeletons: true, band: BAND_TIGHTEN, smoothed: 0.95 });
   const wp = withered.b.lastPoses()[0];
@@ -239,7 +289,12 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const localAngle = (skel, id) => skel.bones.find((bn) => bn.id === id).localAngleDeg;
   // The curl lands per segment at exactly the pose's degrees. The sign flips across the mirror (the left
   // chain is built in negated angle space, the right is its mirror) — the pair curls symmetrically.
-  for (const [seg, want] of [['fore/L/1', -10], ['fore/L/2', -10], ['fore/R/1', 10], ['fore/R/2', 10]]) {
+  for (const [seg, want] of [
+    ['fore/L/1', -10],
+    ['fore/L/2', -10],
+    ['fore/R/1', 10],
+    ['fore/R/2', 10],
+  ]) {
     const d = localAngle(withered.b.lastSkeletons()[0], seg) - localAngle(plain.b.lastSkeletons()[0], seg);
     assert.ok(near(d, want, 1e-6), `${seg} curls by the pose’s per-segment curl (got ${d})`);
   }
@@ -273,23 +328,50 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   for (let f = 0; f < 480; f++) {
     const r = tracker.update(all(script(f)));
     for (const e of r.events) if (e.type === 'band') bandEvents.push(e.band);
-    b.append({
-      dishPins: [{ x: 500, y: 350 }], dishFormed: [true], seed: 77, seedOffsets: null, loopTimeMs: 0,
-      assetAttach: {}, wantSkeletons: true, band: r.band, smoothed: r.smoothed,
-    }, entry(), ASSETS);
+    b.append(
+      {
+        dishPins: [{ x: 500, y: 350 }],
+        dishFormed: [true],
+        seed: 77,
+        seedOffsets: null,
+        loopTimeMs: 0,
+        assetAttach: {},
+        wantSkeletons: true,
+        band: r.band,
+        smoothed: r.smoothed,
+      },
+      entry(),
+      ASSETS,
+    );
     const skel = b.lastSkeletons()[0];
     const name = b.lastPoses()[0].name;
     names.push(name);
     hashes.push(skel.hash);
     chain = fnv1a(`${chain}:${skel.hash}:${name}`);
   }
-  assert.deepEqual(bandEvents, [BAND_NORMAL, BAND_TIGHTEN, BAND_NORMAL],
-    'the whole clip crosses into Tighten once and back once — hysteresis holds the ramps clean');
-  assert.ok(names.slice(60, 120).every((n) => n === 'neutral'), 'the clip opens at rest');
-  assert.ok(names.slice(300, 360).every((n) => n === 'withered'), 'the hold is fully withered');
-  assert.ok(names.slice(440, 480).every((n) => n === 'neutral'), 'and it recovers to rest');
+  assert.deepEqual(
+    bandEvents,
+    [BAND_NORMAL, BAND_TIGHTEN, BAND_NORMAL],
+    'the whole clip crosses into Tighten once and back once — hysteresis holds the ramps clean',
+  );
+  assert.ok(
+    names.slice(60, 120).every((n) => n === 'neutral'),
+    'the clip opens at rest',
+  );
+  assert.ok(
+    names.slice(300, 360).every((n) => n === 'withered'),
+    'the hold is fully withered',
+  );
+  assert.ok(
+    names.slice(440, 480).every((n) => n === 'neutral'),
+    'and it recovers to rest',
+  );
   for (let k = 0; k < 20; k++) {
-    assert.equal(hashes[460 + k], hashes[100 + k], `frame ${460 + k} is frame ${100 + k} again: the recover is exact, not approximate`);
+    assert.equal(
+      hashes[460 + k],
+      hashes[100 + k],
+      `frame ${460 + k} is frame ${100 + k} again: the recover is exact, not approximate`,
+    );
   }
   // Pinned 2026-10-16 from the first verified run: every structural assertion above (band crossings,
   // pose plateaus, exact recovery) passed on the sequence this hash summarizes before it was pinned.
@@ -297,4 +379,6 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(CLIP_HASH, '4c71aad3', `the clip's frame-sequence hash (got ${CLIP_HASH})`);
 }
 
-console.log('creaturePose.selfcheck: OK (endpoints, blending, flourish, hygiene, one-place edges, hysteresis consumed, builder seam, clip)');
+console.log(
+  'creaturePose.selfcheck: OK (endpoints, blending, flourish, hygiene, one-place edges, hysteresis consumed, builder seam, clip)',
+);

@@ -138,10 +138,17 @@ export function clearDishDeform(sys, i) {
 export function stepDishDeform(sys, dtSec, opts = {}) {
   const n = sys.n;
   if (!n) return;
-  const MEM = sys.deformMem; const MX = sys.deformMemX; const MY = sys.deformMemY;
-  const AMT = sys.deformAmt; const AX = sys.deformAxisX; const AY = sys.deformAxisY;
-  const ALIVE = sys.alive; const ENERGY = sys.energy;
-  const PHASE = sys.phase; const SOFF = sys.seedOffset; const SMUL = sys.speedMul;
+  const MEM = sys.deformMem;
+  const MX = sys.deformMemX;
+  const MY = sys.deformMemY;
+  const AMT = sys.deformAmt;
+  const AX = sys.deformAxisX;
+  const AY = sys.deformAxisY;
+  const ALIVE = sys.alive;
+  const ENERGY = sys.energy;
+  const PHASE = sys.phase;
+  const SOFF = sys.seedOffset;
+  const SMUL = sys.speedMul;
   const on = sys._deformOn !== false;
   const still = !on || !!opts.reducedMotion;
   // Spine C (#389): amt *= exp(-lambda * dt) — the critically-damped step,
@@ -149,22 +156,31 @@ export function stepDishDeform(sys, dtSec, opts = {}) {
   const keep = Math.exp(-DEFORM_SPRING_LAMBDA * dtSec);
   const step = sys._step;
   for (let i = 0; i < n; i++) {
-    if (!ALIVE[i]) { MEM[i] = 0; AMT[i] = 0; continue; }
+    if (!ALIVE[i]) {
+      MEM[i] = 0;
+      AMT[i] = 0;
+      continue;
+    }
     let s = MEM[i] * keep;
     if (s < 1e-4) s = 0; // settled: exact rest, not an asymptote
     MEM[i] = on ? s : 0;
-    if (still) { AMT[i] = 0; continue; }
+    if (still) {
+      AMT[i] = 0;
+      continue;
+    }
     // Membrane wobble: signed, per-body decorrelated (#558 columns), a
     // pure function of the step counter — same steps, same wobble, in
     // the live loop and in the bake alike.
     const liv = 0.25 + 0.75 * clamp01(ENERGY[i]);
-    const wa = WOBBLE_MAX * liv
-      * Math.sin(step * WOBBLE_STEP * (SMUL[i] || 1) + PHASE[i] * TAU + SOFF[i] * TAU);
+    const wa = WOBBLE_MAX * liv * Math.sin(step * WOBBLE_STEP * (SMUL[i] || 1) + PHASE[i] * TAU + SOFF[i] * TAU);
     const wang = (SOFF[i] + PHASE[i]) * TAU;
     const dx = MX[i] * s + wa * Math.cos(wang);
     const dy = MY[i] * s + wa * Math.sin(wang);
     const m = Math.sqrt(dx * dx + dy * dy);
-    if (m < 1e-5) { AMT[i] = 0; continue; }
+    if (m < 1e-5) {
+      AMT[i] = 0;
+      continue;
+    }
     AMT[i] = Math.min(DEFORM_MAX, m);
     AX[i] = dx / m;
     AY[i] = dy / m;

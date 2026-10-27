@@ -29,7 +29,13 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { ParticleSystem } from './particles.js';
-import { stepDishCoalesce, coalescePairs, coalesceFactor, COALESCE_DWELL_GATE, COALESCE_RAMP_STEPS } from './dishCoalesce.mjs';
+import {
+  stepDishCoalesce,
+  coalescePairs,
+  coalesceFactor,
+  COALESCE_DWELL_GATE,
+  COALESCE_RAMP_STEPS,
+} from './dishCoalesce.mjs';
 import { stepDishPigment, syncDishPigment, pigmentHex, PIGMENT_RATE_PER_SEC } from './dishPigment.mjs';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
@@ -47,17 +53,36 @@ const BASE_K = 1 - Math.exp(-PIGMENT_RATE_PER_SEC * DT);
 // near-touch rule keeps the contact sustained. Colours set against
 // the palette's grain, then synced into the working copy.
 const CTX = {
-  radius: 20, restitution: 1, repel: 0, mode: 'none', umask: 0xffffffff,
-  breedCap: 10, seed: SEED, organism: false,
-  minScale: 0.4, maxScale: 1.6, minAlpha: 40, maxAlpha: 100,
+  radius: 20,
+  restitution: 1,
+  repel: 0,
+  mode: 'none',
+  umask: 0xffffffff,
+  breedCap: 10,
+  seed: SEED,
+  organism: false,
+  minScale: 0.4,
+  maxScale: 1.6,
+  minAlpha: 40,
+  maxAlpha: 100,
 };
 const restingPair = () => {
   const sys = new ParticleSystem();
   sys.init(2, 1000, 700, assets, palette, SEED);
-  sys.x[0] = 400; sys.y[0] = 350; sys.x[1] = 430; sys.y[1] = 350;
-  sys.vx[0] = 0; sys.vy[0] = 0; sys.vx[1] = 0; sys.vy[1] = 0;
-  sys.mass[0] = 1; sys.mass[1] = 1; sys.scale[0] = 1; sys.scale[1] = 1;
-  sys.color[0] = '#ff0000'; sys.color[1] = '#0000ff';
+  sys.x[0] = 400;
+  sys.y[0] = 350;
+  sys.x[1] = 430;
+  sys.y[1] = 350;
+  sys.vx[0] = 0;
+  sys.vy[0] = 0;
+  sys.vx[1] = 0;
+  sys.vy[1] = 0;
+  sys.mass[0] = 1;
+  sys.mass[1] = 1;
+  sys.scale[0] = 1;
+  sys.scale[1] = 1;
+  sys.color[0] = '#ff0000';
+  sys.color[1] = '#0000ff';
   syncDishPigment(sys); // the working copy starts at the visible colours
   sys._layout = { contactRadius: 20 };
   return sys;
@@ -95,16 +120,21 @@ const rgb = (sys, i) => [sys.leakRgb[i * 3], sys.leakRgb[i * 3 + 1], sys.leakRgb
       assert.ok(r0 < prevR0 && r0 >= 127.5 - 1e-9, `step ${s}: monotone, no overshoot (${r0})`);
       prevR0 = r0;
       if (s === 200) {
-        assert.notStrictEqual(sys.color[0], '#ff0000',
-          'by step 200 the quantized write-back has visibly traded (it lags the working copy by design — the atlas discipline)');
+        assert.notStrictEqual(
+          sys.color[0],
+          '#ff0000',
+          'by step 200 the quantized write-back has visibly traded (it lags the working copy by design — the atlas discipline)',
+        );
       }
     }
   }
   // The acceptance probe: 60 s of contact — measurably converged.
   const [r0, , b0] = rgb(sys, 0);
   const [r1, , b1] = rgb(sys, 1);
-  assert.ok(Math.abs(r0 - r1) < 1 && Math.abs(b0 - b1) < 1,
-    `after 60 s the channel gap is under 1/255 of its start (${Math.abs(r0 - r1)})`);
+  assert.ok(
+    Math.abs(r0 - r1) < 1 && Math.abs(b0 - b1) < 1,
+    `after 60 s the channel gap is under 1/255 of its start (${Math.abs(r0 - r1)})`,
+  );
   assert.strictEqual(sys.color[0], sys.color[1], 'the visible colours converge to the same hex');
   assert.strictEqual(sys.color[0], '#800080', 'the converged colour is the pair mean, quantized');
   assert.strictEqual(pigmentHex(127.5, 0, 127.5), '#800080', 'write-back quantization is the #287 discipline');
@@ -135,11 +165,20 @@ const rgb = (sys, i) => [sys.leakRgb[i * 3], sys.leakRgb[i * 3 + 1], sys.leakRgb
 
 // Seeded full-update harness for (d), (e), (g). 'stick' so bodies
 // genuinely rest against each other and merge (B2's harness).
-const lpSwarm = (over = {}) => normalizeLayoutParams({
-  ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 90,
-  contactRadius: 26, contactMode: 'stick', contactRestitution: 0.6,
-  kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0, ...over,
-});
+const lpSwarm = (over = {}) =>
+  normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'swarm',
+    particleCount: 90,
+    contactRadius: 26,
+    contactMode: 'stick',
+    contactRestitution: 0.6,
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+    lifeDrift: 0,
+    ...over,
+  });
 const runSys = (lp, steps, extra = {}, seed = SEED) => {
   const sys = new ParticleSystem();
   sys.init(lp.particleCount, 1000, 700, assets, palette, seed, null, { graze: lp.graze || 0 });
@@ -163,13 +202,20 @@ const assertSamePhysics = (a, b, label) => {
   const on = runSys(lpSwarm(), 90);
   const off = runSys(lpSwarm(), 90, { pigment: false });
   assertSamePhysics(on.sys, off.sys, 'pigment on == off');
-  assert.ok(on.sys.color.some((c) => !palette.swatches.includes(c)),
-    'the on run earned colours outside the palette (the comparison is not vacuous)');
-  assert.ok(off.sys.color.every((c) => palette.swatches.includes(c)),
-    'the off run never writes a colour: every body keeps its dealt swatch');
+  assert.ok(
+    on.sys.color.some((c) => !palette.swatches.includes(c)),
+    'the on run earned colours outside the palette (the comparison is not vacuous)',
+  );
+  assert.ok(
+    off.sys.color.every((c) => palette.swatches.includes(c)),
+    'the off run never writes a colour: every body keeps its dealt swatch',
+  );
   for (let s = 1; s < off.trail.length; s++) {
-    assert.deepStrictEqual(off.trail[s].leak, off.trail[0].leak,
-      `off step ${s}: the working copy never moves (the trade is the only writer here)`);
+    assert.deepStrictEqual(
+      off.trail[s].leak,
+      off.trail[0].leak,
+      `off step ${s}: the working copy never moves (the trade is the only writer here)`,
+    );
   }
   for (let i = 0; i < off.sys.n; i++) {
     const [r, g, b] = rgb(off.sys, i);
@@ -182,10 +228,15 @@ const assertSamePhysics = (a, b, label) => {
   const on = runSys(lpSwarm(), 90);
   const rm = runSys(lpSwarm(), 90, { reducedMotion: true });
   const off = runSys(lpSwarm(), 90, { pigment: false });
-  assert.ok(rm.sys._coalesce && rm.sys._coalesce.pairs.size > 0,
-    'the dwell state still tracks underneath the stillness');
-  assert.deepStrictEqual(rm.trail, off.trail,
-    'reduced-motion accrues no trade at any step (working copy + colours equal the off run)');
+  assert.ok(
+    rm.sys._coalesce && rm.sys._coalesce.pairs.size > 0,
+    'the dwell state still tracks underneath the stillness',
+  );
+  assert.deepStrictEqual(
+    rm.trail,
+    off.trail,
+    'reduced-motion accrues no trade at any step (working copy + colours equal the off run)',
+  );
   assertSamePhysics(on.sys, rm.sys, 'reduced-motion == full motion, physically');
 }
 
@@ -195,8 +246,16 @@ const assertSamePhysics = (a, b, label) => {
   assert.ok(decl, 'pigment cost tier registered');
   assert.strictEqual(decl.tier, 2, 'pigment sheds on tier 2, deform\u2019s rung');
   assert.ok(!tier1ShedIds().includes('engine/dish-pigment'), 'the tier-1 shed set does not name it');
-  assert.strictEqual(dishPigmentShed({ perfTier1: true, quality: 'performance' }), true, 'shed: tier 1 gone AND quality at performance');
-  assert.strictEqual(dishPigmentShed({ perfTier1: true, quality: 'balanced' }), false, 'no shed: tier 1 gone but quality not stepped down');
+  assert.strictEqual(
+    dishPigmentShed({ perfTier1: true, quality: 'performance' }),
+    true,
+    'shed: tier 1 gone AND quality at performance',
+  );
+  assert.strictEqual(
+    dishPigmentShed({ perfTier1: true, quality: 'balanced' }),
+    false,
+    'no shed: tier 1 gone but quality not stepped down',
+  );
   assert.strictEqual(dishPigmentShed({ perfTier1: false, quality: 'performance' }), false, 'no shed: tier 1 still on');
   assert.strictEqual(dishPigmentShed({}), false, 'no shed: a still/export doc carries no governor state');
 
@@ -229,7 +288,11 @@ const assertSamePhysics = (a, b, label) => {
   for (let i = 0; i < sys.n; i++) {
     assert.strictEqual(sys.color[i], paletteB.swatches[i % 3], `body ${i}: re-dealt from the new palette`);
     const [r, g, b] = rgb(sys, i);
-    assert.strictEqual(pigmentHex(r, g, b), sys.color[i], `body ${i}: working copy re-seeded (no repaint from the old palette)`);
+    assert.strictEqual(
+      pigmentHex(r, g, b),
+      sys.color[i],
+      `body ${i}: working copy re-seeded (no repaint from the old palette)`,
+    );
   }
 }
 
@@ -237,13 +300,21 @@ const assertSamePhysics = (a, b, label) => {
 {
   const particles = readFileSync(new URL('./particles.js', import.meta.url), 'utf8');
   const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
-  assert.ok(particles.includes('stepDishPigment(this') && particles.includes('syncDishPigment(this)'),
-    'particles.js takes the step + palette-sync call sites');
-  assert.ok(particles.includes('_pigmentOn = layoutParams.pigment !== false'),
-    'the spread-only switch is read in update()');
+  assert.ok(
+    particles.includes('stepDishPigment(this') && particles.includes('syncDishPigment(this)'),
+    'particles.js takes the step + palette-sync call sites',
+  );
+  assert.ok(
+    particles.includes('_pigmentOn = layoutParams.pigment !== false'),
+    'the spread-only switch is read in update()',
+  );
   assert.ok(!particles.includes('PIGMENT_RATE_PER_SEC'), 'the rate law stays in the module, not the integrator');
-  assert.ok(resolve.includes('pigmentShed: !!ctx.pigmentShed') && resolve.includes('dishPigmentShed({'),
-    'the resolver forwards the governor\u2019s shed into the swarm update');
+  assert.ok(
+    resolve.includes('pigmentShed: !!ctx.pigmentShed') && resolve.includes('dishPigmentShed({'),
+    'the resolver forwards the governor\u2019s shed into the swarm update',
+  );
 }
 
-console.log('dishPigment.selfcheck: OK (#1412 — closed-form dwell-weighted trade, 60 s convergence, history kept, exact symmetry, physics byte-identity, reduced-motion rest, tier-2 shed, bake=live, palette re-seed)');
+console.log(
+  'dishPigment.selfcheck: OK (#1412 — closed-form dwell-weighted trade, 60 s convergence, history kept, exact symmetry, physics byte-identity, reduced-motion rest, tier-2 shed, bake=live, palette re-seed)',
+);

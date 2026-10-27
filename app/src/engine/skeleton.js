@@ -28,7 +28,7 @@ const CENTRE = 50; // the asset box's centre; attach points arrive in box units,
 const rad = (deg) => (deg * Math.PI) / 180;
 const finite = (v, d) => (Number.isFinite(v) ? v : d);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const normDeg = (d) => (((d + 180) % 360) + 360) % 360 - 180;
+const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const noNegZero = (v) => (v === 0 ? 0 : v);
 
 /** FNV-1a 32-bit of a string — the house hash (hierarchy.js's pathHash, creature.js's hash32). */
@@ -61,7 +61,9 @@ export function resolveMarkers(points) {
   let head = pts.findIndex((p) => p && p.role === 'H');
   if (head < 0) head = pts.length ? 0 : -1;
   const limbs = [];
-  pts.forEach((p, i) => { if (i !== head) limbs.push(i); });
+  pts.forEach((p, i) => {
+    if (i !== head) limbs.push(i);
+  });
   return { head, limbs };
 }
 
@@ -90,9 +92,18 @@ function makeBone({ id, parent, chain, role, side, marker, base, tip, parentAngl
   const uy = length > 0 ? dy / length : -1;
   const angleDeg = normDeg((Math.atan2(uy, ux) * 180) / Math.PI);
   return {
-    id, parent, chain, role, side, marker,
-    base: { x: base.x, y: base.y }, tip: { x: tip.x, y: tip.y },
-    ux, uy, angleDeg, length,
+    id,
+    parent,
+    chain,
+    role,
+    side,
+    marker,
+    base: { x: base.x, y: base.y },
+    tip: { x: tip.x, y: tip.y },
+    ux,
+    uy,
+    angleDeg,
+    length,
     localAngleDeg: parentAngleDeg == null ? 0 : normDeg(angleDeg - parentAngleDeg),
   };
 }
@@ -110,7 +121,8 @@ export function mirrorBone(b) {
     side: 'R',
     base: { x: mir(b.base.x), y: b.base.y },
     tip: { x: mir(b.tip.x), y: b.tip.y },
-    ux: mir(b.ux), uy: b.uy,
+    ux: mir(b.ux),
+    uy: b.uy,
     angleDeg: normDeg(180 - b.angleDeg),
     localAngleDeg: mir(b.localAngleDeg),
   };
@@ -128,8 +140,22 @@ export const MOTH_SKELETON_PLAN = Object.freeze({
   spineSegments: 4,
   hindAlong: 0.45, // where the hind chain roots: this far from the side point toward the bottom point
   chains: Object.freeze([
-    Object.freeze({ id: 'fore', root: 'side', dirDeg: 58, sweepDeg: 7, totalLen: 100, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
-    Object.freeze({ id: 'hind', root: 'hind', dirDeg: 122, sweepDeg: 5, totalLen: 78, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
+    Object.freeze({
+      id: 'fore',
+      root: 'side',
+      dirDeg: 58,
+      sweepDeg: 7,
+      totalLen: 100,
+      lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+    }),
+    Object.freeze({
+      id: 'hind',
+      root: 'hind',
+      dirDeg: 122,
+      sweepDeg: 5,
+      totalLen: 78,
+      lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+    }),
   ]),
 });
 
@@ -153,7 +179,14 @@ export const MOTH_SKELETON_PLAN = Object.freeze({
  * @returns { plan, creatureId, bones, headBone, hash } — bones in construction order: spine, left chains, right
  *          chains (mirrored). headBone is the H bone's id. hash is skeletonHash() of the bones.
  */
-export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETON_PLAN, attach = null, pose = {}, seedOffsets = null } = {}) {
+export function buildSkeleton({
+  seed = 0,
+  creatureId = 'c0',
+  plan = MOTH_SKELETON_PLAN,
+  attach = null,
+  pose = {},
+  seedOffsets = null,
+} = {}) {
   const bodyScale = finite(pose.bodyScale, 1);
   const wingScale = finite(pose.wingScale, 1);
   const hindAmount = clamp(finite(pose.hindAmount, 1), 0, 1);
@@ -169,11 +202,18 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
   const pts = rawPts.map(centred);
   let top = pts.length ? extreme(pts, 'top') : { x: 0, y: -CENTRE };
   let bottom = pts.length ? extreme(pts, 'bottom') : { x: 0, y: CENTRE };
-  if (Math.hypot(top.x - bottom.x, top.y - bottom.y) < 1) { top = { x: 0, y: -CENTRE }; bottom = { x: 0, y: CENTRE }; }
+  if (Math.hypot(top.x - bottom.x, top.y - bottom.y) < 1) {
+    top = { x: 0, y: -CENTRE };
+    bottom = { x: 0, y: CENTRE };
+  }
   const sidePoint = (side) => {
     if (!pts.length) return side === 'left' ? { x: -CENTRE, y: 0 } : { x: CENTRE, y: 0 };
     const p = extreme(pts, side);
-    return Math.hypot(p.x - top.x, p.y - top.y) < 1 && Math.hypot(p.x - bottom.x, p.y - bottom.y) < 1 ? (side === 'left' ? { x: -CENTRE, y: 0 } : { x: CENTRE, y: 0 }) : p;
+    return Math.hypot(p.x - top.x, p.y - top.y) < 1 && Math.hypot(p.x - bottom.x, p.y - bottom.y) < 1
+      ? side === 'left'
+        ? { x: -CENTRE, y: 0 }
+        : { x: CENTRE, y: 0 }
+      : p;
   };
   // The artist's head point wins over the geometric top when a role (or the default first point) names one.
   const headPoint = markers.head >= 0 && rawPts.length ? centred(rawPts[markers.head]) : top;
@@ -192,21 +232,38 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
   for (let i = 0; i < segCount; i++) {
     acc += (weights[i] * bodyScale) / totalW;
     const t = i === segCount - 1 ? 1 : acc;
-    joints.push({ x: (bottom.x + (headPoint.x - bottom.x) * t) * bodyScale, y: (bottom.y + (headPoint.y - bottom.y) * t) * bodyScale });
+    joints.push({
+      x: (bottom.x + (headPoint.x - bottom.x) * t) * bodyScale,
+      y: (bottom.y + (headPoint.y - bottom.y) * t) * bodyScale,
+    });
   }
   for (let i = 0; i < segCount; i++) {
     const isHead = i === segCount - 1;
-    bones.push(makeBone({
-      id: `spine/${i}`, parent: i === 0 ? null : `spine/${i - 1}`, chain: null,
-      role: isHead ? 'head' : 'spine', side: 'C', marker: isHead ? 'H' : null,
-      base: joints[i], tip: joints[i + 1],
-      parentAngleDeg: i === 0 ? null : bones[i - 1].angleDeg,
-    }));
+    bones.push(
+      makeBone({
+        id: `spine/${i}`,
+        parent: i === 0 ? null : `spine/${i - 1}`,
+        chain: null,
+        role: isHead ? 'head' : 'spine',
+        side: 'C',
+        marker: isHead ? 'H' : null,
+        base: joints[i],
+        tip: joints[i + 1],
+        parentAngleDeg: i === 0 ? null : bones[i - 1].angleDeg,
+      }),
+    );
   }
   const spineAngleAt = (jointIdx) => bones[clamp(jointIdx, 0, segCount - 1)].angleDeg;
   const nearestJoint = (p) => {
-    let best = 0; let bd = Infinity;
-    joints.forEach((j, i) => { const d = Math.hypot(j.x - p.x, j.y - p.y); if (d < bd) { bd = d; best = i; } });
+    let best = 0;
+    let bd = Infinity;
+    joints.forEach((j, i) => {
+      const d = Math.hypot(j.x - p.x, j.y - p.y);
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
+    });
     return best;
   };
 
@@ -221,7 +278,10 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
     const flexDeg = isHind ? finite(pose.hindFlexDeg, 0) : finite(pose.foreFlexDeg, 0);
     const rootSide = sidePoint('left');
     const root = isHind
-      ? { x: (rootSide.x + (bottom.x - rootSide.x) * finite(plan.hindAlong, 0.45)) * bodyScale, y: (rootSide.y + (bottom.y - rootSide.y) * finite(plan.hindAlong, 0.45)) * bodyScale }
+      ? {
+          x: (rootSide.x + (bottom.x - rootSide.x) * finite(plan.hindAlong, 0.45)) * bodyScale,
+          y: (rootSide.y + (bottom.y - rootSide.y) * finite(plan.hindAlong, 0.45)) * bodyScale,
+        }
       : { x: rootSide.x * bodyScale, y: rootSide.y * bodyScale };
     const fracs = Array.isArray(spec.lenFrac) && spec.lenFrac.length ? spec.lenFrac : [1];
     const chainStream = stream(spec.id);
@@ -236,11 +296,20 @@ export function buildSkeleton({ seed = 0, creatureId = 'c0', plan = MOTH_SKELETO
       const dir = dirFromUp(-(dirDeg + sweep)); // left: angles run negative from straight up
       const tip = { x: base.x + dir.x * len, y: base.y + dir.y * len };
       const bone = makeBone({
-        id: `${spec.id}/L/${i}`, parent: parentId, chain: spec.id, role: 'limb', side: 'L',
-        marker: i === 0 ? 'L' : null, base, tip, parentAngleDeg: parentAngle,
+        id: `${spec.id}/L/${i}`,
+        parent: parentId,
+        chain: spec.id,
+        role: 'limb',
+        side: 'L',
+        marker: i === 0 ? 'L' : null,
+        base,
+        tip,
+        parentAngleDeg: parentAngle,
       });
       leftBones.push(bone);
-      base = tip; parentId = bone.id; parentAngle = bone.angleDeg;
+      base = tip;
+      parentId = bone.id;
+      parentAngle = bone.angleDeg;
     }
   }
   bones.push(...leftBones, ...leftBones.map(mirrorBone));
@@ -278,9 +347,13 @@ export function transformSkeleton(skel, { x = 0, y = 0, rotDeg = 0, scale = 1 } 
     const dy = tip.y - base.y;
     const length = Math.hypot(dx, dy);
     return {
-      ...b, base, tip,
-      ux: length > 0 ? dx / length : b.ux, uy: length > 0 ? dy / length : b.uy,
-      angleDeg: normDeg(b.angleDeg + rotDeg), length,
+      ...b,
+      base,
+      tip,
+      ux: length > 0 ? dx / length : b.ux,
+      uy: length > 0 ? dy / length : b.uy,
+      angleDeg: normDeg(b.angleDeg + rotDeg),
+      length,
     };
   });
   const out = { ...skel, bones };

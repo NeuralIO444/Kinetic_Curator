@@ -280,8 +280,8 @@ ok(
     assert.match(panel, /<MeterHero \/>[\s\S]*?<MotionMeter \/>/, 'beside the meter, STIMULI only');
     assert.ok(!/MotionStrip/.test(panel), 'the #1485 strip no longer renders: one motion readout in the panel');
     assert.match(
-      src('../App.jsx'),
-      /observeAudio\(input && input\.loopTimeMs[\s\S]*?observeMotion\(\)/,
+      flat(src('../App.jsx')),
+      fre(/observeAudio\(input && input\.loopTimeMs[\s\S]*?observeMotion\(\)/),
       'published once per resolved frame, from the frame tap',
     );
   },

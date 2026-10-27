@@ -29,7 +29,7 @@ import { rngForIndex } from './kernel/rng.js';
 import { buildSkeleton, mirrorBone, skeletonHash, fnv1a } from './skeleton.js';
 
 const finite = (v, d) => (Number.isFinite(v) ? v : d);
-const normDeg = (d) => (((d + 180) % 360) + 360) % 360 - 180;
+const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 const noNegZero = (v) => (v === 0 ? 0 : v);
 const rad = (deg) => (deg * Math.PI) / 180;
 
@@ -85,7 +85,9 @@ function poseWithAngles(skel, angleOf) {
       ...b,
       base: { x: base.x, y: base.y },
       tip: { x: base.x + ux * b.length, y: base.y + uy * b.length },
-      ux, uy, angleDeg,
+      ux,
+      uy,
+      angleDeg,
       localAngleDeg: parent ? normDeg(angleDeg - parent.angleDeg) : 0,
     };
     posed.set(b.id, bone);
@@ -157,11 +159,20 @@ export function stepRobotPose(state, targetAngles, frame) {
   for (const [id, target] of Object.entries(targetAngles || {})) {
     const seg = prev[id];
     const cur = seg ? segmentAngleAt(seg, frame) : target;
-    if (seg && seg.to === target) { joints[id] = seg; continue; }
-    if (cur === target) { joints[id] = { from: target, to: target, delta: 0, start: frame, frames: 0 }; continue; }
+    if (seg && seg.to === target) {
+      joints[id] = seg;
+      continue;
+    }
+    if (cur === target) {
+      joints[id] = { from: target, to: target, delta: 0, start: frame, frames: 0 };
+      continue;
+    }
     const delta = arcDeltaDeg(cur, target);
     joints[id] = {
-      from: cur, to: target, delta, start: frame,
+      from: cur,
+      to: target,
+      delta,
+      start: frame,
       frames: Math.abs(delta) <= ROBOT_DETENT_STEP_DEG ? ROBOT_SETTLE_FRAMES_NEAR : ROBOT_SETTLE_FRAMES_FAR,
     };
   }
@@ -202,28 +213,77 @@ export const ROBOT_CHAIN_PLANS = Object.freeze([
   Object.freeze({
     id: 'arms',
     chains: Object.freeze([
-      Object.freeze({ id: 'fore', root: 'side', dirDeg: 90, sweepDeg: 0, totalLen: 96, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
+      Object.freeze({
+        id: 'fore',
+        root: 'side',
+        dirDeg: 90,
+        sweepDeg: 0,
+        totalLen: 96,
+        lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+      }),
     ]),
   }),
   Object.freeze({
     id: 'arms-legs',
     chains: Object.freeze([
-      Object.freeze({ id: 'fore', root: 'side', dirDeg: 90, sweepDeg: 0, totalLen: 90, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
-      Object.freeze({ id: 'hind', root: 'hind', dirDeg: 135, sweepDeg: 0, totalLen: 70, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
+      Object.freeze({
+        id: 'fore',
+        root: 'side',
+        dirDeg: 90,
+        sweepDeg: 0,
+        totalLen: 90,
+        lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+      }),
+      Object.freeze({
+        id: 'hind',
+        root: 'hind',
+        dirDeg: 135,
+        sweepDeg: 0,
+        totalLen: 70,
+        lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+      }),
     ]),
   }),
   Object.freeze({
     id: 'cranes',
     chains: Object.freeze([
-      Object.freeze({ id: 'fore', root: 'side', dirDeg: 45, sweepDeg: 0, totalLen: 110, lenFrac: Object.freeze([0.50, 0.30, 0.20]) }),
-      Object.freeze({ id: 'hind', root: 'hind', dirDeg: 90, sweepDeg: 0, totalLen: 60, lenFrac: Object.freeze([0.50, 0.30, 0.20]) }),
+      Object.freeze({
+        id: 'fore',
+        root: 'side',
+        dirDeg: 45,
+        sweepDeg: 0,
+        totalLen: 110,
+        lenFrac: Object.freeze([0.5, 0.3, 0.2]),
+      }),
+      Object.freeze({
+        id: 'hind',
+        root: 'hind',
+        dirDeg: 90,
+        sweepDeg: 0,
+        totalLen: 60,
+        lenFrac: Object.freeze([0.5, 0.3, 0.2]),
+      }),
     ]),
   }),
   Object.freeze({
     id: 'pylons',
     chains: Object.freeze([
-      Object.freeze({ id: 'fore', root: 'side', dirDeg: 135, sweepDeg: 0, totalLen: 84, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
-      Object.freeze({ id: 'hind', root: 'hind', dirDeg: 90, sweepDeg: 0, totalLen: 66, lenFrac: Object.freeze([0.40, 0.33, 0.27]) }),
+      Object.freeze({
+        id: 'fore',
+        root: 'side',
+        dirDeg: 135,
+        sweepDeg: 0,
+        totalLen: 84,
+        lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+      }),
+      Object.freeze({
+        id: 'hind',
+        root: 'hind',
+        dirDeg: 90,
+        sweepDeg: 0,
+        totalLen: 66,
+        lenFrac: Object.freeze([0.4, 0.33, 0.27]),
+      }),
     ]),
   }),
 ]);
@@ -238,9 +298,7 @@ export const ROBOT_ORNAMENT_SETS = Object.freeze([
   Object.freeze({ id: 'bare', pieces: Object.freeze([]) }),
   Object.freeze({
     id: 'rivet-seams',
-    pieces: Object.freeze([
-      Object.freeze({ part: 'rivet/dome', on: 'joint', every: true }),
-    ]),
+    pieces: Object.freeze([Object.freeze({ part: 'rivet/dome', on: 'joint', every: true })]),
   }),
   Object.freeze({
     id: 'tip-caps',
@@ -268,7 +326,16 @@ export const ROBOT_PART_POOL = Object.freeze([
   Object.freeze({ id: 'plate/slab', kind: 'plate', w: 36, h: 24, corner: 2, rivetPattern: 'corners', rivets: 4 }),
   Object.freeze({ id: 'plate/door', kind: 'plate', w: 24, h: 34, corner: 2, rivetPattern: 'corners', rivets: 4 }),
   Object.freeze({ id: 'plate/disc', kind: 'plate', w: 26, h: 26, corner: 13, rivetPattern: 'ring', rivets: 6 }),
-  Object.freeze({ id: 'plate/vent', kind: 'plate', w: 30, h: 18, corner: 2, rivetPattern: 'corners', rivets: 4, slots: 3 }),
+  Object.freeze({
+    id: 'plate/vent',
+    kind: 'plate',
+    w: 30,
+    h: 18,
+    corner: 2,
+    rivetPattern: 'corners',
+    rivets: 4,
+    slots: 3,
+  }),
   Object.freeze({ id: 'strut/bar', kind: 'strut', w: 30, h: 7, corner: 1, rivetPattern: 'ends', rivets: 2 }),
   Object.freeze({ id: 'strut/brace', kind: 'strut', w: 22, h: 6, corner: 1, rivetPattern: 'ends', rivets: 2 }),
   Object.freeze({ id: 'rivet/dome', kind: 'rivet', w: 4.4, h: 4.4, corner: 2.2 }),
@@ -323,11 +390,23 @@ export function robotPlan(spineIdx, chainIdx) {
  * quantise the pose onto the detents. Returns { planIndices, plan, ornamentSet, skeleton } — the skeleton
  * is born settled on its detents; frame-by-frame travel between poses is settleRobotSkeleton's business.
  */
-export function buildRobotSkeleton({ seed = 0, creatureId = 'r0', attach = null, pose = {}, seedOffsets = null, planIndices = null } = {}) {
+export function buildRobotSkeleton({
+  seed = 0,
+  creatureId = 'r0',
+  attach = null,
+  pose = {},
+  seedOffsets = null,
+  planIndices = null,
+} = {}) {
   const idx = planIndices || robotPlanIndices(seed, creatureId, seedOffsets);
   const plan = robotPlan(idx.spine, idx.chains);
   const raw = buildSkeleton({ seed, creatureId, plan, attach, pose, seedOffsets });
-  return { planIndices: idx, plan, ornamentSet: ROBOT_ORNAMENT_SETS[idx.ornaments], skeleton: quantiseSkeletonPose(raw) };
+  return {
+    planIndices: idx,
+    plan,
+    ornamentSet: ROBOT_ORNAMENT_SETS[idx.ornaments],
+    skeleton: quantiseSkeletonPose(raw),
+  };
 }
 
 /**
@@ -336,7 +415,11 @@ export function buildRobotSkeleton({ seed = 0, creatureId = 'r0', attach = null,
  * `state` back in next frame. This is the whole per-frame robot rule, and it is a pure function of
  * (state, seed, creature, attach, pose, frame).
  */
-export function buildRobotFrame(state, { seed = 0, creatureId = 'r0', attach = null, pose = {}, seedOffsets = null, planIndices = null } = {}, frame = 0) {
+export function buildRobotFrame(
+  state,
+  { seed = 0, creatureId = 'r0', attach = null, pose = {}, seedOffsets = null, planIndices = null } = {},
+  frame = 0,
+) {
   const idx = planIndices || robotPlanIndices(seed, creatureId, seedOffsets);
   const raw = buildSkeleton({ seed, creatureId, plan: robotPlan(idx.spine, idx.chains), attach, pose, seedOffsets });
   const { state: next, skeleton, angles } = settleRobotSkeleton(state, raw, frame);

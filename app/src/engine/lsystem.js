@@ -33,7 +33,7 @@ const rad = (deg) => (deg * Math.PI) / 180;
 const finite = (v, d) => (Number.isFinite(v) ? v : d);
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const clamp01 = (v) => clamp(finite(v, 0), 0, 1);
-const normDeg = (d) => (((d + 180) % 360) + 360) % 360 - 180;
+const normDeg = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
 
 /** The hard bounds on grammar growth — expansion and interpretation are total under these, always. */
 export const LSYSTEM_CAPS = Object.freeze({
@@ -57,15 +57,21 @@ export const SPROUT_FRAMES = 120;
  */
 export const LSYSTEM_RULE_SETS = Object.freeze([
   Object.freeze({
-    id: 'canopy', paired: true, axiom: 'X',
+    id: 'canopy',
+    paired: true,
+    axiom: 'X',
     rules: Object.freeze({ X: 'F[+X][-X]FX' }),
   }),
   Object.freeze({
-    id: 'fern', paired: false, axiom: 'X',
+    id: 'fern',
+    paired: false,
+    axiom: 'X',
     rules: Object.freeze({ X: 'F[-Y]FX', Y: 'F[+X]FY' }),
   }),
   Object.freeze({
-    id: 'spire', paired: true, axiom: 'X',
+    id: 'spire',
+    paired: true,
+    axiom: 'X',
     rules: Object.freeze({ X: 'F[+L][-L]FFX', L: 'FF' }),
   }),
 ]);
@@ -88,9 +94,18 @@ function makeBone({ id, parent, chain, role, side, marker, base, tip, parentAngl
   const uy = length > 0 ? dy / length : -1;
   const angleDeg = normDeg((Math.atan2(uy, ux) * 180) / Math.PI);
   return {
-    id, parent, chain, role, side, marker,
-    base: { x: base.x, y: base.y }, tip: { x: tip.x, y: tip.y },
-    ux, uy, angleDeg, length,
+    id,
+    parent,
+    chain,
+    role,
+    side,
+    marker,
+    base: { x: base.x, y: base.y },
+    tip: { x: tip.x, y: tip.y },
+    ux,
+    uy,
+    angleDeg,
+    length,
     localAngleDeg: parentAngleDeg == null ? 0 : normDeg(angleDeg - parentAngleDeg),
   };
 }
@@ -113,7 +128,10 @@ export function expandLSystem(ruleSet, generations) {
   for (let g = 0; g < gens; g++) {
     let next = '';
     for (const ch of s) next += rules[ch] ?? ch;
-    if (next.length > LSYSTEM_CAPS.stringLength) { s = next.slice(0, LSYSTEM_CAPS.stringLength); break; }
+    if (next.length > LSYSTEM_CAPS.stringLength) {
+      s = next.slice(0, LSYSTEM_CAPS.stringLength);
+      break;
+    }
     s = next;
   }
   return s;
@@ -170,30 +188,56 @@ export function buildTreeSkeleton({ seed = 0, creatureId = 'c0', ruleSet = null,
     if (ch === 'F') {
       const dir = dirFromUp(heading);
       const tip = { x: pos.x + dir.x * step, y: pos.y + dir.y * step };
-      let id; let role; let marker; let side;
+      let id;
+      let role;
+      let marker;
+      let side;
       if (chain === null) {
-        id = `trunk/${trunkCount++}`; role = 'spine'; marker = null; side = 'C';
+        id = `trunk/${trunkCount++}`;
+        role = 'spine';
+        marker = null;
+        side = 'C';
       } else {
-        id = `${chain}/${chainSeg}`; role = 'limb'; marker = chainSeg === 0 ? 'L' : null;
+        id = `${chain}/${chainSeg}`;
+        role = 'limb';
+        marker = chainSeg === 0 ? 'L' : null;
         if (chainSeg === 0) chainSide = dir.x > 1e-9 ? 'R' : dir.x < -1e-9 ? 'L' : 'C';
         side = chainSide;
       }
-      const bone = makeBone({ id, parent: parentId, chain, role, side, marker, base: pos, tip, parentAngleDeg: parentAngle });
+      const bone = makeBone({
+        id,
+        parent: parentId,
+        chain,
+        role,
+        side,
+        marker,
+        base: pos,
+        tip,
+        parentAngleDeg: parentAngle,
+      });
       bones.push(bone);
-      pos = tip; parentId = id; parentAngle = bone.angleDeg;
+      pos = tip;
+      parentId = id;
+      parentAngle = bone.angleDeg;
       if (chain !== null) chainSeg++;
     } else if (ch === '+') {
       heading += angleDeg;
     } else if (ch === '-') {
       heading -= angleDeg;
     } else if (ch === '[') {
-      if (stack.length >= LSYSTEM_CAPS.depth) { skippedPushes++; continue; }
+      if (stack.length >= LSYSTEM_CAPS.depth) {
+        skippedPushes++;
+        continue;
+      }
       stack.push({ pos, heading, step, parentId, parentAngle, chain, chainSeg, chainSide });
       step *= ratio;
       chain = `branch/${chainCount++}`;
       chainSeg = 0;
     } else if (ch === ']') {
-      if (skippedPushes > 0) { skippedPushes--; continue; }
+      if (skippedPushes > 0) {
+        skippedPushes--;
+        continue;
+      }
       const st = stack.pop();
       if (!st) continue; // an unbalanced close in a caller-supplied grammar: ignored, never fatal
       ({ pos, heading, step, parentId, parentAngle, chain, chainSeg, chainSide } = st);
@@ -271,9 +315,13 @@ function reposeTree(skel, factorOf) {
     const length = b.length * factorOf(b, i);
     const tip = { x: base.x + Math.cos(rad(angleDeg)) * length, y: base.y + Math.sin(rad(angleDeg)) * length };
     const out = {
-      ...b, base, tip,
-      ux: Math.cos(rad(angleDeg)), uy: Math.sin(rad(angleDeg)),
-      angleDeg, length,
+      ...b,
+      base,
+      tip,
+      ux: Math.cos(rad(angleDeg)),
+      uy: Math.sin(rad(angleDeg)),
+      angleDeg,
+      length,
     };
     posed.set(b.id, out);
     return out;
@@ -294,7 +342,10 @@ export function poseTreeSkeleton(skel, { growth = 1, band = 0 } = {}) {
   const depths = generationDepths(skel);
   const maxDepth = Math.max(0, ...depths.values());
   const count = ((skel && skel.bones) || []).length;
-  return reposeTree(skel, (bone, i) => growthFactor(i, count, g) * pruneFactor(bone, depths.get(bone.id) || 0, maxDepth, b));
+  return reposeTree(
+    skel,
+    (bone, i) => growthFactor(i, count, g) * pruneFactor(bone, depths.get(bone.id) || 0, maxDepth, b),
+  );
 }
 
 /** The sprouting pose alone: the tree at growth amount `amount` (0 = seed, 1 = fully grown). */

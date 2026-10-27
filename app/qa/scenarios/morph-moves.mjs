@@ -16,7 +16,8 @@
 // - Screenshots use the full page — element screenshots of the WebGL canvas
 //   go stale in headless Chromium, the page capture stays live.
 export default {
-  describe: 'Click a MODE chip and screenshot the page across the item-morph transition — the picture should ripple (per-node moves), not blink.',
+  describe:
+    'Click a MODE chip and screenshot the page across the item-morph transition — the picture should ripple (per-node moves), not blink.',
   async run(ctx) {
     const page = await ctx.newPage();
     const errors = [];
@@ -50,7 +51,10 @@ export default {
     let target = -1;
     for (let i = 0; i < n; i++) {
       const cls = (await chips.nth(i).getAttribute('class')) || '';
-      if (!cls.includes('active')) { target = i; break; }
+      if (!cls.includes('active')) {
+        target = i;
+        break;
+      }
     }
     ctx.check('an inactive mode chip exists to click', target >= 0, `target=${target}`);
     if (target < 0) return;

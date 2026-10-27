@@ -9,58 +9,119 @@
 // has one). 13 built-ins use arcs; if their points look wrong, flatten the arc here.
 import { MAX_ATTACH, ATTACH_BOX, ATTACH_HIT, sanitizeAttachPoints } from './assetAttach.js';
 
-const num = (s, name) => { const m = new RegExp(`\\s${name}="\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(s); return m ? parseFloat(m[1]) : 0; };
+const num = (s, name) => {
+  const m = new RegExp(`\\s${name}="\\s*(-?[\\d.]+(?:e-?\\d+)?)`).exec(s);
+  return m ? parseFloat(m[1]) : 0;
+};
 const CURVE_STEPS = 8;
 
 function pathPoints(d, out) {
   const tok = d.match(/[a-zA-Z]|-?(?:\d+\.?\d*|\.\d+)(?:e-?\d+)?/g) || [];
-  let i = 0; let cmd = ''; let x = 0; let y = 0; let sx = 0; let sy = 0;
+  let i = 0;
+  let cmd = '';
+  let x = 0;
+  let y = 0;
+  let sx = 0;
+  let sy = 0;
   const n = () => parseFloat(tok[i++]);
   const more = () => i < tok.length && !/[a-zA-Z]/.test(tok[i]);
-  const curve = (pts) => { // de Casteljau samples of a bezier through pts (start first)
+  const curve = (pts) => {
+    // de Casteljau samples of a bezier through pts (start first)
     for (let s = 1; s <= CURVE_STEPS; s++) {
-      const t = s / CURVE_STEPS; let q = pts;
-      while (q.length > 1) q = q.slice(1).map((p, k) => [q[k][0] + (p[0] - q[k][0]) * t, q[k][1] + (p[1] - q[k][1]) * t]);
+      const t = s / CURVE_STEPS;
+      let q = pts;
+      while (q.length > 1)
+        q = q.slice(1).map((p, k) => [q[k][0] + (p[0] - q[k][0]) * t, q[k][1] + (p[1] - q[k][1]) * t]);
       out.push(q[0]);
     }
   };
   while (i < tok.length) {
-    if (/[a-zA-Z]/.test(tok[i])) cmd = tok[i++]; else if (!cmd) { i++; continue; }
-    const rel = cmd === cmd.toLowerCase(); const c = cmd.toUpperCase();
-    const ox = rel ? x : 0; const oy = rel ? y : 0;
-    if (c === 'Z') { x = sx; y = sy; continue; }
+    if (/[a-zA-Z]/.test(tok[i])) cmd = tok[i++];
+    else if (!cmd) {
+      i++;
+      continue;
+    }
+    const rel = cmd === cmd.toLowerCase();
+    const c = cmd.toUpperCase();
+    const ox = rel ? x : 0;
+    const oy = rel ? y : 0;
+    if (c === 'Z') {
+      x = sx;
+      y = sy;
+      continue;
+    }
     if (!more()) continue;
     if (c === 'M' || c === 'L' || c === 'T') {
-      x = ox + n(); y = oy + n(); out.push([x, y]);
-      if (c === 'M') { sx = x; sy = y; cmd = rel ? 'l' : 'L'; }
-    } else if (c === 'H') { x = ox + n(); out.push([x, y]); }
-    else if (c === 'V') { y = oy + n(); out.push([x, y]); }
-    else if (c === 'C') { const p = [[x, y], [ox + n(), oy + n()], [ox + n(), oy + n()], [ox + n(), oy + n()]]; curve(p); [x, y] = p[3]; }
-    else if (c === 'S' || c === 'Q') { const p = [[x, y], [ox + n(), oy + n()], [ox + n(), oy + n()]]; curve(p); [x, y] = p[2]; }
-    else if (c === 'A') { i += 5; x = ox + n(); y = oy + n(); out.push([x, y]); }
-    else i++;
+      x = ox + n();
+      y = oy + n();
+      out.push([x, y]);
+      if (c === 'M') {
+        sx = x;
+        sy = y;
+        cmd = rel ? 'l' : 'L';
+      }
+    } else if (c === 'H') {
+      x = ox + n();
+      out.push([x, y]);
+    } else if (c === 'V') {
+      y = oy + n();
+      out.push([x, y]);
+    } else if (c === 'C') {
+      const p = [
+        [x, y],
+        [ox + n(), oy + n()],
+        [ox + n(), oy + n()],
+        [ox + n(), oy + n()],
+      ];
+      curve(p);
+      [x, y] = p[3];
+    } else if (c === 'S' || c === 'Q') {
+      const p = [
+        [x, y],
+        [ox + n(), oy + n()],
+        [ox + n(), oy + n()],
+      ];
+      curve(p);
+      [x, y] = p[2];
+    } else if (c === 'A') {
+      i += 5;
+      x = ox + n();
+      y = oy + n();
+      out.push([x, y]);
+    } else i++;
   }
 }
 
 function elementPoints(tag, el) {
   const out = [];
-  if (tag === 'path') { const m = /\sd="([^"]*)"/.exec(el); if (m) pathPoints(m[1], out); }
-  else if (tag === 'circle' || tag === 'ellipse') {
-    const cx = num(el, 'cx'); const cy = num(el, 'cy');
-    const rx = tag === 'circle' ? num(el, 'r') : num(el, 'rx'); const ry = tag === 'circle' ? rx : num(el, 'ry');
+  if (tag === 'path') {
+    const m = /\sd="([^"]*)"/.exec(el);
+    if (m) pathPoints(m[1], out);
+  } else if (tag === 'circle' || tag === 'ellipse') {
+    const cx = num(el, 'cx');
+    const cy = num(el, 'cy');
+    const rx = tag === 'circle' ? num(el, 'r') : num(el, 'rx');
+    const ry = tag === 'circle' ? rx : num(el, 'ry');
     out.push([cx, cy - ry], [cx + rx, cy], [cx, cy + ry], [cx - rx, cy]);
   } else if (tag === 'rect') {
-    const x = num(el, 'x'); const y = num(el, 'y'); const w = num(el, 'width'); const h = num(el, 'height');
+    const x = num(el, 'x');
+    const y = num(el, 'y');
+    const w = num(el, 'width');
+    const h = num(el, 'height');
     out.push([x, y], [x + w, y], [x + w, y + h], [x, y + h]);
   } else if (tag === 'line') out.push([num(el, 'x1'), num(el, 'y1')], [num(el, 'x2'), num(el, 'y2')]);
   else if (tag === 'polygon' || tag === 'polyline') {
-    const m = /\spoints="([^"]*)"/.exec(el); const v = m ? (m[1].match(/-?[\d.]+/g) || []).map(parseFloat) : [];
+    const m = /\spoints="([^"]*)"/.exec(el);
+    const v = m ? (m[1].match(/-?[\d.]+/g) || []).map(parseFloat) : [];
     for (let k = 0; k + 1 < v.length; k += 2) out.push([v[k], v[k + 1]]);
   }
   const r = /\stransform="rotate\(\s*(-?[\d.]+)[\s,]*(-?[\d.]+)?[\s,]*(-?[\d.]+)?\s*\)"/.exec(el);
   if (r) {
-    const a = (parseFloat(r[1]) * Math.PI) / 180; const cx = parseFloat(r[2]) || 0; const cy = parseFloat(r[3]) || 0;
-    const cos = Math.cos(a); const sin = Math.sin(a);
+    const a = (parseFloat(r[1]) * Math.PI) / 180;
+    const cx = parseFloat(r[2]) || 0;
+    const cy = parseFloat(r[3]) || 0;
+    const cos = Math.cos(a);
+    const sin = Math.sin(a);
     return out.map(([px, py]) => [cx + (px - cx) * cos - (py - cy) * sin, cy + (px - cx) * sin + (py - cy) * cos]);
   }
   return out;

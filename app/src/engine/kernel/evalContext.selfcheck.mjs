@@ -7,14 +7,26 @@ import { evaluate } from './evalContext.js';
 import { buildPlacements } from '../buildPlacements.js';
 
 const LAYOUT_PARAMS = {
-  mode: 'grid', composition: 'default', count: 40,
-  scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-  jitter: 10, density: 100, zTiers: 1, bleed: false,
-  mirror: false, overlap: true, displacement: 0,
-  noiseFreq: 0.005, noiseSpeed: 0.5,
+  mode: 'grid',
+  composition: 'default',
+  count: 40,
+  scale: [0.4, 0.8],
+  rotate: [0, 45],
+  alpha: [60, 100],
+  jitter: 10,
+  density: 100,
+  zTiers: 1,
+  bleed: false,
+  mirror: false,
+  overlap: true,
+  displacement: 0,
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
 };
 const ASSETS = [
-  { id: 'a', weight: 'heavy' }, { id: 'b', weight: 'medium' }, { id: 'c', weight: 'light' },
+  { id: 'a', weight: 'heavy' },
+  { id: 'b', weight: 'medium' },
+  { id: 'c', weight: 'light' },
 ];
 const PALETTE = { swatches: ['#111', '#222', '#333', '#444'] };
 const CAPS = { maxCount: 420, maxCountMirrored: 360, allowMirror: true };
@@ -61,7 +73,7 @@ assert.deepStrictEqual(viaCtxOtherT, viaCtx, 'ctx.t must not affect evaluate() o
 const buffers = {};
 evaluate({ ...baseCtx, t: 0, buffers });
 
-assert.ok(buffers.soa, 'evaluate should populate ctx.buffers.soa via buildPlacements\' cache');
+assert.ok(buffers.soa, "evaluate should populate ctx.buffers.soa via buildPlacements' cache");
 const clonedBuffers = structuredClone(buffers);
 assert.deepStrictEqual(clonedBuffers, buffers, 'buffers must round-trip through structuredClone unchanged');
 for (const key of ['x', 'y', 'scale', 'rotation', 'alpha', 't', 'index', 'zTier']) {

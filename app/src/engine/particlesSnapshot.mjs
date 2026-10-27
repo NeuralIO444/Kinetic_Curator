@@ -23,19 +23,59 @@ import { SCENT_COLS, SCENT_ROWS } from './kernel/field/scent.js';
 // added there it must be added here too (the resolver snapshot proof exercises breed,
 // death, bonds and coalescence precisely so a missing column diverges loudly).
 const F64_COLS = [
-  'x', 'y', 'vx', 'vy', 'ax', 'ay', 'mass', 'contactTrim',
-  'deformMem', 'deformMemX', 'deformMemY', 'deformAmt', 'deformAxisX', 'deformAxisY',
-  'ecoCrowd', 'omega', 'theta', 'scale', 'baseScale', 'rotation', 'alpha', 'phase', 'u',
-  'seedOffset', 'phaseOffset', 'driftMul', 'speedMul', 'noiseSeed',
-  'energy', 'drive', 'lorenzX', 'lorenzY', 'lorenzZ', 'leakRgb',
+  'x',
+  'y',
+  'vx',
+  'vy',
+  'ax',
+  'ay',
+  'mass',
+  'contactTrim',
+  'deformMem',
+  'deformMemX',
+  'deformMemY',
+  'deformAmt',
+  'deformAxisX',
+  'deformAxisY',
+  'ecoCrowd',
+  'omega',
+  'theta',
+  'scale',
+  'baseScale',
+  'rotation',
+  'alpha',
+  'phase',
+  'u',
+  'seedOffset',
+  'phaseOffset',
+  'driftMul',
+  'speedMul',
+  'noiseSeed',
+  'energy',
+  'drive',
+  'lorenzX',
+  'lorenzY',
+  'lorenzZ',
+  'leakRgb',
 ];
 const I32_COLS = ['assetIndex', '_cellOf', '_order'];
 const U8_COLS = ['alive', 'cgroup', 'grazer'];
 const ALL_COLS = [...F64_COLS, ...I32_COLS, ...U8_COLS];
 
 const SCALARS = [
-  'n', 'canvasW', 'canvasH', '_step', '_breedSeq', '_authoredCount', '_floatCount',
-  '_noiseSeed', '_colorSig', '_lastBehave', '_deformOn', '_coalesceOn', '_pigmentOn',
+  'n',
+  'canvasW',
+  'canvasH',
+  '_step',
+  '_breedSeq',
+  '_authoredCount',
+  '_floatCount',
+  '_noiseSeed',
+  '_colorSig',
+  '_lastBehave',
+  '_deformOn',
+  '_coalesceOn',
+  '_pigmentOn',
 ];
 
 const deepCopy = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v)));
@@ -98,7 +138,8 @@ export function restoreParticleSystem(sys, snap, { createNoise, createScentField
   // value ("never seen"); JSON carries it as null, so map it back for exactly those keys.
   const UNDEF_OK = new Set(['_deformOn', '_coalesceOn', '_pigmentOn', '_floatCount']);
   for (const name of SCALARS) {
-    if (name in (snap.scalars || {})) sys[name] = snap.scalars[name] === null && UNDEF_OK.has(name) ? undefined : snap.scalars[name];
+    if (name in (snap.scalars || {}))
+      sys[name] = snap.scalars[name] === null && UNDEF_OK.has(name) ? undefined : snap.scalars[name];
   }
   sys._trig = trig;
   sys._noise = createNoise(sys._noiseSeed || 444);

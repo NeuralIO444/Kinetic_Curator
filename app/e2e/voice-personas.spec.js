@@ -8,11 +8,19 @@ test.describe('Mode personas', () => {
     // NOTE: the shelf clear must NOT live in the init script — it re-runs on
     // every navigation, which would wipe a captured voice on page.reload().
     await page.addInitScript(() => {
-      try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+      try {
+        localStorage.setItem('kc:first-run-seen', '1');
+      } catch {
+        /* ignore */
+      }
     });
     await page.goto('/?boot=factory');
     await page.evaluate(() => {
-      try { localStorage.removeItem('kc:user-voices:v1'); } catch { /* ignore */ }
+      try {
+        localStorage.removeItem('kc:user-voices:v1');
+      } catch {
+        /* ignore */
+      }
     });
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
     const buildTab = page.getByRole('tab', { name: /build/i });
@@ -27,13 +35,16 @@ test.describe('Mode personas', () => {
   };
 
   // #1153: the factory four are retired; DIRECTORS holds the earned voices and, until the first find, ONE starter.
-  test('the starter voice lives on DIRECTORS, not BUILD; the other three are gone from the picker', async ({ page }) => {
+  test('the starter voice lives on DIRECTORS, not BUILD; the other three are gone from the picker', async ({
+    page,
+  }) => {
     await expect(page.locator('.panel-layout .voice-chip.starter')).toHaveCount(0);
     await openDavis(page);
     await expect(page.locator('.voice-chip.starter')).toHaveCount(1);
     await expect(page.locator('.voice-chip.earned')).toHaveCount(0);
     await expect(page.locator('.voice-flagships')).toContainText(/Night Migration/);
-    for (const gone of [/Chrome Parade/, /Deep Water/, /Dark Glass/]) await expect(page.locator('.voice-flagships')).not.toContainText(gone);
+    for (const gone of [/Chrome Parade/, /Deep Water/, /Dark Glass/])
+      await expect(page.locator('.voice-flagships')).not.toContainText(gone);
   });
 
   test('BUILD keeps the stub tiles, the header ROLL button, and the + cell', async ({ page }) => {
@@ -80,7 +91,9 @@ test.describe('Mode personas', () => {
     await page.reload();
     await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
     await page.getByRole('tab', { name: /build/i }).click();
-    await expect(page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.te-matrix[aria-label="My voices"] span.te-cell', { hasText: 'VOICE 01' })).toBeVisible({
+      timeout: 10_000,
+    });
   });
 
   test('delete removes a user voice after confirm', async ({ page }) => {

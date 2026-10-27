@@ -14,4 +14,7 @@ export default {
   tabWidth: 2,
   trailingComma: 'all',
   printWidth: 120,
+  // #1684 slice 11: CSS keeps its double-quoted attribute selectors ([data-open="true"]). singleQuote would rewrite
+  // every one — the same selector, but text the stylesheet checks pin — so stylesheets format with double quotes.
+  overrides: [{ files: '*.css', options: { singleQuote: false } }],
 };

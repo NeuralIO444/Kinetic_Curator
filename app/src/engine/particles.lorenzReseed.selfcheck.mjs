@@ -26,9 +26,13 @@ const W = 1000;
 const H = 700;
 const N = 60;
 
-const lp = (behave) => normalizeLayoutParams({
-  ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave, particleCount: N,
-});
+const lp = (behave) =>
+  normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    behave,
+    particleCount: N,
+  });
 
 function step(sys, behave, frames, t0) {
   for (let s = 0; s < frames; s++) {
@@ -51,9 +55,9 @@ function assertPhaseIdentical(a, b, label) {
     assert.ok(
       Object.is(a.x[i], b.x[i]) && Object.is(a.y[i], b.y[i]) && Object.is(a.z[i], b.z[i]),
       `${label}: agent ${i} phase state differs on re-entry — ` +
-      `(${a.x[i]}, ${a.y[i]}, ${a.z[i]}) vs (${b.x[i]}, ${b.y[i]}, ${b.z[i]}). ` +
-      `The lorenz entry re-seed is broken: re-entry must restart the seeded dance, ` +
-      `not resume frozen poles or draw at random. Do not relax this assertion.`,
+        `(${a.x[i]}, ${a.y[i]}, ${a.z[i]}) vs (${b.x[i]}, ${b.y[i]}, ${b.z[i]}). ` +
+        `The lorenz entry re-seed is broken: re-entry must restart the seeded dance, ` +
+        `not resume frozen poles or draw at random. Do not relax this assertion.`,
     );
   }
 }

@@ -89,10 +89,18 @@ export class ReferenceParticleSystem {
       const r = rngForIndex(seed >>> 0, CH.dyn, i);
       const x = MARGIN + r() * Math.max(1, canvasW - MARGIN * 2);
       const y = MARGIN + r() * Math.max(1, canvasH - MARGIN * 2);
-      this.particles.push(new Particle(
-        x, y, i % activeAssets.length, swatches[i % swatches.length],
-        r() * 0.8 + 0.4, r() * TAU, r() * 0.55 + 0.15, r() * 10000,
-      ));
+      this.particles.push(
+        new Particle(
+          x,
+          y,
+          i % activeAssets.length,
+          swatches[i % swatches.length],
+          r() * 0.8 + 0.4,
+          r() * TAU,
+          r() * 0.55 + 0.15,
+          r() * 10000,
+        ),
+      );
     }
   }
 
@@ -102,7 +110,10 @@ export class ReferenceParticleSystem {
     for (const p of this.particles) {
       const k = key(Math.floor(p.x / cellSize), Math.floor(p.y / cellSize));
       let bucket = grid.get(k);
-      if (!bucket) { bucket = []; grid.set(k, bucket); }
+      if (!bucket) {
+        bucket = [];
+        grid.set(k, bucket);
+      }
       bucket.push(p);
     }
     return { grid, key, cellSize };
@@ -124,9 +135,16 @@ export class ReferenceParticleSystem {
     const domainOffsetX = Number(layoutParams.noiseDomainOffsetX ?? layoutParams.noiseDomainOffset) || 0;
     const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset) || 0;
     const {
-      noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
-      gravityWells = 1.0, damping = 0.95, scale: scaleParam = [0.4, 1.6], alpha = [40, 100],
-      wind = 1, body = 3, tight = 0.55,
+      noiseFreq = 0.005,
+      noiseSpeed = 0.5,
+      swarmCohesion = 1.5,
+      gravityWells = 1.0,
+      damping = 0.95,
+      scale: scaleParam = [0.4, 1.6],
+      alpha = [40, 100],
+      wind = 1,
+      body = 3,
+      tight = 0.55,
     } = layoutParams;
 
     const organism = isOrganismMode(layoutParams.mode);
@@ -190,11 +208,10 @@ export class ReferenceParticleSystem {
           nt + p1.seedOffset * 0.0001,
         );
         const windAngle = n * TAU;
-        const windMag = (noise.noise3D(
-          p1.x * noiseFreq + 200 + domainOffsetX,
-          p1.y * noiseFreq + 200 + domainOffsetY,
-          nt,
-        ) + 1.0) * 0.4 * windMul;
+        const windMag =
+          (noise.noise3D(p1.x * noiseFreq + 200 + domainOffsetX, p1.y * noiseFreq + 200 + domainOffsetY, nt) + 1.0) *
+          0.4 *
+          windMul;
         p1.applyForce(Math.cos(windAngle) * windMag, Math.sin(windAngle) * windMag);
       }
       if (organism && profile.orbit) {
@@ -210,9 +227,15 @@ export class ReferenceParticleSystem {
           p1.applyForce((dx / d) * forceMag, (dy / d) * forceMag);
         }
       }
-      let sepX = 0, sepY = 0, sepCount = 0;
-      let aliX = 0, aliY = 0, aliCount = 0;
-      let cohX = 0, cohY = 0, cohCount = 0;
+      let sepX = 0,
+        sepY = 0,
+        sepCount = 0;
+      let aliX = 0,
+        aliY = 0,
+        aliCount = 0;
+      let cohX = 0,
+        cohY = 0,
+        cohCount = 0;
       const cx = Math.floor(p1.x / cellSize);
       const cy = Math.floor(p1.y / cellSize);
       for (let ox = -1; ox <= 1; ox++) {
@@ -225,9 +248,21 @@ export class ReferenceParticleSystem {
             const dx = p2.x - p1.x;
             const dy = p2.y - p1.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist > 0 && dist < sepRadius) { sepX -= dx / dist; sepY -= dy / dist; sepCount++; }
-            if (dist > 0 && dist < aliRadius) { aliX += p2.vx; aliY += p2.vy; aliCount++; }
-            if (dist > 0 && dist < cohRadius) { cohX += p2.x; cohY += p2.y; cohCount++; }
+            if (dist > 0 && dist < sepRadius) {
+              sepX -= dx / dist;
+              sepY -= dy / dist;
+              sepCount++;
+            }
+            if (dist > 0 && dist < aliRadius) {
+              aliX += p2.vx;
+              aliY += p2.vy;
+              aliCount++;
+            }
+            if (dist > 0 && dist < cohRadius) {
+              cohX += p2.x;
+              cohY += p2.y;
+              cohCount++;
+            }
           }
         }
       }
@@ -284,8 +319,8 @@ export class ReferenceParticleSystem {
           p.rotation += step;
         } else p.rotation = next;
       }
-      p.scale = minScale + (p.mass * (maxScale - minScale));
-      p.alpha = minAlpha + (p.mass * (maxAlpha - minAlpha));
+      p.scale = minScale + p.mass * (maxScale - minScale);
+      p.alpha = minAlpha + p.mass * (maxAlpha - minAlpha);
       p.phase = (p.phase + 0.004 * noiseSpeed) % 1;
       const spdU = Math.max(0, Math.min(1, speed / maxSpeed));
       if (organism) {
@@ -297,8 +332,10 @@ export class ReferenceParticleSystem {
       if (organism) {
         const bx = bounceAxis(p.x, p.vx, MARGIN, this.canvasW - MARGIN);
         const by = bounceAxis(p.y, p.vy, MARGIN, this.canvasH - MARGIN);
-        p.x = bx.pos; p.vx = bx.vel;
-        p.y = by.pos; p.vy = by.vel;
+        p.x = bx.pos;
+        p.vx = bx.vel;
+        p.y = by.pos;
+        p.vy = by.vel;
         if (!p.spine || !p.spine.length) p.spine = [{ x: p.x, y: p.y }];
         const head = { x: p.x, y: p.y };
         const nextSpine = [head];
@@ -322,8 +359,14 @@ export class ReferenceParticleSystem {
     const lp = this._layout || {};
     if (!isOrganismMode(lp.mode)) {
       return this.particles.map((p) => ({
-        x: p.x, y: p.y, scale: p.scale, rotation: p.rotation, alpha: p.alpha,
-        asset: activeAssets[p.assetIndex % activeAssets.length], color: p.color, u: p.u,
+        x: p.x,
+        y: p.y,
+        scale: p.scale,
+        rotation: p.rotation,
+        alpha: p.alpha,
+        asset: activeAssets[p.assetIndex % activeAssets.length],
+        color: p.color,
+        u: p.u,
       }));
     }
     return this._organismItems(activeAssets, lp);
@@ -341,9 +384,16 @@ export class ReferenceParticleSystem {
       for (let s = 0; s < bodyLen; s++) {
         const pt = spine[Math.min(s, spine.length - 1)];
         items.push({
-          x: pt.x, y: pt.y, scale: p.scale * (1 - s * 0.1), rotation: p.rotation,
-          alpha: p.alpha * (1 - s * 0.08), asset, color: p.color, u: p.u,
-          key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment',
+          x: pt.x,
+          y: pt.y,
+          scale: p.scale * (1 - s * 0.1),
+          rotation: p.rotation,
+          alpha: p.alpha * (1 - s * 0.08),
+          asset,
+          color: p.color,
+          u: p.u,
+          key: `o${i}-s${s}`,
+          role: s === 0 ? 'body' : 'segment',
         });
       }
       if (symmetry === 'bilateral') {
@@ -353,14 +403,29 @@ export class ReferenceParticleSystem {
         const amp = flap * Math.sin(p.phase * TAU + p.seedOffset);
         const reach = 16 + Math.abs(amp) * 20;
         items.push({
-          x: p.x - py * reach, y: p.y + px * reach,
-          scale: p.scale * 0.7, rotation: p.rotation + amp * 18,
-          alpha: p.alpha, asset, color: p.color, u: p.u, key: `o${i}-wl`, role: 'wing',
+          x: p.x - py * reach,
+          y: p.y + px * reach,
+          scale: p.scale * 0.7,
+          rotation: p.rotation + amp * 18,
+          alpha: p.alpha,
+          asset,
+          color: p.color,
+          u: p.u,
+          key: `o${i}-wl`,
+          role: 'wing',
         });
         items.push({
-          x: p.x + py * reach, y: p.y - px * reach,
-          scale: p.scale * 0.7, rotation: p.rotation - amp * 18,
-          alpha: p.alpha, asset, color: p.color, u: p.u, key: `o${i}-wr`, role: 'wing', _mirrored: true,
+          x: p.x + py * reach,
+          y: p.y - px * reach,
+          scale: p.scale * 0.7,
+          rotation: p.rotation - amp * 18,
+          alpha: p.alpha,
+          asset,
+          color: p.color,
+          u: p.u,
+          key: `o${i}-wr`,
+          role: 'wing',
+          _mirrored: true,
         });
       }
     }

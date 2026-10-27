@@ -82,12 +82,32 @@ function walk(root, recipe, { budget, maxDepth, scatter, emit, problems }) {
   let total = 0;
   let truncated = false;
   // explicit stack (no recursion): a pathological recipe cannot blow the call stack either
-  const stack = [{ partId: root.part, world: { x: root.x, y: root.y, rot: finite(root.rot, 0), scaleX: finite(root.scaleX, 1), scaleY: finite(root.scaleY, 1), depth: 0 }, path: String(root.key ?? 'root'), anchorId: null }];
+  const stack = [
+    {
+      partId: root.part,
+      world: {
+        x: root.x,
+        y: root.y,
+        rot: finite(root.rot, 0),
+        scaleX: finite(root.scaleX, 1),
+        scaleY: finite(root.scaleY, 1),
+        depth: 0,
+      },
+      path: String(root.key ?? 'root'),
+      anchorId: null,
+    },
+  ];
   while (stack.length) {
     const node = stack.pop();
     const part = Object.prototype.hasOwnProperty.call(parts, node.partId) ? parts[node.partId] : null;
-    if (!part) { problems.push(`unknown part "${String(node.partId)}"`); continue; }
-    if (total >= budget) { truncated = true; break; }
+    if (!part) {
+      problems.push(`unknown part "${String(node.partId)}"`);
+      continue;
+    }
+    if (total >= budget) {
+      truncated = true;
+      break;
+    }
     total += 1;
     if (emit) emit(part, node);
     if (node.world.depth >= maxDepth) {
@@ -98,22 +118,44 @@ function walk(root, recipe, { budget, maxDepth, scatter, emit, problems }) {
     // push in reverse so children are processed (and emitted) in declaration order
     for (let c = kids.length - 1; c >= 0; c--) {
       const child = kids[c];
-      if (!child || typeof child.part !== 'string') { problems.push(`"${node.partId}": child ${c} names no part`); continue; }
+      if (!child || typeof child.part !== 'string') {
+        problems.push(`"${node.partId}": child ${c} names no part`);
+        continue;
+      }
       if (child.anchor === SURFACE) {
         const b = part.localBounds;
-        if (!b || ![b.x0, b.y0, b.x1, b.y1].every(Number.isFinite)) { problems.push(`"${node.partId}": a surface child needs localBounds`); continue; }
+        if (!b || ![b.x0, b.y0, b.x1, b.y1].every(Number.isFinite)) {
+          problems.push(`"${node.partId}": a surface child needs localBounds`);
+          continue;
+        }
         const want = Math.max(0, Math.floor(finite(child.count, 0)));
         // never ask the sampler for more than the budget could ever hold
         const count = Math.min(want, Math.max(0, budget - total));
         if (count < want) truncated = true;
         const pts = scatter(`${node.path}/${child.key ?? child.part}`, count, b);
         for (let i = pts.length - 1; i >= 0; i--) {
-          stack.push({ partId: child.part, world: computeWorldTransform(node.world, pts[i]), path: `${node.path}/${child.key ?? child.part}#${i}`, anchorId: SURFACE });
+          stack.push({
+            partId: child.part,
+            world: computeWorldTransform(node.world, pts[i]),
+            path: `${node.path}/${child.key ?? child.part}#${i}`,
+            anchorId: SURFACE,
+          });
         }
       } else {
-        const anchor = part.anchors && Object.prototype.hasOwnProperty.call(part.anchors, child.anchor) ? part.anchors[child.anchor] : null;
-        if (!anchor) { problems.push(`"${node.partId}": no anchor "${String(child.anchor)}"`); continue; }
-        stack.push({ partId: child.part, world: computeWorldTransform(node.world, anchor), path: `${node.path}/${child.anchor}`, anchorId: child.anchor });
+        const anchor =
+          part.anchors && Object.prototype.hasOwnProperty.call(part.anchors, child.anchor)
+            ? part.anchors[child.anchor]
+            : null;
+        if (!anchor) {
+          problems.push(`"${node.partId}": no anchor "${String(child.anchor)}"`);
+          continue;
+        }
+        stack.push({
+          partId: child.part,
+          world: computeWorldTransform(node.world, anchor),
+          path: `${node.path}/${child.anchor}`,
+          anchorId: child.anchor,
+        });
       }
     }
   }
@@ -127,7 +169,11 @@ function walk(root, recipe, { budget, maxDepth, scatter, emit, problems }) {
  * serialized. Returns { items, truncated, problems }: `truncated` when a cap cut the creature short, `problems` for
  * recipe mistakes (an unknown part or anchor is skipped and named, never guessed).
  */
-export function expandHierarchy(root, recipe, { seed = 0, budget = HIER_GLOBAL_BUDGET, maxDepth = HIER_MAX_DEPTH, scatter = null } = {}) {
+export function expandHierarchy(
+  root,
+  recipe,
+  { seed = 0, budget = HIER_GLOBAL_BUDGET, maxDepth = HIER_MAX_DEPTH, scatter = null } = {},
+) {
   const items = [];
   const problems = [];
   const rootKey = String(root.key ?? 'root');
@@ -136,15 +182,16 @@ export function expandHierarchy(root, recipe, { seed = 0, budget = HIER_GLOBAL_B
     maxDepth: Math.max(0, Math.floor(maxDepth)),
     scatter: scatter || hashScatter(seed),
     problems,
-    emit: (part, node) => items.push({
-      assetId: part.asset,
-      x: node.world.x,
-      y: node.world.y,
-      rotation: node.world.rot,
-      scaleX: node.world.scaleX,
-      scaleY: node.world.scaleY,
-      _hier: { depth: node.world.depth, anchorId: node.anchorId, rootKey, path: node.path },
-    }),
+    emit: (part, node) =>
+      items.push({
+        assetId: part.asset,
+        x: node.world.x,
+        y: node.world.y,
+        rotation: node.world.rot,
+        scaleX: node.world.scaleX,
+        scaleY: node.world.scaleY,
+        _hier: { depth: node.world.depth, anchorId: node.anchorId, rootKey, path: node.path },
+      }),
   });
   return { items, truncated, problems };
 }
