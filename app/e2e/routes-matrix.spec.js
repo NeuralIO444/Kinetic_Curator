@@ -5,7 +5,13 @@
 import { test, expect } from '@playwright/test';
 
 test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) => {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /stimuli/i }).click();
@@ -15,7 +21,9 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
 
   // #1477 — a fresh project starts with every route OFF: nothing is routed until audio is on and AUTO builds a starter
   await expect(rows).toHaveCount(0);
-  await expect(page.locator('.stim-matrix-empty')).toContainText('SILENT — sound is in the room and nothing is listening.');
+  await expect(page.locator('.stim-matrix-empty')).toContainText(
+    'SILENT — sound is in the room and nothing is listening.',
+  );
   const clear0 = page.getByRole('button', { name: 'clear', exact: true });
   await expect(clear0).toBeDisabled();
   await expect(add).toBeEnabled();
@@ -65,7 +73,9 @@ test('STIMULI matrix: edit, add, remove, reset, click-a-band', async ({ page }) 
   await expect(clear).toBeEnabled();
   await clear.click();
   await expect(rows).toHaveCount(0);
-  await expect(page.locator('.stim-matrix-empty')).toContainText('SILENT — sound is in the room and nothing is listening.');
+  await expect(page.locator('.stim-matrix-empty')).toContainText(
+    'SILENT — sound is in the room and nothing is listening.',
+  );
   await expect(clear).toBeDisabled();
   await expect(add).toBeEnabled();
   // …and build up from nothing with + ROUTE

@@ -16,11 +16,15 @@ const ALLOW = [
   'styles/ux-polish.css|.hit-pill-main {', // its left end follows the pill
   'styles/ux-polish.css|.hit-pill-act {', // round hover on the two actions
 ];
-const selectorOf = (lines, i) => { for (let k = i; k >= 0; k--) if (lines[k].includes('{')) return lines[k].trim(); return ''; };
-const walk = (d) => readdirSync(d).flatMap((n) => {
-  const p = join(d, n);
-  return statSync(p).isDirectory() ? walk(p) : [p];
-});
+const selectorOf = (lines, i) => {
+  for (let k = i; k >= 0; k--) if (lines[k].includes('{')) return lines[k].trim();
+  return '';
+};
+const walk = (d) =>
+  readdirSync(d).flatMap((n) => {
+    const p = join(d, n);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
 
 const bad = [];
 for (const p of walk(SRC)) {
@@ -33,5 +37,8 @@ for (const p of walk(SRC)) {
     bad.push(`${rel}:${i + 1}  border-radius ${m[1].trim()}`);
   });
 }
-if (bad.length) { console.error('nonzero radii (square corners everywhere, §1.4):\n' + bad.join('\n')); process.exit(1); }
+if (bad.length) {
+  console.error('nonzero radii (square corners everywhere, §1.4):\n' + bad.join('\n'));
+  process.exit(1);
+}
 console.log('radii.selfcheck: ok');

@@ -28,6 +28,8 @@ import { sigilTempo } from './davisSigil.js';
 import { DAVIS_STATES } from './davisState.js';
 import { LOIS_FACES } from './loisFace.js';
 import { LOIS_EXTRA_FACES } from './mindFace.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -321,7 +323,7 @@ ok('purity + wiring: the module reads no clock and rolls no dice; the seam rende
   );
   assert.match(codec, /<DavisFaceNow seed=\{seed\} code=\{dCode\} \/>/);
   const css = readFileSync(new URL('../styles/panels.css', import.meta.url), 'utf8');
-  assert.match(css, /\.codec-dither \{ width: 84px; height: 84px;/);
+  assert.match(flat(css), fre(/\.codec-dither \{ width: 84px; height: 84px;/));
 });
 
 console.log(`roomDither.selfcheck: ${n} checks passed`);

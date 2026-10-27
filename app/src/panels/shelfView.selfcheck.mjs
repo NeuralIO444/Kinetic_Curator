@@ -20,6 +20,8 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(here, rel), 'utf8');
@@ -186,7 +188,7 @@ ok('the CSS: grid, one inversion grammar, no amber, staged rows at full strength
   assert.ok(slotAimed.includes('background: var(--ink)'), 'the aimed slot is the same inversion');
   assert.ok(!shelfCss.includes('kc-amber'), 'amber appears nowhere on the surface');
   assert.ok(!/\.shelf-row\.is-stage\s*\{[^}]*opacity/.test(shelfCss), 'staged rows are not dimmed');
-  assert.ok(shelfCss.includes('.shelf-row-label { font-size: 11px'), 'row identity is DS body size');
+  assert.ok(flat(shelfCss).includes(flat('.shelf-row-label { font-size: 11px')), 'row identity is DS body size');
   const overlay = shelfCss.slice(shelfCss.indexOf('.shelf-overlay {'), shelfCss.indexOf('.shelf-overlay {') + 200);
   assert.ok(
     overlay.includes('position: fixed') && overlay.includes('z-index: 60'),

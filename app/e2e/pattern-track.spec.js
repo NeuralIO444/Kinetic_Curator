@@ -12,8 +12,17 @@ const pillText = (page) => page.locator('.status-pill').allInnerTexts();
 test('a PATTERN track draws in every mode, still and drifting, without faulting the renderer', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => !!window.__kcStore)).toBe(true);
@@ -32,7 +41,10 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
     for (const drift of [0, 0.6]) {
       await st('setPatternParam', id, 'drift', drift);
       await page.waitForTimeout(900);
-      expect(await faulted(page), `${mode} drift ${drift}: a fault pill is showing: ${JSON.stringify(await pillText(page))} ${JSON.stringify(errors.slice(0, 4))}`).toBe(0);
+      expect(
+        await faulted(page),
+        `${mode} drift ${drift}: a fault pill is showing: ${JSON.stringify(await pillText(page))} ${JSON.stringify(errors.slice(0, 4))}`,
+      ).toBe(0);
     }
     await st('shufflePattern', id);
     await page.waitForTimeout(500);
@@ -46,5 +58,8 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
   await page.waitForTimeout(500);
   expect(await page.evaluate(() => window.__kcStore.getState().layers.length)).toBe(kcLayers);
   expect(await faulted(page)).toBe(0);
-  expect(errors.filter((e) => !/favicon|ResizeObserver|Download the React DevTools/i.test(e)), 'no page errors').toEqual([]);
+  expect(
+    errors.filter((e) => !/favicon|ResizeObserver|Download the React DevTools/i.test(e)),
+    'no page errors',
+  ).toEqual([]);
 });

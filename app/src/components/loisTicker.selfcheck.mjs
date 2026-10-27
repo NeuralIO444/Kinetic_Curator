@@ -6,6 +6,8 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { tickerLine, tickerMotion, TICKER_SPEED_PX_S, TICKER_DIVIDER } from './loisTicker.mjs';
 import { rankLois, getLoisVerdict, clearLoisVerdict } from '../curator/loisRank.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -123,8 +125,8 @@ ok('the tape: caps, blocks divide the repeats, two units carry the loop, the slo
   );
   assert.ok(!/\.lois-ticker-run \{[^}]*text-shadow/.test(css), 'no glow on the run (Matt, 2026-10-22: lose the bloom)');
   assert.match(
-    css,
-    /\.lois-ticker\[data-mode="scroll"\][^{]*\{[^}]*mask-image:/,
+    flat(css),
+    fre(/\.lois-ticker\[data-mode="scroll"\][^{]*\{[^}]*mask-image:/),
     'the running tape fades at the slot\u2019s edges',
   );
   assert.match(

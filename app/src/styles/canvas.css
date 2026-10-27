@@ -7,66 +7,118 @@
   min-height: 0;
 }
 .canvas-wrap {
-  flex: 1; position: relative; margin: 6px;
-  border: 1px solid var(--line-2); overflow: hidden; min-height: 180px;
+  flex: 1;
+  position: relative;
+  margin: 6px;
+  border: 1px solid var(--line-2);
+  overflow: hidden;
+  min-height: 180px;
 }
-.canvas-bg { position: absolute; inset: 0; }
+.canvas-bg {
+  position: absolute;
+  inset: 0;
+}
 .canvas-rulers {
-  position: absolute; inset: 0;
+  position: absolute;
+  inset: 0;
   background-image:
-    linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
   background-size: 50px 50px;
   pointer-events: none;
 }
 /* ─── Checkerboard Background ─── */
 .canvas-wrap.checkerboard {
-  background-image: 
+  background-image:
     linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222),
     linear-gradient(45deg, #222 25%, transparent 25%, transparent 75%, #222 75%, #222);
   background-size: 20px 20px;
-  background-position: 0 0, 10px 10px;
+  background-position:
+    0 0,
+    10px 10px;
   background-color: #111;
 }
 
-.canvas-gl { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; touch-action: none; }
-.canvas-corner {
-  position: absolute; font-size: 8px; color: var(--dim);
-  padding: 1px 4px; background: rgba(0,0,0,0.5);
-  border: 1px solid var(--line); letter-spacing: 0.1em;
-  opacity: 0; transition: opacity 0.2s; pointer-events: none;
+.canvas-gl {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+  touch-action: none;
 }
-.canvas-wrap:hover .canvas-corner { opacity: 1; }
+.canvas-corner {
+  position: absolute;
+  font-size: 8px;
+  color: var(--dim);
+  padding: 1px 4px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--line);
+  letter-spacing: 0.1em;
+  opacity: 0;
+  transition: opacity 0.2s;
+  pointer-events: none;
+}
+.canvas-wrap:hover .canvas-corner {
+  opacity: 1;
+}
 
 /* ─── Evolve Indicator ─── */
 .panel-canvas.evolve-active .canvas-wrap {
   border-color: #00ff88;
-  box-shadow: 0 0 12px rgba(0,255,136,0.3);
+  box-shadow: 0 0 12px rgba(0, 255, 136, 0.3);
   animation: evolve-pulse 2s ease-in-out infinite;
 }
 @keyframes evolve-pulse {
-  0%, 100% { box-shadow: 0 0 8px rgba(0,255,136,0.2); }
-  50% { box-shadow: 0 0 24px rgba(0,255,136,0.6); }
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(0, 255, 136, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(0, 255, 136, 0.6);
+  }
 }
-.canvas-corner.tl { top: 3px; left: 3px; }
-.canvas-corner.tr { top: 3px; right: 3px; }
-.canvas-corner.bl { bottom: 3px; left: 3px; }
-.canvas-corner.br { bottom: 3px; right: 3px; }
+.canvas-corner.tl {
+  top: 3px;
+  left: 3px;
+}
+.canvas-corner.tr {
+  top: 3px;
+  right: 3px;
+}
+.canvas-corner.bl {
+  bottom: 3px;
+  left: 3px;
+}
+.canvas-corner.br {
+  bottom: 3px;
+  right: 3px;
+}
 
 /* ─── Drag Resize Handle ─── */
 .canvas-resize-handle {
-  position: absolute; bottom: 0; left: 0; right: 0;
-  height: 14px; cursor: ns-resize;
-  display: flex; align-items: center; justify-content: center;
-  background: linear-gradient(to top, rgba(0,0,0,0.5), transparent);
-  opacity: 0.5; transition: opacity 0.2s;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 14px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.5), transparent);
+  opacity: 0.5;
+  transition: opacity 0.2s;
 }
-.canvas-resize-handle:hover, .canvas-resize-handle:active {
+.canvas-resize-handle:hover,
+.canvas-resize-handle:active {
   opacity: 1;
-  background: linear-gradient(to top, rgba(0,217,255,0.15), transparent);
+  background: linear-gradient(to top, rgba(0, 217, 255, 0.15), transparent);
 }
 .resize-grip {
-  width: 40px; height: 3px;
+  width: 40px;
+  height: 3px;
   background: var(--dim);
   transition: background 150ms;
 }

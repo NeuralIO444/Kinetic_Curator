@@ -23,7 +23,12 @@ import { fileURLToPath } from 'node:url';
 
 import { createLiveResolver } from '../src/gl/liveResolve.mjs';
 import { withResolveTap, setResolveTap, setResolveOutputTap } from '../src/gl/resolveTap.mjs';
-import { createPerformanceRecorder, checkPerformance, packPerformance, CHECKPOINT_EVERY } from '../src/gl/performanceFile.mjs';
+import {
+  createPerformanceRecorder,
+  checkPerformance,
+  packPerformance,
+  CHECKPOINT_EVERY,
+} from '../src/gl/performanceFile.mjs';
 import { stepSpectrum, readSpectrum, setSpectrumTap } from '../src/gl/spectrumLive.mjs';
 import { createSpectrumRecorder, checkSpectrumRecord } from '../src/curator/spectrumRecord.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../src/data/layout-modes.js';
@@ -47,7 +52,9 @@ const analyserFor = (f) => ({
       a[i] = -92 + 56 * bump + 44 * bump2 + 10 * Math.sin(f / 90 + x * 9);
     }
   },
-  getFloatTimeDomainData(a) { a.fill(0); },
+  getFloatTimeDomainData(a) {
+    a.fill(0);
+  },
 });
 
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
@@ -55,17 +62,52 @@ const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'n
 // section (#1534) — the section playback will hear — while the gate's hash comparison covers the
 // resolver chain the take's checkpoints are made of
 const lp = (over = {}) => ({
-  ...DEFAULT_LAYOUT_PARAMS, count: 220, particleCount: 100,
-  spectrumScale: 0.8, spectrumDisplace: 0.35, spectrumColour: 0.5, spectrumMap: 0, ...over,
+  ...DEFAULT_LAYOUT_PARAMS,
+  count: 220,
+  particleCount: 100,
+  spectrumScale: 0.8,
+  spectrumDisplace: 0.35,
+  spectrumColour: 0.5,
+  spectrumMap: 0,
+  ...over,
 });
-const snap = (seed, over = {}) => ({ seed, paletteId: 'bone', paletteOverrides: null, layoutParams: lp(over), caGrid: null, enabledAssets: null });
+const snap = (seed, over = {}) => ({
+  seed,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  layoutParams: lp(over),
+  caGrid: null,
+  enabledAssets: null,
+});
 const stable = {
-  canvasW: 1000, canvasH: 700,
-  layers: [L('lyr-a'), L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }), L('fx', { type: 'fx' }), L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })],
-  activeLayerId: 'lyr-a', layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) }, seed: SEED, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
-  customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1,
-  alphaBoost: 0, effectiveScaleY: undefined, phraseWrapGen: 0, reducedMotion: false,
+  canvasW: 1000,
+  canvasH: 700,
+  layers: [
+    L('lyr-a'),
+    L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }),
+    L('fx', { type: 'fx' }),
+    L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) }),
+  ],
+  activeLayerId: 'lyr-a',
+  layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) },
+  seed: SEED,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  perfClampOverride: null,
+  scaleMul: 1,
+  alphaBoost: 0,
+  effectiveScaleY: undefined,
+  phraseWrapGen: 0,
+  reducedMotion: false,
 };
 
 let frame = 0;
@@ -94,9 +136,12 @@ for (let f = 0; f < FRAMES; f++) {
     effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)],
     effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
     attractor: f % 40 < 20 ? { x: 400 + (f % 7), y: 300, strength: 1 } : null,
-    quality: 'balanced', perfTier1: false, assetThin: false,
+    quality: 'balanced',
+    perfTier1: false,
+    assetThin: false,
     slowRender: false,
-    loopTimeMs: t, dtSec: dt / 1000,
+    loopTimeMs: t,
+    dtSec: dt / 1000,
   });
 }
 setResolveTap(null);
@@ -114,7 +159,9 @@ const head = execSync('git rev-parse --short HEAD', { cwd: APP, encoding: 'utf8'
 
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'replayGate.kcperf'), bytes);
-writeFileSync(join(OUT_DIR, 'replayGate.PROVENANCE.md'), `# Replay gate fixture — provenance (#1638)
+writeFileSync(
+  join(OUT_DIR, 'replayGate.PROVENANCE.md'),
+  `# Replay gate fixture — provenance (#1638)
 
 - **What:** one scripted 60-second performance, recorded through the app's real recording taps
   (the performance recorder on the resolve taps, the spectrum recorder on the spectrum tap).
@@ -133,5 +180,8 @@ writeFileSync(join(OUT_DIR, 'replayGate.PROVENANCE.md'), `# Replay gate fixture 
 - **Re-record:** run the same command. It is deterministic — the sha256 must be identical unless
   behaviour changed. When an intentional behaviour change moves the replay, re-record in the same
   PR and say so in its body, with the reason. Never re-record just to make a red gate green.
-`);
-console.log(`fixture: ${bytes.length} bytes, ${perf.frames} frames, ${perf.checkpoints.length} checkpoints, sha256 ${sha}, recorded in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+`,
+);
+console.log(
+  `fixture: ${bytes.length} bytes, ${perf.frames} frames, ${perf.checkpoints.length} checkpoints, sha256 ${sha}, recorded in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+);

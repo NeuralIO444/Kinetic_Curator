@@ -6,7 +6,14 @@
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => !!window.__kcStore)).toBe(true);
@@ -29,9 +36,7 @@ const rangeOf = (page, key) => page.evaluate((k) => window.__kcStore.getState().
 /** Set a native range input to an exact value and let React commit it. */
 async function setRange(page, slider, value) {
   await slider.evaluate((el, v) => {
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, 'value',
-    ).set;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     setter.call(el, String(v));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -70,7 +75,9 @@ test('dock edits apply live to the store and persist across reload', async ({ pa
   await expect.poll(() => rangeOf(page, 'rotate').then((r) => r[0])).toBe(-400);
 });
 
-test('the hard range is enforced by the editor: inputs carry the hard min/max and a backwards span clamps', async ({ page }) => {
+test('the hard range is enforced by the editor: inputs carry the hard min/max and a backwards span clamps', async ({
+  page,
+}) => {
   await boot(page);
   await valueButton(page, 'SCALE').click();
   const d = dock(page, 'SCALE');
@@ -85,15 +92,17 @@ test('the hard range is enforced by the editor: inputs carry the hard min/max an
   expect(lo).toBeLessThanOrEqual(hi);
 });
 
-test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals the speed slider; OFF returns to 0', async ({ page }) => {
+test('ROTATE dock: the Spin matrix starts OFF; ON offers 0.05 rev/s and reveals the speed slider; OFF returns to 0', async ({
+  page,
+}) => {
   await boot(page);
   await expect.poll(() => spinOf(page)).toBe(0);
   await valueButton(page, 'ROTATE').click();
-  await expect(dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]')
-    .getByRole('button', { name: 'OFF' })).toHaveAttribute('aria-pressed', 'true');
+  await expect(
+    dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]').getByRole('button', { name: 'OFF' }),
+  ).toHaveAttribute('aria-pressed', 'true');
 
-  await dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]')
-    .getByRole('button', { name: 'ON' }).click();
+  await dock(page, 'ROTATE').locator('.te-matrix[aria-label="Spin"]').getByRole('button', { name: 'ON' }).click();
   // #1128: spin is chosen — ON starts at the offered 0.05 rev/s, not 0
   await expect.poll(() => spinOf(page)).toBeCloseTo(0.05, 5);
 

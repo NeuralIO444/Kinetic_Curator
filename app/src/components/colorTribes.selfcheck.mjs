@@ -2,6 +2,8 @@
 import assert from 'node:assert';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -82,15 +84,15 @@ ok('amber means one thing: only these files may use it, and a new one has to be 
   );
   const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
   const controls = readFileSync(join(SRC, 'styles/controls.css'), 'utf8');
-  assert.match(panels, /\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/);
-  assert.match(panels, /\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/);
-  assert.match(controls, /\.spin-readout \{ color: var\(--kc-davis\)/);
+  assert.match(flat(panels), fre(/\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/));
+  assert.match(flat(panels), fre(/\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/));
+  assert.match(flat(controls), fre(/\.spin-readout \{ color: var\(--kc-davis\)/));
 });
 
 ok('faults and errors are the red: the pills, the dialog error, the fps needle', () => {
   const css = (f) => readFileSync(join(SRC, f), 'utf8');
   assert.match(css('styles/controls.css'), /\.slider-dialog-error \{[^}]*var\(--kc-warn\)/);
-  assert.match(css('styles/layout.css'), /\.fps-needle\.bad \{ background: var\(--kc-warn\)/);
+  assert.match(flat(css('styles/layout.css')), fre(/\.fps-needle\.bad \{ background: var\(--kc-warn\)/));
   const tape = css('components/TapeCounter.jsx');
   assert.match(
     tape,
@@ -111,9 +113,9 @@ ok(
     );
     assert.equal((panel.match(/tribe-/g) || []).length, 3, 'exactly these three verbs are tribal');
     const css = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
-    assert.match(css, /\.big-btn\.tribe-davis:not\(\.active\) \{ border-color: var\(--kc-davis\); \}/);
-    assert.match(css, /\.big-btn\.tribe-lois \{ border-color: var\(--kc-red\); \}/);
-    assert.match(css, /\.big-btn\.active \{ background: var\(--accent\)/, 'live pink is untouched');
+    assert.match(flat(css), fre(/\.big-btn\.tribe-davis:not\(\.active\) \{ border-color: var\(--kc-davis\); \}/));
+    assert.match(flat(css), fre(/\.big-btn\.tribe-lois \{ border-color: var\(--kc-red\); \}/));
+    assert.match(flat(css), fre(/\.big-btn\.active \{ background: var\(--accent\)/), 'live pink is untouched');
   },
 );
 

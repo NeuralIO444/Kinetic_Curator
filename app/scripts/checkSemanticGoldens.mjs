@@ -42,7 +42,9 @@ export function skipBanner() {
 }
 
 function cosine(a, b) {
-  let dot = 0, na = 0, nb = 0;
+  let dot = 0,
+    na = 0,
+    nb = 0;
   for (let i = 0; i < a.length; i++) {
     dot += a[i] * b[i];
     na += a[i] * a[i];
@@ -71,7 +73,10 @@ function main() {
 
   // Schema + model identity — a model change is NEVER silently mixed.
   // (The curator's 768 -> 1152 lesson, enforced in CI.)
-  for (const [label, doc] of [['golden', golden], ['current', current]]) {
+  for (const [label, doc] of [
+    ['golden', golden],
+    ['current', current],
+  ]) {
     if (doc.schema !== EXPECTED_SCHEMA) {
       console.error(`[semantic-goldens] FAIL — ${label} schema is "${doc.schema}", expected "${EXPECTED_SCHEMA}"`);
       process.exit(1);
@@ -84,8 +89,8 @@ function main() {
   if (golden.model.id !== current.model.id || golden.model.dims !== current.model.dims) {
     console.error(
       `[semantic-goldens] FAIL — embedding model mismatch: golden is ${golden.model.id} ` +
-      `(${golden.model.dims}d), current is ${current.model.id} (${current.model.dims}d). ` +
-      `RE-EMBED REQUIRED — re-run docs/MLX_HARNESS_RUNBOOK.md §2, do not mix models.`,
+        `(${golden.model.dims}d), current is ${current.model.id} (${current.model.dims}d). ` +
+        `RE-EMBED REQUIRED — re-run docs/MLX_HARNESS_RUNBOOK.md §2, do not mix models.`,
     );
     process.exit(1);
   }
@@ -110,7 +115,10 @@ function main() {
       continue;
     }
     if (g.embedding.length !== golden.model.dims || c.embedding.length !== golden.model.dims) {
-      failures.push({ kind, reason: `embedding dims ${g.embedding.length}/${c.embedding.length} != model dims ${golden.model.dims} — re-embed required` });
+      failures.push({
+        kind,
+        reason: `embedding dims ${g.embedding.length}/${c.embedding.length} != model dims ${golden.model.dims} — re-embed required`,
+      });
       continue;
     }
     const sim = cosine(g.embedding, c.embedding);
@@ -128,7 +136,9 @@ function main() {
     console.error('[semantic-goldens] FAIL — the following effects no longer read as the same artwork:');
     for (const f of failures) {
       if (f.sim != null) {
-        console.error(`  ✗ ${f.kind}: cosine ${f.sim.toFixed(4)} < threshold ${f.threshold} — looks-wrong, or bless new goldens deliberately`);
+        console.error(
+          `  ✗ ${f.kind}: cosine ${f.sim.toFixed(4)} < threshold ${f.threshold} — looks-wrong, or bless new goldens deliberately`,
+        );
       } else {
         console.error(`  ✗ ${f.kind}: ${f.reason}`);
       }

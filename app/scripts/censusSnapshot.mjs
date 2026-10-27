@@ -26,7 +26,8 @@ if (!outDir) {
 }
 const keepsAt = process.argv.indexOf('--keeps');
 let keepsRecords = [];
-let keepsNote = 'keeps corpus EMPTY in this snapshot — no ledger export was handed in (kc:keeps:v1 is browser-local); the keeps cut below spans zero records.';
+let keepsNote =
+  'keeps corpus EMPTY in this snapshot — no ledger export was handed in (kc:keeps:v1 is browser-local); the keeps cut below spans zero records.';
 if (keepsAt >= 0 && process.argv[keepsAt + 1]) {
   const parsed = JSON.parse(readFileSync(process.argv[keepsAt + 1], 'utf8'));
   keepsRecords = Array.isArray(parsed) ? parsed : (parsed.keeps ?? parsed.records ?? []);
@@ -46,8 +47,14 @@ const census = {
   params: {
     total: rows.length,
     moves: rows.filter((r) => r.class === 'moves').length,
-    dead: rows.filter((r) => r.class === 'zero-in-context').map((r) => r.key).sort(),
-    notHeadless: rows.filter((r) => r.class === 'not-headless').map((r) => r.key).sort(),
+    dead: rows
+      .filter((r) => r.class === 'zero-in-context')
+      .map((r) => r.key)
+      .sort(),
+    notHeadless: rows
+      .filter((r) => r.class === 'not-headless')
+      .map((r) => r.key)
+      .sort(),
     dish: rows.filter((r) => r.class === 'dish-matrix').length,
   },
   reach: {
@@ -62,6 +69,12 @@ const census = {
 writeFileSync(join(outDir, 'census.json'), JSON.stringify(census, null, 2));
 
 console.log(`census snapshot → ${outDir}/coverage.json + census.json (${((Date.now() - t0) / 1000).toFixed(1)}s)`);
-console.log(`  tray: ${coverage.dice.tray.distinct}/${coverage.dice.library.assets} assets reach the tray · ${coverage.dice.tray.neverCount} never`);
-console.log(`  params: ${census.params.total} keys · ${census.params.moves} move · ${census.params.dead.length} dead (${census.params.dead.join(', ')})`);
-console.log(`  reach: ${census.reach.assetsMeasured - census.reach.assetsUnreached.length}/${census.reach.assetsMeasured} assets draw`);
+console.log(
+  `  tray: ${coverage.dice.tray.distinct}/${coverage.dice.library.assets} assets reach the tray · ${coverage.dice.tray.neverCount} never`,
+);
+console.log(
+  `  params: ${census.params.total} keys · ${census.params.moves} move · ${census.params.dead.length} dead (${census.params.dead.join(', ')})`,
+);
+console.log(
+  `  reach: ${census.reach.assetsMeasured - census.reach.assetsUnreached.length}/${census.reach.assetsMeasured} assets draw`,
+);

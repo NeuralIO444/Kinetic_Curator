@@ -16,10 +16,10 @@
   --kc-davis-rgb: 255, 205, 130; /* the same colour as r,g,b for the canvas */
   --panel: #111114;
   --panel-2: #16161b;
-  --line: rgba(255,255,255,0.08);
-  --line-2: rgba(255,255,255,0.14);
-  --dim: rgba(232,232,224,0.5);
-  --dimmer: rgba(232,232,224,0.32);
+  --line: rgba(255, 255, 255, 0.08);
+  --line-2: rgba(255, 255, 255, 0.14);
+  --dim: rgba(232, 232, 224, 0.5);
+  --dimmer: rgba(232, 232, 224, 0.32);
   --mono: ui-monospace, "JetBrains Mono", "IBM Plex Mono", Menlo, Consolas, monospace;
 
   /* Compact spacing scale */
@@ -36,7 +36,9 @@
   --focus: var(--accent2);
 }
 
-* { box-sizing: border-box; }
+* {
+  box-sizing: border-box;
+}
 
 /* Keyboard users had no focus indicator anywhere in the app. */
 :focus-visible {
@@ -44,13 +46,19 @@
   outline-offset: 1px;
 }
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
 }
-html, body { margin: 0; padding: 0; }
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
 body {
   background: var(--bg);
   color: var(--ink);
@@ -60,26 +68,59 @@ body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
-button { font-family: inherit; cursor: pointer; }
-input { font-family: inherit; font-size: 11px; }
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+input {
+  font-family: inherit;
+  font-size: 11px;
+}
 /* #1033 (M8) — one dropdown (docs/DESIGN_SYSTEM.md §2.5). The native arrow stays; the
    open list is OS-drawn. Live-path selects (route matrix, layer rows) override to 44px. */
 select {
-  background: var(--panel-2); color: var(--ink);
+  background: var(--panel-2);
+  color: var(--ink);
   border: 1px solid var(--line);
-  font: 9px var(--mono); letter-spacing: 0.04em;
-  padding: 2px 4px; min-height: 28px;
+  font: 9px var(--mono);
+  letter-spacing: 0.04em;
+  padding: 2px 4px;
+  min-height: 28px;
   color-scheme: dark;
 }
-select:hover { border-color: var(--line-2); }
-select:focus-visible { outline: 1px solid var(--ink); outline-offset: 1px; }
-select:disabled { color: var(--dimmer); cursor: default; }
-.mono { font-family: var(--mono); letter-spacing: 0.02em; }
+select:hover {
+  border-color: var(--line-2);
+}
+select:focus-visible {
+  outline: 1px solid var(--ink);
+  outline-offset: 1px;
+}
+select:disabled {
+  color: var(--dimmer);
+  cursor: default;
+}
+.mono {
+  font-family: var(--mono);
+  letter-spacing: 0.02em;
+}
 
-@keyframes pulse { 50% { opacity: 0.5; } }
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
+}
 
 /* Scrollbar styling — compact and unobtrusive */
-::-webkit-scrollbar { width: 4px; height: 4px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.24); }
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.12);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.24);
+}

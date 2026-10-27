@@ -46,7 +46,9 @@ lines.push('| class | target | frame | render cap | near-bust from |');
 lines.push('|---|---|---|---|---|');
 for (const cls of ['desktop', 'ipad']) {
   const b = FRAME_BUDGETS[cls];
-  lines.push(`| ${cls} | ${b.targetFps} fps | ${fmt(b.frameMs)} ms | ${fmt(b.renderCapMs)} ms | ${fmt(b.renderCapMs * b.nearBustRatio)} ms |`);
+  lines.push(
+    `| ${cls} | ${b.targetFps} fps | ${fmt(b.frameMs)} ms | ${fmt(b.renderCapMs)} ms | ${fmt(b.renderCapMs * b.nearBustRatio)} ms |`,
+  );
 }
 lines.push('');
 lines.push('## The evidence');
@@ -71,11 +73,19 @@ for (const r of c.rows) {
 lines.push('');
 lines.push('## Named findings');
 lines.push('');
-lines.push(`- **Busts both budgets:** ${c.busts.desktop.filter((id) => c.busts.ipad.includes(id)).join(', ') || 'none'}`);
-lines.push(`- **Desktop-only (busts iPad, fits or near on desktop):** ${c.busts.ipad.filter((id) => !c.busts.desktop.includes(id)).join(', ') || 'none'}`);
-lines.push(`- **Near-busts:** desktop — ${c.nearBusts.desktop.join(', ') || 'none'}; iPad — ${c.nearBusts.ipad.join(', ') || 'none'}`);
+lines.push(
+  `- **Busts both budgets:** ${c.busts.desktop.filter((id) => c.busts.ipad.includes(id)).join(', ') || 'none'}`,
+);
+lines.push(
+  `- **Desktop-only (busts iPad, fits or near on desktop):** ${c.busts.ipad.filter((id) => !c.busts.desktop.includes(id)).join(', ') || 'none'}`,
+);
+lines.push(
+  `- **Near-busts:** desktop — ${c.nearBusts.desktop.join(', ') || 'none'}; iPad — ${c.nearBusts.ipad.join(', ') || 'none'}`,
+);
 const un = c.rows.filter((r) => r.desktop.verdict === 'unmeasured');
-lines.push(`- **Unmeasured in this environment:** ${un.length ? un.map((r) => `${r.id} (${r.failed || 'no label'})`).join('; ') : 'none'}`);
+lines.push(
+  `- **Unmeasured in this environment:** ${un.length ? un.map((r) => `${r.id} (${r.failed || 'no label'})`).join('; ') : 'none'}`,
+);
 lines.push('');
 
 // #1694 S2 — the creature citizen's families. Not recipes in the dataset: per-family cost
@@ -95,20 +105,26 @@ const familyRows = ['creature/moth', 'creature/dish'].map((id) => {
 });
 lines.push('## Creatures — the citizen\u2019s families (registry declarations)');
 lines.push('');
-lines.push(`Allowance: **${fmt(CREATURE_FRAME_ALLOWANCE_MS, 2)} ms** at the population cap (near-bust from ${fmt(nearBustFrom, 2)} ms, the budgets' 80% rule).`);
+lines.push(
+  `Allowance: **${fmt(CREATURE_FRAME_ALLOWANCE_MS, 2)} ms** at the population cap (near-bust from ${fmt(nearBustFrom, 2)} ms, the budgets' 80% rule).`,
+);
 lines.push('');
 lines.push('| family | declared (ms) | share of allowance | verdict |');
 lines.push('|---|---|---|---|');
 for (const d of familyRows) {
-  lines.push(`| ${d.id} | ${fmt(d.timeMs, 2)} | ${fmt((d.timeMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(d.timeMs)} |`);
+  lines.push(
+    `| ${d.id} | ${fmt(d.timeMs, 2)} | ${fmt((d.timeMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(d.timeMs)} |`,
+  );
 }
 const combinedMs = familyRows.reduce((s2, d) => s2 + d.timeMs, 0);
-lines.push(`| both families at their own caps (conservative sum — the 4-pin cap means they cannot co-occur; the measured full stage is lower) | ${fmt(combinedMs, 2)} | ${fmt((combinedMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(combinedMs)} |`);
+lines.push(
+  `| both families at their own caps (conservative sum — the 4-pin cap means they cannot co-occur; the measured full stage is lower) | ${fmt(combinedMs, 2)} | ${fmt((combinedMs / CREATURE_FRAME_ALLOWANCE_MS) * 100, 0)}% | ${creatureVerdict(combinedMs)} |`,
+);
 lines.push('');
 lines.push('## Worked example');
 lines.push('');
 lines.push('<!-- Authored in the committed report: name the heaviest measured recipe, its label against');
-lines.push('     both caps, and what the governor\'s shed order would do about it, tier by tier. -->');
+lines.push("     both caps, and what the governor's shed order would do about it, tier by tier. -->");
 lines.push('');
 
 const text = lines.join('\n');

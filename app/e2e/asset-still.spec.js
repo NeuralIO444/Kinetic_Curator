@@ -2,7 +2,14 @@
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /assets/i }).click();
@@ -27,7 +34,9 @@ test('only assets in use have a STILL toggle; it is 44px tall and flips the proj
   expect(await page.evaluate(() => Object.keys(window.__kcStore.getState().assetStill).length)).toBe(0);
 });
 
-test('DUP sits next to STILL on a tile in use; nothing depends on hover; a tile that is off is only a picture', async ({ page }) => {
+test('DUP sits next to STILL on a tile in use; nothing depends on hover; a tile that is off is only a picture', async ({
+  page,
+}) => {
   await boot(page);
   const used = page.locator('.tile.tile-on').first();
   await expect(used.locator('.tile-foot .tile-dup')).toBeVisible();
@@ -42,7 +51,9 @@ test('DUP sits next to STILL on a tile in use; nothing depends on hover; a tile 
   await expect(off).toHaveClass(/tile-on/);
 });
 
-test('pinning marks the picture too (a red corner), so a scan of the grid sees what is held still', async ({ page }) => {
+test('pinning marks the picture too (a red corner), so a scan of the grid sees what is held still', async ({
+  page,
+}) => {
   await boot(page);
   const used = page.locator('.tile.tile-on').first();
   await used.locator('.tile-still').click();

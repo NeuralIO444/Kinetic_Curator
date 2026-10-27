@@ -17,16 +17,8 @@ export const TRIO = {
     'src/gl/clock.freeze.selfcheck.mjs',
     'qa/units.selfcheck.mjs',
   ],
-  playwright: [
-    'e2e/smoke.spec.js',
-    'e2e/startup-chaos.spec.js',
-    'e2e/director-regroup.spec.js',
-  ],
-  qa: [
-    'palette-import',
-    'wash-mode',
-    'fx-finish-grain-rgb',
-  ],
+  playwright: ['e2e/smoke.spec.js', 'e2e/startup-chaos.spec.js', 'e2e/director-regroup.spec.js'],
+  qa: ['palette-import', 'wash-mode', 'fx-finish-grain-rgb'],
 };
 
 export function trioProblems(trio) {
