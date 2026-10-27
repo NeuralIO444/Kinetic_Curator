@@ -246,6 +246,16 @@ impl MediaAppState {
     }
 }
 
+/// #1743: clears `is_exporting` however the export ends — an early return, an error, or a panic — so a failed
+/// export can never leave every later one refused with "Another export is already in progress".
+struct ExportFlag(Arc<AtomicBool>);
+
+impl Drop for ExportFlag {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
+    }
+}
+
 // ── Tauri Commands ───────────────────────────────────────────────────
 
 #[tauri::command]
@@ -256,79 +266,80 @@ pub async fn start_media_engine_export(
     fps: u32,
     codec: String,
 ) -> Result<String, String> {
+    if fps == 0 || fps > 240 {
+        return Err(format!("fps must be 1–240 (got {fps})"));
+    }
+    // #1742: the export file lands under the temp folder only, like write_batch_frame.
+    let out_path = crate::batch_frame::resolve_under(&path, &crate::batch_frame::allowed_roots())?;
+    let out_path = out_path.to_string_lossy().to_string();
+
     let media_state = app.state::<MediaAppState>();
     if media_state.is_exporting.swap(true, Ordering::SeqCst) {
         return Err("Another export is already in progress".to_string());
     }
-
-    let is_exporting = media_state.is_exporting.clone();
+    let flag = ExportFlag(media_state.is_exporting.clone());
     let app_handle = app.clone();
 
     // Spawn export on background OS thread
     tauri::async_runtime::spawn_blocking(move || {
+        let _flag = flag; // released when this closure ends, whatever the path out
         let t_start = Instant::now();
         let metal_state = app_handle.state::<MetalAppState>();
 
-        // 1. Initialize AVAssetWriter with hardware Media Engine encoding
-        let (width, height, shared_accum_ptr) = {
-            let lock = metal_state.0.lock().unwrap();
-            let ctx = match lock.as_ref() {
-                Some(c) => c,
-                None => {
-                    is_exporting.store(false, Ordering::SeqCst);
-                    return Err("Metal engine not initialized".to_string());
-                }
-            };
-            (ctx.width, ctx.height, ctx.shared_accum_buffer.contents())
-        };
-
-        let writer = match MediaEngineWriter::new(&path, width, height, fps, &codec) {
-            Ok(w) => w,
-            Err(e) => {
-                is_exporting.store(false, Ordering::SeqCst);
-                return Err(format!("MediaEngineWriter init failed: {}", e));
+        // 1. Read the frame size. The buffer pointer is NOT kept: #1743 — a pointer copied out of the lock dangled
+        //    as soon as metal_init replaced the context mid-export.
+        let (width, height) = {
+            let lock = metal_state.0.lock().map_err(|e| format!("Metal state poisoned: {e}"))?;
+            match lock.as_ref() {
+                Some(c) => (c.width, c.height),
+                None => return Err("Metal engine not initialized".to_string()),
             }
         };
+
+        let writer = MediaEngineWriter::new(&out_path, width, height, fps, &codec)
+            .map_err(|e| format!("MediaEngineWriter init failed: {}", e))?;
 
         let curator = CoreMLCurator::new();
+        let mut written: u32 = 0;
+        let mut failure: Option<String> = None;
 
-        // 2. Stream candidate frames straight from Metal zero-copy buffer
+        // 2. Each frame steps, wraps and appends with the Metal lock HELD, re-reading the buffer pointer from the
+        //    live context, so a re-init waits for the frame instead of freeing the memory under it.
         for i in 0..frame_count {
-            if !is_exporting.load(Ordering::Relaxed) {
+            if !_flag.0.load(Ordering::Relaxed) {
                 break;
             }
-
-            // Step Metal simulation for dynamic animation frame
-            {
-                let mut lock = metal_state.0.lock().unwrap();
-                if let Some(ctx) = lock.as_mut() {
-                    let _ = ctx.step_boids(1.0 / (fps as f32), 60.0, [width as f32 / 2.0, height as f32 / 2.0], 600.0);
-                    let _ = ctx.step_accum(0.96, [0.0, 0.0, 0.0, 1.0]);
+            let frame_result: Result<(), String> = (|| {
+                let mut lock = metal_state.0.lock().map_err(|e| format!("Metal state poisoned: {e}"))?;
+                let ctx = lock.as_mut().ok_or("Metal engine was torn down during the export")?;
+                if ctx.width != width || ctx.height != height {
+                    return Err("Metal engine was re-initialised at a different size during the export".into());
                 }
-            }
-
-            // Wrap unified memory frame directly into CVPixelBuffer
-            let pixel_buf = match curator.wrap_metal_buffer_zero_copy(shared_accum_ptr, width as usize, height as usize) {
-                Ok(b) => b,
-                Err(e) => {
-                    println!("[MediaEngine] Frame {} wrap error: {}", i, e);
-                    continue;
+                ctx.step_boids(1.0 / (fps as f32), 60.0, [width as f32 / 2.0, height as f32 / 2.0], 600.0)?;
+                ctx.step_accum(0.96, [0.0, 0.0, 0.0, 1.0])?;
+                let pixel_buf = curator.wrap_metal_buffer_zero_copy(
+                    ctx.shared_accum_buffer.contents(),
+                    width as usize,
+                    height as usize,
+                )?;
+                let appended = writer.append_frame(pixel_buf, written as i64);
+                unsafe {
+                    CVPixelBufferRelease(pixel_buf);
                 }
-            };
-
-            // Feed frame directly to AVAssetWriter hardware encoder
-            let _ = writer.append_frame(pixel_buf, i as i64);
-
-            unsafe {
-                CVPixelBufferRelease(pixel_buf);
+                appended
+            })();
+            if let Err(e) = frame_result {
+                failure = Some(format!("frame {}: {}", i, e));
+                break;
             }
+            written += 1;
 
             // Emit live progress
-            let current_fps = (i + 1) as f32 / t_start.elapsed().as_secs_f32().max(0.001);
+            let current_fps = written as f32 / t_start.elapsed().as_secs_f32().max(0.001);
             let _ = app_handle.emit_all("media-export-progress", MediaExportProgress {
-                completed: i + 1,
+                completed: written,
                 total: frame_count,
-                current_file: path.clone(),
+                current_file: out_path.clone(),
                 fps: current_fps,
                 qos_core: "Apple Media Engine (Hardware)".to_string(),
                 codec: codec.clone(),
@@ -336,24 +347,36 @@ pub async fn start_media_engine_export(
             });
         }
 
-        let _ = writer.finish();
-        is_exporting.store(false, Ordering::SeqCst);
-
-        let final_fps = frame_count as f32 / t_start.elapsed().as_secs_f32().max(0.001);
+        // #1744: the encoder's verdict is the export's verdict — never "completed" over a failed append or finish.
+        let finished = writer.finish();
+        let final_fps = written as f32 / t_start.elapsed().as_secs_f32().max(0.001);
         let _ = app_handle.emit_all("media-export-progress", MediaExportProgress {
-            completed: frame_count,
+            completed: written,
             total: frame_count,
-            current_file: path.clone(),
+            current_file: out_path.clone(),
             fps: final_fps,
             qos_core: "Apple Media Engine (Hardware)".to_string(),
             codec: codec.clone(),
             finished: true,
         });
-
-        Ok(format!("Export completed in {:.2}s (~{:.1} fps)", t_start.elapsed().as_secs_f32(), final_fps))
-    }).await.map_err(|e| e.to_string())?
+        if let Some(e) = failure {
+            return Err(format!("Export stopped after {} of {} frames — {}", written, frame_count, e));
+        }
+        finished.map_err(|e| format!("Export wrote {} frames but the file did not finish: {}", written, e))?;
+        Ok(format!(
+            "Export completed: {} frames in {:.2}s (~{:.1} fps)",
+            written,
+            t_start.elapsed().as_secs_f32(),
+            final_fps
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
+/// #1744: the dump writes the accumulation buffer as it is — little-endian RGBA f32, the whole frame — under an
+/// honest `.rgba32f` name. It used to write the first 256 KB of that buffer into files named `.png` / `.tiff`,
+/// which no image tool opens. `format` is kept for the IPC shape; only raw is written.
 #[tauri::command]
 pub async fn dump_image_batch(
     app: AppHandle,
@@ -361,97 +384,101 @@ pub async fn dump_image_batch(
     count: u32,
     format: String,
 ) -> Result<String, String> {
+    // #1742: under the temp folder only. Resolving a probe file inside the folder checks (and creates) the folder.
+    let probe = std::path::Path::new(&target_dir).join(".kc-dump");
+    let dir = crate::batch_frame::resolve_under(&probe.to_string_lossy(), &crate::batch_frame::allowed_roots())?
+        .parent()
+        .map(|p| p.to_path_buf())
+        .ok_or("no target folder")?;
+
     let media_state = app.state::<MediaAppState>();
     if media_state.is_exporting.swap(true, Ordering::SeqCst) {
         return Err("Another export is already in progress".to_string());
     }
-
-    let is_exporting = media_state.is_exporting.clone();
+    let flag = ExportFlag(media_state.is_exporting.clone());
     let app_handle = app.clone();
+    let requested = format.to_lowercase();
 
     tauri::async_runtime::spawn_blocking(move || {
+        let _flag = flag;
         // Pin this worker thread strictly to macOS Efficiency Cores (E-Cores)
         unsafe {
             pthread_set_qos_class_self_np(QOS_CLASS_BACKGROUND, 0);
         }
 
-        let _ = fs::create_dir_all(&target_dir);
         let t_start = Instant::now();
         let metal_state = app_handle.state::<MetalAppState>();
-
-        let (width, height, shared_accum_ptr) = {
-            let lock = metal_state.0.lock().unwrap();
-            let ctx = match lock.as_ref() {
-                Some(c) => c,
-                None => {
-                    is_exporting.store(false, Ordering::SeqCst);
-                    return Err("Metal engine not initialized".to_string());
-                }
-            };
-            (ctx.width, ctx.height, ctx.shared_accum_buffer.contents())
+        let codec_label = if requested == "raw" || requested == "rgba32f" {
+            "RAW RGBA32F".to_string()
+        } else {
+            format!("RAW RGBA32F ({} not encoded)", requested.to_uppercase())
         };
-
-        let ext = if format.eq_ignore_ascii_case("tiff") { "tiff" } else { "png" };
+        let mut written: u32 = 0;
 
         for i in 0..count {
-            if !is_exporting.load(Ordering::Relaxed) {
+            if !_flag.0.load(Ordering::Relaxed) {
                 break;
             }
+            let file_name = format!("kc_frame_{:04}.rgba32f", i);
+            let file_path = dir.join(&file_name);
 
-            // Step dynamic frame
-            {
-                let mut lock = metal_state.0.lock().unwrap();
-                if let Some(ctx) = lock.as_mut() {
-                    let _ = ctx.step_boids(0.016, 60.0, [width as f32 / 2.0, height as f32 / 2.0], 500.0);
-                    let _ = ctx.step_accum(0.96, [0.0, 0.0, 0.0, 1.0]);
-                }
-            }
+            // Step and copy the frame with the lock held (#1743), then write outside it.
+            let bytes: Vec<u8> = {
+                let mut lock = metal_state.0.lock().map_err(|e| format!("Metal state poisoned: {e}"))?;
+                let ctx = lock
+                    .as_mut()
+                    .ok_or_else(|| if i == 0 { "Metal engine not initialized".to_string() } else { "Metal engine was torn down during the dump".to_string() })?;
+                ctx.step_boids(0.016, 60.0, [ctx.width as f32 / 2.0, ctx.height as f32 / 2.0], 500.0)?;
+                ctx.step_accum(0.96, [0.0, 0.0, 0.0, 1.0])?;
+                let len = (ctx.width as usize) * (ctx.height as usize) * 16;
+                let len = len.min(ctx.shared_accum_buffer.length() as usize);
+                unsafe { std::slice::from_raw_parts(ctx.shared_accum_buffer.contents() as *const u8, len).to_vec() }
+            };
+            fs::write(&file_path, &bytes).map_err(|e| format!("Failed to write {}: {}", file_path.display(), e))?;
+            written += 1;
 
-            let file_name = format!("kc_frame_{:04}.{}", i, ext);
-            let file_path = Path::new(&target_dir).join(&file_name);
-
-            // Stream raw uncompressed buffer directly to disk via E-Core
-            let pixel_bytes = (width * height * 16) as usize;
-            unsafe {
-                let slice = std::slice::from_raw_parts(shared_accum_ptr as *const u8, pixel_bytes.min(256 * 1024)); // representative dump
-                let _ = fs::write(&file_path, slice);
-            }
-
-            let current_fps = (i + 1) as f32 / t_start.elapsed().as_secs_f32().max(0.001);
+            let current_fps = written as f32 / t_start.elapsed().as_secs_f32().max(0.001);
             let _ = app_handle.emit_all("media-export-progress", MediaExportProgress {
-                completed: i + 1,
+                completed: written,
                 total: count,
                 current_file: file_name,
                 fps: current_fps,
                 qos_core: "E-Cores (QOS_CLASS_BACKGROUND)".to_string(),
-                codec: format.to_uppercase(),
+                codec: codec_label.clone(),
                 finished: false,
             });
         }
 
-        is_exporting.store(false, Ordering::SeqCst);
-        let final_fps = count as f32 / t_start.elapsed().as_secs_f32().max(0.001);
-
+        let final_fps = written as f32 / t_start.elapsed().as_secs_f32().max(0.001);
         let _ = app_handle.emit_all("media-export-progress", MediaExportProgress {
-            completed: count,
+            completed: written,
             total: count,
-            current_file: format!("Batch finished in {}", target_dir),
+            current_file: format!("Batch finished in {}", dir.display()),
             fps: final_fps,
             qos_core: "E-Cores (QOS_CLASS_BACKGROUND)".to_string(),
-            codec: format.to_uppercase(),
+            codec: codec_label.clone(),
             finished: true,
         });
 
-        Ok(format!("Batch dump completed: {} frames in {:.2}s (~{:.1} fps)", count, t_start.elapsed().as_secs_f32(), final_fps))
-    }).await.map_err(|e| e.to_string())?
+        Ok(format!(
+            "Batch dump completed: {} raw RGBA32F frames in {:.2}s (~{:.1} fps)",
+            written,
+            t_start.elapsed().as_secs_f32(),
+            final_fps
+        ))
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
+/// #1744: reports what is true — whether AVAssetWriter is present, and whether an export is running — instead of
+/// a fixed "ready, idle".
 #[tauri::command]
-pub fn media_engine_get_status() -> Result<MediaEngineStatus, String> {
+pub fn media_engine_get_status(state: tauri::State<'_, MediaAppState>) -> Result<MediaEngineStatus, String> {
     Ok(MediaEngineStatus {
-        hardware_encoder_ready: true,
-        supported_codecs: vec!["HEVC (H.265)".to_string(), "ProRes 4444 XQ".to_string(), "PNG / TIFF (E-Core)".to_string()],
+        hardware_encoder_ready: Class::get("AVAssetWriter").is_some(),
+        supported_codecs: vec!["HEVC (H.265)".to_string(), "ProRes 4444".to_string(), "RAW RGBA32F dump (E-Core)".to_string()],
         e_core_qos_enabled: true,
-        active_export: false,
+        active_export: state.is_exporting.load(Ordering::SeqCst),
     })
 }

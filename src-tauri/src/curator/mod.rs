@@ -193,6 +193,9 @@ impl CoreMLCurator {
     }
 }
 
+/// #1744: what actually computes the curator score today. Was labelled "CPUAndNeuralEngine" though no model runs.
+pub const CPU_HEURISTIC_LABEL: &str = "CPU heuristic (no Core ML model)";
+
 // ── State Container ──────────────────────────────────────────────────
 
 pub struct CuratorAppState(pub std::sync::Mutex<CoreMLCurator>);
@@ -220,7 +223,8 @@ pub fn curator_evaluate_frame(
         ctx.height as usize,
     )?;
 
-    // 2. Perform ANE evaluation directly from unified memory
+    // 2. Score the frame. #1744: this is a CPU heuristic over sampled pixels (evaluate_pixel_buffer) — no Core ML
+    //    model is loaded and nothing runs on the Neural Engine, so the payload says so.
     let score = curator_lock.evaluate_pixel_buffer(
         accum_ptr as *const [f32; 4],
         ctx.width as usize,
@@ -238,7 +242,7 @@ pub fn curator_evaluate_frame(
         score,
         active: true,
         latency_ms,
-        compute_units: "CPUAndNeuralEngine".to_string(),
+        compute_units: CPU_HEURISTIC_LABEL.to_string(),
         frame_counter: ctx.frame_counter,
     };
 
@@ -254,9 +258,9 @@ pub fn curator_get_status(
 ) -> Result<CuratorStatus, String> {
     let lock = curator_state.0.lock().map_err(|e| e.to_string())?;
     Ok(CuratorStatus {
-        model_ready: true,
-        compute_units: "CPUAndNeuralEngine (ANE)".to_string(),
-        target_device: "Apple Neural Engine (16-core)".to_string(),
+        model_ready: false, // #1744: no Core ML model is loaded; the score is the CPU heuristic
+        compute_units: CPU_HEURISTIC_LABEL.to_string(),
+        target_device: "CPU".to_string(),
         last_score: lock.last_score,
         total_evaluations: lock.total_evaluations,
     })
