@@ -13,7 +13,9 @@ test.describe('readable recipes (#307)', () => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     await page.goto('/?boot=factory');
@@ -65,7 +67,9 @@ test.describe('readable recipes (#307)', () => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     await page.goto('/?boot=factory');

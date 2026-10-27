@@ -2,6 +2,8 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { splitLabel } from './expandLabel.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
@@ -50,7 +52,7 @@ ok('every expanding button opens on hover, keyboard focus AND touch; no pixel wi
   assert.ok(open.length >= 3);
   for (const r of open) {
     assert.match(r.sel, /:focus-visible/, 'keyboard focus opens it');
-    assert.match(r.sel, /\[data-open="true"\]/, 'a touch opens it');
+    assert.match(flat(r.sel), fre(/\[data-open="true"\]/), 'a touch opens it');
     assert.ok(!/\d+px/.test(r.body), 'a width is a character count, not pixels');
   }
   assert.match(css, /prefers-reduced-motion: reduce\) \{[^}]*\.xl-ch/, 'reduced motion drops the transition');

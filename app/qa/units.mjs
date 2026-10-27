@@ -21,7 +21,10 @@ export function suitesFor(files, listing) {
     for (const name of listing(dir)) {
       if (name.endsWith('.selfcheck.mjs')) wanted.add(join(dir, name).split('\\').join('/'));
     }
-    const stem = rel.split('/').pop().replace(/\.(mjs|js|jsx)$/, '');
+    const stem = rel
+      .split('/')
+      .pop()
+      .replace(/\.(mjs|js|jsx)$/, '');
     for (const suite of listing.all || []) {
       if (suite.includes(stem) && suite.endsWith('.selfcheck.mjs')) wanted.add(suite);
     }
@@ -41,15 +44,24 @@ function walk(dir, out = []) {
 }
 
 function changedFiles(pr) {
-  const r = spawnSync('gh', ['pr', 'diff', String(pr), '--name-only', '--repo', 'NeuralIO444/Kinetic_Curator'], { encoding: 'utf8' });
+  const r = spawnSync('gh', ['pr', 'diff', String(pr), '--name-only', '--repo', 'NeuralIO444/Kinetic_Curator'], {
+    encoding: 'utf8',
+  });
   if (r.status !== 0) throw new Error(r.stderr || 'gh pr diff failed');
-  return r.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+  return r.stdout
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
 }
 
 function hardness(files) {
   const e2e = files.some((f) => f.includes('/e2e/') || f.endsWith('.jsx'));
   const feel = files.some((f) => /particles\.js|paletteMix|behave/.test(f));
-  return feel ? 'feel — unit pin is not the review' : e2e ? 'face — units first, e2e only if the click path changed' : 'unit — selfcheck is the gate';
+  return feel
+    ? 'feel — unit pin is not the review'
+    : e2e
+      ? 'face — units first, e2e only if the click path changed'
+      : 'unit — selfcheck is the gate';
 }
 
 function main() {

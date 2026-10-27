@@ -4,7 +4,13 @@
 import { test, expect } from '@playwright/test';
 
 test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE progress', async ({ page }) => {
-  await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /director/i }).click();
@@ -14,7 +20,13 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
   // + gestures in-panel, so FREEZE/CLEAR/SWELL are reachable from DIRECTOR.
   // #1507's mined tray adds NO section: its load control rides GENERATE's
   // label row and its body renders sectionless below Evolve when loaded)
-  await expect(panel.locator('.davis-section-label')).toHaveText(['voices', 'generate', 'perform', 'trails', 'the room']); // #1126: the two Directors close the panel
+  await expect(panel.locator('.davis-section-label')).toHaveText([
+    'voices',
+    'generate',
+    'perform',
+    'trails',
+    'the room',
+  ]); // #1126: the two Directors close the panel
 
   // nothing deleted: every existing control is findable
   await expect(panel.locator('.voice-chip.starter')).toHaveCount(1); // #1153: one starter until the first find
@@ -23,7 +35,8 @@ test('DIRECTORS: VOICES / GENERATE / PERFORM sections, controls intact, EVOLVE p
   }
 
   // #1128: the DIRECTOR's motion pattern — a discrete TE choice, DRIFT (the floor) until another is picked
-  const pat = (name) => panel.getByRole('group', { name: 'motion pattern' }).getByRole('button', { name: `${name} pattern`, exact: true });
+  const pat = (name) =>
+    panel.getByRole('group', { name: 'motion pattern' }).getByRole('button', { name: `${name} pattern`, exact: true });
   await expect(pat('DRIFT')).toHaveAttribute('aria-pressed', 'true');
   await expect(pat('THUMP')).toHaveAttribute('title', /needs audio on; plays DRIFT until then/);
   await pat('SWELL').click();

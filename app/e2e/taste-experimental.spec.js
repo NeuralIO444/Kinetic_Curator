@@ -3,13 +3,29 @@
 import { test, expect } from '@playwright/test';
 
 const THIN = {
-  kind: 'kc-taste', version: 1, featuresVersion: 4, model: 'm', dims: 1152, trainedAt: '2026-10-08T00:00:00Z',
+  kind: 'kc-taste',
+  version: 1,
+  featuresVersion: 4,
+  model: 'm',
+  dims: 1152,
+  trainedAt: '2026-10-08T00:00:00Z',
   labels: { likes: 20, passes: 200 },
   head: { terms: { 'scale=large': 1 }, num: {}, bias: 0, fidelity: 0.17, fitOn: 202 },
 };
 
-test('a below-bar taste is ignored by default; the switch lets it steer and says so; off puts the rule back', async ({ page }) => {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); localStorage.removeItem('kc:taste:v1'); localStorage.removeItem('kc:taste:experimental:v1'); } catch { /* ignore */ } });
+test('a below-bar taste is ignored by default; the switch lets it steer and says so; off puts the rule back', async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.removeItem('kc:taste:v1');
+      localStorage.removeItem('kc:taste:experimental:v1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /pipeline/i }).click();

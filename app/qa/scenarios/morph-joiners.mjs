@@ -16,7 +16,8 @@
 // - Screenshots use the full page — element screenshots of the WebGL canvas
 //   go stale in headless Chromium, the page capture stays live.
 export default {
-  describe: 'Drag COUNT up then down and screenshot across both transitions — arrivals should punch in (pop/wave), departures should slip out quietly.',
+  describe:
+    'Drag COUNT up then down and screenshot across both transitions — arrivals should punch in (pop/wave), departures should slip out quietly.',
   async run(ctx) {
     const page = await ctx.newPage();
     const errors = [];
@@ -25,7 +26,9 @@ export default {
     // sandbox's software GL can't hold 10fps, so the watchdog hard-stops the
     // loop on boot and re-trips on resume — with the governor off the loop
     // runs and the item-morph code path under test is unaffected.
-    await page.addInitScript(() => { window.__KC_GOVERNOR_OFF = true; });
+    await page.addInitScript(() => {
+      window.__KC_GOVERNOR_OFF = true;
+    });
     await ctx.openApp(page);
     // Half-res render so software GL keeps up and the loop actually runs.
     const u = new URL(page.url());
@@ -43,7 +46,7 @@ export default {
     }
 
     const countSlider = page.locator('.range-row:has(.range-label:text-is("COUNT")) input.single-slider');
-    ctx.check('COUNT slider exists', await countSlider.count() > 0, 'no COUNT slider found');
+    ctx.check('COUNT slider exists', (await countSlider.count()) > 0, 'no COUNT slider found');
     if (!(await countSlider.count())) return;
     await countSlider.fill('40');
     await page.waitForTimeout(800);

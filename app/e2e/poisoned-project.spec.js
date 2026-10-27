@@ -34,13 +34,17 @@ const POISONED = `{
 test('poisoned project loads without killing the canvas', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
 
   await page.addInitScript((doc) => {
     try {
       localStorage.setItem('kc:first-run-seen', '1');
       localStorage.setItem('kc:project:v1', doc);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, POISONED);
 
   await page.goto('/?boot=factory');
@@ -52,17 +56,17 @@ test('poisoned project loads without killing the canvas', async ({ page }) => {
   const footer = await page.locator('.footer-bar').textContent();
   console.log('[poison] nodes:', nodes, '| footer:', footer?.slice(0, 80));
 
-  expect(nodes, 'canvas rendered nothing — the poisoned project broke the kernel')
-    .toBeGreaterThan(0);
-  expect(footer, 'mode should have fallen back to an allow-listed value')
-    .not.toMatch(/__proto__/);
+  expect(nodes, 'canvas rendered nothing — the poisoned project broke the kernel').toBeGreaterThan(0);
+  expect(footer, 'mode should have fallen back to an allow-listed value').not.toMatch(/__proto__/);
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });
 
 // #103 Track B — a hostile project with 200 layers, a bloated asset map,
 // and a dangling quality key must boot, apply the caps, and keep rendering.
-const LAYERS_200 = Array.from({ length: 200 }, (_, i) =>
-  `{"id":"l${i}","name":"L${i}","type":"content","visible":true}`).join(',');
+const LAYERS_200 = Array.from(
+  { length: 200 },
+  (_, i) => `{"id":"l${i}","name":"L${i}","type":"content","visible":true}`,
+).join(',');
 const EVIL_KEYS = Array.from({ length: 5000 }, (_, i) => `"evil-${i}":true`).join(',');
 const HOSTILE = `{
   "version": 1,
@@ -77,13 +81,17 @@ const HOSTILE = `{
 test('hostile 200-layer project boots capped and keeps rendering', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
 
   await page.addInitScript((doc) => {
     try {
       localStorage.setItem('kc:first-run-seen', '1');
       localStorage.setItem('kc:project:v1', doc);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, HOSTILE);
 
   await page.goto('/?boot=factory');
@@ -94,7 +102,6 @@ test('hostile 200-layer project boots capped and keeps rendering', async ({ page
   const nodes = await glNodeCount(page);
   console.log('[hostile] nodes:', nodes);
 
-  expect(nodes, 'canvas rendered nothing — the hostile project broke the loop')
-    .toBeGreaterThan(0);
+  expect(nodes, 'canvas rendered nothing — the hostile project broke the loop').toBeGreaterThan(0);
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });
