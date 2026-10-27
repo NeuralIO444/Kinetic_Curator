@@ -43,8 +43,5 @@ export function sampleFlowField(field, u, v) {
   const c = at(x0, y1);
   const d = at(x1, y1);
   const lerp = (p, q, t) => p + (q - p) * t;
-  return [
-    lerp(lerp(a[0], b[0], tx), lerp(c[0], d[0], tx), ty),
-    lerp(lerp(a[1], b[1], tx), lerp(c[1], d[1], tx), ty),
-  ];
+  return [lerp(lerp(a[0], b[0], tx), lerp(c[0], d[0], tx), ty), lerp(lerp(a[1], b[1], tx), lerp(c[1], d[1], tx), ty)];
 }

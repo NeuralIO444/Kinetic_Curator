@@ -69,13 +69,16 @@ export function estimateTempo(onsetTimes) {
 
 export function createAudioEventDetector() {
   let prev = null; // last band levels
-  let fluxMean = 0.02; let fluxDev = 0.02;
+  let fluxMean = 0.02;
+  let fluxDev = 0.02;
   let lastOnset = -Infinity;
   const onsets = [];
   let lastTempo = null;
   let level = 0; // smoothed overall level
   let energy = null; // 'low' | 'mid' | 'high'
-  let quietSince = null; let silent = false; let silentAt = 0;
+  let quietSince = null;
+  let silent = false;
+  let silentAt = 0;
   let source = null;
 
   return {
@@ -93,11 +96,18 @@ export function createAudioEventDetector() {
       if (src !== source) {
         source = src;
         out.push({ type: 'input', source: src });
-        if (src === 'none') { prev = null; level = 0; quietSince = null; }
+        if (src === 'none') {
+          prev = null;
+          level = 0;
+          quietSince = null;
+        }
       }
       if (!bands) return out;
 
-      let sum = 0; let flux = 0; let top = 0; let topBand = BANDS[0];
+      let sum = 0;
+      let flux = 0;
+      let top = 0;
+      let topBand = BANDS[0];
       const cur = {};
       for (const k of BANDS) {
         const v = clamp01(bands[k]);
@@ -105,7 +115,10 @@ export function createAudioEventDetector() {
         sum += v;
         const rise = prev ? Math.max(0, v - prev[k]) : 0;
         flux += rise;
-        if (rise > top) { top = rise; topBand = k; }
+        if (rise > top) {
+          top = rise;
+          topBand = k;
+        }
       }
       flux /= BANDS.length;
       const overall = sum / BANDS.length;
@@ -117,7 +130,11 @@ export function createAudioEventDetector() {
         lastOnset = t;
         onsets.push(t);
         if (onsets.length > TEMPO_WINDOW * 2) onsets.shift();
-        out.push({ type: 'onset', strength: Math.round(clamp01((flux - thr) / 0.2 + 0.25) * 1000) / 1000, band: topBand });
+        out.push({
+          type: 'onset',
+          strength: Math.round(clamp01((flux - thr) / 0.2 + 0.25) * 1000) / 1000,
+          band: topBand,
+        });
         const est = estimateTempo(onsets);
         if (est && (lastTempo === null || Math.abs(est.bpm - lastTempo) > TEMPO_STEP)) {
           lastTempo = est.bpm;
@@ -132,32 +149,53 @@ export function createAudioEventDetector() {
       level += LEVEL_EMA * (overall - level);
       let next = energy;
       if (energy === null) next = level < ENERGY_LOW ? 'low' : level > ENERGY_HIGH ? 'high' : 'mid';
-      else if (energy === 'low' && level > ENERGY_LOW + ENERGY_HYST) next = level > ENERGY_HIGH + ENERGY_HYST ? 'high' : 'mid';
-      else if (energy === 'high' && level < ENERGY_HIGH - ENERGY_HYST) next = level < ENERGY_LOW - ENERGY_HYST ? 'low' : 'mid';
+      else if (energy === 'low' && level > ENERGY_LOW + ENERGY_HYST)
+        next = level > ENERGY_HIGH + ENERGY_HYST ? 'high' : 'mid';
+      else if (energy === 'high' && level < ENERGY_HIGH - ENERGY_HYST)
+        next = level < ENERGY_LOW - ENERGY_HYST ? 'low' : 'mid';
       else if (energy === 'mid') {
         if (level < ENERGY_LOW - ENERGY_HYST) next = 'low';
         else if (level > ENERGY_HIGH + ENERGY_HYST) next = 'high';
       }
-      if (next !== energy) { energy = next; out.push({ type: 'energy', level: energy }); }
+      if (next !== energy) {
+        energy = next;
+        out.push({ type: 'energy', level: energy });
+      }
 
       // ── silence: quiet for SILENCE_MS, then sound again ──────────────────────────────────────────────────────
       if (level < SILENCE_LEVEL) {
         if (quietSince === null) quietSince = t;
         if (!silent && t - quietSince >= SILENCE_MS) {
-          silent = true; silentAt = quietSince;
+          silent = true;
+          silentAt = quietSince;
           out.push({ type: 'silenceStart', ms: Math.round(t - quietSince) });
         }
       } else if (level > SOUND_LEVEL) {
         quietSince = null;
-        if (silent) { silent = false; out.push({ type: 'silenceEnd', ms: Math.round(t - silentAt) }); }
+        if (silent) {
+          silent = false;
+          out.push({ type: 'silenceEnd', ms: Math.round(t - silentAt) });
+        }
       }
       return out;
     },
     /** The latest tempo estimate that was published, or null. */
-    tempo() { return lastTempo; },
+    tempo() {
+      return lastTempo;
+    },
     reset() {
-      prev = null; fluxMean = 0.02; fluxDev = 0.02; lastOnset = -Infinity; onsets.length = 0; lastTempo = null;
-      level = 0; energy = null; quietSince = null; silent = false; silentAt = 0; source = null;
+      prev = null;
+      fluxMean = 0.02;
+      fluxDev = 0.02;
+      lastOnset = -Infinity;
+      onsets.length = 0;
+      lastTempo = null;
+      level = 0;
+      energy = null;
+      quietSince = null;
+      silent = false;
+      silentAt = 0;
+      source = null;
     },
   };
 }

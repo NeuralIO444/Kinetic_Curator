@@ -24,7 +24,6 @@ let browser = null;
 let page = null;
 const atlasCache = new Map();
 
-
 // Single page.evaluate arguments much past ~100MB never arrive ("Target page,
 // context or browser has been closed"). Combo-heavy scenes bake 3000px+
 // atlases whose base64 (+mipmaps) exceeds that, so large strings are ferried
@@ -69,32 +68,47 @@ export async function evaluateChunked(pg, fnName, payload) {
   for (const [key, pieces] of chunks) {
     const id = `${fnName}:${key}`;
     ids.push([id, key]);
-    await pg.evaluate(([i]) => { (window.__kcXfer = window.__kcXfer || {})[i] = []; }, [id]);
+    await pg.evaluate(
+      ([i]) => {
+        (window.__kcXfer = window.__kcXfer || {})[i] = [];
+      },
+      [id],
+    );
     for (const piece of pieces) {
-      await pg.evaluate(([i, pc]) => { window.__kcXfer[i].push(pc); }, [id, piece]);
+      await pg.evaluate(
+        ([i, pc]) => {
+          window.__kcXfer[i].push(pc);
+        },
+        [id, piece],
+      );
     }
   }
   try {
-    return await pg.evaluate(([name, arg, refs]) => {
-      const store = window.__kcXfer || {};
-      const byKey = Object.fromEntries(refs.map(([id, key]) => [key, id]));
-      const walk = (v) => {
-        if (Array.isArray(v)) return v.map(walk);
-        if (v && typeof v === 'object') {
-          if (typeof v.__chunk === 'string') return store[byKey[v.__chunk]].join('');
-          const o = {};
-          for (const [k, val] of Object.entries(v)) o[k] = walk(val);
-          return o;
-        }
-        return v;
-      };
-      return window[name](walk(arg));
-    }, [fnName, slim, ids]);
+    return await pg.evaluate(
+      ([name, arg, refs]) => {
+        const store = window.__kcXfer || {};
+        const byKey = Object.fromEntries(refs.map(([id, key]) => [key, id]));
+        const walk = (v) => {
+          if (Array.isArray(v)) return v.map(walk);
+          if (v && typeof v === 'object') {
+            if (typeof v.__chunk === 'string') return store[byKey[v.__chunk]].join('');
+            const o = {};
+            for (const [k, val] of Object.entries(v)) o[k] = walk(val);
+            return o;
+          }
+          return v;
+        };
+        return window[name](walk(arg));
+      },
+      [fnName, slim, ids],
+    );
   } finally {
     const idsOnly = ids.map(([id]) => id);
-    await pg.evaluate((list) => {
-      if (window.__kcXfer) for (const id of list) delete window.__kcXfer[id];
-    }, idsOnly).catch(() => {});
+    await pg
+      .evaluate((list) => {
+        if (window.__kcXfer) for (const id of list) delete window.__kcXfer[id];
+      }, idsOnly)
+      .catch(() => {});
   }
 }
 
@@ -119,9 +133,21 @@ async function ensurePage() {
 }
 
 export async function closeGlDriver() {
-  try { await page?.close(); } catch { /* noop */ }
-  try { await browser?.close(); } catch { /* noop */ }
-  try { server?.close(); } catch { /* noop */ }
+  try {
+    await page?.close();
+  } catch {
+    /* noop */
+  }
+  try {
+    await browser?.close();
+  } catch {
+    /* noop */
+  }
+  try {
+    server?.close();
+  } catch {
+    /* noop */
+  }
   page = browser = server = null;
 }
 
@@ -142,7 +168,9 @@ export async function openHarnessPage(pagePath) {
   return { page: probe, port, close: () => probe.close().catch(() => {}) };
 }
 
-function b64(buf) { return Buffer.from(buf).toString('base64'); }
+function b64(buf) {
+  return Buffer.from(buf).toString('base64');
+}
 
 // Atlas pixels cross to the page as an ARRAY of base64 pieces, never one
 // string: with region cells baked (#1434), a whole-library atlas base64s
@@ -168,7 +196,10 @@ function getAtlas(combos, regionAssets = null) {
   // combos rendered with and without region assignments need different
   // atlases (region cells exist only for assets the contract expands).
   const regionKey = regionAssets === null ? '*' : [...regionAssets].sort().join(',');
-  const key = `${regionKey}#${combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join('|')}`;
+  const key = `${regionKey}#${combos
+    .map((c) => comboKey(c.asset, c.ink, c.accent))
+    .sort()
+    .join('|')}`;
   let a = atlasCache.get(key);
   if (!a) {
     a = bakeAtlas(combos, { regionAssets });
@@ -194,11 +225,18 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
   const atlas = getAtlas(combos, regionAssetsFor(contract));
   const cells = {};
-  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
+  for (const [k, v] of atlas.cells)
+    cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
   return {
-    width, height, bg, contract, cells,
-    atlasB64: b64Pieces(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
+    width,
+    height,
+    bg,
+    contract,
+    cells,
+    atlasB64: b64Pieces(atlas.pixels),
+    atlasW: atlas.width,
+    atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64Pieces(m.pixels), w: m.width, h: m.height })),
   };
 }
@@ -212,7 +250,22 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
  * @param {object} opts { width, height, bg, fade, optics, tunnel, prism }
  * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
  */
-export async function renderAccumViaGL(frameContracts, { width = 400, height = 280, bg = '#0a0a0a', fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, swell = 1 } = {}) {
+export async function renderAccumViaGL(
+  frameContracts,
+  {
+    width = 400,
+    height = 280,
+    bg = '#0a0a0a',
+    fade = 0.88,
+    optics = 0,
+    tunnel = 0,
+    prism = 0,
+    flow = 0,
+    echoes = 0,
+    audio = null,
+    swell = 1,
+  } = {},
+) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
   const page = await ensurePage();
   const combos = [];
@@ -230,14 +283,25 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
   for (const contract of frameContracts) for (const id of regionAssetsFor(contract)) regionAssets.add(id);
   const atlas = getAtlas(combos, regionAssets);
   const cells = {};
-  for (const [k, v] of atlas.cells) cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
+  for (const [k, v] of atlas.cells)
+    cells[k] = { u0: v.u0, v0: v.v0, u1: v.u1, v1: v.v1, ...(v.geo ? { geo: v.geo } : {}) }; // #1433: region geometry rides through
   // #1079: grain is procedural — no LUT is baked or shipped.
   const payload = {
-    width, height, bg, fade, optics, tunnel, prism, flow, echoes,
+    width,
+    height,
+    bg,
+    fade,
+    optics,
+    tunnel,
+    prism,
+    flow,
+    echoes,
     audioFrames: audio,
     swell, // #306: audio→glow fader, forwarded to renderAccumSequence
     cells,
-    atlasB64: b64Pieces(atlas.pixels), atlasW: atlas.width, atlasH: atlas.height,
+    atlasB64: b64Pieces(atlas.pixels),
+    atlasW: atlas.width,
+    atlasH: atlas.height,
     atlasMips: atlas.mipmaps.map((m) => ({ b64: b64Pieces(m.pixels), w: m.width, h: m.height })),
     frames: frameContracts.map((contract) => ({
       contract,
@@ -260,7 +324,12 @@ export async function renderAccumViaGL(frameContracts, { width = 400, height = 2
 export async function presentProbeViaGL(contract, opts = {}) {
   const page = await ensurePage();
   const res = await evaluateChunked(page, '__kcPresentProbe', buildRenderPayload(contract, opts));
-  return { shown: Buffer.from(res.shownB64, 'base64'), readback: Buffer.from(res.readbackB64, 'base64'), width: res.width, height: res.height };
+  return {
+    shown: Buffer.from(res.shownB64, 'base64'),
+    readback: Buffer.from(res.readbackB64, 'base64'),
+    width: res.width,
+    height: res.height,
+  };
 }
 
 export async function renderViaGL(contract, opts = {}) {

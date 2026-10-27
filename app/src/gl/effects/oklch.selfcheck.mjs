@@ -12,7 +12,10 @@ import { FX_GRADE_DESCRIPTOR, FX_GRADE_FS } from './fxShaders.mjs';
 // ── the chunks are registered and documented ────────────────────────────────
 for (const name of ['kc_lin2oklab', 'kc_oklab2lin', 'kc_oklab2oklch', 'kc_oklch2oklab']) {
   assert.ok(COMMON_GLSL.includes(`vec3 ${name}(`), `${name} must exist in the chunk library`);
-  assert.ok(CHUNK_INDEX.some((c) => c.name === name), `${name} must be in CHUNK_INDEX`);
+  assert.ok(
+    CHUNK_INDEX.some((c) => c.name === name),
+    `${name} must be in CHUNK_INDEX`,
+  );
 }
 assert.ok(COMMON_VERSION >= 2, 'adding chunks bumps the library version');
 
@@ -20,7 +23,9 @@ assert.ok(COMMON_VERSION >= 2, 'adding chunks bumps the library version');
 function coeffs(fnName, count) {
   // Comments first — the chunk documents its ranges ("a/b ~ +-0.4"), and a
   // stray literal from prose would shift every coefficient by one.
-  const body = COMMON_GLSL.split(`vec3 ${fnName}(`)[1].split('\n}')[0].replace(/\/\/[^\n]*/g, '');
+  const body = COMMON_GLSL.split(`vec3 ${fnName}(`)[1]
+    .split('\n}')[0]
+    .replace(/\/\/[^\n]*/g, '');
   const nums = (body.match(/[-+]?\d*\.\d+/g) || []).map(Number);
   assert.ok(nums.length >= count, `${fnName}: expected >= ${count} coefficients, found ${nums.length}`);
   return nums;
@@ -89,9 +94,14 @@ const lightness = (lin) => lin2oklab(lin)[0];
 // replaces, over a full 360-degree rotation.
 {
   const rgb2hsl = (r, g, b) => {
-    r /= 255; g /= 255; b /= 255;
-    const mx = Math.max(r, g, b); const mn = Math.min(r, g, b);
-    let h = 0; let s = 0; const l = (mx + mn) / 2;
+    r /= 255;
+    g /= 255;
+    b /= 255;
+    const mx = Math.max(r, g, b);
+    const mn = Math.min(r, g, b);
+    let h = 0;
+    let s = 0;
+    const l = (mx + mn) / 2;
     if (mx !== mn) {
       const d = mx - mn;
       s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
@@ -115,8 +125,15 @@ const lightness = (lin) => lin2oklab(lin)[0];
     return oklab2lin([L, C * Math.cos(H), C * Math.sin(H)]).map(clamp01);
   };
 
-  const samples = [[180, 90, 40], [40, 120, 200], [200, 60, 150], [230, 220, 60], [60, 20, 90]];
-  let dropOklch = 0; let dropHsl = 0;
+  const samples = [
+    [180, 90, 40],
+    [40, 120, 200],
+    [200, 60, 150],
+    [230, 220, 60],
+    [60, 20, 90],
+  ];
+  let dropOklch = 0;
+  let dropHsl = 0;
   for (const s of samples) {
     const L0 = lightness(toLin(s));
     for (let d = 0; d <= 360; d += 5) {
@@ -128,8 +145,10 @@ const lightness = (lin) => lin2oklab(lin)[0];
   // In sRGB, a saturated hue walk leaves the gamut and the clamp costs some
   // lightness — that is the documented limit, not a bug (see below). What must
   // hold is that OKLCH is dramatically better than the thing it replaces.
-  assert.ok(dropHsl > 5 * dropOklch,
-    `OKLCH must hold lightness far better than HSL (oklch ${dropOklch.toFixed(4)} vs hsl ${dropHsl.toFixed(4)})`);
+  assert.ok(
+    dropHsl > 5 * dropOklch,
+    `OKLCH must hold lightness far better than HSL (oklch ${dropOklch.toFixed(4)} vs hsl ${dropHsl.toFixed(4)})`,
+  );
   assert.ok(dropOklch < 0.12, `OKLCH lightness drop must stay small (got ${dropOklch.toFixed(4)})`);
 
   // IN GAMUT the claim is absolute: at a chroma that survives a full rotation,
@@ -150,8 +169,10 @@ const lightness = (lin) => lin2oklab(lin)[0];
       // the rotation still grazes the gamut edge at a few hues, and the
       // residue is far below anything renderable. HSL over the same walk
       // drops 0.095 — roughly 24 steps.
-      assert.ok(Math.abs(L0 - L1) < 1e-3,
-        `in-gamut hue rotation must not move lightness (${L0.toFixed(6)} -> ${L1.toFixed(6)} at ${d} deg)`);
+      assert.ok(
+        Math.abs(L0 - L1) < 1e-3,
+        `in-gamut hue rotation must not move lightness (${L0.toFixed(6)} -> ${L1.toFixed(6)} at ${d} deg)`,
+      );
     }
   }
 }

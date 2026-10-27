@@ -196,7 +196,7 @@ export function createTintInject() {
         lastBg = bgNow;
         return { injecting: false, bg: bgNow };
       }
-      active = { startMs: now, durMs, seed: (seed >>> 0) || 0 };
+      active = { startMs: now, durMs, seed: seed >>> 0 || 0 };
     }
 
     if (!active) {

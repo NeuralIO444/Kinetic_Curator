@@ -43,9 +43,7 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
     if (v && typeof v.ms === 'number' && Number.isFinite(v.ms)) return v.ms;
     return undefined;
   };
-  const lookup = typeof measuredMs === 'function'
-    ? (id) => asMs(measuredMs(id))
-    : (id) => asMs(measuredMs?.[id]);
+  const lookup = typeof measuredMs === 'function' ? (id) => asMs(measuredMs(id)) : (id) => asMs(measuredMs?.[id]);
   const s = {
     fxaaShed: !!shed.fxaaShed,
     perfTier1: !!shed.perfTier1,
@@ -60,19 +58,22 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
 
   const cuts = [
     {
-      step: SHED_STEPS.fxaa, cutKind: 'fxaa',
+      step: SHED_STEPS.fxaa,
+      cutKind: 'fxaa',
       label: 'edge AA (FXAA)',
       active: s.fxaaShed,
       state: s.fxaaShed ? 'off' : 'on',
     },
     {
-      step: SHED_STEPS.renderScale, cutKind: 'renderScale',
+      step: SHED_STEPS.renderScale,
+      cutKind: 'renderScale',
       label: 'resolution scale (dynamic)',
       active: s.renderScale < 1 - 1e-9,
       state: `${Math.round(s.renderScale * 100)}%`,
     },
     {
-      step: SHED_STEPS.quality, cutKind: 'quality',
+      step: SHED_STEPS.quality,
+      cutKind: 'quality',
       label: 'quality tier step',
       // #264 — governor-shed quality is tracked (qualityShedFrom); a
       // user-chosen tier is not a shed, so the row stays informational then.
@@ -80,31 +81,36 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
       state: s.qualityShedFrom != null ? `SHED → ${s.quality}` : 'follows the cut ladder (step 2)',
     },
     {
-      step: SHED_STEPS.perfTier1, cutKind: 'perfTier1',
+      step: SHED_STEPS.perfTier1,
+      cutKind: 'perfTier1',
       label: 'mirror/gloss/ACCUM (tier-1 passes)',
       active: s.perfTier1,
       state: s.perfTier1 ? 'SHED' : 'active',
     },
     {
-      step: SHED_STEPS.assetThin, cutKind: 'assetThin',
+      step: SHED_STEPS.assetThin,
+      cutKind: 'assetThin',
       label: 'asset thinning (highest-cost assets drop first)',
       active: s.assetThin,
       state: s.assetThin ? 'SHED' : 'active',
     },
     {
-      step: SHED_STEPS.countClamp, cutKind: 'countClamp',
+      step: SHED_STEPS.countClamp,
+      cutKind: 'countClamp',
       label: 'count clamp (live only)',
       active: !!s.perfClampOverride,
       state: s.perfClampOverride ? `count → ${s.perfClampOverride.count}` : 'not applied',
     },
     {
-      step: SHED_STEPS.slowRender, cutKind: 'slowRender',
+      step: SHED_STEPS.slowRender,
+      cutKind: 'slowRender',
       label: 'motion freeze (slowRender)',
       active: s.slowRender,
       state: s.slowRender ? 'FROZEN' : 'running',
     },
     {
-      step: SHED_STEPS.watchdog, cutKind: 'watchdog',
+      step: SHED_STEPS.watchdog,
+      cutKind: 'watchdog',
       label: 'watchdog hard stop',
       active: s.watchdogTripped,
       state: s.watchdogTripped ? 'TRIPPED (manual resume)' : 'armed',
@@ -115,7 +121,10 @@ export function buildXray({ tiers = [], measuredMs = {}, shed = {} }) {
   // (perfTier1 covering tier-1 passes — see perfTier1Passes() in
   // governorCuts.js). Resolution scaling drops pixels, not passes; asset
   // thinning drops assets, not passes. FX layers are never culled (#192).
-  const ids = shedOrder(tiers.map((t) => t.id), lookup);
+  const ids = shedOrder(
+    tiers.map((t) => t.id),
+    lookup,
+  );
   const byId = new Map(tiers.map((t) => [t.id, t]));
   const passes = ids.map((id) => {
     const t = byId.get(id) ?? { id, tier: 3, timeMs: 0, memoryBytes: 0, notes: '' };

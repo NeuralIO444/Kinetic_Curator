@@ -18,11 +18,18 @@
 //   BREATH ← beat · 0.035                                                    (× depth)
 //   GLOW   ← min(1, beat · 0.8 + level · 0.4)                                (× depth)
 
-
 // ── vocabulary ───────────────────────────────────────────────────────────
 /** Coarse inputs come from the shaped audio; band.* from the meter tap (PR3). */
 export const COARSE_INPUTS = Object.freeze(['beat', 'level', 'bass', 'mid', 'treble']);
-export const BAND_INPUTS = Object.freeze(['band.sub', 'band.bass', 'band.mud', 'band.mids', 'band.edge', 'band.pres', 'band.air']);
+export const BAND_INPUTS = Object.freeze([
+  'band.sub',
+  'band.bass',
+  'band.mud',
+  'band.mids',
+  'band.edge',
+  'band.pres',
+  'band.air',
+]);
 export const ROUTE_INPUTS = Object.freeze([...COARSE_INPUTS, ...BAND_INPUTS]);
 
 /**
@@ -64,15 +71,17 @@ export const PATTERN_ROUTE_PARAMS = Object.freeze(['drift', 'mix', 'hero', 'grou
 export const MAX_ROUTES = 16;
 
 /** Today's hardcoded routes as a table. depth is in the target's natural units. */
-export const DEFAULT_ROUTES = Object.freeze([
-  { input: 'beat', target: 'render.scale', depth: 0.38 },
-  { input: 'bass', target: 'render.scale', depth: 0.55 * 0.28 },
-  { input: 'level', target: 'render.scale', depth: 0.35 * 0.28 },
-  { input: 'beat', target: 'render.alpha', depth: 18 },
-  { input: 'beat', target: 'render.breath', depth: 0.035 },
-  { input: 'beat', target: 'render.glow', depth: 0.8 },
-  { input: 'level', target: 'render.glow', depth: 0.4 },
-].map(Object.freeze));
+export const DEFAULT_ROUTES = Object.freeze(
+  [
+    { input: 'beat', target: 'render.scale', depth: 0.38 },
+    { input: 'bass', target: 'render.scale', depth: 0.55 * 0.28 },
+    { input: 'level', target: 'render.scale', depth: 0.35 * 0.28 },
+    { input: 'beat', target: 'render.alpha', depth: 18 },
+    { input: 'beat', target: 'render.breath', depth: 0.035 },
+    { input: 'beat', target: 'render.glow', depth: 0.8 },
+    { input: 'level', target: 'render.glow', depth: 0.4 },
+  ].map(Object.freeze),
+);
 
 // ── table evaluation ─────────────────────────────────────────────────────
 const num = (v) => (Number.isFinite(v) ? v : 0);
@@ -94,7 +103,9 @@ const compiled = new WeakMap();
 function compile(routes) {
   let c = compiled.get(routes);
   if (c) return c;
-  const usable = routes.filter((r) => r && READ[r.input] && ROUTE_TARGETS[r.target] && Number.isFinite(r.depth)).slice(0, MAX_ROUTES);
+  const usable = routes
+    .filter((r) => r && READ[r.input] && ROUTE_TARGETS[r.target] && Number.isFinite(r.depth))
+    .slice(0, MAX_ROUTES);
   c = {
     read: usable.map((r) => READ[r.input]),
     target: usable.map((r) => r.target),
@@ -118,23 +129,49 @@ export function routesUseBands(routes) {
 /** Evaluate a route table. Same four outputs as the legacy path. */
 export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands = null) {
   const c = compile(routes);
-  let scale = 0, alpha = 0, breath = 0, glow = 0, hue = 0, squash = 0, kinemeRate = 0, accum = 0, sun = 0;
+  let scale = 0,
+    alpha = 0,
+    breath = 0,
+    glow = 0,
+    hue = 0,
+    squash = 0,
+    kinemeRate = 0,
+    accum = 0,
+    sun = 0;
   const pat = {};
   for (let i = 0; i < c.n; i++) {
     const v = c.read[i](a, bands) * c.depth[i];
     switch (c.target[i]) {
-      case 'render.scale': scale += c.beatScale[i] ? v * scaleMod : v; break;
-      case 'render.alpha': alpha += v; break;
-      case 'render.breath': breath += v; break;
-      case 'render.glow': glow += v; break;
+      case 'render.scale':
+        scale += c.beatScale[i] ? v * scaleMod : v;
+        break;
+      case 'render.alpha':
+        alpha += v;
+        break;
+      case 'render.breath':
+        breath += v;
+        break;
+      case 'render.glow':
+        glow += v;
+        break;
       case 'render.hue':
-      case 'color.hue': hue += v; break;
-      case 'render.squash': squash += v; break;
+      case 'color.hue':
+        hue += v;
+        break;
+      case 'render.squash':
+        squash += v;
+        break;
       case 'render.kineme':
-      case 'clock.kinemeRate': kinemeRate += v; break;
-      case 'render.accum': accum += v; break;
+      case 'clock.kinemeRate':
+        kinemeRate += v;
+        break;
+      case 'render.accum':
+        accum += v;
+        break;
       case 'render.sun':
-      case 'light.intensity': sun += v; break;
+      case 'light.intensity':
+        sun += v;
+        break;
       default:
         if (c.target[i].startsWith('pattern.')) pat[c.target[i].slice(8)] = (pat[c.target[i].slice(8)] || 0) + v;
         break;
@@ -149,11 +186,14 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
   const used = new Set(c.target);
   if (used.has('render.hue') || used.has('color.hue')) out.hue = clampTo(hue * depth, ROUTE_TARGETS['color.hue'].clamp);
   if (used.has('render.squash')) out.squash = clampTo(squash * depth, ROUTE_TARGETS['render.squash'].clamp);
-  if (used.has('render.kineme') || used.has('clock.kinemeRate')) out.kinemeRate = clampTo(kinemeRate * depth, ROUTE_TARGETS['clock.kinemeRate'].clamp);
+  if (used.has('render.kineme') || used.has('clock.kinemeRate'))
+    out.kinemeRate = clampTo(kinemeRate * depth, ROUTE_TARGETS['clock.kinemeRate'].clamp);
   if (used.has('render.accum')) out.accum = clampTo(accum * depth, ROUTE_TARGETS['render.accum'].clamp);
-  if (used.has('render.sun') || used.has('light.intensity')) out.sun = clampTo(sun * depth, ROUTE_TARGETS['light.intensity'].clamp);
+  if (used.has('render.sun') || used.has('light.intensity'))
+    out.sun = clampTo(sun * depth, ROUTE_TARGETS['light.intensity'].clamp);
   // #1110 — only the pattern params a route targets appear, so a table without one adds no key
-  for (const k of Object.keys(pat)) (out.pattern ||= {})[k] = clampTo(pat[k] * depth, ROUTE_TARGETS[`pattern.${k}`].clamp);
+  for (const k of Object.keys(pat))
+    (out.pattern ||= {})[k] = clampTo(pat[k] * depth, ROUTE_TARGETS[`pattern.${k}`].clamp);
   return out;
 }
 
@@ -168,10 +208,7 @@ export function evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands =
 export function audioRoutes(a, { depth, scaleMod, alphaMod }, routes = null, bands = null) {
   if (Array.isArray(routes)) return evaluateRoutes(a, { depth, scaleMod, alphaMod }, routes, bands);
   return {
-    scaleMul: 1 + (
-      a.beatPulse * 0.38 * scaleMod +
-      (a.bass * 0.55 + a.rms * 0.35) * 0.28
-    ) * depth,
+    scaleMul: 1 + (a.beatPulse * 0.38 * scaleMod + (a.bass * 0.55 + a.rms * 0.35) * 0.28) * depth,
     alphaBoost: a.beatPulse * 18 * alphaMod * depth,
     breathAudio: a.beatPulse * 0.035 * depth,
     glow: Math.min(1, a.beatPulse * 0.8 + a.rms * 0.4) * depth,
@@ -191,12 +228,22 @@ export function audioRoutes(a, { depth, scaleMod, alphaMod }, routes = null, ban
 export function audioMatrixRows(a, { depth, scaleMod, alphaMod }, enabled = true, routes = null, bands = null) {
   const on = enabled ? 1 : 0;
   if (Array.isArray(routes)) {
-    const usable = routes.filter((r) => r && READ[r.input] && ROUTE_TARGETS[r.target] && Number.isFinite(r.depth)).slice(0, MAX_ROUTES);
+    const usable = routes
+      .filter((r) => r && READ[r.input] && ROUTE_TARGETS[r.target] && Number.isFinite(r.depth))
+      .slice(0, MAX_ROUTES);
     return usable.map((r) => {
-      const mod = r.target === 'render.alpha' ? alphaMod : (r.input === 'beat' && r.target === 'render.scale' ? scaleMod : 1);
+      const mod =
+        r.target === 'render.alpha' ? alphaMod : r.input === 'beat' && r.target === 'render.scale' ? scaleMod : 1;
       const gain = r.depth * mod * depth;
       const label = r.input.startsWith('band.') ? `BAND ${r.input.slice(5).toUpperCase()}` : r.input.toUpperCase();
-      return { input: label, target: r.target.split('.').pop(), depth: gain, live: READ[r.input](a, bands) * on * gain, inputId: r.input, targetId: r.target };
+      return {
+        input: label,
+        target: r.target.split('.').pop(),
+        depth: gain,
+        live: READ[r.input](a, bands) * on * gain,
+        inputId: r.input,
+        targetId: r.target,
+      };
     });
   }
   const beat = (a?.beatPulse || 0) * on;

@@ -35,10 +35,7 @@ test('QUAD_FS multiplies spec by the glass-gated caustic field', () => {
 });
 
 test('noise comes from the shared chunk library, not an inline duplicate or texture', () => {
-  assert.ok(
-    QUAD_FS.includes('float kc_vnoise(vec2 p)'),
-    'kc_vnoise is defined via injectCommon (shared chunks #196)',
-  );
+  assert.ok(QUAD_FS.includes('float kc_vnoise(vec2 p)'), 'kc_vnoise is defined via injectCommon (shared chunks #196)');
   const samplers = [...QUAD_FS.matchAll(/uniform\s+sampler2D\s+(\w+)\s*;/g)].map((m) => m[1]);
   assert.deepStrictEqual(samplers, ['u_atlas'], `no new texture samplers (found: ${samplers})`);
   // Audit the shader body (past the injected chunk preamble — the library's
@@ -58,10 +55,7 @@ test('non-glass keeps the exact existing specular (gate is bit-identical to 1.0)
   // so c * 0.0 is +0.0 and 1.0 + 0.0 is 1.0. spec *= 1.0 is spec.
   assert.ok(Number.isFinite(GLASS_CAUSTIC.base), 'base finite');
   assert.ok(Number.isFinite(GLASS_CAUSTIC.amp), 'amp finite');
-  assert.ok(
-    QUAD_FS.includes('spec *= mix(1.0,'),
-    'the gate multiplies by the mix, never by the raw noise',
-  );
+  assert.ok(QUAD_FS.includes('spec *= mix(1.0,'), 'the gate multiplies by the mix, never by the raw noise');
 });
 
 test('unlit path is byte-identical: no caustic evaluation outside the sun block', () => {
@@ -70,10 +64,7 @@ test('unlit path is byte-identical: no caustic evaluation outside the sun block'
   assert.ok(!head.includes('spec *= mix(1.0,'), 'no caustic gate before the sun block');
   // The kc_vnoise *definition* lives in the injected chunk preamble — that is
   // dead code until called, and the unlit branch never calls it.
-  assert.ok(
-    QUAD_FS.includes('o.rgb = min(o.rgb * v_light, vec3(o.a));'),
-    'the unlit else-branch is untouched',
-  );
+  assert.ok(QUAD_FS.includes('o.rgb = min(o.rgb * v_light, vec3(o.a));'), 'the unlit else-branch is untouched');
 });
 
 test('per-instance seed offsets the field so bodies do not share a pattern', () => {

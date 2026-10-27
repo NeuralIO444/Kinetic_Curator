@@ -25,12 +25,32 @@ for (const k of ATLAS_AFFECTING_PARAMS) assert.ok(PARAM_SPEC[k], `registry key "
 function input(params, assets) {
   return {
     layers: [{ id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, paletteId: 'bone', paletteOverrides: null,
-    userPalettes: [], layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...params }, caGrid: null,
-    enabledAssets: assets === 'all' ? null : assets, assetWeightOverrides: {}, customAssets: [],
-    quality: 'balanced', lockedParams: {}, batchPaused: false, focusSwap: false, loopTimeMs: 0,
-    perfClampOverride: null, perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1,
-    alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
+    activeLayerId: 'lyr-a',
+    layerSnapshots: {},
+    seed: 1234,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...params },
+    caGrid: null,
+    enabledAssets: assets === 'all' ? null : assets,
+    assetWeightOverrides: {},
+    customAssets: [],
+    quality: 'balanced',
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    loopTimeMs: 0,
+    perfClampOverride: null,
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    phraseWrapGen: 0,
+    attractor: null,
   };
 }
 /** The atlas key's asset half: sorted distinct placed asset ids. */
@@ -60,7 +80,10 @@ for (const [ia, a] of states) {
   for (const [ib, b] of states) {
     if (ia === ib) continue;
     const { bad } = sweep(a, b);
-    assert.ok(!bad, `MIX ${ia} → ${ib}: atlas asset set changed mid-blend at t=${bad?.[0]} (a lerped atlas-affecting param — step it or hold-then-bake, docs/PLENUM.md Hold)`);
+    assert.ok(
+      !bad,
+      `MIX ${ia} → ${ib}: atlas asset set changed mid-blend at t=${bad?.[0]} (a lerped atlas-affecting param — step it or hold-then-bake, docs/PLENUM.md Hold)`,
+    );
     pairs++;
   }
 }
@@ -70,4 +93,6 @@ const lo = { ...states[0][1], params: { ...states[0][1].params, mode: 'scatter',
 const hi = { ...lo, params: { ...lo.params, count: 400 } };
 assert.ok(sweep(lo, hi).bad, 'guard must catch a count lerp that pulls new assets in mid-blend');
 
-console.log(`atlasKeyGuard selfcheck: OK — ${pairs} flagship MIX pairs hold one atlas through the blend; negative test caught`);
+console.log(
+  `atlasKeyGuard selfcheck: OK — ${pairs} flagship MIX pairs hold one atlas through the blend; negative test caught`,
+);

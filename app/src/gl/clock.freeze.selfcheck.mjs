@@ -28,7 +28,7 @@ test('#823 liveLoop tick rolls the clock advance back on a governor freeze', () 
   assert.match(
     src,
     /if \(getState\(\)\.slowRender\) \{\s*\n\s*loopTimeMs -= clampedDtMs;\s*\n\s*\}/,
-    'slowRender must roll back the tick\'s loopTimeMs advance like the paused path',
+    "slowRender must roll back the tick's loopTimeMs advance like the paused path",
   );
 });
 

@@ -59,7 +59,15 @@ console.log(JSON.stringify(out));
 
 let r;
 try {
-  r = JSON.parse(execFileSync(process.execPath, ['--expose-gc', '--no-warnings', '--input-type=module', '-e', CHILD], { encoding: 'utf8', timeout: 120000 }).trim().split('\n').pop());
+  r = JSON.parse(
+    execFileSync(process.execPath, ['--expose-gc', '--no-warnings', '--input-type=module', '-e', CHILD], {
+      encoding: 'utf8',
+      timeout: 120000,
+    })
+      .trim()
+      .split('\n')
+      .pop(),
+  );
 } catch (e) {
   console.log(`resolverProbe.selfcheck: SKIP (${String(e.message).split('\n')[0].slice(0, 100)})`);
   process.exit(0);
@@ -74,4 +82,6 @@ assert.ok(r.four.p95 < 12, `p95 with four creatures ${r.four.p95.toFixed(3)} ms 
 assert.ok(r.leakRandom < 4, `heap grew ${r.leakRandom.toFixed(2)} MB in random mode (budget 4)`);
 assert.ok(r.leakSwarm < 4, `heap grew ${r.leakSwarm.toFixed(2)} MB in swarm mode (budget 4)`);
 
-console.log(`resolverProbe.selfcheck: ok (0 creatures ${r.none.mean.toFixed(2)} ms, 4 creatures ${r.four.mean.toFixed(2)} ms p95 ${r.four.p95.toFixed(2)}, added ${r.added.toFixed(2)} ms paired; heap growth ${r.leakRandom.toFixed(2)} / ${r.leakSwarm.toFixed(2)} MB)`);
+console.log(
+  `resolverProbe.selfcheck: ok (0 creatures ${r.none.mean.toFixed(2)} ms, 4 creatures ${r.four.mean.toFixed(2)} ms p95 ${r.four.p95.toFixed(2)}, added ${r.added.toFixed(2)} ms paired; heap growth ${r.leakRandom.toFixed(2)} / ${r.leakSwarm.toFixed(2)} MB)`,
+);

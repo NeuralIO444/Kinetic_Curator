@@ -25,7 +25,11 @@ import {
 } from './vortex.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const mark = (layer, key, x, y, vx, vy) => ({ layer, key, x, y, vx, vy });
 
@@ -87,10 +91,7 @@ ok('stationary paint wets the paper and sheds nothing', () => {
 });
 
 ok('emission order is layer|key, independent of input order', () => {
-  const items = [
-    mark('b', 'z', 10, 20, 5, 0),
-    mark('a', 'm', 30, 40, 0, 7),
-  ];
+  const items = [mark('b', 'z', 10, 20, 5, 0), mark('a', 'm', 30, 40, 0, 7)];
   const a = createVortex({ seed: 970 });
   const b = createVortex({ seed: 970 });
   emitFromInstances(a, items);
@@ -145,8 +146,14 @@ ok('wet mask advects downwind instead of fading in place (#998)', () => {
     stepVortex(v, { wetAdvect: 0.6 });
   }
   const comX = () => {
-    let m = 0, cx = 0;
-    for (let j = 0; j < 64; j++) for (let i = 0; i < 64; i++) { const w = v.wet[j * 64 + i]; m += w; cx += w * i; }
+    let m = 0,
+      cx = 0;
+    for (let j = 0; j < 64; j++)
+      for (let i = 0; i < 64; i++) {
+        const w = v.wet[j * 64 + i];
+        m += w;
+        cx += w * i;
+      }
     return cx / m;
   };
   const x0 = comX();
@@ -222,7 +229,14 @@ ok('packed velocity hash is stable, and freeze does not zero it', () => {
   assert.strictEqual(dry.wetStep, 0);
   assert.strictEqual(dry.wetGain, 0);
   assert.strictEqual(dry.wetVel, null);
-  const again = noteWetFrame(slot, { wetness: 0.6, freeze: true, seed: 970, width: 1000, height: 700, instances: inst });
+  const again = noteWetFrame(slot, {
+    wetness: 0.6,
+    freeze: true,
+    seed: 970,
+    width: 1000,
+    height: 700,
+    instances: inst,
+  });
   assert.strictEqual(hashPacked(again.wetVel), h, 'dry frame must not drop the held field');
 });
 
@@ -256,8 +270,14 @@ ok('motion amount reads wind, breath, and flap', () => {
 ok('noteWetFrame seeds ambient from behave without dropping the dry gate', () => {
   const slot = {};
   const wet = noteWetFrame(slot, {
-    wetness: 0.8, freeze: false, seed: 11, width: 200, height: 140,
-    instances: [], behave: 'orbit', motion: 0.8,
+    wetness: 0.8,
+    freeze: false,
+    seed: 11,
+    width: 200,
+    height: 140,
+    instances: [],
+    behave: 'orbit',
+    motion: 0.8,
   });
   assert.strictEqual(wet.wetStep, 1);
   assert.ok(slot.vortex.count >= 4, 'ambient pairs landed');

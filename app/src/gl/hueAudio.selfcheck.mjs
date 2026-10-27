@@ -15,13 +15,7 @@ test('sanitizeHueAudio: finite degrees pass, clamped; garbage → 0', () => {
 });
 
 test('applyHueAudio: offset rides on top of each layer hueRotate', () => {
-  const layers = [
-    { layout: { hueRotate: 30 } },
-    { layout: { hueRotate: 0 } },
-    { layout: {} },
-    {},
-    null,
-  ];
+  const layers = [{ layout: { hueRotate: 30 } }, { layout: { hueRotate: 0 } }, { layout: {} }, {}, null];
   assert.equal(applyHueAudio(layers, 45), 45);
   assert.equal(layers[0].layout.hueRotate, 75);
   assert.equal(layers[1].layout.hueRotate, 45);

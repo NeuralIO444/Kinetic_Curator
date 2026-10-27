@@ -6,14 +6,21 @@ import { gateWeaveOffset, WEAVE_MAX_PX } from './gateWeave.mjs';
 
 assert.ok(WEAVE_MAX_PX <= 0.75, 'subtle at max: under three-quarters of a pixel');
 
-let sx = 0, sy = 0, n = 0, maxX = 0, maxY = 0;
+let sx = 0,
+  sy = 0,
+  n = 0,
+  maxX = 0,
+  maxY = 0;
 const seenX = new Set();
 for (let f = 0; f < 20000; f++) {
   const [dx, dy] = gateWeaveOffset(f * 16.667, f); // ~5.5 min at 60fps
   assert.ok(Number.isFinite(dx) && Number.isFinite(dy), 'finite');
   assert.ok(Math.abs(dx) <= WEAVE_MAX_PX && Math.abs(dy) <= WEAVE_MAX_PX, `bounded: ${dx}, ${dy}`);
-  maxX = Math.max(maxX, Math.abs(dx)); maxY = Math.max(maxY, Math.abs(dy));
-  sx += dx; sy += dy; n++;
+  maxX = Math.max(maxX, Math.abs(dx));
+  maxY = Math.max(maxY, Math.abs(dy));
+  sx += dx;
+  sy += dy;
+  n++;
   seenX.add(dx.toFixed(4));
 }
 assert.ok(maxX > 0.2 && maxY > 0.1, `it actually moves (max ${maxX.toFixed(2)}, ${maxY.toFixed(2)})`);

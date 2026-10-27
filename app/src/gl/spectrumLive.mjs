@@ -60,18 +60,28 @@ export function stepSpectrum(analyser, sampleRate, dtMs) {
   let waveIn = null;
   if (analyser) {
     const key = `${analyser.frequencyBinCount}:${sampleRate}`;
-    if (key !== shape) { core = createSpectrumCore({ fftBins: analyser.frequencyBinCount, sampleRate }); shape = key; }
+    if (key !== shape) {
+      core = createSpectrumCore({ fftBins: analyser.frequencyBinCount, sampleRate });
+      shape = key;
+    }
     if (!db || db.length !== analyser.frequencyBinCount) db = new Float32Array(analyser.frequencyBinCount);
     if (!wave || wave.length !== analyser.fftSize) wave = new Float32Array(analyser.fftSize);
     analyser.getFloatFrequencyData(db);
     analyser.getFloatTimeDomainData(wave);
-    dbIn = db; waveIn = wave;
+    dbIn = db;
+    waveIn = wave;
   }
   const feed = peekSourceFeed();
   const mix = feed && feed.bands ? feed.mix : 0;
   if (mix > 0) spectrumFromBands(feed.bands, synth);
   const state = core.update(dbIn, dtMs, waveIn, mix > 0 ? synth : null, mix);
-  if (spectrumTap) { try { spectrumTap(state); } catch { spectrumTap = null; } }
+  if (spectrumTap) {
+    try {
+      spectrumTap(state);
+    } catch {
+      spectrumTap = null;
+    }
+  }
   return state;
 }
 

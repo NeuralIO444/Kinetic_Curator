@@ -15,12 +15,12 @@
 // to the upload + instanced draw it measures. PR2 (dirty-range uploads) uses
 // these numbers at the decision gate: changed/uploaded > 0.7 → not worth it.
 
-let frames = 0;          // beginFrame() calls since reset
-let uploadedBytes = 0;   // cumulative bytes handed to bufferSubData
-let changedBytes = 0;    // cumulative bytes differing from last frame's shadow
-let uploadCalls = 0;     // cumulative drawInstances uploads
-let callIndex = 0;       // call slot within the current frame
-let shadows = [];        // per-call-slot Uint8Array shadow of the last frame
+let frames = 0; // beginFrame() calls since reset
+let uploadedBytes = 0; // cumulative bytes handed to bufferSubData
+let changedBytes = 0; // cumulative bytes differing from last frame's shadow
+let uploadCalls = 0; // cumulative drawInstances uploads
+let callIndex = 0; // call slot within the current frame
+let shadows = []; // per-call-slot Uint8Array shadow of the last frame
 
 /** Start a new frame: call-slot indexing restarts at 0. */
 export function beginFrame() {

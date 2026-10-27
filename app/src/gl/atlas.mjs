@@ -30,10 +30,7 @@ export const CELL_UNITS = Object.freeze({ x0: -50, y0: -50, x1: 150, y1: 150 });
 export const CELL_PX = 400;
 const ALPHA_CUTOFF = 4;
 
-const subColors = (svg, ink, accent) =>
-  svg
-    .replace(/var\(--ink[^)]*\)/g, ink)
-    .replace(/var\(--accent[^)]*\)/g, accent);
+const subColors = (svg, ink, accent) => svg.replace(/var\(--ink[^)]*\)/g, ink).replace(/var\(--accent[^)]*\)/g, accent);
 
 /**
  * Bake one asset/color combination into a CELL_PX square — or, for a
@@ -60,7 +57,12 @@ function bakeCombo(assetId, ink, accent) {
   // the live path bakes the same ramp into its R/G mask. Same module, same
   // stops, so a gradient asset prints what the canvas showed.
   const body = frames
-    ? frames.map((f, i) => `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(applyGradient(f, asset.gradient, { ink, accent }), ink, accent)}</g>`).join('')
+    ? frames
+        .map(
+          (f, i) =>
+            `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(applyGradient(f, asset.gradient, { ink, accent }), ink, accent)}</g>`,
+        )
+        .join('')
     : subColors(applyGradient(asset.svg, asset.gradient, { ink, accent }), ink, accent);
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${CELL_PX}" ` +
@@ -75,7 +77,10 @@ function bakeCombo(assetId, ink, accent) {
   // Ink bbox in asset units (for filter-region clipping). For a strip, x
   // folds back into the frame-local cell: ink stays in single-asset units,
   // the union across frames.
-  let bx0 = CELL_PX, by0 = CELL_PX, bx1 = -1, by1 = -1;
+  let bx0 = CELL_PX,
+    by0 = CELL_PX,
+    bx1 = -1,
+    by1 = -1;
   for (let y = 0; y < CELL_PX; y++) {
     for (let x = 0; x < widthPx; x++) {
       if (pixels[(y * widthPx + x) * 4 + 3] > ALPHA_CUTOFF) {
@@ -88,9 +93,10 @@ function bakeCombo(assetId, ink, accent) {
     }
   }
   const unitsPerPx = (x1 - x0) / CELL_PX;
-  const inkBounds = bx1 >= 0
-    ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
-    : null;
+  const inkBounds =
+    bx1 >= 0
+      ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
+      : null;
   return { pixels, ink: inkBounds, widthPx };
 }
 
@@ -125,8 +131,7 @@ function regionCellsFor(asset, wholePixels, partCache) {
   // Cell px -> partition owner. The 100-unit box occupies cell px
   // [100, 300) at the same 2 px/unit as the 200px canonical raster, so
   // canonical px = cell px - 100 inside the box; outside it, -1.
-  const ownerAt = (x, y) =>
-    x >= 100 && x < 300 && y >= 100 && y < 300 ? part.owner[(y - 100) * 200 + (x - 100)] : -1;
+  const ownerAt = (x, y) => (x >= 100 && x < 300 && y >= 100 && y < 300 ? part.owner[(y - 100) * 200 + (x - 100)] : -1);
   const out = [];
   // The remainder: every whole-cell pixel no region owns.
   {
@@ -182,7 +187,10 @@ export function bakeAtlas(combos, { regionAssets = null } = {}) {
   const seen = new Set();
   for (const c of combos) {
     const k = comboKey(c.asset, c.ink, c.accent);
-    if (!seen.has(k)) { seen.add(k); uniq.push({ ...c, key: k }); }
+    if (!seen.has(k)) {
+      seen.add(k);
+      uniq.push({ ...c, key: k });
+    }
   }
   // Gutter between cells: mipmap footprints at the cell edge must not reach
   // the neighbor cell's ink. The gutter is transparent black; combined with
@@ -215,19 +223,36 @@ export function bakeAtlas(combos, { regionAssets = null } = {}) {
     if (regionAssets && !regionAssets.has(b.c.asset)) continue;
     const asset = ASSET_BY_ID.get(b.c.asset);
     for (const e of regionCellsFor(asset, b.cp, partCache)) {
-      extras.push({ key: b.c.key + e.suffix, cp: e.cp, ink: null, widthPx: CELL_PX, slots: 1, uvSub: e.uvSub, geo: e.geo });
+      extras.push({
+        key: b.c.key + e.suffix,
+        cp: e.cp,
+        ink: null,
+        widthPx: CELL_PX,
+        slots: 1,
+        uvSub: e.uvSub,
+        geo: e.geo,
+      });
     }
   }
   const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots + extras.length)), maxSlots);
-  let col = 0, row = 0;
+  let col = 0,
+    row = 0;
   for (const b of baked) {
-    if (col + b.slots > cols) { row++; col = 0; }
-    b.cx = col * stride; b.cy = row * stride;
+    if (col + b.slots > cols) {
+      row++;
+      col = 0;
+    }
+    b.cx = col * stride;
+    b.cy = row * stride;
     col += b.slots;
   }
   for (const e of extras) {
-    if (col + 1 > cols) { row++; col = 0; }
-    e.cx = col * stride; e.cy = row * stride;
+    if (col + 1 > cols) {
+      row++;
+      col = 0;
+    }
+    e.cx = col * stride;
+    e.cy = row * stride;
     col += 1;
   }
   const width = cols * stride;
@@ -244,8 +269,10 @@ export function bakeAtlas(combos, { regionAssets = null } = {}) {
     cells.set(b.key || b.c.key, {
       // Inset by half a texel: the shader quad spans the texel centers
       // (asset units [-49.75, 149.75]), so UVs address texel centers.
-      u0: (b.cx + sub.ox + 0.5) / width, v0: (b.cy + sub.oy + 0.5) / height,
-      u1: (b.cx + sub.ox + sub.w - 0.5) / width, v1: (b.cy + sub.oy + sub.h - 0.5) / height,
+      u0: (b.cx + sub.ox + 0.5) / width,
+      v0: (b.cy + sub.oy + 0.5) / height,
+      u1: (b.cx + sub.ox + sub.w - 0.5) / width,
+      v1: (b.cy + sub.oy + sub.h - 0.5) / height,
       ink: b.ink,
       // #1433: region-instance geometry (pivot + scale vs the quad span);
       // absent on whole/remainder cells — the pack reads it only for #r: cells.
@@ -267,29 +294,44 @@ export function bakeAtlas(combos, { regionAssets = null } = {}) {
  */
 export function buildMipmaps(pixels, width, height) {
   const levels = [{ pixels, width, height }];
-  let w = width, h = height;
+  let w = width,
+    h = height;
   let src = pixels;
   while (w > 1 || h > 1) {
-    const nw = Math.max(1, w >> 1), nh = Math.max(1, h >> 1);
+    const nw = Math.max(1, w >> 1),
+      nh = Math.max(1, h >> 1);
     const dst = Buffer.alloc(nw * nh * 4);
     for (let y = 0; y < nh; y++) {
       for (let x = 0; x < nw; x++) {
         // Box filter over 2x2 (clamped at edges for odd sizes).
-        let r = 0, g = 0, b = 0, a = 0, n = 0;
+        let r = 0,
+          g = 0,
+          b = 0,
+          a = 0,
+          n = 0;
         for (let dy = 0; dy < 2; dy++) {
           for (let dx = 0; dx < 2; dx++) {
-            const sx = Math.min(w - 1, x * 2 + dx), sy = Math.min(h - 1, y * 2 + dy);
+            const sx = Math.min(w - 1, x * 2 + dx),
+              sy = Math.min(h - 1, y * 2 + dy);
             const i = (sy * w + sx) * 4;
-            r += src[i]; g += src[i + 1]; b += src[i + 2]; a += src[i + 3]; n++;
+            r += src[i];
+            g += src[i + 1];
+            b += src[i + 2];
+            a += src[i + 3];
+            n++;
           }
         }
         const o = (y * nw + x) * 4;
-        dst[o] = Math.round(r / n); dst[o + 1] = Math.round(g / n);
-        dst[o + 2] = Math.round(b / n); dst[o + 3] = Math.round(a / n);
+        dst[o] = Math.round(r / n);
+        dst[o + 1] = Math.round(g / n);
+        dst[o + 2] = Math.round(b / n);
+        dst[o + 3] = Math.round(a / n);
       }
     }
     levels.push({ pixels: dst, width: nw, height: nh });
-    src = dst; w = nw; h = nh;
+    src = dst;
+    w = nw;
+    h = nh;
   }
   return levels;
 }

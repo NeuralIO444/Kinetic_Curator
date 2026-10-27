@@ -78,7 +78,15 @@ test('#808 loopClock mirror starts unknown', () => {
 // #1741 — a tempo-locked interval holds its rate: the frame's lateness is
 // carried, not kept, so one minute at BEAT bpm fires exactly bpm times.
 test('#1741 one minute of frames fires exactly bpm times', () => {
-  for (const [bpm, fps] of [[120, 60], [128, 60], [128, 120], [140, 60], [174, 60], [100, 30], [93, 144]]) {
+  for (const [bpm, fps] of [
+    [120, 60],
+    [128, 60],
+    [128, 120],
+    [140, 60],
+    [174, 60],
+    [100, 30],
+    [93, 144],
+  ]) {
     const iv = 60000 / bpm;
     const dt = 1000 / fps;
     let lastFire = -1;

@@ -8,7 +8,10 @@ import { packSpectrumTexture, TEX_W, TEX_H } from './spectrumCore.mjs';
 export const SPECTRUM_MAPS = Object.freeze(['INDEX', 'ANGLE', 'POSITION', 'HASH']);
 
 const bytes = new Uint8Array(TEX_W * TEX_H);
-const unit = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0; };
+const unit = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0;
+};
 
 /**
  * @param layoutParams  spectrumMap (0..3) and spectrumScale / spectrumDisplace / spectrumColour (0..1)

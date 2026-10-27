@@ -6,7 +6,13 @@
 // mid-session could not replay, because the resolver carries state from before it). Stop detaches the recorder and
 // returns the finished performance.
 // One take at a time. The take's seed is read from the first recorded frame, for the file name only.
-import { setResolveTap, setResolveOutputTap, requestResolverReset, setResolverSwapListener, snapshotLiveResolver } from './resolveTap.mjs';
+import {
+  setResolveTap,
+  setResolveOutputTap,
+  requestResolverReset,
+  setResolverSwapListener,
+  snapshotLiveResolver,
+} from './resolveTap.mjs';
 import { createPerformanceRecorder, packPerformance } from './performanceFile.mjs';
 import { createRetroCapture } from './retroCapture.mjs';
 
@@ -24,7 +30,9 @@ let retro = null;
 let retroOpts = null;
 let suspendedRetroOpts = null;
 
-setResolverSwapListener(() => { if (retro) retro.clear(); });
+setResolverSwapListener(() => {
+  if (retro) retro.clear();
+});
 
 /** Begin retroactive capture. Returns false when the ring or a take is already running. */
 export function startRetroCapture(opts = {}) {
@@ -98,7 +106,10 @@ export function startPerformance(opts = {}) {
   recorder = r;
   seed = 0;
   setResolveTap((input) => {
-    if (first) { first = false; seed = Number.isFinite(input && input.seed) ? input.seed >>> 0 : 0; }
+    if (first) {
+      first = false;
+      seed = Number.isFinite(input && input.seed) ? input.seed >>> 0 : 0;
+    }
     r.onInput(input);
   });
   setResolveOutputTap((output) => r.onOutput(output));
@@ -106,7 +117,11 @@ export function startPerformance(opts = {}) {
   requestResolverReset();
   sections = {};
   for (const name of Object.keys(makers || {})) {
-    try { sections[name] = makers[name](() => r.frames); } catch { /* a section that cannot start is simply absent */ }
+    try {
+      sections[name] = makers[name](() => r.frames);
+    } catch {
+      /* a section that cannot start is simply absent */
+    }
   }
   return true;
 }
@@ -131,7 +146,11 @@ export async function stopPerformance() {
   sections = null;
   const data = {};
   for (const name of Object.keys(extra)) {
-    try { data[name] = extra[name].stop(); } catch { /* a section that cannot finish is left out */ }
+    try {
+      data[name] = extra[name].stop();
+    } catch {
+      /* a section that cannot finish is left out */
+    }
   }
   let perf;
   try {

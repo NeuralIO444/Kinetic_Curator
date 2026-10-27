@@ -44,7 +44,7 @@ async function runScene(scene, candidate, width) {
   }
   if (cand.width !== ref.width || cand.height !== ref.height) {
     throw new Error(
-      `[parity:${scene.id}] dimension mismatch (ref ${ref.width}x${ref.height}, cand ${cand.width}x${cand.height})`
+      `[parity:${scene.id}] dimension mismatch (ref ${ref.width}x${ref.height}, cand ${cand.width}x${cand.height})`,
     );
   }
   const report = diffPixels(ref.pixels, cand.pixels, ref.width, ref.height, POLICIES[scene.policy]);
@@ -56,29 +56,38 @@ async function main(argv) {
   const scenes = scene ? [getScene(scene)] : CORPUS;
   const results = [];
   try {
-  for (const s of scenes) {
-    const r = await runScene(s, candidate, s.width || width);
-    results.push(r);
-    if (!json) console.log(formatReport(r, `${r.id}/${candidate}`));
-  }
-  const failed = results.filter((r) => !r.pass);
-  if (json) {
-    console.log(JSON.stringify({
-      candidate, width, scenes: results.length, failed: failed.map((r) => r.id),
-      results: results.map(({ failedSample, ...rest }) => rest),
-    }, null, 2));
-  } else {
-    console.log(`[parity] ${results.length - failed.length}/${results.length} scenes pass (candidate=${candidate})`);
-  }
-  if (failed.length > 0) {
-    for (const r of failed) {
-      if (!json && r.failedSample.length > 0) {
-        const p = r.failedSample[0];
-        console.log(`[parity:${r.id}] first failing pixel @(${p.x},${p.y}) Δ=${p.maxDelta} ref=${p.a} cand=${p.b}`);
-      }
+    for (const s of scenes) {
+      const r = await runScene(s, candidate, s.width || width);
+      results.push(r);
+      if (!json) console.log(formatReport(r, `${r.id}/${candidate}`));
     }
-    process.exitCode = 1;
-  }
+    const failed = results.filter((r) => !r.pass);
+    if (json) {
+      console.log(
+        JSON.stringify(
+          {
+            candidate,
+            width,
+            scenes: results.length,
+            failed: failed.map((r) => r.id),
+            results: results.map(({ failedSample, ...rest }) => rest),
+          },
+          null,
+          2,
+        ),
+      );
+    } else {
+      console.log(`[parity] ${results.length - failed.length}/${results.length} scenes pass (candidate=${candidate})`);
+    }
+    if (failed.length > 0) {
+      for (const r of failed) {
+        if (!json && r.failedSample.length > 0) {
+          const p = r.failedSample[0];
+          console.log(`[parity:${r.id}] first failing pixel @(${p.x},${p.y}) Δ=${p.maxDelta} ref=${p.a} cand=${p.b}`);
+        }
+      }
+      process.exitCode = 1;
+    }
   } finally {
     if (candidate === 'gl') await closeCandidate(); // release headless Chromium
   }

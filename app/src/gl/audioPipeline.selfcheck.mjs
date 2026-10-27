@@ -22,7 +22,11 @@ import assert from 'node:assert';
 import { processBallistics, createBallisticsState } from './audioBallistics.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const approx = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
 
@@ -35,10 +39,14 @@ const DT = 16.7;
 function scriptedEnvelope() {
   const frames = [];
   for (let i = 0; i < 60; i++) {
-    let v = 0, beat = 0;
+    let v = 0,
+      beat = 0;
     if (i >= 10 && i < 20) v = (i - 9) / 10;
     else if (i >= 20 && i < 30) v = 1;
-    else if (i === 30) { v = 1; beat = 1; }
+    else if (i === 30) {
+      v = 1;
+      beat = 1;
+    }
     frames.push({ bass: v * 0.9, mid: v * 0.7, treble: v * 0.5, rms: v, beatPulse: beat });
   }
   return frames;
@@ -57,7 +65,10 @@ function runPipeline(frames, hookKnobs) {
     storeBands.push(shaped);
     // Stage 2 (liveLoop): store bands back in, defaults; beatPulse joins raw.
     const loopIn = {
-      rms: shaped.rms, bass: shaped.bass, mid: shaped.mid, treble: shaped.treble,
+      rms: shaped.rms,
+      bass: shaped.bass,
+      mid: shaped.mid,
+      treble: shaped.treble,
       beatPulse: f.beatPulse,
     };
     loopActed.push(processBallistics(loopState, loopIn, DT, {}));
@@ -106,12 +117,21 @@ ok('loop stage acts on the store bands, not raw', () => {
   const frames = scriptedEnvelope();
   const { loopActed } = runPipeline(frames, HOOK_KNOBS);
   const f = frames[15];
-  const direct = processBallistics(createBallisticsState(), {
-    rms: f.rms, bass: f.bass, mid: f.mid, treble: f.treble, beatPulse: 0,
-  }, DT, {});
+  const direct = processBallistics(
+    createBallisticsState(),
+    {
+      rms: f.rms,
+      bass: f.bass,
+      mid: f.mid,
+      treble: f.treble,
+      beatPulse: 0,
+    },
+    DT,
+    {},
+  );
   assert.ok(
     Math.abs(direct.rms - loopActed[15].rms) > 0.1,
-    `loop-on-raw (${direct.rms}) must differ from loop-on-shaped (${loopActed[15].rms})`
+    `loop-on-raw (${direct.rms}) must differ from loop-on-shaped (${loopActed[15].rms})`,
   );
 });
 

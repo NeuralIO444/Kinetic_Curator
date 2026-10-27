@@ -9,7 +9,11 @@
 import assert from 'node:assert';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // ── no browser needed: the finish-chain plumbing is reachable from every presenter ──
 import { readFileSync } from 'node:fs';
@@ -19,7 +23,11 @@ ok('every non-accum present and readback applies the finish chains', () => {
   const live = read('./liveLoop.mjs');
   const ren = read('./renderer.mjs');
   // the three plain-present sites in the main-thread loop
-  assert.equal((live.match(/live\.present\(live\.applyFinishChains\(/g) || []).length, 3, 'liveLoop: three plain presents');
+  assert.equal(
+    (live.match(/live\.present\(live\.applyFinishChains\(/g) || []).length,
+    3,
+    'liveLoop: three plain presents',
+  );
   assert.ok(!/live\.present\(target\)/.test(live), 'liveLoop: no raw present(target) is left');
   // one-shot stills and captures
   assert.ok(/applyFinishChains\(renderFrameInto\(payload, T, uploaded\)\)/.test(ren), 'renderScene finishes');
@@ -28,10 +36,12 @@ ok('every non-accum present and readback applies the finish chains', () => {
 
 // ── browser: the actual pixels ──────────────────────────────────────────────
 const diffStats = (a, b) => {
-  let differ = 0; let sum = 0;
+  let differ = 0;
+  let sum = 0;
   const px = Math.min(a.length, b.length) / 4;
   for (let i = 0; i < px; i++) {
-    const d = Math.abs(a[i * 4] - b[i * 4]) + Math.abs(a[i * 4 + 1] - b[i * 4 + 1]) + Math.abs(a[i * 4 + 2] - b[i * 4 + 2]);
+    const d =
+      Math.abs(a[i * 4] - b[i * 4]) + Math.abs(a[i * 4 + 1] - b[i * 4 + 1]) + Math.abs(a[i * 4 + 2] - b[i * 4 + 2]);
     if (d > 0) differ++;
     sum += d;
   }

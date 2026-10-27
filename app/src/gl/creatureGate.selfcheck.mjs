@@ -34,10 +34,22 @@ assert.equal(perf.frames, 901, 'the scripted 15-second take');
 assert.equal(perf.checkpoints.length, 16, 'a checkpoint every 60 frames');
 {
   const steps = perf.inputs.steps;
-  assert.ok(steps.some((s) => s.k && Array.isArray(s.k.dishFormed) && s.k.dishFormed.some(Boolean)), 'pins formed in the take');
-  assert.ok(steps.some((s) => s.k && Array.isArray(s.k.dishTraits) && s.k.dishTraits.some(Boolean)), 'Davis stamped a birth in the take');
-  assert.ok(steps.some((s) => s.k && Array.isArray(s.k.dishLimbs) && s.k.dishLimbs.some((n) => n >= 2)), 'a second pair of wings grew in the take');
-  assert.ok(steps.some((s) => s.k && Array.isArray(s.k.dishHosted) && s.k.dishHosted.some(Boolean)), 'the dish creature was hosted in the take');
+  assert.ok(
+    steps.some((s) => s.k && Array.isArray(s.k.dishFormed) && s.k.dishFormed.some(Boolean)),
+    'pins formed in the take',
+  );
+  assert.ok(
+    steps.some((s) => s.k && Array.isArray(s.k.dishTraits) && s.k.dishTraits.some(Boolean)),
+    'Davis stamped a birth in the take',
+  );
+  assert.ok(
+    steps.some((s) => s.k && Array.isArray(s.k.dishLimbs) && s.k.dishLimbs.some((n) => n >= 2)),
+    'a second pair of wings grew in the take',
+  );
+  assert.ok(
+    steps.some((s) => s.k && Array.isArray(s.k.dishHosted) && s.k.dishHosted.some(Boolean)),
+    'the dish creature was hosted in the take',
+  );
 }
 
 // THE GATE: replay the pre-repipe fixture and compare every checkpoint.
@@ -48,7 +60,9 @@ assert.equal(perf.checkpoints.length, 16, 'a checkpoint every 60 frames');
   assert.equal(v.firstMismatchFrame, null, 'no checkpoint diverges');
   assert.equal(v.ok, true, 'the pre-repipe take replays identically on the current path');
   assert.equal(v.checked, perf.checkpoints.length, 'every checkpoint was compared');
-  console.log(`creatureGate: pre-repipe fixture replayed green in ${((Date.now() - t0) / 1000).toFixed(1)}s (${v.frames} frames, ${v.checked} checkpoints)`);
+  console.log(
+    `creatureGate: pre-repipe fixture replayed green in ${((Date.now() - t0) / 1000).toFixed(1)}s (${v.frames} frames, ${v.checked} checkpoints)`,
+  );
 }
 
 // A perturbed recorded decision turns the gate red at the expected checkpoint: the creatures are in the
@@ -58,19 +72,31 @@ assert.equal(perf.checkpoints.length, 16, 'a checkpoint every 60 frames');
   const p2 = clone();
   const j = p2.inputs.steps.findIndex((s) => s.k && Array.isArray(s.k.dishFormed) && s.k.dishFormed.some(Boolean));
   assert.ok(j >= 0, 'a step carries recorded formed flags to tamper with');
-  for (const s of p2.inputs.steps.slice(j)) if (s.k && Array.isArray(s.k.dishFormed)) s.k.dishFormed = s.k.dishFormed.map(() => false);
+  for (const s of p2.inputs.steps.slice(j))
+    if (s.k && Array.isArray(s.k.dishFormed)) s.k.dishFormed = s.k.dishFormed.map(() => false);
   const v = verifyPerformance(p2);
   assert.equal(v.ok, false, 'un-forming every pin is caught');
-  assert.equal(v.firstMismatchFrame, firstCheckpointAtOrAfter(j), 'divergence is named at the first checkpoint at or after the edit');
+  assert.equal(
+    v.firstMismatchFrame,
+    firstCheckpointAtOrAfter(j),
+    'divergence is named at the first checkpoint at or after the edit',
+  );
 }
 {
   const p3 = clone();
   const j = p3.inputs.steps.findIndex((s) => s.k && Array.isArray(s.k.dishPins) && s.k.dishPins.length > 0);
   assert.ok(j >= 0, 'a step carries recorded homes to tamper with');
-  p3.inputs.steps[j].k.dishPins[0] = { ...p3.inputs.steps[j].k.dishPins[0], x: p3.inputs.steps[j].k.dishPins[0].x + 40 };
+  p3.inputs.steps[j].k.dishPins[0] = {
+    ...p3.inputs.steps[j].k.dishPins[0],
+    x: p3.inputs.steps[j].k.dishPins[0].x + 40,
+  };
   const v = verifyPerformance(p3);
   assert.equal(v.ok, false, 'a moved home is caught');
-  assert.equal(v.firstMismatchFrame, firstCheckpointAtOrAfter(j), 'divergence is named at the first checkpoint at or after the edit');
+  assert.equal(
+    v.firstMismatchFrame,
+    firstCheckpointAtOrAfter(j),
+    'divergence is named at the first checkpoint at or after the edit',
+  );
 }
 
 console.log('creatureGate.selfcheck: ok');

@@ -24,7 +24,11 @@ assert.equal(frameBudgetForDevice(false), FRAME_BUDGETS.desktop);
 const D = FRAME_BUDGETS.desktop;
 assert.equal(classifyLabel(1, D).verdict, 'fits');
 assert.equal(classifyLabel(D.renderCapMs * D.nearBustRatio - 0.01, D).verdict, 'fits');
-assert.equal(classifyLabel(D.renderCapMs * D.nearBustRatio, D).verdict, 'near-bust', 'the near band includes its floor');
+assert.equal(
+  classifyLabel(D.renderCapMs * D.nearBustRatio, D).verdict,
+  'near-bust',
+  'the near band includes its floor',
+);
 assert.equal(classifyLabel(D.renderCapMs, D).verdict, 'near-bust', 'exactly at the cap still fits — nothing spare');
 assert.equal(classifyLabel(D.renderCapMs + 0.01, D).verdict, 'bust');
 assert.equal(classifyLabel(null, D).verdict, 'unmeasured');
@@ -48,20 +52,36 @@ assert.ok(Math.abs(classifyLabel(16, D).multiple - 2) < 1e-9, 'the multiple is t
   const c = classifyDataset(ds);
   assert.equal(c.environment.renderer, 'test-renderer', 'the environment stamp passes through');
   assert.equal(c.baseMs, 2);
-  assert.deepEqual(c.rows.map((r) => r.id), ['busts-both', 'desktop-near', 'ipad-bust', 'fits-both', 'grid-base', 'heavy-failed'], 'heaviest first, unmeasured last');
+  assert.deepEqual(
+    c.rows.map((r) => r.id),
+    ['busts-both', 'desktop-near', 'ipad-bust', 'fits-both', 'grid-base', 'heavy-failed'],
+    'heaviest first, unmeasured last',
+  );
   const byId = Object.fromEntries(c.rows.map((r) => [r.id, r]));
   assert.equal(byId['fits-both'].overBase, 1.5, 'the spread is measured against the base recipe');
   assert.equal(byId['fits-both'].ipad.verdict, 'fits');
   assert.equal(byId['desktop-near'].desktop.verdict, 'near-bust');
-  assert.equal(byId['desktop-near'].ipad.verdict, 'bust', 'a desktop near-bust can be an iPad bust — the classes judge independently');
-  assert.equal(byId['ipad-bust'].desktop.verdict, 'fits', 'under the desktop near floor of 6.4, over the iPad cap entirely');
+  assert.equal(
+    byId['desktop-near'].ipad.verdict,
+    'bust',
+    'a desktop near-bust can be an iPad bust — the classes judge independently',
+  );
+  assert.equal(
+    byId['ipad-bust'].desktop.verdict,
+    'fits',
+    'under the desktop near floor of 6.4, over the iPad cap entirely',
+  );
   assert.deepEqual(c.busts.desktop, ['busts-both']);
   assert.deepEqual(c.busts.ipad, ['busts-both', 'desktop-near', 'ipad-bust']);
   assert.deepEqual(c.nearBusts.desktop, ['desktop-near']);
   assert.deepEqual(c.nearBusts.ipad, []);
   assert.deepEqual(c.unmeasured, ['heavy-failed']);
   assert.match(byId['heavy-failed'].failed, /payload too large/, 'the failed row keeps its error');
-  assert.equal(byId['heavy-failed'].desktop.verdict, 'unmeasured', 'a harness failure is never reported as a cost bust');
+  assert.equal(
+    byId['heavy-failed'].desktop.verdict,
+    'unmeasured',
+    'a harness failure is never reported as a cost bust',
+  );
 }
 
 console.log('deviceBudgets.selfcheck: ok');

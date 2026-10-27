@@ -58,15 +58,20 @@ for (const d of decls) {
   assert.ok(Number.isFinite(d.timeMs) && d.timeMs >= 0, `${d.id}: bad timeMs`);
   assert.ok(COST_TIER_INFO[d.tier], `${d.id}: tier ${d.tier} has no contract description`);
   if (d.memoryGate !== null) {
-    assert.ok(Number.isFinite(d.memoryGate.minWidth) && Number.isInteger(d.memoryGate.maxTaps),
-      `${d.id}: malformed memoryGate`);
+    assert.ok(
+      Number.isFinite(d.memoryGate.minWidth) && Number.isInteger(d.memoryGate.maxTaps),
+      `${d.id}: malformed memoryGate`,
+    );
   }
 }
 console.log(`[selfcheck] A declarations valid — ${decls.length} effects declare tiers`);
 
 // Fail-closed: duplicates and bad tiers throw, naming the id.
-assert.throws(() => registerCostTier('accum/fade', { tier: 1 }), /already registered/,
-  'a CONFLICTING re-registration must throw');
+assert.throws(
+  () => registerCostTier('accum/fade', { tier: 1 }),
+  /already registered/,
+  'a CONFLICTING re-registration must throw',
+);
 // #551: an identical re-declaration (Vite HMR re-running a module) is a no-op.
 {
   const before = allCostTiers().length;
@@ -76,11 +81,19 @@ assert.throws(() => registerCostTier('accum/fade', { tier: 1 }), /already regist
   assert.equal(allCostTiers().length, before, 'identical re-declaration adds nothing');
   assert.deepEqual(getCostTier('accum/fade'), d, 'and changes nothing');
 }
-assert.throws(() => registerCostTier('__selfcheck__/bad-tier', { tier: 7 }), /tier must be/,
-  'out-of-range tier must throw');
-assert.throws(() => registerCostTier('__selfcheck__/neg-mem', { tier: 3, memoryBytes: -1 }), /memoryBytes/,
-  'negative memoryBytes must throw');
-console.log('[selfcheck] A registration is fail-closed — conflicting duplicates/bad tiers throw; identical re-declaration is idempotent');
+assert.throws(
+  () => registerCostTier('__selfcheck__/bad-tier', { tier: 7 }),
+  /tier must be/,
+  'out-of-range tier must throw',
+);
+assert.throws(
+  () => registerCostTier('__selfcheck__/neg-mem', { tier: 3, memoryBytes: -1 }),
+  /memoryBytes/,
+  'negative memoryBytes must throw',
+);
+console.log(
+  '[selfcheck] A registration is fail-closed — conflicting duplicates/bad tiers throw; identical re-declaration is idempotent',
+);
 
 // ---- B. coverage both ways ----------------------------------------------
 
@@ -94,10 +107,12 @@ for (const d of decls) {
   if (d.tier === 0) continue; // structural: exempt from measurement by contract
   assert.ok(
     Object.prototype.hasOwnProperty.call(MEASURED_COSTS, d.id),
-    `declared effect "${d.id}" (tier ${d.tier}) has no committed measurement — run \`npm run measure-costs\``
+    `declared effect "${d.id}" (tier ${d.tier}) has no committed measurement — run \`npm run measure-costs\``,
   );
 }
-console.log(`[selfcheck] B coverage — ${measuredIds.length} measured, all declared; all declared non-tier-0 measured (measuredAt ${MEASURED_AT})`);
+console.log(
+  `[selfcheck] B coverage — ${measuredIds.length} measured, all declared; all declared non-tier-0 measured (measuredAt ${MEASURED_AT})`,
+);
 
 // ---- C. declaration-vs-measured mapping rule -----------------------------
 
@@ -119,8 +134,8 @@ export function checkCostBands(rows) {
     if (ratio > band.maxRatio) {
       throw new Error(
         `[cost-tiers] "${id}" declares tier ${tier} (${COST_TIER_INFO[tier].name}) but measures ` +
-        `at ratio ${ratio.toFixed(2)} (max ${band.maxRatio}× the ${(med).toFixed(2)}ms median) — ` +
-        `a cheap-declared effect measuring expensive. Re-tier the effect or re-run \`npm run measure-costs\`.`
+          `at ratio ${ratio.toFixed(2)} (max ${band.maxRatio}× the ${med.toFixed(2)}ms median) — ` +
+          `a cheap-declared effect measuring expensive. Re-tier the effect or re-run \`npm run measure-costs\`.`,
       );
     }
     if (ratio > band.warnRatio) {
@@ -138,15 +153,15 @@ for (const w of warnings) console.log(`[selfcheck] C warning: ${w}`);
 const worst3 = rows.filter((r) => r.tier === 3).sort((a, b) => b.ratio - a.ratio)[0];
 console.log(
   `[selfcheck] C bands hold — median ${med.toFixed(2)}ms; ` +
-  `worst tier-3 ratio ${worst3 ? worst3.ratio.toFixed(2) + ` (${worst3.id})` : 'n/a'} ` +
-  `(band ≤ ${TIER_COST_BANDS[3].maxRatio}×)`
+    `worst tier-3 ratio ${worst3 ? worst3.ratio.toFixed(2) + ` (${worst3.id})` : 'n/a'} ` +
+    `(band ≤ ${TIER_COST_BANDS[3].maxRatio}×)`,
 );
 
 // Negative test: a deliberately mis-declared tier must fail the rule.
 assert.throws(
   () => checkCostBands([{ id: 'fx/scanlines', tier: 3, ratio: 100 }]),
   /cheap-declared effect measuring expensive/,
-  'a tier-3 effect measuring 100× the median must fail the gate'
+  'a tier-3 effect measuring 100× the median must fail the gate',
 );
 console.log('[selfcheck] C negative test — synthetic mis-declared tier fails as required');
 
@@ -158,27 +173,44 @@ assert.deepEqual(echoDecl.memoryGate, { minWidth: 2048, maxTaps: 3 }, 'echo memo
 assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 2048 }).echoTaps, 3, 'gate: 2K width caps 4 taps to 3');
 assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 3000 }).echoTaps, 3, 'gate: above 2K still capped');
 assert.equal(accumRecipeParams({ echoes: 4, echoWidth: 1000 }).echoTaps, 4, 'gate: below 2K uncapped');
-assert.equal(accumRecipeParams({ echoes: 2, echoWidth: 4096 }).echoTaps, 2, 'gate: fewer taps than the cap pass through');
+assert.equal(
+  accumRecipeParams({ echoes: 2, echoWidth: 4096 }).echoTaps,
+  2,
+  'gate: fewer taps than the cap pass through',
+);
 console.log('[selfcheck] D echo memory gate — declared { minWidth: 2048, maxTaps: 3 } matches the recipe');
 
 // ---- E. governor migration: registry-driven, order unchanged --------------
 // (#308: the blur passes are gone — the tier-1 chain is the 8 ACCUM passes
 // with accum/glow replacing accum/blur + accum/add.)
 const EXPECTED_TIER1 = [
-  'accum/fade', 'accum/feed', 'accum/echo', 'accum/copy',
-  'accum/over', 'accum/down', 'accum/glow', 'accum/leave',
+  'accum/fade',
+  'accum/feed',
+  'accum/echo',
+  'accum/copy',
+  'accum/over',
+  'accum/down',
+  'accum/glow',
+  'accum/leave',
 ];
 assert.deepEqual(tier1ShedIds().sort(), [...EXPECTED_TIER1].sort(), 'registry tier-1 set');
-assert.deepEqual(perfTier1Passes().sort(), [...EXPECTED_TIER1].sort(),
-  'governor cut-3 coverage reads the registry (was hard-coded "ACCUM")');
+assert.deepEqual(
+  perfTier1Passes().sort(),
+  [...EXPECTED_TIER1].sort(),
+  'governor cut-3 coverage reads the registry (was hard-coded "ACCUM")',
+);
 console.log('[selfcheck] E governor cut-3 coverage is registry-driven — 8 ACCUM passes');
 
 // The shed ORDER is unchanged: walk the ladder end to end.
 {
   const kinds = [];
   let s = {
-    renderScale: 1, quality: 'high', assetThin: false,
-    perfClampOverride: null, effectiveCount: 500, slowRender: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 500,
+    slowRender: false,
   };
   for (let i = 0; i < 12 && kinds[kinds.length - 1] !== null; i++) {
     const cut = nextGovernorCut(s);
@@ -187,20 +219,36 @@ console.log('[selfcheck] E governor cut-3 coverage is registry-driven — 8 ACCU
     if (cut.kind === 'renderScale') s = { ...s, renderScale: cut.scale };
     else if (cut.kind === 'quality') s = { ...s, quality: cut.quality };
     else if (cut.kind === 'assetThin') s = { ...s, assetThin: true };
-    else if (cut.kind === 'countClamp') s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
+    else if (cut.kind === 'countClamp')
+      s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
     else if (cut.kind === 'slowRender') s = { ...s, slowRender: true };
   }
   const seq = kinds.filter(Boolean);
   // Cut 5 (countClamp) repeats with geometric decay: 500 → 350 → 245 →
   // 171 → 119 (≤120 floor reached), hence four countClamps.
-  assert.deepEqual(seq,
-    ['renderScale', 'renderScale', 'renderScale', 'quality', 'quality', 'assetThin',
-     'countClamp', 'countClamp', 'countClamp', 'countClamp', 'slowRender'],
-    `shed order changed: ${seq.join(' → ')}`);
+  assert.deepEqual(
+    seq,
+    [
+      'renderScale',
+      'renderScale',
+      'renderScale',
+      'quality',
+      'quality',
+      'assetThin',
+      'countClamp',
+      'countClamp',
+      'countClamp',
+      'countClamp',
+      'slowRender',
+    ],
+    `shed order changed: ${seq.join(' → ')}`,
+  );
   assert.equal(kinds[kinds.length - 1], null, 'ladder exhausts to hold (null)');
   assert.deepEqual(RENDER_SCALES, [1, 0.75, 0.5, 0.33], 'render scales unchanged');
 }
-console.log('[selfcheck] E shed order unchanged — resolution ×3 → quality ×2 → assetThin → countClamp → slowRender → hold');
+console.log(
+  '[selfcheck] E shed order unchanged — resolution ×3 → quality ×2 → assetThin → countClamp → slowRender → hold',
+);
 
 // shedOrder(): tier 1 before 2 before 3, tier 0 never shed (last).
 {
@@ -214,17 +262,31 @@ console.log('[selfcheck] E shed order unchanged — resolution ×3 → quality �
   const ranks = ordered.map(rankOf);
   const sorted = [...ranks].sort((a, b) => a - b);
   assert.deepEqual(ranks, sorted, 'shedOrder sorts tier 1 → 2 → 3 → 0');
-  assert.ok(ordered.slice(-5).every((id) => rankOf(id) === 4), 'tier-0 entries sort last (never shed)');
+  assert.ok(
+    ordered.slice(-5).every((id) => rankOf(id) === 4),
+    'tier-0 entries sort last (never shed)',
+  );
 }
 console.log('[selfcheck] E shedOrder — tier 1 first, tier 0 last');
 
 // shedSummary strings match the #294 instrument names (UI contract — the
 // badge/pills/tape read these exact strings).
 {
-  const sum = shedSummary({ renderScale: 0.5, perfTier1: true, assetThin: true, perfClampOverride: { count: 80 }, slowRender: false, watchdogTripped: true });
-  assert.ok(sum.join(' ').includes('pixel trim 50%') && sum.join(' ').includes('shine off')
-    && sum.join(' ').includes('crowd control → 80') && sum.join(' ').includes('watchdog — hard stop'),
-    'shedSummary strings match the instrument names');
+  const sum = shedSummary({
+    renderScale: 0.5,
+    perfTier1: true,
+    assetThin: true,
+    perfClampOverride: { count: 80 },
+    slowRender: false,
+    watchdogTripped: true,
+  });
+  assert.ok(
+    sum.join(' ').includes('pixel trim 50%') &&
+      sum.join(' ').includes('shine off') &&
+      sum.join(' ').includes('crowd control → 80') &&
+      sum.join(' ').includes('watchdog — hard stop'),
+    'shedSummary strings match the instrument names',
+  );
 }
 console.log('[selfcheck] E shedSummary strings match the instrument names');
 
@@ -239,14 +301,19 @@ for (const s of ['none', 'bilateral', 'stamp', undefined, null, '', 'radial', 'r
 assert.strictEqual(radialFanMultiplier('radial-4', 2), 1.5, 'radial-4 @ body 2 → (2+4)/(2+2)');
 assert.strictEqual(radialFanMultiplier('radial-6', 2), 2, 'radial-6 @ body 2 → (2+6)/(2+2)');
 assert.strictEqual(radialFanMultiplier('radial-8', 1), 3, 'radial-8 @ body 1 (medusa bell) → (1+8)/(1+2)');
-assert.ok(Math.abs(radialFanMultiplier('radial-8', 7) - 15 / 9) < 1e-12,
-  'radial-8 @ body 7 (segmented radiolarian) → (7+8)/(7+2)');
+assert.ok(
+  Math.abs(radialFanMultiplier('radial-8', 7) - 15 / 9) < 1e-12,
+  'radial-8 @ body 7 (segmented radiolarian) → (7+8)/(7+2)',
+);
 // bodyLen clamps to 1..7, mirroring particles.js.
 assert.strictEqual(radialFanMultiplier('radial-6', 0), radialFanMultiplier('radial-6', 1), 'body clamps low');
 assert.strictEqual(radialFanMultiplier('radial-6', 99), radialFanMultiplier('radial-6', 7), 'body clamps high');
 // Monotonic in folds at fixed body: higher fold counts cost more.
-assert.ok(radialFanMultiplier('radial-8', 3) > radialFanMultiplier('radial-6', 3)
-  && radialFanMultiplier('radial-6', 3) > radialFanMultiplier('radial-4', 3), 'monotonic in folds');
+assert.ok(
+  radialFanMultiplier('radial-8', 3) > radialFanMultiplier('radial-6', 3) &&
+    radialFanMultiplier('radial-6', 3) > radialFanMultiplier('radial-4', 3),
+  'monotonic in folds',
+);
 console.log('[selfcheck] F radial-fan multiplier — (bodyLen+N)/(bodyLen+2), 1 for non-radial');
 
 console.log('[selfcheck] cost tiers OK — declarations valid, coverage complete, bands hold, governor registry-driven');

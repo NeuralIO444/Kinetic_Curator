@@ -134,13 +134,34 @@ export function opticsDerived(o) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
  */
-export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, echoWidth = 0, background = '#000000', leave = false, ribbon = false, comet = false, leaveFade = 0, tunnelFade = 0, prismFade = 0, flowFade = 0, wetStep = 0, wetGain = 0, wetAmount = 0, wetVel = null, wetMask = null } = {}) {
+export function accumRecipeParams({
+  fade = 0.88,
+  optics = 0,
+  tunnel = 0,
+  prism = 0,
+  flow = 0,
+  echoes = 0,
+  echoWidth = 0,
+  background = '#000000',
+  leave = false,
+  ribbon = false,
+  comet = false,
+  leaveFade = 0,
+  tunnelFade = 0,
+  prismFade = 0,
+  flowFade = 0,
+  wetStep = 0,
+  wetGain = 0,
+  wetAmount = 0,
+  wetVel = null,
+  wetMask = null,
+} = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
   const keep = Number.isFinite(Number(fade)) ? Math.min(0.99, Math.max(0, Number(fade))) : 0;
   const o = clamp01(optics);
   const leaveEarly = !!leave;
-  const fadeOf = (v) => leaveEarly ? 1 - Math.min(1, Math.max(0, Number(v) || 0)) : 1;
+  const fadeOf = (v) => (leaveEarly ? 1 - Math.min(1, Math.max(0, Number(v) || 0)) : 1);
   const t = clamp01(tunnel) * fadeOf(tunnelFade);
   const pr = clamp01(prism) * fadeOf(prismFade);
   const fl = clamp01(flow) * fadeOf(flowFade);
@@ -158,9 +179,11 @@ export function accumRecipeParams({ fade = 0.88, optics = 0, tunnel = 0, prism =
     comet: !!comet,
     keep: held
       ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0)))
-      : ribbon ? Math.max(keep, 0.96)
-      : comet ? Math.min(keep, 0.72)
-      : keep,
+      : ribbon
+        ? Math.max(keep, 0.96)
+        : comet
+          ? Math.min(keep, 0.72)
+          : keep,
     bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
@@ -299,7 +322,13 @@ export function sanitizeAccumEchoes(v) {
 function hexToRgb01(hex) {
   const m = /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.exec(String(hex || ''));
   if (!m) return [0, 0, 0];
-  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  const h =
+    m[1].length === 3
+      ? m[1]
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : m[1];
   return [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255);
 }
 
@@ -563,7 +592,7 @@ uniform float u_wetAmount;`,
 // While the wet mask is up, two deposits blend toward their concentration
 // average instead of stacking toward white.
 export const OVER_WET_FS = OVER_FS.replace(
-  'uniform float u_headBoost; // 1.0 = off (today\'s render, bit-identical)',
+  "uniform float u_headBoost; // 1.0 = off (today's render, bit-identical)",
   `uniform float u_headBoost; // 1.0 = off (today's render, bit-identical)
 uniform sampler2D u_wetMask;
 uniform float u_wetAmount;`,
@@ -577,7 +606,6 @@ uniform float u_wetAmount;`,
   float mixT = wet * step(0.02, d.a);
   o = vec4(mix(over.rgb, pigment * over.a, mixT), over.a);`,
 );
-
 
 // Frame resample for #309: the feedback pair runs at logical size, but the
 // incoming frame can be backing-store sized (live retina path). This pass
@@ -625,35 +653,91 @@ void main() {
 const FRAME_16F = 1920 * 1080 * 8;
 export const ACCUM_PROGRAMS = {
   // Fade + tunnel/prism feedback in one pass.
-  fade: { fs: FADE_FS, file: 'accum.mjs:FADE_FS', uniforms: ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
-    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.8, notes: 'fade + tunnel/prism feedback; shed with ACCUM' } },
+  fade: {
+    fs: FADE_FS,
+    file: 'accum.mjs:FADE_FS',
+    uniforms: ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.8, notes: 'fade + tunnel/prism feedback; shed with ACCUM' },
+  },
   // Flow feedback: advects the buffer through the flow field.
-  feed: { fs: FEED_FS, file: 'accum.mjs:FEED_FS', uniforms: ['u_src', 'u_flowField', 'u_flow', 'u_flowShared'],
-    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 1.0, notes: 'flow feedback advection' } },
+  feed: {
+    fs: FEED_FS,
+    file: 'accum.mjs:FEED_FS',
+    uniforms: ['u_src', 'u_flowField', 'u_flow', 'u_flowShared'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 1.0, notes: 'flow feedback advection' },
+  },
   // Echoes: mixes up to 4 past frames; the ring is the memory-heavy one.
-  echo: { fs: ECHO_FS, file: 'accum.mjs:ECHO_FS', uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'],
-    cost: { tier: 1, memoryBytes: 5 * FRAME_16F, timeMs: 1.2,
+  echo: {
+    fs: ECHO_FS,
+    file: 'accum.mjs:ECHO_FS',
+    uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'],
+    cost: {
+      tier: 1,
+      memoryBytes: 5 * FRAME_16F,
+      timeMs: 1.2,
       notes: '4-frame ring + mix; ring dominates the working set',
-      memoryGate: { minWidth: 2048, maxTaps: 3 } } },
-  copy: { fs: COPY_FS, file: 'shaders.mjs:COPY_FS', uniforms: ['u_src'],
-    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.2, notes: 'chain plumbing: ping-pong copy, shed with the chain' } },
-  over: { fs: OVER_FS, file: 'accum.mjs:OVER_FS', uniforms: ['u_src', 'u_dst', 'u_headBoost'],
-    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.25, notes: 'chain plumbing: source-over, shed with the chain' } },
-  down: { fs: DOWN_FS, file: 'accum.mjs:DOWN_FS', uniforms: ['u_src'],
-    cost: { tier: 1, memoryBytes: FRAME_16F / 64, timeMs: 0.3, notes: 'chain plumbing: 8x8 box downsample into the glow target, shed with the chain' } },
+      memoryGate: { minWidth: 2048, maxTaps: 3 },
+    },
+  },
+  copy: {
+    fs: COPY_FS,
+    file: 'shaders.mjs:COPY_FS',
+    uniforms: ['u_src'],
+    cost: {
+      tier: 1,
+      memoryBytes: FRAME_16F,
+      timeMs: 0.2,
+      notes: 'chain plumbing: ping-pong copy, shed with the chain',
+    },
+  },
+  over: {
+    fs: OVER_FS,
+    file: 'accum.mjs:OVER_FS',
+    uniforms: ['u_src', 'u_dst', 'u_headBoost'],
+    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.25, notes: 'chain plumbing: source-over, shed with the chain' },
+  },
+  down: {
+    fs: DOWN_FS,
+    file: 'accum.mjs:DOWN_FS',
+    uniforms: ['u_src'],
+    cost: {
+      tier: 1,
+      memoryBytes: FRAME_16F / 64,
+      timeMs: 0.3,
+      notes: 'chain plumbing: 8x8 box downsample into the glow target, shed with the chain',
+    },
+  },
   // The glow pass (#308): mip-chain bloom + stipple diffusion + chromatic
   // offset. One pass per glow tier (bloom, halation); the mip levels are
   // built by the hardware (generateMipmap), so the per-pass cost is a
   // single textured fullscreen read with a few ALU ops. There is no blur
   // pass in this instrument anymore.
-  glow: { fs: GLOW_FS, file: 'accum.mjs:GLOW_FS', uniforms: ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint'],
-    cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.6, notes: 'mip-chain bloom + stipple + chroma; one pass per tier (bloom, halation); shed with ACCUM' } },
+  glow: {
+    fs: GLOW_FS,
+    file: 'accum.mjs:GLOW_FS',
+    uniforms: ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint'],
+    cost: {
+      tier: 1,
+      memoryBytes: FRAME_16F,
+      timeMs: 0.6,
+      notes: 'mip-chain bloom + stipple + chroma; one pass per tier (bloom, halation); shed with ACCUM',
+    },
+  },
   // #309: backing-store frame -> logical-size feedback pair, one fullscreen
   // pass, only in the live retina path (resDiv > 1). Tier 0 structural
   // plumbing — shedding it alone would break the recipe (frame/pair size
   // mismatch), so it lives and dies with the chain itself.
-  resample: { fs: RESAMPLE_FS, file: 'accum.mjs:RESAMPLE_FS', uniforms: ['u_src', 'u_srcSize'],
-    cost: { tier: 0, memoryBytes: FRAME_16F, timeMs: 0.3, notes: 'structural ACCUM plumbing (frame resample to feedback-pair size); never shed alone' } },
+  resample: {
+    fs: RESAMPLE_FS,
+    file: 'accum.mjs:RESAMPLE_FS',
+    uniforms: ['u_src', 'u_srcSize'],
+    cost: {
+      tier: 0,
+      memoryBytes: FRAME_16F,
+      timeMs: 0.3,
+      notes: 'structural ACCUM plumbing (frame resample to feedback-pair size); never shed alone',
+    },
+  },
 };
 
 for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
@@ -667,7 +751,9 @@ for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
  * (applyAudioEnvelope, just below).
  */
 registerCostTier('audio/modulation', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
   notes: 'scalar per-frame recipe math (CPU); the cheapest thing in the chain, never shed',
 });
 
@@ -675,7 +761,9 @@ registerCostTier('audio/modulation', {
 // a shed loses the stamps and they recover when the chain comes back.
 // Disclosed, not engineered around. CLEAR still wipes both pair buffers.
 registerCostTier('accum/leave', {
-  tier: 1, memoryBytes: FRAME_16F, timeMs: 0.2,
+  tier: 1,
+  memoryBytes: FRAME_16F,
+  timeMs: 0.2,
   notes: 'LEAVE hold: copy instead of fade. Shed loses the stamps; CLEAR wipes both buffers',
 });
 
@@ -797,8 +885,12 @@ export function mirrorMipChain(base, gw, gh) {
       for (let x = 0; x < w; x++) {
         for (let c = 0; c < 4; c++) {
           px[(y * w + x) * 4 + c] = q(
-            (fetch(2 * x, 2 * y, c) + fetch(2 * x + 1, 2 * y, c) +
-             fetch(2 * x, 2 * y + 1, c) + fetch(2 * x + 1, 2 * y + 1, c)) / 4);
+            (fetch(2 * x, 2 * y, c) +
+              fetch(2 * x + 1, 2 * y, c) +
+              fetch(2 * x, 2 * y + 1, c) +
+              fetch(2 * x + 1, 2 * y + 1, c)) /
+              4,
+          );
         }
       }
     }
@@ -814,12 +906,17 @@ export function mirrorMipChain(base, gw, gh) {
  */
 function bilinearLevel(level, u, v, c) {
   const { px, w, h } = level;
-  const stx = u * w - 0.5, sty = v * h - 0.5;
-  const fx = stx - Math.floor(stx), fy = sty - Math.floor(sty);
-  const bx = Math.floor(stx), by = Math.floor(sty);
+  const stx = u * w - 0.5,
+    sty = v * h - 0.5;
+  const fx = stx - Math.floor(stx),
+    fy = sty - Math.floor(sty);
+  const bx = Math.floor(stx),
+    by = Math.floor(sty);
   const fetch = (x, y) => px[(Math.min(h - 1, Math.max(0, y)) * w + Math.min(w - 1, Math.max(0, x))) * 4 + c];
-  const s00 = fetch(bx, by), s10 = fetch(bx + 1, by);
-  const s01 = fetch(bx, by + 1), s11 = fetch(bx + 1, by + 1);
+  const s00 = fetch(bx, by),
+    s10 = fetch(bx + 1, by);
+  const s01 = fetch(bx, by + 1),
+    s11 = fetch(bx + 1, by + 1);
   return (s00 * (1 - fx) + s10 * fx) * (1 - fy) + (s01 * (1 - fx) + s11 * fx) * fy;
 }
 
@@ -832,7 +929,8 @@ function bilinearLevel(level, u, v, c) {
 export function mirrorTrilinear(chain, u, v, lod) {
   const maxLod = chain.length - 1;
   const l = Math.min(Math.max(lod, 0), maxLod);
-  const l0 = Math.floor(l), f = l - l0;
+  const l0 = Math.floor(l),
+    f = l - l0;
   const l1 = Math.min(l0 + 1, maxLod);
   const out = [0, 0, 0];
   for (let c = 0; c < 3; c++) {
@@ -850,7 +948,8 @@ export function mirrorTrilinear(chain, u, v, lod) {
  * the screen-space dot grid — gl_FragCoord.xy is (x+0.5, y+0.5).
  */
 export function mirrorGlowSample(chain, gw, gh, u, v, x, y, { lod, stipple, chromaTexels }) {
-  const texelX = Math.pow(2, lod) / gw, texelY = Math.pow(2, lod) / gh;
+  const texelX = Math.pow(2, lod) / gw,
+    texelY = Math.pow(2, lod) / gh;
   const cox = (u - 0.5) * chromaTexels * texelX;
   const coy = (v - 0.5) * chromaTexels * texelY;
   const r = mirrorTrilinear(chain, u + cox, v + coy, lod)[0];
@@ -888,9 +987,12 @@ function ihash2(px, py) {
 }
 
 function vnoise2(px, py) {
-  const ix = Math.floor(px), iy = Math.floor(py);
-  const fx = px - ix, fy = py - iy;
-  const ux = fx * fx * (3 - 2 * fx), uy = fy * fy * (3 - 2 * fy);
+  const ix = Math.floor(px),
+    iy = Math.floor(py);
+  const fx = px - ix,
+    fy = py - iy;
+  const ux = fx * fx * (3 - 2 * fx),
+    uy = fy * fy * (3 - 2 * fy);
   const a = ihash2(ix, iy);
   const b = ihash2(ix + 1, iy);
   const c = ihash2(ix, iy + 1);
@@ -906,7 +1008,8 @@ export function mirrorFlowVec(u, v, field = null) {
     // Late import keeps accum.mjs free of a cycle through the field builder.
     return sampleFlowField(field, u, v);
   }
-  const px = u * 6, py = v * 6;
+  const px = u * 6,
+    py = v * 6;
   const n1 = vnoise2(px, py);
   const n2 = vnoise2(px + 7.3, py + 2.9);
   const n3 = vnoise2(px * 2 + 3.1, py * 2 + 9.7);
@@ -973,13 +1076,17 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
       const i1 = Math.min(gn - 1, i0 + 1);
       const j1 = Math.min(gn - 1, j0 + 1);
       const at = (j, i, c) => field.rgba[(j * gn + i) * 4 + c] / 255;
-      const s = (c) => (1 - tx) * (1 - ty) * at(j0, i0, c) + tx * (1 - ty) * at(j0, i1, c)
-        + (1 - tx) * ty * at(j1, i0, c) + tx * ty * at(j1, i1, c);
+      const s = (c) =>
+        (1 - tx) * (1 - ty) * at(j0, i0, c) +
+        tx * (1 - ty) * at(j0, i1, c) +
+        (1 - tx) * ty * at(j1, i0, c) +
+        tx * ty * at(j1, i1, c);
       return [s(0) * 2 - 1, s(1) * 2 - 1];
     };
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const u = (x + 0.5) / w, v = (y + 0.5) / h;
+        const u = (x + 0.5) / w,
+          v = (y + 0.5) / h;
         const [fx, fy] = p.flowUv > 0 ? mirrorFlowVec(u, v, p.flowField) : [0, 0];
         const [wx, wy] = wetVec(u, v);
         const tu = u + fx * p.flowUv + wx * (p.wetGain || 0);
@@ -1012,8 +1119,11 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
         const ty = gy - j0;
         const i1 = Math.min(gn - 1, i0 + 1);
         const j1 = Math.min(gn - 1, j0 + 1);
-        const wet = (1 - tx) * (1 - ty) * at(j0, i0) + tx * (1 - ty) * at(j0, i1)
-          + (1 - tx) * ty * at(j1, i0) + tx * ty * at(j1, i1);
+        const wet =
+          (1 - tx) * (1 - ty) * at(j0, i0) +
+          tx * (1 - ty) * at(j0, i1) +
+          (1 - tx) * ty * at(j1, i0) +
+          tx * ty * at(j1, i1);
         const edge = wet * (1 - wet) * 4;
         let hh = Math.imul((x * 1664525 + y) ^ 1013904223, 2246822519) >>> 16;
         const paper = (hh & 65535) / 65535;
@@ -1037,7 +1147,9 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   // #287 fade-to-paper: the fade lerps toward the palette background, not
   // black. With the default black bg this is exactly the old `* keep`
   // (0 * (1 - keep) = 0), so the legacy fade hashes can't move.
-  const bg0 = p.bg[0], bg1 = p.bg[1], bg2 = p.bg[2];
+  const bg0 = p.bg[0],
+    bg1 = p.bg[1],
+    bg2 = p.bg[2];
   const fadeTo = (c, b) => b * (1 - p.keep) + c * p.keep;
   if (!feedback) {
     for (let i = 0; i < n; i += 4) {
@@ -1052,18 +1164,23 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
       const sy = Math.min(h - 1, Math.max(0, Math.floor(v * h)));
       return fed[(sy * w + sx) * 4 + c];
     };
-    const ca = Math.cos(p.tunnelSpin), sa = Math.sin(p.tunnelSpin);
+    const ca = Math.cos(p.tunnelSpin),
+      sa = Math.sin(p.tunnelSpin);
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
-        const u = (x + 0.5) / w, v = (y + 0.5) / h;
-        const ox = u - 0.5, oy = v - 0.5;
+        const u = (x + 0.5) / w,
+          v = (y + 0.5) / h;
+        const ox = u - 0.5,
+          oy = v - 0.5;
         const tu = 0.5 + (ca * ox - sa * oy) * p.tunnelZoom;
         const tv = 0.5 + (sa * ox + ca * oy) * p.tunnelZoom;
         let r, g, b, a;
         if (p.prismUv > 0) {
-          const pox = tu - 0.5, poy = tv - 0.5;
+          const pox = tu - 0.5,
+            poy = tv - 0.5;
           const len = Math.max(Math.hypot(pox, poy), 1e-4);
-          const prx = (pox / len) * p.prismUv, pry = (poy / len) * p.prismUv;
+          const prx = (pox / len) * p.prismUv,
+            pry = (poy / len) * p.prismUv;
           r = nearest(tu + prx, tv + pry, 0);
           g = nearest(tu, tv, 1);
           b = nearest(tu - prx, tv - pry, 2);
@@ -1103,7 +1220,10 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
     const ob = sb + db * (1 - sa);
     const oa = sa + da * (1 - sa);
     if (!mixWet || da <= 0.02) {
-      comp[i] = or; comp[i + 1] = og; comp[i + 2] = ob; comp[i + 3] = oa;
+      comp[i] = or;
+      comp[i + 1] = og;
+      comp[i + 2] = ob;
+      comp[i + 3] = oa;
       continue;
     }
     const px = (i / 4) % w;
@@ -1121,8 +1241,12 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
     const i1 = Math.min(gn - 1, i0 + 1);
     const j1 = Math.min(gn - 1, j0 + 1);
     const at = (j, ii) => mask.rgba[(j * gn + ii) * 4] / 255;
-    const wet = ((1 - tx) * (1 - ty) * at(j0, i0) + tx * (1 - ty) * at(j0, i1)
-      + (1 - tx) * ty * at(j1, i0) + tx * ty * at(j1, i1)) * p.wetAmount;
+    const wet =
+      ((1 - tx) * (1 - ty) * at(j0, i0) +
+        tx * (1 - ty) * at(j0, i1) +
+        (1 - tx) * ty * at(j1, i0) +
+        tx * ty * at(j1, i1)) *
+      p.wetAmount;
     const sc = [sr, sg, sb].map((c) => Math.min(1, c / Math.max(sa, 1e-4)));
     const dc = [dr, dg, db].map((c) => Math.min(1, c / Math.max(da, 1e-4)));
     const denom = Math.max(sa + da, 1e-4);
@@ -1141,10 +1265,12 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   const out = new Float64Array(n);
   const [tr, tg, tb] = p.halationTint;
   const glowArgs = (lod) => ({ lod, stipple: p.stipple, chromaTexels: p.chromaTexels });
-  const g1args = glowArgs(p.bloomLod), g2args = glowArgs(p.halationLod);
+  const g1args = glowArgs(p.bloomLod),
+    g2args = glowArgs(p.halationLod);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
-      const u = (x + 0.5) / w, v = (y + 0.5) / h;
+      const u = (x + 0.5) / w,
+        v = (y + 0.5) / h;
       const o = (y * w + x) * 4;
       const g1 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g1args);
       const g2 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g2args);
@@ -1194,11 +1320,34 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       });
       const L = {};
       const U = (n) => gl.getUniformLocation(progs[name], n);
-      for (const u of ['u_src', 'u_dst', 'u_headBoost', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism',
-        'u_flow', 'u_flowField', 'u_flowShared',
-        'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps',
-        'u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint',
-        'u_srcSize']) {
+      for (const u of [
+        'u_src',
+        'u_dst',
+        'u_headBoost',
+        'u_keep',
+        'u_bg',
+        'u_tunnelZoom',
+        'u_tunnelSpin',
+        'u_prism',
+        'u_flow',
+        'u_flowField',
+        'u_flowShared',
+        'u_t0',
+        'u_t1',
+        'u_t2',
+        'u_t3',
+        'u_w',
+        'u_ntaps',
+        'u_base',
+        'u_glow',
+        'u_glowSize',
+        'u_lod',
+        'u_stipple',
+        'u_chromaTexels',
+        'u_amount',
+        'u_tint',
+        'u_srcSize',
+      ]) {
         L[u] = U(u);
       }
       locs[name] = L;
@@ -1221,10 +1370,43 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     for (const u of uniforms) L[u] = gl.getUniformLocation(wetProgs[name], u);
     wetLocs[name] = L;
   };
-  buildWet('feedWet', FEED_WET_FS, 'accum.mjs:FEED_WET_FS', ['u_src', 'u_flowField', 'u_flow', 'u_flowShared', 'u_wetVel', 'u_wetGain']);
-  buildWet('fadeWet', FADE_WET_FS, 'accum.mjs:FADE_WET_FS', ['u_src', 'u_keep', 'u_bg', 'u_tunnelZoom', 'u_tunnelSpin', 'u_prism', 'u_wetMask', 'u_wetAmount']);
-  buildWet('glowWet', GLOW_WET_FS, 'accum.mjs:GLOW_WET_FS', ['u_base', 'u_glow', 'u_glowSize', 'u_lod', 'u_stipple', 'u_chromaTexels', 'u_amount', 'u_tint', 'u_wetMask', 'u_wetAmount']);
-  buildWet('overWet', OVER_WET_FS, 'accum.mjs:OVER_WET_FS', ['u_src', 'u_dst', 'u_headBoost', 'u_wetMask', 'u_wetAmount']);
+  buildWet('feedWet', FEED_WET_FS, 'accum.mjs:FEED_WET_FS', [
+    'u_src',
+    'u_flowField',
+    'u_flow',
+    'u_flowShared',
+    'u_wetVel',
+    'u_wetGain',
+  ]);
+  buildWet('fadeWet', FADE_WET_FS, 'accum.mjs:FADE_WET_FS', [
+    'u_src',
+    'u_keep',
+    'u_bg',
+    'u_tunnelZoom',
+    'u_tunnelSpin',
+    'u_prism',
+    'u_wetMask',
+    'u_wetAmount',
+  ]);
+  buildWet('glowWet', GLOW_WET_FS, 'accum.mjs:GLOW_WET_FS', [
+    'u_base',
+    'u_glow',
+    'u_glowSize',
+    'u_lod',
+    'u_stipple',
+    'u_chromaTexels',
+    'u_amount',
+    'u_tint',
+    'u_wetMask',
+    'u_wetAmount',
+  ]);
+  buildWet('overWet', OVER_WET_FS, 'accum.mjs:OVER_WET_FS', [
+    'u_src',
+    'u_dst',
+    'u_headBoost',
+    'u_wetMask',
+    'u_wetAmount',
+  ]);
 
   // Fullscreen triangle; FULL_VS maps a_pos via v_cuv = a_pos*0.5+0.5.
   const vbo = gl.createBuffer();
@@ -1246,7 +1428,8 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       rs: makeTarget(gl, W, H), // #309: frame -> pair-size resample target
       em: makeTarget(gl, W, H), // B3 echo mix target
       gm: makeGlowTarget(gl, gw, gh), // mip-chain bloom source (RGBA8)
-      gw, gh,
+      gw,
+      gh,
     };
   };
   allocScratch();
@@ -1441,9 +1624,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
             gl.uniform1i(u.u_src, bind(0, frameIn));
             for (let i = 0; i < 4; i++) {
               // Tap i = frame from i+1 steps ago (ring holds past frames only).
-              const slot = i < taps
-                ? echoRing[(echoHead - 1 - i + 2 * K) % K].tex
-                : frameIn; // unused sampler: any valid texture
+              const slot = i < taps ? echoRing[(echoHead - 1 - i + 2 * K) % K].tex : frameIn; // unused sampler: any valid texture
               gl.uniform1i(u[`u_t${i}`], bind(1 + i, slot));
             }
             const wv = p.echoWeights;

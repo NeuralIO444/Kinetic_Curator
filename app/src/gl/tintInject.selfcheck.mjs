@@ -4,17 +4,37 @@
 // colors; MIX 0 is an instant cut; only color/accent are ever rewritten.
 import assert from 'node:assert/strict';
 import {
-  createTintInject, applyInject, colorMap, injectKey, paletteIdentity,
-  hash01, hexToRgb, rgbToHex, lerpHex, lerpHexRaw, smootherstep,
-  easeOutCubic, fieldProgress, injectDelay,
-  INJECT_SALT, INJECT_FIELD_SPAN, INJECT_LEAD, INJECT_DELAY_SPAN, INJECT_ADOPT_SPAN,
+  createTintInject,
+  applyInject,
+  colorMap,
+  injectKey,
+  paletteIdentity,
+  hash01,
+  hexToRgb,
+  rgbToHex,
+  lerpHex,
+  lerpHexRaw,
+  smootherstep,
+  easeOutCubic,
+  fieldProgress,
+  injectDelay,
+  INJECT_SALT,
+  INJECT_FIELD_SPAN,
+  INJECT_LEAD,
+  INJECT_DELAY_SPAN,
+  INJECT_ADOPT_SPAN,
 } from './tintInject.mjs';
 
 let n = 0;
 function ok(name, fn) {
   n++;
-  try { fn(); console.log(`ok ${n} - ${name}`); }
-  catch (e) { console.error(`not ok ${n} - ${name}\n  ${e.message}`); process.exitCode = 1; }
+  try {
+    fn();
+    console.log(`ok ${n} - ${name}`);
+  } catch (e) {
+    console.error(`not ok ${n} - ${name}\n  ${e.message}`);
+    process.exitCode = 1;
+  }
 }
 
 /** A fake resolveLayers() result: one layer, items with color/accent/geometry. */
@@ -22,12 +42,24 @@ function fakeResolved(items, layerId = 'L1') {
   return [{ id: layerId, isFx: false, items }];
 }
 const mkItem = (color = '#111111', accent = '#222222') => ({
-  x: 10, y: 20, scaleX: 1.5, scaleY: 0.7, rotation: 0.3, color, accent,
+  x: 10,
+  y: 20,
+  scaleX: 1.5,
+  scaleY: 0.7,
+  rotation: 0.3,
+  color,
+  accent,
 });
 
 const baseInput = (over = {}) => ({
-  identity: paletteIdentity('p1', null, null), mode: 'INJECT',
-  mixSeconds: 2, now: 0, seed: 7, bg: '#000000', lastResolved: null, ...over,
+  identity: paletteIdentity('p1', null, null),
+  mode: 'INJECT',
+  mixSeconds: 2,
+  now: 0,
+  seed: 7,
+  bg: '#000000',
+  lastResolved: null,
+  ...over,
 });
 const id2 = () => paletteIdentity('p2', null, null);
 
@@ -50,8 +82,10 @@ ok('color utils: hex round-trips, raw vs eased lerps', () => {
 });
 
 ok('schedule spans sum to exactly 1: every adoption completes by t=1', () => {
-  assert.ok(Math.abs(INJECT_LEAD + INJECT_DELAY_SPAN + INJECT_ADOPT_SPAN - 1) < 1e-9,
-    `spans sum to 1, got ${INJECT_LEAD + INJECT_DELAY_SPAN + INJECT_ADOPT_SPAN}`);
+  assert.ok(
+    Math.abs(INJECT_LEAD + INJECT_DELAY_SPAN + INJECT_ADOPT_SPAN - 1) < 1e-9,
+    `spans sum to 1, got ${INJECT_LEAD + INJECT_DELAY_SPAN + INJECT_ADOPT_SPAN}`,
+  );
   for (let i = 0; i < 50; i++) {
     const d = injectDelay(i, 7);
     assert.ok(d >= INJECT_LEAD && d < INJECT_LEAD + INJECT_DELAY_SPAN, `delay ${d} in range`);
@@ -65,16 +99,24 @@ ok('delays are seeded and varied — the propagation is never lockstep', () => {
   const vals = Array.from({ length: 24 }, (_, i) => injectDelay(i, 11));
   assert.ok(new Set(vals).size > 18, 'delays actually vary per agent');
   const spread = Math.max(...vals) - Math.min(...vals);
-  assert.ok(spread > INJECT_DELAY_SPAN * 0.5,
-    `spread ${spread.toFixed(3)} covers most of the delay span — no lockstep arrival`);
-  assert.ok(vals.every((v) => v >= 0 && v < 1), 'delays in [0,1)');
+  assert.ok(
+    spread > INJECT_DELAY_SPAN * 0.5,
+    `spread ${spread.toFixed(3)} covers most of the delay span — no lockstep arrival`,
+  );
+  assert.ok(
+    vals.every((v) => v >= 0 && v < 1),
+    'delays in [0,1)',
+  );
 });
 
 ok('hash01 is index-stable and spread', () => {
   assert.equal(hash01(5, 11), hash01(5, 11));
   const vals = Array.from({ length: 20 }, (_, i) => hash01(i, 11));
   assert.ok(new Set(vals).size > 15, 'hash actually varies per node');
-  assert.ok(vals.every((v) => v >= 0 && v < 1), 'hash in [0,1)');
+  assert.ok(
+    vals.every((v) => v >= 0 && v < 1),
+    'hash in [0,1)',
+  );
 });
 
 ok('field dyes first: field done while agents are still catching up', () => {
@@ -86,8 +128,10 @@ ok('field dyes first: field done while agents are still catching up', () => {
   // is (FIELD_SPAN - LEAD) / ADOPT_SPAN < 1).
   const pAtFieldDone = (INJECT_FIELD_SPAN - INJECT_LEAD) / INJECT_ADOPT_SPAN;
   assert.ok(pAtFieldDone < 1, `max agent progress at field completion is ${pAtFieldDone.toFixed(2)} < 1`);
-  assert.ok(fieldProgress(INJECT_LEAD) > 0.85,
-    `field is ${Math.round(fieldProgress(INJECT_LEAD) * 100)}% dyed when the first agent even starts`);
+  assert.ok(
+    fieldProgress(INJECT_LEAD) > 0.85,
+    `field is ${Math.round(fieldProgress(INJECT_LEAD) * 100)}% dyed when the first agent even starts`,
+  );
   for (let i = 0; i < 50; i++) {
     const p = (INJECT_FIELD_SPAN - injectDelay(i, 7)) / INJECT_ADOPT_SPAN;
     assert.ok(p < 1, `agent ${i} not fully adopted when the field finishes`);
@@ -117,10 +161,15 @@ ok('non-INJECT modes never inject', () => {
 ok('MIX 0 is an instant cut — the slider at 0 means now, like everywhere else', () => {
   const m = createTintInject();
   m.update(baseInput({ lastResolved: fakeResolved([mkItem()]) }));
-  const r = m.update(baseInput({
-    identity: id2(), mixSeconds: 0, now: 50, bg: '#ffffff',
-    lastResolved: fakeResolved([mkItem('#ffffff')]),
-  }));
+  const r = m.update(
+    baseInput({
+      identity: id2(),
+      mixSeconds: 0,
+      now: 50,
+      bg: '#ffffff',
+      lastResolved: fakeResolved([mkItem('#ffffff')]),
+    }),
+  );
   assert.equal(r.injecting, false);
   assert.equal(r.bg, '#ffffff', 'bg cuts straight to the new palette');
 });
@@ -129,29 +178,49 @@ ok('the inject follows the time slider: duration scales with mixSeconds', () => 
   for (const mixSeconds of [0.5, 2, 8]) {
     const m = createTintInject();
     m.update(baseInput({ mixSeconds, lastResolved: fakeResolved([mkItem()]) }));
-    const ev = m.update(baseInput({ mixSeconds, identity: id2(), now: 0, bg: '#ffffff', lastResolved: fakeResolved([mkItem()]) }));
+    const ev = m.update(
+      baseInput({ mixSeconds, identity: id2(), now: 0, bg: '#ffffff', lastResolved: fakeResolved([mkItem()]) }),
+    );
     assert.equal(ev.injecting, true);
     // Halfway through the SLIDER's duration the inject is still mid-flight…
-    const mid = m.update(baseInput({
-      mixSeconds, identity: id2(), now: (mixSeconds * 1000) / 2, bg: '#ffffff',
-      lastResolved: fakeResolved([mkItem()]),
-    }));
+    const mid = m.update(
+      baseInput({
+        mixSeconds,
+        identity: id2(),
+        now: (mixSeconds * 1000) / 2,
+        bg: '#ffffff',
+        lastResolved: fakeResolved([mkItem()]),
+      }),
+    );
     assert.equal(mid.injecting, true, `still injecting at half of ${mixSeconds}s`);
     assert.ok(mid.t > 0.4 && mid.t < 0.6, `t tracks the slider, got ${mid.t}`);
     // …and done only when the slider's duration elapses, never before.
-    const done = m.update(baseInput({
-      mixSeconds, identity: id2(), now: mixSeconds * 1000, bg: '#ffffff',
-      lastResolved: fakeResolved([mkItem()]),
-    }));
+    const done = m.update(
+      baseInput({
+        mixSeconds,
+        identity: id2(),
+        now: mixSeconds * 1000,
+        bg: '#ffffff',
+        lastResolved: fakeResolved([mkItem()]),
+      }),
+    );
     assert.equal(done.injecting, false, `complete exactly at ${mixSeconds}s`);
   }
 });
 
-ok('applyInject: old colors hold until each agent\'s seeded delay, then lerp', () => {
+ok("applyInject: old colors hold until each agent's seeded delay, then lerp", () => {
   const m = createTintInject();
-  const oldItems = fakeResolved([mkItem('#111111', '#222222'), mkItem('#111111', '#222222'), mkItem('#111111', '#222222')]);
+  const oldItems = fakeResolved([
+    mkItem('#111111', '#222222'),
+    mkItem('#111111', '#222222'),
+    mkItem('#111111', '#222222'),
+  ]);
   m.update(baseInput({ lastResolved: oldItems }));
-  const newItems = fakeResolved([mkItem('#eeeeee', '#dddddd'), mkItem('#eeeeee', '#dddddd'), mkItem('#eeeeee', '#dddddd')]);
+  const newItems = fakeResolved([
+    mkItem('#eeeeee', '#dddddd'),
+    mkItem('#eeeeee', '#dddddd'),
+    mkItem('#eeeeee', '#dddddd'),
+  ]);
   const ev = m.update(baseInput({ identity: id2(), now: 0, bg: '#ffffff', lastResolved: oldItems }));
   assert.equal(ev.injecting, true);
 
@@ -163,7 +232,11 @@ ok('applyInject: old colors hold until each agent\'s seeded delay, then lerp', (
   }
 
   // t=1: everything adopted — the resolver's new-palette colors stand
-  const newItems2 = fakeResolved([mkItem('#eeeeee', '#dddddd'), mkItem('#eeeeee', '#dddddd'), mkItem('#eeeeee', '#dddddd')]);
+  const newItems2 = fakeResolved([
+    mkItem('#eeeeee', '#dddddd'),
+    mkItem('#eeeeee', '#dddddd'),
+    mkItem('#eeeeee', '#dddddd'),
+  ]);
   applyInject(newItems2, { ...ev, t: 1 });
   for (const it of newItems2[0].items) {
     assert.equal(it.color, '#eeeeee');
@@ -181,8 +254,7 @@ ok('applyInject never touches geometry — no asset changes size, ever', () => {
   for (const t of [0, 0.3, 0.7, 0.999]) {
     applyInject(fakeResolved(items), { ...ev, t });
     items.forEach((it, i) => {
-      assert.deepEqual([it.x, it.y, it.scaleX, it.scaleY, it.rotation], before[i],
-        `geometry untouched at t=${t}`);
+      assert.deepEqual([it.x, it.y, it.scaleX, it.scaleY, it.rotation], before[i], `geometry untouched at t=${t}`);
     });
   }
 });
@@ -214,12 +286,16 @@ ok('colorMap snapshots per-item colors; paletteIdentity is content-based', () =>
 ok('rapid re-tap re-bases from displayed colors instead of stacking', () => {
   const m = createTintInject();
   m.update(baseInput({ lastResolved: fakeResolved([mkItem('#111111', '#111111')]) }));
-  const ev1 = m.update(baseInput({ identity: id2(), now: 0, bg: '#333333', lastResolved: fakeResolved([mkItem('#111111', '#111111')]) }));
+  const ev1 = m.update(
+    baseInput({ identity: id2(), now: 0, bg: '#333333', lastResolved: fakeResolved([mkItem('#111111', '#111111')]) }),
+  );
   assert.equal(ev1.injecting, true);
   // Mid-inject the user taps again: the new inject starts from the displayed
   // (mid-inject) colors, not the original palette.
   const midItems = fakeResolved([mkItem('#777777', '#777777')]);
-  const ev2 = m.update(baseInput({ identity: paletteIdentity('p3', null, null), now: 500, bg: '#999999', lastResolved: midItems }));
+  const ev2 = m.update(
+    baseInput({ identity: paletteIdentity('p3', null, null), now: 500, bg: '#999999', lastResolved: midItems }),
+  );
   assert.equal(ev2.injecting, true);
   assert.equal(ev2.t, 0, 're-tap restarts the clock');
   const check = fakeResolved([mkItem('#bbbbbb', '#bbbbbb')]);

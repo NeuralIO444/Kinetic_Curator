@@ -12,8 +12,12 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 function layer(id, over = {}) {
   return {
-    id, name: id, visible: true, type: 'content',
-    layerBlendMode: 'normal', layerOpacity: 1,
+    id,
+    name: id,
+    visible: true,
+    type: 'content',
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
     patch: { mode: 'off', to: null, strength: 0.16 },
     ...over,
   };
@@ -56,11 +60,12 @@ function pts(out, id = 'lyr-a') {
 
 test('#822 life-drift phase survives hide → show (no reset to t=0)', () => {
   const lp = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 12, displacement: 0, lifeDrift: 1 };
-  const mk = (visible, loopTimeMs) => input({
-    layoutParams: lp,
-    loopTimeMs,
-    layers: [layer('lyr-a', { visible })],
-  });
+  const mk = (visible, loopTimeMs) =>
+    input({
+      layoutParams: lp,
+      loopTimeMs,
+      layers: [layer('lyr-a', { visible })],
+    });
   const held = createLiveResolver();
   held.resolveLayers(mk(true, 0));
   held.resolveLayers(mk(true, 1000));
@@ -104,10 +109,7 @@ test('#822 FIELD/FEED with a hidden partner do not hop', () => {
 
   for (const mode of ['field', 'feed']) {
     const r = createLiveResolver();
-    const layers = [
-      layer('lyr-a', { patch: { mode, to: 'lyr-b', strength: 1 } }),
-      layer('lyr-b', { visible: false }),
-    ];
+    const layers = [layer('lyr-a', { patch: { mode, to: 'lyr-b', strength: 1 } }), layer('lyr-b', { visible: false })];
     r.resolveLayers(input({ loopTimeMs: 0, layers }));
     const shown = pts(r.resolveLayers(input({ loopTimeMs: 32, layers })));
     r.dispose();
@@ -118,11 +120,12 @@ test('#822 FIELD/FEED with a hidden partner do not hop', () => {
 test('#822 FEED slot survives hide → show (re-show reads the same partner, not a recycled slot)', () => {
   const patch = { mode: 'feed', to: 'lyr-a', strength: 1 };
   const layers = [layer('lyr-a'), layer('lyr-b', { patch })];
-  const mk = (bVisible, loopTimeMs) => input({
-    loopTimeMs,
-    dtSec: 1 / 60,
-    layers: layers.map((l) => (l.id === 'lyr-b' ? { ...l, visible: bVisible } : l)),
-  });
+  const mk = (bVisible, loopTimeMs) =>
+    input({
+      loopTimeMs,
+      dtSec: 1 / 60,
+      layers: layers.map((l) => (l.id === 'lyr-b' ? { ...l, visible: bVisible } : l)),
+    });
 
   const held = createLiveResolver();
   held.resolveLayers(mk(true, 0));

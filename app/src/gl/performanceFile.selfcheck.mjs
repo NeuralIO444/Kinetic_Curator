@@ -5,8 +5,18 @@ import assert from 'node:assert/strict';
 import { createLiveResolver } from './liveResolve.mjs';
 import { withResolveTap, setResolveTap, setResolveOutputTap } from './resolveTap.mjs';
 import {
-  createPerformanceRecorder, verifyPerformance, checkPerformance, packPerformance, unpackPerformance, frameHash, createHashChain,
-  PerformanceFileError, PERFORMANCE_FORMAT, PERFORMANCE_VERSION, CHECKPOINT_EVERY, MACHINE_KEYS,
+  createPerformanceRecorder,
+  verifyPerformance,
+  checkPerformance,
+  packPerformance,
+  unpackPerformance,
+  frameHash,
+  createHashChain,
+  PerformanceFileError,
+  PERFORMANCE_FORMAT,
+  PERFORMANCE_VERSION,
+  CHECKPOINT_EVERY,
+  MACHINE_KEYS,
 } from './performanceFile.mjs';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -23,10 +33,18 @@ import { defaultPattern } from '../state/patternTrack.js';
   assert.notEqual(frameHash({ a: 'bc' }), frameHash({ ab: 'c' }), 'keys and values do not run together');
   assert.notEqual(frameHash([NaN]), frameHash([0]), 'NaN is a value');
   // the chain: one differing frame ANYWHERE changes every later value
-  const run = (alter) => { const c = createHashChain(); for (let f = 0; f < 50; f++) c.push(mk(f === alter ? 9 : f)); return c.value(); };
+  const run = (alter) => {
+    const c = createHashChain();
+    for (let f = 0; f < 50; f++) c.push(mk(f === alter ? 9 : f));
+    return c.value();
+  };
   assert.equal(run(-1), run(-1));
   for (const f of [0, 17, 49]) assert.notEqual(run(f), run(-1), `a change at frame ${f} changes the chain`);
-  const order = (seq) => { const c = createHashChain(); for (const v of seq) c.push(mk(v)); return c.value(); };
+  const order = (seq) => {
+    const c = createHashChain();
+    for (const v of seq) c.push(mk(v));
+    return c.value();
+  };
   assert.notEqual(order([1, 2]), order([2, 1]), 'frame order is part of the chain');
 }
 
@@ -35,17 +53,46 @@ const DT_MS = [16.7, 16.7, 33.3, 8, 16.7, 50, 16.7, 12.5];
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
 // counts above the 'performance' tier's caps (180 nodes / 100 particles), so the governor's shedding is real here
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 300, particleCount: 150, ...over });
-const snap = (seed, over = {}) => ({ seed, paletteId: 'bone', paletteOverrides: null, layoutParams: lp(over), caGrid: null, enabledAssets: null });
+const snap = (seed, over = {}) => ({
+  seed,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  layoutParams: lp(over),
+  caGrid: null,
+  enabledAssets: null,
+});
 
 function session(frames, opts = {}) {
   // the store keeps objects stable between edits; build the stream the same way
   const stable = {
-    canvasW: 1000, canvasH: 700,
-    layers: [L('lyr-a'), L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }), L('fx', { type: 'fx' }), L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })],
-    activeLayerId: 'lyr-a', layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) }, seed: 1234, seedOffsets: null,
-    paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
-    customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1,
-    alphaBoost: 0, effectiveScaleY: undefined, phraseWrapGen: 0, reducedMotion: false,
+    canvasW: 1000,
+    canvasH: 700,
+    layers: [
+      L('lyr-a'),
+      L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }),
+      L('fx', { type: 'fx' }),
+      L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) }),
+    ],
+    activeLayerId: 'lyr-a',
+    layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) },
+    seed: 1234,
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    perfClampOverride: null,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScaleY: undefined,
+    phraseWrapGen: 0,
+    reducedMotion: false,
   };
   let params = lp({ mode: 'swarm', behave: 'scatter' });
   const recorder = createPerformanceRecorder(opts);
@@ -69,9 +116,12 @@ function session(frames, opts = {}) {
       effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
       attractor: f % 40 < 20 ? { x: 400 + (f % 7), y: 300, strength: 1 } : null,
       // this machine's governor sheds detail for a while
-      quality: f > 100 && f < 200 ? 'performance' : 'balanced', perfTier1: f > 110 && f < 190, assetThin: f > 115 && f < 185,
+      quality: f > 100 && f < 200 ? 'performance' : 'balanced',
+      perfTier1: f > 110 && f < 190,
+      assetThin: f > 115 && f < 185,
       slowRender: f > 250 && f < 256,
-      loopTimeMs: t, dtSec: dt / 1000,
+      loopTimeMs: t,
+      dtSec: dt / 1000,
     });
     liveChain.push(out);
     liveHashes.push(liveChain.value());
@@ -88,9 +138,14 @@ function session(frames, opts = {}) {
   assert.equal(perf.format, PERFORMANCE_FORMAT);
   assert.equal(perf.version, PERFORMANCE_VERSION);
   assert.equal(perf.kernelVersion, KERNEL_VERSION);
-  assert.equal(perf.frames, 361, 'the take ends on its last checkpoint (frame 360), so every frame in it is verifiable');
+  assert.equal(
+    perf.frames,
+    361,
+    'the take ends on its last checkpoint (frame 360), so every frame in it is verifiable',
+  );
   assert.equal(perf.checkpoints.length, 7);
-  for (const c of perf.checkpoints) assert.equal(c.hash, liveHashes[c.frame], `checkpoint ${c.frame} is the live run's chain over every frame so far`);
+  for (const c of perf.checkpoints)
+    assert.equal(c.hash, liveHashes[c.frame], `checkpoint ${c.frame} is the live run's chain over every frame so far`);
 
   const bytes = await packPerformance(perf); // export: this is the file
   assert.ok(bytes instanceof Uint8Array && bytes[0] === 0x1f && bytes[1] === 0x8b, 'gzip bytes');
@@ -98,9 +153,14 @@ function session(frames, opts = {}) {
   assert.deepEqual(back, JSON.parse(JSON.stringify(perf)), 'the file round-trips');
 
   const v = verifyPerformance(back); // replay through a fresh resolver
-  assert.deepEqual(v, { ok: true, frames: 361, checked: 7, firstMismatchFrame: null, kernelMismatch: false },
-    'replay lands on every checkpoint of the live run');
-  console.log(`performanceFile: EXIT MET — a ${perf.frames}-frame live session exports to ${bytes.length} bytes, imports, and replays to all ${v.checked} checkpoints`);
+  assert.deepEqual(
+    v,
+    { ok: true, frames: 361, checked: 7, firstMismatchFrame: null, kernelMismatch: false },
+    'replay lands on every checkpoint of the live run',
+  );
+  console.log(
+    `performanceFile: EXIT MET — a ${perf.frames}-frame live session exports to ${bytes.length} bytes, imports, and replays to all ${v.checked} checkpoints`,
+  );
 }
 
 // 3. it is the recorded machine state that makes verification exact, and the file says which keys those are
@@ -117,26 +177,47 @@ function session(frames, opts = {}) {
     if ('assetThin' in step.k) step.k.assetThin = false;
   }
   const v = verifyPerformance(stronger);
-  assert.equal(v.ok, false, 'per-machine detail really changes the frames (which is the point of playing on a stronger machine)');
-  assert.equal(v.firstMismatchFrame, 120, 'and the difference shows at the first checkpoint inside the stretch where the governor shed detail');
+  assert.equal(
+    v.ok,
+    false,
+    'per-machine detail really changes the frames (which is the point of playing on a stronger machine)',
+  );
+  assert.equal(
+    v.firstMismatchFrame,
+    120,
+    'and the difference shows at the first checkpoint inside the stretch where the governor shed detail',
+  );
 }
 
 // 4. tampering is caught, at the first checkpoint after it
 {
   const { perf } = session(300);
   const forged = JSON.parse(JSON.stringify(perf));
-  const i = forged.inputs.steps.findIndex((s, f) => f > 70 && f % CHECKPOINT_EVERY !== 0 && s.k && Array.isArray(s.k.effectiveScale));
+  const i = forged.inputs.steps.findIndex(
+    (s, f) => f > 70 && f % CHECKPOINT_EVERY !== 0 && s.k && Array.isArray(s.k.effectiveScale),
+  );
   forged.inputs.steps[i].k.effectiveScale[1] += 0.01;
   const v = verifyPerformance(forged);
   assert.equal(v.ok, false);
-  assert.equal(v.firstMismatchFrame, Math.ceil(i / CHECKPOINT_EVERY) * CHECKPOINT_EVERY, 'named at the first checkpoint at or after the edit');
-  assert.ok(i % CHECKPOINT_EVERY !== 0, 'the edited frame was BETWEEN checkpoints: a one-frame change cannot hide (the chain covers every frame)');
+  assert.equal(
+    v.firstMismatchFrame,
+    Math.ceil(i / CHECKPOINT_EVERY) * CHECKPOINT_EVERY,
+    'named at the first checkpoint at or after the edit',
+  );
+  assert.ok(
+    i % CHECKPOINT_EVERY !== 0,
+    'the edited frame was BETWEEN checkpoints: a one-frame change cannot hide (the chain covers every frame)',
+  );
 }
 
 // 5. fail-closed: nothing malformed is ever called a performance
 {
   const { perf } = session(130);
-  const bad = (mut, re) => assert.throws(() => checkPerformance(mut), (e) => e instanceof PerformanceFileError && re.test(e.message));
+  const bad = (mut, re) =>
+    assert.throws(
+      () => checkPerformance(mut),
+      (e) => e instanceof PerformanceFileError && re.test(e.message),
+    );
   bad(null, /not a performance/);
   bad({ ...perf, format: 'kc-session-log' }, /unknown format/);
   bad({ ...perf, version: 1 }, /unsupported version/);
@@ -146,9 +227,15 @@ function session(frames, opts = {}) {
   bad({ ...perf, frames: perf.frames + 1 }, /header says/);
   bad({ ...perf, inputs: { version: 9, steps: [] } }, /input log/);
   await assert.rejects(() => unpackPerformance(new Uint8Array([1, 2, 3, 4])), PerformanceFileError, 'garbage bytes');
-  const notJson = await new Response(new Blob(['{nope']).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer();
+  const notJson = await new Response(
+    new Blob(['{nope']).stream().pipeThrough(new CompressionStream('gzip')),
+  ).arrayBuffer();
   await assert.rejects(() => unpackPerformance(new Uint8Array(notJson)), /not valid JSON/);
-  assert.equal(verifyPerformance({ ...perf, kernelVersion: 'kernel.v0' }).kernelMismatch, true, 'another kernel version is flagged, not hidden');
+  assert.equal(
+    verifyPerformance({ ...perf, kernelVersion: 'kernel.v0' }).kernelMismatch,
+    true,
+    'another kernel version is flagged, not hidden',
+  );
   assert.throws(() => createPerformanceRecorder().finish(), /nothing recorded/);
 }
 
@@ -167,9 +254,15 @@ function session(frames, opts = {}) {
   const bytes = await packPerformance(perf);
   const raw = JSON.stringify(perf).length;
   const kib = bytes.length / 1024;
-  console.log(`  [info] 1 minute (${perf.frames} frames): ${kib.toFixed(0)} KiB gzipped (${(raw / 1024).toFixed(0)} KiB of JSON, ${(raw / bytes.length).toFixed(1)}x)`);
+  console.log(
+    `  [info] 1 minute (${perf.frames} frames): ${kib.toFixed(0)} KiB gzipped (${(raw / 1024).toFixed(0)} KiB of JSON, ${(raw / bytes.length).toFixed(1)}x)`,
+  );
   assert.ok(kib < 300, `a minute stays under 300 KiB gzipped (got ${kib.toFixed(0)})`);
-  assert.equal(verifyPerformance(await unpackPerformance(bytes)).ok, true, 'and a full minute replays to every checkpoint');
+  assert.equal(
+    verifyPerformance(await unpackPerformance(bytes)).ok,
+    true,
+    'and a full minute replays to every checkpoint',
+  );
 }
 
 // 8. #1367 — a take that begins mid-session: the initialState section (snapshot + chain seed) verifies
@@ -177,28 +270,55 @@ function session(frames, opts = {}) {
   // Drive one resolver directly, feeding two recorders the same frames: A from launch, B from a snapshot
   // boundary at frame 60, its chain seeded with A's chain value at that boundary.
   const stable = {
-    canvasW: 1000, canvasH: 700,
-    layers: [L('lyr-a'), L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }), L('fx', { type: 'fx' }), L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })],
-    activeLayerId: 'lyr-a', layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) }, seed: 1234, seedOffsets: null,
-    paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
-    customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1,
-    alphaBoost: 0, effectiveScaleY: undefined, phraseWrapGen: 0, reducedMotion: false,
+    canvasW: 1000,
+    canvasH: 700,
+    layers: [
+      L('lyr-a'),
+      L('lyr-b', { patch: { mode: 'field', to: 'lyr-a', strength: 1 } }),
+      L('fx', { type: 'fx' }),
+      L('p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) }),
+    ],
+    activeLayerId: 'lyr-a',
+    layerSnapshots: { 'lyr-b': snap(999, { mode: 'poisson', count: 24 }) },
+    seed: 1234,
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    perfClampOverride: null,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScaleY: undefined,
+    phraseWrapGen: 0,
+    reducedMotion: false,
   };
   let params = lp({ mode: 'swarm', behave: 'scatter' });
   const resolver = createLiveResolver();
   const a = createPerformanceRecorder({ checkpointEvery: 10 });
   let b = null;
   let t = 0;
-  const FRAMES = 130, AT = 60;
+  const FRAMES = 130,
+    AT = 60;
   for (let f = 0; f < FRAMES; f++) {
     const dt = DT_MS[f % DT_MS.length];
     t += dt;
     if (f === 90) params = { ...params, count: 320 };
     const input = {
-      ...stable, layoutParams: params, seed: 1234,
-      effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)], effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
+      ...stable,
+      layoutParams: params,
+      seed: 1234,
+      effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)],
+      effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
       attractor: f % 40 < 20 ? { x: 400 + (f % 7), y: 300, strength: 1 } : null,
-      loopTimeMs: t, dtSec: dt / 1000,
+      loopTimeMs: t,
+      dtSec: dt / 1000,
     };
     if (f === AT) {
       b = createPerformanceRecorder({
@@ -206,9 +326,11 @@ function session(frames, opts = {}) {
         initialState: { atFrame: AT, chainSeed: a.chainValue(), snapshot: resolver.snapshotState() },
       });
     }
-    a.onInput(input); if (b) b.onInput(input);
+    a.onInput(input);
+    if (b) b.onInput(input);
     const out = resolver.resolveLayers(input);
-    a.onOutput(out); if (b) b.onOutput(out);
+    a.onOutput(out);
+    if (b) b.onOutput(out);
   }
   resolver.dispose();
 
@@ -232,7 +354,8 @@ function session(frames, opts = {}) {
   assert.equal(verifyPerformance(backB).ok, true, 'the mid-session take verifies after a file round-trip');
   // a wrong seed is caught at B's first checkpoint
   const badSeed = JSON.parse(JSON.stringify(perfB));
-  badSeed.initialState.chainSeed = (badSeed.initialState.chainSeed[0] === '0' ? '1' : '0') + badSeed.initialState.chainSeed.slice(1);
+  badSeed.initialState.chainSeed =
+    (badSeed.initialState.chainSeed[0] === '0' ? '1' : '0') + badSeed.initialState.chainSeed.slice(1);
   const vBad = verifyPerformance(badSeed);
   assert.equal(vBad.ok, false);
   assert.equal(vBad.firstMismatchFrame, 0, 'a wrong seed fails at the first checkpoint');
@@ -242,10 +365,37 @@ function session(frames, opts = {}) {
   forged.initialState.snapshot.swarm[layerId].system.cols.x.b64 = 'AAAA';
   assert.throws(() => verifyPerformance(forged), /refused/, 'a tampered snapshot refuses verification');
   // malformed sections are refused at validation, and the recorder refuses one up front
-  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: -1, chainSeed: perfB.initialState.chainSeed, snapshot: perfB.initialState.snapshot } }), /atFrame/);
-  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot } }), /chainSeed/);
-  assert.throws(() => checkPerformance({ ...perfB, initialState: { atFrame: AT, chainSeed: perfB.initialState.chainSeed, snapshot: null } }), /snapshot/);
-  assert.throws(() => createPerformanceRecorder({ initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot } }), /chainSeed/);
+  assert.throws(
+    () =>
+      checkPerformance({
+        ...perfB,
+        initialState: { atFrame: -1, chainSeed: perfB.initialState.chainSeed, snapshot: perfB.initialState.snapshot },
+      }),
+    /atFrame/,
+  );
+  assert.throws(
+    () =>
+      checkPerformance({
+        ...perfB,
+        initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot },
+      }),
+    /chainSeed/,
+  );
+  assert.throws(
+    () =>
+      checkPerformance({
+        ...perfB,
+        initialState: { atFrame: AT, chainSeed: perfB.initialState.chainSeed, snapshot: null },
+      }),
+    /snapshot/,
+  );
+  assert.throws(
+    () =>
+      createPerformanceRecorder({
+        initialState: { atFrame: AT, chainSeed: 'xyz', snapshot: perfB.initialState.snapshot },
+      }),
+    /chainSeed/,
+  );
   console.log('  [ok] #1367 mid-session take: snapshot + seeded chain verifies, round-trips, and fails closed');
 }
 

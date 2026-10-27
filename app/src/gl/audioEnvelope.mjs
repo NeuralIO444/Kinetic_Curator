@@ -12,8 +12,8 @@
 // resampling, no GPU pass and nothing in the live frame budget. The per-frame
 // scalar modulation it feeds is already declared as 'audio/modulation' (tier 0,
 // accum.mjs); a second declaration here would double-count it.
-import { existsSync, readFileSync } from "node:fs";
-import { AUDIO_SCHEMA, parseAudioEnvelope, sampleEnvelope, envelopeTick } from "./audioEnvelopeCore.mjs";
+import { existsSync, readFileSync } from 'node:fs';
+import { AUDIO_SCHEMA, parseAudioEnvelope, sampleEnvelope, envelopeTick } from './audioEnvelopeCore.mjs';
 
 // Parse + sampling live in audioEnvelopeCore.mjs (browser-safe, shared with the
 // live STIMULI file source, #618); this file keeps the node:fs loader.
@@ -24,19 +24,19 @@ export { AUDIO_SCHEMA, parseAudioEnvelope, sampleEnvelope, envelopeTick };
 export function loadAudioEnvelope(path) {
   let raw;
   try {
-    raw = JSON.parse(readFileSync(path, "utf8"));
+    raw = JSON.parse(readFileSync(path, 'utf8'));
   } catch (err) {
     process.stderr.write(
-      `[accumStill] cannot read --audio sidecar ${path}: ${err.message} — continuing without audio\n`
+      `[accumStill] cannot read --audio sidecar ${path}: ${err.message} — continuing without audio\n`,
     );
     return null;
   }
   const { env, problem, note } = parseAudioEnvelope(raw);
   if (!env) {
     process.stderr.write(
-      problem === "no-frames"
+      problem === 'no-frames'
         ? `[accumStill] --audio sidecar ${path} has no frames[] (schema ${AUDIO_SCHEMA}) — continuing without audio\n`
-        : `[accumStill] --audio sidecar ${path} has no usable frames — continuing without audio\n`
+        : `[accumStill] --audio sidecar ${path} has no usable frames — continuing without audio\n`,
     );
     return null;
   }

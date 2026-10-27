@@ -68,8 +68,13 @@ void main() {
 }`;
 
 export const COALESCE_PROGRAMS = [
-  { key: 'fuse', name: 'dish-coalesce/fuse', fs: COALESCE_FS, fsFile: 'coalesceFinish.mjs:COALESCE_FS',
-    uniforms: ['u_src', 'u_scene', 'u_count', 'u_fields', 'u_colors'] },
+  {
+    key: 'fuse',
+    name: 'dish-coalesce/fuse',
+    fs: COALESCE_FS,
+    fsFile: 'coalesceFinish.mjs:COALESCE_FS',
+    uniforms: ['u_src', 'u_scene', 'u_count', 'u_fields', 'u_colors'],
+  },
 ];
 
 /**
@@ -101,13 +106,17 @@ export function createCoalesceFinish(gl, { buildProgram, drawFullscreen, bindTex
     const fb = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('[gl] dish-coalesce framebuffer incomplete');
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+      throw new Error('[gl] dish-coalesce framebuffer incomplete');
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return { tex, fb, w, h };
   }
   function ensureOut(w, h) {
     if (out && out.w === w && out.h === h) return out;
-    if (out) { gl.deleteTexture(out.tex); gl.deleteFramebuffer(out.fb); }
+    if (out) {
+      gl.deleteTexture(out.tex);
+      gl.deleteFramebuffer(out.fb);
+    }
     out = makeOut(w, h);
     return out;
   }
@@ -151,7 +160,11 @@ export function createCoalesceFinish(gl, { buildProgram, drawFullscreen, bindTex
   }
 
   function dispose() {
-    if (out) { gl.deleteTexture(out.tex); gl.deleteFramebuffer(out.fb); out = null; }
+    if (out) {
+      gl.deleteTexture(out.tex);
+      gl.deleteFramebuffer(out.fb);
+      out = null;
+    }
     for (const p of Object.values(progs)) gl.deleteProgram(p);
   }
 

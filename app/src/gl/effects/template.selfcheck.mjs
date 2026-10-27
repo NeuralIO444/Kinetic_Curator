@@ -28,7 +28,11 @@ import {
 import { TEMPLATE_EXAMPLES } from './examples.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const parseUniforms = (src) => {
   const names = [];
@@ -42,7 +46,9 @@ const parseUniforms = (src) => {
 function makeMockGl() {
   const calls = [];
   let nextId = 1;
-  const call = (name, ...args) => { calls.push({ name, args }); };
+  const call = (name, ...args) => {
+    calls.push({ name, args });
+  };
   const shaders = new Map();
   const attached = new Map();
   const activeNames = (p) => {
@@ -51,15 +57,28 @@ function makeMockGl() {
     return fs ? parseUniforms(fs.src) : [];
   };
   const gl = {
-    VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82, ACTIVE_UNIFORMS: 0x8b86,
-    TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0, FRAMEBUFFER: 0x8d40,
-    COLOR_ATTACHMENT0: 0x8ce0, FRAMEBUFFER_COMPLETE: 0x8cd5,
-    RGBA16F: 0x881a, RGBA: 0x1908, HALF_FLOAT: 0x140b,
-    CLAMP_TO_EDGE: 0x812f, TEXTURE_MIN_FILTER: 0x2801,
-    TEXTURE_MAG_FILTER: 0x2800, NEAREST: 0x2600,
-    ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88e4, FLOAT: 0x1406,
-    TRIANGLES: 0x0004, BLEND: 0x0be2,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    ACTIVE_UNIFORMS: 0x8b86,
+    TEXTURE_2D: 0x0de1,
+    TEXTURE0: 0x84c0,
+    FRAMEBUFFER: 0x8d40,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    RGBA16F: 0x881a,
+    RGBA: 0x1908,
+    HALF_FLOAT: 0x140b,
+    CLAMP_TO_EDGE: 0x812f,
+    TEXTURE_MIN_FILTER: 0x2801,
+    TEXTURE_MAG_FILTER: 0x2800,
+    NEAREST: 0x2600,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    FLOAT: 0x1406,
+    TRIANGLES: 0x0004,
+    BLEND: 0x0be2,
     calls,
     count: (name) => calls.filter((c) => c.name === name).length,
     withName: (name) => calls.filter((c) => c.name === name),
@@ -69,30 +88,53 @@ function makeMockGl() {
       shaders.set(s, s);
       return s;
     },
-    shaderSource: (s, src) => { shaders.get(s).src = src; call('shaderSource'); },
+    shaderSource: (s, src) => {
+      shaders.get(s).src = src;
+      call('shaderSource');
+    },
     compileShader: (s) => call('compileShader'),
     getShaderParameter: () => true,
     getShaderInfoLog: () => '',
     deleteShader: (s) => call('deleteShader'),
-    createProgram: () => { call('createProgram'); const p = { __p: nextId++ }; attached.set(p, []); return p; },
-    attachShader: (p, s) => { attached.get(p).push(s); call('attachShader'); },
+    createProgram: () => {
+      call('createProgram');
+      const p = { __p: nextId++ };
+      attached.set(p, []);
+      return p;
+    },
+    attachShader: (p, s) => {
+      attached.get(p).push(s);
+      call('attachShader');
+    },
     linkProgram: (p) => call('linkProgram'),
     getProgramParameter: (p, pname) => (pname === gl.ACTIVE_UNIFORMS ? activeNames(p).length : true),
     getActiveUniform: (p, i) => ({ name: activeNames(p)[i] }),
     getProgramInfoLog: () => '',
     deleteProgram: (p) => call('deleteProgram'),
-    getUniformLocation: (p, uname) => { call('getUniformLocation', uname); return { __loc: uname }; },
-    createTexture: () => { call('createTexture'); return { __t: nextId++ }; },
+    getUniformLocation: (p, uname) => {
+      call('getUniformLocation', uname);
+      return { __loc: uname };
+    },
+    createTexture: () => {
+      call('createTexture');
+      return { __t: nextId++ };
+    },
     bindTexture: (t, x) => call('bindTexture', x),
     texImage2D: (...a) => call('texImage2D', a[3], a[4]),
     texParameteri: () => call('texParameteri'),
     deleteTexture: (x) => call('deleteTexture', x),
-    createFramebuffer: () => { call('createFramebuffer'); return { __f: nextId++ }; },
+    createFramebuffer: () => {
+      call('createFramebuffer');
+      return { __f: nextId++ };
+    },
     bindFramebuffer: (t, x) => call('bindFramebuffer', x),
     framebufferTexture2D: () => call('framebufferTexture2D'),
     checkFramebufferStatus: () => gl.FRAMEBUFFER_COMPLETE,
     deleteFramebuffer: (x) => call('deleteFramebuffer', x),
-    createBuffer: () => { call('createBuffer'); return { __b: nextId++ }; },
+    createBuffer: () => {
+      call('createBuffer');
+      return { __b: nextId++ };
+    },
     bindBuffer: (t, x) => call('bindBuffer', x),
     bufferData: () => call('bufferData'),
     deleteBuffer: (x) => call('deleteBuffer', x),
@@ -113,8 +155,10 @@ function makeMockGl() {
 }
 
 const mockCanvas = () => ({
-  width: 400, height: 280,
-  addEventListener() {}, removeEventListener() {},
+  width: 400,
+  height: 280,
+  addEventListener() {},
+  removeEventListener() {},
 });
 
 function makeTemplateBridge(gl) {
@@ -186,7 +230,8 @@ ok('controlSpecs describe panel controls with no per-effect code', () => {
     { name: 'levels', ui: 'slider', min: 2, max: 8, def: 4 },
   );
   const all = validateDescriptor('a', {
-    label: 'All', params: {
+    label: 'All',
+    params: {
       on: { type: 'bool', label: 'On', def: true },
       tint: { type: 'color', label: 'Tint', def: [1, 0, 0, 1] },
       off: { type: 'vec2', label: 'Offset', min: -10, max: 10, def: [0, 0] },
@@ -212,11 +257,16 @@ ok('registration wires effects into the bridge with zero runner changes', () => 
     assert.deepEqual(getTemplateEffect(kind).warnings, [], `${kind}: no audit warnings`);
   }
   const L = bridge.layer('fx1');
-  const out = bridge.runChain('fx1', L.t0, [
-    { kind: 'tmplPoster', params: { levels: 3 } },
-    { kind: 'tmplGrain', params: { amount: 0.7 } },
-    { kind: 'tmplInvert', params: {} },
-  ], { time: 1.5 });
+  const out = bridge.runChain(
+    'fx1',
+    L.t0,
+    [
+      { kind: 'tmplPoster', params: { levels: 3 } },
+      { kind: 'tmplGrain', params: { amount: 0.7 } },
+      { kind: 'tmplInvert', params: {} },
+    ],
+    { time: 1.5 },
+  );
   assert.ok(out === L.t1 || out === L.t0, 'chain returns a bridge-owned target');
   // Param -> uniform binding with the template's naming convention.
   const iLevels = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_levels');
@@ -256,7 +306,10 @@ ok('uniform uploads are dirty-checked across frames', () => {
   bridge.runChain('fx1', L.t0, steps, { time: 1 });
   assert.equal(gl.count('uniform1i'), n1, 'identical frame uploads nothing');
   bridge.runChain('fx1', L.t0, [{ kind: 'tmplPoster', params: { levels: 6 } }], { time: 1 });
-  const last = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_levels').pop();
+  const last = gl
+    .withName('uniform1i')
+    .filter((c) => c.args[0] === 'u_levels')
+    .pop();
   assert.equal(last.args[1], 6, 'changed param re-uploads');
 });
 
@@ -281,34 +334,33 @@ ok('uniform audit fails closed at load on a typo', () => {
   const bridge = createBridge(gl, mockCanvas(), { width: 400, height: 280, dpr: 1 });
   const [, grainDef] = TEMPLATE_EXAMPLES[2];
   assert.throws(
-    () => registerTemplateEffect(bridge, gl, 'typo', {
-      fs: grainDef.fs, // declares u_amount...
-      descriptor: {
-        ...grainDef.descriptor,
-        params: {
-          // ...but the descriptor renamed it to u_amout's param
-          amout: { type: 'float', label: 'Amount', min: 0, max: 1, def: 0.4, ui: 'slider' },
+    () =>
+      registerTemplateEffect(bridge, gl, 'typo', {
+        fs: grainDef.fs, // declares u_amount...
+        descriptor: {
+          ...grainDef.descriptor,
+          params: {
+            // ...but the descriptor renamed it to u_amout's param
+            amout: { type: 'float', label: 'Amount', min: 0, max: 1, def: 0.4, ui: 'slider' },
+          },
         },
-      },
-      file: 'test:typo',
-    }),
+        file: 'test:typo',
+      }),
     /uniform audit failed.*u_amout/,
     'renamed param surfaces at load, not as silent wrong output',
   );
   assert.throws(
-    () => registerTemplateEffect(bridge, gl, 'stray', {
-      fs: grainDef.fs, // declares u_amount...
-      descriptor: { label: 'Stray', animated: true, params: {} }, // ...but no param claims it
-      file: 'test:stray',
-    }),
+    () =>
+      registerTemplateEffect(bridge, gl, 'stray', {
+        fs: grainDef.fs, // declares u_amount...
+        descriptor: { label: 'Stray', animated: true, params: {} }, // ...but no param claims it
+        file: 'test:stray',
+      }),
     /uniform audit failed.*u_amount/,
     'shader-side stray uniform surfaces at load',
   );
   registerTemplateEffect(bridge, gl, 'tmplInvert', TEMPLATE_EXAMPLES[0][1]);
-  assert.throws(
-    () => registerTemplateEffect(bridge, gl, 'tmplInvert', TEMPLATE_EXAMPLES[0][1]),
-    /already registered/,
-  );
+  assert.throws(() => registerTemplateEffect(bridge, gl, 'tmplInvert', TEMPLATE_EXAMPLES[0][1]), /already registered/);
   __clearTemplateRegistry();
 });
 

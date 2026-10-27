@@ -13,7 +13,15 @@
  * measuredAt: '2026-09-27T17:20:00.028Z'
  */
 export const MEASURED_AT = '2026-09-27T17:20:00.028Z';
-export const MEASURE_METHOD = { w: 512, h: 512, warmup: 8, batches: 3, drawsPerBatch: 30, stat: 'median', params: 'max-contract-case' };
+export const MEASURE_METHOD = {
+  w: 512,
+  h: 512,
+  warmup: 8,
+  batches: 3,
+  drawsPerBatch: 30,
+  stat: 'median',
+  params: 'max-contract-case',
+};
 export const MEASURED_COSTS = {
   'accum/copy': { ms: 0.3, method: 'wall', draws: 90 },
   // #560 LEAVE hold is the copy pass, not a new shader. Same wall number.

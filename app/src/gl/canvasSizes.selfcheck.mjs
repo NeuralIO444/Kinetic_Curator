@@ -29,21 +29,39 @@ function makeMockGL() {
   const loc = () => ({ _loc: nextId++ });
   const gl = {
     // constants
-    TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0, RGBA: 0x1908, RGBA8: 0x8058,
-    RGBA16F: 0x881a, UNSIGNED_BYTE: 0x1401, HALF_FLOAT: 0x140b, FLOAT: 0x1406,
-    COLOR_ATTACHMENT0: 0x8ce0, FRAMEBUFFER: 0x8d40, FRAMEBUFFER_COMPLETE: 0x8cd5,
-    LINEAR: 0x2601, CLAMP_TO_EDGE: 0x812f, COLOR_BUFFER_BIT: 0x4000,
-    VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82, ACTIVE_UNIFORMS: 0x8b86,
-    ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88e4, TRIANGLE_STRIP: 0x0005,
-    BLEND: 0x0be2, ONE: 1, ONE_MINUS_SRC_ALPHA: 0x0303,
-    drawingBufferWidth: 0, drawingBufferHeight: 0,
+    TEXTURE_2D: 0x0de1,
+    TEXTURE0: 0x84c0,
+    RGBA: 0x1908,
+    RGBA8: 0x8058,
+    RGBA16F: 0x881a,
+    UNSIGNED_BYTE: 0x1401,
+    HALF_FLOAT: 0x140b,
+    FLOAT: 0x1406,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER: 0x8d40,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    LINEAR: 0x2601,
+    CLAMP_TO_EDGE: 0x812f,
+    COLOR_BUFFER_BIT: 0x4000,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    ACTIVE_UNIFORMS: 0x8b86,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    TRIANGLE_STRIP: 0x0005,
+    BLEND: 0x0be2,
+    ONE: 1,
+    ONE_MINUS_SRC_ALPHA: 0x0303,
+    drawingBufferWidth: 0,
+    drawingBufferHeight: 0,
     calls,
     // --- uniform introspection for auditProgramChecked: parse the uniforms
     // declared in the attached shader sources so the audit sees the real set.
     _uniformsOf(p) {
       const names = [];
-      for (const sh of (p._shaders || [])) {
+      for (const sh of p._shaders || []) {
         const src = sh._src || '';
         for (const m of src.matchAll(/uniform\s+\w+\s+(\w+)(\s*\[[^\]]*\])?\s*;/g)) {
           names.push(m[2] ? `${m[1]}[0]` : m[1]);
@@ -56,59 +74,117 @@ function makeMockGL() {
       return i < names.length ? { name: names[i], size: 1, type: 0 } : null;
     },
     // textures & targets
-    createTexture() { const t = { id: nextId++ }; calls.push(['createTexture', t.id]); return t; },
-    bindTexture(t, x) { calls.push(['bindTexture', x && x.id]); },
+    createTexture() {
+      const t = { id: nextId++ };
+      calls.push(['createTexture', t.id]);
+      return t;
+    },
+    bindTexture(t, x) {
+      calls.push(['bindTexture', x && x.id]);
+    },
     activeTexture() {},
     texImage2D(t, level, internal, w, h, border, format, type, pixels) {
       calls.push(['texImage2D', w, h]);
     },
     texParameteri() {},
     generateMipmap() {},
-    createFramebuffer() { const f = { id: nextId++ }; calls.push(['createFramebuffer', f.id]); return f; },
-    bindFramebuffer(t, f) { calls.push(['bindFramebuffer', f && f.id]); },
-    framebufferTexture2D() { calls.push(['framebufferTexture2D']); },
-    checkFramebufferStatus() { return gl.FRAMEBUFFER_COMPLETE; },
-    deleteTexture(t) { calls.push(['deleteTexture', t && t.id]); },
-    deleteFramebuffer(f) { calls.push(['deleteFramebuffer', f && f.id]); },
+    createFramebuffer() {
+      const f = { id: nextId++ };
+      calls.push(['createFramebuffer', f.id]);
+      return f;
+    },
+    bindFramebuffer(t, f) {
+      calls.push(['bindFramebuffer', f && f.id]);
+    },
+    framebufferTexture2D() {
+      calls.push(['framebufferTexture2D']);
+    },
+    checkFramebufferStatus() {
+      return gl.FRAMEBUFFER_COMPLETE;
+    },
+    deleteTexture(t) {
+      calls.push(['deleteTexture', t && t.id]);
+    },
+    deleteFramebuffer(f) {
+      calls.push(['deleteFramebuffer', f && f.id]);
+    },
     // shaders & programs
-    createShader(type) { const s = { id: nextId++, _type: type, _src: '' }; return s; },
-    shaderSource(sh, src) { sh._src = String(src); },
+    createShader(type) {
+      const s = { id: nextId++, _type: type, _src: '' };
+      return s;
+    },
+    shaderSource(sh, src) {
+      sh._src = String(src);
+    },
     compileShader() {},
-    getShaderParameter() { return true; },
-    getShaderInfoLog() { return ''; },
+    getShaderParameter() {
+      return true;
+    },
+    getShaderInfoLog() {
+      return '';
+    },
     deleteShader() {},
-    createProgram() { return { id: nextId++, _shaders: [] }; },
-    attachShader(p, sh) { p._shaders.push(sh); },
+    createProgram() {
+      return { id: nextId++, _shaders: [] };
+    },
+    attachShader(p, sh) {
+      p._shaders.push(sh);
+    },
     linkProgram() {},
     getProgramParameter(p, pname) {
       if (pname === gl.ACTIVE_UNIFORMS) return gl._uniformsOf(p).length;
       return true;
     },
-    getProgramInfoLog() { return ''; },
-    deleteProgram(p) { calls.push(['deleteProgram', p && p.id]); },
-    getAttribLocation() { return 0; },
-    getUniformLocation() { return loc(); },
+    getProgramInfoLog() {
+      return '';
+    },
+    deleteProgram(p) {
+      calls.push(['deleteProgram', p && p.id]);
+    },
+    getAttribLocation() {
+      return 0;
+    },
+    getUniformLocation() {
+      return loc();
+    },
     useProgram() {},
-    uniform1i() {}, uniform1f() {}, uniform2f() {}, uniform3f() {}, uniform4f() {},
+    uniform1i() {},
+    uniform1f() {},
+    uniform2f() {},
+    uniform3f() {},
+    uniform4f() {},
     // buffers & draw
-    createBuffer() { return { id: nextId++ }; },
+    createBuffer() {
+      return { id: nextId++ };
+    },
     bindBuffer() {},
     bufferData() {},
-    deleteBuffer(b) { calls.push(['deleteBuffer', b && b.id]); },
+    deleteBuffer(b) {
+      calls.push(['deleteBuffer', b && b.id]);
+    },
     enableVertexAttribArray() {},
     disableVertexAttribArray() {},
     vertexAttribPointer() {},
-    drawArrays(mode, first, count) { calls.push(['drawArrays', count]); },
+    drawArrays(mode, first, count) {
+      calls.push(['drawArrays', count]);
+    },
     // state
     viewport(x, y, w, h) {
       calls.push(['viewport', w, h]);
-      gl.drawingBufferWidth = w; gl.drawingBufferHeight = h;
+      gl.drawingBufferWidth = w;
+      gl.drawingBufferHeight = h;
     },
     clearColor() {},
     clear() {},
-    enable() {}, disable() {}, blendFunc() {},
-    getExtension() { return null; },
-    getError() { return 0; },
+    enable() {},
+    disable() {},
+    blendFunc() {},
+    getExtension() {
+      return null;
+    },
+    getError() {
+      return 0;
+    },
     NO_ERROR: 0,
   };
   return gl;
@@ -163,34 +239,40 @@ export async function runMockChecks() {
 
     // Every allocated texture must be canvas-sized, glow-chain at W/8,
     // or the bridge pair at W/div (div=1 here → canvas-sized).
-    const gw = Math.floor(w / GLOW_DIV), gh = Math.floor(h / GLOW_DIV);
+    const gw = Math.floor(w / GLOW_DIV),
+      gh = Math.floor(h / GLOW_DIV);
     const allowed = new Set([`${w}x${h}`, `${gw}x${gh}`, '1x1']);
     for (const [tw, th] of texSizes(gl)) {
-      assert.ok(allowed.has(`${tw}x${th}`),
-        `${name}: texture ${tw}x${th} not canvas ${w}x${h}, glow ${gw}x${gh}, or the 1x1 curl table`);
+      assert.ok(
+        allowed.has(`${tw}x${th}`),
+        `${name}: texture ${tw}x${th} not canvas ${w}x${h}, glow ${gw}x${gh}, or the 1x1 curl table`,
+      );
       n++;
     }
     // Every viewport must be canvas-sized (begin clears the pair at pair
     // dims = canvas dims here; step draws at canvas dims).
     for (const [vw, vh] of viewports(gl)) {
-      assert.ok(allowed.has(`${vw}x${vh}`),
-        `${name}: viewport ${vw}x${vh} not canvas-sized`);
+      assert.ok(allowed.has(`${vw}x${vh}`), `${name}: viewport ${vw}x${vh} not canvas-sized`);
       n++;
     }
 
     // Resize to the other size: scratch reallocates at the new dims.
     const other = SIZES.find((s) => s.name !== name);
     const before = gl.calls.length;
-    liveSize.w = other.w; liveSize.h = other.h;
+    liveSize.w = other.w;
+    liveSize.h = other.h;
     acc.resize(other.w, other.h);
-    const ogw = Math.floor(other.w / GLOW_DIV), ogh = Math.floor(other.h / GLOW_DIV);
+    const ogw = Math.floor(other.w / GLOW_DIV),
+      ogh = Math.floor(other.h / GLOW_DIV);
     const postCalls = gl.calls.slice(before);
     const postTex = postCalls.filter((c) => c[0] === 'texImage2D').map((c) => [c[1], c[2]]);
     assert.ok(postTex.length > 0, `${name}: resize produced no reallocations`);
     const allowed2 = new Set([`${other.w}x${other.h}`, `${ogw}x${ogh}`, '1x1']);
     for (const [tw, th] of postTex) {
-      assert.ok(allowed2.has(`${tw}x${th}`),
-        `resize: texture ${tw}x${th} not ${other.w}x${other.h}, glow ${ogw}x${ogh}, or the 1x1 curl table`);
+      assert.ok(
+        allowed2.has(`${tw}x${th}`),
+        `resize: texture ${tw}x${th} not ${other.w}x${other.h}, glow ${ogw}x${ogh}, or the 1x1 curl table`,
+      );
       n++;
     }
     acc.dispose();
@@ -219,7 +301,8 @@ export async function runBrowserChecks() {
       assert.strictEqual(still.pixels.length, w * h * 4, `${name}: export pixel buffer size`);
       // Not blank: the corpus doc renders something.
       let lit = 0;
-      for (let i = 0; i < still.pixels.length; i += 4 * 997) lit += still.pixels[i] + still.pixels[i + 1] + still.pixels[i + 2];
+      for (let i = 0; i < still.pixels.length; i += 4 * 997)
+        lit += still.pixels[i] + still.pixels[i + 1] + still.pixels[i + 2];
       assert.ok(lit > 0, `${name}: export rendered blank`);
       n += 4;
       console.log(`canvasSizes.selfcheck: export ${w}x${h} OK`);
@@ -229,10 +312,14 @@ export async function runBrowserChecks() {
       const frames = [];
       for (const progress of [0, 0.5, 1]) {
         const rl = resolveLayers(doc, { caps, motion: 'auto', progress });
-        frames.push(buildSceneContract({
-          doc, resolvedLayers: rl, caps,
-          accum: { enabled: true, fade: 0.9, optics: 0.2, background: '#000000' },
-        }));
+        frames.push(
+          buildSceneContract({
+            doc,
+            resolvedLayers: rl,
+            caps,
+            accum: { enabled: true, fade: 0.9, optics: 0.2, background: '#000000' },
+          }),
+        );
       }
       const acc = await renderAccumViaGL(frames, { width: w, height: h, fade: 0.9, optics: 0.2 });
       assert.strictEqual(acc.width, w, `${name}: accum width ${acc.width} !== ${w}`);
@@ -267,4 +354,8 @@ async function main() {
 }
 
 const isMain = process.argv[1] && import.meta.url === `file://${process.argv[1]}`;
-if (isMain) main().catch((e) => { console.error('canvasSizes.selfcheck FAILED:', e.message); process.exit(1); });
+if (isMain)
+  main().catch((e) => {
+    console.error('canvasSizes.selfcheck FAILED:', e.message);
+    process.exit(1);
+  });

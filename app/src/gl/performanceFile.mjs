@@ -24,7 +24,14 @@ export const CHECKPOINT_EVERY = 60;
 export const MAX_FRAMES = 60 * 60 * 20;
 /** Inputs that describe the recording MACHINE, not the performance. A note, never an instruction (see header). */
 export const MACHINE_KEYS = Object.freeze([
-  'quality', 'perfTier1', 'assetThin', 'perfClampOverride', 'slowRender', 'reducedMotion', 'canvasW', 'canvasH',
+  'quality',
+  'perfTier1',
+  'assetThin',
+  'perfClampOverride',
+  'slowRender',
+  'reducedMotion',
+  'canvasW',
+  'canvasH',
   'travelIpadClass', // #1574 Q2 — the recording machine's device class, which the traveler budget reads
 ]);
 
@@ -54,13 +61,34 @@ function str(s) {
   word(0x1f000000 | s.length);
 }
 function walk(v, depth) {
-  if (v === null || v === undefined) { word(0xa0000000); return; }
+  if (v === null || v === undefined) {
+    word(0xa0000000);
+    return;
+  }
   const t = typeof v;
-  if (t === 'number') { F64[0] = v; word(U32[0]); word(U32[1]); return; }
-  if (t === 'string') { word(0xa0000002); str(v); return; }
-  if (t === 'boolean') { word(v ? 0xa0000003 : 0xa0000004); return; }
-  if (t === 'function') { word(0xa0000005); return; }
-  if (depth > 12) { word(0xa0000006); return; }
+  if (t === 'number') {
+    F64[0] = v;
+    word(U32[0]);
+    word(U32[1]);
+    return;
+  }
+  if (t === 'string') {
+    word(0xa0000002);
+    str(v);
+    return;
+  }
+  if (t === 'boolean') {
+    word(v ? 0xa0000003 : 0xa0000004);
+    return;
+  }
+  if (t === 'function') {
+    word(0xa0000005);
+    return;
+  }
+  if (depth > 12) {
+    word(0xa0000006);
+    return;
+  }
   if (Array.isArray(v) || ArrayBuffer.isView(v)) {
     word(0xa0000007);
     for (let i = 0; i < v.length; i++) walk(v[i], depth + 1);
@@ -68,7 +96,12 @@ function walk(v, depth) {
     return;
   }
   word(0xa0000009);
-  for (const k in v) { if (Object.prototype.hasOwnProperty.call(v, k)) { str(k); walk(v[k], depth + 1); } }
+  for (const k in v) {
+    if (Object.prototype.hasOwnProperty.call(v, k)) {
+      str(k);
+      walk(v[k], depth + 1);
+    }
+  }
   word(0xa000000a);
 }
 const hex8 = (n) => (n >>> 0).toString(16).padStart(8, '0');
@@ -120,9 +153,12 @@ export function createHashChain(seedValue = null) {
  */
 function checkInitialState(s) {
   if (!s || typeof s !== 'object' || Array.isArray(s)) throw new PerformanceFileError('initialState must be an object');
-  if (!Number.isInteger(s.atFrame) || s.atFrame < 0) throw new PerformanceFileError('initialState.atFrame must be a non-negative integer');
-  if (typeof s.chainSeed !== 'string' || !/^[0-9a-f]{16}$/.test(s.chainSeed)) throw new PerformanceFileError('initialState.chainSeed must be a chain value (16 hex chars)');
-  if (!checkResolverSnapshot(s.snapshot)) throw new PerformanceFileError('initialState.snapshot is not a resolver snapshot');
+  if (!Number.isInteger(s.atFrame) || s.atFrame < 0)
+    throw new PerformanceFileError('initialState.atFrame must be a non-negative integer');
+  if (typeof s.chainSeed !== 'string' || !/^[0-9a-f]{16}$/.test(s.chainSeed))
+    throw new PerformanceFileError('initialState.chainSeed must be a chain value (16 hex chars)');
+  if (!checkResolverSnapshot(s.snapshot))
+    throw new PerformanceFileError('initialState.snapshot is not a resolver snapshot');
   return s;
 }
 
@@ -134,7 +170,11 @@ function checkInitialState(s) {
  * `finish()` emits the section, so the take verifies from the snapshot instead of from launch. Without it the
  * recorder is exactly the from-launch recorder it always was, and the file carries no section.
  */
-export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, maxFrames = MAX_FRAMES, initialState = null } = {}) {
+export function createPerformanceRecorder({
+  checkpointEvery = CHECKPOINT_EVERY,
+  maxFrames = MAX_FRAMES,
+  initialState = null,
+} = {}) {
   if (initialState != null) checkInitialState(initialState);
   const log = createInputLog();
   const checkpoints = [];
@@ -142,12 +182,22 @@ export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, 
   let truncated = false;
   let pending = false; // an input was recorded and its output has not arrived yet
   return {
-    get frames() { return log.frames; },
-    get truncated() { return truncated; },
+    get frames() {
+      return log.frames;
+    },
+    get truncated() {
+      return truncated;
+    },
     /** The chain's current value — the seed a snapshot taken at this frame boundary would carry (#1367). */
-    chainValue() { return chain.value(); },
+    chainValue() {
+      return chain.value();
+    },
     onInput(input) {
-      if (log.frames >= maxFrames) { truncated = true; pending = false; return; }
+      if (log.frames >= maxFrames) {
+        truncated = true;
+        pending = false;
+        return;
+      }
       log.record(input);
       pending = true;
     },
@@ -179,7 +229,15 @@ export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, 
         checkpoints: checkpoints.slice(),
         inputs: { ...inputs, frames, steps: inputs.steps.slice(0, frames) },
         // #1367 — absent for a from-launch take (the file is exactly what it was before this section existed).
-        ...(initialState ? { initialState: { atFrame: initialState.atFrame, chainSeed: initialState.chainSeed, snapshot: initialState.snapshot } } : {}),
+        ...(initialState
+          ? {
+              initialState: {
+                atFrame: initialState.atFrame,
+                chainSeed: initialState.chainSeed,
+                snapshot: initialState.snapshot,
+              },
+            }
+          : {}),
       };
     },
   };
@@ -189,11 +247,15 @@ export function createPerformanceRecorder({ checkpointEvery = CHECKPOINT_EVERY, 
 export function checkPerformance(p) {
   if (!p || typeof p !== 'object' || Array.isArray(p)) throw new PerformanceFileError('not a performance object');
   if (p.format !== PERFORMANCE_FORMAT) throw new PerformanceFileError(`unknown format ${String(p.format)}`);
-  if (p.version !== PERFORMANCE_VERSION) throw new PerformanceFileError(`unsupported version ${String(p.version)} (want ${PERFORMANCE_VERSION})`);
+  if (p.version !== PERFORMANCE_VERSION)
+    throw new PerformanceFileError(`unsupported version ${String(p.version)} (want ${PERFORMANCE_VERSION})`);
   if (!Number.isInteger(p.frames) || p.frames < 1) throw new PerformanceFileError('frames must be a positive integer');
-  if (!p.inputs || p.inputs.version !== INPUT_LOG_VERSION || !Array.isArray(p.inputs.steps)) throw new PerformanceFileError('inputs must be an input log');
-  if (p.inputs.steps.length !== p.frames) throw new PerformanceFileError(`inputs hold ${p.inputs.steps.length} frames, header says ${p.frames}`);
-  if (!Array.isArray(p.checkpoints) || p.checkpoints.length === 0) throw new PerformanceFileError('no checkpoints: a file that cannot be verified is not a performance');
+  if (!p.inputs || p.inputs.version !== INPUT_LOG_VERSION || !Array.isArray(p.inputs.steps))
+    throw new PerformanceFileError('inputs must be an input log');
+  if (p.inputs.steps.length !== p.frames)
+    throw new PerformanceFileError(`inputs hold ${p.inputs.steps.length} frames, header says ${p.frames}`);
+  if (!Array.isArray(p.checkpoints) || p.checkpoints.length === 0)
+    throw new PerformanceFileError('no checkpoints: a file that cannot be verified is not a performance');
   for (const c of p.checkpoints) {
     if (!c || !Number.isInteger(c.frame) || c.frame < 0 || c.frame >= p.frames || typeof c.hash !== 'string') {
       throw new PerformanceFileError('checkpoints must be [{ frame, hash }] inside the take');

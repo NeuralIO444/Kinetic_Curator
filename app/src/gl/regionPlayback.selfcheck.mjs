@@ -23,15 +23,17 @@ import { detectRegions } from '../assets/regionMattes.js';
 import { capRegions, canonicalSvg, REGION_CAP } from '../assets/regionBake.mjs';
 import { capRegionsTracked, buildRegionPartition, regionCellGeometry } from '../assets/regionPartition.js';
 import {
-  regionsForAsset, sanitizeRegionKinemes, regionAssignmentFor, selectAnimatedRegions,
-  regionKinemePhase, REGION_TAG_CAP,
+  regionsForAsset,
+  sanitizeRegionKinemes,
+  regionAssignmentFor,
+  selectAnimatedRegions,
+  regionKinemePhase,
+  REGION_TAG_CAP,
 } from '../data/regionKinemes.js';
 import { getKineme, kinemePhase } from '../data/kinemes.js';
 import { bakeAtlas, CELL_PX, comboKey } from './atlas.mjs';
 import { packInstanceData } from './renderer.mjs';
-import {
-  buildSceneContract, regionKinemesFrozen, regionCollapseShed, regionAnimBudget,
-} from './sceneContract.js';
+import { buildSceneContract, regionKinemesFrozen, regionCollapseShed, regionAnimBudget } from './sceneContract.js';
 
 // The fixture items below carry tint #ffffff / accent #ff4444 (the
 // stage-1 suite's shape); the bakes must use the same combo colours or
@@ -102,18 +104,29 @@ console.log('regionPlayback node (geometry): OK');
 // ── the assignment surface: sanitize, selection, phase ────────────────
 {
   const records = flora.regions;
-  assert.deepEqual(sanitizeRegionKinemes({ [PETALS[0]]: 'rock', nope: 'rock', [PETALS[1]]: 'nope' }, records),
-    { [PETALS[0]]: 'rock' }, 'unknown regions and kinemes are dropped');
+  assert.deepEqual(
+    sanitizeRegionKinemes({ [PETALS[0]]: 'rock', nope: 'rock', [PETALS[1]]: 'nope' }, records),
+    { [PETALS[0]]: 'rock' },
+    'unknown regions and kinemes are dropped',
+  );
   assert.strictEqual(sanitizeRegionKinemes({}, records), null, 'empty assignment is null');
   assert.strictEqual(sanitizeRegionKinemes({ [PETALS[0]]: 'rock' }, null), null, 'no records, no assignment');
   // Selection: largest first (areas: west petal 2581, the other petals
   // 2580 in record order, centre 1294), record order breaks ties.
   const all = Object.fromEntries(records.map((r) => [r.id, 'rock']));
   const byAreaDesc = [...records].sort((a, b) => b.area - a.area).map((r) => r.id);
-  assert.deepEqual([...selectAnimatedRegions(records, all, 2)], byAreaDesc.slice(0, 2), 'budget 2 picks the two largest');
+  assert.deepEqual(
+    [...selectAnimatedRegions(records, all, 2)],
+    byAreaDesc.slice(0, 2),
+    'budget 2 picks the two largest',
+  );
   assert.strictEqual(selectAnimatedRegions(records, all, 0).size, 0, 'budget 0 animates nothing');
   assert.strictEqual(selectAnimatedRegions(records, all, 12).size, 5, 'full budget animates every assigned region');
-  assert.strictEqual(selectAnimatedRegions(records, { [CENTRE]: 'pulse' }, 12).size, 1, 'only assigned regions can be selected');
+  assert.strictEqual(
+    selectAnimatedRegions(records, { [CENTRE]: 'pulse' }, 12).size,
+    1,
+    'only assigned regions can be selected',
+  );
   // Phase: the house hash of (asset id, region id); distinct per region.
   const phases = records.map((r) => regionKinemePhase(FLORA, r.id));
   for (const [i, r] of records.entries()) {
@@ -127,9 +140,16 @@ console.log('regionPlayback node (geometry): OK');
   // entry wins per region over the default it names.
   const DEFAULTS = { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: 'pulse' };
   assert.deepEqual(regionAssignmentFor(FLORA, null), DEFAULTS, 'R3: baked family defaults resolve with no doc');
-  assert.deepEqual(regionAssignmentFor(FLORA, { [FLORA]: { [PETALS[0]]: 'bob' } }),
-    { ...DEFAULTS, [PETALS[0]]: 'bob' }, 'doc wins per region over the default');
-  assert.strictEqual(regionAssignmentFor('geo_tri_01', { geo_tri_01: { 'rm-xxxxxx-0-0': 'rock' } }), null, 'invalid entries sanitize away');
+  assert.deepEqual(
+    regionAssignmentFor(FLORA, { [FLORA]: { [PETALS[0]]: 'bob' } }),
+    { ...DEFAULTS, [PETALS[0]]: 'bob' },
+    'doc wins per region over the default',
+  );
+  assert.strictEqual(
+    regionAssignmentFor('geo_tri_01', { geo_tri_01: { 'rm-xxxxxx-0-0': 'rock' } }),
+    null,
+    'invalid entries sanitize away',
+  );
   assert.deepEqual(regionsForAsset(FLORA), flora.regions, 'records come from the catalogue');
 }
 console.log('regionPlayback node (assignment surface): OK');
@@ -167,7 +187,7 @@ console.log('regionPlayback node (assignment surface): OK');
   }
   let wholeSum = 0;
   for (let p = 0; p < CELL_PX * CELL_PX; p++) {
-    const o = ((wy + (p / CELL_PX | 0)) * atlas.width + (wx + (p % CELL_PX))) * 4;
+    const o = ((wy + ((p / CELL_PX) | 0)) * atlas.width + (wx + (p % CELL_PX))) * 4;
     for (let ch = 0; ch < 4; ch++) {
       assert.strictEqual(sum[p * 4 + ch], atlas.pixels[o + ch], `tiled bytes == whole-cell bytes (px ${p} ch ${ch})`);
       wholeSum += atlas.pixels[o + ch];
@@ -176,7 +196,10 @@ console.log('regionPlayback node (assignment surface): OK');
   assert.ok(wholeSum > 0, 'the whole cell has ink');
   // Strip assets never gain region cells (cell kinemes own them).
   const stripAtlas = bakeAtlas([{ asset: 'mic_dial', ink: INK, accent: ACC }]);
-  assert.ok(![...stripAtlas.cells.keys()].some((k) => k.includes('#r:') || k.endsWith('#rem')), 'strip asset: no region cells');
+  assert.ok(
+    ![...stripAtlas.cells.keys()].some((k) => k.includes('#r:') || k.endsWith('#rem')),
+    'strip asset: no region cells',
+  );
   // Region cells are baked on demand: an empty demand set is the
   // pre-R2 atlas (one cell, one slot); naming the asset bakes them.
   const noDemand = bakeAtlas([{ asset: FLORA, ink: INK, accent: ACC }], { regionAssets: new Set() });
@@ -191,7 +214,18 @@ console.log('regionPlayback node (assignment surface): OK');
 console.log('regionPlayback node (bake): OK');
 
 // ── the contract ──────────────────────────────────────────────────────
-const item = (assetId, key) => ({ assetId, x: 500, y: 350, scale: 2.5, rotation: 0, color: '#ffffff', accent: '#ff4444', alpha: 100, key, seedOffset: 0 });
+const item = (assetId, key) => ({
+  assetId,
+  x: 500,
+  y: 350,
+  scale: 2.5,
+  rotation: 0,
+  color: '#ffffff',
+  accent: '#ff4444',
+  alpha: 100,
+  key,
+  seedOffset: 0,
+});
 const layer = (items) => [{ id: 'L', isFx: false, items }];
 const contract = (doc, items) => buildSceneContract({ doc: { seed: 1, ...doc }, resolvedLayers: layer(items) });
 const ASSIGN = { [FLORA]: { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: 'pulse' } };
@@ -208,11 +242,13 @@ const STILL = { regionKinemes: { [FLORA]: Object.fromEntries(flora.regions.map((
   const c = contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]);
   assert.deepEqual(c.instances, bare.instances, 'placements byte-identical to the single-quad run');
   assert.strictEqual(c.regionAnim.budget, 12, 'no caller budget -> the tag cap');
-  const slotOf = (kind, period, amp) => c.kinemes.findIndex((k) => k.kind === kind && k.period === period && k.amp === amp) + 1;
+  const slotOf = (kind, period, amp) =>
+    c.kinemes.findIndex((k) => k.kind === kind && k.period === period && k.amp === amp) + 1;
   const rockSlot = slotOf(2, 2.4, 18);
   const pulseSlot = slotOf(3, 1.6, 0.12);
   assert.ok(rockSlot > 0 && pulseSlot > 0 && rockSlot !== pulseSlot, 'region kinemes joined the shared table');
-  for (const p of PETALS) assert.strictEqual(c.regionAnim.assets[FLORA][p], rockSlot, `${p}: petal rides the rock slot`);
+  for (const p of PETALS)
+    assert.strictEqual(c.regionAnim.assets[FLORA][p], rockSlot, `${p}: petal rides the rock slot`);
   assert.strictEqual(c.regionAnim.assets[FLORA][CENTRE], pulseSlot, 'centre rides the pulse slot');
   assert.ok(!('shed' in c.regionAnim), 'healthy governor -> no shed flag');
   // Instance kinemes keep the first slots; region slots append after.
@@ -221,16 +257,32 @@ const STILL = { regionKinemes: { [FLORA]: Object.fromEntries(flora.regions.map((
   assert.ok(both.regionAnim.assets[FLORA][PETALS[0]] > 1, 'region slots append after instance slots');
   // The governor predicates + the budget they produce.
   assert.strictEqual(regionKinemesFrozen({ perfTier1: true, quality: 'performance' }), true);
-  assert.strictEqual(regionKinemesFrozen({ perfTier1: true, quality: 'balanced' }), false, 'tier-2 rung needs PERF too');
+  assert.strictEqual(
+    regionKinemesFrozen({ perfTier1: true, quality: 'balanced' }),
+    false,
+    'tier-2 rung needs PERF too',
+  );
   assert.strictEqual(regionKinemesFrozen({ quality: 'performance' }), false, 'tier-2 rung needs perfTier1');
-  assert.strictEqual(regionCollapseShed({ perfTier1: true, quality: 'performance' }), false, 'freeze alone does not collapse');
-  assert.strictEqual(regionCollapseShed({ perfTier1: true, quality: 'performance', assetThin: true }), true, 'a deeper cut collapses');
+  assert.strictEqual(
+    regionCollapseShed({ perfTier1: true, quality: 'performance' }),
+    false,
+    'freeze alone does not collapse',
+  );
+  assert.strictEqual(
+    regionCollapseShed({ perfTier1: true, quality: 'performance', assetThin: true }),
+    true,
+    'a deeper cut collapses',
+  );
   assert.strictEqual(regionCollapseShed({ perfTier1: true, quality: 'performance', slowRender: true }), true);
   assert.strictEqual(regionAnimBudget({}), 12);
   assert.strictEqual(regionAnimBudget({ regionBudget: 8 }), 8, 'the iPad-class ceiling');
   assert.strictEqual(regionAnimBudget({ regionBudget: 99 }), 12, 'clamped to the tag cap');
   assert.strictEqual(regionAnimBudget({ reducedMotion: true }), 0, 'reduced motion: regions hold rest');
-  assert.strictEqual(regionAnimBudget({ perfTier1: true, quality: 'performance', regionBudget: 8 }), 0, 'the freeze tightens to 0');
+  assert.strictEqual(
+    regionAnimBudget({ perfTier1: true, quality: 'performance', regionBudget: 8 }),
+    0,
+    'the freeze tightens to 0',
+  );
   // Budget through the contract: 1 -> only the largest petal is slotted.
   const low = contract({ regionKinemes: ASSIGN, regionBudget: 1 }, [item(FLORA, 'a')]);
   const entries = Object.entries(low.regionAnim.assets[FLORA]);
@@ -241,8 +293,13 @@ const STILL = { regionKinemes: { [FLORA]: Object.fromEntries(flora.regions.map((
   // Freeze + collapse ride the contract.
   const frozen = contract({ regionKinemes: ASSIGN, perfTier1: true, quality: 'performance' }, [item(FLORA, 'a')]);
   assert.strictEqual(frozen.regionAnim.budget, 0, 'frozen: budget 0');
-  assert.ok(Object.values(frozen.regionAnim.assets[FLORA]).every((s) => s === 0), 'frozen: every region at rest');
-  const collapsed = contract({ regionKinemes: ASSIGN, perfTier1: true, quality: 'performance', assetThin: true }, [item(FLORA, 'a')]);
+  assert.ok(
+    Object.values(frozen.regionAnim.assets[FLORA]).every((s) => s === 0),
+    'frozen: every region at rest',
+  );
+  const collapsed = contract({ regionKinemes: ASSIGN, perfTier1: true, quality: 'performance', assetThin: true }, [
+    item(FLORA, 'a'),
+  ]);
   assert.strictEqual(collapsed.regionAnim.shed, true, 'collapsed: shed flag set');
 }
 console.log('regionPlayback node (contract): OK');
@@ -256,7 +313,10 @@ console.log('regionPlayback node (contract): OK');
   const barePayload = buildRenderPayload(contract(STILL, [item(FLORA, 'a')]), { width: 400, height: 280 });
   assert.ok(!hasRegionCells(barePayload), 'no region state -> the payload atlas has no region cells');
   assert.strictEqual(barePayload.atlasW, 432, 'no region state -> the pre-R2 atlas size');
-  const assignedPayload = buildRenderPayload(contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]), { width: 400, height: 280 });
+  const assignedPayload = buildRenderPayload(contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]), {
+    width: 400,
+    height: 280,
+  });
   assert.ok(hasRegionCells(assignedPayload), 'assignments -> the payload atlas carries region cells');
   const shedContract = contract({ regionKinemes: ASSIGN }, [item(FLORA, 'a')]);
   shedContract.regionAnim = { ...shedContract.regionAnim, shed: true };
@@ -273,23 +333,36 @@ console.log('regionPlayback node (atlas demand): OK');
   const inst = { ...c.instances[0], rotation: 30 }; // rotated, to prove the parenting math
   const frame = { motionTime: 0, shed: false, regions: c.regionAnim };
   const packed = packInstanceData([inst], cellsObj, 1, frame);
-  assert.strictEqual(packed.length, (flora.regions.length + 1) * 45, 'one mark expands to remainder + R region instances');
+  assert.strictEqual(
+    packed.length,
+    (flora.regions.length + 1) * 45,
+    'one mark expands to remainder + R region instances',
+  );
   // Remainder first: the mark's own transform and kineme, the remainder cell.
   const base = comboKey(FLORA, inst.tint, inst.accent);
   const remCell = atlas.cells.get(`${base}#rem`);
   assert.strictEqual(packed[0], inst.x, 'remainder at the mark x');
   assert.strictEqual(packed[1], inst.y, 'remainder at the mark y');
-  assert.ok(Math.abs(packed[6] - remCell.u0) < 2e-7 && Math.abs(packed[8] - remCell.u1) < 2e-7, 'remainder packs the remainder cell');
+  assert.ok(
+    Math.abs(packed[6] - remCell.u0) < 2e-7 && Math.abs(packed[8] - remCell.u1) < 2e-7,
+    'remainder packs the remainder cell',
+  );
   // Each region: pivot = the mark affine applied to the centroid,
   // scale = mark scale x geometry, kineme slot + hash phase.
-  const th = (inst.rotation * Math.PI) / 180, co = Math.cos(th), si = Math.sin(th);
+  const th = (inst.rotation * Math.PI) / 180,
+    co = Math.cos(th),
+    si = Math.sin(th);
   flora.regions.forEach((r, i) => {
     const o = (i + 1) * 45;
     const cell = atlas.cells.get(`${base}#r:${r.id}`);
     const g = cell.geo;
-    const lx = (g.px - 50) * inst.scaleX, ly = (g.py - 50) * inst.scaleY;
+    const lx = (g.px - 50) * inst.scaleX,
+      ly = (g.py - 50) * inst.scaleY;
     assert.ok(Math.abs(packed[o] - (inst.x + lx * co - ly * si)) < 1e-3, `${r.id}: pivot x = mark affine(centroid)`);
-    assert.ok(Math.abs(packed[o + 1] - (inst.y + lx * si + ly * co)) < 1e-3, `${r.id}: pivot y = mark affine(centroid)`);
+    assert.ok(
+      Math.abs(packed[o + 1] - (inst.y + lx * si + ly * co)) < 1e-3,
+      `${r.id}: pivot y = mark affine(centroid)`,
+    );
     assert.ok(Math.abs(packed[o + 2] - inst.scaleX * g.sx) < 1e-6, `${r.id}: scale x = mark x geometry`);
     assert.ok(Math.abs(packed[o + 4] - inst.rotation) < 1e-6, `${r.id}: rotation is the mark's`);
     assert.strictEqual(packed[o + 18], c.regionAnim.assets[FLORA][r.id], `${r.id}: kineme slot from the contract`);
@@ -298,22 +371,40 @@ console.log('regionPlayback node (atlas demand): OK');
   });
   // The collapse shed and the no-state path are the pre-R2 pack, byte for byte.
   const bare = packInstanceData([inst], cellsObj);
-  assert.deepStrictEqual(packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: { ...c.regionAnim, shed: true } }), bare,
-    'shed collapse packs exactly the single quad');
-  assert.deepStrictEqual(packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: null }), bare,
-    'no region state packs exactly the single quad');
+  assert.deepStrictEqual(
+    packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: { ...c.regionAnim, shed: true } }),
+    bare,
+    'shed collapse packs exactly the single quad',
+  );
+  assert.deepStrictEqual(
+    packInstanceData([inst], cellsObj, 1, { motionTime: 0, shed: false, regions: null }),
+    bare,
+    'no region state packs exactly the single quad',
+  );
   assert.strictEqual(bare.length, 45, 'the single quad is one instance');
   // Fail-closed: region state but no region cells -> the single quad.
   const wholeOnly = { [base]: atlas.cells.get(base) };
-  assert.deepStrictEqual(packInstanceData([inst], wholeOnly, 1, frame), packInstanceData([inst], wholeOnly),
-    'missing region cells: the mark still draws, as one quad');
+  assert.deepStrictEqual(
+    packInstanceData([inst], wholeOnly, 1, frame),
+    packInstanceData([inst], wholeOnly),
+    'missing region cells: the mark still draws, as one quad',
+  );
   // An unselected region (slot 0) inherits the mark's kineme, not silence.
-  const low = contract({ regionKinemes: ASSIGN, regionBudget: 1, assetKineme: { [FLORA]: 'bob' }, kinemeTime: 0 }, [item(FLORA, 'a')]);
+  const low = contract({ regionKinemes: ASSIGN, regionBudget: 1, assetKineme: { [FLORA]: 'bob' }, kinemeTime: 0 }, [
+    item(FLORA, 'a'),
+  ]);
   const lowInst = low.instances[0];
   const lowPacked = packInstanceData([lowInst], cellsObj, 1, { motionTime: 0, shed: false, regions: low.regionAnim });
   const centreIdx = flora.regions.findIndex((r) => r.id === CENTRE);
-  assert.strictEqual(lowPacked[(centreIdx + 1) * 45 + 18], lowInst.kineme, 'unselected region inherits the mark kineme');
-  assert.ok(Math.abs(lowPacked[(centreIdx + 1) * 45 + 19] - lowInst.kinemePhase) < 2e-3, 'unselected region inherits the mark phase');
+  assert.strictEqual(
+    lowPacked[(centreIdx + 1) * 45 + 18],
+    lowInst.kineme,
+    'unselected region inherits the mark kineme',
+  );
+  assert.ok(
+    Math.abs(lowPacked[(centreIdx + 1) * 45 + 19] - lowInst.kinemePhase) < 2e-3,
+    'unselected region inherits the mark phase',
+  );
   // Two marks expand independently.
   const two = packInstanceData([inst, { ...inst, x: 100, y: 100 }], cellsObj, 1, frame);
   assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 45, 'two marks -> two expansions');
@@ -336,7 +427,11 @@ async function runBrowserTests() {
     }
     return n;
   };
-  const alphaSum = (a) => { let s = 0; for (let i = 3; i < a.length; i += 4) s += a[i]; return s; };
+  const alphaSum = (a) => {
+    let s = 0;
+    for (let i = 3; i < a.length; i += 4) s += a[i];
+    return s;
+  };
   // Screen rect (400x280 render of the 1000x700 contract) of an asset-space rect, shrunk 2px off the edges.
   const rectOf = (r) => {
     const X = (u) => (500 + (u * 100 - 50) * 2.5) * 0.4;
@@ -345,10 +440,11 @@ async function runBrowserTests() {
   };
   const diffIn = (a, b, [x0, y0, x1, y1]) => {
     let n = 0;
-    for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-      const i = (y * 400 + x) * 4;
-      if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n++;
-    }
+    for (let y = y0; y < y1; y++)
+      for (let x = x0; x < x1; x++) {
+        const i = (y * 400 + x) * 4;
+        if (a[i] !== b[i] || a[i + 1] !== b[i + 1] || a[i + 2] !== b[i + 2] || a[i + 3] !== b[i + 3]) n++;
+      }
     return n;
   };
   try {
@@ -359,11 +455,16 @@ async function runBrowserTests() {
     const restTiled = await shot({ regionKinemes: ASSIGN, regionBudget: 0, kinemeTime: 0.6 });
     const plainShot = await shot({ ...STILL, kinemeTime: 0 });
     const parity = diffPx(restTiled, plainShot) / (400 * 280);
-    assert.ok(parity < 0.10, `rest parity inside the WebGL bar: ${(parity * 100).toFixed(3)}% of pixels differ`);
+    assert.ok(parity < 0.1, `rest parity inside the WebGL bar: ${(parity * 100).toFixed(3)}% of pixels differ`);
     // The shed render IS the pre-R2 render: byte-identical to no regionAnim at all.
-    const shedShot = await shot({ regionKinemes: ASSIGN, kinemeTime: 0.6 }, (c) => { c.regionAnim = { ...c.regionAnim, shed: true }; });
+    const shedShot = await shot({ regionKinemes: ASSIGN, kinemeTime: 0.6 }, (c) => {
+      c.regionAnim = { ...c.regionAnim, shed: true };
+    });
     assert.ok(same(shedShot, plainShot), 'shed collapse renders byte-identically to the pre-R2 path');
-    assert.ok(same(restTiled, await shot({ regionKinemes: ASSIGN, regionBudget: 0, kinemeTime: 0.6 })), 'same state -> same frame (deterministic)');
+    assert.ok(
+      same(restTiled, await shot({ regionKinemes: ASSIGN, regionBudget: 0, kinemeTime: 0.6 })),
+      'same state -> same frame (deterministic)',
+    );
     // Petals move independently: at t=0.6 the rock (period 2.4) has
     // swung each petal by its own hash phase; the centre's pulse is
     // its own motion, on its own region.
@@ -380,7 +481,10 @@ async function runBrowserTests() {
     // would keep its baked pulse default.
     const PETALS_ONLY = { [FLORA]: { ...Object.fromEntries(PETALS.map((p) => [p, 'rock'])), [CENTRE]: null } };
     const restPetals = await shot({ regionKinemes: PETALS_ONLY, kinemeTime: 0 });
-    assert.ok(same(restPetals, await shot({ regionKinemes: PETALS_ONLY, kinemeTime: 2.4 })), 'one full period wraps exactly');
+    assert.ok(
+      same(restPetals, await shot({ regionKinemes: PETALS_ONLY, kinemeTime: 2.4 })),
+      'one full period wraps exactly',
+    );
     // Governor selection: budget 1 animates only the largest petal —
     // motion is present but smaller, confined to that petal, and the
     // mark stays complete.
@@ -389,12 +493,24 @@ async function runBrowserTests() {
     const fullDiff = diffPx(restTiled, moved);
     assert.ok(lowDiff > 20 && lowDiff < fullDiff, `budget 1 moves less than budget 12 (${lowDiff}px vs ${fullDiff}px)`);
     const largest = [...flora.regions].sort((a, b) => b.area - a.area)[0].id;
-    assert.ok(diffIn(restTiled, lowMoved, rectOf(flora.regions.find((r) => r.id === largest))) > 20, 'budget 1: the largest petal moves');
+    assert.ok(
+      diffIn(restTiled, lowMoved, rectOf(flora.regions.find((r) => r.id === largest))) > 20,
+      'budget 1: the largest petal moves',
+    );
     for (const id of PETALS.filter((p) => p !== largest)) {
-      assert.strictEqual(diffIn(restTiled, lowMoved, rectOf(flora.regions.find((r) => r.id === id))), 0, `budget 1: petal ${id} is byte-still`);
+      assert.strictEqual(
+        diffIn(restTiled, lowMoved, rectOf(flora.regions.find((r) => r.id === id))),
+        0,
+        `budget 1: petal ${id} is byte-still`,
+      );
     }
-    assert.ok(Math.abs(alphaSum(lowMoved) - alphaSum(restTiled)) / alphaSum(restTiled) < 0.02, 'budget 1: the mark still draws complete (alpha within 2%)');
-    console.log(`regionPlayback GPU: OK — rest parity ${(parity * 100).toFixed(3)}% of pixels; petal diffs ${petalDiffs.join('/')}; centre ${centreDiff}; budget1 ${lowDiff}px vs full ${fullDiff}px`);
+    assert.ok(
+      Math.abs(alphaSum(lowMoved) - alphaSum(restTiled)) / alphaSum(restTiled) < 0.02,
+      'budget 1: the mark still draws complete (alpha within 2%)',
+    );
+    console.log(
+      `regionPlayback GPU: OK — rest parity ${(parity * 100).toFixed(3)}% of pixels; petal diffs ${petalDiffs.join('/')}; centre ${centreDiff}; budget1 ${lowDiff}px vs full ${fullDiff}px`,
+    );
   } finally {
     await closeGlDriver();
   }

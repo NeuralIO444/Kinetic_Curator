@@ -23,7 +23,11 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
   assert.strictEqual(nearestWeatherAbove(stack, 'b').layer.id, 'fx-high', 'the nearest above, not the topmost');
   assert.strictEqual(nearestWeatherAbove(stack, 'c'), null, 'no FX above the top layer');
   assert.strictEqual(nearestWeatherAbove([FX('fx-below', [HAZE()]), L('a')], 'a'), null, 'haze below is not weather');
-  assert.strictEqual(nearestWeatherAbove([L('a'), FX('fx', [GRAIN])], 'a'), null, 'an FX layer without haze is not weather');
+  assert.strictEqual(
+    nearestWeatherAbove([L('a'), FX('fx', [GRAIN])], 'a'),
+    null,
+    'an FX layer without haze is not weather',
+  );
   assert.strictEqual(
     nearestWeatherAbove([L('a'), FX('fx-grain', [GRAIN]), FX('fx-haze', [HAZE()])], 'a').layer.id,
     'fx-haze',
@@ -45,7 +49,16 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
 //    to buildPlacements, nothing is built, the frame is byte-identical.
 {
   const layers = [L('a'), FX('fx', [HAZE()])];
-  const none = weatherArgs({ dish: createResolverDish(), layers, layerId: 'a', air: 0, W: 1000, H: 700, tSec: 0, seed: 7 });
+  const none = weatherArgs({
+    dish: createResolverDish(),
+    layers,
+    layerId: 'a',
+    air: 0,
+    W: 1000,
+    H: 700,
+    tSec: 0,
+    seed: 7,
+  });
   assert.ok(Object.isFrozen(none) && Object.keys(none).length === 0, 'dial 0 -> frozen NONE');
   for (const args of [
     { layers, layerId: 'a', air: undefined },
@@ -70,7 +83,17 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
 {
   const layers = [L('a'), FX('fx', [HAZE(0.35, 0.5)])];
   const dish = createResolverDish();
-  const args = weatherArgs({ dish, layers, layerId: 'a', air: 0.5, W: 1000, H: 700, tSec: 3.2, seed: 1234, seedOffsets: null });
+  const args = weatherArgs({
+    dish,
+    layers,
+    layerId: 'a',
+    air: 0.5,
+    W: 1000,
+    H: 700,
+    tSec: 3.2,
+    seed: 1234,
+    seedOffsets: null,
+  });
   assert.strictEqual(args.air, 0.175, 'strength = amount × dial');
   assert.strictEqual(args.airVeil, hazeVeilHex(0.5));
   assert.strictEqual(args.airVeil, '#a6a6a6');
@@ -80,7 +103,17 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
     const v = dish.air((k % 8) * 125, Math.floor(k / 8) * 87.5);
     assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, `mist sample in range: ${v}`);
   }
-  const full = weatherArgs({ dish: createResolverDish(), layers, layerId: 'a', air: 1, W: 1000, H: 700, tSec: 3.2, seed: 1234, seedOffsets: null });
+  const full = weatherArgs({
+    dish: createResolverDish(),
+    layers,
+    layerId: 'a',
+    air: 1,
+    W: 1000,
+    H: 700,
+    tSec: 3.2,
+    seed: 1234,
+    seedOffsets: null,
+  });
   assert.strictEqual(full.air, 0.35, 'dial 1 passes the haze amount through');
 }
 
@@ -89,7 +122,17 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
 {
   const fadeOf = (tSec) => {
     const dish = createResolverDish();
-    const args = weatherArgs({ dish, layers: [L('a'), FX('fx', [HAZE()])], layerId: 'a', air: 1, W: 1000, H: 700, tSec, seed: 42, seedOffsets: null });
+    const args = weatherArgs({
+      dish,
+      layers: [L('a'), FX('fx', [HAZE()])],
+      layerId: 'a',
+      air: 1,
+      W: 1000,
+      H: 700,
+      tSec,
+      seed: 42,
+      seedOffsets: null,
+    });
     const fade = new Float32Array(64);
     for (let k = 0; k < 64; k++) fade[k] = args.air * dish.air((k % 8) * 125, Math.floor(k / 8) * 87.5);
     return fade;

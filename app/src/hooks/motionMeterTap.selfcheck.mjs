@@ -18,6 +18,8 @@ import { createLiveResolver, getLastFrameMotion } from '../gl/liveResolve.mjs';
 import { createCreatureBuilder, MOTH, MOTH_PARTS } from '../engine/creature.js';
 import { ASSETS } from '../data/assets/index.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -241,8 +243,10 @@ ok("LIFE rides the loop's note: the publisher folds the noted reading in verbati
   noteLifeBreath(0);
   const loop = src('../gl/liveLoop.mjs');
   assert.match(
-    loop,
-    /noteLifeBreath\(\(s\.slowRender \|\| !s\.running\) \? 0 : Math\.abs\(breathScaleSmoothed - 1\) \/ LIFE_FULL\)/,
+    flat(loop),
+    fre(
+      /noteLifeBreath\(\(?s\.slowRender \|\| !s\.running\)? \? 0 : Math\.abs\(breathScaleSmoothed - 1\) \/ LIFE_FULL\)/,
+    ),
     'the loop notes |breathScale − 1| over the span, zeroed while frozen',
   );
   assert.ok(

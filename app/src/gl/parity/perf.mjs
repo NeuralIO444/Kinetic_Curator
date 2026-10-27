@@ -38,12 +38,12 @@ async function main(argv) {
     const r = await page.evaluate(([p, k]) => window.__kcPerf(p, k), [payload, iters]);
     console.log(
       `[perf:${sceneId}] ${r.width}x${r.height} x${r.iters}: ` +
-      `avg ${r.avgMs.toFixed(2)}ms (${r.fps.toFixed(1)} fps), ` +
-      `p50 ${r.p50Ms.toFixed(2)}ms, min ${r.minMs.toFixed(2)}ms`
+        `avg ${r.avgMs.toFixed(2)}ms (${r.fps.toFixed(1)} fps), ` +
+        `p50 ${r.p50Ms.toFixed(2)}ms, min ${r.minMs.toFixed(2)}ms`,
     );
     console.log(
       `[perf:${sceneId}] ${r.avgMs < 16.67 ? 'HOLDS 60fps' : 'BELOW 60fps'} ` +
-      `(budget 16.67ms/frame; includes readPixels, so this is an upper bound)`
+        `(budget 16.67ms/frame; includes readPixels, so this is an upper bound)`,
     );
   } finally {
     await close();

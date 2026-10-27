@@ -9,12 +9,12 @@
 //   { schema, source, sr, hop_length, fps, duration, tempo_bpm,
 //     frames: [{t, rms, flux, beat_phase}], beats: [t…], downbeats: [] }
 
-export const AUDIO_SCHEMA = "kc-audio-envelope/1";
+export const AUDIO_SCHEMA = 'kc-audio-envelope/1';
 
 const clamp01 = (x) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
 function asFrame(o) {
-  if (!o || typeof o !== "object") return null;
+  if (!o || typeof o !== 'object') return null;
   const t = Number(o.t);
   if (!Number.isFinite(t) || t < 0) return null;
   return {
@@ -28,7 +28,7 @@ function asFrame(o) {
 // Legacy alias for the pre-research sketch ({t, rms, beat} flat arrays, where
 // beat was a 0/1 flag): beat=1 marks the downbeat instant, i.e. beat_phase 0.
 function asLegacyFrame(o) {
-  if (!o || typeof o !== "object") return null;
+  if (!o || typeof o !== 'object') return null;
   const t = Number(o.t);
   if (!Number.isFinite(t) || t < 0) return null;
   return {
@@ -47,7 +47,6 @@ function asBeats(v) {
     .sort((a, b) => a - b);
 }
 
-
 /**
  * Parse an already-JSON-decoded sidecar.
  * @returns {{env: {samples, beats, tempoBpm}|null, problem: string|null, note: string|null}}
@@ -57,16 +56,10 @@ export function parseAudioEnvelope(raw) {
   // Current schema: { schema: "kc-audio-envelope/1", frames: [...], beats: [...] }
   const frames = Array.isArray(raw?.frames) ? raw.frames : null;
   // Legacy sketch: bare array or {envelope: [...]} of {t, rms, beat}.
-  const legacy = Array.isArray(raw)
-    ? raw
-    : Array.isArray(raw?.envelope)
-      ? raw.envelope
-      : null;
-  if (!frames && !legacy) return { env: null, problem: "no-frames", note: null };
-  const samples = (frames ? frames.map(asFrame) : legacy.map(asLegacyFrame))
-    .filter(Boolean)
-    .sort((a, b) => a.t - b.t);
-  if (samples.length === 0) return { env: null, problem: "no-usable-frames", note: null };
+  const legacy = Array.isArray(raw) ? raw : Array.isArray(raw?.envelope) ? raw.envelope : null;
+  if (!frames && !legacy) return { env: null, problem: 'no-frames', note: null };
+  const samples = (frames ? frames.map(asFrame) : legacy.map(asLegacyFrame)).filter(Boolean).sort((a, b) => a.t - b.t);
+  if (samples.length === 0) return { env: null, problem: 'no-usable-frames', note: null };
   const note =
     frames && raw.schema && raw.schema !== AUDIO_SCHEMA
       ? `declares schema ${raw.schema} (expected ${AUDIO_SCHEMA}); reading frames[] anyway`

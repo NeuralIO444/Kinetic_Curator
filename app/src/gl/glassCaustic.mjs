@@ -37,5 +37,6 @@ registerCostTier('light/glass-caustic-spec', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.05,
-  notes: '#1129 PR3: caustic shimmer for glass instances — one kc_vnoise eval per lit fragment (~48 ALU: 4 hashes + bilinear mix), glass-gated by mix so the non-glass result is bit-identical to 1.0; rides the quad pass, never shed separately from it',
+  notes:
+    '#1129 PR3: caustic shimmer for glass instances — one kc_vnoise eval per lit fragment (~48 ALU: 4 hashes + bilinear mix), glass-gated by mix so the non-glass result is bit-identical to 1.0; rides the quad pass, never shed separately from it',
 });

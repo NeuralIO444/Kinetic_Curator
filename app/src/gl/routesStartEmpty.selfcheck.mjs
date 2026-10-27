@@ -5,12 +5,23 @@ import { readFileSync } from 'node:fs';
 import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { autoInvites } from './stimuliAuto.mjs';
-import { DEFAULT_ROUTES, METRO_BREATH, hasNoRoutes, effectiveRoutes, metroBreath, audioRoutes } from './audioRoutes.mjs';
+import {
+  DEFAULT_ROUTES,
+  METRO_BREATH,
+  hasNoRoutes,
+  effectiveRoutes,
+  metroBreath,
+  audioRoutes,
+} from './audioRoutes.mjs';
 const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const loud = { rms: 0.8, bass: 0.9, mid: 0.6, treble: 0.5, beatPulse: 1 };
 const P = { depth: 1, scaleMod: 1, alphaMod: 1 };
@@ -24,7 +35,10 @@ ok('a fresh store has no routes at all ([]), not the default table', () => {
 
 ok('with an empty table real audio moves nothing until routes exist (AUTO builds them)', () => {
   const r = audioRoutes(loud, P, [], null);
-  assert.equal(r.scaleMul, 1); assert.equal(r.alphaBoost, 0); assert.equal(r.breathAudio, 0); assert.equal(r.glow, 0);
+  assert.equal(r.scaleMul, 1);
+  assert.equal(r.alphaBoost, 0);
+  assert.equal(r.breathAudio, 0);
+  assert.equal(r.glow, 0);
   const d = audioRoutes(loud, P, null, null);
   assert.ok(d.scaleMul > 1, 'the default table, by contrast, reacts');
 });
@@ -38,7 +52,9 @@ ok('a fresh project saves its empty table, and loads it back empty (it is a stat
 });
 
 ok('a document saved before this (no table) still loads as the default, so old sessions are untouched', () => {
-  const old = JSON.parse(JSON.stringify(serializeProject({ seed: 7, paletteId: 'bone', layoutParams: {}, audioRoutes: null })));
+  const old = JSON.parse(
+    JSON.stringify(serializeProject({ seed: 7, paletteId: 'bone', layoutParams: {}, audioRoutes: null })),
+  );
   assert.ok(!('audioRoutes' in old));
   assert.strictEqual(parseProject(old).doc.audioRoutes, null, 'absent -> default table');
   useStore.getState().applyProject(parseProject(old).doc);
@@ -62,7 +78,11 @@ ok('the metro keeps a small breath of its own: only with an empty table, no audi
   assert.equal(metroBreath({ ...live, metro: false }), 0, 'metro off: still');
   assert.equal(metroBreath({ ...live, audioOn: true }), 0, 'real audio replaces it');
   assert.equal(metroBreath({ ...live, routes: null }), 0, 'the default table has its own beat routes');
-  assert.equal(metroBreath({ ...live, routes: [{ input: 'beat', target: 'render.scale', depth: 0.1 }] }), 0, 'routing the beat anywhere replaces it');
+  assert.equal(
+    metroBreath({ ...live, routes: [{ input: 'beat', target: 'render.scale', depth: 0.1 }] }),
+    0,
+    'routing the beat anywhere replaces it',
+  );
   assert.ok(metroBreath({ ...live, beatPulse: NaN }) === 0 && metroBreath({ ...live, beatPulse: 99 }) <= 0.2);
 });
 
@@ -75,19 +95,35 @@ ok('her set is not inert: with no routes of your own it uses the default routing
 });
 
 ok('the guided path: AUDIO ON shimmers while audio is off, then AUTO once audio is on and nothing is routed', () => {
-  assert.equal(autoInvites({ audioEnabled: false, routeCount: 0 }), false, 'audio off: the AUDIO button is the invitation');
+  assert.equal(
+    autoInvites({ audioEnabled: false, routeCount: 0 }),
+    false,
+    'audio off: the AUDIO button is the invitation',
+  );
   assert.equal(autoInvites({ audioEnabled: true, routeCount: 0 }), true, 'audio on and no routes: AUTO');
   assert.equal(autoInvites({ audioEnabled: true, routeCount: 3 }), false, 'a route exists: quiet');
   const m = src('../panels/stimulus/ModMatrix.jsx');
-  assert.match(flat(m), fre(/className=\{`chip-btn act\$\{autoInvited \? ' xl-shimmer' : ''\}`\} onClick=\{\(\) => \{ markAuto\(\); autoSetup\(\); \}\}/));
+  assert.match(
+    flat(m),
+    fre(
+      /className=\{`chip-btn act\$\{autoInvited \? ' xl-shimmer' : ''\}`\} onClick=\{\(\) => \{ markAuto\(\); autoSetup\(\); \}\}/,
+    ),
+  );
   assert.match(m, /useInvite\('auto'\)/);
-  assert.match(src('../panels/StimulusPanel.jsx'), /\$\{audioEnabled \? 'on' : 'invite'\}/, 'the AUDIO button still invites while off');
+  assert.match(
+    src('../panels/StimulusPanel.jsx'),
+    /\$\{audioEnabled \? 'on' : 'invite'\}/,
+    'the AUDIO button still invites while off',
+  );
 });
 
 ok('wiring: the loop uses these, and the slice default is []', () => {
   const loop = src('./liveLoop.mjs');
   assert.match(loop, /effectiveRoutes\(s\.audioRoutes, !!synth\)/);
-  assert.match(loop, /metroBreath\(\{ routes: s\.audioRoutes, audioOn, metro: s\.beatMetro, beatPulse: s\.beatPulse \}\)/);
+  assert.match(
+    loop,
+    /metroBreath\(\{ routes: s\.audioRoutes, audioOn, metro: s\.beatMetro, beatPulse: s\.beatPulse \}\)/,
+  );
   assert.match(src('../state/slices/audioSlice.js'), /audioRoutes: \[\],/);
 });
 

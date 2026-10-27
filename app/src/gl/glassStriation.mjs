@@ -48,5 +48,6 @@ registerCostTier('light/glass-striation', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.05,
-  notes: '#1129 PR4: internal striations for glass instances — one kc_vnoise eval + sine per lit fragment (~50 ALU), glass-gated by mix so the non-glass result is bit-identical to 1.0; rides the quad pass, never shed separately from it',
+  notes:
+    '#1129 PR4: internal striations for glass instances — one kc_vnoise eval + sine per lit fragment (~50 ALU), glass-gated by mix so the non-glass result is bit-identical to 1.0; rides the quad pass, never shed separately from it',
 });

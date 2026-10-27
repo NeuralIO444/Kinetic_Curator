@@ -16,7 +16,7 @@ export function stretchCorner(c, amount, seed) {
   const m = (s * 2 - Math.floor(s * 2)) * 2 - 1; // -1..1 magnitude+sign
   const ax = s < 0.5 ? m : m * 0.25; // one axis dominates: wider or taller, never both equally
   const ay = s < 0.5 ? m * 0.25 : m;
-  return { x: c.x * (1 + amount * 0.30 * ax), y: c.y * (1 + amount * 0.30 * ay) };
+  return { x: c.x * (1 + amount * 0.3 * ax), y: c.y * (1 + amount * 0.3 * ay) };
 }
 
 export function nickCorner(c, amount, seed, cornerIndex) {
@@ -41,7 +41,7 @@ export function openAlpha(alpha, local, amount, seed) {
   const istr = seed * 3.3 - Math.floor(seed * 3.3); // ink pick strand
   const ipick = Math.min(3, Math.floor(istr * 4)); // 0 stroke, 1 hollow, 2 double, 3 crop
   if (ipick === 0) {
-    const edge = (d < 0.05 ? 0 : d < 0.22 ? (d - 0.05) / 0.17 : d < 0.34 ? 1 : d < 0.48 ? 1 - (d - 0.34) / 0.14 : 0);
+    const edge = d < 0.05 ? 0 : d < 0.22 ? (d - 0.05) / 0.17 : d < 0.34 ? 1 : d < 0.48 ? 1 - (d - 0.34) / 0.14 : 0;
     return alpha * (1 - amount + amount * edge);
   }
   if (ipick === 1) {
@@ -60,6 +60,6 @@ export function openAlpha(alpha, local, amount, seed) {
   const cedge = 0.4 + (cstr * 7 - Math.floor(cstr * 7)) * 0.2; // 0.4..0.6
   const coord = cfg === 0 ? local.x : cfg === 1 ? 1 - local.x : cfg === 2 ? local.y : 1 - local.y;
   const ct = Math.max(0, Math.min(1, (coord - cedge) / 0.08));
-  const keep = 1 - (ct * ct * (3 - 2 * ct)); // smoothstep falloff
+  const keep = 1 - ct * ct * (3 - 2 * ct); // smoothstep falloff
   return alpha * (1 - amount + amount * keep);
 }

@@ -107,7 +107,10 @@ test('live swarm modes advance real particle physics', () => {
   assert.equal(pa.length, pb.length);
   assert.ok(pa.length > 0);
   // Physics advanced between resolves (positions moved).
-  assert.ok(pa.some((x, i) => Math.abs(x - pb[i]) > 1e-9), 'swarm moved between frames');
+  assert.ok(
+    pa.some((x, i) => Math.abs(x - pb[i]) > 1e-9),
+    'swarm moved between frames',
+  );
   for (const it of b[0].items) assert.ok(it.assetId, 'swarm item has assetId');
   r.dispose();
 });
@@ -132,9 +135,11 @@ test('known asset ids resolve (pool sanity)', () => {
 
 test('#269: null layers are skipped, not thrown', () => {
   const r = createLiveResolver();
-  const out = r.resolveLayers(baseInput({
-    layers: [null, { id: 'lyr-a', name: 'A', visible: true }],
-  }));
+  const out = r.resolveLayers(
+    baseInput({
+      layers: [null, { id: 'lyr-a', name: 'A', visible: true }],
+    }),
+  );
   assert.equal(out.length, 1);
   assert.equal(out[0].id, 'lyr-a');
   assert.ok(out[0].items.length > 0);
@@ -143,9 +148,11 @@ test('#269: null layers are skipped, not thrown', () => {
 
 test('#269: rotate:null degrades to zero rotation', () => {
   const r = createLiveResolver();
-  const out = r.resolveLayers(baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 40, rotate: null },
-  }));
+  const out = r.resolveLayers(
+    baseInput({
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 40, rotate: null },
+    }),
+  );
   const content = out.find((l) => l.id === 'lyr-a');
   assert.ok(content.items.length > 0);
   for (const it of content.items) assert.equal(it.rotation, 0);
@@ -154,11 +161,13 @@ test('#269: rotate:null degrades to zero rotation', () => {
 
 test('#269: negative particleCount floors to 0 instead of RangeError', () => {
   const r = createLiveResolver();
-  const out = r.resolveLayers(baseInput({
-    layers: [{ id: 'lyr-s', name: 'S', visible: true }],
-    activeLayerId: 'lyr-s',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: -50 },
-  }));
+  const out = r.resolveLayers(
+    baseInput({
+      layers: [{ id: 'lyr-s', name: 'S', visible: true }],
+      activeLayerId: 'lyr-s',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: -50 },
+    }),
+  );
   assert.equal(out[0].items.length, 0);
   r.dispose();
 });
@@ -168,7 +177,11 @@ function modInput(patch) {
     layers: [
       { id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
       {
-        id: 'lyr-b', name: 'B', visible: true, layerBlendMode: 'normal', layerOpacity: 1,
+        id: 'lyr-b',
+        name: 'B',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
         patch,
       },
     ],
@@ -199,7 +212,7 @@ test('#343: MOD patch perturbs the target when the source track has motion', () 
     const base = bOff.items[i];
     return base && (it.scale !== base.scale || it.alpha !== base.alpha || it.x !== base.x);
   });
-  assert.ok(changed, 'a swarm source with real motion perturbs the MOD target\'s scale/alpha/x');
+  assert.ok(changed, "a swarm source with real motion perturbs the MOD target's scale/alpha/x");
 });
 
 test('#457: patch target resolves by stable layer id, not an ordinal into the visible-only list', () => {
@@ -213,24 +226,47 @@ test('#457: patch target resolves by stable layer id, not an ordinal into the vi
     { id: 'lyr-decoy', name: 'Decoy', visible: decoyVisible, layerBlendMode: 'normal', layerOpacity: 1 },
     { id: 'lyr-src', name: 'Src', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
     {
-      id: 'lyr-target', name: 'Target', visible: true, layerBlendMode: 'normal', layerOpacity: 1,
+      id: 'lyr-target',
+      name: 'Target',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
       patch: { mode: 'mod', to: 'lyr-src', strength: 1 },
     },
   ];
-  const mk = (decoyVisible) => baseInput({
-    layers: layers(decoyVisible),
-    activeLayerId: 'lyr-src',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', count: 30, particleCount: 30, behave: 'scatter' },
-    layerSnapshots: {
-      'lyr-decoy': { seed: 111, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 15 }, caGrid: null, enabledAssets: null },
-      'lyr-target': { seed: 333, paletteId: 'bone', paletteOverrides: null, layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20 }, caGrid: null, enabledAssets: null },
-    },
-  });
+  const mk = (decoyVisible) =>
+    baseInput({
+      layers: layers(decoyVisible),
+      activeLayerId: 'lyr-src',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', count: 30, particleCount: 30, behave: 'scatter' },
+      layerSnapshots: {
+        'lyr-decoy': {
+          seed: 111,
+          paletteId: 'bone',
+          paletteOverrides: null,
+          layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 15 },
+          caGrid: null,
+          enabledAssets: null,
+        },
+        'lyr-target': {
+          seed: 333,
+          paletteId: 'bone',
+          paletteOverrides: null,
+          layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 20 },
+          caGrid: null,
+          enabledAssets: null,
+        },
+      },
+    });
   const targetItems = (out) => out.find((l) => l.id === 'lyr-target').items;
 
   const decoyShown = targetItems(createLiveResolver().resolveLayers(mk(true)));
   const decoyHidden = targetItems(createLiveResolver().resolveLayers(mk(false)));
-  assert.deepEqual(decoyHidden, decoyShown, 'hiding an unrelated layer earlier in the stack must not change what the patch targets');
+  assert.deepEqual(
+    decoyHidden,
+    decoyShown,
+    'hiding an unrelated layer earlier in the stack must not change what the patch targets',
+  );
 });
 
 test('#343: MOD is a no-op when strength is 0', () => {
@@ -271,16 +307,20 @@ test('#509: shared scent field carries across ticks without breaking the pipelin
     { id: 'lyr-m2', name: 'M2', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
   ];
   const moldSnap = (seed) => ({
-    seed, paletteId: 'bone', paletteOverrides: null,
+    seed,
+    paletteId: 'bone',
+    paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
-    caGrid: null, enabledAssets: null,
+    caGrid: null,
+    enabledAssets: null,
   });
-  const mk = () => baseInput({
-    layers: moldLayers(),
-    activeLayerId: 'lyr-m1',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
-    layerSnapshots: { 'lyr-m1': moldSnap(101), 'lyr-m2': moldSnap(202) },
-  });
+  const mk = () =>
+    baseInput({
+      layers: moldLayers(),
+      activeLayerId: 'lyr-m1',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'mold', count: 12, particleCount: 12 },
+      layerSnapshots: { 'lyr-m1': moldSnap(101), 'lyr-m2': moldSnap(202) },
+    });
   const r = createLiveResolver();
   const t1 = r.resolveLayers(mk());
   const t2 = r.resolveLayers(mk());
@@ -340,21 +380,36 @@ function input425(over = {}) {
 test('#425: per-layer life drift is byte-identical across a focus swap', () => {
   const r = createLiveResolver();
   const snapOf = (params, locks, seed) => ({
-    seed, paletteId: 'bone', paletteOverrides: null, layoutParams: params,
-    caGrid: null, enabledAssets: null, lockedParams: locks,
+    seed,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    layoutParams: params,
+    caGrid: null,
+    enabledAssets: null,
+    lockedParams: locks,
   });
   // R1: A active (top-level = A), B from its snapshot.
-  const r1 = r.resolveLayers(input425({
-    activeLayerId: 'lyr-a', layoutParams: A425, seed: 111, lockedParams: A425_LOCKS,
-    layerSnapshots: { 'lyr-b': snapOf(B425, B425_LOCKS, 999) },
-    focusSwap: false,
-  }));
+  const r1 = r.resolveLayers(
+    input425({
+      activeLayerId: 'lyr-a',
+      layoutParams: A425,
+      seed: 111,
+      lockedParams: A425_LOCKS,
+      layerSnapshots: { 'lyr-b': snapOf(B425, B425_LOCKS, 999) },
+      focusSwap: false,
+    }),
+  );
   // R2: the click — top-level becomes B, A moves to its snapshot.
-  const r2 = r.resolveLayers(input425({
-    activeLayerId: 'lyr-b', layoutParams: B425, seed: 999, lockedParams: B425_LOCKS,
-    layerSnapshots: { 'lyr-a': snapOf(A425, A425_LOCKS, 111) },
-    focusSwap: true,
-  }));
+  const r2 = r.resolveLayers(
+    input425({
+      activeLayerId: 'lyr-b',
+      layoutParams: B425,
+      seed: 999,
+      lockedParams: B425_LOCKS,
+      layerSnapshots: { 'lyr-a': snapOf(A425, A425_LOCKS, 111) },
+      focusSwap: true,
+    }),
+  );
   const a1 = r1.find((l) => l.id === 'lyr-a');
   const a2 = r2.find((l) => l.id === 'lyr-a');
   const b1 = r1.find((l) => l.id === 'lyr-b');
@@ -385,7 +440,10 @@ test('#425: per-layer life drift is byte-identical across a focus swap', () => {
 
 test('#425: life drift pauses with batch exports / slowRender / low lifeDrift', () => {
   const base = {
-    activeLayerId: 'lyr-a', layoutParams: A425, seed: 111, lockedParams: {},
+    activeLayerId: 'lyr-a',
+    layoutParams: A425,
+    seed: 111,
+    lockedParams: {},
     layerSnapshots: {},
   };
   const driftOf = (over) => {
@@ -416,24 +474,43 @@ test('#425: life drift pauses with batch exports / slowRender / low lifeDrift', 
 test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', () => {
   const r = createLiveResolver();
   const snapA = {
-    seed: 111, paletteId: 'bone', paletteOverrides: null,
+    seed: 111,
+    paletteId: 'bone',
+    paletteOverrides: null,
     layoutParams: { ...A425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    caGrid: null, enabledAssets: null, lockedParams: {},
-  };
-  const aActive111 = (loopTimeMs = 1000) => r.resolveLayers(input425({
-    activeLayerId: 'lyr-a', layoutParams: { ...A425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 }, seed: 111,
-    lockedParams: {}, layerSnapshots: {}, focusSwap: false, loopTimeMs,
-  }));
-  const clickToB = (seed, focusSwap) => r.resolveLayers(input425({
-    activeLayerId: 'lyr-b',
-    layoutParams: { ...B425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    seed, // the swapped-in layer's different seed
+    caGrid: null,
+    enabledAssets: null,
     lockedParams: {},
-    layerSnapshots: { 'lyr-a': snapA },
-    focusSwap,
-    loopTimeMs: 1000, // warp must be live (curDx != baseDx)
-  }));
-  const coord = (frame) => frame.find((l) => l.id === 'lyr-a').items.map((i) => `${i.x},${i.y}`).join(';');
+  };
+  const aActive111 = (loopTimeMs = 1000) =>
+    r.resolveLayers(
+      input425({
+        activeLayerId: 'lyr-a',
+        layoutParams: { ...A425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
+        seed: 111,
+        lockedParams: {},
+        layerSnapshots: {},
+        focusSwap: false,
+        loopTimeMs,
+      }),
+    );
+  const clickToB = (seed, focusSwap) =>
+    r.resolveLayers(
+      input425({
+        activeLayerId: 'lyr-b',
+        layoutParams: { ...B425, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
+        seed, // the swapped-in layer's different seed
+        lockedParams: {},
+        layerSnapshots: { 'lyr-a': snapA },
+        focusSwap,
+        loopTimeMs: 1000, // warp must be live (curDx != baseDx)
+      }),
+    );
+  const coord = (frame) =>
+    frame
+      .find((l) => l.id === 'lyr-a')
+      .items.map((i) => `${i.x},${i.y}`)
+      .join(';');
 
   // #432 — the warp phase is now accumulated incrementally (real elapsed
   // loopTimeMs since the layer's last resolve), not derived fresh from the
@@ -453,22 +530,25 @@ test('#425: focus swap keeps the shared weather; a genuine reseed re-rolls it', 
 
 test('#419: chip morph plans once at the click, blends, then lands raw', () => {
   const r = createLiveResolver();
-  const mk = (mode, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    mixSeconds: 0.5,
-    loopTimeMs,
-  });
+  const mk = (mode, loopTimeMs) =>
+    baseInput({
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
-  const before = lyr(r.resolveLayers(mk('scatter', 0)));      // baseline, sig recorded
-  const start = lyr(r.resolveLayers(mk('grid', 1000)));       // chip click: plan built, t=0
-  const mid = lyr(r.resolveLayers(mk('grid', 1250)));         // t=0.5, plan in use
-  const done = lyr(r.resolveLayers(mk('grid', 1600)));        // past mixSeconds: landed
+  const before = lyr(r.resolveLayers(mk('scatter', 0))); // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk('grid', 1000))); // chip click: plan built, t=0
+  const mid = lyr(r.resolveLayers(mk('grid', 1250))); // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk('grid', 1600))); // past mixSeconds: landed
   const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 1600)));
 
   assert.deepEqual(start, before, 'first frame after the click still presents the old layout');
   assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw target layout');
-  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
-    'planned blend produces finite positions every frame');
+  assert.ok(
+    mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame',
+  );
   assert.deepEqual(done, raw, 'completed morph presents the raw resolved items');
   r.dispose();
 });
@@ -480,8 +560,13 @@ test('#419: chip morph plans once at the click, blends, then lands raw', () => {
 // the pool's CONTENT, so both route through the director's scale swap.
 
 const userAsset = (svg) => ({
-  id: 'user:motif', category: 'fragments', weight: 'medium',
-  tags: ['overlay'], compound: false, source: 'overlay', svg,
+  id: 'user:motif',
+  category: 'fragments',
+  weight: 'medium',
+  tags: ['overlay'],
+  compound: false,
+  source: 'overlay',
+  svg,
 });
 
 /** Mid-transition, has any node dipped below the size it rests at? */
@@ -512,30 +597,52 @@ test('#564: swapping an overlay asset SVG under the same id fires the director',
   // Same array identity per call for a given svg, as the store hands it over.
   const poolV1 = [userAsset('<path d="M0 0 L10 10"/>')];
   const poolV2 = [userAsset('<circle cx="5" cy="5" r="4"/>')];
-  const mk = (customAssets, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    customAssets, mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (customAssets, loopTimeMs) =>
+    baseInput({
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'scatter',
+        count: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      customAssets,
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
-  lyr(r.resolveLayers(mk(poolV1, 0)));                  // baseline, sig recorded
+  lyr(r.resolveLayers(mk(poolV1, 0))); // baseline, sig recorded
   const start = lyr(r.resolveLayers(mk(poolV2, 1000))); // the SWAP
   const mid = lyr(r.resolveLayers(mk(poolV2, 1250)));
   const done = lyr(r.resolveLayers(mk(poolV2, 1600)));
   const raw = lyr(createLiveResolver().resolveLayers(mk(poolV2, 1600)));
 
   assert.ok(dipped(mid, raw), 'the swap shrinks nodes through it — it no longer snaps');
-  assert.ok(start.every((it) => Number.isFinite(it.x) && Number.isFinite(it.scale)),
-    'the transition produces finite items from its first frame');
+  assert.ok(
+    start.every((it) => Number.isFinite(it.x) && Number.isFinite(it.scale)),
+    'the transition produces finite items from its first frame',
+  );
   assert.deepEqual(done, raw, 'and lands on the raw resolved items');
   r.dispose();
 });
 
 test('#564: an asset weight edit fires the director', () => {
   const r = createLiveResolver();
-  const mk = (assetWeightOverrides, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    assetWeightOverrides, mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (assetWeightOverrides, loopTimeMs) =>
+    baseInput({
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'scatter',
+        count: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      assetWeightOverrides,
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   // ASSETS[0] ships 'heavy', so 'light' is a real edit, not a no-op write.
   lyr(r.resolveLayers(mk({}, 0)));
@@ -554,10 +661,20 @@ test('#564: a governor asset shed is NOT a transition — different class', () =
   // BEFORE the thin on purpose: a shed must not spend a MIX-long swap wave
   // on top of the load that caused it.
   const r = createLiveResolver();
-  const mk = (assetThin, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    assetThin, mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (assetThin, loopTimeMs) =>
+    baseInput({
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'scatter',
+        count: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      assetThin,
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   lyr(r.resolveLayers(mk(false, 0)));
   const shed = lyr(r.resolveLayers(mk(true, 1000)));
@@ -576,10 +693,12 @@ test('#564: a governor asset shed is NOT a transition — different class', () =
 /** Baseline at t=0, change params at t=1000; return the mid, landed and raw frames. */
 function mirrorRun(from, to, mode = 'scatter') {
   const r = createLiveResolver();
-  const mk = (lp, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0, ...lp },
-    mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (lp, loopTimeMs) =>
+    baseInput({
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0, ...lp },
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   lyr(r.resolveLayers(mk(from, 0)));
   lyr(r.resolveLayers(mk(to, 1000)));
@@ -592,14 +711,20 @@ function mirrorRun(from, to, mode = 'scatter') {
 
 test('#564: toggling mirror fires the director', () => {
   const { mid, done, raw } = mirrorRun({ mirror: false }, { mirror: true });
-  assert.ok(raw.some((it) => it._mirrored), 'mirror on really does append mirrored copies');
+  assert.ok(
+    raw.some((it) => it._mirrored),
+    'mirror on really does append mirrored copies',
+  );
   assert.ok(dipped(mid, raw), 'the new half grows in from zero — it does not pop');
   assert.deepEqual(done, raw, 'and it lands on the raw resolved items');
 });
 
 test("#564: symmetry 'stamp' fires the director", () => {
   const { mid, done, raw } = mirrorRun({ symmetry: 'none' }, { symmetry: 'stamp' }, 'swarm');
-  assert.ok(raw.some((it) => it._mirrored), 'stamp really does append mirrored copies');
+  assert.ok(
+    raw.some((it) => it._mirrored),
+    'stamp really does append mirrored copies',
+  );
   assert.ok(dipped(mid, raw), 'the stamped half grows in from zero — it does not pop');
   // Swarm physics is stateful, so a fresh resolver's frame is not bit-equal to
   // the warmed one's — assert the landing structurally instead.
@@ -612,15 +737,21 @@ test('#564: a governor perfTier1 clamp of mirror is NOT a transition — differe
   // AUTHORED mirror, so the clamp must not spend a swap wave on the load
   // that caused it — the clamped frame presents its raw items immediately.
   const r = createLiveResolver();
-  const mk = (perfTier1, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, mirror: true },
-    perfTier1, mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (perfTier1, loopTimeMs) =>
+    baseInput({
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, mirror: true },
+      perfTier1,
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   const before = lyr(r.resolveLayers(mk(false, 0)));
   const clamped = lyr(r.resolveLayers(mk(true, 1000)));
   const rawClamped = lyr(createLiveResolver().resolveLayers(mk(true, 1000)));
-  assert.ok(before.some((it) => it._mirrored), 'baseline really was mirrored');
+  assert.ok(
+    before.some((it) => it._mirrored),
+    'baseline really was mirrored',
+  );
   assert.ok(!rawClamped.some((it) => it._mirrored), 'the clamp really did drop the mirrored half');
   assert.deepEqual(clamped, rawClamped, 'the clamp presents its raw items immediately, no transition');
   r.dispose();
@@ -632,11 +763,20 @@ test('#564: a governor perfTier1 clamp of mirror is NOT a transition — differe
 // (interim — the colour transitions are the Sleight v2 modes, #624/#625).
 test('#622: a palette-only change is NOT a transition — no scale swap, colours land at once', () => {
   const r = createLiveResolver();
-  const mk = (paletteId, loopTimeMs) => baseInput({
-    paletteId,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    mixSeconds: 2, loopTimeMs,
-  });
+  const mk = (paletteId, loopTimeMs) =>
+    baseInput({
+      paletteId,
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'scatter',
+        count: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      mixSeconds: 2,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   const before = lyr(r.resolveLayers(mk('praystation', 0)));
   const colors = (its) => [...new Set(its.map((it) => it.color))].sort().join(',');
@@ -655,17 +795,22 @@ test('#622: a palette-only change is NOT a transition — no scale swap, colours
 test('#622: mode still fires the director while palette does not', () => {
   // The other sig fields are untouched: a mode change alongside is still a transition.
   const r = createLiveResolver();
-  const mk = (mode, paletteId, loopTimeMs) => baseInput({
-    paletteId,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    mixSeconds: 0.5, loopTimeMs,
-  });
+  const mk = (mode, paletteId, loopTimeMs) =>
+    baseInput({
+      paletteId,
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
   lyr(r.resolveLayers(mk('scatter', 'praystation', 0)));
   lyr(r.resolveLayers(mk('grid', 'hydra', 1000)));
   const mid = lyr(r.resolveLayers(mk('grid', 'hydra', 1250)));
   const raw = lyr(createLiveResolver().resolveLayers(mk('grid', 'hydra', 1250)));
-  assert.ok(midMove(mid, raw), 'a mode change (with a palette change) still fires the director — nodes play their moves through the swap');
+  assert.ok(
+    midMove(mid, raw),
+    'a mode change (with a palette change) still fires the director — nodes play their moves through the swap',
+  );
   r.dispose();
 });
 
@@ -676,36 +821,47 @@ test('#471: a seed change alone now glides through item-morph, not a hard snap',
   // seed into morphSig routes it through the same blendItems/morphEase
   // glide every other chip-triggered field already gets.
   const r = createLiveResolver();
-  const mk = (seed, loopTimeMs) => baseInput({
-    seed,
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    mixSeconds: 0.5,
-    loopTimeMs,
-  });
+  const mk = (seed, loopTimeMs) =>
+    baseInput({
+      seed,
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'grid',
+        count: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      mixSeconds: 0.5,
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
-  const before = lyr(r.resolveLayers(mk(1111, 0)));       // baseline, sig recorded
-  const start = lyr(r.resolveLayers(mk(2222, 1000)));     // seed change (EVOLVE-style): plan built, t=0
-  const mid = lyr(r.resolveLayers(mk(2222, 1250)));       // t=0.5, plan in use
-  const done = lyr(r.resolveLayers(mk(2222, 1600)));      // past mixSeconds: landed
+  const before = lyr(r.resolveLayers(mk(1111, 0))); // baseline, sig recorded
+  const start = lyr(r.resolveLayers(mk(2222, 1000))); // seed change (EVOLVE-style): plan built, t=0
+  const mid = lyr(r.resolveLayers(mk(2222, 1250))); // t=0.5, plan in use
+  const done = lyr(r.resolveLayers(mk(2222, 1600))); // past mixSeconds: landed
   const raw = lyr(createLiveResolver().resolveLayers(mk(2222, 1600)));
 
   assert.deepEqual(start, before, 'first frame after a seed change still presents the old placement');
   assert.notDeepEqual(mid, raw, 'mid-transition presents a blend, not the raw new-seed placement');
-  assert.ok(mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
-    'planned blend produces finite positions every frame');
+  assert.ok(
+    mid.every((it) => Number.isFinite(it.x) && Number.isFinite(it.y)),
+    'planned blend produces finite positions every frame',
+  );
   assert.deepEqual(done, raw, 'completed morph presents the raw resolved items at the new seed');
   r.dispose();
 });
 
 test('#451: overlap:false sorts by pre-breath baseScale — draw order does not flip on every breath crossing', () => {
   const r = createLiveResolver();
-  const mk = (loopTimeMs) => baseInput({
-    layers: [{ id: 'lyr-s', name: 'S', visible: true }],
-    activeLayerId: 'lyr-s',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 24, overlap: false, breath: 1 },
-    loopTimeMs,
-    dtSec: 1 / 30,
-  });
+  const mk = (loopTimeMs) =>
+    baseInput({
+      layers: [{ id: 'lyr-s', name: 'S', visible: true }],
+      activeLayerId: 'lyr-s',
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 24, overlap: false, breath: 1 },
+      loopTimeMs,
+      dtSec: 1 / 30,
+    });
   r.resolveLayers(mk(0)); // warm-up: let spawn settle before measuring
 
   let prevOrder = null;
@@ -723,12 +879,18 @@ test('#451: overlap:false sorts by pre-breath baseScale — draw order does not 
     // Proves this scenario actually exercises a breath-driven crossing: had
     // the live (breathing) scale been the sort key instead, this frame's
     // order would differ from the baseScale order.
-    const liveOrder = [...items].sort((a, b) => a.scale - b.scale).map((it) => it.seedOffset).join(',');
+    const liveOrder = [...items]
+      .sort((a, b) => a.scale - b.scale)
+      .map((it) => it.seedOffset)
+      .join(',');
     if (liveOrder !== order) sawLiveScaleCross = true;
     if (prevOrder !== null && order !== prevOrder) orderFlips++;
     prevOrder = order;
   }
-  assert.ok(sawLiveScaleCross, 'test setup must actually exercise a live-scale crossing (breath amplitude too low otherwise)');
+  assert.ok(
+    sawLiveScaleCross,
+    'test setup must actually exercise a live-scale crossing (breath amplitude too low otherwise)',
+  );
   assert.equal(orderFlips, 0, 'baseScale-sorted draw order must not flip across frames while breath oscillates');
   r.dispose();
 });
@@ -742,15 +904,16 @@ test('#455: a continuously-lerped paletteOverrides during an auto-MIX must not r
     ink: '#ffffff',
     swatches: ['#112233'],
   });
-  const mk = (mode, loopTimeMs, paletteOverrides) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    mixSeconds: 0.5,
-    loopTimeMs,
-    paletteOverrides,
-  });
+  const mk = (mode, loopTimeMs, paletteOverrides) =>
+    baseInput({
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
+      mixSeconds: 0.5,
+      loopTimeMs,
+      paletteOverrides,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
 
-  r.resolveLayers(mk('scatter', 0, null));               // baseline, sig recorded
+  r.resolveLayers(mk('scatter', 0, null)); // baseline, sig recorded
   r.resolveLayers(mk('grid', 1000, lerpOverrides(1000))); // chip click: plan built, t=0
 
   // A live auto-MIX driving paletteOverrides every frame while mode/behave/
@@ -776,12 +939,21 @@ test('#427: adopt-on-enter — a chip into a live swarm mode starts from the pri
   // which is a real but different case from what this test isolates.
   const orgAssets = ASSETS.filter((a) => /^(org_|geo_tri_)/.test(a.id)).map((a) => a.id);
   const enabledAssets = Object.fromEntries(orgAssets.map((id) => [id, true]));
-  const mk = (mode, loopTimeMs) => baseInput({
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode, count: 24, particleCount: 24, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0 },
-    enabledAssets,
-    mixSeconds: 0, // #419's morph is orthogonal to this — isolate the init-time adopt itself
-    loopTimeMs,
-  });
+  const mk = (mode, loopTimeMs) =>
+    baseInput({
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode,
+        count: 24,
+        particleCount: 24,
+        lifeDrift: 0,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+      },
+      enabledAssets,
+      mixSeconds: 0, // #419's morph is orthogonal to this — isolate the init-time adopt itself
+      loopTimeMs,
+    });
   const lyr = (out) => out.find((l) => l.id === 'lyr-a').items;
 
   const gridItems = lyr(r.resolveLayers(mk('grid', 0)));
@@ -828,7 +1000,15 @@ test('#427: adopt-on-enter — a chip into a live swarm mode starts from the pri
 // delta (curDx - baseDx) is exactly zero there — that frame's positions
 // ARE the static (pre-warp) reference, with no separate probe needed.
 
-const WARP442_LP = { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 6, lifeDrift: 0, kinemeBreath: 0, kinemeDrift: 0, displacement: 40 };
+const WARP442_LP = {
+  ...DEFAULT_LAYOUT_PARAMS,
+  mode: 'scatter',
+  count: 6,
+  lifeDrift: 0,
+  kinemeBreath: 0,
+  kinemeDrift: 0,
+  displacement: 40,
+};
 const warp442Items = (out) => out.find((l) => l.id === 'lyr-a').items;
 function assertWarpMatches(staticPos, after, { seed, noiseFreq, displacement, ntLive, nt0 }, msg) {
   const noise = createNoise(seed >>> 0);
@@ -850,7 +1030,7 @@ test('#442: warp phase — a mid-stream speed change is continuous (bounded by e
 
   // 600s of real elapsed time at speed 0.5 -- a large absolute session
   // time, exactly the regime where the pre-#432 formula misbehaved.
-  warp442Items(r.resolveLayers(mk(0, 0.5)));       // establish wp at t=0
+  warp442Items(r.resolveLayers(mk(0, 0.5))); // establish wp at t=0
   warp442Items(r.resolveLayers(mk(600_000, 0.5)));
   // +1s at a very different speed (0.5 -> 2.8). Under the fixed formula
   // this adds only 1s * 2.8 to the phase; under the old formula this
@@ -872,7 +1052,8 @@ test('#442: warp phase — a mid-stream speed change is continuous (bounded by e
   const nt0 = (seed & 0xffff) * 0.02;
   const expectedBase = 600 * 0.5 + 1 * 2.8; // seconds elapsed * speed, per segment
   assertWarpMatches(
-    staticPos, after,
+    staticPos,
+    after,
     { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
     'a mid-stream speed change must move the phase by elapsed time x the new speed, not by the whole elapsed session time',
   );
@@ -885,8 +1066,8 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   const speed = 1;
   const mk = (loopTimeMs) => baseInput({ seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs });
 
-  const staticPos = warp442Items(r.resolveLayers(mk(0)));       // wp.base = 0 -> static ref
-  const at1000 = warp442Items(r.resolveLayers(mk(1000)));       // 1s elapsed -> wp.base = 1 * speed
+  const staticPos = warp442Items(r.resolveLayers(mk(0))); // wp.base = 0 -> static ref
+  const at1000 = warp442Items(r.resolveLayers(mk(1000))); // 1s elapsed -> wp.base = 1 * speed
 
   // #421-style rejected/rolled-back frame: loopTimeMs goes BACKWARD to 500.
   // The pre-#432 formula tied ntLive directly to raw loopTimeMs, so this
@@ -910,7 +1091,8 @@ test('#442: warp phase — a backward loopTimeMs (a rejected/rolled-back frame, 
   const nt0 = (seed & 0xffff) * 0.02;
   const expectedBase = 1 * speed + (DELTA / 1000) * speed;
   assertWarpMatches(
-    staticPos, after,
+    staticPos,
+    after,
     { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
     "resuming forward after a rollback must match the resolver's own clamped-clock formula exactly",
   );
@@ -921,12 +1103,16 @@ test('#474: warpPhase does not lump-sum-credit a slowRender freeze once it lifts
   const seed = 5151;
   const r = createLiveResolver();
   const speed = 1;
-  const mk = (loopTimeMs, slowRender) => baseInput({
-    seed, layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs, slowRender: !!slowRender,
-  });
+  const mk = (loopTimeMs, slowRender) =>
+    baseInput({
+      seed,
+      layoutParams: { ...WARP442_LP, noiseSpeed: speed },
+      loopTimeMs,
+      slowRender: !!slowRender,
+    });
 
-  const staticPos = warp442Items(r.resolveLayers(mk(0)));  // wp.base = 0 -> static ref
-  warp442Items(r.resolveLayers(mk(1000)));                 // 1s elapsed, wp.base = 1 * speed
+  const staticPos = warp442Items(r.resolveLayers(mk(0))); // wp.base = 0 -> static ref
+  warp442Items(r.resolveLayers(mk(1000))); // 1s elapsed, wp.base = 1 * speed
 
   // A long governor cut6/watchdog freeze: liveLoop.mjs only rolls
   // loopTimeMs back for a true pause (!running); slowRender leaves it
@@ -943,7 +1129,8 @@ test('#474: warpPhase does not lump-sum-credit a slowRender freeze once it lifts
   const nt0 = (seed & 0xffff) * 0.02;
   const expectedBase = 1 * speed + (DELTA / 1000) * speed;
   assertWarpMatches(
-    staticPos, after,
+    staticPos,
+    after,
     { seed, noiseFreq: WARP442_LP.noiseFreq, displacement: WARP442_LP.displacement, ntLive: nt0 + expectedBase, nt0 },
     'resuming after a slowRender freeze must not credit the frozen span as warp progress',
   );
@@ -954,9 +1141,13 @@ test('#450: warpPhase persists across a layer being hidden and re-shown — no p
   const seed = 999;
   const speed = 1;
   const layer = (visible) => ({ id: 'lyr-a', name: 'A', visible, layerBlendMode: 'normal', layerOpacity: 1 });
-  const mk = (visible, loopTimeMs) => baseInput({
-    seed, layers: [layer(visible)], layoutParams: { ...WARP442_LP, noiseSpeed: speed }, loopTimeMs,
-  });
+  const mk = (visible, loopTimeMs) =>
+    baseInput({
+      seed,
+      layers: [layer(visible)],
+      layoutParams: { ...WARP442_LP, noiseSpeed: speed },
+      loopTimeMs,
+    });
 
   // Continuously visible: 0 -> 1000 -> 3000ms, no hide in between.
   const rContinuous = createLiveResolver();
@@ -977,6 +1168,9 @@ test('#450: warpPhase persists across a layer being hidden and re-shown — no p
   const hiddenAfter = warp442Items(rHidden.resolveLayers(mk(true, 3000)));
   rHidden.dispose();
 
-  assert.deepEqual(hiddenAfter, continuousAfter,
-    'hiding a layer and re-showing it later must land the warp exactly where it would be had the layer stayed visible throughout -- not reset to the phase-0 baseline');
+  assert.deepEqual(
+    hiddenAfter,
+    continuousAfter,
+    'hiding a layer and re-showing it later must land the warp exactly where it would be had the layer stayed visible throughout -- not reset to the phase-0 baseline',
+  );
 });

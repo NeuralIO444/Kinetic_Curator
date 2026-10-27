@@ -35,8 +35,8 @@ test('#865 stretch: amount 0 is identity, repeats per seed, clamps at 30% per ax
     const seed = i / 50;
     for (const amount of [0.25, 0.6, 1]) {
       const r = stretchCorner({ x: 40, y: -25 }, amount, seed);
-      assert.ok(Math.abs(r.x - 40) <= 0.30 * 40 + 1e-9, `x clamp seed=${seed} amount=${amount}`);
-      assert.ok(Math.abs(r.y - -25) <= 0.30 * 25 + 1e-9, `y clamp seed=${seed} amount=${amount}`);
+      assert.ok(Math.abs(r.x - 40) <= 0.3 * 40 + 1e-9, `x clamp seed=${seed} amount=${amount}`);
+      assert.ok(Math.abs(r.y - -25) <= 0.3 * 25 + 1e-9, `y clamp seed=${seed} amount=${amount}`);
     }
   }
   // the GLSL implements the stretch strand
@@ -64,7 +64,8 @@ test('#865 flip: amount 0 is identity, binary per seed, mirror is exact', () => 
   assert.deepEqual(flipCorner(c, 0, 0.3), c);
   assert.deepEqual(flipCorner(c, 0.6, 0.3), flipCorner(c, 0.6, 0.3), 'same seed repeats');
   // find one seed that flips and one that does not
-  let flipped = null, kept = null;
+  let flipped = null,
+    kept = null;
   for (let i = 0; i < 100 && (!flipped || !kept); i++) {
     const r = flipCorner(c, 0.6, i / 100);
     if (r.x === -c.x && r.y === c.y) flipped = r;
@@ -85,7 +86,10 @@ test('#868 double: amount 0 is identity, repeats per seed, faint mix bounded by 
   for (let i = 0; i < 200; i++) {
     const s = i / 200;
     const istr = s * 3.3 - Math.floor(s * 3.3);
-    if (Math.min(3, Math.floor(istr * 4)) === 2) { dseed = s; break; }
+    if (Math.min(3, Math.floor(istr * 4)) === 2) {
+      dseed = s;
+      break;
+    }
   }
   assert.ok(dseed !== null, 'some seed picks double');
   const a = openAlpha(0.8, local, 0.7, dseed);

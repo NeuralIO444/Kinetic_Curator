@@ -43,7 +43,11 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const SRC_ROOT = path.join(HERE, '..', '..'); // app/src
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const near = (a, b, tol, msg) => {
   assert.ok(Math.abs(a - b) <= tol, `${msg}: got ${a}, want ${b} ±${tol}`);
 };
@@ -61,11 +65,20 @@ ok('auditChunks is clean (pure, prefixed, documented, resolvable)', () => {
 
 ok('auditChunks catches violations', () => {
   const badUniform = COMMON_GLSL + '\nuniform float u_x;\nfloat kc_bad(vec2 p) { return u_x; }\n';
-  assert.ok(auditChunks(badUniform).errors.some((e) => /uniform/.test(e)), 'uniform rejected');
+  assert.ok(
+    auditChunks(badUniform).errors.some((e) => /uniform/.test(e)),
+    'uniform rejected',
+  );
   const badName = COMMON_GLSL + '\nfloat myhash(vec2 p) { return p.x; }\n';
-  assert.ok(auditChunks(badName).errors.some((e) => /kc_ prefix/.test(e)), 'prefix enforced');
+  assert.ok(
+    auditChunks(badName).errors.some((e) => /kc_ prefix/.test(e)),
+    'prefix enforced',
+  );
   const badCall = COMMON_GLSL + '\nfloat kc_bad2(vec2 p) { return kc_nope(p); }\n';
-  assert.ok(auditChunks(badCall).errors.some((e) => /undefined/.test(e)), 'undefined callee rejected');
+  assert.ok(
+    auditChunks(badCall).errors.some((e) => /undefined/.test(e)),
+    'undefined callee rejected',
+  );
 });
 
 ok('CHUNK_INDEX covers every defined chunk', () => {
@@ -93,7 +106,7 @@ ok('injectCommon maps #line for chunks and effect body', () => {
 ok('injectCommon output still declares no uniforms', () => {
   const out = injectCommon('#version 300 es\nuniform float u_x;\nvoid main() {}\n');
   const decls = [...out.matchAll(/uniform\s+\w+\s+(\w+)\s*;/g)].map((m) => m[1]);
-  assert.deepEqual(decls, ['u_x'], 'only the effect\'s own uniforms survive');
+  assert.deepEqual(decls, ['u_x'], "only the effect's own uniforms survive");
 });
 
 ok('no duplicated noise/hash/color implementations in the tree', () => {
@@ -111,7 +124,10 @@ ok('no duplicated noise/hash/color implementations in the tree', () => {
   const walk = (dir) => {
     for (const e of readdirSync(dir)) {
       const p = path.join(dir, e);
-      if (statSync(p).isDirectory()) { walk(p); continue; }
+      if (statSync(p).isDirectory()) {
+        walk(p);
+        continue;
+      }
       // chunks.mjs is the one file allowed to implement the primitives;
       // this selfcheck is the auditor, not the audited.
       if (!/\.(mjs|js|jsx)$/.test(e) || p === LIB || p === SELF) continue;
@@ -154,11 +170,18 @@ ok('CPU reference: hand-verifiable properties', () => {
   assert.equal(refLin2srgb(0), 0);
   near(refLin2srgb(1), 1, 1e-12, 'lin2srgb(1)');
   near(refLin2srgb(refSrgb2lin(0.5)), 0.5, 1e-12, 'srgb roundtrip');
-  for (const [x, y] of [[0.3, 0.7], [4.5, 7.5], [100.2, 0.1]]) {
+  for (const [x, y] of [
+    [0.3, 0.7],
+    [4.5, 7.5],
+    [100.2, 0.1],
+  ]) {
     const h = refHash12(x, y);
     assert.ok(h >= 0 && h < 1, `hash12 in [0,1): ${h}`);
     const h2 = refHash22(x, y);
-    assert.ok(h2.every((v) => v >= 0 && v < 1), 'hash22 in [0,1)^2');
+    assert.ok(
+      h2.every((v) => v >= 0 && v < 1),
+      'hash22 in [0,1)^2',
+    );
     const ig = refIgn(x, y);
     assert.ok(ig >= 0 && ig < 1, 'ign in [0,1)');
     const d = refDither(x, y);

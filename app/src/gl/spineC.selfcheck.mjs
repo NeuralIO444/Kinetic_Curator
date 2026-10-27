@@ -52,8 +52,18 @@ console.log('spineC.selfcheck: starting...');
   console.log(`  [ok] critically damped heading differs from snap (${differences}/${count} agents)`);
 
   // Verify that higher motionSmoothing (e.g. 2.0) converges faster toward target than lower (0.5)
-  const lpSlow = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', particleCount: count, motionSmoothing: 0.5 });
-  const lpFast = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', particleCount: count, motionSmoothing: 2.0 });
+  const lpSlow = normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    particleCount: count,
+    motionSmoothing: 0.5,
+  });
+  const lpFast = normalizeLayoutParams({
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    particleCount: count,
+    motionSmoothing: 2.0,
+  });
 
   const sysSlow = new ParticleSystem();
   sysSlow.init(count, 1000, 700, assets, palette, 0x99);
@@ -86,10 +96,8 @@ console.log('spineC.selfcheck: starting...');
   const scaleModAmt = 0.45;
   const alphaModAmt = 0.25;
 
-  const scaleMulZero = 1 + (
-    shapedZero.beatPulse * 0.38 * scaleModAmt +
-    (shapedZero.bass * 0.55 + shapedZero.rms * 0.35) * 0.28
-  ) * depth;
+  const scaleMulZero =
+    1 + (shapedZero.beatPulse * 0.38 * scaleModAmt + (shapedZero.bass * 0.55 + shapedZero.rms * 0.35) * 0.28) * depth;
   const alphaBoostZero = shapedZero.beatPulse * 18 * alphaModAmt * depth;
   const glowZero = Math.min(1, shapedZero.beatPulse * 0.8 + shapedZero.rms * 0.4) * depth;
 
@@ -102,10 +110,8 @@ console.log('spineC.selfcheck: starting...');
   const kick = { rms: 0.8, bass: 0.9, mid: 0.2, treble: 0.1, beatPulse: 1.0 };
   const shapedKick = processBallistics(follower, kick, 16.7, { attackMs: 25, releaseMs: 320 });
 
-  const scaleMulKick = 1 + (
-    shapedKick.beatPulse * 0.38 * scaleModAmt +
-    (shapedKick.bass * 0.55 + shapedKick.rms * 0.35) * 0.28
-  ) * depth;
+  const scaleMulKick =
+    1 + (shapedKick.beatPulse * 0.38 * scaleModAmt + (shapedKick.bass * 0.55 + shapedKick.rms * 0.35) * 0.28) * depth;
   const alphaBoostKick = shapedKick.beatPulse * 18 * alphaModAmt * depth;
   const glowKick = Math.min(1, shapedKick.beatPulse * 0.8 + shapedKick.rms * 0.4) * depth;
 
@@ -118,10 +124,8 @@ console.log('spineC.selfcheck: starting...');
   for (let s = 0; s < 30; s++) {
     settled = processBallistics(follower, silence, 16.7, { attackMs: 25, releaseMs: 320 });
   }
-  const scaleMulSettled = 1 + (
-    settled.beatPulse * 0.38 * scaleModAmt +
-    (settled.bass * 0.55 + settled.rms * 0.35) * 0.28
-  ) * depth;
+  const scaleMulSettled =
+    1 + (settled.beatPulse * 0.38 * scaleModAmt + (settled.bass * 0.55 + settled.rms * 0.35) * 0.28) * depth;
   assert.ok(scaleMulSettled < scaleMulKick, 'scale settles after kick');
   assert.ok(settled.beatPulse < 0.1, 'beatPulse decays smoothly over release');
   console.log('  [ok] audio hit shoves then settles smoothly');
@@ -130,10 +134,7 @@ console.log('spineC.selfcheck: starting...');
 // ── 3. Layered life LFO and per-agent phase ──────────────────────────────────
 {
   const t = 2.5;
-  const rawBreath =
-    0.55 * Math.sin(t * 0.73) +
-    0.30 * Math.sin(t * 1.19 + 1.7) +
-    0.15 * Math.sin(t * 0.29 + 4.1);
+  const rawBreath = 0.55 * Math.sin(t * 0.73) + 0.3 * Math.sin(t * 1.19 + 1.7) + 0.15 * Math.sin(t * 0.29 + 4.1);
 
   // Check that two agents with different seedOffsets have different phase offsets
   const seedOffsetA = 1234.5;
@@ -143,14 +144,14 @@ console.log('spineC.selfcheck: starting...');
   const pA = seedOffsetA * 0.001;
   const rawA =
     0.55 * Math.sin(t * 0.73 + pA) +
-    0.30 * Math.sin(t * 1.19 + 1.7 + pA * 1.3) +
+    0.3 * Math.sin(t * 1.19 + 1.7 + pA * 1.3) +
     0.15 * Math.sin(t * 0.29 + 4.1 + pA * 0.7);
   const scaleMulA = 1 + (rawA - rawBreath) * 0.008 * lifeDrift;
 
   const pB = seedOffsetB * 0.001;
   const rawB =
     0.55 * Math.sin(t * 0.73 + pB) +
-    0.30 * Math.sin(t * 1.19 + 1.7 + pB * 1.3) +
+    0.3 * Math.sin(t * 1.19 + 1.7 + pB * 1.3) +
     0.15 * Math.sin(t * 0.29 + 4.1 + pB * 0.7);
   const scaleMulB = 1 + (rawB - rawBreath) * 0.008 * lifeDrift;
 

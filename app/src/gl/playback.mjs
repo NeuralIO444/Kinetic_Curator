@@ -15,9 +15,25 @@ import { checkPerformance } from './performanceFile.mjs';
 
 /** The scene-defining fields of a recorded input that the loop's store view takes from the take while it plays. */
 export const SCENE_KEYS = Object.freeze([
-  'layers', 'activeLayerId', 'layerSnapshots', 'seed', 'seedOffsets', 'paletteId', 'paletteOverrides', 'userPalettes',
-  'layoutParams', 'customAssets', 'enabledAssets', 'assetWeightOverrides', 'assetAttach', 'caGrid', 'attractor',
-  'dishPins', 'lockedParams', 'canvasW', 'canvasH',
+  'layers',
+  'activeLayerId',
+  'layerSnapshots',
+  'seed',
+  'seedOffsets',
+  'paletteId',
+  'paletteOverrides',
+  'userPalettes',
+  'layoutParams',
+  'customAssets',
+  'enabledAssets',
+  'assetWeightOverrides',
+  'assetAttach',
+  'caGrid',
+  'attractor',
+  'dishPins',
+  'lockedParams',
+  'canvasW',
+  'canvasH',
 ]);
 
 let active = null; // { perf, frames, index, ended, pendingSeek }
@@ -31,12 +47,24 @@ export function setPlaybackFrameTap(fn) {
   frameTap = typeof fn === 'function' ? fn : null;
 }
 const listeners = new Set();
-const notify = () => { for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the loop */ } } };
+const notify = () => {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the loop */
+    }
+  }
+};
 
 /** Load a take and start from frame 0. Returns false for anything that is not a valid performance. */
 export function startPlayback(perf) {
   let p;
-  try { p = checkPerformance(perf); } catch { return false; }
+  try {
+    p = checkPerformance(perf);
+  } catch {
+    return false;
+  }
   const frames = [];
   for (const input of replayInputs(p.inputs)) frames.push(input);
   if (frames.length !== p.frames) return false;
@@ -95,11 +123,20 @@ export function playbackStep(liveInput) {
   const playedIndex = Math.min(a.index, a.frames.length - 1);
   const recorded = a.frames[playedIndex];
   if (!held && frameTap !== null) {
-    try { frameTap(playedIndex, a.perf, { seeked: rewind }); } catch { frameTap = null; }
+    try {
+      frameTap(playedIndex, a.perf, { seeked: rewind });
+    } catch {
+      frameTap = null;
+    }
   }
   const input = held ? { ...recorded, slowRender: true } : recorded;
   if (!held) {
-    if (a.index < a.frames.length - 1) { a.index += 1; } else if (!a.ended) { a.ended = true; notify(); }
+    if (a.index < a.frames.length - 1) {
+      a.index += 1;
+    } else if (!a.ended) {
+      a.ended = true;
+      notify();
+    }
   }
   return { input, rewind, catchUp };
 }

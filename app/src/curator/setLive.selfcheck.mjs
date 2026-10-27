@@ -10,6 +10,8 @@ import { IDLE_MS } from './sourceArbiter.mjs';
 import { observeClock, resetClock } from '../composition/clockLive.js';
 import { getSwayMagnitude, SWAY_VISIBLE_THRESHOLD } from './swayView.mjs';
 import { setSourceFeed, readSourceFeed, mixLevels } from '../gl/sourceFeed.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -129,7 +131,7 @@ ok('the live loop reads one door and blends: nothing playing is null; mixLevels 
   const loop = readFileSync(join(srcRoot, 'gl/liveLoop.mjs'), 'utf8');
   assert.match(loop, /readSourceFeed\(loopTimeMs\)/);
   assert.match(loop, /const audioOn = audioReal \|\| !!synth;/);
-  assert.match(loop, /readBands: synth \? \(\) => mixLevels\(/);
+  assert.match(flat(loop), fre(/readBands: synth \? \(\) => mixLevels\(/));
 });
 
 ok('hidden: nothing names her, no surface lists the library, no store key holds it, no wall clock', () => {

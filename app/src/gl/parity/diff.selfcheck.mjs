@@ -4,7 +4,11 @@ import assert from 'node:assert';
 import { diffPixels, formatReport, DEFAULT_POLICY, FX_RELAXED_POLICY } from './diff.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const rgba = (w, h, fn) => {
   const buf = Buffer.alloc(w * h * 4);

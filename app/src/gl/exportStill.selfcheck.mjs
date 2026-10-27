@@ -36,13 +36,21 @@ check('parseRes 4k', JSON.stringify(parseRes('4k')) === JSON.stringify({ w: 3840
 check('parseRes 8k', JSON.stringify(parseRes('8k')) === JSON.stringify({ w: 7680, h: 5376 }));
 for (const bad of ['0x100', '100x0', 'nope', '-2', '99999x99999', '20000x100']) {
   let threw = false;
-  try { parseRes(bad); } catch { threw = true; }
+  try {
+    parseRes(bad);
+  } catch {
+    threw = true;
+  }
   check(`parseRes rejects ${bad}`, threw);
 }
 
 // ── isBrowserMissingError ────────────────────────────────────────────────
-check('classifies missing browser',
-  isBrowserMissingError(new Error("Executable doesn't exist at /root/.cache/ms-playwright/chromium-1181/chrome-linux/chrome")));
+check(
+  'classifies missing browser',
+  isBrowserMissingError(
+    new Error("Executable doesn't exist at /root/.cache/ms-playwright/chromium-1181/chrome-linux/chrome"),
+  ),
+);
 check('ignores other errors', !isBrowserMissingError(new Error('WebGL2 not available')));
 
 // ── PNG round-trip ───────────────────────────────────────────────────────
@@ -61,13 +69,16 @@ function parsePng(buf) {
 }
 
 {
-  const w = 5, h = 3;
+  const w = 5,
+    h = 3;
   const px = Buffer.alloc(w * h * 4);
   for (let y = 0; y < h; y++) {
     for (let x = 0; x < w; x++) {
       const i = (y * w + x) * 4;
-      px[i] = (x * 51) & 0xff; px[i + 1] = (y * 127) & 0xff;
-      px[i + 2] = ((x + y) * 37) & 0xff; px[i + 3] = (x === 4 && y === 2) ? 0 : 255;
+      px[i] = (x * 51) & 0xff;
+      px[i + 1] = (y * 127) & 0xff;
+      px[i + 2] = ((x + y) * 37) & 0xff;
+      px[i + 3] = x === 4 && y === 2 ? 0 : 255;
     }
   }
   const tmp = path.join(HERE, '.exportStill-selfcheck.png');
@@ -85,7 +96,11 @@ function parsePng(buf) {
   check('png rows round-trip', rowsOk);
   check('png IEND present', (chunks.IEND || []).length === 1);
   let rejected = false;
-  try { await writePngFile(tmp, Buffer.alloc(10), w, h); } catch { rejected = true; }
+  try {
+    await writePngFile(tmp, Buffer.alloc(10), w, h);
+  } catch {
+    rejected = true;
+  }
   check('png rejects short buffer', rejected);
   unlinkSync(tmp);
 }
@@ -101,10 +116,8 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
 {
   const { getScene } = await import('./parity/corpus.mjs');
   const { resolveLayers } = await import('../../../studio/render.mjs');
-  const { buildSceneContract, warnUnsupportedMaterials } =
-    await import('./sceneContract.js');
-  const { getRenderCaps, QUALITY_PRESETS, FINAL_CAPS } =
-    await import('../data/quality.js');
+  const { buildSceneContract, warnUnsupportedMaterials } = await import('./sceneContract.js');
+  const { getRenderCaps, QUALITY_PRESETS, FINAL_CAPS } = await import('../data/quality.js');
 
   const scene = getScene('single-basic');
 
@@ -115,8 +128,7 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
   const capsLive = getRenderCaps(doc.quality || 'balanced', false);
   const rl = resolveLayers(doc, { caps: capsLive });
   buildSceneContract({ doc, resolvedLayers: rl, caps: capsLive });
-  check('export recipe does not mutate the project doc',
-    JSON.stringify(doc) === before);
+  check('export recipe does not mutate the project doc', JSON.stringify(doc) === before);
 
   // Export drivers never touch the live zustand store — all inputs are
   // explicit arguments (doc, seed, width, height).
@@ -135,11 +147,12 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
   const highCaps = getRenderCaps('high', false);
   check('HIGH caps resolve', highCaps === QUALITY_PRESETS.high);
   const rlHigh = resolveLayers(big, { caps: highCaps });
-  check('HIGH clamps count to ceiling',
+  check(
+    'HIGH clamps count to ceiling',
     rlHigh.every((L) => L.safeCount === QUALITY_PRESETS.high.maxCount),
-    rlHigh.map((L) => L.safeCount).join(','));
-  check('uncapped resolves FINAL_CAPS',
-    getRenderCaps('high', true) === FINAL_CAPS);
+    rlHigh.map((L) => L.safeCount).join(','),
+  );
+  check('uncapped resolves FINAL_CAPS', getRenderCaps('high', true) === FINAL_CAPS);
 
   // Materials honesty (#168): the colour-ramp bodies (plate/wash)
   // render in the live tab and in composed stills, but the headless
@@ -173,22 +186,24 @@ for (const rel of ['src/hooks/useMediaExport.js', 'src/panels/PipelinePanel.jsx'
 try {
   const { getScene } = await import('./parity/corpus.mjs');
   const { renderCandidate, closeCandidate } = await import('./candidate.mjs');
-  const { renderViaGL, renderExportViaGL, closeGlDriver } =
-    await import('./parity/glDriver.mjs');
+  const { renderViaGL, renderExportViaGL, closeGlDriver } = await import('./parity/glDriver.mjs');
   const { buildSceneContract } = await import('./sceneContract.js');
   const { resolveLayers } = await import('../../../studio/render.mjs');
   const { getRenderCaps } = await import('../data/quality.js');
 
   const scene = getScene('single-basic');
   const doc = scene.doc;
-  const W = 200, H = 140;
+  const W = 200,
+    H = 140;
 
   const viaExport = await renderExport({ doc, width: W, height: H });
   const viaCandidate = await renderCandidate({ doc }, { width: W });
   check('export 1x dims', viaExport.width === W && viaExport.height === H);
-  check('export ≡ candidate (shared render fn, #176 rule)',
+  check(
+    'export ≡ candidate (shared render fn, #176 rule)',
     viaExport.pixels.equals(viaCandidate.pixels),
-    `bytes differ`);
+    `bytes differ`,
+  );
 
   // Chunked readback vs the single-shot path, same contract.
   const caps = getRenderCaps(doc.quality || 'balanced', false);

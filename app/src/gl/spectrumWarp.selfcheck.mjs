@@ -20,14 +20,28 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  createSpectrumWarp, feedbackWarpAmount, applySpectrumWarp,
-  FEEDBACK_WARP_KIND, WARP_KEEP_MIN, WARP_KEEP_MAX, WARP_ATT_MS,
-  WARP_BASS_BINS, WARP_MIDS_BINS, WARP_TREBLE_BINS,
+  createSpectrumWarp,
+  feedbackWarpAmount,
+  applySpectrumWarp,
+  FEEDBACK_WARP_KIND,
+  WARP_KEEP_MIN,
+  WARP_KEEP_MAX,
+  WARP_ATT_MS,
+  WARP_BASS_BINS,
+  WARP_MIDS_BINS,
+  WARP_TREBLE_BINS,
 } from './spectrumWarp.mjs';
 import { createSpectrumCore, quantizeSpectrum, LOG_BINS } from './spectrumCore.mjs';
 import { beginSpectrumPlayback, stepSpectrumPlayback, endSpectrumPlayback, readSpectrum } from './spectrumLive.mjs';
 import { accumRecipeParams, applyAudioEnvelope, assertRecipeFinite } from './accum.mjs';
-import { sanitizeFxEffects, defaultFxParams, compileFxPrimitives, FX_EFFECT_KINDS, FX_RACK, FX_MENU_KINDS } from '../fx/fxFilters.js';
+import {
+  sanitizeFxEffects,
+  defaultFxParams,
+  compileFxPrimitives,
+  FX_EFFECT_KINDS,
+  FX_RACK,
+  FX_MENU_KINDS,
+} from '../fx/fxFilters.js';
 import { compileFxShaders } from './effects/fxShaders.mjs';
 import { KIND_FACE } from '../fx/efRackTile.mjs';
 import { buildSceneContract } from './sceneContract.js';
@@ -36,8 +50,14 @@ import { nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS } from '../hooks/go
 import { getCostTier } from './costTiers.mjs';
 
 let checks = 0;
-const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
-const eq = (a, b, msg) => { assert.equal(a, b, msg); checks++; };
+const ok = (cond, msg) => {
+  assert.ok(cond, msg);
+  checks++;
+};
+const eq = (a, b, msg) => {
+  assert.equal(a, b, msg);
+  checks++;
+};
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32Array(LOG_BINS) });
@@ -46,32 +66,81 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
 {
   eq(feedbackWarpAmount(null), 0, 'no layers: 0');
   eq(feedbackWarpAmount([]), 0, 'no FX item: 0');
-  eq(feedbackWarpAmount([{ type: 'content', effects: [{ kind: 'feedbackWarp', params: { amount: 1 } }] }]), 0, 'a content layer is not the FX stratum');
-  eq(feedbackWarpAmount([{ type: 'fx', visible: false, effects: [{ kind: 'feedbackWarp', params: { amount: 1 } }] }]), 0, 'a hidden FX layer does not drive');
-  eq(feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0 } }] }]), 0, 'amount 0 is off');
-  eq(feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.7 } }] }]), 0.7, 'the amount reads off the item params');
-  eq(feedbackWarpAmount([
-    { type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.3 } }] },
-    { type: 'fx', effects: [{ kind: 'grain', params: { amount: 1 } }, { kind: 'feedbackWarp', params: { amount: 0.6 } }] },
-  ]), 0.6, 'the largest amount across the strata wins');
-  eq(feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 2 } }] }]), 1, 'clamped to 1');
-  eq(feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 'x' } }] }]), 0, 'junk is 0, never throws');
-  eq(feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.9 } }] }], true), 0, 'shed is 0');
+  eq(
+    feedbackWarpAmount([{ type: 'content', effects: [{ kind: 'feedbackWarp', params: { amount: 1 } }] }]),
+    0,
+    'a content layer is not the FX stratum',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', visible: false, effects: [{ kind: 'feedbackWarp', params: { amount: 1 } }] }]),
+    0,
+    'a hidden FX layer does not drive',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0 } }] }]),
+    0,
+    'amount 0 is off',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.7 } }] }]),
+    0.7,
+    'the amount reads off the item params',
+  );
+  eq(
+    feedbackWarpAmount([
+      { type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.3 } }] },
+      {
+        type: 'fx',
+        effects: [
+          { kind: 'grain', params: { amount: 1 } },
+          { kind: 'feedbackWarp', params: { amount: 0.6 } },
+        ],
+      },
+    ]),
+    0.6,
+    'the largest amount across the strata wins',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 2 } }] }]),
+    1,
+    'clamped to 1',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 'x' } }] }]),
+    0,
+    'junk is 0, never throws',
+  );
+  eq(
+    feedbackWarpAmount([{ type: 'fx', effects: [{ kind: 'feedbackWarp', params: { amount: 0.9 } }] }], true),
+    0,
+    'shed is 0',
+  );
   eq(FEEDBACK_WARP_KIND, 'feedbackWarp');
 
   // The catalog surface: sanitized like every FX item, offered by the rack and the menu, faced on the tile.
-  assert.deepEqual(defaultFxParams('feedbackWarp'), { amount: 0 }); checks++;
-  assert.deepEqual(sanitizeFxEffects([{ kind: 'feedbackWarp', params: { amount: 5 } }]), [{ kind: 'feedbackWarp', params: { amount: 1 } }]); checks++;
+  assert.deepEqual(defaultFxParams('feedbackWarp'), { amount: 0 });
+  checks++;
+  assert.deepEqual(sanitizeFxEffects([{ kind: 'feedbackWarp', params: { amount: 5 } }]), [
+    { kind: 'feedbackWarp', params: { amount: 1 } },
+  ]);
+  checks++;
   ok(FX_EFFECT_KINDS.includes('feedbackWarp'), 'the kind is in the FX roster');
   ok(FX_RACK.find((s) => s.slot === 'EF-2').kinds.includes('feedbackWarp'), 'EF-2 Distort holds it');
   ok(FX_MENU_KINDS.includes('feedbackWarp'), 'the add menu offers it');
   ok(!!KIND_FACE.feedbackWarp, 'the rack tile has a face for it');
 
   // No chain step, either backend: GL compiles nothing (no extra pass), SVG compiles the identity.
-  assert.deepEqual(compileFxShaders([{ kind: 'feedbackWarp', params: { amount: 0.8 } }]), []); checks++;
+  assert.deepEqual(compileFxShaders([{ kind: 'feedbackWarp', params: { amount: 0.8 } }]), []);
+  checks++;
   const prims = compileFxPrimitives([{ kind: 'feedbackWarp', params: { amount: 0.8 } }], {});
-  assert.deepEqual(prims.map((p) => p.prim), ['feOffset'], 'the SVG half is the identity pass-through'); checks++;
-  eq(prims[0].attrs.dx, 0); eq(prims[0].attrs.dy, 0);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feOffset'],
+    'the SVG half is the identity pass-through',
+  );
+  checks++;
+  eq(prims[0].attrs.dx, 0);
+  eq(prims[0].attrs.dy, 0);
 
   // No key anywhere else: not in the layout defaults (a document gains nothing by existing), not
   // invented by normalize, and a contract built without the item never mentions the warp.
@@ -96,23 +165,32 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   // The distinction, suite-proven: a block-smoothed variant (the spectrum averaged as a block, then
   // spread back) leaks the hot bin across the whole spectrum. The driver's att does not.
   const block = new Float32Array(LOG_BINS).fill((1 / LOG_BINS) * k1);
-  ok(Math.abs(block[hot + 1] - d.att[hot + 1]) > 1e-6, 'a block-smoothed variant would differ at the neighbour — and fail here');
+  ok(
+    Math.abs(block[hot + 1] - d.att[hot + 1]) > 1e-6,
+    'a block-smoothed variant would differ at the neighbour — and fail here',
+  );
 
   // The core's state is read, never written; its smoothed values are NOT the attenuated ones.
   const before = Float32Array.from(st.smooth);
   d.step(st, 16.7);
-  assert.deepEqual(Float32Array.from(st.smooth), before, 'the spectrum state is untouched by the warp step'); checks++;
+  assert.deepEqual(Float32Array.from(st.smooth), before, 'the spectrum state is untouched by the warp step');
+  checks++;
   ok(d.att[hot] < st.smooth[hot], 'attenuated is slower than the core smooth — a different signal, not a copy');
 
   // Frame-rate independence: 2 x 50 ms lands where 1 x 100 ms lands (constant input, exact ODE).
-  const a = createSpectrumWarp(); const b = createSpectrumWarp();
-  const st1 = blankState(); st1.smooth.fill(0.8);
-  a.step(st1, 100); b.step(st1, 50); b.step(st1, 50);
+  const a = createSpectrumWarp();
+  const b = createSpectrumWarp();
+  const st1 = blankState();
+  st1.smooth.fill(0.8);
+  a.step(st1, 100);
+  b.step(st1, 50);
+  b.step(st1, 50);
   ok(Math.abs(a.att[10] - b.att[10]) < 1e-6, 'the ballistics are the same at any frame rate (to Float32 storage)');
 
   // Alternation survives: even bins hot, odd bins silent — per-bin keeps the pattern, a block
   // smoother would flatten it to the mean.
-  const d2 = createSpectrumWarp(); const alt = blankState();
+  const d2 = createSpectrumWarp();
+  const alt = blankState();
   for (let i = 0; i < LOG_BINS; i += 2) alt.smooth[i] = 1;
   for (let f = 0; f < 30; f++) d2.step(alt, 16.7);
   ok(d2.att[0] > 0.3 && d2.att[1] === 0 && d2.att[3] === 0, 'the per-bin pattern survives 30 frames');
@@ -124,24 +202,36 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   const d = createSpectrumWarp();
   const w = d.step(blankState(), 16.7);
   eq(w.bassDev, 0, 'silence: no bass deviation');
-  eq(w.attMids, 0); eq(w.attTreble, 0); eq(w.attAll, 0);
+  eq(w.attMids, 0);
+  eq(w.attTreble, 0);
+  eq(w.attAll, 0);
   eq(w.keep, WARP_KEEP_MIN, 'silence: decay at the band floor (0.92)');
 
   // Bass deviation (relative mode) passes through, both signs — while bass is sounding.
-  const d2 = createSpectrumWarp(); const st = blankState();
-  for (const i of WARP_BASS_BINS) { st.smooth[i] = 0.4; st.rel[i] = 0.5; }
+  const d2 = createSpectrumWarp();
+  const st = blankState();
+  for (const i of WARP_BASS_BINS) {
+    st.smooth[i] = 0.4;
+    st.rel[i] = 0.5;
+  }
   eq(d2.step(st, 16.7).bassDev, 0.5, 'above-normal bass reads +0.5');
-  const d3 = createSpectrumWarp(); const st3 = blankState();
-  for (const i of WARP_BASS_BINS) { st3.smooth[i] = 0.4; st3.rel[i] = -0.25; }
+  const d3 = createSpectrumWarp();
+  const st3 = blankState();
+  for (const i of WARP_BASS_BINS) {
+    st3.smooth[i] = 0.4;
+    st3.rel[i] = -0.25;
+  }
   eq(d3.step(st3, 16.7).bassDev, -0.25, 'below-normal bass reads -0.25');
 
   // The gate: bass silent but the stale average still high (rel very negative) — history, not signal.
-  const d4 = createSpectrumWarp(); const st4 = blankState();
+  const d4 = createSpectrumWarp();
+  const st4 = blankState();
   for (const i of WARP_BASS_BINS) st4.rel[i] = -0.9;
   eq(d4.step(st4, 16.7).bassDev, 0, 'silent bass: deviation gated to 0, zoom sits at identity');
 
   // Band isolation: energy only in the mids moves attMids and nothing else.
-  const d5 = createSpectrumWarp(); const st5 = blankState();
+  const d5 = createSpectrumWarp();
+  const st5 = blankState();
   for (const i of WARP_MIDS_BINS) st5.smooth[i] = 1;
   for (let f = 0; f < 10; f++) d5.step(st5, 16.7);
   ok(d5.att[WARP_MIDS_BINS[0]] > 0, 'mids energy attenuates in');
@@ -149,21 +239,26 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   eq(Math.max(...WARP_BASS_BINS.map((i) => d5.att[i])), 0, 'no bass leakage');
 
   // Decay rides the attenuated overall level toward the band ceiling, and relaxes back to the floor.
-  const d6 = createSpectrumWarp(); const loud = blankState(); loud.smooth.fill(1);
+  const d6 = createSpectrumWarp();
+  const loud = blankState();
+  loud.smooth.fill(1);
   let w6;
   for (let f = 0; f < 60; f++) w6 = d6.step(loud, 200);
   ok(w6.keep > WARP_KEEP_MAX - 0.005 && w6.keep <= WARP_KEEP_MAX, `loud: keep near the 0.985 ceiling (got ${w6.keep})`);
   for (let f = 0; f < 400; f++) w6 = d6.step(blankState(), 200);
   eq(w6.keep, WARP_KEEP_MIN, 'after silence: keep back at the floor, att exactly 0');
-  eq(w6.attMids, 0); eq(w6.attTreble, 0);
+  eq(w6.attMids, 0);
+  eq(w6.attTreble, 0);
 }
 
 // ── D. applySpectrumWarp ──────────────────────────────────────────────────────────────────────────────
 {
   const base = accumRecipeParams({ fade: 0.88, optics: 0.1, tunnel: 0.5, prism: 0.5, background: '#000000' });
-  assert.deepEqual(applySpectrumWarp(base, null, 1), base, 'null warp: the recipe, field for field'); checks++;
+  assert.deepEqual(applySpectrumWarp(base, null, 1), base, 'null warp: the recipe, field for field');
+  checks++;
   const silent = createSpectrumWarp().step(blankState(), 16.7);
-  assert.deepEqual(applySpectrumWarp(base, silent, 0), base, 'amount 0: the recipe, field for field'); checks++;
+  assert.deepEqual(applySpectrumWarp(base, silent, 0), base, 'amount 0: the recipe, field for field');
+  checks++;
 
   // Silence at full amount: identity warp, decay only — every transform field is the recipe's own,
   // and keep alone blends to the band floor.
@@ -181,16 +276,24 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   ok(Math.abs(h.tunnelZoom - (base.tunnelZoom + 0.02)) < 1e-12, 'zoom = the recipe zoom + 0.02 at deviation 1');
   ok(Math.abs(h.tunnelSpin - (base.tunnelSpin + 0.015)) < 1e-12, 'spin adds 0.015 rad/frame at att mids 1');
   ok(Math.abs(h.prismUv - (base.prismUv + 0.0015)) < 1e-12, 'prism adds 0.0015 UV at att treble 1');
-  ok(h.optics > base.optics && h.stipple > base.stipple && h.chromaTexels > base.chromaTexels, 'treble lifts the glow grain (stipple + chroma)');
+  ok(
+    h.optics > base.optics && h.stipple > base.stipple && h.chromaTexels > base.chromaTexels,
+    'treble lifts the glow grain (stipple + chroma)',
+  );
   eq(h.keep, WARP_KEEP_MAX, 'keep reaches the warp target at amount 1');
-  assertRecipeFinite(h); checks++;
+  assertRecipeFinite(h);
+  checks++;
 
   // Partial amount scales the whole gesture; hostile warp values stay inside the clamps.
   const half = applySpectrumWarp(base, hot, 0.5);
   ok(Math.abs(half.tunnelSpin - (base.tunnelSpin + 0.0075)) < 1e-12, 'amount 0.5 halves the spin');
   const wild = applySpectrumWarp(base, { bassDev: 50, attMids: 50, attTreble: 50, keep: 99 }, 1);
-  ok(wild.tunnelZoom <= 1.05 && wild.tunnelSpin <= 0.05 && wild.prismUv <= 0.004 && wild.keep <= 0.99, 'clamps hold against hostile targets');
-  assertRecipeFinite(wild); checks++;
+  ok(
+    wild.tunnelZoom <= 1.05 && wild.tunnelSpin <= 0.05 && wild.prismUv <= 0.004 && wild.keep <= 0.99,
+    'clamps hold against hostile targets',
+  );
+  assertRecipeFinite(wild);
+  checks++;
 
   // It composes with the band envelope the same way it composes with the sliders (order: envelope, then warp).
   const env = applyAudioEnvelope(base, { rms: 0.5, flux: 0, beatPulse: 0 }, { swell: 1 });
@@ -210,12 +313,21 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
     dbSeq.push(db);
   }
   const liveRun = () => {
-    const core = createSpectrumCore(); const d = createSpectrumWarp();
-    return dbSeq.map((db) => { const w = d.step(core.update(db, 1000 / 60), 1000 / 60); return [w.bassDev, w.attMids, w.attTreble, w.keep]; });
+    const core = createSpectrumCore();
+    const d = createSpectrumWarp();
+    return dbSeq.map((db) => {
+      const w = d.step(core.update(db, 1000 / 60), 1000 / 60);
+      return [w.bassDev, w.attMids, w.attTreble, w.keep];
+    });
   };
-  const run1 = liveRun(); const run2 = liveRun();
-  assert.deepEqual(run2, run1, 'the same analysis sequence warps identically, run for run'); checks++;
-  ok(run1.some((w) => w[3] > WARP_KEEP_MIN + 0.01), 'the sequence actually warps (keep leaves the floor)');
+  const run1 = liveRun();
+  const run2 = liveRun();
+  assert.deepEqual(run2, run1, 'the same analysis sequence warps identically, run for run');
+  checks++;
+  ok(
+    run1.some((w) => w[3] > WARP_KEEP_MIN + 0.01),
+    'the sequence actually warps (keep leaves the floor)',
+  );
 
   // The take's path: record the section the way the take does (32-bin rows of the smoothed spectrum),
   // then play it back through spectrumLive — the exact calls the app makes — and step the warp off
@@ -223,18 +335,31 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   const core = createSpectrumCore();
   const rows = [];
   const bytes = new Uint8Array(frames * 32);
-  dbSeq.forEach((db, f) => { core.update(db, 1000 / 60); rows.push(quantizeSpectrum(core.state.smooth, new Uint8Array(32))); });
+  dbSeq.forEach((db, f) => {
+    core.update(db, 1000 / 60);
+    rows.push(quantizeSpectrum(core.state.smooth, new Uint8Array(32)));
+  });
   rows.forEach((r, f) => bytes.set(r, f * 32));
   const playRun = () => {
     beginSpectrumPlayback(bytes);
-    const d = createSpectrumWarp(); const out = [];
-    for (let f = 0; f < frames; f++) { stepSpectrumPlayback(f); const w = d.step(readSpectrum(), 1000 / 60); out.push([w.bassDev, w.attMids, w.attTreble, w.keep]); }
+    const d = createSpectrumWarp();
+    const out = [];
+    for (let f = 0; f < frames; f++) {
+      stepSpectrumPlayback(f);
+      const w = d.step(readSpectrum(), 1000 / 60);
+      out.push([w.bassDev, w.attMids, w.attTreble, w.keep]);
+    }
     endSpectrumPlayback();
     return out;
   };
-  const play1 = playRun(); const play2 = playRun();
-  assert.deepEqual(play2, play1, 'the recorded section replays to the identical warp sequence'); checks++;
-  ok(play1.some((w) => w[3] > WARP_KEEP_MIN + 0.005), 'the replayed take still warps (the hearing survives the record)');
+  const play1 = playRun();
+  const play2 = playRun();
+  assert.deepEqual(play2, play1, 'the recorded section replays to the identical warp sequence');
+  checks++;
+  ok(
+    play1.some((w) => w[3] > WARP_KEEP_MIN + 0.005),
+    'the replayed take still warps (the hearing survives the record)',
+  );
 }
 
 // ── F. the governor rung ──────────────────────────────────────────────────────────────────────────────
@@ -253,22 +378,68 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
       else if (cut.kind === 'travel') s = { ...s, travelShed: true };
       else if (cut.kind === 'quality') s = { ...s, quality: cut.quality };
       else if (cut.kind === 'assetThin') s = { ...s, assetThin: true };
-      else if (cut.kind === 'countClamp') s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
+      else if (cut.kind === 'countClamp')
+        s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
       else if (cut.kind === 'slowRender') s = { ...s, slowRender: true };
     }
     return kinds;
   };
-  const PRESSURE = { renderScale: 1, quality: 'high', assetThin: false, perfClampOverride: null, effectiveCount: 400, slowRender: false, gpuSaturated: true };
-  const kinds = walk({ ...PRESSURE, creatureCount: 2, creatureShed: 0, weatherActive: true, weatherShed: false, feedbackWarpActive: true, feedbackWarpShed: false, travelActive: true, travelShed: false });
-  assert.deepStrictEqual(kinds.slice(0, 8),
-    ['renderScale', 'renderScale', 'renderScale', 'markWeather', 'feedbackWarp', 'creatureCount', 'creatureCount', 'travel'],
-    'pixel trim, weather (1.4), warp (1.45), population (1.5), travel (1.6)'); checks++;
+  const PRESSURE = {
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
+    gpuSaturated: true,
+  };
+  const kinds = walk({
+    ...PRESSURE,
+    creatureCount: 2,
+    creatureShed: 0,
+    weatherActive: true,
+    weatherShed: false,
+    feedbackWarpActive: true,
+    feedbackWarpShed: false,
+    travelActive: true,
+    travelShed: false,
+  });
+  assert.deepStrictEqual(
+    kinds.slice(0, 8),
+    [
+      'renderScale',
+      'renderScale',
+      'renderScale',
+      'markWeather',
+      'feedbackWarp',
+      'creatureCount',
+      'creatureCount',
+      'travel',
+    ],
+    'pixel trim, weather (1.4), warp (1.45), population (1.5), travel (1.6)',
+  );
+  checks++;
   ok(kinds.indexOf('feedbackWarp') < kinds.indexOf('creatureCount'), 'the warp sheds before body counts');
   ok(kinds.indexOf('markWeather') < kinds.indexOf('feedbackWarp'), 'weather still dies before the warp');
 
-  const noWarp = walk({ ...PRESSURE, creatureCount: 1, creatureShed: 0, weatherActive: true, weatherShed: false, travelActive: true, travelShed: false });
+  const noWarp = walk({
+    ...PRESSURE,
+    creatureCount: 1,
+    creatureShed: 0,
+    weatherActive: true,
+    weatherShed: false,
+    travelActive: true,
+    travelShed: false,
+  });
   ok(!noWarp.includes('feedbackWarp'), 'no feedbackWarpActive from the caller → no warp rung (pre-#1490 ladder)');
-  const already = nextGovernorCut({ ...PRESSURE, renderScale: 0.33, feedbackWarpActive: true, feedbackWarpShed: true, creatureCount: 0, creatureShed: 0 });
+  const already = nextGovernorCut({
+    ...PRESSURE,
+    renderScale: 0.33,
+    feedbackWarpActive: true,
+    feedbackWarpShed: true,
+    creatureCount: 0,
+    creatureShed: 0,
+  });
   ok(already.kind !== 'feedbackWarp', 'an already-shed warp does not re-fire');
 
   const summary = shedSummary({ renderScale: 1, feedbackWarpShed: true });
@@ -282,15 +453,24 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   // The event log's SHED_STEPS predates this rung (and 1.4/1.5/1.6): the hook's guarded record pattern
   // is the treatment — asserted here at the source so the guard is never "tidied" away.
   const hook = src('../hooks/usePerformanceGovernor.js');
-  ok(flat(hook).includes(flat('recordCutEvent = (e) => { if (LOG_KNOWN_KINDS.has(e.cutKind))')), 'the hook still guards event-log kinds');
+  ok(
+    flat(hook).includes(flat('recordCutEvent = (e) => { if (LOG_KNOWN_KINDS.has(e.cutKind))')),
+    'the hook still guards event-log kinds',
+  );
   ok(flat(hook).includes(flat("case 'feedbackWarp': setFeedbackWarpShed(true);")), 'the hook applies the warp shed');
   ok(flat(hook).includes(flat("case 'feedbackWarp': setFeedbackWarpShed(false);")), 'the hook restores the warp shed');
 
   // The live seam: amount gated, driver stepped off the shared spectrum state, only on the accum path.
   const loop = src('./liveLoop.mjs');
-  ok(loop.includes('feedbackWarpAmount(s.layers, !!s.feedbackWarpShed)'), 'the loop reads the amount off the FX strata + shed overlay');
+  ok(
+    loop.includes('feedbackWarpAmount(s.layers, !!s.feedbackWarpShed)'),
+    'the loop reads the amount off the FX strata + shed overlay',
+  );
   ok(loop.includes('if (feedbackWarp > 0)'), 'the warp application is gated on the amount');
-  ok(loop.includes('warpDriver.step(readSpectrum(), clampedDtMs)'), 'the driver steps off readSpectrum() — the recorded-input path');
+  ok(
+    loop.includes('warpDriver.step(readSpectrum(), clampedDtMs)'),
+    'the driver steps off readSpectrum() — the recorded-input path',
+  );
 }
 
 // ── G. cost ───────────────────────────────────────────────────────────────────────────────────────────
@@ -299,17 +479,27 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   ok(!!decl, 'the warp declares its cost tier at registration');
   eq(decl.tier, 1, 'tier 1 — the shed-first family');
   eq(decl.memoryBytes, 0, 'no working set: no pass, no texture');
-  const st = blankState(); st.smooth.fill(0.7);
+  const st = blankState();
+  st.smooth.fill(0.7);
   const d = createSpectrumWarp();
-  const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[s.length >> 1]; };
+  const med = (xs) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[s.length >> 1];
+  };
   const runs = [];
   for (let r = 0; r < 7; r++) {
     const times = [];
-    for (let i = 0; i < 2000; i++) { const t0 = process.hrtime.bigint(); d.step(st, 16.7); times.push(Number(process.hrtime.bigint() - t0) / 1e6); }
+    for (let i = 0; i < 2000; i++) {
+      const t0 = process.hrtime.bigint();
+      d.step(st, 16.7);
+      times.push(Number(process.hrtime.bigint() - t0) / 1e6);
+    }
     runs.push(med(times));
   }
   const stepMs = med(runs);
-  console.log(`spectrumWarp bench: step ${stepMs.toFixed(4)} ms (per-step hrtime, median of 7 runs of 2000-step medians, sandbox node)`);
+  console.log(
+    `spectrumWarp bench: step ${stepMs.toFixed(4)} ms (per-step hrtime, median of 7 runs of 2000-step medians, sandbox node)`,
+  );
   ok(stepMs < 0.05, 'the per-frame CPU step stays in the declared class (0.01 declared, timer-bound measure)');
 }
 

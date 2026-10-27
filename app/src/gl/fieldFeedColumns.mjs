@@ -35,12 +35,7 @@
  * in-place write must be revisited — hence this note.
  */
 
-import {
-  normalizePatch,
-  FIELD_RADIUS,
-  FIELD_SOFT,
-  sampleFlow,
-} from '../engine/kernel/tracks/trackGraph.js';
+import { normalizePatch, FIELD_RADIUS, FIELD_SOFT, sampleFlow } from '../engine/kernel/tracks/trackGraph.js';
 
 // Matches liveResolve.mjs's clampHop (moved here with the loop).
 const HOP_MAX_PX = 4;

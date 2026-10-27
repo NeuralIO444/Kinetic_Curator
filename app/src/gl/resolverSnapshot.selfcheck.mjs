@@ -23,14 +23,46 @@ const DT_MS = [16.7, 16.7, 33.3, 8, 16.7, 50, 16.7, 12.5];
 
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 48, particleCount: 48, ...over });
-const snap = (seed, over = {}) => ({ seed, paletteId: 'bone', paletteOverrides: null, layoutParams: lp(over), caGrid: null, enabledAssets: null });
+const snap = (seed, over = {}) => ({
+  seed,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  layoutParams: lp(over),
+  caGrid: null,
+  enabledAssets: null,
+});
 const baseInput = (over = {}) => ({
-  layers: [L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [], layoutParams: lp({ mode: 'random' }), caGrid: null,
-  enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {},
-  batchPaused: false, focusSwap: false, loopTimeMs: 0, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false,
-  assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100],
-  phraseWrapGen: 0, attractor: null, mixSeconds: 0, ...over,
+  layers: [L('lyr-a')],
+  activeLayerId: 'lyr-a',
+  layerSnapshots: {},
+  seed: 1234,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  layoutParams: lp({ mode: 'random' }),
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  quality: 'balanced',
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  loopTimeMs: 0,
+  dtSec: 1 / 60,
+  perfClampOverride: null,
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  scaleMul: 1,
+  alphaBoost: 0,
+  effectiveScale: [0.5, 1.5],
+  effectiveAlpha: [20, 100],
+  phraseWrapGen: 0,
+  attractor: null,
+  mixSeconds: 0,
+  ...over,
 });
 
 /** Canonical encoding of anything the resolver returns (the determinism harness's). */
@@ -42,11 +74,17 @@ function canon(v, depth = 0) {
   if (t === 'boolean') return v ? 'T' : 'F';
   if (t === 'function') return 'fn';
   if (depth > 12) return '…';
-  if (ArrayBuffer.isView(v)) return `[${Array.from(v).map((x) => canon(x, depth + 1)).join(',')}]`;
+  if (ArrayBuffer.isView(v))
+    return `[${Array.from(v)
+      .map((x) => canon(x, depth + 1))
+      .join(',')}]`;
   if (Array.isArray(v)) return `[${v.map((x) => canon(x, depth + 1)).join(',')}]`;
   if (v instanceof Map) return canon([...v.entries()], depth + 1);
   if (v instanceof Set) return canon([...v.values()], depth + 1);
-  return `{${Object.keys(v).sort().map((k) => `${k}:${canon(v[k], depth + 1)}`).join(',')}}`;
+  return `{${Object.keys(v)
+    .sort()
+    .map((k) => `${k}:${canon(v[k], depth + 1)}`)
+    .join(',')}}`;
 }
 const frameHash = (out) => createHash('sha256').update(canon(out)).digest('hex').slice(0, 20);
 
@@ -80,7 +118,10 @@ function runRestored(scenario) {
   return { hashes, snapshot };
 }
 
-const breathe = (f) => ({ effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)], effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100] });
+const breathe = (f) => ({
+  effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)],
+  effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
+});
 const single = (mode, over = {}) => ({
   name: `single:${mode}`,
   at: (f) => ({ layoutParams: lp({ mode, ...over }), ...breathe(f) }),
@@ -107,13 +148,30 @@ const SCENARIOS = [
   // step bank, the travel clock's last frame) — a missed field restores every traveller at home and the
   // continuation roams elsewhere. Fifty frames of roam are banked when the snapshot lands.
   { ...single('random', { transport: 'flow', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:flow' },
-  { ...single('random', { transport: 'path', transportPath: 'lissajous', kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }), name: 'travel:path' },
+  {
+    ...single('random', {
+      transport: 'path',
+      transportPath: 'lissajous',
+      kinemeBreath: 0,
+      kinemeDrift: 0,
+      lifeDrift: 0,
+    }),
+    name: 'travel:path',
+  },
   // #1576 — P3's accumulative state: the surge envelope store (a trigger pulse at frame 40 starts an envelope that is
   // mid-flight at the frame-50 snapshot) and the parallax drift clock (zTiers > 1 so the front tiers move)
   {
     name: 'travel:surge+parallax',
     at: (f) => ({
-      layoutParams: lp({ mode: 'random', zTiers: 4, transportSurge: 1, transportParallax: 1, kinemeBreath: 0, kinemeDrift: 0, lifeDrift: 0 }),
+      layoutParams: lp({
+        mode: 'random',
+        zTiers: 4,
+        transportSurge: 1,
+        transportParallax: 1,
+        kinemeBreath: 0,
+        kinemeDrift: 0,
+        lifeDrift: 0,
+      }),
       surgeTrigger: f >= 40 && f < 44 ? 1 : 0,
       ...breathe(f),
     }),
@@ -121,9 +179,13 @@ const SCENARIOS = [
   {
     name: 'shared-scent:mold',
     at: (f) => ({
-      layers: [L('lyr-m1'), L('lyr-m2')], activeLayerId: 'lyr-m1',
+      layers: [L('lyr-m1'), L('lyr-m2')],
+      activeLayerId: 'lyr-m1',
       layoutParams: lp({ mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
-      layerSnapshots: { 'lyr-m1': snap(101, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }), 'lyr-m2': snap(202, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }) },
+      layerSnapshots: {
+        'lyr-m1': snap(101, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
+        'lyr-m2': snap(202, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
+      },
       ...breathe(f),
     }),
   },
@@ -132,16 +194,33 @@ const SCENARIOS = [
     // deform + pigment (param defaults), trail accumulation, the ecology ledger.
     name: 'dish-full',
     at: (f) => ({
-      layers: [L('lyr-a'), L('lyr-b')], activeLayerId: 'lyr-a',
+      layers: [L('lyr-a'), L('lyr-b')],
+      activeLayerId: 'lyr-a',
       layoutParams: lp({
-        mode: 'swarm', behave: 'flock', count: 60, particleCount: 60,
-        dish: true, contactRadius: 42, contactMode: 'friction', contactRestitution: 0.4,
-        accumulation: true, accumulationWetness: 0.85, ecology: true,
+        mode: 'swarm',
+        behave: 'flock',
+        count: 60,
+        particleCount: 60,
+        dish: true,
+        contactRadius: 42,
+        contactMode: 'friction',
+        contactRestitution: 0.4,
+        accumulation: true,
+        accumulationWetness: 0.85,
+        ecology: true,
       }),
       layerSnapshots: {
         'lyr-b': snap(999, {
-          mode: 'swarm', behave: 'flock', count: 40, particleCount: 40,
-          dish: true, contactRadius: 42, contactMode: 'friction', accumulation: true, accumulationWetness: 0.85, ecology: true,
+          mode: 'swarm',
+          behave: 'flock',
+          count: 40,
+          particleCount: 40,
+          dish: true,
+          contactRadius: 42,
+          contactMode: 'friction',
+          accumulation: true,
+          accumulationWetness: 0.85,
+          ecology: true,
         }),
       },
       ...breathe(f),
@@ -167,7 +246,10 @@ const SCENARIOS = [
     name: 'creatures',
     at: (f) => ({
       layoutParams: lp({ mode: 'grid', count: 24 }),
-      dishPins: [{ x: 500, y: 350 }, { x: 640, y: 350 }],
+      dishPins: [
+        { x: 500, y: 350 },
+        { x: 640, y: 350 },
+      ],
       dishFormed: [true, true],
       dishHosted: [false, true],
       dishPressure: 0.7,
@@ -180,16 +262,29 @@ for (const scenario of SCENARIOS) {
   const control = runControl(scenario);
   assert.ok(new Set(control).size > 10, `${scenario.name}: scenario barely moves — the proof would be vacuous`);
   const { hashes, snapshot } = runRestored(scenario);
-  assert.deepEqual(hashes, control.slice(SNAP_AT), `${scenario.name}: continuation after restore diverges from the uninterrupted run`);
+  assert.deepEqual(
+    hashes,
+    control.slice(SNAP_AT),
+    `${scenario.name}: continuation after restore diverges from the uninterrupted run`,
+  );
   console.log(`[ok] ${scenario.name} — snapshot at frame ${SNAP_AT}, ${T - SNAP_AT} continuation frames identical`);
   if (scenario.name === 'dish-full') {
     assert.ok(Object.keys(snapshot.swarm).length === 2, 'dish-full: both swarm systems snapshotted');
     assert.ok(snapshot.dishSession.trailTotal, 'dish-full: trail total field snapshotted');
-    assert.ok(Object.keys(snapshot.dishSession.trailsByKey).length >= 1, 'dish-full: per-stratum trail fields snapshotted');
+    assert.ok(
+      Object.keys(snapshot.dishSession.trailsByKey).length >= 1,
+      'dish-full: per-stratum trail fields snapshotted',
+    );
   }
   if (scenario.name === 'creatures') {
-    assert.ok(snapshot.creatures.ages.some((a) => a > 0), 'creatures: the moth had banked grow-in ages at the snapshot');
-    assert.ok(snapshot.dishCreatures.states.some((s) => s && s.age > 0), 'creatures: the dish creature had banked age at the snapshot');
+    assert.ok(
+      snapshot.creatures.ages.some((a) => a > 0),
+      'creatures: the moth had banked grow-in ages at the snapshot',
+    );
+    assert.ok(
+      snapshot.dishCreatures.states.some((s) => s && s.age > 0),
+      'creatures: the dish creature had banked age at the snapshot',
+    );
   }
   if (scenario.name === 'morph-in-flight') {
     assert.ok(Object.keys(snapshot.morphState).length >= 1, 'morph-in-flight: a morph was in flight at the snapshot');
@@ -218,7 +313,9 @@ for (const scenario of SCENARIOS) {
   drive(r, scenario, 30, T, hashes);
   r.dispose();
   assert.deepEqual(hashes, control, 'after refused restores the resolver continues exactly as the control');
-  console.log('[ok] fail-closed — refused restores (null, wrong version, tampered column, garbage scent) leave the run untouched');
+  console.log(
+    '[ok] fail-closed — refused restores (null, wrong version, tampered column, garbage scent) leave the run untouched',
+  );
 }
 
 console.log(`resolverSnapshot.selfcheck: ok (${SCENARIOS.length} scenarios, snapshot at frame ${SNAP_AT} of ${T})`);

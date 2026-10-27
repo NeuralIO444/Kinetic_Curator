@@ -47,16 +47,32 @@ import { buildRenderPayload, openHarnessPage, closeGlDriver, evaluateChunked } f
 import { costFeatures } from '../../hooks/costHead.mjs';
 import { FEATURES_VERSION } from '../../curator/recipeFeatures.js';
 import {
-  COST_DATASET_KIND, COST_DATASET_VERSION, LABEL_DEFINITION,
-  summarizeFrames, labelFromReps, validateDataset,
+  COST_DATASET_KIND,
+  COST_DATASET_VERSION,
+  LABEL_DEFINITION,
+  summarizeFrames,
+  labelFromReps,
+  validateDataset,
 } from './costDataset.mjs';
 
 function parseArgs(argv) {
-  const args = { out: 'cost-dataset.json', only: null, width: 1280, height: 720, frames: 30, reps: 3, maxPayloadMb: 512 };
+  const args = {
+    out: 'cost-dataset.json',
+    only: null,
+    width: 1280,
+    height: 720,
+    frames: 30,
+    reps: 3,
+    maxPayloadMb: 512,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') args.out = argv[++i];
-    else if (a === '--only') args.only = argv[++i].split(',').map((s) => s.trim()).filter(Boolean);
+    else if (a === '--only')
+      args.only = argv[++i]
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean);
     else if (a === '--width') args.width = Number(argv[++i]);
     else if (a === '--height') args.height = Number(argv[++i]);
     else if (a === '--frames') args.frames = Number(argv[++i]);
@@ -91,8 +107,13 @@ async function ensureBenchPage() {
   return benchPage;
 }
 async function resetBrowser() {
-  try { await benchClose?.(); } catch { /* already gone */ }
-  benchPage = null; benchClose = null;
+  try {
+    await benchClose?.();
+  } catch {
+    /* already gone */
+  }
+  benchPage = null;
+  benchClose = null;
   await closeGlDriver();
 }
 
@@ -108,7 +129,9 @@ async function measureRecipe(scene, args, probes) {
   const payloadChars = payloadCharsOf(payload);
   const maxPayloadChars = args.maxPayloadMb * 1024 * 1024;
   if (payloadChars > maxPayloadChars) {
-    throw new Error(`payload too large for page memory: ${(payloadChars / 1048576).toFixed(1)}MB > ${args.maxPayloadMb}MB cap`);
+    throw new Error(
+      `payload too large for page memory: ${(payloadChars / 1048576).toFixed(1)}MB > ${args.maxPayloadMb}MB cap`,
+    );
   }
   const page = await ensureBenchPage();
   await evaluateChunked(page, '__kcBenchLoad', payload);
@@ -145,13 +168,17 @@ async function measureRecipe(scene, args, probes) {
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const scenes = args.only ? args.only.map(getCostScene) : COST_CORPUS;
-  console.log(`[costBench] ${scenes.length} recipes @ ${args.width}x${args.height}, ${args.reps} reps x ${args.frames} frames`);
+  console.log(
+    `[costBench] ${scenes.length} recipes @ ${args.width}x${args.height}, ${args.reps} reps x ${args.frames} frames`,
+  );
   await whenSwarmWasmReady();
 
   const page = await ensureBenchPage();
   const ua = await page.evaluate(() => navigator.userAgent);
   const probesStart = await page.evaluate(() => window.__kcProbes());
-  console.log(`[costBench] probes: fill ${probesStart.fillMs}ms, instanced ${probesStart.instancedMs}ms, blend ${probesStart.blendMs}ms, js ${probesStart.jsMs}ms — ${probesStart.renderer}`);
+  console.log(
+    `[costBench] probes: fill ${probesStart.fillMs}ms, instanced ${probesStart.instancedMs}ms, blend ${probesStart.blendMs}ms, js ${probesStart.jsMs}ms — ${probesStart.renderer}`,
+  );
 
   const rows = [];
   for (const scene of scenes) {
@@ -169,11 +196,16 @@ async function main() {
     }
     if (!row) {
       row = {
-        id: scene.id, description: scene.description, status: 'failed',
+        id: scene.id,
+        description: scene.description,
+        status: 'failed',
         doc: scene.doc,
         features: costFeatures({
-          layoutParams: scene.doc.layoutParams, paletteId: scene.doc.paletteId,
-          assets: castIdsOf(scene.doc), canvas: { w: args.width, h: args.height }, probes: probeBag(probesStart),
+          layoutParams: scene.doc.layoutParams,
+          paletteId: scene.doc.paletteId,
+          assets: castIdsOf(scene.doc),
+          canvas: { w: args.width, h: args.height },
+          probes: probeBag(probesStart),
         }),
         canvas: { w: args.width, h: args.height },
         error: String((lastError && lastError.message) || lastError).slice(0, 500),
@@ -182,7 +214,9 @@ async function main() {
     rows.push(row);
     const secs = ((Date.now() - t0) / 1000).toFixed(0);
     if (row.status === 'measured') {
-      console.log(`  [cost] ${row.id}: label ${row.labelMs} ms (rep p90s: ${row.reps.map((r) => r.p90).join(', ')})${row.timingSuspect ? ' TIMING-SUSPECT' : ''} [${secs}s]`);
+      console.log(
+        `  [cost] ${row.id}: label ${row.labelMs} ms (rep p90s: ${row.reps.map((r) => r.p90).join(', ')})${row.timingSuspect ? ' TIMING-SUSPECT' : ''} [${secs}s]`,
+      );
     } else {
       console.log(`  [cost] ${row.id}: FAILED — ${row.error.slice(0, 120)} [${secs}s]`);
     }
@@ -197,10 +231,16 @@ async function main() {
       const ratio = probesEnd[k] / probesStart[k];
       if (ratio > 1.5 || ratio < 0.67) probeDrift = true;
     }
-  } catch { probesEnd = null; }
+  } catch {
+    probesEnd = null;
+  }
 
   let gitSha = null;
-  try { gitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(); } catch { /* not a repo run */ }
+  try {
+    gitSha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+  } catch {
+    /* not a repo run */
+  }
 
   const dataset = {
     kind: COST_DATASET_KIND,
@@ -216,34 +256,42 @@ async function main() {
       platform: `${os.platform()} ${os.arch()}`,
       cpus: os.cpus().length,
       totalMemGB: +(os.totalmem() / 1073741824).toFixed(1),
-      probesStart, probesEnd, probeDrift,
+      probesStart,
+      probesEnd,
+      probeDrift,
     },
     method: {
       label: LABEL_DEFINITION,
       framesPerRep: args.frames,
       reps: args.reps,
       warmupFrames: WARMUP_FRAMES,
-      timing: 'page performance.now() around readback-forced renderScene (upper-bound frame cost, readPixels included — the __kcPerf convention); Node wall-clock cross-check per rep, >2.5x disagreement flags timingSuspect',
+      timing:
+        'page performance.now() around readback-forced renderScene (upper-bound frame cost, readPixels included — the __kcPerf convention); Node wall-clock cross-check per rep, >2.5x disagreement flags timingSuspect',
       vsync: 'none — tight render loop, no rAF; labels are uncensored render cost',
     },
     featureSchema: {
       source: 'costFeatures() from src/hooks/costHead.mjs (recipeFeatures + mechanismFeatures + probe descriptors)',
       featuresVersion: FEATURES_VERSION,
-      probeKeys: 'features.probe uses the runtime bag names { fillRate, instanced, blend, js } carrying the measured probe ms for the fixed PROBE_SPEC work (costDataset.mjs)',
+      probeKeys:
+        'features.probe uses the runtime bag names { fillRate, instanced, blend, js } carrying the measured probe ms for the fixed PROBE_SPEC work (costDataset.mjs)',
     },
     rows,
   };
 
   const check = validateDataset(dataset);
   if (!check.ok) {
-    console.error('[costBench] dataset FAILED schema validation — not writing:\n' + check.errors.map((e) => `  - ${e}`).join('\n'));
+    console.error(
+      '[costBench] dataset FAILED schema validation — not writing:\n' + check.errors.map((e) => `  - ${e}`).join('\n'),
+    );
     process.exitCode = 1;
     await resetBrowser();
     return;
   }
   await writeFile(args.out, JSON.stringify(dataset, null, 2));
   const measured = rows.filter((r) => r.status === 'measured').sort((a, b) => a.labelMs - b.labelMs);
-  console.log(`[costBench] wrote ${args.out}: ${rows.length} rows (${measured.length} measured, ${rows.length - measured.length} failed)`);
+  console.log(
+    `[costBench] wrote ${args.out}: ${rows.length} rows (${measured.length} measured, ${rows.length - measured.length} failed)`,
+  );
   console.log('[costBench] label order (cheap → heavy): ' + measured.map((r) => `${r.id} ${r.labelMs}ms`).join(' · '));
   await resetBrowser();
 }

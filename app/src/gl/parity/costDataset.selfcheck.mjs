@@ -4,8 +4,14 @@
 // at write time; this suite pins the rules that gate applies.
 import assert from 'node:assert';
 import {
-  COST_DATASET_KIND, COST_DATASET_VERSION, LABEL_DEFINITION,
-  summarizeFrames, labelFromReps, validateDataset, percentile, median,
+  COST_DATASET_KIND,
+  COST_DATASET_VERSION,
+  LABEL_DEFINITION,
+  summarizeFrames,
+  labelFromReps,
+  validateDataset,
+  percentile,
+  median,
 } from './costDataset.mjs';
 import { COST_CORPUS, getCostScene, castIdsOf } from './costCorpus.mjs';
 import { costFeatures } from '../../hooks/costHead.mjs';
@@ -24,10 +30,7 @@ assert.deepStrictEqual(
 );
 assert.strictEqual(summarizeFrames([]), null);
 assert.strictEqual(summarizeFrames([NaN, -1]), null, 'junk samples are not data');
-assert.strictEqual(
-  labelFromReps([{ p90: 10 }, { p90: 30 }, { p90: 20 }]), 20,
-  'label = median of rep p90s',
-);
+assert.strictEqual(labelFromReps([{ p90: 10 }, { p90: 30 }, { p90: 20 }]), 20, 'label = median of rep p90s');
 assert.strictEqual(labelFromReps([]), null);
 
 // — corpus: unique ids, JSON-safe docs (they ride into the artifact),
@@ -37,7 +40,8 @@ assert.strictEqual(new Set(ids).size, ids.length, 'corpus ids are unique');
 assert.ok(COST_CORPUS.length >= 20, `corpus has ${COST_CORPUS.length} recipes`);
 for (const scene of COST_CORPUS) {
   assert.deepStrictEqual(
-    JSON.parse(JSON.stringify(scene.doc)), scene.doc,
+    JSON.parse(JSON.stringify(scene.doc)),
+    scene.doc,
     `${scene.id}: doc must survive a JSON round-trip unchanged`,
   );
   if (scene.id.startsWith('grid-')) {
@@ -78,15 +82,23 @@ function minimalDataset() {
     generator: { script: 'test', gitSha: null, node: process.version },
     environment: { renderer: 'Test GPU', swiftShader: false },
     method: { label: LABEL_DEFINITION },
-    rows: [{
-      id: scene.id, status: 'measured', doc: scene.doc,
-      features: costFeatures({
-        layoutParams: scene.doc.layoutParams, paletteId: scene.doc.paletteId,
-        assets: castIdsOf(scene.doc), canvas: { w: 1280, h: 720 }, probes,
-      }),
-      canvas: { w: 1280, h: 720 },
-      reps, labelMs: labelFromReps(reps),
-    }],
+    rows: [
+      {
+        id: scene.id,
+        status: 'measured',
+        doc: scene.doc,
+        features: costFeatures({
+          layoutParams: scene.doc.layoutParams,
+          paletteId: scene.doc.paletteId,
+          assets: castIdsOf(scene.doc),
+          canvas: { w: 1280, h: 720 },
+          probes,
+        }),
+        canvas: { w: 1280, h: 720 },
+        reps,
+        labelMs: labelFromReps(reps),
+      },
+    ],
   };
 }
 const good = minimalDataset();
@@ -100,11 +112,19 @@ wrongLabel.rows[0].labelMs += 5;
 assert.strictEqual(validateDataset(wrongLabel).ok, false, 'label must equal median-of-p90 of its reps');
 
 const bareFailed = minimalDataset();
-bareFailed.rows[0] = { id: 'x', status: 'failed', doc: {}, features: bareFailed.rows[0].features, canvas: { w: 1, h: 1 } };
+bareFailed.rows[0] = {
+  id: 'x',
+  status: 'failed',
+  doc: {},
+  features: bareFailed.rows[0].features,
+  canvas: { w: 1, h: 1 },
+};
 assert.strictEqual(validateDataset(bareFailed).ok, false, 'a failed row must carry its error');
 
 const noProbe = JSON.parse(JSON.stringify(good));
 delete noProbe.rows[0].features.probe.js;
 assert.strictEqual(validateDataset(noProbe).ok, false, 'probe descriptors are part of the vector');
 
-console.log(`costDataset.selfcheck: OK (${COST_CORPUS.length} corpus recipes, dataset v${COST_DATASET_VERSION} contract pinned)`);
+console.log(
+  `costDataset.selfcheck: OK (${COST_CORPUS.length} corpus recipes, dataset v${COST_DATASET_VERSION} contract pinned)`,
+);

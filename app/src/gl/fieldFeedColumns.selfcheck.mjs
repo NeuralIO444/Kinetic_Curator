@@ -26,7 +26,8 @@ const { W, H } = fixture.meta;
 // (same seeds ⇒ same inputs ⇒ outputs must match the fixture bit-for-bit).
 function mulberry32(a) {
   return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -80,9 +81,12 @@ for (const c of fixture.cases) {
     const rand = mulberry32(seed);
     const tgt = makeItems(rand, nTgt, W, H);
     const src = makeItems(rand, nSrc, W, H);
-    const pullPx = resolveFieldItems(tgt, src,
-      { mode: 'field', from: 0, to: 1, strength: patchStrength(patch) }, W, H);
-    assert.deepStrictEqual(tgt.map((it) => [it.x, it.y]), c.xy, `${c.name}: item xy drifted`);
+    const pullPx = resolveFieldItems(tgt, src, { mode: 'field', from: 0, to: 1, strength: patchStrength(patch) }, W, H);
+    assert.deepStrictEqual(
+      tgt.map((it) => [it.x, it.y]),
+      c.xy,
+      `${c.name}: item xy drifted`,
+    );
     assert.strictEqual(pullPx, c.pullPx, `${c.name}: pullPx drifted`);
     checked++;
   } else if (FEED_SPECS[c.name]) {
@@ -98,9 +102,12 @@ for (const c of fixture.cases) {
       field = feedLive.delay.field(0);
     }
     const amt = patchStrength(patch) * 0.05;
-    const pullPx = resolveFeedItems(tgt, field,
-      { mode: 'feed', from: 0, to: 1, strength: amt }, W, H);
-    assert.deepStrictEqual(tgt.map((it) => [it.x, it.y]), c.xy, `${c.name}: item xy drifted`);
+    const pullPx = resolveFeedItems(tgt, field, { mode: 'feed', from: 0, to: 1, strength: amt }, W, H);
+    assert.deepStrictEqual(
+      tgt.map((it) => [it.x, it.y]),
+      c.xy,
+      `${c.name}: item xy drifted`,
+    );
     assert.strictEqual(pullPx, c.pullPx, `${c.name}: pullPx drifted`);
     checked++;
   } else if (c.name === 'pushSource.raster') {

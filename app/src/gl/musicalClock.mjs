@@ -35,9 +35,14 @@ export function createMusicalClock({ beatsPerBar = BEATS_PER_BAR } = {}) {
       bpm = sanitizeBeatBpm(rawBpm);
       const t = Number(loopMs);
       if (!Number.isFinite(t)) return { ...view(), ticks: [], restarted: false };
-      if (last === null) { last = t; return { ...view(), ticks: [], restarted: false }; }
-      if (t < last) { // the loop clock went back (REC restarts the scene): start the bars over from here
-        last = t; pos = 0;
+      if (last === null) {
+        last = t;
+        return { ...view(), ticks: [], restarted: false };
+      }
+      if (t < last) {
+        // the loop clock went back (REC restarts the scene): start the bars over from here
+        last = t;
+        pos = 0;
         return { ...view(), ticks: [], restarted: true };
       }
       const before = whole(pos);
@@ -47,13 +52,17 @@ export function createMusicalClock({ beatsPerBar = BEATS_PER_BAR } = {}) {
       const ticks = [];
       const from = Math.max(before + 1, after - MAX_TICKS_PER_ADVANCE + 1);
       for (let b = from; b <= after; b++) {
-        const beat = b % per; const bar = Math.floor(b / per);
+        const beat = b % per;
+        const bar = Math.floor(b / per);
         ticks.push({ type: 'beat', bar, beat, bpm });
         if (beat === 0) ticks.push({ type: 'bar', bar, beat, bpm });
       }
       return { ...view(), ticks, restarted: false };
     },
     now: view,
-    reset() { last = null; pos = 0; },
+    reset() {
+      last = null;
+      pos = 0;
+    },
   };
 }

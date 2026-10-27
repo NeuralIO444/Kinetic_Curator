@@ -71,12 +71,18 @@ export function recordGovernorEvent(e = {}) {
     throw new Error(`[governor-event-log] type must be 'shed' or 'restore' (got ${String(type)})`);
   }
   if (!CUT_KINDS.includes(cutKind)) {
-    throw new Error(`[governor-event-log] unknown cutKind "${String(cutKind)}" — must be one of ${CUT_KINDS.join(', ')}`);
+    throw new Error(
+      `[governor-event-log] unknown cutKind "${String(cutKind)}" — must be one of ${CUT_KINDS.join(', ')}`,
+    );
   }
   const fps = e.fps ?? null;
   if (fps !== null) {
     const { at, threshold, sustainedMs } = fps;
-    for (const [k, v] of [['at', at], ['threshold', threshold], ['sustainedMs', sustainedMs]]) {
+    for (const [k, v] of [
+      ['at', at],
+      ['threshold', threshold],
+      ['sustainedMs', sustainedMs],
+    ]) {
       if (typeof v !== 'number' || !Number.isFinite(v)) {
         throw new Error(`[governor-event-log] fps.${k} must be a finite number (got ${String(v)})`);
       }
