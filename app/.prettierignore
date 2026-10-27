@@ -16,6 +16,9 @@ src/gl/*
 !src/engine/colorHex.selfcheck.mjs
 !src/gl/liveLoopSwell.selfcheck.mjs
 
+# ── Adopted (slice 1, #1684: src/midi — the MIDI engine, map, learn, banks, targets and their selfchecks) ──
+!src/midi/
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

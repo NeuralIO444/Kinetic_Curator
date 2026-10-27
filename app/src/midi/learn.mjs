@@ -69,10 +69,9 @@ export function isLearnArmed(state) {
 /** The one honest line the UI shows while armed (or after a refusal). */
 export function learnPrompt(target, refused = null) {
   if (!target) return '';
-  if (refused === 'wrong-kind') return `${target.label} needs a knob or fader — a pad can't drive it. Move a knob, or cancel.`;
-  return target.kind === 'cc'
-    ? `${target.label}: move a knob or fader…`
-    : `${target.label}: press a pad or key…`;
+  if (refused === 'wrong-kind')
+    return `${target.label} needs a knob or fader — a pad can't drive it. Move a knob, or cancel.`;
+  return target.kind === 'cc' ? `${target.label}: move a knob or fader…` : `${target.label}: press a pad or key…`;
 }
 
 /**
@@ -85,6 +84,7 @@ export function routeLearnMessage(st, msg) {
   st.setMidiLast(msg);
   const r = learnMessage(st.midiLearn, msg);
   if (!r.claimed) return false;
-  if (r.key) st.completeMidiLearn(r.key, r.targetId); else st.setMidiLearnRefused(r.refused);
+  if (r.key) st.completeMidiLearn(r.key, r.targetId);
+  else st.setMidiLearnRefused(r.refused);
   return true;
 }
