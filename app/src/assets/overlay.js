@@ -1,9 +1,16 @@
-import { ingestSvg, duplicateAsset, isHostile, overlayId, errorHint } from './ingest.js';
+import { ingestSvg, duplicateAsset, isHostile, disallowedTag, overlayId, errorHint } from './ingest.js';
 import { sanitizeGradient } from './gradient.js';
 import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
 import { sanitizeRegionKinemes } from '../data/regionKinemes.js';
 
 export const OVERLAY_CAP = 32;
+
+/**
+ * #1707 — tags the LOAD path accepts on top of import's allowlist. Duplicating a canon asset keeps its markup when
+ * re-ingest refuses it (duplicateIntoOverlay's fallback), and 17 canon stamps are `<text>`; refusing `text` here would
+ * silently drop every duplicated stamp from a saved project. `<text>` carries no link or script surface.
+ */
+const LOAD_EXTRA_TAGS = Object.freeze(['text']);
 
 /**
  * #701/#708 — this is the ONE trust boundary a custom asset's `gradient`
@@ -23,7 +30,8 @@ export function sanitizeOverlay(list) {
   for (const raw of list) {
     if (!raw || typeof raw !== 'object') continue;
     if (out.length >= OVERLAY_CAP) break;
-    if (isHostile(raw.svg)) continue;
+    // #1707: the same tag allowlist import enforces (plus LOAD_EXTRA_TAGS), not only the hostile-pattern match
+    if (isHostile(raw.svg) || disallowedTag(raw.svg, LOAD_EXTRA_TAGS)) continue;
     const id = String(raw.id || '');
     if (!id.startsWith('user:')) continue;
     if (seen.has(id)) continue;

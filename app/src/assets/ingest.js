@@ -200,6 +200,21 @@ function fail(error) {
   return { ok: false, error, hint: errorHint(error) };
 }
 
+/**
+ * #1707 — the first tag outside the allowlist (plus `extra`), or null. One check for import and project load, so a
+ * hand-edited project file can no longer carry markup that import would refuse (e.g. `<a>` + `<animate>`/`<set>`
+ * rewriting `href` to a tab-split `javascript:`, which `isHostile`'s literal match misses).
+ */
+export function disallowedTag(svg, extra = []) {
+  const allow = extra.length ? new Set([...ALLOWED, ...extra]) : ALLOWED;
+  for (const m of String(svg || '').matchAll(/<\/?\s*([a-zA-Z0-9:-]+)/g)) {
+    const t = m[1].toLowerCase().replace(/:.*/, '');
+    if (!t || t === '?xml' || t === '!--') continue;
+    if (!allow.has(t)) return t;
+  }
+  return null;
+}
+
 export function isHostile(svg) {
   const s = String(svg || '');
   return FORBIDDEN.test(s) || REMOTE_HREF.test(s) || STYLE_URL.test(s) || ENTITY.test(s);
@@ -271,11 +286,8 @@ export function ingestSvg(raw, { id, category = 'fragments', weight = 'medium' }
   if (gDepth(inner0) > MAX_G_DEPTH) return fail('too deep');
   if (!/<svg[\s>]|<path[\s>]|<g[\s>]/i.test(svg)) return fail('not svg');
 
-  const tags = [...inner0.matchAll(/<\/?\s*([a-zA-Z0-9:-]+)/g)].map((m) => m[1].toLowerCase().replace(/:.*/, ''));
-  for (const t of tags) {
-    if (!t || t === '?xml' || t === '!--') continue;
-    if (!ALLOWED.has(t)) return fail(`tag not allowed: ${t}`);
-  }
+  const badTag = disallowedTag(inner0);
+  if (badTag) return fail(`tag not allowed: ${badTag}`);
 
   const inner1 = inner0.replace(ACCENT_HEX, 'var(--accent)');
   // #1275: map any artboard into the 0 0 100 100 tile box. No-op when the
