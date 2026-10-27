@@ -46,6 +46,26 @@ assert.strictEqual(describeKey('cc:3:7'), 'CC 7 · ch 3');
   assert.strictEqual(getMidiTarget('accum.freeze').kind, 'hold', 'FREEZE is momentary: hold a pad, release to thaw');
 }
 
+// #617 — the rest of the spec's list: keep (J), pass (X), phrase reset, and the voice-mix morph as a fader
+{
+  for (const [id, kind] of [['taste.keep', 'trigger'], ['taste.pass', 'trigger'], ['phrase.reset', 'trigger'], ['voice.mix', 'cc']]) {
+    assert.ok(getMidiTarget(id) && getMidiTarget(id).kind === kind, `${id} is a ${kind} target`);
+  }
+  const log = [];
+  const plate = { seed: 9, seedOffsets: {}, layoutParams: {}, enabledAssets: {}, layers: [], activeLayerId: null, layerSnapshots: {}, paletteId: 'praystation' };
+  const ctx = { emit: (ev, p) => log.push([ev, p]), Events, getState: () => ({ ...plate, addPass: (rec) => log.push(['addPass', rec]) }) };
+  getMidiTarget('taste.keep').run(ctx);
+  assert.strictEqual(log[0][0], Events.KEEP_ADD, 'KEEP rides the same bus event as J');
+  assert.strictEqual(log[0][1].keep.seed, 9, 'the keep carries the plate');
+  getMidiTarget('taste.pass').run(ctx);
+  assert.strictEqual(log[1][0], 'addPass', 'PASS lands where X lands (addPass)');
+  assert.strictEqual(log[1][1].seed, 9, 'the pass carries the plate');
+  getMidiTarget('phrase.reset').run(ctx);
+  assert.deepStrictEqual(log[2], [Events.DAVIS_RESET_PHRASE, undefined]);
+  getMidiTarget('voice.mix').run(ctx, 0.25);
+  assert.deepStrictEqual(log[3], [Events.VOICE_MIX, { t: 0.25 }], 'the fader position is the MIX road position');
+}
+
 // ── picker targets + bank switch (#1720) ─────────────────────────────────
 {
   // one target per palette, per flagship voice, per user-voice slot, plus the switch
@@ -58,7 +78,7 @@ assert.strictEqual(describeKey('cc:3:7'), 'CC 7 · ch 3');
   for (let i = 1; i <= 12; i++) assert.ok(getMidiTarget(`voice.my.${i}`), `voice.my.${i} is a picker target`);
   assert.strictEqual(getMidiTarget('voice.my.13'), undefined, 'the shelf holds 12 hand-made voices, no 13th slot');
   assert.ok(getMidiTarget('bank.next') && getMidiTarget('bank.next').kind === 'trigger', 'one bank-switch target');
-  assert.strictEqual(MIDI_TARGETS.length, 15 + PALETTES.length + FLAGSHIP_VOICES.length + 12 + 1, 'the registry is the 15 + pickers + slots + switch');
+  assert.strictEqual(MIDI_TARGETS.length, 19 + PALETTES.length + FLAGSHIP_VOICES.length + 12 + 1, 'the registry is the 19 + pickers + slots + switch (#617 added keep, pass, phrase reset, voice mix)');
   // the cap covers a whole registry bound into ONE bank, on legal keys
   assert.strictEqual(MAX_BINDINGS, 128);
   assert.ok(MAX_BINDINGS >= MIDI_TARGETS.length, 'the cap covers every target at once');
