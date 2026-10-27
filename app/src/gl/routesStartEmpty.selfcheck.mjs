@@ -6,6 +6,8 @@ import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { autoInvites } from './stimuliAuto.mjs';
 import { DEFAULT_ROUTES, METRO_BREATH, hasNoRoutes, effectiveRoutes, metroBreath, audioRoutes } from './audioRoutes.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -77,7 +79,7 @@ ok('the guided path: AUDIO ON shimmers while audio is off, then AUTO once audio 
   assert.equal(autoInvites({ audioEnabled: true, routeCount: 0 }), true, 'audio on and no routes: AUTO');
   assert.equal(autoInvites({ audioEnabled: true, routeCount: 3 }), false, 'a route exists: quiet');
   const m = src('../panels/stimulus/ModMatrix.jsx');
-  assert.match(m, /className=\{`chip-btn act\$\{autoInvited \? ' xl-shimmer' : ''\}`\} onClick=\{\(\) => \{ markAuto\(\); autoSetup\(\); \}\}/);
+  assert.match(flat(m), fre(/className=\{`chip-btn act\$\{autoInvited \? ' xl-shimmer' : ''\}`\} onClick=\{\(\) => \{ markAuto\(\); autoSetup\(\); \}\}/));
   assert.match(m, /useInvite\('auto'\)/);
   assert.match(src('../panels/StimulusPanel.jsx'), /\$\{audioEnabled \? 'on' : 'invite'\}/, 'the AUDIO button still invites while off');
 });

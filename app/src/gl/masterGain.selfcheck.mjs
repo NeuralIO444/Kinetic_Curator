@@ -6,6 +6,8 @@ import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-mod
 import { FEEL_PRESETS, activeFeelId } from '../data/feels.js';
 import { masterGainFor, loudestPeak, MASTER_DEFAULTS, MASTER_MAX, GAIN_MAX_FACTOR, GAIN_TARGET_PEAK, ENERGY_FLOOR } from './stimuliAuto.mjs';
 import { audioRoutes, DEFAULT_ROUTES } from './audioRoutes.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
@@ -93,11 +95,11 @@ ok('AUTO is monotone in how quiet it was, bounded, and never lowers what the art
 ok('loudestPeak reads every route input, and the sliders and AUTO are wired to the new ceiling', () => {
   assert.equal(loudestPeak({ beat: 0.2, level: 0.1, bass: 0, mid: 0, treble: 0, bands: { sub: 0.55 } }), 0.55);
   const rc = src('../panels/stimulus/ReactivityControls.jsx');
-  for (const l of ['DEPTH', 'SCALE', 'ALPHA']) assert.match(rc, new RegExp(`label="${l}" value=\\{\\w+\\} min=\\{0\\} max=\\{2\\} step=\\{0\\.05\\}`));
+  for (const l of ['DEPTH', 'SCALE', 'ALPHA']) assert.match(flat(rc), fre(new RegExp(`label="${l}" value=\\{\\w+\\} min=\\{0\\} max=\\{2\\} step=\\{0\\.05\\}`)));
   const mm = src('../panels/stimulus/ModMatrix.jsx');
-  assert.match(mm, /masterGainFor\(peaks, \{ audioModDepth: lp\.audioModDepth/);
-  assert.match(mm, /armMasters\(peaks\);/);
-  assert.match(src('../data/layout-modes.js'), /audioModDepth: \{ min: 0, max: 2 \}/);
+  assert.match(flat(mm), fre(/masterGainFor\(peaks, \{ audioModDepth: lp\.audioModDepth/));
+  assert.match(flat(mm), fre(/armMasters\(peaks\);/));
+  assert.match(flat(src('../data/layout-modes.js')), fre(/audioModDepth: \{ min: 0, max: 2 \}/));
 });
 
 console.log(`masterGain.selfcheck: ${n} checks passed`);

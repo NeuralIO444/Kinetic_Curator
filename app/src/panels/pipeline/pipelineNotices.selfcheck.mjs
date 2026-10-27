@@ -1,9 +1,18 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  importConfirmMessage, loadedMessage, exportSavedMessage, exportFilename,
-  nextExportFilename, nextTitleVersion, titleSlug,
-  missingPaletteMessage, rememberRecent, readRecent, dirtyMessage, shouldExportOnKey,
+  importConfirmMessage,
+  loadedMessage,
+  exportSavedMessage,
+  exportFilename,
+  nextExportFilename,
+  nextTitleVersion,
+  titleSlug,
+  missingPaletteMessage,
+  rememberRecent,
+  readRecent,
+  dirtyMessage,
+  shouldExportOnKey,
 } from './pipelineNotices.mjs';
 
 test('#647 import confirm dialog copy names the file and seed', () => {
@@ -20,7 +29,10 @@ test('#630 #646 loaded message names the file, seed, tracks, palette', () => {
   assert.match(msg, /seed 12345/);
   assert.match(msg, /2 tracks/);
   assert.match(msg, /praystation/);
-  assert.match(loadedMessage('a.json', { title: 'Dusk Flock', seed: 1, layers: [{}], paletteId: 'bone' }), /Dusk Flock/);
+  assert.match(
+    loadedMessage('a.json', { title: 'Dusk Flock', seed: 1, layers: [{}], paletteId: 'bone' }),
+    /Dusk Flock/,
+  );
 });
 
 test('#646 sanitized count shown only when repairs happened', () => {

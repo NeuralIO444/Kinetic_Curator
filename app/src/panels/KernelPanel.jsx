@@ -15,7 +15,13 @@ import { useStore } from '../state/store.js';
 import { registryTileRows, registryCounts, probeField } from './kernelTiles.mjs';
 
 const ROW = { display: 'flex', gap: 6, flexWrap: 'wrap', margin: '2px 0 10px' };
-const FAM = { fontSize: 9, letterSpacing: '0.12em', color: 'var(--dim)', margin: '8px 0 2px', textTransform: 'uppercase' };
+const FAM = {
+  fontSize: 9,
+  letterSpacing: '0.12em',
+  color: 'var(--dim)',
+  margin: '8px 0 2px',
+  textTransform: 'uppercase',
+};
 const DETAIL = { fontSize: 10, color: 'var(--dim)', margin: '-6px 0 10px', lineHeight: 1.5 };
 const PROBE = { color: 'var(--kc-davis)' };
 const ERR = { color: 'var(--kc-red)' };
@@ -47,9 +53,14 @@ export function KernelPanel() {
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <div style={{ fontSize: 13, marginBottom: 2 }}>
-        <span><b>Kernel modules</b> <span style={{ opacity: 0.55 }}>the declared roster — tap to probe</span></span>
+        <span>
+          <b>Kernel modules</b> <span style={{ opacity: 0.55 }}>the declared roster — tap to probe</span>
+        </span>
       </div>
-      <p style={{ fontSize: 10, color: 'var(--dim)', margin: '6px 0' }} title="Registered modules per kernel family. New modules appear here with no panel edits.">
+      <p
+        style={{ fontSize: 10, color: 'var(--dim)', margin: '6px 0' }}
+        title="Registered modules per kernel family. New modules appear here with no panel edits."
+      >
         {counts.map((c) => `${c.n} ${c.family}`).join(' · ')}
       </p>
       {rows.map((row) => (
@@ -67,7 +78,9 @@ export function KernelPanel() {
                 aria-pressed={!!(selected && selected.id === t.id)}
                 aria-label={`${t.family} module ${t.id}, tier ${t.tier}. Tap to probe.`}
               >
-                <span className="te-glyph" aria-hidden="true">{t.face}</span>
+                <span className="te-glyph" aria-hidden="true">
+                  {t.face}
+                </span>
                 <span className="te-cell-label">T{t.tier}</span>
               </button>
             ))}
@@ -76,7 +89,17 @@ export function KernelPanel() {
             <div style={DETAIL}>
               {declLine(selected)}
               {selected.family === 'field' && probes[selected.id] !== undefined && (
-                <> · <span style={probes[selected.id] === 'ERR' ? ERR : PROBE} title="sample(0.5, 0.5) at the project seed — same seed, same value">probe {probes[selected.id] === 'ERR' ? 'ERR' : `${Number(probes[selected.id]).toFixed(4)} @${seed >>> 0}`}</span></>
+                <>
+                  {' '}
+                  ·{' '}
+                  <span
+                    style={probes[selected.id] === 'ERR' ? ERR : PROBE}
+                    title="sample(0.5, 0.5) at the project seed — same seed, same value"
+                  >
+                    probe{' '}
+                    {probes[selected.id] === 'ERR' ? 'ERR' : `${Number(probes[selected.id]).toFixed(4)} @${seed >>> 0}`}
+                  </span>
+                </>
               )}
             </div>
           )}

@@ -1,11 +1,7 @@
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { confirmClearSnapshotsMessage } from './snapshotCopy.mjs';
-import {
-  encodeRecipe,
-  copyTextToClipboard,
-  recipeFieldsFromKept,
-} from '../../state/recipes.js';
+import { encodeRecipe, copyTextToClipboard, recipeFieldsFromKept } from '../../state/recipes.js';
 
 export function SnapshotGallery({ snapshots }) {
   // #307 — per-snapshot copy feedback: '✓ COPIED' for 1.5s, or the failure
@@ -23,7 +19,15 @@ export function SnapshotGallery({ snapshots }) {
   return (
     <>
       <div className="pipeline-row">
-        <button className="big-btn dl act" onClick={() => { if (window.confirm(confirmClearSnapshotsMessage(snapshots.length))) emit(Events.EXPORT_CLEAR_SNAPSHOTS); }} style={{ width: '100%' }}>✕ clear</button>
+        <button
+          className="big-btn dl act"
+          onClick={() => {
+            if (window.confirm(confirmClearSnapshotsMessage(snapshots.length))) emit(Events.EXPORT_CLEAR_SNAPSHOTS);
+          }}
+          style={{ width: '100%' }}
+        >
+          ✕ clear
+        </button>
       </div>
 
       {snapshots.length > 0 && (
@@ -31,9 +35,11 @@ export function SnapshotGallery({ snapshots }) {
           {snapshots.map((s) => (
             <div key={s.id} className="snap">
               <div className="snap-thumb">
-                {s.thumb
-                  ? <img src={s.thumb} alt={`Snapshot, seed ${s.seed.toString(16)}`} />
-                  : <span className="snap-fmt">{s.format}</span>}
+                {s.thumb ? (
+                  <img src={s.thumb} alt={`Snapshot, seed ${s.seed.toString(16)}`} />
+                ) : (
+                  <span className="snap-fmt">{s.format}</span>
+                )}
               </div>
               <div className="snap-meta">
                 <span>{s.seed.toString(16)}</span>
@@ -51,7 +57,9 @@ export function SnapshotGallery({ snapshots }) {
         </div>
       )}
       {snapshots.length === 0 && (
-        <div className="pipeline-hint">Press <b>S</b> for snap · RENDER · BATCH · ACCUM for trails · PROJECT for state</div>
+        <div className="pipeline-hint">
+          Press <b>S</b> for snap · RENDER · BATCH · ACCUM for trails · PROJECT for state
+        </div>
       )}
     </>
   );

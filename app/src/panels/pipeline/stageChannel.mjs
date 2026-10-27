@@ -29,14 +29,25 @@ export function makeControlMessage(raw = {}) {
 
 /** Guard for inbound control messages. */
 export function isControlMessage(m) {
-  return !!m && typeof m === 'object' && m.type === 'control'
-    && typeof m.blackout === 'boolean' && typeof m.testPattern === 'boolean';
+  return (
+    !!m &&
+    typeof m === 'object' &&
+    m.type === 'control' &&
+    typeof m.blackout === 'boolean' &&
+    typeof m.testPattern === 'boolean'
+  );
 }
 
 /** Guard for inbound frame messages (the bitmap travels in the transfer list). */
 export function isFrameMessage(m) {
-  return !!m && typeof m === 'object' && m.type === 'frame'
-    && Number.isFinite(m.width) && Number.isFinite(m.height) && !!m.bitmap;
+  return (
+    !!m &&
+    typeof m === 'object' &&
+    m.type === 'frame' &&
+    Number.isFinite(m.width) &&
+    Number.isFinite(m.height) &&
+    !!m.bitmap
+  );
 }
 
 /** The stage window listens for this to close itself on command. */

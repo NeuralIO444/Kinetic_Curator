@@ -31,7 +31,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(here, rel), 'utf8');
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const buildPanel = read('../BuildPanel.jsx');
 const section = read('./ChiaroscuroSection.jsx');
@@ -59,9 +63,7 @@ ok('the sun controls speak LIGHT_SET over exactly the light keys', () => {
 });
 
 ok('the section and its tenants emit only the events their controls always emitted', () => {
-  const emitted = new Set(
-    [...(section + sun + map).matchAll(/Events\.([A-Z_]+)/g)].map((m) => m[1]),
-  );
+  const emitted = new Set([...(section + sun + map).matchAll(/Events\.([A-Z_]+)/g)].map((m) => m[1]));
   assert.deepStrictEqual([...emitted].sort(), ['LAYOUT_LOCK', 'LAYOUT_PARAM', 'LIGHT_SET']);
 });
 
@@ -74,10 +76,11 @@ ok('the editor floats over the canvas — portal, canvas anchor, Esc, no modal',
 });
 
 ok('the panel form is just a button (#1629) — no title row, no summary, no EDIT', () => {
-  assert.ok(section.includes('<span className="te-cell-label">CHIAROSCURO</span>'),
-    'the one button is labelled CHIAROSCURO');
-  assert.equal([...section.matchAll(/aria-haspopup="dialog"/g)].length, 1,
-    'exactly one editor launcher');
+  assert.ok(
+    section.includes('<span className="te-cell-label">CHIAROSCURO</span>'),
+    'the one button is labelled CHIAROSCURO',
+  );
+  assert.equal([...section.matchAll(/aria-haspopup="dialog"/g)].length, 1, 'exactly one editor launcher');
   for (const gone of ['chiaro-row', 'chiaro-head', 'chiaro-title', 'chiaro-summary', 'const summary']) {
     assert.ok(!section.includes(gone), `${gone} left with the section row`);
   }
@@ -87,8 +90,10 @@ ok('the panel form is just a button (#1629) — no title row, no summary, no EDI
 ok('HUE ROTATE left AppearanceSliders; FXAA never moved', () => {
   assert.ok(!appearance.includes('hueRotate'), 'hue dial is out of the appearance shelf');
   assert.ok(section.includes('hueRotate'), 'hue dial lives in the section editor');
-  assert.ok(!section.includes('DISPLAY_FXAA') && !sun.includes('DISPLAY_FXAA'),
-    'the section never touches the FXAA event');
+  assert.ok(
+    !section.includes('DISPLAY_FXAA') && !sun.includes('DISPLAY_FXAA'),
+    'the section never touches the FXAA event',
+  );
   assert.ok(displayBlock.includes('Events.DISPLAY_FXAA'), 'FXAA stays in Pipeline (amendment 1)');
 });
 
@@ -114,10 +119,14 @@ ok('the editor is content-sized, bounded by the wrap minus its inset (2026-10-16
   assert.ok(!section.includes('width: pos.width'), 'no forced panel width — the content sizes the panel');
   assert.ok(!section.includes('height: pos.height'), 'no forced panel height — the content sizes the panel');
   assert.ok(!section.includes('EDITOR_W'), 'the old 560px panel-width constant stays gone');
-  assert.ok(/\.chiaro-editor \{[^}]*width: max-content/.test(css),
-    'the panel hugs its content (width: max-content) up to the inline bound');
-  assert.ok(/\.chiaro-editor-body \{[^}]*overflow-y: auto/.test(css),
-    'past the height bound the body scrolls internally, never overflowing the canvas');
+  assert.ok(
+    /\.chiaro-editor \{[^}]*width: max-content/.test(css),
+    'the panel hugs its content (width: max-content) up to the inline bound',
+  );
+  assert.ok(
+    /\.chiaro-editor-body \{[^}]*overflow-y: auto/.test(css),
+    'past the height bound the body scrolls internally, never overflowing the canvas',
+  );
 });
 
 ok('inside the editor the map keeps its one-line form — no wrap, no reflow (2026-10-16, amendment 3)', () => {
@@ -127,12 +136,18 @@ ok('inside the editor the map keeps its one-line form — no wrap, no reflow (20
   // "same component, same form": scoped to the editor, the map row
   // and its matrices are pinned to a single non-wrapping row at
   // natural width, tiles at their designed 52px measure.
-  assert.ok(/\.chiaro-editor \.map-tiles \{[^}]*flex-wrap: nowrap/.test(css),
-    'the map tile row never wraps inside the editor');
-  assert.ok(/\.chiaro-editor \.map-tiles \.te-matrix \{[^}]*display: flex[^}]*flex-wrap: nowrap[^}]*flex: 0 0 auto/.test(css),
-    'inside the editor the matrices render as one non-wrapping row at natural width, not the reflow-prone auto-fill grid');
-  assert.ok(/\.chiaro-editor \.map-tiles \.te-cell \{[^}]*flex: 0 0 auto[^}]*min-width: 52px/.test(css),
-    'inside the editor the map tiles keep their designed 52px measure');
+  assert.ok(
+    /\.chiaro-editor \.map-tiles \{[^}]*flex-wrap: nowrap/.test(css),
+    'the map tile row never wraps inside the editor',
+  );
+  assert.ok(
+    /\.chiaro-editor \.map-tiles \.te-matrix \{[^}]*display: flex[^}]*flex-wrap: nowrap[^}]*flex: 0 0 auto/.test(css),
+    'inside the editor the matrices render as one non-wrapping row at natural width, not the reflow-prone auto-fill grid',
+  );
+  assert.ok(
+    /\.chiaro-editor \.map-tiles \.te-cell \{[^}]*flex: 0 0 auto[^}]*min-width: 52px/.test(css),
+    'inside the editor the map tiles keep their designed 52px measure',
+  );
 });
 
 console.log(`chiaroscuro.selfcheck: ${n} checks passed`);

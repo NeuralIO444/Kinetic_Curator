@@ -11,23 +11,23 @@
 //     branch on it
 //   - message — one status line, written by both data-export and batch
 //     completion, exactly as before
-import { useEffect, useRef, useState } from "react";
-import { useApp } from "../state/AppContext.jsx";
-import { PanelHeader } from "../components/PanelHeader.jsx";
-import { emit, Events } from "../composition/eventBus.js";
-import { RenderFinalBlock } from "./pipeline/RenderFinalBlock.jsx";
-import { DisplayBlock } from "./pipeline/DisplayBlock.jsx";
-import { SetupBlock } from "./pipeline/SetupBlock.jsx";
-import { StageBlock } from "./pipeline/StageBlock.jsx";
-import { BatchEditionBlock } from "./pipeline/BatchEditionBlock.jsx";
-import { SnapRecordRow } from "./pipeline/SnapRecordRow.jsx";
-import { LoopCaptureBlock } from "./pipeline/LoopCaptureBlock.jsx";
-import { DataExportRow } from "./pipeline/DataExportRow.jsx";
-import { RecipeRow } from "./pipeline/RecipeRow.jsx";
-import { SnapshotGallery } from "./pipeline/SnapshotGallery.jsx";
-import { LatestCapture } from "./pipeline/LatestCapture.jsx";
-import { NativeLabBlock } from "./pipeline/NativeLabBlock.jsx";
-import { LootRow } from "./pipeline/LootRow.jsx"; // #1479: the loot folder
+import { useEffect, useRef, useState } from 'react';
+import { useApp } from '../state/AppContext.jsx';
+import { PanelHeader } from '../components/PanelHeader.jsx';
+import { emit, Events } from '../composition/eventBus.js';
+import { RenderFinalBlock } from './pipeline/RenderFinalBlock.jsx';
+import { DisplayBlock } from './pipeline/DisplayBlock.jsx';
+import { SetupBlock } from './pipeline/SetupBlock.jsx';
+import { StageBlock } from './pipeline/StageBlock.jsx';
+import { BatchEditionBlock } from './pipeline/BatchEditionBlock.jsx';
+import { SnapRecordRow } from './pipeline/SnapRecordRow.jsx';
+import { LoopCaptureBlock } from './pipeline/LoopCaptureBlock.jsx';
+import { DataExportRow } from './pipeline/DataExportRow.jsx';
+import { RecipeRow } from './pipeline/RecipeRow.jsx';
+import { SnapshotGallery } from './pipeline/SnapshotGallery.jsx';
+import { LatestCapture } from './pipeline/LatestCapture.jsx';
+import { NativeLabBlock } from './pipeline/NativeLabBlock.jsx';
+import { LootRow } from './pipeline/LootRow.jsx'; // #1479: the loot folder
 
 export function PipelinePanel() {
   const { palette, glCanvasRef, glLoopRef } = useApp();
@@ -104,7 +104,6 @@ export function PipelinePanel() {
 
   const accumOn = !!layoutParams.accumulation;
 
-
   // #107 §4 (flip mechanism deleted in #191): a watchdog trip (tier 2 — FPS
   // ~0 or a critical render-error) mid-export must not leave the UI stuck
   // showing RENDERING — running=false alone doesn't undo that. There is no
@@ -121,14 +120,9 @@ export function PipelinePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watchdogTripGen]);
 
-
   return (
     <div className="panel panel-pipeline panel-output">
-      <PanelHeader
-        tag="P05"
-        title="PIPELINE"
-        subtitle={`${snapshots.length} snaps`}
-      />
+      <PanelHeader tag="P05" title="PIPELINE" subtitle={`${snapshots.length} snaps`} />
       <div className="panel-body pipeline-body output-body">
         {/* ESSENTIALS — the three things every session needs, with the
             result shown right under the buttons. */}
@@ -161,12 +155,7 @@ export function PipelinePanel() {
         </section>
 
         <div className="pipeline-section-label">CAPTURE · MORE</div>
-        <LoopCaptureBlock
-          glLoopRef={glLoopRef}
-          seed={seed}
-          rendering={rendering}
-          setRendering={setRendering}
-        />
+        <LoopCaptureBlock glLoopRef={glLoopRef} seed={seed} rendering={rendering} setRendering={setRendering} />
         <BatchEditionBlock
           glLoopRef={glLoopRef}
           palette={palette}

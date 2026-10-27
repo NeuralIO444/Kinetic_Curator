@@ -9,15 +9,27 @@ test('#607 test pattern: seven bars span the full width', () => {
   assert.equal(TEST_PATTERN_BARS.length, 7);
   const totalW = bars.reduce((a, b) => a + b.w, 0);
   assert.ok(totalW >= 1920, 'bars cover the width');
-  assert.ok(bars.every((b) => b.h === Math.floor(1080 * 0.67)), 'uniform bar height');
-  assert.deepEqual(bars.map((b) => b.color), TEST_PATTERN_BARS);
+  assert.ok(
+    bars.every((b) => b.h === Math.floor(1080 * 0.67)),
+    'uniform bar height',
+  );
+  assert.deepEqual(
+    bars.map((b) => b.color),
+    TEST_PATTERN_BARS,
+  );
 });
 
 test('#607 test pattern: grayscale strip fills the bottom', () => {
   const { strip } = testPatternLayout(1920, 1080);
   assert.equal(strip.length, TEST_PATTERN_GRAYSCALE.length);
-  assert.ok(strip.every((s) => s.y === Math.floor(1080 * 0.67)), 'strip starts where bars end');
-  assert.ok(strip.every((s) => s.y + s.h === 1080), 'strip reaches the bottom edge');
+  assert.ok(
+    strip.every((s) => s.y === Math.floor(1080 * 0.67)),
+    'strip starts where bars end',
+  );
+  assert.ok(
+    strip.every((s) => s.y + s.h === 1080),
+    'strip reaches the bottom edge',
+  );
 });
 
 test('#607 test pattern: portrait canvas still lays out', () => {

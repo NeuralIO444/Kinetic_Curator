@@ -24,12 +24,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { useHotkeys } from '../../hooks/useHotkeys.js';
-import {
-  routeKineticTapHeat,
-  decayHeat,
-  heatLevel,
-  publishShownHeat,
-} from './kineticHeat.mjs';
+import { routeKineticTapHeat, decayHeat, heatLevel, publishShownHeat } from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';

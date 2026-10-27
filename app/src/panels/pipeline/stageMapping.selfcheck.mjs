@@ -48,7 +48,11 @@ test('#607 1:1: source bigger than display goes negative (crop by drawing)', () 
 });
 
 test('#607 degenerate inputs never throw and never go zero-size', () => {
-  for (const args of [[0, 0, 0, 0, 'fit'], [-5, 100, 200, 100, 'fill'], [NaN, 700, 1920, 1080, '1:1']]) {
+  for (const args of [
+    [0, 0, 0, 0, 'fit'],
+    [-5, 100, 200, 100, 'fill'],
+    [NaN, 700, 1920, 1080, '1:1'],
+  ]) {
     const r = computeStageRect(...args);
     assert.ok(r.dw >= 1 && r.dh >= 1, `sane rect for ${JSON.stringify(args)}`);
   }

@@ -49,37 +49,106 @@ export function HypeSliders({ layoutParams, lockedParams }) {
         {/* #1694 S3 — the count, at home: a quantized hand input with the same
             0..4 range and 0 default the retired stepper had, written through
             the same LAYOUT_PARAM door as every neighbour. */}
-        {btn('CREATURES', 'creatures', `${layoutParams.creatures ?? 0}`,
-          <SliderEditor ariaLabel="Creatures" value={layoutParams.creatures ?? 0}
-            min={0} max={4} step={1} onChange={(v) => set('creatures', Math.round(v))} />)}
-        {btn('BODY', 'body', `${layoutParams.body ?? 3}`,
-          <SliderEditor ariaLabel="Body" value={layoutParams.body ?? 3}
-            min={1} max={7} step={1} onChange={(v) => set('body', Math.round(v))} />,
-          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' })}
+        {btn(
+          'CREATURES',
+          'creatures',
+          `${layoutParams.creatures ?? 0}`,
+          <SliderEditor
+            ariaLabel="Creatures"
+            value={layoutParams.creatures ?? 0}
+            min={0}
+            max={4}
+            step={1}
+            onChange={(v) => set('creatures', Math.round(v))}
+          />,
+        )}
+        {btn(
+          'BODY',
+          'body',
+          `${layoutParams.body ?? 3}`,
+          <SliderEditor
+            ariaLabel="Body"
+            value={layoutParams.body ?? 3}
+            min={1}
+            max={7}
+            step={1}
+            onChange={(v) => set('body', Math.round(v))}
+          />,
+          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
+        )}
         {/* #716 — the motion keys wear the tile (glyph visualizes the value). */}
-        <MotionTile kind="flap" label="flap" value={layoutParams.flap ?? 0.35} min={0} max={1} step={0.05}
+        <MotionTile
+          kind="flap"
+          label="flap"
+          value={layoutParams.flap ?? 0.35}
+          min={0}
+          max={1}
+          step={0.05}
           hint="Wing beat amplitude on bilateral wings and radial fans"
-          disabled={!(isHype && (bilateral || radial))} disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
-          onChange={v => set('flap', v)}
-          locked={lockedParams.flap} onToggleLock={() => lock('flap')} />
-        {btn('TIGHT', 'tight', fmt2(layoutParams.tight ?? 0.55),
-          <SliderEditor ariaLabel="Tight" value={layoutParams.tight ?? 0.55}
-            min={0.05} max={0.95} step={0.05} format={fmt2} onChange={(v) => set('tight', v)} />,
-          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' })}
-        <MotionTile kind="breath" label="breath" value={layoutParams.breath ?? 0} min={0} max={1} step={0.05}
+          disabled={!(isHype && (bilateral || radial))}
+          disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
+          onChange={(v) => set('flap', v)}
+          locked={lockedParams.flap}
+          onToggleLock={() => lock('flap')}
+        />
+        {btn(
+          'TIGHT',
+          'tight',
+          fmt2(layoutParams.tight ?? 0.55),
+          <SliderEditor
+            ariaLabel="Tight"
+            value={layoutParams.tight ?? 0.55}
+            min={0.05}
+            max={0.95}
+            step={0.05}
+            format={fmt2}
+            onChange={(v) => set('tight', v)}
+          />,
+          { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
+        )}
+        <MotionTile
+          kind="breath"
+          label="breath"
+          value={layoutParams.breath ?? 0}
+          min={0}
+          max={1}
+          step={0.05}
           hint="Breathing swell on body scale — amplitude follows each creature's energy, so tired creatures breathe shallow"
-          disabled={!(isSwarm || isHype)} disabledReason="Swarm or hype mode only"
-          onChange={v => set('breath', v)}
-          locked={lockedParams.breath} onToggleLock={() => lock('breath')} />
-        <MotionTile kind="wind" label="wind" value={layoutParams.wind ?? 1} min={0} max={3} step={0.1}
+          disabled={!(isSwarm || isHype)}
+          disabledReason="Swarm or hype mode only"
+          onChange={(v) => set('breath', v)}
+          locked={lockedParams.breath}
+          onToggleLock={() => lock('breath')}
+        />
+        <MotionTile
+          kind="wind"
+          label="wind"
+          value={layoutParams.wind ?? 1}
+          min={0}
+          max={3}
+          step={0.1}
           hint="Hype-only multiplier on the noise wind"
-          disabled={!isHype} disabledReason="Hype mode only"
-          onChange={v => set('wind', v)}
-          locked={lockedParams.wind} onToggleLock={() => lock('wind')} />
-        {btn('METABOLISM', 'metabolism', fmt2(layoutParams.metabolism ?? 0),
-          <SliderEditor ariaLabel="Metabolism" value={layoutParams.metabolism ?? 0}
-            min={0} max={2} step={0.1} format={fmt2} onChange={(v) => set('metabolism', v)} />,
-          { disabled: !isHype, disabledReason: 'Hype mode only' })}
+          disabled={!isHype}
+          disabledReason="Hype mode only"
+          onChange={(v) => set('wind', v)}
+          locked={lockedParams.wind}
+          onToggleLock={() => lock('wind')}
+        />
+        {btn(
+          'METABOLISM',
+          'metabolism',
+          fmt2(layoutParams.metabolism ?? 0),
+          <SliderEditor
+            ariaLabel="Metabolism"
+            value={layoutParams.metabolism ?? 0}
+            min={0}
+            max={2}
+            step={0.1}
+            format={fmt2}
+            onChange={(v) => set('metabolism', v)}
+          />,
+          { disabled: !isHype, disabledReason: 'Hype mode only' },
+        )}
         {/* #268: MATERIAL removed — the GL backend renders every instance
             flat; the buttons changed nothing in the live instrument. */}
       </div>

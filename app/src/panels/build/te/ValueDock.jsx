@@ -17,7 +17,9 @@ export function DockProvider({ children }) {
   // value button that opened it are ignored — it's outside the dock too).
   useEffect(() => {
     if (!editor) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') close(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') close();
+    };
     const onDown = (e) => {
       if (dockRef.current && !dockRef.current.contains(e.target)) close();
     };
@@ -46,12 +48,7 @@ export function DockProvider({ children }) {
                 <div className="te-dock-kicker">EDIT VALUE</div>
                 <div className="te-dock-title">{editor.title}</div>
               </div>
-              <button
-                type="button"
-                className="te-dock-close"
-                onClick={close}
-                aria-label="Close editor"
-              >
+              <button type="button" className="te-dock-close" onClick={close} aria-label="Close editor">
                 ×
               </button>
             </div>

@@ -11,13 +11,7 @@ import { FIELDS } from '../engine/kernel/field/registry.js';
 import { WEATHER } from '../engine/kernel/weather/registry.js';
 import { FEATURES } from '../engine/kernel/feature/registry.js';
 import { makeNoiseField } from '../engine/kernel/field/index.js';
-import {
-  tileFace,
-  tileRowsFor,
-  registryTileRows,
-  registryCounts,
-  probeField,
-} from './kernelTiles.mjs';
+import { tileFace, tileRowsFor, registryTileRows, registryCounts, probeField } from './kernelTiles.mjs';
 
 // --- the live roster: six fields + the first weather module, two rows ---
 {
@@ -26,13 +20,20 @@ import {
   const [row, weatherRow] = rows;
   assert.strictEqual(row.family, 'field');
   assert.strictEqual(weatherRow.family, 'weather');
-  assert.deepStrictEqual(weatherRow.tiles.map((t) => t.id), ['haze-air'], 'weather row carries its first module (#1183)');
+  assert.deepStrictEqual(
+    weatherRow.tiles.map((t) => t.id),
+    ['haze-air'],
+    'weather row carries its first module (#1183)',
+  );
   for (const t of weatherRow.tiles) {
     assert.strictEqual(t.face, 'HAZE');
     assert.strictEqual(t.tier, 1, 'haze-air declares cost tier 1');
     assert.ok(t.decl && typeof t.decl.create === 'function', 'haze-air: tile must carry the registry declaration');
   }
-  assert.deepStrictEqual(row.tiles.map((t) => t.id), ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor']);
+  assert.deepStrictEqual(
+    row.tiles.map((t) => t.id),
+    ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor'],
+  );
   for (const t of row.tiles) {
     assert.ok(t.face.length > 0 && t.face.length <= 4, `${t.id}: face "${t.face}" must be 1–4 chars`);
     assert.strictEqual(t.face, tileFace(t.id));

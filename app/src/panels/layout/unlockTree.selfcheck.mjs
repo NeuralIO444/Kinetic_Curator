@@ -22,29 +22,58 @@ const here = dirname(fileURLToPath(import.meta.url));
 const read = (rel) => readFileSync(join(here, rel), 'utf8');
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const { buildUnlockTree, UNLOCK_NODE_IDS } = await import('./unlockTree.mjs');
 const { TIER_OPS } = await import('../../curator/mindConduct.js');
 const { PARAM_SPEC } = await import('../../data/layout-modes.js');
 
-const tree = (over = {}) => buildUnlockTree({
-  mode: 'grid', symmetry: 'none', material: 'flat',
-  hasGround: false, voiceCount: 0, voiceCap: 12,
-  davis: { tier: 1, cool: false }, ...over,
-});
+const tree = (over = {}) =>
+  buildUnlockTree({
+    mode: 'grid',
+    symmetry: 'none',
+    material: 'flat',
+    hasGround: false,
+    voiceCount: 0,
+    voiceCap: 12,
+    davis: { tier: 1, cool: false },
+    ...over,
+  });
 const nodeOf = (groups, id) => groups.flatMap((g) => g.nodes).find((x) => x.id === id);
 const stateIn = (over, id) => nodeOf(tree(over), id).state;
 const lineIn = (over, id) => nodeOf(tree(over), id).line;
 
 ok('the catalogue is complete and stable (5 groups, every node present in every snapshot)', () => {
-  assert.deepEqual(tree().map((g) => g.id), ['davis-ladder', 'davis-settings', 'materials', 'modes', 'shelf']);
+  assert.deepEqual(
+    tree().map((g) => g.id),
+    ['davis-ladder', 'davis-settings', 'materials', 'modes', 'shelf'],
+  );
   assert.deepEqual(UNLOCK_NODE_IDS, [
-    'tier-1', 'tier-2', 'tier-3', 'tier-4',
-    'voice-material', 'voice-ztiers', 'voice-noisefreq', 'voice-displace',
-    'mat-glass', 'mat-plate', 'mat-wash', 'mat-stipple',
-    'gate-swarm-family', 'gate-cohesion', 'gate-damping', 'gate-moth',
-    'gate-flap', 'gate-growth', 'gate-ground', 'gate-weather', 'gate-divergence',
+    'tier-1',
+    'tier-2',
+    'tier-3',
+    'tier-4',
+    'voice-material',
+    'voice-ztiers',
+    'voice-noisefreq',
+    'voice-displace',
+    'mat-glass',
+    'mat-plate',
+    'mat-wash',
+    'mat-stipple',
+    'gate-swarm-family',
+    'gate-cohesion',
+    'gate-damping',
+    'gate-moth',
+    'gate-flap',
+    'gate-growth',
+    'gate-ground',
+    'gate-weather',
+    'gate-divergence',
     'shelf-voice',
   ]);
   for (const mode of ['grid', 'swarm', 'murmuration', 'hype', 'dla', 'eden', 'phyllotaxis']) {
@@ -68,7 +97,11 @@ ok('the ladder is derived from TIER_OPS: each tier line names exactly the ops th
 ok('tier states are monotone in Davis standing, and an unreadable standing lights nothing', () => {
   for (const t of [1, 2, 3, 4]) {
     for (const k of [1, 2, 3, 4]) {
-      assert.equal(stateIn({ davis: { tier: t, cool: false } }, `tier-${k}`), k <= t ? 'lit' : 'dark', `davis t${t}, node t${k}`);
+      assert.equal(
+        stateIn({ davis: { tier: t, cool: false } }, `tier-${k}`),
+        k <= t ? 'lit' : 'dark',
+        `davis t${t}, node t${k}`,
+      );
     }
   }
   for (const k of [1, 2, 3, 4]) assert.equal(stateIn({ davis: null }, `tier-${k}`), 'dark');
@@ -91,8 +124,15 @@ ok('his settings: voice-only nodes never read lit or dark, and MATERIAL names th
 
 ok('the voice-only params exist in PARAM_SPEC and no performer slider writes them', () => {
   for (const key of ['zTiers', 'noiseFreq', 'displacement']) assert.ok(PARAM_SPEC[key], `${key} in PARAM_SPEC`);
-  const sliders = ['AppearanceSliders.jsx', 'LayoutSliders.jsx', 'SwarmSliders.jsx', 'HypeSliders.jsx', 'MaterialSliders.jsx']
-    .map((f) => read(`./${f}`)).join('\n');
+  const sliders = [
+    'AppearanceSliders.jsx',
+    'LayoutSliders.jsx',
+    'SwarmSliders.jsx',
+    'HypeSliders.jsx',
+    'MaterialSliders.jsx',
+  ]
+    .map((f) => read(`./${f}`))
+    .join('\n');
   for (const key of ['zTiers', 'noiseFreq', 'displacement']) {
     assert.ok(!sliders.includes(`set('${key}'`), `no slider sets ${key}`);
     assert.ok(!sliders.includes(`'${key}',`), `no slider button carries ${key}`);
@@ -106,13 +146,20 @@ ok('material knobs light per material, exactly as MaterialSliders gates them', (
       assert.equal(stateIn({ material: m }, `mat-${other}`), 'dark', `${other} dark under ${m}`);
     }
   }
-  for (const m of ['glass', 'plate', 'wash', 'stipple']) assert.equal(stateIn({ material: 'flat' }, `mat-${m}`), 'dark');
+  for (const m of ['glass', 'plate', 'wash', 'stipple'])
+    assert.equal(stateIn({ material: 'flat' }, `mat-${m}`), 'dark');
   assert.match(lineIn({ material: 'flat' }, 'mat-wash'), /Davis sets the material/);
 });
 
 ok('mode gates match the components\u2019 predicates (swarm family, hype, growth, phyllotaxis)', () => {
   // PARTICLES · GRAVITY · BREATH: swarm || murmuration || hype
-  for (const [mode, want] of [['swarm', 'lit'], ['murmuration', 'lit'], ['hype', 'lit'], ['grid', 'dark'], ['dla', 'dark']]) {
+  for (const [mode, want] of [
+    ['swarm', 'lit'],
+    ['murmuration', 'lit'],
+    ['hype', 'lit'],
+    ['grid', 'dark'],
+    ['dla', 'dark'],
+  ]) {
     assert.equal(stateIn({ mode }, 'gate-swarm-family'), want, `swarm-family in ${mode}`);
   }
   // The moth family: hype only. Growth: dla/eden. Divergence: phyllotaxis.
@@ -156,7 +203,13 @@ ok('the pattern-ground family follows hasGround, and the voice shelf follows its
 });
 
 ok('catalogue-from-code: the pinned set of lock reasons across the gating sources', () => {
-  const files = ['AppearanceSliders.jsx', 'HypeSliders.jsx', 'SwarmSliders.jsx', 'LayoutSliders.jsx', 'MaterialSliders.jsx'];
+  const files = [
+    'AppearanceSliders.jsx',
+    'HypeSliders.jsx',
+    'SwarmSliders.jsx',
+    'LayoutSliders.jsx',
+    'MaterialSliders.jsx',
+  ];
   const reasons = new Set();
   for (const f of files) {
     for (const line of read(`./${f}`).split('\n')) {
@@ -184,11 +237,31 @@ ok('catalogue-from-code: the pinned set of lock reasons across the gating source
   assert.ok(read('./VoicesShelf.jsx').includes('disabled={shelfFull}'), 'voice shelf cap gate');
   // The gated-control census: every gated ValueButton/MotionTile label in the
   // sources is named by some node in the tree.
-  const named = tree().flatMap((g) => g.nodes.map((x) => x.name)).join(' · ');
-  for (const label of ['GROWTH RATE', 'BRANCHING', 'BODY', 'TIGHT', 'WIND', 'METABOLISM',
-    'PARTICLES', 'GRAVITY', 'COHESION', 'DAMPING',
-    'GROUND', 'EDGE', 'SHADOW', 'SNAP', 'WEATHER', 'DIVERGENCE',
-    'GLASS', 'PLATE', 'WASH', 'STIPPLE']) {
+  const named = tree()
+    .flatMap((g) => g.nodes.map((x) => x.name))
+    .join(' · ');
+  for (const label of [
+    'GROWTH RATE',
+    'BRANCHING',
+    'BODY',
+    'TIGHT',
+    'WIND',
+    'METABOLISM',
+    'PARTICLES',
+    'GRAVITY',
+    'COHESION',
+    'DAMPING',
+    'GROUND',
+    'EDGE',
+    'SHADOW',
+    'SNAP',
+    'WEATHER',
+    'DIVERGENCE',
+    'GLASS',
+    'PLATE',
+    'WASH',
+    'STIPPLE',
+  ]) {
     assert.ok(named.includes(label), `tree names ${label}`);
   }
   assert.ok(named.includes('FLAP') && named.includes('BREATH'), 'tree names the motion tiles');
@@ -204,7 +277,10 @@ ok('read-only by construction, and mounted last in BUILD', () => {
   const panel = read('../BuildPanel.jsx');
   assert.ok(panel.includes('<UnlockTreeSection'), 'BuildPanel renders the tree');
   assert.ok(panel.indexOf('<UnlockTreeSection') > panel.indexOf('<MathSection'), 'the tree sits below MATH');
-  assert.ok(panel.indexOf('<UnlockTreeSection') > panel.indexOf('<ChiaroscuroSection'), 'the tree sits below Appearance too');
+  assert.ok(
+    panel.indexOf('<UnlockTreeSection') > panel.indexOf('<ChiaroscuroSection'),
+    'the tree sits below Appearance too',
+  );
 });
 
 console.log(`\nunlockTree.selfcheck: ${n} groups OK`);

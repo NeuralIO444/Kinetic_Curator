@@ -2,6 +2,8 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { COLD_OPEN_MS, TAP_PULSE_MS, coldOpenWanted, createColdOpen } from './coldOpen.mjs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
@@ -151,8 +153,8 @@ ok(
     );
     const bar = read('../panels/layout/CuratorBar.jsx');
     assert.match(
-      bar,
-      /on\(Events\.LAYOUT_CURATE, \(\) => \{ pulseCurator\(TAP_PULSE_MS\); curUsed\(\); \}\)/,
+      flat(bar),
+      fre(/on\(Events\.LAYOUT_CURATE, \(\) => \{ pulseCurator\(TAP_PULSE_MS\); curUsed\(\); \}\)/),
       'subscribed to the roll event, not just the click',
     );
     const hook = read('./useTapOpen.js');

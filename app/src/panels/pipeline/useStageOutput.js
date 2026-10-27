@@ -9,7 +9,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { useStore } from '../../state/store.js';
 import {
-  isTauriRuntime, listStageDisplays, openStageWindow, closeStageWindow,
+  isTauriRuntime,
+  listStageDisplays,
+  openStageWindow,
+  closeStageWindow,
   watchStageDisplay,
 } from './stageWindow.js';
 import { startStageMirror, stopStageMirror } from './stageMirror.js';
@@ -28,7 +31,11 @@ export function useStageOutput() {
     }
     stopStageMirror();
     if (isTauriRuntime()) {
-      try { await closeStageWindow(); } catch { /* best-effort on the way out */ }
+      try {
+        await closeStageWindow();
+      } catch {
+        /* best-effort on the way out */
+      }
     }
   }, []);
 
@@ -50,10 +57,14 @@ export function useStageOutput() {
 
   useEffect(() => {
     // Deferred past the commit phase — the enumeration is async I/O anyway.
-    const t = window.setTimeout(() => { if (isTauriRuntime()) refreshDisplays(); }, 0);
+    const t = window.setTimeout(() => {
+      if (isTauriRuntime()) refreshDisplays();
+    }, 0);
     // No zombie window: if the instrument window closes first, drop the
     // mirror; the stage self-closes on heartbeat timeout as the backstop.
-    const onUnload = () => { stopStageMirror(); };
+    const onUnload = () => {
+      stopStageMirror();
+    };
     window.addEventListener('beforeunload', onUnload);
     return () => {
       window.clearTimeout(t);
@@ -75,9 +86,11 @@ export function useStageOutput() {
     }
     const listed = await listStageDisplays();
     if (!listed.ok || listed.displays.length === 0) {
-      s.setStageError(listed.ok
-        ? 'No displays found. Attach a display and hit REFRESH.'
-        : `Could not list displays: ${listed.reason}`);
+      s.setStageError(
+        listed.ok
+          ? 'No displays found. Attach a display and hit REFRESH.'
+          : `Could not list displays: ${listed.reason}`,
+      );
       return;
     }
     setDisplays(listed.displays);
@@ -122,7 +135,9 @@ export function useStageOutput() {
         teardown();
         const st = useStore.getState();
         st.setStageMode('preview');
-        st.setStageError('Display unplugged mid-stage — stage closed, nothing frozen. Reattach it and hit FULLSCREEN to resume.');
+        st.setStageError(
+          'Display unplugged mid-stage — stage closed, nothing frozen. Reattach it and hit FULLSCREEN to resume.',
+        );
       },
       onWindowClosed: () => {
         // The performer closed the stage window directly — stop the mirror

@@ -27,7 +27,9 @@ export function SunControls() {
       label={label}
       ariaLabel={label}
       value={light[key]}
-      min={min} max={max} step={step}
+      min={min}
+      max={max}
+      step={step}
       readout={format(light[key])}
       defaultValue={LIGHT_DEFAULT[key]}
       hint={hint}
@@ -50,32 +52,74 @@ export function SunControls() {
       />
       {on && (
         <div className="slider-stack" style={{ marginTop: 6 }}>
-          {row('SUN X', 'x', -500, 1500, 1,
+          {row(
+            'SUN X',
+            'x',
+            -500,
+            1500,
+            1,
             'Where the sun sits across the canvas (off-canvas = a low sun from outside the frame)',
-            (v) => `${Math.round(v)}`)}
-          {row('SUN Y', 'y', -500, 1200, 1,
-            'Where the sun sits down the canvas',
-            (v) => `${Math.round(v)}`)}
-          {row('HEIGHT', 'height', 20, 1000, 1,
+            (v) => `${Math.round(v)}`,
+          )}
+          {row('SUN Y', 'y', -500, 1200, 1, 'Where the sun sits down the canvas', (v) => `${Math.round(v)}`)}
+          {row(
+            'HEIGHT',
+            'height',
+            20,
+            1000,
+            1,
             'Low = raking dawn/dusk light with a long falloff; high = flat noon',
-            (v) => `${Math.round(v)}`)}
-          {row('INTENSITY', 'intensity', 0, 1, 0.01,
+            (v) => `${Math.round(v)}`,
+          )}
+          {row(
+            'INTENSITY',
+            'intensity',
+            0,
+            1,
+            0.01,
             'How strongly the sun lights the marks facing it',
-            (v) => `${Math.round(v * 100)}%`)}
-          {row('AMBIENT', 'ambient', 0, 1, 0.01,
+            (v) => `${Math.round(v * 100)}%`,
+          )}
+          {row(
+            'AMBIENT',
+            'ambient',
+            0,
+            1,
+            0.01,
             'Light that reaches marks facing away — 0 is black shadow sides',
-            (v) => `${Math.round(v * 100)}%`)}
-          {row('BEVEL', 'bevel', 0, 1, 0.01,
-            'Edges slope from each mark\'s own shape and catch the light — 0 is flat',
-            (v) => `${Math.round(v * 100)}%`)}
-          {row('SPEC', 'spec', 0, 1, 0.01,
+            (v) => `${Math.round(v * 100)}%`,
+          )}
+          {row(
+            'BEVEL',
+            'bevel',
+            0,
+            1,
+            0.01,
+            "Edges slope from each mark's own shape and catch the light — 0 is flat",
+            (v) => `${Math.round(v * 100)}%`,
+          )}
+          {row(
+            'SPEC',
+            'spec',
+            0,
+            1,
+            0.01,
             'A tight enamel highlight where an edge faces the sun',
-            (v) => `${Math.round(v * 100)}%`)}
-          {row('POOL', 'pool', 0, 1, 0.01,
-            'Zero is today\'s sun. Higher pools ink in the shadow and paper on the highlight.',
-            (v) => `${Math.round(v * 100)}%`)}
+            (v) => `${Math.round(v * 100)}%`,
+          )}
+          {row(
+            'POOL',
+            'pool',
+            0,
+            1,
+            0.01,
+            "Zero is today's sun. Higher pools ink in the shadow and paper on the highlight.",
+            (v) => `${Math.round(v * 100)}%`,
+          )}
           <div>
-            <div className="davis-label lbl" style={{ marginBottom: 2 }}>sun colour</div>
+            <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+              sun colour
+            </div>
             <TeaMatrix
               ariaLabel="Sun colour"
               value={light.slot}

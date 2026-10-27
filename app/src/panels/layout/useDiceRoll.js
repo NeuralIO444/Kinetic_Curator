@@ -47,24 +47,30 @@ export function useDiceRoll() {
     // The keep ledger: what was crowned, as crowned (not a mid-blend snapshot).
     // #1140 — same record contract as captureFavorite: stream offsets (#305)
     // plus the session context. The crown used to drop the offsets.
-    emit(Events.KEEP_ADD, { keep: {
-      seed: s.seed,
-      seedOffsets: { ...(s.seedOffsets || {}) },
-      timestamp: new Date().toISOString(),
-      context: captureKeepContext(s.paletteId),
-      config: {
-        layout: { ...s.layoutParams, mode: finalist.layoutId },
-        palette: { id: s.paletteId },
-        assets: [...finalist.assetIds],
+    emit(Events.KEEP_ADD, {
+      keep: {
+        seed: s.seed,
+        seedOffsets: { ...(s.seedOffsets || {}) },
+        timestamp: new Date().toISOString(),
+        context: captureKeepContext(s.paletteId),
+        config: {
+          layout: { ...s.layoutParams, mode: finalist.layoutId },
+          palette: { id: s.paletteId },
+          assets: [...finalist.assetIds],
+        },
       },
-    } });
+    });
     // The dice's own log: the learned-compatibility training data.
     // T2: a crown from a model-ordered tray carries the model's stamp
     // (score + taste version + head kind); a persona crown carries
     // nulls — sanitize files them either way.
     recordCrown({
-      layoutId: finalist.layoutId, assetIds: finalist.assetIds, davisCode: tray?.davisCode ?? null,
-      xgbScore: finalist.xgbScore, tasteVersion: tray?.orderMeta?.tasteVersion, headKind: tray?.orderMeta?.headKind,
+      layoutId: finalist.layoutId,
+      assetIds: finalist.assetIds,
+      davisCode: tray?.davisCode ?? null,
+      xgbScore: finalist.xgbScore,
+      tasteVersion: tray?.orderMeta?.tasteVersion,
+      headKind: tray?.orderMeta?.headKind,
     });
     setTray(null);
   };

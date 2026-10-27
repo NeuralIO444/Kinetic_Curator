@@ -11,9 +11,14 @@ import { emit, Events } from '../../composition/eventBus.js';
 // through the project doc the same as every other layoutParams field, no
 // separate persistence path needed.
 const FIELDS = [
-  ['sep', 'SEP'], ['ali', 'ALI'], ['coh', 'COH'],
-  ['sepR', 'SEP R'], ['aliR', 'ALI R'], ['cohR', 'COH R'],
-  ['wind', 'WIND'], ['attract', 'ATTRACT'],
+  ['sep', 'SEP'],
+  ['ali', 'ALI'],
+  ['coh', 'COH'],
+  ['sepR', 'SEP R'],
+  ['aliR', 'ALI R'],
+  ['cohR', 'COH R'],
+  ['wind', 'WIND'],
+  ['attract', 'ATTRACT'],
 ];
 const overrideKey = (key) => `behave${key[0].toUpperCase()}${key.slice(1)}`;
 
@@ -88,18 +93,29 @@ export function BehaveReadout({ layoutParams }) {
     `behave-field${flash?.fields.has(key) ? ' flash' : ''}${overridden ? ' overridden' : ''}`;
 
   return (
-    <div className="davis-source-row" style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}
-      title="The resolved BEHAVE steering profile actually driving motion — edit a field to override this layer's table row; RESET clears every override back to the chip's default.">
+    <div
+      className="davis-source-row"
+      style={{ alignItems: 'flex-start', flexWrap: 'wrap' }}
+      title="The resolved BEHAVE steering profile actually driving motion — edit a field to override this layer's table row; RESET clears every override back to the chip's default."
+    >
       <span className="davis-label lbl">profile</span>
       <div className="behave-readout">
         {FIELDS.map(([key, label]) => {
           const overridden = layoutParams[overrideKey(key)] != null;
           return (
-            <label key={fieldKey(key)} className={fieldClass(key, overridden)}
-              title={overridden ? `${label}: edited for this layer, overriding the ${behave} table row` : `${label}: at the ${behave} table row's default`}>
+            <label
+              key={fieldKey(key)}
+              className={fieldClass(key, overridden)}
+              title={
+                overridden
+                  ? `${label}: edited for this layer, overriding the ${behave} table row`
+                  : `${label}: at the ${behave} table row's default`
+              }
+            >
               {label}{' '}
               <input
-                type="number" step="0.01"
+                type="number"
+                step="0.01"
                 className="behave-field-input"
                 value={Number(profile[key] ?? 0).toFixed(2)}
                 onChange={(e) => setOverride(key, e.target.value === '' ? null : Number(e.target.value))}
@@ -111,8 +127,12 @@ export function BehaveReadout({ layoutParams }) {
           WIND KERNEL <b>{windMode.toUpperCase()}</b>
         </span>
         {hasAnyOverride && (
-          <button type="button" className="micro-btn" onClick={resetAll}
-            title="Clear every BEHAVE override on this layer — back to the chip's table row">
+          <button
+            type="button"
+            className="micro-btn"
+            onClick={resetAll}
+            title="Clear every BEHAVE override on this layer — back to the chip's table row"
+          >
             RESET
           </button>
         )}

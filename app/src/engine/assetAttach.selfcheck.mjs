@@ -4,6 +4,8 @@ import assert from 'node:assert/strict';
 import { MAX_ATTACH, ATTACH_HIT, clickAttach, sanitizeAttachPoints, sanitizeAssetAttach } from './assetAttach.js';
 import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 // 1. a click adds a plain point; a click on a point steps its role plain → H → L → gone (#1634); never more than four
 {
@@ -111,8 +113,8 @@ import { serializeProject, parseProject } from '../state/projectDocument.js';
 {
   const { readFileSync } = await import('node:fs');
   const panel = readFileSync(new URL('../panels/AssetPoolPanel.jsx', import.meta.url), 'utf8');
-  assert.ok(/a\.svg \+ \(enabled\[a\.id\] \? attachMarks\(attachPointsFor\(a, attach\)/.test(panel), 'the tile preview of an asset in use draws its attach points');
-  assert.ok(/data-attach[^`]*var\(--kc-red\)/.test(panel) && !/kc-davis/.test(readFileSync(new URL('../panels/WetLab.jsx', import.meta.url), 'utf8')));
+  assert.ok(fre(/a\.svg \+ \(enabled\[a\.id\] \? attachMarks\(attachPointsFor\(a, attach\)/).test(flat(panel)), 'the tile preview of an asset in use draws its attach points');
+  assert.ok(fre(/data-attach[^`]*var\(--kc-red\)/).test(flat(panel)) && !/kc-davis/.test(readFileSync(new URL('../panels/WetLab.jsx', import.meta.url), 'utf8')));
 }
 
 console.log('assetAttach.selfcheck: ok (#1355 attach points)');

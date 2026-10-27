@@ -54,10 +54,12 @@ function flapReport(events) {
       cycles.get(e.cutKind).push(t);
     }
   }
-  return [...cycles.entries()].map(([cutKind, ends]) => {
-    const recent = ends.filter((t) => t >= cutoff);
-    return { cutKind, cycles: recent.length, flapping: recent.length >= FLAP_CYCLES };
-  }).sort((a, b) => b.cycles - a.cycles);
+  return [...cycles.entries()]
+    .map(([cutKind, ends]) => {
+      const recent = ends.filter((t) => t >= cutoff);
+      return { cutKind, cycles: recent.length, flapping: recent.length >= FLAP_CYCLES };
+    })
+    .sort((a, b) => b.cycles - a.cycles);
 }
 
 function ThresholdRow({ label, value, setValue, min, max, hint }) {
@@ -119,16 +121,25 @@ export function GovernorTunePanel() {
       <PanelHeader tag="DEV" title="GOV TUNE" subtitle="frame-time histogram · thresholds · flap detection" />
 
       <div style={{ color: '#8a93a6', margin: '8px 0', fontSize: 11 }}>
-        The FPS average lies — one 200ms hitch vanishes inside it. The histogram shows
-        what the governor actually reacts to. Thresholds are live: change them and the
-        governor uses the new values on its next tick.
+        The FPS average lies — one 200ms hitch vanishes inside it. The histogram shows what the governor actually reacts
+        to. Thresholds are live: change them and the governor uses the new values on its next tick.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>
         Frame-time histogram — last {deltas.length} frames
         <span style={{ color: '#8a93a6', fontWeight: 'normal', fontSize: 11 }}> (5ms buckets)</span>
       </h4>
-      <div style={{ position: 'relative', display: 'flex', alignItems: 'flex-end', gap: 2, height: 90, borderBottom: '1px solid #2a2a2a', paddingBottom: 2 }}>
+      <div
+        style={{
+          position: 'relative',
+          display: 'flex',
+          alignItems: 'flex-end',
+          gap: 2,
+          height: 90,
+          borderBottom: '1px solid #2a2a2a',
+          paddingBottom: 2,
+        }}
+      >
         {counts.map((c, i) => (
           <div
             key={i}
@@ -144,18 +155,38 @@ export function GovernorTunePanel() {
         {/* shed threshold line */}
         <div
           title={`shed below ${shedFps}fps (${shedMs.toFixed(1)}ms)`}
-          style={{ position: 'absolute', top: 0, bottom: 2, left: `${Math.min(100, (shedMs / ((BUCKET_N + 1) * BUCKET_MS)) * 100)}%`, width: 2, background: '#ffb454' }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 2,
+            left: `${Math.min(100, (shedMs / ((BUCKET_N + 1) * BUCKET_MS)) * 100)}%`,
+            width: 2,
+            background: '#ffb454',
+          }}
         />
         {/* recover threshold line */}
         <div
           title={`recover at ${recoverFps}fps (${recoverMs.toFixed(1)}ms)`}
-          style={{ position: 'absolute', top: 0, bottom: 2, left: `${Math.min(100, (recoverMs / ((BUCKET_N + 1) * BUCKET_MS)) * 100)}%`, width: 2, background: '#9fe870' }}
+          style={{
+            position: 'absolute',
+            top: 0,
+            bottom: 2,
+            left: `${Math.min(100, (recoverMs / ((BUCKET_N + 1) * BUCKET_MS)) * 100)}%`,
+            width: 2,
+            background: '#9fe870',
+          }}
         />
       </div>
       <div style={{ display: 'flex', gap: 12, fontSize: 11, color: '#8a93a6', marginTop: 4 }}>
-        <span><span style={{ color: '#ffb454' }}>│</span> shed &lt; {shedFps}fps</span>
-        <span><span style={{ color: '#9fe870' }}>│</span> recover ≥ {recoverFps}fps</span>
-        <span><span style={{ color: 'var(--kc-warn)' }}>■</span> slower than 30fps</span>
+        <span>
+          <span style={{ color: '#ffb454' }}>│</span> shed &lt; {shedFps}fps
+        </span>
+        <span>
+          <span style={{ color: '#9fe870' }}>│</span> recover ≥ {recoverFps}fps
+        </span>
+        <span>
+          <span style={{ color: 'var(--kc-warn)' }}>■</span> slower than 30fps
+        </span>
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Thresholds — live override</h4>
@@ -176,34 +207,44 @@ export function GovernorTunePanel() {
         hint="cuts auto-clear once FPS is back here"
       />
       <div style={{ fontSize: 11, color: '#5a6272', marginTop: 2 }}>
-        Shed must stay below recover — the setters enforce it, so the permanent-shed trap can't be reintroduced from this panel.
+        Shed must stay below recover — the setters enforce it, so the permanent-shed trap can't be reintroduced from
+        this panel.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Live signal</h4>
       <div style={{ fontSize: 12, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px 12px' }}>
-        <span style={{ color: '#8a93a6' }}>rAF fps</span><span>{Number.isFinite(fps) ? fps.toFixed(1) : '—'}</span>
-        <span style={{ color: '#8a93a6' }}>GPU-implied fps</span><span>{Number.isFinite(gpuFps) ? gpuFps.toFixed(1) : '∞ (no timing yet)'}</span>
-        <span style={{ color: '#8a93a6' }}>effective fps</span><span>{Number.isFinite(effFps) ? effFps.toFixed(1) : '—'}</span>
+        <span style={{ color: '#8a93a6' }}>rAF fps</span>
+        <span>{Number.isFinite(fps) ? fps.toFixed(1) : '—'}</span>
+        <span style={{ color: '#8a93a6' }}>GPU-implied fps</span>
+        <span>{Number.isFinite(gpuFps) ? gpuFps.toFixed(1) : '∞ (no timing yet)'}</span>
+        <span style={{ color: '#8a93a6' }}>effective fps</span>
+        <span>{Number.isFinite(effFps) ? effFps.toFixed(1) : '—'}</span>
         <span style={{ color: '#8a93a6' }}>gpuSaturated</span>
         <span style={{ color: saturated ? '#ffb454' : '#9fe870', fontWeight: 'bold' }}>{String(saturated)}</span>
-        <span style={{ color: '#8a93a6' }}>renderScale</span><span>{Math.round(renderScale * 100)}%</span>
-        <span style={{ color: '#8a93a6' }}>motion</span><span>{slowRender ? 'frozen' : 'live'}</span>
+        <span style={{ color: '#8a93a6' }}>renderScale</span>
+        <span>{Math.round(renderScale * 100)}%</span>
+        <span style={{ color: '#8a93a6' }}>motion</span>
+        <span>{slowRender ? 'frozen' : 'live'}</span>
       </div>
       <div style={{ fontSize: 11, color: '#5a6272', marginTop: 2 }}>
-        Resolution cuts (ladder step 1) fire only when gpuSaturated is true — otherwise cutting pixels can't buy frames back.
+        Resolution cuts (ladder step 1) fire only when gpuSaturated is true — otherwise cutting pixels can't buy frames
+        back.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>
         Flap detection — {governorEventLogSize()} events
-        <span style={{ color: '#8a93a6', fontWeight: 'normal', fontSize: 11 }}> (shed→restore cycles, trailing {FLAP_WINDOW_S}s)</span>
+        <span style={{ color: '#8a93a6', fontWeight: 'normal', fontSize: 11 }}>
+          {' '}
+          (shed→restore cycles, trailing {FLAP_WINDOW_S}s)
+        </span>
       </h4>
-      {flaps.length === 0 && (
-        <div style={{ color: '#8a93a6', fontSize: 11 }}>No shed/restore cycles this session.</div>
-      )}
+      {flaps.length === 0 && <div style={{ color: '#8a93a6', fontSize: 11 }}>No shed/restore cycles this session.</div>}
       {flaps.map((f) => (
         <div key={f.cutKind} style={{ display: 'flex', gap: 8, fontSize: 12, padding: '2px 0' }}>
           <span style={{ flex: 1 }}>{f.cutKind}</span>
-          <span style={{ color: '#8a93a6' }}>{f.cycles} cycle{f.cycles === 1 ? '' : 's'}</span>
+          <span style={{ color: '#8a93a6' }}>
+            {f.cycles} cycle{f.cycles === 1 ? '' : 's'}
+          </span>
           <span style={{ color: f.flapping ? 'var(--kc-warn)' : '#9fe870', fontWeight: 'bold' }}>
             {f.flapping ? 'FLAPPING' : 'stable'}
           </span>

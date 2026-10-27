@@ -22,9 +22,7 @@ export { MAX_HEROES, ATTRACTOR_RADIUS_DEFAULT };
 
 /** The four modes, in row order. Ids are the stored vocabulary; labels render upper-case (TE). */
 export const SHIFT_MODE_IDS = Object.freeze(['off', 'low', 'mid', 'high']);
-export const SHIFT_MODE_OPTIONS = Object.freeze(
-  SHIFT_MODE_IDS.map((id) => ({ id, label: id.toUpperCase() })),
-);
+export const SHIFT_MODE_OPTIONS = Object.freeze(SHIFT_MODE_IDS.map((id) => ({ id, label: id.toUpperCase() })));
 
 // ── HEROES ────────────────────────────────────────────────────────────────
 // OFF · LOW · MID · HIGH → 0 · 1 · 3 · 7 heroes. Seven is the engine's
@@ -46,7 +44,10 @@ export function heroModeForCount(count) {
   let bestDist = Infinity;
   for (const id of SHIFT_MODE_IDS) {
     const d = Math.abs(HERO_COUNT_BY_MODE[id] - c);
-    if (d < bestDist) { best = id; bestDist = d; }
+    if (d < bestDist) {
+      best = id;
+      bestDist = d;
+    }
   }
   return best;
 }
@@ -107,9 +108,12 @@ export function attractorModeForParams(params = {}) {
   let best = 'low';
   let bestScore = Infinity;
   for (const id of ['low', 'mid', 'high']) {
-    const score = Math.abs(ATTRACTOR_COUNT_BY_MODE[id] - count) * 2
-      + Math.abs(ATTRACTOR_RADIUS_MULT_BY_MODE[id] - mult);
-    if (score < bestScore) { best = id; bestScore = score; }
+    const score =
+      Math.abs(ATTRACTOR_COUNT_BY_MODE[id] - count) * 2 + Math.abs(ATTRACTOR_RADIUS_MULT_BY_MODE[id] - mult);
+    if (score < bestScore) {
+      best = id;
+      bestScore = score;
+    }
   }
   return best;
 }

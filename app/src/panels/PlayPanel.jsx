@@ -15,7 +15,7 @@ import { QueueTransport } from './davis/QueueTransport.jsx';
 import { WhisperLine } from '../components/WhisperLine.jsx';
 
 export function PlayPanel() {
-  const { state } = useApp(s => ({
+  const { state } = useApp((s) => ({
     evolveMode: s.evolveMode,
     evolveSource: s.evolveSource,
     evolveTarget: s.evolveTarget,
@@ -39,10 +39,26 @@ export function PlayPanel() {
     layoutParams: s.layoutParams,
   }));
   const {
-    evolveMode, evolveSource, evolveTarget, evolveInterval, beatRoute,
-    phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseClock, beatBpm,
-    euclidBeats, euclidSteps, euclidRotate,
-    morphEvolve, morphDurationMs, morphing, audioEnabled, beatPulse, audioBands,
+    evolveMode,
+    evolveSource,
+    evolveTarget,
+    evolveInterval,
+    beatRoute,
+    phraseEnabled,
+    phraseLength,
+    phraseMode,
+    phraseBeat,
+    phraseClock,
+    beatBpm,
+    euclidBeats,
+    euclidSteps,
+    euclidRotate,
+    morphEvolve,
+    morphDurationMs,
+    morphing,
+    audioEnabled,
+    beatPulse,
+    audioBands,
     layoutParams,
   } = state;
 
@@ -61,19 +77,11 @@ export function PlayPanel() {
         {/* #966 — HITS queue transport: autoplay + tap-to-jump for the setlist. */}
         <QueueTransport />
 
-        <EvolveControls
-          evolveTarget={evolveTarget}
-          evolveSource={evolveSource}
-          evolveInterval={evolveInterval}
-        />
+        <EvolveControls evolveTarget={evolveTarget} evolveSource={evolveSource} evolveInterval={evolveInterval} />
 
         {beatCollision && <BeatRouter beatRoute={beatRoute || 'both'} />}
 
-        <MorphControls
-          morphEvolve={morphEvolve}
-          morphDurationMs={morphDurationMs}
-          morphing={morphing}
-        />
+        <MorphControls morphEvolve={morphEvolve} morphDurationMs={morphDurationMs} morphing={morphing} />
 
         <PhraseControls
           phraseEnabled={phraseEnabled}

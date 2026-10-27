@@ -40,29 +40,42 @@ export function ShelfDevPanel() {
   };
   const undealt = lastFill?.undealt || [];
   const acct = anchorAccount({
-    stubs: shelfDiskStubs, diskRecords: shelfDiskRecords,
+    stubs: shelfDiskStubs,
+    diskRecords: shelfDiskRecords,
     inAppIds: new Set(keeps.map((k) => k.id)),
   });
   const missingCount = Object.values(shelfDiskStubs).filter((s) => s && s.missing).length;
   const xp = shelfExportPrefs || DEFAULT_EXPORT_PREFS;
-  const moves = [...shelfHistory].reverse()
-    .filter((r) => r && (r.kind === 'export' || r.kind === 'import')).slice(0, 5);
+  const moves = [...shelfHistory]
+    .reverse()
+    .filter((r) => r && (r.kind === 'export' || r.kind === 'import'))
+    .slice(0, 5);
 
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <h3 style={{ ...h3, marginTop: 0 }}>THE TABLE IN FORCE</h3>
       <div>
-        {tableName(prefs)} — {shelfPrefsSource === 'file' ? 'from preferences.json in the loot folder' : 'shipped defaults (no preferences.json read)'}
+        {tableName(prefs)} —{' '}
+        {shelfPrefsSource === 'file'
+          ? 'from preferences.json in the loot folder'
+          : 'shipped defaults (no preferences.json read)'}
       </div>
       <div style={dim}>
         {RULE_ORDER.map((r) => `${r} ${prefs.table[r]}`).join(' · ')} · recency window {prefs.recencyWindow} fills ·
         collection soft bound {prefs.collectionSoftBound} (collection now {keeps.length}
-        {keeps.length > prefs.collectionSoftBound ? ' — over: K3\'s export is the release valve, nothing is deleted' : ''})
+        {keeps.length > prefs.collectionSoftBound
+          ? " — over: K3's export is the release valve, nothing is deleted"
+          : ''}
+        )
       </div>
       {shelfPrefsLines.length > 0 && (
         <>
           <h3 style={h3}>CORRECTIONS + FALLBACKS, NAMED</h3>
-          {shelfPrefsLines.map((l, i) => <div key={i} style={dim}>{l}</div>)}
+          {shelfPrefsLines.map((l, i) => (
+            <div key={i} style={dim}>
+              {l}
+            </div>
+          ))}
         </>
       )}
 
@@ -70,7 +83,9 @@ export function ShelfDevPanel() {
       <div style={dim}>
         in-app {keeps.length} · on disk {acct.known} ({acct.loaded} read this session
         {missingCount ? `, ${missingCount} missing` : ''}) ·{' '}
-        {shelfDiskConnected ? 'folder read this session' : 'folder not read this session — disk keeps list from the index'}
+        {shelfDiskConnected
+          ? 'folder read this session'
+          : 'folder not read this session — disk keeps list from the index'}
       </div>
       <div style={dim}>
         {acct.partial
@@ -103,7 +118,11 @@ export function ShelfDevPanel() {
           </div>
           <table style={{ borderCollapse: 'collapse', marginTop: 6 }}>
             <thead>
-              <tr><th style={cell}>slot</th><th style={cell}>rule</th><th style={cell}>keep</th></tr>
+              <tr>
+                <th style={cell}>slot</th>
+                <th style={cell}>rule</th>
+                <th style={cell}>keep</th>
+              </tr>
             </thead>
             <tbody>
               {lastFill.slots.map((s, i) => (
@@ -123,7 +142,11 @@ export function ShelfDevPanel() {
           {(lastFill.notes || []).length > 0 && (
             <>
               <h3 style={h3}>RECEIPT NOTES</h3>
-              {lastFill.notes.map((n, i) => <div key={i} style={dim}>{n}</div>)}
+              {lastFill.notes.map((n, i) => (
+                <div key={i} style={dim}>
+                  {n}
+                </div>
+              ))}
             </>
           )}
         </>

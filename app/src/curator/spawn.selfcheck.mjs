@@ -8,6 +8,8 @@ import { observeSpawn, resetSpawn, getSpawnHomes, RETRY_FRAMES, PATIENCE_FRAMES 
 import { thresholdsFor, conditionsHold, fertilityField } from './formation.js';
 import { DISH_RADIUS, DISH_SATURATE, pinPressures } from './dishPressure.js';
 import { BAND_NORMAL, BAND_RELAX, BAND_TIGHTEN } from './stress.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const W = 1000;
 const H = 700;
@@ -239,7 +241,7 @@ const inRegion = (p) =>
   assert.ok(!/davis-section-label ttl">creatures/.test(dav), 'no sixth section label');
   const hype = readFileSync(new URL('../panels/layout/HypeSliders.jsx', import.meta.url), 'utf8');
   assert.ok(
-    /btn\('CREATURES', 'creatures'/.test(hype) && /min=\{0\} max=\{4\} step=\{1\}/.test(hype),
+    fre(/btn\('CREATURES', 'creatures'/).test(flat(hype)) && fre(/min=\{0\} max=\{4\} step=\{1\}/).test(flat(hype)),
     'the count is settable 0..4 from BUILD (the stepper range, unchanged)',
   );
   const src =
@@ -250,12 +252,12 @@ const inRegion = (p) =>
     .filter((l) => !l.trim().startsWith('//') && !l.trim().startsWith('*') && !l.trim().startsWith('/*'))
     .join('\n');
   assert.ok(
-    !/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(code),
+    !fre(/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/).test(flat(code)),
     'frames, not a clock; no chance',
   );
   const doc = readFileSync(new URL('../state/projectDocument.js', import.meta.url), 'utf8');
   assert.ok(
-    !/doc\.creatureCount =/.test(doc),
+    !fre(/doc\.creatureCount =/).test(flat(doc)),
     'the count is no longer saved as a top-level field (it rides layoutParams)',
   );
   assert.ok(

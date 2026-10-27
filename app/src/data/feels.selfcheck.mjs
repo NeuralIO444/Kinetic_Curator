@@ -16,6 +16,8 @@ import { audioRoutes } from '../gl/audioRoutes.mjs';
 import { processBallistics, createBallisticsState, sanitizeBallistics } from '../gl/audioBallistics.mjs';
 import { useStore } from '../state/store.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const byId = (id) => FEEL_PRESETS.find((f) => f.id === id);
 
@@ -126,7 +128,7 @@ assert.strictEqual(activeFeelId(DEFAULT_LAYOUT_PARAMS), 'punchy', 'a fresh piece
   const panel = readFileSync(new URL('../panels/StimulusPanel.jsx', import.meta.url), 'utf8');
   assert.ok(/<FeelPicker /.test(panel), 'the panel face shows the three feels');
   assert.ok(
-    /<details className="stim-advanced"[^]*<ReactivityControls [^]*<\/details>/.test(panel),
+    fre(/<details className="stim-advanced"[^]*<ReactivityControls [^]*<\/details>/).test(flat(panel)),
     'the 8 raw sliders survive behind ADVANCED',
   );
   assert.ok(

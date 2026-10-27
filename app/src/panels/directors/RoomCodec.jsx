@@ -42,7 +42,9 @@ export function RoomCodec() {
       const feed = loisActivity.snapshot();
       const lois = resolveLoisFace(feed);
       const davis = resolveDavisState(feed);
-      setFaces((cur) => (cur.lois.code === lois.code && (cur.davis?.code ?? null) === (davis?.code ?? null) ? cur : { lois, davis }));
+      setFaces((cur) =>
+        cur.lois.code === lois.code && (cur.davis?.code ?? null) === (davis?.code ?? null) ? cur : { lois, davis },
+      );
     };
     const timer = setInterval(read, POLL_MS);
     read();
@@ -60,7 +62,7 @@ export function RoomCodec() {
   // the room exists only when BOTH have a state; the footer names it (the matrix's words, verbatim)
   const talk = roomFor(lois.code, davis ? davis.code : null);
   const loisWord = lOn ? lLook.code : lois.code;
-  const davisWord = dOn ? (dLook.name ?? dLook.code) : (davis ? (davis.name ?? davis.code) : '—');
+  const davisWord = dOn ? (dLook.name ?? dLook.code) : davis ? (davis.name ?? davis.code) : '—';
   const records = useRoomFeed();
   const blocks = tasteBlocks(getTaste(), TASTE_SLOTS);
   const shown = records.slice(-VISIBLE_LINES);
@@ -86,22 +88,32 @@ export function RoomCodec() {
               <span key={i} className={`codec-taste-block${i < blocks ? ' on' : ''}`} />
             ))}
           </span>
-          <span className="codec-bus" title={`BUS — the bus window: the last ${ROOM_FEED_MAX} records`}>BUS {records.length}</span>
+          <span className="codec-bus" title={`BUS — the bus window: the last ${ROOM_FEED_MAX} records`}>
+            BUS {records.length}
+          </span>
         </div>
         <div className="codec-lines">
-          {shown.map((r) => (r.kind === 'persona' ? (
-            <div className="codec-line persona" key={r.seq}>
-              {r.bar !== null && <span className="codec-bar">bar {r.bar} </span>}
-              <span className={`codec-who ${r.persona}`}>{r.persona}</span>{' '}
-              <span className="codec-text">{r.text}</span>
-            </div>
-          ) : (
-            <div className="codec-line room" key={r.seq}>{r.text}</div>
-          )))}
+          {shown.map((r) =>
+            r.kind === 'persona' ? (
+              <div className="codec-line persona" key={r.seq}>
+                {r.bar !== null && <span className="codec-bar">bar {r.bar} </span>}
+                <span className={`codec-who ${r.persona}`}>{r.persona}</span>{' '}
+                <span className="codec-text">{r.text}</span>
+              </div>
+            ) : (
+              <div className="codec-line room" key={r.seq}>
+                {r.text}
+              </div>
+            ),
+          )}
         </div>
       </div>
 
-      <div className="codec-window codec-davis" data-code={davis ? davis.code : 'none'} data-mind={dLook ? dLook.code : undefined}>
+      <div
+        className="codec-window codec-davis"
+        data-code={davis ? davis.code : 'none'}
+        data-mind={dLook ? dLook.code : undefined}
+      >
         <div className="codec-face-slot">
           <DavisFaceNow seed={seed} code={dCode} />
         </div>

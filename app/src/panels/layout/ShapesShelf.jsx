@@ -6,7 +6,10 @@ import { SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, isShapeSetActive, liveSha
 import { emit, Events } from '../../composition/eventBus.js';
 
 export function ShapesShelf() {
-  const shapeLevels = liveShapeLevels(useStore((s) => s.shapeLevels), useStore((s) => s.enabledAssets));
+  const shapeLevels = liveShapeLevels(
+    useStore((s) => s.shapeLevels),
+    useStore((s) => s.enabledAssets),
+  );
   const enabledAssets = useStore((s) => s.enabledAssets);
 
   // TeaMatrix is single-select; the shelf is multi-select with LED levels,
@@ -26,15 +29,19 @@ export function ShapesShelf() {
               className={`te-cell${active ? ' sel' : ''}`}
               aria-pressed={active}
               aria-label={mixable ? `${x.name}, level ${lv} of 3` : x.name}
-              title={mixable
-                ? `${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`
-                : `${x.name} — ${x.ids.length} shapes`}
+              title={
+                mixable
+                  ? `${x.name} — level ${lv}/3. Tap: off → 1 → 2 → 3 → off. Up to ${SHAPE_MIX_MAX} on.`
+                  : `${x.name} — ${x.ids.length} shapes`
+              }
               onClick={() => emit(mixable ? Events.SHAPES_CYCLE : Events.SHAPES_LOAD, { id: x.id })}
             >
               <span className="te-cell-label">{x.name}</span>
               {mixable && (
                 <span className="te-pips" aria-hidden="true">
-                  {[1, 2, 3].map((n) => <i key={n} className={lv >= n ? 'lit' : ''} />)}
+                  {[1, 2, 3].map((n) => (
+                    <i key={n} className={lv >= n ? 'lit' : ''} />
+                  ))}
                 </span>
               )}
             </button>

@@ -4,6 +4,7 @@ import { curatePaletteTarget } from './curatePalette.mjs';
 import { PHASE_EXPLORE, PHASE_REFINE } from './phase.js';
 import { getRenderProfile } from './renderProfiles.js';
 const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const davis = getRenderProfile('davis');
 assert.ok(davis && davis.paletteId, 'fixture: the davis render profile has a palette');
@@ -207,8 +208,8 @@ assert.strictEqual(
   );
   const { readFileSync } = await import('node:fs');
   assert.match(
-    readFileSync(new URL('../panels/layout/CuratorBar.jsx', import.meta.url), 'utf8'),
-    /seed: st\.seed, seedOffsets: st\.seedOffsets/,
+    flat(readFileSync(new URL('../panels/layout/CuratorBar.jsx', import.meta.url), 'utf8')),
+    fre(/seed: st\.seed, seedOffsets: st\.seedOffsets/),
     'CURATOR passes the seed',
   );
 }

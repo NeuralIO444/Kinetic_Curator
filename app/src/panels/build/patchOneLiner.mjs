@@ -20,8 +20,7 @@ export const PATCH_ONELINER_SEEN_KEY = 'kc:patch-oneliner-seen';
 
 // Mockup C register: compact, lowercase, tells you the two things to touch
 // (the mode select and the target select right above it).
-export const PATCH_ONELINER_COPY =
-  "PATCH routes one track's motion into another — pick a mode, point at a target.";
+export const PATCH_ONELINER_COPY = "PATCH routes one track's motion into another — pick a mode, point at a target.";
 
 export function shouldShowPatchOneLiner({ seen, dismissed, contentCount }) {
   if (seen || dismissed) return false;

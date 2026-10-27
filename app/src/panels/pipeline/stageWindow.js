@@ -38,7 +38,11 @@ export async function openStageWindow(display) {
   const { WebviewWindow } = await import('@tauri-apps/api/window');
   const existing = WebviewWindow.getByLabel(STAGE_LABEL);
   if (existing) {
-    try { await existing.setFocus(); } catch { /* best-effort */ }
+    try {
+      await existing.setFocus();
+    } catch {
+      /* best-effort */
+    }
     return { ok: true, reused: true };
   }
   const opts = {
@@ -72,7 +76,9 @@ export async function closeStageWindow() {
       const bc = new BroadcastChannel(STAGE_CONTROL_CHANNEL);
       bc.postMessage(makeCloseMessage());
       bc.close();
-    } catch { /* channel unavailable — fall through to window close */ }
+    } catch {
+      /* channel unavailable — fall through to window close */
+    }
     const { WebviewWindow } = await import('@tauri-apps/api/window');
     const existing = WebviewWindow.getByLabel(STAGE_LABEL);
     if (!existing) return { ok: true };
@@ -112,11 +118,16 @@ export function watchStageDisplay({ getDisplayId, onGone, onWindowClosed, interv
         if (onWindowClosed) onWindowClosed();
         return;
       }
-    } catch { /* transient Tauri hiccup — keep watching, never fail silently into a stop */ }
+    } catch {
+      /* transient Tauri hiccup — keep watching, never fail silently into a stop */
+    }
     if (!stopped) timer = setTimeout(tick, Math.max(500, intervalMs));
   };
   timer = setTimeout(tick, Math.max(500, intervalMs));
-  return () => { stopped = true; clearTimeout(timer); };
+  return () => {
+    stopped = true;
+    clearTimeout(timer);
+  };
 }
 
 export async function syphonStatus() {

@@ -2,9 +2,15 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  STAGE_FRAME_CHANNEL, STAGE_CONTROL_CHANNEL, STAGE_MIRROR_FPS,
-  STAGE_HEARTBEAT_TIMEOUT_MS, makeControlMessage, isControlMessage,
-  isFrameMessage, makeCloseMessage, isCloseMessage,
+  STAGE_FRAME_CHANNEL,
+  STAGE_CONTROL_CHANNEL,
+  STAGE_MIRROR_FPS,
+  STAGE_HEARTBEAT_TIMEOUT_MS,
+  makeControlMessage,
+  isControlMessage,
+  isFrameMessage,
+  makeCloseMessage,
+  isCloseMessage,
 } from './stageChannel.mjs';
 
 test('#607 channel names are stable', () => {

@@ -26,7 +26,9 @@ export function SymmetryRow({ layoutParams }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
       <div>
-        <div className="davis-label lbl" style={{ marginBottom: 2 }}>mirror</div>
+        <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+          mirror
+        </div>
         <TeaMatrix
           ariaLabel="Mirror"
           columns={4}
@@ -41,7 +43,9 @@ export function SymmetryRow({ layoutParams }) {
         />
       </div>
       <div>
-        <div className="davis-label lbl" style={{ marginBottom: 2 }}>symmetry</div>
+        <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+          symmetry
+        </div>
         <TeaMatrix
           ariaLabel="Symmetry"
           columns={4}
@@ -65,7 +69,9 @@ export function SymmetryRow({ layoutParams }) {
 export function BehaveRow({ layoutParams }) {
   return (
     <div style={{ marginTop: 6 }}>
-      <div className="davis-label lbl" style={{ marginBottom: 2 }}>behave</div>
+      <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+        behave
+      </div>
       <TeaMatrix
         ariaLabel="Behave"
         columns={4}

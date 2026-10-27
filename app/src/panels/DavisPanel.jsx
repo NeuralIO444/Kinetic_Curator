@@ -26,13 +26,15 @@ const SUB_SEED_STREAMS = [
 ];
 
 export function DavisPanel() {
-  const { state } = useApp(s => ({
+  const { state } = useApp((s) => ({
     evolveMode: s.evolveMode,
     seed: s.seed,
     seedOffsets: s.seedOffsets,
     layoutParams: s.layoutParams,
     enabledAssets: s.enabledAssets,
-    layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots, // #1131: a keep carries the stack
+    layers: s.layers,
+    activeLayerId: s.activeLayerId,
+    layerSnapshots: s.layerSnapshots, // #1131: a keep carries the stack
     phraseEnabled: s.phraseEnabled,
     phraseLength: s.phraseLength,
     phraseBeat: s.phraseBeat,
@@ -45,18 +47,34 @@ export function DavisPanel() {
   }));
   const {
     evolveMode,
-    seed, seedOffsets, layoutParams, enabledAssets, layers, activeLayerId, layerSnapshots,
-    phraseEnabled, phraseLength, phraseBeat,
-    phraseClock, beatBpm, morphing, audioEnabled,
-    audioBands, hitCount,
+    seed,
+    seedOffsets,
+    layoutParams,
+    enabledAssets,
+    layers,
+    activeLayerId,
+    layerSnapshots,
+    phraseEnabled,
+    phraseLength,
+    phraseBeat,
+    phraseClock,
+    beatBpm,
+    morphing,
+    audioEnabled,
+    audioBands,
+    hitCount,
   } = state;
   const { palette } = useApp();
 
   // #719: the one keep capture — seed, offsets (#305), layout, palette, cast.
-  const saveFavorite = () => emit(Events.DAVIS_FAVORITE, {
-    action: 'add',
-    favorite: captureFavorite({ seed, seedOffsets, layoutParams, enabledAssets, layers, activeLayerId, layerSnapshots }, palette.id),
-  });
+  const saveFavorite = () =>
+    emit(Events.DAVIS_FAVORITE, {
+      action: 'add',
+      favorite: captureFavorite(
+        { seed, seedOffsets, layoutParams, enabledAssets, layers, activeLayerId, layerSnapshots },
+        palette.id,
+      ),
+    });
 
   const metro = phraseClock === 'metro';
   const rms = audioBands?.rms || 0;
@@ -65,7 +83,13 @@ export function DavisPanel() {
   // toggle, and this row unmounts with it, so the two stay in sync).
   const [accumFrozen, setAccumFrozen] = useState(false);
   // #617: a MIDI pad can hold FREEZE; keep the button honest about it
-  useEffect(() => on(Events.ACCUM_GESTURE, (p) => { if (p && p.action === 'freeze') setAccumFrozen(!!p.value); }), []);
+  useEffect(
+    () =>
+      on(Events.ACCUM_GESTURE, (p) => {
+        if (p && p.action === 'freeze') setAccumFrozen(!!p.value);
+      }),
+    [],
+  );
   const toggleFreeze = () => {
     const next = !accumFrozen;
     setAccumFrozen(next);
@@ -76,24 +100,37 @@ export function DavisPanel() {
   // panel — but the live loop drops its own frozen flag when the ACCUM
   // session ends, so mirror that reset here or the button lies (THAW while
   // the loop is unfrozen: the two-press FREEZE trap, panel-side).
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mirror of the loop's own reset
-  useEffect(() => { if (!accumOn) setAccumFrozen(false); }, [accumOn]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mirror of the loop's own reset
+    if (!accumOn) setAccumFrozen(false);
+  }, [accumOn]);
 
   // The header subtitle is unchanged (#616 only moved it out of the JSX). The
   // PERFORM readout is the phrase half of it, stated on its own.
-  const phraseStatus = morphing ? 'morphing…'
-    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
-    : phraseEnabled && !audioEnabled ? 'armed · waiting for beat'
-    : noAttack ? 'armed · no attack'
-    : phraseEnabled ? `${phraseBeat}/${phraseLength}`
-    : 'off';
-  const subtitle = morphing ? 'morphing…'
-    : phraseEnabled && metro ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
-    : phraseEnabled && !audioEnabled ? 'phrase armed · waiting for beat'
-    : noAttack ? 'armed · no attack'
-    : phraseEnabled ? `phrase ${phraseBeat}/${phraseLength}`
-    : evolveMode ? 'evolving'
-    : 'paused';
+  const phraseStatus = morphing
+    ? 'morphing…'
+    : phraseEnabled && metro
+      ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
+      : phraseEnabled && !audioEnabled
+        ? 'armed · waiting for beat'
+        : noAttack
+          ? 'armed · no attack'
+          : phraseEnabled
+            ? `${phraseBeat}/${phraseLength}`
+            : 'off';
+  const subtitle = morphing
+    ? 'morphing…'
+    : phraseEnabled && metro
+      ? `metro ${phraseBeat}/${phraseLength} @ BEAT ${beatBpm || 120}`
+      : phraseEnabled && !audioEnabled
+        ? 'phrase armed · waiting for beat'
+        : noAttack
+          ? 'armed · no attack'
+          : phraseEnabled
+            ? `phrase ${phraseBeat}/${phraseLength}`
+            : evolveMode
+              ? 'evolving'
+              : 'paused';
 
   return (
     <div className="panel panel-davis">
@@ -102,132 +139,182 @@ export function DavisPanel() {
           (CREATURES in BUILD's hype/moth block), beside the motion params it belongs with. */}
       <PanelHeader tag="P07" title="DIRECTORS" subtitle={subtitle} />
       <div className="davis-body">
-          {/* #248 Phase 5 — MORPH EVOLVE and PHRASE LOOP moved to PLAY.
+        {/* #248 Phase 5 — MORPH EVOLVE and PHRASE LOOP moved to PLAY.
               The phrase- and morph-related state above stays selected here:
               this panel's own header subtitle still reports live phrase and
               morph status even though the controls that drive them now
               live in PLAY — cross-panel status at a glance, same as Phase 4
               left beatCollision's inputs selected here for PLAY to read. */}
-          {/* #616 — the panel reads in three labelled sections. Nothing was
+        {/* #616 — the panel reads in three labelled sections. Nothing was
               removed or re-wired: same controls, same events, new headings. */}
-          <div className="davis-section-label ttl">voices</div>
-          {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
-          <VoiceTiles />
-          <BehaveReadout layoutParams={layoutParams} />
+        <div className="davis-section-label ttl">voices</div>
+        {/* #717 — the flagship Voices' one home: load through the voice MIX. */}
+        <VoiceTiles />
+        <BehaveReadout layoutParams={layoutParams} />
 
-          <div className="davis-label-row">
-            <div className="davis-section-label ttl bare">generate</div>
-            {/* #1507 — the mined tray's load control rides this existing
+        <div className="davis-label-row">
+          <div className="davis-section-label ttl bare">generate</div>
+          {/* #1507 — the mined tray's load control rides this existing
                 label row (zero added height: the DIRECTORS panel has a
                 no-scroll fit contract). The tray itself sits below
                 Evolve and opens its picker on this event. */}
-            <button type="button" className="micro-btn"
-              title="Load a mined run folder (Look Explorer) — its finalists open below Evolve for crowning"
-              onClick={() => emit(Events.EXPLORER_LOAD_RUN)}>
-              load run
-            </button>
-          </div>
-          {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
-          {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
-          <div className="davis-actions davis-actions-3">
-            <button className={`big-btn tribe-davis ${evolveMode ? 'active' : ''}`}
-              onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}>
-              {evolveMode ? 'STOP' : 'EVOLVE'}
-            </button>
-            <button className="big-btn act tribe-lois" onClick={saveFavorite}>favorite</button>
-            <button className="big-btn act tribe-davis" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>new seed</button>
-          </div>
+          <button
+            type="button"
+            className="micro-btn"
+            title="Load a mined run folder (Look Explorer) — its finalists open below Evolve for crowning"
+            onClick={() => emit(Events.EXPLORER_LOAD_RUN)}
+          >
+            load run
+          </button>
+        </div>
+        {/* #1032 — voice 1: the unnamed-plate room. HITS carry no names, so this holds until the first keep. */}
+        {hitCount === 0 && <div className="lois-line name">{LOIS_LINES.director}</div>}
+        <div className="davis-actions davis-actions-3">
+          <button
+            className={`big-btn tribe-davis ${evolveMode ? 'active' : ''}`}
+            onClick={() => emit(Events.DAVIS_EVOLVE, { toggle: true })}
+          >
+            {evolveMode ? 'STOP' : 'EVOLVE'}
+          </button>
+          <button className="big-btn act tribe-lois" onClick={saveFavorite}>
+            favorite
+          </button>
+          <button className="big-btn act tribe-davis" onClick={() => emit(Events.DAVIS_EVOLVE, { bumpSeed: true })}>
+            new seed
+          </button>
+        </div>
 
-          {/* #305 — mutate one sub-seed stream. Same seed control area, no
+        {/* #305 — mutate one sub-seed stream. Same seed control area, no
               new panel: re-roll one stream's dice while the master seed and
               the other three streams stay locked. Highlighted = mutated. */}
-          <div className="davis-actions" style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
-            title="Sub-seed streams: re-roll one stream without touching the others">
-            {SUB_SEED_STREAMS.map(({ id, label, hint }) => {
-              const off = (seedOffsets?.[id] || 0) >>> 0;
-              return (
-                <button key={id} className={`micro-btn ${off ? 'active' : ''}`}
-                  title={`${label} — ${hint}. Re-roll this stream's offset${off ? ` (now 0x${off.toString(16)})` : ' (locked to master seed)'}`}
-                  onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { group: id })}>
-                  {label}
-                </button>
-              );
-            })}
-            <button className="micro-btn"
-              title="Lock every stream back to the master seed (all offsets zero)"
-              onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { reset: true })}>
-              ↺
-            </button>
-          </div>
+        <div
+          className="davis-actions"
+          style={{ gridTemplateColumns: 'repeat(5, 1fr)' }}
+          title="Sub-seed streams: re-roll one stream without touching the others"
+        >
+          {SUB_SEED_STREAMS.map(({ id, label, hint }) => {
+            const off = (seedOffsets?.[id] || 0) >>> 0;
+            return (
+              <button
+                key={id}
+                className={`micro-btn ${off ? 'active' : ''}`}
+                title={`${label} — ${hint}. Re-roll this stream's offset${off ? ` (now 0x${off.toString(16)})` : ' (locked to master seed)'}`}
+                onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { group: id })}
+              >
+                {label}
+              </button>
+            );
+          })}
+          <button
+            className="micro-btn"
+            title="Lock every stream back to the master seed (all offsets zero)"
+            onClick={() => emit(Events.DAVIS_MUTATE_STREAM, { reset: true })}
+          >
+            ↺
+          </button>
+        </div>
 
-          <EvolveProgress />
+        <EvolveProgress />
 
-          {/* #1507 — the mined candidates' curation view: at rest it
+        {/* #1507 — the mined candidates' curation view: at rest it
               renders nothing (the panel's fit budget is spent on the
               performance surface); once a run loads from the GENERATE
               label row, its finalists render here for crowning. */}
-          <CandidateTray />
+        <CandidateTray />
 
-          <div className="davis-section-label ttl">perform</div>
-          <div className="davis-perform-row">
-          <div className="davis-phrase-status" title="Phrase clock status. The controls live in PLAY; this panel only reports.">
-            <i className="lbl">phrase</i><b>{phraseStatus}</b>
+        <div className="davis-section-label ttl">perform</div>
+        <div className="davis-perform-row">
+          <div
+            className="davis-phrase-status"
+            title="Phrase clock status. The controls live in PLAY; this panel only reports."
+          >
+            <i className="lbl">phrase</i>
+            <b>{phraseStatus}</b>
           </div>
           <MidiSection />
-          </div>
-          {/* UX-7: the gesture row is always reachable from Director — the
+        </div>
+        {/* UX-7: the gesture row is always reachable from Director — the
               ACCUM toggle lives here now, and FREEZE/CLEAR/SWELL wait on it
               (dim, never dead-looking) instead of the row vanishing. */}
-          <div className="davis-section-label ttl">trails</div>
-          <div className="davis-actions davis-actions-4" title="ACCUM gestures — play the trail buffer">
-            <button className={`big-btn ${accumOn ? 'active' : ''}`}
-              onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !accumOn })}
-              title={helpText('layout-accum')}>
-              ACCUM
-            </button>
-            <button className={`big-btn ${accumFrozen ? 'active' : ''}`}
-              onClick={toggleFreeze}
-              disabled={!accumOn}
-              title={accumOn ? 'FREEZE: hold the trails mid-air — no fade, no new marks' : 'Waiting for ACCUM — turn ACCUM on to freeze the trails'}>
-              {accumFrozen ? 'THAW' : 'FREEZE'}
-            </button>
-            <button className="big-btn"
-              onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
-              disabled={!accumOn}
-              title={accumOn ? helpText('davis-clear') : 'Waiting for ACCUM — turn ACCUM on to clear the trails'}>
-              CLEAR
-            </button>
-            <button className="big-btn"
-              onClick={() => emit(Events.ACCUM_GESTURE, { action: 'swell' })}
-              disabled={!accumOn}
-              title={accumOn ? 'SWELL: breathe the trail length out and back over ~2 seconds' : 'Waiting for ACCUM — turn ACCUM on to swell the trails'}>
-              SWELL
-            </button>
-          </div>
+        <div className="davis-section-label ttl">trails</div>
+        <div className="davis-actions davis-actions-4" title="ACCUM gestures — play the trail buffer">
+          <button
+            className={`big-btn ${accumOn ? 'active' : ''}`}
+            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'accumulation', value: !accumOn })}
+            title={helpText('layout-accum')}
+          >
+            ACCUM
+          </button>
+          <button
+            className={`big-btn ${accumFrozen ? 'active' : ''}`}
+            onClick={toggleFreeze}
+            disabled={!accumOn}
+            title={
+              accumOn
+                ? 'FREEZE: hold the trails mid-air — no fade, no new marks'
+                : 'Waiting for ACCUM — turn ACCUM on to freeze the trails'
+            }
+          >
+            {accumFrozen ? 'THAW' : 'FREEZE'}
+          </button>
+          <button
+            className="big-btn"
+            onClick={() => emit(Events.ACCUM_GESTURE, { action: 'clear' })}
+            disabled={!accumOn}
+            title={accumOn ? helpText('davis-clear') : 'Waiting for ACCUM — turn ACCUM on to clear the trails'}
+          >
+            CLEAR
+          </button>
+          <button
+            className="big-btn"
+            onClick={() => emit(Events.ACCUM_GESTURE, { action: 'swell' })}
+            disabled={!accumOn}
+            title={
+              accumOn
+                ? 'SWELL: breathe the trail length out and back over ~2 seconds'
+                : 'Waiting for ACCUM — turn ACCUM on to swell the trails'
+            }
+          >
+            SWELL
+          </button>
+        </div>
 
-          {/* #1128 — the DIRECTOR's motion pattern: which way the always-on breath and drift lean. A discrete choice, so it
+        {/* #1128 — the DIRECTOR's motion pattern: which way the always-on breath and drift lean. A discrete choice, so it
               renders TE (rule 2). THUMP needs a real beat; without audio it plays DRIFT, and says so.
               #1198 — ORGANIC/CADENCE switch on the rhythm placement layer (Perlin/sine over spacing, scale, rotation),
               even with every motion amount at 0. */}
-          <div className="davis-actions davis-actions-motion" role="group" aria-label="motion pattern">
-            <i className="lbl" title="THUMP follows a live audio beat; with none it plays DRIFT">{(layoutParams.kinemePattern === 'THUMP' && !audioEnabled) ? 'no beat' : 'motion'}</i>
-            {KINEME_PATTERNS.map((p) => {
-              const on = (layoutParams.kinemePattern || 'DRIFT') === p;
-              return (
-                <button key={p} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${p} pattern`}
-                  title={p === 'DRIFT' ? 'DRIFT: the floor — marks breathe and drift as set'
-                    : p === 'SWELL' ? 'SWELL: breath leads, drift steps back'
-                    : p === 'ORGANIC' ? 'ORGANIC: Perlin-field rhythm over spacing, scale and rotation'
-                    : p === 'CADENCE' ? 'CADENCE: sine-wave rhythm over spacing, scale and rotation'
-                    : `THUMP: marks pulse on the beat${audioEnabled ? '' : ' — needs audio on; plays DRIFT until then'}`}
-                  onClick={() => emit(Events.LAYOUT_PARAM, { key: 'kinemePattern', value: p })}>
-                  {p}
-                </button>
-              );
-            })}
-          </div>
+        <div className="davis-actions davis-actions-motion" role="group" aria-label="motion pattern">
+          <i className="lbl" title="THUMP follows a live audio beat; with none it plays DRIFT">
+            {layoutParams.kinemePattern === 'THUMP' && !audioEnabled ? 'no beat' : 'motion'}
+          </i>
+          {KINEME_PATTERNS.map((p) => {
+            const on = (layoutParams.kinemePattern || 'DRIFT') === p;
+            return (
+              <button
+                key={p}
+                className={`big-btn ${on ? 'active' : ''}`}
+                aria-pressed={on}
+                aria-label={`${p} pattern`}
+                title={
+                  p === 'DRIFT'
+                    ? 'DRIFT: the floor — marks breathe and drift as set'
+                    : p === 'SWELL'
+                      ? 'SWELL: breath leads, drift steps back'
+                      : p === 'ORGANIC'
+                        ? 'ORGANIC: Perlin-field rhythm over spacing, scale and rotation'
+                        : p === 'CADENCE'
+                          ? 'CADENCE: sine-wave rhythm over spacing, scale and rotation'
+                          : `THUMP: marks pulse on the beat${audioEnabled ? '' : ' — needs audio on; plays DRIFT until then'}`
+                }
+                onClick={() => emit(Events.LAYOUT_PARAM, { key: 'kinemePattern', value: p })}
+              >
+                {p}
+              </button>
+            );
+          })}
+        </div>
 
-          {/* #1574 — travel kinemes P1: the scene-level travel controls live in this motion group
+        {/* #1574 — travel kinemes P1: the scene-level travel controls live in this motion group
               (Matt's ruling, 2026-10-14), beside the DIRECTOR pattern selector above — never in BUILD,
               never a new panel. The mode is a discrete choice, so it renders TE; leash and flow are
               digits on the one slider. The keys stay recipe data (layoutParams); only the editing
@@ -235,103 +322,165 @@ export function DavisPanel() {
               noise field inside the leash. Q2 (a traveler budget) is unruled and is NOT built.
               #1575 — P2 adds 'path' to the same row and its family/speed/radius controls below;
               BUILD gets only the minimal mode chip on the stratum block (LayerStack). */}
-          <div className="davis-actions davis-actions-motion" role="group" aria-label="travel transport">
-            <i className="lbl" title="travel: marks roam from home inside a leash, on the noise field's curl">travel</i>
-            {TRANSPORT_MODES.map((t) => {
-              const on = (layoutParams.transport || 'still') === t;
-              return (
-                <button key={t} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${t} transport`}
-                  title={t === 'still' ? 'still: marks stay where they were placed'
-                    : t === 'flow' ? 'flow: marks roam the curl of the noise field, held by the leash'
-                    : 'path: marks travel a dealt path — a pure function of time and seed, replay-exact'}
-                  onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transport', value: t })}>
-                  {t}
-                </button>
-              );
-            })}
-          </div>
-          {/* #1575 — PATH's richer controls live here too (the same ruling:
+        <div className="davis-actions davis-actions-motion" role="group" aria-label="travel transport">
+          <i className="lbl" title="travel: marks roam from home inside a leash, on the noise field's curl">
+            travel
+          </i>
+          {TRANSPORT_MODES.map((t) => {
+            const on = (layoutParams.transport || 'still') === t;
+            return (
+              <button
+                key={t}
+                className={`big-btn ${on ? 'active' : ''}`}
+                aria-pressed={on}
+                aria-label={`${t} transport`}
+                title={
+                  t === 'still'
+                    ? 'still: marks stay where they were placed'
+                    : t === 'flow'
+                      ? 'flow: marks roam the curl of the noise field, held by the leash'
+                      : 'path: marks travel a dealt path — a pure function of time and seed, replay-exact'
+                }
+                onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transport', value: t })}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </div>
+        {/* #1575 — PATH's richer controls live here too (the same ruling:
               amounts edit from this motion group, never BUILD). The family
               is a discrete choice, so it renders TE; speed/radius are
               digits on the one slider. Heavy solids anchor and the
               artist's per-asset pin tames — assignment is family data
               (engine/kineme.js), not another control cluster. */}
-          {(layoutParams.transport || 'still') === 'path' && (
-            <div className="davis-actions davis-actions-motion" role="group" aria-label="travel path family">
-              <i className="lbl" title="path family: orbit turns around the dish centre, spiral breathes, sweep crosses the canvas and wraps, lissajous weaves">path</i>
-              {PATH_FAMILIES.map((f) => {
-                const on = (layoutParams.transportPath || 'orbit') === f;
-                return (
-                  <button key={f} className={`big-btn ${on ? 'active' : ''}`} aria-pressed={on} aria-label={`${f} path`}
-                    title={f === 'orbit' ? 'orbit: marks turn around the dish centre, keeping their own radius'
-                      : f === 'spiral' ? 'spiral: the radius breathes while the angle drifts'
-                      : f === 'sweep' ? 'sweep: a cross-canvas lane with wrap, bowed into an arc'
-                      : 'lissajous: a two-sine weave around home'}
-                    onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transportPath', value: f })}>
-                    {f}
-                  </button>
-                );
-              })}
-            </div>
-          )}
-          {/* #1576 — travel kinemes P3: the surge amount lives in this motion group
+        {(layoutParams.transport || 'still') === 'path' && (
+          <div className="davis-actions davis-actions-motion" role="group" aria-label="travel path family">
+            <i
+              className="lbl"
+              title="path family: orbit turns around the dish centre, spiral breathes, sweep crosses the canvas and wraps, lissajous weaves"
+            >
+              path
+            </i>
+            {PATH_FAMILIES.map((f) => {
+              const on = (layoutParams.transportPath || 'orbit') === f;
+              return (
+                <button
+                  key={f}
+                  className={`big-btn ${on ? 'active' : ''}`}
+                  aria-pressed={on}
+                  aria-label={`${f} path`}
+                  title={
+                    f === 'orbit'
+                      ? 'orbit: marks turn around the dish centre, keeping their own radius'
+                      : f === 'spiral'
+                        ? 'spiral: the radius breathes while the angle drifts'
+                        : f === 'sweep'
+                          ? 'sweep: a cross-canvas lane with wrap, bowed into an arc'
+                          : 'lissajous: a two-sine weave around home'
+                  }
+                  onClick={() => emit(Events.LAYOUT_PARAM, { key: 'transportPath', value: f })}
+                >
+                  {f}
+                </button>
+              );
+            })}
+          </div>
+        )}
+        {/* #1576 — travel kinemes P3: the surge amount lives in this motion group
               (ruled, #1574's comment: "surge amount when P3 lands"), beside the
               parallax drift amount. Both are amounts on the house slider, shown
               in EVERY transport mode — surge and drift compose on still scenes
               too. What FIRES a surge is Q3, unruled: there is deliberately no
               trigger control here or anywhere — the machinery reads an inert
               input signal until Matt rules the trigger surface. */}
-          <RangeRow label="surge" tone="ink" min={0} max={100} step={1}
-            value={Math.round((layoutParams.transportSurge ?? 0) * 100)}
-            readout={`${Math.round((layoutParams.transportSurge ?? 0) * 100)}%`}
-            defaultValue={0}
-            hint="surge: how deep a surge approaches (z) when one fires — scale-up, rise, sharper alpha, with the anticipation settle first. What fires it is not ruled yet; the amount waits here."
-            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSurge', value: Math.round(v) / 100 })} />
-          <RangeRow label="parallax" tone="ink" min={0} max={100} step={1}
-            value={Math.round((layoutParams.transportParallax ?? 0) * 100)}
-            readout={`${Math.round((layoutParams.transportParallax ?? 0) * 100)}%`}
-            defaultValue={0}
-            hint="parallax: a slow constant anchor drift, proportional to z tier — foreground strata travel faster than ground. (Not the #796 camera parallax; this drifts the anchors.) 0 is still."
-            onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportParallax', value: Math.round(v) / 100 })} />
-          {((layoutParams.transport || 'still') === 'flow' || (layoutParams.transport || 'still') === 'path') && (
-            <>
-              <RangeRow label="leash" tone="ink" min={0} max={400} step={1}
-                value={Math.round(layoutParams.transportLeash ?? 112)}
-                readout={`${Math.round(layoutParams.transportLeash ?? 112)}px`}
-                defaultValue={112}
-                hint="leash: how far a mark may roam from home, in px — no pull inside it, a spring outside it. 0 is still."
-                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportLeash', value: Math.round(v) })} />
-              {(layoutParams.transport || 'still') === 'flow' && (
-                <RangeRow label="flow" tone="ink" min={0} max={100} step={1}
-                  value={Math.round((layoutParams.transportFlow ?? 0.8) * 100)}
-                  readout={`${Math.round((layoutParams.transportFlow ?? 0.8) * 100)}%`}
-                  defaultValue={80}
-                  hint="flow: how hard the noise field's curl carries the marks"
-                  onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportFlow', value: Math.round(v) / 100 })} />
-              )}
-              {(layoutParams.transport || 'still') === 'path' && (
-                <>
-                  <RangeRow label="speed" tone="ink" min={0} max={200} step={1}
-                    value={Math.round((layoutParams.transportSpeed ?? 1) * 100)}
-                    readout={`${Math.round((layoutParams.transportSpeed ?? 1) * 100)}%`}
-                    defaultValue={100}
-                    hint="speed: how fast marks travel their path. 0 freezes the path at its deal."
-                    onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSpeed', value: Math.round(v) / 100 })} />
-                  <RangeRow label="radius" tone="ink" min={0} max={300} step={1}
-                    value={Math.round(layoutParams.transportRadius ?? 140)}
-                    readout={`${Math.round(layoutParams.transportRadius ?? 140)}px`}
-                    defaultValue={140}
-                    hint="radius: the path's reach in px — spiral breathing, sweep arc, lissajous weave. The leash still caps it."
-                    onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportRadius', value: Math.round(v) })} />
-                </>
-              )}
-            </>
-          )}
+        <RangeRow
+          label="surge"
+          tone="ink"
+          min={0}
+          max={100}
+          step={1}
+          value={Math.round((layoutParams.transportSurge ?? 0) * 100)}
+          readout={`${Math.round((layoutParams.transportSurge ?? 0) * 100)}%`}
+          defaultValue={0}
+          hint="surge: how deep a surge approaches (z) when one fires — scale-up, rise, sharper alpha, with the anticipation settle first. What fires it is not ruled yet; the amount waits here."
+          onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSurge', value: Math.round(v) / 100 })}
+        />
+        <RangeRow
+          label="parallax"
+          tone="ink"
+          min={0}
+          max={100}
+          step={1}
+          value={Math.round((layoutParams.transportParallax ?? 0) * 100)}
+          readout={`${Math.round((layoutParams.transportParallax ?? 0) * 100)}%`}
+          defaultValue={0}
+          hint="parallax: a slow constant anchor drift, proportional to z tier — foreground strata travel faster than ground. (Not the #796 camera parallax; this drifts the anchors.) 0 is still."
+          onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportParallax', value: Math.round(v) / 100 })}
+        />
+        {((layoutParams.transport || 'still') === 'flow' || (layoutParams.transport || 'still') === 'path') && (
+          <>
+            <RangeRow
+              label="leash"
+              tone="ink"
+              min={0}
+              max={400}
+              step={1}
+              value={Math.round(layoutParams.transportLeash ?? 112)}
+              readout={`${Math.round(layoutParams.transportLeash ?? 112)}px`}
+              defaultValue={112}
+              hint="leash: how far a mark may roam from home, in px — no pull inside it, a spring outside it. 0 is still."
+              onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportLeash', value: Math.round(v) })}
+            />
+            {(layoutParams.transport || 'still') === 'flow' && (
+              <RangeRow
+                label="flow"
+                tone="ink"
+                min={0}
+                max={100}
+                step={1}
+                value={Math.round((layoutParams.transportFlow ?? 0.8) * 100)}
+                readout={`${Math.round((layoutParams.transportFlow ?? 0.8) * 100)}%`}
+                defaultValue={80}
+                hint="flow: how hard the noise field's curl carries the marks"
+                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportFlow', value: Math.round(v) / 100 })}
+              />
+            )}
+            {(layoutParams.transport || 'still') === 'path' && (
+              <>
+                <RangeRow
+                  label="speed"
+                  tone="ink"
+                  min={0}
+                  max={200}
+                  step={1}
+                  value={Math.round((layoutParams.transportSpeed ?? 1) * 100)}
+                  readout={`${Math.round((layoutParams.transportSpeed ?? 1) * 100)}%`}
+                  defaultValue={100}
+                  hint="speed: how fast marks travel their path. 0 freezes the path at its deal."
+                  onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportSpeed', value: Math.round(v) / 100 })}
+                />
+                <RangeRow
+                  label="radius"
+                  tone="ink"
+                  min={0}
+                  max={300}
+                  step={1}
+                  value={Math.round(layoutParams.transportRadius ?? 140)}
+                  readout={`${Math.round(layoutParams.transportRadius ?? 140)}px`}
+                  defaultValue={140}
+                  hint="radius: the path's reach in px — spiral breathing, sweep arc, lissajous weave. The leash still caps it."
+                  onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'transportRadius', value: Math.round(v) })}
+                />
+              </>
+            )}
+          </>
+        )}
 
-          {/* #1126 → #1560 S1 — THE ROOM at the foot of the panel (Matt): re-cut to the codec — two face windows
+        {/* #1126 → #1560 S1 — THE ROOM at the foot of the panel (Matt): re-cut to the codec — two face windows
               and the transcript between them, readout only (docs/research/room-codec/03) */}
-          <div className="davis-section-label ttl">the room</div>
-          <RoomCodec />
+        <div className="davis-section-label ttl">the room</div>
+        <RoomCodec />
       </div>
     </div>
   );

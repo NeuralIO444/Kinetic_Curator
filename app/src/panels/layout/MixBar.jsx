@@ -22,7 +22,10 @@ export function MixBar() {
       <span className="mix-names" title="Crossfading between voices">
         {voiceMix.targetName || 'VOICE'}
       </span>
-      <RangeRow layout="bare" tone="ink" className="mix-slider"
+      <RangeRow
+        layout="bare"
+        tone="ink"
+        className="mix-slider"
         className="mix-slider"
         min={0}
         max={1000}
@@ -33,9 +36,13 @@ export function MixBar() {
       />
       <span className="mix-pct">{pct}%</span>
       {!voiceMix.auto && (
-        <button className="mix-btn" onClick={resumeVoiceMix} title="Resume the crossfade">⏵</button>
+        <button className="mix-btn" onClick={resumeVoiceMix} title="Resume the crossfade">
+          ⏵
+        </button>
       )}
-      <button className="mix-btn" onClick={cancelVoiceMix} title="Cancel the mix — keep the committed state">✕</button>
+      <button className="mix-btn" onClick={cancelVoiceMix} title="Cancel the mix — keep the committed state">
+        ✕
+      </button>
     </div>
   );
 }

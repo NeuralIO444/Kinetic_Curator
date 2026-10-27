@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { emit, Events } from "../../composition/eventBus.js";
-import { useStore } from "../../state/store.js";
-import { renderBatch, canStartBatch } from "../../hooks/useMediaExport.js";
-import { resolutionLabel } from "../../data/quality.js";
-import { AmberValue } from "./ds.jsx";
+import { useState } from 'react';
+import { emit, Events } from '../../composition/eventBus.js';
+import { useStore } from '../../state/store.js';
+import { renderBatch, canStartBatch } from '../../hooks/useMediaExport.js';
+import { resolutionLabel } from '../../data/quality.js';
+import { AmberValue } from './ds.jsx';
 
 // cancelBatchRef is a prop, not local state — the parent's watchdog-trip
 // effect (#107 §5) also needs to flip it when a render dies mid-batch, so
@@ -59,7 +59,7 @@ export function BatchEditionBlock({
           if (thumb) {
             emit(Events.EXPORT_SNAPSHOT, {
               seed: s,
-              format: "PNG",
+              format: 'PNG',
               resolution: `${resolutionLabel(exportResolution)} · BATCH ${done}/${total}`,
               timestamp: new Date().toISOString().slice(11, 19),
               config: {
@@ -80,9 +80,9 @@ export function BatchEditionBlock({
         onDone(`Batch complete: ${results.done} stills`);
       }
     } catch (e) {
-      console.warn("[BATCH]", e);
+      console.warn('[BATCH]', e);
       emit(Events.EXPORT_SEED, startSeed);
-      onDone("Batch failed");
+      onDone('Batch failed');
     } finally {
       setRendering(false);
       setBatchProgress(null);
@@ -96,16 +96,16 @@ export function BatchEditionBlock({
       style={{
         marginBottom: 8,
         padding: 8,
-        border: "1px solid var(--line-2)",
-        background: "rgba(255,255,255,0.02)",
+        border: '1px solid var(--line-2)',
+        background: 'rgba(255,255,255,0.02)',
       }}
     >
       <div
         className="ttl"
         style={{
           fontSize: 9,
-          letterSpacing: "0.12em",
-          color: "var(--dim)",
+          letterSpacing: '0.12em',
+          color: 'var(--dim)',
           marginBottom: 6,
         }}
       >
@@ -115,9 +115,9 @@ export function BatchEditionBlock({
         <label
           style={{
             fontSize: 10,
-            color: "var(--dim)",
-            display: "flex",
-            alignItems: "center",
+            color: 'var(--dim)',
+            display: 'flex',
+            alignItems: 'center',
             gap: 4,
           }}
         >
@@ -132,7 +132,7 @@ export function BatchEditionBlock({
             disabled={rendering}
           />
         </label>
-        <span style={{ fontSize: 10, color: "var(--dim)" }}>
+        <span style={{ fontSize: 10, color: 'var(--dim)' }}>
           from seed <code>{seed.toString(16)}</code>
         </span>
       </div>
@@ -144,18 +144,13 @@ export function BatchEditionBlock({
           disabled={!batchGate.ok}
           style={{
             flex: 2,
-            background: rendering && batchProgress ? "var(--line)" : undefined,
+            background: rendering && batchProgress ? 'var(--line)' : undefined,
             fontWeight: 700,
-            letterSpacing: "0.06em",
+            letterSpacing: '0.06em',
           }}
-          title={
-            batchGate.reason ??
-            "Render N sequential seeds as PNG + JSON sidecar"
-          }
+          title={batchGate.reason ?? 'Render N sequential seeds as PNG + JSON sidecar'}
         >
-          {batchProgress
-            ? `BATCH ${batchProgress.done}/${batchProgress.total}…`
-            : `▶ BATCH ×${batchCount}`}
+          {batchProgress ? `BATCH ${batchProgress.done}/${batchProgress.total}…` : `▶ BATCH ×${batchCount}`}
         </button>
         {batchProgress && (
           <button

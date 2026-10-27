@@ -37,7 +37,9 @@ export function MapRow({ layoutParams, lockedParams }) {
 
   return (
     <div className="map-row">
-      <div className="davis-label lbl" style={{ marginBottom: 2 }} title={helpText('layout-map')}>map</div>
+      <div className="davis-label lbl" style={{ marginBottom: 2 }} title={helpText('layout-map')}>
+        map
+      </div>
       <div className="map-tiles">
         <TeaMatrix
           ariaLabel="Field"
@@ -45,7 +47,9 @@ export function MapRow({ layoutParams, lockedParams }) {
           value={layoutParams.fieldMapField ?? 'off'}
           onChange={(id) => set('fieldMapField', id)}
         />
-        <span className="map-arrow" aria-hidden="true">→</span>
+        <span className="map-arrow" aria-hidden="true">
+          →
+        </span>
         <TeaMatrix
           ariaLabel="Channel"
           options={CHANNEL_TILES}
@@ -62,7 +66,9 @@ export function MapRow({ layoutParams, lockedParams }) {
             <SliderEditor
               ariaLabel="Map amount"
               value={amount}
-              min={0} max={1} step={0.01}
+              min={0}
+              max={1}
+              step={0.01}
               format={(v) => `${Math.round(v * 100)}%`}
               onChange={(v) => set('fieldMapAmount', v)}
             />

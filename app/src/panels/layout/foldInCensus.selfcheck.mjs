@@ -24,9 +24,15 @@ import { MAX_CREATURES, sanitizeCount } from '../../curator/spawn.js';
 import { RANDOMIZABLE_KEYS, MORPHABLE_KEYS } from '../../state/paramUtils.js';
 import { parseProject, serializeProject } from '../../state/projectDocument.js';
 import { useStore } from '../../state/store.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -34,16 +40,27 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 ok('the count is a layout param: default 0, spec 0..4 int — the retired stepper’s range', () => {
   assert.equal(DEFAULT_LAYOUT_PARAMS.creatures, 0, 'an untouched stage spawns nothing');
   assert.deepEqual(PARAM_SPEC.creatures, { min: 0, max: 4, int: true });
-  assert.equal(PARAM_SPEC.creatures.max, MAX_CREATURES, 'the trust boundary and the spawn sanitizer clamp to the same cap');
+  assert.equal(
+    PARAM_SPEC.creatures.max,
+    MAX_CREATURES,
+    'the trust boundary and the spawn sanitizer clamp to the same cap',
+  );
   for (const v of [-3, 0, 2, 4, 4.4, 99]) {
-    assert.equal(Math.min(PARAM_SPEC.creatures.max, Math.max(0, Math.round(v))), sanitizeCount(v), `spec bounds ≡ sanitizeCount for ${v}`);
+    assert.equal(
+      Math.min(PARAM_SPEC.creatures.max, Math.max(0, Math.round(v))),
+      sanitizeCount(v),
+      `spec bounds ≡ sanitizeCount for ${v}`,
+    );
   }
 });
 
-ok('no machine writes the count: dice, Evolve and morph key lists exclude it (hand input only, DS quantized law)', () => {
-  assert.ok(!RANDOMIZABLE_KEYS.includes('creatures'), 'the dice never deal a population');
-  assert.ok(!MORPHABLE_KEYS.includes('creatures'), 'a morph never blends one');
-});
+ok(
+  'no machine writes the count: dice, Evolve and morph key lists exclude it (hand input only, DS quantized law)',
+  () => {
+    assert.ok(!RANDOMIZABLE_KEYS.includes('creatures'), 'the dice never deal a population');
+    assert.ok(!MORPHABLE_KEYS.includes('creatures'), 'a morph never blends one');
+  },
+);
 
 // ── 2. the old home is fully retired ─────────────────────────────────────────
 ok('no store field, no setter, no bus event, no action for the count', () => {
@@ -55,7 +72,10 @@ ok('no store field, no setter, no bus event, no action for the count', () => {
   assert.ok(!/CREATURE_COUNT|SET_CREATURE_COUNT/.test(src('../../composition/wireEventBus.js')), 'no wiring');
   assert.ok(!/SET_CREATURE_COUNT/.test(src('../../state/actions.js')), 'no action');
   assert.ok(!/SET_CREATURE_COUNT/.test(src('../../state/applyAction.js')), 'no action case');
-  assert.ok(!/^\s+creatureCount:/m.test(src('../../state/slices/globalSlice.js')), 'no field definition left in the slice');
+  assert.ok(
+    !/^\s+creatureCount:/m.test(src('../../state/slices/globalSlice.js')),
+    'no field definition left in the slice',
+  );
 });
 
 ok('DIRECTORS carries no creature control (the stepper retired; the header is its pre-#1355 self)', () => {
@@ -68,22 +88,38 @@ ok('DIRECTORS carries no creature control (the stepper retired; the header is it
 // ── 3. the count is settable from BUILD, beside its neighbours ───────────────
 ok('BUILD’s hype/moth block sets the count 0..4 through the shared layout-param door', () => {
   const hype = src('./HypeSliders.jsx');
-  assert.ok(/btn\('CREATURES', 'creatures'/.test(hype), 'a CREATURES value button in the block');
-  assert.ok(/min=\{0\} max=\{4\} step=\{1\}/.test(hype), 'quantized 0..4 step 1 — the stepper’s stepping feel');
-  assert.ok(/set\('creatures', Math\.round\(v\)\)/.test(hype), 'written through the block’s own set() (Events.LAYOUT_PARAM)');
-  const creaturesCall = hype.slice(hype.indexOf("btn('CREATURES'"), hype.indexOf("{btn('BODY'"));
-  assert.ok(creaturesCall.length > 0 && !/disabled/.test(creaturesCall), 'the count is not mode-gated — the stepper never was');
+  assert.ok(fre(/btn\('CREATURES', 'creatures'/).test(flat(hype)), 'a CREATURES value button in the block');
+  assert.ok(
+    fre(/min=\{0\} max=\{4\} step=\{1\}/).test(flat(hype)),
+    'quantized 0..4 step 1 — the stepper’s stepping feel',
+  );
+  assert.ok(
+    fre(/set\('creatures', Math\.round\(v\)\)/).test(flat(hype)),
+    'written through the block’s own set() (Events.LAYOUT_PARAM)',
+  );
+  const fh = flat(hype);
+  const creaturesCall = fh.slice(fh.indexOf("btn('CREATURES'"), fh.indexOf("{btn('BODY'"));
+  assert.ok(
+    creaturesCall.length > 0 && !fre(/disabled/).test(flat(creaturesCall)),
+    'the count is not mode-gated — the stepper never was',
+  );
   const build = src('../BuildPanel.jsx');
-  assert.ok(/<HypeSliders layoutParams=\{layoutParams\} lockedParams=\{lockedParams\} \/>/.test(build), 'BUILD renders the block');
-  assert.ok(/title="Motion & Behavior"[\s\S]*?<HypeSliders/.test(build), 'in §3 Motion & Behavior, where it already lived');
+  assert.ok(
+    fre(/<HypeSliders layoutParams=\{layoutParams\} lockedParams=\{lockedParams\} \/>/).test(flat(build)),
+    'BUILD renders the block',
+  );
+  assert.ok(
+    fre(/title="Motion & Behavior"[\s\S]*?<HypeSliders/).test(flat(build)),
+    'in §3 Motion & Behavior, where it already lived',
+  );
 });
 
 ok('every pre-slice param is reachable at its home in the block (nothing moved, nothing lost)', () => {
   const hype = src('./HypeSliders.jsx');
   for (const key of ['body', 'flap', 'tight', 'breath', 'wind', 'metabolism']) {
-    assert.ok(hype.includes(`set('${key}'`), `${key} still written from the block`);
+    assert.ok(flat(hype).includes(flat(`set('${key}'`)), `${key} still written from the block`);
   }
-  assert.ok(!/🦋/.test(hype), 'the creature-only framing (the butterfly header) retired with the stepper');
+  assert.ok(!fre(/🦋/).test(flat(hype)), 'the creature-only framing (the butterfly header) retired with the stepper');
 });
 
 // ── 4. the store door behaves (bounds, and only bounds) ──────────────────────
@@ -102,24 +138,52 @@ ok('setLayoutParam writes the count and clamps it like the stepper did', () => {
 // ── 5. documents keep loading: the migration lands the old field in the param ─
 ok('a pre-fold-in document’s top-level count lands in the param — root and snapshots', () => {
   const legacy = {
-    version: 1, seed: 7, creatureCount: 3, layoutParams: { count: 5 },
-    layers: [{ id: 'a' }, { id: 'b' }], activeLayerId: 'a',
+    version: 1,
+    seed: 7,
+    creatureCount: 3,
+    layoutParams: { count: 5 },
+    layers: [{ id: 'a' }, { id: 'b' }],
+    activeLayerId: 'a',
     layerSnapshots: { a: { layoutParams: { count: 9 } }, b: { seed: 3 } },
   };
   const p = parseProject(clone(legacy));
   assert.ok(p.ok);
   assert.equal(p.doc.layoutParams.creatures, 3, 'the root count survives the move');
-  assert.equal(p.doc.layerSnapshots.a.layoutParams.creatures, 3, 'a snapshot with params of its own takes the legacy count, not the default');
-  assert.equal(p.doc.layerSnapshots.b.layoutParams.creatures, 3, 'a snapshot without params inherits the migrated root');
+  assert.equal(
+    p.doc.layerSnapshots.a.layoutParams.creatures,
+    3,
+    'a snapshot with params of its own takes the legacy count, not the default',
+  );
+  assert.equal(
+    p.doc.layerSnapshots.b.layoutParams.creatures,
+    3,
+    'a snapshot without params inherits the migrated root',
+  );
   assert.ok(!('creatureCount' in p.doc), 'the parsed document has no top-level count field');
-  assert.deepEqual(parseProject(clone(p.doc)).doc, p.doc, 'the migrated document is a fixed point (nothing repaired twice)');
+  assert.deepEqual(
+    parseProject(clone(p.doc)).doc,
+    p.doc,
+    'the migrated document is a fixed point (nothing repaired twice)',
+  );
 });
 
 ok('an explicit param wins over a stale top-level field, and hostile counts clamp through the old sanitizer', () => {
   const base = { version: 1, seed: 7, layers: [], activeLayerId: null };
-  assert.equal(parseProject({ ...base, creatureCount: 3, layoutParams: { creatures: 1 } }).doc.layoutParams.creatures, 1, 'the new home wins');
-  assert.equal(parseProject({ ...base, creatureCount: 99, layoutParams: {} }).doc.layoutParams.creatures, 4, 'the old field clamps to the same 0..4');
-  assert.equal(parseProject({ ...base, creatureCount: 'lots', layoutParams: {} }).doc.layoutParams.creatures, 0, 'junk reads as none');
+  assert.equal(
+    parseProject({ ...base, creatureCount: 3, layoutParams: { creatures: 1 } }).doc.layoutParams.creatures,
+    1,
+    'the new home wins',
+  );
+  assert.equal(
+    parseProject({ ...base, creatureCount: 99, layoutParams: {} }).doc.layoutParams.creatures,
+    4,
+    'the old field clamps to the same 0..4',
+  );
+  assert.equal(
+    parseProject({ ...base, creatureCount: 'lots', layoutParams: {} }).doc.layoutParams.creatures,
+    0,
+    'junk reads as none',
+  );
 });
 
 ok('the count round-trips through serialize → parse inside layoutParams', () => {
@@ -135,10 +199,19 @@ ok('the count round-trips through serialize → parse inside layoutParams', () =
 // ── 6. the claim’s boundary, named and pinned ────────────────────────────────
 ok('the dev surfaces stay dev surfaces: skeleton and stress readouts mount only behind their URL flags', () => {
   const app = src('../../App.jsx');
-  assert.ok(/\{DEBUG_STRESS && <StressReadout \/>\}/.test(app), 'the stress readout mounts only when ?debug=stress set the flag');
+  assert.ok(
+    fre(/\{DEBUG_STRESS && <StressReadout \/>\}/).test(flat(app)),
+    'the stress readout mounts only when ?debug=stress set the flag',
+  );
   const canvas = src('../CanvasPanel.jsx');
-  assert.ok(/\{isSkeletonDebug\(\) && \(/.test(canvas) && /<SkeletonOverlay/.test(canvas), 'the skeleton overlay mounts only when ?debug=skeleton');
-  assert.ok(!/creatureCount/.test(src('../WetLab.jsx')), 'the Wet Lab (asset-side) carries no count control');
+  assert.ok(
+    fre(/\{isSkeletonDebug\(\) && \(/).test(flat(canvas)) && fre(/<SkeletonOverlay/).test(flat(canvas)),
+    'the skeleton overlay mounts only when ?debug=skeleton',
+  );
+  assert.ok(
+    !fre(/creatureCount/).test(flat(src('../WetLab.jsx'))),
+    'the Wet Lab (asset-side) carries no count control',
+  );
 });
 
 console.log(`foldInCensus.selfcheck: ${n} checks passed (no creature-only performer surface; one count home)`);

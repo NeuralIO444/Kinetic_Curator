@@ -3,7 +3,7 @@
 // Discrete choices render as a button matrix (ink/red hard states — TE).
 // Editable values render as amber buttons opening a panel-edge stepper popup.
 // Read-only state renders as a quiet chip (DsChip) — no control.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from 'react';
 
 /** Discrete choice as a button matrix. One hard state per group. */
 export function DsMatrix({ options, value, onChange, label }) {
@@ -13,7 +13,7 @@ export function DsMatrix({ options, value, onChange, label }) {
         <button
           key={String(o.value)}
           type="button"
-          className={`ds-mbtn${o.value === value ? " sel" : ""}`}
+          className={`ds-mbtn${o.value === value ? ' sel' : ''}`}
           aria-pressed={o.value === value}
           onClick={() => onChange(o.value)}
         >
@@ -25,26 +25,16 @@ export function DsMatrix({ options, value, onChange, label }) {
 }
 
 /** Editable numeric value: amber button, tap opens a stepper popup. */
-export function AmberValue({
-  label,
-  value,
-  min,
-  max,
-  step = 1,
-  format = (v) => String(v),
-  onChange,
-  disabled,
-}) {
+export function AmberValue({ label, value, min, max, step = 1, format = (v) => String(v), onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const wrapRef = useRef(null);
   useEffect(() => {
     if (!open) return;
     const onDoc = (e) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target))
-        setOpen(false);
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false);
     };
-    document.addEventListener("pointerdown", onDoc);
-    return () => document.removeEventListener("pointerdown", onDoc);
+    document.addEventListener('pointerdown', onDoc);
+    return () => document.removeEventListener('pointerdown', onDoc);
   }, [open]);
   const clamp = (v) => Math.max(min, Math.min(max, v));
   return (
@@ -61,19 +51,11 @@ export function AmberValue({
       </button>
       {open && !disabled && (
         <span className="ds-pop" role="dialog" aria-label={label}>
-          <button
-            type="button"
-            aria-label="decrease"
-            onClick={() => onChange(clamp(value - step))}
-          >
+          <button type="button" aria-label="decrease" onClick={() => onChange(clamp(value - step))}>
             −
           </button>
           <span className="ds-pop-val">{format(value)}</span>
-          <button
-            type="button"
-            aria-label="increase"
-            onClick={() => onChange(clamp(value + step))}
-          >
+          <button type="button" aria-label="increase" onClick={() => onChange(clamp(value + step))}>
             +
           </button>
         </span>
@@ -84,7 +66,5 @@ export function AmberValue({
 
 /** Read-only state chip. Quiet text, no control — state lives elsewhere. */
 export function DsChip({ children, tone }) {
-  return (
-    <span className={`ds-chip${tone ? ` tone-${tone}` : ""}`}>{children}</span>
-  );
+  return <span className={`ds-chip${tone ? ` tone-${tone}` : ''}`}>{children}</span>;
 }

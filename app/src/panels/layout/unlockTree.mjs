@@ -31,7 +31,13 @@
 import { TIER_OPS } from '../../curator/mindConduct.js';
 
 /** Plain names for the materials the bodies ship with (MaterialSliders' NAMES + the flat floor). */
-const MATERIAL_NAMES = Object.freeze({ flat: 'Flat', glass: 'Glass', plate: 'Plate', wash: 'Wash', stipple: 'Stipple' });
+const MATERIAL_NAMES = Object.freeze({
+  flat: 'Flat',
+  glass: 'Glass',
+  plate: 'Plate',
+  wash: 'Wash',
+  stipple: 'Stipple',
+});
 
 /** What one route op means in plain language, for the ladder lines. */
 const OP_LINES = Object.freeze({
@@ -90,22 +96,43 @@ export function buildUnlockTree(input = {}) {
   });
 
   // ── Davis — his settings (no performer control exists) ──────────────────
-  const materialName = material ? (MATERIAL_NAMES[material] || material) : '—';
+  const materialName = material ? MATERIAL_NAMES[material] || material : '—';
   const his = [
-    node('voice-material', 'MATERIAL', 'his',
-      `Which body the marks wear. Voices set it — there is no performer control (#268). This Look: ${materialName}.`),
-    node('voice-ztiers', 'Z-TIERS', 'his',
-      'How many depth tiers the bodies sort into. Voices and presets set it — the knob left BUILD (#310).'),
-    node('voice-noisefreq', 'NOISE FREQ', 'his',
-      'The grain of the noise warp. Voices and presets set it — the knob left BUILD (#310).'),
-    node('voice-displace', 'DISPLACE', 'his',
-      'How far the noise warp pushes the marks. Voices and presets set it — the knob left BUILD (#310).'),
+    node(
+      'voice-material',
+      'MATERIAL',
+      'his',
+      `Which body the marks wear. Voices set it — there is no performer control (#268). This Look: ${materialName}.`,
+    ),
+    node(
+      'voice-ztiers',
+      'Z-TIERS',
+      'his',
+      'How many depth tiers the bodies sort into. Voices and presets set it — the knob left BUILD (#310).',
+    ),
+    node(
+      'voice-noisefreq',
+      'NOISE FREQ',
+      'his',
+      'The grain of the noise warp. Voices and presets set it — the knob left BUILD (#310).',
+    ),
+    node(
+      'voice-displace',
+      'DISPLACE',
+      'his',
+      'How far the noise warp pushes the marks. Voices and presets set it — the knob left BUILD (#310).',
+    ),
   ];
 
   // ── Materials — the M4 knobs, gated per body ─────────────────────────────
-  const matGate = (m, name) => gate(`mat-${m}`, name, material === m,
-    `This Look's material — the ${MATERIAL_NAMES[m].toLowerCase()} knobs above are live.`,
-    `Lights when the Look's material is ${MATERIAL_NAMES[m].toLowerCase()} — Davis sets the material.`);
+  const matGate = (m, name) =>
+    gate(
+      `mat-${m}`,
+      name,
+      material === m,
+      `This Look's material — the ${MATERIAL_NAMES[m].toLowerCase()} knobs above are live.`,
+      `Lights when the Look's material is ${MATERIAL_NAMES[m].toLowerCase()} — Davis sets the material.`,
+    );
   const materials = [
     matGate('glass', 'GLASS — ALPHA'),
     matGate('plate', 'PLATE — RADIUS · CENTRE X · CENTRE Y'),
@@ -115,49 +142,88 @@ export function buildUnlockTree(input = {}) {
 
   // ── Modes — the #272 gates ───────────────────────────────────────────────
   const modes = [
-    gate('gate-swarm-family', 'PARTICLES · GRAVITY · BREATH', isSwarm || isHype,
+    gate(
+      'gate-swarm-family',
+      'PARTICLES · GRAVITY · BREATH',
+      isSwarm || isHype,
       'Live in this mode.',
-      'Lights in the swarm modes (swarm, murmuration) and hype.'),
-    node('gate-cohesion', 'COHESION', isSwarm ? 'lit' : 'dark',
-      isSwarm ? 'Live in this mode.'
-        : isHype ? 'In hype the BEHAVE table drives cohesion — the knob stays dark there.'
-          : 'Lights in the swarm modes (swarm, murmuration).'),
-    node('gate-damping', 'DAMPING', isSwarm ? 'lit' : 'dark',
-      isSwarm ? 'Live in this mode.'
-        : isHype ? 'In hype, moth bodies pin damping at 0.97 or above for stability — the knob stays dark there.'
-          : 'Lights in the swarm modes (swarm, murmuration).'),
-    gate('gate-moth', 'BODY · TIGHT · WIND · METABOLISM', isHype,
+      'Lights in the swarm modes (swarm, murmuration) and hype.',
+    ),
+    node(
+      'gate-cohesion',
+      'COHESION',
+      isSwarm ? 'lit' : 'dark',
+      isSwarm
+        ? 'Live in this mode.'
+        : isHype
+          ? 'In hype the BEHAVE table drives cohesion — the knob stays dark there.'
+          : 'Lights in the swarm modes (swarm, murmuration).',
+    ),
+    node(
+      'gate-damping',
+      'DAMPING',
+      isSwarm ? 'lit' : 'dark',
+      isSwarm
+        ? 'Live in this mode.'
+        : isHype
+          ? 'In hype, moth bodies pin damping at 0.97 or above for stability — the knob stays dark there.'
+          : 'Lights in the swarm modes (swarm, murmuration).',
+    ),
+    gate(
+      'gate-moth',
+      'BODY · TIGHT · WIND · METABOLISM',
+      isHype,
       'Live — the moth bodies are on stage.',
-      'Lights in hype mode — these drive the moth bodies.'),
-    gate('gate-flap', 'FLAP', isHype && (bilateral || radial),
+      'Lights in hype mode — these drive the moth bodies.',
+    ),
+    gate(
+      'gate-flap',
+      'FLAP',
+      isHype && (bilateral || radial),
       'Live — hype, and a symmetric body to beat.',
       isHype
         ? 'Hype is on — flap still needs a symmetric body: bilateral, radial or kaleido symmetry.'
-        : 'Needs hype mode and a symmetric body — wings and fans are only built for symmetric organisms.'),
-    gate('gate-growth', 'GROWTH RATE · BRANCHING', growth,
+        : 'Needs hype mode and a symmetric body — wings and fans are only built for symmetric organisms.',
+    ),
+    gate(
+      'gate-growth',
+      'GROWTH RATE · BRANCHING',
+      growth,
       'Live in this mode.',
-      'Lights in the growth modes — DLA and Eden.'),
-    gate('gate-ground', 'GROUND · EDGE · SHADOW · SNAP', hasGround,
+      'Lights in the growth modes — DLA and Eden.',
+    ),
+    gate(
+      'gate-ground',
+      'GROUND · EDGE · SHADOW · SNAP',
+      hasGround,
       'A PATTERN layer sits below the active one — live.',
-      'Lights when a PATTERN layer sits below the active layer.'),
-    gate('gate-weather', 'WEATHER', hasWeather,
+      'Lights when a PATTERN layer sits below the active layer.',
+    ),
+    gate(
+      'gate-weather',
+      'WEATHER',
+      hasWeather,
       'An FX layer with HAZE sits above the active one — live.',
-      'Lights when an FX layer with HAZE sits above the active layer.'),
-    gate('gate-divergence', 'DIVERGENCE', mode === 'phyllotaxis',
-      'Live in this mode.',
-      'Lights in phyllotaxis mode.'),
+      'Lights when an FX layer with HAZE sits above the active layer.',
+    ),
+    gate('gate-divergence', 'DIVERGENCE', mode === 'phyllotaxis', 'Live in this mode.', 'Lights in phyllotaxis mode.'),
   ];
 
   // ── The shelf — a standing capacity gate ─────────────────────────────────
   const shelf = [
-    gate('shelf-voice', 'CAPTURE A VOICE', voiceCount < voiceCap,
+    gate(
+      'shelf-voice',
+      'CAPTURE A VOICE',
+      voiceCount < voiceCap,
       `Room on the shelf — ${voiceCount} of ${voiceCap} voices.`,
-      `The voice shelf holds ${voiceCap} — delete a voice to make room.`),
+      `The voice shelf holds ${voiceCap} — delete a voice to make room.`,
+    ),
   ];
 
   return [
     {
-      id: 'davis-ladder', title: 'DAVIS — THE LADDER',
+      id: 'davis-ladder',
+      title: 'DAVIS — THE LADDER',
       note: 'Tiers are earned by playing: keeps, lingering on a frame, returning to kept seeds, evolving. A tier never demotes — a quiet spell is a cool-down, not a step back.',
       nodes: ladder,
     },
@@ -169,6 +235,4 @@ export function buildUnlockTree(input = {}) {
 }
 
 /** Every node id in the catalogue (the selfcheck pins this set against the gating sources). */
-export const UNLOCK_NODE_IDS = Object.freeze(
-  buildUnlockTree({}).flatMap((g) => g.nodes.map((n) => n.id)),
-);
+export const UNLOCK_NODE_IDS = Object.freeze(buildUnlockTree({}).flatMap((g) => g.nodes.map((n) => n.id)));

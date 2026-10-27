@@ -13,11 +13,7 @@ import { getRenderProfile } from '../../curator/renderProfiles.js';
 import { curatePaletteTarget } from '../../curator/curatePalette.mjs';
 import { getPhase } from '../../curator/phase.js';
 import { getPresetsByGroup } from '../../data/presets.js';
-import {
-  voiceOptions,
-  getActivePersonaId,
-  setActivePersona,
-} from '../../curator/taste.js';
+import { voiceOptions, getActivePersonaId, setActivePersona } from '../../curator/taste.js';
 import { getLoisVerdictParts } from '../../curator/loisRank.js';
 import { getPersonaTaste } from '../../curator/personaTastes.js';
 import { verdictDetent, voiceBreathS, voiceLevel, litPills } from '../../curator/topbarTaste.mjs';
@@ -68,17 +64,28 @@ export function CuratorBar() {
   // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
   const pulseCurator = curTap.pulse;
   const [curShimmer, curUsed] = useInvite('curator'); // #1103 — same sheen as KINETIC, until it is pressed
-  useEffect(() => on(Events.LAYOUT_CURATE, () => { pulseCurator(TAP_PULSE_MS); curUsed(); }), [pulseCurator, curUsed]);
+  useEffect(
+    () =>
+      on(Events.LAYOUT_CURATE, () => {
+        pulseCurator(TAP_PULSE_MS);
+        curUsed();
+      }),
+    [pulseCurator, curUsed],
+  );
 
   // Close either popup on outside click or Escape.
   useEffect(() => {
     if (!menuOpen && !presetMenuOpen) return undefined;
     const onDown = (e) => {
       if (menuOpen && wrapRef.current && !wrapRef.current.contains(e.target)) setMenuOpen(false);
-      if (presetMenuOpen && presetWrapRef.current && !presetWrapRef.current.contains(e.target)) setPresetMenuOpen(false);
+      if (presetMenuOpen && presetWrapRef.current && !presetWrapRef.current.contains(e.target))
+        setPresetMenuOpen(false);
     };
     const onKey = (e) => {
-      if (e.key === 'Escape') { setMenuOpen(false); setPresetMenuOpen(false); }
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        setPresetMenuOpen(false);
+      }
     };
     document.addEventListener('pointerdown', onDown);
     document.addEventListener('keydown', onKey);
@@ -96,14 +103,11 @@ export function CuratorBar() {
 
   const pickVoice = (id) => {
     setActivePersona(id === 'off' ? null : id);
-    setVoice(id === 'off' ? 'off' : getActivePersonaId() ?? 'off');
+    setVoice(id === 'off' ? 'off' : (getActivePersonaId() ?? 'off'));
     setMenuOpen(false);
   };
   const voices = voiceOptions();
-  const activeAlias =
-    voice === 'off'
-      ? 'off'
-      : voices.find((p) => p.id === voice)?.alias ?? voice;
+  const activeAlias = voice === 'off' ? 'off' : (voices.find((p) => p.id === voice)?.alias ?? voice);
   // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in her slot
   // (components/LoisPill.jsx). The pick record stays in the Curator button's tooltip, via the hint.
   // #1122 — affective grammar derivations. Every one traces to a real signal:
@@ -115,8 +119,11 @@ export function CuratorBar() {
   // #1122: V breathes only after the voice rolled, then decays to still. Read the honest feed once a second.
   const [voiceLvl, setVoiceLvl] = useState(0);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror of the feed, read on mount and each second
-    if (!voiceOn) { setVoiceLvl(0); return undefined; }
+    if (!voiceOn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror of the feed, read on mount and each second
+      setVoiceLvl(0);
+      return undefined;
+    }
     const tick = () => setVoiceLvl(voiceLevel(loisActivity.snapshot().lastRollAgoMs));
     tick();
     const id = setInterval(tick, 1000);
@@ -142,7 +149,14 @@ export function CuratorBar() {
     // presses don't wipe swatch overrides or stack undo entries. "off" never
     // touches the palette.
     const st = useStore.getState();
-    const target = curatePaletteTarget({ phase, profile: getRenderProfile(getActivePersonaId()), paletteId: st.paletteId, artistChose: !!st.paletteChosen, seed: st.seed, seedOffsets: st.seedOffsets });
+    const target = curatePaletteTarget({
+      phase,
+      profile: getRenderProfile(getActivePersonaId()),
+      paletteId: st.paletteId,
+      artistChose: !!st.paletteChosen,
+      seed: st.seed,
+      seedOffsets: st.seedOffsets,
+    });
     if (target) st.setPaletteId(target);
   };
 
@@ -158,150 +172,180 @@ export function CuratorBar() {
   );
   const lockTitle = armed
     ? 'roll scope armed — tap to disarm'
-    : lockCount > 0 ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}` : 'no locked params';
+    : lockCount > 0
+      ? `${lockCount} locked param${lockCount === 1 ? '' : 's'}`
+      : 'no locked params';
   return (
     <div className="curator-left-group kc-topbar-curator">
-        {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN].
+      {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN].
             The ::before square is the ■ marker — accent-filled in CHAOS. */}
+      <button
+        type="button"
+        className="tb-pill start-mode-btn act"
+        data-mode={startupMode}
+        onClick={() => emit(Events.STARTUP_MODE, { mode: startupMode === 'chaos' ? 'fixed' : 'chaos' })}
+        title={
+          startupMode === 'chaos'
+            ? 'START: K.O.Z. (Kinetic Operation Zone) — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
+            : 'START: FIXED — every cold launch opens on the factory default scene. Click for chaos.'
+        }
+        aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
+      >
+        <span className="tb-start-key">start: </span>
+        {startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
+      </button>
+      <span className="tb-sep" aria-hidden="true" />
+      {/* #942 — KINETIC: storm generator after the START toggle. */}
+      <KineticButton />
+      <div className="curator-voice-wrap" ref={presetWrapRef}>
         <button
-          type="button"
-          className="tb-pill start-mode-btn act"
-          data-mode={startupMode}
-          onClick={() => emit(Events.STARTUP_MODE, { mode: startupMode === 'chaos' ? 'fixed' : 'chaos' })}
-          title={
-            startupMode === 'chaos'
-              ? 'START: K.O.Z. (Kinetic Operation Zone) — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
-              : 'START: FIXED — every cold launch opens on the factory default scene. Click for chaos.'
-          }
-          aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
+          className="tb-pill curator-voice-btn xl act"
+          data-open={looksTap.open ? 'true' : undefined}
+          onClick={() => {
+            setPresetMenuOpen((o) => !o);
+            setLooksUsed(true);
+          }}
+          onMouseLeave={() => setLooksUsed(true)}
+          onBlur={() => setLooksUsed(true)}
+          {...looksTap.props}
+          aria-label="Looks — pick a complete layout"
+          aria-haspopup="menu"
+          aria-expanded={presetMenuOpen}
+          title="Apply a Look — layout only; your palette and marks stay put"
         >
-          <span className="tb-start-key">start: </span>{startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
+          {/* #1122 — L is structure → TE: hollow / solid-red / half-fill + look name */}
+          <span
+            className={`tb-looksq ${lookState}`}
+            data-subdued={subdued('look', lookState !== 'none')}
+            aria-hidden="true"
+          />
+          <ExpandLabel mode="swap" short={looksUsed ? 'lok' : 'l'} full="looks ▾" />
+          {lookState !== 'none' && <span className="tb-micro">{lookName}</span>}
         </button>
-        <span className="tb-sep" aria-hidden="true" />
-        {/* #942 — KINETIC: storm generator after the START toggle. */}
-        <KineticButton />
-        <div className="curator-voice-wrap" ref={presetWrapRef}>
-          <button
-            className="tb-pill curator-voice-btn xl act"
-            data-open={looksTap.open ? 'true' : undefined}
-            onClick={() => { setPresetMenuOpen((o) => !o); setLooksUsed(true); }}
-            onMouseLeave={() => setLooksUsed(true)}
-            onBlur={() => setLooksUsed(true)}
-            {...looksTap.props}
-            aria-label="Looks — pick a complete layout"
-            aria-haspopup="menu"
-            aria-expanded={presetMenuOpen}
-            title="Apply a Look — layout only; your palette and marks stay put"
-          >
-            {/* #1122 — L is structure → TE: hollow / solid-red / half-fill + look name */}
-            <span className={`tb-looksq ${lookState}`} data-subdued={subdued('look', lookState !== 'none')} aria-hidden="true" />
-            <ExpandLabel mode="swap" short={looksUsed ? 'lok' : 'l'} full="looks ▾" />
-            {lookState !== 'none' && <span className="tb-micro">{lookName}</span>}
-          </button>
-          {presetMenuOpen && (
-            <div className="curator-voice-menu preset-menu" role="menu">
-              <div className="preset-groups">
-                {presetGroups.map((g) => (
-                  <div key={g.id} className="preset-group">
-                    <div className="preset-group-label">{g.label}</div>
-                    <div className="preset-row">
-                      {g.presets.map((p) => (
-                        <button
-                          key={p.id}
-                          type="button"
-                          role="menuitem"
-                          className={`preset-btn ${composition === p.id ? 'active' : ''}`}
-                          onClick={() => pickPreset(p)}
-                          title={p.desc}
-                        >
-                          {p.name}
-                        </button>
-                      ))}
-                    </div>
+        {presetMenuOpen && (
+          <div className="curator-voice-menu preset-menu" role="menu">
+            <div className="preset-groups">
+              {presetGroups.map((g) => (
+                <div key={g.id} className="preset-group">
+                  <div className="preset-group-label">{g.label}</div>
+                  <div className="preset-row">
+                    {g.presets.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        role="menuitem"
+                        className={`preset-btn ${composition === p.id ? 'active' : ''}`}
+                        onClick={() => pickPreset(p)}
+                        title={p.desc}
+                      >
+                        {p.name}
+                      </button>
+                    ))}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="curator-voice-wrap" ref={wrapRef}>
-          <button
-            className="tb-pill curator-voice-btn xl act"
-            data-open={voiceTap.open ? 'true' : undefined}
-            onClick={() => { setMenuOpen((o) => !o); setVoiceUsed(true); }}
-            onMouseLeave={() => setVoiceUsed(true)}
-            onBlur={() => setVoiceUsed(true)}
-            {...voiceTap.props}
-            aria-label={`Voice: ${activeAlias}. Persona voice tasting the candidates`}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            title="Persona voice tasting the candidates — off means a plain dice roll"
-          >
-            {/* #1122 — V is drift → Davis: the circle breathes at the persona's drift
-                rate; hollow and dark when off */}
-            <span className={`tb-voice${voiceOn ? ' on' : ''}${voiceLvl ? ` lvl${voiceLvl}` : ''}`} data-subdued={subdued('voice', voiceOn)}
-              style={voiceOn ? { animationDuration: `${breathS.toFixed(1)}s` } : undefined} aria-hidden="true" />
-            <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
-            {voiceOn && <span className="tb-micro">{voice}</span>}
-          </button>
-          {menuOpen && (
-            <div className="curator-voice-menu" role="menu">
-              <button
-                role="menuitem"
-                className={voice === 'off' ? 'active' : ''}
-                onClick={() => pickVoice('off')}
-              >
-                voice: off
-              </button>
-              {voices.map((p) => (
-                <button
-                  role="menuitem"
-                  key={p.id}
-                  className={voice === p.id ? 'active' : ''}
-                  onClick={() => pickVoice(p.id)}
-                  title={p.heuristic ? 'Hand-tuned rank: glance, distance from the pile, boldness. Not a trained eye.' : undefined}
-                >
-                  voice: {p.title || p.alias}
-                </button>
+                </div>
               ))}
             </div>
-          )}
-        </div>
-        <button className={`tb-pill randomize-btn xl act${curShimmer ? ' xl-shimmer' : ''}`} onClick={onCurate}
-          data-open={curTap.open || cold ? 'true' : undefined}
-          {...curTap.props}
-          aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
-          title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}>
-          {/* #1122 — CUR is verdict → TE: detent-step diamond + keep/favorite ledger.
-              The ledger stays silent at 0/0 (silence is default); it appears with the first keep. */}
-          <span className={`tb-curdia v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
-          <ExpandLabel short="cur" full="curator" />
-          {(keepsCount > 0 || favoritesCount > 0) && (
-            <span className="tb-micro" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>{keepsCount}/{favoritesCount}</span>
-          )}
+          </div>
+        )}
+      </div>
+      <div className="curator-voice-wrap" ref={wrapRef}>
+        <button
+          className="tb-pill curator-voice-btn xl act"
+          data-open={voiceTap.open ? 'true' : undefined}
+          onClick={() => {
+            setMenuOpen((o) => !o);
+            setVoiceUsed(true);
+          }}
+          onMouseLeave={() => setVoiceUsed(true)}
+          onBlur={() => setVoiceUsed(true)}
+          {...voiceTap.props}
+          aria-label={`Voice: ${activeAlias}. Persona voice tasting the candidates`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          title="Persona voice tasting the candidates — off means a plain dice roll"
+        >
+          {/* #1122 — V is drift → Davis: the circle breathes at the persona's drift
+                rate; hollow and dark when off */}
+          <span
+            className={`tb-voice${voiceOn ? ' on' : ''}${voiceLvl ? ` lvl${voiceLvl}` : ''}`}
+            data-subdued={subdued('voice', voiceOn)}
+            style={voiceOn ? { animationDuration: `${breathS.toFixed(1)}s` } : undefined}
+            aria-hidden="true"
+          />
+          <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
+          {voiceOn && <span className="tb-micro">{voice}</span>}
         </button>
-        <span className="tb-sep" aria-hidden="true" />
-        {armed ? (
-          <button
-            type="button"
-            className="tb-pill lock-pill act"
-            data-subdued={subdued('locks', true)}
-            title={lockTitle}
-            aria-label="disarm roll scope"
-            onClick={(e) => { e.stopPropagation(); emit(Events.ROLL_SCOPE_CLEAR); }}
-          >
-            {lockPillInner}
-          </button>
-        ) : (
-          <span className="tb-pill" data-subdued={subdued('locks', lockCount > 0)}
-            title={lockTitle} role="img" aria-label={lockTitle}>
-            {lockPillInner}
+        {menuOpen && (
+          <div className="curator-voice-menu" role="menu">
+            <button role="menuitem" className={voice === 'off' ? 'active' : ''} onClick={() => pickVoice('off')}>
+              voice: off
+            </button>
+            {voices.map((p) => (
+              <button
+                role="menuitem"
+                key={p.id}
+                className={voice === p.id ? 'active' : ''}
+                onClick={() => pickVoice(p.id)}
+                title={
+                  p.heuristic
+                    ? 'Hand-tuned rank: glance, distance from the pile, boldness. Not a trained eye.'
+                    : undefined
+                }
+              >
+                voice: {p.title || p.alias}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      <button
+        className={`tb-pill randomize-btn xl act${curShimmer ? ' xl-shimmer' : ''}`}
+        onClick={onCurate}
+        data-open={curTap.open || cold ? 'true' : undefined}
+        {...curTap.props}
+        aria-label="Curator — roll a taste-guided scene over the unlocked parameters"
+        title={`${lockCount > 0 ? `${lockCount} locked · ` : ''}${hint}`}
+      >
+        {/* #1122 — CUR is verdict → TE: detent-step diamond + keep/favorite ledger.
+              The ledger stays silent at 0/0 (silence is default); it appears with the first keep. */}
+        <span className={`tb-curdia v${curDetent}`} data-subdued={subdued('cur', curDetent > 0)} aria-hidden="true" />
+        <ExpandLabel short="cur" full="curator" />
+        {(keepsCount > 0 || favoritesCount > 0) && (
+          <span className="tb-micro" title={`${keepsCount} keeps / ${favoritesCount} favorites`}>
+            {keepsCount}/{favoritesCount}
           </span>
         )}
-        {/* #1103 — BEAT sits right of the locks: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
-        <BeatButton />
-        {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
-        <SwayMark />
+      </button>
+      <span className="tb-sep" aria-hidden="true" />
+      {armed ? (
+        <button
+          type="button"
+          className="tb-pill lock-pill act"
+          data-subdued={subdued('locks', true)}
+          title={lockTitle}
+          aria-label="disarm roll scope"
+          onClick={(e) => {
+            e.stopPropagation();
+            emit(Events.ROLL_SCOPE_CLEAR);
+          }}
+        >
+          {lockPillInner}
+        </button>
+      ) : (
+        <span
+          className="tb-pill"
+          data-subdued={subdued('locks', lockCount > 0)}
+          title={lockTitle}
+          role="img"
+          aria-label={lockTitle}
+        >
+          {lockPillInner}
+        </span>
+      )}
+      {/* #1103 — BEAT sits right of the locks: the verbs, then the clock they run on. [•B] opens to BEAT · 120. */}
+      <BeatButton />
+      {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
+      <SwayMark />
     </div>
   );
 }

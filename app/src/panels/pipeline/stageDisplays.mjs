@@ -6,8 +6,7 @@
 // It does NOT expose refresh rate — the descriptor says so honestly instead
 // of inventing a number.
 
-export const REFRESH_RATE_UNAVAILABLE =
-  'Refresh rate is not exposed by the Tauri 1.x display API — shown as n/a.';
+export const REFRESH_RATE_UNAVAILABLE = 'Refresh rate is not exposed by the Tauri 1.x display API — shown as n/a.';
 
 /**
  * Normalize one raw monitor into a stage display descriptor.
@@ -18,9 +17,8 @@ export function normalizeMonitor(raw, index = 0) {
   const pos = (raw && typeof raw === 'object' && raw.position) || {};
   const w = Math.max(1, Math.round(Number(size.width) || 0));
   const h = Math.max(1, Math.round(Number(size.height) || 0));
-  const name = raw && typeof raw.name === 'string' && raw.name.trim()
-    ? raw.name.trim().slice(0, 80)
-    : `Display ${index + 1}`;
+  const name =
+    raw && typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 80) : `Display ${index + 1}`;
   return {
     id: `mon-${index}-${w}x${h}`,
     name,

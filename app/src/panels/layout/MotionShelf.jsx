@@ -18,7 +18,9 @@ export function MotionShelf({ layoutParams }) {
   return (
     <>
       <div className="voice-shelf" {...press}>
-        <span className="shelf-label ttl" title="Motion — long-press for heroes">motion</span>
+        <span className="shelf-label ttl" title="Motion — long-press for heroes">
+          motion
+        </span>
         <TeaMatrix
           ariaLabel="Motion"
           value={MOTION_MODES.find((m) => isMotionActive(layoutParams, m))?.id}

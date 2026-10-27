@@ -26,18 +26,16 @@ export function MathSection() {
   return (
     <div className="math-section">
       <p className="math-blurb">
-        Broad strokes over the fine sliders. One knob drives many sliders at
-        once — hit <b>LEARN</b>, wiggle sliders to gang them, then drag the
-        knob. It springs back; the macro nudges, never snaps. Setups save
-        with the project.
+        Broad strokes over the fine sliders. One knob drives many sliders at once — hit <b>LEARN</b>, wiggle sliders to
+        gang them, then drag the knob. It springs back; the macro nudges, never snaps. Setups save with the project.
       </p>
       {armed && (
-        <p className="math-learning">
-          ● Learning — wiggle sliders to assign them. LEARN again or Esc to stop.
-        </p>
+        <p className="math-learning">● Learning — wiggle sliders to assign them. LEARN again or Esc to stop.</p>
       )}
       <div className="math-knobs">
-        {macros.map((m) => <MacroKnob key={m.id} macro={m} />)}
+        {macros.map((m) => (
+          <MacroKnob key={m.id} macro={m} />
+        ))}
         {macros.length < MATH_MAX_MACROS && (
           <button className="math-add" onClick={() => emit(Events.MACRO_ADD)} title="Add a macro knob">
             + MACRO

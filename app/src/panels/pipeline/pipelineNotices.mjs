@@ -57,7 +57,9 @@ export function nextTitleVersion(slug, store = globalThis.localStorage) {
   versions[slug] = next;
   try {
     store.setItem(TITLE_VERSIONS_KEY, JSON.stringify(versions));
-  } catch { /* storage full or blocked — version still returned */ }
+  } catch {
+    /* storage full or blocked — version still returned */
+  }
   return next;
 }
 

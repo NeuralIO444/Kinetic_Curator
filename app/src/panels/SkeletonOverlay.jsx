@@ -45,19 +45,38 @@ export function SkeletonOverlay({ zoom, pan, canvasW, canvasH }) {
               {skel.bones.map((b) => (
                 <g key={b.id}>
                   <line
-                    x1={b.base.x} y1={b.base.y} x2={b.tip.x} y2={b.tip.y}
-                    stroke={b.chain ? (CHAIN_COLOR[b.chain] || '#4dd0e1') : '#ffd166'}
+                    x1={b.base.x}
+                    y1={b.base.y}
+                    x2={b.tip.x}
+                    y2={b.tip.y}
+                    stroke={b.chain ? CHAIN_COLOR[b.chain] || '#4dd0e1' : '#ffd166'}
                     strokeWidth={sw}
                   />
                   <circle cx={b.base.x} cy={b.base.y} r={r} fill="#fff" />
                   {b.marker === 'H' && (
                     <>
                       <circle cx={b.tip.x} cy={b.tip.y} r={r * 2} fill="none" stroke="#ff5252" strokeWidth={sw} />
-                      <text x={b.tip.x + r * 3} y={b.tip.y} fill="#ff5252" fontSize={10 / z} fontFamily="ui-monospace, Menlo, monospace">H</text>
+                      <text
+                        x={b.tip.x + r * 3}
+                        y={b.tip.y}
+                        fill="#ff5252"
+                        fontSize={10 / z}
+                        fontFamily="ui-monospace, Menlo, monospace"
+                      >
+                        H
+                      </text>
                     </>
                   )}
                   {b.marker === 'L' && (
-                    <text x={b.base.x + r * 2} y={b.base.y - r * 2} fill="#fff" fontSize={10 / z} fontFamily="ui-monospace, Menlo, monospace">L</text>
+                    <text
+                      x={b.base.x + r * 2}
+                      y={b.base.y - r * 2}
+                      fill="#fff"
+                      fontSize={10 / z}
+                      fontFamily="ui-monospace, Menlo, monospace"
+                    >
+                      L
+                    </text>
                   )}
                 </g>
               ))}
@@ -65,7 +84,17 @@ export function SkeletonOverlay({ zoom, pan, canvasW, canvasH }) {
           ))}
         </g>
       </svg>
-      <span style={{ position: 'absolute', left: 8, top: 8, zIndex: 2, pointerEvents: 'none', font: '10px ui-monospace, Menlo, monospace', color: '#ffd166' }}>
+      <span
+        style={{
+          position: 'absolute',
+          left: 8,
+          top: 8,
+          zIndex: 2,
+          pointerEvents: 'none',
+          font: '10px ui-monospace, Menlo, monospace',
+          color: '#ffd166',
+        }}
+      >
         SKELETON (debug)
       </span>
     </>

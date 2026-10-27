@@ -32,56 +32,123 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
     />
   );
   const NAMES = { glass: 'Glass', plate: 'Plate', wash: 'Wash', stipple: 'Stipple' };
-  const gate = (m) => material === m
-    ? {}
-    : { disabled: true, disabledReason: `${NAMES[m]} material only` };
+  const gate = (m) => (material === m ? {} : { disabled: true, disabledReason: `${NAMES[m]} material only` });
   const pct = (v) => `${Math.round((v ?? 0) * 100)}%`;
 
   return (
     <div className="param-block">
       <div className="slider-stack">
-        {btn('GLASS ALPHA', pct(layoutParams.glassAlpha ?? 0.78), 'glassAlpha',
-          <SliderEditor ariaLabel="Glass alpha" value={layoutParams.glassAlpha ?? 0.78}
-            min={0} max={1} step={0.01}
+        {btn(
+          'GLASS ALPHA',
+          pct(layoutParams.glassAlpha ?? 0.78),
+          'glassAlpha',
+          <SliderEditor
+            ariaLabel="Glass alpha"
+            value={layoutParams.glassAlpha ?? 0.78}
+            min={0}
+            max={1}
+            step={0.01}
             format={(v) => pct(v)}
-            onChange={(v) => set('glassAlpha', v)} />,
-          { ...gate('glass'), hint: 'How much of its rolled alpha a glass body keeps — 0.78 is the shipped tune' })}
-        {btn('PLATE RADIUS', `×${(layoutParams.plateRadius ?? 1.05).toFixed(2)}`, 'plateRadius',
-          <SliderEditor ariaLabel="Plate radius" value={layoutParams.plateRadius ?? 1.05}
-            min={0.2} max={2} step={0.05}
+            onChange={(v) => set('glassAlpha', v)}
+          />,
+          { ...gate('glass'), hint: 'How much of its rolled alpha a glass body keeps — 0.78 is the shipped tune' },
+        )}
+        {btn(
+          'PLATE RADIUS',
+          `×${(layoutParams.plateRadius ?? 1.05).toFixed(2)}`,
+          'plateRadius',
+          <SliderEditor
+            ariaLabel="Plate radius"
+            value={layoutParams.plateRadius ?? 1.05}
+            min={0.2}
+            max={2}
+            step={0.05}
             format={(v) => `×${v.toFixed(2)}`}
-            onChange={(v) => set('plateRadius', v)} />,
-          { ...gate('plate'), hint: 'The plate gradient\'s radius in glyph-box units — 1.05 is the shipped tune' })}
-        {btn('PLATE CENTRE X', pct(layoutParams.plateCenterX ?? 0.36), 'plateCenterX',
-          <SliderEditor ariaLabel="Plate centre X" value={layoutParams.plateCenterX ?? 0.36}
-            min={0} max={1} step={0.01}
+            onChange={(v) => set('plateRadius', v)}
+          />,
+          { ...gate('plate'), hint: "The plate gradient's radius in glyph-box units — 1.05 is the shipped tune" },
+        )}
+        {btn(
+          'PLATE CENTRE X',
+          pct(layoutParams.plateCenterX ?? 0.36),
+          'plateCenterX',
+          <SliderEditor
+            ariaLabel="Plate centre X"
+            value={layoutParams.plateCenterX ?? 0.36}
+            min={0}
+            max={1}
+            step={0.01}
             format={(v) => pct(v)}
-            onChange={(v) => set('plateCenterX', v)} />,
-          { ...gate('plate'), hint: 'Where the plate gradient\'s core sits across the glyph — 36% is the shipped tune' })}
-        {btn('PLATE CENTRE Y', pct(layoutParams.plateCenterY ?? 0.30), 'plateCenterY',
-          <SliderEditor ariaLabel="Plate centre Y" value={layoutParams.plateCenterY ?? 0.30}
-            min={0} max={1} step={0.01}
+            onChange={(v) => set('plateCenterX', v)}
+          />,
+          { ...gate('plate'), hint: "Where the plate gradient's core sits across the glyph — 36% is the shipped tune" },
+        )}
+        {btn(
+          'PLATE CENTRE Y',
+          pct(layoutParams.plateCenterY ?? 0.3),
+          'plateCenterY',
+          <SliderEditor
+            ariaLabel="Plate centre Y"
+            value={layoutParams.plateCenterY ?? 0.3}
+            min={0}
+            max={1}
+            step={0.01}
             format={(v) => pct(v)}
-            onChange={(v) => set('plateCenterY', v)} />,
-          { ...gate('plate'), hint: 'Where the plate gradient\'s core sits down the glyph — 30% is the shipped tune' })}
-        {btn('WASH STRENGTH', pct(layoutParams.washStrength ?? 1), 'washStrength',
-          <SliderEditor ariaLabel="Wash strength" value={layoutParams.washStrength ?? 1}
-            min={0} max={1} step={0.01}
+            onChange={(v) => set('plateCenterY', v)}
+          />,
+          { ...gate('plate'), hint: "Where the plate gradient's core sits down the glyph — 30% is the shipped tune" },
+        )}
+        {btn(
+          'WASH STRENGTH',
+          pct(layoutParams.washStrength ?? 1),
+          'washStrength',
+          <SliderEditor
+            ariaLabel="Wash strength"
+            value={layoutParams.washStrength ?? 1}
+            min={0}
+            max={1}
+            step={0.01}
             format={(v) => pct(v)}
-            onChange={(v) => set('washStrength', v)} />,
-          { ...gate('wash'), hint: 'How far the wash ramp travels from accent to ink — 100% is the shipped ramp' })}
-        {btn('WASH SPREAD', `×${(layoutParams.washSpread ?? 1).toFixed(2)}`, 'washSpread',
-          <SliderEditor ariaLabel="Wash spread" value={layoutParams.washSpread ?? 1}
-            min={0.25} max={4} step={0.05}
+            onChange={(v) => set('washStrength', v)}
+          />,
+          { ...gate('wash'), hint: 'How far the wash ramp travels from accent to ink — 100% is the shipped ramp' },
+        )}
+        {btn(
+          'WASH SPREAD',
+          `×${(layoutParams.washSpread ?? 1).toFixed(2)}`,
+          'washSpread',
+          <SliderEditor
+            ariaLabel="Wash spread"
+            value={layoutParams.washSpread ?? 1}
+            min={0.25}
+            max={4}
+            step={0.05}
             format={(v) => `×${v.toFixed(2)}`}
-            onChange={(v) => set('washSpread', v)} />,
-          { ...gate('wash'), hint: 'The height over which the wash ramp runs — under 1 compresses it to the top, over 1 leaves the bottom short of ink' })}
-        {btn('STIPPLE DOTS', `×${(layoutParams.stippleDotScale ?? 2.5).toFixed(2)}`, 'stippleDotScale',
-          <SliderEditor ariaLabel="Stipple dot scale" value={layoutParams.stippleDotScale ?? 2.5}
-            min={0.5} max={5} step={0.1}
+            onChange={(v) => set('washSpread', v)}
+          />,
+          {
+            ...gate('wash'),
+            hint: 'The height over which the wash ramp runs — under 1 compresses it to the top, over 1 leaves the bottom short of ink',
+          },
+        )}
+        {btn(
+          'STIPPLE DOTS',
+          `×${(layoutParams.stippleDotScale ?? 2.5).toFixed(2)}`,
+          'stippleDotScale',
+          <SliderEditor
+            ariaLabel="Stipple dot scale"
+            value={layoutParams.stippleDotScale ?? 2.5}
+            min={0.5}
+            max={5}
+            step={0.1}
             format={(v) => `×${v.toFixed(2)}`}
-            onChange={(v) => set('stippleDotScale', v)} />,
-          { ...gate('stipple'), hint: 'The stipple dots\' size against the authored field — 2.50 is Matt\'s shipped tune' })}
+            onChange={(v) => set('stippleDotScale', v)}
+          />,
+          {
+            ...gate('stipple'),
+            hint: "The stipple dots' size against the authored field — 2.50 is Matt's shipped tune",
+          },
+        )}
       </div>
     </div>
   );

@@ -21,9 +21,20 @@ import { blendStyles } from '../../hooks/useMindFaces.js';
 import { getPresenceView, subscribePresence } from '../../curator/mindPresenceLive.js';
 import { UNMODULATED } from '../../curator/mindZodiac.js';
 import {
-  DITHER_GRIDS, gridTierFor, vibeBend, orderedLevel,
-  buildDavisSource, davisSampler, davisFaceParams, davisRamp, DAVIS_LEVELS,
-  loisSampler, loisFaceParams, loisInk, LOIS_GLYPHS, LOIS_LEVELS,
+  DITHER_GRIDS,
+  gridTierFor,
+  vibeBend,
+  orderedLevel,
+  buildDavisSource,
+  davisSampler,
+  davisFaceParams,
+  davisRamp,
+  DAVIS_LEVELS,
+  loisSampler,
+  loisFaceParams,
+  loisInk,
+  LOIS_GLYPHS,
+  LOIS_LEVELS,
 } from '../../curator/roomDither.js';
 
 const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)';
@@ -68,7 +79,10 @@ function tokenRgb(el, tripleVar, hexVar, fallback) {
   if (!el) return fallback;
   const cs = getComputedStyle(el);
   const triple = cs.getPropertyValue(tripleVar).trim();
-  if (triple) { const p = triple.split(',').map((v) => parseInt(v, 10)); if (p.length === 3 && p.every(Number.isFinite)) return p; }
+  if (triple) {
+    const p = triple.split(',').map((v) => parseInt(v, 10));
+    if (p.length === 3 && p.every(Number.isFinite)) return p;
+  }
   const hex = cs.getPropertyValue(hexVar).trim();
   const m = /^#([0-9a-f]{6})$/i.exec(hex);
   if (m) return [0, 2, 4].map((i) => parseInt(m[1].slice(i, i + 2), 16));
@@ -87,7 +101,10 @@ function useFaceCanvas({ target, draw }) {
   const stateRef = useRef({ params: target, angle: 0, last: null });
   const drawRef = useRef(draw);
   const targetRef = useRef(target);
-  useEffect(() => { drawRef.current = draw; targetRef.current = target; });
+  useEffect(() => {
+    drawRef.current = draw;
+    targetRef.current = target;
+  });
   const [motion, setMotion] = useState('still');
   const reduced = useReducedMotion();
 
@@ -95,12 +112,14 @@ function useFaceCanvas({ target, draw }) {
     const cv = ref.current;
     if (!cv) return undefined;
     const st = stateRef.current;
-    let raf = 0; let lastTick = 0;
+    let raf = 0;
+    let lastTick = 0;
     const frame = (now) => {
       raf = requestAnimationFrame(frame);
       if (lastTick && now - lastTick < TICK_MS) return;
       const dt = st.last ? Math.min(0.5, (now - st.last) / 1000) : 0;
-      st.last = now; lastTick = now;
+      st.last = now;
+      lastTick = now;
       const tgt = targetRef.current;
       // ease the parameters toward the target set (a state's face re-generates, it does not cut)
       let maxDelta = 0;
@@ -108,7 +127,8 @@ function useFaceCanvas({ target, draw }) {
       for (const k of Object.keys(tgt)) {
         if (typeof tgt[k] === 'number' && typeof next[k] === 'number') {
           const d = (tgt[k] - next[k]) * (reduced ? 1 : 1 - Math.exp(-dt / 0.35));
-          next[k] += d; maxDelta = Math.max(maxDelta, Math.abs(tgt[k] - next[k]));
+          next[k] += d;
+          maxDelta = Math.max(maxDelta, Math.abs(tgt[k] - next[k]));
         } else next[k] = tgt[k];
       }
       st.params = next;
@@ -128,7 +148,10 @@ function useFaceCanvas({ target, draw }) {
       };
       drawRef.current(cv, st.params, phase);
       const alive = !reduced && (!!spin || maxDelta > 0.002);
-      setMotion((cur) => { const m = alive ? 'turning' : 'still'; return cur === m ? cur : m; });
+      setMotion((cur) => {
+        const m = alive ? 'turning' : 'still';
+        return cur === m ? cur : m;
+      });
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
@@ -141,12 +164,16 @@ function paintDots(cv, cells, sampler, ramp, levels) {
   const cx = cv.getContext && cv.getContext('2d');
   if (!cx) return;
   const px = cells * CELL_PX;
-  if (cv.width !== px) { cv.width = px; cv.height = px; }
+  if (cv.width !== px) {
+    cv.width = px;
+    cv.height = px;
+  }
   cx.clearRect(0, 0, px, px);
   const paths = Array.from({ length: levels }, () => []);
   for (let j = 0; j < cells; j++) {
     for (let i = 0; i < cells; i++) {
-      const x = ((i + 0.5) / cells) * 2 - 1; const y = ((j + 0.5) / cells) * 2 - 1;
+      const x = ((i + 0.5) / cells) * 2 - 1;
+      const y = ((j + 0.5) / cells) * 2 - 1;
       const lvl = orderedLevel(sampler(x, y), i, j, levels);
       if (lvl > 0) paths[lvl].push([i, j]);
     }
@@ -157,7 +184,8 @@ function paintDots(cv, cells, sampler, ramp, levels) {
     cx.fillStyle = ramp[lvl];
     cx.beginPath();
     for (const [i, j] of paths[lvl]) {
-      const cxp = (i + 0.5) * CELL_PX; const cyp = (j + 0.5) * CELL_PX;
+      const cxp = (i + 0.5) * CELL_PX;
+      const cyp = (j + 0.5) * CELL_PX;
       cx.moveTo(cxp + rad, cyp);
       cx.arc(cxp, cyp, rad, 0, 7);
     }
@@ -170,18 +198,26 @@ function paintGlyphs(cv, cells, sampler, glyphs, inks) {
   const cx = cv.getContext && cv.getContext('2d');
   if (!cx) return;
   const px = cells * CELL_PX;
-  if (cv.width !== px) { cv.width = px; cv.height = px; }
+  if (cv.width !== px) {
+    cv.width = px;
+    cv.height = px;
+  }
   cx.clearRect(0, 0, px, px);
   cx.font = `${CELL_PX}px ui-monospace, SFMono-Regular, Menlo, monospace`;
-  cx.textAlign = 'center'; cx.textBaseline = 'middle';
+  cx.textAlign = 'center';
+  cx.textBaseline = 'middle';
   let lastInk = null;
   for (let j = 0; j < cells; j++) {
     for (let i = 0; i < cells; i++) {
-      const x = ((i + 0.5) / cells) * 2 - 1; const y = ((j + 0.5) / cells) * 2 - 1;
+      const x = ((i + 0.5) / cells) * 2 - 1;
+      const y = ((j + 0.5) / cells) * 2 - 1;
       const lvl = orderedLevel(sampler(x, y), i, j, LOIS_LEVELS);
       const g = glyphs[lvl];
       if (!g || g === ' ') continue;
-      if (inks[lvl] !== lastInk) { cx.fillStyle = inks[lvl]; lastInk = inks[lvl]; }
+      if (inks[lvl] !== lastInk) {
+        cx.fillStyle = inks[lvl];
+        lastInk = inks[lvl];
+      }
       cx.fillText(g, (i + 0.5) * CELL_PX, (j + 0.5) * CELL_PX + CELL_PX * 0.06);
     }
   }
@@ -202,8 +238,14 @@ export function LoisFaceNow({ face, overlay, barS }) {
   const honestCode = LOIS_CODE_BY_FACE[face] || 'VIBE';
   return (
     <span className="codec-face mind-blend" aria-hidden="true">
-      <span className="mind-honest" style={styles.honest}><LoisDither code={honestCode} /></span>
-      {look && <span className="mind-over" style={styles.mind}><LoisDither code={look.code} /></span>}
+      <span className="mind-honest" style={styles.honest}>
+        <LoisDither code={honestCode} />
+      </span>
+      {look && (
+        <span className="mind-over" style={styles.mind}>
+          <LoisDither code={look.code} />
+        </span>
+      )}
     </span>
   );
 }
@@ -223,11 +265,22 @@ function LoisDither({ code }) {
         inkRef.current = { ink, red };
       }
       const glyphs = LOIS_GLYPHS[params.glyphs] || LOIS_GLYPHS.vibe;
-      const inks = Array.from({ length: LOIS_LEVELS }, (_, l) => loisInk(l, params.tint, bend.warmth, inkRef.current.ink, inkRef.current.red));
+      const inks = Array.from({ length: LOIS_LEVELS }, (_, l) =>
+        loisInk(l, params.tint, bend.warmth, inkRef.current.ink, inkRef.current.red),
+      );
       paintGlyphs(cv, cells, loisSampler(params, { lift: phase.lift, contrast: bend.contrast }), glyphs, inks);
     },
   });
-  return <canvas ref={ref} className="codec-dither lois-dither" width={cells * CELL_PX} height={cells * CELL_PX} data-state={code} aria-hidden="true" />;
+  return (
+    <canvas
+      ref={ref}
+      className="codec-dither lois-dither"
+      width={cells * CELL_PX}
+      height={cells * CELL_PX}
+      data-state={code}
+      aria-hidden="true"
+    />
+  );
 }
 
 /**
@@ -248,15 +301,25 @@ export function DavisFaceNow({ seed, code }) {
     draw: (cv, params, phase) => {
       if (!rgbRef.current) rgbRef.current = tokenRgb(cv, '--kc-davis-rgb', '--kc-davis', [255, 205, 130]);
       const sampler = davisSampler(source, {
-        angle: phase.angle, breath: code ? phase.breath : 1,
-        density: params.density, ringGain: params.ringGain, contrast: bend.contrast,
+        angle: phase.angle,
+        breath: code ? phase.breath : 1,
+        density: params.density,
+        ringGain: params.ringGain,
+        contrast: bend.contrast,
       });
       paintDots(cv, cells, sampler, davisRamp(rgbRef.current, bend.warmth), DAVIS_LEVELS);
     },
   });
   return (
-    <canvas ref={ref} className="codec-dither davis-dither" width={cells * CELL_PX} height={cells * CELL_PX}
-      data-state={code || 'none'} data-motion={code ? motion : 'still'} role="img"
-      aria-label={code ? `Davis, ${code}` : 'Davis, resting'} />
+    <canvas
+      ref={ref}
+      className="codec-dither davis-dither"
+      width={cells * CELL_PX}
+      height={cells * CELL_PX}
+      data-state={code || 'none'}
+      data-motion={code ? motion : 'still'}
+      role="img"
+      aria-label={code ? `Davis, ${code}` : 'Davis, resting'}
+    />
   );
 }

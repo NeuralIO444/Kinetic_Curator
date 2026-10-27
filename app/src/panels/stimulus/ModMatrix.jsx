@@ -14,10 +14,27 @@ import { useEffect, useRef, useState } from 'react';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { audioMatrixRows, ROUTE_TARGETS, COARSE_INPUTS, BAND_INPUTS, MAX_ROUTES } from '../../gl/audioRoutes.mjs';
 import { getShapedBands } from '../../gl/bandFeed.mjs';
-import { absorbPeaks, autoInvites, autoSetupRoutes, masterGainFor, deadRouteIndexes, ENERGY_FLOOR, inputEnergy, retuneRoutes, snapshotFromReads } from '../../gl/stimuliAuto.mjs';
+import {
+  absorbPeaks,
+  autoInvites,
+  autoSetupRoutes,
+  masterGainFor,
+  deadRouteIndexes,
+  ENERGY_FLOOR,
+  inputEnergy,
+  retuneRoutes,
+  snapshotFromReads,
+} from '../../gl/stimuliAuto.mjs';
 import { readMeterBandLevels } from '../../hooks/audioMeterTap.js';
 import { useStore } from '../../state/store.js';
-import { editableRoutes, nextRoute, patchRoute, removeRoute, routeDepthRange, defaultDepthFor } from '../../data/audioRoutes.js';
+import {
+  editableRoutes,
+  nextRoute,
+  patchRoute,
+  removeRoute,
+  routeDepthRange,
+  defaultDepthFor,
+} from '../../data/audioRoutes.js';
 import { useInvite } from '../../hooks/useInvite.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { LOIS_LINES } from '../loisLines.mjs';
@@ -26,7 +43,22 @@ const fmt = (v) => (v >= 10 ? v.toFixed(1) : v.toFixed(3));
 const INPUT_LABEL = (id) => (id.startsWith('band.') ? `BAND ${id.slice(5).toUpperCase()}` : id.toUpperCase());
 // glow is the DOM frame glow (box-shadow), not a GL glow: the picker says so.
 // #790: only targets the live loop consumes get picker options (all #790 targets shipped).
-const TARGET_LABEL = { 'render.scale': 'scale', 'render.alpha': 'alpha', 'render.breath': 'breath', 'render.glow': 'frame glow', 'render.accum': 'accum trails', 'color.hue': 'hue rotate', 'clock.kinemeRate': 'kineme rate', 'light.intensity': 'light', 'render.squash': 'squash', 'pattern.drift': 'pattern drift', 'pattern.mix': 'pattern mix', 'pattern.hero': 'pattern hero', 'pattern.grout': 'pattern grout', 'pattern.density': 'pattern density' };
+const TARGET_LABEL = {
+  'render.scale': 'scale',
+  'render.alpha': 'alpha',
+  'render.breath': 'breath',
+  'render.glow': 'frame glow',
+  'render.accum': 'accum trails',
+  'color.hue': 'hue rotate',
+  'clock.kinemeRate': 'kineme rate',
+  'light.intensity': 'light',
+  'render.squash': 'squash',
+  'pattern.drift': 'pattern drift',
+  'pattern.mix': 'pattern mix',
+  'pattern.hero': 'pattern hero',
+  'pattern.grout': 'pattern grout',
+  'pattern.density': 'pattern density',
+};
 const PICKABLE_TARGETS = Object.keys(ROUTE_TARGETS).filter((id) => TARGET_LABEL[id]);
 const LISTEN_MS = 1500;
 const LISTEN_CAP_MS = 8000;
@@ -43,36 +75,96 @@ function Row({ row, route, index, table, onEdit }) {
     <div className={`stim-route${route.by === 'davis' ? ' stim-route-davis' : ''}`} role="row">
       <span className="stim-route-pick">
         {route.by === 'davis' && (
-          <b className="stim-route-by" title="Davis made this route. Touch it and it is yours.">D</b>
+          <b className="stim-route-by" title="Davis made this route. Touch it and it is yours.">
+            D
+          </b>
         )}
-        <select aria-label={`Route ${index + 1} input`} className="blend-mode-select" value={route.input}
-          onChange={(e) => onEdit((t) => patchRoute(t, index, { input: e.target.value }), false)}>
+        <select
+          aria-label={`Route ${index + 1} input`}
+          className="blend-mode-select"
+          value={route.input}
+          onChange={(e) => onEdit((t) => patchRoute(t, index, { input: e.target.value }), false)}
+        >
           <optgroup label="SOUND">
-            {COARSE_INPUTS.map((id) => <option key={id} value={id} disabled={taken(id, route.target)}>{INPUT_LABEL(id)}</option>)}
+            {COARSE_INPUTS.map((id) => (
+              <option key={id} value={id} disabled={taken(id, route.target)}>
+                {INPUT_LABEL(id)}
+              </option>
+            ))}
           </optgroup>
           <optgroup label="BANDS">
-            {BAND_INPUTS.map((id) => <option key={id} value={id} disabled={taken(id, route.target)}>{INPUT_LABEL(id)}</option>)}
+            {BAND_INPUTS.map((id) => (
+              <option key={id} value={id} disabled={taken(id, route.target)}>
+                {INPUT_LABEL(id)}
+              </option>
+            ))}
           </optgroup>
         </select>
         <i aria-hidden="true">▸</i>
-        <select aria-label={`Route ${index + 1} target`} className="blend-mode-select" value={route.target}
-          onChange={(e) => onEdit((t) => patchRoute(t, index, { target: e.target.value, depth: defaultDepthFor(route.input, e.target.value) }), false)}>
-          {PICKABLE_TARGETS.map((id) => <option key={id} value={id} disabled={taken(route.input, id)}>{TARGET_LABEL[id]}</option>)}
+        <select
+          aria-label={`Route ${index + 1} target`}
+          className="blend-mode-select"
+          value={route.target}
+          onChange={(e) =>
+            onEdit(
+              (t) =>
+                patchRoute(t, index, { target: e.target.value, depth: defaultDepthFor(route.input, e.target.value) }),
+              false,
+            )
+          }
+        >
+          {PICKABLE_TARGETS.map((id) => (
+            <option key={id} value={id} disabled={taken(route.input, id)}>
+              {TARGET_LABEL[id]}
+            </option>
+          ))}
         </select>
       </span>
-      <span className="stim-route-depth" title={`effective gain ×${fmt(row.depth)} after the master DEPTH / SCALE / ALPHA knobs · double-click to reset`}>
-        <RangeRow layout="bare" tone="stim" ariaLabel={`Route ${index + 1} depth`} min={range.min} max={range.max} step={range.step} value={shown}
+      <span
+        className="stim-route-depth"
+        title={`effective gain ×${fmt(row.depth)} after the master DEPTH / SCALE / ALPHA knobs · double-click to reset`}
+      >
+        <RangeRow
+          layout="bare"
+          tone="stim"
+          ariaLabel={`Route ${index + 1} depth`}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          value={shown}
           onChange={(v) => onEdit((t) => patchRoute(t, index, { depth: v }), true)}
-          onReset={() => onEdit((t) => patchRoute(t, index, { depth: defaultDepthFor(route.input, route.target) }), false)} />
-        <input type="number" aria-label={`Route ${index + 1} depth value`} min={range.min} max={range.max} step={range.step} value={shown}
-          onChange={(e) => { const v = Number(e.target.value); if (Number.isFinite(v)) onEdit((t) => patchRoute(t, index, { depth: v }), true); }} />
+          onReset={() =>
+            onEdit((t) => patchRoute(t, index, { depth: defaultDepthFor(route.input, route.target) }), false)
+          }
+        />
+        <input
+          type="number"
+          aria-label={`Route ${index + 1} depth value`}
+          min={range.min}
+          max={range.max}
+          step={range.step}
+          value={shown}
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            if (Number.isFinite(v)) onEdit((t) => patchRoute(t, index, { depth: v }), true);
+          }}
+        />
       </span>
       <span className="stim-matrix-live">
-        <i className="stim-matrix-bar"><b style={{ width: `${fill}%` }} /></i>
+        <i className="stim-matrix-bar">
+          <b style={{ width: `${fill}%` }} />
+        </i>
         {fmt(row.live)}
       </span>
-      <button type="button" className="micro-btn stim-route-x" aria-label={`Remove route ${index + 1}`} title="Remove this route"
-        onClick={() => onEdit((t) => removeRoute(t, index), false)}>×</button>
+      <button
+        type="button"
+        className="micro-btn stim-route-x"
+        aria-label={`Remove route ${index + 1}`}
+        title="Remove this route"
+        onClick={() => onEdit((t) => removeRoute(t, index), false)}
+      >
+        ×
+      </button>
     </div>
   );
 }
@@ -91,7 +183,13 @@ const setAudioRoutes = (routes, continuous = false) => emit(Events.AUDIO_ROUTES_
 export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod, alphaMod, routes = null }) {
   const table = editableRoutes(routes); // the scene's table, or a copy of the default
   // the rows follow the table; bands: exactly what the loop fed
-  const rows = audioMatrixRows({ ...audioBands, beatPulse }, { depth, scaleMod, alphaMod }, audioEnabled, table, getShapedBands());
+  const rows = audioMatrixRows(
+    { ...audioBands, beatPulse },
+    { depth, scaleMod, alphaMod },
+    audioEnabled,
+    table,
+    getShapedBands(),
+  );
   const custom = Array.isArray(routes);
   const full = table.length >= MAX_ROUTES;
   const used = new Set(table.map((r) => r.input));
@@ -100,7 +198,12 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   const [advice, setAdvice] = useState(null);
   const listenRef = useRef(0);
 
-  useEffect(() => () => { listenRef.current += 1; }, []);
+  useEffect(
+    () => () => {
+      listenRef.current += 1;
+    },
+    [],
+  );
 
   // Retune agent: while audio is on, notice routes parked on silence or depth ~ 0.
   // Suggest only — a tap applies the fix (one undo step). Nothing is cleared in
@@ -112,10 +215,14 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       const live = editableRoutes(useStore.getState().audioRoutes);
       const snap = readSnap();
       const dead = deadRouteIndexes(live, snap);
-      const hot = inputEnergy('level', snap) >= ENERGY_FLOOR
-        || ['beat', 'bass', 'mid', 'treble'].some((id) => inputEnergy(id, snap) >= ENERGY_FLOOR)
-        || Object.values(snap.bands || {}).some((v) => v >= ENERGY_FLOOR);
-      if (!hot || dead.length === 0) { setAdvice(null); return; }
+      const hot =
+        inputEnergy('level', snap) >= ENERGY_FLOOR ||
+        ['beat', 'bass', 'mid', 'treble'].some((id) => inputEnergy(id, snap) >= ENERGY_FLOOR) ||
+        Object.values(snap.bands || {}).some((v) => v >= ENERGY_FLOOR);
+      if (!hot || dead.length === 0) {
+        setAdvice(null);
+        return;
+      }
       const names = dead.map((i) => INPUT_LABEL(live[i].input)).filter((v, i, a) => a.indexOf(v) === i);
       setAdvice({ dead: dead.length, names });
     }, 1000);
@@ -135,7 +242,11 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
     // #1478 — the masters follow the signal AUTO heard: a quiet input gets more gain (up to 2x the defaults) so a normal
     // signal fills the range; a hot one leaves them; nothing the artist set higher is lowered.
     const lp = useStore.getState().layoutParams || {};
-    const g = masterGainFor(peaks, { audioModDepth: lp.audioModDepth, audioScaleMod: lp.audioScaleMod, audioAlphaMod: lp.audioAlphaMod });
+    const g = masterGainFor(peaks, {
+      audioModDepth: lp.audioModDepth,
+      audioScaleMod: lp.audioScaleMod,
+      audioAlphaMod: lp.audioAlphaMod,
+    });
     if (g) for (const [key, value] of Object.entries(g.patch)) emit(Events.LAYOUT_PARAM, { key, value });
     const gain = useStore.getState().audioGain;
     if (Number.isFinite(gain) && gain < 0.4) emit(Events.AUDIO_GAIN, 1);
@@ -144,7 +255,10 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   const autoSetup = () => {
     // #980, spec item 5: audio off or signal silent ⇒ say so plainly, change
     // nothing. The listen only runs when there is something to listen to.
-    if (!audioEnabled) { setStatus(NO_SIGNAL); return; }
+    if (!audioEnabled) {
+      setStatus(NO_SIGNAL);
+      return;
+    }
     const token = ++listenRef.current;
     setStatus('listening');
     setAdvice(null);
@@ -156,7 +270,10 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
       const elapsed = performance.now() - started;
       if ((autoSetupRoutes(peaks).heard && elapsed >= LISTEN_MS) || elapsed >= LISTEN_CAP_MS) {
         const built = autoSetupRoutes(peaks);
-        if (!built.heard) { setStatus(NO_SIGNAL); return; } // silence: nothing to route
+        if (!built.heard) {
+          setStatus(NO_SIGNAL);
+          return;
+        } // silence: nothing to route
         armMasters(peaks);
         setAudioRoutes(built.routes);
         setStatus(`routed ${built.picked.map(INPUT_LABEL).join(' · ')}`);
@@ -177,29 +294,84 @@ export function ModMatrix({ audioBands, beatPulse, audioEnabled, depth, scaleMod
   return (
     <div className="stim-matrix" role="table" aria-label="Modulation matrix">
       <div className="stim-matrix-head" role="row">
-        <span className="lbl">route</span><span className="lbl">depth</span><span className="lbl">live</span><span />
+        <span className="lbl">route</span>
+        <span className="lbl">depth</span>
+        <span className="lbl">live</span>
+        <span />
       </div>
       {table.length === 0 && <div className="stim-matrix-empty name">{LOIS_LINES.stimuli}</div>}
       {rows.map((row, i) => (
         <Row key={i} row={row} route={table[i]} index={i} table={table} onEdit={editAudioRoutes} />
       ))}
       <div className="stim-matrix-foot">
-        <button type="button" className={`chip-btn act${autoInvited ? ' xl-shimmer' : ''}`} onClick={() => { markAuto(); autoSetup(); }}
-          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing.">auto</button>
-        <button type="button" className="chip-btn act" disabled={full} onClick={() => editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; }, false)}
-          title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}>+ route</button>
-        <button type="button" className="chip-btn act" disabled={table.length === 0} onClick={() => setAudioRoutes([])}
-          title={table.length === 0 ? 'Already empty' : 'Remove every route: start from scratch'}>clear</button>
-        <button type="button" className="chip-btn act" disabled={!custom} onClick={() => setAudioRoutes(null)}
-          title={custom ? 'Back to the default routes' : 'Already the default routes'}>reset</button>
-        <span className="stim-matrix-count">{table.length}/{MAX_ROUTES}</span>
-        {unrouted.length > 0 && <span className="stim-matrix-unrouted" title="Inputs no route reads">not routed: {unrouted.map((id) => id.toUpperCase()).join(' · ')}</span>}
+        <button
+          type="button"
+          className={`chip-btn act${autoInvited ? ' xl-shimmer' : ''}`}
+          onClick={() => {
+            markAuto();
+            autoSetup();
+          }}
+          title="Listen to the live input and build a starter routing from whatever has energy. No signal: it says so and changes nothing."
+        >
+          auto
+        </button>
+        <button
+          type="button"
+          className="chip-btn act"
+          disabled={full}
+          onClick={() =>
+            editAudioRoutes((t) => {
+              const r = nextRoute(t);
+              return r ? [...t, r] : t;
+            }, false)
+          }
+          title={full ? `A table holds at most ${MAX_ROUTES} routes` : 'Add a route'}
+        >
+          + route
+        </button>
+        <button
+          type="button"
+          className="chip-btn act"
+          disabled={table.length === 0}
+          onClick={() => setAudioRoutes([])}
+          title={table.length === 0 ? 'Already empty' : 'Remove every route: start from scratch'}
+        >
+          clear
+        </button>
+        <button
+          type="button"
+          className="chip-btn act"
+          disabled={!custom}
+          onClick={() => setAudioRoutes(null)}
+          title={custom ? 'Back to the default routes' : 'Already the default routes'}
+        >
+          reset
+        </button>
+        <span className="stim-matrix-count">
+          {table.length}/{MAX_ROUTES}
+        </span>
+        {unrouted.length > 0 && (
+          <span className="stim-matrix-unrouted" title="Inputs no route reads">
+            not routed: {unrouted.map((id) => id.toUpperCase()).join(' · ')}
+          </span>
+        )}
       </div>
-      {status && <div className="stim-matrix-unrouted" role="status">{status}</div>}
+      {status && (
+        <div className="stim-matrix-unrouted" role="status">
+          {status}
+        </div>
+      )}
       {shownAdvice && (
         <div className="stim-matrix-unrouted" role="status">
           {shownAdvice.names.join(' · ')} {shownAdvice.dead === 1 ? 'is' : 'are'} silent.
-          <button type="button" className="chip-btn act" onClick={retune} title="Move dead routes onto inputs that have energy, and raise a depth of 0">retune</button>
+          <button
+            type="button"
+            className="chip-btn act"
+            onClick={retune}
+            title="Move dead routes onto inputs that have energy, and raise a depth of 0"
+          >
+            retune
+          </button>
         </div>
       )}
     </div>

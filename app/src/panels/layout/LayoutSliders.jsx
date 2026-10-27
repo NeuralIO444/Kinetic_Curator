@@ -46,277 +46,310 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
 
   return (
     <div className="slider-stack">
-        <ValueButton
-          label="COUNT"
-          display={`${Math.round(layoutParams.count)}${mirrorMult > 1 ? ` ×${mirrorMult}` : ''}`}
-          title={mirrorMult > 1 ? `Count ×${mirrorMult} with mirror — tap to edit` : 'Count — tap to edit'}
-          locked={lockedParams.count}
-          onToggleLock={() => lock('count')}
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Count"
-              value={Math.round(layoutParams.count)}
-              min={10} max={800} step={1}
-              onChange={(v) => set('count', Math.round(v))}
-            />
-          )}
-        />
+      <ValueButton
+        label="COUNT"
+        display={`${Math.round(layoutParams.count)}${mirrorMult > 1 ? ` ×${mirrorMult}` : ''}`}
+        title={mirrorMult > 1 ? `Count ×${mirrorMult} with mirror — tap to edit` : 'Count — tap to edit'}
+        locked={lockedParams.count}
+        onToggleLock={() => lock('count')}
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Count"
+            value={Math.round(layoutParams.count)}
+            min={10}
+            max={800}
+            step={1}
+            onChange={(v) => set('count', Math.round(v))}
+          />
+        )}
+      />
 
-        <ValueButton
-          label="SCALE"
-          display={scaleDisplay(layoutParams.scale)}
-          locked={lockedParams.scale}
-          onToggleLock={() => lock('scale')}
-          onOpen={() => (
-            <div className="te-editor">
-              <div className="te-link-row">
-                <button
-                  type="button"
-                  className={`te-link-btn${linked ? ' linked' : ''}`}
-                  aria-pressed={linked}
-                  title={linked ? 'X/Y linked (today\'s behavior) — tap to split' : 'X/Y split — tap to link'}
-                  onClick={() => {
-                    if (linked) setScale(sx, [...sx]);
-                    else setScale(sx, sx);
-                  }}
-                >
-                  {linked ? 'LINKED' : 'SPLIT'}
-                </button>
-              </div>
-              <div className="te-editor-hint">{linked ? 'one range drives X and Y' : 'X and Y ranges drive independently'}</div>
-              <DualEditor
-                ariaLabel={linked ? 'Scale' : 'Scale X'}
-                low={sx[0]} high={sx[1]}
-                min={RANGE_HARD.scale.min} max={RANGE_HARD.scale.max} step={0.05}
-                format={fmt1}
-                onChange={(lo, hi) => {
-                  const x = [lo, hi];
-                  setScale(x, linked ? x : sy);
+      <ValueButton
+        label="SCALE"
+        display={scaleDisplay(layoutParams.scale)}
+        locked={lockedParams.scale}
+        onToggleLock={() => lock('scale')}
+        onOpen={() => (
+          <div className="te-editor">
+            <div className="te-link-row">
+              <button
+                type="button"
+                className={`te-link-btn${linked ? ' linked' : ''}`}
+                aria-pressed={linked}
+                title={linked ? "X/Y linked (today's behavior) — tap to split" : 'X/Y split — tap to link'}
+                onClick={() => {
+                  if (linked) setScale(sx, [...sx]);
+                  else setScale(sx, sx);
                 }}
-              />
-              {!linked && (
-                <DualEditor
-                  ariaLabel="Scale Y"
-                  low={sy[0]} high={sy[1]}
-                  min={RANGE_HARD.scale.min} max={RANGE_HARD.scale.max} step={0.05}
-                  format={fmt1}
-                  onChange={(lo, hi) => setScale(sx, [lo, hi])}
-                />
-              )}
-              <div className="te-editor-hint">full hard range — tap-name dialog range, no separate dialog needed</div>
+              >
+                {linked ? 'LINKED' : 'SPLIT'}
+              </button>
             </div>
-          )}
-        />
-
-        <ValueButton
-          label="ROTATE"
-          display={`${Math.round(layoutParams.rotate?.[0] ?? -180)}°–${Math.round(layoutParams.rotate?.[1] ?? 180)}°${rotateSpin !== 0 ? ` ⟳${rotateSpin.toFixed(2)}` : ''}`}
-          locked={lockedParams.rotate}
-          onToggleLock={() => lock('rotate')}
-          onOpen={() => (
-            <div className="te-editor">
-              <DualEditor
-                ariaLabel="Rotate"
-                low={layoutParams.rotate?.[0] ?? -180}
-                high={layoutParams.rotate?.[1] ?? 180}
-                min={RANGE_HARD.rotate.min} max={RANGE_HARD.rotate.max} step={1}
-                unit="°"
-                onChange={(lo, hi) => set('rotate', [lo, hi])}
-              />
-              <div className="te-editor-hint">full hard range — tap-name dialog range, no separate dialog needed</div>
-              <div className="te-editor-readout" style={{ fontSize: 14 }}>
-                SPIN {rotateSpin !== 0 ? `${rotateSpin.toFixed(2)} rev/s` : 'OFF'}
-              </div>
-              <TeaMatrix
-                ariaLabel="Spin"
-                options={['OFF', 'ON'].map((id) => ({ id, label: id }))}
-                value={rotateSpin !== 0 ? 'ON' : 'OFF'}
-                onChange={(id) => set('rotateSpin', id === 'ON' ? ROTATE_SPIN_START : 0)}
-              />
-              {rotateSpin !== 0 && (
-                <SliderEditor
-                  ariaLabel="Spin speed"
-                  value={rotateSpin}
-                  min={0} max={PARAM_SPEC.rotateSpin.max} step={0.01}
-                  format={(v) => v.toFixed(2)}
-                  onChange={(v) => set('rotateSpin', v)}
-                />
-              )}
+            <div className="te-editor-hint">
+              {linked ? 'one range drives X and Y' : 'X and Y ranges drive independently'}
             </div>
-          )}
-        />
-
-        <ValueButton
-          label="ALPHA"
-          display={`${Math.round(layoutParams.alpha?.[0] ?? 60)}–${Math.round(layoutParams.alpha?.[1] ?? 100)}%`}
-          locked={lockedParams.alpha}
-          onToggleLock={() => lock('alpha')}
-          onOpen={() => (
             <DualEditor
-              ariaLabel="Alpha"
-              low={layoutParams.alpha?.[0] ?? 60}
-              high={layoutParams.alpha?.[1] ?? 100}
-              min={RANGE_HARD.alpha.min} max={RANGE_HARD.alpha.max} step={1}
-              unit="%"
-              onChange={(lo, hi) => set('alpha', [lo, hi])}
+              ariaLabel={linked ? 'Scale' : 'Scale X'}
+              low={sx[0]}
+              high={sx[1]}
+              min={RANGE_HARD.scale.min}
+              max={RANGE_HARD.scale.max}
+              step={0.05}
+              format={fmt1}
+              onChange={(lo, hi) => {
+                const x = [lo, hi];
+                setScale(x, linked ? x : sy);
+              }}
             />
-          )}
-        />
+            {!linked && (
+              <DualEditor
+                ariaLabel="Scale Y"
+                low={sy[0]}
+                high={sy[1]}
+                min={RANGE_HARD.scale.min}
+                max={RANGE_HARD.scale.max}
+                step={0.05}
+                format={fmt1}
+                onChange={(lo, hi) => setScale(sx, [lo, hi])}
+              />
+            )}
+            <div className="te-editor-hint">full hard range — tap-name dialog range, no separate dialog needed</div>
+          </div>
+        )}
+      />
 
-        <ValueButton
-          label="JITTER"
-          display={`${Math.round(layoutParams.jitter ?? 0)}`}
-          locked={lockedParams.jitter}
-          onToggleLock={() => lock('jitter')}
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Jitter"
-              value={layoutParams.jitter ?? 0}
-              min={0} max={200} step={1}
-              onChange={(v) => set('jitter', Math.round(v))}
+      <ValueButton
+        label="ROTATE"
+        display={`${Math.round(layoutParams.rotate?.[0] ?? -180)}°–${Math.round(layoutParams.rotate?.[1] ?? 180)}°${rotateSpin !== 0 ? ` ⟳${rotateSpin.toFixed(2)}` : ''}`}
+        locked={lockedParams.rotate}
+        onToggleLock={() => lock('rotate')}
+        onOpen={() => (
+          <div className="te-editor">
+            <DualEditor
+              ariaLabel="Rotate"
+              low={layoutParams.rotate?.[0] ?? -180}
+              high={layoutParams.rotate?.[1] ?? 180}
+              min={RANGE_HARD.rotate.min}
+              max={RANGE_HARD.rotate.max}
+              step={1}
+              unit="°"
+              onChange={(lo, hi) => set('rotate', [lo, hi])}
             />
-          )}
-        />
-
-        <ValueButton
-          label="DENSITY"
-          display={`${Math.round(layoutParams.density ?? 80)}%`}
-          locked={lockedParams.density}
-          onToggleLock={() => lock('density')}
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Density"
-              value={layoutParams.density ?? 80}
-              min={10} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('density', Math.round(v))}
+            <div className="te-editor-hint">full hard range — tap-name dialog range, no separate dialog needed</div>
+            <div className="te-editor-readout" style={{ fontSize: 14 }}>
+              SPIN {rotateSpin !== 0 ? `${rotateSpin.toFixed(2)} rev/s` : 'OFF'}
+            </div>
+            <TeaMatrix
+              ariaLabel="Spin"
+              options={['OFF', 'ON'].map((id) => ({ id, label: id }))}
+              value={rotateSpin !== 0 ? 'ON' : 'OFF'}
+              onChange={(id) => set('rotateSpin', id === 'ON' ? ROTATE_SPIN_START : 0)}
             />
-          )}
-        />
+            {rotateSpin !== 0 && (
+              <SliderEditor
+                ariaLabel="Spin speed"
+                value={rotateSpin}
+                min={0}
+                max={PARAM_SPEC.rotateSpin.max}
+                step={0.01}
+                format={(v) => v.toFixed(2)}
+                onChange={(v) => set('rotateSpin', v)}
+              />
+            )}
+          </div>
+        )}
+      />
 
-        {/* #1183: how far this layer's marks take the colour of the pattern tile beneath them. Per layer; 0 is today's
+      <ValueButton
+        label="ALPHA"
+        display={`${Math.round(layoutParams.alpha?.[0] ?? 60)}–${Math.round(layoutParams.alpha?.[1] ?? 100)}%`}
+        locked={lockedParams.alpha}
+        onToggleLock={() => lock('alpha')}
+        onOpen={() => (
+          <DualEditor
+            ariaLabel="Alpha"
+            low={layoutParams.alpha?.[0] ?? 60}
+            high={layoutParams.alpha?.[1] ?? 100}
+            min={RANGE_HARD.alpha.min}
+            max={RANGE_HARD.alpha.max}
+            step={1}
+            unit="%"
+            onChange={(lo, hi) => set('alpha', [lo, hi])}
+          />
+        )}
+      />
+
+      <ValueButton
+        label="JITTER"
+        display={`${Math.round(layoutParams.jitter ?? 0)}`}
+        locked={lockedParams.jitter}
+        onToggleLock={() => lock('jitter')}
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Jitter"
+            value={layoutParams.jitter ?? 0}
+            min={0}
+            max={200}
+            step={1}
+            onChange={(v) => set('jitter', Math.round(v))}
+          />
+        )}
+      />
+
+      <ValueButton
+        label="DENSITY"
+        display={`${Math.round(layoutParams.density ?? 80)}%`}
+        locked={lockedParams.density}
+        onToggleLock={() => lock('density')}
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Density"
+            value={layoutParams.density ?? 80}
+            min={10}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('density', Math.round(v))}
+          />
+        )}
+      />
+
+      {/* #1183: how far this layer's marks take the colour of the pattern tile beneath them. Per layer; 0 is today's
             frame exactly. Visible but inert without a pattern below, with the reason (#272). */}
-        <ValueButton
-          label="GROUND"
-          display={`${Math.round((layoutParams.groundLean ?? 0) * 100)}%`}
-          locked={lockedParams.groundLean}
-          onToggleLock={() => lock('groundLean')}
-          disabled={!hasGround}
-          disabledReason="Needs a PATTERN layer below this one"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Ground: how far marks take the colour of the pattern beneath them"
-              value={Math.round((layoutParams.groundLean ?? 0) * 100)}
-              min={0} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('groundLean', Math.round(v) / 100)}
-            />
-          )}
-        />
+      <ValueButton
+        label="GROUND"
+        display={`${Math.round((layoutParams.groundLean ?? 0) * 100)}%`}
+        locked={lockedParams.groundLean}
+        onToggleLock={() => lock('groundLean')}
+        disabled={!hasGround}
+        disabledReason="Needs a PATTERN layer below this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Ground: how far marks take the colour of the pattern beneath them"
+            value={Math.round((layoutParams.groundLean ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('groundLean', Math.round(v) / 100)}
+          />
+        )}
+      />
 
-        {/* #1183 tile-edge nudge: marks ease off the edges of the pattern tile beneath them, so the grid reads
+      {/* #1183 tile-edge nudge: marks ease off the edges of the pattern tile beneath them, so the grid reads
             through the layout. Per layer; 0 is today's frame exactly. Inert without a pattern below (#272). */}
-        <ValueButton
-          label="EDGE"
-          display={`${Math.round((layoutParams.groundNudge ?? 0) * 100)}%`}
-          locked={lockedParams.groundNudge}
-          onToggleLock={() => lock('groundNudge')}
-          disabled={!hasGround}
-          disabledReason="Needs a PATTERN layer below this one"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Edge: how strongly marks ease off the edges of the pattern tile beneath them"
-              value={Math.round((layoutParams.groundNudge ?? 0) * 100)}
-              min={0} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('groundNudge', Math.round(v) / 100)}
-            />
-          )}
-        />
+      <ValueButton
+        label="EDGE"
+        display={`${Math.round((layoutParams.groundNudge ?? 0) * 100)}%`}
+        locked={lockedParams.groundNudge}
+        onToggleLock={() => lock('groundNudge')}
+        disabled={!hasGround}
+        disabledReason="Needs a PATTERN layer below this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Edge: how strongly marks ease off the edges of the pattern tile beneath them"
+            value={Math.round((layoutParams.groundNudge ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('groundNudge', Math.round(v) / 100)}
+          />
+        )}
+      />
 
-        {/* #1183 contact shadow: this layer's marks cast a soft shadow onto what lies beneath them, toward the sun
+      {/* #1183 contact shadow: this layer's marks cast a soft shadow onto what lies beneath them, toward the sun
             when it is on, straight under them when it is off, in the palette's darkest colour. Per layer; 0 is
             today's frame exactly. Inert without a pattern below (#272). */}
-        <ValueButton
-          label="SHADOW"
-          display={`${Math.round((layoutParams.groundShadow ?? 0) * 100)}%`}
-          locked={lockedParams.groundShadow}
-          onToggleLock={() => lock('groundShadow')}
-          disabled={!hasGround}
-          disabledReason="Needs a PATTERN layer below this one"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Shadow: how dark a shadow the marks cast onto what lies beneath them"
-              value={Math.round((layoutParams.groundShadow ?? 0) * 100)}
-              min={0} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('groundShadow', Math.round(v) / 100)}
-            />
-          )}
-        />
+      <ValueButton
+        label="SHADOW"
+        display={`${Math.round((layoutParams.groundShadow ?? 0) * 100)}%`}
+        locked={lockedParams.groundShadow}
+        onToggleLock={() => lock('groundShadow')}
+        disabled={!hasGround}
+        disabledReason="Needs a PATTERN layer below this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Shadow: how dark a shadow the marks cast onto what lies beneath them"
+            value={Math.round((layoutParams.groundShadow ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('groundShadow', Math.round(v) / 100)}
+          />
+        )}
+      />
 
-        {/* #1183 palette snap: this share of the layer's marks take the exact colours of the pattern tile beneath
+      {/* #1183 palette snap: this share of the layer's marks take the exact colours of the pattern tile beneath
             them (main and accent); the same marks every frame for a seed. Per layer; 0 is today's frame exactly.
             Inert without a pattern below (#272). */}
-        <ValueButton
-          label="SNAP"
-          display={`${Math.round((layoutParams.groundSnap ?? 0) * 100)}%`}
-          locked={lockedParams.groundSnap}
-          onToggleLock={() => lock('groundSnap')}
-          disabled={!hasGround}
-          disabledReason="Needs a PATTERN layer below this one"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Snap: the share of marks that take the exact colours of the pattern tile beneath them"
-              value={Math.round((layoutParams.groundSnap ?? 0) * 100)}
-              min={0} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('groundSnap', Math.round(v) / 100)}
-            />
-          )}
-        />
+      <ValueButton
+        label="SNAP"
+        display={`${Math.round((layoutParams.groundSnap ?? 0) * 100)}%`}
+        locked={lockedParams.groundSnap}
+        onToggleLock={() => lock('groundSnap')}
+        disabled={!hasGround}
+        disabledReason="Needs a PATTERN layer below this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Snap: the share of marks that take the exact colours of the pattern tile beneath them"
+            value={Math.round((layoutParams.groundSnap ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('groundSnap', Math.round(v) / 100)}
+          />
+        )}
+      />
 
-        {/* #1183 weather slice 1 (FX as weather): this layer's marks fade into the haze of the nearest FX
+      {/* #1183 weather slice 1 (FX as weather): this layer's marks fade into the haze of the nearest FX
             layer above them — colour toward the veil, alpha thinning in the thick mist. Per layer; 0 is
             today's frame exactly. Inert without a hazy FX layer above (#272). */}
-        <ValueButton
-          label="WEATHER"
-          display={`${Math.round((layoutParams.weatherAir ?? 0) * 100)}%`}
-          locked={lockedParams.weatherAir}
-          onToggleLock={() => lock('weatherAir')}
-          disabled={!hasWeather}
-          disabledReason="Needs an FX layer with HAZE above this one"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Weather: how far marks fade into the haze above them"
-              value={Math.round((layoutParams.weatherAir ?? 0) * 100)}
-              min={0} max={100} step={1}
-              unit="%"
-              onChange={(v) => set('weatherAir', Math.round(v) / 100)}
-            />
-          )}
-        />
+      <ValueButton
+        label="WEATHER"
+        display={`${Math.round((layoutParams.weatherAir ?? 0) * 100)}%`}
+        locked={lockedParams.weatherAir}
+        onToggleLock={() => lock('weatherAir')}
+        disabled={!hasWeather}
+        disabledReason="Needs an FX layer with HAZE above this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Weather: how far marks fade into the haze above them"
+            value={Math.round((layoutParams.weatherAir ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            onChange={(v) => set('weatherAir', Math.round(v) / 100)}
+          />
+        )}
+      />
 
-        {/* #585: phyllotaxis divergence — mode-gated per #272: visible but
+      {/* #585: phyllotaxis divergence — mode-gated per #272: visible but
             inert outside phyllotaxis, with the reason. */}
-        <ValueButton
-          label="DIVERGENCE"
-          display={`${fmt1(layoutParams.phylloDivergence ?? 0)}°`}
-          locked={lockedParams.phylloDivergence}
-          onToggleLock={() => lock('phylloDivergence')}
-          disabled={mode !== 'phyllotaxis'}
-          disabledReason="Phyllotaxis mode only"
-          onOpen={() => (
-            <SliderEditor
-              ariaLabel="Phyllotaxis divergence"
-              value={layoutParams.phylloDivergence ?? 0}
-              min={-20} max={20} step={0.1}
-              unit="°" format={fmt1}
-              onChange={(v) => set('phylloDivergence', v)}
-            />
-          )}
-        />
-      </div>
+      <ValueButton
+        label="DIVERGENCE"
+        display={`${fmt1(layoutParams.phylloDivergence ?? 0)}°`}
+        locked={lockedParams.phylloDivergence}
+        onToggleLock={() => lock('phylloDivergence')}
+        disabled={mode !== 'phyllotaxis'}
+        disabledReason="Phyllotaxis mode only"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Phyllotaxis divergence"
+            value={layoutParams.phylloDivergence ?? 0}
+            min={-20}
+            max={20}
+            step={0.1}
+            unit="°"
+            format={fmt1}
+            onChange={(v) => set('phylloDivergence', v)}
+          />
+        )}
+      />
+    </div>
   );
 }
 

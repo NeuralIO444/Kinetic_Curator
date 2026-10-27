@@ -71,6 +71,9 @@ src/data/**/*.json
 src/state/**/*.json
 src/curator/**/*.json
 
+# ── Adopted (slice 8, #1684: panels — their source-text pins made layout-blind first) ──
+!src/panels/
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

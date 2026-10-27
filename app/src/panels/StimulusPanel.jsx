@@ -15,7 +15,7 @@ import { audioInputs } from '../hooks/audioLoss.mjs';
 import { RangeTone } from '../components/RangeTone.jsx';
 
 export function StimulusPanel() {
-  const { state } = useApp(s => ({
+  const { state } = useApp((s) => ({
     audioEnabled: s.audioEnabled,
     audioGain: s.audioGain,
     audioSource: s.audioSource,
@@ -30,9 +30,18 @@ export function StimulusPanel() {
     layoutParams: s.layoutParams,
   }));
   const {
-    audioEnabled, audioGain, audioSource, audioLastFile,
-    audioMonitor, beatPulse, audioBands, layoutParams,
-    audioSidecar, audioSidecarNote, audioRoutes, audioLost,
+    audioEnabled,
+    audioGain,
+    audioSource,
+    audioLastFile,
+    audioMonitor,
+    beatPulse,
+    audioBands,
+    layoutParams,
+    audioSidecar,
+    audioSidecarNote,
+    audioRoutes,
+    audioLost,
   } = state;
 
   const [devices, setDevices] = useState([]);
@@ -46,12 +55,22 @@ export function StimulusPanel() {
     let alive = true;
     const refresh = () => {
       md.enumerateDevices()
-        .then(devs => { if (alive) { setDevices(audioInputs(devs)); setDevicesError(false); } })
-        .catch(() => { if (alive) setDevicesError(true); }); // #1641: was .catch(() => {}) — an empty list with no reason
+        .then((devs) => {
+          if (alive) {
+            setDevices(audioInputs(devs));
+            setDevicesError(false);
+          }
+        })
+        .catch(() => {
+          if (alive) setDevicesError(true);
+        }); // #1641: was .catch(() => {}) — an empty list with no reason
     };
     refresh();
     md.addEventListener?.('devicechange', refresh);
-    return () => { alive = false; md.removeEventListener?.('devicechange', refresh); };
+    return () => {
+      alive = false;
+      md.removeEventListener?.('devicechange', refresh);
+    };
   }, []);
 
   const depth = layoutParams.audioModDepth ?? 0.65;
@@ -71,9 +90,9 @@ export function StimulusPanel() {
 
   return (
     <RangeTone tone="stim">
-    <div className="panel panel-stimulus">
-      <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
-      <div className="stim-body">
+      <div className="panel panel-stimulus">
+        <PanelHeader tag="P06" title="STIMULI" subtitle={audioEnabled ? 'active' : 'idle'} />
+        <div className="stim-body">
           {/* Matt 2026-10-04: the AUDIO toggle is the panel's front door —
               first thing in the panel, shimmering until clicked. */}
           <div className="stim-toggle-row">
@@ -87,7 +106,7 @@ export function StimulusPanel() {
             </button>
             <button
               className={`stim-toggle act ${setupOpen ? 'on' : ''}`}
-              onClick={() => setSetupOpen(o => !o)}
+              onClick={() => setSetupOpen((o) => !o)}
               title="Audio setup: source mic/file, monitor, gain"
               aria-expanded={setupOpen}
             >
@@ -123,17 +142,37 @@ export function StimulusPanel() {
           {/* UX-7 — FEEL macros lead: the three feels are the first thing you
               see in Stimuli, above the route table. */}
           <FeelPicker layoutParams={layoutParams} />
-          <ModMatrix audioBands={audioBands} beatPulse={beatPulse} audioEnabled={audioEnabled}
-            depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} routes={audioRoutes} />
+          <ModMatrix
+            audioBands={audioBands}
+            beatPulse={beatPulse}
+            audioEnabled={audioEnabled}
+            depth={depth}
+            scaleMod={scaleMod}
+            alphaMod={alphaMod}
+            routes={audioRoutes}
+          />
 
           {/* #615 — the eight raw sliders survive behind ADVANCED, unchanged. */}
-          <details className="stim-advanced" open={advancedOpen} onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}>
+          <details
+            className="stim-advanced"
+            open={advancedOpen}
+            onToggle={(e) => setAdvancedOpen(e.currentTarget.open)}
+          >
             <summary className="ttl">advanced</summary>
-            <ReactivityControls depth={depth} scaleMod={scaleMod} alphaMod={alphaMod} life={life} attackMs={attackMs} decayMs={decayMs} response={response} swell={swell} audioEnabled={audioEnabled} />
+            <ReactivityControls
+              depth={depth}
+              scaleMod={scaleMod}
+              alphaMod={alphaMod}
+              life={life}
+              attackMs={attackMs}
+              decayMs={decayMs}
+              response={response}
+              swell={swell}
+              audioEnabled={audioEnabled}
+            />
           </details>
-
+        </div>
       </div>
-    </div>
     </RangeTone>
   );
 }
