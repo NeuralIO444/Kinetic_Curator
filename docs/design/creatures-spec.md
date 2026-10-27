@@ -134,3 +134,22 @@ as issues:
 - **Reflection** — creatures/motes deflect off the dish edge and stage bounds with speed preserved: #1731
 - **Dot-product facing** — a creature's facing derived from heading vs field flow / attractor direction, the
   alignment value itself a behaviour input: #1732
+
+Filed 2026-10-25 from the Creatures (1996) research (report: KC-1 goal research library,
+`creatures-1996-alife-transfer-2026-10-25.md`). Creatures' ALife stack — genome, biochemistry, drive-manufactured
+reward, dreaming, breeding — read as five additive creature systems. All five are library records like the pair
+above: **not built, not scheduled, not on the queue.**
+
+- **Genome** — the seeded body record formalized as an inheritable structure-gene record: per-gene
+  mutate/duplicate/cut flags, life-stage switch-on times, protected genes: #1734
+- **Biochemistry** — a per-creature chemical vector ticked at ~5 Hz under the band reaction; emitters in
+  (band, dish, crowd), the dominant drive read back out in material and posture: #1735
+- **Drive-reduction learning** — reward/punishment are chemicals manufactured by drive *change*, acting only on
+  recently-fired synapses (eligibility traces); a keep is an approval-drive dropping, teaching a small
+  concept→mode policy kept separate from taste.json. OHSS law: caps, short half-lives, delta-only reward,
+  silence neutral: #1736
+- **Dreaming and consolidation** — dreaming rehearses *genetic instincts* (at hatching, in deep sleep), never
+  lived experience; experience consolidates separately as short-term weights relax into long-term ones — in
+  KC-1 terms, instinct rehearsal at hatch/set breaks and the STW→LTW fold at export: #1737
+- **Breeding from keeps** — the keep-folder is the breeding pool: offspring of two kept creatures, crossover at
+  gene boundaries, diversity guards against monoculture; genetics must change behaviour, not just looks: #1738
