@@ -61,5 +61,7 @@ export function euclidHit(step, beats, steps, rotate = 0) {
 
 /** Render a pattern as `x` / `.` — the shape the performer is counting. */
 export function euclidString(beats, steps, rotate = 0) {
-  return euclidPattern(beats, steps, rotate).map((v) => (v ? 'x' : '.')).join('');
+  return euclidPattern(beats, steps, rotate)
+    .map((v) => (v ? 'x' : '.'))
+    .join('');
 }

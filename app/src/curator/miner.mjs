@@ -47,9 +47,7 @@ import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
-import {
-  DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams,
-} from '../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { STUB_VOICES } from '../data/voices.js';
 import { getQualityCaps } from '../data/quality.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
@@ -65,8 +63,14 @@ import { applyRenderProfile, getRenderProfile, RENDER_PROFILE_IDS } from './rend
 import { recipeFeatures } from './recipeFeatures.js';
 import { mulberry32 } from './coverageReport.mjs';
 import {
-  COMBINE_OPS, RESTYLE_MODES, VARIANT_OPS,
-  drawVariantParams, generateVariantSvg, morphCompatible, variantIdFor, variantRecord,
+  COMBINE_OPS,
+  RESTYLE_MODES,
+  VARIANT_OPS,
+  drawVariantParams,
+  generateVariantSvg,
+  morphCompatible,
+  variantIdFor,
+  variantRecord,
 } from './variants.mjs';
 
 export { mulberry32 };
@@ -100,10 +104,16 @@ export const STARVED_CATEGORIES = ['radial', 'crystalline', 'floral', 'biosynthe
 // sweep's protocol, the primary statistic) and with system fonts —
 // and flagging every candidate whose cast carries one.
 export const FONT_CONTINGENT_IDS = new Set([
-  'stamp_num_04', 'stamp_num_05',
-  'stamp_glyph_01', 'stamp_glyph_02', 'stamp_glyph_03', 'stamp_glyph_04',
-  'stamp_glyph_05', 'stamp_glyph_06',
-  'stamp_arrow_01', 'stamp_letter_02',
+  'stamp_num_04',
+  'stamp_num_05',
+  'stamp_glyph_01',
+  'stamp_glyph_02',
+  'stamp_glyph_03',
+  'stamp_glyph_04',
+  'stamp_glyph_05',
+  'stamp_glyph_06',
+  'stamp_arrow_01',
+  'stamp_letter_02',
 ]);
 
 // Sampling rotation: the open wilderness plus one corner per persona
@@ -156,9 +166,8 @@ function dealOneVariant(leadId, rng) {
   if (!lead) return null;
   const start = Math.floor(rng() * VARIANT_OPS.length);
   const partnerIdx = Math.floor(rng() * ASSETS.length);
-  const partner = ASSETS[partnerIdx].id === leadId
-    ? ASSETS[(partnerIdx + 1) % ASSETS.length].id
-    : ASSETS[partnerIdx].id;
+  const partner =
+    ASSETS[partnerIdx].id === leadId ? ASSETS[(partnerIdx + 1) % ASSETS.length].id : ASSETS[partnerIdx].id;
   const seed = Math.floor(rng() * 0x7fffffff);
   for (let k = 0; k < VARIANT_OPS.length; k++) {
     let op = VARIANT_OPS[(start + k) % VARIANT_OPS.length];
@@ -188,7 +197,10 @@ function dealVariants(cast, rng, fraction) {
     if (rng() >= fraction) continue;
     attempts++;
     const v = dealOneVariant(out[j], rng);
-    if (v) { out[j] = v.id; variants[v.id] = v.recipe; } else fallbacks++;
+    if (v) {
+      out[j] = v.id;
+      variants[v.id] = v.recipe;
+    } else fallbacks++;
   }
   return { cast: out, variants, attempts, fallbacks };
 }
@@ -218,7 +230,10 @@ function dealVariants(cast, rng, fraction) {
  * carries a variants key — the default run stays byte-identical.
  */
 export function sampleBatch({
-  runSeed = MINER_SEED, batchSize = 240, corner = null, davisCode = null,
+  runSeed = MINER_SEED,
+  batchSize = 240,
+  corner = null,
+  davisCode = null,
   variantFraction = 0,
 } = {}) {
   if (corner !== null && !CORNERS.includes(corner)) {
@@ -232,9 +247,7 @@ export function sampleBatch({
   const samples = [];
   for (let i = 0; i < batchSize; i++) {
     const sampleCorner = corner ?? CORNERS[i % CORNERS.length];
-    const anchor = i % 3 === 2
-      ? STARVED_CATEGORIES[Math.floor(i / 3) % STARVED_CATEGORIES.length]
-      : null;
+    const anchor = i % 3 === 2 ? STARVED_CATEGORIES[Math.floor(i / 3) % STARVED_CATEGORIES.length] : null;
     const layoutId = STUB_VOICES[Math.floor(rng() * STUB_VOICES.length)].id;
     const seed = Math.floor(rng() * 0x7fffffff);
     const size = castSizeFor(layoutId, rng, wildness);
@@ -316,22 +329,34 @@ export function bakeSample(sample) {
     let bakePath;
     if (LIVE_MODES.has(lp.mode)) {
       items = bakeParticles({
-        seed: sample.seed, count: lp.particleCount, layoutParams: lp,
-        activeAssets: castRecords, palette, canvasW: W, canvasH: H,
-        steps: SWARM_STEPS, maxParticles: lp.particleCount,
+        seed: sample.seed,
+        count: lp.particleCount,
+        layoutParams: lp,
+        activeAssets: castRecords,
+        palette,
+        canvasW: W,
+        canvasH: H,
+        steps: SWARM_STEPS,
+        maxParticles: lp.particleCount,
       });
       bakePath = 'particles';
     } else {
       ({ items } = buildPlacements({
-        layoutParams: lp, seed: sample.seed, activeAssets: castRecords,
-        palette, caps: CAPS, canvasW: W, canvasH: H, seedOffsets: sample.seedOffsets || {},
+        layoutParams: lp,
+        seed: sample.seed,
+        activeAssets: castRecords,
+        palette,
+        caps: CAPS,
+        canvasW: W,
+        canvasH: H,
+        seedOffsets: sample.seedOffsets || {},
       }));
       bakePath = 'placements';
     }
     if (!items || !items.length) return { ok: false, reason: 'no-items' };
     return { ok: true, items, bakePath, fingerprint: fingerprintItems(items) };
   } catch (err) {
-    return { ok: false, reason: `bake-threw:${String(err && err.message || err).slice(0, 120)}` };
+    return { ok: false, reason: `bake-threw:${String((err && err.message) || err).slice(0, 120)}` };
   }
 }
 
@@ -353,9 +378,7 @@ const num = (v) => Math.round((Number(v) || 0) * 100) / 100;
  */
 export function composeStillSvg(items, palette, { withBg = true } = {}) {
   const symbols = new Map();
-  const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`,
-  ];
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}">`];
   if (withBg) parts.push(`<rect width="${W}" height="${H}" fill="${palette.bg}"/>`);
   const body = [];
   const matDefs = [];
@@ -387,18 +410,14 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // pair, emitted alongside the symbols below.
         const gid = `pg${matDefs.length}`;
         matDefs.push(plateGradientDef(gid, accent, color, mp ? { cx: mp[0], cy: mp[1], radius: mp[2] } : undefined));
-        svg = assetRec.svg
-          .replace(INK_RE, `url(#${gid})`)
-          .replace(ACCENT_RE, accent);
+        svg = assetRec.svg.replace(INK_RE, `url(#${gid})`).replace(ACCENT_RE, accent);
       } else if (item.wash) {
         // #1549 (Materials M3): a wash item's ink paint is the
         // vertical wash gradient — the same retired-def treatment
         // (washBody.mjs cites the def; accent paint stayed flat).
         const gid = `wg${matDefs.length}`;
         matDefs.push(washGradientDef(gid, accent, color, mp ? { strength: mp[0], spread: mp[1] } : undefined));
-        svg = assetRec.svg
-          .replace(INK_RE, `url(#${gid})`)
-          .replace(ACCENT_RE, accent);
+        svg = assetRec.svg.replace(INK_RE, `url(#${gid})`).replace(ACCENT_RE, accent);
       } else if (item.stipple) {
         // #1549 (Materials M3): a stipple item's ink paint is the
         // dot-field pattern — the same retired-def treatment
@@ -408,21 +427,20 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
         // userSpaceOnUse semantics read in the glyph's space.
         const gid = `sg${matDefs.length}`;
         matDefs.push(stipplePatternDef(gid, accent, color, mp ? mp[0] : undefined));
-        svg = assetRec.svg
-          .replace(INK_RE, `url(#${gid})`)
-          .replace(ACCENT_RE, accent);
+        svg = assetRec.svg.replace(INK_RE, `url(#${gid})`).replace(ACCENT_RE, accent);
       } else {
-        svg = assetRec.svg
-          .replace(INK_RE, color)
-          .replace(ACCENT_RE, accent);
+        svg = assetRec.svg.replace(INK_RE, color).replace(ACCENT_RE, accent);
       }
       symbols.set(key, `<symbol id="s${symbols.size}" viewBox="0 0 100 100" overflow="visible">${svg}</symbol>`);
     }
     const sx = item._mirrored ? -item.scale : item.scale;
     const sy = Number.isFinite(item.scaleY) ? item.scaleY : item.scale;
-    const t = `translate(${num(item.x)},${num(item.y)}) rotate(${num(item.rotation)}) `
-      + `scale(${num(sx)},${num(sy)}) translate(-50,-50)`;
-    body.push(`<g transform="${t}" opacity="${num((item.alpha ?? 100) / 100)}"><use href="#s${[...symbols.keys()].indexOf(key)}" width="100" height="100"/></g>`);
+    const t =
+      `translate(${num(item.x)},${num(item.y)}) rotate(${num(item.rotation)}) ` +
+      `scale(${num(sx)},${num(sy)}) translate(-50,-50)`;
+    body.push(
+      `<g transform="${t}" opacity="${num((item.alpha ?? 100) / 100)}"><use href="#s${[...symbols.keys()].indexOf(key)}" width="100" height="100"/></g>`,
+    );
   }
   parts.push(`<defs>${[...symbols.values()].join('')}${matDefs.join('')}</defs>`, ...body, '</svg>');
   return parts.join('\n');
@@ -446,12 +464,18 @@ function nearestColorCube(colors) {
   for (let r5 = 0; r5 < 32; r5++) {
     for (let g5 = 0; g5 < 32; g5++) {
       for (let b5 = 0; b5 < 32; b5++) {
-        const r = r5 * 8 + 4; const g = g5 * 8 + 4; const b = b5 * 8 + 4;
-        let best = 0; let bestD = Infinity;
+        const r = r5 * 8 + 4;
+        const g = g5 * 8 + 4;
+        const b = b5 * 8 + 4;
+        let best = 0;
+        let bestD = Infinity;
         for (let c = 0; c < colors.length; c++) {
           const [cr, cg, cb] = colors[c].rgb;
           const d = (r - cr) ** 2 + (g - cg) ** 2 + (b - cb) ** 2;
-          if (d < bestD) { bestD = d; best = c; }
+          if (d < bestD) {
+            bestD = d;
+            best = c;
+          }
         }
         cube[(r5 << 10) | (g5 << 5) | b5] = best;
       }
@@ -506,12 +530,16 @@ export function renderStats(items, palette) {
   let lumTotal = 0;
   const px = full.pixels;
   for (let i = 0; i < px.length; i += 4) {
-    const r = px[i]; const g = px[i + 1]; const b = px[i + 2];
+    const r = px[i];
+    const g = px[i + 1];
+    const b = px[i + 2];
     counts[cube[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)]]++;
-    lumBins[Math.round((0.299 * r + 0.587 * g + 0.114 * b))]++;
+    lumBins[Math.round(0.299 * r + 0.587 * g + 0.114 * b)]++;
     lumTotal++;
-    const max = Math.max(r, g, b); const min = Math.min(r, g, b);
-    if (max - min > 24) { // saturated enough to have a hue worth binning
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    if (max - min > 24) {
+      // saturated enough to have a hue worth binning
       let h;
       if (max === r) h = ((g - b) / (max - min)) % 6;
       else if (max === g) h = (b - r) / (max - min) + 2;
@@ -524,7 +552,10 @@ export function renderStats(items, palette) {
   const q = (p) => {
     const target = p * lumTotal;
     let acc = 0;
-    for (let v = 0; v < 256; v++) { acc += lumBins[v]; if (acc >= target) return v / 255; }
+    for (let v = 0; v < 256; v++) {
+      acc += lumBins[v];
+      if (acc >= target) return v / 255;
+    }
     return 1;
   };
   const round = (v, d = 4) => Math.round(v * 10 ** d) / 10 ** d;
@@ -568,9 +599,7 @@ export function stillHash(pngBuffer) {
  * provenance — featuresOfKeep below), which is what keeps the two
  * sides agreeing (recipeFeatures' own stated purpose). */
 export function featuresOf({ layoutParams, paletteId, cast }, recipesById = null) {
-  const assets = recipesById && Array.isArray(cast)
-    ? cast.map((id) => recipesById.get(id)?.parents?.[0] ?? id)
-    : cast;
+  const assets = recipesById && Array.isArray(cast) ? cast.map((id) => recipesById.get(id)?.parents?.[0] ?? id) : cast;
   return recipeFeatures({ layoutParams, paletteId, assets });
 }
 
@@ -588,20 +617,35 @@ export function featuresOfKeep(record) {
   if (Array.isArray(variants) && variants.length) {
     recipesById = new Map(variants.map((r) => [variantIdFor(r), r]));
   }
-  return featuresOf({
-    layoutParams: cfg.layout || {},
-    paletteId: cfg.palette?.id ?? null,
-    cast: Array.isArray(cfg.assets) ? cfg.assets : null,
-  }, recipesById);
+  return featuresOf(
+    {
+      layoutParams: cfg.layout || {},
+      paletteId: cfg.palette?.id ?? null,
+      cast: Array.isArray(cfg.assets) ? cfg.assets : null,
+    },
+    recipesById,
+  );
 }
 
 const CATEGORICALS = [
-  'system', 'symmetry', 'behave', 'blend', 'paletteShift', 'palette',
-  'accum', 'mirror', 'bleed', 'overlap', 'bodies', 'density', 'scale',
+  'system',
+  'symmetry',
+  'behave',
+  'blend',
+  'paletteShift',
+  'palette',
+  'accum',
+  'mirror',
+  'bleed',
+  'overlap',
+  'bodies',
+  'density',
+  'scale',
 ];
 
 const jaccardDistance = (a, b) => {
-  const A = new Set(a || []); const B = new Set(b || []);
+  const A = new Set(a || []);
+  const B = new Set(b || []);
   if (!A.size && !B.size) return 0;
   let inter = 0;
   for (const x of A) if (B.has(x)) inter++;
@@ -622,7 +666,8 @@ const jaccardDistance = (a, b) => {
 export function featureDistance(fa, fb) {
   if (!fa || !fb) return 1;
   const terms = [];
-  let miss = 0; let compared = 0;
+  let miss = 0;
+  let compared = 0;
   for (const k of CATEGORICALS) {
     if (fa[k] === undefined || fb[k] === undefined) continue;
     compared++;
@@ -633,7 +678,8 @@ export function featureDistance(fa, fb) {
   if (Array.isArray(fa.castCategories) && Array.isArray(fb.castCategories)) {
     terms.push(jaccardDistance(fa.castCategories, fb.castCategories));
   }
-  const na = fa.num || {}; const nb = fb.num || {};
+  const na = fa.num || {};
+  const nb = fb.num || {};
   const keys = [...new Set([...Object.keys(na), ...Object.keys(nb)])];
   if (keys.length) {
     let s = 0;
@@ -661,17 +707,20 @@ export function renderDistance(sa, sb) {
 
 export function meanPairwise(items, dist) {
   if (!items || items.length < 2) return 0;
-  let s = 0; let n = 0;
+  let s = 0;
+  let n = 0;
   for (let i = 0; i < items.length; i++) {
-    for (let j = i + 1; j < items.length; j++) { s += dist(items[i], items[j]); n++; }
+    for (let j = i + 1; j < items.length; j++) {
+      s += dist(items[i], items[j]);
+      n++;
+    }
   }
   return n ? s / n : 0;
 }
 
 // ── selection ───────────────────────────────────────────────────────
-const castCategoriesOf = (cast, sample) => new Set(
-  (cast || []).map((id) => recordFor(id, sample)?.category).filter(Boolean),
-);
+const castCategoriesOf = (cast, sample) =>
+  new Set((cast || []).map((id) => recordFor(id, sample)?.category).filter(Boolean));
 
 /**
  * Farthest-point selection (spec §3.4): the first finalist is the
@@ -691,28 +740,29 @@ const castCategoriesOf = (cast, sample) => new Set(
  */
 export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {}) {
   const pool = [...baked];
-  const distToKeeps = (c) => (keepsFeatures.length
-    ? Math.min(...keepsFeatures.map((kf) => featureDistance(c.features, kf)))
-    : Infinity);
-  const minDistTo = (c, set) => (set.length
-    ? Math.min(...set.map((o) => featureDistance(c.features, o.features)))
-    : Infinity);
+  const distToKeeps = (c) =>
+    keepsFeatures.length ? Math.min(...keepsFeatures.map((kf) => featureDistance(c.features, kf))) : Infinity;
+  const minDistTo = (c, set) =>
+    set.length ? Math.min(...set.map((o) => featureDistance(c.features, o.features))) : Infinity;
   const novelty = (c, picked) => Math.min(distToKeeps(c), minDistTo(c, picked));
 
   const picked = [];
   const remaining = new Set(pool);
   while (picked.length < Math.min(finalistCount, pool.length) && remaining.size) {
-    let best = null; let bestScore = -Infinity;
+    let best = null;
+    let bestScore = -Infinity;
     for (const c of remaining) {
       let score;
       if (!picked.length && !keepsFeatures.length) {
-        score = pool.reduce((s, o) => s + (o === c ? 0 : featureDistance(c.features, o.features)), 0)
-          / Math.max(1, pool.length - 1);
+        score =
+          pool.reduce((s, o) => s + (o === c ? 0 : featureDistance(c.features, o.features)), 0) /
+          Math.max(1, pool.length - 1);
       } else {
         score = novelty(c, picked);
       }
       if (score > bestScore || (score === bestScore && best && c.sample.index < best.sample.index)) {
-        best = c; bestScore = score;
+        best = c;
+        bestScore = score;
       }
     }
     picked.push(best);
@@ -726,22 +776,33 @@ export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {
     if (picked.some((c) => carries(c, cat))) continue;
     const carriers = [...remaining].filter((c) => carries(c, cat));
     if (!carriers.length) continue; // proof below reports the miss
-    let swap = null; let swapScore = -Infinity;
+    let swap = null;
+    let swapScore = -Infinity;
     for (const c of carriers) {
       const s = novelty(c, picked);
-      if (s > swapScore) { swap = c; swapScore = s; }
+      if (s > swapScore) {
+        swap = c;
+        swapScore = s;
+      }
     }
     // victim: the picked finalist whose absence costs the spread
     // least (smallest distance to the rest), never a sole carrier of
     // another required category.
-    let victim = null; let victimScore = Infinity;
+    let victim = null;
+    let victimScore = Infinity;
     for (const c of picked) {
       const soleCarrier = STARVED_CATEGORIES.some(
         (other) => other !== cat && carries(c, other) && !picked.some((o) => o !== c && carries(o, other)),
       );
       if (soleCarrier) continue;
-      const s = minDistTo(c, picked.filter((o) => o !== c));
-      if (s < victimScore) { victim = c; victimScore = s; }
+      const s = minDistTo(
+        c,
+        picked.filter((o) => o !== c),
+      );
+      if (s < victimScore) {
+        victim = c;
+        victimScore = s;
+      }
     }
     if (swap && victim) {
       picked[picked.indexOf(victim)] = swap;
@@ -755,15 +816,20 @@ export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {
   for (const c of picked) for (const cat of castCategoriesOf(c.sample.cast, c.sample)) finalCats.add(cat);
   const quota = {
     required: [...STARVED_CATEGORIES],
-    perCategory: Object.fromEntries(STARVED_CATEGORIES.map((cat) => [cat, {
-      // anchoredSamples / inBatch are batch-level counts — runMiner
-      // fills them in from the full sampled batch (selection sees
-      // only the baked pool).
-      anchoredSamples: 0,
-      inBatch: 0,
-      inFinalists: picked.filter((c) => carries(c, cat)).length,
-      present: finalCats.has(cat),
-    }])),
+    perCategory: Object.fromEntries(
+      STARVED_CATEGORIES.map((cat) => [
+        cat,
+        {
+          // anchoredSamples / inBatch are batch-level counts — runMiner
+          // fills them in from the full sampled batch (selection sees
+          // only the baked pool).
+          anchoredSamples: 0,
+          inBatch: 0,
+          inFinalists: picked.filter((c) => carries(c, cat)).length,
+          present: finalCats.has(cat),
+        },
+      ]),
+    ),
     repairs,
     pass: STARVED_CATEGORIES.every((cat) => finalCats.has(cat)),
   };
@@ -786,11 +852,13 @@ export function diceTrayFeatures(k, { seed = MINER_SEED ^ 0xd1ce } = {}) {
   while (out.length < k) {
     const r = rollDice({ assets: ASSETS, rng, davisCode: null, scorer, crowns: [] });
     for (const f of r.finalists) {
-      out.push(recipeFeatures({
-        layoutParams: normalizeLayoutParams({ mode: f.layoutId }),
-        paletteId: null,
-        assets: f.assetIds,
-      }));
+      out.push(
+        recipeFeatures({
+          layoutParams: normalizeLayoutParams({ mode: f.layoutId }),
+          paletteId: null,
+          assets: f.assetIds,
+        }),
+      );
       if (out.length >= k) break;
     }
   }
@@ -810,7 +878,9 @@ export function candidateRecord(sample, runId) {
   // forever and countable under its lead family. Absent when the
   // cast is all library: absent stays absent.
   const variantRecipes = sample.variants
-    ? Object.keys(sample.variants).sort().map((id) => sample.variants[id])
+    ? Object.keys(sample.variants)
+        .sort()
+        .map((id) => sample.variants[id])
     : [];
   return {
     seed: sample.seed,
@@ -836,15 +906,23 @@ export function candidateRecord(sample, runId) {
 }
 
 export function runIdFor({
-  runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, corner = null, davisCode = null,
+  runSeed = MINER_SEED,
+  batchSize = 240,
+  finalistCount = 12,
+  corner = null,
+  davisCode = null,
   variantFraction = 0,
 } = {}) {
   const base = `xpl-${runSeed.toString(16)}-${batchSize}-${finalistCount}`;
   // E4: an aimed run names its corner (and Davis's state) in its id —
   // the default rotation run keeps the E2 id exactly.
   // E5: a variant-axis run names its fraction the same way.
-  return base + (corner ? `-${corner}` : '') + (davisCode ? `-${String(davisCode).toLowerCase()}` : '')
-    + (variantFraction > 0 ? `-var${Math.round(variantFraction * 100)}` : '');
+  return (
+    base +
+    (corner ? `-${corner}` : '') +
+    (davisCode ? `-${String(davisCode).toLowerCase()}` : '') +
+    (variantFraction > 0 ? `-var${Math.round(variantFraction * 100)}` : '')
+  );
 }
 
 /**
@@ -854,8 +932,13 @@ export function runIdFor({
  * report numbers all reproduce exactly.
  */
 export function runMiner({
-  runSeed = MINER_SEED, batchSize = 240, finalistCount = 12, keeps = [],
-  corner = null, davisCode = null, variantFraction = 0,
+  runSeed = MINER_SEED,
+  batchSize = 240,
+  finalistCount = 12,
+  keeps = [],
+  corner = null,
+  davisCode = null,
+  variantFraction = 0,
 } = {}) {
   const runId = runIdFor({ runSeed, batchSize, finalistCount, corner, davisCode, variantFraction });
   const samples = sampleBatch({ runSeed, batchSize, corner, davisCode, variantFraction });
@@ -873,9 +956,14 @@ export function runMiner({
       bakePath: bake.bakePath,
       fingerprint: bake.fingerprint,
       items: bake.items,
-      features: featuresOf({
-        layoutParams: sample.layoutParams, paletteId: sample.paletteId, cast: sample.cast,
-      }, sample.variants ? new Map(Object.entries(sample.variants)) : null),
+      features: featuresOf(
+        {
+          layoutParams: sample.layoutParams,
+          paletteId: sample.paletteId,
+          cast: sample.cast,
+        },
+        sample.variants ? new Map(Object.entries(sample.variants)) : null,
+      ),
       stats: renderStats(bake.items, palette),
       fontContingent: sample.cast.some((id) => FONT_CONTINGENT_IDS.has(id)),
       record: candidateRecord(sample, runId),
@@ -892,8 +980,10 @@ export function runMiner({
   // selection already happened, by distance alone (spec §3.4).
   for (const f of finalists) {
     const v = judgeRender({
-      features: f.features, stats: f.stats,
-      fingerprint: f.fingerprint, fontContingent: f.fontContingent,
+      features: f.features,
+      stats: f.stats,
+      fingerprint: f.fingerprint,
+      fontContingent: f.fontContingent,
     });
     f.loisVerdict = v;
     f.statsProvenance = v.statsProvenance;
@@ -916,18 +1006,18 @@ export function runMiner({
   const categories = [...new Set(ASSETS.map((a) => a.category))]
     .sort()
     .map((name) => ({ name, ...catRow((a) => a && a.category === name) }));
-  const packs = [{
-    name: 'haeckel',
-    ...catRow((a) => a && (a.variant ? a.variant.parents[0] : a.id).startsWith('hae')),
-  }];
+  const packs = [
+    {
+      name: 'haeckel',
+      ...catRow((a) => a && (a.variant ? a.variant.parents[0] : a.id).startsWith('hae')),
+    },
+  ];
 
   // quota proof, stated over the full sampled batch (selectFinalists
   // sees only the baked pool; the anchor counts belong to the batch)
   for (const cat of STARVED_CATEGORIES) {
     quota.perCategory[cat].anchoredSamples = samples.filter((s) => s.anchor === cat).length;
-    quota.perCategory[cat].inBatch = samples.filter(
-      (s) => s.cast.some((id) => byId.get(id)?.category === cat),
-    ).length;
+    quota.perCategory[cat].inBatch = samples.filter((s) => s.cast.some((id) => byId.get(id)?.category === cat)).length;
   }
 
   // E5: the variant axis's accounting — present only when the axis
@@ -948,9 +1038,7 @@ export function runMiner({
       dealt,
       fallbacks: samples.reduce((n, s) => n + (s.variantDraws?.fallbacks || 0), 0),
       byOp,
-      inFinalists: finalists.reduce(
-        (n, f) => n + f.sample.cast.filter((id) => f.sample.variants?.[id]).length, 0,
-      ),
+      inFinalists: finalists.reduce((n, f) => n + f.sample.cast.filter((id) => f.sample.variants?.[id]).length, 0),
     };
   }
 
@@ -976,14 +1064,15 @@ export function runMiner({
     if (f.loisVerdict?.verdict === 'keep') r.loisKeeps++;
     if (f.loisVerdict?.verdict === 'pass') r.loisPasses++;
   }
-  const yieldByCorner = [...ybc.values()].sort(
-    (a, b) => b.finalists - a.finalists || a.corner.localeCompare(b.corner),
-  );
+  const yieldByCorner = [...ybc.values()].sort((a, b) => b.finalists - a.finalists || a.corner.localeCompare(b.corner));
 
   return {
     runId,
     config: {
-      runSeed, batchSize, finalistCount, keepsCorpus: keepsFeatures.length,
+      runSeed,
+      batchSize,
+      finalistCount,
+      keepsCorpus: keepsFeatures.length,
       corner: corner ?? 'rotation',
       davisCode: davisCode ?? null,
       wildness: wildnessForDavis(davisCode ?? null),
@@ -1012,9 +1101,9 @@ export function runMiner({
       },
       keepsNote: keepsFeatures.length
         ? `novelty measured against ${keepsFeatures.length} keep record(s) handed to the run`
-        : 'keeps corpus EMPTY in this run — novelty is pairwise-only (the production '
-          + 'ledger kc:keeps:v1 is browser-local and absent headlessly; hand the run '
-          + 'tool a ledger export to measure against the real corpus)',
+        : 'keeps corpus EMPTY in this run — novelty is pairwise-only (the production ' +
+          'ledger kc:keeps:v1 is browser-local and absent headlessly; hand the run ' +
+          'tool a ledger export to measure against the real corpus)',
       lois: {
         judge: 'lois-render-v1',
         judged: finalists.length,
@@ -1032,57 +1121,92 @@ export function formatMinerReport(run) {
   const L = [];
   const r = run.report;
   L.push(`LOOK EXPLORER — MINER RUN ${run.runId} (#1506)`);
-  L.push(`config: seed 0x${run.config.runSeed.toString(16)} · batch ${run.config.batchSize} · finalists ${run.config.finalistCount} · keeps corpus ${run.config.keepsCorpus}`
-    + (run.config.corner && run.config.corner !== 'rotation' ? ` · corner ${run.config.corner}` : '')
-    + (run.config.davisCode ? ` · davis ${run.config.davisCode} (wildness ${run.config.wildness})` : ''));
+  L.push(
+    `config: seed 0x${run.config.runSeed.toString(16)} · batch ${run.config.batchSize} · finalists ${run.config.finalistCount} · keeps corpus ${run.config.keepsCorpus}` +
+      (run.config.corner && run.config.corner !== 'rotation' ? ` · corner ${run.config.corner}` : '') +
+      (run.config.davisCode ? ` · davis ${run.config.davisCode} (wildness ${run.config.wildness})` : ''),
+  );
   L.push('');
-  L.push(`YIELD: sampled ${r.yield.sampled} · baked ${r.yield.baked} · discarded ${r.yield.discarded} · finalists ${r.yield.finalists}`);
+  L.push(
+    `YIELD: sampled ${r.yield.sampled} · baked ${r.yield.baked} · discarded ${r.yield.discarded} · finalists ${r.yield.finalists}`,
+  );
   if (r.yield.discarded) {
-    L.push(`  discard reasons: ${Object.entries(r.yield.discardReasons).map(([k, v]) => `${k} ×${v}`).join(' · ')}`);
+    L.push(
+      `  discard reasons: ${Object.entries(r.yield.discardReasons)
+        .map(([k, v]) => `${k} ×${v}`)
+        .join(' · ')}`,
+    );
   }
   L.push('');
   L.push('COVERAGE (samples whose cast carries the category):');
   for (const c of r.coverage.categories) {
-    L.push(`  ${c.name.padEnd(14)} library ${String(c.inLibrary).padStart(3)} · batch ${String(c.inBatch).padStart(3)} · baked ${String(c.inBaked).padStart(3)} · finalists ${c.inFinalists}`);
+    L.push(
+      `  ${c.name.padEnd(14)} library ${String(c.inLibrary).padStart(3)} · batch ${String(c.inBatch).padStart(3)} · baked ${String(c.inBaked).padStart(3)} · finalists ${c.inFinalists}`,
+    );
   }
   for (const p of r.coverage.packs) {
-    L.push(`  pack:${p.name.padEnd(9)} library ${String(p.inLibrary).padStart(3)} · batch ${String(p.inBatch).padStart(3)} · baked ${String(p.inBaked).padStart(3)} · finalists ${p.inFinalists}`);
+    L.push(
+      `  pack:${p.name.padEnd(9)} library ${String(p.inLibrary).padStart(3)} · batch ${String(p.inBatch).padStart(3)} · baked ${String(p.inBaked).padStart(3)} · finalists ${p.inFinalists}`,
+    );
   }
   L.push('');
   L.push(`QUOTA PROOF (starved families, E1a evidence): ${r.quota.pass ? 'PASS' : 'FAIL'}`);
   for (const cat of r.quota.required) {
     const q = r.quota.perCategory[cat];
-    L.push(`  ${cat.padEnd(14)} anchored samples ${q.anchoredSamples} · in batch ${q.inBatch} · in finalists ${q.inFinalists}`);
+    L.push(
+      `  ${cat.padEnd(14)} anchored samples ${q.anchoredSamples} · in batch ${q.inBatch} · in finalists ${q.inFinalists}`,
+    );
   }
   if (r.quota.repairs.length) {
-    L.push(`  selection repairs: ${r.quota.repairs.map((x) => `${x.category}: sample ${x.in} in, sample ${x.out} out`).join(' · ')}`);
+    L.push(
+      `  selection repairs: ${r.quota.repairs.map((x) => `${x.category}: sample ${x.in} in, sample ${x.out} out`).join(' · ')}`,
+    );
   }
   L.push('');
-  L.push(`SPREAD (mean pairwise feature distance, 0..1): finalists ${r.spread.finalistsFeature} vs dice tray ${r.spread.trayFeature} (tray of ${r.spread.traySize}, same protocol as E1a)`);
+  L.push(
+    `SPREAD (mean pairwise feature distance, 0..1): finalists ${r.spread.finalistsFeature} vs dice tray ${r.spread.trayFeature} (tray of ${r.spread.traySize}, same protocol as E1a)`,
+  );
   L.push(`  finalists render-statistic spread: ${r.spread.finalistsRender}`);
   L.push('');
-  L.push(`FONT-CONTINGENT TEXT STAMPS: ${r.fontContingent.inBatch} sampled casts carry one · ${r.fontContingent.inFinalists} among finalists`);
-  L.push('  ink is reported twice for every candidate (inkCoverage font-less = E1b protocol; inkCoverageWithFonts = system fonts on). A font-less bake reads these stamps blank; they are never excluded from sampling.');
+  L.push(
+    `FONT-CONTINGENT TEXT STAMPS: ${r.fontContingent.inBatch} sampled casts carry one · ${r.fontContingent.inFinalists} among finalists`,
+  );
+  L.push(
+    '  ink is reported twice for every candidate (inkCoverage font-less = E1b protocol; inkCoverageWithFonts = system fonts on). A font-less bake reads these stamps blank; they are never excluded from sampling.',
+  );
   L.push('');
   L.push(`KEEPS: ${r.keepsNote}`);
   L.push('');
   if (r.lois) {
-    L.push(`LOIS JUDGES RENDERS (${r.lois.judge}): ${r.lois.judged} finalists judged from their bakes · keeps ${r.lois.keeps} · passes ${r.lois.passes}`);
-    L.push('  verdicts are recorded in verdicts.jsonl with provenance + the measured stats they rest on; they steer nothing — selection above ran on distance alone.');
+    L.push(
+      `LOIS JUDGES RENDERS (${r.lois.judge}): ${r.lois.judged} finalists judged from their bakes · keeps ${r.lois.keeps} · passes ${r.lois.passes}`,
+    );
+    L.push(
+      '  verdicts are recorded in verdicts.jsonl with provenance + the measured stats they rest on; they steer nothing — selection above ran on distance alone.',
+    );
     L.push('');
   }
   if (r.variants) {
     const v = r.variants;
-    const ops = Object.entries(v.byOp).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ×${n}`).join(' · ');
-    L.push(`VARIANTS (Davis variants, #1530): fraction ${v.fraction} · dealt ${v.dealt} of ${v.attempts} drawn members · fallbacks ${v.fallbacks} (member stayed a library asset)`);
+    const ops = Object.entries(v.byOp)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k} ×${n}`)
+      .join(' · ');
+    L.push(
+      `VARIANTS (Davis variants, #1530): fraction ${v.fraction} · dealt ${v.dealt} of ${v.attempts} drawn members · fallbacks ${v.fallbacks} (member stayed a library asset)`,
+    );
     L.push(`  ops dealt: ${ops}`);
-    L.push(`  variant members among finalists: ${v.inFinalists} — each is a recipe in its record's provenance; in coverage and feature space it stands at its lead parent's coordinates (variant-ness is provenance, not an axis).`);
+    L.push(
+      `  variant members among finalists: ${v.inFinalists} — each is a recipe in its record's provenance; in coverage and feature space it stands at its lead parent's coordinates (variant-ness is provenance, not an axis).`,
+    );
     L.push('');
   }
   if (r.yieldByCorner) {
     L.push('YIELD BY CORNER (this run):');
     for (const row of r.yieldByCorner) {
-      L.push(`  ${row.corner.padEnd(12)} mined ${String(row.candidates).padStart(3)} · finalists ${row.finalists} · LOIS keep ${row.loisKeeps} / pass ${row.loisPasses}`);
+      L.push(
+        `  ${row.corner.padEnd(12)} mined ${String(row.candidates).padStart(3)} · finalists ${row.finalists} · LOIS keep ${row.loisKeeps} / pass ${row.loisPasses}`,
+      );
     }
     L.push('');
   }
@@ -1090,12 +1214,19 @@ export function formatMinerReport(run) {
   for (const f of run.finalists) {
     const s = f.sample;
     const lois = f.loisVerdict
-      ? ` · LOIS ${f.loisVerdict.verdict}${f.loisVerdict.verdict === 'pass'
-        ? ` (failed: ${f.loisVerdict.checks.filter((c) => !c.ok).map((c) => c.key).join(', ')})`
-        : ''}`
+      ? ` · LOIS ${f.loisVerdict.verdict}${
+          f.loisVerdict.verdict === 'pass'
+            ? ` (failed: ${f.loisVerdict.checks
+                .filter((c) => !c.ok)
+                .map((c) => c.key)
+                .join(', ')})`
+            : ''
+        }`
       : '';
     const variantMembers = s.variants ? s.cast.filter((id) => s.variants[id]).length : 0;
-    L.push(`  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length}${variantMembers ? ` (variants ${variantMembers})` : ''} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…${lois}`);
+    L.push(
+      `  sample ${String(s.index).padStart(3)} · ${s.corner}${s.anchor ? ` (anchor ${s.anchor})` : ''} · ${s.layoutId} · ${s.paletteId} · cast ${s.cast.length}${variantMembers ? ` (variants ${variantMembers})` : ''} · ink ${f.stats.inkCoverage}${f.fontContingent ? ' · font-contingent cast' : ''} · bake ${f.fingerprint.slice(0, 12)}…${lois}`,
+    );
   }
   return L.join('\n');
 }

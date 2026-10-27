@@ -12,7 +12,11 @@ import { initialEnabledAssets } from './slices/globalSlice.js';
 import { ASSETS } from '../data/assets/index.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const S = () => useStore.getState();
 const clone = (o) => JSON.parse(JSON.stringify(o));
 const DEFAULTS = Object.keys(initialEnabledAssets);
@@ -43,7 +47,8 @@ ok('export -> import -> export leaves enabledAssets unchanged (layered document)
   assert.deepEqual(S().enabledAssets, narrow, 'the store holds exactly what was saved: no default re-enabled');
   const snap = (d) => d.layerSnapshots[d.activeLayerId].enabledAssets;
   assert.deepEqual(snap(second), snap(first), 'the active layer snapshot too');
-  for (const d of DEFAULTS) assert.ok(!(d in S().enabledAssets), `${d} was never in the file, so it must not come back`);
+  for (const d of DEFAULTS)
+    assert.ok(!(d in S().enabledAssets), `${d} was never in the file, so it must not come back`);
 });
 
 ok('and it is a fixed point: a second round trip changes nothing', () => {
@@ -73,7 +78,7 @@ ok('a document with no enabledAssets at all still boots with the default four', 
 });
 
 ok('an empty or hostile map is NOT read as "no assets": a damaged file must not blank the canvas', () => {
-  for (const bad of [{}, { 'not-an-asset': true, '__proto__': true }]) {
+  for (const bad of [{}, { 'not-an-asset': true, __proto__: true }]) {
     const doc = clone(serializeProject(S()));
     doc.enabledAssets = bad;
     doc.layerSnapshots[doc.activeLayerId].enabledAssets = bad;

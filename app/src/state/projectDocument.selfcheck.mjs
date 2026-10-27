@@ -113,7 +113,9 @@ assert.deepStrictEqual(
   'legacy docs normalize missing offsets to zeros',
 );
 const hostileOffsets = parseProject({
-  version: 1, seed: 1, layoutParams: {},
+  version: 1,
+  seed: 1,
+  layoutParams: {},
   seedOffsets: { spatial: 'nope', color: 1.5, asset: -3, noise: null, bogus: 7 },
 });
 assert.ok(hostileOffsets.ok);
@@ -156,7 +158,8 @@ const hostileAssets = {};
 for (let i = 0; i < 100000; i++) hostileAssets[`evil-${i}`] = true;
 hostileAssets[ASSETS[0].id] = false;
 const hostile = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   enabledAssets: hostileAssets,
   assetWeightOverrides: { ...hostileAssets, [ASSETS[1].id]: 'heavy', [ASSETS[2].id]: 3 },
 });
@@ -165,7 +168,8 @@ assert.ok(Object.keys(hostile.doc.enabledAssets).length < 500, 'enabledAssets co
 assert.strictEqual(hostile.doc.enabledAssets[ASSETS[0].id], false, 'known ids keep their values');
 assert.ok(!('evil-99999' in hostile.doc.enabledAssets), 'hostile keys dropped');
 assert.deepStrictEqual(
-  Object.keys(hostile.doc.assetWeightOverrides).sort(), [ASSETS[0].id, ASSETS[1].id, ASSETS[2].id].sort(),
+  Object.keys(hostile.doc.assetWeightOverrides).sort(),
+  [ASSETS[0].id, ASSETS[1].id, ASSETS[2].id].sort(),
   'weight overrides filtered to known ids',
 );
 assert.strictEqual(hostile.doc.assetWeightOverrides[ASSETS[1].id], 'heavy', 'weight strings survive the round trip');
@@ -189,7 +193,8 @@ assert.ok(Number.isFinite(applied.seed), 'applied doc stays playable');
 // Before the fix, normalizeLayers built each content layer without ever
 // reading l.patch, so every MOD/FIELD/FEED row vanished silently on load.
 const withPatch = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [
     { id: 'a', name: 'A', type: 'content', patch: { mode: 'mod', to: 'b', strength: 0.4 } },
     { id: 'b', name: 'B', type: 'content', patch: { mode: 'off', to: null, strength: 0.16 } },
@@ -207,7 +212,8 @@ assert.deepStrictEqual(
 // than pointing at nothing; mode is left alone since liveResolve already
 // no-ops on a missing target.
 const danglingPatch = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [
     { id: 'a', name: 'A', type: 'content', patch: { mode: 'field', to: 'ghost', strength: 0.5 } },
     { id: 'fx1', name: 'FX', type: 'fx' },
@@ -223,7 +229,8 @@ assert.deepStrictEqual(
 
 // A self-targeting patch (corrupt doc) also goes inert.
 const selfPatch = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [{ id: 'a', name: 'A', type: 'content', patch: { mode: 'mod', to: 'a', strength: 0.2 } }],
   activeLayerId: 'a',
 });
@@ -233,7 +240,8 @@ assert.strictEqual(selfPatch.doc.layers[0].patch.to, null, 'a self-targeting pat
 // A pre-#457 numeric ordinal `to` is meaningless under id-based addressing;
 // it must null out rather than being coerced into a string id.
 const legacyOrdinalPatch = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [
     { id: 'a', name: 'A', type: 'content', patch: { mode: 'mod', to: 0, strength: 0.2 } },
     { id: 'b', name: 'B', type: 'content' },
@@ -246,7 +254,8 @@ assert.strictEqual(legacyOrdinalPatch.doc.layers[0].patch.to, null, 'a legacy nu
 // A layer with no patch field at all (very old doc) gets the same default
 // shape addLayer/duplicateLayer give a fresh layer.
 const noPatchField = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [{ id: 'a', name: 'A', type: 'content' }],
   activeLayerId: 'a',
 });
@@ -268,7 +277,8 @@ assert.strictEqual(
 // FX layers are a separate budget and must not be squeezed out by the
 // content cap, nor count against it.
 const mixedOverCap = parseProject({
-  version: 1, seed: 1,
+  version: 1,
+  seed: 1,
   layers: [
     ...Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, name: `C${i}`, type: 'content' })),
     { id: 'fx1', name: 'FX', type: 'fx' },
@@ -277,7 +287,10 @@ const mixedOverCap = parseProject({
 });
 assert.ok(mixedOverCap.ok);
 assert.strictEqual(mixedOverCap.doc.layers.filter((l) => l.type === 'content').length, MAX_CONTENT_TRACKS);
-assert.ok(mixedOverCap.doc.layers.some((l) => l.id === 'fx1'), 'the fx layer must survive the content-only cap');
+assert.ok(
+  mixedOverCap.doc.layers.some((l) => l.id === 'fx1'),
+  'the fx layer must survive the content-only cap',
+);
 
 // Apply path: a document exceeding the cap must not leave the store over
 // budget either (governor/tape assumptions read state.layers directly).
@@ -299,10 +312,13 @@ assert.strictEqual(
 
   const hostile = {
     ...serializeProject(cleanState),
-    quality: 'turbo-ultra',          // unknown preset → fallback
-    paletteId: 42,                   // non-string → fallback
-    autoQuality: 'yes',              // non-boolean → coerced
-    layers: [...Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, name: `C${i}`, type: 'content' })), { id: 'fx1', name: 'FX', type: 'fx' }],
+    quality: 'turbo-ultra', // unknown preset → fallback
+    paletteId: 42, // non-string → fallback
+    autoQuality: 'yes', // non-boolean → coerced
+    layers: [
+      ...Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, name: `C${i}`, type: 'content' })),
+      { id: 'fx1', name: 'FX', type: 'fx' },
+    ],
   };
   const parsed = parseProject(hostile);
   assert.ok(parsed.ok);

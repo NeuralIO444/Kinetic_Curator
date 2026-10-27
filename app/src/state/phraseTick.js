@@ -23,7 +23,11 @@ export function tickPhraseBeat(state, hooks = {}) {
     const step = hooks.stepGrid;
     const create = hooks.createGrid;
     if (typeof step === 'function') {
-      updates.caGrid = state.caGrid ? step(state.caGrid) : (typeof create === 'function' ? create(40, 28, origin) : state.caGrid);
+      updates.caGrid = state.caGrid
+        ? step(state.caGrid)
+        : typeof create === 'function'
+          ? create(40, 28, origin)
+          : state.caGrid;
     }
     updates.seed = origin;
     return updates;

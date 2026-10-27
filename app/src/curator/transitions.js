@@ -22,7 +22,7 @@ import { MODE_IDS, BEHAVE_MODES, PALETTE_SHIFTS } from '../data/layout-modes.js'
  *           is "develop", the second press.
  *   far   — another family. The surprise, and the way back out of a corner.
  */
-const AFFINITY = { self: 0.06, kin: 0.64, far: 0.30 };
+const AFFINITY = { self: 0.06, kin: 0.64, far: 0.3 };
 
 const FAMILIES = {
   mode: {
@@ -71,7 +71,10 @@ function buildRow(key, from) {
   const far = domain.filter((v) => v !== from && familyOf(key, v) !== fromFam);
   const row = {};
   let mass = 0;
-  const give = (v, w) => { row[v] = (row[v] || 0) + w; mass += w; };
+  const give = (v, w) => {
+    row[v] = (row[v] || 0) + w;
+    mass += w;
+  };
   give(from, AFFINITY.self);
   for (const v of kin) give(v, AFFINITY.kin / kin.length);
   for (const v of far) give(v, AFFINITY.far / far.length);

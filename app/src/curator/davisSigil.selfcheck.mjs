@@ -6,22 +6,44 @@ import { sigilGeometry, drawSigil, sigilTempo, SIGIL_FOLDS, SIGIL_TEMPO_S, SIGIL
 import { DAVIS_STATES } from './davisState.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // a recording 2D context: no canvas needed to prove the structure
 const rec = () => {
-  const calls = []; const ctx = { fillStyle: '', strokeStyle: '', lineWidth: 0 };
-  for (const m of ['clearRect', 'save', 'restore', 'scale', 'translate', 'rotate', 'beginPath', 'arc', 'fill', 'stroke']) ctx[m] = (...a) => calls.push([m, ...a]);
+  const calls = [];
+  const ctx = { fillStyle: '', strokeStyle: '', lineWidth: 0 };
+  for (const m of [
+    'clearRect',
+    'save',
+    'restore',
+    'scale',
+    'translate',
+    'rotate',
+    'beginPath',
+    'arc',
+    'fill',
+    'stroke',
+  ])
+    ctx[m] = (...a) => calls.push([m, ...a]);
   return { ctx, calls };
 };
-const draw = (seed) => { const r = rec(); drawSigil(r.ctx, sigilGeometry(seed)); return r.calls; };
+const draw = (seed) => {
+  const r = rec();
+  drawSigil(r.ctx, sigilGeometry(seed));
+  return r.calls;
+};
 
 ok('a NEW SEED is a NEW FACE; the same seed is the same face', () => {
   assert.deepEqual(sigilGeometry(0x8bea), sigilGeometry(0x8bea));
   assert.notDeepEqual(sigilGeometry(1), sigilGeometry(2));
   assert.notDeepEqual(draw(7), draw(8));
   assert.deepEqual(draw(7), draw(7));
-  for (const bad of [0, -1, 2 ** 40, NaN, undefined]) assert.ok(sigilGeometry(bad).els.length >= 24, `seed ${bad} still draws a face`);
+  for (const bad of [0, -1, 2 ** 40, NaN, undefined])
+    assert.ok(sigilGeometry(bad).els.length >= 24, `seed ${bad} still draws a face`);
 });
 
 ok('eight-fold: one wedge of 24..41 ornaments, stamped eight times with its mirror half', () => {
@@ -29,24 +51,55 @@ ok('eight-fold: one wedge of 24..41 ornaments, stamped eight times with its mirr
   for (const seed of [1, 42, 31337, 0xdeadbeef]) {
     const g = sigilGeometry(seed);
     assert.ok(g.els.length >= 24 && g.els.length <= 41, `${g.els.length} ornaments`);
-    for (const e of g.els) { assert.ok(e.a >= 0 && e.a < g.wedge, 'every ornament sits inside its wedge'); assert.ok(e.r >= 8 && e.r <= 40 && e.s >= 1 && e.o >= 0.25 && e.o <= 0.9); }
+    for (const e of g.els) {
+      assert.ok(e.a >= 0 && e.a < g.wedge, 'every ornament sits inside its wedge');
+      assert.ok(e.r >= 8 && e.r <= 40 && e.s >= 1 && e.o >= 0.25 && e.o <= 0.9);
+    }
     const calls = draw(seed);
-    const rotations = calls.filter((c) => c[0] === 'rotate'); assert.equal(rotations.length, SIGIL_FOLDS);
-    rotations.forEach((c, k) => assert.ok(Math.abs(c[1] - (k * Math.PI * 2) / SIGIL_FOLDS) < 1e-12, `fold ${k} is ${k}/8 of a turn`));
+    const rotations = calls.filter((c) => c[0] === 'rotate');
+    assert.equal(rotations.length, SIGIL_FOLDS);
+    rotations.forEach((c, k) =>
+      assert.ok(Math.abs(c[1] - (k * Math.PI * 2) / SIGIL_FOLDS) < 1e-12, `fold ${k} is ${k}/8 of a turn`),
+    );
     const rings = g.els.filter((e) => e.ring).length;
     const arcs = calls.filter((c) => c[0] === 'arc').length;
-    assert.equal(arcs, SIGIL_RINGS.length + SIGIL_FOLDS * (g.els.length * 2 + rings) + 1, 'rings + 8 x (dot + mirror dot + any halo) + the centre');
+    assert.equal(
+      arcs,
+      SIGIL_RINGS.length + SIGIL_FOLDS * (g.els.length * 2 + rings) + 1,
+      'rings + 8 x (dot + mirror dot + any halo) + the centre',
+    );
   }
 });
 
 ok('fidelity: the same picture at any pixel density, the canvas just gets more real pixels', () => {
-  const at = (px) => { const r = rec(); drawSigil(r.ctx, sigilGeometry(5), '255,205,130', px); return r.calls; };
-  const lo = at(96); const hi = at(96 * 4);
-  assert.deepEqual(lo.filter((c) => c[0] === 'arc'), hi.filter((c) => c[0] === 'arc'), 'every arc is placed identically: only the scale differs');
-  assert.deepEqual(lo.find((c) => c[0] === 'scale'), ['scale', 1, 1]); assert.deepEqual(hi.find((c) => c[0] === 'scale'), ['scale', 4, 4]);
-  assert.deepEqual(hi.find((c) => c[0] === 'clearRect'), ['clearRect', 0, 0, 384, 384], 'the whole backing store is cleared');
+  const at = (px) => {
+    const r = rec();
+    drawSigil(r.ctx, sigilGeometry(5), '255,205,130', px);
+    return r.calls;
+  };
+  const lo = at(96);
+  const hi = at(96 * 4);
+  assert.deepEqual(
+    lo.filter((c) => c[0] === 'arc'),
+    hi.filter((c) => c[0] === 'arc'),
+    'every arc is placed identically: only the scale differs',
+  );
+  assert.deepEqual(
+    lo.find((c) => c[0] === 'scale'),
+    ['scale', 1, 1],
+  );
+  assert.deepEqual(
+    hi.find((c) => c[0] === 'scale'),
+    ['scale', 4, 4],
+  );
+  assert.deepEqual(
+    hi.find((c) => c[0] === 'clearRect'),
+    ['clearRect', 0, 0, 384, 384],
+    'the whole backing store is cleared',
+  );
   const src = readFileSync(new URL('../components/DavisSigil.jsx', import.meta.url), 'utf8');
-  assert.ok(flat(src).includes(flat('Math.min(5, Math.max(3, '))); assert.ok(flat(src).includes(flat('width={px} height={px}')));
+  assert.ok(flat(src).includes(flat('Math.min(5, Math.max(3, ')));
+  assert.ok(flat(src).includes(flat('width={px} height={px}')));
 });
 
 ok('drawn only from the seed: no Math.random, no clock, in the module or its component', () => {
@@ -58,18 +111,35 @@ ok('drawn only from the seed: no Math.random, no clock, in the module or its com
 
 ok('tempo per state, from the mockup; no state means he is not turning', () => {
   assert.deepEqual({ ...SIGIL_TEMPO_S }, { FLOW: 14, SEEDLING: 6, UGLY: 4, STUCK: 40, BLOOM: 9 });
-  assert.deepEqual(Object.keys(SIGIL_TEMPO_S).sort(), Object.keys(DAVIS_STATES).sort(), 'every Davis state has a tempo and nothing else does');
-  assert.ok(SIGIL_TEMPO_S.UGLY < SIGIL_TEMPO_S.SEEDLING && SIGIL_TEMPO_S.SEEDLING < SIGIL_TEMPO_S.BLOOM && SIGIL_TEMPO_S.BLOOM < SIGIL_TEMPO_S.FLOW && SIGIL_TEMPO_S.FLOW < SIGIL_TEMPO_S.STUCK, 'agitated in UGLY, barely turning in STUCK');
-  assert.equal(sigilTempo(null), null); assert.equal(sigilTempo(undefined), null); assert.equal(sigilTempo('NOPE'), null);
+  assert.deepEqual(
+    Object.keys(SIGIL_TEMPO_S).sort(),
+    Object.keys(DAVIS_STATES).sort(),
+    'every Davis state has a tempo and nothing else does',
+  );
+  assert.ok(
+    SIGIL_TEMPO_S.UGLY < SIGIL_TEMPO_S.SEEDLING &&
+      SIGIL_TEMPO_S.SEEDLING < SIGIL_TEMPO_S.BLOOM &&
+      SIGIL_TEMPO_S.BLOOM < SIGIL_TEMPO_S.FLOW &&
+      SIGIL_TEMPO_S.FLOW < SIGIL_TEMPO_S.STUCK,
+    'agitated in UGLY, barely turning in STUCK',
+  );
+  assert.equal(sigilTempo(null), null);
+  assert.equal(sigilTempo(undefined), null);
+  assert.equal(sigilTempo('NOPE'), null);
 });
 
 ok('wiring: a readout only, in his colour, still with less motion', () => {
   const r = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
   const codec = r('../panels/directors/RoomCodec.jsx');
-  assert.match(codec, /resolveLoisFace\(feed\)/); assert.match(codec, /resolveDavisState\(feed\)/);
-  assert.ok(!/emit\(|dispatch|useStore\.getState\(\)\.\w+\(|onClick/.test(codec.replace(/\/\/.*$/gm, '')), 'READOUT ONLY: nothing in the room acts');
+  assert.match(codec, /resolveLoisFace\(feed\)/);
+  assert.match(codec, /resolveDavisState\(feed\)/);
+  assert.ok(
+    !/emit\(|dispatch|useStore\.getState\(\)\.\w+\(|onClick/.test(codec.replace(/\/\/.*$/gm, '')),
+    'READOUT ONLY: nothing in the room acts',
+  );
   assert.match(r('../panels/DavisPanel.jsx'), /<RoomCodec \/>/);
-  const css = r('../styles/panels.css'); assert.match(css, /prefers-reduced-motion: reduce\) \{ \.davis-sigil\.turning \{ animation: none; \} \}/);
+  const css = r('../styles/panels.css');
+  assert.match(css, /prefers-reduced-motion: reduce\) \{ \.davis-sigil\.turning \{ animation: none; \} \}/);
   assert.match(r('../styles/tokens.css'), /--kc-davis: #ffcd82;/);
 });
 

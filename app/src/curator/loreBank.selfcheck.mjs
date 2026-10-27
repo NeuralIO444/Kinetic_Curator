@@ -5,29 +5,60 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  LORE_KIND, LORE_VERSION, validateLore, getLoreBank, loreById, loreForDate, pickOnThisDay, drawLore,
+  LORE_KIND,
+  LORE_VERSION,
+  validateLore,
+  getLoreBank,
+  loreById,
+  loreForDate,
+  pickOnThisDay,
+  drawLore,
 } from './loreBank.js';
 import { BEAT_FORMS } from './storyState.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const bank = getLoreBank();
 const entry = (over = {}) => ({
-  id: 'otd-test-born-0101', kind: 'onthisday', fact: 'A fact, worded here.', month: 1, day: 1,
+  id: 'otd-test-born-0101',
+  kind: 'onthisday',
+  fact: 'A fact, worded here.',
+  month: 1,
+  day: 1,
   tags: { family: 'print', movement: 'test', mood: 'calm' },
-  source_id: 'wikidata:Q1', source_url: 'https://www.wikidata.org/wiki/Q1',
-  rights: 'CC0 — test', retrieved_date: '2026-10-22', bank_version: 'test.1', ...over,
+  source_id: 'wikidata:Q1',
+  source_url: 'https://www.wikidata.org/wiki/Q1',
+  rights: 'CC0 — test',
+  retrieved_date: '2026-10-22',
+  bank_version: 'test.1',
+  ...over,
 });
-const file = (entries, over = {}) => ({ kind: LORE_KIND, version: LORE_VERSION, bank_version: 'test.1', entries, ...over });
+const file = (entries, over = {}) => ({
+  kind: LORE_KIND,
+  version: LORE_VERSION,
+  bank_version: 'test.1',
+  entries,
+  ...over,
+});
 
 ok('the shipped bank validates: kind, version, and a size worthy of a first pass', () => {
   assert.ok(bank, 'lore.json on disk is a bank this app may read');
   assert.equal(bank.kind, 'kc-lore');
   assert.equal(bank.version, 1);
-  assert.ok(bank.entries.length >= 40 && bank.entries.length <= 120, `a modest first pass (got ${bank.entries.length})`);
+  assert.ok(
+    bank.entries.length >= 40 && bank.entries.length <= 120,
+    `a modest first pass (got ${bank.entries.length})`,
+  );
   for (const kind of ['maxim', 'ancestor', 'fact', 'onthisday']) {
-    assert.ok(bank.entries.some((e) => e.kind === kind), `the bank holds ${kind} entries`);
+    assert.ok(
+      bank.entries.some((e) => e.kind === kind),
+      `the bank holds ${kind} entries`,
+    );
   }
 });
 
@@ -36,9 +67,15 @@ ok('provenance rides every record: source, rights basis, retrieval date, bank ve
   const stamps = new Set();
   for (const e of bank.entries) {
     assert.ok(e.source_id && e.source_url.startsWith('https://'), `${e.id}: a source, reachable in principle`);
-    assert.ok(!e.source_url.includes('wikipedia.org'), `${e.id}: facts come from structured data — Wikipedia prose is CC BY-SA and never a source`);
+    assert.ok(
+      !e.source_url.includes('wikipedia.org'),
+      `${e.id}: facts come from structured data — Wikipedia prose is CC BY-SA and never a source`,
+    );
     assert.ok(!/wikipedia/i.test(e.fact), `${e.id}: no lifted prose`);
-    assert.ok(/CC0|public domain|Original KC-1 wording/.test(e.rights), `${e.id}: the rights basis is named in the record`);
+    assert.ok(
+      /CC0|public domain|Original KC-1 wording/.test(e.rights),
+      `${e.id}: the rights basis is named in the record`,
+    );
     assert.ok(!ids.has(e.id), `${e.id}: ids are unique`);
     ids.add(e.id);
     stamps.add(e.retrieved_date);
@@ -83,27 +120,52 @@ ok('on this day: the date is an input, the pick replays exactly, absence is hone
   assert.equal(oct22.length, 1, 'the curation day itself carries one entry');
   assert.equal(oct22[0].id, 'otd-rauschenberg-born-1022');
   assert.deepEqual(loreForDate(bank, 9, 15), [], 'a day the first pass holds nothing for');
-  assert.equal(pickOnThisDay(bank, { month: 9, day: 15 }, () => 0.5), null, 'no entry, no cold open — never a borrowed fact');
+  assert.equal(
+    pickOnThisDay(bank, { month: 9, day: 15 }, () => 0.5),
+    null,
+    'no entry, no cold open — never a borrowed fact',
+  );
   const jan19 = loreForDate(bank, 1, 19);
   assert.equal(jan19.length, 2, 'two entries share 19 January');
-  assert.deepEqual(jan19.map((e) => e.id), [...jan19.map((e) => e.id)].sort(), 'bank order is id order: the draw is stable');
+  assert.deepEqual(
+    jan19.map((e) => e.id),
+    [...jan19.map((e) => e.id)].sort(),
+    'bank order is id order: the draw is stable',
+  );
   assert.equal(pickOnThisDay(bank, { month: 1, day: 19 }, () => 0).id, jan19[0].id, 'roll 0 takes the first');
   assert.equal(pickOnThisDay(bank, { month: 1, day: 19 }, () => 0.999).id, jan19[1].id, 'a high roll takes the last');
   assert.equal(
     pickOnThisDay(bank, { month: 1, day: 19 }, () => 0.42).id,
     pickOnThisDay(bank, { month: 1, day: 19 }, () => 0.42).id,
-    'the same roll selects the same entry — selection replays exactly');
+    'the same roll selects the same entry — selection replays exactly',
+  );
 });
 
 ok('the tag draw (05): the best-matching tier only, deterministic, silent on no match', () => {
   const dither = drawLore(bank, { family: 'dither' }, () => 0);
   assert.ok(dither && dither.tags.family === 'dither', 'a family draw lands in the family');
-  assert.equal(drawLore(bank, { family: 'dither' }, () => 0.5).id, drawLore(bank, { family: 'dither' }, () => 0.5).id, 'same tags, same roll, same entry');
+  assert.equal(
+    drawLore(bank, { family: 'dither' }, () => 0.5).id,
+    drawLore(bank, { family: 'dither' }, () => 0.5).id,
+    'same tags, same roll, same entry',
+  );
   const wave = drawLore(bank, { family: 'print', movement: 'ukiyo-e', mood: 'surge' }, () => 0);
   assert.equal(wave.id, 'fact-great-wave', 'matching all three axes outranks matching one');
-  assert.equal(drawLore(bank, { family: 'astrophysics' }, () => 0), null, 'nothing keyed, nothing drawn');
-  assert.equal(drawLore(bank, {}, () => 0), null, 'no axes named, no draw');
-  assert.equal(drawLore(null, { family: 'dither' }, () => 0), null, 'no bank, no draw');
+  assert.equal(
+    drawLore(bank, { family: 'astrophysics' }, () => 0),
+    null,
+    'nothing keyed, nothing drawn',
+  );
+  assert.equal(
+    drawLore(bank, {}, () => 0),
+    null,
+    'no axes named, no draw',
+  );
+  assert.equal(
+    drawLore(null, { family: 'dither' }, () => 0),
+    null,
+    'no bank, no draw',
+  );
 });
 
 ok('wiring: the story machine takes the cold open as a callback form; the driver seeds and resolves it', () => {

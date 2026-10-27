@@ -75,10 +75,12 @@ const FIELDS = {
   assert.deepStrictEqual(readSeedOffsets(null), { spatial: 0, color: 0, asset: 0, noise: 0 });
   assert.deepStrictEqual(readSeedOffsets({}), { spatial: 0, color: 0, asset: 0, noise: 0 });
   // Junk values collapse to 0, never NaN into the text.
-  assert.deepStrictEqual(
-    readSeedOffsets({ seedOffsets: { spatial: 'x', color: NaN, asset: 1.9, noise: -2.2 } }),
-    { spatial: 0, color: 0, asset: 1, noise: -2 },
-  );
+  assert.deepStrictEqual(readSeedOffsets({ seedOffsets: { spatial: 'x', color: NaN, asset: 1.9, noise: -2.2 } }), {
+    spatial: 0,
+    color: 0,
+    asset: 1,
+    noise: -2,
+  });
   const text = encodeRecipe({ seed: 7, paletteId: 'p', layoutParams: {} });
   for (const ch of RECIPE_OFFSET_CHANNELS) {
     assert.ok(text.includes(`seedOffset.${ch}: 0`), `missing zero default for ${ch}`);
@@ -93,7 +95,10 @@ const FIELDS = {
 {
   // Live store shape.
   const live = recipeFieldsFromKept({
-    seed: 99, seedOffsets: undefined, paletteId: 'ember', layoutParams: { mode: 'swarm' },
+    seed: 99,
+    seedOffsets: undefined,
+    paletteId: 'ember',
+    layoutParams: { mode: 'swarm' },
   });
   assert.deepStrictEqual(live, {
     seed: 99,

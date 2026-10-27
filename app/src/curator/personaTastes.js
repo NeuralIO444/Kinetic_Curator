@@ -21,25 +21,25 @@
 // persona source files — lineage documented, just not on the surface.
 
 export const TASTE_FEATURES = [
-  'markDensity',    // count — how many marks
-  'markSize',       // mean(scale) — how big the marks are
-  'sizeVariety',    // scale range — size diversity across marks
+  'markDensity', // count — how many marks
+  'markSize', // mean(scale) — how big the marks are
+  'sizeVariety', // scale range — size diversity across marks
   'rotationSpread', // rotate range — angular diversity
-  'opacity',        // mean(alpha)
+  'opacity', // mean(alpha)
   'opacityVariety', // alpha range
-  'disorder',       // jitter + displacement — chaotic placement
-  'coverage',       // density — how much of the field is filled
-  'depth',          // zTiers — layering
-  'flowEnergy',     // noiseSpeed — motion speed
-  'flowWarp',       // noiseFreq — spatial warping of the field
-  'swarmDrive',     // swarmCohesion — flocking tightness
-  'attractors',     // gravityWells — structured pull points
-  'particles',      // particleCount — fine particulate detail
-  'calm',           // damping — how fast motion settles
-  'windPush',       // wind — ambient push on the marks (#518)
-  'breathSwell',    // breath — slow scale swell (#518)
-  'drift',          // lifeDrift — organic wander (#518)
-  'flowRate',       // flap — beat rate (#518)
+  'disorder', // jitter + displacement — chaotic placement
+  'coverage', // density — how much of the field is filled
+  'depth', // zTiers — layering
+  'flowEnergy', // noiseSpeed — motion speed
+  'flowWarp', // noiseFreq — spatial warping of the field
+  'swarmDrive', // swarmCohesion — flocking tightness
+  'attractors', // gravityWells — structured pull points
+  'particles', // particleCount — fine particulate detail
+  'calm', // damping — how fast motion settles
+  'windPush', // wind — ambient push on the marks (#518)
+  'breathSwell', // breath — slow scale swell (#518)
+  'drift', // lifeDrift — organic wander (#518)
+  'flowRate', // flap — beat rate (#518)
 ];
 
 // weights: +loves / −avoids. Sparse on purpose — only set where the
@@ -52,10 +52,17 @@ export const PERSONA_TASTES = [
     rationale:
       'Loves maximum density with legible modules and weighted-probability richness; avoids pure noise with no authored structure.',
     weights: {
-      markDensity: 1.0, coverage: 0.5, markSize: 0.5, sizeVariety: 0.6,
-      rotationSpread: 0.4, disorder: -0.8, depth: 0.5, flowEnergy: 0.4,
+      markDensity: 1.0,
+      coverage: 0.5,
+      markSize: 0.5,
+      sizeVariety: 0.6,
+      rotationSpread: 0.4,
+      disorder: -0.8,
+      depth: 0.5,
+      flowEnergy: 0.4,
       particles: 0.4,
-      windPush: 0.2, drift: 0.3,
+      windPush: 0.2,
+      drift: 0.3,
     },
   },
   {
@@ -65,9 +72,14 @@ export const PERSONA_TASTES = [
     rationale:
       'Organized structure with ~1% disorder: vast seas of tiny marks, near-zero chaos, pared-down vocabulary.',
     weights: {
-      markDensity: 0.6, markSize: -0.8, disorder: -1.0, calm: 0.6,
-      sizeVariety: -0.4, opacityVariety: -0.4,
-      windPush: -0.3, drift: -0.5,
+      markDensity: 0.6,
+      markSize: -0.8,
+      disorder: -1.0,
+      calm: 0.6,
+      sizeVariety: -0.4,
+      opacityVariety: -0.4,
+      windPush: -0.3,
+      drift: -0.5,
     },
   },
   {
@@ -77,21 +89,29 @@ export const PERSONA_TASTES = [
     rationale:
       'Rational exhaustive variation on one motif; disturbance of symmetry for tension but never chaos; slow structural motion.',
     weights: {
-      disorder: -0.7, rotationSpread: 0.3, depth: 0.3, flowEnergy: -0.3,
-      calm: 0.4, markSize: -0.3,
-      windPush: -0.2, drift: -0.3,
+      disorder: -0.7,
+      rotationSpread: 0.3,
+      depth: 0.3,
+      flowEnergy: -0.3,
+      calm: 0.4,
+      markSize: -0.3,
+      windPush: -0.2,
+      drift: -0.3,
     },
   },
   {
     id: 'benjamin',
     name: 'Karl Benjamin',
     alias: 'HARD EDGE',
-    rationale:
-      'Tight ordered structure as the setting for invention; flat, calm, full fields; no gestural chaos.',
+    rationale: 'Tight ordered structure as the setting for invention; flat, calm, full fields; no gestural chaos.',
     weights: {
-      disorder: -0.8, calm: 0.4, coverage: 0.4, markDensity: 0.3,
+      disorder: -0.8,
+      calm: 0.4,
+      coverage: 0.4,
+      markDensity: 0.3,
       opacityVariety: -0.5,
-      drift: -0.5, breathSwell: -0.2,
+      drift: -0.5,
+      breathSwell: -0.2,
     },
   },
   {
@@ -101,9 +121,17 @@ export const PERSONA_TASTES = [
     rationale:
       'Simple elements + behaviors in continuous motion; full-surface field, no focal center, no finished state.',
     weights: {
-      flowEnergy: 0.8, coverage: 0.6, markDensity: 0.5, markSize: -0.4,
-      swarmDrive: 0.6, attractors: 0.4, calm: -0.5, opacityVariety: -0.3,
-      windPush: 0.6, drift: 0.6, flowRate: 0.4,
+      flowEnergy: 0.8,
+      coverage: 0.6,
+      markDensity: 0.5,
+      markSize: -0.4,
+      swarmDrive: 0.6,
+      attractors: 0.4,
+      calm: -0.5,
+      opacityVariety: -0.3,
+      windPush: 0.6,
+      drift: 0.6,
+      flowRate: 0.4,
     },
   },
   {
@@ -113,21 +141,34 @@ export const PERSONA_TASTES = [
     rationale:
       'Perfect symmetry as organizing law; dense fine detail on a stripped void ground; only slow ornamental breathing.',
     weights: {
-      disorder: -1.0, markDensity: 0.7, particles: 0.5, coverage: -0.6,
-      sizeVariety: 0.4, flowEnergy: -0.6, calm: 0.6,
-      breathSwell: 0.7, windPush: -0.4, drift: -0.2,
+      disorder: -1.0,
+      markDensity: 0.7,
+      particles: 0.5,
+      coverage: -0.6,
+      sizeVariety: 0.4,
+      flowEnergy: -0.6,
+      calm: 0.6,
+      breathSwell: 0.7,
+      windPush: -0.4,
+      drift: -0.2,
     },
   },
   {
     id: 'oxman',
     name: 'Neri Oxman',
     alias: 'GROWN',
-    rationale:
-      'Grown gradients varying by field logic; environmental responsiveness; never static, never assembled.',
+    rationale: 'Grown gradients varying by field logic; environmental responsiveness; never static, never assembled.',
     weights: {
-      opacityVariety: 0.5, sizeVariety: 0.5, coverage: 0.5, flowEnergy: 0.5,
-      flowWarp: 0.4, calm: -0.4, markDensity: 0.4,
-      breathSwell: 0.6, drift: 0.5, windPush: 0.3,
+      opacityVariety: 0.5,
+      sizeVariety: 0.5,
+      coverage: 0.5,
+      flowEnergy: 0.5,
+      flowWarp: 0.4,
+      calm: -0.4,
+      markDensity: 0.4,
+      breathSwell: 0.6,
+      drift: 0.5,
+      windPush: 0.3,
     },
   },
   {
@@ -137,33 +178,50 @@ export const PERSONA_TASTES = [
     rationale:
       'One dominant flow event in deep negative space; real turbulence frozen at peak; fine filamentary detail.',
     weights: {
-      markDensity: -0.5, particles: 0.6, flowEnergy: 0.6, flowWarp: 0.7,
-      attractors: -0.5, coverage: -0.6, calm: -0.3,
-      windPush: 0.4, drift: 0.3,
+      markDensity: -0.5,
+      particles: 0.6,
+      flowEnergy: 0.6,
+      flowWarp: 0.7,
+      attractors: -0.5,
+      coverage: -0.6,
+      calm: -0.3,
+      windPush: 0.4,
+      drift: 0.3,
     },
   },
   {
     id: 'anadol',
     name: 'Refik Anadol',
     alias: 'LATENT DRIFT',
-    rationale:
-      'Everything in ceaseless flow; full-bleed with no center; never still, never a frozen frame.',
+    rationale: 'Everything in ceaseless flow; full-bleed with no center; never still, never a frozen frame.',
     weights: {
-      flowEnergy: 1.0, flowWarp: 0.8, coverage: 0.8, markDensity: 0.5,
-      disorder: -0.4, calm: -0.8, particles: 0.5,
-      drift: 0.8, windPush: 0.6, flowRate: 0.6, breathSwell: 0.4,
+      flowEnergy: 1.0,
+      flowWarp: 0.8,
+      coverage: 0.8,
+      markDensity: 0.5,
+      disorder: -0.4,
+      calm: -0.8,
+      particles: 0.5,
+      drift: 0.8,
+      windPush: 0.6,
+      flowRate: 0.6,
+      breathSwell: 0.4,
     },
   },
   {
     id: 'menkman',
     name: 'Rosa Menkman',
     alias: 'COMPRESSION',
-    rationale:
-      'Rupture as material: the accident legible, feedback in the loop, seamless polish is the enemy.',
+    rationale: 'Rupture as material: the accident legible, feedback in the loop, seamless polish is the enemy.',
     weights: {
-      disorder: 0.8, calm: -0.6, flowEnergy: 0.5, markDensity: 0.4,
+      disorder: 0.8,
+      calm: -0.6,
+      flowEnergy: 0.5,
+      markDensity: 0.4,
       rotationSpread: 0.4,
-      drift: 0.3, flowRate: 0.4, windPush: 0.3,
+      drift: 0.3,
+      flowRate: 0.4,
+      windPush: 0.3,
     },
   },
 ];

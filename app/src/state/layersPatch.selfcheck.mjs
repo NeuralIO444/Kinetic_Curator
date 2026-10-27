@@ -7,8 +7,22 @@ import { useStore } from './store.js';
 function seedTwoTracks() {
   useStore.setState({
     layers: [
-      { id: 'kc-a', name: 'KC-1', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } },
-      { id: 'kc-b', name: 'KC-2', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } },
+      {
+        id: 'kc-a',
+        name: 'KC-1',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
+        patch: { mode: 'off', to: null, strength: 0.16 },
+      },
+      {
+        id: 'kc-b',
+        name: 'KC-2',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
+        patch: { mode: 'off', to: null, strength: 0.16 },
+      },
     ],
     activeLayerId: 'kc-a',
   });
@@ -67,7 +81,11 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
   assert.strictEqual(s.activeLayerId, kc, 'active layer stays the content track');
   s.removeLayer(fx);
   s = useStore.getState();
-  assert.deepStrictEqual(s.layers.map((l) => l.id), [kc], 'FX track still removable');
+  assert.deepStrictEqual(
+    s.layers.map((l) => l.id),
+    [kc],
+    'FX track still removable',
+  );
   console.log('[selfcheck] layersPatch last-content-track guard');
 }
 
@@ -76,7 +94,14 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
 {
   useStore.setState(useStore.getInitialState());
   useStore.setState({
-    layers: ['kc-a', 'kc-b', 'kc-c'].map((id, i) => ({ id, name: `KC-${i + 1}`, visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } })),
+    layers: ['kc-a', 'kc-b', 'kc-c'].map((id, i) => ({
+      id,
+      name: `KC-${i + 1}`,
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      patch: { mode: 'off', to: null, strength: 0.16 },
+    })),
     activeLayerId: 'kc-a',
   });
   const { setLayerPatch, removeLayer } = useStore.getState();
@@ -92,16 +117,36 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
 // Solo (KC_HANDOFF T6): solo among KC tracks only — FX tracks are never hidden by
 // it — and un-solo restores the visibility the user had before soloing.
 {
-  const L = (id, type, visible = true) => ({ id, name: id, type, visible, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: null, strength: 0.16 } });
+  const L = (id, type, visible = true) => ({
+    id,
+    name: id,
+    type,
+    visible,
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
+    patch: { mode: 'off', to: null, strength: 0.16 },
+  });
   const vis = () => Object.fromEntries(useStore.getState().layers.map((l) => [l.id, l.visible]));
   useStore.setState(useStore.getInitialState());
-  useStore.setState({ layers: [L('kc-a', 'content'), L('kc-b', 'content', false), L('kc-c', 'content'), L('fx-1', 'fx')], activeLayerId: 'kc-a', soloStash: null });
+  useStore.setState({
+    layers: [L('kc-a', 'content'), L('kc-b', 'content', false), L('kc-c', 'content'), L('fx-1', 'fx')],
+    activeLayerId: 'kc-a',
+    soloStash: null,
+  });
   const { soloLayer } = useStore.getState();
 
   soloLayer('kc-a');
-  assert.deepStrictEqual(vis(), { 'kc-a': true, 'kc-b': false, 'kc-c': false, 'fx-1': true }, 'solo hides other KC tracks, leaves FX alone');
+  assert.deepStrictEqual(
+    vis(),
+    { 'kc-a': true, 'kc-b': false, 'kc-c': false, 'fx-1': true },
+    'solo hides other KC tracks, leaves FX alone',
+  );
   soloLayer('kc-a');
-  assert.deepStrictEqual(vis(), { 'kc-a': true, 'kc-b': false, 'kc-c': true, 'fx-1': true }, 'un-solo restores the pre-solo visibility (kc-b stays hidden)');
+  assert.deepStrictEqual(
+    vis(),
+    { 'kc-a': true, 'kc-b': false, 'kc-c': true, 'fx-1': true },
+    'un-solo restores the pre-solo visibility (kc-b stays hidden)',
+  );
 
   const before = vis();
   soloLayer('fx-1');
@@ -110,6 +155,10 @@ const patchOf = (id) => useStore.getState().layers.find((l) => l.id === id).patc
   // No stash (e.g. a loaded doc that was saved mid-solo): un-solo falls back to all KC visible.
   useStore.setState({ layers: [L('kc-a', 'content'), L('kc-b', 'content', false), L('fx-1', 'fx')], soloStash: null });
   soloLayer('kc-a');
-  assert.deepStrictEqual(vis(), { 'kc-a': true, 'kc-b': true, 'fx-1': true }, 'stash-less un-solo shows every KC track');
+  assert.deepStrictEqual(
+    vis(),
+    { 'kc-a': true, 'kc-b': true, 'fx-1': true },
+    'stash-less un-solo shows every KC track',
+  );
   console.log('[selfcheck] layersPatch solo content-only + restore');
 }

@@ -38,13 +38,14 @@ export const alarmFor = (reached, total) => {
   return null;
 };
 
-const cutRows = (cuts) => (cuts || []).map((c) => ({
-  name: c.name,
-  inLibrary: c.inLibrary ?? 0,
-  inCandidates: c.inCandidates ?? 0,
-  inTray: c.inTray ?? 0,
-  alarm: alarmFor(c.inTray ?? 0, c.inLibrary ?? 0),
-}));
+const cutRows = (cuts) =>
+  (cuts || []).map((c) => ({
+    name: c.name,
+    inLibrary: c.inLibrary ?? 0,
+    inCandidates: c.inCandidates ?? 0,
+    inTray: c.inTray ?? 0,
+    alarm: alarmFor(c.inTray ?? 0, c.inLibrary ?? 0),
+  }));
 
 /** E1a tray coverage + keeps coverage, display-ready. */
 export function coverageView(artifact) {
@@ -149,9 +150,15 @@ export const SHELF_CENSUS_FILL_WINDOW = 10;
 export const SHELF_CENSUS_TAIL = 8;
 
 export function shelfCensusView({
-  keeps = [], stageIds = [], history = [], historyShed = 0,
-  stubs = {}, diskRecords = {},
-  prefs = null, exportPrefs = null, labels = {},
+  keeps = [],
+  stageIds = [],
+  history = [],
+  historyShed = 0,
+  stubs = {},
+  diskRecords = {},
+  prefs = null,
+  exportPrefs = null,
+  labels = {},
 } = {}) {
   const p = prefs || DEFAULT_SHELF_PREFS;
   const xp = exportPrefs || DEFAULT_EXPORT_PREFS;
@@ -191,8 +198,7 @@ export function shelfCensusView({
     lastStagedAt: Number.isFinite(rec?.lastStagedAt) ? rec.lastStagedAt : null,
     location,
     onStage: stageSet.has(id),
-    staged: stageSet.has(id) || ledgerStaged.has(id)
-      || (Number.isFinite(rec?.stagedCount) && rec.stagedCount >= 1),
+    staged: stageSet.has(id) || ledgerStaged.has(id) || (Number.isFinite(rec?.stagedCount) && rec.stagedCount >= 1),
   });
   for (const k of keeps || []) {
     if (!k || seen.has(k.id)) continue;
@@ -211,15 +217,18 @@ export function shelfCensusView({
     return {
       empty: true,
       emptyLine: 'the shelf is empty — no keeps in the app, none on disk. Crown a keep and it lands here.',
-      tiers: null, fills: null, neglect: null, wiring: [], moves,
+      tiers: null,
+      fills: null,
+      neglect: null,
+      wiring: [],
+      moves,
       anchor: { partial: acct.partial, unread: acct.unread.length },
     };
   }
 
   // ── tier counts (live) ──
   const stageKeeps = population.filter((e) => e.onStage);
-  const allRecords = [...(keeps || []),
-    ...Object.values(diskRecords || {}).filter((k) => k && !inApp.has(k.id))];
+  const allRecords = [...(keeps || []), ...Object.values(diskRecords || {}).filter((k) => k && !inApp.has(k.id))];
   const slotsUsed = stageSlotsUsed(allRecords, stageIds);
   const tiers = {
     stage: stageKeeps.length,
@@ -260,7 +269,7 @@ export function shelfCensusView({
     rows: ruleRows,
     slotsTotal: ruleRows.reduce((n, r) => n + r.dealt, 0),
     distinctDealt: distinctDealt.size,
-    lastTable: windowFills.length ? (windowFills[windowFills.length - 1].table || '') : '',
+    lastTable: windowFills.length ? windowFills[windowFills.length - 1].table || '' : '',
   };
 
   // ── neglect coverage + the longest-unstaged tail ──
@@ -270,15 +279,22 @@ export function shelfCensusView({
   const stagedEver = population.filter((e) => e.staged).length;
   const tail = population
     .filter((e) => !e.onStage)
-    .sort((a, b) => ((a.stagedCount ?? 0) - (b.stagedCount ?? 0))
-      || ((a.lastStagedAt ?? -Infinity) - (b.lastStagedAt ?? -Infinity))
-      || ((a.keptAt ?? -Infinity) - (b.keptAt ?? -Infinity))
-      || (a.id < b.id ? -1 : 1))
+    .sort(
+      (a, b) =>
+        (a.stagedCount ?? 0) - (b.stagedCount ?? 0) ||
+        (a.lastStagedAt ?? -Infinity) - (b.lastStagedAt ?? -Infinity) ||
+        (a.keptAt ?? -Infinity) - (b.keptAt ?? -Infinity) ||
+        (a.id < b.id ? -1 : 1),
+    )
     .slice(0, SHELF_CENSUS_TAIL)
     .map((e) => ({
-      id: e.id, label: e.label, keptAt: e.keptAt,
-      stagedCount: e.stagedCount, lastStagedAt: e.lastStagedAt,
-      neverStaged: !e.staged, location: e.location,
+      id: e.id,
+      label: e.label,
+      keptAt: e.keptAt,
+      stagedCount: e.stagedCount,
+      lastStagedAt: e.lastStagedAt,
+      neverStaged: !e.staged,
+      location: e.location,
     }));
   const neglect = {
     population: total,
@@ -310,9 +326,10 @@ export function shelfCensusView({
     {
       key: 'collectionSoftBound',
       setting: `collection soft bound ${p.collectionSoftBound}`,
-      footprint: tiers.overBy > 0
-        ? `the shelf stands at ${tiers.inApp} in-app — ${tiers.overBy} over the bound (K3's export is the release valve)`
-        : `the shelf stands at ${tiers.inApp} in-app — under the bound`,
+      footprint:
+        tiers.overBy > 0
+          ? `the shelf stands at ${tiers.inApp} in-app — ${tiers.overBy} over the bound (K3's export is the release valve)`
+          : `the shelf stands at ${tiers.inApp} in-app — under the bound`,
     },
     {
       key: 'export',
@@ -322,8 +339,13 @@ export function shelfCensusView({
   ];
 
   return {
-    empty: false, emptyLine: null,
-    tiers, fills: fillsView, neglect, wiring, moves,
+    empty: false,
+    emptyLine: null,
+    tiers,
+    fills: fillsView,
+    neglect,
+    wiring,
+    moves,
     // #1645 — the history window, stated: how much of the ledger the
     // readout can see, and how much the cap has shed beyond it.
     historyCount: (history || []).length,

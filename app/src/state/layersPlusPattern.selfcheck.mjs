@@ -88,7 +88,10 @@ assert.deepStrictEqual(fx.effects, [], 'cross-family replay falls back to empty 
 assert.strictEqual(S().lastUsedFxKind, 'invert', 'fallback replay must not clobber last-used');
 
 // --- FX: remove/re-add at an ordinal → replay goes live ----------------------
-for (const id of fxLayers().slice(1).map((l) => l.id)) S().removeLayer(id); // keep FX-1
+for (const id of fxLayers()
+  .slice(1)
+  .map((l) => l.id))
+  S().removeLayer(id); // keep FX-1
 assert.strictEqual(fxLayers().length, 1);
 S().addFxLayer(); // FX-2 = Tonal again → invert replays
 fx = S().layers.at(-1);
@@ -108,7 +111,11 @@ assert.strictEqual(fx.effects[0].kind, 'invert', 'replay goes live on remove/re-
   assert.strictEqual(after[ia], b, 'positions trade');
   assert.strictEqual(after[ib], a, 'positions trade');
   S().swapLayerPositions(a, b); // restore
-  assert.deepStrictEqual(S().layers.map((l) => l.id), before, 'swap back restores order');
+  assert.deepStrictEqual(
+    S().layers.map((l) => l.id),
+    before,
+    'swap back restores order',
+  );
 }
 
 // --- swapLayerPositions: content never crosses the adjustment line ------------
@@ -117,7 +124,11 @@ assert.strictEqual(fx.effects[0].kind, 'invert', 'replay goes live on remove/re-
   const f = fxLayers()[0].id;
   const before = S().layers.map((l) => l.id);
   S().swapLayerPositions(c, f);
-  assert.deepStrictEqual(S().layers.map((l) => l.id), before, 'cross-class swap refused');
+  assert.deepStrictEqual(
+    S().layers.map((l) => l.id),
+    before,
+    'cross-class swap refused',
+  );
 }
 
 // --- boot/shuffle isolation: layoutSlice never writes last-used ---------------

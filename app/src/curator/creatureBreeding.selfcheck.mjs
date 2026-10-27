@@ -57,7 +57,9 @@ assert.equal(breedFor({ ring: [[A], [B], [C]], seed: 9, key: 5, ordinal: IMMIGRA
 
 // 6. the pool is capped, newest kept; junk in the ring is ignored
 {
-  const ring = Array.from({ length: 30 }, (_, n) => [genomeFromTraits({ spread: n - 15, wing: 1, body: 1, swatch: n % 4 }, n, `g${n}`)]);
+  const ring = Array.from({ length: 30 }, (_, n) => [
+    genomeFromTraits({ spread: n - 15, wing: 1, body: 1, swatch: n % 4 }, n, `g${n}`),
+  ]);
   ring.push([null, { genes: 'x' }, 7]);
   const pool = poolOf(ring);
   assert.equal(pool.length, POOL_CAP);

@@ -20,11 +20,23 @@ export function isTrivialStack(layers) {
   if (!Array.isArray(layers) || layers.length === 0) return true;
   if (layers.length > 1) return false;
   const l = layers[0];
-  return !!l && l.type === 'content' && l.visible !== false && (l.layerBlendMode ?? 'normal') === 'normal'
-    && (l.layerOpacity ?? 1) === 1 && (!l.patch || l.patch.mode === 'off') && !l.matte;
+  return (
+    !!l &&
+    l.type === 'content' &&
+    l.visible !== false &&
+    (l.layerBlendMode ?? 'normal') === 'normal' &&
+    (l.layerOpacity ?? 1) === 1 &&
+    (!l.patch || l.patch.mode === 'off') &&
+    !l.matte
+  );
 }
 
-const enabledIds = (map) => (isObj(map) ? Object.keys(map).filter((k) => map[k]).sort() : []);
+const enabledIds = (map) =>
+  isObj(map)
+    ? Object.keys(map)
+        .filter((k) => map[k])
+        .sort()
+    : [];
 
 /**
  * The compact stack of any carrier: the live store ({ layers, activeLayerId, layerSnapshots }) or a keep that
@@ -43,9 +55,11 @@ export function stackOf(src) {
     const s = snaps[l.id];
     const lay = isObj(s.layoutParams) ? s.layoutParams : {};
     const delta = {};
-    for (const k of new Set([...Object.keys(DEFAULT_LAYOUT_PARAMS), ...Object.keys(lay)])) if (!same(lay[k], DEFAULT_LAYOUT_PARAMS[k])) delta[k] = lay[k];
+    for (const k of new Set([...Object.keys(DEFAULT_LAYOUT_PARAMS), ...Object.keys(lay)]))
+      if (!same(lay[k], DEFAULT_LAYOUT_PARAMS[k])) delta[k] = lay[k];
     const o = {};
-    for (const [ch, v] of Object.entries(isObj(s.seedOffsets) ? s.seedOffsets : {})) if (Number.isFinite(v) && v !== 0) o[ch] = Math.trunc(v);
+    for (const [ch, v] of Object.entries(isObj(s.seedOffsets) ? s.seedOffsets : {}))
+      if (Number.isFinite(v) && v !== 0) o[ch] = Math.trunc(v);
     n[l.id] = {
       s: Number(s.seed) >>> 0,
       ...(Object.keys(o).length ? { o } : {}),
@@ -75,9 +89,16 @@ export function expandStack(compact) {
       paletteId: typeof s.p === 'string' && s.p ? s.p : undefined,
       paletteOverrides: isObj(s.po) ? s.po : null,
       layoutParams: { ...DEFAULT_LAYOUT_PARAMS, ...(isObj(s.l) ? s.l : {}) },
-      enabledAssets: Object.fromEntries((Array.isArray(s.e) ? s.e : []).filter((k) => typeof k === 'string').map((k) => [k, true])),
+      enabledAssets: Object.fromEntries(
+        (Array.isArray(s.e) ? s.e : []).filter((k) => typeof k === 'string').map((k) => [k, true]),
+      ),
     };
   }
-  const layerSnapshots = normalizeSnapshots(raw, [], {}, layers.filter((l) => l.type === 'content').map((l) => l.id));
+  const layerSnapshots = normalizeSnapshots(
+    raw,
+    [],
+    {},
+    layers.filter((l) => l.type === 'content').map((l) => l.id),
+  );
   return { ok: true, stack: { layers, activeLayerId, layerSnapshots } };
 }

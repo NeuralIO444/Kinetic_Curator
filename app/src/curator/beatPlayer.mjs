@@ -18,7 +18,7 @@ const MAX_BACK = STEPS; // look back up to one bar for the most recent hit
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
 /** Time (in steps) a hit on step k lands at: the odd sixteenths are delayed by the swing. */
-const hitTime = (k, swing) => k + ((k % 2 + 2) % 2 === 1 ? swing : 0);
+const hitTime = (k, swing) => k + (((k % 2) + 2) % 2 === 1 ? swing : 0);
 
 /** Envelope of the lane at step-time t: the most recent hit's amplitude, decayed. 0 before any hit. */
 function laneLevel(pattern, lane, t) {
@@ -53,7 +53,7 @@ export function playLevels(pattern, beatPos, { intensity = 0.6 } = {}) {
     for (const [b, w] of Object.entries(LANE[lane].w)) raw[b] += lv * w;
   }
   // a slow bed under the hits: it breathes over 16 beats so a gap in the pattern is never dead
-  const bed = pattern.bed * (0.6 + 0.4 * Math.sin((Number.isFinite(beatPos) ? beatPos : 0) * (Math.PI * 2) / 16));
+  const bed = pattern.bed * (0.6 + 0.4 * Math.sin(((Number.isFinite(beatPos) ? beatPos : 0) * (Math.PI * 2)) / 16));
   const bands = {};
   for (const b of BANDS) bands[b] = clamp01((raw[b] + bed) * gain);
   const mean = (...k) => k.reduce((s, x) => s + bands[x], 0) / k.length;

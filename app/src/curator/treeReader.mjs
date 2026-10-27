@@ -38,9 +38,8 @@ function formatTree(node, names, depth = 0) {
   const pad = '  '.repeat(depth);
   if ('leaf' in node) return [`${pad}-> ${fmtLeaf(node.leaf)}`];
   const name = names[node.f];
-  const cond = node.op === '<'
-    ? `${name} < ${fmtG(node.v)}`
-    : `${name} = ${String(node.v)} (${describeSplitValue(name, node.v)})`;
+  const cond =
+    node.op === '<' ? `${name} < ${fmtG(node.v)}` : `${name} = ${String(node.v)} (${describeSplitValue(name, node.v)})`;
   return [
     `${pad}if ${cond}  [gain ${fmtG(node.gain)}]`,
     ...formatTree(node.y, names, depth + 1),
@@ -86,9 +85,7 @@ export function treeHeadView(taste) {
     .map((t) => ({ tree: t, gain: treeGain(t) }))
     .sort((a, b) => b.gain - a.gain)
     .slice(0, 3);
-  const lines = [
-    `xgboost trees · ${head.trees.length} trees, depth <= ${maxDepth}, ${nodes} nodes`,
-  ];
+  const lines = [`xgboost trees · ${head.trees.length} trees, depth <= ${maxDepth}, ${nodes} nodes`];
   if (strongest.length) {
     lines.push(`strongest features: ${strongest.map((s) => `${s.feature} (gain ${fmtG(s.gain)})`).join(', ')}`);
   }

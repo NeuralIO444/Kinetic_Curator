@@ -105,9 +105,7 @@ export function rankBiases(candidates, centroid) {
  */
 export function applyRankBias(scores, biases) {
   const n = scores ? scores.length : 0;
-  const order = Array.from({ length: n }, (_, i) => i).sort(
-    (a, b) => (scores[b] - scores[a]) || (a - b),
-  );
+  const order = Array.from({ length: n }, (_, i) => i).sort((a, b) => scores[b] - scores[a] || a - b);
   const bScore = (i) => scores[i] + (biases && biases[i] ? biases[i] : 0);
   let swapAt = -1;
   let swapGain = 0;
@@ -190,9 +188,7 @@ export const M4_HOLD_PCT = 0.08;
  * the beat length). All zeros when not confident.
  */
 export function phraseTiming(beatConfident) {
-  return beatConfident
-    ? { armEarlyMs: M4_ARM_MS, holdPct: M4_HOLD_PCT }
-    : { armEarlyMs: 0, holdPct: 0 };
+  return beatConfident ? { armEarlyMs: M4_ARM_MS, holdPct: M4_HOLD_PCT } : { armEarlyMs: 0, holdPct: 0 };
 }
 
 // ─── M5: the lean-in ─────────────────────────────────────────────────────
@@ -294,7 +290,10 @@ export function warmCentreOpen(ring, defaults, allowance, nKeeps = Infinity) {
   if (!(nKeeps >= MIN_KEEPS) || !Array.isArray(ring)) return null;
   const a = clamp01(allowance) * M6_STRENGTH;
   if (a === 0) return null;
-  const sample = ring.slice(-M6_KEEPS).flat().filter((t) => t && typeof t === 'object');
+  const sample = ring
+    .slice(-M6_KEEPS)
+    .flat()
+    .filter((t) => t && typeof t === 'object');
   if (!sample.length) return null;
   const out = {};
   for (const k of Object.keys(defaults)) {
@@ -332,7 +331,8 @@ export function tempoEaseOpen({ current, target, confidence, nKeeps = Infinity, 
   const a = clamp01(allowance);
   if (a === 0) return null;
   if (!(confidence >= M7_CONFIDENCE)) return null;
-  const cur = Number(current); const want = Number(target);
+  const cur = Number(current);
+  const want = Number(target);
   if (!Number.isFinite(cur) || !Number.isFinite(want)) return null;
   const goal = Math.min(M7_RANGE[1], Math.max(M7_RANGE[0], want));
   const gap = goal - cur;
@@ -387,7 +387,12 @@ export function wetnessLeanOpen(args = {}) {
   if (!(nKeeps >= MIN_KEEPS)) return null;
   if (!(allowance > 0)) return null;
   if (!Number.isFinite(current) || !Number.isFinite(target)) return null;
-  const next = boundedDialStep(current, clamp01(target), M8_WET_STEP * (0.5 + 0.5 * clamp01(allowance)), M8_WET_DEADBAND);
+  const next = boundedDialStep(
+    current,
+    clamp01(target),
+    M8_WET_STEP * (0.5 + 0.5 * clamp01(allowance)),
+    M8_WET_DEADBAND,
+  );
   return next === null ? null : Math.round(next * 1000) / 1000;
 }
 

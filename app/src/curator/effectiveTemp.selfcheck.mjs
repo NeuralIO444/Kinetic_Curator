@@ -1,18 +1,15 @@
 // effectiveTemp.selfcheck.mjs — #1145: the single temperature source of truth.
 import assert from 'node:assert';
-import {
-  TEMP_DEFAULT,
-  TEMP_FLOOR,
-  TEMP_CAP,
-  REFINE_COOL,
-  EXPLORE_WARM,
-  effectiveTemp,
-} from './effectiveTemp.js';
+import { TEMP_DEFAULT, TEMP_FLOOR, TEMP_CAP, REFINE_COOL, EXPLORE_WARM, effectiveTemp } from './effectiveTemp.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
-ok('silence → the global default 0.4 (yesterday\'s behavior)', () => {
+ok("silence → the global default 0.4 (yesterday's behavior)", () => {
   assert.equal(effectiveTemp(), TEMP_DEFAULT);
   assert.equal(effectiveTemp({}), TEMP_DEFAULT);
   assert.equal(effectiveTemp({ room: null }), TEMP_DEFAULT);
@@ -24,7 +21,7 @@ ok('explicit room base_temp wins (the room is the thermostat)', () => {
   assert.equal(effectiveTemp({ room: { base_temp: 0.55 } }), 0.55);
 });
 
-ok('refine cools the room; explore warms it (#1144\'s interface)', () => {
+ok("refine cools the room; explore warms it (#1144's interface)", () => {
   assert.ok(Math.abs(effectiveTemp({ room: { base_temp: 0.4 }, phase: 'refine' }) - (0.4 - REFINE_COOL)) < 1e-9);
   assert.ok(Math.abs(effectiveTemp({ room: { base_temp: 0.4 }, phase: 'explore' }) - (0.4 + EXPLORE_WARM)) < 1e-9);
 });

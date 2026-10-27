@@ -11,7 +11,9 @@ export const HEAT_STEPS = 4; // 0 cool (dark), 1 low, 2 warm, 3 hot
 
 /** The three strongest swatches of a palette, as #rrggbb. */
 export function dominantColors(palette) {
-  const ranked = rankedSwatches(palette).map((c) => normalizeHex(c)).filter(Boolean);
+  const ranked = rankedSwatches(palette)
+    .map((c) => normalizeHex(c))
+    .filter(Boolean);
   return ranked.slice(0, 3);
 }
 

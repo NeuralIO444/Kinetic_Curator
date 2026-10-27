@@ -16,12 +16,16 @@
 //     because it cannot compute a different answer.
 import assert from 'node:assert';
 
-const { coverageView, censusView, yieldByCornerView, agreementView, alarmFor, COVERAGE_KIND, CENSUS_KIND } = await import('./censusReadout.mjs');
+const { coverageView, censusView, yieldByCornerView, agreementView, alarmFor, COVERAGE_KIND, CENSUS_KIND } =
+  await import('./censusReadout.mjs');
 const { diceTrayCoverage, keepsCoverage } = await import('./coverageReport.mjs');
 
 const lines = [];
 const deepFreeze = (o) => {
-  if (o && typeof o === 'object') { for (const v of Object.values(o)) deepFreeze(v); Object.freeze(o); }
+  if (o && typeof o === 'object') {
+    for (const v of Object.values(o)) deepFreeze(v);
+    Object.freeze(o);
+  }
   return o;
 };
 
@@ -29,7 +33,8 @@ const deepFreeze = (o) => {
 const coverageArtifact = deepFreeze({
   kind: COVERAGE_KIND,
   dice: {
-    rolls: 600, seed: 0xA0D17,
+    rolls: 600,
+    seed: 0xa0d17,
     library: { assets: 294, palettes: 37, layouts: 15 },
     tray: { distinct: 208, neverCount: 86, top15Share: 0.42 },
     categories: [
@@ -39,14 +44,23 @@ const coverageArtifact = deepFreeze({
       { name: 'speck', inLibrary: 30, inCandidates: 29, inTray: 1 },
     ],
     packs: [{ name: 'haeckel', inLibrary: 26, inCandidates: 26, inTray: 1 }],
-    layouts: [{ layout: 'radial', trios: 3 }, { layout: 'grid', trios: 210 }],
+    layouts: [
+      { layout: 'radial', trios: 3 },
+      { layout: 'grid', trios: 210 },
+    ],
     layoutsReached: 14,
   },
   keeps: {
-    keeps: 9, withCast: 8, castless: 1, unknownIds: 0,
-    categories: [{ name: 'grid', keeps: 5 }], distinctCategories: 3,
-    palettes: [{ name: 'hydra', keeps: 2 }], distinctPalettes: 4,
-    layouts: [{ name: 'grid', keeps: 6 }], distinctLayouts: 2,
+    keeps: 9,
+    withCast: 8,
+    castless: 1,
+    unknownIds: 0,
+    categories: [{ name: 'grid', keeps: 5 }],
+    distinctCategories: 3,
+    palettes: [{ name: 'hydra', keeps: 2 }],
+    distinctPalettes: 4,
+    layouts: [{ name: 'grid', keeps: 6 }],
+    distinctLayouts: 2,
   },
   keepsNote: 'fixture note',
 });
@@ -59,7 +73,11 @@ const coverageArtifact = deepFreeze({
   assert.strictEqual(byName.get('crystalline').alarm, 'zero', 'crystalline at 0 lights the zero alarm');
   assert.strictEqual(byName.get('speck').alarm, 'low', '≤10% reads near-zero, not zero');
   assert.strictEqual(byName.get('grid').alarm, null, 'a healthy family lights nothing');
-  assert.deepStrictEqual(v.alarms.map((a) => a.name).sort(), ['crystalline', 'haeckel', 'radial', 'speck'], 'the alarm roll-up spans categories and packs');
+  assert.deepStrictEqual(
+    v.alarms.map((a) => a.name).sort(),
+    ['crystalline', 'haeckel', 'radial', 'speck'],
+    'the alarm roll-up spans categories and packs',
+  );
   assert.strictEqual(v.trayDistinct, 208);
   assert.strictEqual(v.trayNever, 86);
   assert.strictEqual(v.keeps.total, 9);
@@ -85,7 +103,14 @@ const coverageArtifact = deepFreeze({
   const censusArtifact = deepFreeze({
     kind: CENSUS_KIND,
     params: { total: 105, moves: 60, dead: ['brushWidth', 'material'], notHeadless: ['dishO2'], dish: 10 },
-    reach: { assetsMeasured: 294, assetsUnreached: [], palettesDistinct: 37, palettesTotal: 37, layoutsDistinct: 12, layoutsTotal: 15 },
+    reach: {
+      assetsMeasured: 294,
+      assetsUnreached: [],
+      palettesDistinct: 37,
+      palettesTotal: 37,
+      layoutsDistinct: 12,
+      layoutsTotal: 15,
+    },
   });
   const v = censusView(censusArtifact);
   assert.deepStrictEqual(v.params.dead, ['brushWidth', 'material'], 'the dead list passes through');
@@ -97,8 +122,11 @@ const coverageArtifact = deepFreeze({
   const prov = (corner) => ({ provenance: { source: 'explorer', run: 'r', corner } });
   const y = yieldByCornerView({
     candidates: [
-      { corner: 'haeckel' }, { corner: 'haeckel' }, { corner: 'haeckel' },
-      { corner: 'reas' }, { corner: 'reas' },
+      { corner: 'haeckel' },
+      { corner: 'haeckel' },
+      { corner: 'haeckel' },
+      { corner: 'reas' },
+      { corner: 'reas' },
     ],
     finalists: [{ ...prov('haeckel') }, { seed: 1 }],
   });
@@ -110,7 +138,7 @@ const coverageArtifact = deepFreeze({
   assert.strictEqual(y.totalCandidates, 5);
   assert.strictEqual(y.totalFinalists, 2);
   assert.strictEqual(byCorner.get('haeckel').label, 'SPECIMEN', 'corner labels are the TE aliases');
-  lines.push('yield: candidates/finalists tallied per corner from the run\'s own records; aliases only');
+  lines.push("yield: candidates/finalists tallied per corner from the run's own records; aliases only");
 }
 
 // ── the real E1a artifact, end to end ────────────────────────────────
@@ -123,7 +151,9 @@ const coverageArtifact = deepFreeze({
   }
   const radial = v.categories.find((r) => r.name === 'radial');
   assert.ok(radial && radial.inLibrary === 26, 'radial is in the readout with its library size');
-  lines.push(`real artifact: E1a coverage renders (tray ${v.trayDistinct}/${v.library.assets}, radial tray ${radial.inTray}/${radial.inLibrary}); every alarm consistent`);
+  lines.push(
+    `real artifact: E1a coverage renders (tray ${v.trayDistinct}/${v.library.assets}, radial tray ${radial.inTray}/${radial.inLibrary}); every alarm consistent`,
+  );
 }
 
 // ── XGBoost T2 — the taste-agreement section ─────────────────────────
@@ -132,17 +162,33 @@ const coverageArtifact = deepFreeze({
 // reason; a deep-frozen input is never mutated.
 {
   const agr = deepFreeze({
-    present: true, headKind: 'xgboost-trees', tasteVersion: 1, fidelity: 0.9,
-    keeps: { n: 2, mean: 0.7282 }, passes: { n: 2, mean: 0.5585 }, unscored: 2, auc: 0.875,
+    present: true,
+    headKind: 'xgboost-trees',
+    tasteVersion: 1,
+    fidelity: 0.9,
+    keeps: { n: 2, mean: 0.7282 },
+    passes: { n: 2, mean: 0.5585 },
+    unscored: 2,
+    auc: 0.875,
   });
   assert.deepStrictEqual(agreementView(agr), {
-    present: true, headKind: 'xgboost-trees', tasteVersion: 1, fidelity: 0.9,
-    keepsMean: 0.7282, keepsN: 2, passesMean: 0.5585, passesN: 2, auc: 0.875, unscored: 2,
+    present: true,
+    headKind: 'xgboost-trees',
+    tasteVersion: 1,
+    fidelity: 0.9,
+    keepsMean: 0.7282,
+    keepsN: 2,
+    passesMean: 0.5585,
+    passesN: 2,
+    auc: 0.875,
+    unscored: 2,
   });
   assert.deepStrictEqual(agreementView(agr), agreementView(agr), 'agreement view is pure');
   assert.deepStrictEqual(
     agreementView(deepFreeze({ present: false, reason: 'no taste loaded' })),
-    { present: false, reason: 'no taste loaded' }, 'absent stays absent, reason carried');
+    { present: false, reason: 'no taste loaded' },
+    'absent stays absent, reason carried',
+  );
   assert.deepStrictEqual(agreementView(null), { present: false, reason: 'not measured' });
   lines.push('taste agreement: present reshapes flat, absent stays absent with its reason, frozen inputs unmutated');
 }

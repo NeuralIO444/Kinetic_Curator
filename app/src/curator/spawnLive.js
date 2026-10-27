@@ -13,7 +13,9 @@ export { SPAWN_RETRY_FRAMES as RETRY_FRAMES, SPAWN_PATIENCE_FRAMES as PATIENCE_F
 
 /** The standing homes, [{x, y}] (a copy, as the singleton's getter always handed out). */
 export function getSpawnHomes() {
-  return activeSpawnState().getDecisions().dishPins.map((p) => ({ ...p }));
+  return activeSpawnState()
+    .getDecisions()
+    .dishPins.map((p) => ({ ...p }));
 }
 
 /** Start over (a fresh document, tests). */

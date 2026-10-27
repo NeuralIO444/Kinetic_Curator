@@ -19,11 +19,24 @@ const LABELS = Object.freeze({ lois: 'LOIS', davis: 'DAVIS', queen: 'III' });
 
 let view = null;
 const listeners = new Set();
-const notify = () => { for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the loop */ } } };
+const notify = () => {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the loop */
+    }
+  }
+};
 
 /** The dev readout, or null before the driver runs: { reading, rows: [...], constants }. */
-export function getPresenceView() { return view; }
-export function subscribePresence(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+export function getPresenceView() {
+  return view;
+}
+export function subscribePresence(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 
 const delta = (now, prev, k) => Math.max(0, (Number(now && now[k]) || 0) - (Number(prev && prev[k]) || 0));
 
@@ -34,12 +47,25 @@ const delta = (now, prev, k) => Math.max(0, (Number(now && now[k]) || 0) - (Numb
  * @param now        () => ms (Date.now by default)
  * @param today      the Date the startup reading is taken from (new Date() by default)
  */
-export function createPresenceDriver({ getSignals, storage = globalThis.localStorage, now = () => Date.now(), today = undefined } = {}) {
+export function createPresenceDriver({
+  getSignals,
+  storage = globalThis.localStorage,
+  now = () => Date.now(),
+  today = undefined,
+} = {}) {
   let saved;
-  try { saved = storage ? storage.getItem(STORAGE_KEY) : null; } catch { saved = null; }
+  try {
+    saved = storage ? storage.getItem(STORAGE_KEY) : null;
+  } catch {
+    saved = null;
+  }
   const book = createEngagement(decodeEngagement(saved));
   let reading = null;
-  try { reading = readCalendar(today instanceof Date ? today : new Date()); } catch { reading = null; }
+  try {
+    reading = readCalendar(today instanceof Date ? today : new Date());
+  } catch {
+    reading = null;
+  }
   const mods = Object.fromEntries(PERSONAS.map((p) => [p, modulation(p, reading)]));
   const halfLifeMul = Object.fromEntries(PERSONAS.map((p) => [p, mods[p].halfLife]));
   const personas = Object.fromEntries(PERSONAS.map((p) => [p, createPresence(p, { level: book.get(p).tier })]));
@@ -47,7 +73,13 @@ export function createPresenceDriver({ getSignals, storage = globalThis.localSto
   let prev = null;
   let bars = 0;
 
-  const save = () => { try { if (storage) storage.setItem(STORAGE_KEY, book.encode()); } catch { /* private mode: this session only */ } };
+  const save = () => {
+    try {
+      if (storage) storage.setItem(STORAGE_KEY, book.encode());
+    } catch {
+      /* private mode: this session only */
+    }
+  };
   const publish = () => {
     view = {
       reading: reading ? { ...reading } : null,
@@ -55,10 +87,20 @@ export function createPresenceDriver({ getSignals, storage = globalThis.localSto
         const e = book.get(p);
         const tr = last[p];
         return {
-          label: LABELS[p], sign: SIGNS[p], score: Math.round(e.score * 10) / 10, tier: e.tier, level: personas[p].level,
-          cool: e.cool, floor: e.floor, next: e.next, mod: mods[p], halfLifeDays: HALF_LIFE_DAYS[p] * mods[p].halfLife,
+          label: LABELS[p],
+          sign: SIGNS[p],
+          score: Math.round(e.score * 10) / 10,
+          tier: e.tier,
+          level: personas[p].level,
+          cool: e.cool,
+          floor: e.floor,
+          next: e.next,
+          mod: mods[p],
+          halfLifeDays: HALF_LIFE_DAYS[p] * mods[p].halfLife,
           moved: tr ? (tr.g ? 'own move' : tr.r ? 'rested' : tr.gh ? `presence ${tr.gh.k} ${tr.gh.s}` : '') : '',
-          weights: WEIGHTS[p], temperament: TEMPERAMENT[SIGNS[p]], born: BIRTHDAYS[p].join('-'),
+          weights: WEIGHTS[p],
+          temperament: TEMPERAMENT[SIGNS[p]],
+          born: BIRTHDAYS[p].join('-'),
         };
       }),
       constants: { floors: TIER_FLOORS, shape: TIER_SHAPE, cool: COOL, coolEnter: COOL_ENTER },
@@ -71,11 +113,20 @@ export function createPresenceDriver({ getSignals, storage = globalThis.localSto
     /** One live bar: activity → engagement. */
     beforeBar() {
       let sig;
-      try { sig = getSignals(); } catch { sig = null; }
+      try {
+        sig = getSignals();
+      } catch {
+        sig = null;
+      }
       if (sig) {
         const step = {
-          active: !!sig.active, dwelling: !!sig.dwelling, audio: !!sig.audio,
-          keeps: delta(sig, prev, 'keeps'), exports: delta(sig, prev, 'exports'), returns: delta(sig, prev, 'returns'), evolves: delta(sig, prev, 'evolves'),
+          active: !!sig.active,
+          dwelling: !!sig.dwelling,
+          audio: !!sig.audio,
+          keeps: delta(sig, prev, 'keeps'),
+          exports: delta(sig, prev, 'exports'),
+          returns: delta(sig, prev, 'returns'),
+          evolves: delta(sig, prev, 'evolves'),
         };
         prev = sig;
         book.step(step, now(), halfLifeMul);
@@ -89,16 +140,28 @@ export function createPresenceDriver({ getSignals, storage = globalThis.localSto
     },
     shape(d, ctx) {
       const e = book.get(d.persona);
-      const out = personas[d.persona].shape(d, { tier: e.tier, cool: e.cool, mod: mods[d.persona], room: ctx && ctx.room });
+      const out = personas[d.persona].shape(d, {
+        tier: e.tier,
+        cool: e.cool,
+        mod: mods[d.persona],
+        room: ctx && ctx.room,
+      });
       last[d.persona] = out.traits;
       if (d.persona === PERSONAS[PERSONAS.length - 1]) publish(); // once a bar, after the last persona
       return out;
     },
-    stop() { save(); },
+    stop() {
+      save();
+    },
     /** For the selfcheck. */
-    get reading() { return reading; },
+    get reading() {
+      return reading;
+    },
     engagement: (p) => book.get(p),
     /** The third's presence for the Director (#1145): { tier, cool } — earned from honest engagement only. */
-    third: () => { const e = book.get(PERSONAS[2]); return { tier: e.tier, cool: e.cool }; },
+    third: () => {
+      const e = book.get(PERSONAS[2]);
+      return { tier: e.tier, cool: e.cool };
+    },
   };
 }

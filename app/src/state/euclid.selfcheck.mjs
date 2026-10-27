@@ -29,8 +29,10 @@ for (let n = 1; n <= 16; n++) {
       // "as evenly as possible" for integers.
       const idx = p.map((v, i) => (v ? i : -1)).filter((i) => i >= 0);
       const gaps = idx.map((v, i) => (i === 0 ? v + n - idx[idx.length - 1] : v - idx[i - 1]));
-      assert.ok(Math.max(...gaps) - Math.min(...gaps) <= 1,
-        `E(${k},${n}) is not evenly spread: gaps ${gaps.join(',')}`);
+      assert.ok(
+        Math.max(...gaps) - Math.min(...gaps) <= 1,
+        `E(${k},${n}) is not evenly spread: gaps ${gaps.join(',')}`,
+      );
     }
   }
 }
@@ -45,8 +47,10 @@ assert.strictEqual(euclidPattern(3, 0).length, 1, 'n<1 clamps to a single step')
 assert.strictEqual(euclidPattern(3, 9999).length, EUCLID_MAX_STEPS, 'n is capped');
 for (const bad of [NaN, undefined, null, 'x', Infinity, -5]) {
   const p = euclidPattern(bad, bad, bad);
-  assert.ok(Array.isArray(p) && p.length >= 1 && p.every((v) => v === 0 || v === 1),
-    `hostile input ${bad} must still produce a pattern`);
+  assert.ok(
+    Array.isArray(p) && p.length >= 1 && p.every((v) => v === 0 || v === 1),
+    `hostile input ${bad} must still produce a pattern`,
+  );
 }
 
 // Rotation turns the figure without changing its content.
@@ -73,18 +77,32 @@ assert.notStrictEqual(euclidString(3, 8, 1), euclidString(3, 8, 0), 'rotation ac
   // Only ONE source may answer a mic attack. METRO and EUCLID run their own
   // interval, so if either also answered audio the bar would advance twice.
   const base = {
-    phraseEnabled: true, audioEnabled: true, evolveMode: false,
-    slowRender: false, batchPaused: false, beatRoute: 'both',
+    phraseEnabled: true,
+    audioEnabled: true,
+    evolveMode: false,
+    slowRender: false,
+    batchPaused: false,
+    beatRoute: 'both',
   };
   assert.strictEqual(routeBeat({ ...base, phraseClock: 'audio' }).tickPhrase, true, 'AUDIO answers the mic');
-  assert.strictEqual(routeBeat({ ...base, phraseClock: 'metro' }).tickPhrase, false, 'METRO must not also answer the mic');
-  assert.strictEqual(routeBeat({ ...base, phraseClock: 'euclid' }).tickPhrase, false, 'EUCLID must not also answer the mic');
+  assert.strictEqual(
+    routeBeat({ ...base, phraseClock: 'metro' }).tickPhrase,
+    false,
+    'METRO must not also answer the mic',
+  );
+  assert.strictEqual(
+    routeBeat({ ...base, phraseClock: 'euclid' }).tickPhrase,
+    false,
+    'EUCLID must not also answer the mic',
+  );
 
   // A switch changes the SOURCE and nothing else: the bar position, the origin
   // seed and the wrap generation all survive it, so no hit is dropped and none
   // is replayed.
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set, () => state);
   state.setPhraseClock('euclid');
   state = { ...state, phraseBeat: 3, phraseWrapGen: 2, phraseOriginSeed: 777 };
@@ -102,10 +120,15 @@ assert.notStrictEqual(euclidString(3, 8, 1), euclidString(3, 8, 0), 'rotation ac
 // ── THE STORE ───────────────────────────────────────────────────────────────
 {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set, () => state);
   assert.deepStrictEqual(PHRASE_CLOCKS, ['audio', 'metro', 'euclid']);
-  for (const c of PHRASE_CLOCKS) { state.setPhraseClock(c); assert.strictEqual(state.phraseClock, c); }
+  for (const c of PHRASE_CLOCKS) {
+    state.setPhraseClock(c);
+    assert.strictEqual(state.phraseClock, c);
+  }
   for (const bad of ['nope', null, undefined, 7, '__proto__']) {
     state.setPhraseClock(bad);
     assert.strictEqual(state.phraseClock, 'audio', `a bogus clock (${bad}) falls back to audio`);
@@ -123,8 +146,10 @@ assert.notStrictEqual(euclidString(3, 8, 1), euclidString(3, 8, 0), 'rotation ac
   assert.ok(state.euclidSteps <= EUCLID_MAX_STEPS, 'steps capped');
   for (const bad of [NaN, 'x', null]) {
     state.setEuclid({ beats: bad, steps: bad, rotate: bad });
-    assert.ok(Number.isFinite(state.euclidBeats) && Number.isFinite(state.euclidSteps) && Number.isFinite(state.euclidRotate),
-      'hostile store input stays finite');
+    assert.ok(
+      Number.isFinite(state.euclidBeats) && Number.isFinite(state.euclidSteps) && Number.isFinite(state.euclidRotate),
+      'hostile store input stays finite',
+    );
   }
 }
 

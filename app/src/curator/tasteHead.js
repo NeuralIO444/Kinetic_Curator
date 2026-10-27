@@ -70,9 +70,13 @@ const finite = (x) => typeof x === 'number' && Number.isFinite(x);
 export function validateTaste(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: 'not a taste file' };
   if (raw.kind !== TASTE_KIND) return { ok: false, error: 'not a taste file (kind)' };
-  if (raw.version !== TASTE_VERSION) return { ok: false, error: `taste v${raw.version} — this app reads v${TASTE_VERSION}` };
+  if (raw.version !== TASTE_VERSION)
+    return { ok: false, error: `taste v${raw.version} — this app reads v${TASTE_VERSION}` };
   if (raw.featuresVersion !== FEATURES_VERSION) {
-    return { ok: false, error: `taste was trained on features v${raw.featuresVersion}, app has v${FEATURES_VERSION} — retrain on a fresh pool` };
+    return {
+      ok: false,
+      error: `taste was trained on features v${raw.featuresVersion}, app has v${FEATURES_VERSION} — retrain on a fresh pool`,
+    };
   }
   const h = raw.head;
   if (!h || typeof h !== 'object') return { ok: false, error: 'taste has no head — train with --features' };
@@ -86,17 +90,24 @@ export function validateTaste(raw) {
     return { ok: false, error: `unknown taste head kind: ${String(h.kind)}` };
   } else {
     const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
-    if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'taste head terms missing or too large' };
+    if (!terms || Object.keys(terms).length > MAX_TERMS)
+      return { ok: false, error: 'taste head terms missing or too large' };
     const num = h.num && typeof h.num === 'object' ? h.num : {};
-    for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
-    for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
-    if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
+    for (const [k, w] of Object.entries(terms))
+      if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
+    for (const [k, w] of Object.entries(num))
+      if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
+    if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1)
+      return { ok: false, error: 'bad head bias/fidelity' };
     head = { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 };
   }
   const labels = raw.labels && typeof raw.labels === 'object' ? raw.labels : {};
   const taste = {
-    kind: TASTE_KIND, version: TASTE_VERSION, featuresVersion: FEATURES_VERSION,
-    model: String(raw.model || ''), dims: Number(raw.dims) || 0,
+    kind: TASTE_KIND,
+    version: TASTE_VERSION,
+    featuresVersion: FEATURES_VERSION,
+    model: String(raw.model || ''),
+    dims: Number(raw.dims) || 0,
     trainedAt: String(raw.trainedAt || ''),
     labels: { likes: Number(labels.likes) || 0, passes: Number(labels.passes) || 0 },
     head,
@@ -137,10 +148,16 @@ function validateHead(h, numKeys) {
   const terms = h.terms && typeof h.terms === 'object' ? h.terms : null;
   if (!terms || Object.keys(terms).length > MAX_TERMS) return { ok: false, error: 'head terms missing or too large' };
   const num = h.num && typeof h.num === 'object' ? h.num : {};
-  for (const [k, w] of Object.entries(terms)) if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
-  for (const [k, w] of Object.entries(num)) if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
-  if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1) return { ok: false, error: 'bad head bias/fidelity' };
-  return { ok: true, head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 } };
+  for (const [k, w] of Object.entries(terms))
+    if (typeof k !== 'string' || !finite(w)) return { ok: false, error: `bad head weight: ${k}` };
+  for (const [k, w] of Object.entries(num))
+    if (!numKeys.includes(k) || !finite(w)) return { ok: false, error: `bad head numeric: ${k}` };
+  if (!finite(h.bias) || !finite(h.fidelity) || h.fidelity < -1 || h.fidelity > 1)
+    return { ok: false, error: 'bad head bias/fidelity' };
+  return {
+    ok: true,
+    head: { terms: { ...terms }, num: { ...num }, bias: h.bias, fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0 },
+  };
 }
 
 /**
@@ -160,7 +177,8 @@ function validateTreeHead(h) {
   if (!Array.isArray(features) || !features.length) return { ok: false, error: 'tree head features missing' };
   const seen = new Set();
   for (const name of features) {
-    if (typeof name !== 'string' || !allowed.has(name)) return { ok: false, error: `tree head feature unknown: ${String(name)}` };
+    if (typeof name !== 'string' || !allowed.has(name))
+      return { ok: false, error: `tree head feature unknown: ${String(name)}` };
     if (seen.has(name)) return { ok: false, error: `tree head feature duplicated: ${name}` };
     seen.add(name);
   }
@@ -177,9 +195,13 @@ function validateTreeHead(h) {
   return {
     ok: true,
     head: {
-      kind: XGB_HEAD_KIND, objective: XGB_OBJECTIVE, baseScore: h.baseScore,
-      fidelity: h.fidelity, fitOn: Number(h.fitOn) || 0,
-      features: [...features], trees: clean,
+      kind: XGB_HEAD_KIND,
+      objective: XGB_OBJECTIVE,
+      baseScore: h.baseScore,
+      fidelity: h.fidelity,
+      fitOn: Number(h.fitOn) || 0,
+      features: [...features],
+      trees: clean,
     },
   };
 }
@@ -248,9 +270,7 @@ function treeFeatureValue(features, name) {
  * term-rule spelling ('true'/'false') so a trainer emitting either form
  * binds the same. */
 const treeEq = (a, b) =>
-  a === b ||
-  (typeof a === 'boolean' && String(a) === b) ||
-  (typeof b === 'boolean' && String(b) === a);
+  a === b || (typeof a === 'boolean' && String(a) === b) || (typeof b === 'boolean' && String(b) === a);
 
 /** Walk one tree to its leaf margin, recording the path taken. Pure,
  * deterministic, no state. The path is the citation material (T3): every
@@ -260,9 +280,7 @@ function walkTreePath(node, features, names) {
   let cur = node;
   while (!('leaf' in cur)) {
     const val = treeFeatureValue(features, names[cur.f]);
-    const go = cur.op === '<'
-      ? typeof val === 'number' && Number.isFinite(val) && val < cur.v
-      : treeEq(val, cur.v);
+    const go = cur.op === '<' ? typeof val === 'number' && Number.isFinite(val) && val < cur.v : treeEq(val, cur.v);
     path.push({ node: cur, went: go ? 'y' : 'n', value: val });
     cur = go ? cur.y : cur.n;
   }
@@ -292,21 +310,42 @@ export function scoreTreeHead(head, layoutParams) {
 // splits cite the candidate's side of the split's own line.
 
 const FEATURE_WORDS = {
-  bodies: '{v} crowds', density: '{v} density', scale: '{v} marks', system: '{v} layouts',
-  symmetry: '{v} symmetry', behave: '{v} motion', blend: '{v} blend',
-  palette: 'the {v} palette', paletteShift: '{v} colour shift',
+  bodies: '{v} crowds',
+  density: '{v} density',
+  scale: '{v} marks',
+  system: '{v} layouts',
+  symmetry: '{v} symmetry',
+  behave: '{v} motion',
+  blend: '{v} blend',
+  palette: 'the {v} palette',
+  paletteShift: '{v} colour shift',
 };
 const BOOL_WORDS = {
-  accum: ['trails on', 'trails off'], mirror: ['mirrored', 'unmirrored'],
-  bleed: ['bleed on', 'bleed off'], overlap: ['overlap', 'no overlap'],
+  accum: ['trails on', 'trails off'],
+  mirror: ['mirrored', 'unmirrored'],
+  bleed: ['bleed on', 'bleed off'],
+  overlap: ['overlap', 'no overlap'],
 };
 /** Numeric feature → the noun its citation names (mirrors curator.py _NUM_WORDS' keys). */
 const NUM_NOUNS = {
-  count: 'marks', particleCount: 'particles', scaleMid: 'scale', rotateSpread: 'rotation',
-  alphaMid: 'opacity', density: 'density', jitter: 'jitter', zTiers: 'depth tiers',
-  noiseFreq: 'noise', noiseSpeed: 'noise speed', displacement: 'displacement',
-  swarmCohesion: 'swarm cohesion', gravityWells: 'gravity', damping: 'damping',
-  wind: 'wind', flap: 'flap', breath: 'breath', lifeDrift: 'drift',
+  count: 'marks',
+  particleCount: 'particles',
+  scaleMid: 'scale',
+  rotateSpread: 'rotation',
+  alphaMid: 'opacity',
+  density: 'density',
+  jitter: 'jitter',
+  zTiers: 'depth tiers',
+  noiseFreq: 'noise',
+  noiseSpeed: 'noise speed',
+  displacement: 'displacement',
+  swarmCohesion: 'swarm cohesion',
+  gravityWells: 'gravity',
+  damping: 'damping',
+  wind: 'wind',
+  flap: 'flap',
+  breath: 'breath',
+  lifeDrift: 'drift',
 };
 
 /** A categorical/boolean feature fact in the trainer's own words:
@@ -403,7 +442,9 @@ function candidateLayoutParams(candidate) {
   const c = candidate && typeof candidate === 'object' ? candidate : {};
   return c.layoutParams && typeof c.layoutParams === 'object'
     ? c.layoutParams
-    : typeof c.layoutId === 'string' ? { mode: c.layoutId } : c;
+    : typeof c.layoutId === 'string'
+      ? { mode: c.layoutId }
+      : c;
 }
 
 export function makeXgbScorer(taste, { experimental = false } = {}) {
@@ -434,10 +475,14 @@ export function makeMlxCurator(taste, { experimental = false } = {}) {
     experimental: !(head.fidelity >= HEAD_MIN_FIDELITY), // steering below the bar: every readout must say so
     status: () => 'active',
     pick(candidates) {
-      let best = -1, bestScore = -Infinity;
+      let best = -1,
+        bestScore = -Infinity;
       candidates.forEach((c, i) => {
         const s = scoreLayout(head, c);
-        if (s > bestScore) { bestScore = s; best = i; }
+        if (s > bestScore) {
+          bestScore = s;
+          best = i;
+        }
       });
       // T3: a tree head's pick carries its citation (the winner's own tree
       // paths, as a clause) for the hint to quote. A linear head cites
@@ -454,9 +499,12 @@ export function tasteSummary(taste, { experimental = false } = {}) {
   if (!taste) return 'no taste loaded — the persona curator is choosing';
   const { likes, passes } = taste.labels;
   const f = taste.head.fidelity;
-  const live = f >= HEAD_MIN_FIDELITY ? 'curating live'
-    : headUsable(taste.head, experimental) ? `EXPERIMENTAL: steering below the ${HEAD_MIN_FIDELITY.toFixed(1)} bar`
-    : 'fidelity too low — persona curator stays on';
+  const live =
+    f >= HEAD_MIN_FIDELITY
+      ? 'curating live'
+      : headUsable(taste.head, experimental)
+        ? `EXPERIMENTAL: steering below the ${HEAD_MIN_FIDELITY.toFixed(1)} bar`
+        : 'fidelity too low — persona curator stays on';
   return `taste · ${likes} keeps / ${passes} passes · fidelity ${f.toFixed(2)} · ${live}`;
 }
 
@@ -476,9 +524,12 @@ export function loisSummary(taste, { experimental = false } = {}) {
   if (!taste || !taste.lois) return 'lois · not trained — favorites vs keeps still waiting on labels';
   const { favorites, keeps } = taste.lois.labels;
   const f = taste.lois.head.fidelity;
-  const live = f >= HEAD_MIN_FIDELITY ? 'boldness live'
-    : headUsable(taste.lois.head, experimental) ? 'EXPERIMENTAL: boldness below the bar'
-    : 'fidelity too low — CRIT stays parked';
+  const live =
+    f >= HEAD_MIN_FIDELITY
+      ? 'boldness live'
+      : headUsable(taste.lois.head, experimental)
+        ? 'EXPERIMENTAL: boldness below the bar'
+        : 'fidelity too low — CRIT stays parked';
   return `lois · ${favorites} favorites / ${keeps} kept-not-favorited · fidelity ${f.toFixed(2)} · ${live}`;
 }
 

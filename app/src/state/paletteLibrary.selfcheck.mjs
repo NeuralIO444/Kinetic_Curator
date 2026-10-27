@@ -6,7 +6,10 @@ import { sessionOnlyNoted } from './sessionOnly.mjs';
 
 // Well-formed entry survives intact
 const good = sanitizePalette({
-  id: 'user-abc', name: 'MY KIT', bg: '#101010', ink: '#EEEEEE',
+  id: 'user-abc',
+  name: 'MY KIT',
+  bg: '#101010',
+  ink: '#EEEEEE',
   swatches: ['#FF0000', '#00ff00'],
 });
 assert.strictEqual(good.id, 'user-abc');
@@ -43,32 +46,38 @@ assert.strictEqual(sanitizePalette({ name: 'x'.repeat(200), swatches: ['#123456'
 {
   const N = 10;
   const idLess = Array.from({ length: N }, (_, i) => ({
-    name: `KIT ${i}`, swatches: ['#ff0000', '#00ff00'],
+    name: `KIT ${i}`,
+    swatches: ['#ff0000', '#00ff00'],
   }));
   const sanitized = idLess.map(sanitizePalette);
   assert.strictEqual(new Set(sanitized.map((p) => p.id)).size, N, 'fallback ids must be unique per call');
-  assert.ok(sanitized.every((p) => p.id.startsWith('user-')), 'fallback ids keep the user- prefix');
+  assert.ok(
+    sanitized.every((p) => p.id.startsWith('user-')),
+    'fallback ids keep the user- prefix',
+  );
 
   // Drive importUserPalettes with a minimal zustand-like set/get.
   // localStorage stand-in so persist() exercises its real write path instead of warning.
   const backing = new Map();
   globalThis.localStorage = {
     getItem: (k) => (backing.has(k) ? backing.get(k) : null),
-    setItem: (k, v) => { backing.set(k, String(v)); },
+    setItem: (k, v) => {
+      backing.set(k, String(v));
+    },
   };
   let state = { userPalettes: [] };
   const slice = createPaletteLibrarySlice(
-    (updater) => { state = { ...state, ...(typeof updater === 'function' ? updater(state) : updater) }; },
+    (updater) => {
+      state = { ...state, ...(typeof updater === 'function' ? updater(state) : updater) };
+    },
     () => state,
   );
   slice.importUserPalettes(idLess);
   assert.strictEqual(state.userPalettes.length, N, 'all id-less palettes must survive import');
+  assert.strictEqual(new Set(state.userPalettes.map((p) => p.id)).size, N, 'stored ids must be distinct');
   assert.strictEqual(
-    new Set(state.userPalettes.map((p) => p.id)).size, N,
-    'stored ids must be distinct',
-  );
-  assert.strictEqual(
-    JSON.parse(backing.get('kc:user-palettes:v1')).length, N,
+    JSON.parse(backing.get('kc:user-palettes:v1')).length,
+    N,
     'persisted payload must hold all N entries',
   );
 
@@ -86,11 +95,15 @@ assert.strictEqual(sanitizePalette({ name: 'x'.repeat(200), swatches: ['#123456'
   assert.strictEqual(sessionOnlyNoted(), false, 'the working stand-in never refused — nothing noted yet');
   globalThis.localStorage = {
     getItem: () => null,
-    setItem: () => { throw new Error('QuotaExceededError'); },
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
   };
   let st = { userPalettes: [] };
   const sl = createPaletteLibrarySlice(
-    (updater) => { st = { ...st, ...(typeof updater === 'function' ? updater(st) : updater) }; },
+    (updater) => {
+      st = { ...st, ...(typeof updater === 'function' ? updater(st) : updater) };
+    },
     () => st,
   );
   sl.importUserPalettes([{ name: 'SESSION ONLY', swatches: ['#123456'] }]);

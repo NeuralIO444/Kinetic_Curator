@@ -44,7 +44,15 @@ let setMagnitude = 0;
 // #1640 — the dial lean (her hand on the wetness and evolve dials in silence) shows the same mark while it moves a dial
 let dialMagnitude = 0;
 const subscribers = new Set();
-const notify = () => { for (const fn of subscribers) { try { fn(); } catch { /* a listener must not break the holder */ } } };
+const notify = () => {
+  for (const fn of subscribers) {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the holder */
+    }
+  }
+};
 
 /** Called by the pick path after the Director ticks. */
 export function setSwayMagnitude(n) {

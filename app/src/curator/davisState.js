@@ -44,10 +44,12 @@ export function resolveDavisState(feed = {}) {
   const f = feed || {};
   if (f.bloomAgeMs != null && f.bloomAgeMs < DAVIS_BLOOM_MS) return DAVIS_STATES.BLOOM;
   if ((f.passesLast2m || 0) >= DAVIS_UGLY_PASSES) return DAVIS_STATES.UGLY;
-  if ((f.seedAgeMs || 0) >= DAVIS_STUCK_MS && (f.rollsSinceSeed || 0) >= DAVIS_STUCK_ROLLS && !f.keptThisSeed) return DAVIS_STATES.STUCK;
+  if ((f.seedAgeMs || 0) >= DAVIS_STUCK_MS && (f.rollsSinceSeed || 0) >= DAVIS_STUCK_ROLLS && !f.keptThisSeed)
+    return DAVIS_STATES.STUCK;
   if (f.seedDropped && (f.seedAgeMs ?? Infinity) < DAVIS_SEEDLING_MS) return DAVIS_STATES.SEEDLING;
   if ((f.rollsLastMinute || 0) >= DAVIS_FLOW_ROLLS) return DAVIS_STATES.FLOW;
-  if (Number.isFinite(f.dishPressure)) { // null / absent: no pins, no opinion
+  if (Number.isFinite(f.dishPressure)) {
+    // null / absent: no pins, no opinion
     if (f.dishPressure >= DAVIS_DISH_CROWDED) return DAVIS_STATES.FLOW;
     if (f.dishPressure <= DAVIS_DISH_SPARSE) return DAVIS_STATES.SEEDLING;
   }

@@ -21,14 +21,20 @@ import { effectiveTemp, TEMP_FLOOR, TEMP_CAP } from './effectiveTemp.js';
 import { readsMetric } from './censusReport.mjs';
 
 let checks = 0;
-const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
+const ok = (cond, msg) => {
+  assert.ok(cond, msg);
+  checks++;
+};
 
 // The corpus's own reads (S2's measured scenes) as candidate reads,
 // and an anchor from two "keeps": the balanced scene read twice over
 // with small perturbations — a Queen whose taste sits at balance.
 const corpus = new Map(readsMetric().map((r) => [r.scene, r.shares]));
 const BAL = corpus.get('balanced');
-const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04, mid: BAL.mid + 0.02, fine: BAL.fine + 0.02 } }]);
+const anchor = anchorFromReads([
+  { shares: BAL },
+  { shares: { big: BAL.big - 0.04, mid: BAL.mid + 0.02, fine: BAL.fine + 0.02 } },
+]);
 
 // ── A. the anchor ────────────────────────────────────────────────────
 {
@@ -39,7 +45,9 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
   // Bare share maps anchor too (the caller’s shape is its own).
   const bare = anchorFromReads([BAL]);
   ok(Math.abs(bare.fine - BAL.fine) < 1e-9, 'bare share maps anchor');
-  console.log(`readDuel.selfcheck A anchor: queen sits at big ${anchor.big.toFixed(3)} · mid ${anchor.mid.toFixed(3)} · fine ${anchor.fine.toFixed(3)} (the keeps’ mean)`);
+  console.log(
+    `readDuel.selfcheck A anchor: queen sits at big ${anchor.big.toFixed(3)} · mid ${anchor.mid.toFixed(3)} · fine ${anchor.fine.toFixed(3)} (the keeps’ mean)`,
+  );
 }
 
 // ── B. the gate ──────────────────────────────────────────────────────
@@ -55,7 +63,11 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
   ok(!mud.pass && mud.verdict === 'mud' && mud.demand.band === 'big', 'mud fails, demanding big');
   const top = judgeRead(corpus.get('top-heavy'), anchor);
   ok(top.verdict === 'top-heavy', 'top-heavy verdicts as the meter names it');
-  assert.strictEqual(judgeRead(null, anchor).verdict, 'unmeasured', 'an unmeasured read is judged unmeasured, never passed');
+  assert.strictEqual(
+    judgeRead(null, anchor).verdict,
+    'unmeasured',
+    'an unmeasured read is judged unmeasured, never passed',
+  );
   checks++;
   ok(readDistance(BAL, BAL) === 0 && readDistance(BAL, corpus.get('mud')) > 0.5, 'distance is a distance');
   console.log('readDuel.selfcheck B gate: balance passes, bald demands fine, mud demands big — by name');
@@ -64,13 +76,22 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
 // ── C. the heat ──────────────────────────────────────────────────────
 {
   ok(duelTolerance(TEMP_FLOOR) < duelTolerance(TEMP_CAP), 'a hotter room tolerates more');
-  assert.strictEqual(duelTolerance(), duelTolerance(effectiveTemp()), 'the default heat IS effectiveTemp — the single source (#1483)');
+  assert.strictEqual(
+    duelTolerance(),
+    duelTolerance(effectiveTemp()),
+    'the default heat IS effectiveTemp — the single source (#1483)',
+  );
   checks++;
   // A borderline read: inside at the cap, outside at the floor.
   const borderline = { big: anchor.big - 0.16, mid: anchor.mid + 0.08, fine: anchor.fine + 0.08 };
   ok(!judgeRead(borderline, anchor, TEMP_FLOOR).pass, 'cold room: the borderline read is tilted away');
-  ok(judgeRead(borderline, anchor, TEMP_CAP).pass, 'hot room: the same read stands — boldness is the temperature’s whole job');
-  console.log(`readDuel.selfcheck C heat: tolerance ${duelTolerance(TEMP_FLOOR)} at the floor → ${duelTolerance(TEMP_CAP)} at the cap`);
+  ok(
+    judgeRead(borderline, anchor, TEMP_CAP).pass,
+    'hot room: the same read stands — boldness is the temperature’s whole job',
+  );
+  console.log(
+    `readDuel.selfcheck C heat: tolerance ${duelTolerance(TEMP_FLOOR)} at the floor → ${duelTolerance(TEMP_CAP)} at the cap`,
+  );
 }
 
 // ── D. the tilt, through pickCurated ─────────────────────────────────
@@ -89,7 +110,10 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
   ok(dueled.duel.fromLine.includes('demand fine'), 'the tilt names why Davis’s pick fell');
   checks += 2;
   // Davis picks the balanced one: it stands, no tilt.
-  const stands = pickCurated(cands, { name: 'stub', status: () => 'active', pick: () => 2 }, () => 0, { reads, anchor });
+  const stands = pickCurated(cands, { name: 'stub', status: () => 'active', pick: () => 2 }, () => 0, {
+    reads,
+    anchor,
+  });
   assert.strictEqual(stands.index, 2);
   ok(stands.duel?.dueled && !stands.duel?.tilted, 'inside tolerance, Davis’s pick stands');
   checks++;
@@ -100,7 +124,9 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
   // duelPick direct: first of equals wins (LOIS's convention).
   const eq = duelPick({ reads: [BAL, BAL], anchor, davisIndex: 0 });
   ok(eq.dueled && !eq.tilted && eq.index === 0, 'equals: the first stands');
-  console.log('readDuel.selfcheck D tilt: bald pick tilts to balance; a standing pick is left alone; absence is honest');
+  console.log(
+    'readDuel.selfcheck D tilt: bald pick tilts to balance; a standing pick is left alone; absence is honest',
+  );
 }
 
 // ── E. the hint ──────────────────────────────────────────────────────
@@ -114,7 +140,11 @@ const anchor = anchorFromReads([{ shares: BAL }, { shares: { big: BAL.big - 0.04
   pickCurated(cands, { name: 'stub', status: () => 'active', pick: () => 0 }, () => 0);
   assert.strictEqual(getLastDuel(), null, 'a pick without reads clears the record — no stale judgments');
   checks++;
-  assert.strictEqual(curatorHint(nullCurator()), 'curator untrained · dice roll', 'no duel → yesterday’s hint, exactly');
+  assert.strictEqual(
+    curatorHint(nullCurator()),
+    'curator untrained · dice roll',
+    'no duel → yesterday’s hint, exactly',
+  );
   checks++;
   console.log('readDuel.selfcheck E hint: the duel is spoken when it ran, absent when it didn’t');
 }

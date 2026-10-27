@@ -13,8 +13,7 @@ function hitRow(f) {
   const context = sanitizeKeepContext(f.context);
   return {
     seed: f.seed >>> 0,
-    ...(f.seedOffsets && typeof f.seedOffsets === 'object'
-      ? { seedOffsets: normalizeSeedOffsets(f.seedOffsets) } : {}),
+    ...(f.seedOffsets && typeof f.seedOffsets === 'object' ? { seedOffsets: normalizeSeedOffsets(f.seedOffsets) } : {}),
     timestamp: f.timestamp,
     // #1140 — the keep's session context (audio/palette-warmth/dwell); legacy
     // rows omit it (hits_bridge treats "absent" as "not instrumented").
@@ -24,7 +23,11 @@ function hitRow(f) {
     // #719 — the kept cast; legacy keeps omit it (hits_bridge then keeps the project's own).
     ...(Array.isArray(f.config?.assets) && f.config.assets.length ? { assets: [...f.config.assets] } : {}),
     // #719 — named features, the same function studio sidecars use for the pool.
-    features: recipeFeatures({ layoutParams: f.config?.layout, paletteId: f.config?.palette?.id, assets: f.config?.assets }),
+    features: recipeFeatures({
+      layoutParams: f.config?.layout,
+      paletteId: f.config?.palette?.id,
+      assets: f.config?.assets,
+    }),
   };
 }
 

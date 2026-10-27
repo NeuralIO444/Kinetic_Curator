@@ -63,8 +63,10 @@ for (const key of MARKOV_KEYS) {
   }
   for (const v of domain) {
     const observed = seen[v] / N;
-    assert.ok(Math.abs(observed - dist[v]) < 0.01,
-      `${key}: ${v} visited ${(observed * 100).toFixed(2)}%, chain predicts ${(dist[v] * 100).toFixed(2)}%`);
+    assert.ok(
+      Math.abs(observed - dist[v]) < 0.01,
+      `${key}: ${v} visited ${(observed * 100).toFixed(2)}%, chain predicts ${(dist[v] * 100).toFixed(2)}%`,
+    );
   }
   // …and the walk must actually visit the whole domain.
   for (const v of domain) assert.ok(seen[v] > 0, `${key}: ${v} never visited`);
@@ -108,11 +110,15 @@ for (const key of MARKOV_KEYS) {
 {
   const curator = { status: () => 'active', name: 'persona', personaName: 'Haeckel' };
   assert.ok(!curatorHint(curator).includes('uniform'), 'a working chain says nothing extra');
-  assert.ok(curatorHint(curator, { chainFallback: true }).includes('chain: uniform'),
-    'a fallen-back chain must be visible in the bar');
+  assert.ok(
+    curatorHint(curator, { chainFallback: true }).includes('chain: uniform'),
+    'a fallen-back chain must be visible in the bar',
+  );
   const untrained = { status: () => 'idle', name: 'null' };
-  assert.ok(curatorHint(untrained, { chainFallback: true }).includes('chain: uniform'),
-    'the flag survives the untrained-curator copy too');
+  assert.ok(
+    curatorHint(untrained, { chainFallback: true }).includes('chain: uniform'),
+    'the flag survives the untrained-curator copy too',
+  );
 }
 
 // ─── #1667 (audit fix 3a): no rng → no fallback die ───
@@ -133,11 +139,28 @@ for (const key of MARKOV_KEYS) {
   const rng = mkRng(7);
   let cur = 'grid';
   const seq = [];
-  for (let i = 0; i < 12; i += 1) { cur = markovPick('mode', cur, rng).value; seq.push(cur); }
-  assert.deepStrictEqual(seq, [
-    'random', 'phyllotaxis', 'orbit', 'hype', 'colonize', 'dla',
-    'radial', 'fibonacci', 'radial', 'fibonacci', 'orbit', 'fibonacci',
-  ], 'seeded chain unchanged by the fallback removal');
+  for (let i = 0; i < 12; i += 1) {
+    cur = markovPick('mode', cur, rng).value;
+    seq.push(cur);
+  }
+  assert.deepStrictEqual(
+    seq,
+    [
+      'random',
+      'phyllotaxis',
+      'orbit',
+      'hype',
+      'colonize',
+      'dla',
+      'radial',
+      'fibonacci',
+      'radial',
+      'fibonacci',
+      'orbit',
+      'fibonacci',
+    ],
+    'seeded chain unchanged by the fallback removal',
+  );
 }
 
 console.log('transitions.selfcheck: OK');

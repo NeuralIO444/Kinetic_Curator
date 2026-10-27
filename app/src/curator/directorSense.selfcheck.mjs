@@ -11,7 +11,11 @@ import {
 } from './directorSense.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('max-pool: the hottest signal sets the room, not the average', () => {
   assert.equal(intensityFromSignals({ audio: 0.9, keepPass: 0.1, beat: 0.1, phaseTime: 0.1 }), 0.9);

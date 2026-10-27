@@ -18,14 +18,15 @@ export function nextFallbackPaletteId() {
 
 export function sanitizePalette(raw) {
   if (!raw || typeof raw !== 'object') return null;
-  const swatches = Array.isArray(raw.swatches)
-    ? raw.swatches.map(normalizeHex).filter(Boolean)
-    : [];
+  const swatches = Array.isArray(raw.swatches) ? raw.swatches.map(normalizeHex).filter(Boolean) : [];
   if (swatches.length === 0) return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id : nextFallbackPaletteId();
   // #1049 — keep hand-set weights only when no swatch was dropped above and they are usable.
   const kept = { swatches, weights: raw.weights };
-  const weights = Array.isArray(raw.swatches) && raw.swatches.length === swatches.length && validWeights(kept) ? { weights: raw.weights.slice() } : {};
+  const weights =
+    Array.isArray(raw.swatches) && raw.swatches.length === swatches.length && validWeights(kept)
+      ? { weights: raw.weights.slice() }
+      : {};
   return {
     id,
     name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 40) : 'UNTITLED',
@@ -63,55 +64,69 @@ export const createPaletteLibrarySlice = (set, get) => ({
 
   setPaletteMixSeconds: (v) => set({ paletteMixSeconds: sanitizeMixSeconds(v) }),
 
-  saveUserPalette: (name) => set((state) => {
-    const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const o = state.paletteOverrides;
-    const entry = sanitizePalette({
-      id: nextFallbackPaletteId(),
-      name: name || `${base.name} ✎`,
-      bg: o?.bg || base.bg,
-      ink: o?.ink || base.ink,
-      swatches: base.swatches.map((s, i) => o?.swatches?.[i] || s),
-    });
-    if (!entry) return {};
-    const userPalettes = [...state.userPalettes, entry];
-    persist(userPalettes);
-    return { userPalettes, paletteId: entry.id, paletteOverrides: null };
-  }),
+  saveUserPalette: (name) =>
+    set((state) => {
+      const base = getCatalogPalette(state.paletteId, state.userPalettes);
+      const o = state.paletteOverrides;
+      const entry = sanitizePalette({
+        id: nextFallbackPaletteId(),
+        name: name || `${base.name} ✎`,
+        bg: o?.bg || base.bg,
+        ink: o?.ink || base.ink,
+        swatches: base.swatches.map((s, i) => o?.swatches?.[i] || s),
+      });
+      if (!entry) return {};
+      const userPalettes = [...state.userPalettes, entry];
+      persist(userPalettes);
+      return { userPalettes, paletteId: entry.id, paletteOverrides: null };
+    }),
 
-  deleteUserPalette: (id) => set((state) => {
-    const userPalettes = state.userPalettes.filter((p) => p.id !== id);
-    if (userPalettes.length === state.userPalettes.length) return {};
-    persist(userPalettes);
-    const next = { userPalettes };
-    if (state.paletteId === id) {
-      next.paletteId = 'praystation';
-      next.paletteOverrides = null;
-    }
-    return next;
-  }),
+  deleteUserPalette: (id) =>
+    set((state) => {
+      const userPalettes = state.userPalettes.filter((p) => p.id !== id);
+      if (userPalettes.length === state.userPalettes.length) return {};
+      persist(userPalettes);
+      const next = { userPalettes };
+      if (state.paletteId === id) {
+        next.paletteId = 'praystation';
+        next.paletteOverrides = null;
+      }
+      return next;
+    }),
 
-  renameUserPalette: (id, name) => set((state) => {
-    const userPalettes = state.userPalettes.map((p) =>
-      (p.id === id ? { ...p, name: String(name || '').trim().slice(0, 40) || p.name } : p));
-    persist(userPalettes);
-    return { userPalettes };
-  }),
+  renameUserPalette: (id, name) =>
+    set((state) => {
+      const userPalettes = state.userPalettes.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              name:
+                String(name || '')
+                  .trim()
+                  .slice(0, 40) || p.name,
+            }
+          : p,
+      );
+      persist(userPalettes);
+      return { userPalettes };
+    }),
 
-  importUserPalettes: (list) => set((state) => {
-    const incoming = (Array.isArray(list) ? list : [list]).map(sanitizePalette).filter(Boolean);
-    if (incoming.length === 0) return {};
-    const byId = new Map(state.userPalettes.map((p) => [p.id, p]));
-    for (const p of incoming) byId.set(p.id, p);
-    const userPalettes = [...byId.values()];
-    persist(userPalettes);
-    return { userPalettes };
-  }),
+  importUserPalettes: (list) =>
+    set((state) => {
+      const incoming = (Array.isArray(list) ? list : [list]).map(sanitizePalette).filter(Boolean);
+      if (incoming.length === 0) return {};
+      const byId = new Map(state.userPalettes.map((p) => [p.id, p]));
+      for (const p of incoming) byId.set(p.id, p);
+      const userPalettes = [...byId.values()];
+      persist(userPalettes);
+      return { userPalettes };
+    }),
 
-  clearUserPalettes: () => set(() => {
-    persist([]);
-    return { userPalettes: [] };
-  }),
+  clearUserPalettes: () =>
+    set(() => {
+      persist([]);
+      return { userPalettes: [] };
+    }),
 
   exportUserPalettes: () => get().userPalettes,
 });

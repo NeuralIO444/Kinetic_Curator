@@ -11,7 +11,9 @@
 import { DIRECTORS_MATRIX } from './directorsMatrix.js';
 
 /** Every verdict a room can carry (from the 20-room copy matrix). */
-export const ROOM_VERDICTS = Object.freeze([...new Set(Object.values(DIRECTORS_MATRIX).flatMap((row) => Object.values(row).map((r) => r.verdict)))]);
+export const ROOM_VERDICTS = Object.freeze([
+  ...new Set(Object.values(DIRECTORS_MATRIX).flatMap((row) => Object.values(row).map((r) => r.verdict))),
+]);
 /** How hot the room runs, as a band: the minds hear the band, never the number. */
 export const INTENSITY_BANDS = Object.freeze(['low', 'mid', 'peak']);
 /** Below this the room reads low; at the Director's peak (or its peak tick) it reads peak. */
@@ -55,7 +57,11 @@ export function createRoomPublisher(emit) {
     const key = JSON.stringify(p);
     if (key === last) return false;
     last = key;
-    try { emit(p); } catch { /* the bus must never take a pick down */ }
+    try {
+      emit(p);
+    } catch {
+      /* the bus must never take a pick down */
+    }
     return true;
   };
 }

@@ -7,7 +7,11 @@ import { createBeatTracker, confidentFromPeaks, ATTACK_FLOOR, CONFIDENCE_BAR } f
 import { trace } from './queenLean.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('the five lines are verbatim', () => {
   assert.equal(LINES.LOST, "input's gone. i'm still listening.");

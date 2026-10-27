@@ -14,7 +14,10 @@ export function StressReadout() {
   const occ = s.occupancy || { relax: 0, normal: 0, tighten: 0 }; // #1635: frames per band, this session
   // The tracker is a module singleton with no subscription API: a light poll keeps the readout current.
   useEffect(() => {
-    const id = setInterval(() => { setS(getStressState()); setF(getFormationState()); }, 200);
+    const id = setInterval(() => {
+      setS(getStressState());
+      setF(getFormationState());
+    }, 200);
     return () => clearInterval(id);
   }, []);
   return (
@@ -22,9 +25,16 @@ export function StressReadout() {
       role="status"
       aria-label="Stress and band (debug)"
       style={{
-        position: 'fixed', right: 12, bottom: 44, zIndex: 9999, padding: '8px 10px', whiteSpace: 'pre',
-        background: 'rgba(12,12,14,0.92)', border: '1px solid rgba(255,255,255,0.18)',
-        font: '11px ui-monospace, Menlo, monospace', color: '#e8e8ea',
+        position: 'fixed',
+        right: 12,
+        bottom: 44,
+        zIndex: 9999,
+        padding: '8px 10px',
+        whiteSpace: 'pre',
+        background: 'rgba(12,12,14,0.92)',
+        border: '1px solid rgba(255,255,255,0.18)',
+        font: '11px ui-monospace, Menlo, monospace',
+        color: '#e8e8ea',
       }}
     >
       {`STRESS ${pct(s.smoothed)}  BAND ${s.band || 'none'}\nactivity ${pct(s.activity)}  dish ${pct(s.dish)}  taste ${pct(s.taste)}\nsession  R ${occ.relax}  N ${occ.normal}  T ${occ.tighten}  crossings ${s.crossings || 0}`}
@@ -35,7 +45,9 @@ export function StressReadout() {
         const state = p.formed ? 'FORMED' : `spore ${String(p.hold).padStart(2, ' ')}/${FORM_HOLD_FRAMES}`;
         const pairs = p.formed ? `  wings x${(getLimbPairs()[i] || 1) * 2}` : '';
         const tr = p.formed ? getPinTraits()[i] : null;
-        const shift = tr ? `\n       spread ${tr.spread >= 0 ? '+' : ''}${tr.spread.toFixed(0)}  wing x${tr.wing.toFixed(2)}  body x${tr.body.toFixed(2)}  swatch ${tr.swatch}` : '';
+        const shift = tr
+          ? `\n       spread ${tr.spread >= 0 ? '+' : ''}${tr.spread.toFixed(0)}  wing x${tr.wing.toFixed(2)}  body x${tr.body.toFixed(2)}  swatch ${tr.swatch}`
+          : '';
         return `\npin ${i + 1}  attract ${pct(p.attraction)}/${pct(t.attraction)}  crowd ${pct(p.density)}/${pct(t.density)}  ${state}${pairs}${shift}`;
       })}
     </div>

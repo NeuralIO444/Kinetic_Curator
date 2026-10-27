@@ -5,7 +5,11 @@ import { BEATS, findBeat } from './beatLibrary.js';
 import { playLevels } from './beatPlayer.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const four = findBeat('four-floor');
 const BANDS = ['sub', 'bass', 'mud', 'mids', 'edge', 'pres', 'air'];
 
@@ -20,21 +24,34 @@ ok('a kick lands on the low bands and a hat on the high ones, and both fade betw
 });
 
 ok('every level is 0..1 and finite, for every pattern, across several bars', () => {
-  for (const b of BEATS) for (let p = 0; p < 16; p += 0.173) {
-    const { bands, coarse } = playLevels(b, p, { intensity: 1 });
-    for (const k of BANDS) assert.ok(Number.isFinite(bands[k]) && bands[k] >= 0 && bands[k] <= 1, `${b.id} ${k} @${p}`);
-    for (const v of Object.values(coarse)) assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, `${b.id} coarse @${p}`);
-  }
+  for (const b of BEATS)
+    for (let p = 0; p < 16; p += 0.173) {
+      const { bands, coarse } = playLevels(b, p, { intensity: 1 });
+      for (const k of BANDS)
+        assert.ok(Number.isFinite(bands[k]) && bands[k] >= 0 && bands[k] <= 1, `${b.id} ${k} @${p}`);
+      for (const v of Object.values(coarse)) assert.ok(Number.isFinite(v) && v >= 0 && v <= 1, `${b.id} coarse @${p}`);
+    }
 });
 
-ok('periodic: the hits repeat every bar and the whole set exactly every four bars (the bed breathes over 16 beats)', () => {
-  for (const b of BEATS) for (const p of [0, 0.3, 1.1, 2.9, 3.99]) {
-    const u = playLevels(b, p, { intensity: 0.7 }); const v = playLevels(b, p + 16, { intensity: 0.7 });
-    for (const k of BANDS) assert.ok(Math.abs(u.bands[k] - v.bands[k]) < 1e-9, `${b.id} ${k} @${p}: the same over 16 beats`);
-    const x = playLevels(b, p, { intensity: 0.7 }); const y = playLevels(b, p + 4, { intensity: 0.7 });
-    for (const k of BANDS) assert.ok(Math.abs(x.bands[k] - y.bands[k]) <= 0.2 * 0.7 + 1e-9, `${b.id} ${k} @${p}: a bar later differs only by the bed`);
-  }
-});
+ok(
+  'periodic: the hits repeat every bar and the whole set exactly every four bars (the bed breathes over 16 beats)',
+  () => {
+    for (const b of BEATS)
+      for (const p of [0, 0.3, 1.1, 2.9, 3.99]) {
+        const u = playLevels(b, p, { intensity: 0.7 });
+        const v = playLevels(b, p + 16, { intensity: 0.7 });
+        for (const k of BANDS)
+          assert.ok(Math.abs(u.bands[k] - v.bands[k]) < 1e-9, `${b.id} ${k} @${p}: the same over 16 beats`);
+        const x = playLevels(b, p, { intensity: 0.7 });
+        const y = playLevels(b, p + 4, { intensity: 0.7 });
+        for (const k of BANDS)
+          assert.ok(
+            Math.abs(x.bands[k] - y.bands[k]) <= 0.2 * 0.7 + 1e-9,
+            `${b.id} ${k} @${p}: a bar later differs only by the bed`,
+          );
+      }
+  },
+);
 
 ok('intensity scales the whole set and 0 is silence; the bed keeps a gap from being dead', () => {
   const hi = playLevels(four, 0, { intensity: 1 }).bands.sub;
@@ -47,7 +64,11 @@ ok('intensity scales the whole set and 0 is silence; the bed keeps a gap from be
 
 ok('swing delays the odd sixteenths: at an odd step a swung hat has not landed yet, and lands later', () => {
   const e = findBeat('eighths'); // a hat on every step
-  const straight = { ...e, swing: 0, lanes: { ...e.lanes, kick: '................', snare: '................', bass: '................' } };
+  const straight = {
+    ...e,
+    swing: 0,
+    lanes: { ...e.lanes, kick: '................', snare: '................', bass: '................' },
+  };
   const swung = { ...straight, swing: 0.4 };
   const atStep1 = 0.25; // beat position of step 1 (odd)
   const dry = playLevels(straight, atStep1, { intensity: 1 }).bands.air;

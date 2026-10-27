@@ -33,8 +33,18 @@
 // <alias>" hint). The persona palette catalog names are the aliases for
 // the same reason.
 
-export const RENDER_PROFILE_IDS = ['davis', 'benjamin', 'reas', 'haeckel',
-  'molnar', 'mohr', 'anadol', 'menkman', 'oxman', 'stock'];
+export const RENDER_PROFILE_IDS = [
+  'davis',
+  'benjamin',
+  'reas',
+  'haeckel',
+  'molnar',
+  'mohr',
+  'anadol',
+  'menkman',
+  'oxman',
+  'stock',
+];
 
 export const RENDER_PROFILES = [
   {
@@ -48,26 +58,34 @@ export const RENDER_PROFILES = [
       'so compositions feel alive but not formless. Palette: acid brights ' +
       'and jewel tones on near-black — his praystation screen ground — per ' +
       'the persona file ("acid brights, jewel tones, tuned duotone runs") ' +
-      'and Matt\'s reference of hot translucent ribbons.',
+      "and Matt's reference of hot translucent ribbons.",
     gaps: [
-      'No vector-module library: the engine\'s marks are generic sprites, ' +
-      'not Davis\'s hand-illustrated blobs/botanicals/skulls. Density and ' +
-      'overlap approximate the collage; the modules themselves don\'t exist.',
+      "No vector-module library: the engine's marks are generic sprites, " +
+        "not Davis's hand-illustrated blobs/botanicals/skulls. Density and " +
+        "overlap approximate the collage; the modules themselves don't exist.",
       'No weighted-probability asset instancing or rare "hard-to-acquire" ' +
-      'color gating — every mark draws from the same pool.',
-      'No drop-shadows: zTiers layering fakes depth over flat fills, but ' +
-      'there is no actual shadow pass.',
+        'color gating — every mark draws from the same pool.',
+      'No drop-shadows: zTiers layering fakes depth over flat fills, but ' + 'there is no actual shadow pass.',
       'No viewer-proximity mutation behaviors.',
     ],
     biases: {
       count: [380, 600],
-      scale: [[0.3, 1.0], [1.0, 2.8]],
-      rotate: [[-180, 0], [0, 180]],
-      alpha: [[25, 60], [70, 100]],
+      scale: [
+        [0.3, 1.0],
+        [1.0, 2.8],
+      ],
+      rotate: [
+        [-180, 0],
+        [0, 180],
+      ],
+      alpha: [
+        [25, 60],
+        [70, 100],
+      ],
       jitter: [0, 60],
       density: [80, 120],
       zTiers: [4, 10],
-      noiseFreq: [0.003, 0.010],
+      noiseFreq: [0.003, 0.01],
       noiseSpeed: [0.3, 1.2],
       displacement: [0, 60],
       particleCount: [120, 300],
@@ -100,18 +118,27 @@ export const RENDER_PROFILES = [
       'violets and burning yellow-reds").',
     gaps: [
       'No true polygons: the engine cannot draw tape-hard geometric cells, ' +
-      'grids, or stripes. Large opaque marks with zero glow and zero ' +
-      'trails are the closest honest approximation of flat hard-edge fields.',
-      'No neighbor-aware color tension: Benjamin chooses each cell\'s color ' +
-      'against its neighbors; the engine fills from the palette pool with ' +
-      'no adjacency logic.',
+        'grids, or stripes. Large opaque marks with zero glow and zero ' +
+        'trails are the closest honest approximation of flat hard-edge fields.',
+      "No neighbor-aware color tension: Benjamin chooses each cell's color " +
+        'against its neighbors; the engine fills from the palette pool with ' +
+        'no adjacency logic.',
       'No black-latticework compositions.',
     ],
     biases: {
       count: [60, 220],
-      scale: [[0.8, 1.0], [1.6, 3.0]],
-      rotate: [[-90, 0], [0, 90]],
-      alpha: [[50, 60], [95, 100]],
+      scale: [
+        [0.8, 1.0],
+        [1.6, 3.0],
+      ],
+      rotate: [
+        [-90, 0],
+        [0, 90],
+      ],
+      alpha: [
+        [50, 60],
+        [95, 100],
+      ],
       jitter: [0, 15],
       density: [60, 110],
       zTiers: [1, 3],
@@ -134,7 +161,7 @@ export const RENDER_PROFILES = [
     name: 'Casey Reas',
     paletteId: 'persona-reas',
     rationale:
-      'Reas is the engine\'s native tongue: thousands of tiny simple marks ' +
+      "Reas is the engine's native tongue: thousands of tiny simple marks " +
       'following flow rules until emergence appears. Count pushed to the ' +
       'engine cap, scale tiny, flow energy high, damping low so motion never ' +
       'settles, swarm cohesion and gravity wells up for emergent clustering. ' +
@@ -144,19 +171,26 @@ export const RENDER_PROFILES = [
       'bitforms reading ("simple white lines rapidly dart and cluster ' +
       'across a black background").',
     gaps: [
-      'Count caps at 600; Reas fields run to thousands of elements. ' +
-      'Density is as close as the engine gets.',
-      'No erasure sweep: Reas\'s periodic background-colored wave that ' +
-      'wipes accumulated trails while live elements persist doesn\'t exist.',
-      'No dual-surface rendering (hard 1px lines AND painterly accumulation ' +
-      'of the same simulation side by side).',
+      'Count caps at 600; Reas fields run to thousands of elements. ' + 'Density is as close as the engine gets.',
+      "No erasure sweep: Reas's periodic background-colored wave that " +
+        "wipes accumulated trails while live elements persist doesn't exist.",
+      'No dual-surface rendering (hard 1px lines AND painterly accumulation ' + 'of the same simulation side by side).',
       'No plain-language instruction panel executed literally.',
     ],
     biases: {
       count: [300, 600],
-      scale: [[0.1, 0.4], [1.0, 1.2]],
-      rotate: [[-180, 0], [0, 180]],
-      alpha: [[40, 60], [70, 100]],
+      scale: [
+        [0.1, 0.4],
+        [1.0, 1.2],
+      ],
+      rotate: [
+        [-180, 0],
+        [0, 180],
+      ],
+      alpha: [
+        [40, 60],
+        [70, 100],
+      ],
       jitter: [0, 40],
       density: [70, 120],
       zTiers: [1, 4],
@@ -166,7 +200,7 @@ export const RENDER_PROFILES = [
       particleCount: [150, 300],
       swarmCohesion: [1.0, 4.0],
       gravityWells: [0.8, 3.0],
-      damping: [0.90, 0.94],
+      damping: [0.9, 0.94],
       wind: [1.0, 2.0],
       flap: [0.4, 0.9],
       breath: [0.2, 0.6],
@@ -180,7 +214,7 @@ export const RENDER_PROFILES = [
     paletteId: 'persona-haeckel',
     rationale:
       'Haeckel is symmetry as organizing law on a void ground: bilateral ' +
-      'symmetry forced on (the engine\'s closest to his radial/bilateral ' +
+      "symmetry forced on (the engine's closest to his radial/bilateral " +
       'plates — there is no radial mode), fine small marks at high counts ' +
       'for stipple-like detail density, calm near-static motion (slow ' +
       'ornamental breathing only), restrained density so the specimen sits ' +
@@ -191,20 +225,29 @@ export const RENDER_PROFILES = [
       'colored gently with muted green, delicate pink, and sepia").',
     gaps: [
       'No radial symmetry mode: SYMMETRY_MODES is none/bilateral/stamp. ' +
-      'Bilateral is forced as the closest; true n-fold radial specimen ' +
-      'arrangement is impossible today.',
+        'Bilateral is forced as the closest; true n-fold radial specimen ' +
+        'arrangement is impossible today.',
       'No stipple engraving: particleCount approximates fine detail ' +
-      'density, but the engine cannot render curvature-proportional ' +
-      'stipple or cross-hatching.',
+        'density, but the engine cannot render curvature-proportional ' +
+        'stipple or cross-hatching.',
       'No taxonomic labels, plate numerals, or serif caption graphics.',
-      'No organism legibility: the engine\'s marks are abstract; Haeckel\'s ' +
-      'anatomy (radiolarians, medusae, lattice shells) has no counterpart.',
+      "No organism legibility: the engine's marks are abstract; Haeckel's " +
+        'anatomy (radiolarians, medusae, lattice shells) has no counterpart.',
     ],
     biases: {
       count: [200, 500],
-      scale: [[0.1, 0.5], [1.0, 1.2]],
-      rotate: [[-180, 0], [0, 180]],
-      alpha: [[45, 60], [85, 100]],
+      scale: [
+        [0.1, 0.5],
+        [1.0, 1.2],
+      ],
+      rotate: [
+        [-180, 0],
+        [0, 180],
+      ],
+      alpha: [
+        [45, 60],
+        [85, 100],
+      ],
       jitter: [0, 30],
       density: [40, 90],
       zTiers: [2, 5],
@@ -237,19 +280,27 @@ export const RENDER_PROFILES = [
       'near-monochrome reputation as incomplete.',
     gaps: [
       'No plotter-line drawing: the engine scatters sprites, it cannot ' +
-      'draw sequential uniform line segments or the labyrinthine dash ' +
-      'maze register.',
+        'draw sequential uniform line segments or the labyrinthine dash ' +
+        'maze register.',
       'No 1%-disturbance logic: her signature tilted/erased element is a ' +
-      'deliberate single delta, not random jitter.',
-      'No serial-variant presentation: one algorithm, a family of ' +
-      'variations shown side by side.',
+        'deliberate single delta, not random jitter.',
+      'No serial-variant presentation: one algorithm, a family of ' + 'variations shown side by side.',
       'Near-static, but not frozen: the engine always breathes a little.',
     ],
     biases: {
       count: [200, 600],
-      scale: [[0.1, 0.4], [1.0, 1.4]],
-      rotate: [[-45, 0], [0, 45]],
-      alpha: [[50, 60], [90, 100]],
+      scale: [
+        [0.1, 0.4],
+        [1.0, 1.4],
+      ],
+      rotate: [
+        [-45, 0],
+        [0, 45],
+      ],
+      alpha: [
+        [50, 60],
+        [90, 100],
+      ],
       jitter: [0, 20],
       density: [80, 120],
       zTiers: [1, 2],
@@ -282,18 +333,26 @@ export const RENDER_PROFILES = [
       'are white" rule spirit).',
     gaps: [
       'No cube/hypercube geometry: the engine cannot construct the ' +
-      'combinatorial edge-sets or diagonal paths that are his entire motif.',
+        'combinatorial edge-sets or diagonal paths that are his entire motif.',
       'No faint construction lines or hairline rules as system evidence.',
       'The early (1962–1999) black-on-warm-paper register is not ' +
-      'expressed — this profile takes the late flat-black lineage.',
-      'No systematic enumeration: rows that progressively remove ' +
-      'contour lines until the cube dissolves.',
+        'expressed — this profile takes the late flat-black lineage.',
+      'No systematic enumeration: rows that progressively remove ' + 'contour lines until the cube dissolves.',
     ],
     biases: {
       count: [60, 240],
-      scale: [[0.6, 1.0], [1.0, 2.2]],
-      rotate: [[-45, 0], [0, 45]],
-      alpha: [[50, 60], [95, 100]],
+      scale: [
+        [0.6, 1.0],
+        [1.0, 2.2],
+      ],
+      rotate: [
+        [-45, 0],
+        [0, 45],
+      ],
+      alpha: [
+        [50, 60],
+        [95, 100],
+      ],
       jitter: [0, 15],
       density: [30, 70],
       zTiers: [1, 3],
@@ -327,19 +386,26 @@ export const RENDER_PROFILES = [
       'pollen gold, glacier teal, coral ribbon, lagoon cyan, dusk salmon, ' +
       'ember orange.',
     gaps: [
-      'No volumetric fluid rendering: the engine\'s marks have edges; ' +
-      'his masses are continuous and edgeless everywhere.',
+      "No volumetric fluid rendering: the engine's marks have edges; " +
+        'his masses are continuous and edgeless everywhere.',
       'No chapter logic or slow cross-dissolves between animation styles.',
-      'No latent-space walk: the palette is fixed, not derived from a ' +
-      'dataset per press.',
-      'The white-ground Nature Dreams chapter is not expressed — this ' +
-      'profile takes the dark lineage.',
+      'No latent-space walk: the palette is fixed, not derived from a ' + 'dataset per press.',
+      'The white-ground Nature Dreams chapter is not expressed — this ' + 'profile takes the dark lineage.',
     ],
     biases: {
       count: [150, 400],
-      scale: [[0.8, 1.0], [1.6, 3.0]],
-      rotate: [[-180, 0], [0, 180]],
-      alpha: [[15, 40], [70, 90]],
+      scale: [
+        [0.8, 1.0],
+        [1.6, 3.0],
+      ],
+      rotate: [
+        [-180, 0],
+        [0, 180],
+      ],
+      alpha: [
+        [15, 40],
+        [70, 90],
+      ],
       jitter: [20, 100],
       density: [80, 120],
       zTiers: [5, 10],
@@ -349,7 +415,7 @@ export const RENDER_PROFILES = [
       particleCount: [150, 300],
       swarmCohesion: [0.2, 1.0],
       gravityWells: [0.2, 1.5],
-      damping: [0.90, 0.94],
+      damping: [0.9, 0.94],
       wind: [1.2, 2.0],
       flap: [0.5, 0.9],
       breath: [0.3, 0.7],
@@ -372,27 +438,36 @@ export const RENDER_PROFILES = [
       'error set (magenta, blue, yellow, green, cyan).',
     gaps: [
       'No host image to rupture: her glitch needs a recognizable source ' +
-      'so the break reads as a break; the engine generates abstraction ' +
-      'with no source frame.',
+        'so the break reads as a break; the engine generates abstraction ' +
+        'with no source frame.',
       'No macroblock geometry, DCT blocks, codec tear lines, or genuine ' +
-      'datamosh propagation — the engine has no codec layer.',
+        'datamosh propagation — the engine has no codec layer.',
       'No forensic-compare presentation (one source × N formats).',
     ],
     biases: {
       count: [200, 500],
-      scale: [[0.3, 0.8], [1.0, 2.0]],
-      rotate: [[-15, 0], [0, 15]],
-      alpha: [[50, 60], [90, 100]],
+      scale: [
+        [0.3, 0.8],
+        [1.0, 2.0],
+      ],
+      rotate: [
+        [-15, 0],
+        [0, 15],
+      ],
+      alpha: [
+        [50, 60],
+        [90, 100],
+      ],
       jitter: [0, 50],
       density: [70, 120],
       zTiers: [1, 4],
-      noiseFreq: [0.002, 0.010],
+      noiseFreq: [0.002, 0.01],
       noiseSpeed: [0.5, 1.5],
       displacement: [40, 120],
       particleCount: [100, 250],
       swarmCohesion: [0.2, 1.5],
       gravityWells: [0.1, 1.5],
-      damping: [0.90, 0.95],
+      damping: [0.9, 0.95],
       wind: [0.6, 2.0],
       flap: [0.2, 0.9],
       breath: [0, 0.3],
@@ -414,19 +489,26 @@ export const RENDER_PROFILES = [
       'only — cocoon white ground, silk shadow, chitin amber, biopolymer ' +
       'umber, honey deposit, bone rib, weathered fiber, aperture dark.',
     gaps: [
-      'No deposition-path line: her "line" is thread courses and ' +
-      'extrusion ridges, not drawn marks.',
+      'No deposition-path line: her "line" is thread courses and ' + 'extrusion ridges, not drawn marks.',
       'No material translucency or hygroscopic darkening: engine marks ' +
-      'are lit sprites, not amber membranes with visible weave.',
-      'No growth/decay lifecycle: programmed decay and endings don\'t ' +
-      'exist in the live loop.',
+        'are lit sprites, not amber membranes with visible weave.',
+      "No growth/decay lifecycle: programmed decay and endings don't " + 'exist in the live loop.',
       'No environmental scalar fields driving fiber density.',
     ],
     biases: {
       count: [100, 350],
-      scale: [[0.5, 1.0], [1.0, 2.5]],
-      rotate: [[-180, 0], [0, 180]],
-      alpha: [[50, 60], [80, 100]],
+      scale: [
+        [0.5, 1.0],
+        [1.0, 2.5],
+      ],
+      rotate: [
+        [-180, 0],
+        [0, 180],
+      ],
+      alpha: [
+        [50, 60],
+        [80, 100],
+      ],
       jitter: [0, 30],
       density: [20, 50],
       zTiers: [3, 6],
@@ -456,27 +538,34 @@ export const RENDER_PROFILES = [
       'turbulence (count and density maxed, displacement high, never ' +
       'settling). Both read photographic, so glow stays forced off. ' +
       'Palette: one catalog entry compromises the two stagings — deep ' +
-      'warm charcoal ground (Dynamo\'s taupe void meets Magma 19\'s char) ' +
+      "warm charcoal ground (Dynamo's taupe void meets Magma 19's char) " +
       'carrying tube bone, ember core, olive/copper streamlines, vortex ' +
       'blue, eddy green, magma red, slate void.',
     gaps: [
-      'No streamline tubes: the engine cannot render tapering 3D ' +
-      'cylinders with real light transport.',
+      'No streamline tubes: the engine cannot render tapering 3D ' + 'cylinders with real light transport.',
       'No vorticity colormap: the engine has no fluid simulation; ' +
-      'turbulence is faked with flow fields and displacement.',
-      'No energetic arc: birth, peak turbulence, decay — the live loop ' +
-      'is perpetual.',
+        'turbulence is faked with flow fields and displacement.',
+      'No energetic arc: birth, peak turbulence, decay — the live loop ' + 'is perpetual.',
       'One palette compromises the two grounds; the true taupe void ' +
-      'and true char ground each want their own entry.',
+        'and true char ground each want their own entry.',
     ],
     modes: {
       tubes: {
         note: 'Mode A — lit streamline-tube sculpture floating in a void.',
         biases: {
           count: [150, 350],
-          scale: [[0.4, 1.0], [1.0, 2.4]],
-          rotate: [[-180, 0], [0, 180]],
-          alpha: [[50, 60], [80, 100]],
+          scale: [
+            [0.4, 1.0],
+            [1.0, 2.4],
+          ],
+          rotate: [
+            [-180, 0],
+            [0, 180],
+          ],
+          alpha: [
+            [50, 60],
+            [80, 100],
+          ],
           jitter: [0, 40],
           density: [25, 60],
           zTiers: [4, 8],
@@ -498,9 +587,18 @@ export const RENDER_PROFILES = [
         note: 'Mode B — full-frame vorticity colormap field, edge to edge.',
         biases: {
           count: [300, 600],
-          scale: [[0.3, 1.0], [1.0, 2.8]],
-          rotate: [[-180, 0], [0, 180]],
-          alpha: [[30, 60], [70, 100]],
+          scale: [
+            [0.3, 1.0],
+            [1.0, 2.8],
+          ],
+          rotate: [
+            [-180, 0],
+            [0, 180],
+          ],
+          alpha: [
+            [30, 60],
+            [70, 100],
+          ],
           jitter: [10, 80],
           density: [90, 120],
           zTiers: [2, 5],
@@ -510,7 +608,7 @@ export const RENDER_PROFILES = [
           particleCount: [150, 300],
           swarmCohesion: [0.2, 1.2],
           gravityWells: [0.2, 1.5],
-          damping: [0.90, 0.95],
+          damping: [0.9, 0.95],
           wind: [1.2, 2.0],
           flap: [0.3, 0.7],
           breath: [0, 0.2],
@@ -532,8 +630,8 @@ export function getRenderProfile(id) {
 // range pairs [[lo1, hi1], [lo2, hi2]], float scalars [lo, hi] with the
 // same decimal precision randomizeKey uses.
 
-const r2 = (v) => +(v.toFixed(2));
-const r4 = (v) => +(v.toFixed(4));
+const r2 = (v) => +v.toFixed(2);
+const r4 = (v) => +v.toFixed(4);
 const randInt = (lo, hi, rng) => Math.floor(lo + rng() * (hi - lo + 1));
 
 function rollBias(key, spec, rng) {

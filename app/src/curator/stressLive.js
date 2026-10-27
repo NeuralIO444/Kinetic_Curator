@@ -19,8 +19,15 @@ export const ACTIVITY_WINDOW_FRAMES = 120;
 // and the 0.28 / 0.72 edges tuned from evidence instead of feel. Zero here; a live session's counters are
 // its own objects, built in initStress — this frozen shape is only the never-started / stopped state.
 export const NEUTRAL_STRESS = Object.freeze({
-  stress: 0, smoothed: 0, band: null, activity: 0, dish: 0, taste: 0, frames: 0,
-  occupancy: Object.freeze({ relax: 0, normal: 0, tighten: 0 }), crossings: 0,
+  stress: 0,
+  smoothed: 0,
+  band: null,
+  activity: 0,
+  dish: 0,
+  taste: 0,
+  frames: 0,
+  occupancy: Object.freeze({ relax: 0, normal: 0, tighten: 0 }),
+  crossings: 0,
 });
 
 let live = NEUTRAL_STRESS;
@@ -78,7 +85,12 @@ export function initStress({ getCounts, isRunning, getDish, raf, caf } = {}) {
     const taste = tasteWithVerdicts(counts && counts.passRun, counts && counts.verdicts); // #1753
     let dish = 0;
     if (getDish) {
-      try { const d = getDish(); if (d > 0) dish = Math.min(1, d); } catch { dish = 0; } // unreadable = no pressure
+      try {
+        const d = getDish();
+        if (d > 0) dish = Math.min(1, d);
+      } catch {
+        dish = 0;
+      } // unreadable = no pressure
     }
     const r = tracker.update({ activity, dish, taste });
     frames += 1;
@@ -87,15 +99,33 @@ export function initStress({ getCounts, isRunning, getDish, raf, caf } = {}) {
       if (prevBand !== null && r.band !== prevBand) crossings += 1;
       prevBand = r.band;
     }
-    live = { stress: r.stress, smoothed: r.smoothed, band: r.band, activity, dish, taste, frames, occupancy, crossings };
+    live = {
+      stress: r.stress,
+      smoothed: r.smoothed,
+      band: r.band,
+      activity,
+      dish,
+      taste,
+      frames,
+      occupancy,
+      crossings,
+    };
     if (tap !== null) {
-      try { tap({ activity, dish, taste, band: r.band }); } catch { tap = null; }
+      try {
+        tap({ activity, dish, taste, band: r.band });
+      } catch {
+        tap = null;
+      }
     }
   };
   const loop = () => {
     handle = req(loop);
     let running;
-    try { running = isRunning ? !!isRunning() : true; } catch { running = false; }
+    try {
+      running = isRunning ? !!isRunning() : true;
+    } catch {
+      running = false;
+    }
     if (running) step();
   };
   if (req) handle = req(loop);

@@ -15,7 +15,10 @@ import {
 const favs = (n) => Array.from({ length: n }, (_, i) => ({ id: `f${i}` }));
 
 // visibleQueue: same window the tray shows (last 12, oldest→newest order kept)
-assert.deepStrictEqual(visibleQueue(favs(5)).map((f) => f.id), ['f0', 'f1', 'f2', 'f3', 'f4']);
+assert.deepStrictEqual(
+  visibleQueue(favs(5)).map((f) => f.id),
+  ['f0', 'f1', 'f2', 'f3', 'f4'],
+);
 {
   const win = visibleQueue(favs(15));
   assert.strictEqual(win.length, QUEUE_MAX_VISIBLE, 'window caps at 12');

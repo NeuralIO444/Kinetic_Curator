@@ -7,12 +7,20 @@
 // stored shape never changes, and the count survives a reload.
 import assert from 'node:assert';
 import {
-  DICE_CROWNS_KEY, DICE_CROWNS_MAX, DICE_CROWNS_SHED_KEY,
-  readCrowns, readCrownsCounted, readCrownShed, recordCrown,
+  DICE_CROWNS_KEY,
+  DICE_CROWNS_MAX,
+  DICE_CROWNS_SHED_KEY,
+  readCrowns,
+  readCrownsCounted,
+  readCrownShed,
+  recordCrown,
 } from './diceCrowns.js';
 
 let checks = 0;
-const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
+const ok = (name) => {
+  checks += 1;
+  console.log(`  [ok] ${name}`);
+};
 const store = () => {
   const m = new Map();
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, String(v)), map: m };
@@ -36,7 +44,10 @@ const crown = (i) => ({ ts: 1000 + i, layoutId: `layout-${i}`, assetIds: [`asset
   for (let i = 0; i < DICE_CROWNS_MAX + 5; i++) recordCrown(crown(i), s);
   assert.equal(readCrowns(s).length, DICE_CROWNS_MAX, 'the cap still holds');
   assert.equal(readCrownShed(s), 5, 'five crowns shed past the cap, counted');
-  assert.ok(Array.isArray(JSON.parse(s.map.get(DICE_CROWNS_KEY))), 'the stored list is still a bare array — no migration of the training data');
+  assert.ok(
+    Array.isArray(JSON.parse(s.map.get(DICE_CROWNS_KEY))),
+    'the stored list is still a bare array — no migration of the training data',
+  );
   assert.equal(readCrowns(s)[0].layoutId, 'layout-5', 'the oldest five are the ones that went');
   ok('cap trims increment the persisted shed counter');
 }
@@ -51,7 +62,10 @@ const crown = (i) => ({ ts: 1000 + i, layoutId: `layout-${i}`, assetIds: [`asset
   assert.equal(readCrownShed(s), 0, 'a read alone sheds nothing — the entries are still stored');
   recordCrown(crown(3), s);
   assert.equal(readCrownShed(s), 2, 'the rewrite that drops them is what counts them');
-  assert.deepEqual(readCrowns(s).map((c) => c.layoutId), ['layout-1', 'layout-2', 'layout-3']);
+  assert.deepEqual(
+    readCrowns(s).map((c) => c.layoutId),
+    ['layout-1', 'layout-2', 'layout-3'],
+  );
   // an unsanitizable crown is refused without touching the count
   const before = readCrownShed(s);
   assert.equal(recordCrown({ layoutId: '', assetIds: [] }, s).length, 3);

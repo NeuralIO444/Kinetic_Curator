@@ -44,6 +44,11 @@ export function createSourceArbiter() {
       return { mix, source, audio };
     },
     mix: () => mix,
-    reset() { last = null; mix = 0; level = 0; audio = false; },
+    reset() {
+      last = null;
+      mix = 0;
+      level = 0;
+      audio = false;
+    },
   };
 }

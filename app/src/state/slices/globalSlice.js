@@ -2,8 +2,12 @@ import { ASSETS } from '../../data/assets/index.js';
 import { getQualityCaps } from '../../data/quality.js';
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
 import {
-  sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay,
-  removeFromOverlay, renameOverlayAsset, replaceOverlayAsset,
+  sanitizeOverlay,
+  duplicateIntoOverlay,
+  ingestIntoOverlay,
+  removeFromOverlay,
+  renameOverlayAsset,
+  replaceOverlayAsset,
 } from '../../assets/overlay.js';
 import {
   normalizeSnapshots,
@@ -49,9 +53,7 @@ initialEnabledAssets.creature = true;
  * explicit `false` values, never as `{}`.
  */
 function wholeEnabledAssets(map) {
-  return map && typeof map === 'object' && Object.keys(map).length > 0
-    ? { ...map }
-    : { ...initialEnabledAssets };
+  return map && typeof map === 'object' && Object.keys(map).length > 0 ? { ...map } : { ...initialEnabledAssets };
 }
 
 const WEIGHT_CYCLE = ['light', 'medium', 'heavy'];
@@ -349,7 +351,12 @@ export const createGlobalSlice = (set) => ({
   },
   importTaste: (raw) => {
     const r = keepTaste(raw);
-    if (r.ok) set((s) => ({ tasteStatus: tasteSummary(r.taste, { experimental: experimentalOn() }), loisStatus: loisSummary(r.taste, { experimental: experimentalOn() }), tasteRev: (s.tasteRev || 0) + 1 }));
+    if (r.ok)
+      set((s) => ({
+        tasteStatus: tasteSummary(r.taste, { experimental: experimentalOn() }),
+        loisStatus: loisSummary(r.taste, { experimental: experimentalOn() }),
+        tasteRev: (s.tasteRev || 0) + 1,
+      }));
     return r;
   },
   clearTaste: () => {
@@ -381,9 +388,10 @@ export const createGlobalSlice = (set) => ({
    * the live loop picks it up via the CanvasPanel effect below.
    */
   canvasBg: 'palette',
-  cycleCanvasBg: () => set((state) => ({
-    canvasBg: state.canvasBg === 'palette' ? 'transparent' : state.canvasBg === 'transparent' ? 'white' : 'palette',
-  })),
+  cycleCanvasBg: () =>
+    set((state) => ({
+      canvasBg: state.canvasBg === 'palette' ? 'transparent' : state.canvasBg === 'transparent' ? 'white' : 'palette',
+    })),
 
   setPersistStatus: (persistStatus) => set({ persistStatus }),
   /**
@@ -393,30 +401,30 @@ export const createGlobalSlice = (set) => ({
    */
   bootNotice: null,
   setBootNotice: (msg) => set({ bootNotice: typeof msg === 'string' && msg ? msg : null }),
-  setRunning: (running) => set((state) => {
-    // #264 — manual resume contract: anything that sets running=true
-    // (Space, the RUN button) after a watchdog hard stop clears the stop
-    // outright — slowRender, its source, and the badge's reason. The cut-6
-    // soft freeze is NOT cleared here; it auto-clears on FPS recovery in
-    // the governor hook.
-    const resumeWatchdog = !!running && state.slowRenderSource === 'watchdog';
-    return {
-      running,
-      ...(resumeWatchdog
-        ? { slowRender: false, slowRenderSource: null, lastWatchdogReason: null }
-        : {}),
-    };
-  }),
+  setRunning: (running) =>
+    set((state) => {
+      // #264 — manual resume contract: anything that sets running=true
+      // (Space, the RUN button) after a watchdog hard stop clears the stop
+      // outright — slowRender, its source, and the badge's reason. The cut-6
+      // soft freeze is NOT cleared here; it auto-clears on FPS recovery in
+      // the governor hook.
+      const resumeWatchdog = !!running && state.slowRenderSource === 'watchdog';
+      return {
+        running,
+        ...(resumeWatchdog ? { slowRender: false, slowRenderSource: null, lastWatchdogReason: null } : {}),
+      };
+    }),
   setFps: (fps) => set({ fps }),
   setNodeCount: (count) => set({ nodeCount: count }),
-  setQuality: (quality) => set((state) => {
-    const caps = getQualityCaps(quality);
-    const next = { quality };
-    if (!caps.allowMirror && state.layoutParams.mirror) {
-      next.layoutParams = { ...state.layoutParams, mirror: false };
-    }
-    return next;
-  }),
+  setQuality: (quality) =>
+    set((state) => {
+      const caps = getQualityCaps(quality);
+      const next = { quality };
+      if (!caps.allowMirror && state.layoutParams.mirror) {
+        next.layoutParams = { ...state.layoutParams, mirror: false };
+      }
+      return next;
+    }),
   setAutoQuality: (auto) => set({ autoQuality: !!auto }),
   toggleFullscreen: () => set((state) => ({ isFullscreen: !state.isFullscreen })),
   // #1355 AUTO SPAWN homes are published here as `dishPins`, which the resolver reads (so a
@@ -454,10 +462,11 @@ export const createGlobalSlice = (set) => ({
   setFeedbackWarpShed: (on) => set({ feedbackWarpShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
-  setSlowRender: (slow, source) => set({
-    slowRender: slow,
-    slowRenderSource: slow ? (source || 'cut6') : null,
-  }),
+  setSlowRender: (slow, source) =>
+    set({
+      slowRender: slow,
+      slowRenderSource: slow ? source || 'cut6' : null,
+    }),
   /** #264 — the governor records the tier its quality shed stepped from. */
   setQualityShedFrom: (tier) => set({ qualityShedFrom: tier }),
   /** #264 — lets the badge return to clean once a watchdog stop is gone. */
@@ -476,20 +485,22 @@ export const createGlobalSlice = (set) => ({
    * and to each other: shed must stay strictly below recover, or the
    * permanent-shed trap returns.
    */
-  setGovernorShedFps: (v) => set((state) => ({
-    governorShedFps: Math.min(
-      Math.max(1, Math.round(Number(v) || state.governorShedFps)),
-      120,
-      state.governorRecoverFps - 1,
-    ),
-  })),
-  setGovernorRecoverFps: (v) => set((state) => ({
-    governorRecoverFps: Math.max(
-      Math.min(120, Math.round(Number(v) || state.governorRecoverFps)),
-      1,
-      state.governorShedFps + 1,
-    ),
-  })),
+  setGovernorShedFps: (v) =>
+    set((state) => ({
+      governorShedFps: Math.min(
+        Math.max(1, Math.round(Number(v) || state.governorShedFps)),
+        120,
+        state.governorRecoverFps - 1,
+      ),
+    })),
+  setGovernorRecoverFps: (v) =>
+    set((state) => ({
+      governorRecoverFps: Math.max(
+        Math.min(120, Math.round(Number(v) || state.governorRecoverFps)),
+        1,
+        state.governorShedFps + 1,
+      ),
+    })),
   setFrameLock: (on) => set({ frameLock: !!on }),
   /** Live-GL context health signal (#263) — one of 'ok' | 'lost' | 'restoring'. */
   setGlContext: (v) => set({ glContext: v === 'lost' ? 'lost' : v === 'restoring' ? 'restoring' : 'ok' }),
@@ -501,15 +512,16 @@ export const createGlobalSlice = (set) => ({
    * Cross-slice write (evolveMode lives in davisSlice): already precedented
    * by setQuality reaching into layoutParams above.
    */
-  tripWatchdog: (reason) => set((state) => ({
-    slowRender: true,
-    slowRenderSource: 'watchdog',
-    running: false,
-    evolveMode: false,
-    perfTier1: true,
-    watchdogTripGen: state.watchdogTripGen + 1,
-    lastWatchdogReason: reason,
-  })),
+  tripWatchdog: (reason) =>
+    set((state) => ({
+      slowRender: true,
+      slowRenderSource: 'watchdog',
+      running: false,
+      evolveMode: false,
+      perfTier1: true,
+      watchdogTripGen: state.watchdogTripGen + 1,
+      lastWatchdogReason: reason,
+    })),
   setWebcamEnabled: (enabled) => set({ webcamEnabled: enabled }),
   /**
    * RENDER FAULT setter (#266). Written only on transitions by the live
@@ -518,32 +530,41 @@ export const createGlobalSlice = (set) => ({
    * explicit `false`, which also drops the reason so a stale diagnosis
    * can't linger after recovery.
    */
-  setRenderFault: (on, reason) => set({
-    renderFault: !!on,
-    renderFaultReason: on ? (reason || 'render-error') : null,
-  }),
+  setRenderFault: (on, reason) =>
+    set({
+      renderFault: !!on,
+      renderFaultReason: on ? reason || 'render-error' : null,
+    }),
 
-  toggleAsset: (id) => set((state) => ({
-    enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },
-  })),
-  soloAsset: (id) => set((state) => {
-    const next = {};
-    ASSETS.forEach((a) => { next[a.id] = a.id === id; });
-    sanitizeOverlay(state.customAssets).forEach((a) => { next[a.id] = a.id === id; });
-    return { enabledAssets: next };
-  }),
-  toggleAllAssets: (enabled) => set((state) => {
-    const next = { ...state.enabledAssets };
-    const userOnly = state.catFilter === 'user';
-    ASSETS.forEach((a) => {
-      if (userOnly) return;
-      if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
-    });
-    sanitizeOverlay(state.customAssets).forEach((a) => {
-      if (state.catFilter === 'all' || state.catFilter === 'user' || a.category === state.catFilter) next[a.id] = enabled;
-    });
-    return { enabledAssets: next };
-  }),
+  toggleAsset: (id) =>
+    set((state) => ({
+      enabledAssets: { ...state.enabledAssets, [id]: !state.enabledAssets[id] },
+    })),
+  soloAsset: (id) =>
+    set((state) => {
+      const next = {};
+      ASSETS.forEach((a) => {
+        next[a.id] = a.id === id;
+      });
+      sanitizeOverlay(state.customAssets).forEach((a) => {
+        next[a.id] = a.id === id;
+      });
+      return { enabledAssets: next };
+    }),
+  toggleAllAssets: (enabled) =>
+    set((state) => {
+      const next = { ...state.enabledAssets };
+      const userOnly = state.catFilter === 'user';
+      ASSETS.forEach((a) => {
+        if (userOnly) return;
+        if (state.catFilter === 'all' || a.category === state.catFilter) next[a.id] = enabled;
+      });
+      sanitizeOverlay(state.customAssets).forEach((a) => {
+        if (state.catFilter === 'all' || state.catFilter === 'user' || a.category === state.catFilter)
+          next[a.id] = enabled;
+      });
+      return { enabledAssets: next };
+    }),
   setEnabledAssets: (map) => set({ enabledAssets: { ...map } }),
   setSearch: (search) => set({ search }),
   setCatFilter: (filter) => set({ catFilter: filter }),
@@ -552,154 +573,174 @@ export const createGlobalSlice = (set) => ({
     return set({ poolView: view });
   },
 
-  duplicateAsset: (id) => set((state) => {
-    const src = findAsset(id, sanitizeOverlay(state.customAssets));
-    if (!src) return {};
-    const result = duplicateIntoOverlay(src, state.customAssets);
-    if (!result.ok) return { ingestError: result.hint || result.error };
-    // #1434 — a duplicate is a new arrival: it inherits its source's
-    // regions + defaults through the record spread; if the source had
-    // none yet, tag it on arrival like any import.
-    if (!Array.isArray(result.asset.regions) || !result.asset.regions.length) {
-      queueRegionDetect(result.asset.id, result.asset.svg, (rid, regions) => {
+  duplicateAsset: (id) =>
+    set((state) => {
+      const src = findAsset(id, sanitizeOverlay(state.customAssets));
+      if (!src) return {};
+      const result = duplicateIntoOverlay(src, state.customAssets);
+      if (!result.ok) return { ingestError: result.hint || result.error };
+      // #1434 — a duplicate is a new arrival: it inherits its source's
+      // regions + defaults through the record spread; if the source had
+      // none yet, tag it on arrival like any import.
+      if (!Array.isArray(result.asset.regions) || !result.asset.regions.length) {
+        queueRegionDetect(result.asset.id, result.asset.svg, (rid, regions) => {
+          set((st) => {
+            const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
+            if (!cur || cur.svg !== result.asset.svg) return {};
+            return {
+              customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
+            };
+          });
+        });
+      }
+      return {
+        customAssets: result.overlay,
+        enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+        ingestError: null,
+      };
+    }),
+
+  ingestAsset: (svg, hint, opts = {}) =>
+    set((state) => {
+      const result = ingestIntoOverlay(svg, state.customAssets, hint, opts);
+      if (!result.ok) return { ingestError: result.hint || result.error || 'ingest failed' };
+      // #725: region detection needs a rasterize (async) — the asset lands
+      // now, its regions follow. Stale-guarded: a replace in between wins.
+      // #1434: when they land they are capped + family-defaulted
+      // (withTaggedRegions) — no raw/inert import state.
+      queueRegionDetect(result.asset.id, result.asset.svg, (id, regions) => {
         set((st) => {
-          const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
+          const cur = findAsset(id, sanitizeOverlay(st.customAssets));
           if (!cur || cur.svg !== result.asset.svg) return {};
           return {
-            customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
+            customAssets: st.customAssets.map((a) => (a.id === id ? withTaggedRegions(a, regions) : a)),
           };
         });
       });
-    }
-    return {
-      customAssets: result.overlay,
-      enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
-      ingestError: null,
-    };
-  }),
+      return {
+        customAssets: result.overlay,
+        enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
+        ingestError: null,
+      };
+    }),
 
-  ingestAsset: (svg, hint, opts = {}) => set((state) => {
-    const result = ingestIntoOverlay(svg, state.customAssets, hint, opts);
-    if (!result.ok) return { ingestError: result.hint || result.error || 'ingest failed' };
-    // #725: region detection needs a rasterize (async) — the asset lands
-    // now, its regions follow. Stale-guarded: a replace in between wins.
-    // #1434: when they land they are capped + family-defaulted
-    // (withTaggedRegions) — no raw/inert import state.
-    queueRegionDetect(result.asset.id, result.asset.svg, (id, regions) => {
-      set((st) => {
-        const cur = findAsset(id, sanitizeOverlay(st.customAssets));
-        if (!cur || cur.svg !== result.asset.svg) return {};
-        return {
-          customAssets: st.customAssets.map((a) => (a.id === id ? withTaggedRegions(a, regions) : a)),
-        };
-      });
-    });
-    return {
-      customAssets: result.overlay,
-      enabledAssets: { ...state.enabledAssets, [result.asset.id]: false },
-      ingestError: null,
-    };
-  }),
+  removeCustomAsset: (id) =>
+    set((state) => {
+      const result = removeFromOverlay(id, state.customAssets);
+      if (!result.ok) return { ingestError: result.hint || result.error };
+      const enabled = { ...state.enabledAssets };
+      const overrides = { ...(state.assetWeightOverrides || {}) };
+      delete enabled[id];
+      delete overrides[id];
+      return {
+        customAssets: result.overlay,
+        enabledAssets: enabled,
+        assetWeightOverrides: overrides,
+        ingestError: null,
+      };
+    }),
 
-  removeCustomAsset: (id) => set((state) => {
-    const result = removeFromOverlay(id, state.customAssets);
-    if (!result.ok) return { ingestError: result.hint || result.error };
-    const enabled = { ...state.enabledAssets };
-    const overrides = { ...(state.assetWeightOverrides || {}) };
-    delete enabled[id];
-    delete overrides[id];
-    return { customAssets: result.overlay, enabledAssets: enabled, assetWeightOverrides: overrides, ingestError: null };
-  }),
-
-  renameCustomAsset: (id, name) => set((state) => {
-    const result = renameOverlayAsset(id, name, state.customAssets);
-    if (!result.ok) return { ingestError: result.hint || result.error };
-    const enabled = { ...state.enabledAssets };
-    const overrides = { ...(state.assetWeightOverrides || {}) };
-    if (result.from !== result.to) {
-      // Propagate the rename to every id-keyed map so no stale reference
-      // to the old id survives (#134: overrides used to be left behind,
-      // silently resetting the renamed asset's weight and persisting the
-      // dead id into saved project documents).
-      if (result.from in enabled) {
-        enabled[result.to] = enabled[result.from];
-        delete enabled[result.from];
+  renameCustomAsset: (id, name) =>
+    set((state) => {
+      const result = renameOverlayAsset(id, name, state.customAssets);
+      if (!result.ok) return { ingestError: result.hint || result.error };
+      const enabled = { ...state.enabledAssets };
+      const overrides = { ...(state.assetWeightOverrides || {}) };
+      if (result.from !== result.to) {
+        // Propagate the rename to every id-keyed map so no stale reference
+        // to the old id survives (#134: overrides used to be left behind,
+        // silently resetting the renamed asset's weight and persisting the
+        // dead id into saved project documents).
+        if (result.from in enabled) {
+          enabled[result.to] = enabled[result.from];
+          delete enabled[result.from];
+        }
+        if (result.from in overrides) {
+          overrides[result.to] = overrides[result.from];
+          delete overrides[result.from];
+        }
       }
-      if (result.from in overrides) {
-        overrides[result.to] = overrides[result.from];
-        delete overrides[result.from];
-      }
-    }
-    return { customAssets: result.overlay, enabledAssets: enabled, assetWeightOverrides: overrides, ingestError: null };
-  }),
+      return {
+        customAssets: result.overlay,
+        enabledAssets: enabled,
+        assetWeightOverrides: overrides,
+        ingestError: null,
+      };
+    }),
 
-  replaceCustomAsset: (id, svg) => set((state) => {
-    const result = replaceOverlayAsset(id, svg, state.customAssets);
-    if (!result.ok) return { ingestError: result.hint || result.error };
-    // #725: re-detect regions for the new artwork; stale-guard as above.
-    // #1434: the new geometry re-tags (cap + family defaults) on arrival.
-    const nextSvg = result.overlay.find((a) => a.id === id)?.svg;
-    if (nextSvg) {
-      queueRegionDetect(id, nextSvg, (rid, regions) => {
-        set((st) => {
-          const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
-          if (!cur || cur.svg !== nextSvg) return {};
-          return {
-            customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
-          };
+  replaceCustomAsset: (id, svg) =>
+    set((state) => {
+      const result = replaceOverlayAsset(id, svg, state.customAssets);
+      if (!result.ok) return { ingestError: result.hint || result.error };
+      // #725: re-detect regions for the new artwork; stale-guard as above.
+      // #1434: the new geometry re-tags (cap + family defaults) on arrival.
+      const nextSvg = result.overlay.find((a) => a.id === id)?.svg;
+      if (nextSvg) {
+        queueRegionDetect(id, nextSvg, (rid, regions) => {
+          set((st) => {
+            const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
+            if (!cur || cur.svg !== nextSvg) return {};
+            return {
+              customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)),
+            };
+          });
         });
-      });
-    }
-    return { customAssets: result.overlay, ingestError: null };
-  }),
+      }
+      return { customAssets: result.overlay, ingestError: null };
+    }),
 
   /**
    * #725 — set an asset's detected regions (from the async rasterize) or
    * assign a region to a named slot (A/B/C/D). Slot keys are stable region
    * IDs: redraw-same-color survives, recolor breaks (new ID).
    */
-  setAssetRegions: (id, regions) => set((state) => {
-    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
-    if (!asset) return {};
-    // #1434 — regions landing through here get the import pipeline too:
-    // the tag cap + family defaults, recomputed from the new geometry.
-    const tagged = tagImportedRegions(asset, regions);
-    const clean = tagged.regions;
-    // #725: prune slot assignments whose IDs died with the recolor — a slot
-    // pointing at a missing region is a broken promise, not a kept one.
-    const alive = new Set(clean.map((r) => r.id));
-    const slots = normalizeRegionSlots(asset.regionSlots);
-    let pruned = false;
-    for (const s of REGION_SLOTS) {
-      if (slots[s] && !alive.has(slots[s])) { slots[s] = null; pruned = true; }
-    }
-    const prevSlots = normalizeRegionSlots(asset.regionSlots);
-    const slotsChanged = pruned || REGION_SLOTS.some((s) => slots[s] !== prevSlots[s]);
-    return {
-      customAssets: state.customAssets.map((a) => {
-        if (a.id !== id) return a;
-        const rest = { ...a };
-        delete rest.regionKinemes; // stale defaults off — the fresh tag below replaces them
-        return {
-          ...rest,
-          regions: clean,
-          ...(slotsChanged ? { regionSlots: slots } : {}),
-          ...(tagged.regionKinemes ? { regionKinemes: tagged.regionKinemes } : {}),
-        };
-      }),
-    };
-  }),
-  setAssetRegionSlot: (id, slot, regionId) => set((state) => {
-    if (!REGION_SLOTS.includes(slot)) return {};
-    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
-    if (!asset) return {};
-    const next = assignRegionSlot(asset.regionSlots, slot, regionId);
-    const prev = normalizeRegionSlots(asset.regionSlots);
-    if (REGION_SLOTS.every((s) => next[s] === prev[s])) return {};
-    return {
-      customAssets: state.customAssets.map((a) => (a.id === id ? { ...a, regionSlots: next } : a)),
-    };
-  }),
+  setAssetRegions: (id, regions) =>
+    set((state) => {
+      const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+      if (!asset) return {};
+      // #1434 — regions landing through here get the import pipeline too:
+      // the tag cap + family defaults, recomputed from the new geometry.
+      const tagged = tagImportedRegions(asset, regions);
+      const clean = tagged.regions;
+      // #725: prune slot assignments whose IDs died with the recolor — a slot
+      // pointing at a missing region is a broken promise, not a kept one.
+      const alive = new Set(clean.map((r) => r.id));
+      const slots = normalizeRegionSlots(asset.regionSlots);
+      let pruned = false;
+      for (const s of REGION_SLOTS) {
+        if (slots[s] && !alive.has(slots[s])) {
+          slots[s] = null;
+          pruned = true;
+        }
+      }
+      const prevSlots = normalizeRegionSlots(asset.regionSlots);
+      const slotsChanged = pruned || REGION_SLOTS.some((s) => slots[s] !== prevSlots[s]);
+      return {
+        customAssets: state.customAssets.map((a) => {
+          if (a.id !== id) return a;
+          const rest = { ...a };
+          delete rest.regionKinemes; // stale defaults off — the fresh tag below replaces them
+          return {
+            ...rest,
+            regions: clean,
+            ...(slotsChanged ? { regionSlots: slots } : {}),
+            ...(tagged.regionKinemes ? { regionKinemes: tagged.regionKinemes } : {}),
+          };
+        }),
+      };
+    }),
+  setAssetRegionSlot: (id, slot, regionId) =>
+    set((state) => {
+      if (!REGION_SLOTS.includes(slot)) return {};
+      const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+      if (!asset) return {};
+      const next = assignRegionSlot(asset.regionSlots, slot, regionId);
+      const prev = normalizeRegionSlots(asset.regionSlots);
+      if (REGION_SLOTS.every((s) => next[s] === prev[s])) return {};
+      return {
+        customAssets: state.customAssets.map((a) => (a.id === id ? { ...a, regionSlots: next } : a)),
+      };
+    }),
 
   /**
    * #781 KINEME — give an asset a motion (kinemeId) or make it still (null).
@@ -707,49 +748,58 @@ export const createGlobalSlice = (set) => ({
    * surface; until then this is the store/test entry point.
    */
   /** #1128 — pin an asset still, or let it move again. The artist's own choice, so it rides the document. */
-  toggleAssetStill: (assetId) => set((state) => {
-    if (!assetId || typeof assetId !== 'string') return {};
-    const cur = state.assetStill || {};
-    if (cur[assetId]) { const next = { ...cur }; delete next[assetId]; return { assetStill: next }; }
-    return { assetStill: { ...cur, [assetId]: true } };
-  }),
+  toggleAssetStill: (assetId) =>
+    set((state) => {
+      if (!assetId || typeof assetId !== 'string') return {};
+      const cur = state.assetStill || {};
+      if (cur[assetId]) {
+        const next = { ...cur };
+        delete next[assetId];
+        return { assetStill: next };
+      }
+      return { assetStill: { ...cur, [assetId]: true } };
+    }),
   /**
    * #1355 — a wet-lab click on an asset: add an attach point, or step the clicked one's role (#1634: plain →
    * H → L → gone). `shown` is what the lab is
    * showing (the asset's own points, or the ones worked out from its shape): the first hand edit starts from those
    * and from then on the asset uses the artist's. Rides the document.
    */
-  clickAssetAttach: (assetId, pt, shown) => set((state) => {
-    if (!assetId || typeof assetId !== 'string') return {};
-    const cur = state.assetAttach || {};
-    const before = Array.isArray(cur[assetId]) ? cur[assetId] : sanitizeAttachPoints(shown);
-    const after = clickAttach(before, pt);
-    if (after === before) return {};
-    return { assetAttach: { ...cur, [assetId]: after } };
-  }),
+  clickAssetAttach: (assetId, pt, shown) =>
+    set((state) => {
+      if (!assetId || typeof assetId !== 'string') return {};
+      const cur = state.assetAttach || {};
+      const before = Array.isArray(cur[assetId]) ? cur[assetId] : sanitizeAttachPoints(shown);
+      const after = clickAttach(before, pt);
+      if (after === before) return {};
+      return { assetAttach: { ...cur, [assetId]: after } };
+    }),
   /** No points on this asset: an explicit empty list, the artist's choice (not the same as "auto"). */
-  clearAssetAttach: (assetId) => set((state) => (
-    assetId && typeof assetId === 'string' ? { assetAttach: { ...(state.assetAttach || {}), [assetId]: [] } } : {}
-  )),
+  clearAssetAttach: (assetId) =>
+    set((state) =>
+      assetId && typeof assetId === 'string' ? { assetAttach: { ...(state.assetAttach || {}), [assetId]: [] } } : {},
+    ),
   /** Back to the points worked out from the shape: the hand edit is dropped. */
-  autoAssetAttach: (assetId) => set((state) => {
-    if (!state.assetAttach || !(assetId in state.assetAttach)) return {};
-    const next = { ...state.assetAttach };
-    delete next[assetId];
-    return { assetAttach: next };
-  }),
-  setAssetKineme: (assetId, kinemeId) => set((state) => {
-    const cur = state.assetKineme || {};
-    if (!assetId) return {};
-    if (kinemeId == null) {
-      if (!(assetId in cur)) return {};
-      const next = { ...cur };
+  autoAssetAttach: (assetId) =>
+    set((state) => {
+      if (!state.assetAttach || !(assetId in state.assetAttach)) return {};
+      const next = { ...state.assetAttach };
       delete next[assetId];
-      return { assetKineme: next };
-    }
-    if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
-    return { assetKineme: { ...cur, [assetId]: kinemeId } };
-  }),
+      return { assetAttach: next };
+    }),
+  setAssetKineme: (assetId, kinemeId) =>
+    set((state) => {
+      const cur = state.assetKineme || {};
+      if (!assetId) return {};
+      if (kinemeId == null) {
+        if (!(assetId in cur)) return {};
+        const next = { ...cur };
+        delete next[assetId];
+        return { assetKineme: next };
+      }
+      if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
+      return { assetKineme: { ...cur, [assetId]: kinemeId } };
+    }),
   /**
    * #1434 — the artist's per-region kineme override, from the asset tools.
    * value: a kineme id (override), 'still' (tombstone — the region rests
@@ -758,51 +808,54 @@ export const createGlobalSlice = (set) => ({
    * the baked/auto-tagged defaults at resolve time, and a re-bake or
    * re-tag never touches this map.
    */
-  setRegionKineme: (assetId, regionId, value) => set((state) => {
-    if (!assetId || typeof assetId !== 'string' || !regionId || typeof regionId !== 'string') return {};
-    const cur = state.regionKinemes || {};
-    const per = { ...(cur[assetId] || {}) };
-    if (value === 'default') {
-      if (!(regionId in per)) return {};
-      delete per[regionId];
-    } else if (value === 'still') {
-      if (per[regionId] === null) return {};
-      per[regionId] = null;
-    } else if (typeof value === 'string' && getKineme(value)) {
-      if (per[regionId] === value) return {};
-      per[regionId] = value;
-    } else return {};
-    const next = { ...cur };
-    if (Object.keys(per).length) next[assetId] = per;
-    else delete next[assetId];
-    return { regionKinemes: next };
-  }),
-  setAssetWeight: (id, weight) => set((state) => {
-    if (!WEIGHT_CYCLE.includes(weight)) return {};
-    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
-    if (!asset) return {};
-    if (asset.weight === weight) {
-      if (!(id in state.assetWeightOverrides)) return {};
-      const next = { ...state.assetWeightOverrides };
-      delete next[id];
-      return { assetWeightOverrides: next };
-    }
-    return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: weight } };
-  }),
+  setRegionKineme: (assetId, regionId, value) =>
+    set((state) => {
+      if (!assetId || typeof assetId !== 'string' || !regionId || typeof regionId !== 'string') return {};
+      const cur = state.regionKinemes || {};
+      const per = { ...(cur[assetId] || {}) };
+      if (value === 'default') {
+        if (!(regionId in per)) return {};
+        delete per[regionId];
+      } else if (value === 'still') {
+        if (per[regionId] === null) return {};
+        per[regionId] = null;
+      } else if (typeof value === 'string' && getKineme(value)) {
+        if (per[regionId] === value) return {};
+        per[regionId] = value;
+      } else return {};
+      const next = { ...cur };
+      if (Object.keys(per).length) next[assetId] = per;
+      else delete next[assetId];
+      return { regionKinemes: next };
+    }),
+  setAssetWeight: (id, weight) =>
+    set((state) => {
+      if (!WEIGHT_CYCLE.includes(weight)) return {};
+      const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+      if (!asset) return {};
+      if (asset.weight === weight) {
+        if (!(id in state.assetWeightOverrides)) return {};
+        const next = { ...state.assetWeightOverrides };
+        delete next[id];
+        return { assetWeightOverrides: next };
+      }
+      return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: weight } };
+    }),
 
-  cycleAssetWeight: (id) => set((state) => {
-    const asset = findAsset(id, sanitizeOverlay(state.customAssets));
-    if (!asset) return {};
-    const current = state.assetWeightOverrides[id] || asset.weight || 'medium';
-    const idx = WEIGHT_CYCLE.indexOf(current);
-    const nextW = WEIGHT_CYCLE[(idx + 1) % WEIGHT_CYCLE.length];
-    if (nextW === asset.weight) {
-      const next = { ...state.assetWeightOverrides };
-      delete next[id];
-      return { assetWeightOverrides: next };
-    }
-    return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW } };
-  }),
+  cycleAssetWeight: (id) =>
+    set((state) => {
+      const asset = findAsset(id, sanitizeOverlay(state.customAssets));
+      if (!asset) return {};
+      const current = state.assetWeightOverrides[id] || asset.weight || 'medium';
+      const idx = WEIGHT_CYCLE.indexOf(current);
+      const nextW = WEIGHT_CYCLE[(idx + 1) % WEIGHT_CYCLE.length];
+      if (nextW === asset.weight) {
+        const next = { ...state.assetWeightOverrides };
+        delete next[id];
+        return { assetWeightOverrides: next };
+      }
+      return { assetWeightOverrides: { ...state.assetWeightOverrides, [id]: nextW } };
+    }),
 
   /**
    * #1694 S2 — cycle one declared tile option on an asset (the citizen's family). Fully generic,
@@ -811,145 +864,150 @@ export const createGlobalSlice = (set) => ({
    * only ever holds what the artist actually set. Unknown assets, undeclared keys and
    * single-choice options are no-ops.
    */
-  cycleAssetOption: (assetId, key) => set((state) => {
-    const asset = findAsset(assetId, sanitizeOverlay(state.customAssets));
-    const opt = (asset && Array.isArray(asset.options) ? asset.options : []).find((o) => o && o.key === key);
-    if (!opt || !Array.isArray(opt.choices) || opt.choices.length < 2) return {};
-    const dflt = opt.default !== undefined ? opt.default : opt.choices[0];
-    const cur = (state.assetOptions && state.assetOptions[assetId] && state.assetOptions[assetId][key]) ?? dflt;
-    const idx = opt.choices.indexOf(cur);
-    const nextV = opt.choices[((idx < 0 ? 0 : idx) + 1) % opt.choices.length];
-    const forAsset = { ...(state.assetOptions && state.assetOptions[assetId] ? state.assetOptions[assetId] : {}) };
-    if (nextV === dflt) delete forAsset[key]; else forAsset[key] = nextV;
-    const assetOptions = { ...(state.assetOptions || {}) };
-    if (Object.keys(forAsset).length) assetOptions[assetId] = forAsset;
-    else delete assetOptions[assetId];
-    return { assetOptions };
-  }),
+  cycleAssetOption: (assetId, key) =>
+    set((state) => {
+      const asset = findAsset(assetId, sanitizeOverlay(state.customAssets));
+      const opt = (asset && Array.isArray(asset.options) ? asset.options : []).find((o) => o && o.key === key);
+      if (!opt || !Array.isArray(opt.choices) || opt.choices.length < 2) return {};
+      const dflt = opt.default !== undefined ? opt.default : opt.choices[0];
+      const cur = (state.assetOptions && state.assetOptions[assetId] && state.assetOptions[assetId][key]) ?? dflt;
+      const idx = opt.choices.indexOf(cur);
+      const nextV = opt.choices[((idx < 0 ? 0 : idx) + 1) % opt.choices.length];
+      const forAsset = { ...(state.assetOptions && state.assetOptions[assetId] ? state.assetOptions[assetId] : {}) };
+      if (nextV === dflt) delete forAsset[key];
+      else forAsset[key] = nextV;
+      const assetOptions = { ...(state.assetOptions || {}) };
+      if (Object.keys(forAsset).length) assetOptions[assetId] = forAsset;
+      else delete assetOptions[assetId];
+      return { assetOptions };
+    }),
 
-  setCategoryWeight: (category, weight) => set((state) => {
-    if (!WEIGHT_CYCLE.includes(weight)) return {};
-    const next = { ...state.assetWeightOverrides };
-    ASSETS.forEach((a) => {
-      if (a.category !== category) return;
-      if (a.weight === weight) delete next[a.id];
-      else next[a.id] = weight;
-    });
-    return { assetWeightOverrides: next };
-  }),
+  setCategoryWeight: (category, weight) =>
+    set((state) => {
+      if (!WEIGHT_CYCLE.includes(weight)) return {};
+      const next = { ...state.assetWeightOverrides };
+      ASSETS.forEach((a) => {
+        if (a.category !== category) return;
+        if (a.weight === weight) delete next[a.id];
+        else next[a.id] = weight;
+      });
+      return { assetWeightOverrides: next };
+    }),
 
   clearWeightOverrides: () => set({ assetWeightOverrides: {} }),
 
-  applyProject: (doc) => set((state) => {
-    const next = {
-      seed: doc.seed >>> 0,
-      // #305 — sub-seed offsets restore with the seed; absent → zeros.
-      seedOffsets: normalizeSeedOffsets(doc.seedOffsets),
-      paletteId: doc.paletteId || state.paletteId,
-      // #103 Track B — a dangling quality key must never reach the caps lookup.
-      quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
-      // #310: AUTO left performer sight, but the governor still reads the
-      // flag — the document carries the hidden default.
-      autoQuality: doc.autoQuality !== false,
-      // #264 — a fresh document owns its quality; any governor shed claim ends here.
-      qualityShedFrom: null,
-      // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
-      creatureShed: 0,
-      // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
-      travelShed: false,
-      // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.
-      weatherShed: false,
-      // #1490 — the warp shed is likewise a governor claim on the OLD document's FX strata.
-      feedbackWarpShed: false,
-      layoutParams: normalizeLayoutParams(doc.layoutParams),
-      customAssets: sanitizeOverlay(doc.customAssets),
-      ingestError: null,
-    };
-    if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
-      // #103 Track B — apply-path defense in depth: collapse hostile maps to
-      // known asset ids (+ the doc's own sanitized custom assets) before they
-      // reach the store.
-      // #1062 — what the document lists IS the set. This used to seed the
-      // default four ON and overlay the document, so an asset the file never
-      // mentioned came back enabled and export -> import -> export widened.
-      next.enabledAssets = wholeEnabledAssets(sanitizeEnabledAssets(doc.enabledAssets, next.customAssets));
-    }
-    if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
-      next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides, next.customAssets) };
-    } else {
-      // The serializer omits the field when empty — without this, loading a
-      // clean project over a session with overrides kept the old weights.
-      next.assetWeightOverrides = {};
-    }
-    next.paletteOverrides = doc.paletteOverrides ?? null;
-    next.paletteChosen = false; // #1365 — a loaded document's palette is the document's, not a pick made this session
-    // #639 — an import is a new document: undo must never resurrect the
-    // pre-import composition. This runs for every import, not just ones with
-    // layers (a layerless doc used to leave stale undo history behind).
-    next.historyUndoStack = [];
-    next.historyRedoStack = [];
-    // #638 — restore palette locks so harmony regeneration keeps building
-    // around the swatches the designer pinned.
-    next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
-    next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
-    next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
-    next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
-    // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
-    // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
-    // there). Homes are found again for the new dish either way.
-    next.dishPins = [];
-    next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
-    next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
-    next.assetOptions = sanitizeAssetOptions(doc.assetOptions, next.customAssets) || {}; // #1694 S2 — a doc without tile options is all-defaults (citizen family: both)
-    next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
-    {
-      const canvas = sanitizeCanvasSpec(doc);
-      next.canvasW = canvas.canvasW;
-      next.canvasH = canvas.canvasH;
-      next.canvasFps = canvas.canvasFps;
-      next.canvasPresetId = canvas.canvasPresetId;
-      next.stageMode = canvas.stageMode;
-    }
-    { // #617 + #1720 — banks land together: the bank list, the active bank, and
-      // the active bank's map as the `midiMap` mirror. A doc without banks
-      // (the legacy midiMap shape) becomes the single MAIN bank.
-      const banks = sanitizeMidiBanks(doc.midiBanks, doc.midiMap);
-      const active = sanitizeMidiActiveBank(doc.midiActiveBank, banks);
-      next.midiBanks = banks;
-      next.midiActiveBank = active;
-      next.midiMap = activeBankMap(banks, active);
-    }
-    next.mathMacros = sanitizeMathMacros(doc.mathMacros); // #724 — a doc without macros has none
-    next.mathLearnArmed = null; // #724 — learn never survives a load; it is a gesture
-    // #651 — reimported titles persist; a doc without a title clears it.
-    next.projectTitle = typeof doc.title === 'string' ? doc.title.slice(0, 80) : '';
-    if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
-      // #103 Track B — bound on the apply path too; the live loop resolves
-      // every layer per frame.
-      next.layers = doc.layers.slice(0, MAX_LAYERS);
-      next.activeLayerId = doc.activeLayerId;
-      next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots, doc.customAssets, doc);
-      // Install the active layer's snapshot onto live state. The serializer
-      // writes lockedParams/caGrid only into snapshots (never root fields),
-      // so without this a load silently dropped parameter locks and the CA
-      // grid; and a doc whose root values disagree with its active snapshot
-      // rendered the wrong composition until a layer switch. For well-formed
-      // docs this is a no-op — the snapshot was captured from the same
-      // state as the root values.
-      const activeSnap = next.layerSnapshots[doc.activeLayerId];
-      if (activeSnap) {
-        next.seed = activeSnap.seed >>> 0;
-        next.seedOffsets = normalizeSeedOffsets(activeSnap.seedOffsets ?? doc.seedOffsets);
-        next.paletteId = activeSnap.paletteId || next.paletteId;
-        next.paletteOverrides = activeSnap.paletteOverrides ?? null;
-        next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);
-        next.lockedParams = activeSnap.lockedParams || {};
-        next.caGrid = activeSnap.caGrid || null;
-        next.enabledAssets = wholeEnabledAssets(activeSnap.enabledAssets); // #1062 — the snapshot is the whole set too
+  applyProject: (doc) =>
+    set((state) => {
+      const next = {
+        seed: doc.seed >>> 0,
+        // #305 — sub-seed offsets restore with the seed; absent → zeros.
+        seedOffsets: normalizeSeedOffsets(doc.seedOffsets),
+        paletteId: doc.paletteId || state.paletteId,
+        // #103 Track B — a dangling quality key must never reach the caps lookup.
+        quality: sanitizeQuality(doc.quality, state.quality || 'balanced'),
+        // #310: AUTO left performer sight, but the governor still reads the
+        // flag — the document carries the hidden default.
+        autoQuality: doc.autoQuality !== false,
+        // #264 — a fresh document owns its quality; any governor shed claim ends here.
+        qualityShedFrom: null,
+        // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
+        creatureShed: 0,
+        // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
+        travelShed: false,
+        // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.
+        weatherShed: false,
+        // #1490 — the warp shed is likewise a governor claim on the OLD document's FX strata.
+        feedbackWarpShed: false,
+        layoutParams: normalizeLayoutParams(doc.layoutParams),
+        customAssets: sanitizeOverlay(doc.customAssets),
+        ingestError: null,
+      };
+      if (doc.enabledAssets && typeof doc.enabledAssets === 'object') {
+        // #103 Track B — apply-path defense in depth: collapse hostile maps to
+        // known asset ids (+ the doc's own sanitized custom assets) before they
+        // reach the store.
+        // #1062 — what the document lists IS the set. This used to seed the
+        // default four ON and overlay the document, so an asset the file never
+        // mentioned came back enabled and export -> import -> export widened.
+        next.enabledAssets = wholeEnabledAssets(sanitizeEnabledAssets(doc.enabledAssets, next.customAssets));
       }
-    }
-    return next;
-  }),
+      if (doc.assetWeightOverrides && typeof doc.assetWeightOverrides === 'object') {
+        next.assetWeightOverrides = { ...sanitizeAssetWeightOverrides(doc.assetWeightOverrides, next.customAssets) };
+      } else {
+        // The serializer omits the field when empty — without this, loading a
+        // clean project over a session with overrides kept the old weights.
+        next.assetWeightOverrides = {};
+      }
+      next.paletteOverrides = doc.paletteOverrides ?? null;
+      next.paletteChosen = false; // #1365 — a loaded document's palette is the document's, not a pick made this session
+      // #639 — an import is a new document: undo must never resurrect the
+      // pre-import composition. This runs for every import, not just ones with
+      // layers (a layerless doc used to leave stale undo history behind).
+      next.historyUndoStack = [];
+      next.historyRedoStack = [];
+      // #638 — restore palette locks so harmony regeneration keeps building
+      // around the swatches the designer pinned.
+      next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
+      next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
+      next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
+      next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
+      // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
+      // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
+      // there). Homes are found again for the new dish either way.
+      next.dishPins = [];
+      next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
+      next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
+      next.assetOptions = sanitizeAssetOptions(doc.assetOptions, next.customAssets) || {}; // #1694 S2 — a doc without tile options is all-defaults (citizen family: both)
+      next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790
+      {
+        const canvas = sanitizeCanvasSpec(doc);
+        next.canvasW = canvas.canvasW;
+        next.canvasH = canvas.canvasH;
+        next.canvasFps = canvas.canvasFps;
+        next.canvasPresetId = canvas.canvasPresetId;
+        next.stageMode = canvas.stageMode;
+      }
+      {
+        // #617 + #1720 — banks land together: the bank list, the active bank, and
+        // the active bank's map as the `midiMap` mirror. A doc without banks
+        // (the legacy midiMap shape) becomes the single MAIN bank.
+        const banks = sanitizeMidiBanks(doc.midiBanks, doc.midiMap);
+        const active = sanitizeMidiActiveBank(doc.midiActiveBank, banks);
+        next.midiBanks = banks;
+        next.midiActiveBank = active;
+        next.midiMap = activeBankMap(banks, active);
+      }
+      next.mathMacros = sanitizeMathMacros(doc.mathMacros); // #724 — a doc without macros has none
+      next.mathLearnArmed = null; // #724 — learn never survives a load; it is a gesture
+      // #651 — reimported titles persist; a doc without a title clears it.
+      next.projectTitle = typeof doc.title === 'string' ? doc.title.slice(0, 80) : '';
+      if (Array.isArray(doc.layers) && doc.layers.length > 0 && doc.activeLayerId) {
+        // #103 Track B — bound on the apply path too; the live loop resolves
+        // every layer per frame.
+        next.layers = doc.layers.slice(0, MAX_LAYERS);
+        next.activeLayerId = doc.activeLayerId;
+        next.layerSnapshots = normalizeSnapshots(doc.layerSnapshots, doc.customAssets, doc);
+        // Install the active layer's snapshot onto live state. The serializer
+        // writes lockedParams/caGrid only into snapshots (never root fields),
+        // so without this a load silently dropped parameter locks and the CA
+        // grid; and a doc whose root values disagree with its active snapshot
+        // rendered the wrong composition until a layer switch. For well-formed
+        // docs this is a no-op — the snapshot was captured from the same
+        // state as the root values.
+        const activeSnap = next.layerSnapshots[doc.activeLayerId];
+        if (activeSnap) {
+          next.seed = activeSnap.seed >>> 0;
+          next.seedOffsets = normalizeSeedOffsets(activeSnap.seedOffsets ?? doc.seedOffsets);
+          next.paletteId = activeSnap.paletteId || next.paletteId;
+          next.paletteOverrides = activeSnap.paletteOverrides ?? null;
+          next.layoutParams = normalizeLayoutParams(activeSnap.layoutParams);
+          next.lockedParams = activeSnap.lockedParams || {};
+          next.caGrid = activeSnap.caGrid || null;
+          next.enabledAssets = wholeEnabledAssets(activeSnap.enabledAssets); // #1062 — the snapshot is the whole set too
+        }
+      }
+      return next;
+    }),
 });
 
 export { WEIGHT_CYCLE, initialEnabledAssets };

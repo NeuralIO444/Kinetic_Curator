@@ -9,22 +9,64 @@ import { getRenderProfile } from './renderProfiles.js';
 import { curatorHint, pickCurated } from './curate.js';
 
 const davisFav = {
-  count: 580, scale: [0.8, 1.4], rotate: [-20, 20], alpha: [60, 80],
-  jitter: 4, displacement: 2, density: 110, zTiers: 6,
-  noiseSpeed: 0.8, noiseFreq: 0.006, swarmCohesion: 1.4, gravityWells: 0.8,
-  particleCount: 200, damping: 0.95, wind: 0.4, breath: 0.15, lifeDrift: 0.2, flap: 0.15,
+  count: 580,
+  scale: [0.8, 1.4],
+  rotate: [-20, 20],
+  alpha: [60, 80],
+  jitter: 4,
+  displacement: 2,
+  density: 110,
+  zTiers: 6,
+  noiseSpeed: 0.8,
+  noiseFreq: 0.006,
+  swarmCohesion: 1.4,
+  gravityWells: 0.8,
+  particleCount: 200,
+  damping: 0.95,
+  wind: 0.4,
+  breath: 0.15,
+  lifeDrift: 0.2,
+  flap: 0.15,
 };
 const mid = {
-  count: 280, scale: [0.7, 1.1], rotate: [-15, 15], alpha: [55, 70],
-  jitter: 18, displacement: 10, density: 70, zTiers: 4,
-  noiseSpeed: 0.6, noiseFreq: 0.006, swarmCohesion: 1.3, gravityWells: 0.7,
-  particleCount: 140, damping: 0.95, wind: 0.45, breath: 0.2, lifeDrift: 0.25, flap: 0.2,
+  count: 280,
+  scale: [0.7, 1.1],
+  rotate: [-15, 15],
+  alpha: [55, 70],
+  jitter: 18,
+  displacement: 10,
+  density: 70,
+  zTiers: 4,
+  noiseSpeed: 0.6,
+  noiseFreq: 0.006,
+  swarmCohesion: 1.3,
+  gravityWells: 0.7,
+  particleCount: 140,
+  damping: 0.95,
+  wind: 0.45,
+  breath: 0.2,
+  lifeDrift: 0.25,
+  flap: 0.2,
 };
 const outlier = {
-  count: 40, scale: [0.15, 2.9], rotate: [-180, 180], alpha: [15, 100],
-  jitter: 150, displacement: 150, density: 22, zTiers: 2,
-  noiseSpeed: 1.9, noiseFreq: 0.014, swarmCohesion: 0.3, gravityWells: 0.2,
-  particleCount: 55, damping: 0.91, wind: 1.9, breath: 0.75, lifeDrift: 0.85, flap: 0.88,
+  count: 40,
+  scale: [0.15, 2.9],
+  rotate: [-180, 180],
+  alpha: [15, 100],
+  jitter: 150,
+  displacement: 150,
+  density: 22,
+  zTiers: 2,
+  noiseSpeed: 1.9,
+  noiseFreq: 0.014,
+  swarmCohesion: 0.3,
+  gravityWells: 0.2,
+  particleCount: 55,
+  damping: 0.91,
+  wind: 1.9,
+  breath: 0.75,
+  lifeDrift: 0.85,
+  flap: 0.88,
 };
 const pool = [davisFav, ...Array.from({ length: 6 }, () => ({ ...mid })), outlier];
 
@@ -55,7 +97,10 @@ const pool = [davisFav, ...Array.from({ length: 6 }, () => ({ ...mid })), outlie
   assert.ok(muddy.originality < 0.05, 'a candidate is not original against itself');
   assert.strictEqual(loisVerdict({ glance: 0.1, originality: 0.8, boldness: 0.8 }), 'No hit at a glance. Out.');
   assert.strictEqual(loisVerdict({ glance: 0.5, originality: 0.1, boldness: 0.8 }), 'Too close to the pile. Habit.');
-  assert.strictEqual(loisVerdict({ glance: 0.5, originality: 0.5, boldness: 0.1 }), 'Cautious or creative, kid. Pick one.');
+  assert.strictEqual(
+    loisVerdict({ glance: 0.5, originality: 0.5, boldness: 0.1 }),
+    'Cautious or creative, kid. Pick one.',
+  );
 }
 
 {
@@ -74,7 +119,11 @@ const pool = [davisFav, ...Array.from({ length: 6 }, () => ({ ...mid })), outlie
   assert.strictEqual(eng.heuristic, true);
   assert.strictEqual(eng.status(), 'active');
   assert.strictEqual(curatorHint(eng), `heuristic pick: LOIS · ${getLoisVerdict() || 'Walk in. Show me something.'}`);
-  const picked = pickCurated(pool.map((c) => ({ ...c })), eng, () => 0.2);
+  const picked = pickCurated(
+    pool.map((c) => ({ ...c })),
+    eng,
+    () => 0.2,
+  );
   assert.strictEqual(picked.curated, true);
   assert.strictEqual(picked.index, pool.length - 1);
   assert.match(curatorHint(eng), /^heuristic pick: LOIS · /);

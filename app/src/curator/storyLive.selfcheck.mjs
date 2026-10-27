@@ -7,7 +7,11 @@ import { Events, emit } from '../composition/eventBus.js';
 import { startStoryLive, getStoryView, subscribeStory, STORY_STORAGE_KEY } from './storyLive.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const shim = (m = new Map()) => {
   return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => m.set(k, String(v)), _map: m };
@@ -17,19 +21,42 @@ const decision = (persona, reply, bar) => ({ persona, bar, backend: 'rules', see
 
 ok('the driver folds the live bus into standing, and a replay’s republication counts nothing twice', () => {
   const storage = shim();
-  storage.setItem('kc:ledger:passes:v1', row({ seed: 5, recipe: { layoutParams: null, paletteId: null }, timestamp: '2026-01-01', keepContext: null, projectRef: null }));
-  storage.setItem('kc:ledger:keeps:v1', row({ seed: 5, recipe: { layoutParams: null, paletteId: 'noir' }, timestamp: '2026-01-02', keepContext: null, projectRef: null }));
+  storage.setItem(
+    'kc:ledger:passes:v1',
+    row({
+      seed: 5,
+      recipe: { layoutParams: null, paletteId: null },
+      timestamp: '2026-01-01',
+      keepContext: null,
+      projectRef: null,
+    }),
+  );
+  storage.setItem(
+    'kc:ledger:keeps:v1',
+    row({
+      seed: 5,
+      recipe: { layoutParams: null, paletteId: 'noir' },
+      timestamp: '2026-01-02',
+      keepContext: null,
+      projectRef: null,
+    }),
+  );
   const stop = startStoryLive({ getSeed: () => 42, getTiers: () => ({ davis: 4, lois: 4 }), storage });
   const v0 = getStoryView();
   assert.equal(v0.session, 1);
-  assert.ok(v0.patterns.some((p) => p.kind === 'debt'), 'the session-start sift found the ledger debt');
+  assert.ok(
+    v0.patterns.some((p) => p.kind === 'debt'),
+    'the session-start sift found the ledger debt',
+  );
   emit(Events.CLOCK_BAR, { bar: 1 }, { cause: 'mind' });
   emit(Events.MIND_DECISION, decision('davis', { propose: { assetId: 'fern' } }, 1), { cause: 'mind' });
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'density', delta: 0.25 } }, 1), { cause: 'mind' });
   const v1 = getStoryView();
   assert.ok(Math.abs(v1.esteem.standing - 1.2) < 1e-9, 'her regard moved by the verdict');
   assert.ok(Math.abs(v1.trust.standing - -0.1) < 1e-9, 'his trust paid the proposal’s small exposure');
-  emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'density', delta: 0.25 } }, 1), { cause: 'replay' });
+  emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'density', delta: 0.25 } }, 1), {
+    cause: 'replay',
+  });
   assert.equal(getStoryView().esteem.standing, v1.esteem.standing, 'a replayed decision is history already counted');
   for (let b = 2; b <= 6; b++) emit(Events.CLOCK_BAR, { bar: b }, { cause: 'mind' });
   const kinds = getStoryView().beats.map((b) => b.kind);
@@ -72,8 +99,14 @@ ok('the backstage view carries story state only — the arc has no readout, anyw
   const storage = shim();
   const stop = startStoryLive({ getSeed: () => 1, storage });
   // drive the arc hard: lean shifts across sessions and a verdict flip — none of it may surface
-  const lean = (keys, bar) => emit(Events.MIND_DECISION, decision('queen', { mood: 'calm', lean: Object.fromEntries(keys.map((k) => [k, 0.5])) }, bar), { cause: 'mind' });
-  lean(['wetness'], 1); lean(['evolve'], 2);
+  const lean = (keys, bar) =>
+    emit(
+      Events.MIND_DECISION,
+      decision('queen', { mood: 'calm', lean: Object.fromEntries(keys.map((k) => [k, 0.5])) }, bar),
+      { cause: 'mind' },
+    );
+  lean(['wetness'], 1);
+  lean(['evolve'], 2);
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'hue', delta: 0.2 } }, 3), { cause: 'mind' });
   emit(Events.MIND_DECISION, decision('lois', { critique: { target: 'hue', delta: -0.2 } }, 4), { cause: 'mind' });
   const text = JSON.stringify(getStoryView()).toLowerCase();
@@ -92,26 +125,37 @@ ok('wiring: App starts and stops the driver; the dev panel reads its view; subsc
   assert.ok(!/queen/i.test(panel), 'the dev panel names no third persona (surface law)');
   const storage = shim();
   let heard = 0;
-  const off = subscribeStory(() => { heard++; });
+  const off = subscribeStory(() => {
+    heard++;
+  });
   const stop = startStoryLive({ getSeed: () => 3, storage });
   emit(Events.CLOCK_BAR, { bar: 1 }, { cause: 'mind' });
   assert.ok(heard > 0, 'subscribers are notified on change');
-  off(); stop();
+  off();
+  stop();
 });
 
 ok('the cold open (S4): the driver seeds the day’s lore entry and the beat log reads its fact backstage', () => {
   const storage = shim();
   const stop = startStoryLive({ getSeed: () => 42, getDate: () => ({ month: 10, day: 22 }), storage });
   const v0 = getStoryView();
-  assert.ok(v0.patterns.some((p) => p.kind === 'onthisday' && p.loreId === 'otd-rauschenberg-born-1022'),
-    'the session opened with the curation day’s entry seeded as a pattern');
+  assert.ok(
+    v0.patterns.some((p) => p.kind === 'onthisday' && p.loreId === 'otd-rauschenberg-born-1022'),
+    'the session opened with the curation day’s entry seeded as a pattern',
+  );
   emit(Events.CLOCK_BAR, { bar: 1 }, { cause: 'mind' });
   const beat = getStoryView().beats.find((b) => b.form === 'onthisday');
   assert.ok(beat && beat.kind === 'callback' && beat.persona === 'davis', 'the cold open fired as the callback');
-  assert.ok(beat.loreFact && beat.loreFact.includes('Rauschenberg'), 'the backstage log resolves the referent to the bank’s fact');
+  assert.ok(
+    beat.loreFact && beat.loreFact.includes('Rauschenberg'),
+    'the backstage log resolves the referent to the bank’s fact',
+  );
   stop();
   const bare = startStoryLive({ getSeed: () => 42, getDate: () => ({ month: 9, day: 15 }), storage: shim() });
-  assert.ok(!getStoryView().patterns.some((p) => p.kind === 'onthisday'), 'a day with no entry seeds nothing — honest absence');
+  assert.ok(
+    !getStoryView().patterns.some((p) => p.kind === 'onthisday'),
+    'a day with no entry seeds nothing — honest absence',
+  );
   bare();
 });
 

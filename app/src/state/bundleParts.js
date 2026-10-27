@@ -8,7 +8,8 @@ import { validateTaste } from '../curator/tasteHead.js';
 import { validateBiologyPolicy } from '../biology/policy.js';
 import { sanitizeUserPresets } from '../data/canvasPresets.js';
 
-const asList = (raw, what) => (Array.isArray(raw) ? { ok: true, list: raw } : { ok: false, error: `${what} is not a list` });
+const asList = (raw, what) =>
+  Array.isArray(raw) ? { ok: true, list: raw } : { ok: false, error: `${what} is not a list` };
 
 export const BUNDLE_SANITIZERS = {
   project(raw) {
@@ -23,7 +24,13 @@ export const BUNDLE_SANITIZERS = {
   // #1063 — the performer's captured voices (the VOICE shelf, capped at 12).
   userVoices(raw) {
     const l = asList(raw, 'voices');
-    return l.ok ? { ok: true, value: l.list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES), given: l.list.length } : l;
+    return l.ok
+      ? {
+          ok: true,
+          value: l.list.map(sanitizeUserVoice).filter(Boolean).slice(0, MAX_USER_VOICES),
+          given: l.list.length,
+        }
+      : l;
   },
   favorites(raw) {
     const l = asList(raw, 'favorites');

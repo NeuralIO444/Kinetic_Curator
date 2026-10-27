@@ -91,7 +91,14 @@ export function duelTolerance(temperature = effectiveTemp()) {
 export function judgeRead(shares, anchor, temperature = effectiveTemp()) {
   const tolerance = duelTolerance(temperature);
   if (!validShares(shares) || !validShares(anchor)) {
-    return { dist: Infinity, tolerance, pass: false, verdict: 'unmeasured', demand: null, line: 'no read — no judgment' };
+    return {
+      dist: Infinity,
+      tolerance,
+      pass: false,
+      verdict: 'unmeasured',
+      demand: null,
+      line: 'no read — no judgment',
+    };
   }
   const dist = readDistance(shares, anchor);
   const verdict = readVerdict(shares);
@@ -104,7 +111,8 @@ export function judgeRead(shares, anchor, temperature = effectiveTemp()) {
     // the fine (72% under the anchor) before the mid (37% under).
     const rel = anchor[b] > 0 ? below / anchor[b] : 0;
     if (below > DEMAND_MIN_DEFICIT && rel > DEMAND_REL && rel > worst) {
-      worst = rel; demand = { band: b, kind: 'demand', line: DEMAND_LINE[b] };
+      worst = rel;
+      demand = { band: b, kind: 'demand', line: DEMAND_LINE[b] };
     }
   }
   if (!demand) {
@@ -112,7 +120,10 @@ export function judgeRead(shares, anchor, temperature = effectiveTemp()) {
     worst = throttleBar;
     for (const b of BANDS) {
       const above = shares[b] - anchor[b];
-      if (above > worst) { worst = above; demand = { band: b, kind: 'throttle', line: THROTTLE_LINE[b] }; }
+      if (above > worst) {
+        worst = above;
+        demand = { band: b, kind: 'throttle', line: THROTTLE_LINE[b] };
+      }
     }
   }
   // The gate is both halves of LOIS's job: near the anchor (distance)
@@ -121,8 +132,12 @@ export function judgeRead(shares, anchor, temperature = effectiveTemp()) {
   // fine band is still a demand, and a demand never passes.
   const pass = dist <= tolerance && !demand;
   return {
-    dist: +dist.toFixed(4), tolerance, pass, verdict, demand,
-    line: pass ? 'the reads hold' : (demand ? demand.line : 'off the anchor — tilt'),
+    dist: +dist.toFixed(4),
+    tolerance,
+    pass,
+    verdict,
+    demand,
+    line: pass ? 'the reads hold' : demand ? demand.line : 'off the anchor — tilt',
   };
 }
 
@@ -139,7 +154,8 @@ export function judgeRead(shares, anchor, temperature = effectiveTemp()) {
  *     LOIS rank's own convention).
  */
 export function duelPick({ reads, anchor, davisIndex, temperature = effectiveTemp() } = {}) {
-  if (!validShares(anchor)) return { dueled: false, reason: 'no queen anchor — no duel', index: davisIndex, verdicts: [] };
+  if (!validShares(anchor))
+    return { dueled: false, reason: 'no queen anchor — no duel', index: davisIndex, verdicts: [] };
   if (!Array.isArray(reads) || !reads.some((r) => validShares(r && r.shares ? r.shares : r))) {
     return { dueled: false, reason: 'no measured reads — no duel', index: davisIndex, verdicts: [] };
   }
@@ -154,11 +170,17 @@ export function duelPick({ reads, anchor, davisIndex, temperature = effectiveTem
   let best = -1;
   let bestDist = Infinity;
   for (let i = 0; i < verdicts.length; i++) {
-    if (verdicts[i] && verdicts[i].dist < bestDist) { bestDist = verdicts[i].dist; best = i; }
+    if (verdicts[i] && verdicts[i].dist < bestDist) {
+      bestDist = verdicts[i].dist;
+      best = i;
+    }
   }
   if (best < 0) return { dueled: false, reason: 'no measured reads — no duel', index: davisIndex, verdicts };
   return {
-    dueled: true, tilted: best !== davisIndex, index: best, verdicts,
+    dueled: true,
+    tilted: best !== davisIndex,
+    index: best,
+    verdicts,
     line: verdicts[best].pass ? 'tilted to the anchor' : (verdicts[davisIndex]?.line ?? 'tilted to the anchor'),
     fromLine: davis ? davis.line : null,
   };

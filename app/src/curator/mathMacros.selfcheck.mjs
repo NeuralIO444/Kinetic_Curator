@@ -2,21 +2,46 @@
 // Pure module contract: registry, sanitize, assign/unassign/invert, drive math.
 import assert from 'node:assert';
 import {
-  LEARNABLE_TARGETS, getTargetSpec, sanitizeMathMacros,
-  createMacro, addMacro, removeMacro, renameMacro,
-  assignTarget, unassignTarget, toggleInvert, drivePatch,
-  MATH_MAX_MACROS, MATH_MAX_TARGETS,
+  LEARNABLE_TARGETS,
+  getTargetSpec,
+  sanitizeMathMacros,
+  createMacro,
+  addMacro,
+  removeMacro,
+  renameMacro,
+  assignTarget,
+  unassignTarget,
+  toggleInvert,
+  drivePatch,
+  MATH_MAX_MACROS,
+  MATH_MAX_TARGETS,
 } from './mathMacros.js';
 
 let n = 0;
-const ok = (cond, msg) => { n++; assert(cond, msg); };
+const ok = (cond, msg) => {
+  n++;
+  assert(cond, msg);
+};
 
 // --- registry ---------------------------------------------------------------
 ok(LEARNABLE_TARGETS.length > 40, `registry is broad (${LEARNABLE_TARGETS.length})`);
 const keys = new Set(LEARNABLE_TARGETS.map((t) => t.key));
-for (const k of ['jitter', 'density', 'hueRotate', 'audioModDepth', 'audioSwell',
-  'swarmCohesion', 'damping', 'accumulationWetness', 'scale', 'rotate', 'alpha',
-  'growthRate', 'metabolism', 'parallax']) {
+for (const k of [
+  'jitter',
+  'density',
+  'hueRotate',
+  'audioModDepth',
+  'audioSwell',
+  'swarmCohesion',
+  'damping',
+  'accumulationWetness',
+  'scale',
+  'rotate',
+  'alpha',
+  'growthRate',
+  'metabolism',
+  'parallax',
+]) {
   ok(keys.has(k), `learnable: ${k}`);
 }
 // Atlas-affecting counts stay human-paced: a macro sweeping COUNT would
@@ -30,7 +55,7 @@ for (const k of ['collideMask', 'contactRadius', 'contactRestitution', 'contactR
 }
 ok(getTargetSpec('nope') === null, 'unknown key -> null');
 const damp = getTargetSpec('damping');
-ok(damp.min === 0.80 && damp.max === 0.99 && damp.label === 'DAMPING', 'spec carries label + span');
+ok(damp.min === 0.8 && damp.max === 0.99 && damp.label === 'DAMPING', 'spec carries label + span');
 ok(getTargetSpec('scale').isRange === true, 'scale is a range target');
 
 // --- sanitize (hostile docs collapse) ---------------------------------------
@@ -86,7 +111,10 @@ ok(macros[0].targets.length === 2 && !macros[0].targets.some((t) => t.key === 'j
 
 // --- drive math ---------------------------------------------------------------
 const params = { jitter: 100, damping: 0.9, scale: [0.5, 1.5], zTiers: 4 };
-const tgts = [{ key: 'jitter', invert: false }, { key: 'damping', invert: false }];
+const tgts = [
+  { key: 'jitter', invert: false },
+  { key: 'damping', invert: false },
+];
 {
   // Full sweep up: each target crosses its whole span.
   const p = drivePatch(params, tgts, 1.0, {});
@@ -107,10 +135,12 @@ const tgts = [{ key: 'jitter', invert: false }, { key: 'damping', invert: false 
 {
   // Range targets shift both ends, spread preserved, clamped.
   const p = drivePatch(params, [{ key: 'scale', invert: false }], 1.0, {});
-  ok(Math.abs(p.scale[0] - 3.0) < 1e-9 && Math.abs(p.scale[1] - 3.0) < 1e-9,
-    `scale range shifts to the top, spread clamped (${p.scale})`);
+  ok(
+    Math.abs(p.scale[0] - 3.0) < 1e-9 && Math.abs(p.scale[1] - 3.0) < 1e-9,
+    `scale range shifts to the top, spread clamped (${p.scale})`,
+  );
   const p2 = drivePatch({ scale: [0.5, 1.5] }, [{ key: 'scale', invert: false }], 0.1, {});
-  ok(Math.abs((p2.scale[1] - p2.scale[0]) - 1.0) < 1e-9, 'spread preserved mid-range');
+  ok(Math.abs(p2.scale[1] - p2.scale[0] - 1.0) < 1e-9, 'spread preserved mid-range');
 }
 {
   // Int params round.
@@ -126,8 +156,10 @@ const tgts = [{ key: 'jitter', invert: false }, { key: 'damping', invert: false 
   // Empty / zero-delta / unknown keys produce no patch.
   ok(Object.keys(drivePatch(params, [], 1.0, {})).length === 0, 'no targets -> no patch');
   ok(Object.keys(drivePatch(params, tgts, 0, {})).length === 0, 'zero delta -> no patch');
-  ok(Object.keys(drivePatch(params, [{ key: 'nope', invert: false }], 1.0, {})).length === 0,
-    'unknown key -> no patch');
+  ok(
+    Object.keys(drivePatch(params, [{ key: 'nope', invert: false }], 1.0, {})).length === 0,
+    'unknown key -> no patch',
+  );
 }
 
 console.log(`mathMacros.selfcheck: ${n} assertions passed`);

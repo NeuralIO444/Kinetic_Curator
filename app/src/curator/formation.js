@@ -77,7 +77,10 @@ export function createFormationTracker() {
       const next = [];
       for (let i = 0; i < pins.length; i++) {
         const p = pins[i];
-        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) { next.push(null); continue; }
+        if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+          next.push(null);
+          continue;
+        }
         const prev = samePin(slots[i], p) ? slots[i] : null;
         const s = prev ? { ...prev } : { x: p.x, y: p.y, hold: 0, formed: false };
         if (!s.formed) {
@@ -92,17 +95,32 @@ export function createFormationTracker() {
       slots = next;
       return { states: slots.map((s) => (s ? { ...s } : null)), events };
     },
-    states() { return slots.map((s) => (s ? { ...s } : null)); },
+    states() {
+      return slots.map((s) => (s ? { ...s } : null));
+    },
     // #1694 slice 1 — the resolver's spawn state snapshots its trackers with the rest of the resolver
     // (#1367's law): a take that begins mid-session continues with the same holds. Fail-closed, like the
     // builders': a malformed payload restores nothing and says so.
-    snapshotState() { return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) }; },
+    snapshotState() {
+      return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) };
+    },
     restoreState(snap) {
       if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots)) return false;
       const next = [];
       for (const s of snap.slots) {
-        if (s === null) { next.push(null); continue; }
-        if (!s || typeof s !== 'object' || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.hold) || typeof s.formed !== 'boolean') return false;
+        if (s === null) {
+          next.push(null);
+          continue;
+        }
+        if (
+          !s ||
+          typeof s !== 'object' ||
+          !Number.isFinite(s.x) ||
+          !Number.isFinite(s.y) ||
+          !Number.isFinite(s.hold) ||
+          typeof s.formed !== 'boolean'
+        )
+          return false;
         next.push({ x: s.x, y: s.y, hold: s.hold, formed: s.formed });
       }
       slots = next;
@@ -136,7 +154,14 @@ export function createFormationRecorder({ getFrame = () => 0 } = {}) {
       const key = signalKey(u);
       if (last && key === lastKey) last[5] += 1;
       else {
-        last = [frame, u.pins.map((p) => (p ? { x: p.x, y: p.y } : null)), u.attraction.slice(), u.density.slice(), u.band ?? null, 1];
+        last = [
+          frame,
+          u.pins.map((p) => (p ? { x: p.x, y: p.y } : null)),
+          u.attraction.slice(),
+          u.density.slice(),
+          u.band ?? null,
+          1,
+        ];
         lastKey = key;
         runs.push(last);
       }
@@ -170,14 +195,20 @@ export function replayFormation(record) {
  * @returns {{ ok: boolean, forms: number, firstMismatch: number|null }}
  */
 export function verifyFormationRecord(record) {
-  if (!record || record.version !== FORMATION_RECORD_VERSION || !Array.isArray(record.runs) || !Array.isArray(record.forms)) {
+  if (
+    !record ||
+    record.version !== FORMATION_RECORD_VERSION ||
+    !Array.isArray(record.runs) ||
+    !Array.isArray(record.forms)
+  ) {
     return { ok: false, forms: 0, firstMismatch: 0 };
   }
   const got = replayFormation(record);
   const want = record.forms.map((f) => [f[1], f[2], f[3], f[4]]);
   const n = Math.max(got.length, want.length);
   for (let i = 0; i < n; i++) {
-    const a = got[i]; const b = want[i];
+    const a = got[i];
+    const b = want[i];
     if (!a || !b || a.some((v, k) => v !== b[k])) return { ok: false, forms: want.length, firstMismatch: i };
   }
   return { ok: true, forms: want.length, firstMismatch: null };

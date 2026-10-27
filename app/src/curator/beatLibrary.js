@@ -13,25 +13,142 @@ export const STEPS = 16;
 export const LANES = Object.freeze(['kick', 'snare', 'hat', 'bass']);
 export const VIBES = Object.freeze(['calm', 'drive', 'lift', 'sparse', 'shift', 'weird']);
 
-const P = (id, name, bpm, swing, intensity, vibes, lanes, bed = 0.05) => ({ id, name, bpm, swing, intensity, vibes, lanes, bed });
+const P = (id, name, bpm, swing, intensity, vibes, lanes, bed = 0.05) => ({
+  id,
+  name,
+  bpm,
+  swing,
+  intensity,
+  vibes,
+  lanes,
+  bed,
+});
 
 export const BEATS = Object.freeze([
-  P('four-floor', 'four on the floor', [118, 128], 0, 0.8, ['drive'], { kick: 'x...x...x...x...', snare: '....x.......x...', hat: '..o...o...o...o.', bass: '..x...x...x...x.' }),
-  P('slow-four', 'slow four', [70, 90], 0, 0.5, ['calm'], { kick: 'x.......x.......', snare: '................', hat: 'o...o...o...o...', bass: '................' }, 0.1),
-  P('broken', 'broken beat', [100, 124], 0.1, 0.7, ['drive', 'shift'], { kick: 'x..x..x...x..x..', snare: '....x.......x..o', hat: 'x.x.x.x.x.x.x.xo', bass: 'x.....x...x.....' }),
-  P('half-time', 'half time', [68, 84], 0, 0.55, ['calm', 'shift'], { kick: 'x.........x.....', snare: '........x.......', hat: 'o.o.o.o.o.o.o.o.', bass: 'x...............' }, 0.08),
-  P('shuffle', 'shuffle', [88, 110], 0.33, 0.6, ['drive', 'lift'], { kick: 'x.....x...x.....', snare: '....x.......x...', hat: 'o.o.o.o.o.o.o.o.', bass: 'x.....o...x.....' }),
-  P('pulse', 'ambient pulse', [60, 80], 0, 0.3, ['calm', 'sparse'], { kick: 'x...............', snare: '................', hat: '................', bass: '................' }, 0.14),
-  P('threes', 'three against four', [96, 120], 0, 0.6, ['weird', 'shift'], { kick: 'x..x..x..x..x..x', snare: '....x.......x...', hat: 'o...o...o...o...', bass: '..o.....o.....o.' }),
-  P('build', 'build', [110, 130], 0, 0.75, ['lift'], { kick: 'x...x...x...x...', snare: '........x.xxxxxx', hat: 'x.x.x.x.xxxxxxxx', bass: '................' }),
-  P('drop', 'drop', [118, 130], 0, 0.9, ['lift', 'drive'], { kick: 'x.......x.......', snare: '....o.......o...', hat: 'o.o.o.o.o.o.o.o.', bass: 'x...x...x...x...' }, 0.02),
-  P('tick', 'sparse tick', [70, 100], 0, 0.25, ['sparse', 'calm'], { kick: '................', snare: '................', hat: 'o...............', bass: '................' }, 0.12),
-  P('two-step', 'two step', [128, 140], 0.05, 0.7, ['drive'], { kick: 'x.....x...x...x.', snare: '....x.......x...', hat: 'o.o.xo.o.o.xo.o.', bass: 'x.....o...x.....' }),
-  P('breaks', 'breaks', [130, 150], 0.08, 0.85, ['drive', 'weird'], { kick: 'x.......x.x.....', snare: '....x..o.o..x..x', hat: 'x.xxx.xxx.xxx.xx', bass: 'x.......x.x.....' }),
-  P('clave', 'clave', [96, 116], 0, 0.5, ['shift', 'weird'], { kick: 'x..x..x...x.x...', snare: '................', hat: 'o.o.o.o.o.o.o.o.', bass: 'x..o..x...x.o...' }),
-  P('dub', 'dub', [70, 82], 0.12, 0.5, ['calm', 'weird'], { kick: 'x.......x..x....', snare: '....x.......x...', hat: '..o.....o.....o.', bass: '..x.......x.....' }, 0.1),
-  P('eighths', 'driving eighths', [120, 138], 0, 0.8, ['drive', 'lift'], { kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'xoxoxoxoxoxoxoxo', bass: 'xxxxxxxxxxxxxxxx' }, 0.03),
-  P('glitch', 'glitch', [90, 130], 0.18, 0.65, ['weird', 'sparse'], { kick: 'x.....x..x......', snare: '...o....x..o...x', hat: '.x.o..x.o.x..x..', bass: '....x..o......x.' }),
+  P('four-floor', 'four on the floor', [118, 128], 0, 0.8, ['drive'], {
+    kick: 'x...x...x...x...',
+    snare: '....x.......x...',
+    hat: '..o...o...o...o.',
+    bass: '..x...x...x...x.',
+  }),
+  P(
+    'slow-four',
+    'slow four',
+    [70, 90],
+    0,
+    0.5,
+    ['calm'],
+    { kick: 'x.......x.......', snare: '................', hat: 'o...o...o...o...', bass: '................' },
+    0.1,
+  ),
+  P('broken', 'broken beat', [100, 124], 0.1, 0.7, ['drive', 'shift'], {
+    kick: 'x..x..x...x..x..',
+    snare: '....x.......x..o',
+    hat: 'x.x.x.x.x.x.x.xo',
+    bass: 'x.....x...x.....',
+  }),
+  P(
+    'half-time',
+    'half time',
+    [68, 84],
+    0,
+    0.55,
+    ['calm', 'shift'],
+    { kick: 'x.........x.....', snare: '........x.......', hat: 'o.o.o.o.o.o.o.o.', bass: 'x...............' },
+    0.08,
+  ),
+  P('shuffle', 'shuffle', [88, 110], 0.33, 0.6, ['drive', 'lift'], {
+    kick: 'x.....x...x.....',
+    snare: '....x.......x...',
+    hat: 'o.o.o.o.o.o.o.o.',
+    bass: 'x.....o...x.....',
+  }),
+  P(
+    'pulse',
+    'ambient pulse',
+    [60, 80],
+    0,
+    0.3,
+    ['calm', 'sparse'],
+    { kick: 'x...............', snare: '................', hat: '................', bass: '................' },
+    0.14,
+  ),
+  P('threes', 'three against four', [96, 120], 0, 0.6, ['weird', 'shift'], {
+    kick: 'x..x..x..x..x..x',
+    snare: '....x.......x...',
+    hat: 'o...o...o...o...',
+    bass: '..o.....o.....o.',
+  }),
+  P('build', 'build', [110, 130], 0, 0.75, ['lift'], {
+    kick: 'x...x...x...x...',
+    snare: '........x.xxxxxx',
+    hat: 'x.x.x.x.xxxxxxxx',
+    bass: '................',
+  }),
+  P(
+    'drop',
+    'drop',
+    [118, 130],
+    0,
+    0.9,
+    ['lift', 'drive'],
+    { kick: 'x.......x.......', snare: '....o.......o...', hat: 'o.o.o.o.o.o.o.o.', bass: 'x...x...x...x...' },
+    0.02,
+  ),
+  P(
+    'tick',
+    'sparse tick',
+    [70, 100],
+    0,
+    0.25,
+    ['sparse', 'calm'],
+    { kick: '................', snare: '................', hat: 'o...............', bass: '................' },
+    0.12,
+  ),
+  P('two-step', 'two step', [128, 140], 0.05, 0.7, ['drive'], {
+    kick: 'x.....x...x...x.',
+    snare: '....x.......x...',
+    hat: 'o.o.xo.o.o.xo.o.',
+    bass: 'x.....o...x.....',
+  }),
+  P('breaks', 'breaks', [130, 150], 0.08, 0.85, ['drive', 'weird'], {
+    kick: 'x.......x.x.....',
+    snare: '....x..o.o..x..x',
+    hat: 'x.xxx.xxx.xxx.xx',
+    bass: 'x.......x.x.....',
+  }),
+  P('clave', 'clave', [96, 116], 0, 0.5, ['shift', 'weird'], {
+    kick: 'x..x..x...x.x...',
+    snare: '................',
+    hat: 'o.o.o.o.o.o.o.o.',
+    bass: 'x..o..x...x.o...',
+  }),
+  P(
+    'dub',
+    'dub',
+    [70, 82],
+    0.12,
+    0.5,
+    ['calm', 'weird'],
+    { kick: 'x.......x..x....', snare: '....x.......x...', hat: '..o.....o.....o.', bass: '..x.......x.....' },
+    0.1,
+  ),
+  P(
+    'eighths',
+    'driving eighths',
+    [120, 138],
+    0,
+    0.8,
+    ['drive', 'lift'],
+    { kick: 'x...x...x...x...', snare: '....x.......x...', hat: 'xoxoxoxoxoxoxoxo', bass: 'xxxxxxxxxxxxxxxx' },
+    0.03,
+  ),
+  P('glitch', 'glitch', [90, 130], 0.18, 0.65, ['weird', 'sparse'], {
+    kick: 'x.....x..x......',
+    snare: '...o....x..o...x',
+    hat: '.x.o..x.o.x..x..',
+    bass: '....x..o......x.',
+  }),
 ]);
 
 const STEP_RE = /^[xo.]{16}$/;
@@ -55,9 +172,14 @@ export function sanitizePattern(raw) {
   const vibes = Array.isArray(raw.vibes) ? raw.vibes.filter((v) => VIBES.includes(v)) : [];
   if (vibes.length === 0) return null;
   return {
-    id, name: typeof raw.name === 'string' ? raw.name.slice(0, 40) : id,
-    bpm: b, swing: num(Number(raw.swing), 0, 0.5, 0), intensity: num(Number(raw.intensity), 0, 1, 0.5),
-    vibes, lanes, bed: num(Number(raw.bed), 0, 0.2, 0.05),
+    id,
+    name: typeof raw.name === 'string' ? raw.name.slice(0, 40) : id,
+    bpm: b,
+    swing: num(Number(raw.swing), 0, 0.5, 0),
+    intensity: num(Number(raw.intensity), 0, 1, 0.5),
+    vibes,
+    lanes,
+    bed: num(Number(raw.bed), 0, 0.2, 0.05),
   };
 }
 

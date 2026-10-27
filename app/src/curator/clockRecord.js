@@ -27,7 +27,8 @@ export function createClockRecorder({ initialBpm = 120, beatsPerBar = BEATS_PER_
     },
     finish() {
       return {
-        version: CLOCK_RECORD_VERSION, beatsPerBar,
+        version: CLOCK_RECORD_VERSION,
+        beatsPerBar,
         initial: Number.isFinite(initialBpm) ? initialBpm : 120,
         changes: changes.map((c) => c.slice()),
       };
@@ -43,7 +44,8 @@ export function checkClockRecord(r) {
   if (!Array.isArray(r.changes)) return null;
   let prev = -1;
   for (const c of r.changes) {
-    if (!Array.isArray(c) || c.length !== 2 || !Number.isInteger(c[0]) || c[0] < prev || !Number.isFinite(c[1])) return null;
+    if (!Array.isArray(c) || c.length !== 2 || !Number.isInteger(c[0]) || c[0] < prev || !Number.isFinite(c[1]))
+      return null;
     prev = c[0];
   }
   return r;
@@ -52,7 +54,8 @@ export function checkClockRecord(r) {
 /** The loop time (ms) of every frame of a take, in order. */
 export function loopTimesOf(perf) {
   const out = [];
-  for (const input of replayInputs(perf.inputs)) out.push(Number.isFinite(input && input.loopTimeMs) ? input.loopTimeMs : 0);
+  for (const input of replayInputs(perf.inputs))
+    out.push(Number.isFinite(input && input.loopTimeMs) ? input.loopTimeMs : 0);
   return out;
 }
 
@@ -69,7 +72,10 @@ export function rebuildBars(record, loopTimes) {
   let bpm = rec.initial;
   let ci = 0;
   for (let f = 0; f < loopTimes.length; f++) {
-    while (ci < rec.changes.length && rec.changes[ci][0] <= f) { bpm = rec.changes[ci][1]; ci++; }
+    while (ci < rec.changes.length && rec.changes[ci][0] <= f) {
+      bpm = rec.changes[ci][1];
+      ci++;
+    }
     bpmAt.push(bpm);
     const r = clock.advance(loopTimes[f], bpm);
     if (r.restarted) continue;
@@ -87,7 +93,10 @@ export function frameForBar(downbeats, bar) {
 /** The bar a frame falls in (the last downbeat at or before it). */
 export function barAtFrame(downbeats, frame) {
   let bar = 0;
-  for (const d of downbeats) { if (d.frame <= frame) bar = d.bar; else break; }
+  for (const d of downbeats) {
+    if (d.frame <= frame) bar = d.bar;
+    else break;
+  }
   return bar;
 }
 

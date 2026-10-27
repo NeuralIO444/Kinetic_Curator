@@ -13,8 +13,12 @@ import assert from 'node:assert/strict';
 
 globalThis.localStorage = {
   getItem: () => null,
-  setItem: () => { throw new Error('storage blocked'); },
-  removeItem: () => { throw new Error('storage blocked'); },
+  setItem: () => {
+    throw new Error('storage blocked');
+  },
+  removeItem: () => {
+    throw new Error('storage blocked');
+  },
 };
 
 const { noteSessionOnly, sessionOnlyNoted, onSessionOnly } = await import('./sessionOnly.mjs');
@@ -23,7 +27,10 @@ const { importTaste, clearTaste } = await import('../curator/tasteStore.js');
 const { FEATURES_VERSION } = await import('../curator/recipeFeatures.js');
 
 let checks = 0;
-const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
+const ok = (name) => {
+  checks += 1;
+  console.log(`  [ok] ${name}`);
+};
 
 // ── a refused persist latches the flag, and the value still applies ──
 {
@@ -36,9 +43,14 @@ const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
 // ── the taste import keeps its session contract under refusal ──
 {
   const taste = {
-    kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'm', dims: 1152,
+    kind: 'kc-taste',
+    version: 1,
+    featuresVersion: FEATURES_VERSION,
+    model: 'm',
+    dims: 1152,
     probe: { weights: new Array(1152).fill(0.001), bias: 0 },
-    labels: { likes: 42, passes: 180 }, trainedAt: '2026-09-30T00:00:00Z',
+    labels: { likes: 42, passes: 180 },
+    trainedAt: '2026-09-30T00:00:00Z',
     head: { terms: { 'scale=large': 1.5 }, num: { count: -2 }, bias: 0.1, fidelity: 0.71, fitOn: 222 },
   };
   const r = importTaste(taste);
@@ -50,14 +62,20 @@ const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
 // ── the store mirrors a note latched before it existed ──
 {
   const { useStore } = await import('./store.js');
-  assert.equal(useStore.getState().tuningSessionOnly, true, 'MasterBar\'s flag is set — the subscription fires for a latched note');
+  assert.equal(
+    useStore.getState().tuningSessionOnly,
+    true,
+    "MasterBar's flag is set — the subscription fires for a latched note",
+  );
   ok('the store mirrors the latch beside persistStatus');
 }
 
 // ── the latch fires its listeners once ──
 {
   let calls = 0;
-  onSessionOnly(() => { calls += 1; });
+  onSessionOnly(() => {
+    calls += 1;
+  });
   assert.equal(calls, 1, 'a late subscriber hears the latch immediately');
   noteSessionOnly();
   assert.equal(calls, 1, 'and never twice');

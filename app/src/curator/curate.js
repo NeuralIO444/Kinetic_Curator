@@ -72,7 +72,12 @@ export function getLastDuel() {
   return lastDuel;
 }
 
-export function pickCurated(candidates, curator, rng = null, { refine = false, reads = null, anchor = null, temperature } = {}) {
+export function pickCurated(
+  candidates,
+  curator,
+  rng = null,
+  { refine = false, reads = null, anchor = null, temperature } = {},
+) {
   // Audit fix 3f — no Math.random default (the 3a contract): a
   // missing/non-function rng rolls 0, so the fallback deals candidate 0
   // and the persona machinery receives the zero stream. Production
@@ -130,7 +135,9 @@ export function curatorHint(curator, { chainFallback = false } = {}) {
   const chain = chainFallback ? ' · chain: uniform' : '';
   // #1627 S3 — a duel that ran is said out loud (honest signals): the
   // tilt and LOIS's demand ride the hint; no duel, no line.
-  const duelLine = lastDuel ? ` · duel: ${lastDuel.tilted ? `tilted — ${lastDuel.fromLine ?? lastDuel.line}` : lastDuel.line}` : '';
+  const duelLine = lastDuel
+    ? ` · duel: ${lastDuel.tilted ? `tilted — ${lastDuel.fromLine ?? lastDuel.line}` : lastDuel.line}`
+    : '';
   if (curator.status() !== 'active') return `curator untrained · dice roll${duelLine}${chain}`;
   if (curator.heuristic) {
     const line = getLoisVerdict() || 'Walk in. Show me something.';

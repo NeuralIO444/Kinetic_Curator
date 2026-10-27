@@ -2,13 +2,7 @@
 import assert from 'node:assert';
 import { useStore } from '../state/store.js';
 import { RANDOMIZABLE_KEYS } from '../state/paramUtils.js';
-import {
-  CURATE_CANDIDATES,
-  nullCurator,
-  getActiveCurator,
-  pickCurated,
-  curatorHint,
-} from './curate.js';
+import { CURATE_CANDIDATES, nullCurator, getActiveCurator, pickCurated, curatorHint } from './curate.js';
 
 const cands = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
 
@@ -57,7 +51,12 @@ assert.strictEqual(getActiveCurator().status(), 'active');
     { status: () => 'active', pick: () => 99 },
     { status: () => 'active', pick: () => -2 },
     { status: () => 'active', pick: () => 1.5 },
-    { status: () => 'active', pick: () => { throw new Error('boom'); } },
+    {
+      status: () => 'active',
+      pick: () => {
+        throw new Error('boom');
+      },
+    },
   ]) {
     const r = pickCurated(cands, bad);
     assert.strictEqual(r.curated, false);
@@ -76,7 +75,13 @@ assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'cura
 // scene; the next press differs; a different seed differs.
 {
   const press = (seed, curatePress, seedOffsets = { spatial: 0, color: 0, asset: 0, noise: 0 }) => {
-    useStore.setState({ seed, seedOffsets, curatePress, lockedParams: {}, layoutParams: { ...useStore.getInitialState().layoutParams } });
+    useStore.setState({
+      seed,
+      seedOffsets,
+      curatePress,
+      lockedParams: {},
+      layoutParams: { ...useStore.getInitialState().layoutParams },
+    });
     useStore.getState().curateUnlocked();
     return JSON.stringify(useStore.getState().layoutParams);
   };
@@ -110,7 +115,11 @@ assert.strictEqual(curatorHint({ status: () => 'active', pick: () => 0 }), 'cura
   assert.strictEqual(a.index, 0, 'no-rng fallback deals candidate 0 (the roll-0 stream)');
   assert.deepStrictEqual(pickCurated(cands, noPick, undefined), a, 'undefined rng = the roll-0 stream');
   assert.deepStrictEqual(pickCurated(cands, noPick, 42), a, 'non-function rng = the roll-0 stream');
-  assert.deepStrictEqual(pickCurated(cands, noPick, () => 0), a, 'explicit zero stream matches');
+  assert.deepStrictEqual(
+    pickCurated(cands, noPick, () => 0),
+    a,
+    'explicit zero stream matches',
+  );
 }
 
 console.log('curate.selfcheck: ok');

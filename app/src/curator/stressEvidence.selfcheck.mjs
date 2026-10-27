@@ -5,7 +5,11 @@ import assert from 'node:assert/strict';
 import { createStressTracker } from './stress.js';
 import { createStressRecorder } from './stressRecord.js';
 import {
-  stressTakeEvidence, pooledStressEvidence, stressEvidenceMarkdown, MIN_SESSIONS, UPDATES_PER_MINUTE,
+  stressTakeEvidence,
+  pooledStressEvidence,
+  stressEvidenceMarkdown,
+  MIN_SESSIONS,
+  UPDATES_PER_MINUTE,
 } from './stressEvidence.js';
 
 /** Record a synthetic take of n reader updates driven by sig(f); returns { record, live } (live = the reader's own counts). */
@@ -28,7 +32,11 @@ function take(n, sig) {
   }
   return { record: JSON.parse(JSON.stringify(rec.finish())), live };
 }
-const swing = (f) => ({ activity: 0.5 + 0.5 * Math.sin(f / 60), dish: 0.5 + 0.5 * Math.sin(f / 60 + 0.4), taste: 0.5 + 0.5 * Math.sin(f / 60 - 0.3) });
+const swing = (f) => ({
+  activity: 0.5 + 0.5 * Math.sin(f / 60),
+  dish: 0.5 + 0.5 * Math.sin(f / 60 + 0.4),
+  taste: 0.5 + 0.5 * Math.sin(f / 60 - 0.3),
+});
 const calm = () => ({ activity: 0.05, dish: 0.05, taste: 0.05 });
 
 // 1. one take: the evidence agrees with what the live reader counted (stressLive's session telemetry)
@@ -38,7 +46,11 @@ const calm = () => ({ activity: 0.05, dish: 0.05, taste: 0.05 });
   assert.ok(e.ok && e.consistent, 'the take reads and its log is consistent');
   assert.equal(e.updates, 2 * UPDATES_PER_MINUTE);
   assert.equal(e.minutes, 2);
-  assert.deepEqual({ relax: e.frames.relax, normal: e.frames.normal, tighten: e.frames.tighten }, { relax: live.relax, normal: live.normal, tighten: live.tighten }, 'per-band frames match the live counters');
+  assert.deepEqual(
+    { relax: e.frames.relax, normal: e.frames.normal, tighten: e.frames.tighten },
+    { relax: live.relax, normal: live.normal, tighten: live.tighten },
+    'per-band frames match the live counters',
+  );
   assert.equal(e.crossings, live.crossings, 'crossings match the live counter');
   assert.ok(e.crossings > 0 && e.frames.relax > 0 && e.frames.tighten > 0, 'a swinging take visits every band');
   assert.equal(e.crossingsPerMinute, +(live.crossings / 2).toFixed(2));
@@ -59,13 +71,22 @@ const calm = () => ({ activity: 0.05, dish: 0.05, taste: 0.05 });
 
 // 3. verdicts: too few sessions; one band dominating (the kill criterion); otherwise tunable
 {
-  const swingTakes = Array.from({ length: MIN_SESSIONS }, (_, i) => stressTakeEvidence(take(1800 + i * 120, (f) => swing(f + i * 97)).record));
+  const swingTakes = Array.from({ length: MIN_SESSIONS }, (_, i) =>
+    stressTakeEvidence(take(1800 + i * 120, (f) => swing(f + i * 97)).record),
+  );
   assert.equal(pooledStressEvidence(swingTakes.slice(0, MIN_SESSIONS - 1)).verdict.kind, 'insufficient');
   const p = pooledStressEvidence(swingTakes);
   assert.equal(p.sessions, MIN_SESSIONS);
   assert.equal(p.verdict.kind, 'tunable');
-  assert.equal(p.updates, swingTakes.reduce((s, t) => s + t.updates, 0), 'pooled updates sum the takes');
-  assert.equal(p.crossings, swingTakes.reduce((s, t) => s + t.crossings, 0));
+  assert.equal(
+    p.updates,
+    swingTakes.reduce((s, t) => s + t.updates, 0),
+    'pooled updates sum the takes',
+  );
+  assert.equal(
+    p.crossings,
+    swingTakes.reduce((s, t) => s + t.crossings, 0),
+  );
   const calmTakes = Array.from({ length: MIN_SESSIONS }, () => stressTakeEvidence(take(1800, calm).record));
   const c = pooledStressEvidence(calmTakes);
   assert.equal(c.verdict.kind, 'signal', 'a show pinned in one band is a signal problem, not an edge problem');

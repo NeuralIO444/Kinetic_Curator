@@ -75,8 +75,10 @@ function cleanEntry(raw) {
 export function validateLore(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { ok: false, error: 'not a lore file' };
   if (raw.kind !== LORE_KIND) return { ok: false, error: 'not a lore file (kind)' };
-  if (raw.version !== LORE_VERSION) return { ok: false, error: `lore v${raw.version} — this app reads v${LORE_VERSION}` };
-  if (typeof raw.bank_version !== 'string' || !raw.bank_version.trim()) return { ok: false, error: 'lore has no bank_version' };
+  if (raw.version !== LORE_VERSION)
+    return { ok: false, error: `lore v${raw.version} — this app reads v${LORE_VERSION}` };
+  if (typeof raw.bank_version !== 'string' || !raw.bank_version.trim())
+    return { ok: false, error: 'lore has no bank_version' };
   if (!Array.isArray(raw.entries) || raw.entries.length === 0 || raw.entries.length > MAX_ENTRIES) {
     return { ok: false, error: 'lore entries missing or out of bounds' };
   }
@@ -87,7 +89,8 @@ export function validateLore(raw) {
     if (!entry) return { ok: false, error: `bad lore entry: ${String(rawEntry && rawEntry.id)}` };
     if (seen.has(entry.id)) return { ok: false, error: `duplicate lore id: ${entry.id}` };
     seen.add(entry.id);
-    if (entry.bank_version !== raw.bank_version) return { ok: false, error: `entry ${entry.id} is not of this bank version` };
+    if (entry.bank_version !== raw.bank_version)
+      return { ok: false, error: `entry ${entry.id} is not of this bank version` };
     entries.push(entry);
   }
   return { ok: true, bank: { kind: LORE_KIND, version: LORE_VERSION, bankVersion: raw.bank_version, entries } };
@@ -145,8 +148,10 @@ export function drawLore(bank, tags, roll) {
   for (const e of bank.entries) {
     let score = 0;
     for (const a of wanted) if (e.tags[a] === tags[a]) score++;
-    if (score > bestScore) { bestScore = score; best = [e]; }
-    else if (score === bestScore && score > 0) best.push(e);
+    if (score > bestScore) {
+      bestScore = score;
+      best = [e];
+    } else if (score === bestScore && score > 0) best.push(e);
   }
   if (!bestScore) return null;
   const r = typeof roll === 'function' ? roll() : 0;

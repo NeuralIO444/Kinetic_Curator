@@ -35,9 +35,7 @@ export function mulberry32(seed) {
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
 
 /** Packs the audit names separately from categories (spec §0: the Haeckel pack). */
-const PACKS = [
-  { id: 'haeckel', test: (a) => a.id.startsWith('hae') },
-];
+const PACKS = [{ id: 'haeckel', test: (a) => a.id.startsWith('hae') }];
 
 const jaccard = (a, b) => {
   const A = new Set(a);
@@ -72,7 +70,11 @@ export function diceTrayCoverage({ rolls = 600, seed = 0x1504, ordering = null }
 
   for (let i = 0; i < rolls; i++) {
     const r = rollDice({
-      assets: ASSETS, rng, davisCode: null, scorer, crowns: [],
+      assets: ASSETS,
+      rng,
+      davisCode: null,
+      scorer,
+      crowns: [],
       ...(ordering ? { orderScorer: ordering.scorer, orderMeta: ordering.meta ?? null } : {}),
     });
     for (const c of r.candidates) for (const id of c.assetIds) candidateSeen.add(id);
@@ -98,15 +100,16 @@ export function diceTrayCoverage({ rolls = 600, seed = 0x1504, ordering = null }
     if (trioHi) hiOverlapTrios++;
   }
 
-  const cut = (list) => list.map((key) => {
-    const inLib = ASSETS.filter(key.test);
-    return {
-      name: key.name,
-      inLibrary: inLib.length,
-      inCandidates: inLib.filter((a) => candidateSeen.has(a.id)).length,
-      inTray: inLib.filter((a) => trayCount.has(a.id)).length,
-    };
-  });
+  const cut = (list) =>
+    list.map((key) => {
+      const inLib = ASSETS.filter(key.test);
+      return {
+        name: key.name,
+        inLibrary: inLib.length,
+        inCandidates: inLib.filter((a) => candidateSeen.has(a.id)).length,
+        inTray: inLib.filter((a) => trayCount.has(a.id)).length,
+      };
+    });
   const categories = cut(
     [...new Set(ASSETS.map((a) => a.category))].map((c) => ({
       name: c,
@@ -131,9 +134,7 @@ export function diceTrayCoverage({ rolls = 600, seed = 0x1504, ordering = null }
       neverCount: ASSETS.length - trayIds.size,
       neverIds: ASSETS.filter((a) => !trayIds.has(a.id)).map((a) => a.id),
       finalistSlots,
-      top15Share: finalistSlots
-        ? topCounts.slice(0, 15).reduce((s, n) => s + n, 0) / finalistSlots
-        : 0,
+      top15Share: finalistSlots ? topCounts.slice(0, 15).reduce((s, n) => s + n, 0) / finalistSlots : 0,
     },
     categories,
     packs,
@@ -215,7 +216,10 @@ export function evolveTargetCoverage({ draws = 2000 } = {}) {
   const track = (key, v) => {
     const leaves = Array.isArray(v) ? v : [v];
     for (const x of leaves) {
-      if (typeof x !== 'number' || !Number.isFinite(x)) { allFinite = false; continue; }
+      if (typeof x !== 'number' || !Number.isFinite(x)) {
+        allFinite = false;
+        continue;
+      }
       const s = spans.get(key) || { min: Infinity, max: -Infinity };
       if (x < s.min) s.min = x;
       if (x > s.max) s.max = x;
@@ -264,7 +268,10 @@ export function keepsCoverage(records) {
       const seen = new Set();
       for (const id of cast) {
         const a = byId.get(id);
-        if (!a) { unknownIds++; continue; }
+        if (!a) {
+          unknownIds++;
+          continue;
+        }
         seen.add(a.category);
       }
       for (const c of seen) catKeeps.set(c, (catKeeps.get(c) || 0) + 1);
@@ -274,7 +281,10 @@ export function keepsCoverage(records) {
     const mode = r?.config?.layout?.mode;
     if (mode) layKeeps.set(mode, (layKeeps.get(mode) || 0) + 1);
   }
-  const rows = (m) => [...m.entries()].map(([name, keeps]) => ({ name, keeps })).sort((a, b) => b.keeps - a.keeps || a.name.localeCompare(b.name));
+  const rows = (m) =>
+    [...m.entries()]
+      .map(([name, keeps]) => ({ name, keeps }))
+      .sort((a, b) => b.keeps - a.keeps || a.name.localeCompare(b.name));
   return {
     keeps: (records || []).length,
     withCast,
@@ -295,13 +305,21 @@ const frac = (n, d) => `${n}/${d}`;
 /** The readable report (spec §6: reported per run, in the open). */
 export function formatCoverageReport({ dice, doors, evolve, keeps, keepsNote }) {
   const L = [];
-  L.push(`COVERAGE REPORT (#1504) — seeded headless census; dice: ${dice.rolls} rolls, Davis silent, no crowns, seed 0x${dice.seed.toString(16)}`);
-  L.push(`library: ${dice.library.assets} assets · ${dice.library.palettes} palettes · ${dice.library.layouts} layouts`);
-  L.push(`dealer: ${frac(dice.candidates.distinct, dice.library.assets)} assets proposed among candidates (${pct(dice.candidates.distinct / dice.library.assets)})`);
+  L.push(
+    `COVERAGE REPORT (#1504) — seeded headless census; dice: ${dice.rolls} rolls, Davis silent, no crowns, seed 0x${dice.seed.toString(16)}`,
+  );
+  L.push(
+    `library: ${dice.library.assets} assets · ${dice.library.palettes} palettes · ${dice.library.layouts} layouts`,
+  );
+  L.push(
+    `dealer: ${frac(dice.candidates.distinct, dice.library.assets)} assets proposed among candidates (${pct(dice.candidates.distinct / dice.library.assets)})`,
+  );
   if (dice.candidates.neverIds.length) {
     L.push(`  never proposed: ${dice.candidates.neverIds.join(', ')}`);
   }
-  L.push(`tray: ${frac(dice.tray.distinct, dice.library.assets)} assets reached the finalist tray (${pct(dice.tray.distinct / dice.library.assets)}) · ${dice.tray.neverCount} never`);
+  L.push(
+    `tray: ${frac(dice.tray.distinct, dice.library.assets)} assets reached the finalist tray (${pct(dice.tray.distinct / dice.library.assets)}) · ${dice.tray.neverCount} never`,
+  );
   // Alarm rule: an exact zero is a hard alarm; <=10% of the family is a
   // near-zero alarm. The audit's zeros were seed luck (see the suite's
   // multi-seed note); the standing fact is the near-zero itself.
@@ -318,21 +336,33 @@ export function formatCoverageReport({ dice, doors, evolve, keeps, keepsNote }) 
     L.push(`pack ${p.name.padEnd(10)} ${frac(p.inTray, p.inLibrary)}${alarmFor(p.inTray, p.inLibrary)}`);
   }
   L.push(`layouts: ${frac(dice.layoutsReached, dice.library.layouts)} modes reached the tray`);
-  L.push(`palette: the tray carries no palette — 0/${dice.library.palettes} palettes reachable via the dice (frozen axis, spec §0)`);
-  L.push(`trio distinctness (PA1): mean pairwise cast overlap ${pct(dice.trios.meanPairwiseJaccard)} · trios with a >=50%-overlap pair ${pct(dice.trios.hiOverlapPct)}`);
+  L.push(
+    `palette: the tray carries no palette — 0/${dice.library.palettes} palettes reachable via the dice (frozen axis, spec §0)`,
+  );
+  L.push(
+    `trio distinctness (PA1): mean pairwise cast overlap ${pct(dice.trios.meanPairwiseJaccard)} · trios with a >=50%-overlap pair ${pct(dice.trios.hiOverlapPct)}`,
+  );
   L.push(`concentration: top 15 assets take ${pct(dice.tray.top15Share)} of finalist slots`);
-  L.push(`random doors (RA2): ${doors.keys.length} keys x ${doors.draws} seeded rolls — in declared ranges: ${doors.allInRange ? 'all' : 'VIOLATIONS'} · quartile reach: ${doors.allQuartiles ? 'all keys' : 'SOFT FUNNEL (see below)'}`);
+  L.push(
+    `random doors (RA2): ${doors.keys.length} keys x ${doors.draws} seeded rolls — in declared ranges: ${doors.allInRange ? 'all' : 'VIOLATIONS'} · quartile reach: ${doors.allQuartiles ? 'all keys' : 'SOFT FUNNEL (see below)'}`,
+  );
   for (const k of doors.keys) {
     for (const [e, s] of k.streams.entries()) {
       const flag = s.reachesLowQuartile && s.reachesHighQuartile ? '' : '  SOFT FUNNEL — quartile unreached';
       if (flag || k.outOfRange) {
-        L.push(`  ${k.key}${k.pair ? `[${e}]` : ''}: rolled [${s.min}, ${s.max}] of declared [${s.lo}, ${s.hi}]${flag}${k.outOfRange ? ` · ${k.outOfRange} out-of-range draws` : ''}`);
+        L.push(
+          `  ${k.key}${k.pair ? `[${e}]` : ''}: rolled [${s.min}, ${s.max}] of declared [${s.lo}, ${s.hi}]${flag}${k.outOfRange ? ` · ${k.outOfRange} out-of-range draws` : ''}`,
+        );
       }
     }
   }
-  L.push(`evolve targets: ${evolve.draws} draws — all 18 keys present: ${evolve.allPresent} · finite: ${evolve.allFinite} · locks respected: ${evolve.locksRespected}`);
+  L.push(
+    `evolve targets: ${evolve.draws} draws — all 18 keys present: ${evolve.allPresent} · finite: ${evolve.allFinite} · locks respected: ${evolve.locksRespected}`,
+  );
   if (keeps) {
-    L.push(`keeps: ${keeps.keeps} records (${keeps.withCast} with cast, ${keeps.castless} castless legacy) · categories spanned ${frac(keeps.distinctCategories, dice.categories.length)} · palettes ${keeps.distinctPalettes} · layouts ${keeps.distinctLayouts}${keeps.unknownIds ? ` · ${keeps.unknownIds} unknown (custom) asset ids` : ''}`);
+    L.push(
+      `keeps: ${keeps.keeps} records (${keeps.withCast} with cast, ${keeps.castless} castless legacy) · categories spanned ${frac(keeps.distinctCategories, dice.categories.length)} · palettes ${keeps.distinctPalettes} · layouts ${keeps.distinctLayouts}${keeps.unknownIds ? ` · ${keeps.unknownIds} unknown (custom) asset ids` : ''}`,
+    );
   }
   if (keepsNote) L.push(`keeps note: ${keepsNote}`);
   return L.join('\n');

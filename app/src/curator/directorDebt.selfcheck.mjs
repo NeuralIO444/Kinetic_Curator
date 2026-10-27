@@ -2,11 +2,25 @@
 // to 0 — temperature capped, her allowance held, Davis's freedom held — and a stall still widens. Never serialized.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createDirector, directorGains, nextDebt, nextOwed, DEBT_CAP, DEBT_OWED, DEBT_TEMP_CAP, DEBT_HOLD, SWAY_GATE_OPEN } from './director.js';
+import {
+  createDirector,
+  directorGains,
+  nextDebt,
+  nextOwed,
+  DEBT_CAP,
+  DEBT_OWED,
+  DEBT_TEMP_CAP,
+  DEBT_HOLD,
+  SWAY_GATE_OPEN,
+} from './director.js';
 import { DIRECTORS_MATRIX } from './directorsMatrix.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const rooms = Object.entries(DIRECTORS_MATRIX).flatMap(([l, row]) => Object.keys(row).map((d) => [l, d]));
 
@@ -27,22 +41,34 @@ ok('owing quiet has hysteresis: starts at 3, lasts until the debt is paid to 0',
   assert.equal(nextOwed(true, 0), false, 'paid off');
 });
 
-ok('every room while owing: temperature capped, her allowance held, Davis held — except a stall; not owing is today', () => {
-  for (const [l, d] of rooms) {
-    const today = directorGains({ loisCode: l, davisCode: d, phase: 'explore' });
-    assert.deepEqual(directorGains({ loisCode: l, davisCode: d, phase: 'explore', owed: false }), today);
-    const q = directorGains({ loisCode: l, davisCode: d, phase: 'explore', owed: true });
-    if (d === 'STUCK') { assert.deepEqual(q, today, `${l}×STUCK: a stall still widens`); continue; }
-    assert.ok(q.temperature <= DEBT_TEMP_CAP + 1e-12 && q.temperature <= today.temperature, `${l}×${d} temp`);
-    assert.ok(q.kinWeight <= 1 && q.kinWeight <= today.kinWeight, `${l}×${d} kin`);
-    if (SWAY_GATE_OPEN) assert.ok(q.swayAllowance >= Math.min(1, Math.max(DEBT_HOLD, today.swayAllowance)) - 1e-12, `${l}×${d} she holds`);
-    assert.equal(q.loisWeight, today.loisWeight); assert.equal(q.tiltLimit, today.tiltLimit); assert.deepEqual(q.room, today.room);
-  }
-  const fb = directorGains({ loisCode: 'BURN', davisCode: 'FLOW', owed: true });
-  assert.ok(fb.temperature <= DEBT_TEMP_CAP && fb.kinWeight <= 1, 'even FULL BURN owes');
-  const held = directorGains({ loisCode: 'BURN', davisCode: 'FLOW', owed: true, presence: { tier: 1 } });
-  assert.ok(Math.abs(held.swayAllowance - fb.swayAllowance * 0.5) < 1e-12, 'her hold is still × her presence');
-});
+ok(
+  'every room while owing: temperature capped, her allowance held, Davis held — except a stall; not owing is today',
+  () => {
+    for (const [l, d] of rooms) {
+      const today = directorGains({ loisCode: l, davisCode: d, phase: 'explore' });
+      assert.deepEqual(directorGains({ loisCode: l, davisCode: d, phase: 'explore', owed: false }), today);
+      const q = directorGains({ loisCode: l, davisCode: d, phase: 'explore', owed: true });
+      if (d === 'STUCK') {
+        assert.deepEqual(q, today, `${l}×STUCK: a stall still widens`);
+        continue;
+      }
+      assert.ok(q.temperature <= DEBT_TEMP_CAP + 1e-12 && q.temperature <= today.temperature, `${l}×${d} temp`);
+      assert.ok(q.kinWeight <= 1 && q.kinWeight <= today.kinWeight, `${l}×${d} kin`);
+      if (SWAY_GATE_OPEN)
+        assert.ok(
+          q.swayAllowance >= Math.min(1, Math.max(DEBT_HOLD, today.swayAllowance)) - 1e-12,
+          `${l}×${d} she holds`,
+        );
+      assert.equal(q.loisWeight, today.loisWeight);
+      assert.equal(q.tiltLimit, today.tiltLimit);
+      assert.deepEqual(q.room, today.room);
+    }
+    const fb = directorGains({ loisCode: 'BURN', davisCode: 'FLOW', owed: true });
+    assert.ok(fb.temperature <= DEBT_TEMP_CAP && fb.kinWeight <= 1, 'even FULL BURN owes');
+    const held = directorGains({ loisCode: 'BURN', davisCode: 'FLOW', owed: true, presence: { tier: 1 } });
+    assert.ok(Math.abs(held.swayAllowance - fb.swayAllowance * 0.5) < 1e-12, 'her hold is still × her presence');
+  },
+);
 
 ok('live: three burns and the room owes quiet; FULL BURN cools; nods pay it back and Davis is free again', () => {
   const d = createDirector({ now: () => 0 });
@@ -51,12 +77,16 @@ ok('live: three burns and the room owes quiet; FULL BURN cools; nods pay it back
   const hot = d.tick({ feed: at('BURN'), audio: 0, nowTs: 0 }); // burn 1
   assert.equal(hot.gains.room.verdict, 'FULL BURN');
   assert.ok(hot.gains.kinWeight > 1, 'the first burns are unleashed');
-  d.tick({ feed: at('VIBE'), audio: 0, nowTs: 0 }); d.tick({ feed: at('BURN'), audio: 0, nowTs: 0 }); // burn 2
+  d.tick({ feed: at('VIBE'), audio: 0, nowTs: 0 });
+  d.tick({ feed: at('BURN'), audio: 0, nowTs: 0 }); // burn 2
   d.tick({ feed: at('VIBE'), audio: 0, nowTs: 0 });
   const owe = d.tick({ feed: at('BURN'), audio: 0, nowTs: 0 }); // burn 3
   assert.deepEqual(d.pacing, { debt: 3, owed: true });
   assert.ok(owe.gains.temperature <= DEBT_TEMP_CAP && owe.gains.kinWeight <= 1, 'FULL BURN owes quiet now');
-  for (let i = 0; i < 2; i++) { d.tick({ feed: at('NOD'), audio: 0, nowTs: 0 }); d.tick({ feed: at('VIBE'), audio: 0, nowTs: 0 }); }
+  for (let i = 0; i < 2; i++) {
+    d.tick({ feed: at('NOD'), audio: 0, nowTs: 0 });
+    d.tick({ feed: at('VIBE'), audio: 0, nowTs: 0 });
+  }
   assert.deepEqual(d.pacing, { debt: 1, owed: true }, 'still owing');
   d.tick({ feed: at('NOD'), audio: 0, nowTs: 0 });
   assert.deepEqual(d.pacing, { debt: 0, owed: false }, 'paid');
@@ -70,7 +100,8 @@ ok('never serialized, never on a surface: the debt lives only inside the Directo
   const dir = src('./director.js');
   assert.match(dir, /let debt = 0;/);
   assert.ok(!/localStorage\.setItem|JSON\.stringify\(\s*\{\s*debt/.test(dir));
-  for (const f of ['./directorRoom.js', './mindRoom.js', './mindContext.js']) assert.ok(!/debt/i.test(src(f)), `${f} never carries the debt`);
+  for (const f of ['./directorRoom.js', './mindRoom.js', './mindContext.js'])
+    assert.ok(!/debt/i.test(src(f)), `${f} never carries the debt`);
 });
 
 console.log(`directorDebt.selfcheck: ${n} checks passed`);

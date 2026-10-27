@@ -65,6 +65,12 @@ src/composition/fixtures/
 !src/data/
 src/data/**/*.json
 
+# ── Adopted (slice 7, #1684: state + curator — their source-text pins made layout-blind first) ──
+!src/state/
+!src/curator/
+src/state/**/*.json
+src/curator/**/*.json
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

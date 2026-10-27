@@ -97,7 +97,13 @@ export function noteKeep() {
 
 const sameHomes = (a, b) => a.length === b.length && a.every((p, i) => p.x === b[i].x && p.y === b[i].y);
 const copyTraits = (t) => (t ? { spread: t.spread, wing: t.wing, body: t.body, swatch: t.swatch } : null);
-const isTrait = (t) => !!t && typeof t === 'object' && Number.isFinite(t.spread) && Number.isFinite(t.wing) && Number.isFinite(t.body) && Number.isFinite(t.swatch);
+const isTrait = (t) =>
+  !!t &&
+  typeof t === 'object' &&
+  Number.isFinite(t.spread) &&
+  Number.isFinite(t.wing) &&
+  Number.isFinite(t.body) &&
+  Number.isFinite(t.swatch);
 
 export function createCreatureSpawnState() {
   let formationTracker = createFormationTracker();
@@ -145,11 +151,15 @@ export function createCreatureSpawnState() {
   // fertility field, density from the marks the resolver placed, the band the frame rode in on.
   function observeFormationHalf(input, output, band) {
     const pins = sanitizePins(input && input.dishPins);
-    const W = input && input.canvasW; const H = input && input.canvasH;
+    const W = input && input.canvasW;
+    const H = input && input.canvasH;
     let attraction = [];
     if (pins.length) {
       const key = JSON.stringify([input.seed >>> 0, input.seedOffsets ?? null, W, H]);
-      if (key !== fieldKey) { field = fertilityField(input.seed, input.seedOffsets, W, H); fieldKey = key; }
+      if (key !== fieldKey) {
+        field = fertilityField(input.seed, input.seedOffsets, W, H);
+        fieldKey = key;
+      }
       attraction = pins.map((p) => quantizeSignal(field.at(p.x, p.y)));
     }
     const density = pinPressures(pins, output, W, H).map(quantizeSignal);
@@ -162,18 +172,37 @@ export function createCreatureSpawnState() {
     limbs = limbTracker.update(latest.states);
     hosted = latest.states.map((s, i) => !!(s && s.formed) && !latest.states.slice(0, i).some((p) => p && p.formed));
     const shifted = shiftTracker.update(latest.states, {
-      seed: input && input.seed, seedOffsets: input && input.seedOffsets, band,
-      room: () => { try { return roomProvider ? roomProvider() : null; } catch { return null; } },
-      centre: (r) => birthCentre({ ring: keepRing, keeps: r && r.keeps, allowance: r && r.allowance, defaults: TRAIT_DEFAULTS }),
+      seed: input && input.seed,
+      seedOffsets: input && input.seedOffsets,
+      band,
+      room: () => {
+        try {
+          return roomProvider ? roomProvider() : null;
+        } catch {
+          return null;
+        }
+      },
+      centre: (r) =>
+        birthCentre({ ring: keepRing, keeps: r && r.keeps, allowance: r && r.allowance, defaults: TRAIT_DEFAULTS }),
     });
     traits = shifted.traits;
     alifeOn = !!(input && input.creatureAlife);
     if (alifeOn) observeGenomes(input, shifted.born);
     else genomes = [];
-    if (shifted.born.length && shiftTap) { try { shiftTap(shifted.born); } catch { shiftTap = null; } }
+    if (shifted.born.length && shiftTap) {
+      try {
+        shiftTap(shifted.born);
+      } catch {
+        shiftTap = null;
+      }
+    }
     if (formationTap) {
       // resolveTap's listener law, carried over: a throwing tap is dropped, never fatal to the frame.
-      try { formationTap(u, r.events); } catch { formationTap = null; }
+      try {
+        formationTap(u, r.events);
+      } catch {
+        formationTap = null;
+      }
     }
     return r;
   }
@@ -190,13 +219,18 @@ export function createCreatureSpawnState() {
       const s = latest.states[i];
       if (!s || !s.formed || !traits[i]) continue;
       const prev = genomes[i] && genomes[i].x === s.x && genomes[i].y === s.y ? genomes[i] : null;
-      if (prev && !bornAt.has(i)) { next[i] = prev; continue; }
+      if (prev && !bornAt.has(i)) {
+        next[i] = prev;
+        continue;
+      }
       breedOrdinal += 1;
       const key = birthKey(`alife:${i}:${breedOrdinal}:${Math.round(s.x)}:${Math.round(s.y)}`);
       const bred = breedFor({ ring: genomeRing, seed, key, ordinal: breedOrdinal, lastPair });
       let genome;
-      if (bred) { genome = bred.genome; lastPair = bred.pair; }
-      else genome = genomeFromTraits(traits[i], seed, `wild:${key}`);
+      if (bred) {
+        genome = bred.genome;
+        lastPair = bred.pair;
+      } else genome = genomeFromTraits(traits[i], seed, `wild:${key}`);
       next[i] = { x: s.x, y: s.y, genome };
       const e = bornAt.get(i);
       if (e && bred) e.traits = traitsOf(genome); // the davis-shift log records the look this animal was born with
@@ -210,21 +244,43 @@ export function createCreatureSpawnState() {
   // Returns true when the standing homes changed (App's tap wrote the store on exactly this condition).
   function observeSpawnHalf(input, output, { count = 0, formed = [], band = null, weight = null } = {}) {
     const want = sanitizeCount(count);
-    const W = input && input.canvasW; const H = input && input.canvasH;
+    const W = input && input.canvasW;
+    const H = input && input.canvasH;
     const k = `${(input && input.seed) >>> 0}|${JSON.stringify((input && input.seedOffsets) ?? null)}|${W}x${H}`;
     const before = homes.map(({ x, y }) => ({ x, y }));
-    if (k !== dishKey) { dishKey = k; homes = []; spawnField = null; sinceTry = SPAWN_RETRY_FRAMES; } // a new dish: start again
+    if (k !== dishKey) {
+      dishKey = k;
+      homes = [];
+      spawnField = null;
+      sinceTry = SPAWN_RETRY_FRAMES;
+    } // a new dish: start again
     if (homes.length > want) homes = homes.slice(0, want);
     for (let i = 0; i < homes.length; i++) {
       homes[i].age += 1;
-      if (!formed[i] && homes[i].age >= SPAWN_PATIENCE_FRAMES) { homes.splice(i, 1); i--; sinceTry = SPAWN_RETRY_FRAMES; }
+      if (!formed[i] && homes[i].age >= SPAWN_PATIENCE_FRAMES) {
+        homes.splice(i, 1);
+        i--;
+        sinceTry = SPAWN_RETRY_FRAMES;
+      }
     }
     if (homes.length < want) {
       sinceTry += 1;
       if (sinceTry >= SPAWN_RETRY_FRAMES) {
         sinceTry = 0;
-        if (!spawnField || spawnFieldKey !== k) { spawnField = fertilityField(input.seed, input.seedOffsets, W, H).at; spawnFieldKey = k; }
-        const next = chooseHomes({ count: want, existing: homes, marks: marksOf(output), field: spawnField, band, canvasW: W, canvasH: H, weight });
+        if (!spawnField || spawnFieldKey !== k) {
+          spawnField = fertilityField(input.seed, input.seedOffsets, W, H).at;
+          spawnFieldKey = k;
+        }
+        const next = chooseHomes({
+          count: want,
+          existing: homes,
+          marks: marksOf(output),
+          field: spawnField,
+          band,
+          canvasW: W,
+          canvasH: H,
+          weight,
+        });
         for (let i = homes.length; i < next.length; i++) homes.push({ x: next[i].x, y: next[i].y, age: 0 });
       }
     }
@@ -247,7 +303,7 @@ export function createCreatureSpawnState() {
         // dialing the count to 0 does), and the citizen's pool weight rides to the home choice.
         // An input that never mentions the citizen (every pre-slice take, the gate fixture)
         // reads enabled and unweighted — this frame logic is then unchanged.
-        count: creatureEnabled(input) ? (input && input.creatureCount) : 0,
+        count: creatureEnabled(input) ? input && input.creatureCount : 0,
         formed: latest.states.map((s) => !!(s && s.formed)),
         band,
         weight: input && input.assetWeightOverrides ? input.assetWeightOverrides[CREATURE_ASSET_ID] : undefined,
@@ -268,15 +324,22 @@ export function createCreatureSpawnState() {
       return changed ? decisions.dishPins : null;
     },
     /** The decisions the next frame's input carries, as of the last observed frame. */
-    getDecisions() { return decisions; },
+    getDecisions() {
+      return decisions;
+    },
     /** The latest per-pin formation view ([{ x, y, hold, formed, attraction, density }] and their band) — the ?debug=stress readout's. */
-    getFormationView() { return latest; },
+    getFormationView() {
+      return latest;
+    },
     /** A keep just landed: remember the traits of the moths alive now (a session ring; nothing without a moth). */
     noteKeep() {
       if (alifeOn) {
         keepSerial += 1; // #1736/#1737: the builder hears every keep (consolidation, the approval drive's drop)
         const kept = genomes.filter(Boolean).map((g) => g.genome);
-        if (kept.length) { genomeRing.push(kept); while (genomeRing.length > GENOME_RING_CAP) genomeRing.shift(); } // #1738: the breeding pool
+        if (kept.length) {
+          genomeRing.push(kept);
+          while (genomeRing.length > GENOME_RING_CAP) genomeRing.shift();
+        } // #1738: the breeding pool
       }
       const alive = traits.filter(Boolean).map((t) => ({ ...t }));
       if (!alive.length) return;
@@ -293,12 +356,21 @@ export function createCreatureSpawnState() {
       shiftTracker.reset();
       traits = [];
       keepRing.length = 0;
-      genomes = []; genomeRing.length = 0; breedOrdinal = 0; lastPair = null; keepSerial = 0; alifeOn = false;
+      genomes = [];
+      genomeRing.length = 0;
+      breedOrdinal = 0;
+      lastPair = null;
+      keepSerial = 0;
+      alifeOn = false;
       decisions = freshDecisions(false);
     },
     /** Start the spawn half over (a fresh document, tests). */
     resetSpawnHalf() {
-      homes = []; dishKey = ''; sinceTry = SPAWN_RETRY_FRAMES; spawnField = null; spawnFieldKey = '';
+      homes = [];
+      dishKey = '';
+      sinceTry = SPAWN_RETRY_FRAMES;
+      spawnField = null;
+      spawnFieldKey = '';
       decisions = freshDecisions(false);
     },
     /** Start the whole channel over. */
@@ -324,7 +396,18 @@ export function createCreatureSpawnState() {
         keepRing: keepRing.map((list) => list.map(copyTraits)),
         // #1734/#1738 — the ALife channel, only once it has run (a session without it snapshots exactly as before);
         // absent from older snapshots, which restore it empty
-        ...(alifeOn || breedOrdinal > 0 || keepSerial > 0 ? { alife: { on: alifeOn, genomes: genomes.map((g) => (g ? { x: g.x, y: g.y, genome: g.genome } : null)), ring: genomeRing.map((l) => l.slice()), ordinal: breedOrdinal, lastPair, keepSerial } } : {}),
+        ...(alifeOn || breedOrdinal > 0 || keepSerial > 0
+          ? {
+              alife: {
+                on: alifeOn,
+                genomes: genomes.map((g) => (g ? { x: g.x, y: g.y, genome: g.genome } : null)),
+                ring: genomeRing.map((l) => l.slice()),
+                ordinal: breedOrdinal,
+                lastPair,
+                keepSerial,
+              },
+            }
+          : {}),
       };
     },
     /** Fail-closed, like the builders': validate everything (sub-trackers against throwaway instances) before applying anything. */
@@ -337,15 +420,25 @@ export function createCreatureSpawnState() {
       if (!(snap.latest.band === null || typeof snap.latest.band === 'string')) return false;
       for (const s of snap.latest.states) {
         if (s === null) continue;
-        if (!s || typeof s !== 'object' || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.hold)
-          || typeof s.formed !== 'boolean' || !Number.isFinite(s.attraction) || !Number.isFinite(s.density)) return false;
+        if (
+          !s ||
+          typeof s !== 'object' ||
+          !Number.isFinite(s.x) ||
+          !Number.isFinite(s.y) ||
+          !Number.isFinite(s.hold) ||
+          typeof s.formed !== 'boolean' ||
+          !Number.isFinite(s.attraction) ||
+          !Number.isFinite(s.density)
+        )
+          return false;
       }
       if (!Array.isArray(snap.limbsOut) || !snap.limbsOut.every((n) => n === 1 || n === 2)) return false;
       if (!Array.isArray(snap.traitsOut) || !snap.traitsOut.every((t) => t === null || isTrait(t))) return false;
       if (!Array.isArray(snap.hostedOut) || !snap.hostedOut.every((b) => typeof b === 'boolean')) return false;
       if (!Array.isArray(snap.homes)) return false;
       for (const h of snap.homes) {
-        if (!h || typeof h !== 'object' || !Number.isFinite(h.x) || !Number.isFinite(h.y) || !Number.isFinite(h.age)) return false;
+        if (!h || typeof h !== 'object' || !Number.isFinite(h.x) || !Number.isFinite(h.y) || !Number.isFinite(h.age))
+          return false;
       }
       if (typeof snap.dishKey !== 'string' || !Number.isInteger(snap.sinceTry) || snap.sinceTry < 0) return false;
       if (!Array.isArray(snap.keepRing)) return false;
@@ -354,9 +447,21 @@ export function createCreatureSpawnState() {
       }
       const al = snap.alife;
       if (al !== undefined) {
-        if (!al || typeof al !== 'object' || !Array.isArray(al.genomes) || !Array.isArray(al.ring) || !Number.isInteger(al.ordinal) || al.ordinal < 0
-          || !Number.isInteger(al.keepSerial) || al.keepSerial < 0 || !(al.lastPair === null || (Array.isArray(al.lastPair) && al.lastPair.length === 2))) return false;
-        for (const g of al.genomes) if (g !== null && (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y) || !sanitizeGenome(g.genome))) return false;
+        if (
+          !al ||
+          typeof al !== 'object' ||
+          !Array.isArray(al.genomes) ||
+          !Array.isArray(al.ring) ||
+          !Number.isInteger(al.ordinal) ||
+          al.ordinal < 0 ||
+          !Number.isInteger(al.keepSerial) ||
+          al.keepSerial < 0 ||
+          !(al.lastPair === null || (Array.isArray(al.lastPair) && al.lastPair.length === 2))
+        )
+          return false;
+        for (const g of al.genomes)
+          if (g !== null && (!g || !Number.isFinite(g.x) || !Number.isFinite(g.y) || !sanitizeGenome(g.genome)))
+            return false;
         for (const l of al.ring) if (!Array.isArray(l) || !l.every((g) => sanitizeGenome(g))) return false;
       }
       formationTracker.restoreState(snap.formation);
@@ -374,10 +479,14 @@ export function createCreatureSpawnState() {
       genomes = al ? al.genomes.map((g) => (g ? { x: g.x, y: g.y, genome: sanitizeGenome(g.genome) } : null)) : [];
       genomeRing.length = 0;
       if (al) for (const l of al.ring) genomeRing.push(l.map(sanitizeGenome));
-      breedOrdinal = al ? al.ordinal : 0; lastPair = al && al.lastPair ? al.lastPair.slice() : null;
-      keepSerial = al ? al.keepSerial : 0; alifeOn = !!(al && al.on);
-      field = null; fieldKey = '';
-      spawnField = null; spawnFieldKey = '';
+      breedOrdinal = al ? al.ordinal : 0;
+      lastPair = al && al.lastPair ? al.lastPair.slice() : null;
+      keepSerial = al ? al.keepSerial : 0;
+      alifeOn = !!(al && al.on);
+      field = null;
+      fieldKey = '';
+      spawnField = null;
+      spawnFieldKey = '';
       decisions = freshDecisions(false);
       return true;
     },

@@ -22,13 +22,16 @@
 //     leans toward a keeps-like finalist and stays silent below
 //     MIN_KEEPS keeps, as ever.
 import assert from 'node:assert/strict';
-import {
-  CORNERS, sampleBatch, runMiner, featuresOf, selectFinalists,
-} from './miner.mjs';
+import { CORNERS, sampleBatch, runMiner, featuresOf, selectFinalists } from './miner.mjs';
 import { getRenderProfile, RENDER_PROFILE_IDS } from './renderProfiles.js';
 import {
-  cornerDefinition, declaredNumRanges, declaredScaleBuckets, featureCentroid, centroidViolations,
-  yieldAccrual, formatYieldReport,
+  cornerDefinition,
+  declaredNumRanges,
+  declaredScaleBuckets,
+  featureCentroid,
+  centroidViolations,
+  yieldAccrual,
+  formatYieldReport,
 } from './prospecting.mjs';
 // The Queen's evidence is operator tooling (scripts/queenEvidence.mjs):
 // rule 10 confines her mechanics to one host in the app graph, so no
@@ -40,10 +43,19 @@ import { ledgerRow } from './tasteLedger.js';
 
 // ── corners as data ─────────────────────────────────────────────────
 assert.strictEqual(CORNERS.length, 11, 'the rotation is the wilderness + 10 profiles');
-assert.deepStrictEqual(cornerDefinition('wilderness'), {
-  id: 'wilderness', kind: 'wilderness', word: 'wilderness',
-  paletteId: null, biases: null, forces: null, modes: null,
-}, 'the wilderness corner declares nothing — that is what makes it the wilderness');
+assert.deepStrictEqual(
+  cornerDefinition('wilderness'),
+  {
+    id: 'wilderness',
+    kind: 'wilderness',
+    word: 'wilderness',
+    paletteId: null,
+    biases: null,
+    forces: null,
+    modes: null,
+  },
+  'the wilderness corner declares nothing — that is what makes it the wilderness',
+);
 for (const id of RENDER_PROFILE_IDS) {
   const def = cornerDefinition(id);
   const src = getRenderProfile(id);
@@ -65,28 +77,47 @@ assert.strictEqual(declaredNumRanges('wilderness'), null, 'the wilderness declar
 // on real bakes.
 for (const id of RENDER_PROFILE_IDS) {
   const samples = sampleBatch({ runSeed: 0x1508, batchSize: 44, corner: id });
-  assert.ok(samples.every((s) => s.corner === id), `${id}: an aimed run deals only its corner`);
-  assert.ok(samples.every((s) => s.paletteId === getRenderProfile(id).paletteId),
-    `${id}: every sample wears the profile palette`);
-  const feats = samples.map((s) => featuresOf({
-    layoutParams: s.layoutParams, paletteId: s.paletteId, cast: s.cast,
-  }));
+  assert.ok(
+    samples.every((s) => s.corner === id),
+    `${id}: an aimed run deals only its corner`,
+  );
+  assert.ok(
+    samples.every((s) => s.paletteId === getRenderProfile(id).paletteId),
+    `${id}: every sample wears the profile palette`,
+  );
+  const feats = samples.map((s) =>
+    featuresOf({
+      layoutParams: s.layoutParams,
+      paletteId: s.paletteId,
+      cast: s.cast,
+    }),
+  );
   const ranges = declaredNumRanges(id);
-  assert.ok(!('scaleMid' in ranges),
-    `${id}: no declared range over scaleMid — scale is proven at bucket granularity by design (see prospecting.mjs)`);
-  assert.deepStrictEqual(centroidViolations(featureCentroid(feats), ranges), [],
-    `${id}: batch centroid inside the declared ranges`);
+  assert.ok(
+    !('scaleMid' in ranges),
+    `${id}: no declared range over scaleMid — scale is proven at bucket granularity by design (see prospecting.mjs)`,
+  );
+  assert.deepStrictEqual(
+    centroidViolations(featureCentroid(feats), ranges),
+    [],
+    `${id}: batch centroid inside the declared ranges`,
+  );
   const buckets = declaredScaleBuckets(id);
   assert.ok(buckets && buckets.length >= 1, `${id}: scale buckets declared`);
   for (const f of feats) {
-    assert.ok(buckets.includes(f.scale),
-      `${id}: scale bucket ${f.scale} is one its declared ranges can land in (${buckets})`);
+    assert.ok(
+      buckets.includes(f.scale),
+      `${id}: scale bucket ${f.scale} is one its declared ranges can land in (${buckets})`,
+    );
   }
   const { finalists } = selectFinalists(
-    samples.map((sample, i) => ({ sample, features: feats[i] })), [], { finalistCount: 6 },
+    samples.map((sample, i) => ({ sample, features: feats[i] })),
+    [],
+    { finalistCount: 6 },
   );
   assert.deepStrictEqual(
-    centroidViolations(featureCentroid(finalists.map((f) => f.features)), ranges), [],
+    centroidViolations(featureCentroid(finalists.map((f) => f.features)), ranges),
+    [],
     `${id}: finalist centroid inside the declared ranges`,
   );
   // forced categoricals hold on every sample (dual-mode stock rolls
@@ -94,25 +125,35 @@ for (const id of RENDER_PROFILE_IDS) {
   const prof = getRenderProfile(id);
   const forceSets = prof.modes ? Object.values(prof.modes).map((m) => m.forces) : [prof.forces];
   for (const f of feats) {
-    assert.ok(forceSets.some((forces) => (
-      (forces.symmetry === undefined || f.symmetry === forces.symmetry)
-      && (forces.accumulation === undefined || f.accum === forces.accumulation)
-      && (forces.behave === undefined || f.behave === forces.behave)
-    )), `${id}: a sample's categoricals match one of its declared force sets`);
+    assert.ok(
+      forceSets.some(
+        (forces) =>
+          (forces.symmetry === undefined || f.symmetry === forces.symmetry) &&
+          (forces.accumulation === undefined || f.accum === forces.accumulation) &&
+          (forces.behave === undefined || f.behave === forces.behave),
+      ),
+      `${id}: a sample's categoricals match one of its declared force sets`,
+    );
   }
 }
 
 // the wilderness stays uniform: no profile palette, varied palettes
 const wild = sampleBatch({ runSeed: 0x1508, batchSize: 44, corner: 'wilderness' });
-assert.ok(wild.every((s) => s.corner === 'wilderness'), 'an aimed wilderness run deals only wilderness');
+assert.ok(
+  wild.every((s) => s.corner === 'wilderness'),
+  'an aimed wilderness run deals only wilderness',
+);
 assert.ok(new Set(wild.map((s) => s.paletteId)).size > 4, 'the wilderness wears the whole catalog, not a palette');
 
 // ── Davis steers spread ─────────────────────────────────────────────
 const castKey = (list) => list.map((s) => [s.layoutId, s.seed, s.cast.join(',')]);
 const silent = sampleBatch({ runSeed: 0x1508, batchSize: 33 });
 const seedling = sampleBatch({ runSeed: 0x1508, batchSize: 33, davisCode: 'SEEDLING' });
-assert.deepStrictEqual(castKey(seedling), castKey(silent),
-  'Davis silent IS the seedling stream (wildness 0.5) — the E2 default is unchanged');
+assert.deepStrictEqual(
+  castKey(seedling),
+  castKey(silent),
+  'Davis silent IS the seedling stream (wildness 0.5) — the E2 default is unchanged',
+);
 const ugly = sampleBatch({ runSeed: 0x1508, batchSize: 33, davisCode: 'UGLY' });
 const flow = sampleBatch({ runSeed: 0x1508, batchSize: 33, davisCode: 'FLOW' });
 assert.notDeepStrictEqual(castKey(ugly), castKey(flow), 'UGLY and FLOW deal different casts');
@@ -135,14 +176,15 @@ for (const f of run.finalists) {
   assert.ok(['keep', 'pass'].includes(f.loisVerdict?.verdict), 'every finalist carries a LOIS verdict');
   assert.strictEqual(f.loisVerdict.judge, 'lois-render', 'the verdict names its judge');
   assert.deepStrictEqual(f.record.loisVerdict, f.loisVerdict, 'the record carries the verdict (E3’s gap, closed)');
-  assert.strictEqual(f.record.statsProvenance.fingerprint, f.fingerprint,
-    'the record carries statsProvenance bound to its bake');
+  assert.strictEqual(
+    f.record.statsProvenance.fingerprint,
+    f.fingerprint,
+    'the record carries statsProvenance bound to its bake',
+  );
   assert.strictEqual(f.statsProvenance, f.loisVerdict.statsProvenance, 'one stats provenance, two doors');
 }
 assert.deepStrictEqual(
-  centroidViolations(
-    featureCentroid(run.finalists.map((f) => f.features)), declaredNumRanges('haeckel'),
-  ),
+  centroidViolations(featureCentroid(run.finalists.map((f) => f.features)), declaredNumRanges('haeckel')),
   [],
   'the real run’s finalist centroid sits inside Haeckel’s declared ranges',
 );
@@ -155,17 +197,38 @@ for (const v of run.verdicts) {
   assert.strictEqual(v.run, run.runId, 'verdict rows name the run');
 }
 const runAgain = runMiner({ runSeed: 0x1508, batchSize: 33, finalistCount: 6, corner: 'haeckel' });
-assert.deepStrictEqual(runAgain.finalists.map((f) => f.sample.index), run.finalists.map((f) => f.sample.index),
-  'determinism: the aimed run reproduces its finalists');
-assert.deepStrictEqual(runAgain.finalists.map((f) => f.loisVerdict), run.finalists.map((f) => f.loisVerdict),
-  'determinism: the verdicts reproduce with the bakes');
+assert.deepStrictEqual(
+  runAgain.finalists.map((f) => f.sample.index),
+  run.finalists.map((f) => f.sample.index),
+  'determinism: the aimed run reproduces its finalists',
+);
+assert.deepStrictEqual(
+  runAgain.finalists.map((f) => f.loisVerdict),
+  run.finalists.map((f) => f.loisVerdict),
+  'determinism: the verdicts reproduce with the bakes',
+);
 
 // ── the Queen's evidence ────────────────────────────────────────────
 const keepLayout = {
-  mode: 'grid', count: 100, scale: [1, 1.5], rotate: [0, 90], alpha: [60, 90],
-  jitter: 10, density: 80, zTiers: 3, noiseFreq: 0.005, noiseSpeed: 0.5,
-  displacement: 20, particleCount: 100, swarmCohesion: 1, gravityWells: 1,
-  damping: 0.95, wind: 0.5, flap: 0.3, breath: 0.3, lifeDrift: 0.4,
+  mode: 'grid',
+  count: 100,
+  scale: [1, 1.5],
+  rotate: [0, 90],
+  alpha: [60, 90],
+  jitter: 10,
+  density: 80,
+  zTiers: 3,
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
+  displacement: 20,
+  particleCount: 100,
+  swarmCohesion: 1,
+  gravityWells: 1,
+  damping: 0.95,
+  wind: 0.5,
+  flap: 0.3,
+  breath: 0.3,
+  lifeDrift: 0.4,
 };
 const KEEPS8 = Array.from({ length: MIN_KEEPS }, (_, i) => ({
   seed: 100 + i,
@@ -175,10 +238,18 @@ const ev = queenEvidence(KEEPS8, [
   { layoutParams: { ...keepLayout }, corner: 'haeckel', index: 0 },
   {
     layoutParams: {
-      ...keepLayout, count: 590, density: 5, alpha: [5, 15], jitter: 95,
-      noiseSpeed: 2.0, displacement: 140, swarmCohesion: 3.9, gravityWells: 2.9,
+      ...keepLayout,
+      count: 590,
+      density: 5,
+      alpha: [5, 15],
+      jitter: 95,
+      noiseSpeed: 2.0,
+      displacement: 140,
+      swarmCohesion: 3.9,
+      gravityWells: 2.9,
     },
-    corner: 'reas', index: 1,
+    corner: 'reas',
+    index: 1,
   },
 ]);
 assert.strictEqual(ev.silent, false, 'with 8 keeps she weighs the pool');
@@ -199,10 +270,14 @@ const asSource = (r) => ({
 const TS = '2026-10-14T19:00:00.000Z';
 const crownRow = ledgerRow({ ...run.finalists[0].record, timestamp: TS }, 'selfcheck');
 const passRow = ledgerRow({ ...davisRun.finalists[0].record, timestamp: TS }, 'selfcheck');
-const handRow = ledgerRow({
-  seed: 7, timestamp: TS,
-  config: { layout: { mode: 'grid' }, palette: { id: 'hydra' }, assets: [] },
-}, 'selfcheck');
+const handRow = ledgerRow(
+  {
+    seed: 7,
+    timestamp: TS,
+    config: { layout: { mode: 'grid' }, palette: { id: 'hydra' }, assets: [] },
+  },
+  'selfcheck',
+);
 assert.ok(crownRow?.provenance, 'a crowned mined keep’s ledger row carries provenance (E3 wiring)');
 assert.ok(!handRow?.provenance, 'a hand keep carries no provenance — and must not accrue to a corner');
 
@@ -219,7 +294,8 @@ assert.strictEqual(byId.davis.crowns, 0, 'davis was passed, not crowned');
 assert.strictEqual(byId.haeckel.retire, false, 'a crowned corner is never flagged');
 assert.strictEqual(accrual.totals.crowns, 1, 'the hand keep did not leak into corner crowns');
 assert.strictEqual(
-  byId.haeckel.loisKeeps + byId.haeckel.loisPasses, 6,
+  byId.haeckel.loisKeeps + byId.haeckel.loisPasses,
+  6,
   'LOIS keeps/passes accrue from the run’s verdicts',
 );
 
@@ -237,11 +313,16 @@ const accrual2 = yieldAccrual({
 });
 const mohr = accrual2.corners.find((r) => r.corner === 'mohr');
 assert.strictEqual(mohr.retire, true, 'two runs of finalists, zero crowns: flagged for retirement');
-assert.strictEqual(accrual2.corners.find((r) => r.corner === 'reas').retire, false,
-  'a corner with no finalists is not flagged — no evidence, no flag');
+assert.strictEqual(
+  accrual2.corners.find((r) => r.corner === 'reas').retire,
+  false,
+  'a corner with no finalists is not flagged — no evidence, no flag',
+);
 const text = formatYieldReport(accrual2);
 assert.ok(text.includes('RETIREMENT FLAGS'), 'the report carries the flags section');
 assert.ok(text.includes('mohr'), 'the flag names the corner');
 assert.ok(text.includes('NOT widened'), 'the flag says what does not happen next');
 
-console.log('prospecting.selfcheck: OK (#1508 — centroid inside declared ranges ×10 profiles, Davis steers the stream, verdicts on records + ledger rows, the Queen weighs the mined pool, yield accrues and flags retirement)');
+console.log(
+  'prospecting.selfcheck: OK (#1508 — centroid inside declared ranges ×10 profiles, Davis steers the stream, verdicts on records + ledger rows, the Queen weighs the mined pool, yield accrues and flags retirement)',
+);

@@ -85,7 +85,8 @@ function shape(t) {
  */
 export function stressTakeEvidence(record) {
   const v = verifyStressRecord(record);
-  if (!record || record.version === undefined || !Array.isArray(record.runs)) return { ok: false, reason: 'no stress record' };
+  if (!record || record.version === undefined || !Array.isArray(record.runs))
+    return { ok: false, reason: 'no stress record' };
   const frames = expandStressRecord(record);
   if (!frames.length) return { ok: false, reason: 'empty or unreadable stress record' };
   const t = tally(frames);
@@ -99,7 +100,14 @@ export function stressTakeEvidence(record) {
 export function pooledStressEvidence(takes) {
   const good = (Array.isArray(takes) ? takes : []).filter((t) => t && t.ok && t._tally);
   const skipped = (Array.isArray(takes) ? takes.length : 0) - good.length;
-  const sum = { updates: 0, counts: { relax: 0, normal: 0, tighten: 0, none: 0 }, crossings: 0, nearRelax: 0, nearTighten: 0, stress: [] };
+  const sum = {
+    updates: 0,
+    counts: { relax: 0, normal: 0, tighten: 0, none: 0 },
+    crossings: 0,
+    nearRelax: 0,
+    nearTighten: 0,
+    stress: [],
+  };
   for (const t of good) {
     const r = t._tally;
     sum.updates += r.updates;
@@ -116,13 +124,31 @@ export function pooledStressEvidence(takes) {
   const dominantShare = banded > 0 ? round(sum.counts[dominant] / banded) : 0;
   let verdict;
   if (good.length < MIN_SESSIONS) {
-    verdict = { kind: 'insufficient', text: `${good.length} of ${MIN_SESSIONS} sessions — not enough evidence to touch the edges yet` };
+    verdict = {
+      kind: 'insufficient',
+      text: `${good.length} of ${MIN_SESSIONS} sessions — not enough evidence to touch the edges yet`,
+    };
   } else if (dominant && dominantShare >= SINGLE_BAND_SHARE) {
-    verdict = { kind: 'signal', text: `${dominant} holds ${(dominantShare * 100).toFixed(1)}% of banded time — the stress signal needs re-scoping before the edges are touched (#1635 kill criterion)` };
+    verdict = {
+      kind: 'signal',
+      text: `${dominant} holds ${(dominantShare * 100).toFixed(1)}% of banded time — the stress signal needs re-scoping before the edges are touched (#1635 kill criterion)`,
+    };
   } else {
-    verdict = { kind: 'tunable', text: `${good.length} sessions, no single band dominates — the edges can be tuned or kept from this evidence (a person decides; cite it)` };
+    verdict = {
+      kind: 'tunable',
+      text: `${good.length} sessions, no single band dominates — the edges can be tuned or kept from this evidence (a person decides; cite it)`,
+    };
   }
-  return { sessions: good.length, skipped, inconsistent, edges: { relax: RELAX_BELOW, tighten: TIGHTEN_ABOVE }, ...pooled, dominant, dominantShare, verdict };
+  return {
+    sessions: good.length,
+    skipped,
+    inconsistent,
+    edges: { relax: RELAX_BELOW, tighten: TIGHTEN_ABOVE },
+    ...pooled,
+    dominant,
+    dominantShare,
+    verdict,
+  };
 }
 
 const pct = (v) => `${(v * 100).toFixed(1)}%`;
@@ -138,11 +164,23 @@ export function stressEvidenceMarkdown(takes, names = []) {
   ];
   (takes || []).forEach((t, i) => {
     const name = names[i] || `take ${i + 1}`;
-    if (!t || !t.ok) { lines.push(`| ${name} | — | — | — | — | — | — | — | ${t ? t.reason : 'unreadable'} |`); return; }
-    lines.push(`| ${name} | ${t.minutes} | ${pct(t.occupancy.relax)} | ${pct(t.occupancy.normal)} | ${pct(t.occupancy.tighten)} | ${t.crossingsPerMinute} | ${t.stress.p50} | ${pct(t.nearEdge.relax)} / ${pct(t.nearEdge.tighten)} | ${t.consistent ? 'yes' : `NO (band change ${t.firstMismatch})`} |`);
+    if (!t || !t.ok) {
+      lines.push(`| ${name} | — | — | — | — | — | — | — | ${t ? t.reason : 'unreadable'} |`);
+      return;
+    }
+    lines.push(
+      `| ${name} | ${t.minutes} | ${pct(t.occupancy.relax)} | ${pct(t.occupancy.normal)} | ${pct(t.occupancy.tighten)} | ${t.crossingsPerMinute} | ${t.stress.p50} | ${pct(t.nearEdge.relax)} / ${pct(t.nearEdge.tighten)} | ${t.consistent ? 'yes' : `NO (band change ${t.firstMismatch})`} |`,
+    );
   });
-  lines.push(`| **all** | ${pooled.minutes} | ${pct(pooled.occupancy.relax)} | ${pct(pooled.occupancy.normal)} | ${pct(pooled.occupancy.tighten)} | ${pooled.crossingsPerMinute} | ${pooled.stress.p50} | ${pct(pooled.nearEdge.relax)} / ${pct(pooled.nearEdge.tighten)} | ${pooled.inconsistent ? `${pooled.inconsistent} inconsistent` : 'yes'} |`);
+  lines.push(
+    `| **all** | ${pooled.minutes} | ${pct(pooled.occupancy.relax)} | ${pct(pooled.occupancy.normal)} | ${pct(pooled.occupancy.tighten)} | ${pooled.crossingsPerMinute} | ${pooled.stress.p50} | ${pct(pooled.nearEdge.relax)} / ${pct(pooled.nearEdge.tighten)} | ${pooled.inconsistent ? `${pooled.inconsistent} inconsistent` : 'yes'} |`,
+  );
   const q = pooled.stress;
-  lines.push('', `Smoothed stress, pooled: p10 ${q.p10} · p25 ${q.p25} · p50 ${q.p50} · p75 ${q.p75} · p90 ${q.p90}`, '', `**Verdict:** ${pooled.verdict.text}`);
+  lines.push(
+    '',
+    `Smoothed stress, pooled: p10 ${q.p10} · p25 ${q.p25} · p50 ${q.p50} · p75 ${q.p75} · p90 ${q.p90}`,
+    '',
+    `**Verdict:** ${pooled.verdict.text}`,
+  );
   return lines.join('\n');
 }

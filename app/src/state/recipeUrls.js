@@ -75,9 +75,7 @@ function valuesEqual(a, b) {
   if (Object.is(a, b)) return true;
   if (typeof a !== typeof b) return false;
   if (Array.isArray(a) || Array.isArray(b)) {
-    return Array.isArray(a) && Array.isArray(b)
-      && a.length === b.length
-      && a.every((v, i) => valuesEqual(v, b[i]));
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((v, i) => valuesEqual(v, b[i]));
   }
   if (isPlainObject(a) && isPlainObject(b)) {
     const ka = Object.keys(a);
@@ -153,9 +151,9 @@ export function describePaletteFallback(paletteId, userPalettes) {
  * carry the identical field set, so favorite-as-link is this one function.
  */
 export function encodeRecipeUrl(fields) {
-  const f = (fields && typeof fields === 'object') ? fields : {};
+  const f = fields && typeof fields === 'object' ? fields : {};
   const stack = f.stack && typeof f.stack === 'object' ? f.stack : null;
-  const payload = { v: stack ? 2 : 1, s: (f.seed >>> 0) };
+  const payload = { v: stack ? 2 : 1, s: f.seed >>> 0 };
 
   const offsets = readSeedOffsets({ seedOffsets: f.seedOffsets });
   const o = {};
@@ -167,7 +165,7 @@ export function encodeRecipeUrl(fields) {
   if (typeof f.paletteId === 'string' && f.paletteId) payload.p = f.paletteId;
   if (f.paletteOverrides !== undefined && f.paletteOverrides !== null) payload.po = f.paletteOverrides;
 
-  const layout = (f.layoutParams && typeof f.layoutParams === 'object') ? f.layoutParams : {};
+  const layout = f.layoutParams && typeof f.layoutParams === 'object' ? f.layoutParams : {};
   const l = {};
   const keys = new Set([...Object.keys(DEFAULT_LAYOUT_PARAMS), ...Object.keys(layout)]);
   for (const key of keys) {
@@ -176,7 +174,8 @@ export function encodeRecipeUrl(fields) {
   // #1127 — ROTATE spin is always written, even at its default: a link that lacks it predates the field and means 0.
   // #1128: so are the two living-motion amounts (breath, drift): a link without them predates the floor.
   // #1151: palette-breath likewise.
-  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath']) l[k] = Number.isFinite(layout[k]) ? layout[k] : 0;
+  for (const k of ['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath'])
+    l[k] = Number.isFinite(layout[k]) ? layout[k] : 0;
   if (Object.keys(l).length) payload.l = l;
 
   if (stack) payload.k = stack;
@@ -211,7 +210,8 @@ export function decodeRecipeUrl(str) {
   if (json.v !== 1 && json.v !== 2) {
     return fail(`Unknown recipe link version "kc-r/${json.v}" — this build reads kc-r/1 and kc-r/2.`);
   }
-  if (json.v !== (t.startsWith(RECIPE_URL_PREFIX_2) ? 2 : 1)) return fail('Bad recipe link: its version does not match its payload. Starting from a clean scene.');
+  if (json.v !== (t.startsWith(RECIPE_URL_PREFIX_2) ? 2 : 1))
+    return fail('Bad recipe link: its version does not match its payload. Starting from a clean scene.');
   if (typeof json.s !== 'number' || !Number.isFinite(json.s)) {
     return fail('Bad recipe link: the seed is missing. Starting from a clean scene.');
   }
@@ -230,17 +230,26 @@ export function decodeRecipeUrl(str) {
   }
   let paletteId = null;
   if (json.p !== undefined && json.p !== null) {
-    if (typeof json.p !== 'string') return fail('Bad recipe link: the palette id is malformed. Starting from a clean scene.');
+    if (typeof json.p !== 'string')
+      return fail('Bad recipe link: the palette id is malformed. Starting from a clean scene.');
     paletteId = json.p || null;
   }
   let paletteOverrides = null;
   if (json.po !== undefined && json.po !== null) {
-    if (!isPlainObject(json.po)) return fail('Bad recipe link: the palette overrides are malformed. Starting from a clean scene.');
+    if (!isPlainObject(json.po))
+      return fail('Bad recipe link: the palette overrides are malformed. Starting from a clean scene.');
     paletteOverrides = json.po;
   }
-  let layoutParams = { ...DEFAULT_LAYOUT_PARAMS, rotateSpin: 0, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0 }; // #1127/#1128/#1151: absent in a link = it predates them
+  let layoutParams = {
+    ...DEFAULT_LAYOUT_PARAMS,
+    rotateSpin: 0,
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+  }; // #1127/#1128/#1151: absent in a link = it predates them
   if (json.l !== undefined) {
-    if (!isPlainObject(json.l)) return fail('Bad recipe link: the layout params are malformed. Starting from a clean scene.');
+    if (!isPlainObject(json.l))
+      return fail('Bad recipe link: the layout params are malformed. Starting from a clean scene.');
     layoutParams = { ...layoutParams, ...json.l };
   }
   let stack = null;

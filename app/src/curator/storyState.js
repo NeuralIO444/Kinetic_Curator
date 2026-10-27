@@ -21,11 +21,14 @@ export const MOOD_DECAY_PER_BAR = 0.995;
 /** The event → regard weights (08-Q1 default, flagged in the staging report). Mood points, ±100 scale. */
 export const STORY_WEIGHTS = Object.freeze({
   verdictEsteemPerDelta: 48, // a verdict moves the judge's regard by its delta (contract caps |delta| at 0.25 → ±12)
-  burnEsteem: -14,           // she burns a flat show: the strongest ordinary verdict
-  crownEsteem: 4, crownTrust: 3,
-  bloomEsteem: 6, bloomTrust: 5,
-  keepEsteem: 3, keepTrust: 6,
-  proposalTrust: -1,         // every proposal is a small exposure
+  burnEsteem: -14, // she burns a flat show: the strongest ordinary verdict
+  crownEsteem: 4,
+  crownTrust: 3,
+  bloomEsteem: 6,
+  bloomTrust: 5,
+  keepEsteem: 3,
+  keepTrust: 6,
+  proposalTrust: -1, // every proposal is a small exposure
 });
 /** A verdict at or below this delta is an offence (a cut, not a nudge); at or above its mirror, praise. */
 export const OFFENCE_DELTA = -0.1;
@@ -39,7 +42,14 @@ export const MISREAD_THRESHOLD = 12;
 
 // ── episodes (04 + research §1.7): callback → working → build → ONE peak → release ───────────────────────────
 export const INTENSITY_WEIGHTS = Object.freeze({
-  verdict: 0.25, crown: 0.2, bloom: 0.35, keep: 0.15, proposal: 0.1, route: 0.05, room: 0.15, promotion: 0.5,
+  verdict: 0.25,
+  crown: 0.2,
+  bloom: 0.35,
+  keep: 0.15,
+  proposal: 0.1,
+  route: 0.05,
+  room: 0.15,
+  promotion: 0.5,
 });
 export const INTENSITY_DECAY_PER_BAR = 0.99;
 export const BUILD_INTENSITY = 0.55;
@@ -97,13 +107,13 @@ export function createStoryBook() {
   return {
     sessions: 0,
     esteem: { mood: 0, standing: 0 }, // the judge's regard for the generator (directed; §1.6.2)
-    trust: { mood: 0, standing: 0 },  // the generator's trust in the judge (≠ the reverse)
+    trust: { mood: 0, standing: 0 }, // the generator's trust in the judge (≠ the reverse)
     believed: { davis: { esteem: 0, trust: 0 }, lois: { esteem: 0, trust: 0 } }, // each one's last taken-stock read
-    topics: {},   // topic -> { praise, blame }: the verdict history a grudge is about
-    grudges: [],  // { topic, count, promoted, lastFiredSession }: records, not moods (§1.6.4)
+    topics: {}, // topic -> { praise, blame }: the verdict history a grudge is about
+    grudges: [], // { topic, count, promoted, lastFiredSession }: records, not moods (§1.6.4)
     suspicion: { value: 0, lastIncrementSession: null, anomalySeq: 0, anomalies: [], pending: null }, // anomalies: { id, kind, session, bar, witness }; pending: an armed milestone { at, witness }
     lastLean: null, // { mood, sig }: the third's last recorded lean, for lean-shift verification
-    bags: {},     // kind -> [forms remaining]: the shuffle-bags' persistent seen flags (rule 1)
+    bags: {}, // kind -> [forms remaining]: the shuffle-bags' persistent seen flags (rule 1)
   };
 }
 
@@ -113,12 +123,18 @@ const num = (v, lo, hi) => (Number.isFinite(v) && v >= lo && v <= hi ? v : null)
 export function decodeStoryBook(raw) {
   const book = createStoryBook();
   let o;
-  try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return book; }
+  try {
+    o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return book;
+  }
   if (!o || o.v !== 1) return book;
   if (Number.isInteger(o.s) && o.s >= 0) book.sessions = o.s;
   const pair = (a) => (Array.isArray(a) && a.length === 2 ? [num(a[0], -100, 100), num(a[1], -100, 100)] : null);
-  const e = pair(o.e); if (e) book.esteem = { mood: e[0] ?? 0, standing: e[1] ?? 0 };
-  const t = pair(o.t); if (t) book.trust = { mood: t[0] ?? 0, standing: t[1] ?? 0 };
+  const e = pair(o.e);
+  if (e) book.esteem = { mood: e[0] ?? 0, standing: e[1] ?? 0 };
+  const t = pair(o.t);
+  if (t) book.trust = { mood: t[0] ?? 0, standing: t[1] ?? 0 };
   if (o.b && typeof o.b === 'object') {
     for (const p of ['davis', 'lois']) {
       const b = pair(o.b[p === 'davis' ? 'd' : 'l']);
@@ -128,7 +144,15 @@ export function decodeStoryBook(raw) {
   if (o.topics && typeof o.topics === 'object' && !Array.isArray(o.topics)) {
     for (const [k, v] of Object.entries(o.topics).slice(0, 24)) {
       const topic = topicOf(k);
-      if (topic && Array.isArray(v) && v.length === 2 && Number.isInteger(v[0]) && Number.isInteger(v[1]) && v[0] >= 0 && v[1] >= 0) {
+      if (
+        topic &&
+        Array.isArray(v) &&
+        v.length === 2 &&
+        Number.isInteger(v[0]) &&
+        Number.isInteger(v[1]) &&
+        v[0] >= 0 &&
+        v[1] >= 0
+      ) {
         book.topics[topic] = { praise: v[0], blame: v[1] };
       }
     }
@@ -137,7 +161,13 @@ export function decodeStoryBook(raw) {
     for (const g of o.g.slice(0, 12)) {
       if (!Array.isArray(g) || g.length !== 4) continue;
       const topic = topicOf(g[0]);
-      if (topic && Number.isInteger(g[1]) && g[1] > 0 && (g[2] === 0 || g[2] === 1) && (g[3] === null || Number.isInteger(g[3]))) {
+      if (
+        topic &&
+        Number.isInteger(g[1]) &&
+        g[1] > 0 &&
+        (g[2] === 0 || g[2] === 1) &&
+        (g[3] === null || Number.isInteger(g[3]))
+      ) {
         book.grudges.push({ topic, count: g[1], promoted: g[2] === 1, lastFiredSession: g[3] });
       }
     }
@@ -149,13 +179,31 @@ export function decodeStoryBook(raw) {
     if (Number.isInteger(o.sus.n) && o.sus.n >= 0) book.suspicion.anomalySeq = o.sus.n;
     if (Array.isArray(o.sus.a)) {
       for (const a of o.sus.a.slice(-40)) {
-        if (Array.isArray(a) && a.length === 5 && Number.isInteger(a[0]) && (a[1] === 'f' || a[1] === 'l')
-          && Number.isInteger(a[2]) && Number.isInteger(a[3]) && (a[4] === 'd' || a[4] === 'l')) {
-          book.suspicion.anomalies.push({ id: a[0], kind: a[1] === 'f' ? 'flip' : 'lean', session: a[2], bar: a[3], witness: a[4] === 'd' ? 'davis' : 'lois' });
+        if (
+          Array.isArray(a) &&
+          a.length === 5 &&
+          Number.isInteger(a[0]) &&
+          (a[1] === 'f' || a[1] === 'l') &&
+          Number.isInteger(a[2]) &&
+          Number.isInteger(a[3]) &&
+          (a[4] === 'd' || a[4] === 'l')
+        ) {
+          book.suspicion.anomalies.push({
+            id: a[0],
+            kind: a[1] === 'f' ? 'flip' : 'lean',
+            session: a[2],
+            bar: a[3],
+            witness: a[4] === 'd' ? 'davis' : 'lois',
+          });
         }
       }
     }
-    if (Array.isArray(o.sus.p) && o.sus.p.length === 2 && SUSPICION_MILESTONES.includes(o.sus.p[0]) && (o.sus.p[1] === 'd' || o.sus.p[1] === 'l')) {
+    if (
+      Array.isArray(o.sus.p) &&
+      o.sus.p.length === 2 &&
+      SUSPICION_MILESTONES.includes(o.sus.p[0]) &&
+      (o.sus.p[1] === 'd' || o.sus.p[1] === 'l')
+    ) {
       book.suspicion.pending = { at: o.sus.p[0], witness: o.sus.p[1] === 'd' ? 'davis' : 'lois' };
     }
   }
@@ -177,14 +225,30 @@ export function decodeStoryBook(raw) {
 export function encodeStoryBook(book) {
   const pair = (s) => [Math.round(s.mood * 100) / 100, Math.round(s.standing * 100) / 100];
   return JSON.stringify({
-    v: 1, s: book.sessions, e: pair(book.esteem), t: pair(book.trust),
-    b: { d: [book.believed.davis.esteem, book.believed.davis.trust], l: [book.believed.lois.esteem, book.believed.lois.trust] },
+    v: 1,
+    s: book.sessions,
+    e: pair(book.esteem),
+    t: pair(book.trust),
+    b: {
+      d: [book.believed.davis.esteem, book.believed.davis.trust],
+      l: [book.believed.lois.esteem, book.believed.lois.trust],
+    },
     topics: Object.fromEntries(Object.entries(book.topics).map(([k, v]) => [k, [v.praise, v.blame]])),
     g: book.grudges.map((g) => [g.topic, g.count, g.promoted ? 1 : 0, g.lastFiredSession]),
     sus: {
-      v: Math.round(book.suspicion.value * 100) / 100, l: book.suspicion.lastIncrementSession, n: book.suspicion.anomalySeq,
-      a: book.suspicion.anomalies.map((a) => [a.id, a.kind === 'flip' ? 'f' : 'l', a.session, a.bar, a.witness === 'davis' ? 'd' : 'l']),
-      p: book.suspicion.pending ? [book.suspicion.pending.at, book.suspicion.pending.witness === 'davis' ? 'd' : 'l'] : null,
+      v: Math.round(book.suspicion.value * 100) / 100,
+      l: book.suspicion.lastIncrementSession,
+      n: book.suspicion.anomalySeq,
+      a: book.suspicion.anomalies.map((a) => [
+        a.id,
+        a.kind === 'flip' ? 'f' : 'l',
+        a.session,
+        a.bar,
+        a.witness === 'davis' ? 'd' : 'l',
+      ]),
+      p: book.suspicion.pending
+        ? [book.suspicion.pending.at, book.suspicion.pending.witness === 'davis' ? 'd' : 'l']
+        : null,
     },
     ll: book.lastLean ? { m: book.lastLean.mood, s: book.lastLean.sig } : null,
     bags: book.bags,
@@ -199,11 +263,29 @@ export function encodeStoryBook(book) {
  */
 export function createEpisode(book, ledgerPatterns = []) {
   const ep = {
-    session: book.sessions, phase: 'callback', phaseEpoch: 0, bar: 0, intensity: 0,
-    peakFired: false, callbackFired: false, storyBeats: 0,
-    patterns: [], topicCool: {}, phaseMoves: new Set(), lastBeatBar: -Infinity, lastNoteBar: -Infinity,
-    lastActor: null, lastVerdict: null, verdictRun: null, lastWorkSeq: -1, seq: 0,
-    lastVerdictByTopic: {}, freshVerdict: null, misread: null, truce: null, lastRoomVerdict: null,
+    session: book.sessions,
+    phase: 'callback',
+    phaseEpoch: 0,
+    bar: 0,
+    intensity: 0,
+    peakFired: false,
+    callbackFired: false,
+    storyBeats: 0,
+    patterns: [],
+    topicCool: {},
+    phaseMoves: new Set(),
+    lastBeatBar: -Infinity,
+    lastNoteBar: -Infinity,
+    lastActor: null,
+    lastVerdict: null,
+    verdictRun: null,
+    lastWorkSeq: -1,
+    seq: 0,
+    lastVerdictByTopic: {},
+    freshVerdict: null,
+    misread: null,
+    truce: null,
+    lastRoomVerdict: null,
   };
   for (const p of Array.isArray(ledgerPatterns) ? ledgerPatterns : []) {
     if (p && typeof p.kind === 'string') ep.patterns.push({ ...p, fresh: true });
@@ -214,13 +296,22 @@ export function createEpisode(book, ledgerPatterns = []) {
   return ep;
 }
 
-const setPhase = (ep, phase) => { if (ep.phase !== phase) { ep.phase = phase; ep.phaseEpoch++; ep.phaseMoves = new Set(); } };
+const setPhase = (ep, phase) => {
+  if (ep.phase !== phase) {
+    ep.phase = phase;
+    ep.phaseEpoch++;
+    ep.phaseMoves = new Set();
+  }
+};
 
 const sift = (ep, pattern) => {
   const key = (p) => `${p.kind}|${p.topic || ''}|${p.seed ?? ''}`;
   const old = ep.patterns.find((p) => key(p) === key(pattern));
   if (old) Object.assign(old, pattern, { fresh: true });
-  else { ep.patterns.push({ ...pattern, fresh: true }); if (ep.patterns.length > 8) ep.patterns.splice(0, ep.patterns.length - 8); }
+  else {
+    ep.patterns.push({ ...pattern, fresh: true });
+    if (ep.patterns.length > 8) ep.patterns.splice(0, ep.patterns.length - 8);
+  }
   if (ep.phase === 'working') setPhase(ep, 'build'); // a sifted pattern is the build knocking (§1.7)
 };
 
@@ -246,7 +337,7 @@ function noteAnomaly(book, ep, kind, witness, bar) {
   // rationed in sessions: an increment lands at most once per SUSPICION_SESSION_GAP sessions
   if (s.lastIncrementSession !== null && book.sessions - s.lastIncrementSession < SUSPICION_SESSION_GAP) return anomaly;
   const before = s.value;
-  s.value = Math.min(SUSPICION_CAP, s.value + SUSPICION_STEP * (SUSPICION_CAP - s.value) / SUSPICION_CAP);
+  s.value = Math.min(SUSPICION_CAP, s.value + (SUSPICION_STEP * (SUSPICION_CAP - s.value)) / SUSPICION_CAP);
   s.lastIncrementSession = book.sessions;
   // a crossed milestone arms its beat for the persona who holds this anomaly's evidence — in the BOOK, not the
   // episode: if it cannot fire this session (the peak is spent, the tier is not earned) it stays armed (§1.8.6)
@@ -275,7 +366,9 @@ export function applyStoryEvent(book, ep, ev) {
     scalar.mood = clamp100(scalar.mood + moodPts);
     scalar.standing = clamp100(scalar.standing + STORY_ALPHA * moodPts);
   };
-  const takeStock = (p) => { book.believed[p] = { esteem: book.esteem.standing, trust: book.trust.standing }; };
+  const takeStock = (p) => {
+    book.believed[p] = { esteem: book.esteem.standing, trust: book.trust.standing };
+  };
   // belief ≠ truth, caught in the act: a persona who moves while their last taken-stock read is far from the
   // true standing has acted on a misread — noted BEFORE their stock refreshes, or the moment erases itself
   const misreadCheck = (p) => {
@@ -283,11 +376,14 @@ export function applyStoryEvent(book, ep, ev) {
     const gap = Math.max(Math.abs(b.esteem - book.esteem.standing), Math.abs(b.trust - book.trust.standing));
     if (gap >= MISREAD_THRESHOLD) ep.misread = { persona: p, gap };
   };
-  const heat = (kind) => { ep.intensity = clamp(ep.intensity + (INTENSITY_WEIGHTS[kind] || 0), 0, 1); };
+  const heat = (kind) => {
+    ep.intensity = clamp(ep.intensity + (INTENSITY_WEIGHTS[kind] || 0), 0, 1);
+  };
 
   switch (ev.kind) {
     case 'proposal': {
-      ep.lastActor = 'davis'; ep.lastWorkSeq = ep.seq;
+      ep.lastActor = 'davis';
+      ep.lastWorkSeq = ep.seq;
       misreadCheck('davis');
       bump(book.trust, STORY_WEIGHTS.proposalTrust);
       takeStock('davis');
@@ -295,7 +391,10 @@ export function applyStoryEvent(book, ep, ev) {
       if (ep.phase === 'callback') setPhase(ep, 'working');
       break;
     }
-    case 'route': { heat('route'); break; }
+    case 'route': {
+      heat('route');
+      break;
+    }
     case 'verdict': {
       const topic = topicOf(ev.topic) || 'show';
       const delta = clamp(Number(ev.delta) || 0, -0.25, 0.25);
@@ -306,11 +405,15 @@ export function applyStoryEvent(book, ep, ev) {
       heat('verdict');
       ep.freshVerdict = { topic, delta, bar: ep.bar };
       const t = (book.topics[topic] ||= { praise: 0, blame: 0 });
-      if (delta >= PRAISE_DELTA) t.praise++; else if (delta <= OFFENCE_DELTA) t.blame++;
+      if (delta >= PRAISE_DELTA) t.praise++;
+      else if (delta <= OFFENCE_DELTA) t.blame++;
       // grudges are records: an offence on a topic counts; praise on the same topic is its forgiveness condition
       if (delta <= OFFENCE_DELTA) {
         let g = book.grudges.find((x) => x.topic === topic);
-        if (!g) { g = { topic, count: 0, promoted: false, lastFiredSession: null }; book.grudges.push(g); }
+        if (!g) {
+          g = { topic, count: 0, promoted: false, lastFiredSession: null };
+          book.grudges.push(g);
+        }
         g.count++;
         if (g.count >= GRUDGE_PROMOTE_AT && !g.promoted) {
           g.promoted = true;
@@ -336,9 +439,11 @@ export function applyStoryEvent(book, ep, ev) {
       }
       ep.lastVerdictByTopic[topic] = { delta, seq: ep.seq };
       if (delta !== 0) {
-        if (ep.verdictRun && ep.verdictRun.topic === topic && Math.sign(ep.verdictRun.delta) === Math.sign(delta)) ep.verdictRun.count++;
+        if (ep.verdictRun && ep.verdictRun.topic === topic && Math.sign(ep.verdictRun.delta) === Math.sign(delta))
+          ep.verdictRun.count++;
         else ep.verdictRun = { topic, delta, count: 1 };
-        if (ep.verdictRun.count >= 3) sift(ep, { kind: 'streak', topic, count: ep.verdictRun.count, sign: Math.sign(delta) });
+        if (ep.verdictRun.count >= 3)
+          sift(ep, { kind: 'streak', topic, count: ep.verdictRun.count, sign: Math.sign(delta) });
       }
       ep.lastVerdict = { topic, delta };
       if (ep.phase === 'callback') setPhase(ep, 'working');
@@ -346,21 +451,24 @@ export function applyStoryEvent(book, ep, ev) {
     }
     case 'crown': {
       ep.lastWorkSeq = ep.seq;
-      bump(book.esteem, STORY_WEIGHTS.crownEsteem); bump(book.trust, STORY_WEIGHTS.crownTrust);
+      bump(book.esteem, STORY_WEIGHTS.crownEsteem);
+      bump(book.trust, STORY_WEIGHTS.crownTrust);
       heat('crown');
       if (ep.phase === 'callback') setPhase(ep, 'working');
       break;
     }
     case 'bloom': {
       ep.lastWorkSeq = ep.seq;
-      bump(book.esteem, STORY_WEIGHTS.bloomEsteem); bump(book.trust, STORY_WEIGHTS.bloomTrust);
+      bump(book.esteem, STORY_WEIGHTS.bloomEsteem);
+      bump(book.trust, STORY_WEIGHTS.bloomTrust);
       heat('bloom');
       if (ep.phase === 'callback') setPhase(ep, 'working');
       break;
     }
     case 'keep': {
       ep.lastWorkSeq = ep.seq;
-      bump(book.esteem, STORY_WEIGHTS.keepEsteem); bump(book.trust, STORY_WEIGHTS.keepTrust);
+      bump(book.esteem, STORY_WEIGHTS.keepEsteem);
+      bump(book.trust, STORY_WEIGHTS.keepTrust);
       heat('keep');
       break;
     }
@@ -385,7 +493,8 @@ export function applyStoryEvent(book, ep, ev) {
       }
       break;
     }
-    default: break;
+    default:
+      break;
   }
   // a warmth crossing arms a truce (checked after every standing move)
   if (!ep.truce) {
@@ -402,7 +511,10 @@ function drawForm(book, kind, roll, fits) {
   let bag = book.bags[kind];
   if (!Array.isArray(bag) || !bag.length) {
     bag = forms.slice();
-    for (let i = bag.length - 1; i > 0; i--) { const j = Math.floor(roll() * (i + 1)); [bag[i], bag[j]] = [bag[j], bag[i]]; }
+    for (let i = bag.length - 1; i > 0; i--) {
+      const j = Math.floor(roll() * (i + 1));
+      [bag[i], bag[j]] = [bag[j], bag[i]];
+    }
     book.bags[kind] = bag;
   }
   for (let i = bag.length - 1; i >= 0; i--) {
@@ -415,7 +527,8 @@ function drawForm(book, kind, roll, fits) {
   return null;
 }
 
-const freshPattern = (ep, kind, topic) => ep.patterns.find((p) => p.fresh && p.kind === kind && (topic === undefined || p.topic === topic));
+const freshPattern = (ep, kind, topic) =>
+  ep.patterns.find((p) => p.fresh && p.kind === kind && (topic === undefined || p.topic === topic));
 
 /**
  * Choose the next beat, or null (silence — rule 8). Consumes what it fires: patterns go stale, bags draw down,
@@ -431,7 +544,10 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
     ep.lastBeatBar = ep.bar;
     ep.phaseMoves.add(beat.kind);
     if (beat.topic) ep.topicCool[beat.topic] = ep.bar + TOPIC_COOLDOWN_BARS;
-    if (beat.cls === 'peak') { ep.peakFired = true; setPhase(ep, 'peak'); }
+    if (beat.cls === 'peak') {
+      ep.peakFired = true;
+      setPhase(ep, 'peak');
+    }
     return beat;
   };
   const topicCool = (topic) => topic && ep.topicCool[topic] > ep.bar;
@@ -442,7 +558,14 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
     const promo = freshPattern(ep, 'promotion');
     if (promo && moveFree('promotion')) {
       promo.fresh = false;
-      return fire({ ...base, kind: 'promotion', cls: 'peak', persona: 'lois', topic: promo.topic, referent: { topic: promo.topic } });
+      return fire({
+        ...base,
+        kind: 'promotion',
+        cls: 'peak',
+        persona: 'lois',
+        topic: promo.topic,
+        referent: { topic: promo.topic },
+      });
     }
     // a milestone loses the priority contest to a genuine peak (promotion, above) — §1.8.6
     const ms = book.suspicion.pending;
@@ -452,8 +575,14 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
       const floor = Math.max(0, ...SUSPICION_MILESTONES.filter((m) => m < ms.at));
       book.suspicion.value = Math.max(book.suspicion.value - MILESTONE_TALKDOWN, floor);
       return fire({
-        ...base, kind: 'milestone', cls: 'peak', persona: ms.witness, form: MILESTONE_FORMS[ms.at], milestone: ms.at,
-        mundaneExit: true, referent: { evidence: evidenceOf(book, ms.witness).slice(-3) },
+        ...base,
+        kind: 'milestone',
+        cls: 'peak',
+        persona: ms.witness,
+        form: MILESTONE_FORMS[ms.at],
+        milestone: ms.at,
+        mundaneExit: true,
+        referent: { evidence: evidenceOf(book, ms.witness).slice(-3) },
       });
     }
   }
@@ -463,18 +592,36 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
     if (ep.phase === 'callback' && !ep.callbackFired) {
       const streak = ep.patterns.find((p) => p.fresh && p.kind === 'streak' && p.paletteId);
       if (streak) {
-        streak.fresh = false; ep.callbackFired = true;
-        return fire({ ...base, kind: 'callback', cls: 'story', form: 'streak', persona: 'lois', referent: { paletteId: streak.paletteId, count: streak.count || 3 } });
+        streak.fresh = false;
+        ep.callbackFired = true;
+        return fire({
+          ...base,
+          kind: 'callback',
+          cls: 'story',
+          form: 'streak',
+          persona: 'lois',
+          referent: { paletteId: streak.paletteId, count: streak.count || 3 },
+        });
       }
       const form = drawForm(book, 'callback', roll, (f) => !!freshPattern(ep, f));
       if (form) {
         const p = freshPattern(ep, form);
         if (p) {
-          p.fresh = false; ep.callbackFired = true;
+          p.fresh = false;
+          ep.callbackFired = true;
           return fire({
-            ...base, kind: 'callback', cls: 'story', form, persona: form === 'grudge' ? 'lois' : 'davis',
+            ...base,
+            kind: 'callback',
+            cls: 'story',
+            form,
+            persona: form === 'grudge' ? 'lois' : 'davis',
             ...(p.topic ? { topic: p.topic } : {}),
-            referent: { ...(p.seed !== undefined ? { seed: p.seed } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), ...(p.topic ? { topic: p.topic } : {}), ...(p.loreId ? { loreId: p.loreId } : {}) },
+            referent: {
+              ...(p.seed !== undefined ? { seed: p.seed } : {}),
+              ...(p.paletteId ? { paletteId: p.paletteId } : {}),
+              ...(p.topic ? { topic: p.topic } : {}),
+              ...(p.loreId ? { loreId: p.loreId } : {}),
+            },
           });
         }
       }
@@ -482,41 +629,114 @@ export function selectStoryBeat(book, ep, { tiers = {}, roll = () => 0.5 } = {})
     if (moveFree('grudge')) {
       const p = freshPattern(ep, 'grudge');
       const g = p && book.grudges.find((x) => x.topic === p.topic && x.promoted);
-      if (p && g && !p.opening && (g.lastFiredSession === null || ep.session - g.lastFiredSession >= 1) && !topicCool(p.topic)) {
+      if (
+        p &&
+        g &&
+        !p.opening &&
+        (g.lastFiredSession === null || ep.session - g.lastFiredSession >= 1) &&
+        !topicCool(p.topic)
+      ) {
         const form = drawForm(book, 'grudge', roll);
-        if (form) { p.fresh = false; g.lastFiredSession = ep.session; return fire({ ...base, kind: 'grudge', cls: 'story', form, persona: 'lois', topic: p.topic, referent: { topic: p.topic, count: g.count } }); }
+        if (form) {
+          p.fresh = false;
+          g.lastFiredSession = ep.session;
+          return fire({
+            ...base,
+            kind: 'grudge',
+            cls: 'story',
+            form,
+            persona: 'lois',
+            topic: p.topic,
+            referent: { topic: p.topic, count: g.count },
+          });
+        }
       }
     }
     if (moveFree('streak')) {
       const p = freshPattern(ep, 'streak');
       if (p && p.topic && !topicCool(p.topic)) {
         const form = drawForm(book, 'streak', roll);
-        if (form) { p.fresh = false; return fire({ ...base, kind: 'streak', cls: 'story', form, persona: 'lois', topic: p.topic, referent: { topic: p.topic, count: p.count || 3 } }); }
+        if (form) {
+          p.fresh = false;
+          return fire({
+            ...base,
+            kind: 'streak',
+            cls: 'story',
+            form,
+            persona: 'lois',
+            topic: p.topic,
+            referent: { topic: p.topic, count: p.count || 3 },
+          });
+        }
       }
     }
     if (moveFree('reversal')) {
       const p = freshPattern(ep, 'reversal');
       if (p && p.topic && !topicCool(p.topic)) {
         const form = drawForm(book, 'reversal', roll);
-        if (form) { p.fresh = false; return fire({ ...base, kind: 'reversal', cls: 'story', form, persona: 'davis', topic: p.topic, referent: { topic: p.topic } }); }
+        if (form) {
+          p.fresh = false;
+          return fire({
+            ...base,
+            kind: 'reversal',
+            cls: 'story',
+            form,
+            persona: 'davis',
+            topic: p.topic,
+            referent: { topic: p.topic },
+          });
+        }
       }
     }
     if (moveFree('misread') && ep.misread) {
       const form = drawForm(book, 'misread', roll);
-      if (form) { const m = ep.misread; ep.misread = null; return fire({ ...base, kind: 'misread', cls: 'story', form, persona: m.persona, referent: { gap: Math.round(m.gap) } }); }
+      if (form) {
+        const m = ep.misread;
+        ep.misread = null;
+        return fire({
+          ...base,
+          kind: 'misread',
+          cls: 'story',
+          form,
+          persona: m.persona,
+          referent: { gap: Math.round(m.gap) },
+        });
+      }
     }
   }
   if (budgeted && ep.truce && moveFree('truce')) {
-    const truce = ep.truce; ep.truce = null;
-    return fire({ ...base, kind: 'truce', cls: 'story', persona: truce.scalar === 'esteem' ? 'lois' : 'davis', referent: { scalar: truce.scalar } });
+    const truce = ep.truce;
+    ep.truce = null;
+    return fire({
+      ...base,
+      kind: 'truce',
+      cls: 'story',
+      persona: truce.scalar === 'esteem' ? 'lois' : 'davis',
+      referent: { scalar: truce.scalar },
+    });
   }
 
   // ── bed class: the functional floor (rule 6 — exempt from bags and the budget, not from manners) ──
-  if (ep.freshVerdict && (ep.phase === 'working' || ep.phase === 'build' || ep.phase === 'release')
-    && ep.bar - ep.lastNoteBar >= NOTE_COOLDOWN_BARS) {
+  if (
+    ep.freshVerdict &&
+    (ep.phase === 'working' || ep.phase === 'build' || ep.phase === 'release') &&
+    ep.bar - ep.lastNoteBar >= NOTE_COOLDOWN_BARS
+  ) {
     const form = drawForm(book, 'note', roll) || 'plain'; // rule 6: the floor is never gated out of existence
-    { const v = ep.freshVerdict; ep.freshVerdict = null; ep.lastNoteBar = ep.bar;
-      return fire({ ...base, kind: 'note', cls: 'bed', form, persona: 'lois', topic: v.topic, referent: { topic: v.topic, delta: v.delta } }); }
+    {
+      const v = ep.freshVerdict;
+      ep.freshVerdict = null;
+      ep.lastNoteBar = ep.bar;
+      return fire({
+        ...base,
+        kind: 'note',
+        cls: 'bed',
+        form,
+        persona: 'lois',
+        topic: v.topic,
+        referent: { topic: v.topic, delta: v.delta },
+      });
+    }
   }
   return null;
 }
@@ -533,7 +753,8 @@ export function storyEventFromRecord(event, p, bar = 0) {
     if (!p || typeof p !== 'object') return null;
     const r = p.reply || {};
     if (p.persona === 'davis') {
-      if (r.propose && typeof r.propose.assetId === 'string') return { kind: 'proposal', assetId: r.propose.assetId, bar: at };
+      if (r.propose && typeof r.propose.assetId === 'string')
+        return { kind: 'proposal', assetId: r.propose.assetId, bar: at };
       if (r.route) return { kind: 'route', bar: at };
       return null;
     }
@@ -541,7 +762,8 @@ export function storyEventFromRecord(event, p, bar = 0) {
       if (r.critique && typeof r.critique.target === 'string' && Number.isFinite(r.critique.delta)) {
         return { kind: 'verdict', topic: r.critique.target, delta: r.critique.delta, bar: at };
       }
-      if (r.state && r.state.id === 'BURN') return { kind: 'verdict', topic: 'show', delta: -0.25, burn: true, bar: at };
+      if (r.state && r.state.id === 'BURN')
+        return { kind: 'verdict', topic: 'show', delta: -0.25, burn: true, bar: at };
       return null;
     }
     // the third's decision: only her lean is story matter — her sway, on the record (never her name, never a line)
@@ -564,7 +786,8 @@ export function storyEventFromRecord(event, p, bar = 0) {
   if (event === Events.KEEP_ADD) {
     const keep = p && p.keep;
     if (!keep || !Number.isFinite(Number(keep.seed))) return null;
-    const paletteId = keep.config && keep.config.palette && typeof keep.config.palette.id === 'string' ? keep.config.palette.id : null;
+    const paletteId =
+      keep.config && keep.config.palette && typeof keep.config.palette.id === 'string' ? keep.config.palette.id : null;
     return { kind: 'keep', seed: Number(keep.seed) >>> 0, paletteId, bar };
   }
   if (event === Events.CLOCK_BAR) {
@@ -595,7 +818,13 @@ export function siftLedgers(keeps = [], passes = []) {
     }
   }
   for (const k of Array.isArray(keeps) ? keeps : []) {
-    if (k && Number.isInteger(k.seed) && typeof k.timestamp === 'string' && passedAt.has(k.seed) && passedAt.get(k.seed) < k.timestamp) {
+    if (
+      k &&
+      Number.isInteger(k.seed) &&
+      typeof k.timestamp === 'string' &&
+      passedAt.has(k.seed) &&
+      passedAt.get(k.seed) < k.timestamp
+    ) {
       out.push({ kind: 'debt', seed: k.seed });
       break; // one debt is a callback; a list is a spreadsheet
     }

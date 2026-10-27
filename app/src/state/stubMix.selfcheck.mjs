@@ -31,7 +31,12 @@ assert.strictEqual(mm('orbit').behave, 'orbit');
 
 // ── loadStubMode: opens a MIX, touches nothing until commit ──────────────
 const id = S().layoutParams.mode === 'grid' ? 'rails' : 'grid';
-const before = { params: { ...S().layoutParams }, paletteId: S().paletteId, overrides: S().paletteOverrides, assets: { ...S().enabledAssets } };
+const before = {
+  params: { ...S().layoutParams },
+  paletteId: S().paletteId,
+  overrides: S().paletteOverrides,
+  assets: { ...S().enabledAssets },
+};
 
 S().loadStubMode(id);
 const mix = S().voiceMix;
@@ -58,14 +63,20 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
 // ── loadMotion: the animation axis ───────────────────────────────────────
 {
   const pick = MOTION_MODES.find((m) => !isMotionActive(S().layoutParams, m));
-  const b = { mode: S().layoutParams.mode, composition: S().layoutParams.composition, paletteId: S().paletteId, assets: { ...S().enabledAssets } };
+  const b = {
+    mode: S().layoutParams.mode,
+    composition: S().layoutParams.composition,
+    paletteId: S().paletteId,
+    assets: { ...S().enabledAssets },
+  };
   S().loadMotion(pick.id);
   const mx = S().voiceMix;
   assert.ok(mx, 'a motion tap opens a MIX');
   assert.strictEqual(mx.to.params.mode, b.mode, 'motion chip leaves the layout mode alone');
   assert.strictEqual(mx.to.paletteId, null, 'motion chip leaves color alone');
   S().commitVoiceMix();
-  for (const [k, v] of Object.entries(pick.params)) assert.strictEqual(S().layoutParams[k], v, `${pick.id}.${k} landed`);
+  for (const [k, v] of Object.entries(pick.params))
+    assert.strictEqual(S().layoutParams[k], v, `${pick.id}.${k} landed`);
   assert.ok(isMotionActive(S().layoutParams, pick), 'the chip reads active after landing');
   assert.strictEqual(S().layoutParams.mode, b.mode);
   assert.strictEqual(S().layoutParams.composition, b.composition);
@@ -103,7 +114,10 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
   assert.strictEqual(SHAPE_SETS.length, 19, '4 flagship (#704 dark glass) + 15 layout-tile shape sets'); // #1196: +voronoi-cells
   for (const x of SHAPE_SETS) {
     assert.strictEqual(x.ids.length, 4, `${x.id}: exactly 4 shapes`);
-    assert.ok(x.ids.every((i) => known.has(i)), `${x.id}: all ids are real assets`);
+    assert.ok(
+      x.ids.every((i) => known.has(i)),
+      `${x.id}: all ids are real assets`,
+    );
   }
   const pick = SHAPE_SETS.find((x) => !isShapeSetActive(S().enabledAssets, x));
   const b = { params: { ...S().layoutParams }, paletteId: S().paletteId, assets: { ...S().enabledAssets } };

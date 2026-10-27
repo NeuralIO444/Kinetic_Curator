@@ -49,7 +49,7 @@ export function createPersonaScorer({ assetsById } = {}) {
     if (pairs) {
       const frac = same / pairs;
       s += frac >= 1 ? 0.05 : frac * 0.2; // all-same gets almost nothing
-      s += Math.min(0.1, sharedTags / pairs * 0.05);
+      s += Math.min(0.1, (sharedTags / pairs) * 0.05);
     }
     // Size sweet spot: 3–4 is a cast; 2 is a duet, 5 is a crowd.
     if (cast.length === 3 || cast.length === 4) s += 0.1;

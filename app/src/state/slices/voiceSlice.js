@@ -10,10 +10,7 @@
 // blend (see resolveLiveRenderState) until the driver commits the target.
 
 import { createGrid } from '../../engine/ca-engine.js';
-import {
-  DEFAULT_LAYOUT_PARAMS,
-  validateLayoutParams,
-} from '../../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from '../../data/layout-modes.js';
 import { normalizeHex } from '../../data/palettes.js';
 import {
   FLAGSHIP_VOICES,
@@ -45,20 +42,26 @@ export function sanitizeUserVoice(raw) {
   if (!raw || typeof raw !== 'object') return null;
   const id = typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 64) : null;
   if (!id) return null;
-  const name = typeof raw.name === 'string' && raw.name.trim()
-    ? raw.name.trim().slice(0, 24)
-    : 'VOICE';
+  const name = typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, 24) : 'VOICE';
   const st = raw.state && typeof raw.state === 'object' ? raw.state : null;
   if (!st) return null;
   const { params } = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, ...(st.params || {}) });
   const pal = st.palette && typeof st.palette === 'object' ? st.palette : {};
-  const assets = st.assets === 'all'
-    ? 'all'
-    : (st.assets && typeof st.assets === 'object'
-      ? Object.fromEntries(Object.entries(st.assets).filter(([, v]) => typeof v === 'boolean').slice(0, 400))
-      : 'all');
+  const assets =
+    st.assets === 'all'
+      ? 'all'
+      : st.assets && typeof st.assets === 'object'
+        ? Object.fromEntries(
+            Object.entries(st.assets)
+              .filter(([, v]) => typeof v === 'boolean')
+              .slice(0, 400),
+          )
+        : 'all';
   // #1153 — the layer stack an earned voice brings back: refused whole if it does not expand, and bounded in size
-  const stack = st.stack && JSON.stringify(st.stack).length < 60000 && expandStack(st.stack).ok ? JSON.parse(JSON.stringify(st.stack)) : null;
+  const stack =
+    st.stack && JSON.stringify(st.stack).length < 60000 && expandStack(st.stack).ok
+      ? JSON.parse(JSON.stringify(st.stack))
+      : null;
   const earned = sanitizeEarned(raw.earned);
   return {
     id,
@@ -109,7 +112,10 @@ function readStored() {
 
 function persist(list) {
   const ls = storage();
-  if (!ls) { noteSessionOnly(); return; } // #1641: no storage at all is still a refusal worth saying
+  if (!ls) {
+    noteSessionOnly();
+    return;
+  } // #1641: no storage at all is still a refusal worth saying
   try {
     ls.setItem(USER_VOICES_KEY, JSON.stringify(list));
   } catch {
@@ -164,155 +170,171 @@ export const createVoiceSlice = (set) => ({
    * driver commits when t reaches 1. Retargeting mid-mix re-snapshots from
    * the in-flight blend, so chains stay smooth.
    */
-  loadVoice: (voiceId) => set((state) => {
-    const def = findVoiceDef(voiceId, state.userVoices);
-    if (!def) return {};
-    if (state.activeVoiceId === voiceId && !state.voiceMix) return {};
-    const from = captureLiveVoiceState(state);
-    const to = resolveVoiceState(def);
-    const durationMs = Math.max(200, (to.blendSeconds || 2) * 1000);
-    return {
-      voiceMix: {
-        from,
-        to,
-        t: 0,
-        durationMs,
-        auto: true,
-        // #806: MIX dissolve is a must-loop performer — stamp in loop ms
-        // (useVoiceMixDriver reads loopClock.ms), never wall clock.
-        startedAt: loopClock.ms,
-        targetVoiceId: voiceId,
-        targetName: def.displayName || def.name || voiceId,
-      },
-      activeVoiceId: voiceId,
-    };
-  }),
+  loadVoice: (voiceId) =>
+    set((state) => {
+      const def = findVoiceDef(voiceId, state.userVoices);
+      if (!def) return {};
+      if (state.activeVoiceId === voiceId && !state.voiceMix) return {};
+      const from = captureLiveVoiceState(state);
+      const to = resolveVoiceState(def);
+      const durationMs = Math.max(200, (to.blendSeconds || 2) * 1000);
+      return {
+        voiceMix: {
+          from,
+          to,
+          t: 0,
+          durationMs,
+          auto: true,
+          // #806: MIX dissolve is a must-loop performer — stamp in loop ms
+          // (useVoiceMixDriver reads loopClock.ms), never wall clock.
+          startedAt: loopClock.ms,
+          targetVoiceId: voiceId,
+          targetName: def.displayName || def.name || voiceId,
+        },
+        activeVoiceId: voiceId,
+      };
+    }),
 
   /** Scrub the MIX position by hand — pauses the auto-advance. */
-  setVoiceMixT: (t) => set((state) => {
-    const mix = state.voiceMix;
-    if (!mix) return {};
-    const nt = Math.min(1, Math.max(0, Number(t) || 0));
-    if (Math.abs(nt - mix.t) < 0.001) return {};
-    return { voiceMix: { ...mix, t: nt, auto: false } };
-  }),
+  setVoiceMixT: (t) =>
+    set((state) => {
+      const mix = state.voiceMix;
+      if (!mix) return {};
+      const nt = Math.min(1, Math.max(0, Number(t) || 0));
+      if (Math.abs(nt - mix.t) < 0.001) return {};
+      return { voiceMix: { ...mix, t: nt, auto: false } };
+    }),
 
   /**
    * Driver tick — advances the MIX position without touching `auto`.
    * The driver calls this (not setVoiceMixT) so its own writes don't
    * pause the auto-advance it is driving.
    */
-  advanceVoiceMix: (t) => set((state) => {
-    const mix = state.voiceMix;
-    if (!mix) return {};
-    const nt = Math.min(1, Math.max(0, Number(t) || 0));
-    if (Math.abs(nt - mix.t) < 0.001) return {};
-    return { voiceMix: { ...mix, t: nt } };
-  }),
+  advanceVoiceMix: (t) =>
+    set((state) => {
+      const mix = state.voiceMix;
+      if (!mix) return {};
+      const nt = Math.min(1, Math.max(0, Number(t) || 0));
+      if (Math.abs(nt - mix.t) < 0.001) return {};
+      return { voiceMix: { ...mix, t: nt } };
+    }),
 
   /** Resume the auto-advance from the scrubbed position. */
-  resumeVoiceMix: () => set((state) => {
-    const mix = state.voiceMix;
-    if (!mix || mix.auto) return {};
-    return {
-      // #806: MIX dissolve is a must-loop performer — re-anchor in loop ms,
-      // preserving the scrubbed position, never wall clock.
-      voiceMix: { ...mix, auto: true, startedAt: loopClock.ms - mix.t * mix.durationMs },
-    };
-  }),
+  resumeVoiceMix: () =>
+    set((state) => {
+      const mix = state.voiceMix;
+      if (!mix || mix.auto) return {};
+      return {
+        // #806: MIX dissolve is a must-loop performer — re-anchor in loop ms,
+        // preserving the scrubbed position, never wall clock.
+        voiceMix: { ...mix, auto: true, startedAt: loopClock.ms - mix.t * mix.durationMs },
+      };
+    }),
 
   /** Bail out of a mix — the committed state is untouched. */
-  cancelVoiceMix: () => set((state) => {
-    if (!state.voiceMix) return {};
-    return { voiceMix: null, activeVoiceId: null };
-  }),
+  cancelVoiceMix: () =>
+    set((state) => {
+      if (!state.voiceMix) return {};
+      return { voiceMix: null, activeVoiceId: null };
+    }),
 
   /**
    * Land the mix: the target becomes the committed state in one undo step.
    * Called by the driver at t=1.
    */
-  commitVoiceMix: () => set((state) => {
-    const mix = state.voiceMix;
-    if (!mix || !mix.to) return {};
-    const to = mix.to;
-    const next = { ...pushToUndo(state, true) };
-    next.layoutParams = { ...to.params };
-    // #1153 — an earned voice brings its tracks (PATTERN, FX, extra KC) back with it, as one whole-document undo
-    const ex = to.stack ? expandStack(to.stack) : null;
-    if (ex && ex.ok) Object.assign(next, pushToUndo(state, true, UNDO_KIND_LAYERS), { layers: ex.stack.layers, activeLayerId: ex.stack.activeLayerId, layerSnapshots: ex.stack.layerSnapshots });
-    // Voices are catalog-independent (freeform colors), so they always land
-    // as an override blob — unchanged from day one. A preset mix (#284-style
-    // "morph, don't cut") instead pairs a real catalog id: `to.paletteId` set
-    // means land clean (paletteId + no override, byte-identical colors to
-    // the blend's endpoint); left undefined, this is a no-op for voices.
-    if (to.paletteId) {
-      next.paletteId = to.paletteId;
-      next.paletteOverrides = null;
-      next.paletteLocks = {};
-    } else if (to.paletteId === undefined) {
-      next.paletteOverrides = {
-        bg: to.palette.bg,
-        ink: to.palette.ink,
-        swatches: [...to.palette.swatches],
-      };
-    }
-    // to.paletteId === null: the mix didn't touch color (a preset with no
-    // palette pairing) — leave paletteId/paletteOverrides exactly as they
-    // are, so a plain composition swap doesn't freeze the current colors
-    // into a stray override.
-    if (to.assets === 'all') {
-      const m = {};
-      for (const k of Object.keys(state.enabledAssets || {})) m[k] = true;
-      next.enabledAssets = m;
-    } else {
-      next.enabledAssets = { ...to.assets };
-    }
-    // A user voice captured while on the cellular engine restores its grid.
-    if (to.params.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
-    next.voiceMix = null;
-    next.activeVoiceId = mix.targetVoiceId || null;
-    return next;
-  }),
+  commitVoiceMix: () =>
+    set((state) => {
+      const mix = state.voiceMix;
+      if (!mix || !mix.to) return {};
+      const to = mix.to;
+      const next = { ...pushToUndo(state, true) };
+      next.layoutParams = { ...to.params };
+      // #1153 — an earned voice brings its tracks (PATTERN, FX, extra KC) back with it, as one whole-document undo
+      const ex = to.stack ? expandStack(to.stack) : null;
+      if (ex && ex.ok)
+        Object.assign(next, pushToUndo(state, true, UNDO_KIND_LAYERS), {
+          layers: ex.stack.layers,
+          activeLayerId: ex.stack.activeLayerId,
+          layerSnapshots: ex.stack.layerSnapshots,
+        });
+      // Voices are catalog-independent (freeform colors), so they always land
+      // as an override blob — unchanged from day one. A preset mix (#284-style
+      // "morph, don't cut") instead pairs a real catalog id: `to.paletteId` set
+      // means land clean (paletteId + no override, byte-identical colors to
+      // the blend's endpoint); left undefined, this is a no-op for voices.
+      if (to.paletteId) {
+        next.paletteId = to.paletteId;
+        next.paletteOverrides = null;
+        next.paletteLocks = {};
+      } else if (to.paletteId === undefined) {
+        next.paletteOverrides = {
+          bg: to.palette.bg,
+          ink: to.palette.ink,
+          swatches: [...to.palette.swatches],
+        };
+      }
+      // to.paletteId === null: the mix didn't touch color (a preset with no
+      // palette pairing) — leave paletteId/paletteOverrides exactly as they
+      // are, so a plain composition swap doesn't freeze the current colors
+      // into a stray override.
+      if (to.assets === 'all') {
+        const m = {};
+        for (const k of Object.keys(state.enabledAssets || {})) m[k] = true;
+        next.enabledAssets = m;
+      } else {
+        next.enabledAssets = { ...to.assets };
+      }
+      // A user voice captured while on the cellular engine restores its grid.
+      if (to.params.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
+      next.voiceMix = null;
+      next.activeVoiceId = mix.targetVoiceId || null;
+      return next;
+    }),
 
   /**
    * The + chip: capture the current live state as a new user voice.
    * Returns {} when the shelf is full — the UI disables + at the cap.
    */
-  captureUserVoice: () => set((state) => {
-    if (handMade(state.userVoices).length >= MAX_USER_VOICES) return {};
-    const entry = sanitizeUserVoice({
-      id: `uv-${Date.now().toString(36)}`,
-      name: nextVoiceName(state.userVoices),
-      state: captureLiveVoiceState(state),
-      createdAt: Date.now(),
-    });
-    if (!entry) return {};
-    const userVoices = [...state.userVoices, entry];
-    persist(userVoices);
-    // Capturing doesn't switch voices — it shelves what you're hearing.
-    return { userVoices };
-  }),
+  captureUserVoice: () =>
+    set((state) => {
+      if (handMade(state.userVoices).length >= MAX_USER_VOICES) return {};
+      const entry = sanitizeUserVoice({
+        id: `uv-${Date.now().toString(36)}`,
+        name: nextVoiceName(state.userVoices),
+        state: captureLiveVoiceState(state),
+        createdAt: Date.now(),
+      });
+      if (!entry) return {};
+      const userVoices = [...state.userVoices, entry];
+      persist(userVoices);
+      // Capturing doesn't switch voices — it shelves what you're hearing.
+      return { userVoices };
+    }),
 
-  renameUserVoice: (id, name) => set((state) => {
-    if (isEarned(state.userVoices.find((v) => v.id === id))) return {}; // a find is frozen history (rule 9)
-    const clean = typeof name === 'string' ? name.trim().slice(0, 24) : '';
-    if (!clean) return {};
-    const userVoices = state.userVoices.map((v) => (v.id === id ? { ...v, name: clean } : v));
-    persist(userVoices);
-    return { userVoices };
-  }),
+  renameUserVoice: (id, name) =>
+    set((state) => {
+      if (isEarned(state.userVoices.find((v) => v.id === id))) return {}; // a find is frozen history (rule 9)
+      const clean = typeof name === 'string' ? name.trim().slice(0, 24) : '';
+      if (!clean) return {};
+      const userVoices = state.userVoices.map((v) => (v.id === id ? { ...v, name: clean } : v));
+      persist(userVoices);
+      return { userVoices };
+    }),
 
   /** Long-press: overwrite the chip with the current live state. */
-  overwriteUserVoice: (id) => set((state) => {
-    const target = state.userVoices.find((v) => v.id === id);
-    if (!target || isEarned(target)) return {}; // a find is never overwritten
-    const nextState = captureLiveVoiceState(state);
-    const userVoices = state.userVoices.map((v) => (v.id === id
-      ? sanitizeUserVoice({ id: v.id, name: v.name, state: nextState, createdAt: v.createdAt })
-      : v)).filter(Boolean);
-    persist(userVoices);
-    return { userVoices };
-  }),
+  overwriteUserVoice: (id) =>
+    set((state) => {
+      const target = state.userVoices.find((v) => v.id === id);
+      if (!target || isEarned(target)) return {}; // a find is never overwritten
+      const nextState = captureLiveVoiceState(state);
+      const userVoices = state.userVoices
+        .map((v) =>
+          v.id === id ? sanitizeUserVoice({ id: v.id, name: v.name, state: nextState, createdAt: v.createdAt }) : v,
+        )
+        .filter(Boolean);
+      persist(userVoices);
+      return { userVoices };
+    }),
 
   /**
    * #1063 — replace the shelf from an imported bundle. Same sanitizer and cap as
@@ -339,29 +361,35 @@ export const createVoiceSlice = (set) => ({
    * the live scene, with its layer stack and the roll count. A shallower find than a full shelf's shallowest, a repeat,
    * or fewer than EARNED_MIN_ROLLS rolls changes nothing.
    */
-  mintEarnedVoice: ({ rolls, at } = {}) => set((state) => {
-    const createdAt = Number.isFinite(at) ? at : Date.now(); // a stamp for the shelf, not a clock the sim reads
-    const stack = stackOf(state);
-    const entry = sanitizeUserVoice({
-      id: `ev-${(state.seed >>> 0).toString(16)}-${Math.floor(Number(rolls) || 0)}`,
-      name: earnedName(state),
-      state: { ...captureLiveVoiceState(state), ...(stack ? { stack } : {}) },
-      earned: { rolls, at: createdAt, caption: earnedCaption({ rolls, count: state.layoutParams && state.layoutParams.count, seed: state.seed }) },
-      createdAt,
-    });
-    if (!entry) return {};
-    const out = mintEarned(state.userVoices, entry);
-    if (!out.minted) return {};
-    persist(out.list);
-    return { userVoices: out.list };
-  }),
+  mintEarnedVoice: ({ rolls, at } = {}) =>
+    set((state) => {
+      const createdAt = Number.isFinite(at) ? at : Date.now(); // a stamp for the shelf, not a clock the sim reads
+      const stack = stackOf(state);
+      const entry = sanitizeUserVoice({
+        id: `ev-${(state.seed >>> 0).toString(16)}-${Math.floor(Number(rolls) || 0)}`,
+        name: earnedName(state),
+        state: { ...captureLiveVoiceState(state), ...(stack ? { stack } : {}) },
+        earned: {
+          rolls,
+          at: createdAt,
+          caption: earnedCaption({ rolls, count: state.layoutParams && state.layoutParams.count, seed: state.seed }),
+        },
+        createdAt,
+      });
+      if (!entry) return {};
+      const out = mintEarned(state.userVoices, entry);
+      if (!out.minted) return {};
+      persist(out.list);
+      return { userVoices: out.list };
+    }),
 
-  deleteUserVoice: (id) => set((state) => {
-    const userVoices = state.userVoices.filter((v) => v.id !== id);
-    if (userVoices.length === state.userVoices.length) return {};
-    persist(userVoices);
-    const next = { userVoices };
-    if (state.activeVoiceId === id) next.activeVoiceId = null;
-    return next;
-  }),
+  deleteUserVoice: (id) =>
+    set((state) => {
+      const userVoices = state.userVoices.filter((v) => v.id !== id);
+      if (userVoices.length === state.userVoices.length) return {};
+      persist(userVoices);
+      const next = { userVoices };
+      if (state.activeVoiceId === id) next.activeVoiceId = null;
+      return next;
+    }),
 });

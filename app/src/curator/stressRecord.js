@@ -25,8 +25,14 @@ export function createStressRecorder({ initial = null, getFrame = () => 0 } = {}
     update({ activity, dish, taste, band: now }) {
       const frame = getFrame() | 0;
       if (last && last[1] === activity && last[2] === dish && last[3] === taste) last[4] += 1;
-      else { last = [frame, activity, dish, taste, 1]; runs.push(last); }
-      if (now !== band) { band = now; bands.push([frame, now]); }
+      else {
+        last = [frame, activity, dish, taste, 1];
+        runs.push(last);
+      }
+      if (now !== band) {
+        band = now;
+        bands.push([frame, now]);
+      }
       if (now in occupancy) occupancy[now] += 1;
     },
     finish() {
@@ -78,14 +84,22 @@ export function replayStress(record) {
  * @returns {{ ok: boolean, updates: number, bandChanges: number, firstMismatch: number|null }}
  */
 export function verifyStressRecord(record) {
-  if (!record || record.version !== STRESS_RECORD_VERSION || !Array.isArray(record.runs) || !Array.isArray(record.bands)) {
+  if (
+    !record ||
+    record.version !== STRESS_RECORD_VERSION ||
+    !Array.isArray(record.runs) ||
+    !Array.isArray(record.bands)
+  ) {
     return { ok: false, updates: 0, bandChanges: 0, firstMismatch: 0 };
   }
   const got = replayStress(record);
   const want = record.bands.map((b) => b[1]);
   let firstMismatch = null;
   for (let i = 0; i < Math.max(got.length, want.length); i++) {
-    if (got[i] !== want[i]) { firstMismatch = i; break; }
+    if (got[i] !== want[i]) {
+      firstMismatch = i;
+      break;
+    }
   }
   return {
     ok: firstMismatch === null,

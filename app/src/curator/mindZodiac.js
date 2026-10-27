@@ -20,11 +20,20 @@ export const BIRTHDAYS = Object.freeze({
   queen: Object.freeze([1983, 9, 23]),
 });
 
-
 // Tropical signs: the first day (month, day) each sign begins, in calendar order from Capricorn's January tail.
 const SIGN_STARTS = [
-  [1, 20, 'aquarius'], [2, 19, 'pisces'], [3, 21, 'aries'], [4, 20, 'taurus'], [5, 21, 'gemini'], [6, 21, 'cancer'],
-  [7, 23, 'leo'], [8, 23, 'virgo'], [9, 23, 'libra'], [10, 23, 'scorpio'], [11, 22, 'sagittarius'], [12, 22, 'capricorn'],
+  [1, 20, 'aquarius'],
+  [2, 19, 'pisces'],
+  [3, 21, 'aries'],
+  [4, 20, 'taurus'],
+  [5, 21, 'gemini'],
+  [6, 21, 'cancer'],
+  [7, 23, 'leo'],
+  [8, 23, 'virgo'],
+  [9, 23, 'libra'],
+  [10, 23, 'scorpio'],
+  [11, 22, 'sagittarius'],
+  [12, 22, 'capricorn'],
 ];
 
 /** The sun sign for a month (1-12) and day, or null for an impossible date. */
@@ -40,7 +49,9 @@ export const GOVERNOR_BIRTHDAY = Object.freeze([1977, 1, 8]);
 export const GOVERNOR_SIGN = signOf(GOVERNOR_BIRTHDAY[1], GOVERNOR_BIRTHDAY[2]);
 
 /** Each persona's sign, from the canon birthday. */
-export const SIGNS = Object.freeze(Object.fromEntries(Object.entries(BIRTHDAYS).map(([p, [, m, d]]) => [p, signOf(m, d)])));
+export const SIGNS = Object.freeze(
+  Object.fromEntries(Object.entries(BIRTHDAYS).map(([p, [, m, d]]) => [p, signOf(m, d)])),
+);
 
 /**
  * The base colouring per sign (the personas' three, plus the Governor's). Few, legible numbers — the dev panel shows them.
@@ -54,13 +65,45 @@ export const SIGNS = Object.freeze(Object.fromEntries(Object.entries(BIRTHDAYS).
  */
 export const TEMPERAMENT = Object.freeze({
   // Gemini, mutable air: quick, curious, two-sided; many small moves, short rests
-  gemini: Object.freeze({ moves: Object.freeze(['tinkering', 'double-take', 'restless', 'grin']), tempo: 1.3, intensity: 0.85, recharge: 3, hold: 1, season: 'spring', moonPull: 0.2 }),
+  gemini: Object.freeze({
+    moves: Object.freeze(['tinkering', 'double-take', 'restless', 'grin']),
+    tempo: 1.3,
+    intensity: 0.85,
+    recharge: 3,
+    hold: 1,
+    season: 'spring',
+    moonPull: 0.2,
+  }),
   // Cancer, cardinal water: moody, guarded, sentimental; fewer moves, felt harder, long rests
-  cancer: Object.freeze({ moves: Object.freeze(['brood', 'guarded', 'wistful', 'side-eye']), tempo: 0.8, intensity: 1.1, recharge: 8, hold: 3, season: 'summer', moonPull: 0.6 }),
+  cancer: Object.freeze({
+    moves: Object.freeze(['brood', 'guarded', 'wistful', 'side-eye']),
+    tempo: 0.8,
+    intensity: 1.1,
+    recharge: 8,
+    hold: 3,
+    season: 'summer',
+    moonPull: 0.6,
+  }),
   // Libra, cardinal air: balance, harmony, an eye for beauty; measured presences that come when the room asks, then settle
-  libra: Object.freeze({ moves: Object.freeze(['warm', 'drift', 'lean']), tempo: 0.85, intensity: 0.95, recharge: 10, hold: 4, season: 'autumn', moonPull: 0.2 }),
+  libra: Object.freeze({
+    moves: Object.freeze(['warm', 'drift', 'lean']),
+    tempo: 0.85,
+    intensity: 0.95,
+    recharge: 10,
+    hold: 4,
+    season: 'autumn',
+    moonPull: 0.2,
+  }),
   // Capricorn, cardinal earth (the Governor's sign): patient, controlled, a slow build. Kept for the Governor; no mind reads it yet
-  capricorn: Object.freeze({ moves: Object.freeze(['warm', 'drift', 'lean']), tempo: 0.7, intensity: 1, recharge: 12, hold: 4, season: 'winter', moonPull: 0.2 }),
+  capricorn: Object.freeze({
+    moves: Object.freeze(['warm', 'drift', 'lean']),
+    tempo: 0.7,
+    intensity: 1,
+    recharge: 12,
+    hold: 4,
+    season: 'winter',
+    moonPull: 0.2,
+  }),
 });
 
 const OPPOSITE = Object.freeze({ spring: 'autumn', summer: 'winter', autumn: 'spring', winter: 'summer' });
@@ -116,4 +159,6 @@ export function zodiacBlock(persona, reading) {
   return { sign, moonPhase: reading.moonPhase, season: reading.season };
 }
 
-function round2(v) { return Math.round(v * 100) / 100; }
+function round2(v) {
+  return Math.round(v * 100) / 100;
+}

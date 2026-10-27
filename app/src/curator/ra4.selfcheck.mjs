@@ -22,7 +22,10 @@ globalThis.localStorage = {
   setItem: (k, v) => lsData.set(k, String(v)),
   removeItem: (k) => lsData.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
 const { ASSETS } = await import('../data/assets/index.js');
 const { PALETTES } = await import('../data/palettes.js');
@@ -49,7 +52,9 @@ wireEventBus(applyAction);
     if (S().enabledAssets[a.id]) unreachable.push(`${a.id} (won't deselect)`);
   }
   assert.deepStrictEqual(unreachable, [], `assets unreachable by hand: ${unreachable.join(', ')}`);
-  lines.push(`assets: ${ASSETS.length}/${ASSETS.length} selectable + deselectable via ASSETS_TOGGLE (the pool tile's event)`);
+  lines.push(
+    `assets: ${ASSETS.length}/${ASSETS.length} selectable + deselectable via ASSETS_TOGGLE (the pool tile's event)`,
+  );
 }
 
 // ── palettes: every one applicable through the palette event ───────
@@ -111,7 +116,9 @@ wireEventBus(applyAction);
     if (!(layer.effects || []).some((e) => e.kind === kind)) unreachable.push(kind);
   }
   assert.deepStrictEqual(unreachable, [], `FX kinds unreachable by hand: ${unreachable.join(', ')}`);
-  lines.push(`FX modules: ${FX_MENU_KINDS.length}/${FX_MENU_KINDS.length} menu kinds enable-able via FX_EFFECT_ADD (${FX_MENU_KINDS.join(', ')})`);
+  lines.push(
+    `FX modules: ${FX_MENU_KINDS.length}/${FX_MENU_KINDS.length} menu kinds enable-able via FX_EFFECT_ADD (${FX_MENU_KINDS.join(', ')})`,
+  );
 }
 
 console.log('ra4.selfcheck (RA4 manual reachability census):');

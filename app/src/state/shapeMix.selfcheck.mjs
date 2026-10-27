@@ -6,7 +6,12 @@
 import assert from 'node:assert';
 import { useStore } from './store.js';
 import {
-  SHAPE_SETS, MIXABLE_SHAPE_IDS, SHAPE_MIX_MAX, shapeMixIds, shapeMixWeights, liveShapeLevels,
+  SHAPE_SETS,
+  MIXABLE_SHAPE_IDS,
+  SHAPE_MIX_MAX,
+  shapeMixIds,
+  shapeMixWeights,
+  liveShapeLevels,
 } from '../data/voices.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
@@ -25,7 +30,10 @@ assert.strictEqual(SHAPE_MIX_MAX, 4);
   const share = (id) => set(id).ids.reduce((s, i) => s + (w[i] || 0), 0);
   const overlap = set(A).ids.filter((i) => set(B).ids.includes(i)).length;
   if (!overlap) {
-    assert.ok(Math.abs(share(A) - 0.75) < 1e-9 && Math.abs(share(B) - 0.25) < 1e-9, 'level 3 vs 1 → 3/4 : 1/4 of the pool');
+    assert.ok(
+      Math.abs(share(A) - 0.75) < 1e-9 && Math.abs(share(B) - 0.25) < 1e-9,
+      'level 3 vs 1 → 3/4 : 1/4 of the pool',
+    );
   }
   assert.strictEqual(shapeMixWeights({}), null, 'nothing on → no mix');
   // overlapping sets (if any ids are shared) still normalize: add first, then divide
@@ -41,18 +49,22 @@ S().cycleShapeLevel(A);
 assert.deepStrictEqual(lv(), { [A]: 1 }, 'first tap → 1, pool = that set');
 assert.deepStrictEqual(Object.keys(S().enabledAssets).sort(), [...set(A).ids].sort());
 S().cycleShapeLevel(B); // second chip so A may go off
-S().cycleShapeLevel(A); S().cycleShapeLevel(A);
+S().cycleShapeLevel(A);
+S().cycleShapeLevel(A);
 assert.strictEqual(lv()[A], 3, 'off→1→2→3');
 S().cycleShapeLevel(A);
 assert.strictEqual(lv()[A], undefined, '3 → off');
 assert.deepStrictEqual(Object.keys(lv()), [B]);
-S().cycleShapeLevel(B); S().cycleShapeLevel(B); // 1→2→3
+S().cycleShapeLevel(B);
+S().cycleShapeLevel(B); // 1→2→3
 S().cycleShapeLevel(B); // last chip at 3: refused, never an empty pool
 assert.strictEqual(lv()[B], 3, 'the last chip cannot go off');
 assert.ok(Object.keys(S().enabledAssets).length > 0);
 
 // fifth tap refused
-S().cycleShapeLevel(A); S().cycleShapeLevel(C); S().cycleShapeLevel(D);
+S().cycleShapeLevel(A);
+S().cycleShapeLevel(C);
+S().cycleShapeLevel(D);
 assert.strictEqual(Object.keys(lv()).length, 4, 'four chips on');
 const before = { pool: { ...S().enabledAssets }, levels: { ...lv() }, undo: S().historyUndoStack.length };
 S().cycleShapeLevel(E);
@@ -68,7 +80,11 @@ assert.strictEqual(Object.keys(lv()).length, 4, 'flagship chip ignored by the mi
 {
   const lvls = { ...lv() };
   assert.deepStrictEqual(liveShapeLevels(lvls, null), {}, "the 'all' sentinel is not a mix");
-  assert.deepStrictEqual(liveShapeLevels(lvls, { ...S().enabledAssets, extra: true }), {}, 'pool changed elsewhere → levels retire');
+  assert.deepStrictEqual(
+    liveShapeLevels(lvls, { ...S().enabledAssets, extra: true }),
+    {},
+    'pool changed elsewhere → levels retire',
+  );
   S().loadShapeSet('hype');
   assert.deepStrictEqual(lv(), {}, 'a flagship swap retires the mix');
 }
@@ -78,15 +94,39 @@ function shares(levels, over = {}) {
   const enabled = {};
   for (const id of shapeMixIds(levels)) enabled[id] = true;
   const r = createLiveResolver();
-  const out = r.resolveLayers({
-    layers: [{ id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 4242, paletteId: 'bone', paletteOverrides: null,
-    userPalettes: [], layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 400 }, caGrid: null,
-    enabledAssets: enabled, shapeLevels: levels, assetWeightOverrides: {}, customAssets: [], quality: 'final',
-    lockedParams: {}, batchPaused: false, focusSwap: false, loopTimeMs: 0, perfClampOverride: null,
-    perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0,
-    effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null, ...over,
-  }).find((l) => l.id === 'lyr-a');
+  const out = r
+    .resolveLayers({
+      layers: [{ id: 'lyr-a', name: 'A', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
+      activeLayerId: 'lyr-a',
+      layerSnapshots: {},
+      seed: 4242,
+      paletteId: 'bone',
+      paletteOverrides: null,
+      userPalettes: [],
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'scatter', count: 400 },
+      caGrid: null,
+      enabledAssets: enabled,
+      shapeLevels: levels,
+      assetWeightOverrides: {},
+      customAssets: [],
+      quality: 'final',
+      lockedParams: {},
+      batchPaused: false,
+      focusSwap: false,
+      loopTimeMs: 0,
+      perfClampOverride: null,
+      perfTier1: false,
+      assetThin: false,
+      slowRender: false,
+      scaleMul: 1,
+      alphaBoost: 0,
+      effectiveScale: [0.5, 1.5],
+      effectiveAlpha: [20, 100],
+      phraseWrapGen: 0,
+      attractor: null,
+      ...over,
+    })
+    .find((l) => l.id === 'lyr-a');
   const inA = new Set(set(A).ids);
   const n = out.items.length;
   return { fracA: out.items.filter((it) => inA.has(it.assetId)).length / n, n };

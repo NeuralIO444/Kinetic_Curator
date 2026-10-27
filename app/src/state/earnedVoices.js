@@ -52,15 +52,20 @@ export function sanitizeEarned(raw) {
  */
 export function mintEarned(list, entry) {
   const all = Array.isArray(list) ? list : [];
-  if (!entry || !entry.earned || entry.earned.rolls < EARNED_MIN_ROLLS) return { list: all, minted: false, replaced: null };
+  if (!entry || !entry.earned || entry.earned.rolls < EARNED_MIN_ROLLS)
+    return { list: all, minted: false, replaced: null };
   if (all.some((v) => v.id === entry.id)) return { list: all, minted: false, replaced: null };
   const earned = all.filter(isEarned);
   if (earned.length < EARNED_SLOTS) return { list: [...all, entry], minted: true, replaced: null };
-  const shallowest = earned.reduce((a, b) => (b.earned.rolls < a.earned.rolls || (b.earned.rolls === a.earned.rolls && b.earned.at < a.earned.at) ? b : a));
+  const shallowest = earned.reduce((a, b) =>
+    b.earned.rolls < a.earned.rolls || (b.earned.rolls === a.earned.rolls && b.earned.at < a.earned.at) ? b : a,
+  );
   if (entry.earned.rolls < shallowest.earned.rolls) return { list: all, minted: false, replaced: null };
   return { list: all.map((v) => (v.id === shallowest.id ? entry : v)), minted: true, replaced: shallowest.id };
 }
 
 /** The earned voices, deepest first (the order the tiles show them). */
-export const earnedVoices = (list) => (Array.isArray(list) ? list : []).filter(isEarned)
-  .sort((a, b) => b.earned.rolls - a.earned.rolls || b.earned.at - a.earned.at);
+export const earnedVoices = (list) =>
+  (Array.isArray(list) ? list : [])
+    .filter(isEarned)
+    .sort((a, b) => b.earned.rolls - a.earned.rolls || b.earned.at - a.earned.at);

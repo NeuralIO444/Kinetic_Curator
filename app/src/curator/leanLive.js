@@ -36,37 +36,78 @@ export function startLean({ getWetness, getEvolveInterval, context }) {
   let silenced = false; // a hand took a dial: released until the window closes or the input changes
   const stop = [];
 
-  stop.push(on(Events.MIND_DECISION, (p) => {
-    if (!p || p.persona !== 'queen' || !p.reply || typeof p.reply !== 'object') return;
-    lean = p.reply.lean && typeof p.reply.lean === 'object' ? p.reply.lean : null;
-  }));
-  stop.push(on(Events.AUDIO_SILENCE_START, () => { silent = true; }));
-  stop.push(on(Events.AUDIO_SILENCE_END, () => { silent = false; silenced = false; setDialMagnitude(0); }));
-  stop.push(on(Events.AUDIO_INPUT, () => { silenced = false; lean = null; setDialMagnitude(0); }));
+  stop.push(
+    on(Events.MIND_DECISION, (p) => {
+      if (!p || p.persona !== 'queen' || !p.reply || typeof p.reply !== 'object') return;
+      lean = p.reply.lean && typeof p.reply.lean === 'object' ? p.reply.lean : null;
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_SILENCE_START, () => {
+      silent = true;
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_SILENCE_END, () => {
+      silent = false;
+      silenced = false;
+      setDialMagnitude(0);
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_INPUT, () => {
+      silenced = false;
+      lean = null;
+      setDialMagnitude(0);
+    }),
+  );
   // anything that is not her own step is a hand on the dial: it wins, on either dial, for both
-  stop.push(on(Events.LAYOUT_PARAM, (p, meta) => {
-    if (meta && meta.cause === 'lean') return;
-    if (!p || p.key !== 'accumulationWetness') return;
-    silenced = true; setDialMagnitude(0);
-  }));
-  stop.push(on(Events.DAVIS_EVOLVE, (p, meta) => {
-    if (meta && meta.cause === 'lean') return;
-    if (!p || p.interval === undefined) return;
-    silenced = true; setDialMagnitude(0);
-  }));
-  stop.push(on(Events.CLOCK_BAR, (p) => {
-    if (!p || p.bar % PHRASE_BARS !== 0) return;
-    if (!silent || silenced || !lean) { setDialMagnitude(0); return; }
-    let ctx;
-    try { ctx = context() || {}; } catch { ctx = {}; }
-    const wetness = getWetness();
-    const evolveInterval = getEvolveInterval();
-    const steps = leanDialSteps({ lean, wetness, evolveInterval, keeps: ctx.keeps, allowance: ctx.allowance });
-    if (steps.wetness === null && steps.evolveInterval === null) { setDialMagnitude(0); return; }
-    setDialMagnitude(markFor(steps.pull));
-    if (steps.wetness !== null) emit(Events.LAYOUT_PARAM, { key: 'accumulationWetness', value: steps.wetness }, { cause: 'lean' });
-    if (steps.evolveInterval !== null) emit(Events.DAVIS_EVOLVE, { interval: steps.evolveInterval }, { cause: 'lean' });
-  }));
+  stop.push(
+    on(Events.LAYOUT_PARAM, (p, meta) => {
+      if (meta && meta.cause === 'lean') return;
+      if (!p || p.key !== 'accumulationWetness') return;
+      silenced = true;
+      setDialMagnitude(0);
+    }),
+  );
+  stop.push(
+    on(Events.DAVIS_EVOLVE, (p, meta) => {
+      if (meta && meta.cause === 'lean') return;
+      if (!p || p.interval === undefined) return;
+      silenced = true;
+      setDialMagnitude(0);
+    }),
+  );
+  stop.push(
+    on(Events.CLOCK_BAR, (p) => {
+      if (!p || p.bar % PHRASE_BARS !== 0) return;
+      if (!silent || silenced || !lean) {
+        setDialMagnitude(0);
+        return;
+      }
+      let ctx;
+      try {
+        ctx = context() || {};
+      } catch {
+        ctx = {};
+      }
+      const wetness = getWetness();
+      const evolveInterval = getEvolveInterval();
+      const steps = leanDialSteps({ lean, wetness, evolveInterval, keeps: ctx.keeps, allowance: ctx.allowance });
+      if (steps.wetness === null && steps.evolveInterval === null) {
+        setDialMagnitude(0);
+        return;
+      }
+      setDialMagnitude(markFor(steps.pull));
+      if (steps.wetness !== null)
+        emit(Events.LAYOUT_PARAM, { key: 'accumulationWetness', value: steps.wetness }, { cause: 'lean' });
+      if (steps.evolveInterval !== null)
+        emit(Events.DAVIS_EVOLVE, { interval: steps.evolveInterval }, { cause: 'lean' });
+    }),
+  );
 
-  return () => { for (const off of stop) off(); setDialMagnitude(0); };
+  return () => {
+    for (const off of stop) off();
+    setDialMagnitude(0);
+  };
 }

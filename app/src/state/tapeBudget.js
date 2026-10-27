@@ -27,7 +27,7 @@ export const TAPE_FULL_PCT = 100;
 export function tapeFillPct(state) {
   const gpuMs = Number(state?.stageTimings?.gpuFrame) || 0;
   const fps = Number(state?.fps) || 0;
-  const frameMs = gpuMs > 0 ? gpuMs : (fps > 0 ? 1000 / fps : 0);
+  const frameMs = gpuMs > 0 ? gpuMs : fps > 0 ? 1000 / fps : 0;
   return frameMs > 0 ? (frameMs / FRAME_BUDGET_MS) * 100 : 0;
 }
 

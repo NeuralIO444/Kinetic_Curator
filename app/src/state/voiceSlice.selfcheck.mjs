@@ -38,14 +38,22 @@ assert.strictEqual(good.state.fx.grain, 0.5);
 assert.strictEqual(sanitizeUserVoice(null), null);
 assert.strictEqual(sanitizeUserVoice({}), null);
 assert.strictEqual(sanitizeUserVoice({ id: 'x' }), null, 'state is required');
-assert.strictEqual(sanitizeUserVoice({ id: 'x', state: { params: { mode: '__proto__' } } }).state.params.mode, 'fibonacci', 'bad mode falls back to default');
+assert.strictEqual(
+  sanitizeUserVoice({ id: 'x', state: { params: { mode: '__proto__' } } }).state.params.mode,
+  'fibonacci',
+  'bad mode falls back to default',
+);
 assert.strictEqual(sanitizeUserVoice({ id: 'x', state: {}, name: 'y'.repeat(99) }).name.length, 24, 'names truncate');
 assert.strictEqual(sanitizeUserVoice({ id: 'x', state: {}, name: '   ' }).name, 'VOICE', 'blank name defaults');
 
 // ── nextVoiceName ────────────────────────────────────────────────────────
 assert.strictEqual(nextVoiceName([]), 'VOICE 01');
 assert.strictEqual(nextVoiceName([{ name: 'VOICE 01' }]), 'VOICE 02');
-assert.strictEqual(nextVoiceName([{ name: 'VOICE 01' }, { name: 'VOICE 03' }]), 'VOICE 04', 'never reuses a live number');
+assert.strictEqual(
+  nextVoiceName([{ name: 'VOICE 01' }, { name: 'VOICE 03' }]),
+  'VOICE 04',
+  'never reuses a live number',
+);
 assert.strictEqual(nextVoiceName([{ name: 'CUSTOM' }]), 'VOICE 01');
 
 // ── findVoiceDef ─────────────────────────────────────────────────────────
@@ -81,7 +89,9 @@ assert.strictEqual(api.activeVoiceId, null);
   assert.strictEqual(sessionOnlyNoted(), false, 'nothing noted yet (absent storage is not a refusal)');
   globalThis.localStorage = {
     getItem: () => JSON.stringify([{ nope: 1 }, 'junk']),
-    setItem: () => { throw new Error('private mode'); },
+    setItem: () => {
+      throw new Error('private mode');
+    },
     removeItem: () => {},
   };
   let vstate = {};
@@ -142,12 +152,16 @@ assert.strictEqual(state.voiceMix, null);
 assert.strictEqual(state.layoutParams.mode, 'swarm');
 assert.strictEqual(state.layoutParams.particleCount, 120);
 assert.strictEqual(state.paletteOverrides.swatches.length, 8);
-assert.deepStrictEqual(state.enabledAssets, {
-  dot_single_01: true,
-  org_petal_01: true,
-  org_leaf_01: true,
-  line_swoosh_01: true,
-}, 'swarm 4-asset pool applied');
+assert.deepStrictEqual(
+  state.enabledAssets,
+  {
+    dot_single_01: true,
+    org_petal_01: true,
+    org_leaf_01: true,
+    line_swoosh_01: true,
+  },
+  'swarm 4-asset pool applied',
+);
 assert.strictEqual(state.activeVoiceId, 'swarm');
 assert.strictEqual(state.historyUndoStack.length, 1, 'one undo entry for the whole voice load');
 
@@ -163,7 +177,11 @@ api.setVoiceMixT(0.5);
 const midMode = state.voiceMix.to.params.mode;
 assert.strictEqual(midMode, 'hype');
 api.loadVoice('murmuration');
-assert.strictEqual(state.voiceMix.from.params.mode, 'hype', 'from re-snapshots the in-flight target at the dissolve point');
+assert.strictEqual(
+  state.voiceMix.from.params.mode,
+  'hype',
+  'from re-snapshots the in-flight target at the dissolve point',
+);
 assert.strictEqual(state.voiceMix.t, 0);
 
 // Long-press overwrite refreshes the chip's captured state.

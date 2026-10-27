@@ -37,12 +37,9 @@ export function voiceOptions() {
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
 // Unknown/missing feature: neutral 0.5, never 0 (0 would read as "absent").
-const num = (v, lo, hi) =>
-  typeof v === 'number' && Number.isFinite(v) ? clamp01((v - lo) / (hi - lo)) : 0.5;
-const rangeMean = (r, lo, hi) =>
-  Array.isArray(r) && r.length >= 2 ? num((r[0] + r[1]) / 2, lo, hi) : 0.5;
-const rangeSpan = (r, lo, hi) =>
-  Array.isArray(r) && r.length >= 2 ? num(Math.abs(r[1] - r[0]), 0, hi - lo) : 0.5;
+const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) ? clamp01((v - lo) / (hi - lo)) : 0.5);
+const rangeMean = (r, lo, hi) => (Array.isArray(r) && r.length >= 2 ? num((r[0] + r[1]) / 2, lo, hi) : 0.5);
+const rangeSpan = (r, lo, hi) => (Array.isArray(r) && r.length >= 2 ? num(Math.abs(r[1] - r[0]), 0, hi - lo) : 0.5);
 
 /**
  * Measure 19 honest visual features from a candidate layoutParams object.
@@ -86,7 +83,6 @@ export function scoreCandidate(features, weights) {
   }
   return s;
 }
-
 
 /**
  * Cosine proximity of two feature maps from extractFeatures — the

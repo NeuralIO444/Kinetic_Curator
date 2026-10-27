@@ -10,10 +10,30 @@ export const CONTEXT_VERSION = 3;
 // #1462 spec update — the persona's engagement tier and the session's zodiac block both come from Mind 3 (#1464).
 // Until a tier is supplied it is null; the zodiac block is ABSENT unless the startup reading succeeded, and an absent
 // block changes nothing else in the summary.
-export const ZODIAC_SIGNS = Object.freeze(['aries', 'taurus', 'gemini', 'cancer', 'leo', 'virgo', 'libra', 'scorpio',
-  'sagittarius', 'capricorn', 'aquarius', 'pisces']);
-export const MOON_PHASES = Object.freeze(['new', 'waxing-crescent', 'first-quarter', 'waxing-gibbous', 'full',
-  'waning-gibbous', 'last-quarter', 'waning-crescent']);
+export const ZODIAC_SIGNS = Object.freeze([
+  'aries',
+  'taurus',
+  'gemini',
+  'cancer',
+  'leo',
+  'virgo',
+  'libra',
+  'scorpio',
+  'sagittarius',
+  'capricorn',
+  'aquarius',
+  'pisces',
+]);
+export const MOON_PHASES = Object.freeze([
+  'new',
+  'waxing-crescent',
+  'first-quarter',
+  'waxing-gibbous',
+  'full',
+  'waning-gibbous',
+  'last-quarter',
+  'waning-crescent',
+]);
 export const SEASONS = Object.freeze(['spring', 'summer', 'autumn', 'winter']);
 
 /** The zodiac block, or null when it is missing or malformed (fail closed: the personas then run unmodulated). */
@@ -36,9 +56,15 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
  */
 export function showOf(s) {
   if (!s || typeof s !== 'object') return null;
-  const routes = (Array.isArray(s.routes) ? s.routes : []).slice(0, 16)
+  const routes = (Array.isArray(s.routes) ? s.routes : [])
+    .slice(0, 16)
     .filter((r) => r && typeof r.input === 'string' && typeof r.target === 'string' && Number.isFinite(r.depth))
-    .map((r) => ({ input: r.input, target: r.target, depth: r3(r.depth), ...(r.by === 'davis' ? { by: 'davis' } : {}) }));
+    .map((r) => ({
+      input: r.input,
+      target: r.target,
+      depth: r3(r.depth),
+      ...(r.by === 'davis' ? { by: 'davis' } : {}),
+    }));
   return {
     energy: SHOW_ENERGY.includes(s.energy) ? s.energy : null,
     bpm: Number.isFinite(s.bpm) ? Math.round(s.bpm) : null,
@@ -81,7 +107,12 @@ export function buildContext(input) {
     source: snap.source === 'set' || snap.source === 'audio' ? snap.source : 'ambient',
     creatures: Number.isFinite(snap.creatures) ? snap.creatures : 0,
     verdict: snap.director && ROOM_VERDICTS.includes(snap.director.verdict) ? snap.director.verdict : null,
-    intensity: snap.director && ROOM_VERDICTS.includes(snap.director.verdict) && INTENSITY_BANDS.includes(snap.director.intensity) ? snap.director.intensity : null,
+    intensity:
+      snap.director &&
+      ROOM_VERDICTS.includes(snap.director.verdict) &&
+      INTENSITY_BANDS.includes(snap.director.intensity)
+        ? snap.director.intensity
+        : null,
     tier: typeof snap.tier === 'string' && /^[a-z0-9-]{1,16}$/.test(snap.tier) ? snap.tier : null,
     ...((z) => (z ? { zodiac: z } : {}))(zodiacOf(snap.zodiac)),
     ...((sh) => (sh && snap.audio !== 'none' ? { show: sh } : {}))(showOf(snap.show)),

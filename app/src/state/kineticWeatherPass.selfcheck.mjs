@@ -60,8 +60,16 @@ assert.strictEqual(u.seed, seedBefore, 'undo keeps the seed');
 assert.strictEqual(KINETIC_WARM_MS, 2000, 'warm window is ~2s');
 assert.strictEqual(routeKineticTap(0, 1_000_000), 'rules', 'never tapped → RULES');
 assert.strictEqual(routeKineticTap(1000, 1500), 'weather', 'tap 0.5s later → WEATHER (warm)');
-assert.strictEqual(routeKineticTap(1000, 1000 + KINETIC_WARM_MS - 1), 'weather', 'tap just inside the window → WEATHER');
-assert.strictEqual(routeKineticTap(1000, 1000 + KINETIC_WARM_MS + 1), 'rules', 'tap just outside the window → RULES (fresh)');
+assert.strictEqual(
+  routeKineticTap(1000, 1000 + KINETIC_WARM_MS - 1),
+  'weather',
+  'tap just inside the window → WEATHER',
+);
+assert.strictEqual(
+  routeKineticTap(1000, 1000 + KINETIC_WARM_MS + 1),
+  'rules',
+  'tap just outside the window → RULES (fresh)',
+);
 
 // End to end through the store actions the button calls: a warm second tap
 // keeps the skeleton and weathers the air; a stale tap re-works the rules.

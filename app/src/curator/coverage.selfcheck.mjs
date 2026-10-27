@@ -46,29 +46,61 @@ const evolve = evolveTargetCoverage({ draws: 2000 });
 const mem = new Map();
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 const { createDavisSlice, sanitizeFavorite, captureFavorite } = await import('../state/slices/davisSlice.js');
 
 function boot() {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set, () => state);
   return { api: state, get: () => state, call: (name, ...a) => state[name](...a) };
 }
 
 const PARAMS_A = {
-  count: 100, scale: [0.5, 2.0], rotate: [-90, 90], alpha: [30, 85], jitter: 40,
-  density: 60, zTiers: 4, noiseFreq: 0.008, noiseSpeed: 1.0, displacement: 60,
-  particleCount: 150, swarmCohesion: 2.0, gravityWells: 1.5, damping: 0.94,
-  wind: 1.0, flap: 0.5, breath: 0.4, lifeDrift: 0.5,
+  count: 100,
+  scale: [0.5, 2.0],
+  rotate: [-90, 90],
+  alpha: [30, 85],
+  jitter: 40,
+  density: 60,
+  zTiers: 4,
+  noiseFreq: 0.008,
+  noiseSpeed: 1.0,
+  displacement: 60,
+  particleCount: 150,
+  swarmCohesion: 2.0,
+  gravityWells: 1.5,
+  damping: 0.94,
+  wind: 1.0,
+  flap: 0.5,
+  breath: 0.4,
+  lifeDrift: 0.5,
 };
 const PARAMS_B = {
-  count: 500, scale: [0.9, 2.9], rotate: [-10, 170], alpha: [55, 95], jitter: 140,
-  density: 110, zTiers: 9, noiseFreq: 0.014, noiseSpeed: 1.9, displacement: 140,
-  particleCount: 290, swarmCohesion: 3.8, gravityWells: 2.9, damping: 0.97,
-  wind: 1.9, flap: 0.85, breath: 0.75, lifeDrift: 0.85,
+  count: 500,
+  scale: [0.9, 2.9],
+  rotate: [-10, 170],
+  alpha: [55, 95],
+  jitter: 140,
+  density: 110,
+  zTiers: 9,
+  noiseFreq: 0.014,
+  noiseSpeed: 1.9,
+  displacement: 140,
+  particleCount: 290,
+  swarmCohesion: 3.8,
+  gravityWells: 2.9,
+  damping: 0.97,
+  wind: 1.9,
+  flap: 0.85,
+  breath: 0.75,
+  lifeDrift: 0.85,
 };
 
 function assertMorphSpan(keepRaw, label) {
@@ -90,7 +122,11 @@ function assertMorphSpan(keepRaw, label) {
     assert.deepStrictEqual(st.morphFrom[key], PARAMS_A[key], `${label}: morphFrom.${key} is the live value, unclamped`);
     // the audio setup (FEEL keys) stays live across a recall (audioRig.js, "always live"); the picture keys are the keep's
     const want = AUDIO_RIG_KEYS.includes(key) ? PARAMS_A[key] : keep.config.layout[key];
-    assert.deepStrictEqual(st.morphTo[key], want, `${label}: morphTo.${key} is ${AUDIO_RIG_KEYS.includes(key) ? 'the live audio setup' : "the keep's value"}, unclamped`);
+    assert.deepStrictEqual(
+      st.morphTo[key],
+      want,
+      `${label}: morphTo.${key} is ${AUDIO_RIG_KEYS.includes(key) ? 'the live audio setup' : "the keep's value"}, unclamped`,
+    );
   }
 }
 assertMorphSpan(
@@ -118,38 +154,78 @@ const live = (seed, mode, castIds) => ({
   enabledAssets: Object.fromEntries(castIds.map((id) => [id, true])),
 });
 const shelf = boot();
-shelf.call('addKeep', captureFavorite(live(11, 'grid', [firstOf('geometric'), secondOf('geometric'), firstOf('stamps')]), 'praystation'));
-shelf.call('addKeep', captureFavorite(live(12, 'eden', [firstOf('radial'), firstOf('crystalline'), firstOf('linework')]), 'hydra'));
-shelf.call('addKeep', captureFavorite(live(13, 'orbit', [firstOf('floral'), firstOf('biosynthetic'), firstOf('dots')]), 'praystation'));
+shelf.call(
+  'addKeep',
+  captureFavorite(live(11, 'grid', [firstOf('geometric'), secondOf('geometric'), firstOf('stamps')]), 'praystation'),
+);
+shelf.call(
+  'addKeep',
+  captureFavorite(live(12, 'eden', [firstOf('radial'), firstOf('crystalline'), firstOf('linework')]), 'hydra'),
+);
+shelf.call(
+  'addKeep',
+  captureFavorite(live(13, 'orbit', [firstOf('floral'), firstOf('biosynthetic'), firstOf('dots')]), 'praystation'),
+);
 shelf.call('addKeep', captureFavorite(live(14, 'grid', [firstOf('organic'), 'user:custom_1']), 'kiln-columns'));
 shelf.call('addKeep', { seed: 15, timestamp: '', config: { layout: { mode: 'flow' }, palette: { id: 'v01d' } } }); // legacy: no cast
 const reloaded = boot();
 const keeps = keepsCoverage(reloaded.get().keeps);
-const keepsNote = "production ledger is browser-local (kc:keeps:v1) and absent in this environment — the cut above ran on records driven through the slice's own capture/persist path; keepsCoverage() consumes a real ledger export unchanged.";
+const keepsNote =
+  "production ledger is browser-local (kc:keeps:v1) and absent in this environment — the cut above ran on records driven through the slice's own capture/persist path; keepsCoverage() consumes a real ledger export unchanged.";
 
 // ---------------------------------------------------------------- the report
 console.log(formatCoverageReport({ dice, doors, evolve, keeps, keepsNote }));
 
 // ---------------------------------------------------------------- assertions
 const cat = Object.fromEntries(dice.categories.map((c) => [c.name, c]));
-assert.ok(dice.candidates.distinct >= 285, `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 282-292 by seed)`);
+assert.ok(
+  dice.candidates.distinct >= 285,
+  `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 282-292 by seed)`,
+);
 assert.ok(
   dice.tray.neverCount <= 40,
   `never-tray ceiling: ${dice.tray.neverCount} (#1546 measured 31 on this stream; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
 );
-assert.ok(cat.radial.inTray >= 15, `radial reaches the tray: ${cat.radial.inTray}/26 (#1546 measured 25; pre-fix audit 0-2)`);
-assert.ok(cat.crystalline.inTray >= 6, `crystalline reaches the tray: ${cat.crystalline.inTray}/12 (#1546 measured 10; pre-fix audit 0-2)`);
-assert.ok(cat.floral.inTray >= 8, `floral reaches the tray: ${cat.floral.inTray}/15 (#1546 measured 13; pre-fix audit 2)`);
-assert.ok(cat.biosynthetic.inTray >= 7, `biosynthetic reaches the tray: ${cat.biosynthetic.inTray}/12 (#1546 measured 11; pre-fix audit 2)`);
+assert.ok(
+  cat.radial.inTray >= 15,
+  `radial reaches the tray: ${cat.radial.inTray}/26 (#1546 measured 25; pre-fix audit 0-2)`,
+);
+assert.ok(
+  cat.crystalline.inTray >= 6,
+  `crystalline reaches the tray: ${cat.crystalline.inTray}/12 (#1546 measured 10; pre-fix audit 0-2)`,
+);
+assert.ok(
+  cat.floral.inTray >= 8,
+  `floral reaches the tray: ${cat.floral.inTray}/15 (#1546 measured 13; pre-fix audit 2)`,
+);
+assert.ok(
+  cat.biosynthetic.inTray >= 7,
+  `biosynthetic reaches the tray: ${cat.biosynthetic.inTray}/12 (#1546 measured 11; pre-fix audit 2)`,
+);
 const haeckel = dice.packs.find((p) => p.name === 'haeckel');
-assert.ok(haeckel.inTray >= 15, `haeckel pack reachable: ${haeckel.inTray}/20 (#1546 measured 20 — its radial half deals now)`);
+assert.ok(
+  haeckel.inTray >= 15,
+  `haeckel pack reachable: ${haeckel.inTray}/20 (#1546 measured 20 — its radial half deals now)`,
+);
 assert.strictEqual(dice.layoutsReached, dice.library.layouts, 'every layout mode reaches the tray');
-assert.ok(dice.trios.meanPairwiseJaccard <= 0.1, `PA1: finalist trios stay distinct (mean overlap ${(dice.trios.meanPairwiseJaccard * 100).toFixed(1)}%, audit 1.7%)`);
-assert.ok(dice.trios.hiOverlapPct <= 0.02, `PA1: >=50%-overlap trios stay rare (${(dice.trios.hiOverlapPct * 100).toFixed(2)}%, audit 0.3%)`);
-assert.ok(dice.tray.top15Share <= 0.35, `concentration bounded: top 15 take ${(dice.tray.top15Share * 100).toFixed(1)}% of slots (audit 21%)`);
+assert.ok(
+  dice.trios.meanPairwiseJaccard <= 0.1,
+  `PA1: finalist trios stay distinct (mean overlap ${(dice.trios.meanPairwiseJaccard * 100).toFixed(1)}%, audit 1.7%)`,
+);
+assert.ok(
+  dice.trios.hiOverlapPct <= 0.02,
+  `PA1: >=50%-overlap trios stay rare (${(dice.trios.hiOverlapPct * 100).toFixed(2)}%, audit 0.3%)`,
+);
+assert.ok(
+  dice.tray.top15Share <= 0.35,
+  `concentration bounded: top 15 take ${(dice.tray.top15Share * 100).toFixed(1)}% of slots (audit 21%)`,
+);
 
 assert.ok(doors.allInRange, 'RA2: every randomizeKey roll inside its declared range (REFINE_RANGES mirror holds)');
-assert.ok(doors.allQuartiles, 'RA2: every key reaches its top and bottom quartiles — no soft funnel in the CURATE door');
+assert.ok(
+  doors.allQuartiles,
+  'RA2: every key reaches its top and bottom quartiles — no soft funnel in the CURATE door',
+);
 assert.ok(evolve.allPresent, 'RA2: evolve targets carry all 18 keys when nothing is locked');
 assert.ok(evolve.allFinite, 'RA2: evolve targets are finite');
 assert.ok(evolve.locksRespected, 'RA2: evolve targets respect locks');
@@ -159,8 +235,14 @@ assert.strictEqual(keeps.withCast, 4, 'four keeps carry casts');
 assert.strictEqual(keeps.castless, 1, 'the legacy castless keep is counted, not dropped');
 assert.strictEqual(keeps.unknownIds, 1, 'the custom (user:) asset id is counted as unknown, not miscategorized');
 assert.strictEqual(keeps.distinctCategories, 9, 'the kept world spans 9 categories');
-assert.ok(keeps.categories.some((c) => c.name === 'radial'), 'keeps hold radial — the shelf reaches what the tray cannot');
-assert.ok(keeps.categories.some((c) => c.name === 'crystalline'), 'keeps hold crystalline');
+assert.ok(
+  keeps.categories.some((c) => c.name === 'radial'),
+  'keeps hold radial — the shelf reaches what the tray cannot',
+);
+assert.ok(
+  keeps.categories.some((c) => c.name === 'crystalline'),
+  'keeps hold crystalline',
+);
 assert.strictEqual(keeps.distinctPalettes, 4, 'keeps span 4 palettes');
 assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
 
@@ -187,35 +269,68 @@ assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
 // 28–37 never-tray; with an opinionated head the counts land BELOW it —
 // reach improves rather than degrades. That band call is the staging
 // report's, flagged for the coordinator, not silently re-baselined here.)
-const chainOf = (pairs, rest) => (pairs.length === 0
-  ? { leaf: rest }
-  : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) });
-const OPINIONATED = makeXgbScorer(validateTaste({
-  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'coverage fixture',
-  dims: 1152, labels: { likes: 10, passes: 10 },
-  head: {
-    kind: XGB_HEAD_KIND, objective: 'binary:logistic', baseScore: 0, fidelity: 0.9,
-    features: ['system'],
-    trees: [chainOf([['fibonacci', 1.2], ['orbit', 0.9], ['grid', 0.4], ['swarm', -0.9], ['eden', -0.5]], 0)],
-  },
-}).taste);
+const chainOf = (pairs, rest) =>
+  pairs.length === 0
+    ? { leaf: rest }
+    : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) };
+const OPINIONATED = makeXgbScorer(
+  validateTaste({
+    kind: 'kc-taste',
+    version: 1,
+    featuresVersion: FEATURES_VERSION,
+    model: 'coverage fixture',
+    dims: 1152,
+    labels: { likes: 10, passes: 10 },
+    head: {
+      kind: XGB_HEAD_KIND,
+      objective: 'binary:logistic',
+      baseScore: 0,
+      fidelity: 0.9,
+      features: ['system'],
+      trees: [
+        chainOf(
+          [
+            ['fibonacci', 1.2],
+            ['orbit', 0.9],
+            ['grid', 0.4],
+            ['swarm', -0.9],
+            ['eden', -0.5],
+          ],
+          0,
+        ),
+      ],
+    },
+  }).taste,
+);
 const FLAT = { id: 'xgb-head-v1', score: () => 0.5 };
 const SWEEP_SEEDS = [0x1504, 0x1505, 0x1506, 0x1507, 0x1508, 0x1509, 0x150a, 0x150b];
 for (const seed of SWEEP_SEEDS) {
   const off = diceTrayCoverage({ rolls: 600, seed });
   const flat = diceTrayCoverage({ rolls: 600, seed, ordering: { scorer: FLAT } });
-  const opin = diceTrayCoverage({ rolls: 600, seed, ordering: { scorer: OPINIONATED, meta: { tasteVersion: 1, headKind: XGB_HEAD_KIND } } });
+  const opin = diceTrayCoverage({
+    rolls: 600,
+    seed,
+    ordering: { scorer: OPINIONATED, meta: { tasteVersion: 1, headKind: XGB_HEAD_KIND } },
+  });
   assert.strictEqual(off.ordering, null, 'unordered census records no ordering');
   assert.strictEqual(opin.ordering.scorerId, 'xgb-head-v1', 'ordered census names its scorer');
-  for (const [name, on] of [['flat', flat], ['opinionated', opin]]) {
-    assert.ok(on.tray.neverCount <= off.tray.neverCount,
-      `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount}`);
-    assert.ok(on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard,
-      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered`);
-    assert.ok(on.tray.distinct >= off.tray.distinct,
-      `seed 0x${seed.toString(16)} ${name}: tray reach must not shrink`);
+  for (const [name, on] of [
+    ['flat', flat],
+    ['opinionated', opin],
+  ]) {
+    assert.ok(
+      on.tray.neverCount <= off.tray.neverCount,
+      `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount}`,
+    );
+    assert.ok(
+      on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard,
+      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered`,
+    );
+    assert.ok(on.tray.distinct >= off.tray.distinct, `seed 0x${seed.toString(16)} ${name}: tray reach must not shrink`);
   }
-  console.log(`  [t2 guard] seed 0x${seed.toString(16)}: never OFF ${off.tray.neverCount} · flat ${flat.tray.neverCount} · opin ${opin.tray.neverCount}; jac OFF ${(off.trios.meanPairwiseJaccard * 100).toFixed(2)}% · opin ${(opin.trios.meanPairwiseJaccard * 100).toFixed(2)}%`);
+  console.log(
+    `  [t2 guard] seed 0x${seed.toString(16)}: never OFF ${off.tray.neverCount} · flat ${flat.tray.neverCount} · opin ${opin.tray.neverCount}; jac OFF ${(off.trios.meanPairwiseJaccard * 100).toFixed(2)}% · opin ${(opin.trios.meanPairwiseJaccard * 100).toFixed(2)}%`,
+  );
 }
 // On the headline stream the opinionated head completes the #1546
 // rescue in-tray: every stratified family reaches its full library.
@@ -225,4 +340,6 @@ for (const fam of ['biosynthetic', 'crystalline', 'floral', 'radial']) {
   assert.strictEqual(c.inTray, c.inLibrary, `ordered headline: ${fam} fully tray-reached (${c.inTray}/${c.inLibrary})`);
 }
 
-console.log('coverage.selfcheck: OK (#1504 — RA1 tray census reproduces the audit band, RA2 doors honest, PA1 distinct, keeps cut on the real ledger path)');
+console.log(
+  'coverage.selfcheck: OK (#1504 — RA1 tray census reproduces the audit band, RA2 doors honest, PA1 distinct, keeps cut on the real ledger path)',
+);

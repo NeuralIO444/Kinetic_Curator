@@ -45,7 +45,10 @@ export function validateRouteOp(raw) {
   if (raw === undefined) return undefined;
   if (raw === null) return null; // an explicit "no edit": the caller treats null as nothing, never as malformed
   if (!isObj(raw) || !ROUTE_OPS.includes(raw.op) || !hasInput(raw.input)) return false;
-  if (raw.op === 'retarget') return hasTarget(raw.from) && hasTarget(raw.to) && raw.from !== raw.to ? { op: 'retarget', input: raw.input, from: raw.from, to: raw.to } : false;
+  if (raw.op === 'retarget')
+    return hasTarget(raw.from) && hasTarget(raw.to) && raw.from !== raw.to
+      ? { op: 'retarget', input: raw.input, from: raw.from, to: raw.to }
+      : false;
   if (!hasTarget(raw.target)) return false;
   if (raw.op === 'remove') return { op: 'remove', input: raw.input, target: raw.target };
   const depth = depthIn(raw.target, Number(raw.depth));
@@ -67,7 +70,12 @@ const pairIndex = (table, input, target) => table.findIndex((r) => r && r.input 
 export function applyRouteOp(table, op, by = null) {
   if (!Array.isArray(table) || !op) return null;
   // a row keeps its tag (`by`) unless this edit is the one that makes it Davis's
-  const routes = table.map((r) => ({ input: r.input, target: r.target, depth: r.depth, ...(r.by ? { by: r.by } : {}) }));
+  const routes = table.map((r) => ({
+    input: r.input,
+    target: r.target,
+    depth: r.depth,
+    ...(r.by ? { by: r.by } : {}),
+  }));
   const mark = (row) => (by ? { ...row, by } : row);
   if (op.op === 'add') {
     if (routes.length >= MAX_ROUTES || pairIndex(routes, op.input, op.target) >= 0) return null;
@@ -172,14 +180,22 @@ export function davisRoute(show, seed = 0) {
     const lvl = ENERGY_LEVELS[(order + rerolls + k) % ENERGY_LEVELS.length];
     for (const c of PRESETS[lvl]) if (fits(c)) pool.push(c);
   }
-  const start = pool.length ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length) : 0;
+  const start = pool.length
+    ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length)
+    : 0;
   const mine = table.filter((r) => r && r.by === DAVIS_TAG);
   // a flat show with a route of his: move it somewhere else (one move, no pile-up)
   if (rerolls > 0 && mine.length > 0) {
     const m = mine[0];
     for (let k = 0; k < pool.length; k++) {
       const c = pool[(start + k) % pool.length];
-      if (c.target === m.target || owned.has(c.target) || owned.has(m.target) || pairIndex(table, m.input, c.target) >= 0) continue;
+      if (
+        c.target === m.target ||
+        owned.has(c.target) ||
+        owned.has(m.target) ||
+        pairIndex(table, m.input, c.target) >= 0
+      )
+        continue;
       return { op: 'retarget', input: m.input, from: m.target, to: c.target };
     }
     return null;
@@ -229,21 +245,27 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
   const reading = () => {
     if (rows.length === 0) return { level: 0, spread: 0, full: false };
     const n = rows[0].length;
-    let level = 0; let spread = 0;
+    let level = 0;
+    let spread = 0;
     for (let b = 0; b < n; b++) {
       let mean = 0;
       for (const r of rows) mean += r[b];
       mean /= rows.length;
       let v = 0;
       for (const r of rows) v += (r[b] - mean) * (r[b] - mean);
-      level += mean; spread += Math.sqrt(v / rows.length);
+      level += mean;
+      spread += Math.sqrt(v / rows.length);
     }
     return { level: level / n, spread: spread / n, full: rows.length >= windowBars };
   };
   return {
     /** One sample per bar: an array of band levels (any length), or null for no audio (clears the run). */
     push(bands) {
-      if (!Array.isArray(bands) || bands.length === 0) { rows.length = 0; flatBars = 0; return false; }
+      if (!Array.isArray(bands) || bands.length === 0) {
+        rows.length = 0;
+        flatBars = 0;
+        return false;
+      }
       rows.push(bands.map(unit));
       if (rows.length > windowBars) rows.shift();
       const r = reading();
@@ -253,11 +275,16 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
     },
     flatBars: () => flatBars,
     /** LOIS's keep-rate read (flatBias): -1 loosens (how still it must be falls), +1 tightens (a livelier show is called flat). */
-    setBias(b) { epsNow = eps * (1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0)); },
+    setBias(b) {
+      epsNow = eps * (1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0));
+    },
     /** The spread under which the bands read as held, as moved by the bias. */
     threshold: () => epsNow,
     reading,
-    reset() { rows.length = 0; flatBars = 0; },
+    reset() {
+      rows.length = 0;
+      flatBars = 0;
+    },
   };
 }
 
@@ -276,7 +303,9 @@ export function createConductor() {
   let reverts = 0;
   let coolUntil = -Infinity;
   return {
-    touch(targets) { for (const t of Array.isArray(targets) ? targets : [targets]) if (hasTarget(t)) owned.add(t); },
+    touch(targets) {
+      for (const t of Array.isArray(targets) ? targets : [targets]) if (hasTarget(t)) owned.add(t);
+    },
     owned: () => [...owned].sort(),
     isOwned: (t) => owned.has(t),
     consider(op, { bar, tier } = {}) {
@@ -291,12 +320,22 @@ export function createConductor() {
       while (phrases.has(phraseOf(landBar))) landBar += PHRASE_BARS;
       return { ok: true, landBar };
     },
-    commit(landBar) { if (Number.isInteger(landBar)) phrases.add(phraseOf(landBar)); },
+    commit(landBar) {
+      if (Number.isInteger(landBar)) phrases.add(phraseOf(landBar));
+    },
     revert(bar) {
       reverts++;
-      if (reverts >= BACKOFF_REVERTS && Number.isInteger(bar)) { coolUntil = bar + BACKOFF_BARS; reverts = 0; }
+      if (reverts >= BACKOFF_REVERTS && Number.isInteger(bar)) {
+        coolUntil = bar + BACKOFF_BARS;
+        reverts = 0;
+      }
     },
     cooling: (bar) => bar < coolUntil,
-    reset() { owned.clear(); phrases.clear(); reverts = 0; coolUntil = -Infinity; },
+    reset() {
+      owned.clear();
+      phrases.clear();
+      reverts = 0;
+      coolUntil = -Infinity;
+    },
   };
 }

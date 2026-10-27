@@ -24,7 +24,14 @@ import { hashU32 } from '../engine/kernel/rng.js';
  *   artistChose?: boolean }} p  artistChose: the store's `paletteChosen` (the artist picked or edited the palette)
  * @returns {string|null} the palette id to switch to, or null to leave the palette alone.
  */
-export function curatePaletteTarget({ phase, profile, paletteId, artistChose = false, seed = null, seedOffsets = null }) {
+export function curatePaletteTarget({
+  phase,
+  profile,
+  paletteId,
+  artistChose = false,
+  seed = null,
+  seedOffsets = null,
+}) {
   if (!profile || typeof profile.paletteId !== 'string' || !profile.paletteId) return null;
   if (phase === PHASE_REFINE) return null;
   if (artistChose) return null; // #1365 Q1: the artist's palette is theirs, in explore too

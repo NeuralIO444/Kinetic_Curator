@@ -17,7 +17,10 @@ const listeners = new Set();
 let timer = null;
 let snapshot = new Set(); // pending ids, replaced on every change (what useSyncExternalStore reads)
 
-const notify = () => { snapshot = new Set(gates.keys()); listeners.forEach((f) => f()); };
+const notify = () => {
+  snapshot = new Set(gates.keys());
+  listeners.forEach((f) => f());
+};
 
 // The poll runs only while something is pending. rAF in the browser; a timer elsewhere (node selfchecks).
 const raf = (fn) => (typeof requestAnimationFrame === 'function' ? requestAnimationFrame(fn) : setTimeout(fn, 16));
@@ -25,7 +28,11 @@ const caf = (h) => (typeof cancelAnimationFrame === 'function' ? cancelAnimation
 
 function schedule() {
   if (timer != null || gates.size === 0) return;
-  timer = raf(() => { timer = null; tickPatternShuffles(); schedule(); });
+  timer = raf(() => {
+    timer = null;
+    tickPatternShuffles();
+    schedule();
+  });
 }
 
 function fire(id) {
@@ -38,8 +45,13 @@ export function requestPatternShuffle(id) {
   const s = useStore.getState();
   const layer = s.layers.find((l) => l.id === id && l.type === 'pattern');
   if (!layer) return;
-  const r = requestShuffle(gates.get(id) ?? createShuffleGate(), { drop: layer.pattern?.drop === true, bpm: s.beatBpm, loopMs: loopClock.ms });
-  if (r.fire) fire(id); else gates.set(id, r.gate);
+  const r = requestShuffle(gates.get(id) ?? createShuffleGate(), {
+    drop: layer.pattern?.drop === true,
+    bpm: s.beatBpm,
+    loopMs: loopClock.ms,
+  });
+  if (r.fire) fire(id);
+  else gates.set(id, r.gate);
   notify();
   schedule();
 }
@@ -51,18 +63,35 @@ export function tickPatternShuffles() {
   let changed = false;
   for (const [id, gate] of [...gates]) {
     const layer = s.layers.find((l) => l.id === id && l.type === 'pattern');
-    if (!layer) { gates.delete(id); changed = true; continue; } // the track went away: nothing to land on
+    if (!layer) {
+      gates.delete(id);
+      changed = true;
+      continue;
+    } // the track went away: nothing to land on
     const r = tickShuffle(gate, { drop: layer.pattern?.drop === true, bpm: s.beatBpm, loopMs: loopClock.ms });
-    if (r.fire) { fire(id); changed = true; } else if (r.gate !== gate) { gates.set(id, r.gate); }
+    if (r.fire) {
+      fire(id);
+      changed = true;
+    } else if (r.gate !== gate) {
+      gates.set(id, r.gate);
+    }
   }
   if (changed) notify();
 }
 
 export const isShufflePending = (id) => gates.has(id);
-export const subscribePending = (f) => { listeners.add(f); return () => listeners.delete(f); };
+export const subscribePending = (f) => {
+  listeners.add(f);
+  return () => listeners.delete(f);
+};
 export const pendingSnapshot = () => snapshot;
 
 /** Test hook: forget every pending shuffle and stop polling. */
 export function resetPatternShuffle() {
-  gates.clear(); if (timer != null) { caf(timer); timer = null; } notify();
+  gates.clear();
+  if (timer != null) {
+    caf(timer);
+    timer = null;
+  }
+  notify();
 }

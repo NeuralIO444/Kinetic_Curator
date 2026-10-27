@@ -2,17 +2,31 @@
 // #1355 step 5 — limb count over a life: the crowd gives a moth its second pair of wings and takes it away again.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { MAX_PAIRS, LIMB_GROW_AT, LIMB_SHED_AT, LIMB_GROW_FRAMES, LIMB_SHED_FRAMES, createLimbTracker } from './limbs.js';
+import {
+  MAX_PAIRS,
+  LIMB_GROW_AT,
+  LIMB_SHED_AT,
+  LIMB_GROW_FRAMES,
+  LIMB_SHED_FRAMES,
+  createLimbTracker,
+} from './limbs.js';
 import { observeFormation, getLimbPairs, getFormedPins, resetFormation } from './formationLive.js';
 import { fertilityField, FORM_HOLD_FRAMES } from './formation.js';
 
 const st = (density, over = {}) => ({ x: 100, y: 100, formed: true, density, ...over });
-const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(states); return r; };
+const run = (t, states, n) => {
+  let r;
+  for (let i = 0; i < n; i++) r = t.update(states);
+  return r;
+};
 
 // 1. the limits: two pairs is the most (four wings: the TE four limbs), and the gap between the thresholds is real
 {
   assert.equal(MAX_PAIRS, 2);
-  assert.ok(LIMB_SHED_AT < LIMB_GROW_AT, 'hysteresis: the crowd that sheds a pair is thinner than the crowd that grows it');
+  assert.ok(
+    LIMB_SHED_AT < LIMB_GROW_AT,
+    'hysteresis: the crowd that sheds a pair is thinner than the crowd that grows it',
+  );
   assert.ok(LIMB_SHED_FRAMES > LIMB_GROW_FRAMES, 'a limb is lost more slowly than it is gained');
 }
 
@@ -27,7 +41,10 @@ const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(
 // 3. a crowd that comes and goes does not count: the run must be unbroken
 {
   const t = createLimbTracker();
-  for (let i = 0; i < 4; i++) { run(t, [st(0.9)], LIMB_GROW_FRAMES - 5); run(t, [st(0.1)], 1); }
+  for (let i = 0; i < 4; i++) {
+    run(t, [st(0.9)], LIMB_GROW_FRAMES - 5);
+    run(t, [st(0.1)], 1);
+  }
   assert.deepEqual(t.update([st(0.9)]), [1], 'broken runs never add up');
 }
 
@@ -55,7 +72,11 @@ const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(
   run(u, [st(1)], LIMB_GROW_FRAMES);
   assert.deepEqual(u.update([st(1, { x: 300 })]), [1], 'a moved pin is a new creature');
   const v = createLimbTracker();
-  assert.deepEqual(run(v, [st(1), st(0, { x: 5 }), null], LIMB_GROW_FRAMES), [2, 1, 1], 'pins are independent; a missing pin reads one pair');
+  assert.deepEqual(
+    run(v, [st(1), st(0, { x: 5 }), null], LIMB_GROW_FRAMES),
+    [2, 1, 1],
+    'pins are independent; a missing pin reads one pair',
+  );
   assert.deepEqual(createLimbTracker().update([st(NaN)]), [1], 'junk density is no crowd');
 }
 
@@ -64,7 +85,8 @@ const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(
   resetFormation();
   const f = fertilityField(5, null, 1000, 700);
   let spot = null;
-  for (let x = 25; x < 1000 && !spot; x += 25) for (let y = 25; y < 700 && !spot; y += 25) if (f.at(x, y) > 0.7) spot = { x, y };
+  for (let x = 25; x < 1000 && !spot; x += 25)
+    for (let y = 25; y < 700 && !spot; y += 25) if (f.at(x, y) > 0.7) spot = { x, y };
   assert.ok(spot);
   const crowd = (n) => [{ items: Array.from({ length: n }, (_, i) => ({ x: spot.x + (i % 4), y: spot.y + (i % 3) })) }];
   const inp = { dishPins: [spot], canvasW: 1000, canvasH: 700, seed: 5, seedOffsets: null };
@@ -82,10 +104,16 @@ const run = (t, states, n) => { let r; for (let i = 0; i < n; i++) r = t.update(
   const src = readFileSync(new URL('./limbs.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|Math\.random/.test(src), 'no clock, no chance');
   const loop = readFileSync(new URL('../gl/liveLoop.mjs', import.meta.url), 'utf8');
-  assert.ok(/dishLimbs: spawnDecisions \? spawnDecisions\.dishLimbs/.test(loop), 'the loop passes dishLimbs in the resolver input');
+  assert.ok(
+    /dishLimbs: spawnDecisions \? spawnDecisions\.dishLimbs/.test(loop),
+    'the loop passes dishLimbs in the resolver input',
+  );
   // #1694 slice 1 — the decision's source moved: the resolver publishes it (no provider registered by App any more)
   const resolve = readFileSync(new URL('../gl/liveResolve.mjs', import.meta.url), 'utf8');
-  assert.ok(/lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve), 'the resolver publishes the spawn decisions');
+  assert.ok(
+    /lastSpawnDecisions = spawnState\.observe\(input, out\)/.test(resolve),
+    'the resolver publishes the spawn decisions',
+  );
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(!/setLimbsProvider/.test(app), 'the provider channel is retired');
 }

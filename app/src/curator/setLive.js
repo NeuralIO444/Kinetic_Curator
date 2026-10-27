@@ -15,7 +15,11 @@ import { setSetMagnitude } from './swayView.mjs';
 
 /** Which moods the room asks for (Davis's state), widest first. */
 const VIBES_FOR = Object.freeze({
-  FLOW: ['drive'], SEEDLING: ['calm', 'sparse'], STUCK: ['shift', 'weird'], UGLY: ['sparse', 'calm'], BLOOM: ['lift', 'drive'],
+  FLOW: ['drive'],
+  SEEDLING: ['calm', 'sparse'],
+  STUCK: ['shift', 'weird'],
+  UGLY: ['sparse', 'calm'],
+  BLOOM: ['lift', 'drive'],
 });
 const DEFAULT_VIBES = ['calm'];
 /** What the stress band asks of the stage. */
@@ -54,14 +58,19 @@ export function choosePattern({ vibes, bpm, seed, slot, lib = BEATS }) {
  */
 export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, getSeed }) {
   const arbiter = createSourceArbiter();
-  let current = null; let slot = -1;
+  let current = null;
+  let slot = -1;
   const feed = (loopMs) => {
     const bpm = Number(getBpm()) || 120;
     const barMs = (60000 / bpm) * 4;
     const idle = Number(getIdleMs());
     const st = arbiter.update(loopMs, idle, getRealLevel(), barMs);
     setSetMagnitude(st.mix > 0.05 ? 0.5 + 0.5 * st.mix : 0);
-    if (st.mix <= 0) { current = null; slot = -1; return null; }
+    if (st.mix <= 0) {
+      current = null;
+      slot = -1;
+      return null;
+    }
     const t = getMusicalTime();
     const s = Math.floor(barOf(t) / HOLD_BARS);
     if (!current || s !== slot) {
@@ -74,5 +83,14 @@ export function createSet({ getBpm, getIdleMs, getRealLevel, getRoom, getBand, g
     const lv = playLevels(current, t.pos, { intensity });
     return { mix: st.mix, coarse: lv.coarse, bands: lv.bands, source: st.source, pattern: current.id };
   };
-  return { feed, source: () => arbiter.mix(), reset() { arbiter.reset(); current = null; slot = -1; setSetMagnitude(0); } };
+  return {
+    feed,
+    source: () => arbiter.mix(),
+    reset() {
+      arbiter.reset();
+      current = null;
+      slot = -1;
+      setSetMagnitude(0);
+    },
+  };
 }

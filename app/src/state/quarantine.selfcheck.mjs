@@ -11,7 +11,9 @@ globalThis.localStorage = {
   setItem: (k, v) => {
     const s = String(v);
     if (used() - (store.get(k)?.length ?? 0) + s.length > quota) {
-      const e = new Error('full'); e.name = 'QuotaExceededError'; throw e;
+      const e = new Error('full');
+      e.name = 'QuotaExceededError';
+      throw e;
     }
     store.set(k, s);
   },
@@ -19,11 +21,21 @@ globalThis.localStorage = {
 };
 
 const {
-  readPipelineAutosave, writePipelineAutosave, readQuarantine, readQuarantineAll,
-  QUARANTINE_KEY, QUARANTINE_CAP, PIPELINE_KEY, PIPELINE_BACKUP_KEY, AUTOSAVE_KEY,
+  readPipelineAutosave,
+  writePipelineAutosave,
+  readQuarantine,
+  readQuarantineAll,
+  QUARANTINE_KEY,
+  QUARANTINE_CAP,
+  PIPELINE_KEY,
+  PIPELINE_BACKUP_KEY,
+  AUTOSAVE_KEY,
 } = await import('./projectDocument.js');
 
-const reset = () => { store.clear(); quota = Infinity; };
+const reset = () => {
+  store.clear();
+  quota = Infinity;
+};
 
 // 1. Primary, backup and legacy all unreadable: all three raws survive, newest work first.
 {
@@ -52,7 +64,10 @@ const reset = () => { store.clear(); quota = Infinity; };
   readPipelineAutosave();
   store.set(PIPELINE_KEY, '{ tuesday');
   readPipelineAutosave();
-  assert.deepEqual(readQuarantineAll().map((e) => e.raw), ['{ tuesday', '{ monday']);
+  assert.deepEqual(
+    readQuarantineAll().map((e) => e.raw),
+    ['{ tuesday', '{ monday'],
+  );
 }
 
 // 3. The list is capped, oldest dropped.
@@ -75,7 +90,10 @@ const reset = () => { store.clear(); quota = Infinity; };
   assert.equal(readQuarantine().raw, '{ legacy-shape');
   store.set(PIPELINE_KEY, '{ new');
   readPipelineAutosave();
-  assert.deepEqual(readQuarantineAll().map((e) => e.raw), ['{ new', '{ legacy-shape']);
+  assert.deepEqual(
+    readQuarantineAll().map((e) => e.raw),
+    ['{ new', '{ legacy-shape'],
+  );
 }
 
 // 5. No room for the quarantine copy: the source key is left in place, not deleted.

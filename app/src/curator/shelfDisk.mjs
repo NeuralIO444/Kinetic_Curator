@@ -71,23 +71,33 @@ export function parseShelfExportPrefs(text) {
   const lines = [];
   let doc = null;
   if (typeof text === 'string' && text.trim() !== '') {
-    try { doc = JSON.parse(text); } catch { doc = null; }
+    try {
+      doc = JSON.parse(text);
+    } catch {
+      doc = null;
+    }
   }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return { exportPrefs: DEFAULT_EXPORT_PREFS, lines };
-  const shelf = (doc.shelf && typeof doc.shelf === 'object' && !Array.isArray(doc.shelf)) ? doc.shelf : {};
-  const raw = (shelf.export && typeof shelf.export === 'object' && !Array.isArray(shelf.export)) ? shelf.export : {};
+  const shelf = doc.shelf && typeof doc.shelf === 'object' && !Array.isArray(doc.shelf) ? doc.shelf : {};
+  const raw = shelf.export && typeof shelf.export === 'object' && !Array.isArray(shelf.export) ? shelf.export : {};
 
   let folder = DEFAULT_EXPORT_PREFS.folder;
   if (raw.folder !== undefined && raw.folder !== null) {
     if (raw.folder === EXPORT_FOLDER) folder = EXPORT_FOLDER;
-    else lines.push(`shelf.export.folder: ${JSON.stringify(raw.folder)} is not the loot folder's looks/ — exports land in ${EXPORT_FOLDER}`);
+    else
+      lines.push(
+        `shelf.export.folder: ${JSON.stringify(raw.folder)} is not the loot folder's looks/ — exports land in ${EXPORT_FOLDER}`,
+      );
   }
   const includeStills = boolOr(raw.includeStills, 'includeStills', DEFAULT_EXPORT_PREFS.includeStills, lines);
   const includeSeeds = boolOr(raw.includeSeeds, 'includeSeeds', DEFAULT_EXPORT_PREFS.includeSeeds, lines);
   let onSoftBound = DEFAULT_EXPORT_PREFS.onSoftBound;
   if (raw.onSoftBound !== undefined && raw.onSoftBound !== null) {
     if (EXPORT_ON_SOFT_BOUND.includes(raw.onSoftBound)) onSoftBound = raw.onSoftBound;
-    else lines.push(`shelf.export.onSoftBound: ${JSON.stringify(raw.onSoftBound)} is not a behaviour the shelf has (export, or off) — export stands`);
+    else
+      lines.push(
+        `shelf.export.onSoftBound: ${JSON.stringify(raw.onSoftBound)} is not a behaviour the shelf has (export, or off) — export stands`,
+      );
   }
   return { exportPrefs: { folder, includeStills, includeSeeds, onSoftBound }, lines };
 }
@@ -136,7 +146,11 @@ export function serializeExport(keep, exportPrefs = DEFAULT_EXPORT_PREFS) {
 export function parseExportDocument(text) {
   if (typeof text !== 'string' || text.trim() === '') return null;
   let doc;
-  try { doc = JSON.parse(text); } catch { return null; }
+  try {
+    doc = JSON.parse(text);
+  } catch {
+    return null;
+  }
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return null;
   if (typeof doc.id !== 'string' || !doc.id) return null;
   return { keep: doc };
@@ -159,25 +173,34 @@ export function parseExportDocument(text) {
  * the protected set.
  */
 export function planExports({
-  keeps = [], stageIds = [], bound = 400, exportPrefs = DEFAULT_EXPORT_PREFS,
-  sessionStartMs = 0, performingKeepId = null,
+  keeps = [],
+  stageIds = [],
+  bound = 400,
+  exportPrefs = DEFAULT_EXPORT_PREFS,
+  sessionStartMs = 0,
+  performingKeepId = null,
 } = {}) {
   const over = Math.max(0, (keeps || []).length - Math.max(0, Math.floor(Number(bound) || 0)));
   if (over === 0 || !exportPrefs || exportPrefs.onSoftBound === 'off') return { victims: [], over, lines: [] };
   const staged = new Set(stageIds || []);
   const stamp = (k, key) => (Number.isFinite(k?.[key]) ? k[key] : null);
-  const eligible = (keeps || []).filter((k) => k
-    && !staged.has(k.id)
-    && k.id !== performingKeepId
-    && !(sessionStartMs > 0 && (stamp(k, 'lastStagedAt') ?? -Infinity) >= sessionStartMs));
+  const eligible = (keeps || []).filter(
+    (k) =>
+      k &&
+      !staged.has(k.id) &&
+      k.id !== performingKeepId &&
+      !(sessionStartMs > 0 && (stamp(k, 'lastStagedAt') ?? -Infinity) >= sessionStartMs),
+  );
   const byUnstaged = (a, b) =>
-    ((stamp(a, 'lastStagedAt') ?? -Infinity) - (stamp(b, 'lastStagedAt') ?? -Infinity))
-    || ((stamp(a, 'keptAt') ?? -Infinity) - (stamp(b, 'keptAt') ?? -Infinity))
-    || (String(a.id) < String(b.id) ? -1 : 1);
+    (stamp(a, 'lastStagedAt') ?? -Infinity) - (stamp(b, 'lastStagedAt') ?? -Infinity) ||
+    (stamp(a, 'keptAt') ?? -Infinity) - (stamp(b, 'keptAt') ?? -Infinity) ||
+    (String(a.id) < String(b.id) ? -1 : 1);
   const victims = [...eligible].sort(byUnstaged).slice(0, over);
   const lines = [];
   if (victims.length < over) {
-    lines.push(`over the soft bound with nothing more exportable — the stage and this session hold the other ${over - victims.length}`);
+    lines.push(
+      `over the soft bound with nothing more exportable — the stage and this session hold the other ${over - victims.length}`,
+    );
   }
   return { victims, over, lines };
 }
@@ -240,7 +263,12 @@ export function sanitizeDiskStub(raw) {
     label: stubStr(raw.label, 160),
     mode: stubStr(raw.mode, 80),
     paletteId: stubStr(raw.paletteId, 80),
-    families: Array.isArray(raw.families) ? raw.families.filter((f) => typeof f === 'string').map((f) => f.slice(0, 40)).slice(0, 12) : [],
+    families: Array.isArray(raw.families)
+      ? raw.families
+          .filter((f) => typeof f === 'string')
+          .map((f) => f.slice(0, 40))
+          .slice(0, 12)
+      : [],
     origin: stubStr(raw.origin, 40),
     corner: stubStr(raw.corner, 40),
     keptAt: stubNum(raw.keptAt),
@@ -256,7 +284,8 @@ export function sanitizeDiskStub(raw) {
 export function sanitizeDiskIndex(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw) || raw.v !== 1) return { v: 1, root: null, stubs: {} };
   const stubs = {};
-  const entries = (raw.stubs && typeof raw.stubs === 'object' && !Array.isArray(raw.stubs)) ? Object.entries(raw.stubs) : [];
+  const entries =
+    raw.stubs && typeof raw.stubs === 'object' && !Array.isArray(raw.stubs) ? Object.entries(raw.stubs) : [];
   for (const [id, s] of entries) {
     const clean = sanitizeDiskStub(s);
     if (clean && clean.id === id) stubs[id] = clean;

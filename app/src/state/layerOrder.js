@@ -23,13 +23,17 @@ export const isAdjustment = (l) => isFx(l) || isMath(l);
 export function fxBeforeMath(layers) {
   if (!Array.isArray(layers)) return { layers, moved: false };
   const slots = [];
-  layers.forEach((l, i) => { if (isAdjustment(l)) slots.push(i); });
+  layers.forEach((l, i) => {
+    if (isAdjustment(l)) slots.push(i);
+  });
   const adj = slots.map((i) => layers[i]);
   const sorted = [...adj.filter(isFx), ...adj.filter(isMath)];
   const moved = sorted.some((l, k) => l !== adj[k]);
   if (!moved) return { layers, moved: false };
   const out = layers.slice();
-  slots.forEach((idx, k) => { out[idx] = sorted[k]; });
+  slots.forEach((idx, k) => {
+    out[idx] = sorted[k];
+  });
   return { layers: out, moved: true };
 }
 

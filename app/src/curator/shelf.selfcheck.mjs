@@ -26,15 +26,31 @@ import assert from 'node:assert';
 const mem = new Map();
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 
 const {
-  STAGE_BUDGET, ON_SHELF_COPY, ON_DECK_COPY, SWAP_BUDGET_COPY, COLLECTION_SOFT_BOUND,
-  stageRecords, stageSlotsUsed, tierOf, stageFits, routeCrown, admitToStage,
-  deriveStageIds, sanitizeStageIds, swapSlots, shelfRows,
-  crownHistoryRecord, swapHistoryRecord, sanitizeHistoryRecord,
+  STAGE_BUDGET,
+  ON_SHELF_COPY,
+  ON_DECK_COPY,
+  SWAP_BUDGET_COPY,
+  COLLECTION_SOFT_BOUND,
+  stageRecords,
+  stageSlotsUsed,
+  tierOf,
+  stageFits,
+  routeCrown,
+  admitToStage,
+  deriveStageIds,
+  sanitizeStageIds,
+  swapSlots,
+  shelfRows,
+  crownHistoryRecord,
+  swapHistoryRecord,
+  sanitizeHistoryRecord,
 } = await import('./shelf.mjs');
 const { LOOK_SLOT_BUDGET, MINED_SLOT_COST } = await import('./candidateTray.mjs');
 const { createDavisSlice, sanitizeFavorite, KEEPS_KEY, STAGE_KEY } = await import('../state/slices/davisSlice.js');
@@ -45,26 +61,41 @@ const { PALETTES } = await import('../data/palettes.js');
 const lines = [];
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
-const radialIds = ASSETS.filter((a) => a.category === 'radial').slice(0, 3).map((a) => a.id);
+const radialIds = ASSETS.filter((a) => a.category === 'radial')
+  .slice(0, 3)
+  .map((a) => a.id);
 
 const hand = (id, extra = {}) => ({
-  id, seed: 100, timestamp: '2026-10-01T00:00:00.000Z',
+  id,
+  seed: 100,
+  timestamp: '2026-10-01T00:00:00.000Z',
   config: { layout: { mode: 'grid', count: 30 }, palette: { id: 'bone' }, assets: radialIds.slice(0, 2) },
   ...extra,
 });
-const mined = (id, extra = {}) => hand(id, {
-  provenance: { source: 'explorer', run: 'xpl-1', corner: 'haeckel', axes: { layout: 'radial', palette: 'hydra', castSize: 3 } },
-  ...extra,
-});
+const mined = (id, extra = {}) =>
+  hand(id, {
+    provenance: {
+      source: 'explorer',
+      run: 'xpl-1',
+      corner: 'haeckel',
+      axes: { layout: 'radial', palette: 'hydra', castSize: 3 },
+    },
+    ...extra,
+  });
 const handList = (n, from = 0) => Array.from({ length: n }, (_, i) => hand(`k${from + i}`));
 
 function boot() {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set);
   return { get: () => state, call: (name, ...a) => state[name](...a) };
 }
-const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
+const resetStorage = () => {
+  mem.delete(KEEPS_KEY);
+  mem.delete(STAGE_KEY);
+};
 
 // ── the budget is the E3 budget, folded into the stage ───────────────
 {
@@ -78,7 +109,11 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
 {
   const twenty = handList(20);
   const stage = deriveStageIds(twenty);
-  assert.deepStrictEqual(stage, twenty.slice(4).map((k) => k.id), 'all-hand: the 16 most recent, in collection order');
+  assert.deepStrictEqual(
+    stage,
+    twenty.slice(4).map((k) => k.id),
+    'all-hand: the 16 most recent, in collection order',
+  );
 
   const mixed = [...handList(15), mined('m15')];
   const mixedStage = deriveStageIds(mixed);
@@ -88,18 +123,31 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   assert.strictEqual(stageSlotsUsed(mixed, mixedStage), 16);
 
   const huge = handList(250);
-  assert.deepStrictEqual(deriveStageIds(huge), huge.slice(-16).map((k) => k.id), 'past the old cap: still exactly the newest 16');
+  assert.deepStrictEqual(
+    deriveStageIds(huge),
+    huge.slice(-16).map((k) => k.id),
+    'past the old cap: still exactly the newest 16',
+  );
   assert.deepStrictEqual(deriveStageIds([]), []);
-  lines.push('derive: newest-first admission under the budget, returned in collection order; all-hand = the 16 most recent');
+  lines.push(
+    'derive: newest-first admission under the budget, returned in collection order; all-hand = the 16 most recent',
+  );
 }
 
 // ── the stored stage is a trust boundary ──────────────────────────────
 {
   const keeps = handList(20);
-  assert.deepStrictEqual(sanitizeStageIds(['k19', 'k19', 'nope', 7, 'k18'], keeps), ['k19', 'k18'],
-    'dupes, junk and unknown ids drop; real membership survives');
+  assert.deepStrictEqual(
+    sanitizeStageIds(['k19', 'k19', 'nope', 7, 'k18'], keeps),
+    ['k19', 'k18'],
+    'dupes, junk and unknown ids drop; real membership survives',
+  );
   const over = sanitizeStageIds([...handList(15).map((k) => k.id), 'mX'], [...handList(15), mined('mX')]);
-  assert.strictEqual(stageSlotsUsed([...handList(15), mined('mX')], over), 16, 'an over-budget stored stage (17) trims its OLDEST ids back to the budget');
+  assert.strictEqual(
+    stageSlotsUsed([...handList(15), mined('mX')], over),
+    16,
+    'an over-budget stored stage (17) trims its OLDEST ids back to the budget',
+  );
   assert.ok(!over.includes('k0'), 'the trimmed id is the oldest staged one');
   assert.deepStrictEqual(sanitizeStageIds('junk', keeps), []);
   lines.push('sanitize stage: strings only, deduped, must name real keeps, budget repaired from the oldest end');
@@ -113,12 +161,20 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   assert.strictEqual(r1.lands, 'stage');
   assert.strictEqual(r1.stageIds.at(-1), 'new');
   const r2 = routeCrown(keeps, stageIds, mined('newM'));
-  assert.strictEqual(r2.lands, 'collection', 'at 15 slots a mined crown (cost 2) lands in the collection — not refused, not evicting');
+  assert.strictEqual(
+    r2.lands,
+    'collection',
+    'at 15 slots a mined crown (cost 2) lands in the collection — not refused, not evicting',
+  );
   assert.deepStrictEqual(r2.stageIds, stageIds, 'a collection landing leaves the stage untouched');
   assert.strictEqual(stageFits([], [], mined('x')).fits, true, 'an empty stage takes a mined crown');
   assert.strictEqual(tierOf('k0', stageIds), 'stage');
   assert.strictEqual(tierOf('k0', []), 'collection');
-  assert.deepStrictEqual(stageRecords(keeps, ['k2', 'k0']).map((k) => k.id), ['k2', 'k0'], 'stage order is the id list order');
+  assert.deepStrictEqual(
+    stageRecords(keeps, ['k2', 'k0']).map((k) => k.id),
+    ['k2', 'k0'],
+    'stage order is the id list order',
+  );
   lines.push('route: fits → stage slot (appended); full → collection, stage untouched; the crown always lands');
 }
 
@@ -133,9 +189,18 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   assert.strictEqual(pinned.copy, ON_DECK_COPY, 'the performing Look’s slot refuses, with its line (S1)');
   assert.deepStrictEqual(pinned.stageIds, ids, 'a refused swap changes nothing');
   const full = [...handList(16), mined('mIn')];
-  const over = swapSlots(full, handList(16).map((k) => k.id), 'k0', 'mIn');
+  const over = swapSlots(
+    full,
+    handList(16).map((k) => k.id),
+    'k0',
+    'mIn',
+  );
   assert.strictEqual(over.ok, false);
-  assert.strictEqual(over.copy, SWAP_BUDGET_COPY, 'a hand→mined exchange at a full stage overfills (+1) and refuses, with its line');
+  assert.strictEqual(
+    over.copy,
+    SWAP_BUDGET_COPY,
+    'a hand→mined exchange at a full stage overfills (+1) and refuses, with its line',
+  );
   assert.strictEqual(swapSlots(keeps, ids, 'k1', 'k2').ok, false, 'the incoming keep must be off-stage');
   assert.strictEqual(swapSlots(keeps, ids, 'zz', 'x').ok, false, 'the outgoing keep must be on-stage');
   const adm = admitToStage(keeps, ids, keeps[3]);
@@ -149,9 +214,17 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
 {
   assert.deepStrictEqual(crownHistoryRecord('a', 'stage', 5), { kind: 'crown', keepId: 'a', tier: 'stage', at: 5 });
   assert.deepStrictEqual(swapHistoryRecord(null, 'b', 6), { kind: 'swap', outId: null, inId: 'b', at: 6 });
-  assert.deepStrictEqual(sanitizeHistoryRecord({ kind: 'crown', keepId: 'a', tier: 'stage', at: 5.7 }),
-    { kind: 'crown', keepId: 'a', tier: 'stage', at: 5 });
-  assert.strictEqual(sanitizeHistoryRecord({ kind: 'fill', keepId: 'a' }), null, 'K2 kinds are not K1 records — junk to this reader');
+  assert.deepStrictEqual(sanitizeHistoryRecord({ kind: 'crown', keepId: 'a', tier: 'stage', at: 5.7 }), {
+    kind: 'crown',
+    keepId: 'a',
+    tier: 'stage',
+    at: 5,
+  });
+  assert.strictEqual(
+    sanitizeHistoryRecord({ kind: 'fill', keepId: 'a' }),
+    null,
+    'K2 kinds are not K1 records — junk to this reader',
+  );
   assert.strictEqual(sanitizeHistoryRecord({ kind: 'crown', keepId: 'a', tier: 'attic' }), null);
   lines.push('history: crown/swap flat records; sanitize floors the stamp and drops off-shape records whole');
 }
@@ -160,22 +233,52 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
 {
   const keeps = [
     hand('a', { keptAt: 100, config: { layout: { mode: 'grid' }, palette: { id: 'bone' }, assets: radialIds } }),
-    hand('b', { keptAt: 300, stagedCount: 2, lastStagedAt: 50, config: { layout: { mode: 'phi' }, palette: { id: 'hydra' }, assets: radialIds.slice(0, 1) } }),
+    hand('b', {
+      keptAt: 300,
+      stagedCount: 2,
+      lastStagedAt: 50,
+      config: { layout: { mode: 'phi' }, palette: { id: 'hydra' }, assets: radialIds.slice(0, 1) },
+    }),
     mined('c', { keptAt: 200, config: { layout: { mode: 'radial' }, palette: { id: 'hydra' }, assets: radialIds } }),
   ];
   const rows = shelfRows(keeps, ['b'], { assetsById, palettesById });
-  assert.deepStrictEqual(rows.map((r) => r.id), ['b', 'c', 'a'], 'kept sort: newest kept first');
+  assert.deepStrictEqual(
+    rows.map((r) => r.id),
+    ['b', 'c', 'a'],
+    'kept sort: newest kept first',
+  );
   assert.strictEqual(rows.find((r) => r.id === 'b').tier, 'stage');
   assert.strictEqual(rows.find((r) => r.id === 'a').stagedCount, null, 'never staged reads null — absent, not zero');
   assert.ok(rows.find((r) => r.id === 'a').families.includes('radial'), 'families derive from the cast');
   assert.strictEqual(rows.find((r) => r.id === 'c').origin, 'explorer');
-  assert.deepStrictEqual(shelfRows(keeps, [], { query: 'hydra', assetsById, palettesById }).map((r) => r.id), ['b', 'c'], 'search hits palette');
-  assert.deepStrictEqual(shelfRows(keeps, [], { query: 'explorer', assetsById, palettesById }).map((r) => r.id), ['c'], 'search hits origin');
-  assert.deepStrictEqual(shelfRows(keeps, [], { query: 'radial', assetsById, palettesById }).length, 3, 'search hits family words');
-  assert.deepStrictEqual(shelfRows(keeps, [], { sort: 'staged', assetsById, palettesById }).map((r) => r.id), ['b', 'a', 'c'], 'staged sort: stamped first, never-staged last in collection order');
-  assert.deepStrictEqual(shelfRows(keeps, [], { sort: 'never', assetsById, palettesById }).map((r) => r.id), ['a', 'c', 'b'],
-    'never sort: never-staged first (oldest kept leads), then least-staged');
-  lines.push('view rows: label/families/origin derived · search across palette+origin+family · kept/staged/never sorts honest about absent stamps');
+  assert.deepStrictEqual(
+    shelfRows(keeps, [], { query: 'hydra', assetsById, palettesById }).map((r) => r.id),
+    ['b', 'c'],
+    'search hits palette',
+  );
+  assert.deepStrictEqual(
+    shelfRows(keeps, [], { query: 'explorer', assetsById, palettesById }).map((r) => r.id),
+    ['c'],
+    'search hits origin',
+  );
+  assert.deepStrictEqual(
+    shelfRows(keeps, [], { query: 'radial', assetsById, palettesById }).length,
+    3,
+    'search hits family words',
+  );
+  assert.deepStrictEqual(
+    shelfRows(keeps, [], { sort: 'staged', assetsById, palettesById }).map((r) => r.id),
+    ['b', 'a', 'c'],
+    'staged sort: stamped first, never-staged last in collection order',
+  );
+  assert.deepStrictEqual(
+    shelfRows(keeps, [], { sort: 'never', assetsById, palettesById }).map((r) => r.id),
+    ['a', 'c', 'b'],
+    'never sort: never-staged first (oldest kept leads), then least-staged',
+  );
+  lines.push(
+    'view rows: label/families/origin derived · search across palette+origin+family · kept/staged/never sorts honest about absent stamps',
+  );
 }
 
 // ── sanitize carries the staging facts; junk stays absent ─────────────
@@ -183,7 +286,10 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   const s = sanitizeFavorite({ seed: 1, stagedCount: 3.9, lastStagedAt: 123.4, config: {} });
   assert.strictEqual(s.stagedCount, 3);
   assert.strictEqual(s.lastStagedAt, 123);
-  assert.ok(!('stagedCount' in sanitizeFavorite({ seed: 1, stagedCount: 0, config: {} })), 'a zero count is not a staging fact');
+  assert.ok(
+    !('stagedCount' in sanitizeFavorite({ seed: 1, stagedCount: 0, config: {} })),
+    'a zero count is not a staging fact',
+  );
   assert.ok(!('lastStagedAt' in sanitizeFavorite({ seed: 1, lastStagedAt: 'soon', config: {} })));
   lines.push('sanitize: stagedCount/lastStagedAt round-trip when real, stay absent when junk or legacy');
 }
@@ -193,10 +299,26 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   resetStorage();
   // Real v1 shapes: pure-legacy (HH:MM:SS, nothing else), ISO legacy,
   // a mined record, a modern stamped record — 200 in all, the old cap.
-  const legacy = { id: 'legacy1', seed: 11, timestamp: '12:00:00', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } };
-  const isoLegacy = { id: 'iso1', seed: 22, timestamp: '2026-09-01T10:00:00.000Z', config: { layout: { mode: 'phi' }, palette: { id: 'hydra' } } };
+  const legacy = {
+    id: 'legacy1',
+    seed: 11,
+    timestamp: '12:00:00',
+    config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+  };
+  const isoLegacy = {
+    id: 'iso1',
+    seed: 22,
+    timestamp: '2026-09-01T10:00:00.000Z',
+    config: { layout: { mode: 'phi' }, palette: { id: 'hydra' } },
+  };
   const fixture = [legacy, isoLegacy];
-  for (let i = 2; i < 190; i++) fixture.push({ id: `mid${i}`, seed: 1000 + i, timestamp: '2026-10-01T00:00:00.000Z', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  for (let i = 2; i < 190; i++)
+    fixture.push({
+      id: `mid${i}`,
+      seed: 1000 + i,
+      timestamp: '2026-10-01T00:00:00.000Z',
+      config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+    });
   for (let i = 190; i < 200; i++) fixture.push(mined(`fx${i}`, { seed: 2000 + i }));
   mem.set(KEEPS_KEY, JSON.stringify(fixture));
 
@@ -204,11 +326,19 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   const st = a.get();
   assert.strictEqual(st.keeps.length, 200, 'every stored keep loads — the read path trims nothing');
   const expected = fixture.map((f) => sanitizeFavorite(f));
-  assert.deepStrictEqual(st.keeps.map((k) => k.id), expected.map((k) => k.id), 'ids preserved (sanitize is the only transformation)');
+  assert.deepStrictEqual(
+    st.keeps.map((k) => k.id),
+    expected.map((k) => k.id),
+    'ids preserved (sanitize is the only transformation)',
+  );
   assert.deepStrictEqual(st.keeps[0], expected[0], 'the pure-legacy record survives byte-for-byte as sanitized');
   assert.ok(!('keptAt' in st.keeps[0]) && !('stagedCount' in st.keeps[0]), 'legacy gains nothing invented');
   // the tail is 10 mined (cost 20): the newest 8 fill the budget exactly
-  assert.deepStrictEqual(st.keepStage, fixture.slice(192).map((f) => f.id), 'stage = the newest keeps the budget admits (8 mined × 2 = 16)');
+  assert.deepStrictEqual(
+    st.keepStage,
+    fixture.slice(192).map((f) => f.id),
+    'stage = the newest keeps the budget admits (8 mined × 2 = 16)',
+  );
   assert.ok(mem.has(STAGE_KEY), 'migration persists the derived stage — the step is one-time');
 
   // a swap in session A is still the stage in session B (no re-derive)
@@ -223,14 +353,21 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   // a present-but-empty stored stage is a real state, not a migration trigger
   mem.set(STAGE_KEY, '[]');
   assert.deepStrictEqual(boot().get().keepStage, []);
-  lines.push('migration: 200 real-shape records lossless (ids + content) · stage derived once, persisted, swap-stable across reloads');
+  lines.push(
+    'migration: 200 real-shape records lossless (ids + content) · stage derived once, persisted, swap-stable across reloads',
+  );
 }
 
 // ── store: crowns past the old cap — the eviction is dead ─────────────
 {
   resetStorage();
   const a = boot();
-  for (let i = 0; i < 200; i++) a.call('addKeep', { seed: 5000 + i, timestamp: '2026-10-02T00:00:00.000Z', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  for (let i = 0; i < 200; i++)
+    a.call('addKeep', {
+      seed: 5000 + i,
+      timestamp: '2026-10-02T00:00:00.000Z',
+      config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+    });
   let st = a.get();
   assert.strictEqual(st.keeps.length, 200);
   assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), 16, 'the first 16 crowns filled the stage');
@@ -240,36 +377,67 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   const prefix = st.keeps.map((k) => k.id);
   const centroidBefore = keptCentroid(st.keeps);
 
-  for (let i = 0; i < 5; i++) a.call('addKeep', { seed: 6000 + i, timestamp: '2026-10-03T00:00:00.000Z', config: { layout: { mode: 'phi' }, palette: { id: 'hydra' } } });
+  for (let i = 0; i < 5; i++)
+    a.call('addKeep', {
+      seed: 6000 + i,
+      timestamp: '2026-10-03T00:00:00.000Z',
+      config: { layout: { mode: 'phi' }, palette: { id: 'hydra' } },
+    });
   st = a.get();
   assert.strictEqual(st.keeps.length, 205, 'crown #201+ LANDS — no cap, no eviction');
-  assert.deepStrictEqual(st.keeps.slice(0, 200).map((k) => k.id), prefix, 'the collection prefix never moves: every prior keep still stands, in order');
+  assert.deepStrictEqual(
+    st.keeps.slice(0, 200).map((k) => k.id),
+    prefix,
+    'the collection prefix never moves: every prior keep still stands, in order',
+  );
   assert.strictEqual(st.shelfNotice, ON_SHELF_COPY, 'the landing speaks its line');
   assert.deepStrictEqual(st.shelfHistory.at(-1).kind, 'crown');
   assert.strictEqual(st.shelfHistory.at(-1).tier, 'collection');
-  assert.notDeepStrictEqual(keptCentroid(st.keeps), centroidBefore, 'the Queen’s input set only GREW (addition moves it; deletion never does)');
+  assert.notDeepStrictEqual(
+    keptCentroid(st.keeps),
+    centroidBefore,
+    'the Queen’s input set only GREW (addition moves it; deletion never does)',
+  );
   assert.strictEqual(st.keepStage.length, 16, 'the stage is untouched by collection crowns');
-  lines.push('crowns past 200: all land in the collection with the line · prefix intact · history records the landing tier');
+  lines.push(
+    'crowns past 200: all land in the collection with the line · prefix intact · history records the landing tier',
+  );
 }
 
 // ── store: mined crown at a nearly-full stage ─────────────────────────
 {
   resetStorage();
   const a = boot();
-  for (let i = 0; i < 15; i++) a.call('addKeep', { seed: 7000 + i, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  for (let i = 0; i < 15; i++)
+    a.call('addKeep', {
+      seed: 7000 + i,
+      timestamp: 't',
+      config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+    });
   a.call('addKeep', mined('mx', { seed: 7999, timestamp: 't' }));
   const st = a.get();
   assert.strictEqual(st.keeps.length, 16, 'the mined crown landed');
-  assert.strictEqual(tierOf(st.keeps.at(-1).id, st.keepStage), 'collection', 'at 15 slots the mined crown (cost 2) takes the collection');
+  assert.strictEqual(
+    tierOf(st.keeps.at(-1).id, st.keepStage),
+    'collection',
+    'at 15 slots the mined crown (cost 2) takes the collection',
+  );
   assert.strictEqual(st.shelfNotice, ON_SHELF_COPY);
-  lines.push('mined crown at 15/16: lands in the collection with the line — the tray refusal is dead for mined crowns too');
+  lines.push(
+    'mined crown at 15/16: lands in the collection with the line — the tray refusal is dead for mined crowns too',
+  );
 }
 
 // ── store: swap law end-to-end (pin, stamps, history, persistence) ────
 {
   resetStorage();
   const a = boot();
-  for (let i = 0; i < 20; i++) a.call('addKeep', { seed: 8000 + i, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  for (let i = 0; i < 20; i++)
+    a.call('addKeep', {
+      seed: 8000 + i,
+      timestamp: 't',
+      config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+    });
   let st = a.get();
   const stage0 = [...st.keepStage];
   const onDeck = st.keeps.find((k) => k.id === stage0[0]);
@@ -291,7 +459,10 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
   assert.strictEqual(inAfter.stagedCount, 1, 'the incoming keep is stamped staged');
   assert.ok(Number.isFinite(inAfter.lastStagedAt));
   assert.ok(Number.isFinite(outAfter.lastStagedAt), 'the swapped-out keep’s lastStagedAt updates too (§3.6)');
-  assert.ok(!('stagedCount' in outAfter) || outAfter.stagedCount === 1, 'the outgoing keep gains no new staging count from being chosen against');
+  assert.ok(
+    !('stagedCount' in outAfter) || outAfter.stagedCount === 1,
+    'the outgoing keep gains no new staging count from being chosen against',
+  );
   assert.strictEqual(st.shelfHistory.at(-1).kind, 'swap');
   const b = boot();
   assert.deepStrictEqual(b.get().keepStage, st.keepStage, 'the swap persists across a reload');
@@ -302,11 +473,18 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
 {
   resetStorage();
   const a = boot();
-  for (let i = 0; i < 201; i++) a.call('addFavorite', { seed: 9000 + i, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
+  for (let i = 0; i < 201; i++)
+    a.call('addFavorite', {
+      seed: 9000 + i,
+      timestamp: 't',
+      config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+    });
   const st = a.get();
   assert.strictEqual(st.favorites.length, 200, 'the favorites cap still trims (restructure is out of scope)');
-  assert.ok(typeof st.shelfNotice === 'string' && st.shelfNotice.includes('favorites full — the oldest favorite was let go'),
-    `the trim speaks its line, got: ${st.shelfNotice}`);
+  assert.ok(
+    typeof st.shelfNotice === 'string' && st.shelfNotice.includes('favorites full — the oldest favorite was let go'),
+    `the trim speaks its line, got: ${st.shelfNotice}`,
+  );
   assert.strictEqual(st.keeps.length, 201, 'meanwhile every implied keep landed — keeps have no silent cap anymore');
   lines.push('favorites rider: the 201st favorite trims the oldest — and the shelf says so; its keep still landed');
 }
@@ -315,7 +493,11 @@ const resetStorage = () => { mem.delete(KEEPS_KEY); mem.delete(STAGE_KEY); };
 {
   resetStorage();
   const a = boot();
-  const many = Array.from({ length: 250 }, (_, i) => ({ seed: 3000 + i, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } }));
+  const many = Array.from({ length: 250 }, (_, i) => ({
+    seed: 3000 + i,
+    timestamp: 't',
+    config: { layout: { mode: 'grid' }, palette: { id: 'bone' } },
+  }));
   const counts = a.call('importShelf', { keeps: many });
   const st = a.get();
   assert.strictEqual(counts.keeps, 250);

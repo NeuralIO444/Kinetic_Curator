@@ -17,7 +17,8 @@ import { getActiveCurator, curatorHint, pickCurated } from './curate.js';
 function mulberry32(seed) {
   let a = seed >>> 0;
   return function () {
-    a |= 0; a = (a + 0x6d2b79f5) | 0;
+    a |= 0;
+    a = (a + 0x6d2b79f5) | 0;
     let t = Math.imul(a ^ (a >>> 15), 1 | a);
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
@@ -29,10 +30,24 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 // ─── feature extraction: hand-computed values ───
 {
   const f = extractFeatures({
-    count: 315, scale: [0.4, 1.6], rotate: [-90, 90], alpha: [40, 80],
-    jitter: 75, displacement: 0, density: 70, zTiers: 5, noiseSpeed: 1.0,
-    noiseFreq: 0.008, swarmCohesion: 2.0, gravityWells: 1.5,
-    particleCount: 150, damping: 0.94, wind: 1.5, breath: 0.25, lifeDrift: 0.5, flap: 0.8,
+    count: 315,
+    scale: [0.4, 1.6],
+    rotate: [-90, 90],
+    alpha: [40, 80],
+    jitter: 75,
+    displacement: 0,
+    density: 70,
+    zTiers: 5,
+    noiseSpeed: 1.0,
+    noiseFreq: 0.008,
+    swarmCohesion: 2.0,
+    gravityWells: 1.5,
+    particleCount: 150,
+    damping: 0.94,
+    wind: 1.5,
+    breath: 0.25,
+    lifeDrift: 0.5,
+    flap: 0.8,
   });
   assert.ok(approx(f.markDensity, 0.5), 'markDensity');
   assert.ok(approx(f.markSize, 0.9 / 2.9), 'markSize');
@@ -63,7 +78,8 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
     for (const v of Object.values(f)) assert.strictEqual(v, 0.5);
   }
   const frozen = Object.freeze({
-    count: 100, scale: Object.freeze([0.2, 0.8]),
+    count: 100,
+    scale: Object.freeze([0.2, 0.8]),
   });
   extractFeatures(frozen);
   pickPersona([frozen, frozen], 'davis', mulberry32(1)); // frozen input: no mutation
@@ -72,9 +88,17 @@ const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 // davis prefers dense+ordered over sparse+chaotic (his Loves/Avoids)
 {
   const base = {
-    scale: [0.4, 1.6], rotate: [-90, 90], alpha: [40, 80], density: 70,
-    zTiers: 5, noiseSpeed: 1.0, noiseFreq: 0.008, swarmCohesion: 2.0,
-    gravityWells: 1.5, particleCount: 150, damping: 0.94,
+    scale: [0.4, 1.6],
+    rotate: [-90, 90],
+    alpha: [40, 80],
+    density: 70,
+    zTiers: 5,
+    noiseSpeed: 1.0,
+    noiseFreq: 0.008,
+    swarmCohesion: 2.0,
+    gravityWells: 1.5,
+    particleCount: 150,
+    damping: 0.94,
   };
   const dense = { ...base, count: 600, density: 120, jitter: 0, displacement: 0 };
   const sparse = { ...base, count: 30, density: 20, jitter: 150, displacement: 150 };
@@ -132,7 +156,10 @@ assert.deepStrictEqual(pickPersona(cands, 'bogus-persona', mulberry32(1)), -1);
   const w = getPersonaTaste('davis').weights;
   const scores = cands.map((c) => scoreCandidate(extractFeatures(c), w));
   const argmax = scores.indexOf(Math.max(...scores));
-  assert.strictEqual(pickPersona(cands, 'davis', () => 0), argmax);
+  assert.strictEqual(
+    pickPersona(cands, 'davis', () => 0),
+    argmax,
+  );
 }
 
 // every pick lands inside the top-3 by score; jitter actually fires
@@ -186,7 +213,11 @@ assert.deepStrictEqual(pickPersona(cands, 'bogus-persona', mulberry32(1)), -1);
   const seen = new Set();
   for (let i = 0; i < 200; i += 1) seen.add(pickPersona(cands, 'davis'));
   assert.strictEqual(seen.size, 1, 'no-rng pickPersona must be deterministic (was Math.random)');
-  assert.strictEqual(pickPersona(cands, 'davis'), pickPersona(cands, 'davis', () => 0), 'the no-rng pick is the rng=0 pick');
+  assert.strictEqual(
+    pickPersona(cands, 'davis'),
+    pickPersona(cands, 'davis', () => 0),
+    'the no-rng pick is the rng=0 pick',
+  );
   // The seeded path itself is pinned by the determinism section above; the
   // absolute picks from pristine state (mulberry32(7) → 7, (42) → 6) are
   // recorded on issue #1667 — suite state by this point has exercised the

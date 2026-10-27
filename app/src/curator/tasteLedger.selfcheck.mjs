@@ -11,20 +11,32 @@ import { dirname, join } from 'node:path';
 const mem = new Map();
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 
 const {
-  ledgerRow, isLedgerRow, parseLedger, appendToLedger, readLedgerText, ledgerCounts,
-  LEDGER_STORAGE_KEYS, LEDGER_FILES,
+  ledgerRow,
+  isLedgerRow,
+  parseLedger,
+  appendToLedger,
+  readLedgerText,
+  ledgerCounts,
+  LEDGER_STORAGE_KEYS,
+  LEDGER_FILES,
 } = await import('./tasteLedger.js');
 const { createDavisSlice } = await import('../state/slices/davisSlice.js');
 const { SEED_OFFSET_GROUPS } = await import('../engine/kernel/rng.js');
 const G = SEED_OFFSET_GROUPS[0];
 
 let passed = 0;
-const ok = async (name, fn) => { await fn(); passed++; console.log(`  ok  ${name}`); };
+const ok = async (name, fn) => {
+  await fn();
+  passed++;
+  console.log(`  ok  ${name}`);
+};
 
 const rec = (seed, extra = {}) => ({
   seed,
@@ -37,11 +49,16 @@ const rec = (seed, extra = {}) => ({
 
 function boot(projectTitle = '') {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = { ...createDavisSlice(set, () => state), projectTitle };
   return { get: () => state, call: (name, ...a) => state[name](...a) };
 }
-const lines = (kind) => readLedgerText(kind).split('\n').filter((l) => l.trim());
+const lines = (kind) =>
+  readLedgerText(kind)
+    .split('\n')
+    .filter((l) => l.trim());
 const reset = () => mem.clear();
 
 await ok('a row has the spec shape {seed, recipe, timestamp, keepContext, projectRef}', () => {
@@ -81,8 +98,14 @@ await ok('append-only: two appends are two lines, in order, on the right key', (
   appendToLedger('keeps', rec(1), '', { fileSink: null });
   appendToLedger('keeps', rec(2), '', { fileSink: null });
   appendToLedger('passes', rec(3), '', { fileSink: null });
-  assert.deepStrictEqual(lines('keeps').map((l) => JSON.parse(l).seed), [1, 2]);
-  assert.deepStrictEqual(lines('passes').map((l) => JSON.parse(l).seed), [3]);
+  assert.deepStrictEqual(
+    lines('keeps').map((l) => JSON.parse(l).seed),
+    [1, 2],
+  );
+  assert.deepStrictEqual(
+    lines('passes').map((l) => JSON.parse(l).seed),
+    [3],
+  );
   assert.ok(mem.get(LEDGER_STORAGE_KEYS.keeps).endsWith('\n'), 'every line newline-terminated');
   assert.deepStrictEqual(ledgerCounts(), { keeps: 2, passes: 1 });
   assert.throws(() => appendToLedger('clicks', rec(4), '', { fileSink: null }), /unknown ledger/, 'two ledgers only');
@@ -91,11 +114,20 @@ await ok('append-only: two appends are two lines, in order, on the right key', (
 await ok('desktop mirror gets the same line; a failing sink warns, never throws', async () => {
   reset();
   const got = [];
-  appendToLedger('passes', rec(9), '', { fileSink: (kind, line) => { got.push([kind, line]); } });
+  appendToLedger('passes', rec(9), '', {
+    fileSink: (kind, line) => {
+      got.push([kind, line]);
+    },
+  });
   await new Promise((r) => setTimeout(r, 0));
   assert.deepStrictEqual(got, [['passes', readLedgerText('passes')]]);
   const warned = [];
-  appendToLedger('keeps', rec(9), '', { fileSink: () => { throw new Error('disk'); }, warn: (m) => warned.push(m) });
+  appendToLedger('keeps', rec(9), '', {
+    fileSink: () => {
+      throw new Error('disk');
+    },
+    warn: (m) => warned.push(m),
+  });
   await new Promise((r) => setTimeout(r, 0));
   assert.strictEqual(warned.length, 1);
   assert.match(warned[0], /desktop file append failed/);
@@ -104,7 +136,12 @@ await ok('desktop mirror gets the same line; a failing sink warns, never throws'
 
 await ok('a full localStorage is reported, not swallowed', () => {
   const warned = [];
-  const full = { getItem: () => '', setItem: () => { throw new Error('QuotaExceededError'); } };
+  const full = {
+    getItem: () => '',
+    setItem: () => {
+      throw new Error('QuotaExceededError');
+    },
+  };
   appendToLedger('keeps', rec(1), '', { storage: full, fileSink: null, warn: (m) => warned.push(m) });
   assert.strictEqual(warned.length, 1);
   assert.match(warned[0], /local save failed/);
@@ -117,7 +154,10 @@ await ok('corrupt / off-schema lines are skipped WITH a warning', () => {
   const { rows, skipped } = parseLedger(text, (m) => warned.push(m));
   assert.strictEqual(rows.length, 2);
   assert.strictEqual(skipped, 2);
-  assert.deepStrictEqual(warned.map((w) => w.match(/line (\d+)/)[1]), ['2', '4']);
+  assert.deepStrictEqual(
+    warned.map((w) => w.match(/line (\d+)/)[1]),
+    ['2', '4'],
+  );
 });
 
 await ok('slice: F (favorite) → one keep line; J (keep) → one keep line; with project ref', () => {
@@ -126,7 +166,10 @@ await ok('slice: F (favorite) → one keep line; J (keep) → one keep line; wit
   a.call('addFavorite', rec(11));
   a.call('addKeep', rec(22));
   const ks = lines('keeps').map((l) => JSON.parse(l));
-  assert.deepStrictEqual(ks.map((k) => k.seed), [11, 22]);
+  assert.deepStrictEqual(
+    ks.map((k) => k.seed),
+    [11, 22],
+  );
   assert.ok(ks.every(isLedgerRow));
   assert.ok(ks.every((k) => k.projectRef === 'night set'));
   assert.strictEqual(lines('passes').length, 0);
@@ -145,7 +188,11 @@ await ok('slice: X (pass) → one pass line; keeps/favorites untouched; passCoun
   assert.strictEqual(ps[0].seed, 33);
   assert.ok(isLedgerRow(ps[0]));
   assert.strictEqual(lines('keeps').length, 0, 'a pass is never a keep');
-  assert.strictEqual(after.passCount, (before.passCount || 0) + 1, '#1753: a landed pass is counted for taste pressure');
+  assert.strictEqual(
+    after.passCount,
+    (before.passCount || 0) + 1,
+    '#1753: a landed pass is counted for taste pressure',
+  );
 });
 
 await ok('slice: a setlist duplicate and a shelf import are NOT new keep lines (two-ledger rule)', () => {
@@ -154,18 +201,31 @@ await ok('slice: a setlist duplicate and a shelf import are NOT new keep lines (
   a.call('addFavorite', rec(44));
   a.call('duplicateFavorite', a.get().favorites[0].id);
   a.call('importShelf', { favorites: [rec(55)], keeps: [rec(66)] });
-  assert.deepStrictEqual(lines('keeps').map((l) => JSON.parse(l).seed), [44]);
+  assert.deepStrictEqual(
+    lines('keeps').map((l) => JSON.parse(l).seed),
+    [44],
+  );
 });
 
-await ok('#1507: a mined record\'s provenance rides its ledger line; forged provenance is off-schema', () => {
-  const prov = { source: 'explorer', run: 'xpl-1', corner: 'haeckel', axes: { layout: 'radial', palette: 'hydra', castSize: 3 } };
+await ok("#1507: a mined record's provenance rides its ledger line; forged provenance is off-schema", () => {
+  const prov = {
+    source: 'explorer',
+    run: 'xpl-1',
+    corner: 'haeckel',
+    axes: { layout: 'radial', palette: 'hydra', castSize: 3 },
+  };
   const row = ledgerRow(rec(71, { provenance: prov }));
   assert.deepStrictEqual(row.provenance, prov, 'the line keeps the provenance');
   assert.strictEqual(isLedgerRow(row), true, 'a provenance line validates');
   const { rows, skipped } = parseLedger(`${JSON.stringify(row)}\n`);
-  assert.strictEqual(rows.length, 1); assert.strictEqual(skipped, 0);
+  assert.strictEqual(rows.length, 1);
+  assert.strictEqual(skipped, 0);
   assert.deepStrictEqual(rows[0].provenance, prov, 'provenance survives the JSONL round-trip');
-  assert.strictEqual(isLedgerRow({ ...row, provenance: { source: 'forged', run: 'x', corner: 'y' } }), false, 'a forged origin is not a ledger row');
+  assert.strictEqual(
+    isLedgerRow({ ...row, provenance: { source: 'forged', run: 'x', corner: 'y' } }),
+    false,
+    'a forged origin is not a ledger row',
+  );
   const hand = ledgerRow(rec(72));
   assert.ok(!('provenance' in hand), 'a hand line grows no provenance');
   assert.strictEqual(isLedgerRow(hand), true, 'legacy lines (no provenance) still validate');
@@ -190,10 +250,17 @@ const withLedgerKeysBlocked = (fn) => {
   const ctl = { blocked: true };
   globalThis.localStorage = {
     getItem: (k) => plain.getItem(k),
-    setItem: (k, v) => { if (ctl.blocked && keys.has(k)) throw new Error('denied'); plain.setItem(k, v); },
+    setItem: (k, v) => {
+      if (ctl.blocked && keys.has(k)) throw new Error('denied');
+      plain.setItem(k, v);
+    },
     removeItem: (k) => plain.removeItem(k),
   };
-  try { fn(ctl); } finally { globalThis.localStorage = plain; }
+  try {
+    fn(ctl);
+  } finally {
+    globalThis.localStorage = plain;
+  }
 };
 
 await ok('#1643: appendToLedger reports rejected / storage / saved — its returns do not change', () => {
@@ -203,12 +270,22 @@ await ok('#1643: appendToLedger reports rejected / storage / saved — its retur
   assert.ok(appendToLedger('keeps', rec(1), '', { storage: good, fileSink: null, report }));
   assert.deepEqual(seen, ['saved']);
   seen.length = 0;
-  assert.strictEqual(appendToLedger('keeps', { seed: NaN, timestamp: 't' }, '', { storage: good, fileSink: null, report }), null);
+  assert.strictEqual(
+    appendToLedger('keeps', { seed: NaN, timestamp: 't' }, '', { storage: good, fileSink: null, report }),
+    null,
+  );
   assert.deepEqual(seen, ['rejected']);
   seen.length = 0;
-  const bad = { getItem: () => '', setItem: () => { throw new Error('denied'); } };
-  assert.ok(appendToLedger('keeps', rec(2), '', { storage: bad, fileSink: null, warn: () => {}, report }),
-    'the row still returns when the local save fails — the desktop mirror may yet land it');
+  const bad = {
+    getItem: () => '',
+    setItem: () => {
+      throw new Error('denied');
+    },
+  };
+  assert.ok(
+    appendToLedger('keeps', rec(2), '', { storage: bad, fileSink: null, warn: () => {}, report }),
+    'the row still returns when the local save fails — the desktop mirror may yet land it',
+  );
   assert.deepEqual(seen, ['storage']);
 });
 
@@ -219,7 +296,10 @@ await ok('#1643: a blocked ledger save answers at the J press — once per episo
     a.call('addKeep', rec(501));
     assert.equal(a.get().keeps.length, 1, 'the keep lands on the shelf');
     assert.equal(lines('keeps').length, 0, 'but the training line does not exist');
-    assert.ok((a.get().shelfNotice || '').includes('the keeps ledger would not save — export from PIPELINE'), 'and the press says so');
+    assert.ok(
+      (a.get().shelfNotice || '').includes('the keeps ledger would not save — export from PIPELINE'),
+      'and the press says so',
+    );
     a.call('setShelfNotice', null);
     a.call('addKeep', rec(502));
     assert.equal(a.get().shelfNotice, null, 'the same episode does not nag');
@@ -243,14 +323,18 @@ await ok('#1643: F with a blocked ledger — the favorite lands, the lost label 
   });
 });
 
-await ok("#1643: an uncapturable plate and a rejected record answer at the press", () => {
+await ok('#1643: an uncapturable plate and a rejected record answer at the press', () => {
   reset();
   const a = boot();
   a.call('addPass', { seed: NaN, timestamp: 't' });
   assert.equal(a.get().shelfNotice, "this plate can't be kept", 'X on an unsanitizable plate says so');
   assert.equal(lines('passes').length, 0);
   a.call('addPass', { seed: 777, config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
-  assert.equal(a.get().shelfNotice, 'that pass was not recorded', 'a capture with no timestamp is rejected at the ledger door — and says so');
+  assert.equal(
+    a.get().shelfNotice,
+    'that pass was not recorded',
+    'a capture with no timestamp is rejected at the ledger door — and says so',
+  );
   assert.equal(lines('passes').length, 0, 'still nothing in the passes ledger');
   assert.equal(a.get().passCount || 0, 0, '#1753: a pass that did not land is not counted');
   a.call('addKeep', { seed: NaN });

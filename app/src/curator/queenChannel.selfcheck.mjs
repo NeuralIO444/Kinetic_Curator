@@ -8,15 +8,16 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateTaste, HEAD_MIN_FIDELITY } from './tasteHead.js';
 import { FEATURES_VERSION } from './recipeFeatures.js';
-import {
-  GATE_OPEN, NEUTRAL_BIAS, BIAS_KEYS,
-  readQueenHead, isLive, hiddenBias,
-} from './queenChannel.js';
+import { GATE_OPEN, NEUTRAL_BIAS, BIAS_KEYS, readQueenHead, isLive, hiddenBias } from './queenChannel.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // A minimal valid taste.json v1 (single head). Queen section added per test.
 const baseFile = () => ({
@@ -99,9 +100,12 @@ ok('bad lois still refuses with a valid queen section', () => {
 });
 
 // ─── gate tripwire ───
-ok('GATE_OPEN is true: opened deliberately on 2026-10-08 (#762 proof cleared, Matt: open rank + temperature); a flip either way is a decision', () => {
-  assert.equal(GATE_OPEN, true);
-});
+ok(
+  'GATE_OPEN is true: opened deliberately on 2026-10-08 (#762 proof cleared, Matt: open rank + temperature); a flip either way is a decision',
+  () => {
+    assert.equal(GATE_OPEN, true);
+  },
+);
 
 // ─── inertness: flipped inputs → identical output ───
 ok('inert: inputs change, output does not', () => {
@@ -116,7 +120,11 @@ ok('inert: inputs change, output does not', () => {
   assert.deepEqual(a, b, 'queen section present or not: same output');
   assert.ok(Object.isFrozen(NEUTRAL_BIAS), 'neutral bias is frozen');
   assert.deepEqual([...BIAS_KEYS].sort(), ['palette', 'phrase', 'rank', 'reactivity', 'temperature']);
-  assert.equal(isLive(withQ), withQ.queen.head.fidelity >= 0.3, 'with the gate open a head is live exactly when it clears the 0.3 bar');
+  assert.equal(
+    isLive(withQ),
+    withQ.queen.head.fidelity >= 0.3,
+    'with the gate open a head is live exactly when it clears the 0.3 bar',
+  );
   assert.equal(isLive(null), false);
 });
 
@@ -145,7 +153,10 @@ ok('no UI-surface file references the channel', () => {
     for (const e of readdirSync(dir)) {
       const p = join(dir, e);
       const st = statSync(p);
-      if (st.isDirectory()) { walk(p); continue; }
+      if (st.isDirectory()) {
+        walk(p);
+        continue;
+      }
       if (!/\.(js|mjs)$/.test(e)) continue;
       const rel = relative(srcRoot, p);
       if (allowed.has(rel)) continue;

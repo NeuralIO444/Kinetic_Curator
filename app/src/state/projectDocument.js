@@ -86,13 +86,25 @@ export function countRepairedFields(raw, doc) {
   // autoQuality: coerced via !== false
   if (raw.autoQuality !== undefined && typeof raw.autoQuality !== 'boolean') n++;
   // enabledAssets: hostile map collapsed to the known set
-  if (raw.enabledAssets != null && typeof raw.enabledAssets === 'object'
-    && !sameJson(raw.enabledAssets, doc.enabledAssets)) n++;
+  if (
+    raw.enabledAssets != null &&
+    typeof raw.enabledAssets === 'object' &&
+    !sameJson(raw.enabledAssets, doc.enabledAssets)
+  )
+    n++;
   // assetWeightOverrides / paletteLocks: dropped keys
-  if (raw.assetWeightOverrides != null && typeof raw.assetWeightOverrides === 'object'
-    && !sameJson(raw.assetWeightOverrides, doc.assetWeightOverrides)) n++;
-  if (raw.paletteLocks != null && typeof raw.paletteLocks === 'object'
-    && !sameJson(raw.paletteLocks, doc.paletteLocks || {})) n++;
+  if (
+    raw.assetWeightOverrides != null &&
+    typeof raw.assetWeightOverrides === 'object' &&
+    !sameJson(raw.assetWeightOverrides, doc.assetWeightOverrides)
+  )
+    n++;
+  if (
+    raw.paletteLocks != null &&
+    typeof raw.paletteLocks === 'object' &&
+    !sameJson(raw.paletteLocks, doc.paletteLocks || {})
+  )
+    n++;
   // layers: dropped or capped
   if (Array.isArray(raw.layers) && raw.layers.length !== (doc.layers || []).length) n++;
   return n;
@@ -269,45 +281,50 @@ export function parseProject(raw) {
     // #643 — drop snapshots for layers that don't exist in the doc.
     const layerIds = (layers || []).map((l) => l && l.id);
     const doc = {
-        version: PROJECT_VERSION,
-        seed: seed >>> 0,
-        seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
-        // #645 — same string guard the v1 branch uses: a corrupt legacy file
-        // with a numeric/null palette degrades to the fallback palette.
-        paletteId:
-          typeof raw.paletteId === 'string'
-            ? raw.paletteId
-            : typeof raw.palette === 'string'
-              ? raw.palette
-              : 'praystation',
-        layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
-        // #103 Track B — validate asset maps against the registry; a hostile
-        // 100k-key map collapses to the known set instead of bloating the store.
-        enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
-        quality: sanitizeQuality(raw.quality),
-        autoQuality: raw.autoQuality !== false,
-        assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
-        paletteOverrides: raw.paletteOverrides || null,
-        paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
-        light: sanitizeLight(raw.light), // #594 — absent → null (off)
-        assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
-        regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
-        assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
-        assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
-        assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
-        audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
-        ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
-        mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
+      version: PROJECT_VERSION,
+      seed: seed >>> 0,
+      seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
+      // #645 — same string guard the v1 branch uses: a corrupt legacy file
+      // with a numeric/null palette degrades to the fallback palette.
+      paletteId:
+        typeof raw.paletteId === 'string'
+          ? raw.paletteId
+          : typeof raw.palette === 'string'
+            ? raw.palette
+            : 'praystation',
+      layoutParams: normalizeLayoutParams(raw.layoutParams || raw.layout),
+      // #103 Track B — validate asset maps against the registry; a hostile
+      // 100k-key map collapses to the known set instead of bloating the store.
+      enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
+      quality: sanitizeQuality(raw.quality),
+      autoQuality: raw.autoQuality !== false,
+      assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
+      paletteOverrides: raw.paletteOverrides || null,
+      paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
+      light: sanitizeLight(raw.light), // #594 — absent → null (off)
+      assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
+      regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
+      assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
+      assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
+      assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
+      audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
+      ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
+      mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
+      customAssets,
+      layers,
+      activeLayerId,
+      // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+      // #643 — drop snapshots for layers that don't exist in the doc.
+      layerSnapshots: normalizeSnapshots(
+        raw.layerSnapshots,
         customAssets,
-        layers,
-        activeLayerId,
-        // #637 — partial snapshots inherit the root doc's seed/palette/layout.
-        // #643 — drop snapshots for layers that don't exist in the doc.
-        layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
+        {
           seed: seed >>> 0,
           paletteId: raw.paletteId || raw.palette || 'praystation',
           layoutParams: raw.layoutParams || raw.layout,
-        }, layerIds),
+        },
+        layerIds,
+      ),
     };
     landLegacyCreatureCount(raw, doc);
     return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
@@ -329,44 +346,46 @@ export function parseProject(raw) {
   // #643 — drop snapshots for layers that don't exist in the doc.
   const layerIds = (layers || []).map((l) => l && l.id);
   const doc = {
-      version: PROJECT_VERSION,
-      seed: seed >>> 0,
-      seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
-      paletteId: typeof raw.paletteId === 'string' ? raw.paletteId : 'praystation',
-      layoutParams: normalizeLayoutParams(raw.layoutParams),
-      // #103 Track B — validate asset maps against the registry; a hostile
-      // 100k-key map collapses to the known set instead of bloating the store.
-      enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
-      quality: sanitizeQuality(raw.quality),
-      autoQuality: raw.autoQuality !== false,
-      assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
-      light: sanitizeLight(raw.light), // #594 — absent → null (off)
-      assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
-      regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
-      assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
-      assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
-      assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
-      audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
-      ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
-      mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
-      paletteOverrides:
-        raw.paletteOverrides && typeof raw.paletteOverrides === 'object'
-          ? raw.paletteOverrides
-          : null,
-      paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
+    version: PROJECT_VERSION,
+    seed: seed >>> 0,
+    seedOffsets: normalizeSeedOffsets(raw.seedOffsets),
+    paletteId: typeof raw.paletteId === 'string' ? raw.paletteId : 'praystation',
+    layoutParams: normalizeLayoutParams(raw.layoutParams),
+    // #103 Track B — validate asset maps against the registry; a hostile
+    // 100k-key map collapses to the known set instead of bloating the store.
+    enabledAssets: sanitizeEnabledAssets(raw.enabledAssets, customAssets),
+    quality: sanitizeQuality(raw.quality),
+    autoQuality: raw.autoQuality !== false,
+    assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
+    light: sanitizeLight(raw.light), // #594 — absent → null (off)
+    assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
+    regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
+    assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
+    assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
+    assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
+    audioRoutes: sanitizeAudioRoutes(raw.audioRoutes), // #790
+    ...midiDocFields(raw), // #617 + #1720 — banks, active bank, the active map
+    mathMacros: sanitizeMathMacros(raw.mathMacros), // #724
+    paletteOverrides: raw.paletteOverrides && typeof raw.paletteOverrides === 'object' ? raw.paletteOverrides : null,
+    paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
+    customAssets,
+    layers,
+    activeLayerId,
+    // #637 — partial snapshots inherit the root doc's seed/palette/layout.
+    // #643 — drop snapshots for layers that don't exist in the doc.
+    layerSnapshots: normalizeSnapshots(
+      raw.layerSnapshots,
       customAssets,
-      layers,
-      activeLayerId,
-      // #637 — partial snapshots inherit the root doc's seed/palette/layout.
-      // #643 — drop snapshots for layers that don't exist in the doc.
-      layerSnapshots: normalizeSnapshots(raw.layerSnapshots, customAssets, {
+      {
         seed: raw.seed,
         paletteId: raw.paletteId,
         layoutParams: raw.layoutParams,
-      }, layerIds),
-    };
-    landLegacyCreatureCount(raw, doc);
-    return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
+      },
+      layerIds,
+    ),
+  };
+  landLegacyCreatureCount(raw, doc);
+  return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
 }
 
 export function downloadProject(doc, filename) {
@@ -408,7 +427,9 @@ export function readAutosave() {
       if (pushQuarantine({ quarantinedAt: new Date().toISOString(), reason, source: AUTOSAVE_KEY, raw })) {
         localStorage.removeItem(AUTOSAVE_KEY);
       }
-    } catch { /* storage is already unhappy; nothing useful to do */ }
+    } catch {
+      /* storage is already unhappy; nothing useful to do */
+    }
     console.warn(`[project] autosave quarantined (${reason}); booting defaults`);
     return { doc: null, quarantined: true };
   };
@@ -423,9 +444,7 @@ export function readAutosave() {
   // Envelope form is { version, savedAt, doc }; older builds wrote the bare
   // document, so accept both rather than quarantining every existing session
   // on upgrade.
-  const candidate = envelope && typeof envelope === 'object' && envelope.doc
-    ? envelope.doc
-    : envelope;
+  const candidate = envelope && typeof envelope === 'object' && envelope.doc ? envelope.doc : envelope;
 
   const result = parseProject(candidate);
   if (!result.ok) return quarantine(result.error || 'failed to parse');
@@ -438,11 +457,14 @@ export function readAutosave() {
  */
 export function writeAutosave(doc) {
   try {
-    localStorage.setItem(AUTOSAVE_KEY, JSON.stringify({
-      version: PROJECT_VERSION,
-      savedAt: new Date().toISOString(),
-      doc,
-    }));
+    localStorage.setItem(
+      AUTOSAVE_KEY,
+      JSON.stringify({
+        version: PROJECT_VERSION,
+        savedAt: new Date().toISOString(),
+        doc,
+      }),
+    );
     return { ok: true };
   } catch (e) {
     // Quota exceeded, or a private window that refuses storage entirely.
@@ -484,14 +506,25 @@ export function writePipelineAutosave(doc) {
     // (left behind when its quarantine could not be stored) must not replace a
     // good backup.
     let prevReadable = false;
-    if (prev) { try { JSON.parse(prev); prevReadable = true; } catch { /* keep the backup */ } }
+    if (prev) {
+      try {
+        JSON.parse(prev);
+        prevReadable = true;
+      } catch {
+        /* keep the backup */
+      }
+    }
     if (prevReadable) {
       try {
         localStorage.setItem(PIPELINE_BACKUP_KEY, prev);
       } catch {
         // Quota hit on backup — drop it silently so the primary write
         // still has room. The backup is best-effort.
-        try { localStorage.removeItem(PIPELINE_BACKUP_KEY); } catch { /* */ }
+        try {
+          localStorage.removeItem(PIPELINE_BACKUP_KEY);
+        } catch {
+          /* */
+        }
       }
     }
     localStorage.setItem(PIPELINE_KEY, envelope);
@@ -527,18 +560,23 @@ export function readPipelineAutosave() {
 /** Shared key-reader: parse envelope → parseProject. */
 function _tryReadKey(key) {
   let raw;
-  try { raw = localStorage.getItem(key); } catch { return { doc: null, quarantined: false }; }
+  try {
+    raw = localStorage.getItem(key);
+  } catch {
+    return { doc: null, quarantined: false };
+  }
   if (!raw) return { doc: null, quarantined: false };
 
   let envelope;
-  try { envelope = JSON.parse(raw); } catch {
+  try {
+    envelope = JSON.parse(raw);
+  } catch {
     console.warn(`[pipeline] ${key} unparseable, quarantining`);
     _quarantineKey(key, 'unparseable JSON');
     return { doc: null, quarantined: true };
   }
 
-  const candidate = envelope && typeof envelope === 'object' && envelope.doc
-    ? envelope.doc : envelope;
+  const candidate = envelope && typeof envelope === 'object' && envelope.doc ? envelope.doc : envelope;
   const result = parseProject(candidate);
   if (!result.ok) {
     _quarantineKey(key, result.error || 'failed to parse');
@@ -554,5 +592,7 @@ function _quarantineKey(key, reason) {
     if (pushQuarantine({ quarantinedAt: new Date().toISOString(), reason, source: key, raw })) {
       localStorage.removeItem(key);
     }
-  } catch { /* storage is already unhappy */ }
+  } catch {
+    /* storage is already unhappy */
+  }
 }

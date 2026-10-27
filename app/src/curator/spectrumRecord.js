@@ -28,7 +28,9 @@ const B64_REV = new Map([...B64].map((c, i) => [c, i]));
 export function bytesToB64(bytes) {
   let out = '';
   for (let i = 0; i < bytes.length; i += 3) {
-    const a = bytes[i]; const b = i + 1 < bytes.length ? bytes[i + 1] : 0; const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
+    const a = bytes[i];
+    const b = i + 1 < bytes.length ? bytes[i + 1] : 0;
+    const c = i + 2 < bytes.length ? bytes[i + 2] : 0;
     out += B64[a >> 2] + B64[((a & 3) << 4) | (b >> 4)];
     out += i + 1 < bytes.length ? B64[((b & 15) << 2) | (c >> 6)] : '=';
     out += i + 2 < bytes.length ? B64[c & 63] : '=';
@@ -63,14 +65,17 @@ export function createSpectrumRecorder({ getFrame = () => 0 } = {}) {
   const scratch = new Uint8Array(RECORD_BINS);
   return {
     /** The marks are up (call on every dial change; the same value is harmless). */
-    note(audible) { if (audible) heard = true; },
+    note(audible) {
+      if (audible) heard = true;
+    },
     /** One hearing: the core's smoothed 128 bins at the take's current frame. */
     sample(smooth) {
       const frame = getFrame() | 0;
       if (frame < 0 || frame <= lastFrame) return;
       quantizeSpectrum(smooth, scratch);
       const row = scratch.slice();
-      for (let f = lastFrame + 1; f < frame; f++) rows[f] = lastFrame >= 0 ? rows[lastFrame] : new Uint8Array(RECORD_BINS);
+      for (let f = lastFrame + 1; f < frame; f++)
+        rows[f] = lastFrame >= 0 ? rows[lastFrame] : new Uint8Array(RECORD_BINS);
       rows[frame] = row;
       lastFrame = frame;
     },
@@ -109,7 +114,10 @@ let replayingSection = null; // the take section object being fed, or null (iden
 export function replaySpectrumFrame(frame, section, { seeked = false } = {}) {
   const rec = section ? checkSpectrumRecord(section) : null;
   if (!rec) {
-    if (replayingSection) { endSpectrumPlayback(); replayingSection = null; }
+    if (replayingSection) {
+      endSpectrumPlayback();
+      replayingSection = null;
+    }
     return;
   }
   if (replayingSection !== section || seeked) {
@@ -121,5 +129,8 @@ export function replaySpectrumFrame(frame, section, { seeked = false } = {}) {
 
 /** Playback stopped (or a sectionless take started): the live spectrum is the room's again. */
 export function endSpectrumReplay() {
-  if (replayingSection) { endSpectrumPlayback(); replayingSection = null; }
+  if (replayingSection) {
+    endSpectrumPlayback();
+    replayingSection = null;
+  }
 }
