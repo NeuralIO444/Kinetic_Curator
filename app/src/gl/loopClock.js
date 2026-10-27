@@ -21,6 +21,10 @@ export const loopClock = {
  * - A huge loop-time jump (thaw) fires AT MOST once: the accumulator
  *   re-anchors to now instead of crediting the gap as catch-up bursts.
  * - A rolled-back clock re-arms instead of stalling on a stale anchor.
+ * - #1741: a normal fire carries the anchor by exactly one interval, so the
+ *   frame's lateness is not kept and a tempo-locked clock (PHRASE METRO /
+ *   EUCLID) holds the BEAT rate instead of rounding every period up a frame.
+ *   Only a gap of two intervals or more counts as a thaw and re-anchors.
  */
 export function loopIntervalTick(lastFire, loopMs, intervalMs) {
   // No usable clock (not observed yet, or the mirror's 0): hold the anchor.
@@ -33,8 +37,12 @@ export function loopIntervalTick(lastFire, loopMs, intervalMs) {
   if (loopMs < lastFire) {
     return { fire: false, lastFire: loopMs }; // clock rolled back — re-arm
   }
-  if (loopMs - lastFire >= intervalMs) {
-    return { fire: true, lastFire: loopMs };
+  const elapsed = loopMs - lastFire;
+  if (elapsed >= 2 * intervalMs) {
+    return { fire: true, lastFire: loopMs }; // thaw / big jump: fire once, re-anchor to now
+  }
+  if (elapsed >= intervalMs) {
+    return { fire: true, lastFire: lastFire + intervalMs }; // #1741: carry, don't drift
   }
   return { fire: false, lastFire };
 }

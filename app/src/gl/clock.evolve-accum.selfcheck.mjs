@@ -75,6 +75,39 @@ test('#808 loopClock mirror starts unknown', () => {
   assert.equal(loopClock.ms, 0);
 });
 
+// #1741 — a tempo-locked interval holds its rate: the frame's lateness is
+// carried, not kept, so one minute at BEAT bpm fires exactly bpm times.
+test('#1741 one minute of frames fires exactly bpm times', () => {
+  for (const [bpm, fps] of [[120, 60], [128, 60], [128, 120], [140, 60], [174, 60], [100, 30], [93, 144]]) {
+    const iv = 60000 / bpm;
+    const dt = 1000 / fps;
+    let lastFire = -1;
+    let fires = 0;
+    // arm on the first frame, then 60 s (+ half an interval, so the bpm-th fire
+    // is not on the float edge of the window) of frames after it
+    for (let i = 1; i * dt <= dt + 60000 + iv / 2; i++) {
+      const r = loopIntervalTick(lastFire, i * dt, iv);
+      lastFire = r.lastFire;
+      if (r.fire) fires += 1;
+    }
+    assert.equal(fires, bpm, `${bpm} bpm @ ${fps} fps`);
+  }
+});
+
+test('#1741 a normal fire carries the anchor by one interval', () => {
+  const s = loopIntervalTick(1000, 3012, INTERVAL);
+  assert.equal(s.fire, true);
+  assert.equal(s.lastFire, 3000);
+});
+
+test('#1741 a gap of two intervals is a thaw: one fire, re-anchored to now', () => {
+  let s = loopIntervalTick(1000, 5000, INTERVAL);
+  assert.equal(s.fire, true);
+  assert.equal(s.lastFire, 5000);
+  s = loopIntervalTick(s.lastFire, 5016, INTERVAL);
+  assert.equal(s.fire, false, 'no catch-up burst after a thaw');
+});
+
 // --- slice-level: the stamp is loop time, never wall time ---
 
 import { createDavisSlice } from '../state/slices/davisSlice.js';
