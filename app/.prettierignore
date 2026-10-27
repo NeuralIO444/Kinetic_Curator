@@ -10,6 +10,8 @@ src/*
 src/engine/*
 !src/gl/
 src/gl/*
+!src/engine/kernel/
+src/engine/kernel/*
 
 # ── Adopted (slice 0: the audit run's own files, born formatted) ──
 !src/engine/colorHex.mjs
@@ -18,6 +20,14 @@ src/gl/*
 
 # ── Adopted (slice 1, #1684: src/midi — the MIDI engine, map, learn, banks, targets and their selfchecks) ──
 !src/midi/
+
+# ── Adopted (slice 2, #1684: dirs no check reads as source text) ──
+!src/dev/
+!src/shimmer/
+!src/gl/fields/
+src/gl/fields/fieldHarness.html
+!src/engine/kernel/feature/
+!src/engine/kernel/weather/
 
 # Tooling and non-src trees: not yet adopted.
 /scripts/**

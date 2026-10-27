@@ -32,7 +32,7 @@
  *   float kcNoise3D(float x, float y, float z)
  *   float kcFbm3D(x, y, z, octaves, lacunarity, gain)
  */
-export const FIELD_COMMON_GLSL = /* glsl */`
+export const FIELD_COMMON_GLSL = /* glsl */ `
 uniform highp usampler2D u_perm;
 
 // JS: p[i] on the 512-byte table (buildPerm doubles the 256-byte shuffle).

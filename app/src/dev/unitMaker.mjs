@@ -9,7 +9,11 @@ export const UNIT_TRIO = {
 export function makeUnit({ issue = '000', name = 'unit' } = {}) {
   const title = String(name).trim() || 'unit';
   const n = String(issue).replace(/\D/g, '') || '000';
-  const file = title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'unit';
+  const file =
+    title
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'unit';
   return {
     file: `src/${file}.selfcheck.mjs`,
     src: `// #${n} — ${title}
