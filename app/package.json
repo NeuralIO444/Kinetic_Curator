@@ -24,6 +24,7 @@
     "preflight": "npm run lint && npm run selfcheck && npm run build && npm run test:e2e",
     "parity": "node src/gl/parity/run.mjs",
     "verify:take": "node scripts/verifyPerformance.mjs",
+    "evidence:stress": "node scripts/stressEvidence.mjs",
     "bake:regions": "node scripts/bakeRegionMattes.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
