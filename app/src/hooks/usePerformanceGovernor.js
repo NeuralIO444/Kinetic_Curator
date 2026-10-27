@@ -41,7 +41,9 @@ import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 // crash the governor; the shed itself, the badge (shedSummary) and the
 // restore all still happen. Extending the log's map is a follow-up.
 const LOG_KNOWN_KINDS = new Set(CUT_KINDS);
-const recordCutEvent = (e) => { if (LOG_KNOWN_KINDS.has(e.cutKind)) recordGovernorEvent(e); };
+const recordCutEvent = (e) => {
+  if (LOG_KNOWN_KINDS.has(e.cutKind)) recordGovernorEvent(e);
+};
 
 // Hysteresis defaults (#259 — the permanent-shed-trap fix). Shed below 28,
 // recover at/above 30: the two thresholds must never coincide above a
@@ -62,8 +64,8 @@ const TIER1_SUSTAIN_MS = 2000; // #107 §4 spec: 2s sustained below TIER1_FPS
 const COOLDOWN_MS = 8000; // don't auto-step again for a while
 
 export function usePerformanceGovernor() {
-  const fps = useStore(s => s.fps);
-  const stageTimings = useStore(s => s.stageTimings);
+  const fps = useStore((s) => s.fps);
+  const stageTimings = useStore((s) => s.stageTimings);
   // #103 Track A — GPU-implied frame rate. Under vsync the rAF cadence lies:
   // the GPU can be saturated (fill-rate, ACCUM ping-pong) while FPS reads 60.
   // The live loop reports per-tick GPU time into stageTimings ('gpuFrame',
@@ -75,8 +77,8 @@ export function usePerformanceGovernor() {
   const effFps = Math.round(Math.min(fps, gpuFps) * 10) / 10;
   // Hysteresis thresholds, live-overridable (GOV TUNE). Shed below shedFps,
   // recover at/above recoverFps — never the same number (#259).
-  const shedFps = Number(useStore(s => s.governorShedFps)) || DEFAULT_SHED_FPS;
-  const recoverFps = Number(useStore(s => s.governorRecoverFps)) || DEFAULT_RECOVER_FPS;
+  const shedFps = Number(useStore((s) => s.governorShedFps)) || DEFAULT_SHED_FPS;
+  const recoverFps = Number(useStore((s) => s.governorRecoverFps)) || DEFAULT_RECOVER_FPS;
   // #265 — cut 1 (resolution) may fire when the GPU-implied rate is the
   // binding constraint: at/below the rAF rate AND below the shed floor —
   // including when BOTH are bad, the case where dropping pixels is what
@@ -85,42 +87,41 @@ export function usePerformanceGovernor() {
   const gpuNote = gpuSaturated
     ? ` (gpu-saturated: GPU frame ${gpuFrameMs.toFixed(1)}ms ≈ ${Math.round(gpuFps)}fps)`
     : '';
-  const quality = useStore(s => s.quality);
-  const qualityShedFrom = useStore(s => s.qualityShedFrom);
-  const setQualityShedFrom = useStore(s => s.setQualityShedFrom);
-  const clearWatchdogReason = useStore(s => s.clearWatchdogReason);
-  const autoQuality = useStore(s => s.autoQuality);
-  const slowRender = useStore(s => s.slowRender);
-  const slowRenderSource = useStore(s => s.slowRenderSource);
-  const perfTier1 = useStore(s => s.perfTier1);
+  const quality = useStore((s) => s.quality);
+  const qualityShedFrom = useStore((s) => s.qualityShedFrom);
+  const setQualityShedFrom = useStore((s) => s.setQualityShedFrom);
+  const clearWatchdogReason = useStore((s) => s.clearWatchdogReason);
+  const autoQuality = useStore((s) => s.autoQuality);
+  const slowRender = useStore((s) => s.slowRender);
+  const slowRenderSource = useStore((s) => s.slowRenderSource);
+  const perfTier1 = useStore((s) => s.perfTier1);
   // #655 — e2e test hook: a page can force the governor off before the app
   // boots (page.addInitScript sets window.__KC_GOVERNOR_OFF = true). Shed
   // cuts are render-only overlays driven by wall-clock FPS, so under CI load
   // they contaminate node-count assertions with nondeterminism. This flag is
   // only ever set by tests; it never appears in the product surface.
-  const governorTestOff =
-    typeof window !== 'undefined' && window.__KC_GOVERNOR_OFF === true;
+  const governorTestOff = typeof window !== 'undefined' && window.__KC_GOVERNOR_OFF === true;
   const governorArmed = autoQuality && !governorTestOff;
-  const perfClampOverride = useStore(s => s.perfClampOverride);
-  const assetThin = useStore(s => s.assetThin);
-  const renderScale = useStore(s => s.renderScale);
-  const setQuality = useStore(s => s.setQuality);
-  const setSlowRender = useStore(s => s.setSlowRender);
-  const setPerfTier1 = useStore(s => s.setPerfTier1);
-  const tripWatchdog = useStore(s => s.tripWatchdog);
-  const setPerfClampOverride = useStore(s => s.setPerfClampOverride);
-  const setAssetThin = useStore(s => s.setAssetThin);
-  const setRenderScale = useStore(s => s.setRenderScale);
-  const fxaa = useStore(s => s.fxaa);
-  const fxaaShed = useStore(s => s.fxaaShed);
-  const setFxaaShed = useStore(s => s.setFxaaShed);
+  const perfClampOverride = useStore((s) => s.perfClampOverride);
+  const assetThin = useStore((s) => s.assetThin);
+  const renderScale = useStore((s) => s.renderScale);
+  const setQuality = useStore((s) => s.setQuality);
+  const setSlowRender = useStore((s) => s.setSlowRender);
+  const setPerfTier1 = useStore((s) => s.setPerfTier1);
+  const tripWatchdog = useStore((s) => s.tripWatchdog);
+  const setPerfClampOverride = useStore((s) => s.setPerfClampOverride);
+  const setAssetThin = useStore((s) => s.setAssetThin);
+  const setRenderScale = useStore((s) => s.setRenderScale);
+  const fxaa = useStore((s) => s.fxaa);
+  const fxaaShed = useStore((s) => s.fxaaShed);
+  const setFxaaShed = useStore((s) => s.setFxaaShed);
   // #1694 S2 — the creature rung: the artist's count and the shed overlay.
   // S3 — the count is the BUILD param `creatures`; it derives from the layoutParams
   // selection below (the governor state's creatureCount field keeps its shape, so
   // governorCuts' shed/restore contract is untouched).
-  const creatureShed = useStore(s => s.creatureShed);
-  const setCreatureShed = useStore(s => s.setCreatureShed);
-  const layoutParams = useStore(s => s.layoutParams);
+  const creatureShed = useStore((s) => s.creatureShed);
+  const setCreatureShed = useStore((s) => s.setCreatureShed);
+  const layoutParams = useStore((s) => s.layoutParams);
   const creatureCount = layoutParams?.creatures ?? 0;
   // #1574 — the travel rung: the shed overlay, and whether travel is live
   // on the scene (FLOW with a leash — the same gate buildPlacements runs).
@@ -134,45 +135,47 @@ export function usePerformanceGovernor() {
   // order and the shed overlay are unmoved; only the sensor's scope
   // matches the per-stratum mechanism. (Snapshots exist only for KC
   // strata, so the snapshot scan is the non-active strata by construction.)
-  const travelShed = useStore(s => s.travelShed);
-  const setTravelShed = useStore(s => s.setTravelShed);
+  const travelShed = useStore((s) => s.travelShed);
+  const setTravelShed = useStore((s) => s.setTravelShed);
   // #1576 — P3's siblings are travel too: a scene whose only travel is
   // surge or parallax drift (either amount up, any transport mode) is
   // live for this rung, and the same shed holds them (surge dies,
   // drift presents home — engine/surge.js, engine/parallaxDrift.js).
-  const layerSnapshots = useStore(s => s.layerSnapshots);
-  const activeLayerId = useStore(s => s.activeLayerId);
-  const stratumTravels = (p) => !!p
-    && (((p.transport === 'flow' || p.transport === 'path') && (p.transportLeash ?? 112) > 0)
-      || (p.transportSurge ?? 0) > 0
-      || (p.transportParallax ?? 0) > 0);
-  const travelActive = stratumTravels(layoutParams)
-    || Object.entries(layerSnapshots || {}).some(([id, snap]) => id !== activeLayerId && stratumTravels(snap?.layoutParams));
+  const layerSnapshots = useStore((s) => s.layerSnapshots);
+  const activeLayerId = useStore((s) => s.activeLayerId);
+  const stratumTravels = (p) =>
+    !!p &&
+    (((p.transport === 'flow' || p.transport === 'path') && (p.transportLeash ?? 112) > 0) ||
+      (p.transportSurge ?? 0) > 0 ||
+      (p.transportParallax ?? 0) > 0);
+  const travelActive =
+    stratumTravels(layoutParams) ||
+    Object.entries(layerSnapshots || {}).some(
+      ([id, snap]) => id !== activeLayerId && stratumTravels(snap?.layoutParams),
+    );
   // #1627 S1 — the mark-weather rung (cut 1.4, FIRST): the shed overlay,
   // and whether weather can be live on this scene — a measured spawn
   // source is present: the sun's spec pool (a lit sun with spec up),
   // the dish (density peaks + contacts), or traveling marks (travel
   // live). No source, no weather, no rung.
-  const weatherShed = useStore(s => s.weatherShed);
-  const setWeatherShed = useStore(s => s.setWeatherShed);
+  const weatherShed = useStore((s) => s.weatherShed);
+  const setWeatherShed = useStore((s) => s.setWeatherShed);
   // #1490 — the feedback warp rung (cut 1.45): the shed overlay, and whether
   // the warp is live on this scene — an FX layer carries a feedbackWarp item
   // with amount > 0 (gl/spectrumWarp.mjs reads the FX strata), ACCUM is on
   // (no feedback buffer, no warp), and the tier-1 shed has not already
   // killed the feedback chain the warp rides.
-  const feedbackWarpShed = useStore(s => s.feedbackWarpShed);
-  const setFeedbackWarpShed = useStore(s => s.setFeedbackWarpShed);
-  const layers = useStore(s => s.layers);
-  const feedbackWarpActive = feedbackWarpAmount(layers, false) > 0
-    && !!layoutParams?.accumulation && !perfTier1;
-  const light = useStore(s => s.light);
-  const weatherActive = (!!(light && (light.spec ?? 0) > 0 && (light.intensity ?? 0) > 0)
-    || layoutParams?.dish === true
-    || travelActive);
+  const feedbackWarpShed = useStore((s) => s.feedbackWarpShed);
+  const setFeedbackWarpShed = useStore((s) => s.setFeedbackWarpShed);
+  const layers = useStore((s) => s.layers);
+  const feedbackWarpActive = feedbackWarpAmount(layers, false) > 0 && !!layoutParams?.accumulation && !perfTier1;
+  const light = useStore((s) => s.light);
+  const weatherActive =
+    !!(light && (light.spec ?? 0) > 0 && (light.intensity ?? 0) > 0) || layoutParams?.dish === true || travelActive;
   // #263 — while a context restore is in flight the FPS reading is
   // meaningless (no frames present during the rebake); don't let the
   // watchdog trip on the new session before it has drawn anything.
-  const glContext = useStore(s => s.glContext);
+  const glContext = useStore((s) => s.glContext);
 
   const lowSinceRef = useRef(null);
   const lastActionRef = useRef(0);
@@ -189,7 +192,8 @@ export function usePerformanceGovernor() {
       setSlowRender(false);
       if (kind === 'watchdog') clearWatchdogReason();
       recordGovernorEvent({
-        type: 'restore', cutKind: kind,
+        type: 'restore',
+        cutKind: kind,
         label: kind === 'watchdog' ? 'watchdog hard stop cleared' : 'freeze frame off — motion back',
         ...(detail ? { detail } : {}),
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
@@ -231,13 +235,29 @@ export function usePerformanceGovernor() {
       tripWatchdog('fps-critical');
       // Event-log only: step 7 of the shed ladder fired.
       recordGovernorEvent({
-        type: 'shed', cutKind: 'watchdog', label: 'watchdog hard stop',
+        type: 'shed',
+        cutKind: 'watchdog',
+        label: 'watchdog hard stop',
         fps: { at: effFps, threshold: CRITICAL_FPS, sustainedMs: CRITICAL_SUSTAIN_MS },
         detail: `FPS ${effFps} < ${CRITICAL_FPS} sustained ${CRITICAL_SUSTAIN_MS / 1000}s${gpuNote}`,
       });
-      console.info('[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below', CRITICAL_FPS + ')' + gpuNote);
+      console.info(
+        '[Kinetic] Perf critical: watchdog tripped — running/evolve off (FPS below',
+        CRITICAL_FPS + ')' + gpuNote,
+      );
     }
-  }, [effFps, gpuNote, governorArmed, slowRender, slowRenderSource, tripWatchdog, setSlowRender, clearWatchdogReason, recoverFps, glContext]);
+  }, [
+    effFps,
+    gpuNote,
+    governorArmed,
+    slowRender,
+    slowRenderSource,
+    tripWatchdog,
+    setSlowRender,
+    clearWatchdogReason,
+    recoverFps,
+    glContext,
+  ]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher
@@ -252,7 +272,12 @@ export function usePerformanceGovernor() {
       if (perfTier1) {
         setPerfTier1(false);
         // Event-log only: the cut cleared (governor disabled).
-        recordGovernorEvent({ type: 'restore', cutKind: 'perfTier1', label: 'shine back on', detail: 'autoQuality off' });
+        recordGovernorEvent({
+          type: 'restore',
+          cutKind: 'perfTier1',
+          label: 'shine back on',
+          detail: 'autoQuality off',
+        });
       }
       return;
     }
@@ -263,7 +288,9 @@ export function usePerformanceGovernor() {
         // Event-log only: the cut cleared (FPS recovered past the tier-1
         // RECOVER threshold — hysteresis, #265).
         recordGovernorEvent({
-          type: 'restore', cutKind: 'perfTier1', label: 'shine back on',
+          type: 'restore',
+          cutKind: 'perfTier1',
+          label: 'shine back on',
           fps: { at: effFps, threshold: TIER1_RECOVER_FPS, sustainedMs: 0 },
         });
       }
@@ -283,7 +310,9 @@ export function usePerformanceGovernor() {
       setPerfTier1(true);
       // Event-log only: step 3 of the shed ladder fired.
       recordGovernorEvent({
-        type: 'shed', cutKind: 'perfTier1', label: 'SHINE OFF',
+        type: 'shed',
+        cutKind: 'perfTier1',
+        label: 'SHINE OFF',
         fps: { at: effFps, threshold: TIER1_FPS, sustainedMs: TIER1_SUSTAIN_MS },
         detail: `FPS ${effFps} < ${TIER1_FPS} sustained ${TIER1_SUSTAIN_MS / 1000}s${gpuNote}`,
       });
@@ -301,18 +330,40 @@ export function usePerformanceGovernor() {
     const healthy = !governorArmed || effFps >= recoverFps;
 
     const snap = {
-      fxaaShed, renderScale, quality, qualityShedFrom, assetThin, perfClampOverride,
-      slowRender, slowRenderSource, creatureShed, travelShed, weatherShed, feedbackWarpShed,
+      fxaaShed,
+      renderScale,
+      quality,
+      qualityShedFrom,
+      assetThin,
+      perfClampOverride,
+      slowRender,
+      slowRenderSource,
+      creatureShed,
+      travelShed,
+      weatherShed,
+      feedbackWarpShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
       switch (cut.kind) {
-        case 'fxaa': setFxaaShed(false); break;
-        case 'renderScale': setRenderScale(1); break;
-        case 'markWeather': setWeatherShed(false); break;
-        case 'feedbackWarp': setFeedbackWarpShed(false); break;
-        case 'creatureCount': setCreatureShed(0); break;
-        case 'travel': setTravelShed(false); break;
+        case 'fxaa':
+          setFxaaShed(false);
+          break;
+        case 'renderScale':
+          setRenderScale(1);
+          break;
+        case 'markWeather':
+          setWeatherShed(false);
+          break;
+        case 'feedbackWarp':
+          setFeedbackWarpShed(false);
+          break;
+        case 'creatureCount':
+          setCreatureShed(0);
+          break;
+        case 'travel':
+          setTravelShed(false);
+          break;
         case 'quality':
           // #264 M1 — restore the tier the governor stepped down from,
           // then release the claim. A manual quality change clears
@@ -321,15 +372,23 @@ export function usePerformanceGovernor() {
           setQuality(qualityShedFrom);
           setQualityShedFrom(null);
           break;
-        case 'assetThin': setAssetThin(false); break;
-        case 'countClamp': setPerfClampOverride(null); break;
-        case 'slowRender': setSlowRender(false); break;
-        default: break;
+        case 'assetThin':
+          setAssetThin(false);
+          break;
+        case 'countClamp':
+          setPerfClampOverride(null);
+          break;
+        case 'slowRender':
+          setSlowRender(false);
+          break;
+        default:
+          break;
       }
       // Event-log only: the cut cleared (FPS recovered past RECOVER —
       // hysteresis, #259; countClamp also clears on tier change).
       recordCutEvent({
-        type: 'restore', cutKind: cut.kind,
+        type: 'restore',
+        cutKind: cut.kind,
         label: cut.kind === 'quality' ? `tier restored → ${qualityShedFrom}` : cut.restoredLabel,
         fps: { at: effFps, threshold: recoverFps, sustainedMs: 0 },
       });
@@ -379,12 +438,24 @@ export function usePerformanceGovernor() {
     if (!cut) return; // ladder exhausted — hold; the watchdog is separate
 
     switch (cut.kind) {
-      case 'fxaa': setFxaaShed(true); break;
-      case 'renderScale': setRenderScale(cut.scale); break;
-      case 'markWeather': setWeatherShed(true); break;
-      case 'feedbackWarp': setFeedbackWarpShed(true); break;
-      case 'creatureCount': setCreatureShed(cut.creatureShed); break;
-      case 'travel': setTravelShed(true); break;
+      case 'fxaa':
+        setFxaaShed(true);
+        break;
+      case 'renderScale':
+        setRenderScale(cut.scale);
+        break;
+      case 'markWeather':
+        setWeatherShed(true);
+        break;
+      case 'feedbackWarp':
+        setFeedbackWarpShed(true);
+        break;
+      case 'creatureCount':
+        setCreatureShed(cut.creatureShed);
+        break;
+      case 'travel':
+        setTravelShed(true);
+        break;
       case 'quality':
         // #264 — record the tier being stepped down from, once per shed
         // episode, so recovery restores exactly it (never the operator's
@@ -392,25 +463,64 @@ export function usePerformanceGovernor() {
         if (qualityShedFrom == null) setQualityShedFrom(quality);
         setQuality(cut.quality);
         break;
-      case 'assetThin': setAssetThin(true); break;
-      case 'countClamp': setPerfClampOverride({ count: cut.count, mirror: false }); break;
-      case 'slowRender': setSlowRender(true, 'cut6'); break;
-      default: break;
+      case 'assetThin':
+        setAssetThin(true);
+        break;
+      case 'countClamp':
+        setPerfClampOverride({ count: cut.count, mirror: false });
+        break;
+      case 'slowRender':
+        setSlowRender(true, 'cut6');
+        break;
+      default:
+        break;
     }
     // Event-log only: steps 1–2 / 4–6 of the shed ladder fire here.
     recordCutEvent({
-      type: 'shed', cutKind: cut.kind, label: cut.label,
+      type: 'shed',
+      cutKind: cut.kind,
+      label: cut.label,
       fps: { at: effFps, threshold: shedFps, sustainedMs: SUSTAIN_MS },
       detail: `FPS ${effFps} < ${shedFps} sustained ${SUSTAIN_MS / 1000}s${gpuNote}`,
     });
     lastActionRef.current = now;
     lowSinceRef.current = null;
     console.info('[Kinetic] Showrunner cut:', cut.label, '(FPS sustained below', shedFps + ')' + gpuNote);
-  }, [fxaa, fxaaShed, setFxaaShed, effFps, gpuNote, quality, qualityShedFrom, setQualityShedFrom, governorArmed, setQuality, layoutParams.count, perfClampOverride,
-    setPerfClampOverride, assetThin, setAssetThin, renderScale, setRenderScale,
-    creatureCount, creatureShed, setCreatureShed,
-    weatherActive, weatherShed, setWeatherShed,
-    feedbackWarpActive, feedbackWarpShed, setFeedbackWarpShed,
-    travelActive, travelShed, setTravelShed,
-    slowRender, slowRenderSource, setSlowRender, shedFps, recoverFps, gpuSaturated]);
+  }, [
+    fxaa,
+    fxaaShed,
+    setFxaaShed,
+    effFps,
+    gpuNote,
+    quality,
+    qualityShedFrom,
+    setQualityShedFrom,
+    governorArmed,
+    setQuality,
+    layoutParams.count,
+    perfClampOverride,
+    setPerfClampOverride,
+    assetThin,
+    setAssetThin,
+    renderScale,
+    setRenderScale,
+    creatureCount,
+    creatureShed,
+    setCreatureShed,
+    weatherActive,
+    weatherShed,
+    setWeatherShed,
+    feedbackWarpActive,
+    feedbackWarpShed,
+    setFeedbackWarpShed,
+    travelActive,
+    travelShed,
+    setTravelShed,
+    slowRender,
+    slowRenderSource,
+    setSlowRender,
+    shedFps,
+    recoverFps,
+    gpuSaturated,
+  ]);
 }

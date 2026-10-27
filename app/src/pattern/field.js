@@ -28,20 +28,20 @@ const EPS = 1e-9;
 // is exactly on a cell edge (x*n integer) and one a single ulp below it land in
 // the SAME cell. Without this, 0 versus 0.9999999999 at a wrap is a full-color flip.
 const flE = (v) => Math.floor(v + EPS);
-const frE = (v) => (v + EPS) - Math.floor(v + EPS);
+const frE = (v) => v + EPS - Math.floor(v + EPS);
 
 /** Pattern names in spec order (24–33). The array index is the pattern id. */
 export const FIELD_PATTERNS = Object.freeze([
-  'stripeStack',     // 24
-  'triangleField',   // 25
-  'plusGrid',        // 26
-  'zigzagRows',      // 27
-  'diamondLattice',  // 28
-  'concentricArcs',  // 29
-  'pinstripes',      // 30
-  'rayBurst',        // 31
-  'barStack',        // 32
-  'diamondBands',    // 33
+  'stripeStack', // 24
+  'triangleField', // 25
+  'plusGrid', // 26
+  'zigzagRows', // 27
+  'diamondLattice', // 28
+  'concentricArcs', // 29
+  'pinstripes', // 30
+  'rayBurst', // 31
+  'barStack', // 32
+  'diamondBands', // 33
 ]);
 
 // Cell lookup along one axis: a wrapped sequence, periodic for any length.
@@ -53,8 +53,10 @@ const G = {
 
   // 25 — grid of solid triangles. n even so the parity flip continues.
   triangleField: (x, y, p) => {
-    const cx = flE(x * p.n); const cy = flE(y * p.n);
-    const fx = frE(x * p.n); const fy = frE(y * p.n);
+    const cx = flE(x * p.n);
+    const cy = flE(y * p.n);
+    const fx = frE(x * p.n);
+    const fy = frE(y * p.n);
     const flip = mod(cx + cy, 2) === 1;
     const upper = flip ? fx + fy > 1 + EPS : fx > fy + EPS;
     return upper ? 1 : 2;
@@ -62,7 +64,8 @@ const G = {
 
   // 26 — evenly spaced crosses.
   plusGrid: (x, y, p) => {
-    const a = Math.abs(frE(x * p.n) - 0.5); const b = Math.abs(frE(y * p.n) - 0.5);
+    const a = Math.abs(frE(x * p.n) - 0.5);
+    const b = Math.abs(frE(y * p.n) - 0.5);
     return (a < p.arm - EPS && b < p.len - EPS) || (b < p.arm - EPS && a < p.len - EPS) ? 1 : 0;
   },
 
@@ -75,13 +78,15 @@ const G = {
 
   // 28 — interlocking diamond grid: a diamond in each cell, corners between.
   diamondLattice: (x, y, p) => {
-    const a = frE(x * p.n) - 0.5; const b = frE(y * p.n) - 0.5;
+    const a = frE(x * p.n) - 0.5;
+    const b = frE(y * p.n) - 0.5;
     return Math.abs(a) + Math.abs(b) < 0.5 - EPS ? 1 : 2;
   },
 
   // 29 — radiating arc bands around each cell center (periodic distance).
   concentricArcs: (x, y, p) => {
-    const a = frE(x * p.n) - 0.5; const b = frE(y * p.n) - 0.5;
+    const a = frE(x * p.n) - 0.5;
+    const b = frE(y * p.n) - 0.5;
     const r = Math.sqrt(a * a + b * b);
     return mod(flE(r * p.bands), 2) === 0 ? 1 : 2;
   },
@@ -92,7 +97,8 @@ const G = {
   // 31 — radial ticks around EVERY lattice point, not one corner. Even ray
   // count so alternation continues across the branch cut of atan2.
   rayBurst: (x, y, p) => {
-    const a = frE(x * p.n + 0.5) - 0.5; const b = frE(y * p.n + 0.5) - 0.5;
+    const a = frE(x * p.n + 0.5) - 0.5;
+    const b = frE(y * p.n + 0.5) - 0.5;
     if (Math.sqrt(a * a + b * b) > p.reach + EPS) return 0;
     const ang = (Math.atan2(b, a) + Math.PI) / (2 * Math.PI);
     return mod(flE(ang * p.rays), 2) === 0 ? 1 : 2;
@@ -103,7 +109,8 @@ const G = {
 
   // 33 — expanding diamond outlines, periodic per cell.
   diamondBands: (x, y, p) => {
-    const a = frE(x * p.n) - 0.5; const b = frE(y * p.n) - 0.5;
+    const a = frE(x * p.n) - 0.5;
+    const b = frE(y * p.n) - 0.5;
     return mod(flE((Math.abs(a) + Math.abs(b)) * p.bands), 3);
   },
 };
@@ -136,16 +143,27 @@ function runSeq(rng, cells) {
 /** Fresh params for a pattern. Every count is an integer; parity counts are even. */
 export function patternParams(name, rng) {
   switch (name) {
-    case 'stripeStack': return { seq: runSeq(rng, pick(rng, [8, 12, 16])) };
-    case 'triangleField': return { n: pick(rng, [2, 4, 6]) };
-    case 'plusGrid': return { n: pick(rng, [2, 3, 4, 5]), arm: pick(rng, [0.08, 0.12, 0.16]), len: pick(rng, [0.3, 0.38, 0.44]) };
-    case 'zigzagRows': return { rows: pick(rng, [4, 6, 8]), waves: pick(rng, [2, 3, 4]), amp: pick(rng, [1, 2]) };
-    case 'diamondLattice': return { n: pick(rng, [2, 3, 4]) };
-    case 'concentricArcs': return { n: pick(rng, [1, 2, 3]), bands: pick(rng, [4, 6, 8]) };
-    case 'pinstripes': return { k: pick(rng, [4, 6, 8, 12]), width: pick(rng, [0.18, 0.3, 0.45]), dir: pick(rng, [1, -1]) };
-    case 'rayBurst': return { n: pick(rng, [1, 2, 3]), rays: pick(rng, [8, 12, 16]), reach: pick(rng, [0.28, 0.4, 0.5]) };
-    case 'barStack': return { seq: runSeq(rng, pick(rng, [8, 12, 16])) };
-    case 'diamondBands': return { n: pick(rng, [1, 2, 3]), bands: pick(rng, [3, 4, 6]) };
-    default: throw new Error(`unknown field pattern: ${name}`);
+    case 'stripeStack':
+      return { seq: runSeq(rng, pick(rng, [8, 12, 16])) };
+    case 'triangleField':
+      return { n: pick(rng, [2, 4, 6]) };
+    case 'plusGrid':
+      return { n: pick(rng, [2, 3, 4, 5]), arm: pick(rng, [0.08, 0.12, 0.16]), len: pick(rng, [0.3, 0.38, 0.44]) };
+    case 'zigzagRows':
+      return { rows: pick(rng, [4, 6, 8]), waves: pick(rng, [2, 3, 4]), amp: pick(rng, [1, 2]) };
+    case 'diamondLattice':
+      return { n: pick(rng, [2, 3, 4]) };
+    case 'concentricArcs':
+      return { n: pick(rng, [1, 2, 3]), bands: pick(rng, [4, 6, 8]) };
+    case 'pinstripes':
+      return { k: pick(rng, [4, 6, 8, 12]), width: pick(rng, [0.18, 0.3, 0.45]), dir: pick(rng, [1, -1]) };
+    case 'rayBurst':
+      return { n: pick(rng, [1, 2, 3]), rays: pick(rng, [8, 12, 16]), reach: pick(rng, [0.28, 0.4, 0.5]) };
+    case 'barStack':
+      return { seq: runSeq(rng, pick(rng, [8, 12, 16])) };
+    case 'diamondBands':
+      return { n: pick(rng, [1, 2, 3]), bands: pick(rng, [3, 4, 6]) };
+    default:
+      throw new Error(`unknown field pattern: ${name}`);
   }
 }

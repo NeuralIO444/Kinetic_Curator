@@ -45,7 +45,11 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
  * Invariants: bodyFrames >= 1, dissolveFrames <= totalFrames / 2,
  * totalFrames === bodyFrames + dissolveFrames.
  */
-export function planLoopFrames({ seconds = 4, fps = LOOP_CAPTURE_FPS, dissolveSeconds = LOOP_CAPTURE_DISSOLVE_SECONDS } = {}) {
+export function planLoopFrames({
+  seconds = 4,
+  fps = LOOP_CAPTURE_FPS,
+  dissolveSeconds = LOOP_CAPTURE_DISSOLVE_SECONDS,
+} = {}) {
   const safeFps = Math.max(1, Math.round(fps) || LOOP_CAPTURE_FPS);
   const totalFrames = Math.max(2, Math.round((seconds || 4) * safeFps));
   const dissolveFrames = Math.max(
@@ -70,11 +74,7 @@ function frameToCanvas(frame) {
   const c = document.createElement('canvas');
   c.width = frame.width;
   c.height = frame.height;
-  c.getContext('2d').putImageData(
-    new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height),
-    0,
-    0,
-  );
+  c.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height), 0, 0);
   return c;
 }
 
@@ -173,11 +173,19 @@ export async function captureLoop({
   try {
     rec = makeRecorder(stream);
   } catch (e) {
-    stream.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+    stream.getTracks().forEach((t) => {
+      try {
+        t.stop();
+      } catch {
+        /* noop */
+      }
+    });
     throw new Error(`[loop] recorder failed: ${e && e.message ? e.message : e}`, { cause: e });
   }
   const chunks = [];
-  rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
+  rec.ondataavailable = (e) => {
+    if (e.data && e.data.size) chunks.push(e.data);
+  };
   const stopped = new Promise((resolve, reject) => {
     rec.onstop = resolve;
     rec.onerror = (e) => reject((e && e.error) || new Error('[loop] recorder error'));
@@ -186,11 +194,7 @@ export async function captureLoop({
   const drawLive = async () => {
     const frame = await grabFrame(loop);
     octx.globalAlpha = 1;
-    octx.putImageData(
-      new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height),
-      0,
-      0,
-    );
+    octx.putImageData(new ImageData(new Uint8ClampedArray(frame.pixels), frame.width, frame.height), 0, 0);
   };
 
   let failed = null;
@@ -218,9 +222,23 @@ export async function captureLoop({
   } catch (e) {
     failed = e;
   }
-  try { if (rec.state !== 'inactive') rec.stop(); } catch { /* noop */ }
-  try { await stopped; } catch (e) { if (!failed) failed = e; }
-  stream.getTracks().forEach((t) => { try { t.stop(); } catch { /* noop */ } });
+  try {
+    if (rec.state !== 'inactive') rec.stop();
+  } catch {
+    /* noop */
+  }
+  try {
+    await stopped;
+  } catch (e) {
+    if (!failed) failed = e;
+  }
+  stream.getTracks().forEach((t) => {
+    try {
+      t.stop();
+    } catch {
+      /* noop */
+    }
+  });
 
   if (failed) throw failed;
   if (cancelled()) return { blob: null, cancelled: true };

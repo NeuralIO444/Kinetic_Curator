@@ -19,7 +19,11 @@ import {
 } from './mathFilters.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('isMathLayer matches type only', () => {
   assert.equal(isMathLayer({ type: 'math' }), true);
@@ -35,7 +39,10 @@ ok('twelve ops in the catalog', () => {
 
 ok('default chain is GAIN → CONTRAST', () => {
   const fx = defaultMathEffects();
-  assert.deepEqual(fx.map((f) => f.kind), ['gain', 'contrast']);
+  assert.deepEqual(
+    fx.map((f) => f.kind),
+    ['gain', 'contrast'],
+  );
   assert.deepEqual(fx[0].params, { exposure: 0 });
   assert.deepEqual(fx[1].params, { amount: 0.5 });
   assert.deepEqual(fx[0].mod, {});
@@ -71,7 +78,10 @@ ok('mathTrackHitsHard: hard threshold, hard quantize', () => {
   assert.equal(mathTrackHitsHard(layer([{ kind: 'quantize', params: { steps: 5 } }])), false);
   assert.equal(mathTrackHitsHard(layer([{ kind: 'gain', params: { exposure: 3 } }])), false);
   assert.equal(mathTrackHitsHard({ type: 'fx', visible: true, effects: [] }), false);
-  assert.equal(mathTrackHitsHard({ type: 'math', visible: false, effects: [{ kind: 'threshold', params: { softness: 0 } }] }), false);
+  assert.equal(
+    mathTrackHitsHard({ type: 'math', visible: false, effects: [{ kind: 'threshold', params: { softness: 0 } }] }),
+    false,
+  );
 });
 
 ok('mathTrackWetCeiling: 50% while HUE ROTATE is in the chain', () => {

@@ -23,7 +23,10 @@ test('#1072 every slot abbreviation matches what the slot holds', () => {
   assert.ok(!ef1.kinds.includes('blur'));
   assert.equal(efTileFace(ef1, null).abbr, 'FOC');
   assert.notEqual(efTileFace(ef1, null).abbr, 'BLR', 'the empty slot must not claim a blur');
-  assert.deepEqual(FX_RACK.map((s) => efTileFace(s, null).abbr), ['FOC', 'DST', 'TON', 'FIN']);
+  assert.deepEqual(
+    FX_RACK.map((s) => efTileFace(s, null).abbr),
+    ['FOC', 'DST', 'TON', 'FIN'],
+  );
 });
 
 test('#1046 an empty slot names its family, never the bare word "empty"', () => {
@@ -63,8 +66,16 @@ test('#1046 an effect with almost nothing to set says so, and an empty slot offe
   // WHICH effects get one. A new effect with <= 1 control must be added here on purpose.
   const countOf = (k) => Object.keys(FX_EFFECT_DEFS[k].params).length;
   const kinds = Object.keys(FX_EFFECT_DEFS);
-  assert.deepEqual(kinds.filter((k) => countOf(k) === 0).sort(), ['edge', 'invert', 'solarize'], 'these read "no controls"');
+  assert.deepEqual(
+    kinds.filter((k) => countOf(k) === 0).sort(),
+    ['edge', 'invert', 'solarize'],
+    'these read "no controls"',
+  );
   // #1490 — feedbackWarp has exactly one control (its amount) on purpose: it joins this list deliberately.
-  assert.deepEqual(kinds.filter((k) => countOf(k) === 1).sort(), ['feedbackWarp', 'grain', 'posterize', 'rgbSplit'], 'these read "no other controls"');
+  assert.deepEqual(
+    kinds.filter((k) => countOf(k) === 1).sort(),
+    ['feedbackWarp', 'grain', 'posterize', 'rgbSplit'],
+    'these read "no other controls"',
+  );
   assert.ok(kinds.filter((k) => countOf(k) > 1).length >= 6, 'everything else shows its sliders and no note');
 });

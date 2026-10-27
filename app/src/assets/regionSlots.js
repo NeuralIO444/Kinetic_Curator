@@ -75,8 +75,14 @@ export function normalizeRegions(raw) {
     if (!Number.isInteger(r.area) || r.area <= 0) continue;
     seen.add(r.id);
     out.push({
-      id: r.id, color: r.color,
-      cx: r.cx, cy: r.cy, x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1,
+      id: r.id,
+      color: r.color,
+      cx: r.cx,
+      cy: r.cy,
+      x0: r.x0,
+      y0: r.y0,
+      x1: r.x1,
+      y1: r.y1,
       area: r.area,
     });
   }

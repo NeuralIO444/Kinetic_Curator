@@ -26,7 +26,11 @@ import { createLayersSlice } from '../state/slices/layersSlice.js';
 import { normalizeLayers, serializeProject, parseProject } from '../state/projectDocument.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // --- sanitize ---------------------------------------------------------------
 ok('sanitize drops unknown kinds, clamps params, fills defaults', () => {
@@ -55,25 +59,45 @@ ok('#520: defaultFxEffects is empty — empty rack is trivially valid', () => {
   const defs = defaultFxEffects();
   assert.deepEqual(defs, [], 'default rack starts empty');
   let moved = false;
-  sanitizeFxEffects(defs, { onMove: () => { moved = true; } });
+  sanitizeFxEffects(defs, {
+    onMove: () => {
+      moved = true;
+    },
+  });
   assert.ok(!moved, 'empty stack must not trigger onMove');
 });
 ok('#520: grain mid-chain is moved to last, onMove fires with kind', () => {
   const moved = [];
   const out = sanitizeFxEffects(
-    [{ kind: 'grain', params: { amount: 0.4 } }, { kind: 'rgbSplit', params: { dx: 3 } }],
-    { onMove: ({ kinds }) => moved.push(...kinds) }
+    [
+      { kind: 'grain', params: { amount: 0.4 } },
+      { kind: 'rgbSplit', params: { dx: 3 } },
+    ],
+    { onMove: ({ kinds }) => moved.push(...kinds) },
   );
-  assert.deepEqual(out.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.deepEqual(
+    out.map((e) => e.kind),
+    ['rgbSplit', 'grain'],
+  );
   assert.deepEqual(moved, ['grain']);
 });
 ok('#520: grain at last position with non-grain before it — no move, onMove silent', () => {
   let moved = false;
   const out = sanitizeFxEffects(
-    [{ kind: 'rgbSplit', params: { dx: 3 } }, { kind: 'grain', params: { amount: 0.4 } }],
-    { onMove: () => { moved = true; } }
+    [
+      { kind: 'rgbSplit', params: { dx: 3 } },
+      { kind: 'grain', params: { amount: 0.4 } },
+    ],
+    {
+      onMove: () => {
+        moved = true;
+      },
+    },
   );
-  assert.deepEqual(out.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.deepEqual(
+    out.map((e) => e.kind),
+    ['rgbSplit', 'grain'],
+  );
   assert.ok(!moved);
 });
 ok('#520: multiple grain-family mid-chain all move to end, order preserved within group', () => {
@@ -84,9 +108,12 @@ ok('#520: multiple grain-family mid-chain all move to end, order preserved withi
       { kind: 'grain', params: { amount: 0.6 } },
       { kind: 'displace', params: { scale: 24, seed: 7 } },
     ],
-    { onMove: ({ kinds }) => moved.push(...kinds) }
+    { onMove: ({ kinds }) => moved.push(...kinds) },
   );
-  assert.deepEqual(out.map((e) => e.kind), ['displace', 'grain', 'grain']);
+  assert.deepEqual(
+    out.map((e) => e.kind),
+    ['displace', 'grain', 'grain'],
+  );
   assert.equal(out[1].params.amount, 0.2); // relative order within group preserved
   assert.equal(out[2].params.amount, 0.6);
   assert.deepEqual(moved, ['grain', 'grain']);
@@ -94,8 +121,15 @@ ok('#520: multiple grain-family mid-chain all move to end, order preserved withi
 ok('#520: all-grain-family stack is valid (nothing non-grain follows any grain)', () => {
   let moved = false;
   const out = sanitizeFxEffects(
-    [{ kind: 'grain', params: { amount: 0.3 } }, { kind: 'grain', params: { amount: 0.7 } }],
-    { onMove: () => { moved = true; } }
+    [
+      { kind: 'grain', params: { amount: 0.3 } },
+      { kind: 'grain', params: { amount: 0.7 } },
+    ],
+    {
+      onMove: () => {
+        moved = true;
+      },
+    },
   );
   assert.equal(out.length, 2);
   assert.ok(!moved);
@@ -105,7 +139,10 @@ ok('#520: onMove absent — mid-chain grain still moves silently on non-load pat
     { kind: 'grain', params: { amount: 0.4 } },
     { kind: 'posterize', params: { levels: 4 } },
   ]);
-  assert.deepEqual(out.map((e) => e.kind), ['posterize', 'grain']);
+  assert.deepEqual(
+    out.map((e) => e.kind),
+    ['posterize', 'grain'],
+  );
 });
 
 // #520 Phase 1b — availableFxKinds offer-list
@@ -118,11 +155,20 @@ ok('#520 Phase 2: grain-family split partitions effects correctly', () => {
   ];
   const pre = effects.filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
   const fin = effects.filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
-  assert.deepEqual(pre.map((f) => f.kind), ['rgbSplit', 'posterize']);
-  assert.deepEqual(fin.map((f) => f.kind), ['grain']);
+  assert.deepEqual(
+    pre.map((f) => f.kind),
+    ['rgbSplit', 'posterize'],
+  );
+  assert.deepEqual(
+    fin.map((f) => f.kind),
+    ['grain'],
+  );
 });
 ok('#520 Phase 2: grain-free stack has empty finEffects', () => {
-  const effects = [{ kind: 'rgbSplit', params: {} }, { kind: 'invert', params: {} }];
+  const effects = [
+    { kind: 'rgbSplit', params: {} },
+    { kind: 'invert', params: {} },
+  ];
   const fin = effects.filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
   assert.deepEqual(fin, []);
 });
@@ -140,12 +186,12 @@ ok('#520 Phase 2: renderer.mjs local GRAIN_FAMILY_KINDS matches fxFilters.js', (
 ok('#520 Phase 1b: availableFxKinds — empty stack offers all live kinds in slot order', () => {
   const kinds = availableFxKinds([]);
   // #1022 — EF-1 holds sharpen and haze now; every slot has live kinds
-  const ef1 = FX_RACK.find(s => s.slot === 'EF-1').kinds;
-  const ef2 = FX_RACK.find(s => s.slot === 'EF-2').kinds;
-  const ef3 = FX_RACK.find(s => s.slot === 'EF-3').kinds;
-  const ef4 = FX_RACK.find(s => s.slot === 'EF-4').kinds;
+  const ef1 = FX_RACK.find((s) => s.slot === 'EF-1').kinds;
+  const ef2 = FX_RACK.find((s) => s.slot === 'EF-2').kinds;
+  const ef3 = FX_RACK.find((s) => s.slot === 'EF-3').kinds;
+  const ef4 = FX_RACK.find((s) => s.slot === 'EF-4').kinds;
   assert.deepEqual(kinds, [...ef1, ...ef2, ...ef3, ...ef4]);
-  assert.ok(!kinds.some(k => FX_RACK.find(s => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
+  assert.ok(!kinds.some((k) => FX_RACK.find((s) => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
 });
 ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-list', () => {
   const kinds = availableFxKinds([{ kind: 'rgbSplit', params: {} }]);
@@ -157,17 +203,20 @@ ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-li
 });
 ok('#520 Phase 1b: availableFxKinds — all slots filled returns empty', () => {
   const effects = [
-    { kind: 'sharpen', params: {} },    // EF-1 (#1022)
-    { kind: 'rgbSplit', params: {} },   // EF-2
-    { kind: 'posterize', params: {} },  // EF-3
-    { kind: 'grain', params: {} },      // EF-4
+    { kind: 'sharpen', params: {} }, // EF-1 (#1022)
+    { kind: 'rgbSplit', params: {} }, // EF-2
+    { kind: 'posterize', params: {} }, // EF-3
+    { kind: 'grain', params: {} }, // EF-4
   ];
   assert.deepEqual(availableFxKinds(effects), []);
 });
 
 // #520 Phase 1b — fxEffectInsertIndex ordered insertion
 ok('#520 Phase 1b: fxEffectInsertIndex — EF-3 inserts before EF-4', () => {
-  const effects = [{ kind: 'rgbSplit', params: {} }, { kind: 'grain', params: {} }];
+  const effects = [
+    { kind: 'rgbSplit', params: {} },
+    { kind: 'grain', params: {} },
+  ];
   assert.equal(fxEffectInsertIndex('posterize', effects), 1); // before grain (EF-4)
 });
 ok('#520 Phase 1b: fxEffectInsertIndex — EF-2 appends before any higher slot', () => {
@@ -186,7 +235,16 @@ ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
   // #1022 — sharpen and haze join: the Blur / Focus slot must offer something.
   // #1490 — feedbackWarp joins: the spectral feedback warp's amount must be
   // reachable from the add surfaces or the warp could never be turned on.
-  assert.deepEqual(FX_MENU_KINDS, ['rgbSplit', 'displace', 'tear', 'invert', 'halo', 'sharpen', 'haze', 'feedbackWarp']);
+  assert.deepEqual(FX_MENU_KINDS, [
+    'rgbSplit',
+    'displace',
+    'tear',
+    'invert',
+    'halo',
+    'sharpen',
+    'haze',
+    'feedbackWarp',
+  ]);
   assert.ok(!FX_EFFECT_KINDS.includes('blur'), 'blur is cut from the roster');
   for (const k of FX_MENU_KINDS) assert.ok(FX_EFFECT_KINDS.includes(k), `${k} stays in the roster`);
   // The five demoted effects stay renderable: they compile, they just leave the menu.
@@ -198,8 +256,10 @@ ok('#310/#704: add-menu stays curated, roster stays renderable', () => {
 // --- compiler recipes -------------------------------------------------------
 ok('rgbSplit compiles to 7 prims in recipe order', () => {
   const prims = compileFxPrimitives([{ kind: 'rgbSplit', params: { dx: 3 } }]);
-  assert.deepEqual(prims.map((p) => p.prim),
-    ['feColorMatrix', 'feColorMatrix', 'feColorMatrix', 'feOffset', 'feOffset', 'feBlend', 'feBlend']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feColorMatrix', 'feColorMatrix', 'feColorMatrix', 'feOffset', 'feOffset', 'feBlend', 'feBlend'],
+  );
   assert.equal(prims[3].attrs.dx, 3);
   assert.equal(prims[4].attrs.dx, -3);
   assert.equal(prims[6].attrs.mode, 'screen');
@@ -211,15 +271,20 @@ ok('rgbSplit dx accepts live modulation', () => {
 });
 ok('displace: turbulence + displacement map, octaves clamped', () => {
   const prims = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7 } }], { octaves: 2 });
-  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feDisplacementMap']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feTurbulence', 'feDisplacementMap'],
+  );
   assert.equal(prims[0].attrs.numOctaves, 2);
   assert.equal(prims[0].attrs.seed, 7);
   assert.equal(prims[1].attrs.scale, 24);
 });
 ok('tear: x-only displacement via flattened Y channel', () => {
   const prims = compileFxPrimitives([{ kind: 'tear', params: { bands: 18, amount: 12 } }]);
-  assert.deepEqual(prims.map((p) => p.prim),
-    ['feTurbulence', 'feComponentTransfer', 'feDisplacementMap']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feTurbulence', 'feComponentTransfer', 'feDisplacementMap'],
+  );
   const flat = prims[1].children[0];
   assert.equal(flat.prim, 'feFuncG');
   assert.equal(flat.attrs.intercept, 0.5); // Y displacement exactly 0
@@ -227,7 +292,10 @@ ok('tear: x-only displacement via flattened Y channel', () => {
 });
 ok('grain: noise alpha composited over source', () => {
   const prims = compileFxPrimitives([{ kind: 'grain', params: { amount: 0.4 } }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite'],
+  );
   assert.equal(prims[2].attrs.operator, 'in'); // alpha-aware: grain masked by source alpha
   assert.equal(prims[2].attrs.in2, 'SourceAlpha');
   assert.equal(prims[3].attrs.operator, 'over');
@@ -307,7 +375,9 @@ ok('fxFilterStringForLayer returns null for empty stacks', () => {
 // --- layer model --------------------------------------------------------------
 function driveSlice() {
   let state = {
-    layers: [{ id: 'layer-1', name: 'Layer 1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
+    layers: [
+      { id: 'layer-1', name: 'Layer 1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    ],
     activeLayerId: 'layer-1',
     layerSnapshots: {},
     selectedFxLayerId: null,
@@ -319,7 +389,9 @@ function driveSlice() {
     caGrid: null,
     enabledAssets: {},
   };
-  const set = (fn) => { state = { ...state, ...fn(state) }; };
+  const set = (fn) => {
+    state = { ...state, ...fn(state) };
+  };
   return { api: createLayersSlice(set), get: () => state };
 }
 
@@ -363,8 +435,8 @@ ok('effect CRUD is fail-closed', () => {
   api.addFxLayer();
   const fxId = get().layers[1].id;
   // default stack: empty
-  api.fxEffectAdd('nope', 'tear');          // bad layerId — rejected
-  api.fxEffectAdd(fxId, 'vaporwave');       // unknown kind — rejected
+  api.fxEffectAdd('nope', 'tear'); // bad layerId — rejected
+  api.fxEffectAdd(fxId, 'vaporwave'); // unknown kind — rejected
   assert.equal(get().layers[1].effects.length, 0); // unchanged
   // add rgbSplit (EF-2)
   api.fxEffectAdd(fxId, 'rgbSplit');
@@ -375,7 +447,10 @@ ok('effect CRUD is fail-closed', () => {
   // posterize is EF-3 (empty slot) — accepted, inserted after rgbSplit
   api.fxEffectAdd(fxId, 'posterize');
   assert.equal(get().layers[1].effects.length, 2);
-  assert.deepEqual(get().layers[1].effects.map(e => e.kind), ['rgbSplit', 'posterize']);
+  assert.deepEqual(
+    get().layers[1].effects.map((e) => e.kind),
+    ['rgbSplit', 'posterize'],
+  );
   assert.deepEqual(get().layers[1].effects[1].params, defaultFxParams('posterize'));
   api.fxEffectRemove(fxId, 99);
   api.fxEffectReorder(fxId, 0, 99);
@@ -417,24 +492,52 @@ ok('#554: builtin u_p packers agree with the catalog sanitize — hostile values
       assert.ok(Math.abs(got - want) < 1e-9, `${kind}.${key}=${String(v)}: packer ${got} !== catalog ${want}`);
       if (kind === 'grain') assert.equal(packed[0], 0, 'grain must not write u_p.x');
     }
-    assert.ok(Math.abs(packFor(kind, {})[slot] * scale - FX_EFFECT_DEFS[kind].params[key].def) < 1e-9, `${kind} default`);
+    assert.ok(
+      Math.abs(packFor(kind, {})[slot] * scale - FX_EFFECT_DEFS[kind].params[key].def) < 1e-9,
+      `${kind} default`,
+    );
   }
   assert.deepEqual(packFor('invert', {}), [0, 0, 0, 0]);
 });
 ok('#704: the SVG halo is identity at defaults and approximates the bloom otherwise', () => {
-  const idle = compileFxPrimitives([{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0 } }], {});
-  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'defaults must pass the layer through');
-  const bloom = compileFxPrimitives([{ kind: 'halo', params: { amount: 0.8, radius: 24, threshold: 0.4, vignette: 0 } }], {});
+  const idle = compileFxPrimitives(
+    [{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0 } }],
+    {},
+  );
+  assert.deepStrictEqual(
+    idle.map((p) => p.prim),
+    ['feOffset'],
+    'defaults must pass the layer through',
+  );
+  const bloom = compileFxPrimitives(
+    [{ kind: 'halo', params: { amount: 0.8, radius: 24, threshold: 0.4, vignette: 0 } }],
+    {},
+  );
   const prims = bloom.map((p) => p.prim);
   assert.ok(prims.includes('feComponentTransfer'), 'the bright-pass keeps a dark ground dark');
-  assert.ok(prims.includes('feGaussianBlur'), 'the SVG half spreads with a gaussian — the GL half deliberately does not');
+  assert.ok(
+    prims.includes('feGaussianBlur'),
+    'the SVG half spreads with a gaussian — the GL half deliberately does not',
+  );
   assert.ok(prims.includes('feComposite'), 'the bloom is composited back over the source');
-  const vig = compileFxPrimitives([{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0.7 } }], {});
-  assert.ok(vig.some((p) => p.prim === 'feFlood'), 'the vignette darkens with a flood');
-  assert.ok(vig.some((p) => p.prim === 'feBlend' && p.attrs.mode === 'multiply'), 'and multiplies it in');
+  const vig = compileFxPrimitives(
+    [{ kind: 'halo', params: { amount: 0, radius: 18, threshold: 0.45, vignette: 0.7 } }],
+    {},
+  );
+  assert.ok(
+    vig.some((p) => p.prim === 'feFlood'),
+    'the vignette darkens with a flood',
+  );
+  assert.ok(
+    vig.some((p) => p.prim === 'feBlend' && p.attrs.mode === 'multiply'),
+    'and multiplies it in',
+  );
   // Hostile values must not emit junk primitives.
   for (const bad of [NaN, -5, null, 'x']) {
-    const out = compileFxPrimitives([{ kind: 'halo', params: { amount: bad, radius: bad, threshold: bad, vignette: bad } }], {});
+    const out = compileFxPrimitives(
+      [{ kind: 'halo', params: { amount: bad, radius: bad, threshold: bad, vignette: bad } }],
+      {},
+    );
     assert.ok(out.length >= 1 && out.every((p) => typeof p.prim === 'string'), `halo ${bad} must still compile`);
   }
 });
@@ -451,14 +554,24 @@ ok('#1022: no rack slot presents as available while unable to hold an effect', (
 });
 ok('#1022: the SVG sharpen is identity at 0, a brightness-preserving cross kernel otherwise', () => {
   const idle = compileFxPrimitives([{ kind: 'sharpen', params: { amount: 0, radius: 1 } }], {});
-  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'amount 0 passes the layer through');
+  assert.deepStrictEqual(
+    idle.map((p) => p.prim),
+    ['feOffset'],
+    'amount 0 passes the layer through',
+  );
   for (const a of [0.3, 0.6, 1, 2]) {
     const out = compileFxPrimitives([{ kind: 'sharpen', params: { amount: a, radius: 1 } }], {});
-    assert.deepStrictEqual(out.map((p) => p.prim), ['feConvolveMatrix']);
+    assert.deepStrictEqual(
+      out.map((p) => p.prim),
+      ['feConvolveMatrix'],
+    );
     assert.equal(out[0].attrs.preserveAlpha, 'true', 'a silhouette never grows');
     const k = out[0].attrs.kernelMatrix.split(' ').map(Number);
     assert.equal(k.length, 9);
-    assert.ok(Math.abs(k.reduce((s, v) => s + v, 0) - 1) < 1e-2, `kernel sums to 1 at amount ${a}: flat areas keep their brightness`);
+    assert.ok(
+      Math.abs(k.reduce((s, v) => s + v, 0) - 1) < 1e-2,
+      `kernel sums to 1 at amount ${a}: flat areas keep their brightness`,
+    );
     assert.ok(k[4] > 1 && k[1] < 0 && k[3] < 0 && k[5] < 0 && k[7] < 0, 'positive centre, negative arms');
     assert.equal(k[0] + k[2] + k[6] + k[8], 0, 'cross, not box: corners untouched');
   }
@@ -469,9 +582,16 @@ ok('#1022: the SVG sharpen is identity at 0, a brightness-preserving cross kerne
 });
 ok('#1022: the SVG haze is identity at 0 and pulls every channel toward the veil', () => {
   const idle = compileFxPrimitives([{ kind: 'haze', params: { amount: 0, lift: 0.5 } }], {});
-  assert.deepStrictEqual(idle.map((p) => p.prim), ['feOffset'], 'amount 0 passes the layer through');
+  assert.deepStrictEqual(
+    idle.map((p) => p.prim),
+    ['feOffset'],
+    'amount 0 passes the layer through',
+  );
   const out = compileFxPrimitives([{ kind: 'haze', params: { amount: 0.8, lift: 1 } }], {});
-  assert.deepStrictEqual(out.map((p) => p.prim), ['feComponentTransfer']);
+  assert.deepStrictEqual(
+    out.map((p) => p.prim),
+    ['feComponentTransfer'],
+  );
   assert.equal(out[0].children.length, 3);
   for (const f of out[0].children) {
     assert.ok(f.attrs.slope < 1 && f.attrs.slope > 0, 'contrast is reduced, never inverted');
@@ -493,17 +613,26 @@ ok('#590: the SVG displace emits the identical legacy primitives at warp 0', () 
   // first, and only then does the result displace the source.
   const warped = compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7, warp: 30 } }], {});
   const prims = warped.map((p) => p.prim);
-  assert.deepStrictEqual(prims, ['feTurbulence', 'feTurbulence', 'feDisplacementMap', 'feDisplacementMap'],
-    'warp adds a turbulence and a displacement of the noise itself');
-  assert.notStrictEqual(warped[0].attrs.seed, warped[1].attrs.seed,
-    'the warp field must not be the same noise it is warping');
-  assert.ok(warped[0].attrs.baseFrequency < warped[1].attrs.baseFrequency,
-    'the warp field must be the slower of the two, or it is just more noise');
+  assert.deepStrictEqual(
+    prims,
+    ['feTurbulence', 'feTurbulence', 'feDisplacementMap', 'feDisplacementMap'],
+    'warp adds a turbulence and a displacement of the noise itself',
+  );
+  assert.notStrictEqual(
+    warped[0].attrs.seed,
+    warped[1].attrs.seed,
+    'the warp field must not be the same noise it is warping',
+  );
+  assert.ok(
+    warped[0].attrs.baseFrequency < warped[1].attrs.baseFrequency,
+    'the warp field must be the slower of the two, or it is just more noise',
+  );
   // Hostile values fall back to the legacy shape rather than emitting junk.
   for (const bad of [NaN, -5, null, undefined, 'x']) {
     assert.deepStrictEqual(
       compileFxPrimitives([{ kind: 'displace', params: { scale: 24, seed: 7, warp: bad } }], {}),
-      legacy, `warp ${bad} must fall back to the legacy filter`,
+      legacy,
+      `warp ${bad} must fall back to the legacy filter`,
     );
   }
 });
@@ -522,10 +651,19 @@ ok('setSelectedFxLayer only accepts fx ids', () => {
 
 // --- round-trip -----------------------------------------------------------------
 ok('normalizeLayers sanitizes fx and repairs fx-pointing activeLayerId', () => {
-  const { layers, activeLayerId } = normalizeLayers([
-    { id: 'a', name: 'A', type: 'content', visible: true },
-    { id: 'b', name: 'B', type: 'fx', visible: true, effects: [{ kind: 'rgbSplit', params: { dx: 500 } }, { kind: 'nope' }] },
-  ], 'b');
+  const { layers, activeLayerId } = normalizeLayers(
+    [
+      { id: 'a', name: 'A', type: 'content', visible: true },
+      {
+        id: 'b',
+        name: 'B',
+        type: 'fx',
+        visible: true,
+        effects: [{ kind: 'rgbSplit', params: { dx: 500 } }, { kind: 'nope' }],
+      },
+    ],
+    'b',
+  );
   assert.equal(layers[1].effects.length, 1);
   assert.equal(layers[1].effects[0].params.dx, 24);
   assert.equal(activeLayerId, 'a'); // repaired: fx can't be content-active
@@ -538,7 +676,13 @@ ok('project JSON round-trips fx layers exactly', () => {
   api.fxEffectAdd(fxId, 'rgbSplit');
   api.fxEffectSetParam(fxId, 0, 'dx', 7);
   api.fxEffectAdd(fxId, 'grain'); // inserted after rgbSplit (EF-4 > EF-2)
-  const doc = serializeProject({ ...get(), quality: 'high', assetWeightOverrides: null, paletteOverrides: null, customAssets: [] });
+  const doc = serializeProject({
+    ...get(),
+    quality: 'high',
+    assetWeightOverrides: null,
+    paletteOverrides: null,
+    customAssets: [],
+  });
   const json = JSON.parse(JSON.stringify(doc)); // through the wire
   const parsed = parseProject(json);
   assert.ok(parsed.ok);
@@ -546,7 +690,10 @@ ok('project JSON round-trips fx layers exactly', () => {
   assert.equal(fx.type, 'fx');
   assert.deepEqual(fx.effects, get().layers.find((l) => l.id === fxId).effects);
   // same filter chain after the round-trip
-  const before = fxFilterStringForLayer(get().layers.find((l) => l.id === fxId), {});
+  const before = fxFilterStringForLayer(
+    get().layers.find((l) => l.id === fxId),
+    {},
+  );
   const after = fxFilterStringForLayer(fx, {});
   assert.equal(before, after);
 });
@@ -561,7 +708,10 @@ ok('#310: blur fails closed — the roster entry is gone', () => {
 });
 ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulence', () => {
   const prims = compileFxPrimitives([{ kind: 'scanlines', params: { density: 0.35, amount: 0.5 } }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feTurbulence', 'feColorMatrix', 'feComposite', 'feComposite'],
+  );
   assert.equal(prims[2].attrs.operator, 'in'); // alpha-aware: no filter-region box
   assert.equal(prims[2].attrs.in2, 'SourceAlpha');
   assert.equal(prims[3].attrs.operator, 'over');
@@ -571,8 +721,14 @@ ok('scanlines: anisotropic noise, alpha-masked, octaves shed like other turbulen
 });
 ok('posterize: discrete component transfer, alpha untouched', () => {
   const prims = compileFxPrimitives([{ kind: 'posterize', params: { levels: 4 } }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
-  assert.deepEqual(prims[0].children.map((c) => c.prim), ['feFuncR', 'feFuncG', 'feFuncB']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feComponentTransfer'],
+  );
+  assert.deepEqual(
+    prims[0].children.map((c) => c.prim),
+    ['feFuncR', 'feFuncG', 'feFuncB'],
+  );
   for (const c of prims[0].children) {
     assert.equal(c.attrs.type, 'discrete');
     assert.equal(c.attrs.tableValues, '0 0.333 0.667 1');
@@ -580,8 +736,14 @@ ok('posterize: discrete component transfer, alpha untouched', () => {
 });
 ok('invert: linear channel flip, no params needed', () => {
   const prims = compileFxPrimitives([{ kind: 'invert', params: {} }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
-  assert.deepEqual(prims[0].children.map((c) => c.prim), ['feFuncR', 'feFuncG', 'feFuncB']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feComponentTransfer'],
+  );
+  assert.deepEqual(
+    prims[0].children.map((c) => c.prim),
+    ['feFuncR', 'feFuncG', 'feFuncB'],
+  );
   for (const c of prims[0].children) {
     assert.equal(c.attrs.type, 'linear');
     assert.equal(c.attrs.slope, -1);
@@ -590,7 +752,10 @@ ok('invert: linear channel flip, no params needed', () => {
 });
 ok('solarize: folded table curve per channel', () => {
   const prims = compileFxPrimitives([{ kind: 'solarize' }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feComponentTransfer']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feComponentTransfer'],
+  );
   for (const c of prims[0].children) {
     assert.equal(c.attrs.type, 'table');
     assert.equal(c.attrs.tableValues, '0 0.5 1 0.5 0');
@@ -598,7 +763,10 @@ ok('solarize: folded table curve per channel', () => {
 });
 ok('edge: 3x3 convolve, alpha preserved', () => {
   const prims = compileFxPrimitives([{ kind: 'edge' }]);
-  assert.deepEqual(prims.map((p) => p.prim), ['feConvolveMatrix']);
+  assert.deepEqual(
+    prims.map((p) => p.prim),
+    ['feConvolveMatrix'],
+  );
   assert.equal(prims[0].attrs.order, 3);
   assert.equal(prims[0].attrs.preserveAlpha, 'true');
   assert.equal(prims[0].attrs.in, 'SourceGraphic');

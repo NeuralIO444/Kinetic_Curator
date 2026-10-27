@@ -43,7 +43,14 @@ export const FX_EFFECT_DEFS = {
       scale: { label: 'Scale', min: 0, max: 120, step: 1, def: 24, hint: 'Maximum warp displacement in pixels' },
       seed: { label: 'Seed', min: 0, max: 99, step: 1, def: 7, hint: 'Noise seed — same seed, same warp' },
       // #590 — additive: 0 is the legacy displace, primitive-for-primitive.
-      warp: { label: 'Warp', min: 0, max: 60, step: 1, def: 0, hint: 'Domain warp — bends the noise field itself, so edges boil instead of wobble. 0 is the legacy displace.' },
+      warp: {
+        label: 'Warp',
+        min: 0,
+        max: 60,
+        step: 1,
+        def: 0,
+        hint: 'Domain warp — bends the noise field itself, so edges boil instead of wobble. 0 is the legacy displace.',
+      },
     },
   },
   // #704 — GL renders the halo with ring taps; this SVG builder is an
@@ -52,9 +59,30 @@ export const FX_EFFECT_DEFS = {
     label: 'Halo',
     hint: 'Soft, wide bloom on the bright parts plus an edge vignette — tuned for dark grounds. Defaults are identity.',
     params: {
-      amount: { label: 'Amount', min: 0, max: 1.5, step: 0.05, def: 0, hint: 'Bloom strength. 0 is the layer untouched.' },
-      radius: { label: 'Radius', min: 1, max: 64, step: 1, def: 18, hint: 'How far the light spreads, in pixels. The outer ring reaches twice this.' },
-      threshold: { label: 'Threshold', min: 0, max: 1, step: 0.05, def: 0.45, hint: 'Only light above this blooms. Low values fog a dark ground.' },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1.5,
+        step: 0.05,
+        def: 0,
+        hint: 'Bloom strength. 0 is the layer untouched.',
+      },
+      radius: {
+        label: 'Radius',
+        min: 1,
+        max: 64,
+        step: 1,
+        def: 18,
+        hint: 'How far the light spreads, in pixels. The outer ring reaches twice this.',
+      },
+      threshold: {
+        label: 'Threshold',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.45,
+        hint: 'Only light above this blooms. Low values fog a dark ground.',
+      },
       vignette: { label: 'Vignette', min: 0, max: 1, step: 0.05, def: 0, hint: 'Edge falloff. 0 is off.' },
     },
   },
@@ -64,9 +92,30 @@ export const FX_EFFECT_DEFS = {
     label: 'Grade',
     hint: 'Colour grade in OKLCH: hue travels without losing brightness. Defaults are identity.',
     params: {
-      hue: { label: 'Hue', min: -180, max: 180, step: 1, def: 0, hint: 'Rotate hue in degrees. L and C are untouched, so nothing dims.' },
-      chroma: { label: 'Chroma', min: 0, max: 2, step: 0.05, def: 1, hint: 'Scale colourfulness. 0 is neutral gray, 1 is unchanged.' },
-      lift: { label: 'Lift', min: 0.5, max: 1.5, step: 0.01, def: 1, hint: 'Scale perceptual lightness. 1 is unchanged.' },
+      hue: {
+        label: 'Hue',
+        min: -180,
+        max: 180,
+        step: 1,
+        def: 0,
+        hint: 'Rotate hue in degrees. L and C are untouched, so nothing dims.',
+      },
+      chroma: {
+        label: 'Chroma',
+        min: 0,
+        max: 2,
+        step: 0.05,
+        def: 1,
+        hint: 'Scale colourfulness. 0 is neutral gray, 1 is unchanged.',
+      },
+      lift: {
+        label: 'Lift',
+        min: 0.5,
+        max: 1.5,
+        step: 0.01,
+        def: 1,
+        hint: 'Scale perceptual lightness. 1 is unchanged.',
+      },
     },
   },
   // #1022 — the Blur / Focus family gets its two planned effects. The GL
@@ -77,7 +126,14 @@ export const FX_EFFECT_DEFS = {
     label: 'Sharpen',
     hint: 'Unsharp mask: edges gain contrast, flat areas stay put. Four taps, no blur pass. Amount 0 is the layer untouched.',
     params: {
-      amount: { label: 'Amount', min: 0, max: 2, step: 0.05, def: 0.6, hint: 'Edge contrast. 0 is the layer untouched; past 1 it starts to ring.' },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 2,
+        step: 0.05,
+        def: 0.6,
+        hint: 'Edge contrast. 0 is the layer untouched; past 1 it starts to ring.',
+      },
       radius: { label: 'Radius', min: 0.5, max: 3, step: 0.1, def: 1, hint: 'How wide an edge counts, in pixels.' },
     },
   },
@@ -85,8 +141,22 @@ export const FX_EFFECT_DEFS = {
     label: 'Haze',
     hint: 'A veil of mist over the plate: shadows lift and colour drains toward the veil. Amount 0 is the layer untouched.',
     params: {
-      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.35, hint: 'How much mist. 0 is the layer untouched.' },
-      lift: { label: 'Lift', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'How light the mist is: low is smoke, high is fog.' },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.35,
+        hint: 'How much mist. 0 is the layer untouched.',
+      },
+      lift: {
+        label: 'Lift',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.5,
+        hint: 'How light the mist is: low is smoke, high is fog.',
+      },
     },
   },
   // #1490 — spectral path P4: the feedback warp's carrier. This item is NOT a chain filter: it registers
@@ -101,7 +171,14 @@ export const FX_EFFECT_DEFS = {
     label: 'Feedback Warp',
     hint: 'Previous-frame feedback warped by the music: bass deviation zooms, mids spin, treble fringes. Live only — needs ACCUM on. Amount 0 is the layer untouched.',
     params: {
-      amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0, hint: 'How hard the spectrum warps the feedback. 0 is off.' },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0,
+        hint: 'How hard the spectrum warps the feedback. 0 is off.',
+      },
     },
   },
   tear: {
@@ -123,7 +200,14 @@ export const FX_EFFECT_DEFS = {
     label: 'Scanlines',
     hint: 'CRT scanline banding: fine horizontal dark lines over the artwork.',
     params: {
-      density: { label: 'Density', min: 0.05, max: 1, step: 0.05, def: 0.35, hint: 'Line frequency — higher = finer lines' },
+      density: {
+        label: 'Density',
+        min: 0.05,
+        max: 1,
+        step: 0.05,
+        def: 0.35,
+        hint: 'Line frequency — higher = finer lines',
+      },
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'Line darkness' },
     },
   },
@@ -169,9 +253,9 @@ export const GRAIN_FAMILY_KINDS = ['grain'];
 export const FX_RACK = [
   // #1022 — EF-1 holds real effects again; the two stubs it promised are built.
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
-  { slot: 'EF-2', label: 'Distort',      kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
-  { slot: 'EF-3', label: 'Tonal',        kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
-  { slot: 'EF-4', label: 'Finish',       kinds: ['grain', 'scanlines', 'halo'],          stubs: ['dither', 'stipple'] },
+  { slot: 'EF-2', label: 'Distort', kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
+  { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
+  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo'], stubs: ['dither', 'stipple'] },
 ];
 
 /**
@@ -202,9 +286,12 @@ export function isFxLayer(layer) {
  */
 export function availableFxKinds(effects) {
   const filledSlots = new Set();
-  for (const e of (effects || [])) {
+  for (const e of effects || []) {
     for (const slot of FX_RACK) {
-      if (slot.kinds.includes(e.kind)) { filledSlots.add(slot.slot); break; }
+      if (slot.kinds.includes(e.kind)) {
+        filledSlots.add(slot.slot);
+        break;
+      }
     }
   }
   return FX_RACK.flatMap((slot) => (filledSlots.has(slot.slot) ? [] : slot.kinds));
@@ -269,7 +356,8 @@ export function sanitizeFxEffects(raw, { onMove } = {}) {
   // effect after it is out of position. Stable-sort: non-grain-family first,
   // grain-family last, preserving relative order within each group.
   const violated = out.some(
-    (e, i) => GRAIN_FAMILY_KINDS.includes(e.kind) && out.slice(i + 1).some((e2) => !GRAIN_FAMILY_KINDS.includes(e2.kind))
+    (e, i) =>
+      GRAIN_FAMILY_KINDS.includes(e.kind) && out.slice(i + 1).some((e2) => !GRAIN_FAMILY_KINDS.includes(e2.kind)),
   );
   if (violated) {
     const nonFinish = out.filter((e) => !GRAIN_FAMILY_KINDS.includes(e.kind));
@@ -296,7 +384,12 @@ const CH_B = '0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0';
 
 function buildRgbSplit(params, ctx, rid, src) {
   const dx = r3(params.dx + (ctx.dxMod || 0));
-  const rIso = rid(), gIso = rid(), bIso = rid(), rOff = rid(), bOff = rid(), rg = rid();
+  const rIso = rid(),
+    gIso = rid(),
+    bIso = rid(),
+    rOff = rid(),
+    bOff = rid(),
+    rg = rid();
   return [
     { prim: 'feColorMatrix', attrs: { in: src, type: 'matrix', values: CH_R, result: rIso } },
     { prim: 'feColorMatrix', attrs: { in: src, type: 'matrix', values: CH_G, result: gIso } },
@@ -325,15 +418,58 @@ function buildDisplace(params, ctx, rid, src) {
     const warpNoise = rid();
     const warped = rid();
     return [
-      { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.0054, numOctaves: Math.min(2, octaves), seed: Math.round(params.seed) + 41, result: warpNoise } },
-      { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
-      { prim: 'feDisplacementMap', attrs: { in: noise, in2: warpNoise, scale: r3(warp), xChannelSelector: 'R', yChannelSelector: 'G', result: warped } },
-      { prim: 'feDisplacementMap', attrs: { in: src, in2: warped, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
+      {
+        prim: 'feTurbulence',
+        attrs: {
+          type: 'fractalNoise',
+          baseFrequency: 0.0054,
+          numOctaves: Math.min(2, octaves),
+          seed: Math.round(params.seed) + 41,
+          result: warpNoise,
+        },
+      },
+      {
+        prim: 'feTurbulence',
+        attrs: {
+          type: 'fractalNoise',
+          baseFrequency: 0.012,
+          numOctaves: octaves,
+          seed: Math.round(params.seed),
+          result: noise,
+        },
+      },
+      {
+        prim: 'feDisplacementMap',
+        attrs: {
+          in: noise,
+          in2: warpNoise,
+          scale: r3(warp),
+          xChannelSelector: 'R',
+          yChannelSelector: 'G',
+          result: warped,
+        },
+      },
+      {
+        prim: 'feDisplacementMap',
+        attrs: { in: src, in2: warped, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' },
+      },
     ];
   }
   return [
-    { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.012, numOctaves: octaves, seed: Math.round(params.seed), result: noise } },
-    { prim: 'feDisplacementMap', attrs: { in: src, in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' } },
+    {
+      prim: 'feTurbulence',
+      attrs: {
+        type: 'fractalNoise',
+        baseFrequency: 0.012,
+        numOctaves: octaves,
+        seed: Math.round(params.seed),
+        result: noise,
+      },
+    },
+    {
+      prim: 'feDisplacementMap',
+      attrs: { in: src, in2: noise, scale: r3(params.scale), xChannelSelector: 'R', yChannelSelector: 'G' },
+    },
   ];
 }
 
@@ -372,11 +508,18 @@ function buildHalo(params, ctx, rid, src) {
       attrs: { in: cur, result: bright },
       children: ['R', 'G', 'B'].map((chan) => ({
         prim: `feFunc${chan}`,
-        attrs: { type: 'linear', slope: r3(1 / Math.max(0.05, 1 - threshold)), intercept: r3(-threshold / Math.max(0.05, 1 - threshold)) },
+        attrs: {
+          type: 'linear',
+          slope: r3(1 / Math.max(0.05, 1 - threshold)),
+          intercept: r3(-threshold / Math.max(0.05, 1 - threshold)),
+        },
       })),
     });
     out.push({ prim: 'feGaussianBlur', attrs: { in: bright, stdDeviation: r3(radius * 0.6), result: blur } });
-    out.push({ prim: 'feComposite', attrs: { in: blur, in2: cur, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: 1, k4: 0, result: lit } });
+    out.push({
+      prim: 'feComposite',
+      attrs: { in: blur, in2: cur, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: 1, k4: 0, result: lit },
+    });
     cur = lit;
   }
   if (vignette > 0) {
@@ -420,7 +563,10 @@ function buildGrade(params, ctx, rid, src) {
   }
   if (chroma !== 1) {
     const id = rid();
-    out.push({ prim: 'feColorMatrix', attrs: { in: cur, type: 'saturate', values: r3(Math.max(0, chroma)), result: id } });
+    out.push({
+      prim: 'feColorMatrix',
+      attrs: { in: cur, type: 'saturate', values: r3(Math.max(0, chroma)), result: id },
+    });
     cur = id;
   }
   if (lift !== 1) {
@@ -429,7 +575,8 @@ function buildGrade(params, ctx, rid, src) {
       prim: 'feComponentTransfer',
       attrs: { in: cur, result: id },
       children: ['R', 'G', 'B'].map((ch) => ({
-        prim: `feFunc${ch}`, attrs: { type: 'linear', slope: r3(lift), intercept: 0 },
+        prim: `feFunc${ch}`,
+        attrs: { type: 'linear', slope: r3(lift), intercept: 0 },
       })),
     });
     void id;
@@ -444,24 +591,37 @@ function buildTear(params, ctx, rid, src) {
   // along X. Y displacement is flattened to exactly 0 via feFuncG so the
   // shear is strictly horizontal.
   const fy = r3(Math.max(0.002, params.bands / 700));
-  const raw = rid(), flat = rid();
+  const raw = rid(),
+    flat = rid();
   return [
-    { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: `0.008 ${fy}`, numOctaves: 1, seed: 7, result: raw } },
     {
-      prim: 'feComponentTransfer', attrs: { in: raw, result: flat },
+      prim: 'feTurbulence',
+      attrs: { type: 'fractalNoise', baseFrequency: `0.008 ${fy}`, numOctaves: 1, seed: 7, result: raw },
+    },
+    {
+      prim: 'feComponentTransfer',
+      attrs: { in: raw, result: flat },
       children: [{ prim: 'feFuncG', attrs: { type: 'linear', slope: 0, intercept: 0.5 } }],
     },
-    { prim: 'feDisplacementMap', attrs: { in: src, in2: flat, scale: r3(params.amount * 4), xChannelSelector: 'R', yChannelSelector: 'G' } },
+    {
+      prim: 'feDisplacementMap',
+      attrs: { in: src, in2: flat, scale: r3(params.amount * 4), xChannelSelector: 'R', yChannelSelector: 'G' },
+    },
   ];
 }
 
 function buildGrain(params, ctx, rid, src, srcAlpha) {
-  const n = rid(), ga = rid(), gam = rid();
+  const n = rid(),
+    ga = rid(),
+    gam = rid();
   const k = r3(Math.max(0, Math.min(1, params.amount)));
   return [
     { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: 0.9, numOctaves: 2, seed: 3, result: n } },
     // Noise alpha channel, RGB zeroed: black grain with varying opacity.
-    { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: ga } },
+    {
+      prim: 'feColorMatrix',
+      attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: ga },
+    },
     // Alpha-aware: mask the grain by the chained source's own alpha so it never paints
     // the filter-region box over transparent areas.
     { prim: 'feComposite', attrs: { in: ga, in2: srcAlpha, operator: 'in', result: gam } },
@@ -477,12 +637,20 @@ function buildScanlines(params, ctx, rid, src, srcAlpha) {
   const octaves = Math.max(1, Math.min(4, Math.round(ctx.octaves ?? 3)));
   // Noise varies along Y (bands across the height), near-constant along X:
   // fine horizontal dark lines. Alpha-masked to the source like grain.
-  const n = rid(), la = rid(), lam = rid();
+  const n = rid(),
+    la = rid(),
+    lam = rid();
   const fy = r3(Math.max(0.01, params.density));
   const k = r3(Math.max(0, Math.min(1, params.amount)));
   return [
-    { prim: 'feTurbulence', attrs: { type: 'fractalNoise', baseFrequency: `0.01 ${fy}`, numOctaves: octaves, seed: 11, result: n } },
-    { prim: 'feColorMatrix', attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: la } },
+    {
+      prim: 'feTurbulence',
+      attrs: { type: 'fractalNoise', baseFrequency: `0.01 ${fy}`, numOctaves: octaves, seed: 11, result: n },
+    },
+    {
+      prim: 'feColorMatrix',
+      attrs: { in: n, type: 'matrix', values: `0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 ${k} 0`, result: la },
+    },
     { prim: 'feComposite', attrs: { in: la, in2: srcAlpha, operator: 'in', result: lam } },
     { prim: 'feComposite', attrs: { in: lam, in2: src, operator: 'over' } },
   ];
@@ -494,7 +662,8 @@ function buildPosterize(params, ctx, rid, src) {
   const func = (prim) => ({ prim, attrs: { type: 'discrete', tableValues: table } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: src },
+      prim: 'feComponentTransfer',
+      attrs: { in: src },
       children: [func('feFuncR'), func('feFuncG'), func('feFuncB')],
     },
   ];
@@ -504,7 +673,8 @@ function buildInvert(params, ctx, rid, src) {
   const flip = (prim) => ({ prim, attrs: { type: 'linear', slope: -1, intercept: 1 } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: src },
+      prim: 'feComponentTransfer',
+      attrs: { in: src },
       children: [flip('feFuncR'), flip('feFuncG'), flip('feFuncB')],
     },
   ];
@@ -514,7 +684,8 @@ function buildSolarize(params, ctx, rid, src) {
   const curve = (prim) => ({ prim, attrs: { type: 'table', tableValues: '0 0.5 1 0.5 0' } });
   return [
     {
-      prim: 'feComponentTransfer', attrs: { in: src },
+      prim: 'feComponentTransfer',
+      attrs: { in: src },
       children: [curve('feFuncR'), curve('feFuncG'), curve('feFuncB')],
     },
   ];
@@ -536,7 +707,17 @@ function buildSharpen(params, ctx, rid, src) {
   const a = Math.min(2, Math.max(0, Number(params.amount) || 0));
   if (a <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
   const arm = r3(-a / 4);
-  return [{ prim: 'feConvolveMatrix', attrs: { in: src, order: 3, kernelMatrix: `0 ${arm} 0 ${arm} ${r3(1 + a)} ${arm} 0 ${arm} 0`, preserveAlpha: 'true' } }];
+  return [
+    {
+      prim: 'feConvolveMatrix',
+      attrs: {
+        in: src,
+        order: 3,
+        kernelMatrix: `0 ${arm} 0 ${arm} ${r3(1 + a)} ${arm} 0 ${arm} 0`,
+        preserveAlpha: 'true',
+      },
+    },
+  ];
 }
 
 // #1022 — SVG half of HAZE: a linear pull of each channel toward the veil.
@@ -548,10 +729,16 @@ function buildHaze(params, ctx, rid, src) {
   const lift = Math.min(1, Math.max(0, Number.isFinite(Number(params.lift)) ? Number(params.lift) : 0.5));
   const veil = 0.35 + (0.95 - 0.35) * lift;
   const k = amount * 0.75;
-  return [{
-    prim: 'feComponentTransfer', attrs: { in: src },
-    children: ['R', 'G', 'B'].map((chan) => ({ prim: `feFunc${chan}`, attrs: { type: 'linear', slope: r3(1 - k), intercept: r3(k * veil) } })),
-  }];
+  return [
+    {
+      prim: 'feComponentTransfer',
+      attrs: { in: src },
+      children: ['R', 'G', 'B'].map((chan) => ({
+        prim: `feFunc${chan}`,
+        attrs: { type: 'linear', slope: r3(1 - k), intercept: r3(k * veil) },
+      })),
+    },
+  ];
 }
 
 // #1490 — the SVG half of FEEDBACK WARP is the identity, honestly: the warp is temporal (previous-frame
@@ -564,7 +751,22 @@ function buildFeedbackWarp(params, ctx, rid, src) {
   return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
 }
 
-const BUILDERS = { sharpen: buildSharpen, haze: buildHaze, rgbSplit: buildRgbSplit, displace: buildDisplace, halo: buildHalo, grade: buildGrade, tear: buildTear, grain: buildGrain, scanlines: buildScanlines, posterize: buildPosterize, invert: buildInvert, solarize: buildSolarize, edge: buildEdge, feedbackWarp: buildFeedbackWarp };
+const BUILDERS = {
+  sharpen: buildSharpen,
+  haze: buildHaze,
+  rgbSplit: buildRgbSplit,
+  displace: buildDisplace,
+  halo: buildHalo,
+  grade: buildGrade,
+  tear: buildTear,
+  grain: buildGrain,
+  scanlines: buildScanlines,
+  posterize: buildPosterize,
+  invert: buildInvert,
+  solarize: buildSolarize,
+  edge: buildEdge,
+  feedbackWarp: buildFeedbackWarp,
+};
 
 /**
  * Compile an effects array into filter primitives.
@@ -603,7 +805,9 @@ export function compileFxPrimitives(effects, ctx = {}) {
   });
   if (ctx.primBudget != null && prims.length > ctx.primBudget && !compileFxPrimitives._warned) {
     compileFxPrimitives._warned = true;
-    console.warn(`[fx] ${prims.length} filter primitives exceed budget ${ctx.primBudget} — stacking FX is the steepest per-frame cost; consider fewer effects or layers`);
+    console.warn(
+      `[fx] ${prims.length} filter primitives exceed budget ${ctx.primBudget} — stacking FX is the steepest per-frame cost; consider fewer effects or layers`,
+    );
   }
   return prims;
 }

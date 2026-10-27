@@ -9,7 +9,10 @@ import assert from 'node:assert/strict';
 import { emitOn, releaseTick, clearPending, droppedPastCap, PENDING_CAP, on, Events } from './eventBus.js';
 
 let checks = 0;
-const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
+const ok = (name) => {
+  checks += 1;
+  console.log(`  [ok] ${name}`);
+};
 
 clearPending();
 

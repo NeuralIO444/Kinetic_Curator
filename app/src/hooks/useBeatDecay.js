@@ -3,10 +3,10 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 
-const DECAY = 0.90; // per frame at ~60fps → ~100ms half-life feel
+const DECAY = 0.9; // per frame at ~60fps → ~100ms half-life feel
 
 export function useBeatDecay() {
-  const setBeatPulse = useStore(s => s.setBeatPulse);
+  const setBeatPulse = useStore((s) => s.setBeatPulse);
   const rafRef = useRef(null);
 
   useEffect(() => {

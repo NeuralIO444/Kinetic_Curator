@@ -3,13 +3,27 @@
  * Never writes into the shipped 137. Live tab does not eval markup.
  */
 
-const FORBIDDEN = /<script|foreignObject|<iframe|<object|<embed|<image|<img|\bon[a-z]+\s*=|javascript:|data:text\/html/i;
+const FORBIDDEN =
+  /<script|foreignObject|<iframe|<object|<embed|<image|<img|\bon[a-z]+\s*=|javascript:|data:text\/html/i;
 const REMOTE_HREF = /(?:xlink:)?href\s*=\s*["']\s*(?!#)/i;
 const STYLE_URL = /style\s*=\s*["'][^"']*url\s*\(/i;
 const ENTITY = /<!ENTITY|&#/i;
 const ALLOWED = new Set([
-  'svg', 'g', 'path', 'circle', 'ellipse', 'rect', 'polygon', 'polyline', 'line',
-  'defs', 'title', 'clippath', 'lineargradient', 'radialgradient', 'stop',
+  'svg',
+  'g',
+  'path',
+  'circle',
+  'ellipse',
+  'rect',
+  'polygon',
+  'polyline',
+  'line',
+  'defs',
+  'title',
+  'clippath',
+  'lineargradient',
+  'radialgradient',
+  'stop',
 ]);
 const MAX_BYTES = 48_000;
 const MAX_G_DEPTH = 24;
@@ -33,10 +47,19 @@ export function stripAuthoringChrome(svg) {
  * back to stripping (yesterday's behavior).
  */
 const SAFE_CSS_PROPS = new Set([
-  'fill', 'fill-rule', 'fill-opacity',
-  'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
-  'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset',
-  'stroke-opacity', 'opacity', 'clip-rule',
+  'fill',
+  'fill-rule',
+  'fill-opacity',
+  'stroke',
+  'stroke-width',
+  'stroke-linecap',
+  'stroke-linejoin',
+  'stroke-miterlimit',
+  'stroke-dasharray',
+  'stroke-dashoffset',
+  'stroke-opacity',
+  'opacity',
+  'clip-rule',
 ]);
 
 function isSafeCssValue(v) {
@@ -87,24 +110,21 @@ function parseSimpleStylesheet(css) {
  * stripping the stylesheet used to render).
  */
 function applyClassAttributes(svg, rules) {
-  return String(svg || '').replace(
-    /<([a-zA-Z][a-zA-Z0-9]*)\b([^<>]*?)(\/?)>/g,
-    (full, name, attrs, selfClose) => {
-      const cm = /\bclass\s*=\s*"([^"]*)"/.exec(attrs) || /\bclass\s*=\s*'([^']*)'/.exec(attrs);
-      if (!cm) return full;
-      const tokens = new Set(cm[1].split(/\s+/).filter(Boolean));
-      let add = '';
-      for (const [cls, decls] of rules) {
-        if (!tokens.has(cls)) continue;
-        for (const [prop, val] of decls) {
-          if (new RegExp(`\\b${prop}\\s*=`, 'i').test(attrs + add)) continue;
-          add += ` ${prop}="${val}"`;
-        }
+  return String(svg || '').replace(/<([a-zA-Z][a-zA-Z0-9]*)\b([^<>]*?)(\/?)>/g, (full, name, attrs, selfClose) => {
+    const cm = /\bclass\s*=\s*"([^"]*)"/.exec(attrs) || /\bclass\s*=\s*'([^']*)'/.exec(attrs);
+    if (!cm) return full;
+    const tokens = new Set(cm[1].split(/\s+/).filter(Boolean));
+    let add = '';
+    for (const [cls, decls] of rules) {
+      if (!tokens.has(cls)) continue;
+      for (const [prop, val] of decls) {
+        if (new RegExp(`\\b${prop}\\s*=`, 'i').test(attrs + add)) continue;
+        add += ` ${prop}="${val}"`;
       }
-      if (!add) return full;
-      return `<${name}${attrs}${add}${selfClose ? '/' : ''}>`;
     }
-  );
+    if (!add) return full;
+    return `<${name}${attrs}${add}${selfClose ? '/' : ''}>`;
+  });
 }
 
 /**
@@ -134,7 +154,10 @@ export function parseSvgBounds(openTag) {
   const tag = String(openTag || '');
   const vb = /viewBox\s*=\s*"([^"]*)"/i.exec(tag);
   if (vb) {
-    const p = vb[1].trim().split(/[\s,]+/).map(Number);
+    const p = vb[1]
+      .trim()
+      .split(/[\s,]+/)
+      .map(Number);
     if (p.length === 4 && p.every((n) => Number.isFinite(n)) && p[2] > 0 && p[3] > 0) {
       return { minx: p[0], miny: p[1], w: p[2], h: p[3] };
     }
@@ -171,7 +194,7 @@ export function fitInner(inner, bounds) {
 
 /** Human fix suggestion per rejection. `hint` rides next to `error`; the error codes are unchanged. */
 const ERROR_HINTS = {
-  'empty': 'Nothing to import — drop an SVG file or paste SVG code',
+  empty: 'Nothing to import — drop an SVG file or paste SVG code',
   'too large': 'Over 48KB — simplify paths, or uncheck Preserve Illustrator Editing Capabilities on export',
   'too deep': 'Too many nested groups — ungroup a few levels in Illustrator and retry',
   'not svg': "That doesn't look like SVG — export it as .svg first",
@@ -261,7 +284,10 @@ export function assetCostScore(svg) {
 export const COST_WARNING_THRESHOLD = 600;
 
 export function overlayId(base) {
-  const slug = String(base || 'motif').replace(/^user:/, '').replace(/[^a-z0-9_-]+/gi, '_').slice(0, 40);
+  const slug = String(base || 'motif')
+    .replace(/^user:/, '')
+    .replace(/[^a-z0-9_-]+/gi, '_')
+    .slice(0, 40);
   return `user:${slug}`;
 }
 
@@ -279,7 +305,11 @@ export function ingestSvg(raw, { id, category = 'fragments', weight = 'medium' }
 
   const openTag = (svg.match(/<svg[^>]*>/i) || [''])[0];
   const bounds = parseSvgBounds(openTag);
-  const inner0 = svg.replace(/^[\s\S]*?<svg[^>]*>/i, '').replace(/<\/svg>\s*$/i, '').trim() || svg;
+  const inner0 =
+    svg
+      .replace(/^[\s\S]*?<svg[^>]*>/i, '')
+      .replace(/<\/svg>\s*$/i, '')
+      .trim() || svg;
 
   // Depth is measured pre-fit: the fit wrapper is one static transform we
   // add ourselves, never a reason to reject yesterday's artwork.

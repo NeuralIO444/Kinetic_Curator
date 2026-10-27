@@ -10,7 +10,17 @@ import { mkRng } from '../engine/prng.js';
 import { hexToRgb255 } from '../engine/colorHex.mjs'; // #1682: canonical lenient parse (was a local copy)
 import { FIELD_PATTERNS, samplePattern, fieldSampler, patternParams } from './field.js';
 import { TILE_MOTIFS, HERO_MOTIFS, sampleQuilt, quiltSampler, quiltParams } from './quilt.js';
-import { GLYPH_MARKS, FILLED_MARKS, RHYTHM_MARKS, POSES, MIN_STROKE, MARK_BOX, buildMark, sampleMark, motifRoles } from './glyph.js';
+import {
+  GLYPH_MARKS,
+  FILLED_MARKS,
+  RHYTHM_MARKS,
+  POSES,
+  MIN_STROKE,
+  MARK_BOX,
+  buildMark,
+  sampleMark,
+  motifRoles,
+} from './glyph.js';
 import { rankedSwatches } from '../data/swatchWeights.js';
 import { motion, glyphPulse, fieldPan, QUILT_ROTATING, FIELD_PAN_TILES_PER_S } from './motion.js';
 import { pickMovers, elementXform, isRest } from './elements.js'; // #1137: KINEME motion per element
@@ -42,8 +52,10 @@ export const GLYPH_QUOTA_RUN = 8;
 /** uint32 mix of (seed, i): one independent rng stream per tile. */
 export function hash32(seed, i) {
   let h = (Math.imul((seed >>> 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((i | 0) + 0x7f4a7c15, 0xc2b2ae35)) >>> 0;
-  h ^= h >>> 16; h = Math.imul(h, 0x7feb352d) >>> 0;
-  h ^= h >>> 15; h = Math.imul(h, 0x846ca68b) >>> 0;
+  h ^= h >>> 16;
+  h = Math.imul(h, 0x7feb352d) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 0x846ca68b) >>> 0;
   h ^= h >>> 16;
   return h >>> 0;
 }
@@ -57,7 +69,10 @@ export function toRgba(hex) {
   return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
 }
 
-const lum = (hex) => { const [r, g, b] = parseHex(hex); return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+const lum = (hex) => {
+  const [r, g, b] = parseHex(hex);
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
 
 /**
  * Ground = the darkest swatch; brights = the rest, in palette order. Fills are
@@ -68,7 +83,9 @@ export function paletteRoles(palette) {
   const sw = (palette && Array.isArray(palette.swatches) ? palette.swatches : []).filter((c) => typeof c === 'string');
   const all = sw.length ? sw : [palette?.bg || '#000000', palette?.ink || '#ffffff'];
   let gi = 0;
-  all.forEach((c, i) => { if (lum(c) < lum(all[gi])) gi = i; });
+  all.forEach((c, i) => {
+    if (lum(c) < lum(all[gi])) gi = i;
+  });
   const ground = all[gi];
   const brights = all.filter((_, i) => i !== gi);
   return { ground, brights: brights.length ? brights : [palette?.ink || '#ffffff'] };
@@ -81,11 +98,13 @@ export function paletteRoles(palette) {
 function choosePatterns(rng, count, mix) {
   const m = Math.min(1, Math.max(0, Number(mix) || 0));
   const A = Math.floor(rng() * FIELD_PATTERNS.length);
-  let B = Math.floor(rng() * (FIELD_PATTERNS.length - 1)); if (B >= A) B += 1;
+  let B = Math.floor(rng() * (FIELD_PATTERNS.length - 1));
+  if (B >= A) B += 1;
   const out = [];
   for (let i = 0; i < count; i++) {
-    const draw = rng(); const free = Math.floor(rng() * FIELD_PATTERNS.length);
-    out.push(draw < m ? free : (i % 2 === 0 ? A : B));
+    const draw = rng();
+    const free = Math.floor(rng() * FIELD_PATTERNS.length);
+    out.push(draw < m ? free : i % 2 === 0 ? A : B);
   }
   return out;
 }
@@ -115,7 +134,9 @@ export function assign(seed, density, mix, palette, rows = density) {
 }
 
 /** Pan direction, stable for the seed (radians). */
-export function panAngle(seed) { return mkRng(hash32(seed, 0x9a4)) () * Math.PI * 2; }
+export function panAngle(seed) {
+  return mkRng(hash32(seed, 0x9a4))() * Math.PI * 2;
+}
 
 /** Pan offset in tile units at time t (seconds). Zero at DRIFT 0. */
 export function panOffset(seed, drift, t) {
@@ -159,16 +180,24 @@ export function rasterField(buf, bw, bh, grid, tileW, offset = { x: 0, y: 0 }) {
   const fns = tiles.map((tl) => fieldSampler(tl.pattern));
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW + offset.y;
-    const fy = Math.floor(Y); const v = Y - fy;
+    const fy = Math.floor(Y);
+    const v = Y - fy;
     const rowBase = (((fy % rows) + rows) % rows) * cols;
     const out = y * bw;
-    let lastFx = NaN; let fn = null; let rgba = null; let params = null;
+    let lastFx = NaN;
+    let fn = null;
+    let rgba = null;
+    let params = null;
     for (let x = 0; x < bw; x++) {
       const X = (x + 0.5) / tileW + offset.x;
       const fx = Math.floor(X);
       if (fx !== lastFx) {
         const i = rowBase + (((fx % cols) + cols) % cols);
-        const tl = tiles[i]; fn = fns[i]; rgba = tl.rgba; params = tl.params; lastFx = fx;
+        const tl = tiles[i];
+        fn = fns[i];
+        rgba = tl.rgba;
+        params = tl.params;
+        lastFx = fx;
       }
       buf[out + x] = rgba[fn(X - fx, v, params)];
     }
@@ -181,7 +210,8 @@ export function rasterFieldReference(buf, bw, bh, grid, tileW, offset = { x: 0, 
   const { cols, rows, tiles } = grid;
   for (let y = 0; y < bh; y++) {
     const Y = (y + 0.5) / tileW + offset.y;
-    const fy = Math.floor(Y); const v = Y - fy;
+    const fy = Math.floor(Y);
+    const v = Y - fy;
     const tr = ((fy % rows) + rows) % rows;
     for (let x = 0; x < bw; x++) {
       const X = (x + 0.5) / tileW + offset.x;
@@ -201,7 +231,10 @@ const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 // color is the ground, so a two-color motif (stripes, pinwheel) never goes flat.
 function motifColors(rng, ground, brights) {
   const c1 = brights[Math.floor(rng() * brights.length)];
-  const c2 = brights.length > 1 ? brights[(brights.indexOf(c1) + 1 + Math.floor(rng() * (brights.length - 1))) % brights.length] : ground;
+  const c2 =
+    brights.length > 1
+      ? brights[(brights.indexOf(c1) + 1 + Math.floor(rng() * (brights.length - 1))) % brights.length]
+      : ground;
   return [ground, c1, c2];
 }
 
@@ -229,12 +262,14 @@ export function assignQuilt(seed, density, mix, hero, palette, rows = density) {
   // 1) tile motifs. Low MIX is a two-motif checkerboard; MIX is the per-tile
   //    probability of a free draw instead. Quilt vocabulary only.
   const A = Math.floor(rng() * TILE_MOTIFS.length);
-  let B = Math.floor(rng() * (TILE_MOTIFS.length - 1)); if (B >= A) B += 1;
+  let B = Math.floor(rng() * (TILE_MOTIFS.length - 1));
+  if (B >= A) B += 1;
   const tiles = [];
   for (let r = 0; r < nrows; r++) {
     for (let c = 0; c < cols; c++) {
-      const draw = rng(); const free = Math.floor(rng() * TILE_MOTIFS.length);
-      const name = TILE_MOTIFS[draw < m ? free : ((c + r) % 2 === 0 ? A : B)];
+      const draw = rng();
+      const free = Math.floor(rng() * TILE_MOTIFS.length);
+      const name = TILE_MOTIFS[draw < m ? free : (c + r) % 2 === 0 ? A : B];
       const trng = mkRng(hash32(seed, r * cols + c + 1));
       const colors = motifColors(trng, ground, brights);
       tiles.push({ pattern: name, colors, rgba: colors.map(toRgba), params: quiltParams(name, trng) });
@@ -275,7 +310,8 @@ export function assignQuilt(seed, density, mix, hero, palette, rows = density) {
   });
 
   // 4) the quota, now that heroes are known: a medallion hero covers its four cells.
-  const turns = (i) => (heroAt[i] !== -1 ? heroes[heroAt[i]].pattern === 'medallion' : QUILT_ROTATING.includes(tiles[i].pattern));
+  const turns = (i) =>
+    heroAt[i] !== -1 ? heroes[heroAt[i]].pattern === 'medallion' : QUILT_ROTATING.includes(tiles[i].pattern);
   // The tail run counts too: a small grid (4×3 at DENSITY 4) is all tail, and must still move.
   for (let start = 0; start < tiles.length; start += QUILT_QUOTA_RUN) {
     const end = Math.min(start + QUILT_QUOTA_RUN, tiles.length);
@@ -304,14 +340,18 @@ export function onGrout(grid, X, Y, grout) {
   const { cols, rows, heroAt } = grid;
   const half = g / 2;
   const cellOf = (c, r) => (c >= 0 && c < cols && r >= 0 && r < rows ? heroAt[r * cols + c] : -1);
-  const kx = Math.round(X); const ky = Math.round(Y);
-  const fc = Math.floor(X); const fr = Math.floor(Y);
+  const kx = Math.round(X);
+  const ky = Math.round(Y);
+  const fc = Math.floor(X);
+  const fr = Math.floor(Y);
   if (Math.abs(X - kx) < half && kx > 0 && kx < cols) {
-    const a = cellOf(kx - 1, fr); const b = cellOf(kx, fr);
+    const a = cellOf(kx - 1, fr);
+    const b = cellOf(kx, fr);
     if (!(a !== -1 && a === b)) return true;
   }
   if (Math.abs(Y - ky) < half && ky > 0 && ky < rows) {
-    const a = cellOf(fc, ky - 1); const b = cellOf(fc, ky);
+    const a = cellOf(fc, ky - 1);
+    const b = cellOf(fc, ky);
     if (!(a !== -1 && a === b)) return true;
   }
   return false;
@@ -322,11 +362,20 @@ function quiltCell(grid, X, Y, rot = null, xf = null) {
   const c = Math.min(grid.cols - 1, Math.max(0, Math.floor(X)));
   const r = Math.min(grid.rows - 1, Math.max(0, Math.floor(Y)));
   const hi = grid.heroAt[r * grid.cols + c];
-  let tile; let u; let v; let at;
+  let tile;
+  let u;
+  let v;
+  let at;
   if (hi !== -1) {
-    tile = grid.heroes[hi]; u = (X - tile.c) / 2; v = (Y - tile.r) / 2; at = tile.r * grid.cols + tile.c;
+    tile = grid.heroes[hi];
+    u = (X - tile.c) / 2;
+    v = (Y - tile.r) / 2;
+    at = tile.r * grid.cols + tile.c;
   } else {
-    tile = grid.tiles[r * grid.cols + c]; u = X - c; v = Y - r; at = r * grid.cols + c;
+    tile = grid.tiles[r * grid.cols + c];
+    u = X - c;
+    v = Y - r;
+    at = r * grid.cols + c;
   }
   // DRIFT (#1042): only the motif art turns, about the tile center. A tile's ground is the
   // frame itself, so no corner can show through; the art is sampled, not clipped, and the
@@ -338,13 +387,19 @@ function quiltCell(grid, X, Y, rot = null, xf = null) {
   const turns = QUILT_ROTATING.includes(tile.pattern);
   const x = xf ? xf.get(at) : null;
   if (x && !x.vis) return { tile, u, v, ground: true };
-  const a = turns ? (rot ? (x ? rot[at] + x.a : rot[at]) : (x ? x.a : 0)) : 0;
+  const a = turns ? (rot ? (x ? rot[at] + x.a : rot[at]) : x ? x.a : 0) : 0;
   const moved = !!x && (x.s !== 1 || x.dy !== 0);
   if (a || moved) {
-    const cs = Math.cos(a); const sn = Math.sin(a);
-    let dx = u - 0.5; let dy = v - 0.5;
-    if (moved) { dx /= x.s; dy = (dy - x.dy) / x.s; }
-    u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs;
+    const cs = Math.cos(a);
+    const sn = Math.sin(a);
+    let dx = u - 0.5;
+    let dy = v - 0.5;
+    if (moved) {
+      dx /= x.s;
+      dy = (dy - x.dy) / x.s;
+    }
+    u = 0.5 + dx * cs + dy * sn;
+    v = 0.5 - dx * sn + dy * cs;
     if (moved && (u < 0 || u >= 1 || v < 0 || v >= 1)) return { tile, u, v, ground: true };
   }
   return { tile, u, v };
@@ -360,7 +415,9 @@ export function quiltColorAt(grid, X, Y, grout = 0, rot = null, xf = null) {
 /** Every element of a quilt: each 1x1 tile not under a hero, and each hero block, with its anchor cell index `at`. */
 function quiltElementList(grid) {
   const out = [];
-  grid.tiles.forEach((tl, i) => { if (grid.heroAt[i] === -1) out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i }); });
+  grid.tiles.forEach((tl, i) => {
+    if (grid.heroAt[i] === -1) out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i });
+  });
   grid.heroes.forEach((h) => out.push({ tile: h, c: h.c, r: h.r, span: 2, at: h.r * grid.cols + h.c }));
   return out;
 }
@@ -406,7 +463,10 @@ export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift 
     const Y = (y + 0.5) / tileW;
     for (let x = 0; x < bw; x++) {
       const X = (x + 0.5) / tileW;
-      if (onGrout(grid, X, Y, grout)) { buf[y * bw + x] = grid.groundRgba; continue; }
+      if (onGrout(grid, X, Y, grout)) {
+        buf[y * bw + x] = grid.groundRgba;
+        continue;
+      }
       const { tile, u, v, ground } = quiltCell(grid, X, Y, rot, xf);
       buf[y * bw + x] = ground ? tile.rgba[0] : tile.rgba[sampleQuilt(tile.pattern, u, v, tile.params)];
     }
@@ -423,9 +483,12 @@ export function rasterQuiltReference(buf, bw, bh, grid, tileW, grout = 0, drift 
 /** Per-(grid, size, grout) pixel tables: tile-space positions, each cell's pixel span, the grout band flags. */
 function quiltPlan(grid, bw, bh, tileW, grout) {
   const { cols, rows } = grid;
-  const Xf = new Float64Array(bw); const Yf = new Float64Array(bh);
-  const colA = new Int32Array(cols).fill(-1); const colB = new Int32Array(cols);
-  const rowA = new Int32Array(rows).fill(-1); const rowB = new Int32Array(rows);
+  const Xf = new Float64Array(bw);
+  const Yf = new Float64Array(bh);
+  const colA = new Int32Array(cols).fill(-1);
+  const colB = new Int32Array(cols);
+  const rowA = new Int32Array(rows).fill(-1);
+  const rowB = new Int32Array(rows);
   for (let x = 0; x < bw; x++) {
     Xf[x] = (x + 0.5) / tileW;
     const c = Math.min(cols - 1, Math.max(0, Math.floor(Xf[x])));
@@ -440,10 +503,17 @@ function quiltPlan(grid, bw, bh, tileW, grout) {
   }
   const g = Math.min(QUILT_MAX_GROUT, Math.max(0, Number(grout) || 0));
   const half = g / 2;
-  const bandX = new Uint8Array(bw); const bandY = new Uint8Array(bh);
+  const bandX = new Uint8Array(bw);
+  const bandY = new Uint8Array(bh);
   if (g > 0) {
-    for (let x = 0; x < bw; x++) { const k = Math.round(Xf[x]); bandX[x] = Math.abs(Xf[x] - k) < half && k > 0 && k < cols ? 1 : 0; }
-    for (let y = 0; y < bh; y++) { const k = Math.round(Yf[y]); bandY[y] = Math.abs(Yf[y] - k) < half && k > 0 && k < rows ? 1 : 0; }
+    for (let x = 0; x < bw; x++) {
+      const k = Math.round(Xf[x]);
+      bandX[x] = Math.abs(Xf[x] - k) < half && k > 0 && k < cols ? 1 : 0;
+    }
+    for (let y = 0; y < bh; y++) {
+      const k = Math.round(Yf[y]);
+      bandY[y] = Math.abs(Yf[y] - k) < half && k > 0 && k < rows ? 1 : 0;
+    }
   }
   return { bw, bh, Xf, Yf, colA, colB, rowA, rowB, bandX, bandY, grout, hasGrout: g > 0 };
 }
@@ -452,10 +522,14 @@ const ROT_SET = new Set(QUILT_ROTATING);
 
 /** Paint one tile (span 1) or one hero (span 2) into the pixel rect it owns, turned by `a` radians. */
 function quiltPaint(buf, plan, tile, c0, r0, span, a, el = null) {
-  const xs = plan.colA[c0]; const xe = plan.colB[c0 + span - 1];
-  const ys = plan.rowA[r0]; const ye = plan.rowB[r0 + span - 1];
+  const xs = plan.colA[c0];
+  const xe = plan.colB[c0 + span - 1];
+  const ys = plan.rowA[r0];
+  const ye = plan.rowB[r0 + span - 1];
   if (xs < 0 || ys < 0) return; // this cell is past the bottom or right of the frame
-  const fn = quiltSampler(tile.pattern); const params = tile.params; const rgba = tile.rgba;
+  const fn = quiltSampler(tile.pattern);
+  const params = tile.params;
+  const rgba = tile.rgba;
   const { Xf, Yf, bw } = plan;
   const ground = rgba[0];
   // #1137 — the element's own KINEME transform (see quiltCell, whose numbers this repeats)
@@ -467,17 +541,27 @@ function quiltPaint(buf, plan, tile, c0, r0, span, a, el = null) {
   const at = rotates ? (el ? a + el.a : a) : 0;
   const moved = !!el && (el.s !== 1 || el.dy !== 0);
   const turn = at !== 0 && rotates;
-  const cs = turn || moved ? Math.cos(at) : 1; const sn = turn || moved ? Math.sin(at) : 0;
+  const cs = turn || moved ? Math.cos(at) : 1;
+  const sn = turn || moved ? Math.sin(at) : 0;
   for (let y = ys; y < ye; y++) {
     const v0 = span === 2 ? (Yf[y] - r0) / 2 : Yf[y] - r0;
     const row = y * bw;
     for (let x = xs; x < xe; x++) {
-      let u = span === 2 ? (Xf[x] - c0) / 2 : Xf[x] - c0; let v = v0;
+      let u = span === 2 ? (Xf[x] - c0) / 2 : Xf[x] - c0;
+      let v = v0;
       if (turn || moved) {
-        let dx = u - 0.5; let dy = v - 0.5;
-        if (moved) { dx /= el.s; dy = (dy - el.dy) / el.s; }
-        u = 0.5 + dx * cs + dy * sn; v = 0.5 - dx * sn + dy * cs;
-        if (moved && (u < 0 || u >= 1 || v < 0 || v >= 1)) { buf[row + x] = ground; continue; }
+        let dx = u - 0.5;
+        let dy = v - 0.5;
+        if (moved) {
+          dx /= el.s;
+          dy = (dy - el.dy) / el.s;
+        }
+        u = 0.5 + dx * cs + dy * sn;
+        v = 0.5 - dx * sn + dy * cs;
+        if (moved && (u < 0 || u >= 1 || v < 0 || v >= 1)) {
+          buf[row + x] = ground;
+          continue;
+        }
       }
       buf[row + x] = rgba[fn(u, v, params)];
     }
@@ -489,7 +573,8 @@ function quiltGrout(buf, plan, grid, xs, xe, ys, ye) {
   if (!plan.hasGrout) return;
   const { Xf, Yf, bw, bandX, bandY } = plan;
   for (let y = Math.max(0, ys); y < ye; y++) {
-    const all = bandY[y] === 1; const row = y * bw;
+    const all = bandY[y] === 1;
+    const row = y * bw;
     for (let x = Math.max(0, xs); x < xe; x++) {
       if ((all || bandX[x] === 1) && onGrout(grid, Xf[x], Yf[y], plan.grout)) buf[row + x] = grid.groundRgba;
     }
@@ -499,8 +584,13 @@ function quiltGrout(buf, plan, grid, xs, xe, ys, ye) {
 /** The cell index and angle of every cell the DRIFT can turn: 1x1 pinwheels / medallions, and medallion heroes. */
 function quiltMovers(grid) {
   const out = [];
-  grid.tiles.forEach((tl, i) => { if (grid.heroAt[i] === -1 && ROT_SET.has(tl.pattern)) out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i }); });
-  grid.heroes.forEach((h) => { if (ROT_SET.has(h.pattern)) out.push({ tile: h, c: h.c, r: h.r, span: 2, at: h.r * grid.cols + h.c }); });
+  grid.tiles.forEach((tl, i) => {
+    if (grid.heroAt[i] === -1 && ROT_SET.has(tl.pattern))
+      out.push({ tile: tl, c: i % grid.cols, r: (i / grid.cols) | 0, span: 1, at: i });
+  });
+  grid.heroes.forEach((h) => {
+    if (ROT_SET.has(h.pattern)) out.push({ tile: h, c: h.c, r: h.r, span: 2, at: h.r * grid.cols + h.c });
+  });
   return out;
 }
 
@@ -519,7 +609,8 @@ export function rasterQuilt(buf, bw, bh, grid, tileW, grout = 0, drift = 0, t = 
       if (heroAt[i] === -1) quiltPaint(buf, plan, tiles[i], c, r, 1, rot ? rot[i] : 0, xf ? xf.get(i) : null);
     }
   }
-  for (const h of heroes) quiltPaint(buf, plan, h, h.c, h.r, 2, rot ? rot[h.r * cols + h.c] : 0, xf ? xf.get(h.r * cols + h.c) : null);
+  for (const h of heroes)
+    quiltPaint(buf, plan, h, h.c, h.r, 2, rot ? rot[h.r * cols + h.c] : 0, xf ? xf.get(h.r * cols + h.c) : null);
   quiltGrout(buf, plan, grid, 0, bw, 0, bh);
   return buf;
 }
@@ -537,9 +628,13 @@ export function createQuiltRaster(grid, bw, bh, tileW, grout = 0, kinMovers = nu
   // seeded few that carry a KINEME motion. Everything else is the base, copied.
   const turning = quiltMovers(grid);
   const seen = new Set(turning.map((m) => m.at));
-  const movers = [...turning, ...(kinMovers ? quiltElementList(grid).filter((e) => kinMovers.has(e.at) && !seen.has(e.at)) : [])];
+  const movers = [
+    ...turning,
+    ...(kinMovers ? quiltElementList(grid).filter((e) => kinMovers.has(e.at) && !seen.has(e.at)) : []),
+  ];
   return {
-    base, movers: movers.length,
+    base,
+    movers: movers.length,
     draw(out, drift, t) {
       const rot = quiltAngles(grid, drift, t);
       const xf = quiltXforms(kinMovers, drift, t);
@@ -550,7 +645,15 @@ export function createQuiltRaster(grid, bw, bh, tileW, grout = 0, kinMovers = nu
         const x = xf ? xf.get(m.at) || null : null;
         if (!x && (a === 0 || !ROT_SET.has(m.tile.pattern))) continue;
         quiltPaint(out, plan, m.tile, m.c, m.r, m.span, a, x);
-        quiltGrout(out, plan, grid, plan.colA[m.c], plan.colB[m.c + m.span - 1], plan.rowA[m.r], plan.rowB[m.r + m.span - 1]);
+        quiltGrout(
+          out,
+          plan,
+          grid,
+          plan.colA[m.c],
+          plan.colB[m.c + m.span - 1],
+          plan.rowA[m.r],
+          plan.rowB[m.r + m.span - 1],
+        );
       }
       return out;
     },
@@ -577,7 +680,9 @@ export function glyphRoles(palette) {
   const set = [...new Set(rankedSwatches(palette))].slice(0, GLYPH_MAX_ROLES);
   const all = set.length ? set : [palette?.bg || '#000000', palette?.ink || '#ffffff'];
   let gi = 0;
-  all.forEach((c, i) => { if (lum(c) < lum(all[gi])) gi = i; });
+  all.forEach((c, i) => {
+    if (lum(c) < lum(all[gi])) gi = i;
+  });
   return { ground: all[gi], pool: all.filter((_, i) => i !== gi) };
 }
 
@@ -605,8 +710,10 @@ export function assignGlyph(seed, density, mix, palette) {
   const mrng = mkRng(hash32(seed, 0x61f));
   const marks = [];
   for (let i = 0; i < count; i++) {
-    const draw = mrng(); const free = Math.floor(mrng() * GLYPH_MARKS.length);
-    const c = i % cols; const r = Math.floor(i / cols);
+    const draw = mrng();
+    const free = Math.floor(mrng() * GLYPH_MARKS.length);
+    const c = i % cols;
+    const r = Math.floor(i / cols);
     marks.push(draw < m ? GLYPH_MARKS[free] : RHYTHM_MARKS[(c + r) % 2]);
   }
   // quota: every full aligned run of 8 holds a filled mark; a trailing partial run is exempt.
@@ -621,11 +728,19 @@ export function assignGlyph(seed, density, mix, palette) {
   const flip = crng() < 0.5 ? 0 : 1; // pool of two: which role takes even parity
   const markCol = [];
   for (let i = 0; i < count; i++) {
-    const c = i % cols; const r = Math.floor(i / cols);
+    const c = i % cols;
+    const r = Math.floor(i / cols);
     const roll = crng();
-    if (pool.length <= 1) { markCol.push(pool[0] ?? ground); continue; } // rule waived
-    if (pool.length === 2) { markCol.push(pool[(c + r + flip) % 2]); continue; }
-    const left = c > 0 ? markCol[i - 1] : null; const up = r > 0 ? markCol[i - cols] : null;
+    if (pool.length <= 1) {
+      markCol.push(pool[0] ?? ground);
+      continue;
+    } // rule waived
+    if (pool.length === 2) {
+      markCol.push(pool[(c + r + flip) % 2]);
+      continue;
+    }
+    const left = c > 0 ? markCol[i - 1] : null;
+    const up = r > 0 ? markCol[i - cols] : null;
     const ok = pool.filter((p) => p !== left && p !== up);
     markCol.push(ok[Math.floor(roll * ok.length)]);
   }
@@ -642,7 +757,14 @@ export function assignGlyph(seed, density, mix, palette) {
     const accent = rest.length ? rest[Math.floor(trng() * rest.length)] : cut;
     const roles = { mark: markCol[i], cut, accent, ground };
     const used = [...new Set(motifRoles(ops).map((k) => roles[k]))];
-    return { mark, pose, ops, roles, rgba: { mark: toRgba(roles.mark), cut: toRgba(cut), accent: toRgba(accent), ground: toRgba(ground) }, used };
+    return {
+      mark,
+      pose,
+      ops,
+      roles,
+      rgba: { mark: toRgba(roles.mark), cut: toRgba(cut), accent: toRgba(accent), ground: toRgba(ground) },
+      used,
+    };
   });
 
   return { cols, rows, ground, groundRgba: toRgba(ground), pool, tiles };
@@ -679,16 +801,20 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) 
   // Only the pixels inside a tile's mark box can be anything but ground (sampleMark returns null outside it),
   // so each tile samples just its own box. Same pixels as walking the whole frame, a fraction of the work (#1101).
   for (let i = 0; i < count; i++) {
-    const c = i % cols; const r = (i / cols) | 0;
+    const c = i % cols;
+    const r = (i / cols) | 0;
     // #1137 — this glyph's own KINEME transform (null: the original path, number for number)
     const xe = movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null;
     if (xe && !xe.vis) continue; // blinked out: the ground shows
     const scale = xe ? glyphScale(i, count, drift, t) * xe.s : glyphScale(i, count, drift, t);
     // a turned mark needs the diagonal of its box; a bobbing one reaches |dy| tiles further down or up
     const half = MARK_BOX * scale * tile * (xe && xe.a !== 0 ? Math.SQRT2 : 1) + (xe ? Math.abs(xe.dy) * tile : 0);
-    const cx = x0 + (c + 0.5) * tile; const cy = y0 + (r + 0.5) * tile;
-    const xa = Math.max(0, Math.floor(cx - half) - 1); const xb = Math.min(bw - 1, Math.ceil(cx + half) + 1);
-    const ya = Math.max(0, Math.floor(cy - half) - 1); const yb = Math.min(bh - 1, Math.ceil(cy + half) + 1);
+    const cx = x0 + (c + 0.5) * tile;
+    const cy = y0 + (r + 0.5) * tile;
+    const xa = Math.max(0, Math.floor(cx - half) - 1);
+    const xb = Math.min(bw - 1, Math.ceil(cx + half) + 1);
+    const ya = Math.max(0, Math.floor(cy - half) - 1);
+    const yb = Math.min(bh - 1, Math.ceil(cy + half) + 1);
     const tl = tiles[i];
     for (let y = ya; y <= yb; y++) {
       const gy = (y + 0.5 - y0) / tile;
@@ -696,7 +822,9 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) 
       for (let x = xa; x <= xb; x++) {
         const gx = (x + 0.5 - x0) / tile;
         if (Math.floor(gx) !== c) continue;
-        const role = xe ? sampleMarkXf(tl.ops, gx - c - 0.5, gy - r - 0.5, scale, xe) : sampleMark(tl.ops, gx - c - 0.5, gy - r - 0.5, scale);
+        const role = xe
+          ? sampleMarkXf(tl.ops, gx - c - 0.5, gy - r - 0.5, scale, xe)
+          : sampleMark(tl.ops, gx - c - 0.5, gy - r - 0.5, scale);
         if (role) buf[y * bw + x] = tl.rgba[role];
       }
     }
@@ -710,7 +838,12 @@ export function rasterGlyph(buf, bw, bh, grid, drift = 0, t = 0, movers = null) 
  */
 export function glyphMoverMap(grid, seed, kin, movers) {
   if (!kin || kin === 'OFF') return null;
-  const m = pickMovers(seed, kin, movers, grid.tiles.map((_, i) => ({ at: i, turns: true })));
+  const m = pickMovers(
+    seed,
+    kin,
+    movers,
+    grid.tiles.map((_, i) => ({ at: i, turns: true })),
+  );
   return m.size ? m : null;
 }
 
@@ -725,7 +858,8 @@ function glyphXform(mv, drift, t) {
 function sampleMarkXf(ops, lx, ly, scale, xe) {
   const dy = ly - xe.dy;
   if (xe.a === 0) return sampleMark(ops, lx, dy, scale);
-  const cs = Math.cos(xe.a); const sn = Math.sin(xe.a);
+  const cs = Math.cos(xe.a);
+  const sn = Math.sin(xe.a);
   return sampleMark(ops, lx * cs + dy * sn, -lx * sn + dy * cs, scale);
 }
 
@@ -735,16 +869,28 @@ export function rasterGlyphReference(buf, bw, bh, grid, drift = 0, t = 0, movers
   const { tile, x0, y0 } = glyphLayout(grid, bw, bh);
   const count = cols * rows;
   const xes = tiles.map((_, i) => (movers && drift > 0 ? glyphXform(movers.get(i), drift, t) : null));
-  const scales = tiles.map((_, i) => (xes[i] ? glyphScale(i, count, drift, t) * xes[i].s : glyphScale(i, count, drift, t)));
+  const scales = tiles.map((_, i) =>
+    xes[i] ? glyphScale(i, count, drift, t) * xes[i].s : glyphScale(i, count, drift, t),
+  );
   for (let y = 0; y < bh; y++) {
-    const gy = (y + 0.5 - y0) / tile; const r = Math.floor(gy);
+    const gy = (y + 0.5 - y0) / tile;
+    const r = Math.floor(gy);
     for (let x = 0; x < bw; x++) {
-      const gx = (x + 0.5 - x0) / tile; const c = Math.floor(gx);
-      if (c < 0 || c >= cols || r < 0 || r >= rows) { buf[y * bw + x] = groundRgba; continue; }
+      const gx = (x + 0.5 - x0) / tile;
+      const c = Math.floor(gx);
+      if (c < 0 || c >= cols || r < 0 || r >= rows) {
+        buf[y * bw + x] = groundRgba;
+        continue;
+      }
       const i = r * cols + c;
       const xe = xes[i];
-      if (xe && !xe.vis) { buf[y * bw + x] = groundRgba; continue; }
-      const role = xe ? sampleMarkXf(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i], xe) : sampleMark(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i]);
+      if (xe && !xe.vis) {
+        buf[y * bw + x] = groundRgba;
+        continue;
+      }
+      const role = xe
+        ? sampleMarkXf(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i], xe)
+        : sampleMark(tiles[i].ops, gx - c - 0.5, gy - r - 0.5, scales[i]);
       buf[y * bw + x] = role ? tiles[i].rgba[role] : groundRgba;
     }
   }
@@ -766,27 +912,39 @@ export function drawGlyph(ctx, grid, w, h, drift = 0, t = 0) {
   tiles.forEach((tl, i) => {
     const scale = glyphScale(i, count, drift, t);
     const k = tile * scale; // tile-local units → pixels
-    const ox = x0 + ((i % cols) + 0.5) * tile; const oy = y0 + (Math.floor(i / cols) + 0.5) * tile;
-    const X = (v) => ox + v * k; const Y = (v) => oy + v * k;
+    const ox = x0 + ((i % cols) + 0.5) * tile;
+    const oy = y0 + (Math.floor(i / cols) + 0.5) * tile;
+    const X = (v) => ox + v * k;
+    const Y = (v) => oy + v * k;
     const width = (v) => Math.max(v * scale, MIN_STROKE) * tile; // the floor holds after the scale
     for (const op of tl.ops) {
       const color = tl.roles[op.role];
       ctx.beginPath();
       if (op.type === 'disc') {
         ctx.arc(X(op.cx), Y(op.cy), op.r * k, 0, Math.PI * 2);
-        ctx.fillStyle = color; ctx.fill();
+        ctx.fillStyle = color;
+        ctx.fill();
       } else if (op.type === 'ring') {
         ctx.arc(X(op.cx), Y(op.cy), op.r * k, 0, Math.PI * 2);
-        ctx.strokeStyle = color; ctx.lineWidth = width(op.w); ctx.stroke();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width(op.w);
+        ctx.stroke();
       } else if (op.type === 'seg') {
-        ctx.moveTo(X(op.x1), Y(op.y1)); ctx.lineTo(X(op.x2), Y(op.y2));
-        ctx.strokeStyle = color; ctx.lineWidth = width(op.w); ctx.lineCap = op.cap; ctx.stroke();
+        ctx.moveTo(X(op.x1), Y(op.y1));
+        ctx.lineTo(X(op.x2), Y(op.y2));
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width(op.w);
+        ctx.lineCap = op.cap;
+        ctx.stroke();
       } else if (op.type === 'poly') {
         op.pts.forEach(([px, py], j) => (j ? ctx.lineTo(X(px), Y(py)) : ctx.moveTo(X(px), Y(py))));
-        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
       } else if (op.type === 'lens') {
         // two arcs of radius R whose centers sit d either side of the long axis
-        const R = (op.a * op.a + op.h * op.h) / (2 * op.h); const d = R - op.h;
+        const R = (op.a * op.a + op.h * op.h) / (2 * op.h);
+        const d = R - op.h;
         const half = Math.asin(op.a / R);
         if (op.vertical) {
           ctx.arc(X(d), Y(0), R * k, Math.PI - half, Math.PI + half);
@@ -795,7 +953,9 @@ export function drawGlyph(ctx, grid, w, h, drift = 0, t = 0) {
           ctx.arc(X(0), Y(d), R * k, -Math.PI / 2 - half, -Math.PI / 2 + half);
           ctx.arc(X(0), Y(-d), R * k, Math.PI / 2 - half, Math.PI / 2 + half);
         }
-        ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+        ctx.closePath();
+        ctx.fillStyle = color;
+        ctx.fill();
       }
     }
   });
@@ -818,10 +978,14 @@ const BUF_W = 512;
  * here: FIELD forces it to 0.
  */
 export function renderPattern(ctx, o) {
-  if (o.mode !== 'FIELD' && o.mode !== 'QUILT' && o.mode !== 'GLYPH') throw new Error(`renderPattern: mode ${o.mode} is not built yet`);
+  if (o.mode !== 'FIELD' && o.mode !== 'QUILT' && o.mode !== 'GLYPH')
+    throw new Error(`renderPattern: mode ${o.mode} is not built yet`);
   const quilt = o.mode === 'QUILT';
   const glyph = o.mode === 'GLYPH';
-  const density = Math.max(1, Math.round(o.density || (quilt ? QUILT_DEFAULT_DENSITY : glyph ? GLYPH_DEFAULT_DENSITY : FIELD_DEFAULT_DENSITY)));
+  const density = Math.max(
+    1,
+    Math.round(o.density || (quilt ? QUILT_DEFAULT_DENSITY : glyph ? GLYPH_DEFAULT_DENSITY : FIELD_DEFAULT_DENSITY)),
+  );
   const tileW = o.w / density;
   const rows = Math.max(1, Math.ceil(o.h / tileW));
   const grid = glyph
@@ -829,11 +993,17 @@ export function renderPattern(ctx, o) {
     : quilt
       ? assignQuilt(o.seed >>> 0, density, o.mix ?? QUILT_DEFAULT_MIX, o.hero ?? QUILT_DEFAULT_HERO, o.palette, rows)
       : assign(o.seed >>> 0, density, o.mix, o.palette, rows);
-  if (glyph) { drawGlyph(ctx, grid, o.w, o.h, o.drift, o.t); return; }
+  if (glyph) {
+    drawGlyph(ctx, grid, o.w, o.h, o.drift, o.t);
+    return;
+  }
   const bw = Math.min(BUF_W, Math.max(1, Math.round(o.w)));
   const bh = Math.max(1, Math.round(bw * (o.h / o.w)));
   if (!scratch || scratch.w !== bw || scratch.h !== bh) {
-    const canvas = typeof OffscreenCanvas !== 'undefined' ? new OffscreenCanvas(bw, bh) : Object.assign(document.createElement('canvas'), { width: bw, height: bh });
+    const canvas =
+      typeof OffscreenCanvas !== 'undefined'
+        ? new OffscreenCanvas(bw, bh)
+        : Object.assign(document.createElement('canvas'), { width: bw, height: bh });
     const c = canvas.getContext('2d');
     scratch = { canvas, c, image: c.createImageData(bw, bh), w: bw, h: bh };
   }

@@ -268,7 +268,11 @@ export function nextGovernorCut(s) {
   const creatureCount = s.creatureCount | 0;
   const creatureShed = s.creatureShed | 0;
   if (creatureCount - creatureShed > 0) {
-    return { kind: 'creatureCount', creatureShed: creatureShed + 1, label: `CREATURES → ${creatureCount - creatureShed - 1}` };
+    return {
+      kind: 'creatureCount',
+      creatureShed: creatureShed + 1,
+      label: `CREATURES → ${creatureCount - creatureShed - 1}`,
+    };
   }
 
   // Cut 1.6 (#1574): travel. After the population (cut 1.5 stands), ahead

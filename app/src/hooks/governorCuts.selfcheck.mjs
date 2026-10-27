@@ -3,8 +3,12 @@
 // governor must act on the worse of the two rates.
 import assert from 'node:assert';
 import {
-  gpuImpliedFps, effectiveGovernorFps, isGpuBinding,
-  nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS,
+  gpuImpliedFps,
+  effectiveGovernorFps,
+  isGpuBinding,
+  nextGovernorCut,
+  shedSummary,
+  GOVERNOR_RESTORE_CUTS,
 } from './governorCuts.js';
 
 // Absent timing → Infinity → governor reduces exactly to the rAF rate.
@@ -51,8 +55,12 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
 {
   const shedKinds = new Set();
   let s = {
-    renderScale: 1, quality: 'high', assetThin: false,
-    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
     gpuSaturated: true,
   };
   for (let i = 0; i < 12; i++) {
@@ -82,9 +90,22 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // (cut 1.45): the warp sheds before body counts, weather still first
   // (the full walk is pinned in spectrumWarp.selfcheck G).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.deepStrictEqual(order, ['fxaa', 'renderScale', 'markWeather', 'feedbackWarp', 'creatureCount', 'travel', 'quality', 'assetThin', 'countClamp', 'slowRender']);
-  console.log('[selfcheck] governorCuts (#264 restore coverage):',
-    `shed kinds [${[...shedKinds].join(', ')}] all restorable`);
+  assert.deepStrictEqual(order, [
+    'fxaa',
+    'renderScale',
+    'markWeather',
+    'feedbackWarp',
+    'creatureCount',
+    'travel',
+    'quality',
+    'assetThin',
+    'countClamp',
+    'slowRender',
+  ]);
+  console.log(
+    '[selfcheck] governorCuts (#264 restore coverage):',
+    `shed kinds [${[...shedKinds].join(', ')}] all restorable`,
+  );
 }
 
 // #264 — quality restores only when the GOVERNOR shed it (qualityShedFrom
@@ -98,20 +119,21 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   assert.strictEqual(q.needsRestore(gov, { healthy: false }), false, 'no restore while unhealthy');
   assert.strictEqual(
     q.needsRestore({ quality: 'performance', qualityShedFrom: null }, { healthy: true }),
-    false, 'user-chosen tier never restores',
+    false,
+    'user-chosen tier never restores',
   );
   // The badge shows governor-shed quality and stays silent otherwise.
-  assert.deepStrictEqual(
-    shedSummary({ renderScale: 1, quality: 'performance', qualityShedFrom: 'balanced' }),
-    ['tier → PERFORMANCE'],
-  );
-  assert.deepStrictEqual(
-    shedSummary({ renderScale: 0.5, quality: 'performance', qualityShedFrom: 'balanced' }),
-    ['pixel trim 50%', 'tier → PERFORMANCE'],
-  );
+  assert.deepStrictEqual(shedSummary({ renderScale: 1, quality: 'performance', qualityShedFrom: 'balanced' }), [
+    'tier → PERFORMANCE',
+  ]);
+  assert.deepStrictEqual(shedSummary({ renderScale: 0.5, quality: 'performance', qualityShedFrom: 'balanced' }), [
+    'pixel trim 50%',
+    'tier → PERFORMANCE',
+  ]);
   assert.strictEqual(
     shedSummary({ renderScale: 1, quality: 'performance', qualityShedFrom: null }),
-    null, 'user-chosen PERF is not a shed',
+    null,
+    'user-chosen PERF is not a shed',
   );
   console.log('[selfcheck] governorCuts (#264 quality restore + badge): 7 cases passed');
 }
@@ -125,11 +147,13 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   const sr = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'slowRender');
   assert.strictEqual(
     sr.needsRestore({ slowRender: true, slowRenderSource: 'cut6' }, { healthy: true }),
-    true, 'cut-6 soft freeze auto-clears',
+    true,
+    'cut-6 soft freeze auto-clears',
   );
   assert.strictEqual(
     sr.needsRestore({ slowRender: true, slowRenderSource: 'watchdog' }, { healthy: true }),
-    false, 'watchdog stop never auto-clears',
+    false,
+    'watchdog stop never auto-clears',
   );
   console.log('[selfcheck] governorCuts (#264 watchdog/manual-resume contract): 4 cases passed');
 }
@@ -138,8 +162,12 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
 // bottleneck, only when the caller says it is on-and-unshed, and restores last.
 {
   const base = {
-    renderScale: 1, quality: 'high', assetThin: false,
-    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
     gpuSaturated: true,
   };
   // Older callers (no fxaa key) keep the pre-#740 ladder: renderScale first.

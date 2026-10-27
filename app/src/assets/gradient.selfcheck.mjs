@@ -1,8 +1,13 @@
 // node src/assets/gradient.selfcheck.mjs — #701 TE-limited gradients.
 import assert from 'node:assert';
 import {
-  sanitizeGradient, hasGradient, gradientDefs, applyGradient,
-  GRADIENT_TYPES, GRADIENT_DIRS, GRADIENT_STOPS,
+  sanitizeGradient,
+  hasGradient,
+  gradientDefs,
+  applyGradient,
+  GRADIENT_TYPES,
+  GRADIENT_DIRS,
+  GRADIENT_STOPS,
 } from './gradient.js';
 import { ASSETS } from '../data/assets/index.js';
 import { Resvg } from '@resvg/resvg-js';
@@ -10,25 +15,42 @@ import { Resvg } from '@resvg/resvg-js';
 // ── the limitation is the feature ───────────────────────────────────────────
 assert.deepStrictEqual([...GRADIENT_TYPES], ['linear', 'radial']);
 assert.deepStrictEqual([...GRADIENT_DIRS], ['up', 'down', 'left', 'right']);
-assert.deepStrictEqual([...GRADIENT_STOPS], ['ink', 'accent', 'transparent'],
-  'stops are palette slots only — an arbitrary colour cannot survive the live R/G mask');
+assert.deepStrictEqual(
+  [...GRADIENT_STOPS],
+  ['ink', 'accent', 'transparent'],
+  'stops are palette slots only — an arbitrary colour cannot survive the live R/G mask',
+);
 
 // Legal declarations normalize; everything else is FLAT.
-assert.deepStrictEqual(sanitizeGradient({ type: 'linear', dir: 'up', from: 'ink', to: 'accent' }),
-  { type: 'linear', dir: 'up', from: 'ink', to: 'accent' });
-assert.deepStrictEqual(sanitizeGradient({ type: 'radial', from: 'ink', to: 'transparent' }),
-  { type: 'radial', from: 'ink', to: 'transparent' });
-assert.deepStrictEqual(sanitizeGradient({ type: 'linear', from: 'ink', to: 'accent' }).dir, 'down',
-  'a linear gradient with no direction falls to down');
+assert.deepStrictEqual(sanitizeGradient({ type: 'linear', dir: 'up', from: 'ink', to: 'accent' }), {
+  type: 'linear',
+  dir: 'up',
+  from: 'ink',
+  to: 'accent',
+});
+assert.deepStrictEqual(sanitizeGradient({ type: 'radial', from: 'ink', to: 'transparent' }), {
+  type: 'radial',
+  from: 'ink',
+  to: 'transparent',
+});
+assert.deepStrictEqual(
+  sanitizeGradient({ type: 'linear', from: 'ink', to: 'accent' }).dir,
+  'down',
+  'a linear gradient with no direction falls to down',
+);
 for (const bad of [
-  null, undefined, 'x', 42, {},
-  { type: 'conic', from: 'ink', to: 'accent' },                 // not a legal type
-  { type: 'linear', from: '#ff0000', to: 'accent' },            // arbitrary colour
+  null,
+  undefined,
+  'x',
+  42,
+  {},
+  { type: 'conic', from: 'ink', to: 'accent' }, // not a legal type
+  { type: 'linear', from: '#ff0000', to: 'accent' }, // arbitrary colour
   { type: 'linear', from: 'ink', to: 'rebeccapurple' },
-  { type: 'linear', from: 'ink' },                              // one stop
+  { type: 'linear', from: 'ink' }, // one stop
   { type: 'linear', to: 'accent' },
-  { type: 'linear', from: 'transparent', to: 'transparent' },   // invisible
-  { type: 'linear', from: 'ink', to: 'ink' },                   // flat by another name
+  { type: 'linear', from: 'transparent', to: 'transparent' }, // invisible
+  { type: 'linear', from: 'ink', to: 'ink' }, // flat by another name
   { type: 'radial', from: 'accent', to: 'accent' },
 ]) {
   assert.strictEqual(sanitizeGradient(bad), null, `${JSON.stringify(bad)} must fall back to flat`);
@@ -41,22 +63,31 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
 {
   const body = '<path d="M0 0" fill="var(--ink)"/><circle fill="var(--accent)"/>';
   for (const g of [undefined, null, {}, { type: 'conic' }]) {
-    assert.strictEqual(applyGradient(body, g, { ink: '#ff0000', accent: '#00ff00' }), body,
-      'a flat asset must come back byte-identical');
+    assert.strictEqual(
+      applyGradient(body, g, { ink: '#ff0000', accent: '#00ff00' }),
+      body,
+      'a flat asset must come back byte-identical',
+    );
   }
   assert.strictEqual(gradientDefs(null, { ink: '#f00', accent: '#0f0' }), '');
   // And the shipped catalogue is still entirely flat: this mechanism is inert
   // until an asset opts in, so nothing on the plate changes today.
   const optedIn = ASSETS.filter(hasGradient);
-  assert.strictEqual(optedIn.length, 0,
-    `no shipped asset may opt in yet (found ${optedIn.map((a) => a.id).join(', ')})`);
+  assert.strictEqual(
+    optedIn.length,
+    0,
+    `no shipped asset may opt in yet (found ${optedIn.map((a) => a.id).join(', ')})`,
+  );
 }
 
 // ── what a gradient actually bakes ──────────────────────────────────────────
 {
   const body = '<path d="M0 0" fill="var(--ink)"/><circle fill="var(--accent)"/>';
-  const out = applyGradient(body, { type: 'linear', dir: 'down', from: 'ink', to: 'accent' },
-    { ink: '#ff0000', accent: '#00ff00' });
+  const out = applyGradient(
+    body,
+    { type: 'linear', dir: 'down', from: 'ink', to: 'accent' },
+    { ink: '#ff0000', accent: '#00ff00' },
+  );
   // INK is painted by the ramp; ACCENT stays a flat second colour, so the
   // asset keeps a readable figure/ground.
   assert.ok(out.includes('fill="url(#kc-grad)"'), 'ink must paint with the gradient');
@@ -71,7 +102,8 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
 // Direction actually changes the ramp, and every direction is distinct.
 {
   const coords = GRADIENT_DIRS.map((dir) =>
-    gradientDefs({ type: 'linear', dir, from: 'ink', to: 'accent' }, { ink: '#f00', accent: '#0f0' }));
+    gradientDefs({ type: 'linear', dir, from: 'ink', to: 'accent' }, { ink: '#f00', accent: '#0f0' }),
+  );
   assert.strictEqual(new Set(coords).size, GRADIENT_DIRS.length, 'each direction must be its own ramp');
   assert.ok(coords[GRADIENT_DIRS.indexOf('down')].includes('y1="0"'));
   assert.ok(coords[GRADIENT_DIRS.indexOf('up')].includes('y1="1"'));
@@ -86,15 +118,16 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
 // The classic gradient mistake: fading to `transparent` in a naive
 // implementation ramps through an unrelated colour on the way down.
 {
-  const d = gradientDefs({ type: 'linear', from: 'accent', to: 'transparent' },
-    { ink: '#112233', accent: '#445566' });
+  const d = gradientDefs({ type: 'linear', from: 'accent', to: 'transparent' }, { ink: '#112233', accent: '#445566' });
   assert.ok(d.includes('stop-opacity="0"'), 'the transparent stop must be zero-opacity');
-  assert.strictEqual((d.match(/#445566/g) || []).length, 2,
-    'a transparent stop borrows the other stop colour, so the ramp fades out cleanly');
+  assert.strictEqual(
+    (d.match(/#445566/g) || []).length,
+    2,
+    'a transparent stop borrows the other stop colour, so the ramp fades out cleanly',
+  );
   assert.ok(!d.includes('#112233'), 'the unrelated slot must not appear in the ramp');
   // …and the same holds when transparent is the FIRST stop.
-  const d2 = gradientDefs({ type: 'linear', from: 'transparent', to: 'ink' },
-    { ink: '#112233', accent: '#445566' });
+  const d2 = gradientDefs({ type: 'linear', from: 'transparent', to: 'ink' }, { ink: '#112233', accent: '#445566' });
   assert.strictEqual((d2.match(/#112233/g) || []).length, 2);
   assert.ok(d2.includes('stop-opacity="0"'));
   // Both orders, against BOTH slots: transparent->accent must borrow accent,
@@ -107,8 +140,7 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
     ['ink', 'transparent', '#112233', '#445566'],
   ]) {
     const d3 = gradientDefs({ type: 'linear', from, to }, { ink: '#112233', accent: '#445566' });
-    assert.strictEqual((d3.match(new RegExp(want, 'g')) || []).length, 2,
-      `${from}->${to} must ramp within ${want}`);
+    assert.strictEqual((d3.match(new RegExp(want, 'g')) || []).length, 2, `${from}->${to} must ramp within ${want}`);
     assert.ok(!d3.includes(avoid), `${from}->${to} must not reach for ${avoid}`);
   }
 }
@@ -122,8 +154,11 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
   const live = applyGradient(body, g, { ink: '#ff0000', accent: '#00ff00' });
   const still = applyGradient(body, g, { ink: '#1a1a1a', accent: '#d08020' });
   const shape = (s) => s.replace(/#[0-9a-f]{6}/gi, '#COLOR');
-  assert.strictEqual(shape(live), shape(still),
-    'the two bakers must produce the same ramp, differing only in the baked colours');
+  assert.strictEqual(
+    shape(live),
+    shape(still),
+    'the two bakers must produce the same ramp, differing only in the baked colours',
+  );
 }
 
 // ── it bakes: through the real rasterizer, not just as a string ─────────────
@@ -138,7 +173,10 @@ assert.strictEqual(sanitizeGradient({ type: 'linear', dir: 'sideways', from: 'in
       .replace(/var\(--accent[^)]*\)/g, accent);
     const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 100 100">${b}</svg>`;
     const px = Buffer.from(new Resvg(svg).render().pixels);
-    const at = (x, y) => { const o = (y * 64 + x) * 4; return [px[o], px[o + 1], px[o + 2], px[o + 3]]; };
+    const at = (x, y) => {
+      const o = (y * 64 + x) * 4;
+      return [px[o], px[o + 1], px[o + 2], px[o + 3]];
+    };
     return { top: at(32, 4), mid: at(32, 32), bot: at(32, 59) };
   };
 

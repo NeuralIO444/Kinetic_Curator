@@ -15,24 +15,24 @@ function lerpValue(from, to, t) {
     for (let i = 0; i < len; i++) {
       const a = from[i] ?? from[from.length - 1] ?? 0;
       const b = to[i] ?? to[to.length - 1] ?? 0;
-      out.push(+(lerp(a, b, t).toFixed(3)));
+      out.push(+lerp(a, b, t).toFixed(3));
     }
     return out;
   }
   if (typeof from === 'number' && typeof to === 'number') {
-    return +(lerp(from, to, t).toFixed(3));
+    return +lerp(from, to, t).toFixed(3);
   }
   return to;
 }
 
 export function useMorphEvolve() {
-  const morphing = useStore(s => s.morphing);
-  const morphFrom = useStore(s => s.morphFrom);
-  const morphTo = useStore(s => s.morphTo);
-  const morphStart = useStore(s => s.morphStart);
-  const morphDurationMs = useStore(s => s.morphDurationMs);
-  const setLayoutParams = useStore(s => s.setLayoutParams);
-  const finishMorph = useStore(s => s.finishMorph);
+  const morphing = useStore((s) => s.morphing);
+  const morphFrom = useStore((s) => s.morphFrom);
+  const morphTo = useStore((s) => s.morphTo);
+  const morphStart = useStore((s) => s.morphStart);
+  const morphDurationMs = useStore((s) => s.morphDurationMs);
+  const setLayoutParams = useStore((s) => s.setLayoutParams);
+  const finishMorph = useStore((s) => s.finishMorph);
 
   const rafRef = useRef(null);
 

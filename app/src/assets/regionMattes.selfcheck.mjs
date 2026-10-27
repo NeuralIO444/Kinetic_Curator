@@ -23,17 +23,24 @@ function fillRect(b, x0, y0, x1, y1, r, g, bl, a = 255) {
   for (let y = y0; y < y1; y++) {
     for (let x = x0; x < x1; x++) {
       const i = (y * b.w + x) * 4;
-      b.px[i] = r; b.px[i + 1] = g; b.px[i + 2] = bl; b.px[i + 3] = a;
+      b.px[i] = r;
+      b.px[i + 1] = g;
+      b.px[i + 2] = bl;
+      b.px[i + 3] = a;
     }
   }
 }
 function fillCircle(b, cx, cy, rad, r, g, bl, a = 255) {
   for (let y = 0; y < b.h; y++) {
     for (let x = 0; x < b.w; x++) {
-      const dx = x - cx, dy = y - cy;
+      const dx = x - cx,
+        dy = y - cy;
       if (dx * dx + dy * dy <= rad * rad) {
         const i = (y * b.w + x) * 4;
-        b.px[i] = r; b.px[i + 1] = g; b.px[i + 2] = bl; b.px[i + 3] = a;
+        b.px[i] = r;
+        b.px[i + 1] = g;
+        b.px[i + 2] = bl;
+        b.px[i + 3] = a;
       }
     }
   }
@@ -67,8 +74,11 @@ function twoSquares() {
   const b = makeBuf(200, 200);
   fillRect(b, 26, 14, 92, 78, 255, 0, 0); // same red, shifted/resized
   fillRect(b, 112, 126, 172, 186, 0, 0, 255); // same blue, shifted
-  assert.deepStrictEqual(ids(detectRegions(b.px, b.w, b.h)), ids(detectRegions(a.px, a.w, a.h)),
-    'redraw with same colors must keep IDs');
+  assert.deepStrictEqual(
+    ids(detectRegions(b.px, b.w, b.h)),
+    ids(detectRegions(a.px, a.w, a.h)),
+    'redraw with same colors must keep IDs',
+  );
 }
 
 // 3. Recolor one region → NEW id for it, other region's id survives.
@@ -103,13 +113,19 @@ function twoSquares() {
   for (let x = 40; x < 160; x++) {
     for (const y of [40, 159]) {
       const i = (y * b.w + x) * 4;
-      b.px[i] = 128; b.px[i + 1] = 0; b.px[i + 2] = 0; b.px[i + 3] = 255;
+      b.px[i] = 128;
+      b.px[i + 1] = 0;
+      b.px[i + 2] = 0;
+      b.px[i + 3] = 255;
     }
   }
   for (let y = 40; y < 160; y++) {
     for (const x of [40, 159]) {
       const i = (y * b.w + x) * 4;
-      b.px[i] = 128; b.px[i + 1] = 0; b.px[i + 2] = 0; b.px[i + 3] = 255;
+      b.px[i] = 128;
+      b.px[i + 1] = 0;
+      b.px[i + 2] = 0;
+      b.px[i + 3] = 255;
     }
   }
   const res = detectRegions(b.px, b.w, b.h);
@@ -126,15 +142,27 @@ function twoSquares() {
 // 6b. Isolated sub-minimum specks (AA fringe pixels with no adjacent region)
 // are dropped, not reported — Matt Q1: minimum region size.
 {
-  const S = 64, px = new Uint8ClampedArray(S * S * 4);
-  for (let y = 20; y < 40; y++) for (let x = 20; x < 40; x++) {
-    const o = (y * S + x) * 4;
-    px[o] = 255; px[o + 3] = 255;
-  }
-  const specks = [[5, 5], [50, 10], [10, 55], [58, 58], [30, 2]];
+  const S = 64,
+    px = new Uint8ClampedArray(S * S * 4);
+  for (let y = 20; y < 40; y++)
+    for (let x = 20; x < 40; x++) {
+      const o = (y * S + x) * 4;
+      px[o] = 255;
+      px[o + 3] = 255;
+    }
+  const specks = [
+    [5, 5],
+    [50, 10],
+    [10, 55],
+    [58, 58],
+    [30, 2],
+  ];
   for (const [x, y] of specks) {
     const o = (y * S + x) * 4;
-    px[o] = 200; px[o + 1] = 30; px[o + 2] = 30; px[o + 3] = 40;
+    px[o] = 200;
+    px[o + 1] = 30;
+    px[o + 2] = 30;
+    px[o + 3] = 40;
   }
   const { regions } = detectRegions(px, S, S);
   assert.strictEqual(regions.length, 1, `specks must not spawn regions, got ${regions.length}`);

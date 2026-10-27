@@ -40,16 +40,17 @@ export function wireEventBus(rawDispatch) {
     if (p.euclid !== undefined) dispatch({ type: A.SET_EUCLID, payload: p.euclid });
   });
   on(Events.DAVIS_RESET_PHRASE, () => dispatch({ type: A.RESET_PHRASE }));
-  on(Events.DAVIS_MUTATE_STREAM, (p) => dispatch(p && p.reset
-    ? { type: A.RESET_SEED_OFFSETS }
-    : { type: A.MUTATE_SEED_OFFSET, group: p && p.group }));
+  on(Events.DAVIS_MUTATE_STREAM, (p) =>
+    dispatch(p && p.reset ? { type: A.RESET_SEED_OFFSETS } : { type: A.MUTATE_SEED_OFFSET, group: p && p.group }),
+  );
   on(Events.CANVAS_BG_CYCLE, () => dispatch({ type: A.CYCLE_CANVAS_BG })); // #310: BG cycle moved to OUTPUT
   on(Events.DAVIS_FAVORITE, (fav) => {
     if (fav.action === 'recall') return dispatch({ type: A.RECALL_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'add' && fav.favorite) return dispatch({ type: A.ADD_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'morph' && fav.favorite) return dispatch({ type: A.MORPH_TO_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'duplicate' && fav.id) return dispatch({ type: A.DUPLICATE_FAVORITE, id: fav.id });
-    if (fav.action === 'reorder' && fav.id) return dispatch({ type: A.REORDER_FAVORITE, id: fav.id, delta: fav.delta || 0 });
+    if (fav.action === 'reorder' && fav.id)
+      return dispatch({ type: A.REORDER_FAVORITE, id: fav.id, delta: fav.delta || 0 });
     if (fav.action === 'clear') return dispatch({ type: A.CLEAR_FAVORITES });
   });
   on(Events.DAVIS_FAVORITE_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_FAVORITE, id }));
@@ -68,15 +69,23 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_OPTION_CYCLE, ({ id, key }) => dispatch({ type: 'CYCLE_ASSET_OPTION', id, key })); // #1694 S2
   on(Events.ASSETS_STILL_TOGGLE, ({ id }) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
   on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
-  on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) => dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }));
+  on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) =>
+    dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }),
+  );
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
   on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_ASSET', id }));
-  on(Events.ASSETS_INGEST, ({ svg, hint, category, source }) => dispatch({ type: 'INGEST_ASSET', svg, hint, category, source }));
+  on(Events.ASSETS_INGEST, ({ svg, hint, category, source }) =>
+    dispatch({ type: 'INGEST_ASSET', svg, hint, category, source }),
+  );
   on(Events.ASSETS_REMOVE, ({ id }) => dispatch({ type: 'REMOVE_CUSTOM_ASSET', id }));
   on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
   on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
-  on(Events.ASSETS_REGION_SLOT, ({ id, slot, regionId }) => dispatch({ type: 'SET_ASSET_REGION_SLOT', id, slot, regionId }));
-  on(Events.ASSETS_REGION_KINEME, ({ id, regionId, value }) => dispatch({ type: 'SET_ASSET_REGION_KINEME', id, regionId, value })); // #1434
+  on(Events.ASSETS_REGION_SLOT, ({ id, slot, regionId }) =>
+    dispatch({ type: 'SET_ASSET_REGION_SLOT', id, slot, regionId }),
+  );
+  on(Events.ASSETS_REGION_KINEME, ({ id, regionId, value }) =>
+    dispatch({ type: 'SET_ASSET_REGION_KINEME', id, regionId, value }),
+  ); // #1434
 
   on(Events.EXPORT_RECORD, (recording) => dispatch({ type: A.SET_IS_RECORDING, payload: recording }));
   on(Events.EXPORT_RENDERING, (rendering) => dispatch({ type: A.SET_IS_RENDERING, payload: rendering }));
@@ -102,15 +111,25 @@ export function wireEventBus(rawDispatch) {
   on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
   on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
   on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
-  on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }));
+  on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) =>
+    dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }),
+  );
   on(Events.LAYER_ADD_MATH, () => dispatch({ type: A.ADD_MATH_LAYER }));
   on(Events.MATH_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_MATH_LAYER, id }));
   on(Events.MATH_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.MATH_EFFECT_ADD, layerId, kind }));
   on(Events.MATH_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.MATH_EFFECT_REMOVE, layerId, index }));
-  on(Events.MATH_EFFECT_REORDER, ({ layerId, index, delta }) => dispatch({ type: A.MATH_EFFECT_REORDER, layerId, index, delta }));
-  on(Events.MATH_EFFECT_SET_KIND, ({ layerId, index, kind }) => dispatch({ type: A.MATH_EFFECT_SET_KIND, layerId, index, kind }));
-  on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) => dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }));
-  on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) => dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }));
+  on(Events.MATH_EFFECT_REORDER, ({ layerId, index, delta }) =>
+    dispatch({ type: A.MATH_EFFECT_REORDER, layerId, index, delta }),
+  );
+  on(Events.MATH_EFFECT_SET_KIND, ({ layerId, index, kind }) =>
+    dispatch({ type: A.MATH_EFFECT_SET_KIND, layerId, index, kind }),
+  );
+  on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) =>
+    dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }),
+  );
+  on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) =>
+    dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }),
+  );
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
   on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
@@ -123,7 +142,9 @@ export function wireEventBus(rawDispatch) {
   on(Events.PALETTE_COLOR_MODE, ({ mode }) => dispatch({ type: A.SET_COLOR_MODE, payload: mode }));
   on(Events.RUN_SET, ({ running }) => dispatch({ type: A.SET_RUNNING, payload: !!running }));
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
-  on(Events.PALETTE_LOCK, ({ index, clear }) => dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }));
+  on(Events.PALETTE_LOCK, ({ index, clear }) =>
+    dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }),
+  );
   on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));
   on(Events.VIEW_FULLSCREEN, () => dispatch({ type: A.TOGGLE_FULLSCREEN }));
   on(Events.STAGE_MODE, (p = {}) => dispatch({ type: A.SET_STAGE_MODE, mode: p.mode }));
@@ -176,8 +197,12 @@ export function wireEventBus(rawDispatch) {
   on(Events.ATTACH_CLEAR, (p = {}) => dispatch({ type: A.CLEAR_ASSET_ATTACH, assetId: p.assetId }));
   on(Events.BEAT_BPM, (p = {}) => dispatch({ type: A.SET_BEAT_BPM, bpm: p.bpm }));
   on(Events.BEAT_METRO, (p = {}) => dispatch({ type: A.SET_BEAT_METRO, on: p.on }));
-  on(Events.AUDIO_ROUTES_SET, (p = {}) => dispatch({ type: A.SET_AUDIO_ROUTES, routes: p.routes, continuous: !!p.continuous }));
-  on(Events.AUDIO_ROUTES_EDIT, (p = {}) => dispatch({ type: A.EDIT_AUDIO_ROUTES, fn: p.fn, continuous: !!p.continuous }));
+  on(Events.AUDIO_ROUTES_SET, (p = {}) =>
+    dispatch({ type: A.SET_AUDIO_ROUTES, routes: p.routes, continuous: !!p.continuous }),
+  );
+  on(Events.AUDIO_ROUTES_EDIT, (p = {}) =>
+    dispatch({ type: A.EDIT_AUDIO_ROUTES, fn: p.fn, continuous: !!p.continuous }),
+  );
   on(Events.AUDIO_SIDECAR, (p = {}) => dispatch({ type: A.SET_AUDIO_SIDECAR, sidecar: p.sidecar, note: p.note }));
   on(Events.MIDI_ENABLED, (p = {}) => dispatch({ type: A.SET_MIDI_ENABLED, on: p.on }));
   on(Events.STARTUP_MODE, (p = {}) => dispatch({ type: A.SET_STARTUP_MODE, mode: p.mode }));

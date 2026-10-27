@@ -7,8 +7,12 @@
  */
 import assert from 'node:assert';
 import {
-  REGION_SLOTS, emptyRegionSlots, normalizeRegionSlots,
-  assignRegionSlot, slotOfRegion, normalizeRegions,
+  REGION_SLOTS,
+  emptyRegionSlots,
+  normalizeRegionSlots,
+  assignRegionSlot,
+  slotOfRegion,
+  normalizeRegions,
 } from './regionSlots.js';
 
 const ID_A = 'rm-ff0000-2-2';
@@ -74,7 +78,9 @@ assert.deepStrictEqual(emptyRegionSlots(), { A: null, B: null, C: null, D: null 
     { id: ID_A, color: 'ff0000', cx: 0.3, cy: 0.3, x0: 0.1, y0: 0.1, x1: 0.4, y1: 0.4, area: 100 },
     { id: 'bogus', color: 'ff0000', cx: 0.5, cy: 0.5, x0: 0, y0: 0, x1: 1, y1: 1, area: 10 },
     { id: ID_B, color: 'zzz', cx: 0.5, cy: 0.5, x0: 0, y0: 0, x1: 1, y1: 1, area: 10 },
-    null, 'x', 42,
+    null,
+    'x',
+    42,
   ]);
   assert.strictEqual(out.length, 1);
   assert.strictEqual(out[0].id, ID_A);

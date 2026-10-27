@@ -1,8 +1,13 @@
 import assert from 'node:assert';
 import { ASSETS } from '../data/assets/index.js';
 import {
-  sanitizeOverlay, duplicateIntoOverlay, ingestIntoOverlay, mergePool,
-  renameOverlayAsset, replaceOverlayAsset, OVERLAY_CAP,
+  sanitizeOverlay,
+  duplicateIntoOverlay,
+  ingestIntoOverlay,
+  mergePool,
+  renameOverlayAsset,
+  replaceOverlayAsset,
+  OVERLAY_CAP,
 } from './overlay.js';
 
 const hostile = sanitizeOverlay([
@@ -51,12 +56,18 @@ assert.strictEqual(last.asset.id, 'user:last_one');
 const over = ingestIntoOverlay(SVG, full, 'too_many');
 assert.strictEqual(over.ok, false);
 assert.strictEqual(over.error, 'overlay full');
-assert.deepStrictEqual(over.overlay.map((a) => a.id), full.map((a) => a.id));
+assert.deepStrictEqual(
+  over.overlay.map((a) => a.id),
+  full.map((a) => a.id),
+);
 
 const overDup = duplicateIntoOverlay(src, full);
 assert.strictEqual(overDup.ok, false);
 assert.strictEqual(overDup.error, 'overlay full');
-assert.deepStrictEqual(overDup.overlay.map((a) => a.id), full.map((a) => a.id));
+assert.deepStrictEqual(
+  overDup.overlay.map((a) => a.id),
+  full.map((a) => a.id),
+);
 
 // sanitizeOverlay (load path) truncates rather than overflows: first 32 win.
 const bloated = mkSlots(OVERLAY_CAP + 8);
@@ -134,7 +145,9 @@ assert.strictEqual(pooled.asset.category, 'fragments');
   // Untrusted input is re-validated, not trusted verbatim: an arbitrary
   // colour (not a palette slot) must not survive, same as sanitizeGradient
   // enforces everywhere else.
-  const withBadGrad = sanitizeOverlay([{ id: 'user:lit', svg: '<path d="M0 0"/>', gradient: { type: 'linear', from: '#ff0000', to: 'accent' } }]);
+  const withBadGrad = sanitizeOverlay([
+    { id: 'user:lit', svg: '<path d="M0 0"/>', gradient: { type: 'linear', from: '#ff0000', to: 'accent' } },
+  ]);
   assert.ok(!('gradient' in withBadGrad[0]), 'an illegal gradient must not survive load');
 
   // Absent stays absent — the field key itself must not appear, so a flat
@@ -163,41 +176,55 @@ assert.strictEqual(pooled.asset.category, 'fragments');
   const regions = [
     { id: 'rm-ff0000-2-2', color: 'ff0000', cx: 0.25, cy: 0.25, x0: 0.1, y0: 0.1, x1: 0.4, y1: 0.4, area: 3600 },
   ];
-  const clean = sanitizeOverlay([{
-    id: 'user:matte', svg: '<path d="M0 0"/>',
-    regions,
-    regionSlots: { A: 'rm-ff0000-2-2', B: 'bogus', C: null, D: null },
-  }]);
+  const clean = sanitizeOverlay([
+    {
+      id: 'user:matte',
+      svg: '<path d="M0 0"/>',
+      regions,
+      regionSlots: { A: 'rm-ff0000-2-2', B: 'bogus', C: null, D: null },
+    },
+  ]);
   assert.deepStrictEqual(clean[0].regions, regions, 'well-formed regions must round-trip');
-  assert.deepStrictEqual(clean[0].regionSlots, { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
-    'well-formed slot assignments must round-trip; bogus IDs dropped');
+  assert.deepStrictEqual(
+    clean[0].regionSlots,
+    { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
+    'well-formed slot assignments must round-trip; bogus IDs dropped',
+  );
 
-  const hostile = sanitizeOverlay([{
-    id: 'user:matte', svg: '<path d="M0 0"/>',
-    regions: 'x',
-    regionSlots: { A: 42, __proto__: 'rm-ff0000-2-2' },
-    extra: 'drop me',
-  }]);
+  const hostile = sanitizeOverlay([
+    {
+      id: 'user:matte',
+      svg: '<path d="M0 0"/>',
+      regions: 'x',
+      regionSlots: { A: 42, __proto__: 'rm-ff0000-2-2' },
+      extra: 'drop me',
+    },
+  ]);
   assert.ok(!('regions' in hostile[0]), 'malformed regions must not survive load');
   assert.ok(!('regionSlots' in hostile[0]), 'malformed slots must not survive load');
   assert.ok(!('extra' in hostile[0]), 'unknown fields must not survive load');
 
   const bare = sanitizeOverlay([{ id: 'user:matte', svg: '<path d="M0 0"/>' }]);
-  assert.ok(!('regions' in bare[0]) && !('regionSlots' in bare[0]),
-    'an asset without mattes must not gain the keys');
+  assert.ok(!('regions' in bare[0]) && !('regionSlots' in bare[0]), 'an asset without mattes must not gain the keys');
 
   // Replace: geometry is re-detected, but slot assignments carry forward so
   // a redraw keeping the flat colors keeps its slots (IDs are stable).
-  const withSlots = sanitizeOverlay([{
-    id: 'user:matte', svg: '<path d="M0 0"/>',
-    regions,
-    regionSlots: { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
-  }]);
+  const withSlots = sanitizeOverlay([
+    {
+      id: 'user:matte',
+      svg: '<path d="M0 0"/>',
+      regions,
+      regionSlots: { A: 'rm-ff0000-2-2', B: null, C: null, D: null },
+    },
+  ]);
   const rep = replaceOverlayAsset('user:matte', '<svg viewBox="0 0 100 100"><circle r="10"/></svg>', withSlots);
   assert.ok(rep.ok);
   assert.ok(!('regions' in rep.asset), 'replace must drop stale geometry');
-  assert.strictEqual(rep.asset.regionSlots.A, 'rm-ff0000-2-2',
-    'replace must carry slot assignments (ID stability does the rest)');
+  assert.strictEqual(
+    rep.asset.regionSlots.A,
+    'rm-ff0000-2-2',
+    'replace must carry slot assignments (ID stability does the rest)',
+  );
 }
 
 // #1707 — project load enforces import's tag allowlist, not only isHostile. The two payloads from the issue pass
@@ -206,13 +233,25 @@ assert.strictEqual(pooled.asset.category, 'fragments');
   const animateHref = '<a href="#x"><animate attributeName="href" values="java\tscript:alert(1)"/><circle r="1"/></a>';
   const setHref = '<a href="#x"><set attributeName="href" to="java\nscript:alert(1)"/><circle r="1"/></a>';
   for (const svg of [animateHref, setHref]) {
-    assert.strictEqual(sanitizeOverlay([{ id: 'user:evil', svg }]).length, 0, `load refuses: ${JSON.stringify(svg).slice(0, 40)}`);
+    assert.strictEqual(
+      sanitizeOverlay([{ id: 'user:evil', svg }]).length,
+      0,
+      `load refuses: ${JSON.stringify(svg).slice(0, 40)}`,
+    );
   }
   for (const tag of ['use', 'foreignobject', 'style', 'filter', 'mask', 'image']) {
-    assert.strictEqual(sanitizeOverlay([{ id: 'user:t', svg: `<${tag}></${tag}><path d="M0 0"/>` }]).length, 0, `load refuses <${tag}>`);
+    assert.strictEqual(
+      sanitizeOverlay([{ id: 'user:t', svg: `<${tag}></${tag}><path d="M0 0"/>` }]).length,
+      0,
+      `load refuses <${tag}>`,
+    );
   }
   // what import itself produces still loads
-  const fine = ingestIntoOverlay('<svg viewBox="0 0 400 400"><g><path d="M0 0 L10 10"/><circle r="2"/></g></svg>', [], 'fine');
+  const fine = ingestIntoOverlay(
+    '<svg viewBox="0 0 400 400"><g><path d="M0 0 L10 10"/><circle r="2"/></g></svg>',
+    [],
+    'fine',
+  );
   assert.ok(fine.ok);
   assert.strictEqual(sanitizeOverlay(fine.overlay).length, 1, 'an imported asset survives the load check');
   // a duplicated canon <text> stamp (kept raw when re-ingest refuses <text>) survives a save/load round trip
@@ -220,7 +259,11 @@ assert.strictEqual(pooled.asset.category, 'fragments');
   assert.ok(stamp, 'canon still ships a <text> stamp');
   const dup = duplicateIntoOverlay(stamp, []);
   assert.ok(dup.ok);
-  assert.strictEqual(sanitizeOverlay(JSON.parse(JSON.stringify(dup.overlay))).length, 1, 'a duplicated <text> stamp is not dropped on load');
+  assert.strictEqual(
+    sanitizeOverlay(JSON.parse(JSON.stringify(dup.overlay))).length,
+    1,
+    'a duplicated <text> stamp is not dropped on load',
+  );
 }
 
 console.log('overlay.selfcheck: OK');

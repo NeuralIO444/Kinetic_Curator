@@ -32,7 +32,9 @@ const ACCENT_CSS = /var\(--accent[^)]*\)/g;
 
 /** The same canonical SVG the browser rasterizes (regionRaster.js canonicalSvg). */
 export function canonicalSvg(svg) {
-  const body = String(svg || '').replace(INK_CSS, '#000000').replace(ACCENT_CSS, '#ff2d95');
+  const body = String(svg || '')
+    .replace(INK_CSS, '#000000')
+    .replace(ACCENT_CSS, '#ff2d95');
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${BAKE_PX}" height="${BAKE_PX}">${body}</svg>`;
 }
 
@@ -45,15 +47,29 @@ export function capRegions(regions, cap = REGION_CAP) {
 
 /** Reading order: top-left first, by line then left to right. Pure. */
 export function readingOrder(regions) {
-  return regions.map((r, i) => ({ r, i })).sort((a, b) => {
-    const ra = Math.floor(a.r.cy / ROW_BAND); const rb = Math.floor(b.r.cy / ROW_BAND);
-    return ra - rb || a.r.cx - b.r.cx || a.i - b.i;
-  }).map((e) => e.r);
+  return regions
+    .map((r, i) => ({ r, i }))
+    .sort((a, b) => {
+      const ra = Math.floor(a.r.cy / ROW_BAND);
+      const rb = Math.floor(b.r.cy / ROW_BAND);
+      return ra - rb || a.r.cx - b.r.cx || a.i - b.i;
+    })
+    .map((e) => e.r);
 }
 
 /** The round-trip shape: numbers to 6 places (the renderer never sees more), the same keys normalizeRegions keeps. */
 const q = (v) => Math.round(v * 1e6) / 1e6;
-const clean = (r) => ({ id: r.id, color: r.color, cx: q(r.cx), cy: q(r.cy), x0: q(r.x0), y0: q(r.y0), x1: q(r.x1), y1: q(r.y1), area: r.area });
+const clean = (r) => ({
+  id: r.id,
+  color: r.color,
+  cx: q(r.cx),
+  cy: q(r.cy),
+  x0: q(r.x0),
+  y0: q(r.y0),
+  x1: q(r.x1),
+  y1: q(r.y1),
+  area: r.area,
+});
 
 /**
  * One asset's matte: { regions, regionSlots } or null when it rasterizes to nothing.
@@ -66,7 +82,9 @@ export function bakeAsset(svg) {
   if (!regions.length) return null;
   const ordered = readingOrder(capRegions(regions)).map(clean);
   const raw = {};
-  REGION_SLOTS.forEach((s, i) => { if (ordered[i]) raw[s] = ordered[i].id; });
+  REGION_SLOTS.forEach((s, i) => {
+    if (ordered[i]) raw[s] = ordered[i].id;
+  });
   return { regions: ordered, regionSlots: normalizeRegionSlots(raw) }; // the validator's own shape: A..D, empty = null
 }
 
@@ -114,15 +132,22 @@ export function renderReport(baked, assets) {
     assignedRegions += r.assigned;
     const cat = catOf.get(r.id) || '?';
     famAssign[cat] = famAssign[cat] || { assets: 0, regions: 0 };
-    famAssign[cat].assets += 1; famAssign[cat].regions += r.assigned;
+    famAssign[cat].assets += 1;
+    famAssign[cat].regions += r.assigned;
   }
-  const famLine = Object.keys(famAssign).sort().map((c) => `${c}: ${famAssign[c].assets} assets / ${famAssign[c].regions} regions`).join(', ');
+  const famLine = Object.keys(famAssign)
+    .sort()
+    .map((c) => `${c}: ${famAssign[c].assets} assets / ${famAssign[c].regions} regions`)
+    .join(', ');
   const lines = [
     '# Region mattes: bake report (#1432)',
     '',
     `Assets in the library: ${total}. With regions: ${rows.length}. Without (rasterize to nothing): ${total - rows.length}.`,
     `Region cap: ${REGION_CAP}. Regions in total: ${rows.reduce((s, r) => s + r.n, 0)}.`,
-    `Count histogram (regions per asset: assets): ${Object.keys(hist).sort((a, b) => a - b).map((k) => `${k}: ${hist[k]}`).join(', ')}.`,
+    `Count histogram (regions per asset: assets): ${Object.keys(hist)
+      .sort((a, b) => a - b)
+      .map((k) => `${k}: ${hist[k]}`)
+      .join(', ')}.`,
     `Summed region bbox area (fractions of the 100-unit box): ${rows.reduce((s, r) => s + r.bbox, 0).toFixed(3)}.`,
     `Family-default region kinemes (#1434): ${assignedRegions} regions assigned across ${rows.filter((r) => r.assigned).length} assets (${famLine}).`,
     '',

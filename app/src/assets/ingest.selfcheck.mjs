@@ -79,19 +79,16 @@ assert.strictEqual(badvb.asset.svg, '<path d="M0 0L1 1"/>');
 // CSS conversion: Illustrator Internal-CSS classes become presentation attributes
 const css = ingestSvg(
   '<svg viewBox="0 0 100 100"><style>.st0{fill:none;stroke:#000000;stroke-width:12;}</style><path class="st0" d="M0 0L10 10"/></svg>',
-  { id: 'css' }
+  { id: 'css' },
 );
 assert.strictEqual(css.ok, true);
 assert.ok(!css.asset.svg.includes('<style'), 'style block removed');
-assert.strictEqual(
-  css.asset.svg,
-  '<path class="st0" d="M0 0L10 10" fill="none" stroke="#000000" stroke-width="12"/>'
-);
+assert.strictEqual(css.asset.svg, '<path class="st0" d="M0 0L10 10" fill="none" stroke="#000000" stroke-width="12"/>');
 
 // CSS conversion: attribute already on the element wins over the class
 const css2 = ingestSvg(
   '<svg><style>.st0{fill:red;stroke:blue;}</style><path class="st0" fill="green" d="M0 0"/></svg>',
-  { id: 'css2' }
+  { id: 'css2' },
 );
 assert.strictEqual(css2.ok, true);
 assert.ok(css2.asset.svg.includes('fill="green"'));
@@ -99,19 +96,17 @@ assert.ok(css2.asset.svg.includes('stroke="blue"'));
 assert.ok(!css2.asset.svg.includes('fill="red"'));
 
 // CSS conversion: fancy stylesheet falls back to stripping (yesterday's behavior)
-const css3 = ingestSvg(
-  '<svg><style>@media screen{.st0{fill:red;}}</style><path class="st0" d="M0 0"/></svg>',
-  { id: 'css3' }
-);
+const css3 = ingestSvg('<svg><style>@media screen{.st0{fill:red;}}</style><path class="st0" d="M0 0"/></svg>', {
+  id: 'css3',
+});
 assert.strictEqual(css3.ok, true);
 assert.ok(!css3.asset.svg.includes('style'));
 assert.ok(!css3.asset.svg.includes('fill="red"'));
 
 // CSS conversion: unsafe values never become attributes
-const css4 = ingestSvg(
-  '<svg><style>.st0{fill:url(https://evil.test/x);}</style><path class="st0" d="M0 0"/></svg>',
-  { id: 'css4' }
-);
+const css4 = ingestSvg('<svg><style>.st0{fill:url(https://evil.test/x);}</style><path class="st0" d="M0 0"/></svg>', {
+  id: 'css4',
+});
 assert.strictEqual(css4.ok, true);
 assert.ok(!css4.asset.svg.includes('url('));
 

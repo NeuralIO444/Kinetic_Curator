@@ -24,7 +24,12 @@ export const TURNING = Object.freeze(['SPIN', 'ROCK']);
 export const BOB_TILES = 0.1;
 
 const TAU = Math.PI * 2;
-const hashU32 = (a, b) => { let h = (a ^ Math.imul(b + 0x9e3779b9, 0x85ebca6b)) >>> 0; h = Math.imul(h ^ (h >>> 16), 0x45d9f3b); h = Math.imul(h ^ (h >>> 16), 0x45d9f3b); return (h ^ (h >>> 16)) >>> 0; };
+const hashU32 = (a, b) => {
+  let h = (a ^ Math.imul(b + 0x9e3779b9, 0x85ebca6b)) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b);
+  return (h ^ (h >>> 16)) >>> 0;
+};
 const unit = (a, b) => hashU32(a, b) / 4294967296;
 const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 
@@ -43,12 +48,17 @@ export function pickMovers(seed, kin, movers, candidates) {
   const fixed = KIND_NAMES.includes(kin) ? kin : null;
   const able = candidates.filter((c) => !fixed || !TURNING.includes(fixed) || c.turns);
   if (!able.length) return out;
-  const ranked = able.map((c) => ({ c, r: unit(seed >>> 0, 0x7e10 + c.at) })).sort((x, y) => x.r - y.r || x.c.at - y.c.at);
+  const ranked = able
+    .map((c) => ({ c, r: unit(seed >>> 0, 0x7e10 + c.at) }))
+    .sort((x, y) => x.r - y.r || x.c.at - y.c.at);
   const n = Math.min(able.length, Math.max(1, Math.ceil(share * able.length)));
   for (let k = 0; k < n; k++) {
     const { c } = ranked[k];
-    const pool = fixed ? [fixed] : (c.turns ? KIND_NAMES : KIND_NAMES.filter((x) => !TURNING.includes(x)));
-    out.set(c.at, { kind: pool[Math.floor(unit(seed >>> 0, 0x51b0 + c.at) * pool.length)], phase: unit(seed >>> 0, 0x9a5e + c.at) });
+    const pool = fixed ? [fixed] : c.turns ? KIND_NAMES : KIND_NAMES.filter((x) => !TURNING.includes(x));
+    out.set(c.at, {
+      kind: pool[Math.floor(unit(seed >>> 0, 0x51b0 + c.at) * pool.length)],
+      phase: unit(seed >>> 0, 0x9a5e + c.at),
+    });
   }
   return out;
 }
@@ -65,12 +75,18 @@ export function elementXform(mv, drift, t) {
   const ph = (((time / k.period + mv.phase) % 1) + 1) % 1;
   const wav = Math.sin(ph * TAU);
   switch (mv.kind) {
-    case 'SPIN': return { a: ph * TAU, s: 1, vis: true, dy: 0 };
-    case 'ROCK': return { a: ((k.amp * Math.PI) / 180) * d * wav, s: 1, vis: true, dy: 0 };
-    case 'PULSE': return { a: 0, s: 1 + k.amp * d * wav, vis: true, dy: 0 };
-    case 'BLINK': return { a: 0, s: 1, vis: ph < k.amp, dy: 0 };
-    case 'BOB': return { a: 0, s: 1, vis: true, dy: BOB_TILES * d * wav };
-    default: return REST;
+    case 'SPIN':
+      return { a: ph * TAU, s: 1, vis: true, dy: 0 };
+    case 'ROCK':
+      return { a: ((k.amp * Math.PI) / 180) * d * wav, s: 1, vis: true, dy: 0 };
+    case 'PULSE':
+      return { a: 0, s: 1 + k.amp * d * wav, vis: true, dy: 0 };
+    case 'BLINK':
+      return { a: 0, s: 1, vis: ph < k.amp, dy: 0 };
+    case 'BOB':
+      return { a: 0, s: 1, vis: true, dy: BOB_TILES * d * wav };
+    default:
+      return REST;
   }
 }
 

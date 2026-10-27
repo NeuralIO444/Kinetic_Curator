@@ -34,7 +34,8 @@ export function nextBarMs(loopMs, bpm) {
 }
 
 /** BEAT is running when a BPM is set and the loop clock has been observed (0 = not yet). */
-export const beatRunning = (bpm, loopMs) => bpm != null && Number.isFinite(Number(bpm)) && Number.isFinite(loopMs) && loopMs > 0;
+export const beatRunning = (bpm, loopMs) =>
+  bpm != null && Number.isFinite(Number(bpm)) && Number.isFinite(loopMs) && loopMs > 0;
 
 /** A fresh gate: nothing pending. */
 export const createShuffleGate = () => Object.freeze({ pendingAt: null, bpm: null });

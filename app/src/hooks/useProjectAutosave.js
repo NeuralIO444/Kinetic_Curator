@@ -2,11 +2,7 @@
 import { useEffect, useRef } from 'react';
 import { useStore } from '../state/store.js';
 import { Events, emit } from '../composition/eventBus.js';
-import {
-  serializeProject,
-  writePipelineAutosave,
-  readPipelineAutosave,
-} from '../state/projectDocument.js';
+import { serializeProject, writePipelineAutosave, readPipelineAutosave } from '../state/projectDocument.js';
 import { decideBoot } from '../state/startupBoot.mjs';
 import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
 import { recipeToProjectDoc } from '../state/recipes.js';
@@ -90,9 +86,7 @@ function bootFromHash() {
   st.applyProject({ ...recipeToProjectDoc(recipe), paletteOverrides: recipe.paletteOverrides });
   const fb = describePaletteFallback(recipe.paletteId, st.userPalettes);
   st.setBootNotice(
-    fb
-      ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"`
-      : 'Opened shared scene from link',
+    fb ? `Opened from link · palette "${fb.requested}" not here — using "${fb.used}"` : 'Opened shared scene from link',
   );
   try {
     sessionStorage.setItem(RESTORED_FLAG, '1');
@@ -188,7 +182,10 @@ export function useProjectAutosave() {
     // One writer, used by the debounce, the max-wait and the flush on hide/close.
     const doWrite = () => {
       firstChangeAt.current = null;
-      if (timer.current) { clearTimeout(timer.current); timer.current = null; }
+      if (timer.current) {
+        clearTimeout(timer.current);
+        timer.current = null;
+      }
       const res = writePipelineAutosave(serializeProject(useStore.getState()));
       const store = useStore.getState();
       // Do not clear a quarantine flag on a later successful write: the
@@ -200,8 +197,12 @@ export function useProjectAutosave() {
       }
     };
     // A pending change is written NOW when the page is hidden or closing: the debounce would otherwise never fire.
-    const flush = () => { if (firstChangeAt.current != null || timer.current) doWrite(); };
-    const onVisibility = () => { if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush(); };
+    const flush = () => {
+      if (firstChangeAt.current != null || timer.current) doWrite();
+    };
+    const onVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') flush();
+    };
 
     const unsub = useStore.subscribe((state, prev) => {
       // every field the document saves (state/projectWatch.mjs), not a hand-kept dozen
