@@ -74,11 +74,13 @@ export function parseRes(spec) {
     [w, h] = RES_SHORTHAND[s];
   } else if (/x/.test(s)) {
     const [ws, hs] = s.split('x');
-    w = parseInt(ws, 10); h = parseInt(hs, 10);
+    w = parseInt(ws, 10);
+    h = parseInt(hs, 10);
   } else {
     const mul = Number(s);
     if (!Number.isFinite(mul) || mul <= 0) throw new Error(`bad --res ${spec}`);
-    w = Math.round(1000 * mul); h = Math.round(700 * mul);
+    w = Math.round(1000 * mul);
+    h = Math.round(700 * mul);
   }
   if (!Number.isFinite(w) || !Number.isFinite(h) || w < 1 || h < 1) {
     throw new Error(`bad --res ${spec}: expected WxH (e.g. 3840x2160), 4k, 8k, or a scale factor`);
@@ -87,16 +89,26 @@ export function parseRes(spec) {
     throw new Error(`--res ${w}x${h} exceeds the ${MAX_DIM}px per-side limit`);
   }
   if (w * h > MAX_PIXELS) {
-    throw new Error(`--res ${w}x${h} is ${(w * h / 1e6).toFixed(1)}MP, over the ${(MAX_PIXELS / 1e6).toFixed(0)}MP limit`);
+    throw new Error(
+      `--res ${w}x${h} is ${((w * h) / 1e6).toFixed(1)}MP, over the ${(MAX_PIXELS / 1e6).toFixed(0)}MP limit`,
+    );
   }
   return { w, h };
 }
 
 function parseArgs(argv) {
   const out = {
-    project: null, out: null, res: '1', seed: null, seeds: null,
-    uncapped: false, background: null, ramps: [], motion: 'none',
-    progress: 0, time: 0,
+    project: null,
+    out: null,
+    res: '1',
+    seed: null,
+    seeds: null,
+    uncapped: false,
+    background: null,
+    ramps: [],
+    motion: 'none',
+    progress: 0,
+    time: 0,
   };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -116,8 +128,7 @@ function parseArgs(argv) {
         return n | 0;
       });
       if (!out.seeds.length) throw new Error('--seeds needs at least one seed');
-    }
-    else if (a === '--uncapped') out.uncapped = true;
+    } else if (a === '--uncapped') out.uncapped = true;
     else if (a === '--background') out.background = argv[++i];
     else if (a === '--ramp') out.ramps.push(argv[++i]);
     else if (a === '--motion') out.motion = argv[++i];
@@ -153,8 +164,15 @@ function parseRamps(list) {
  * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
  */
 export async function renderExport({
-  doc, seed = null, width, height,
-  uncapped = false, background = null, ramp = null, motion = 'none', progress = 0,
+  doc,
+  seed = null,
+  width,
+  height,
+  uncapped = false,
+  background = null,
+  ramp = null,
+  motion = 'none',
+  progress = 0,
 } = {}) {
   if (!doc || typeof doc !== 'object') throw new Error('[export] doc required');
   if (!Number.isFinite(width) || !Number.isFinite(height) || width < 1 || height < 1) {
@@ -182,9 +200,7 @@ function outPathForSeed(template, seed) {
   const hex = (seed >>> 0).toString(16).padStart(8, '0');
   if (template.includes('{seed}')) return template.replaceAll('{seed}', hex);
   const dot = template.lastIndexOf('.');
-  return dot > 0
-    ? `${template.slice(0, dot)}-${hex}${template.slice(dot)}`
-    : `${template}-${hex}`;
+  return dot > 0 ? `${template.slice(0, dot)}-${hex}${template.slice(dot)}` : `${template}-${hex}`;
 }
 
 async function main(argv) {
@@ -232,9 +248,15 @@ async function main(argv) {
     for (const seed of seeds) {
       const outPath = args.seeds ? outPathForSeed(args.out, seed) : args.out;
       const { pixels, width, height } = await renderExport({
-        doc, seed, width: size.w, height: size.h,
-        uncapped: args.uncapped, background: args.background,
-        ramp, motion: args.motion, progress: args.progress,
+        doc,
+        seed,
+        width: size.w,
+        height: size.h,
+        uncapped: args.uncapped,
+        background: args.background,
+        ramp,
+        motion: args.motion,
+        progress: args.progress,
       });
       await writePngFile(outPath, pixels, width, height);
       console.log(outPath);
@@ -243,8 +265,8 @@ async function main(argv) {
     if (isBrowserMissingError(e)) {
       console.error(
         '[exportStill] refusing: headless Chromium is not installed.\n' +
-        '  FINAL export runs on the GPU via headless Chromium (#191).\n' +
-        '  Install it with:  cd app && npx playwright install chromium'
+          '  FINAL export runs on the GPU via headless Chromium (#191).\n' +
+          '  Install it with:  cd app && npx playwright install chromium',
       );
       process.exitCode = 3;
       return;

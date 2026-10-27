@@ -23,7 +23,19 @@ const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
  */
 export function creatureGround({ dish, layers, layerId, layoutParams, getPalette, W, H, tSec, seed }) {
   const lp = layoutParams || {};
-  const a = groundArgs({ dish, layers, layerId, lean: lp.groundLean, nudge: lp.groundNudge, snap: lp.groundSnap, getPalette, W, H, tSec, seed });
+  const a = groundArgs({
+    dish,
+    layers,
+    layerId,
+    lean: lp.groundLean,
+    nudge: lp.groundNudge,
+    snap: lp.groundSnap,
+    getPalette,
+    W,
+    H,
+    tSec,
+    seed,
+  });
   return a.dish ? { ...a, shadow: lp.groundShadow } : null;
 }
 
@@ -46,7 +58,7 @@ export function groundArgs({ dish, layers, layerId, lean, nudge = 0, snap = 0, g
   const below = nearestPatternBelow(layers, layerId);
   if (!below) return NONE;
   const ground = patternGround(below.pattern, getPalette(), W, H);
-  dish.seed = (seed >>> 0) || 0;
+  dish.seed = seed >>> 0 || 0;
   dish.ground = (x, y) => ground.at(x, y, tSec);
   dish.groundCell = (x, y) => ground.cell(x, y, tSec);
   dish.groundRoles = (x, y) => ground.roles(x, y, tSec);

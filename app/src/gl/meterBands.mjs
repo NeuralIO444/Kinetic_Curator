@@ -5,15 +5,17 @@
 // meter can be honest without changing the instrument's feel.
 //
 // Log-spaced edges in Hz. Pure.
-export const METER_BANDS = Object.freeze([
-  { id: 'sub', label: 'SUB', lo: 20, hi: 60 },
-  { id: 'bass', label: 'BASS', lo: 60, hi: 250 },
-  { id: 'mud', label: 'MUD', lo: 250, hi: 500 },
-  { id: 'mids', label: 'MIDS', lo: 500, hi: 2000 },
-  { id: 'edge', label: 'EDGE', lo: 2000, hi: 4000 },
-  { id: 'presence', label: 'PRES', lo: 4000, hi: 6000 },
-  { id: 'air', label: 'AIR', lo: 6000, hi: 20000 },
-].map(Object.freeze));
+export const METER_BANDS = Object.freeze(
+  [
+    { id: 'sub', label: 'SUB', lo: 20, hi: 60 },
+    { id: 'bass', label: 'BASS', lo: 60, hi: 250 },
+    { id: 'mud', label: 'MUD', lo: 250, hi: 500 },
+    { id: 'mids', label: 'MIDS', lo: 500, hi: 2000 },
+    { id: 'edge', label: 'EDGE', lo: 2000, hi: 4000 },
+    { id: 'presence', label: 'PRES', lo: 4000, hi: 6000 },
+    { id: 'air', label: 'AIR', lo: 6000, hi: 20000 },
+  ].map(Object.freeze),
+);
 
 /** FFT size of the meter analyser: ~23 Hz bins at 48 kHz, enough to split SUB from BASS. */
 export const METER_FFT_SIZE = 2048;

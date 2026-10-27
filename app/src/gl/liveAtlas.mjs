@@ -41,13 +41,9 @@ export const comboKey = (asset) => asset;
  * stops bake as the mask primaries and the shader resolves them to the live
  * palette per frame. Assets without the field are untouched.
  */
-const withGradient = (svg, gradient) =>
-  applyGradient(svg, gradient, { ink: '#ff0000', accent: '#00ff00' });
+const withGradient = (svg, gradient) => applyGradient(svg, gradient, { ink: '#ff0000', accent: '#00ff00' });
 
-const subColors = (svg, ink, accent) =>
-  svg
-    .replace(/var\(--ink[^)]*\)/g, ink)
-    .replace(/var\(--accent[^)]*\)/g, accent);
+const subColors = (svg, ink, accent) => svg.replace(/var\(--ink[^)]*\)/g, ink).replace(/var\(--accent[^)]*\)/g, accent);
 
 function rasterizeSvg(svgString, w, h) {
   return new Promise((resolve, reject) => {
@@ -86,7 +82,12 @@ async function bakeCombo(assetId, svgById, gradientById) {
   const n = frames ? frames.length : 1;
   const widthPx = LIVE_CELL_PX * n;
   const body = frames
-    ? frames.map((f, i) => `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(withGradient(f, gradient), '#ff0000', '#00ff00')}</g>`).join('')
+    ? frames
+        .map(
+          (f, i) =>
+            `<g transform="translate(${(x1 - x0) * i} 0)">${subColors(withGradient(f, gradient), '#ff0000', '#00ff00')}</g>`,
+        )
+        .join('')
     : subColors(withGradient(src, gradient), '#ff0000', '#00ff00');
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="${widthPx}" height="${LIVE_CELL_PX}" ` +
@@ -96,7 +97,10 @@ async function bakeCombo(assetId, svgById, gradientById) {
   const img = await rasterizeSvg(svg, widthPx, LIVE_CELL_PX);
   const d = img.data;
   const out = new Uint8Array(widthPx * LIVE_CELL_PX * 4);
-  let bx0 = LIVE_CELL_PX, by0 = LIVE_CELL_PX, bx1 = -1, by1 = -1;
+  let bx0 = LIVE_CELL_PX,
+    by0 = LIVE_CELL_PX,
+    bx1 = -1,
+    by1 = -1;
   for (let i = 0, np = widthPx * LIVE_CELL_PX; i < np; i++) {
     const o = i * 4;
     const a = d[o + 3];
@@ -108,7 +112,8 @@ async function bakeCombo(assetId, svgById, gradientById) {
     if (a > ALPHA_CUTOFF) {
       // Strip x folds back into the frame-local cell (ink stays in
       // single-asset units, the union across frames — mirrors atlas.mjs).
-      const x = (i % widthPx) % LIVE_CELL_PX, y = (i / widthPx) | 0;
+      const x = (i % widthPx) % LIVE_CELL_PX,
+        y = (i / widthPx) | 0;
       if (x < bx0) bx0 = x;
       if (x > bx1) bx1 = x;
       if (y < by0) by0 = y;
@@ -116,9 +121,10 @@ async function bakeCombo(assetId, svgById, gradientById) {
     }
   }
   const unitsPerPx = (x1 - x0) / LIVE_CELL_PX;
-  const inkBox = bx1 >= 0
-    ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
-    : null;
+  const inkBox =
+    bx1 >= 0
+      ? [x0 + bx0 * unitsPerPx, y0 + by0 * unitsPerPx, x0 + (bx1 + 1) * unitsPerPx, y0 + (by1 + 1) * unitsPerPx]
+      : null;
   return { data: out, ink: inkBox, widthPx };
 }
 
@@ -127,28 +133,43 @@ async function bakeCombo(assetId, svgById, gradientById) {
  *  from the base pixels and levels 1..n from this array). */
 function buildMipmaps(pixels, width, height) {
   const levels = [{ pixels, width, height }];
-  let src = pixels, w = width, h = height;
+  let src = pixels,
+    w = width,
+    h = height;
   while (w > 1 || h > 1) {
-    const nw = Math.max(1, w >> 1), nh = Math.max(1, h >> 1);
+    const nw = Math.max(1, w >> 1),
+      nh = Math.max(1, h >> 1);
     const dst = new Uint8Array(nw * nh * 4);
     for (let y = 0; y < nh; y++) {
       for (let x = 0; x < nw; x++) {
         const o = (y * nw + x) * 4;
-        let r = 0, g = 0, b = 0, a = 0, n = 0;
+        let r = 0,
+          g = 0,
+          b = 0,
+          a = 0,
+          n = 0;
         for (let dy = 0; dy < 2; dy++) {
           for (let dx = 0; dx < 2; dx++) {
-            const sx = Math.min(w - 1, x * 2 + dx), sy = Math.min(h - 1, y * 2 + dy);
+            const sx = Math.min(w - 1, x * 2 + dx),
+              sy = Math.min(h - 1, y * 2 + dy);
             const so = (sy * w + sx) * 4;
-            r += src[so]; g += src[so + 1]; b += src[so + 2]; a += src[so + 3];
+            r += src[so];
+            g += src[so + 1];
+            b += src[so + 2];
+            a += src[so + 3];
             n++;
           }
         }
-        dst[o] = Math.round(r / n); dst[o + 1] = Math.round(g / n);
-        dst[o + 2] = Math.round(b / n); dst[o + 3] = Math.round(a / n);
+        dst[o] = Math.round(r / n);
+        dst[o + 1] = Math.round(g / n);
+        dst[o + 2] = Math.round(b / n);
+        dst[o + 3] = Math.round(a / n);
       }
     }
     levels.push({ pixels: dst, width: nw, height: nh });
-    src = dst; w = nw; h = nh;
+    src = dst;
+    w = nw;
+    h = nh;
   }
   return levels;
 }
@@ -172,8 +193,7 @@ async function regionCellsLive(src, records, wholeData) {
   const img = await rasterizeSvg(canonicalSvg(src), 200, 200);
   const det = detectRegions(img.data, 200, 200, { wantMap: true });
   const part = partitionFromDetection(det.regions, det.idMap, 200, 200, records);
-  const ownerAt = (x, y) =>
-    x >= 100 && x < 300 && y >= 100 && y < 300 ? part.owner[(y - 100) * 200 + (x - 100)] : -1;
+  const ownerAt = (x, y) => (x >= 100 && x < 300 && y >= 100 && y < 300 ? part.owner[(y - 100) * 200 + (x - 100)] : -1);
   const out = [];
   {
     const data = new Uint8Array(LIVE_CELL_PX * LIVE_CELL_PX * 4);
@@ -222,7 +242,10 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
   const seen = new Set();
   for (const c of combos) {
     const k = comboKey(c.asset);
-    if (!seen.has(k)) { seen.add(k); uniq.push({ ...c, key: k }); }
+    if (!seen.has(k)) {
+      seen.add(k);
+      uniq.push({ ...c, key: k });
+    }
   }
   const stride = LIVE_CELL_PX + LIVE_GUTTER;
   // #1431 — slot packing, mirroring atlas.mjs: a strip entry occupies
@@ -249,9 +272,13 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
   const extrasTotal = regioned.reduce((s, r) => s + (r ? r.length + 1 : 0), 0);
   const cols = Math.max(1, Math.ceil(Math.sqrt(totalSlots + extrasTotal)), maxSlots);
   const place = [];
-  let col = 0, row = 0;
+  let col = 0,
+    row = 0;
   for (let i = 0; i < uniq.length; i++) {
-    if (col + slots[i] > cols) { row++; col = 0; }
+    if (col + slots[i] > cols) {
+      row++;
+      col = 0;
+    }
     place.push({ cx: col * stride, cy: row * stride });
     col += slots[i];
   }
@@ -259,7 +286,10 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
   for (const records of regioned) {
     if (!records) continue;
     for (let n = 0; n < records.length + 1; n++) {
-      if (col + 1 > cols) { row++; col = 0; }
+      if (col + 1 > cols) {
+        row++;
+        col = 0;
+      }
       extraPlace.push({ cx: col * stride, cy: row * stride });
       col += 1;
     }
@@ -270,8 +300,10 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
   const cells = new Map();
   const cellRect = (cx, cy, sub) => ({
     // Half-texel inset: the shader quad spans texel centers.
-    u0: (cx + sub.ox + 0.5) / width, v0: (cy + sub.oy + 0.5) / height,
-    u1: (cx + sub.ox + sub.w - 0.5) / width, v1: (cy + sub.oy + sub.h - 0.5) / height,
+    u0: (cx + sub.ox + 0.5) / width,
+    v0: (cy + sub.oy + 0.5) / height,
+    u1: (cx + sub.ox + sub.w - 0.5) / width,
+    v1: (cy + sub.oy + sub.h - 0.5) / height,
   });
   // Rasterize sequentially: parallel Image decodes thrash the raster pool
   const bakedData = [];
@@ -281,10 +313,7 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
     bakedData.push(data);
     const { cx, cy } = place[i];
     for (let y = 0; y < LIVE_CELL_PX; y++) {
-      pixels.set(
-        data.subarray(y * widthPx * 4, (y + 1) * widthPx * 4),
-        ((cy + y) * width + cx) * 4,
-      );
+      pixels.set(data.subarray(y * widthPx * 4, (y + 1) * widthPx * 4), ((cy + y) * width + cx) * 4);
     }
     cells.set(c.key, { ...cellRect(cx, cy, { ox: 0, oy: 0, w: widthPx, h: LIVE_CELL_PX }), ink });
   }
@@ -297,10 +326,7 @@ export async function bakeLiveAtlas(combos, svgById, gradientById = null, region
     for (const e of extras) {
       const { cx, cy } = extraPlace[xp++];
       for (let y = 0; y < LIVE_CELL_PX; y++) {
-        pixels.set(
-          e.data.subarray(y * LIVE_CELL_PX * 4, (y + 1) * LIVE_CELL_PX * 4),
-          ((cy + y) * width + cx) * 4,
-        );
+        pixels.set(e.data.subarray(y * LIVE_CELL_PX * 4, (y + 1) * LIVE_CELL_PX * 4), ((cy + y) * width + cx) * 4);
       }
       cells.set(uniq[i].key + e.suffix, {
         ...cellRect(cx, cy, e.uvSub || { ox: 0, oy: 0, w: LIVE_CELL_PX, h: LIVE_CELL_PX }),

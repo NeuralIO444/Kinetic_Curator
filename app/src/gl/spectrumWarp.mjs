@@ -57,7 +57,10 @@ const SNAP = 0.002; // the core's own silence snap: below this, with nothing com
 // (below 250 Hz), mids = the mids band (500..2000 Hz), treble = pres+air (from 4000 Hz).
 const inBand = (lo, hi) => {
   const out = [];
-  for (let i = 0; i < LOG_BINS; i++) { const f = logBinCentre(i); if (f >= lo && f < hi) out.push(i); }
+  for (let i = 0; i < LOG_BINS; i++) {
+    const f = logBinCentre(i);
+    if (f >= lo && f < hi) out.push(i);
+  }
   return out;
 };
 export const WARP_BASS_BINS = Object.freeze(inBand(0, 250));
@@ -65,9 +68,16 @@ export const WARP_MIDS_BINS = Object.freeze(inBand(500, 2000));
 export const WARP_TREBLE_BINS = Object.freeze(inBand(4000, Infinity));
 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
-const unit = (v) => { const n = Number(v); return Number.isFinite(n) ? clamp(n, 0, 1) : 0; };
+const unit = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) ? clamp(n, 0, 1) : 0;
+};
 const coef = (dtMs, tauMs) => 1 - Math.exp(-Math.max(0, dtMs) / tauMs); // the core's frame-rate-independent form
-const meanOver = (arr, bins) => { let s = 0; for (const i of bins) s += arr[i]; return bins.length ? s / bins.length : 0; };
+const meanOver = (arr, bins) => {
+  let s = 0;
+  for (const i of bins) s += arr[i];
+  return bins.length ? s / bins.length : 0;
+};
 
 /**
  * The warp amount a scene's FX strata declare: the largest feedbackWarp amount among visible FX layers,
@@ -122,7 +132,11 @@ export function createSpectrumWarp() {
     },
     reset() {
       att.fill(0);
-      warp.bassDev = 0; warp.attMids = 0; warp.attTreble = 0; warp.attAll = 0; warp.keep = WARP_KEEP_MIN;
+      warp.bassDev = 0;
+      warp.attMids = 0;
+      warp.attTreble = 0;
+      warp.attAll = 0;
+      warp.keep = WARP_KEEP_MIN;
     },
   };
 }
@@ -169,6 +183,9 @@ export function applySpectrumWarp(p, warp, amount) {
 // it is the governor's cut 1.45 (hooks/governorCuts.js) — after mark weather (1.4), before the creature
 // count (1.5): the issue's law, "sheds before body counts", with weather still dying first.
 registerCostTier('gl/spectrum-warp', {
-  tier: 1, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1490 spectral warp: per-bin attenuated spectrum driving the existing ACCUM fade/glow uniforms (zoom/spin/decay/prism/grain); no extra pass, no texture. CPU step measured 0.002–0.003 ms/step (sandbox node, per-step hrtime median-of-medians, timer-bound); shed by governor cut 1.45, before creature count (1.5).',
+  tier: 1,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1490 spectral warp: per-bin attenuated spectrum driving the existing ACCUM fade/glow uniforms (zoom/spin/decay/prism/grain); no extra pass, no texture. CPU step measured 0.002–0.003 ms/step (sandbox node, per-step hrtime median-of-medians, timer-bound); shed by governor cut 1.45, before creature count (1.5).',
 });

@@ -10,8 +10,16 @@ import { diffPixels, DEFAULT_POLICY } from './diff.mjs';
 import { parseProject } from '../../state/projectDocument.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
-const okAsync = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const okAsync = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('corpus: unique ids, valid policies, parseable docs', () => {
   const ids = CORPUS.map((c) => c.id);

@@ -23,8 +23,16 @@ import { resolveLayerMattes, RENDERER_PROGRAMS, hueRotateMatrix } from './render
 import { buildSceneContract, assertSceneContract, sanitizeMatte } from './sceneContract.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
-const okAsync = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const okAsync = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // --- Node: blend id mapping -------------------------------------------------
 
@@ -46,35 +54,39 @@ ok('sanitizeMatte: shape, defaults, and fail-closed nulls', () => {
   assert.equal(sanitizeMatte({}), null);
   assert.equal(sanitizeMatte({ sourceId: '' }), null);
   assert.equal(sanitizeMatte({ sourceId: 42 }), null);
-  assert.deepEqual(
-    sanitizeMatte({ sourceId: 'bg' }),
-    { sourceId: 'bg', mode: 'alpha', invert: false }
-  );
-  assert.deepEqual(
-    sanitizeMatte({ sourceId: 'bg', mode: 'luma', invert: 1 }),
-    { sourceId: 'bg', mode: 'luma', invert: true }
-  );
-  assert.deepEqual(
-    sanitizeMatte({ sourceId: 'bg', mode: 'bogus' }),
-    { sourceId: 'bg', mode: 'alpha', invert: false }
-  );
+  assert.deepEqual(sanitizeMatte({ sourceId: 'bg' }), { sourceId: 'bg', mode: 'alpha', invert: false });
+  assert.deepEqual(sanitizeMatte({ sourceId: 'bg', mode: 'luma', invert: 1 }), {
+    sourceId: 'bg',
+    mode: 'luma',
+    invert: true,
+  });
+  assert.deepEqual(sanitizeMatte({ sourceId: 'bg', mode: 'bogus' }), { sourceId: 'bg', mode: 'alpha', invert: false });
 });
 
 ok('buildSceneContract plumbs doc-layer matte onto content and fx layers', () => {
   const doc = {
-    seed: 1, quality: 'balanced',
+    seed: 1,
+    quality: 'balanced',
     layers: [
       { id: 'bg', type: 'content', layerBlendMode: 'normal', layerOpacity: 1 },
       {
-        id: 'top', type: 'content', layerBlendMode: 'screen', layerOpacity: 0.5,
+        id: 'top',
+        type: 'content',
+        layerBlendMode: 'screen',
+        layerOpacity: 0.5,
         matte: { sourceId: 'bg', mode: 'luma', invert: true },
       },
       { id: 'fx1', type: 'fx', layerOpacity: 0.9, matte: { sourceId: 'bg' }, effects: [] },
     ],
   };
   const rl = (id, extra = {}) => ({
-    id, layoutParams: {}, palette: {}, items: [],
-    layerBlendMode: 'normal', layerOpacity: 1, ...extra,
+    id,
+    layoutParams: {},
+    palette: {},
+    items: [],
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
+    ...extra,
   });
   const scene = buildSceneContract({
     doc,
@@ -131,8 +143,9 @@ ok('resolveLayerMattes: valid, self-cycle, 2-cycle, missing, fx source', () => {
   assert.deepEqual(m.get('g'), { sourceId: 'b', mode: 'alpha', invert: false }, 'fx layer matte is valid');
   assert.equal(m.get('h'), null, 'fx source fails closed');
   assert.deepEqual(
-    m.get('i'), { sourceId: 'j', mode: 'luma', invert: true },
-    'chained sources resolve to the immediate layer'
+    m.get('i'),
+    { sourceId: 'j', mode: 'luma', invert: true },
+    'chained sources resolve to the immediate layer',
   );
 });
 
@@ -172,7 +185,8 @@ ok('harness: every uniform each renderer shader declares is in its upload list',
 });
 
 // --- hueRotateMatrix (#262): the SVG feColorMatrix hue-rotation matrix ----
-const applyMat3 = (m, c) => [ // column-major mat3 * vec3
+const applyMat3 = (m, c) => [
+  // column-major mat3 * vec3
   m[0] * c[0] + m[3] * c[1] + m[6] * c[2],
   m[1] * c[0] + m[4] * c[1] + m[7] * c[2],
   m[2] * c[0] + m[5] * c[1] + m[8] * c[2],
@@ -189,12 +203,19 @@ ok('hueRotateMatrix: exact identity at 0 and 360', () => {
 ok('hueRotateMatrix: preserves gray and (approx) luminance; rotates hues', () => {
   // 120 degrees maps pure red onto the green column of the matrix.
   const got = applyMat3([...hueRotateMatrix(120)], [1, 0, 0]);
-  const want = [-0.3649634110, 0.4433416327, -0.3620619928]; // SVG feColorMatrix type="hueRotate" @120
+  const want = [-0.364963411, 0.4433416327, -0.3620619928]; // SVG feColorMatrix type="hueRotate" @120
   for (let i = 0; i < 3; i++) {
     assert.ok(Math.abs(got[i] - want[i]) < 1e-5, `120deg red channel ${i}: ${got[i]} vs ${want[i]}`);
   }
   assert.ok(got[1] > 0.4 && got[0] < 0 && got[2] < 0, 'red visibly shifts toward green');
-  const colors = [[1, 0, 0], [0, 1, 0], [0, 0, 1], [0.8, 0.2, 0.5], [0.1, 0.9, 0.3], [0.4, 0.4, 0.4]];
+  const colors = [
+    [1, 0, 0],
+    [0, 1, 0],
+    [0, 0, 1],
+    [0.8, 0.2, 0.5],
+    [0.1, 0.9, 0.3],
+    [0.4, 0.4, 0.4],
+  ];
   for (let deg = 0; deg < 360; deg += 15) {
     const m = [...hueRotateMatrix(deg)];
     for (const c of colors) {
@@ -229,7 +250,8 @@ function compositeRef(S, D, { opacity = 1, mask = null, maskMode = 0, maskInvert
   s = [s[0] * opacity, s[1] * opacity, s[2] * opacity, s[3] * opacity];
   const cs = unpre3([s[0], s[1], s[2]], s[3]);
   const cb = unpre3([D[0], D[1], D[2]], D[3]);
-  const as = s[3], ab = D[3];
+  const as = s[3],
+    ab = D[3];
   const ao = as + ab - as * ab;
   let co = [0, 0, 0];
   if (ao > 1e-6) {
@@ -252,13 +274,22 @@ async function runBrowserTests() {
   await okAsync('probe: alpha matte math matches the JS mirror (per-pixel masks)', async () => {
     const { page, close } = await openHarnessPage('/parity/compositeProbe.html');
     try {
-      const w = 2, h = 2;
+      const w = 2,
+        h = 2;
       const rep = (v) => [v, v, v, v].flat();
-      const src = rep([128, 0, 0, 128]);   // red @ 50%
-      const dst = rep([0, 128, 0, 128]);   // green @ 50%
+      const src = rep([128, 0, 0, 128]); // red @ 50%
+      const dst = rep([0, 128, 0, 128]); // green @ 50%
       const mask = [0, 0, 0, 64, 0, 0, 0, 128, 0, 0, 0, 192, 0, 0, 0, 255];
       const res = await page.evaluate((p) => window.__kcComposite(p), {
-        w, h, src, dst, mask, blend: 0, opacity: 1, maskMode: 0, maskInvert: false,
+        w,
+        h,
+        src,
+        dst,
+        mask,
+        blend: 0,
+        opacity: 1,
+        maskMode: 0,
+        maskInvert: false,
       });
       assert.equal(res.pixels.length, 16);
       const alphas = [64, 128, 192, 255];
@@ -268,27 +299,36 @@ async function runBrowserTests() {
         const exp = bytesOf(compositeRef(S, D, { mask: [0, 0, 0, alphas[i] / 255] }));
         const got = res.pixels.slice(i * 4, i * 4 + 4);
         for (let c = 0; c < 4; c++) {
-          assert.ok(
-            Math.abs(got[c] - exp[c]) <= 2,
-            `pixel ${i} ch ${c}: got ${got[c]}, expected ${exp[c]}`
-          );
+          assert.ok(Math.abs(got[c] - exp[c]) <= 2, `pixel ${i} ch ${c}: got ${got[c]}, expected ${exp[c]}`);
         }
       }
-    } finally { await close(); }
+    } finally {
+      await close();
+    }
   });
 
   await okAsync('probe: luma matte uses sRGB luminance; invert flips', async () => {
     const { page, close } = await openHarnessPage('/parity/compositeProbe.html');
     try {
-      const w = 2, h = 2;
+      const w = 2,
+        h = 2;
       const rep = (v) => [v, v, v, v].flat();
       const src = rep([128, 0, 0, 128]);
       const dst = rep([0, 128, 0, 128]);
       // Opaque gray masks: luma path must equal the alpha value v/255 here.
       const mask = [64, 64, 64, 255, 128, 128, 128, 255, 192, 192, 192, 255, 255, 255, 255, 255];
-      const run = (maskInvert) => page.evaluate((p) => window.__kcComposite(p), {
-        w, h, src, dst, mask, blend: 0, opacity: 1, maskMode: 1, maskInvert,
-      });
+      const run = (maskInvert) =>
+        page.evaluate((p) => window.__kcComposite(p), {
+          w,
+          h,
+          src,
+          dst,
+          mask,
+          blend: 0,
+          opacity: 1,
+          maskMode: 1,
+          maskInvert,
+        });
       const vals = [64, 128, 192, 255];
       for (const invert of [false, true]) {
         const res = await run(invert);
@@ -296,21 +336,33 @@ async function runBrowserTests() {
           const S = [128 / 255, 0, 0, 128 / 255];
           const D = [0, 128 / 255, 0, 128 / 255];
           const v = vals[i] / 255;
-          const exp = bytesOf(compositeRef(S, D, {
-            mask: [v, v, v, 1], maskMode: 1, maskInvert: invert,
-          }));
+          const exp = bytesOf(
+            compositeRef(S, D, {
+              mask: [v, v, v, 1],
+              maskMode: 1,
+              maskInvert: invert,
+            }),
+          );
           const got = res.pixels.slice(i * 4, i * 4 + 4);
           for (let c = 0; c < 4; c++) {
             assert.ok(
               Math.abs(got[c] - exp[c]) <= 2,
-              `invert=${invert} pixel ${i} ch ${c}: got ${got[c]}, expected ${exp[c]}`
+              `invert=${invert} pixel ${i} ch ${c}: got ${got[c]}, expected ${exp[c]}`,
             );
           }
         }
       }
       // No mask: control path is unchanged.
       const res = await page.evaluate((p) => window.__kcComposite(p), {
-        w, h, src, dst, mask: null, blend: 0, opacity: 1, maskMode: 0, maskInvert: false,
+        w,
+        h,
+        src,
+        dst,
+        mask: null,
+        blend: 0,
+        opacity: 1,
+        maskMode: 0,
+        maskInvert: false,
       });
       const S = [128 / 255, 0, 0, 128 / 255];
       const D = [0, 128 / 255, 0, 128 / 255];
@@ -321,7 +373,9 @@ async function runBrowserTests() {
           assert.ok(Math.abs(got[c] - exp[c]) <= 2, `no-mask pixel ${i} ch ${c}`);
         }
       }
-    } finally { await close(); }
+    } finally {
+      await close();
+    }
   });
 
   async function renderDoc(doc, width = 200) {
@@ -336,7 +390,8 @@ async function runBrowserTests() {
   const withMatte = (doc, layerId, matte) => {
     const d = JSON.parse(JSON.stringify(doc));
     const l = d.layers.find((x) => x.id === layerId);
-    if (matte) l.matte = matte; else delete l.matte;
+    if (matte) l.matte = matte;
+    else delete l.matte;
     return d;
   };
   const differ = (a, b) => {
@@ -392,8 +447,13 @@ async function runBrowserTests() {
     base.layers = base.layers.filter((l) => l.id !== 'top');
     base.layers.find((l) => l.id === 'fx1').layerOpacity = 1;
     base.layers.push({
-      id: 'fx2', name: 'FX2', type: 'fx', visible: true,
-      layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }],
+      id: 'fx2',
+      name: 'FX2',
+      type: 'fx',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      effects: [{ kind: 'invert', params: {} }],
     });
     const noFx = JSON.parse(JSON.stringify(base));
     noFx.layers = noFx.layers.filter((l) => l.type !== 'fx');
@@ -411,7 +471,7 @@ async function runBrowserTests() {
     assert.ok(fracBad(pxSingle, pxNone) > 0.5, 'sanity: a single invert must change most pixels');
     assert.ok(
       fracBad(pxDouble, pxNone) < 0.01,
-      `double invert must cancel to the unwrapped render, got ${(fracBad(pxDouble, pxNone) * 100).toFixed(2)}% bad pixels`
+      `double invert must cancel to the unwrapped render, got ${(fracBad(pxDouble, pxNone) * 100).toFixed(2)}% bad pixels`,
     );
   });
 

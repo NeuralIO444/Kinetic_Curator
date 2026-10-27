@@ -32,10 +32,7 @@
  *   capture. One instrument, one pipeline.
  */
 
-import {
-  QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS,
-  blendIdFor,
-} from './shaders.mjs';
+import { QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS, blendIdFor } from './shaders.mjs';
 import { RESOLVE_FS } from './resolveFs.mjs';
 import { bindResolveProbe } from './resolveBind.mjs';
 import { createUniformLocator } from './uniformLocations.mjs';
@@ -59,7 +56,12 @@ import { PLATE_GEO_DEFAULTS } from '../engine/plateBody.mjs'; // #1585 (Material
 import { WASH_PARAM_DEFAULTS } from '../engine/washBody.mjs'; // #1585
 import { STIPPLE_DOT_SCALE } from '../engine/stippleBody.mjs'; // #1585
 import { createCoalesceFinish } from './coalesceFinish.mjs'; // #1411 coalescence finish
-import { beginFrame as uploadMeterBeginFrame, noteUpload as uploadMeterNoteUpload, snapshot as uploadMeterSnapshot, reset as uploadMeterReset } from './uploadMeter.mjs';
+import {
+  beginFrame as uploadMeterBeginFrame,
+  noteUpload as uploadMeterNoteUpload,
+  snapshot as uploadMeterSnapshot,
+  reset as uploadMeterReset,
+} from './uploadMeter.mjs';
 
 // #533 PR1 — upload-byte meter (measure-only). renderer.mjs is the only file
 // allowed to change, so the debug handle attaches here rather than in
@@ -95,15 +97,16 @@ export function resolveLayerMattes(contract) {
         if (!src || src.type !== 'content') break; // missing / non-content → ignore
         seen.add(cur);
         const next = src.matte && typeof src.matte.sourceId === 'string' ? src.matte.sourceId : '';
-        if (!next) { valid = true; break; } // chain ends cleanly
+        if (!next) {
+          valid = true;
+          break;
+        } // chain ends cleanly
         cur = next; // walk on, cycle-checking
       }
     }
     out.set(
       layer.id,
-      valid
-        ? { sourceId: m.sourceId, mode: m.mode === 'luma' ? 'luma' : 'alpha', invert: !!m.invert }
-        : null
+      valid ? { sourceId: m.sourceId, mode: m.mode === 'luma' ? 'luma' : 'alpha', invert: !!m.invert } : null,
     );
   }
   return out;
@@ -168,14 +171,15 @@ function uploadTexture(gl, pixels, w, h, { mipmap = false, nearest = false, mipm
  * Identity (exactly) when deg is 0 or a multiple of 360.
  */
 export function hueRotateMatrix(deg) {
-  const rad = ((Number(deg) || 0) % 360) * Math.PI / 180;
-  const c = Math.cos(rad), s = Math.sin(rad);
+  const rad = (((Number(deg) || 0) % 360) * Math.PI) / 180;
+  const c = Math.cos(rad),
+    s = Math.sin(rad);
   // Row-major SVG hueRotate matrix...
   const r00 = 0.213 + c * 0.787 - s * 0.213;
   const r01 = 0.715 - c * 0.715 - s * 0.715;
   const r02 = 0.072 - c * 0.072 + s * 0.928;
   const r10 = 0.213 - c * 0.213 + s * 0.143;
-  const r11 = 0.715 + c * 0.285 + s * 0.140;
+  const r11 = 0.715 + c * 0.285 + s * 0.14;
   const r12 = 0.072 - c * 0.072 - s * 0.283;
   const r20 = 0.213 - c * 0.213 - s * 0.787;
   const r21 = 0.715 - c * 0.715 + s * 0.715;
@@ -194,9 +198,14 @@ const hexToRgb = (hex) => {
   const cached = HEX_RGB_CACHE.get(hex);
   if (cached) return cached;
   const h = hex.replace('#', '');
-  const v = h.length <= 4
-    ? h.slice(0, 3).split('').map((c) => c + c).join('')
-    : h.slice(0, 6);
+  const v =
+    h.length <= 4
+      ? h
+          .slice(0, 3)
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h.slice(0, 6);
   const rgb = [0, 2, 4].map((i) => parseInt(v.slice(i, i + 2), 16) / 255);
   HEX_RGB_CACHE.set(hex, rgb);
   return rgb;
@@ -218,53 +227,154 @@ const hexToRgb = (hex) => {
  */
 export const RENDERER_PROGRAMS = [
   {
-    key: 'quad', name: 'quad', vs: QUAD_VS, fs: QUAD_FS,
-    vsFile: 'shaders.mjs:QUAD_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_smear', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_kineme', 'u_kinemeTime', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
-    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'structural renderer program (composite/present plumbing); never shed' },
+    key: 'quad',
+    name: 'quad',
+    vs: QUAD_VS,
+    fs: QUAD_FS,
+    vsFile: 'shaders.mjs:QUAD_VS',
+    fsFile: 'shaders.mjs:QUAD_FS',
+    uniforms: [
+      'u_canvas',
+      'u_atlas',
+      'u_smear',
+      'u_liveTint',
+      'u_sun',
+      'u_sunLight',
+      'u_ambient',
+      'u_sunMat',
+      'u_pool',
+      'u_kineme',
+      'u_kinemeTime',
+      'u_hands',
+      'u_spec',
+      'u_specA',
+      'u_specN',
+    ],
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
   },
   {
     // Phase 2 S2 — the wing-warp mesh program: MESH_VS places resolver-skinned vertices and fills the
     // quad varyings; the fragment stage is QUAD_FS itself, so a warped wing shades identically to a quad.
     // Structural like the quad program (tier 0); the warp FEATURE registers separately as engine/wing-warp.
-    key: 'mesh', name: 'mesh', vs: MESH_VS, fs: QUAD_FS,
-    vsFile: 'shaders.mjs:MESH_VS', fsFile: 'shaders.mjs:QUAD_FS',
-    uniforms: ['u_canvas', 'u_atlas', 'u_liveTint', 'u_sun', 'u_sunLight', 'u_ambient', 'u_sunMat', 'u_pool', 'u_hands', 'u_spec', 'u_specA', 'u_specN'],
-    cost: { tier: 0, memoryBytes: 49152, timeMs: 0.05,
-      notes: 'Phase 2 S2 wing warp draw: skinned wing meshes in list order; transient VBO (~48 KB at the 4-creature cap)' },
+    key: 'mesh',
+    name: 'mesh',
+    vs: MESH_VS,
+    fs: QUAD_FS,
+    vsFile: 'shaders.mjs:MESH_VS',
+    fsFile: 'shaders.mjs:QUAD_FS',
+    uniforms: [
+      'u_canvas',
+      'u_atlas',
+      'u_liveTint',
+      'u_sun',
+      'u_sunLight',
+      'u_ambient',
+      'u_sunMat',
+      'u_pool',
+      'u_hands',
+      'u_spec',
+      'u_specA',
+      'u_specN',
+    ],
+    cost: {
+      tier: 0,
+      memoryBytes: 49152,
+      timeMs: 0.05,
+      notes:
+        'Phase 2 S2 wing warp draw: skinned wing meshes in list order; transient VBO (~48 KB at the 4-creature cap)',
+    },
   },
   {
-    key: 'composite', name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS,
-    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COMPOSITE_FS',
-    uniforms: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn',
-      'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert',
-      'u_hueOn', 'u_hueMat'], // hueRotate (#262)
-    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'structural renderer program (composite/present plumbing); never shed' },
+    key: 'composite',
+    name: 'composite',
+    vs: FULL_VS,
+    fs: COMPOSITE_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'shaders.mjs:COMPOSITE_FS',
+    uniforms: [
+      'u_src',
+      'u_dst',
+      'u_blend',
+      'u_opacity',
+      'u_clip',
+      'u_clipOn',
+      'u_mask',
+      'u_maskOn',
+      'u_maskMode',
+      'u_maskInvert',
+      'u_hueOn',
+      'u_hueMat',
+    ], // hueRotate (#262)
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
   },
   {
-    key: 'resolve', name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS,
-    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'resolveFs.mjs:RESOLVE_FS',
-    uniforms: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave', 'u_fake', 'u_light', 'u_shape', 'u_present'],
-    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'final resolve: exposure + ACES + dither, one tap; structural, never shed (FXAA is its own governor cut, see renderer/resolve-fxaa)' },
+    key: 'resolve',
+    name: 'resolve',
+    vs: FULL_VS,
+    fs: RESOLVE_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'resolveFs.mjs:RESOLVE_FS',
+    uniforms: [
+      'u_src',
+      'u_aces',
+      'u_exposure',
+      'u_dither',
+      'u_fxaa',
+      'u_weave',
+      'u_fake',
+      'u_light',
+      'u_shape',
+      'u_present',
+    ],
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes:
+        'final resolve: exposure + ACES + dither, one tap; structural, never shed (FXAA is its own governor cut, see renderer/resolve-fxaa)',
+    },
   },
   {
-    key: 'copy', name: 'copy', vs: FULL_VS, fs: COPY_FS,
-    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:COPY_FS',
+    key: 'copy',
+    name: 'copy',
+    vs: FULL_VS,
+    fs: COPY_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'shaders.mjs:COPY_FS',
     uniforms: ['u_src'],
-    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'structural renderer program (composite/present plumbing); never shed' },
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
   },
   {
     // #309: presents the half-res ACCUM feedback pair at backing size
     // (manual bilinear upscale). Tier 0 structural plumbing, never shed.
-    key: 'upscale', name: 'upscale', vs: FULL_VS, fs: UPSCALE_FS,
-    vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:UPSCALE_FS',
+    key: 'upscale',
+    name: 'upscale',
+    vs: FULL_VS,
+    fs: UPSCALE_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'shaders.mjs:UPSCALE_FS',
     uniforms: ['u_src', 'u_srcSize'],
-    cost: { tier: 0, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3,
-      notes: 'structural renderer program (composite/present plumbing); never shed' },
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
   },
 ];
 
@@ -284,26 +394,35 @@ registerCostTier('gl/spectrum-marks', {
   tier: 2,
   memoryBytes: 256 * 4,
   timeMs: 0.05,
-  notes: '#1482 spectrum marks: vertex-shader lookup into a 256x4 R8 texture; off sends zeros and never enters the branch; shed after tier 1 (perfTier1 + PERF quality), like the contact shadow',
+  notes:
+    '#1482 spectrum marks: vertex-shader lookup into a 256x4 R8 texture; off sends zeros and never enters the branch; shed after tier 1 (perfTier1 + PERF quality), like the contact shadow',
 });
 registerCostTier('gl/sun', {
-  tier: 0, memoryBytes: 0, timeMs: 0.02,
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
 });
 // #781 KINEME Build A: whole-mark motion (spin/rock/pulse/blink/bob) evaluated
 // per vertex in the existing quad shader, only for instances with a kineme;
 // no pass, no texture, no atlas cells. Stills pause with loop time. Tier 0.
 registerCostTier('gl/kineme', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#781 KINEME A: per-instance motion in QUAD_VS from a 16-slot uniform table; moving instances only; zero passes/cells; live + GL stills',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#781 KINEME A: per-instance motion in QUAD_VS from a 16-slot uniform table; moving instances only; zero passes/cells; live + GL stills',
 });
 // #1431 KINEME C: strip playback is a UV window chosen at pack time inside
 // the existing quad pass — no pass, no texture beyond the strip frames the
 // atlas already carries (their cell count is the kineme's costCells). Shed
 // on the tier-2 rung (sceneContract.cellKinemesShed) pins cell 0.
 registerCostTier('gl/cell-kineme', {
-  tier: 0, memoryBytes: 0, timeMs: 0,
-  notes: '#1431 KINEME C: cell window picked in packInstanceData per strip instance; zero passes; frames ride the atlas (costCells in cellKinemes.js); shed pins cell 0; live + GL stills',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes:
+    '#1431 KINEME C: cell window picked in packInstanceData per strip instance; zero passes; frames ride the atlas (costCells in cellKinemes.js); shed pins cell 0; live + GL stills',
 });
 // #1433 R2: region expansion is pack-time instance multiplication inside
 // the existing quad pass — no pass, no texture beyond the region cells
@@ -313,8 +432,11 @@ registerCostTier('gl/cell-kineme', {
 // freeze on the tier-2 rung (budget -> 0), then collapse to the single
 // original quad (the pre-R2 code path, exact).
 registerCostTier('gl/region-instances', {
-  tier: 0, memoryBytes: 0, timeMs: 0,
-  notes: '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills; #1435 R4: a bend region expands into slice instances along its length — same pass, the slices are instances at full price',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0,
+  notes:
+    '#1433 R2: region instances expand in packInstanceData inside the quad pass; zero passes; region cells ride the atlas; governor selection via regionAnim budget; freeze tier-2, collapse deeper; live + GL stills; #1435 R4: a bend region expands into slice instances along its length — same pass, the slices are instances at full price',
 });
 // #594 PR2 bevel: 4 extra atlas taps per LIT fragment (only when the sun is on
 // and bevel > 0), inside the same quad pass. Declared tier 0 like the rest of the
@@ -322,15 +444,20 @@ registerCostTier('gl/region-instances', {
 // and the sweep harness cannot drive the instanced quad program yet — this is an
 // UNMEASURED estimate. Re-tier to 2 (quality scaler) once a quad sweep exists.
 registerCostTier('gl/sun-bevel', {
-  tier: 0, memoryBytes: 0, timeMs: 0.15,
-  notes: '#594 PR2 bevel-from-alpha normals + spec: +4 atlas taps per lit fragment; unmeasured estimate (no quad sweep yet) — re-tier to 2 when measurable',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.15,
+  notes:
+    '#594 PR2 bevel-from-alpha normals + spec: +4 atlas taps per lit fragment; unmeasured estimate (no quad sweep yet) — re-tier to 2 when measurable',
 });
 // #740: FXAA runs inside the resolve pass behind u_fxaa (same pass, no new texture) —
 // declared separately so the harness can measure resolve with it on. Tier 0 stays: the
 // pass is structural; the governor sheds FXAA as its own cut 0 (governorCuts.js), not
 // via this tier. timeMs is the author's estimate (9 display-referred taps at 1080p).
 registerCostTier('renderer/resolve-fxaa', {
-  tier: 0, memoryBytes: 0, timeMs: 0.4,
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.4,
   notes: 'resolve pass with FXAA 3.11 console (9 taps, ~+30 ALU); shed by governor cut 0, not by tier',
 });
 
@@ -361,7 +488,10 @@ function regionIndexFor(cells) {
   idx = new Map();
   const entryFor = (base) => {
     let e = idx.get(base);
-    if (!e) { e = { remainder: null, regions: [], ids: new Set() }; idx.set(base, e); }
+    if (!e) {
+      e = { remainder: null, regions: [], ids: new Set() };
+      idx.set(base, e);
+    }
     return e;
   };
   for (const key of Object.keys(cells)) {
@@ -404,11 +534,14 @@ function expandRegionInstances(instances, cells, regionAnim) {
     const it = instances[i];
     const assignment = assets[it.asset];
     const combo = `${it.asset}|${it.tint}|${it.accent}`;
-    const base = cells[combo] ? combo : (cells[it.asset] ? it.asset : null);
+    const base = cells[combo] ? combo : cells[it.asset] ? it.asset : null;
     const entry = assignment && base ? idx.get(base) : null;
-    const complete = entry && entry.remainder && entry.regions.length
-      && entry.regions.every((r) => r.cell.geo)
-      && Object.keys(assignment).every((id) => entry.ids.has(id));
+    const complete =
+      entry &&
+      entry.remainder &&
+      entry.regions.length &&
+      entry.regions.every((r) => r.cell.geo) &&
+      Object.keys(assignment).every((id) => entry.ids.has(id));
     if (!complete) {
       if (out) out.push(it);
       continue;
@@ -419,7 +552,8 @@ function expandRegionInstances(instances, cells, regionAnim) {
     // (pivot - box centre) * scale, rotated by the mark's rotation
     // (the shader's own convention), translated to the mark's origin.
     const th = (it.rotation * Math.PI) / 180;
-    const co = Math.cos(th), si = Math.sin(th);
+    const co = Math.cos(th),
+      si = Math.sin(th);
     const bend = regionAnim.bend?.[it.asset];
     for (const r of entry.regions) {
       const geo = r.cell.geo;
@@ -446,7 +580,8 @@ function expandRegionInstances(instances, cells, regionAnim) {
           const sCell = alongX
             ? { ...r.cell, ...cellUvWindow(r.cell, j, slices), geo: sGeo }
             : {
-                ...r.cell, geo: sGeo,
+                ...r.cell,
+                geo: sGeo,
                 v0: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * j) / slices,
                 v1: r.cell.v0 + ((r.cell.v1 - r.cell.v0) * (j + 1)) / slices,
               };
@@ -532,7 +667,10 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     // #1433: an expanded region/remainder instance carries its resolved cell.
     const cell = it._cell || cells[`${it.asset}|${it.tint}|${it.accent}`] || cells[it.asset];
     if (!cell) continue; // Spine B: skip missing instance, never throw
-    let u0 = cell.u0, v0 = cell.v0, u1 = cell.u1, v1 = cell.v1;
+    let u0 = cell.u0,
+      v0 = cell.v0,
+      u1 = cell.u1,
+      v1 = cell.v1;
     // #1431 KINEME C — a strip asset's UV window steps through its baked
     // frames: when the caller supplies the frame clock (the renderer
     // always does), the strip table is authoritative for strip assets —
@@ -541,13 +679,18 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     // clock (every pre-#1431 caller) never consult the table, so their
     // packed output is byte-identical to before. Non-strip assets fall
     // through untouched.
-    const stripK = cellFrame && stripFramesFor(it.asset)
-      ? getCellKineme(ASSET_CELL_KINEME[it.asset])
-      : null;
+    const stripK = cellFrame && stripFramesFor(it.asset) ? getCellKineme(ASSET_CELL_KINEME[it.asset]) : null;
     if (stripK) {
-      const idx = cellIndexAt(cellFrame.motionTime, { period: stripK.period, cells: stripK.cells, shed: !!cellFrame.shed });
+      const idx = cellIndexAt(cellFrame.motionTime, {
+        period: stripK.period,
+        cells: stripK.cells,
+        shed: !!cellFrame.shed,
+      });
       const win = cellUvWindow(cell, idx, stripK.cells);
-      u0 = win.u0; v0 = win.v0; u1 = win.u1; v1 = win.v1;
+      u0 = win.u0;
+      v0 = win.v0;
+      u1 = win.u1;
+      v1 = win.v1;
     } else if (it.cellIndex != null && it.cellCount > 1) {
       const n = it.cellCount;
       const i = Math.max(0, Math.min(n - 1, it.cellIndex | 0));
@@ -555,19 +698,33 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
       u0 = u0 + w * i;
       u1 = u0 + w;
     }
-    buf[o] = it.x; buf[o + 1] = it.y;
-    buf[o + 2] = it.scaleX; buf[o + 3] = it.scaleY;
-    buf[o + 4] = it.rotation; buf[o + 5] = it.opacity * alphaScale;
-    buf[o + 6] = u0; buf[o + 7] = v0;
-    buf[o + 8] = u1; buf[o + 9] = v1;
-    buf[o + 10] = it.vx || 0; buf[o + 11] = it.vy || 0;
+    buf[o] = it.x;
+    buf[o + 1] = it.y;
+    buf[o + 2] = it.scaleX;
+    buf[o + 3] = it.scaleY;
+    buf[o + 4] = it.rotation;
+    buf[o + 5] = it.opacity * alphaScale;
+    buf[o + 6] = u0;
+    buf[o + 7] = v0;
+    buf[o + 8] = u1;
+    buf[o + 9] = v1;
+    buf[o + 10] = it.vx || 0;
+    buf[o + 11] = it.vy || 0;
     const ink = hexToRgb(it.tint);
     const acc = hexToRgb(it.accent);
-    buf[o + 12] = ink[0]; buf[o + 13] = ink[1]; buf[o + 14] = ink[2]; buf[o + 15] = acc[0];
-    buf[o + 16] = acc[1]; buf[o + 17] = acc[2]; buf[o + 18] = it.kineme || 0; buf[o + 19] = it.kinemePhase || 0;
+    buf[o + 12] = ink[0];
+    buf[o + 13] = ink[1];
+    buf[o + 14] = ink[2];
+    buf[o + 15] = acc[0];
+    buf[o + 16] = acc[1];
+    buf[o + 17] = acc[2];
+    buf[o + 18] = it.kineme || 0;
+    buf[o + 19] = it.kinemePhase || 0;
     buf[o + 20] = it.glass ? 1 : 0; // #1129 PR2: missing flag (old producers) reads 0 = enamel
     const df = it.deform; // #1410: [axisX, axisY, amount]; missing (old producers) reads 0 = round
-    buf[o + 21] = df ? df[0] : 0; buf[o + 22] = df ? df[1] : 0; buf[o + 23] = df ? df[2] : 0;
+    buf[o + 21] = df ? df[0] : 0;
+    buf[o + 22] = df ? df[1] : 0;
+    buf[o + 23] = df ? df[2] : 0;
     buf[o + 24] = it.plate ? 1 : it.wash ? 2 : it.stipple ? 3 : 0; // #1548/#1549: material body code; missing flags (old producers) read 0 = flat ink
     // #1585: the body's M4 params (see the stride note above). `mat`
     // rides the contract only when the Look moved a knob; absent, the
@@ -589,7 +746,10 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
       buf[o + 27] = 0;
       buf[o + 28] = 0;
     } else {
-      buf[o + 25] = 0; buf[o + 26] = 0; buf[o + 27] = 0; buf[o + 28] = 0;
+      buf[o + 25] = 0;
+      buf[o + 26] = 0;
+      buf[o + 27] = 0;
+      buf[o + 28] = 0;
     }
     // Phase 2 S4: the engraving block (engine/engraveBody.mjs). Absent
     // (the common case) the sixteen floats stay zero — exactly the old
@@ -607,8 +767,12 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
 
 function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const gl = canvas.getContext('webgl2', {
-    alpha, antialias: false, depth: false, stencil: false,
-    premultipliedAlpha: false, preserveDrawingBuffer: false,
+    alpha,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    premultipliedAlpha: false,
+    preserveDrawingBuffer: false,
   });
   if (!gl) throw new Error('[gl] WebGL2 not available');
   if (!gl.getExtension('EXT_color_buffer_float')) {
@@ -618,13 +782,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const progs = {};
   for (const def of RENDERER_PROGRAMS) {
     progs[def.key] = buildProgramChecked(gl, def.vs, def.fs, {
-      name: def.name, vsFile: def.vsFile, fsFile: def.fsFile,
+      name: def.name,
+      vsFile: def.vsFile,
+      fsFile: def.fsFile,
     });
     // Uniform gate (#193 second pass): the shader may only declare
     // uniforms the renderer uploads. A mismatch throws here — naming the
     // program and file — instead of failing silently mid-render.
     auditProgramChecked(gl, progs[def.key], def.uniforms, {
-      name: def.name, file: 'shaders.mjs',
+      name: def.name,
+      file: 'shaders.mjs',
     });
   }
   const quadProg = progs.quad;
@@ -708,18 +875,28 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     drawFullscreen(prog);
   }
   const compU = {
-    u_src: U(compProg, 'u_src'), u_dst: U(compProg, 'u_dst'),
-    u_blend: U(compProg, 'u_blend'), u_opacity: U(compProg, 'u_opacity'),
-    u_clip: U(compProg, 'u_clip'), u_clipOn: U(compProg, 'u_clipOn'),
-    u_mask: U(compProg, 'u_mask'), u_maskOn: U(compProg, 'u_maskOn'),
-    u_maskMode: U(compProg, 'u_maskMode'), u_maskInvert: U(compProg, 'u_maskInvert'),
-    u_hueOn: U(compProg, 'u_hueOn'), u_hueMat: U(compProg, 'u_hueMat'),
+    u_src: U(compProg, 'u_src'),
+    u_dst: U(compProg, 'u_dst'),
+    u_blend: U(compProg, 'u_blend'),
+    u_opacity: U(compProg, 'u_opacity'),
+    u_clip: U(compProg, 'u_clip'),
+    u_clipOn: U(compProg, 'u_clipOn'),
+    u_mask: U(compProg, 'u_mask'),
+    u_maskOn: U(compProg, 'u_maskOn'),
+    u_maskMode: U(compProg, 'u_maskMode'),
+    u_maskInvert: U(compProg, 'u_maskInvert'),
+    u_hueOn: U(compProg, 'u_hueOn'),
+    u_hueMat: U(compProg, 'u_hueMat'),
   };
 
   // #1183 — the contact shadow's programs go through the same checked build + uniform audit as the renderer's.
   const contactShadow = createContactShadow(gl, {
     buildProgram: (def) => {
-      const p = buildProgramChecked(gl, FULL_VS, def.fs, { name: def.name, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile });
+      const p = buildProgramChecked(gl, FULL_VS, def.fs, {
+        name: def.name,
+        vsFile: 'shaders.mjs:FULL_VS',
+        fsFile: def.fsFile,
+      });
       auditProgramChecked(gl, p, def.uniforms, { name: def.name, file: 'contactShadow.mjs' });
       return p;
     },
@@ -730,7 +907,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // #1411 — the coalescence finish's program goes through the same checked build + audit.
   const dishCoalesce = createCoalesceFinish(gl, {
     buildProgram: (def) => {
-      const p = buildProgramChecked(gl, FULL_VS, def.fs, { name: def.name, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile });
+      const p = buildProgramChecked(gl, FULL_VS, def.fs, {
+        name: def.name,
+        vsFile: 'shaders.mjs:FULL_VS',
+        fsFile: def.fsFile,
+      });
       auditProgramChecked(gl, p, def.uniforms, { name: def.name, file: 'coalesceFinish.mjs' });
       return p;
     },
@@ -758,7 +939,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (specUploaded || !spec || !spec.tex) return;
     // The live loop hands a Uint8Array; a contract that was cloned or serialised (the parity harness) hands an
     // array-like. Either way the texture is exactly 256 x 4 bytes, and anything else is not uploaded.
-    const bytes = spec.tex instanceof Uint8Array ? spec.tex : Uint8Array.from(Array.isArray(spec.tex) ? spec.tex : Object.values(spec.tex));
+    const bytes =
+      spec.tex instanceof Uint8Array
+        ? spec.tex
+        : Uint8Array.from(Array.isArray(spec.tex) ? spec.tex : Object.values(spec.tex));
     if (bytes.length !== 256 * 4) return;
     gl.activeTexture(gl.TEXTURE0 + SPEC_UNIT); // upload on its own unit: unit 0 holds the atlas right now
     if (!specTex) {
@@ -776,7 +960,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     specUploaded = true;
   }
 
-  let sceneW = 1000, sceneH = 700;
+  let sceneW = 1000,
+    sceneH = 700;
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
@@ -796,13 +981,24 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
     gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
-    gl.uniform4f(U(quadProg, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
+    gl.uniform4f(
+      U(quadProg, 'u_sunLight'),
+      sun ? sun.color[0] : 1,
+      sun ? sun.color[1] : 1,
+      sun ? sun.color[2] : 1,
+      sun ? sun.intensity : 0,
+    );
     gl.uniform1f(U(quadProg, 'u_ambient'), sun ? sun.ambient : 1);
     gl.uniform2f(U(quadProg, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0); // #594 PR2
     gl.uniform1f(U(quadProg, 'u_pool'), sun ? sun.pool || 0 : 0);
     // #781 KINEME: (kind, period, amp) per slot; untouched slots stay 0 (unused).
     kinemeBuf.fill(0);
-    if (kinemeTable) kinemeTable.slice(0, 16).forEach((k, i) => { kinemeBuf[i * 3] = k.kind; kinemeBuf[i * 3 + 1] = k.period; kinemeBuf[i * 3 + 2] = k.amp; });
+    if (kinemeTable)
+      kinemeTable.slice(0, 16).forEach((k, i) => {
+        kinemeBuf[i * 3] = k.kind;
+        kinemeBuf[i * 3 + 1] = k.period;
+        kinemeBuf[i * 3 + 2] = k.amp;
+      });
     gl.uniform3fv(U(quadProg, 'u_kineme'), kinemeBuf);
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
@@ -856,7 +1052,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 45);
-    for (let i = 0; i <= 13; i++) { gl.disableVertexAttribArray(i); gl.vertexAttribDivisor(i, 0); }
+    for (let i = 0; i <= 13; i++) {
+      gl.disableVertexAttribArray(i);
+      gl.vertexAttribDivisor(i, 0);
+    }
     gl.disable(gl.BLEND);
   }
 
@@ -870,7 +1069,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let meshIndexCapacityBytes = 0;
   const meshVbo = gl.createBuffer();
   const meshIbo = gl.createBuffer();
-  const MESH_ATTRIBS = [[0, 2, 0], [1, 2, 8], [2, 3, 16], [3, 3, 28], [4, 4, 40], [5, 4, 56], [6, 4, 72], [7, 1, 88]];
+  const MESH_ATTRIBS = [
+    [0, 2, 0],
+    [1, 2, 8],
+    [2, 3, 16],
+    [3, 3, 28],
+    [4, 4, 40],
+    [5, 4, 56],
+    [6, 4, 72],
+    [7, 1, 88],
+  ];
   function drawMeshes(list, cells, atlasTex, w, h, groupOpacity, layerCount) {
     const verts = [];
     const idxs = [];
@@ -883,19 +1091,36 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       const acc = hexToRgb(it.accent);
       const op = (it.opacity ?? 1) * groupOpacity;
       const th = (it.rotation * Math.PI) / 180;
-      const co = Math.cos(th); const si = Math.sin(th);
+      const co = Math.cos(th);
+      const si = Math.sin(th);
       // v_rot mirror signs, QUAD_VS's rule: scale sign x atlas uv direction.
       const mx = (it.scaleX < 0 ? -1 : 1) * (cell.u1 < cell.u0 ? -1 : 1);
       const my = (it.scaleY < 0 ? -1 : 1) * (cell.v1 < cell.v0 ? -1 : 1);
       const base = verts.length / MESH_STRIDE;
       for (let v = 0; v < m.pos.length; v += 2) {
         verts.push(
-          m.pos[v], m.pos[v + 1],
-          cell.u0 + (cell.u1 - cell.u0) * m.uv[v], cell.v0 + (cell.v1 - cell.v0) * m.uv[v + 1],
-          ink[0], ink[1], ink[2], acc[0], acc[1], acc[2],
-          it.x, it.y, it.rotation, index,
-          co, si, mx, my,
-          cell.u0, cell.v0, cell.u1, cell.v1,
+          m.pos[v],
+          m.pos[v + 1],
+          cell.u0 + (cell.u1 - cell.u0) * m.uv[v],
+          cell.v0 + (cell.v1 - cell.v0) * m.uv[v + 1],
+          ink[0],
+          ink[1],
+          ink[2],
+          acc[0],
+          acc[1],
+          acc[2],
+          it.x,
+          it.y,
+          it.rotation,
+          index,
+          co,
+          si,
+          mx,
+          my,
+          cell.u0,
+          cell.v0,
+          cell.u1,
+          cell.v1,
           op,
         );
       }
@@ -923,7 +1148,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.uniform1f(U(p, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun — the same uploads the quad draw makes (the shared FS reads u_sunMat/u_pool/u_hands).
     gl.uniform4f(U(p, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
-    gl.uniform4f(U(p, 'u_sunLight'), sun ? sun.color[0] : 1, sun ? sun.color[1] : 1, sun ? sun.color[2] : 1, sun ? sun.intensity : 0);
+    gl.uniform4f(
+      U(p, 'u_sunLight'),
+      sun ? sun.color[0] : 1,
+      sun ? sun.color[1] : 1,
+      sun ? sun.color[2] : 1,
+      sun ? sun.intensity : 0,
+    );
     gl.uniform1f(U(p, 'u_ambient'), sun ? sun.ambient : 1);
     gl.uniform2f(U(p, 'u_sunMat'), sun ? sun.bevel : 0, sun ? sun.spec : 0);
     gl.uniform1f(U(p, 'u_pool'), sun ? sun.pool || 0 : 0);
@@ -1024,23 +1255,37 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     let isolatedRunBlend = null;
     for (let n = 0; n < instances.length; n++) {
       const it = instances[n];
-      const b = (it.blend && it.blend !== 'normal') ? it.blend : 'normal';
+      const b = it.blend && it.blend !== 'normal' ? it.blend : 'normal';
       if (it.mesh) {
-        if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        if (isolatedRun.length) {
+          flushIsolatedRun(isolatedRun, isolatedRunBlend);
+          isolatedRun = [];
+          isolatedRunBlend = null;
+        }
         flushNormal();
-        if (b === 'normal') { meshRun.push({ it, index: n }); continue; }
+        if (b === 'normal') {
+          meshRun.push({ it, index: n });
+          continue;
+        }
         flushMesh();
         isolateDraw(() => drawMeshes([{ it, index: n }], cells, atlasTex, w, h, groupOpacity, instances.length), b);
         continue;
       }
       if (b === 'normal') {
-        if (isolatedRun.length) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; isolatedRunBlend = null; }
+        if (isolatedRun.length) {
+          flushIsolatedRun(isolatedRun, isolatedRunBlend);
+          isolatedRun = [];
+          isolatedRunBlend = null;
+        }
         flushMesh();
         batch.push(it);
         continue;
       }
       flushMesh();
-      if (isolatedRun.length && b !== isolatedRunBlend) { flushIsolatedRun(isolatedRun, isolatedRunBlend); isolatedRun = []; }
+      if (isolatedRun.length && b !== isolatedRunBlend) {
+        flushIsolatedRun(isolatedRun, isolatedRunBlend);
+        isolatedRun = [];
+      }
       isolatedRunBlend = b;
       isolatedRun.push(it);
     }
@@ -1054,7 +1299,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * renderScene and renderAccumSequence — a sequence uploads once.
    */
   function uploadStatic(payload) {
-    const atlasTex = uploadTexture(gl, payload.atlas.pixels, payload.atlas.width, payload.atlas.height, { mipmaps: payload.atlas.mipmaps || null });
+    const atlasTex = uploadTexture(gl, payload.atlas.pixels, payload.atlas.width, payload.atlas.height, {
+      mipmaps: payload.atlas.mipmaps || null,
+    });
     return { atlasTex };
   }
 
@@ -1075,7 +1322,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (!e) {
       const tex = gl.createTexture();
       gl.bindTexture(gl.TEXTURE_2D, tex);
-      for (const [k, v] of [[gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE], [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE]]) gl.texParameteri(gl.TEXTURE_2D, k, v);
+      for (const [k, v] of [
+        [gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE],
+        [gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE],
+      ])
+        gl.texParameteri(gl.TEXTURE_2D, k, v);
       e = { tex, key: null, frames: createPatternFrames() };
       patternTex.set(layer.id, e);
     }
@@ -1096,7 +1347,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
   function sweepPatternTextures() {
     for (const [id, e] of patternTex) {
-      if (!patternSeen.has(id)) { gl.deleteTexture(e.tex); patternTex.delete(id); }
+      if (!patternSeen.has(id)) {
+        gl.deleteTexture(e.tex);
+        patternTex.delete(id);
+      }
     }
   }
 
@@ -1112,7 +1366,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
 
   function freeFrameTargets(T) {
-    for (const t of Object.values(T)) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+    for (const t of Object.values(T)) {
+      gl.deleteTexture(t.tex);
+      gl.deleteFramebuffer(t.fb);
+    }
   }
 
   /**
@@ -1163,7 +1420,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     };
 
     // Main accumulation, ping-ponged.
-    let mRead = mainA, mWrite = mainB;
+    let mRead = mainA,
+      mWrite = mainB;
     gl.bindFramebuffer(gl.FRAMEBUFFER, mRead.fb);
     gl.viewport(0, 0, w, h);
     if (transparent) {
@@ -1183,7 +1441,10 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       const hueRotate = (layer.layout && layer.layout.hueRotate) || 0;
       // #1098 — a PATTERN track is one generated texture, not instances: it skips the layer target
       // and composites straight from its own texture, with the same blend / opacity / matte.
-      let srcTex = layer.type === 'pattern' ? patternTexture(layer, w, h) : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+      let srcTex =
+        layer.type === 'pattern'
+          ? patternTexture(layer, w, h)
+          : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
       // #1411 — coalescence: fuse the layer's merge fields into its own marks BEFORE anything else reads
       // them, so the membrane is part of the layer (its contact shadow silhouettes the fused shape).
       // No `coalesce` key: nothing runs and the frame is pixel-identical.
@@ -1197,15 +1458,21 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       let base = dRead;
       if (layer.type === 'content' && layer.shadow) {
         contactShadow.apply({
-          srcTex, mask, dstRead: dRead, dstWrite: blendT, shadow: layer.shadow, sun,
-          opacity: layer.opacity, sceneW, sceneH, w: blendT.w, h: blendT.h,
+          srcTex,
+          mask,
+          dstRead: dRead,
+          dstWrite: blendT,
+          shadow: layer.shadow,
+          sun,
+          opacity: layer.opacity,
+          sceneW,
+          sceneH,
+          w: blendT.w,
+          h: blendT.h,
         });
         base = blendT;
       }
-      composite(
-        compProg, compU, srcTex, base, dWrite,
-        blendIdFor(layer.blend), layer.opacity, null, mask, hueRotate
-      );
+      composite(compProg, compU, srcTex, base, dWrite, blendIdFor(layer.blend), layer.opacity, null, mask, hueRotate);
     };
 
     let pending = []; // content layers accumulated below the next FX layer (SVG pushAcc fold)
@@ -1244,7 +1511,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         // The wrap used to start from transparent, so with multiple FX
         // layers an upper one never saw what the lower ones had done.
         const bt = bridge.layer(layerId);
-        let wRead = bt.t0, wWrite = bt.t1;
+        let wRead = bt.t0,
+          wWrite = bt.t1;
         gl.bindFramebuffer(gl.FRAMEBUFFER, wRead.fb);
         gl.viewport(0, 0, w, h);
         gl.disable(gl.BLEND);
@@ -1269,7 +1537,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         // #1079: grain is procedural hash speckle — no aux texture exists.
         // #1010 — per-knob MOD (none/rms/flux/beatPulse) pushes routed knobs
         // toward their catalog max on the envelope; null audio is a no-op.
-        const chainFx = layer.type === 'math' ? applyMathMod(layer.fx || [], payload.audio) : (layer.fx || []);
+        const chainFx = layer.type === 'math' ? applyMathMod(layer.fx || [], payload.audio) : layer.fx || [];
         const preEffects = chainFx.filter((f) => !GRAIN_FAMILY_KINDS.includes(f.kind));
         const finEffects = (layer.fx || []).filter((f) => GRAIN_FAMILY_KINDS.includes(f.kind));
         const preSteps = compileFxShaders(preEffects);
@@ -1282,8 +1550,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         // composite below, so clipping to the pending layers' bbox would cut
         // the effect (e.g. an invert would only invert inside the box).
         composite(
-          compProg, compU, afterFx.tex, mRead, mWrite,
-          blendIdFor('normal'), wrap.opacity, null, maskFor(layerId)
+          compProg,
+          compU,
+          afterFx.tex,
+          mRead,
+          mWrite,
+          blendIdFor('normal'),
+          wrap.opacity,
+          null,
+          maskFor(layerId),
         );
         [mRead, mWrite] = [mWrite, mRead];
         continue;
@@ -1306,7 +1581,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   // readback/export path so what you see is what you export. Empty = the probe
   // defaults (fxaa off), which is what the golden/parity harness renderers use.
   let resolveOpts = {};
-  function setResolveOptions(o) { resolveOpts = { ...o }; }
+  function setResolveOptions(o) {
+    resolveOpts = { ...o };
+  }
 
   /** Resolve a 16F premultiplied target to RGBA8 bytes (top-first rows). */
   function resolveTargetToBytes(mRead, T, w, h) {
@@ -1323,7 +1600,6 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     return pixels;
   }
 
-
   function disposeBase() {
     contactShadow.dispose(); // #1183
     dishCoalesce.dispose(); // #1411
@@ -1331,7 +1607,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     for (const e of patternTex.values()) gl.deleteTexture(e.tex);
     patternTex.clear();
     for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
-    gl.deleteBuffer(fullVbo); gl.deleteBuffer(cornerVbo); gl.deleteBuffer(instVbo);
+    gl.deleteBuffer(fullVbo);
+    gl.deleteBuffer(cornerVbo);
+    gl.deleteBuffer(instVbo);
   }
 
   /**
@@ -1353,11 +1631,28 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
 
   return {
-    gl, canvas, bridge, progs, U, bindTex, drawFullscreen,
-    composite, drawInstances, instanceData, renderLayerInstances,
-    uploadStatic, freeStatic, makeTarget, allocFrameTargets, freeFrameTargets,
-    renderFrameInto, resolveTargetToBytes, applyFinishChains, disposeBase,
-    setResolveOptions, getResolveOptions: () => resolveOpts,
+    gl,
+    canvas,
+    bridge,
+    progs,
+    U,
+    bindTex,
+    drawFullscreen,
+    composite,
+    drawInstances,
+    instanceData,
+    renderLayerInstances,
+    uploadStatic,
+    freeStatic,
+    makeTarget,
+    allocFrameTargets,
+    freeFrameTargets,
+    renderFrameInto,
+    resolveTargetToBytes,
+    applyFinishChains,
+    disposeBase,
+    setResolveOptions,
+    getResolveOptions: () => resolveOpts,
   };
 }
 
@@ -1369,8 +1664,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 export function createRenderer(canvas) {
   const b = createRendererBase(canvas, { alpha: false });
   const {
-    gl, bridge, uploadStatic, freeStatic,
-    allocFrameTargets, freeFrameTargets, renderFrameInto, resolveTargetToBytes, applyFinishChains,
+    gl,
+    bridge,
+    uploadStatic,
+    freeStatic,
+    allocFrameTargets,
+    freeFrameTargets,
+    renderFrameInto,
+    resolveTargetToBytes,
+    applyFinishChains,
   } = b;
   /**
    * @param {object} payload
@@ -1379,7 +1681,8 @@ export function createRenderer(canvas) {
   function renderScene(payload) {
     const { width: w, height: h, contract } = payload;
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
-    canvas.width = w; canvas.height = h;
+    canvas.width = w;
+    canvas.height = h;
     bridge.resize(w, h, 1);
 
     const uploaded = uploadStatic(payload);
@@ -1408,11 +1711,25 @@ export function createRenderer(canvas) {
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
-  function renderAccumSequence(frames, { fade = 0.88, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, swell = 1, background = '#000000' } = {}) {
+  function renderAccumSequence(
+    frames,
+    {
+      fade = 0.88,
+      optics = 0,
+      tunnel = 0,
+      prism = 0,
+      flow = 0,
+      echoes = 0,
+      audio = null,
+      swell = 1,
+      background = '#000000',
+    } = {},
+  ) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
     const { width: w, height: h, contract } = frames[0];
     if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
-    canvas.width = w; canvas.height = h;
+    canvas.width = w;
+    canvas.height = h;
     bridge.resize(w, h, 1);
 
     const uploaded = uploadStatic(frames[0]);
@@ -1463,7 +1780,6 @@ export function createRenderer(canvas) {
   return { renderScene, renderAccumSequence, dispose };
 }
 
-
 /**
  * createLiveRenderer(canvas) — the live instrument's GPU session (#224).
  *
@@ -1504,7 +1820,8 @@ export function createLiveRenderer(canvas) {
   const { gl, bridge } = b;
 
   let T = null;
-  let TW = 0, TH = 0;
+  let TW = 0,
+    TH = 0;
   let atlasTex = null;
   let accum = null;
 
@@ -1516,18 +1833,23 @@ export function createLiveRenderer(canvas) {
 
   // #267: last live geometry, so offscreen captures can restore the
   // bridge to exactly the live size after rendering at capture size.
-  let liveW = 0, liveH = 0, liveDpr = 1;
+  let liveW = 0,
+    liveH = 0,
+    liveDpr = 1;
   function ensureTargets(w, h, dprScale = 1) {
     // Backing-store (pixel) size: logical render size × dprScale. The CSS
     // layout size never changes — only canvas.width/height (the backing
     // store) and the render targets follow.
-    liveW = w; liveH = h; liveDpr = dprScale;
+    liveW = w;
+    liveH = h;
+    liveDpr = dprScale;
     const bw = Math.max(2, Math.round(w * dprScale));
     const bh = Math.max(2, Math.round(h * dprScale));
     if (T && bw === TW && bh === TH) return;
     if (T) b.freeFrameTargets(T);
     T = b.allocFrameTargets(bw, bh);
-    TW = bw; TH = bh;
+    TW = bw;
+    TH = bh;
     // Resizing the canvas clears it; the loop re-renders every frame, so
     // this costs one frame on renderScale changes only.
     if (canvas.width !== bw) canvas.width = bw;
@@ -1601,7 +1923,10 @@ export function createLiveRenderer(canvas) {
    * every frame, so there is no cross-frame state.
    */
   function presentUpscaled(target) {
-    if (!T) { present(target); return; } // degenerate: no live targets yet
+    if (!T) {
+      present(target);
+      return;
+    } // degenerate: no live targets yet
     const up = b.progs.upscale;
     const dst = T.mainA;
     gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fb);
@@ -1666,18 +1991,27 @@ export function createLiveRenderer(canvas) {
   // main ping-pong, allocated lazily at the live render size and REUSED
   // across dissolves — no per-dissolve allocation, no per-frame allocation.
   // (One 16F target ≈ 5.6MB at 1000×700; the pair is ~11MB.)
-  let holdT = null, mixT = null, mixW = 0, mixH = 0;
+  let holdT = null,
+    mixT = null,
+    mixW = 0,
+    mixH = 0;
   let compU = null;
   const getCompU = () => {
     if (!compU) {
       const p = b.progs.composite;
       compU = {
-        u_src: b.U(p, 'u_src'), u_dst: b.U(p, 'u_dst'),
-        u_blend: b.U(p, 'u_blend'), u_opacity: b.U(p, 'u_opacity'),
-        u_clip: b.U(p, 'u_clip'), u_clipOn: b.U(p, 'u_clipOn'),
-        u_mask: b.U(p, 'u_mask'), u_maskOn: b.U(p, 'u_maskOn'),
-        u_maskMode: b.U(p, 'u_maskMode'), u_maskInvert: b.U(p, 'u_maskInvert'),
-        u_hueOn: b.U(p, 'u_hueOn'), u_hueMat: b.U(p, 'u_hueMat'),
+        u_src: b.U(p, 'u_src'),
+        u_dst: b.U(p, 'u_dst'),
+        u_blend: b.U(p, 'u_blend'),
+        u_opacity: b.U(p, 'u_opacity'),
+        u_clip: b.U(p, 'u_clip'),
+        u_clipOn: b.U(p, 'u_clipOn'),
+        u_mask: b.U(p, 'u_mask'),
+        u_maskOn: b.U(p, 'u_maskOn'),
+        u_maskMode: b.U(p, 'u_maskMode'),
+        u_maskInvert: b.U(p, 'u_maskInvert'),
+        u_hueOn: b.U(p, 'u_hueOn'),
+        u_hueMat: b.U(p, 'u_hueMat'),
       };
     }
     return compU;
@@ -1688,14 +2022,21 @@ export function createLiveRenderer(canvas) {
     dropMixTargets();
     holdT = b.makeTarget(gl, w, h, true);
     mixT = b.makeTarget(gl, w, h, true);
-    mixW = w; mixH = h;
+    mixW = w;
+    mixH = h;
     return true;
   }
   function dropMixTargets() {
     for (const t of [holdT, mixT]) {
-      if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); }
+      if (t) {
+        gl.deleteTexture(t.tex);
+        gl.deleteFramebuffer(t.fb);
+      }
     }
-    holdT = null; mixT = null; mixW = 0; mixH = 0;
+    holdT = null;
+    mixT = null;
+    mixW = 0;
+    mixH = 0;
   }
   /**
    * Snapshot a rendered frame as the dissolve's outgoing deck. Must be
@@ -1729,10 +2070,7 @@ export function createLiveRenderer(canvas) {
   function mixWithHold(srcTarget, t) {
     const resized = ensureMixTargets(TW, TH);
     const e = Math.min(1, Math.max(0, Number(t) || 0));
-    b.composite(
-      b.progs.composite, getCompU(), srcTarget.tex, holdT, mixT,
-      blendIdFor('normal'), e, null,
-    );
+    b.composite(b.progs.composite, getCompU(), srcTarget.tex, holdT, mixT, blendIdFor('normal'), e, null);
     return { target: mixT, resized };
   }
 
@@ -1743,26 +2081,28 @@ export function createLiveRenderer(canvas) {
   // resolution jump. The bridge (FX-layer FBOs) is resized to the capture
   // size for the render and restored to the live geometry afterwards, so the
   // next live tick's ensureTargets is a no-op.
-  let OT = null, OTW = 0, OTH = 0;
+  let OT = null,
+    OTW = 0,
+    OTH = 0;
   // #267: the capture size rides in the payload (width/height) — one shape
   // for every caller, so a signature skew can't silently mis-size a capture.
   function renderFrameOffscreen(payload, { transparent = false } = {}) {
-    const w = payload.width, h = payload.height;
+    const w = payload.width,
+      h = payload.height;
     if (!Number.isFinite(w) || !Number.isFinite(h) || w <= 0 || h <= 0)
       throw new Error(`[gl-live] renderFrameOffscreen needs payload.width/height, got ${w}x${h}`);
     if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
     if (!OT || OTW !== w || OTH !== h) {
       if (OT) b.freeFrameTargets(OT);
       OT = b.allocFrameTargets(w, h);
-      OTW = w; OTH = h;
+      OTW = w;
+      OTH = h;
     }
     bridge.resize(w, h, 1);
     try {
       // u_canvas stays 1000×700 (scene layout units) — the extra pixels are
       // pure sharpness, same trick governor renderScale uses below 1x.
-      const mRead = b.renderFrameInto(
-        { ...payload, width: w, height: h }, OT,
-        { atlasTex }, { transparent });
+      const mRead = b.renderFrameInto({ ...payload, width: w, height: h }, OT, { atlasTex }, { transparent });
       // #1069 — captures (PNG stills, batch, Print Desk) get their grain too.
       return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
     } finally {
@@ -1785,10 +2125,18 @@ export function createLiveRenderer(canvas) {
     setAtlas,
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
-    renderFrame, renderFrameOffscreen, present, presentUpscaled, readback, readPresented,
+    renderFrame,
+    renderFrameOffscreen,
+    present,
+    presentUpscaled,
+    readback,
+    readPresented,
     applyFinishChains: (target, chains) => b.applyFinishChains(target, chains),
-    ensureAccum, dropAccum,
-    snapshotHoldFrame, mixWithHold, dropMixTargets,
+    ensureAccum,
+    dropAccum,
+    snapshotHoldFrame,
+    mixWithHold,
+    dropMixTargets,
     getGL: () => gl,
     getBridge: () => bridge,
     dispose,

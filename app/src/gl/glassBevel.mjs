@@ -38,5 +38,6 @@ registerCostTier('light/glass-soft-bevel', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.01,
-  notes: '#1129 PR2: soft-bevel variant for glass instances — same 4 alpha taps at wider offsets (zero new texture fetches), 3 extra mix ALU ops per lit fragment; negligible delta over the existing bevel, never shed separately from the quad pass',
+  notes:
+    '#1129 PR2: soft-bevel variant for glass instances — same 4 alpha taps at wider offsets (zero new texture fetches), 3 extra mix ALU ops per lit fragment; negligible delta over the existing bevel, never shed separately from the quad pass',
 });

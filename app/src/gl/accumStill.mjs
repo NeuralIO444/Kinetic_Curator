@@ -40,12 +40,7 @@ import { writePngFile } from './png.mjs';
 // ~3.6GB pixel buffer → OOM on an unattended batch tool.
 import { parseRes } from './exportStill.mjs';
 import { loadAudioEnvelope, sampleEnvelope } from './audioEnvelope.mjs';
-import {
-  createBallisticsState,
-  processBallistics,
-  sanitizeBallistics,
-  BALLISTICS_CURVES,
-} from './audioBallistics.mjs';
+import { createBallisticsState, processBallistics, sanitizeBallistics, BALLISTICS_CURVES } from './audioBallistics.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
 import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
@@ -55,12 +50,29 @@ const BROWSER_MISSING_RE = /Executable doesn't exist/;
 
 function parseArgs(argv) {
   const out = {
-    project: null, out: null, steps: 24, fps: 30, fade: 0.88, optics: 0,
-    tunnel: 0, prism: 0, flow: 0, echoes: 0, audio: null,
+    project: null,
+    out: null,
+    steps: 24,
+    fps: 30,
+    fade: 0.88,
+    optics: 0,
+    tunnel: 0,
+    prism: 0,
+    flow: 0,
+    echoes: 0,
+    audio: null,
     // #306: still-path ballistics default to the identity — existing renders
     // are byte-identical unless these flags are passed.
-    attackMs: 0, decayMs: 0, response: 'linear', swell: 1,
-    res: '1', seed: null, uncapped: false, background: null, ramps: [], motion: 'auto',
+    attackMs: 0,
+    decayMs: 0,
+    response: 'linear',
+    swell: 1,
+    res: '1',
+    seed: null,
+    uncapped: false,
+    background: null,
+    ramps: [],
+    motion: 'auto',
   };
   const rest = [];
   for (let i = 0; i < argv.length; i++) {
@@ -88,8 +100,7 @@ function parseArgs(argv) {
         throw new Error(`bad --response ${v} (expected one of ${BALLISTICS_CURVES.join(', ')})`);
       }
       out.response = v;
-    }
-    else if (a === '--swell') out.swell = num('--swell');
+    } else if (a === '--swell') out.swell = num('--swell');
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -175,7 +186,9 @@ async function main(argv) {
   if (args.audio) {
     audioEnv = loadAudioEnvelope(args.audio);
     if (audioEnv) {
-      console.log(`  audio envelope: ${audioEnv.samples.length} frames, ${audioEnv.beats.length} beats from ${args.audio}`);
+      console.log(
+        `  audio envelope: ${audioEnv.samples.length} frames, ${audioEnv.beats.length} beats from ${args.audio}`,
+      );
     }
   }
   const duration = args.steps / args.fps; // seconds across the sequence
@@ -193,7 +206,9 @@ async function main(argv) {
   // exactly; beat_phase is never shaped — the follower would smear it.
   const ballistics = createBallisticsState();
   const ballParams = sanitizeBallistics({
-    attackMs: args.attackMs, releaseMs: args.decayMs, curve: args.response,
+    attackMs: args.attackMs,
+    releaseMs: args.decayMs,
+    curve: args.response,
   });
   let prevT = 0;
   const stepMs = (duration / Math.max(1, args.steps - 1)) * 1000;
@@ -202,16 +217,32 @@ async function main(argv) {
       const progress = i / Math.max(1, args.steps - 1);
       const t = progress * duration;
       const resolvedLayers = resolveLayers(doc, { caps, ramp, motion, progress });
-      frames.push(buildSceneContract({
-        doc, resolvedLayers, caps,
-        accum: { enabled: true, fade: args.fade, optics: args.optics, tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes, background },
-      }));
+      frames.push(
+        buildSceneContract({
+          doc,
+          resolvedLayers,
+          caps,
+          accum: {
+            enabled: true,
+            fade: args.fade,
+            optics: args.optics,
+            tunnel: args.tunnel,
+            prism: args.prism,
+            flow: args.flow,
+            echoes: args.echoes,
+            background,
+          },
+        }),
+      );
       if (audioEnv) {
         const raw = sampleEnvelope(audioEnv, t);
         const dtMs = i === 0 ? stepMs : (t - prevT) * 1000;
         prevT = t;
         const shaped = processBallistics(
-          ballistics, { rms: raw.rms, flux: raw.flux, beatPulse: raw.beatPulse }, dtMs, ballParams
+          ballistics,
+          { rms: raw.rms, flux: raw.flux, beatPulse: raw.beatPulse },
+          dtMs,
+          ballParams,
         );
         audioFrames.push({ ...raw, ...shaped });
       }
@@ -220,9 +251,17 @@ async function main(argv) {
       }
     }
     const { pixels, width, height } = await renderAccumViaGL(frames, {
-      width: w, height: h, bg: background, fade: args.fade, optics: args.optics,
-      tunnel: args.tunnel, prism: args.prism, flow: args.flow, echoes: args.echoes,
-      audio: audioFrames, swell: args.swell,
+      width: w,
+      height: h,
+      bg: background,
+      fade: args.fade,
+      optics: args.optics,
+      tunnel: args.tunnel,
+      prism: args.prism,
+      flow: args.flow,
+      echoes: args.echoes,
+      audio: audioFrames,
+      swell: args.swell,
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);
@@ -230,8 +269,8 @@ async function main(argv) {
     if (BROWSER_MISSING_RE.test(e.message || '')) {
       console.error(
         '[accumStill] refusing --accum: headless Chromium is not installed.\n' +
-        '  The ACCUM recipe runs on the GPU via headless Chromium (shared recipe,\n' +
-        '  #190). Install it with:  cd app && npx playwright install chromium'
+          '  The ACCUM recipe runs on the GPU via headless Chromium (shared recipe,\n' +
+          '  #190). Install it with:  cd app && npx playwright install chromium',
       );
       process.exitCode = 3;
       return;

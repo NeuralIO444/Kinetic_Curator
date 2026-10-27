@@ -4,13 +4,25 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { FEEL_PRESETS, activeFeelId } from '../data/feels.js';
-import { masterGainFor, loudestPeak, MASTER_DEFAULTS, MASTER_MAX, GAIN_MAX_FACTOR, GAIN_TARGET_PEAK, ENERGY_FLOOR } from './stimuliAuto.mjs';
+import {
+  masterGainFor,
+  loudestPeak,
+  MASTER_DEFAULTS,
+  MASTER_MAX,
+  GAIN_MAX_FACTOR,
+  GAIN_TARGET_PEAK,
+  ENERGY_FLOOR,
+} from './stimuliAuto.mjs';
 import { audioRoutes, DEFAULT_ROUTES } from './audioRoutes.mjs';
 const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 const KEYS = ['audioModDepth', 'audioScaleMod', 'audioAlphaMod'];
 const snap = (peak) => ({ beat: 0, level: peak, bass: 0, mid: 0, treble: 0, bands: {} });
@@ -32,12 +44,15 @@ ok('the defaults did not move: an old session is exactly what it was', () => {
   assert.equal(MASTER_MAX, 2);
   // a saved project at the old maximum loads unchanged
   const old = normalizeLayoutParams({ audioModDepth: 1, audioScaleMod: 1, audioAlphaMod: 1 });
-  assert.deepEqual(KEYS.map((k) => old[k]), [1, 1, 1]);
+  assert.deepEqual(
+    KEYS.map((k) => old[k]),
+    [1, 1, 1],
+  );
 });
 
 ok('FEEL: GENTLE and PUNCHY are as they were; VIOLENT uses the new headroom and stays inside it', () => {
   const by = Object.fromEntries(FEEL_PRESETS.map((f) => [f.id, f.params]));
-  assert.deepEqual([by.gentle.audioModDepth, by.gentle.audioScaleMod, by.gentle.audioAlphaMod], [0.35, 0.30, 0.12]);
+  assert.deepEqual([by.gentle.audioModDepth, by.gentle.audioScaleMod, by.gentle.audioAlphaMod], [0.35, 0.3, 0.12]);
   assert.deepEqual([by.punchy.audioModDepth, by.punchy.audioScaleMod, by.punchy.audioAlphaMod], [0.65, 0.45, 0.25]);
   const v = by.violent;
   assert.ok(v.audioModDepth > 1 && v.audioScaleMod > 0.95 && v.audioAlphaMod > 0.65, 'more than before');
@@ -53,7 +68,8 @@ ok('FEEL: GENTLE and PUNCHY are as they were; VIOLENT uses the new headroom and 
 ok('more master gain really is more animation: the same quiet signal moves further', () => {
   const quiet = { rms: 0.2, bass: 0.25, mid: 0.1, treble: 0.1, beatPulse: 0.3 };
   const at = (g) => audioRoutes(quiet, { depth: g, scaleMod: g, alphaMod: g }, null, null);
-  const lo = at(0.65); const hi = at(1.3);
+  const lo = at(0.65);
+  const hi = at(1.3);
   assert.ok(hi.scaleMul > lo.scaleMul && hi.alphaBoost > lo.alphaBoost, 'twice the gain, more swing');
   assert.ok(hi.scaleMul <= 3 + 1e-9, 'the per-target output clamp still holds: no blow-out');
   assert.ok(DEFAULT_ROUTES.length > 0);
@@ -87,7 +103,11 @@ ok('AUTO is monotone in how quiet it was, bounded, and never lowers what the art
   assert.ok(!('audioModDepth' in high.patch), 'a DEPTH the artist set to 1.8 is left alone');
   assert.ok('audioScaleMod' in high.patch);
   const buried = masterGainFor(snap(0.7), { audioModDepth: 0.1, audioScaleMod: 0.45, audioAlphaMod: 0.25 });
-  assert.deepEqual(buried.patch, { audioModDepth: 0.65 }, 'the old rule: a buried master returns to its default, nothing more');
+  assert.deepEqual(
+    buried.patch,
+    { audioModDepth: 0.65 },
+    'the old rule: a buried master returns to its default, nothing more',
+  );
   const gentle = masterGainFor(snap(0.7), { audioModDepth: 0.35, audioScaleMod: 0.3, audioAlphaMod: 0.12 });
   assert.deepEqual(gentle.patch, {}, 'a GENTLE feel is not overridden by a hot signal');
 });
@@ -95,7 +115,8 @@ ok('AUTO is monotone in how quiet it was, bounded, and never lowers what the art
 ok('loudestPeak reads every route input, and the sliders and AUTO are wired to the new ceiling', () => {
   assert.equal(loudestPeak({ beat: 0.2, level: 0.1, bass: 0, mid: 0, treble: 0, bands: { sub: 0.55 } }), 0.55);
   const rc = src('../panels/stimulus/ReactivityControls.jsx');
-  for (const l of ['DEPTH', 'SCALE', 'ALPHA']) assert.match(flat(rc), fre(new RegExp(`label="${l}" value=\\{\\w+\\} min=\\{0\\} max=\\{2\\} step=\\{0\\.05\\}`)));
+  for (const l of ['DEPTH', 'SCALE', 'ALPHA'])
+    assert.match(flat(rc), fre(new RegExp(`label="${l}" value=\\{\\w+\\} min=\\{0\\} max=\\{2\\} step=\\{0\\.05\\}`)));
   const mm = src('../panels/stimulus/ModMatrix.jsx');
   assert.match(flat(mm), fre(/masterGainFor\(peaks, \{ audioModDepth: lp\.audioModDepth/));
   assert.match(flat(mm), fre(/armMasters\(peaks\);/));

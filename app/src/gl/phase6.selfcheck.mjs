@@ -38,8 +38,12 @@ const APP_SRC = path.resolve(HERE, '..');
 // ---------------------------------------------------------------- A. cut order
 {
   const base = {
-    renderScale: 1, quality: 'high', assetThin: false,
-    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
   };
   // The FIRST cut on a fresh low-FPS episode is resolution — not FX, not
   // quality. This is the #192 contract: pixels drop before anything visible.
@@ -62,8 +66,20 @@ const APP_SRC = path.resolve(HERE, '..');
   }
   assert.deepEqual(
     kinds,
-    ['renderScale', 'renderScale', 'renderScale', 'quality', 'quality', 'assetThin', 'countClamp', 'countClamp', 'countClamp', 'countClamp', 'slowRender'],
-    `ladder order wrong: ${kinds.join(',')}`
+    [
+      'renderScale',
+      'renderScale',
+      'renderScale',
+      'quality',
+      'quality',
+      'assetThin',
+      'countClamp',
+      'countClamp',
+      'countClamp',
+      'countClamp',
+      'slowRender',
+    ],
+    `ladder order wrong: ${kinds.join(',')}`,
   );
   assert.ok(!kinds.some((k) => k.toLowerCase().includes('fx')), 'no FX-culling cut may exist');
   assert.equal(nextGovernorCut(s), null, 'exhausted ladder returns null (watchdog is separate)');
@@ -79,8 +95,11 @@ const APP_SRC = path.resolve(HERE, '..');
 {
   assert.equal(shedSummary({ renderScale: 1 }), null, 'clean state: no badge');
   const sum = shedSummary({
-    renderScale: 0.5, perfTier1: true, assetThin: true,
-    perfClampOverride: { count: 90, mirror: false }, slowRender: true,
+    renderScale: 0.5,
+    perfTier1: true,
+    assetThin: true,
+    perfClampOverride: { count: 90, mirror: false },
+    slowRender: true,
     watchdogTripped: true,
   });
   assert.ok(sum.length === 6, `every shed state must be named, got: ${sum}`);
@@ -96,8 +115,12 @@ const APP_SRC = path.resolve(HERE, '..');
 // behavior: resolution sheds first.
 {
   const base = {
-    renderScale: 1, quality: 'high', assetThin: false,
-    perfClampOverride: null, effectiveCount: 400, slowRender: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
   };
   // GPU saturated: resolution sheds first (unchanged contract).
   let cut = nextGovernorCut({ ...base, gpuSaturated: true });
@@ -123,25 +146,33 @@ const APP_SRC = path.resolve(HERE, '..');
   assert.deepEqual(
     kinds,
     ['quality', 'quality', 'assetThin', 'countClamp', 'countClamp', 'countClamp', 'countClamp', 'slowRender'],
-    `unsaturated ladder order wrong: ${kinds.join(',')}`
+    `unsaturated ladder order wrong: ${kinds.join(',')}`,
   );
   console.log('[selfcheck] C gpuSaturated gate OK —', kinds.join(' → '));
 }
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, ...over });
 const contentLayer = (id) => ({
-  id, name: id, type: 'content', visible: true,
-  layerBlendMode: 'normal', layerOpacity: 1,
+  id,
+  name: id,
+  type: 'content',
+  visible: true,
+  layerBlendMode: 'normal',
+  layerOpacity: 1,
 });
 const fxLayer = (id, kind = 'invert') => ({
-  id, name: id, type: 'fx', visible: true,
-  layerBlendMode: 'normal', layerOpacity: 1,
+  id,
+  name: id,
+  type: 'fx',
+  visible: true,
+  layerBlendMode: 'normal',
+  layerOpacity: 1,
   effects: [{ kind, params: {} }],
 });
 function doc(over = {}) {
   return {
     version: 1,
-    seed: 0xC0FFEE,
+    seed: 0xc0ffee,
     paletteId: 'praystation',
     paletteOverrides: null,
     layoutParams: lp({ count: 36 }),
@@ -205,7 +236,7 @@ const contractOf = (d) => {
   assert.ok(Number.isFinite(scene.instances.length), 'hostile doc builds a contract');
   assert.ok(
     scene.instances.length <= getRenderCaps('balanced', false).maxCount * 1,
-    `count 1e12 must clamp to caps, got ${scene.instances.length}`
+    `count 1e12 must clamp to caps, got ${scene.instances.length}`,
   );
   const rl = resolveLayers(doc({ layoutParams: hostileLp }), { caps: getRenderCaps('balanced', false) });
   assert.deepEqual(rl[0].layoutParams.scale, DEFAULT_LAYOUT_PARAMS.scale, 'scale [null,null] → default');
@@ -217,7 +248,8 @@ const contractOf = (d) => {
 
   // D2: hostile leftovers — NaN/Infinity ranges, null layers entries, version 999.
   const hostile2 = parseProject({
-    version: 1, seed: 'not-a-number',
+    version: 1,
+    seed: 'not-a-number',
     layoutParams: { scale: [NaN, Infinity], rotate: 'junk', count: -50, particleCount: 1e9 },
     layers: [null, { id: 42 }, { id: 'ok', type: 'fx', effects: [{ kind: 'nope', params: {} }] }],
   });
@@ -239,8 +271,10 @@ const contractOf = (d) => {
   const scene3 = contractOf(doc({ layers: many }));
   const dt = Date.now() - t0;
   assert.equal(scene3.layers.length, 200, '200 layers resolve');
-  assert.ok(scene3.instances.length <= 200 * getRenderCaps('balanced', false).maxCount,
-    'total instances bounded by per-layer caps');
+  assert.ok(
+    scene3.instances.length <= 200 * getRenderCaps('balanced', false).maxCount,
+    'total instances bounded by per-layer caps',
+  );
   console.log(`[selfcheck] D #103 hostile/docs OK — 200 layers in ${dt}ms (bounded by caps)`);
 }
 
@@ -277,14 +311,18 @@ const contractOf = (d) => {
       const spec = m[1] || m[2];
       if (!spec || !spec.startsWith('.')) continue; // external / absolute: not ours
       let target = path.resolve(path.dirname(file), spec);
-      if (existsSync(target)) { /* exact file */ }
-      else if (existsSync(target + '.js')) target += '.js';
+      if (existsSync(target)) {
+        /* exact file */
+      } else if (existsSync(target + '.js')) target += '.js';
       else if (existsSync(target + '.jsx')) target += '.jsx';
       else if (existsSync(target + '.mjs')) target += '.mjs';
       else if (existsSync(path.join(target, 'index.js'))) target = path.join(target, 'index.js');
       else continue;
       const norm = target.split(path.sep).join('/');
-      if (norm.endsWith('/studio/render.mjs')) { hit = file; break; }
+      if (norm.endsWith('/studio/render.mjs')) {
+        hit = file;
+        break;
+      }
       stack.push(target);
     }
   }

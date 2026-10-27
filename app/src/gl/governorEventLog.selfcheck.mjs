@@ -39,7 +39,9 @@ import './accum.mjs';
 import './renderer.mjs';
 import { MEASURED_COSTS } from './effects/measuredCosts.mjs';
 
-function fresh() { clearGovernorEvents(); }
+function fresh() {
+  clearGovernorEvents();
+}
 
 // --- A. shed/restore recorded with cause ------------------------------------
 fresh();
@@ -67,7 +69,10 @@ const restoreEv = recordGovernorEvent({
 assert.equal(restoreEv.type, 'restore');
 assert.equal(restoreEv.step, 1);
 assert.equal(governorEventLogSize(), 2);
-assert.deepEqual(getGovernorEvents().map((e) => e.type), ['shed', 'restore']);
+assert.deepEqual(
+  getGovernorEvents().map((e) => e.type),
+  ['shed', 'restore'],
+);
 
 // --- B. ring buffer bounds ---------------------------------------------------
 fresh();
@@ -89,21 +94,12 @@ assert.match(exported.exportedAt, /^\d{4}-\d{2}-\d{2}T/);
 assert.equal(exported.count, 1);
 assert.equal(exported.capacity, MAX_EVENTS);
 assert.equal(exported.events.length, 1);
-assert.deepEqual(
-  Object.keys(exported.events[0]).sort(),
-  ['cutKind', 'detail', 'fps', 'label', 'step', 't', 'type'],
-);
+assert.deepEqual(Object.keys(exported.events[0]).sort(), ['cutKind', 'detail', 'fps', 'label', 'step', 't', 'type']);
 
 // --- D. fail-closed ----------------------------------------------------------
 fresh();
-assert.throws(
-  () => recordGovernorEvent({ type: 'drop', cutKind: 'renderScale' }),
-  /type must be/,
-);
-assert.throws(
-  () => recordGovernorEvent({ type: 'shed', cutKind: 'fxCull' }),
-  /unknown cutKind/,
-);
+assert.throws(() => recordGovernorEvent({ type: 'drop', cutKind: 'renderScale' }), /type must be/);
+assert.throws(() => recordGovernorEvent({ type: 'shed', cutKind: 'fxCull' }), /unknown cutKind/);
 assert.throws(
   () => recordGovernorEvent({ type: 'shed', cutKind: 'renderScale', fps: { at: NaN, threshold: 32, sustainedMs: 0 } }),
   /fps\.at must be a finite number/,
@@ -144,7 +140,11 @@ for (const row of shedding.passes) {
 assert.equal(shedding.cuts.length, 8, 'one row per shed-ladder step (cut 0 fxaa + 1–7)');
 const stepMap = new Map(shedding.cuts.map((c) => [c.cutKind, c]));
 assert.equal(stepMap.get('fxaa').active, false, 'fxaa on → not shed');
-assert.equal(buildXray({ tiers, measuredMs: MEASURED_COSTS, shed: { fxaaShed: true } }).cuts.find((c) => c.cutKind === 'fxaa').state, 'off');
+assert.equal(
+  buildXray({ tiers, measuredMs: MEASURED_COSTS, shed: { fxaaShed: true } }).cuts.find((c) => c.cutKind === 'fxaa')
+    .state,
+  'off',
+);
 assert.equal(stepMap.get('renderScale').active, false);
 assert.equal(stepMap.get('perfTier1').active, true);
 const scaled = buildXray({ tiers, measuredMs: MEASURED_COSTS, shed: { renderScale: 0.5 } });
@@ -164,4 +164,6 @@ assert.deepEqual(SHED_STEPS, {
 assert.deepEqual([...CUT_KINDS].sort(), Object.keys(SHED_STEPS).sort());
 
 clearGovernorEvents();
-console.log('[selfcheck] governorEventLog: OK — shed/restore with cause, ring bounded, export valid, X-ray matches registry');
+console.log(
+  '[selfcheck] governorEventLog: OK — shed/restore with cause, ring bounded, export valid, X-ray matches registry',
+);

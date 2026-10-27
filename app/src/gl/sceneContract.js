@@ -23,11 +23,33 @@
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/mathFilters.js';
-import { sanitizeAccumOptics, sanitizeAccumTunnel, sanitizeAccumPrism, sanitizeAccumFlow, sanitizeAccumEchoes } from './accum.mjs';
+import {
+  sanitizeAccumOptics,
+  sanitizeAccumTunnel,
+  sanitizeAccumPrism,
+  sanitizeAccumFlow,
+  sanitizeAccumEchoes,
+} from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
-import { KINEME_KINDS, KINEME_TABLE_MAX, getKineme, kinemePhase, sanitizeAssetKineme, spinKineme, spinVariant, BEND_KINEME_ID } from '../data/kinemes.js';
-import { regionsForAsset, regionAssignmentFor, selectAnimatedRegions, isStrokeRegion, bendSlicesFor, REGION_TAG_CAP } from '../data/regionKinemes.js';
+import {
+  KINEME_KINDS,
+  KINEME_TABLE_MAX,
+  getKineme,
+  kinemePhase,
+  sanitizeAssetKineme,
+  spinKineme,
+  spinVariant,
+  BEND_KINEME_ID,
+} from '../data/kinemes.js';
+import {
+  regionsForAsset,
+  regionAssignmentFor,
+  selectAnimatedRegions,
+  isStrokeRegion,
+  bendSlicesFor,
+  REGION_TAG_CAP,
+} from '../data/regionKinemes.js';
 import { resolvePalette } from '../data/palettes.js';
 import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
 import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
@@ -40,9 +62,23 @@ export const GL_CONTRACT_VERSION = 1;
 export const CONTRACT_CANVAS = Object.freeze({ w: 1000, h: 700 });
 
 const KNOWN_BLENDS = new Set([
-  'normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten',
-  'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference',
-  'exclusion', 'hue', 'saturation', 'color', 'luminosity', 'plus-lighter',
+  'normal',
+  'multiply',
+  'screen',
+  'overlay',
+  'darken',
+  'lighten',
+  'color-dodge',
+  'color-burn',
+  'hard-light',
+  'soft-light',
+  'difference',
+  'exclusion',
+  'hue',
+  'saturation',
+  'color',
+  'luminosity',
+  'plus-lighter',
 ]);
 
 const r3 = (v) => Math.round(Number(v) * 1000) / 1000;
@@ -312,14 +348,17 @@ export function warnUnsupportedMaterials(resolvedLayers) {
     warnedMaterials.add(mat);
     console.warn(
       `[export] material "${mat}" renders flat in studio stills (#168): ` +
-      'its colour-ramp body renders in the live tab and in composed stills, but the GL export ' +
-      '(studio.py still) has no channel decomposition to ramp against. See docs/QUALITY.md.',
+        'its colour-ramp body renders in the live tab and in composed stills, but the GL export ' +
+        '(studio.py still) has no channel decomposition to ramp against. See docs/QUALITY.md.',
     );
   }
 }
 
 /** #1127 — a layer's ROTATE spin in rev/s: finite, 0..1, anything else is still. */
-const spinOf = (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0; };
+const spinOf = (v) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
+};
 
 /**
  * #1183 contact shadow — is it shed? Tier 2 (Matt, 2026-10-12): it goes only after the tier-1 extras are already
@@ -441,8 +480,10 @@ export function contractCoalesce(rl, shed) {
   const out = [];
   for (const f of rl.coalesce) {
     if (!f || typeof f !== 'object') continue;
-    const x = Number(f.x); const y = Number(f.y);
-    const r = Number(f.r); const fac = r3(Number(f.f));
+    const x = Number(f.x);
+    const y = Number(f.y);
+    const r = Number(f.r);
+    const fac = r3(Number(f.f));
     const tint = typeof f.tint === 'string' ? f.tint.toLowerCase() : '';
     if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
     if (!Number.isFinite(r) || !(r > 0)) continue;
@@ -475,9 +516,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
   const assetIds = new Set();
   // Doc layers are looked up by id for fields resolveLayers() doesn't
   // forward (matte); the app model itself is untouched (#189).
-  const docLayerById = new Map(
-    (doc.layers || []).filter((l) => l && l.id != null).map((l) => [String(l.id), l])
-  );
+  const docLayerById = new Map((doc.layers || []).filter((l) => l && l.id != null).map((l) => [String(l.id), l]));
 
   const shadowShed = contactShadowShed(doc); // #1183
   const deformShed = dishDeformShed(doc); // #1410
@@ -527,7 +566,10 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         opacity: clamp01(rl.layerOpacity ?? 1),
         blend: KNOWN_BLENDS.has(rl.layerBlendMode) ? rl.layerBlendMode : 'normal',
         matte: sanitizeMatte(docLayerById.get(String(rl.id))?.matte),
-        pattern: pattern.drift > 0 ? { ...pattern, t: Number.isFinite(Number(rl.t)) ? Math.round(Number(rl.t) * 1000) / 1000 : 0 } : pattern,
+        pattern:
+          pattern.drift > 0
+            ? { ...pattern, t: Number.isFinite(Number(rl.t)) ? Math.round(Number(rl.t) * 1000) / 1000 : 0 }
+            : pattern,
         palette: patternPalette(rl.palette),
       });
       continue;
@@ -601,9 +643,10 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     {
       const seenAssets = new Set();
       const budget = regionAnimBudget(doc);
-      const overlayById = Array.isArray(doc.customAssets) && doc.customAssets.length
-        ? new Map(doc.customAssets.map((a) => [a && a.id, a]))
-        : null;
+      const overlayById =
+        Array.isArray(doc.customAssets) && doc.customAssets.length
+          ? new Map(doc.customAssets.map((a) => [a && a.id, a]))
+          : null;
       for (const inst of instances) {
         if (seenAssets.has(inst.asset)) continue;
         seenAssets.add(inst.asset);
@@ -616,11 +659,20 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         const recordById = new Map(records.map((r) => [r.id, r]));
         const entry = {};
         for (const [regionId, kid] of Object.entries(assignment)) {
-          if (!animated.has(regionId)) { entry[regionId] = 0; continue; }
+          if (!animated.has(regionId)) {
+            entry[regionId] = 0;
+            continue;
+          }
           const k = getKineme(kid); // sanitizeRegionKinemes proved it exists
-          if (!k) { entry[regionId] = 0; continue; }
+          if (!k) {
+            entry[regionId] = 0;
+            continue;
+          }
           if (!slot.has(k.id)) {
-            if (table.length >= KINEME_TABLE_MAX) { entry[regionId] = 0; continue; } // 16-slot cap, shared with instance kinemes
+            if (table.length >= KINEME_TABLE_MAX) {
+              entry[regionId] = 0;
+              continue;
+            } // 16-slot cap, shared with instance kinemes
             slot.set(k.id, table.length + 1);
             table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
           }
@@ -707,18 +759,19 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     // unshed contract (and its hash) is exactly what it was.
     ...(cellKinemesShed(doc) ? { cellShed: true } : {}),
     textRuns: [], // #550: CUT — no producer (glyph-atlas baker removed; text is baked into stamp assets). Kept as [] for shape/hash stability; the renderer never reads it.
-    accum: accum && accum.enabled
-      ? {
-          enabled: true,
-          fade: Math.min(0.99, Math.max(0, Number(accum.fade ?? 0.88))),
-          optics: sanitizeAccumOptics(accum.optics ?? 0), // #190: bloom/halation/blur-over-time amount
-          tunnel: sanitizeAccumTunnel(accum.tunnel ?? 0), // Phase A: feedback zoom/spin amount
-          prism: sanitizeAccumPrism(accum.prism ?? 0), // Phase A: chromatic drift amount
-          flow: sanitizeAccumFlow(accum.flow ?? 0), // Phase B2: flow-advected feedback amount
-          echoes: sanitizeAccumEchoes(accum.echoes ?? 0), // Phase B3: echo tap count
-          background: hexColor(accum.background, '#000000'),
-        }
-      : null,
+    accum:
+      accum && accum.enabled
+        ? {
+            enabled: true,
+            fade: Math.min(0.99, Math.max(0, Number(accum.fade ?? 0.88))),
+            optics: sanitizeAccumOptics(accum.optics ?? 0), // #190: bloom/halation/blur-over-time amount
+            tunnel: sanitizeAccumTunnel(accum.tunnel ?? 0), // Phase A: feedback zoom/spin amount
+            prism: sanitizeAccumPrism(accum.prism ?? 0), // Phase A: chromatic drift amount
+            flow: sanitizeAccumFlow(accum.flow ?? 0), // Phase B2: flow-advected feedback amount
+            echoes: sanitizeAccumEchoes(accum.echoes ?? 0), // Phase B3: echo tap count
+            background: hexColor(accum.background, '#000000'),
+          }
+        : null,
     provenance: {
       contractVersion: GL_CONTRACT_VERSION,
       caps: caps ? { ...caps } : null,
@@ -734,7 +787,9 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
  * hand-built scene with an unknown kind is a bug, not data).
  */
 export function assertSceneContract(scene) {
-  const fail = (msg) => { throw new Error(`sceneContract: ${msg}`); };
+  const fail = (msg) => {
+    throw new Error(`sceneContract: ${msg}`);
+  };
   if (!scene || typeof scene !== 'object') fail('scene must be an object');
   if (scene.version !== GL_CONTRACT_VERSION) fail(`unsupported version ${scene.version}`);
   if (!scene.canvas || !Number.isFinite(scene.canvas.w) || !Number.isFinite(scene.canvas.h)) {
@@ -753,20 +808,24 @@ export function assertSceneContract(scene) {
   for (const l of scene.layers) {
     if (!l.id || layerIds.has(l.id)) fail(`duplicate or missing layer id: ${l.id}`);
     layerIds.add(l.id);
-    if (l.type !== 'content' && l.type !== 'fx' && l.type !== 'math' && l.type !== 'pattern') fail(`layer ${l.id}: bad type ${l.type}`);
+    if (l.type !== 'content' && l.type !== 'fx' && l.type !== 'math' && l.type !== 'pattern')
+      fail(`layer ${l.id}: bad type ${l.type}`);
     if (l.type === 'pattern') {
       if (!l.pattern || typeof l.pattern !== 'object') fail(`pattern layer ${l.id}: pattern block required`);
       if (!l.palette || !Array.isArray(l.palette.swatches)) fail(`pattern layer ${l.id}: palette required`);
     }
-    if (l.shadow !== undefined) { // #1183 contact shadow
+    if (l.shadow !== undefined) {
+      // #1183 contact shadow
       const sh = l.shadow;
       if (l.type !== 'content') fail(`layer ${l.id}: only content layers cast a shadow`);
       if (!sh || typeof sh !== 'object' || !Number.isFinite(sh.amount) || sh.amount <= 0 || sh.amount > 1) {
         fail(`layer ${l.id}: shadow.amount must be in (0, 1]`);
       }
-      if (typeof sh.color !== 'string' || !/^#[0-9a-f]{6}$/.test(sh.color)) fail(`layer ${l.id}: shadow.color must be #rrggbb`);
+      if (typeof sh.color !== 'string' || !/^#[0-9a-f]{6}$/.test(sh.color))
+        fail(`layer ${l.id}: shadow.color must be #rrggbb`);
     }
-    if (l.coalesce !== undefined) { // #1411 coalescence fields
+    if (l.coalesce !== undefined) {
+      // #1411 coalescence fields
       if (l.type !== 'content') fail(`layer ${l.id}: only content layers coalesce`);
       if (!Array.isArray(l.coalesce) || l.coalesce.length === 0 || l.coalesce.length > COALESCE_MAX_FIELDS) {
         fail(`layer ${l.id}: coalesce must be an array of 1..${COALESCE_MAX_FIELDS} fields`);
@@ -777,7 +836,8 @@ export function assertSceneContract(scene) {
         }
         if (!Number.isFinite(f.r) || !(f.r > 0)) fail(`layer ${l.id}: coalesce field r must be > 0`);
         if (!Number.isFinite(f.f) || !(f.f > 0) || f.f > 1) fail(`layer ${l.id}: coalesce field f must be in (0, 1]`);
-        if (typeof f.tint !== 'string' || !/^#[0-9a-f]{6}$/.test(f.tint)) fail(`layer ${l.id}: coalesce field tint must be #rrggbb`);
+        if (typeof f.tint !== 'string' || !/^#[0-9a-f]{6}$/.test(f.tint))
+          fail(`layer ${l.id}: coalesce field tint must be #rrggbb`);
       }
     }
     if (l.matte !== null && l.matte !== undefined) {
@@ -815,7 +875,8 @@ export function assertSceneContract(scene) {
       if (!Number.isFinite(it[k])) fail(`instance ${it.key}: ${k} must be finite`);
     }
     if (it.opacity < 0 || it.opacity > 1) fail(`instance ${it.key}: opacity out of range`);
-    if (it.deform !== undefined) { // #1410 impact deform
+    if (it.deform !== undefined) {
+      // #1410 impact deform
       const d = it.deform;
       if (!Array.isArray(d) || d.length !== 3 || !d.every(Number.isFinite)) {
         fail(`instance ${it.key}: deform must be [axisX, axisY, amount] of finite numbers`);
@@ -823,7 +884,8 @@ export function assertSceneContract(scene) {
       if (Math.abs(Math.hypot(d[0], d[1]) - 1) > 0.01) fail(`instance ${it.key}: deform axis must be a unit vector`);
       if (!(d[2] > 0 && d[2] <= 1)) fail(`instance ${it.key}: deform amount must be in (0, 1]`);
     }
-    if (it.engrave !== undefined) { // Phase 2 S4 engraving (engine/engraveBody.mjs)
+    if (it.engrave !== undefined) {
+      // Phase 2 S4 engraving (engine/engraveBody.mjs)
       const e = it.engrave;
       if (!Array.isArray(e) || e.length !== 16 || !e.every(Number.isFinite)) {
         fail(`instance ${it.key}: engrave must be 16 finite numbers [joints x6, count, spacing, width, strength]`);
@@ -832,26 +894,31 @@ export function assertSceneContract(scene) {
       if (!(e[13] > 0)) fail(`instance ${it.key}: engrave spacing must be > 0`);
     }
   }
-  if (scene.regionAnim !== undefined) { // #1433 region playback state
+  if (scene.regionAnim !== undefined) {
+    // #1433 region playback state
     const ra = scene.regionAnim;
     if (!ra || typeof ra !== 'object' || Array.isArray(ra)) fail('regionAnim must be an object');
     if (!Number.isInteger(ra.budget) || ra.budget < 0 || ra.budget > REGION_TAG_CAP) {
       fail(`regionAnim.budget must be an integer in [0, ${REGION_TAG_CAP}]`);
     }
     if (ra.shed !== undefined && ra.shed !== true) fail('regionAnim.shed must be true when present');
-    if (!ra.assets || typeof ra.assets !== 'object' || Array.isArray(ra.assets)) fail('regionAnim.assets must be an object');
+    if (!ra.assets || typeof ra.assets !== 'object' || Array.isArray(ra.assets))
+      fail('regionAnim.assets must be an object');
     for (const [assetId, entry] of Object.entries(ra.assets)) {
-      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`regionAnim.assets.${assetId} must be an object`);
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+        fail(`regionAnim.assets.${assetId} must be an object`);
       for (const [regionId, s] of Object.entries(entry)) {
         if (!Number.isInteger(s) || s < 0 || s > (scene.kinemes?.length || 0)) {
           fail(`regionAnim slot for ${assetId}/${regionId} out of range`);
         }
       }
     }
-    if (ra.bend !== undefined) { // #1435 R4: per-region bend slice counts
+    if (ra.bend !== undefined) {
+      // #1435 R4: per-region bend slice counts
       if (!ra.bend || typeof ra.bend !== 'object' || Array.isArray(ra.bend)) fail('regionAnim.bend must be an object');
       for (const [assetId, entry] of Object.entries(ra.bend)) {
-        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) fail(`regionAnim.bend.${assetId} must be an object`);
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry))
+          fail(`regionAnim.bend.${assetId} must be an object`);
         for (const [regionId, n] of Object.entries(entry)) {
           if (!Number.isInteger(n) || n < 3 || n > 8) {
             fail(`regionAnim bend slices for ${assetId}/${regionId} out of range`);

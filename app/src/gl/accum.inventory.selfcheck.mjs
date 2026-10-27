@@ -52,7 +52,11 @@ test('#819 grain is not mixed inside accum.mjs keep', () => {
 });
 
 test('#819 recipe paths have no destination-in alpha fade', () => {
-  for (const [name, src] of [['liveLoop', live], ['accumStill', still], ['studio.py', studio]]) {
+  for (const [name, src] of [
+    ['liveLoop', live],
+    ['accumStill', still],
+    ['studio.py', studio],
+  ]) {
     assert.doesNotMatch(src, /destination-in/, `${name} must not fade alpha`);
     assert.doesNotMatch(src, /globalCompositeOperation/, `${name} must not composite in 2D`);
   }

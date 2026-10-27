@@ -76,16 +76,14 @@ export function createPaletteMix() {
   let seen = null; // { id, overrides, user } — identity of the last update
   let dissolve = null; // null | { start: -1 (arming) | ms timestamp, dur }
 
-  function update({
-    id, overrides, userPalettes, mode, assetsKey,
-    mixSeconds, now, canDissolve, bakeReady, scrubT,
-  }) {
-    const changed = !seen
-      || id !== seen.id
-      || overrides !== seen.overrides
-      || userPalettes !== seen.user
-      || mode !== seen.mode
-      || assetsKey !== seen.assetsKey;
+  function update({ id, overrides, userPalettes, mode, assetsKey, mixSeconds, now, canDissolve, bakeReady, scrubT }) {
+    const changed =
+      !seen ||
+      id !== seen.id ||
+      overrides !== seen.overrides ||
+      userPalettes !== seen.user ||
+      mode !== seen.mode ||
+      assetsKey !== seen.assetsKey;
     if (changed) {
       const retarget = dissolve !== null;
       seen = { id, overrides, user: userPalettes, mode, assetsKey };

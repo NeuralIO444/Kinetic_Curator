@@ -136,29 +136,30 @@ test('Spine F: organism items include real vx and vy', () => {
 
 test('Spine F: MOD patch coupled to HYPE organism track perturbs target knobs', () => {
   const r = createLiveResolver();
-  const makeInput = (patch) => baseInput({
-    layers: [
-      { id: 'lyr-hype', name: 'Hype Source', visible: true },
-      { id: 'lyr-target', name: 'Target', visible: true, patch },
-    ],
-    activeLayerId: 'lyr-hype',
-    seed: 555,
-    layoutParams: {
-      ...DEFAULT_LAYOUT_PARAMS,
-      mode: 'hype',
-      behave: 'flock',
-      particleCount: 30,
-      body: 2,
-    },
-    layerSnapshots: {
-      'lyr-target': {
-        seed: 555,
-        paletteId: 'bone',
-        layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 16 },
+  const makeInput = (patch) =>
+    baseInput({
+      layers: [
+        { id: 'lyr-hype', name: 'Hype Source', visible: true },
+        { id: 'lyr-target', name: 'Target', visible: true, patch },
+      ],
+      activeLayerId: 'lyr-hype',
+      seed: 555,
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'hype',
+        behave: 'flock',
+        particleCount: 30,
+        body: 2,
       },
-    },
-    loopTimeMs: 200,
-  });
+      layerSnapshots: {
+        'lyr-target': {
+          seed: 555,
+          paletteId: 'bone',
+          layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'grid', count: 16 },
+        },
+      },
+      loopTimeMs: 200,
+    });
 
   // #457 — patch.to is a stable layer id now, not an ordinal into the
   // visible-only content list; 'lyr-hype' is this test's source layer.
@@ -258,17 +259,18 @@ test('Spine F: live displacement offset breathes with loopTimeMs; slowRender/sti
 
 test('Spine F: mode layers with displacement shows bands slipping at different rates', () => {
   const r = createLiveResolver();
-  const input = (loopTimeMs) => baseInput({
-    layoutParams: {
-      ...DEFAULT_LAYOUT_PARAMS,
-      mode: 'layers',
-      count: 50,
-      displacement: 80,
-      noiseSpeed: 0.5,
-    },
-    loopTimeMs,
-    slowRender: false,
-  });
+  const input = (loopTimeMs) =>
+    baseInput({
+      layoutParams: {
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'layers',
+        count: 50,
+        displacement: 80,
+        noiseSpeed: 0.5,
+      },
+      loopTimeMs,
+      slowRender: false,
+    });
 
   const a = r.resolveLayers(input(0))[0].items;
   const b = r.resolveLayers(input(1500))[0].items;

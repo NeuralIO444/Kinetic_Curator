@@ -21,10 +21,27 @@ assert.strictEqual(validateLayoutParams({ squash: -1 }).params.squash, 0);
 assert.strictEqual(validateLayoutParams({ squash: 'x' }).params.squash, 0);
 
 // ── contract: key omitted when off, so unlit/unsquashed hashes never move ─
-const layer = (vx) => [{ id: 'L', isFx: false, items: [{
-  assetId: ASSETS[0].id, x: 500, y: 350, scale: 1.4, rotation: 0,
-  color: '#ffffff', accent: '#ffffff', alpha: 100, vx, vy: 0, key: 'k0',
-}] }];
+const layer = (vx) => [
+  {
+    id: 'L',
+    isFx: false,
+    items: [
+      {
+        assetId: ASSETS[0].id,
+        x: 500,
+        y: 350,
+        scale: 1.4,
+        rotation: 0,
+        color: '#ffffff',
+        accent: '#ffffff',
+        alpha: 100,
+        vx,
+        vy: 0,
+        key: 'k0',
+      },
+    ],
+  },
+];
 const contract = (doc, vx = 12) => buildSceneContract({ doc: { seed: 1, ...doc }, resolvedLayers: layer(vx) });
 assert.ok(!('squash' in contract({})), 'no squash → no key');
 assert.ok(!('squash' in contract({ squash: 0 })), 'squash 0 → no key');
@@ -36,8 +53,11 @@ assert.ok(!('squash' in contract({ squash: NaN })));
 
 // ── shader: squash only inside the smear, only when > 0 ───────────────────
 assert.match(QUAD_VS, /uniform vec3 u_smear;/);
-assert.match(QUAD_VS, /if \(sms > 1e-4\) \{[^]*if \(u_smear\.z > 0\.0\) \{[^]*1\.0 \/ \(1\.0 \+ smk\)[^]*\}\s*\}/,
-  'squash lives inside the moving-mark branch and is gated on > 0');
+assert.match(
+  QUAD_VS,
+  /if \(sms > 1e-4\) \{[^]*if \(u_smear\.z > 0\.0\) \{[^]*1\.0 \/ \(1\.0 \+ smk\)[^]*\}\s*\}/,
+  'squash lives inside the moving-mark branch and is gated on > 0',
+);
 
 // ── JS mirror of the vertex math: area of a unit square after the transform ─
 function transform([x, y], v, q) {
@@ -58,7 +78,12 @@ const area = (v, q) => {
   const [a, b] = [transform([1, 0], v, q), transform([0, 1], v, q)];
   return Math.abs(a[0] * b[1] - a[1] * b[0]);
 };
-for (const v of [[12, 0], [5, 5], [0, -30], [0.5, 0.2]]) {
+for (const v of [
+  [12, 0],
+  [5, 5],
+  [0, -30],
+  [0.5, 0.2],
+]) {
   const k = Math.min(Math.hypot(...v) * SMEAR_K, SMEAR_MAX);
   assert.ok(Math.abs(area(v, 0) - (1 + k)) < 1e-9, `stretch-only grows area by 1+k (${v})`);
   assert.ok(Math.abs(area(v, 1) - 1) < 1e-9, `squash 1 holds area (${v})`);
@@ -71,7 +96,11 @@ console.log('squash node: OK');
 async function runBrowserTests() {
   const { renderViaGL, closeGlDriver } = await import('./parity/glDriver.mjs');
   const render = async (c) => (await renderViaGL(c, { width: 400, height: 280, bg: '#000000' })).pixels;
-  const lit = (px) => { let n = 0; for (let i = 3; i < px.length; i += 4) if (px[i - 3] + px[i - 2] + px[i - 1] > 96) n++; return n; };
+  const lit = (px) => {
+    let n = 0;
+    for (let i = 3; i < px.length; i += 4) if (px[i - 3] + px[i - 2] + px[i - 1] > 96) n++;
+    return n;
+  };
   try {
     const rest = await render(contract({}, 0));
     const smear = await render(contract({}, 12));

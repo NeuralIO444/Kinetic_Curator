@@ -156,9 +156,10 @@ const base = {
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   assert.ok(
-    /audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, effRoutes, shapedBands\)/.test(
-      src('../gl/liveLoop.mjs'),
-    ) && /effectiveRoutes\(s\.audioRoutes, !!synth\)/.test(src('../gl/liveLoop.mjs')),
+    fre(
+      /audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, effRoutes, shapedBands\)/,
+    ).test(flat(src('../gl/liveLoop.mjs'))) &&
+      fre(/effectiveRoutes\(s\.audioRoutes, !!synth\)/).test(flat(src('../gl/liveLoop.mjs'))),
     'the live loop passes the scene table (default while her set plays and there are no routes) and the shaped bands',
   );
   const sites = {

@@ -15,7 +15,12 @@
 import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
-  CELL_KINEMES, ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor,
+  CELL_KINEMES,
+  ASSET_CELL_KINEME,
+  getCellKineme,
+  cellIndexAt,
+  cellUvWindow,
+  stripFramesFor,
 } from '../data/cellKinemes.js';
 import { MICRO_HUD_STRIPS } from '../data/assets/assets-micro-hud-strips.js';
 import { LINE_STRIPS } from '../data/assets/assets-line-strips.js';
@@ -39,7 +44,7 @@ for (const k of CELL_KINEMES) {
   // centre instead (== the old probe for the even-count kinemes).
   const midCell = Math.floor(k.cells / 2);
   assert.strictEqual(cellIndexAt(((midCell + 0.5) / k.cells) * k.period, k), midCell, `${k.id} mid-strip cell`);
-  assert.strictEqual(cellIndexAt(1.5 / k.cells * k.period, k), 1, `${k.id} reaches cell 1`);
+  assert.strictEqual(cellIndexAt((1.5 / k.cells) * k.period, k), 1, `${k.id} reaches cell 1`);
   const seen = new Set();
   for (let s = 0; s < 400; s++) seen.add(cellIndexAt((s / 400) * k.period, k));
   assert.strictEqual(seen.size, k.cells, `${k.id} visits all ${k.cells} cells in one period`);
@@ -54,7 +59,8 @@ for (const k of CELL_KINEMES) {
   for (const k of CELL_KINEMES) {
     const wins = Array.from({ length: k.cells }, (_, i) => cellUvWindow(cell, i, k.cells));
     assert.strictEqual(wins[0].u0, cell.u0, `${k.id} window 0 starts at the cell edge`);
-    for (let i = 1; i < k.cells; i++) assert.strictEqual(wins[i].u0, wins[i - 1].u1, `${k.id} windows tile contiguously`);
+    for (let i = 1; i < k.cells; i++)
+      assert.strictEqual(wins[i].u0, wins[i - 1].u1, `${k.id} windows tile contiguously`);
     assert.ok(Math.abs(wins[k.cells - 1].u1 - cell.u1) < 1e-12, `${k.id} last window ends at the cell edge`);
     for (const w of wins) {
       assert.strictEqual(w.v0, cell.v0);
@@ -83,7 +89,11 @@ for (const a of STRIP_ASSETS) {
   const atlas = bakeAtlas([{ asset: a, ink: INK, accent: ACC }]);
   const cell = atlas.cells.get(comboKey(a, INK, ACC));
   const k = getCellKineme(ASSET_CELL_KINEME[a]);
-  assert.strictEqual(Math.round((cell.u1 - cell.u0) * atlas.width), k.cells * CELL_PX - 1, `${a} cell spans ${k.cells} frames of texels`);
+  assert.strictEqual(
+    Math.round((cell.u1 - cell.u0) * atlas.width),
+    k.cells * CELL_PX - 1,
+    `${a} cell spans ${k.cells} frames of texels`,
+  );
   assert.strictEqual(Math.round((cell.v1 - cell.v0) * atlas.height), CELL_PX - 1, `${a} cell is one frame tall`);
   assert.ok(cell.ink, `${a} carries an ink bbox`);
   stripBakes.set(a, { atlas, cell });
@@ -138,7 +148,8 @@ console.log('cellKinemePlayback node (bake): OK');
   // math with float32 tolerance.
   const assertUv = (buf, want, msg) => {
     const got = [buf[6], buf[7], buf[8], buf[9]];
-    for (let i = 0; i < 4; i++) assert.ok(Math.abs(got[i] - want[i]) < 2e-7, `${msg} (uv[${i}] ${got[i]} ≈ ${want[i]})`);
+    for (let i = 0; i < 4; i++)
+      assert.ok(Math.abs(got[i] - want[i]) < 2e-7, `${msg} (uv[${i}] ${got[i]} ≈ ${want[i]})`);
   };
   for (const a of STRIP_ASSETS) {
     const { atlas, cell } = stripBakes.get(a);
@@ -146,9 +157,22 @@ console.log('cellKinemePlayback node (bake): OK');
     const k = getCellKineme(ASSET_CELL_KINEME[a]);
     const inst = { asset: a, tint: INK, accent: ACC, x: 10, y: 20, scaleX: 2, scaleY: 2, rotation: 0, opacity: 1 };
     // No clock → today's pack, the full cell.
-    assertUv(packInstanceData([inst], cellsObj), [cell.u0, cell.v0, cell.u1, cell.v1], `${a}: no clock packs the full cell`);
+    assertUv(
+      packInstanceData([inst], cellsObj),
+      [cell.u0, cell.v0, cell.u1, cell.v1],
+      `${a}: no clock packs the full cell`,
+    );
     // Clock → the window of the cell the clock selects.
-    for (const t of [0, 0.37, 1.5 / k.cells * k.period, k.period / 2, k.period - 0.01, k.period, k.period * 2.75, -0.5]) {
+    for (const t of [
+      0,
+      0.37,
+      (1.5 / k.cells) * k.period,
+      k.period / 2,
+      k.period - 0.01,
+      k.period,
+      k.period * 2.75,
+      -0.5,
+    ]) {
       const want = cellUvWindow(cell, cellIndexAt(t, k), k.cells);
       assertUv(
         packInstanceData([inst], cellsObj, 1, { motionTime: t, shed: false }),
@@ -167,7 +191,17 @@ console.log('cellKinemePlayback node (bake): OK');
   // A non-strip instance is untouched by the clock — byte for byte.
   const { atlas: plain } = stripBakes.get('__plain__');
   const plainCells = Object.fromEntries(plain.cells);
-  const pinst = { asset: 'geo_tri_01', tint: INK, accent: ACC, x: 1, y: 2, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1 };
+  const pinst = {
+    asset: 'geo_tri_01',
+    tint: INK,
+    accent: ACC,
+    x: 1,
+    y: 2,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+    opacity: 1,
+  };
   const before = packInstanceData([pinst], plainCells);
   const clocked = packInstanceData([pinst], plainCells, 1, { motionTime: 2.3, shed: false });
   assert.deepStrictEqual(clocked, before, 'non-strip instance: the clock changes nothing');
@@ -175,24 +209,47 @@ console.log('cellKinemePlayback node (bake): OK');
   const legacy = packInstanceData([{ ...pinst, cellIndex: 1, cellCount: 4 }], plainCells);
   const pc = plain.cells.get(comboKey('geo_tri_01', INK, ACC));
   const w = (pc.u1 - pc.u0) / 4;
-  assert.ok(Math.abs(legacy[6] - (pc.u0 + w)) < 1e-7 && Math.abs(legacy[8] - (pc.u0 + 2 * w)) < 1e-7, 'legacy cellIndex branch unchanged');
+  assert.ok(
+    Math.abs(legacy[6] - (pc.u0 + w)) < 1e-7 && Math.abs(legacy[8] - (pc.u0 + 2 * w)) < 1e-7,
+    'legacy cellIndex branch unchanged',
+  );
 }
 console.log('cellKinemePlayback node (pack): OK');
 
 // ── the contract ─────────────────────────────────────────────────────────
-const item = (assetId, key) => ({ assetId, x: 500, y: 350, scale: 2.5, rotation: 0, color: '#ffffff', accent: '#ff4444', alpha: 100, key, seedOffset: 0 });
+const item = (assetId, key) => ({
+  assetId,
+  x: 500,
+  y: 350,
+  scale: 2.5,
+  rotation: 0,
+  color: '#ffffff',
+  accent: '#ff4444',
+  alpha: 100,
+  key,
+  seedOffset: 0,
+});
 const layer = (items) => [{ id: 'L', isFx: false, items }];
 const contract = (doc, items) => buildSceneContract({ doc: { seed: 1, ...doc }, resolvedLayers: layer(items) });
 {
   const bare = contract({}, [item('mic_dial', 'a')]);
-  assert.ok(!('kinemeTime' in bare) && !('kinemes' in bare) && !('cellShed' in bare), 'motionless doc → no motion keys (hashes unchanged)');
+  assert.ok(
+    !('kinemeTime' in bare) && !('kinemes' in bare) && !('cellShed' in bare),
+    'motionless doc → no motion keys (hashes unchanged)',
+  );
   const timed = contract({ kinemeTime: 1.25 }, [item('mic_dial', 'a')]);
   assert.strictEqual(timed.kinemeTime, 1.25, 'motion time rides without an instance-kineme table');
   assert.ok(!('kinemes' in timed) && !('cellShed' in timed), 'timed but unshed: no table, no shed key');
   const shed = contract({ kinemeTime: 2, perfTier1: true, quality: 'performance' }, [item('mic_dial', 'a')]);
   assert.strictEqual(shed.cellShed, true, 'tier-2 rung sheds the strips');
-  assert.ok(!('cellShed' in contract({ perfTier1: true, quality: 'balanced' }, [item('mic_dial', 'a')])), 'tier-1 alone does not shed');
-  assert.ok(!('cellShed' in contract({ quality: 'performance' }, [item('mic_dial', 'a')])), 'PERF quality alone does not shed');
+  assert.ok(
+    !('cellShed' in contract({ perfTier1: true, quality: 'balanced' }, [item('mic_dial', 'a')])),
+    'tier-1 alone does not shed',
+  );
+  assert.ok(
+    !('cellShed' in contract({ quality: 'performance' }, [item('mic_dial', 'a')])),
+    'PERF quality alone does not shed',
+  );
   assert.strictEqual(cellKinemesShed({ perfTier1: true, quality: 'performance' }), true);
   assert.strictEqual(cellKinemesShed({ perfTier1: true, quality: 'balanced' }), false);
   assert.strictEqual(cellKinemesShed({}), false);
@@ -219,7 +276,7 @@ async function runBrowserTests() {
     for (const a of STRIP_ASSETS) {
       const k = getCellKineme(ASSET_CELL_KINEME[a]);
       const c0 = await shot({ kinemeTime: 0 }, a);
-      const c1 = await shot({ kinemeTime: 1.5 / k.cells * k.period }, a);
+      const c1 = await shot({ kinemeTime: (1.5 / k.cells) * k.period }, a);
       const d = diffPx(c0, c1);
       report.push(`${a} cell0→cell1 ${d}px`);
       assert.ok(d > 40, `${a} visibly steps to cell 1 (${d} differing px)`);

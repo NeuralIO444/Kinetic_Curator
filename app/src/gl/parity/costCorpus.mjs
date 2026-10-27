@@ -33,9 +33,7 @@ import { CORPUS as PARITY_CORPUS } from './corpus.mjs';
 
 // Text-bearing stamps stay out (same rule as corpus.mjs: reference pixels —
 // and here, atlas bakes — must not depend on font resolution).
-const TEXT_ASSET_IDS = new Set(
-  ASSETS.filter((a) => a.svg.includes('<text')).map((a) => a.id)
-);
+const TEXT_ASSET_IDS = new Set(ASSETS.filter((a) => a.svg.includes('<text')).map((a) => a.id));
 const ALL_ASSET_IDS = ASSETS.map((a) => a.id).sort();
 const CASTABLE_IDS = ALL_ASSET_IDS.filter((id) => !TEXT_ASSET_IDS.has(id));
 
@@ -56,15 +54,13 @@ const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, ...over });
 function doc(over = {}) {
   return {
     version: 1,
-    seed: 0xC057,
+    seed: 0xc057,
     paletteId: 'praystation',
     paletteOverrides: null,
     layoutParams: lp({ count: 48 }),
     enabledAssets: castOf(8),
     quality: 'balanced',
-    layers: [
-      { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    ],
+    layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
     activeLayerId: 'bg',
     layerSnapshots: {},
     ...over,
@@ -73,8 +69,13 @@ function doc(over = {}) {
 
 function fxLayer(id, effects, layerOpacity = 1) {
   return {
-    id, name: id.toUpperCase(), type: 'fx', visible: true,
-    layerBlendMode: 'normal', layerOpacity, effects,
+    id,
+    name: id.toUpperCase(),
+    type: 'fx',
+    visible: true,
+    layerBlendMode: 'normal',
+    layerOpacity,
+    effects,
   };
 }
 
@@ -101,15 +102,35 @@ const GRID = [
   // — count ladder (bodies axis) —
   { id: 'grid-count-12', description: 'Count ladder: 12 bodies.', doc: doc({ layoutParams: lp({ count: 12 }) }) },
   { id: 'grid-count-160', description: 'Count ladder: 160 bodies.', doc: doc({ layoutParams: lp({ count: 160 }) }) },
-  { id: 'grid-count-480', description: 'Count ladder: 480 bodies (heavy tail).', doc: doc({ layoutParams: lp({ count: 480 }) }) },
+  {
+    id: 'grid-count-480',
+    description: 'Count ladder: 480 bodies (heavy tail).',
+    doc: doc({ layoutParams: lp({ count: 480 }) }),
+  },
 
   // — cast ladder (atlas/instance variety axis) —
-  { id: 'grid-cast-4', description: 'Cast ladder: 4 assets, 160 bodies.', doc: doc({ layoutParams: lp({ count: 160 }), enabledAssets: castOf(4) }) },
-  { id: 'grid-cast-24', description: 'Cast ladder: 24 assets, 160 bodies.', doc: doc({ layoutParams: lp({ count: 160 }), enabledAssets: castOf(24, 7) }) },
+  {
+    id: 'grid-cast-4',
+    description: 'Cast ladder: 4 assets, 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160 }), enabledAssets: castOf(4) }),
+  },
+  {
+    id: 'grid-cast-24',
+    description: 'Cast ladder: 24 assets, 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160 }), enabledAssets: castOf(24, 7) }),
+  },
 
   // — scale ladder (overdraw axis) —
-  { id: 'grid-scale-small', description: 'Scale ladder: small marks (0.2-0.4), 160 bodies.', doc: doc({ layoutParams: lp({ count: 160, scale: { x: [0.2, 0.4], y: [0.2, 0.4] } }) }) },
-  { id: 'grid-scale-large', description: 'Scale ladder: large marks (1.8-2.6), 160 bodies.', doc: doc({ layoutParams: lp({ count: 160, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }) },
+  {
+    id: 'grid-scale-small',
+    description: 'Scale ladder: small marks (0.2-0.4), 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160, scale: { x: [0.2, 0.4], y: [0.2, 0.4] } }) }),
+  },
+  {
+    id: 'grid-scale-large',
+    description: 'Scale ladder: large marks (1.8-2.6), 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }),
+  },
 
   // — FX depth ladder (fullscreen-pass axis) —
   { id: 'grid-fx-1', description: 'FX ladder: 1 wrap (grain).', doc: withFx(1) },
@@ -118,18 +139,53 @@ const GRID = [
   { id: 'grid-fx-4', description: 'FX ladder: 4 wraps (+ posterize).', doc: withFx(4) },
 
   // — blend + mirror (composite axis) —
-  { id: 'grid-blend-screen', description: 'Blend: screen at 160 bodies.', doc: doc({ layoutParams: lp({ count: 160, blendMode: 'screen' }) }) },
-  { id: 'grid-mirror-x', description: 'Mirror: x at 160 bodies.', doc: doc({ layoutParams: lp({ count: 160, mirror: 'x' }) }) },
+  {
+    id: 'grid-blend-screen',
+    description: 'Blend: screen at 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160, blendMode: 'screen' }) }),
+  },
+  {
+    id: 'grid-mirror-x',
+    description: 'Mirror: x at 160 bodies.',
+    doc: doc({ layoutParams: lp({ count: 160, mirror: 'x' }) }),
+  },
 
   // — live modes (particle axis; particleCount spec max is 500) —
-  { id: 'grid-swarm-150', description: 'Swarm: 150 particles (spec default).', doc: doc({ layoutParams: lp({ mode: 'swarm', particleCount: 150 }) }) },
-  { id: 'grid-swarm-500', description: 'Swarm: 500 particles (spec max).', doc: doc({ layoutParams: lp({ mode: 'swarm', particleCount: 500 }) }) },
+  {
+    id: 'grid-swarm-150',
+    description: 'Swarm: 150 particles (spec default).',
+    doc: doc({ layoutParams: lp({ mode: 'swarm', particleCount: 150 }) }),
+  },
+  {
+    id: 'grid-swarm-500',
+    description: 'Swarm: 500 particles (spec max).',
+    doc: doc({ layoutParams: lp({ mode: 'swarm', particleCount: 500 }) }),
+  },
 
   // — heavy tail: pairwise expensive combinations, deliberately oversampled —
-  { id: 'grid-heavy-count-fx', description: 'Heavy: 480 bodies x 3 FX wraps.', doc: withFx(3, { layoutParams: lp({ count: 480 }) }) },
-  { id: 'grid-heavy-scale-fx', description: 'Heavy: large marks x 2 FX wraps, 160 bodies.', doc: withFx(2, { layoutParams: lp({ count: 160, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }) },
-  { id: 'grid-heavy-count-scale', description: 'Heavy: 480 bodies x large marks.', doc: doc({ layoutParams: lp({ count: 480, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }) },
-  { id: 'grid-heavy-all', description: 'Heavy: 480 bodies x large marks x cast 24 x 4 FX wraps.', doc: withFx(4, { layoutParams: lp({ count: 480, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }), enabledAssets: castOf(24, 7) }) },
+  {
+    id: 'grid-heavy-count-fx',
+    description: 'Heavy: 480 bodies x 3 FX wraps.',
+    doc: withFx(3, { layoutParams: lp({ count: 480 }) }),
+  },
+  {
+    id: 'grid-heavy-scale-fx',
+    description: 'Heavy: large marks x 2 FX wraps, 160 bodies.',
+    doc: withFx(2, { layoutParams: lp({ count: 160, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }),
+  },
+  {
+    id: 'grid-heavy-count-scale',
+    description: 'Heavy: 480 bodies x large marks.',
+    doc: doc({ layoutParams: lp({ count: 480, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }) }),
+  },
+  {
+    id: 'grid-heavy-all',
+    description: 'Heavy: 480 bodies x large marks x cast 24 x 4 FX wraps.',
+    doc: withFx(4, {
+      layoutParams: lp({ count: 480, scale: { x: [1.8, 2.6], y: [1.8, 2.6] } }),
+      enabledAssets: castOf(24, 7),
+    }),
+  },
 ];
 
 /** All bench recipes: parity anchors first (the sanity ladder), then the grid. */
@@ -147,5 +203,7 @@ export function getCostScene(id) {
 /** The enabled cast ids of a doc — the `assets` input recipeFeatures expects. */
 export function castIdsOf(doc) {
   const enabled = doc.enabledAssets || {};
-  return Object.keys(enabled).filter((id) => enabled[id]).sort();
+  return Object.keys(enabled)
+    .filter((id) => enabled[id])
+    .sort();
 }

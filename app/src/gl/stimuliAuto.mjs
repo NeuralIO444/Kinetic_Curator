@@ -23,8 +23,12 @@ export const DEPTH_FLOOR = 0.001;
  * scale, alpha, squash, breath, light, accum — `color.hue`, `clock.kinemeRate`
  * and glow are not starter targets). At most STARTER_MAX routes are built. */
 export const STARTER_TARGETS = Object.freeze([
-  'render.scale', 'render.alpha', 'render.squash', 'render.breath',
-  'light.intensity', 'render.accum',
+  'render.scale',
+  'render.alpha',
+  'render.squash',
+  'render.breath',
+  'light.intensity',
+  'render.accum',
 ]);
 
 /** A starter fills at most one slot per fair target (#980 decision 4 lists
@@ -59,11 +63,16 @@ export function inputEnergy(id, snap) {
  * independent: a missing tap must not wipe a peak already heard.
  */
 export function absorbPeaks(peaks, snap) {
-  const next = peaks ? {
-    beat: num(peaks.beat), level: num(peaks.level), bass: num(peaks.bass),
-    mid: num(peaks.mid), treble: num(peaks.treble),
-    bands: { ...(peaks.bands || {}) },
-  } : { beat: 0, level: 0, bass: 0, mid: 0, treble: 0, bands: {} };
+  const next = peaks
+    ? {
+        beat: num(peaks.beat),
+        level: num(peaks.level),
+        bass: num(peaks.bass),
+        mid: num(peaks.mid),
+        treble: num(peaks.treble),
+        bands: { ...(peaks.bands || {}) },
+      }
+    : { beat: 0, level: 0, bass: 0, mid: 0, treble: 0, bands: {} };
   if (!snap) return next;
   next.beat = Math.max(next.beat, num(snap.beat ?? snap.beatPulse));
   next.level = Math.max(next.level, num(snap.level ?? snap.rms));
@@ -89,9 +98,7 @@ export function snapshotFromReads({ audioBands, beatPulse, meter } = {}) {
 function rank(snap) {
   const coarse = COARSE_INPUTS.map((id) => ({ id, energy: inputEnergy(id, snap), coarse: true }));
   const bands = BAND_INPUTS.map((id) => ({ id, energy: inputEnergy(id, snap), coarse: false }));
-  return [...coarse, ...bands].sort((a, b) => (
-    b.energy - a.energy || (a.coarse === b.coarse ? 0 : a.coarse ? -1 : 1)
-  ));
+  return [...coarse, ...bands].sort((a, b) => b.energy - a.energy || (a.coarse === b.coarse ? 0 : a.coarse ? -1 : 1));
 }
 
 function route(input, target) {
@@ -147,7 +154,8 @@ export function retuneRoutes(routes, snap) {
   if (!table.length) {
     const built = autoSetupRoutes(snap);
     // No signal: RETUNE changes nothing either (#980 — say so, don't arm).
-    if (!built.heard) return { routes: null, changed: false, fixed: 0, note: 'no signal — turn the mic on and play something' };
+    if (!built.heard)
+      return { routes: null, changed: false, fixed: 0, note: 'no signal — turn the mic on and play something' };
     return { routes: built.routes, changed: true, fixed: built.routes.length, note: 'armed from the live input' };
   }
   const used = new Set(table.map((r) => r.input));
@@ -169,25 +177,33 @@ export function retuneRoutes(routes, snap) {
     fixed += 1;
     return { ...r, depth: STARTER_DEPTH[r.target] ?? 0.2 };
   });
-  const note = fixed
-    ? `retuned ${fixed} dead ${fixed === 1 ? 'route' : 'routes'}`
-    : 'routes already moving';
+  const note = fixed ? `retuned ${fixed} dead ${fixed === 1 ? 'route' : 'routes'}` : 'routes already moving';
   return { routes: next, changed: fixed > 0, fixed, note };
 }
 
 /** True when the starter actually moves scale under a typical master depth. */
 export function starterMovesScale(routes, snap, master = { depth: 0.65, scaleMod: 0.45, alphaMod: 0.25 }) {
-  const out = evaluateRoutes({
-    beatPulse: inputEnergy('beat', snap),
-    rms: inputEnergy('level', snap),
-    bass: inputEnergy('bass', snap),
-    mid: inputEnergy('mid', snap),
-    treble: inputEnergy('treble', snap),
-  }, master, routes, snap?.bands || null);
+  const out = evaluateRoutes(
+    {
+      beatPulse: inputEnergy('beat', snap),
+      rms: inputEnergy('level', snap),
+      bass: inputEnergy('bass', snap),
+      mid: inputEnergy('mid', snap),
+      treble: inputEnergy('treble', snap),
+    },
+    master,
+    routes,
+    snap?.bands || null,
+  );
   // The starter's own targets (#980 decision 4): scale, alpha, squash, breath,
   // light, accum. glow and hue are not starter targets, so they are not read.
-  return out.scaleMul > 1.02 || out.alphaBoost > 0.5
-    || (out.squash ?? 0) > 0.05 || (out.accum ?? 0) > 0.5 || (out.sun ?? 0) > 0.05;
+  return (
+    out.scaleMul > 1.02 ||
+    out.alphaBoost > 0.5 ||
+    (out.squash ?? 0) > 0.05 ||
+    (out.accum ?? 0) > 0.5 ||
+    (out.sun ?? 0) > 0.05
+  );
 }
 
 // ── #1478: the master gain from the signal AUTO heard ─────────────────────────────────────────────────────────

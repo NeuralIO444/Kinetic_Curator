@@ -39,7 +39,8 @@ registerCostTier('gl/vortex', {
   tier: 1,
   memoryBytes: 64 * 64 * 4 * 5 + 2048 * 16,
   timeMs: 0.5,
-  notes: '#970 vortex-particle core: 64×64 Poisson + ≤2048 vortons, CPU, fixed dt. Slice 2 adds the velocity texture as an offset on the existing feed (never a replacement). Live-only.',
+  notes:
+    '#970 vortex-particle core: 64×64 Poisson + ≤2048 vortons, CPU, fixed dt. Slice 2 adds the velocity texture as an offset on the existing feed (never a replacement). Live-only.',
 });
 
 export const VORTEX_GRID = 64;
@@ -84,7 +85,7 @@ export function createVortex(opts = {}) {
   const cells = n * n;
   const width = Number.isFinite(opts.width) && opts.width > 0 ? opts.width : 1000;
   const height = Number.isFinite(opts.height) && opts.height > 0 ? opts.height : 700;
-  const seed = (Number(opts.seed) | 0) || 970;
+  const seed = Number(opts.seed) | 0 || 970;
   return {
     n,
     width,
@@ -219,15 +220,15 @@ export function emitAmbient(state, pairs = 4) {
 
 /** Behave → ambient pair pattern. Unknown names fall back to cruise. */
 const AMBIENT = {
-  cruise:  { pairs: 1, gamma: 0.35, pattern: 'drift' },
-  flock:   { pairs: 2, gamma: 0.45, pattern: 'shear' },
-  orbit:   { pairs: 2, gamma: 0.55, pattern: 'orbit' },
+  cruise: { pairs: 1, gamma: 0.35, pattern: 'drift' },
+  flock: { pairs: 2, gamma: 0.45, pattern: 'shear' },
+  orbit: { pairs: 2, gamma: 0.55, pattern: 'orbit' },
   scatter: { pairs: 3, gamma: 0.5, pattern: 'out' },
-  mold:    { pairs: 1, gamma: 0.25, pattern: 'drift' },
-  levy:    { pairs: 1, gamma: 0.3, pattern: 'stride' },
-  lorenz:  { pairs: 2, gamma: 0.4, pattern: 'orbit' },
-  seek:    { pairs: 1, gamma: 0.4, pattern: 'in' },
-  flee:    { pairs: 1, gamma: 0.5, pattern: 'out' },
+  mold: { pairs: 1, gamma: 0.25, pattern: 'drift' },
+  levy: { pairs: 1, gamma: 0.3, pattern: 'stride' },
+  lorenz: { pairs: 2, gamma: 0.4, pattern: 'orbit' },
+  seek: { pairs: 1, gamma: 0.4, pattern: 'in' },
+  flee: { pairs: 1, gamma: 0.5, pattern: 'out' },
 };
 
 /**
@@ -368,14 +369,16 @@ function sampleV(state, x, y) {
   const j1 = j0 + 1;
   const row0 = j0 * n;
   const row1 = j1 * n;
-  const u = (1 - tx) * (1 - ty) * vx[row0 + i0]
-    + tx * (1 - ty) * vx[row0 + i1]
-    + (1 - tx) * ty * vx[row1 + i0]
-    + tx * ty * vx[row1 + i1];
-  const v = (1 - tx) * (1 - ty) * vy[row0 + i0]
-    + tx * (1 - ty) * vy[row0 + i1]
-    + (1 - tx) * ty * vy[row1 + i0]
-    + tx * ty * vy[row1 + i1];
+  const u =
+    (1 - tx) * (1 - ty) * vx[row0 + i0] +
+    tx * (1 - ty) * vx[row0 + i1] +
+    (1 - tx) * ty * vx[row1 + i0] +
+    tx * ty * vx[row1 + i1];
+  const v =
+    (1 - tx) * (1 - ty) * vy[row0 + i0] +
+    tx * (1 - ty) * vy[row0 + i1] +
+    (1 - tx) * ty * vy[row1 + i0] +
+    tx * ty * vy[row1 + i1];
   return [u, v];
 }
 
@@ -407,20 +410,26 @@ function advectWet(state, disp = 1) {
       // with the feed shader's wet offset.
       let xb = x - vx[k] * disp;
       let yb = y - vy[k] * disp;
-      if (xb < 0) xb = 0; else if (xb > width) xb = width;
-      if (yb < 0) yb = 0; else if (yb > height) yb = height;
+      if (xb < 0) xb = 0;
+      else if (xb > width) xb = width;
+      if (yb < 0) yb = 0;
+      else if (yb > height) yb = height;
       let i0 = (xb * gxScale) | 0;
       let j0 = (yb * gyScale) | 0;
-      if (i0 < 0) i0 = 0; else if (i0 > n - 2) i0 = n - 2;
-      if (j0 < 0) j0 = 0; else if (j0 > n - 2) j0 = n - 2;
+      if (i0 < 0) i0 = 0;
+      else if (i0 > n - 2) i0 = n - 2;
+      if (j0 < 0) j0 = 0;
+      else if (j0 > n - 2) j0 = n - 2;
       const tx = xb * gxScale - i0;
       const ty = yb * gyScale - j0;
       const i1 = i0 + 1;
       const j1 = j0 + 1;
       const r0 = j0 * n;
       const r1 = j1 * n;
-      wetNext[k] = ((wet[r0 + i0] * (1 - tx) + wet[r0 + i1] * tx) * (1 - ty)
-        + (wet[r1 + i0] * (1 - tx) + wet[r1 + i1] * tx) * ty) * dry;
+      wetNext[k] =
+        ((wet[r0 + i0] * (1 - tx) + wet[r0 + i1] * tx) * (1 - ty) +
+          (wet[r1 + i0] * (1 - tx) + wet[r1 + i1] * tx) * ty) *
+        dry;
     }
   }
   wet.set(wetNext);
@@ -512,8 +521,8 @@ export function packVelocity(state, pack = VORTEX_VEL_PACK) {
   const rgba = new Uint8Array(n * n * 4);
   const { vx, vy } = state;
   for (let i = 0; i < n * n; i++) {
-    rgba[i * 4] = packByte(vx[i] / pack * 0.5 + 0.5);
-    rgba[i * 4 + 1] = packByte(vy[i] / pack * 0.5 + 0.5);
+    rgba[i * 4] = packByte((vx[i] / pack) * 0.5 + 0.5);
+    rgba[i * 4 + 1] = packByte((vy[i] / pack) * 0.5 + 0.5);
     rgba[i * 4 + 3] = 255;
   }
   return { n, rgba, pack };
@@ -554,7 +563,7 @@ export function noteWetFrame(slot, { wetness, freeze, seed, width, height, insta
   if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
   const w = width > 0 ? width : 1000;
   const h = height > 0 ? height : 700;
-  const s = (Number(seed) | 0) || 970;
+  const s = Number(seed) | 0 || 970;
   if (!slot.vortex || slot.seed !== s || slot.width !== w || slot.height !== h) {
     slot.vortex = createVortex({ seed: s, width: w, height: h });
     slot.seed = s;

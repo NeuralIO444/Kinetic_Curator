@@ -56,10 +56,7 @@ test('bands are vertical (local-y modulation), noise-warped, alpha-masked, seed-
 });
 
 test('warp comes from the shared chunk library, not an inline duplicate or texture', () => {
-  assert.ok(
-    QUAD_FS.includes('float kc_vnoise(vec2 p)'),
-    'kc_vnoise is defined via injectCommon (shared chunks #196)',
-  );
+  assert.ok(QUAD_FS.includes('float kc_vnoise(vec2 p)'), 'kc_vnoise is defined via injectCommon (shared chunks #196)');
   const samplers = [...QUAD_FS.matchAll(/uniform\s+sampler2D\s+(\w+)\s*;/g)].map((m) => m[1]);
   assert.deepStrictEqual(samplers, ['u_atlas'], `no new texture samplers (found: ${samplers})`);
   // Audit the shader body (past the injected chunk preamble — the library's
@@ -80,20 +77,14 @@ test('non-glass keeps the exact existing diffuse (gate is bit-identical to 1.0)'
   // wrap * 1.0 is wrap.
   assert.ok(Number.isFinite(GLASS_STRIATION.amp), 'amp finite');
   assert.ok(Number.isFinite(GLASS_STRIATION.warpAmp), 'warpAmp finite');
-  assert.ok(
-    QUAD_FS.includes('float strMul = mix(1.0,'),
-    'the gate multiplies by the mix, never by the raw band',
-  );
+  assert.ok(QUAD_FS.includes('float strMul = mix(1.0,'), 'the gate multiplies by the mix, never by the raw band');
 });
 
 test('unlit path is byte-identical: no striation evaluation outside the sun block', () => {
   const head = QUAD_FS.split('if (u_sun.w > 0.5)')[0];
   assert.ok(!head.includes('strBand'), 'no banding wave before the sun block');
   assert.ok(!head.includes('strMul'), 'no striation gate before the sun block');
-  assert.ok(
-    QUAD_FS.includes('o.rgb = min(o.rgb * v_light, vec3(o.a));'),
-    'the unlit else-branch is untouched',
-  );
+  assert.ok(QUAD_FS.includes('o.rgb = min(o.rgb * v_light, vec3(o.a));'), 'the unlit else-branch is untouched');
 });
 
 test('the four PRs compose without cross-talk: each term gated independently', () => {

@@ -35,7 +35,10 @@ export function hexLuminance(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(String(hex ?? '').trim());
   if (!m) return NaN;
   const n = parseInt(m[1], 16);
-  const lin = (c) => { const s = c / 255; return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4; };
+  const lin = (c) => {
+    const s = c / 255;
+    return s <= 0.04045 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4;
+  };
   return 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
 }
 
@@ -46,7 +49,10 @@ export function darkestSwatch(palette) {
   let bestL = Infinity;
   for (const c of sw) {
     const L = hexLuminance(c);
-    if (Number.isFinite(L) && L < bestL) { bestL = L; best = String(c).trim().toLowerCase(); }
+    if (Number.isFinite(L) && L < bestL) {
+      bestL = L;
+      best = String(c).trim().toLowerCase();
+    }
   }
   if (!best) return '#000000';
   return best.startsWith('#') ? best : `#${best}`;
@@ -63,7 +69,10 @@ export function shadowOffset(x, y, sun) {
   let dx = (x - Number(sun.x)) * k;
   let dy = (y - Number(sun.y)) * k;
   const len = Math.hypot(dx, dy);
-  if (len > SHADOW_MAX_OFFSET) { dx *= SHADOW_MAX_OFFSET / len; dy *= SHADOW_MAX_OFFSET / len; }
+  if (len > SHADOW_MAX_OFFSET) {
+    dx *= SHADOW_MAX_OFFSET / len;
+    dy *= SHADOW_MAX_OFFSET / len;
+  }
   return { dx, dy };
 }
 
@@ -71,7 +80,11 @@ export function shadowOffset(x, y, sun) {
 export function blurWeights() {
   const w = [];
   let sum = 0;
-  for (let i = -4; i <= 4; i++) { const v = Math.exp(-((i / 2) ** 2) / 2); w.push(v); sum += v; }
+  for (let i = -4; i <= 4; i++) {
+    const v = Math.exp(-((i / 2) ** 2) / 2);
+    w.push(v);
+    sum += v;
+  }
   return w.map((v) => v / sum);
 }
 
@@ -155,12 +168,27 @@ void main() {
 
 /** The three programs (the silhouette, the blur used twice, the lay-down), with the exact uniforms each uploads. */
 export const CONTACT_SHADOW_PROGRAMS = [
-  { key: 'silhouette', name: 'contact-shadow/silhouette', fs: SHADOW_SILHOUETTE_FS, fsFile: 'contactShadow.mjs:SHADOW_SILHOUETTE_FS',
-    uniforms: ['u_src', 'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert', 'u_scene', 'u_sun', 'u_throw'] },
-  { key: 'blur', name: 'contact-shadow/blur', fs: SHADOW_BLUR_FS, fsFile: 'contactShadow.mjs:SHADOW_BLUR_FS',
-    uniforms: ['u_src', 'u_step'] },
-  { key: 'lay', name: 'contact-shadow/lay', fs: SHADOW_LAY_FS, fsFile: 'contactShadow.mjs:SHADOW_LAY_FS',
-    uniforms: ['u_shadow', 'u_dst', 'u_color', 'u_strength'] },
+  {
+    key: 'silhouette',
+    name: 'contact-shadow/silhouette',
+    fs: SHADOW_SILHOUETTE_FS,
+    fsFile: 'contactShadow.mjs:SHADOW_SILHOUETTE_FS',
+    uniforms: ['u_src', 'u_mask', 'u_maskOn', 'u_maskMode', 'u_maskInvert', 'u_scene', 'u_sun', 'u_throw'],
+  },
+  {
+    key: 'blur',
+    name: 'contact-shadow/blur',
+    fs: SHADOW_BLUR_FS,
+    fsFile: 'contactShadow.mjs:SHADOW_BLUR_FS',
+    uniforms: ['u_src', 'u_step'],
+  },
+  {
+    key: 'lay',
+    name: 'contact-shadow/lay',
+    fs: SHADOW_LAY_FS,
+    fsFile: 'contactShadow.mjs:SHADOW_LAY_FS',
+    uniforms: ['u_shadow', 'u_dst', 'u_color', 'u_strength'],
+  },
 ];
 
 /** The cost declaration (decision 6). The measured number lives in effects/measuredCosts.mjs. */
@@ -169,7 +197,8 @@ export const CONTACT_SHADOW_COST = {
   // two half-size RGBA16F buffers at 1080p: 2 x 960 x 540 x 8 B
   memoryBytes: 2 * 960 * 540 * 8,
   timeMs: 0.3,
-  notes: '#1183 contact shadow: 3 half-size passes (silhouette, blur x, blur y) + 1 full-size lay-down, per shadowed layer only; shed after tier 1 (quality PERF + perfTier1)',
+  notes:
+    '#1183 contact shadow: 3 half-size passes (silhouette, blur x, blur y) + 1 full-size lay-down, per shadowed layer only; shed after tier 1 (quality PERF + perfTier1)',
 };
 
 /** '#rrggbb' -> [r, g, b] in 0..1 (sRGB, straight). */
@@ -207,16 +236,25 @@ export function createContactShadow(gl, { buildProgram, drawFullscreen, bindTex 
     const fb = gl.createFramebuffer();
     gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
     gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) throw new Error('[gl] contact-shadow framebuffer incomplete');
+    if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE)
+      throw new Error('[gl] contact-shadow framebuffer incomplete');
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     return { tex, fb, w, h };
   }
-  function free(t) { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb); } }
+  function free(t) {
+    if (t) {
+      gl.deleteTexture(t.tex);
+      gl.deleteFramebuffer(t.fb);
+    }
+  }
   function ensureHalf(w, h) {
     const hw = Math.max(1, w >> 1);
     const hh = Math.max(1, h >> 1);
     if (half && half.w === hw && half.h === hh) return half;
-    if (half) { free(half.a); free(half.b); }
+    if (half) {
+      free(half.a);
+      free(half.b);
+    }
     half = { a: halfTarget(hw, hh), b: halfTarget(hw, hh), w: hw, h: hh };
     return half;
   }
@@ -269,7 +307,11 @@ export function createContactShadow(gl, { buildProgram, drawFullscreen, bindTex 
   }
 
   function dispose() {
-    if (half) { free(half.a); free(half.b); half = null; }
+    if (half) {
+      free(half.a);
+      free(half.b);
+      half = null;
+    }
     for (const p of Object.values(progs)) gl.deleteProgram(p);
   }
 

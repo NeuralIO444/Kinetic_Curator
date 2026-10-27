@@ -39,8 +39,16 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
-const okAsync = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const okAsync = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('recipe params: defaults and clamps', () => {
   assert.equal(ACCUM_VERSION, 2);
@@ -64,8 +72,10 @@ ok('recipe params: one optics amount drives bloom + halation + stipple + chroma'
   assert.ok(p.halationLod > p.bloomLod, 'halation reads a deeper mip than bloom');
   assert.ok(p.stipple > 0, 'stipple diffusion is on');
   assert.ok(p.chromaTexels > 0, 'chromatic offset is on');
-  assert.ok(!('frameBlurSigma' in p) && !('bloomSigma' in p) && !('halationSigma' in p),
-    'no sigma fields survive the blur removal');
+  assert.ok(
+    !('frameBlurSigma' in p) && !('bloomSigma' in p) && !('halationSigma' in p),
+    'no sigma fields survive the blur removal',
+  );
   const [r, g, b] = p.halationTint;
   assert.ok(r >= g && g > b, `halation tint is red/warm biased, got [${r},${g},${b}]`);
   const half = accumRecipeParams({ optics: 0.5 });
@@ -90,8 +100,10 @@ ok('recipe params: Phase A feedback defaults to off (identity transform)', () =>
   const p = accumRecipeParams({ tunnel: 1, prism: 1 });
   assert.ok(p.tunnelZoom > 1 && p.tunnelSpin > 0 && p.prismUv > 0);
   const half = accumRecipeParams({ tunnel: 0.5, prism: 0.5 });
-  assert.ok(half.tunnelZoom < p.tunnelZoom && half.tunnelSpin < p.tunnelSpin && half.prismUv < p.prismUv,
-    'feedback amounts scale with the sliders');
+  assert.ok(
+    half.tunnelZoom < p.tunnelZoom && half.tunnelSpin < p.tunnelSpin && half.prismUv < p.prismUv,
+    'feedback amounts scale with the sliders',
+  );
   assert.deepEqual(accumRecipeParams({ tunnel: 2, prism: -1 }).tunnelZoom, p.tunnelZoom, 'tunnel clamps at 1');
   assert.equal(accumRecipeParams({ tunnel: 2, prism: -1 }).prismUv, 0, 'prism clamps at 0');
 });
@@ -161,9 +173,9 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
   // hundredths, on top of the hardcoded gesture, clamped at the 0.99 ceiling.
   const dryBase = accumRecipeParams({ fade: 0.5, optics: 0.5, tunnel: 0.5, prism: 0.5 });
   const routed = applyAudioEnvelope(dryBase, { rms: 0, flux: 0, beatPulse: 0 }, { accumAudio: 20 });
-  assert.equal(routed.keep, 0.5 + 0.20, 'route adds +0.20 keep');
+  assert.equal(routed.keep, 0.5 + 0.2, 'route adds +0.20 keep');
   const loudRouted = applyAudioEnvelope(dryBase, { rms: 1, flux: 0, beatPulse: 0 }, { accumAudio: 20 });
-  assert.equal(loudRouted.keep, 0.5 + 0.08 + 0.20, 'route stacks with the hardcoded gesture');
+  assert.equal(loudRouted.keep, 0.5 + 0.08 + 0.2, 'route stacks with the hardcoded gesture');
   const ceiling = applyAudioEnvelope(base, { rms: 1 }, { accumAudio: 40 });
   assert.equal(ceiling.keep, 0.99, 'keep never exceeds the 0.99 ceiling');
   const silentRouted = applyAudioEnvelope(dryBase, { rms: 0, flux: 0, beatPulse: 0 }, { accumAudio: 0 });
@@ -190,7 +202,11 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
 });
 
 ok('sanitizeAudioSample clamps rms, flux, beatPulse', () => {
-  assert.deepEqual(sanitizeAudioSample({ rms: 0.5, flux: 0.2, beatPulse: 0.9 }), { rms: 0.5, flux: 0.2, beatPulse: 0.9 });
+  assert.deepEqual(sanitizeAudioSample({ rms: 0.5, flux: 0.2, beatPulse: 0.9 }), {
+    rms: 0.5,
+    flux: 0.2,
+    beatPulse: 0.9,
+  });
   assert.deepEqual(sanitizeAudioSample({ rms: 7, flux: -1, beatPulse: 'x' }), { rms: 1, flux: 0, beatPulse: 0 });
   assert.deepEqual(sanitizeAudioSample({}), { rms: 0, flux: 0, beatPulse: 0 });
 });
@@ -199,8 +215,13 @@ ok('audioEnvelope: loads kc-audio-envelope/1, samples rms/flux/beatPulse', async
   const { loadAudioEnvelope, sampleEnvelope } = await import('./audioEnvelope.mjs');
   const { writeFileSync } = await import('node:fs');
   const sidecar = {
-    schema: 'kc-audio-envelope/1', source: 't.mp3', sr: 22050, hop_length: 512,
-    fps: 43.066, duration: 2, tempo_bpm: 120,
+    schema: 'kc-audio-envelope/1',
+    source: 't.mp3',
+    sr: 22050,
+    hop_length: 512,
+    fps: 43.066,
+    duration: 2,
+    tempo_bpm: 120,
     frames: [
       { t: 0, rms: 0, flux: 0, beat_phase: 0 },
       { t: 1, rms: 1, flux: 0.5, beat_phase: 0.5 },
@@ -236,9 +257,13 @@ ok('audioEnvelope: malformed/missing sidecar is a null no-op; legacy sketch acce
   writeFileSync('/tmp/kc-audioenv-noframes.json', JSON.stringify({ schema: 'kc-audio-envelope/1' }));
   assert.equal(loadAudioEnvelope('/tmp/kc-audioenv-noframes.json'), null, 'no frames -> null');
   // Legacy pre-research sketch: bare array of {t, rms, beat}.
-  writeFileSync('/tmp/kc-audioenv-legacy.json', JSON.stringify([
-    { t: 0, rms: 0.2, beat: 1 }, { t: 1, rms: 0.4, beat: 0 },
-  ]));
+  writeFileSync(
+    '/tmp/kc-audioenv-legacy.json',
+    JSON.stringify([
+      { t: 0, rms: 0.2, beat: 1 },
+      { t: 1, rms: 0.4, beat: 0 },
+    ]),
+  );
   const legacy = loadAudioEnvelope('/tmp/kc-audioenv-legacy.json');
   assert.ok(legacy && legacy.samples.length === 2, 'legacy array loads');
   assert.equal(legacy.samples[0].flux, 0, 'legacy has no flux');
@@ -248,9 +273,13 @@ const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
 function fixtureDoc() {
   return {
-    version: 1, seed: 4242, paletteId: 'praystation', paletteOverrides: null,
+    version: 1,
+    seed: 4242,
+    paletteId: 'praystation',
+    paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, count: 16, lifeDrift: 0 },
-    enabledAssets, quality: 'balanced',
+    enabledAssets,
+    quality: 'balanced',
     layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
     activeLayerId: 'bg',
   };
@@ -259,7 +288,12 @@ function fixtureDoc() {
 ok('contract carries sanitized accum.optics (additive, no version bump)', () => {
   const doc = fixtureDoc();
   const rl = resolveLayers(doc, { caps });
-  const c = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, fade: 0.9, optics: 0.5, background: '#112233' } });
+  const c = buildSceneContract({
+    doc,
+    resolvedLayers: rl,
+    caps,
+    accum: { enabled: true, fade: 0.9, optics: 0.5, background: '#112233' },
+  });
   assert.equal(c.accum.enabled, true);
   assert.equal(c.accum.fade, 0.9);
   assert.equal(c.accum.optics, 0.5);
@@ -271,7 +305,9 @@ ok('contract carries sanitized accum.optics (additive, no version bump)', () => 
   const cl = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, optics: 9 } });
   assert.equal(cl.accum.optics, 1, 'optics clamps at the contract boundary');
   const fb = buildSceneContract({
-    doc, resolvedLayers: rl, caps,
+    doc,
+    resolvedLayers: rl,
+    caps,
     accum: { enabled: true, tunnel: 0.4, prism: 9, flow: 0.7, echoes: 2.6 },
   });
   assert.equal(fb.accum.tunnel, 0.4, 'tunnel rides the contract');
@@ -284,22 +320,40 @@ ok('contract carries sanitized accum.optics (additive, no version bump)', () => 
 
 // --- mirror sanity (float64, hand-computed expectations) --------------------
 
-const W = 8, H = 8, N4 = W * H * 4;
-const f64 = (fill) => { const a = new Float64Array(N4); if (fill) a.fill(fill); return a; };
+const W = 8,
+  H = 8,
+  N4 = W * H * 4;
+const f64 = (fill) => {
+  const a = new Float64Array(N4);
+  if (fill) a.fill(fill);
+  return a;
+};
 const px = (buf, x, y) => [0, 1, 2, 3].map((c) => buf[(y * W + x) * 4 + c]);
 
 ok('mirror: fade-only step matches hand math', () => {
   const accum = f64(0); // black transparent buffer start
   const frame = f64(0);
   const o = 3 * 4; // pixel (3,0)
-  frame[o] = 1; frame[o + 1] = 0.5; frame[o + 2] = 0.25; frame[o + 3] = 1;
+  frame[o] = 1;
+  frame[o + 1] = 0.5;
+  frame[o + 2] = 0.25;
+  frame[o + 3] = 1;
   const out = mirrorAccumStep({ accum, frame, w: W, h: H, params: accumRecipeParams({ fade: 0.8, optics: 0 }) });
   assert.deepEqual(px(out, 3, 0), [1, 0.5, 0.25, 1], 'opaque frame lands via over');
   assert.deepEqual(px(out, 0, 0), [0, 0, 0, 0], 'untouched pixels stay empty');
   // Second step with an empty frame: light decays toward black, alpha kept.
-  const out2 = mirrorAccumStep({ accum: out, frame: f64(0), w: W, h: H, params: accumRecipeParams({ fade: 0.8, optics: 0 }) });
+  const out2 = mirrorAccumStep({
+    accum: out,
+    frame: f64(0),
+    w: W,
+    h: H,
+    params: accumRecipeParams({ fade: 0.8, optics: 0 }),
+  });
   const [r, g, b, a] = px(out2, 3, 0);
-  assert.ok(Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12, `fade *= keep, got ${r},${g},${b}`);
+  assert.ok(
+    Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
+    `fade *= keep, got ${r},${g},${b}`,
+  );
   assert.equal(a, 1, 'alpha is not faded');
 });
 
@@ -307,7 +361,8 @@ ok('mirror: optics 0 blooms nothing', () => {
   const accum = f64(0);
   const frame = f64(0);
   const o = (4 * W + 4) * 4;
-  frame[o] = 1; frame[o + 3] = 1;
+  frame[o] = 1;
+  frame[o + 3] = 1;
   const out = mirrorAccumStep({ accum, frame, w: W, h: H, params: accumRecipeParams({ fade: 1, optics: 0 }) });
   assert.deepEqual(px(out, 6, 4), [0, 0, 0, 0], 'no bleed two pixels away at optics 0');
   assert.deepEqual(px(out, 4, 4)[0], 1);
@@ -321,20 +376,29 @@ ok('mirror: fade falls toward the paper on light grounds (#287)', () => {
   const params = accumRecipeParams({ fade: 0.8, optics: 0, background: '#f2ecdd' });
   assert.deepEqual(params.bg, paper, 'recipe params carry the parsed background');
   const accum = f64(0);
-  for (let i = 0; i < N4; i += 4) { accum[i] = 1; accum[i + 1] = 1; accum[i + 2] = 1; accum[i + 3] = 1; }
+  for (let i = 0; i < N4; i += 4) {
+    accum[i] = 1;
+    accum[i + 1] = 1;
+    accum[i + 2] = 1;
+    accum[i + 3] = 1;
+  }
   const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
   const [r, g, b, a] = px(out, 0, 0);
   const want = paper.map((c) => c * 0.2 + 1 * 0.8);
-  assert.ok(Math.abs(r - want[0]) < 1e-12 && Math.abs(g - want[1]) < 1e-12 && Math.abs(b - want[2]) < 1e-12,
-    `expected fade toward paper ${want}, got ${r},${g},${b}`);
+  assert.ok(
+    Math.abs(r - want[0]) < 1e-12 && Math.abs(g - want[1]) < 1e-12 && Math.abs(b - want[2]) < 1e-12,
+    `expected fade toward paper ${want}, got ${r},${g},${b}`,
+  );
   assert.ok(r > 0.95, `light ground must stay light, got ${r}`);
   assert.equal(a, 1, 'alpha is not faded');
   // Many steps: the mark settles exactly onto the paper, never below it.
   let cur = out;
   for (let k = 0; k < 200; k++) cur = mirrorAccumStep({ accum: cur, frame: f64(0), w: W, h: H, params });
   const [r2, g2, b2] = px(cur, 0, 0);
-  assert.ok(Math.abs(r2 - paper[0]) < 1e-6 && Math.abs(g2 - paper[1]) < 1e-6 && Math.abs(b2 - paper[2]) < 1e-6,
-    `200 steps should settle on the paper, got ${r2},${g2},${b2}`);
+  assert.ok(
+    Math.abs(r2 - paper[0]) < 1e-6 && Math.abs(g2 - paper[1]) < 1e-6 && Math.abs(b2 - paper[2]) < 1e-6,
+    `200 steps should settle on the paper, got ${r2},${g2},${b2}`,
+  );
 });
 
 // #287 — the default black ground keeps the legacy `rgb *= keep` exactly.
@@ -343,11 +407,16 @@ ok('mirror: fade on the default black ground is unchanged (#287)', () => {
   assert.deepEqual(params.bg, [0, 0, 0]);
   const accum = f64(0);
   const o = 3 * 4;
-  accum[o] = 1; accum[o + 1] = 0.5; accum[o + 2] = 0.25; accum[o + 3] = 1;
+  accum[o] = 1;
+  accum[o + 1] = 0.5;
+  accum[o + 2] = 0.25;
+  accum[o + 3] = 1;
   const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
   const [r, g, b] = px(out, 3, 0);
-  assert.ok(Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
-    `black-ground fade must stay rgb *= keep, got ${r},${g},${b}`);
+  assert.ok(
+    Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
+    `black-ground fade must stay rgb *= keep, got ${r},${g},${b}`,
+  );
 });
 
 ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => {
@@ -361,19 +430,28 @@ ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => 
     assert.ok(!/sigma/i.test(src), `accum-${name}: no sigma in the shader source`);
     assert.ok(!/gauss/i.test(src), `accum-${name}: no gaussian in the shader source`);
   }
-  assert.deepEqual(Object.keys(ACCUM_PROGRAMS).sort(), keys,
-    'the audit table and the pass sources agree');
+  assert.deepEqual(Object.keys(ACCUM_PROGRAMS).sort(), keys, 'the audit table and the pass sources agree');
 });
 
 ok('mirror: mip chain halves each level and quantizes to 8-bit', () => {
-  const gw = 8, gh = 6;
+  const gw = 8,
+    gh = 6;
   const base = new Float64Array(gw * gh * 4);
   // Quantize like the GPU's RGBA8 framebuffer write does (boxDownsample in
   // the real path) — level 0 enters the chain already 8-bit.
-  for (let i = 0; i < base.length; i++) base[i] = Math.round(((i * 7919) % 257 / 300) * 255) / 255;
+  for (let i = 0; i < base.length; i++) base[i] = Math.round((((i * 7919) % 257) / 300) * 255) / 255;
   const chain = mirrorMipChain(base, gw, gh);
   const sizes = chain.map((l) => [l.w, l.h]);
-  assert.deepEqual(sizes, [[8, 6], [4, 3], [2, 1], [1, 1]], 'each level halves (floor, min 1)');
+  assert.deepEqual(
+    sizes,
+    [
+      [8, 6],
+      [4, 3],
+      [2, 1],
+      [1, 1],
+    ],
+    'each level halves (floor, min 1)',
+  );
   for (const level of chain) {
     for (const v of level.px) {
       assert.ok(Math.abs(v * 255 - Math.round(v * 255)) < 1e-9, 'every level is 8-bit quantized');
@@ -390,17 +468,25 @@ ok('mirror: mip chain halves each level and quantizes to 8-bit', () => {
 });
 
 ok('mirror: glow sample with the gate off and no chroma is plain trilinear', () => {
-  const gw = 4, gh = 4;
+  const gw = 4,
+    gh = 4;
   const base = new Float64Array(gw * gh * 4);
   for (let y = 0; y < gh; y++) {
     for (let x = 0; x < gw; x++) {
       const o = (y * gw + x) * 4;
-      base[o] = x / gw; base[o + 1] = y / gh; base[o + 2] = 0.5; base[o + 3] = 1;
+      base[o] = x / gw;
+      base[o + 1] = y / gh;
+      base[o + 2] = 0.5;
+      base[o + 3] = 1;
     }
   }
   const chain = mirrorMipChain(base, gw, gh);
   const args = { lod: 1.5, stipple: 0, chromaTexels: 0 };
-  for (const [u, v, x, y] of [[0.3, 0.4, 5, 9], [0.7, 0.2, 40, 3], [0.51, 0.49, 0, 0]]) {
+  for (const [u, v, x, y] of [
+    [0.3, 0.4, 5, 9],
+    [0.7, 0.2, 40, 3],
+    [0.51, 0.49, 0, 0],
+  ]) {
     const g = mirrorGlowSample(chain, gw, gh, u, v, x, y, args);
     const t = mirrorTrilinear(chain, u, v, 1.5);
     assert.deepEqual(g, t, 'gate off + chroma 0: the glow sample is plain trilinear');
@@ -418,13 +504,17 @@ ok('mirror: glow sample with the gate off and no chroma is plain trilinear', () 
 ok('mirror: chromatic offset fringes the channels radially', () => {
   // White block on black; at lod 0 the glow target resolves the edge, and
   // an exaggerated chroma offset pushes red outward and blue inward.
-  const gw = 8, gh = 8;
+  const gw = 8,
+    gh = 8;
   const base = new Float64Array(gw * gh * 4);
   for (let y = 0; y < gh; y++) {
     for (let x = 0; x < gw; x++) {
       const o = (y * gw + x) * 4;
-      const v = (x >= 3 && x < 5) ? 1 : 0;
-      base[o] = v; base[o + 1] = v; base[o + 2] = v; base[o + 3] = 1;
+      const v = x >= 3 && x < 5 ? 1 : 0;
+      base[o] = v;
+      base[o + 1] = v;
+      base[o + 2] = v;
+      base[o + 3] = 1;
     }
   }
   const chain = mirrorMipChain(base, gw, gh);
@@ -439,16 +529,24 @@ ok('mirror: chromatic offset fringes the channels radially', () => {
   assert.ok(left[2] - left[0] > 0.3, `left of the block fringes blue: r=${left[0].toFixed(3)} b=${left[2].toFixed(3)}`);
   // Radial symmetry: the same blue outer fringe on the right edge.
   const right = mirrorGlowSample(chain, gw, gh, 5.5 / 8, 0.5, 22, 16, args);
-  assert.ok(right[2] - right[0] > 0.3, `right of the block fringes blue: r=${right[0].toFixed(3)} b=${right[2].toFixed(3)}`);
+  assert.ok(
+    right[2] - right[0] > 0.3,
+    `right of the block fringes blue: r=${right[0].toFixed(3)} b=${right[2].toFixed(3)}`,
+  );
 });
 
 ok('mirror: optics 1 glows — bleed, added light, warm bias, no frame blur', () => {
-  const w = 64, h = 64, n4 = w * h * 4;
+  const w = 64,
+    h = 64,
+    n4 = w * h * 4;
   const block = new Float64Array(n4);
   for (let y = 26; y < 38; y++) {
     for (let x = 26; x < 38; x++) {
       const o = (y * w + x) * 4;
-      block[o] = 1; block[o + 1] = 1; block[o + 2] = 1; block[o + 3] = 1;
+      block[o] = 1;
+      block[o + 1] = 1;
+      block[o + 2] = 1;
+      block[o + 3] = 1;
     }
   }
   const acc0 = new Float64Array(n4);
@@ -467,14 +565,21 @@ ok('mirror: optics 1 glows — bleed, added light, warm bias, no frame blur', ()
   // The glow bleeds past the block…
   assert.ok(at(out, 44, 32) > 0.002, `glow bleeds well past the block, got ${at(out, 44, 32).toFixed(4)}`);
   // …adds light rather than redistributing it…
-  const sum = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2]; return s; };
+  const sum = (buf) => {
+    let s = 0;
+    for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2];
+    return s;
+  };
   const plain = mirrorAccumStep({ accum: acc0, frame: block, w, h, params: accumRecipeParams({ fade: 1, optics: 0 }) });
   assert.ok(sum(out) > sum(plain) * 1.01, 'bloom + halation add light');
   // …and the halation tier biases it warm.
-  const warm = (buf) => { let d = 0; for (let i = 0; i < buf.length; i += 4) d += buf[i] - buf[i + 2]; return d; };
+  const warm = (buf) => {
+    let d = 0;
+    for (let i = 0; i < buf.length; i += 4) d += buf[i] - buf[i + 2];
+    return d;
+  };
   assert.ok(warm(out) > warm(plain), 'optics shift the added light warm/red');
 });
-
 
 const fbParams = (over) => ({ ...accumRecipeParams({ fade: 1, optics: 0 }), ...over });
 
@@ -483,20 +588,27 @@ ok('mirror: tunnel zoom pulls a soft mark toward center', () => {
   // is a fixed point at small canvas sizes (the effect is resolution-
   // dependent — real at still sizes). So: a soft 5x5 blob, centroid metric,
   // exaggerated zoom through the real code path.
-  const w2 = 32, h2 = 32, n2 = w2 * h2 * 4;
+  const w2 = 32,
+    h2 = 32,
+    n2 = w2 * h2 * 4;
   const blob = new Float64Array(n2);
   for (let y = 14; y <= 18; y++) {
     for (let x = 22; x <= 26; x++) {
       const o = (y * w2 + x) * 4;
-      blob[o] = 1; blob[o + 1] = 0.5; blob[o + 2] = 0.25; blob[o + 3] = 1;
+      blob[o] = 1;
+      blob[o + 1] = 0.5;
+      blob[o + 2] = 0.25;
+      blob[o + 3] = 1;
     }
   }
   const centroidX = (buf) => {
-    let s = 0, sx = 0;
+    let s = 0,
+      sx = 0;
     for (let y = 0; y < h2; y++) {
       for (let x = 0; x < w2; x++) {
         const v = buf[(y * w2 + x) * 4];
-        s += v; sx += v * x;
+        s += v;
+        sx += v * x;
       }
     }
     return sx / s;
@@ -520,9 +632,14 @@ ok('mirror: tunnel zoom pulls a soft mark toward center', () => {
 ok('mirror: prism separates the RGB channels radially', () => {
   // 16x1 strip, white dot at x=10, prismUv = 0.1: r samples outward
   // (+pr), g at center, b inward (-pr) — peaks land at x=8 / 10 / 12.
-  const w2 = 16, h2 = 1, n2 = w2 * h2 * 4;
+  const w2 = 16,
+    h2 = 1,
+    n2 = w2 * h2 * 4;
   const dot = new Float64Array(n2);
-  dot[10 * 4] = 1; dot[10 * 4 + 1] = 1; dot[10 * 4 + 2] = 1; dot[10 * 4 + 3] = 1;
+  dot[10 * 4] = 1;
+  dot[10 * 4 + 1] = 1;
+  dot[10 * 4 + 2] = 1;
+  dot[10 * 4 + 3] = 1;
   const params = fbParams({ prismUv: 0.1 });
   const out = mirrorAccumStep({ accum: dot, frame: new Float64Array(n2), w: w2, h: h2, params });
   const close = (v, e) => Math.abs(v - e) < 1e-9;
@@ -546,9 +663,11 @@ ok('mirror: flow = 0 is a no-op, flow > 0 advects', () => {
   const v3 = mirrorFlowVec(0.8, 0.2);
   assert.ok(Math.abs(v1[0] - v3[0]) > 1e-6 || Math.abs(v1[1] - v3[1]) > 1e-6, 'field varies spatially');
   // flow = 0: the buffer is untouched (skipped pass, not an identity warp).
-  const w3 = 8, h3 = 8, n3 = w3 * h3 * 4;
+  const w3 = 8,
+    h3 = 8,
+    n3 = w3 * h3 * 4;
   const blob = new Float64Array(n3);
-  for (let i = 0; i < n3; i++) blob[i] = (i * 7919) % 97 / 97; // deterministic junk
+  for (let i = 0; i < n3; i++) blob[i] = ((i * 7919) % 97) / 97; // deterministic junk
   const fb0 = fbParams({ flowUv: 0 }); // keep = 0.99 (fade: 1 clamps)
   const still = mirrorAccumStep({ accum: blob, frame: new Float64Array(n3), w: w3, h: h3, params: fb0 });
   for (let i = 0; i < n3; i += 4) {
@@ -556,24 +675,44 @@ ok('mirror: flow = 0 is a no-op, flow > 0 advects', () => {
   }
   // flow > 0 on a uniform field: advection of a constant is the constant.
   const flat = new Float64Array(n3).fill(0.5);
-  flat.forEach((_, i) => { if (i % 4 === 3) flat[i] = 1; });
-  const adv = mirrorAccumStep({ accum: flat, frame: new Float64Array(n3), w: w3, h: h3, params: fbParams({ flowUv: 0.03 }) });
+  flat.forEach((_, i) => {
+    if (i % 4 === 3) flat[i] = 1;
+  });
+  const adv = mirrorAccumStep({
+    accum: flat,
+    frame: new Float64Array(n3),
+    w: w3,
+    h: h3,
+    params: fbParams({ flowUv: 0.03 }),
+  });
   for (let i = 0; i < n3; i += 4) {
     assert.ok(Math.abs(adv[i] - 0.5 * 0.99) < 1e-9, `uniform field advects to itself, then fades (i=${i})`);
   }
 });
 
 ok('mirror: echoes mix past frames, echoes = 0 is a no-op', () => {
-  const w4 = 4, h4 = 4, n4 = w4 * h4 * 4;
+  const w4 = 4,
+    h4 = 4,
+    n4 = w4 * h4 * 4;
   const dotAt = (x) => {
     const f = new Float64Array(n4);
-    f[x * 4] = 1; f[x * 4 + 1] = 1; f[x * 4 + 2] = 1; f[x * 4 + 3] = 1;
+    f[x * 4] = 1;
+    f[x * 4 + 1] = 1;
+    f[x * 4 + 2] = 1;
+    f[x * 4 + 3] = 1;
     return f;
   };
   const silent = new Float64Array(n4);
   const params = { ...accumRecipeParams({ fade: 1, optics: 0 }), echoTaps: 2, echoWeights: [0.5, 0.35] };
   // echoes = 0: identical to the old path even with a state object around.
-  const noEcho = mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params: fbParams({}), echo: createEchoState() });
+  const noEcho = mirrorAccumStep({
+    accum: silent,
+    frame: dotAt(0),
+    w: w4,
+    h: h4,
+    params: fbParams({}),
+    echo: createEchoState(),
+  });
   assert.equal(noEcho[0], 1, 'live frame lands at full weight');
   assert.equal(noEcho[4], 0, 'no ghost without echoes');
   // With echoes: step 1 has no history yet (no taps valid) — the live
@@ -639,45 +778,93 @@ ok('harness: every uniform each ACCUM shader declares is in its upload list', ()
 function makeMockGL() {
   let ids = 1;
   const C = {
-    TEXTURE_2D: 0x0DE1, TEXTURE0: 0x84C0, FRAMEBUFFER: 0x8D40,
-    COLOR_ATTACHMENT0: 0x8CE0, FRAMEBUFFER_COMPLETE: 0x8CD5,
-    RGBA16F: 0x881A, RGBA8: 0x8058, RGBA: 0x1908, HALF_FLOAT: 0x140B,
-    UNSIGNED_BYTE: 0x1401, NEAREST: 0x2600, LINEAR: 0x2601,
+    TEXTURE_2D: 0x0de1,
+    TEXTURE0: 0x84c0,
+    FRAMEBUFFER: 0x8d40,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    RGBA16F: 0x881a,
+    RGBA8: 0x8058,
+    RGBA: 0x1908,
+    HALF_FLOAT: 0x140b,
+    UNSIGNED_BYTE: 0x1401,
+    NEAREST: 0x2600,
+    LINEAR: 0x2601,
     LINEAR_MIPMAP_LINEAR: 0x2703,
-    CLAMP_TO_EDGE: 0x812F, TEXTURE_MIN_FILTER: 0x2801, TEXTURE_MAG_FILTER: 0x2800,
-    TEXTURE_WRAP_S: 0x2802, TEXTURE_WRAP_T: 0x2803, COLOR_BUFFER_BIT: 0x4000,
-    TRIANGLES: 0x0004, ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88E4, FLOAT: 0x1406,
-    BLEND: 0x0BE2, VERTEX_SHADER: 0x8B31, FRAGMENT_SHADER: 0x8B30,
-    COMPILE_STATUS: 0x8B81, LINK_STATUS: 0x8B82, ACTIVE_UNIFORMS: 0x8B86,
-    NO_ERROR: 0, INVALID_OPERATION: 0x0502,
+    CLAMP_TO_EDGE: 0x812f,
+    TEXTURE_MIN_FILTER: 0x2801,
+    TEXTURE_MAG_FILTER: 0x2800,
+    TEXTURE_WRAP_S: 0x2802,
+    TEXTURE_WRAP_T: 0x2803,
+    COLOR_BUFFER_BIT: 0x4000,
+    TRIANGLES: 0x0004,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    FLOAT: 0x1406,
+    BLEND: 0x0be2,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    ACTIVE_UNIFORMS: 0x8b86,
+    NO_ERROR: 0,
+    INVALID_OPERATION: 0x0502,
   };
   let activeUnit = 0;
   const gl = {
     ...C,
     _errorQueue: [],
-    createTexture: () => ids++, deleteTexture() {},
-    bindTexture(t, id) { if (t === C.TEXTURE_2D) this._bound = id; },
-    activeTexture(u) { activeUnit = u - C.TEXTURE0; },
+    createTexture: () => ids++,
+    deleteTexture() {},
+    bindTexture(t, id) {
+      if (t === C.TEXTURE_2D) this._bound = id;
+    },
+    activeTexture(u) {
+      activeUnit = u - C.TEXTURE0;
+    },
     texParameteri() {},
     texImage2D() {},
     generateMipmap() {},
-    createFramebuffer: () => ids++, deleteFramebuffer() {},
+    createFramebuffer: () => ids++,
+    deleteFramebuffer() {},
     bindFramebuffer() {},
     framebufferTexture2D() {},
     checkFramebufferStatus: () => C.FRAMEBUFFER_COMPLETE,
-    createBuffer: () => ids++, deleteBuffer() {},
-    bindBuffer() {}, bufferData() {},
-    createShader: () => ids++, shaderSource() {}, compileShader() {},
-    getShaderParameter: () => true, getShaderInfoLog: () => '', deleteShader() {},
-    createProgram: () => ids++, attachShader() {}, linkProgram() {},
+    createBuffer: () => ids++,
+    deleteBuffer() {},
+    bindBuffer() {},
+    bufferData() {},
+    createShader: () => ids++,
+    shaderSource() {},
+    compileShader() {},
+    getShaderParameter: () => true,
+    getShaderInfoLog: () => '',
+    deleteShader() {},
+    createProgram: () => ids++,
+    attachShader() {},
+    linkProgram() {},
     getProgramParameter: (p, q) => (q === C.LINK_STATUS ? true : 0),
-    getProgramInfoLog: () => '', deleteProgram() {},
-    getActiveUniform: () => null, getUniformLocation: () => ({}),
-    useProgram() {}, viewport() {}, disable() {}, clearColor() {}, clear() {},
-    enableVertexAttribArray() {}, vertexAttribPointer() {}, disableVertexAttribArray() {},
-    uniform1i() {}, uniform1f() {}, uniform2f() {}, uniform3f() {}, uniform4f() {},
+    getProgramInfoLog: () => '',
+    deleteProgram() {},
+    getActiveUniform: () => null,
+    getUniformLocation: () => ({}),
+    useProgram() {},
+    viewport() {},
+    disable() {},
+    clearColor() {},
+    clear() {},
+    enableVertexAttribArray() {},
+    vertexAttribPointer() {},
+    disableVertexAttribArray() {},
+    uniform1i() {},
+    uniform1f() {},
+    uniform2f() {},
+    uniform3f() {},
+    uniform4f() {},
     drawArrays() {},
-    getError() { return this._errorQueue.length ? this._errorQueue.shift() : C.NO_ERROR; },
+    getError() {
+      return this._errorQueue.length ? this._errorQueue.shift() : C.NO_ERROR;
+    },
   };
   return gl;
 }
@@ -758,8 +945,7 @@ ok('regression: step() still throws on an error from its own passes', () => {
   // The drain consumes the first call; the post-step check is the second.
   let calls = 0;
   gl.getError = () => (++calls <= 1 ? gl.NO_ERROR : gl.INVALID_OPERATION);
-  assert.throws(() => accum.step(frameTex, p), /GL error after step/,
-    'genuine pass error still throws');
+  assert.throws(() => accum.step(frameTex, p), /GL error after step/, 'genuine pass error still throws');
   accum.dispose();
 });
 
@@ -817,17 +1003,59 @@ async function runBrowserTests() {
     const f64Of = (bytes) => Float64Array.from(bytes, (v) => v / 255);
     const LSB = 1 / 255;
 
-    const runProbe = async ({ w = 12, h = 12, bg = '#000000', fade = 0.9, optics = 0, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, stipple = null, frames }) => {
+    const runProbe = async ({
+      w = 12,
+      h = 12,
+      bg = '#000000',
+      fade = 0.9,
+      optics = 0,
+      tunnel = 0,
+      prism = 0,
+      flow = 0,
+      echoes = 0,
+      audio = null,
+      stipple = null,
+      frames,
+    }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
-        w, h, bg, fade, optics, tunnel, prism, flow, echoes, echoWidth: w, audio, stipple,
+        w,
+        h,
+        bg,
+        fade,
+        optics,
+        tunnel,
+        prism,
+        flow,
+        echoes,
+        echoWidth: w,
+        audio,
+        stipple,
         frames: frames.map(bytesOf),
       });
       return { gpu: f64Of(res.pixels), w: res.width, h: res.height };
     };
-    const mirrorSeq = ({ w, h, bg, fade, optics, tunnel = 0, prism = 0, flow = 0, echoes = 0, audio = null, stipple = null, frames }) => {
+    const mirrorSeq = ({
+      w,
+      h,
+      bg,
+      fade,
+      optics,
+      tunnel = 0,
+      prism = 0,
+      flow = 0,
+      echoes = 0,
+      audio = null,
+      stipple = null,
+      frames,
+    }) => {
       const bgV = [0, 1, 2].map((i) => parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16) / 255);
       let acc = new Float64Array(w * h * 4);
-      for (let i = 0; i < w * h; i++) { acc[i * 4] = bgV[0]; acc[i * 4 + 1] = bgV[1]; acc[i * 4 + 2] = bgV[2]; acc[i * 4 + 3] = 1; }
+      for (let i = 0; i < w * h; i++) {
+        acc[i * 4] = bgV[0];
+        acc[i * 4 + 1] = bgV[1];
+        acc[i * 4 + 2] = bgV[2];
+        acc[i * 4 + 3] = 1;
+      }
       const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background: bg });
       if (stipple !== null && stipple !== undefined) base.stipple = stipple;
       const echo = createEchoState();
@@ -853,7 +1081,10 @@ async function runBrowserTests() {
     const whiteDot = (w, h, x, y) => {
       const f = new Float64Array(w * h * 4);
       const o = (y * w + x) * 4;
-      f[o] = 1; f[o + 1] = 1; f[o + 2] = 1; f[o + 3] = 1;
+      f[o] = 1;
+      f[o + 1] = 1;
+      f[o + 2] = 1;
+      f[o + 3] = 1;
       return f;
     };
     const whiteBlock = (w, h, x, y, s, v = 1) => {
@@ -861,14 +1092,19 @@ async function runBrowserTests() {
       for (let j = 0; j < s; j++) {
         for (let i = 0; i < s; i++) {
           const o = ((y + j) * w + x + i) * 4;
-          f[o] = v; f[o + 1] = v; f[o + 2] = v; f[o + 3] = 1;
+          f[o] = v;
+          f[o + 1] = v;
+          f[o + 2] = v;
+          f[o + 3] = 1;
         }
       }
       return f;
     };
 
     await okAsync('probe: ping-pong feedback accumulates across frames (GPU = mirror)', async () => {
-      const w = 12, h = 12, fade = 0.9;
+      const w = 12,
+        h = 12,
+        fade = 0.9;
       const frames = [whiteDot(w, h, 3, 3), whiteDot(w, h, 8, 8), new Float64Array(w * h * 4)];
       const { gpu } = await runProbe({ w, h, fade, optics: 0, frames });
       const ref = mirrorSeq({ w, h, bg: '#000000', fade, optics: 0, frames });
@@ -879,7 +1115,8 @@ async function runBrowserTests() {
     });
 
     await okAsync('probe: optics 0 = no bloom bleed (off by default)', async () => {
-      const w = 12, h = 12;
+      const w = 12,
+        h = 12;
       const frames = [whiteDot(w, h, 6, 6)];
       const { gpu } = await runProbe({ w, h, fade: 1, optics: 0, frames });
       const far = (x, y) => gpu[(y * w + x) * 4];
@@ -891,7 +1128,8 @@ async function runBrowserTests() {
       // 64x64: a realistic scale for the recipe's glow lods — the mip
       // chain reads a 8x8 base at lods ~3 (bloom) and ~4.6 (halation),
       // so the glow is broad and soft, not a tight halo.
-      const w = 64, h = 64;
+      const w = 64,
+        h = 64;
       // Bright block: the additive glow lifts the block core past 1.0 and
       // the probe's 8-bit readback clamps it — mirrorSeq clamps the same
       // way, so the bloom/halation add stays measurable without the
@@ -905,11 +1143,23 @@ async function runBrowserTests() {
       closeTo(gpu, ref, 6 * LSB, 'glow step (stipple off)');
       const at = (x, y) => gpu[(y * w + x) * 4];
       assert.ok(at(48, 32) > 0.003, `glow bleeds ten pixels past the block, got ${at(48, 32).toFixed(4)}`);
-      const sum = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2]; return s; };
+      const sum = (buf) => {
+        let s = 0;
+        for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2];
+        return s;
+      };
       const plain = await runProbe({ w, h, fade: 1, optics: 0, frames });
       assert.ok(sum(gpu) > sum(plain.gpu) * 1.01, 'bloom + halation add light (not just redistribute)');
       // Warm bias: halation adds more red than blue.
-      const hal = (buf) => { let r = 0, b = 0; for (let i = 0; i < buf.length; i += 4) { r += buf[i]; b += buf[i + 2]; } return r - b; };
+      const hal = (buf) => {
+        let r = 0,
+          b = 0;
+        for (let i = 0; i < buf.length; i += 4) {
+          r += buf[i];
+          b += buf[i + 2];
+        }
+        return r - b;
+      };
       assert.ok(hal(gpu) > hal(plain.gpu), 'optics shift the added light warm/red');
       // The frame itself lands sharp — no blur-over-time.
       assert.ok(at(30, 30) > 0.99, 'the block interior is untouched at full weight');
@@ -921,7 +1171,8 @@ async function runBrowserTests() {
       // flips between GPU and mirror, so worst-pixel parity is the wrong
       // bar. The hash itself is bit-exact (16-bit quantized); agreement is
       // statistical — sparse flipped dots, tiny mean difference.
-      const w = 64, h = 64;
+      const w = 64,
+        h = 64;
       const frames = [whiteBlock(w, h, 26, 26, 12, 1)];
       const { gpu } = await runProbe({ w, h, fade: 1, optics: 1, frames });
       const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 1, frames });
@@ -950,7 +1201,8 @@ async function runBrowserTests() {
     });
 
     await okAsync('probe: fade 0 kills trails', async () => {
-      const w = 12, h = 12;
+      const w = 12,
+        h = 12;
       const frames = [whiteDot(w, h, 6, 6), new Float64Array(w * h * 4)];
       const { gpu } = await runProbe({ w, h, fade: 0, optics: 0, frames });
       const at = (x, y) => gpu[(y * w + x) * 4];
@@ -960,7 +1212,8 @@ async function runBrowserTests() {
     await okAsync('probe: tunnel feedback spirals inward (GPU = mirror)', async () => {
       // 256px: the recipe's per-frame zoom (1%/frame at tunnel = 1) moves
       // ~0.65px/frame at this radius — above the NEAREST visibility floor.
-      const w = 256, h = 256;
+      const w = 256,
+        h = 256;
       // 6x6 block east of center; 15 fade-only frames at tunnel = 1.
       const frames = [whiteBlock(w, h, 190, 125, 6)];
       for (let i = 0; i < 14; i++) frames.push(new Float64Array(w * h * 4));
@@ -968,19 +1221,27 @@ async function runBrowserTests() {
       const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 0, tunnel: 1, frames });
       closeTo(gpu, ref, 6 * LSB, 'tunnel sequence');
       const cx = (buf) => {
-        let s = 0, sx = 0;
-        for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-          const v = buf[(y * w + x) * 4]; s += v; sx += v * x;
-        }
+        let s = 0,
+          sx = 0;
+        for (let y = 0; y < h; y++)
+          for (let x = 0; x < w; x++) {
+            const v = buf[(y * w + x) * 4];
+            s += v;
+            sx += v * x;
+          }
         return sx / s;
       };
-      assert.ok(cx(gpu) < 192.5 - 8, `tunnel pulls the block toward center: centroid x ${cx(gpu).toFixed(1)} (was 192.5)`);
+      assert.ok(
+        cx(gpu) < 192.5 - 8,
+        `tunnel pulls the block toward center: centroid x ${cx(gpu).toFixed(1)} (was 192.5)`,
+      );
     });
 
     await okAsync('probe: prism splits channels radially (GPU = mirror)', async () => {
       // 512px: the recipe's per-frame prism push (0.001 UV at prism = 1)
       // moves ~0.5px/frame — just above the NEAREST visibility floor.
-      const w = 512, h = 512;
+      const w = 512,
+        h = 512;
       // 3x3 dot east of center; 8 fade-only frames at prism = 1.
       const frames = [whiteBlock(w, h, 400, 256, 3)];
       for (let i = 0; i < 7; i++) frames.push(new Float64Array(w * h * 4));
@@ -988,15 +1249,21 @@ async function runBrowserTests() {
       const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 0, prism: 1, frames });
       closeTo(gpu, ref, 6 * LSB, 'prism sequence');
       const peakX = (buf, c) => {
-        let bx = 0, bv = -1;
+        let bx = 0,
+          bv = -1;
         for (let x = 0; x < w; x++) {
           let s = 0;
           for (let y = 252; y < 262; y++) s += buf[(y * w + x) * 4 + c];
-          if (s > bv) { bv = s; bx = x; }
+          if (s > bv) {
+            bv = s;
+            bx = x;
+          }
         }
         return bx;
       };
-      const rx = peakX(gpu, 0), gx = peakX(gpu, 1), bx = peakX(gpu, 2);
+      const rx = peakX(gpu, 0),
+        gx = peakX(gpu, 1),
+        bx = peakX(gpu, 2);
       assert.ok(rx < gx && gx < bx, `channels separate radially: r@${rx} g@${gx} b@${bx}`);
       assert.ok(bx - rx >= 4, `separation is visible: r/b spread ${bx - rx}px`);
     });
@@ -1005,15 +1272,20 @@ async function runBrowserTests() {
       // The noise hash is integer-exact on both sides, but the displacement
       // is float32 vs float64 — so parity runs on a smooth blob (neighbor
       // flips cost little) rather than a hard dot.
-      const w = 256, h = 256;
+      const w = 256,
+        h = 256;
       const blob = (w, h) => {
         const f = new Float64Array(w * h * 4);
         for (let y = 0; y < h; y++) {
           for (let x = 0; x < w; x++) {
-            const dx = (x - w / 2) / (w / 8), dy = (y - h / 2) / (h / 8);
+            const dx = (x - w / 2) / (w / 8),
+              dy = (y - h / 2) / (h / 8);
             const v = Math.exp(-(dx * dx + dy * dy));
             const o = (y * w + x) * 4;
-            f[o] = v; f[o + 1] = v; f[o + 2] = v; f[o + 3] = 1;
+            f[o] = v;
+            f[o + 1] = v;
+            f[o + 2] = v;
+            f[o + 3] = 1;
           }
         }
         return f;
@@ -1031,12 +1303,20 @@ async function runBrowserTests() {
       // Conservation-ish: the forward warp is not divergence-free, so it
       // dissipates a few %/step at max flow (part of the billow look) — but
       // it must never CREATE light.
-      const sum = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i]; return s; };
-      assert.ok(sum(gpu) <= sum(still) * 1.02, `flow never creates light (gpu=${sum(gpu).toFixed(1)} still=${sum(still).toFixed(1)})`);
+      const sum = (buf) => {
+        let s = 0;
+        for (let i = 0; i < buf.length; i += 4) s += buf[i];
+        return s;
+      };
+      assert.ok(
+        sum(gpu) <= sum(still) * 1.02,
+        `flow never creates light (gpu=${sum(gpu).toFixed(1)} still=${sum(still).toFixed(1)})`,
+      );
     });
 
     await okAsync('probe: echoes leave discrete ghosts (GPU = mirror)', async () => {
-      const w = 12, h = 12;
+      const w = 12,
+        h = 12;
       // Dots march right across three frames; tap 0 should ghost the
       // previous frame's dot at half weight behind the live one.
       // fade = 0 (keep = 0) so the fade trail doesn't drown the ghosts —
@@ -1053,7 +1333,8 @@ async function runBrowserTests() {
     });
 
     await okAsync('probe: echo mix clamps alpha to <= 1 (GPU and mirror)', async () => {
-      const w = 8, h = 8;
+      const w = 8,
+        h = 8;
       // Two identical frames stacked: additive mixing would push alpha to
       // 1.85 without the clamp. (RGB goes HDR here, which the 8-bit probe
       // readback clips — so this locks the alpha guarantee specifically,
@@ -1061,13 +1342,18 @@ async function runBrowserTests() {
       const frames = [whiteDot(w, h, 4, 4), whiteDot(w, h, 4, 4), whiteDot(w, h, 4, 4)];
       const { gpu } = await runProbe({ w, h, fade: 0, optics: 0, echoes: 2, frames });
       const ref = mirrorSeq({ w, h, bg: '#000000', fade: 0, optics: 0, echoes: 2, frames });
-      const maxAlpha = (buf) => { let m = 0; for (let i = 3; i < buf.length; i += 4) m = Math.max(m, buf[i]); return m; };
+      const maxAlpha = (buf) => {
+        let m = 0;
+        for (let i = 3; i < buf.length; i += 4) m = Math.max(m, buf[i]);
+        return m;
+      };
       assert.ok(maxAlpha(gpu) <= 1 + 1e-6, `GPU echo alpha clamped, got max ${maxAlpha(gpu).toFixed(3)}`);
       assert.ok(maxAlpha(ref) <= 1 + 1e-6, `mirror echo alpha clamped, got max ${maxAlpha(ref).toFixed(3)}`);
     });
 
     await okAsync('probe: audio envelope modulates per-frame params (GPU = mirror)', async () => {
-      const w = 12, h = 12;
+      const w = 12,
+        h = 12;
       // One dot, then silence: with a loud envelope the trail survives
       // longer (keep punched up); with silence it decays to the base keep.
       const frames = [whiteDot(w, h, 6, 6)];
@@ -1081,8 +1367,15 @@ async function runBrowserTests() {
       // Total light (not the center pixel): the audio-swollen optics adds
       // glow light around the dot while the punched-up keep makes the
       // trail as a whole survive longer.
-      const total = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i]; return s; };
-      assert.ok(total(loud) > total(quiet) * 1.5, `loud envelope keeps brighter trails (${total(loud).toFixed(3)} vs ${total(quiet).toFixed(3)})`);
+      const total = (buf) => {
+        let s = 0;
+        for (let i = 0; i < buf.length; i += 4) s += buf[i];
+        return s;
+      };
+      assert.ok(
+        total(loud) > total(quiet) * 1.5,
+        `loud envelope keeps brighter trails (${total(loud).toFixed(3)} vs ${total(quiet).toFixed(3)})`,
+      );
       // Silence envelope == no envelope at all (the no-audio path untouched).
       const { gpu: noEnv } = await runProbe({ w, h, fade: 0.5, optics: 0, frames });
       closeTo(quiet, noEnv, 1e-9, 'silent envelope is identity');
@@ -1095,9 +1388,21 @@ async function runBrowserTests() {
       const frames = [];
       for (const progress of [0, 0.5, 1]) {
         const rl = resolveLayers(doc, { caps, motion: 'auto', progress });
-        frames.push(bsc({ doc, resolvedLayers: rl, caps, accum: { enabled: true, fade: 0.9, optics: 0.4, background: '#000000' } }));
+        frames.push(
+          bsc({
+            doc,
+            resolvedLayers: rl,
+            caps,
+            accum: { enabled: true, fade: 0.9, optics: 0.4, background: '#000000' },
+          }),
+        );
       }
-      const { pixels, width, height } = await renderAccumViaGL(frames, { width: 200, height: 140, fade: 0.9, optics: 0.4 });
+      const { pixels, width, height } = await renderAccumViaGL(frames, {
+        width: 200,
+        height: 140,
+        fade: 0.9,
+        optics: 0.4,
+      });
       assert.equal(width, 200);
       assert.equal(height, 140);
       assert.equal(pixels.length, 200 * 140 * 4);
@@ -1109,7 +1414,11 @@ async function runBrowserTests() {
       const sharp = await renderAccumViaGL(frames, { width: 200, height: 140, fade: 0.9, optics: 0 });
       assert.ok(!sharp.pixels.equals(single.pixels), 'optics=0: trails accumulate (differs from last frame)');
       const dim = await renderAccumViaGL(frames, { width: 200, height: 140, fade: 0.5, optics: 0 });
-      const bright = (buf) => { let s = 0; for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2]; return s; };
+      const bright = (buf) => {
+        let s = 0;
+        for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2];
+        return s;
+      };
       assert.ok(bright(pixels) > bright(dim.pixels), 'higher fade keeps brighter trails');
     });
 
@@ -1122,7 +1431,12 @@ async function runBrowserTests() {
       const { buildSceneContract: bsc } = await import('./sceneContract.js');
       const doc = getScene('single-basic').doc;
       const rl = resolveLayers(doc, { caps, motion: 'auto', progress: 0.5 });
-      const c1 = bsc({ doc, resolvedLayers: rl, caps, accum: { enabled: true, fade: 0.9, optics: 0, background: '#000000' } });
+      const c1 = bsc({
+        doc,
+        resolvedLayers: rl,
+        caps,
+        accum: { enabled: true, fade: 0.9, optics: 0, background: '#000000' },
+      });
       const c2 = JSON.parse(JSON.stringify(c1));
       for (const it of c2.instances) it.x += 24;
       const seq = await renderAccumViaGL([c1, c2], { width: 200, height: 140, bg: '#000000', fade: 0.01, optics: 0 });
@@ -1143,24 +1457,29 @@ async function runBrowserTests() {
       assert.ok(iPlain > 0, 'control render has ink');
       // #532 PR2: ACES changes the 8-bit inked count. Smear must still
       // add ink; the 1.4x margin was clamp-resolve specific.
-      assert.ok(iSmeared > iPlain,
-        `smeared inked pixels ${iSmeared} vs plain ${iPlain}`);
+      assert.ok(iSmeared > iPlain, `smeared inked pixels ${iSmeared} vs plain ${iPlain}`);
     });
 
     await okAsync('#309: resDiv=2 resample is the exact 2x2 box (real GPU)', async () => {
       // 4x4 frame, 2x2 pair: each 2x2 quadrant is a solid color, so the
       // resampled pair must equal the quadrant colors exactly.
-      const R = [255, 0, 0, 255], G = [0, 255, 0, 255];
-      const B = [0, 0, 255, 255], Wh = [255, 255, 255, 255];
-      const frame = [
-        R, R, G, G,
-        R, R, G, G,
-        B, B, Wh, Wh,
-        B, B, Wh, Wh,
-      ].flat(); // bottom-first rows
+      const R = [255, 0, 0, 255],
+        G = [0, 255, 0, 255];
+      const B = [0, 0, 255, 255],
+        Wh = [255, 255, 255, 255];
+      const frame = [R, R, G, G, R, R, G, G, B, B, Wh, Wh, B, B, Wh, Wh].flat(); // bottom-first rows
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
-        w: 2, h: 2, resDiv: 2, bg: '#000000', fade: 0.9, optics: 0,
-        tunnel: 0, prism: 0, flow: 0, echoes: 0, echoWidth: 2,
+        w: 2,
+        h: 2,
+        resDiv: 2,
+        bg: '#000000',
+        fade: 0.9,
+        optics: 0,
+        tunnel: 0,
+        prism: 0,
+        flow: 0,
+        echoes: 0,
+        echoWidth: 2,
         frames: [frame],
       });
       assert.equal(res.width, 2);
@@ -1168,8 +1487,7 @@ async function runBrowserTests() {
       const expected = [R, G, B, Wh].flat(); // bottom-first
       assert.equal(res.pixels.length, expected.length);
       for (let i = 0; i < expected.length; i++) {
-        assert.ok(Math.abs(res.pixels[i] - expected[i]) <= 1,
-          `byte ${i}: got ${res.pixels[i]}, want ${expected[i]}`);
+        assert.ok(Math.abs(res.pixels[i] - expected[i]) <= 1, `byte ${i}: got ${res.pixels[i]}, want ${expected[i]}`);
       }
     });
 
@@ -1179,8 +1497,17 @@ async function runBrowserTests() {
       const solid = [];
       for (let i = 0; i < 6 * 6; i++) solid.push(200, 100, 50, 255);
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
-        w: 4, h: 4, resDiv: 1.5, bg: '#000000', fade: 0.9, optics: 0,
-        tunnel: 0, prism: 0, flow: 0, echoes: 0, echoWidth: 4,
+        w: 4,
+        h: 4,
+        resDiv: 1.5,
+        bg: '#000000',
+        fade: 0.9,
+        optics: 0,
+        tunnel: 0,
+        prism: 0,
+        flow: 0,
+        echoes: 0,
+        echoWidth: 4,
         frames: [solid],
       });
       assert.equal(res.width, 4);

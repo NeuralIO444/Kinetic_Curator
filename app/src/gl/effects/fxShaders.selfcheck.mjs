@@ -35,7 +35,11 @@ import {
 import { EFFECT_FS } from '../shaders.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const parseUniforms = (src) => {
   const names = [];
@@ -49,7 +53,9 @@ const parseUniforms = (src) => {
 function makeMockGl() {
   const calls = [];
   let nextId = 1;
-  const call = (name, ...args) => { calls.push({ name, args }); };
+  const call = (name, ...args) => {
+    calls.push({ name, args });
+  };
   const shaders = new Map();
   const attached = new Map();
   const activeNames = (p) => {
@@ -58,15 +64,28 @@ function makeMockGl() {
     return fs ? parseUniforms(fs.src) : [];
   };
   const gl = {
-    VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82, ACTIVE_UNIFORMS: 0x8b86,
-    TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0, FRAMEBUFFER: 0x8d40,
-    COLOR_ATTACHMENT0: 0x8ce0, FRAMEBUFFER_COMPLETE: 0x8cd5,
-    RGBA16F: 0x881a, RGBA: 0x1908, HALF_FLOAT: 0x140b,
-    CLAMP_TO_EDGE: 0x812f, TEXTURE_MIN_FILTER: 0x2801,
-    TEXTURE_MAG_FILTER: 0x2800, NEAREST: 0x2600,
-    ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88e4, FLOAT: 0x1406,
-    TRIANGLES: 0x0004, BLEND: 0x0be2,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    ACTIVE_UNIFORMS: 0x8b86,
+    TEXTURE_2D: 0x0de1,
+    TEXTURE0: 0x84c0,
+    FRAMEBUFFER: 0x8d40,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    RGBA16F: 0x881a,
+    RGBA: 0x1908,
+    HALF_FLOAT: 0x140b,
+    CLAMP_TO_EDGE: 0x812f,
+    TEXTURE_MIN_FILTER: 0x2801,
+    TEXTURE_MAG_FILTER: 0x2800,
+    NEAREST: 0x2600,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    FLOAT: 0x1406,
+    TRIANGLES: 0x0004,
+    BLEND: 0x0be2,
     calls,
     count: (name) => calls.filter((c) => c.name === name).length,
     withName: (name) => calls.filter((c) => c.name === name),
@@ -76,30 +95,53 @@ function makeMockGl() {
       shaders.set(s, s);
       return s;
     },
-    shaderSource: (s, src) => { shaders.get(s).src = src; call('shaderSource'); },
+    shaderSource: (s, src) => {
+      shaders.get(s).src = src;
+      call('shaderSource');
+    },
     compileShader: (s) => call('compileShader'),
     getShaderParameter: () => true,
     getShaderInfoLog: () => '',
     deleteShader: (s) => call('deleteShader'),
-    createProgram: () => { call('createProgram'); const p = { __p: nextId++ }; attached.set(p, []); return p; },
-    attachShader: (p, s) => { attached.get(p).push(s); call('attachShader'); },
+    createProgram: () => {
+      call('createProgram');
+      const p = { __p: nextId++ };
+      attached.set(p, []);
+      return p;
+    },
+    attachShader: (p, s) => {
+      attached.get(p).push(s);
+      call('attachShader');
+    },
     linkProgram: (p) => call('linkProgram'),
     getProgramParameter: (p, pname) => (pname === gl.ACTIVE_UNIFORMS ? activeNames(p).length : true),
     getActiveUniform: (p, i) => ({ name: activeNames(p)[i] }),
     getProgramInfoLog: () => '',
     deleteProgram: (p) => call('deleteProgram'),
-    getUniformLocation: (p, uname) => { call('getUniformLocation', uname); return { __loc: uname }; },
-    createTexture: () => { call('createTexture'); return { __t: nextId++ }; },
+    getUniformLocation: (p, uname) => {
+      call('getUniformLocation', uname);
+      return { __loc: uname };
+    },
+    createTexture: () => {
+      call('createTexture');
+      return { __t: nextId++ };
+    },
     bindTexture: (t, x) => call('bindTexture', x),
     texImage2D: (...a) => call('texImage2D', a[3], a[4]),
     texParameteri: () => call('texParameteri'),
     deleteTexture: (x) => call('deleteTexture', x),
-    createFramebuffer: () => { call('createFramebuffer'); return { __f: nextId++ }; },
+    createFramebuffer: () => {
+      call('createFramebuffer');
+      return { __f: nextId++ };
+    },
     bindFramebuffer: (t, x) => call('bindFramebuffer', x),
     framebufferTexture2D: () => call('framebufferTexture2D'),
     checkFramebufferStatus: () => gl.FRAMEBUFFER_COMPLETE,
     deleteFramebuffer: (x) => call('deleteFramebuffer', x),
-    createBuffer: () => { call('createBuffer'); return { __b: nextId++ }; },
+    createBuffer: () => {
+      call('createBuffer');
+      return { __b: nextId++ };
+    },
     bindBuffer: (t, x) => call('bindBuffer', x),
     bufferData: () => call('bufferData'),
     deleteBuffer: (x) => call('deleteBuffer', x),
@@ -120,8 +162,10 @@ function makeMockGl() {
 }
 
 const mockCanvas = () => ({
-  width: 400, height: 280,
-  addEventListener() {}, removeEventListener() {},
+  width: 400,
+  height: 280,
+  addEventListener() {},
+  removeEventListener() {},
 });
 
 function makeFxBridge(gl) {
@@ -132,7 +176,17 @@ function makeFxBridge(gl) {
 }
 
 ok('all Phase-2 kinds are declared', () => {
-  assert.deepEqual([...FX_SHADER_KINDS].sort(), ['displace', 'edge', 'grade', 'halo', 'haze', 'scanlines', 'sharpen', 'solarize', 'tear']);
+  assert.deepEqual([...FX_SHADER_KINDS].sort(), [
+    'displace',
+    'edge',
+    'grade',
+    'halo',
+    'haze',
+    'scanlines',
+    'sharpen',
+    'solarize',
+    'tear',
+  ]);
 });
 
 ok('descriptors validate and mirror the SVG-side FX catalog', () => {
@@ -209,9 +263,9 @@ ok('all five run top-down through the bridge (one pass each)', () => {
 ok('compileFxShaders fails closed on unknown kinds and bad params', () => {
   const steps = compileFxShaders([
     { kind: 'displace', params: { scale: 9999, seed: -5 } }, // clamped
-    { kind: 'nope', params: {} },                            // dropped
-    null,                                                    // dropped
-    { kind: 'edge' },                                        // params default to {}
+    { kind: 'nope', params: {} }, // dropped
+    null, // dropped
+    { kind: 'edge' }, // params default to {}
   ]);
   assert.equal(steps.length, 2);
   assert.equal(steps[0].kind, 'displace');
@@ -246,22 +300,41 @@ ok('#704: halo is identity at defaults and never blurs with a gaussian', () => {
   // Sanitisation still clamps every knob.
   const steps = compileFxShaders([{ kind: 'halo', params: { amount: 99, radius: 1e6, threshold: -5, vignette: 9 } }]);
   const p = steps[0].params;
-  assert.ok(p.amount <= 1.5 && p.radius <= 64 && p.threshold >= 0 && p.vignette <= 1,
-    `halo params must clamp (${JSON.stringify(p)})`);
-  assert.strictEqual(compileFxShaders([{ kind: 'halo', params: { amount: NaN } }])[0].params.amount, 0,
-    'a non-finite amount falls back to off');
+  assert.ok(
+    p.amount <= 1.5 && p.radius <= 64 && p.threshold >= 0 && p.vignette <= 1,
+    `halo params must clamp (${JSON.stringify(p)})`,
+  );
+  assert.strictEqual(
+    compileFxShaders([{ kind: 'halo', params: { amount: NaN } }])[0].params.amount,
+    0,
+    'a non-finite amount falls back to off',
+  );
 });
 ok('#1022: sharpen is a 4-tap unsharp mask — no blur pass, byte-identical at amount 0', () => {
-  assert.ok(!/blur\(|gaussian|for \(int/i.test(FX_SHARPEN_FS.replace(/\/\/.*$/gm, '')), 'no blur and no loop: a bounded, countable cost');
+  assert.ok(
+    !/blur\(|gaussian|for \(int/i.test(FX_SHARPEN_FS.replace(/\/\/.*$/gm, '')),
+    'no blur and no loop: a bounded, countable cost',
+  );
   assert.strictEqual((FX_SHARPEN_FS.match(/texture\(u_tex/g) || []).length, 5, 'centre plus four taps');
-  assert.ok(FX_SHARPEN_FS.includes('if (u_amount > 0.0'), 'amount 0 must skip the work and return the source untouched');
+  assert.ok(
+    FX_SHARPEN_FS.includes('if (u_amount > 0.0'),
+    'amount 0 must skip the work and return the source untouched',
+  );
   assert.ok(FX_SHARPEN_FS.includes('o = c;'), 'the default output is the source, byte for byte');
-  assert.ok(FX_SHARPEN_FS.includes('max(a.a + b.a + d.a + e.a'), 'taps are averaged weighted by alpha, so silhouettes get no dark-rim bias');
+  assert.ok(
+    FX_SHARPEN_FS.includes('max(a.a + b.a + d.a + e.a'),
+    'taps are averaged weighted by alpha, so silhouettes get no dark-rim bias',
+  );
   const steps = compileFxShaders([{ kind: 'sharpen', params: { amount: 99, radius: 1e6 } }]);
-  assert.ok(steps[0].params.amount <= 2 && steps[0].params.radius <= 3, `sharpen params must clamp (${JSON.stringify(steps[0].params)})`);
+  assert.ok(
+    steps[0].params.amount <= 2 && steps[0].params.radius <= 3,
+    `sharpen params must clamp (${JSON.stringify(steps[0].params)})`,
+  );
   const lo = compileFxShaders([{ kind: 'sharpen', params: { amount: -9, radius: -9 } }])[0].params;
   assert.ok(lo.amount >= 0 && lo.radius >= 0.5, `sharpen params clamp low (${JSON.stringify(lo)})`);
-  assert.ok(Number.isFinite(compileFxShaders([{ kind: 'sharpen', params: { amount: NaN, radius: NaN } }])[0].params.amount));
+  assert.ok(
+    Number.isFinite(compileFxShaders([{ kind: 'sharpen', params: { amount: NaN, radius: NaN } }])[0].params.amount),
+  );
 });
 ok('#1022: haze is a single-tap veil — no blur, byte-identical at amount 0', () => {
   assert.strictEqual((FX_HAZE_FS.match(/texture\(u_tex/g) || []).length, 1, 'one tap: pure ALU');
@@ -278,7 +351,11 @@ ok('#1022: both new effects declare a cost and a descriptor that mirrors the SVG
   for (const kind of ['sharpen', 'haze']) {
     const reg = getTemplateEffect(kind);
     assert.ok(reg && reg.descriptor, `${kind} is registered`);
-    assert.deepEqual(Object.keys(reg.descriptor.params), Object.keys(FX_EFFECT_DEFS[kind].params), `${kind} params match the SVG catalog`);
+    assert.deepEqual(
+      Object.keys(reg.descriptor.params),
+      Object.keys(FX_EFFECT_DEFS[kind].params),
+      `${kind} params match the SVG catalog`,
+    );
     for (const [k, p] of Object.entries(reg.descriptor.params)) {
       const s = FX_EFFECT_DEFS[kind].params[k];
       assert.deepEqual([p.min, p.max, p.def], [s.min, s.max, s.def], `${kind}.${k} range and default agree`);
@@ -299,14 +376,18 @@ ok('#590: displace warp is additive — 0 is the legacy effect, and the block is
   // Sanitization still clamps it like every other param.
   const steps = compileFxShaders([{ kind: 'displace', params: { scale: 24, seed: 7, warp: 999 } }]);
   assert.ok(steps[0].params.warp <= 60, 'warp clamps to its descriptor max');
-  assert.strictEqual(compileFxShaders([{ kind: 'displace', params: { scale: 24, seed: 7, warp: NaN } }])[0].params.warp, 0,
-    'a non-finite warp falls back to the legacy default');
+  assert.strictEqual(
+    compileFxShaders([{ kind: 'displace', params: { scale: 24, seed: 7, warp: NaN } }])[0].params.warp,
+    0,
+    'a non-finite warp falls back to the legacy default',
+  );
 });
 
 ok('compileFxShaders emits kind+params steps, no aux (#1079)', () => {
-  const steps = compileFxShaders(
-    [{ kind: 'grain', params: { amount: 0.4 } }, { kind: 'edge', params: {} }],
-  );
+  const steps = compileFxShaders([
+    { kind: 'grain', params: { amount: 0.4 } },
+    { kind: 'edge', params: {} },
+  ]);
   assert.equal(steps[0].kind, 'grain');
   assert.deepEqual(Object.keys(steps[0]).sort(), ['kind', 'params'], 'no aux texture on any step');
   assert.ok(!('aux' in steps[1]), 'edge has no aux either');

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { sanitizeKinemeRateAudio, applyKinemeRateAudio } from './kinemeRateAudio.mjs';
 
-test('sanitizeKinemeRateAudio: 0/undefined/non-finite → 1 (today\'s rate exactly)', () => {
+test("sanitizeKinemeRateAudio: 0/undefined/non-finite → 1 (today's rate exactly)", () => {
   assert.equal(sanitizeKinemeRateAudio(0), 1, 'silence relaxes to base rate, never stalls');
   assert.equal(sanitizeKinemeRateAudio(undefined), 1, 'no route → identity');
   assert.equal(sanitizeKinemeRateAudio(null), 1);
@@ -30,7 +30,7 @@ test('applyKinemeRateAudio: multiplier rides on top of the base rate', () => {
 });
 
 test('applyKinemeRateAudio: base rate itself is sanitized, never non-finite', () => {
-  assert.equal(applyKinemeRateAudio(0, 2), 0, 'a zero base stays zero (user\'s slider, clock freezes honestly)');
+  assert.equal(applyKinemeRateAudio(0, 2), 0, "a zero base stays zero (user's slider, clock freezes honestly)");
   assert.equal(applyKinemeRateAudio(NaN, 2), 2, 'garbage base → 1 × mult');
   assert.equal(applyKinemeRateAudio(-1, 2), 0, 'negative base clamps at 0');
   const r = applyKinemeRateAudio(1, 3);

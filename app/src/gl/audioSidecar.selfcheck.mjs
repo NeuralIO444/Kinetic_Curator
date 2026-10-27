@@ -23,9 +23,21 @@ import { sourceStatus, sidecarReason, clock } from './sourceStatus.mjs';
 import { useStore } from '../state/store.js';
 
 const good = () => ({
-  schema: AUDIO_SCHEMA, source: 'x.wav', sr: 22050, hop_length: 512, fps: 10, duration: 4, tempo_bpm: 120,
-  frames: Array.from({ length: 41 }, (_, i) => ({ t: i / 10, rms: Math.min(1, i / 40), flux: 0.2, beat_phase: (i % 5) / 5 })),
-  beats: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5], downbeats: [],
+  schema: AUDIO_SCHEMA,
+  source: 'x.wav',
+  sr: 22050,
+  hop_length: 512,
+  fps: 10,
+  duration: 4,
+  tempo_bpm: 120,
+  frames: Array.from({ length: 41 }, (_, i) => ({
+    t: i / 10,
+    rms: Math.min(1, i / 40),
+    flux: 0.2,
+    beat_phase: (i % 5) / 5,
+  })),
+  beats: [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5],
+  downbeats: [],
 });
 
 // ── A ────────────────────────────────────────────────────────────────────
@@ -37,18 +49,49 @@ const good = () => ({
   assert.strictEqual(r.env.tempoBpm, 120);
   const drift = parseAudioEnvelope({ ...good(), schema: 'kc-audio-envelope/2' });
   assert.ok(drift.env && /kc-audio-envelope\/2/.test(drift.note), 'schema drift still reads, with a note');
-  const legacy = parseAudioEnvelope([{ t: 0, rms: 0.5, beat: 1 }, { t: 0.1, rms: 0.7, beat: 0 }]);
+  const legacy = parseAudioEnvelope([
+    { t: 0, rms: 0.5, beat: 1 },
+    { t: 0.1, rms: 0.7, beat: 0 },
+  ]);
   assert.ok(legacy.env && legacy.env.samples.length === 2, 'the legacy sketch still reads');
   // hostile values are clamped, bad frames dropped, order fixed
-  const hostile = parseAudioEnvelope({ frames: [{ t: 1, rms: 9, flux: -3 }, { t: 'x', rms: 1 }, null, { t: -1, rms: 1 }, { t: 0, rms: NaN }], beats: [2, 'a', -1, 1] });
+  const hostile = parseAudioEnvelope({
+    frames: [{ t: 1, rms: 9, flux: -3 }, { t: 'x', rms: 1 }, null, { t: -1, rms: 1 }, { t: 0, rms: NaN }],
+    beats: [2, 'a', -1, 1],
+  });
   assert.ok(hostile.env);
-  assert.deepStrictEqual(hostile.env.samples.map((s) => s.t), [0, 1], 'bad frames dropped, sorted');
-  assert.deepStrictEqual(hostile.env.samples.map((s) => s.rms), [0, 1], 'rms clamped 0..1, NaN → 0');
+  assert.deepStrictEqual(
+    hostile.env.samples.map((s) => s.t),
+    [0, 1],
+    'bad frames dropped, sorted',
+  );
+  assert.deepStrictEqual(
+    hostile.env.samples.map((s) => s.rms),
+    [0, 1],
+    'rms clamped 0..1, NaN → 0',
+  );
   assert.deepStrictEqual(hostile.env.beats, [1, 2], 'beats filtered and sorted');
   // malformed: refused with a reason, never a throw
-  for (const bad of [null, undefined, 0, 'x', true, {}, [], { frames: [] }, { frames: 'nope' }, { frames: [null, 'a', {}] }, { envelope: [] }]) {
+  for (const bad of [
+    null,
+    undefined,
+    0,
+    'x',
+    true,
+    {},
+    [],
+    { frames: [] },
+    { frames: 'nope' },
+    { frames: [null, 'a', {}] },
+    { envelope: [] },
+  ]) {
     let r2;
-    assert.doesNotThrow(() => { r2 = parseAudioEnvelope(bad); }, `malformed ${JSON.stringify(bad)} never throws`);
+    assert.doesNotThrow(
+      () => {
+        r2 = parseAudioEnvelope(bad);
+      },
+      `malformed ${JSON.stringify(bad)} never throws`,
+    );
     assert.strictEqual(r2.env, null, `malformed ${JSON.stringify(bad)} is refused`);
     assert.ok(['no-frames', 'no-usable-frames'].includes(r2.problem));
   }
@@ -59,13 +102,22 @@ const good = () => ({
   const env = parseAudioEnvelope(good()).env;
   // deterministic: replay a fixed playback script twice → identical
   const play = () => {
-    const out = []; let prev = null;
-    for (let i = 0; i <= 400; i++) { const t = i * 0.01; out.push(envelopeTick(env, t, prev)); prev = t; }
+    const out = [];
+    let prev = null;
+    for (let i = 0; i <= 400; i++) {
+      const t = i * 0.01;
+      out.push(envelopeTick(env, t, prev));
+      prev = t;
+    }
     return out;
   };
   assert.deepStrictEqual(play(), play(), 'same file, same playback → same visuals, twice in a row');
   const run = play();
-  assert.strictEqual(run.reduce((n, x) => n + x.beats, 0), 7, 'all 7 beats fire exactly once over one play');
+  assert.strictEqual(
+    run.reduce((n, x) => n + x.beats, 0),
+    7,
+    'all 7 beats fire exactly once over one play',
+  );
   assert.strictEqual(envelopeTick(env, 0.5, null).beats, 0, 'first tick never fires beats');
   assert.strictEqual(envelopeTick(env, 0.5, 0.49).beats, 1, 'a beat crossed fires');
   assert.strictEqual(envelopeTick(env, 0.5, 0.5).beats, 0, 'and only once');
@@ -87,7 +139,11 @@ const good = () => ({
   const dir = mkdtempSync(join(tmpdir(), 'kc-sidecar-'));
   const p = join(dir, 'good.audio.json');
   writeFileSync(p, JSON.stringify(good()));
-  assert.deepStrictEqual(nodeLoader.loadAudioEnvelope(p), parseAudioEnvelope(good()).env, 'node loader = browser parser');
+  assert.deepStrictEqual(
+    nodeLoader.loadAudioEnvelope(p),
+    parseAudioEnvelope(good()).env,
+    'node loader = browser parser',
+  );
   assert.strictEqual(nodeLoader.sampleEnvelope, sampleEnvelope, 'one sampler');
   const badPath = join(dir, 'bad.json');
   writeFileSync(badPath, '{"frames": []}');
@@ -96,7 +152,9 @@ const good = () => ({
   try {
     assert.strictEqual(nodeLoader.loadAudioEnvelope(badPath), null, 'malformed file → null (a real no-op)');
     assert.strictEqual(nodeLoader.loadAudioEnvelope(join(dir, 'missing.json')), null, 'missing file → null');
-  } finally { process.stderr.write = errWrite; }
+  } finally {
+    process.stderr.write = errWrite;
+  }
 }
 
 // ── D ────────────────────────────────────────────────────────────────────
@@ -139,13 +197,26 @@ const good = () => ({
 // ── F ────────────────────────────────────────────────────────────────────
 {
   const hook = readFileSync(new URL('../hooks/useAudioInput.js', import.meta.url), 'utf8');
-  assert.ok(flat(hook).includes(flat("source.type === 'file'")) && flat(hook).includes(flat('envelopeTick(env, el.currentTime, envPrevTRef.current)')), 'the sidecar drives a FILE source only, from playback time');
-  assert.ok(flat(hook).includes(flat('rms = tick.rms; bass = 0; mid = 0; treble = 0;')), 'band routes zero: the sidecar has no bands');
-  assert.ok(flat(hook).includes(flat('envBeat != null ? envBeat : rms - prevRmsRef.current > 0.15')), 'beats from the sidecar, else the live spike detector');
+  assert.ok(
+    flat(hook).includes(flat("source.type === 'file'")) &&
+      flat(hook).includes(flat('envelopeTick(env, el.currentTime, envPrevTRef.current)')),
+    'the sidecar drives a FILE source only, from playback time',
+  );
+  assert.ok(
+    flat(hook).includes(flat('rms = tick.rms; bass = 0; mid = 0; treble = 0;')),
+    'band routes zero: the sidecar has no bands',
+  );
+  assert.ok(
+    flat(hook).includes(flat('envBeat != null ? envBeat : rms - prevRmsRef.current > 0.15')),
+    'beats from the sidecar, else the live spike detector',
+  );
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(/sidecar: state\.audioSidecar\?\.env \?\? null/.test(app), 'App hands the sidecar to the hook');
   const ctl = readFileSync(new URL('../panels/stimulus/SourceControls.jsx', import.meta.url), 'utf8');
-  assert.ok(/parseAudioEnvelope\(raw\)/.test(ctl) && /set\(null, sidecarReason/.test(ctl), 'a malformed pick is refused with a reason');
+  assert.ok(
+    /parseAudioEnvelope\(raw\)/.test(ctl) && /set\(null, sidecarReason/.test(ctl),
+    'a malformed pick is refused with a reason',
+  );
   assert.ok(/not-json/.test(ctl), 'invalid JSON is refused too');
 }
 console.log('audioSidecar.selfcheck: OK');

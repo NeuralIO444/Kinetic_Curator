@@ -5,6 +5,8 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const APP = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
@@ -21,10 +23,7 @@ const WALL_OK = [
   'src/gl/phase6.selfcheck.mjs',
 ];
 
-const LOOP_OWNERS = [
-  'src/gl/liveLoop.mjs',
-  'src/gl/liveResolve.mjs',
-];
+const LOOP_OWNERS = ['src/gl/liveLoop.mjs', 'src/gl/liveResolve.mjs'];
 
 function read(rel) {
   return readFileSync(join(APP, rel), 'utf8');
@@ -76,10 +75,13 @@ test('#807 wall allow-list is explicit', () => {
 const WALL_RE = /Date\.now\(\)|performance\.now\(\)|new Date\(/;
 
 function codeLinesWithNumbers(src) {
-  return src.split('\n').map((t, i) => ({ n: i + 1, t })).filter(({ t }) => {
-    const s = t.trim();
-    return s && !s.startsWith('//') && !s.startsWith('*') && !s.startsWith('/*');
-  });
+  return src
+    .split('\n')
+    .map((t, i) => ({ n: i + 1, t }))
+    .filter(({ t }) => {
+      const s = t.trim();
+      return s && !s.startsWith('//') && !s.startsWith('*') && !s.startsWith('/*');
+    });
 }
 
 // Every wall-clock read must be justified: an allow pattern matching the
@@ -90,7 +92,10 @@ function unjustifiedWallHits(rel, allowRes, contextLines = 4) {
   const bad = [];
   lines.forEach(({ n, t }, i) => {
     if (!WALL_RE.test(t)) return;
-    const window = lines.slice(i, i + 1 + contextLines).map((l) => l.t).join('\n');
+    const window = lines
+      .slice(i, i + 1 + contextLines)
+      .map((l) => l.t)
+      .join('\n');
     if (!allowRes.some((re) => re.test(window))) bad.push(`${rel}:${n}: ${t.trim()}`);
   });
   return bad;
@@ -168,11 +173,15 @@ test('#806 must-loop files justify every wall-clock read', () => {
     const src = read(f);
     assert.deepEqual(unjustifiedWallHits(f, policy.allow), [], `${f}: unjustified wall-clock read`);
     for (const re of policy.mustContain) {
-      assert.match(src, re, `${f}: must contain ${re}`);
+      assert.match(flat(src), fre(re), `${f}: must contain ${re}`);
     }
     if (policy.noDateNow) {
       const hits = codeLinesWithNumbers(src).filter(({ t }) => /Date\.now\(\)/.test(t));
-      assert.deepEqual(hits.map((h) => `${f}:${h.n}`), [], `${f}: loop owner must never Date.now()`);
+      assert.deepEqual(
+        hits.map((h) => `${f}:${h.n}`),
+        [],
+        `${f}: loop owner must never Date.now()`,
+      );
     }
   }
 });

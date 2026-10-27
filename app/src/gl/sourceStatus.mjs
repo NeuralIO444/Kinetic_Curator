@@ -36,12 +36,14 @@ export function sourceStatus(source, sidecar, note = '') {
     return {
       tag: 'FILE+ENV',
       line: `FILE · SIDECAR ${sidecar.name} · ${s.length} frames · ${clock(span)}`,
-      driving: 'Level and beat come from the sidecar, the same every play. Bass / mid / treble routes are idle (the sidecar has no bands).',
+      driving:
+        'Level and beat come from the sidecar, the same every play. Bass / mid / treble routes are idle (the sidecar has no bands).',
     };
   }
   return {
     tag: 'FILE',
     line: note ? `FILE · sidecar ignored: ${note} — live analysis` : 'FILE · no sidecar — live analysis',
-    driving: 'The file, analysed live (not repeatable to the frame). Load a kc-audio-envelope/1 sidecar to drive it from pre-analysed truth.',
+    driving:
+      'The file, analysed live (not repeatable to the frame). Load a kc-audio-envelope/1 sidecar to drive it from pre-analysed truth.',
   };
 }

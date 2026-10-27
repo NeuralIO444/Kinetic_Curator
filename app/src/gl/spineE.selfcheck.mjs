@@ -19,17 +19,31 @@ console.log('spineE.selfcheck: starting...');
   const m = createPaletteMix();
   // Frame 0: cold start
   const c0 = m.update({
-    id: 'p1', overrides: null, userPalettes: null,
-    mode: 'grid', behave: 'cruise', assetsKey: 'a,b',
-    mixSeconds: 2, now: 1000, canDissolve: false, bakeReady: true,
+    id: 'p1',
+    overrides: null,
+    userPalettes: null,
+    mode: 'grid',
+    behave: 'cruise',
+    assetsKey: 'a,b',
+    mixSeconds: 2,
+    now: 1000,
+    canDissolve: false,
+    bakeReady: true,
   });
   assert.strictEqual(c0.kind, 'cut', 'first sighting is cut');
 
   // Frame 1: mode chip changed from grid to swarm
   const c1 = m.update({
-    id: 'p1', overrides: null, userPalettes: null,
-    mode: 'swarm', behave: 'cruise', assetsKey: 'a,b',
-    mixSeconds: 2, now: 1016, canDissolve: true, bakeReady: true,
+    id: 'p1',
+    overrides: null,
+    userPalettes: null,
+    mode: 'swarm',
+    behave: 'cruise',
+    assetsKey: 'a,b',
+    mixSeconds: 2,
+    now: 1016,
+    canDissolve: true,
+    bakeReady: true,
   });
   assert.strictEqual(c1.kind, 'start', 'mode change triggers dissolve start');
   assert.strictEqual(c1.dur, 2);
@@ -37,27 +51,48 @@ console.log('spineE.selfcheck: starting...');
 
   // Frame 2: first bake-ready frame starts the mix clock (t=0)
   const c2 = m.update({
-    id: 'p1', overrides: null, userPalettes: null,
-    mode: 'swarm', behave: 'cruise', assetsKey: 'a,b',
-    mixSeconds: 2, now: 1016, canDissolve: true, bakeReady: true,
+    id: 'p1',
+    overrides: null,
+    userPalettes: null,
+    mode: 'swarm',
+    behave: 'cruise',
+    assetsKey: 'a,b',
+    mixSeconds: 2,
+    now: 1016,
+    canDissolve: true,
+    bakeReady: true,
   });
   assert.strictEqual(c2.kind, 'mix', 'bake ready starts mix');
   assert.strictEqual(c2.t, 0, 't=0 at clock start');
 
   // Frame 3: dissolve in progress at halfway mark
   const c3 = m.update({
-    id: 'p1', overrides: null, userPalettes: null,
-    mode: 'swarm', behave: 'cruise', assetsKey: 'a,b',
-    mixSeconds: 2, now: 2016, canDissolve: true, bakeReady: true,
+    id: 'p1',
+    overrides: null,
+    userPalettes: null,
+    mode: 'swarm',
+    behave: 'cruise',
+    assetsKey: 'a,b',
+    mixSeconds: 2,
+    now: 2016,
+    canDissolve: true,
+    bakeReady: true,
   });
   assert.strictEqual(c3.kind, 'mix', 'dissolve progresses');
   assert.ok(c3.t > 0 && c3.t < 1, 't in (0, 1)');
 
   // Frame 4: rapid retarget to fibonacci before mix finishes
   const c4 = m.update({
-    id: 'p1', overrides: null, userPalettes: null,
-    mode: 'fibonacci', behave: 'cruise', assetsKey: 'a,b',
-    mixSeconds: 2, now: 2100, canDissolve: true, bakeReady: true,
+    id: 'p1',
+    overrides: null,
+    userPalettes: null,
+    mode: 'fibonacci',
+    behave: 'cruise',
+    assetsKey: 'a,b',
+    mixSeconds: 2,
+    now: 2100,
+    canDissolve: true,
+    bakeReady: true,
   });
   assert.strictEqual(c4.kind, 'start', 'retarget triggers start');
   assert.strictEqual(c4.retarget, true, 'retarget flag is true to preserve original held deck');
@@ -75,7 +110,13 @@ console.log('spineE.selfcheck: starting...');
   // Set count to float 10.5
   sys.update(
     { ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 10.5 },
-    assets, palette, 0x123, 1000, null, null, 1 / 60,
+    assets,
+    palette,
+    0x123,
+    1000,
+    null,
+    null,
+    1 / 60,
   );
   // Ensure alpha is nonzero for testing
   sys.alpha.fill(80);

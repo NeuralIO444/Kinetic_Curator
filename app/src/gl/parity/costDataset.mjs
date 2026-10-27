@@ -26,7 +26,8 @@
 
 export const COST_DATASET_KIND = 'kc-cost-dataset';
 export const COST_DATASET_VERSION = 1;
-export const LABEL_DEFINITION = 'median of per-repetition p90 frame ms (readback-forced renderScene, warm-up discarded)';
+export const LABEL_DEFINITION =
+  'median of per-repetition p90 frame ms (readback-forced renderScene, warm-up discarded)';
 
 /**
  * The four device-probe microbenchmarks (FTRF-style: descriptors of the
@@ -112,7 +113,10 @@ export function validateDataset(ds) {
   const ids = new Set();
   for (const [i, row] of (ds.rows || []).entries()) {
     const at = `rows[${i}]${row && row.id ? ` (${row.id})` : ''}`;
-    if (!row || typeof row !== 'object') { bad(`${at}: not an object`); continue; }
+    if (!row || typeof row !== 'object') {
+      bad(`${at}: not an object`);
+      continue;
+    }
     if (typeof row.id !== 'string' || !row.id) bad(`${at}: id missing`);
     else if (ids.has(row.id)) bad(`${at}: duplicate id`);
     else ids.add(row.id);
@@ -121,16 +125,21 @@ export function validateDataset(ds) {
     if (!f || typeof f !== 'object') bad(`${at}: features missing`);
     else {
       if (!f.num || typeof f.num !== 'object') bad(`${at}: features.num missing`);
-      else for (const [k, v] of Object.entries(f.num)) if (!finite(v)) bad(`${at}: features.num.${k} must be a finite number`);
+      else
+        for (const [k, v] of Object.entries(f.num))
+          if (!finite(v)) bad(`${at}: features.num.${k} must be a finite number`);
       if (!f.mech || typeof f.mech !== 'object') bad(`${at}: features.mech missing`);
-      else for (const [k, v] of Object.entries(f.mech)) if (!finite(v)) bad(`${at}: features.mech.${k} must be a finite number`);
+      else
+        for (const [k, v] of Object.entries(f.mech))
+          if (!finite(v)) bad(`${at}: features.mech.${k} must be a finite number`);
       if (!f.probe || typeof f.probe !== 'object') bad(`${at}: features.probe missing`);
       // Probe keys are costHead's runtime names (runDeviceProbes' bag):
       // the dataset's feature vectors must be the vectors a trainer — and
       // later the runtime — actually see.
-      if (f && f.probe) for (const k of ['fillRate', 'instanced', 'blend', 'js']) {
-        if (!finite(f.probe[k])) bad(`${at}: features.probe.${k} must be a finite number`);
-      }
+      if (f && f.probe)
+        for (const k of ['fillRate', 'instanced', 'blend', 'js']) {
+          if (!finite(f.probe[k])) bad(`${at}: features.probe.${k} must be a finite number`);
+        }
     }
     if (!row.canvas || !finite(row.canvas.w) || !finite(row.canvas.h)) bad(`${at}: canvas missing`);
     if (row.status === 'failed') {
@@ -141,7 +150,10 @@ export function validateDataset(ds) {
     if (!Array.isArray(row.reps) || !row.reps.length) bad(`${at}: reps missing`);
     else {
       for (const r of row.reps) {
-        if (!r || !finite(r.p90) || !finite(r.p50) || !finite(r.mean) || !(r.n > 0)) { bad(`${at}: bad rep summary`); break; }
+        if (!r || !finite(r.p90) || !finite(r.p50) || !finite(r.mean) || !(r.n > 0)) {
+          bad(`${at}: bad rep summary`);
+          break;
+        }
       }
       const expect = labelFromReps(row.reps);
       if (!finite(row.labelMs)) bad(`${at}: labelMs missing`);

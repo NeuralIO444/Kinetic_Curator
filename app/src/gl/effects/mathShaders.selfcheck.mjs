@@ -27,7 +27,11 @@ import { MATH_SHADER_EFFECTS, MATH_SHADER_KINDS, registerMathShaders, applyMathM
 const here = dirname(fileURLToPath(import.meta.url));
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 /** Minimal bridge stub: registerTemplateEffect only needs these three. */
 function stubBridge() {
@@ -44,8 +48,18 @@ const stubGl = { ACTIVE_UNIFORMS: 0x8b86, getProgramParameter: () => 0, getActiv
 
 ok('twelve math ops are declared', () => {
   assert.deepEqual([...MATH_SHADER_KINDS].sort(), [
-    'channelMix', 'contrast', 'gain', 'hueRotate', 'knee', 'levelsFixed',
-    'lift', 'quantize', 'saturate', 'tempTint', 'threshold', 'vignette',
+    'channelMix',
+    'contrast',
+    'gain',
+    'hueRotate',
+    'knee',
+    'levelsFixed',
+    'lift',
+    'quantize',
+    'saturate',
+    'tempTint',
+    'threshold',
+    'vignette',
   ]);
 });
 
@@ -136,17 +150,23 @@ ok('applyMathMod pushes routed knobs toward max; silence is a no-op', () => {
   const half = applyMathMod(fx, { rms: 0, flux: 0, beatPulse: 0.5 });
   assert.equal(half[0].params.exposure, 1.5);
   // rms source routes rms, not beatPulse
-  const rmsHit = applyMathMod(
-    [{ kind: 'threshold', params: { level: 0.5, softness: 0 }, mod: { level: 'rms' } }],
-    { rms: 1, flux: 0, beatPulse: 0 });
+  const rmsHit = applyMathMod([{ kind: 'threshold', params: { level: 0.5, softness: 0 }, mod: { level: 'rms' } }], {
+    rms: 1,
+    flux: 0,
+    beatPulse: 0,
+  });
   assert.equal(rmsHit[0].params.level, 1);
   // int knobs stay ints after the push
-  const intHit = applyMathMod(
-    [{ kind: 'quantize', params: { steps: 8 }, mod: { steps: 'rms' } }],
-    { rms: 0.5, flux: 0, beatPulse: 0 });
+  const intHit = applyMathMod([{ kind: 'quantize', params: { steps: 8 }, mod: { steps: 'rms' } }], {
+    rms: 0.5,
+    flux: 0,
+    beatPulse: 0,
+  });
   assert.equal(intHit[0].params.steps, 12, '8 + 0.5*(16-8) = 12');
   // Unknown kind / knob are no-ops, never throw
-  assert.deepEqual(applyMathMod([{ kind: 'nope', params: {} }], { rms: 1, flux: 0, beatPulse: 0 }), [{ kind: 'nope', params: {} }]);
+  assert.deepEqual(applyMathMod([{ kind: 'nope', params: {} }], { rms: 1, flux: 0, beatPulse: 0 }), [
+    { kind: 'nope', params: {} },
+  ]);
 });
 
 console.log(`ok mathShaders.selfcheck — ${n} checks`);

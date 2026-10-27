@@ -1,8 +1,30 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
 import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
-import { createDriverClock, driverTimeSec, patternAmounts, rhythmTypeForPattern, createTravelStore, pruneTravelStore, snapshotTravelStore, restoreTravelStore, checkTravelStoreSnapshot } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
-import { createSurgeStore, pruneSurgeStore, snapshotSurgeStore, restoreSurgeStore, checkSurgeStoreSnapshot } from '../engine/surge.js'; // #1576: the surge envelope store
-import { createParallaxStore, pruneParallaxStore, snapshotParallaxStore, restoreParallaxStore, checkParallaxStoreSnapshot } from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
+import {
+  createDriverClock,
+  driverTimeSec,
+  patternAmounts,
+  rhythmTypeForPattern,
+  createTravelStore,
+  pruneTravelStore,
+  snapshotTravelStore,
+  restoreTravelStore,
+  checkTravelStoreSnapshot,
+} from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
+import {
+  createSurgeStore,
+  pruneSurgeStore,
+  snapshotSurgeStore,
+  restoreSurgeStore,
+  checkSurgeStoreSnapshot,
+} from '../engine/surge.js'; // #1576: the surge envelope store
+import {
+  createParallaxStore,
+  pruneParallaxStore,
+  snapshotParallaxStore,
+  restoreParallaxStore,
+  checkParallaxStoreSnapshot,
+} from '../engine/parallaxDrift.js'; // #1576: the parallax drift store
 import { ParticleSystem } from '../engine/particles.js';
 import { isLiveSwarmMode, isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { resolvePalette } from '../data/palettes.js';
@@ -26,7 +48,17 @@ import { recordPatchSample } from '../engine/kernel/tracks/patchDiag.mjs';
 
 import { createNoise } from '../engine/noise.js';
 import { createScentField } from '../engine/kernel/field/scent.js';
-import { createDishSession, enrolDishBody, releaseDishBody, armDish, dishEnrolRadius, snapshotDishSession, restoreDishSession, checkDishSessionSnapshot, restoreDishEntries } from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
+import {
+  createDishSession,
+  enrolDishBody,
+  releaseDishBody,
+  armDish,
+  dishEnrolRadius,
+  snapshotDishSession,
+  restoreDishSession,
+  checkDishSessionSnapshot,
+  restoreDishEntries,
+} from '../engine/dishContacts.mjs'; // #1407: one shared grid across strata; #1367: its snapshot
 import { createFeedDelay } from '../engine/kernel/tracks/feedDelay.js'; // #1367 — restore validation builds a throwaway delay
 import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the layer system's composed merge fields
 import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mjs'; // #1412: the shared grid's density field, published per frame
@@ -136,7 +168,9 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
   if (slowRender) return null;
   const amounts = patternAmounts(
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
-    layoutParams.kinemePattern, beatDrive);
+    layoutParams.kinemePattern,
+    beatDrive,
+  );
   amounts.paletteBreath = reducedMotion ? 0 : layoutParams.kinemePaletteBreath;
   // #1516 — brushWobble is assigned beside paletteBreath, for the same
   // reason: patternAmounts carries only the three pattern-weighted
@@ -148,9 +182,28 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
   amounts.brushWobble = layoutParams.kinemeBrushWobble;
   const rhythmType = rhythmTypeForPattern(layoutParams.kinemePattern);
   const rhythm = rhythmType ? { type: rhythmType } : null;
-  if (!rhythm && !(amounts.breath > 0) && !(amounts.drift > 0) && !(amounts.pulse > 0) && !(amounts.paletteBreath > 0) && !(amounts.brushWobble > 0)) return null;
+  if (
+    !rhythm &&
+    !(amounts.breath > 0) &&
+    !(amounts.drift > 0) &&
+    !(amounts.pulse > 0) &&
+    !(amounts.paletteBreath > 0) &&
+    !(amounts.brushWobble > 0)
+  )
+    return null;
   const pinned = assetStill && typeof assetStill === 'object' ? Object.keys(assetStill) : null;
-  return { seed, driverSec, boilStep: 0, amounts, canvasW: W, canvasH: H, shedTier: 0, anchored: true, rhythm, ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}) };
+  return {
+    seed,
+    driverSec,
+    boilStep: 0,
+    amounts,
+    canvasW: W,
+    canvasH: H,
+    shedTier: 0,
+    anchored: true,
+    rhythm,
+    ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}),
+  };
 }
 
 /**
@@ -166,7 +219,9 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
  * own gate). Nothing here is recomputed for the readout.
  */
 let lastFrameMotion = null;
-export function getLastFrameMotion() { return lastFrameMotion; }
+export function getLastFrameMotion() {
+  return lastFrameMotion;
+}
 
 /**
  * Phase 2 S1 — the last resolved frame's creature skeletons (world/scene space, per pin, null where
@@ -174,7 +229,9 @@ export function getLastFrameMotion() { return lastFrameMotion; }
  * objects, nothing recomputed. Empty when no creature was resolved (worker mode carries no creatures).
  */
 let lastSkeletons = [];
-export function getLastSkeletons() { return lastSkeletons; }
+export function getLastSkeletons() {
+  return lastSkeletons;
+}
 
 /**
  * Phase 2 S5 — the last resolved frame's band poses (per pin, one shared object — the pose is the
@@ -182,7 +239,9 @@ export function getLastSkeletons() { return lastSkeletons; }
  * that follow: S2's skinning and S4's material (the pose's dim above all) read them from here.
  */
 let lastPoses = [];
-export function getLastPoses() { return lastPoses; }
+export function getLastPoses() {
+  return lastPoses;
+}
 
 /**
  * #1694 slice 1 — the last resolved frame's SPAWN decisions, published by the resolver that owns the
@@ -195,7 +254,9 @@ export function getLastPoses() { return lastPoses; }
  * Shape: { dishPins, dishFormed, dishLimbs, dishTraits, dishHosted, dishPressure, homesChanged }.
  */
 let lastSpawnDecisions = null;
-export function getLastSpawnDecisions() { return lastSpawnDecisions; }
+export function getLastSpawnDecisions() {
+  return lastSpawnDecisions;
+}
 
 export function createLiveResolver() {
   const placementCaches = new Map();
@@ -320,13 +381,19 @@ export function createLiveResolver() {
     // delay-1 buffer (a snap, and a partner the picture did not have).
     // Only a removed layer returns its slot.
     for (const k of [...feedSlots.keys()]) {
-      if (!documentIds.has(k)) { feedSlotFree.push(feedSlots.get(k)); feedSlots.delete(k); }
+      if (!documentIds.has(k)) {
+        feedSlotFree.push(feedSlots.get(k));
+        feedSlots.delete(k);
+      }
     }
   }
 
   function cacheFor(layerId) {
     let c = placementCaches.get(layerId);
-    if (!c) { c = {}; placementCaches.set(layerId, c); }
+    if (!c) {
+      c = {};
+      placementCaches.set(layerId, c);
+    }
     return c;
   }
 
@@ -336,10 +403,17 @@ export function createLiveResolver() {
       st = { system: new ParticleSystem(), initKey: null, phraseGen: -1 };
       swarmState.set(layerId, st);
     }
-    const initKey = [ctx.mode, ctx.seed, W, H,
-      ctx.seedOffsets?.spatial || 0, ctx.seedOffsets?.color || 0,
-      ctx.seedOffsets?.asset || 0, ctx.seedOffsets?.noise || 0,
-      ctx.layoutParams.graze || 0].join('|');
+    const initKey = [
+      ctx.mode,
+      ctx.seed,
+      W,
+      H,
+      ctx.seedOffsets?.spatial || 0,
+      ctx.seedOffsets?.color || 0,
+      ctx.seedOffsets?.asset || 0,
+      ctx.seedOffsets?.noise || 0,
+      ctx.layoutParams.graze || 0,
+    ].join('|');
     if (st.initKey !== initKey) {
       // #427 — adopt-on-enter: capture whatever was actually on screen for
       // this layer last frame BEFORE re-init scatters fresh positions from
@@ -350,8 +424,10 @@ export function createLiveResolver() {
       // unrelated distributions. itemMorph then honestly tweens toward
       // the new scatter -- but the targets are arbitrary relative to a
       // frame ago, so every organism used to fly canvas-wide on entry.
-      const wasShown = ctx.slowRender ? [] : (lastShown.get(layerId)?.items || []);
-      st.system.init(Math.ceil(ctx.safeParticles), W, H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, { graze: ctx.layoutParams.graze || 0 });
+      const wasShown = ctx.slowRender ? [] : lastShown.get(layerId)?.items || [];
+      st.system.init(Math.ceil(ctx.safeParticles), W, H, ctx.activeAssets, ctx.palette, ctx.seed, ctx.seedOffsets, {
+        graze: ctx.layoutParams.graze || 0,
+      });
       st.initKey = initKey;
       if (wasShown.length) {
         // Right after init every particle is alive and (for organisms)
@@ -362,7 +438,8 @@ export function createLiveResolver() {
         // `.assetId` (string) — the same derivation swarmItems does below
         // for the presented list, needed here too or every fresh item
         // falls into one shared 'default' bucket and nothing matches.
-        const fresh = st.system.getItems(ctx.activeAssets)
+        const fresh = st.system
+          .getItems(ctx.activeAssets)
           .filter((it) => !it.role || it.role === 'body')
           .map((it) => (it.assetId ? it : { ...it, assetId: it.asset?.id }));
         const { pairs } = matchItems(wasShown, fresh);
@@ -383,7 +460,8 @@ export function createLiveResolver() {
     // radius 0, the session never arms, strata ghost (the bake driver
     // gates through the same helper — live and bake cannot disagree).
     enrolDishBody(dishSession, {
-      key: layerId, sys: st.system,
+      key: layerId,
+      sys: st.system,
       radius: dishEnrolRadius(ctx.layoutParams),
       restitution: ctx.layoutParams.contactRestitution ?? 0.5,
       contactMode: ctx.layoutParams.contactMode || 'none',
@@ -435,7 +513,12 @@ export function createLiveResolver() {
           // swarmItems call site from the frame's governor state.
           pigmentShed: !!ctx.pigmentShed,
         },
-        ctx.activeAssets, ctx.palette, ctx.seed, ctx.loopTimeMs, ctx.attractor, ctx.seedOffsets,
+        ctx.activeAssets,
+        ctx.palette,
+        ctx.seed,
+        ctx.loopTimeMs,
+        ctx.attractor,
+        ctx.seedOffsets,
         ctx.dtSec,
       );
     }
@@ -445,7 +528,7 @@ export function createLiveResolver() {
       // over-composite then erases beneath them (the deposit/erode loop).
       // The tint is stable per asset, so the atlas bakes the bg combo once.
       const bg = ctx.palette.bg;
-      const accent = item.graze ? bg : (swatches[(swatches.indexOf(item.color) + 3) % swatches.length] || swatches[0]);
+      const accent = item.graze ? bg : swatches[(swatches.indexOf(item.color) + 3) % swatches.length] || swatches[0];
       const u = Number.isFinite(item.u) ? Math.min(1, Math.max(0, item.u)) : 0;
       const uScale = item.role === 'wing' ? 1 + u * 0.18 : 1;
       return {
@@ -497,9 +580,11 @@ export function createLiveResolver() {
     const pool = mergePool(ASSETS, input.customAssets || []);
     if (overlayRevSrc !== input.customAssets) {
       overlayRevSrc = input.customAssets;
-      overlayRevs = new Map((input.customAssets || [])
-        .filter((a) => a && typeof a === 'object')
-        .map((a) => [String(a.id), hashStr(String(a.svg || ''))]));
+      overlayRevs = new Map(
+        (input.customAssets || [])
+          .filter((a) => a && typeof a === 'object')
+          .map((a) => [String(a.id), hashStr(String(a.svg || ''))]),
+      );
     }
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
     // #1574 — this frame's travel delta on the spine-A clock, measured once
@@ -514,7 +599,14 @@ export function createLiveResolver() {
     // device, recorded in a take's input log like every resolver input).
     // Absent — every take recorded before Q2 — it reads false (desktop
     // class), whose cap is the full placement cap: P1's behaviour exactly.
-    const travelBase = input.slowRender ? null : { store: travelStore, frameMs: travelFrameMs, shed: !!input.travelShed, ipadClass: input.travelIpadClass === true };
+    const travelBase = input.slowRender
+      ? null
+      : {
+          store: travelStore,
+          frameMs: travelFrameMs,
+          shed: !!input.travelShed,
+          ipadClass: input.travelIpadClass === true,
+        };
     // #1576 — P3's bases ride the same measured frame delta and the same
     // travel shed. The surge TRIGGER is an input signal: input.surgeTrigger,
     // which the Queen stamps (Q3, ruled by Matt 2026-10-20 — liveLoop stamps
@@ -523,8 +615,12 @@ export function createLiveResolver() {
     // no surface). Absent — every take recorded before Q3 — and 0 on every
     // frame she does not call, the machinery is inert and frames are
     // bit-identical to pre-P3.
-    const surgeBase = input.slowRender ? null : { store: surgeStore, frameMs: travelFrameMs, shed: !!input.travelShed, trigger: input.surgeTrigger ?? 0 };
-    const parallaxBase = input.slowRender ? null : { store: parallaxStore, frameMs: travelFrameMs, shed: !!input.travelShed };
+    const surgeBase = input.slowRender
+      ? null
+      : { store: surgeStore, frameMs: travelFrameMs, shed: !!input.travelShed, trigger: input.surgeTrigger ?? 0 };
+    const parallaxBase = input.slowRender
+      ? null
+      : { store: parallaxStore, frameMs: travelFrameMs, shed: !!input.travelShed };
     const weightOverrides = input.assetWeightOverrides || {};
     const out = [];
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
@@ -571,7 +667,10 @@ export function createLiveResolver() {
       let sum = 0;
       let n = 0;
       for (const v of Object.values(meterBands)) {
-        if (Number.isFinite(v)) { sum += v; n++; }
+        if (Number.isFinite(v)) {
+          sum += v;
+          n++;
+        }
       }
       if (n > 0) audioEnergy = Math.min(1, Math.max(0, sum / n));
     }
@@ -580,9 +679,10 @@ export function createLiveResolver() {
     // (the order the loop below resolves in). Arms only when at least two
     // enrolled strata have contacts on; otherwise every update below
     // stays bit-identical to the per-system engine.
-    armDish(dishSession, (input.layers || [])
-      .filter((l) => l && typeof l === 'object' && l.visible !== false)
-      .map((l) => l.id));
+    armDish(
+      dishSession,
+      (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false).map((l) => l.id),
+    );
 
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
@@ -622,18 +722,25 @@ export function createLiveResolver() {
       const snap = input.layerSnapshots?.[layer.id];
       const src = isActive
         ? {
-            seed: input.seed, seedOffsets: input.seedOffsets, paletteId: input.paletteId,
+            seed: input.seed,
+            seedOffsets: input.seedOffsets,
+            paletteId: input.paletteId,
             paletteOverrides: input.paletteOverrides,
             layoutParams: input.perfClampOverride
               ? { ...input.layoutParams, ...input.perfClampOverride }
               : input.layoutParams,
-            caGrid: input.caGrid, enabledAssets: input.enabledAssets,
+            caGrid: input.caGrid,
+            enabledAssets: input.enabledAssets,
           }
-        : (snap || {
-            seed: input.seed, seedOffsets: input.seedOffsets, paletteId: input.paletteId,
-            paletteOverrides: input.paletteOverrides, layoutParams: input.layoutParams,
-            caGrid: input.caGrid, enabledAssets: input.enabledAssets,
-          });
+        : snap || {
+            seed: input.seed,
+            seedOffsets: input.seedOffsets,
+            paletteId: input.paletteId,
+            paletteOverrides: input.paletteOverrides,
+            layoutParams: input.layoutParams,
+            caGrid: input.caGrid,
+            enabledAssets: input.enabledAssets,
+          };
 
       const layoutParams = { ...DEFAULT_LAYOUT_PARAMS, ...(src.layoutParams || {}) };
       // #1202 — mirror is a 4-state enum; 'off' is truthy, so compare explicitly.
@@ -643,9 +750,7 @@ export function createLiveResolver() {
       // for the rest. Life pauses the same two ways it used to: slowRender
       // (which folds !running) and batch exports.
       if (!input.slowRender && !input.batchPaused) {
-        const locks = isActive
-          ? (input.lockedParams || {})
-          : (snap ? (snap.lockedParams || {}) : (input.lockedParams || {}));
+        const locks = isActive ? input.lockedParams || {} : snap ? snap.lockedParams || {} : input.lockedParams || {};
         applyLifeDrift(layoutParams, locks, input.loopTimeMs ?? 0);
       }
       const palette = resolvePalette(src.paletteId, src.paletteOverrides, input.userPalettes);
@@ -681,9 +786,18 @@ export function createLiveResolver() {
       let items;
       if (isLiveSwarmMode(layoutParams.mode)) {
         items = swarmItems(layer.id, {
-          mode: layoutParams.mode, safeParticles, activeAssets, palette, seed, seedOffsets,
-          layoutParams, caps, scaleMul: input.scaleMul ?? 1, alphaBoost: input.alphaBoost ?? 0,
-          slowRender: !!input.slowRender, attractor: input.attractor ?? null,
+          mode: layoutParams.mode,
+          safeParticles,
+          activeAssets,
+          palette,
+          seed,
+          seedOffsets,
+          layoutParams,
+          caps,
+          scaleMul: input.scaleMul ?? 1,
+          alphaBoost: input.alphaBoost ?? 0,
+          slowRender: !!input.slowRender,
+          attractor: input.attractor ?? null,
           phraseWrapGen: input.phraseWrapGen || 0,
           // Spine A (#387): dt clock + loop time replace Date.now().
           dtSec: input.dtSec ?? 1 / 60,
@@ -707,7 +821,10 @@ export function createLiveResolver() {
         if (layoutParams.mode === 'dla' || layoutParams.mode === 'eden') {
           const gKey = [layoutParams.mode, seed, seedOffsets?.spatial || 0].join('|');
           let gt = growthTickByLayer.get(layer.id);
-          if (!gt || gt.key !== gKey) { gt = { tick: 0, key: gKey, gen: 0 }; growthTickByLayer.set(layer.id, gt); }
+          if (!gt || gt.key !== gKey) {
+            gt = { tick: 0, key: gKey, gen: 0 };
+            growthTickByLayer.set(layer.id, gt);
+          }
           if (!input.slowRender) {
             gt.tick++;
             // #793 — biology: the policy may end this generation. The decision
@@ -728,26 +845,55 @@ export function createLiveResolver() {
               gt.tick = 0;
               gt.gen++;
             }
-            recordLifecycleState(layer.id, {
-              mode: layoutParams.mode, gen: gt.gen, tick: gt.tick,
-              cellCount: stats.cellCount, oldestAge: stats.oldestAge,
-              meanAge01: stats.meanAge01, decision: decision.action,
-              reason: decision.reason,
-            }, input.loopTimeMs);
+            recordLifecycleState(
+              layer.id,
+              {
+                mode: layoutParams.mode,
+                gen: gt.gen,
+                tick: gt.tick,
+                cellCount: stats.cellCount,
+                oldestAge: stats.oldestAge,
+                meanAge01: stats.meanAge01,
+                decision: decision.action,
+                reason: decision.reason,
+              },
+              input.loopTimeMs,
+            );
           }
           growthTick = gt.tick;
         }
         // #1469 — capture the frame's living-motion read as the placements consume it: the first
         // layer (stack order) whose floor is alive supplies the kineme; wind comes from the first
         // resolved layer. Published at the end of the resolve (getLastFrameMotion).
-        const kineme = livingMotion(layoutParams, seed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion);
+        const kineme = livingMotion(
+          layoutParams,
+          seed,
+          driverSec,
+          W,
+          H,
+          input.slowRender,
+          input.beatDrive,
+          input.assetStill,
+          input.reducedMotion,
+        );
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;
         items = buildPlacements({
-          layoutParams, seed, seedOffsets, activeAssets, palette,
-          caGrid: src.caGrid ?? null, caps, canvasW: W, canvasH: H,
-          scale: input.effectiveScale, scaleY: input.effectiveScaleY, alpha: input.effectiveAlpha, cache: cacheFor(layer.id),
-          growthTick, audioEnergy,
+          layoutParams,
+          seed,
+          seedOffsets,
+          activeAssets,
+          palette,
+          caGrid: src.caGrid ?? null,
+          caps,
+          canvasW: W,
+          canvasH: H,
+          scale: input.effectiveScale,
+          scaleY: input.effectiveScaleY,
+          alpha: input.effectiveAlpha,
+          cache: cacheFor(layer.id),
+          growthTick,
+          audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme,
           // #1574 — the travel input: the resolver's store + this frame's
@@ -764,14 +910,29 @@ export function createLiveResolver() {
           parallaxDrift: parallaxBase ? { ...parallaxBase, sceneId: layer.id } : null,
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
-            dish, layers: input.layers, layerId: layer.id, lean: layoutParams.groundLean, nudge: layoutParams.groundNudge, snap: layoutParams.groundSnap, W, H, seed,
+            dish,
+            layers: input.layers,
+            layerId: layer.id,
+            lean: layoutParams.groundLean,
+            nudge: layoutParams.groundNudge,
+            snap: layoutParams.groundSnap,
+            W,
+            H,
+            seed,
             getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
             tSec: (input.loopTimeMs ?? 0) / 1000,
           }),
           // #1183 weather — the air: { dish, air, airVeil } when an FX layer above carries haze and this
           // layer's WEATHER dial is up, else nothing (byte-identical). Same dish, same frame time.
           ...weatherArgs({
-            dish, layers: input.layers, layerId: layer.id, air: layoutParams.weatherAir, W, H, seed, seedOffsets,
+            dish,
+            layers: input.layers,
+            layerId: layer.id,
+            air: layoutParams.weatherAir,
+            W,
+            H,
+            seed,
+            seedOffsets,
             tSec: (input.loopTimeMs ?? 0) / 1000,
           }),
         }).items;
@@ -782,7 +943,10 @@ export function createLiveResolver() {
         if (layoutParams.displacement > 0) {
           const nowMs = input.loopTimeMs ?? 0;
           let wp = warpPhase.get(layer.id);
-          if (!wp) { wp = { base: 0, lastMs: nowMs }; warpPhase.set(layer.id, wp); }
+          if (!wp) {
+            wp = { base: 0, lastMs: nowMs };
+            warpPhase.set(layer.id, wp);
+          }
           if (input.slowRender) {
             // #474 — a governor cut6/watchdog freeze is NOT a true pause:
             // liveLoop.mjs only rolls loopTimeMs back for `paused` (!running);
@@ -835,15 +999,31 @@ export function createLiveResolver() {
             const isLayersMode = layoutParams.mode === 'layers';
 
             items = items.map((it, k) => {
-              const band = isLayersMode ? ((it.index ?? k) % 5) : 0;
+              const band = isLayersMode ? (it.index ?? k) % 5 : 0;
               // bandMult is time-invariant, so scaling the already-accumulated
               // phase by it is exactly the integral of (speed * bandMult) dt.
-              const bandMult = isLayersMode ? (0.4 + band * 0.25) : 1;
+              const bandMult = isLayersMode ? 0.4 + band * 0.25 : 1;
               const ntLive = nt0 + nodePhase(wp.base * bandMult, it);
-              const curDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) * displacement;
-              const curDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, ntLive + 100, 3) * displacement;
-              const baseDx = worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) * displacement;
-              const baseDy = worldNoise.fBm3D(it.x * noiseFreq + 200 + domainOffsetX, it.y * noiseFreq + 200 + domainOffsetY, nt0 + 100, 3) * displacement;
+              const curDx =
+                worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, ntLive, 3) *
+                displacement;
+              const curDy =
+                worldNoise.fBm3D(
+                  it.x * noiseFreq + 200 + domainOffsetX,
+                  it.y * noiseFreq + 200 + domainOffsetY,
+                  ntLive + 100,
+                  3,
+                ) * displacement;
+              const baseDx =
+                worldNoise.fBm3D(it.x * noiseFreq + domainOffsetX, it.y * noiseFreq + domainOffsetY, nt0, 3) *
+                displacement;
+              const baseDy =
+                worldNoise.fBm3D(
+                  it.x * noiseFreq + 200 + domainOffsetX,
+                  it.y * noiseFreq + 200 + domainOffsetY,
+                  nt0 + 100,
+                  3,
+                ) * displacement;
               return {
                 ...it,
                 x: it.x + (curDx - baseDx),
@@ -858,7 +1038,8 @@ export function createLiveResolver() {
           const drift = layoutParams.lifeDriftOffset;
           if (drift && (drift.j || drift.d)) {
             items = items.map((it, k) => {
-              let dx = 0, dy = 0;
+              let dx = 0,
+                dy = 0;
               if (drift.j) {
                 dx += (hash01(k) - 0.5) * drift.j;
                 dy += (hash01(k + 7919) - 0.5) * drift.j;
@@ -924,17 +1105,30 @@ export function createLiveResolver() {
       // (true → 'x'), and an unset mirror hashes as 'off' like before.
       const srcMirror = src.layoutParams?.mirror;
       const morphSig = [
-        layoutParams.mode, layoutParams.behave, seed, assetSig,
-        srcMirror === true ? 'x' : (typeof srcMirror === 'string' ? srcMirror : 'off'),
+        layoutParams.mode,
+        layoutParams.behave,
+        seed,
+        assetSig,
+        srcMirror === true ? 'x' : typeof srcMirror === 'string' ? srcMirror : 'off',
         src.layoutParams?.symmetry ?? 'none',
       ].join('|');
       // #1411 — coalescence: the swarm system's composed merge fields
       // ride the resolved layer (key present only while pairs actually
       // merge, so an unmerged layer's contract is exactly what it was).
-      const coalesce = isLiveSwarmMode(layoutParams.mode)
-        ? coalescenceFields(swarmState.get(layer.id)?.system)
-        : null;
-      out.push({ id: layer.id, layoutParams, palette, items, safeCount, morphSig, morphSeed: seed, layerBlendMode: layer.layerBlendMode || 'normal', layerOpacity: layer.layerOpacity ?? 1, layer, ...(coalesce && coalesce.length ? { coalesce } : {}) });
+      const coalesce = isLiveSwarmMode(layoutParams.mode) ? coalescenceFields(swarmState.get(layer.id)?.system) : null;
+      out.push({
+        id: layer.id,
+        layoutParams,
+        palette,
+        items,
+        safeCount,
+        morphSig,
+        morphSeed: seed,
+        layerBlendMode: layer.layerBlendMode || 'normal',
+        layerOpacity: layer.layerOpacity ?? 1,
+        layer,
+        ...(coalesce && coalesce.length ? { coalesce } : {}),
+      });
     }
     const content = out.filter((e) => !e.isFx);
     const toNorm = (it) => ({ x: (Number(it.x) || 0) / W, y: (Number(it.y) || 0) / H });
@@ -975,8 +1169,13 @@ export function createLiveResolver() {
         // keep the old postcondition (always an array after this branch).
         const items = e.items || [];
         // #507 — mean presented hop (post-clamp px); the diagnostic line.
-        const pullPx = resolveFieldItems(items, src?.items || [],
-          { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) }, W, H);
+        const pullPx = resolveFieldItems(
+          items,
+          src?.items || [],
+          { mode: 'field', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) },
+          W,
+          H,
+        );
         e.items = items;
         recordPatchSample(e.id, { mode: 'field', strength: patchStrength(patch), pullPx });
       } else if (patch.mode === 'feed') {
@@ -988,24 +1187,31 @@ export function createLiveResolver() {
         const from = slotFor(src.id);
         const field = feedLive.delay.hasHistory(from) ? feedLive.delay.field(from) : null;
         // #507 — same accumulation shape as FIELD (mean post-clamp hop px).
-        const pullPx = resolveFeedItems(items, field,
-          { mode: 'feed', from, to: slotFor(e.id), strength: amt }, W, H);
+        const pullPx = resolveFeedItems(items, field, { mode: 'feed', from, to: slotFor(e.id), strength: amt }, W, H);
         e.items = items;
         recordPatchSample(e.id, { mode: 'feed', strength: patchStrength(patch), pullPx });
       } else if (patch.mode === 'mod') {
         const src = content.find((c) => c.id === patch.to);
         const metrics = motionMetrics((src?.items || []).map(toNormVel));
-        const knobs = applyMod({ glow: 0, fade: 0, displace: 0 }, metrics,
-          { mode: 'mod', from: slotFor(patch.to), to: slotFor(e.id), strength: patchStrength(patch) });
+        const knobs = applyMod({ glow: 0, fade: 0, displace: 0 }, metrics, {
+          mode: 'mod',
+          from: slotFor(patch.to),
+          to: slotFor(e.id),
+          strength: patchStrength(patch),
+        });
         // #509 phase 1 — steer the NEXT tick (see modSteerByLayer): the
         // force pass already ran this tick, so these multipliers land in the
         // following update spread — one frame of lag, same as FEED's delay.
         modSteerByLayer.set(e.id, { ali: knobs.ali, coh: knobs.coh, sep: knobs.sep });
         // #507 — MOD diagnostic rides the same knobs + metrics (no new math).
         recordPatchSample(e.id, {
-          mode: 'mod', strength: patchStrength(patch),
-          speed: metrics.speed, agitation: metrics.agitation,
-          glow: knobs.glow, fade: knobs.fade, displace: knobs.displace,
+          mode: 'mod',
+          strength: patchStrength(patch),
+          speed: metrics.speed,
+          agitation: metrics.agitation,
+          glow: knobs.glow,
+          fade: knobs.fade,
+          displace: knobs.displace,
         });
         e.items = (e.items || []).map((it) => ({
           ...it,
@@ -1089,25 +1295,77 @@ export function createLiveResolver() {
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
     // #1694 slice 2 — the citizen's switch + family option gate the append: citizen off (or family
     // set to dish-only) and no moth is born. The builders keep the full pool (their part lookups).
-    if (mothsAllowed(input)) creatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
-      // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
-      (e) => creatureGround({
-        dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
-        getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
-        W, H, tSec: (input.loopTimeMs ?? 0) / 1000, seed: e.morphSeed,
-      }));
+    if (mothsAllowed(input))
+      creatures.append(
+        input,
+        out,
+        pool,
+        (e) =>
+          livingMotion(
+            e.layoutParams || {},
+            e.morphSeed,
+            driverSec,
+            W,
+            H,
+            input.slowRender,
+            input.beatDrive,
+            input.assetStill,
+            input.reducedMotion,
+          ),
+        // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
+        (e) =>
+          creatureGround({
+            dish,
+            layers: input.layers,
+            layerId: e.id,
+            layoutParams: e.layoutParams,
+            getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+            W,
+            H,
+            tSec: (input.loopTimeMs ?? 0) / 1000,
+            seed: e.morphSeed,
+          }),
+      );
     // #1634 slice 2 — the dish creature on the hosted pin (input.dishHosted), on the same motion floor and
     // the same ground. No pin hosted: nothing happens, the stage is the moths' alone.
     // #1694 slice 2 — same citizen gate, other family (family moth-only or citizen off: no dish creature).
-    if (dishAllowed(input)) dishCreatures.append(input, out, pool, (e) => livingMotion(e.layoutParams || {}, e.morphSeed, driverSec, W, H, input.slowRender, input.beatDrive, input.assetStill, input.reducedMotion),
-      (e) => creatureGround({
-        dish, layers: input.layers, layerId: e.id, layoutParams: e.layoutParams,
-        getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
-        W, H, tSec: (input.loopTimeMs ?? 0) / 1000, seed: e.morphSeed,
-      }));
+    if (dishAllowed(input))
+      dishCreatures.append(
+        input,
+        out,
+        pool,
+        (e) =>
+          livingMotion(
+            e.layoutParams || {},
+            e.morphSeed,
+            driverSec,
+            W,
+            H,
+            input.slowRender,
+            input.beatDrive,
+            input.assetStill,
+            input.reducedMotion,
+          ),
+        (e) =>
+          creatureGround({
+            dish,
+            layers: input.layers,
+            layerId: e.id,
+            layoutParams: e.layoutParams,
+            getPalette: () => resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
+            W,
+            H,
+            tSec: (input.loopTimeMs ?? 0) / 1000,
+            seed: e.morphSeed,
+          }),
+      );
     // #1469 — publish the frame's living-motion read (see getLastFrameMotion). Wind reads 0 on a
     // frozen frame (slowRender): nothing is carried then, and a stale strength would be a ghost.
-    lastFrameMotion = { kineme: frameKineme, wind: input.slowRender ? 0 : frameWind, mothBeat: creatures.lastWingBeat() };
+    lastFrameMotion = {
+      kineme: frameKineme,
+      wind: input.slowRender ? 0 : frameWind,
+      mothBeat: creatures.lastWingBeat(),
+    };
     lastSkeletons = creatures.lastSkeletons(); // S1 — the frame's bone graphs, for ?debug=skeleton
     lastPoses = creatures.lastPoses(); // S5 — the frame's band poses, for S2/S4 to consume
     // #1694 slice 1 — the spawn channel observes the resolved frame (formation judges it, then spawn
@@ -1174,7 +1432,12 @@ export function createLiveResolver() {
       spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
       // travel kinemes (#1574/#1575) — the roam is accumulative state: each mark's offset + velocity, each scene's
       // step bank, and the clock's last frame. OPTIONAL key: a pre-travel snapshot restores with every mark home.
-      travel: { store: snapshotTravelStore(travelStore), lastMs: travelLastMs, surge: snapshotSurgeStore(surgeStore), parallax: snapshotParallaxStore(parallaxStore) },
+      travel: {
+        store: snapshotTravelStore(travelStore),
+        lastMs: travelLastMs,
+        surge: snapshotSurgeStore(surgeStore),
+        parallax: snapshotParallaxStore(parallaxStore),
+      },
     };
   }
 
@@ -1238,15 +1501,23 @@ export function createLiveResolver() {
     dishCreatures.restoreState(snap.dishCreatures);
     // #1694 slice 1 — a pre-repipe snapshot carries no spawn state: the channel starts fresh, as a fresh
     // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
-    if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn); else spawnState.reset();
+    if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn);
+    else spawnState.reset();
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
     if (snap.travel !== undefined) {
       restoreTravelStore(travelStore, snap.travel.store);
       travelLastMs = snap.travel.lastMs;
       // #1576 — P3's envelope store and drift clock ride the same section (optional inside it: a P1/P2-era snapshot has neither)
-      if (snap.travel.surge !== undefined) restoreSurgeStore(surgeStore, snap.travel.surge); else surgeStore.scenes.clear();
-      if (snap.travel.parallax !== undefined) restoreParallaxStore(parallaxStore, snap.travel.parallax); else parallaxStore.scenes.clear();
-    } else { travelStore.scenes.clear(); surgeStore.scenes.clear(); parallaxStore.scenes.clear(); travelLastMs = null; }
+      if (snap.travel.surge !== undefined) restoreSurgeStore(surgeStore, snap.travel.surge);
+      else surgeStore.scenes.clear();
+      if (snap.travel.parallax !== undefined) restoreParallaxStore(parallaxStore, snap.travel.parallax);
+      else parallaxStore.scenes.clear();
+    } else {
+      travelStore.scenes.clear();
+      surgeStore.scenes.clear();
+      parallaxStore.scenes.clear();
+      travelLastMs = null;
+    }
     return true;
   }
 
@@ -1259,7 +1530,8 @@ export function createLiveResolver() {
 // counts key presence. Normalizing undefined -> null keeps the key, and the
 // canon reads null and undefined identically, so a restored continuation
 // hashes exactly like the uninterrupted run.
-const deepCopyData = (v) => (v === undefined ? undefined : JSON.parse(JSON.stringify(v, (_k, val) => (val === undefined ? null : val))));
+const deepCopyData = (v) =>
+  v === undefined ? undefined : JSON.parse(JSON.stringify(v, (_k, val) => (val === undefined ? null : val)));
 
 // #1367 — the morph plan's pairings point INTO fromItems by object identity
 // (blendItems ranks partners through an identity map over fromItems), and JSON
@@ -1296,8 +1568,15 @@ function restoreMorphEntry(snap) {
  */
 /** Travel kinemes — the snapshot's travel section: the store plus the clock's last frame (null = unanchored). */
 function checkTravelSnapshot(t) {
-  return !!t && typeof t === 'object' && !Array.isArray(t) && (t.lastMs === null || Number.isFinite(t.lastMs)) && checkTravelStoreSnapshot(t.store)
-    && (t.surge === undefined || checkSurgeStoreSnapshot(t.surge)) && (t.parallax === undefined || checkParallaxStoreSnapshot(t.parallax));
+  return (
+    !!t &&
+    typeof t === 'object' &&
+    !Array.isArray(t) &&
+    (t.lastMs === null || Number.isFinite(t.lastMs)) &&
+    checkTravelStoreSnapshot(t.store) &&
+    (t.surge === undefined || checkSurgeStoreSnapshot(t.surge)) &&
+    (t.parallax === undefined || checkParallaxStoreSnapshot(t.parallax))
+  );
 }
 
 export function checkResolverSnapshot(snap) {
@@ -1312,7 +1591,8 @@ export function checkResolverSnapshot(snap) {
     if (!Number.isInteger(rec.system.cap) || rec.system.cap < 0) return false;
   }
   if (!snap.feedDelay || typeof snap.feedDelay !== 'object') return false;
-  if (!Array.isArray(snap.feedSlots) || !Array.isArray(snap.feedSlotFree) || !Number.isInteger(snap.feedSlotNext)) return false;
+  if (!Array.isArray(snap.feedSlots) || !Array.isArray(snap.feedSlotFree) || !Number.isInteger(snap.feedSlotNext))
+    return false;
   if (!snap.scent || typeof snap.scent !== 'object') return false;
   if (!snap.dishSession || typeof snap.dishSession !== 'object') return false;
   if (!snap.lastShown || typeof snap.lastShown !== 'object' || Array.isArray(snap.lastShown)) return false;
@@ -1336,7 +1616,8 @@ export function checkResolverSnapshot(snap) {
   if (!snap.creatures || typeof snap.creatures !== 'object') return false;
   if (!snap.dishCreatures || typeof snap.dishCreatures !== 'object') return false;
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
-  if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn))) return false;
+  if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn)))
+    return false;
   if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
   return true;
 }

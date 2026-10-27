@@ -28,7 +28,7 @@ export const DEFAULT_POLICY = Object.freeze({
   // Project owner call (2026-09-16): under 10% differing pixels is a pass.
   // This is art, not rocket science — the atlas architecture trades exact
   // edge-antialiasing parity for 60fps, and the difference is sub-visible.
-  maxFailFraction: 0.10,
+  maxFailFraction: 0.1,
 });
 
 /** Relaxed policy for scenes with SVG-filter FX (documented variance). */
@@ -58,9 +58,7 @@ export function diffPixels(a, b, width, height, policy = DEFAULT_POLICY) {
   const B = toBytes(b);
   const total = width * height;
   if (A.length !== total * 4 || B.length !== total * 4) {
-    throw new Error(
-      `diffPixels: buffer size mismatch (a=${A.length}, b=${B.length}, expected=${total * 4})`
-    );
+    throw new Error(`diffPixels: buffer size mismatch (a=${A.length}, b=${B.length}, expected=${total * 4})`);
   }
   const tol = policy.perChannelTol;
   let failed = 0;

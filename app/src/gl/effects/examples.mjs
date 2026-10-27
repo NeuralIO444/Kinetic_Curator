@@ -48,8 +48,14 @@ export const TMPL_POSTER_DESCRIPTOR = {
   animated: false,
   params: {
     levels: {
-      type: 'int', label: 'Levels', min: 2, max: 8, step: 1, def: 4,
-      ui: 'slider', hint: 'Tonal steps per channel',
+      type: 'int',
+      label: 'Levels',
+      min: 2,
+      max: 8,
+      step: 1,
+      def: 4,
+      ui: 'slider',
+      hint: 'Tonal steps per channel',
     },
   },
 };
@@ -78,8 +84,14 @@ export const TMPL_GRAIN_DESCRIPTOR = {
   animated: true,
   params: {
     amount: {
-      type: 'float', label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.4,
-      ui: 'slider', hint: 'Grain strength',
+      type: 'float',
+      label: 'Amount',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      def: 0.4,
+      ui: 'slider',
+      hint: 'Grain strength',
     },
   },
 };

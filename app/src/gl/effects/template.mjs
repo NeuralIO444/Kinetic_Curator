@@ -102,7 +102,11 @@ export function validateDescriptor(kind, descriptor) {
         fail(`param "${name}": def must be [r, g, b, a] with channels 0..1`);
       }
     } else if (p.type === 'vec2') {
-      if (!Array.isArray(p.def) || p.def.length !== 2 || p.def.some((c) => typeof c !== 'number' || !Number.isFinite(c))) {
+      if (
+        !Array.isArray(p.def) ||
+        p.def.length !== 2 ||
+        p.def.some((c) => typeof c !== 'number' || !Number.isFinite(c))
+      ) {
         fail(`param "${name}": def must be [x, y] finite numbers`);
       }
       for (const k of ['min', 'max']) {
@@ -300,8 +304,8 @@ export function registerTemplateEffect(bridge, gl, kind, { fs, descriptor, file 
   if (staticAudit.missingInShader.length || staticAudit.extraInShader.length) {
     throw new Error(
       `[gl-template] effect "${kind}": uniform audit failed at load — ` +
-      `missing in shader: [${staticAudit.missingInShader.join(', ')}]; ` +
-      `extra in shader: [${staticAudit.extraInShader.join(', ')}]`
+        `missing in shader: [${staticAudit.missingInShader.join(', ')}]; ` +
+        `extra in shader: [${staticAudit.extraInShader.join(', ')}]`,
     );
   }
   const entry = {
@@ -352,9 +356,15 @@ function wireTemplateEffect(bridge, gl, kind, entry) {
   });
   // Runtime audit through the #193 debug harness: catches uniforms the
   // compiler optimized out or names the uploader never set.
-  const setNames = Object.keys(uploadUniformsFor(d, {
-    readTex: null, width: 1, height: 1, time: 0, params: defaultParams(d),
-  }));
+  const setNames = Object.keys(
+    uploadUniformsFor(d, {
+      readTex: null,
+      width: 1,
+      height: 1,
+      time: 0,
+      params: defaultParams(d),
+    }),
+  );
   const runtime = auditUniforms(gl, rec.program, setNames);
   const warnings = [];
   if (runtime.neverSet.length) warnings.push(`declared-but-never-set: ${runtime.neverSet.join(', ')}`);

@@ -123,7 +123,8 @@ export function requestResolverReset() {
  * the SAME input object to the resolver and returns the same result.
  */
 export function withResolveTap(createResolver) {
-  if (typeof createResolver !== 'function') throw new TypeError('[resolveTap] withResolveTap needs the resolver factory');
+  if (typeof createResolver !== 'function')
+    throw new TypeError('[resolveTap] withResolveTap needs the resolver factory');
   let inner = createResolver();
   // #1367 — snapshot whoever is current: the delegate reads `inner` at call time, so it follows swaps.
   snapshotter = () => (inner && typeof inner.snapshotState === 'function' ? inner.snapshotState() : null);

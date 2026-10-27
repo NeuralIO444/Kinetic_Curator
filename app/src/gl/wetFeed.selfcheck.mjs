@@ -15,7 +15,11 @@ import {
 } from './accum.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('dry feed shader is unchanged and does not sample the velocity texture', () => {
   assert.doesNotMatch(FEED_FS, /u_wetVel/);
@@ -49,7 +53,8 @@ ok('recipe gate is integer: dry gain is exactly 0', () => {
 });
 
 ok('dry mirror matches a step that never heard of wetness', () => {
-  const w = 4, h = 4;
+  const w = 4,
+    h = 4;
   const accum = new Float64Array(w * h * 4).fill(0.2);
   const frame = new Float64Array(w * h * 4).fill(0);
   const base = accumRecipeParams({ fade: 0.5 });
@@ -60,7 +65,8 @@ ok('dry mirror matches a step that never heard of wetness', () => {
 });
 
 ok('wet mirror moves a mark and darkens a half-dry edge', () => {
-  const w = 8, h = 8;
+  const w = 8,
+    h = 8;
   const accum = new Float64Array(w * h * 4);
   accum[(3 * w + 3) * 4] = 1;
   const frame = new Float64Array(w * h * 4);
@@ -73,19 +79,32 @@ ok('wet mirror moves a mark and darkens a half-dry edge', () => {
   mask.rgba[0] = 128;
   mask.rgba[3] = 255;
   const dry = mirrorAccumStep({
-    accum, frame, w, h,
+    accum,
+    frame,
+    w,
+    h,
     params: accumRecipeParams({ fade: 1 }),
   });
   const moved = mirrorAccumStep({
-    accum, frame, w, h,
+    accum,
+    frame,
+    w,
+    h,
     params: accumRecipeParams({
-      fade: 1, wetStep: 1, wetGain: 0.5, wetAmount: 0, wetVel: vel, wetMask: mask,
+      fade: 1,
+      wetStep: 1,
+      wetGain: 0.5,
+      wetAmount: 0,
+      wetVel: vel,
+      wetMask: mask,
     }),
   });
   assert.notStrictEqual(moved[(3 * w + 3) * 4], dry[(3 * w + 3) * 4], 'wet offset moved the sample');
   const edged = mirrorAccumStep({
     accum: new Float64Array(w * h * 4).fill(0.8),
-    frame, w, h,
+    frame,
+    w,
+    h,
     params: accumRecipeParams({ fade: 1, wetStep: 1, wetGain: 0, wetAmount: 1, wetVel: vel, wetMask: mask }),
   });
   assert.ok(edged[0] < 0.8, `drying edge darkened (${edged[0]})`);
@@ -94,22 +113,37 @@ ok('wet mirror moves a mark and darkens a half-dry edge', () => {
 ok('dry over does not mix; wet over makes a third color', () => {
   assert.doesNotMatch(OVER_FS, /u_wetMask/);
   assert.match(OVER_WET_FS, /pigment/);
-  const w = 2, h = 2;
+  const w = 2,
+    h = 2;
   const frame = new Float64Array(w * h * 4);
   const accum = new Float64Array(w * h * 4);
   // Incoming blue over resident red, both opaque.
-  frame[2] = 1; frame[3] = 1;
-  accum[0] = 1; accum[3] = 1;
+  frame[2] = 1;
+  frame[3] = 1;
+  accum[0] = 1;
+  accum[3] = 1;
   const mask = { n: 2, rgba: new Uint8Array(16) };
-  mask.rgba[0] = 255; mask.rgba[3] = 255;
+  mask.rgba[0] = 255;
+  mask.rgba[3] = 255;
   const dry = mirrorAccumStep({
-    accum, frame, w, h,
+    accum,
+    frame,
+    w,
+    h,
     params: accumRecipeParams({ fade: 1 }),
   });
   const mixed = mirrorAccumStep({
-    accum, frame, w, h,
+    accum,
+    frame,
+    w,
+    h,
     params: accumRecipeParams({
-      fade: 1, wetStep: 1, wetGain: 0, wetAmount: 1, wetVel: mask, wetMask: mask,
+      fade: 1,
+      wetStep: 1,
+      wetGain: 0,
+      wetAmount: 1,
+      wetVel: mask,
+      wetMask: mask,
     }),
   });
   // Dry source-over keeps the incoming blue.

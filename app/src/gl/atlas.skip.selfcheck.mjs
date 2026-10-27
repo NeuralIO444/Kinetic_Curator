@@ -11,8 +11,15 @@ const DIR = dirname(fileURLToPath(import.meta.url));
 
 function inst(over = {}) {
   return {
-    asset: 'mark', tint: '#111111', accent: '#eeeeee',
-    x: 10, y: 20, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1,
+    asset: 'mark',
+    tint: '#111111',
+    accent: '#eeeeee',
+    x: 10,
+    y: 20,
+    scaleX: 1,
+    scaleY: 1,
+    rotation: 0,
+    opacity: 1,
     ...over,
   };
 }
@@ -21,11 +28,12 @@ test('#817 missing cell is skipped and the frame continues', () => {
   const cells = {
     'mark|#111111|#eeeeee': { u0: 0.1, v0: 0.2, u1: 0.3, v1: 0.4 },
   };
-  const packed = packInstanceData([
-    inst({ asset: 'ghost' }),
-    inst(),
-  ], cells);
-  assert.equal(packed.length, 45, 'the present combo still packs (45-float stride: 21 in #1129 PR2, +deform vec3 in #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)');
+  const packed = packInstanceData([inst({ asset: 'ghost' }), inst()], cells);
+  assert.equal(
+    packed.length,
+    45,
+    'the present combo still packs (45-float stride: 21 in #1129 PR2, +deform vec3 in #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)',
+  );
   assert.ok(Math.abs(packed[6] - 0.1) < 1e-6, 'uv survived the skip');
   assert.ok(packed[12] > 0, 'ink is an attribute, not a rebaked cell');
   assert.equal(packInstanceData([inst({ asset: 'ghost' })], cells).length, 0);

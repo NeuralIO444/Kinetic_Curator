@@ -20,13 +20,27 @@ export function glStaticHandler(glDir) {
     try {
       const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname);
       const file = path.normalize(path.join(glDir, urlPath));
-      if (!file.startsWith(glDir)) { res.writeHead(403); res.end(); return; }
-      try { send(res, file, await readFile(file)); return; } catch { /* not under src/gl: try src/ */ }
+      if (!file.startsWith(glDir)) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
+      try {
+        send(res, file, await readFile(file));
+        return;
+      } catch {
+        /* not under src/gl: try src/ */
+      }
       const alt = path.normalize(path.join(srcDir, urlPath));
-      if (!alt.startsWith(srcDir)) { res.writeHead(403); res.end(); return; }
+      if (!alt.startsWith(srcDir)) {
+        res.writeHead(403);
+        res.end();
+        return;
+      }
       send(res, alt, await readFile(alt));
     } catch {
-      res.writeHead(404); res.end('nf');
+      res.writeHead(404);
+      res.end('nf');
     }
   };
 }

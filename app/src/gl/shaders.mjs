@@ -18,9 +18,22 @@ import { GLASS_CAUSTIC } from './glassCaustic.mjs';
 import { GLASS_STRIATION } from './glassStriation.mjs';
 
 export const BLEND_IDS = Object.freeze({
-  normal: 0, multiply: 1, screen: 2, overlay: 3, darken: 4, lighten: 5,
-  'color-dodge': 6, 'color-burn': 7, 'hard-light': 8, 'soft-light': 9,
-  difference: 10, exclusion: 11, hue: 12, saturation: 13, color: 14, luminosity: 15,
+  normal: 0,
+  multiply: 1,
+  screen: 2,
+  overlay: 3,
+  darken: 4,
+  lighten: 5,
+  'color-dodge': 6,
+  'color-burn': 7,
+  'hard-light': 8,
+  'soft-light': 9,
+  difference: 10,
+  exclusion: 11,
+  hue: 12,
+  saturation: 13,
+  color: 14,
+  luminosity: 15,
 });
 
 /**
@@ -38,7 +51,10 @@ export function blendIdFor(mode) {
 }
 
 export const EFFECT_IDS = Object.freeze({
-  invert: 0, rgbSplit: 1, grain: 2, posterize: 5,
+  invert: 0,
+  rgbSplit: 1,
+  grain: 2,
+  posterize: 5,
 });
 // NOTE (#308): the instrument has no gaussian blur — the blurH/blurV ids
 // are gone, not reserved. posterize keeps id 5 (ids are explicit, nothing

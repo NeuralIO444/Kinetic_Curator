@@ -36,7 +36,9 @@ assert.equal(perf.checkpoints.length, 61, 'a 60-second take: 61 checkpoints');
   assert.equal(v.firstMismatchFrame, null, 'no checkpoint diverges');
   assert.equal(v.ok, true, 'the take replays to the same performance');
   assert.equal(v.checked, perf.checkpoints.length, 'every checkpoint was compared');
-  console.log(`replayGate: fixture replayed green in ${((Date.now() - t0) / 1000).toFixed(1)}s (${v.frames} frames, ${v.checked} checkpoints)`);
+  console.log(
+    `replayGate: fixture replayed green in ${((Date.now() - t0) / 1000).toFixed(1)}s (${v.frames} frames, ${v.checked} checkpoints)`,
+  );
 }
 
 // A perturbed recorded input turns the gate red at the expected checkpoint — the first checkpoint
@@ -50,7 +52,11 @@ for (const F of [5, 1801]) {
   p2.inputs.steps[F] = step;
   const v = verifyPerformance(p2);
   assert.equal(v.ok, false, `an input altered at frame ${F} must fail the gate`);
-  assert.equal(v.firstMismatchFrame, firstCheckpointAtOrAfter(F), `divergence from frame ${F} is named at checkpoint ${firstCheckpointAtOrAfter(F)}`);
+  assert.equal(
+    v.firstMismatchFrame,
+    firstCheckpointAtOrAfter(F),
+    `divergence from frame ${F} is named at checkpoint ${firstCheckpointAtOrAfter(F)}`,
+  );
 }
 
 console.log('replayGate.selfcheck: ok');

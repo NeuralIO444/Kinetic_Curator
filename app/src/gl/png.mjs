@@ -20,7 +20,7 @@ const CRC_TABLE = (() => {
   const t = new Int32Array(256);
   for (let n = 0; n < 256; n++) {
     let c = n;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
     t[n] = c;
   }
   return t;
@@ -34,15 +34,19 @@ function crc32(buf) {
 
 function chunk(type, data) {
   const td = Buffer.from(type, 'ascii');
-  const len = Buffer.alloc(4); len.writeUInt32BE(data.length);
-  const cd = Buffer.alloc(4); cd.writeUInt32BE(crc32(Buffer.concat([td, data])));
+  const len = Buffer.alloc(4);
+  len.writeUInt32BE(data.length);
+  const cd = Buffer.alloc(4);
+  cd.writeUInt32BE(crc32(Buffer.concat([td, data])));
   return Buffer.concat([len, td, data, cd]);
 }
 
 function ihdr(w, h) {
   const b = Buffer.alloc(13);
-  b.writeUInt32BE(w, 0); b.writeUInt32BE(h, 4);
-  b[8] = 8; b[9] = 6; // 8-bit, RGBA
+  b.writeUInt32BE(w, 0);
+  b.writeUInt32BE(h, 4);
+  b[8] = 8;
+  b[9] = 6; // 8-bit, RGBA
   return chunk('IHDR', b);
 }
 
@@ -66,7 +70,10 @@ export function writePngFile(path, pixels, w, h) {
     const deflate = createDeflate({ level: 6 });
     const idatParts = [];
     deflate.on('data', (c) => idatParts.push(c));
-    deflate.on('error', (e) => { out.destroy(); reject(e); });
+    deflate.on('error', (e) => {
+      out.destroy();
+      reject(e);
+    });
     deflate.on('end', () => {
       try {
         out.write(chunk('IDAT', Buffer.concat(idatParts)));

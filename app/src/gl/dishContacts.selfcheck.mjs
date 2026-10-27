@@ -11,29 +11,61 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
 const swarmLp = (over = {}) => ({
-  ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 90,
-  contactRadius: 26, contactMode: 'bounce', contactRestitution: 0.6,
-  kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0, ...over,
+  ...DEFAULT_LAYOUT_PARAMS,
+  mode: 'swarm',
+  particleCount: 90,
+  contactRadius: 26,
+  contactMode: 'bounce',
+  contactRestitution: 0.6,
+  kinemeBreath: 0,
+  kinemeDrift: 0,
+  kinemePaletteBreath: 0,
+  lifeDrift: 0,
+  ...over,
 });
 const snap = (seed, lp) => ({
-  seed, seedOffsets: null, paletteId: 'bone', paletteOverrides: null,
-  layoutParams: lp, caGrid: null, enabledAssets: null, lockedParams: {},
+  seed,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  layoutParams: lp,
+  caGrid: null,
+  enabledAssets: null,
+  lockedParams: {},
 });
 
 const FRAMES = 25;
 const input = (over = {}) => ({
-  canvasW: 1000, canvasH: 700,
+  canvasW: 1000,
+  canvasH: 700,
   layers: [L('lyr-b'), L('lyr-a')],
   activeLayerId: 'lyr-a',
   layerSnapshots: { 'lyr-b': snap(777, swarmLp()) },
-  seed: 1234, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [],
-  layoutParams: swarmLp(), caGrid: null, enabledAssets: null,
-  assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {},
-  batchPaused: false, focusSwap: false,
-  loopTimeMs: 16, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false,
-  assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0,
-  phraseWrapGen: 0, attractor: null, ...over,
+  seed: 1234,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  layoutParams: swarmLp(),
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  quality: 'balanced',
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  loopTimeMs: 16,
+  dtSec: 1 / 60,
+  perfClampOverride: null,
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  scaleMul: 1,
+  alphaBoost: 0,
+  phraseWrapGen: 0,
+  attractor: null,
+  ...over,
 });
 const runFrames = (inp) => {
   const r = createLiveResolver();
@@ -45,9 +77,10 @@ const runFrames = (inp) => {
   }
   return { hashes, out };
 };
-const hash = (out) => createHash('sha256')
-  .update(JSON.stringify(out.map((l) => (l.items || []).map((i) => [i.x, i.y, i.assetId]))))
-  .digest('hex');
+const hash = (out) =>
+  createHash('sha256')
+    .update(JSON.stringify(out.map((l) => (l.items || []).map((i) => [i.x, i.y, i.assetId]))))
+    .digest('hex');
 const itemsOf = (out, id) => out.find((l) => l.id === id).items;
 const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) || !Object.is(it.y, ys[k].y)).length;
 
@@ -63,15 +96,20 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
 // params, same shared world noise) — every difference is the dish.
 {
   const combined = runFrames(input()).out;
-  const solo = runFrames(input({
-    layers: [L('lyr-a')], layerSnapshots: {},
-  })).out;
+  const solo = runFrames(
+    input({
+      layers: [L('lyr-a')],
+      layerSnapshots: {},
+    }),
+  ).out;
   const moved = movedCount(itemsOf(combined, 'lyr-a'), itemsOf(solo, 'lyr-a'));
   assert.ok(moved >= 4, `stratum B's bodies pushed stratum A's (moved ${moved})`);
   // Same isolation, other expression: hide B and A's dish displacement goes.
-  const hidden = runFrames(input({
-    layers: [L('lyr-b', { visible: false }), L('lyr-a')],
-  })).out;
+  const hidden = runFrames(
+    input({
+      layers: [L('lyr-b', { visible: false }), L('lyr-a')],
+    }),
+  ).out;
   assert.deepEqual(
     itemsOf(hidden, 'lyr-a').map((i) => [i.x, i.y]),
     itemsOf(solo, 'lyr-a').map((i) => [i.x, i.y]),
@@ -82,15 +120,25 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
 // 3. dish-off is untouched: contacts at 0 equal a scene that never heard of
 // contact params, frame for frame.
 {
-  const off = runFrames(input({
-    layoutParams: swarmLp({ contactRadius: 0 }),
-    layerSnapshots: { 'lyr-b': snap(777, swarmLp({ contactRadius: 0 })) },
-  }));
-  const noKeys = (lp) => { const c = { ...lp }; delete c.contactRadius; delete c.contactMode; delete c.contactRestitution; return c; };
-  const never = runFrames(input({
-    layoutParams: noKeys(swarmLp()),
-    layerSnapshots: { 'lyr-b': snap(777, noKeys(swarmLp())) },
-  }));
+  const off = runFrames(
+    input({
+      layoutParams: swarmLp({ contactRadius: 0 }),
+      layerSnapshots: { 'lyr-b': snap(777, swarmLp({ contactRadius: 0 })) },
+    }),
+  );
+  const noKeys = (lp) => {
+    const c = { ...lp };
+    delete c.contactRadius;
+    delete c.contactMode;
+    delete c.contactRestitution;
+    return c;
+  };
+  const never = runFrames(
+    input({
+      layoutParams: noKeys(swarmLp()),
+      layerSnapshots: { 'lyr-b': snap(777, noKeys(swarmLp())) },
+    }),
+  );
   assert.deepEqual(off.hashes, never.hashes, 'radius 0 is bit-identical to no dish at all');
 }
 
@@ -101,42 +149,60 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
 // dish:true, and differently from OFF.
 {
   const offLp = () => swarmLp({ dish: false });
-  const combinedOff = runFrames(input({
-    layoutParams: offLp(),
-    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
-  })).out;
-  const soloAOff = runFrames(input({
-    layers: [L('lyr-a')], layerSnapshots: {}, layoutParams: offLp(),
-  })).out;
+  const combinedOff = runFrames(
+    input({
+      layoutParams: offLp(),
+      layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+    }),
+  ).out;
+  const soloAOff = runFrames(
+    input({
+      layers: [L('lyr-a')],
+      layerSnapshots: {},
+      layoutParams: offLp(),
+    }),
+  ).out;
   assert.deepEqual(
     itemsOf(combinedOff, 'lyr-a').map((i) => [i.x, i.y]),
     itemsOf(soloAOff, 'lyr-a').map((i) => [i.x, i.y]),
     'dish OFF: stratum A resolves exactly as if alone (ghost stack)',
   );
-  const bAloneOff = runFrames(input({
-    layers: [L('lyr-b'), L('lyr-a', { visible: false })],
-    layoutParams: offLp(),
-    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
-  })).out;
+  const bAloneOff = runFrames(
+    input({
+      layers: [L('lyr-b'), L('lyr-a', { visible: false })],
+      layoutParams: offLp(),
+      layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+    }),
+  ).out;
   assert.deepEqual(
     itemsOf(combinedOff, 'lyr-b').map((i) => [i.x, i.y]),
     itemsOf(bAloneOff, 'lyr-b').map((i) => [i.x, i.y]),
     'dish OFF: stratum B resolves exactly as if alone (ghost stack)',
   );
-  const stripDish = (lp) => { const c = { ...lp }; delete c.dish; return c; };
-  const preA3 = runFrames(input({
-    layoutParams: stripDish(swarmLp()),
-    layerSnapshots: { 'lyr-b': snap(777, stripDish(swarmLp())) },
-  }));
-  const explicitOn = runFrames(input({
-    layoutParams: swarmLp({ dish: true }),
-    layerSnapshots: { 'lyr-b': snap(777, swarmLp({ dish: true })) },
-  }));
+  const stripDish = (lp) => {
+    const c = { ...lp };
+    delete c.dish;
+    return c;
+  };
+  const preA3 = runFrames(
+    input({
+      layoutParams: stripDish(swarmLp()),
+      layerSnapshots: { 'lyr-b': snap(777, stripDish(swarmLp())) },
+    }),
+  );
+  const explicitOn = runFrames(
+    input({
+      layoutParams: swarmLp({ dish: true }),
+      layerSnapshots: { 'lyr-b': snap(777, swarmLp({ dish: true })) },
+    }),
+  );
   assert.deepEqual(preA3.hashes, explicitOn.hashes, 'a pre-A3 document (no dish key) == dish ON, frame for frame');
-  const offHashes = runFrames(input({
-    layoutParams: offLp(),
-    layerSnapshots: { 'lyr-b': snap(777, offLp()) },
-  })).hashes;
+  const offHashes = runFrames(
+    input({
+      layoutParams: offLp(),
+      layerSnapshots: { 'lyr-b': snap(777, offLp()) },
+    }),
+  ).hashes;
   assert.notDeepEqual(preA3.hashes, offHashes, 'ON and OFF are different frames (the switch is real)');
 }
 
@@ -150,4 +216,6 @@ const movedCount = (xs, ys) => xs.filter((it, k) => !Object.is(it.x, ys[k].x) ||
   assert.equal((pj.match(/runDishContacts\(/g) || []).length, 1, 'particles.js takes one call site');
 }
 
-console.log('dishContacts.selfcheck: ok (#1407 — live strata share one contact grid; #1409 — the per-Look switch gates enrolment)');
+console.log(
+  'dishContacts.selfcheck: ok (#1407 — live strata share one contact grid; #1409 — the per-Look switch gates enrolment)',
+);

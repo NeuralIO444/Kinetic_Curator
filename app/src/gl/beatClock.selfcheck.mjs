@@ -17,7 +17,11 @@ import {
 } from './beatClock.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const approx = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
 
 ok('sanitize: finite clamps to [30, 300], garbage → 120', () => {
@@ -76,25 +80,45 @@ ok('tapBpm: needs at least 2 taps', () => {
 });
 
 // ── the metro pulse (#1144): honest beat when there is no audio ──
-ok('metro: the interval is the dialed tempo (120 BPM = 500 ms), always inside the sanitized 30..300 BPM range', async () => {
-  assert.equal(metroIntervalMs(120), 500); assert.equal(metroIntervalMs(60), 1000); assert.equal(metroIntervalMs(30), 2000); assert.equal(metroIntervalMs(300), 200);
-  for (const bad of [NaN, 0, -5, 1e9, 'x', null, undefined]) { const ms = metroIntervalMs(bad); assert.ok(Number.isFinite(ms) && ms >= 200 && ms <= 2000, `${bad} -> ${ms}`); }
-});
+ok(
+  'metro: the interval is the dialed tempo (120 BPM = 500 ms), always inside the sanitized 30..300 BPM range',
+  async () => {
+    assert.equal(metroIntervalMs(120), 500);
+    assert.equal(metroIntervalMs(60), 1000);
+    assert.equal(metroIntervalMs(30), 2000);
+    assert.equal(metroIntervalMs(300), 200);
+    for (const bad of [NaN, 0, -5, 1e9, 'x', null, undefined]) {
+      const ms = metroIntervalMs(bad);
+      assert.ok(Number.isFinite(ms) && ms >= 200 && ms <= 2000, `${bad} -> ${ms}`);
+    }
+  },
+);
 
-ok('metro: it fires only when the artist turned it on, the instrument runs, and audio is NOT the beat (audio always wins)', () => {
-  assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: true }), true);
-  assert.equal(metroRunning({ beatMetro: false, audioEnabled: false, running: true }), false, 'off when the switch is off');
-  assert.equal(metroRunning({ beatMetro: true, audioEnabled: true, running: true }), false, 'audio wins');
-  assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: false }), false, 'paused');
-  assert.equal(metroRunning(), false); assert.equal(metroRunning({}), false);
-});
+ok(
+  'metro: it fires only when the artist turned it on, the instrument runs, and audio is NOT the beat (audio always wins)',
+  () => {
+    assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: true }), true);
+    assert.equal(
+      metroRunning({ beatMetro: false, audioEnabled: false, running: true }),
+      false,
+      'off when the switch is off',
+    );
+    assert.equal(metroRunning({ beatMetro: true, audioEnabled: true, running: true }), false, 'audio wins');
+    assert.equal(metroRunning({ beatMetro: true, audioEnabled: false, running: false }), false, 'paused');
+    assert.equal(metroRunning(), false);
+    assert.equal(metroRunning({}), false);
+  },
+);
 
-ok('the dot may flash only while a real beat drives the stage: the metro or live audio (KC-1 DS rule 3: no performed liveness)', () => {
-  assert.equal(beatDotLive({ beatMetro: false, audioEnabled: false }), false);
-  assert.equal(beatDotLive({ beatMetro: true, audioEnabled: false }), true);
-  assert.equal(beatDotLive({ beatMetro: false, audioEnabled: true }), true);
-  assert.equal(beatDotLive(), false);
-});
+ok(
+  'the dot may flash only while a real beat drives the stage: the metro or live audio (KC-1 DS rule 3: no performed liveness)',
+  () => {
+    assert.equal(beatDotLive({ beatMetro: false, audioEnabled: false }), false);
+    assert.equal(beatDotLive({ beatMetro: true, audioEnabled: false }), true);
+    assert.equal(beatDotLive({ beatMetro: false, audioEnabled: true }), true);
+    assert.equal(beatDotLive(), false);
+  },
+);
 
 console.log(`beatClock.selfcheck: OK (${n} checks)`);
 
@@ -105,4 +129,3 @@ console.log(`beatClock.selfcheck: OK (${n} checks)`);
   assert.equal(useStore.getInitialState().beatMetro, true, 'beatMetro defaults on');
   console.log('beatClock.selfcheck: metro pulse defaults on');
 }
-

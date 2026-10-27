@@ -26,7 +26,16 @@ test('#560 Leave fade is optional', () => {
 
 test('#560 tunnel prism and flow can fade in Leave', () => {
   const full = accumRecipeParams({ leave: true, tunnel: 1, prism: 1, flow: 1 });
-  const faded = accumRecipeParams({ leave: true, tunnel: 1, prism: 1, flow: 1, leave: true, tunnelFade: 1, prismFade: 1, flowFade: 1 });
+  const faded = accumRecipeParams({
+    leave: true,
+    tunnel: 1,
+    prism: 1,
+    flow: 1,
+    leave: true,
+    tunnelFade: 1,
+    prismFade: 1,
+    flowFade: 1,
+  });
   assert.ok(full.tunnelZoom > 1);
   assert.equal(faded.tunnelZoom, 1);
   assert.equal(faded.prismUv, 0);

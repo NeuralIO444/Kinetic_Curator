@@ -32,28 +32,22 @@ export const POLICIES = Object.freeze({
 
 // Text is baked into these stamp assets as SVG <text>; keep them out of the
 // corpus so reference pixels never depend on font resolution.
-const TEXT_ASSET_IDS = new Set(
-  ASSETS.filter((a) => a.svg.includes('<text')).map((a) => a.id)
-);
+const TEXT_ASSET_IDS = new Set(ASSETS.filter((a) => a.svg.includes('<text')).map((a) => a.id));
 
-const enabledAssets = Object.fromEntries(
-  ASSETS.map((a) => [a.id, !TEXT_ASSET_IDS.has(a.id)])
-);
+const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, !TEXT_ASSET_IDS.has(a.id)]));
 
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, ...over });
 
 function doc(over = {}) {
   return {
     version: 1,
-    seed: 0xC0FFEE,
+    seed: 0xc0ffee,
     paletteId: 'praystation',
     paletteOverrides: null,
     layoutParams: lp({ count: 36 }),
     enabledAssets,
     quality: 'balanced',
-    layers: [
-      { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    ],
+    layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
     activeLayerId: 'bg',
     layerSnapshots: {},
     ...over,
@@ -62,8 +56,13 @@ function doc(over = {}) {
 
 function fxLayer(id, effects, layerOpacity = 1) {
   return {
-    id, name: id.toUpperCase(), type: 'fx', visible: true,
-    layerBlendMode: 'normal', layerOpacity, effects,
+    id,
+    name: id.toUpperCase(),
+    type: 'fx',
+    visible: true,
+    layerBlendMode: 'normal',
+    layerOpacity,
+    effects,
   };
 }
 
@@ -87,8 +86,12 @@ export const CORPUS = [
       ],
       layerSnapshots: {
         top: {
-          seed: 99, paletteId: 'praystation', paletteOverrides: null,
-          layoutParams: lp({ count: 14 }), caGrid: null, enabledAssets,
+          seed: 99,
+          paletteId: 'praystation',
+          paletteOverrides: null,
+          layoutParams: lp({ count: 14 }),
+          caGrid: null,
+          enabledAssets,
         },
       },
     }),
@@ -137,15 +140,20 @@ export const CORPUS = [
       ],
       layerSnapshots: {
         top: {
-          seed: 7, paletteId: 'praystation', paletteOverrides: null,
-          layoutParams: lp({ count: 12 }), caGrid: null, enabledAssets,
+          seed: 7,
+          paletteId: 'praystation',
+          paletteOverrides: null,
+          layoutParams: lp({ count: 12 }),
+          caGrid: null,
+          enabledAssets,
         },
       },
     }),
   },
   {
     id: 'fx-stack-3',
-    description: 'Stacked FX layers (invert / posterize / rgbSplit) with blend modes — multi-wrap compositing (#189). Since #192 retires maxFxLayers as a budget, all 3 FX wraps apply on both reference and candidate; the 60fps probe scene.',
+    description:
+      'Stacked FX layers (invert / posterize / rgbSplit) with blend modes — multi-wrap compositing (#189). Since #192 retires maxFxLayers as a budget, all 3 FX wraps apply on both reference and candidate; the 60fps probe scene.',
     policy: 'default',
     width: 400,
     doc: doc({
@@ -166,12 +174,20 @@ export const CORPUS = [
         // Small counts keep the baked atlas under the harness ferry limit
         // (a 44-combo atlas produced a 108MB payload and killed evaluate).
         mid: {
-          seed: 99, paletteId: 'praystation', paletteOverrides: null,
-          layoutParams: lp({ count: 8 }), caGrid: null, enabledAssets,
+          seed: 99,
+          paletteId: 'praystation',
+          paletteOverrides: null,
+          layoutParams: lp({ count: 8 }),
+          caGrid: null,
+          enabledAssets,
         },
         top: {
-          seed: 7, paletteId: 'praystation', paletteOverrides: null,
-          layoutParams: lp({ count: 8 }), caGrid: null, enabledAssets,
+          seed: 7,
+          paletteId: 'praystation',
+          paletteOverrides: null,
+          layoutParams: lp({ count: 8 }),
+          caGrid: null,
+          enabledAssets,
         },
       },
     }),

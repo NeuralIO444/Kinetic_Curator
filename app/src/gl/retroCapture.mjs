@@ -27,7 +27,12 @@
 import { createInputLog, rebaseInputLog } from '../engine/kernel/replay/inputLog.js';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
 import {
-  createHashChain, checkPerformance, PERFORMANCE_FORMAT, PERFORMANCE_VERSION, CHECKPOINT_EVERY, MACHINE_KEYS,
+  createHashChain,
+  checkPerformance,
+  PERFORMANCE_FORMAT,
+  PERFORMANCE_VERSION,
+  CHECKPOINT_EVERY,
+  MACHINE_KEYS,
 } from './performanceFile.mjs';
 
 export const RETRO_DEFAULTS = Object.freeze({
@@ -48,11 +53,15 @@ export function createRetroCapture({
   maxSnapshots = RETRO_DEFAULTS.maxSnapshots,
 } = {}) {
   if (typeof snapshotProvider !== 'function') throw new TypeError('[retroCapture] a snapshotProvider is required');
-  if (!Number.isInteger(checkpointEvery) || checkpointEvery < 1) throw new RangeError('[retroCapture] checkpointEvery must be a positive integer');
+  if (!Number.isInteger(checkpointEvery) || checkpointEvery < 1)
+    throw new RangeError('[retroCapture] checkpointEvery must be a positive integer');
   if (!Number.isInteger(snapshotEvery) || snapshotEvery < checkpointEvery || snapshotEvery % checkpointEvery !== 0) {
-    throw new RangeError('[retroCapture] snapshotEvery must be a multiple of checkpointEvery (snapshots land on checkpoints)');
+    throw new RangeError(
+      '[retroCapture] snapshotEvery must be a multiple of checkpointEvery (snapshots land on checkpoints)',
+    );
   }
-  if (!Number.isInteger(maxSnapshots) || maxSnapshots < 1) throw new RangeError('[retroCapture] maxSnapshots must be a positive integer');
+  if (!Number.isInteger(maxSnapshots) || maxSnapshots < 1)
+    throw new RangeError('[retroCapture] maxSnapshots must be a positive integer');
 
   let log = createInputLog();
   let chain = createHashChain();
@@ -162,7 +171,9 @@ export function createRetroCapture({
     saveLast,
     clear,
     /** The coordinator's manual shed (the input stream's perfTier1 is the automatic one). */
-    setShed(on) { shedManual = !!on; },
+    setShed(on) {
+      shedManual = !!on;
+    },
     /** Window state, for readouts and proofs. */
     stats() {
       return {

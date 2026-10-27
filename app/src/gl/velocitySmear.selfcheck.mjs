@@ -5,7 +5,11 @@ import assert from 'node:assert';
 import { attachVelocities, SMEAR_MAX_SPEED } from './velocitySmear.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const inst = (layer, key, x, y) => ({ layer, key, x, y });
 

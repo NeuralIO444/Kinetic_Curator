@@ -24,14 +24,45 @@ const DT_MS = [16.7, 16.7, 33.3, 8, 16.7, 50, 16.7, 12.5];
 
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 48, particleCount: 48, ...over });
-const snap = (seed, over = {}) => ({ seed, paletteId: 'bone', paletteOverrides: null, layoutParams: lp(over), caGrid: null, enabledAssets: null });
+const snap = (seed, over = {}) => ({
+  seed,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  layoutParams: lp(over),
+  caGrid: null,
+  enabledAssets: null,
+});
 const baseInput = (over = {}) => ({
-  layers: [L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [], layoutParams: lp({ mode: 'random' }), caGrid: null,
-  enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {},
-  batchPaused: false, focusSwap: false, loopTimeMs: 0, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false,
-  assetThin: false, slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100],
-  phraseWrapGen: 0, attractor: null, ...over,
+  layers: [L('lyr-a')],
+  activeLayerId: 'lyr-a',
+  layerSnapshots: {},
+  seed: 1234,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  layoutParams: lp({ mode: 'random' }),
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  quality: 'balanced',
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  loopTimeMs: 0,
+  dtSec: 1 / 60,
+  perfClampOverride: null,
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  scaleMul: 1,
+  alphaBoost: 0,
+  effectiveScale: [0.5, 1.5],
+  effectiveAlpha: [20, 100],
+  phraseWrapGen: 0,
+  attractor: null,
+  ...over,
 });
 
 /** Canonical encoding of anything the resolver returns: sorted keys, typed arrays as lists, no functions. */
@@ -43,11 +74,17 @@ function canon(v, depth = 0) {
   if (t === 'boolean') return v ? 'T' : 'F';
   if (t === 'function') return 'fn';
   if (depth > 12) return '…';
-  if (ArrayBuffer.isView(v)) return `[${Array.from(v).map((x) => canon(x, depth + 1)).join(',')}]`;
+  if (ArrayBuffer.isView(v))
+    return `[${Array.from(v)
+      .map((x) => canon(x, depth + 1))
+      .join(',')}]`;
   if (Array.isArray(v)) return `[${v.map((x) => canon(x, depth + 1)).join(',')}]`;
   if (v instanceof Map) return canon([...v.entries()], depth + 1);
   if (v instanceof Set) return canon([...v.values()], depth + 1);
-  return `{${Object.keys(v).sort().map((k) => `${k}:${canon(v[k], depth + 1)}`).join(',')}}`;
+  return `{${Object.keys(v)
+    .sort()
+    .map((k) => `${k}:${canon(v[k], depth + 1)}`)
+    .join(',')}}`;
 }
 const frameHash = (out) => createHash('sha256').update(canon(out)).digest('hex').slice(0, 20);
 
@@ -65,7 +102,10 @@ function run(scenario) {
   return hashes;
 }
 
-const breathe = (f) => ({ effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)], effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100] });
+const breathe = (f) => ({
+  effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)],
+  effectiveAlpha: [20 + 10 * Math.sin(f / 13), 100],
+});
 const single = (mode, over = {}) => ({
   name: `single:${mode}`,
   at: (f) => ({
@@ -87,9 +127,32 @@ const twoLayer = (name, patch, aOver = {}, bOver = {}) => ({
 });
 
 const SCENARIOS = [
-  ...['random', 'grid', 'fibonacci', 'phyllotaxis', 'truchet', 'radial', 'swarm', 'flow', 'layers', 'rails',
-    'voronoi', 'lsystem', 'dla', 'eden', 'orbit', 'abacus', 'noise', 'hype', 'murmuration', 'brush', 'stratified',
-    'poisson', 'gaussian', 'circlepack'].map((m) => single(m)),
+  ...[
+    'random',
+    'grid',
+    'fibonacci',
+    'phyllotaxis',
+    'truchet',
+    'radial',
+    'swarm',
+    'flow',
+    'layers',
+    'rails',
+    'voronoi',
+    'lsystem',
+    'dla',
+    'eden',
+    'orbit',
+    'abacus',
+    'noise',
+    'hype',
+    'murmuration',
+    'brush',
+    'stratified',
+    'poisson',
+    'gaussian',
+    'circlepack',
+  ].map((m) => single(m)),
   twoLayer('patch:none', null),
   twoLayer('patch:field', { mode: 'field', to: 'lyr-a', strength: 1.5 }),
   twoLayer('patch:feed', { mode: 'feed', to: 'lyr-a', strength: 1 }),
@@ -97,16 +160,24 @@ const SCENARIOS = [
   {
     name: 'shared-scent:mold',
     at: (f) => ({
-      layers: [L('lyr-m1'), L('lyr-m2')], activeLayerId: 'lyr-m1',
+      layers: [L('lyr-m1'), L('lyr-m2')],
+      activeLayerId: 'lyr-m1',
       layoutParams: lp({ mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
-      layerSnapshots: { 'lyr-m1': snap(101, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }), 'lyr-m2': snap(202, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }) },
+      layerSnapshots: {
+        'lyr-m1': snap(101, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
+        'lyr-m2': snap(202, { mode: 'hype', behave: 'mold', count: 16, particleCount: 16 }),
+      },
       ...breathe(f),
     }),
   },
   {
     name: 'fx+pattern',
     at: (f) => ({
-      layers: [L('lyr-a'), L('lyr-fx', { type: 'fx' }), L('lyr-p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) })],
+      layers: [
+        L('lyr-a'),
+        L('lyr-fx', { type: 'fx' }),
+        L('lyr-p', { type: 'pattern', pattern: defaultPattern('QUILT', 7) }),
+      ],
       layoutParams: lp({ mode: 'grid', kinemeBreath: 0.6, kinemeDrift: 0.8 }),
       ...breathe(f),
     }),
@@ -129,14 +200,18 @@ const SCENARIOS = [
     at: (f) => ({
       // 300 nodes is over the 'performance' tier's cap (180), so the tier change really sheds
       layoutParams: lp({ mode: 'flow', count: 300 }),
-      quality: f < 30 ? 'balanced' : 'performance', perfTier1: f > 45, slowRender: f > 70 && f < 80, assetThin: f > 60,
+      quality: f < 30 ? 'balanced' : 'performance',
+      perfTier1: f > 45,
+      slowRender: f > 70 && f < 80,
+      assetThin: f > 60,
       ...breathe(f),
     }),
   },
   {
     name: 'sub-seeds+reduced-motion',
     at: (f) => ({
-      layoutParams: lp({ mode: 'gaussian' }), reducedMotion: f > 50,
+      layoutParams: lp({ mode: 'gaussian' }),
+      reducedMotion: f > 50,
       seedOffsets: { spatial: f > 30 ? 4 : 0, color: f > 60 ? 2 : 0, asset: 0, noise: 1 },
       ...breathe(f),
     }),
@@ -163,7 +238,10 @@ for (const s of SCENARIOS) {
   const first = a.findIndex((h, i) => h !== b[i]);
   assert.equal(first, -1, `${s.name}: two fresh resolvers diverge at frame ${first}`);
   // not vacuous: the scenario has to actually move
-  assert.ok(new Set(a).size > FRAMES / 3, `${s.name}: only ${new Set(a).size} distinct frames of ${FRAMES} — the scenario is not exercising motion`);
+  assert.ok(
+    new Set(a).size > FRAMES / 3,
+    `${s.name}: only ${new Set(a).size} distinct frames of ${FRAMES} — the scenario is not exercising motion`,
+  );
   mine[s.name] = createHash('sha256').update(a.join('')).digest('hex').slice(0, 16);
   checked += 1;
 }
@@ -171,9 +249,15 @@ console.log(`liveResolve.determinism: ${checked} scenarios x ${FRAMES} frames id
 
 // the governor scenario really sheds: the same scene held at one tier is a different run
 {
-  const held = run({ name: 'governor-held', at: (f) => ({ layoutParams: lp({ mode: 'flow', count: 300 }), ...breathe(f) }) });
-  assert.notEqual(createHash('sha256').update(held.join('')).digest('hex').slice(0, 16), mine['governor-inputs'],
-    'changing the quality tier changes the frames (a tier name that does not exist would silently do nothing)');
+  const held = run({
+    name: 'governor-held',
+    at: (f) => ({ layoutParams: lp({ mode: 'flow', count: 300 }), ...breathe(f) }),
+  });
+  assert.notEqual(
+    createHash('sha256').update(held.join('')).digest('hex').slice(0, 16),
+    mine['governor-inputs'],
+    'changing the quality tier changes the frames (a tier name that does not exist would silently do nothing)',
+  );
 }
 
 // the patch scenarios really exercise the patches: each one differs from the unpatched pair
@@ -192,14 +276,23 @@ for (const p of ['patch:field', 'patch:feed', 'patch:mod']) {
     ['scale range', (f) => ({ ...base.at(f), effectiveScale: [0.5, 1.6] })],
   ]) {
     const b = run({ name: 'mut', at: mut });
-    assert.ok(a.some((h, i) => h !== b[i]), `changing the ${label} changes the frame`);
+    assert.ok(
+      a.some((h, i) => h !== b[i]),
+      `changing the ${label} changes the frame`,
+    );
   }
   // and frame TIME is an input: the same scene on a different clock is a different performance
   const r = createLiveResolver();
   const slow = [];
   let t = 0;
-  for (let f = 0; f < FRAMES; f++) { t += 33.3; slow.push(frameHash(r.resolveLayers(baseInput({ ...single('swarm').at(f), loopTimeMs: t, dtSec: 0.0333 })))); }
-  assert.ok(run(single('swarm')).some((h, i) => h !== slow[i]), 'frame time is part of the input (recorded per frame, decision 1)');
+  for (let f = 0; f < FRAMES; f++) {
+    t += 33.3;
+    slow.push(frameHash(r.resolveLayers(baseInput({ ...single('swarm').at(f), loopTimeMs: t, dtSec: 0.0333 }))));
+  }
+  assert.ok(
+    run(single('swarm')).some((h, i) => h !== slow[i]),
+    'frame time is part of the input (recorded per frame, decision 1)',
+  );
   console.log('liveResolve.determinism: sensitive to seed, count, palette, scale range and frame time');
 }
 
@@ -207,7 +300,11 @@ for (const p of ['patch:field', 'patch:feed', 'patch:mod']) {
 {
   const self = fileURLToPath(import.meta.url);
   const child = () => {
-    const txt = execFileSync(process.execPath, [self], { env: { ...process.env, KC_DET_CHILD: '1' }, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+    const txt = execFileSync(process.execPath, [self], {
+      env: { ...process.env, KC_DET_CHILD: '1' },
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    });
     const line = txt.split('\n').find((l) => l.startsWith('KCDET'));
     assert.ok(line, 'child printed its digests');
     return JSON.parse(line.slice(5));

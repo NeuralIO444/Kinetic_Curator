@@ -69,12 +69,7 @@ import { motionAmount, noteWetFrame } from './vortex.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
-import {
-  createRenderFaultTracker,
-  RENDER_FAULT_FAILS,
-  frameFaultReason,
-  bakeFaultReason,
-} from './renderFault.mjs';
+import { createRenderFaultTracker, RENDER_FAULT_FAILS, frameFaultReason, bakeFaultReason } from './renderFault.mjs';
 
 /**
  * #265 — the atlas is resolution-independent (asset/color combos only), so
@@ -82,7 +77,10 @@ import {
  * (grain is procedural), so there is no second bake key anymore.
  */
 function atlasKeyFor(combos, fxLayerIds, regionAssets = []) {
-  const ck = combos.map((c) => comboKey(c.asset, c.ink, c.accent)).sort().join(';');
+  const ck = combos
+    .map((c) => comboKey(c.asset, c.ink, c.accent))
+    .sort()
+    .join(';');
   // #1433: region cells are baked on demand (only for assets the
   // contract expands), so the demand set is part of the bake key.
   return `${[...fxLayerIds].sort().join(',')}|${[...regionAssets].sort().join(',')}|${ck}`;
@@ -125,10 +123,16 @@ export function swellProgress(loopTimeMs, swellStartMs) {
   return Math.sin(Math.PI * p);
 }
 
-export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {}) {
+export function createLiveLoop(
+  canvas,
+  { getState, viewRef, wrapEl = null, wantSkeletons = false, wantEngraving = true } = {},
+) {
   // #1734-#1738 — the ALife creature is opt-in while it is young: ?alife=1 turns the channel on (stamped on every
   // input as creatureAlife, so a take records whether it ran). Read once: the page's URL does not change mid-run.
-  const alifeOn = typeof window !== 'undefined' && !!window.location && new URLSearchParams(window.location.search || '').get('alife') === '1';
+  const alifeOn =
+    typeof window !== 'undefined' &&
+    !!window.location &&
+    new URLSearchParams(window.location.search || '').get('alife') === '1';
   if (!canvas) throw new Error('[gl-live] no canvas');
   if (typeof getState !== 'function') throw new Error('[gl-live] getState required');
 
@@ -182,7 +186,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     try {
       const s = getState();
       if (s && typeof s.setGlContext === 'function') s.setGlContext(v);
-    } catch { /* store gone */ }
+    } catch {
+      /* store gone */
+    }
   };
   const restartGlSession = () => {
     // Detach the dead session's bridge listeners. Do NOT call live.dispose():
@@ -191,7 +197,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // process (observed as a spontaneous second webglcontextlost). The JS
     // wrappers are garbage-collected; the browser reclaims the dead GL
     // objects with the lost context.
-    try { live.getBridge().dispose(); } catch { /* best-effort */ }
+    try {
+      live.getBridge().dispose();
+    } catch {
+      /* best-effort */
+    }
     live = createLiveRenderer(canvas);
     // Orphan any bake in flight against the dead session — its token
     // checkpoints bail at the next await boundary; nulling the bake keys
@@ -236,7 +246,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       if (st && st.slowRenderSource === 'watchdog' && typeof st.setRunning === 'function') {
         st.setRunning(true);
       }
-    } catch { /* store gone */ }
+    } catch {
+      /* store gone */
+    }
   };
   // Synchronous half of the loss path: webglcontextlost is dispatched
   // asynchronously, so a tick can land in the gap between the loss and
@@ -331,7 +343,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   let flowField = null;
   let flowFieldSeed = null;
   const flowFor = (seed) => {
-    const key = (seed >>> 0) || 444;
+    const key = seed >>> 0 || 444;
     if (!flowField || flowFieldSeed !== key) {
       flowField = buildFlowField(createNoise(key));
       flowFieldSeed = key;
@@ -366,10 +378,18 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   let accumPoisonRun = 0;
   const noteAccumFault = (e) => {
     if (e?.name === 'AccumRecipeError' && ++accumPoisonRun >= 3) {
-      try { getState().tripWatchdog('accum-nan'); } catch { /* store gone */ }
+      try {
+        getState().tripWatchdog('accum-nan');
+      } catch {
+        /* store gone */
+      }
       accumPoisonRun = 0;
     }
-    try { live.dropAccum(); } catch { /* already torn down */ }
+    try {
+      live.dropAccum();
+    } catch {
+      /* already torn down */
+    }
     accumObj = null;
     accumActive = false;
     velPrev.clear(); // #309: the retry starts at zero velocity
@@ -397,7 +417,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   // reload). The store write happens only on transitions — the loop never
   // re-renders React per frame.
   const renderFault = createRenderFaultTracker((on, reason) => {
-    try { getState().setRenderFault(on, reason); } catch { /* store gone */ }
+    try {
+      getState().setRenderFault(on, reason);
+    } catch {
+      /* store gone */
+    }
   });
 
   // #266 — atlas-bake failure state. A deterministic bake failure (e.g. an
@@ -427,7 +451,9 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // #1433 — per-asset region records for the live baker's region
       // cells, keyed the same way (canon + overlay assets both carry
       // `.regions`: R1's bake for built-ins, #725 for imports).
-      regionsPool = new Map(pool.filter((a) => Array.isArray(a.regions) && a.regions.length).map((a) => [a.id, a.regions]));
+      regionsPool = new Map(
+        pool.filter((a) => Array.isArray(a.regions) && a.regions.length).map((a) => [a.id, a.regions]),
+      );
       svgPoolRef = customAssets;
     }
     return svgPool;
@@ -512,13 +538,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     const synth = readSourceFeed(loopTimeMs);
     const audioOn = audioReal || !!synth;
     const realAudio = {
-      rms: audioReal ? (s.audioBands?.rms || 0) : 0,
-      bass: audioReal ? (s.audioBands?.bass || 0) : 0,
-      mid: audioReal ? (s.audioBands?.mid || 0) : 0,
-      treble: audioReal ? (s.audioBands?.treble || 0) : 0,
-      beatPulse: audioReal ? (s.beatPulse || 0) : 0,
+      rms: audioReal ? s.audioBands?.rms || 0 : 0,
+      bass: audioReal ? s.audioBands?.bass || 0 : 0,
+      mid: audioReal ? s.audioBands?.mid || 0 : 0,
+      treble: audioReal ? s.audioBands?.treble || 0 : 0,
+      beatPulse: audioReal ? s.beatPulse || 0 : 0,
     };
-    const rawAudio = synth ? mixLevels(realAudio, synth.coarse, synth.mix, ['rms', 'bass', 'mid', 'treble', 'beatPulse']) : realAudio;
+    const rawAudio = synth
+      ? mixLevels(realAudio, synth.coarse, synth.mix, ['rms', 'bass', 'mid', 'treble', 'beatPulse'])
+      : realAudio;
     // #503 — two-stage envelope, DELIBERATE (documented, pinned by
     // audioPipeline.selfcheck.mjs). Stage 1 (useAudioInput) shapes the mic
     // bands with the user's attack/decay/response knobs on the rAF clock;
@@ -548,24 +576,34 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // artist has no routes of their own it uses the default routing; real audio never does (AUTO builds the table).
     const effRoutes = effectiveRoutes(s.audioRoutes, !!synth);
     const shapedBands = bandFeed.read({
-      routes: effRoutes, enabled: audioOn, sidecar: !!(s.audioSidecar && s.audioSource?.type === 'file'),
-      readBands: synth ? () => mixLevels(audioReal ? readMeterBandLevels() : null, synth.bands, synth.mix, BAND_KEYS) : readMeterBandLevels,
+      routes: effRoutes,
+      enabled: audioOn,
+      sidecar: !!(s.audioSidecar && s.audioSource?.type === 'file'),
+      readBands: synth
+        ? () => mixLevels(audioReal ? readMeterBandLevels() : null, synth.bands, synth.mix, BAND_KEYS)
+        : readMeterBandLevels,
       dtMs: dtSec * 1000,
     });
-    const routes = audioRoutes(shapedAudio, { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt }, effRoutes, shapedBands);
+    const routes = audioRoutes(
+      shapedAudio,
+      { depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt },
+      effRoutes,
+      shapedBands,
+    );
     // #1477 — the metro's own breath: an empty table is not inert. With no audio and no set, the BEAT's pulse (the
     // dialed BPM) breathes the stage a little, exactly while the artist has no routes. Routing the beat anywhere, or
     // real audio, replaces it. (The default routes never did this with audio off: the loop reads beatPulse only
     // through the routes, and only while audio is on.)
-    routes.breathAudio = Math.min(0.2, (routes.breathAudio || 0) + metroBreath({ routes: s.audioRoutes, audioOn, metro: s.beatMetro, beatPulse: s.beatPulse }));
+    routes.breathAudio = Math.min(
+      0.2,
+      (routes.breathAudio || 0) +
+        metroBreath({ routes: s.audioRoutes, audioOn, metro: s.beatMetro, beatPulse: s.beatPulse }),
+    );
     const { scaleMul, alphaBoost } = routes;
 
     // Layered life LFO (incommensurate sines) from the GL loop
     const t = loopLifeT;
-    const rawBreath =
-      0.55 * Math.sin(t * 0.73) +
-      0.30 * Math.sin(t * 1.19 + 1.7) +
-      0.15 * Math.sin(t * 0.29 + 4.1);
+    const rawBreath = 0.55 * Math.sin(t * 0.73) + 0.3 * Math.sin(t * 1.19 + 1.7) + 0.15 * Math.sin(t * 0.29 + 4.1);
 
     const targetBreathScale = 1 + rawBreath * 0.012 * lifeDrift + routes.breathAudio;
     const targetBreathRot = rawBreath * 0.6 * lifeDrift;
@@ -580,7 +618,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // loop is its only honest source; the resolver's amounts ride the frame tap on their own
     // path (composition/motionLive folds this note into the strip's levels). Read-only: a note,
     // not a route.
-    noteLifeBreath((s.slowRender || !s.running) ? 0 : Math.abs(breathScaleSmoothed - 1) / LIFE_FULL);
+    noteLifeBreath(s.slowRender || !s.running ? 0 : Math.abs(breathScaleSmoothed - 1) / LIFE_FULL);
 
     const glow = routes.glow;
 
@@ -589,14 +627,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     const sc = layoutParams.scale;
     const scX = Array.isArray(sc) ? sc : (sc?.x ?? [0.4, 1.6]);
     const scY = Array.isArray(sc) ? sc : (sc?.y ?? scX);
-    const effectiveScale = [
-      (scX[0] ?? 0.4) * scaleMul,
-      (scX[1] ?? 1.6) * scaleMul,
-    ];
-    const effectiveScaleY = [
-      (scY[0] ?? 0.4) * scaleMul,
-      (scY[1] ?? 1.6) * scaleMul,
-    ];
+    const effectiveScale = [(scX[0] ?? 0.4) * scaleMul, (scX[1] ?? 1.6) * scaleMul];
+    const effectiveScaleY = [(scY[0] ?? 0.4) * scaleMul, (scY[1] ?? 1.6) * scaleMul];
     const effectiveAlpha = [
       Math.min(100, (layoutParams.alpha?.[0] ?? 40) + alphaBoost * 0.4),
       Math.min(100, (layoutParams.alpha?.[1] ?? 100) + alphaBoost),
@@ -610,7 +642,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     const mixSeconds = voiceMixSec ?? s.paletteMixSeconds;
     const assetsKey = Array.isArray(voiceState.assets)
       ? voiceState.assets.join(',')
-      : (s.enabledAssets ? Object.keys(s.enabledAssets).filter((k) => s.enabledAssets[k]).sort().join(',') : '');
+      : s.enabledAssets
+        ? Object.keys(s.enabledAssets)
+            .filter((k) => s.enabledAssets[k])
+            .sort()
+            .join(',')
+        : '';
 
     if (s.activeLayerId !== lastActiveLayerId) {
       // The active layer's own id/mode/behave/assets just swapped in from
@@ -619,8 +656,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // composite that never actually moved.
       if (lastActiveLayerId !== null) {
         paletteMix.resync({
-          id: s.paletteId, overrides: s.paletteOverrides, userPalettes: s.userPalettes,
-          mode: layoutParams.mode, behave: layoutParams.behave, assetsKey,
+          id: s.paletteId,
+          overrides: s.paletteOverrides,
+          userPalettes: s.userPalettes,
+          mode: layoutParams.mode,
+          behave: layoutParams.behave,
+          assetsKey,
         });
         // #417: the slider-spring cache was already wiped at the top of
         // this frame (focus-swap check before the springs), so
@@ -644,7 +685,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       now: loopTimeMs,
       canDissolve: frameCount > 0 && !!lastFrameTarget && !contextDown,
       bakeReady: !building && !!cells,
-      scrubT: (s.voiceMix && !s.voiceMix.auto) ? s.voiceMix.t : null,
+      scrubT: s.voiceMix && !s.voiceMix.auto ? s.voiceMix.t : null,
     });
     if (mixEv.kind === 'start' && !mixEv.retarget) {
       if (!live.snapshotHoldFrame(lastFrameTarget)) paletteMix.cancel();
@@ -671,7 +712,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       queenSeenKeeps = nx.seen;
     }
     const resolved = resolver.resolveLayers({
-      canvasW, canvasH,
+      canvasW,
+      canvasH,
       layers: s.layers,
       activeLayerId: s.activeLayerId,
       layerSnapshots: s.layerSnapshots,
@@ -727,7 +769,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // when on, so a take recorded without it carries exactly the older input shape. dishGenomes: each pin's genome
       // (bred from keeps or wild), decided by the spawn channel and recorded, so a take replays the animal without the
       // pool; creatureKeeps: the keep serial — a rise consolidates what the creatures learned.
-      ...(alifeOn ? { creatureAlife: true, dishGenomes: (spawnDecisions && spawnDecisions.dishGenomes) || [], creatureKeeps: (spawnDecisions && spawnDecisions.creatureKeeps) || 0 } : {}),
+      ...(alifeOn
+        ? {
+            creatureAlife: true,
+            dishGenomes: (spawnDecisions && spawnDecisions.dishGenomes) || [],
+            creatureKeeps: (spawnDecisions && spawnDecisions.creatureKeeps) || 0,
+          }
+        : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,
@@ -750,7 +798,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // dishPins follow them and the next frame's input carries the new homes.
     const spawnNow = getLastSpawnDecisions();
     if (spawnNow && spawnNow.homesChanged) {
-      try { s.setDishPins(spawnNow.dishPins); } catch { /* store gone */ }
+      try {
+        s.setDishPins(spawnNow.dishPins);
+      } catch {
+        /* store gone */
+      }
     }
 
     // Node-count instrumentation (footer readout), store-owned.
@@ -758,7 +810,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     for (const r of resolved) if (!r.isFx) nodes += r.items?.length || 0;
     if (nodes !== lastNodeCount) {
       lastNodeCount = nodes;
-      try { s.setNodeCount(nodes); } catch { /* store gone */ }
+      try {
+        s.setNodeCount(nodes);
+      } catch {
+        /* store gone */
+      }
     }
 
     // #624 WASH / #625 INJECT color modes: on a palette change each item
@@ -789,7 +845,20 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // amount, u_smear.z). 0 on the default table (routes.squash undefined)
     // → the contract is exactly as built, today's render bit-identical.
     const contract = buildSceneContract({
-      doc: { seed: s.seed, seedOffsets: s.seedOffsets, quality: s.quality, perfTier1: !!s.perfTier1, layers: s.layers, light: s.light, squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0), assetKineme: s.assetKineme, kinemeTime: kinemeClock.at(loopTimeMs / 1000, applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate)), palette: activePalette,
+      doc: {
+        seed: s.seed,
+        seedOffsets: s.seedOffsets,
+        quality: s.quality,
+        perfTier1: !!s.perfTier1,
+        layers: s.layers,
+        light: s.light,
+        squash: squashWithAudio(layoutParams.squash, routes.squash ?? 0),
+        assetKineme: s.assetKineme,
+        kinemeTime: kinemeClock.at(
+          loopTimeMs / 1000,
+          applyKinemeRateAudio(layoutParams.kinemeRate ?? 1, routes.kinemeRate),
+        ),
+        palette: activePalette,
         // #1433 — the governor state the region shed ladder reads
         // (sceneContract.regionKinemesFrozen / regionCollapseShed /
         // regionAnimBudget): deeper cuts, the OS reduced-motion
@@ -798,10 +867,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
         // #1434 — the region data itself: the artist's per-region
         // overrides (doc map) and the custom-asset records the contract
         // resolves regions/defaults from.
-        regionKinemes: s.regionKinemes, customAssets: s.customAssets,
-        assetThin: s.assetThin, perfClamp: !!s.perfClampOverride, slowRender: s.slowRender || !s.running,
-        reducedMotion: typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
-        regionBudget: regionBudgetForDevice(isIpadClassDevice()) },
+        regionKinemes: s.regionKinemes,
+        customAssets: s.customAssets,
+        assetThin: s.assetThin,
+        perfClamp: !!s.perfClampOverride,
+        slowRender: s.slowRender || !s.running,
+        reducedMotion:
+          typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+        regionBudget: regionBudgetForDevice(isIpadClassDevice()),
+      },
       resolvedLayers: resolved,
       caps: null,
       accum: null, // ACCUM is loop-owned (begin/step below), not contract-owned
@@ -810,7 +884,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     contract.hands = { crooked: Number(layoutParams.crooked) || 0, open: Number(layoutParams.open) || 0 };
     // #1482 P3 — spectrum marks: only while a dial is up and the governor has not made its first cut. Off leaves the key
     // absent, so the frame is exactly what it was. The texture bytes are the live spectrum (gl/spectrumLive), packed once.
-    const spectrumMarks = spectrumMarksFor(layoutParams, spectrumMarksShed({ perfTier1: s.perfTier1, quality: s.quality }));
+    const spectrumMarks = spectrumMarksFor(
+      layoutParams,
+      spectrumMarksShed({ perfTier1: s.perfTier1, quality: s.quality }),
+    );
     if (spectrumMarks) contract.spectrum = spectrumMarks;
     // #1490 — the FX feedback warp's amount, read off the FX strata's feedbackWarp items (the existing
     // { kind, params } surface: no layout key, no contract key, nothing serialized when the item is
@@ -844,7 +921,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     const px = view.pan?.x || 0;
     const py = view.pan?.y || 0;
     const bs = breathScaleSmoothed;
-    const br = ((breathRotSmoothed) * Math.PI) / 180;
+    const br = (breathRotSmoothed * Math.PI) / 180;
     const cos = Math.cos(br);
     const sin = Math.sin(br);
     const sizeMul = bs * z;
@@ -861,7 +938,7 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
         const p = it.seedOffset * 0.001;
         const agentRaw =
           0.55 * Math.sin(t * 0.73 + p) +
-          0.30 * Math.sin(t * 1.19 + 1.7 + p * 1.3) +
+          0.3 * Math.sin(t * 1.19 + 1.7 + p * 1.3) +
           0.15 * Math.sin(t * 0.29 + 4.1 + p * 0.7);
         const agentScaleMul = 1 + (agentRaw - rawBreath) * 0.008 * lifeDrift;
         const agentRotOffset = (agentRaw - rawBreath) * 0.3 * lifeDrift;
@@ -886,18 +963,19 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     }
     // #970: step the vortex next to attachVelocities. Freeze holds the
     // last field. Wetness 0 does not step and does not bind a texture.
-    const wet = (!!layoutParams.accumulation && !s.perfTier1)
-      ? noteWetFrame(wetSlot, {
-          wetness: layoutParams.accumulationWetness,
-          freeze: accumFrozen || s.running === false || !!s.slowRender,
-          seed: s.seed,
-          width: canvasW,
-          height: canvasH,
-          instances: contract.instances,
-          behave: layoutParams.behave,
-          motion: motionAmount(layoutParams),
-        })
-      : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+    const wet =
+      !!layoutParams.accumulation && !s.perfTier1
+        ? noteWetFrame(wetSlot, {
+            wetness: layoutParams.accumulationWetness,
+            freeze: accumFrozen || s.running === false || !!s.slowRender,
+            seed: s.seed,
+            width: canvasW,
+            height: canvasH,
+            instances: contract.instances,
+            behave: layoutParams.behave,
+            motion: motionAmount(layoutParams),
+          })
+        : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
 
     // Static resource: the atlas, keyed by the combos the transformed instances use.
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
@@ -910,9 +988,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // #1433: region cells only for assets this frame's contract
     // actually expands (none under the collapse shed — the pack reads
     // no region cells there).
-    const regionAssets = contract.regionAnim && !contract.regionAnim.shed
-      ? Object.keys(contract.regionAnim.assets || {})
-      : [];
+    const regionAssets =
+      contract.regionAnim && !contract.regionAnim.shed ? Object.keys(contract.regionAnim.assets || {}) : [];
     const aKey = atlasKeyFor(combos, fxLayerIds, regionAssets);
     if (aKey !== atlasKey && !building && performance.now() >= bakeRetryAt) {
       startStaticBuild(combos, aKey, regionAssets);
@@ -927,8 +1004,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     // field dyes first on the fast envelope. The event's bg is the lerped
     // field color while a soak/propagation runs, the plain palette bg
     // otherwise.
-    const bgCss = bgMode === 'white' ? '#ffffff' : bgMode === 'transparent' ? null
-      : s.colorMode === 'INJECT' ? injectEv.bg : washEv.bg;
+    const bgCss =
+      bgMode === 'white'
+        ? '#ffffff'
+        : bgMode === 'transparent'
+          ? null
+          : s.colorMode === 'INJECT'
+            ? injectEv.bg
+            : washEv.bg;
 
     return {
       payload: {
@@ -942,28 +1025,32 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
         // #1010 — per-knob audio modulation for MATH ops (none/rms/flux/
         // beatPulse). Shaped envelope, 0..1; null when audio is off so the
         // knobs pass through untouched.
-        audio: audioOn ? {
-          rms: rmsNow,
-          flux: fluxNow,
-          beatPulse: shapedAudio.beatPulse || 0,
-        } : null,
+        audio: audioOn
+          ? {
+              rms: rmsNow,
+              flux: fluxNow,
+              beatPulse: shapedAudio.beatPulse || 0,
+            }
+          : null,
       },
       transparent: !bgCss,
       bgCss: bgCss || activePalette.bg,
-      rw, rh,
+      rw,
+      rh,
       accumOn: !!layoutParams.accumulation && !s.perfTier1,
       accumFrozen,
       accumParams: {
         // #274: fade is trail half-life in frames — convert to keep at the
         // boundary. #268: SWELL breathes the half-life toward 40 frames and
         // back on a timestamped envelope, so it can't stick at full swell.
-        fade: halfLifeToKeep((layoutParams.accumulationFade ?? 5.4)
-          + swellEnvelope() * (40 - (layoutParams.accumulationFade ?? 5.4))),
+        fade: halfLifeToKeep(
+          (layoutParams.accumulationFade ?? 5.4) + swellEnvelope() * (40 - (layoutParams.accumulationFade ?? 5.4)),
+        ),
         optics: layoutParams.accumulationOptics,
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider
-        flowField: (layoutParams.accumulationFlow > 0) ? flowFor(s.seed) : null,
+        flowField: layoutParams.accumulationFlow > 0 ? flowFor(s.seed) : null,
         wetStep: wet.wetStep,
         wetGain: wet.wetGain,
         wetAmount: wet.wetAmount,
@@ -1000,10 +1087,13 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       // itemMorph). paletteMix.update() above still runs unconditionally
       // (scrub bookkeeping, isDissolving()/cancel() for other callers); we
       // just stop reading its dissolve factor for the non-scrub case.
-      mix: !(s.voiceMix && !s.voiceMix.auto) ? null
-        : mixEv.kind === 'mix' ? mixEv.t
-        : (mixEv.kind === 'start' || mixEv.kind === 'arming') ? 0
-        : null,
+      mix: !(s.voiceMix && !s.voiceMix.auto)
+        ? null
+        : mixEv.kind === 'mix'
+          ? mixEv.t
+          : mixEv.kind === 'start' || mixEv.kind === 'arming'
+            ? 0
+            : null,
     };
   }
 
@@ -1141,7 +1231,22 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
         return;
       }
 
-      const { payload, transparent, bgCss, accumOn, accumFrozen: frozen, accumParams, audioBands, audioOn, audioSwell, accumAudio, glow, paused, mix, feedbackWarp } = frame;
+      const {
+        payload,
+        transparent,
+        bgCss,
+        accumOn,
+        accumFrozen: frozen,
+        accumParams,
+        audioBands,
+        audioOn,
+        audioSwell,
+        accumAudio,
+        glow,
+        paused,
+        mix,
+        feedbackWarp,
+      } = frame;
 
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
@@ -1165,9 +1270,10 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
       }
 
       if (wrapEl) {
-        wrapEl.style.boxShadow = glow > 0.02
-          ? `0 0 ${Math.round(90 * glow)}px ${Math.round(18 * glow)}px rgba(255,255,255,${(0.10 * glow).toFixed(3)})`
-          : '';
+        wrapEl.style.boxShadow =
+          glow > 0.02
+            ? `0 0 ${Math.round(90 * glow)}px ${Math.round(18 * glow)}px rgba(255,255,255,${(0.1 * glow).toFixed(3)})`
+            : '';
       }
 
       // #103 Track A — time the GPU work itself: content render, ACCUM step,
@@ -1225,11 +1331,15 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
               // #306: the bands are already shaped by the ballistics follower
               // (useAudioInput); swell scales the glow gesture only.
               // #287 fade-to-paper: the fade target follows the scene bg.
-              let rp = applyAudioEnvelope(accumRecipeParams({ ...accumParams, background: bgCss }), {
-                rms: audioOn ? bands.rms || 0 : 0,
-                flux: 0,
-                beatPulse: audioOn ? bands.beatPulse || 0 : 0,
-              }, { swell: audioSwell ?? 1, accumAudio });
+              let rp = applyAudioEnvelope(
+                accumRecipeParams({ ...accumParams, background: bgCss }),
+                {
+                  rms: audioOn ? bands.rms || 0 : 0,
+                  flux: 0,
+                  beatPulse: audioOn ? bands.beatPulse || 0 : 0,
+                },
+                { swell: audioSwell ?? 1, accumAudio },
+              );
               // #1490 — the spectral feedback warp rides the same recipe, after the band envelope:
               // the spectrum state the core analysed (during a take, the recorded rows — the same
               // recorded-input path the marks hear, so a replay warps identically) bends the
@@ -1378,10 +1488,12 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   function upscaleIfNeeded(pixels, sw, sh, dw, dh) {
     if (sw === dw && sh === dh) return { pixels, width: dw, height: dh };
     const src = document.createElement('canvas');
-    src.width = sw; src.height = sh;
+    src.width = sw;
+    src.height = sh;
     src.getContext('2d').putImageData(new ImageData(new Uint8ClampedArray(pixels), sw, sh), 0, 0);
     const out = document.createElement('canvas');
-    out.width = dw; out.height = dh;
+    out.width = dw;
+    out.height = dh;
     const ctx = out.getContext('2d');
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
@@ -1401,10 +1513,14 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     if (contextDown) return null;
     try {
       if (live.getGL().isContextLost()) return null;
-    } catch { return null; }
+    } catch {
+      return null;
+    }
     try {
       return live.readPresented();
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   function start() {
@@ -1444,7 +1560,11 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
    * unlike waitForSettled, which requires the loop to be running.
    */
   function waitForReady(timeoutMs = 60000) {
-    try { buildFrame(); } catch { /* real errors surface from captureFrame */ }
+    try {
+      buildFrame();
+    } catch {
+      /* real errors surface from captureFrame */
+    }
     return new Promise((resolve, reject) => {
       const t0 = performance.now();
       const check = () => {
@@ -1462,7 +1582,8 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
     });
   }
 
-  function waitForSettled(timeoutMs = 12000) {    return new Promise((resolve, reject) => {
+  function waitForSettled(timeoutMs = 12000) {
+    return new Promise((resolve, reject) => {
       const t0 = performance.now();
       const startFrame = frameCount;
       const check = () => {
@@ -1481,11 +1602,17 @@ export function createLiveLoop(canvas, { getState, viewRef, wrapEl = null, wantS
   }
 
   return {
-    start, stop, dispose,
+    start,
+    stop,
+    dispose,
     getLoopTimeMs: () => loopTimeMs,
     setBgMode,
-    setAccumFrozen: (f) => { accumFrozen = !!f; },
-    swellAccum: () => { swellStart = loopTimeMs; },
+    setAccumFrozen: (f) => {
+      accumFrozen = !!f;
+    },
+    swellAccum: () => {
+      swellStart = loopTimeMs;
+    },
     captureFrame,
     grabPresentedFrame,
     waitForSettled,

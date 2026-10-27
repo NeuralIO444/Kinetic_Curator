@@ -16,7 +16,11 @@ import { ASSETS } from '../data/assets/index.js';
 import { packInstanceData, comboKey } from './renderer.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
@@ -34,8 +38,12 @@ function fixtureDoc() {
     layers: [
       { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
       {
-        id: 'fx1', name: 'FX 1', type: 'fx', visible: true,
-        layerBlendMode: 'normal', layerOpacity: 0.9,
+        id: 'fx1',
+        name: 'FX 1',
+        type: 'fx',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 0.9,
         effects: [
           { kind: 'rgbSplit', params: { dx: 3 } },
           { kind: 'grain', params: { amount: 0.4 } },
@@ -46,8 +54,12 @@ function fixtureDoc() {
     activeLayerId: 'bg',
     layerSnapshots: {
       top: {
-        seed: 99, paletteId: 'praystation', paletteOverrides: null,
-        layoutParams: lp({ count: 10 }), caGrid: null, enabledAssets,
+        seed: 99,
+        paletteId: 'praystation',
+        paletteOverrides: null,
+        layoutParams: lp({ count: 10 }),
+        caGrid: null,
+        enabledAssets,
       },
     },
   };
@@ -70,8 +82,14 @@ ok('contract version and canvas', () => {
 
 ok('layers keep store order, types, opacity, blend', () => {
   const s = build();
-  assert.deepEqual(s.layers.map((l) => l.id), ['bg', 'fx1', 'top']);
-  assert.deepEqual(s.layers.map((l) => l.type), ['content', 'fx', 'content']);
+  assert.deepEqual(
+    s.layers.map((l) => l.id),
+    ['bg', 'fx1', 'top'],
+  );
+  assert.deepEqual(
+    s.layers.map((l) => l.type),
+    ['content', 'fx', 'content'],
+  );
   assert.deepEqual(s.compositeOrder, ['bg', 'fx1', 'top']);
   assert.equal(s.layers[2].blend, 'screen');
   assert.equal(s.layers[2].opacity, 0.5);
@@ -81,7 +99,10 @@ ok('layers keep store order, types, opacity, blend', () => {
 ok('fx stack recorded top-down, sanitized (#185 semantics frozen)', () => {
   const s = build();
   const fx = s.layers[1];
-  assert.deepEqual(fx.fx.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.deepEqual(
+    fx.fx.map((e) => e.kind),
+    ['rgbSplit', 'grain'],
+  );
   assert.equal(fx.fx[0].params.dx, 3);
   assert.equal(fx.fx[1].params.amount, 0.4);
   // unknown kinds are dropped by the builder, never crash the contract
@@ -90,7 +111,10 @@ ok('fx stack recorded top-down, sanitized (#185 semantics frozen)', () => {
   // #310: blur is cut from the roster — an old chain carrying it fails closed
   dirty.layers[1].effects.push({ kind: 'blur', params: { radius: 999 } });
   const s2 = build(dirty);
-  assert.deepEqual(s2.layers[1].fx.map((e) => e.kind), ['rgbSplit', 'grain']);
+  assert.deepEqual(
+    s2.layers[1].fx.map((e) => e.kind),
+    ['rgbSplit', 'grain'],
+  );
 });
 
 ok('fxWraps captures the buildLayerStack fold', () => {
@@ -109,13 +133,32 @@ ok('fxWraps: stacked FX layers each get a wrap (#227)', () => {
   // old fold shed it because its direct segment was empty.
   d.layers = [
     { id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    { id: 'fx1', name: 'FX 1', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }] },
-    { id: 'fx2', name: 'FX 2', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'posterize', params: { levels: 4 } }] },
+    {
+      id: 'fx1',
+      name: 'FX 1',
+      type: 'fx',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      effects: [{ kind: 'invert', params: {} }],
+    },
+    {
+      id: 'fx2',
+      name: 'FX 2',
+      type: 'fx',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      effects: [{ kind: 'posterize', params: { levels: 4 } }],
+    },
     { id: 'top', name: 'Top', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
   ];
   const s = build(d);
   assert.equal(s.fxWraps.length, 2);
-  assert.deepEqual(s.fxWraps.map((w) => w.fxLayerId), ['fx1', 'fx2']);
+  assert.deepEqual(
+    s.fxWraps.map((w) => w.fxLayerId),
+    ['fx1', 'fx2'],
+  );
   assert.deepEqual(s.fxWraps[0].contentLayerIds, ['bg']);
   assert.deepEqual(s.fxWraps[1].contentLayerIds, ['bg']);
   assert.deepEqual(s.shed.fxLayerIds, [], 'nothing shed: every FX layer has the canvas below it');
@@ -124,7 +167,15 @@ ok('fxWraps: stacked FX layers each get a wrap (#227)', () => {
 ok('fxWraps: bottom FX layer wraps the canvas background (#227)', () => {
   const d = fixtureDoc();
   d.layers = [
-    { id: 'fx1', name: 'FX 1', type: 'fx', visible: true, layerBlendMode: 'normal', layerOpacity: 1, effects: [{ kind: 'invert', params: {} }] },
+    {
+      id: 'fx1',
+      name: 'FX 1',
+      type: 'fx',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      effects: [{ kind: 'invert', params: {} }],
+    },
     { id: 'top', name: 'Top', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
   ];
   const s = build(d);
@@ -194,7 +245,16 @@ ok('accum defaults null; enabled accum recorded and clamped', () => {
     resolvedLayers: resolveLayers(doc, { caps }),
     accum: { enabled: true, fade: 5, background: '#101010' },
   });
-  assert.deepEqual(s.accum, { enabled: true, fade: 0.99, optics: 0, tunnel: 0, prism: 0, flow: 0, echoes: 0, background: '#101010' });
+  assert.deepEqual(s.accum, {
+    enabled: true,
+    fade: 0.99,
+    optics: 0,
+    tunnel: 0,
+    prism: 0,
+    flow: 0,
+    echoes: 0,
+    background: '#101010',
+  });
 });
 
 ok('assertSceneContract rejects malformed scenes', () => {
@@ -219,17 +279,55 @@ ok('no store/schema changes: builder consumes existing shapes only', () => {
   // is where it lands (additive fields only, per #186).
   const doc = fixtureDoc();
   for (const l of doc.layers) {
-    assert.ok(['id', 'name', 'type', 'visible', 'layerBlendMode', 'layerOpacity']
-      .every((k) => k in l), `layer ${l.id} carries only known fields`);
+    assert.ok(
+      ['id', 'name', 'type', 'visible', 'layerBlendMode', 'layerOpacity'].every((k) => k in l),
+      `layer ${l.id} carries only known fields`,
+    );
   }
   assert.ok(build());
 });
 
 ok('Spine B (#388): packInstanceData skips missing atlas cells without throwing', () => {
   const instances = [
-    { asset: 'ast-a', tint: '#ff0000', accent: '#00ff00', x: 10, y: 20, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
-    { asset: 'ast-b', tint: '#ff0000', accent: '#00ff00', x: 30, y: 40, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
-    { asset: 'ast-c', tint: '#ff0000', accent: '#00ff00', x: 50, y: 60, scaleX: 1, scaleY: 1, rotation: 0, opacity: 1, vx: 0, vy: 0 },
+    {
+      asset: 'ast-a',
+      tint: '#ff0000',
+      accent: '#00ff00',
+      x: 10,
+      y: 20,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      opacity: 1,
+      vx: 0,
+      vy: 0,
+    },
+    {
+      asset: 'ast-b',
+      tint: '#ff0000',
+      accent: '#00ff00',
+      x: 30,
+      y: 40,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      opacity: 1,
+      vx: 0,
+      vy: 0,
+    },
+    {
+      asset: 'ast-c',
+      tint: '#ff0000',
+      accent: '#00ff00',
+      x: 50,
+      y: 60,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 0,
+      opacity: 1,
+      vx: 0,
+      vy: 0,
+    },
   ];
   // Cells only has ast-a and ast-c; ast-b is missing (in flight bake)
   const cells = {

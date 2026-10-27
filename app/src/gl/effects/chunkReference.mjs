@@ -17,22 +17,28 @@ export function refHash12(x, y) {
   let p3y = fract(y * 0.1031);
   let p3z = fract(x * 0.1031);
   const d = p3x * (p3y + 33.33) + p3y * (p3z + 33.33) + p3z * (p3x + 33.33);
-  p3x += d; p3y += d; p3z += d;
+  p3x += d;
+  p3y += d;
+  p3z += d;
   return fract((p3x + p3y) * p3z);
 }
 
 export function refHash22(x, y) {
   let p3x = fract(x * 0.1031);
-  let p3y = fract(y * 0.1030);
+  let p3y = fract(y * 0.103);
   let p3z = fract(x * 0.0973);
   const d = p3x * (p3y + 33.33) + p3y * (p3z + 33.33) + p3z * (p3x + 33.33);
-  p3x += d; p3y += d; p3z += d;
+  p3x += d;
+  p3y += d;
+  p3z += d;
   return [fract((p3x + p3y) * p3z), fract((p3x + p3z) * p3y)];
 }
 
 export function refVnoise(x, y) {
-  const ix = Math.floor(x), iy = Math.floor(y);
-  const fx = x - ix, fy = y - iy;
+  const ix = Math.floor(x),
+    iy = Math.floor(y);
+  const fx = x - ix,
+    fy = y - iy;
   const ux = fx * fx * (3 - 2 * fx);
   const uy = fy * fy * (3 - 2 * fy);
   const a = refHash12(ix, iy);
@@ -43,12 +49,17 @@ export function refVnoise(x, y) {
 }
 
 export function refFbm(x, y, octaves) {
-  let v = 0, amp = 0.5, qx = x, qy = y;
+  let v = 0,
+    amp = 0.5,
+    qx = x,
+    qy = y;
   for (let i = 0; i < 4; i++) {
     if (i >= octaves) break;
     v += amp * refVnoise(qx, qy);
-    const nx = qx * 2.03 + 19.7, ny = qy * 2.03 + 7.3;
-    qx = nx; qy = ny;
+    const nx = qx * 2.03 + 19.7,
+      ny = qy * 2.03 + 7.3;
+    qx = nx;
+    qy = ny;
     amp *= 0.5;
   }
   return v;
@@ -59,9 +70,12 @@ export function refLuma(r, g, b) {
 }
 
 export function refRgb2hsl(r, g, b) {
-  const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  const l = (mx + mn) * 0.5, d = mx - mn;
-  let h = 0, s = 0;
+  const mx = Math.max(r, g, b),
+    mn = Math.min(r, g, b);
+  const l = (mx + mn) * 0.5,
+    d = mx - mn;
+  let h = 0,
+    s = 0;
   if (d > 0) {
     s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
     if (mx === r) h = (g - b) / d + (g < b ? 6 : 0);

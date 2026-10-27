@@ -14,6 +14,8 @@ import { getRenderCaps } from '../data/quality.js';
 import { resolvePalette } from '../data/palettes.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { createNoise } from '../engine/noise.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -229,8 +231,8 @@ ok(
   () => {
     const src = read('../gl/renderer.mjs');
     assert.match(
-      src,
-      /layer\.type === 'pattern' \? patternTexture\(layer, w, h\)/,
+      flat(src),
+      fre(/layer\.type === 'pattern' \? patternTexture\(layer, w, h\)/),
       'compositeLayerTo draws a pattern from its own texture',
     );
     assert.match(src, /frames: createPatternFrames\(\)/, 'each track owns a frame source (#1101)');

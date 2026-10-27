@@ -3,17 +3,36 @@
 // rapid re-taps re-base from displayed colors; MIX 0 is an instant cut.
 import assert from 'node:assert/strict';
 import {
-  createTintWash, applyWash, colorMap, washKey, paletteIdentity,
-  hash01, hexToRgb, rgbToHex, lerpHex, smootherstep,
-  waveRank, adoptionDelay,
-  WASH_SALT, WASH_WAVE_SPAN, WASH_JITTER_SPAN, WASH_ADOPT_SPAN, FADE_JITTER_SPAN, FADE_ADOPT_SPAN,
+  createTintWash,
+  applyWash,
+  colorMap,
+  washKey,
+  paletteIdentity,
+  hash01,
+  hexToRgb,
+  rgbToHex,
+  lerpHex,
+  smootherstep,
+  waveRank,
+  adoptionDelay,
+  WASH_SALT,
+  WASH_WAVE_SPAN,
+  WASH_JITTER_SPAN,
+  WASH_ADOPT_SPAN,
+  FADE_JITTER_SPAN,
+  FADE_ADOPT_SPAN,
 } from './tintWash.mjs';
 
 let n = 0;
 function ok(name, fn) {
   n++;
-  try { fn(); console.log(`ok ${n} - ${name}`); }
-  catch (e) { console.error(`not ok ${n} - ${name}\n  ${e.message}`); process.exitCode = 1; }
+  try {
+    fn();
+    console.log(`ok ${n} - ${name}`);
+  } catch (e) {
+    console.error(`not ok ${n} - ${name}\n  ${e.message}`);
+    process.exitCode = 1;
+  }
 }
 
 /** A fake resolveLayers() result: one layer, items with x/y/color/accent. */
@@ -23,8 +42,14 @@ function fakeResolved(items, layerId = 'L1') {
 const mkItem = (x, y, color = '#111111', accent = '#222222') => ({ x, y, color, accent });
 
 const baseInput = (over = {}) => ({
-  identity: paletteIdentity('p1', null, null), mode: 'WASH',
-  mixSeconds: 2, now: 0, seed: 7, bg: '#000000', lastResolved: null, ...over,
+  identity: paletteIdentity('p1', null, null),
+  mode: 'WASH',
+  mixSeconds: 2,
+  now: 0,
+  seed: 7,
+  bg: '#000000',
+  lastResolved: null,
+  ...over,
 });
 const id2 = () => paletteIdentity('p2', null, null);
 
@@ -65,8 +90,7 @@ ok('schedule: seeded, bounded, wave spans the wash', () => {
     assert.ok(d >= 0 && d < WASH_WAVE_SPAN + WASH_JITTER_SPAN, `delay ${d} in range`);
     assert.ok(d + WASH_ADOPT_SPAN <= 1 + 1e-9, 'every adoption completes by t=1');
   }
-  assert.ok(Math.abs(WASH_WAVE_SPAN + WASH_JITTER_SPAN + WASH_ADOPT_SPAN - 1) < 1e-9,
-    'spans sum to exactly 1');
+  assert.ok(Math.abs(WASH_WAVE_SPAN + WASH_JITTER_SPAN + WASH_ADOPT_SPAN - 1) < 1e-9, 'spans sum to exactly 1');
   // wavefront order: center item starts before corner item, same seed
   const dCenter = adoptionDelay(0, 7, 0);
   const dCorner = adoptionDelay(0, 7, 1);
@@ -77,7 +101,10 @@ ok('hash01 is index-stable and spread', () => {
   assert.equal(hash01(5, 11), hash01(5, 11));
   const vals = Array.from({ length: 20 }, (_, i) => hash01(i, 11));
   assert.ok(new Set(vals).size > 15, 'jitter actually varies per node');
-  assert.ok(vals.every((v) => v >= 0 && v < 1), 'hash in [0,1)');
+  assert.ok(
+    vals.every((v) => v >= 0 && v < 1),
+    'hash in [0,1)',
+  );
 });
 
 ok('idle when nothing changed; starts on palette identity change', () => {
@@ -103,7 +130,15 @@ ok('non-WASH/FADE modes never soak', () => {
 ok('MIX 0 is an instant cut, like everywhere else', () => {
   const w = createTintWash();
   w.update(baseInput({ lastResolved: fakeResolved([mkItem(0, 0)]) }));
-  const r = w.update(baseInput({ identity: id2(), mixSeconds: 0, now: 50, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]) }));
+  const r = w.update(
+    baseInput({
+      identity: id2(),
+      mixSeconds: 0,
+      now: 50,
+      bg: '#ffffff',
+      lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]),
+    }),
+  );
   assert.equal(r.washing, false);
   assert.equal(r.bg, '#ffffff', 'bg cuts straight to the new palette');
 });
@@ -191,9 +226,13 @@ ok('wash completes and hands off cleanly at t=1', () => {
   const w = createTintWash();
   w.update(baseInput({ lastResolved: fakeResolved([mkItem(0, 0)]) }));
   w.update(baseInput({ identity: id2(), now: 0, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0)]) }));
-  const done = w.update(baseInput({ identity: id2(), now: 2000, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]) }));
+  const done = w.update(
+    baseInput({ identity: id2(), now: 2000, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]) }),
+  );
   assert.equal(done.washing, false, 't>=1 ends the wash');
-  const idle = w.update(baseInput({ identity: id2(), now: 2100, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]) }));
+  const idle = w.update(
+    baseInput({ identity: id2(), now: 2100, bg: '#ffffff', lastResolved: fakeResolved([mkItem(0, 0, '#ffffff')]) }),
+  );
   assert.equal(idle.washing, false, 'stays idle after handoff');
 });
 
@@ -210,20 +249,35 @@ ok('paletteIdentity is content-stable across structured clones', () => {
   const w = createTintWash();
   // Simulate the worker: same content, fresh array references each frame.
   w.update(baseInput({ identity: paletteIdentity('p1', null, []), lastResolved: fakeResolved([mkItem(0, 0)]) }));
-  const r = w.update(baseInput({ identity: paletteIdentity('p1', null, []), now: 100, lastResolved: fakeResolved([mkItem(0, 0)]) }));
+  const r = w.update(
+    baseInput({ identity: paletteIdentity('p1', null, []), now: 100, lastResolved: fakeResolved([mkItem(0, 0)]) }),
+  );
   assert.equal(r.washing, false, 'fresh-but-equal arrays do not restart the wash');
 });
 
 // ── #632 FADE — the default mode: colour-only, per-node, seeded ───────────
-const fadeItems = () => Array.from({ length: 24 }, (_, i) => mkItem((i * 41) % 1000, (i * 67) % 700, '#111111', '#222222'));
+const fadeItems = () =>
+  Array.from({ length: 24 }, (_, i) => mkItem((i * 41) % 1000, (i * 67) % 700, '#111111', '#222222'));
 /** Drive a FADE from p1→p2 and apply it at fraction t; returns the displayed items. */
 function fadeAt(t, seed = 7, mix = 2) {
   const w = createTintWash();
   const old = fakeResolved(fadeItems());
   w.update(baseInput({ mode: 'FADE', seed, lastResolved: old }));
   // the change frame starts the clock at now=0; the frame under test lands at t
-  w.update(baseInput({ mode: 'FADE', seed, identity: id2(), now: 0, mixSeconds: mix, bg: '#000000', lastResolved: old }));
-  const ev = w.update(baseInput({ mode: 'FADE', seed, identity: id2(), now: t * mix * 1000, mixSeconds: mix, bg: '#000000', lastResolved: old }));
+  w.update(
+    baseInput({ mode: 'FADE', seed, identity: id2(), now: 0, mixSeconds: mix, bg: '#000000', lastResolved: old }),
+  );
+  const ev = w.update(
+    baseInput({
+      mode: 'FADE',
+      seed,
+      identity: id2(),
+      now: t * mix * 1000,
+      mixSeconds: mix,
+      bg: '#000000',
+      lastResolved: old,
+    }),
+  );
   const next = fakeResolved(fadeItems().map((it) => ({ ...it, color: '#ffffff', accent: '#ffffff' })));
   if (ev.washing) applyWash(next, ev);
   return { ev, items: next[0].items };
@@ -247,18 +301,36 @@ ok('FADE: no wavefront — delay ignores position; spans sum to 1', () => {
 
 ok('FADE: same seed → same adoption order; different seed differs', () => {
   const a = fadeAt(0.5, 7).items.map((it) => it.color);
-  assert.deepEqual(a, fadeAt(0.5, 7).items.map((it) => it.color), 'same seed replays the same fade');
-  assert.notDeepEqual(a, fadeAt(0.5, 99).items.map((it) => it.color), 'another seed fades in another order');
+  assert.deepEqual(
+    a,
+    fadeAt(0.5, 7).items.map((it) => it.color),
+    'same seed replays the same fade',
+  );
+  assert.notDeepEqual(
+    a,
+    fadeAt(0.5, 99).items.map((it) => it.color),
+    'another seed fades in another order',
+  );
   assert.ok(new Set(a).size > 1, 'nodes are at different stages mid-fade');
 });
 
 ok('FADE: colours only — never touches size/position; ends exactly on the new palette', () => {
   const mid = fadeAt(0.5).items;
-  fadeItems().forEach((it, i) => { assert.equal(mid[i].x, it.x); assert.equal(mid[i].y, it.y); assert.equal('scale' in mid[i], false, 'no size field written'); });
+  fadeItems().forEach((it, i) => {
+    assert.equal(mid[i].x, it.x);
+    assert.equal(mid[i].y, it.y);
+    assert.equal('scale' in mid[i], false, 'no size field written');
+  });
   const start = fadeAt(0).items;
-  assert.ok(start.every((it) => it.color === '#111111'), 't=0 shows the old colours');
+  assert.ok(
+    start.every((it) => it.color === '#111111'),
+    't=0 shows the old colours',
+  );
   const end = fadeAt(0.999).items;
-  assert.ok(end.every((it) => it.color !== '#111111'), 'almost done: every node has started');
+  assert.ok(
+    end.every((it) => it.color !== '#111111'),
+    'almost done: every node has started',
+  );
   assert.equal(fadeAt(1).ev.washing, false, 'at t=1 the fade hands off to the plain new palette');
 });
 

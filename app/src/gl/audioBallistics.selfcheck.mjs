@@ -16,7 +16,11 @@ import {
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const approx = (a, b, tol = 1e-9) => Math.abs(a - b) <= tol;
 
@@ -47,7 +51,11 @@ ok('silence stays exact zeros (no-op contract)', () => {
   processBallistics(st, { rms: 1, flux: 1, beatPulse: 1 }, 16.7, { attackMs: 0, releaseMs: 50, curve: 'linear' });
   assert.ok(st.rms > 0, 'follower primed');
   for (let i = 0; i < 400; i++) {
-    const out = processBallistics(st, { rms: 0, flux: 0, beatPulse: 0 }, 16.7, { attackMs: 0, releaseMs: 50, curve: 'linear' });
+    const out = processBallistics(st, { rms: 0, flux: 0, beatPulse: 0 }, 16.7, {
+      attackMs: 0,
+      releaseMs: 50,
+      curve: 'linear',
+    });
     assert.ok(out.rms >= 0 && out.flux >= 0 && out.beatPulse >= 0, 'never negative');
   }
   assert.strictEqual(st.rms, 0, 'rms snaps to exact 0');
@@ -68,8 +76,10 @@ ok('attack/release are one-pole time constants', () => {
   const b = processBallistics(st, { rms: 1 }, 100, p).rms;
   assert.ok(b > a && b < 1, 'attack converges smoothly');
   // Release at 400ms moves slower than attack at 100ms from the same distance.
-  const stA = createBallisticsState(); stA.rms = 1;
-  const stB = createBallisticsState(); stB.rms = 1;
+  const stA = createBallisticsState();
+  stA.rms = 1;
+  const stB = createBallisticsState();
+  stB.rms = 1;
   const dropA = 1 - processBallistics(stA, { rms: 0 }, 100, { attackMs: 100, releaseMs: 100, curve: 'linear' }).rms;
   const dropB = 1 - processBallistics(stB, { rms: 0 }, 100, { attackMs: 100, releaseMs: 400, curve: 'linear' }).rms;
   assert.ok(dropA > dropB, `slower release moves less (fast ${dropA.toFixed(3)} > slow ${dropB.toFixed(3)})`);
@@ -80,9 +90,12 @@ ok('attack/release are one-pole time constants', () => {
 });
 
 ok('response curves shape the followed value', () => {
-  const lin = (v) => processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'linear' }).rms;
-  const exp = (v) => processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'exponential' }).rms;
-  const log = (v) => processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'logarithmic' }).rms;
+  const lin = (v) =>
+    processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'linear' }).rms;
+  const exp = (v) =>
+    processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'exponential' }).rms;
+  const log = (v) =>
+    processBallistics(createBallisticsState(), { rms: v }, 0, { attackMs: 0, releaseMs: 0, curve: 'logarithmic' }).rms;
   assert.ok(approx(lin(0.5), 0.5), 'linear is identity');
   assert.ok(approx(exp(0.5), 0.25), 'exponential squares (heavy at low levels)');
   assert.ok(approx(exp(0), 0) && approx(exp(1), 1), 'exponential pins 0 and 1');

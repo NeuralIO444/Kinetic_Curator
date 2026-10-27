@@ -9,7 +9,6 @@ src/*
 !src/engine/
 src/engine/*
 !src/gl/
-src/gl/*
 !src/engine/kernel/
 src/engine/kernel/*
 
@@ -73,6 +72,11 @@ src/curator/**/*.json
 
 # ── Adopted (slice 8, #1684: panels — their source-text pins made layout-blind first) ──
 !src/panels/
+
+# ── Adopted (slice 9, #1684: all of src/gl — its source-text pins made layout-blind first; data stays ignored) ──
+src/gl/**/*.html
+src/gl/**/*.json
+src/gl/**/*.md
 
 # Tooling and non-src trees: not yet adopted.
 /scripts/**

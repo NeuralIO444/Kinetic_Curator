@@ -6,14 +6,24 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
-  MIX_MIN, MIX_MAX, MIX_DEFAULT,
-  sanitizeMixSeconds, mixEase, morphEase, createPaletteMix,
+  MIX_MIN,
+  MIX_MAX,
+  MIX_DEFAULT,
+  sanitizeMixSeconds,
+  mixEase,
+  morphEase,
+  createPaletteMix,
 } from './paletteMix.mjs';
 
 function base(over = {}) {
   return {
-    id: 'praystation', overrides: null, userPalettes: null,
-    mixSeconds: 2, now: 1000, canDissolve: true, bakeReady: true,
+    id: 'praystation',
+    overrides: null,
+    userPalettes: null,
+    mixSeconds: 2,
+    now: 1000,
+    canDissolve: true,
+    bakeReady: true,
     ...over,
   };
 }
@@ -202,10 +212,8 @@ for (let i = 0; i <= 20; i++) {
   const at = src.indexOf('paletteMix.update(');
   assert.ok(at >= 0, 'paletteMix.update call found in liveLoop.mjs');
   const call = src.slice(at, src.indexOf('});', at));
-  assert.ok(call.includes('now: loopTimeMs'),
-    'dissolve ticks on loopTimeMs — the same clock the item morph reads');
-  assert.ok(!call.includes('performance.now()'),
-    'no wall clock in the dissolve tick (#453: two time domains)');
+  assert.ok(call.includes('now: loopTimeMs'), 'dissolve ticks on loopTimeMs — the same clock the item morph reads');
+  assert.ok(!call.includes('performance.now()'), 'no wall clock in the dissolve tick (#453: two time domains)');
 }
 
 // Always Alive Protocol — morphEase: smooth ease-in / ease-out (smootherstep).

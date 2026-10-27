@@ -72,7 +72,7 @@ export function weatherArgs({ dish, layers, layerId, air, W, H, tSec, seed, seed
   const field = decl.create(fieldSeed, { z: (Number(tSec) || 0) * AIR_DRIFT_PER_SEC });
   const iw = W > 0 ? 1 / W : 0;
   const ih = H > 0 ? 1 / H : 0;
-  dish.seed = (seed >>> 0) || 0;
+  dish.seed = seed >>> 0 || 0;
   dish.air = (x, y) => field.sample(x * iw, y * ih);
   return { dish, air: src.haze.amount * dial, airVeil: hazeVeilHex(src.haze.lift) };
 }
