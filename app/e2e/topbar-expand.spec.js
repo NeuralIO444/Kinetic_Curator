@@ -154,16 +154,21 @@ test('a K press flashes KINETIC in full and cools it down, with the pointer nowh
   await expect.poll(async () => width(kin), { timeout: 6000 }).toBeLessThanOrEqual(rest + 2);
 });
 
+// Unlike the K press, the click ROLLS — real scene work that can hold a starved runner's main thread long enough that
+// the width glide never gets a frame inside a ×4 flash (seen on CI: 82 of the 94 px, poll timed out). The window is
+// stretched ×10 (12 s) and the waits follow it, so the test measures the flash, not the runner.
 test('a CURATOR roll flashes CURATOR in full and cools it down, even when the pointer has left', async ({ page }) => {
-  await boot(page, { hold: 4 });
+  const HOLD = 10;
+  test.setTimeout(120_000); // the ×10 cold open alone is 22 s
+  await boot(page, { hold: HOLD });
   const cur = group(page).locator('.randomize-btn');
   const rest = await width(cur);
   await cur.click();
   await page.mouse.move(600, 600);
   await expect(cur).toHaveAttribute('data-open', 'true');
-  await expect.poll(async () => width(cur)).toBeGreaterThan(rest + 20);
-  await expect(cur).not.toHaveAttribute('data-open', 'true', { timeout: 8000 });
-  await expect.poll(async () => width(cur), { timeout: 4000 }).toBeLessThanOrEqual(rest + 2);
+  await expect.poll(async () => width(cur), { timeout: 10_000 }).toBeGreaterThan(rest + 20);
+  await expect(cur).not.toHaveAttribute('data-open', 'true', { timeout: 1200 * HOLD + 6000 });
+  await expect.poll(async () => width(cur), { timeout: 6000 }).toBeLessThanOrEqual(rest + 2);
 });
 
 // ── the polish: shimmer, letters that let go one at a time, a glide instead of steps ──
