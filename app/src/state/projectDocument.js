@@ -27,6 +27,46 @@ export const PROJECT_VERSION = 1;
 export const AUTOSAVE_KEY = 'kc:project:v1';
 /** Where a document that failed to parse is kept instead of being applied (#107 §6). */
 export const QUARANTINE_KEY = 'kc:project:quarantine';
+/**
+ * #1745 — how many quarantined documents are kept. One boot can quarantine
+ * the primary, the backup and the legacy key; a single slot kept only the
+ * last (oldest) of those and lost the newest work. Newest first, oldest dropped.
+ */
+export const QUARANTINE_CAP = 4;
+
+/** Every quarantined entry, newest first. Reads the pre-#1745 single-object shape too. */
+export function readQuarantineAll(storage = globalThis.localStorage) {
+  try {
+    const raw = storage.getItem(QUARANTINE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (parsed && Array.isArray(parsed.entries)) return parsed.entries.filter((e) => e && typeof e === 'object');
+    if (parsed && typeof parsed === 'object' && 'raw' in parsed) return [parsed]; // pre-#1745: one object
+    return [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * #1745 — add one entry to the quarantine list without overwriting the others.
+ * Returns true only when the entry is stored: the caller removes the source
+ * key on true and leaves it in place on false (nothing is lost either way).
+ * On a quota error, older entries are shed one at a time to make room — never
+ * the new one, which is the document being moved out of the source key.
+ */
+function pushQuarantine(entry, storage = globalThis.localStorage) {
+  let entries = [entry, ...readQuarantineAll(storage).filter((e) => e.raw !== entry.raw)].slice(0, QUARANTINE_CAP);
+  for (;;) {
+    try {
+      storage.setItem(QUARANTINE_KEY, JSON.stringify({ entries }));
+      return true;
+    } catch {
+      if (entries.length <= 1) return false;
+      entries = entries.slice(0, -1);
+    }
+  }
+}
 
 const MAX_UINT32 = 0xffffffff;
 
@@ -364,10 +404,10 @@ export function readAutosave() {
 
   const quarantine = (reason) => {
     try {
-      localStorage.setItem(QUARANTINE_KEY, JSON.stringify({
-        quarantinedAt: new Date().toISOString(), reason, raw,
-      }));
-      localStorage.removeItem(AUTOSAVE_KEY);
+      // #1745: appended to the list, never over another quarantined document
+      if (pushQuarantine({ quarantinedAt: new Date().toISOString(), reason, source: AUTOSAVE_KEY, raw })) {
+        localStorage.removeItem(AUTOSAVE_KEY);
+      }
     } catch { /* storage is already unhappy; nothing useful to do */ }
     console.warn(`[project] autosave quarantined (${reason}); booting defaults`);
     return { doc: null, quarantined: true };
@@ -412,13 +452,9 @@ export function writeAutosave(doc) {
 }
 
 /** The document that was refused at boot, if any. */
+/** The most recently refused document, if any (readQuarantineAll for every one, #1745). */
 export function readQuarantine() {
-  try {
-    const raw = localStorage.getItem(QUARANTINE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  return readQuarantineAll()[0] ?? null;
 }
 
 // ── Rolling pipeline autosave (#33, #53) ─────────────────────────────────
@@ -444,7 +480,12 @@ export function writePipelineAutosave(doc) {
   try {
     // Rotate current primary into the backup slot.
     const prev = localStorage.getItem(PIPELINE_KEY);
-    if (prev) {
+    // #1745: only a primary that still parses is rotated in — an unreadable one
+    // (left behind when its quarantine could not be stored) must not replace a
+    // good backup.
+    let prevReadable = false;
+    if (prev) { try { JSON.parse(prev); prevReadable = true; } catch { /* keep the backup */ } }
+    if (prevReadable) {
       try {
         localStorage.setItem(PIPELINE_BACKUP_KEY, prev);
       } catch {
@@ -509,9 +550,9 @@ function _tryReadKey(key) {
 function _quarantineKey(key, reason) {
   try {
     const raw = localStorage.getItem(key);
-    localStorage.setItem(QUARANTINE_KEY, JSON.stringify({
-      quarantinedAt: new Date().toISOString(), reason, source: key, raw,
-    }));
-    localStorage.removeItem(key);
+    // #1745: appended to the list, never over another quarantined document
+    if (pushQuarantine({ quarantinedAt: new Date().toISOString(), reason, source: key, raw })) {
+      localStorage.removeItem(key);
+    }
   } catch { /* storage is already unhappy */ }
 }
