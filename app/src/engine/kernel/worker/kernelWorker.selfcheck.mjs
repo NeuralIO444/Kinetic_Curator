@@ -35,12 +35,7 @@ import {
   assertTransferCoverage,
   payloadBuffers,
 } from './protocol.js';
-import {
-  DEFAULT_STEP_PARAMS,
-  dispatchKernelMessage,
-  dispatchToReply,
-  columnTransferList,
-} from './stepKernel.js';
+import { DEFAULT_STEP_PARAMS, dispatchKernelMessage, dispatchToReply, columnTransferList } from './stepKernel.js';
 import { createKernelClient } from './kernelClient.js';
 import { KERNEL_VERSION } from '../version.js';
 
@@ -57,27 +52,45 @@ function throwsProtocol(fn, label) {
     'STEP event without frame',
   );
   throwsProtocol(
-    () => validateStepMessage(stepMessage({ frame: 3, dt: 1 / 60, events: [{ frame: 'now', type: 'impulse', dx: 1, dy: 0 }] })),
+    () =>
+      validateStepMessage(
+        stepMessage({ frame: 3, dt: 1 / 60, events: [{ frame: 'now', type: 'impulse', dx: 1, dy: 0 }] }),
+      ),
     'STEP event with wall-clock-ish frame',
   );
   throwsProtocol(
-    () => validateStepMessage(stepMessage({ frame: 3, dt: 1 / 60, events: [{ frame: 4, type: 'impulse', dx: 1, dy: 0 }] })),
+    () =>
+      validateStepMessage(stepMessage({ frame: 3, dt: 1 / 60, events: [{ frame: 4, type: 'impulse', dx: 1, dy: 0 }] })),
     'STEP event for a different frame',
   );
-  throwsProtocol(() => validateSetParamMessage(setParamMessage({ key: 'damping', value: 0.9 })), 'SET_PARAM without frame');
+  throwsProtocol(
+    () => validateSetParamMessage(setParamMessage({ key: 'damping', value: 0.9 })),
+    'SET_PARAM without frame',
+  );
   throwsProtocol(() => validateSnapshotMessage(snapshotMessage({})), 'SNAPSHOT without atFrame');
   throwsProtocol(() => validateInitMessage({ ...initMessage({ seed: 1 }), protocol: 999 }), 'INIT protocol mismatch');
-  throwsProtocol(() => validateStepMessage({ ...stepMessage({ frame: 0, dt: 0.016 }), protocol: 999 }), 'STEP protocol mismatch');
+  throwsProtocol(
+    () => validateStepMessage({ ...stepMessage({ frame: 0, dt: 0.016 }), protocol: 999 }),
+    'STEP protocol mismatch',
+  );
   throwsProtocol(() => validateStepMessage(stepMessage({ frame: -1, dt: 0.016 })), 'negative STEP frame');
   throwsProtocol(() => validateStepMessage(stepMessage({ frame: 1.5, dt: 0.016 })), 'fractional STEP frame');
-  throwsProtocol(() => validateStepMessage(stepMessage({ frame: 0, dt: 0.016, events: [{ frame: 0, type: 'nope' }] })), 'unknown event type');
-  throwsProtocol(() => validateSetParamMessage(setParamMessage({ key: 'pointCount', value: 8, frame: 0 })), 'SET_PARAM non-settable key');
+  throwsProtocol(
+    () => validateStepMessage(stepMessage({ frame: 0, dt: 0.016, events: [{ frame: 0, type: 'nope' }] })),
+    'unknown event type',
+  );
+  throwsProtocol(
+    () => validateSetParamMessage(setParamMessage({ key: 'pointCount', value: 8, frame: 0 })),
+    'SET_PARAM non-settable key',
+  );
   throwsProtocol(
     () => validateInitMessage(initMessage({ seed: 1, params: { pointCount: 1.5 } })),
     'INIT fractional pointCount',
   );
   // Valid messages pass.
-  validateStepMessage(stepMessage({ frame: 0, dt: 1 / 60, events: [{ frame: 0, type: 'audio-envelope', energy: 0.5 }] }));
+  validateStepMessage(
+    stepMessage({ frame: 0, dt: 1 / 60, events: [{ frame: 0, type: 'audio-envelope', energy: 0.5 }] }),
+  );
   validateSetParamMessage(setParamMessage({ key: 'damping', value: 0.9, frame: 7 }));
   validateSnapshotMessage(snapshotMessage({ atFrame: 0 }));
   validateInitMessage(initMessage({ seed: 42, params: { pointCount: 64 } }));
@@ -116,11 +129,21 @@ function throwsProtocol(fn, label) {
   assert.strictEqual(r0.reply.type, MSG.FRAME, 'STEP → FRAME');
   assert.strictEqual(r0.reply.frame, 0, 'FRAME echoes the STEP frame');
   assert.strictEqual(r0.transfers.length, POINT_COLUMN_NAMES.length, 'FRAME transfers every column buffer');
-  throwsProtocol(() => dispatchKernelMessage(session, stepMessage({ frame: 2, dt: 1 / 60 })), 'skipped frame is a protocol error');
-  throwsProtocol(() => dispatchKernelMessage(session, { type: 'bogus', protocol: PROTOCOL_VERSION }), 'unknown message type');
+  throwsProtocol(
+    () => dispatchKernelMessage(session, stepMessage({ frame: 2, dt: 1 / 60 })),
+    'skipped frame is a protocol error',
+  );
+  throwsProtocol(
+    () => dispatchKernelMessage(session, { type: 'bogus', protocol: PROTOCOL_VERSION }),
+    'unknown message type',
+  );
   const snap = dispatchKernelMessage(session, snapshotMessage({ atFrame: 0 }));
   assert.strictEqual(snap.reply.type, MSG.SNAPSHOT_RESULT, 'SNAPSHOT → SNAPSHOT_RESULT');
-  assert.notStrictEqual(snap.reply.columns.x.buffer, r0.reply.columns.x.buffer, 'snapshot copies (never detaches the live set)');
+  assert.notStrictEqual(
+    snap.reply.columns.x.buffer,
+    r0.reply.columns.x.buffer,
+    'snapshot copies (never detaches the live set)',
+  );
 }
 
 // ── client: default stays inline; worker is opt-in ───────────────────────────
@@ -129,10 +152,12 @@ function throwsProtocol(fn, label) {
   assert.strictEqual(def.mode, 'inline', 'default stays inline');
   def.terminate();
   const src = readFileSync(join(DIR, 'kernelClient.js'), 'utf8');
-  assert.match(src, /new Worker\(url, \{ type: 'module' \}\)/,
-    'worker host constructs a module worker');
-  assert.match(src, /new URL\('\.\/kernel\.worker\.js', import\.meta\.url\)/,
-    'worker entry URL resolved relative to the module (resolved relative to this module)');
+  assert.match(src, /new Worker\(url, \{ type: 'module' \}\)/, 'worker host constructs a module worker');
+  assert.match(
+    src,
+    /new URL\('\.\/kernel\.worker\.js', import\.meta\.url\)/,
+    'worker entry URL resolved relative to the module (resolved relative to this module)',
+  );
 }
 
 // ── client: backpressure — re-present once, then shed ────────────────────────
@@ -140,8 +165,12 @@ function throwsProtocol(fn, label) {
   let handler = null;
   const posted = [];
   const fakeHost = {
-    post(msg, transfers) { posted.push({ msg, transfers }); },
-    onMessage(h) { handler = h; },
+    post(msg, transfers) {
+      posted.push({ msg, transfers });
+    },
+    onMessage(h) {
+      handler = h;
+    },
     terminate() {},
   };
   const client = createKernelClient({ host: fakeHost });
@@ -181,8 +210,12 @@ function throwsProtocol(fn, label) {
     let handler = null;
     const posted = [];
     const host = {
-      post(msg, transfers) { posted.push({ msg, transfers }); },
-      onMessage(h) { handler = h; },
+      post(msg, transfers) {
+        posted.push({ msg, transfers });
+      },
+      onMessage(h) {
+        handler = h;
+      },
       terminate() {},
     };
     return { host, posted, reply: (r) => handler(r) };
@@ -212,7 +245,10 @@ function throwsProtocol(fn, label) {
   // 2. a SNAPSHOT error is routed by atFrame, not left unmatched.
   {
     const t = mk();
-    const client = createKernelClient({ host: t.host, onProtocolError: () => assert.fail('SNAPSHOT error must match its request') });
+    const client = createKernelClient({
+      host: t.host,
+      onProtocolError: () => assert.fail('SNAPSHOT error must match its request'),
+    });
     await ready(t, client);
     const snap = client.snapshot(5);
     const out = dispatchToReply(null, snapshotMessage({ atFrame: 5 })); // SNAPSHOT before INIT → ERROR reply
@@ -234,7 +270,11 @@ function throwsProtocol(fn, label) {
     t.reply(frameMessage({ frame: 0, columns: createPointSet(2), count: 2 }));
     await s0;
     assert.throws(() => client.stepFrame(2, 1 / 60, []), /expected frame 1/, 'skipping the shed frame fails fast');
-    assert.strictEqual(t.posted.filter((p) => p.msg.type === MSG.STEP).length, 1, 'nothing out of sequence reached the worker');
+    assert.strictEqual(
+      t.posted.filter((p) => p.msg.type === MSG.STEP).length,
+      1,
+      'nothing out of sequence reached the worker',
+    );
     const s1 = client.stepFrame(1, 1 / 60, []);
     assert.strictEqual(t.posted.filter((p) => p.msg.type === MSG.STEP).length, 2, 'the retried frame is posted');
     t.reply(frameMessage({ frame: 1, columns: createPointSet(2), count: 2 }));

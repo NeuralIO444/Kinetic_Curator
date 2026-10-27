@@ -71,15 +71,17 @@ const sameValue = (a, b) => {
 const copyValue = (v) => (Array.isArray(v) ? v.slice() : v);
 
 export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}) {
-  let W = width, H = height, DPR = dpr;
+  let W = width,
+    H = height,
+    DPR = dpr;
   let lost = false;
 
   // Program defs survive context loss (sources needed to recompile);
   // live handles are dropped and rebuilt.
   const programDefs = new Map(); // name -> { vs, fs, uniforms, file }
-  const programs = new Map();    // name -> { program, locations: Map }
-  const effects = new Map();     // kind -> { program, pad, passes }
-  const layers = new Map();      // id -> { t0, t1, padT0, padT1|null, pad }
+  const programs = new Map(); // name -> { program, locations: Map }
+  const effects = new Map(); // kind -> { program, pad, passes }
+  const layers = new Map(); // id -> { t0, t1, padT0, padT1|null, pad }
   // #748: one cache for the bridge, keyed `${program}\0${uname}`. Uniform
   // values live on the GL program, which every layer shares — a per-layer
   // cache let FX-1 skip uploads FX-4 had overwritten (grain drove RGB dx).
@@ -229,7 +231,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       L.div = d;
     }
     if (maxPad > 0 && L.pad !== maxPad) {
-      if (L.padT0) { deleteTarget(gl, L.padT0); deleteTarget(gl, L.padT1); }
+      if (L.padT0) {
+        deleteTarget(gl, L.padT0);
+        deleteTarget(gl, L.padT1);
+      }
       L.padT0 = allocTarget(w + 2 * maxPad, h + 2 * maxPad);
       L.padT1 = allocTarget(w + 2 * maxPad, h + 2 * maxPad);
       L.pad = maxPad;
@@ -244,11 +249,20 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
         gl.bindTexture(gl.TEXTURE_2D, value);
         gl.uniform1i(loc, glType.unit);
         return;
-      case 'int': gl.uniform1i(loc, value); return;
-      case 'float': gl.uniform1f(loc, value); return;
-      case 'vec2': gl.uniform2f(loc, value[0], value[1]); return;
-      case 'vec4': gl.uniform4f(loc, value[0], value[1], value[2], value[3]); return;
-      default: throw new Error(`[bridge] unknown uniform kind "${glType.kind}"`);
+      case 'int':
+        gl.uniform1i(loc, value);
+        return;
+      case 'float':
+        gl.uniform1f(loc, value);
+        return;
+      case 'vec2':
+        gl.uniform2f(loc, value[0], value[1]);
+        return;
+      case 'vec4':
+        gl.uniform4f(loc, value[0], value[1], value[2], value[3]);
+        return;
+      default:
+        throw new Error(`[bridge] unknown uniform kind "${glType.kind}"`);
     }
   }
 
@@ -262,7 +276,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       const glType = def.uniforms[uname];
       if (!glType) throw new Error(`[bridge] program "${rec.name}": uniform "${uname}" not declared`);
       const loc = locationOf(rec, uname);
-      if (loc == null) { stats.uniformSkips++; continue; } // optimized out of the shader
+      if (loc == null) {
+        stats.uniformSkips++;
+        continue;
+      } // optimized out of the shader
       const key = ns + uname;
       const prev = cache.get(key);
       // #1069 — a sampler's TEXTURE BINDING is never skipped by value. A texture
@@ -277,13 +294,19 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       if (glType.kind === 'sampler') {
         gl.activeTexture(gl.TEXTURE0 + glType.unit);
         gl.bindTexture(gl.TEXTURE_2D, value);
-        if (prev === glType.unit) { stats.uniformSkips++; continue; }
+        if (prev === glType.unit) {
+          stats.uniformSkips++;
+          continue;
+        }
         gl.uniform1i(loc, glType.unit);
         cache.set(key, glType.unit);
         stats.uniformUploads++;
         continue;
       }
-      if (prev !== undefined && sameValue(prev, value)) { stats.uniformSkips++; continue; }
+      if (prev !== undefined && sameValue(prev, value)) {
+        stats.uniformSkips++;
+        continue;
+      }
       setUniform(glType, loc, value);
       cache.set(key, copyValue(value));
       stats.uniformUploads++;
@@ -320,9 +343,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
       const firstWrite = padded ? (read === L.padT0 ? L.padT1 : L.padT0) : write;
       // #225: function-form passes are evaluated once per step against the
       // first write target's size (all ping-pong targets share the size).
-      const passes = typeof def.passes === 'function'
-        ? def.passes(step.params || {}, { width: firstWrite.w, height: firstWrite.h })
-        : def.passes;
+      const passes =
+        typeof def.passes === 'function'
+          ? def.passes(step.params || {}, { width: firstWrite.w, height: firstWrite.h })
+          : def.passes;
       for (const pass of passes) {
         const wTarget = padded ? (read === L.padT0 ? L.padT1 : L.padT0) : write;
         gl.bindFramebuffer(gl.FRAMEBUFFER, wTarget.fb);
@@ -332,22 +356,21 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
         const progDef = programDefs.get(def.program);
         // Template passes (#195) supply their own uniform map from the
         // param descriptor; legacy passes use the builtin u_* set.
-        const values = typeof pass.uniforms === 'function'
-          ? pass.uniforms(step, { read, wTarget, time })
-          : {
-            u_src: read.tex,
-            u_effect: pass.mode,
-            u_p: pass.params(step.params || {}, { width: wTarget.w, height: wTarget.h }),
-            u_texel: [1 / wTarget.w, 1 / wTarget.h],
-            u_res: [wTarget.w, wTarget.h],
-            ...(clip ? { u_clip: clip, u_clipOn: 1 } : { u_clipOn: 0 }),
-          };
+        const values =
+          typeof pass.uniforms === 'function'
+            ? pass.uniforms(step, { read, wTarget, time })
+            : {
+                u_src: read.tex,
+                u_effect: pass.mode,
+                u_p: pass.params(step.params || {}, { width: wTarget.w, height: wTarget.h }),
+                u_texel: [1 / wTarget.w, 1 / wTarget.h],
+                u_res: [wTarget.w, wTarget.h],
+                ...(clip ? { u_clip: clip, u_clipOn: 1 } : { u_clipOn: 0 }),
+              };
         uploadUniforms(rec, progDef, values, cache);
         drawFullscreen();
         read = wTarget;
-        write = padded
-          ? (wTarget === L.padT0 ? L.padT1 : L.padT0)
-          : (wTarget === L.t0 ? L.t1 : L.t0);
+        write = padded ? (wTarget === L.padT0 ? L.padT1 : L.padT0) : wTarget === L.t0 ? L.t1 : L.t0;
       }
     }
     stats.framesRun++;
@@ -360,7 +383,9 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
    * resolution-derived uniforms (u_texel/u_res) re-upload.
    */
   function resize(width, height, dpr = 1) {
-    W = width; H = height; DPR = dpr;
+    W = width;
+    H = height;
+    DPR = dpr;
     const { w, h } = targetSize();
     for (const L of layers.values()) {
       // The pair honors the layer's resolution divisor (#309: the ACCUM
@@ -377,10 +402,13 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
         }
       }
       if (L.padT0) {
-        const pw = w + 2 * L.pad, ph = h + 2 * L.pad;
+        const pw = w + 2 * L.pad,
+          ph = h + 2 * L.pad;
         if (L.padT0.w !== pw || L.padT0.h !== ph) {
-          deleteTarget(gl, L.padT0); deleteTarget(gl, L.padT1);
-          L.padT0 = allocTarget(pw, ph); L.padT1 = allocTarget(pw, ph);
+          deleteTarget(gl, L.padT0);
+          deleteTarget(gl, L.padT1);
+          L.padT0 = allocTarget(pw, ph);
+          L.padT1 = allocTarget(pw, ph);
         }
       }
     }
@@ -393,11 +421,18 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     for (const rec of programs.values()) gl.deleteProgram(rec.program);
     programs.clear();
     for (const L of layers.values()) {
-      deleteTarget(gl, L.t0); deleteTarget(gl, L.t1);
-      if (L.padT0) { deleteTarget(gl, L.padT0); deleteTarget(gl, L.padT1); }
+      deleteTarget(gl, L.t0);
+      deleteTarget(gl, L.t1);
+      if (L.padT0) {
+        deleteTarget(gl, L.padT0);
+        deleteTarget(gl, L.padT1);
+      }
     }
     layers.clear();
-    if (vbo) { gl.deleteBuffer(vbo); vbo = null; }
+    if (vbo) {
+      gl.deleteBuffer(vbo);
+      vbo = null;
+    }
     uniformCache.clear();
     stats.contextLosses++;
   }
@@ -409,7 +444,10 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     // Targets rebuild lazily on next layer()/runChain() at current size.
   }
 
-  const onLost = (e) => { if (e && e.preventDefault) e.preventDefault(); handleContextLost(); };
+  const onLost = (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    handleContextLost();
+  };
   const onRestored = () => handleContextRestored();
   if (canvas && typeof canvas.addEventListener === 'function') {
     canvas.addEventListener('webglcontextlost', onLost);
@@ -438,7 +476,9 @@ export function createBridge(gl, canvas, { width = 2, height = 2, dpr = 1 } = {}
     handleContextLost,
     handleContextRestored,
     stats: () => ({ ...stats }),
-    get lost() { return lost; },
+    get lost() {
+      return lost;
+    },
     dispose,
   };
 }

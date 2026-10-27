@@ -8,9 +8,22 @@ import { mkRng } from '../../prng.js';
 import { hashU01 } from '../rng.js';
 
 const required = [
-  'grid', 'fibonacci', 'radial', 'swarm', 'flow', 'layers', 'rails',
-  'ca', 'orbit', 'abacus', 'noise', 'hype', 'stratified', 'random',
-  'dla', 'eden', // #720
+  'grid',
+  'fibonacci',
+  'radial',
+  'swarm',
+  'flow',
+  'layers',
+  'rails',
+  'ca',
+  'orbit',
+  'abacus',
+  'noise',
+  'hype',
+  'stratified',
+  'random',
+  'dla',
+  'eden', // #720
   'brush', // flow-field trail stamping
   'poisson', // #1193 — Poisson-disc blue noise
   'gaussian', // #1194 — Gaussian cluster mixture
@@ -37,9 +50,17 @@ assert.ok(listed.includes('stratified'));
     const points = [];
     for (let i = 0; i < 40; i++) {
       const rng = mkRng((s ^ (i * 0x9e3779b9)) >>> 0 || 1);
-      points.push(stratified({
-        i, count: 40, w: 1000, h: 700, rng, jitter: 10, seed: s,
-      }));
+      points.push(
+        stratified({
+          i,
+          count: 40,
+          w: 1000,
+          h: 700,
+          rng,
+          jitter: 10,
+          seed: s,
+        }),
+      );
     }
     return points;
   };
@@ -78,10 +99,18 @@ assert.ok(listed.includes('stratified'));
 // Grid / fib still work through getSampler path
 {
   const g = computePlacements({
-    mode: 'grid', count: 40, seed: 0x1a4f,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false,
-    canvasW: 1000, canvasH: 700,
+    mode: 'grid',
+    count: 40,
+    seed: 0x1a4f,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
   });
   assert.strictEqual(g.length, 40);
 }
@@ -90,15 +119,20 @@ assert.ok(listed.includes('stratified'));
 // (Worker / parallel eval isolation).
 {
   const ca = getSampler('ca');
-  const gridA = Array.from({ length: 4 }, (_, y) =>
-    Array.from({ length: 4 }, (_, x) => (x === 1 && y === 1 ? 1 : 0)));
-  const gridB = Array.from({ length: 4 }, (_, y) =>
-    Array.from({ length: 4 }, (_, x) => (x === 2 && y === 2 ? 1 : 0)));
+  const gridA = Array.from({ length: 4 }, (_, y) => Array.from({ length: 4 }, (_, x) => (x === 1 && y === 1 ? 1 : 0)));
+  const gridB = Array.from({ length: 4 }, (_, y) => Array.from({ length: 4 }, (_, x) => (x === 2 && y === 2 ? 1 : 0)));
   const seed = 0xcafef00d;
   const mk = (grid, i) => {
     const rng = mkRng((seed ^ (i * 0x9e3779b9)) >>> 0 || 1);
     return ca({
-      i, count: 8, w: 100, h: 100, rng, jitter: 0, seed, caGrid: grid,
+      i,
+      count: 8,
+      w: 100,
+      h: 100,
+      rng,
+      jitter: 0,
+      seed,
+      caGrid: grid,
     });
   };
   // Warm both grids in alternating order — a single-slot cache would leave
@@ -113,10 +147,7 @@ assert.ok(listed.includes('stratified'));
   assert.strictEqual(b0.y, b1.y, 'grid B samples must be stable across interleaved A');
   // Different density peaks → different rejection samples at the same index
   // (not always true for every seed, but these two grids are sparse opposites).
-  assert.ok(
-    a0.x !== b0.x || a0.y !== b0.y,
-    'distinct CA grids should not produce identical point 0 for this fixture',
-  );
+  assert.ok(a0.x !== b0.x || a0.y !== b0.y, 'distinct CA grids should not produce identical point 0 for this fixture');
 }
 
 // ── #585 phyllotaxis ────────────────────────────────────────────────────────
@@ -125,7 +156,9 @@ assert.ok(listed.includes('stratified'));
   const fib = getSampler('fibonacci');
   assert.ok(listSamplers().includes('phyllotaxis'), 'phyllotaxis must be registered');
 
-  const W = 1000; const H = 700; const COUNT = 400;
+  const W = 1000;
+  const H = 700;
+  const COUNT = 400;
   /** Lay out the whole disc; jitter off so the geometry is the only thing measured. */
   const disc = (sampler, phylloDivergence) => {
     const out = [];
@@ -158,11 +191,15 @@ assert.ok(listed.includes('stratified'));
   const parastichy = (pts) => {
     const gaps = new Map();
     for (let i = 0; i < pts.length; i++) {
-      let best = -1; let bd = Infinity;
+      let best = -1;
+      let bd = Infinity;
       for (let j = 0; j < pts.length; j++) {
         if (i === j) continue;
         const d = (pts[i].x - pts[j].x) ** 2 + (pts[i].y - pts[j].y) ** 2;
-        if (d < bd) { bd = d; best = j; }
+        if (d < bd) {
+          bd = d;
+          best = j;
+        }
       }
       const g = Math.abs(i - best);
       gaps.set(g, (gaps.get(g) || 0) + 1);
@@ -177,8 +214,11 @@ assert.ok(listed.includes('stratified'));
     assert.ok(FIBS.has(atGolden), `the golden angle must produce a Fibonacci parastichy (got ${atGolden})`);
     // A fraction of a degree re-counts the arms — that is the whole knob.
     for (const off of [0.5, 1, 2, -1.5]) {
-      assert.notStrictEqual(parastichy(disc(phyllo, off)),
-        atGolden, `divergence ${off} must shift the parastichy away from ${atGolden}`);
+      assert.notStrictEqual(
+        parastichy(disc(phyllo, off)),
+        atGolden,
+        `divergence ${off} must shift the parastichy away from ${atGolden}`,
+      );
     }
   }
 
@@ -199,7 +239,10 @@ assert.ok(listed.includes('stratified'));
 {
   const truchet = getSampler('truchet');
   assert.ok(listSamplers().includes('truchet'), 'truchet must be registered');
-  const W = 1000; const H = 700; const N = 400; const PER_CELL = 4;
+  const W = 1000;
+  const H = 700;
+  const N = 400;
+  const PER_CELL = 4;
   const lay = (seed, jitter = 0) => {
     const out = [];
     for (let i = 0; i < N; i++) {
@@ -223,16 +266,24 @@ assert.ok(listed.includes('stratified'));
   // it Smith tiles rather than a grid with noise in it, and it is the property
   // a "simplification" would quietly break.
   {
-    const cw = W / cols; const ch = H / rows;
+    const cw = W / cols;
+    const ch = H / rows;
     for (let i = 0; i < N; i++) {
       const cell = Math.floor(i / PER_CELL) % (cols * rows);
-      const col = cell % cols; const row = Math.floor(cell / cols);
+      const col = cell % cols;
+      const row = Math.floor(cell / cols);
       const ux = pts[i].x / cw - col;
       const uy = pts[i].y / ch - row;
-      assert.ok(ux >= -1e-9 && ux <= 1 + 1e-9 && uy >= -1e-9 && uy <= 1 + 1e-9,
-        `item ${i} fell outside its own cell (${ux}, ${uy})`);
-      const onArc = [[0, 0], [1, 0], [0, 1], [1, 1]]
-        .some(([ax, ay]) => Math.abs(Math.hypot(ux - ax, uy - ay) - 0.5) < 1e-9);
+      assert.ok(
+        ux >= -1e-9 && ux <= 1 + 1e-9 && uy >= -1e-9 && uy <= 1 + 1e-9,
+        `item ${i} fell outside its own cell (${ux}, ${uy})`,
+      );
+      const onArc = [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ].some(([ax, ay]) => Math.abs(Math.hypot(ux - ax, uy - ay) - 0.5) < 1e-9);
       assert.ok(onArc, `item ${i} is not on a quarter-arc (${ux.toFixed(3)}, ${uy.toFixed(3)})`);
     }
   }
@@ -241,16 +292,23 @@ assert.ok(listed.includes('stratified'));
   // tile turns. Orientation comes from a per-cell draw for exactly this
   // reason; a per-item draw would shear each tile's arcs apart.
   {
-    const cw = W / cols; const ch = H / rows;
+    const cw = W / cols;
+    const ch = H / rows;
     const byCell = new Map();
     for (let i = 0; i < N; i++) {
       const cell = Math.floor(i / PER_CELL) % (cols * rows);
-      const col = cell % cols; const row = Math.floor(cell / cols);
-      const ux = pts[i].x / cw - col; const uy = pts[i].y / ch - row;
+      const col = cell % cols;
+      const row = Math.floor(cell / cols);
+      const ux = pts[i].x / cw - col;
+      const uy = pts[i].y / ch - row;
       // Which diagonal pair of corners this point turns around.
-      const corner = [[0, 0], [1, 0], [0, 1], [1, 1]]
-        .findIndex(([ax, ay]) => Math.abs(Math.hypot(ux - ax, uy - ay) - 0.5) < 1e-9);
-      const diagonal = (corner === 0 || corner === 3) ? 'A' : 'B';
+      const corner = [
+        [0, 0],
+        [1, 0],
+        [0, 1],
+        [1, 1],
+      ].findIndex(([ax, ay]) => Math.abs(Math.hypot(ux - ax, uy - ay) - 0.5) < 1e-9);
+      const diagonal = corner === 0 || corner === 3 ? 'A' : 'B';
       if (!byCell.has(cell)) byCell.set(cell, diagonal);
       assert.strictEqual(byCell.get(cell), diagonal, `cell ${cell} turns two ways at once`);
     }
@@ -265,22 +323,34 @@ assert.ok(listed.includes('stratified'));
   {
     const occ = new Set();
     for (const q of pts) {
-      occ.add(Math.min(rows - 1, Math.floor(q.y / (H / rows))) * cols
-        + Math.min(cols - 1, Math.floor(q.x / (W / cols))));
+      occ.add(
+        Math.min(rows - 1, Math.floor(q.y / (H / rows))) * cols + Math.min(cols - 1, Math.floor(q.x / (W / cols))),
+      );
     }
     const start = [...occ][0];
-    const seen = new Set([start]); const stack = [start];
+    const seen = new Set([start]);
+    const stack = [start];
     while (stack.length) {
-      const c = stack.pop(); const cx = c % cols; const cy = Math.floor(c / cols);
-      for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-        const nx = cx + dx; const ny = cy + dy;
+      const c = stack.pop();
+      const cx = c % cols;
+      const cy = Math.floor(c / cols);
+      for (const [dx, dy] of [
+        [1, 0],
+        [-1, 0],
+        [0, 1],
+        [0, -1],
+      ]) {
+        const nx = cx + dx;
+        const ny = cy + dy;
         if (nx < 0 || ny < 0 || nx >= cols || ny >= rows) continue;
         const nc = ny * cols + nx;
-        if (occ.has(nc) && !seen.has(nc)) { seen.add(nc); stack.push(nc); }
+        if (occ.has(nc) && !seen.has(nc)) {
+          seen.add(nc);
+          stack.push(nc);
+        }
       }
     }
-    assert.ok(seen.size / occ.size > 0.9,
-      `the floor fragmented: ${seen.size}/${occ.size} cells reachable`);
+    assert.ok(seen.size / occ.size > 0.9, `the floor fragmented: ${seen.size}/${occ.size} cells reachable`);
     assert.ok(occ.size >= cellCount * 0.9, `the floor has holes: ${occ.size} of ${cellCount} cells used`);
   }
 }
@@ -289,7 +359,9 @@ assert.ok(listed.includes('stratified'));
 {
   const voronoi = getSampler('voronoi');
   assert.ok(listSamplers().includes('voronoi'), 'voronoi must be registered');
-  const W = 1000; const H = 700; const N = 600;
+  const W = 1000;
+  const H = 700;
+  const N = 600;
   const SEED = 1234;
   const lay = (seed, seedOffsets = null) => {
     const out = [];
@@ -308,25 +380,38 @@ assert.ok(listed.includes('stratified'));
 
   // The mask rides the SPATIAL stream, so re-rolling spatial must move the
   // veins and re-rolling colour must not.
-  assert.notDeepStrictEqual(lay(SEED, { spatial: 7, color: 0, asset: 0, noise: 0 }), pts,
-    'a spatial re-roll must move the veins');
-  assert.deepStrictEqual(lay(SEED, { spatial: 0, color: 9, asset: 3, noise: 5 }), pts,
-    'colour/asset/noise re-rolls must leave the veins alone');
+  assert.notDeepStrictEqual(
+    lay(SEED, { spatial: 7, color: 0, asset: 0, noise: 0 }),
+    pts,
+    'a spatial re-roll must move the veins',
+  );
+  assert.deepStrictEqual(
+    lay(SEED, { spatial: 0, color: 9, asset: 3, noise: 5 }),
+    pts,
+    'colour/asset/noise re-rolls must leave the veins alone',
+  );
 
   // VEIN EMPTINESS, quantified — the negative space has to be intentional.
   // Rebuild the same mask independently and measure how much of the PLATE is
   // seam versus how many POINTS landed on one.
-  const CELLS = 14; const VEIN = 0.04;
+  const CELLS = 14;
+  const VEIN = 0.04;
   const gapFor = (seed, seedOffsets) => {
     const c = [];
     for (let k = 0; k < CELLS; k++) {
       c.push([hashU01(seed, 'voronoi', k * 2, seedOffsets), hashU01(seed, 'voronoi', k * 2 + 1, seedOffsets)]);
     }
     return (x, y) => {
-      let d1 = Infinity; let d2 = Infinity;
+      let d1 = Infinity;
+      let d2 = Infinity;
       for (const [px, py] of c) {
         const d = (x - px) ** 2 + (y - py) ** 2;
-        if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+        if (d < d1) {
+          d2 = d1;
+          d1 = d;
+        } else if (d < d2) {
+          d2 = d;
+        }
       }
       return Math.sqrt(d2) - Math.sqrt(d1);
     };
@@ -334,15 +419,21 @@ assert.ok(listed.includes('stratified'));
   /** Measure a layout against the mask its OWN seed+offsets should produce. */
   const emptiness = (seed, seedOffsets, layout, label) => {
     const gap = gapFor(seed, seedOffsets);
-    let probeIn = 0; const M = 20000;
+    let probeIn = 0;
+    const M = 20000;
     for (let i = 0; i < M; i++) {
       if (gap(hashU01(7, 'probe', i * 2), hashU01(7, 'probe', i * 2 + 1)) < VEIN) probeIn++;
     }
     const veinArea = probeIn / M;
     const inVein = layout.filter((q) => gap(q.x / W, q.y / H) < VEIN).length / layout.length;
-    assert.ok(veinArea > 0.15, `${label}: veins must be a real share of the plate (got ${(veinArea * 100).toFixed(1)}%)`);
-    assert.ok(inVein < 0.1 * veinArea,
-      `${label}: density in the veins must be a fraction of outside — ${(inVein * 100).toFixed(2)}% of points in ${(veinArea * 100).toFixed(1)}% of plate`);
+    assert.ok(
+      veinArea > 0.15,
+      `${label}: veins must be a real share of the plate (got ${(veinArea * 100).toFixed(1)}%)`,
+    );
+    assert.ok(
+      inVein < 0.1 * veinArea,
+      `${label}: density in the veins must be a fraction of outside — ${(inVein * 100).toFixed(2)}% of points in ${(veinArea * 100).toFixed(1)}% of plate`,
+    );
   };
   emptiness(SEED, null, pts, 'default');
   // …and the SAME must hold under a spatial re-roll, measured against the
@@ -364,10 +455,14 @@ assert.ok(listed.includes('stratified'));
       // A degenerate mask is not reachable through the public sampler, so the
       // cap is exercised the only way it can be: many points, one seed, and
       // the assertion that every single one resolves.
-      squeezed.push(voronoi({ i, count: 200, w: W, h: H, rng: () => 0.5, jitter: 0, seed: i * 7919, seedOffsets: null }));
+      squeezed.push(
+        voronoi({ i, count: 200, w: W, h: H, rng: () => 0.5, jitter: 0, seed: i * 7919, seedOffsets: null }),
+      );
     }
-    assert.ok(squeezed.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && q.x >= 0 && q.x <= W),
-      'every point resolves, whatever the mask');
+    assert.ok(
+      squeezed.every((q) => Number.isFinite(q.x) && Number.isFinite(q.y) && q.x >= 0 && q.x <= W),
+      'every point resolves, whatever the mask',
+    );
     assert.ok(Date.now() - t0 < 4000, 'the attempt cap must bound the work');
   }
 }
@@ -376,14 +471,26 @@ assert.ok(listed.includes('stratified'));
 {
   const lsystem = getSampler('lsystem');
   assert.ok(listSamplers().includes('lsystem'), 'lsystem must be registered');
-  const W = 1000; const H = 700;
+  const W = 1000;
+  const H = 700;
   const lay = (n, o = {}) => {
     const out = [];
     for (let i = 0; i < n; i++) {
-      out.push(lsystem({
-        i, count: n, w: W, h: H, rng: () => 0.5, jitter: 0,
-        seed: 42, seedOffsets: null, lsysDepth: 4, lsysAngle: 25, ...o,
-      }));
+      out.push(
+        lsystem({
+          i,
+          count: n,
+          w: W,
+          h: H,
+          rng: () => 0.5,
+          jitter: 0,
+          seed: 42,
+          seedOffsets: null,
+          lsysDepth: 4,
+          lsysAngle: 25,
+          ...o,
+        }),
+      );
     }
     return out;
   };
@@ -396,27 +503,46 @@ assert.ok(listed.includes('stratified'));
   // what says so.
   {
     const want = [
-      [500, 672, 0], [500, 642.202632, 0],
-      [507.807605, 625.459168, 0.25], [492.192395, 625.459168, 0.25],
-      [500, 612.405264, 0], [500, 582.607896, 0],
-      [507.807605, 565.864432, 0.25], [492.192395, 565.864432, 0.25],
+      [500, 672, 0],
+      [500, 642.202632, 0],
+      [507.807605, 625.459168, 0.25],
+      [492.192395, 625.459168, 0.25],
+      [500, 612.405264, 0],
+      [500, 582.607896, 0],
+      [507.807605, 565.864432, 0.25],
+      [492.192395, 565.864432, 0.25],
     ];
     const got = lay(8).map((q) => [+q.x.toFixed(6), +q.y.toFixed(6), +q.t.toFixed(6)]);
     assert.deepStrictEqual(got, want, 'seed 42 / depth 4 / angle 25 is the canonical plate');
     // …and the OTHER two rules are pinned too, or a change to either would
     // slip past a golden that only ever exercises one of the three.
     const first = (seed, n) => lay(n, { seed }).map((q) => [+q.x.toFixed(6), +q.y.toFixed(6), +q.t.toFixed(6)]);
-    assert.deepStrictEqual(first(2, 4), [
-      [501.17529, 672, 0], [503.284578, 667.476618, 0.25],
-      [501.17529, 663.95, 0], [499.066002, 659.426618, 0.25],
-    ], 'seed 2 pins the second rule');
-    assert.deepStrictEqual(first(101, 4), [
-      [500, 672, 0], [511.249535, 647.875295, 0.25],
-      [488.750465, 647.875295, 0.25], [500, 629.066667, 0],
-    ], 'seed 101 pins the third rule');
+    assert.deepStrictEqual(
+      first(2, 4),
+      [
+        [501.17529, 672, 0],
+        [503.284578, 667.476618, 0.25],
+        [501.17529, 663.95, 0],
+        [499.066002, 659.426618, 0.25],
+      ],
+      'seed 2 pins the second rule',
+    );
+    assert.deepStrictEqual(
+      first(101, 4),
+      [
+        [500, 672, 0],
+        [511.249535, 647.875295, 0.25],
+        [488.750465, 647.875295, 0.25],
+        [500, 629.066667, 0],
+      ],
+      'seed 101 pins the third rule',
+    );
     // The three seeds really do grow three different plants.
-    assert.strictEqual(new Set([2, 42, 101].map((seed) => distinct({ seed }))).size, 3,
-      'the canonical set must be three distinct rules');
+    assert.strictEqual(
+      new Set([2, 42, 101].map((seed) => distinct({ seed }))).size,
+      3,
+      'the canonical set must be three distinct rules',
+    );
   }
 
   // TOPOLOGY — this is the only sampler that grows a structure, so the test
@@ -448,12 +574,18 @@ assert.ok(listed.includes('stratified'));
   {
     const p = lay(600);
     const ts = p.map((q) => q.t);
-    assert.ok(ts.every((t) => Number.isFinite(t) && t >= 0 && t <= 1), 't must be a normalised depth');
+    assert.ok(
+      ts.every((t) => Number.isFinite(t) && t >= 0 && t <= 1),
+      't must be a normalised depth',
+    );
     assert.ok(ts.includes(0), 'the trunk must be depth 0');
     assert.ok(new Set(ts).size >= 3, 'a plant needs several branch orders');
     assert.ok(Math.max(...ts) > 0.9, 'the deepest twigs must reach the top of the range');
     // Not the traversal index: t must repeat as the walk returns to the trunk.
-    assert.ok(ts.slice(1).some((t, i) => t < ts[i]), 't must fall back when the turtle pops a branch');
+    assert.ok(
+      ts.slice(1).some((t, i) => t < ts[i]),
+      't must fall back when the turtle pops a branch',
+    );
   }
 
   // Bounds, determinism, and the angle actually being a knob.
@@ -470,19 +602,34 @@ assert.ok(listed.includes('stratified'));
 
 // ── brush mode: flow-field trail stamping ──────────────────────────────────
 {
-  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const W = 1000,
+    H = 700,
+    COUNT = 60,
+    TRAILS = 6;
   const PER = Math.ceil(COUNT / TRAILS);
   const P = {
-    mode: 'brush', count: COUNT, seed: 0xbeef,
-    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
-    jitter: 0, density: 100, zTiers: 1, bleed: false,
-    canvasW: W, canvasH: H,
-    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+    mode: 'brush',
+    count: COUNT,
+    seed: 0xbeef,
+    scale: [0.4, 0.8],
+    rotate: [-180, 180],
+    alpha: [60, 100],
+    jitter: 0,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: W,
+    canvasH: H,
+    brushSize: 24,
+    brushSpacing: 0.5,
+    fieldScale: 0.004,
+    trailCount: TRAILS,
   };
   const lay = (seed) => computePlacements({ ...P, seed });
 
   // seed determinism: same seed → bit-identical placements, inside the canvas
-  const a = lay(0xbeef), b = lay(0xbeef);
+  const a = lay(0xbeef),
+    b = lay(0xbeef);
   assert.strictEqual(a.length, COUNT);
   for (let k = 0; k < a.length; k++) {
     assert.strictEqual(a[k].x, b[k].x, `x determinism ${k}`);
@@ -503,7 +650,7 @@ assert.ok(listed.includes('stratified'));
 
   // rotation aims along the trail tangent (slice 2 adds ±10° stamp jitter)
   const tangDiff = (k, arr) => {
-    const tang = Math.atan2(arr[k].y - arr[k - 1].y, arr[k].x - arr[k - 1].x) * 180 / Math.PI;
+    const tang = (Math.atan2(arr[k].y - arr[k - 1].y, arr[k].x - arr[k - 1].x) * 180) / Math.PI;
     let diff = Math.abs(arr[k].rotation - tang) % 360;
     return diff > 180 ? 360 - diff : diff;
   };
@@ -514,25 +661,47 @@ assert.ok(listed.includes('stratified'));
 
   // a different seed draws a different line
   const c = lay(0x1234);
-  assert.ok(c.some((p, k) => p.x !== a[k].x), 'a new seed must move the line');
+  assert.ok(
+    c.some((p, k) => p.x !== a[k].x),
+    'a new seed must move the line',
+  );
 
   // cache honesty: every brush param busts the geometry signature
   const s1 = geometrySignature(P);
-  for (const [key, val] of [['brushSize', 25], ['brushSpacing', 0.6], ['fieldScale', 0.005], ['trailCount', 7]]) {
+  for (const [key, val] of [
+    ['brushSize', 25],
+    ['brushSpacing', 0.6],
+    ['fieldScale', 0.005],
+    ['trailCount', 7],
+  ]) {
     assert.notDeepStrictEqual(geometrySignature({ ...P, [key]: val }), s1, `${key} must bust the cache`);
   }
 }
 
 // ── brush slice 2: the crooked — trail wobble + stamp jitter ────────────────
 {
-  const W = 1000, H = 700, COUNT = 60, TRAILS = 6;
+  const W = 1000,
+    H = 700,
+    COUNT = 60,
+    TRAILS = 6;
   const PER = Math.ceil(COUNT / TRAILS);
   const P = {
-    mode: 'brush', count: COUNT, seed: 0xbeef,
-    scale: [0.4, 0.8], rotate: [-180, 180], alpha: [60, 100],
-    jitter: 0, density: 100, zTiers: 1, bleed: false,
-    canvasW: W, canvasH: H,
-    brushSize: 24, brushSpacing: 0.5, fieldScale: 0.004, trailCount: TRAILS,
+    mode: 'brush',
+    count: COUNT,
+    seed: 0xbeef,
+    scale: [0.4, 0.8],
+    rotate: [-180, 180],
+    alpha: [60, 100],
+    jitter: 0,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: W,
+    canvasH: H,
+    brushSize: 24,
+    brushSpacing: 0.5,
+    fieldScale: 0.004,
+    trailCount: TRAILS,
     wobbleFreq: 0.5,
   };
   const lay = (extra) => computePlacements({ ...P, ...extra });
@@ -549,7 +718,8 @@ assert.ok(listed.includes('stratified'));
   // wobble moves stamps, perpendicular to the trail, bounded by the amp
   const AMP = 8;
   const wobbled = lay({ wobbleAmp: AMP });
-  let moved = 0, maxD = 0;
+  let moved = 0,
+    maxD = 0;
   for (let k = 0; k < straight.length; k++) {
     const d = Math.hypot(wobbled[k].x - straight[k].x, wobbled[k].y - straight[k].y);
     maxD = Math.max(maxD, d);
@@ -569,7 +739,7 @@ assert.ok(listed.includes('stratified'));
   const sameTrail = (k) => Math.floor(k / PER) === Math.floor((k - 1) / PER);
   for (let k = 1; k < straight.length; k++) {
     if (!sameTrail(k)) continue;
-    const tang = Math.atan2(straight[k].y - straight[k - 1].y, straight[k].x - straight[k - 1].x) * 180 / Math.PI;
+    const tang = (Math.atan2(straight[k].y - straight[k - 1].y, straight[k].x - straight[k - 1].x) * 180) / Math.PI;
     let diff = Math.abs(straight[k].rotation - tang) % 360;
     if (diff > 180) diff = 360 - diff;
     assert.ok(diff <= 10 + 1e-9, `rotation jitter ≤ 10° at ${k}: ${diff}`);

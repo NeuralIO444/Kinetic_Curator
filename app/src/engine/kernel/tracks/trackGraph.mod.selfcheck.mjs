@@ -5,8 +5,7 @@
 import assert from 'node:assert';
 import { applyMod, motionMetrics, normalizePatch } from './trackGraph.js';
 
-const patch = (over = {}) =>
-  normalizePatch({ from: 0, to: 1, mode: 'mod', strength: 1, polarity: 1, ...over });
+const patch = (over = {}) => normalizePatch({ from: 0, to: 1, mode: 'mod', strength: 1, polarity: 1, ...over });
 const knobs0 = () => ({ glow: 0, fade: 0, displace: 0, ali: 1, coh: 1, sep: 1 });
 
 // --- motionMetrics -----------------------------------------------------
@@ -15,23 +14,36 @@ assert.deepStrictEqual(
   { cx: 0.5, cy: 0.5, vx: 0, vy: 0, speed: 0, agitation: 0, density: 0 },
   'no points: centered, at rest',
 );
-const still = motionMetrics([{ x: 0.3, y: 0.3, vx: 0, vy: 0 }, { x: 0.7, y: 0.7, vx: 0, vy: 0 }]);
+const still = motionMetrics([
+  { x: 0.3, y: 0.3, vx: 0, vy: 0 },
+  { x: 0.7, y: 0.7, vx: 0, vy: 0 },
+]);
 assert.strictEqual(still.speed, 0, 'zero velocity → zero speed');
 assert.strictEqual(still.agitation, 0, 'zero velocity → zero agitation');
 assert.ok(Math.abs(still.cx - 0.5) < 1e-9, 'centroid x averages the points');
 
-const moving = motionMetrics([{ x: 0.5, y: 0.5, vx: 1, vy: 0 }, { x: 0.5, y: 0.5, vx: 1, vy: 0 }]);
+const moving = motionMetrics([
+  { x: 0.5, y: 0.5, vx: 1, vy: 0 },
+  { x: 0.5, y: 0.5, vx: 1, vy: 0 },
+]);
 assert.ok(moving.speed > 0, 'shared-direction velocity produces nonzero speed');
 assert.ok(moving.agitation > 0, 'moving points produce nonzero agitation');
 
-const jittery = motionMetrics([{ x: 0.5, y: 0.5, vx: 5, vy: 0 }, { x: 0.5, y: 0.5, vx: -5, vy: 0 }]);
+const jittery = motionMetrics([
+  { x: 0.5, y: 0.5, vx: 5, vy: 0 },
+  { x: 0.5, y: 0.5, vx: -5, vy: 0 },
+]);
 assert.ok(jittery.speed < 1e-9, 'opposed velocities cancel in mean speed');
 assert.ok(jittery.agitation > 0, 'opposed velocities still register as agitation (energy, not drift)');
 
 // --- applyMod: off / non-mod modes pass knobs through untouched --------
 const m = motionMetrics([{ x: 0.5, y: 0.5, vx: 5, vy: 5 }]);
 assert.deepStrictEqual(applyMod(knobs0(), m, patch({ mode: 'off' })), knobs0(), 'off: knobs untouched');
-assert.deepStrictEqual(applyMod(knobs0(), m, patch({ mode: 'field' })), knobs0(), 'field mode: not applyMod\'s to touch');
+assert.deepStrictEqual(
+  applyMod(knobs0(), m, patch({ mode: 'field' })),
+  knobs0(),
+  "field mode: not applyMod's to touch",
+);
 
 // --- applyMod: strength 0 is a no-op, even with real source motion -----
 // (Extended #509 phase 1: the steering multipliers must also read exactly
@@ -60,7 +72,8 @@ const gentle = motionMetrics([{ x: 0.5, y: 0.5, vx: 0.5, vy: 0 }]);
 const half = applyMod(knobs0(), gentle, patch({ strength: 0.5 }));
 const full = applyMod(knobs0(), gentle, patch({ strength: 1 }));
 for (const k of ['ali', 'coh', 'sep']) {
-  const dHalf = half[k] - 1, dFull = full[k] - 1;
+  const dHalf = half[k] - 1,
+    dFull = full[k] - 1;
   assert.ok(Math.abs(dFull - 2 * dHalf) < 1e-9, `steering ${k} scales linearly with strength`);
 }
 // Clamp [0,3]: extreme sources bend, never invert or explode.

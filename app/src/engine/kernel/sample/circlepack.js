@@ -66,7 +66,8 @@ export function circlePack({ seed, seedOffsets = null, w, h, count, lo, hi, tier
   const gw = Math.max(1, Math.ceil(w / cell));
   const gh = Math.max(1, Math.ceil(h / cell));
   const grid = Array.from({ length: gw * gh }, () => []);
-  const cellOf = (x, y) => Math.min(gh - 1, Math.max(0, Math.floor(y / cell))) * gw + Math.min(gw - 1, Math.max(0, Math.floor(x / cell)));
+  const cellOf = (x, y) =>
+    Math.min(gh - 1, Math.max(0, Math.floor(y / cell))) * gw + Math.min(gw - 1, Math.max(0, Math.floor(x / cell)));
 
   const fits = (x, y, r) => {
     if (x - r < 0 || x + r > w || y - r < 0 || y + r > h) return false;
@@ -93,7 +94,8 @@ export function circlePack({ seed, seedOffsets = null, w, h, count, lo, hi, tier
     for (let shrink = 0; shrink <= PACK_MAX_SHRINKS && !placedAt; shrink++) {
       const scale = (lo + span * u) * depth;
       const r = Math.max(0.5, unit * scale);
-      if (2 * r > w || 2 * r > h) { // too big for the plate at all: shrink first
+      if (2 * r > w || 2 * r > h) {
+        // too big for the plate at all: shrink first
         u = Math.max(floorU, u - 0.5);
         continue;
       }
@@ -112,7 +114,10 @@ export function circlePack({ seed, seedOffsets = null, w, h, count, lo, hi, tier
           y = r + stream() * Math.max(0, h - 2 * r);
         }
         if (fits(x, y, r)) {
-          xs[k] = x; ys[k] = y; rs[k] = r; us[k] = u;
+          xs[k] = x;
+          ys[k] = y;
+          rs[k] = r;
+          us[k] = u;
           grid[cellOf(x, y)].push(k);
           placedAt = true;
         }
@@ -139,7 +144,10 @@ export function circlePack({ seed, seedOffsets = null, w, h, count, lo, hi, tier
           if (pen < best.pen) best = { x, y, pen };
         }
       }
-      xs[k] = best.x; ys[k] = best.y; rs[k] = r; us[k] = floorU;
+      xs[k] = best.x;
+      ys[k] = best.y;
+      rs[k] = r;
+      us[k] = floorU;
       grid[cellOf(best.x, best.y)].push(k);
       overflow += 1;
     }
@@ -157,11 +165,19 @@ export function clearCirclePackCache() {
 /** Sampler: (ctx) => { x, y, t }. A lookup into the cached packing; no jitter, no ctx.rng (exact guarantee). */
 export function circlepack(ctx) {
   const { i, count, w, h, seed, seedOffsets, zTiers, packScale, packUnitPx } = ctx;
-  const range = Array.isArray(packScale) && packScale.length === 2 && packScale.every(Number.isFinite) ? packScale : [0.4, 1.6];
+  const range =
+    Array.isArray(packScale) && packScale.length === 2 && packScale.every(Number.isFinite) ? packScale : [0.4, 1.6];
   const lo = Math.min(range[0], range[1]);
   const hi = Math.max(range[0], range[1]);
   const set = circlePack({
-    seed, seedOffsets, w, h, count, lo, hi, tiers: zTiers || 1,
+    seed,
+    seedOffsets,
+    w,
+    h,
+    count,
+    lo,
+    hi,
+    tiers: zTiers || 1,
     unit: Number.isFinite(packUnitPx) && packUnitPx > 0 ? packUnitPx : PACK_UNIT_PX,
   });
   const k = i < set.n ? i : set.n - 1;

@@ -82,9 +82,13 @@ export function gaussian(ctx) {
   const pick = r();
   let lobe = lobes[lobes.length - 1];
   for (let k = 0; k < lobes.length; k++) {
-    if (pick <= lobes[k].cum) { lobe = lobes[k]; break; }
+    if (pick <= lobes[k].cum) {
+      lobe = lobes[k];
+      break;
+    }
   }
-  const sigma = (Number.isFinite(gaussianSigma) && gaussianSigma > 0 ? gaussianSigma : GAUSS_SIGMA_FRAC) * Math.min(w, h);
+  const sigma =
+    (Number.isFinite(gaussianSigma) && gaussianSigma > 0 ? gaussianSigma : GAUSS_SIGMA_FRAC) * Math.min(w, h);
   const mag = Math.sqrt(-2 * Math.log(Math.max(r(), 1e-12)));
   const ang = r() * TAU;
   let x = lobe.cx + Math.cos(ang) * mag * sigma;

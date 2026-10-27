@@ -5,9 +5,14 @@
 
 import assert from 'node:assert';
 import {
-  BIO_KIND, BIO_VERSION,
-  defaultBiologyPolicy, validateBiologyPolicy,
-  getBiologyPolicy, importBiologyPolicy, resetBiologyPolicy, exportBiologyPolicy,
+  BIO_KIND,
+  BIO_VERSION,
+  defaultBiologyPolicy,
+  validateBiologyPolicy,
+  getBiologyPolicy,
+  importBiologyPolicy,
+  resetBiologyPolicy,
+  exportBiologyPolicy,
 } from './policy.js';
 import { assessAggregate, decideLifecycle, fadeForAge } from './lifecycle.js';
 import { sessionOnlyNoted } from '../state/sessionOnly.mjs';
@@ -17,16 +22,16 @@ import { sessionOnlyNoted } from '../state/sessionOnly.mjs';
   assert.strictEqual(sessionOnlyNoted(), false, 'nothing noted yet');
   globalThis.localStorage = {
     getItem: () => null,
-    setItem: () => { throw new Error('private mode'); },
+    setItem: () => {
+      throw new Error('private mode');
+    },
     removeItem: () => {},
   };
   assert.ok(importBiologyPolicy(defaultBiologyPolicy()).ok, 'the policy still imports for the session');
   assert.strictEqual(sessionOnlyNoted(), true, 'the refusal is on the shared session-only flag, not only a comment');
   delete globalThis.localStorage;
 }
-import {
-  ensureAggregate, cellsPerTick, liveCount, liveCell, GrowthHooks,
-} from '../engine/kernel/sample/growth.js';
+import { ensureAggregate, cellsPerTick, liveCount, liveCell, GrowthHooks } from '../engine/kernel/sample/growth.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
 
 const { clearGrowth, age01, constants } = GrowthHooks;
@@ -60,7 +65,9 @@ const fresh = (seed, mode, tick, opts = {}) => {
 
   // Unknown future knobs are dropped, not rejected.
   const future = validateBiologyPolicy({
-    kind: BIO_KIND, version: 1, growth: { ...d.growth, sporeChance: 0.5 },
+    kind: BIO_KIND,
+    version: 1,
+    growth: { ...d.growth, sporeChance: 0.5 },
   });
   assert.ok(future.ok && !('sporeChance' in future.policy.growth), 'unknown fields dropped');
 }
@@ -161,11 +168,7 @@ const fresh = (seed, mode, tick, opts = {}) => {
     }
     return out;
   };
-  assert.deepStrictEqual(
-    liveSeq(again),
-    liveSeq(once),
-    'rebirth cell-for-cell identical',
-  );
+  assert.deepStrictEqual(liveSeq(again), liveSeq(once), 'rebirth cell-for-cell identical');
 
   // Never static: the drive floors at 1 cell/tick even silent at rate 0.
   assert.ok(cellsPerTick(0, null) >= 1, 'silent rate-0 still creeps');
@@ -181,15 +184,33 @@ const fresh = (seed, mode, tick, opts = {}) => {
   const assets = [{ id: 'a', weight: 'heavy' }];
   const palette = { swatches: ['#111', '#222', '#333', '#444'] };
   const layoutParams = {
-    mode: 'dla', composition: 'default', count: 60,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
-    overlap: true, displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
-    growthRate: 3, growthBranch: 0.8,
+    mode: 'dla',
+    composition: 'default',
+    count: 60,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    mirror: false,
+    overlap: true,
+    displacement: 0,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
+    growthRate: 3,
+    growthBranch: 0.8,
   };
   const common = {
-    layoutParams, seed: 0x1a4f, seedOffsets: null, activeAssets: assets,
-    palette, canvasW: 1000, canvasH: 700, audioEnergy: null,
+    layoutParams,
+    seed: 0x1a4f,
+    seedOffsets: null,
+    activeAssets: assets,
+    palette,
+    canvasW: 1000,
+    canvasH: 700,
+    audioEnergy: null,
   };
   // A late-tick form has fully-aged cells; their item alpha must be faded
   // below the young form's. (alpha range 60..100 → base per-item alpha.)
@@ -215,7 +236,9 @@ const fresh = (seed, mode, tick, opts = {}) => {
 {
   const { recordLifecycleState, getLifecycleState } = await import('./lifecycle.js');
   const realNow = Date.now;
-  Date.now = () => { throw new Error('wall clock consulted'); };
+  Date.now = () => {
+    throw new Error('wall clock consulted');
+  };
   try {
     recordLifecycleState('fix3d-a', { mode: 'dla', gen: 0, tick: 7 }, 123456);
     recordLifecycleState('fix3d-b', { mode: 'eden', gen: 1, tick: 3 }, 123500);

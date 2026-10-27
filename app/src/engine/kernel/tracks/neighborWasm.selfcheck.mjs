@@ -87,10 +87,16 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
   };
   const rustDraws = (seed, ch, index, offsets) => {
     const o = offsets || { spatial: 0, color: 0, asset: 0, noise: 0 };
-    const s = X.neighbor_stream_seed(
-      seed | 0, rustChannel(ch), index >>> 0,
-      o.spatial >>> 0, o.color >>> 0, o.asset >>> 0, o.noise >>> 0,
-    ) >>> 0;
+    const s =
+      X.neighbor_stream_seed(
+        seed | 0,
+        rustChannel(ch),
+        index >>> 0,
+        o.spatial >>> 0,
+        o.color >>> 0,
+        o.asset >>> 0,
+        o.noise >>> 0,
+      ) >>> 0;
     const rng = X.neighbor_rng_create(s);
     assert.ok(rng, 'neighbor_rng_create failed');
     try {
@@ -99,8 +105,7 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
       X.neighbor_rng_destroy(rng);
     }
   };
-  const jsDraws = (seed, ch, index, offsets) =>
-    Array.from({ length: 8 }, rngForIndex(seed, ch, index, offsets));
+  const jsDraws = (seed, ch, index, offsets) => Array.from({ length: 8 }, rngForIndex(seed, ch, index, offsets));
 
   const seeds = [0, 1, 444, -7, 0xa17e9b21];
   // One numeric channel per offset group (dens/spatial, asset, color, noise,
@@ -123,9 +128,10 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
           const js = jsDraws(seed, ch, index, offsets);
           const rs = rustDraws(seed, ch, index, normalizeSeedOffsets(offsets));
           assert.deepStrictEqual(
-            rs, js,
+            rs,
+            js,
             `RNG draw mismatch: seed=${seed} channel=${JSON.stringify(ch)} index=${index} ` +
-            `offsets=${JSON.stringify(offsets)}\n  js:   ${js}\n  rust: ${rs}`,
+              `offsets=${JSON.stringify(offsets)}\n  js:   ${js}\n  rust: ${rs}`,
           );
           n++;
         }
@@ -168,9 +174,11 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
     };
     const fwd = (x) => {
       x >>>= 0;
-      x ^= (x << 13) >>> 0; x >>>= 0;
+      x ^= (x << 13) >>> 0;
+      x >>>= 0;
       x ^= x >>> 17;
-      x ^= (x << 5) >>> 0; x >>>= 0;
+      x ^= (x << 5) >>> 0;
+      x >>>= 0;
       return x;
     };
     const seed = invL(invR(invL(0xffffffff, 5), 17), 13);
@@ -224,9 +232,22 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
   const R = FIELD_RADIUS; // 0.35
   checkScene(
     'mixed',
-    [[0, 0], [0.9, 0.9], [R, 0]],
-    [[0.1, 0], [-0.2, 0.2], [0, 0.3], [0.34, 0], [0.36, 0], [0.9, 0.9], [R, 0]],
-    R, 16,
+    [
+      [0, 0],
+      [0.9, 0.9],
+      [R, 0],
+    ],
+    [
+      [0.1, 0],
+      [-0.2, 0.2],
+      [0, 0.3],
+      [0.34, 0],
+      [0.36, 0],
+      [0.9, 0.9],
+      [R, 0],
+    ],
+    R,
+    16,
   );
 
   // D2: boundary sweep — sources at exactly r and ±1/+2 f32 ulps.
@@ -241,9 +262,18 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
     checkScene(
       'boundary',
       [[0, 0]],
-      [[r32, 0], [up(r32, -1), 0], [up(r32, -2), 0], [up(r32, 1), 0], [up(r32, 2), 0],
-       [0, r32], [0, up(r32, 1)], [r32 * Math.SQRT1_2, r32 * Math.SQRT1_2]],
-      R, 16,
+      [
+        [r32, 0],
+        [up(r32, -1), 0],
+        [up(r32, -2), 0],
+        [up(r32, 1), 0],
+        [up(r32, 2), 0],
+        [0, r32],
+        [0, up(r32, 1)],
+        [r32 * Math.SQRT1_2, r32 * Math.SQRT1_2],
+      ],
+      R,
+      16,
     );
   }
 
@@ -260,10 +290,13 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
 
   // D5: seeded stress — random scenes, small to near-global radii.
   {
-    const rng = mkRng(0xC10C);
+    const rng = mkRng(0xc10c);
     const mk = (n) => Array.from({ length: n }, () => [rng(), rng()]);
     const radii = [0.05, 0.12, R, 2.0];
-    for (const [ti, si] of [[8, 24], [48, 160]]) {
+    for (const [ti, si] of [
+      [8, 24],
+      [48, 160],
+    ]) {
       const targets = mk(ti);
       const sources = mk(si);
       for (const radius of radii) {
@@ -281,19 +314,41 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
   // D6: negative + large coordinates (grid extent spans negative cells).
   checkScene(
     'neg-large',
-    [[-100, -200], [5000, -3000], [0, 0]],
-    [[-100.5, -200.5], [5000.2, -3000.1], [3, 4], [-1e4, 1e4]],
-    2.5, 8,
+    [
+      [-100, -200],
+      [5000, -3000],
+      [0, 0],
+    ],
+    [
+      [-100.5, -200.5],
+      [5000.2, -3000.1],
+      [3, 4],
+      [-1e4, 1e4],
+    ],
+    2.5,
+    8,
   );
 
   // D7: NaN coordinates — `d2 > r2` is false, so NaN pairs are INCLUDED,
   // exactly like applyField. Both sides must agree.
-  checkScene('nan', [[NaN, 0]], [[NaN, 0], [0.1, 0]], R, 4);
+  checkScene(
+    'nan',
+    [[NaN, 0]],
+    [
+      [NaN, 0],
+      [0.1, 0],
+    ],
+    R,
+    4,
+  );
 
   // D8: overflow is loud on both sides.
   {
     const [tx, ty] = cols([[0, 0]]);
-    const [sx, sy] = cols([[0.1, 0], [0.2, 0]]);
+    const [sx, sy] = cols([
+      [0.1, 0],
+      [0.2, 0],
+    ]);
     assert.throws(() => findNeighborsJS(tx, ty, sx, sy, R, 1), RangeError, 'JS ref overflow');
     assert.throws(() => findNeighborsWasm(wasm, tx, ty, sx, sy, R, 1), /overflow/, 'wasm overflow');
     console.log('[ok] D. overflow is loud on both backends (maxNeighbors too small)');
@@ -362,10 +417,19 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
 // construction — that comparison belongs to sections D, not here).
 {
   const R = FIELD_RADIUS;
-  const rawTargets = [[0, 0], [0.9, 0.9], [R, 0]];
+  const rawTargets = [
+    [0, 0],
+    [0.9, 0.9],
+    [R, 0],
+  ];
   const rawSources = [
-    [0.1, 0], [-0.2, 0.2], [0, 0.3],
-    [0.34, 0], [0.36, 0], [0.9, 0.9], [R, 0],
+    [0.1, 0],
+    [-0.2, 0.2],
+    [0, 0.3],
+    [0.34, 0],
+    [0.36, 0],
+    [0.9, 0.9],
+    [R, 0],
   ];
   const tx = new Float32Array(rawTargets.map((p) => p[0]));
   const ty = new Float32Array(rawTargets.map((p) => p[1]));

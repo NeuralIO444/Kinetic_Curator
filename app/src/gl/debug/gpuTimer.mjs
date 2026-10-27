@@ -144,9 +144,7 @@ export function createGpuTimer(gl) {
       }
       const timings = new Map();
       for (const p of pending) {
-        const ms = p.query
-          ? gl.getQueryParameter(p.query, ext.QUERY_RESULT_EXT) / 1e6
-          : p.t1 - p.t0;
+        const ms = p.query ? gl.getQueryParameter(p.query, ext.QUERY_RESULT_EXT) / 1e6 : p.t1 - p.t0;
         if (p.query) gl.deleteQuery(p.query);
         timings.set(p.label, ms);
       }

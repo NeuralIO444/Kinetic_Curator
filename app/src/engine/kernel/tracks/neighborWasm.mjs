@@ -46,7 +46,7 @@ const REQUIRED_EXPORTS = [
   'neighbor_stream_seed',
 ];
 
-let cached = null;      // { instance } | null
+let cached = null; // { instance } | null
 let loadAttempted = false;
 let loadError = null;
 
@@ -156,8 +156,12 @@ export function effectiveNeighborBackend() {
 // indices ascending. Bit-identical to the wasm path by construction.
 
 function checkArgs(tx, ty, sx, sy, radius, maxNeighbors) {
-  if (!(tx instanceof Float32Array) || !(ty instanceof Float32Array)
-      || !(sx instanceof Float32Array) || !(sy instanceof Float32Array)) {
+  if (
+    !(tx instanceof Float32Array) ||
+    !(ty instanceof Float32Array) ||
+    !(sx instanceof Float32Array) ||
+    !(sy instanceof Float32Array)
+  ) {
     throw new TypeError('[neighborWasm] columns must be Float32Array (SoA x/y)');
   }
   if (tx.length !== ty.length || sx.length !== sy.length) {
@@ -198,9 +202,7 @@ export function findNeighborsJS(tx, ty, sx, sy, radius, maxNeighbors) {
       // Verbatim applyField inclusion: `if (d2 > r2) continue`.
       if (d2 > r2) continue;
       if (k >= maxNeighbors) {
-        throw new RangeError(
-          `[neighborWasm] target ${i} exceeds maxNeighbors=${maxNeighbors} (JS reference)`,
-        );
+        throw new RangeError(`[neighborWasm] target ${i} exceeds maxNeighbors=${maxNeighbors} (JS reference)`);
       }
       indices[base + k] = j;
       k++;
@@ -247,10 +249,16 @@ export function findNeighborsWasm(wasm, tx, ty, sx, sy, radius, maxNeighbors) {
     f32(sxOff, nS).set(sx);
     f32(syOff, nS).set(sy);
     const rc = exports.neighbor_run(
-      base + txOff, base + tyOff, nT,
-      base + sxOff, base + syOff, nS,
+      base + txOff,
+      base + tyOff,
+      nT,
+      base + sxOff,
+      base + syOff,
+      nS,
       r32,
-      base + countsOff, base + idxOff, maxNeighbors,
+      base + countsOff,
+      base + idxOff,
+      maxNeighbors,
     );
     if (rc !== RC_OK) {
       const why = rc === -2 ? 'neighbor overflow: raise maxNeighbors' : `bad args (rc=${rc})`;

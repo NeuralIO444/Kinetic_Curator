@@ -89,8 +89,7 @@ export function patchSampleAgeMs(layerId, now = Date.now()) {
  * never throws.
  */
 export function isSourceStill(speed, agitation) {
-  return (Number(speed) || 0) < SOURCE_STILL_SPEED
-    && (Number(agitation) || 0) < SOURCE_STILL_AGITATION;
+  return (Number(speed) || 0) < SOURCE_STILL_SPEED && (Number(agitation) || 0) < SOURCE_STILL_AGITATION;
 }
 
 const finite = (v, fallback = 0) => (Number.isFinite(Number(v)) ? Number(v) : fallback);

@@ -41,7 +41,8 @@ export function validateFailureRecord(r) {
   if (typeof r.message !== 'string' || !r.message) fail('message', 'must be a non-empty string naming what went wrong');
   if (typeof r.harness_run_id !== 'string' || !r.harness_run_id) fail('harness_run_id', 'must be a non-empty string');
   if (typeof r.harness_commit !== 'string') fail('harness_commit', 'must be a string');
-  if (typeof r.timestamp !== 'string' || Number.isNaN(Date.parse(r.timestamp))) fail('timestamp', 'must be an ISO-8601 string');
+  if (typeof r.timestamp !== 'string' || Number.isNaN(Date.parse(r.timestamp)))
+    fail('timestamp', 'must be an ISO-8601 string');
   return r;
 }
 
@@ -58,7 +59,16 @@ export function validateFailureRecord(r) {
  * @param {string} o.message       human sentence naming the failure
  * @param {object} [o.meta]        { runId, commit }
  */
-export function failureFromSweep({ effect, shader, params = {}, paramSwept = null, check, severity, message, meta = {} }) {
+export function failureFromSweep({
+  effect,
+  shader,
+  params = {},
+  paramSwept = null,
+  check,
+  severity,
+  message,
+  meta = {},
+}) {
   return validateFailureRecord({
     schema: schemaId('sweepFailure'),
     effect,
@@ -81,13 +91,16 @@ export function toJsonl(records) {
 
 /** Parse + validate JSONL back into records. */
 export function fromJsonl(text) {
-  return text.split('\n').filter((l) => l.trim()).map((l, i) => {
-    try {
-      return validateFailureRecord(JSON.parse(l));
-    } catch (e) {
-      throw new Error(`[mlx:failure] line ${i + 1}: ${e.message}`);
-    }
-  });
+  return text
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((l, i) => {
+      try {
+        return validateFailureRecord(JSON.parse(l));
+      } catch (e) {
+        throw new Error(`[mlx:failure] line ${i + 1}: ${e.message}`);
+      }
+    });
 }
 
 export const CHECK_NAMES = CHECKS;

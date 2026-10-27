@@ -21,7 +21,11 @@ const { clearGrowth, regrowGrowth, cellAge, age01, fadeWeight, constants } = Gro
 const { MAX_GROWTH_CELLS, GROWTH_FADE_TICKS } = constants;
 
 const OPTS = (over = {}) => ({
-  growthRate: 5, growthBranch: 0.8, audioEnergy: 0.5, seedOffsets: null, ...over,
+  growthRate: 5,
+  growthBranch: 0.8,
+  audioEnergy: 0.5,
+  seedOffsets: null,
+  ...over,
 });
 
 function fresh(seed, mode, tick, opts) {
@@ -64,8 +68,12 @@ function liveCells(agg) {
     assert.ok(!occ.has(code), 'frontier cell is occupied — Eden invariant broken');
     const gx = code % 128;
     const gy = (code / 128) | 0;
-    const touches = [[1, 0], [-1, 0], [0, 1], [0, -1]]
-      .some(([dx, dy]) => occ.has((gy + dy) * 128 + (gx + dx)));
+    const touches = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ].some(([dx, dy]) => occ.has((gy + dy) * 128 + (gx + dx)));
     assert.ok(touches, 'frontier cell detached from the form');
   }
 }
@@ -75,7 +83,10 @@ function liveCells(agg) {
   const dla = fresh(99, 'dla', 60, { growthRate: 8, audioEnergy: 1 });
   const eden = fresh(99, 'eden', 60, { growthRate: 8, audioEnergy: 1 });
   const fill = (agg) => {
-    let minX = 1e9; let maxX = -1e9; let minY = 1e9; let maxY = -1e9;
+    let minX = 1e9;
+    let maxX = -1e9;
+    let minY = 1e9;
+    let maxY = -1e9;
     for (const c of liveCells(agg)) {
       if (c.gx < minX) minX = c.gx;
       if (c.gx > maxX) maxX = c.gx;
@@ -93,7 +104,10 @@ function liveCells(agg) {
 
 // ── Seeded determinism: same seed → same growth, even across eviction ─────
 {
-  const snap = (agg) => liveCells(agg).map((c) => `${c.gx},${c.gy},${c.birth}`).join(';');
+  const snap = (agg) =>
+    liveCells(agg)
+      .map((c) => `${c.gx},${c.gy},${c.birth}`)
+      .join(';');
   const a = fresh(777, 'dla', 40, { growthBranch: 0.7 });
   const b = fresh(777, 'dla', 40, { growthBranch: 0.7 }); // cache cleared → full replay
   assert.strictEqual(snap(a), snap(b), 'rebuild must replay identically');
@@ -150,8 +164,10 @@ function liveCells(agg) {
   assert.strictEqual(fadeWeight(0), 1);
   assert.strictEqual(fadeWeight(1), 0);
   assert.strictEqual(fadeWeight(0.5), 0.5);
-  assert.ok(fadeWeight(0.25) > fadeWeight(0.5) && fadeWeight(0.5) > fadeWeight(0.75),
-    'fade must decrease monotonically');
+  assert.ok(
+    fadeWeight(0.25) > fadeWeight(0.5) && fadeWeight(0.5) > fadeWeight(0.75),
+    'fade must decrease monotonically',
+  );
 
   // clear + regrow
   const seed = 808;
@@ -172,8 +188,18 @@ function liveCells(agg) {
     const fn = getSampler(mode);
     assert.strictEqual(typeof fn, 'function', `${mode} sampler registered`);
     const ctx = {
-      i: 3, count: 60, w: 1000, h: 700, rng: mkRng(42), jitter: 8, seed: 2024,
-      seedOffsets: null, growthRate: 3, growthBranch: 0.8, growthTick: 12, audioEnergy: null,
+      i: 3,
+      count: 60,
+      w: 1000,
+      h: 700,
+      rng: mkRng(42),
+      jitter: 8,
+      seed: 2024,
+      seedOffsets: null,
+      growthRate: 3,
+      growthBranch: 0.8,
+      growthTick: 12,
+      audioEnergy: null,
     };
     const p = fn(ctx);
     assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), `${mode}: finite point`);
@@ -188,9 +214,20 @@ function liveCells(agg) {
 // ── Orchestrator: dla/eden through computePlacements + signature honesty ───
 {
   const base = {
-    mode: 'dla', count: 60, seed: 0x1a4f, jitter: 10, density: 100, zTiers: 1,
-    bleed: false, canvasW: 1000, canvasH: 700, growthRate: 3, growthBranch: 0.8,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+    mode: 'dla',
+    count: 60,
+    seed: 0x1a4f,
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
+    growthRate: 3,
+    growthBranch: 0.8,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
   };
   const items = computePlacements({ ...base, growthTick: 20 });
   assert.ok(items.length > 0, 'dla places items');
@@ -230,7 +267,9 @@ function liveCells(agg) {
   for (const [mode, seed, tick, opts, want] of NULL_AUDIO_GOLDENS) {
     clearGrowth(seed, mode, null);
     const agg = ensureAggregate(seed, mode, tick, { ...opts, audioEnergy: null, seedOffsets: null });
-    const seq = liveCells(agg).map((c) => `${c.gx},${c.gy},${c.birth}`).join(';');
+    const seq = liveCells(agg)
+      .map((c) => `${c.gx},${c.gy},${c.birth}`)
+      .join(';');
     const got = createHash('sha256').update(seq).digest('hex').slice(0, 32);
     assert.strictEqual(got, want, `${mode}/${seed}@tick${tick}: null-audio sequence moved`);
   }
@@ -315,8 +354,7 @@ function liveCells(agg) {
       // Draw order: instance index i reads cells[i % n].
       const n = ref.cells.length;
       for (let i = 0; i < n * 2 + 7; i++) {
-        assert.deepStrictEqual(
-          liveCell(fixture, i % liveCount(fixture)), ref.cells[i % n], `${tag}: draw order ${i}`);
+        assert.deepStrictEqual(liveCell(fixture, i % liveCount(fixture)), ref.cells[i % n], `${tag}: draw order ${i}`);
       }
       assert.deepStrictEqual([...fixture.occ], [...ref.occ], `${tag}: occ freed identically`);
       if (mode === 'eden') {
@@ -335,7 +373,15 @@ function liveCells(agg) {
   // Deep past the compact threshold (head would be 9952 > 2048): one O(live)
   // copy must fire, head resets, survivors unchanged vs shift().
   const rng = mkRng(0xbeef1242);
-  const big = { mode: 'eden', tick: 1000, cells: [], head: 0, occ: new Uint8Array(128 * 128), frontierArr: [], frontierIdx: new Map() };
+  const big = {
+    mode: 'eden',
+    tick: 1000,
+    cells: [],
+    head: 0,
+    occ: new Uint8Array(128 * 128),
+    frontierArr: [],
+    frontierIdx: new Map(),
+  };
   const used = new Set();
   const G = 128;
   while (big.cells.length < 12000) {
@@ -353,11 +399,18 @@ function liveCells(agg) {
   assert.strictEqual(big.head, 0, 'compaction resets the head');
   assert.ok(big.cells.length <= 4096, `raw array bounded after compaction: ${big.cells.length}`);
   for (let i = 0; i < 2048; i++) {
-    assert.deepStrictEqual(liveCell(big, i), refCells[refCells.length - 2048 + i],
-      `compaction survivor ${i}`);
+    assert.deepStrictEqual(liveCell(big, i), refCells[refCells.length - 2048 + i], `compaction survivor ${i}`);
   }
   // Below the threshold the dead prefix is retained (lazy, not eager).
-  const small = { mode: 'dla', tick: 1000, cells: [], head: 0, occ: new Uint8Array(128 * 128), frontierArr: [], frontierIdx: new Map() };
+  const small = {
+    mode: 'dla',
+    tick: 1000,
+    cells: [],
+    head: 0,
+    occ: new Uint8Array(128 * 128),
+    frontierArr: [],
+    frontierIdx: new Map(),
+  };
   const used2 = new Set();
   const rng2 = mkRng(7);
   while (small.cells.length < 3000) {
@@ -374,4 +427,6 @@ function liveCells(agg) {
   assert.strictEqual(small.cells.length, 3000, 'dead prefix retained until threshold — lazy compaction');
 }
 
-console.log('growth selfcheck: OK — DLA/Eden aggregate, determinism, hooks, never-static, aging bound, head-index dequeue');
+console.log(
+  'growth selfcheck: OK — DLA/Eden aggregate, determinism, hooks, never-static, aging bound, head-index dequeue',
+);

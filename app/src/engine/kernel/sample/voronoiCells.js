@@ -65,7 +65,10 @@ export function nearestSeed(seeds, px, py) {
     const dx = px - seeds.x[k];
     const dy = py - seeds.y[k];
     const d = dx * dx + dy * dy;
-    if (d < bestD) { bestD = d; best = k; }
+    if (d < bestD) {
+      bestD = d;
+      best = k;
+    }
   }
   return best;
 }

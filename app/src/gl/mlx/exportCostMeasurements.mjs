@@ -55,7 +55,8 @@ export function validateCostRecord(r) {
   if (typeof r.gpu_renderer !== 'string') fail('gpu_renderer', 'must be a string (may be "unknown" headless)');
   if (typeof r.harness_run_id !== 'string' || !r.harness_run_id) fail('harness_run_id', 'must be a non-empty string');
   if (typeof r.harness_commit !== 'string') fail('harness_commit', 'must be a string (git sha, may be "unknown")');
-  if (typeof r.timestamp !== 'string' || Number.isNaN(Date.parse(r.timestamp))) fail('timestamp', 'must be an ISO-8601 string');
+  if (typeof r.timestamp !== 'string' || Number.isNaN(Date.parse(r.timestamp)))
+    fail('timestamp', 'must be an ISO-8601 string');
   return r;
 }
 
@@ -66,7 +67,9 @@ export function validateCostRecord(r) {
 export function fromTimerPoll({ shader, effectKind, params = {}, timings, label, meta = {} }) {
   const vals = [...timings.values()];
   if (!vals.length) {
-    throw new Error(`[mlx:cost] no timings for "${label ?? shader}" — the GPU timer returned an empty map (disjoint or unsupported?)`);
+    throw new Error(
+      `[mlx:cost] no timings for "${label ?? shader}" — the GPU timer returned an empty map (disjoint or unsupported?)`,
+    );
   }
   const sorted = [...vals].sort((a, b) => a - b);
   const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
@@ -99,13 +102,16 @@ export function toJsonl(records) {
 
 /** Parse + validate JSONL back into records (used by selfcheck and tooling). */
 export function fromJsonl(text) {
-  return text.split('\n').filter((l) => l.trim()).map((l, i) => {
-    try {
-      return validateCostRecord(JSON.parse(l));
-    } catch (e) {
-      throw new Error(`[mlx:cost] line ${i + 1}: ${e.message}`);
-    }
-  });
+  return text
+    .split('\n')
+    .filter((l) => l.trim())
+    .map((l, i) => {
+      try {
+        return validateCostRecord(JSON.parse(l));
+      } catch (e) {
+        throw new Error(`[mlx:cost] line ${i + 1}: ${e.message}`);
+      }
+    });
 }
 
 export const FIELDS = SCHEMAS.costMeasurement.fields;

@@ -14,12 +14,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkRng } from '../../prng.js';
-import {
-  createPointSet,
-  POINT_COLUMN_NAMES,
-  FAMILY_NONE,
-  FAMILY_DEBUG_POISON,
-} from './pointSet.js';
+import { createPointSet, POINT_COLUMN_NAMES, FAMILY_NONE, FAMILY_DEBUG_POISON } from './pointSet.js';
 import {
   acquirePointSet,
   releasePointSet,
@@ -48,7 +43,10 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
   assert.ok(s.family instanceof Uint8Array, 'family is Uint8Array');
   for (const name of POINT_COLUMN_NAMES) {
     assert.strictEqual(s[name].length, 8, `${name} has capacity 8`);
-    assert.ok(s[name].every((v) => v === 0), `${name} zeroed at birth`);
+    assert.ok(
+      s[name].every((v) => v === 0),
+      `${name} zeroed at birth`,
+    );
   }
   assert.strictEqual(s.count, 0, 'count starts at 0');
   assert.strictEqual(s.capacity, 8, 'capacity recorded');
@@ -68,7 +66,9 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
   assert.strictEqual(assertColumnsClean(a), true, 'fresh zeroed set is clean');
   // Dirty it like a writer would, then release.
   for (let i = 0; i < 16; i++) {
-    a.x[i] = i + 0.5; a.id[i] = 1000 + i; a.family[i] = 7;
+    a.x[i] = i + 0.5;
+    a.id[i] = 1000 + i;
+    a.family[i] = 7;
   }
   a.count = 16;
   releasePointSet(a);
@@ -90,12 +90,18 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
   const t = acquirePointSet(7, 4); // definitely the poisoned one
   assert.strictEqual(t.x.buffer, s.x.buffer, 're-acquired the poisoned set');
   t.count = 4; // plant: claim 4 live lanes without overwriting any
-  assert.throws(() => assertColumnsClean(t), SoaContractError,
-    'debug assertion fires on a planted dirty read');
+  assert.throws(() => assertColumnsClean(t), SoaContractError, 'debug assertion fires on a planted dirty read');
   // Full overwrite clears the poison: the assertion goes quiet.
   for (let i = 0; i < 4; i++) {
-    t.x[i] = i; t.y[i] = -i; t.vx[i] = 0.25; t.vy[i] = 0.5;
-    t.slot[i] = i; t.energy[i] = 1; t.id[i] = i + 1; t.family[i] = 7; t.source[i] = 3;
+    t.x[i] = i;
+    t.y[i] = -i;
+    t.vx[i] = 0.25;
+    t.vy[i] = 0.5;
+    t.slot[i] = i;
+    t.energy[i] = 1;
+    t.id[i] = i + 1;
+    t.family[i] = 7;
+    t.source[i] = 3;
   }
   assert.strictEqual(assertColumnsClean(t), true, 'fully overwritten set is clean');
   // Partial overwrite still trips: lane 3 left poisoned.
@@ -103,9 +109,18 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
   releasePointSet(u);
   const v = acquirePointSet(9, 4);
   v.count = 4;
-  for (let i = 0; i < 3; i++) { v.x[i] = 1; v.y[i] = 1; v.vx[i] = 1; v.vy[i] = 1; v.energy[i] = 1; v.slot[i] = 1; v.id[i] = 1; v.family[i] = 9; v.source[i] = 1; }
-  assert.throws(() => assertColumnsClean(v), SoaContractError,
-    'partial overwrite still trips the assertion');
+  for (let i = 0; i < 3; i++) {
+    v.x[i] = 1;
+    v.y[i] = 1;
+    v.vx[i] = 1;
+    v.vy[i] = 1;
+    v.energy[i] = 1;
+    v.slot[i] = 1;
+    v.id[i] = 1;
+    v.family[i] = 9;
+    v.source[i] = 1;
+  }
+  assert.throws(() => assertColumnsClean(v), SoaContractError, 'partial overwrite still trips the assertion');
   releasePointSet(t);
   releasePointSet(v);
 }
@@ -147,12 +162,9 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
 
 // ── guards: reserved family code, non-set release ──────────────────────────
 {
-  assert.throws(() => acquirePointSet(0xff, 4), SoaContractError,
-    'family code 0xFF is reserved for debug poison');
-  assert.throws(() => releasePointSet({}), SoaContractError,
-    'releasing a non-point-set throws');
-  assert.throws(() => releasePointSet(null), SoaContractError,
-    'releasing null throws');
+  assert.throws(() => acquirePointSet(0xff, 4), SoaContractError, 'family code 0xFF is reserved for debug poison');
+  assert.throws(() => releasePointSet({}), SoaContractError, 'releasing a non-point-set throws');
+  assert.throws(() => releasePointSet(null), SoaContractError, 'releasing null throws');
 }
 
 // ── kill list (#1309): adapters.js is gone; no toObjects/fromObjects ───────
@@ -166,15 +178,15 @@ setSoaDebugEnabled(true); // the contract assertions are a debug-build feature
 // kill list culturally clean (reword, don't paren).
 {
   const here = dirname(fileURLToPath(import.meta.url));
-  assert.ok(
-    !existsSync(join(here, 'adapters.js')),
-    'kill list: src/engine/kernel/soa/adapters.js must be deleted',
-  );
+  assert.ok(!existsSync(join(here, 'adapters.js')), 'kill list: src/engine/kernel/soa/adapters.js must be deleted');
   const hits = [];
   const walk = (dir) => {
     for (const name of readdirSync(dir)) {
       const p = join(dir, name);
-      if (statSync(p).isDirectory()) { walk(p); continue; }
+      if (statSync(p).isDirectory()) {
+        walk(p);
+        continue;
+      }
       if (!/\.(m?js)$/.test(name)) continue;
       const code = readFileSync(p, 'utf8');
       // Built via concatenation so this file's own source doesn't trip the
@@ -215,19 +227,20 @@ function snapshot(set) {
   fillFromSeed(runB, 1234, N);
   const snapA = snapshot(runA);
   const snapB = snapshot(runB);
-  assert.strictEqual(Buffer.compare(snapA, snapB), 0,
-    'same seed → bit-identical columns across runs');
+  assert.strictEqual(Buffer.compare(snapA, snapB), 0, 'same seed → bit-identical columns across runs');
   // Through the pool too: release, re-acquire, refill from the same seed.
   releasePointSet(runA);
   const runC = acquirePointSet(2, N);
   fillFromSeed(runC, 1234, N);
-  assert.strictEqual(Buffer.compare(snapshot(runC), snapA), 0,
-    'same seed → same columns after an acquire/release cycle');
+  assert.strictEqual(
+    Buffer.compare(snapshot(runC), snapA),
+    0,
+    'same seed → same columns after an acquire/release cycle',
+  );
   assert.strictEqual(assertColumnsClean(runC), true, 'refilled set passes the contract');
   const runD = createPointSet(N);
   fillFromSeed(runD, 9999, N);
-  assert.notStrictEqual(Buffer.compare(snapshot(runD), snapA), 0,
-    'different seed → different columns (sanity)');
+  assert.notStrictEqual(Buffer.compare(snapshot(runD), snapA), 0, 'different seed → different columns (sanity)');
   releasePointSet(runB);
   releasePointSet(runC);
   releasePointSet(runD);
@@ -242,7 +255,11 @@ function snapshot(set) {
   releasePointSet(s);
   const t = acquirePointSet(1, 4);
   assert.strictEqual(t.x.buffer, s.x.buffer, 'pool still reuses with debug off');
-  assert.strictEqual(t.x[0], new Float32Array([123.456])[0], 'no poisoning with debug off (prod path: writer overwrites)');
+  assert.strictEqual(
+    t.x[0],
+    new Float32Array([123.456])[0],
+    'no poisoning with debug off (prod path: writer overwrites)',
+  );
   t.count = 4;
   assert.strictEqual(assertColumnsClean(t), true, 'assertion is a no-op with debug off');
   setSoaDebugEnabled(true);

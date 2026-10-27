@@ -9,7 +9,15 @@
 // deliberately so: it scans the full grid and has no place on the hottest
 // FEED path (#1253: do not wire into live diagnostics).
 import assert from 'node:assert';
-import { lumaToGrad, lumaToCurl, lumaToFlow, lumaToGradInto, lumaToCurlInto, lumaToFlowInto, fieldInvariants } from './feedOps.js';
+import {
+  lumaToGrad,
+  lumaToCurl,
+  lumaToFlow,
+  lumaToGradInto,
+  lumaToCurlInto,
+  lumaToFlowInto,
+  fieldInvariants,
+} from './feedOps.js';
 
 const W = 4;
 const H = 4;
@@ -69,7 +77,10 @@ for (let i = 0; i < W * H; i++) {
 // --- constant luma → exact zero flow, both ops ------------------------------
 const flat = new Float32Array(W * H).fill(0.5);
 for (const f of [lumaToGrad(flat, W, H), lumaToCurl(flat, W, H)]) {
-  assert.ok(Array.from(f.flow).every((v) => v === 0), 'constant luma → zero flow');
+  assert.ok(
+    Array.from(f.flow).every((v) => v === 0),
+    'constant luma → zero flow',
+  );
 }
 
 // --- lumaToFlow dispatch -----------------------------------------------------
@@ -106,10 +117,21 @@ for (const [op, into, ref] of [
   assert.strictEqual(out.w, W, `${op}Into width rides along`);
   assert.strictEqual(out.h, H, `${op}Into height rides along`);
   for (let i = 0; i < W * H; i++) {
-    assert.strictEqual(u[i], ref.flow[i * 2], `${op}Into u[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`);
-    assert.strictEqual(v[i], ref.flow[i * 2 + 1], `${op}Into v[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`);
+    assert.strictEqual(
+      u[i],
+      ref.flow[i * 2],
+      `${op}Into u[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`,
+    );
+    assert.strictEqual(
+      v[i],
+      ref.flow[i * 2 + 1],
+      `${op}Into v[${i}] bit-identical to lumaTo${op === 'grad' ? 'Grad' : 'Curl'}`,
+    );
   }
-  assert.ok(!Array.from(u).includes(123) && !Array.from(v).includes(123), `${op}Into overwrote every lane (no sentinel left)`);
+  assert.ok(
+    !Array.from(u).includes(123) && !Array.from(v).includes(123),
+    `${op}Into overwrote every lane (no sentinel left)`,
+  );
 }
 // lumaToFlowInto dispatch mirrors lumaToFlow (default curl; 'grad' → grad).
 {
@@ -121,7 +143,11 @@ for (const [op, into, ref] of [
   const ug = new Float32Array(W * H);
   const vg = new Float32Array(W * H);
   lumaToFlowInto(ramp, W, H, ug, vg, 'grad');
-  assert.deepStrictEqual(Array.from(ug), Array.from(grad.flow.filter((_, i) => i % 2 === 0)), "'grad' dispatches to lumaToGradInto");
+  assert.deepStrictEqual(
+    Array.from(ug),
+    Array.from(grad.flow.filter((_, i) => i % 2 === 0)),
+    "'grad' dispatches to lumaToGradInto",
+  );
 }
 // Zero allocation inside the encode (the #1308 guarantee): counting
 // Float32Array construction across encodes must see none.
@@ -152,14 +178,8 @@ for (const [op, into, ref] of [
 // reads as the spec, not the fixture.
 const invGrad = fieldInvariants(grad);
 const invCurl = fieldInvariants(curl);
-assert.ok(
-  invCurl.meanAbsDiv < 1e-9,
-  `curl field must be divergence-free (meanAbsDiv ${invCurl.meanAbsDiv})`,
-);
-assert.ok(
-  invGrad.meanAbsCurl < 1e-9,
-  `grad field must be curl-free (meanAbsCurl ${invGrad.meanAbsCurl})`,
-);
+assert.ok(invCurl.meanAbsDiv < 1e-9, `curl field must be divergence-free (meanAbsDiv ${invCurl.meanAbsDiv})`);
+assert.ok(invGrad.meanAbsCurl < 1e-9, `grad field must be curl-free (meanAbsCurl ${invGrad.meanAbsCurl})`);
 
 // --- determinism --------------------------------------------------------------
 const again = lumaToFlow(ramp, W, H);

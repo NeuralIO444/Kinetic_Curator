@@ -88,9 +88,7 @@ function assertJsonSafe(value, path, depth) {
     }
     return;
   }
-  throw new EventLogError(
-    `payload must be JSON-safe data at ${path} (got ${t === 'object' ? 'non-plain object' : t})`,
-  );
+  throw new EventLogError(`payload must be JSON-safe data at ${path} (got ${t === 'object' ? 'non-plain object' : t})`);
 }
 
 function isFiniteNumber(v) {
@@ -208,7 +206,7 @@ export function sortedEvents(log) {
   if (!log || !Array.isArray(log.events)) {
     throw new EventLogError('log must be created by createEventLog()/parseEventLog()');
   }
-  return [...log.events].sort((a, b) => (a.frame - b.frame) || (a.seq - b.seq));
+  return [...log.events].sort((a, b) => a.frame - b.frame || a.seq - b.seq);
 }
 
 /** Entries for one frame, in application order. */
@@ -245,9 +243,7 @@ export function parseEventLog(data) {
     throw new EventLogError('serialized log must be { version, events: [...] }');
   }
   if (data.version !== EVENT_LOG_VERSION) {
-    throw new EventLogError(
-      `unsupported event log version ${String(data.version)} (want ${EVENT_LOG_VERSION})`,
-    );
+    throw new EventLogError(`unsupported event log version ${String(data.version)} (want ${EVENT_LOG_VERSION})`);
   }
   const log = createEventLog();
   for (const e of data.events) {

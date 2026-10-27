@@ -34,12 +34,12 @@ export function runFeedGolden(deps) {
   const { createFeedDelay, createFeedLive, applyFeed, normalizePatch, MAX_TRACKS, columnHashes } = deps;
   const records = [];
   const rec = (label, obj) => records.push({ label, ...obj });
-  const fieldsOf = (delay) =>
-    Array.from({ length: MAX_TRACKS }, (_, t) => columnHashes(delay.field(t)));
+  const fieldsOf = (delay) => Array.from({ length: MAX_TRACKS }, (_, t) => columnHashes(delay.field(t)));
 
   // --- A. raw delay: push() path, multi-track, re-push, reset --------------
   {
-    const W = 40, H = 28;
+    const W = 40,
+      H = 28;
     const delay = createFeedDelay(W, H);
     rec('A0.pristine', { fields: fieldsOf(delay) });
     delay.push(0, makeLuma(W, H, 11));
@@ -51,7 +51,11 @@ export function runFeedGolden(deps) {
     // applyTo through each track's field, two strengths
     for (const strength of [0.5, 1.7]) {
       const patch = normalizePatch({ mode: 'feed', from: 0, to: 1, strength });
-      const pts = [{ x: 0.1, y: 0.2 }, { x: 0.5, y: 0.5 }, { x: 0.9, y: 0.8 }];
+      const pts = [
+        { x: 0.1, y: 0.2 },
+        { x: 0.5, y: 0.5 },
+        { x: 0.9, y: 0.8 },
+      ];
       const outs = [];
       for (let t = 0; t < MAX_TRACKS; t++) {
         outs.push(applyFeed(pts, delay.field(t), { ...patch, from: t }));
@@ -66,7 +70,10 @@ export function runFeedGolden(deps) {
   {
     const live = createFeedLive(160, 112); // w=40, h=28 after FEED_SCALE
     const rng = mulberry32(1308);
-    const dst = [{ x: 0.25, y: 0.5 }, { x: 0.7, y: 0.3 }];
+    const dst = [
+      { x: 0.25, y: 0.5 },
+      { x: 0.7, y: 0.3 },
+    ];
     const patch = { mode: 'feed', from: 1, to: 2, strength: 0.9 };
     for (let f = 0; f < 16; f++) {
       for (let t = 0; t < MAX_TRACKS; t++) {

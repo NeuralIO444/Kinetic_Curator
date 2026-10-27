@@ -98,8 +98,8 @@ function grid(ctx) {
   const { i, count, w, h, rng, jitter } = ctx;
   const cols = Math.ceil(Math.sqrt(count * (w / h)));
   const rows = Math.ceil(count / cols);
-  const cx = ((i % cols) + 0.5) / cols * w;
-  const cy = (Math.floor(i / cols) + 0.5) / rows * h;
+  const cx = (((i % cols) + 0.5) / cols) * w;
+  const cy = ((Math.floor(i / cols) + 0.5) / rows) * h;
   const x = cx + (rng() - 0.5) * jitter;
   const y = cy + (rng() - 0.5) * jitter;
   if (writeSampleColumns(ctx, x, y)) return; // #1309 — column mode
@@ -109,7 +109,7 @@ function grid(ctx) {
 function fibonacci(ctx) {
   const { i, count, w, h, rng, jitter } = ctx;
   const phi = (1 + Math.sqrt(5)) / 2;
-  const angle = 2 * Math.PI * i / (phi * phi);
+  const angle = (2 * Math.PI * i) / (phi * phi);
   const radius = Math.sqrt(i / count) * Math.min(w, h) * 0.48;
   const cx = w / 2 + Math.cos(angle) * radius;
   const cy = h / 2 + Math.sin(angle) * radius;
@@ -143,7 +143,7 @@ function phyllotaxis(ctx) {
   const off = Number.isFinite(phylloDivergence) ? phylloDivergence : 0;
   // Written as fibonacci's own expression plus the offset term so that at
   // off = 0 the addition is exactly + 0 and the result is bit-identical.
-  const angle = 2 * Math.PI * i / (PHYLLO_PHI * PHYLLO_PHI) + i * off * DEG;
+  const angle = (2 * Math.PI * i) / (PHYLLO_PHI * PHYLLO_PHI) + i * off * DEG;
   const radius = Math.sqrt(i / count) * Math.min(w, h) * 0.48;
   const cx = w / 2 + Math.cos(angle) * radius;
   const cy = h / 2 + Math.sin(angle) * radius;
@@ -191,10 +191,10 @@ function truchet(ctx) {
   const k = i % TRUCHET_PER_CELL;
   const half = TRUCHET_PER_CELL >> 1;
   const second = k >= half;
-  const along = ((k % half) + rng()) / half;          // 0..1 along the quarter
+  const along = ((k % half) + rng()) / half; // 0..1 along the quarter
   const ang = along * Math.PI * 0.5;
   // Corner the arc is centred on, in unit-cell coords.
-  const ax = second ? (flip ? 0 : 1) : (flip ? 1 : 0);
+  const ax = second ? (flip ? 0 : 1) : flip ? 1 : 0;
   const ay = second ? 1 : 0;
   const ux = ax + (ax === 0 ? 0.5 * Math.cos(ang) : -0.5 * Math.cos(ang));
   const uy = ay + (ay === 0 ? 0.5 * Math.sin(ang) : -0.5 * Math.sin(ang));
@@ -317,7 +317,7 @@ function ca(ctx) {
  * is placed in 1.5 attempts on average.
  */
 const VORONOI_CELLS = 14;
-const VORONOI_VEIN = 0.04;   // unit-space half-width of the empty seam
+const VORONOI_VEIN = 0.04; // unit-space half-width of the empty seam
 const VORONOI_ATTEMPTS = 24; // hard cap — see below
 
 // Centres are pure in (seed, spatial offset), so they are cached rather than
@@ -347,7 +347,12 @@ function voronoiGap(pts, x, y) {
     const dx = x - pts[k * 2];
     const dy = y - pts[k * 2 + 1];
     const d = dx * dx + dy * dy;
-    if (d < d1) { d2 = d1; d1 = d; } else if (d < d2) { d2 = d; }
+    if (d < d1) {
+      d2 = d1;
+      d1 = d;
+    } else if (d < d2) {
+      d2 = d;
+    }
   }
   return Math.sqrt(d2) - Math.sqrt(d1);
 }
@@ -376,7 +381,11 @@ function voronoi(ctx) {
       if (writeSampleColumns(ctx, px, py)) return; // #1309 — column mode
       return { x: px, y: py };
     }
-    if (gap > bestGap) { bestGap = gap; bestX = x; bestY = y; }
+    if (gap > bestGap) {
+      bestGap = gap;
+      bestX = x;
+      bestY = y;
+    }
   }
   // Graceful degradation, never a hang: the cap is hard, and on exhaustion we
   // keep the least-bad candidate (furthest from a seam) rather than looping or
@@ -435,12 +444,16 @@ function lsystemString(rule, depth) {
 
 /** Walk the string with a turtle; one point per segment, plus its branch depth. */
 function lsystemWalk(str, angleDeg) {
-  const turn = angleDeg * Math.PI / 180;
-  let x = 0; let y = 0; let a = -Math.PI / 2; // grow upward
+  const turn = (angleDeg * Math.PI) / 180;
+  let x = 0;
+  let y = 0;
+  let a = -Math.PI / 2; // grow upward
   let depth = 0;
   let maxDepth = 0;
   const stack = [];
-  const xs = []; const ys = []; const ds = [];
+  const xs = [];
+  const ys = [];
+  const ds = [];
   for (let k = 0; k < str.length; k++) {
     switch (str[k]) {
       case 'F': {
@@ -450,15 +463,35 @@ function lsystemWalk(str, angleDeg) {
         // as a frond, with a trunk and finer twigs, instead of a lattice of
         // equal-length struts.
         const step = Math.pow(LSYS_BRANCH_SCALE, depth);
-        x += Math.cos(a) * step; y += Math.sin(a) * step;
-        xs.push(x); ys.push(y); ds.push(depth);
+        x += Math.cos(a) * step;
+        y += Math.sin(a) * step;
+        xs.push(x);
+        ys.push(y);
+        ds.push(depth);
         break;
       }
-      case '+': a += turn; break;
-      case '-': a -= turn; break;
-      case '[': stack.push([x, y, a, depth]); depth++; if (depth > maxDepth) maxDepth = depth; break;
-      case ']': if (stack.length) { const p = stack.pop(); x = p[0]; y = p[1]; a = p[2]; depth = p[3]; } break;
-      default: break;
+      case '+':
+        a += turn;
+        break;
+      case '-':
+        a -= turn;
+        break;
+      case '[':
+        stack.push([x, y, a, depth]);
+        depth++;
+        if (depth > maxDepth) maxDepth = depth;
+        break;
+      case ']':
+        if (stack.length) {
+          const p = stack.pop();
+          x = p[0];
+          y = p[1];
+          a = p[2];
+          depth = p[3];
+        }
+        break;
+      default:
+        break;
     }
   }
   return { xs, ys, ds, maxDepth };
@@ -473,11 +506,15 @@ function lsystemPlant(seed, seedOffsets, depth, angleDeg) {
   const key = `${seed >>> 0}:${off}:${depth}:${angleDeg}`;
   let plant = _lsysCache.get(key);
   if (!plant) {
-    const pick = LSYS_RULES[Math.floor(hashU01(seed, CH.geo, 0x15e5, seedOffsets) * LSYS_RULES.length) % LSYS_RULES.length];
+    const pick =
+      LSYS_RULES[Math.floor(hashU01(seed, CH.geo, 0x15e5, seedOffsets) * LSYS_RULES.length) % LSYS_RULES.length];
     const walk = lsystemWalk(lsystemString(pick.rule, depth), angleDeg);
     // Normalise the plant into the unit box, preserving aspect so a frond
     // stays a frond rather than being stretched to fill the plate.
-    let minX = Infinity; let maxX = -Infinity; let minY = Infinity; let maxY = -Infinity;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
     for (let k = 0; k < walk.xs.length; k++) {
       if (walk.xs[k] < minX) minX = walk.xs[k];
       if (walk.xs[k] > maxX) maxX = walk.xs[k];
@@ -709,14 +746,38 @@ registerSampler({
 });
 registerSampler({
   id: 'dla', // #720
-  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'growthTick', 'growthRate', 'growthBranch', 'audioEnergy'],
+  reads: [
+    'i',
+    'w',
+    'h',
+    'rng',
+    'jitter',
+    'seed',
+    'seedOffsets',
+    'growthTick',
+    'growthRate',
+    'growthBranch',
+    'audioEnergy',
+  ],
   writes: ['points', 'points.t'],
   costTier: 2,
   fn: dla,
 });
 registerSampler({
   id: 'eden', // #720
-  reads: ['i', 'w', 'h', 'rng', 'jitter', 'seed', 'seedOffsets', 'growthTick', 'growthRate', 'growthBranch', 'audioEnergy'],
+  reads: [
+    'i',
+    'w',
+    'h',
+    'rng',
+    'jitter',
+    'seed',
+    'seedOffsets',
+    'growthTick',
+    'growthRate',
+    'growthBranch',
+    'audioEnergy',
+  ],
   writes: ['points', 'points.t'],
   costTier: 2,
   fn: eden,
@@ -802,13 +863,20 @@ function traceBrushTrails(ctx, trailCount, per) {
       let a = ang;
       let nx = x + Math.cos(a) * stepLen;
       let ny = y + Math.sin(a) * stepLen;
-      if (nx < 0 || nx > w) { a = Math.PI - a; nx = x + Math.cos(a) * stepLen; }
-      if (ny < 0 || ny > h) { a = -a; ny = y + Math.sin(a) * stepLen; }
+      if (nx < 0 || nx > w) {
+        a = Math.PI - a;
+        nx = x + Math.cos(a) * stepLen;
+      }
+      if (ny < 0 || ny > h) {
+        a = -a;
+        ny = y + Math.sin(a) * stepLen;
+      }
       nx = Math.min(w, Math.max(0, nx));
       ny = Math.min(h, Math.max(0, ny));
       // Wobble pushes the stamp off the trail, perpendicular to the step,
       // by fBm noise — the hand-drawn quiver. Bounded by wobbleAmp.
-      let ox = 0, oy = 0;
+      let ox = 0,
+        oy = 0;
       if (wobbleAmp > 0) {
         const off = noise.fBm3D(s * wobbleFreq, k * 13.7 + 5, seedZ * 2 + 3, 2) * wobbleAmp;
         ox = -Math.sin(a) * off;
@@ -816,7 +884,7 @@ function traceBrushTrails(ctx, trailCount, per) {
       }
       // rot01 maps the full circle onto the stage-C unit draw so that the
       // default rotate range [-180, 180] reproduces the tangent in degrees.
-      const deg = a * 180 / Math.PI;
+      const deg = (a * 180) / Math.PI;
       pts.push({ x: nx + ox, y: ny + oy, rot01: (((deg % 360) + 540) % 360) / 360 });
       x = nx;
       y = ny;
@@ -845,7 +913,20 @@ registerSampler({
   // call, then dealt round-robin. Deliberately does NOT read ctx.rng or
   // jitter (the file comment explains why) — neither is declared.
   id: 'brush',
-  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets', 'fieldScale', 'brushSize', 'brushSpacing', 'wobbleAmp', 'wobbleFreq', 'trailCount'],
+  reads: [
+    'i',
+    'count',
+    'w',
+    'h',
+    'seed',
+    'seedOffsets',
+    'fieldScale',
+    'brushSize',
+    'brushSpacing',
+    'wobbleAmp',
+    'wobbleFreq',
+    'trailCount',
+  ],
   writes: ['points', 'points.t', 'points.rot01'],
   costTier: 2,
   fn: brush,
@@ -887,8 +968,18 @@ registerSampler({
   // knobs) and cached; sampling deals points off the network. No jitter —
   // jitter would break the vein structure.
   id: 'colonize',
-  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets',
-    'colonizeInfluence', 'colonizeKill', 'colonizeBranch', 'colonizeStep'],
+  reads: [
+    'i',
+    'count',
+    'w',
+    'h',
+    'seed',
+    'seedOffsets',
+    'colonizeInfluence',
+    'colonizeKill',
+    'colonizeBranch',
+    'colonizeStep',
+  ],
   writes: ['points', 'points.t'],
   costTier: 2,
   fn: colonize,

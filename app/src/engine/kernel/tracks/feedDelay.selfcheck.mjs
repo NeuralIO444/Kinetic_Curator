@@ -94,11 +94,7 @@ assert.deepStrictEqual(Array.from(afterPush.v), freshB.v, 'after push, v reflect
 assert.notStrictEqual(afterPush, f1, 'recompute produces a new object, old one untouched');
 assert.deepStrictEqual(Array.from(f1.u), fresh.u, 'previously returned field keeps its old u values');
 assert.deepStrictEqual(Array.from(f1.v), fresh.v, 'previously returned field keeps its old v values');
-assert.notDeepStrictEqual(
-  Array.from(afterPush.u),
-  Array.from(f1.u),
-  'new luma actually changes the flow',
-);
+assert.notDeepStrictEqual(Array.from(afterPush.u), Array.from(f1.u), 'new luma actually changes the flow');
 
 // --- 4. reset() drops cache and history --------------------------------------
 delay.reset();

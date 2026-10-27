@@ -25,15 +25,37 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
 
 // Formatting per mode matches the specified strings exactly.
 {
-  const f = formatPatchLine({ srcN: 2, dstN: 1, mode: 'field', strength: 0.16, sample: sample({ pullPx: 1.234 }), now: Date.now() });
+  const f = formatPatchLine({
+    srcN: 2,
+    dstN: 1,
+    mode: 'field',
+    strength: 0.16,
+    sample: sample({ pullPx: 1.234 }),
+    now: Date.now(),
+  });
   assert.strictEqual(f, 'KC-2 → KC-1 · FIELD · 0.16 · pull 1.2px', 'field line');
-  const fe = formatPatchLine({ srcN: 3, dstN: 1, mode: 'feed', strength: 0.16, sample: sample({ pullPx: 0.44 }), now: Date.now() });
+  const fe = formatPatchLine({
+    srcN: 3,
+    dstN: 1,
+    mode: 'feed',
+    strength: 0.16,
+    sample: sample({ pullPx: 0.44 }),
+    now: Date.now(),
+  });
   assert.strictEqual(fe, 'KC-3 → KC-1 · FEED · 0.16 · blend 0.8% · hop 0.4px', 'feed line (0.16 × 5% = 0.8%)');
   const mm = formatPatchLine({
-    srcN: 2, dstN: 1, mode: 'mod', strength: 0.5,
-    sample: sample({ speed: 2, agitation: 3, glow: 0.12, fade: 0.03, displace: 2.5 }), now: Date.now(),
+    srcN: 2,
+    dstN: 1,
+    mode: 'mod',
+    strength: 0.5,
+    sample: sample({ speed: 2, agitation: 3, glow: 0.12, fade: 0.03, displace: 2.5 }),
+    now: Date.now(),
   });
-  assert.strictEqual(mm, 'KC-2 → KC-1 · MOD · 0.50 · glow 0.12 · fade 0.03 · nudge 0.4px', 'mod line (min(4,2.5) × 0.15 = 0.375 → 0.4)');
+  assert.strictEqual(
+    mm,
+    'KC-2 → KC-1 · MOD · 0.50 · glow 0.12 · fade 0.03 · nudge 0.4px',
+    'mod line (min(4,2.5) × 0.15 = 0.375 → 0.4)',
+  );
   console.log('[selfcheck] patchDiag format lines');
 }
 
@@ -44,16 +66,28 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   assert.strictEqual(isSourceStill(0, 0.05), false, 'boundary agitation is not still');
   assert.strictEqual(isSourceStill(NaN, NaN), true, 'NaN metrics read still, never throw');
   const ms = formatPatchLine({
-    srcN: 2, dstN: 1, mode: 'mod', strength: 0.5,
-    sample: sample({ speed: 0, agitation: 0, glow: 0, fade: 0, displace: 0 }), now: Date.now(),
+    srcN: 2,
+    dstN: 1,
+    mode: 'mod',
+    strength: 0.5,
+    sample: sample({ speed: 0, agitation: 0, glow: 0, fade: 0, displace: 0 }),
+    now: Date.now(),
   });
   assert.strictEqual(ms, 'KC-2 → KC-1 · MOD · 0.50 · source still — strength held', 'still mod line');
   const held = formatPatchLine({
-    srcN: 2, dstN: 1, mode: 'field', strength: 0.16,
-    sample: { at: at(PATCH_DIAG_STALE_MS + 100), pullPx: 1 }, now: Date.now(),
+    srcN: 2,
+    dstN: 1,
+    mode: 'field',
+    strength: 0.16,
+    sample: { at: at(PATCH_DIAG_STALE_MS + 100), pullPx: 1 },
+    now: Date.now(),
   });
   assert.ok(held.endsWith('· held'), 'stale sample appends held');
-  assert.strictEqual(formatPatchLine({ srcN: 1, dstN: 2, mode: 'feed', strength: 0.1, sample: null, now: Date.now() }), null, 'missing sample is null, never undefined');
+  assert.strictEqual(
+    formatPatchLine({ srcN: 1, dstN: 2, mode: 'feed', strength: 0.1, sample: null, now: Date.now() }),
+    null,
+    'missing sample is null, never undefined',
+  );
   console.log('[selfcheck] patchDiag still/stale/null rules');
 }
 
@@ -66,8 +100,12 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   assert.strictEqual(getPatchSample('nope'), null, 'unknown id is null');
   assert.strictEqual(patchSampleAgeMs('nope'), Infinity, 'unknown age is Infinity');
   const adv = formatPatchLine({
-    srcN: 1, dstN: 2, mode: 'mod', strength: Infinity,
-    sample: sample({ speed: NaN, agitation: Infinity, glow: NaN, fade: -3, displace: Infinity }), now: Date.now(),
+    srcN: 1,
+    dstN: 2,
+    mode: 'mod',
+    strength: Infinity,
+    sample: sample({ speed: NaN, agitation: Infinity, glow: NaN, fade: -3, displace: Infinity }),
+    now: Date.now(),
   });
   assert.ok(!/NaN|Infinity/.test(adv), `adversarial input never prints NaN/Infinity (got ${adv})`);
   console.log('[selfcheck] patchDiag record semantics + finiteness');
@@ -83,15 +121,22 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
     { id: 'd', type: 'content', patch: { mode: 'field', to: 'd', strength: 0.3 } },
   ];
   const pairs = activePatchPairs(layers);
-  assert.deepStrictEqual(pairs, [{ srcId: 'b', dstId: 'a', mode: 'mod', strength: 0.5 }],
-    'only live-pointing content patches pair (fx skipped, off/null-to/self skipped)');
+  assert.deepStrictEqual(
+    pairs,
+    [{ srcId: 'b', dstId: 'a', mode: 'mod', strength: 0.5 }],
+    'only live-pointing content patches pair (fx skipped, off/null-to/self skipped)',
+  );
   assert.deepStrictEqual(activePatchPairs(null), [], 'null layers pair nothing');
-  const ord = new Map([['a', 1], ['b', 2]]);
-  assert.strictEqual(
-    formatMatrixRow(pairs[0], ord), 'KC-2 → KC-1 · MOD · 0.50', 'matrix row format');
+  const ord = new Map([
+    ['a', 1],
+    ['b', 2],
+  ]);
+  assert.strictEqual(formatMatrixRow(pairs[0], ord), 'KC-2 → KC-1 · MOD · 0.50', 'matrix row format');
   assert.strictEqual(
     formatMatrixRow({ srcId: 'x', dstId: 'a', mode: 'feed', strength: 0 }, new Map()),
-    'KC-? → KC-? · FEED · 0.00', 'unknown ordinals read ?');
+    'KC-? → KC-? · FEED · 0.00',
+    'unknown ordinals read ?',
+  );
   console.log('[selfcheck] patchDiag matrix pairs + rows');
 }
 
@@ -107,10 +152,16 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
     const id = `torture-${i}`;
     recordPatchSample(id, { mode: 'feed', strength: 0.2, pullPx: i });
     live.add(id);
-    if (i % 2 === 0) { removePatchSample(id); live.delete(id); } // churn the hook path
+    if (i % 2 === 0) {
+      removePatchSample(id);
+      live.delete(id);
+    } // churn the hook path
   }
-  assert.strictEqual(patchDiagSampleCount(), base + live.size,
-    `map size tracks live layers exactly (got ${patchDiagSampleCount()}, want ${base + live.size})`);
+  assert.strictEqual(
+    patchDiagSampleCount(),
+    base + live.size,
+    `map size tracks live layers exactly (got ${patchDiagSampleCount()}, want ${base + live.size})`,
+  );
   assert.strictEqual(getPatchSample('torture-0'), null, 'removed id is absent');
   assert.ok(getPatchSample('torture-1'), 'live id survives');
   // Large cycle: map size stays ≤ live layers even when churn overflows the cap.
@@ -118,17 +169,24 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
     const id = `big-${i}`;
     recordPatchSample(id, { mode: 'feed', strength: 0.2, pullPx: i });
     live.add(id);
-    if (i % 2 === 0) { removePatchSample(id); live.delete(id); }
+    if (i % 2 === 0) {
+      removePatchSample(id);
+      live.delete(id);
+    }
   }
-  assert.ok(patchDiagSampleCount() <= base + live.size,
-    `map size stays ≤ live layers (got ${patchDiagSampleCount()}, live ${base + live.size})`);
+  assert.ok(
+    patchDiagSampleCount() <= base + live.size,
+    `map size stays ≤ live layers (got ${patchDiagSampleCount()}, live ${base + live.size})`,
+  );
   console.log('[selfcheck] patchDiag #1246 delete-on-remove bound');
 
   // Cap backstop: churn that never hits the remove hook stays bounded.
   const C = PATCH_DIAG_MAX_SAMPLES * 2;
   for (let i = 0; i < C; i++) recordPatchSample(`churn-${i}`, { mode: 'field', strength: 0.1, pullPx: i });
-  assert.ok(patchDiagSampleCount() <= PATCH_DIAG_MAX_SAMPLES,
-    `cap backstop holds (${patchDiagSampleCount()} ≤ ${PATCH_DIAG_MAX_SAMPLES})`);
+  assert.ok(
+    patchDiagSampleCount() <= PATCH_DIAG_MAX_SAMPLES,
+    `cap backstop holds (${patchDiagSampleCount()} ≤ ${PATCH_DIAG_MAX_SAMPLES})`,
+  );
   // A live patched layer records every tick, so recency refresh keeps the
   // artist's watched diagnostic out of the eviction path.
   recordPatchSample('watched', { mode: 'mod', strength: 0.5, pullPx: 1 });
@@ -142,9 +200,14 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   for (let i = 0; i < M; i++) removePatchSample(`torture-${i}`);
   for (let i = 0; i < PATCH_DIAG_MAX_SAMPLES * 4; i++) removePatchSample(`big-${i}`);
   removePatchSample('watched');
-  for (let i = 0; i < C; i++) { removePatchSample(`churn-${i}`); removePatchSample(`churn2-${i}`); }
-  assert.ok(patchDiagSampleCount() <= base,
-    `cleanup restores at most the baseline (got ${patchDiagSampleCount()}, base ${base})`);
+  for (let i = 0; i < C; i++) {
+    removePatchSample(`churn-${i}`);
+    removePatchSample(`churn2-${i}`);
+  }
+  assert.ok(
+    patchDiagSampleCount() <= base,
+    `cleanup restores at most the baseline (got ${patchDiagSampleCount()}, base ${base})`,
+  );
   console.log('[selfcheck] patchDiag #1246 cap backstop + recency refresh');
 }
 
@@ -153,10 +216,16 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   const randomFn = getSampler('random');
   // The fallback behaviour itself is unchanged: the miss returns the
   // byte-identical `random` function it always did.
-  assert.strictEqual(getSampler('not-a-real-mode', 'L-fb-a'), randomFn,
-    'unknown mode still falls back to the same random function');
-  assert.strictEqual(getSampler('__proto__', 'L-fb-poison'), randomFn,
-    'poisoned mode falls back to random, not Object.prototype');
+  assert.strictEqual(
+    getSampler('not-a-real-mode', 'L-fb-a'),
+    randomFn,
+    'unknown mode still falls back to the same random function',
+  );
+  assert.strictEqual(
+    getSampler('__proto__', 'L-fb-poison'),
+    randomFn,
+    'poisoned mode falls back to random, not Object.prototype',
+  );
 
   // The diagnostic names the missing id in the patch-diagnostic channel.
   const fb = getSamplerFallback('L-fb-a');
@@ -171,12 +240,14 @@ const sample = (over = {}) => ({ at: Date.now(), ...over });
   // Once per (layer, mode) per session: count console.warns.
   let warns = 0;
   const origWarn = console.warn;
-  console.warn = () => { warns++; };
+  console.warn = () => {
+    warns++;
+  };
   try {
     getSampler('nope-1', 'L-fb-once');
-    getSampler('nope-1', 'L-fb-once');   // same pair: silent
+    getSampler('nope-1', 'L-fb-once'); // same pair: silent
     getSampler('nope-1', 'L-fb-once-2'); // new layer: fires again
-    getSampler('nope-2', 'L-fb-once');   // new mode: fires again
+    getSampler('nope-2', 'L-fb-once'); // new mode: fires again
   } finally {
     console.warn = origWarn;
   }

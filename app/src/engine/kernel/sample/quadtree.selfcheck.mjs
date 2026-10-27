@@ -4,12 +4,7 @@
 // separation, and the degenerate never-empty case.
 
 import assert from 'node:assert';
-import {
-  buildQuadtree,
-  clearQuadtreeCache,
-  QUAD_LEAF_BUDGET,
-  QUAD_MAX_DEPTH,
-} from './quadtree.js';
+import { buildQuadtree, clearQuadtreeCache, QUAD_LEAF_BUDGET, QUAD_MAX_DEPTH } from './quadtree.js';
 import { hashU01 } from '../rng.js';
 
 // Stub interestingness: diagonal gradient, seed-shifted so different seeds
@@ -48,7 +43,10 @@ const stubFor = (seed) => (x, y, d) => {
 {
   clearQuadtreeCache();
   const leaves = buildQuadtree({
-    interestingness: () => 1, seed: 1, maxDepth: 5, leafBudget: QUAD_LEAF_BUDGET,
+    interestingness: () => 1,
+    seed: 1,
+    maxDepth: 5,
+    leafBudget: QUAD_LEAF_BUDGET,
   });
   assert.ok(leaves.length <= QUAD_LEAF_BUDGET, `over budget: ${leaves.length}`);
   assert.strictEqual(leaves.length, QUAD_LEAF_BUDGET, 'all-interesting should fill the budget exactly');

@@ -204,21 +204,23 @@ export function clearColonizeCache() {
  * No jitter (would break the vein structure). Dedicated stream only for the growth itself.
  */
 export function colonize(ctx) {
-  const {
-    i, count, w, h, seed, seedOffsets,
-    colonizeInfluence, colonizeKill, colonizeBranch, colonizeStep,
-  } = ctx;
-  const influence = Number.isFinite(colonizeInfluence) && colonizeInfluence > 0
-    ? colonizeInfluence : COLONIZE_INFLUENCE;
-  const kill = Number.isFinite(colonizeKill) && colonizeKill > 0
-    ? colonizeKill : COLONIZE_KILL;
-  const branch = Number.isFinite(colonizeBranch)
-    ? Math.max(0, Math.min(1, colonizeBranch)) : COLONIZE_BRANCH;
-  const step = Number.isFinite(colonizeStep) && colonizeStep > 0
-    ? colonizeStep : COLONIZE_STEP;
+  const { i, count, w, h, seed, seedOffsets, colonizeInfluence, colonizeKill, colonizeBranch, colonizeStep } = ctx;
+  const influence =
+    Number.isFinite(colonizeInfluence) && colonizeInfluence > 0 ? colonizeInfluence : COLONIZE_INFLUENCE;
+  const kill = Number.isFinite(colonizeKill) && colonizeKill > 0 ? colonizeKill : COLONIZE_KILL;
+  const branch = Number.isFinite(colonizeBranch) ? Math.max(0, Math.min(1, colonizeBranch)) : COLONIZE_BRANCH;
+  const step = Number.isFinite(colonizeStep) && colonizeStep > 0 ? colonizeStep : COLONIZE_STEP;
 
   const net = colonizeNetwork({
-    seed, seedOffsets, w, h, count, influence, kill, branch, step,
+    seed,
+    seedOffsets,
+    w,
+    h,
+    count,
+    influence,
+    kill,
+    branch,
+    step,
   });
   const nodes = net.nodes;
   if (!nodes.length) {

@@ -20,18 +20,28 @@ import { join } from 'node:path';
 
 import { schemaId, describeSchemas, SCHEMAS } from './schemas.mjs';
 import {
-  validateCostRecord, fromTimerPoll, toJsonl as costToJsonl, fromJsonl as costFromJsonl,
+  validateCostRecord,
+  fromTimerPoll,
+  toJsonl as costToJsonl,
+  fromJsonl as costFromJsonl,
 } from './exportCostMeasurements.mjs';
 import {
-  validateFailureRecord, failureFromSweep, toJsonl as failToJsonl, fromJsonl as failFromJsonl,
+  validateFailureRecord,
+  failureFromSweep,
+  toJsonl as failToJsonl,
+  fromJsonl as failFromJsonl,
 } from './exportSweepFailures.mjs';
 import { renderEntry, validateManifest, writeTestRenderManifest } from './exportTestRenders.mjs';
 import { parseFailureLog, failureDensity, biasOrder, suggestSamples } from './guidedFuzz.mjs';
 import { effectSources, assertSourcesCoverDeclared } from './effectSources.mjs';
 import { declaredKinds, declaredTier } from './declaredCostTiers.mjs';
 import {
-  FEATURE_EXTRACTOR_VERSION, FEATURE_NAMES, extractFeaturesFor, extractAllFeatures,
-  linearScore, scoreToTier,
+  FEATURE_EXTRACTOR_VERSION,
+  FEATURE_NAMES,
+  extractFeaturesFor,
+  extractAllFeatures,
+  linearScore,
+  scoreToTier,
 } from './extractFeatures.mjs';
 
 // 1. schemas ---------------------------------------------------------------
@@ -47,7 +57,12 @@ const rec = fromTimerPoll({
   shader: 'accum-echo',
   effectKind: 'accum-echo',
   params: { echoes: 3 },
-  timings: new Map([['a', 1], ['b', 2], ['c', 3], ['d', 4]]),
+  timings: new Map([
+    ['a', 1],
+    ['b', 2],
+    ['c', 3],
+    ['d', 4],
+  ]),
   label: 'accum-echo',
   meta: { runId: 'run-1', commit: 'abc123', resolution: { w: 320, h: 200 }, dpr: 1, gpuRenderer: 'swiftshader' },
 });
@@ -62,14 +77,18 @@ assert.throws(() => validateCostRecord({ ...rec, ms_mean: -1 }), /ms_mean/, 'neg
 assert.throws(() => validateCostRecord({ ...rec, samples: 0 }), /samples/, 'zero samples rejected');
 assert.throws(
   () => fromTimerPoll({ shader: 'x', timings: new Map(), meta: {} }),
-  /empty map/, 'empty timer map throws (disjoint/unsupported)',
+  /empty map/,
+  'empty timer map throws (disjoint/unsupported)',
 );
 
 // 3. sweep failures ----------------------------------------------------------
 const f = failureFromSweep({
-  effect: 'accum-echo', shader: 'accum-echo',
-  params: { echoes: 4, echoWidth: 0.9 }, paramSwept: 'echoes',
-  check: 'nan-scan', severity: 'nan',
+  effect: 'accum-echo',
+  shader: 'accum-echo',
+  params: { echoes: 4, echoWidth: 0.9 },
+  paramSwept: 'echoes',
+  check: 'nan-scan',
+  severity: 'nan',
   message: 'NaN pixels at echoes=4, echoWidth=0.9 (flag view nan)',
   meta: { runId: 'run-1', commit: 'abc123' },
 });
@@ -83,9 +102,14 @@ assert.throws(() => failureFromSweep({ ...f, message: '' }), /message/, 'empty m
 const dir = mkdtempSync(join(tmpdir(), 'mlx-renders-'));
 const pngPath = join(dir, 'accum-echo.png');
 // Minimal valid PNG (1x1). The manifest hashes bytes, it doesn't decode them.
-writeFileSync(pngPath, Buffer.from(
-  '89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c4944415478' +
-  '9c626001000000ffff03000006000574365e0000000049454e44ae426082', 'hex'));
+writeFileSync(
+  pngPath,
+  Buffer.from(
+    '89504e470d0a1a0a0000000d4948445200000001000000010802000000907753de0000000c4944415478' +
+      '9c626001000000ffff03000006000574365e0000000049454e44ae426082',
+    'hex',
+  ),
+);
 const entry = renderEntry({ effect: 'accum-echo', shader: 'accum-echo', params: { echoes: 2 }, pngPath, pngDir: dir });
 assert.ok(/^[0-9a-f]{64}$/.test(entry.sha256), 'sha256 is 64 hex chars');
 assert.equal(entry.png, 'accum-echo.png');
@@ -98,9 +122,33 @@ assert.throws(() => validateManifest({ ...mBack, renders: [] }), /renders/, 'emp
 
 // 5. guided fuzzing -----------------------------------------------------------
 const hist = failToJsonl([
-  failureFromSweep({ effect: 'accum-echo', shader: 'accum-echo', params: { echoes: 4 }, paramSwept: 'echoes', check: 'nan-scan', severity: 'nan', message: 'NaN at 4' }),
-  failureFromSweep({ effect: 'accum-echo', shader: 'accum-echo', params: { echoes: 5 }, paramSwept: 'echoes', check: 'nan-scan', severity: 'nan', message: 'NaN at 5' }),
-  failureFromSweep({ effect: 'grain', shader: 'effect', params: { amount: 0.99 }, paramSwept: 'amount', check: 'range', severity: 'out-of-range', message: 'overbright' }),
+  failureFromSweep({
+    effect: 'accum-echo',
+    shader: 'accum-echo',
+    params: { echoes: 4 },
+    paramSwept: 'echoes',
+    check: 'nan-scan',
+    severity: 'nan',
+    message: 'NaN at 4',
+  }),
+  failureFromSweep({
+    effect: 'accum-echo',
+    shader: 'accum-echo',
+    params: { echoes: 5 },
+    paramSwept: 'echoes',
+    check: 'nan-scan',
+    severity: 'nan',
+    message: 'NaN at 5',
+  }),
+  failureFromSweep({
+    effect: 'grain',
+    shader: 'effect',
+    params: { amount: 0.99 },
+    paramSwept: 'amount',
+    check: 'range',
+    severity: 'out-of-range',
+    message: 'overbright',
+  }),
 ]);
 const parsed = parseFailureLog(hist);
 assert.equal(parsed.length, 3, 'failure log parses');

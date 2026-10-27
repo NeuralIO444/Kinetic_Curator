@@ -84,9 +84,7 @@ export function lumaToCurlInto(luma, w, h, uOut, vOut) {
 }
 
 export function lumaToFlowInto(luma, w, h, uOut, vOut, op = FEED_OP_DEFAULT) {
-  return op === 'grad'
-    ? lumaToGradInto(luma, w, h, uOut, vOut)
-    : lumaToCurlInto(luma, w, h, uOut, vOut);
+  return op === 'grad' ? lumaToGradInto(luma, w, h, uOut, vOut) : lumaToCurlInto(luma, w, h, uOut, vOut);
 }
 
 export function fieldInvariants(field) {

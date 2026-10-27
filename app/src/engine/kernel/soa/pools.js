@@ -73,7 +73,7 @@ export function assertColumnsClean(set) {
   if (!columnsLookClean(set)) {
     throw new SoaContractError(
       `set (capacity ${set.capacity}, count ${set.count}) has poisoned lanes ` +
-        '— it was read before being fully overwritten (or was never zeroed)'
+        '— it was read before being fully overwritten (or was never zeroed)',
     );
   }
   return true;

@@ -25,12 +25,7 @@ import {
 } from './debugStrip.mjs';
 import { createGpuTimer } from './gpuTimer.mjs';
 import { createTapRecorder } from './tapPoints.mjs';
-import {
-  COMMON_VERSION,
-  auditChunks,
-  injectCommon,
-  chunksUsedBy,
-} from '../effects/chunks.mjs';
+import { COMMON_VERSION, auditChunks, injectCommon, chunksUsedBy } from '../effects/chunks.mjs';
 import { refHash12, refVnoise } from '../effects/chunkReference.mjs';
 // Shipped-shader coverage (#193 second pass): every program the app
 // compiles goes through the checked builders + uniform audit here, so a
@@ -45,7 +40,11 @@ import { TEMPLATE_VS, uniformDecls } from '../effects/template.mjs';
 import { runAllSweeps } from './sweepEffects.mjs';
 import {
   createCostMeasurer,
-  MEASURE_W, MEASURE_H, MEASURE_WARMUP, MEASURE_BATCH_DRAWS, MEASURE_BATCHES,
+  MEASURE_W,
+  MEASURE_H,
+  MEASURE_WARMUP,
+  MEASURE_BATCH_DRAWS,
+  MEASURE_BATCHES,
 } from './measureCosts.mjs';
 
 const failures = [];
@@ -91,10 +90,7 @@ void main() { o_color = vec4(1.0); }
 
 function makeTex2x2(gl) {
   // Row 0: mid-gray, NaN-red. Row 1: overbright, dim.
-  const data = new Float32Array([
-    0.5, 0.5, 0.5, 0.5, NaN, 0, 0, 1,
-    2.0, 0.5, 0.5, 1, 0.1, 0.2, 0.3, 0.4,
-  ]);
+  const data = new Float32Array([0.5, 0.5, 0.5, 0.5, NaN, 0, 0, 1, 2.0, 0.5, 0.5, 1, 0.1, 0.2, 0.3, 0.4]);
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
   gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -148,7 +144,7 @@ export function runAll() {
     const e = throwsAs(
       () => compileShaderChecked(gl, gl.FRAGMENT_SHADER, bad, { name: 'brokenFx', file: 'broken.glsl' }),
       ShaderCompileError,
-      'compile'
+      'compile',
     );
     eq(e.shaderName, 'brokenFx', 'effect name');
     eq(e.file, 'broken.glsl', 'file');
@@ -191,9 +187,15 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
     fp.render(tex, 'nan', 2, 2);
     const px = readFB(gl, 2, 2);
-    near(px[0], 0, 1, 'finite px r'); eq(px[3], 255, 'finite px a');
-    near(px[4], 255, 1, 'nan px r'); near(px[5], 0, 1, 'nan px g'); near(px[6], 255, 1, 'nan px b');
-    fp.dispose(); gl.deleteTexture(tex); gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+    near(px[0], 0, 1, 'finite px r');
+    eq(px[3], 255, 'finite px a');
+    near(px[4], 255, 1, 'nan px r');
+    near(px[5], 0, 1, 'nan px g');
+    near(px[6], 255, 1, 'nan px b');
+    fp.dispose();
+    gl.deleteTexture(tex);
+    gl.deleteTexture(t.tex);
+    gl.deleteFramebuffer(t.fb);
   });
   log('flagPass: alpha view shows alpha as red', () => {
     const fp = createFlagPass(gl);
@@ -203,8 +205,13 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     fp.render(tex, 'alpha', 2, 2);
     const px = readFB(gl, 2, 2);
     // row1[1] = (0.1,0.2,0.3,0.4) -> bytes 12..15
-    near(px[12], 0.4 * 255, 1.5, 'alpha->red'); eq(px[13], 0, 'g'); eq(px[14], 0, 'b');
-    fp.dispose(); gl.deleteTexture(tex); gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+    near(px[12], 0.4 * 255, 1.5, 'alpha->red');
+    eq(px[13], 0, 'g');
+    eq(px[14], 0, 'b');
+    fp.dispose();
+    gl.deleteTexture(tex);
+    gl.deleteTexture(t.tex);
+    gl.deleteFramebuffer(t.fb);
   });
   log('flagPass: range view flags out-of-[0,1]', () => {
     const fp = createFlagPass(gl);
@@ -214,10 +221,15 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     fp.render(tex, 'range', 2, 2);
     const px = readFB(gl, 2, 2);
     // row1[0] = (2.0,...) -> bytes 8..11 magenta
-    near(px[8], 255, 1, 'oor r'); near(px[10], 255, 1, 'oor b');
+    near(px[8], 255, 1, 'oor r');
+    near(px[10], 255, 1, 'oor b');
     // row0[0] = (0.5,0.5,0.5,0.5) -> passed through
-    near(px[0], 128, 2, 'in-range r'); near(px[3], 128, 2, 'in-range a');
-    fp.dispose(); gl.deleteTexture(tex); gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+    near(px[0], 128, 2, 'in-range r');
+    near(px[3], 128, 2, 'in-range a');
+    fp.dispose();
+    gl.deleteTexture(tex);
+    gl.deleteTexture(t.tex);
+    gl.deleteFramebuffer(t.fb);
   });
   log('flagPass: luminance heat ramp is monotonic', () => {
     const fp = createFlagPass(gl);
@@ -225,8 +237,7 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 2, 1, 0, gl.RGBA, gl.FLOAT,
-      new Float32Array([1, 1, 1, 1, 0, 0, 0, 1]));
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA32F, 2, 1, 0, gl.RGBA, gl.FLOAT, new Float32Array([1, 1, 1, 1, 0, 0, 0, 1]));
     gl.bindTexture(gl.TEXTURE_2D, null);
     const t = makeTarget2x2(gl);
     gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
@@ -235,7 +246,10 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     const px = readFB(gl, 2, 1);
     eq(px[0] > 200 && px[2] < 80, true, `white is hot (r=${px[0]},b=${px[2]})`);
     eq(px[6] > 200 && px[4] < 80, true, `black is cold (r=${px[4]},b=${px[6]})`);
-    fp.dispose(); gl.deleteTexture(tex); gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+    fp.dispose();
+    gl.deleteTexture(tex);
+    gl.deleteTexture(t.tex);
+    gl.deleteFramebuffer(t.fb);
   });
 
   // ---- debugStrip ----
@@ -296,13 +310,24 @@ void main() { o_color = vec4(u_a + u_b, 0.0, 0.0, 1.0); }
     gl.clear(gl.COLOR_BUFFER_BIT);
     const a = rec.tap('stage-a', 2, 2);
     const b = rec.tap('stage-b', 2, 2);
-    eq(a.name, 'stage-a', 'name a'); eq(b.w, 2, 'width');
-    near(a.pixels[0], 0.2 * 255, 1.5, 'r'); near(a.pixels[1], 0.4 * 255, 1.5, 'g');
-    near(a.pixels[2], 0.6 * 255, 1.5, 'b'); eq(a.pixels[3], 255, 'a');
-    eq(rec.getTaps().map((x) => x.name).join(','), 'stage-a,stage-b', 'order');
+    eq(a.name, 'stage-a', 'name a');
+    eq(b.w, 2, 'width');
+    near(a.pixels[0], 0.2 * 255, 1.5, 'r');
+    near(a.pixels[1], 0.4 * 255, 1.5, 'g');
+    near(a.pixels[2], 0.6 * 255, 1.5, 'b');
+    eq(a.pixels[3], 255, 'a');
+    eq(
+      rec
+        .getTaps()
+        .map((x) => x.name)
+        .join(','),
+      'stage-a,stage-b',
+      'order',
+    );
     rec.clear();
     eq(rec.getTaps().length, 0, 'clear');
-    gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fb);
+    gl.deleteTexture(t.tex);
+    gl.deleteFramebuffer(t.fb);
   });
 
   // ---- chunk library (#196) ----
@@ -328,7 +353,8 @@ void main() {
 }
 `);
     const prog = buildProgramChecked(gl, SIMPLE_VS, fs, { name: 'chunk-probe' });
-    const W = 8, H = 8;
+    const W = 8,
+      H = 8;
     const tex = gl.createTexture();
     gl.bindTexture(gl.TEXTURE_2D, tex);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
@@ -358,7 +384,9 @@ void main() {
   log('chunks: injected library compiles through the harness', () => {
     // A successful renderChunk already proves compile+link; this one is the
     // explicit syntax gate with the harness's diagnostics attached.
-    const fs = injectCommon('#version 300 es\nprecision highp float;\nout vec4 o;\nvoid main() { o = vec4(kc_fbm(vec2(1.0), 3)); }\n');
+    const fs = injectCommon(
+      '#version 300 es\nprecision highp float;\nout vec4 o;\nvoid main() { o = vec4(kc_fbm(vec2(1.0), 3)); }\n',
+    );
     const sh = compileShaderChecked(gl, gl.FRAGMENT_SHADER, fs, { name: 'chunk-syntax', file: 'common.glsl' });
     eq(!!sh, true, 'chunk block compiles');
     gl.deleteShader(sh);
@@ -383,7 +411,7 @@ void main() {
     eq(
       chunksUsedBy('void main() { o = vec4(kc_dither(p), kc_vnoise(p), 0.0, 1.0); }').join(','),
       'kc_dither,kc_vnoise',
-      'direct chunk uses'
+      'direct chunk uses',
     );
     eq(chunksUsedBy('void main() {}').length, 0, 'no chunk uses');
   });
@@ -397,7 +425,9 @@ void main() {
   for (const def of RENDERER_PROGRAMS) {
     log(`coverage: renderer/${def.name} compiles + audits clean`, () => {
       const p = buildProgramChecked(gl, def.vs, def.fs, {
-        name: `coverage-${def.name}`, vsFile: def.vsFile, fsFile: def.fsFile,
+        name: `coverage-${def.name}`,
+        vsFile: def.vsFile,
+        fsFile: def.fsFile,
       });
       try {
         auditProgramChecked(gl, p, def.uniforms, { name: `coverage-${def.name}`, file: 'shaders.mjs' });
@@ -409,7 +439,9 @@ void main() {
   for (const [pname, def] of Object.entries(ACCUM_PROGRAMS)) {
     log(`coverage: accum-${pname} compiles + audits clean`, () => {
       const p = buildProgramChecked(gl, FULL_VS, def.fs, {
-        name: `accum-${pname}`, vsFile: 'accum.mjs:FULL_VS', fsFile: def.file,
+        name: `accum-${pname}`,
+        vsFile: 'accum.mjs:FULL_VS',
+        fsFile: def.file,
       });
       try {
         auditProgramChecked(gl, p, def.uniforms, { name: `accum-${pname}`, file: def.file });
@@ -420,11 +452,14 @@ void main() {
   }
   log('coverage: bridge builtin effect program compiles + audits clean', () => {
     const p = buildProgramChecked(gl, FULL_VS, EFFECT_FS, {
-      name: 'effect', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'shaders.mjs:EFFECT_FS',
+      name: 'effect',
+      vsFile: 'shaders.mjs:FULL_VS',
+      fsFile: 'shaders.mjs:EFFECT_FS',
     });
     try {
       auditProgramChecked(gl, p, Object.keys(BUILTIN_EFFECT_UNIFORMS), {
-        name: 'effect', file: 'shaders.mjs:EFFECT_FS',
+        name: 'effect',
+        file: 'shaders.mjs:EFFECT_FS',
       });
     } finally {
       gl.deleteProgram(p);
@@ -433,11 +468,14 @@ void main() {
   for (const [kind, def] of FX_SHADER_EFFECTS) {
     log(`coverage: fx/${kind} compiles + audits clean`, () => {
       const p = buildProgramChecked(gl, TEMPLATE_VS, injectCommon(def.fs), {
-        name: `fx/${kind}`, vsFile: 'template.mjs:TEMPLATE_VS', fsFile: def.file,
+        name: `fx/${kind}`,
+        vsFile: 'template.mjs:TEMPLATE_VS',
+        fsFile: def.file,
       });
       try {
         auditProgramChecked(gl, p, Object.keys(uniformDecls(def.descriptor)), {
-          name: `fx/${kind}`, file: def.file,
+          name: `fx/${kind}`,
+          file: def.file,
         });
       } finally {
         gl.deleteProgram(p);
@@ -517,8 +555,8 @@ export function runMeasureSection() {
   window.__kcMeasureReady = true;
   const lines = [
     `measure: ${measurer.ids.length} effects ready @${MEASURE_W}x${MEASURE_H} ` +
-    `(warmup ${MEASURE_WARMUP}, ${MEASURE_BATCHES} batches x ${MEASURE_BATCH_DRAWS} draws, ` +
-    `${measurer.hwTimer ? 'hardware' : 'node wall-time'} timing)`,
+      `(warmup ${MEASURE_WARMUP}, ${MEASURE_BATCHES} batches x ${MEASURE_BATCH_DRAWS} draws, ` +
+      `${measurer.hwTimer ? 'hardware' : 'node wall-time'} timing)`,
   ];
   return { lines };
 }

@@ -54,7 +54,11 @@ async function main() {
       console.log(`debug.selfcheck: OK (${(result.lines || []).length} cases)`);
     }
   } finally {
-    try { await browser?.close(); } catch { /* noop */ }
+    try {
+      await browser?.close();
+    } catch {
+      /* noop */
+    }
     server.close();
   }
 }

@@ -11,7 +11,11 @@ import { join, relative } from 'node:path';
 import { registerSampler, getSamplerDecl, listSamplers } from './registry.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // --- no legacy registerSampler('id', fn) calls remain in-tree ---
 // Boundary: *.selfcheck.mjs files are excluded on purpose — the
@@ -26,21 +30,42 @@ const walk = (d) =>
 const LEGACY_CALL = /registerSampler\s*\(\s*['"]/;
 
 ok('no in-tree legacy registerSampler(id, fn) calls', () => {
-  const files = walk(SRC).filter(
-    (p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs'),
-  );
+  const files = walk(SRC).filter((p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs'));
   assert.ok(files.length > 0, 'expected to scan real source files');
-  const bad = files
-    .filter((p) => LEGACY_CALL.test(readFileSync(p, 'utf8')))
-    .map((p) => relative(SRC, p));
+  const bad = files.filter((p) => LEGACY_CALL.test(readFileSync(p, 'utf8'))).map((p) => relative(SRC, p));
   assert.deepStrictEqual(bad, [], `legacy sampler registrations in: ${bad.join(', ')}`);
 });
 
 // --- the true per-sampler tiers (the written scale lives in
 // engine/kernel/costRegistry.mjs, shared with #1239) ---
-const TIER_0 = ['random', 'grid', 'fibonacci', 'phyllotaxis', 'truchet', 'radial', 'layers', 'rails', 'orbit', 'abacus', 'stratified', 'noise', 'gaussian'];
+const TIER_0 = [
+  'random',
+  'grid',
+  'fibonacci',
+  'phyllotaxis',
+  'truchet',
+  'radial',
+  'layers',
+  'rails',
+  'orbit',
+  'abacus',
+  'stratified',
+  'noise',
+  'gaussian',
+];
 const TIER_1 = ['swarm', 'flow', 'hype', 'murmuration'];
-const TIER_2 = ['ca', 'voronoi', 'lsystem', 'dla', 'eden', 'brush', 'poisson', 'circlepack', 'voronoi-cells', 'colonize']; // #1196, #1197
+const TIER_2 = [
+  'ca',
+  'voronoi',
+  'lsystem',
+  'dla',
+  'eden',
+  'brush',
+  'poisson',
+  'circlepack',
+  'voronoi-cells',
+  'colonize',
+]; // #1196, #1197
 
 ok('every built-in sampler declares its true tier', () => {
   const expect = new Map([
@@ -55,11 +80,7 @@ ok('every built-in sampler declares its true tier', () => {
     assert.strictEqual(d.costTier, expect.get(id), `${id}: expected costTier ${expect.get(id)}, got ${d.costTier}`);
   }
   // Nothing else may be registered by this module.
-  assert.deepStrictEqual(
-    [...listSamplers()].sort(),
-    [...expect.keys()].sort(),
-    'unexpected sampler ids registered',
-  );
+  assert.deepStrictEqual([...listSamplers()].sort(), [...expect.keys()].sort(), 'unexpected sampler ids registered');
 });
 
 ok('the named samplers declare real inputs, not the legacy defaults', () => {
@@ -94,7 +115,9 @@ ok('the governor can shed high-tier samplers while tier-0 placement stays', () =
     assert.ok(!shed.has(id), `${id} is structural and must never shed`);
   }
   // Shed-first among placement is the voice tier.
-  const shedFirst = listSamplers().filter((id) => getSamplerDecl(id).costTier === 1).sort();
+  const shedFirst = listSamplers()
+    .filter((id) => getSamplerDecl(id).costTier === 1)
+    .sort();
   assert.deepStrictEqual(shedFirst, [...TIER_1].sort(), 'tier 1 is exactly the voice samplers');
 });
 

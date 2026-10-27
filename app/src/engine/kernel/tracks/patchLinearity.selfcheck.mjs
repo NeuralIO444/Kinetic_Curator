@@ -14,13 +14,21 @@ const ratio2 = (dFull, dHalf, label) => {
 
 // FIELD: fixed geometry, strength 0.5 → 1.0 doubles per-item displacement.
 {
-  const tgt = [{ x: 0.5, y: 0.5 }, { x: 0.2, y: 0.8 }];
-  const src = [{ x: 0.9, y: 0.1 }, { x: 0.8, y: 0.2 }, { x: 0.7, y: 0.3 }];
+  const tgt = [
+    { x: 0.5, y: 0.5 },
+    { x: 0.2, y: 0.8 },
+  ];
+  const src = [
+    { x: 0.9, y: 0.1 },
+    { x: 0.8, y: 0.2 },
+    { x: 0.7, y: 0.3 },
+  ];
   const disp = (s) => {
     const out = applyField(tgt, src, normalizePatch({ mode: 'field', strength: s }));
     return tgt.map((q, i) => Math.hypot(out[i].x - q.x, out[i].y - q.y));
   };
-  const half = disp(0.5), full = disp(1.0);
+  const half = disp(0.5),
+    full = disp(1.0);
   for (let i = 0; i < tgt.length; i++) ratio2(full[i], half[i], `field item ${i}`);
   console.log('[selfcheck] patchLinearity FIELD gain shape');
 }
@@ -30,7 +38,10 @@ const ratio2 = (dFull, dHalf, label) => {
 // the committed delay state. Fresh identical history per strength so each
 // applyTo reads the same delay.)
 {
-  const pts = [{ x: 0.4, y: 0.55 }, { x: 0.5, y: 0.55 }];
+  const pts = [
+    { x: 0.4, y: 0.55 },
+    { x: 0.5, y: 0.55 },
+  ];
   // History must be DENSE around the targets: the flow field is the spatial
   // gradient/curl of the rasterized luma, so isolated dots read ~zero
   // everywhere except their immediate neighbours. A tight line through the
@@ -46,8 +57,12 @@ const ratio2 = (dFull, dHalf, label) => {
     const out = feed.applyTo(pts, { mode: 'feed', from: 0, to: 1, strength: s });
     return pts.map((q, i) => Math.hypot(out[i].x - q.x, out[i].y - q.y));
   };
-  const half = disp(0.5), full = disp(1.0);
-  assert.ok(half.some((d) => d > 0), 'committed history pulls (nonzero baseline)');
+  const half = disp(0.5),
+    full = disp(1.0);
+  assert.ok(
+    half.some((d) => d > 0),
+    'committed history pulls (nonzero baseline)',
+  );
   for (let i = 0; i < pts.length; i++) ratio2(full[i], half[i], `feed item ${i}`);
   console.log('[selfcheck] patchLinearity FEED gain shape');
 }

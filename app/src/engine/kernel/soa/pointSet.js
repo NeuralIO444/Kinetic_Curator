@@ -47,9 +47,7 @@
 // adds the dish string↔code registry; until then writers pick codes.
 
 /** Data columns of a point set, in canonical order. */
-export const POINT_COLUMN_NAMES = Object.freeze([
-  'x', 'y', 'vx', 'vy', 'slot', 'energy', 'id', 'family', 'source',
-]);
+export const POINT_COLUMN_NAMES = Object.freeze(['x', 'y', 'vx', 'vy', 'slot', 'energy', 'id', 'family', 'source']);
 
 /** Family code meaning "no family assigned". */
 export const FAMILY_NONE = 0;
@@ -93,10 +91,13 @@ export function columnsLookClean(set) {
   const n = set.count | 0;
   for (let i = 0; i < n; i++) {
     if (
-      Number.isNaN(set.x[i]) || Number.isNaN(set.y[i]) ||
-      Number.isNaN(set.vx[i]) || Number.isNaN(set.vy[i]) ||
+      Number.isNaN(set.x[i]) ||
+      Number.isNaN(set.y[i]) ||
+      Number.isNaN(set.vx[i]) ||
+      Number.isNaN(set.vy[i]) ||
       Number.isNaN(set.energy[i])
-    ) return false;
+    )
+      return false;
     if (set.slot[i] === 0xffff || set.source[i] === 0xffff) return false;
     if (set.id[i] === 0xffffffff) return false;
     if (set.family[i] === FAMILY_DEBUG_POISON) return false;

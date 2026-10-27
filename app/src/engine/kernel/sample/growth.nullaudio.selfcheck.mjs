@@ -29,12 +29,7 @@ import assert from 'node:assert';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import {
-  ensureAggregate,
-  liveCount,
-  liveCell,
-  GrowthHooks,
-} from './growth.js';
+import { ensureAggregate, liveCount, liveCell, GrowthHooks } from './growth.js';
 
 const { clearGrowth } = GrowthHooks;
 
@@ -68,11 +63,20 @@ if (process.argv[2] === '--digest') {
 }
 
 function childDigest(mode, seed, tick, rate, branch, energy) {
-  const r = spawnSync(process.execPath, [
-    fileURLToPath(import.meta.url), '--digest',
-    mode, String(seed), String(tick), String(rate), String(branch),
-    energy === null ? 'null' : String(energy),
-  ], { encoding: 'utf8' });
+  const r = spawnSync(
+    process.execPath,
+    [
+      fileURLToPath(import.meta.url),
+      '--digest',
+      mode,
+      String(seed),
+      String(tick),
+      String(rate),
+      String(branch),
+      energy === null ? 'null' : String(energy),
+    ],
+    { encoding: 'utf8' },
+  );
   assert.strictEqual(r.status, 0, `--digest child failed: ${r.stderr}`);
   return r.stdout.trim();
 }
@@ -90,10 +94,7 @@ function childDigest(mode, seed, tick, rate, branch, energy) {
   for (const [mode, seed, tick, rate, branch] of REPRO) {
     const first = digestAggregate(seed, mode, tick, rate, branch, null);
     const replay = digestAggregate(seed, mode, tick, rate, branch, null); // cache cleared
-    assert.strictEqual(
-      replay, first,
-      `${mode}/${seed}@tick${tick}: null-audio output moved between replays`,
-    );
+    assert.strictEqual(replay, first, `${mode}/${seed}@tick${tick}: null-audio output moved between replays`);
   }
 }
 
@@ -124,12 +125,14 @@ function childDigest(mode, seed, tick, rate, branch, energy) {
     const nullRun = digestAggregate(seed, mode, tick, rate, branch, null);
     const loud = digestAggregate(seed, mode, tick, rate, branch, 1.0);
     assert.notStrictEqual(
-      loud, nullRun,
+      loud,
+      nullRun,
       `${mode}/${seed}@tick${tick}: energy=1.0 matched the null run — the audio drive gap closed?`,
     );
     const silentZero = digestAggregate(seed, mode, tick, rate, branch, 0.0);
     assert.notStrictEqual(
-      silentZero, nullRun,
+      silentZero,
+      nullRun,
       `${mode}/${seed}@tick${tick}: energy=0.0 matched the null run — the audio drive gap closed?`,
     );
   }

@@ -99,7 +99,7 @@ const _stateByLayer = new Map(); // layerId -> { mode, gen, tick, stats, decisio
  */
 export function recordLifecycleState(layerId, entry, atMs) {
   const prev = _stateByLayer.get(layerId);
-  const at = Number.isFinite(atMs) ? atMs : (prev ? prev.at : 0);
+  const at = Number.isFinite(atMs) ? atMs : prev ? prev.at : 0;
   _stateByLayer.set(layerId, { ...entry, at });
   if (_stateByLayer.size > 16) {
     const first = _stateByLayer.keys().next().value;

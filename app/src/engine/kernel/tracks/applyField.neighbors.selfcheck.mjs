@@ -34,8 +34,7 @@ function referenceApplyField(targetPts, sourcePts, strength, polarity) {
   });
 }
 
-const patch = (over = {}) =>
-  normalizePatch({ from: 0, to: 1, mode: 'field', strength: 1, polarity: 1, ...over });
+const patch = (over = {}) => normalizePatch({ from: 0, to: 1, mode: 'field', strength: 1, polarity: 1, ...over });
 
 // --- 1. mixed fixture: sources inside, on, and outside the radius ------------
 // Target at origin. Sources at known distances; radius = 0.35.
@@ -54,11 +53,7 @@ const sources = [
 ];
 const got = applyField(targets, sources, patch());
 const want = referenceApplyField(targets, sources, 1, 1);
-assert.deepStrictEqual(
-  got,
-  want,
-  'applyField bit-matches the independent neighbor-set reference on a mixed fixture',
-);
+assert.deepStrictEqual(got, want, 'applyField bit-matches the independent neighbor-set reference on a mixed fixture');
 assert.ok(got[0].x !== 0 || got[0].y !== 0, 'origin target feels its inside sources');
 assert.strictEqual(got[1].x, 0.9, 'far target: x untouched except by its co-located source');
 assert.strictEqual(got[1].y, 0.9, 'far target: y untouched except by its co-located source');
@@ -82,10 +77,7 @@ assert.ok(Math.abs(rep[0].x) === Math.abs(edgeOut[0].x), 'repel is the exact mir
 
 // --- 5. strength scales the included set --------------------------------------
 const strong = applyField(onEdge, edgeSrc, patch({ strength: 2 }));
-assert.ok(
-  Math.abs(strong[0].x - 0) === 2 * Math.abs(edgeOut[0].x - 0),
-  'strength 2 doubles the included contribution',
-);
+assert.ok(Math.abs(strong[0].x - 0) === 2 * Math.abs(edgeOut[0].x - 0), 'strength 2 doubles the included contribution');
 
 // --- 6. determinism + no input mutation ---------------------------------------
 const runA = applyField(targets, sources, patch());

@@ -19,9 +19,20 @@ export const SCHEMAS = Object.freeze({
       'One line per (shader, params) measurement: ms_mean / ms_p50 over samples ' +
       'from the harness GPU timer, plus resolution, renderer string, run id, commit.',
     fields: [
-      'schema', 'shader', 'effect_kind', 'params', 'ms_mean', 'ms_p50',
-      'samples', 'disjoint_discarded', 'resolution', 'dpr', 'gpu_renderer',
-      'harness_run_id', 'harness_commit', 'timestamp',
+      'schema',
+      'shader',
+      'effect_kind',
+      'params',
+      'ms_mean',
+      'ms_p50',
+      'samples',
+      'disjoint_discarded',
+      'resolution',
+      'dpr',
+      'gpu_renderer',
+      'harness_run_id',
+      'harness_commit',
+      'timestamp',
     ],
   },
   /** A harness sweep failure — the raw material for guided fuzzing (item 12). */
@@ -34,8 +45,17 @@ export const SCHEMAS = Object.freeze({
       'link, uniform-audit, golden-diff), severity, and the message. ' +
       'The future sweep harness biases toward previously-broken regions.',
     fields: [
-      'schema', 'effect', 'shader', 'params', 'param_swept', 'check',
-      'severity', 'message', 'harness_run_id', 'harness_commit', 'timestamp',
+      'schema',
+      'effect',
+      'shader',
+      'params',
+      'param_swept',
+      'check',
+      'severity',
+      'message',
+      'harness_run_id',
+      'harness_commit',
+      'timestamp',
     ],
     checks: ['compile', 'link', 'uniform-audit', 'nan-scan', 'range', 'zero-noop', 'golden-diff'],
     severities: ['crash', 'nan', 'out-of-range', 'zero-noop-fail', 'misrender'],
@@ -67,11 +87,20 @@ export const SCHEMAS = Object.freeze({
     description:
       'Ridge-regression weights over static shader-source features, trained ' +
       'on Mac Studio measurements. Evaluable with pure arithmetic, so CI ' +
-      'predicts a new shader\'s tier without a GPU or MLX.',
+      "predicts a new shader's tier without a GPU or MLX.",
     fields: [
-      'schema', 'feature_extractor', 'feature_spec', 'model', 'weights',
-      'intercept', 'feature_mean', 'feature_std', 'tier_boundaries',
-      'trained_at', 'measurement_count', 'declared_tiers_schema',
+      'schema',
+      'feature_extractor',
+      'feature_spec',
+      'model',
+      'weights',
+      'intercept',
+      'feature_mean',
+      'feature_std',
+      'tier_boundaries',
+      'trained_at',
+      'measurement_count',
+      'declared_tiers_schema',
     ],
   },
 });
