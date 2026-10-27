@@ -510,3 +510,4 @@ node src/loot/shelfDiskPort.selfcheck.mjs
 node src/engine/engraving.selfcheck.mjs
 node src/gl/spectrumWarp.selfcheck.mjs
 node src/engine/finishingLook.selfcheck.mjs
+node src/assets/tauriCsp.selfcheck.mjs
