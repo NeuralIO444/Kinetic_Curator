@@ -30,13 +30,14 @@ assert.ok(before.light, 'setup: the sun is on');
 S().kineticWeatherPass();
 const s = S();
 
-// Atmosphere moved: a different known palette, sun re-aimed, glow re-rolled.
+// Atmosphere moved: a different known palette, sun re-aimed. The glow is NOT dealt (#1768).
 assert.ok(paletteIds.has(s.paletteId), `palette ${s.paletteId} is a known catalog palette`);
 assert.notStrictEqual(s.paletteId, paletteBefore, 'WEATHER rolls a new palette (palette weather)');
 assert.notStrictEqual(JSON.stringify(s.light), lightBefore, 'WEATHER moves the sun (mood)');
-assert.ok(
-  s.layoutParams.accumulationOptics >= 0 && s.layoutParams.accumulationOptics <= 0.25,
-  `WEATHER rolls bloom+halation in range, got ${s.layoutParams.accumulationOptics}`,
+assert.strictEqual(
+  s.layoutParams.accumulationOptics,
+  before.layoutParams.accumulationOptics,
+  'WEATHER leaves the glow alone (#1768)',
 );
 
 // Skeleton held: same seed, composition, structure, assets, layers.
@@ -95,4 +96,17 @@ S().kineticWeatherPass();
 assert.strictEqual(S().layoutParams.accumulationOptics, 0.2, 'locked glow survives the pass');
 S().toggleParamLock('accumulationOptics');
 
-console.log('kineticWeatherPass.selfcheck ok');
+// ── 4. #1768: 20 warm taps from a neutral project never deal the glow ──────
+S().setLayoutParam('accumulationOptics', 0);
+for (let i = 0; i < 20; i++) S().kineticWeatherPass();
+assert.strictEqual(
+  S().layoutParams.accumulationOptics,
+  0,
+  '20 warm taps leave accumulationOptics at its start (#1768)',
+);
+// …nor a non-zero value the artist set (no drift, no re-roll).
+S().setLayoutParam('accumulationOptics', 0.12);
+for (let i = 0; i < 20; i++) S().kineticWeatherPass();
+assert.strictEqual(S().layoutParams.accumulationOptics, 0.12, 'an artist-set glow holds across 20 warm taps');
+
+console.log('kineticWeatherPass.selfcheck ok (#944, #1768)');

@@ -1035,11 +1035,11 @@ export const createLayoutSlice = (set) => ({
    *     (overrides + swatch locks clear, exactly like setPaletteId);
    *  2. mood — the chiaroscuro sun, if it's on, moves to a new position and
    *     intensity (a storm rolling in, golden hour…); off stays off;
-   *  3. atmospheric FX — accumulationOptics (bloom + halation, the GLOW
-   *     slider) rolls fresh, unless locked.
+   *  (#1768: the GLOW — accumulationOptics — is NOT dealt here any more. Rolling it on every warm tap kept landing
+   *  the piece in bloom + halation blur; it now moves only when a dealt look/voice declares it, or the artist sets it.)
    *
    * What holds: seed (same DNA — the HUD readout keeps showing it),
-   * composition and every structural param, asset pool, layers, FX chain.
+   * composition and every structural param (glow included), asset pool, layers, FX chain.
    * One atomic store update = one undo entry (edit kind). The honest die
    * matches kineticRulesPass/kineticRoll's convention: replayability comes
    * from the stored state + seed (#710), not from the pass itself.
@@ -1066,12 +1066,6 @@ export const createLayoutSlice = (set) => ({
         });
       }
 
-      // 3. Atmospheric FX — bloom + halation amount.
-      const merged = { ...state.layoutParams };
-      if (!state.lockedParams.accumulationOptics) {
-        merged.accumulationOptics = Math.random() * 0.25;
-      }
-
       return {
         ...undo,
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1080,7 +1074,6 @@ export const createLayoutSlice = (set) => ({
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
         light,
-        layoutParams: merged,
         voiceMix: null,
         activeVoiceId: null,
       };

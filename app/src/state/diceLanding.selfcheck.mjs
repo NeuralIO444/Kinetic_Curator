@@ -76,7 +76,7 @@ lands(
   (d) => (d.layers || []).map((l) => l.pattern?.seed ?? null),
 );
 
-// ── layoutSlice: kineticWeatherPass (sun + optics dice, stubbed die) ────────
+// ── layoutSlice: kineticWeatherPass (sun dice, stubbed die; #1768 dropped the glow die) ────────
 S().setLight({ x: 10, y: 20, intensity: 0.5, ambient: 0.4 });
 try {
   Math.random = () => 0.999;
@@ -94,16 +94,7 @@ assert.ok(
   Math.abs(S().light.ambient - (0.2 + 0.999 * 0.5)) < 0.01,
   `weather die set ambient, got ${S().light.ambient}`,
 );
-assert.ok(
-  Math.abs(S().layoutParams.accumulationOptics - 0.999 * 0.25) < 0.01,
-  `weather die set accumulationOptics, got ${S().layoutParams.accumulationOptics}`,
-);
 lands('kineticWeatherPass -> light', S().light, (d) => d.light);
-lands(
-  'kineticWeatherPass -> accumulationOptics',
-  S().layoutParams.accumulationOptics,
-  (d) => d.layoutParams?.accumulationOptics,
-);
 
 // ── layersSlice: addLayer (id identity + snapshot seed) ─────────────────────
 const before = S().layers.length;

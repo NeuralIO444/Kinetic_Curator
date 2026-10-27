@@ -50,8 +50,8 @@ export const DETERMINISM_ALLOWLIST = {
   },
   'state/slices/layoutSlice.js': {
     'Math.random': {
-      count: 7,
-      why: 'bumpSeed / mutateSeedOffset dice + #942 kineticRoll die + seed roll + #944 weather dice (3: sun intensity/ambient, glow); every result lands in seed / paletteId / layoutParams / enabledAssets / layers / light — landings proven by state/diceLanding.selfcheck (audit 3e, #1675)',
+      count: 6,
+      why: 'bumpSeed / mutateSeedOffset dice + #942 kineticRoll die + seed roll + #944 weather dice (2: sun intensity/ambient; #1768 dropped the glow die); every result lands in seed / paletteId / layoutParams / enabledAssets / layers / light — landings proven by state/diceLanding.selfcheck (audit 3e, #1675)',
     },
   },
   'state/slices/layersSlice.js': {
