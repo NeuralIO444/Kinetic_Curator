@@ -22,7 +22,13 @@ const win = () => (typeof window !== 'undefined' ? window : undefined);
 /** Which of the Tauri globals this window carries (for the diagnostic line; never throws). */
 export function desktopGlobals(w = win()) {
   if (!w || (typeof w !== 'object' && typeof w !== 'function')) return [];
-  return TAURI_GLOBALS.filter((k) => { try { return w[k] !== undefined && w[k] !== null && w[k] !== false; } catch { return false; } });
+  return TAURI_GLOBALS.filter((k) => {
+    try {
+      return w[k] !== undefined && w[k] !== null && w[k] !== false;
+    } catch {
+      return false;
+    }
+  });
 }
 
 /** True in the Tauri desktop shell, false in a browser and in node. */

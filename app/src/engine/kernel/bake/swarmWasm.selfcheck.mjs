@@ -27,12 +27,7 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bakeParticles } from './index.js';
-import {
-  ensureSwarmWasm,
-  getSwarmWasm,
-  wasmBakeEligible,
-  swarmWasmLoadError,
-} from './swarmWasm.mjs';
+import { ensureSwarmWasm, getSwarmWasm, wasmBakeEligible, swarmWasmLoadError } from './swarmWasm.mjs';
 import { createNoise } from '../../noise.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../../../data/layout-modes.js';
 
@@ -70,12 +65,7 @@ function parseToolchainChannel(tomlPath) {
 }
 
 function crateSourceHash(crate) {
-  const files = [
-    'rust-toolchain.toml',
-    'Cargo.toml',
-    'Cargo.lock',
-    `${crate}/Cargo.toml`,
-  ];
+  const files = ['rust-toolchain.toml', 'Cargo.toml', 'Cargo.lock', `${crate}/Cargo.toml`];
   const walkRs = (dir) => {
     for (const name of readdirSync(dir).sort()) {
       const p = join(dir, name);
@@ -100,9 +90,7 @@ function crateSourceHash(crate) {
   try {
     manifest = JSON.parse(readFileSync(manifestPath, 'utf8'));
   } catch (e) {
-    assert.fail(
-      `kernel wasm MANIFEST.json is missing or invalid — run ./scripts/build-wasm.sh: ${e.message}`,
-    );
+    assert.fail(`kernel wasm MANIFEST.json is missing or invalid — run ./scripts/build-wasm.sh: ${e.message}`);
   }
   const pinned = parseToolchainChannel(join(RUST_DIR, 'rust-toolchain.toml'));
   const crates = manifest.crates || {};
@@ -162,8 +150,12 @@ console.log('[ok] wasm module loads and instantiates');
 
 {
   const points = [
-    [0, 0, 0], [1.5, -2.25, 3.125], [100.7, 200.3, 0.5],
-    [-50.25, 75.5, -12.75], [0.001, 0.002, 999.999], [-999.5, -999.5, -999.5],
+    [0, 0, 0],
+    [1.5, -2.25, 3.125],
+    [100.7, 200.3, 0.5],
+    [-50.25, 75.5, -12.75],
+    [0.001, 0.002, 999.999],
+    [-999.5, -999.5, -999.5],
   ];
   const seeds = [444, 0, 1, 7, 0xa17e9b21, -7, 3.14, NaN];
   let checked = 0;
@@ -188,7 +180,10 @@ function maxPosDiff(a, b) {
   return m;
 }
 {
-  for (const [steps, limit] of [[1, 1e-12], [10, 1e-9]]) {
+  for (const [steps, limit] of [
+    [1, 1e-12],
+    [10, 1e-9],
+  ]) {
     const js = bakeParticles({ ...base, steps, engine: 'js' });
     const w = bakeParticles({ ...base, steps, engine: 'wasm' });
     const d = maxPosDiff(js, w);
@@ -201,8 +196,7 @@ const w1 = bakeParticles({ ...base, engine: 'wasm' });
 const w2 = bakeParticles({ ...base, engine: 'wasm' });
 assert.strictEqual(w1.length, w2.length);
 for (let i = 0; i < w1.length; i++) {
-  assert.ok(Object.is(w1[i].x, w2[i].x) && Object.is(w1[i].y, w2[i].y),
-    `wasm bake not deterministic at particle ${i}`);
+  assert.ok(Object.is(w1[i].x, w2[i].x) && Object.is(w1[i].y, w2[i].y), `wasm bake not deterministic at particle ${i}`);
 }
 console.log('[ok] wasm bake is exactly deterministic run-to-run');
 
@@ -211,26 +205,40 @@ assert.ok(maxPosDiff(w1, wDiff) > 1, 'a different seed must give a different was
 console.log('[ok] wasm bake is seed-sensitive');
 
 function distStats(items) {
-  let mx = 0, my = 0;
-  for (const p of items) { mx += p.x; my += p.y; }
-  mx /= items.length; my /= items.length;
-  let sx = 0, sy = 0;
-  for (const p of items) { sx += (p.x - mx) ** 2; sy += (p.y - my) ** 2; }
+  let mx = 0,
+    my = 0;
+  for (const p of items) {
+    mx += p.x;
+    my += p.y;
+  }
+  mx /= items.length;
+  my /= items.length;
+  let sx = 0,
+    sy = 0;
+  for (const p of items) {
+    sx += (p.x - mx) ** 2;
+    sy += (p.y - my) ** 2;
+  }
   return { mx, my, sdx: Math.sqrt(sx / items.length), sdy: Math.sqrt(sy / items.length) };
 }
 for (const seed of [0xa17e9b21, 12345]) {
   const js = bakeParticles({ ...base, seed, engine: 'js' });
   const w = bakeParticles({ ...base, seed, engine: 'wasm' });
-  const a = distStats(js), b = distStats(w);
-  const cdx = Math.abs(a.mx - b.mx), cdy = Math.abs(a.my - b.my);
-  const sdx = Math.abs(a.sdx - b.sdx), sdy = Math.abs(a.sdy - b.sdy);
+  const a = distStats(js),
+    b = distStats(w);
+  const cdx = Math.abs(a.mx - b.mx),
+    cdy = Math.abs(a.my - b.my);
+  const sdx = Math.abs(a.sdx - b.sdx),
+    sdy = Math.abs(a.sdy - b.sdy);
   assert.ok(cdx <= 15 && cdy <= 15, `centroid drift too large: ${cdx}, ${cdy}`);
   assert.ok(sdx <= 8 && sdy <= 8, `spread drift too large: ${sdx}, ${sdy}`);
   for (const p of w) {
     assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y), 'non-finite wasm position');
   }
-  console.log(`[ok] 120-step distribution: centroid drift (${cdx.toFixed(2)}, ${cdy.toFixed(2)})px, ` +
-    `spread drift (${sdx.toFixed(2)}, ${sdy.toFixed(2)})px`);
+  console.log(
+    `[ok] 120-step distribution: centroid drift (${cdx.toFixed(2)}, ${cdy.toFixed(2)})px, ` +
+      `spread drift (${sdx.toFixed(2)}, ${sdy.toFixed(2)})px`,
+  );
 }
 
 assert.deepStrictEqual(wasmBakeEligible({ layoutParams: { mode: 'swarm' }, count: 10 }).ok, true);
@@ -263,8 +271,14 @@ console.log('[ok] scope gate routes hype/contacts/attractor/empty/breath to JS')
     'contacts + engine:"wasm" must throw',
   );
   // engine:'auto' still routes both to the JS engine.
-  assert.ok(Array.isArray(bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'auto' })));
-  assert.ok(Array.isArray(bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'auto' })));
+  assert.ok(
+    Array.isArray(bakeParticles({ ...small, layoutParams: { ...small.layoutParams, mode: 'hype' }, engine: 'auto' })),
+  );
+  assert.ok(
+    Array.isArray(
+      bakeParticles({ ...small, layoutParams: { ...small.layoutParams, contactRadius: 8 }, engine: 'auto' }),
+    ),
+  );
   globalThis.process.env.KC_SWARM_WASM = '0';
   try {
     const forced = bakeParticles({ ...small, engine: 'auto' });
@@ -305,19 +319,18 @@ function timeMs(fn, { warmup, trials }) {
 
   console.log(
     `  [${underBudget ? 'OK  ' : 'SOFT'}] wasm bake 400x120: ${wasmMs.toFixed(2)}ms ` +
-    `(reference budget ${REF_BUDGET_MS}ms${enforce ? ', ENFORCED' : ', advisory'})`,
+      `(reference budget ${REF_BUDGET_MS}ms${enforce ? ', ENFORCED' : ', advisory'})`,
   );
   console.log(`  [info] JS baseline on this machine: ${jsMs.toFixed(2)}ms — wasm is ${ratio.toFixed(2)}x faster`);
-  console.log('  [info] reference machine (JS ~36ms per #175) projects to ' +
-    `${(36 / ratio).toFixed(1)}ms for wasm`);
+  console.log('  [info] reference machine (JS ~36ms per #175) projects to ' + `${(36 / ratio).toFixed(1)}ms for wasm`);
 
-  assert.ok(wasmMs <= jsMs * 1.05,
-    `wasm must not be slower than JS: wasm ${wasmMs.toFixed(2)}ms > JS ${jsMs.toFixed(2)}ms`);
+  assert.ok(
+    wasmMs <= jsMs * 1.05,
+    `wasm must not be slower than JS: wasm ${wasmMs.toFixed(2)}ms > JS ${jsMs.toFixed(2)}ms`,
+  );
 
   if (enforce && !underBudget) {
-    assert.fail(
-      `KC_WASM_ENFORCE_BUDGET=1: wasm ${wasmMs.toFixed(2)}ms exceeds reference budget ${REF_BUDGET_MS}ms`,
-    );
+    assert.fail(`KC_WASM_ENFORCE_BUDGET=1: wasm ${wasmMs.toFixed(2)}ms exceeds reference budget ${REF_BUDGET_MS}ms`);
   }
 }
 console.log('\nswarmWasm.selfcheck: all green (parity hard; budget soft unless KC_WASM_ENFORCE_BUDGET=1)');

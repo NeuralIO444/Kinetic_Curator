@@ -11,18 +11,39 @@ import { MAX_BYTES } from './lootWeb.mjs';
 import { rootLabel, SESSION_GONE, WEB_UNSUPPORTED } from './lootCopy.mjs';
 
 let n = 0;
-const ok = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
-const NOW = 9_000_000; const OLD = NOW - 120_000;
+const ok = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const NOW = 9_000_000;
+const OLD = NOW - 120_000;
 const digest = async (buf) => createHash('sha256').update(Buffer.from(buf)).digest();
 const file = (path, text, extra = {}) => {
   const bytes = typeof text === 'string' ? new TextEncoder().encode(text) : text;
-  return { webkitRelativePath: path, size: bytes.length, lastModified: OLD, arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length), ...extra };
+  return {
+    webkitRelativePath: path,
+    size: bytes.length,
+    lastModified: OLD,
+    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length),
+    ...extra,
+  };
 };
 /** A fake <input webkitdirectory>: click() answers with `files` (or a cancel). */
-const fakeInput = (files, { cancel = false } = {}) => () => {
-  const l = {};
-  return { files, addEventListener: (t, f) => { l[t] = f; }, click() { queueMicrotask(() => (cancel ? l.cancel() : l.change())); } };
-};
+const fakeInput =
+  (files, { cancel = false } = {}) =>
+  () => {
+    const l = {};
+    return {
+      files,
+      addEventListener: (t, f) => {
+        l[t] = f;
+      },
+      click() {
+        queueMicrotask(() => (cancel ? l.cancel() : l.change()));
+      },
+    };
+  };
 const W = { document: { createElement: () => ({}) } }; // a browser whose input has no directory attribute
 const GOOD = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><circle cx="5" cy="5" r="4"/></svg>';
 
@@ -50,12 +71,18 @@ const files = [
 ];
 
 await ok('pick, scan, hash, read: the real planner indexes the files for this visit', async () => {
-  const s = createLootSession({ w: { document: { createElement: () => ({ webkitdirectory: true }) } }, makeInput: fakeInput(files), digest });
+  const s = createLootSession({
+    w: { document: { createElement: () => ({ webkitdirectory: true }) } },
+    makeInput: fakeInput(files),
+    digest,
+  });
   const p = await s.pickFolder();
   assert.equal(p.path, `${SESSION_PREFIX}KC-1 Loot`);
   const r = await runScan({ native: s, index: withRoot(emptyIndex(), p.path), nowMs: NOW });
   assert.equal(r.ok, true);
-  const rels = Object.values(r.index.items).map((i) => i.rel).sort();
+  const rels = Object.values(r.index.items)
+    .map((i) => i.rel)
+    .sort();
   assert.deepEqual(rels, ['images/a.svg', 'palettes/p.json']);
   const logged = r.index.log.map((l) => `${l.rel}: ${l.reason}`).join('\n');
   assert.match(logged, /images\/b\.png: raster not supported yet/);
@@ -71,8 +98,14 @@ await ok('pick, scan, hash, read: the real planner indexes the files for this vi
 
 await ok('a cancel is quiet; an empty folder is a cancel; another visit is told to point again', async () => {
   const w = { document: { createElement: () => ({ webkitdirectory: true }) } };
-  assert.deepEqual(await createLootSession({ w, makeInput: fakeInput([], { cancel: true }), digest }).pickFolder(), { ok: true, path: null });
-  assert.deepEqual(await createLootSession({ w, makeInput: fakeInput([]), digest }).pickFolder(), { ok: true, path: null });
+  assert.deepEqual(await createLootSession({ w, makeInput: fakeInput([], { cancel: true }), digest }).pickFolder(), {
+    ok: true,
+    path: null,
+  });
+  assert.deepEqual(await createLootSession({ w, makeInput: fakeInput([]), digest }).pickFolder(), {
+    ok: true,
+    path: null,
+  });
   const fresh = createLootSession({ w, makeInput: fakeInput(files), digest }); // a new visit: nothing held
   assert.equal((await fresh.scan(`${SESSION_PREFIX}KC-1 Loot`)).reason, SESSION_GONE);
   const r = await runScan({ native: fresh, index: withRoot(emptyIndex(), `${SESSION_PREFIX}KC-1 Loot`), nowMs: NOW });
@@ -90,10 +123,18 @@ await ok('forget drops the files; a web: label is not ours', async () => {
 });
 
 await ok('the chooser: desktop native, Chromium web, anything else the session read', () => {
-  const N = {}; const Wb = {}; const S = {};
+  const N = {};
+  const Wb = {};
+  const S = {};
   assert.equal(createLootBackend({ isDesktop: () => true, native: N, web: Wb, session: S }), N);
-  assert.equal(createLootBackend({ isDesktop: () => false, native: N, web: Wb, session: S, supportsWeb: () => true }), Wb);
-  assert.equal(createLootBackend({ isDesktop: () => false, native: N, web: Wb, session: S, supportsWeb: () => false }), S);
+  assert.equal(
+    createLootBackend({ isDesktop: () => false, native: N, web: Wb, session: S, supportsWeb: () => true }),
+    Wb,
+  );
+  assert.equal(
+    createLootBackend({ isDesktop: () => false, native: N, web: Wb, session: S, supportsWeb: () => false }),
+    S,
+  );
 });
 
 await ok('the row names the folder as this visit only', () => {

@@ -77,9 +77,10 @@ const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
  */
 export function cellsPerTick(growthRate, audioEnergy) {
   const rate = Number.isFinite(growthRate) ? Math.max(0, growthRate) : 3;
-  const drive = audioEnergy == null
-    ? 0.4 // seeded baseline — subtle motion and vibe always
-    : 0.15 + 0.85 * clamp01(audioEnergy);
+  const drive =
+    audioEnergy == null
+      ? 0.4 // seeded baseline — subtle motion and vibe always
+      : 0.15 + 0.85 * clamp01(audioEnergy);
   return Math.max(1, Math.round(rate * drive));
 }
 
@@ -97,9 +98,9 @@ function newAggregate(seed, mode, seedOffsets) {
     tick: -1,
     cells: [], // { gx, gy, ux, uy, birth }, birth order
     head: 0, // dead-prefix index: cells[0..head) have aged out (#1242).
-             // Live cells are cells[head..]; iterate from the head, never
-             // from 0. ageOut compacts lazily when the dead prefix crosses
-             // the threshold, so the raw array stays bounded.
+    // Live cells are cells[head..]; iterate from the head, never
+    // from 0. ageOut compacts lazily when the dead prefix crosses
+    // the threshold, so the raw array stays bounded.
     occ: new Uint8Array(GROWTH_GRID * GROWTH_GRID),
     frontierArr: [], // Eden: encoded empty neighbours of the form
     frontierIdx: new Map(), // Eden: encoded -> index into frontierArr

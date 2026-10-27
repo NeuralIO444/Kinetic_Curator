@@ -26,10 +26,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 
 // --- 1. golden replay: same sequence, new columns, identical bytes ---------
 const golden = JSON.parse(readFileSync(join(here, 'feedColumns.golden.json'), 'utf8'));
-assert.ok(
-  golden.gitRev && golden.gitRev !== 'unknown',
-  'golden fixture records the base rev it was captured at',
-);
+assert.ok(golden.gitRev && golden.gitRev !== 'unknown', 'golden fixture records the base rev it was captured at');
 const records = runFeedGolden({
   createFeedDelay,
   createFeedLive,

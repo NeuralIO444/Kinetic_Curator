@@ -12,7 +12,11 @@ import { lootHint } from './lootClassify.mjs';
 export const MAX_SVG_BYTES = 512 * 1024;
 
 const decode = (bytes) => {
-  try { return new TextDecoder('utf-8', { fatal: true }).decode(bytes); } catch { return null; }
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    return null;
+  }
 };
 
 /**
@@ -25,13 +29,21 @@ const decode = (bytes) => {
 export async function takeInImages({ native, index, ingest, onProgress = null }) {
   let ix = sanitizeIndex(index);
   const todo = Object.entries(ix.items)
-    .filter(([, it]) => it.kind === 'image' && it.state === 'ok' && !it.ingested && (!it.hold || /^pool full/.test(it.hold)))
+    .filter(
+      ([, it]) => it.kind === 'image' && it.state === 'ok' && !it.ingested && (!it.hold || /^pool full/.test(it.hold)),
+    )
     .sort((a, b) => (a[1].rel < b[1].rel ? -1 : 1));
   const summary = { taken: 0, rejected: 0, poolFull: 0, unreadable: 0 };
   const rows = [];
   let done = 0;
   for (const [id, it] of todo) {
-    if (onProgress) { try { onProgress({ done, total: todo.length }); } catch { /* a progress callback must not stop this */ } }
+    if (onProgress) {
+      try {
+        onProgress({ done, total: todo.length });
+      } catch {
+        /* a progress callback must not stop this */
+      }
+    }
     done += 1;
     const read = await native.read(ix.root, it.rel);
     if (!read.ok) {
@@ -40,12 +52,31 @@ export async function takeInImages({ native, index, ingest, onProgress = null })
       ix = markTaken(ix, id, { status: 'held', reason: `unreadable: ${read.reason}` });
       continue;
     }
-    if (read.bytes.length === 0) { summary.rejected += 1; rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'empty file' }); ix = markTaken(ix, id, { status: 'held', reason: 'empty file' }); continue; }
-    if (read.bytes.length > MAX_SVG_BYTES) { summary.rejected += 1; rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'too big for the pool' }); ix = markTaken(ix, id, { status: 'held', reason: 'too big for the pool' }); continue; }
+    if (read.bytes.length === 0) {
+      summary.rejected += 1;
+      rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'empty file' });
+      ix = markTaken(ix, id, { status: 'held', reason: 'empty file' });
+      continue;
+    }
+    if (read.bytes.length > MAX_SVG_BYTES) {
+      summary.rejected += 1;
+      rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'too big for the pool' });
+      ix = markTaken(ix, id, { status: 'held', reason: 'too big for the pool' });
+      continue;
+    }
     const text = decode(read.bytes);
-    if (text === null) { summary.rejected += 1; rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'not text (not an SVG)' }); ix = markTaken(ix, id, { status: 'held', reason: 'not text (not an SVG)' }); continue; }
+    if (text === null) {
+      summary.rejected += 1;
+      rows.push({ rel: it.rel, kind: 'image', outcome: 'rejected', reason: 'not text (not an SVG)' });
+      ix = markTaken(ix, id, { status: 'held', reason: 'not text (not an SVG)' });
+      continue;
+    }
     let r;
-    try { r = ingest(text, lootHint(id)); } catch (e) { r = { ok: false, reason: String((e && e.message) || e).slice(0, 100) }; }
+    try {
+      r = ingest(text, lootHint(id));
+    } catch (e) {
+      r = { ok: false, reason: String((e && e.message) || e).slice(0, 100) };
+    }
     if (r && r.ok) {
       summary.taken += 1;
       rows.push({ rel: it.rel, kind: 'image', outcome: 'taken-in', reason: 'in the pool, off until you enable it' });
@@ -61,7 +92,13 @@ export async function takeInImages({ native, index, ingest, onProgress = null })
       ix = markTaken(ix, id, { status: 'held', reason: `rejected: ${why}`.slice(0, 120) });
     }
   }
-  if (onProgress && todo.length) { try { onProgress({ done: todo.length, total: todo.length }); } catch { /* ignore */ } }
+  if (onProgress && todo.length) {
+    try {
+      onProgress({ done: todo.length, total: todo.length });
+    } catch {
+      /* ignore */
+    }
+  }
   return { index: addRows(ix, rows.reverse()), summary };
 }
 

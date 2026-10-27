@@ -45,8 +45,7 @@ function bandAtPos(bands, pos) {
   const i0 = Math.floor(pos);
   const i1 = Math.min(QUAD_BAND_ORDER.length - 1, i0 + 1);
   const f = pos - i0;
-  const v = bandLevel(bands, QUAD_BAND_ORDER[i0]) * (1 - f)
-          + bandLevel(bands, QUAD_BAND_ORDER[i1]) * f;
+  const v = bandLevel(bands, QUAD_BAND_ORDER[i0]) * (1 - f) + bandLevel(bands, QUAD_BAND_ORDER[i1]) * f;
   return v < BAND_FLOOR ? 0 : v;
 }
 
@@ -143,19 +142,22 @@ export function createBandSmoother({ attackSec = QUAD_ATTACK_SEC, releaseSec = Q
  * Compose the interestingness callback slice 1's buildQuadtree consumes.
  * Pure given its inputs — `bands` is a snapshot object (smoothed or raw).
  */
-export function makeQuadtreeInterestingness({ seed, seedOffsets = null, quadAudio = 0.5, quadField = 0.5, fieldZ = 0, bands = null }) {
+export function makeQuadtreeInterestingness({
+  seed,
+  seedOffsets = null,
+  quadAudio = 0.5,
+  quadField = 0.5,
+  fieldZ = 0,
+  bands = null,
+}) {
   const field = makeQuadtreeField(seed, seedOffsets, fieldZ);
   // Relax contract: when the bus is silent the audio weight eases to zero,
   // so the tree becomes field-only at FULL strength — not half-diluted by a
   // dead term. (Spec §Dropout: "at zero audio term, interesting = fieldTerm".)
   const audioActive = !!bands && QUAD_BAND_ORDER.some((k) => bandLevel(bands, k) >= BAND_FLOOR);
   const wa = audioActive ? quadAudio : 0;
-  return (nx, ny, w, h /* , depth */) => blendInteresting(
-    audioTermCell(bands, ny - h / 2, ny + h / 2),
-    fieldTermAt(field, nx, ny, w),
-    wa,
-    quadField,
-  );
+  return (nx, ny, w, h /* , depth */) =>
+    blendInteresting(audioTermCell(bands, ny - h / 2, ny + h / 2), fieldTermAt(field, nx, ny, w), wa, quadField);
 }
 
 /**
@@ -173,7 +175,7 @@ export function readSmoothedBands(nowMs) {
   // wall-clock fallback. A missing or non-finite timestamp reuses the last
   // one (0 before the first timed call): the smoother idles inside its
   // throttle window instead of poisoning its state on a NaN dt.
-  const t = Number.isFinite(nowMs) ? nowMs : (_liveLastMs < 0 ? 0 : _liveLastMs);
+  const t = Number.isFinite(nowMs) ? nowMs : _liveLastMs < 0 ? 0 : _liveLastMs;
   if (_liveCached && t - _liveLastMs < 100) return _liveCached;
   _liveLastMs = t;
   _liveCached = _liveSmoother.update(readMeterBandLevels(), t);

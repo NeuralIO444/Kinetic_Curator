@@ -29,6 +29,27 @@ src/gl/fields/fieldHarness.html
 !src/engine/kernel/feature/
 !src/engine/kernel/weather/
 
+# ── Adopted (slice 3, #1684: proved by formatting then running the full selfcheck + lint + build) ──
+!src/biology/
+!src/engine/organisms/
+!src/engine/kernel/soa/
+!src/engine/kernel/worker/
+!src/engine/kernel/replay/
+src/engine/kernel/replay/goldens/
+!src/engine/kernel/sample/
+!src/engine/kernel/tracks/
+src/engine/kernel/tracks/*.golden.json
+!src/gl/debug/
+src/gl/debug/*.html
+!src/gl/bridge/
+!src/gl/mlx/
+src/gl/mlx/*.json
+!src/engine/kernel/bake/
+!src/engine/kernel/color/
+!src/engine/kernel/field/
+!src/loot/
+!src/platform/
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

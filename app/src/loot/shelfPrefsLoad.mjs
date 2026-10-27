@@ -25,9 +25,7 @@
 // exportPrefs, its corrections folded into the lines after the main
 // parser's — one file, one set of named corrections.
 
-import {
-  parseShelfPrefs, isConflictCopyName, conflictCopyLine,
-} from '../curator/shelfPrefs.mjs';
+import { parseShelfPrefs, isConflictCopyName, conflictCopyLine } from '../curator/shelfPrefs.mjs';
 import { parseShelfExportPrefs } from '../curator/shelfDisk.mjs';
 
 export const PREFERENCES_REL = 'preferences.json';
@@ -41,12 +39,18 @@ export const PREFERENCES_REL = 'preferences.json';
  */
 export async function loadShelfPrefs({ backend, root, rels = [] } = {}) {
   const lines = [];
-  for (const rel of (Array.isArray(rels) ? rels : [])) {
-    const name = String(rel || '').split('/').pop();
+  for (const rel of Array.isArray(rels) ? rels : []) {
+    const name = String(rel || '')
+      .split('/')
+      .pop();
     if (name && isConflictCopyName(name)) lines.push(conflictCopyLine(name));
   }
-  if (!root || !backend || typeof backend.read !== 'function'
-    || (typeof backend.unavailable === 'function' && backend.unavailable())) {
+  if (
+    !root ||
+    !backend ||
+    typeof backend.read !== 'function' ||
+    (typeof backend.unavailable === 'function' && backend.unavailable())
+  ) {
     // No folder (or no readable backend): shipped defaults, and —
     // with no folder connected — nothing to say anywhere visible.
     const parsed = parseShelfPrefs(null);
@@ -57,11 +61,15 @@ export async function loadShelfPrefs({ backend, root, rels = [] } = {}) {
   try {
     const read = await backend.read(root, PREFERENCES_REL);
     if (read && read.ok && read.bytes) text = new TextDecoder().decode(read.bytes);
-  } catch { /* unreadable reads as missing — the parser names it */ }
+  } catch {
+    /* unreadable reads as missing — the parser names it */
+  }
   const parsed = parseShelfPrefs(text);
   const exp = parseShelfExportPrefs(text);
   return {
-    prefs: parsed.prefs, exportPrefs: exp.exportPrefs, source: parsed.source,
+    prefs: parsed.prefs,
+    exportPrefs: exp.exportPrefs,
+    source: parsed.source,
     lines: [...lines, ...parsed.lines, ...exp.lines],
   };
 }

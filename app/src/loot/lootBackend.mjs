@@ -7,7 +7,13 @@ import { createLootWeb, webFolderSupport } from './lootWeb.mjs';
 import { createLootSession } from './lootSession.mjs';
 
 /** A browser with no folder-handle API (Safari, Firefox) still reads a chosen folder for the visit (slice 5c). */
-export function createLootBackend({ isDesktop = isTauriRuntime, native = null, web = null, session = null, supportsWeb = () => webFolderSupport() === null } = {}) {
+export function createLootBackend({
+  isDesktop = isTauriRuntime,
+  native = null,
+  web = null,
+  session = null,
+  supportsWeb = () => webFolderSupport() === null,
+} = {}) {
   if (isDesktop()) return native || createLootNative();
-  return supportsWeb() ? (web || createLootWeb()) : (session || createLootSession());
+  return supportsWeb() ? web || createLootWeb() : session || createLootSession();
 }

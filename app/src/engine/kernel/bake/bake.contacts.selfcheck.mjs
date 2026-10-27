@@ -34,10 +34,18 @@ test('#814 policy: contacts force JS', () => {
 
 test('#814 engine wasm + contacts throws', () => {
   assert.throws(
-    () => bakeParticles({
-      seed, count, layoutParams: lp(), activeAssets: assets, palette,
-      canvasW: 1000, canvasH: 700, steps: 2, engine: 'wasm',
-    }),
+    () =>
+      bakeParticles({
+        seed,
+        count,
+        layoutParams: lp(),
+        activeAssets: assets,
+        palette,
+        canvasW: 1000,
+        canvasH: 700,
+        steps: 2,
+        engine: 'wasm',
+      }),
     /cannot bake this config \(contacts\)/,
   );
 });
@@ -45,8 +53,16 @@ test('#814 engine wasm + contacts throws', () => {
 test('#814 JS bake with contacts matches live ticks', () => {
   const layoutParams = lp();
   const baked = bakeParticles({
-    seed, count, layoutParams, activeAssets: assets, palette,
-    canvasW: 1000, canvasH: 700, steps, dt: BAKE_DT_MS, engine: 'js',
+    seed,
+    count,
+    layoutParams,
+    activeAssets: assets,
+    palette,
+    canvasW: 1000,
+    canvasH: 700,
+    steps,
+    dt: BAKE_DT_MS,
+    engine: 'js',
   });
   const sys = new ParticleSystem();
   sys.init(count, 1000, 700, assets, palette, seed);

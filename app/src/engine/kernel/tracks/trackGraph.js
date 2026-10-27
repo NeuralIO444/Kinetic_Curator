@@ -118,7 +118,11 @@ export function motionMetrics(points) {
   const pts = Array.isArray(points) ? points : [];
   const n = pts.length;
   if (!n) return { cx: 0.5, cy: 0.5, vx: 0, vy: 0, speed: 0, agitation: 0, density: 0 };
-  let sx = 0, sy = 0, svx = 0, svy = 0, energy = 0;
+  let sx = 0,
+    sy = 0,
+    svx = 0,
+    svy = 0,
+    energy = 0;
   for (const p of pts) {
     sx += Number(p.x) || 0;
     sy += Number(p.y) || 0;
@@ -129,7 +133,10 @@ export function motionMetrics(points) {
     energy += vx * vx + vy * vy;
   }
   return {
-    cx: sx / n, cy: sy / n, vx: svx / n, vy: svy / n,
+    cx: sx / n,
+    cy: sy / n,
+    vx: svx / n,
+    vy: svy / n,
     speed: Math.hypot(svx / n, svy / n),
     agitation: Math.sqrt(energy / n),
     density: n / MAX_TRACKS,

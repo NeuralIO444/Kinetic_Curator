@@ -5,13 +5,29 @@ import { mkRng } from '../../prng.js';
 import { makeScratchStream } from '../rng.js';
 import { computePlacements } from '../../placement.js';
 import {
-  gaussian, gaussianLobes, clearGaussianCache, reflect,
-  GAUSS_MIN_LOBES, GAUSS_MAX_LOBES, GAUSS_MARGIN, GAUSS_SIGMA_FRAC,
+  gaussian,
+  gaussianLobes,
+  clearGaussianCache,
+  reflect,
+  GAUSS_MIN_LOBES,
+  GAUSS_MAX_LOBES,
+  GAUSS_MARGIN,
+  GAUSS_SIGMA_FRAC,
 } from './gaussian.js';
 
 const W = 1000;
 const H = 700;
-const ctxFor = (i, seed, extra = {}) => ({ i, count: 400, w: W, h: H, rng: mkRng(i + 1), jitter: 0, seed, seedOffsets: null, ...extra });
+const ctxFor = (i, seed, extra = {}) => ({
+  i,
+  count: 400,
+  w: W,
+  h: H,
+  rng: mkRng(i + 1),
+  jitter: 0,
+  seed,
+  seedOffsets: null,
+  ...extra,
+});
 const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
 
 // 1. reflect: identity inside, mirror outside, always in [0, size], exact for huge distances
@@ -32,7 +48,10 @@ const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
   const seen = new Set();
   for (let seed = 1; seed <= 40; seed++) {
     const lobes = gaussianLobes(seed, W, H, null);
-    assert.ok(lobes.length >= GAUSS_MIN_LOBES && lobes.length <= GAUSS_MAX_LOBES, `seed ${seed}: ${lobes.length} lobes`);
+    assert.ok(
+      lobes.length >= GAUSS_MIN_LOBES && lobes.length <= GAUSS_MAX_LOBES,
+      `seed ${seed}: ${lobes.length} lobes`,
+    );
     seen.add(lobes.length);
     let prev = 0;
     for (const l of lobes) {
@@ -50,7 +69,11 @@ const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
   assert.notEqual(JSON.stringify(gaussianLobes(6, W, H, null)), a, 'seeds differ');
   const off = { spatial: 3, color: 0, asset: 0, noise: 0 };
   assert.notEqual(JSON.stringify(gaussianLobes(5, W, H, off)), a, 're-rolling SPATIAL re-rolls the grouping');
-  assert.equal(JSON.stringify(gaussianLobes(5, W, H, { spatial: 0, color: 9, asset: 9, noise: 9 })), a, 'colour/asset/noise offsets do not');
+  assert.equal(
+    JSON.stringify(gaussianLobes(5, W, H, { spatial: 0, color: 9, asset: 9, noise: 9 })),
+    a,
+    'colour/asset/noise offsets do not',
+  );
 }
 
 // 3. every point is on the plate (never off, never piled on the border), for any seed, jitter and sigma
@@ -101,11 +124,23 @@ const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
     uniMean += nearest(rng() * W, rng() * H);
     let k = 0;
     let best = Infinity;
-    lobes.forEach((l, li) => { const d = Math.hypot(p.x - l.cx, p.y - l.cy); if (d < best) { best = d; k = li; } });
+    lobes.forEach((l, li) => {
+      const d = Math.hypot(p.x - l.cx, p.y - l.cy);
+      if (d < best) {
+        best = d;
+        k = li;
+      }
+    });
     hits[k] += 1;
   }
-  assert.ok(gaussMean / N < 0.55 * (uniMean / N), `clustered: ${(gaussMean / N).toFixed(0)}px vs uniform ${(uniMean / N).toFixed(0)}px`);
-  assert.ok(hits.every((h) => h > N * 0.08), `every lobe holds a group: ${hits.join('/')}`);
+  assert.ok(
+    gaussMean / N < 0.55 * (uniMean / N),
+    `clustered: ${(gaussMean / N).toFixed(0)}px vs uniform ${(uniMean / N).toFixed(0)}px`,
+  );
+  assert.ok(
+    hits.every((h) => h > N * 0.08),
+    `every lobe holds a group: ${hits.join('/')}`,
+  );
   // soft falloff: a dense core and a sparse edge, not a ring or a hard disc
   const sigma = GAUSS_SIGMA_FRAC * Math.min(W, H);
   let core = 0;
@@ -117,7 +152,10 @@ const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
     else if (d < 2 * sigma) shell += 1;
   }
   // density, not count: the shell [sigma, 2sigma] has 3x the core's area
-  assert.ok(core > shell / 3, `core density (${core}) beats the next shell's (${(shell / 3).toFixed(0)} per core-area)`);
+  assert.ok(
+    core > shell / 3,
+    `core density (${core}) beats the next shell's (${(shell / 3).toFixed(0)} per core-area)`,
+  );
   assert.ok(core > N * 0.25, 'a real core: a quarter of the points sit within one sigma of a centre');
   assert.ok(shell > 0, 'the edge feathers rather than stops');
 }
@@ -138,19 +176,49 @@ const pt = (i, seed, extra) => gaussian(ctxFor(i, seed, extra));
 
 // 7. orchestrator: mode 'gaussian' places count finite, on-plate, deterministic points
 {
-  const run = () => computePlacements({
-    mode: 'gaussian', count: 120, seed: 0x1194, scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 12, density: 100, zTiers: 1, bleed: false, canvasW: W, canvasH: H,
-  });
+  const run = () =>
+    computePlacements({
+      mode: 'gaussian',
+      count: 120,
+      seed: 0x1194,
+      scale: [0.4, 0.8],
+      rotate: [0, 45],
+      alpha: [60, 100],
+      jitter: 12,
+      density: 100,
+      zTiers: 1,
+      bleed: false,
+      canvasW: W,
+      canvasH: H,
+    });
   const a = run();
   assert.equal(a.length, 120);
-  for (const p of a) assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H);
-  assert.deepEqual(run().map((p) => [p.x, p.y]), a.map((p) => [p.x, p.y]), 'same seed, same scene');
+  for (const p of a)
+    assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && p.x >= 0 && p.x <= W && p.y >= 0 && p.y <= H);
+  assert.deepEqual(
+    run().map((p) => [p.x, p.y]),
+    a.map((p) => [p.x, p.y]),
+    'same seed, same scene',
+  );
   const b = computePlacements({
-    mode: 'gaussian', count: 120, seed: 0x1195, scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 12, density: 100, zTiers: 1, bleed: false, canvasW: W, canvasH: H,
+    mode: 'gaussian',
+    count: 120,
+    seed: 0x1195,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 12,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: W,
+    canvasH: H,
   });
-  assert.notDeepEqual(b.map((p) => [p.x, p.y]), a.map((p) => [p.x, p.y]), 'a different seed re-deals');
+  assert.notDeepEqual(
+    b.map((p) => [p.x, p.y]),
+    a.map((p) => [p.x, p.y]),
+    'a different seed re-deals',
+  );
 }
 
 console.log('gaussian.selfcheck: ok (#1194)');

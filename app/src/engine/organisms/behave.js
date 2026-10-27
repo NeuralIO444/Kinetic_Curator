@@ -273,9 +273,7 @@ export function resolveBehave(id) {
 }
 
 /** #479 Option B — which table fields a per-layer override can replace. */
-export const BEHAVE_OVERRIDE_FIELDS = [
-  'sep', 'ali', 'coh', 'sepR', 'aliR', 'cohR', 'wind', 'orbit', 'attract',
-];
+export const BEHAVE_OVERRIDE_FIELDS = ['sep', 'ali', 'coh', 'sepR', 'aliR', 'cohR', 'wind', 'orbit', 'attract'];
 
 /**
  * #479 Option B — the table row for `layoutParams.behave`, with any
@@ -309,7 +307,7 @@ export function resolveWindMode(layoutParams) {
   if (layoutParams.windMode === 'curl' || layoutParams.windType === 'curl') return 'curl';
   if (layoutParams.windMode === 'point' || layoutParams.windType === 'point') return 'point';
   const { behave, mode } = layoutParams;
-  return (behave === 'flock' || behave === 'mold' || mode === 'murmuration') ? 'curl' : 'point';
+  return behave === 'flock' || behave === 'mold' || mode === 'murmuration' ? 'curl' : 'point';
 }
 
 /** Weak pull around plate center — Haeckel grid, not a drain. */

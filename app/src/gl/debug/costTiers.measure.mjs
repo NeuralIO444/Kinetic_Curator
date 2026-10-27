@@ -63,7 +63,10 @@ async function main() {
     const page = await browser.newPage();
     const errors = [];
     page.on('pageerror', (e) => errors.push(String((e && e.stack) || e)));
-    await page.goto(`http://127.0.0.1:${port}/debug/selfcheck.html?only=measure`, { waitUntil: 'commit', timeout: 60000 });
+    await page.goto(`http://127.0.0.1:${port}/debug/selfcheck.html?only=measure`, {
+      waitUntil: 'commit',
+      timeout: 60000,
+    });
     await page.waitForFunction('window.__kcMeasureReady === true', null, { timeout: 120000 });
     const info = await page.evaluate('({ ids: window.__kcMeasure.ids, hwTimer: window.__kcMeasure.hwTimer })');
     console.log(`[measure] ${info.ids.length} effects, ${info.hwTimer ? 'hardware timer' : 'node wall-time'} timing`);
@@ -77,7 +80,8 @@ async function main() {
         const t0 = Date.now();
         const hw = await page.evaluate(([x, n]) => window.__kcMeasure.runBatch(x, n), [id, BATCH_DRAWS]);
         const wall = (Date.now() - t0) / BATCH_DRAWS;
-        if (hw && typeof hw.hwMs === 'number') hwMs = hw.hwMs; // hardware path: page times itself
+        if (hw && typeof hw.hwMs === 'number')
+          hwMs = hw.hwMs; // hardware path: page times itself
         else batchMs.push(wall);
       }
       const ms = hwMs !== null ? hwMs : median(batchMs);
@@ -86,7 +90,11 @@ async function main() {
       console.log(`  [cost] ${id} [${caseName}]: ${ms.toFixed(4)} ms/draw (${results[id].method})`);
     }
     await page.evaluate('window.__kcMeasure.dispose()');
-    if (errors.length) { console.error('page errors:\n' + errors.join('\n')); process.exitCode = 1; return; }
+    if (errors.length) {
+      console.error('page errors:\n' + errors.join('\n'));
+      process.exitCode = 1;
+      return;
+    }
 
     const entries = Object.entries(results)
       .sort(([a], [b]) => (a < b ? -1 : 1))
@@ -115,7 +123,11 @@ ${entries.join('\n')}
     await writeFile(OUT_FILE, body);
     console.log(`[measure] wrote ${path.relative(process.cwd(), OUT_FILE)} (${entries.length} effects, ${stamp})`);
   } finally {
-    try { await browser?.close(); } catch { /* noop */ }
+    try {
+      await browser?.close();
+    } catch {
+      /* noop */
+    }
     server.close();
   }
 }

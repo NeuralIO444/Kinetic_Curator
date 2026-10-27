@@ -11,13 +11,19 @@ import { registerBuiltinEffects } from './builtinEffects.mjs';
 import { UniformAuditError } from '../debug/diagnostics.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 /** Minimal WebGL2 mock: records calls, hands out unique fake objects. */
 function makeMockGl({ nullUniforms = [] } = {}) {
   const calls = [];
   let nextId = 1;
-  const call = (name, ...args) => { calls.push({ name, args }); };
+  const call = (name, ...args) => {
+    calls.push({ name, args });
+  };
   // Active-uniform derivation: the harness audit reads ACTIVE_UNIFORMS /
   // getActiveUniform, so the mock parses them out of the attached FS source
   // (same pattern as the template/fxShaders mocks).
@@ -36,15 +42,28 @@ function makeMockGl({ nullUniforms = [] } = {}) {
     return fs ? parseUniforms(fs.src) : [];
   };
   const gl = {
-    VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-    COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82, ACTIVE_UNIFORMS: 0x8b86,
-    TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0, FRAMEBUFFER: 0x8d40,
-    COLOR_ATTACHMENT0: 0x8ce0, FRAMEBUFFER_COMPLETE: 0x8cd5,
-    RGBA16F: 0x881a, RGBA: 0x1908, HALF_FLOAT: 0x140b,
-    CLAMP_TO_EDGE: 0x812f, TEXTURE_MIN_FILTER: 0x2801,
-    TEXTURE_MAG_FILTER: 0x2800, NEAREST: 0x2600,
-    ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88e4, FLOAT: 0x1406,
-    TRIANGLES: 0x0004, BLEND: 0x0be2,
+    VERTEX_SHADER: 0x8b31,
+    FRAGMENT_SHADER: 0x8b30,
+    COMPILE_STATUS: 0x8b81,
+    LINK_STATUS: 0x8b82,
+    ACTIVE_UNIFORMS: 0x8b86,
+    TEXTURE_2D: 0x0de1,
+    TEXTURE0: 0x84c0,
+    FRAMEBUFFER: 0x8d40,
+    COLOR_ATTACHMENT0: 0x8ce0,
+    FRAMEBUFFER_COMPLETE: 0x8cd5,
+    RGBA16F: 0x881a,
+    RGBA: 0x1908,
+    HALF_FLOAT: 0x140b,
+    CLAMP_TO_EDGE: 0x812f,
+    TEXTURE_MIN_FILTER: 0x2801,
+    TEXTURE_MAG_FILTER: 0x2800,
+    NEAREST: 0x2600,
+    ARRAY_BUFFER: 0x8892,
+    STATIC_DRAW: 0x88e4,
+    FLOAT: 0x1406,
+    TRIANGLES: 0x0004,
+    BLEND: 0x0be2,
     calls,
     count: (name) => calls.filter((c) => c.name === name).length,
     withName: (name) => calls.filter((c) => c.name === name),
@@ -54,13 +73,24 @@ function makeMockGl({ nullUniforms = [] } = {}) {
       shaders.set(s, s);
       return s;
     },
-    shaderSource: (s, src) => { shaders.get(s).src = src; call('shaderSource', s); },
+    shaderSource: (s, src) => {
+      shaders.get(s).src = src;
+      call('shaderSource', s);
+    },
     compileShader: (s) => call('compileShader', s),
     getShaderParameter: () => true,
     getShaderInfoLog: () => '',
     deleteShader: (s) => call('deleteShader', s),
-    createProgram: () => { call('createProgram'); const p = { __p: nextId++ }; attached.set(p, []); return p; },
-    attachShader: (p, s) => { attached.get(p).push(s); call('attachShader', p); },
+    createProgram: () => {
+      call('createProgram');
+      const p = { __p: nextId++ };
+      attached.set(p, []);
+      return p;
+    },
+    attachShader: (p, s) => {
+      attached.get(p).push(s);
+      call('attachShader', p);
+    },
     linkProgram: (p) => call('linkProgram', p),
     getProgramParameter: (p, pname) => (pname === gl.ACTIVE_UNIFORMS ? activeNames(p).length : true),
     getActiveUniform: (p, i) => ({ name: activeNames(p)[i] }),
@@ -70,17 +100,26 @@ function makeMockGl({ nullUniforms = [] } = {}) {
       call('getUniformLocation', uname);
       return nullUniforms.includes(uname) ? null : { __loc: uname };
     },
-    createTexture: () => { call('createTexture'); return { __t: nextId++ }; },
+    createTexture: () => {
+      call('createTexture');
+      return { __t: nextId++ };
+    },
     bindTexture: (t, x) => call('bindTexture', x),
     texImage2D: (...a) => call('texImage2D', a[3], a[4]),
     texParameteri: () => call('texParameteri'),
     deleteTexture: (x) => call('deleteTexture', x),
-    createFramebuffer: () => { call('createFramebuffer'); return { __f: nextId++ }; },
+    createFramebuffer: () => {
+      call('createFramebuffer');
+      return { __f: nextId++ };
+    },
     bindFramebuffer: (t, x) => call('bindFramebuffer', x),
     framebufferTexture2D: () => call('framebufferTexture2D'),
     checkFramebufferStatus: () => gl.FRAMEBUFFER_COMPLETE,
     deleteFramebuffer: (x) => call('deleteFramebuffer', x),
-    createBuffer: () => { call('createBuffer'); return { __b: nextId++ }; },
+    createBuffer: () => {
+      call('createBuffer');
+      return { __b: nextId++ };
+    },
     bindBuffer: (t, x) => call('bindBuffer', x),
     bufferData: () => call('bufferData'),
     deleteBuffer: (x) => call('deleteBuffer', x),
@@ -101,8 +140,10 @@ function makeMockGl({ nullUniforms = [] } = {}) {
 }
 
 const mockCanvas = () => ({
-  width: 400, height: 280,
-  addEventListener() {}, removeEventListener() {},
+  width: 400,
+  height: 280,
+  addEventListener() {},
+  removeEventListener() {},
 });
 
 function makeBridge(gl, w = 400, h = 280) {
@@ -111,9 +152,11 @@ function makeBridge(gl, w = 400, h = 280) {
   return bridge;
 }
 
-const chainOf = (...kinds) => kinds.map((kind) => ({
-  kind, params: kind === 'rgbSplit' ? { dx: 3 } : kind === 'grain' ? { amount: 0.4 } : {},
-}));
+const chainOf = (...kinds) =>
+  kinds.map((kind) => ({
+    kind,
+    params: kind === 'rgbSplit' ? { dx: 3 } : kind === 'grain' ? { amount: 0.4 } : {},
+  }));
 
 ok('bridge exposes the contract version', () => {
   assert.equal(BRIDGE_VERSION, 1);
@@ -160,7 +203,10 @@ ok('chain runs top-down with ping-pong targets', () => {
   assert.equal(passFbs[0], L.t1.fb, 'pass 1 writes t1');
   assert.equal(passFbs[1], L.t0.fb, 'pass 2 writes t0');
   assert.equal(out, L.t0, 'chain returns the final read target');
-  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  const modes = gl
+    .withName('uniform1i')
+    .filter((c) => c.args[0] === 'u_effect')
+    .map((c) => c.args[1]);
   assert.deepEqual(modes, [0, 1], 'top-down mode order');
 });
 
@@ -181,7 +227,10 @@ ok('blur is dead on the GPU path: kind "blur" fails closed (#308)', () => {
   // The four surviving builtins still chain top-down.
   const out = bridge.runChain('fx1', L.t0, chainOf('invert', 'rgbSplit', 'grain', 'posterize'));
   assert.equal(out, L.t0, 'chain returns the final read target');
-  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  const modes = gl
+    .withName('uniform1i')
+    .filter((c) => c.args[0] === 'u_effect')
+    .map((c) => c.args[1]);
   assert.deepEqual(modes, [0, 1, 2, 5], 'invert, rgbSplit, grain, posterize — no blur ids');
 });
 
@@ -200,7 +249,10 @@ ok('bridge: passes may be a function of (stepParams, {width,height}) (#225)', ()
   bridge.runChain('fx1', L.t0, [{ kind: 'dyn', params: { radius: 6 } }]);
   assert.deepEqual(seen.p, { radius: 6 }, 'step params forwarded');
   assert.deepEqual(seen.ctx, { width: 400, height: 280 }, 'write-target size forwarded');
-  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
+  const modes = gl
+    .withName('uniform1i')
+    .filter((c) => c.args[0] === 'u_effect')
+    .map((c) => c.args[1]);
   assert.deepEqual(modes, [0], 'returned passes run');
 });
 
@@ -210,7 +262,8 @@ ok('bridge: defineEffect rejects a non-array non-function passes', () => {
   assert.throws(
     () => bridge.defineEffect('bad', { program: 'effect', passes: 42 }),
     /passes must be an array or a/,
-    'fail closed on a bad passes shape');
+    'fail closed on a bad passes shape',
+  );
 });
 
 ok('u_texel and u_res reflect the write target size', () => {
@@ -238,10 +291,7 @@ ok('unknown effect kinds fail closed', () => {
 ok('defineEffect rejects unregistered programs', () => {
   const gl = makeMockGl();
   const bridge = createBridge(gl, mockCanvas(), {});
-  assert.throws(
-    () => bridge.defineEffect('nope', { program: 'missing', passes: [] }),
-    /not registered/
-  );
+  assert.throws(() => bridge.defineEffect('nope', { program: 'missing', passes: [] }), /not registered/);
 });
 
 ok('uniform audit gate: a shader declaring an un-uploaded uniform throws, naming the program', () => {
@@ -264,7 +314,9 @@ void main() { o = texture(u_src, vec2(0.5)) * u_mystery; }
       uniforms: { u_src: { kind: 'sampler', unit: 0 } },
       file: 'test:badProg',
     });
-  } catch (e) { err = e; }
+  } catch (e) {
+    err = e;
+  }
   assert.ok(err instanceof UniformAuditError, `expected UniformAuditError, got ${err}`);
   assert.equal(err.programName, 'badProg', 'names the program');
   assert.deepEqual(err.neverSet, ['u_mystery'], 'names the unset uniform');
@@ -285,11 +337,9 @@ ok('zero GL allocation per frame after warmup', () => {
   const bridge = makeBridge(gl);
   const L = bridge.layer('fx1');
   bridge.runChain('fx1', L.t0, chainOf('invert', 'rgbSplit', 'grain'));
-  const snap = ['createTexture', 'createFramebuffer', 'createBuffer', 'createProgram']
-    .map((k) => gl.count(k));
+  const snap = ['createTexture', 'createFramebuffer', 'createBuffer', 'createProgram'].map((k) => gl.count(k));
   for (let i = 0; i < 3; i++) bridge.runChain('fx1', L.t0, chainOf('invert', 'rgbSplit', 'grain'));
-  const now = ['createTexture', 'createFramebuffer', 'createBuffer', 'createProgram']
-    .map((k) => gl.count(k));
+  const now = ['createTexture', 'createFramebuffer', 'createBuffer', 'createProgram'].map((k) => gl.count(k));
   assert.deepEqual(now, snap, 'no per-frame allocation');
 });
 
@@ -306,7 +356,10 @@ ok('resize reallocates FBOs without recompiling shaders', () => {
   assert.equal(L2.t0.h, 560);
   assert.equal(gl.count('createProgram'), 1, 'resize never recompiles');
   bridge.runChain('fx1', L2.t0, chainOf('invert'));
-  const texel = gl.withName('uniform2f').filter((c) => c.args[0] === 'u_texel').pop();
+  const texel = gl
+    .withName('uniform2f')
+    .filter((c) => c.args[0] === 'u_texel')
+    .pop();
   assert.ok(Math.abs(texel.args[1] - 1 / 800) < 1e-12, 'u_texel re-uploaded at new size');
 });
 
@@ -344,7 +397,10 @@ ok('pad descriptor allocates padded targets', () => {
   assert.equal(L2.padT0.w, 400 + 32);
   assert.equal(L2.padT0.h, 280 + 32);
   bridge.runChain('fx1', L2.t0, [{ kind: 'wide', params: {} }]);
-  const passFbs = gl.withName('bindFramebuffer').map((c) => c.args[0]).slice(-1);
+  const passFbs = gl
+    .withName('bindFramebuffer')
+    .map((c) => c.args[0])
+    .slice(-1);
   assert.equal(passFbs[0], L2.padT0.fb, 'padded pass writes the padded target');
 });
 
@@ -399,14 +455,16 @@ ok('passes may supply a custom uniform map (#195 template)', () => {
   bridge.defineEffect('customFx', {
     program: 'custom',
     pad: 0,
-    passes: [{
-      uniforms: (step, { read, wTarget, time }) => ({
-        u_tex: read.tex,
-        u_res: [wTarget.w, wTarget.h],
-        u_time: time,
-        u_amount: step.params.amount ?? 0.5,
-      }),
-    }],
+    passes: [
+      {
+        uniforms: (step, { read, wTarget, time }) => ({
+          u_tex: read.tex,
+          u_res: [wTarget.w, wTarget.h],
+          u_time: time,
+          u_amount: step.params.amount ?? 0.5,
+        }),
+      },
+    ],
   });
   const L = bridge.layer('fx1');
   bridge.runChain('fx1', L.t0, [{ kind: 'customFx', params: { amount: 0.25 } }], { time: 2.5 });
@@ -431,33 +489,42 @@ ok('uniform dirty-cache is per-program: a second program re-uploads u_res (QA sw
     bridge.defineEffect(`fx-${name}`, {
       program: name,
       pad: 0,
-      passes: [{
-        uniforms: (step, { read, wTarget }) => ({
-          u_tex: read.tex,
-          u_res: [wTarget.w, wTarget.h],
-        }),
-      }],
+      passes: [
+        {
+          uniforms: (step, { read, wTarget }) => ({
+            u_tex: read.tex,
+            u_res: [wTarget.w, wTarget.h],
+          }),
+        },
+      ],
     });
   }
   const L = bridge.layer('fx1');
-  bridge.runChain('fx1', L.t0, [{ kind: 'fx-progA', params: {} }, { kind: 'fx-progB', params: {} }]);
+  bridge.runChain('fx1', L.t0, [
+    { kind: 'fx-progA', params: {} },
+    { kind: 'fx-progB', params: {} },
+  ]);
   const resUploads = gl.withName('uniform2f').filter((c) => c.args[0] === 'u_res');
   assert.equal(resUploads.length, 2, 'each program uploads its own u_res');
   assert.deepEqual([resUploads[0].args[1], resUploads[0].args[2]], [400, 280]);
 });
 
-ok('two FX layers on one program never inherit each other\'s uniforms (#748)', () => {
+ok("two FX layers on one program never inherit each other's uniforms (#748)", () => {
   // GL uniform state lives on the program, not the layer: FX-1 rgbSplit and
   // FX-4 grain share 'effect', so each frame must re-upload its own u_effect.
   const gl = makeMockGl({ nullUniforms: ['u_res'] });
   const bridge = makeBridge(gl);
-  const a = bridge.layer('fx1'), b = bridge.layer('fx4');
+  const a = bridge.layer('fx1'),
+    b = bridge.layer('fx4');
   for (let i = 0; i < 2; i++) {
     bridge.runChain('fx1', a.t0, chainOf('rgbSplit'));
     bridge.runChain('fx4', b.t0, chainOf('grain'));
   }
-  const modes = gl.withName('uniform1i').filter((c) => c.args[0] === 'u_effect').map((c) => c.args[1]);
-  assert.deepEqual(modes, [1, 2, 1, 2], 'frame 2 re-uploads each layer\'s effect id');
+  const modes = gl
+    .withName('uniform1i')
+    .filter((c) => c.args[0] === 'u_effect')
+    .map((c) => c.args[1]);
+  assert.deepEqual(modes, [1, 2, 1, 2], "frame 2 re-uploads each layer's effect id");
 });
 
 console.log(`bridge.selfcheck: OK (${n} cases)`);

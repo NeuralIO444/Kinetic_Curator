@@ -23,8 +23,13 @@
 
 import { shelfRow } from '../curator/shelf.mjs';
 import {
-  planExports, diskStubFor, parseExportDocument, serializeExport,
-  exportRelFor, keepIdFromLookRel, DEFAULT_EXPORT_PREFS,
+  planExports,
+  diskStubFor,
+  parseExportDocument,
+  serializeExport,
+  exportRelFor,
+  keepIdFromLookRel,
+  DEFAULT_EXPORT_PREFS,
 } from '../curator/shelfDisk.mjs';
 import { DEFAULT_SHELF_PREFS } from '../curator/shelfPrefs.mjs';
 import { markTaken, addRows } from './lootIndex.mjs';
@@ -43,9 +48,7 @@ import { markTaken, addRows } from './lootIndex.mjs';
  * keep's file is its fossil copy (marked taken unread), and a record
  * already in hand is re-read only when its bytes changed.
  */
-export async function takeInLooks({
-  backend, index, isInApp, isLoaded, assetsById = null, palettesById = null,
-} = {}) {
+export async function takeInLooks({ backend, index, isInApp, isLoaded, assetsById = null, palettesById = null } = {}) {
   let ix = index;
   const records = {};
   const stubs = {};
@@ -71,12 +74,21 @@ export async function takeInLooks({
       // The keep's own file: an archival copy of a shelf resident.
       // Marked taken, never read into a second record.
       ix = markTaken(ix, id, { status: 'taken' });
-      rows.push({ rel: it.rel, kind: 'look', outcome: 'taken-in', reason: 'a keep already on the shelf — its disk copy, unchanged' });
+      rows.push({
+        rel: it.rel,
+        kind: 'look',
+        outcome: 'taken-in',
+        reason: 'a keep already on the shelf — its disk copy, unchanged',
+      });
       continue;
     }
     if (it.ingested && typeof isLoaded === 'function' && isLoaded(keepId)) continue; // in hand, unchanged
     let read = null;
-    try { read = await backend.read(ix.root, it.rel); } catch { read = null; }
+    try {
+      read = await backend.read(ix.root, it.rel);
+    } catch {
+      read = null;
+    }
     if (!read || !read.ok || !read.bytes) continue; // unreadable this pass — unmarked, retried next scan
     const parsed = parseExportDocument(new TextDecoder().decode(read.bytes));
     if (!parsed || parsed.keep.id !== keepId) {
@@ -103,9 +115,10 @@ export async function takeInLooks({
  * take-in just read. `get` is the store's getState; the store action
  * owns the laws (fossils, root changes, persistence).
  */
-export function applyShelfDiskScan(get, {
-  root = null, connected = false, index = null, records = {}, freshStubs = {},
-} = {}) {
+export function applyShelfDiskScan(
+  get,
+  { root = null, connected = false, index = null, records = {}, freshStubs = {} } = {},
+) {
   const present = [];
   const missingIds = [];
   for (const it of Object.values(index?.items || {})) {
@@ -128,9 +141,10 @@ export function applyShelfDiskScan(get, {
  * the reason on the shelf's line and every un-moved keep still in
  * the collection: nothing is half-moved, nothing is silent.
  */
-export async function runShelfExports(get, {
-  backend, root, sessionStartMs = 0, assetsById = null, palettesById = null,
-} = {}) {
+export async function runShelfExports(
+  get,
+  { backend, root, sessionStartMs = 0, assetsById = null, palettesById = null } = {},
+) {
   const exported = [];
   const st = typeof get === 'function' ? get() : null;
   if (!st || !backend || typeof backend.write !== 'function' || !root || !st.shelfDiskConnected) {
@@ -142,31 +156,49 @@ export async function runShelfExports(get, {
   for (let guard = 0; guard < 1000; guard += 1) {
     const cur = get();
     const plan = planExports({
-      keeps: cur.keeps || [], stageIds: cur.keepStage || [], bound,
-      exportPrefs: xp, sessionStartMs, performingKeepId: cur.performingKeepId || null,
+      keeps: cur.keeps || [],
+      stageIds: cur.keepStage || [],
+      bound,
+      exportPrefs: xp,
+      sessionStartMs,
+      performingKeepId: cur.performingKeepId || null,
     });
     const victim = plan.victims[0];
     if (!victim) break;
     const rel = exportRelFor(victim.id, xp.folder);
     const row = shelfRow(victim, cur.keepStage || [], { assetsById, palettesById });
     let w = null;
-    try { w = await backend.write(root, rel, new TextEncoder().encode(serializeExport(victim, xp))); } catch { w = null; }
+    try {
+      w = await backend.write(root, rel, new TextEncoder().encode(serializeExport(victim, xp)));
+    } catch {
+      w = null;
+    }
     if (!w || !w.ok) {
-      cur.setShelfNotice(`export stopped — ${(w && w.reason) || 'the folder would not take the file'}; ${row.label} stayed in the collection`);
+      cur.setShelfNotice(
+        `export stopped — ${(w && w.reason) || 'the folder would not take the file'}; ${row.label} stayed in the collection`,
+      );
       return { exported, stopped: victim.id };
     }
     let back = null;
-    try { back = await backend.read(root, rel); } catch { back = null; }
+    try {
+      back = await backend.read(root, rel);
+    } catch {
+      back = null;
+    }
     const parsed = back && back.ok && back.bytes ? parseExportDocument(new TextDecoder().decode(back.bytes)) : null;
     if (!parsed || parsed.keep.id !== victim.id) {
-      cur.setShelfNotice(`export stopped — the file for ${row.label} did not read back whole; it stayed in the collection`);
+      cur.setShelfNotice(
+        `export stopped — the file for ${row.label} did not read back whole; it stayed in the collection`,
+      );
       return { exported, stopped: victim.id };
     }
     cur.shelfExported(victim.id, diskStubFor(row, rel));
     exported.push(victim.id);
   }
   if (exported.length > 1) {
-    get().setShelfNotice(`exported ${exported.length} keeps to the loot folder — the collection is back at its soft bound`);
+    get().setShelfNotice(
+      `exported ${exported.length} keeps to the loot folder — the collection is back at its soft bound`,
+    );
   }
   return { exported, stopped: null };
 }

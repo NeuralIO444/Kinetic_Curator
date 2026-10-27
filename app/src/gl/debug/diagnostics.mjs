@@ -46,9 +46,7 @@ export function injectLineDirectives(src, file) {
 
 export class ShaderCompileError extends Error {
   constructor({ name, file, line, log }) {
-    super(
-      `[gl-debug] shader compile failed: ${name} (${file}${line ? ':' + line : ''})\n${log}`
-    );
+    super(`[gl-debug] shader compile failed: ${name} (${file}${line ? ':' + line : ''})\n${log}`);
     this.name = 'ShaderCompileError';
     this.shaderName = name;
     this.file = file;
@@ -168,12 +166,7 @@ export function linkProgramChecked(gl, vs, fs, { name = 'program' } = {}) {
 }
 
 /** Compile + link in one call (shaders are deleted after a successful link). */
-export function buildProgramChecked(
-  gl,
-  vsSrc,
-  fsSrc,
-  { name = 'program', vsFile, fsFile } = {}
-) {
+export function buildProgramChecked(gl, vsSrc, fsSrc, { name = 'program', vsFile, fsFile } = {}) {
   const vs = compileShaderChecked(gl, gl.VERTEX_SHADER, vsSrc, {
     name: `${name}:vs`,
     file: vsFile || `${name}.vs.glsl`,

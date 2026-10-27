@@ -107,8 +107,7 @@ export function createScentField(cols = SCENT_COLS, rows = SCENT_ROWS) {
       for (let x = 0; x < cols; x++) {
         const i = row + x;
         const c = cells[i];
-        const n =
-          (at(x - 1, y) + at(x + 1, y) + at(x, y - 1) + at(x, y + 1)) * 0.25;
+        const n = (at(x - 1, y) + at(x + 1, y) + at(x, y - 1) + at(x, y + 1)) * 0.25;
         scratch[i] = (c + (n - c) * diffuse) * decay;
       }
     }

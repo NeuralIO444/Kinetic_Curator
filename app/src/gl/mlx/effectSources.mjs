@@ -21,9 +21,9 @@ import { declaredKinds } from './declaredCostTiers.mjs';
 // number of effect params the bridge maps into u_p (see bridge/builtinEffects.mjs).
 // (#308: blur is gone — the instrument has no gaussian blur.)
 const BUILTIN = {
-  invert:    { paramCount: 0, passCount: 1 },
-  rgbSplit:  { paramCount: 1, passCount: 1 },
-  grain:     { paramCount: 1, passCount: 1 },
+  invert: { paramCount: 0, passCount: 1 },
+  rgbSplit: { paramCount: 1, passCount: 1 },
+  grain: { paramCount: 1, passCount: 1 },
   posterize: { paramCount: 1, passCount: 1 },
 };
 
@@ -31,10 +31,10 @@ const BUILTIN = {
 // per-frame data (a static proxy for how much the pass is driven); passCount
 // is 1 for all of them.
 const PROGRAMS = {
-  quad:        { fs: QUAD_FS,  vs: QUAD_VS, paramCount: 0, passCount: 1 },
-  composite:   { fs: COMPOSITE_FS, vs: FULL_VS, paramCount: 3, passCount: 1 },
-  resolve:     { fs: RESOLVE_FS,   vs: FULL_VS, paramCount: 5, passCount: 1 },
-  copy:        { fs: COPY_FS,  vs: FULL_VS, paramCount: 0, passCount: 1 },
+  quad: { fs: QUAD_FS, vs: QUAD_VS, paramCount: 0, passCount: 1 },
+  composite: { fs: COMPOSITE_FS, vs: FULL_VS, paramCount: 3, passCount: 1 },
+  resolve: { fs: RESOLVE_FS, vs: FULL_VS, paramCount: 5, passCount: 1 },
+  copy: { fs: COPY_FS, vs: FULL_VS, paramCount: 0, passCount: 1 },
 };
 
 /**
@@ -45,10 +45,20 @@ export function effectSources() {
   const out = new Map();
 
   for (const [kind, spec] of Object.entries(PROGRAMS)) {
-    out.set(kind, { sources: [spec.vs, spec.fs], passCount: spec.passCount, paramCount: spec.paramCount, file: kind === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs' });
+    out.set(kind, {
+      sources: [spec.vs, spec.fs],
+      passCount: spec.passCount,
+      paramCount: spec.paramCount,
+      file: kind === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs',
+    });
   }
   for (const [kind, spec] of Object.entries(BUILTIN)) {
-    out.set(kind, { sources: [EFFECT_FS], passCount: spec.passCount, paramCount: spec.paramCount, file: 'shaders.mjs:EFFECT_FS' });
+    out.set(kind, {
+      sources: [EFFECT_FS],
+      passCount: spec.passCount,
+      paramCount: spec.paramCount,
+      file: 'shaders.mjs:EFFECT_FS',
+    });
   }
   for (const [kind, def] of FX_SHADER_EFFECTS) {
     const paramCount = Object.keys(def.descriptor.params || {}).length;
@@ -72,7 +82,8 @@ export function assertSourcesCoverDeclared() {
     if (!srcs.has(k)) throw new Error(`[mlx] declared tier for "${k}" but no shader sources — extend effectSources()`);
   }
   for (const k of srcs.keys()) {
-    if (!kinds.has(k)) throw new Error(`[mlx] shader sources for "${k}" but no declared tier — extend declaredCostTiers.json`);
+    if (!kinds.has(k))
+      throw new Error(`[mlx] shader sources for "${k}" but no declared tier — extend declaredCostTiers.json`);
   }
   return { kinds: srcs.size };
 }

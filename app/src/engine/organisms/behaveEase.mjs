@@ -24,7 +24,7 @@ export function blendBehave(from, to, t) {
 
 /** Curl vs point, matching resolveWindMode's default (no explicit override). */
 export function windKernelFor(behave, mode) {
-  return (behave === 'flock' || behave === 'mold' || mode === 'murmuration') ? 'curl' : 'point';
+  return behave === 'flock' || behave === 'mold' || mode === 'murmuration' ? 'curl' : 'point';
 }
 
 /**

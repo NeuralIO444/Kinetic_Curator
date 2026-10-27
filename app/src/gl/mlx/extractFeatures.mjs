@@ -96,7 +96,7 @@ export function linearScore(features, model) {
   if (model.weights.length !== features.length) {
     throw new Error(
       `[mlx] cost model has ${model.weights.length} weights but extractor ${FEATURE_EXTRACTOR_VERSION} ` +
-      `produces ${features.length} features — model and extractor disagree (re-train with the current extractor)`,
+        `produces ${features.length} features — model and extractor disagree (re-train with the current extractor)`,
     );
   }
   return features.reduce((s, x, i) => s + x * model.weights[i], model.intercept);
@@ -127,7 +127,9 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split(/[\\/]/).p
   if (outPath) {
     const { writeFileSync } = await import('node:fs');
     writeFileSync(outPath, JSON.stringify(payload, null, 2) + '\n');
-    console.log(`[mlx] wrote ${payload.features ? Object.keys(payload.features).length : 0} effect feature vectors -> ${outPath}`);
+    console.log(
+      `[mlx] wrote ${payload.features ? Object.keys(payload.features).length : 0} effect feature vectors -> ${outPath}`,
+    );
   } else {
     console.log(JSON.stringify(payload, null, 2));
   }

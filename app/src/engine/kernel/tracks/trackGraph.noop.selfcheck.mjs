@@ -9,14 +9,15 @@ import assert from 'node:assert';
 import { applyField, applyFeed, normalizePatch } from './trackGraph.js';
 import { createPointSet, POINT_COLUMN_NAMES } from '../soa/pointSet.js';
 
-const fieldPatch = (over = {}) =>
-  normalizePatch({ from: 0, to: 1, mode: 'field', strength: 1, polarity: 1, ...over });
-const feedPatch = (over = {}) =>
-  normalizePatch({ from: 0, to: 1, mode: 'feed', strength: 1, polarity: 1, ...over });
+const fieldPatch = (over = {}) => normalizePatch({ from: 0, to: 1, mode: 'field', strength: 1, polarity: 1, ...over });
+const feedPatch = (over = {}) => normalizePatch({ from: 0, to: 1, mode: 'feed', strength: 1, polarity: 1, ...over });
 
 // --- applyField: no-op path returns the identical input reference ---------
 {
-  const tgt = [{ x: 0.5, y: 0.5 }, { x: 0.2, y: 0.8 }];
+  const tgt = [
+    { x: 0.5, y: 0.5 },
+    { x: 0.2, y: 0.8 },
+  ];
   const src = [{ x: 0.9, y: 0.1 }];
 
   const off = applyField(tgt, src, fieldPatch({ mode: 'off' }));
@@ -41,8 +42,15 @@ const feedPatch = (over = {}) =>
 
 // --- applyField: active path is unchanged ----------------------------------
 {
-  const tgt = [{ x: 0.5, y: 0.5 }, { x: 0.2, y: 0.8 }];
-  const src = [{ x: 0.9, y: 0.1 }, { x: 0.8, y: 0.2 }, { x: 0.7, y: 0.3 }];
+  const tgt = [
+    { x: 0.5, y: 0.5 },
+    { x: 0.2, y: 0.8 },
+  ];
+  const src = [
+    { x: 0.9, y: 0.1 },
+    { x: 0.8, y: 0.2 },
+    { x: 0.7, y: 0.3 },
+  ];
   const out = applyField(tgt, src, fieldPatch());
   assert.notStrictEqual(out, tgt, 'FIELD active: fresh array, not the input');
   assert.notStrictEqual(out[0], tgt[0], 'FIELD active: fresh point objects');
@@ -55,7 +63,14 @@ const feedPatch = (over = {}) =>
     ],
     'FIELD active: byte-identical to pre-#1236 output',
   );
-  assert.deepStrictEqual(tgt, [{ x: 0.5, y: 0.5 }, { x: 0.2, y: 0.8 }], 'FIELD active: input not mutated');
+  assert.deepStrictEqual(
+    tgt,
+    [
+      { x: 0.5, y: 0.5 },
+      { x: 0.2, y: 0.8 },
+    ],
+    'FIELD active: input not mutated',
+  );
   const again = applyField(tgt, src, fieldPatch());
   assert.deepStrictEqual(out, again, 'FIELD active: deterministic across runs');
   // A mutated copy must not alias the input: write through the returned
@@ -69,7 +84,8 @@ const feedPatch = (over = {}) =>
 
 // --- applyFeed: no-op path returns the identical input reference -----------
 {
-  const w = 4, h = 4;
+  const w = 4,
+    h = 4;
   // #1308: sampleFlow reads SoA columns — the fixture is built as (u, v)
   // directly, with the same values the old interleaved layout held.
   const u = new Float32Array(w * h);
@@ -81,7 +97,10 @@ const feedPatch = (over = {}) =>
       v[i] = -0.01 * (y + 1);
     }
   const field = { w, h, u, v };
-  const pts = [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.5 }];
+  const pts = [
+    { x: 0.25, y: 0.25 },
+    { x: 0.75, y: 0.5 },
+  ];
 
   const off = applyFeed(pts, field, feedPatch({ mode: 'off' }));
   assert.strictEqual(off, pts, 'FEED off: same array reference (not a copy)');
@@ -95,7 +114,8 @@ const feedPatch = (over = {}) =>
 
 // --- applyFeed: active path is unchanged ------------------------------------
 {
-  const w = 4, h = 4;
+  const w = 4,
+    h = 4;
   // #1308: sampleFlow reads SoA columns — the fixture is built as (u, v)
   // directly, with the same values the old interleaved layout held.
   const u = new Float32Array(w * h);
@@ -107,7 +127,10 @@ const feedPatch = (over = {}) =>
       v[i] = -0.01 * (y + 1);
     }
   const field = { w, h, u, v };
-  const pts = [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.5 }];
+  const pts = [
+    { x: 0.25, y: 0.25 },
+    { x: 0.75, y: 0.5 },
+  ];
   const out = applyFeed(pts, field, feedPatch());
   assert.notStrictEqual(out, pts, 'FEED active: fresh array, not the input');
   assert.notStrictEqual(out[0], pts[0], 'FEED active: fresh point objects');
@@ -120,7 +143,14 @@ const feedPatch = (over = {}) =>
     ],
     'FEED active: byte-identical to pre-#1236 output',
   );
-  assert.deepStrictEqual(pts, [{ x: 0.25, y: 0.25 }, { x: 0.75, y: 0.5 }], 'FEED active: input not mutated');
+  assert.deepStrictEqual(
+    pts,
+    [
+      { x: 0.25, y: 0.25 },
+      { x: 0.75, y: 0.5 },
+    ],
+    'FEED active: input not mutated',
+  );
   const again = applyFeed(pts, field, feedPatch());
   assert.deepStrictEqual(out, again, 'FEED active: deterministic across runs');
   // A mutated copy must not alias the input: write through the returned
@@ -144,10 +174,15 @@ const feedPatch = (over = {}) =>
   const mkSet = (n, count) => {
     const s = createPointSet(Math.max(1, n));
     for (let i = 0; i < n; i++) {
-      s.x[i] = 0.1 * (i + 1); s.y[i] = 0.2 * (i + 1);
-      s.vx[i] = 0.01 * i; s.vy[i] = -0.01 * i;
-      s.slot[i] = i; s.energy[i] = 1 + i;
-      s.id[i] = 100 + i; s.family[i] = 7; s.source[i] = 3;
+      s.x[i] = 0.1 * (i + 1);
+      s.y[i] = 0.2 * (i + 1);
+      s.vx[i] = 0.01 * i;
+      s.vy[i] = -0.01 * i;
+      s.slot[i] = i;
+      s.energy[i] = 1 + i;
+      s.id[i] = 100 + i;
+      s.family[i] = 7;
+      s.source[i] = 3;
     }
     s.count = count;
     return s;
@@ -164,16 +199,24 @@ const feedPatch = (over = {}) =>
 
   // Non-empty set sources with an off / zero-strength patch: same ref.
   const liveSet = mkSet(3, 3);
-  assert.strictEqual(applyField(tgt, liveSet, fieldPatch({ mode: 'off' })), tgt,
-    'FIELD set no-op (off): same set reference');
-  assert.strictEqual(applyField(tgt, liveSet, fieldPatch({ strength: 0 })), tgt,
-    'FIELD set no-op (strength 0): same set reference');
+  assert.strictEqual(
+    applyField(tgt, liveSet, fieldPatch({ mode: 'off' })),
+    tgt,
+    'FIELD set no-op (off): same set reference',
+  );
+  assert.strictEqual(
+    applyField(tgt, liveSet, fieldPatch({ strength: 0 })),
+    tgt,
+    'FIELD set no-op (strength 0): same set reference',
+  );
   assert.strictEqual(snap(tgt), tgtBefore, 'FIELD set no-op: still zero column writes');
 
   // Mixed shapes on the no-op path: set target + array sources, off patch.
   assert.strictEqual(
-    applyField(tgt, [{ x: 0.9, y: 0.1 }], fieldPatch({ mode: 'off' })), tgt,
-    'FIELD set target + array sources, off: same set reference');
+    applyField(tgt, [{ x: 0.9, y: 0.1 }], fieldPatch({ mode: 'off' })),
+    tgt,
+    'FIELD set target + array sources, off: same set reference',
+  );
 
   // The snapshot comparisons above are the column equivalent of #1236's
   // frozen-input test (typed arrays cannot be Object.freeze()d when
@@ -184,10 +227,12 @@ const feedPatch = (over = {}) =>
   assert.throws(
     () => applyField([{ x: 0.5, y: 0.5 }], liveSet, fieldPatch()),
     /slice 2\/5/,
-    'FIELD active + set sources: loud migration error, not a silent no-op');
+    'FIELD active + set sources: loud migration error, not a silent no-op',
+  );
   assert.throws(
     () => applyField(tgt, [{ x: 0.9, y: 0.1 }], fieldPatch()),
     /slice 2\/5/,
-    'FIELD active + set target: loud migration error');
+    'FIELD active + set target: loud migration error',
+  );
   console.log('[selfcheck] trackGraph.noop #1306 set no-op is a column-count check');
 }

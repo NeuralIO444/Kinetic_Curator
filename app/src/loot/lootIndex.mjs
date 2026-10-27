@@ -11,7 +11,18 @@ export const LOG_MAX = 200;
 export const ITEMS_MAX = 5000;
 const KINDS = ['image', 'audio', 'palette', 'look'];
 const STATES = ['ok', 'missing'];
-const OUTCOMES = ['added', 'dup', 'changed', 'renamed', 'missing', 'skipped', 'pool-full', 'rejected', 'restored', 'taken-in'];
+const OUTCOMES = [
+  'added',
+  'dup',
+  'changed',
+  'renamed',
+  'missing',
+  'skipped',
+  'pool-full',
+  'rejected',
+  'restored',
+  'taken-in',
+];
 const ID = /^user:loot_[a-z0-9_]{1,40}$/;
 const ID_ANY = /^user:[A-Za-z0-9_-]{1,40}$/;
 const HASH = /^[0-9a-f]{8,64}$/;
@@ -33,16 +44,30 @@ export function sanitizeIndexCounted(raw) {
   const out = emptyIndex();
   out.root = str(raw.root, 1024);
   out.scannedAt = num(raw.scannedAt);
-  const entries = raw.items && typeof raw.items === 'object' && !Array.isArray(raw.items) ? Object.entries(raw.items) : [];
+  const entries =
+    raw.items && typeof raw.items === 'object' && !Array.isArray(raw.items) ? Object.entries(raw.items) : [];
   for (let i = 0; i < entries.length; i++) {
     const [id, it] = entries[i];
-    if (Object.keys(out.items).length >= ITEMS_MAX) { tally.itemsOverflow = entries.length - i; break; }
-    if (!ID.test(id) || !it || typeof it !== 'object') { tally.itemsUnreadable++; continue; }
+    if (Object.keys(out.items).length >= ITEMS_MAX) {
+      tally.itemsOverflow = entries.length - i;
+      break;
+    }
+    if (!ID.test(id) || !it || typeof it !== 'object') {
+      tally.itemsUnreadable++;
+      continue;
+    }
     const segs = relSegments(it.rel);
     const hash = typeof it.hash === 'string' && HASH.test(it.hash) ? it.hash : null;
-    if (!segs || !hash || !KINDS.includes(it.kind)) { tally.itemsUnreadable++; continue; }
+    if (!segs || !hash || !KINDS.includes(it.kind)) {
+      tally.itemsUnreadable++;
+      continue;
+    }
     out.items[id] = {
-      kind: it.kind, rel: segs.join('/'), size: num(it.size) ?? 0, mtimeMs: num(it.mtimeMs) ?? 0, hash,
+      kind: it.kind,
+      rel: segs.join('/'),
+      size: num(it.size) ?? 0,
+      mtimeMs: num(it.mtimeMs) ?? 0,
+      hash,
       state: STATES.includes(it.state) ? it.state : 'ok',
       ingested: it.ingested === true, // false until its asset/palette/audio has actually been taken in (slice 6 and on)
       hold: str(it.hold, 120), // why it was not taken in (rejected, pool full), so a rescan does not retry the same file
@@ -52,10 +77,19 @@ export function sanitizeIndexCounted(raw) {
   const log = Array.isArray(raw.log) ? raw.log : [];
   for (let i = 0; i < log.length; i++) {
     const r = log[i];
-    if (out.log.length >= LOG_MAX) { tally.logOverflow = log.length - i; break; }
-    if (!r || typeof r !== 'object' || !OUTCOMES.includes(r.outcome)) { tally.logUnreadable++; continue; }
+    if (out.log.length >= LOG_MAX) {
+      tally.logOverflow = log.length - i;
+      break;
+    }
+    if (!r || typeof r !== 'object' || !OUTCOMES.includes(r.outcome)) {
+      tally.logUnreadable++;
+      continue;
+    }
     const rel = str(r.rel, 512);
-    if (!rel) { tally.logUnreadable++; continue; }
+    if (!rel) {
+      tally.logUnreadable++;
+      continue;
+    }
     out.log.push({ rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) });
   }
   // #1645 — the log's all-time trim count rides the index (absent =
@@ -86,33 +120,61 @@ export function applyPlan(index, plan, { nowMs = null } = {}) {
     return { index: base, rows: [row(base.root || '', null, 'skipped', 'folder not reachable')] };
   }
   for (const a of plan.add || []) {
-    if (Object.keys(items).length >= ITEMS_MAX) { rows.push(row(a.rel, a.kind, 'skipped', 'index full')); continue; }
-    items[a.id] = { kind: a.kind, rel: a.rel, size: a.size ?? 0, mtimeMs: a.mtimeMs ?? 0, hash: a.hash, state: 'ok', ingested: false, hold: null, assetId: null };
+    if (Object.keys(items).length >= ITEMS_MAX) {
+      rows.push(row(a.rel, a.kind, 'skipped', 'index full'));
+      continue;
+    }
+    items[a.id] = {
+      kind: a.kind,
+      rel: a.rel,
+      size: a.size ?? 0,
+      mtimeMs: a.mtimeMs ?? 0,
+      hash: a.hash,
+      state: 'ok',
+      ingested: false,
+      hold: null,
+      assetId: null,
+    };
     rows.push(row(a.rel, a.kind, 'added'));
   }
   for (const r of plan.renamed || []) {
     const it = items[r.id];
-    if (it) { items[r.id] = { ...it, rel: r.rel, state: 'ok' }; rows.push(row(r.rel, r.kind, 'renamed', `was ${r.from}`)); }
+    if (it) {
+      items[r.id] = { ...it, rel: r.rel, state: 'ok' };
+      rows.push(row(r.rel, r.kind, 'renamed', `was ${r.from}`));
+    }
   }
   for (const c of plan.changed || []) {
     const it = items[c.id];
-    if (it) { items[c.id] = { ...it, hash: c.hash, state: 'ok', ingested: false, hold: null }; rows.push(row(c.rel, c.kind, 'changed')); } // new bytes: to be taken in again
+    if (it) {
+      items[c.id] = { ...it, hash: c.hash, state: 'ok', ingested: false, hold: null };
+      rows.push(row(c.rel, c.kind, 'changed'));
+    } // new bytes: to be taken in again
   }
   for (const d of plan.dup || []) rows.push(row(d.rel, d.kind, 'dup', `same as ${d.of}`));
   for (const m of plan.missing || []) {
     const it = items[m.id];
-    if (it && it.state !== 'missing') { items[m.id] = { ...it, state: 'missing' }; rows.push(row(m.rel, it.kind, 'missing', 'file is gone; the asset keeps working')); }
+    if (it && it.state !== 'missing') {
+      items[m.id] = { ...it, state: 'missing' };
+      rows.push(row(m.rel, it.kind, 'missing', 'file is gone; the asset keeps working'));
+    }
   }
   for (const u of plan.unchanged || []) {
     const it = items[u.id];
-    if (it && it.state === 'missing') { items[u.id] = { ...it, state: 'ok' }; rows.push(row(u.rel, it.kind, 'restored')); }
+    if (it && it.state === 'missing') {
+      items[u.id] = { ...it, state: 'ok' };
+      rows.push(row(u.rel, it.kind, 'restored'));
+    }
   }
   for (const s of plan.skipped || []) rows.push(row(s.rel, s.kind, 'skipped', s.reason));
   rows.reverse(); // newest first
   const log = [...rows, ...base.log].slice(0, LOG_MAX);
   // #1645 — rows the cap shed join the index's trim count.
   const logTrimmed = (base.logTrimmed || 0) + (rows.length + base.log.length - log.length);
-  return { index: { ...base, items, log, scannedAt: num(nowMs) ?? base.scannedAt, ...(logTrimmed > 0 ? { logTrimmed } : {}) }, rows };
+  return {
+    index: { ...base, items, log, scannedAt: num(nowMs) ?? base.scannedAt, ...(logTrimmed > 0 ? { logTrimmed } : {}) },
+    rows,
+  };
 }
 
 /** Point the index at a folder. A different folder starts a clean index (its items were another folder's). */
@@ -127,7 +189,9 @@ export function withRoot(index, root) {
 export function countItems(index) {
   const items = Object.values(sanitizeIndex(index).items);
   return {
-    items: items.length, ok: items.filter((i) => i.state === 'ok').length, missing: items.filter((i) => i.state === 'missing').length,
+    items: items.length,
+    ok: items.filter((i) => i.state === 'ok').length,
+    missing: items.filter((i) => i.state === 'missing').length,
     pending: items.filter((i) => i.state === 'ok' && !i.ingested && !i.hold).length,
     held: items.filter((i) => i.state === 'ok' && !i.ingested && Boolean(i.hold)).length,
     taken: items.filter((i) => i.state === 'ok' && i.ingested).length,
@@ -168,10 +232,37 @@ export function loadIndexDetailed(storage) {
   const { index, tally } = sanitizeIndexCounted(parsed);
   const rel = index.root || '';
   const rows = [];
-  if (tally.itemsUnreadable) rows.push(row(rel, null, 'skipped', `${counted(tally.itemsUnreadable, 'stored item', 'stored items')} could not be read`));
-  if (tally.itemsOverflow) rows.push(row(rel, null, 'skipped', `${counted(tally.itemsOverflow, 'stored item', 'stored items')} over the cap, left out`));
-  if (tally.logUnreadable) rows.push(row(rel, null, 'skipped', `${counted(tally.logUnreadable, 'stored log row', 'stored log rows')} could not be read`));
-  if (tally.logOverflow) rows.push(row(rel, null, 'skipped', `${counted(tally.logOverflow, 'stored log row', 'stored log rows')} over the cap, left out`));
+  if (tally.itemsUnreadable)
+    rows.push(
+      row(rel, null, 'skipped', `${counted(tally.itemsUnreadable, 'stored item', 'stored items')} could not be read`),
+    );
+  if (tally.itemsOverflow)
+    rows.push(
+      row(
+        rel,
+        null,
+        'skipped',
+        `${counted(tally.itemsOverflow, 'stored item', 'stored items')} over the cap, left out`,
+      ),
+    );
+  if (tally.logUnreadable)
+    rows.push(
+      row(
+        rel,
+        null,
+        'skipped',
+        `${counted(tally.logUnreadable, 'stored log row', 'stored log rows')} could not be read`,
+      ),
+    );
+  if (tally.logOverflow)
+    rows.push(
+      row(
+        rel,
+        null,
+        'skipped',
+        `${counted(tally.logOverflow, 'stored log row', 'stored log rows')} over the cap, left out`,
+      ),
+    );
   return {
     index: rows.length ? { ...index, log: [...rows, ...index.log].slice(0, LOG_MAX) } : index,
     status: 'ok',
@@ -189,7 +280,9 @@ export function saveIndex(storage, index) {
   try {
     storage.setItem(LOOT_KEY, JSON.stringify(sanitizeIndex(index)));
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -201,9 +294,10 @@ export function markTaken(index, id, { status, reason = null, assetId = null } =
   const base = sanitizeIndex(index);
   const it = base.items[id];
   if (!it) return base;
-  const next = status === 'taken'
-    ? { ...it, ingested: true, hold: null, assetId: typeof assetId === 'string' ? assetId : it.assetId }
-    : { ...it, ingested: false, hold: str(reason, 120) || 'not taken in' };
+  const next =
+    status === 'taken'
+      ? { ...it, ingested: true, hold: null, assetId: typeof assetId === 'string' ? assetId : it.assetId }
+      : { ...it, ingested: false, hold: str(reason, 120) || 'not taken in' };
   return { ...base, items: { ...base.items, [id]: next } };
 }
 
@@ -211,7 +305,15 @@ export function markTaken(index, id, { status, reason = null, assetId = null } =
 export function addRows(index, rows) {
   const base = sanitizeIndex(index);
   const clean = (Array.isArray(rows) ? rows : []).filter((r) => r && OUTCOMES.includes(r.outcome) && str(r.rel, 512));
-  const log = [...clean.map((r) => ({ rel: r.rel, kind: KINDS.includes(r.kind) ? r.kind : null, outcome: r.outcome, reason: str(r.reason, 120) })), ...base.log].slice(0, LOG_MAX);
+  const log = [
+    ...clean.map((r) => ({
+      rel: r.rel,
+      kind: KINDS.includes(r.kind) ? r.kind : null,
+      outcome: r.outcome,
+      reason: str(r.reason, 120),
+    })),
+    ...base.log,
+  ].slice(0, LOG_MAX);
   // #1645 — same count as applyPlan: the tail the cap shed is totalled.
   const logTrimmed = (base.logTrimmed || 0) + (clean.length + base.log.length - log.length);
   return { ...base, log, ...(logTrimmed > 0 ? { logTrimmed } : {}) };

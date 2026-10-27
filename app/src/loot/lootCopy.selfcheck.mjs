@@ -8,8 +8,12 @@ const ix = (...items) => ({ items: Object.fromEntries(items.map((x, i) => [`id${
 
 assert.deepEqual(missingLines(null), []);
 assert.deepEqual(missingLines(ix({ rel: 'a.svg', kind: 'image', state: 'ok' })), []);
-assert.deepEqual(missingLines(ix(it('images/a.svg', 'image'))), ['images/a.svg: source missing, the pool keeps its copy']);
-assert.deepEqual(missingLines(ix(it('audio/k.wav', 'audio'))), ['audio/k.wav: source missing, it leaves the STIMULI menu']);
+assert.deepEqual(missingLines(ix(it('images/a.svg', 'image'))), [
+  'images/a.svg: source missing, the pool keeps its copy',
+]);
+assert.deepEqual(missingLines(ix(it('audio/k.wav', 'audio'))), [
+  'audio/k.wav: source missing, it leaves the STIMULI menu',
+]);
 assert.deepEqual(missingLines(ix(it('images/x.svg', 'image', { ingested: false }))), ['images/x.svg: source missing']);
 const many = missingLines(ix(...['d', 'c', 'b', 'a', 'e'].map((n) => it(`images/${n}.svg`, 'image'))));
 assert.equal(many.length, 4);

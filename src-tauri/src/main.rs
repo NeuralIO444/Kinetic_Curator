@@ -727,8 +727,9 @@ mod tests {
                 .expect("HEVC MediaEngineWriter init");
             for i in 0..10 {
                 let pb = curator.wrap_metal_buffer_zero_copy(accum_ptr, width as usize, height as usize).unwrap();
-                let _ = writer.append_frame(pb, i as i64);
+                let appended = writer.append_frame(pb, i as i64);
                 unsafe { CVPixelBufferRelease(pb); }
+                appended.expect("HEVC append failed");
             }
             writer.finish().expect("HEVC finish failed");
         }
@@ -740,8 +741,9 @@ mod tests {
                 .expect("ProRes MediaEngineWriter init");
             for i in 0..10 {
                 let pb = curator.wrap_metal_buffer_zero_copy(accum_ptr, width as usize, height as usize).unwrap();
-                let _ = writer.append_frame(pb, i as i64);
+                let appended = writer.append_frame(pb, i as i64);
                 unsafe { CVPixelBufferRelease(pb); }
+                appended.expect("ProRes append failed");
             }
             writer.finish().expect("ProRes finish failed");
         }

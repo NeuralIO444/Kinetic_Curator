@@ -18,7 +18,15 @@
 export const INPUT_LOG_VERSION = 1;
 
 const TYPED = {
-  Float32Array, Float64Array, Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array,
+  Float32Array,
+  Float64Array,
+  Int8Array,
+  Uint8Array,
+  Uint8ClampedArray,
+  Int16Array,
+  Uint16Array,
+  Int32Array,
+  Uint32Array,
 };
 
 function isPlain(v) {
@@ -95,7 +103,14 @@ function foldEnc(steps, upto) {
         const e = step.k[key];
         if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$s === 1 && Object.keys(e).length === 1) {
           nextEnc[key] = enc[key]; // same value, new identity: the encoding is unchanged
-        } else if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$p && Array.isArray(e.$d) && Object.keys(e).length === 2) {
+        } else if (
+          e !== null &&
+          typeof e === 'object' &&
+          !Array.isArray(e) &&
+          e.$p &&
+          Array.isArray(e.$d) &&
+          Object.keys(e).length === 2
+        ) {
           const full = { ...enc[key], ...e.$p };
           for (const sub of e.$d) delete full[sub];
           nextEnc[key] = full;
@@ -149,7 +164,9 @@ export function createInputLog() {
   let prevRaw = null; // the previous frame's actual objects (identity)
   let prevEnc = null; // their encodings (value)
   return {
-    get frames() { return steps.length; },
+    get frames() {
+      return steps.length;
+    },
     record(input) {
       if (!isPlain(input)) throw new TypeError('[inputLog] input must be a plain object');
       const k = {};
@@ -165,7 +182,10 @@ export function createInputLog() {
         }
         const e = encode(cur);
         enc[key] = e;
-        if (!had) { k[key] = e; continue; }
+        if (!had) {
+          k[key] = e;
+          continue;
+        }
         const pe = prevEnc[key];
         if (sameValue(pe, e)) {
           // a primitive that is Object.is-different always differs in value, so this is an object: new identity only
@@ -180,7 +200,8 @@ export function createInputLog() {
           k[key] = e;
         }
       }
-      if (prevRaw !== null) for (const key of Object.keys(prevRaw)) if (!Object.prototype.hasOwnProperty.call(input, key)) x.push(key);
+      if (prevRaw !== null)
+        for (const key of Object.keys(prevRaw)) if (!Object.prototype.hasOwnProperty.call(input, key)) x.push(key);
       const step = {};
       if (Object.keys(k).length) step.k = k;
       if (x.length) step.x = x;
@@ -221,14 +242,25 @@ export function* replayInputs(log) {
   for (const step of log.steps) {
     const next = { ...cur };
     const nextEnc = { ...enc };
-    if (step.x) for (const key of step.x) { delete next[key]; delete nextEnc[key]; }
+    if (step.x)
+      for (const key of step.x) {
+        delete next[key];
+        delete nextEnc[key];
+      }
     if (step.k) {
       for (const key of Object.keys(step.k)) {
         const e = step.k[key];
         let full;
         if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$s === 1 && Object.keys(e).length === 1) {
           full = enc[key];
-        } else if (e !== null && typeof e === 'object' && !Array.isArray(e) && e.$p && Array.isArray(e.$d) && Object.keys(e).length === 2) {
+        } else if (
+          e !== null &&
+          typeof e === 'object' &&
+          !Array.isArray(e) &&
+          e.$p &&
+          Array.isArray(e.$d) &&
+          Object.keys(e).length === 2
+        ) {
           full = { ...enc[key], ...e.$p };
           for (const sub of e.$d) delete full[sub];
         } else {

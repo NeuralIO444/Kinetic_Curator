@@ -70,7 +70,10 @@ import { createSweepLab, runEffectSweep, locMap } from './sweep.mjs';
 function solidTexture(gl, w, h, r, g, b, a) {
   const bytes = new Uint8Array(w * h * 4);
   for (let k = 0; k < bytes.length; k += 4) {
-    bytes[k] = r; bytes[k + 1] = g; bytes[k + 2] = b; bytes[k + 3] = a;
+    bytes[k] = r;
+    bytes[k + 1] = g;
+    bytes[k + 2] = b;
+    bytes[k + 3] = a;
   }
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -92,7 +95,10 @@ function solidTexture(gl, w, h, r, g, b, a) {
 function glowTexture(gl, size) {
   const bytes = new Uint8Array(size * size * 4);
   for (let k = 0; k < bytes.length; k += 4) {
-    bytes[k] = 200; bytes[k + 1] = 160; bytes[k + 2] = 120; bytes[k + 3] = 255;
+    bytes[k] = 200;
+    bytes[k + 1] = 160;
+    bytes[k + 2] = 120;
+    bytes[k + 3] = 255;
   }
   const tex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -150,11 +156,16 @@ function templateEffectDef(kind) {
         program,
         locs,
         apply: (glA, locsA, c, lab, targets) => {
-          const values = c.kind === 'hostile'
-            ? rawTemplateValues(descriptor, c.params, lab.input.tex, lab.w, lab.h)
-            : uploadUniformsFor(descriptor, {
-                readTex: lab.input.tex, width: lab.w, height: lab.h, time: 0, params: c.params,
-              });
+          const values =
+            c.kind === 'hostile'
+              ? rawTemplateValues(descriptor, c.params, lab.input.tex, lab.w, lab.h)
+              : uploadUniformsFor(descriptor, {
+                  readTex: lab.input.tex,
+                  width: lab.w,
+                  height: lab.h,
+                  time: 0,
+                  params: c.params,
+                });
           lab.render(program, targets.out, locsA, decls, values);
         },
         dispose: () => gl.deleteProgram(program),
@@ -186,11 +197,16 @@ function mathEffectDef(kind) {
         program,
         locs,
         apply: (glA, locsA, c, lab, targets) => {
-          const values = c.kind === 'hostile'
-            ? rawTemplateValues(descriptor, c.params, lab.input.tex, lab.w, lab.h)
-            : uploadUniformsFor(descriptor, {
-                readTex: lab.input.tex, width: lab.w, height: lab.h, time: 0, params: c.params,
-              });
+          const values =
+            c.kind === 'hostile'
+              ? rawTemplateValues(descriptor, c.params, lab.input.tex, lab.w, lab.h)
+              : uploadUniformsFor(descriptor, {
+                  readTex: lab.input.tex,
+                  width: lab.w,
+                  height: lab.h,
+                  time: 0,
+                  params: c.params,
+                });
           lab.render(program, targets.out, locsA, decls, values);
         },
         dispose: () => gl.deleteProgram(program),
@@ -249,7 +265,18 @@ function builtinEffectDef(id, mode, pack) {
 /* ------------------------------------------------------------------ */
 
 const F = { kind: 'float' };
-const RESOLVE_DECLS = { u_src: S(0), u_aces: F, u_exposure: F, u_dither: F, u_fxaa: F, u_weave: { kind: 'vec2' }, u_fake: { kind: 'vec4' }, u_light: { kind: 'vec2' }, u_shape: F, u_present: F };
+const RESOLVE_DECLS = {
+  u_src: S(0),
+  u_aces: F,
+  u_exposure: F,
+  u_dither: F,
+  u_fxaa: F,
+  u_weave: { kind: 'vec2' },
+  u_fake: { kind: 'vec4' },
+  u_light: { kind: 'vec2' },
+  u_shape: F,
+  u_present: F,
+};
 
 /** Uniform values match resolveBind.mjs's production defaults (aces 1, dither 1/255). */
 function resolveDef(id, fxaa) {
@@ -292,7 +319,16 @@ function resolveDef(id, fxaa) {
 /* ------------------------------------------------------------------ */
 
 const SHADOW_DECLS = {
-  silhouette: { u_src: S(0), u_mask: S(1), u_maskOn: F, u_maskMode: { kind: 'int' }, u_maskInvert: F, u_scene: { kind: 'vec2' }, u_sun: { kind: 'vec4' }, u_throw: { kind: 'vec3' } },
+  silhouette: {
+    u_src: S(0),
+    u_mask: S(1),
+    u_maskOn: F,
+    u_maskMode: { kind: 'int' },
+    u_maskInvert: F,
+    u_scene: { kind: 'vec2' },
+    u_sun: { kind: 'vec4' },
+    u_throw: { kind: 'vec3' },
+  },
   blur: { u_src: S(0), u_step: { kind: 'vec2' } },
   lay: { u_shadow: S(0), u_dst: S(1), u_color: { kind: 'vec3' }, u_strength: F },
 };
@@ -309,7 +345,12 @@ function contactShadowDef() {
       const built = {};
       for (const def of CONTACT_SHADOW_PROGRAMS) {
         built[def.key] = buildChecked(gl, {
-          vs: FULL_VS, fs: def.fs, name: `sweep-${def.name}`, vsFile: 'shaders.mjs:FULL_VS', fsFile: def.fsFile, decls: SHADOW_DECLS[def.key],
+          vs: FULL_VS,
+          fs: def.fs,
+          name: `sweep-${def.name}`,
+          vsFile: 'shaders.mjs:FULL_VS',
+          fsFile: def.fsFile,
+          decls: SHADOW_DECLS[def.key],
         });
       }
       return {
@@ -318,16 +359,33 @@ function contactShadowDef() {
         apply: (glA, _locs, c, lab, targets) => {
           const sun = c.params.sun ? [-200, 350, 120, 1] : [0, 0, 1, 0];
           lab.render(built.silhouette.program, targets.tmp, built.silhouette.locs, SHADOW_DECLS.silhouette, {
-            u_src: lab.input.tex, u_mask: lab.input.tex, u_maskOn: c.params.matte ? 1 : 0, u_maskMode: 0, u_maskInvert: 0,
-            u_scene: [1000, 700], u_sun: sun, u_throw: [SHADOW_LIFT, SHADOW_MAX_OFFSET, 0],
+            u_src: lab.input.tex,
+            u_mask: lab.input.tex,
+            u_maskOn: c.params.matte ? 1 : 0,
+            u_maskMode: 0,
+            u_maskInvert: 0,
+            u_scene: [1000, 700],
+            u_sun: sun,
+            u_throw: [SHADOW_LIFT, SHADOW_MAX_OFFSET, 0],
           });
-          lab.render(built.blur.program, targets.out, built.blur.locs, SHADOW_DECLS.blur, { u_src: targets.tmp.tex, u_step: [SHADOW_SOFT / 1000 / 2, 0] });
-          lab.render(built.blur.program, targets.tmp, built.blur.locs, SHADOW_DECLS.blur, { u_src: targets.out.tex, u_step: [0, SHADOW_SOFT / 700 / 2] });
+          lab.render(built.blur.program, targets.out, built.blur.locs, SHADOW_DECLS.blur, {
+            u_src: targets.tmp.tex,
+            u_step: [SHADOW_SOFT / 1000 / 2, 0],
+          });
+          lab.render(built.blur.program, targets.tmp, built.blur.locs, SHADOW_DECLS.blur, {
+            u_src: targets.out.tex,
+            u_step: [0, SHADOW_SOFT / 700 / 2],
+          });
           lab.render(built.lay.program, targets.out, built.lay.locs, SHADOW_DECLS.lay, {
-            u_shadow: targets.tmp.tex, u_dst: lab.input.tex, u_color: [0.1, 0.16, 0.29], u_strength: c.params.strength,
+            u_shadow: targets.tmp.tex,
+            u_dst: lab.input.tex,
+            u_color: [0.1, 0.16, 0.29],
+            u_strength: c.params.strength,
           });
         },
-        dispose: () => { for (const b of Object.values(built)) gl.deleteProgram(b.program); },
+        dispose: () => {
+          for (const b of Object.values(built)) gl.deleteProgram(b.program);
+        },
       };
     },
   };
@@ -689,18 +747,29 @@ export const SWEEP_EFFECTS = [
 
   // ---- ACCUM passes ----
   {
-    ...accumDef('fade',
-      { u_src: S(0), u_keep: { kind: 'float' }, u_bg: { kind: 'vec3' }, u_tunnelZoom: { kind: 'float' }, u_tunnelSpin: { kind: 'float' }, u_prism: { kind: 'float' } },
+    ...accumDef(
+      'fade',
+      {
+        u_src: S(0),
+        u_keep: { kind: 'float' },
+        u_bg: { kind: 'vec3' },
+        u_tunnelZoom: { kind: 'float' },
+        u_tunnelSpin: { kind: 'float' },
+        u_prism: { kind: 'float' },
+      },
       (c, lab) => ({
-        u_src: lab.input.tex, u_keep: c.params.keep,
+        u_src: lab.input.tex,
+        u_keep: c.params.keep,
         // #287 fade-to-paper target — production sources this from the
         // palette bg (accum.mjs's real 'fade' pass); the sweep has no
         // palette, so a fixed stand-in is enough to satisfy the uniform
         // audit and give the keep<1 cases a real fade destination.
         u_bg: [0, 0, 0],
         u_tunnelZoom: c.params.tz,
-        u_tunnelSpin: c.params.ts, u_prism: c.params.prism,
-      })),
+        u_tunnelSpin: c.params.ts,
+        u_prism: c.params.prism,
+      }),
+    ),
     cases: [
       C('defaults', { keep: 0.88, tz: 1, ts: 0, prism: 0 }),
       // keep=1 is the shader's identity point (the recipe clamps fade to
@@ -712,9 +781,11 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...accumDef('feed',
+    ...accumDef(
+      'feed',
       { u_src: S(0), u_flowField: S(1), u_flow: { kind: 'float' }, u_flowShared: { kind: 'float' } },
-      (c, lab) => ({ u_src: lab.input.tex, u_flowField: lab.input.tex, u_flow: c.params.flow, u_flowShared: 0 })),
+      (c, lab) => ({ u_src: lab.input.tex, u_flowField: lab.input.tex, u_flow: c.params.flow, u_flowShared: 0 }),
+    ),
     cases: [
       // The house pattern: flow=0 skips exactly (createAccum.step); the
       // shader at flow=0 is independently the identity.
@@ -726,16 +797,28 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...accumDef('echo',
+    ...accumDef(
+      'echo',
       {
-        u_src: S(0), u_t0: S(1), u_t1: S(2), u_t2: S(3), u_t3: S(4),
-        u_w: { kind: 'vec4' }, u_ntaps: { kind: 'int' },
+        u_src: S(0),
+        u_t0: S(1),
+        u_t1: S(2),
+        u_t2: S(3),
+        u_t3: S(4),
+        u_w: { kind: 'vec4' },
+        u_ntaps: { kind: 'int' },
       },
       (c, lab, aux) => ({
-        u_src: lab.input.tex, u_t0: lab.input.tex, u_t1: aux.gray, u_t2: aux.clear, u_t3: lab.input.tex,
-        u_w: [0.5, 0.35, 0.25, 0.18], u_ntaps: c.params.ntaps,
+        u_src: lab.input.tex,
+        u_t0: lab.input.tex,
+        u_t1: aux.gray,
+        u_t2: aux.clear,
+        u_t3: lab.input.tex,
+        u_w: [0.5, 0.35, 0.25, 0.18],
+        u_ntaps: c.params.ntaps,
       }),
-      { hdr: true }),
+      { hdr: true },
+    ),
     cases: [
       // ntaps=0: the echo mix is skipped in the recipe; the shader at
       // ntaps=0 is independently the identity.
@@ -753,9 +836,11 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
-    ...accumDef('over',
-      { u_src: S(0), u_dst: S(1), u_headBoost: { kind: 'float' } },
-      (c, lab, aux) => ({ u_src: lab.input.tex, u_dst: aux.gray, u_headBoost: 1.0 })),
+    ...accumDef('over', { u_src: S(0), u_dst: S(1), u_headBoost: { kind: 'float' } }, (c, lab, aux) => ({
+      u_src: lab.input.tex,
+      u_dst: aux.gray,
+      u_headBoost: 1.0,
+    })),
     cases: [C('source-over', {}, { costly: true })],
   },
   {
@@ -769,21 +854,31 @@ export const SWEEP_EFFECTS = [
     cases: [C('8x8 box downsample', {}, { costly: true })],
   },
   {
-    ...accumDef('glow',
+    ...accumDef(
+      'glow',
       {
-        u_base: S(0), u_glow: S(1), u_glowSize: { kind: 'vec2' },
-        u_lod: { kind: 'float' }, u_stipple: { kind: 'float' },
-        u_chromaTexels: { kind: 'float' }, u_amount: { kind: 'float' },
+        u_base: S(0),
+        u_glow: S(1),
+        u_glowSize: { kind: 'vec2' },
+        u_lod: { kind: 'float' },
+        u_stipple: { kind: 'float' },
+        u_chromaTexels: { kind: 'float' },
+        u_amount: { kind: 'float' },
         u_tint: { kind: 'vec3' },
       },
       (c, lab, aux) => ({
-        u_base: lab.input.tex, u_glow: aux.glow, u_glowSize: [64, 64],
-        u_lod: c.params.lod ?? 1, u_stipple: c.params.stipple ?? 0.5,
+        u_base: lab.input.tex,
+        u_glow: aux.glow,
+        u_glowSize: [64, 64],
+        u_lod: c.params.lod ?? 1,
+        u_stipple: c.params.stipple ?? 0.5,
         u_chromaTexels: c.params.chromaTexels ?? 1,
-        u_amount: c.params.amount ?? 0.55, u_tint: [1.0, 0.6, 0.35],
+        u_amount: c.params.amount ?? 0.55,
+        u_tint: [1.0, 0.6, 0.35],
       }),
       // hdr: amount=1 over a bright input exceeds 1.0 by design (bloom adds light).
-      { hdr: true }),
+      { hdr: true },
+    ),
     // Production shape (#308): the glow target is canvas/8 RGBA8 with a full
     // mip chain; lod 1 ≈ canvas/16. amount=0 is a provable no-op
     // (base + 0·tint·glow·gate is exactly base, IEEE).
@@ -820,7 +915,7 @@ export function runAllSweeps(gl) {
   lab.dispose();
   lines.unshift(
     `sweep: ${SWEEP_EFFECTS.length} effects, ${cases} cases, ${noops} no-op proof(s)` +
-    (hostile ? `, ${hostile} hostile note(s) (logged, not failing)` : '')
+      (hostile ? `, ${hostile} hostile note(s) (logged, not failing)` : ''),
   );
   return { lines, failures };
 }

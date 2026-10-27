@@ -58,9 +58,16 @@ function makeInputPattern(w, h) {
   // Anchor rows: transparent black, opaque white — the extremes every
   // premultiplied/unpremultiplied path must survive.
   for (let i = 0; i < w; i++) {
-    const k0 = i * 4, k1 = (w + i) * 4;
-    bytes[k0] = 0; bytes[k0 + 1] = 0; bytes[k0 + 2] = 0; bytes[k0 + 3] = 0;
-    bytes[k1] = 255; bytes[k1 + 1] = 255; bytes[k1 + 2] = 255; bytes[k1 + 3] = 255;
+    const k0 = i * 4,
+      k1 = (w + i) * 4;
+    bytes[k0] = 0;
+    bytes[k0 + 1] = 0;
+    bytes[k0 + 2] = 0;
+    bytes[k0 + 3] = 0;
+    bytes[k1] = 255;
+    bytes[k1 + 1] = 255;
+    bytes[k1 + 2] = 255;
+    bytes[k1 + 3] = 255;
   }
   return bytes;
 }
@@ -124,12 +131,23 @@ export function applyUniforms(gl, locs, decls, values) {
         gl.bindTexture(gl.TEXTURE_2D, v);
         gl.uniform1i(loc, decl.unit);
         break;
-      case 'int': gl.uniform1i(loc, v); break;
-      case 'float': gl.uniform1f(loc, v); break;
-      case 'vec2': gl.uniform2f(loc, v[0], v[1]); break;
-      case 'vec3': gl.uniform3f(loc, v[0], v[1], v[2]); break;
-      case 'vec4': gl.uniform4f(loc, v[0], v[1], v[2], v[3]); break;
-      default: throw new Error(`[sweep] unknown uniform kind "${decl.kind}" for ${name}`);
+      case 'int':
+        gl.uniform1i(loc, v);
+        break;
+      case 'float':
+        gl.uniform1f(loc, v);
+        break;
+      case 'vec2':
+        gl.uniform2f(loc, v[0], v[1]);
+        break;
+      case 'vec3':
+        gl.uniform3f(loc, v[0], v[1], v[2]);
+        break;
+      case 'vec4':
+        gl.uniform4f(loc, v[0], v[1], v[2], v[3]);
+        break;
+      default:
+        throw new Error(`[sweep] unknown uniform kind "${decl.kind}" for ${name}`);
     }
   }
 }
@@ -241,13 +259,18 @@ export function createSweepLab(gl, { w = SWEEP_W, h = SWEEP_H } = {}) {
     gl.readPixels(0, 0, target.w, target.h, gl.RGBA, gl.FLOAT, flagFloat);
     // Pixel counts (not value counts): a pixel is non-finite if ANY
     // channel is, out-of-range if any finite channel leaves [0,1].
-    let nonFinite = 0, outOfRange = 0;
+    let nonFinite = 0,
+      outOfRange = 0;
     for (let p = 0; p < nPx; p++) {
       const o = p * 4;
-      let bad = false, oor = false;
+      let bad = false,
+        oor = false;
       for (let k = 0; k < 4; k++) {
         const v = flagFloat[o + k];
-        if (!Number.isFinite(v)) { bad = true; break; }
+        if (!Number.isFinite(v)) {
+          bad = true;
+          break;
+        }
         if (v < 0 || v > 1) oor = true;
       }
       if (bad) nonFinite++;
@@ -269,10 +292,18 @@ export function createSweepLab(gl, { w = SWEEP_W, h = SWEEP_H } = {}) {
   }
 
   return {
-    w, h,
+    w,
+    h,
     input: { tex: inputTex, bytes: inputBytes },
-    t16a, t16b, t16q, t8,
-    draw, render, readBytes, scanFlags, dispose,
+    t16a,
+    t16b,
+    t16q,
+    t8,
+    draw,
+    render,
+    readBytes,
+    scanFlags,
+    dispose,
   };
 }
 
@@ -363,12 +394,16 @@ export function runEffectSweep(gl, lab, def) {
     }
   }
 
-  try { dispose(); } catch { /* noop */ }
+  try {
+    dispose();
+  } catch {
+    /* noop */
+  }
   const ok = failures.length === 0;
   lines.unshift(
     `  [${ok ? 'ok' : 'FAIL'}] sweep ${def.id} — ${nCases} case(s)` +
-    (nNoop ? `, ${nNoop} no-op proof(s)` : '') +
-    (hostileNotes.length ? `, ${hostileNotes.length} hostile note(s)` : '')
+      (nNoop ? `, ${nNoop} no-op proof(s)` : '') +
+      (hostileNotes.length ? `, ${hostileNotes.length} hostile note(s)` : ''),
   );
   return { lines, failures, hostileNotes, cases: nCases };
 }

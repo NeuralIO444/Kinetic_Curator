@@ -73,18 +73,26 @@ export const EFFECT_SLOT_MAP = Object.freeze({
 });
 
 export const BUILTIN_EFFECT_DEFS = [
-  { kind: 'invert',
+  {
+    kind: 'invert',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.15, notes: 'pure ALU color op' },
-    make: (id) => one(id.invert, () => [0, 0, 0, 0]) },
-  { kind: 'rgbSplit',
+    make: (id) => one(id.invert, () => [0, 0, 0, 0]),
+  },
+  {
+    kind: 'rgbSplit',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.3, notes: '3 taps + screen-alpha recombine' },
-    make: (id) => one(id.rgbSplit, (p) => [knob(p.dx, 0, 24, 3) / 1000, 0, 0, 0]) },
-  { kind: 'grain',
+    make: (id) => one(id.rgbSplit, (p) => [knob(p.dx, 0, 24, 3) / 1000, 0, 0, 0]),
+  },
+  {
+    kind: 'grain',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.4, notes: 'LUT fetch + mix; grain LUT is baked, not per-frame' },
-    make: (id) => one(id.grain, (p) => [0, knob(p.amount, 0, 1, 0.4), 0, 0]) },
-  { kind: 'posterize',
+    make: (id) => one(id.grain, (p) => [0, knob(p.amount, 0, 1, 0.4), 0, 0]),
+  },
+  {
+    kind: 'posterize',
     cost: { tier: 3, memoryBytes: FRAME_16F, timeMs: 0.2, notes: 'pure ALU color op' },
-    make: (id) => one(id.posterize, (p) => [knob(p.levels, 2, 8, 4), 0, 0, 0]) },
+    make: (id) => one(id.posterize, (p) => [knob(p.levels, 2, 8, 4), 0, 0, 0]),
+  },
 ];
 
 // Module-scope registration: the gate imports this file without a bridge.
@@ -92,7 +100,8 @@ for (const { kind, cost } of BUILTIN_EFFECT_DEFS) {
   registerCostTier(`builtin/${kind}`, cost);
 }
 
-export function registerBuiltinEffects(bridge) {  bridge.registerProgram('effect', FULL_VS, EFFECT_FS, {
+export function registerBuiltinEffects(bridge) {
+  bridge.registerProgram('effect', FULL_VS, EFFECT_FS, {
     uniforms: UNIFORMS,
     file: 'shaders.mjs:EFFECT_FS',
   });

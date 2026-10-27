@@ -39,22 +39,54 @@ for (let i = 2; i < process.argv.length; i++) {
 const WARMUP_FRAMES = 2;
 const PEAK_MS = MOTH.flapMs / 4;
 const FULL = MOTH.growFrames + 1;
-const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2; };
+const median = (xs) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+};
 
 const PINS = [
-  { x: 0.22, y: 0.35 }, { x: 0.72, y: 0.30 }, { x: 0.38, y: 0.72 }, { x: 0.82, y: 0.68 },
+  { x: 0.22, y: 0.35 },
+  { x: 0.72, y: 0.3 },
+  { x: 0.38, y: 0.72 },
+  { x: 0.82, y: 0.68 },
 ].map((p) => ({ x: Math.round(p.x * args.width), y: Math.round(p.y * args.height) }));
 
 function sceneInput(loopTimeMs) {
   return {
-    canvasW: args.width, canvasH: args.height,
+    canvasW: args.width,
+    canvasH: args.height,
     layers: [{ id: 'a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'a', layerSnapshots: {}, seed: 1234, seedOffsets: null, paletteId: 'bone', paletteOverrides: null,
-    userPalettes: [], layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 }, caGrid: null,
-    enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {}, batchPaused: false,
-    focusSwap: false, loopTimeMs, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false, assetThin: false,
-    slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
-    dishPins: PINS, dishFormed: PINS.map(() => true), assetAttach: {},
+    activeLayerId: 'a',
+    layerSnapshots: {},
+    seed: 1234,
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 },
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    quality: 'balanced',
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    loopTimeMs,
+    dtSec: 1 / 60,
+    perfClampOverride: null,
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    phraseWrapGen: 0,
+    attractor: null,
+    dishPins: PINS,
+    dishFormed: PINS.map(() => true),
+    assetAttach: {},
   };
 }
 
@@ -76,20 +108,37 @@ function resolveScene(loopTimeMs) {
 function contractOf(resolved) {
   return buildSceneContract({
     doc: {
-      seed: 1234, seedOffsets: null, quality: 'balanced', perfTier1: false,
-      layers: [{ id: 'a', name: 'a', visible: true }], light: null, squash: 0, assetKineme: null, kinemeTime: 0,
-      palette: resolved[0]?.palette || null, regionKinemes: null, customAssets: [],
-      assetThin: false, perfClamp: false, slowRender: false, reducedMotion: false, regionBudget: null,
+      seed: 1234,
+      seedOffsets: null,
+      quality: 'balanced',
+      perfTier1: false,
+      layers: [{ id: 'a', name: 'a', visible: true }],
+      light: null,
+      squash: 0,
+      assetKineme: null,
+      kinemeTime: 0,
+      palette: resolved[0]?.palette || null,
+      regionKinemes: null,
+      customAssets: [],
+      assetThin: false,
+      perfClamp: false,
+      slowRender: false,
+      reducedMotion: false,
+      regionBudget: null,
     },
-    resolvedLayers: resolved, caps: null, accum: null,
+    resolvedLayers: resolved,
+    caps: null,
+    accum: null,
   });
 }
 
-let page = null; let closePage = null;
+let page = null;
+let closePage = null;
 async function ensurePage() {
   if (page) return page;
   const h = await openHarnessPage('/parity/costBench.html');
-  page = h.page; closePage = h.close;
+  page = h.page;
+  closePage = h.close;
   return page;
 }
 
@@ -122,7 +171,9 @@ const meshCensus = (contract) => {
 };
 
 async function main() {
-  console.log(`[measureWingWarp] 4-creature cap @ ${args.width}x${args.height}, ${args.reps} reps x ${args.frames} frames`);
+  console.log(
+    `[measureWingWarp] 4-creature cap @ ${args.width}x${args.height}, ${args.reps} reps x ${args.frames} frames`,
+  );
   const rest = resolveScene(0);
   const bent = resolveScene(PEAK_MS);
   const restContract = contractOf(rest.resolved);
@@ -130,38 +181,73 @@ async function main() {
   const bg = rest.resolved[0]?.palette?.bg || '#000000';
   console.log(`[measureWingWarp] rest census: ${JSON.stringify(meshCensus(restContract))}`);
   console.log(`[measureWingWarp] bent census: ${JSON.stringify(meshCensus(bentContract))}`);
-  console.log(`[measureWingWarp] resolver CPU/frame at cap: rest ${rest.cpuMsPerFrame.toFixed(3)} ms, bent ${bent.cpuMsPerFrame.toFixed(3)} ms (Node, this machine)`);
+  console.log(
+    `[measureWingWarp] resolver CPU/frame at cap: rest ${rest.cpuMsPerFrame.toFixed(3)} ms, bent ${bent.cpuMsPerFrame.toFixed(3)} ms (Node, this machine)`,
+  );
   if (args.noGpu) {
     const report = {
-      kind: 'kc-wing-warp-measure', slice: 'S2', creatures: 4, mode: 'cpu+census only (--no-gpu)',
+      kind: 'kc-wing-warp-measure',
+      slice: 'S2',
+      creatures: 4,
+      mode: 'cpu+census only (--no-gpu)',
       canvas: { w: args.width, h: args.height },
       resolverCpuMsPerFrame: { rest: rest.cpuMsPerFrame, bent: bent.cpuMsPerFrame },
       census: { rest: meshCensus(restContract), bent: meshCensus(bentContract) },
-      budget: { gpuMsPerFrame1080pIpadClass: 2.0, verdict: 'GPU not measured in this mode — see the full run / the Studio run' },
+      budget: {
+        gpuMsPerFrame1080pIpadClass: 2.0,
+        verdict: 'GPU not measured in this mode — see the full run / the Studio run',
+      },
     };
     console.log('[measureWingWarp] --no-gpu: census + resolver CPU only');
-    if (args.out) { await writeFile(args.out, JSON.stringify(report, null, 2)); console.log(`[measureWingWarp] wrote ${args.out}`); }
+    if (args.out) {
+      await writeFile(args.out, JSON.stringify(report, null, 2));
+      console.log(`[measureWingWarp] wrote ${args.out}`);
+    }
     return;
   }
   const restGpu = await measureGpu(restContract, bg);
   const bentGpu = await measureGpu(bentContract, bg);
   const pg = await ensurePage();
-  const env = await pg.evaluate(() => ({ ua: navigator.userAgent, probes: window.__kcProbes ? window.__kcProbes() : null }));
+  const env = await pg.evaluate(() => ({
+    ua: navigator.userAgent,
+    probes: window.__kcProbes ? window.__kcProbes() : null,
+  }));
   const delta = bentGpu.p50Ms - restGpu.p50Ms;
   const report = {
-    kind: 'kc-wing-warp-measure', slice: 'S2', creatures: 4,
+    kind: 'kc-wing-warp-measure',
+    slice: 'S2',
+    creatures: 4,
     canvas: { w: args.width, h: args.height },
-    environment: { ua: env.ua, renderer: env.probes?.renderer || 'unknown', note: 'headless Chromium / SwiftShader — INDICATIVE ONLY, not iPad truth; the Studio run settles the 2.0 ms budget' },
+    environment: {
+      ua: env.ua,
+      renderer: env.probes?.renderer || 'unknown',
+      note: 'headless Chromium / SwiftShader — INDICATIVE ONLY, not iPad truth; the Studio run settles the 2.0 ms budget',
+    },
     resolverCpuMsPerFrame: { rest: rest.cpuMsPerFrame, bent: bent.cpuMsPerFrame },
     gpuMsPerFrame: { rest: restGpu, bent: bentGpu, warpDelta: delta },
     census: { rest: meshCensus(restContract), bent: meshCensus(bentContract) },
-    budget: { gpuMsPerFrame1080pIpadClass: 2.0, bentTotalVsBudget: bentGpu.p50Ms, verdict: 'IN THIS ENVIRONMENT ONLY — see environment.note' },
+    budget: {
+      gpuMsPerFrame1080pIpadClass: 2.0,
+      bentTotalVsBudget: bentGpu.p50Ms,
+      verdict: 'IN THIS ENVIRONMENT ONLY — see environment.note',
+    },
   };
-  console.log(`[measureWingWarp] GPU/frame p50: rest ${restGpu.p50Ms.toFixed(3)} ms, bent ${bentGpu.p50Ms.toFixed(3)} ms, warp delta ${delta.toFixed(3)} ms`);
+  console.log(
+    `[measureWingWarp] GPU/frame p50: rest ${restGpu.p50Ms.toFixed(3)} ms, bent ${bentGpu.p50Ms.toFixed(3)} ms, warp delta ${delta.toFixed(3)} ms`,
+  );
   console.log(`[measureWingWarp] renderer: ${report.environment.renderer}`);
-  console.log('[measureWingWarp] NOTE: SwiftShader numbers — indicative ordering only. The 2.0 ms iPad budget is settled by the Studio run, not by this sandbox.');
-  if (args.out) { await writeFile(args.out, JSON.stringify(report, null, 2)); console.log(`[measureWingWarp] wrote ${args.out}`); }
-  try { await closePage?.(); } catch { /* already gone */ }
+  console.log(
+    '[measureWingWarp] NOTE: SwiftShader numbers — indicative ordering only. The 2.0 ms iPad budget is settled by the Studio run, not by this sandbox.',
+  );
+  if (args.out) {
+    await writeFile(args.out, JSON.stringify(report, null, 2));
+    console.log(`[measureWingWarp] wrote ${args.out}`);
+  }
+  try {
+    await closePage?.();
+  } catch {
+    /* already gone */
+  }
   await closeGlDriver();
 }
 

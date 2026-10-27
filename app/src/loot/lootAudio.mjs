@@ -69,7 +69,12 @@ export async function takeInAudio({ native, index }) {
       continue;
     }
     summary.taken += 1;
-    rows.push({ rel: it.rel, kind: 'audio', outcome: 'taken-in', reason: `${c.type.toUpperCase()}, pick it in STIMULI` });
+    rows.push({
+      rel: it.rel,
+      kind: 'audio',
+      outcome: 'taken-in',
+      reason: `${c.type.toUpperCase()}, pick it in STIMULI`,
+    });
     ix = markTaken(ix, id, { status: 'taken' });
   }
   return { index: addRows(ix, rows.reverse()), summary };
@@ -82,10 +87,15 @@ export async function takeInAudio({ native, index }) {
 export async function loadAudio({ native, index, id, makeUrl }) {
   const ix = sanitizeIndex(index);
   const it = ix.items[id];
-  if (!it || it.kind !== 'audio' || it.state !== 'ok') return { ok: false, reason: 'that file is no longer in the folder' };
+  if (!it || it.kind !== 'audio' || it.state !== 'ok')
+    return { ok: false, reason: 'that file is no longer in the folder' };
   const read = await native.read(ix.root, it.rel);
   if (!read.ok) return { ok: false, reason: `unreadable: ${read.reason}` };
   const c = checkAudio(read.bytes);
   if (c.reason) return { ok: false, reason: c.reason };
-  try { return { ok: true, url: makeUrl(read.bytes, MIME[c.type]), name: it.rel.split('/').pop() }; } catch (e) { return { ok: false, reason: String((e && e.message) || e).slice(0, 100) }; }
+  try {
+    return { ok: true, url: makeUrl(read.bytes, MIME[c.type]), name: it.rel.split('/').pop() };
+  } catch (e) {
+    return { ok: false, reason: String((e && e.message) || e).slice(0, 100) };
+  }
 }

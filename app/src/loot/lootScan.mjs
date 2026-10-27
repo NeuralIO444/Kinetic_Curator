@@ -21,13 +21,27 @@ const byRel = (a, b) => (a.rel < b.rel ? -1 : a.rel > b.rel ? 1 : 0);
  * @param rootReachable false when the folder could not be listed at all (an unmounted volume): nothing is marked missing
  */
 export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable = true } = {}) {
-  const out = { add: [], dup: [], changed: [], renamed: [], unchanged: [], missing: [], skipped: [], needHash: [], collisions: [], unreachable: !rootReachable };
+  const out = {
+    add: [],
+    dup: [],
+    changed: [],
+    renamed: [],
+    unchanged: [],
+    missing: [],
+    skipped: [],
+    needHash: [],
+    collisions: [],
+    unreachable: !rootReachable,
+  };
   const prevItems = prev && prev.items && typeof prev.items === 'object' ? Object.entries(prev.items) : [];
   const prevByRel = new Map(prevItems.map(([id, it]) => [it.rel, { id, ...it }]));
   const prevByHash = new Map();
   for (const [id, it] of prevItems) if (it.hash && !prevByHash.has(it.hash)) prevByHash.set(it.hash, { id, ...it });
 
-  const list = (Array.isArray(entries) ? entries : []).filter((e) => e && typeof e === 'object').slice().sort(byRel);
+  const list = (Array.isArray(entries) ? entries : [])
+    .filter((e) => e && typeof e === 'object')
+    .slice()
+    .sort(byRel);
   const seenLower = new Map();
   const livePaths = new Set();
   const candidates = [];
@@ -36,11 +50,23 @@ export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable =
     const c = classify(e.rel);
     if (c.ignored) continue; // outside the known subfolders: not ours, not logged
     const key = String(e.rel).toLowerCase();
-    if (seenLower.has(key)) { out.collisions.push({ rel: e.rel, with: seenLower.get(key) }); out.skipped.push({ rel: e.rel, kind: c.kind, reason: 'name differs only by case' }); continue; }
+    if (seenLower.has(key)) {
+      out.collisions.push({ rel: e.rel, with: seenLower.get(key) });
+      out.skipped.push({ rel: e.rel, kind: c.kind, reason: 'name differs only by case' });
+      continue;
+    }
     seenLower.set(key, e.rel);
-    if (!c.ok) { out.skipped.push({ rel: e.rel, kind: c.kind, reason: c.reason }); continue; }
+    if (!c.ok) {
+      out.skipped.push({ rel: e.rel, kind: c.kind, reason: c.reason });
+      continue;
+    }
     livePaths.add(e.rel);
-    if (Number.isFinite(e.mtimeMs) && Number.isFinite(nowMs) && nowMs - e.mtimeMs < SETTLE_MS && nowMs - e.mtimeMs > -SETTLE_MS) {
+    if (
+      Number.isFinite(e.mtimeMs) &&
+      Number.isFinite(nowMs) &&
+      nowMs - e.mtimeMs < SETTLE_MS &&
+      nowMs - e.mtimeMs > -SETTLE_MS
+    ) {
       out.skipped.push({ rel: e.rel, kind: c.kind, reason: 'still changing' });
       continue;
     }
@@ -49,7 +75,10 @@ export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable =
       out.unchanged.push({ rel: e.rel, id: known.id });
       continue;
     }
-    if (!e.hash) { out.needHash.push(e.rel); continue; }
+    if (!e.hash) {
+      out.needHash.push(e.rel);
+      continue;
+    }
     candidates.push({ e, c });
   }
 
@@ -61,17 +90,39 @@ export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable =
   candidates.sort((a, b) => knownFirst(a) - knownFirst(b) || byRel(a.e, b.e));
   for (const { e, c } of candidates) {
     const known = prevByRel.get(e.rel);
-    if (known && known.hash === e.hash) { out.unchanged.push({ rel: e.rel, id: known.id }); claimed.set(e.hash, e.rel); continue; }
-    if (known && known.hash !== e.hash) { out.changed.push({ rel: e.rel, id: known.id, hash: e.hash, kind: c.kind, stem: c.stem }); claimed.set(e.hash, e.rel); continue; }
-    if (claimed.has(e.hash)) { out.dup.push({ rel: e.rel, of: claimed.get(e.hash), hash: e.hash, kind: c.kind }); continue; }
+    if (known && known.hash === e.hash) {
+      out.unchanged.push({ rel: e.rel, id: known.id });
+      claimed.set(e.hash, e.rel);
+      continue;
+    }
+    if (known && known.hash !== e.hash) {
+      out.changed.push({ rel: e.rel, id: known.id, hash: e.hash, kind: c.kind, stem: c.stem });
+      claimed.set(e.hash, e.rel);
+      continue;
+    }
+    if (claimed.has(e.hash)) {
+      out.dup.push({ rel: e.rel, of: claimed.get(e.hash), hash: e.hash, kind: c.kind });
+      continue;
+    }
     const same = prevByHash.get(e.hash);
     if (same && !livePaths.has(same.rel)) {
       out.renamed.push({ rel: e.rel, from: same.rel, id: same.id, hash: e.hash, kind: c.kind });
       claimed.set(e.hash, e.rel);
       continue;
     }
-    if (same) { out.dup.push({ rel: e.rel, of: same.rel, hash: e.hash, kind: c.kind }); continue; } // a copy of a file still here
-    out.add.push({ rel: e.rel, hash: e.hash, kind: c.kind, stem: c.stem, size: e.size, mtimeMs: e.mtimeMs, id: lootId(c.stem, e.hash) });
+    if (same) {
+      out.dup.push({ rel: e.rel, of: same.rel, hash: e.hash, kind: c.kind });
+      continue;
+    } // a copy of a file still here
+    out.add.push({
+      rel: e.rel,
+      hash: e.hash,
+      kind: c.kind,
+      stem: c.stem,
+      size: e.size,
+      mtimeMs: e.mtimeMs,
+      id: lootId(c.stem, e.hash),
+    });
     claimed.set(e.hash, e.rel);
   }
 
@@ -90,7 +141,13 @@ export function planScan({ entries = [], prev = null, nowMs = 0, rootReachable =
 /** The counts a status line shows. */
 export function summarize(plan) {
   return {
-    add: plan.add.length, dup: plan.dup.length, changed: plan.changed.length, renamed: plan.renamed.length,
-    unchanged: plan.unchanged.length, missing: plan.missing.length, skipped: plan.skipped.length, needHash: plan.needHash.length,
+    add: plan.add.length,
+    dup: plan.dup.length,
+    changed: plan.changed.length,
+    renamed: plan.renamed.length,
+    unchanged: plan.unchanged.length,
+    missing: plan.missing.length,
+    skipped: plan.skipped.length,
+    needHash: plan.needHash.length,
   };
 }

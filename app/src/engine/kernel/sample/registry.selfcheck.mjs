@@ -22,7 +22,9 @@ for (const id of listSamplers()) {
 }
 
 // --- legacy shim: registerSampler(id, fn) fills the declaration ---
-function legacyFn() { return { x: 1, y: 2 }; }
+function legacyFn() {
+  return { x: 1, y: 2 };
+}
 registerSampler('__dish_compat', legacyFn);
 {
   const d = getSamplerDecl('__dish_compat');
@@ -35,7 +37,9 @@ registerSampler('__dish_compat', legacyFn);
 }
 
 // --- declared shape round-trips ---
-function declaredFn() { return { x: 3, y: 4 }; }
+function declaredFn() {
+  return { x: 3, y: 4 };
+}
 registerSampler({
   id: '__dish_declared',
   reads: ['seed', 'caGrid'],
@@ -55,7 +59,7 @@ assert.strictEqual(getSampler('__no_such_mode'), getSampler('random'));
 assert.strictEqual(getSamplerDecl('__no_such_mode'), undefined);
 
 // --- bad declarations throw, naming the offender ---
-assert.throws(() => registerSampler({ id: '__dish_bad', fn() {} , costTier: 9 }), /costTier/);
+assert.throws(() => registerSampler({ id: '__dish_bad', fn() {}, costTier: 9 }), /costTier/);
 assert.throws(() => registerSampler({ fn() {} }), /id must be a non-empty string/);
 
 console.log('sample/registry.selfcheck: ok');

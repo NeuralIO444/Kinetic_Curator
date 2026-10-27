@@ -89,7 +89,9 @@ function createWorkerHost(url) {
  *   that match no pending request land here; default rethrows async.
  */
 export function createKernelClient({ runInline = true, workerUrl, host, onProtocolError } = {}) {
-  const activeHost = host || (runInline ? createInlineHost() : createWorkerHost(workerUrl || new URL('./kernel.worker.js', import.meta.url)));
+  const activeHost =
+    host ||
+    (runInline ? createInlineHost() : createWorkerHost(workerUrl || new URL('./kernel.worker.js', import.meta.url)));
   const mode = host ? 'injected' : runInline ? 'inline' : 'worker';
 
   let readyInfo = null;
@@ -171,7 +173,11 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
           pendingStep = null;
           nextFrame = p.frame; // the worker did not advance: retry this number
           p.reject(err);
-        } else if (pendingSnapshot && reply.forFrame === pendingSnapshot.atFrame && (!reply.forType || reply.forType === MSG.SNAPSHOT)) {
+        } else if (
+          pendingSnapshot &&
+          reply.forFrame === pendingSnapshot.atFrame &&
+          (!reply.forType || reply.forType === MSG.SNAPSHOT)
+        ) {
           const s = pendingSnapshot;
           pendingSnapshot = null;
           s.reject(err);
@@ -286,7 +292,10 @@ export function createKernelClient({ runInline = true, workerUrl, host, onProtoc
       ensureLive();
       if (mode !== 'worker' && mode !== 'injected') return;
       if (!result || !result.columns) return;
-      activeHost.post(returnMessage({ frame: result.frame, columns: result.columns }), payloadBuffers({ columns: result.columns }));
+      activeHost.post(
+        returnMessage({ frame: result.frame, columns: result.columns }),
+        payloadBuffers({ columns: result.columns }),
+      );
     },
 
     /** Consecutive unanswered STEPs (governor telemetry). */

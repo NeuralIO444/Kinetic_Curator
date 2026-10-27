@@ -111,7 +111,12 @@ function subdivide(interestingness, maxDepth, leafBudget, threshold) {
     const hw = L.w / 2;
     const hh = L.h / 2;
     const nd = L.depth + 1;
-    const quads = [[L.x, L.y], [L.x + hw, L.y], [L.x, L.y + hh], [L.x + hw, L.y + hh]];
+    const quads = [
+      [L.x, L.y],
+      [L.x + hw, L.y],
+      [L.x, L.y + hh],
+      [L.x + hw, L.y + hh],
+    ];
     for (const [qx, qy] of quads) {
       leaves.push({ x: qx, y: qy, w: hw, h: hh, depth: nd, score: scoreOf(qx, qy, hw, hh, nd) });
     }

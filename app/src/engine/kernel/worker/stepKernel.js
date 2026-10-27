@@ -197,9 +197,7 @@ export function stepKernelFrame(session, { frame, dt, events }) {
  * Same source on both hosts ⇒ bit-identical snapshots worker vs inline. */
 export function snapshotKernel(session, atFrame) {
   if (atFrame !== session.lastFrame) {
-    throw new ProtocolError(
-      `SNAPSHOT atFrame ${atFrame} is not the current frame ${session.lastFrame}`,
-    );
+    throw new ProtocolError(`SNAPSHOT atFrame ${atFrame} is not the current frame ${session.lastFrame}`);
   }
   const copy = createPointSet(session.count);
   copyColumns(session.live, copy, session.count);

@@ -38,9 +38,11 @@ async function kick(runner = runShelfExports) {
   running = true;
   try {
     await runner(useStore.getState, {
-      backend: port.backend, root: port.root,
+      backend: port.backend,
+      root: port.root,
       sessionStartMs: SHELF_SESSION_START_MS,
-      assetsById: ASSETS_BY_ID, palettesById: PALETTES_BY_ID,
+      assetsById: ASSETS_BY_ID,
+      palettesById: PALETTES_BY_ID,
     });
     wireStopSpoken = false; // a completed run closes the episode
   } catch {
@@ -52,15 +54,22 @@ async function kick(runner = runShelfExports) {
     // per episode, like the runner's own stops.
     if (!wireStopSpoken) {
       wireStopSpoken = true;
-      useStore.getState().setShelfNotice('export check stopped early — a keep may be waiting to move to the disk; nothing was half-moved');
+      useStore
+        .getState()
+        .setShelfNotice(
+          'export check stopped early — a keep may be waiting to move to the disk; nothing was half-moved',
+        );
     }
+  } finally {
+    running = false;
   }
-  finally { running = false; }
 }
 
 /** Ask the runner to check the overflow now (after a prefs read).
  * The runner is injectable so the port's own behaviour is checkable. */
-export function kickShelfExports(runner) { return kick(runner); }
+export function kickShelfExports(runner) {
+  return kick(runner);
+}
 
 /** Register (or re-point) the connected folder and arm the watch. */
 export function registerShelfDiskPort(backend, root) {
@@ -77,7 +86,10 @@ export function registerShelfDiskPort(backend, root) {
         s.shelfDiskConnected ? 1 : 0,
         s.shelfDiskRoot || '',
       ].join('|');
-      if (next !== key) { key = next; void kick(); }
+      if (next !== key) {
+        key = next;
+        void kick();
+      }
     });
   }
   void kick();
@@ -86,5 +98,8 @@ export function registerShelfDiskPort(backend, root) {
 /** The folder was forgotten: disarm. The files are not touched. */
 export function clearShelfDiskPort() {
   port = null;
-  if (unsubscribe) { unsubscribe(); unsubscribe = null; }
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
 }

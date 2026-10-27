@@ -70,7 +70,15 @@ export function createCostMeasurer(gl) {
     // so the measurement does too. Falls back to the first contract case.
     const contracts = def.cases.filter((c) => c.kind === 'contract');
     const c = contracts.find((x) => x.costly) ?? contracts[contracts.length - 1] ?? def.cases[0];
-    built.set(def.id, { def, program: b.program, locs: b.locs, apply: b.apply, dispose: b.dispose, params: c, caseName: c.name });
+    built.set(def.id, {
+      def,
+      program: b.program,
+      locs: b.locs,
+      apply: b.apply,
+      dispose: b.dispose,
+      params: c,
+      caseName: c.name,
+    });
   }
 
   function drawOnce(e) {
@@ -126,7 +134,11 @@ export function createCostMeasurer(gl) {
     },
     dispose() {
       for (const e of built.values()) {
-        try { e.dispose(); } catch { /* noop */ }
+        try {
+          e.dispose();
+        } catch {
+          /* noop */
+        }
       }
       built.clear();
       lab.dispose();

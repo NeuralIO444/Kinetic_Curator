@@ -48,8 +48,15 @@ function lp(extra = {}) {
 
 function bakeOpts(layoutParams, engine) {
   return {
-    seed, count, layoutParams, activeAssets: assets, palette,
-    canvasW: 1000, canvasH: 700, steps: 4, engine,
+    seed,
+    count,
+    layoutParams,
+    activeAssets: assets,
+    palette,
+    canvasW: 1000,
+    canvasH: 700,
+    steps: 4,
+    engine,
   };
 }
 

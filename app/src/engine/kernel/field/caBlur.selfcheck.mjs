@@ -20,20 +20,22 @@ function makeCaFieldOld(grid, { softness = 1 } = {}) {
   const passes = Math.max(0, Math.round(softness));
   for (let p = 0; p < passes; p++) {
     const prev = field;
-    field = prev.map((row, y) => row.map((_, x) => {
-      let sum = 0;
-      let n = 0;
-      for (let dy = -1; dy <= 1; dy++) {
-        for (let dx = -1; dx <= 1; dx++) {
-          const yy = y + dy;
-          const xx = x + dx;
-          if (yy < 0 || yy >= rows || xx < 0 || xx >= cols) continue;
-          sum += prev[yy][xx];
-          n++;
+    field = prev.map((row, y) =>
+      row.map((_, x) => {
+        let sum = 0;
+        let n = 0;
+        for (let dy = -1; dy <= 1; dy++) {
+          for (let dx = -1; dx <= 1; dx++) {
+            const yy = y + dy;
+            const xx = x + dx;
+            if (yy < 0 || yy >= rows || xx < 0 || xx >= cols) continue;
+            sum += prev[yy][xx];
+            n++;
+          }
         }
-      }
-      return n ? sum / n : 0;
-    }));
+        return n ? sum / n : 0;
+      }),
+    );
   }
   let max = 0;
   for (const row of field) for (const v of row) if (v > max) max = v;
@@ -60,12 +62,10 @@ function makeCaFieldOld(grid, { softness = 1 } = {}) {
 let lcgState = 0xc0ffee;
 const lcg = () => (lcgState = (lcgState * 1664525 + 1013904223) >>> 0) / 4294967296;
 function randomGrid(cols, rows, density) {
-  return Array.from({ length: rows }, () =>
-    Array.from({ length: cols }, () => (lcg() < density ? 1 : 0)));
+  return Array.from({ length: rows }, () => Array.from({ length: cols }, () => (lcg() < density ? 1 : 0)));
 }
 function checkerGrid(cols, rows) {
-  return Array.from({ length: rows }, (_, y) =>
-    Array.from({ length: cols }, (_, x) => ((x + y) % 2 ? 1 : 0)));
+  return Array.from({ length: rows }, (_, y) => Array.from({ length: cols }, (_, x) => ((x + y) % 2 ? 1 : 0)));
 }
 
 const EPS = 1e-6; // float32 rounding lands ~1e-7; 1e-6 leaves a full order of margin
@@ -79,8 +79,11 @@ const fixtures = [
   ['random 16x16 s4', randomGrid(16, 16, 0.2), 4],
   ['single alive 1x1 s3', [[1]], 3],
   ['all-dead 4x4 s2', Array.from({ length: 4 }, () => [0, 0, 0, 0]), 2],
-  ['single corner cell 5x5 s2', Array.from({ length: 5 }, (_, y) =>
-    Array.from({ length: 5 }, (_, x) => (x === 0 && y === 0 ? 1 : 0))), 2],
+  [
+    'single corner cell 5x5 s2',
+    Array.from({ length: 5 }, (_, y) => Array.from({ length: 5 }, (_, x) => (x === 0 && y === 0 ? 1 : 0))),
+    2,
+  ],
 ];
 
 let worst = 0;
@@ -106,13 +109,20 @@ for (const [name, grid, softness] of fixtures) {
 // A second pin independent of the in-file reference, so a reference that
 // drifts with the implementation cannot hide a change.
 const GOLDEN_PTS = [
-  [0, 0], [1, 1], [0, 1], [1, 0], [0.5, 0.5],
-  [0.123, 0.876], [0.99, 0.02], [0.333, 0.666], [0.02, 0.5], [0.5, 0.98],
+  [0, 0],
+  [1, 1],
+  [0, 1],
+  [1, 0],
+  [0.5, 0.5],
+  [0.123, 0.876],
+  [0.99, 0.02],
+  [0.333, 0.666],
+  [0.02, 0.5],
+  [0.5, 0.98],
 ];
 const GOLDEN_VALS = [
-  0.3860294117647058, 0.5404411764705881, 0.5404411764705882, 0.11029411764705882,
-  0.4215686274509804, 0.3893128431372548, 0.12298137254901959, 0.46038305882352937,
-  0.5516666666666665, 0.08686274509803923,
+  0.3860294117647058, 0.5404411764705881, 0.5404411764705882, 0.11029411764705882, 0.4215686274509804,
+  0.3893128431372548, 0.12298137254901959, 0.46038305882352937, 0.5516666666666665, 0.08686274509803923,
 ];
 lcgState = 0xc0ffee;
 const goldenGrid = randomGrid(12, 9, 0.35);

@@ -41,14 +41,7 @@ export const EVENT = Object.freeze({
 
 /** Params the protocol allows INIT to carry. Must stay in sync with
  *  DEFAULT_STEP_PARAMS in stepKernel.js (asserted by kernelWorker.selfcheck). */
-export const KNOWN_INIT_PARAMS = Object.freeze([
-  'pointCount',
-  'damping',
-  'speed',
-  'audioGain',
-  'boundW',
-  'boundH',
-]);
+export const KNOWN_INIT_PARAMS = Object.freeze(['pointCount', 'damping', 'speed', 'audioGain', 'boundW', 'boundH']);
 
 /** Params SET_PARAM / param-set events may change mid-run. */
 export const SETTABLE_PARAMS = Object.freeze(['damping', 'speed', 'audioGain']);
@@ -83,9 +76,7 @@ export function assertFrameIndex(frame, what) {
 function assertProtocolField(msg, what) {
   if (!isObject(msg)) throw new ProtocolError(`${what}: message must be an object`);
   if (msg.protocol !== PROTOCOL_VERSION) {
-    throw new ProtocolError(
-      `${what}: protocol mismatch (got ${String(msg.protocol)}, want ${PROTOCOL_VERSION})`,
-    );
+    throw new ProtocolError(`${what}: protocol mismatch (got ${String(msg.protocol)}, want ${PROTOCOL_VERSION})`);
   }
 }
 

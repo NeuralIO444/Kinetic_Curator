@@ -60,6 +60,44 @@ unsafe fn ns_number_i32(val: i32) -> *mut Object {
     msg_send![cls, numberWithInt:val]
 }
 
+// ── Helper: Rust String from NSString (null → empty) ────────────────
+
+unsafe fn ns_to_string(ns: *mut Object) -> String {
+    if ns.is_null() {
+        return String::new();
+    }
+    let p: *const std::os::raw::c_char = msg_send![ns, UTF8String];
+    if p.is_null() {
+        return String::new();
+    }
+    std::ffi::CStr::from_ptr(p).to_string_lossy().into_owned()
+}
+
+// AVAssetWriterStatus: 0 unknown · 1 writing · 2 completed · 3 failed · 4 cancelled.
+const AV_WRITER_WRITING: i64 = 1;
+
+/// #1744 — the writer's failure, if it is no longer writing: its status and AVFoundation's own error text.
+/// AVFoundation RAISES (an Objective-C exception, which aborts the whole process through `msg_send!`) on an
+/// append or a finishWriting once the writer has left the writing state, so every such call is guarded by this.
+unsafe fn writer_failure(writer: *mut Object) -> Option<String> {
+    let status: i64 = msg_send![writer, status];
+    if status == AV_WRITER_WRITING {
+        return None;
+    }
+    let err: *mut Object = msg_send![writer, error];
+    let text = if err.is_null() {
+        String::new()
+    } else {
+        let d: *mut Object = msg_send![err, localizedDescription];
+        ns_to_string(d)
+    };
+    Some(if text.is_empty() {
+        format!("AVAssetWriter status {}", status)
+    } else {
+        format!("AVAssetWriter status {}: {}", status, text)
+    })
+}
+
 // ── CMTime Struct ────────────────────────────────────────────────────
 
 #[repr(C)]
@@ -190,15 +228,25 @@ impl MediaEngineWriter {
 
     pub fn append_frame(&self, pixel_buffer: CVPixelBufferRef, frame_idx: i64) -> Result<(), String> {
         unsafe {
-            // Spin-wait briefly until encoder input is ready for more frames
-            let mut attempts = 0;
-            while attempts < 100 {
-                let ready: bool = msg_send![self.input, isReadyForMoreMediaData];
+            // #1744 — never append to a writer that has failed (AVFoundation raises; the process aborts).
+            if let Some(e) = writer_failure(self.writer) {
+                return Err(format!("frame {}: {}", frame_idx, e));
+            }
+            // Wait until the encoder input is ready for more frames. Appending while it is NOT ready raises too, so
+            // a timeout is an error, never an append anyway.
+            let mut ready = false;
+            for _ in 0..2000 {
+                ready = msg_send![self.input, isReadyForMoreMediaData];
                 if ready {
                     break;
                 }
+                if let Some(e) = writer_failure(self.writer) {
+                    return Err(format!("frame {}: {}", frame_idx, e));
+                }
                 thread::sleep(std::time::Duration::from_millis(1));
-                attempts += 1;
+            }
+            if !ready {
+                return Err(format!("frame {}: the encoder was not ready for 2 s", frame_idx));
             }
 
             let pts = CMTime::new(frame_idx, self.fps as i32);
@@ -209,7 +257,8 @@ impl MediaEngineWriter {
             ];
 
             if !success {
-                return Err(format!("Failed to append CVPixelBuffer at frame {}", frame_idx));
+                let why = writer_failure(self.writer).unwrap_or_else(|| "append returned NO".to_string());
+                return Err(format!("Failed to append CVPixelBuffer at frame {}: {}", frame_idx, why));
             }
         }
         Ok(())
@@ -217,6 +266,10 @@ impl MediaEngineWriter {
 
     pub fn finish(self) -> Result<(), String> {
         unsafe {
+            // #1744 — a writer that already failed cannot be finished (finishWriting raises): report its error.
+            if let Some(e) = writer_failure(self.writer) {
+                return Err(format!("AVAssetWriter finish failed: {}", e));
+            }
             let _: () = msg_send![self.input, markAsFinished];
 
             // Wait synchronously for writer to finish writing
@@ -224,8 +277,10 @@ impl MediaEngineWriter {
 
             // Check final status
             let status: i64 = msg_send![self.writer, status];
-            if status == 3 { // AVAssetWriterStatusFailed
-                return Err("AVAssetWriter finish failed".to_string());
+            if status == 3 {
+                // AVAssetWriterStatusFailed
+                let e = writer_failure(self.writer).unwrap_or_default();
+                return Err(format!("AVAssetWriter finish failed: {}", e));
             }
         }
         Ok(())

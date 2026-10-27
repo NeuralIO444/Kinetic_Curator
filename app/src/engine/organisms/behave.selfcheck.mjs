@@ -1,8 +1,18 @@
 import assert from 'node:assert';
 import {
-  BEHAVE, BEHAVE_IDS, resolveBehave, orbitForce, resolveSeekGain,
-  levyStep, LEVY_MAX_STEP, LEVY_ALPHA_MAX,
-  lorenzAdvance, lorenzSeed, lorenzDeriv, LORENZ_DT, LORENZ_RHO_MAX,
+  BEHAVE,
+  BEHAVE_IDS,
+  resolveBehave,
+  orbitForce,
+  resolveSeekGain,
+  levyStep,
+  LEVY_MAX_STEP,
+  LEVY_ALPHA_MAX,
+  lorenzAdvance,
+  lorenzSeed,
+  lorenzDeriv,
+  LORENZ_DT,
+  LORENZ_RHO_MAX,
 } from './behave.js';
 import { hashU01, CH } from '../kernel/rng.js';
 
@@ -71,13 +81,17 @@ assert.ok(overThreshold(1.35) > overThreshold(2), 'alpha 1.35 must out-tail 2');
 // is the distribution it claims to be and not merely monotone.
 for (const a of [0.8, 1.35, 2]) {
   const want = Math.pow(9, -a); // shifted: P(L-1 > 8) = (1+8)^-alpha
-  assert.ok(Math.abs(overThreshold(a) - want) < want * 0.15,
-    `P(L>8) at alpha ${a}: got ${overThreshold(a).toFixed(4)}, analytic ${want.toFixed(4)}`);
+  assert.ok(
+    Math.abs(overThreshold(a) - want) < want * 0.15,
+    `P(L>8) at alpha ${a}: got ${overThreshold(a).toFixed(4)}, analytic ${want.toFixed(4)}`,
+  );
 }
 // The cap is a real ceiling, stated: at the authored default it is rare, but a
 // much lower alpha saturates often and stops being a distribution.
-assert.ok(levySteps.filter((x) => x >= LEVY_MAX_STEP).length / N < 0.01,
-  'at the authored alpha the cap must be a guard rail, not the common case');
+assert.ok(
+  levySteps.filter((x) => x >= LEVY_MAX_STEP).length / N < 0.01,
+  'at the authored alpha the cap must be a guard rail, not the common case',
+);
 
 // Bounded and finite for every input, including the ones that break the math:
 // u -> 1 is an infinite raw draw, alpha <= 0 flips the exponent.
@@ -110,8 +124,13 @@ assert.ok(!(lz.chemotaxis > 0), 'lorenz must not reach the mold-only chemotaxis 
 /** Walk one seeded ride; report the envelope and how often it changed lobe. */
 function ride(rho, steps = 120000, dt = LORENZ_DT, seed = [0.3, 0.7, 0.5]) {
   let s = lorenzSeed(...seed);
-  let mx = 0; let my = 0; let mz = -Infinity; let mnz = Infinity;
-  let flips = 0; let settledFlips = 0; let last = Math.sign(s.x);
+  let mx = 0;
+  let my = 0;
+  let mz = -Infinity;
+  let mnz = Infinity;
+  let flips = 0;
+  let settledFlips = 0;
+  let last = Math.sign(s.x);
   const settle = steps / 6; // discard the approach; a spiral-in crosses x=0 a
   // couple of times on its way to the fixed point, and that is not chaos.
   for (let i = 0; i < steps; i++) {
@@ -120,10 +139,16 @@ function ride(rho, steps = 120000, dt = LORENZ_DT, seed = [0.3, 0.7, 0.5]) {
     if (!Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.z)) {
       return { blewUp: true, at: i };
     }
-    mx = Math.max(mx, Math.abs(s.x)); my = Math.max(my, Math.abs(s.y));
-    mz = Math.max(mz, s.z); mnz = Math.min(mnz, s.z);
+    mx = Math.max(mx, Math.abs(s.x));
+    my = Math.max(my, Math.abs(s.y));
+    mz = Math.max(mz, s.z);
+    mnz = Math.min(mnz, s.z);
     const g = Math.sign(s.x);
-    if (g !== 0 && g !== last) { flips++; if (i > settle) settledFlips++; last = g; }
+    if (g !== 0 && g !== last) {
+      flips++;
+      if (i > settle) settledFlips++;
+      last = g;
+    }
   }
   return { mx, my, mz, mnz, flips, settledFlips, end: s };
 }
@@ -219,156 +244,223 @@ assert.strictEqual(resolveSeekGain({ seekGain: -2 }), -2);
   /** Per-agent displacement over W-frame windows. */
   function hops(gain) {
     const restore = BEHAVE.levy.levyGain;
-    BEHAVE.levy.levyGain = gain;                       // A/B the branch itself
+    BEHAVE.levy.levyGain = gain; // A/B the branch itself
     try {
       const n = 16;
       const sys = new ParticleSystem();
-      const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'levy', particleCount: n, metabolism: 0 });
+      const lp = normalizeLayoutParams({
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'hype',
+        behave: 'levy',
+        particleCount: n,
+        metabolism: 0,
+      });
       sys.init(n, 1000, 700, assets, palette, 0x51);
       const out = [];
-      let px = [...sys.x.subarray(0, n)]; let py = [...sys.y.subarray(0, n)];
+      let px = [...sys.x.subarray(0, n)];
+      let py = [...sys.y.subarray(0, n)];
       for (let s = 1; s <= 1800; s++) {
         sys.update(lp, assets, palette, 0x51, 5000 + s * (1000 / 60), null);
         if (s % W === 0) {
           for (let i = 0; i < n; i++) out.push(Math.hypot(sys.x[i] - px[i], sys.y[i] - py[i]));
-          px = [...sys.x.subarray(0, n)]; py = [...sys.y.subarray(0, n)];
+          px = [...sys.x.subarray(0, n)];
+          py = [...sys.y.subarray(0, n)];
         }
       }
       return { list: out.slice().sort((a, b) => a - b), last: [...sys.x.subarray(0, n)] };
-    } finally { BEHAVE.levy.levyGain = restore; }
+    } finally {
+      BEHAVE.levy.levyGain = restore;
+    }
   }
   const q = (l, p) => l[Math.min(l.length - 1, Math.floor(l.length * p))];
 
   const on = hops(BEHAVE.levy.levyGain);
-  const off = hops(0);                                  // control: branch closed
+  const off = hops(0); // control: branch closed
   const spreadOn = q(on.list, 0.99) / q(on.list, 0.5);
   const spreadOff = q(off.list, 0.99) / q(off.list, 0.5);
   assert.ok(spreadOn > 4, `levy p99/median displacement ${spreadOn.toFixed(1)} is not a stride`);
-  assert.ok(spreadOn > 1.5 * spreadOff,
-    `the BRANCH must make the tail, not the row: on ${spreadOn.toFixed(1)} vs off ${spreadOff.toFixed(1)}`);
-  assert.ok(q(on.list, 0.99) > 3 * q(off.list, 0.99),
-    'the longest flights must travel much further than the same row with the branch closed');
+  assert.ok(
+    spreadOn > 1.5 * spreadOff,
+    `the BRANCH must make the tail, not the row: on ${spreadOn.toFixed(1)} vs off ${spreadOff.toFixed(1)}`,
+  );
+  assert.ok(
+    q(on.list, 0.99) > 3 * q(off.list, 0.99),
+    'the longest flights must travel much further than the same row with the branch closed',
+  );
   // Hold and stride are different things, not one blurred average.
   assert.ok(q(on.list, 0.5) < 0.35 * q(on.list, 0.99), 'the common case must still be a hold');
   // Bounded: no NaN escape, nothing off the plate.
-  assert.ok(on.last.every((x) => Number.isFinite(x) && x >= 0 && x <= 1000), 'levy stays finite and on the plate');
+  assert.ok(
+    on.last.every((x) => Number.isFinite(x) && x >= 0 && x <= 1000),
+    'levy stays finite and on the plate',
+  );
   // Same seed, same walk.
   assert.deepStrictEqual(hops(BEHAVE.levy.levyGain).last, on.last, 'the walk replays exactly');
   const nLz = 16;
   function fly(steps = 900) {
     const sys = new ParticleSystem();
-    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'lorenz', particleCount: nLz, metabolism: 0 });
+    const lp = normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'hype',
+      behave: 'lorenz',
+      particleCount: nLz,
+      metabolism: 0,
+    });
     sys.init(nLz, 1000, 700, assets, palette, 0x51);
     for (let s = 1; s <= steps; s++) sys.update(lp, assets, palette, 0x51, 5000 + s * (1000 / 60), null);
     return sys;
   }
   const sys = fly();
   const lx = [...sys.lorenzX.subarray(0, nLz)];
-  assert.ok([...sys.x.subarray(0, nLz)].every((x) => Number.isFinite(x) && x >= 0 && x <= 1000), 'lorenz stays on the plate in x');
-  assert.ok([...sys.y.subarray(0, nLz)].every((y) => Number.isFinite(y) && y >= 0 && y <= 700), 'lorenz stays on the plate in y');
+  assert.ok(
+    [...sys.x.subarray(0, nLz)].every((x) => Number.isFinite(x) && x >= 0 && x <= 1000),
+    'lorenz stays on the plate in x',
+  );
+  assert.ok(
+    [...sys.y.subarray(0, nLz)].every((y) => Number.isFinite(y) && y >= 0 && y <= 700),
+    'lorenz stays on the plate in y',
+  );
   // Per-agent state: every agent rides its own trajectory.
   assert.ok(new Set(lx.map((v) => v.toFixed(6))).size > nLz / 2, 'agents must not ride in lockstep');
-  assert.ok(lx.every((v) => Math.abs(v) < 25), 'every agent stays on the attractor');
+  assert.ok(
+    lx.every((v) => Math.abs(v) < 25),
+    'every agent stays on the attractor',
+  );
   // No agent parked on the origin fixed point.
-  assert.ok(lx.every((v, i) => Math.hypot(v, sys.lorenzY[i], sys.lorenzZ[i]) > 1), 'no agent fell into the fixed point');
+  assert.ok(
+    lx.every((v, i) => Math.hypot(v, sys.lorenzY[i], sys.lorenzZ[i]) > 1),
+    'no agent fell into the fixed point',
+  );
   // Replays.
   assert.deepStrictEqual([...fly().x.subarray(0, nLz)], [...sys.x.subarray(0, nLz)], 'the ride replays exactly');
-// ── #584 at the engine: the two claims that are the whole verb ──────────────
+  // ── #584 at the engine: the two claims that are the whole verb ──────────────
   {
-  const n = 24;
-  const POINTER = { x: 500, y: 350 };
-  const mk = (behave) => {
-    const sys = new ParticleSystem();
-    const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave, particleCount: n, metabolism: 0 });
-    sys.init(n, 1000, 700, assets, palette, 0x77);
-    return { sys, lp };
-  };
-  const step = ({ sys, lp }, attractor, t) => sys.update(lp, assets, palette, 0x77, t, attractor);
-  // ax/ay are consumed and cleared by the integrator, so the attractor's
-  // contribution is read from the VELOCITY it produced. That is exact: with
-  // the state grafted and velocity zeroed, v = (0 + a*dt) * damp is linear in
-  // a, so equal-and-opposite forces give equal-and-opposite velocities —
-  // provided no particle hits the speed clamp, which zeroing velocity and
-  // taking a single step guarantees.
-  const vel = (s) => [...s.vx.subarray(0, n)].concat([...s.vy.subarray(0, n)]);
-  /** Copy the full motion state of one system onto another. */
-  const graft = (dst, src, { still = false } = {}) => {
-    for (const k of ['x', 'y', 'vx', 'vy']) dst[k].set(src[k].subarray(0, n), 0);
-    if (still) { dst.vx.fill(0, 0, n); dst.vy.fill(0, 0, n); }
-  };
-
-  // SYMMETRY — flee at gain g is exactly -1 x seek at gain g on the same field.
-  // Measured as the attractor's CONTRIBUTION (with-pointer minus without), so
-  // the shared steering cancels and only the hand is left.
-  {
-    const base = mk('seek');
-    for (let i = 1; i <= 40; i++) step(base, POINTER, 5000 + i * 16.67);
-    const S = base.sys;
-    const seekRun = mk('seek'); const fleeRun = mk('flee'); const noneRun = mk('seek');
-    for (const r of [seekRun, fleeRun, noneRun]) graft(r.sys, S, { still: true });
-    step(seekRun, POINTER, 6000); step(fleeRun, POINTER, 6000); step(noneRun, null, 6000);
-    const a0 = vel(noneRun.sys); const as = vel(seekRun.sys); const af = vel(fleeRun.sys);
-    // The speed clamp is the one non-linearity in the path, so a particle that
-    // saturates it cannot be expected to negate exactly. Skip those and
-    // require the rest to be exact — a real sign bug would break every
-    // particle, not only the fast ones.
-    const SPEED_CLAMP = 1.65;
-    const fast = (v, i) => Math.hypot(v[i], v[i + n]) > SPEED_CLAMP * 0.999;
-    let moved = 0;
-    for (let i = 0; i < n; i++) {
-      if (fast(as, i) || fast(af, i) || fast(a0, i)) continue;
-      for (const off of [0, n]) {
-        const pull = as[i + off] - a0[i + off];
-        const push = af[i + off] - a0[i + off];
-        if (Math.abs(pull) > 1e-9) moved++;
-        assert.ok(Math.abs(pull + push) < 1e-9 * Math.max(1, Math.abs(pull)),
-          `flee must be exactly -seek: pull ${pull}, push ${push}`);
-      }
-    }
-    assert.ok(moved > n, `the pointer must actually move the field, or the symmetry is vacuous (moved ${moved})`);
-  }
-
-  // RELEASE — pointerup zeroes the hand the SAME frame, with no residual kick.
-  // Two systems reach an identical motion state by DIFFERENT histories (one
-  // fled the pointer for 120 frames, one never saw it). Grafted to the same
-  // state and stepped with no attractor, they must agree bit-for-bit: anything
-  // remembered about the pointer — a smoothed position, a decaying gain, a
-  // "last attractor" fallback — would keep pushing one of them and not the other.
-  {
-    const held = mk('flee'); const never = mk('flee');
-    for (let i = 1; i <= 120; i++) { step(held, POINTER, 5000 + i * 16.67); step(never, null, 5000 + i * 16.67); }
-    graft(never.sys, held.sys);
-    const beforeX = [...held.sys.x.subarray(0, n)];
-    step(held, null, 7000); step(never, null, 7000);
-    assert.deepStrictEqual([...held.sys.x.subarray(0, n)], [...never.sys.x.subarray(0, n)],
-      'a released pointer must leave no residue in x');
-    assert.deepStrictEqual([...held.sys.vx.subarray(0, n)], [...never.sys.vx.subarray(0, n)],
-      'a released pointer must leave no residue in velocity');
-    // Sanity: the pointer really was doing something up to the release.
-    assert.notDeepStrictEqual([...held.sys.x.subarray(0, n)], beforeX, 'the field must still be alive after release');
-  }
-
-  // A null / malformed attractor is a no-op, not a crash and not a NaN.
-  for (const bad of [null, undefined, {}, { x: NaN, y: 0 }, { x: 0, y: Infinity }]) {
-    const r = mk('seek');
-    for (let i = 1; i <= 20; i++) step(r, bad, 5000 + i * 16.67);
-    assert.ok([...r.sys.x.subarray(0, n)].every(Number.isFinite), `attractor ${JSON.stringify(bad)} must be a no-op`);
-  }
-
-  // seek pulls IN, flee pushes OUT — the directions are not swapped.
-  {
-    const dist = (sys) => {
-      let d = 0;
-      for (let i = 0; i < n; i++) d += Math.hypot(sys.x[i] - POINTER.x, sys.y[i] - POINTER.y);
-      return d / n;
+    const n = 24;
+    const POINTER = { x: 500, y: 350 };
+    const mk = (behave) => {
+      const sys = new ParticleSystem();
+      const lp = normalizeLayoutParams({
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'hype',
+        behave,
+        particleCount: n,
+        metabolism: 0,
+      });
+      sys.init(n, 1000, 700, assets, palette, 0x77);
+      return { sys, lp };
     };
-    const s = mk('seek'); const f = mk('flee');
-    graft(f.sys, s.sys);
-    const d0 = dist(s.sys);
-    for (let i = 1; i <= 90; i++) { step(s, POINTER, 5000 + i * 16.67); step(f, POINTER, 5000 + i * 16.67); }
-    assert.ok(dist(s.sys) < d0, `seek must close on the pointer (${d0.toFixed(0)} -> ${dist(s.sys).toFixed(0)})`);
-    assert.ok(dist(f.sys) > dist(s.sys), 'flee must end further out than seek');
-  }
+    const step = ({ sys, lp }, attractor, t) => sys.update(lp, assets, palette, 0x77, t, attractor);
+    // ax/ay are consumed and cleared by the integrator, so the attractor's
+    // contribution is read from the VELOCITY it produced. That is exact: with
+    // the state grafted and velocity zeroed, v = (0 + a*dt) * damp is linear in
+    // a, so equal-and-opposite forces give equal-and-opposite velocities —
+    // provided no particle hits the speed clamp, which zeroing velocity and
+    // taking a single step guarantees.
+    const vel = (s) => [...s.vx.subarray(0, n)].concat([...s.vy.subarray(0, n)]);
+    /** Copy the full motion state of one system onto another. */
+    const graft = (dst, src, { still = false } = {}) => {
+      for (const k of ['x', 'y', 'vx', 'vy']) dst[k].set(src[k].subarray(0, n), 0);
+      if (still) {
+        dst.vx.fill(0, 0, n);
+        dst.vy.fill(0, 0, n);
+      }
+    };
+
+    // SYMMETRY — flee at gain g is exactly -1 x seek at gain g on the same field.
+    // Measured as the attractor's CONTRIBUTION (with-pointer minus without), so
+    // the shared steering cancels and only the hand is left.
+    {
+      const base = mk('seek');
+      for (let i = 1; i <= 40; i++) step(base, POINTER, 5000 + i * 16.67);
+      const S = base.sys;
+      const seekRun = mk('seek');
+      const fleeRun = mk('flee');
+      const noneRun = mk('seek');
+      for (const r of [seekRun, fleeRun, noneRun]) graft(r.sys, S, { still: true });
+      step(seekRun, POINTER, 6000);
+      step(fleeRun, POINTER, 6000);
+      step(noneRun, null, 6000);
+      const a0 = vel(noneRun.sys);
+      const as = vel(seekRun.sys);
+      const af = vel(fleeRun.sys);
+      // The speed clamp is the one non-linearity in the path, so a particle that
+      // saturates it cannot be expected to negate exactly. Skip those and
+      // require the rest to be exact — a real sign bug would break every
+      // particle, not only the fast ones.
+      const SPEED_CLAMP = 1.65;
+      const fast = (v, i) => Math.hypot(v[i], v[i + n]) > SPEED_CLAMP * 0.999;
+      let moved = 0;
+      for (let i = 0; i < n; i++) {
+        if (fast(as, i) || fast(af, i) || fast(a0, i)) continue;
+        for (const off of [0, n]) {
+          const pull = as[i + off] - a0[i + off];
+          const push = af[i + off] - a0[i + off];
+          if (Math.abs(pull) > 1e-9) moved++;
+          assert.ok(
+            Math.abs(pull + push) < 1e-9 * Math.max(1, Math.abs(pull)),
+            `flee must be exactly -seek: pull ${pull}, push ${push}`,
+          );
+        }
+      }
+      assert.ok(moved > n, `the pointer must actually move the field, or the symmetry is vacuous (moved ${moved})`);
+    }
+
+    // RELEASE — pointerup zeroes the hand the SAME frame, with no residual kick.
+    // Two systems reach an identical motion state by DIFFERENT histories (one
+    // fled the pointer for 120 frames, one never saw it). Grafted to the same
+    // state and stepped with no attractor, they must agree bit-for-bit: anything
+    // remembered about the pointer — a smoothed position, a decaying gain, a
+    // "last attractor" fallback — would keep pushing one of them and not the other.
+    {
+      const held = mk('flee');
+      const never = mk('flee');
+      for (let i = 1; i <= 120; i++) {
+        step(held, POINTER, 5000 + i * 16.67);
+        step(never, null, 5000 + i * 16.67);
+      }
+      graft(never.sys, held.sys);
+      const beforeX = [...held.sys.x.subarray(0, n)];
+      step(held, null, 7000);
+      step(never, null, 7000);
+      assert.deepStrictEqual(
+        [...held.sys.x.subarray(0, n)],
+        [...never.sys.x.subarray(0, n)],
+        'a released pointer must leave no residue in x',
+      );
+      assert.deepStrictEqual(
+        [...held.sys.vx.subarray(0, n)],
+        [...never.sys.vx.subarray(0, n)],
+        'a released pointer must leave no residue in velocity',
+      );
+      // Sanity: the pointer really was doing something up to the release.
+      assert.notDeepStrictEqual([...held.sys.x.subarray(0, n)], beforeX, 'the field must still be alive after release');
+    }
+
+    // A null / malformed attractor is a no-op, not a crash and not a NaN.
+    for (const bad of [null, undefined, {}, { x: NaN, y: 0 }, { x: 0, y: Infinity }]) {
+      const r = mk('seek');
+      for (let i = 1; i <= 20; i++) step(r, bad, 5000 + i * 16.67);
+      assert.ok([...r.sys.x.subarray(0, n)].every(Number.isFinite), `attractor ${JSON.stringify(bad)} must be a no-op`);
+    }
+
+    // seek pulls IN, flee pushes OUT — the directions are not swapped.
+    {
+      const dist = (sys) => {
+        let d = 0;
+        for (let i = 0; i < n; i++) d += Math.hypot(sys.x[i] - POINTER.x, sys.y[i] - POINTER.y);
+        return d / n;
+      };
+      const s = mk('seek');
+      const f = mk('flee');
+      graft(f.sys, s.sys);
+      const d0 = dist(s.sys);
+      for (let i = 1; i <= 90; i++) {
+        step(s, POINTER, 5000 + i * 16.67);
+        step(f, POINTER, 5000 + i * 16.67);
+      }
+      assert.ok(dist(s.sys) < d0, `seek must close on the pointer (${d0.toFixed(0)} -> ${dist(s.sys).toFixed(0)})`);
+      assert.ok(dist(f.sys) > dist(s.sys), 'flee must end further out than seek');
+    }
   } // seek/flee engine block
 }
 

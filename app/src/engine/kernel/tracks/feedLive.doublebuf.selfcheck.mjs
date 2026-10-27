@@ -133,17 +133,9 @@ try {
 // --- 5. staged-but-uncommitted writes are invisible, like the old pending ----
 const pts3 = makePoints(mulberry32(42), 20);
 live.pushSource(3, pts3);
-assert.deepStrictEqual(
-  live.delay.field(3),
-  ref.field(3),
-  'uncommitted stage does not leak into the delay slot',
-);
+assert.deepStrictEqual(live.delay.field(3), ref.field(3), 'uncommitted stage does not leak into the delay slot');
 ref.push(3, oldRasterize(w, h, pts3));
 live.commit();
-assert.deepStrictEqual(
-  live.delay.field(3),
-  ref.field(3),
-  'after commit the staged frame matches the reference push',
-);
+assert.deepStrictEqual(live.delay.field(3), ref.field(3), 'after commit the staged frame matches the reference push');
 
 console.log('feedLive.doublebuf.selfcheck: OK', { w, h, frames: FRAMES });

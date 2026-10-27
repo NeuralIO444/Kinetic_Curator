@@ -9,7 +9,11 @@ const DOS_TIME = 0;
 
 const CRC_TABLE = (() => {
   const t = new Uint32Array(256);
-  for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+  for (let n = 0; n < 256; n++) {
+    let c = n;
+    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+    t[n] = c >>> 0;
+  }
   return t;
 })();
 
@@ -55,8 +59,19 @@ export function zipStore(files) {
   for (const f of files) {
     const name = enc(f.name);
     const crc = crc32(f.bytes);
-    const head = [...u32(0x04034b50), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE),
-      ...u32(crc), ...u32(f.bytes.length), ...u32(f.bytes.length), ...u16(name.length), ...u16(0)];
+    const head = [
+      ...u32(0x04034b50),
+      ...u16(20),
+      ...u16(0x0800),
+      ...u16(0),
+      ...u16(DOS_TIME),
+      ...u16(DOS_DATE),
+      ...u32(crc),
+      ...u32(f.bytes.length),
+      ...u32(f.bytes.length),
+      ...u16(name.length),
+      ...u16(0),
+    ];
     chunks.push(Uint8Array.from(head), name, f.bytes);
     central.push({ name, crc, size: f.bytes.length, offset });
     offset += head.length + name.length + f.bytes.length;
@@ -64,18 +79,45 @@ export function zipStore(files) {
   const cdStart = offset;
   for (const c of central) {
     const dir = c.name[c.name.length - 1] === 0x2f;
-    const rec = [...u32(0x02014b50), ...u16(20), ...u16(20), ...u16(0x0800), ...u16(0), ...u16(DOS_TIME), ...u16(DOS_DATE),
-      ...u32(c.crc), ...u32(c.size), ...u32(c.size), ...u16(c.name.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-      ...u32(dir ? 0x10 : 0), ...u32(c.offset)];
+    const rec = [
+      ...u32(0x02014b50),
+      ...u16(20),
+      ...u16(20),
+      ...u16(0x0800),
+      ...u16(0),
+      ...u16(DOS_TIME),
+      ...u16(DOS_DATE),
+      ...u32(c.crc),
+      ...u32(c.size),
+      ...u32(c.size),
+      ...u16(c.name.length),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u16(0),
+      ...u32(dir ? 0x10 : 0),
+      ...u32(c.offset),
+    ];
     chunks.push(Uint8Array.from(rec), c.name);
     offset += rec.length + c.name.length;
   }
-  const end = [...u32(0x06054b50), ...u16(0), ...u16(0), ...u16(central.length), ...u16(central.length),
-    ...u32(offset - cdStart), ...u32(cdStart), ...u16(0)];
+  const end = [
+    ...u32(0x06054b50),
+    ...u16(0),
+    ...u16(0),
+    ...u16(central.length),
+    ...u16(central.length),
+    ...u32(offset - cdStart),
+    ...u32(cdStart),
+    ...u16(0),
+  ];
   chunks.push(Uint8Array.from(end));
   const out = new Uint8Array(chunks.reduce((n, c) => n + c.length, 0));
   let at = 0;
-  for (const c of chunks) { out.set(c, at); at += c.length; }
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.length;
+  }
   return out;
 }
 

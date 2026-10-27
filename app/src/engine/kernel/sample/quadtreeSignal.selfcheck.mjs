@@ -44,7 +44,9 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
 // ── field term: ridges read hot, flats read cold, bounded ─────────────────
 {
   const field = makeQuadtreeField(SEED, null, 0);
-  let min = 1, max = 0, sum = 0;
+  let min = 1,
+    max = 0,
+    sum = 0;
   const N = 40;
   for (let i = 0; i < N; i++) {
     for (let j = 0; j < N; j++) {
@@ -79,13 +81,16 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
   clearQuadtreeCache();
   const fieldOnly = buildQuadtree({
     interestingness: makeQuadtreeInterestingness({ seed: SEED, quadAudio: 0.5, quadField: 0.5, bands: null }),
-    seed: SEED, maxDepth: 5,
+    seed: SEED,
+    maxDepth: 5,
   });
   assert.ok(fieldOnly.length > 1, 'field-only signal must still subdivide (never empty)');
   assert.ok(fieldOnly.length <= QUAD_LEAF_BUDGET);
   const zeroBands = buildQuadtree({
     interestingness: makeQuadtreeInterestingness({ seed: SEED, quadAudio: 0.5, quadField: 0.5, bands: bandsOf(0) }),
-    seed: SEED, maxDepth: 5, signalKey: 'zero',
+    seed: SEED,
+    maxDepth: 5,
+    signalKey: 'zero',
   });
   assert.deepStrictEqual(
     zeroBands.map((L) => [L.x, L.y, L.depth]),
@@ -99,11 +104,15 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
   clearQuadtreeCache();
   const audioLed = buildQuadtree({
     interestingness: makeQuadtreeInterestingness({ seed: SEED, quadAudio: 1, quadField: 0, bands: KICK }),
-    seed: SEED, maxDepth: 5, signalKey: 'audio-led',
+    seed: SEED,
+    maxDepth: 5,
+    signalKey: 'audio-led',
   });
   const fieldLed = buildQuadtree({
     interestingness: makeQuadtreeInterestingness({ seed: SEED, quadAudio: 0, quadField: 1, bands: KICK }),
-    seed: SEED, maxDepth: 5, signalKey: 'field-led',
+    seed: SEED,
+    maxDepth: 5,
+    signalKey: 'field-led',
   });
   const sig = (leaves) => leaves.map((L) => `${L.x.toFixed(4)},${L.y.toFixed(4)},${L.depth}`).join(';');
   assert.ok(sig(audioLed) !== sig(fieldLed), 'blend extremes must grow different trees');
@@ -157,8 +166,12 @@ const BRIGHT = { sub: 0.02, bass: 0.05, mud: 0.1, edge: 0.4, pres: 0.7, air: 0.9
 {
   const origPerfNow = performance.now;
   const origDateNow = Date.now;
-  performance.now = () => { throw new Error('performance.now consulted'); };
-  Date.now = () => { throw new Error('Date.now consulted'); };
+  performance.now = () => {
+    throw new Error('performance.now consulted');
+  };
+  Date.now = () => {
+    throw new Error('Date.now consulted');
+  };
   try {
     // No tap: levels read null, targets are zero — finite, zeroed bands.
     const idle = readSmoothedBands();

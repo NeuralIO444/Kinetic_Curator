@@ -52,7 +52,8 @@ export function renderEntry({ effect, shader, params = {}, pngPath, pngDir }) {
 export function validateManifest(m) {
   if (!m || typeof m !== 'object' || Array.isArray(m)) fail('manifest', 'must be an object');
   if (m.schema !== schemaId('testRenderManifest')) fail('schema', `must be ${schemaId('testRenderManifest')}`);
-  if (typeof m.generated_at !== 'string' || Number.isNaN(Date.parse(m.generated_at))) fail('generated_at', 'ISO-8601 required');
+  if (typeof m.generated_at !== 'string' || Number.isNaN(Date.parse(m.generated_at)))
+    fail('generated_at', 'ISO-8601 required');
   if (typeof m.harness_commit !== 'string') fail('harness_commit', 'string required');
   if (typeof m.png_dir !== 'string') fail('png_dir', 'string required');
   if (!Array.isArray(m.renders) || !m.renders.length) fail('renders', 'must be a non-empty array');
