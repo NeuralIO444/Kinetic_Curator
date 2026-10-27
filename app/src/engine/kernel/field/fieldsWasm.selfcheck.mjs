@@ -88,16 +88,20 @@ function crateSourceHash(crate) {
   const entry = (manifest.crates || {})['kc-fields'];
   assert.ok(entry, 'MANIFEST.json has no "kc-fields" entry — run ./scripts/build-wasm.sh');
   assert.strictEqual(
-    entry.rustcVersion, pinned,
+    entry.rustcVersion,
+    pinned,
     `"kc-fields": manifest rustcVersion ${entry.rustcVersion} != pinned ${pinned}`,
   );
   const current = crateSourceHash('kc-fields');
   assert.strictEqual(
-    current, entry.sourceHash,
+    current,
+    entry.sourceHash,
     `stale fields wasm: kc-fields sources changed without a rebuild ` +
       `(run ./scripts/build-wasm.sh):\n  recorded: ${entry.sourceHash}\n  current:  ${current}`,
   );
-  console.log(`[ok] crate "kc-fields" manifest matches Rust sources (source hash ${current.slice(0, 12)}…, rustc ${entry.rustcVersion})`);
+  console.log(
+    `[ok] crate "kc-fields" manifest matches Rust sources (source hash ${current.slice(0, 12)}…, rustc ${entry.rustcVersion})`,
+  );
 }
 
 // --- 1. module loads -------------------------------------------------------
@@ -121,13 +125,23 @@ function lcg(seed) {
 // propagate to NaN identically on both sides) plus a deterministic
 // pseudo-random cloud in [0,1) and in [-2,2).
 const EDGE_POINTS = [
-  [0, 0], [1, 1], [0.5, 0.5], [-1, -1], [2, 3], [-0.0, 0.0],
-  [0.99999, 0.00001], [1e-7, -1e-7], [123.456, -789.012],
+  [0, 0],
+  [1, 1],
+  [0.5, 0.5],
+  [-1, -1],
+  [2, 3],
+  [-0.0, 0.0],
+  [0.99999, 0.00001],
+  [1e-7, -1e-7],
+  [123.456, -789.012],
   [0.0078125, 0.9921875], // exact cell-center-ish fractions
-  [Number.NaN, 0.5], [0.5, Number.NaN], [Number.NaN, Number.NaN],
-  [Number.POSITIVE_INFINITY, 0.5], [0.5, Number.NEGATIVE_INFINITY],
+  [Number.NaN, 0.5],
+  [0.5, Number.NaN],
+  [Number.NaN, Number.NaN],
+  [Number.POSITIVE_INFINITY, 0.5],
+  [0.5, Number.NEGATIVE_INFINITY],
 ];
-const rand = lcg(0xC0FFEE);
+const rand = lcg(0xc0ffee);
 const RAND_POINTS = [];
 for (let i = 0; i < 256; i++) RAND_POINTS.push([rand(), rand()]);
 for (let i = 0; i < 64; i++) RAND_POINTS.push([rand() * 4 - 2, rand() * 4 - 2]);
@@ -161,7 +175,9 @@ function rawNoiseBatch(seed, { freq = 2.5, octaves = 3, lacunarity = 2, gain = 0
   const base = exports.memory.buffer.byteLength; // page-aligned, never collides
   exports.memory.grow(Math.ceil((n * 4 * 3) / 65536) + 1);
   const buf = exports.memory.buffer;
-  const px = base, py = base + n * 4, po = base + n * 8;
+  const px = base,
+    py = base + n * 4,
+    po = base + n * 8;
   new Float32Array(buf, px, n).set(xs);
   new Float32Array(buf, py, n).set(ys);
   exports.fields_noise_batch(seed, freq, octaves, lacunarity, gain, z, px, py, po, n);
@@ -197,7 +213,9 @@ function checkNoiseParity(seed, opts, xs, ys, n, raw) {
   for (const seed of edgeSeeds) {
     for (const opts of paramSets) checked += checkNoiseParity(seed, opts, xs, ys, n, true);
   }
-  console.log(`[ok] noise batch bit-identical to JS across ${checked} seed/param/point lanes (incl. NaN/Inf coords + edge seeds)`);
+  console.log(
+    `[ok] noise batch bit-identical to JS across ${checked} seed/param/point lanes (incl. NaN/Inf coords + edge seeds)`,
+  );
 }
 
 // --- 2b. large batch: staging must not touch the module's own memory ----------
@@ -210,7 +228,7 @@ function checkNoiseParity(seed, opts, xs, ys, n, raw) {
   const ys = new Float32Array(n);
   for (let i = 0; i < n; i++) {
     xs[i] = ((i * 2654435761) >>> 0) / 4294967296;
-    ys[i] = ((i * 40503 + 17) >>> 0) % 65536 / 65536;
+    ys[i] = (((i * 40503 + 17) >>> 0) % 65536) / 65536;
   }
   const opts = { freq: 3, octaves: 4, lacunarity: 2, gain: 0.5, z: 0.5 };
   const field = makeNoiseField(444, opts);
@@ -261,7 +279,12 @@ function buildScentFixture(cols, rows) {
 }
 
 {
-  for (const [cols, rows] of [[SCENT_COLS_FIX, SCENT_ROWS_FIX], [5, 3], [2, 2], [1, 1]]) {
+  for (const [cols, rows] of [
+    [SCENT_COLS_FIX, SCENT_ROWS_FIX],
+    [5, 3],
+    [2, 2],
+    [1, 1],
+  ]) {
     const { field, cells } = buildScentFixture(cols, rows);
     const { xs, ys, n } = toF32Columns(FIXTURE_POINTS);
     const ref = new Float32Array(n);
@@ -297,7 +320,10 @@ function gridViaCellCenters(field, wasmCells, cols, rows, label) {
 }
 
 {
-  for (const [cols, rows, steps] of [[SCENT_COLS_FIX, SCENT_ROWS_FIX, 12], [5, 3, 30]]) {
+  for (const [cols, rows, steps] of [
+    [SCENT_COLS_FIX, SCENT_ROWS_FIX, 12],
+    [5, 3, 30],
+  ]) {
     const { field, cells } = buildScentFixture(cols, rows);
     // Non-default decay/diffuse on the small grid; defaults on the big one.
     const opts = cols === 5 ? { decay: 0.9, diffuse: 0.4 } : {};
@@ -338,14 +364,64 @@ function gridViaCellCenters(field, wasmCells, cols, rows, label) {
 
 // --- 6. scope gate --------------------------------------------------------------
 {
-  assert.deepStrictEqual(wasmFieldsEligible('noise', { seed: 1, freq: 2.5, octaves: 3, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 4, ysLen: 4, outLen: 4 }).ok, true);
+  assert.deepStrictEqual(
+    wasmFieldsEligible('noise', {
+      seed: 1,
+      freq: 2.5,
+      octaves: 3,
+      lacunarity: 2,
+      gain: 0.5,
+      z: 0,
+      count: 4,
+      xsLen: 4,
+      ysLen: 4,
+      outLen: 4,
+    }).ok,
+    true,
+  );
   const bad = [
     ['empty', ['noise', { count: 0, xsLen: 0, ysLen: 0, outLen: 0 }], 'empty'],
-    ['short buffer', ['noise', { seed: 1, freq: 1, octaves: 3, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 3, ysLen: 4, outLen: 4 }], 'short-buffer'],
-    ['bad octaves', ['noise', { seed: 1, freq: 1, octaves: 9, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 4, ysLen: 4, outLen: 4 }], 'bad-octaves'],
-    ['bad seed', ['noise', { seed: Number.NaN, freq: 1, octaves: 3, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 4, ysLen: 4, outLen: 4 }], 'bad-seed'],
+    [
+      'short buffer',
+      [
+        'noise',
+        { seed: 1, freq: 1, octaves: 3, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 3, ysLen: 4, outLen: 4 },
+      ],
+      'short-buffer',
+    ],
+    [
+      'bad octaves',
+      [
+        'noise',
+        { seed: 1, freq: 1, octaves: 9, lacunarity: 2, gain: 0.5, z: 0, count: 4, xsLen: 4, ysLen: 4, outLen: 4 },
+      ],
+      'bad-octaves',
+    ],
+    [
+      'bad seed',
+      [
+        'noise',
+        {
+          seed: Number.NaN,
+          freq: 1,
+          octaves: 3,
+          lacunarity: 2,
+          gain: 0.5,
+          z: 0,
+          count: 4,
+          xsLen: 4,
+          ysLen: 4,
+          outLen: 4,
+        },
+      ],
+      'bad-seed',
+    ],
     ['grid mismatch', ['scent-step', { cols: 4, rows: 4, cellsLen: 15, decay: 0.9, diffuse: 0.2 }], 'grid-mismatch'],
-    ['bad grid', ['scent-sample', { cols: 0, rows: 4, cellsLen: 0, count: 1, xsLen: 1, ysLen: 1, outLen: 1 }], 'bad-grid'],
+    [
+      'bad grid',
+      ['scent-sample', { cols: 0, rows: 4, cellsLen: 0, count: 1, xsLen: 1, ysLen: 1, outLen: 1 }],
+      'bad-grid',
+    ],
   ];
   for (const [label, args, reason] of bad) {
     const r = wasmFieldsEligible(...args);
@@ -443,26 +519,40 @@ function timeMs(fn, { warmup, trials }) {
   }
   const out = new Float32Array(N);
   const refField = makeNoiseField(777, {});
-  const jsMs = timeMs(() => {
-    for (let i = 0; i < N; i++) out[i] = refField.sample(big.xs[i], big.ys[i]);
-  }, { warmup: 1, trials: 5 });
+  const jsMs = timeMs(
+    () => {
+      for (let i = 0; i < N; i++) out[i] = refField.sample(big.xs[i], big.ys[i]);
+    },
+    { warmup: 1, trials: 5 },
+  );
   const wasmMs = timeMs(() => fieldsNoiseBatch(wasm, 777, {}, big.xs, big.ys, out, N), { warmup: 2, trials: 7 });
   const ratio = jsMs / Math.max(wasmMs, 1e-9);
-  console.log(`  [info] noise batch ${N} pts: JS ${jsMs.toFixed(2)}ms, wasm ${wasmMs.toFixed(2)}ms (${ratio.toFixed(2)}x)`);
+  console.log(
+    `  [info] noise batch ${N} pts: JS ${jsMs.toFixed(2)}ms, wasm ${wasmMs.toFixed(2)}ms (${ratio.toFixed(2)}x)`,
+  );
   assert.ok(wasmMs <= jsMs * 1.05, `wasm must not be slower than JS: ${wasmMs.toFixed(2)} > ${jsMs.toFixed(2)}`);
 
   const { cells } = buildScentFixture(SCENT_COLS_FIX, SCENT_ROWS_FIX);
   const jsField = createScentField(SCENT_COLS_FIX, SCENT_ROWS_FIX);
-  for (let i = 0; i < cells.length; i++) jsField.deposit(((i * 37) % SCENT_COLS_FIX) / SCENT_COLS_FIX, ((i * 53) % SCENT_ROWS_FIX) / SCENT_ROWS_FIX, 1);
+  for (let i = 0; i < cells.length; i++)
+    jsField.deposit(((i * 37) % SCENT_COLS_FIX) / SCENT_COLS_FIX, ((i * 53) % SCENT_ROWS_FIX) / SCENT_ROWS_FIX, 1);
   const wasmCells = Float64Array.from(cells);
   // jsField.step() now dispatches to wasm by default (#1304): force the JS
   // reference for the timing baseline or this would compare wasm to wasm.
   process.env.KC_FIELDS_WASM = '0';
   const jsStepMs = timeMs(() => jsField.step(), { warmup: 1, trials: 5 });
   delete process.env.KC_FIELDS_WASM;
-  const wasmStepMs = timeMs(() => fieldsScentStep(wasm, wasmCells, SCENT_COLS_FIX, SCENT_ROWS_FIX, {}), { warmup: 2, trials: 7 });
+  const wasmStepMs = timeMs(() => fieldsScentStep(wasm, wasmCells, SCENT_COLS_FIX, SCENT_ROWS_FIX, {}), {
+    warmup: 2,
+    trials: 7,
+  });
   const stepRatio = jsStepMs / Math.max(wasmStepMs, 1e-9);
-  console.log(`  [info] scent step 64x36: JS ${jsStepMs.toFixed(2)}ms, wasm ${wasmStepMs.toFixed(2)}ms (${stepRatio.toFixed(2)}x)`);
-  assert.ok(wasmStepMs <= jsStepMs * 1.05, `wasm step must not be slower than JS: ${wasmStepMs.toFixed(2)} > ${jsStepMs.toFixed(2)}`);
+  console.log(
+    `  [info] scent step 64x36: JS ${jsStepMs.toFixed(2)}ms, wasm ${wasmStepMs.toFixed(2)}ms (${stepRatio.toFixed(2)}x)`,
+  );
+  assert.ok(
+    wasmStepMs <= jsStepMs * 1.05,
+    `wasm step must not be slower than JS: ${wasmStepMs.toFixed(2)} > ${jsStepMs.toFixed(2)}`,
+  );
 }
 console.log('\nfieldsWasm.selfcheck: all green (parity bit-identical; wasm not slower than JS)');

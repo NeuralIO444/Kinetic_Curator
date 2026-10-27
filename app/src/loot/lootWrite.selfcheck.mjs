@@ -17,13 +17,20 @@ import { createLootNative, MAX_WRITE_BYTES } from './lootNative.mjs';
 import { createLootWeb, WEB_PREFIX, FOLDER_NAME } from './lootWeb.mjs';
 
 let n = 0;
-const ok = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const enc = (s) => new TextEncoder().encode(s);
 
 // ── native ──────────────────────────────────────────────────────────
 await ok('native write: gates, validation, and the base64 payload', async () => {
   const calls = [];
-  const inv = async (cmd, args) => { calls.push([cmd, args]); return null; };
+  const inv = async (cmd, args) => {
+    calls.push([cmd, args]);
+    return null;
+  };
   const b = createLootNative({ invoke: inv, isDesktop: () => true, confirmed: true });
 
   const r = await b.write('/loot', 'looks/k1.json', enc('{"id":"k1"}'));
@@ -47,44 +54,102 @@ await ok('native write: gates, validation, and the base64 payload', async () => 
   const unconf = createLootNative({ invoke: inv, isDesktop: () => true, confirmed: false });
   assert.equal((await unconf.write('/loot', 'looks/k1.json', enc('x'))).ok, false, 'unconfirmed: gated');
 
-  const boom = createLootNative({ invoke: async () => { throw new Error('ipc gone'); }, isDesktop: () => true, confirmed: true });
-  assert.equal((await boom.write('/loot', 'looks/k1.json', enc('x'))).ok, false, 'a dead IPC is a refusal, not a throw');
+  const boom = createLootNative({
+    invoke: async () => {
+      throw new Error('ipc gone');
+    },
+    isDesktop: () => true,
+    confirmed: true,
+  });
+  assert.equal(
+    (await boom.write('/loot', 'looks/k1.json', enc('x'))).ok,
+    false,
+    'a dead IPC is a refusal, not a throw',
+  );
 });
 
 // ── web ─────────────────────────────────────────────────────────────
 class WFile {
-  constructor(name) { this.kind = 'file'; this.name = name; this.bytes = null; }
+  constructor(name) {
+    this.kind = 'file';
+    this.name = name;
+    this.bytes = null;
+  }
   async createWritable() {
     const self = this;
-    return { async write(b) { self.bytes = b; }, async close() {} };
+    return {
+      async write(b) {
+        self.bytes = b;
+      },
+      async close() {},
+    };
   }
   async getFile() {
     const b = this.bytes || new Uint8Array(0);
-    return { size: b.length, lastModified: 1, arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength) };
+    return {
+      size: b.length,
+      lastModified: 1,
+      arrayBuffer: async () => b.buffer.slice(b.byteOffset, b.byteOffset + b.byteLength),
+    };
   }
 }
 class WDir {
-  constructor(name) { this.kind = 'directory'; this.name = name; this.kids = new Map(); }
-  async *entries() { for (const e of [...this.kids].sort((a, b) => (a[0] < b[0] ? -1 : 1))) yield e; }
-  values() { const it = this.entries(); return { next: () => it.next() }; }
+  constructor(name) {
+    this.kind = 'directory';
+    this.name = name;
+    this.kids = new Map();
+  }
+  async *entries() {
+    for (const e of [...this.kids].sort((a, b) => (a[0] < b[0] ? -1 : 1))) yield e;
+  }
+  values() {
+    const it = this.entries();
+    return { next: () => it.next() };
+  }
   async getDirectoryHandle(name, opts = {}) {
     const k = this.kids.get(name);
-    if (k) { if (k.kind !== 'directory') throw Object.assign(new Error('type'), { name: 'TypeMismatchError' }); return k; }
+    if (k) {
+      if (k.kind !== 'directory') throw Object.assign(new Error('type'), { name: 'TypeMismatchError' });
+      return k;
+    }
     if (!opts.create) throw Object.assign(new Error('nf'), { name: 'NotFoundError' });
-    const d = new WDir(name); this.kids.set(name, d); return d;
+    const d = new WDir(name);
+    this.kids.set(name, d);
+    return d;
   }
   async getFileHandle(name, opts = {}) {
     let f = this.kids.get(name);
     if (!f) {
       if (!opts.create) throw Object.assign(new Error('nf'), { name: 'NotFoundError' });
-      f = new WFile(name); this.kids.set(name, f);
+      f = new WFile(name);
+      this.kids.set(name, f);
     }
     return f;
   }
-  async queryPermission() { return 'granted'; }
-  async requestPermission() { return 'granted'; }
+  async queryPermission() {
+    return 'granted';
+  }
+  async requestPermission() {
+    return 'granted';
+  }
 }
-const memStore = () => { const m = new Map(); return { m, async get(k) { return m.has(k) ? m.get(k) : null; }, async put(k, v) { m.set(k, v); return true; }, async del(k) { m.delete(k); return true; } }; };
+const memStore = () => {
+  const m = new Map();
+  return {
+    m,
+    async get(k) {
+      return m.has(k) ? m.get(k) : null;
+    },
+    async put(k, v) {
+      m.set(k, v);
+      return true;
+    },
+    async del(k) {
+      m.delete(k);
+      return true;
+    },
+  };
+};
 const goodWin = (pick) => ({ isSecureContext: true, indexedDB: {}, showDirectoryPicker: pick });
 
 await ok('web write: creates the subfolder, writes flat, reads back whole', async () => {
@@ -107,7 +172,11 @@ await ok('web write: creates the subfolder, writes flat, reads back whole', asyn
   const big = await b.write(label, 'looks/k9.json', new Uint8Array(MAX_WRITE_BYTES + 1));
   assert.equal(big.ok, false);
   assert.match(big.reason, /too large/);
-  assert.equal((await b.write('web:Somebody Elses Folder', 'looks/k9.json', bytes)).ok, false, 'a foreign label is refused');
+  assert.equal(
+    (await b.write('web:Somebody Elses Folder', 'looks/k9.json', bytes)).ok,
+    false,
+    'a foreign label is refused',
+  );
 });
 
 console.log(`lootWrite.selfcheck: PASS (${n} groups)`);

@@ -12,7 +12,10 @@ export const MAX_WRITE_BYTES = 16 * 1024 * 1024;
 const MAX_B64 = 90 * 1024 * 1024; // ~64 MB of bytes
 const HEX64 = /^[0-9a-f]{64}$/;
 
-const short = (e) => String((e && e.message) || e || 'failed').replace(/\s+/g, ' ').slice(0, 160);
+const short = (e) =>
+  String((e && e.message) || e || 'failed')
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
 const num = (v) => (Number.isFinite(v) && v >= 0 ? v : null);
 
 /** A scan reply as a clean one. */
@@ -22,7 +25,8 @@ export function shapeScan(raw) {
   for (const e of Array.isArray(r.entries) ? r.entries : []) {
     if (entries.length >= MAX_ENTRIES) break;
     if (!e || typeof e.rel !== 'string' || e.rel.length === 0 || e.rel.length > 512) continue;
-    const size = num(e.size); const mtimeMs = num(e.mtimeMs);
+    const size = num(e.size);
+    const mtimeMs = num(e.mtimeMs);
     if (size === null || mtimeMs === null) continue;
     entries.push({ rel: e.rel, size, mtimeMs });
   }
@@ -41,7 +45,12 @@ export function shapeScan(raw) {
  * @param pick      (options) => Promise<string|string[]|null>: the folder dialog, injected for tests (absent: lazy)
  * @param confirmed whether Matt has confirmed the desktop check on the Mac
  */
-export function createLootNative({ invoke = null, pick = null, isDesktop = isTauriRuntime, confirmed = DESKTOP_CHECK_CONFIRMED } = {}) {
+export function createLootNative({
+  invoke = null,
+  pick = null,
+  isDesktop = isTauriRuntime,
+  confirmed = DESKTOP_CHECK_CONFIRMED,
+} = {}) {
   const gate = () => {
     if (!isDesktop()) return { ok: false, reason: DESKTOP_ONLY };
     if (!confirmed) return { ok: false, reason: NOT_CONFIRMED };
@@ -57,10 +66,14 @@ export function createLootNative({ invoke = null, pick = null, isDesktop = isTau
       return { ok: false, reason: short(e) };
     }
   };
-  const validRoot = (root) => typeof root === 'string' && root.length > 0 && root.length <= 1024 && !root.includes('\0');
+  const validRoot = (root) =>
+    typeof root === 'string' && root.length > 0 && root.length <= 1024 && !root.includes('\0');
   return {
     /** Why the native calls are unavailable right now, or null when they are available. */
-    unavailable: () => { const g = gate(); return g ? g.reason : null; },
+    unavailable: () => {
+      const g = gate();
+      return g ? g.reason : null;
+    },
     /** The native folder picker. { ok: true, path } on a pick, { ok: true, path: null } on cancel. */
     async pickFolder() {
       const g = gate();
@@ -69,7 +82,11 @@ export function createLootNative({ invoke = null, pick = null, isDesktop = isTau
         const dlg = pick || (await import('@tauri-apps/api/dialog')).open;
         const r = await dlg({ directory: true, multiple: false, title: 'Point KC-1 at your loot folder' });
         const path = Array.isArray(r) ? r[0] : r;
-        return { ok: true, path: typeof path === 'string' && path.length > 0 && path.length <= 1024 && !path.includes('\0') ? path : null };
+        return {
+          ok: true,
+          path:
+            typeof path === 'string' && path.length > 0 && path.length <= 1024 && !path.includes('\0') ? path : null,
+        };
       } catch (e) {
         return { ok: false, reason: short(e) };
       }
@@ -83,13 +100,16 @@ export function createLootNative({ invoke = null, pick = null, isDesktop = isTau
       if (!validRoot(root) || typeof rel !== 'string' || !rel) return { ok: false, reason: 'not a file path' };
       const r = await call('loot_hash', { root, rel });
       if (!r.ok) return r;
-      return typeof r.value === 'string' && HEX64.test(r.value) ? { ok: true, hash: r.value } : { ok: false, reason: 'unreadable: bad hash' };
+      return typeof r.value === 'string' && HEX64.test(r.value)
+        ? { ok: true, hash: r.value }
+        : { ok: false, reason: 'unreadable: bad hash' };
     },
     async read(root, rel) {
       if (!validRoot(root) || typeof rel !== 'string' || !rel) return { ok: false, reason: 'not a file path' };
       const r = await call('loot_read', { root, rel });
       if (!r.ok) return r;
-      if (typeof r.value !== 'string' || r.value.length > MAX_B64) return { ok: false, reason: 'unreadable: bad reply' };
+      if (typeof r.value !== 'string' || r.value.length > MAX_B64)
+        return { ok: false, reason: 'unreadable: bad reply' };
       try {
         const bin = atob(r.value);
         const bytes = new Uint8Array(bin.length);
@@ -107,7 +127,8 @@ export function createLootNative({ invoke = null, pick = null, isDesktop = isTau
     async write(root, rel, bytes) {
       if (!validRoot(root) || typeof rel !== 'string' || !rel) return { ok: false, reason: 'not a file path' };
       if (!(bytes instanceof Uint8Array)) return { ok: false, reason: 'not bytes' };
-      if (bytes.length > MAX_WRITE_BYTES) return { ok: false, reason: `file too large (${Math.ceil(bytes.length / (1024 * 1024))} MB)` };
+      if (bytes.length > MAX_WRITE_BYTES)
+        return { ok: false, reason: `file too large (${Math.ceil(bytes.length / (1024 * 1024))} MB)` };
       let bin = '';
       for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
       const r = await call('loot_write', { root, rel, data: btoa(bin) });

@@ -28,12 +28,7 @@
 //     and anything else silently uses the JS reference, which is never
 //     deleted. Parity is bit-identical and gated in CI.
 
-const REQUIRED_EXPORTS = [
-  'memory',
-  'fields_noise_batch',
-  'fields_scent_sample',
-  'fields_scent_step',
-];
+const REQUIRED_EXPORTS = ['memory', 'fields_noise_batch', 'fields_scent_sample', 'fields_scent_step'];
 
 /**
  * Per-field WASM_BACKEND flags. The JS implementations are the permanent
@@ -46,7 +41,7 @@ export const WASM_BACKEND = { noise: true, scent: true };
 /** Debug counters: lets selfchecks prove the wasm path actually ran. */
 export const wasmStats = { noiseBatches: 0, scentSamples: 0, scentSteps: 0 };
 
-let cached = null;      // { instance } | null
+let cached = null; // { instance } | null
 let loadAttempted = false;
 let loadError = null;
 
@@ -172,8 +167,8 @@ export function wasmFieldsEligible(kind, p = {}) {
     if (!Number.isInteger(count) || count <= 0) return { ok: false, reason: 'empty' };
     if (xsLen < count || ysLen < count || outLen < count) return { ok: false, reason: 'short-buffer' };
     if (!Number.isFinite(seed)) return { ok: false, reason: 'bad-seed' };
-    if (!Number.isFinite(freq) || !Number.isFinite(lacunarity) ||
-        !Number.isFinite(gain) || !Number.isFinite(z)) return { ok: false, reason: 'bad-params' };
+    if (!Number.isFinite(freq) || !Number.isFinite(lacunarity) || !Number.isFinite(gain) || !Number.isFinite(z))
+      return { ok: false, reason: 'bad-params' };
     if (!Number.isInteger(octaves) || octaves < 1 || octaves > 8) return { ok: false, reason: 'bad-octaves' };
     return { ok: true };
   }
@@ -204,8 +199,16 @@ export function wasmFieldsEligible(kind, p = {}) {
 export function fieldsNoiseBatch(wasm, seed, opts = {}, xs, ys, out, count = lenOf(xs)) {
   const { freq = 2.5, octaves = 3, lacunarity = 2, gain = 0.5, z = 0 } = opts;
   const gate = wasmFieldsEligible('noise', {
-    seed, freq, octaves, lacunarity, gain, z, count,
-    xsLen: lenOf(xs), ysLen: lenOf(ys), outLen: lenOf(out),
+    seed,
+    freq,
+    octaves,
+    lacunarity,
+    gain,
+    z,
+    count,
+    xsLen: lenOf(xs),
+    ysLen: lenOf(ys),
+    outLen: lenOf(out),
   });
   if (!gate.ok) throw new Error(`fields wasm: noise call ineligible (${gate.reason})`);
   const { exports } = wasm.instance;
@@ -229,8 +232,13 @@ export function fieldsNoiseBatch(wasm, seed, opts = {}, xs, ys, out, count = len
  */
 export function fieldsScentSample(wasm, cells, cols, rows, xs, ys, out, count = lenOf(xs)) {
   const gate = wasmFieldsEligible('scent-sample', {
-    cols, rows, cellsLen: lenOf(cells), count,
-    xsLen: lenOf(xs), ysLen: lenOf(ys), outLen: lenOf(out),
+    cols,
+    rows,
+    cellsLen: lenOf(cells),
+    count,
+    xsLen: lenOf(xs),
+    ysLen: lenOf(ys),
+    outLen: lenOf(out),
   });
   if (!gate.ok) throw new Error(`fields wasm: scent-sample call ineligible (${gate.reason})`);
   const { exports } = wasm.instance;

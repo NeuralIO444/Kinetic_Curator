@@ -27,16 +27,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { bakeParticles } from './index.js';
-import {
-  TRIG_NATIVE,
-  TRIG_DET,
-  NATIVE_TRIG,
-  DET_TRIG,
-  resolveTrig,
-  detSin,
-  detCos,
-  detAtan2,
-} from '../trig.mjs';
+import { TRIG_NATIVE, TRIG_DET, NATIVE_TRIG, DET_TRIG, resolveTrig, detSin, detCos, detAtan2 } from '../trig.mjs';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../../../data/layout-modes.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -53,7 +44,8 @@ function lcg(seed) {
 // on |x| ≤ 2π; atan2 ≤ 7.8e-12 abs. Thresholds carry ~10x headroom.
 {
   const rnd = lcg(0x1240);
-  let maxSin = 0, maxCos = 0;
+  let maxSin = 0,
+    maxCos = 0;
   for (let i = 0; i < 200000; i++) {
     const x = (rnd() * 2 - 1) * 10001;
     const es = Math.abs(detSin(x) - Math.sin(x));
@@ -99,7 +91,8 @@ function lcg(seed) {
   const end = src.indexOf('});', start);
   assert.ok(end > start, 'trig.mjs NATIVE_TRIG literal must terminate');
   src = src.slice(0, start) + src.slice(end + 3);
-  const banned = /\bMath\.(sin|cos|tan|asin|acos|atan|atan2|exp|expm1|log|log1p|log2|log10|pow|cbrt|hypot|sinh|cosh|tanh|asinh|acosh|atanh)\b/;
+  const banned =
+    /\bMath\.(sin|cos|tan|asin|acos|atan|atan2|exp|expm1|log|log1p|log2|log10|pow|cbrt|hypot|sinh|cosh|tanh|asinh|acosh|atanh)\b/;
   assert.ok(!banned.test(src), 'trig.mjs must not call implementation-defined transcendentals outside NATIVE_TRIG');
   console.log('detTrig source scan: OK (no Math.sin/cos/atan2 or other libm transcendentals outside NATIVE_TRIG)');
 }
@@ -116,7 +109,11 @@ function lcg(seed) {
   assert.strictEqual(resolveTrig(null), NATIVE_TRIG);
   assert.strictEqual(resolveTrig(TRIG_NATIVE), NATIVE_TRIG);
   assert.strictEqual(resolveTrig(TRIG_DET), DET_TRIG);
-  assert.throws(() => resolveTrig('bogus'), /unknown trig mode/, 'unknown trig mode must throw, never silently fall back');
+  assert.throws(
+    () => resolveTrig('bogus'),
+    /unknown trig mode/,
+    'unknown trig mode must throw, never silently fall back',
+  );
   console.log('detTrig default-path identity: OK');
 }
 
@@ -144,9 +141,11 @@ const lp = (extra = {}) =>
 
 // Canonical form — x/y/rotation drive (and are driven by) every trig call on
 // the bake path.
-const canon = (items) =>
-  items.map((p) => [+p.x.toFixed(9), +p.y.toFixed(9), +p.rotation.toFixed(9)]);
-const sha = (items) => createHash('sha256').update(JSON.stringify(canon(items))).digest('hex');
+const canon = (items) => items.map((p) => [+p.x.toFixed(9), +p.y.toFixed(9), +p.rotation.toFixed(9)]);
+const sha = (items) =>
+  createHash('sha256')
+    .update(JSON.stringify(canon(items)))
+    .digest('hex');
 
 // --- 3b. default path: explicit 'native' is a no-op vs the default ---------
 {

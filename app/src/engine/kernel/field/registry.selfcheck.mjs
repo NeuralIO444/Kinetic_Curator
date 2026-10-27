@@ -27,12 +27,19 @@ assert.strictEqual(FIELDS.get('scent').costTier, 0, 'scent is tier 0 (structural
   const direct = makeNoiseField(seed, { freq: 2.5, octaves: 3 });
   const via = FIELDS.get('noise').create(seed, { freq: 2.5, octaves: 3 });
   assert.strictEqual(via.kind, direct.kind);
-  for (const [nx, ny] of [[0.1, 0.2], [0.5, 0.5], [0.9, 0.1]]) {
+  for (const [nx, ny] of [
+    [0.1, 0.2],
+    [0.5, 0.5],
+    [0.9, 0.1],
+  ]) {
     assert.strictEqual(via.sample(nx, ny), direct.sample(nx, ny), `noise field differs at ${nx},${ny}`);
   }
 }
 {
-  const grid = [[1, 0], [0, 1]];
+  const grid = [
+    [1, 0],
+    [0, 1],
+  ];
   const direct = makeCaField(grid, { softness: 1 });
   const via = FIELDS.get('ca').create(0, { grid, softness: 1 });
   assert.strictEqual(via.sample(0.25, 0.25), direct.sample(0.25, 0.25));
@@ -75,9 +82,6 @@ for (const [reg, family, payloadKey, baseline] of [
 // --- fail-closed ---
 assert.throws(() => FIELDS.register({ id: '__dish_nocreate' }), /missing create/);
 assert.throws(() => FIELDS.register({ id: '__dish_badtier', costTier: 5, create: () => ({}) }), /costTier/);
-assert.throws(
-  () => FIELDS.register({ id: 'noise', reads: ['nope'], create: (s) => ({}) }),
-  /conflicting declaration/,
-);
+assert.throws(() => FIELDS.register({ id: 'noise', reads: ['nope'], create: (s) => ({}) }), /conflicting declaration/);
 
 console.log('field/registry.selfcheck: ok');

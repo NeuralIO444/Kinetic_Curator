@@ -27,12 +27,18 @@ assert.deepStrictEqual(pos(a), pos(b), 'AC1: identical inputs must give identica
 
 // a third run, after other work has happened, still matches
 bakeParticles({ ...base, seed: 1 });
-assert.deepStrictEqual(pos(bakeParticles(base)), pos(a),
-  'AC1: baking a different swarm in between must not disturb the result');
+assert.deepStrictEqual(
+  pos(bakeParticles(base)),
+  pos(a),
+  'AC1: baking a different swarm in between must not disturb the result',
+);
 
 // --- seed actually matters --------------------------------------------------
-assert.notDeepStrictEqual(pos(bakeParticles({ ...base, seed: 0xbeef })), pos(a),
-  'a different seed must give a different swarm');
+assert.notDeepStrictEqual(
+  pos(bakeParticles({ ...base, seed: 0xbeef })),
+  pos(a),
+  'a different seed must give a different swarm',
+);
 
 // --- the simulation actually runs -------------------------------------------
 const one = bakeParticles({ ...base, steps: 1 });
@@ -64,7 +70,8 @@ assert.deepStrictEqual(
 // --- dt is honoured ---------------------------------------------------------
 assert.ok(BAKE_DT_MS > 16 && BAKE_DT_MS < 17, 'default dt should be ~60fps');
 assert.notDeepStrictEqual(
-  pos(bakeParticles({ ...base, dt: BAKE_DT_MS * 4 })), pos(a),
+  pos(bakeParticles({ ...base, dt: BAKE_DT_MS * 4 })),
+  pos(a),
   'a different timestep must change the trajectory',
 );
 
@@ -79,17 +86,28 @@ assert.notDeepStrictEqual(
     palette: bgPalette,
   });
   assert.ok(grazed.length > 0, 'expected baked items');
-  assert.ok(grazed.every((i) => i.graze === true), 'graze 1 -> every item is a grazer');
-  assert.ok(grazed.every((i) => i.color === '#123456' && i.accent === '#123456'),
-    'grazer items are stamped in the palette bg');
+  assert.ok(
+    grazed.every((i) => i.graze === true),
+    'graze 1 -> every item is a grazer',
+  );
+  assert.ok(
+    grazed.every((i) => i.color === '#123456' && i.accent === '#123456'),
+    'grazer items are stamped in the palette bg',
+  );
   const calm = bakeSwarmItems({
     ...base,
     engine: 'js',
     layoutParams: { ...base.layoutParams, graze: 0 },
     palette: bgPalette,
   });
-  assert.ok(calm.every((i) => i.graze === false), 'graze 0 -> no grazers');
-  assert.ok(calm.every((i) => i.color !== '#123456'), 'no bg stamping at graze 0');
+  assert.ok(
+    calm.every((i) => i.graze === false),
+    'graze 0 -> no grazers',
+  );
+  assert.ok(
+    calm.every((i) => i.color !== '#123456'),
+    'no bg stamping at graze 0',
+  );
 }
 
 console.log('kernel/bake.selfcheck: OK (K4)', { particles: a.length, steps: base.steps });

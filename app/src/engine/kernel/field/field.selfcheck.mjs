@@ -1,9 +1,7 @@
 // node src/engine/kernel/field/field.selfcheck.mjs
 // K3 (#62) AC2 + AC4: field determinism and density behaviour.
 import assert from 'node:assert';
-import {
-  makeConstantField, makeCaField, makeNoiseField, combineFields, sampleFieldPoint,
-} from './index.js';
+import { makeConstantField, makeCaField, makeNoiseField, combineFields, sampleFieldPoint } from './index.js';
 
 // --- constant field -------------------------------------------------------
 const flat = makeConstantField(1);
@@ -11,8 +9,7 @@ assert.strictEqual(flat.sample(0.1, 0.9), 1);
 
 // --- CA field -------------------------------------------------------------
 // left half alive, right half dead
-const grid = Array.from({ length: 8 }, () =>
-  Array.from({ length: 8 }, (_, x) => (x < 4 ? 1 : 0)));
+const grid = Array.from({ length: 8 }, () => Array.from({ length: 8 }, (_, x) => (x < 4 ? 1 : 0)));
 const caf = makeCaField(grid, { softness: 0 });
 assert.ok(caf.sample(0.05, 0.5) > 0.9, 'alive region should read high');
 assert.ok(caf.sample(0.95, 0.5) < 0.1, 'dead region should read low');
@@ -67,10 +64,7 @@ const p1 = sampleFieldPoint(caf, 4242, 1);
 assert.notDeepStrictEqual(p0, p1, 'different indices must not collapse to one point');
 
 // different seed => different point
-assert.notDeepStrictEqual(
-  sampleFieldPoint(caf, 1, 5), sampleFieldPoint(caf, 2, 5),
-  'seed must change the sample',
-);
+assert.notDeepStrictEqual(sampleFieldPoint(caf, 1, 5), sampleFieldPoint(caf, 2, 5), 'seed must change the sample');
 
 // INDEX STABILITY — the actual point of K3. Placement i's position must not
 // depend on how many placements there are; nothing here takes `count`.
@@ -84,10 +78,7 @@ const pts = Array.from({ length: 400 }, (_, i) => sampleFieldPoint(caf, 31337, i
 const accepted = pts.filter((p) => p.accepted);
 assert.ok(accepted.length > 200, `expected most samples accepted, got ${accepted.length}/400`);
 const left = accepted.filter((p) => p.x < 0.5).length;
-assert.ok(
-  left / accepted.length > 0.85,
-  `density should follow the field: ${left}/${accepted.length} landed left`,
-);
+assert.ok(left / accepted.length > 0.85, `density should follow the field: ${left}/${accepted.length} landed left`);
 
 console.log('kernel/field.selfcheck: OK (K3)', {
   accepted: accepted.length,

@@ -41,8 +41,9 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
   const keys = [];
   const units = layers.map((layer) => {
     const sys = new ParticleSystem();
-    sys.init(layer.count, canvasW, canvasH, layer.activeAssets, layer.palette,
-      layer.seed, layer.seedOffsets ?? null, { graze: layer.layoutParams.graze || 0 });
+    sys.init(layer.count, canvasW, canvasH, layer.activeAssets, layer.palette, layer.seed, layer.seedOffsets ?? null, {
+      graze: layer.layoutParams.graze || 0,
+    });
     const params = {
       ...layer.layoutParams,
       particleCount: layer.count,
@@ -84,8 +85,15 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
     armDish(session, keys);
     for (const u of units) {
       if (s >= u.steps) continue;
-      u.sys.update(u.params, u.layer.activeAssets, u.layer.palette,
-        u.layer.seed, BAKE_TIME_ORIGIN + s * dt, attractor, u.layer.seedOffsets ?? null);
+      u.sys.update(
+        u.params,
+        u.layer.activeAssets,
+        u.layer.palette,
+        u.layer.seed,
+        BAKE_TIME_ORIGIN + s * dt,
+        attractor,
+        u.layer.seedOffsets ?? null,
+      );
     }
     // #1415 — the trail substrate ticks once per step, after every
     // unit's update, exactly as the live resolver ticks once per frame

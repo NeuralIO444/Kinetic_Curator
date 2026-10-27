@@ -13,10 +13,15 @@ import { useStore } from '../state/store.js';
 import { registerShelfDiskPort, kickShelfExports, clearShelfDiskPort } from './shelfDiskPort.mjs';
 
 let checks = 0;
-const ok = (name) => { checks += 1; console.log(`  [ok] ${name}`); };
+const ok = (name) => {
+  checks += 1;
+  console.log(`  [ok] ${name}`);
+};
 const notice = () => useStore.getState().shelfNotice;
 const LINE = 'export check stopped early — a keep may be waiting to move to the disk; nothing was half-moved';
-const boom = async () => { throw new Error('planner exploded'); };
+const boom = async () => {
+  throw new Error('planner exploded');
+};
 const quiet = async () => {};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -29,7 +34,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const runWith = async (fn) => {
   for (;;) {
     let ran = false;
-    await kickShelfExports(async (...a) => { ran = true; return fn(...a); });
+    await kickShelfExports(async (...a) => {
+      ran = true;
+      return fn(...a);
+    });
     if (ran) return;
     await sleep(10);
   }

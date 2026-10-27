@@ -26,7 +26,10 @@ const MAX_DEPTH = 16;
 const SUBDIR = 'get' + 'DirectoryHandle';
 const HANDLE_KEY = 'root';
 
-const short = (e) => String((e && e.message) || e || 'failed').replace(/\s+/g, ' ').slice(0, 160);
+const short = (e) =>
+  String((e && e.message) || e || 'failed')
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
 const errName = (e) => (e && typeof e === 'object' && typeof e.name === 'string' ? e.name : '');
 const win = () => (typeof window !== 'undefined' ? window : undefined);
 const mb = (n) => Math.ceil(n / (1024 * 1024));
@@ -42,14 +45,24 @@ export function webFolderSupport(w = win()) {
 
 /** The folder handle's home: one small IndexedDB store. Every call is guarded: a browser that refuses gives null/false. */
 export function createIdbHandleStore(w = win()) {
-  const open = () => new Promise((resolve, reject) => {
-    const idb = w && w.indexedDB;
-    if (!idb) { reject(new Error('no indexedDB')); return; }
-    const req = idb.open('kc-loot', 1);
-    req.onupgradeneeded = () => { try { req.result.createObjectStore('handles'); } catch { /* already there */ } };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
-  });
+  const open = () =>
+    new Promise((resolve, reject) => {
+      const idb = w && w.indexedDB;
+      if (!idb) {
+        reject(new Error('no indexedDB'));
+        return;
+      }
+      const req = idb.open('kc-loot', 1);
+      req.onupgradeneeded = () => {
+        try {
+          req.result.createObjectStore('handles');
+        } catch {
+          /* already there */
+        }
+      };
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = () => reject(req.error || new Error('indexedDB open failed'));
+    });
   const run = async (mode, fn) => {
     const db = await open();
     try {
@@ -60,12 +73,39 @@ export function createIdbHandleStore(w = win()) {
         tx.onerror = () => reject(tx.error || new Error('indexedDB failed'));
         tx.onabort = () => reject(tx.error || new Error('indexedDB aborted'));
       });
-    } finally { try { db.close(); } catch { /* ignore */ } }
+    } finally {
+      try {
+        db.close();
+      } catch {
+        /* ignore */
+      }
+    }
   };
   return {
-    async get(key) { try { const v = await run('readonly', (s) => s.get(key)); return v === undefined ? null : v; } catch { return null; } },
-    async put(key, value) { try { await run('readwrite', (s) => s.put(value, key)); return true; } catch { return false; } },
-    async del(key) { try { await run('readwrite', (s) => s.delete(key)); return true; } catch { return false; } },
+    async get(key) {
+      try {
+        const v = await run('readonly', (s) => s.get(key));
+        return v === undefined ? null : v;
+      } catch {
+        return null;
+      }
+    },
+    async put(key, value) {
+      try {
+        await run('readwrite', (s) => s.put(value, key));
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    async del(key) {
+      try {
+        await run('readwrite', (s) => s.delete(key));
+        return true;
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
@@ -74,7 +114,9 @@ async function allowed(handle, mode) {
     if (typeof handle.queryPermission !== 'function') return true;
     if ((await handle.queryPermission({ mode })) === 'granted') return true;
     if (typeof handle.requestPermission === 'function') return (await handle.requestPermission({ mode })) === 'granted';
-  } catch { /* fall through: not allowed */ }
+  } catch {
+    /* fall through: not allowed */
+  }
   return false;
 }
 
@@ -96,7 +138,13 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
   async function rootHandle(label, mode = 'read') {
     if (typeof label !== 'string' || !label.startsWith(WEB_PREFIX)) return { ok: false, reason: NOT_BROWSER_FOLDER };
     let h = mem;
-    if (!h) { try { h = await handles.get(HANDLE_KEY); } catch { h = null; } }
+    if (!h) {
+      try {
+        h = await handles.get(HANDLE_KEY);
+      } catch {
+        h = null;
+      }
+    }
     if (!h || h.kind !== 'directory' || WEB_PREFIX + h.name !== label) return { ok: false, reason: LINK_LOST };
     if (!(await allowed(h, mode))) return { ok: false, reason: ALLOW_AGAIN };
     mem = h;
@@ -126,10 +174,16 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
       if (state.truncated) return;
       const rel = prefix + name;
       if (h.kind === 'directory') {
-        if (depth >= MAX_DEPTH) { skipped.push({ rel, reason: 'too deep' }); continue; }
+        if (depth >= MAX_DEPTH) {
+          skipped.push({ rel, reason: 'too deep' });
+          continue;
+        }
         await walk(h, `${rel}/`, depth + 1, out, skipped, state);
       } else if (h.kind === 'file') {
-        if (out.length >= MAX_ENTRIES) { state.truncated = true; return; }
+        if (out.length >= MAX_ENTRIES) {
+          state.truncated = true;
+          return;
+        }
         try {
           const f = await h.getFile();
           out.push({ rel, size: f.size, mtimeMs: f.lastModified });
@@ -141,7 +195,14 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
   }
 
   const hasKnown = async (d) => {
-    for (const s of SUBFOLDERS) { try { await d[SUBDIR](s); return true; } catch { /* not this one */ } }
+    for (const s of SUBFOLDERS) {
+      try {
+        await d[SUBDIR](s);
+        return true;
+      } catch {
+        /* not this one */
+      }
+    }
     return false;
   };
 
@@ -165,11 +226,13 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
       }
       try {
         let rootH = picked;
-        if (picked.name !== FOLDER_NAME && !(await hasKnown(picked))) rootH = await picked[SUBDIR](FOLDER_NAME, { create: true });
+        if (picked.name !== FOLDER_NAME && !(await hasKnown(picked)))
+          rootH = await picked[SUBDIR](FOLDER_NAME, { create: true });
         for (const s of SUBFOLDERS) await rootH[SUBDIR](s, { create: true });
         const saved = await handles.put(HANDLE_KEY, rootH);
         mem = rootH;
-        if (!saved) return { ok: true, path: WEB_PREFIX + rootH.name, note: 'link not kept: this browser would not store it' };
+        if (!saved)
+          return { ok: true, path: WEB_PREFIX + rootH.name, note: 'link not kept: this browser would not store it' };
         return { ok: true, path: WEB_PREFIX + rootH.name };
       } catch (e) {
         return { ok: false, reason: short(e) };
@@ -182,15 +245,22 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
       if (!r.ok) return r;
       try {
         // a moved or deleted folder: unreachable (nothing is marked missing), not an error
-        try { await r.h.values().next(); } catch (e) {
+        try {
+          await r.h.values().next();
+        } catch (e) {
           const n = errName(e);
-          if (n === 'NotFoundError' || n === 'InvalidStateError') return { ok: true, ...shapeScan({ reachable: false, entries: [], skipped: [] }) };
+          if (n === 'NotFoundError' || n === 'InvalidStateError')
+            return { ok: true, ...shapeScan({ reachable: false, entries: [], skipped: [] }) };
           throw e;
         }
-        const entries = []; const skipped = []; const state = { truncated: false };
+        const entries = [];
+        const skipped = [];
+        const state = { truncated: false };
         for (const sub of SUBFOLDERS) {
           let d;
-          try { d = await r.h[SUBDIR](sub); } catch (e) {
+          try {
+            d = await r.h[SUBDIR](sub);
+          } catch (e) {
             if (errName(e) !== 'NotFoundError') skipped.push({ rel: sub, reason: `unreadable: ${short(e)}` });
             continue; // a missing subfolder is just empty
           }
@@ -253,7 +323,11 @@ export function createLootWeb({ w = win(), store = null, digest = null } = {}) {
     /** Forget the stored link (the row's "forget"). The user's folder and files are not touched. */
     async forget() {
       mem = null;
-      try { await handles.del(HANDLE_KEY); } catch { /* nothing to forget */ }
+      try {
+        await handles.del(HANDLE_KEY);
+      } catch {
+        /* nothing to forget */
+      }
     },
   };
 }

@@ -44,6 +44,11 @@ src/gl/debug/*.html
 !src/gl/bridge/
 !src/gl/mlx/
 src/gl/mlx/*.json
+!src/engine/kernel/bake/
+!src/engine/kernel/color/
+!src/engine/kernel/field/
+!src/loot/
+!src/platform/
 
 # Tooling and non-src trees: not yet adopted.
 /scripts/**

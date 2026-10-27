@@ -105,20 +105,27 @@ export function makeCaField(grid, { softness = 1 } = {}) {
  * from the JS field silently.
  */
 export const NOISE_FIELD_DEFAULTS = Object.freeze({
-  freq: 2.5, octaves: 3, lacunarity: 2, gain: 0.5, z: 0,
+  freq: 2.5,
+  octaves: 3,
+  lacunarity: 2,
+  gain: 0.5,
+  z: 0,
 });
 
 /**
  * fBm density field. Same seed gives the same field, because the noise
  * instance is seeded (K1 removed the global perm table).
  */
-export function makeNoiseField(seed, {
-  freq = NOISE_FIELD_DEFAULTS.freq,
-  octaves = NOISE_FIELD_DEFAULTS.octaves,
-  lacunarity = NOISE_FIELD_DEFAULTS.lacunarity,
-  gain = NOISE_FIELD_DEFAULTS.gain,
-  z = NOISE_FIELD_DEFAULTS.z,
-} = {}) {
+export function makeNoiseField(
+  seed,
+  {
+    freq = NOISE_FIELD_DEFAULTS.freq,
+    octaves = NOISE_FIELD_DEFAULTS.octaves,
+    lacunarity = NOISE_FIELD_DEFAULTS.lacunarity,
+    gain = NOISE_FIELD_DEFAULTS.gain,
+    z = NOISE_FIELD_DEFAULTS.z,
+  } = {},
+) {
   const noise = createNoise(seed >>> 0);
   return {
     kind: 'noise',
@@ -149,7 +156,12 @@ export function combineFields(a, b) {
  *   Falls back to `rngForIndex` when absent (direct sampler callers).
  * @returns {{x:number,y:number,accepted:boolean}} normalized 0..1
  */
-export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 'field', seedOffsets = null, scratch = null } = {}) {
+export function sampleFieldPoint(
+  field,
+  seed,
+  index,
+  { attempts = 24, channel = 'field', seedOffsets = null, scratch = null } = {},
+) {
   const rng = scratch
     ? scratch.reseed(seed, channel, index, seedOffsets).draw
     : rngForIndex(seed, channel, index, seedOffsets);
@@ -160,7 +172,11 @@ export function sampleFieldPoint(field, seed, index, { attempts = 24, channel = 
     const x = rng();
     const y = rng();
     const v = field.sample(x, y);
-    if (v > bestV) { bestV = v; bestX = x; bestY = y; }
+    if (v > bestV) {
+      bestV = v;
+      bestX = x;
+      bestY = y;
+    }
     if (rng() < v) return { x, y, accepted: true };
   }
   return { x: bestX, y: bestY, accepted: false };

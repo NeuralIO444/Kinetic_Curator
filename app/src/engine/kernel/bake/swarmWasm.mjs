@@ -19,10 +19,7 @@
 import { isOrganismMode } from '../../../data/layout-modes.js';
 
 // The f64 columns, in swarm_col_f64() id order.
-const F64_COLS = [
-  'x', 'y', 'vx', 'vy', 'ax', 'ay', 'mass', 'scale', 'rotation',
-  'alpha', 'phase', 'u', 'seedOffset',
-];
+const F64_COLS = ['x', 'y', 'vx', 'vy', 'ax', 'ay', 'mass', 'scale', 'rotation', 'alpha', 'phase', 'u', 'seedOffset'];
 
 const REQUIRED_EXPORTS = [
   'memory',
@@ -37,7 +34,7 @@ const REQUIRED_EXPORTS = [
   'swarm_params_ptr',
 ];
 
-let cached = null;      // { instance } | null
+let cached = null; // { instance } | null
 let loadAttempted = false;
 let loadError = null;
 
@@ -164,22 +161,22 @@ export function resolveWasmParams(layoutParams = {}, canvasW = 0, canvasH = 0) {
   const [minScale, maxScale] = scale;
   const [minAlpha, maxAlpha] = alpha;
   return [
-    noiseFreq,          // 0 P_NOISE_FREQ
-    noiseSpeed,         // 1 P_NOISE_SPEED
-    damping,            // 2 P_DAMPING (cloud: as-is)
-    minScale,           // 3 P_MIN_SCALE
-    maxScale,           // 4 P_MAX_SCALE
-    minAlpha,           // 5 P_MIN_ALPHA
-    maxAlpha,           // 6 P_MAX_ALPHA
-    1.0,                // 7 P_WIND_MUL (cloud: 1 — wind ignored, like JS)
-    gravityWells,       // 8 P_GRAVITY_WELLS
-    swarmCohesion,      // 9 P_COH_W
-    canvasW,            // 10 P_CANVAS_W
-    canvasH,            // 11 P_CANVAS_H
-    8.0,                // 12 P_MAX_SPEED (MAX_SPEED_CLOUD)
-    0,                  // 13 P_ATTRACTOR_X (scope-gated off)
-    0,                  // 14 P_ATTRACTOR_Y
-    0,                  // 15 P_ATTRACTOR_ON
+    noiseFreq, // 0 P_NOISE_FREQ
+    noiseSpeed, // 1 P_NOISE_SPEED
+    damping, // 2 P_DAMPING (cloud: as-is)
+    minScale, // 3 P_MIN_SCALE
+    maxScale, // 4 P_MAX_SCALE
+    minAlpha, // 5 P_MIN_ALPHA
+    maxAlpha, // 6 P_MAX_ALPHA
+    1.0, // 7 P_WIND_MUL (cloud: 1 — wind ignored, like JS)
+    gravityWells, // 8 P_GRAVITY_WELLS
+    swarmCohesion, // 9 P_COH_W
+    canvasW, // 10 P_CANVAS_W
+    canvasH, // 11 P_CANVAS_H
+    8.0, // 12 P_MAX_SPEED (MAX_SPEED_CLOUD)
+    0, // 13 P_ATTRACTOR_X (scope-gated off)
+    0, // 14 P_ATTRACTOR_Y
+    0, // 15 P_ATTRACTOR_ON
   ];
 }
 
@@ -199,15 +196,11 @@ export function runSwarmWasm(wasm, sys, { n, steps, time0, dt, params16, seed })
   if (!ctx) throw new Error('swarm wasm: swarm_create failed');
   try {
     for (let c = 0; c < F64_COLS.length; c++) {
-      memView(exports, exports.swarm_col_f64(ctx, c), n, Float64Array)
-        .set(sys[F64_COLS[c]].subarray(0, n));
+      memView(exports, exports.swarm_col_f64(ctx, c), n, Float64Array).set(sys[F64_COLS[c]].subarray(0, n));
     }
-    memView(exports, exports.swarm_col_i32(ctx, 0), n, Int32Array)
-      .set(sys.assetIndex.subarray(0, n));
-    memView(exports, exports.swarm_col_u8(ctx, 0), n, Uint8Array)
-      .set(sys.alive.subarray(0, n));
-    memView(exports, exports.swarm_col_u8(ctx, 1), n, Uint8Array)
-      .set(sys.cgroup.subarray(0, n));
+    memView(exports, exports.swarm_col_i32(ctx, 0), n, Int32Array).set(sys.assetIndex.subarray(0, n));
+    memView(exports, exports.swarm_col_u8(ctx, 0), n, Uint8Array).set(sys.alive.subarray(0, n));
+    memView(exports, exports.swarm_col_u8(ctx, 1), n, Uint8Array).set(sys.cgroup.subarray(0, n));
 
     exports.swarm_init_noise(ctx, seed || 444);
 
@@ -216,9 +209,7 @@ export function runSwarmWasm(wasm, sys, { n, steps, time0, dt, params16, seed })
     if (rc !== 0) throw new Error(`swarm wasm: swarm_run failed (rc=${rc})`);
 
     for (let c = 0; c < F64_COLS.length; c++) {
-      sys[F64_COLS[c]].set(
-        memView(exports, exports.swarm_col_f64(ctx, c), n, Float64Array),
-      );
+      sys[F64_COLS[c]].set(memView(exports, exports.swarm_col_f64(ctx, c), n, Float64Array));
     }
     sys.assetIndex.set(memView(exports, exports.swarm_col_i32(ctx, 0), n, Int32Array));
     sys.alive.set(memView(exports, exports.swarm_col_u8(ctx, 0), n, Uint8Array));

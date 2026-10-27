@@ -36,10 +36,7 @@ assert.ok(items.length > 0, 'fixture must bake items');
 // swatches[(slot + ACCENT_OFFSET) % len].
 for (const it of items) {
   if (it.graze) continue;
-  assert.ok(
-    Number.isInteger(it.colorSlot),
-    'baked items must carry their palette slot (colorSlot)',
-  );
+  assert.ok(Number.isInteger(it.colorSlot), 'baked items must carry their palette slot (colorSlot)');
   const expected = SWATCHES[(it.colorSlot + ACCENT_OFFSET) % SWATCHES.length];
   assert.strictEqual(
     it.accent,
@@ -64,19 +61,11 @@ for (const it of dupSlotItems) {
 
 // Agreement with the live path: assignColor on the same slot must produce
 // the same accent. 'band' with t = 0.625 lands the placement in slot 2.
-const live = assignColor(
-  { seed: 0x1237, index: 7, t: 0.625, seedOffsets: {} },
-  palette,
-  'band',
-);
+const live = assignColor({ seed: 0x1237, index: 7, t: 0.625, seedOffsets: {} }, palette, 'band');
 assert.strictEqual(live.slot, 2, 'live fixture setup: placement must land in slot 2');
 assert.strictEqual(live.color, DUP, 'live fixture setup: slot 2 must hold the duplicated hex');
 for (const it of dupSlotItems) {
-  assert.strictEqual(
-    it.accent,
-    live.accent,
-    'bake accent must equal live accent on the duplicate-hex slot',
-  );
+  assert.strictEqual(it.accent, live.accent, 'bake accent must equal live accent on the duplicate-hex slot');
 }
 
 // Determinism: accents are a pure function of the bake inputs.
@@ -87,6 +76,4 @@ assert.deepStrictEqual(
   'accents must be deterministic across bakes',
 );
 
-console.log(
-  `bake.accent.selfcheck: ok (${items.length} items, ${dupSlotItems.length} in duplicate slot 2)`,
-);
+console.log(`bake.accent.selfcheck: ok (${items.length} items, ${dupSlotItems.length} in duplicate slot 2)`);

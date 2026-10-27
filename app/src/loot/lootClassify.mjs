@@ -10,7 +10,14 @@ export const MAX_REL_LENGTH = 512;
 
 /** extension -> { kind, supported, reason } per kind. A recognised-but-unsupported type is reported, not guessed at. */
 const EXT = Object.freeze({
-  image: { '.svg': { ok: true }, '.png': { ok: false, reason: 'raster not supported yet' }, '.jpg': { ok: false, reason: 'raster not supported yet' }, '.jpeg': { ok: false, reason: 'raster not supported yet' }, '.gif': { ok: false, reason: 'raster not supported yet' }, '.webp': { ok: false, reason: 'raster not supported yet' } },
+  image: {
+    '.svg': { ok: true },
+    '.png': { ok: false, reason: 'raster not supported yet' },
+    '.jpg': { ok: false, reason: 'raster not supported yet' },
+    '.jpeg': { ok: false, reason: 'raster not supported yet' },
+    '.gif': { ok: false, reason: 'raster not supported yet' },
+    '.webp': { ok: false, reason: 'raster not supported yet' },
+  },
   audio: { '.wav': { ok: true }, '.mp3': { ok: true }, '.aif': { ok: true }, '.aiff': { ok: true } },
   palette: { '.json': { ok: true } },
   look: { '.json': { ok: true }, '.kclook': { ok: false, reason: 'looks not supported yet' } },
@@ -20,7 +27,10 @@ const EXT = Object.freeze({
 export function relSegments(rel) {
   if (typeof rel !== 'string' || rel.length === 0 || rel.length > MAX_REL_LENGTH) return null;
   if (rel.includes('\0') || rel.includes('�')) return null; // NUL, or a name that was not valid UTF-8 upstream
-  const parts = rel.replace(/\\/g, '/').split('/').filter((p) => p !== '' && p !== '.');
+  const parts = rel
+    .replace(/\\/g, '/')
+    .split('/')
+    .filter((p) => p !== '' && p !== '.');
   if (parts.length === 0 || parts.some((p) => p === '..')) return null;
   return parts;
 }
@@ -37,7 +47,8 @@ const CONFLICT = /conflicted copy/i;
  */
 export function classify(rel) {
   const segments = relSegments(rel);
-  if (!segments) return { kind: null, ok: false, reason: 'unsafe or unreadable name', segments: null, stem: '', ext: '' };
+  if (!segments)
+    return { kind: null, ok: false, reason: 'unsafe or unreadable name', segments: null, stem: '', ext: '' };
   const top = segments[0].toLowerCase();
   const kind = Object.prototype.hasOwnProperty.call(LOOT_SUBFOLDERS, top) ? LOOT_SUBFOLDERS[top] : null;
   const base = segments[segments.length - 1];
@@ -47,7 +58,11 @@ export function classify(rel) {
   const stem = dot > 0 ? base.slice(0, dot) : base;
   const out = { kind, ext, ok: false, segments, stem };
   if (segments.length < 2) return { ...out, reason: 'a folder, not a file' }; // "images" itself
-  if (base.startsWith('.')) return { ...out, reason: base.toLowerCase().endsWith('.icloud') ? 'iCloud placeholder (not downloaded)' : 'hidden file' };
+  if (base.startsWith('.'))
+    return {
+      ...out,
+      reason: base.toLowerCase().endsWith('.icloud') ? 'iCloud placeholder (not downloaded)' : 'hidden file',
+    };
   if (segments.slice(1, -1).some((p) => p.startsWith('.'))) return { ...out, reason: 'hidden folder' };
   if (base.toLowerCase().endsWith('.icloud')) return { ...out, reason: 'iCloud placeholder (not downloaded)' };
   if (/^(thumbs\.db|desktop\.ini)$/i.test(base)) return { ...out, reason: 'system file' };
@@ -59,7 +74,12 @@ export function classify(rel) {
 
 /** A stable, readable slug for an id: lower-case a-z0-9 and underscores, at most `max` characters (default 32). */
 export function slug(stem, max = 32) {
-  const s = String(stem ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, max).replace(/_+$/g, '');
+  const s = String(stem ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, max)
+    .replace(/_+$/g, '');
   return s || 'item';
 }
 
@@ -68,7 +88,13 @@ export const LOOT_STEM_MAX = 28;
 
 /** The `user:` id of a loot item: readable stem plus the first six hex of its content hash, so a rename keeps it. */
 export function lootId(stem, hash) {
-  const h = typeof hash === 'string' ? hash.toLowerCase().replace(/[^0-9a-f]/g, '').slice(0, 6) : '';
+  const h =
+    typeof hash === 'string'
+      ? hash
+          .toLowerCase()
+          .replace(/[^0-9a-f]/g, '')
+          .slice(0, 6)
+      : '';
   return `user:loot_${slug(stem, LOOT_STEM_MAX)}_${h || '000000'}`;
 }
 

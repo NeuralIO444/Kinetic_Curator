@@ -72,10 +72,11 @@ FIELDS.register({
 FIELDS.register({
   id: 'attractor',
   reads: ['seed'],
-  create: (seed, opts) => createAttractorField(
-    seed,
-    opts?.bounds ?? null,
-    opts?.count ?? 0,
-    { radius: opts?.radius, falloff: opts?.falloff, minSpacing: opts?.minSpacing, seedOffsets: opts?.seedOffsets ?? null },
-  ),
+  create: (seed, opts) =>
+    createAttractorField(seed, opts?.bounds ?? null, opts?.count ?? 0, {
+      radius: opts?.radius,
+      falloff: opts?.falloff,
+      minSpacing: opts?.minSpacing,
+      seedOffsets: opts?.seedOffsets ?? null,
+    }),
 });

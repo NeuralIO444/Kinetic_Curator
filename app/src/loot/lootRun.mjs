@@ -28,11 +28,24 @@ export async function runScan({ native, index, nowMs = 0, onProgress = null }) {
   const hashes = new Map();
   const failed = new Map();
   for (let i = 0; i < need.length; i++) {
-    if (onProgress) { try { onProgress({ done: i, total: need.length }); } catch { /* a progress callback must not stop a scan */ } }
+    if (onProgress) {
+      try {
+        onProgress({ done: i, total: need.length });
+      } catch {
+        /* a progress callback must not stop a scan */
+      }
+    }
     const h = await native.hash(base.root, need[i]);
-    if (h.ok) hashes.set(need[i], h.hash); else failed.set(need[i], h.reason || 'unreadable');
+    if (h.ok) hashes.set(need[i], h.hash);
+    else failed.set(need[i], h.reason || 'unreadable');
   }
-  if (onProgress && need.length) { try { onProgress({ done: need.length, total: need.length }); } catch { /* ignore */ } }
+  if (onProgress && need.length) {
+    try {
+      onProgress({ done: need.length, total: need.length });
+    } catch {
+      /* ignore */
+    }
+  }
 
   const withHashes = listed.map((e) => (hashes.has(e.rel) ? { ...e, hash: hashes.get(e.rel) } : e));
   const plan = planScan({ entries: withHashes, prev, nowMs, rootReachable: listing.reachable });
@@ -43,5 +56,12 @@ export async function runScan({ native, index, nowMs = 0, onProgress = null }) {
   if (listing.truncated) plan.skipped.push({ rel: '', kind: null, reason: 'folder too large: listing stopped early' });
 
   const folded = applyPlan(base, plan, { nowMs });
-  return { ok: true, index: folded.index, rows: folded.rows, summary: summarize(plan), truncated: listing.truncated, unreachable: !listing.reachable };
+  return {
+    ok: true,
+    index: folded.index,
+    rows: folded.rows,
+    summary: summarize(plan),
+    truncated: listing.truncated,
+    unreachable: !listing.reachable,
+  };
 }

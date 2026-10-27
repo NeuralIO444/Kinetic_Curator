@@ -30,7 +30,15 @@
 // live loop would show after N steps from the same seed.
 
 import { ParticleSystem } from '../../particles.js';
-import { ensureSwarmWasm, getSwarmWasm, runSwarmWasm, resolveWasmParams, wasmBakeEligible, wasmForcedOff, contactsActive } from './swarmWasm.mjs';
+import {
+  ensureSwarmWasm,
+  getSwarmWasm,
+  runSwarmWasm,
+  resolveWasmParams,
+  wasmBakeEligible,
+  wasmForcedOff,
+  contactsActive,
+} from './swarmWasm.mjs';
 import { noiseSeedFor } from '../rng.js';
 import { TRIG_NATIVE, TRIG_DET } from '../trig.mjs'; // #1240 — opt-in deterministic trig
 import { ACCENT_OFFSET } from '../color/index.js';
@@ -150,24 +158,24 @@ export function bakeParticles({
       throw new Error(`bakeParticles: engine "wasm" cannot bake this config (${gate.reason})`);
     }
     if (gate.ok) {
-    const wasm = getSwarmWasm();
-    if (wasm) {
-      runSwarmWasm(wasm, sys, {
-        n: sys.n,
-        steps,
-        time0: BAKE_TIME_ORIGIN,
-        dt,
-        params16: resolveWasmParams(params, canvasW, canvasH),
-        // #305 — the wasm noise init must see the same derived seed as the
-        // JS path's createNoise; zero offsets → exactly `seed || 444`.
-        seed: noiseSeedFor(seed, seedOffsets),
-      });
-      ranWasm = true;
-    } else if (engine === 'wasm') {
-      throw new Error(
-        'bakeParticles: engine "wasm" requested but the swarm wasm module is not loaded — call ensureSwarmWasm() first.',
-      );
-    }
+      const wasm = getSwarmWasm();
+      if (wasm) {
+        runSwarmWasm(wasm, sys, {
+          n: sys.n,
+          steps,
+          time0: BAKE_TIME_ORIGIN,
+          dt,
+          params16: resolveWasmParams(params, canvasW, canvasH),
+          // #305 — the wasm noise init must see the same derived seed as the
+          // JS path's createNoise; zero offsets → exactly `seed || 444`.
+          seed: noiseSeedFor(seed, seedOffsets),
+        });
+        ranWasm = true;
+      } else if (engine === 'wasm') {
+        throw new Error(
+          'bakeParticles: engine "wasm" requested but the swarm wasm module is not loaded — call ensureSwarmWasm() first.',
+        );
+      }
     }
   }
   if (!ranWasm) {
@@ -195,13 +203,11 @@ export function bakeSwarmItems(opts) {
     // got the wrong accent. The swarm system threads colorSlot through
     // getItems; the indexOf fallback only covers foreign items that never
     // rode through it.
-    const slot = Number.isInteger(item.colorSlot)
-      ? item.colorSlot
-      : swatches.indexOf(item.color);
+    const slot = Number.isInteger(item.colorSlot) ? item.colorSlot : swatches.indexOf(item.color);
     return {
       ...item,
       assetId: item.asset?.id,
-      accent: item.graze ? bg : (swatches[(slot + ACCENT_OFFSET) % swatches.length] || swatches[0]),
+      accent: item.graze ? bg : swatches[(slot + ACCENT_OFFSET) % swatches.length] || swatches[0],
       color: item.graze ? bg : item.color,
     };
   });

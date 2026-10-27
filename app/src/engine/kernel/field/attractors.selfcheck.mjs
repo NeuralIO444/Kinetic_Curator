@@ -75,8 +75,11 @@ const base = makeConstantField(0.7);
 const pooled0 = withAttractorDensity(base, empty);
 for (let i = 0; i <= 10; i++) {
   for (let j = 0; j <= 10; j++) {
-    assert.strictEqual(pooled0.sample(i / 10, j / 10), base.sample(i / 10, j / 10),
-      'empty attractor field leaves the base field bit-identical');
+    assert.strictEqual(
+      pooled0.sample(i / 10, j / 10),
+      base.sample(i / 10, j / 10),
+      'empty attractor field leaves the base field bit-identical',
+    );
   }
 }
 // and it is still the identity through the generic combinator
@@ -93,7 +96,11 @@ const h1 = selectHeroIndices(4242, 1000, 3);
 const h2 = selectHeroIndices(4242, 1000, 3);
 assert.deepStrictEqual(h1, h2, 'hero selection deterministic per seed');
 assert.strictEqual(h1.length, 3);
-assert.deepStrictEqual([...h1].sort((a, b) => a - b), h1, 'hero indices sorted');
+assert.deepStrictEqual(
+  [...h1].sort((a, b) => a - b),
+  h1,
+  'hero indices sorted',
+);
 assert.strictEqual(new Set(h1).size, 3, 'hero indices unique');
 for (const idx of h1) assert.ok(idx >= 0 && idx < 1000, 'hero index in range');
 
@@ -114,8 +121,7 @@ assert.notDeepStrictEqual(
 for (let k = 0; k < 20; k++) {
   const t = heroTransform(4242, k * 37);
   assert.ok(t.scaleMult >= 3 && t.scaleMult < 6, `hero scale ${t.scaleMult} in [3, 6)`);
-  assert.ok(Math.abs(t.rotationOffset - Math.PI) <= 0.35 + 1e-9,
-    `hero rotation ${t.rotationOffset} within PI ± 0.35`);
+  assert.ok(Math.abs(t.rotationOffset - Math.PI) <= 0.35 + 1e-9, `hero rotation ${t.rotationOffset} within PI ± 0.35`);
 }
 const ht1 = heroTransform(4242, 9);
 const ht2 = heroTransform(4242, 9);
@@ -125,7 +131,10 @@ assert.deepStrictEqual(ht1, ht2, 'hero transform deterministic per (seed, index)
 assert.strictEqual(makeHeroInfo(1, 100, 0), null, '0 heroes -> null');
 const hi = makeHeroInfo(4242, 1000, 3);
 assert.ok(hi && hi.set instanceof Set && hi.set.size === 3);
-assert.deepStrictEqual([...hi.set].sort((a, b) => a - b), h1);
+assert.deepStrictEqual(
+  [...hi.set].sort((a, b) => a - b),
+  h1,
+);
 
 // applyHeroes: null = untouched lanes; heroes break scale + rotation
 function miniSoA(n, indices) {
@@ -180,8 +189,11 @@ const offA = computeGeometrySoA({ ...P });
 const offB = computeGeometrySoA({ ...P, attractorCount: 0, attractorRadius: 0.2 });
 assert.strictEqual(offA.n, offB.n);
 for (const lane of ['x', 'y', 't', 'index', 'zTier', 'depth', 'uScale', 'uScaleY', 'uRot', 'uAlpha']) {
-  assert.deepStrictEqual([...offA[lane].slice(0, offA.n)], [...offB[lane].slice(0, offB.n)],
-    `off-state lane ${lane} byte-identical`);
+  assert.deepStrictEqual(
+    [...offA[lane].slice(0, offA.n)],
+    [...offB[lane].slice(0, offB.n)],
+    `off-state lane ${lane} byte-identical`,
+  );
 }
 // stage C: heroes=null and heroes=makeHeroInfo(...,0) both leave lanes alone
 const sc = { scale: [0.5, 2], rotate: [0, Math.PI], alpha: [0.2, 0.9] };

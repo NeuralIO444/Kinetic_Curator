@@ -105,9 +105,7 @@ export function createAttractorField(seed, bounds, count, opts = {}) {
     channel = 'attractor',
     seedOffsets = null,
   } = opts;
-  const b = bounds && Number.isFinite(bounds.w) && Number.isFinite(bounds.h)
-    ? bounds
-    : { x: 0, y: 0, w: 1, h: 1 };
+  const b = bounds && Number.isFinite(bounds.w) && Number.isFinite(bounds.h) ? bounds : { x: 0, y: 0, w: 1, h: 1 };
   const w = falloffFn(ATTRACTOR_FALLOFFS.includes(falloff) ? falloff : ATTRACTOR_FALLOFF_DEFAULT);
 
   // x,y pairs in normalized 0..1 canvas space.
@@ -131,7 +129,10 @@ export function createAttractorField(seed, bounds, count, opts = {}) {
         for (let j = 0; j < placed; j++) {
           const dx = ax - points[j * 2];
           const dy = ay - points[j * 2 + 1];
-          if (dx * dx + dy * dy < ms2) { ok = false; break; }
+          if (dx * dx + dy * dy < ms2) {
+            ok = false;
+            break;
+          }
         }
       }
     }
