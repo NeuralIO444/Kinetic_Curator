@@ -44,6 +44,7 @@ import {
   shapeMixIds,
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
+import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -68,6 +69,8 @@ const editableOverrides = (ov) => {
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
+/** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
+const dieRng = () => die(0x40000000) / 0x40000000;
 
 /** Pick a random id from `ids`, preferring one that differs from `current`. */
 function pickOtherId(ids, current) {
@@ -884,12 +887,9 @@ export const createLayoutSlice = (set) => ({
       // #964: pin the armed roll scope over whatever the roll dealt.
       merged = pinRollScope(merged, state.armedMode, state.armedMotion);
 
-      // 4. assets — random shape set, mapped through known ids like loadShapeSet.
-      const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
-      const known = new Set(ASSETS.map((a) => a.id));
-      for (const c of state.customAssets || []) known.add(c.id);
-      const enabledAssets = {};
-      for (const assetId of shapeSet.ids) if (known.has(assetId)) enabledAssets[assetId] = true;
+      // 4. assets — #1767: a mixed-family pool dealt from the WHOLE library (+ the artist's imports), not one of the
+      // 19 shape sets (49 of 295 assets). Same size as a set, so density/count behave as before (state/rollPool.mjs).
+      const enabledAssets = poolToEnabled(dealMixedPool(dealableRecords(ASSETS, state.customAssets), dieRng).ids);
 
       // 5. FX + blend — one FX layer, 0–3 random menu effects with default
       // params; content layers get a random blend mode. Never strands the

@@ -511,3 +511,4 @@ node src/engine/engraving.selfcheck.mjs
 node src/gl/spectrumWarp.selfcheck.mjs
 node src/engine/finishingLook.selfcheck.mjs
 node src/data/assetStyle.selfcheck.mjs
+node src/state/rollPool.selfcheck.mjs
