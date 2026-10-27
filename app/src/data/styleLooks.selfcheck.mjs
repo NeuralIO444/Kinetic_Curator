@@ -51,6 +51,13 @@ for (const g of STYLE_LOOK_GROUPS) {
   );
 }
 
+// 2b. a dealt look meets any palette: none may multiply (on a dark ground it erases the marks — rollSafety, #1107)
+assert.deepEqual(
+  COMPOSITION_PRESETS.filter((p) => p.params.blendMode === 'multiply').map((p) => p.id),
+  [],
+  'no look multiplies',
+);
+
 // 3. no near-duplicate padding across the whole rack
 const sig = (p) =>
   JSON.stringify([

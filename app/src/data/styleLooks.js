@@ -6,6 +6,10 @@
 // the KINETIC look pass deals it). A look is a different recipe, never a renamed copy: the group's language decides
 // mode + rhythm, and inside a group no two looks share a mode.
 //
+// No look sets blendMode 'multiply': KINETIC deals any palette with any look, and multiply on a dark ground erases
+// the marks (rollSafety.selfcheck caught SUMI BRANCH at 3% ink on PERSONA ANADOL). The ink-on-paper looks say 'normal'
+// outright (the CHIAROSCURO precedent) so they never inherit a leftover blend from the roll before.
+//
 // Read by data/presets.js (appended to COMPOSITION_PRESETS / PRESET_GROUPS). Pure data.
 
 export const STYLE_LOOK_GROUPS = [
@@ -32,6 +36,7 @@ export const STYLE_LOOKS = [
     paletteShift: 'band',
     paletteId: 'sepia-plate',
     params: {
+      blendMode: 'normal',
       mode: 'poisson',
       count: 48,
       scale: [0.6, 1.9],
@@ -43,7 +48,6 @@ export const STYLE_LOOKS = [
       bleed: false,
       mirror: false,
       overlap: false,
-      blendMode: 'multiply',
       displacement: 4,
       ...still,
     },
@@ -112,6 +116,7 @@ export const STYLE_LOOKS = [
     paletteShift: 'band',
     paletteId: 'lithograph',
     params: {
+      blendMode: 'normal',
       mode: 'lsystem',
       lsysDepth: 4,
       lsysAngle: 23,
@@ -125,7 +130,6 @@ export const STYLE_LOOKS = [
       bleed: false,
       mirror: false,
       overlap: true,
-      blendMode: 'multiply',
       displacement: 3,
       lifeDrift: 0.1,
       noiseSpeed: 0.15,
@@ -170,6 +174,7 @@ export const STYLE_LOOKS = [
     paletteShift: 'zone',
     paletteId: 'lithograph',
     params: {
+      blendMode: 'normal',
       mode: 'random',
       count: 260,
       scale: [0.3, 1.6],
@@ -181,7 +186,6 @@ export const STYLE_LOOKS = [
       bleed: true,
       mirror: false,
       overlap: true,
-      blendMode: 'multiply',
       displacement: 14,
       lifeDrift: 0.12,
       noiseSpeed: 0.3,
@@ -467,6 +471,7 @@ export const STYLE_LOOKS = [
     paletteShift: 'split',
     paletteId: 'folktotem',
     params: {
+      blendMode: 'normal',
       mode: 'layers',
       count: 60,
       scale: [0.8, 2.6],
@@ -478,7 +483,6 @@ export const STYLE_LOOKS = [
       bleed: true,
       mirror: false,
       overlap: true,
-      blendMode: 'multiply',
       displacement: 4,
       ...still,
     },
@@ -799,6 +803,7 @@ export const STYLE_LOOKS = [
     paletteShift: 'band',
     paletteId: 'sepia-plate',
     params: {
+      blendMode: 'normal',
       mode: 'colonize',
       colonizeInfluence: 120,
       colonizeKill: 12,
@@ -814,7 +819,6 @@ export const STYLE_LOOKS = [
       bleed: false,
       mirror: false,
       overlap: true,
-      blendMode: 'multiply',
       displacement: 2,
       ...still,
     },
