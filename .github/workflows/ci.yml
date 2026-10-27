@@ -121,6 +121,9 @@ jobs:
         with:
           workspaces: src-tauri
       - run: cargo check --locked --all-targets
+      # #1744 part 6: the shell's unit tests (batch_frame path guards, native I/O, the Metal context on this Mac's
+      # real GPU) used to be compiled here but never run. Same runner, same cache, so the extra cost is the test run.
+      - run: cargo test --locked
 
   # Advisory scan (Matt, 2026-10-13): production npm deps and the Rust crates (kc-fields, kc-neighbor).
   # Informational: a new advisory appears without any code change, so it must not block unrelated PRs.
