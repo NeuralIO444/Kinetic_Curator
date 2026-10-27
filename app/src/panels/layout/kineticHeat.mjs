@@ -80,11 +80,13 @@ export function heatLevel(heat) {
  * @param {{ heat: number, taps: number, lastTapAt: number }} run — heat and
  *   tap count as of the previous tap (heat at last tap, not decayed).
  * @param {number} now — Date.now() at this tap.
+ * @param {{ chaos?: boolean }} [scope] — #1772: may hammering break into CHAOS? Only at START: KOZ
+ *   (kineticScope.mjs); below it a hot run keeps advancing the curator.
  * @returns {{ layer: 'look'|'voice'|'curator'|'chaos', heat: number, taps: number,
  *   lastTapAt: number }} heat is post-tap heat (decayed then added); taps is
  *   the run length; lastTapAt echoes `now` so runs thread through calls.
  */
-export function routeKineticTapHeat(run, now) {
+export function routeKineticTapHeat(run, now, { chaos = true } = {}) {
   const lastTapAt = run.lastTapAt || 0;
   const dt = now - lastTapAt;
   if (dt >= KINETIC_WARM_MS || lastTapAt === 0) {
@@ -94,7 +96,7 @@ export function routeKineticTapHeat(run, now) {
   let heat = decayHeat(run.heat || 0, dt);
   const taps = (run.taps || 0) + 1;
   if (dt < KINETIC_HEAT_TAP_MS) heat = addHeat(heat);
-  if (taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
+  if (chaos && taps >= 3 && heat >= KINETIC_CHAOS_HEAT) {
     return { layer: 'chaos', heat, taps, lastTapAt: now };
   }
   return { layer: taps >= 3 ? 'curator' : taps === 2 ? 'voice' : 'look', heat, taps, lastTapAt: now };

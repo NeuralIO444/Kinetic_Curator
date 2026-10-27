@@ -13,6 +13,7 @@ const REDEAL = {
   look: (s) => s.kineticLookPass(), // #1772 — the sweep's passes
   voice: (s) => s.kineticVoicePass(),
   curator: (s) => s.kineticCuratorPass(),
+  open: (s) => s.kineticOpenPass(), // #1772 — START: WEAK / MED's opener
   curate: (s) => s.curateUnlocked(),
 };
 const snap = () => {

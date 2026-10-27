@@ -46,6 +46,7 @@ import {
 import { ASSETS } from '../../data/assets/index.js';
 import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
 import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
+import { scopeDecks, CURATED_SETS } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -70,6 +71,17 @@ const editableOverrides = (ov) => {
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
+/** #1772 — a look pass under the START pill's ceiling (kineticScope.mjs): its look deck and its pool kind. */
+function scopedLook(state) {
+  const d = scopeDecks(state.startupMode);
+  return lookPass(state, dieRng, {
+    looks: d.looks,
+    pool: d.pool,
+    sets: CURATED_SETS,
+    records: dealableRecords(ASSETS, state.customAssets),
+  });
+}
+
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
 const dieRng = () => die(0x40000000) / 0x40000000;
 
@@ -934,7 +946,7 @@ export const createLayoutSlice = (set) => ({
    */
   kineticLookPass: () =>
     set((state) => {
-      const r = lookPass(state, dieRng, { records: dealableRecords(ASSETS, state.customAssets) });
+      const r = scopedLook(state);
       // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
       // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
@@ -956,7 +968,7 @@ export const createLayoutSlice = (set) => ({
    */
   kineticVoicePass: () =>
     set((state) => {
-      const r = voicePass(state, dieRng);
+      const r = voicePass(state, dieRng, { deck: scopeDecks(state.startupMode).voices });
       // The air moves with the costume (what the retired WEATHER pass dealt): PATTERN tracks drift and mix over the
       // same picture, and the chiaroscuro sun, if it is out, moves to a new position and intensity. Off stays off.
       const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
@@ -979,6 +991,29 @@ export const createLayoutSlice = (set) => ({
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
         kineticVoiceId: r.voiceId,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — the START pill's WEAK / MED launch opener: one look pass and one voice pass under that state's decks, in
+   * ONE store update — one undo entry, so a restored project stays one Ctrl+Z away (#33, #946).
+   */
+  kineticOpenPass: () =>
+    set((state) => {
+      const look = scopedLook(state);
+      const mid = { ...state, layoutParams: look.layoutParams };
+      const voice = voicePass(mid, dieRng, { deck: scopeDecks(state.startupMode).voices });
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: voice.layoutParams,
+        enabledAssets: Object.keys(look.enabledAssets).length ? look.enabledAssets : state.enabledAssets,
+        paletteId: voice.paletteId,
+        paletteOverrides: voice.paletteOverrides,
+        paletteLocks: {},
+        paletteChosen: false,
+        kineticVoiceId: voice.voiceId,
         voiceMix: null,
         activeVoiceId: null,
       };

@@ -59,7 +59,11 @@ export function paramDiff(before, after) {
  * LOOK pass. Returns { layoutParams, enabledAssets, lookId, coherent }.
  * Moves: composition + the look's structural params (never motion — that is the voice's axis) and the asset pool.
  */
-export function lookPass(state, rng, { looks = COMPOSITION_PRESETS, records } = {}) {
+export function lookPass(
+  state,
+  rng,
+  { looks = COMPOSITION_PRESETS, records, pool: poolKind = 'library', sets = [] } = {},
+) {
   const lp = state.layoutParams || {};
   const locked = state.lockedParams || {};
   const standing = looks.find((p) => p.id === lp.composition) || null;
@@ -74,7 +78,11 @@ export function lookPass(state, rng, { looks = COMPOSITION_PRESETS, records } = 
     }
   }
   merged = pinRollScope(merged, state.armedMode, state.armedMotion);
-  const pool = dealPoolFor(records, rng, look || {});
+  // START: OFF deals the pre-#1767 pool — one curated 4-shape set — instead of a library pool (kineticScope.mjs)
+  const pool =
+    poolKind === 'sets' && sets.length
+      ? { ids: [...sets[pickIndex(rng, sets.length)]], coherent: false }
+      : dealPoolFor(records, rng, look || {});
   return {
     layoutParams: validateLayoutParams(merged).params, // #1550: rolled values land through the validating door
     enabledAssets: poolToEnabled(pool.ids),

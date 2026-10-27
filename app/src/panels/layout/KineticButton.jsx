@@ -20,6 +20,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { useHotkeys } from '../../hooks/useHotkeys.js';
+import { scopeDecks } from '../../state/kineticScope.mjs';
 import { routeKineticTapHeat, decayHeat, heatLevel, publishShownHeat, kineticLayerLabel } from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
@@ -33,6 +34,7 @@ export function KineticButton() {
   const kineticVoicePass = useStore((s) => s.kineticVoicePass);
   const kineticCuratorPass = useStore((s) => s.kineticCuratorPass);
   const kineticRoll = useStore((s) => s.kineticRoll);
+  const scopeChaos = useStore((s) => scopeDecks(s.startupMode).chaos); // #1772 — hammering reaches CHAOS only at KOZ
   // Heat run state (#945): heat/taps as of the last tap + its timestamp.
   // The router returns the next run; the cooling interval below decays the
   // *displayed* heat between taps. All wall-clock stays in this component.
@@ -74,7 +76,7 @@ export function KineticButton() {
 
   const tap = () => {
     const now = Date.now();
-    const r = routeKineticTapHeat(runRef.current, now);
+    const r = routeKineticTapHeat(runRef.current, now, { chaos: scopeChaos });
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
     publishShownHeat(r.heat);
     setHeat(r.heat);

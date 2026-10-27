@@ -513,3 +513,4 @@ node src/state/rollPool.selfcheck.mjs
 node src/data/styleLooks.selfcheck.mjs
 node src/data/voiceDeck.selfcheck.mjs
 node src/state/kineticSweep.selfcheck.mjs
+node src/state/kineticScope.selfcheck.mjs

@@ -7,6 +7,7 @@ import { decideBoot } from '../state/startupBoot.mjs';
 import { projectDirty } from '../state/projectWatch.mjs'; // every field the document saves
 import { recipeToProjectDoc } from '../state/recipes.js';
 import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
+import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
 
 const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
@@ -40,9 +41,13 @@ function bootFactoryRequested() {
  */
 function applyStartupChaos() {
   const st = useStore.getState();
-  st.kineticRoll();
+  // #1772 — the START pill sets how wide the opener deals: KOZ is the full wild roll (#946), WEAK / MED one look +
+  // voice pass under their decks (one undo entry either way). OFF never reaches here (decideBoot → factory).
+  const open = scopeDecks(st.startupMode).launch === 'open';
+  if (open) st.kineticOpenPass();
+  else st.kineticRoll();
   st.setRunning(true);
-  emit(Events.ROLL_GUARD, { kind: 'chaos' }); // #1107: the cold-open roll is judged like any other
+  emit(Events.ROLL_GUARD, { kind: open ? 'open' : 'chaos' }); // #1107: the cold-open roll is judged like any other
 }
 
 // Module-scope once-guard: the `restored` ref below already makes the boot
@@ -121,7 +126,7 @@ export function useProjectAutosave() {
       // ?boot=factory and START: FIXED never roll.
       if (sessionStorage.getItem(RESTORED_FLAG)) {
         const st = useStore.getState();
-        if (st.startupMode !== 'fixed' && !bootFactoryRequested()) applyStartupChaos();
+        if (scopeDecks(st.startupMode).launch !== 'factory' && !bootFactoryRequested()) applyStartupChaos();
         return;
       }
       // #534 — a share-link fragment boots the linked scene instead of the
