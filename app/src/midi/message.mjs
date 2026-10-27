@@ -31,7 +31,8 @@ export function bindKey(msg) {
   return msg.type === 'cc' ? `cc:${msg.channel}:${msg.number}` : `note:${msg.channel}:${msg.number}`;
 }
 
-const KEY_RE = /^(note|cc):(1[0-6]|[1-9]):(1[0-2][0-7]|[1-9]?[0-9])$/;
+// #1740: the number group is 0–127 exactly. The old `1[0-2][0-7]` skipped 108, 109, 118 and 119.
+const KEY_RE = /^(note|cc):(1[0-6]|[1-9]):(12[0-7]|1[01][0-9]|[1-9]?[0-9])$/;
 /** Is this string a well-formed binding key? */
 export function isBindKey(k) {
   return typeof k === 'string' && KEY_RE.test(k);
