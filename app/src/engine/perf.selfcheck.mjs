@@ -63,9 +63,7 @@ function budget(name, ms, limitMs, note = '') {
   const pass = ms <= limitMs;
   results.push({ name, ms, limitMs, pass });
   const flag = pass ? 'OK  ' : 'MISS';
-  console.log(
-    `  [${flag}] ${name}: ${ms.toFixed(3)}ms (budget ${limitMs}ms)${note ? ' — ' + note : ''}`,
-  );
+  console.log(`  [${flag}] ${name}: ${ms.toFixed(3)}ms (budget ${limitMs}ms)${note ? ' — ' + note : ''}`);
 }
 
 console.log('perf.selfcheck: measuring against #108 target budgets\n');
@@ -76,10 +74,19 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 // is exactly staged eval's point).
 {
   const args = {
-    mode: 'random', count: 20000, seed: SEED,
-    scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
-    jitter: 24, density: 100, zTiers: 4, bleed: false,
-    canvasW: CANVAS_W, canvasH: CANVAS_H, displacement: 0,
+    mode: 'random',
+    count: 20000,
+    seed: SEED,
+    scale: [0.4, 1.6],
+    rotate: [-180, 180],
+    alpha: [40, 100],
+    jitter: 24,
+    density: 100,
+    zTiers: 4,
+    bleed: false,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
+    displacement: 0,
   };
   const soa = computePlacementsSoA(args);
   assert.strictEqual(soa.n, 20000, '20k sample should produce 20k points at density 100');
@@ -104,7 +111,9 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   const pooled = timeMs(() => computePlacementsSoA(args, soa));
   console.log(`  [info] 20k SoA, buffers reused: ${pooled.toFixed(3)}ms — ceiling without a sampler-ABI change`);
   const shim = timeMs(() => computePlacements(args));
-  console.log(`  [info] 20k via computePlacements shim: ${shim.toFixed(3)}ms — cost of materializing 20k objects; deletable once callers read columns`);
+  console.log(
+    `  [info] 20k via computePlacements shim: ${shim.toFixed(3)}ms — cost of materializing 20k objects; deletable once callers read columns`,
+  );
 }
 
 // ── 2. 8k points + displacement field sample ────────────────────────────
@@ -114,19 +123,26 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 // 3 has to be the field texture and not more loop tuning.
 {
   const args = {
-    mode: 'random', count: 8000, seed: SEED,
-    scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
-    jitter: 24, density: 100, zTiers: 4, bleed: false,
-    canvasW: CANVAS_W, canvasH: CANVAS_H,
-    displacement: 40, noiseFreq: 0.005, noiseSpeed: 0.5,
+    mode: 'random',
+    count: 8000,
+    seed: SEED,
+    scale: [0.4, 1.6],
+    rotate: [-180, 180],
+    alpha: [40, 100],
+    jitter: 24,
+    density: 100,
+    zTiers: 4,
+    bleed: false,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
+    displacement: 40,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
   };
   const soa = computePlacementsSoA(args);
   assert.strictEqual(soa.n, 8000);
   for (let i = 0; i < soa.n; i++) {
-    assert.ok(
-      Number.isFinite(soa.x[i]) && Number.isFinite(soa.y[i]),
-      'non-finite position after fBm displacement',
-    );
+    assert.ok(Number.isFinite(soa.x[i]) && Number.isFinite(soa.y[i]), 'non-finite position after fBm displacement');
   }
   const ms = timeMs(() => computePlacementsSoA(args));
   budget('8k pts + displacement (fBm)', ms, 3, '2x fBm3D(3 octaves) per point, no field texture yet (#108 step 3)');
@@ -139,10 +155,19 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 // which would look like a plausible render, not a crash.
 {
   const base = {
-    mode: 'random', count: 2000, seed: SEED,
-    scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
-    jitter: 24, density: 100, zTiers: 4, bleed: false,
-    canvasW: CANVAS_W, canvasH: CANVAS_H, displacement: 0,
+    mode: 'random',
+    count: 2000,
+    seed: SEED,
+    scale: [0.4, 1.6],
+    rotate: [-180, 180],
+    alpha: [40, 100],
+    jitter: 24,
+    density: 100,
+    zTiers: 4,
+    bleed: false,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
+    displacement: 0,
   };
   const dense = computePlacementsSoA(base);
   assert.strictEqual(dense.n, 2000);
@@ -195,13 +220,19 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
     activeAssets: [{ id: 'a' }, { id: 'b' }, { id: 'c' }],
     palette: { swatches: ['#ff0000', '#00ff00', '#0000ff', '#ffff00'] },
-    canvasW: CANVAS_W, canvasH: CANVAS_H,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
     steps: 120,
   };
   const out = bakeParticles(opts);
   assert.strictEqual(out.length, 400, 'bake should return the requested particle count');
   const ms = timeMs(() => bakeParticles(opts), { warmup: 1, trials: 5 });
-  budget('bake 400x120 swarm steps (JS)', ms, 30, 'post swarm-SoA; remaining cost is real neighbour work in a clustered swarm');
+  budget(
+    'bake 400x120 swarm steps (JS)',
+    ms,
+    30,
+    'post swarm-SoA; remaining cost is real neighbour work in a clustered swarm',
+  );
 
   // #175 — the Rust/wasm fast path for this exact bake. Correctness and
   // distribution gates live in kernel/bake/swarmWasm.selfcheck.mjs; here we
@@ -209,8 +240,12 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
   const wasm = await ensureSwarmWasm();
   if (wasm) {
     const wms = timeMs(() => bakeParticles({ ...opts, engine: 'wasm' }), { warmup: 2, trials: 5 });
-    budget('bake 400x120 swarm steps (wasm)', wms, 30,
-      `#175 fast path; ${(ms / wms).toFixed(2)}x the JS engine on this machine`);
+    budget(
+      'bake 400x120 swarm steps (wasm)',
+      wms,
+      30,
+      `#175 fast path; ${(ms / wms).toFixed(2)}x the JS engine on this machine`,
+    );
   } else {
     console.log(`  [skip] wasm bake 400x120: module unavailable — ${swarmWasmLoadError()}`);
   }
@@ -225,7 +260,9 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
 // keeps meaning something after the AoS kernel is gone.
 {
   const assets = [
-    { id: 'a', weight: 'heavy' }, { id: 'b', weight: 'medium' }, { id: 'c', weight: 'light' },
+    { id: 'a', weight: 'heavy' },
+    { id: 'b', weight: 'medium' },
+    { id: 'c', weight: 'light' },
   ];
   const mk = (count, extra) => ({
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'fibonacci', count, ...extra },
@@ -233,7 +270,8 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
     activeAssets: assets,
     palette: { swatches: ['#111', '#222', '#333', '#444'] },
     caps: { maxCount: 100000, maxCountMirrored: 100000, allowMirror: true },
-    canvasW: CANVAS_W, canvasH: CANVAS_H,
+    canvasW: CANVAS_W,
+    canvasH: CANVAS_H,
   });
 
   for (const [label, count, extra, limit] of [
@@ -257,12 +295,12 @@ console.log('perf.selfcheck: measuring against #108 target budgets\n');
     const pass = pct <= 10;
     results.push({ name: `dirty-C ${label}`, ms: incr, limitMs: full * 0.1, pass });
     console.log(
-      `  [${pass ? 'OK  ' : 'MISS'}] dirty-C ${label}: ${incr.toFixed(4)}ms vs full ${full.toFixed(4)}ms `
-      + `= ${pct.toFixed(1)}% of full (budget <=10%)`,
+      `  [${pass ? 'OK  ' : 'MISS'}] dirty-C ${label}: ${incr.toFixed(4)}ms vs full ${full.toFixed(4)}ms ` +
+        `= ${pct.toFixed(1)}% of full (budget <=10%)`,
     );
   }
   console.log('  [note] dirty-C 420 now passes: on a full geo+bind hit with overlap on,');
-  console.log('         buildPlacements mutates the cached item pool\'s scale/rotation/alpha');
+  console.log("         buildPlacements mutates the cached item pool's scale/rotation/alpha");
   console.log('         in place (#108 item 6) instead of rebuilding soa.n fresh objects');
   console.log('         every frame. Guarded to overlap-only — the !overlap sort path would');
   console.log('         otherwise reorder a pool that stage bind indexes by soa slot.');

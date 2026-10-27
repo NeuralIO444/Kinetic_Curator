@@ -15,20 +15,16 @@ import { buildPlacements } from './buildPlacements.js';
 import { KERNEL_VERSION } from './kernel/version.js';
 
 /** Primary grid fixture — bump when placement/weight/color pipeline changes. */
-export const EXPECTED_HASH =
-  'e892d112b20d92b6611c0619cb6b6e2bbddb52a179d1c9dc38d3b8185690a9a2';
+export const EXPECTED_HASH = 'e892d112b20d92b6611c0619cb6b6e2bbddb52a179d1c9dc38d3b8185690a9a2';
 
 /** Grid + fBm displacement (noise channel active). */
-export const EXPECTED_HASH_DISPLACEMENT =
-  '7dae61d14441b3aca6bae359c1941c66851f85954ecf518bba2dbae9344eb85c';
+export const EXPECTED_HASH_DISPLACEMENT = '7dae61d14441b3aca6bae359c1941c66851f85954ecf518bba2dbae9344eb85c';
 
 /** Stratified sampler mode. */
-export const EXPECTED_HASH_STRATIFIED =
-  '95612a6179201f9a898ab5141b0cd13b3af804bdba8a46d895bd6692be00cf63';
+export const EXPECTED_HASH_STRATIFIED = '95612a6179201f9a898ab5141b0cd13b3af804bdba8a46d895bd6692be00cf63';
 
 /** Displacement + non-zero noise seedOffset (spatial/color/asset locked). */
-export const EXPECTED_HASH_NOISE_OFFSET =
-  '11d512c4b8c6020727090a792c2f7acfdde8f9afdec1f48563bd328b9cd8b8a4';
+export const EXPECTED_HASH_NOISE_OFFSET = '11d512c4b8c6020727090a792c2f7acfdde8f9afdec1f48563bd328b9cd8b8a4';
 
 export const KERNEL_GOLDEN_VERSION = KERNEL_VERSION;
 
@@ -121,19 +117,9 @@ export function runGolden() {
   );
   assert.strictEqual(zeroOff, primary, 'zero offsets must match primary golden');
 
-  runFixture(
-    'grid+displacement',
-    { ...LAYOUT_BASE, mode: 'grid', displacement: 40 },
-    null,
-    EXPECTED_HASH_DISPLACEMENT,
-  );
+  runFixture('grid+displacement', { ...LAYOUT_BASE, mode: 'grid', displacement: 40 }, null, EXPECTED_HASH_DISPLACEMENT);
 
-  runFixture(
-    'stratified',
-    { ...LAYOUT_BASE, mode: 'stratified' },
-    null,
-    EXPECTED_HASH_STRATIFIED,
-  );
+  runFixture('stratified', { ...LAYOUT_BASE, mode: 'stratified' }, null, EXPECTED_HASH_STRATIFIED);
 
   runFixture(
     'grid+displacement+noiseOffset',

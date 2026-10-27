@@ -116,7 +116,10 @@ function distribute(total, lens) {
   const out = raw.map((r) => Math.floor(r));
   let left = total - out.reduce((a, b) => a + b, 0);
   const order = raw.map((r, i) => [r - Math.floor(r), i]).sort((a, b) => b[0] - a[0] || a[1] - b[1]);
-  for (let n = 0; left > 0 && order.length; n = (n + 1) % order.length) { out[order[n][1]] += 1; left -= 1; }
+  for (let n = 0; left > 0 && order.length; n = (n + 1) % order.length) {
+    out[order[n][1]] += 1;
+    left -= 1;
+  }
   return out;
 }
 
@@ -135,7 +138,15 @@ function distribute(total, lens) {
  * @returns { plate, feather, leaf, chevron } — placements per kind, root -> tip in order, each
  *          { dx, dy, dRot, dScaleX, dScaleY } in wing-local units (the hierarchy scatter shape)
  */
-export function fanPlacements({ chain, seed = 0, creatureId = 'c0', chainKey = 'fore', counts, seedOffsets = null, handedness = 1 } = {}) {
+export function fanPlacements({
+  chain,
+  seed = 0,
+  creatureId = 'c0',
+  chainKey = 'fore',
+  counts,
+  seedOffsets = null,
+  handedness = 1,
+} = {}) {
   const out = { plate: [], feather: [], leaf: [], chevron: [] };
   const segs = (chain || []).filter((s) => s && s.base && s.tip);
   if (!segs.length || !counts) return out;
@@ -143,7 +154,10 @@ export function fanPlacements({ chain, seed = 0, creatureId = 'c0', chainKey = '
   if (!(totalLen > 0)) return out;
   const rooted = counts.plate + counts.feather + counts.leaf;
   const spacing = totalLen / Math.max(1, rooted);
-  const perSeg = distribute(rooted, segs.map((s) => s.len));
+  const perSeg = distribute(
+    rooted,
+    segs.map((s) => s.len),
+  );
 
   let g = 0; // the rooted parts' global index, root -> tip
   segs.forEach((seg, s) => {
@@ -153,16 +167,18 @@ export function fanPlacements({ chain, seed = 0, creatureId = 'c0', chainKey = '
       const rAng = stream();
       const rPos = stream();
       const frac = rooted === 1 ? 1 : g / (rooted - 1); // root -> tip parameter over the whole chain
-      const u = Math.min(1, Math.max(0, (j + 0.5) / perSeg[s] + (rPos - 0.5) * 0.6 / perSeg[s]));
+      const u = Math.min(1, Math.max(0, (j + 0.5) / perSeg[s] + ((rPos - 0.5) * 0.6) / perSeg[s]));
       const rootPt = {
         x: seg.base.x + (seg.tip.x - seg.base.x) * u,
         y: seg.base.y + (seg.tip.y - seg.base.y) * u,
       };
-      const len = spacing * FAN.overlap
-        * (FAN.lenRoot + (FAN.lenTip - FAN.lenRoot) * frac)
-        * (1 + (rLen - 0.5) * 2 * FAN.jitterLen);
+      const len =
+        spacing *
+        FAN.overlap *
+        (FAN.lenRoot + (FAN.lenTip - FAN.lenRoot) * frac) *
+        (1 + (rLen - 0.5) * 2 * FAN.jitterLen);
       const dir = seg.dirDeg + handedness * ((frac - 0.5) * FAN.splayDeg + (rAng - 0.5) * 2 * FAN.jitterDeg);
-      const kind = g === 0 ? 'plate' : (g === rooted - 1 ? 'leaf' : 'feather');
+      const kind = g === 0 ? 'plate' : g === rooted - 1 ? 'leaf' : 'feather';
       const part = FAN_PARTS[kind];
       const d = dirFromUp(dir);
       out[kind].push({
@@ -182,7 +198,10 @@ export function fanPlacements({ chain, seed = 0, creatureId = 'c0', chainKey = '
   for (let s = 0; s + 1 < segs.length; s += 1) spots.push({ pt: segs[s].tip, dir: segs[s + 1].dirDeg });
   if (segs.length) spots.push({ pt: segs[segs.length - 1].tip, dir: segs[segs.length - 1].dirDeg });
   for (let s = 0; spots.length < counts.chevron && s < segs.length; s += 1) {
-    spots.push({ pt: { x: (segs[s].base.x + segs[s].tip.x) / 2, y: (segs[s].base.y + segs[s].tip.y) / 2 }, dir: segs[s].dirDeg });
+    spots.push({
+      pt: { x: (segs[s].base.x + segs[s].tip.x) / 2, y: (segs[s].base.y + segs[s].tip.y) / 2 },
+      dir: segs[s].dirDeg,
+    });
   }
   const orn = FAN_PARTS.chevron;
   for (let n = 0; n < Math.min(counts.chevron, spots.length); n += 1) {
@@ -211,11 +230,13 @@ export function fanPlacements({ chain, seed = 0, creatureId = 'c0', chainKey = '
  */
 export function mirrorPlacements(list, axisDeg = 0) {
   const mir = (v) => (v === 0 ? 0 : -v);
-  const wrap = (d) => (((d + 180) % 360) + 360) % 360 - 180;
+  const wrap = (d) => ((((d + 180) % 360) + 360) % 360) - 180;
   return (list || []).map((p) => ({
-    dx: mir(p.dx), dy: p.dy,
+    dx: mir(p.dx),
+    dy: p.dy,
     dRot: axisDeg ? wrap(-p.dRot - 2 * axisDeg) : mir(p.dRot),
-    dScaleX: p.dScaleX, dScaleY: p.dScaleY,
+    dScaleX: p.dScaleX,
+    dScaleY: p.dScaleY,
   }));
 }
 
@@ -228,7 +249,8 @@ export function fanHash(byKind) {
   let s = '';
   for (const kind of ['plate', 'feather', 'leaf', 'chevron']) {
     s += `${kind}:`;
-    for (const p of (byKind && byKind[kind]) || []) s += `${q(p.dx)},${q(p.dy)},${q(p.dRot)},${q(p.dScaleX)},${q(p.dScaleY)};`;
+    for (const p of (byKind && byKind[kind]) || [])
+      s += `${q(p.dx)},${q(p.dy)},${q(p.dRot)},${q(p.dScaleX)},${q(p.dScaleY)};`;
   }
   return fnv1a(s).toString(16).padStart(8, '0');
 }

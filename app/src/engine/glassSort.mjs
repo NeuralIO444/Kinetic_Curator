@@ -27,8 +27,11 @@
 import { registerCostTier } from '../gl/costTiers.mjs';
 
 registerCostTier('engine/glass-sort', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1129 PR1: CPU-side back-to-front z-tier sort of glass instances; zero GPU cost (no shader/pass/texture change)',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1129 PR1: CPU-side back-to-front z-tier sort of glass instances; zero GPU cost (no shader/pass/texture change)',
 });
 
 /**
@@ -48,7 +51,7 @@ export function sortGlassInstances(items) {
   if (slots.length < 2) return items.slice();
   const sorted = slots
     .map((pos, k) => ({ pos, k, z: Number(items[pos].zTier) || 0 }))
-    .sort((a, b) => (a.z - b.z) || (a.k - b.k))
+    .sort((a, b) => a.z - b.z || a.k - b.k)
     .map((e) => items[e.pos]);
   const out = items.slice();
   for (let k = 0; k < slots.length; k++) out[slots[k]] = sorted[k];

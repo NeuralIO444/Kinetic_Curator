@@ -50,7 +50,10 @@ export function heroIndex(items) {
   for (let i = 0; i < items.length; i++) {
     const s = Number(items[i]?.scale);
     const sc = Number.isFinite(s) ? s : 0;
-    if (sc > bestScale) { bestScale = sc; best = i; }
+    if (sc > bestScale) {
+      bestScale = sc;
+      best = i;
+    }
   }
   return best;
 }
@@ -75,7 +78,7 @@ export function chorusOrder(items, hero) {
       const dy = (Number.isFinite(y) ? y : 0) - fy;
       return { i, d: dx * dx + dy * dy };
     })
-    .sort((a, b) => (a.d - b.d) || (a.i - b.i))
+    .sort((a, b) => a.d - b.d || a.i - b.i)
     .map((e) => e.i);
 }
 

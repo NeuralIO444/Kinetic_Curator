@@ -22,7 +22,9 @@ import { makeSmallCache, cacheGetOrSet } from './cache.js';
 // ── bounded size + evict-oldest order ─────────────────────────────────────
 {
   const c = makeSmallCache(3);
-  c.set('a', 'A'); c.set('b', 'B'); c.set('c', 'C');
+  c.set('a', 'A');
+  c.set('b', 'B');
+  c.set('c', 'C');
   assert.strictEqual(c.size, 3, 'fills to cap');
   c.set('d', 'D'); // full: evicts oldest ('a'), keeps b/c/d
   assert.strictEqual(c.size, 3, 'insert on full keeps the cap');
@@ -47,7 +49,8 @@ import { makeSmallCache, cacheGetOrSet } from './cache.js';
 // ── delete + clear ────────────────────────────────────────────────────────
 {
   const c = makeSmallCache(2);
-  c.set('a', 1); c.set('b', 2);
+  c.set('a', 1);
+  c.set('b', 2);
   assert.strictEqual(c.delete('a'), true, 'delete of present key returns true');
   assert.strictEqual(c.get('a'), undefined, 'deleted key misses');
   assert.strictEqual(c.size, 1);
@@ -65,7 +68,10 @@ import { makeSmallCache, cacheGetOrSet } from './cache.js';
 {
   const c = makeSmallCache(2);
   let calls = 0;
-  const make = () => { calls++; return { v: calls }; };
+  const make = () => {
+    calls++;
+    return { v: calls };
+  };
   const first = cacheGetOrSet(c, 'k', make);
   const second = cacheGetOrSet(c, 'k', make);
   assert.strictEqual(calls, 1, 'factory runs once per key');
@@ -87,11 +93,14 @@ import { makeSmallCache, cacheGetOrSet } from './cache.js';
 // ── cap floors: n < 1 behaves as 1, non-integers floor ────────────────────
 {
   const one = makeSmallCache(0);
-  one.set('a', 1); one.set('b', 2);
+  one.set('a', 1);
+  one.set('b', 2);
   assert.strictEqual(one.size, 1, 'cap 0 floors to 1');
   assert.strictEqual(one.get('a'), undefined);
   const floored = makeSmallCache(2.9);
-  floored.set('a', 1); floored.set('b', 2); floored.set('c', 3);
+  floored.set('a', 1);
+  floored.set('b', 2);
+  floored.set('c', 3);
   assert.strictEqual(floored.size, 2, 'non-integer cap floors');
 }
 

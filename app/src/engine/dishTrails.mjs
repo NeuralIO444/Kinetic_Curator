@@ -174,12 +174,16 @@ export function sampleTrail(field, u, v) {
   const cells = field.cells;
   const x = clamp01(u) * (TRAIL_COLS - 1);
   const y = clamp01(v) * (TRAIL_ROWS - 1);
-  const x0 = Math.floor(x); const y0 = Math.floor(y);
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
   const x1 = Math.min(TRAIL_COLS - 1, x0 + 1);
   const y1 = Math.min(TRAIL_ROWS - 1, y0 + 1);
-  const fx = x - x0; const fy = y - y0;
-  const a = cells[y0 * TRAIL_COLS + x0]; const b = cells[y0 * TRAIL_COLS + x1];
-  const c = cells[y1 * TRAIL_COLS + x0]; const d = cells[y1 * TRAIL_COLS + x1];
+  const fx = x - x0;
+  const fy = y - y0;
+  const a = cells[y0 * TRAIL_COLS + x0];
+  const b = cells[y0 * TRAIL_COLS + x1];
+  const c = cells[y1 * TRAIL_COLS + x0];
+  const d = cells[y1 * TRAIL_COLS + x1];
   return a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
 }
 
@@ -204,7 +208,11 @@ const _total = { gx: 0, gy: 0 };
  * an on resolution from dishTrailsFor; anything else reads zero.
  */
 export function sampleTrailReadGradient(res, u, v, out = _grad) {
-  if (!res || !res.on) { out.gx = 0; out.gy = 0; return out; }
+  if (!res || !res.on) {
+    out.gx = 0;
+    out.gy = 0;
+    return out;
+  }
   sampleTrailGradient(res.own, u, v, _own);
   sampleTrailGradient(res.total, u, v, _total);
   out.gx = 2 * _own.gx - _total.gx;

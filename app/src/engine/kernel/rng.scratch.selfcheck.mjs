@@ -23,8 +23,7 @@ const offsets = { spatial: 3, color: 0, asset: 0, noise: 0 };
           const fresh = rngForIndex(s, ch, i, offs);
           const scratch = makeScratchStream().reseed(s, ch, i, offs).draw;
           for (let k = 0; k < 25; k++) {
-            assert.strictEqual(scratch(), fresh(),
-              `scratch != rngForIndex @ seed=${s} ch=${ch} i=${i} k=${k}`);
+            assert.strictEqual(scratch(), fresh(), `scratch != rngForIndex @ seed=${s} ch=${ch} i=${i} k=${k}`);
           }
         }
       }
@@ -38,11 +37,19 @@ const offsets = { spatial: 3, color: 0, asset: 0, noise: 0 };
 //    output to the same call WITH a scratch stream (the hoisted path).
 {
   const grid = Array.from({ length: 16 }, (_, r) =>
-    Array.from({ length: 16 }, (_, c) => ((r * 7 + c * 13 + 5) % 3 === 0 ? 1 : 0)));
+    Array.from({ length: 16 }, (_, c) => ((r * 7 + c * 13 + 5) % 3 === 0 ? 1 : 0)),
+  );
   const mkCtx = (scratch) => ({
-    i: 0, count: 64, w: 1000, h: 700,
-    rng: () => 0.5, jitter: 8, seed, caGrid: grid,
-    seedOffsets: offsets, scratch,
+    i: 0,
+    count: 64,
+    w: 1000,
+    h: 700,
+    rng: () => 0.5,
+    jitter: 8,
+    seed,
+    caGrid: grid,
+    seedOffsets: offsets,
+    scratch,
   });
   for (const mode of ['ca', 'voronoi']) {
     const sample = getSampler(mode);
@@ -67,23 +74,33 @@ const offsets = { spatial: 3, color: 0, asset: 0, noise: 0 };
 //    — any future value change breaks this CI, which is the intent.
 {
   const grid = Array.from({ length: 16 }, (_, r) =>
-    Array.from({ length: 16 }, (_, c) => ((r * 7 + c * 13 + 5) % 3 === 0 ? 1 : 0)));
+    Array.from({ length: 16 }, (_, c) => ((r * 7 + c * 13 + 5) % 3 === 0 ? 1 : 0)),
+  );
   const base = {
-    seed, count: 64, jitter: 0, density: 100, zTiers: 1, bleed: false,
-    canvasW: 1000, canvasH: 700, scale: [0.4, 0.8], rotate: [0, 45],
-    alpha: [60, 100], caGrid: grid,
+    seed,
+    count: 64,
+    jitter: 0,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    caGrid: grid,
   };
   const checksums = { ca: 'ed09fa64', voronoi: '750137ad' };
   for (const mode of Object.keys(checksums)) {
     const p = computePlacements({ ...base, mode });
     let h = 0;
     for (const pt of p) {
-      const xs = Math.round(pt.x * 1e6), ys = Math.round(pt.y * 1e6);
+      const xs = Math.round(pt.x * 1e6),
+        ys = Math.round(pt.y * 1e6);
       h = (Math.imul(h, 31) ^ xs ^ Math.imul(ys, 7)) >>> 0;
     }
     const hex = h.toString(16).padStart(8, '0');
-    assert.strictEqual(hex, checksums[mode],
-      `${mode} placement changed: expected ${checksums[mode]}, got ${hex}`);
+    assert.strictEqual(hex, checksums[mode], `${mode} placement changed: expected ${checksums[mode]}, got ${hex}`);
   }
   console.log('kernel/rng.scratch.selfcheck: OK (placement fixtures pinned: ca, voronoi)');
 }

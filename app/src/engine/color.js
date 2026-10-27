@@ -24,7 +24,7 @@ export function colorForPlacement({ swatches, strategy, t, index, rng }) {
     case 'zone': {
       // Quadrant-based: use index mod to pick zone, then swatch within
       const zone = index % 4;
-      const offset = Math.floor(zone * swatches.length / 4);
+      const offset = Math.floor((zone * swatches.length) / 4);
       const slot = (offset + Math.floor(rng() * 2)) % swatches.length;
       return { color: swatches[slot], slot };
     }
@@ -34,9 +34,7 @@ export function colorForPlacement({ swatches, strategy, t, index, rng }) {
       const even = index % 2 === 0;
       const pick = Math.floor(rng() * (even ? halfLen : swatches.length - halfLen));
       const slot = even ? pick : halfLen + pick;
-      return swatches[slot]
-        ? { color: swatches[slot], slot }
-        : { color: swatches[0], slot: 0 };
+      return swatches[slot] ? { color: swatches[slot], slot } : { color: swatches[0], slot: 0 };
     }
     default: {
       const slot = Math.floor(rng() * swatches.length);

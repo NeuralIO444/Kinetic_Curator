@@ -1,14 +1,26 @@
 import assert from 'node:assert/strict';
 import {
-  CHOREO_SLOTS, CHOREO_SLOT_T, CHOREO_MAX_DELAY,
-  heroIndex, chorusOrder, chorusSlot, choreoPlan, choreoWindow,
+  CHOREO_SLOTS,
+  CHOREO_SLOT_T,
+  CHOREO_MAX_DELAY,
+  heroIndex,
+  chorusOrder,
+  chorusSlot,
+  choreoPlan,
+  choreoWindow,
 } from './beatChoreo.mjs';
 
-let n = 0, fail = 0;
+let n = 0,
+  fail = 0;
 function ok(name, fn) {
   n++;
-  try { fn(); console.log(`  [ok] ${name}`); }
-  catch (e) { fail++; console.log(`  [FAIL] ${name}: ${e.message}`); }
+  try {
+    fn();
+    console.log(`  [ok] ${name}`);
+  } catch (e) {
+    fail++;
+    console.log(`  [FAIL] ${name}: ${e.message}`);
+  }
 }
 
 const mk = (x, y, scale) => ({ x, y, scale });
@@ -59,8 +71,7 @@ ok('choreoPlan: hero owns slot 0, chorus radiates outward', () => {
   assert.equal(plan.hero, 1);
   assert.equal(plan.slots[1], 0, 'hero on the downbeat');
   assert.ok(plan.slots[0] >= 1 && plan.slots[2] >= 1 && plan.slots[3] >= 1);
-  assert.ok(plan.slots[0] <= plan.slots[2] && plan.slots[2] <= plan.slots[3],
-    'nearer the hero, earlier the slot');
+  assert.ok(plan.slots[0] <= plan.slots[2] && plan.slots[2] <= plan.slots[3], 'nearer the hero, earlier the slot');
 });
 
 ok('choreoWindow: starts quantize to the 16th-note grid', () => {

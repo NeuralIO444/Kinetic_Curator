@@ -9,15 +9,7 @@ const ROOT = dirname(fileURLToPath(import.meta.url));
 const particles = readFileSync(join(ROOT, 'particles.js'), 'utf8');
 const wasm = readFileSync(join(ROOT, 'kernel/bake/swarmWasm.mjs'), 'utf8');
 
-const LIVE = [
-  'cohesion',
-  'separate',
-  '_contactPass',
-  'curl2',
-  'levyGain',
-  'lorenzGain',
-  'chemotaxis',
-];
+const LIVE = ['cohesion', 'separate', '_contactPass', 'curl2', 'levyGain', 'lorenzGain', 'chemotaxis'];
 
 test('#812 live integrator still has the named terms', () => {
   for (const term of LIVE) {

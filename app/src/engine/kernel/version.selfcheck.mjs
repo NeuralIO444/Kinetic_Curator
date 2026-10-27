@@ -159,10 +159,7 @@ for (const rel of FOOTER_FILES) {
     /import\s+\{\s*KERNEL_VERSION\s*\}\s+from\s+['"][^'"]*engine\/kernel\/version\.js['"]/.test(src),
     `${rel}: footer must import KERNEL_VERSION from engine/kernel/version.js (no bare or copied string)`,
   );
-  assert.ok(
-    /\{KERNEL_VERSION\}/.test(src),
-    `${rel}: footer must render {KERNEL_VERSION}`,
-  );
+  assert.ok(/\{KERNEL_VERSION\}/.test(src), `${rel}: footer must render {KERNEL_VERSION}`);
   assert.ok(
     !/kernel\.v\d+/.test(src),
     `${rel}: footer contains a hard-coded kernel version literal — it would drift from version.js`,

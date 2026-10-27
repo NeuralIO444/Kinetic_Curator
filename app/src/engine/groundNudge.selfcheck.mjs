@@ -58,11 +58,13 @@ const pal = resolvePalette('bone', null, []);
   for (const mode of ['FIELD', 'QUILT', 'GLYPH']) {
     const g = patternGround(defaultPattern(mode, 21), pal, 1000, 700);
     for (let i = 0; i < 400; i++) {
-      const x = (i * 37.3) % 1000; const y = (i * 53.1) % 700;
+      const x = (i * 37.3) % 1000;
+      const y = (i * 53.1) % 700;
       const c = g.cell(x, y, 0);
       assert.ok(c.u >= 0 && c.u < 1 && c.v >= 0 && c.v < 1 && c.size > 0, `${mode}: cell coords in range`);
       // a point eased inward by the full nudge lands on the same tile colour
-      const nx = x + nudgeAxis(c.u, 1) * c.size; const ny = y + nudgeAxis(c.v, 1) * c.size;
+      const nx = x + nudgeAxis(c.u, 1) * c.size;
+      const ny = y + nudgeAxis(c.v, 1) * c.size;
       assert.equal(g.at(nx, ny, 0), g.at(x, y, 0), `${mode}: the nudge never leaves the tile`);
     }
   }
@@ -72,7 +74,10 @@ const pal = resolvePalette('bone', null, []);
     const base = g.cell(1, 1, 0).size;
     for (let i = 0; i < 2000 && !heroSeen; i++) {
       const c = g.cell((i * 13.7) % 1000, (i * 7.9) % 700, 0);
-      if (c.size !== base) { heroSeen = true; assert.equal(c.size, base * 2, 'a hero block is a 2x2 tile'); }
+      if (c.size !== base) {
+        heroSeen = true;
+        assert.equal(c.size, base * 2, 'a hero block is a 2x2 tile');
+      }
     }
   }
   assert.ok(heroSeen, 'fixture: some QUILT seed has a hero block');
@@ -80,30 +85,80 @@ const pal = resolvePalette('bone', null, []);
 
 // ── the live frame ───────────────────────────────────────────────────────────────────────────────────────────────
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
-const P = (id, mode = 'FIELD', seed = 9, extra = {}) => L(id, { type: 'pattern', pattern: { ...defaultPattern(mode, seed), ...extra } });
-const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 300, kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0, ...over });
+const P = (id, mode = 'FIELD', seed = 9, extra = {}) =>
+  L(id, { type: 'pattern', pattern: { ...defaultPattern(mode, seed), ...extra } });
+const lp = (over = {}) => ({
+  ...DEFAULT_LAYOUT_PARAMS,
+  mode: 'random',
+  count: 300,
+  kinemeBreath: 0,
+  kinemeDrift: 0,
+  kinemePaletteBreath: 0,
+  lifeDrift: 0,
+  ...over,
+});
 const input = (over = {}) => ({
-  canvasW: 1000, canvasH: 700, layers: [P('p'), L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [], layoutParams: lp(), caGrid: null, enabledAssets: null,
-  assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {}, batchPaused: false, focusSwap: false,
-  loopTimeMs: 16, dtSec: 0.016, perfClampOverride: null, perfTier1: false, assetThin: false, slowRender: false, scaleMul: 1,
-  alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null, ...over,
+  canvasW: 1000,
+  canvasH: 700,
+  layers: [P('p'), L('lyr-a')],
+  activeLayerId: 'lyr-a',
+  layerSnapshots: {},
+  seed: 1234,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  layoutParams: lp(),
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  quality: 'balanced',
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  loopTimeMs: 16,
+  dtSec: 0.016,
+  perfClampOverride: null,
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  scaleMul: 1,
+  alphaBoost: 0,
+  effectiveScale: [0.5, 1.5],
+  effectiveAlpha: [20, 100],
+  phraseWrapGen: 0,
+  attractor: null,
+  ...over,
 });
 const itemsOf = (out, id = 'lyr-a') => out.find((l) => l.id === id).items;
-const hash = (items) => createHash('sha256').update(JSON.stringify(items.map((i) => [i.x, i.y, i.scale, i.rotation, i.alpha, i.assetId, i.tint, i.color, i.accent]))).digest('hex');
+const hash = (items) =>
+  createHash('sha256')
+    .update(
+      JSON.stringify(items.map((i) => [i.x, i.y, i.scale, i.rotation, i.alpha, i.assetId, i.tint, i.color, i.accent])),
+    )
+    .digest('hex');
 const frame = (over) => itemsOf(createLiveResolver().resolveLayers(input(over)));
 const col = (it) => String(it.tint ?? it.color).toLowerCase();
 
 // 4. off is byte-identical: knob 0, key absent, no pattern, pattern above
 {
   const off = hash(frame());
-  const noKey = { ...lp() }; delete noKey.groundNudge;
+  const noKey = { ...lp() };
+  delete noKey.groundNudge;
   assert.equal(hash(frame({ layoutParams: noKey })), off, 'a layout without the key is the same frame');
   assert.equal(hash(frame({ layoutParams: lp({ groundNudge: 0 }) })), off, 'knob at 0');
   const plain = hash(frame({ layers: [L('lyr-a')] }));
-  assert.equal(hash(frame({ layers: [L('lyr-a')], layoutParams: lp({ groundNudge: 1 }) })), plain, 'no pattern below: nothing to feel');
-  assert.equal(hash(frame({ layers: [L('lyr-a'), P('p')], layoutParams: lp({ groundNudge: 1 }) })), hash(frame({ layers: [L('lyr-a'), P('p')] })),
-    'a pattern ABOVE the marks is not their ground');
+  assert.equal(
+    hash(frame({ layers: [L('lyr-a')], layoutParams: lp({ groundNudge: 1 }) })),
+    plain,
+    'no pattern below: nothing to feel',
+  );
+  assert.equal(
+    hash(frame({ layers: [L('lyr-a'), P('p')], layoutParams: lp({ groundNudge: 1 }) })),
+    hash(frame({ layers: [L('lyr-a'), P('p')] })),
+    'a pattern ABOVE the marks is not their ground',
+  );
   assert.equal(DEFAULT_LAYOUT_PARAMS.groundNudge, 0, 'the knob ships at 0');
   assert.deepEqual(PARAM_SPEC.groundNudge, { min: 0, max: 1 });
 }
@@ -118,7 +173,11 @@ const col = (it) => String(it.tint ?? it.color).toLowerCase();
   for (let k = 0; k < off.length; k++) {
     const c = g.cell(off[k].x, off[k].y, 0.016);
     const inBand = Math.min(c.u, 1 - c.u) < EDGE_BAND || Math.min(c.v, 1 - c.v) < EDGE_BAND;
-    if (!inBand) { assert.equal(on[k].x, off[k].x); assert.equal(on[k].y, off[k].y); continue; }
+    if (!inBand) {
+      assert.equal(on[k].x, off[k].x);
+      assert.equal(on[k].y, off[k].y);
+      continue;
+    }
     if (on[k].x !== off[k].x || on[k].y !== off[k].y) moved += 1;
     assert.equal(g.at(on[k].x, on[k].y, 0.016), g.at(off[k].x, off[k].y, 0.016), `mark ${k} stays on its tile`);
     const after = g.cell(on[k].x, on[k].y, 0.016);
@@ -139,14 +198,21 @@ const col = (it) => String(it.tint ?? it.color).toLowerCase();
   const args = { layoutParams: lp({ groundNudge: 1 }) };
   const first = hash(itemsOf(r.resolveLayers(input(args))));
   for (let i = 0; i < 5; i++) r.resolveLayers(input(args));
-  assert.equal(hash(itemsOf(r.resolveLayers(input(args)))), first, 'the same frame again is the same frame (no compounding)');
+  assert.equal(
+    hash(itemsOf(r.resolveLayers(input(args)))),
+    first,
+    'the same frame again is the same frame (no compounding)',
+  );
 
   const drifting = { layers: [P('p', 'FIELD', 9, { drift: 1 }), L('lyr-a')], layoutParams: lp({ groundNudge: 1 }) };
   const d = createLiveResolver();
   const t0 = itemsOf(d.resolveLayers(input({ ...drifting, loopTimeMs: 16 }))).map((i) => [i.x, i.y]);
   const t1 = itemsOf(d.resolveLayers(input({ ...drifting, loopTimeMs: 40000 }))).map((i) => [i.x, i.y]);
   const back = itemsOf(d.resolveLayers(input({ ...drifting, loopTimeMs: 16 }))).map((i) => [i.x, i.y]);
-  assert.ok(t0.some((p, k) => p[0] !== t1[k][0] || p[1] !== t1[k][1]), 'as the pattern drifts, different marks feel an edge');
+  assert.ok(
+    t0.some((p, k) => p[0] !== t1[k][0] || p[1] !== t1[k][1]),
+    'as the pattern drifts, different marks feel an edge',
+  );
   assert.deepEqual(back, t0, 'returning to the same time is the same picture');
 }
 
@@ -157,8 +223,20 @@ const col = (it) => String(it.tint ?? it.color).toLowerCase();
   const layers = [P('p', 'QUILT', 21), L('lyr-a')];
   const params = lp({ groundNudge: 0.8, groundLean: 0.5, count: 120 });
   const live = itemsOf(createLiveResolver().resolveLayers(input({ layers, layoutParams: params, loopTimeMs: 0 })));
-  const stillOf = (p) => resolveStill({ layers, activeLayerId: 'lyr-a', layerSnapshots: {}, seed: 1234, paletteId: 'bone', paletteOverrides: null, layoutParams: p, patternTime: 0 },
-    { caps: getRenderCaps('balanced') }).find((l) => l.id === 'lyr-a').items;
+  const stillOf = (p) =>
+    resolveStill(
+      {
+        layers,
+        activeLayerId: 'lyr-a',
+        layerSnapshots: {},
+        seed: 1234,
+        paletteId: 'bone',
+        paletteOverrides: null,
+        layoutParams: p,
+        patternTime: 0,
+      },
+      { caps: getRenderCaps('balanced') },
+    ).find((l) => l.id === 'lyr-a').items;
   const still = stillOf(params);
   assert.equal(still.length, live.length);
   for (let k = 0; k < live.length; k++) {
@@ -167,7 +245,10 @@ const col = (it) => String(it.tint ?? it.color).toLowerCase();
     assert.equal(col(still[k]), col(live[k]));
   }
   const flat = stillOf(lp({ groundLean: 0.5, count: 120 }));
-  assert.ok(still.some((it, k) => it.x !== flat[k].x || it.y !== flat[k].y), 'the still is nudged too');
+  assert.ok(
+    still.some((it, k) => it.x !== flat[k].x || it.y !== flat[k].y),
+    'the still is nudged too',
+  );
 }
 
 console.log('groundNudge.selfcheck: ok (#1183 tile-edge nudge)');

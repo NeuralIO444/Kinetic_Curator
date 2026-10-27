@@ -149,7 +149,10 @@ const colorsBase = base.items.map((i) => i.color);
 // No dish at all: the old call shape is untouched.
 {
   const r = buildPlacements(opts);
-  assert.deepStrictEqual(r.items.map((i) => i.color), colorsBase);
+  assert.deepStrictEqual(
+    r.items.map((i) => i.color),
+    colorsBase,
+  );
 }
 
 console.log('dish.selfcheck: ok');

@@ -91,13 +91,14 @@ assert.strictEqual(resolveSeekGain(resolveBehave('flee')), -1.6, 'flee gain');
 for (const id of BEHAVE_IDS) {
   if (id === 'seek' || id === 'flee') continue;
   assert.strictEqual(
-    resolveSeekGain(resolveBehave(id)), 1,
+    resolveSeekGain(resolveBehave(id)),
+    1,
     `#711: behave '${id}' must resolve seekGain 1 (no silent force change)`,
   );
 }
 
 console.log(
   `ok — #711 seek/flee reach the swarm attractor ` +
-  `(mean dist: seek ${dSeek.toFixed(1)} < cruise ${dCruise.toFixed(1)} < flee ${dFlee.toFixed(1)}), ` +
-  'non-seek verbs bit-identical',
+    `(mean dist: seek ${dSeek.toFixed(1)} < cruise ${dCruise.toFixed(1)} < flee ${dFlee.toFixed(1)}), ` +
+    'non-seek verbs bit-identical',
 );

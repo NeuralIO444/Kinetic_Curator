@@ -48,9 +48,5 @@ for (const file of walk(KERNEL_DIR)) {
   }
 }
 
-assert.equal(
-  offenders.length,
-  0,
-  `kernel→gl imports found (#1239 boundary violated):\n  ${offenders.join('\n  ')}`
-);
+assert.equal(offenders.length, 0, `kernel→gl imports found (#1239 boundary violated):\n  ${offenders.join('\n  ')}`);
 console.log('[selfcheck] kernel/gl boundary OK — no kernel file imports from gl/');

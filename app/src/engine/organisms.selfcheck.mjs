@@ -42,7 +42,11 @@ assert.ok(bi.getItems(assets).every((it) => typeof it.u === 'number' && it.u >= 
 // the moth blend ladders. physics count unchanged.
 // #1202 — RADIAL is pure cyclic rotation (no mirrors); KALEIDO is true
 // dihedral (odd arms mirror, even arms do not).
-for (const [sym, folds] of [['radial-4', 4], ['radial-6', 6], ['radial-8', 8]]) {
+for (const [sym, folds] of [
+  ['radial-4', 4],
+  ['radial-6', 6],
+  ['radial-8', 8],
+]) {
   const fan = run('hype', sym, 2);
   assert.strictEqual(fan.physicsCount(), 40, `${sym} does not multiply the SoA`);
   const items = fan.getItems(assets);
@@ -51,11 +55,18 @@ for (const [sym, folds] of [['radial-4', 4], ['radial-6', 6], ['radial-8', 8]]) 
   assert.strictEqual(wings.length, 40 * folds);
   const mirrored = wings.filter((w) => w._mirrored).length;
   assert.strictEqual(mirrored, 0, `${sym}: pure rotation, no mirrors`);
-  assert.ok(wings.every((w) => typeof w.ladderId === 'string'), `${sym} reuses MOTH_LADDERS`);
+  assert.ok(
+    wings.every((w) => typeof w.ladderId === 'string'),
+    `${sym} reuses MOTH_LADDERS`,
+  );
   const keys = new Set(wings.map((w) => w.key));
   assert.strictEqual(keys.size, 40 * folds, `${sym}: fan keys unique`);
 }
-for (const [sym, folds] of [['kaleido-6', 6], ['kaleido-8', 8], ['kaleido-12', 12]]) {
+for (const [sym, folds] of [
+  ['kaleido-6', 6],
+  ['kaleido-8', 8],
+  ['kaleido-12', 12],
+]) {
   const fan = run('hype', sym, 2);
   assert.strictEqual(fan.physicsCount(), 40, `${sym} does not multiply the SoA`);
   const items = fan.getItems(assets);
@@ -64,7 +75,10 @@ for (const [sym, folds] of [['kaleido-6', 6], ['kaleido-8', 8], ['kaleido-12', 1
   assert.strictEqual(wings.length, 40 * folds);
   const mirrored = wings.filter((w) => w._mirrored).length;
   assert.strictEqual(mirrored, 40 * (folds / 2), `${sym}: odd arms mirror, even arms do not`);
-  assert.ok(wings.every((w) => typeof w.ladderId === 'string'), `${sym} reuses MOTH_LADDERS`);
+  assert.ok(
+    wings.every((w) => typeof w.ladderId === 'string'),
+    `${sym} reuses MOTH_LADDERS`,
+  );
   const keys = new Set(wings.map((w) => w.key));
   assert.strictEqual(keys.size, 40 * folds, `${sym}: fan keys unique`);
 }

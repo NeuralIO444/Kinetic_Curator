@@ -51,7 +51,9 @@ export function applyGroundNudge(soa, cellAt, amount, stillMarks = null) {
     const dx = nudgeAxis(c.u, amount) * c.size;
     const dy = nudgeAxis(c.v, amount) * c.size;
     if (dx === 0 && dy === 0) continue;
-    idx.push(k); ox.push(x); oy.push(y);
+    idx.push(k);
+    ox.push(x);
+    oy.push(y);
     soa.x[k] = x + dx;
     soa.y[k] = y + dy;
   }

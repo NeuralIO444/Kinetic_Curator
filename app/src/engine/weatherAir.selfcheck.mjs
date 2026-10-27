@@ -5,9 +5,7 @@
 // the cost ruling's remedy (measured 0.385 ms vs applyLean's 0.516 ms at 800 marks) may not
 // change a single output byte.
 import assert from 'node:assert/strict';
-import {
-  applyWeatherFade, weatherAlphaScale, hazeVeilHex, hazeVeilLevel, WEATHER_ALPHA_FADE,
-} from './weatherAir.mjs';
+import { applyWeatherFade, weatherAlphaScale, hazeVeilHex, hazeVeilLevel, WEATHER_ALPHA_FADE } from './weatherAir.mjs';
 import { applyLean } from './kernel/color/index.js';
 import { hexToRgb255 } from './colorHex.mjs';
 import { WEATHER } from './kernel/weather/registry.js';
@@ -47,7 +45,18 @@ import { WEATHER } from './kernel/weather/registry.js';
 //    shorthand, upper/mixed case, extremes) × fades (incl. 0 = the exact input string, and
 //    >1 = applyLean's clamp) × veils. Inputs are never mutated.
 {
-  const corpus = ['#112233', '#445566', '#778899', '#aabbcc', '#000000', '#ffffff', '#FF8800', '#aBc123', '#abc', '#0f0'];
+  const corpus = [
+    '#112233',
+    '#445566',
+    '#778899',
+    '#aabbcc',
+    '#000000',
+    '#ffffff',
+    '#FF8800',
+    '#aBc123',
+    '#abc',
+    '#0f0',
+  ];
   const fades = [0, 0.01, 0.2, 1 / 3, 0.5, 0.83, 1, 1.4];
   for (const lift of [0, 0.25, 0.5, 1]) {
     const veil = hazeVeilHex(lift);
@@ -59,8 +68,16 @@ import { WEATHER } from './kernel/weather/registry.js';
     assert.notStrictEqual(out.colors, colors, 'active: fresh colors array');
     assert.deepStrictEqual(colors, before, 'inputs never mutated');
     for (let k = 0; k < corpus.length; k++) {
-      assert.strictEqual(out.colors[k], applyLean(colors[k], veil, fade[k]), `colors[${k}] at fade ${fade[k]}, lift ${lift}`);
-      assert.strictEqual(out.accents[k], applyLean(accents[k], veil, fade[k]), `accents[${k}] at fade ${fade[k]}, lift ${lift}`);
+      assert.strictEqual(
+        out.colors[k],
+        applyLean(colors[k], veil, fade[k]),
+        `colors[${k}] at fade ${fade[k]}, lift ${lift}`,
+      );
+      assert.strictEqual(
+        out.accents[k],
+        applyLean(accents[k], veil, fade[k]),
+        `accents[${k}] at fade ${fade[k]}, lift ${lift}`,
+      );
       if (!(fade[k] > 0)) assert.strictEqual(out.colors[k], colors[k], 'fade 0 keeps the exact input string');
     }
   }
@@ -87,7 +104,11 @@ import { WEATHER } from './kernel/weather/registry.js';
     assert.ok(a < prevAlpha, `alpha scale must fall as fade rises (fade ${f})`);
     prevAlpha = a;
   }
-  assert.strictEqual(dist(applyWeatherFade({ colors: [color], accents: [color], fade: new Float32Array([1]), veil }).colors[0]), 0, 'fade 1 lands exactly on the veil');
+  assert.strictEqual(
+    dist(applyWeatherFade({ colors: [color], accents: [color], fade: new Float32Array([1]), veil }).colors[0]),
+    0,
+    'fade 1 lands exactly on the veil',
+  );
   assert.strictEqual(weatherAlphaScale(0), 1, 'no fade, no thinning');
   assert.strictEqual(weatherAlphaScale(1), 1 - WEATHER_ALPHA_FADE, 'a fully faded mark keeps 40% of its alpha');
   assert.strictEqual(weatherAlphaScale(7), 1 - WEATHER_ALPHA_FADE, 'alpha scale clamps above 1');
@@ -109,8 +130,18 @@ import { WEATHER } from './kernel/weather/registry.js';
   assert.ok(a.some((v) => v > 0) && a.some((v) => v < 0.35), 'the mist varies: thick and thin places');
   const c = fadeFor(9876);
   assert.notDeepStrictEqual([...a], [...c], 'a different seed is a different mist');
-  const out1 = applyWeatherFade({ colors: ['#112233'], accents: ['#445566'], fade: new Float32Array([a[0]]), veil: '#a6a6a6' });
-  const out2 = applyWeatherFade({ colors: ['#112233'], accents: ['#445566'], fade: new Float32Array([b[0]]), veil: '#a6a6a6' });
+  const out1 = applyWeatherFade({
+    colors: ['#112233'],
+    accents: ['#445566'],
+    fade: new Float32Array([a[0]]),
+    veil: '#a6a6a6',
+  });
+  const out2 = applyWeatherFade({
+    colors: ['#112233'],
+    accents: ['#445566'],
+    fade: new Float32Array([b[0]]),
+    veil: '#a6a6a6',
+  });
   assert.deepStrictEqual(out1, out2, 'the response itself is a pure function of its inputs');
 }
 

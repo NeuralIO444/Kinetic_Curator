@@ -59,7 +59,7 @@ export function isPlateMaterial(material) {
 }
 
 /** Gradient geometry in glyph-box units (MaterialSheet @ 0b7d758c). */
-export const PLATE_CENTER = Object.freeze({ x: 0.36, y: 0.30 }); // tuned 2026-10-14: the retired def centers at 50%/45% — Matt offset the core up-left so the grad dot never sits in a mark's center
+export const PLATE_CENTER = Object.freeze({ x: 0.36, y: 0.3 }); // tuned 2026-10-14: the retired def centers at 50%/45% — Matt offset the core up-left so the grad dot never sits in a mark's center
 export const PLATE_RADIUS = 1.05; // tuned 2026-10-14: the historical def below reads r=65% — Matt scaled the gradient larger (0.65 → 0.85 → 1.05) so the filled body carries past the mark
 
 /**
@@ -88,7 +88,9 @@ const lerp = (a, b, f) => (f <= 0 ? a : f >= 1 ? b : a + (b - a) * f);
  * data — the params move the ramp's centre and radius, never its stops.
  */
 export const PLATE_GEO_DEFAULTS = Object.freeze({
-  cx: PLATE_CENTER.x, cy: PLATE_CENTER.y, radius: PLATE_RADIUS,
+  cx: PLATE_CENTER.x,
+  cy: PLATE_CENTER.y,
+  radius: PLATE_RADIUS,
 });
 
 export function plateGeoFrom(layoutParams) {
@@ -117,7 +119,11 @@ export function plateRampAt(lx, ly, geo = PLATE_GEO_DEFAULTS) {
   let a = PLATE_STOPS[0];
   let b = PLATE_STOPS[PLATE_STOPS.length - 1];
   for (let i = 0; i < PLATE_STOPS.length - 1; i++) {
-    if (t >= PLATE_STOPS[i].t && t <= PLATE_STOPS[i + 1].t) { a = PLATE_STOPS[i]; b = PLATE_STOPS[i + 1]; break; }
+    if (t >= PLATE_STOPS[i].t && t <= PLATE_STOPS[i + 1].t) {
+      a = PLATE_STOPS[i];
+      b = PLATE_STOPS[i + 1];
+      break;
+    }
   }
   const f = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
   const mixOf = (s) => (s.color === 'accent' ? 0 : 1);
@@ -136,7 +142,7 @@ const f3 = (v) => v.toFixed(3);
  * attribute the packer fills from the Look's params, or from
  * PLATE_GEO_DEFAULTS when the Look never moved them).
  */
-export const PLATE_GLSL = /* glsl */`
+export const PLATE_GLSL = /* glsl */ `
 vec3 plateShade(vec2 local, vec3 ink, vec3 accent, vec3 geo, out float aMul) {
   float t = clamp(length(local - geo.xy) / geo.z, 0.0, 1.0);
   float inkMix; float a;
@@ -161,15 +167,22 @@ vec3 plateShade(vec2 local, vec3 ink, vec3 accent, vec3 geo, out float aMul) {
  * omitted, the def is byte-identical to the pre-M4 def.
  */
 export function plateGradientDef(id, accentHex, inkHex, geo = PLATE_GEO_DEFAULTS) {
-  const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}" stop-opacity="${s.opacity}"/>`;
+  const stop = (s) =>
+    `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}" stop-opacity="${s.opacity}"/>`;
   return `<radialGradient id="${id}" cx="${geo.cx * 100}%" cy="${geo.cy * 100}%" r="${geo.radius * 100}%">${PLATE_STOPS.map(stop).join('')}</radialGradient>`;
 }
 
 registerCostTier('engine/plate-body', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1548: material plate body — one flag per placed instance at build time; the ramp itself is a fragment-shader term in the existing quad pass (light/plate-gradient) and a bake-time gradient def in composed stills. No new pass, no texture, no per-frame CPU.',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1548: material plate body — one flag per placed instance at build time; the ramp itself is a fragment-shader term in the existing quad pass (light/plate-gradient) and a bake-time gradient def in composed stills. No new pass, no texture, no per-frame CPU.',
 });
 registerCostTier('light/plate-gradient', {
-  tier: 0, memoryBytes: 0, timeMs: 0.05,
-  notes: '#1548: radial ramp on the ink channel for plate-flagged instances inside the existing QUAD_FS live-tint branch — a distance, two mixes and a coverage scale per fragment, plate instances only.',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes:
+    '#1548: radial ramp on the ink channel for plate-flagged instances inside the existing QUAD_FS live-tint branch — a distance, two mixes and a coverage scale per fragment, plate instances only.',
 });

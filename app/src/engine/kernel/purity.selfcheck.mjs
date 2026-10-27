@@ -53,13 +53,38 @@ const SPEC_RE = /(?:\bfrom\s*|\bimport\s*\(\s*|\brequire\s*\(\s*|\bexport\s+[^'"
 /** DOM globals/constructor names. Word-boundary matched; `self`, `performance`,
  *  `console`, and `fetch` are deliberately excluded — all exist in workers. */
 const DOM_IDENTIFIERS = [
-  'document', 'window', 'navigator', 'localStorage', 'sessionStorage', 'indexedDB',
-  'history', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback',
-  'HTMLElement', 'HTMLCanvasElement', 'HTMLImageElement', 'Image', 'Audio',
-  'OffscreenCanvas', 'WebGLRenderingContext', 'WebGL2RenderingContext',
-  'CanvasRenderingContext2D', 'ImageData', 'customElements', 'getComputedStyle',
-  'matchMedia', 'IntersectionObserver', 'ResizeObserver', 'MutationObserver',
-  'devicePixelRatio', 'innerWidth', 'innerHeight', 'alert', 'confirm', 'prompt',
+  'document',
+  'window',
+  'navigator',
+  'localStorage',
+  'sessionStorage',
+  'indexedDB',
+  'history',
+  'requestAnimationFrame',
+  'cancelAnimationFrame',
+  'requestIdleCallback',
+  'HTMLElement',
+  'HTMLCanvasElement',
+  'HTMLImageElement',
+  'Image',
+  'Audio',
+  'OffscreenCanvas',
+  'WebGLRenderingContext',
+  'WebGL2RenderingContext',
+  'CanvasRenderingContext2D',
+  'ImageData',
+  'customElements',
+  'getComputedStyle',
+  'matchMedia',
+  'IntersectionObserver',
+  'ResizeObserver',
+  'MutationObserver',
+  'devicePixelRatio',
+  'innerWidth',
+  'innerHeight',
+  'alert',
+  'confirm',
+  'prompt',
 ];
 const DOM_RE = new RegExp(`\\b(${DOM_IDENTIFIERS.join('|')})\\b`);
 
@@ -74,8 +99,44 @@ const blank = (s) => s.replace(/[^\n]/g, ' ');
 
 // A '/' starts a regex literal (not division) when the previous significant
 // token can't end an operand.
-const REGEX_OK_BEFORE = new Set([',', ';', ':', '{', '}', '(', '[', '=', '!', '&', '|', '?', '+', '-', '*', '%', '^', '~', '<', '>']);
-const REGEX_OK_KEYWORDS = new Set(['return', 'typeof', 'instanceof', 'in', 'of', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else', 'yield', 'await']);
+const REGEX_OK_BEFORE = new Set([
+  ',',
+  ';',
+  ':',
+  '{',
+  '}',
+  '(',
+  '[',
+  '=',
+  '!',
+  '&',
+  '|',
+  '?',
+  '+',
+  '-',
+  '*',
+  '%',
+  '^',
+  '~',
+  '<',
+  '>',
+]);
+const REGEX_OK_KEYWORDS = new Set([
+  'return',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'new',
+  'delete',
+  'void',
+  'throw',
+  'case',
+  'do',
+  'else',
+  'yield',
+  'await',
+]);
 
 function prevSig(text, i) {
   let j = i - 1;
@@ -102,7 +163,10 @@ function skipRegex(text, i) {
   let inClass = false;
   while (k < text.length) {
     const c = text[k];
-    if (c === '\\') { k += 2; continue; }
+    if (c === '\\') {
+      k += 2;
+      continue;
+    }
     if (c === '[') inClass = true;
     else if (c === ']') inClass = false;
     else if (c === '/' && !inClass) {
@@ -120,7 +184,10 @@ function skipString(text, i) {
   const q = text[i];
   let k = i + 1;
   while (k < text.length) {
-    if (text[k] === '\\') { k += 2; continue; }
+    if (text[k] === '\\') {
+      k += 2;
+      continue;
+    }
     if (text[k] === q) return k + 1;
     if (text[k] === '\n') return k; // unterminated — bail
     k++;
@@ -136,11 +203,17 @@ function skipString(text, i) {
 function skipTemplate(text, i) {
   let out = '';
   let k = i + 1; // past opening backtick
-  let seg = k;   // start of the current literal-text run
-  const flush = (to) => { out += blank(text.slice(seg, to)); seg = to; };
+  let seg = k; // start of the current literal-text run
+  const flush = (to) => {
+    out += blank(text.slice(seg, to));
+    seg = to;
+  };
   while (k < text.length && text[k] !== '`') {
     const c = text[k];
-    if (c === '\\') { k += 2; continue; }
+    if (c === '\\') {
+      k += 2;
+      continue;
+    }
     if (c === '$' && text[k + 1] === '{') {
       flush(k);
       let depth = 1;
@@ -150,7 +223,10 @@ function skipTemplate(text, i) {
         if (d === "'" || d === '"') m = skipString(text, m);
         else if (d === '`') {
           let n = m + 1;
-          while (n < text.length && text[n] !== '`') { if (text[n] === '\\') n++; n++; }
+          while (n < text.length && text[n] !== '`') {
+            if (text[n] === '\\') n++;
+            n++;
+          }
           m = Math.min(n + 1, text.length);
         } else if (d === '/' && text[m + 1] === '/') {
           const nl = text.indexOf('\n', m);
@@ -159,7 +235,11 @@ function skipTemplate(text, i) {
           const end = text.indexOf('*/', m + 2);
           m = end === -1 ? text.length : end + 2;
         } else if (d === '/' && regexStart(text, m)) m = skipRegex(text, m);
-        else { if (d === '{') depth++; else if (d === '}') depth--; m++; }
+        else {
+          if (d === '{') depth++;
+          else if (d === '}') depth--;
+          m++;
+        }
       }
       out += stripCode(text.slice(k + 2, Math.max(m - 1, k + 2)));
       k = m;

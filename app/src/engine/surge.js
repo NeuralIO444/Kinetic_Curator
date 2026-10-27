@@ -142,13 +142,21 @@ export function createSurgeStore() {
 const SURGE_FIELDS = ['seed', 'acc', 'steps', 'envStart', 'strength', 'prevTrig'];
 export function snapshotSurgeStore(store) {
   const scenes = [];
-  if (store && store.scenes instanceof Map) for (const [id, sc] of store.scenes) scenes.push([id, SURGE_FIELDS.map((f) => sc[f])]);
+  if (store && store.scenes instanceof Map)
+    for (const [id, sc] of store.scenes) scenes.push([id, SURGE_FIELDS.map((f) => sc[f])]);
   return { v: 1, scenes };
 }
 export function checkSurgeStoreSnapshot(snap) {
   if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.scenes)) return false;
   for (const e of snap.scenes) {
-    if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string' || !Array.isArray(e[1]) || e[1].length !== SURGE_FIELDS.length) return false;
+    if (
+      !Array.isArray(e) ||
+      e.length !== 2 ||
+      typeof e[0] !== 'string' ||
+      !Array.isArray(e[1]) ||
+      e[1].length !== SURGE_FIELDS.length
+    )
+      return false;
     if (!e[1].every((v) => Number.isFinite(v))) return false;
   }
   return true;
@@ -158,7 +166,9 @@ export function restoreSurgeStore(store, snap) {
   store.scenes.clear();
   for (const [id, vals] of snap.scenes) {
     const sc = {};
-    SURGE_FIELDS.forEach((f, i) => { sc[f] = vals[i]; });
+    SURGE_FIELDS.forEach((f, i) => {
+      sc[f] = vals[i];
+    });
     store.scenes.set(id, sc);
   }
   return true;
@@ -229,7 +239,12 @@ export function applySurge(soa, ctx, still = null) {
     sc = { seed, acc: 0, steps: 0, envStart: -1, strength: 0, prevTrig: 0 };
     sg.store.scenes.set(sceneId, sc);
   } else if (sc.seed !== seed) {
-    sc.seed = seed; sc.acc = 0; sc.steps = 0; sc.envStart = -1; sc.strength = 0; sc.prevTrig = 0;
+    sc.seed = seed;
+    sc.acc = 0;
+    sc.steps = 0;
+    sc.envStart = -1;
+    sc.strength = 0;
+    sc.prevTrig = 0;
   }
   const trig = clamp01(sg.trigger);
 
@@ -237,7 +252,9 @@ export function applySurge(soa, ctx, still = null) {
   // trigger (prevTrig tracks it, so a held trigger cannot edge-fire
   // the moment pressure clears). The clock does not bank shed time.
   if (sg.shed) {
-    sc.envStart = -1; sc.strength = 0; sc.prevTrig = trig;
+    sc.envStart = -1;
+    sc.strength = 0;
+    sc.prevTrig = trig;
     return null;
   }
 
@@ -263,14 +280,21 @@ export function applySurge(soa, ctx, still = null) {
 
   if (sc.envStart < 0) return null;
   const phaseSteps = sc.steps - sc.envStart;
-  if (phaseSteps >= SURGE_STEPS) { sc.envStart = -1; sc.strength = 0; return null; }
+  if (phaseSteps >= SURGE_STEPS) {
+    sc.envStart = -1;
+    sc.strength = 0;
+    return null;
+  }
   const z = surgeEnvelope(phaseSteps / SURGE_STEPS) * amount * sc.strength;
   if (z === 0) return null;
 
   const read = surgeZRead(z);
   const n = soa.n | 0;
   let base = SURGE_BASE_Y.get(soa);
-  if (!base || base.y.length < n) { base = { y: new Float64Array(n) }; SURGE_BASE_Y.set(soa, base); }
+  if (!base || base.y.length < n) {
+    base = { y: new Float64Array(n) };
+    SURGE_BASE_Y.set(soa, base);
+  }
   for (let k = 0; k < n; k++) base.y[k] = soa.y[k];
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
@@ -299,5 +323,6 @@ registerCostTier('travel/surge', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.01,
-  notes: '#1576 P3 — SURGE: step-clocked z envelope folded into scale/rise/alpha on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder. The trigger is the Queen\'s stamp (Q3: the curation layer\'s M9 call, stamped by liveLoop on input.surgeTrigger) — inert on every frame she does not call.',
+  notes:
+    "#1576 P3 — SURGE: step-clocked z envelope folded into scale/rise/alpha on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder. The trigger is the Queen's stamp (Q3: the curation layer's M9 call, stamped by liveLoop on input.surgeTrigger) — inert on every frame she does not call.",
 });
