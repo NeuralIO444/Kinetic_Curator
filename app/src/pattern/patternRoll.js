@@ -27,7 +27,7 @@ export const CHAOS_ADD_CHANCE = 0; // Matt, 2026-10-08: patterns on request. KIN
 export const BORN_OPACITY = 1;
 
 const isPattern = (l) => !!l && l.type === 'pattern';
-const u32 = (rng) => (Math.floor(rng() * 0xffffffff) >>> 0) || 1;
+const u32 = (rng) => Math.floor(rng() * 0xffffffff) >>> 0 || 1;
 const between = (rng, lo, hi) => lo + (hi - lo) * rng();
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 
@@ -53,14 +53,22 @@ export function dealPattern(prev, rng) {
 export function reseedPattern(prev, rng) {
   const p = sanitizePattern(prev);
   const step = rng() < 0.5 ? -1 : 1;
-  return sanitizePattern({ ...p, seed: u32(rng), density: clamp(p.density + step, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX) });
+  return sanitizePattern({
+    ...p,
+    seed: u32(rng),
+    density: clamp(p.density + step, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX),
+  });
 }
 
 /** WEATHER tap: the same picture, the air moves. A still pattern stays still (the performer chose that). */
 export function weatherPattern(prev, rng) {
   const p = sanitizePattern(prev);
   const d = (rng() - 0.5) * 0.4;
-  return sanitizePattern({ ...p, mix: clamp(p.mix + d, 0, 1), drift: p.drift > 0 ? clamp(p.drift + (rng() - 0.5) * 0.4, 0.05, 1) : 0 });
+  return sanitizePattern({
+    ...p,
+    mix: clamp(p.mix + d, 0, 1),
+    drift: p.drift > 0 ? clamp(p.drift + (rng() - 0.5) * 0.4, 0.05, 1) : 0,
+  });
 }
 
 const BY_KIND = { chaos: dealPattern, curate: dealPattern, rules: reseedPattern, weather: weatherPattern };
@@ -69,7 +77,12 @@ const BY_KIND = { chaos: dealPattern, curate: dealPattern, rules: reseedPattern,
  * Apply a roll of `kind` to a layer list. Returns { layers, changed }. `canAdd` is the caller's pre-flight (tape not
  * full) and only matters for chaos; the track cap is checked here. `makeId` names an added track from the roll.
  */
-export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = () => 'pt-roll', addChance = CHAOS_ADD_CHANCE } = {}) {
+export function rollPatternLayers(
+  layers,
+  kind,
+  rng,
+  { canAdd = true, makeId = () => 'pt-roll', addChance = CHAOS_ADD_CHANCE } = {},
+) {
   const fn = BY_KIND[kind];
   if (!fn || !Array.isArray(layers)) return { layers, changed: false };
   let changed = false;
@@ -81,10 +94,20 @@ export function rollPatternLayers(layers, kind, rng, { canAdd = true, makeId = (
   if (kind === 'chaos' && canAdd && !out.some(isPattern)) {
     const content = out.filter((l) => !isFxLayer(l) && !isMathLayer(l)).length;
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
-    const roll = rng(); const born = dealPattern(undefined, rng); const id = makeId();
+    const roll = rng();
+    const born = dealPattern(undefined, rng);
+    const id = makeId();
     if (roll < addChance && content < MAX_CONTENT_TRACKS) {
       // one rule everywhere: a pattern is ground, directly below the lowest KC track (bottom -> top)
-      const layer = { id, name: `PT-${out.filter(isPattern).length + 1}`, type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: BORN_OPACITY, pattern: born };
+      const layer = {
+        id,
+        name: `PT-${out.filter(isPattern).length + 1}`,
+        type: 'pattern',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: BORN_OPACITY,
+        pattern: born,
+      };
       const firstKc = out.findIndex((l) => l && !isPattern(l) && !isFxLayer(l) && !isMathLayer(l));
       const at = firstKc < 0 ? 0 : firstKc;
       out = [...out.slice(0, at), layer, ...out.slice(at)];

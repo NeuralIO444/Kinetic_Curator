@@ -32,14 +32,28 @@ const _grids = new Map();
 
 /** The same grid patternSource.buildGrid makes for a w x h frame (kept in step by ground.selfcheck). */
 function gridFor(p, pal, w, h) {
-  const key = JSON.stringify([p.mode, p.seed, p.density, p.mix, p.hero, pal.swatches, pal.bg, pal.weights ?? null, w, h]);
+  const key = JSON.stringify([
+    p.mode,
+    p.seed,
+    p.density,
+    p.mix,
+    p.hero,
+    pal.swatches,
+    pal.bg,
+    pal.weights ?? null,
+    w,
+    h,
+  ]);
   let g = _grids.get(key);
   if (g) return g;
   const tileW = w / p.density;
   const rows = Math.max(1, Math.ceil(h / tileW));
-  const grid = p.mode === 'GLYPH' ? assignGlyph(p.seed, p.density, p.mix, pal)
-    : p.mode === 'FIELD' ? assign(p.seed, p.density, p.mix, pal, rows)
-      : assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows);
+  const grid =
+    p.mode === 'GLYPH'
+      ? assignGlyph(p.seed, p.density, p.mix, pal)
+      : p.mode === 'FIELD'
+        ? assign(p.seed, p.density, p.mix, pal, rows)
+        : assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows);
   g = { tileW, grid };
   if (_grids.size >= CACHE_SIZE) _grids.delete(_grids.keys().next().value);
   _grids.set(key, g);
@@ -92,8 +106,13 @@ export function patternGround(pattern, palette, w, h) {
       const main = String(mainColor(tile, grid)).toLowerCase();
       let ground = grid.ground;
       let all = [];
-      if (tile && Array.isArray(tile.colors)) { ground = tile.colors[0]; all = tile.colors.slice(1); }
-      else if (tile && tile.roles) { ground = tile.roles.ground; all = [tile.roles.mark, tile.roles.accent, tile.roles.cut]; }
+      if (tile && Array.isArray(tile.colors)) {
+        ground = tile.colors[0];
+        all = tile.colors.slice(1);
+      } else if (tile && tile.roles) {
+        ground = tile.roles.ground;
+        all = [tile.roles.mark, tile.roles.accent, tile.roles.cut];
+      }
       const g = typeof ground === 'string' ? ground.toLowerCase() : null;
       const out = [main];
       for (const c of all) {

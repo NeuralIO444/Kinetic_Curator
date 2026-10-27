@@ -43,11 +43,25 @@ export function emit(event, payload, opts) {
   let meta;
   if (opts) {
     let stamp;
-    try { stamp = stampProvider ? stampProvider() : null; } catch { stamp = null; }
-    meta = { seq: ++seq, event, cause: (opts && opts.cause) ?? null, ...(opts && opts.quantized ? { quantized: opts.quantized } : {}), ...(stamp || {}) };
+    try {
+      stamp = stampProvider ? stampProvider() : null;
+    } catch {
+      stamp = null;
+    }
+    meta = {
+      seq: ++seq,
+      event,
+      cause: (opts && opts.cause) ?? null,
+      ...(opts && opts.quantized ? { quantized: opts.quantized } : {}),
+      ...(stamp || {}),
+    };
   }
   for (const fn of set) {
-    try { fn(payload, meta); } catch (e) { console.error('[eventBus]', event, e); }
+    try {
+      fn(payload, meta);
+    } catch (e) {
+      console.error('[eventBus]', event, e);
+    }
   }
 }
 
@@ -65,7 +79,9 @@ export const PENDING_CAP = 64;
  * Reset by clearPending (a fresh take starts a fresh count).
  */
 let dropsPastCap = 0;
-export function droppedPastCap() { return dropsPastCap; }
+export function droppedPastCap() {
+  return dropsPastCap;
+}
 
 /**
  * @param unit 'beat' | 'bar'
@@ -75,7 +91,10 @@ export function emitOn(unit, event, payload, opts = {}) {
   const q = pending[unit];
   if (!q) return false;
   q.push({ event, payload, opts: { ...opts, quantized: unit } });
-  while (q.length > PENDING_CAP) { q.shift(); dropsPastCap++; }
+  while (q.length > PENDING_CAP) {
+    q.shift();
+    dropsPastCap++;
+  }
   return true;
 }
 
@@ -90,12 +109,16 @@ export function releaseTick(unit) {
 
 /** Drop everything waiting (tests, a fresh take). */
 export function clearPending() {
-  pending.beat.length = 0; pending.bar.length = 0;
+  pending.beat.length = 0;
+  pending.bar.length = 0;
   dropsPastCap = 0; // #1641: a fresh take starts a fresh count
 }
 
 export function once(event, fn) {
-  const wrap = (p) => { off(event, wrap); fn(p); };
+  const wrap = (p) => {
+    off(event, wrap);
+    fn(p);
+  };
   on(event, wrap);
 }
 

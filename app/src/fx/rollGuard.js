@@ -21,7 +21,9 @@ export function createRollGuard({ settle, capture, unchanged, redeal, health = f
     for (;;) {
       await settle();
       if (mine !== gen || !unchanged(snapshot)) return { redeals, dead: false, cancelled: true };
-      const frame = await Promise.resolve().then(capture).catch(() => null);
+      const frame = await Promise.resolve()
+        .then(capture)
+        .catch(() => null);
       if (mine !== gen || !unchanged(snapshot)) return { redeals, dead: false, cancelled: true };
       if (!frame || !frame.pixels) return { redeals, dead: false, cancelled: false }; // can't see: trust the roll
       const h = health(frame.pixels);
@@ -32,5 +34,10 @@ export function createRollGuard({ settle, capture, unchanged, redeal, health = f
       redeals += 1;
     }
   }
-  return { check, cancel: () => { gen += 1; } };
+  return {
+    check,
+    cancel: () => {
+      gen += 1;
+    },
+  };
 }

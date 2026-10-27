@@ -69,9 +69,13 @@ export function motion(mode, drift, t, ctx = {}) {
   if (clamp01(drift) === 0) return IDENTITY;
   const n = Math.max(1, Number(ctx.count) || 1);
   switch (mode) {
-    case 'QUILT': return { kind: 'rotate', angle: (i) => quiltAngle(drift, t, i, n) };
-    case 'GLYPH': return { kind: 'scale', scale: (i) => glyphPulse(drift, t, i, n) };
-    case 'FIELD': return { kind: 'pan', ...fieldPan(drift, t, Number(ctx.angle) || 0) };
-    default: return IDENTITY;
+    case 'QUILT':
+      return { kind: 'rotate', angle: (i) => quiltAngle(drift, t, i, n) };
+    case 'GLYPH':
+      return { kind: 'scale', scale: (i) => glyphPulse(drift, t, i, n) };
+    case 'FIELD':
+      return { kind: 'pan', ...fieldPan(drift, t, Number(ctx.angle) || 0) };
+    default:
+      return IDENTITY;
   }
 }

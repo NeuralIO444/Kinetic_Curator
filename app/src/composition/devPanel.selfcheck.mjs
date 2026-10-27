@@ -22,27 +22,38 @@ const APP = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const registrySrc = readFileSync(join(APP, 'src/composition/PanelRegistry.js'), 'utf8');
 
 // A. exactly one DEV registration, id 'dev', DEV-gated.
-const pushed = [...registrySrc.matchAll(/PANEL_REGISTRY\.push\(\s*\{\s*id:\s*'([^']+)'/g)]
-  .map((m) => m[1]);
-assert.deepStrictEqual(pushed, ['dev'],
-  `registry must push exactly one dev entry (id 'dev'), got: ${JSON.stringify(pushed)}`);
-assert.ok(/import\.meta\.env\.DEV && DevPanel/.test(registrySrc),
-  'the dev registration must stay gated behind import.meta.env.DEV');
+const pushed = [...registrySrc.matchAll(/PANEL_REGISTRY\.push\(\s*\{\s*id:\s*'([^']+)'/g)].map((m) => m[1]);
+assert.deepStrictEqual(
+  pushed,
+  ['dev'],
+  `registry must push exactly one dev entry (id 'dev'), got: ${JSON.stringify(pushed)}`,
+);
+assert.ok(
+  /import\.meta\.env\.DEV && DevPanel/.test(registrySrc),
+  'the dev registration must stay gated behind import.meta.env.DEV',
+);
 
 // B. the three old ids are gone from the registry.
 for (const dead of ['shaderlab', 'xray', 'govtune']) {
-  assert.ok(!new RegExp(`id:\\s*'${dead}'`).test(registrySrc),
-    `stale '${dead}' registration must not remain in the registry`);
+  assert.ok(
+    !new RegExp(`id:\\s*'${dead}'`).test(registrySrc),
+    `stale '${dead}' registration must not remain in the registry`,
+  );
 }
 
 // C. the tabs in order — #691's three plus Biology (#793), Units, then
 // Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost
 // T3), and Shelf (#1590) — each a React.lazy component.
-assert.deepStrictEqual(DEV_TABS.map((t) => t.id), ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census', 'taste', 'shelf'],
-  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507) / Taste (XGBoost T3) / Shelf (#1590), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`);
+assert.deepStrictEqual(
+  DEV_TABS.map((t) => t.id),
+  ['xray', 'govtune', 'shaderlab', 'biology', 'units', 'kernel', 'mind', 'census', 'taste', 'shelf'],
+  `DEV_TABS must be X-Ray / Gov Tune / Shader Lab / Biology / Units / Kernel / Mind / Census (#1507) / Taste (XGBoost T3) / Shelf (#1590), got: ${JSON.stringify(DEV_TABS.map((t) => t.id))}`,
+);
 for (const t of DEV_TABS) {
-  assert.ok(t.component?.$$typeof === Symbol.for('react.lazy'),
-    `tab '${t.id}' must be a React.lazy component (one chunk per tab)`);
+  assert.ok(
+    t.component?.$$typeof === Symbol.for('react.lazy'),
+    `tab '${t.id}' must be a React.lazy component (one chunk per tab)`,
+  );
 }
 
 console.log('[selfcheck] dev panel OK — one DEV registry entry (DEV-gated); nine lazy tabs; no stale dev ids');

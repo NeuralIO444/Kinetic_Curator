@@ -26,7 +26,10 @@ const minAreaFor = (w, h) => Math.max(8, Math.round((w * h) / 2500));
 
 const isBadInput = (pixels, w, h) =>
   (!(pixels instanceof Uint8ClampedArray) && !(pixels instanceof Uint8Array)) ||
-  !Number.isInteger(w) || !Number.isInteger(h) || w <= 0 || h <= 0 ||
+  !Number.isInteger(w) ||
+  !Number.isInteger(h) ||
+  w <= 0 ||
+  h <= 0 ||
   pixels.length < w * h * 4;
 
 const hex2 = (n) => n.toString(16).padStart(2, '0');
@@ -61,39 +64,70 @@ export function detectRegions(pixels, w, h, opts = {}) {
     if (!isFg(pixels, s) || regionOf[s] !== -1) continue;
     const bucket = bucketOf[s];
     const rid = regions.length;
-    let area = 0, sx = 0, sy = 0, perim = 0;
-    let x0 = w, y0 = h, x1 = -1, y1 = -1;
+    let area = 0,
+      sx = 0,
+      sy = 0,
+      perim = 0;
+    let x0 = w,
+      y0 = h,
+      x1 = -1,
+      y1 = -1;
     const hist = new Map();
     stack.push(s);
     regionOf[s] = rid;
     while (stack.length) {
       const p = stack.pop();
-      const x = p % w, y = (p / w) | 0;
-      area++; sx += x; sy += y;
-      if (x < x0) x0 = x; if (x > x1) x1 = x;
-      if (y < y0) y0 = y; if (y > y1) y1 = y;
+      const x = p % w,
+        y = (p / w) | 0;
+      area++;
+      sx += x;
+      sy += y;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
       const key = (pixels[p * 4] << 16) | (pixels[p * 4 + 1] << 8) | pixels[p * 4 + 2];
       hist.set(key, (hist.get(key) || 0) + 1);
       // 4 neighbors with row-wrap + bounds guards
-      if (x > 0) tryGrow(p - 1); else perim++;
-      if (x < w - 1) tryGrow(p + 1); else perim++;
-      if (y > 0) tryGrow(p - w); else perim++;
-      if (y < h - 1) tryGrow(p + w); else perim++;
+      if (x > 0) tryGrow(p - 1);
+      else perim++;
+      if (x < w - 1) tryGrow(p + 1);
+      else perim++;
+      if (y > 0) tryGrow(p - w);
+      else perim++;
+      if (y < h - 1) tryGrow(p + w);
+      else perim++;
       function tryGrow(q) {
-        if (!isFg(pixels, q)) { perim++; return; }
+        if (!isFg(pixels, q)) {
+          perim++;
+          return;
+        }
         if (regionOf[q] !== -1) return; // visited (any region): not our problem here
-        if (bucketOf[q] === bucket) { regionOf[q] = rid; stack.push(q); }
-        else perim++;
+        if (bucketOf[q] === bucket) {
+          regionOf[q] = rid;
+          stack.push(q);
+        } else perim++;
       }
     }
-    let modeKey = 0, modeCount = -1;
-    for (const [k, c] of hist) if (c > modeCount) { modeCount = c; modeKey = k; }
+    let modeKey = 0,
+      modeCount = -1;
+    for (const [k, c] of hist)
+      if (c > modeCount) {
+        modeCount = c;
+        modeKey = k;
+      }
     regions.push({
       bucket,
       color: hex2((modeKey >> 16) & 255) + hex2((modeKey >> 8) & 255) + hex2(modeKey & 255),
-      cx: sx / area / w, cy: sy / area / h,
-      x0: x0 / w, y0: y0 / h, x1: (x1 + 1) / w, y1: (y1 + 1) / h,
-      area, perim, alive: true,
+      cx: sx / area / w,
+      cy: sy / area / h,
+      x0: x0 / w,
+      y0: y0 / h,
+      x1: (x1 + 1) / w,
+      y1: (y1 + 1) / h,
+      area,
+      perim,
+      alive: true,
     });
   }
 
@@ -110,7 +144,8 @@ export function detectRegions(pixels, w, h, opts = {}) {
     }
   }
   function link(p, q) {
-    const a = regionOf[p], b = regionOf[q];
+    const a = regionOf[p],
+      b = regionOf[q];
     if (a === -1 || b === -1 || a === b) return;
     adj[a].set(b, (adj[a].get(b) || 0) + 1);
     adj[b].set(a, (adj[b].get(a) || 0) + 1);
@@ -120,7 +155,11 @@ export function detectRegions(pixels, w, h, opts = {}) {
   //    sharing their longest border. Isolated thin marks are kept — they're
   //    real artwork, not edges.
   const parent = regions.map((_, i) => i);
-  const find = (i) => { let r = i; while (parent[r] !== r) r = parent[r]; return r; };
+  const find = (i) => {
+    let r = i;
+    while (parent[r] !== r) r = parent[r];
+    return r;
+  };
   for (let pass = 0; pass < 8; pass++) {
     let changed = false;
     for (let i = 0; i < regions.length; i++) {
@@ -128,19 +167,25 @@ export function detectRegions(pixels, w, h, opts = {}) {
       if (ri !== i || !regions[ri].alive) continue;
       const r = regions[ri];
       if (r.perim === 0 || r.area / r.perim >= SLIVER_RATIO) continue;
-      let best = -1, bestLen = 0;
+      let best = -1,
+        bestLen = 0;
       for (const [nb, len] of adj[ri]) {
         const rn = find(nb);
         if (rn === ri || !regions[rn].alive) continue;
-        if (len > bestLen) { bestLen = len; best = rn; }
+        if (len > bestLen) {
+          bestLen = len;
+          best = rn;
+        }
       }
       if (best === -1) continue;
       const t = regions[best];
       const total = t.area + r.area;
       t.cx = (t.cx * t.area + r.cx * r.area) / total;
       t.cy = (t.cy * t.area + r.cy * r.area) / total;
-      t.x0 = Math.min(t.x0, r.x0); t.y0 = Math.min(t.y0, r.y0);
-      t.x1 = Math.max(t.x1, r.x1); t.y1 = Math.max(t.y1, r.y1);
+      t.x0 = Math.min(t.x0, r.x0);
+      t.y0 = Math.min(t.y0, r.y0);
+      t.x1 = Math.max(t.x1, r.x1);
+      t.y1 = Math.max(t.y1, r.y1);
       t.area = total;
       t.perim = Math.max(1, t.perim + r.perim - 2 * bestLen);
       for (const [nb, len] of adj[ri]) {
@@ -173,7 +218,7 @@ export function detectRegions(pixels, w, h, opts = {}) {
   // 6. Stable IDs: rm-<color>-<gx>-<gy> on an 8x8 nearest grid; deterministic
   //    disambiguator when color+cell collide.
   const alive = regions.filter((r) => r.alive);
-  alive.sort((a, b) => (a.cy - b.cy) || (a.cx - b.cx));
+  alive.sort((a, b) => a.cy - b.cy || a.cx - b.cx);
   const used = new Set();
   const finalIndex = new Map();
   for (const r of alive) {
@@ -204,8 +249,15 @@ export function detectRegions(pixels, w, h, opts = {}) {
 
   return {
     regions: alive.map((r) => ({
-      id: r.id, color: r.color, cx: r.cx, cy: r.cy,
-      x0: r.x0, y0: r.y0, x1: r.x1, y1: r.y1, area: r.area,
+      id: r.id,
+      color: r.color,
+      cx: r.cx,
+      cy: r.cy,
+      x0: r.x0,
+      y0: r.y0,
+      x1: r.x1,
+      y1: r.y1,
+      area: r.area,
     })),
     width: w,
     height: h,

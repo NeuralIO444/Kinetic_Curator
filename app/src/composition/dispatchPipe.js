@@ -23,7 +23,11 @@ export function subscribeDispatch(fn) {
 
 function notify(action) {
   for (const fn of observers) {
-    try { fn(action); } catch (e) { console.error('[dispatchPipe] observer error', e); }
+    try {
+      fn(action);
+    } catch (e) {
+      console.error('[dispatchPipe] observer error', e);
+    }
   }
 }
 
@@ -33,7 +37,11 @@ function flush() {
   const batch = pending;
   pending = new Map();
   for (const action of batch.values()) {
-    try { sink?.(action); } catch (e) { console.error('[dispatchPipe] dispatch error', e); }
+    try {
+      sink?.(action);
+    } catch (e) {
+      console.error('[dispatchPipe] dispatch error', e);
+    }
   }
 }
 
@@ -57,7 +65,10 @@ export function createDispatchPipe(rawDispatch) {
 
     // Preserve ordering: anything queued must land before a discrete action.
     if (pending.size > 0) {
-      if (rafId != null) { cancelAnimationFrame(rafId); rafId = null; }
+      if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       flush();
     }
     rawDispatch(action);

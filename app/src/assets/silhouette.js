@@ -51,10 +51,20 @@ export function traceAlpha(alpha, w, h) {
   const inside = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : alpha[y * w + x]);
   // Edge midpoints in pixel coords. Bits: TL=1 TR=2 BR=4 BL=8.
   const CASES = {
-    1: ['T', 'L'], 2: ['T', 'R'], 3: ['L', 'R'], 4: ['B', 'R'],
-    5: ['T', 'R', 'L', 'B'], 6: ['T', 'B'], 7: ['L', 'B'], 8: ['L', 'B'],
-    9: ['T', 'B'], 10: ['T', 'L', 'B', 'R'], 11: ['B', 'R'], 12: ['L', 'R'],
-    13: ['T', 'R'], 14: ['T', 'L'],
+    1: ['T', 'L'],
+    2: ['T', 'R'],
+    3: ['L', 'R'],
+    4: ['B', 'R'],
+    5: ['T', 'R', 'L', 'B'],
+    6: ['T', 'B'],
+    7: ['L', 'B'],
+    8: ['L', 'B'],
+    9: ['T', 'B'],
+    10: ['T', 'L', 'B', 'R'],
+    11: ['B', 'R'],
+    12: ['L', 'R'],
+    13: ['T', 'R'],
+    14: ['T', 'L'],
   };
   const segs = [];
   for (let y = 0; y < h - 1; y++) {
@@ -128,13 +138,15 @@ function joinSegments(segs) {
  */
 export async function traceSilhouette(svgInner, size = 400, goo = 0, svgSubtract = '') {
   const s = Math.max(64, Math.min(1024, Math.round(size) || 400));
-  const radius = Math.max(0, +goo || 0) * s / 100;
+  const radius = (Math.max(0, +goo || 0) * s) / 100;
   const pad = Math.ceil(radius) + 2;
   const S = s + pad * 2;
   // currentColor has no meaning inside an <img>; pin it to opaque white.
   // Only the alpha channel matters downstream.
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">`
-    + String(svgInner).replace(/currentColor/g, '#fff') + '</svg>';
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">` +
+    String(svgInner).replace(/currentColor/g, '#fff') +
+    '</svg>';
   const img = new Image();
   img.decoding = 'sync';
   img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -146,9 +158,13 @@ export async function traceSilhouette(svgInner, size = 400, goo = 0, svgSubtract
   if (svgSubtract) {
     const simg = new Image();
     simg.decoding = 'sync';
-    simg.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(
-      `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">`
-      + String(svgSubtract).replace(/currentColor/g, '#fff') + '</svg>');
+    simg.src =
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="${s}" height="${s}">` +
+          String(svgSubtract).replace(/currentColor/g, '#fff') +
+          '</svg>',
+      );
     await simg.decode();
     ctx.globalCompositeOperation = 'destination-out';
     ctx.drawImage(simg, pad, pad, s, s);
@@ -228,7 +244,10 @@ export function outerLoop(loops) {
   let bestA = -1;
   for (const l of loops || []) {
     const a = Math.abs(loopArea(l));
-    if (a > bestA) { bestA = a; best = l; }
+    if (a > bestA) {
+      bestA = a;
+      best = l;
+    }
   }
   return best;
 }
@@ -240,7 +259,7 @@ function pointInLoop(pt, loop) {
   for (let i = 0, j = loop.length - 1; i < loop.length; j = i++) {
     const [xi, yi] = loop[i];
     const [xj, yj] = loop[j];
-    if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) inside = !inside;
   }
   return inside;
 }

@@ -26,8 +26,10 @@ function absorbInto(into, from) {
   const total = into.area + from.area;
   into.cx = (into.cx * into.area + from.cx * from.area) / total;
   into.cy = (into.cy * into.area + from.cy * from.area) / total;
-  into.x0 = Math.min(into.x0, from.x0); into.y0 = Math.min(into.y0, from.y0);
-  into.x1 = Math.max(into.x1, from.x1); into.y1 = Math.max(into.y1, from.y1);
+  into.x0 = Math.min(into.x0, from.x0);
+  into.y0 = Math.min(into.y0, from.y0);
+  into.x1 = Math.max(into.x1, from.x1);
+  into.y1 = Math.max(into.y1, from.y1);
   into.area = total;
 }
 
@@ -51,10 +53,14 @@ export function capRegionsTracked(regions, cap) {
   const keptWork = order.slice(0, cap).map((e) => e.r);
   const absorbedInto = new Map(); // work object -> kept work object
   for (const e of order.slice(cap)) {
-    let best = keptWork[0]; let bd = Infinity;
+    let best = keptWork[0];
+    let bd = Infinity;
     for (const k of keptWork) {
       const d = (k.cx - e.r.cx) ** 2 + (k.cy - e.r.cy) ** 2;
-      if (d < bd - 1e-12) { bd = d; best = k; }
+      if (d < bd - 1e-12) {
+        bd = d;
+        best = k;
+      }
     }
     absorbInto(best, e.r);
     absorbedInto.set(e.r, best);
@@ -92,10 +98,14 @@ export function partitionFromDetection(detected, idMap, w, h, records) {
   const keptToRecord = kept.map((k) => {
     const hit = recordById.get(k.id);
     if (hit !== undefined) return hit;
-    let best = 0; let bd = Infinity;
+    let best = 0;
+    let bd = Infinity;
     records.forEach((r, i) => {
       const d = (r.cx - k.cx) ** 2 + (r.cy - k.cy) ** 2;
-      if (d < bd) { bd = d; best = i; }
+      if (d < bd) {
+        bd = d;
+        best = i;
+      }
     });
     return best;
   });
@@ -152,8 +162,13 @@ export function regionCellGeometry(region) {
   const w = hw * 2;
   const h = hh * 2;
   return {
-    x0: cx - hw, y0: cy - hh, w, h,
-    pivotX: (cx - 100) / 2, pivotY: (cy - 100) / 2,
-    scaleX: w / 2 / 199.5, scaleY: h / 2 / 199.5,
+    x0: cx - hw,
+    y0: cy - hh,
+    w,
+    h,
+    pivotX: (cx - 100) / 2,
+    pivotY: (cy - 100) / 2,
+    scaleX: w / 2 / 199.5,
+    scaleY: h / 2 / 199.5,
   };
 }

@@ -13,7 +13,15 @@
 // shader drawers, checked against these references.
 
 import {
-  assign, assignQuilt, assignGlyph, rasterField, rasterGlyph, createQuiltRaster, panOffset, quiltMoverMap, glyphMoverMap,
+  assign,
+  assignQuilt,
+  assignGlyph,
+  rasterField,
+  rasterGlyph,
+  createQuiltRaster,
+  panOffset,
+  quiltMoverMap,
+  glyphMoverMap,
 } from './engine.js';
 import { sanitizePattern } from '../state/patternTrack.js';
 
@@ -36,7 +44,22 @@ export function patternKey(pattern, palette, w, h, t = 0) {
   const time = p.drift > 0 ? Number(t) || 0 : 0;
   // kin and movers change pixels only while the pattern moves, and not at all in FIELD (no discrete elements)
   const el = p.drift > 0 && p.mode !== 'FIELD' ? [p.kin, p.movers] : null;
-  return JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, p.drift, time, pal.swatches, pal.bg, pal.weights ?? null, w, h, el]);
+  return JSON.stringify([
+    p.mode,
+    p.seed,
+    p.density,
+    p.mix,
+    p.grout,
+    p.hero,
+    p.drift,
+    time,
+    pal.swatches,
+    pal.bg,
+    pal.weights ?? null,
+    w,
+    h,
+    el,
+  ]);
 }
 
 /**
@@ -48,13 +71,28 @@ export const PATTERN_LIVE_MAX_W = 1000;
 
 /** The size to draw a pattern at for a w x h target: full size while still, capped while it moves. */
 export function patternDrawSize(drift, w, h) {
-  const tw = Math.max(1, Math.round(w)); const th = Math.max(1, Math.round(h));
+  const tw = Math.max(1, Math.round(w));
+  const th = Math.max(1, Math.round(h));
   if (!(drift > 0) || tw <= PATTERN_LIVE_MAX_W) return { w: tw, h: th, scaled: false };
   return { w: PATTERN_LIVE_MAX_W, h: Math.max(1, Math.round((th * PATTERN_LIVE_MAX_W) / tw)), scaled: true };
 }
 
 /** What decides the PICTURE (everything but time): the key a still frame, and a drifting frame's tables, are cached on. */
-const staticKey = (p, pal, w, h) => JSON.stringify([p.mode, p.seed, p.density, p.mix, p.grout, p.hero, pal.swatches, pal.bg, pal.weights ?? null, w, h, p.mode === 'FIELD' ? null : [p.kin, p.movers]]);
+const staticKey = (p, pal, w, h) =>
+  JSON.stringify([
+    p.mode,
+    p.seed,
+    p.density,
+    p.mix,
+    p.grout,
+    p.hero,
+    pal.swatches,
+    pal.bg,
+    pal.weights ?? null,
+    w,
+    h,
+    p.mode === 'FIELD' ? null : [p.kin, p.movers],
+  ]);
 
 function buildGrid(p, pal, bw, bh) {
   const tileW = bw / p.density;
@@ -74,20 +112,35 @@ function buildGrid(p, pal, bw, bh) {
  * The pixels it returns belong to the source and are overwritten by the next frame: upload, do not keep.
  */
 export function createPatternFrames() {
-  let sKey = null; let plan = null; let still = null; let out = null;
+  let sKey = null;
+  let plan = null;
+  let still = null;
+  let out = null;
   return {
     /** @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first */
     frame(pattern, palette, w, h, t = 0) {
       const p = sanitizePattern(pattern);
       const pal = patternPalette(palette);
-      const bw = Math.max(1, Math.round(w)); const bh = Math.max(1, Math.round(h));
+      const bw = Math.max(1, Math.round(w));
+      const bh = Math.max(1, Math.round(h));
       const k = staticKey(p, pal, bw, bh);
       if (k !== sKey) {
         const { tileW, grid } = buildGrid(p, pal, bw, bh);
         // #1137: the seeded few elements that carry a KINEME motion (null = none, the picture as it was)
-        const movers = p.mode === 'QUILT' ? quiltMoverMap(grid, p.seed, p.kin, p.movers) : p.mode === 'GLYPH' ? glyphMoverMap(grid, p.seed, p.kin, p.movers) : null;
-        plan = { tileW, grid, movers, quilt: p.mode === 'QUILT' ? createQuiltRaster(grid, bw, bh, tileW, p.grout, movers) : null };
-        sKey = k; still = null;
+        const movers =
+          p.mode === 'QUILT'
+            ? quiltMoverMap(grid, p.seed, p.kin, p.movers)
+            : p.mode === 'GLYPH'
+              ? glyphMoverMap(grid, p.seed, p.kin, p.movers)
+              : null;
+        plan = {
+          tileW,
+          grid,
+          movers,
+          quilt: p.mode === 'QUILT' ? createQuiltRaster(grid, bw, bh, tileW, p.grout, movers) : null,
+        };
+        sKey = k;
+        still = null;
         if (!out || out.length !== bw * bh) out = new Uint32Array(bw * bh);
       }
       const key = patternKey(p, pal, bw, bh, t);
@@ -119,7 +172,8 @@ export function patternPixels(pattern, palette, w, h, t = 0) {
 
 /** The same frame as bytes, rows flipped to GL's bottom-up order, ready for texImage2D. */
 export function patternBytesGL(pattern, palette, w, h, t = 0) {
-  const bw = Math.max(1, Math.round(w)); const bh = Math.max(1, Math.round(h));
+  const bw = Math.max(1, Math.round(w));
+  const bh = Math.max(1, Math.round(h));
   const src = patternPixels(pattern, palette, bw, bh, t);
   const outp = new Uint32Array(bw * bh);
   for (let y = 0; y < bh; y++) outp.set(src.subarray(y * bw, (y + 1) * bw), (bh - 1 - y) * bw);
@@ -127,4 +181,5 @@ export function patternBytesGL(pattern, palette, w, h, t = 0) {
 }
 
 /** A frame's pixels as bytes, top row first, with no copy (upload with UNPACK_FLIP_Y_WEBGL). */
-export const patternBytes = (frame) => new Uint8Array(frame.pixels.buffer, frame.pixels.byteOffset, frame.pixels.byteLength);
+export const patternBytes = (frame) =>
+  new Uint8Array(frame.pixels.buffer, frame.pixels.byteOffset, frame.pixels.byteLength);

@@ -6,14 +6,24 @@ import { getRenderCaps } from '../data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const hue = [{ kind: 'hueRotate', params: { degrees: 40 } }];
 const gain = [{ kind: 'gain', params: {} }];
 const math = (effects, layerOpacity) => ({ type: 'math', effects, layerOpacity });
 
 ok('HUE ROTATE caps the display at 50% and clamps a higher stored value to it', () => {
-  for (const [stored, shown] of [[0, 0], [0.3, 0.3], [0.5, 0.5], [0.9, 0.5], [1, 0.5]]) {
+  for (const [stored, shown] of [
+    [0, 0],
+    [0.3, 0.3],
+    [0.5, 0.5],
+    [0.9, 0.5],
+    [1, 0.5],
+  ]) {
     const d = wetDisplay(math(hue, stored));
     assert.equal(d.cap, 0.5);
     assert.equal(d.capped, true);
@@ -54,11 +64,20 @@ ok('junk opacity is clamped, not shown as NaN', () => {
 const caps = getRenderCaps('balanced', false);
 function emittedWet(layer) {
   const doc = {
-    version: 1, seed: 1, paletteId: 'praystation', paletteOverrides: null,
+    version: 1,
+    seed: 1,
+    paletteId: 'praystation',
+    paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, count: 8 },
-    enabledAssets: {}, quality: 'balanced', layers: [layer], activeLayerId: layer.id, layerSnapshots: {},
+    enabledAssets: {},
+    quality: 'balanced',
+    layers: [layer],
+    activeLayerId: layer.id,
+    layerSnapshots: {},
   };
-  const resolvedLayers = [{ id: layer.id, isFx: true, isMath: true, layer, layerOpacity: layer.layerOpacity ?? 1, soloGrade: false }];
+  const resolvedLayers = [
+    { id: layer.id, isFx: true, isMath: true, layer, layerOpacity: layer.layerOpacity ?? 1, soloGrade: false },
+  ];
   const scene = buildSceneContract({ doc, resolvedLayers, caps });
   const w = scene.fxWraps.find((x) => x.fxLayerId === layer.id);
   return w ? w.opacity : null;
@@ -67,7 +86,15 @@ function emittedWet(layer) {
 ok('parity: the slider value equals the opacity the scene contract emits', () => {
   for (const effects of [hue, gain, [...gain, ...hue]]) {
     for (const stored of [0.1, 0.5, 0.75, 1]) {
-      const layer = { id: 'm1', name: 'M 1', type: 'math', visible: true, layerBlendMode: 'normal', layerOpacity: stored, effects };
+      const layer = {
+        id: 'm1',
+        name: 'M 1',
+        type: 'math',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: stored,
+        effects,
+      };
       assert.equal(emittedWet(layer), wetDisplay(layer).wet, `${effects.map((e) => e.kind)} @ ${stored}`);
     }
   }

@@ -14,15 +14,27 @@ export function frameHealth(px) {
   const total = px.length / 4;
   if (!total) return { coverage: 0, lumaGap: 0 };
   const h = new Map();
-  for (let i = 0; i < px.length; i += 4) { const k = (px[i] >> 3) * 1024 + (px[i + 1] >> 3) * 32 + (px[i + 2] >> 3); h.set(k, (h.get(k) || 0) + 1); }
-  let bk = 0; let best = -1;
-  for (const [k, c] of h) if (c > best) { best = c; bk = k; }
-  const br = ((bk >> 10) << 3) + 4; const bgc = (((bk >> 5) & 31) << 3) + 4; const bb = ((bk & 31) << 3) + 4;
+  for (let i = 0; i < px.length; i += 4) {
+    const k = (px[i] >> 3) * 1024 + (px[i + 1] >> 3) * 32 + (px[i + 2] >> 3);
+    h.set(k, (h.get(k) || 0) + 1);
+  }
+  let bk = 0;
+  let best = -1;
+  for (const [k, c] of h)
+    if (c > best) {
+      best = c;
+      bk = k;
+    }
+  const br = ((bk >> 10) << 3) + 4;
+  const bgc = (((bk >> 5) & 31) << 3) + 4;
+  const bb = ((bk & 31) << 3) + 4;
   const bl = (0.2126 * br + 0.7152 * bgc + 0.0722 * bb) / 255;
-  let n = 0; let gap = 0;
+  let n = 0;
+  let gap = 0;
   for (let i = 0; i < px.length; i += 4) {
     if (Math.abs(px[i] - br) + Math.abs(px[i + 1] - bgc) + Math.abs(px[i + 2] - bb) <= 36) continue;
-    n += 1; gap += Math.abs((0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255 - bl);
+    n += 1;
+    gap += Math.abs((0.2126 * px[i] + 0.7152 * px[i + 1] + 0.0722 * px[i + 2]) / 255 - bl);
   }
   return { coverage: n / total, lumaGap: n ? gap / n : 0 };
 }

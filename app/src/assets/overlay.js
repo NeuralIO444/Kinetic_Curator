@@ -74,17 +74,17 @@ export function duplicateIntoOverlay(source, overlay) {
   const taken = new Set(clean.map((a) => a.id));
   const copy = duplicateAsset(source, taken);
   if (!copy.ok) return { ok: false, error: copy.error, hint: errorHint(copy.error), overlay: clean };
-  if (clean.length >= OVERLAY_CAP) return { ok: false, error: 'overlay full', hint: errorHint('overlay full'), overlay: clean };
+  if (clean.length >= OVERLAY_CAP)
+    return { ok: false, error: 'overlay full', hint: errorHint('overlay full'), overlay: clean };
   const checked = ingestSvg(`<svg>${copy.asset.svg}</svg>`, { id: copy.asset.id.replace(/^user:/, '') });
-  const asset = checked.ok
-    ? { ...copy.asset, svg: checked.asset.svg, compound: checked.asset.compound }
-    : copy.asset;
+  const asset = checked.ok ? { ...copy.asset, svg: checked.asset.svg, compound: checked.asset.compound } : copy.asset;
   return { ok: true, asset, overlay: [...clean, asset] };
 }
 
 export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest', opts = {}) {
   const clean = sanitizeOverlay(overlay);
-  if (clean.length >= OVERLAY_CAP) return { ok: false, error: 'overlay full', hint: errorHint('overlay full'), overlay: clean };
+  if (clean.length >= OVERLAY_CAP)
+    return { ok: false, error: 'overlay full', hint: errorHint('overlay full'), overlay: clean };
   const taken = new Set(clean.map((a) => a.id));
   let base = String(hint || 'ingest').replace(/\.svg$/i, '');
   const source = opts.source || 'ingest';
@@ -92,27 +92,42 @@ export function ingestIntoOverlay(rawSvg, overlay, hint = 'ingest', opts = {}) {
   if (opts.category) ingestOpts.category = opts.category;
   if (opts.weight) ingestOpts.weight = opts.weight;
   let parsed = ingestSvg(rawSvg, ingestOpts);
-  if (!parsed.ok) return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
+  if (!parsed.ok)
+    return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
   let n = 2;
   while (taken.has(parsed.asset.id)) {
     parsed = ingestSvg(rawSvg, { ...ingestOpts, id: `${base}_${n}` });
     n += 1;
-    if (!parsed.ok) return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
+    if (!parsed.ok)
+      return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
   }
   const asset = { ...parsed.asset, source, tags: [...new Set([...(parsed.asset.tags || []), 'overlay', source])] };
   return { ok: true, asset, overlay: [...clean, asset] };
 }
 
 export function removeFromOverlay(id, overlay) {
-  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', hint: errorHint('canon is read-only'), overlay: sanitizeOverlay(overlay) };
+  if (!String(id).startsWith('user:'))
+    return {
+      ok: false,
+      error: 'canon is read-only',
+      hint: errorHint('canon is read-only'),
+      overlay: sanitizeOverlay(overlay),
+    };
   return { ok: true, overlay: sanitizeOverlay(overlay).filter((a) => a.id !== id) };
 }
 
 export function renameOverlayAsset(id, nextName, overlay) {
-  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', hint: errorHint('canon is read-only'), overlay: sanitizeOverlay(overlay) };
+  if (!String(id).startsWith('user:'))
+    return {
+      ok: false,
+      error: 'canon is read-only',
+      hint: errorHint('canon is read-only'),
+      overlay: sanitizeOverlay(overlay),
+    };
   const clean = sanitizeOverlay(overlay);
   const nextId = overlayId(nextName || 'motif');
-  if (clean.some((a) => a.id === nextId && a.id !== id)) return { ok: false, error: 'id taken', hint: errorHint('id taken'), overlay: clean };
+  if (clean.some((a) => a.id === nextId && a.id !== id))
+    return { ok: false, error: 'id taken', hint: errorHint('id taken'), overlay: clean };
   return {
     ok: true,
     overlay: clean.map((a) => (a.id === id ? { ...a, id: nextId } : a)),
@@ -122,10 +137,17 @@ export function renameOverlayAsset(id, nextName, overlay) {
 }
 
 export function replaceOverlayAsset(id, rawSvg, overlay) {
-  if (!String(id).startsWith('user:')) return { ok: false, error: 'canon is read-only', hint: errorHint('canon is read-only'), overlay: sanitizeOverlay(overlay) };
+  if (!String(id).startsWith('user:'))
+    return {
+      ok: false,
+      error: 'canon is read-only',
+      hint: errorHint('canon is read-only'),
+      overlay: sanitizeOverlay(overlay),
+    };
   const clean = sanitizeOverlay(overlay);
   const parsed = ingestSvg(rawSvg, { id: String(id).replace(/^user:/, '') });
-  if (!parsed.ok) return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
+  if (!parsed.ok)
+    return { ok: false, error: parsed.error, hint: parsed.hint || errorHint(parsed.error), overlay: clean };
   // #725: the old geometry is gone (regions re-detect from the new SVG),
   // but slot assignments are keyed by stable region ID — carry them so a
   // redraw that keeps the flat colors keeps its assignments. IDs that no
