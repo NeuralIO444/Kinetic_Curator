@@ -265,7 +265,7 @@ export const Events = {
   TASTE_EXPERIMENTAL: 'taste:experimental', // { on } the experimental taste switch
   TASTE_CLEAR: 'taste:clear', // drop the loaded taste.json
   BLOOM: 'davis:bloom', // #1153: a keep after a run of the artist's rolls ({ rolls, at }): the moment an earned voice is minted
-  ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|curate }); the guard checks the frame
+  ROLL_GUARD: 'roll:guard', // #1107: a roll just landed ({ kind: chaos|rules|weather|look|voice|curator|curate }); the guard checks the frame
   KINETIC_TAP: 'kinetic:tap', // loisActivity: every KINETIC tap (button + K)
   AUDIO_INPUT: 'audio:input', // #1459: { source: mic | file | none } the input changed
   AUDIO_ONSET: 'audio:onset', // #1459: { strength, band } a hit (spectral flux)

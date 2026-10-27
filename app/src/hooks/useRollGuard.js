@@ -12,6 +12,9 @@ const REDEAL = {
   chaos: (s) => s.kineticRoll(),
   rules: (s) => s.kineticRulesPass(),
   weather: (s) => s.kineticWeatherPass(),
+  look: (s) => s.kineticLookPass(), // #1772 — the sweep's passes
+  voice: (s) => s.kineticVoicePass(),
+  curator: (s) => s.kineticCuratorPass(),
   curate: (s) => s.curateUnlocked(),
 };
 const snap = () => {

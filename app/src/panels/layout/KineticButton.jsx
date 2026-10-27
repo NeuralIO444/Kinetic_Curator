@@ -1,15 +1,11 @@
-// KINETIC button (#942 shell, #943 RULES, #944 WEATHER, #945 heat + CHAOS) —
-// the top-menu storm generator.
+// KINETIC button (#942 shell, #945 heat, #1772 the sweep) — the top-menu storm generator.
 //
-// Tap routing (#945): every tap runs through the heat model
-// (routeKineticTapHeat in kineticHeat.mjs). A cool tap is a RULES pass — a
-// restrained structural reworking plus a fresh palette from the full pool
-// (#952: every KIN tap deals a new palette). A second tap while warm (~2s)
-// is a WEATHER pass — palette weather, light mood, atmospheric FX over the
-// same structure. Sustained rapid tapping (each tap <600ms after the last) builds heat; past
-// the weather layer it breaks the CHAOS ceiling — the full kitchen-sink
-// re-roll (kineticRoll: seed, palette, composition, mode, FX chain, blend
-// modes, assets, density/count, behave) — in one undo step.
+// Tap routing (#1772): every tap runs through the heat model (routeKineticTapHeat in kineticHeat.mjs), and the run
+// sweeps left to right. A fresh tap is a LOOK pass — a fresh Look + a pool coherent with it. The next warm tap (~2s)
+// is a VOICE pass — a fresh voice's motion + palette over the standing look. Every further warm tap is a CURATOR
+// pass — Davis nudges a few params by a capped amount, or keeps the piece. Sustained rapid tapping (each tap <600ms
+// after the last) builds heat; past the curator it breaks the CHAOS ceiling — the full kitchen-sink re-roll
+// (kineticRoll) — in one undo step. The armed roll scope (#964) is the ceiling over every pass.
 //
 // Heat lives here in the component, not the store: tap timestamps are human
 // gestures (like #268's swell envelope and #944's warm window), and the #806
@@ -24,7 +20,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { useHotkeys } from '../../hooks/useHotkeys.js';
-import { routeKineticTapHeat, decayHeat, heatLevel, publishShownHeat } from './kineticHeat.mjs';
+import { routeKineticTapHeat, decayHeat, heatLevel, publishShownHeat, kineticLayerLabel } from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
@@ -33,8 +29,9 @@ import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
 import { useInvite } from '../../hooks/useInvite.js';
 
 export function KineticButton() {
-  const kineticRulesPass = useStore((s) => s.kineticRulesPass);
-  const kineticWeatherPass = useStore((s) => s.kineticWeatherPass);
+  const kineticLookPass = useStore((s) => s.kineticLookPass);
+  const kineticVoicePass = useStore((s) => s.kineticVoicePass);
+  const kineticCuratorPass = useStore((s) => s.kineticCuratorPass);
   const kineticRoll = useStore((s) => s.kineticRoll);
   // Heat run state (#945): heat/taps as of the last tap + its timestamp.
   // The router returns the next run; the cooling interval below decays the
@@ -81,13 +78,17 @@ export function KineticButton() {
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
     publishShownHeat(r.heat);
     setHeat(r.heat);
-    setLastLayer(r.layer); // #1122 — the layer is discrete: RULES / WEATHER / CHAOS
+    setLastLayer(r.layer); // #1122 — the layer is discrete: LOOK / VOICE / CURATOR / CHAOS (#1772)
     // LOIS honest feed: the single observable for a KINETIC tap (button + K).
     emit(Events.KINETIC_TAP, { kind: r.layer });
     if (r.layer === 'chaos') kineticRoll();
-    else if (r.layer === 'weather') kineticWeatherPass();
-    else kineticRulesPass();
-    emit(Events.ROLL_GUARD, { kind: r.layer === 'chaos' || r.layer === 'weather' ? r.layer : 'rules' }); // #1107
+    else if (r.layer === 'curator') kineticCuratorPass();
+    else if (r.layer === 'voice') kineticVoicePass();
+    else kineticLookPass();
+    // #1107 — the guard re-deals a dead frame by undoing the roll; a curator pass that kept the piece pushed no undo
+    // entry, so there is nothing of its own to undo (and undoing would eat the voice pass before it). #1772
+    const passed = r.layer === 'curator' && !useStore.getState().kineticNudge?.moves?.length;
+    if (!passed) emit(Events.ROLL_GUARD, { kind: r.layer });
     restartCooling();
     setCooling(false);
     tapOpen.pulse(TAP_PULSE_MS); // #1103 — the button AND the K key flash the full name, then cool down
@@ -107,16 +108,16 @@ export function KineticButton() {
       {...tapOpen.props}
       style={{ '--heat': heat.toFixed(3) }}
       onClick={tap}
-      title="KINETIC — tap: recompose under design rules; warm tap: drift the atmosphere; hammer it: chaos (K)"
-      aria-label={`Kinetic — heat ${level}. Tap to recompose, warm tap drifts the atmosphere, rapid hammering breaks into chaos`}
+      title="KINETIC — tap: a new look; tap again: a new voice; keep tapping: the curator nudges; hammer it: chaos (K)"
+      aria-label={`Kinetic — heat ${level}. Tap for a new look, tap again for a new voice, keep tapping for a curator nudge, rapid hammering breaks into chaos`}
     >
       {/* #1122 — ● is heat → Davis: the circle glows with the run's heat */}
       <span className="tb-circle" aria-hidden="true" />
       <ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" />
       {/* #1122 — the layer is discrete → TE micro-label; visible while the run is warm */}
       {heat > 0.01 && lastLayer && (
-        <span className="tb-micro red" title={`last tap ran the ${lastLayer} layer`}>
-          {lastLayer === 'chaos' ? 'C' : lastLayer === 'weather' ? 'W' : 'R'}
+        <span className="tb-micro red" title={`last tap ran the ${lastLayer} pass`}>
+          {kineticLayerLabel(lastLayer)}
         </span>
       )}
     </button>

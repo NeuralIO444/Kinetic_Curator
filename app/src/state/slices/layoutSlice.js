@@ -45,6 +45,7 @@ import {
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
+import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -203,6 +204,13 @@ export const createLayoutSlice = (set) => ({
   seedOffsets: defaultSeedOffsets(),
   /** CURATE press counter (#518) — session-only, never serialized. */
   curatePress: 0,
+  /** #1772 — the deck voice the last KINETIC voice pass dealt (so the next deals a different one). Session-only. */
+  kineticVoiceId: null,
+  /**
+   * #1772 — the last KINETIC curator pass, backstage and honest: { curator, index, moves: [{ key, from, to }] }.
+   * `moves: []` means the curator passed (kept the piece as it stood). Session-only, never serialized.
+   */
+  kineticNudge: null,
   // #592 — did the last CURATE press fall back to an unconditioned roll?
   curateChainFallback: false,
   paletteId: 'praystation',
@@ -1074,6 +1082,62 @@ export const createLayoutSlice = (set) => ({
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
         light,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — KINETIC LOOK pass (tap 1 of the sweep): a fresh Look from the 64 + a pool coherent with its pairing.
+   * Structure and shapes move; motion, palette and seed hold. One undo step. Pure logic: state/kineticSweep.mjs.
+   */
+  kineticLookPass: () =>
+    set((state) => {
+      const r = lookPass(state, dieRng, { records: dealableRecords(ASSETS, state.customAssets) });
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: r.layoutParams,
+        enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — KINETIC VOICE pass (tap 2): a fresh voice from the 64-voice deck over the standing look. Motion + palette
+   * move, and the glow only when the voice declares accumulation (#1768). Structure and the pool hold. One undo step.
+   */
+  kineticVoicePass: () =>
+    set((state) => {
+      const r = voicePass(state, dieRng);
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: r.layoutParams,
+        paletteId: r.paletteId,
+        paletteOverrides: r.paletteOverrides,
+        paletteLocks: {},
+        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
+        kineticVoiceId: r.voiceId,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  /**
+   * #1772 — KINETIC CURATOR pass (tap 3+): Davis weighs the piece as it stands against a few capped nudges
+   * (≤ NUDGE_MAX_KEYS params, each ≤ NUDGE_SPREAD of its dice range) and keeps one. Keeping the standing piece is a
+   * real outcome: no change, no undo entry, and `kineticNudge.moves` reads empty. The record is the backstage signal.
+   */
+  kineticCuratorPass: () =>
+    set((state) => {
+      const curator = getActiveCurator();
+      const r = curatorPass(state, curator, dieRng, pickCurated);
+      const kineticNudge = { curator: curator?.name ?? null, index: r.index, moves: r.moves };
+      if (!r.layoutParams) return { kineticNudge };
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: r.layoutParams,
+        kineticNudge,
         voiceMix: null,
         activeVoiceId: null,
       };

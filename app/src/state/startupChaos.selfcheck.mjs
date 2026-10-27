@@ -74,7 +74,7 @@ assert.notStrictEqual(S().seed, seedBefore, 'the roll draws a fresh seed — lau
 
 // 5. Heat starts cool: the first KIN tap after boot is a RULES pass.
 const first = routeKineticTapHeat({ heat: 0, taps: 0, lastTapAt: 0 }, Date.now());
-assert.strictEqual(first.layer, 'rules', 'first tap after a cold boot routes to RULES');
+assert.strictEqual(first.layer, 'look', 'first tap after a cold boot routes to the LOOK pass (#1772)');
 assert.strictEqual(first.heat, 0, 'no heat carried into the boot');
 
 console.log('[startup-chaos] ok — decideBoot table, START setting, one-roll one-undo, factory opener, cool heat');
