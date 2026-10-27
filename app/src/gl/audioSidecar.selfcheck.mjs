@@ -14,6 +14,7 @@
 //     analysis + its own beat detector otherwise.
 import assert from 'node:assert';
 import { readFileSync, writeFileSync, mkdtempSync } from 'node:fs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { parseAudioEnvelope, envelopeTick, sampleEnvelope, AUDIO_SCHEMA } from './audioEnvelopeCore.mjs';
@@ -138,9 +139,9 @@ const good = () => ({
 // ── F ────────────────────────────────────────────────────────────────────
 {
   const hook = readFileSync(new URL('../hooks/useAudioInput.js', import.meta.url), 'utf8');
-  assert.ok(/source\.type === 'file'/.test(hook) && /envelopeTick\(env, el\.currentTime, envPrevTRef\.current\)/.test(hook), 'the sidecar drives a FILE source only, from playback time');
-  assert.ok(/rms = tick\.rms; bass = 0; mid = 0; treble = 0;/.test(hook), 'band routes zero: the sidecar has no bands');
-  assert.ok(/envBeat != null \? envBeat : rms - prevRmsRef\.current > 0\.15/.test(hook), 'beats from the sidecar, else the live spike detector');
+  assert.ok(flat(hook).includes(flat("source.type === 'file'")) && flat(hook).includes(flat('envelopeTick(env, el.currentTime, envPrevTRef.current)')), 'the sidecar drives a FILE source only, from playback time');
+  assert.ok(flat(hook).includes(flat('rms = tick.rms; bass = 0; mid = 0; treble = 0;')), 'band routes zero: the sidecar has no bands');
+  assert.ok(flat(hook).includes(flat('envBeat != null ? envBeat : rms - prevRmsRef.current > 0.15')), 'beats from the sidecar, else the live spike detector');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(/sidecar: state\.audioSidecar\?\.env \?\? null/.test(app), 'App hands the sidecar to the hook');
   const ctl = readFileSync(new URL('../panels/stimulus/SourceControls.jsx', import.meta.url), 'utf8');

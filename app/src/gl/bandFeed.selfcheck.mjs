@@ -90,12 +90,13 @@ assert.strictEqual(BAND_KEYS.length, METER_BANDS.length);
 // ── E ────────────────────────────────────────────────────────────────────
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
   const loop = src('./liveLoop.mjs');
   assert.ok(/bandFeed\.read\(\{[^}]*routes: effRoutes[^}]*sidecar: !!\(s\.audioSidecar && s\.audioSource\?\.type === 'file'\)[^}]*readBands: synth \? \(\) => mixLevels\([^}]*readMeterBandLevels/s.test(loop), 'the loop asks the feed, gated on the sidecar');
   assert.ok(/effRoutes, shapedBands\)/.test(loop), 'and hands the shaped bands to the routes');
   const tap = src('../hooks/audioMeterTap.js');
   assert.ok(/getByteFrequencyData\(freqBytes\)/.test(tap) && !/MeterHero/.test(tap.replace(/\/\/.*$/gm, '')), 'the tap reads the analyser itself: no dependency on the meter panel being mounted');
-  assert.ok(/setAudioMeterTap\(\{ analyser: meterAnalyser/.test(src('../hooks/useAudioInput.js')), 'the hook publishes the analyser whenever audio is on');
+  assert.ok(flat(src('../hooks/useAudioInput.js')).includes(flat('setAudioMeterTap({ analyser: meterAnalyser')), 'the hook publishes the analyser whenever audio is on');
   assert.ok(/getShapedBands\(\)/.test(src('../panels/stimulus/ModMatrix.jsx')), 'the matrix shows exactly what the loop fed');
   // the store's band shape is untouched (audioPipeline.selfcheck pins it)
   assert.ok(!/band\./.test(src('../state/slices/audioSlice.js').replace(/\/\/.*$/gm, '')), 'no band data in the store');

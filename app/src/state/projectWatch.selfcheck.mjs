@@ -12,6 +12,7 @@ const { serializeProject } = await import('./projectDocument.js');
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 
 ok('every store field serializeProject reads is watched (derived from the source, so a new one cannot slip past)', () => {
   const code = src('./projectDocument.js');
@@ -67,13 +68,13 @@ ok('an unrelated change does not wake it', () => {
 
 ok('wired: the subscriber uses the list, and a pending change is written when the page hides or closes', () => {
   const hook = src('../hooks/useProjectAutosave.js');
-  assert.match(hook, /import \{ projectDirty \} from '\.\.\/state\/projectWatch\.mjs'/);
-  assert.match(hook, /if \(!projectDirty\(state, prev\)\) return;/);
+  assert.ok(flat(hook).includes(flat("import { projectDirty } from '../state/projectWatch.mjs'")));
+  assert.ok(flat(hook).includes(flat('if (!projectDirty(state, prev)) return;')));
   assert.ok(!/state\.paletteOverrides === prev\.paletteOverrides/.test(hook), 'the hand-kept dozen is gone');
-  assert.match(hook, /window\.addEventListener\('pagehide', flush\)/);
-  assert.match(hook, /document\.addEventListener\('visibilitychange', onVisibility\)/);
-  assert.match(hook, /visibilityState === 'hidden'\) flush\(\)/);
-  assert.match(hook, /const flush = \(\) => \{ if \(firstChangeAt\.current != null \|\| timer\.current\) doWrite\(\); \};/, 'only a pending change is flushed');
+  assert.ok(flat(hook).includes(flat("window.addEventListener('pagehide', flush)")));
+  assert.ok(flat(hook).includes(flat("document.addEventListener('visibilitychange', onVisibility)")));
+  assert.ok(flat(hook).includes(flat("visibilityState === 'hidden') flush()")));
+  assert.ok(flat(hook).includes(flat('const flush = () => { if (firstChangeAt.current != null || timer.current) doWrite(); };')), 'only a pending change is flushed');
 });
 
 console.log(`projectWatch.selfcheck: ${n} checks passed`);
