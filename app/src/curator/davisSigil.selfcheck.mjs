@@ -1,6 +1,7 @@
 // davisSigil.selfcheck.mjs — Davis's face: a mandala from the seed, eight-fold, turning at his state's tempo (#1126).
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 import { sigilGeometry, drawSigil, sigilTempo, SIGIL_FOLDS, SIGIL_TEMPO_S, SIGIL_RINGS } from './davisSigil.js';
 import { DAVIS_STATES } from './davisState.js';
 
@@ -45,7 +46,7 @@ ok('fidelity: the same picture at any pixel density, the canvas just gets more r
   assert.deepEqual(lo.find((c) => c[0] === 'scale'), ['scale', 1, 1]); assert.deepEqual(hi.find((c) => c[0] === 'scale'), ['scale', 4, 4]);
   assert.deepEqual(hi.find((c) => c[0] === 'clearRect'), ['clearRect', 0, 0, 384, 384], 'the whole backing store is cleared');
   const src = readFileSync(new URL('../components/DavisSigil.jsx', import.meta.url), 'utf8');
-  assert.match(src, /Math\.min\(5, Math\.max\(3, /); assert.match(src, /width=\{px\} height=\{px\}/);
+  assert.ok(flat(src).includes(flat('Math.min(5, Math.max(3, '))); assert.ok(flat(src).includes(flat('width={px} height={px}')));
 });
 
 ok('drawn only from the seed: no Math.random, no clock, in the module or its component', () => {

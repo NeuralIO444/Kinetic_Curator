@@ -4,6 +4,7 @@
 // density clear the band's thresholds, and not otherwise; a take's record replays to the same events.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 import {
   FORM_HOLD_FRAMES, FORM_THRESHOLDS, thresholdsFor, conditionsHold, fertilityField, quantizeSignal,
   createFormationTracker, createFormationRecorder, replayFormation, verifyFormationRecord,
@@ -175,7 +176,7 @@ const run = (t, frames, u) => { const ev = []; for (let i = 0; i < frames; i++) 
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.ok(!/observeFormation\(input, output\)/.test(app) && !/observeSpawn\(input, output/.test(app), 'the tap channel is retired');
   const btn = readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8');
-  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection(, \w+: \w+)* \}/);
+  assert.match(flat(btn), /sections:\{stress:stressSection,formation:formationSection(,\w+:\w+)*\}/);
   assert.match(btn, /resetFormation\(\);/, 'a take starts from fresh formation state');
 }
 

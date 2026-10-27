@@ -1,6 +1,7 @@
 // #1461 step 1 — a take carries its BPM sequence; bars are rebuilt from it and the loop times, and match the live clock.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { withResolveTap, setResolveTap, setResolveOutputTap } from '../gl/resolveTap.mjs';
 import { createPerformanceRecorder, packPerformance, unpackPerformance, verifyPerformance } from '../gl/performanceFile.mjs';
@@ -100,7 +101,7 @@ await ok('the section survives the file, the take still verifies, and a bad reco
 
 await ok('wired: REC records it beside stress, formation and davis; the module is pure', () => {
   const btn = readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8');
-  assert.match(btn, /sections: \{ stress: stressSection, formation: formationSection, davis: davisSection, clock: clockSection[ ,]/);
+  assert.match(flat(btn), /sections:\{stress:stressSection,formation:formationSection,davis:davisSection,clock:clockSection[,}]/);
   assert.match(btn, /createClockRecorder\(\{ initialBpm: useStore\.getState\(\)\.beatBpm, getFrame \}\)/);
   const src = readFileSync(new URL('./clockRecord.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.ok(!/Date\.now|performance\.now|Math\.random|setTimeout|setInterval/.test(src));
