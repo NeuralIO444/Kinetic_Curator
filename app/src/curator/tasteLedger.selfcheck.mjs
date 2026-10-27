@@ -132,7 +132,7 @@ await ok('slice: F (favorite) → one keep line; J (keep) → one keep line; wit
   assert.strictEqual(lines('passes').length, 0);
 });
 
-await ok('slice: X (pass) → one pass line and NO store change (no live influence)', () => {
+await ok('slice: X (pass) → one pass line; keeps/favorites untouched; passCount +1 (#1753)', () => {
   reset();
   const a = boot();
   const before = a.get();
@@ -145,6 +145,7 @@ await ok('slice: X (pass) → one pass line and NO store change (no live influen
   assert.strictEqual(ps[0].seed, 33);
   assert.ok(isLedgerRow(ps[0]));
   assert.strictEqual(lines('keeps').length, 0, 'a pass is never a keep');
+  assert.strictEqual(after.passCount, (before.passCount || 0) + 1, '#1753: a landed pass is counted for taste pressure');
 });
 
 await ok('slice: a setlist duplicate and a shelf import are NOT new keep lines (two-ledger rule)', () => {
@@ -251,6 +252,7 @@ await ok("#1643: an uncapturable plate and a rejected record answer at the press
   a.call('addPass', { seed: 777, config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
   assert.equal(a.get().shelfNotice, 'that pass was not recorded', 'a capture with no timestamp is rejected at the ledger door — and says so');
   assert.equal(lines('passes').length, 0, 'still nothing in the passes ledger');
+  assert.equal(a.get().passCount || 0, 0, '#1753: a pass that did not land is not counted');
   a.call('addKeep', { seed: NaN });
   assert.equal(a.get().shelfNotice, "this plate can't be kept", 'J on an unsanitizable plate says so');
   assert.equal(a.get().keeps.length, 0, 'and nothing landed');

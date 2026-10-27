@@ -3,7 +3,7 @@
 // docs/ROADMAP_PETRI_DISH.md. Stress is a weighted sum of three HONEST signals, each already normalized to 0..1:
 //   activity  performer activity (input events in a frame window)
 //   dish      dish pressure (neighbour count / attraction around pinned heads)
-//   taste     taste pressure (rolls since the last keep; the keeps-vs-passes ratio joins with #1173)
+//   taste     taste pressure (rolls since the last keep, blended with the recent keeps-vs-passes share, #1753)
 // INSTRUMENT LOAD IS NOT AN INPUT (decision 2): load is the governor's job, and a slow machine must not make
 // different art. Nothing here reads time: every "window" is counted in frames or in actions (KC-1 DS: no timers with
 // opinions).
@@ -41,6 +41,31 @@ export function stressValue({ activity = 0, dish = 0, taste = 0 } = {}) {
 export function tastePressure(rollsSinceKeep, saturation = 24) {
   if (!Number.isFinite(rollsSinceKeep) || rollsSinceKeep <= 0 || !(saturation > 0)) return 0;
   return clamp01(rollsSinceKeep / saturation);
+}
+
+/**
+ * #1753 (decision 5) — the keeps-vs-passes share joins taste pressure now that the pass gesture (#1173) exists.
+ * `verdicts` is the session's recent deliberate verdicts, oldest first: 'keep' (F / the star / J) or 'pass' (X).
+ * Only the last VERDICT_WINDOW count, and nothing changes until VERDICT_MIN are in, so one early pass cannot spike
+ * the band. Counts of the artist's own acts, never a clock. Tunables: telemetry (#1635) sets them later.
+ */
+export const VERDICT_WINDOW = 8;
+export const VERDICT_MIN = 4;
+export const PASS_SHARE_WEIGHT = 0.5;
+
+/** Share of passes among the recent verdicts (0..1), or null below VERDICT_MIN. */
+export function passShare(verdicts) {
+  if (!Array.isArray(verdicts)) return null;
+  const w = verdicts.slice(-VERDICT_WINDOW).filter((v) => v === 'keep' || v === 'pass');
+  if (w.length < VERDICT_MIN) return null;
+  return w.filter((v) => v === 'pass').length / w.length;
+}
+
+/** Taste pressure: rolls since the last keep, blended with the pass share once there are enough verdicts. */
+export function tasteWithVerdicts(rollsSinceKeep, verdicts) {
+  const base = tastePressure(rollsSinceKeep);
+  const share = passShare(verdicts);
+  return share === null ? base : clamp01((1 - PASS_SHARE_WEIGHT) * base + PASS_SHARE_WEIGHT * share);
 }
 
 /** Performer activity from an EVENT count inside a frame window, saturating. */

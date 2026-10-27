@@ -28,6 +28,7 @@ export const LOIS_BURN_KEEPS = 3;
 // Davis reads the same feed through his own windows (#1126); the thresholds live with his states, in davisState.js.
 import { getDishReading } from './dishPressure.js'; // #1356 step 4: the room reads the dish
 import { DAVIS_UGLY_PASSES, DAVIS_UGLY_WINDOW_MS, DAVIS_FLOW_WINDOW_MS } from './davisState.js';
+import { VERDICT_WINDOW } from './stress.js'; // #1753: the verdict window taste pressure reads
 // A keep reaches the feed from two doors (the bus event, and the store's own list growing, which F / the star / K
 // use directly). Two notes this close together are the one keep.
 const KEEP_DEDUPE_MS = 250;
@@ -100,6 +101,8 @@ export function createLoisActivity({
     bloomAt: null, // ts of a keep that followed a run of passes: the ugly paid off
     bloomDepth: 0, // how many rolls (passes) that run held: the number an earned voice carries (#1153)
     activityCount: 0, // #1354: real artist actions since launch (beat() calls); a count, never a duration
+    verdicts: [], // #1753: the last few deliberate verdicts, 'keep' | 'pass' (X), oldest first — taste pressure's share
+    passCount: 0, // #1753: the store's pass counter as last seen
     passRun: 0, // the artist's own passes (CURATOR, KIN) since the last keep; EVOLVE fires are Davis's and do not count
     muted: 0, // >0 while the machine (the dead-frame guard) is re-dealing: not the artist, not noted
     frameKept: false, // the frame on screen was kept: true from a keep until the next roll or seed change (#1126: NOD)
@@ -198,10 +201,16 @@ export function createLoisActivity({
     s.passClusterLen = 0;
     s.keeps.push(at);
     cap(s.keeps);
+    noteVerdict('keep');
     s.frameKept = true;
     beat();
     // announced AFTER the ledgers are updated and while the kept frame is still the live one (#1153 mints from it)
     if (bloomed) emit(Events.BLOOM, { rolls, at });
+  }
+  // #1753 — one deliberate verdict (a keep from any door, or X), kept to a short window for taste pressure.
+  function noteVerdict(v) {
+    s.verdicts.push(v);
+    if (s.verdicts.length > VERDICT_WINDOW) s.verdicts.splice(0, s.verdicts.length - VERDICT_WINDOW);
   }
   const keepListeners = new Set();
   function noteFavorite(fav, at, door) {
@@ -438,6 +447,7 @@ export function createLoisActivity({
           midiLast: st.midiLast ?? null, // #1391 G9
           favIds: new Set((Array.isArray(st.favorites) ? st.favorites : []).map((f) => f && f.id)),
           keepIds: new Set((Array.isArray(st.keeps) ? st.keeps : []).map((k) => k && k.id)),
+          passCount: Number.isInteger(st.passCount) ? st.passCount : 0, // #1753
         };
       };
       // exactly one new entry is a keep; an import or a restore lands many at once and is not one
@@ -508,6 +518,8 @@ export function createLoisActivity({
             }
             beat();
           }
+          // #1753: X landed a pass (the store counts landed passes; exactly one more is one press)
+          if (cur.passCount === was.passCount + 1) noteVerdict('pass');
           // last: a keep can announce BLOOM, and its handler may write the store
           if (newKeep.length === 1) noteKeep('store', t());
         }),
@@ -542,7 +554,7 @@ export function createLoisActivity({
   }
 
   /** #1354 — the two COUNTS the stress signal reads. Cheap (no window scans): safe to call every frame. */
-  const pressureCounts = () => ({ activityCount: s.activityCount, passRun: s.passRun });
+  const pressureCounts = () => ({ activityCount: s.activityCount, passRun: s.passRun, verdicts: s.verdicts.slice() }); // #1753: + verdicts
   const api = { start, stop, beat, noteSeed, snapshot, machine, pressureCounts, onKeep: (fn) => { keepListeners.add(fn); return () => keepListeners.delete(fn); } };
   return api;
 }

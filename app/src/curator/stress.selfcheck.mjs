@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 import {
   STRESS_WEIGHTS, stressValue, tastePressure, activityPressure, bandFor, quantizeStress, createStressTracker,
   BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN, BANDS, RELAX_BELOW, TIGHTEN_ABOVE, HYSTERESIS_GAP,
+  passShare, tasteWithVerdicts, VERDICT_WINDOW, VERDICT_MIN, PASS_SHARE_WEIGHT,
 } from './stress.js';
 
 // 1. three honest signals, weights sum to 1, and instrument load is NOT one of them (decision 2)
@@ -121,4 +122,24 @@ import {
   assert.equal(n, 2, 'a steady room logs one band and one stress value, then stays silent');
 }
 
-console.log('stress.selfcheck: ok (#1354)');
+// #1753 (decision 5) — the keeps-vs-passes share joins taste pressure
+{
+  // no verdicts, or fewer than the minimum: identical to rolls-since-keep alone (today's behaviour)
+  for (const v of [undefined, null, [], ['pass'], ['pass', 'pass', 'pass']]) {
+    assert.equal(tasteWithVerdicts(12, v), tastePressure(12), `unchanged with ${JSON.stringify(v)}`);
+  }
+  assert.equal(VERDICT_MIN, 4);
+  assert.equal(passShare(['keep', 'pass', 'pass', 'pass']), 0.75);
+  assert.equal(passShare(['pass', 'junk', 'keep', 'keep', 'keep']), 0.25, 'only keep/pass count');
+  // only the last VERDICT_WINDOW count
+  const old = Array(20).fill('pass').concat(Array(VERDICT_WINDOW).fill('keep'));
+  assert.equal(passShare(old), 0, 'old passes age out of the window');
+  // all passes press harder than all keeps, at the same rolls-since-keep
+  const allPass = tasteWithVerdicts(6, ['pass', 'pass', 'pass', 'pass']);
+  const allKeep = tasteWithVerdicts(6, ['keep', 'keep', 'keep', 'keep']);
+  assert.ok(allPass > allKeep, 'passes raise taste pressure');
+  assert.equal(allPass, Math.min(1, (1 - PASS_SHARE_WEIGHT) * tastePressure(6) + PASS_SHARE_WEIGHT * 1));
+  for (const t of [allPass, allKeep, tasteWithVerdicts(999, Array(8).fill('pass'))]) assert.ok(t >= 0 && t <= 1, 'stays in 0..1');
+}
+
+console.log('stress.selfcheck: ok (#1354, #1753)');

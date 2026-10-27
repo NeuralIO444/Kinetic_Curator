@@ -621,6 +621,7 @@ export const createDavisSlice = (set) => {
   // and in their own surfaces); performingKeepId is the deck pin (S1),
   // session-only — what is performing is a live fact, not shelf data.
   keeps: bootKeeps,
+  passCount: 0, // #1753: passes landed this session (X); taste pressure's keeps-vs-passes share reads it, never persisted
   keepStage: readStage(bootKeeps),
   shelfHistory: bootHistory,
   shelfHistoryShed: historyShedTotal, // #1645 — the cap's all-time trim count (census readout)
@@ -1171,8 +1172,9 @@ export const createDavisSlice = (set) => {
   }),
   /**
    * #1173 — X passes on the current plate: same capture as a keep, one line in
-   * the passes ledger, nothing else. No store state changes, so no live
-   * influence (taste pressure from passes is Phase 4, #1356 — not here).
+   * the passes ledger. #1753: a landed pass also bumps `passCount`, the one
+   * store change, so taste pressure can read the keeps-vs-passes share
+   * (decision 5). Nothing on screen changes.
    */
   addPass: (rec) => set((state) => {
     const entry = sanitizeFavorite({ ...rec, id: genId() });
@@ -1180,8 +1182,8 @@ export const createDavisSlice = (set) => {
     // press was indistinguishable from a landed one. Both failure shapes
     // now answer: an uncapturable plate, and a rejected/refused append.
     if (!entry) return { shelfNotice: plateNotCapturedLine };
-    appendLedgerSpoken('passes', entry, state.projectTitle, 'pass');
-    return {};
+    const row = appendLedgerSpoken('passes', entry, state.projectTitle, 'pass');
+    return row ? { passCount: (state.passCount || 0) + 1 } : {};
   }),
   /**
    * #1051 — replace the performer's shelf from an imported bundle. Same

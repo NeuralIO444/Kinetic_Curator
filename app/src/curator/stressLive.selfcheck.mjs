@@ -132,10 +132,25 @@ function rig() {
 // 8. the real feed exposes the two counts, from real actions, and no clock is read anywhere here
 {
   const feed = createLoisActivity({ now: () => 1000 });
-  assert.deepEqual(feed.pressureCounts(), { activityCount: 0, passRun: 0 });
+  assert.deepEqual(feed.pressureCounts(), { activityCount: 0, passRun: 0, verdicts: [] }); // #1753: + the verdict window
   feed.beat();
   feed.beat();
   assert.equal(feed.pressureCounts().activityCount, 2, 'every real action is counted');
+  // #1753: a pass that landed in the store is one 'pass' verdict; the window is a copy the tracker cannot mutate
+  {
+    let st = { passCount: 0, favorites: [], keeps: [] };
+    const subs = new Set();
+    const fakeStore = { getState: () => st, subscribe: (fn) => { subs.add(fn); return () => subs.delete(fn); } };
+    const f2 = createLoisActivity({ now: () => 2000 });
+    f2.start({ store: fakeStore });
+    st = { ...st, passCount: 1 }; for (const fn of subs) fn(st);
+    st = { ...st, passCount: 2 }; for (const fn of subs) fn(st);
+    const v = f2.pressureCounts().verdicts;
+    assert.deepEqual(v, ['pass', 'pass'], 'each landed pass is one verdict');
+    v.push('keep');
+    assert.deepEqual(f2.pressureCounts().verdicts, ['pass', 'pass'], 'the window handed out is a copy');
+    f2.stop();
+  }
   const src = readFileSync(new URL('./stressLive.js', import.meta.url), 'utf8');
   assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|new Date|Math\.random/.test(src), 'no clock, no randomness');
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
