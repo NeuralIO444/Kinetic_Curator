@@ -6,9 +6,9 @@ mod curator;
 mod media;
 mod mind; // #1463: Apple Intelligence via the kc-mind sidecar
 mod loot; // #1479: the loot folder: list, hash and read, root-bound
+mod batch_frame; // #1742: write_batch_frame is bound to the temp folder
 
 use std::fs;
-use std::path::Path;
 use std::sync::Mutex;
 
 #[tauri::command]
@@ -24,13 +24,9 @@ fn syphon_status() -> serde_json::Value {
 // 1a04ab4^ (it matches the invoke in PipelinePanel.jsx and the unit test below).
 #[tauri::command]
 fn write_batch_frame(data: Vec<u8>, path: String) -> Result<usize, String> {
-    let target_path = Path::new(&path);
-    if let Some(parent) = target_path.parent() {
-        if !parent.as_os_str().is_empty() {
-            fs::create_dir_all(parent).map_err(|e| format!("Failed to create directories for {}: {}", path, e))?;
-        }
-    }
-    fs::write(target_path, &data).map_err(|e| format!("Failed to write {}: {}", path, e))?;
+    // #1742: only under the temp folder (its one caller, the DEV Native Lab, writes /tmp); never an arbitrary path.
+    let target_path = batch_frame::resolve_under(&path, &batch_frame::allowed_roots())?;
+    fs::write(&target_path, &data).map_err(|e| format!("Failed to write {}: {}", path, e))?;
     Ok(data.len())
 }
 
@@ -67,6 +63,7 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     unsafe fn get_resident_rss() -> usize {
         use std::mem::{size_of, MaybeUninit};

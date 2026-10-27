@@ -85,7 +85,7 @@ impl MindHelper {
                 None => false,
             };
             if !alive {
-                *guard = None;
+                if let Some(old) = guard.take() { reap(old); } // #1747: reap the dead helper, never leave a zombie
                 match self.spawn() {
                     Ok(p) => *guard = Some(p),
                     Err(e) => {
@@ -100,7 +100,9 @@ impl MindHelper {
         };
         if let Err(e) = wrote {
             self.forget(id);
-            if let Ok(mut g) = self.proc_.lock() { *g = None; }
+            // #1747: kill + wait — dropping a Child neither stops nor reaps it, so a still-running helper whose pipe
+            // failed was orphaned, and every restart left one behind.
+            if let Ok(mut g) = self.proc_.lock() { if let Some(old) = g.take() { reap(old); } }
             return Err(format!("helper write failed: {}", e));
         }
         match rx.recv_timeout(timeout) {
@@ -117,10 +119,18 @@ impl MindHelper {
     }
 }
 
+/// #1747: stop and reap a helper process. Dropping `Child` does neither (std docs), so without this a helper whose
+/// stdin write failed kept running, and a dead one stayed a zombie until the app quit.
+fn reap(mut p: Proc) {
+    drop(p.stdin); // close stdin first: the helper exits on EOF by itself
+    let _ = p.child.kill();
+    let _ = p.child.wait();
+}
+
 impl Drop for MindHelper {
     fn drop(&mut self) {
         if let Ok(mut g) = self.proc_.lock() {
-            if let Some(mut p) = g.take() { let _ = p.child.kill(); }
+            if let Some(p) = g.take() { reap(p); }
         }
     }
 }

@@ -173,7 +173,7 @@ export function NativeLabBlock({ onMessage }) {
       const res = await invoke("dump_image_batch", {
         targetDir: "/tmp/kc_batch_export_ecore",
         count: 60,
-        format: "png",
+        format: "raw", // #1744: the dump writes raw RGBA32F frames; it never encoded PNG
       });
       setMessage(`E-Core Dump: ${res}`);
     } catch (err) {

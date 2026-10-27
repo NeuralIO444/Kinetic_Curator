@@ -18,15 +18,10 @@
         "open": true
       },
       "fs": {
-        "all": true,
-        "scope": [
-          "$TEMP/*",
-          "$DOWNLOAD/*",
-          "$DESKTOP/*",
-          "$DOCUMENT/*",
-          "/tmp/*",
-          "**"
-        ]
+        "all": false,
+        "createDir": true,
+        "writeFile": true,
+        "scope": ["$APPDATA", "$APPDATA/**"]
       },
       "path": {
         "all": true
