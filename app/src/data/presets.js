@@ -990,9 +990,11 @@ export function getPreset(id) {
   return COMPOSITION_PRESETS.find((p) => p.id === canon) || COMPOSITION_PRESETS[0];
 }
 
+/** The LOOKS menu's groups, each with its looks. A group with no looks is left out (#1772 cleanup: an empty
+ *  "Cellular Automaton" heading listed nothing). */
 export function getPresetsByGroup() {
   return PRESET_GROUPS.map((g) => ({
     ...g,
     presets: COMPOSITION_PRESETS.filter((p) => p.group === g.id),
-  }));
+  })).filter((g) => g.presets.length > 0);
 }

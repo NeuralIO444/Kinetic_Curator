@@ -24,6 +24,10 @@ const ids = COMPOSITION_PRESETS.map((p) => p.id);
 assert.equal(new Set(ids).size, ids.length, 'look ids stay unique');
 const menuCount = getPresetsByGroup().reduce((n, g) => n + g.presets.length, 0);
 assert.equal(menuCount, 64, 'the LOOKS menu lists all 64 (no look orphaned from its group)');
+assert.ok(
+  getPresetsByGroup().every((g) => g.presets.length > 0),
+  'the LOOKS menu shows no empty group',
+);
 
 // 2. every look names its group, categories and styles; the recipe validates clean
 const groupIds = new Set(PRESET_GROUPS.map((g) => g.id));

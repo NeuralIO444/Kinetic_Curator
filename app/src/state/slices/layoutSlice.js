@@ -101,32 +101,6 @@ function pickOtherPreset(presets, currentComposition) {
   return presets.find((p) => p.id === id) || presets[0];
 }
 
-/**
- * #943 — modes whose layouts converge on a focal region (vs field modes that
- * cover the plate). A focal-mode brief naturally yields one clear hero with
- * a supporting cast; a field brief (flow, grid, rails…) breaks the
- * always-centered habit by construction.
- */
-const FOCAL_MODES = new Set(['fibonacci', 'phyllotaxis', 'radial', 'orbit']);
-
-/**
- * #943 — the RULES pass's compositional strategy, as a documented
- * distribution rather than a dice accident: half the passes land a
- * focal-mode brief (one clear focal region), half land a field brief
- * (off-center asymmetry allowed — the centering habit breaks across taps).
- * The current composition is always excluded: a RULES pass re-works, never
- * re-deals the same brief.
- */
-function pickRulesPreset(currentComposition) {
-  const pool = COMPOSITION_PRESETS.filter((p) => p.id !== currentComposition);
-  const src = pool.length ? pool : COMPOSITION_PRESETS;
-  const focal = src.filter((p) => FOCAL_MODES.has(p.params.mode));
-  const field = src.filter((p) => !FOCAL_MODES.has(p.params.mode));
-  const bucket = die(2) === 0 ? focal : field;
-  const list = bucket.length ? bucket : src;
-  return list[die(list.length)];
-}
-
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
@@ -967,152 +941,25 @@ export const createLayoutSlice = (set) => ({
     }),
 
   /**
-   * KINETIC button — RULES layer (#943). A calm tap runs a compositional
-   * RULES pass over the current piece instead of the naive full re-roll:
-   * order is imposed on what's on screen, not randomness dealt fresh.
-   *
-   * The DNA stays put — same seed, same asset pool, same FX chain and blend
-   * modes — so the result is recognizably related to what was on screen.
-   * The palette DOES roll (#952): every KIN tap deals a new palette from
-   * the full pool (all 37 system palettes + saved user palettes), so the
-   * roll is the review — every palette has to survive a tap.
-   * What changes is the compositional order, under four
-   * rules (each respecting lockedParams, like applyPreset):
-   *
-   *  1. separation — `overlap: false` (small-first paint order) plus density
-   *     clamped into 35..65 for breathing room between elements;
-   *  2. focal hierarchy — the new brief is drawn from a documented
-   *     focal/field distribution (see pickRulesPreset): focal-mode briefs
-   *     converge on one clear region with a supporting cast;
-   *  3. off-center allowed — field briefs (flow, grid, rails…) are eligible
-   *     picks, so the always-centered habit breaks across taps; nothing
-   *     here re-centers;
-   *  4. edge-bleed allowed — `bleed` is rolled fresh each pass (~half the
-   *     passes run elements off-canvas).
-   *
-   * One atomic store update = one undo entry (edit kind: only layoutParams
-   * move — layers, FX and blends are untouched). The honest die
-   * (Math.random) matches kineticRoll's convention: replayability comes
-   * from the stored state + seed (#710), not from the pass itself.
-   * kineticRoll stays for #945's heat ceiling.
-   */
-  kineticRulesPass: () =>
-    set((state) => {
-      // PATTERN tracks join the pass: a new tessellation of the same kind. The roll's own entry is a whole-document
-      // one when it touched a layer, an edit one otherwise (as before).
-      const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
-      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
-
-      // #952 — every KIN tap deals a new palette from the full pool
-      // (37 system + saved user palettes), never the one already up.
-      // Overrides + swatch locks clear, exactly like setPaletteId.
-      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
-
-      const preset = pickRulesPreset(state.layoutParams.composition);
-      // #964: an armed MODE constrains RULES — keep the composition too. The
-      // rules themselves (separation, focal hierarchy, edge-bleed) still apply.
-      const scopeSkip = new Set(state.armedMode ? ['composition', 'mode'] : []);
-      const merged0 = { ...state.layoutParams };
-      if (!state.armedMode && !state.lockedParams.composition) merged0.composition = preset.id;
-      for (const [k, v] of Object.entries(preset.params)) {
-        if (scopeSkip.has(k)) continue;
-        if (!state.lockedParams[k] && merged0[k] !== v) merged0[k] = v;
-      }
-      // #964: pin the armed roll scope over whatever the pass dealt.
-      const merged = pinRollScope(merged0, state.armedMode, state.armedMotion);
-
-      // Rule 1 — separation.
-      if (!state.lockedParams.overlap) merged.overlap = false;
-      if (!state.lockedParams.density && merged.density > 65) {
-        merged.density = 35 + die(31); // 35..65
-      }
-      // Rule 4 — edge-bleed allowed: rolled fresh, ~half the passes bleed.
-      if (!state.lockedParams.bleed) merged.bleed = die(2) === 0;
-
-      const next = {
-        ...undo,
-        ...(pat.changed ? { layers: pat.layers } : {}),
-        paletteId,
-        paletteOverrides: null,
-        paletteLocks: {},
-        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-        layoutParams: merged,
-        voiceMix: null,
-        activeVoiceId: null,
-      };
-      if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
-      return next;
-    }),
-
-  /**
-   * KINETIC button — WEATHER layer (#944). A second tap while the button is
-   * still warm drifts the atmosphere over the SAME structure instead of
-   * re-working it: palette weather, light mood, atmospheric FX. Skeleton
-   * holds; air changes.
-   *
-   * What moves:
-   *  1. palette weather — paletteId rolls to a different catalog palette
-   *     (overrides + swatch locks clear, exactly like setPaletteId);
-   *  2. mood — the chiaroscuro sun, if it's on, moves to a new position and
-   *     intensity (a storm rolling in, golden hour…); off stays off;
-   *  (#1768: the GLOW — accumulationOptics — is NOT dealt here any more. Rolling it on every warm tap kept landing
-   *  the piece in bloom + halation blur; it now moves only when a dealt look/voice declares it, or the artist sets it.)
-   *
-   * What holds: seed (same DNA — the HUD readout keeps showing it),
-   * composition and every structural param (glow included), asset pool, layers, FX chain.
-   * One atomic store update = one undo entry (edit kind). The honest die
-   * matches kineticRulesPass/kineticRoll's convention: replayability comes
-   * from the stored state + seed (#710), not from the pass itself.
-   */
-  kineticWeatherPass: () =>
-    set((state) => {
-      // PATTERN tracks join the pass: same picture, the air moves (DRIFT and MIX nudge; a still pattern stays still).
-      const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
-      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
-
-      // 1. Palette weather — a different sky, never the one already up. Rolls
-      // from the full pool (#952: all 37 system palettes + saved user palettes).
-      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
-
-      // 2. Mood — move the sun if it's out.
-      let light = state.light;
-      if (light) {
-        light = sanitizeLight({
-          ...light,
-          x: -500 + die(2001),
-          y: -500 + die(1701),
-          intensity: 0.3 + Math.random() * 0.7,
-          ambient: 0.2 + Math.random() * 0.5,
-        });
-      }
-
-      return {
-        ...undo,
-        ...(pat.changed ? { layers: pat.layers } : {}),
-        paletteId,
-        paletteOverrides: null,
-        paletteLocks: {},
-        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-        light,
-        voiceMix: null,
-        activeVoiceId: null,
-      };
-    }),
-
-  /**
    * #1772 — KINETIC LOOK pass (tap 1 of the sweep): a fresh Look from the 64 + a pool coherent with its pairing.
    * Structure and shapes move; motion, palette and seed hold. One undo step. Pure logic: state/kineticSweep.mjs.
    */
   kineticLookPass: () =>
     set((state) => {
       const r = scopedLook(state);
-      return {
-        ...pushToUndo(state, true),
+      // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
+      // The entry is a whole-document one when a track moved, an edit one otherwise.
+      const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
+      const next = {
+        ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
+        ...(pat.changed ? { layers: pat.layers } : {}),
         layoutParams: r.layoutParams,
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         voiceMix: null,
         activeVoiceId: null,
       };
+      if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
+      return next;
     }),
 
   /**
@@ -1122,8 +969,22 @@ export const createLayoutSlice = (set) => ({
   kineticVoicePass: () =>
     set((state) => {
       const r = voicePass(state, dieRng, { deck: scopeDecks(state.startupMode).voices });
+      // The air moves with the costume (what the retired WEATHER pass dealt): PATTERN tracks drift and mix over the
+      // same picture, and the chiaroscuro sun, if it is out, moves to a new position and intensity. Off stays off.
+      const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
+      const light = state.light
+        ? sanitizeLight({
+            ...state.light,
+            x: -500 + die(2001),
+            y: -500 + die(1701),
+            intensity: 0.3 + dieRng() * 0.7,
+            ambient: 0.2 + dieRng() * 0.5,
+          })
+        : state.light;
       return {
-        ...pushToUndo(state, true),
+        ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
+        ...(pat.changed ? { layers: pat.layers } : {}),
+        light,
         layoutParams: r.layoutParams,
         paletteId: r.paletteId,
         paletteOverrides: r.paletteOverrides,

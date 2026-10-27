@@ -16,9 +16,7 @@
 //   Heat picks how far the run has swept, not how violent a re-roll is — until hammering.
 // - A stale tap (gap ≥ warm window) starts a fresh run: LOOK, heat 0.
 //
-// kineticWarm.mjs is left untouched — it remains the simple warm/fresh router
-// #944's selfcheck pins. This module is the full heat-aware superset the
-// button actually uses.
+// (#944's simple warm/fresh router, kineticWarm.mjs, retired with the RULES/WEATHER passes — #1772 cleanup.)
 
 /** A second KINETIC tap within this window finds the button "warm" (#944). */
 export const KINETIC_WARM_MS = 2000;
