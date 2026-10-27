@@ -7,15 +7,22 @@ import { emit, Events } from '../../composition/eventBus.js';
 const ROUTES = [
   { id: 'phrase', label: 'PHRASE', title: 'Only the bar answers. Evolve ignores the beat.' },
   { id: 'evolve', label: 'EVOLVE', title: 'Only the gate answers. The bar holds.' },
-  { id: 'both', label: 'BOTH', title: 'Recommended. The clock ticks first, then the gate fires on the post-phrase state.' },
+  {
+    id: 'both',
+    label: 'BOTH',
+    title: 'Recommended. The clock ticks first, then the gate fires on the post-phrase state.',
+  },
 ];
 
 export function BeatRouter({ beatRoute = 'both' }) {
   return (
-    <div className="davis-source-row" style={{ marginTop: 8 }}
-      title="One mic attack, two consumers. Pick who answers the beat.">
+    <div
+      className="davis-source-row"
+      style={{ marginTop: 8 }}
+      title="One mic attack, two consumers. Pick who answers the beat."
+    >
       <span className="davis-label lbl">beat</span>
-      {ROUTES.map(r => (
+      {ROUTES.map((r) => (
         <button
           key={r.id}
           className={`chip-btn ${beatRoute === r.id ? 'active' : ''}`}

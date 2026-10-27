@@ -25,13 +25,32 @@ import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters
 import { MathEffectEditor } from './MathEffectEditor.jsx';
 import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
-import { displayLayerName, isPatternLayer, isKcLayer, MAX_CONTENT_TRACKS, MAX_FX_TRACKS, MAX_MATH_TRACKS } from '../../state/slices/layersSlice.js';
+import {
+  displayLayerName,
+  isPatternLayer,
+  isKcLayer,
+  MAX_CONTENT_TRACKS,
+  MAX_FX_TRACKS,
+  MAX_MATH_TRACKS,
+} from '../../state/slices/layersSlice.js';
 import { PatternEditor } from './PatternEditor.jsx';
 import { helpText } from '../../data/helpCopy.js';
-import { getPatchSample, patchSampleAgeMs, formatPatchLine, PATCH_DIAG_STALE_MS, activePatchPairs, formatMatrixRow } from '../../engine/kernel/tracks/patchDiag.mjs';
+import {
+  getPatchSample,
+  patchSampleAgeMs,
+  formatPatchLine,
+  PATCH_DIAG_STALE_MS,
+  activePatchPairs,
+  formatMatrixRow,
+} from '../../engine/kernel/tracks/patchDiag.mjs';
 import { rowsTopFirst, moveNeighbor, canMoveUp, canMoveDown } from './layerRows.mjs';
 import { trackNumeral, trackNumeralTitle } from './trackNumeral.mjs';
-import { PATCH_ONELINER_COPY, shouldShowPatchOneLiner, readPatchOneLinerSeen, writePatchOneLinerSeen } from './patchOneLiner.mjs';
+import {
+  PATCH_ONELINER_COPY,
+  shouldShowPatchOneLiner,
+  readPatchOneLinerSeen,
+  writePatchOneLinerSeen,
+} from './patchOneLiner.mjs';
 import { strataSummary, trimNum } from './strataSummary.mjs';
 import { RangeRow } from '../../components/RangeRow.jsx';
 import { ASSETS } from '../../data/assets/index.js';
@@ -48,7 +67,9 @@ function TrackNumeral({ n, kind, edited = false, title }) {
       className={`track-numeral${edited ? ' track-numeral-edited' : ''}`}
       title={title ?? trackNumeralTitle(n, kind, { edited })}
       aria-hidden="true"
-    >{glyph}</span>
+    >
+      {glyph}
+    </span>
   );
 }
 
@@ -66,9 +87,13 @@ function PatchMatrix({ layers, ordinals }) {
   if (!pairs.length) return null;
   return (
     <div className="patch-matrix" title="Patch matrix — every live cross-layer link. Edit in the blocks below.">
-      <span className="fx-param-readout lbl" style={{ width: 'auto' }}>matrix</span>
+      <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+        matrix
+      </span>
       {pairs.map((p) => (
-        <div key={p.dstId} className="patch-diag">{formatMatrixRow(p, ordinals)}</div>
+        <div key={p.dstId} className="patch-diag">
+          {formatMatrixRow(p, ordinals)}
+        </div>
       ))}
     </div>
   );
@@ -89,7 +114,10 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
   // the waiting state.
   useEffect(() => {
     const id = setInterval(() => {
-      if (!mode || mode === 'off' || !to) { setLine(null); return; }
+      if (!mode || mode === 'off' || !to) {
+        setLine(null);
+        return;
+      }
       const sample = getPatchSample(layerId);
       const age = patchSampleAgeMs(layerId);
       const s = Number.isFinite(Number(strength)) ? Number(strength) : 0.16;
@@ -106,7 +134,11 @@ function PatchDiagLine({ layerId, patch, srcN, dstN }) {
     return () => clearInterval(id);
   }, [layerId, mode, to, strength, srcN, dstN]); // primitives only: an object/Map dep restarts the timer on every render
   if (!line) return null;
-  return <div className="patch-diag" title={line.title}>{line.text}</div>;
+  return (
+    <div className="patch-diag" title={line.title}>
+      {line.text}
+    </div>
+  );
 }
 
 // #1046 — the editor is a header strip plus its controls, sized to its content.
@@ -120,7 +152,11 @@ function EfTile({ slot, kind, onBypass, children }) {
       <div className="ef-head">
         <span className="ef-abbr">{face.abbr}</span>
         <span className="ef-word">{face.word}</span>
-        {onBypass && <button type="button" className="ef-bypass" onClick={onBypass} title="Remove this effect">✕</button>}
+        {onBypass && (
+          <button type="button" className="ef-bypass" onClick={onBypass} title="Remove this effect">
+            ✕
+          </button>
+        )}
       </div>
       {children}
     </div>
@@ -144,13 +180,28 @@ function FxEffectEditor({ layer, fxOrdinal }) {
     const paramCount = Object.keys(def.params).length;
     return (
       <div className="fx-editor" title={`FX ${fxOrdinal} · ${slot.label}`}>
-        <EfTile slot={slot} kind={filled.kind} onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}>
+        <EfTile
+          slot={slot}
+          kind={filled.kind}
+          onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}
+        >
           {Object.entries(def.params).map(([key, p]) => (
             <div className="fx-param" key={key}>
               <label title={p.hint}>{p.label}</label>
-              <RangeRow layout="bare" tone="build" min={p.min} max={p.max} step={p.step} value={filled.params?.[key] ?? p.def}
-                onReset={() => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })}
-                onChange={(v) => emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: v })} />
+              <RangeRow
+                layout="bare"
+                tone="build"
+                min={p.min}
+                max={p.max}
+                step={p.step}
+                value={filled.params?.[key] ?? p.def}
+                onReset={() =>
+                  emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })
+                }
+                onChange={(v) =>
+                  emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: v })
+                }
+              />
               <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
             </div>
           ))}
@@ -169,11 +220,22 @@ function FxEffectEditor({ layer, fxOrdinal }) {
         {effectiveKind ? (
           <>
             {slotKinds.length > 1 && (
-              <select aria-label={`Choose ${slot.label} effect`} value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
-                {slotKinds.map((k) => <option key={k} value={k}>{FX_EFFECT_DEFS[k].label.toUpperCase()}</option>)}
+              <select
+                aria-label={`Choose ${slot.label} effect`}
+                value={effectiveKind}
+                onChange={(e) => setPick(e.target.value)}
+              >
+                {slotKinds.map((k) => (
+                  <option key={k} value={k}>
+                    {FX_EFFECT_DEFS[k].label.toUpperCase()}
+                  </option>
+                ))}
               </select>
             )}
-            <button className="chip-btn" onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}>
+            <button
+              className="chip-btn"
+              onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}
+            >
               + ADD {FX_EFFECT_DEFS[effectiveKind].label.toUpperCase()}
             </button>
           </>
@@ -181,7 +243,9 @@ function FxEffectEditor({ layer, fxOrdinal }) {
           <div className="fx-note">nothing to add to this slot yet</div>
         )}
         {slot.stubs.length > 0 && (
-          <div className="fx-note" title="Planned — not yet available">planned: {slot.stubs.join(', ')}</div>
+          <div className="fx-note" title="Planned — not yet available">
+            planned: {slot.stubs.join(', ')}
+          </div>
         )}
       </EfTile>
     </div>
@@ -232,7 +296,10 @@ function StrataAddSlot({ title, hint, disabled, onAdd, onOpenChooser }) {
   };
   const cancelPress = () => clearTimeout(timer.current);
   const handleClick = () => {
-    if (longFired.current) { longFired.current = false; return; }
+    if (longFired.current) {
+      longFired.current = false;
+      return;
+    }
     onAdd();
   };
   return (
@@ -260,16 +327,27 @@ function StrataAddSlot({ title, hint, disabled, onAdd, onOpenChooser }) {
 function TypeChooser({ onPick, onClose, hasRoom }) {
   return (
     <>
-      <button type="button" className="layer-chooser-backdrop" aria-label="Close chooser" tabIndex={-1} onClick={onClose} />
+      <button
+        type="button"
+        className="layer-chooser-backdrop"
+        aria-label="Close chooser"
+        tabIndex={-1}
+        onClick={onClose}
+      />
       <div className="layer-chooser" role="dialog" aria-label="Choose stratum type">
         <div className="layer-chooser-title">Choose stratum type</div>
         <div className="layer-chooser-group">
           {ADD_TYPES.map((t) => {
             const room = hasRoom(t);
             return (
-              <button key={t} type="button" className="layer-chooser-item" disabled={!room}
+              <button
+                key={t}
+                type="button"
+                className="layer-chooser-item"
+                disabled={!room}
                 title={room ? `Add ${ADD_TYPE_LABEL[t]} stratum` : 'Track cap reached'}
-                onClick={() => onPick(t)}>
+                onClick={() => onPick(t)}
+              >
                 {ADD_TYPE_LABEL[t]}
               </button>
             );
@@ -289,7 +367,13 @@ function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, o
   const label = section === 'content' ? 'Choose blend for the new KC track' : `Choose effect for FX ${fxOrdinal}`;
   return (
     <>
-      <button type="button" className="layer-chooser-backdrop" aria-label="Close chooser" tabIndex={-1} onClick={onClose} />
+      <button
+        type="button"
+        className="layer-chooser-backdrop"
+        aria-label="Close chooser"
+        tabIndex={-1}
+        onClick={onClose}
+      />
       <div className="layer-chooser" role="dialog" aria-label={label}>
         <div className="layer-chooser-title">{label}</div>
         {section === 'content' ? (
@@ -319,8 +403,28 @@ function FamilyChooser({ section, fxOrdinal, fxSlotKinds, fxSlotLabel, onPick, o
 }
 
 export function LayerStack() {
-  const { state } = useApp(s => ({ layers: s.layers, activeLayerId: s.activeLayerId, selectedFxLayerId: s.selectedFxLayerId, selectedMathLayerId: s.selectedMathLayerId, selectedPatternLayerId: s.selectedPatternLayerId, layoutParams: s.layoutParams, layerSnapshots: s.layerSnapshots, enabledAssets: s.enabledAssets, customAssets: s.customAssets }));
-  const { layers, activeLayerId, selectedFxLayerId, selectedMathLayerId, selectedPatternLayerId, layoutParams, layerSnapshots, enabledAssets, customAssets } = state;
+  const { state } = useApp((s) => ({
+    layers: s.layers,
+    activeLayerId: s.activeLayerId,
+    selectedFxLayerId: s.selectedFxLayerId,
+    selectedMathLayerId: s.selectedMathLayerId,
+    selectedPatternLayerId: s.selectedPatternLayerId,
+    layoutParams: s.layoutParams,
+    layerSnapshots: s.layerSnapshots,
+    enabledAssets: s.enabledAssets,
+    customAssets: s.customAssets,
+  }));
+  const {
+    layers,
+    activeLayerId,
+    selectedFxLayerId,
+    selectedMathLayerId,
+    selectedPatternLayerId,
+    layoutParams,
+    layerSnapshots,
+    enabledAssets,
+    customAssets,
+  } = state;
   // #1409 (petri dish A3) — the DISH controls. The switch and the two
   // contact knobs are layout params (scene/Look state, PARAM_SPEC is the
   // trust boundary), edited through the same LAYOUT_PARAM bus event as
@@ -357,11 +461,17 @@ export function LayerStack() {
     try {
       const v = localStorage.getItem(LAST_ADD_KEY);
       return ADD_TYPES.includes(v) ? v : 'content';
-    } catch { return 'content'; }
+    } catch {
+      return 'content';
+    }
   });
   const recordAddType = (t) => {
     setLastAddType(t);
-    try { localStorage.setItem(LAST_ADD_KEY, t); } catch { /* private mode */ }
+    try {
+      localStorage.setItem(LAST_ADD_KEY, t);
+    } catch {
+      /* private mode */
+    }
   };
   // The next FX track's family is fixed by its ordinal (#520/#732) — the
   // chooser only offers that family's add-menu kinds.
@@ -377,7 +487,12 @@ export function LayerStack() {
     else if (t === 'pattern') emit(Events.PATTERN_ADD, { mode: 'QUILT' });
     else emit(Events.LAYER_ADD);
   };
-  const typeHasRoom = (t) => (t === 'fx' ? fxCount < MAX_FX_TRACKS : t === 'math' ? mathCount < MAX_MATH_TRACKS : contentCount < MAX_CONTENT_TRACKS);
+  const typeHasRoom = (t) =>
+    t === 'fx'
+      ? fxCount < MAX_FX_TRACKS
+      : t === 'math'
+        ? mathCount < MAX_MATH_TRACKS
+        : contentCount < MAX_CONTENT_TRACKS;
   const addTarget = typeHasRoom(lastAddType) ? lastAddType : ADD_TYPES.find(typeHasRoom) || null;
 
   let contentOrdinal = 0;
@@ -418,7 +533,12 @@ export function LayerStack() {
   // order invariants hold.
   const [moveFlash, setMoveFlash] = useState(null); // { id, label } | null
   const flashTimer = useRef(null);
-  useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
+  useEffect(
+    () => () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     if (onelinerArmed) writePatchOneLinerSeen();
   }, [onelinerArmed]);
@@ -458,7 +578,7 @@ export function LayerStack() {
     const mathSoloed = math && layer.visible && layers.every((l) => l.id === layer.id || !l.visible);
     const label = displayLayerName(layer, ordinals.get(layer.id) || 1);
     const patch = layer.patch || { mode: 'off', to: null, strength: 0.16 };
-    const to = (!patch.to || patch.to === layer.id) ? otherTarget(layer) : patch.to;
+    const to = !patch.to || patch.to === layer.id ? otherTarget(layer) : patch.to;
     const hitsHard = math && mathTrackHitsHard(layer);
     // #1015 — DUP at cap used to click through silently. Cap the button
     // instead: disabled + tooltip so the cap reads instead of swallowing
@@ -467,9 +587,13 @@ export function LayerStack() {
     // #1409 — a KC block's collapsed line carries the Look's dish state
     // (off, or on-and-armed); FX/MATH/PATTERN blocks never enrol, so the
     // dish says nothing on them.
-    const summary = expanded ? '' : strataSummary(layer, fine, wetPct,
-      (!adj && !pat) ? { on: dishOn, armed: dishRadius > 0 } : undefined);
-    const selectIt = () => (pat ? emit(Events.PATTERN_SELECT, { id: layer.id }) : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id }));
+    const summary = expanded
+      ? ''
+      : strataSummary(layer, fine, wetPct, !adj && !pat ? { on: dishOn, armed: dishRadius > 0 } : undefined);
+    const selectIt = () =>
+      pat
+        ? emit(Events.PATTERN_SELECT, { id: layer.id })
+        : emit(math ? Events.MATH_SELECT : fx ? Events.FX_SELECT : Events.LAYER_SET_ACTIVE, { id: layer.id });
     // #1575 — the travel mode chip (Matt's controls ruling, 2026-10-14:
     // the per-stratum mode is recipe data riding the stratum, and BUILD
     // gets at most this minimal chip — still/flow/path + the family
@@ -480,15 +604,19 @@ export function LayerStack() {
     // mode edits the active stratum's recipe, like every BUILD control;
     // a tap on the active stratum cycles its mode.
     const snapForChip = !adj && !pat ? (isActive ? null : (layerSnapshots || {})[layer.id]) : null;
-    const chipLp = !adj && !pat ? (isActive ? layoutParams : (snapForChip?.layoutParams || {})) : null;
-    const chipMode = chipLp ? (chipLp.transport || 'still') : null;
-    const chipCast = !adj && !pat
-      ? (() => {
-        const enabled = isActive ? enabledAssets : (snapForChip?.enabledAssets || {});
-        const byId = new Map([...ASSETS, ...(customAssets || [])].map((a) => [a.id, a]));
-        return Object.keys(enabled || {}).filter((id) => enabled[id]).map((id) => byId.get(id)).filter(Boolean);
-      })()
-      : null;
+    const chipLp = !adj && !pat ? (isActive ? layoutParams : snapForChip?.layoutParams || {}) : null;
+    const chipMode = chipLp ? chipLp.transport || 'still' : null;
+    const chipCast =
+      !adj && !pat
+        ? (() => {
+            const enabled = isActive ? enabledAssets : snapForChip?.enabledAssets || {};
+            const byId = new Map([...ASSETS, ...(customAssets || [])].map((a) => [a.id, a]));
+            return Object.keys(enabled || {})
+              .filter((id) => enabled[id])
+              .map((id) => byId.get(id))
+              .filter(Boolean);
+          })()
+        : null;
     const chipFam = chipCast ? defaultTransportForCast(chipCast) : null;
     // #1575 Q4 (ruled 2026-10-20) — the leash is PER-STRATUM: this
     // stratum's own value rides its params (live for the active stratum,
@@ -497,9 +625,10 @@ export function LayerStack() {
     // from the Directors motion group, never a cluster here (the P2
     // controls ruling stands). Unset reads as the shipped default, which
     // is what the resolver's defaults merge applies.
-    const chipLeash = chipLp && chipMode && chipMode !== 'still'
-      ? Math.round(chipLp.transportLeash ?? DEFAULT_LAYOUT_PARAMS.transportLeash)
-      : null;
+    const chipLeash =
+      chipLp && chipMode && chipMode !== 'still'
+        ? Math.round(chipLp.transportLeash ?? DEFAULT_LAYOUT_PARAMS.transportLeash)
+        : null;
     const color = STRATA_COLORS[fine];
     // #1019 — the PATCH one-liner lives under the first KC block's PATCH
     // section, and only once that block is open (the flag is consumed on
@@ -524,23 +653,61 @@ export function LayerStack() {
       >
         <span className="strata-stripe" style={{ background: color }} aria-hidden="true" />
         <div className="strata-head">
-          <TrackNumeral n={position} kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'} edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive} title={`Stratum ${position} of ${stackSize} — ${label}${expanded ? ' — editing' : ''}`} />
+          <TrackNumeral
+            n={position}
+            kind={math ? 'math' : fx ? 'fx' : pat ? 'pattern' : 'kc'}
+            edited={math ? isMathSelected : fx ? isFxSelected : pat ? isPatSelected : isActive}
+            title={`Stratum ${position} of ${stackSize} — ${label}${expanded ? ' — editing' : ''}`}
+          />
           <div className="strata-move">
-            <button className="micro-btn" disabled={!canMoveUp(group, layer.id)} title="Move toward FRONT" onClick={() => handleMove(layer, 'up')}>▲</button>
-            <button className="micro-btn" disabled={!canMoveDown(group, layer.id)} title="Move toward GROUND" onClick={() => handleMove(layer, 'down')}>▼</button>
+            <button
+              className="micro-btn"
+              disabled={!canMoveUp(group, layer.id)}
+              title="Move toward FRONT"
+              onClick={() => handleMove(layer, 'up')}
+            >
+              ▲
+            </button>
+            <button
+              className="micro-btn"
+              disabled={!canMoveDown(group, layer.id)}
+              title="Move toward GROUND"
+              onClick={() => handleMove(layer, 'down')}
+            >
+              ▼
+            </button>
           </div>
           {/* #1015 — transient position badge on the moved block */}
           {moveFlash?.id === layer.id && (
-            <span className={`reorder-badge${fx ? ' reorder-badge-fx' : ''}`} role="status">now {moveFlash.label}</span>
+            <span className={`reorder-badge${fx ? ' reorder-badge-fx' : ''}`} role="status">
+              now {moveFlash.label}
+            </span>
           )}
-          <button className="micro-btn" title="Toggle visibility" onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}>{layer.visible ? '●' : '○'}</button>
-          <button className="micro-btn" disabled={fx} title={fx ? 'Solo applies to KC tracks (FX never solos)' : math ? 'Solo the grade: this track alone over neutral mid-grey' : 'Solo'} onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}>{(soloed || mathSoloed) ? 'S·' : 'S'}</button>
-          <span className="strata-type" style={{ background: color }}>{STRATA_LABEL[fine]}</span>
           <button
-            className="strata-name"
-            title={expanded ? `${label} — editing` : label}
-            onClick={selectIt}
+            className="micro-btn"
+            title="Toggle visibility"
+            onClick={() => emit(Events.LAYER_TOGGLE_VISIBLE, { id: layer.id })}
           >
+            {layer.visible ? '●' : '○'}
+          </button>
+          <button
+            className="micro-btn"
+            disabled={fx}
+            title={
+              fx
+                ? 'Solo applies to KC tracks (FX never solos)'
+                : math
+                  ? 'Solo the grade: this track alone over neutral mid-grey'
+                  : 'Solo'
+            }
+            onClick={() => emit(Events.LAYER_SOLO, { id: layer.id })}
+          >
+            {soloed || mathSoloed ? 'S·' : 'S'}
+          </button>
+          <span className="strata-type" style={{ background: color }}>
+            {STRATA_LABEL[fine]}
+          </span>
+          <button className="strata-name" title={expanded ? `${label} — editing` : label} onClick={selectIt}>
             {label}
           </button>
           {/* #1575 — the minimal travel mode chip: the stratum's mode +
@@ -548,22 +715,46 @@ export function LayerStack() {
               mode (still → flow → path); tap an inactive stratum's chip
               to select that stratum first. No amounts here by ruling. */}
           {chipMode && (
-            <button className="micro-btn" aria-label={`travel mode ${chipMode}, family default ${chipFam}${chipLeash != null ? `, this stratum's leash ${chipLeash} pixels` : ''}`}
-              title={isActive
-                ? `Travel — this stratum's marks ${chipMode === 'still' ? 'stay home' : chipMode === 'flow' ? 'roam the noise field' : 'travel a dealt path'}. Family default for its cast: ${chipFam} (linework roams flow, glyphs roam path, heavy solids anchor).${chipLeash != null ? ` This stratum's leash: ${chipLeash}px — each stratum carries its own.` : ''} Tap cycles still → flow → path. Amounts + leash live in DIRECTORS.`
-                : `Travel ${chipMode} · family default ${chipFam}.${chipLeash != null ? ` This stratum's leash: ${chipLeash}px.` : ''} Tap to select this stratum, then tap again to cycle its mode.`}
+            <button
+              className="micro-btn"
+              aria-label={`travel mode ${chipMode}, family default ${chipFam}${chipLeash != null ? `, this stratum's leash ${chipLeash} pixels` : ''}`}
+              title={
+                isActive
+                  ? `Travel — this stratum's marks ${chipMode === 'still' ? 'stay home' : chipMode === 'flow' ? 'roam the noise field' : 'travel a dealt path'}. Family default for its cast: ${chipFam} (linework roams flow, glyphs roam path, heavy solids anchor).${chipLeash != null ? ` This stratum's leash: ${chipLeash}px — each stratum carries its own.` : ''} Tap cycles still → flow → path. Amounts + leash live in DIRECTORS.`
+                  : `Travel ${chipMode} · family default ${chipFam}.${chipLeash != null ? ` This stratum's leash: ${chipLeash}px.` : ''} Tap to select this stratum, then tap again to cycle its mode.`
+              }
               onClick={() => {
-                if (!isActive) { selectIt(); return; }
+                if (!isActive) {
+                  selectIt();
+                  return;
+                }
                 emit(Events.LAYOUT_PARAM, { key: 'transport', value: nextTransportMode(chipMode) });
-              }}>
+              }}
+            >
               {transportChipLabel(chipMode, chipFam)}
             </button>
           )}
-          <button className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`} disabled={dupCapped} title={dupCapped ? 'Track cap reached' : 'Duplicate'} onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}>dup</button>
-          <button className="micro-btn" title="Remove track (undoable)" disabled={isKcLayer(layer) && kcCount <= 1} onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}>×</button>
+          <button
+            className={`act micro-btn${dupCapped ? ' dup-capped' : ''}`}
+            disabled={dupCapped}
+            title={dupCapped ? 'Track cap reached' : 'Duplicate'}
+            onClick={() => emit(Events.LAYER_DUPLICATE, { id: layer.id })}
+          >
+            dup
+          </button>
+          <button
+            className="micro-btn"
+            title="Remove track (undoable)"
+            disabled={isKcLayer(layer) && kcCount <= 1}
+            onClick={() => emit(Events.LAYER_REMOVE, { id: layer.id })}
+          >
+            ×
+          </button>
         </div>
         {!expanded && summary && (
-          <div className="strata-summary" title="Tap the block to edit">{summary}</div>
+          <div className="strata-summary" title="Tap the block to edit">
+            {summary}
+          </div>
         )}
         {expanded && (
           <div className="strata-body">
@@ -574,115 +765,241 @@ export function LayerStack() {
                   control holding layout alignment. Replaced with the
                   compact WET label so the slider keeps its address. */}
               {!adj && (
-                <select className="blend-mode-select" value={layer.layerBlendMode} title={helpText('layers-blend')}
-                  onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}>
-                  {BLEND_MODES.map((mode) => <option key={mode} value={mode}>{mode.toUpperCase()}</option>)}
+                <select
+                  className="blend-mode-select"
+                  value={layer.layerBlendMode}
+                  title={helpText('layers-blend')}
+                  onChange={(e) => emit(Events.LAYER_SET_BLEND_MODE, { id: layer.id, mode: e.target.value })}
+                >
+                  {BLEND_MODES.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {mode.toUpperCase()}
+                    </option>
+                  ))}
                 </select>
               )}
               {adj && <span className="wet-label lbl">wet</span>}
-              <RangeRow layout="bare" tone="build" min={0} max={wet.cap} step={0.01} value={wet.wet}
+              <RangeRow
+                layout="bare"
+                tone="build"
+                min={0}
+                max={wet.cap}
+                step={0.01}
+                value={wet.wet}
                 hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
-                onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })} />
-              <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>{wetPct}%{wet.capped ? ' max' : ''}</span>
+                onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })}
+              />
+              <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>
+                {wetPct}%{wet.capped ? ' max' : ''}
+              </span>
             </div>
             {!adj && !pat && (
               <>
-              <div className="strata-composite" title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}>
-                <span className="fx-param-readout lbl" style={{ width: 'auto' }}>patch</span>
-                <select className="blend-mode-select" value={patch.mode} disabled={singleTrack && patch.mode === 'off'}
-                  onChange={(e) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: e.target.value, to, strength: patch.strength } })}>
-                  <option value="off">OFF</option>
-                  {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
+                <div
+                  className="strata-composite"
+                  title={singleTrack ? 'PATCH needs a second KC track' : 'PATCH — FEED amount when mode is FEED'}
+                >
+                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                    patch
+                  </span>
+                  <select
+                    className="blend-mode-select"
+                    value={patch.mode}
+                    disabled={singleTrack && patch.mode === 'off'}
+                    onChange={(e) =>
+                      emit(Events.LAYER_PATCH, {
+                        id: layer.id,
+                        patch: { mode: e.target.value, to, strength: patch.strength },
+                      })
+                    }
+                  >
+                    <option value="off">OFF</option>
+                    {/* #346 — MOD/FIELD/FEED icons: Block Elements / Geometric Shapes
                       dither characters (▨▒▤), approximating the TE dot-matrix/LCD
                       pixel-icon texture with plain Unicode text — no new asset
                       pipeline, still the app's existing single-character convention
                       (◆■◇▸◎⬇◈◉◐), just a chunkier sub-family for these three. */}
-                  <option value="mod">⊗ MOD</option>
-                  <option value="field">✦ FIELD</option>
-                  <option value="feed">↻ FEED</option>
-                </select>
-                <select className="blend-mode-select" value={to || ''} disabled={singleTrack}
-                  onChange={(e) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: patch.mode, to: e.target.value, strength: patch.strength } })}>
-                  {contentTargets.map((t) => (
-                    <option key={t.id} value={t.id} disabled={t.id === layer.id}>KC-{t.n}</option>
-                  ))}
-                </select>
-                {patch.mode === 'feed' && (
-                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                    hint={helpText('layers-patch-feed')}
-                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'feed', to, strength: v } })} />
-                )}
-                {patch.mode === 'mod' && (
-                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                    hint={helpText('layers-patch-mod')}
-                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'mod', to, strength: v } })} />
-                )}
-                {patch.mode === 'field' && (
-                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={patch.strength ?? 0.16}
-                    hint={helpText('layers-patch-field')}
-                    onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'field', to, strength: v } })} />
-                )}
-              </div>
-              {/* #1019 — one plain-language PATCH line for newcomers, shown once
+                    <option value="mod">⊗ MOD</option>
+                    <option value="field">✦ FIELD</option>
+                    <option value="feed">↻ FEED</option>
+                  </select>
+                  <select
+                    className="blend-mode-select"
+                    value={to || ''}
+                    disabled={singleTrack}
+                    onChange={(e) =>
+                      emit(Events.LAYER_PATCH, {
+                        id: layer.id,
+                        patch: { mode: patch.mode, to: e.target.value, strength: patch.strength },
+                      })
+                    }
+                  >
+                    {contentTargets.map((t) => (
+                      <option key={t.id} value={t.id} disabled={t.id === layer.id}>
+                        KC-{t.n}
+                      </option>
+                    ))}
+                  </select>
+                  {patch.mode === 'feed' && (
+                    <RangeRow
+                      layout="bare"
+                      tone="build"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={patch.strength ?? 0.16}
+                      hint={helpText('layers-patch-feed')}
+                      onChange={(v) =>
+                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'feed', to, strength: v } })
+                      }
+                    />
+                  )}
+                  {patch.mode === 'mod' && (
+                    <RangeRow
+                      layout="bare"
+                      tone="build"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={patch.strength ?? 0.16}
+                      hint={helpText('layers-patch-mod')}
+                      onChange={(v) =>
+                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'mod', to, strength: v } })
+                      }
+                    />
+                  )}
+                  {patch.mode === 'field' && (
+                    <RangeRow
+                      layout="bare"
+                      tone="build"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={patch.strength ?? 0.16}
+                      hint={helpText('layers-patch-field')}
+                      onChange={(v) =>
+                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'field', to, strength: v } })
+                      }
+                    />
+                  )}
+                </div>
+                {/* #1019 — one plain-language PATCH line for newcomers, shown once
                   (first time a second KC track exists), under the first KC
                   block's PATCH section. × dismisses this session; localStorage
                   keeps it from nagging on repeat visits. */}
-              {showOneliner && (
-                <div className="patch-oneliner" role="note" title={PATCH_ONELINER_COPY}>
-                  <span className="patch-oneliner-text">{PATCH_ONELINER_COPY}</span>
-                  <button type="button" className="patch-oneliner-x" title="Got it — don't show again"
-                    aria-label="Dismiss PATCH hint"
-                    onClick={() => setOnelinerDismissed(true)}>×</button>
-                </div>
-              )}
-              <PatchDiagLine layerId={layer.id} patch={patch} srcN={ordinals.get(patch.to) ?? '?'} dstN={ordinals.get(layer.id) ?? '?'} />
-              {/* #1409 (petri dish A3) — DISH: the per-Look switch for the
+                {showOneliner && (
+                  <div className="patch-oneliner" role="note" title={PATCH_ONELINER_COPY}>
+                    <span className="patch-oneliner-text">{PATCH_ONELINER_COPY}</span>
+                    <button
+                      type="button"
+                      className="patch-oneliner-x"
+                      title="Got it — don't show again"
+                      aria-label="Dismiss PATCH hint"
+                      onClick={() => setOnelinerDismissed(true)}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+                <PatchDiagLine
+                  layerId={layer.id}
+                  patch={patch}
+                  srcN={ordinals.get(patch.to) ?? '?'}
+                  dstN={ordinals.get(layer.id) ?? '?'}
+                />
+                {/* #1409 (petri dish A3) — DISH: the per-Look switch for the
                   shared cross-strata grid (#1407) plus its two knobs.
                   Radius is NOT here: it is A2's law (voice-set anchor ×
                   live scale × asset trim), not a performance knob. OFF is
                   the old ghost stack preserved as a choice; each stratum's
                   own #167 contacts keep working either way. */}
-              <div className="strata-composite" title="DISH — one shared contact grid across strata: bodies push each other instead of ghosting. Per-Look; OFF restores the ghost stack.">
-                <span className="fx-param-readout lbl" style={{ width: 'auto' }}>dish</span>
-                <select className="blend-mode-select" value={dishOn ? 'on' : 'off'}
-                  onChange={(e) => setParam('dish', e.target.value === 'on')}>
-                  <option value="on">ON</option>
-                  <option value="off">OFF</option>
-                </select>
+                <div
+                  className="strata-composite"
+                  title="DISH — one shared contact grid across strata: bodies push each other instead of ghosting. Per-Look; OFF restores the ghost stack."
+                >
+                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                    dish
+                  </span>
+                  <select
+                    className="blend-mode-select"
+                    value={dishOn ? 'on' : 'off'}
+                    onChange={(e) => setParam('dish', e.target.value === 'on')}
+                  >
+                    <option value="on">ON</option>
+                    <option value="off">OFF</option>
+                  </select>
+                  {dishOn && (
+                    <>
+                      <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                        bounce
+                      </span>
+                      <RangeRow
+                        layout="bare"
+                        tone="build"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={dishRestitution}
+                        hint="BOUNCE — contact restitution across strata: 0 sticks, 1 is fully elastic"
+                        onReset={() => setParam('contactRestitution', 0.5)}
+                        onChange={(v) => setParam('contactRestitution', v)}
+                      />
+                      <span className="fx-param-readout">{trimNum(dishRestitution)}</span>
+                    </>
+                  )}
+                </div>
                 {dishOn && (
-                  <>
-                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>bounce</span>
-                    <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={dishRestitution}
-                      hint="BOUNCE — contact restitution across strata: 0 sticks, 1 is fully elastic"
-                      onReset={() => setParam('contactRestitution', 0.5)}
-                      onChange={(v) => setParam('contactRestitution', v)} />
-                    <span className="fx-param-readout">{trimNum(dishRestitution)}</span>
-                  </>
+                  <div
+                    className="strata-composite"
+                    title="REPEL — personal-space force: same-group neighbours push apart before they touch"
+                  >
+                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                      repel
+                    </span>
+                    <RangeRow
+                      layout="bare"
+                      tone="build"
+                      min={0}
+                      max={5}
+                      step={0.05}
+                      value={dishRepel}
+                      hint="REPEL — personal-space force gain vs same-group neighbours"
+                      onReset={() => setParam('contactRepel', 0)}
+                      onChange={(v) => setParam('contactRepel', v)}
+                    />
+                    <span className="fx-param-readout">{trimNum(dishRepel)}</span>
+                  </div>
                 )}
-              </div>
-              {dishOn && (
-                <div className="strata-composite" title="REPEL — personal-space force: same-group neighbours push apart before they touch">
-                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>repel</span>
-                  <RangeRow layout="bare" tone="build" min={0} max={5} step={0.05} value={dishRepel}
-                    hint="REPEL — personal-space force gain vs same-group neighbours"
-                    onReset={() => setParam('contactRepel', 0)}
-                    onChange={(v) => setParam('contactRepel', v)} />
-                  <span className="fx-param-readout">{trimNum(dishRepel)}</span>
-                </div>
-              )}
-              {dishOn && (
-                <div className="strata-composite" title="TEMPO — the dish's thermal energy (petri spec §4): Brownian jitter on every body in the dish. Hot never settles; 0 is the cold dish, exactly as before. DENSITY (the Layout %) is the dish's crowding pressure on REPEL.">
-                  <span className="fx-param-readout lbl" style={{ width: 'auto' }}>tempo</span>
-                  <RangeRow layout="bare" tone="build" min={0} max={1} step={0.01} value={dishTempo}
-                    hint="TEMPO — thermal energy: Brownian jitter amplitude in the dish"
-                    onReset={() => setParam('dishTempo', 0)}
-                    onChange={(v) => setParam('dishTempo', v)} />
-                  <span className="fx-param-readout">{trimNum(dishTempo)}</span>
-                </div>
-              )}
-              {dishOn && dishRadius === 0 && (
-                <div className="fx-note" title="The dish is on, but no stratum in this Look carries a contact radius — voices set the radius, and at radius 0 the grid never arms">idle — contact radius 0</div>
-              )}
+                {dishOn && (
+                  <div
+                    className="strata-composite"
+                    title="TEMPO — the dish's thermal energy (petri spec §4): Brownian jitter on every body in the dish. Hot never settles; 0 is the cold dish, exactly as before. DENSITY (the Layout %) is the dish's crowding pressure on REPEL."
+                  >
+                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                      tempo
+                    </span>
+                    <RangeRow
+                      layout="bare"
+                      tone="build"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={dishTempo}
+                      hint="TEMPO — thermal energy: Brownian jitter amplitude in the dish"
+                      onReset={() => setParam('dishTempo', 0)}
+                      onChange={(v) => setParam('dishTempo', v)}
+                    />
+                    <span className="fx-param-readout">{trimNum(dishTempo)}</span>
+                  </div>
+                )}
+                {dishOn && dishRadius === 0 && (
+                  <div
+                    className="fx-note"
+                    title="The dish is on, but no stratum in this Look carries a contact radius — voices set the radius, and at radius 0 the grid never arms"
+                  >
+                    idle — contact radius 0
+                  </div>
+                )}
               </>
             )}
             {fx && isFxSelected && <FxEffectEditor layer={layer} fxOrdinal={ordinals.get(layer.id) || 1} />}
@@ -711,7 +1028,12 @@ export function LayerStack() {
         {/* Gate: header ADD buttons retired — the dashed ADD STRATUM slot
             below is the add affordance (#1203 block stack). */}
       </PanelHeader>
-      <div className="strata-depth-head" title="The stack order is the dish's depth: the top block is the frontmost stratum.">▲ FRONT — stack order is depth — GROUND ▼</div>
+      <div
+        className="strata-depth-head"
+        title="The stack order is the dish's depth: the top block is the frontmost stratum."
+      >
+        ▲ FRONT — stack order is depth — GROUND ▼
+      </div>
       <PatchMatrix layers={layers} ordinals={ordinals} />
       <div className="strata-list">
         {stack.map((layer, i) => (
@@ -735,8 +1057,14 @@ export function LayerStack() {
           onClose={() => setChooser(null)}
           hasRoom={typeHasRoom}
           onPick={(t) => {
-            if (t === 'fx') { setChooser('fx'); return; }
-            if (t === 'content') { setChooser('content'); return; }
+            if (t === 'fx') {
+              setChooser('fx');
+              return;
+            }
+            if (t === 'content') {
+              setChooser('content');
+              return;
+            }
             setChooser(null);
             doAdd(t);
           }}
@@ -749,14 +1077,22 @@ export function LayerStack() {
           fxSlotKinds={nextFxKinds}
           fxSlotLabel={nextFxSlotLabel}
           onClose={() => setChooser(null)}
-          onPick={(family) => { setChooser(null); recordAddType('fx'); emit(Events.LAYER_ADD_FX, { family }); }}
+          onPick={(family) => {
+            setChooser(null);
+            recordAddType('fx');
+            emit(Events.LAYER_ADD_FX, { family });
+          }}
         />
       )}
       {chooser === 'content' && (
         <FamilyChooser
           section="content"
           onClose={() => setChooser(null)}
-          onPick={(family) => { setChooser(null); recordAddType('content'); emit(Events.LAYER_ADD, { family }); }}
+          onPick={(family) => {
+            setChooser(null);
+            recordAddType('content');
+            emit(Events.LAYER_ADD, { family });
+          }}
         />
       )}
       <div className="strata-foot">

@@ -43,19 +43,32 @@ export function MotionMeter() {
       // Reduced motion: the bars hold the last read values, un-animated — a slow poll, no rAF.
       timer = window.setInterval(draw, 1000);
     } else {
-      const loop = () => { draw(); raf = requestAnimationFrame(loop); };
+      const loop = () => {
+        draw();
+        raf = requestAnimationFrame(loop);
+      };
       raf = requestAnimationFrame(loop);
     }
-    return () => { cancelAnimationFrame(raf); window.clearInterval(timer); };
+    return () => {
+      cancelAnimationFrame(raf);
+      window.clearInterval(timer);
+    };
   }, []);
   return (
     <div className="stim-motionmeter" aria-label="motion readout">
-      <div className="stim-motion-head"><span>motion</span></div>
+      <div className="stim-motion-head">
+        <span>motion</span>
+      </div>
       <div className="stim-motionmeter-bars">
         {BARS.map(([key, label]) => (
           <div key={key} className="stim-motionmeter-col" ref={key === 'mothBeat' ? mothCol : undefined}>
             <div className="stim-motionmeter-track">
-              <div className="stim-motionmeter-fill" ref={(el) => { fills.current[key] = el; }} />
+              <div
+                className="stim-motionmeter-fill"
+                ref={(el) => {
+                  fills.current[key] = el;
+                }}
+              />
             </div>
             <div className="stim-motion-label">{label}</div>
           </div>

@@ -23,7 +23,9 @@ function ModSelect({ value, title, onChange }) {
       onChange={(e) => onChange(e.target.value)}
     >
       {MATH_MOD_SOURCES.map((s) => (
-        <option key={s} value={s}>{s === 'none' ? 'MOD —' : `MOD ${MOD_LABELS[s]}`}</option>
+        <option key={s} value={s}>
+          {s === 'none' ? 'MOD —' : `MOD ${MOD_LABELS[s]}`}
+        </option>
       ))}
     </select>
   );
@@ -43,29 +45,57 @@ function MathOpRow({ layerId, index, fx, count }) {
           onChange={(e) => emit(Events.MATH_EFFECT_SET_KIND, { layerId, index, kind: e.target.value })}
         >
           {MATH_OP_KINDS.map((k) => (
-            <option key={k} value={k}>{MATH_EFFECT_DEFS[k].label.toUpperCase()}</option>
+            <option key={k} value={k}>
+              {MATH_EFFECT_DEFS[k].label.toUpperCase()}
+            </option>
           ))}
         </select>
-        <button type="button" className="micro-btn" title="Move op earlier in the chain (runs first)"
+        <button
+          type="button"
+          className="micro-btn"
+          title="Move op earlier in the chain (runs first)"
           disabled={index === 0}
-          onClick={() => emit(Events.MATH_EFFECT_REORDER, { layerId, index, delta: -1 })}>▲</button>
-        <button type="button" className="micro-btn" title="Move op later in the chain (runs last)"
+          onClick={() => emit(Events.MATH_EFFECT_REORDER, { layerId, index, delta: -1 })}
+        >
+          ▲
+        </button>
+        <button
+          type="button"
+          className="micro-btn"
+          title="Move op later in the chain (runs last)"
           disabled={index === count - 1}
-          onClick={() => emit(Events.MATH_EFFECT_REORDER, { layerId, index, delta: 1 })}>▼</button>
-        <button type="button" className="micro-btn" title="Remove this op"
-          onClick={() => emit(Events.MATH_EFFECT_REMOVE, { layerId, index })}>✕</button>
+          onClick={() => emit(Events.MATH_EFFECT_REORDER, { layerId, index, delta: 1 })}
+        >
+          ▼
+        </button>
+        <button
+          type="button"
+          className="micro-btn"
+          title="Remove this op"
+          onClick={() => emit(Events.MATH_EFFECT_REMOVE, { layerId, index })}
+        >
+          ✕
+        </button>
       </div>
       {Object.entries(def.params).map(([key, p]) => {
         const v = fx.params?.[key] ?? p.def;
         return (
           <div className="fx-param" key={key}>
             <label title={p.hint}>{p.label}</label>
-            <RangeRow layout="bare" tone="build" min={p.min} max={p.max} step={p.step} value={v}
+            <RangeRow
+              layout="bare"
+              tone="build"
+              min={p.min}
+              max={p.max}
+              step={p.step}
+              value={v}
               hint={p.hint}
               onReset={() => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: p.def })}
               onChange={(v) => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: v })}
             />
-            <span className="fx-param-readout" title={p.hint}>{formatMathParam(fx.kind, key, v)}</span>
+            <span className="fx-param-readout" title={p.hint}>
+              {formatMathParam(fx.kind, key, v)}
+            </span>
             <ModSelect
               value={fx.mod?.[key] || 'none'}
               title={`${p.label} — audio modulation source. The envelope pushes the knob toward its max; silence is a no-op.`}
@@ -75,7 +105,10 @@ function MathOpRow({ layerId, index, fx, count }) {
         );
       })}
       {isHue && (
-        <div className="math-warn" title="HUE ROTATE compounds fast — the track is capped at 50% wet while it is in the chain.">
+        <div
+          className="math-warn"
+          title="HUE ROTATE compounds fast — the track is capped at 50% wet while it is in the chain."
+        >
           ⚠ capped at 50% wet while in the chain
         </div>
       )}
@@ -95,7 +128,9 @@ export function MathEffectEditor({ layer, mathOrdinal }) {
       <div className="math-add-row">
         <select value={pick} onChange={(e) => setPick(e.target.value)} title="Op to add">
           {MATH_OP_KINDS.map((k) => (
-            <option key={k} value={k}>{MATH_EFFECT_DEFS[k].label.toUpperCase()}</option>
+            <option key={k} value={k}>
+              {MATH_EFFECT_DEFS[k].label.toUpperCase()}
+            </option>
           ))}
         </select>
         <button className="chip-btn" onClick={() => emit(Events.MATH_EFFECT_ADD, { layerId: layer.id, kind: pick })}>
@@ -107,7 +142,10 @@ export function MathEffectEditor({ layer, mathOrdinal }) {
           ⚠ 50% wet ceiling active (HUE ROTATE)
         </div>
       )}
-      <div className="math-order-note" title="Order is a creative control, never auto-fixed: gain-then-threshold reads differently from threshold-then-gain.">
+      <div
+        className="math-order-note"
+        title="Order is a creative control, never auto-fixed: gain-then-threshold reads differently from threshold-then-gain."
+      >
         Order matters — first op grades first.
       </div>
     </div>

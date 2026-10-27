@@ -47,7 +47,9 @@ export function DevPanel(props) {
             onClick={() => setActiveId(t.id)}
             title={t.title}
           >
-            <span className="panel-tab-icon" aria-hidden="true">{t.icon}</span>
+            <span className="panel-tab-icon" aria-hidden="true">
+              {t.icon}
+            </span>
             <span className="panel-tab-label">{t.title}</span>
           </button>
         ))}

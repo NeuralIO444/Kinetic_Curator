@@ -7,7 +7,9 @@ export function BuildSection({ num, title, children }) {
   return (
     <section className="build-section">
       <h3 className="build-section-title">
-        <span className="build-section-num" aria-hidden="true">{CIRCLED[num] || num}</span>
+        <span className="build-section-num" aria-hidden="true">
+          {CIRCLED[num] || num}
+        </span>
         {title}
       </h3>
       {children}

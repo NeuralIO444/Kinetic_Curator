@@ -6,16 +6,7 @@
 import { useRef } from 'react';
 import { useDock } from './useDock.js';
 
-export function ValueButton({
-  label,
-  display,
-  title,
-  onOpen,
-  locked,
-  onToggleLock,
-  disabled,
-  disabledReason,
-}) {
+export function ValueButton({ label, display, title, onOpen, locked, onToggleLock, disabled, disabledReason }) {
   const { open } = useDock();
   // #1272 — the dock must render the CURRENT editor, not the closure
   // captured at open time. The latest onOpen rides a ref; the dock gets a
@@ -46,7 +37,10 @@ export function ValueButton({
         <button
           type="button"
           className={`te-lock${locked ? ' locked' : ''}`}
-          onClick={(e) => { e.stopPropagation(); onToggleLock(); }}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleLock();
+          }}
           title={locked ? `${label} locked against life-drift — tap to unlock` : `Lock ${label} against life-drift`}
           aria-pressed={!!locked}
           aria-label={locked ? `Unlock ${label}` : `Lock ${label}`}

@@ -9,30 +9,30 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import {
-  buildProgramChecked,
-  auditUniforms,
-  diagnosticsLog,
-} from '../gl/debug/diagnostics.mjs';
+import { buildProgramChecked, auditUniforms, diagnosticsLog } from '../gl/debug/diagnostics.mjs';
 import { createFlagPass, FLAG_VIEWS } from '../gl/debug/flagPass.mjs';
 import { createGpuTimer } from '../gl/debug/gpuTimer.mjs';
-import {
-  packStripValues,
-  unpackStripPixels,
-  formatStripTable,
-} from '../gl/debug/debugStrip.mjs';
+import { packStripValues, unpackStripPixels, formatStripTable } from '../gl/debug/debugStrip.mjs';
 import { tapToDataURL } from '../gl/debug/tapPoints.mjs';
-import {
-  QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, COPY_FS,
-} from '../gl/shaders.mjs';
+import { QUAD_VS, QUAD_FS, FULL_VS, COMPOSITE_FS, EFFECT_FS, COPY_FS } from '../gl/shaders.mjs';
 import { RESOLVE_FS } from '../gl/resolveFs.mjs';
 
 // Programs the Phase 1 renderer builds (mirrors renderer.mjs).
 const PROGRAMS = [
   { name: 'quad', vs: QUAD_VS, fs: QUAD_FS, set: ['u_canvas', 'u_atlas'] },
-  { name: 'composite', vs: FULL_VS, fs: COMPOSITE_FS, set: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn'] },
+  {
+    name: 'composite',
+    vs: FULL_VS,
+    fs: COMPOSITE_FS,
+    set: ['u_src', 'u_dst', 'u_blend', 'u_opacity', 'u_clip', 'u_clipOn'],
+  },
   { name: 'effect', vs: FULL_VS, fs: EFFECT_FS, set: ['u_src', 'u_effect', 'u_p', 'u_texel', 'u_clip', 'u_clipOn'] },
-  { name: 'resolve', vs: FULL_VS, fs: RESOLVE_FS, set: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave'] },
+  {
+    name: 'resolve',
+    vs: FULL_VS,
+    fs: RESOLVE_FS,
+    set: ['u_src', 'u_aces', 'u_exposure', 'u_dither', 'u_fxaa', 'u_weave'],
+  },
   { name: 'copy', vs: FULL_VS, fs: COPY_FS, set: ['u_src'] },
 ];
 // NOTE: the `set` lists mirror the uniforms renderer.mjs uploads. If the
@@ -53,9 +53,22 @@ function makeDemoTexture(gl) {
     for (let x = 0; x < S; x++) {
       const i = (y * S + x) * 4;
       const g = (x + y) / (2 * S);
-      data[i] = g; data[i + 1] = g * 0.5; data[i + 2] = 0.2; data[i + 3] = 0.5 + 0.5 * (x / S);
-      if (x >= 8 && x < 20 && y >= 8 && y < 20) { data[i] = NaN; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 1; }
-      if (x >= 28 && x < 40 && y >= 28 && y < 40) { data[i] = 2.5; data[i + 1] = 0.5; data[i + 2] = 0.5; data[i + 3] = 1; }
+      data[i] = g;
+      data[i + 1] = g * 0.5;
+      data[i + 2] = 0.2;
+      data[i + 3] = 0.5 + 0.5 * (x / S);
+      if (x >= 8 && x < 20 && y >= 8 && y < 20) {
+        data[i] = NaN;
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+        data[i + 3] = 1;
+      }
+      if (x >= 28 && x < 40 && y >= 28 && y < 40) {
+        data[i] = 2.5;
+        data[i + 1] = 0.5;
+        data[i + 2] = 0.5;
+        data[i + 3] = 1;
+      }
     }
   }
   const tex = gl.createTexture();
@@ -95,7 +108,10 @@ export function ShaderLabPanel() {
 
   useEffect(() => {
     const gl = getGL(canvasRef.current);
-    if (!gl) { setNoGL(true); return; }
+    if (!gl) {
+      setNoGL(true);
+      return;
+    }
     glRef.current = gl;
 
     const cRows = [];
@@ -104,14 +120,19 @@ export function ShaderLabPanel() {
       try {
         const prog = buildProgramChecked(gl, p.vs, p.fs, {
           name: p.name,
-          vsFile: 'shaders.mjs', fsFile: p.name === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs',
+          vsFile: 'shaders.mjs',
+          fsFile: p.name === 'resolve' ? 'resolveFs.mjs' : 'shaders.mjs',
         });
         cRows.push({ name: p.name, ok: true });
         const a = auditUniforms(gl, prog, p.set);
         aRows.push({ name: p.name, ...a });
         gl.deleteProgram(prog);
       } catch (e) {
-        cRows.push({ name: p.name, ok: false, detail: `${e.file || ''}${e.line ? ':' + e.line : ''} ${e.log || e.message}`.trim() });
+        cRows.push({
+          name: p.name,
+          ok: false,
+          detail: `${e.file || ''}${e.line ? ':' + e.line : ''} ${e.log || e.message}`.trim(),
+        });
       }
     }
     setCompileRows(cRows);
@@ -130,7 +151,9 @@ export function ShaderLabPanel() {
     }
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     fp.dispose();
-    gl.deleteTexture(demo.tex); gl.deleteTexture(target.tex); gl.deleteFramebuffer(target.fb);
+    gl.deleteTexture(demo.tex);
+    gl.deleteTexture(target.tex);
+    gl.deleteFramebuffer(target.fb);
     setThumbs(urls);
 
     const t = createGpuTimer(gl);
@@ -152,7 +175,7 @@ export function ShaderLabPanel() {
     }, 16);
 
     const labels = ['u_amount', 'u_texel.x', 'iterations', 'seed'];
-    const values = [0.75, 0.0025, 16, 0xC0FFEE];
+    const values = [0.75, 0.0025, 16, 0xc0ffee];
     const back = unpackStripPixels(packStripValues(values));
     setStrip(formatStripTable(labels, back));
 
@@ -180,7 +203,8 @@ export function ShaderLabPanel() {
         <h4 style={{ margin: '4px 0' }}>Compile check</h4>
         {compileRows.map((r) => (
           <div key={r.name} style={{ fontFamily: 'monospace', fontSize: 12, color: r.ok ? '#8f8' : '#f88' }}>
-            {r.ok ? '✓' : '✗'} {r.name}{r.ok ? '' : ` — ${r.detail}`}
+            {r.ok ? '✓' : '✗'} {r.name}
+            {r.ok ? '' : ` — ${r.detail}`}
           </div>
         ))}
       </section>
@@ -190,24 +214,37 @@ export function ShaderLabPanel() {
         {auditRows.map((r) => (
           <div key={r.name} style={{ fontFamily: 'monospace', fontSize: 12 }}>
             <span style={{ color: '#ccc' }}>{r.name}:</span>{' '}
-            {r.neverSet.length === 0 && r.undeclared.length === 0
-              ? <span style={{ color: '#8f8' }}>clean</span>
-              : <span style={{ color: '#fc6' }}>
-                  {r.neverSet.length > 0 && `never set: ${r.neverSet.join(', ')} `}
-                  {r.undeclared.length > 0 && `undeclared: ${r.undeclared.join(', ')}`}
-                </span>}
+            {r.neverSet.length === 0 && r.undeclared.length === 0 ? (
+              <span style={{ color: '#8f8' }}>clean</span>
+            ) : (
+              <span style={{ color: '#fc6' }}>
+                {r.neverSet.length > 0 && `never set: ${r.neverSet.join(', ')} `}
+                {r.undeclared.length > 0 && `undeclared: ${r.undeclared.join(', ')}`}
+              </span>
+            )}
           </div>
         ))}
       </section>
 
       <section style={{ padding: '8px 12px' }}>
-        <h4 style={{ margin: '4px 0' }}>Flag views <span style={{ fontWeight: 400, fontSize: 11, opacity: 0.7 }}>(gradient + NaN block + overbright block)</span></h4>
+        <h4 style={{ margin: '4px 0' }}>
+          Flag views{' '}
+          <span style={{ fontWeight: 400, fontSize: 11, opacity: 0.7 }}>(gradient + NaN block + overbright block)</span>
+        </h4>
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {Object.values(FLAG_VIEWS).map((key) => (
             <figure key={key} style={{ margin: 0, textAlign: 'center' }}>
-              {thumbs[key]
-                ? <img src={thumbs[key]} alt={VIEW_LABELS[key]} width="144" height="144" style={{ imageRendering: 'pixelated', border: '1px solid #444' }} />
-                : <div style={{ width: 144, height: 144, background: '#222' }} />}
+              {thumbs[key] ? (
+                <img
+                  src={thumbs[key]}
+                  alt={VIEW_LABELS[key]}
+                  width="144"
+                  height="144"
+                  style={{ imageRendering: 'pixelated', border: '1px solid #444' }}
+                />
+              ) : (
+                <div style={{ width: 144, height: 144, background: '#222' }} />
+              )}
               <figcaption style={{ fontSize: 11, opacity: 0.8 }}>{VIEW_LABELS[key]}</figcaption>
             </figure>
           ))}
@@ -217,9 +254,11 @@ export function ShaderLabPanel() {
       <section style={{ padding: '8px 12px' }}>
         <h4 style={{ margin: '4px 0' }}>GPU timing</h4>
         <div style={{ fontFamily: 'monospace', fontSize: 12 }}>
-          {timer === null ? 'measuring…'
-            : timer.disjoint ? 'disjoint — clock unreliable, batch discarded'
-            : `${timer.hardware ? 'hardware' : 'CPU fallback'} · clear: ${timer.ms == null ? 'n/a' : timer.ms.toFixed(3) + ' ms'}`}
+          {timer === null
+            ? 'measuring…'
+            : timer.disjoint
+              ? 'disjoint — clock unreliable, batch discarded'
+              : `${timer.hardware ? 'hardware' : 'CPU fallback'} · clear: ${timer.ms == null ? 'n/a' : timer.ms.toFixed(3) + ' ms'}`}
         </div>
       </section>
 
@@ -230,7 +269,9 @@ export function ShaderLabPanel() {
 
       <section style={{ padding: '8px 12px' }}>
         <h4 style={{ margin: '4px 0' }}>Diagnostics log</h4>
-        {logRows.length === 0 && <div style={{ fontSize: 12, opacity: 0.7 }}>no compile/link events yet this session</div>}
+        {logRows.length === 0 && (
+          <div style={{ fontSize: 12, opacity: 0.7 }}>no compile/link events yet this session</div>
+        )}
         {logRows.map((e, i) => (
           <div key={i} style={{ fontFamily: 'monospace', fontSize: 12 }}>
             <span style={{ opacity: 0.6 }}>{e.at}</span> {e.kind} <span style={{ color: '#ccc' }}>{e.name}</span>

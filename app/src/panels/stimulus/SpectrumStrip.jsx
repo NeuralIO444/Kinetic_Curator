@@ -17,7 +17,10 @@ export function SpectrumStrip() {
       const dpr = window.devicePixelRatio || 1;
       const w = Math.max(1, Math.round(cv.clientWidth * dpr));
       const h = Math.round(H * dpr);
-      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+      if (cv.width !== w || cv.height !== h) {
+        cv.width = w;
+        cv.height = h;
+      }
       const g = cv.getContext('2d');
       const css = getComputedStyle(cv);
       const ink = css.getPropertyValue('--ink').trim() || '#e8e8e0';
@@ -41,9 +44,17 @@ export function SpectrumStrip() {
   }, []);
   return (
     <div className="stim-spectrum" aria-label="spectrum readout">
-      <div className="stim-motion-head"><span>spectrum</span><span className="stim-motion-hint">30 Hz – 16 kHz · read only</span></div>
+      <div className="stim-motion-head">
+        <span>spectrum</span>
+        <span className="stim-motion-hint">30 Hz – 16 kHz · read only</span>
+      </div>
       <canvas ref={canvasRef} className="stim-spectrum-canvas" style={{ height: H }} />
-      <div className="stim-spectrum-scale"><span>30</span><span>100</span><span>1k</span><span>16k</span></div>
+      <div className="stim-spectrum-scale">
+        <span>30</span>
+        <span>100</span>
+        <span>1k</span>
+        <span>16k</span>
+      </div>
     </div>
   );
 }

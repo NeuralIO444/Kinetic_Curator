@@ -29,10 +29,7 @@ assert.ok(
 );
 assert.ok(decayHeat(0.8, 10000) < 0.05, 'long idleness cools to ~0');
 assert.strictEqual(addHeat(0.9), 1, 'heat caps at 1');
-assert.ok(
-  approx(addHeat(0), KINETIC_HEAT_PER_TAP),
-  'one rapid tap adds HEAT_PER_TAP',
-);
+assert.ok(approx(addHeat(0), KINETIC_HEAT_PER_TAP), 'one rapid tap adds HEAT_PER_TAP');
 
 assert.strictEqual(heatLevel(0), 'cool', '0 → cool');
 assert.strictEqual(heatLevel(0.4), 'warm', '0.4 → warm');
@@ -108,6 +105,9 @@ for (let i = 0; i < 5; i++) {
   run = tap(run, now);
   slow.push(run.layer);
 }
-assert.ok(slow.every((l) => l === 'rules'), `slow taps all RULES, got ${slow}`);
+assert.ok(
+  slow.every((l) => l === 'rules'),
+  `slow taps all RULES, got ${slow}`,
+);
 
 console.log('ok kineticHeat: heat math + tap routing (#945)');

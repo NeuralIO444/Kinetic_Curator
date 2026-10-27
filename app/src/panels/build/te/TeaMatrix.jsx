@@ -25,12 +25,16 @@ export function TeaMatrix({ options, value, onChange, tone = 'ink', ariaLabel, c
             onClick={() => onChange(id)}
           >
             {typeof opt !== 'string' && opt.glyph && (
-              <span className="te-glyph" aria-hidden="true">{opt.glyph}</span>
+              <span className="te-glyph" aria-hidden="true">
+                {opt.glyph}
+              </span>
             )}
             <span className="te-cell-label">{label}</span>
             {typeof opt !== 'string' && opt.pips !== undefined && (
               <span className="te-pips" aria-hidden="true">
-                {[1, 2, 3].map((n) => <i key={n} className={opt.pips >= n ? 'lit' : ''} />)}
+                {[1, 2, 3].map((n) => (
+                  <i key={n} className={opt.pips >= n ? 'lit' : ''} />
+                ))}
               </span>
             )}
           </button>

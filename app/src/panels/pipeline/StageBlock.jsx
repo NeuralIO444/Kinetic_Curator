@@ -55,16 +55,27 @@ export function StageBlock() {
   return (
     <div className="pipeline-stage">
       {stageError && (
-        <div className="pipeline-row" style={{ background: 'rgba(200,30,30,0.16)', border: '1px solid rgba(200,30,30,0.55)', padding: '6px 8px' }}>
+        <div
+          className="pipeline-row"
+          style={{ background: 'rgba(200,30,30,0.16)', border: '1px solid rgba(200,30,30,0.55)', padding: '6px 8px' }}
+        >
           <span style={{ flex: 1, fontSize: 11, color: '#ff9a9a' }}>⚠ {stageError}</span>
-          <button type="button" className="chip-btn act" onClick={() => setStageError(null)}>dismiss</button>
+          <button type="button" className="chip-btn act" onClick={() => setStageError(null)}>
+            dismiss
+          </button>
         </div>
       )}
       <div className="pipeline-row">
-        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>stage mode</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+          stage mode
+        </span>
         {['preview', 'fullscreen', 'syphon'].map((m) => (
-          <button key={m} type="button" className={`chip-btn${mode === m ? ' active' : ''}`}
-            onClick={() => pickMode(m)}>
+          <button
+            key={m}
+            type="button"
+            className={`chip-btn${mode === m ? ' active' : ''}`}
+            onClick={() => pickMode(m)}
+          >
             {m === 'preview' ? 'PREVIEW' : m === 'fullscreen' ? 'FULLSCREEN' : 'SYPHON'}
           </button>
         ))}
@@ -78,7 +89,9 @@ export function StageBlock() {
           {tauri ? (
             <>
               <div className="pipeline-row">
-                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>display</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+                  display
+                </span>
                 <select
                   value={stageDisplayId || ''}
                   onChange={(e) => setStageDisplayId(e.target.value || null)}
@@ -87,7 +100,9 @@ export function StageBlock() {
                 >
                   {displays.length === 0 && <option value="">— no displays —</option>}
                   {displays.map((d) => (
-                    <option key={d.id} value={d.id}>{displayLabel(d)}</option>
+                    <option key={d.id} value={d.id}>
+                      {displayLabel(d)}
+                    </option>
                   ))}
                 </select>
                 <button type="button" className="chip-btn" onClick={refreshDisplays} disabled={displaysBusy}>
@@ -95,43 +110,73 @@ export function StageBlock() {
                 </button>
               </div>
               <div className="pipeline-row">
-                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>native raster</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+                  native raster
+                </span>
                 <span className="pipeline-status" style={{ fontSize: 11 }}>
                   {activeDisplay ? `${activeDisplay.w}×${activeDisplay.h}` : '—'}
                 </span>
-                <button type="button" className="chip-btn" onClick={matchDisplay} disabled={!activeDisplay}
-                  title="Write the display's native raster to the canvas size">
+                <button
+                  type="button"
+                  className="chip-btn"
+                  onClick={matchDisplay}
+                  disabled={!activeDisplay}
+                  title="Write the display's native raster to the canvas size"
+                >
                   MATCH DISPLAY
                 </button>
               </div>
               <div className="pipeline-row">
-                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>mapping</span>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+                  mapping
+                </span>
                 {STAGE_MAPPINGS.map((mp) => (
-                  <button key={mp} type="button" className={`chip-btn${mapping === mp ? ' active' : ''}`}
+                  <button
+                    key={mp}
+                    type="button"
+                    className={`chip-btn${mapping === mp ? ' active' : ''}`}
                     onClick={() => setMapping(mp)}
-                    title={mp === 'fit' ? 'Whole frame visible, letterboxed' : mp === 'fill' ? 'Cover the display, crop the overflow' : 'Native pixels, centered'}>
+                    title={
+                      mp === 'fit'
+                        ? 'Whole frame visible, letterboxed'
+                        : mp === 'fill'
+                          ? 'Cover the display, crop the overflow'
+                          : 'Native pixels, centered'
+                    }
+                  >
                     {stageMappingLabel(mp)}
                   </button>
                 ))}
               </div>
               <div className="pipeline-row">
-                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>test pattern</span>
-                <button type="button" className={`chip-btn${testPattern ? ' active' : ''}`} onClick={() => setTestPattern(!testPattern)}>
+                <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+                  test pattern
+                </span>
+                <button
+                  type="button"
+                  className={`chip-btn${testPattern ? ' active' : ''}`}
+                  onClick={() => setTestPattern(!testPattern)}
+                >
                   {testPattern ? 'ON' : 'OFF'}
                 </button>
               </div>
             </>
           ) : (
             <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-              Fullscreen stage needs the Mac / Tauri build — this browser cannot open a
-              borderless stage window on a second display. In the browser, FULLSCREEN
-              falls back to the tab's own fullscreen.
+              Fullscreen stage needs the Mac / Tauri build — this browser cannot open a borderless stage window on a
+              second display. In the browser, FULLSCREEN falls back to the tab's own fullscreen.
             </div>
           )}
           <div className="pipeline-row">
-            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>blackout</span>
-            <button type="button" className={`chip-btn${blackout ? ' active' : ''}`} onClick={() => setBlackout(!blackout)}
-              title="Stage goes black instantly. The UI stays live; toggling back recovers without re-creating the window.">
+            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+              blackout
+            </span>
+            <button
+              type="button"
+              className={`chip-btn${blackout ? ' active' : ''}`}
+              onClick={() => setBlackout(!blackout)}
+              title="Stage goes black instantly. The UI stays live; toggling back recovers without re-creating the window."
+            >
               {blackout ? 'ON' : 'OFF'}
             </button>
           </div>
@@ -141,11 +186,20 @@ export function StageBlock() {
       {mode === 'syphon' && (
         <>
           <div className="pipeline-row">
-            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>server</span>
-            <input value={syphonName} onChange={(e) => setSyphonName(e.target.value)} style={{ fontSize: 11, width: 140 }} />
+            <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+              server
+            </span>
+            <input
+              value={syphonName}
+              onChange={(e) => setSyphonName(e.target.value)}
+              style={{ fontSize: 11, width: 140 }}
+            />
             {tauri ? (
-              <button type="button" className={`chip-btn${syphonOn ? ' active' : ''}`}
-                onClick={() => setSyphonOn(!syphonOn)}>
+              <button
+                type="button"
+                className={`chip-btn${syphonOn ? ' active' : ''}`}
+                onClick={() => setSyphonOn(!syphonOn)}
+              >
                 {syphonOn ? 'ON' : 'OFF'}
               </button>
             ) : (

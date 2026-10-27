@@ -7,8 +7,12 @@
 
 import { useEffect, useRef } from 'react';
 import {
-  STAGE_FRAME_CHANNEL, STAGE_CONTROL_CHANNEL, STAGE_HEARTBEAT_TIMEOUT_MS,
-  isControlMessage, isFrameMessage, isCloseMessage,
+  STAGE_FRAME_CHANNEL,
+  STAGE_CONTROL_CHANNEL,
+  STAGE_HEARTBEAT_TIMEOUT_MS,
+  isControlMessage,
+  isFrameMessage,
+  isCloseMessage,
 } from './stageChannel.mjs';
 import { computeStageRect, sanitizeStageMapping } from './stageMapping.mjs';
 import { testPatternLayout } from './stageTestPattern.mjs';
@@ -50,8 +54,10 @@ function drawTestPattern(ctx, W, H, control) {
   const cy = Math.floor(H * 0.335);
   const arm = Math.min(W, H) / 12;
   ctx.beginPath();
-  ctx.moveTo(cx - arm, cy); ctx.lineTo(cx + arm, cy);
-  ctx.moveTo(cx, cy - arm); ctx.lineTo(cx, cy + arm);
+  ctx.moveTo(cx - arm, cy);
+  ctx.lineTo(cx + arm, cy);
+  ctx.moveTo(cx, cy - arm);
+  ctx.lineTo(cx, cy + arm);
   ctx.stroke();
   ctx.beginPath();
   ctx.arc(cx, cy, arm / 3, 0, Math.PI * 2);
@@ -100,8 +106,7 @@ export function StageView() {
       }
       if (bitmap) {
         if (Date.now() - lastFrameAt > 5000) {
-          drawSplash(ctx, W, H, 'KC STAGE — SIGNAL STALE',
-            'the instrument stopped sending frames');
+          drawSplash(ctx, W, H, 'KC STAGE — SIGNAL STALE', 'the instrument stopped sending frames');
           return;
         }
         ctx.fillStyle = '#000';
@@ -111,13 +116,18 @@ export function StageView() {
         ctx.imageSmoothingQuality = 'high';
         try {
           ctx.drawImage(bitmap, r.dx, r.dy, r.dw, r.dh);
-        } catch { /* bitmap neutered mid-draw — next frame recovers */ }
+        } catch {
+          /* bitmap neutered mid-draw — next frame recovers */
+        }
         return;
       }
-      drawSplash(ctx, W, H, 'KC STAGE — NO SIGNAL',
-        Date.now() - lastControlAt > NO_SIGNAL_MS
-          ? 'waiting for the instrument window…'
-          : 'linking…');
+      drawSplash(
+        ctx,
+        W,
+        H,
+        'KC STAGE — NO SIGNAL',
+        Date.now() - lastControlAt > NO_SIGNAL_MS ? 'waiting for the instrument window…' : 'linking…',
+      );
     };
 
     const fit = () => {
@@ -134,8 +144,13 @@ export function StageView() {
       bcFrames = new BroadcastChannel(STAGE_FRAME_CHANNEL);
       bcControl = new BroadcastChannel(STAGE_CONTROL_CHANNEL);
     } catch {
-      drawSplash(ctx, canvas.width, canvas.height, 'KC STAGE — NO CHANNEL',
-        'BroadcastChannel unavailable in this runtime');
+      drawSplash(
+        ctx,
+        canvas.width,
+        canvas.height,
+        'KC STAGE — NO CHANNEL',
+        'BroadcastChannel unavailable in this runtime',
+      );
       return () => window.removeEventListener('resize', fit);
     }
 
@@ -143,15 +158,29 @@ export function StageView() {
       if (dead) return;
       dead = true;
       drawSplash(ctx, canvas.width, canvas.height, title, sub);
-      try { bitmap && bitmap.close(); } catch { /* noop */ }
+      try {
+        bitmap && bitmap.close();
+      } catch {
+        /* noop */
+      }
       bitmap = null;
-      window.setTimeout(() => { try { window.close(); } catch { /* noop */ } }, 2500);
+      window.setTimeout(() => {
+        try {
+          window.close();
+        } catch {
+          /* noop */
+        }
+      }, 2500);
     };
 
     bcFrames.onmessage = (ev) => {
       const m = ev && ev.data;
       if (!isFrameMessage(m)) return;
-      try { bitmap && bitmap.close(); } catch { /* noop */ }
+      try {
+        bitmap && bitmap.close();
+      } catch {
+        /* noop */
+      }
       bitmap = m.bitmap;
       bw = m.width;
       bh = m.height;
@@ -183,15 +212,29 @@ export function StageView() {
     }, 1000);
 
     // Keep the cursor out of the signal.
-    const hideCursor = () => { canvas.style.cursor = 'none'; };
+    const hideCursor = () => {
+      canvas.style.cursor = 'none';
+    };
     hideCursor();
 
     return () => {
       window.clearInterval(heartbeat);
       window.removeEventListener('resize', fit);
-      try { bcFrames && bcFrames.close(); } catch { /* noop */ }
-      try { bcControl && bcControl.close(); } catch { /* noop */ }
-      try { bitmap && bitmap.close(); } catch { /* noop */ }
+      try {
+        bcFrames && bcFrames.close();
+      } catch {
+        /* noop */
+      }
+      try {
+        bcControl && bcControl.close();
+      } catch {
+        /* noop */
+      }
+      try {
+        bitmap && bitmap.close();
+      } catch {
+        /* noop */
+      }
     };
   }, []);
 
@@ -199,8 +242,12 @@ export function StageView() {
     <canvas
       ref={canvasRef}
       style={{
-        position: 'fixed', inset: 0, width: '100vw', height: '100vh',
-        background: '#000', display: 'block',
+        position: 'fixed',
+        inset: 0,
+        width: '100vw',
+        height: '100vh',
+        background: '#000',
+        display: 'block',
       }}
     />
   );

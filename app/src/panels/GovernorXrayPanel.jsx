@@ -85,17 +85,30 @@ export function GovernorXrayPanel() {
     return () => clearInterval(id);
   }, []);
 
-  const shed = useMemo(() => ({
-    fxaaShed,
-    perfTier1,
-    renderScale,
-    assetThin,
-    perfClampOverride,
-    slowRender,
-    watchdogTripped: !!lastWatchdogReason,
-    quality,
-    qualityShedFrom,
-  }), [fxaaShed, perfTier1, renderScale, assetThin, perfClampOverride, slowRender, lastWatchdogReason, quality, qualityShedFrom]);
+  const shed = useMemo(
+    () => ({
+      fxaaShed,
+      perfTier1,
+      renderScale,
+      assetThin,
+      perfClampOverride,
+      slowRender,
+      watchdogTripped: !!lastWatchdogReason,
+      quality,
+      qualityShedFrom,
+    }),
+    [
+      fxaaShed,
+      perfTier1,
+      renderScale,
+      assetThin,
+      perfClampOverride,
+      slowRender,
+      lastWatchdogReason,
+      quality,
+      qualityShedFrom,
+    ],
+  );
 
   const { cuts, passes } = useMemo(
     () => buildXray({ tiers: allCostTiers(), measuredMs: MEASURED_COSTS, shed }),
@@ -114,8 +127,8 @@ export function GovernorXrayPanel() {
         <span style={{ color: TIER_COLORS[1] }}> 1 shed-first</span>
         <span style={{ color: TIER_COLORS[2] }}> · 2 quality-scaler</span>
         <span style={{ color: TIER_COLORS[3] }}> · 3 cosmetic</span>
-        <span style={{ color: TIER_COLORS[0] }}> · 0 structural</span>.
-        Measurements from {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '—'}.
+        <span style={{ color: TIER_COLORS[0] }}> · 0 structural</span>. Measurements from{' '}
+        {MEASURED_AT ? new Date(MEASURED_AT).toLocaleDateString() : '—'}.
       </div>
 
       <h4 style={{ margin: '10px 0 4px' }}>Governor cuts (the shed ladder)</h4>
@@ -156,7 +169,13 @@ export function GovernorXrayPanel() {
                   {p.measuredMs != null ? `${p.measuredMs.toFixed(1)}ms` : '—'}
                 </td>
                 <td style={{ padding: '3px 6px', textAlign: 'right', color: '#8a93a6' }}>{p.memoryMB}</td>
-                <td style={{ padding: '3px 6px', color: p.shed ? '#ffb454' : '#9fe870', fontWeight: p.shed ? 'bold' : 'normal' }}>
+                <td
+                  style={{
+                    padding: '3px 6px',
+                    color: p.shed ? '#ffb454' : '#9fe870',
+                    fontWeight: p.shed ? 'bold' : 'normal',
+                  }}
+                >
                   {p.shed ? `SHED (${p.shedBy})` : 'active'}
                 </td>
               </tr>
@@ -170,13 +189,21 @@ export function GovernorXrayPanel() {
         <span style={{ color: '#8a93a6', fontWeight: 'normal', fontSize: 11 }}> (last {events.length} shown)</span>
       </h4>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        <button type="button" className="micro-btn" onClick={downloadLog} title="Download the full governor event log as JSON">
+        <button
+          type="button"
+          className="micro-btn"
+          onClick={downloadLog}
+          title="Download the full governor event log as JSON"
+        >
           ⬇ export log (JSON)
         </button>
         <button
           type="button"
           className="micro-btn"
-          onClick={() => { clearGovernorEvents(); setEventsVersion((v) => v + 1); }}
+          onClick={() => {
+            clearGovernorEvents();
+            setEventsVersion((v) => v + 1);
+          }}
           title="Empty the in-memory event log"
         >
           clear
@@ -188,7 +215,9 @@ export function GovernorXrayPanel() {
             No governor events yet this session — sheds and restores appear here as they happen.
           </div>
         )}
-        {events.map((e, i) => <EventRow key={`${e.t}-${i}`} e={e} />)}
+        {events.map((e, i) => (
+          <EventRow key={`${e.t}-${i}`} e={e} />
+        ))}
       </div>
     </div>
   );

@@ -61,8 +61,12 @@ export function DiceTray({ tray, onCrown, onReroll, onDismiss }) {
           {wildnessNote(tray)}
         </span>
         <span className="dice-tray-actions">
-          <button onClick={onReroll} title="roll again">↻</button>
-          <button onClick={onDismiss} title="dismiss">✕</button>
+          <button onClick={onReroll} title="roll again">
+            ↻
+          </button>
+          <button onClick={onDismiss} title="dismiss">
+            ✕
+          </button>
         </span>
       </div>
       <div className="dice-finalists">

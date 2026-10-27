@@ -52,8 +52,12 @@ export function addHeat(heat) {
 // #1124 — the heat the KIN button is SHOWING right now, published by the button so a keep can freeze it into its
 // bands. A plain holder: the button is the only writer, a keep the only reader.
 let shown = 0;
-export function publishShownHeat(h) { shown = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0; }
-export function shownHeat() { return shown; }
+export function publishShownHeat(h) {
+  shown = Number.isFinite(h) ? Math.max(0, Math.min(1, h)) : 0;
+}
+export function shownHeat() {
+  return shown;
+}
 /** The 4 steps a HITS band can show: 0 cool, 1 low, 2 warm, 3 hot (the same cuts as heatLevel, plus a low step). */
 export function heatStep(heat) {
   if (!(heat > 0.01)) return 0;

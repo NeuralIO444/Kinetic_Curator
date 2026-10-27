@@ -14,15 +14,7 @@ export function SliderEditor({ value, min, max, step = 1, unit, format, onChange
   return (
     <div className="te-editor">
       <div className="te-editor-readout">{fmtVal(value, format, unit)}</div>
-      <RangeRow
-        layout="bare"
-        ariaLabel={ariaLabel}
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={onChange}
-      />
+      <RangeRow layout="bare" ariaLabel={ariaLabel} min={min} max={max} step={step} value={value} onChange={onChange} />
       <div className="te-editor-scale">
         <span>{fmtVal(min, format, unit)}</span>
         <span>{fmtVal(max, format, unit)}</span>
@@ -34,7 +26,9 @@ export function SliderEditor({ value, min, max, step = 1, unit, format, onChange
 export function DualEditor({ low, high, min, max, step = 1, unit, format, onChange, ariaLabel }) {
   return (
     <div className="te-editor">
-      <div className="te-editor-readout">{fmtVal(low, format, unit)} – {fmtVal(high, format, unit)}</div>
+      <div className="te-editor-readout">
+        {fmtVal(low, format, unit)} – {fmtVal(high, format, unit)}
+      </div>
       <label className="te-dual-row">
         <span>MIN</span>
         <RangeRow
@@ -74,9 +68,25 @@ export function StepperEditor({ value, min, max, step = 1, unit, format, onChang
   };
   return (
     <div className="te-editor te-stepper">
-      <button type="button" className="te-step-btn" onClick={() => clampStep(-1)} aria-label={`Decrease ${ariaLabel}`} disabled={value <= min}>−</button>
+      <button
+        type="button"
+        className="te-step-btn"
+        onClick={() => clampStep(-1)}
+        aria-label={`Decrease ${ariaLabel}`}
+        disabled={value <= min}
+      >
+        −
+      </button>
       <div className="te-editor-readout">{fmtVal(value, format, unit)}</div>
-      <button type="button" className="te-step-btn" onClick={() => clampStep(1)} aria-label={`Increase ${ariaLabel}`} disabled={value >= max}>+</button>
+      <button
+        type="button"
+        className="te-step-btn"
+        onClick={() => clampStep(1)}
+        aria-label={`Increase ${ariaLabel}`}
+        disabled={value >= max}
+      >
+        +
+      </button>
     </div>
   );
 }
@@ -96,7 +106,7 @@ export function DialEditor({ value, min = 0, max = 360, unit = '°', onChange, a
       if (!d) return;
       // Full span per 240px of drag; wrap around the ends.
       let v = d.startVal + ((d.startY - ev.clientY) / 240) * span;
-      v = ((v - min) % span + span) % span + min;
+      v = ((((v - min) % span) + span) % span) + min;
       onChange(Math.round(v * 10) / 10);
     };
     const up = () => {
@@ -124,22 +134,25 @@ export function DialEditor({ value, min = 0, max = 360, unit = '°', onChange, a
           const step = span / 72;
           if (e.key === 'ArrowUp' || e.key === 'ArrowRight') {
             e.preventDefault();
-            onChange(((value - min + step) % span + span) % span + min);
+            onChange(((((value - min + step) % span) + span) % span) + min);
           } else if (e.key === 'ArrowDown' || e.key === 'ArrowLeft') {
             e.preventDefault();
-            onChange(((value - min - step) % span + span) % span + min);
+            onChange(((((value - min - step) % span) + span) % span) + min);
           }
         }}
       >
         <div className="te-dial-face">
-          <div
-            className="te-dial-needle"
-            style={{ transform: `rotate(${frac * 360}deg)` }}
-          />
+          <div className="te-dial-needle" style={{ transform: `rotate(${frac * 360}deg)` }} />
         </div>
       </div>
-      <div className="te-editor-readout">{Math.round(value)}{unit}</div>
-      <div className="te-editor-hint">drag to turn · wraps at {max}{unit}</div>
+      <div className="te-editor-readout">
+        {Math.round(value)}
+        {unit}
+      </div>
+      <div className="te-editor-hint">
+        drag to turn · wraps at {max}
+        {unit}
+      </div>
     </div>
   );
 }

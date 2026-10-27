@@ -7,8 +7,16 @@ import { resolutionLabel } from '../../data/quality.js';
 import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
 
 export function SnapRecordRow({
-  glCanvasRef, glLoopRef, palette, seed, seedOffsets, layoutParams, exportResolution,
-  accumOn, isRecording, rendering,
+  glCanvasRef,
+  glLoopRef,
+  palette,
+  seed,
+  seedOffsets,
+  layoutParams,
+  exportResolution,
+  accumOn,
+  isRecording,
+  rendering,
 }) {
   useVideoRecorder({
     canvasRef: glCanvasRef,
@@ -27,7 +35,8 @@ export function SnapRecordRow({
     if (errTimer.current) clearTimeout(errTimer.current);
     captureStill({
       loopRef: glLoopRef,
-      resolution: exportResolution, seedStr: seed.toString(16),
+      resolution: exportResolution,
+      seedStr: seed.toString(16),
       onThumbnail: (thumb, info) => {
         const up = info && info.upscaledFrom;
         emit(Events.EXPORT_SNAPSHOT, {
@@ -51,13 +60,19 @@ export function SnapRecordRow({
 
   return (
     <div className="pipeline-row">
-      <button className="big-btn act" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>↓ snap</button>
+      <button className="big-btn act" onClick={addSnapshot} style={{ flex: 2 }} disabled={rendering}>
+        ↓ snap
+      </button>
       <button
         className="big-btn"
         onClick={() => emit(Events.EXPORT_RECORD, !isRecording)}
         disabled={rendering}
         title={helpText('output-webm')}
-        style={isRecording ? { background: 'var(--kc-live)', color: '#fff', borderColor: 'var(--kc-live)', flex: 2 } : { flex: 2 }}
+        style={
+          isRecording
+            ? { background: 'var(--kc-live)', color: '#fff', borderColor: 'var(--kc-live)', flex: 2 }
+            : { flex: 2 }
+        }
       >
         {isRecording ? '⏹ STOP REC' : '⏺ REC WEBM'}
       </button>

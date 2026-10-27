@@ -60,7 +60,14 @@ function UserChip({ voice, active, onTap, onOverwrite, onRename, onDelete }) {
       ) : (
         <button
           className="te-cell-label"
-          style={{ background: 'none', border: 'none', color: 'inherit', font: 'inherit', cursor: 'pointer', padding: 0 }}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: 'inherit',
+            font: 'inherit',
+            cursor: 'pointer',
+            padding: 0,
+          }}
           onPointerDown={startPress}
           onPointerUp={cancelPress}
           onPointerLeave={cancelPress}
@@ -121,7 +128,9 @@ export function VoicesShelf() {
           title={shelfFull ? 'Voice shelf is full (12)' : 'Capture the current live state as a new voice'}
           aria-label="Capture current state as a voice"
         >
-          <span className="te-cell-label" style={{ fontSize: 14 }}>+</span>
+          <span className="te-cell-label" style={{ fontSize: 14 }}>
+            +
+          </span>
         </button>
       </div>
     </div>

@@ -53,10 +53,14 @@ function canvasAnchor() {
 function panelRead(enabled, status, bankName) {
   if (!enabled) return 'off';
   switch (status?.state) {
-    case 'denied': return 'refused';
-    case 'unsupported': return 'no midi';
-    case 'no-devices': return 'no device';
-    default: return `on · ${bankName}`;
+    case 'denied':
+      return 'refused';
+    case 'unsupported':
+      return 'no midi';
+    case 'no-devices':
+      return 'no device';
+    default:
+      return `on · ${bankName}`;
   }
 }
 
@@ -106,8 +110,14 @@ export function MidiSection() {
     const next = canvasAnchor();
     setPos((prev) => {
       if (!next) return prev;
-      if (prev && prev.top === next.top && prev.left === next.left
-        && prev.maxWidth === next.maxWidth && prev.maxHeight === next.maxHeight) return prev;
+      if (
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.maxWidth === next.maxWidth &&
+        prev.maxHeight === next.maxHeight
+      )
+        return prev;
       return next;
     });
   }, []);
@@ -152,7 +162,9 @@ export function MidiSection() {
   // Esc backs out of learn.
   useEffect(() => {
     if (!armedTarget) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') cancelMidiLearn(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') cancelMidiLearn();
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [armedTarget, cancelMidiLearn]);
@@ -173,7 +185,9 @@ export function MidiSection() {
           type="button"
           ref={anchorRef}
           className="chip-btn"
-          onClick={() => { if (!armed) (open ? closeEditor() : openEditor()); }}
+          onClick={() => {
+            if (!armed) open ? closeEditor() : openEditor();
+          }}
           aria-expanded={open}
           aria-haspopup="dialog"
           title="MIDI setup — connect a controller, banks and key mapping, over the canvas"
@@ -194,80 +208,134 @@ export function MidiSection() {
           </ul>
         </>
       )}
-      {open && pos && createPortal(
-        <div
-          ref={editorRef}
-          className="midi-editor"
-          role="dialog"
-          aria-label="MIDI — controller setup"
-          style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
-        >
-          <div className="midi-editor-head">
-            <div>
-              <div className="te-dock-kicker">CONTROLLER SETUP</div>
-              <div className="midi-editor-title">MIDI</div>
-            </div>
-            <button
-              type="button"
-              className="te-dock-close"
-              onClick={() => { if (!armed) closeEditor(); }}
-              aria-label="Close MIDI setup"
-            >
-              ×
-            </button>
-          </div>
-          <div className="midi-editor-body">
-            <div className="davis-midi-head">
-              <i className="lbl">midi</i>
-              <button type="button" className={`chip-btn ${enabled ? 'active' : ''}`} aria-pressed={enabled}
-                onClick={() => emit(Events.MIDI_ENABLED, { on: !enabled })}
-                title={enabled ? 'Disconnect MIDI' : 'Connect a MIDI controller (the browser will ask for access)'}>
-                {enabled ? 'ON' : 'ENABLE'}
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={editorRef}
+            className="midi-editor"
+            role="dialog"
+            aria-label="MIDI — controller setup"
+            style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
+          >
+            <div className="midi-editor-head">
+              <div>
+                <div className="te-dock-kicker">CONTROLLER SETUP</div>
+                <div className="midi-editor-title">MIDI</div>
+              </div>
+              <button
+                type="button"
+                className="te-dock-close"
+                onClick={() => {
+                  if (!armed) closeEditor();
+                }}
+                aria-label="Close MIDI setup"
+              >
+                ×
               </button>
             </div>
-            <div className={`davis-midi-status ${view.tone}`} role="status">{view.line}</div>
-            {view.note && <div className={`davis-midi-note ${view.tone}`}>{view.note}</div>}
-            {enabled && last && <div className="davis-midi-last" title="The last message seen">{describeMessage(last)}</div>}
-            {armedTarget && (
-              <div className={`davis-midi-learn ${refused ? 'bad' : ''}`} role="status" aria-live="polite">
-                {learnPrompt(armedTarget, refused)}
+            <div className="midi-editor-body">
+              <div className="davis-midi-head">
+                <i className="lbl">midi</i>
+                <button
+                  type="button"
+                  className={`chip-btn ${enabled ? 'active' : ''}`}
+                  aria-pressed={enabled}
+                  onClick={() => emit(Events.MIDI_ENABLED, { on: !enabled })}
+                  title={enabled ? 'Disconnect MIDI' : 'Connect a MIDI controller (the browser will ask for access)'}
+                >
+                  {enabled ? 'ON' : 'ENABLE'}
+                </button>
               </div>
-            )}
-            <div className="davis-midi-bank">
-              <i className="lbl">bank</i>
-              <select aria-label="Active MIDI bank" value={activeBank}
-                onChange={(e) => switchMidiBank(Number(e.target.value))}>
-                {banks.map((b, i) => <option key={i} value={i}>{b.name}</option>)}
-              </select>
-              <button type="button" className="micro-btn" title="Rename this bank" onClick={renameBank}>≡</button>
-              <button type="button" className="micro-btn" title="New bank" onClick={() => addMidiBank()}>+</button>
-              <button type="button" className="micro-btn" title="Delete this bank" aria-label="Delete this bank"
-                disabled={banks.length <= 1}
-                onClick={() => { if (window.confirm(`Delete bank "${banks[activeBank]?.name}" and its mappings?`)) removeMidiBank(); }}>×</button>
+              <div className={`davis-midi-status ${view.tone}`} role="status">
+                {view.line}
+              </div>
+              {view.note && <div className={`davis-midi-note ${view.tone}`}>{view.note}</div>}
+              {enabled && last && (
+                <div className="davis-midi-last" title="The last message seen">
+                  {describeMessage(last)}
+                </div>
+              )}
+              {armedTarget && (
+                <div className={`davis-midi-learn ${refused ? 'bad' : ''}`} role="status" aria-live="polite">
+                  {learnPrompt(armedTarget, refused)}
+                </div>
+              )}
+              <div className="davis-midi-bank">
+                <i className="lbl">bank</i>
+                <select
+                  aria-label="Active MIDI bank"
+                  value={activeBank}
+                  onChange={(e) => switchMidiBank(Number(e.target.value))}
+                >
+                  {banks.map((b, i) => (
+                    <option key={i} value={i}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                <button type="button" className="micro-btn" title="Rename this bank" onClick={renameBank}>
+                  ≡
+                </button>
+                <button type="button" className="micro-btn" title="New bank" onClick={() => addMidiBank()}>
+                  +
+                </button>
+                <button
+                  type="button"
+                  className="micro-btn"
+                  title="Delete this bank"
+                  aria-label="Delete this bank"
+                  disabled={banks.length <= 1}
+                  onClick={() => {
+                    if (window.confirm(`Delete bank "${banks[activeBank]?.name}" and its mappings?`)) removeMidiBank();
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+              <ul className="davis-midi-map" aria-label="MIDI mappings">
+                {MIDI_TARGETS.map((t) => {
+                  const key = keyFor(map, t.id);
+                  const isArmed = armedTarget?.id === t.id;
+                  return (
+                    <li key={t.id} className={isArmed ? 'armed' : ''}>
+                      <span>{t.label}</span>
+                      <code>{key ? describeKey(key) : '—'}</code>
+                      <button
+                        type="button"
+                        className={`micro-btn ${isArmed ? 'active' : ''}`}
+                        aria-pressed={isArmed}
+                        disabled={!ready && !isArmed}
+                        title={
+                          isArmed
+                            ? 'Cancel learn (Esc)'
+                            : ready
+                              ? `Learn: then touch a ${t.kind === 'cc' ? 'knob or fader' : 'pad or key'}`
+                              : 'Connect a MIDI device to learn'
+                        }
+                        onClick={() => (isArmed ? cancelMidiLearn() : armMidiLearn(t.id))}
+                      >
+                        {isArmed ? 'CANCEL' : 'LEARN'}
+                      </button>
+                      {key && (
+                        <button
+                          type="button"
+                          className="micro-btn"
+                          aria-label={`Unmap ${t.label}`}
+                          title="Remove this mapping"
+                          onClick={() => unbindMidi(t.id)}
+                        >
+                          ×
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
-            <ul className="davis-midi-map" aria-label="MIDI mappings">
-              {MIDI_TARGETS.map((t) => {
-                const key = keyFor(map, t.id);
-                const isArmed = armedTarget?.id === t.id;
-                return (
-                  <li key={t.id} className={isArmed ? 'armed' : ''}>
-                    <span>{t.label}</span>
-                    <code>{key ? describeKey(key) : '—'}</code>
-                    <button type="button" className={`micro-btn ${isArmed ? 'active' : ''}`} aria-pressed={isArmed}
-                      disabled={!ready && !isArmed}
-                      title={isArmed ? 'Cancel learn (Esc)' : ready ? `Learn: then touch a ${t.kind === 'cc' ? 'knob or fader' : 'pad or key'}` : 'Connect a MIDI device to learn'}
-                      onClick={() => (isArmed ? cancelMidiLearn() : armMidiLearn(t.id))}>
-                      {isArmed ? 'CANCEL' : 'LEARN'}
-                    </button>
-                    {key && <button type="button" className="micro-btn" aria-label={`Unmap ${t.label}`} title="Remove this mapping" onClick={() => unbindMidi(t.id)}>×</button>}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        </div>,
-        document.body,
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

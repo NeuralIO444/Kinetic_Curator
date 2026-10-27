@@ -22,6 +22,8 @@ import { DEFAULT_ROUTES, MAX_ROUTES, ROUTE_INPUTS, ROUTE_TARGETS } from '../gl/a
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
 import { DEFAULT_LAYOUT_PARAMS } from './layout-modes.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const R = (input, target, depth) => ({ input, target, depth });
 const custom = [R('band.air', 'render.glow', 0.5), R('band.sub', 'render.breath', 0.05)];
@@ -331,15 +333,18 @@ const base = {
   );
   // #1027: the depth slider is a RangeRow (bare, STIMULI tone). A drag is continuous (one undo step per drag);
   // a double-click reset is its own discrete step, through onReset.
-  assert.ok(/<RangeRow layout="bare" tone="stim"/.test(ui), 'the depth slider is the house slider in the STIMULI tone');
+  assert.ok(
+    fre(/<RangeRow layout="bare" tone="stim"/).test(flat(ui)),
+    'the depth slider is the house slider in the STIMULI tone',
+  );
   assert.ok(
     /onChange=\{\(v\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: v \}\), true\)\}/.test(ui),
     'the depth slider edits continuously (one undo step per drag)',
   );
   assert.ok(
-    /onReset=\{\(\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: defaultDepthFor\(route\.input, route\.target\) \}\), false\)\}/.test(
-      ui,
-    ),
+    fre(
+      /onReset=\{\(\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: defaultDepthFor\(route\.input, route\.target\) \}\), false\)\}/,
+    ).test(flat(ui)),
     'double-click resets to the default depth as its own undo step',
   );
   assert.ok(
@@ -347,13 +352,13 @@ const base = {
     '+ ROUTE stops at the cap; RESET only when customised',
   );
   assert.ok(
-    /disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui),
+    fre(/disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/).test(flat(ui)),
     'CLEAR empties the table (start from scratch), greyed when already empty',
   );
   const meter = src('../panels/stimulus/MeterHero.jsx');
   assert.ok(
-    /Events\.AUDIO_ROUTES_EDIT, \{ fn: \(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) &&
-      /onClick=\{routeBand\}/.test(meter),
+    fre(/Events\.AUDIO_ROUTES_EDIT, \{ fn: \(t\) => \{ const n = nextRoute\(t, input\)/).test(flat(meter)) &&
+      fre(/onClick=\{routeBand\}/).test(flat(meter)),
     'a click on a meter band adds a route for that band',
   );
 }

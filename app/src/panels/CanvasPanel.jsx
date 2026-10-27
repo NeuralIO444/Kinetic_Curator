@@ -19,19 +19,19 @@ import { getPreset } from '../data/presets.js';
 
 export function CanvasPanel() {
   const { palette: activePalette, canvasRef, glCanvasRef, glLoopRef } = useApp();
-  const layoutParams = useStore(s => s.layoutParams);
-  const layers = useStore(s => s.layers);
-  const evolveMode = useStore(s => s.evolveMode);
-  const nodeCount = useStore(s => s.nodeCount);
-  const canvasBg = useStore(s => s.canvasBg);
-  const canvasW = useStore(s => s.canvasW) || CANVAS_W;
-  const canvasH = useStore(s => s.canvasH) || CANVAS_H;
-  const stageBlackout = useStore(s => s.stageBlackout);
+  const layoutParams = useStore((s) => s.layoutParams);
+  const layers = useStore((s) => s.layers);
+  const evolveMode = useStore((s) => s.evolveMode);
+  const nodeCount = useStore((s) => s.nodeCount);
+  const canvasBg = useStore((s) => s.canvasBg);
+  const canvasW = useStore((s) => s.canvasW) || CANVAS_W;
+  const canvasH = useStore((s) => s.canvasH) || CANVAS_H;
+  const stageBlackout = useStore((s) => s.stageBlackout);
   const accumOn = !!layoutParams.accumulation;
   // #268: the pill must read the EFFECTIVE state — the loop computes
   // accumulation as setting AND not-shed (liveLoop buildFrame). Under LOAD
   // SHED the setting stays on while the buffer is actually off.
-  const perfTier1 = useStore(s => s.perfTier1);
+  const perfTier1 = useStore((s) => s.perfTier1);
   const accumEffective = accumOn && !perfTier1;
 
   const viewport = useCanvasViewport(canvasW, canvasH);
@@ -103,14 +103,18 @@ export function CanvasPanel() {
   // Phase A gestures (Davis panel PERFORM): FREEZE / CLEAR / SWELL act on
   // the live GL loop's ACCUM session. #268: SWELL was emitted but nothing
   // listened — it now breathes the trail length out and back over ~2s.
-  useEffect(() => on(Events.ACCUM_GESTURE, (p) => {
-    if (!p || typeof p !== 'object') return;
-    const loop = glLoopRef.current;
-    if (!loop) return;
-    if (p.action === 'clear') loop.clearAccum();
-    else if (p.action === 'freeze') loop.setAccumFrozen(p.value);
-    else if (p.action === 'swell') loop.swellAccum();
-  }), [glLoopRef]);
+  useEffect(
+    () =>
+      on(Events.ACCUM_GESTURE, (p) => {
+        if (!p || typeof p !== 'object') return;
+        const loop = glLoopRef.current;
+        if (!loop) return;
+        if (p.action === 'clear') loop.clearAccum();
+        else if (p.action === 'freeze') loop.setAccumFrozen(p.value);
+        else if (p.action === 'swell') loop.swellAccum();
+      }),
+    [glLoopRef],
+  );
 
   const preset = getPreset(layoutParams.composition);
   let bgStyle = { background: activePalette.bg };
@@ -119,34 +123,86 @@ export function CanvasPanel() {
 
   return (
     <div className={`panel panel-canvas ${evolveMode ? 'evolve-active' : ''}`}>
-      <PanelHeader tag="P01" title="CANVAS" subtitle={`${layoutParams.mode} · GL LIVE · ${layers.length} layer${layers.length > 1 ? 's' : ''}`}>
+      <PanelHeader
+        tag="P01"
+        title="CANVAS"
+        subtitle={`${layoutParams.mode} · GL LIVE · ${layers.length} layer${layers.length > 1 ? 's' : ''}`}
+      >
         <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
           {/* #310: BG cycle moved to PIPELINE. CLEAR ACCUM removed — GHOST
               STATION's gesture row is canonical. */}
           {/* BG cycle lives beside RESET VIEW (canvas belongs with canvas). */}
-          <button className="chip-btn act" onClick={viewport.resetView} title="Reset View">reset view</button>
-          <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">BG: {canvasBg.toUpperCase()}</button>
-          <span className="meter-pill" title="Authored canvas. The element is this size.">{canvasW}×{canvasH}</span>
-          {accumEffective && <span className="meter-pill lbl" title="GPU accumulation buffer is live — trails and glow render in the canvas." style={{ color: 'var(--accent)' }}>accum</span>}
-          {accumOn && !accumEffective && <span className="meter-pill lbl" title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery." style={{ color: '#ffb454' }}>accum held</span>}
-          <span className="meter-pill" title="Instances drawn this frame">{nodeCount} NODES</span>
+          <button className="chip-btn act" onClick={viewport.resetView} title="Reset View">
+            reset view
+          </button>
+          <button className="chip-btn" onClick={() => emit(Events.CANVAS_BG_CYCLE)} title="Toggle canvas background">
+            BG: {canvasBg.toUpperCase()}
+          </button>
+          <span className="meter-pill" title="Authored canvas. The element is this size.">
+            {canvasW}×{canvasH}
+          </span>
+          {accumEffective && (
+            <span
+              className="meter-pill lbl"
+              title="GPU accumulation buffer is live — trails and glow render in the canvas."
+              style={{ color: 'var(--accent)' }}
+            >
+              accum
+            </span>
+          )}
+          {accumOn && !accumEffective && (
+            <span
+              className="meter-pill lbl"
+              title="Accumulation is switched on, but the governor has shed it to protect frame rate — it returns automatically on recovery."
+              style={{ color: '#ffb454' }}
+            >
+              accum held
+            </span>
+          )}
+          <span className="meter-pill" title="Instances drawn this frame">
+            {nodeCount} NODES
+          </span>
         </div>
       </PanelHeader>
-      <div className={`canvas-wrap ${canvasBg === 'transparent' ? 'checkerboard' : ''}`} ref={canvasRef} style={{ position: 'relative' }}>
+      <div
+        className={`canvas-wrap ${canvasBg === 'transparent' ? 'checkerboard' : ''}`}
+        ref={canvasRef}
+        style={{ position: 'relative' }}
+      >
         <div className="canvas-bg" style={bgStyle} />
         <div className="canvas-rulers" />
         {glError ? (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 3, padding: 24, textAlign: 'center' }}>
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              zIndex: 3,
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
             <div>
               <div style={{ fontWeight: 700, marginBottom: 8 }}>LIVE CANVAS UNAVAILABLE</div>
               <div style={{ opacity: 0.7, fontSize: 12 }}>{glError}</div>
             </div>
           </div>
         ) : (
-          <canvas ref={glCanvasRef} className="canvas-gl" width={canvasW} height={canvasH}
+          <canvas
+            ref={glCanvasRef}
+            className="canvas-gl"
+            width={canvasW}
+            height={canvasH}
             style={{ zIndex: 1 }}
-            onWheel={viewport.onWheel} onPointerDown={viewport.onPointerDown} onPointerMove={viewport.onPointerMoveCombined}
-            onPointerUp={viewport.onPointerUpCombined} onPointerCancel={viewport.onPointerUpCombined} onPointerLeave={viewport.clearAttractor} />
+            onWheel={viewport.onWheel}
+            onPointerDown={viewport.onPointerDown}
+            onPointerMove={viewport.onPointerMoveCombined}
+            onPointerUp={viewport.onPointerUpCombined}
+            onPointerCancel={viewport.onPointerUpCombined}
+            onPointerLeave={viewport.clearAttractor}
+          />
         )}
         {isSkeletonDebug() && (
           <SkeletonOverlay zoom={viewport.zoom} pan={viewport.pan} canvasW={canvasW} canvasH={canvasH} />
@@ -155,9 +211,14 @@ export function CanvasPanel() {
           <div style={{ position: 'absolute', inset: 0, background: '#000', zIndex: 4 }} aria-label="Stage blackout" />
         )}
         <span className="canvas-corner tl">0,0</span>
-        <span className="canvas-corner tr">{layoutParams.mode}{accumEffective ? ' · ACCUM' : accumOn ? ' · ACCUM HELD' : ''}</span>
+        <span className="canvas-corner tr">
+          {layoutParams.mode}
+          {accumEffective ? ' · ACCUM' : accumOn ? ' · ACCUM HELD' : ''}
+        </span>
         <span className="canvas-corner bl">{preset.name}</span>
-        <span className="canvas-corner br">{CANVAS_W}×{CANVAS_H}</span>
+        <span className="canvas-corner br">
+          {CANVAS_W}×{CANVAS_H}
+        </span>
       </div>
     </div>
   );

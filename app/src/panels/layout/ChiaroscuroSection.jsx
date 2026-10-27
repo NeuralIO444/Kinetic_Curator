@@ -80,8 +80,14 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
     const next = canvasAnchor();
     setPos((prev) => {
       if (!next) return prev;
-      if (prev && prev.top === next.top && prev.left === next.left
-        && prev.maxWidth === next.maxWidth && prev.maxHeight === next.maxHeight) return prev;
+      if (
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.maxWidth === next.maxWidth &&
+        prev.maxHeight === next.maxHeight
+      )
+        return prev;
       return next;
     });
   }, []);
@@ -96,7 +102,9 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
 
   useEffect(() => {
     if (!open) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') closeEditor(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeEditor();
+    };
     const onDown = (e) => {
       if (editorRef.current?.contains(e.target)) return;
       if (anchorRef.current?.contains(e.target)) return;
@@ -130,58 +138,63 @@ export function ChiaroscuroSection({ layoutParams, lockedParams }) {
       >
         <span className="te-cell-label">CHIAROSCURO</span>
       </button>
-      {open && pos && createPortal(
-        <div
-          ref={editorRef}
-          className="chiaro-editor"
-          role="dialog"
-          aria-label="CHIAROSCURO — render engine controls"
-          style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
-        >
-          <div className="chiaro-editor-head">
-            <div>
-              <div className="te-dock-kicker">RENDER ENGINE</div>
-              <div className="chiaro-editor-title">CHIAROSCURO</div>
-            </div>
-            <button
-              type="button"
-              className="te-dock-close"
-              onClick={closeEditor}
-              aria-label="Close CHIAROSCURO editor"
-            >
-              ×
-            </button>
-          </div>
-          <div className="chiaro-editor-body">
-            <div className="davis-label lbl chiaro-group">sun</div>
-            <SunControls />
-            {!light && (
-              <div className="chiaro-note">the sun is off — the finish still applies</div>
-            )}
-            <div className="chiaro-group chiaro-group-row">
-              <span className="davis-label lbl">hue rotate</span>
+      {open &&
+        pos &&
+        createPortal(
+          <div
+            ref={editorRef}
+            className="chiaro-editor"
+            role="dialog"
+            aria-label="CHIAROSCURO — render engine controls"
+            style={{ top: pos.top, left: pos.left, maxWidth: pos.maxWidth, maxHeight: pos.maxHeight }}
+          >
+            <div className="chiaro-editor-head">
+              <div>
+                <div className="te-dock-kicker">RENDER ENGINE</div>
+                <div className="chiaro-editor-title">CHIAROSCURO</div>
+              </div>
               <button
                 type="button"
-                className={`te-lock${hueLocked ? ' locked' : ''}`}
-                onClick={() => emit(Events.LAYOUT_LOCK, { key: 'hueRotate' })}
-                title={hueLocked ? 'HUE ROTATE locked against life-drift — tap to unlock' : 'Lock HUE ROTATE against life-drift'}
-                aria-pressed={hueLocked}
-                aria-label={hueLocked ? 'Unlock HUE ROTATE' : 'Lock HUE ROTATE'}
+                className="te-dock-close"
+                onClick={closeEditor}
+                aria-label="Close CHIAROSCURO editor"
               >
-                {hueLocked ? '▪' : '▫'}
+                ×
               </button>
             </div>
-            <DialEditor
-              ariaLabel="Hue rotate"
-              value={hue}
-              min={0} max={360}
-              onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'hueRotate', value: Math.round(v) })}
-            />
-            <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
-          </div>
-        </div>,
-        document.body,
-      )}
+            <div className="chiaro-editor-body">
+              <div className="davis-label lbl chiaro-group">sun</div>
+              <SunControls />
+              {!light && <div className="chiaro-note">the sun is off — the finish still applies</div>}
+              <div className="chiaro-group chiaro-group-row">
+                <span className="davis-label lbl">hue rotate</span>
+                <button
+                  type="button"
+                  className={`te-lock${hueLocked ? ' locked' : ''}`}
+                  onClick={() => emit(Events.LAYOUT_LOCK, { key: 'hueRotate' })}
+                  title={
+                    hueLocked
+                      ? 'HUE ROTATE locked against life-drift — tap to unlock'
+                      : 'Lock HUE ROTATE against life-drift'
+                  }
+                  aria-pressed={hueLocked}
+                  aria-label={hueLocked ? 'Unlock HUE ROTATE' : 'Lock HUE ROTATE'}
+                >
+                  {hueLocked ? '▪' : '▫'}
+                </button>
+              </div>
+              <DialEditor
+                ariaLabel="Hue rotate"
+                value={hue}
+                min={0}
+                max={360}
+                onChange={(v) => emit(Events.LAYOUT_PARAM, { key: 'hueRotate', value: Math.round(v) })}
+              />
+              <MapRow layoutParams={layoutParams} lockedParams={lockedParams} />
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

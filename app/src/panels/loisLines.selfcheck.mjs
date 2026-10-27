@@ -6,20 +6,30 @@ import { LOIS_LINES } from './loisLines.mjs';
 
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('the four signed lines are verbatim', () => {
-  assert.deepEqual({ ...LOIS_LINES }, {
-    build: 'NOTHING ON STAGE — a plate with no cast is a room.',
-    stimuli: 'SILENT — sound is in the room and nothing is listening.',
-    play: 'NO SETLIST — a night with no next plate is just this one.',
-    director: "NAME THE PLATE — a roll you didn't name didn't happen.",
-  });
+  assert.deepEqual(
+    { ...LOIS_LINES },
+    {
+      build: 'NOTHING ON STAGE — a plate with no cast is a room.',
+      stimuli: 'SILENT — sound is in the room and nothing is listening.',
+      play: 'NO SETLIST — a night with no next plate is just this one.',
+      director: "NAME THE PLATE — a roll you didn't name didn't happen.",
+    },
+  );
 });
 
 const SITES = {
   build: ['./BuildPanel.jsx', /trackCount <= 1 && <div className="lois-line name">\{LOIS_LINES\.build\}/],
-  stimuli: ['./stimulus/ModMatrix.jsx', /table\.length === 0 && <div className="stim-matrix-empty name">\{LOIS_LINES\.stimuli\}/],
+  stimuli: [
+    './stimulus/ModMatrix.jsx',
+    /table\.length === 0 && <div className="stim-matrix-empty name">\{LOIS_LINES\.stimuli\}/,
+  ],
   play: ['./davis/QueueTransport.jsx', /empty && <div className="lois-line name">\{LOIS_LINES\.play\}/],
   director: ['./DavisPanel.jsx', /hitCount === 0 && <div className="lois-line name">\{LOIS_LINES\.director\}/],
 };
@@ -32,10 +42,29 @@ for (const [key, [file, gate]] of Object.entries(SITES)) {
 }
 
 ok('no other panel renders a LOIS line, and none sits on a live control', () => {
-  const files = ['./BuildPanel.jsx', './DavisPanel.jsx', './StimulusPanel.jsx', './PlayPanel.jsx', './stimulus/ModMatrix.jsx', './davis/QueueTransport.jsx', './PipelinePanel.jsx', './CanvasPanel.jsx', './AssetPoolPanel.jsx'];
+  const files = [
+    './BuildPanel.jsx',
+    './DavisPanel.jsx',
+    './StimulusPanel.jsx',
+    './PlayPanel.jsx',
+    './stimulus/ModMatrix.jsx',
+    './davis/QueueTransport.jsx',
+    './PipelinePanel.jsx',
+    './CanvasPanel.jsx',
+    './AssetPoolPanel.jsx',
+  ];
   const users = files.filter((f) => /LOIS_LINES/.test(src(f)));
-  assert.deepEqual(users.sort(), ['./BuildPanel.jsx', './DavisPanel.jsx', './davis/QueueTransport.jsx', './stimulus/ModMatrix.jsx']);
-  for (const f of users) assert.ok(!/<(button|input|select)[^>]*>\s*\{LOIS_LINES/.test(src(f)), `${f}: a voice-1 line is never inside a control`);
+  assert.deepEqual(users.sort(), [
+    './BuildPanel.jsx',
+    './DavisPanel.jsx',
+    './davis/QueueTransport.jsx',
+    './stimulus/ModMatrix.jsx',
+  ]);
+  for (const f of users)
+    assert.ok(
+      !/<(button|input|select)[^>]*>\s*\{LOIS_LINES/.test(src(f)),
+      `${f}: a voice-1 line is never inside a control`,
+    );
 });
 
 ok('the old stimuli sentence (voice 2) is gone: it would be a second line', () => {

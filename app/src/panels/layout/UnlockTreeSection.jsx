@@ -49,7 +49,9 @@ export function UnlockTreeSection({ layoutParams }) {
           {g.nodes.map((n) => (
             <div key={n.id} className={`unlock-node is-${n.state}`}>
               <div className="unlock-head">
-                <span className="unlock-pip" aria-hidden="true">{STATE_PIP[n.state]}</span>
+                <span className="unlock-pip" aria-hidden="true">
+                  {STATE_PIP[n.state]}
+                </span>
                 <span className="unlock-name">{n.name}</span>
                 <span className="unlock-state">{STATE_WORD[n.state]}</span>
               </div>

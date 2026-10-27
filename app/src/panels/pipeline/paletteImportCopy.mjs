@@ -15,7 +15,5 @@ export function paletteImportCount(list) {
 
 export function paletteImportMessage(list) {
   const stored = paletteImportCount(list);
-  return stored === 0
-    ? 'No valid palettes in file'
-    : `Imported ${stored} palette${stored === 1 ? '' : 's'}`;
+  return stored === 0 ? 'No valid palettes in file' : `Imported ${stored} palette${stored === 1 ? '' : 's'}`;
 }

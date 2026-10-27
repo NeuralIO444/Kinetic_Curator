@@ -25,14 +25,14 @@ function innerFor(p) {
 }
 
 function toSvg(parts) {
-  return parts.map((p) => {
-    const token = p.token === 'accent' ? 'var(--accent)' : 'var(--ink)';
-    const paint = p.stroke
-      ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3`
-      : `color: ${token}`;
-    const { sx, sy } = axes(p);
-    return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${innerFor(p)}</g>`;
-  }).join('');
+  return parts
+    .map((p) => {
+      const token = p.token === 'accent' ? 'var(--accent)' : 'var(--ink)';
+      const paint = p.stroke ? `color: ${token}; fill: none; stroke: currentColor; stroke-width: 3` : `color: ${token}`;
+      const { sx, sy } = axes(p);
+      return `<g style="${paint}" transform="translate(${p.x} ${p.y}) rotate(${p.rot}) scale(${sx} ${sy}) translate(-50 -50)">${innerFor(p)}</g>`;
+    })
+    .join('');
 }
 
 function fresh(kind, extra = {}) {
@@ -43,16 +43,28 @@ function fresh(kind, extra = {}) {
 function mergeKeyFor(allParts, keys, meltAmt, blend, subKeys = []) {
   const set = allParts.filter((p) => keys.includes(p.key));
   const fp = set
-    .map((p) => [p.key, p.kind, p.x, p.y, p.rot, p.sx, p.sy, p.token, p.stroke, p.n, p.svg,
-      subKeys.includes(p.key) ? 'sub' : 'add'].join('|'))
+    .map((p) =>
+      [
+        p.key,
+        p.kind,
+        p.x,
+        p.y,
+        p.rot,
+        p.sx,
+        p.sy,
+        p.token,
+        p.stroke,
+        p.n,
+        p.svg,
+        subKeys.includes(p.key) ? 'sub' : 'add',
+      ].join('|'),
+    )
     .join(';');
   return `${blend ? 'B' : 'M'}|${meltAmt}|${fp}`;
 }
 
 export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
-  const [parts, setParts] = useState(() => (
-    seedSvg ? [fresh('seed', { svg: seedSvg })] : []
-  ));
+  const [parts, setParts] = useState(() => (seedSvg ? [fresh('seed', { svg: seedSvg })] : []));
   const [picked, setPicked] = useState(-1);
   const [category, setCategory] = useState('organic');
   const [hint, setHint] = useState(seedId.replace(/^user:/, '') || 'motif');
@@ -81,7 +93,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   // Parts ref mirrors state so commits can snapshot synchronously.
   const partsRef = useRef(parts);
   const histRef = useRef([]);
-  const sync = (next) => { partsRef.current = next; setParts(next); };
+  const sync = (next) => {
+    partsRef.current = next;
+    setParts(next);
+  };
   const snapshot = () => {
     histRef.current.push(partsRef.current);
     if (histRef.current.length > UNDO_CAP) histRef.current.shift();
@@ -106,17 +121,13 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
   const svg = useMemo(() => toSvg(parts), [parts]);
   const compound = parts.length > 1;
   // Merge keys always name live parts (deleted keys are filtered, never stored back).
-  const validMergeKeys = useMemo(
-    () => mergeKeys.filter((k) => parts.some((p) => p.key === k)),
-    [mergeKeys, parts],
-  );
+  const validMergeKeys = useMemo(() => mergeKeys.filter((k) => parts.some((p) => p.key === k)), [mergeKeys, parts]);
   const validSubtractKeys = useMemo(
     () => subtractKeys.filter((k) => validMergeKeys.includes(k)),
     [subtractKeys, validMergeKeys],
   );
   // 2+ ticked with at least one positive: 1 add + 1 subtract punches a hole.
-  const merging = validMergeKeys.length >= 2
-    && validMergeKeys.some((k) => !validSubtractKeys.includes(k));
+  const merging = validMergeKeys.length >= 2 && validMergeKeys.some((k) => !validSubtractKeys.includes(k));
   const toggleSubtract = (key) => {
     setSubtractKeys((ks) => (ks.includes(key) ? ks.filter((k) => k !== key) : [...ks, key]));
     setBlendOn(false);
@@ -166,7 +177,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
         setError('merge preview failed — shapes stay separate');
       }
     })();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [parts, validMergeKeys, validSubtractKeys, melt, blendOn, mergeOut.key]);
 
   // Blend scrub: ping-pong t 0→1→0 while the toggle is on, unless the user
@@ -185,8 +198,7 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
 
   const blendSvg = useMemo(() => {
     if (!blendOn || !blendPair) return '';
-    return loopsToPath([blendContours(blendPair.a, blendPair.b, blendT)])
-      .replace('currentColor', 'var(--accent)');
+    return loopsToPath([blendContours(blendPair.a, blendPair.b, blendT)]).replace('currentColor', 'var(--accent)');
   }, [blendOn, blendPair, blendT]);
 
   // The merge preview replaces the ticked parts on stage; the rest draw normally.
@@ -196,9 +208,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     [parts, validMergeKeys, merging],
   );
   // Blend falls back to the merged preview until its own trace lands.
-  const previewSvg = merging ? (blendOn ? (blendSvg || mergeOut.svg) : mergeOut.svg) : '';
+  const previewSvg = merging ? (blendOn ? blendSvg || mergeOut.svg : mergeOut.svg) : '';
   // Bake is only offered when the trace matches the current inputs.
-  const bakeReady = mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys) && !!mergeOut.d;
+  const bakeReady =
+    mergeOut.key === mergeKeyFor(parts, validMergeKeys, melt, blendOn, validSubtractKeys) && !!mergeOut.d;
 
   /** Fuse the merge set into one part; undo restores the originals. */
   const bakeMerge = () => {
@@ -219,7 +232,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
 
   // Esc closes the modal; the live canvas keeps running underneath.
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(false); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose(false);
+    };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
@@ -236,15 +251,16 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     if (picked < 0) return;
     commit((p) => p.map((row, i) => (i === picked ? fn(row) : row)));
   };
-  const bump = (key, d) => patchSel((r) => {
-    const { sx, sy } = axes(r);
-    if (key === 'both') {
-      const n = clampS((sx + sy) / 2 + d);
-      return { ...r, scale: n, sx: n, sy: n };
-    }
-    const next = key === 'sx' ? clampS(sx + d) : clampS(sy + d);
-    return key === 'sx' ? { ...r, sx: next } : { ...r, sy: next };
-  });
+  const bump = (key, d) =>
+    patchSel((r) => {
+      const { sx, sy } = axes(r);
+      if (key === 'both') {
+        const n = clampS((sx + sy) / 2 + d);
+        return { ...r, scale: n, sx: n, sy: n };
+      }
+      const next = key === 'sx' ? clampS(sx + d) : clampS(sy + d);
+      return key === 'sx' ? { ...r, sx: next } : { ...r, sy: next };
+    });
   const delSel = () => {
     if (picked < 0) return;
     const i = picked;
@@ -269,7 +285,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       const j = i + dir;
       if (j < 0 || j >= p.length) return p;
       const next = p.slice();
-      const tmp = next[i]; next[i] = next[j]; next[j] = tmp;
+      const tmp = next[i];
+      next[i] = next[j];
+      next[j] = tmp;
       setPicked(j);
       return next;
     });
@@ -291,7 +309,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     let best = 1e9;
     partsRef.current.forEach((p, i) => {
       const d = (p.x - x) ** 2 + (p.y - y) ** 2;
-      if (d < best && d < 18 * 18) { best = d; hit = i; }
+      if (d < best && d < 18 * 18) {
+        best = d;
+        hit = i;
+      }
     });
     setPicked(hit);
     if (hit >= 0) {
@@ -306,7 +327,9 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     const { i, dx, dy } = drag.current;
     live((p) => p.map((row, n) => (n === i ? { ...row, x: snap(x + dx), y: snap(y + dy) } : row)));
   };
-  const onUp = () => { drag.current = null; };
+  const onUp = () => {
+    drag.current = null;
+  };
 
   // Paste into the stage runs the same allow-list as ingest (#113).
   const onPaste = (e) => {
@@ -315,7 +338,10 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
     e.preventDefault();
     e.stopPropagation();
     const res = ingestSvg(text, { id: 'paste' });
-    if (!res.ok) { setError(`paste rejected: ${res.error}`); return; }
+    if (!res.ok) {
+      setError(`paste rejected: ${res.error}`);
+      return;
+    }
     setError('');
     commit((p) => {
       const next = [...p, fresh('seed', { svg: res.asset.svg })];
@@ -353,54 +379,234 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
       <div ref={sheetRef} style={sheet} onClick={(e) => e.stopPropagation()} onPaste={onPaste}>
         <header style={head}>
           <span className="ttl">asset studio</span>
-          <span style={{ color: 'var(--dim)', fontSize: 9 }}>{compound ? 'compound' : 'single-path'} · snap {SNAP} · undo {undoDepth}/{UNDO_CAP}</span>
-          <button type="button" className="chip-btn act" title="Close without saving" onClick={() => onClose(false)}>esc</button>
+          <span style={{ color: 'var(--dim)', fontSize: 9 }}>
+            {compound ? 'compound' : 'single-path'} · snap {SNAP} · undo {undoDepth}/{UNDO_CAP}
+          </span>
+          <button type="button" className="chip-btn act" title="Close without saving" onClick={() => onClose(false)}>
+            esc
+          </button>
         </header>
         <div style={body}>
-          <svg ref={svgRef} viewBox="0 0 100 100" style={stage}
-            onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}>
+          <svg
+            ref={svgRef}
+            viewBox="0 0 100 100"
+            style={stage}
+            onPointerDown={onDown}
+            onPointerMove={onMove}
+            onPointerUp={onUp}
+            onPointerCancel={onUp}
+          >
             <g dangerouslySetInnerHTML={{ __html: grid }} />
             <g dangerouslySetInnerHTML={{ __html: stageBase }} />
             {previewSvg ? <g dangerouslySetInnerHTML={{ __html: previewSvg }} /> : null}
             {picked >= 0 && parts[picked] && (
-              <circle cx={parts[picked].x} cy={parts[picked].y} r="3" fill="none" stroke="var(--accent)" strokeWidth="0.8" />
+              <circle
+                cx={parts[picked].x}
+                cy={parts[picked].y}
+                r="3"
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth="0.8"
+              />
             )}
           </svg>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 180 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
               {Object.keys(PRIMITIVES).map((id) => (
-                <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>{id}</button>
+                <button key={id} type="button" className="chip-btn" title={`Add a ${id} shape`} onClick={() => add(id)}>
+                  {id}
+                </button>
               ))}
-              <button type="button" className="chip-btn act" onClick={() => add('poly')}>poly</button>
+              <button type="button" className="chip-btn act" onClick={() => add('poly')}>
+                poly
+              </button>
               <select value={sides} onChange={(e) => setSides(+e.target.value)} title="polygon sides">
-                {[3, 4, 5, 6, 7, 8].map((n) => <option key={n} value={n}>{n}</option>)}
+                {[3, 4, 5, 6, 7, 8].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
               </select>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape left" onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}>←</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape right" onClick={() => patchSel((r) => ({ ...r, x: snap(r.x + SNAP) }))}>→</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape up" onClick={() => patchSel((r) => ({ ...r, y: snap(r.y - SNAP) }))}>↑</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Nudge the picked shape down" onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}>↓</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Rotate the picked shape −15°" onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}>↺15</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Rotate the picked shape +15°" onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}>↻15</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Shrink the picked shape" onClick={() => bump('both', -0.1)}>S-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Grow the picked shape" onClick={() => bump('both', 0.1)}>S+</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Squash the picked shape horizontally" onClick={() => bump('sx', -0.1)}>Sx-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Stretch the picked shape horizontally" onClick={() => bump('sx', 0.1)}>Sx+</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Squash the picked shape vertically" onClick={() => bump('sy', -0.1)}>Sy-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Stretch the picked shape vertically" onClick={() => bump('sy', 0.1)}>Sy+</button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Nudge the picked shape left"
+                onClick={() => patchSel((r) => ({ ...r, x: snap(r.x - SNAP) }))}
+              >
+                ←
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Nudge the picked shape right"
+                onClick={() => patchSel((r) => ({ ...r, x: snap(r.x + SNAP) }))}
+              >
+                →
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Nudge the picked shape up"
+                onClick={() => patchSel((r) => ({ ...r, y: snap(r.y - SNAP) }))}
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Nudge the picked shape down"
+                onClick={() => patchSel((r) => ({ ...r, y: snap(r.y + SNAP) }))}
+              >
+                ↓
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Rotate the picked shape −15°"
+                onClick={() => patchSel((r) => ({ ...r, rot: r.rot - 15 }))}
+              >
+                ↺15
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Rotate the picked shape +15°"
+                onClick={() => patchSel((r) => ({ ...r, rot: r.rot + 15 }))}
+              >
+                ↻15
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Shrink the picked shape"
+                onClick={() => bump('both', -0.1)}
+              >
+                S-
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Grow the picked shape"
+                onClick={() => bump('both', 0.1)}
+              >
+                S+
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Squash the picked shape horizontally"
+                onClick={() => bump('sx', -0.1)}
+              >
+                Sx-
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Stretch the picked shape horizontally"
+                onClick={() => bump('sx', 0.1)}
+              >
+                Sx+
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Squash the picked shape vertically"
+                onClick={() => bump('sy', -0.1)}
+              >
+                Sy-
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Stretch the picked shape vertically"
+                onClick={() => bump('sy', 0.1)}
+              >
+                Sy+
+              </button>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-              <button type="button" className="chip-btn act" disabled={picked < 0} title="Paint the picked shape ink" onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}>ink</button>
-              <button type="button" className="chip-btn act" disabled={picked < 0} title="Paint the picked shape accent" onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}>accent</button>
-              <button type="button" className="chip-btn act" disabled={picked < 0} title="Flip the picked shape between filled and outline" onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}>fill/stroke</button>
-              <button type="button" className="chip-btn act" disabled={picked < 0} title="Duplicate the picked shape" onClick={dup}>dup</button>
-              <button type="button" className="chip-btn act" disabled={picked < 0} title="Delete the picked shape" onClick={delSel}>del</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Send the picked shape one step back" onClick={() => zShift(-1)}>Z-</button>
-              <button type="button" className="chip-btn" disabled={picked < 0} title="Bring the picked shape one step forward" onClick={() => zShift(1)}>Z+</button>
+              <button
+                type="button"
+                className="chip-btn act"
+                disabled={picked < 0}
+                title="Paint the picked shape ink"
+                onClick={() => patchSel((r) => ({ ...r, token: 'ink' }))}
+              >
+                ink
+              </button>
+              <button
+                type="button"
+                className="chip-btn act"
+                disabled={picked < 0}
+                title="Paint the picked shape accent"
+                onClick={() => patchSel((r) => ({ ...r, token: 'accent' }))}
+              >
+                accent
+              </button>
+              <button
+                type="button"
+                className="chip-btn act"
+                disabled={picked < 0}
+                title="Flip the picked shape between filled and outline"
+                onClick={() => patchSel((r) => ({ ...r, stroke: !r.stroke }))}
+              >
+                fill/stroke
+              </button>
+              <button
+                type="button"
+                className="chip-btn act"
+                disabled={picked < 0}
+                title="Duplicate the picked shape"
+                onClick={dup}
+              >
+                dup
+              </button>
+              <button
+                type="button"
+                className="chip-btn act"
+                disabled={picked < 0}
+                title="Delete the picked shape"
+                onClick={delSel}
+              >
+                del
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Send the picked shape one step back"
+                onClick={() => zShift(-1)}
+              >
+                Z-
+              </button>
+              <button
+                type="button"
+                className="chip-btn"
+                disabled={picked < 0}
+                title="Bring the picked shape one step forward"
+                onClick={() => zShift(1)}
+              >
+                Z+
+              </button>
             </div>
             <div style={mergeBox}>
-              <div className="ttl" style={mergeTitle}>merge</div>
+              <div className="ttl" style={mergeTitle}>
+                merge
+              </div>
               {parts.length === 0 && <span style={dimNote}>add 2+ shapes, then tick them to fuse</span>}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 96, overflowY: 'auto' }}>
                 {parts.map((p, i) => {
@@ -408,19 +614,34 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
                   const isSub = validSubtractKeys.includes(p.key);
                   return (
                     <div key={p.key} style={mergeRow}>
-                      <label style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }} title={`Fuse shape ${i + 1} (${p.kind}) into the merge`}>
-                        <input type="checkbox" checked={ticked}
+                      <label
+                        style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer' }}
+                        title={`Fuse shape ${i + 1} (${p.kind}) into the merge`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={ticked}
                           onChange={(e) => {
                             setMergeKeys((ks) => (e.target.checked ? [...ks, p.key] : ks.filter((k) => k !== p.key)));
                             if (!e.target.checked) setSubtractKeys((ks) => ks.filter((k) => k !== p.key));
-                          }} />
-                        <span>{i + 1} · {p.kind}</span>
+                          }}
+                        />
+                        <span>
+                          {i + 1} · {p.kind}
+                        </span>
                       </label>
                       {ticked && (
-                        <button type="button" className="chip-btn"
-                          title={isSub ? `Shape ${i + 1} subtracts: it punches a hole out of the merge` : `Shape ${i + 1} adds: flip to subtract and it cuts a hole instead`}
+                        <button
+                          type="button"
+                          className="chip-btn"
+                          title={
+                            isSub
+                              ? `Shape ${i + 1} subtracts: it punches a hole out of the merge`
+                              : `Shape ${i + 1} adds: flip to subtract and it cuts a hole instead`
+                          }
                           onClick={() => toggleSubtract(p.key)}
-                          style={isSub ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}>
+                          style={isSub ? { borderColor: 'var(--accent)', color: 'var(--accent)' } : undefined}
+                        >
                           {isSub ? '−' : '+'}
                         </button>
                       )}
@@ -430,74 +651,222 @@ export function AssetStudioModal({ seedSvg = '', seedId = '', onClose }) {
               </div>
               <label style={lbl} title="Melt the fused joins, metaball-style. 0 is a tight union.">
                 melt {melt}
-                <RangeRow layout="bare" tone="ink" min={0} max={12} step={0.5} value={melt} disabled={!merging}
-                  onChange={(v) => setMelt(v)} />
+                <RangeRow
+                  layout="bare"
+                  tone="ink"
+                  min={0}
+                  max={12}
+                  step={0.5}
+                  value={melt}
+                  disabled={!merging}
+                  onChange={(v) => setMelt(v)}
+                />
               </label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                <button type="button" className="chip-btn" disabled={!merging || validSubtractKeys.length > 0}
-                  title={validSubtractKeys.length > 0 ? 'Blend is add-shapes only — untick the subtract shapes to morph' : 'Preview a morph between the first two merge shapes (preview only, never baked)'}
-                  onClick={() => { setBlendOn((b) => !b); setBlendHold(false); }}>
+                <button
+                  type="button"
+                  className="chip-btn"
+                  disabled={!merging || validSubtractKeys.length > 0}
+                  title={
+                    validSubtractKeys.length > 0
+                      ? 'Blend is add-shapes only — untick the subtract shapes to morph'
+                      : 'Preview a morph between the first two merge shapes (preview only, never baked)'
+                  }
+                  onClick={() => {
+                    setBlendOn((b) => !b);
+                    setBlendHold(false);
+                  }}
+                >
                   {blendOn ? 'BLEND ■' : 'BLEND ▶'}
                 </button>
-                <button type="button" className="chip-btn" disabled={!bakeReady}
+                <button
+                  type="button"
+                  className="chip-btn"
+                  disabled={!bakeReady}
                   title="Fuse the ticked shapes into one shape (undo restores the originals)"
-                  onClick={bakeMerge} style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}>
+                  onClick={bakeMerge}
+                  style={{ borderColor: 'var(--accent)', color: 'var(--accent)' }}
+                >
                   BAKE MERGE
                 </button>
               </div>
               {blendOn && (
                 <label style={lbl} title="Scrub the morph by hand (pauses the animation)">
                   blend {Math.round(blendT * 100)}%
-                  <RangeRow layout="bare" tone="ink" min={0} max={1} step={0.01} value={blendT}
-                    onChange={(v) => { setBlendT(v); setBlendHold(true); }} />
+                  <RangeRow
+                    layout="bare"
+                    tone="ink"
+                    min={0}
+                    max={1}
+                    step={0.01}
+                    value={blendT}
+                    onChange={(v) => {
+                      setBlendT(v);
+                      setBlendHold(true);
+                    }}
+                  />
                 </label>
               )}
             </div>
             <label style={lbl} title="Which family the saved asset lands in.">
               family
-              <select value={category} title="Which family the saved asset lands in." onChange={(e) => setCategory(e.target.value)}>
-                {ALL_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              <select
+                value={category}
+                title="Which family the saved asset lands in."
+                onChange={(e) => setCategory(e.target.value)}
+              >
+                {ALL_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
               </select>
             </label>
             <label style={lbl} title="Name for the saved overlay asset.">
               id hint
-              <input value={hint} title="Name for the saved overlay asset." onChange={(e) => setHint(e.target.value)} style={field} />
+              <input
+                value={hint}
+                title="Name for the saved overlay asset."
+                onChange={(e) => setHint(e.target.value)}
+                style={field}
+              />
             </label>
             {error && <p style={{ margin: 0, fontSize: 10, color: 'var(--accent)' }}>{error}</p>}
             <p style={{ margin: 0, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.04em' }}>
-              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; flip a ticked shape to − and it punches a hole instead; blend is preview-only.
+              Sx/Sy stretch on one axis. S± stays uniform. Merge fuses ticked shapes, melt rounds the joins; flip a
+              ticked shape to − and it punches a hole instead; blend is preview-only.
             </p>
           </div>
         </div>
         <footer style={foot}>
-          <button type="button" className="chip-btn act" title="Remove the last added shape" onClick={undo} disabled={!undoDepth}>undo</button>
-          <button type="button" className="chip-btn act" title="Remove every shape" onClick={() => { commit(() => []); setPicked(-1); setMergeKeys([]); setSubtractKeys([]); setBlendOn(false); setBlendHold(false); }}>clear</button>
-          <button type="button" className="chip-btn act" title="Download the motif as an SVG file" onClick={exportSvg} disabled={!parts.length && !seedSvg}>export svg</button>
-          <button type="button" className="chip-btn act" title="Save this motif to the asset pool" onClick={save} disabled={!parts.length && !seedSvg} style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}>save to pool</button>
+          <button
+            type="button"
+            className="chip-btn act"
+            title="Remove the last added shape"
+            onClick={undo}
+            disabled={!undoDepth}
+          >
+            undo
+          </button>
+          <button
+            type="button"
+            className="chip-btn act"
+            title="Remove every shape"
+            onClick={() => {
+              commit(() => []);
+              setPicked(-1);
+              setMergeKeys([]);
+              setSubtractKeys([]);
+              setBlendOn(false);
+              setBlendHold(false);
+            }}
+          >
+            clear
+          </button>
+          <button
+            type="button"
+            className="chip-btn act"
+            title="Download the motif as an SVG file"
+            onClick={exportSvg}
+            disabled={!parts.length && !seedSvg}
+          >
+            export svg
+          </button>
+          <button
+            type="button"
+            className="chip-btn act"
+            title="Save this motif to the asset pool"
+            onClick={save}
+            disabled={!parts.length && !seedSvg}
+            style={{ marginLeft: 'auto', borderColor: 'var(--accent)', color: 'var(--accent)' }}
+          >
+            save to pool
+          </button>
         </footer>
       </div>
     </div>
   );
 }
 
-const grid = '<g stroke="rgba(255,255,255,0.08)" stroke-width="0.4" fill="none">'
-  + Array.from({ length: 11 }, (_, i) => `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="100"/><line x1="0" y1="${i * 10}" x2="100" y2="${i * 10}"/>`).join('')
-  + '</g>';
+const grid =
+  '<g stroke="rgba(255,255,255,0.08)" stroke-width="0.4" fill="none">' +
+  Array.from(
+    { length: 11 },
+    (_, i) =>
+      `<line x1="${i * 10}" y1="0" x2="${i * 10}" y2="100"/><line x1="0" y1="${i * 10}" x2="100" y2="${i * 10}"/>`,
+  ).join('') +
+  '</g>';
 
-const veil = { position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const sheet = {
-  width: 720, height: 520, minWidth: 520, minHeight: 380, maxWidth: '92vw', maxHeight: '88vh',
-  resize: 'both', overflow: 'auto',
-  background: 'var(--bg, #111)', border: '1px solid var(--line)', color: 'var(--ink)', fontFamily: 'inherit',
-  display: 'flex', flexDirection: 'column',
+const veil = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 40,
+  background: 'rgba(0,0,0,0.55)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
 };
-const head = { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderBottom: '1px solid var(--line)', fontSize: 10, letterSpacing: '0.14em', fontWeight: 700, flex: '0 0 auto' };
+const sheet = {
+  width: 720,
+  height: 520,
+  minWidth: 520,
+  minHeight: 380,
+  maxWidth: '92vw',
+  maxHeight: '88vh',
+  resize: 'both',
+  overflow: 'auto',
+  background: 'var(--bg, #111)',
+  border: '1px solid var(--line)',
+  color: 'var(--ink)',
+  fontFamily: 'inherit',
+  display: 'flex',
+  flexDirection: 'column',
+};
+const head = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '8px 10px',
+  borderBottom: '1px solid var(--line)',
+  fontSize: 10,
+  letterSpacing: '0.14em',
+  fontWeight: 700,
+  flex: '0 0 auto',
+};
 const body = { display: 'flex', gap: 12, padding: 12, flex: '1 1 auto', minHeight: 0 };
-const stage = { background: '#0a0a0a', border: '1px solid var(--line)', flex: '1 1 auto', minWidth: 280, height: '100%', touchAction: 'none' };
+const stage = {
+  background: '#0a0a0a',
+  border: '1px solid var(--line)',
+  flex: '1 1 auto',
+  minWidth: 280,
+  height: '100%',
+  touchAction: 'none',
+};
 const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)', flex: '0 0 auto' };
 const mergeBox = { border: '1px solid var(--line)', padding: 6, display: 'flex', flexDirection: 'column', gap: 5 };
 const mergeTitle = { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: 'var(--dim)' };
-const mergeRow = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--ink)', cursor: 'pointer' };
+const mergeRow = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 6,
+  fontSize: 10,
+  color: 'var(--ink)',
+  cursor: 'pointer',
+};
 const dimNote = { fontSize: 9, color: 'var(--dim)' };
-const lbl = { display: 'flex', flexDirection: 'column', gap: 3, fontSize: 9, letterSpacing: '0.08em', color: 'var(--dim)', textTransform: 'uppercase' };
-const field = { background: 'transparent', color: 'var(--ink)', border: '1px solid var(--line)', fontSize: 11, padding: '4px 6px' };
+const lbl = {
+  display: 'flex',
+  flexDirection: 'column',
+  gap: 3,
+  fontSize: 9,
+  letterSpacing: '0.08em',
+  color: 'var(--dim)',
+  textTransform: 'uppercase',
+};
+const field = {
+  background: 'transparent',
+  color: 'var(--ink)',
+  border: '1px solid var(--line)',
+  fontSize: 11,
+  padding: '4px 6px',
+};

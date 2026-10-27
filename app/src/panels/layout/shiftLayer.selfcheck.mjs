@@ -34,11 +34,7 @@ import {
   attractorWrites,
   attractorModeForParams,
 } from './shiftLayer.mjs';
-import {
-  createAttractorField,
-  withAttractorDensity,
-  selectHeroIndices,
-} from '../../engine/kernel/field/attractors.js';
+import { createAttractorField, withAttractorDensity, selectHeroIndices } from '../../engine/kernel/field/attractors.js';
 import { makeConstantField } from '../../engine/kernel/field/index.js';
 import { buildPlacements } from '../../engine/buildPlacements.js';
 
@@ -47,8 +43,11 @@ const R = ATTRACTOR_RADIUS_DEFAULT;
 
 // ── 1 — mode↔value maps: heroes ─────────────────────────────────────────
 assert.deepStrictEqual([...SHIFT_MODE_IDS], ['off', 'low', 'mid', 'high']);
-assert.deepStrictEqual({ ...HERO_COUNT_BY_MODE }, { off: 0, low: 1, mid: 3, high: 7 },
-  'HEROES modes are 0 · 1 · 3 · 7 (7 = MAX_HEROES, the scarcity cap)');
+assert.deepStrictEqual(
+  { ...HERO_COUNT_BY_MODE },
+  { off: 0, low: 1, mid: 3, high: 7 },
+  'HEROES modes are 0 · 1 · 3 · 7 (7 = MAX_HEROES, the scarcity cap)',
+);
 assert.strictEqual(MAX_HEROES, 7);
 for (const id of SHIFT_MODE_IDS) {
   assert.deepStrictEqual(heroesWrite(id), { key: 'heroes', value: HERO_COUNT_BY_MODE[id] });
@@ -69,29 +68,48 @@ assert.deepStrictEqual(heroesExactWrite(5), { key: 'heroes', value: 5 });
 assert.deepStrictEqual(heroesExactWrite(42), { key: 'heroes', value: MAX_HEROES });
 
 // ── 1 — mode↔value maps: attractors ─────────────────────────────────────
-assert.deepStrictEqual({ ...ATTRACTOR_COUNT_BY_MODE }, { off: 0, low: 1, mid: 2, high: 3 },
-  'PULL modes carry 0 · 1 · 2 · 3 attractors');
-assert.deepStrictEqual({ ...ATTRACTOR_RADIUS_MULT_BY_MODE }, { off: 1, low: 1, mid: 1.5, high: 2 },
-  'pinned pull-strength multipliers of the default radius: 1 · 1 · 1.5 · 2');
+assert.deepStrictEqual(
+  { ...ATTRACTOR_COUNT_BY_MODE },
+  { off: 0, low: 1, mid: 2, high: 3 },
+  'PULL modes carry 0 · 1 · 2 · 3 attractors',
+);
+assert.deepStrictEqual(
+  { ...ATTRACTOR_RADIUS_MULT_BY_MODE },
+  { off: 1, low: 1, mid: 1.5, high: 2 },
+  'pinned pull-strength multipliers of the default radius: 1 · 1 · 1.5 · 2',
+);
 for (const id of SHIFT_MODE_IDS) {
   const p = attractorParamsForMode(id);
   assert.strictEqual(p.attractorCount, ATTRACTOR_COUNT_BY_MODE[id]);
   assert.strictEqual(p.attractorRadius, R * ATTRACTOR_RADIUS_MULT_BY_MODE[id]);
   assert.strictEqual(attractorModeForParams(p), id, `pull mode round-trips: ${id}`);
-  assert.deepStrictEqual(attractorWrites(id), [
-    { key: 'attractorCount', value: p.attractorCount },
-    { key: 'attractorRadius', value: p.attractorRadius },
-  ], 'the PULL row writes exactly the engine pair, count then radius');
+  assert.deepStrictEqual(
+    attractorWrites(id),
+    [
+      { key: 'attractorCount', value: p.attractorCount },
+      { key: 'attractorRadius', value: p.attractorRadius },
+    ],
+    'the PULL row writes exactly the engine pair, count then radius',
+  );
 }
 assert.strictEqual(attractorModeForParams({}), 'off', 'absent params are OFF');
-assert.strictEqual(attractorModeForParams({ attractorCount: 0, attractorRadius: 2 * R }), 'off',
-  'count 0 is OFF whatever the radius says');
-assert.strictEqual(attractorModeForParams({ attractorCount: 2, attractorRadius: R }), 'mid',
-  'count dominates: 2 attractors at the LOW radius still show MID');
+assert.strictEqual(
+  attractorModeForParams({ attractorCount: 0, attractorRadius: 2 * R }),
+  'off',
+  'count 0 is OFF whatever the radius says',
+);
+assert.strictEqual(
+  attractorModeForParams({ attractorCount: 2, attractorRadius: R }),
+  'mid',
+  'count dominates: 2 attractors at the LOW radius still show MID',
+);
 assert.strictEqual(attractorModeForParams({ attractorCount: 1, attractorRadius: 2 * R }), 'low');
 assert.strictEqual(attractorModeForParams({ attractorCount: 3, attractorRadius: 1.2 * R }), 'high');
-assert.strictEqual(attractorModeForParams({ attractorCount: 5, attractorRadius: 2 * R }), 'high',
-  'an over-mode count from a file shows as the nearest mode, HIGH');
+assert.strictEqual(
+  attractorModeForParams({ attractorCount: 5, attractorRadius: 2 * R }),
+  'high',
+  'an over-mode count from a file shows as the nearest mode, HIGH',
+);
 
 // ── 2 — the pinned constants, proven on the engine's field ──────────────
 {
@@ -140,8 +158,10 @@ assert.strictEqual(attractorModeForParams({ attractorCount: 5, attractorRadius: 
     }
   }
   assert.ok(sawBelow, 'MID pooling actually bends density somewhere');
-  assert.ok(Math.abs(pooledMid.sample(fields.mid.points[0], fields.mid.points[1]) - 0.8) < 1e-9,
-    'at an attractor centre the pooled density is the base itself');
+  assert.ok(
+    Math.abs(pooledMid.sample(fields.mid.points[0], fields.mid.points[1]) - 0.8) < 1e-9,
+    'at an attractor centre the pooled density is the base itself',
+  );
 }
 
 // ── 3 — the panel path: row writes → params → placements ────────────────
@@ -152,19 +172,38 @@ const assets = [
 ];
 const palette = { swatches: ['#111', '#222', '#333', '#444'] };
 const baseParams = {
-  mode: 'grid', composition: 'default', count: 40,
-  scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-  jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
-  overlap: true, displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+  mode: 'grid',
+  composition: 'default',
+  count: 40,
+  scale: [0.4, 0.8],
+  rotate: [0, 45],
+  alpha: [60, 100],
+  jitter: 10,
+  density: 100,
+  zTiers: 1,
+  bleed: false,
+  mirror: false,
+  overlap: true,
+  displacement: 0,
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
 };
 const caps = { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true };
 const SEED = 0x1a4f;
-const place = (layoutParams) => buildPlacements({
-  layoutParams, seed: SEED, activeAssets: assets, palette, caps, canvasW: 1000, canvasH: 700,
-});
-const serialize = (r) => JSON.stringify(r.items.map((it) => [
-  it.assetId, it.index, it.x, it.y, it.scale, it.scaleY, it.rotation, it.alpha, it.color,
-]));
+const place = (layoutParams) =>
+  buildPlacements({
+    layoutParams,
+    seed: SEED,
+    activeAssets: assets,
+    palette,
+    caps,
+    canvasW: 1000,
+    canvasH: 700,
+  });
+const serialize = (r) =>
+  JSON.stringify(
+    r.items.map((it) => [it.assetId, it.index, it.x, it.y, it.scale, it.scaleY, it.rotation, it.alpha, it.color]),
+  );
 // Apply row writes to a params object the way the store door does.
 const applyWrites = (params, writes) => {
   const next = { ...params };
@@ -174,8 +213,11 @@ const applyWrites = (params, writes) => {
 
 const todayRun = place(baseParams); // today's shape: no shift keys at all
 const offParams = applyWrites(applyWrites(baseParams, [heroesWrite('off')]), attractorWrites('off'));
-assert.strictEqual(serialize(place(offParams)), serialize(todayRun),
-  'OFF through the panel path is byte-identical to today (no shift keys)');
+assert.strictEqual(
+  serialize(place(offParams)),
+  serialize(todayRun),
+  'OFF through the panel path is byte-identical to today (no shift keys)',
+);
 
 // Heroes MID: exactly the seed's three indices transform — scale ×[3,6),
 // rotation + (π ± 0.35) — and nothing else about the frame moves.
@@ -197,7 +239,10 @@ assert.strictEqual(serialize(place(offParams)), serialize(todayRun),
       const ratio = b.scale / a.scale;
       assert.ok(ratio >= 3 && ratio < 6, `hero scale ratio ${ratio} in [3, 6)`);
       const dRot = b.rotation - a.rotation;
-      assert.ok(dRot >= Math.PI - 0.35 && dRot <= Math.PI + 0.35, `hero rotation delta ${dRot} is the half-turn ± 0.35`);
+      assert.ok(
+        dRot >= Math.PI - 0.35 && dRot <= Math.PI + 0.35,
+        `hero rotation delta ${dRot} is the half-turn ± 0.35`,
+      );
     } else {
       assert.strictEqual(b.scale, a.scale, 'non-hero scale untouched');
       assert.strictEqual(b.rotation, a.rotation, 'non-hero rotation untouched');
@@ -218,8 +263,10 @@ assert.strictEqual(serialize(place(offParams)), serialize(todayRun),
   );
   const high = place(highParams);
   assert.notStrictEqual(serialize(high), serialize(todayRun), 'attractors on = a different frame');
-  assert.ok(high.items.some((it, i) => it.x !== todayRun.items[i].x || it.y !== todayRun.items[i].y),
-    'attractors move placement positions (density pooling)');
+  assert.ok(
+    high.items.some((it, i) => it.x !== todayRun.items[i].x || it.y !== todayRun.items[i].y),
+    'attractors move placement positions (density pooling)',
+  );
   assert.strictEqual(serialize(place(highParams)), serialize(high), 'attractors replay deterministically');
   const backOff = applyWrites(highParams, attractorWrites('off'));
   assert.strictEqual(serialize(place(backOff)), serialize(todayRun), 'PULL OFF restores the identical frame');
@@ -233,9 +280,13 @@ globalThis.localStorage = {
   setItem: (k, v) => lsData.set(k, String(v)),
   removeItem: (k) => lsData.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
-const { RANDOMIZABLE_KEYS, MORPHABLE_KEYS, DICE_RANGES, generateLayoutTargets } = await import('../../state/paramUtils.js');
+const { RANDOMIZABLE_KEYS, MORPHABLE_KEYS, DICE_RANGES, generateLayoutTargets } =
+  await import('../../state/paramUtils.js');
 const { MOTION_KEYS } = await import('../../state/rollScope.mjs');
 const { leanDialSteps } = await import('../../curator/director.js');
 const { useStore } = await import('../../state/store.js');
@@ -255,9 +306,18 @@ for (const key of SHIFT_KEYS) {
 }
 // The Queen's lean steps name only her two dials and the pull readout.
 {
-  const steps = leanDialSteps({ lean: { wetness: 0.9, evolve: 0.9 }, wetness: 0.1, evolveInterval: 9000, keeps: [], allowance: 1 });
-  assert.deepStrictEqual(Object.keys(steps).sort(), ['evolveInterval', 'pull', 'wetness'],
-    'the Queen steps wetness + evolve only — she cannot crown heroes or pull');
+  const steps = leanDialSteps({
+    lean: { wetness: 0.9, evolve: 0.9 },
+    wetness: 0.1,
+    evolveInterval: 9000,
+    keeps: [],
+    allowance: 1,
+  });
+  assert.deepStrictEqual(
+    Object.keys(steps).sort(),
+    ['evolveInterval', 'pull', 'wetness'],
+    'the Queen steps wetness + evolve only — she cannot crown heroes or pull',
+  );
 }
 // Dynamic: the real store's doors run; the hand-set triple does not move.
 {

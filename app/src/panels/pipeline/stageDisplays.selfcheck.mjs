@@ -2,8 +2,13 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import {
-  normalizeMonitor, normalizeMonitors, resolveStageDisplay,
-  isDisplayGone, matchRaster, displayLabel, REFRESH_RATE_UNAVAILABLE,
+  normalizeMonitor,
+  normalizeMonitors,
+  resolveStageDisplay,
+  isDisplayGone,
+  matchRaster,
+  displayLabel,
+  REFRESH_RATE_UNAVAILABLE,
 } from './stageDisplays.mjs';
 
 const TAURI_MON = {
@@ -36,7 +41,10 @@ test('#607 normalize: hostile shapes degrade, never throw', () => {
 });
 
 test('#607 resolve: saved pick wins; empty list invents nothing', () => {
-  const list = normalizeMonitors([TAURI_MON, { ...TAURI_MON, name: 'Sidecar', size: { width: 1920, height: 1080 }, position: { x: 5120, y: 0 } }]);
+  const list = normalizeMonitors([
+    TAURI_MON,
+    { ...TAURI_MON, name: 'Sidecar', size: { width: 1920, height: 1080 }, position: { x: 5120, y: 0 } },
+  ]);
   const { display, note } = resolveStageDisplay(list, list[1].id);
   assert.equal(display.name, 'Sidecar');
   assert.equal(note, null);

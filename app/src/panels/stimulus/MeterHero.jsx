@@ -20,7 +20,14 @@ export function MeterHero() {
   const [source, setSource] = useState('IDLE');
   const beatRef = useRef(0);
   const sidecarRef = useRef(false); // #618: a loaded sidecar is what's driving a FILE source
-  useEffect(() => useStore.subscribe((s) => { beatRef.current = s.beatPulse || 0; sidecarRef.current = !!s.audioSidecar; }), []);
+  useEffect(
+    () =>
+      useStore.subscribe((s) => {
+        beatRef.current = s.beatPulse || 0;
+        sidecarRef.current = !!s.audioSidecar;
+      }),
+    [],
+  );
 
   useEffect(() => {
     let raf = 0;
@@ -44,7 +51,10 @@ export function MeterHero() {
       const dpr = window.devicePixelRatio || 1;
       const w = Math.max(1, Math.round(cv.clientWidth * dpr));
       const h = Math.round(H * dpr);
-      if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
+      if (cv.width !== w || cv.height !== h) {
+        cv.width = w;
+        cv.height = h;
+      }
       const g = cv.getContext('2d');
       const css = getComputedStyle(cv);
       const ink = css.getPropertyValue('--ink').trim() || '#e8e8e0';
@@ -57,12 +67,21 @@ export function MeterHero() {
       const dt = (now - last) / 1000;
       last = now;
       const gt = getGhost();
-      if (gt.strength > 0) { ghostKind = gt.kind; ghostBand = gt.band; }
+      if (gt.strength > 0) {
+        ghostKind = gt.kind;
+        ghostBand = gt.band;
+      }
       ghostS += (gt.strength - ghostS) * Math.min(1, dt / 0.8);
-      if (ghostS < 0.002) { ghostS = 0; ghostKind = null; }
+      if (ghostS < 0.002) {
+        ghostS = 0;
+        ghostKind = null;
+      }
       const tap = getAudioMeterTap();
       const kind = tap ? (tap.kind === 'FILE' && sidecarRef.current ? 'FILE+ENV' : tap.kind) : 'IDLE';
-      if (kind !== shownSource) { shownSource = kind; setSource(kind); }
+      if (kind !== shownSource) {
+        shownSource = kind;
+        setSource(kind);
+      }
 
       // waveform
       const wh = WAVE_H * dpr;
@@ -77,12 +96,19 @@ export function MeterHero() {
         for (let i = 0; i < n; i++) {
           const x = (i / (n - 1)) * w;
           const y = (wave[i] / 255) * wh + drift(i / (n - 1));
-          if (i) g.lineTo(x, y); else g.moveTo(x, y);
+          if (i) g.lineTo(x, y);
+          else g.moveTo(x, y);
         }
       } else if (ghostKind === 'drift') {
-        for (let i = 0; i <= 48; i++) { const x = (i / 48) * w; const y = wh / 2 + drift(i / 48); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+        for (let i = 0; i <= 48; i++) {
+          const x = (i / 48) * w;
+          const y = wh / 2 + drift(i / 48);
+          if (i) g.lineTo(x, y);
+          else g.moveTo(x, y);
+        }
       } else {
-        g.moveTo(0, wh / 2); g.lineTo(w, wh / 2);
+        g.moveTo(0, wh / 2);
+        g.lineTo(w, wh / 2);
       }
       g.stroke();
 
@@ -107,11 +133,13 @@ export function MeterHero() {
         g.fillRect(x, top, bw, barH);
         g.fillStyle = ink;
         g.fillRect(x, top + barH * (1 - levels[i]), bw, barH * levels[i]);
-        if (ghostKind === 'warm' && ghostS > 0) { // the graph warms
+        if (ghostKind === 'warm' && ghostS > 0) {
+          // the graph warms
           g.fillStyle = `rgba(255, 150, 110, ${(0.45 * ghostS).toFixed(3)})`;
           g.fillRect(x, top + barH * (1 - Math.max(levels[i], 0.08)), bw, barH * Math.max(levels[i], 0.08));
         }
-        if (ghostKind === 'lean' && ghostS > 0 && i === ghostBand) { // one meter leans
+        if (ghostKind === 'lean' && ghostS > 0 && i === ghostBand) {
+          // one meter leans
           const lean = barH * 0.22 * ghostS;
           g.fillStyle = ink;
           g.globalAlpha = 0.5 * Math.min(1, ghostS * 2);
@@ -163,17 +191,36 @@ export function MeterHero() {
     if (!cv) return;
     const r = cv.getBoundingClientRect();
     if (e.clientY - r.top < WAVE_H + 8) return; // the waveform is not a band
-    const i = Math.min(METER_BANDS.length - 1, Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * METER_BANDS.length)));
+    const i = Math.min(
+      METER_BANDS.length - 1,
+      Math.max(0, Math.floor(((e.clientX - r.left) / r.width) * METER_BANDS.length)),
+    );
     const input = `band.${METER_BANDS[i].label.toLowerCase()}`;
-    emit(Events.AUDIO_ROUTES_EDIT, { fn: (t) => { const n = nextRoute(t, input); return n ? [...t, n] : t; }, continuous: false });
+    emit(Events.AUDIO_ROUTES_EDIT, {
+      fn: (t) => {
+        const n = nextRoute(t, input);
+        return n ? [...t, n] : t;
+      },
+      continuous: false,
+    });
   };
   return (
     <div className="stim-meter-hero">
       <div className="stim-meter-head">
-        <span className="lbl">meter <em className="stim-meter-hint">click a band to route it</em></span>
-        <span className={`stim-source ${source === 'IDLE' ? 'idle' : ''}`} title="Where the sound comes from">{source}</span>
+        <span className="lbl">
+          meter <em className="stim-meter-hint">click a band to route it</em>
+        </span>
+        <span className={`stim-source ${source === 'IDLE' ? 'idle' : ''}`} title="Where the sound comes from">
+          {source}
+        </span>
       </div>
-      <canvas ref={canvasRef} className="stim-meter-canvas" style={{ height: H, cursor: 'pointer' }} onClick={routeBand} aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it." />
+      <canvas
+        ref={canvasRef}
+        className="stim-meter-canvas"
+        style={{ height: H, cursor: 'pointer' }}
+        onClick={routeBand}
+        aria-label="Audio meter: waveform, seven bands, beat. Click a band to add a route for it."
+      />
     </div>
   );
 }

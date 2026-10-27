@@ -11,24 +11,21 @@
 // path; taste.json → the taste store; palettes → the palette importer (merge);
 // hits → the embedded project via the project path (the keeps rows are the
 // studio's feed, not restorable ledger entries).
-import { buildBundle, bundleFilename, isBundle } from "../../state/bundle.js";
-import { buildProjectPayload } from "../../hooks/useProjectPayload.js";
-import { hitsFromFavorites, keepsFromKeeps } from "../../state/hitsExport.js";
-import { getTaste } from "../../curator/tasteStore.js";
-import { validateTaste } from "../../curator/tasteHead.js";
-import { getBiologyPolicy } from "../../biology/policy.js";
-import { readUserPresets } from "../../data/canvasPresets.js";
-import { parseProject } from "../../state/projectDocument.js";
+import { buildBundle, bundleFilename, isBundle } from '../../state/bundle.js';
+import { buildProjectPayload } from '../../hooks/useProjectPayload.js';
+import { hitsFromFavorites, keepsFromKeeps } from '../../state/hitsExport.js';
+import { getTaste } from '../../curator/tasteStore.js';
+import { validateTaste } from '../../curator/tasteHead.js';
+import { getBiologyPolicy } from '../../biology/policy.js';
+import { readUserPresets } from '../../data/canvasPresets.js';
+import { parseProject } from '../../state/projectDocument.js';
 
 /** Version of the hits feed envelope (matches the old ↓ HITS export). */
 export const HITS_ENVELOPE_VERSION = 1;
 
 // import.meta.env only exists under vite — node selfchecks get the fallback.
 const appVersion = () =>
-  (typeof import.meta !== "undefined" &&
-    import.meta.env &&
-    import.meta.env.VITE_APP_VERSION) ||
-  "0.9.0";
+  (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_APP_VERSION) || '0.9.0';
 
 /**
  * Build the one file. `s` is the store state (Shell) or the DataExportRow
@@ -63,12 +60,12 @@ export function exportEnvelopeFilename(now) {
 
 export function downloadJsonFile(obj, filename) {
   const blob = new Blob([JSON.stringify(obj, null, 2)], {
-    type: "application/json",
+    type: 'application/json',
   });
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
   a.download = filename;
-  a.rel = "noopener";
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -80,15 +77,15 @@ export function downloadJsonFile(obj, filename) {
  * taste kind are checked before the lenient project parser ever sees the file.
  */
 export function sniffImportKind(raw) {
-  if (raw === null || typeof raw !== "object") return "unknown";
-  if (isBundle(raw)) return "bundle";
+  if (raw === null || typeof raw !== 'object') return 'unknown';
+  if (isBundle(raw)) return 'bundle';
   if (!Array.isArray(raw)) {
-    if (validateTaste(raw).ok) return "taste";
-    if (Array.isArray(raw.hits)) return "hits";
-    if (Array.isArray(raw.swatches)) return "palettes"; // a single palette object
+    if (validateTaste(raw).ok) return 'taste';
+    if (Array.isArray(raw.hits)) return 'hits';
+    if (Array.isArray(raw.swatches)) return 'palettes'; // a single palette object
   } else {
-    return "palettes"; // the palette library is a JSON array
+    return 'palettes'; // the palette library is a JSON array
   }
-  if (parseProject(raw).ok) return "project";
-  return "unknown";
+  if (parseProject(raw).ok) return 'project';
+  return 'unknown';
 }

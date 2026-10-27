@@ -13,7 +13,10 @@ export function EvolveProgress() {
   const seed = useStore((s) => s.seed);
   const spg = secPerGen(run);
   const cell = (label, value) => (
-    <span className="davis-progress-cell"><i>{label}</i><b>{value}</b></span>
+    <span className="davis-progress-cell">
+      <i>{label}</i>
+      <b>{value}</b>
+    </span>
   );
   return (
     <div className={`davis-progress ${evolveMode ? 'running' : ''}`} role="status" aria-label="Evolve progress">

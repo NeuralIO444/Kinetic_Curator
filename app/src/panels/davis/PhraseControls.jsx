@@ -8,10 +8,20 @@ const PHRASE_MODES = [
 ];
 
 export function PhraseControls({
-  phraseEnabled, phraseLength, phraseMode, phraseBeat, phraseProgress,
-  layoutMode, audioEnabled, phraseClock = 'audio', beatBpm = 120,
-  beatPulse = 0, rms = 0,
-  euclidBeats = 5, euclidSteps = 8, euclidRotate = 0,
+  phraseEnabled,
+  phraseLength,
+  phraseMode,
+  phraseBeat,
+  phraseProgress,
+  layoutMode,
+  audioEnabled,
+  phraseClock = 'audio',
+  beatBpm = 120,
+  beatPulse = 0,
+  rms = 0,
+  euclidBeats = 5,
+  euclidSteps = 8,
+  euclidRotate = 0,
 }) {
   const caLive = layoutMode === 'ca';
   const euclid = phraseClock === 'euclid';
@@ -21,9 +31,22 @@ export function PhraseControls({
   const waiting = phraseEnabled && !internal && !audioEnabled;
   const noAttack = phraseEnabled && !internal && audioEnabled && phraseBeat === 0 && rms > 0.2;
   return (
-    <div style={{ marginTop: 10, padding: '8px 6px', border: '1px solid var(--line-2)', background: 'rgba(255,255,255,0.02)' }}>
+    <div
+      style={{
+        marginTop: 10,
+        padding: '8px 6px',
+        border: '1px solid var(--line-2)',
+        background: 'rgba(255,255,255,0.02)',
+      }}
+    >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-        <span className="davis-label lbl" style={{ margin: 0 }} title="Counts a bar. Does not push SCALE/ALPHA — that is Stimuli.">phrase loop</span>
+        <span
+          className="davis-label lbl"
+          style={{ margin: 0 }}
+          title="Counts a bar. Does not push SCALE/ALPHA — that is Stimuli."
+        >
+          phrase loop
+        </span>
         <button
           className={`chip-btn ${phraseEnabled ? 'active' : ''}`}
           title={phraseEnabled ? 'Stop the bar.' : 'Arm the bar. AUDIO needs a clap; METRO ticks alone.'}
@@ -35,55 +58,103 @@ export function PhraseControls({
       </div>
       <div className="davis-source-row">
         <span className="davis-label lbl">clock</span>
-        <button className={`act chip-btn ${phraseClock === 'audio' ? 'active' : ''}`}
+        <button
+          className={`act chip-btn ${phraseClock === 'audio' ? 'active' : ''}`}
           title="Tick on a mic attack. Held noise is not a beat — you will see no attack."
-          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'audio' })}>audio</button>
-        <button className={`act chip-btn ${phraseClock === 'metro' ? 'active' : ''}`}
+          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'audio' })}
+        >
+          audio
+        </button>
+        <button
+          className={`act chip-btn ${phraseClock === 'metro' ? 'active' : ''}`}
           title="Internal BPM. No mic."
-          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'metro' })}>metro</button>
-        <button className={`act chip-btn ${euclid ? 'active' : ''}`}
+          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'metro' })}
+        >
+          metro
+        </button>
+        <button
+          className={`act chip-btn ${euclid ? 'active' : ''}`}
           title="Internal BPM, but the bar only advances on the hit steps of a Euclidean figure. The misses are the piece."
-          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'euclid' })}>euclid</button>
+          onClick={() => emit(Events.DAVIS_PHRASE, { clock: 'euclid' })}
+        >
+          euclid
+        </button>
       </div>
       {euclid && (
         <>
           <div className="davis-interval-row" title="Hits spread as evenly as possible across the steps.">
             <span className="davis-label lbl">hits</span>
-            <RangeRow layout="bare" tone="ink" min={0} max={euclidSteps} step={1} value={euclidBeats}
-              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { beats: v } })} />
-            <span className="davis-readout">{euclidBeats}/{euclidSteps}</span>
+            <RangeRow
+              layout="bare"
+              tone="ink"
+              min={0}
+              max={euclidSteps}
+              step={1}
+              value={euclidBeats}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { beats: v } })}
+            />
+            <span className="davis-readout">
+              {euclidBeats}/{euclidSteps}
+            </span>
           </div>
           <div className="davis-interval-row" title="Steps in the figure. Hits redistribute.">
             <span className="davis-label lbl">steps</span>
-            <RangeRow layout="bare" tone="ink" min={2} max={32} step={1} value={euclidSteps}
-              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { steps: v } })} />
+            <RangeRow
+              layout="bare"
+              tone="ink"
+              min={2}
+              max={32}
+              step={1}
+              value={euclidSteps}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { steps: v } })}
+            />
             <span className="davis-readout">{euclidSteps}</span>
           </div>
           <div className="davis-interval-row" title="Turn the figure so a different step lands on the downbeat.">
             <span className="davis-label lbl">rotate</span>
-            <RangeRow layout="bare" tone="ink" min={0} max={Math.max(0, euclidSteps - 1)} step={1} value={euclidRotate}
-              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { rotate: v } })} />
-            <span className="davis-readout" style={{ fontFamily: 'var(--font-mono, monospace)', letterSpacing: '0.12em' }}>
+            <RangeRow
+              layout="bare"
+              tone="ink"
+              min={0}
+              max={Math.max(0, euclidSteps - 1)}
+              step={1}
+              value={euclidRotate}
+              onChange={(v) => emit(Events.DAVIS_PHRASE, { euclid: { rotate: v } })}
+            />
+            <span
+              className="davis-readout"
+              style={{ fontFamily: 'var(--font-mono, monospace)', letterSpacing: '0.12em' }}
+            >
               {euclidString(euclidBeats, euclidSteps, euclidRotate)}
             </span>
           </div>
         </>
       )}
       {(metro || euclid) && (
-        <div className="davis-interval-row" title="Tempo follows the top-bar BEAT clock — one clock, not two. Change it up there.">
+        <div
+          className="davis-interval-row"
+          title="Tempo follows the top-bar BEAT clock — one clock, not two. Change it up there."
+        >
           <span className="davis-label lbl">bpm</span>
           <span className="davis-readout">BEAT · {Math.round(beatBpm)}</span>
         </div>
       )}
       <div className="davis-interval-row" title="Beats in the bar before wrap.">
         <span className="davis-label lbl">length</span>
-        <RangeRow layout="bare" tone="ink" min={4} max={32} step={1} value={phraseLength || 8}
-          onChange={(v) => emit(Events.DAVIS_PHRASE, { length: v })} />
+        <RangeRow
+          layout="bare"
+          tone="ink"
+          min={4}
+          max={32}
+          step={1}
+          value={phraseLength || 8}
+          onChange={(v) => emit(Events.DAVIS_PHRASE, { length: v })}
+        />
         <span className="davis-readout">{phraseLength || 8} beats</span>
       </div>
       <div className="davis-source-row" style={{ marginTop: 4 }}>
         <span className="davis-label lbl">mode</span>
-        {PHRASE_MODES.map(m => {
+        {PHRASE_MODES.map((m) => {
           const blocked = m.id === 'step-ca' && !caLive;
           return (
             <button
@@ -91,7 +162,9 @@ export function PhraseControls({
               className={`chip-btn ${phraseMode === m.id ? 'active' : ''}`}
               disabled={blocked}
               title={blocked ? 'CA wrap only affects the picture when layout mode is Cellular' : m.title}
-              onClick={() => { if (!blocked) emit(Events.DAVIS_PHRASE, { mode: m.id }); }}
+              onClick={() => {
+                if (!blocked) emit(Events.DAVIS_PHRASE, { mode: m.id });
+              }}
             >
               {m.label}
             </button>
@@ -100,7 +173,15 @@ export function PhraseControls({
       </div>
       {phraseEnabled && (
         <div style={{ marginTop: 8 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 9, color: 'var(--dim)', marginBottom: 3 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              fontSize: 9,
+              color: 'var(--dim)',
+              marginBottom: 3,
+            }}
+          >
             <span title={noAttack ? 'RMS is up but there was no rising edge. Clap, or use METRO.' : undefined}>
               {waiting
                 ? 'waiting for beat · audio off'
@@ -110,20 +191,33 @@ export function PhraseControls({
                     ? `METRO ${phraseBeat}/${phraseLength}`
                     : `BEAT ${phraseBeat}/${phraseLength}`}
             </span>
-            <button className="micro-btn act" title="Jump to beat 0." onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>reset now</button>
+            <button className="micro-btn act" title="Jump to beat 0." onClick={() => emit(Events.DAVIS_RESET_PHRASE)}>
+              reset now
+            </button>
           </div>
-          <div style={{ position: 'relative', height: 4, background: 'var(--line-2)', overflow: 'hidden' }}
-            title="Bar fill = count. White pip = last audio attack.">
-            <div style={{
-              height: '100%', width: `${phraseProgress}%`,
-              background: 'linear-gradient(90deg, #00d9ff, #00ff88)',
-              transition: 'width 0.1s linear',
-            }} />
-            <div style={{
-              position: 'absolute', top: 0, right: 0, width: 6, height: '100%',
-              background: '#fff',
-              opacity: metro ? 0 : Math.max(0, Math.min(1, beatPulse)),
-            }} />
+          <div
+            style={{ position: 'relative', height: 4, background: 'var(--line-2)', overflow: 'hidden' }}
+            title="Bar fill = count. White pip = last audio attack."
+          >
+            <div
+              style={{
+                height: '100%',
+                width: `${phraseProgress}%`,
+                background: 'linear-gradient(90deg, #00d9ff, #00ff88)',
+                transition: 'width 0.1s linear',
+              }}
+            />
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                width: 6,
+                height: '100%',
+                background: '#fff',
+                opacity: metro ? 0 : Math.max(0, Math.min(1, beatPulse)),
+              }}
+            />
           </div>
         </div>
       )}

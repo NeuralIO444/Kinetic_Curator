@@ -33,19 +33,20 @@ export function HeroesRow({ layoutParams }) {
   // eslint-disable-next-line react-hooks/refs -- render-phase write precedes the dock's read in the same commit (ValueButton #1272)
   latest.current = { count };
 
-  const openExact = () => open({
-    title: 'HEROES',
-    open: () => (
-      <SliderEditor
-        ariaLabel="Heroes — exact count"
-        value={latest.current.count}
-        min={0}
-        max={MAX_HEROES}
-        step={1}
-        onChange={(v) => emit(Events.LAYOUT_PARAM, heroesExactWrite(v))}
-      />
-    ),
-  });
+  const openExact = () =>
+    open({
+      title: 'HEROES',
+      open: () => (
+        <SliderEditor
+          ariaLabel="Heroes — exact count"
+          value={latest.current.count}
+          min={0}
+          max={MAX_HEROES}
+          step={1}
+          onChange={(v) => emit(Events.LAYOUT_PARAM, heroesExactWrite(v))}
+        />
+      ),
+    });
 
   return (
     <div className="voice-shelf">
@@ -70,10 +71,7 @@ export function AttractorRow({ layoutParams }) {
   const count = Math.max(0, Math.floor(Number(layoutParams.attractorCount) || 0));
   return (
     <div className="voice-shelf">
-      <span
-        className="shelf-label ttl"
-        title="Pull — attractor points that bend placement density toward them."
-      >
+      <span className="shelf-label ttl" title="Pull — attractor points that bend placement density toward them.">
         pull · {count}
       </span>
       <TeaMatrix

@@ -46,13 +46,23 @@ import * as A from '../state/actions.js';
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES } from '../data/palettes.js';
 import {
-  stageRecords, stageSlotsUsed, shelfDiskRows,
-  STAGE_BUDGET, COLLECTION_SOFT_BOUND, SHELF_SORTS,
+  stageRecords,
+  stageSlotsUsed,
+  shelfDiskRows,
+  STAGE_BUDGET,
+  COLLECTION_SOFT_BOUND,
+  SHELF_SORTS,
 } from '../curator/shelf.mjs';
 import { DEFAULT_SHELF_PREFS, tableName } from '../curator/shelfPrefs.mjs';
 import {
-  shelfAnchor, stageCells, fillBandState, toolsStandDown,
-  rowIdentity, rowMeta, rowLocationTag, rowReason,
+  shelfAnchor,
+  stageCells,
+  fillBandState,
+  toolsStandDown,
+  rowIdentity,
+  rowMeta,
+  rowLocationTag,
+  rowReason,
 } from './shelfView.mjs';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
@@ -62,11 +72,15 @@ const SORT_LABEL = { kept: 'kept date', staged: 'last staged', never: 'never sta
 
 export function ShelfView() {
   const { state, dispatch } = useApp((s) => ({
-    keeps: s.keeps, keepStage: s.keepStage,
-    shelfNotice: s.shelfNotice, performingKeepId: s.performingKeepId,
-    shelfPrefs: s.shelfPrefs, shelfPrefsSource: s.shelfPrefsSource,
+    keeps: s.keeps,
+    keepStage: s.keepStage,
+    shelfNotice: s.shelfNotice,
+    performingKeepId: s.performingKeepId,
+    shelfPrefs: s.shelfPrefs,
+    shelfPrefsSource: s.shelfPrefsSource,
     // #1591 — the disk tier: records read this session + the stub index.
-    shelfDiskRecords: s.shelfDiskRecords, shelfDiskStubs: s.shelfDiskStubs,
+    shelfDiskRecords: s.shelfDiskRecords,
+    shelfDiskStubs: s.shelfDiskStubs,
   }));
   const setShelfNotice = useStore((s) => s.setShelfNotice);
   const keeps = state.keeps || [];
@@ -85,16 +99,19 @@ export function ShelfView() {
   // #1591 — one listing, three locations: in-app records, disk records
   // read this session (marked on disk), and a stub row for every disk
   // keep whose record is not in hand (folder away, or the file gone).
-  const diskRecords = useMemo(
-    () => Object.values(state.shelfDiskRecords || {}),
-    [state.shelfDiskRecords],
-  );
+  const diskRecords = useMemo(() => Object.values(state.shelfDiskRecords || {}), [state.shelfDiskRecords]);
   const diskStubs = state.shelfDiskStubs || {};
   const diskCount = Object.keys(diskStubs).length;
   const rows = useMemo(
-    () => shelfDiskRows(keeps, keepStage, {
-      diskRecords, stubs: diskStubs, query, sort, assetsById, palettesById,
-    }),
+    () =>
+      shelfDiskRows(keeps, keepStage, {
+        diskRecords,
+        stubs: diskStubs,
+        query,
+        sort,
+        assetsById,
+        palettesById,
+      }),
     [keeps, keepStage, diskRecords, diskStubs, query, sort],
   );
   const aimedId = aimedSlot != null ? keepStage[aimedSlot] : null;
@@ -109,8 +126,8 @@ export function ShelfView() {
     aimedSlot: aimedId != null ? aimedSlot : null,
     tableLine: `table: ${tableName(effectivePrefs)} · ${state.shelfPrefsSource === 'file' ? 'preferences.json' : 'shipped defaults'}`,
   });
-  const countsText = `stage ${used}/${STAGE_BUDGET} · collection ${collectionCount}`
-    + (diskCount ? ` · ${diskCount} on disk` : '');
+  const countsText =
+    `stage ${used}/${STAGE_BUDGET} · collection ${collectionCount}` + (diskCount ? ` · ${diskCount} on disk` : '');
   // The pass (P2-3): the soft-bound overflow is an event, not a count —
   // it leaves the head and stands in the notice position (the store's
   // own line, an actual receipt, always wins the slot).
@@ -131,8 +148,14 @@ export function ShelfView() {
     const next = wrap ? shelfAnchor(wrap.getBoundingClientRect()) : null;
     setPos((prev) => {
       if (!next) return prev;
-      if (prev && prev.top === next.top && prev.left === next.left
-        && prev.width === next.width && prev.height === next.height) return prev;
+      if (
+        prev &&
+        prev.top === next.top &&
+        prev.left === next.left &&
+        prev.width === next.width &&
+        prev.height === next.height
+      )
+        return prev;
       return next;
     });
   }, []);
@@ -146,7 +169,9 @@ export function ShelfView() {
 
   useEffect(() => {
     if (!expanded) return undefined;
-    const onKey = (e) => { if (e.key === 'Escape') closeExpanded(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') closeExpanded();
+    };
     const onDown = (e) => {
       if (editorRef.current?.contains(e.target)) return;
       if (expandRef.current?.contains(e.target)) return;
@@ -169,24 +194,30 @@ export function ShelfView() {
 
   const stageGrid = (
     <div className="shelf-stage" role="list" aria-label="the stage — 16 slots">
-      {cells.map((cell) => (cell.keepId == null ? (
-        <div key={cell.n} className="shelf-slot ghost" aria-hidden="true">
-          <span className="shelf-slot-n">{cell.n}</span>
-        </div>
-      ) : (
-        <button
-          type="button" role="listitem" key={cell.keepId}
-          className={`shelf-slot${aimedSlot === cell.n - 1 ? ' aimed' : ''}${cell.onDeck ? ' on-deck' : ''}`}
-          title={cell.onDeck ? 'on the deck — this slot refuses swaps' : 'aim a swap at this slot'}
-          onClick={() => setAimedSlot(aimedSlot === cell.n - 1 ? null : cell.n - 1)}
-        >
-          <span className="shelf-slot-top">
+      {cells.map((cell) =>
+        cell.keepId == null ? (
+          <div key={cell.n} className="shelf-slot ghost" aria-hidden="true">
             <span className="shelf-slot-n">{cell.n}</span>
-            <span className="shelf-slot-label" title={cell.label}>{cell.label}</span>
-          </span>
-          {cell.marks.length > 0 && <span className="shelf-slot-mark">{cell.marks.join(' · ')}</span>}
-        </button>
-      )))}
+          </div>
+        ) : (
+          <button
+            type="button"
+            role="listitem"
+            key={cell.keepId}
+            className={`shelf-slot${aimedSlot === cell.n - 1 ? ' aimed' : ''}${cell.onDeck ? ' on-deck' : ''}`}
+            title={cell.onDeck ? 'on the deck — this slot refuses swaps' : 'aim a swap at this slot'}
+            onClick={() => setAimedSlot(aimedSlot === cell.n - 1 ? null : cell.n - 1)}
+          >
+            <span className="shelf-slot-top">
+              <span className="shelf-slot-n">{cell.n}</span>
+              <span className="shelf-slot-label" title={cell.label}>
+                {cell.label}
+              </span>
+            </span>
+            {cell.marks.length > 0 && <span className="shelf-slot-mark">{cell.marks.join(' · ')}</span>}
+          </button>
+        ),
+      )}
     </div>
   );
 
@@ -204,7 +235,9 @@ export function ShelfView() {
       {band.kind === 'aim' ? (
         <>
           <span className="shelf-aimline">{band.text}</span>
-          <button type="button" className="micro-btn shelf-aim-clear" onClick={() => setAimedSlot(null)}>clear</button>
+          <button type="button" className="micro-btn shelf-aim-clear" onClick={() => setAimedSlot(null)}>
+            clear
+          </button>
         </>
       ) : (
         <span className="shelf-table">{band.text}</span>
@@ -215,7 +248,9 @@ export function ShelfView() {
   const noticeBand = state.shelfNotice ? (
     <div className="shelf-line" role="status">
       <span className="shelf-line-text">{state.shelfNotice}</span>
-      <button type="button" className="micro-btn" onClick={() => setShelfNotice(null)}>ok</button>
+      <button type="button" className="micro-btn" onClick={() => setShelfNotice(null)}>
+        ok
+      </button>
     </div>
   ) : overBound ? (
     <div className="shelf-line shelf-overbound" role="status">
@@ -223,9 +258,8 @@ export function ShelfView() {
     </div>
   ) : null;
 
-  const emptyStageLine = staged.length === 0
-    ? <div className="shelf-empty">the stage is empty — crown something</div>
-    : null;
+  const emptyStageLine =
+    staged.length === 0 ? <div className="shelf-empty">the stage is empty — crown something</div> : null;
 
   const controlsBand = (
     <div className="shelf-controls">
@@ -237,10 +271,13 @@ export function ShelfView() {
       <span className="shelf-sorts" role="group" aria-label="sort the collection">
         {SHELF_SORTS.map((s) => (
           <button
-            type="button" key={s}
+            type="button"
+            key={s}
             className={`shelf-sort${sort === s ? ' active' : ''}`}
             onClick={() => setSort(s)}
-          >{SORT_LABEL[s]}</button>
+          >
+            {SORT_LABEL[s]}
+          </button>
         ))}
       </span>
     </div>
@@ -254,7 +291,9 @@ export function ShelfView() {
         return (
           <div key={row.id} className={`shelf-row${row.tier === 'stage' ? ' is-stage' : ''}`}>
             <span className="shelf-row-main">
-              <span className="shelf-row-label" title={row.label}>{rowIdentity(row)}</span>
+              <span className="shelf-row-label" title={row.label}>
+                {rowIdentity(row)}
+              </span>
               <span className="shelf-row-meta">{rowMeta(row).join(' · ')}</span>
             </span>
             {tag && <span className="shelf-row-tag">{tag}</span>}
@@ -264,16 +303,34 @@ export function ShelfView() {
               <span className="shelf-row-actions">
                 {row.tier !== 'stage' && aimedId != null && (
                   <>
-                    <button type="button" className="micro-btn" disabled={!row.keep}
+                    <button
+                      type="button"
+                      className="micro-btn"
+                      disabled={!row.keep}
                       title="swap into the aimed slot"
-                      onClick={() => swapIn(row)}>swap in</button>
-                    <button type="button" className="micro-btn" disabled={!row.keep}
+                      onClick={() => swapIn(row)}
+                    >
+                      swap in
+                    </button>
+                    <button
+                      type="button"
+                      className="micro-btn"
+                      disabled={!row.keep}
                       title="take a free stage slot"
-                      onClick={() => dispatch({ type: A.STAGE_KEEP, keepId: row.id })}>stage it</button>
+                      onClick={() => dispatch({ type: A.STAGE_KEEP, keepId: row.id })}
+                    >
+                      stage it
+                    </button>
                   </>
                 )}
-                <button type="button" className="micro-btn" disabled={!row.keep}
-                  onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: row.keep })}>load</button>
+                <button
+                  type="button"
+                  className="micro-btn"
+                  disabled={!row.keep}
+                  onClick={() => dispatch({ type: A.RECALL_FAVORITE, favorite: row.keep })}
+                >
+                  load
+                </button>
               </span>
             )}
           </div>
@@ -294,11 +351,16 @@ export function ShelfView() {
           <span className="shelf-caret">{open ? '▾' : '▸'}</span>
         </button>
         <button
-          type="button" ref={expandRef} className="micro-btn shelf-expand"
-          aria-expanded={expanded} aria-haspopup="dialog"
+          type="button"
+          ref={expandRef}
+          className="micro-btn shelf-expand"
+          aria-expanded={expanded}
+          aria-haspopup="dialog"
           title="Open the shelf over the canvas"
           onClick={() => (expanded ? closeExpanded() : openExpanded())}
-        >expand</button>
+        >
+          expand
+        </button>
       </div>
       {open && (
         <>
@@ -309,33 +371,38 @@ export function ShelfView() {
           {emptyStageLine}
         </>
       )}
-      {expanded && pos && createPortal(
-        <div
-          ref={editorRef}
-          className="shelf-overlay"
-          role="dialog"
-          aria-label="KEEPS SHELF — the collection"
-          style={{ top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
-        >
-          <div className="shelf-overlay-head">
-            <span className="shelf-title">KEEPS SHELF</span>
-            <span className="shelf-counts">{countsText}</span>
-            <button
-              type="button" className="micro-btn shelf-overlay-close"
-              onClick={closeExpanded}
-              aria-label="Close the shelf"
-            >×</button>
-          </div>
-          {stageGrid}
-          {motto}
-          {!standDown && controlsBand}
-          {!standDown && fillBand}
-          {noticeBand}
-          {emptyStageLine}
-          {rowsList}
-        </div>,
-        document.body,
-      )}
+      {expanded &&
+        pos &&
+        createPortal(
+          <div
+            ref={editorRef}
+            className="shelf-overlay"
+            role="dialog"
+            aria-label="KEEPS SHELF — the collection"
+            style={{ top: pos.top, left: pos.left, width: pos.width, height: pos.height }}
+          >
+            <div className="shelf-overlay-head">
+              <span className="shelf-title">KEEPS SHELF</span>
+              <span className="shelf-counts">{countsText}</span>
+              <button
+                type="button"
+                className="micro-btn shelf-overlay-close"
+                onClick={closeExpanded}
+                aria-label="Close the shelf"
+              >
+                ×
+              </button>
+            </div>
+            {stageGrid}
+            {motto}
+            {!standDown && controlsBand}
+            {!standDown && fillBand}
+            {noticeBand}
+            {emptyStageLine}
+            {rowsList}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }

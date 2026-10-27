@@ -59,7 +59,7 @@ function RollButton({ onRoll, pressProps }) {
 }
 
 export function BuildPanel() {
-  const { state } = useApp(s => ({
+  const { state } = useApp((s) => ({
     layoutParams: s.layoutParams,
     lockedParams: s.lockedParams,
     trackCount: s.layers.length,
@@ -74,79 +74,79 @@ export function BuildPanel() {
 
   return (
     <RangeTone tone="build">
-    <div className="panel panel-layout">
-    {/* #1227: the dock must live INSIDE the panel — .panel-layout's
+      <div className="panel panel-layout">
+        {/* #1227: the dock must live INSIDE the panel — .panel-layout's
         overflow:clip only contains descendants, and the always-mounted
         .te-dock (translated 228px off-canvas when closed) widened the
         real page until it did. */}
-    <DockProvider>
-      <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
-        {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
-        <RollButton onRoll={dice.roll} pressProps={rollPress} />
-      </PanelHeader>
-      <div className="panel-body">
-        {/* #1204 — PULL: the dice's shift function, opened by long-pressing
+        <DockProvider>
+          <PanelHeader tag="P03" title="BUILD" subtitle={layoutParams.composition}>
+            {lockCount > 0 && <span className="lock-badge">▪ {lockCount}</span>}
+            <RollButton onRoll={dice.roll} pressProps={rollPress} />
+          </PanelHeader>
+          <div className="panel-body">
+            {/* #1204 — PULL: the dice's shift function, opened by long-pressing
             ROLL. Rides at the top of the body, under its host. */}
-        {pullOpen && <AttractorRow layoutParams={layoutParams} />}
-        {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
-        <BuildSection num="1" title="Layout">
-          <CompositionTiles
-            mode={layoutParams.mode}
-            tray={dice.tray}
-            onCrown={dice.crown}
-            onReroll={dice.roll}
-            onDismiss={dice.dismiss}
-          />
-          <LayoutSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <SymmetryRow layoutParams={layoutParams} />
-          <StructureToggles layoutParams={layoutParams} />
-        </BuildSection>
+            {pullOpen && <AttractorRow layoutParams={layoutParams} />}
+            {/* ① LAYOUT — structure first: tiles, size/shape sliders, symmetry, bleed/mirror/overlap */}
+            <BuildSection num="1" title="Layout">
+              <CompositionTiles
+                mode={layoutParams.mode}
+                tray={dice.tray}
+                onCrown={dice.crown}
+                onReroll={dice.roll}
+                onDismiss={dice.dismiss}
+              />
+              <LayoutSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+              <SymmetryRow layoutParams={layoutParams} />
+              <StructureToggles layoutParams={layoutParams} />
+            </BuildSection>
 
-        {/* ② CAST — who paints the stage: shapes pool, my voices, layer stack */}
-        <BuildSection num="2" title="Cast">
-          {/* #1032 — voice 1, bare-stage moment: one track and nothing else. A second track hides it. */}
-          {trackCount <= 1 && <div className="lois-line name">{LOIS_LINES.build}</div>}
-          <div className="voice-row">
-            <ShapesShelf />
-            <VoicesShelf />
-            <MixBar />
-          </div>
-          <LayerStack />
-        </BuildSection>
+            {/* ② CAST — who paints the stage: shapes pool, my voices, layer stack */}
+            <BuildSection num="2" title="Cast">
+              {/* #1032 — voice 1, bare-stage moment: one track and nothing else. A second track hides it. */}
+              {trackCount <= 1 && <div className="lois-line name">{LOIS_LINES.build}</div>}
+              <div className="voice-row">
+                <ShapesShelf />
+                <VoicesShelf />
+                <MixBar />
+              </div>
+              <LayerStack />
+            </BuildSection>
 
-        {/* ③ MOTION & BEHAVIOR — how it moves: motion/behave chips, physics, creatures, trails */}
-        <BuildSection num="3" title="Motion & Behavior">
-          <MotionShelf layoutParams={layoutParams} />
-          <BehaveRow layoutParams={layoutParams} />
-          <SwarmSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <HypeSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <AccumFamily layoutParams={layoutParams} />
-        </BuildSection>
+            {/* ③ MOTION & BEHAVIOR — how it moves: motion/behave chips, physics, creatures, trails */}
+            <BuildSection num="3" title="Motion & Behavior">
+              <MotionShelf layoutParams={layoutParams} />
+              <BehaveRow layoutParams={layoutParams} />
+              <SwarmSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+              <HypeSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+              <AccumFamily layoutParams={layoutParams} />
+            </BuildSection>
 
-        {/* ④ APPEARANCE — the finish: mark shape, growth, materials, and the
+            {/* ④ APPEARANCE — the finish: mark shape, growth, materials, and the
             CHIAROSCURO button (#1587; a button since #1629): the render
             engine's door — the sun + hue + the field→channel map, edited in
             a floating editor over the canvas */}
-        <BuildSection num="4" title="Appearance">
-          <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />
-          <ChiaroscuroSection layoutParams={layoutParams} lockedParams={lockedParams} />
-        </BuildSection>
+            <BuildSection num="4" title="Appearance">
+              <AppearanceSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+              <MaterialSliders layoutParams={layoutParams} lockedParams={lockedParams} />
+              <ChiaroscuroSection layoutParams={layoutParams} lockedParams={lockedParams} />
+            </BuildSection>
 
-        {/* ⑤ MATH — broad strokes over the fine sliders: assignable macro knobs (#724) */}
-        <BuildSection num="5" title="Math">
-          <MathSection />
-        </BuildSection>
+            {/* ⑤ MATH — broad strokes over the fine sliders: assignable macro knobs (#724) */}
+            <BuildSection num="5" title="Math">
+              <MathSection />
+            </BuildSection>
 
-        {/* ⑥ UNLOCKS — #1630: the unlock tree. Every control in BUILD that can
+            {/* ⑥ UNLOCKS — #1630: the unlock tree. Every control in BUILD that can
             stand greyed or Davis-only, explained: what it is, lit or dark right
             now, and what lights it. Read-only — nodes never apply anything. */}
-        <BuildSection num="6" title="Unlocks">
-          <UnlockTreeSection layoutParams={layoutParams} />
-        </BuildSection>
+            <BuildSection num="6" title="Unlocks">
+              <UnlockTreeSection layoutParams={layoutParams} />
+            </BuildSection>
+          </div>
+        </DockProvider>
       </div>
-    </DockProvider>
-    </div>
     </RangeTone>
   );
 }

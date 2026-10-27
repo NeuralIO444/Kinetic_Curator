@@ -2,15 +2,11 @@
 // Fixed-length take of the live canvas → seamless looping WebM (the tail
 // dissolves into the head — no visible cut). Loop length is an amber stepper
 // value; the freeform REC WEBM toggle (SnapRecordRow) is untouched.
-import { useRef, useState } from "react";
-import {
-  captureLoop,
-  LOOP_CAPTURE_FPS,
-  LOOP_CAPTURE_DISSOLVE_SECONDS,
-} from "../../hooks/useLoopCapture.js";
-import { AmberValue } from "./ds.jsx";
+import { useRef, useState } from 'react';
+import { captureLoop, LOOP_CAPTURE_FPS, LOOP_CAPTURE_DISSOLVE_SECONDS } from '../../hooks/useLoopCapture.js';
+import { AmberValue } from './ds.jsx';
 
-const PHASE_LABEL = { preroll: "LEAD-IN", body: "TAKE", tail: "DISSOLVE" };
+const PHASE_LABEL = { preroll: 'LEAD-IN', body: 'TAKE', tail: 'DISSOLVE' };
 
 export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
   const [seconds, setSeconds] = useState(4);
@@ -36,11 +32,11 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
       });
       setDoneMsg(
         cancelled
-          ? "Loop capture cancelled — no file written."
+          ? 'Loop capture cancelled — no file written.'
           : `Loop captured — ${seconds}s seamless WebM downloaded (${LOOP_CAPTURE_FPS}fps, 1s tail→head dissolve).`,
       );
     } catch (e) {
-      console.error("[loop] capture failed:", e);
+      console.error('[loop] capture failed:', e);
       setError(e && e.message ? e.message : String(e));
     } finally {
       if (setRendering) setRendering(false);
@@ -49,30 +45,29 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
   };
 
   const elapsed = progress
-    ? progress.phase === "preroll"
+    ? progress.phase === 'preroll'
       ? progress.done
-      : progress.phase === "body"
+      : progress.phase === 'body'
         ? LOOP_CAPTURE_DISSOLVE_SECONDS * LOOP_CAPTURE_FPS + progress.done
         : seconds * LOOP_CAPTURE_FPS + progress.done
     : 0;
-  const totalFrames =
-    (seconds + LOOP_CAPTURE_DISSOLVE_SECONDS) * LOOP_CAPTURE_FPS;
+  const totalFrames = (seconds + LOOP_CAPTURE_DISSOLVE_SECONDS) * LOOP_CAPTURE_FPS;
 
   return (
     <div
       style={{
         marginBottom: 8,
         padding: 8,
-        border: "1px solid var(--line-2)",
-        background: "rgba(255,255,255,0.02)",
+        border: '1px solid var(--line-2)',
+        background: 'rgba(255,255,255,0.02)',
       }}
     >
       <div
         className="ttl"
         style={{
           fontSize: 9,
-          letterSpacing: "0.12em",
-          color: "var(--dim)",
+          letterSpacing: '0.12em',
+          color: 'var(--dim)',
           marginBottom: 6,
         }}
       >
@@ -91,15 +86,15 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
           style={
             capturing
               ? {
-                  background: "var(--kc-live)",
-                  color: "#fff",
-                  borderColor: "var(--kc-live)",
+                  background: 'var(--kc-live)',
+                  color: '#fff',
+                  borderColor: 'var(--kc-live)',
                   flex: 2,
                 }
               : { flex: 2 }
           }
         >
-          {capturing ? "⏹ CANCEL" : "▶ RENDER MOVIE"}
+          {capturing ? '⏹ CANCEL' : '▶ RENDER MOVIE'}
         </button>
         <AmberValue
           label="loop seconds"
@@ -121,25 +116,17 @@ export function LoopCaptureBlock({ glLoopRef, seed, rendering, setRendering }) {
           }}
           role="status"
         >
-          ● {PHASE_LABEL[progress.phase] || progress.phase}{" "}
-          {(elapsed / LOOP_CAPTURE_FPS).toFixed(1)}s /{" "}
-          {(totalFrames / LOOP_CAPTURE_FPS).toFixed(1)}s — hold still, the take
-          is recording
+          ● {PHASE_LABEL[progress.phase] || progress.phase} {(elapsed / LOOP_CAPTURE_FPS).toFixed(1)}s /{' '}
+          {(totalFrames / LOOP_CAPTURE_FPS).toFixed(1)}s — hold still, the take is recording
         </div>
       )}
       {doneMsg && !capturing && (
-        <div
-          style={{ fontSize: 11, color: "#00ff88", marginTop: 6 }}
-          role="status"
-        >
+        <div style={{ fontSize: 11, color: '#00ff88', marginTop: 6 }} role="status">
           {doneMsg}
         </div>
       )}
       {error && !capturing && (
-        <div
-          style={{ fontSize: 11, color: "#ff5d7a", marginTop: 6 }}
-          role="alert"
-        >
+        <div style={{ fontSize: 11, color: '#ff5d7a', marginTop: 6 }} role="alert">
           Loop capture failed: {error}
         </div>
       )}

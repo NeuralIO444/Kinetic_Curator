@@ -8,7 +8,10 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   BIO_VERSION,
-  getBiologyPolicy, importBiologyPolicy, resetBiologyPolicy, exportBiologyPolicy,
+  getBiologyPolicy,
+  importBiologyPolicy,
+  resetBiologyPolicy,
+  exportBiologyPolicy,
 } from '../biology/policy.js';
 import { getLifecycleState } from '../biology/lifecycle.js';
 
@@ -74,7 +77,9 @@ export function BiologyPanel() {
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <div style={{ ...ROW, fontSize: 13 }}>
-        <span><b>Lifecycle policy</b> <span style={KEY}>kc-biology v{BIO_VERSION}</span></span>
+        <span>
+          <b>Lifecycle policy</b> <span style={KEY}>kc-biology v{BIO_VERSION}</span>
+        </span>
         <span style={KEY}>{policy.kind}</span>
       </div>
       <div style={{ margin: '8px 0', opacity: 0.85 }}>
@@ -87,24 +92,41 @@ export function BiologyPanel() {
           ['minLifetime', `${g.minLifetime}t`, 'no rebirth before this age'],
         ].map(([k, v, hint]) => (
           <div key={k} style={ROW} title={hint}>
-            <span style={KEY}>{k}</span><span>{v}</span>
+            <span style={KEY}>{k}</span>
+            <span>{v}</span>
           </div>
         ))}
       </div>
       <div style={{ display: 'flex', gap: 8, margin: '8px 0' }}>
-        <button type="button" style={BTN} onClick={onExport}>Export JSON</button>
-        <button type="button" style={BTN} onClick={() => fileRef.current?.click()}>Import JSON</button>
-        <button type="button" style={BTN} onClick={onReset}>Reset to defaults</button>
+        <button type="button" style={BTN} onClick={onExport}>
+          Export JSON
+        </button>
+        <button type="button" style={BTN} onClick={() => fileRef.current?.click()}>
+          Import JSON
+        </button>
+        <button type="button" style={BTN} onClick={onReset}>
+          Reset to defaults
+        </button>
         <input
-          ref={fileRef} type="file" accept="application/json" style={{ display: 'none' }}
-          onChange={(e) => { onImportFile(e.target.files?.[0]); e.target.value = ''; }}
+          ref={fileRef}
+          type="file"
+          accept="application/json"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            onImportFile(e.target.files?.[0]);
+            e.target.value = '';
+          }}
         />
       </div>
       {message && <div style={{ opacity: 0.7, marginBottom: 8 }}>{message}</div>}
 
       <div style={{ ...ROW, fontSize: 13, marginTop: 12 }}>
-        <span><b>Living forms</b></span>
-        <span style={KEY}>{entries.length} growth layer{entries.length === 1 ? '' : 's'}</span>
+        <span>
+          <b>Living forms</b>
+        </span>
+        <span style={KEY}>
+          {entries.length} growth layer{entries.length === 1 ? '' : 's'}
+        </span>
       </div>
       {entries.length === 0 && (
         <div style={{ opacity: 0.55, marginTop: 4 }}>
@@ -114,12 +136,23 @@ export function BiologyPanel() {
       {entries.map(([id, s]) => (
         <div key={id} style={{ marginTop: 8, padding: 8, border: '1px solid rgba(255,255,255,0.12)' }}>
           <div style={ROW}>
-            <span><b>{s.mode}</b> <span style={KEY}>gen {s.gen}</span></span>
+            <span>
+              <b>{s.mode}</b> <span style={KEY}>gen {s.gen}</span>
+            </span>
             <span style={KEY}>tick {s.tick}</span>
           </div>
-          <div style={ROW}><span style={KEY}>cells</span><span>{s.cellCount}</span></div>
-          <div style={ROW}><span style={KEY}>oldest cell</span><span>{s.oldestAge}t</span></div>
-          <div style={ROW}><span style={KEY}>mean age</span><span>{Number(s.meanAge01).toFixed(2)}</span></div>
+          <div style={ROW}>
+            <span style={KEY}>cells</span>
+            <span>{s.cellCount}</span>
+          </div>
+          <div style={ROW}>
+            <span style={KEY}>oldest cell</span>
+            <span>{s.oldestAge}t</span>
+          </div>
+          <div style={ROW}>
+            <span style={KEY}>mean age</span>
+            <span>{Number(s.meanAge01).toFixed(2)}</span>
+          </div>
           <div style={ROW}>
             <span style={KEY}>policy</span>
             <span>{s.decision === 'regrow' ? `rebirth — ${s.reason}` : 'alive'}</span>

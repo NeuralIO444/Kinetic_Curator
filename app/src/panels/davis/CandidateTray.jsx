@@ -48,7 +48,12 @@ export function CandidateTray() {
   const [line, setLine] = useState(null); // the crown landing's line (#1589: a landing, never a refusal)
   const [loadNote, setLoadNote] = useState(null);
 
-  useEffect(() => () => { for (const u of urlsRef.current) URL.revokeObjectURL(u); }, []);
+  useEffect(
+    () => () => {
+      for (const u of urlsRef.current) URL.revokeObjectURL(u);
+    },
+    [],
+  );
 
   // The load control lives on the GENERATE section's label row in
   // DavisPanel (zero added height at rest — the DIRECTORS no-scroll fit
@@ -61,10 +66,16 @@ export function CandidateTray() {
     const readJson = async (name) => {
       const f = files.get(name);
       if (!f) return null;
-      try { return JSON.parse(await f.text()); } catch { return null; }
+      try {
+        return JSON.parse(await f.text());
+      } catch {
+        return null;
+      }
     };
     const [runJson, finalists, candidates] = await Promise.all([
-      readJson('run.json'), readJson('finalists.json'), readJson('candidates.json'),
+      readJson('run.json'),
+      readJson('finalists.json'),
+      readJson('candidates.json'),
     ]);
     if (!runJson || !Array.isArray(finalists)) {
       setLoadNote('not a run folder — run.json + finalists.json are the load');
@@ -138,12 +149,23 @@ export function CandidateTray() {
         // ignores it, multi-file selection of the folder's contents works
         webkitdirectory=""
         style={{ display: 'none' }}
-        onChange={(e) => { loadRun(e.target.files); e.target.value = ''; }}
+        onChange={(e) => {
+          loadRun(e.target.files);
+          e.target.value = '';
+        }}
       />
       {hasBody && <div className="cand-body-label">mined — from the explorer</div>}
-      {run && <div className="cand-run-line">run {run.runId} · {run.cards.length} mined</div>}
+      {run && (
+        <div className="cand-run-line">
+          run {run.runId} · {run.cards.length} mined
+        </div>
+      )}
       {loadNote && <div className="cand-note">{loadNote}</div>}
-      {line && <div className="cand-note" role="status">{line}</div>}
+      {line && (
+        <div className="cand-note" role="status">
+          {line}
+        </div>
+      )}
       {run && (
         <div className="cand-grid">
           {run.cards.map((card) => {
@@ -153,27 +175,33 @@ export function CandidateTray() {
             return (
               <div key={card.key} className={`cand-card${verdict ? ` is-${verdict}` : ''}`} data-source="explorer">
                 <div className="cand-still">
-                  {still
-                    ? <img src={still} alt={label || 'mined candidate still'} />
-                    : <span className="cand-nostill">no still in folder</span>}
+                  {still ? (
+                    <img src={still} alt={label || 'mined candidate still'} />
+                  ) : (
+                    <span className="cand-nostill">no still in folder</span>
+                  )}
                   <span className="cand-tag">mined</span>
-                  {card.provenance?.variants?.length
-                    ? <span className="cand-tag cand-tag-variant">variant</span>
-                    : null}
+                  {card.provenance?.variants?.length ? (
+                    <span className="cand-tag cand-tag-variant">variant</span>
+                  ) : null}
                 </div>
                 <div className="cand-prov">{label}</div>
                 <div className="cand-meta">
                   {card.anchor ? `anchored ${card.anchor} · ` : ''}run {run.runId}
                 </div>
                 <div className="cand-actions">
-                  {verdict
-                    ? <span className="cand-verdict">{verdict}</span>
-                    : (
-                      <>
-                        <button type="button" className="micro-btn" onClick={() => crown(card)}>crown</button>
-                        <button type="button" className="micro-btn" onClick={() => pass(card)}>pass</button>
-                      </>
-                    )}
+                  {verdict ? (
+                    <span className="cand-verdict">{verdict}</span>
+                  ) : (
+                    <>
+                      <button type="button" className="micro-btn" onClick={() => crown(card)}>
+                        crown
+                      </button>
+                      <button type="button" className="micro-btn" onClick={() => pass(card)}>
+                        pass
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             );

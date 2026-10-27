@@ -11,7 +11,9 @@ export function StructureToggles({ layoutParams }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
       {TOGGLES.map((key) => (
         <div key={key}>
-          <div className="davis-label lbl" style={{ marginBottom: 2 }}>{key}</div>
+          <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+            {key}
+          </div>
           <TeaMatrix
             ariaLabel={key}
             columns={2}

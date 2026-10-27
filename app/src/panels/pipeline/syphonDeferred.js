@@ -31,7 +31,8 @@ export function startSyphonPublish() {
   return {
     ok: false,
     deferred: true,
-    reason: 'DEFERRED (#608): needs the Mac/Tauri build and a Syphon receiver app (Simple Client / OBS) to verify publish.',
+    reason:
+      'DEFERRED (#608): needs the Mac/Tauri build and a Syphon receiver app (Simple Client / OBS) to verify publish.',
   };
 }
 

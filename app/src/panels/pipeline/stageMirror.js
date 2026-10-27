@@ -11,10 +11,7 @@
 // break the instrument. Loud failures (no loop, worker loop, no channel)
 // are reported by the caller (useStageOutput → stageError), not thrown here.
 
-import {
-  STAGE_FRAME_CHANNEL, STAGE_CONTROL_CHANNEL, STAGE_MIRROR_FPS,
-  makeControlMessage,
-} from './stageChannel.mjs';
+import { STAGE_FRAME_CHANNEL, STAGE_CONTROL_CHANNEL, STAGE_MIRROR_FPS, makeControlMessage } from './stageChannel.mjs';
 
 let timer = 0;
 let bcFrames = null;
@@ -28,8 +25,16 @@ export function isStageMirrorActive() {
 }
 
 function closeChannels() {
-  try { bcFrames && bcFrames.close(); } catch { /* already gone */ }
-  try { bcControl && bcControl.close(); } catch { /* already gone */ }
+  try {
+    bcFrames && bcFrames.close();
+  } catch {
+    /* already gone */
+  }
+  try {
+    bcControl && bcControl.close();
+  } catch {
+    /* already gone */
+  }
   bcFrames = null;
   bcControl = null;
 }
@@ -60,7 +65,9 @@ export function startStageMirror({ getLoop, getControl } = {}) {
         lastControlJson = json;
         bcControl.postMessage(msg);
       }
-    } catch { /* channel gone — the watch will notice */ }
+    } catch {
+      /* channel gone — the watch will notice */
+    }
   };
   pushControl(); // the stage needs control state before its first frame
 
@@ -70,21 +77,28 @@ export function startStageMirror({ getLoop, getControl } = {}) {
       pushControl(); // doubles as the heartbeat the stage watches
       if (typeof document !== 'undefined' && document.hidden) return;
       const loop = getLoop ? getLoop() : null;
-      const grab = loop && typeof loop.grabPresentedFrame === 'function'
-        ? loop.grabPresentedFrame()
-        : null;
+      const grab = loop && typeof loop.grabPresentedFrame === 'function' ? loop.grabPresentedFrame() : null;
       if (!grab || grab.n === lastSentN) return; // paused / nothing new
       lastSentN = grab.n;
       const { width, height, pixels } = grab;
       if (!width || !height || !pixels) return;
       const view = new Uint8ClampedArray(pixels.buffer, pixels.byteOffset, pixels.length);
       const imageData = new ImageData(view, width, height);
-      window.createImageBitmap(imageData).then((bitmap) => {
-        try {
-          bcFrames.postMessage({ type: 'frame', width, height, bitmap }, [bitmap]);
-        } catch { /* stage closed mid-post */ }
-      }, () => { /* bitmap creation failed — skip the frame */ });
-    } catch { /* never break the instrument for the mirror */ }
+      window.createImageBitmap(imageData).then(
+        (bitmap) => {
+          try {
+            bcFrames.postMessage({ type: 'frame', width, height, bitmap }, [bitmap]);
+          } catch {
+            /* stage closed mid-post */
+          }
+        },
+        () => {
+          /* bitmap creation failed — skip the frame */
+        },
+      );
+    } catch {
+      /* never break the instrument for the mirror */
+    }
   }, intervalMs);
   return { ok: true };
 }
@@ -92,7 +106,11 @@ export function startStageMirror({ getLoop, getControl } = {}) {
 export function stopStageMirror() {
   active = false;
   if (timer) {
-    try { clearInterval(timer); } catch { /* noop */ }
+    try {
+      clearInterval(timer);
+    } catch {
+      /* noop */
+    }
     timer = 0;
   }
   closeChannels();

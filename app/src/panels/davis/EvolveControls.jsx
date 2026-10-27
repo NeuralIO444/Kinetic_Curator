@@ -1,12 +1,6 @@
 import { useEffect, useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
-import {
-  sanitizeScores,
-  levelFor,
-  whyCopy,
-  ariaNote,
-  logShimmer,
-} from '../../shimmer/shimmer.js';
+import { sanitizeScores, levelFor, whyCopy, ariaNote, logShimmer } from '../../shimmer/shimmer.js';
 import { RangeRow } from '../../components/RangeRow.jsx';
 
 // The four EVOLVE mutation targets. Candidate ids match the sidecar's
@@ -32,8 +26,8 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
     let alive = true;
     const url = `${import.meta.env.BASE_URL}shimmer-scores.json`;
     fetch(url)
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
-      .then(raw => {
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`))))
+      .then((raw) => {
         if (!alive) return;
         const clean = sanitizeScores(raw);
         setScores(clean);
@@ -44,13 +38,19 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
         setScores({}); // no shimmer, no error surfaced
         logShimmer({ event: 'scores-unavailable', source: url });
       });
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, []);
 
   // LISTEN: hold SHIFT to amplify the shimmer ~3x; release recedes.
   useEffect(() => {
-    const down = e => { if (e.key === 'Shift') setListening(true); };
-    const up = e => { if (e.key === 'Shift') setListening(false); };
+    const down = (e) => {
+      if (e.key === 'Shift') setListening(true);
+    };
+    const up = (e) => {
+      if (e.key === 'Shift') setListening(false);
+    };
     const blur = () => setListening(false);
     window.addEventListener('keydown', down);
     window.addEventListener('keyup', up);
@@ -67,35 +67,37 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
     if (mode !== 'off' && scores) {
       const pct = scores[id] ?? null;
       logShimmer({
-        event: 'touch', candidate: id, percentile: pct,
-        level: levelFor(scores, id), outcome: 'touched',
-        mode, listening,
+        event: 'touch',
+        candidate: id,
+        percentile: pct,
+        level: levelFor(scores, id),
+        outcome: 'touched',
+        mode,
+        listening,
       });
     }
     emit(Events.DAVIS_EVOLVE, { target: value });
   };
 
-  const rowClass = [
-    'davis-source-row',
-    'shimmer-row',
-    mode === 'quiet' ? 'quiet' : '',
-    listening ? 'listening' : '',
-  ].filter(Boolean).join(' ');
+  const rowClass = ['davis-source-row', 'shimmer-row', mode === 'quiet' ? 'quiet' : '', listening ? 'listening' : '']
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <>
-      <div className={rowClass} title="What jumps when Evolve fires. Shimmer is the taste model's read — a guess, not an order.">
+      <div
+        className={rowClass}
+        title="What jumps when Evolve fires. Shimmer is the taste model's read — a guess, not an order."
+      >
         <span className="davis-label lbl">target</span>
         {TARGETS.map((t, i) => {
           const id = `evolve-target:${t.value}`;
           const level = mode === 'off' ? 0 : levelFor(scores, id);
-          const pct = scores ? scores[id] ?? null : null;
+          const pct = scores ? (scores[id] ?? null) : null;
           const note = ariaNote(level);
-          const cls = [
-            'chip-btn',
-            evolveTarget === t.value ? 'active' : '',
-            level > 0 ? `shimmer-lvl-${level}` : '',
-          ].filter(Boolean).join(' ');
+          const cls = ['chip-btn', evolveTarget === t.value ? 'active' : '', level > 0 ? `shimmer-lvl-${level}` : '']
+            .filter(Boolean)
+            .join(' ');
           return (
             <button
               key={t.value}
@@ -116,21 +118,41 @@ export function EvolveControls({ evolveTarget, evolveSource, evolveInterval }) {
           AUTO-SNAP removed the same way (hidden default: off). */}
       <div className="davis-source-row">
         <span className="davis-label lbl">source</span>
-        <button className={`act chip-btn ${evolveSource === 'time' ? 'active' : ''}`}
+        <button
+          className={`act chip-btn ${evolveSource === 'time' ? 'active' : ''}`}
           title="Fire Evolve on INTERVAL. No mic."
-          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'time' })}>time</button>
-        <button className={`act chip-btn ${evolveSource === 'beat' ? 'active' : ''}`}
+          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'time' })}
+        >
+          time
+        </button>
+        <button
+          className={`act chip-btn ${evolveSource === 'beat' ? 'active' : ''}`}
           title="Fire Evolve on a mic attack. Same edge as phrase AUDIO. INTERVAL is ignored."
-          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'beat' })}>beat</button>
+          onClick={() => emit(Events.DAVIS_EVOLVE, { source: 'beat' })}
+        >
+          beat
+        </button>
       </div>
 
-      <div className="davis-interval-row" style={evolveSource !== 'time' ? { opacity: 0.4 } : undefined}
-        title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}>
+      <div
+        className="davis-interval-row"
+        style={evolveSource !== 'time' ? { opacity: 0.4 } : undefined}
+        title={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}
+      >
         <span className="davis-label lbl">interval</span>
-        <RangeRow layout="bare" tone="ink" min={200} max={10000} step={100} value={evolveInterval}
+        <RangeRow
+          layout="bare"
+          tone="ink"
+          min={200}
+          max={10000}
+          step={100}
+          value={evolveInterval}
           disabled={evolveSource !== 'time'}
-          hint={evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'}
-          onChange={(v) => emit(Events.DAVIS_EVOLVE, { interval: v })} />
+          hint={
+            evolveSource !== 'time' ? 'Dead while SOURCE is BEAT. Switch to TIME.' : 'Seconds between Evolve fires.'
+          }
+          onChange={(v) => emit(Events.DAVIS_EVOLVE, { interval: v })}
+        />
         <span className="davis-readout">{(evolveInterval / 1000).toFixed(1)}s</span>
       </div>
 

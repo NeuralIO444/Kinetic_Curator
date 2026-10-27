@@ -48,20 +48,22 @@ export function QueueTransport() {
   const beatFromButton = beatBpmRaw != null;
   const beatBpm = beatFromButton ? beatBpmRaw : QUEUE_BEAT_FALLBACK_BPM;
 
-
   const queue = visibleQueue(favorites);
   const idx = clampQueueIndex(queueIndex, queue.length);
   const holdMs = queueHoldMs(queueSource, queueSecondsPerHit, queueBeatsPerHit, beatBpm);
 
   // Same fire path as tapping a tray chip: recall, or morph when the
   // morph-evolve toggle is on (ease vs. hard-cut between hits).
-  const fire = useCallback((fav) => {
-    if (!fav) return;
-    emit(Events.DAVIS_FAVORITE, {
-      action: morphEvolve ? 'morph' : 'recall',
-      favorite: fav,
-    });
-  }, [morphEvolve]);
+  const fire = useCallback(
+    (fav) => {
+      if (!fav) return;
+      emit(Events.DAVIS_FAVORITE, {
+        action: morphEvolve ? 'morph' : 'recall',
+        favorite: fav,
+      });
+    },
+    [morphEvolve],
+  );
 
   // Advance on the clock. Keyed on queueIndex so a tap-to-jump restarts the
   // hold from the jumped-to hit without pausing playback.
@@ -123,15 +125,18 @@ export function QueueTransport() {
           className={`chip-btn queue-play${queuePlaying ? ' active' : ''}`}
           aria-pressed={queuePlaying}
           disabled={empty}
-          title={empty ? 'Press F to save hits first — the queue plays your HITS setlist.' : queuePlaying ? 'Stop the queue.' : 'Play the HITS setlist in order. Loops at the end.'}
+          title={
+            empty
+              ? 'Press F to save hits first — the queue plays your HITS setlist.'
+              : queuePlaying
+                ? 'Stop the queue.'
+                : 'Play the HITS setlist in order. Loops at the end.'
+          }
           onClick={toggle}
         >
           {queuePlaying ? '■ STOP' : '▶ PLAY'}
         </button>
-        <span
-          className="davis-readout"
-          title={empty ? 'No hits yet' : `Now playing hit ${idx + 1} of ${queue.length}`}
-        >
+        <span className="davis-readout" title={empty ? 'No hits yet' : `Now playing hit ${idx + 1} of ${queue.length}`}>
           HIT {queuePositionLabel(idx, queue.length)}
         </span>
         {queuePlaying && (
@@ -166,7 +171,9 @@ export function QueueTransport() {
       {queueSource === 'time' ? (
         <div className="davis-interval-row">
           <span className="davis-label lbl">hold</span>
-          <RangeRow layout="bare" tone="ink"
+          <RangeRow
+            layout="bare"
+            tone="ink"
             min={QUEUE_SECONDS_MIN}
             max={QUEUE_SECONDS_MAX}
             step={1}
@@ -180,7 +187,9 @@ export function QueueTransport() {
         <>
           <div className="davis-interval-row">
             <span className="davis-label lbl">beats</span>
-            <RangeRow layout="bare" tone="ink"
+            <RangeRow
+              layout="bare"
+              tone="ink"
               min={QUEUE_BEATS_MIN}
               max={QUEUE_BEATS_MAX}
               step={1}

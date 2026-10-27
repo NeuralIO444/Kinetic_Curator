@@ -13,7 +13,11 @@ const MAP_HINT = [
 
 const AMOUNTS = [
   { key: 'spectrumScale', label: 'SCALE', hint: 'Marks grow with the level at their frequency.' },
-  { key: 'spectrumDisplace', label: 'DISPLACE', hint: 'Marks are pushed by onsets at their frequency, each in its own direction.' },
+  {
+    key: 'spectrumDisplace',
+    label: 'DISPLACE',
+    hint: 'Marks are pushed by onsets at their frequency, each in its own direction.',
+  },
   { key: 'spectrumColour', label: 'COLOUR', hint: 'Ink moves toward its accent with the peak at its frequency.' },
 ];
 
@@ -28,9 +32,14 @@ export function SpectrumMarks({ layoutParams }) {
       </div>
       <div className="stim-spectrum-maps">
         {SPECTRUM_MAPS.map((name, i) => (
-          <button key={name} type="button" className={`chip-btn stim-feel-btn ${map === i ? 'active' : ''}`}
-            aria-pressed={map === i} title={MAP_HINT[i]}
-            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'spectrumMap', value: i })}>
+          <button
+            key={name}
+            type="button"
+            className={`chip-btn stim-feel-btn ${map === i ? 'active' : ''}`}
+            aria-pressed={map === i}
+            title={MAP_HINT[i]}
+            onClick={() => emit(Events.LAYOUT_PARAM, { key: 'spectrumMap', value: i })}
+          >
             {name}
           </button>
         ))}
@@ -38,9 +47,19 @@ export function SpectrumMarks({ layoutParams }) {
       {AMOUNTS.map((a) => {
         const v = layoutParams[a.key] ?? 0;
         return (
-          <RangeRow key={a.key} layout="stack" tone="stim" label={a.label} value={v} min={0} max={1} step={0.05}
-            readout={`${Math.round(v * 100)}%`} hint={a.hint}
-            onChange={(x) => emit(Events.LAYOUT_PARAM, { key: a.key, value: x })} />
+          <RangeRow
+            key={a.key}
+            layout="stack"
+            tone="stim"
+            label={a.label}
+            value={v}
+            min={0}
+            max={1}
+            step={0.05}
+            readout={`${Math.round(v * 100)}%`}
+            hint={a.hint}
+            onChange={(x) => emit(Events.LAYOUT_PARAM, { key: a.key, value: x })}
+          />
         );
       })}
     </div>

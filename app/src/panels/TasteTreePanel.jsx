@@ -11,8 +11,13 @@ import { treeHeadView } from '../curator/treeReader.mjs';
 
 const h3 = { margin: '14px 0 4px', fontSize: 12, letterSpacing: '0.08em' };
 const pre = {
-  margin: 0, padding: '8px 10px', border: '1px solid #333', overflowX: 'auto',
-  fontSize: 11, lineHeight: 1.5, whiteSpace: 'pre',
+  margin: 0,
+  padding: '8px 10px',
+  border: '1px solid #333',
+  overflowX: 'auto',
+  fontSize: 11,
+  lineHeight: 1.5,
+  whiteSpace: 'pre',
 };
 
 export function TasteTreePanel() {
@@ -30,9 +35,8 @@ export function TasteTreePanel() {
     <div style={{ padding: 12 }}>
       <h3 style={h3}>READ THE MODEL</h3>
       <p style={{ opacity: 0.75, margin: '4px 0 8px' }}>
-        {view.treeCount} trees · depth ≤ {view.maxDepth} · {view.nodeCount} nodes ·
-        fidelity {view.fidelity.toFixed(2)} · fit on {view.fitOn} ·
-        {view.steering ? ' steering live' : ' below the bar — not steering'}
+        {view.treeCount} trees · depth ≤ {view.maxDepth} · {view.nodeCount} nodes · fidelity {view.fidelity.toFixed(2)}{' '}
+        · fit on {view.fitOn} ·{view.steering ? ' steering live' : ' below the bar — not steering'}
       </p>
       <pre style={pre}>{view.lines.join('\n')}</pre>
     </div>

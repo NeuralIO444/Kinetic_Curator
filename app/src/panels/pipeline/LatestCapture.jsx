@@ -8,15 +8,15 @@ export function LatestCapture({ snapshots, message }) {
   const view = latestCaptureView(snapshots);
   return (
     <div className="pipeline-latest" aria-live="polite">
-      {message && (
-        <div className={`pipeline-status-line tone-${statusTone(message)}`}>{message}</div>
-      )}
+      {message && <div className={`pipeline-status-line tone-${statusTone(message)}`}>{message}</div>}
       {view ? (
         <div className="pipeline-latest-row">
           <div className="pipeline-latest-thumb">
-            {view.thumb
-              ? <img src={view.thumb} alt={`Latest capture, seed ${view.seed}`} />
-              : <span className="snap-fmt">{view.format}</span>}
+            {view.thumb ? (
+              <img src={view.thumb} alt={`Latest capture, seed ${view.seed}`} />
+            ) : (
+              <span className="snap-fmt">{view.format}</span>
+            )}
           </div>
           <div className="pipeline-latest-meta">
             <span className="pipeline-latest-title">LATEST · {view.time}</span>
@@ -26,7 +26,9 @@ export function LatestCapture({ snapshots, message }) {
           </div>
         </div>
       ) : (
-        <div className="pipeline-hint">Nothing captured yet — press <b>S</b> to snap.</div>
+        <div className="pipeline-hint">
+          Nothing captured yet — press <b>S</b> to snap.
+        </div>
       )}
     </div>
   );

@@ -12,13 +12,20 @@ export function FeelPicker({ layoutParams }) {
     <div className="stim-feel" role="group" aria-label="Audio feel">
       <div className="stim-feel-head">
         <span className="lbl">feel</span>
-        <span className={`stim-feel-state ${active === 'custom' ? 'custom' : ''}`}>{active === 'custom' ? 'CUSTOM' : ''}</span>
+        <span className={`stim-feel-state ${active === 'custom' ? 'custom' : ''}`}>
+          {active === 'custom' ? 'CUSTOM' : ''}
+        </span>
       </div>
       <div className="stim-feel-row">
         {FEEL_PRESETS.map((f) => (
-          <button key={f.id} type="button" className={`chip-btn stim-feel-btn ${active === f.id ? 'active' : ''}`}
-            aria-pressed={active === f.id} onClick={() => emit(Events.FEEL_APPLY, { id: f.id })}
-            title={`${f.hint}\n${feelReadout(f)}`}>
+          <button
+            key={f.id}
+            type="button"
+            className={`chip-btn stim-feel-btn ${active === f.id ? 'active' : ''}`}
+            aria-pressed={active === f.id}
+            onClick={() => emit(Events.FEEL_APPLY, { id: f.id })}
+            title={`${f.hint}\n${feelReadout(f)}`}
+          >
             {f.name}
           </button>
         ))}

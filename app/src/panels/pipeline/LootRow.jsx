@@ -22,9 +22,23 @@ import { ASSETS } from '../../data/assets/index.js';
 import { PALETTES } from '../../data/palettes.js';
 import { useStore } from '../../state/store.js';
 import { loadIndexDetailed, saveIndex, withRoot, emptyIndex, countItems } from '../../loot/lootIndex.mjs';
-import { statusLine, logLine, missingLines, confirmForgetMessage, rootLabel, LABELS, NOT_CONFIRMED } from '../../loot/lootCopy.mjs';
+import {
+  statusLine,
+  logLine,
+  missingLines,
+  confirmForgetMessage,
+  rootLabel,
+  LABELS,
+  NOT_CONFIRMED,
+} from '../../loot/lootCopy.mjs';
 
-const storage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+const storage = () => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+};
 const LOG_SHOWN = 40;
 // #1591 — shelf rows for the disk tier's stubs are built off these.
 const SHELF_ASSETS_BY_ID = new Map(ASSETS.map((a) => [a.id, a]));
@@ -34,8 +48,11 @@ const SHELF_PALETTES_BY_ID = new Map(PALETTES.map((p) => [p.id, p]));
 function downloadStarter() {
   const url = URL.createObjectURL(new Blob([starterZip()], { type: 'application/zip' }));
   const a = document.createElement('a');
-  a.href = url; a.download = STARTER_ZIP_NAME;
-  document.body.appendChild(a); a.click(); a.remove();
+  a.href = url;
+  a.download = STARTER_ZIP_NAME;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
 }
 
@@ -54,7 +71,10 @@ export function LootRow() {
 
   // #1644 — a refused save is a note on the row, not a silent success:
   // what is on screen would not survive a reload, and the row says so.
-  const keep = (next) => { setIndex(next); if (!saveIndex(storage(), next)) setNote(LABELS.indexUnsaved); };
+  const keep = (next) => {
+    setIndex(next);
+    if (!saveIndex(storage(), next)) setNote(LABELS.indexUnsaved);
+  };
 
   // #1590 — preferences.json (the shelf's table + settings) is read on
   // launch and after every rescan, and applied to the store; edits
@@ -67,7 +87,9 @@ export function LootRow() {
     try {
       const listing = await native.scan(ix.root);
       if (listing?.ok) rels = (listing.entries || []).map((e) => e.rel).filter(Boolean);
-    } catch { /* names are a courtesy; the read below is the substance */ }
+    } catch {
+      /* names are a courtesy; the read below is the substance */
+    }
     let r;
     try {
       r = await loadShelfPrefs({ backend: native, root: ix.root, rels });
@@ -95,21 +117,33 @@ export function LootRow() {
   }, []); // launch read (mount only)
 
   const scan = async (from) => {
-    setBusy(LABELS.scanning); setNote(null);
+    setBusy(LABELS.scanning);
+    setNote(null);
     try {
       const r = await runScan({
-        native, index: from, nowMs: Date.now(),
+        native,
+        index: from,
+        nowMs: Date.now(),
         onProgress: ({ done, total }) => setBusy(total ? LABELS.hashing(done, total) : LABELS.scanning),
       });
-      if (!r.ok) { setNote(r.reason); return; }
+      if (!r.ok) {
+        setNote(r.reason);
+        return;
+      }
       // the SVGs go into the pool through the app's own ingest (every trust check applies), up to its 32 slots
       const taken = await takeInImages({
-        native, index: r.index, ingest: ingestVia(() => useStore.getState()),
+        native,
+        index: r.index,
+        ingest: ingestVia(() => useStore.getState()),
         onProgress: ({ done, total }) => setBusy(total ? `adding ${done} of ${total} to the pool...` : LABELS.scanning),
       });
       // palettes go into the user palette library (your library, shared by every project)
       setBusy('adding palettes...');
-      const pals = await takeInPalettes({ native, index: taken.index, importPalettes: (list) => useStore.getState().importUserPalettes(list) });
+      const pals = await takeInPalettes({
+        native,
+        index: taken.index,
+        importPalettes: (list) => useStore.getState().importUserPalettes(list),
+      });
       // audio is only validated here; STIMULI offers it as a pick (a scan never switches the source)
       const aud = await takeInAudio({ native, index: pals.index });
       // #1591 — keeps: the folder's looks/*.json are the shelf's disk
@@ -118,21 +152,36 @@ export function LootRow() {
       // wire runs the overflow against the now-connected folder.
       setBusy('reading the shelf on disk...');
       const looks = await takeInLooks({
-        backend: native, index: aud.index,
+        backend: native,
+        index: aud.index,
         isInApp: (id) => useStore.getState().keeps.some((k) => k.id === id),
         isLoaded: (id) => !!useStore.getState().shelfDiskRecords[id],
-        assetsById: SHELF_ASSETS_BY_ID, palettesById: SHELF_PALETTES_BY_ID,
+        assetsById: SHELF_ASSETS_BY_ID,
+        palettesById: SHELF_PALETTES_BY_ID,
       });
       keep(looks.index);
       registerShelfDiskPort(native, looks.index.root);
       applyShelfDiskScan(useStore.getState, {
-        root: looks.index.root, connected: true, index: looks.index,
-        records: looks.records, freshStubs: looks.stubs,
+        root: looks.index.root,
+        connected: true,
+        index: looks.index,
+        records: looks.records,
+        freshStubs: looks.stubs,
       });
       await applyPrefs(looks.index);
       setLast({
-        added: r.summary.add, skipped: r.summary.skipped, missing: r.summary.missing,
-        taken: taken.summary.taken + pals.summary.files + aud.summary.taken + looks.summary.takenIn, held: taken.summary.poolFull + taken.summary.rejected + pals.summary.rejected + pals.summary.unreadable + aud.summary.rejected + aud.summary.unreadable + looks.summary.held,
+        added: r.summary.add,
+        skipped: r.summary.skipped,
+        missing: r.summary.missing,
+        taken: taken.summary.taken + pals.summary.files + aud.summary.taken + looks.summary.takenIn,
+        held:
+          taken.summary.poolFull +
+          taken.summary.rejected +
+          pals.summary.rejected +
+          pals.summary.unreadable +
+          aud.summary.rejected +
+          aud.summary.unreadable +
+          looks.summary.held,
       });
       if (r.unreachable) setNote('folder not reachable');
     } catch (e) {
@@ -144,7 +193,10 @@ export function LootRow() {
 
   const point = async () => {
     const p = await native.pickFolder();
-    if (!p.ok) { setNote(p.reason); return; }
+    if (!p.ok) {
+      setNote(p.reason);
+      return;
+    }
     if (!p.path) return; // cancelled
     const next = withRoot(index, p.path);
     keep(next);
@@ -159,7 +211,9 @@ export function LootRow() {
 
   const forget = () => {
     if (!window.confirm(confirmForgetMessage(counts.items))) return;
-    keep(emptyIndex()); setLast(null); setNote(null);
+    keep(emptyIndex());
+    setLast(null);
+    setNote(null);
     useStore.getState().setShelfPrefs(null, [], null); // no folder → shipped defaults in force
     // #1591 — the disk tier forgets with the folder (files untouched).
     clearShelfDiskPort();
@@ -173,33 +227,65 @@ export function LootRow() {
   return (
     <div className="pipeline-loot" aria-label="Loot folder">
       <div className="pipeline-row">
-        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>{LABELS.title}</span>
+        <span className="lbl" style={{ flex: 1, fontSize: 11 }}>
+          {LABELS.title}
+        </span>
         {unavailable ? (
-          <span className="pipeline-status lbl" title={unavailable === NOT_CONFIRMED ? seenLine(typeof window !== 'undefined' ? window : undefined) : undefined}>{unavailable}</span>
+          <span
+            className="pipeline-status lbl"
+            title={
+              unavailable === NOT_CONFIRMED ? seenLine(typeof window !== 'undefined' ? window : undefined) : undefined
+            }
+          >
+            {unavailable}
+          </span>
         ) : (
           <>
-            <button type="button" className="chip-btn act" onClick={point} disabled={!!busy}>{has ? LABELS.change : LABELS.point}</button>
-            {has && <button type="button" className="chip-btn act" onClick={() => scan(index)} disabled={!!busy}>{LABELS.rescan}</button>}
-            {has && <button type="button" className="chip-btn" onClick={forget} disabled={!!busy}>{LABELS.forget}</button>}
+            <button type="button" className="chip-btn act" onClick={point} disabled={!!busy}>
+              {has ? LABELS.change : LABELS.point}
+            </button>
+            {has && (
+              <button type="button" className="chip-btn act" onClick={() => scan(index)} disabled={!!busy}>
+                {LABELS.rescan}
+              </button>
+            )}
+            {has && (
+              <button type="button" className="chip-btn" onClick={forget} disabled={!!busy}>
+                {LABELS.forget}
+              </button>
+            )}
           </>
         )}
-        {needsStarter && <button type="button" className="chip-btn" onClick={downloadStarter} title={LABELS.starterHint}>{LABELS.starter}</button>}
+        {needsStarter && (
+          <button type="button" className="chip-btn" onClick={downloadStarter} title={LABELS.starterHint}>
+            {LABELS.starter}
+          </button>
+        )}
       </div>
       <div className="pipeline-hint" style={{ fontSize: 10, opacity: 0.7 }}>
-        {unavailable ? LABELS.hint : (has ? rootLabel(index.root) : LABELS.hint)}
+        {unavailable ? LABELS.hint : has ? rootLabel(index.root) : LABELS.hint}
       </div>
       {!unavailable && (
         <div className="pipeline-hint pipeline-loot-status" style={{ fontSize: 10 }}>
           {busy || note || statusLine({ ...counts, ...(last || {}), scanned: !!last })}
         </div>
       )}
-      {!unavailable && missingLines(index).map((l) => <div key={l} className="pipeline-hint" role="status" style={{ fontSize: 10 }}>{l}</div>)}
+      {!unavailable &&
+        missingLines(index).map((l) => (
+          <div key={l} className="pipeline-hint" role="status" style={{ fontSize: 10 }}>
+            {l}
+          </div>
+        ))}
       {!unavailable && has && (
         <details className="pipeline-loot-log">
-          <summary className="lbl" style={{ fontSize: 10 }}>{LABELS.logTitle} · {index.log.length} shown{index.logTrimmed ? ` · ${index.logTrimmed} older trimmed` : ''}</summary>
+          <summary className="lbl" style={{ fontSize: 10 }}>
+            {LABELS.logTitle} · {index.log.length} shown{index.logTrimmed ? ` · ${index.logTrimmed} older trimmed` : ''}
+          </summary>
           <ul style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, fontSize: 10, opacity: 0.8 }}>
             {index.log.length === 0 && <li>{LABELS.empty}</li>}
-            {index.log.slice(0, LOG_SHOWN).map((r, i) => <li key={`${r.rel}-${i}`}>{logLine(r)}</li>)}
+            {index.log.slice(0, LOG_SHOWN).map((r, i) => (
+              <li key={`${r.rel}-${i}`}>{logLine(r)}</li>
+            ))}
           </ul>
         </details>
       )}

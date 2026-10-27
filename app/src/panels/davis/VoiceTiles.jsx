@@ -18,9 +18,16 @@ const STARTER = FLAGSHIP_VOICES[0];
 function Tile({ id, swatches, name, line, title, active, kind, onTap }) {
   return (
     <div className="voice-tile">
-      <button className={`voice-chip ${kind}${active ? ' active' : ''}`} onClick={onTap} title={title} data-voice-id={id}>
+      <button
+        className={`voice-chip ${kind}${active ? ' active' : ''}`}
+        onClick={onTap}
+        title={title}
+        data-voice-id={id}
+      >
         <span className="voice-dots" aria-hidden="true">
-          {swatches.slice(0, 4).map((c, i) => (<i key={i} style={{ background: c }} />))}
+          {swatches.slice(0, 4).map((c, i) => (
+            <i key={i} style={{ background: c }} />
+          ))}
         </span>
         {/* #735: the face prints the Voice title or its deadpan name, never a chassis id (SWARM/HYPE/MURM) */}
         <span className="voice-name">{name}</span>
@@ -40,14 +47,31 @@ export function VoiceTiles() {
     <div className="voice-row davis-voices">
       <div className="voice-flagships">
         {found.length === 0 ? (
-          <Tile id={STARTER.id} kind="starter" swatches={STARTER.palette.swatches} name={STARTER.title} line="starter"
+          <Tile
+            id={STARTER.id}
+            kind="starter"
+            swatches={STARTER.palette.swatches}
+            name={STARTER.title}
+            line="starter"
             title={`${STARTER.title} — ${STARTER.vibe} The starter voice: it steps aside when the first find is made.`}
-            active={activeVoiceId === STARTER.id} onTap={() => loadVoice(STARTER.id)} />
-        ) : found.map((v) => (
-          <Tile key={v.id} id={v.id} kind="earned" swatches={v.state.palette.swatches} name={v.name}
-            line={`after ${v.earned.rolls} · ${v.state.params.count}`} title={`${v.name} — ${v.earned.caption || `after ${v.earned.rolls} rolls`}`}
-            active={activeVoiceId === v.id} onTap={() => loadVoice(v.id)} />
-        ))}
+            active={activeVoiceId === STARTER.id}
+            onTap={() => loadVoice(STARTER.id)}
+          />
+        ) : (
+          found.map((v) => (
+            <Tile
+              key={v.id}
+              id={v.id}
+              kind="earned"
+              swatches={v.state.palette.swatches}
+              name={v.name}
+              line={`after ${v.earned.rolls} · ${v.state.params.count}`}
+              title={`${v.name} — ${v.earned.caption || `after ${v.earned.rolls} rolls`}`}
+              active={activeVoiceId === v.id}
+              onTap={() => loadVoice(v.id)}
+            />
+          ))
+        )}
       </div>
       <MixBar />
     </div>
