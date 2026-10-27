@@ -6,22 +6,30 @@ import { join, relative } from 'node:path';
 
 const SRC = new URL('..', import.meta.url).pathname;
 const ALLOWED = new Set(['styles/tokens.css', 'data/palettes.js', 'panels/stimulus/MeterHero.jsx']);
-const walk = (d) => readdirSync(d).flatMap((n) => {
-  const p = join(d, n);
-  return statSync(p).isDirectory() ? walk(p) : [p];
-});
+const walk = (d) =>
+  readdirSync(d).flatMap((n) => {
+    const p = join(d, n);
+    return statSync(p).isDirectory() ? walk(p) : [p];
+  });
 
 const bad = [];
 for (const p of walk(SRC)) {
   const rel = relative(SRC, p);
   if (!/\.(jsx?|css|mjs)$/.test(rel) || rel.endsWith('.selfcheck.mjs') || ALLOWED.has(rel)) continue;
-  readFileSync(p, 'utf8').split('\n').forEach((l, i) => {
-    if (/#ff2d6f/i.test(l) || /rgba\(\s*255,\s*45,\s*111,\s*(0?\.9|1)\s*\)/.test(l)) bad.push(`${rel}:${i + 1}`);
-  });
+  readFileSync(p, 'utf8')
+    .split('\n')
+    .forEach((l, i) => {
+      if (/#ff2d6f/i.test(l) || /rgba\(\s*255,\s*45,\s*111,\s*(0?\.9|1)\s*\)/.test(l)) bad.push(`${rel}:${i + 1}`);
+    });
 }
 const tok = readFileSync(join(SRC, 'styles/tokens.css'), 'utf8');
-for (const t of ['--kc-live', '--kc-ok', '--kc-warn', '--kc-red', '--kc-davis']) if (!tok.includes(t + ':')) bad.push(`tokens.css missing ${t}`);
+for (const t of ['--kc-live', '--kc-ok', '--kc-warn', '--kc-red', '--kc-davis'])
+  if (!tok.includes(t + ':')) bad.push(`tokens.css missing ${t}`);
 const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
-if (!/\.chip-btn\.armed\s*\{[^}]*var\(--kc-davis\)/.test(panels)) bad.push('.chip-btn.armed must use --kc-davis (armed = waiting, time-based: the amber family)');
-if (bad.length) { console.error('pink discipline:\n' + bad.join('\n')); process.exit(1); }
+if (!/\.chip-btn\.armed\s*\{[^}]*var\(--kc-davis\)/.test(panels))
+  bad.push('.chip-btn.armed must use --kc-davis (armed = waiting, time-based: the amber family)');
+if (bad.length) {
+  console.error('pink discipline:\n' + bad.join('\n'));
+  process.exit(1);
+}
 console.log('pinkDiscipline.selfcheck: ok');

@@ -54,14 +54,25 @@ export const FAMILY_DEFAULT_KINEMES = Object.freeze({
  */
 export function centreRegionId(regions) {
   if (!Array.isArray(regions) || !regions.length) return null;
-  let total = 0, mx = 0, my = 0;
-  for (const r of regions) { total += r.area; mx += r.cx * r.area; my += r.cy * r.area; }
+  let total = 0,
+    mx = 0,
+    my = 0;
+  for (const r of regions) {
+    total += r.area;
+    mx += r.cx * r.area;
+    my += r.cy * r.area;
+  }
   if (!(total > 0)) return regions[0].id;
-  mx /= total; my /= total;
-  let best = null, bd = Infinity;
+  mx /= total;
+  my /= total;
+  let best = null,
+    bd = Infinity;
   for (const r of regions) {
     const d = (r.cx - mx) ** 2 + (r.cy - my) ** 2;
-    if (d < bd) { bd = d; best = r.id; }
+    if (d < bd) {
+      bd = d;
+      best = r.id;
+    }
   }
   return best;
 }

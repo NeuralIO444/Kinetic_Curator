@@ -396,24 +396,32 @@ export function hueRotateHex(hex, deg) {
   const h = normalizeHex(hex);
   if (!h) return hex;
   const n = parseInt(h.slice(1), 16);
-  const r = ((n >> 16) & 255) / 255; const g = ((n >> 8) & 255) / 255; const b = (n & 255) / 255;
-  const max = Math.max(r, g, b); const min = Math.min(r, g, b);
+  const r = ((n >> 16) & 255) / 255;
+  const g = ((n >> 8) & 255) / 255;
+  const b = (n & 255) / 255;
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
   const l = (max + min) / 2;
   const d = max - min;
   if (d === 0) return h;
   const sat = l > 0.5 ? d / (2 - max - min) : d / (max + min);
   let hue = max === r ? (g - b) / d + (g < b ? 6 : 0) : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  hue = (((hue * 60 + deg) % 360) + 360) % 360 / 360;
+  hue = ((((hue * 60 + deg) % 360) + 360) % 360) / 360;
   const q = l < 0.5 ? l * (1 + sat) : l + sat - l * sat;
   const pp = 2 * l - q;
   const ch = (t) => {
-    let u = t; if (u < 0) u += 1; if (u > 1) u -= 1;
+    let u = t;
+    if (u < 0) u += 1;
+    if (u > 1) u -= 1;
     if (u < 1 / 6) return pp + (q - pp) * 6 * u;
     if (u < 1 / 2) return q;
     if (u < 2 / 3) return pp + (q - pp) * (2 / 3 - u) * 6;
     return pp;
   };
-  const to = (v) => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0');
+  const to = (v) =>
+    Math.round(Math.min(1, Math.max(0, v)) * 255)
+      .toString(16)
+      .padStart(2, '0');
   return `#${to(ch(hue + 1 / 3))}${to(ch(hue))}${to(ch(hue - 1 / 3))}`;
 }
 
@@ -424,17 +432,26 @@ const hasHue = (p) => p.swatches.some((c) => hueRotateHex(c, FAMILY_HUE_STEP) !=
 const familyRoot = (p) => isPersona(p) && hasHue(p);
 
 /** The derived cousins of every persona palette (ids `persona-x~2`, `persona-x~3`). */
-export const FAMILY_PALETTES = Object.freeze(PALETTES.filter(familyRoot).flatMap((p) => [[2, FAMILY_HUE_STEP], [3, -FAMILY_HUE_STEP]].map(([k, deg]) => Object.freeze({
-  id: `${p.id}~${k}`,
-  name: `${p.name} ·${k}`,
-  era: p.era,
-  bg: p.bg,
-  ink: p.ink,
-  swatches: Object.freeze(p.swatches.map((c) => hueRotateHex(c, deg))),
-  ...(Array.isArray(p.weights) ? { weights: Object.freeze([...p.weights]) } : {}),
-  ...(typeof p.leak === 'number' ? { leak: p.leak } : {}),
-  family: p.id,
-}))));
+export const FAMILY_PALETTES = Object.freeze(
+  PALETTES.filter(familyRoot).flatMap((p) =>
+    [
+      [2, FAMILY_HUE_STEP],
+      [3, -FAMILY_HUE_STEP],
+    ].map(([k, deg]) =>
+      Object.freeze({
+        id: `${p.id}~${k}`,
+        name: `${p.name} ·${k}`,
+        era: p.era,
+        bg: p.bg,
+        ink: p.ink,
+        swatches: Object.freeze(p.swatches.map((c) => hueRotateHex(c, deg))),
+        ...(Array.isArray(p.weights) ? { weights: Object.freeze([...p.weights]) } : {}),
+        ...(typeof p.leak === 'number' ? { leak: p.leak } : {}),
+        family: p.id,
+      }),
+    ),
+  ),
+);
 
 /** A palette's family, its own first: [id, id~2, id~3] for a persona palette with hue (or any of its cousins), else [id]. */
 export function paletteFamily(id) {
@@ -450,10 +467,12 @@ export function paletteFamily(id) {
  * #1365: persona cousins (FAMILY_PALETTES) resolve here too.
  */
 export function getCatalogPalette(id, extra = []) {
-  return PALETTES.find((p) => p.id === id)
-    || FAMILY_PALETTES.find((p) => p.id === id)
-    || (Array.isArray(extra) ? extra.find((p) => p && p.id === id) : null)
-    || PALETTES[0];
+  return (
+    PALETTES.find((p) => p.id === id) ||
+    FAMILY_PALETTES.find((p) => p.id === id) ||
+    (Array.isArray(extra) ? extra.find((p) => p && p.id === id) : null) ||
+    PALETTES[0]
+  );
 }
 
 /** Normalize to #rrggbb lowercase; null if invalid. */
@@ -496,8 +515,11 @@ export function resolvePalette(paletteId, overrides = null, extra = []) {
     ...(Array.isArray(base.weights) && !overrides?.swatches && !overrides?.bg ? { weights: [...base.weights] } : {}),
     // #1365 Q2 — a refine colour drift carries the kept palette's weights (it moved the colours a little, it did not
     // change which colour is which). Only when they match the swatches and are finite; an artist edit drops them.
-    ...(Array.isArray(overrides?.weights) && overrides.weights.length === swatches.length && overrides.weights.every(Number.isFinite)
-      ? { weights: [...overrides.weights] } : {}),
+    ...(Array.isArray(overrides?.weights) &&
+    overrides.weights.length === swatches.length &&
+    overrides.weights.every(Number.isFinite)
+      ? { weights: [...overrides.weights] }
+      : {}),
     // #287 — leak is a catalog property, not a per-swatch override.
     leak: typeof base.leak === 'number' ? base.leak : 0,
     dirty: !!(overrides && (overrides.swatches || overrides.bg || overrides.ink)),

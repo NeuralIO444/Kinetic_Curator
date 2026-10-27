@@ -8,8 +8,15 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import {
-  sanitizeAudioRoutes, isDefaultRoutes, editableRoutes, nextRoute, patchRoute, removeRoute,
-  routeDepthRange, defaultDepthFor, NEW_ROUTE_DEPTH,
+  sanitizeAudioRoutes,
+  isDefaultRoutes,
+  editableRoutes,
+  nextRoute,
+  patchRoute,
+  removeRoute,
+  routeDepthRange,
+  defaultDepthFor,
+  NEW_ROUTE_DEPTH,
 } from './audioRoutes.js';
 import { DEFAULT_ROUTES, MAX_ROUTES, ROUTE_INPUTS, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
@@ -20,19 +27,48 @@ const R = (input, target, depth) => ({ input, target, depth });
 const custom = [R('band.air', 'render.glow', 0.5), R('band.sub', 'render.breath', 0.05)];
 
 // ── sanitizer ────────────────────────────────────────────────────────────
-for (const off of [undefined, null, 0, 'x', {}, true]) assert.strictEqual(sanitizeAudioRoutes(off), null, `${String(off)} → default`);
+for (const off of [undefined, null, 0, 'x', {}, true])
+  assert.strictEqual(sanitizeAudioRoutes(off), null, `${String(off)} → default`);
 assert.deepStrictEqual(sanitizeAudioRoutes([]), [], '[] is kept: the user deleted every route');
-assert.strictEqual(sanitizeAudioRoutes([null, 7, { input: 'nope', target: 'render.glow', depth: 1 }]), null, 'a non-empty table with nothing usable is garbage → default, not silence');
-assert.strictEqual(sanitizeAudioRoutes(DEFAULT_ROUTES.map((r) => ({ ...r }))), null, 'the default table is stored as null');
+assert.strictEqual(
+  sanitizeAudioRoutes([null, 7, { input: 'nope', target: 'render.glow', depth: 1 }]),
+  null,
+  'a non-empty table with nothing usable is garbage → default, not silence',
+);
+assert.strictEqual(
+  sanitizeAudioRoutes(DEFAULT_ROUTES.map((r) => ({ ...r }))),
+  null,
+  'the default table is stored as null',
+);
 assert.strictEqual(sanitizeAudioRoutes([...DEFAULT_ROUTES].reverse().map((r) => ({ ...r }))), null, 'in any order');
 assert.strictEqual(isDefaultRoutes(DEFAULT_ROUTES), true);
 assert.strictEqual(isDefaultRoutes(custom), false);
 assert.deepStrictEqual(sanitizeAudioRoutes(custom), custom, 'a custom table round-trips');
 {
-  const t = sanitizeAudioRoutes([R('beat', 'render.scale', 1e9), R('beat', 'render.alpha', -1e9), R('mid', 'render.glow', NaN), R('mid', 'render.breath', 0.1), R('beat', 'render.scale', 0.2), R('beat', 'render.glow', 0.5), { input: 'beat', target: '__proto__', depth: 1 }]);
-  assert.deepStrictEqual(t, [R('beat', 'render.scale', 3), R('beat', 'render.alpha', -60), R('mid', 'render.breath', 0.1), R('beat', 'render.glow', 0.5)],
-    'depth clamps to the target ceiling (± for inverse), NaN/dup-pair/__proto__ dropped, first wins');
-  const many = sanitizeAudioRoutes(Array.from({ length: 40 }, (_, i) => R('band.sub', ['render.scale', 'render.alpha', 'render.breath', 'render.glow'][i % 4], 0.01 * ((i % 7) + 1))));
+  const t = sanitizeAudioRoutes([
+    R('beat', 'render.scale', 1e9),
+    R('beat', 'render.alpha', -1e9),
+    R('mid', 'render.glow', NaN),
+    R('mid', 'render.breath', 0.1),
+    R('beat', 'render.scale', 0.2),
+    R('beat', 'render.glow', 0.5),
+    { input: 'beat', target: '__proto__', depth: 1 },
+  ]);
+  assert.deepStrictEqual(
+    t,
+    [
+      R('beat', 'render.scale', 3),
+      R('beat', 'render.alpha', -60),
+      R('mid', 'render.breath', 0.1),
+      R('beat', 'render.glow', 0.5),
+    ],
+    'depth clamps to the target ceiling (± for inverse), NaN/dup-pair/__proto__ dropped, first wins',
+  );
+  const many = sanitizeAudioRoutes(
+    Array.from({ length: 40 }, (_, i) =>
+      R('band.sub', ['render.scale', 'render.alpha', 'render.breath', 'render.glow'][i % 4], 0.01 * ((i % 7) + 1)),
+    ),
+  );
   assert.ok(many.length <= MAX_ROUTES, 'capped');
   const out = sanitizeAudioRoutes(custom);
   out[0].depth = 99;
@@ -40,9 +76,20 @@ assert.deepStrictEqual(sanitizeAudioRoutes(custom), custom, 'a custom table roun
 }
 
 // ── project document: omitted when default, saved when customised, both parse branches ──
-const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams: { ...DEFAULT_LAYOUT_PARAMS }, enabledAssets: {}, quality: 'balanced', autoQuality: true };
+const base = {
+  seed: 7,
+  seedOffsets: {},
+  paletteId: 'praystation',
+  layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
+  enabledAssets: {},
+  quality: 'balanced',
+  autoQuality: true,
+};
 {
-  assert.ok(!('audioRoutes' in serializeProject({ ...base, audioRoutes: null })), 'untouched piece: no key (byte-identical export)');
+  assert.ok(
+    !('audioRoutes' in serializeProject({ ...base, audioRoutes: null })),
+    'untouched piece: no key (byte-identical export)',
+  );
   assert.ok(!('audioRoutes' in serializeProject({ ...base })), 'absent field: no key');
   assert.deepStrictEqual(serializeProject({ ...base, audioRoutes: [] }).audioRoutes, [], '[] is written');
   const doc = serializeProject({ ...base, audioRoutes: custom });
@@ -55,8 +102,16 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   const legacy = parseProject({ seed: 1, layout: { mode: 'grid' }, audioRoutes: custom });
   assert.ok(legacy.ok);
   assert.deepStrictEqual(legacy.doc.audioRoutes, custom, 'legacy branch reads it');
-  assert.strictEqual(parseProject({ ...wire, audioRoutes: 'hostile' }).doc.audioRoutes, null, 'hostile value → default table');
-  assert.strictEqual(parseProject(JSON.parse(JSON.stringify(serializeProject(base)))).doc.audioRoutes, null, 'absent → default');
+  assert.strictEqual(
+    parseProject({ ...wire, audioRoutes: 'hostile' }).doc.audioRoutes,
+    null,
+    'hostile value → default table',
+  );
+  assert.strictEqual(
+    parseProject(JSON.parse(JSON.stringify(serializeProject(base)))).doc.audioRoutes,
+    null,
+    'absent → default',
+  );
 }
 
 // ── store: set, undo/redo (incl. a routes-ONLY edit), apply clears ──
@@ -78,7 +133,11 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   // the dedupe gap: a routes-only change right after a capture of otherwise-identical state must still record
   S().setAudioRoutes([]);
   S().setAudioRoutes(custom);
-  assert.strictEqual(S().historyUndoStack.length, 3, 'two routes-only edits in a row are two undo steps (not deduped away)');
+  assert.strictEqual(
+    S().historyUndoStack.length,
+    3,
+    'two routes-only edits in a row are two undo steps (not deduped away)',
+  );
   S().undo();
   assert.deepStrictEqual(S().audioRoutes, [], 'undo walks back through [] …');
   S().undo();
@@ -94,17 +153,22 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
 // ── wiring: the loop reads the table; every save/restore site knows the field ──
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
-  assert.ok(/audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, effRoutes, shapedBands\)/.test(src('../gl/liveLoop.mjs')) && /effectiveRoutes\(s\.audioRoutes, !!synth\)/.test(src('../gl/liveLoop.mjs')), 'the live loop passes the scene table (default while her set plays and there are no routes) and the shaped bands');
+  assert.ok(
+    /audioRoutes\(shapedAudio, \{ depth, scaleMod: scaleModAmt, alphaMod: alphaModAmt \}, effRoutes, shapedBands\)/.test(
+      src('../gl/liveLoop.mjs'),
+    ) && /effectiveRoutes\(s\.audioRoutes, !!synth\)/.test(src('../gl/liveLoop.mjs')),
+    'the live loop passes the scene table (default while her set plays and there are no routes) and the shaped bands',
+  );
   const sites = {
-    'state/projectDocument.js': 3,      // serialize + both parse branches
-    'state/slices/globalSlice.js': 1,   // applyProject
-    'state/slices/audioSlice.js': 2,    // default + setter
-    'state/history.js': 3,              // capture + signature + restore (the sun missed the signature)
-    'hooks/useProjectPayload.js': 2,    // destructure + serialize call
-    'state/projectWatch.mjs': 1,        // autosave trigger (the one watch list the autosave hook reads)
-    'panels/PipelinePanel.jsx': 3,      // selector + destructure + prop
+    'state/projectDocument.js': 3, // serialize + both parse branches
+    'state/slices/globalSlice.js': 1, // applyProject
+    'state/slices/audioSlice.js': 2, // default + setter
+    'state/history.js': 3, // capture + signature + restore (the sun missed the signature)
+    'hooks/useProjectPayload.js': 2, // destructure + serialize call
+    'state/projectWatch.mjs': 1, // autosave trigger (the one watch list the autosave hook reads)
+    'panels/PipelinePanel.jsx': 3, // selector + destructure + prop
     'panels/pipeline/DataExportRow.jsx': 2,
-    'panels/StimulusPanel.jsx': 3,      // the matrix reads it
+    'panels/StimulusPanel.jsx': 3, // the matrix reads it
     'panels/stimulus/ModMatrix.jsx': 2,
   };
   for (const [file, min] of Object.entries(sites)) {
@@ -115,7 +179,11 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
 // ── editing helpers (#790 PR4) ───────────────────────────────────────────
 {
   const ed = editableRoutes(null);
-  assert.deepStrictEqual(ed, DEFAULT_ROUTES.map((r) => ({ ...r })), 'editing the default starts from a copy of it');
+  assert.deepStrictEqual(
+    ed,
+    DEFAULT_ROUTES.map((r) => ({ ...r })),
+    'editing the default starts from a copy of it',
+  );
   ed[0].depth = 99;
   assert.notStrictEqual(DEFAULT_ROUTES[0].depth, 99, 'and never aliases the frozen default');
   const mine = [R('band.air', 'render.glow', 0.5)];
@@ -124,31 +192,64 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   assert.strictEqual(mine[0].depth, 0.5, 'editableRoutes copies a custom table too');
 
   // nextRoute: first free pair, preferring a clicked band, null when full
-  assert.deepStrictEqual(nextRoute([], 'band.mud'), { input: 'band.mud', target: 'render.scale', depth: NEW_ROUTE_DEPTH['render.scale'] }, 'a clicked band starts on the first target');
-  assert.deepStrictEqual(nextRoute([R('band.mud', 'render.scale', 0.1)], 'band.mud').target, 'render.alpha', '… then the next free one for that band');
+  assert.deepStrictEqual(
+    nextRoute([], 'band.mud'),
+    { input: 'band.mud', target: 'render.scale', depth: NEW_ROUTE_DEPTH['render.scale'] },
+    'a clicked band starts on the first target',
+  );
+  assert.deepStrictEqual(
+    nextRoute([R('band.mud', 'render.scale', 0.1)], 'band.mud').target,
+    'render.alpha',
+    '… then the next free one for that band',
+  );
   assert.strictEqual(nextRoute([], null).input, 'band.air', "'+ ROUTE' starts on AIR");
   // (#1110: there are now more targets than MAX_ROUTES, so one band can no longer hold them all; a table that
   // is one short of full still hands its clicked band the next free target, and a full one hands out nothing)
   const targets = Object.keys(ROUTE_TARGETS);
   assert.ok(targets.length > MAX_ROUTES, 'more targets than a table can hold');
   const mud = targets.slice(0, MAX_ROUTES - 1).map((t) => R('band.mud', t, 0.01));
-  assert.deepStrictEqual(nextRoute(mud, 'band.mud').target, targets[MAX_ROUTES - 1], 'a band with most targets taken gets the next free one');
-  assert.strictEqual(nextRoute(targets.slice(0, MAX_ROUTES).map((t) => R('band.mud', t, 0.01)), 'band.mud'), null, 'a full table hands out nothing');
-  assert.strictEqual(nextRoute(Array.from({ length: MAX_ROUTES }, (_, i) => R(ROUTE_INPUTS[i % 12], Object.keys(ROUTE_TARGETS)[i % 4], 0.01))), null, 'full table: nothing to add');
+  assert.deepStrictEqual(
+    nextRoute(mud, 'band.mud').target,
+    targets[MAX_ROUTES - 1],
+    'a band with most targets taken gets the next free one',
+  );
+  assert.strictEqual(
+    nextRoute(
+      targets.slice(0, MAX_ROUTES).map((t) => R('band.mud', t, 0.01)),
+      'band.mud',
+    ),
+    null,
+    'a full table hands out nothing',
+  );
+  assert.strictEqual(
+    nextRoute(
+      Array.from({ length: MAX_ROUTES }, (_, i) => R(ROUTE_INPUTS[i % 12], Object.keys(ROUTE_TARGETS)[i % 4], 0.01)),
+    ),
+    null,
+    'full table: nothing to add',
+  );
   for (const t of Object.keys(ROUTE_TARGETS)) {
     const rg = routeDepthRange(t);
     assert.ok(rg.min === -rg.max && rg.step > 0, `${t} range is symmetric`);
     assert.ok(Math.abs(NEW_ROUTE_DEPTH[t]) <= rg.max, `${t}: a new route starts inside its range`);
   }
   assert.strictEqual(defaultDepthFor('beat', 'render.alpha'), 18, 'double-click resets to the default-table depth');
-  assert.strictEqual(defaultDepthFor('band.air', 'render.scale'), NEW_ROUTE_DEPTH['render.scale'], 'or the new-route depth for a pair the default lacks');
+  assert.strictEqual(
+    defaultDepthFor('band.air', 'render.scale'),
+    NEW_ROUTE_DEPTH['render.scale'],
+    'or the new-route depth for a pair the default lacks',
+  );
 
   // patch / remove: immutable, refuse duplicates
   const t3 = [R('band.air', 'render.glow', 0.5), R('band.sub', 'render.breath', 0.05)];
   const patched = patchRoute(t3, 0, { depth: 0.9 });
   assert.strictEqual(patched[0].depth, 0.9);
   assert.strictEqual(t3[0].depth, 0.5, 'patch never mutates');
-  assert.strictEqual(patchRoute(t3, 1, { input: 'band.air', target: 'render.glow' }), t3, 'a patch that duplicates another pair is refused');
+  assert.strictEqual(
+    patchRoute(t3, 1, { input: 'band.air', target: 'render.glow' }),
+    t3,
+    'a patch that duplicates another pair is refused',
+  );
   assert.strictEqual(patchRoute(t3, 9, { depth: 1 }), t3, 'patching a missing row is a no-op');
   assert.deepStrictEqual(removeRoute(t3, 0), [t3[1]]);
   assert.strictEqual(t3.length, 2, 'remove never mutates');
@@ -160,7 +261,10 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
   // the first edit of the default customises it
   S().editAudioRoutes((t) => patchRoute(t, 0, { depth: 0.2 }));
-  assert.ok(Array.isArray(S().audioRoutes) && S().audioRoutes.length === 7 && S().audioRoutes[0].depth === 0.2, 'first edit customises a copy of the default');
+  assert.ok(
+    Array.isArray(S().audioRoutes) && S().audioRoutes.length === 7 && S().audioRoutes[0].depth === 0.2,
+    'first edit customises a copy of the default',
+  );
   assert.strictEqual(S().historyUndoStack.length, 1);
   // a no-op edit is not an edit
   S().editAudioRoutes((t) => t);
@@ -168,7 +272,8 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   // editing back to the default stores null again
   S().editAudioRoutes((t) => patchRoute(t, 0, { depth: 0.38 }));
   assert.strictEqual(S().audioRoutes, null, 'edited back to the default → null (RESET-equivalent)');
-  S().undo(); S().undo();
+  S().undo();
+  S().undo();
   assert.strictEqual(S().audioRoutes, null);
   useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
   // slider drag: continuous ticks coalesce into ONE undo step; a discrete edit right after is its own step
@@ -189,9 +294,16 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
   assert.strictEqual(S().audioRoutes, null, 'RESET');
   // add fills, caps, and refuses duplicates
   useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
-  S().editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; });
+  S().editAudioRoutes((t) => {
+    const r = nextRoute(t);
+    return r ? [...t, r] : t;
+  });
   assert.strictEqual(S().audioRoutes.length, 8);
-  for (let i = 0; i < 20; i++) S().editAudioRoutes((t) => { const r = nextRoute(t); return r ? [...t, r] : t; });
+  for (let i = 0; i < 20; i++)
+    S().editAudioRoutes((t) => {
+      const r = nextRoute(t);
+      return r ? [...t, r] : t;
+    });
   assert.strictEqual(S().audioRoutes.length, MAX_ROUTES, 'adding stops at the cap');
   useStore.setState({ audioRoutes: null, historyUndoStack: [], historyRedoStack: [] });
 }
@@ -200,18 +312,49 @@ const base = { seed: 7, seedOffsets: {}, paletteId: 'praystation', layoutParams:
 {
   const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
   const ui = src('../panels/stimulus/ModMatrix.jsx');
-  for (const s of ['Route ${index + 1} input', 'Route ${index + 1} target', 'Route ${index + 1} depth', 'Remove route ${index + 1}', '+ route', 'clear', 'reset', 'frame glow', 'not routed:']) {
+  for (const s of [
+    'Route ${index + 1} input',
+    'Route ${index + 1} target',
+    'Route ${index + 1} depth',
+    'Remove route ${index + 1}',
+    '+ route',
+    'clear',
+    'reset',
+    'frame glow',
+    'not routed:',
+  ]) {
     assert.ok(ui.includes(s), `the matrix offers ${s}`);
   }
-  assert.ok(/disabled=\{taken\(id, route\.target\)\}/.test(ui) && /disabled=\{taken\(route\.input, id\)\}/.test(ui), 'a duplicate pair cannot be picked');
+  assert.ok(
+    /disabled=\{taken\(id, route\.target\)\}/.test(ui) && /disabled=\{taken\(route\.input, id\)\}/.test(ui),
+    'a duplicate pair cannot be picked',
+  );
   // #1027: the depth slider is a RangeRow (bare, STIMULI tone). A drag is continuous (one undo step per drag);
   // a double-click reset is its own discrete step, through onReset.
   assert.ok(/<RangeRow layout="bare" tone="stim"/.test(ui), 'the depth slider is the house slider in the STIMULI tone');
-  assert.ok(/onChange=\{\(v\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: v \}\), true\)\}/.test(ui), 'the depth slider edits continuously (one undo step per drag)');
-  assert.ok(/onReset=\{\(\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: defaultDepthFor\(route\.input, route\.target\) \}\), false\)\}/.test(ui), 'double-click resets to the default depth as its own undo step');
-  assert.ok(/disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui), '+ ROUTE stops at the cap; RESET only when customised');
-  assert.ok(/disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui), 'CLEAR empties the table (start from scratch), greyed when already empty');
+  assert.ok(
+    /onChange=\{\(v\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: v \}\), true\)\}/.test(ui),
+    'the depth slider edits continuously (one undo step per drag)',
+  );
+  assert.ok(
+    /onReset=\{\(\) => onEdit\(\(t\) => patchRoute\(t, index, \{ depth: defaultDepthFor\(route\.input, route\.target\) \}\), false\)\}/.test(
+      ui,
+    ),
+    'double-click resets to the default depth as its own undo step',
+  );
+  assert.ok(
+    /disabled=\{full\}/.test(ui) && /disabled=\{!custom\}/.test(ui),
+    '+ ROUTE stops at the cap; RESET only when customised',
+  );
+  assert.ok(
+    /disabled=\{table\.length === 0\} onClick=\{\(\) => setAudioRoutes\(\[\]\)\}/.test(ui),
+    'CLEAR empties the table (start from scratch), greyed when already empty',
+  );
   const meter = src('../panels/stimulus/MeterHero.jsx');
-  assert.ok(/Events\.AUDIO_ROUTES_EDIT, \{ fn: \(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) && /onClick=\{routeBand\}/.test(meter), 'a click on a meter band adds a route for that band');
+  assert.ok(
+    /Events\.AUDIO_ROUTES_EDIT, \{ fn: \(t\) => \{ const n = nextRoute\(t, input\)/.test(meter) &&
+      /onClick=\{routeBand\}/.test(meter),
+    'a click on a meter band adds a route for that band',
+  );
 }
 console.log('audioRoutes (state) selfcheck: OK');

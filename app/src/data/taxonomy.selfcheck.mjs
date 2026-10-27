@@ -71,13 +71,19 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
   assert.ok(!/>\s*presets\s*▾/i.test(curatorBar), 'no "presets ▾" on the face');
   // 1.3.0 (#716): the Curator cluster's one home is the top bar, next to KC-1.
   assert.ok(/<CuratorBar \/>/.test(read('../components/PaletteStrip.jsx')), 'top bar renders the Curator cluster');
-  assert.ok(!/CuratorBar/.test(read('../panels/BuildPanel.jsx')), 'BUILD no longer carries the Curator cluster (one home)');
+  assert.ok(
+    !/CuratorBar/.test(read('../panels/BuildPanel.jsx')),
+    'BUILD no longer carries the Curator cluster (one home)',
+  );
   const tour = read('tour.js');
   assert.ok(!/title:\s*'[^']*\b(preset|recipe)\b/i.test(tour), 'tour titles say Look, not preset/recipe');
   // 1.4.0 (#717): the flagship Voices' one home is DAVIS; BUILD no longer renders them.
   const voiceTiles = read('../panels/davis/VoiceTiles.jsx');
   assert.ok(/<VoiceTiles \/>/.test(read('../panels/DavisPanel.jsx')), 'DAVIS renders the flagship Voice tiles');
-  assert.ok(!/FLAGSHIP_VOICES/.test(read('../panels/layout/CompositionTiles.jsx')), 'BUILD no longer renders the flagship Voices (one home)');
+  assert.ok(
+    !/FLAGSHIP_VOICES/.test(read('../panels/layout/CompositionTiles.jsx')),
+    'BUILD no longer renders the flagship Voices (one home)',
+  );
   // #1153: the picker holds earned voices and one starter; the starter prints its title, an earned voice its deadpan name,
   // never the SWARM/HYPE/MURM chassis id
   assert.ok(voiceTiles.indexOf('function Tile') > 0, 'Tile found');
@@ -91,7 +97,10 @@ assert.equal(params.composition, 'dusk-flock', 'load rewrites alias to canonical
     assert.equal(lookIds.has(v.title.toLowerCase()), false, `${v.id}: title must not twin a Look id`);
   }
   const doc = read('../../../docs/TAXONOMY.md');
-  assert.ok(doc.includes(`Version: ${TAXONOMY_VERSION}`), `docs/TAXONOMY.md header must say Version: ${TAXONOMY_VERSION}`);
+  assert.ok(
+    doc.includes(`Version: ${TAXONOMY_VERSION}`),
+    `docs/TAXONOMY.md header must say Version: ${TAXONOMY_VERSION}`,
+  );
   assert.ok(doc.includes(`Frozen voice ids: ${FROZEN_VOICE_IDS.join(', ')}`), 'docs header lists the frozen voice ids');
 }
 

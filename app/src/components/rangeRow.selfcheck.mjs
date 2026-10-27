@@ -10,22 +10,29 @@ import { join, relative } from 'node:path';
 import { RANGE_TONES, RANGE_LAYOUTS, RANGE_TONE_COLORS } from './rangeTones.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 const root = new URL('..', import.meta.url).pathname; // app/src
 const files = [];
 (function walk(dir) {
   for (const f of readdirSync(dir)) {
     const p = join(dir, f);
-    if (statSync(p).isDirectory()) { walk(p); continue; }
+    if (statSync(p).isDirectory()) {
+      walk(p);
+      continue;
+    }
     if (/\.(jsx|js|mjs)$/.test(f) && !/\.selfcheck\.mjs$/.test(f)) files.push(p);
   }
 })(root);
 
 // The only two files allowed to render a native range input, and why.
 const ALLOWED = new Set([
-  'components/RangeRow.jsx',     // the house control (RangeRow and DualRangeRow's two inputs)
-  'components/MotionTile.jsx',   // a glyph tile, not a param row: its input carries .single-slider + data-tone
+  'components/RangeRow.jsx', // the house control (RangeRow and DualRangeRow's two inputs)
+  'components/MotionTile.jsx', // a glyph tile, not a param row: its input carries .single-slider + data-tone
 ]);
 
 const bare = [];
@@ -45,7 +52,10 @@ ok('the allowed exceptions still exist and still use the house slider', () => {
   const rr = readFileSync(join(root, 'components/RangeRow.jsx'), 'utf8');
   assert.ok(/className=\{`single-slider/.test(rr), 'RangeRow renders .single-slider');
   const mt = readFileSync(join(root, 'components/MotionTile.jsx'), 'utf8');
-  assert.ok(/single-slider motion-slider/.test(mt) && /data-tone="ink"/.test(mt), 'MotionTile must carry .single-slider and data-tone="ink": no private thumb');
+  assert.ok(
+    /single-slider motion-slider/.test(mt) && /data-tone="ink"/.test(mt),
+    'MotionTile must carry .single-slider and data-tone="ink": no private thumb',
+  );
 });
 
 ok('tones and layouts are the documented ones, with the design-system colors', () => {
@@ -67,7 +77,9 @@ ok('controls.css: one thumb, 14x18, square, and a 44px hit area; no private thum
   assert.match(css, /\.range-row \{[^}]*min-height:\s*44px/);
   assert.match(css, /\.dual-slider \{[^}]*height:\s*44px/);
   // Rules that SIZE a thumb (the locked-state rules only recolor it, which is fine).
-  const sized = [...css.matchAll(/::-webkit-slider-thumb\s*\{[^}]*\}/g)].map((m) => m[0]).filter((t) => /width:/.test(t));
+  const sized = [...css.matchAll(/::-webkit-slider-thumb\s*\{[^}]*\}/g)]
+    .map((m) => m[0])
+    .filter((t) => /width:/.test(t));
   assert.ok(sized.length >= 2, 'the single and the dual thumb are both sized in one place');
   for (const t of sized) {
     assert.match(t, /width:\s*14px/, `thumb width in ${t.slice(0, 60)}`);

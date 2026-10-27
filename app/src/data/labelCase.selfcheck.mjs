@@ -19,7 +19,7 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
     assert.strictEqual(
       t.title,
       t.title.toLowerCase(),
-      `HELP_TOPICS entry '${t.id}' title '${t.title}' must be lowercase in accordance with #536`
+      `HELP_TOPICS entry '${t.id}' title '${t.title}' must be lowercase in accordance with #536`,
     );
   }
   console.log(`[ok] all ${HELP_TOPICS.length} HELP_TOPICS titles are lowercase`);
@@ -28,15 +28,16 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
 // ── 2. PanelRegistry icon collision resolved (PLAY !== DAVIS) ──
 {
   const registrySrc = read('composition/PanelRegistry.js');
-  const panelEntries = [...registrySrc.matchAll(/\{\s*id:\s*'([^']+)',\s*title:\s*'([^']+)',\s*icon:\s*'([^']+)'/g)]
-    .map(([, id, title, icon]) => ({ id, title, icon }));
+  const panelEntries = [
+    ...registrySrc.matchAll(/\{\s*id:\s*'([^']+)',\s*title:\s*'([^']+)',\s*icon:\s*'([^']+)'/g),
+  ].map(([, id, title, icon]) => ({ id, title, icon }));
 
   const icons = panelEntries.map((p) => p.icon);
   const iconSet = new Set(icons);
   assert.strictEqual(
     iconSet.size,
     icons.length,
-    `PANEL_REGISTRY icons must be unique across all registered panels: found duplicate in ${JSON.stringify(icons)}`
+    `PANEL_REGISTRY icons must be unique across all registered panels: found duplicate in ${JSON.stringify(icons)}`,
   );
 
   const davis = panelEntries.find((p) => p.id === 'davis');
@@ -45,27 +46,27 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
   assert.notStrictEqual(
     davis.icon,
     play.icon,
-    `PLAY icon (${play.icon}) must not collide with DAVIS icon (${davis.icon})`
+    `PLAY icon (${play.icon}) must not collide with DAVIS icon (${davis.icon})`,
   );
   console.log(`[ok] panel icons are unique; PLAY (${play.icon}) vs DAVIS (${davis.icon}) collision resolved`);
 
   // ── 3. Uppercase Allowlist Invariant: Panels stay uppercase ──
   const ALLOWED_UPPERCASE_PANELS = new Set([
-    'CANVAS', 'BUILD', 'ASSETS', 'STIMULI', 'DIRECTORS', 'PLAY', 'PIPELINE',
+    'CANVAS',
+    'BUILD',
+    'ASSETS',
+    'STIMULI',
+    'DIRECTORS',
+    'PLAY',
+    'PIPELINE',
     'DEV', // #691: merged dev panel (was 'SHADER LAB', 'X-RAY', 'GOV TUNE')
   ]);
   for (const p of panelEntries) {
-    assert.ok(
-      ALLOWED_UPPERCASE_PANELS.has(p.title),
-      `Panel title '${p.title}' is not in the allowed uppercase set`
-    );
+    assert.ok(ALLOWED_UPPERCASE_PANELS.has(p.title), `Panel title '${p.title}' is not in the allowed uppercase set`);
   }
 
   for (const s of HELP_SHORTCUTS) {
-    assert.ok(
-      typeof s.key === 'string' && s.key.length > 0,
-      `Shortcut key '${s.key}' must be valid`
-    );
+    assert.ok(typeof s.key === 'string' && s.key.length > 0, `Shortcut key '${s.key}' must be valid`);
   }
   console.log('[ok] uppercase allowlist verified for panels and shortcut keys');
 }
@@ -77,28 +78,28 @@ import { HELP_TOPICS, HELP_SHORTCUTS } from './helpCopy.js';
 
   assert.ok(
     /\.meter-pill\s*\{[^}]*text-transform:\s*lowercase/s.test(panelsCss),
-    'panels.css must define text-transform: lowercase on .meter-pill'
+    'panels.css must define text-transform: lowercase on .meter-pill',
   );
   assert.ok(
     /\.stim-meter-label\s*\{[^}]*text-transform:\s*lowercase/s.test(panelsCss),
-    'panels.css must define text-transform: lowercase on .stim-meter-label'
+    'panels.css must define text-transform: lowercase on .stim-meter-label',
   );
   assert.ok(
     /\.davis-label\s*\{[^}]*text-transform:\s*lowercase/s.test(panelsCss),
-    'panels.css must define text-transform: lowercase on .davis-label'
+    'panels.css must define text-transform: lowercase on .davis-label',
   );
   assert.ok(
     /\.fx-param label\s*\{[^}]*text-transform:\s*lowercase/s.test(panelsCss),
-    'panels.css must define text-transform: lowercase on .fx-param label'
+    'panels.css must define text-transform: lowercase on .fx-param label',
   );
   assert.ok(
     /\.randomize-hint\s*\{[^}]*text-transform:\s*lowercase/s.test(controlsCss),
-    'controls.css must define text-transform: lowercase on .randomize-hint'
+    'controls.css must define text-transform: lowercase on .randomize-hint',
   );
   // #1033 (M8): square corners everywhere — the BEHAVE chip lost its pill radius.
   assert.ok(
     !/\.chip-btn\.chip-behave\s*\{[^}]*border-radius/s.test(panelsCss),
-    '.chip-btn.chip-behave must not set a border-radius (M8, square corners)'
+    '.chip-btn.chip-behave must not set a border-radius (M8, square corners)',
   );
 
   console.log('[ok] CSS micro-label transforms and chip identities verified');

@@ -15,7 +15,8 @@ const COLOR_MODES = ['FADE', 'WASH', 'INJECT'];
 const COLOR_MODE_HINT = {
   FADE: 'Whole picture melts. BEAT is the clock — BPM sets how long.',
   WASH: 'Color soaks from the middle outward — the dye front chases through the marks. BEAT is the clock.',
-  INJECT: 'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. BEAT is the clock.',
+  INJECT:
+    'The field dyes first, then the swarm catches up — the new color spreads through the moving marks. BEAT is the clock.',
 };
 const CHIP_CAP = 4;
 
@@ -45,31 +46,104 @@ function ActivePaletteStrip({ palette, dirty, locks, onSwatch, onBg, onInk, onRe
     <span key={i} className={`palette-sw-cell ${locks?.[i] ? 'locked' : ''}`}>
       <label className="palette-sw-edit" title={`S${i + 1} ${sw} — click to edit`} onClick={(e) => e.stopPropagation()}>
         <span className="palette-chip-sw palette-sw-full" style={{ background: sw }} />
-        <input type="color" className="palette-color-input" value={sw} onChange={(e) => onSwatch(i, e.target.value)} onClick={(e) => e.stopPropagation()} />
+        <input
+          type="color"
+          className="palette-color-input"
+          value={sw}
+          onChange={(e) => onSwatch(i, e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
       </label>
-      <button type="button" className="palette-lock-pip" title={locks?.[i] ? `S${i + 1} locked` : `Lock S${i + 1}`} aria-pressed={!!locks?.[i]} onClick={(e) => { e.stopPropagation(); onLock(i); }}>
+      <button
+        type="button"
+        className="palette-lock-pip"
+        title={locks?.[i] ? `S${i + 1} locked` : `Lock S${i + 1}`}
+        aria-pressed={!!locks?.[i]}
+        onClick={(e) => {
+          e.stopPropagation();
+          onLock(i);
+        }}
+      >
         {locks?.[i] ? '▪' : ''}
       </button>
     </span>
   );
   return (
     <span className="palette-active-strip" aria-label={`${palette.name} palette editor`}>
-      {overflow && (<button type="button" className="palette-nav-btn" title="Previous swatches" disabled={s <= 0} onClick={slide(-1)}>‹</button>)}
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Previous swatches"
+          disabled={s <= 0}
+          onClick={slide(-1)}
+        >
+          ‹
+        </button>
+      )}
       {overflow ? (
-        <span className="palette-sw-viewport"><span className="palette-sw-track" style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}>{swatches.map(cell)}</span></span>
+        <span className="palette-sw-viewport">
+          <span className="palette-sw-track" style={{ transform: `translateX(${-s * SWATCH_STEP}px)` }}>
+            {swatches.map(cell)}
+          </span>
+        </span>
       ) : (
         <span className="palette-active-swatches">{swatches.map(cell)}</span>
       )}
-      {overflow && (<button type="button" className="palette-nav-btn" title="Next swatches" disabled={s >= maxStart} onClick={slide(1)}>›</button>)}
-      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.bg }} title={`BG ${palette.bg}`} onClick={(e) => e.stopPropagation()}>
+      {overflow && (
+        <button
+          type="button"
+          className="palette-nav-btn"
+          title="Next swatches"
+          disabled={s >= maxStart}
+          onClick={slide(1)}
+        >
+          ›
+        </button>
+      )}
+      <label
+        className="palette-meta-sw palette-sw-edit"
+        style={{ background: palette.bg }}
+        title={`BG ${palette.bg}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="palette-meta-label lbl">bg</span>
-        <input type="color" className="palette-color-input" value={palette.bg} onChange={(e) => onBg(e.target.value)} onClick={(e) => e.stopPropagation()} />
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.bg}
+          onChange={(e) => onBg(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
       </label>
-      <label className="palette-meta-sw palette-sw-edit" style={{ background: palette.ink }} title={`INK ${palette.ink}`} onClick={(e) => e.stopPropagation()}>
+      <label
+        className="palette-meta-sw palette-sw-edit"
+        style={{ background: palette.ink }}
+        title={`INK ${palette.ink}`}
+        onClick={(e) => e.stopPropagation()}
+      >
         <span className="palette-meta-label lbl">ink</span>
-        <input type="color" className="palette-color-input" value={palette.ink} onChange={(e) => onInk(e.target.value)} onClick={(e) => e.stopPropagation()} />
+        <input
+          type="color"
+          className="palette-color-input"
+          value={palette.ink}
+          onChange={(e) => onInk(e.target.value)}
+          onClick={(e) => e.stopPropagation()}
+        />
       </label>
-      {dirty && (<button type="button" className="palette-reset-btn" title="Reset to catalog colors" onClick={(e) => { e.stopPropagation(); onReset(); }}>↻</button>)}
+      {dirty && (
+        <button
+          type="button"
+          className="palette-reset-btn"
+          title="Reset to catalog colors"
+          onClick={(e) => {
+            e.stopPropagation();
+            onReset();
+          }}
+        >
+          ↻
+        </button>
+      )}
     </span>
   );
 }
@@ -84,7 +158,11 @@ function TasteDiamond() {
       className={`tb-diamond lvl${level}`}
       role="img"
       aria-label={level === 0 ? 'no taste signal' : `taste confidence level ${level} of 4`}
-      title={level === 0 ? 'taste: no signal — the diamond stays dark until a real taste.json clears fidelity 0.3' : `taste confidence ${level}/4`}
+      title={
+        level === 0
+          ? 'taste: no signal — the diamond stays dark until a real taste.json clears fidelity 0.3'
+          : `taste confidence ${level}/4`
+      }
     />
   );
 }
@@ -113,7 +191,10 @@ export function PaletteStrip() {
     if (palSigRef.current === sig) return;
     const first = palSigRef.current === null;
     palSigRef.current = sig;
-    if (transitRef.current) { cancelAnimationFrame(transitRef.current); transitRef.current = null; }
+    if (transitRef.current) {
+      cancelAnimationFrame(transitRef.current);
+      transitRef.current = null;
+    }
     if (!first && colorMode === 'FADE' && mixSeconds > 0) {
       const durMs = mixSeconds * 1000;
       const t0 = performance.now();
@@ -123,7 +204,10 @@ export function PaletteStrip() {
         // Quantize: the glow depth moves slowly, so only re-render when the
         // displayed value actually changes — not 60fps for a cosmetic dot.
         const d = Math.round((1 - t) * 40) / 40;
-        if (d !== last) { last = d; setFadeDepth(d); }
+        if (d !== last) {
+          last = d;
+          setFadeDepth(d);
+        }
         transitRef.current = t < 1 ? requestAnimationFrame(tick) : null;
       };
       transitRef.current = requestAnimationFrame(tick);
@@ -131,7 +215,10 @@ export function PaletteStrip() {
       setFadeDepth(0);
     }
     return () => {
-      if (transitRef.current) { cancelAnimationFrame(transitRef.current); transitRef.current = null; }
+      if (transitRef.current) {
+        cancelAnimationFrame(transitRef.current);
+        transitRef.current = null;
+      }
     };
   }, [paletteId, paletteOverrides, colorMode, mixSeconds]);
   // #1123 — KC-1 DS rule 3: chip taste-fit shimmer only on a real taste
@@ -143,9 +230,12 @@ export function PaletteStrip() {
   const fits = {};
   let anyFit = false;
   if (taste) {
-    for (const p of (palettes || [])) {
+    for (const p of palettes || []) {
       const lvl = fitLevel(paletteTasteFit(p.id, taste));
-      if (lvl > 0) { fits[p.id] = lvl; anyFit = true; }
+      if (lvl > 0) {
+        fits[p.id] = lvl;
+        anyFit = true;
+      }
     }
   }
   // #952 — the roll can land on any of the 37+ palettes, but the strip only
@@ -170,11 +260,21 @@ export function PaletteStrip() {
 
   const chips = visible.map((p, i) => {
     const active = p.id === palette.id;
-    const num = <span className="palette-chip-num" aria-hidden="true">{i + 1}</span>;
+    const num = (
+      <span className="palette-chip-num" aria-hidden="true">
+        {i + 1}
+      </span>
+    );
     const fit = fits[p.id] || 0;
     if (active) {
       return (
-        <div key={p.id} ref={activeChipRef} className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`} data-fit={fit > 0 ? fit : undefined} title={`${p.name} — key ${i + 1}`}>
+        <div
+          key={p.id}
+          ref={activeChipRef}
+          className={`palette-chip active ${palette.dirty ? 'dirty' : ''}`}
+          data-fit={fit > 0 ? fit : undefined}
+          title={`${p.name} — key ${i + 1}`}
+        >
           {num}
           <ActivePaletteStrip
             key={palette.id}
@@ -193,7 +293,13 @@ export function PaletteStrip() {
     }
     return (
       <span key={p.id} className="palette-chip-wrap">
-        <button type="button" className="palette-chip" data-fit={fit > 0 ? fit : undefined} onClick={() => emit(Events.PALETTE_SET_ID, { id: p.id })} title={`${p.name} — key ${i + 1}`}>
+        <button
+          type="button"
+          className="palette-chip"
+          data-fit={fit > 0 ? fit : undefined}
+          onClick={() => emit(Events.PALETTE_SET_ID, { id: p.id })}
+          title={`${p.name} — key ${i + 1}`}
+        >
           {num}
           <CompactSwatches swatches={p.swatches || []} />
           <span className="palette-chip-name">{p.name}</span>
@@ -227,7 +333,9 @@ export function PaletteStrip() {
         <TasteDiamond />
         <span className="kc-name kc-compact">KC-1</span>
         <span className="kc-name kc-full">
-          <span className="logo-text">KINETIC<span className="logo-accent">_</span>CURATOR</span>
+          <span className="logo-text">
+            KINETIC<span className="logo-accent">_</span>CURATOR
+          </span>
           <span className="logo-version">v0.9.0</span>
         </span>
       </div>
@@ -235,7 +343,10 @@ export function PaletteStrip() {
       {/* #716 — the Curator is the instrument's main verb: a global control,
           not a BUILD-panel one. Same popups, new address. */}
       <CuratorBar />
-      <div className="palette-switch" style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}>
+      <div
+        className="palette-switch"
+        style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}
+      >
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
           <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
             <button
@@ -243,7 +354,18 @@ export function PaletteStrip() {
               className={`palette-mix-label act${fadeDepth > 0 ? ' fading' : ''}`}
               onClick={cycleColorMode}
               title={COLOR_MODE_HINT[colorMode]}
-              style={{ background: 'transparent', border: 0, padding: 0, color: 'inherit', letterSpacing: '0.1em', fontSize: 9, cursor: 'pointer', minWidth: '4.6em', textAlign: 'left', '--fade-depth': fadeDepth.toFixed(3) }}
+              style={{
+                background: 'transparent',
+                border: 0,
+                padding: 0,
+                color: 'inherit',
+                letterSpacing: '0.1em',
+                fontSize: 9,
+                cursor: 'pointer',
+                minWidth: '4.6em',
+                textAlign: 'left',
+                '--fade-depth': fadeDepth.toFixed(3),
+              }}
             >
               <span className="palette-fade-dot" aria-hidden="true" />
               {colorMode}
@@ -254,11 +376,37 @@ export function PaletteStrip() {
           </div>
           <span className="palette-controls" style={{ display: 'inline-flex', alignItems: 'center' }}>
             <span className="palette-switch-label lbl">palette</span>
-            <button type="button" className="palette-save-btn" title="Palette lab — generate, edit, save, import, export" onClick={() => setWingOpen((v) => !v)} aria-expanded={wingOpen}>◈<span className="palette-shuffle-word lbl"> lab</span></button>
-            <select className="palette-harmony" data-scheme={harmonyScheme} value={harmonyScheme} onChange={(e) => setHarmonyScheme(e.target.value)} title="Colour harmony scheme" onClick={(e) => e.stopPropagation()}>
-              {SCHEME_IDS.map((id) => (<option key={id} value={id}>{id.toUpperCase()}</option>))}
+            <button
+              type="button"
+              className="palette-save-btn"
+              title="Palette lab — generate, edit, save, import, export"
+              onClick={() => setWingOpen((v) => !v)}
+              aria-expanded={wingOpen}
+            >
+              ◈<span className="palette-shuffle-word lbl"> lab</span>
+            </button>
+            <select
+              className="palette-harmony"
+              data-scheme={harmonyScheme}
+              value={harmonyScheme}
+              onChange={(e) => setHarmonyScheme(e.target.value)}
+              title="Colour harmony scheme"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {SCHEME_IDS.map((id) => (
+                <option key={id} value={id}>
+                  {id.toUpperCase()}
+                </option>
+              ))}
             </select>
-            <button type="button" className="palette-save-btn" title="Shuffle unlocked swatches" onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}>⟳<span className="palette-shuffle-word lbl"> shuffle</span></button>
+            <button
+              type="button"
+              className="palette-save-btn"
+              title="Shuffle unlocked swatches"
+              onClick={() => emit(Events.PALETTE_HARMONY, { scheme: harmonyScheme })}
+            >
+              ⟳<span className="palette-shuffle-word lbl"> shuffle</span>
+            </button>
           </span>
         </div>
       </div>

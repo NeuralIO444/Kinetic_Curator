@@ -28,14 +28,21 @@ assert.deepStrictEqual(FLAGSHIP_VOICE_IDS, ['swarm', 'hype', 'murmuration', 'dar
 
 for (const v of FLAGSHIP_VOICES) {
   const st = resolveVoiceState(v);
-  assert.deepStrictEqual(Object.keys(st.params).sort(), Object.keys(DEFAULT_LAYOUT_PARAMS).sort(), `${v.id} params complete`);
+  assert.deepStrictEqual(
+    Object.keys(st.params).sort(),
+    Object.keys(DEFAULT_LAYOUT_PARAMS).sort(),
+    `${v.id} params complete`,
+  );
   const { rejected } = validateLayoutParams(st.params);
   assert.deepStrictEqual(rejected, [], `${v.id} params validate clean`);
   assert.match(st.palette.bg, /^#[0-9a-f]{6}$/, `${v.id} bg hex`);
   assert.match(st.palette.ink, /^#[0-9a-f]{6}$/, `${v.id} ink hex`);
   assert.strictEqual(st.palette.swatches.length, VOICE_SWATCH_COUNT, `${v.id} 8 swatches`);
   for (const c of st.palette.swatches) assert.match(c, /^#[0-9a-f]{6}$/, `${v.id} swatch hex`);
-  assert.deepStrictEqual(Object.keys(st.fx).sort(), ['contrast', 'edge', 'glow', 'grain', 'posterize', 'vignette'].sort());
+  assert.deepStrictEqual(
+    Object.keys(st.fx).sort(),
+    ['contrast', 'edge', 'glow', 'grain', 'posterize', 'vignette'].sort(),
+  );
   assert.ok(st.blendSeconds > 0, `${v.id} blendSeconds`);
   assert.strictEqual(Object.keys(st.assets).length, 4, `${v.id} must constrain to exactly 4 curated assets`);
 }
@@ -113,8 +120,14 @@ assert.strictEqual(mixVoiceState(a, b, 0).fx.vignette, true);
 assert.strictEqual(mixVoiceState(a, b, 0.49).fx.vignette, false);
 assert.strictEqual(mid.fx.posterize, true);
 
-assert.deepStrictEqual(sanitizeFx({ grain: 9, glow: -2, vignette: 1, contrast: 99 }),
-  { grain: 1, vignette: true, posterize: false, edge: false, glow: 0, contrast: 3 });
+assert.deepStrictEqual(sanitizeFx({ grain: 9, glow: -2, vignette: 1, contrast: 99 }), {
+  grain: 1,
+  vignette: true,
+  posterize: false,
+  edge: false,
+  glow: 0,
+  contrast: 3,
+});
 assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
 
 {
@@ -122,8 +135,14 @@ assert.deepStrictEqual(sanitizeFx(null), sanitizeFx({}));
   for (const id of FLAGSHIP_VOICE_IDS) {
     assert.ok(p(id).breath > 0 && p(id).metabolism > 0, `${id} carries breath + metabolism`);
   }
-  assert.ok(p('hype').metabolism > p('swarm').metabolism && p('swarm').metabolism > p('murmuration').metabolism, 'metabolism: HYPE > SWARM > MURM');
-  assert.ok(p('murmuration').breath > p('hype').breath && p('hype').breath > p('swarm').breath, 'breath: MURM > HYPE > SWARM');
+  assert.ok(
+    p('hype').metabolism > p('swarm').metabolism && p('swarm').metabolism > p('murmuration').metabolism,
+    'metabolism: HYPE > SWARM > MURM',
+  );
+  assert.ok(
+    p('murmuration').breath > p('hype').breath && p('hype').breath > p('swarm').breath,
+    'breath: MURM > HYPE > SWARM',
+  );
 }
 
 // #704 — DARK GLASS: the chiaroscuro mode in one press. Its cast is four

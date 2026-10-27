@@ -9,13 +9,29 @@
 // `null` means off, and off is byte-identical everywhere: the project omits
 // the key, the contract omits the key, the shader multiplies by exactly 1.0.
 
-export const LIGHT_SLOTS = Object.freeze(['white', 'ink',
-  'swatch0', 'swatch1', 'swatch2', 'swatch3', 'swatch4', 'swatch5', 'swatch6', 'swatch7']);
+export const LIGHT_SLOTS = Object.freeze([
+  'white',
+  'ink',
+  'swatch0',
+  'swatch1',
+  'swatch2',
+  'swatch3',
+  'swatch4',
+  'swatch5',
+  'swatch6',
+  'swatch7',
+]);
 
 /** A fresh sun: upper-left, low enough to rake, warm white. */
 export const LIGHT_DEFAULT = Object.freeze({
-  x: 220, y: 140, height: 260, intensity: 0.8, ambient: 0.35, slot: 'white',
-  bevel: 0.6, spec: 0.3, // #594 PR2: bevel 0 = the flat per-instance light of PR1
+  x: 220,
+  y: 140,
+  height: 260,
+  intensity: 0.8,
+  ambient: 0.35,
+  slot: 'white',
+  bevel: 0.6,
+  spec: 0.3, // #594 PR2: bevel 0 = the flat per-instance light of PR1
   pool: 0, // 0 is today's sun. Higher pools ink in the shadow and paper on the highlight.
 });
 
@@ -74,9 +90,14 @@ export function contractLight(raw, palette) {
   const l = sanitizeLight(raw);
   if (!l) return null;
   return {
-    x: l.x, y: l.y, height: l.height,
-    intensity: l.intensity, ambient: l.ambient,
-    bevel: l.bevel, spec: l.spec, pool: l.pool,
+    x: l.x,
+    y: l.y,
+    height: l.height,
+    intensity: l.intensity,
+    ambient: l.ambient,
+    bevel: l.bevel,
+    spec: l.spec,
+    pool: l.pool,
     color: lightColor(l.slot, palette),
   };
 }

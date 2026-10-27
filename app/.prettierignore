@@ -60,6 +60,11 @@ src/composition/fixtures/
 # ── Adopted (slice 5, #1684: src/hooks — its source-text pins made layout-blind first) ──
 !src/hooks/
 
+# ── Adopted (slice 6, #1684: components + data — their source-text pins made layout-blind first) ──
+!src/components/
+!src/data/
+src/data/**/*.json
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

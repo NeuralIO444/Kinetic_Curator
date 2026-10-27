@@ -19,22 +19,24 @@ export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4,
  * pulse = ± scale fraction, blink = duty (fraction of the period visible),
  * bob = ± scene units along the screen's y. spin ignores amp (one turn/period).
  */
-export const KINEMES = Object.freeze([
-  { id: 'spin', kind: 'spin', period: 4.0, amp: 0 },
-  { id: 'rock', kind: 'osc', period: 2.4, amp: 18 },
-  { id: 'pulse', kind: 'pulse', period: 1.6, amp: 0.12 },
-  { id: 'blink', kind: 'blink', period: 1.0, amp: 0.5 },
-  { id: 'bob', kind: 'bob', period: 3.0, amp: 6 },
-  // #1435 R4 — the line bend: an osc with a small amp, but the id itself is
-  // the signal. On a stroke-shaped REGION (data/regionKinemes.js
-  // isStrokeRegion) the pack subdivides the region into slices along its
-  // length and steps this kineme's phase slice to slice, so the stroke
-  // articulates and the wave travels along it — stroke-aware by
-  // construction (only the stroke's own region instances subdivide; the
-  // quad-wide shader warp stays parked). Anywhere else — a compact region,
-  // a whole mark — it is simply the gentle osc it declares.
-  { id: 'bend', kind: 'osc', period: 3.6, amp: 6 },
-].map(Object.freeze));
+export const KINEMES = Object.freeze(
+  [
+    { id: 'spin', kind: 'spin', period: 4.0, amp: 0 },
+    { id: 'rock', kind: 'osc', period: 2.4, amp: 18 },
+    { id: 'pulse', kind: 'pulse', period: 1.6, amp: 0.12 },
+    { id: 'blink', kind: 'blink', period: 1.0, amp: 0.5 },
+    { id: 'bob', kind: 'bob', period: 3.0, amp: 6 },
+    // #1435 R4 — the line bend: an osc with a small amp, but the id itself is
+    // the signal. On a stroke-shaped REGION (data/regionKinemes.js
+    // isStrokeRegion) the pack subdivides the region into slices along its
+    // length and steps this kineme's phase slice to slice, so the stroke
+    // articulates and the wave travels along it — stroke-aware by
+    // construction (only the stroke's own region instances subdivide; the
+    // quad-wide shader warp stays parked). Anywhere else — a compact region,
+    // a whole mark — it is simply the gentle osc it declares.
+    { id: 'bend', kind: 'osc', period: 3.6, amp: 6 },
+  ].map(Object.freeze),
+);
 
 /** #1435 R4 — the kineme id whose region playback subdivides stroke regions. */
 export const BEND_KINEME_ID = 'bend';
@@ -105,7 +107,10 @@ export function sanitizeAssetStill(raw) {
   const out = {};
   let n = 0;
   for (const [assetId, v] of Object.entries(raw)) {
-    if (v === true && typeof assetId === 'string' && assetId && assetId.length <= 120 && n < 400) { out[assetId] = true; n++; }
+    if (v === true && typeof assetId === 'string' && assetId && assetId.length <= 120 && n < 400) {
+      out[assetId] = true;
+      n++;
+    }
   }
   return n ? out : null;
 }
@@ -149,7 +154,8 @@ export function createKinemeClock() {
       return { anchorLoop, anchorMotion, rate };
     },
     restoreState(s) {
-      if (!s || !Number.isFinite(s.anchorLoop) || !Number.isFinite(s.anchorMotion) || !Number.isFinite(s.rate)) return false;
+      if (!s || !Number.isFinite(s.anchorLoop) || !Number.isFinite(s.anchorMotion) || !Number.isFinite(s.rate))
+        return false;
       anchorLoop = s.anchorLoop;
       anchorMotion = s.anchorMotion;
       rate = s.rate;

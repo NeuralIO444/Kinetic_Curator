@@ -40,13 +40,19 @@ export function ModeStrip() {
               type="button"
               className={`chip-btn ${mode === m.id ? 'active' : ''}${isArmed ? ' armed' : ''}`}
               onClick={() => toggleArmMode(m.id)}
-              title={isArmed
-                ? `${m.name} — ARMED as roll scope. Tap again to disarm.`
-                : `${m.name} — arm as roll scope: the next KINETIC roll pins this mode. Key ${i + 1}`}
+              title={
+                isArmed
+                  ? `${m.name} — ARMED as roll scope. Tap again to disarm.`
+                  : `${m.name} — arm as roll scope: the next KINETIC roll pins this mode. Key ${i + 1}`
+              }
               aria-pressed={isArmed}
             >
               {m.glyph}
-              {isArmed && <span className="pin-glyph" aria-hidden="true">📌</span>}
+              {isArmed && (
+                <span className="pin-glyph" aria-hidden="true">
+                  📌
+                </span>
+              )}
             </button>
           );
         })}
@@ -61,13 +67,19 @@ export function ModeStrip() {
               type="button"
               className={`chip-btn act ${isMotionActive(layoutParams, m) ? 'active' : ''}${isArmed ? ' armed' : ''}`}
               onClick={() => toggleArmMotion(m.id)}
-              title={isArmed
-                ? `${m.name} — ARMED as roll scope. Tap again to disarm.`
-                : `${m.name} — ${m.vibe} Arm as roll scope: the next KINETIC roll pins this motion.`}
+              title={
+                isArmed
+                  ? `${m.name} — ARMED as roll scope. Tap again to disarm.`
+                  : `${m.name} — ${m.vibe} Arm as roll scope: the next KINETIC roll pins this motion.`
+              }
               aria-pressed={isArmed}
             >
               {m.name}
-              {isArmed && <span className="pin-glyph" aria-hidden="true">📌</span>}
+              {isArmed && (
+                <span className="pin-glyph" aria-hidden="true">
+                  📌
+                </span>
+              )}
             </button>
           );
         })}

@@ -1,12 +1,22 @@
 // #1202 selfcheck — TE compaction engine: 4-state mirror, scale X/Y,
 // kaleido dihedral, and legacy migrations.
 import assert from 'node:assert';
-import { normalizeLayoutParams, validateLayoutParams, MIRROR_STATES, mirrorMultiplier, symmetryParts } from '../data/layout-modes.js';
+import {
+  normalizeLayoutParams,
+  validateLayoutParams,
+  MIRROR_STATES,
+  mirrorMultiplier,
+  symmetryParts,
+} from '../data/layout-modes.js';
 import { buildPlacements, mirrorItems, clampCount } from '../engine/buildPlacements.js';
 import { computeGeometrySoA, applyAttributes } from '../engine/placement.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // ── MIRROR_STATES ──
 ok('MIRROR_STATES is the 4-state enum', () => {
@@ -94,9 +104,13 @@ ok('scale: linked Y is a provable no-op', () => {
 ok('scale: unlinked Y draws independently', () => {
   const soa = computeGeometrySoA({ mode: 'grid', count: 50, seed: 1, canvasW: 100, canvasH: 100 });
   applyAttributes(soa, { scale: { x: [0.2, 2.0], y: [0.5, 0.5] }, rotate: [0, 0], alpha: [100, 100] });
-  const xs = [...soa.scale], ys = [...soa.scaleY];
+  const xs = [...soa.scale],
+    ys = [...soa.scaleY];
   assert.ok(Math.max(...xs) - Math.min(...xs) > 1, 'X varies');
-  assert.ok(ys.every((v) => v === 0.5), 'Y constant at 0.5');
+  assert.ok(
+    ys.every((v) => v === 0.5),
+    'Y constant at 0.5',
+  );
 });
 
 // ── legacy migrations ──

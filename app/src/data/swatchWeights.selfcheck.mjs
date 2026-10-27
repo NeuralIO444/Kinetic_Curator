@@ -6,7 +6,11 @@ import { deriveSwatchWeights, swatchWeights, rankedSwatches, validWeights } from
 import { sanitizePalette } from '../state/slices/paletteLibrarySlice.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('every catalog palette has weights: one per swatch, each in 0..1, 2 decimals', () => {
   assert.ok(PALETTES.length >= 37);
@@ -23,7 +27,8 @@ ok('every catalog palette has weights: one per swatch, each in 0..1, 2 decimals'
 
 ok('deriveSwatchWeights is deterministic and length-matched', () => {
   for (const p of PALETTES) {
-    const a = deriveSwatchWeights(p); const b = deriveSwatchWeights({ ...p, swatches: [...p.swatches] });
+    const a = deriveSwatchWeights(p);
+    const b = deriveSwatchWeights({ ...p, swatches: [...p.swatches] });
     assert.deepEqual(a, b);
     assert.equal(a.length, p.swatches.length);
   }
@@ -63,7 +68,17 @@ ok('a palette with no weights ranks from derived weights', () => {
 ok('wrong-length, non-numeric or out-of-range weights fall back to derived and do not throw', () => {
   const base = { bg: '#0a0a0a', swatches: ['#222222', '#ff00aa', '#888888'] };
   const want = deriveSwatchWeights(base);
-  for (const weights of [[1], [0.1, 0.2, 0.3, 0.4], ['a', 'b', 'c'], [0.1, NaN, 0.3], [0.1, 2, 0.3], [-1, 0, 0], 'nope', null, {}]) {
+  for (const weights of [
+    [1],
+    [0.1, 0.2, 0.3, 0.4],
+    ['a', 'b', 'c'],
+    [0.1, NaN, 0.3],
+    [0.1, 2, 0.3],
+    [-1, 0, 0],
+    'nope',
+    null,
+    {},
+  ]) {
     assert.deepEqual(swatchWeights({ ...base, weights }), want, JSON.stringify(weights));
     assert.equal(rankedSwatches({ ...base, weights })[0], '#ff00aa');
   }
@@ -79,7 +94,8 @@ ok('a hand-set weight is the source of truth', () => {
 ok('resolvePalette carries baked weights, and drops them when a color is overridden', () => {
   const id = PALETTES[0].id;
   assert.deepEqual(resolvePalette(id, null).weights, PALETTES[0].weights);
-  const r = resolvePalette(id, null); r.weights[0] = 0.123;
+  const r = resolvePalette(id, null);
+  r.weights[0] = 0.123;
   assert.notEqual(PALETTES[0].weights[0], 0.123, 'the catalog is not mutated');
   const ov = resolvePalette(id, { swatches: ['#ffffff'] });
   assert.equal(ov.weights, undefined);
@@ -88,7 +104,14 @@ ok('resolvePalette carries baked weights, and drops them when a color is overrid
 });
 
 ok('import/export round-trips weights; a file without them still imports', () => {
-  const file = { id: 'u1', name: 'mine', bg: '#000000', ink: '#ffffff', swatches: ['#ff0000', '#00ff00'], weights: [0.2, 0.9] };
+  const file = {
+    id: 'u1',
+    name: 'mine',
+    bg: '#000000',
+    ink: '#ffffff',
+    swatches: ['#ff0000', '#00ff00'],
+    weights: [0.2, 0.9],
+  };
   const a = sanitizePalette(file);
   assert.deepEqual(a.weights, [0.2, 0.9]);
   assert.deepEqual(sanitizePalette(JSON.parse(JSON.stringify(a))).weights, [0.2, 0.9]);
@@ -101,8 +124,18 @@ ok('import/export round-trips weights; a file without them still imports', () =>
 });
 
 ok('nothing in the app reads the field yet (no visual change until #1041)', () => {
-  const readers = ['../gl/liveResolve.mjs', '../gl/sceneContract.js', '../gl/liveLoop.mjs', '../components/PaletteStrip.jsx', '../components/PaletteWing.jsx'];
-  for (const f of readers) assert.ok(!/swatchWeights|rankedSwatches|\.weights\b/.test(readFileSync(new URL(f, import.meta.url), 'utf8')), `${f} reads weights`);
+  const readers = [
+    '../gl/liveResolve.mjs',
+    '../gl/sceneContract.js',
+    '../gl/liveLoop.mjs',
+    '../components/PaletteStrip.jsx',
+    '../components/PaletteWing.jsx',
+  ];
+  for (const f of readers)
+    assert.ok(
+      !/swatchWeights|rankedSwatches|\.weights\b/.test(readFileSync(new URL(f, import.meta.url), 'utf8')),
+      `${f} reads weights`,
+    );
 });
 
 console.log(`swatchWeights.selfcheck: ${n} checks passed`);

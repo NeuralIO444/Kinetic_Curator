@@ -32,7 +32,14 @@ import { useStore } from '../state/store.js';
   // #808: the evolve stamp is loop time, not wall time — simulate an
   // observed loop clock so the stamps land on it.
   loopClock.ms = 42000;
-  useStore.setState({ evolveMode: false, evolveRun: null, evolveLast: null, evolveSeen: 0, evolveTarget: 'seed', lastEvolveTs: 0 });
+  useStore.setState({
+    evolveMode: false,
+    evolveRun: null,
+    evolveLast: null,
+    evolveSeen: 0,
+    evolveTarget: 'seed',
+    lastEvolveTs: 0,
+  });
   const seed0 = S().seed;
   S().triggerEvolve(); // manual tick while stopped
   assert.strictEqual(S().seed, (seed0 + 1) % 1000000, 'the evolve step is unchanged: the seed steps');
@@ -44,7 +51,9 @@ import { useStore } from '../state/store.js';
   assert.ok(S().evolveMode && S().evolveRun && S().evolveRun.gen === 0, 'EVOLVE on starts a fresh run');
   S().setEvolveMode(true);
   assert.strictEqual(S().evolveRun.gen, 0, 're-asserting EVOLVE on does not restart the run');
-  S().triggerEvolve(); S().triggerEvolve(); S().triggerEvolve();
+  S().triggerEvolve();
+  S().triggerEvolve();
+  S().triggerEvolve();
   assert.strictEqual(S().evolveRun.gen, 3, 'each generation counts');
   assert.strictEqual(S().evolveSeen, 4, 'candidates seen keeps the session total');
   assert.strictEqual(S().evolveRun.lastTs, S().lastEvolveTs, 'the run is stamped with the real tick time');
@@ -63,18 +72,35 @@ import { useStore } from '../state/store.js';
 // ── C ────────────────────────────────────────────────────────────────────
 {
   const panel = readFileSync(new URL('../panels/DavisPanel.jsx', import.meta.url), 'utf8');
-  const at = (s) => { const i = panel.indexOf(s); assert.ok(i >= 0, `DavisPanel has ${s}`); return i; };
-  assert.ok(at('>voices<') < at('>generate<') && at('>generate<') < at('>perform<'), 'VOICES → GENERATE → PERFORM, in order');
+  const at = (s) => {
+    const i = panel.indexOf(s);
+    assert.ok(i >= 0, `DavisPanel has ${s}`);
+    return i;
+  };
+  assert.ok(
+    at('>voices<') < at('>generate<') && at('>generate<') < at('>perform<'),
+    'VOICES → GENERATE → PERFORM, in order',
+  );
   const generate = panel.slice(at('>generate<'), at('>perform<'));
-  for (const s of ['DAVIS_EVOLVE, { toggle: true }', 'saveFavorite', 'bumpSeed: true', 'SUB_SEED_STREAMS.map', 'DAVIS_MUTATE_STREAM, { reset: true }', '<EvolveProgress />']) {
+  for (const s of [
+    'DAVIS_EVOLVE, { toggle: true }',
+    'saveFavorite',
+    'bumpSeed: true',
+    'SUB_SEED_STREAMS.map',
+    'DAVIS_MUTATE_STREAM, { reset: true }',
+    '<EvolveProgress />',
+  ]) {
     assert.ok(generate.includes(s), `GENERATE still holds ${s}`);
   }
   const perform = panel.slice(at('>perform<'));
-  for (const s of ['ACCUM_GESTURE, { action: \'freeze\'', "action: 'clear'", "action: 'swell'", 'davis-phrase-status']) {
+  for (const s of ["ACCUM_GESTURE, { action: 'freeze'", "action: 'clear'", "action: 'swell'", 'davis-phrase-status']) {
     assert.ok(perform.includes(s) || panel.includes(s), `PERFORM still holds ${s}`);
   }
   const voices = panel.slice(at('>voices<'), at('>generate<'));
-  assert.ok(voices.includes('<VoiceTiles />') && voices.includes('<BehaveReadout'), 'VOICES holds the tiles and the behave readout');
+  assert.ok(
+    voices.includes('<VoiceTiles />') && voices.includes('<BehaveReadout'),
+    'VOICES holds the tiles and the behave readout',
+  );
   assert.ok(/subtitle=\{subtitle\}/.test(panel), 'the header status line is kept');
   // nothing new that controls phrase/MIDI: the panel reports, it does not duplicate PLAY
   assert.ok(!/DAVIS_PHRASE/.test(panel), 'phrase controls stay in PLAY (#248)');

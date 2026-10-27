@@ -5,15 +5,29 @@
 // nothing about features" extends to the drawer zone too.
 import { useEffect } from 'react';
 
-const veil = { position: 'fixed', inset: 0, zIndex: 40, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
+const veil = {
+  position: 'fixed',
+  inset: 0,
+  zIndex: 40,
+  background: 'rgba(0,0,0,0.55)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+};
 const sheet = {
-  width: 1100, maxWidth: '96vw', maxHeight: '90vh',
-  border: '1px solid var(--line)', display: 'flex', flexDirection: 'column',
+  width: 1100,
+  maxWidth: '96vw',
+  maxHeight: '90vh',
+  border: '1px solid var(--line)',
+  display: 'flex',
+  flexDirection: 'column',
 };
 
 export function DrawerOverlay({ Comp, onClose }) {
   useEffect(() => {
-    const onKey = (e) => { if (e.key === 'Escape') onClose(); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') onClose();
+    };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [onClose]);

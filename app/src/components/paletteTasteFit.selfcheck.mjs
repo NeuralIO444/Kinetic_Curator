@@ -10,7 +10,7 @@ assert.strictEqual(paletteTasteFit('sepia-plate', null), null, 'no taste → nul
 assert.strictEqual(
   paletteTasteFit('sepia-plate', { head: { fidelity: 0.9 } }),
   null,
-  'a taste object alone is not a palette signal → still null'
+  'a taste object alone is not a palette signal → still null',
 );
 
 // Level mapping: 0 = quiet, 4 compressive levels capped dim

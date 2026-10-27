@@ -33,17 +33,25 @@ export function BudgetKnob() {
     emit(Events.EXPORT_AUTO_QUALITY, true);
   };
 
-  const armedTitle = 'Your performance budget — the governor defends it. ' +
+  const armedTitle =
+    'Your performance budget — the governor defends it. ' +
     'It may shed below your ceiling to hold frame rate and restores back up ' +
     'to it; your choice is never cleared automatically.';
-  const disarmedTitle = 'Governor currently off (legacy project setting). ' +
+  const disarmedTitle =
+    'Governor currently off (legacy project setting). ' +
     'Choose a ceiling to arm it — the governor will then defend that budget.';
 
   return (
-    <div className="undo-group" role="group" aria-label="Performance budget ceiling"
+    <div
+      className="undo-group"
+      role="group"
+      aria-label="Performance budget ceiling"
       title={autoQuality ? armedTitle : disarmedTitle}
-      style={autoQuality ? undefined : { opacity: 0.55 }}>
-      <span className="meter-label lbl" style={{ marginRight: 2 }}>budget</span>
+      style={autoQuality ? undefined : { opacity: 0.55 }}
+    >
+      <span className="meter-label lbl" style={{ marginRight: 2 }}>
+        budget
+      </span>
       {CEILING_ORDER.map((tierId) => {
         const preset = QUALITY_PRESETS[tierId];
         const active = quality === tierId && autoQuality;

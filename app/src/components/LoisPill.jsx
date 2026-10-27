@@ -32,7 +32,10 @@ export function LoisPill() {
   }, []);
 
   useEffect(() => {
-    const draw = () => { setFace(resolveLoisFace(loisActivity.snapshot())); setLine(tickerLine()); };
+    const draw = () => {
+      setFace(resolveLoisFace(loisActivity.snapshot()));
+      setLine(tickerLine());
+    };
     // an event or a store change is worth an immediate repaint; the interval carries the clock-driven AWAY
     const unsubs = [on(Events.LAYOUT_CURATE, draw), on(Events.KINETIC_TAP, draw), on(Events.DAVIS_FAVORITE, draw)];
     const unsubStore = useStore.subscribe(draw);
@@ -74,22 +77,40 @@ export function LoisPill() {
   const unit = (copy) => (
     <span className="lois-ticker-unit" {...(copy ? { 'aria-hidden': 'true' } : {})}>
       {line}
-      <span className="lois-ticker-div" aria-hidden="true">{TICKER_DIVIDER}</span>
+      <span className="lois-ticker-div" aria-hidden="true">
+        {TICKER_DIVIDER}
+      </span>
     </span>
   );
   return (
-    <div className="lois-pill" data-tone={face.tone} data-code={face.code} data-mind={look ? look.code : undefined}
-      title={`LOIS · ${code} — ${(mind && mind.line) || (look && mind.weight >= 0.5 ? look.label : '') || face.label}`}>
+    <div
+      className="lois-pill"
+      data-tone={face.tone}
+      data-code={face.code}
+      data-mind={look ? look.code : undefined}
+      title={`LOIS · ${code} — ${(mind && mind.line) || (look && mind.weight >= 0.5 ? look.label : '') || face.label}`}
+    >
       {line && (
         <span className="lois-ticker" ref={slotRef} data-mode={motion.mode}>
-          <span className="lois-ticker-run" key={line}
-            style={motion.mode === 'scroll'
-              ? { '--tk-from': `${motion.from}px`, '--tk-to': `${motion.to}px`, animationDuration: `${motion.durationS.toFixed(2)}s` }
-              : undefined}>
+          <span
+            className="lois-ticker-run"
+            key={line}
+            style={
+              motion.mode === 'scroll'
+                ? {
+                    '--tk-from': `${motion.from}px`,
+                    '--tk-to': `${motion.to}px`,
+                    animationDuration: `${motion.durationS.toFixed(2)}s`,
+                  }
+                : undefined
+            }
+          >
             {unit(false)}
             {unit(true)}
           </span>
-          <span className="lois-ticker-measure" ref={measureRef} aria-hidden="true">{unit(false)}</span>
+          <span className="lois-ticker-measure" ref={measureRef} aria-hidden="true">
+            {unit(false)}
+          </span>
         </span>
       )}
       <span className="lois-word">LOIS</span>

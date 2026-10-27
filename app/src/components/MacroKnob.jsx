@@ -32,12 +32,15 @@ export function MacroKnob({ macro }) {
   const drag = useRef(null);
   const jogRef = useRef(0);
 
-  const applyDelta = useCallback((delta) => {
-    if (!delta) return;
-    drive(macro.id, delta);
-    jogRef.current = Math.max(-1, Math.min(1, jogRef.current + delta));
-    setJog(jogRef.current);
-  }, [drive, macro.id]);
+  const applyDelta = useCallback(
+    (delta) => {
+      if (!delta) return;
+      drive(macro.id, delta);
+      jogRef.current = Math.max(-1, Math.min(1, jogRef.current + delta));
+      setJog(jogRef.current);
+    },
+    [drive, macro.id],
+  );
 
   const onPointerDown = (e) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -68,7 +71,10 @@ export function MacroKnob({ macro }) {
     e.preventDefault();
     applyDelta(d);
     // Keyboard nudges don't spring back — the knob is a handle, not a value.
-    setTimeout(() => { jogRef.current = 0; setJog(0); }, 350);
+    setTimeout(() => {
+      jogRef.current = 0;
+      setJog(0);
+    }, 350);
   };
 
   const commitName = () => {
@@ -85,32 +91,46 @@ export function MacroKnob({ macro }) {
       <div className="macro-head">
         {editing ? (
           <input
-            className="macro-name-edit" value={draft} autoFocus
+            className="macro-name-edit"
+            value={draft}
+            autoFocus
             maxLength={MATH_MAX_NAME}
             onChange={(e) => setDraft(e.target.value)}
             onBlur={commitName}
             onKeyDown={(e) => {
               if (e.key === 'Enter') commitName();
-              if (e.key === 'Escape') { setDraft(macro.name); setEditing(false); }
+              if (e.key === 'Escape') {
+                setDraft(macro.name);
+                setEditing(false);
+              }
             }}
           />
         ) : (
           <button
-            className="macro-name" title="Click to rename"
-            onClick={() => { setDraft(macro.name); setEditing(true); }}
+            className="macro-name"
+            title="Click to rename"
+            onClick={() => {
+              setDraft(macro.name);
+              setEditing(true);
+            }}
           >
             {macro.name}
           </button>
         )}
         <button
           className={`macro-learn ${armed ? 'armed' : ''}`}
-          title={armed ? 'Learning — wiggle sliders to assign, click to stop' : 'Learn: arm, then wiggle sliders to assign them'}
+          title={
+            armed
+              ? 'Learning — wiggle sliders to assign, click to stop'
+              : 'Learn: arm, then wiggle sliders to assign them'
+          }
           onClick={() => arm(macro.id)}
         >
           {armed ? '● LEARN' : '○ LEARN'}
         </button>
         <button
-          className="macro-delete" title="Delete this macro"
+          className="macro-delete"
+          title="Delete this macro"
           onClick={() => emit(Events.MACRO_REMOVE, { id: macro.id })}
         >
           ×
@@ -130,35 +150,38 @@ export function MacroKnob({ macro }) {
         onPointerCancel={endDrag}
         onKeyDown={onKeyDown}
       >
-        <div
-          className={`macro-knob-dial ${dragging ? 'held' : ''}`}
-          style={{ transform: `rotate(${rotation}deg)` }}
-        >
+        <div className={`macro-knob-dial ${dragging ? 'held' : ''}`} style={{ transform: `rotate(${rotation}deg)` }}>
           <div className="macro-knob-pointer" />
         </div>
       </div>
 
       <div className="macro-targets">
         {macro.targets.length === 0 && (
-          <span className="macro-empty">
-            {armed ? 'wiggle sliders to assign…' : 'hit LEARN, then wiggle sliders'}
-          </span>
+          <span className="macro-empty">{armed ? 'wiggle sliders to assign…' : 'hit LEARN, then wiggle sliders'}</span>
         )}
         {macro.targets.map((t) => {
           const spec = getTargetSpec(t.key);
           return (
-            <span key={t.key} className={`macro-chip ${t.invert ? 'inverted' : ''}`}
-              title={spec ? `${spec.label} (${spec.min}–${spec.max})` : t.key}>
+            <span
+              key={t.key}
+              className={`macro-chip ${t.invert ? 'inverted' : ''}`}
+              title={spec ? `${spec.label} (${spec.min}–${spec.max})` : t.key}
+            >
               <button
                 className="macro-invert"
-                title={t.invert ? 'Direction: down when the knob goes up — click to flip' : 'Direction: up with the knob — click to flip'}
+                title={
+                  t.invert
+                    ? 'Direction: down when the knob goes up — click to flip'
+                    : 'Direction: up with the knob — click to flip'
+                }
                 onClick={() => toggleInvert(macro.id, t.key)}
               >
                 {t.invert ? '⇅' : '⇈'}
               </button>
               {spec ? spec.label : t.key}
               <button
-                className="macro-unassign" title="Remove from this macro"
+                className="macro-unassign"
+                title="Remove from this macro"
                 onClick={() => unassign(macro.id, t.key)}
               >
                 ×

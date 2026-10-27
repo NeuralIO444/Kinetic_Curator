@@ -17,13 +17,24 @@
 
 import assert from 'node:assert';
 import {
-  normalizeLayoutParams, validateLayoutParams, DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, RANGE_SPEC,
-  MODE_IDS, BLEND_MODES, PALETTE_SHIFTS, SYMMETRY_MODES, BEHAVE_MODES,
+  normalizeLayoutParams,
+  validateLayoutParams,
+  DEFAULT_LAYOUT_PARAMS,
+  PARAM_SPEC,
+  RANGE_SPEC,
+  MODE_IDS,
+  BLEND_MODES,
+  PALETTE_SHIFTS,
+  SYMMETRY_MODES,
+  BEHAVE_MODES,
   COMPOSITION_IDS,
 } from './layout-modes.js'; // #268: MATERIAL_IDS/SHADING_MODES removed
 import { buildPlacements } from '../engine/buildPlacements.js';
 
-const ASSETS = [{ id: 'a', weight: 'heavy' }, { id: 'b', weight: 'medium' }];
+const ASSETS = [
+  { id: 'a', weight: 'heavy' },
+  { id: 'b', weight: 'medium' },
+];
 const PALETTE = { swatches: ['#111', '#222', '#333'] };
 const CAPS = { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true };
 
@@ -82,9 +93,13 @@ const POISON = [
 for (const [label, patch] of POISON) {
   // Build the input the way JSON.parse would: a plain object with own keys.
   const raw = { ...DEFAULT_LAYOUT_PARAMS };
-  for (const k of Object.keys(patch)) Object.defineProperty(raw, k, {
-    value: patch[k], enumerable: true, writable: true, configurable: true,
-  });
+  for (const k of Object.keys(patch))
+    Object.defineProperty(raw, k, {
+      value: patch[k],
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
 
   const lp = normalizeLayoutParams(raw);
 
@@ -127,16 +142,20 @@ for (const [label, patch] of POISON) {
 
   // 3. Every enum is one of the allowed values.
   for (const [key, allowed] of [
-    ['mode', MODE_IDS], ['composition', COMPOSITION_IDS], ['blendMode', BLEND_MODES],
+    ['mode', MODE_IDS],
+    ['composition', COMPOSITION_IDS],
+    ['blendMode', BLEND_MODES],
     ['paletteShift', PALETTE_SHIFTS],
-    ['symmetry', SYMMETRY_MODES], ['behave', BEHAVE_MODES], // #268: shading/material removed
+    ['symmetry', SYMMETRY_MODES],
+    ['behave', BEHAVE_MODES], // #268: shading/material removed
   ]) {
     assert.ok(allowed.includes(lp[key]), `${label}: ${key}="${lp[key]}" not in allow-list`);
   }
 
   // 4. Booleans are booleans — 'false' is truthy, and used to stay a string.
   // #1202 — mirror is a 4-state enum now (off/x/y/xy), not a boolean.
-  for (const key of ['bleed', 'overlap', 'accumulation', 'dish']) { // #268: recolor removed; #1409: dish
+  for (const key of ['bleed', 'overlap', 'accumulation', 'dish']) {
+    // #268: recolor removed; #1409: dish
     assert.strictEqual(typeof lp[key], 'boolean', `${label}: ${key} must be boolean`);
   }
   assert.ok(['off', 'x', 'y', 'xy'].includes(lp.mirror), `${label}: mirror must be a 4-state enum`);
@@ -148,14 +167,22 @@ for (const [label, patch] of POISON) {
   let out;
   assert.doesNotThrow(() => {
     out = buildPlacements({
-      layoutParams: lp, seed: 0x1a4f, activeAssets: ASSETS, palette: PALETTE,
-      caps: CAPS, canvasW: 1000, canvasH: 700,
+      layoutParams: lp,
+      seed: 0x1a4f,
+      activeAssets: ASSETS,
+      palette: PALETTE,
+      caps: CAPS,
+      canvasW: 1000,
+      canvasH: 700,
     });
   }, `${label}: buildPlacements threw`);
   for (const it of out.items) {
     assert.ok(
-      Number.isFinite(it.x) && Number.isFinite(it.y) && Number.isFinite(it.scale)
-      && Number.isFinite(it.rotation) && Number.isFinite(it.alpha),
+      Number.isFinite(it.x) &&
+        Number.isFinite(it.y) &&
+        Number.isFinite(it.scale) &&
+        Number.isFinite(it.rotation) &&
+        Number.isFinite(it.alpha),
       `${label}: non-finite geometry reached the renderer — ${JSON.stringify(it).slice(0, 120)}`,
     );
   }
@@ -167,11 +194,13 @@ for (const [label, patch] of POISON) {
 for (const absent of [null, undefined, '', '   ', [], true, {}]) {
   const lp = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, damping: absent, count: absent });
   assert.strictEqual(
-    lp.damping, DEFAULT_LAYOUT_PARAMS.damping,
+    lp.damping,
+    DEFAULT_LAYOUT_PARAMS.damping,
     `damping=${JSON.stringify(absent)} should fall back to the default, got ${lp.damping}`,
   );
   assert.strictEqual(
-    lp.count, DEFAULT_LAYOUT_PARAMS.count,
+    lp.count,
+    DEFAULT_LAYOUT_PARAMS.count,
     `count=${JSON.stringify(absent)} should fall back to the default, got ${lp.count}`,
   );
 }
@@ -204,11 +233,25 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
   // …and so must a hand-authored project using the extremes of each slider.
   const extremes = {
     ...DEFAULT_LAYOUT_PARAMS,
-    count: 800, jitter: 200, density: 100, zTiers: 12, displacement: 250, // #272: capped at 100
-    noiseFreq: 0.03, noiseSpeed: 3.0, particleCount: 500, damping: 0.99,
-    wind: 3, body: 7, flap: 1, tight: 0.95,
-    scale: [0.1, 3.0], rotate: [-180, 180], alpha: [0, 100],
-    mode: 'hype', symmetry: 'bilateral', behave: 'cruise',
+    count: 800,
+    jitter: 200,
+    density: 100,
+    zTiers: 12,
+    displacement: 250, // #272: capped at 100
+    noiseFreq: 0.03,
+    noiseSpeed: 3.0,
+    particleCount: 500,
+    damping: 0.99,
+    wind: 3,
+    body: 7,
+    flap: 1,
+    tight: 0.95,
+    scale: [0.1, 3.0],
+    rotate: [-180, 180],
+    alpha: [0, 100],
+    mode: 'hype',
+    symmetry: 'bilateral',
+    behave: 'cruise',
   };
   const norm = normalizeLayoutParams(extremes);
   for (const [k, v] of Object.entries(extremes)) {
@@ -234,11 +277,25 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
   assert.strictEqual(withOverride.behaveSep, 5.5, 'a valid override must survive normalize');
   // Out-of-bounds clamps like every other spec'd field, not falls back to null.
   const clamped = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, behaveSep: 999 });
-  assert.strictEqual(clamped.behaveSep, PARAM_SPEC.behaveSep.max, 'an out-of-range override clamps, not falls back to null');
+  assert.strictEqual(
+    clamped.behaveSep,
+    PARAM_SPEC.behaveSep.max,
+    'an out-of-range override clamps, not falls back to null',
+  );
   // A fresh project (no overrides set) normalizes to null for every one — an
   // unedited layer must be indistinguishable from before #479 existed.
   const fresh = normalizeLayoutParams({ ...DEFAULT_LAYOUT_PARAMS });
-  for (const key of ['behaveSep', 'behaveAli', 'behaveCoh', 'behaveSepR', 'behaveAliR', 'behaveCohR', 'behaveWind', 'behaveOrbit', 'behaveAttract']) {
+  for (const key of [
+    'behaveSep',
+    'behaveAli',
+    'behaveCoh',
+    'behaveSepR',
+    'behaveAliR',
+    'behaveCohR',
+    'behaveWind',
+    'behaveOrbit',
+    'behaveAttract',
+  ]) {
     assert.strictEqual(fresh[key], null, `${key} must default to null (no override)`);
   }
   // validateLayoutParams (the live-edit path, stricter than normalize) must
@@ -257,18 +314,32 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
 // a parameter added later without bounds — the exact way this hole reopens.
 {
   const EXEMPT = new Set([
-    'composition', 'mode', 'scale', 'rotate', 'alpha', 'bleed', 'recolor', 'mirror',
-    'overlap', 'blendMode', 'shading', 'paletteShift', 'accumulation', 'symmetry',
-    'behave', 'material',
+    'composition',
+    'mode',
+    'scale',
+    'rotate',
+    'alpha',
+    'bleed',
+    'recolor',
+    'mirror',
+    'overlap',
+    'blendMode',
+    'shading',
+    'paletteShift',
+    'accumulation',
+    'symmetry',
+    'behave',
+    'material',
   ]);
   const unspecced = Object.entries(DEFAULT_LAYOUT_PARAMS)
     .filter(([k, v]) => typeof v === 'number' && !EXEMPT.has(k) && !PARAM_SPEC[k])
     .map(([k]) => k);
   assert.deepStrictEqual(
-    unspecced, [],
-    `numeric layout params with no PARAM_SPEC bounds: ${unspecced.join(', ')}.\n`
-    + '  Add them to PARAM_SPEC (matching the slider in ParamBlock.jsx), or a\n'
-    + '  poisoned project can put any value at all into the render loop.',
+    unspecced,
+    [],
+    `numeric layout params with no PARAM_SPEC bounds: ${unspecced.join(', ')}.\n` +
+      '  Add them to PARAM_SPEC (matching the slider in ParamBlock.jsx), or a\n' +
+      '  poisoned project can put any value at all into the render loop.',
   );
 }
 
@@ -284,7 +355,11 @@ for (const bad of [null, undefined, 'string', 42, [], [1, 2, 3], true]) {
   assert.strictEqual(loaded.dish, false, 'A3: dish OFF round-trips through save/load');
   assert.strictEqual(loaded.contactRestitution, 0.8, 'A3: restitution round-trips');
   assert.strictEqual(loaded.contactRepel, 2.5, 'A3: repel round-trips');
-  assert.strictEqual(typeof normalizeLayoutParams({ dish: 'junk' }).dish, 'boolean', 'A3: garbage coerces to a boolean, never a string');
+  assert.strictEqual(
+    typeof normalizeLayoutParams({ dish: 'junk' }).dish,
+    'boolean',
+    'A3: garbage coerces to a boolean, never a string',
+  );
   const v = validateLayoutParams({ ...DEFAULT_LAYOUT_PARAMS, dish: false });
   assert.ok(!v.rejected.includes('dish'), 'A3: the firewall never rejects the dish switch');
   assert.strictEqual(v.params.dish, false, 'A3: the firewall keeps the artist\u2019s OFF');

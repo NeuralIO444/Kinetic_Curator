@@ -1,11 +1,21 @@
 // swayMark.selfcheck.mjs — the presence mark next to BEATS (#1258).
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
-import { swayMagnitude, SWAY_DELTA_MAX, SWAY_VISIBLE_THRESHOLD, setSwayMagnitude, getSwayMagnitude } from '../curator/swayView.mjs';
+import {
+  swayMagnitude,
+  SWAY_DELTA_MAX,
+  SWAY_VISIBLE_THRESHOLD,
+  setSwayMagnitude,
+  getSwayMagnitude,
+} from '../curator/swayView.mjs';
 
 const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('magnitude: neutral sway is 0, max delta is 1, half is 0.5', () => {
   assert.equal(swayMagnitude({ temperatureDelta: 0 }), 0);
@@ -61,7 +71,10 @@ ok('the Director never renders: the mark reads the holder, not the scheduler', (
   // the mark imports no scheduler module and reads the published magnitude.)
   const jsx = read('./SwayMark.jsx');
   assert.ok(!jsx.includes('curator/director'), 'no scheduler import');
-  assert.ok(/useSyncExternalStore\(subscribeSway, getSwayMagnitude\)/.test(jsx), 'reads the ephemeral holder, and re-renders when the pace starts or stops (#1460)');
+  assert.ok(
+    /useSyncExternalStore\(subscribeSway, getSwayMagnitude\)/.test(jsx),
+    'reads the ephemeral holder, and re-renders when the pace starts or stops (#1460)',
+  );
   assert.ok(jsx.includes('s.curatePress'), 're-renders on every pick');
 });
 
@@ -78,7 +91,10 @@ ok('placement: the mark sits immediately right of BEATS in the top bar', () => {
   const i = bar.indexOf('<BeatButton />');
   assert.ok(i >= 0, 'BEATS found');
   const after = bar.slice(i, i + 400);
-  assert.ok(/<BeatButton \/>\s*\{\/\* #1258[\s\S]*?\*\/\}\s*<SwayMark \/>/.test(after), 'SwayMark directly after BeatButton');
+  assert.ok(
+    /<BeatButton \/>\s*\{\/\* #1258[\s\S]*?\*\/\}\s*<SwayMark \/>/.test(after),
+    'SwayMark directly after BeatButton',
+  );
 });
 
 ok('CSS: Davis amber breath, reduced-motion static, square corners', () => {

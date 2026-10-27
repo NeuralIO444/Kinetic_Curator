@@ -47,7 +47,12 @@ export function sanitizeAudioRoutes(raw) {
     if (seen.has(key)) continue; // identity is the input+target pair: first one wins
     seen.add(key);
     const max = maxDepth(r.target);
-    out.push({ input: r.input, target: r.target, depth: Math.min(max, Math.max(-max, depth)), ...(r.by === 'davis' ? { by: 'davis' } : {}) }); // #1483: Davis's mark
+    out.push({
+      input: r.input,
+      target: r.target,
+      depth: Math.min(max, Math.max(-max, depth)),
+      ...(r.by === 'davis' ? { by: 'davis' } : {}),
+    }); // #1483: Davis's mark
   }
   // A non-empty array with nothing usable is garbage, not "delete every route".
   if (out.length === 0) return null;
@@ -63,9 +68,23 @@ export function editableRoutes(routes) {
 
 /** A sensible starting depth per target (natural units, well inside its ceiling). */
 export const NEW_ROUTE_DEPTH = Object.freeze({
-  'render.scale': 0.2, 'render.alpha': 10, 'render.breath': 0.03, 'render.glow': 0.5,
-  'render.hue': 15, 'color.hue': 15, 'render.squash': 0.2, 'render.kineme': 0.5, 'clock.kinemeRate': 2, 'render.accum': 4, 'render.sun': 0.2, 'light.intensity': 0.2,
-  'pattern.drift': 0.3, 'pattern.mix': 0.3, 'pattern.hero': 0.3, 'pattern.grout': 0.05, 'pattern.density': 2, // #1110
+  'render.scale': 0.2,
+  'render.alpha': 10,
+  'render.breath': 0.03,
+  'render.glow': 0.5,
+  'render.hue': 15,
+  'color.hue': 15,
+  'render.squash': 0.2,
+  'render.kineme': 0.5,
+  'clock.kinemeRate': 2,
+  'render.accum': 4,
+  'render.sun': 0.2,
+  'light.intensity': 0.2,
+  'pattern.drift': 0.3,
+  'pattern.mix': 0.3,
+  'pattern.hero': 0.3,
+  'pattern.grout': 0.05,
+  'pattern.density': 2, // #1110
 });
 
 /** Slider bounds and step for a target's route depth. */
@@ -87,7 +106,9 @@ export function defaultDepthFor(input, target) {
 export function nextRoute(table, input = null) {
   if (!Array.isArray(table) || table.length >= MAX_ROUTES) return null;
   const taken = new Set(table.map(pairKey));
-  const inputs = input ? [input, ...ROUTE_INPUTS.filter((i) => i !== input)] : ['band.air', ...ROUTE_INPUTS.filter((i) => i !== 'band.air')];
+  const inputs = input
+    ? [input, ...ROUTE_INPUTS.filter((i) => i !== input)]
+    : ['band.air', ...ROUTE_INPUTS.filter((i) => i !== 'band.air')];
   for (const i of inputs) {
     for (const t of Object.keys(ROUTE_TARGETS)) {
       if (!taken.has(`${i}>${t}`)) return { input: i, target: t, depth: NEW_ROUTE_DEPTH[t] };

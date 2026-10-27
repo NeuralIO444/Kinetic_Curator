@@ -25,12 +25,7 @@
 // are declarative for now — captured, interpolated through MIX, and ready
 // for the global post-pass when it lands.
 
-import {
-  DEFAULT_LAYOUT_PARAMS,
-  PARAM_SPEC,
-  MODE_IDS,
-  validateLayoutParams,
-} from './layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, PARAM_SPEC, MODE_IDS, validateLayoutParams } from './layout-modes.js';
 import { normalizeHex, resolvePalette } from './palettes.js';
 
 /** Swatch slots per voice palette — matches the 8-slot catalog shape. */
@@ -302,8 +297,8 @@ export const FLAGSHIP_VOICES = [
       accumulation: true,
       accumulationFade: 14,
       accumulationOptics: 0.08,
-      lifeDrift: 0.10,
-      noiseSpeed: 0.10,
+      lifeDrift: 0.1,
+      noiseSpeed: 0.1,
       displacement: 8,
       flap: 0.1,
       wind: 0.35,
@@ -330,49 +325,109 @@ export const FLAGSHIP_VOICES = [
  * set, the source for the SHAPES chips.
  */
 export const STUB_VOICES = [
-  { id: 'random',     name: 'random',    glyph: 'rand',   vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.',
+  {
+    id: 'random',
+    name: 'random',
+    glyph: 'rand',
+    vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.',
     assets: ['dot_single_01', 'geo_cross_01', 'line_dash_01', 'dot_confetti_01'],
   },
-  { id: 'grid',       name: 'grid',      glyph: 'grid',   vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.',
+  {
+    id: 'grid',
+    name: 'grid',
+    glyph: 'grid',
+    vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.',
     assets: ['geo_square_01', 'geo_hex_01', 'line_solid_01', 'geo_cross_02'],
   },
-  { id: 'fibonacci',  name: 'fibonacci', glyph: 'phi',    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
+  {
+    id: 'fibonacci',
+    name: 'fibonacci',
+    glyph: 'phi',
+    vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
     assets: ['flora_flower_01', 'line_spiral_01', 'rad_rings_01', 'flora_sprig_01'],
   },
-  { id: 'radial',     name: 'radial',    glyph: 'rad',    vibe: 'Radar: sonar pings and target locks. Military calm.',
+  {
+    id: 'radial',
+    name: 'radial',
+    glyph: 'rad',
+    vibe: 'Radar: sonar pings and target locks. Military calm.',
     assets: ['rad_rings_01', 'rad_orbit_01', 'rad_target_01', 'rad_starburst_01'],
   },
-  { id: 'noise',      name: 'noise warp', glyph: 'noise',  vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.',
+  {
+    id: 'noise',
+    name: 'noise warp',
+    glyph: 'noise',
+    vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.',
     assets: ['line_squiggle_01', 'line_zigzag_01', 'line_hatch_01', 'dot_field_02'],
   },
-  { id: 'stratified', name: 'stratified', glyph: 'strat', vibe: 'Sediment: geological layers. Deep time, compressed.',
+  {
+    id: 'stratified',
+    name: 'stratified',
+    glyph: 'strat',
+    vibe: 'Sediment: geological layers. Deep time, compressed.',
     assets: ['line_solid_01', 'line_double_01', 'geo_trapezoid_01', 'geo_parallelo_01'],
   },
-  { id: 'flow',       name: 'wave',      glyph: 'flow',   vibe: 'River: current lines drifting downstream. Hydrology.',
+  {
+    id: 'flow',
+    name: 'wave',
+    glyph: 'flow',
+    vibe: 'River: current lines drifting downstream. Hydrology.',
     assets: ['line_squiggle_02', 'line_swoosh_01', 'org_blob_01', 'hae_tendril_01'],
   },
-  { id: 'rails',      name: 'rails',     glyph: 'rail',   vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
+  {
+    id: 'rails',
+    name: 'rails',
+    glyph: 'rail',
+    vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
     assets: ['line_solid_01', 'line_dash_02', 'geo_cross_01', 'line_arrow_01'],
   },
-  { id: 'layers',     name: 'layers',    glyph: 'z',      vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
+  {
+    id: 'layers',
+    name: 'layers',
+    glyph: 'z',
+    vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
     assets: ['geo_square_02', 'geo_parallelo_01', 'line_double_01', 'geo_halfcircle_01'],
   },
-  { id: 'ca',         name: 'cellular',  glyph: 'ca',     vibe: 'Petri Dish: cellular colonies on agar. Wet biology.',
+  {
+    id: 'ca',
+    name: 'cellular',
+    glyph: 'ca',
+    vibe: 'Petri Dish: cellular colonies on agar. Wet biology.',
     assets: ['org_blob_02', 'dot_field_01', 'org_petal_01', 'dot_single_01'],
   },
-  { id: 'orbit',      name: 'orbit',     glyph: 'orbit',  vibe: 'Planetarium: gravitational ballet. Moons and patience.',
+  {
+    id: 'orbit',
+    name: 'orbit',
+    glyph: 'orbit',
+    vibe: 'Planetarium: gravitational ballet. Moons and patience.',
     assets: ['rad_orbit_01', 'rad_orbit_02', 'rad_orbit_dot_01', 'dot_single_01'],
   },
-  { id: 'abacus',     name: 'abacus',    glyph: 'abacus', vibe: 'Counting House: beads on wires. Arithmetic made visible.',
+  {
+    id: 'abacus',
+    name: 'abacus',
+    glyph: 'abacus',
+    vibe: 'Counting House: beads on wires. Arithmetic made visible.',
     assets: ['geo_hex_02', 'stamp_glyph_01', 'stamp_num_01', 'geo_circle_01'],
   },
-  { id: 'dla',        name: 'DLA growth', glyph: 'coral',  vibe: 'Coral Reef: wandering particles stick and crystallize — dendritic arms bloom from a seed. Living geology.', // #834
+  {
+    id: 'dla',
+    name: 'DLA growth',
+    glyph: 'coral',
+    vibe: 'Coral Reef: wandering particles stick and crystallize — dendritic arms bloom from a seed. Living geology.', // #834
     assets: ['hae_coral_01', 'hae_mycelium_01', 'hae_tendril_01', 'hae_fern_01'],
   },
-  { id: 'eden',       name: 'Eden growth', glyph: 'bloom', vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
+  {
+    id: 'eden',
+    name: 'Eden growth',
+    glyph: 'bloom',
+    vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
     assets: ['org_blob_01', 'org_blob_02', 'hae_sponge_01', 'dot_field_01'],
   },
-  { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell', vibe: 'True Voronoi: gapless cellular fill. Each mark belongs to one cell.', // #1196
+  {
+    id: 'voronoi-cells',
+    name: 'voronoi cells',
+    glyph: 'cell',
+    vibe: 'True Voronoi: gapless cellular fill. Each mark belongs to one cell.', // #1196
     assets: ['geo_hex_01', 'geo_hex_02', 'dot_field_01', 'org_blob_01'],
   },
 ];
@@ -385,20 +440,48 @@ export const STUB_VOICES = [
  * now lives here, chosen independently.
  */
 export const MOTION_MODES = [
-  { id: 'still',   name: 'still',   vibe: 'Held breath: barely moving.',
-    params: { behave: 'cruise', lifeDrift: 0.08, noiseSpeed: 0.1, wind: 0.3, flap: 0.1, breath: 0 } },
-  { id: 'drift',   name: 'drift',   vibe: 'Slow current: everything leans the same way.',
-    params: { behave: 'cruise', lifeDrift: 0.3, noiseSpeed: 0.4, wind: 0.8, flap: 0.3, breath: 0.15 } },
-  { id: 'flow',    name: 'river',   vibe: 'River: a steady downstream push.',
-    params: { behave: 'cruise', lifeDrift: 0.25, noiseSpeed: 0.7, wind: 1.2, flap: 0.4, breath: 0.1 } },
-  { id: 'flock',   name: 'flock',   vibe: 'One mind: tight, turning together.',
-    params: { behave: 'flock', lifeDrift: 0.35, noiseSpeed: 0.5, wind: 1.0, flap: 0.5, breath: 0.2 } },
-  { id: 'orbit',   name: 'orbit',   vibe: 'Planetarium: circling a pull point.',
-    params: { behave: 'orbit', lifeDrift: 0.2, noiseSpeed: 0.35, wind: 0.6, flap: 0.35, breath: 0.1 } },
-  { id: 'scatter', name: 'scatter', vibe: 'Static bloom: restless, no agreement.',
-    params: { behave: 'scatter', lifeDrift: 0.3, noiseSpeed: 0.6, wind: 1.0, flap: 0.6, breath: 0 } },
-  { id: 'mold',    name: 'mold',    vibe: 'Slow growth: breathing colonies.',
-    params: { behave: 'mold', lifeDrift: 0.15, noiseSpeed: 0.2, wind: 0.5, flap: 0.2, breath: 0.5 } },
+  {
+    id: 'still',
+    name: 'still',
+    vibe: 'Held breath: barely moving.',
+    params: { behave: 'cruise', lifeDrift: 0.08, noiseSpeed: 0.1, wind: 0.3, flap: 0.1, breath: 0 },
+  },
+  {
+    id: 'drift',
+    name: 'drift',
+    vibe: 'Slow current: everything leans the same way.',
+    params: { behave: 'cruise', lifeDrift: 0.3, noiseSpeed: 0.4, wind: 0.8, flap: 0.3, breath: 0.15 },
+  },
+  {
+    id: 'flow',
+    name: 'river',
+    vibe: 'River: a steady downstream push.',
+    params: { behave: 'cruise', lifeDrift: 0.25, noiseSpeed: 0.7, wind: 1.2, flap: 0.4, breath: 0.1 },
+  },
+  {
+    id: 'flock',
+    name: 'flock',
+    vibe: 'One mind: tight, turning together.',
+    params: { behave: 'flock', lifeDrift: 0.35, noiseSpeed: 0.5, wind: 1.0, flap: 0.5, breath: 0.2 },
+  },
+  {
+    id: 'orbit',
+    name: 'orbit',
+    vibe: 'Planetarium: circling a pull point.',
+    params: { behave: 'orbit', lifeDrift: 0.2, noiseSpeed: 0.35, wind: 0.6, flap: 0.35, breath: 0.1 },
+  },
+  {
+    id: 'scatter',
+    name: 'scatter',
+    vibe: 'Static bloom: restless, no agreement.',
+    params: { behave: 'scatter', lifeDrift: 0.3, noiseSpeed: 0.6, wind: 1.0, flap: 0.6, breath: 0 },
+  },
+  {
+    id: 'mold',
+    name: 'mold',
+    vibe: 'Slow growth: breathing colonies.',
+    params: { behave: 'mold', lifeDrift: 0.15, noiseSpeed: 0.2, wind: 0.5, flap: 0.2, breath: 0.5 },
+  },
 ];
 
 /**
@@ -447,7 +530,10 @@ export function shapeMixWeights(levels) {
   for (const set of SHAPE_SETS) {
     const lv = levels?.[set.id] || 0;
     if (!(lv > 0)) continue;
-    for (const id of set.ids) { w[id] = (w[id] || 0) + lv; total += lv; }
+    for (const id of set.ids) {
+      w[id] = (w[id] || 0) + lv;
+      total += lv;
+    }
   }
   if (!total) return null;
   for (const id of Object.keys(w)) w[id] /= total;
@@ -467,7 +553,8 @@ export function liveShapeLevels(levels, enabledAssets) {
 }
 
 /** A motion chip reads as active while every param it sets is at its value. */
-export const isMotionActive = (layoutParams, motion) => Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
+export const isMotionActive = (layoutParams, motion) =>
+  Object.entries(motion.params).every(([k, v]) => layoutParams?.[k] === v);
 
 export const FLAGSHIP_VOICE_IDS = FLAGSHIP_VOICES.map((v) => v.id);
 
@@ -500,7 +587,9 @@ export function sanitizeFx(raw) {
     posterize: !!r.posterize,
     edge: !!r.edge,
     glow: num01(r.glow, DEFAULT_FX.glow),
-    contrast: Number.isFinite(Number(r.contrast)) ? Math.min(3, Math.max(0.25, Number(r.contrast))) : DEFAULT_FX.contrast,
+    contrast: Number.isFinite(Number(r.contrast))
+      ? Math.min(3, Math.max(0.25, Number(r.contrast)))
+      : DEFAULT_FX.contrast,
   };
 }
 
@@ -509,7 +598,9 @@ export function sanitizeFx(raw) {
 // at the midpoint — the classic dissolve point. Int-bounded params round.
 
 const INT_KEYS = new Set(
-  Object.entries(PARAM_SPEC).filter(([, spec]) => spec.int).map(([k]) => k),
+  Object.entries(PARAM_SPEC)
+    .filter(([, spec]) => spec.int)
+    .map(([k]) => k),
 );
 
 function isNumArray(v) {
@@ -525,11 +616,16 @@ function lerpParamValue(from, to, t) {
   // array mixes against a linked pair.
   const fromPair = Array.isArray(from) ? { x: from, y: from } : from;
   const toPair = Array.isArray(to) ? { x: to, y: to } : to;
-  if (fromPair && toPair && typeof fromPair === 'object' && typeof toPair === 'object' &&
-      isNumArray(fromPair.x) && isNumArray(toPair.x)) {
-    const lerpAxis = (a, b) => (isNumArray(a) && isNumArray(b) && a.length === b.length)
-      ? a.map((v, i) => v + (b[i] - v) * t)
-      : (t <= 0 ? a : b);
+  if (
+    fromPair &&
+    toPair &&
+    typeof fromPair === 'object' &&
+    typeof toPair === 'object' &&
+    isNumArray(fromPair.x) &&
+    isNumArray(toPair.x)
+  ) {
+    const lerpAxis = (a, b) =>
+      isNumArray(a) && isNumArray(b) && a.length === b.length ? a.map((v, i) => v + (b[i] - v) * t) : t <= 0 ? a : b;
     return {
       x: lerpAxis(fromPair.x, toPair.x),
       y: lerpAxis(fromPair.y ?? fromPair.x, toPair.y ?? toPair.x),
@@ -537,7 +633,7 @@ function lerpParamValue(from, to, t) {
   }
   // Spine E: stop snapping enums at 0.5. At t=0 return `from`; for t>0 return `to`
   // so the live target renders while the held outgoing frame dissolves over it.
-  return t <= 0 ? from : (to !== undefined ? to : from);
+  return t <= 0 ? from : to !== undefined ? to : from;
 }
 
 function lerpHex(a, b, t) {
@@ -573,17 +669,19 @@ export function mixVoiceState(from, to, t) {
   const n = Math.max(from.palette?.swatches?.length || 0, to.palette?.swatches?.length || 0, 1);
   const swatches = [];
   for (let i = 0; i < n; i++) {
-    swatches.push(lerpHex(
-      from.palette?.swatches?.[i] ?? from.palette?.swatches?.[0] ?? '#888888',
-      to.palette?.swatches?.[i] ?? to.palette?.swatches?.[0] ?? '#888888',
-      tc,
-    ));
+    swatches.push(
+      lerpHex(
+        from.palette?.swatches?.[i] ?? from.palette?.swatches?.[0] ?? '#888888',
+        to.palette?.swatches?.[i] ?? to.palette?.swatches?.[0] ?? '#888888',
+        tc,
+      ),
+    );
   }
   const fx = {};
   for (const k of Object.keys(DEFAULT_FX)) {
     const f = from.fx?.[k];
     const o = to.fx?.[k];
-    fx[k] = (typeof f === 'number' && typeof o === 'number') ? f + (o - f) * tc : (tc <= 0 ? f : (o !== undefined ? o : f));
+    fx[k] = typeof f === 'number' && typeof o === 'number' ? f + (o - f) * tc : tc <= 0 ? f : o !== undefined ? o : f;
   }
   return {
     params,
@@ -593,7 +691,7 @@ export function mixVoiceState(from, to, t) {
       swatches,
     },
     fx,
-    assets: tc <= 0 ? from.assets : (to.assets || from.assets),
+    assets: tc <= 0 ? from.assets : to.assets || from.assets,
     blendSeconds: to.blendSeconds ?? from.blendSeconds ?? 2,
   };
 }

@@ -6,7 +6,9 @@ import assert from 'node:assert/strict';
 const css = readFileSync(new URL('../styles/panels.css', import.meta.url), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
 const SCALE = new Set([0, 2, 4, 6, 8, 12, 16, 24]);
 const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((m) => ({ sel: m[1].trim(), body: m[2] }));
-const scoped = rules.filter((r) => /\.(stim-matrix|stim-route|stim-feel|pipeline-(body|row|section)|davis-)/.test(r.sel));
+const scoped = rules.filter((r) =>
+  /\.(stim-matrix|stim-route|stim-feel|pipeline-(body|row|section)|davis-)/.test(r.sel),
+);
 
 for (const r of scoped) {
   for (const m of r.body.matchAll(/(?:^|[;\s])(?:gap|row-gap|column-gap)\s*:\s*([^;]+);/g)) {
