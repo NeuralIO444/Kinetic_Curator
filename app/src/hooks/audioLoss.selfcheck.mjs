@@ -15,6 +15,13 @@ ok('a refused permission is "denied"; a missing device is "lost"', () => {
   }
 });
 
+ok('#1746: a FILE source that fails is "lost", whatever the error name — never MIC BLOCKED', () => {
+  for (const name of ['NotAllowedError', 'NotSupportedError', 'SecurityError', 'AbortError', 'WeirdError']) {
+    assert.equal(classifyAudioError({ name }, 'file'), 'lost', name);
+  }
+  assert.equal(classifyAudioError({ name: 'NotAllowedError' }, 'device'), 'denied', 'a device still reads denied');
+});
+
 ok('unknown errors keep the old behaviour (denied), junk does not throw', () => {
   assert.equal(classifyAudioError({ name: 'WeirdError' }), 'denied');
   assert.equal(classifyAudioError(null), 'denied');

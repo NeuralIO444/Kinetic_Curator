@@ -139,10 +139,15 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
     };
 
     (async () => {
+      // #1746: held outside the try so a failed start can close it — ctxRef is only
+      // set once the graph is built, so cleanup alone never saw this context.
+      let ctx = null;
       try {
-        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        ctx = new (window.AudioContext || window.webkitAudioContext)();
         // Browsers start contexts suspended unless created inside a gesture.
         if (ctx.state === 'suspended') await ctx.resume();
+        // #1746: turned off during the await — don't go on to ask for the mic.
+        if (cancelled) { ctx.close().catch(() => {}); return; }
 
         let srcNode;
         let stream = null;
@@ -216,10 +221,14 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
         cbRef.current.onDenied?.(false);
         rafRef.current = requestAnimationFrame(analyze);
       } catch (err) {
-        if (classifyAudioError(err) === 'lost') {
-          // The chosen device is not there: that is not a refused permission.
+        // #1746: a start that failed never reached ctxRef, so close its context here
+        // (repeated failed toggles used to walk toward the browser's context cap).
+        if (ctx && ctx !== ctxRef.current && ctx.state !== 'closed') ctx.close().catch(() => {});
+        if (cancelled) return;
+        if (classifyAudioError(err, source.type) === 'lost') {
+          // The chosen device (or file) is not there: that is not a refused permission.
           console.warn('[useAudioInput] audio input not available:', err?.message ?? err);
-          cbRef.current.onLost?.(source.id === 'default' ? '' : source.id);
+          cbRef.current.onLost?.(source.type === 'file' ? (source.name || 'the audio file') : (source.id === 'default' ? '' : source.id));
         } else {
           console.warn('[useAudioInput] mic/audio access denied:', err?.message ?? err);
           deniedRef.current = true;
@@ -262,7 +271,7 @@ export function useAudioInput({ enabled, source, gain, monitor, ballistics, side
       analyserRef.current = null;
       ctxRef.current = null;
     };
-  }, [enabled, source.id, source.url, source.type, monitor]);
+  }, [enabled, source.id, source.url, source.type, source.name, monitor]);
 
   // Retune gain without rebuilding the graph.
   useEffect(() => {

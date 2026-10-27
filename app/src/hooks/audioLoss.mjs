@@ -13,7 +13,10 @@ const GONE = new Set(['NotFoundError', 'OverconstrainedError', 'NotReadableError
  * which is what the app did before this existed.
  * @returns {'denied'|'lost'}
  */
-export function classifyAudioError(err) {
+export function classifyAudioError(err, sourceType = 'device') {
+  // #1746: a FILE source asks for no permission — a file that won't play
+  // (undecodable, autoplay-refused) is an input that isn't there, never MIC BLOCKED.
+  if (sourceType === 'file') return 'lost';
   const name = err && err.name;
   if (GONE.has(name) && !DENIED.has(name)) return 'lost';
   return 'denied';
