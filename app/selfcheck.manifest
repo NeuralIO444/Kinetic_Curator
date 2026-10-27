@@ -513,3 +513,4 @@ node src/engine/finishingLook.selfcheck.mjs
 node src/data/assetStyle.selfcheck.mjs
 node src/state/rollPool.selfcheck.mjs
 node src/data/styleLooks.selfcheck.mjs
+node src/data/voiceDeck.selfcheck.mjs

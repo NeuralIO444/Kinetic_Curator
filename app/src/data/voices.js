@@ -322,7 +322,9 @@ export const FLAGSHIP_VOICES = [
  * Stub voices — the 12 layout tiles. Layout axis only (#555): a tile rides the
  * MIX road (loadStubMode) to change `mode`, and never touches motion, color or
  * shapes. `id` is the layout mode id; `assets` is this mode's curated 4-shape
- * set, the source for the SHAPES chips.
+ * set (the dice/miner cast source). #1771: `wardrobe` is the four more shapes the
+ * promoted voice wears (S3-coherent, data/voiceDeck.js) — the SHAPES chip is the
+ * full eight, no `slice(0, 4)` ceiling (fullShapeSet).
  */
 export const STUB_VOICES = [
   {
@@ -331,6 +333,7 @@ export const STUB_VOICES = [
     glyph: 'rand',
     vibe: 'Static Bloom: channel-surfing between accidents. Confetti TV.',
     assets: ['dot_single_01', 'geo_cross_01', 'line_dash_01', 'dot_confetti_01'],
+    wardrobe: ['dot_field_03', 'line_spiral_01', 'dot_ring_01', 'line_hatch_02'],
   },
   {
     id: 'grid',
@@ -338,6 +341,7 @@ export const STUB_VOICES = [
     glyph: 'grid',
     vibe: 'Control Room: brutalist order. Swiss grid, every node in its cell.',
     assets: ['geo_square_01', 'geo_hex_01', 'line_solid_01', 'geo_cross_02'],
+    wardrobe: ['geo_pent_01', 'geo_octa_01', 'line_step_01', 'geo_diamond_03'],
   },
   {
     id: 'fibonacci',
@@ -345,6 +349,7 @@ export const STUB_VOICES = [
     glyph: 'phi',
     vibe: 'Nautilus: golden-spiral growth. Sacred geometry, slow reveal.',
     assets: ['flora_flower_01', 'line_spiral_01', 'rad_rings_01', 'flora_sprig_01'],
+    wardrobe: ['flora_palm_01', 'hae_radiolarian_02', 'hae_radiolarian_01', 'hae_mycelium_01'],
   },
   {
     id: 'radial',
@@ -352,6 +357,7 @@ export const STUB_VOICES = [
     glyph: 'rad',
     vibe: 'Radar: sonar pings and target locks. Military calm.',
     assets: ['rad_rings_01', 'rad_orbit_01', 'rad_target_01', 'rad_starburst_01'],
+    wardrobe: ['hae_coral_01', 'rad_orbit_dot_01', 'hae_diatom_02', 'hae_starfish_01'],
   },
   {
     id: 'noise',
@@ -359,6 +365,7 @@ export const STUB_VOICES = [
     glyph: 'noise',
     vibe: 'Bad Reception: warped broadcast, signal decay. Analog horror.',
     assets: ['line_squiggle_01', 'line_zigzag_01', 'line_hatch_01', 'dot_field_02'],
+    wardrobe: ['dot_field_05', 'scn05', 'scn11', 'scn01'],
   },
   {
     id: 'stratified',
@@ -366,6 +373,7 @@ export const STUB_VOICES = [
     glyph: 'strat',
     vibe: 'Sediment: geological layers. Deep time, compressed.',
     assets: ['line_solid_01', 'line_double_01', 'geo_trapezoid_01', 'geo_parallelo_01'],
+    wardrobe: ['geo_hex_02', 'typ_Y', 'typ_S', 'typ_N'],
   },
   {
     id: 'flow',
@@ -373,6 +381,7 @@ export const STUB_VOICES = [
     glyph: 'flow',
     vibe: 'River: current lines drifting downstream. Hydrology.',
     assets: ['line_squiggle_02', 'line_swoosh_01', 'org_blob_01', 'hae_tendril_01'],
+    wardrobe: ['line_spiral_01', 'line_loop_01', 'org_pod_02', 'org_blob_05'],
   },
   {
     id: 'rails',
@@ -380,6 +389,7 @@ export const STUB_VOICES = [
     glyph: 'rail',
     vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
     assets: ['line_solid_01', 'line_dash_02', 'geo_cross_01', 'line_arrow_01'],
+    wardrobe: ['geo_hex_03', 'line_arrow_03', 'line_squiggle_03', 'typ_M'],
   },
   {
     id: 'layers',
@@ -387,6 +397,7 @@ export const STUB_VOICES = [
     glyph: 'z',
     vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
     assets: ['geo_square_02', 'geo_parallelo_01', 'line_double_01', 'geo_halfcircle_01'],
+    wardrobe: ['geo_hex_01', 'geo_square_01', 'typ_I', 'typ_A'],
   },
   {
     id: 'ca',
@@ -394,6 +405,7 @@ export const STUB_VOICES = [
     glyph: 'ca',
     vibe: 'Petri Dish: cellular colonies on agar. Wet biology.',
     assets: ['org_blob_02', 'dot_field_01', 'org_petal_01', 'dot_single_01'],
+    wardrobe: ['dot_field_04', 'dot_confetti_01', 'org_blob_04', 'org_pod_02'],
   },
   {
     id: 'orbit',
@@ -401,6 +413,7 @@ export const STUB_VOICES = [
     glyph: 'orbit',
     vibe: 'Planetarium: gravitational ballet. Moons and patience.',
     assets: ['rad_orbit_01', 'rad_orbit_02', 'rad_orbit_dot_01', 'dot_single_01'],
+    wardrobe: ['dot_confetti_02', 'rad_rings_03', 'rad_rings_01', 'rad_rings_02'],
   },
   {
     id: 'abacus',
@@ -408,6 +421,7 @@ export const STUB_VOICES = [
     glyph: 'abacus',
     vibe: 'Counting House: beads on wires. Arithmetic made visible.',
     assets: ['geo_hex_02', 'stamp_glyph_01', 'stamp_num_01', 'geo_circle_01'],
+    wardrobe: ['pxg_arch', 'geo_cross_02', 'typ_Z', 'typ_6'],
   },
   {
     id: 'dla',
@@ -415,6 +429,7 @@ export const STUB_VOICES = [
     glyph: 'coral',
     vibe: 'Coral Reef: wandering particles stick and crystallize — dendritic arms bloom from a seed. Living geology.', // #834
     assets: ['hae_coral_01', 'hae_mycelium_01', 'hae_tendril_01', 'hae_fern_01'],
+    wardrobe: ['hae_diatom_02', 'org_blob_04', 'org_lobe_01', 'org_blob_05'],
   },
   {
     id: 'eden',
@@ -422,6 +437,7 @@ export const STUB_VOICES = [
     glyph: 'bloom',
     vibe: 'Eden Garden: cells divide outward from a seed — a compact blob breathes into being. Soft biology.', // #834
     assets: ['org_blob_01', 'org_blob_02', 'hae_sponge_01', 'dot_field_01'],
+    wardrobe: ['bio06', 'bio05', 'org_blob_dotted_01', 'org_blob_outline_01'],
   },
   {
     id: 'voronoi-cells',
@@ -429,6 +445,7 @@ export const STUB_VOICES = [
     glyph: 'cell',
     vibe: 'True Voronoi: gapless cellular fill. Each mark belongs to one cell.', // #1196
     assets: ['geo_hex_01', 'geo_hex_02', 'dot_field_01', 'org_blob_01'],
+    wardrobe: ['dot_field_04', 'geo_burst_02', 'dot_confetti_02', 'dot_cluster_01'],
   },
 ];
 
@@ -484,15 +501,20 @@ export const MOTION_MODES = [
   },
 ];
 
+/** #1771 — a promoted stub voice's full wardrobe: the curated four + the four it gained. */
+export function fullShapeSet(stub) {
+  return [...stub.assets, ...(stub.wardrobe || [])];
+}
+
 /**
- * Shape chips (#555) — the assets axis: curated 4-shape pools, one per flagship
- * voice and per layout tile (the stub `assets` data). A chip swaps the asset pool
+ * Shape chips (#555) — the assets axis: curated pools, one per flagship voice
+ * (4 shapes) and per layout tile (#1771: the promoted voice's full 8-shape wardrobe). A chip swaps the asset pool
  * only, at the press (the live loop's item-morph flies nodes into their new
  * costumes) — never at the end of a MIX.
  */
 export const SHAPE_SETS = [
   ...FLAGSHIP_VOICES.map((v) => ({ id: v.id, name: v.name.toLowerCase(), ids: Object.keys(v.assets) })),
-  ...STUB_VOICES.map((v) => ({ id: v.id, name: v.name, ids: v.assets.slice(0, 4) })),
+  ...STUB_VOICES.map((v) => ({ id: v.id, name: v.name, ids: fullShapeSet(v) })),
 ];
 
 /** A shape chip reads as active while the enabled pool is exactly its set. */
