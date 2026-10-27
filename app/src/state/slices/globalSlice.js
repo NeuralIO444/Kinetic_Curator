@@ -34,6 +34,7 @@ import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../asse
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
+import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -114,17 +115,17 @@ function persistWeave(on) {
   }
 }
 
-// #946: START mode — what a cold launch opens on. 'chaos' (default) fires
-// one full wild roll; 'fixed' boots the deterministic factory opener for
-// performance situations that need a known first frame. A per-machine
+// #946: START mode — what a cold launch opens on. #1772: now a four-state cycle
+// OFF → WEAK → MED → KOZ that also sets the KINETIC ceiling (state/kineticScope.mjs);
+// #946's 'fixed' reads as OFF and its 'chaos' as KOZ. A per-machine
 // preference like the pool view, not project content — its own
 // localStorage key, never enters the project document.
 const STARTUP_MODE_KEY = 'kc:startup-mode:v1';
 function readStartupMode() {
   try {
-    return localStorage.getItem(STARTUP_MODE_KEY) === 'fixed' ? 'fixed' : 'chaos';
+    return sanitizeScope(localStorage.getItem(STARTUP_MODE_KEY));
   } catch {
-    return 'chaos';
+    return DEFAULT_SCOPE;
   }
 }
 function persistStartupMode(mode) {
@@ -373,12 +374,11 @@ export const createGlobalSlice = (set) => ({
     persistFxaa(!!on);
     set({ fxaa: !!on });
   },
-  // #946 — START: CHAOS / FIXED. Read by the boot sequence in
-  // useProjectAutosave; the toggle lives next to the KIN button in the
-  // CuratorBar. Anything but 'fixed' sanitizes to 'chaos' (the default).
+  // #946 / #1772 — START: OFF · WEAK · MED · KOZ. Read by the boot sequence in useProjectAutosave and by every KINETIC
+  // pass (its ceiling); the pill lives next to the KIN button in the CuratorBar and cycles. Junk sanitizes to KOZ.
   startupMode: readStartupMode(),
   setStartupMode: (mode) => {
-    const next = mode === 'fixed' ? 'fixed' : 'chaos';
+    const next = sanitizeScope(mode);
     persistStartupMode(next);
     set({ startupMode: next });
   },
