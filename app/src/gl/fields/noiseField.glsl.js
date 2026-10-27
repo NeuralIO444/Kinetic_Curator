@@ -20,7 +20,7 @@ export const NOISE_FIELD_VARYINGS = Object.freeze(['v_field']);
 /** Maximum octaves the shader loop supports; more falls back to JS. */
 export const NOISE_FIELD_MAX_OCTAVES = 8;
 
-export const NOISE_FIELD_VERT = /* glsl */`#version 300 es
+export const NOISE_FIELD_VERT = /* glsl */ `#version 300 es
 precision highp float;
 precision highp int;
 precision highp usampler2D;
@@ -51,7 +51,7 @@ void main() {
 // Trivial fragment shader: the runner enables RASTERIZER_DISCARD, so this
 // never executes. Attached anyway — a vertex-only program trips driver
 // quirks (ANGLE/SwiftShader link warnings) for zero benefit.
-export const NOISE_FIELD_FRAG = /* glsl */`#version 300 es
+export const NOISE_FIELD_FRAG = /* glsl */ `#version 300 es
 precision highp float;
 layout(location = 0) out vec4 o_color;
 void main() {

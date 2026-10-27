@@ -162,10 +162,7 @@ export function createFieldRunner(gl) {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // Exact perm bytes — the shader hashes exactly like JS (see
     // fieldCommon.glsl.js); only float32 rounding diverges.
-    gl.texImage2D(
-      gl.TEXTURE_2D, 0, gl.R8UI, 512, 1, 0,
-      gl.RED_INTEGER, gl.UNSIGNED_BYTE, permTableFor(key),
-    );
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, 512, 1, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, permTableFor(key));
     permTextures.set(key, tex);
     return tex;
   }
@@ -194,7 +191,9 @@ export function createFieldRunner(gl) {
     const decl = FIELDS.get(fieldId);
     if (!decl) throw new Error(`[fieldRunner] unknown field "${fieldId}"`);
     if (!decl.gpu) {
-      throw new Error(`[fieldRunner] field "${fieldId}" has no GPU twin — use evaluateFieldColumns for the JS fallback`);
+      throw new Error(
+        `[fieldRunner] field "${fieldId}" has no GPU twin — use evaluateFieldColumns for the JS fallback`,
+      );
     }
     const { x, y } = columns || {};
     if (!(x instanceof Float32Array) || !(y instanceof Float32Array)) {
@@ -202,13 +201,14 @@ export function createFieldRunner(gl) {
     }
     const n = columns.count === undefined ? x.length : columns.count;
     if (!Number.isInteger(n) || n < 1 || n > x.length || n > y.length) {
-      throw new Error(`[fieldRunner] bad lane count ${String(columns.count)} for columns of length ${x.length}/${y.length}`);
+      throw new Error(
+        `[fieldRunner] bad lane count ${String(columns.count)} for columns of length ${x.length}/${y.length}`,
+      );
     }
 
     const defaults = GPU_OPT_DEFAULTS[fieldId] || {};
     const o = { ...defaults, ...(opts || {}) };
-    if (!isFiniteNumber(o.freq) || !isFiniteNumber(o.z) ||
-        !isFiniteNumber(o.lacunarity) || !isFiniteNumber(o.gain)) {
+    if (!isFiniteNumber(o.freq) || !isFiniteNumber(o.z) || !isFiniteNumber(o.lacunarity) || !isFiniteNumber(o.gain)) {
       throw new Error(`[fieldRunner] ${fieldId}: freq/z/lacunarity/gain must be finite numbers`);
     }
     if (!Number.isInteger(o.octaves) || o.octaves < 1 || o.octaves > NOISE_FIELD_MAX_OCTAVES) {

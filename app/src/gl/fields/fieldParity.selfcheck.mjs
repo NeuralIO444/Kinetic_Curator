@@ -45,7 +45,7 @@ const GL_DIR = path.join(HERE, '..');
 const FIELD_PARITY_TOL = 1e-5;
 
 const FIXTURE = Object.freeze({
-  seed: 0xC0FFEE,
+  seed: 0xc0ffee,
   opts: Object.freeze({ freq: 2.5, octaves: 3, lacunarity: 2, gain: 0.5, z: 0.37 }),
   n: 4096,
   lcgSeed: 0x1234,
@@ -56,8 +56,16 @@ const FIXTURE_B = Object.freeze({
 });
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
-const okAsync = async (name, fn) => { await fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const okAsync = async (name, fn) => {
+  await fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 function lcg(seed) {
   let a = seed >>> 0;
@@ -69,7 +77,10 @@ function fixtureColumns() {
   const rnd = lcg(FIXTURE.lcgSeed);
   const x = new Float32Array(FIXTURE.n);
   const y = new Float32Array(FIXTURE.n);
-  for (let i = 0; i < FIXTURE.n; i++) { x[i] = rnd(); y[i] = rnd(); }
+  for (let i = 0; i < FIXTURE.n; i++) {
+    x[i] = rnd();
+    y[i] = rnd();
+  }
   return { x, y, count: FIXTURE.n };
 }
 
@@ -91,7 +102,10 @@ function compareFieldColumns(cpu, gpu, tol) {
   for (let i = 0; i < cpu.length; i++) {
     const d = Math.abs(cpu[i] - gpu[i]);
     sum += d;
-    if (d > maxAbs) { maxAbs = d; maxIdx = i; }
+    if (d > maxAbs) {
+      maxAbs = d;
+      maxIdx = i;
+    }
   }
   return {
     pass: maxAbs <= tol,
@@ -108,7 +122,7 @@ function assertFieldParity(cpu, gpu, tol, label) {
   assert.ok(
     r.pass,
     `[parity:${label}] FAIL maxAbs=${r.maxAbs.toExponential(3)} > tol=${tol} ` +
-    `(lane ${r.maxIdx}, mean=${r.meanAbs.toExponential(3)}, n=${r.n})`,
+      `(lane ${r.maxIdx}, mean=${r.meanAbs.toExponential(3)}, n=${r.n})`,
   );
   return r;
 }
@@ -137,8 +151,14 @@ ok('registry: gpu descriptor shape is validated', () => {
   const reg = createRegistry('probe', { payloadKey: 'create' });
   assert.throws(() => reg.register({ id: 'a', create: () => 0, gpu: null }), /gpu must be an object/);
   assert.throws(() => reg.register({ id: 'a', create: () => 0, gpu: { varyings: ['v'] } }), /gpu\.vertexShader/);
-  assert.throws(() => reg.register({ id: 'a', create: () => 0, gpu: { vertexShader: 'x', varyings: [] } }), /gpu\.varyings/);
-  assert.throws(() => reg.register({ id: 'a', create: () => 0, gpu: { vertexShader: 'x', varyings: [42] } }), /gpu\.varyings/);
+  assert.throws(
+    () => reg.register({ id: 'a', create: () => 0, gpu: { vertexShader: 'x', varyings: [] } }),
+    /gpu\.varyings/,
+  );
+  assert.throws(
+    () => reg.register({ id: 'a', create: () => 0, gpu: { vertexShader: 'x', varyings: [42] } }),
+    /gpu\.varyings/,
+  );
   reg.register({ id: 'a', create: () => 0, gpu: { vertexShader: 'void main(){}', varyings: ['v'] } });
   assert.deepStrictEqual([...reg.get('a').gpu.varyings], ['v']);
   // Re-declaring the identical signature with a gpu twin does not throw
@@ -160,7 +180,13 @@ ok('backend: default is js; opt-in is explicit and validated', () => {
 ok('dispatch: JS fallback keeps the forever implementation', () => {
   const cols = fixtureColumns();
   // Backend js + runner present: still JS.
-  const jsValues = evaluateFieldColumns('noise', FIXTURE.seed, FIXTURE.opts, cols, { runner: { runField: () => { throw new Error('must not run'); } } });
+  const jsValues = evaluateFieldColumns('noise', FIXTURE.seed, FIXTURE.opts, cols, {
+    runner: {
+      runField: () => {
+        throw new Error('must not run');
+      },
+    },
+  });
   assert.deepStrictEqual(jsValues, cpuReference(FIXTURE.seed, FIXTURE.opts, cols));
   // Backend gpu but no runner: JS.
   setFieldBackend('gpu');
@@ -169,7 +195,10 @@ ok('dispatch: JS fallback keeps the forever implementation', () => {
     assert.deepStrictEqual(v2, cpuReference(FIXTURE.seed, FIXTURE.opts, cols));
     // Backend gpu + runner, field without a gpu twin: JS fallback.
     const v3 = evaluateFieldColumns('constant', FIXTURE.seed, { value: 0.5 }, cols, { runner: {} });
-    assert.ok(v3.every((v) => v === 0.5), 'constant field falls back to JS');
+    assert.ok(
+      v3.every((v) => v === 0.5),
+      'constant field falls back to JS',
+    );
   } finally {
     setFieldBackend('js');
   }
@@ -203,17 +232,30 @@ ok('comparator: pass/fail semantics incl. boundary', () => {
 // shader math. Value-correctness of the GLSL is the browser tier's job.
 
 const GLC = {
-  VERTEX_SHADER: 0x8b31, FRAGMENT_SHADER: 0x8b30,
-  COMPILE_STATUS: 0x8b81, LINK_STATUS: 0x8b82,
+  VERTEX_SHADER: 0x8b31,
+  FRAGMENT_SHADER: 0x8b30,
+  COMPILE_STATUS: 0x8b81,
+  LINK_STATUS: 0x8b82,
   SEPARATE_ATTRIBS: 0x8c8d,
-  ARRAY_BUFFER: 0x8892, STATIC_DRAW: 0x88e4, DYNAMIC_COPY: 0x88e8,
-  TEXTURE_2D: 0x0de1, TEXTURE0: 0x84c0,
-  TEXTURE_MIN_FILTER: 0x2801, TEXTURE_MAG_FILTER: 0x2800,
-  TEXTURE_WRAP_S: 0x2802, TEXTURE_WRAP_T: 0x2803,
-  NEAREST: 0x2600, CLAMP_TO_EDGE: 0x812f,
-  R8UI: 0x8232, RED_INTEGER: 0x8d94, UNSIGNED_BYTE: 0x1401, FLOAT: 0x1406,
-  POINTS: 0x0000, RASTERIZER_DISCARD: 0x8c89,
-  TRANSFORM_FEEDBACK: 0x8e22, TRANSFORM_FEEDBACK_BUFFER: 0x8c8e,
+  ARRAY_BUFFER: 0x8892,
+  STATIC_DRAW: 0x88e4,
+  DYNAMIC_COPY: 0x88e8,
+  TEXTURE_2D: 0x0de1,
+  TEXTURE0: 0x84c0,
+  TEXTURE_MIN_FILTER: 0x2801,
+  TEXTURE_MAG_FILTER: 0x2800,
+  TEXTURE_WRAP_S: 0x2802,
+  TEXTURE_WRAP_T: 0x2803,
+  NEAREST: 0x2600,
+  CLAMP_TO_EDGE: 0x812f,
+  R8UI: 0x8232,
+  RED_INTEGER: 0x8d94,
+  UNSIGNED_BYTE: 0x1401,
+  FLOAT: 0x1406,
+  POINTS: 0x0000,
+  RASTERIZER_DISCARD: 0x8c89,
+  TRANSFORM_FEEDBACK: 0x8e22,
+  TRANSFORM_FEEDBACK_BUFFER: 0x8c8e,
   NO_ERROR: 0,
 };
 
@@ -236,7 +278,9 @@ function makeMockGL() {
     ...GLC,
     getError: () => GLC.NO_ERROR,
     createShader: (t) => ({ _id: nextId++, _t: t, _src: '' }),
-    shaderSource: (s, src) => { s._src = src; },
+    shaderSource: (s, src) => {
+      s._src = src;
+    },
     compileShader: () => {},
     getShaderParameter: () => true,
     getShaderInfoLog: () => '',
@@ -245,9 +289,13 @@ function makeMockGL() {
     attachShader: () => {},
     transformFeedbackVaryings(p, varyings, mode) {
       calls.push(['transformFeedbackVaryings', [...varyings], mode]);
-      p._varyings = [...varyings]; p._mode = mode;
+      p._varyings = [...varyings];
+      p._mode = mode;
     },
-    linkProgram: (p) => { calls.push(['linkProgram']); p._linked = true; },
+    linkProgram: (p) => {
+      calls.push(['linkProgram']);
+      p._linked = true;
+    },
     getProgramParameter: () => true,
     getProgramInfoLog: () => '',
     deleteProgram: (p) => deleted.push(p),
@@ -255,7 +303,9 @@ function makeMockGL() {
     getUniformLocation: (p, name) => ({ _u: name }),
     useProgram: () => {},
     createBuffer: () => ({ _id: nextId++, _data: null }),
-    bindBuffer: (t, b) => { bound[t] = b; },
+    bindBuffer: (t, b) => {
+      bound[t] = b;
+    },
     bufferData(t, dataOrSize) {
       const b = bound[t];
       b._data = typeof dataOrSize === 'number' ? new Float32Array(dataOrSize / 4) : dataOrSize.slice();
@@ -271,16 +321,33 @@ function makeMockGL() {
       texImages.push({ internal, w, h, format, type, bytes: data ? data.length : 0 });
     },
     deleteTexture: (t) => deleted.push(t),
-    uniform1i: (l, v) => { uniforms[l._u] = v; },
-    uniform1f: (l, v) => { uniforms[l._u] = v; },
+    uniform1i: (l, v) => {
+      uniforms[l._u] = v;
+    },
+    uniform1f: (l, v) => {
+      uniforms[l._u] = v;
+    },
     createTransformFeedback: () => ({ _id: nextId++ }),
-    bindTransformFeedback: (t, tf) => { tfObj = tf; if (!tf) tfBoundBuffer = null; },
-    bindBufferBase: (t, i, b) => { if (tfObj) tfBoundBuffer = b; },
+    bindTransformFeedback: (t, tf) => {
+      tfObj = tf;
+      if (!tf) tfBoundBuffer = null;
+    },
+    bindBufferBase: (t, i, b) => {
+      if (tfObj) tfBoundBuffer = b;
+    },
     deleteTransformFeedback: (tf) => deleted.push(tf),
-    enable: (c) => { caps[c] = true; },
-    disable: (c) => { caps[c] = false; },
-    beginTransformFeedback: (m) => { tfActive = m; },
-    endTransformFeedback: () => { tfActive = false; },
+    enable: (c) => {
+      caps[c] = true;
+    },
+    disable: (c) => {
+      caps[c] = false;
+    },
+    beginTransformFeedback: (m) => {
+      tfActive = m;
+    },
+    endTransformFeedback: () => {
+      tfActive = false;
+    },
     drawArrays(mode, first, count) {
       assert.ok(tfActive !== false, 'mock: TF active during draw');
       assert.ok(tfObj, 'mock: TF object bound');
@@ -323,7 +390,10 @@ await okAsync('runner: mock-GL plumbing (TF contract, call order, readback)', as
   const draw = calls.find((c) => c[0] === 'drawArrays');
   assert.ok(draw[1].discard, 'RASTERIZER_DISCARD on during draw');
   assert.strictEqual(draw[1].count, 100);
-  assert.ok(texImages.some((t) => t.w === 512 && t.h === 1 && t.bytes === 512), 'perm table 512x1x1B');
+  assert.ok(
+    texImages.some((t) => t.w === 512 && t.h === 1 && t.bytes === 512),
+    'perm table 512x1x1B',
+  );
 
   // Uniforms resolved from the field defaults + overrides.
   assert.strictEqual(uniforms.u_freq, FIXTURE.opts.freq);
@@ -343,7 +413,10 @@ await okAsync('runner: mock-GL plumbing (TF contract, call order, readback)', as
   assert.throws(() => runner.runField('nope', 1, {}, sub), /unknown field/);
   assert.throws(() => runner.runField('constant', 1, {}, sub), /no GPU twin/);
   assert.throws(() => runner.runField('noise', 1, { octaves: 9 }, sub), /outside GPU range/);
-  assert.throws(() => runner.runField('noise', 1, {}, { x: new Float64Array(4), y: new Float32Array(4) }), /Float32Array/);
+  assert.throws(
+    () => runner.runField('noise', 1, {}, { x: new Float64Array(4), y: new Float32Array(4) }),
+    /Float32Array/,
+  );
   assert.throws(() => runner.runField('noise', 1, {}, { x: cols.x, y: cols.y, count: 0 }), /bad lane count/);
   // Program compiled once, cached across runs.
   const links = calls.filter((c) => c[0] === 'linkProgram').length;
@@ -407,9 +480,15 @@ await okAsync('browser: GPU vs CPU within documented tolerance (fixture)', async
 
     const run = (fieldId, seed, opts, xB64, yB64, plantShift) =>
       page.evaluate(
-        ([f, s, o, xb, yb, sh]) => window.__kcFieldRun({
-          fieldId: f, seed: s, opts: o, xB64: xb, yB64: yb, plantShift: sh,
-        }),
+        ([f, s, o, xb, yb, sh]) =>
+          window.__kcFieldRun({
+            fieldId: f,
+            seed: s,
+            opts: o,
+            xB64: xb,
+            yB64: yb,
+            plantShift: sh,
+          }),
         [fieldId, seed, opts, xB64, yB64, plantShift],
       );
 
@@ -426,14 +505,18 @@ await okAsync('browser: GPU vs CPU within documented tolerance (fixture)', async
       assert.strictEqual(r1.backend, 'gpu');
       const gpu = unb64f32(r1.valuesB64);
       const pr = assertFieldParity(cpu, gpu, FIELD_PARITY_TOL, 'noise/fixture');
-      console.log(`  [info] noise fixture: maxAbs=${pr.maxAbs.toExponential(3)} meanAbs=${pr.meanAbs.toExponential(3)} (tol=${FIELD_PARITY_TOL})`);
+      console.log(
+        `  [info] noise fixture: maxAbs=${pr.maxAbs.toExponential(3)} meanAbs=${pr.meanAbs.toExponential(3)} (tol=${FIELD_PARITY_TOL})`,
+      );
 
       // Second opt config (more octaves, nonzero z) stays inside tolerance.
       const cpuB = cpuReference(FIXTURE_B.seed, FIXTURE_B.opts, cols);
       const rB = await run('noise', FIXTURE_B.seed, { ...FIXTURE_B.opts }, xB64, yB64, 0);
       assert.ok(rB.ok, `harness run B failed: ${rB.error}`);
       const prB = assertFieldParity(cpuB, unb64f32(rB.valuesB64), FIELD_PARITY_TOL, 'noise/config-B');
-      console.log(`  [info] noise config-B: maxAbs=${prB.maxAbs.toExponential(3)} meanAbs=${prB.meanAbs.toExponential(3)}`);
+      console.log(
+        `  [info] noise config-B: maxAbs=${prB.maxAbs.toExponential(3)} meanAbs=${prB.meanAbs.toExponential(3)}`,
+      );
 
       // The GPU path is a pure function of (seed, x, y): two runs agree
       // bit-for-bit on the same device.
@@ -450,13 +533,18 @@ await okAsync('browser: GPU vs CPU within documented tolerance (fixture)', async
       assert.ok(rP.ok, `planted run failed: ${rP.error}`);
       const planted = compareFieldColumns(cpu, unb64f32(rP.valuesB64), FIELD_PARITY_TOL);
       assert.strictEqual(planted.pass, false, 'planted tolerance violation must fail the comparison');
-      assert.ok(planted.maxAbs > FIELD_PARITY_TOL * 100, `planted diff dwarfs the tolerance (${planted.maxAbs.toExponential(3)})`);
+      assert.ok(
+        planted.maxAbs > FIELD_PARITY_TOL * 100,
+        `planted diff dwarfs the tolerance (${planted.maxAbs.toExponential(3)})`,
+      );
       assert.throws(
         () => assertFieldParity(cpu, unb64f32(rP.valuesB64), FIELD_PARITY_TOL, 'noise/planted'),
         /\[parity:noise\/planted\] FAIL/,
         'planted violation throws in the asserting path',
       );
-      console.log(`  [info] planted shift caught: maxAbs=${planted.maxAbs.toExponential(3)} >> tol=${FIELD_PARITY_TOL}`);
+      console.log(
+        `  [info] planted shift caught: maxAbs=${planted.maxAbs.toExponential(3)} >> tol=${FIELD_PARITY_TOL}`,
+      );
     } finally {
       await page.evaluate((b) => window.__kcSetBackend(b), 'js');
       assert.deepStrictEqual(pageErrors, [], `harness page errors: ${pageErrors.join('; ')}`);

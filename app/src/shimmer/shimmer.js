@@ -13,8 +13,7 @@ export const LISTEN_GAIN = 3; // SHIFT-held amplification
 
 // Stub evidence line for the honest why-copy. The real sidecar would ship a
 // short per-model evidence string; the prototype must never invent specifics.
-export const SHIMMER_EVIDENCE_STUB =
-  'your kept renders lean warm and dense';
+export const SHIMMER_EVIDENCE_STUB = 'your kept renders lean warm and dense';
 
 /** Clamp + sanitize one percentile value. Non-numeric or NaN -> null (no-op). */
 export function sanitizePercentile(v) {
@@ -69,20 +68,22 @@ export function topBand(p) {
 export function whyCopy(label, percentile) {
   const band = topBand(percentile);
   if (!band) return 'Shimmer is off for this one — no score on file.';
-  return (
-    `Shimmer — ${SHIMMER_EVIDENCE_STUB}, and ${label} sits in your ${band}. ` +
-    `The model's guess, not an order.`
-  );
+  return `Shimmer — ${SHIMMER_EVIDENCE_STUB}, and ${label} sits in your ${band}. ` + `The model's guess, not an order.`;
 }
 
 /** Screen-reader note for a shimmered control: information, not animation. */
 export function ariaNote(level) {
   switch (level) {
-    case 4: return 'model suggestion: strongest match';
-    case 3: return 'model suggestion: strong match';
-    case 2: return 'model suggestion: moderate match';
-    case 1: return 'model suggestion: mild match';
-    default: return null;
+    case 4:
+      return 'model suggestion: strongest match';
+    case 3:
+      return 'model suggestion: strong match';
+    case 2:
+      return 'model suggestion: moderate match';
+    case 1:
+      return 'model suggestion: mild match';
+    default:
+      return null;
   }
 }
 

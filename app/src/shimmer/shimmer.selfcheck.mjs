@@ -1,12 +1,5 @@
 import assert from 'node:assert';
-import {
-  percentileToLevel,
-  sanitizeScores,
-  levelFor,
-  topBand,
-  whyCopy,
-  ariaNote,
-} from './shimmer.js';
+import { percentileToLevel, sanitizeScores, levelFor, topBand, whyCopy, ariaNote } from './shimmer.js';
 
 // percentile -> level mapping: dead zone below 70, 4 compressive levels
 assert.strictEqual(percentileToLevel(0), 0);
@@ -58,10 +51,7 @@ const copy = whyCopy('Palette', 96);
 assert.ok(copy.includes('top 10%'));
 assert.ok(copy.includes('not an order'));
 assert.ok(!copy.includes('!'));
-assert.strictEqual(
-  whyCopy('Seed', 'junk'),
-  'Shimmer is off for this one — no score on file.'
-);
+assert.strictEqual(whyCopy('Seed', 'junk'), 'Shimmer is off for this one — no score on file.');
 
 // screen-reader notes exist per level, null when dark
 assert.strictEqual(ariaNote(4), 'model suggestion: strongest match');
