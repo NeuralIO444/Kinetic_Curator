@@ -29,12 +29,14 @@ import { LOIS_EXTRA_FACES } from './mindFace.js';
 // ── the shared dither stage ──────────────────────────────────────────────────
 
 /** The 4×4 Bayer matrix, thresholds 0..1. The one stage both faces pass through. */
-export const BAYER4 = Object.freeze([
-  Object.freeze([0.5, 8.5, 2.5, 10.5]),
-  Object.freeze([12.5, 4.5, 14.5, 6.5]),
-  Object.freeze([3.5, 11.5, 1.5, 9.5]),
-  Object.freeze([15.5, 7.5, 13.5, 5.5]),
-].map((row) => Object.freeze(row.map((v) => v / 16))));
+export const BAYER4 = Object.freeze(
+  [
+    Object.freeze([0.5, 8.5, 2.5, 10.5]),
+    Object.freeze([12.5, 4.5, 14.5, 6.5]),
+    Object.freeze([3.5, 11.5, 1.5, 9.5]),
+    Object.freeze([15.5, 7.5, 13.5, 5.5]),
+  ].map((row) => Object.freeze(row.map((v) => v / 16))),
+);
 
 /**
  * Quantize a shade to one of `levels` levels at cell (x, y), ordered-Bayer: the fractional step is taken
@@ -82,7 +84,10 @@ export function lerpParams(a, b, t) {
 }
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
-const smooth = (edge0, edge1, x) => { const t = clamp01((x - edge0) / (edge1 - edge0)); return t * t * (3 - 2 * t); };
+const smooth = (edge0, edge1, x) => {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+};
 const gauss = (d, s) => Math.exp(-(d * d) / (2 * s * s));
 
 // ── Davis: colour Bayer dither of his live rosette ───────────────────────────
@@ -142,12 +147,16 @@ export function buildDavisSource(seed) {
     for (let i = 0; i < SRC_N; i++) {
       const x = (i / (SRC_N - 1)) * 2 - 1;
       const r = Math.hypot(x, y);
-      let a = Math.atan2(y, x); if (a < 0) a += Math.PI * 2;
-      let aw = a % wedge; if (aw > wedge / 2) aw = wedge - aw; // fold into the wedge, mirrored
-      const fx = Math.cos(aw) * r; const fy = Math.sin(aw) * r;
+      let a = Math.atan2(y, x);
+      if (a < 0) a += Math.PI * 2;
+      let aw = a % wedge;
+      if (aw > wedge / 2) aw = wedge - aw; // fold into the wedge, mirrored
+      const fx = Math.cos(aw) * r;
+      const fy = Math.sin(aw) * r;
       let o = gauss(r, 0.09) * 0.95 + gauss(r, 0.55) * 0.1; // the centre dot over a faint base glow
       for (const e of els) {
-        const ex = (Math.cos(e.a) * e.r) / HALF_ART; const ey = (Math.sin(e.a) * e.r) / HALF_ART;
+        const ex = (Math.cos(e.a) * e.r) / HALF_ART;
+        const ey = (Math.sin(e.a) * e.r) / HALF_ART;
         const s = (e.s / HALF_ART) * 1.5 + 0.012;
         o += e.o * gauss(Math.hypot(fx - ex, fy - ey), s);
         o += e.o * gauss(Math.hypot(fx - ex, fy + ey), s * 0.65); // the mirror half, smaller (drawSigil)
@@ -163,11 +172,16 @@ export function buildDavisSource(seed) {
 }
 
 const sampleField = (data, n, x, y) => {
-  const gx = ((x + 1) / 2) * (n - 1); const gy = ((y + 1) / 2) * (n - 1);
-  const x0 = Math.min(n - 2, Math.max(0, Math.floor(gx))); const y0 = Math.min(n - 2, Math.max(0, Math.floor(gy)));
-  const fx = Math.min(1, Math.max(0, gx - x0)); const fy = Math.min(1, Math.max(0, gy - y0));
-  const a = data[y0 * n + x0]; const b = data[y0 * n + x0 + 1];
-  const c = data[(y0 + 1) * n + x0]; const d = data[(y0 + 1) * n + x0 + 1];
+  const gx = ((x + 1) / 2) * (n - 1);
+  const gy = ((y + 1) / 2) * (n - 1);
+  const x0 = Math.min(n - 2, Math.max(0, Math.floor(gx)));
+  const y0 = Math.min(n - 2, Math.max(0, Math.floor(gy)));
+  const fx = Math.min(1, Math.max(0, gx - x0));
+  const fy = Math.min(1, Math.max(0, gy - y0));
+  const a = data[y0 * n + x0];
+  const b = data[y0 * n + x0 + 1];
+  const c = data[(y0 + 1) * n + x0];
+  const d = data[(y0 + 1) * n + x0 + 1];
   return (a + (b - a) * fx) * (1 - fy) + (c + (d - c) * fx) * fy;
 };
 
@@ -178,11 +192,15 @@ const sampleField = (data, n, x, y) => {
  * whatever shade the source gives, so the dither stays stable while the source moves (06).
  */
 export function davisSampler(source, { angle = 0, breath = 1, density = 1, ringGain = 1, contrast = 1 } = {}) {
-  const cos = Math.cos(-angle); const sin = Math.sin(-angle);
+  const cos = Math.cos(-angle);
+  const sin = Math.sin(-angle);
   const scale = breath > 0 ? 1 / breath : 1;
   return (x, y) => {
-    const rx = (x * cos - y * sin) * scale * DAVIS_ZOOM; const ry = (x * sin + y * cos) * scale * DAVIS_ZOOM;
-    const v = sampleField(source.orn, source.size, rx, ry) * density + sampleField(source.ring, source.size, rx, ry) * ringGain * 0.3;
+    const rx = (x * cos - y * sin) * scale * DAVIS_ZOOM;
+    const ry = (x * sin + y * cos) * scale * DAVIS_ZOOM;
+    const v =
+      sampleField(source.orn, source.size, rx, ry) * density +
+      sampleField(source.ring, source.size, rx, ry) * ringGain * 0.3;
     return clamp01((v - 0.5) * contrast + 0.5);
   };
 }
@@ -197,11 +215,23 @@ export function davisRamp(rgb, warmth = 0, levels = DAVIS_LEVELS) {
   const out = [];
   for (let i = 0; i < levels; i++) {
     const f = stops[Math.round((i / (levels - 1)) * (stops.length - 1))];
-    let cr = r * f; let cg = g * f; let cb = b * f;
-    if (i === levels - 1) { cr += (255 - cr) * 0.35; cg += (255 - cg) * 0.3; cb += (255 - cb) * 0.22; }
+    let cr = r * f;
+    let cg = g * f;
+    let cb = b * f;
+    if (i === levels - 1) {
+      cr += (255 - cr) * 0.35;
+      cg += (255 - cg) * 0.3;
+      cb += (255 - cb) * 0.22;
+    }
     const w = warmth * (1 - Math.abs(f - 0.45));
-    if (w > 0) { cr += (255 - cr) * w * 0.12; cg += (120 - cg) * w * 0.1; }
-    if (w < 0) { cr += (170 - cr) * -w * 0.12; cb += (255 - cb) * -w * 0.1; }
+    if (w > 0) {
+      cr += (255 - cr) * w * 0.12;
+      cg += (120 - cg) * w * 0.1;
+    }
+    if (w < 0) {
+      cr += (170 - cr) * -w * 0.12;
+      cb += (255 - cb) * -w * 0.1;
+    }
     out.push(`rgb(${Math.round(cr)},${Math.round(cg)},${Math.round(cb)})`);
   }
   return out;
@@ -239,11 +269,61 @@ export const LOIS_GLYPHS = Object.freeze({
  * tempo (Matt, 2026-10-23: an idle animation like his).
  */
 export const LOIS_FACE_PARAMS = Object.freeze({
-  VIBE: Object.freeze({ eyeAngle: -4, eyeOpen: 0.045, browTilt: -3, mouthCurve: 0.35, mouthOpen: 0.03, tint: 0.1, dim: 1, glyphs: 'vibe', breathS: 6.5 }),
-  NOD: Object.freeze({ eyeAngle: -6, eyeOpen: 0.062, browTilt: -6, mouthCurve: 0.02, mouthOpen: 0.024, tint: 0.14, dim: 1, glyphs: 'nod', breathS: 6.0 }),
-  BURN: Object.freeze({ eyeAngle: 7, eyeOpen: 0.135, browTilt: 8, mouthCurve: 0.5, mouthOpen: 0.055, tint: 0.38, dim: 1, glyphs: 'burn', breathS: 4.2 }),
-  AWAY: Object.freeze({ eyeAngle: 0, eyeOpen: -0.02, browTilt: 0, mouthCurve: 0, mouthOpen: 0.014, tint: 0.03, dim: 1, glyphs: 'away', breathS: 9.5 }),
-  CUT: Object.freeze({ eyeAngle: 13, eyeOpen: 0.025, browTilt: 15, mouthCurve: -0.35, mouthOpen: 0.012, tint: 0.45, dim: 1, glyphs: 'cut', breathS: 4.8 }),
+  VIBE: Object.freeze({
+    eyeAngle: -4,
+    eyeOpen: 0.045,
+    browTilt: -3,
+    mouthCurve: 0.35,
+    mouthOpen: 0.03,
+    tint: 0.1,
+    dim: 1,
+    glyphs: 'vibe',
+    breathS: 6.5,
+  }),
+  NOD: Object.freeze({
+    eyeAngle: -6,
+    eyeOpen: 0.062,
+    browTilt: -6,
+    mouthCurve: 0.02,
+    mouthOpen: 0.024,
+    tint: 0.14,
+    dim: 1,
+    glyphs: 'nod',
+    breathS: 6.0,
+  }),
+  BURN: Object.freeze({
+    eyeAngle: 7,
+    eyeOpen: 0.135,
+    browTilt: 8,
+    mouthCurve: 0.5,
+    mouthOpen: 0.055,
+    tint: 0.38,
+    dim: 1,
+    glyphs: 'burn',
+    breathS: 4.2,
+  }),
+  AWAY: Object.freeze({
+    eyeAngle: 0,
+    eyeOpen: -0.02,
+    browTilt: 0,
+    mouthCurve: 0,
+    mouthOpen: 0.014,
+    tint: 0.03,
+    dim: 1,
+    glyphs: 'away',
+    breathS: 9.5,
+  }),
+  CUT: Object.freeze({
+    eyeAngle: 13,
+    eyeOpen: 0.025,
+    browTilt: 15,
+    mouthCurve: -0.35,
+    mouthOpen: 0.012,
+    tint: 0.45,
+    dim: 1,
+    glyphs: 'cut',
+    breathS: 4.8,
+  }),
 });
 
 /**
@@ -264,11 +344,18 @@ const LOIS_EXTRA_EXPR_LIST = [
   { eyeAngle: 13, eyeOpen: 0.028, browTilt: 16, mouthCurve: -0.42, mouthOpen: 0.014 }, // ( ಠ_ಠ ) glare
   { eyeAngle: 0, eyeOpen: 0.008, browTilt: -2, mouthCurve: 0, mouthOpen: 0.012 }, // ( ¯ ³¯ ) flat
 ];
-export const LOIS_EXTRA_EXPRS = Object.freeze(Object.fromEntries(
-  LOIS_EXTRA_EXPR_LIST.map((e, i) => [LOIS_EXTRA_FACES[i], Object.freeze(e)]),
-));
+export const LOIS_EXTRA_EXPRS = Object.freeze(
+  Object.fromEntries(LOIS_EXTRA_EXPR_LIST.map((e, i) => [LOIS_EXTRA_FACES[i], Object.freeze(e)])),
+);
 
-const hash = (s) => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
+const hash = (s) => {
+  let h = 2166136261;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+};
 
 /**
  * The parameter set for a LOIS state code. Canonical states (and CUT) wear their own set; an INVENTED state
@@ -284,7 +371,9 @@ export function loisFaceParams(code) {
   const sets = Object.keys(LOIS_GLYPHS);
   return {
     ...LOIS_EXTRA_EXPRS[LOIS_EXTRA_FACES[h % LOIS_EXTRA_FACES.length]],
-    tint: 0.12 + (h % 5) * 0.05, dim: 1, glyphs: sets[h % sets.length],
+    tint: 0.12 + (h % 5) * 0.05,
+    dim: 1,
+    glyphs: sets[h % sets.length],
     breathS: 5.5 + ((h >> 7) % 6) * 0.8, // the invented state breathes at its own hash-derived tempo (deterministic)
   };
 }
@@ -304,7 +393,9 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
     let v = 0.05 + head * 0.3; // background 0.05; the head's mass 0.35
     // hair: above the brow line (which dips at the part) and down the sides
     const hairLine = -0.3 + 0.12 * Math.pow(Math.abs(x), 1.5);
-    const hair = head * Math.max(smooth(hairLine - 0.03, hairLine + 0.05, fy), smooth(0.6, 0.7, Math.abs(x)) * smooth(0.55, 0.3, fy));
+    const hair =
+      head *
+      Math.max(smooth(hairLine - 0.03, hairLine + 0.05, fy), smooth(0.6, 0.7, Math.abs(x)) * smooth(0.55, 0.3, fy));
     v = v * (1 - hair) + 0.17 * hair;
     // the lit face oval
     const e = (x / 0.6) ** 2 + ((fy - 0.1) / 0.76) ** 2;
@@ -316,14 +407,20 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
     v += gauss(Math.hypot(x + 0.36, fy - 0.2), 0.2) * 0.05 * face;
     // eyes: two dark slots, angled by the state; brows: thinner slots above them, tilted against the eyes
     for (const s of [-1, 1]) {
-      const ex = x - s * 0.31; const ey = fy + 0.05;
-      const ca = Math.cos((s * p.eyeAngle * Math.PI) / 180); const sa = Math.sin((s * p.eyeAngle * Math.PI) / 180);
-      const u = ex * ca - ey * sa; const w = ex * sa + ey * ca;
+      const ex = x - s * 0.31;
+      const ey = fy + 0.05;
+      const ca = Math.cos((s * p.eyeAngle * Math.PI) / 180);
+      const sa = Math.sin((s * p.eyeAngle * Math.PI) / 180);
+      const u = ex * ca - ey * sa;
+      const w = ex * sa + ey * ca;
       const eye = smooth(0.165, 0.14, Math.abs(u)) * smooth(p.eyeOpen + 0.012, p.eyeOpen - 0.004, Math.abs(w));
       v = v * (1 - eye) + 0.05 * eye;
-      const bx = x - s * 0.31; const by = fy + 0.245;
-      const ba = Math.cos((s * p.browTilt * Math.PI) / 180); const bs = Math.sin((s * p.browTilt * Math.PI) / 180);
-      const bu = bx * ba - by * bs; const bw = bx * bs + by * ba;
+      const bx = x - s * 0.31;
+      const by = fy + 0.245;
+      const ba = Math.cos((s * p.browTilt * Math.PI) / 180);
+      const bs = Math.sin((s * p.browTilt * Math.PI) / 180);
+      const bu = bx * ba - by * bs;
+      const bw = bx * bs + by * ba;
       const brow = smooth(0.16, 0.13, Math.abs(bu)) * smooth(0.03, 0.012, Math.abs(bw));
       v = v * (1 - brow) + 0.16 * brow;
     }
@@ -334,7 +431,8 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
     // mouth: a dark slot on a curve — corners rise with a smile (curve > 0), drop against it
     const MW = 0.3;
     const ym = 0.46 - p.mouthCurve * 0.12 * (x / MW) ** 2;
-    const mouth = smooth(MW + 0.03, MW - 0.03, Math.abs(x)) * smooth(p.mouthOpen + 0.014, p.mouthOpen - 0.004, Math.abs(fy - ym));
+    const mouth =
+      smooth(MW + 0.03, MW - 0.03, Math.abs(x)) * smooth(p.mouthOpen + 0.014, p.mouthOpen - 0.004, Math.abs(fy - ym));
     v = v * (1 - mouth) + 0.08 * mouth;
     // jaw shadow under the mouth
     v -= smooth(0.58, 0.72, fy) * face * 0.06;
@@ -352,11 +450,21 @@ export function loisSampler(p, { lift = 0, contrast = 1 } = {}) {
  */
 export function loisInk(level, tint, warmth, inkRgb, redRgb) {
   const t = level / (LOIS_LEVELS - 1);
-  let r = inkRgb[0] * (0.3 + 0.7 * t); let g = inkRgb[1] * (0.3 + 0.7 * t); let b = inkRgb[2] * (0.3 + 0.7 * t);
+  let r = inkRgb[0] * (0.3 + 0.7 * t);
+  let g = inkRgb[1] * (0.3 + 0.7 * t);
+  let b = inkRgb[2] * (0.3 + 0.7 * t);
   const mixAmt = Math.min(1, Math.max(0, tint)) * (1 - t * 0.45);
-  r += (redRgb[0] - r) * mixAmt; g += (redRgb[1] - g) * mixAmt; b += (redRgb[2] - b) * mixAmt;
-  if (warmth > 0) { r += (255 - r) * warmth * 0.08; g += (214 - g) * warmth * 0.06; }
-  if (warmth < 0) { b += (255 - b) * -warmth * 0.08; r += (190 - r) * -warmth * 0.05; }
+  r += (redRgb[0] - r) * mixAmt;
+  g += (redRgb[1] - g) * mixAmt;
+  b += (redRgb[2] - b) * mixAmt;
+  if (warmth > 0) {
+    r += (255 - r) * warmth * 0.08;
+    g += (214 - g) * warmth * 0.06;
+  }
+  if (warmth < 0) {
+    b += (255 - b) * -warmth * 0.08;
+    r += (190 - r) * -warmth * 0.05;
+  }
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 

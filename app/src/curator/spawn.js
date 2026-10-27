@@ -79,7 +79,16 @@ export function marksOf(entries) {
  *                  through the order homes were claimed in. Plan §5 risk (iii) fallback.)
  * @returns [{x, y}] the homes, existing first, at most `count`
  */
-export function chooseHomes({ count, existing = [], marks = [], field, band = null, canvasW = 1000, canvasH = 700, weight = null }) {
+export function chooseHomes({
+  count,
+  existing = [],
+  marks = [],
+  field,
+  band = null,
+  canvasW = 1000,
+  canvasH = 700,
+  weight = null,
+}) {
   const want = sanitizeCount(count);
   const homes = existing.slice(0, want).map((p) => ({ x: p.x, y: p.y }));
   if (homes.length >= want || typeof field !== 'function') return homes;
@@ -91,7 +100,8 @@ export function chooseHomes({ count, existing = [], marks = [], field, band = nu
   const needMarks = Math.ceil((bars.density + SPAWN_MARGIN) * DISH_SATURATE);
   const r2 = (DISH_RADIUS * short) ** 2;
   const step = Math.max(2, SPAWN_STEP * short);
-  const cx = W / 2; const cy = H / 2;
+  const cx = W / 2;
+  const cy = H / 2;
   // a spot qualifies once per call however many stages look at it
   const memo = new Map();
   const qualifies = (x, y) => {
@@ -102,7 +112,8 @@ export function chooseHomes({ count, existing = [], marks = [], field, band = nu
       if (clamp01(field(x, y)) > needFertility) {
         let n = 0;
         for (let m = 0; m < marks.length; m += 2) {
-          const dx = marks[m] - x; const dy = marks[m + 1] - y;
+          const dx = marks[m] - x;
+          const dy = marks[m + 1] - y;
           if (dx * dx + dy * dy <= r2 && ++n >= needMarks) break;
         }
         v = n >= needMarks;
@@ -128,7 +139,7 @@ export function chooseHomes({ count, existing = [], marks = [], field, band = nu
     }
     if (weighted) {
       const dir = weight === 'heavy' ? -1 : 1; // heavy: strongest first · light: most marginal first
-      cands.sort((a, b) => (dir * (a.f - b.f)) || (a.d - b.d) || (a.y - b.y) || (a.x - b.x));
+      cands.sort((a, b) => dir * (a.f - b.f) || a.d - b.d || a.y - b.y || a.x - b.x);
     } else {
       cands.sort((a, b) => a.d - b.d || a.y - b.y || a.x - b.x); // nearest the centre first; ties in reading order
     }

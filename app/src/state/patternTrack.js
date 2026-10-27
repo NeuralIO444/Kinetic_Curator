@@ -12,8 +12,14 @@
 // project loader and an imported file all go through it, and it never throws.
 
 import {
-  QUILT_DEFAULT_DENSITY, QUILT_DEFAULT_MIX, QUILT_DEFAULT_GROUT, QUILT_MAX_GROUT, QUILT_DEFAULT_HERO,
-  GLYPH_DEFAULT_DENSITY, GLYPH_DEFAULT_MIX, FIELD_DEFAULT_DENSITY,
+  QUILT_DEFAULT_DENSITY,
+  QUILT_DEFAULT_MIX,
+  QUILT_DEFAULT_GROUT,
+  QUILT_MAX_GROUT,
+  QUILT_DEFAULT_HERO,
+  GLYPH_DEFAULT_DENSITY,
+  GLYPH_DEFAULT_MIX,
+  FIELD_DEFAULT_DENSITY,
 } from '../pattern/engine.js';
 
 export const PATTERN_MODES = Object.freeze(['QUILT', 'GLYPH', 'FIELD']);
@@ -29,7 +35,9 @@ export const PATTERN_DENSITY_MAX = 12;
 
 /** The density each mode opens on (docs/PATTERN_SPEC.md, Parameters). */
 export const PATTERN_DEFAULT_DENSITY = Object.freeze({
-  QUILT: QUILT_DEFAULT_DENSITY, GLYPH: GLYPH_DEFAULT_DENSITY, FIELD: FIELD_DEFAULT_DENSITY,
+  QUILT: QUILT_DEFAULT_DENSITY,
+  GLYPH: GLYPH_DEFAULT_DENSITY,
+  FIELD: FIELD_DEFAULT_DENSITY,
 });
 
 const MIX_DEFAULT = Object.freeze({ QUILT: QUILT_DEFAULT_MIX, GLYPH: GLYPH_DEFAULT_MIX, FIELD: QUILT_DEFAULT_MIX });
@@ -67,7 +75,7 @@ export function sanitizePattern(raw) {
   const seed = Number(r.seed);
   return {
     mode,
-    seed: Number.isFinite(seed) ? (Math.floor(seed) >>> 0) : d.seed,
+    seed: Number.isFinite(seed) ? Math.floor(seed) >>> 0 : d.seed,
     density: Math.round(num(r.density, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX, d.density)),
     mix: num(r.mix, 0, 1, d.mix),
     grout: num(r.grout, 0, QUILT_MAX_GROUT, d.grout),

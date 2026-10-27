@@ -14,9 +14,7 @@
 // Absent stays absent: a hand-built or dice-crowned record has NO
 // provenance key, and none is invented here.
 import { PERSONA_TASTES } from './personaTastes.js';
-import {
-  MAX_VARIANTS_PER_RECORD, isRecipe, sanitizeRecipe, variantIdFor,
-} from './variants.mjs';
+import { MAX_VARIANTS_PER_RECORD, isRecipe, sanitizeRecipe, variantIdFor } from './variants.mjs';
 
 export const PROVENANCE_SOURCES = Object.freeze(['explorer']);
 
@@ -86,8 +84,8 @@ export function isProvenance(o) {
   if (typeof o.run !== 'string' || !o.run) return false;
   if (typeof o.corner !== 'string' || !o.corner) return false;
   if (o.axes !== undefined && !isPlainObject(o.axes)) return false;
-  if (o.variants !== undefined
-    && (!Array.isArray(o.variants) || !o.variants.length || !o.variants.every(isRecipe))) return false;
+  if (o.variants !== undefined && (!Array.isArray(o.variants) || !o.variants.length || !o.variants.every(isRecipe)))
+    return false;
   return true;
 }
 
@@ -120,7 +118,11 @@ export function provenanceLabel(rec, { assetsById, palettesById } = {}) {
     }
     let best = null;
     let bestN = 0;
-    for (const [cat, n] of counts) if (n > bestN) { best = cat; bestN = n; }
+    for (const [cat, n] of counts)
+      if (n > bestN) {
+        best = cat;
+        bestN = n;
+      }
     if (best) parts.push(`${best} cast`);
   }
   const paletteId = rec?.config?.palette?.id;

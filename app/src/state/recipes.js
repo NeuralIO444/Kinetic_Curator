@@ -49,17 +49,24 @@ export function readSeedOffsets(source) {
  * snapshot keeps working whichever place #305's writer puts them.
  */
 export function recipeFieldsFromKept(kept) {
-  const k = (kept && typeof kept === 'object') ? kept : {};
-  const config = (k.config && typeof k.config === 'object') ? k.config : {};
-  const palette = (config.palette && typeof config.palette === 'object') ? config.palette : {};
-  const layout = (config.layout && typeof config.layout === 'object' && !Array.isArray(config.layout))
-    ? config.layout
-    : (k.layoutParams && typeof k.layoutParams === 'object' ? k.layoutParams : {});
+  const k = kept && typeof kept === 'object' ? kept : {};
+  const config = k.config && typeof k.config === 'object' ? k.config : {};
+  const palette = config.palette && typeof config.palette === 'object' ? config.palette : {};
+  const layout =
+    config.layout && typeof config.layout === 'object' && !Array.isArray(config.layout)
+      ? config.layout
+      : k.layoutParams && typeof k.layoutParams === 'object'
+        ? k.layoutParams
+        : {};
   return {
     seed: k.seed >>> 0,
     seedOffsets: readSeedOffsets({ seedOffsets: k.seedOffsets ?? config.seedOffsets }),
-    paletteId: typeof palette.id === 'string' && palette.id ? palette.id
-      : (typeof k.paletteId === 'string' && k.paletteId ? k.paletteId : null),
+    paletteId:
+      typeof palette.id === 'string' && palette.id
+        ? palette.id
+        : typeof k.paletteId === 'string' && k.paletteId
+          ? k.paletteId
+          : null,
     layoutParams: { ...layout },
     ...stackField(k),
   };
@@ -97,7 +104,7 @@ export function encodeRecipe(fields) {
   const f = fields && typeof fields === 'object' ? fields : {};
   const seed = (f.seed >>> 0).toString(16);
   const offsets = readSeedOffsets({ seedOffsets: f.seedOffsets });
-  const layout = (f.layoutParams && typeof f.layoutParams === 'object') ? f.layoutParams : {};
+  const layout = f.layoutParams && typeof f.layoutParams === 'object' ? f.layoutParams : {};
   const stack = f.stack && typeof f.stack === 'object' ? f.stack : null;
   const lines = [stack ? RECIPE_VERSION_2 : RECIPE_VERSION, `seed: 0x${seed}`];
   lines.push(`palette: ${typeof f.paletteId === 'string' && f.paletteId ? encodeValue(f.paletteId) : 'null'}`);
@@ -146,7 +153,10 @@ function parseSeed(raw) {
  */
 export function parseRecipe(text) {
   if (typeof text !== 'string' || !text.trim()) return fail('Empty recipe — paste kc-recipe/1 text first.');
-  const lines = text.split(/\r?\n/).map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
   const [head, ...rest] = lines;
   if (head !== RECIPE_VERSION && head !== RECIPE_VERSION_2) {
     return fail(`Not a recipe: the first line must be "${RECIPE_VERSION}" or "${RECIPE_VERSION_2}".`);
@@ -182,7 +192,11 @@ export function parseRecipe(text) {
       recipe.layoutParams[param] = parseValue(rawVal);
     } else if (key === 'stack' && head === RECIPE_VERSION_2) {
       let raw;
-      try { raw = JSON.parse(rawVal); } catch { return fail('Bad stack line: it is not readable.'); }
+      try {
+        raw = JSON.parse(rawVal);
+      } catch {
+        return fail('Bad stack line: it is not readable.');
+      }
       const ex = expandStack(raw);
       if (!ex.ok) return fail(`Bad stack line: ${ex.error}.`);
       recipe.stack = ex.stack;
@@ -208,7 +222,13 @@ export function recipeToProjectDoc(recipe) {
     paletteId: recipe.paletteId,
     layoutParams: { ...recipe.layoutParams },
     seedOffsets: { ...recipe.seedOffsets },
-    ...(recipe.stack ? { layers: recipe.stack.layers, activeLayerId: recipe.stack.activeLayerId, layerSnapshots: recipe.stack.layerSnapshots } : {}),
+    ...(recipe.stack
+      ? {
+          layers: recipe.stack.layers,
+          activeLayerId: recipe.stack.activeLayerId,
+          layerSnapshots: recipe.stack.layerSnapshots,
+        }
+      : {}),
   };
 }
 

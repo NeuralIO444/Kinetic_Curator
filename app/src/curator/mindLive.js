@@ -36,11 +36,21 @@ export function getMindSystem() {
 export function contextHash(ctx) {
   const s = JSON.stringify(ctx);
   let h = 2166136261;
-  for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); }
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
   return (h >>> 0).toString(16).padStart(8, '0');
 }
 
-const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, invented: d.invented, reply: d.reply, ...(d.traits ? { traits: d.traits } : {}) });
+const requestOf = (d) => ({
+  persona: d.persona,
+  bar: d.bar,
+  backend: d.backend,
+  invented: d.invented,
+  reply: d.reply,
+  ...(d.traits ? { traits: d.traits } : {}),
+});
 
 /**
  * @param getSnapshot () => the plain object buildContext takes
@@ -53,62 +63,169 @@ const requestOf = (d) => ({ persona: d.persona, bar: d.bar, backend: d.backend, 
  *                    (#1464 Mind 3). Absent = no personality layer.
  * @returns stop()
  */
-export function startMind({ getSnapshot, getSeed, model = null, isReplaying = () => false, presence = null, log = () => {} }) {
+export function startMind({
+  getSnapshot,
+  getSeed,
+  model = null,
+  isReplaying = () => false,
+  presence = null,
+  log = () => {},
+}) {
   const name = model && model.name === 'demo' ? 'demo' : 'apple';
-  const available = () => { try { return !!(model && model.available()); } catch { return false; } };
+  const available = () => {
+    try {
+      return !!(model && model.available());
+    } catch {
+      return false;
+    }
+  };
   // #1463 — every model ask is announced (mind:req) and every answer reported (mind:reply: the validated reply or
   // null, with its latency) whatever happens to it next; the thinker still decides whether it is used.
   const ask = (persona) => (context, meta) => {
     const t0 = now();
-    emit(Events.MIND_REQ, { persona, bar: meta.bar, seed: meta.seed, contextHash: contextHash(context) }, { cause: 'mind' });
+    emit(
+      Events.MIND_REQ,
+      { persona, bar: meta.bar, seed: meta.seed, contextHash: contextHash(context) },
+      { cause: 'mind' },
+    );
     const done = (reply, error) => {
-      emit(Events.MIND_REPLY, { persona, bar: meta.bar, backend: name, latencyMs: Math.round(now() - t0), reply, ...(error ? { error } : {}) }, { cause: 'mind' });
+      emit(
+        Events.MIND_REPLY,
+        {
+          persona,
+          bar: meta.bar,
+          backend: name,
+          latencyMs: Math.round(now() - t0),
+          reply,
+          ...(error ? { error } : {}),
+        },
+        { cause: 'mind' },
+      );
     };
     return Promise.resolve()
       .then(() => model.ask(persona, context, meta))
-      .then((raw) => { const v = validateReply(persona, raw); done(v, v ? null : 'malformed'); return raw; },
-        (e) => { done(null, String(e && e.message ? e.message : e).slice(0, 120)); throw e; });
+      .then(
+        (raw) => {
+          const v = validateReply(persona, raw);
+          done(v, v ? null : 'malformed');
+          return raw;
+        },
+        (e) => {
+          done(null, String(e && e.message ? e.message : e).slice(0, 120));
+          throw e;
+        },
+      );
   };
-  const thinkers = PERSONAS.map((persona) => createThinker({
-    persona, log, available, backend: name,
-    mind: model ? ask(persona) : null,
-  }));
+  const thinkers = PERSONAS.map((persona) =>
+    createThinker({
+      persona,
+      log,
+      available,
+      backend: name,
+      mind: model ? ask(persona) : null,
+    }),
+  );
   let status = null;
   const publishStatus = () => {
     const up = available();
     let info;
-    try { info = model && typeof model.info === 'function' ? model.info() : null; } catch { info = null; }
-    const next = { available: up, backend: up ? name : 'rules', ...(up && info && info.model ? { model: info.model } : {}) };
+    try {
+      info = model && typeof model.info === 'function' ? model.info() : null;
+    } catch {
+      info = null;
+    }
+    const next = {
+      available: up,
+      backend: up ? name : 'rules',
+      ...(up && info && info.model ? { model: info.model } : {}),
+    };
     if (status && status.backend === next.backend) return;
     status = next;
-    system = up ? { backend: name, ...(info && info.model ? { model: info.model } : {}), ...(info && info.os ? { os: info.os } : {}) } : null;
+    system = up
+      ? {
+          backend: name,
+          ...(info && info.model ? { model: info.model } : {}),
+          ...(info && info.os ? { os: info.os } : {}),
+        }
+      : null;
     emit(Events.MIND_STATUS, next, { cause: 'mind' });
   };
   publishStatus();
   const off = on(Events.CLOCK_BAR, (p) => {
     if (!p || !Number.isInteger(p.bar)) return;
     let replaying;
-    try { replaying = !!isReplaying(); } catch { replaying = false; }
+    try {
+      replaying = !!isReplaying();
+    } catch {
+      replaying = false;
+    }
     if (replaying) return; // muted: the take's record speaks for the personas
     publishStatus();
-    let snap; let ctx;
-    try { snap = getSnapshot(); ctx = buildContext(snap); } catch { return; }
-    if (presence) { try { presence.beforeBar(p.bar); } catch { /* the personality layer must not stop the personas */ } }
+    let snap;
+    let ctx;
+    try {
+      snap = getSnapshot();
+      ctx = buildContext(snap);
+    } catch {
+      return;
+    }
+    if (presence) {
+      try {
+        presence.beforeBar(p.bar);
+      } catch {
+        /* the personality layer must not stop the personas */
+      }
+    }
     const seed = ((Number(getSeed()) >>> 0) ^ Math.imul(p.bar + 1, 0x9e3779b1)) >>> 0; // the document seed, the bar
     thinkers.forEach((t, i) => {
       let pctx = ctx;
-      if (presence) { try { pctx = buildContext({ ...snap, ...presence.contextFor(PERSONAS[i]) }); } catch { pctx = ctx; } }
+      if (presence) {
+        try {
+          pctx = buildContext({ ...snap, ...presence.contextFor(PERSONAS[i]) });
+        } catch {
+          pctx = ctx;
+        }
+      }
       let d = t.onBar({ bar: p.bar, context: pctx, seed });
       if (!d) return;
-      if (presence) { try { d = presence.shape(d, pctx) || d; } catch { /* unshaped, never lost */ } }
+      if (presence) {
+        try {
+          d = presence.shape(d, pctx) || d;
+        } catch {
+          /* unshaped, never lost */
+        }
+      }
       const requested = wantsStage(d.persona, d.reply, ctx.room);
       emit(Events.MIND_DECISION, d, { cause: 'mind' });
-      if (d.backend === 'rules') emit(Events.MIND_REPLY, { persona: d.persona, bar: d.bar, backend: 'rules', latencyMs: 0, reply: d.reply }, { cause: 'mind' });
+      if (d.backend === 'rules')
+        emit(
+          Events.MIND_REPLY,
+          { persona: d.persona, bar: d.bar, backend: 'rules', latencyMs: 0, reply: d.reply },
+          { cause: 'mind' },
+        );
       if (requested) emitOn('bar', Events.MIND_REQUEST, requestOf(d), { cause: 'mind' });
-      if (tap !== null) { try { tap(d, requested); } catch { tap = null; } }
+      if (tap !== null) {
+        try {
+          tap(d, requested);
+        } catch {
+          tap = null;
+        }
+      }
     });
   });
-  return () => { off(); thinkers.forEach((t) => t.reset()); status = null; system = null; if (presence && typeof presence.stop === 'function') { try { presence.stop(); } catch { /* best effort */ } } };
+  return () => {
+    off();
+    thinkers.forEach((t) => t.reset());
+    status = null;
+    system = null;
+    if (presence && typeof presence.stop === 'function') {
+      try {
+        presence.stop();
+      } catch {
+        /* best effort */
+      }
+    }
+  };
 }
 
 let replay = null; // { record, cursor }
@@ -118,9 +235,14 @@ let replay = null; // { record, cursor }
  * frame is already the downbeat it landed on). Nothing is asked of any backend.
  */
 export function replayMindFrame(frame, record, { seeked = false } = {}) {
-  if (!record) { replay = null; return 0; }
+  if (!record) {
+    replay = null;
+    return 0;
+  }
   if (!replay || replay.record !== record) replay = { record, cursor: createMindReplay(record) };
-  if (seeked) { replay.cursor.seek(frame); }
+  if (seeked) {
+    replay.cursor.seek(frame);
+  }
   const rows = replay.cursor.step(frame);
   for (const e of replay.cursor.conductStep(frame)) emit(Events.MIND_ROUTE, e, { cause: 'replay' }); // #1483: the take's conducting, as it happened
   for (const row of rows) {

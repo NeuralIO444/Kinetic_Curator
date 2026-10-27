@@ -11,8 +11,16 @@ import { on, off, Events } from '../composition/eventBus.js';
 import { hashU32 } from '../engine/kernel/rng.js';
 import { readLedgerText, parseLedger } from './tasteLedger.js';
 import {
-  createStoryBook, decodeStoryBook, encodeStoryBook, beginSession, createEpisode,
-  applyStoryEvent, selectStoryBeat, storyEventFromRecord, siftLedgers, STORY_BEAT_BUDGET,
+  createStoryBook,
+  decodeStoryBook,
+  encodeStoryBook,
+  beginSession,
+  createEpisode,
+  applyStoryEvent,
+  selectStoryBeat,
+  storyEventFromRecord,
+  siftLedgers,
+  STORY_BEAT_BUDGET,
 } from './storyState.js';
 import { getLoreBank, pickOnThisDay, loreById } from './loreBank.js'; // #1560 S4: the lore bank (offline artifact)
 
@@ -30,13 +38,32 @@ let view = null;
  * genuine second run always arrives as a page reload, whose localStorage is a fresh object. */
 let begunFor;
 const listeners = new Set();
-const notify = () => { for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the loop */ } } };
+const notify = () => {
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the loop */
+    }
+  }
+};
 
 /** The dev readout, or null before the driver runs. Story state only — the arc has no readout, anywhere. */
-export function getStoryView() { return view; }
-export function subscribeStory(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+export function getStoryView() {
+  return view;
+}
+export function subscribeStory(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 
-const defaultStorage = () => { try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; } };
+const defaultStorage = () => {
+  try {
+    return typeof localStorage !== 'undefined' ? localStorage : null;
+  } catch {
+    return null;
+  }
+};
 
 /** The session-start sift of the artist's ledgers; a storage failure sifts to nothing, never to invention. */
 const siftFromStorage = (store) => {
@@ -44,7 +71,9 @@ const siftFromStorage = (store) => {
     const keeps = parseLedger(readLedgerText('keeps', store), () => {}).rows;
     const passes = parseLedger(readLedgerText('passes', store), () => {}).rows;
     return siftLedgers(keeps, passes);
-  } catch { return []; }
+  } catch {
+    return [];
+  }
 };
 
 /**
@@ -56,12 +85,25 @@ const siftFromStorage = (store) => {
  * @param storage  { getItem, setItem } (localStorage by default; absent or throwing = this session only)
  * @returns stop()
  */
-export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = null, isReplaying = () => false, storage = undefined } = {}) {
+export function startStoryLive({
+  getSeed = () => 0,
+  getTiers = null,
+  getDate = null,
+  isReplaying = () => false,
+  storage = undefined,
+} = {}) {
   const store = storage === undefined ? defaultStorage() : storage;
   let saved;
-  try { saved = store ? store.getItem(STORY_STORAGE_KEY) : null; } catch { saved = null; }
+  try {
+    saved = store ? store.getItem(STORY_STORAGE_KEY) : null;
+  } catch {
+    saved = null;
+  }
   const book = saved ? decodeStoryBook(saved) : createStoryBook();
-  if (begunFor !== store) { begunFor = store; beginSession(book); }
+  if (begunFor !== store) {
+    begunFor = store;
+    beginSession(book);
+  }
   // the session-start sift of the artist's own ledgers: debts, streaks, the last ending (research §1.6.6)
   const patterns = siftFromStorage(store);
   const ep = createEpisode(book, patterns);
@@ -73,7 +115,11 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
   const roll = () => {
     rollN++;
     let seed;
-    try { seed = Number(getSeed()) >>> 0; } catch { seed = 0; }
+    try {
+      seed = Number(getSeed()) >>> 0;
+    } catch {
+      seed = 0;
+    }
     return hashU32(seed ^ Math.imul(book.sessions + 1, 0x9e3779b9), 'room-story', rollN) / 4294967296;
   };
   // #1560 S4 — the day's cold open: the lore bank's on-this-day entry for the session's date, seeded into
@@ -86,11 +132,22 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
   try {
     let date = null;
     if (typeof getDate === 'function') date = getDate();
-    if (!date) { const now = new Date(); date = { month: now.getMonth() + 1, day: now.getDate() }; }
+    if (!date) {
+      const now = new Date();
+      date = { month: now.getMonth() + 1, day: now.getDate() };
+    }
     const otd = bank ? pickOnThisDay(bank, date, roll) : null;
     if (otd) ep.patterns.push({ kind: 'onthisday', loreId: otd.id, fresh: true });
-  } catch { /* a dateless session simply has no cold open — absence, never invention */ }
-  const save = () => { try { if (store) store.setItem(STORY_STORAGE_KEY, encodeStoryBook(book)); } catch { /* private mode: this session only */ } };
+  } catch {
+    /* a dateless session simply has no cold open — absence, never invention */
+  }
+  const save = () => {
+    try {
+      if (store) store.setItem(STORY_STORAGE_KEY, encodeStoryBook(book));
+    } catch {
+      /* private mode: this session only */
+    }
+  };
   const publish = () => {
     view = {
       session: book.sessions,
@@ -101,11 +158,23 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
       esteem: { mood: Math.round(book.esteem.mood * 10) / 10, standing: Math.round(book.esteem.standing * 10) / 10 },
       trust: { mood: Math.round(book.trust.mood * 10) / 10, standing: Math.round(book.trust.standing * 10) / 10 },
       believed: {
-        davis: { esteem: Math.round(book.believed.davis.esteem * 10) / 10, trust: Math.round(book.believed.davis.trust * 10) / 10 },
-        lois: { esteem: Math.round(book.believed.lois.esteem * 10) / 10, trust: Math.round(book.believed.lois.trust * 10) / 10 },
+        davis: {
+          esteem: Math.round(book.believed.davis.esteem * 10) / 10,
+          trust: Math.round(book.believed.davis.trust * 10) / 10,
+        },
+        lois: {
+          esteem: Math.round(book.believed.lois.esteem * 10) / 10,
+          trust: Math.round(book.believed.lois.trust * 10) / 10,
+        },
       },
       grudges: book.grudges.map((g) => ({ topic: g.topic, count: g.count, promoted: g.promoted })),
-      patterns: ep.patterns.map((p) => ({ kind: p.kind, ...(p.topic ? { topic: p.topic } : {}), ...(p.paletteId ? { paletteId: p.paletteId } : {}), ...(p.loreId ? { loreId: p.loreId } : {}), fresh: !!p.fresh })),
+      patterns: ep.patterns.map((p) => ({
+        kind: p.kind,
+        ...(p.topic ? { topic: p.topic } : {}),
+        ...(p.paletteId ? { paletteId: p.paletteId } : {}),
+        ...(p.loreId ? { loreId: p.loreId } : {}),
+        fresh: !!p.fresh,
+      })),
       // a beat whose referent is a lore entry carries the entry's fact, resolved here — the beat itself
       // stays a referent (storyState knows no text); the backstage log is where the cold open is read
       beats: beatLog.map((b) => {
@@ -122,16 +191,27 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
     applyStoryEvent(book, ep, ev);
     if (ev.kind === 'bar') {
       let tiers;
-      try { tiers = (typeof getTiers === 'function' ? getTiers() : null) || {}; } catch { tiers = {}; }
+      try {
+        tiers = (typeof getTiers === 'function' ? getTiers() : null) || {};
+      } catch {
+        tiers = {};
+      }
       const beat = selectStoryBeat(book, ep, { tiers, roll });
-      if (beat) { beatLog.unshift(beat); if (beatLog.length > STORY_BEAT_LOG) beatLog.length = STORY_BEAT_LOG; }
+      if (beat) {
+        beatLog.unshift(beat);
+        if (beatLog.length > STORY_BEAT_LOG) beatLog.length = STORY_BEAT_LOG;
+      }
     }
     if (++folded % STORY_SAVE_EVERY === 0) save();
     publish();
   };
   const live = (fn) => (p, meta) => {
     if (meta && meta.cause === 'replay') return; // counted when it was live; a replay must not count it again
-    try { if (isReplaying()) return; } catch { /* idle only when sure */ }
+    try {
+      if (isReplaying()) return;
+    } catch {
+      /* idle only when sure */
+    }
     fn(p, meta);
   };
   const onDecision = live((p) => fold(storyEventFromRecord(Events.MIND_DECISION, p, lastBar)));
@@ -139,7 +219,10 @@ export function startStoryLive({ getSeed = () => 0, getTiers = null, getDate = n
   const onCast = live((p) => fold(storyEventFromRecord(Events.DICE_CAST, p, lastBar)));
   const onBloom = live((p) => fold(storyEventFromRecord(Events.BLOOM, p, lastBar)));
   const onKeep = live((p) => fold(storyEventFromRecord(Events.KEEP_ADD, p, lastBar)));
-  const onBar = live((p) => { if (p && Number.isInteger(p.bar)) lastBar = p.bar; fold(storyEventFromRecord(Events.CLOCK_BAR, p, lastBar)); });
+  const onBar = live((p) => {
+    if (p && Number.isInteger(p.bar)) lastBar = p.bar;
+    fold(storyEventFromRecord(Events.CLOCK_BAR, p, lastBar));
+  });
 
   on(Events.MIND_DECISION, onDecision);
   on(Events.DIRECTOR_ROOM, onRoom);

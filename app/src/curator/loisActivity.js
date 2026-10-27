@@ -72,7 +72,9 @@ export function parseFavoriteTimestamp(ts) {
 /** #1391 G14 — a cast's signature: the enabled asset ids, sorted. */
 function castSignature(enabled) {
   if (!enabled || typeof enabled !== 'object') return { sig: '', size: 0 };
-  const ids = Object.keys(enabled).filter((k) => enabled[k]).sort();
+  const ids = Object.keys(enabled)
+    .filter((k) => enabled[k])
+    .sort();
   return { sig: ids.join(','), size: ids.length };
 }
 
@@ -174,7 +176,10 @@ export function createLoisActivity({
       s.seed = seed;
       s.seedSetAt = at;
       s.rollsSinceSeed = 0;
-      if (first === false) { s.seedChanges.push(at); cap(s.seedChanges); } // loading a seed is not dropping one
+      if (first === false) {
+        s.seedChanges.push(at);
+        cap(s.seedChanges);
+      } // loading a seed is not dropping one
     }
   }
 
@@ -187,7 +192,8 @@ export function createLoisActivity({
     const bloomed = countSince(s.passes, DAVIS_UGLY_WINDOW_MS, at) >= DAVIS_UGLY_PASSES;
     const rolls = s.passRun;
     if (bloomed) {
-      s.bloomAt = at; s.bloomDepth = rolls;
+      s.bloomAt = at;
+      s.bloomDepth = rolls;
       // #1391 G15 — remember WHICH seed bloomed, so a later return is visible.
       if (s.seed != null) s.bloomedSeeds.set(s.seed, { ts: at, depth: rolls });
     }
@@ -216,8 +222,19 @@ export function createLoisActivity({
   function noteFavorite(fav, at, door) {
     if (s.favNote.door !== door && at - s.favNote.at < KEEP_DEDUPE_MS) return;
     s.favNote = { at, door };
-    for (const fn of keepListeners) { try { fn(); } catch { /* a listener must not break the ledger */ } }
-    s.favorites.push({ ts: at, msSinceSeed: at - s.seedSetAt, seed: fav.seed ?? null, paletteId: fav.config?.palette?.id ?? null });
+    for (const fn of keepListeners) {
+      try {
+        fn();
+      } catch {
+        /* a listener must not break the ledger */
+      }
+    }
+    s.favorites.push({
+      ts: at,
+      msSinceSeed: at - s.seedSetAt,
+      seed: fav.seed ?? null,
+      paletteId: fav.config?.palette?.id ?? null,
+    });
     cap(s.favorites);
   }
 
@@ -354,7 +371,12 @@ export function createLoisActivity({
           // exactly this. Legacy favorites (time-of-day stamp) age honestly
           // to null — never invented.
           const favTs = parseFavoriteTimestamp(p.favorite.timestamp);
-          s.recalls.push({ ts: at, seed: p.favorite.seed ?? null, favTs, seedAgeMs: favTs != null ? at - favTs : null });
+          s.recalls.push({
+            ts: at,
+            seed: p.favorite.seed ?? null,
+            favTs,
+            seedAgeMs: favTs != null ? at - favTs : null,
+          });
           cap(s.recalls);
           beat();
         }
@@ -391,9 +413,7 @@ export function createLoisActivity({
         noteTweak(p && typeof p.key === 'string' ? p.key : null);
       }),
     );
-    unsubs.push(
-      on(Events.ASSETS_REGION_KINEME, () => noteTweak('regionKineme')),
-    );
+    unsubs.push(on(Events.ASSETS_REGION_KINEME, () => noteTweak('regionKineme')));
 
     // Instrument 6 — rolls-per-keep: curate taps and KINETIC taps vs keeps.
     // #1391 G6/G10/G12 — the same roll feeds the per-keep cost counter, the
@@ -408,7 +428,8 @@ export function createLoisActivity({
         if (s.rollsAll.length > ROLL_LOG_CAP) s.rollsAll.splice(0, s.rollsAll.length - ROLL_LOG_CAP);
       }
       if (!s.frameKept) {
-        s.passes.push(at); cap(s.passes); // it replaced a frame nobody kept
+        s.passes.push(at);
+        cap(s.passes); // it replaced a frame nobody kept
         // #1391 G12 — the pass WITH its seed. There is no seed-region
         // partition anywhere in the instrument; rolls re-press on one seed,
         // so the honest grain is the seed itself: a run of consecutive
@@ -416,7 +437,10 @@ export function createLoisActivity({
         s.passLog.push({ ts: at, seed: s.seed });
         cap(s.passLog);
         if (s.passClusterSeed === s.seed && s.seed != null) s.passClusterLen += 1;
-        else { s.passClusterSeed = s.seed; s.passClusterLen = 1; }
+        else {
+          s.passClusterSeed = s.seed;
+          s.passClusterLen = 1;
+        }
         // the number an earned voice carries is the ARTIST's rolls: an EVOLVE left running overnight must not farm depth
         if (kind !== 'evolve') s.passRun += 1;
       }
@@ -463,7 +487,8 @@ export function createLoisActivity({
           const was = prev;
           prev = cur;
           if (s.muted) return; // the machine, not the artist (the dead-frame guard re-dealing)
-          const newFav = fresh(st.favorites, was.favIds); const newKeep = fresh(st.keeps, was.keepIds);
+          const newFav = fresh(st.favorites, was.favIds);
+          const newKeep = fresh(st.keeps, was.keepIds);
           if (newFav.length === 1 && cur.favIds.size > was.favIds.size - 1) noteFavorite(newFav[0], t(), 'store');
           if (cur.evolveTs != null && cur.evolveTs !== was.evolveTs) {
             // #1391 G13 — the flag: EVOLVE fired off the seed that was live,
@@ -473,7 +498,9 @@ export function createLoisActivity({
               s.evolvesFromKept.push({ ts: t(), seed: s.seed });
               cap(s.evolvesFromKept);
             }
-            s.evolves.push(t()); cap(s.evolves); noteRoll('evolve');
+            s.evolves.push(t());
+            cap(s.evolves);
+            noteRoll('evolve');
           }
           // #1391 G14 — palette / cast changes while a rolled frame is live
           // and unkept: the cast moved mid-roll (DROWN). The seed must not
@@ -550,12 +577,28 @@ export function createLoisActivity({
   /** Run `fn` as the MACHINE: the store changes it makes (a re-deal, its undo) are not the artist and are not noted. */
   function machine(fn) {
     s.muted += 1;
-    try { return fn(); } finally { s.muted -= 1; }
+    try {
+      return fn();
+    } finally {
+      s.muted -= 1;
+    }
   }
 
   /** #1354 — the two COUNTS the stress signal reads. Cheap (no window scans): safe to call every frame. */
   const pressureCounts = () => ({ activityCount: s.activityCount, passRun: s.passRun, verdicts: s.verdicts.slice() }); // #1753: + verdicts
-  const api = { start, stop, beat, noteSeed, snapshot, machine, pressureCounts, onKeep: (fn) => { keepListeners.add(fn); return () => keepListeners.delete(fn); } };
+  const api = {
+    start,
+    stop,
+    beat,
+    noteSeed,
+    snapshot,
+    machine,
+    pressureCounts,
+    onKeep: (fn) => {
+      keepListeners.add(fn);
+      return () => keepListeners.delete(fn);
+    },
+  };
   return api;
 }
 

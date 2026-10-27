@@ -50,7 +50,8 @@ export function mutateKey(key, current, rng, spread = DEFAULT_SPREAD) {
   const s = clampSpread(spread);
   if (!spec) return randomizeKey(key, rng);
   if (spec.pair) {
-    if (!Array.isArray(current) || current.length !== 2 || !current.every(Number.isFinite)) return randomizeKey(key, rng);
+    if (!Array.isArray(current) || current.length !== 2 || !current.every(Number.isFinite))
+      return randomizeKey(key, rng);
     return [
       mutateOne(current[0], spec.pair[0][0], spec.pair[0][1], rng, s, spec),
       mutateOne(current[1], spec.pair[1][0], spec.pair[1][1], rng, s, spec),

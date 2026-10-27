@@ -43,7 +43,11 @@ const count0 = S().layers.length;
 S().addLayer();
 const layerB = S().activeLayerId;
 assert.notStrictEqual(layerB, layerA, 'addLayer must switch to a new layer id');
-assert.strictEqual(S().layers.find((l) => l.id === layerB).type, 'content', 'addLayer sets type: content like the initial layer and duplicateLayer');
+assert.strictEqual(
+  S().layers.find((l) => l.id === layerB).type,
+  'content',
+  'addLayer sets type: content like the initial layer and duplicateLayer',
+);
 assert.strictEqual(S().layers.length, count0 + 1);
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS, 'addLayer must push a layers entry');
 assert.ok(S().historyUndoStack.at(-1).bytes > 0, 'entries carry their estimated size');
@@ -91,10 +95,17 @@ S().addLayer();
 const layerC = S().activeLayerId;
 const orderBefore = S().layers.map((l) => l.id);
 S().reorderLayer(layerC, -1);
-assert.notDeepStrictEqual(S().layers.map((l) => l.id), orderBefore);
+assert.notDeepStrictEqual(
+  S().layers.map((l) => l.id),
+  orderBefore,
+);
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS);
 S().undo();
-assert.deepStrictEqual(S().layers.map((l) => l.id), orderBefore, 'undo restores layer order');
+assert.deepStrictEqual(
+  S().layers.map((l) => l.id),
+  orderBefore,
+  'undo restores layer order',
+);
 
 const fxDepthBefore = undoDepth();
 S().addFxLayer();
@@ -125,7 +136,8 @@ S().fxEffectSetParam(fxId, 0, 'dx', 11);
 assert.strictEqual(undoDepth(), d0 + 1, 'rapid slider ticks share one debounced entry');
 S().undo();
 assert.strictEqual(
-  S().layers.find((l) => l.id === fxId).effects[0].params.dx, 3,
+  S().layers.find((l) => l.id === fxId).effects[0].params.dx,
+  3,
   'undo restores the pre-drag FX param',
 );
 S().undo(); // undo fxEffectAdd(rgbSplit)
@@ -146,7 +158,7 @@ assert.strictEqual(S().seed, 111, "switching back restores A's own snapshot");
 const undoBefore = undoDepth();
 S().undo();
 assert.strictEqual(S().seed, 111, 'undo on A must not be corrupted by a C-tagged entry');
-assert.notStrictEqual(S().seed, seedC0, 'A must never receive C\'s value');
+assert.notStrictEqual(S().seed, seedC0, "A must never receive C's value");
 assert.strictEqual(undoDepth(), undoBefore, 'mismatched undo must not pop the stack');
 assert.strictEqual(S().activeLayerId, layerA, 'edit undo must never change the active layer');
 
@@ -169,7 +181,10 @@ assert.strictEqual(S().seed, 111, "redo on A restores A's edit");
 
 for (let i = 0; i < 60; i++) S().setSeed(1000 + i);
 assert.strictEqual(undoDepth(), UNDO_MAX_DEPTH, 'live stack honors the depth cap');
-assert.ok(S().historyUndoStack.every((e) => e.bytes > 0), 'every entry carries its size');
+assert.ok(
+  S().historyUndoStack.every((e) => e.bytes > 0),
+  'every entry carries its size',
+);
 const totalBytes = S().historyUndoStack.reduce((n, e) => n + e.bytes, 0);
 assert.ok(totalBytes <= UNDO_MAX_BYTES, `live stack honors the memory cap (${totalBytes} bytes)`);
 

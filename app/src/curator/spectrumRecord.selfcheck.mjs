@@ -7,10 +7,22 @@
 //   3. v1 takes and takes without the section still play (the live spectrum simply stays live)
 //   4. while a take's spectrum plays, the live analyser is ignored — the core's only source is the record
 import assert from 'node:assert/strict';
-import { createSpectrumRecorder, checkSpectrumRecord, replaySpectrumFrame, endSpectrumReplay, bytesToB64, b64ToBytes } from './spectrumRecord.js';
+import {
+  createSpectrumRecorder,
+  checkSpectrumRecord,
+  replaySpectrumFrame,
+  endSpectrumReplay,
+  bytesToB64,
+  b64ToBytes,
+} from './spectrumRecord.js';
 import { quantizeSpectrum, expandSpectrum, LOG_BINS, RECORD_BINS } from '../gl/spectrumCore.mjs';
 import { stepSpectrum, readSpectrum, isSpectrumPlayback } from '../gl/spectrumLive.mjs';
-import { createPerformanceRecorder, checkPerformance, packPerformance, unpackPerformance } from '../gl/performanceFile.mjs';
+import {
+  createPerformanceRecorder,
+  checkPerformance,
+  packPerformance,
+  unpackPerformance,
+} from '../gl/performanceFile.mjs';
 import { startPlayback, stopPlayback } from '../gl/playback.mjs';
 
 // A hearing: a smooth gaussian bump that travels the log axis and swells — the shape of a chorus passing.
@@ -41,7 +53,10 @@ let section;
   }
   frame = FRAMES;
   section = rec.finish();
-  assert.ok(section && section.version === 1 && section.bins === RECORD_BINS, 'the section exists with the record shape');
+  assert.ok(
+    section && section.version === 1 && section.bins === RECORD_BINS,
+    'the section exists with the record shape',
+  );
   const decoded = checkSpectrumRecord(section);
   assert.ok(decoded, 'the section passes its own fail-closed check');
   assert.equal(decoded.bytes.length, FRAMES * RECORD_BINS, 'one 32-byte row per frame, tail included');
@@ -64,7 +79,11 @@ let section;
   assert.equal(checkSpectrumRecord({ ...section, version: 2 }), null, 'a future version is refused, not misread');
   assert.equal(checkSpectrumRecord({ ...section, rows: 'not base64!!' }), null, 'garbage rows are refused');
   assert.equal(checkSpectrumRecord(null), null);
-  assert.deepEqual([...b64ToBytes(bytesToB64(new Uint8Array([0, 1, 254, 255])))], [0, 1, 254, 255], 'base64 round trip');
+  assert.deepEqual(
+    [...b64ToBytes(bytesToB64(new Uint8Array([0, 1, 254, 255])))],
+    [0, 1, 254, 255],
+    'base64 round trip',
+  );
 }
 
 // ── 2. the gate: dials at 0 for the whole take -> no section ─────────────────────────────────────────
@@ -72,7 +91,10 @@ let section;
   let frame = 0;
   const rec = createSpectrumRecorder({ getFrame: () => frame });
   rec.note(false); // the dials never rose
-  for (let f = 0; f < 30; f++) { frame = f; rec.sample(smoothAt(f)); }
+  for (let f = 0; f < 30; f++) {
+    frame = f;
+    rec.sample(smoothAt(f));
+  }
   frame = 30;
   assert.equal(rec.finish(), undefined, 'dials at 0: finish() is undefined, so the key is absent from the file');
 }
@@ -81,7 +103,15 @@ let section;
 {
   const recorder = createPerformanceRecorder({ checkpointEvery: 10 });
   for (let f = 0; f < 25; f++) {
-    recorder.onInput({ seed: 7, loopTimeMs: f * 16.7, dtSec: 1 / 60, canvasW: 100, canvasH: 100, layers: [], layoutParams: {} });
+    recorder.onInput({
+      seed: 7,
+      loopTimeMs: f * 16.7,
+      dtSec: 1 / 60,
+      canvasW: 100,
+      canvasH: 100,
+      layers: [],
+      layoutParams: {},
+    });
     recorder.onOutput({ n: f });
   }
   const perf = { ...recorder.finish(), spectrum: section };
@@ -100,9 +130,14 @@ let section;
 // ── 4. playback: the core hears the record; the analyser is ignored; moments land on their frames ────
 {
   const liveAnalyser = {
-    frequencyBinCount: 1024, fftSize: 2048,
-    getFloatFrequencyData(a) { a.fill(-30); }, // loud everywhere: would swamp the core if it were heard
-    getFloatTimeDomainData(a) { a.fill(0.5); },
+    frequencyBinCount: 1024,
+    fftSize: 2048,
+    getFloatFrequencyData(a) {
+      a.fill(-30);
+    }, // loud everywhere: would swamp the core if it were heard
+    getFloatTimeDomainData(a) {
+      a.fill(0.5);
+    },
   };
   replaySpectrumFrame(0, section, {});
   assert.equal(isSpectrumPlayback(), true, 'the take spectrum is the source now');
@@ -111,9 +146,19 @@ let section;
     replaySpectrumFrame(f, section, {});
     const before = Float32Array.from(readSpectrum().smooth);
     stepSpectrum(liveAnalyser, 48000, 16.7); // the room shouts: must change nothing
-    assert.deepEqual([...readSpectrum().smooth], [...before], `frame ${f}: the live analyser is ignored during playback`);
-    let peak = 0; let peakBin = -1;
-    readSpectrum().smooth.forEach((v, i) => { if (v > peak) { peak = v; peakBin = i; } });
+    assert.deepEqual(
+      [...readSpectrum().smooth],
+      [...before],
+      `frame ${f}: the live analyser is ignored during playback`,
+    );
+    let peak = 0;
+    let peakBin = -1;
+    readSpectrum().smooth.forEach((v, i) => {
+      if (v > peak) {
+        peak = v;
+        peakBin = i;
+      }
+    });
     playedMax.push({ peak, peakBin });
   }
   // the bump lands where the record put it: measure the recorded rows' own 0.7-crossing (from the
@@ -128,8 +173,14 @@ let section;
     if (Math.max(...exp) > 0.7) recordedCross = f;
   }
   const crossFrame = playedMax.findIndex((m) => m.peak > 0.7);
-  assert.ok(crossFrame >= recordedCross && crossFrame - recordedCross <= 5, `the swell arrives on its frame (played ${crossFrame}, recorded ${recordedCross})`);
-  assert.ok(Math.abs(playedMax[120].peakBin - (24 + (120 / FRAMES) * 72)) <= 8, `the bump is at its recorded frequency (bin ${playedMax[120].peakBin})`);
+  assert.ok(
+    crossFrame >= recordedCross && crossFrame - recordedCross <= 5,
+    `the swell arrives on its frame (played ${crossFrame}, recorded ${recordedCross})`,
+  );
+  assert.ok(
+    Math.abs(playedMax[120].peakBin - (24 + (120 / FRAMES) * 72)) <= 8,
+    `the bump is at its recorded frequency (bin ${playedMax[120].peakBin})`,
+  );
   endSpectrumReplay();
   assert.equal(isSpectrumPlayback(), false, 'playback ended: the room is the source again');
   stepSpectrum(null, 48000, 16.7); // must not throw, and the core is live again

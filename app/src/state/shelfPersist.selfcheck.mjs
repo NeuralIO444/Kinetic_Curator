@@ -9,24 +9,39 @@ const mem = new Map();
 let failWrites = false;
 let failReads = false;
 globalThis.localStorage = {
-  getItem: (k) => { if (failReads) throw new Error('storage blocked'); return mem.has(k) ? mem.get(k) : null; },
-  setItem: (k, v) => { if (failWrites) throw new Error('QuotaExceededError'); mem.set(k, String(v)); },
+  getItem: (k) => {
+    if (failReads) throw new Error('storage blocked');
+    return mem.has(k) ? mem.get(k) : null;
+  },
+  setItem: (k, v) => {
+    if (failWrites) throw new Error('QuotaExceededError');
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 
-const { createDavisSlice, FAVORITES_KEY, KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, SHELF_HISTORY_SHED_KEY } = await import('./slices/davisSlice.js');
+const { createDavisSlice, FAVORITES_KEY, KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, SHELF_HISTORY_SHED_KEY } =
+  await import('./slices/davisSlice.js');
 
 function boot() {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set);
   return { get: () => state, call: (name, ...a) => state[name](...a) };
 }
 const rec = (seed) => ({ seed, timestamp: 't', config: { layout: { mode: 'grid' }, palette: { id: 'bone' } } });
-const reset = () => { mem.clear(); failWrites = false; failReads = false; mem.set(STAGE_KEY, '[]'); };
+const reset = () => {
+  mem.clear();
+  failWrites = false;
+  failReads = false;
+  mem.set(STAGE_KEY, '[]');
+};
 // #1643 extended the blocked-crown line: the same refused write also loses
 // the crown's ledger label, and both losses speak in the one notice.
-const SAVE_LINE = 'the shelf did not save — storage refused the write — the keeps ledger would not save — export from PIPELINE';
+const SAVE_LINE =
+  'the shelf did not save — storage refused the write — the keeps ledger would not save — export from PIPELINE';
 
 // ── 1. the happy path stays silent ──
 {
@@ -70,12 +85,20 @@ const SAVE_LINE = 'the shelf did not save — storage refused the write — the 
   mem.set(KEEPS_KEY, raw);
   const a = boot();
   assert.equal(a.get().keeps.length, 2, 'the readable keeps load');
-  assert.equal(a.get().shelfNotice, '2 stored keeps could not be read and were left out', 'the loss is counted out loud at boot');
+  assert.equal(
+    a.get().shelfNotice,
+    '2 stored keeps could not be read and were left out',
+    'the loss is counted out loud at boot',
+  );
   const q = JSON.parse(mem.get(`${KEEPS_KEY}:quarantine`));
   assert.equal(q.raw, raw, 'the original stored string was set aside before anything overwrote it');
   a.call('addKeep', rec(303));
   assert.equal(JSON.parse(mem.get(KEEPS_KEY)).length, 3, 'the next persist writes the clean list');
-  assert.equal(JSON.parse(mem.get(`${KEEPS_KEY}:quarantine`)).raw, raw, 'and the quarantined original survives it — recoverable');
+  assert.equal(
+    JSON.parse(mem.get(`${KEEPS_KEY}:quarantine`)).raw,
+    raw,
+    'and the quarantined original survives it — recoverable',
+  );
 }
 
 // ── 4. an unparseable blob is named and set aside, not mistaken for an empty shelf ──
@@ -94,7 +117,10 @@ const SAVE_LINE = 'the shelf did not save — storage refused the write — the 
   failReads = true;
   const a = boot();
   assert.deepEqual(a.get().keeps, []);
-  assert.ok((a.get().shelfNotice || '').includes('could not be read — storage refused'), 'a refused read is spoken, not silent');
+  assert.ok(
+    (a.get().shelfNotice || '').includes('could not be read — storage refused'),
+    'a refused read is spoken, not silent',
+  );
   failReads = false;
 }
 
@@ -108,7 +134,10 @@ const SAVE_LINE = 'the shelf did not save — storage refused the write — the 
   assert.equal(a.get().shelfHistoryShed, 5, 'the five the cap shed at load are counted');
   assert.equal(JSON.parse(mem.get(SHELF_HISTORY_SHED_KEY)), 5, 'the merged total persisted');
   assert.equal(JSON.parse(mem.get(SHELF_HISTORY_KEY)).length, 1000, 'the boot wrote the history back capped');
-  assert.ok(!(a.get().shelfNotice || '').includes('could not be read'), 'cap trims are not misreported as unreadable records');
+  assert.ok(
+    !(a.get().shelfNotice || '').includes('could not be read'),
+    'cap trims are not misreported as unreadable records',
+  );
   const b = boot();
   assert.equal(b.get().shelfHistoryShed, 5, 'a reload reads the counter — the same trims never count twice');
   // fill the stage (16 slots) so the next keep lands in the collection —
@@ -119,7 +148,11 @@ const SAVE_LINE = 'the shelf did not save — storage refused the write — the 
   const shedBefore = b.get().shelfHistoryShed;
   b.call('shelfExported', collectionKeep.id, { id: collectionKeep.id, rel: 'keeps/x.json', label: 'x' });
   assert.equal(b.get().shelfHistory.length, 1000, 'the cap holds after the append');
-  assert.equal(b.get().shelfHistoryShed, shedBefore + 1, 'the append-time trim incremented the counter with the update');
+  assert.equal(
+    b.get().shelfHistoryShed,
+    shedBefore + 1,
+    'the append-time trim incremented the counter with the update',
+  );
   assert.equal(JSON.parse(mem.get(SHELF_HISTORY_SHED_KEY)), shedBefore + 1, 'and persisted it');
 }
 

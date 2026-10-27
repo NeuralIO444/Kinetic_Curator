@@ -1,6 +1,16 @@
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
-import { pushToUndo, captureUndoEntry, entryApplies, editRestoreFields, layersRestoreFields, shelfRestoreFields, trimUndoStack, UNDO_KIND_LAYERS, UNDO_KIND_SHELF } from '../history.js';
+import {
+  pushToUndo,
+  captureUndoEntry,
+  entryApplies,
+  editRestoreFields,
+  layersRestoreFields,
+  shelfRestoreFields,
+  trimUndoStack,
+  UNDO_KIND_LAYERS,
+  UNDO_KIND_SHELF,
+} from '../history.js';
 import { KEEPS_KEY, STAGE_KEY, SHELF_HISTORY_KEY, DISK_KEY } from './davisSlice.js';
 import { RANDOMIZABLE_KEYS, randomizeKey } from '../paramUtils.js';
 import { CURATE_CANDIDATES, getActiveCurator, pickCurated } from '../../curator/curate.js';
@@ -11,12 +21,28 @@ import { isFxLayer, FX_MENU_KINDS } from '../../fx/fxFilters.js';
 import { rollFxKinds, rollFxParams, rollBlend } from '../../fx/rollSafety.js';
 import { isMathLayer } from '../../fx/mathFilters.js';
 import { buildHarmony, applyWithLocks } from '../../engine/harmony.js';
-import { SEED_OFFSET_GROUPS, CH, defaultSeedOffsets, normalizeSeedOffsets, rngForIndex } from '../../engine/kernel/rng.js';
+import {
+  SEED_OFFSET_GROUPS,
+  CH,
+  defaultSeedOffsets,
+  normalizeSeedOffsets,
+  rngForIndex,
+} from '../../engine/kernel/rng.js';
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
 import { FEEL_PRESETS } from '../../data/feels.js';
-import { resolveVoiceState, captureLiveVoiceState, STUB_VOICES, MOTION_MODES, SHAPE_SETS, SHAPE_MIX_MAX, MIXABLE_SHAPE_IDS, liveShapeLevels, shapeMixIds } from '../../data/voices.js';
+import {
+  resolveVoiceState,
+  captureLiveVoiceState,
+  STUB_VOICES,
+  MOTION_MODES,
+  SHAPE_SETS,
+  SHAPE_MIX_MAX,
+  MIXABLE_SHAPE_IDS,
+  liveShapeLevels,
+  shapeMixIds,
+} from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
@@ -149,11 +175,18 @@ function persistShelfRestore(shelfBack) {
     // that returns a record to the disk tier reads consistently
     // after a reload too.
     if (shelfBack.shelfDiskStubs !== undefined) {
-      localStorage.setItem(DISK_KEY, JSON.stringify({
-        v: 1, root: shelfBack.shelfDiskRoot ?? null, stubs: shelfBack.shelfDiskStubs,
-      }));
+      localStorage.setItem(
+        DISK_KEY,
+        JSON.stringify({
+          v: 1,
+          root: shelfBack.shelfDiskRoot ?? null,
+          stubs: shelfBack.shelfDiskStubs,
+        }),
+      );
     }
-  } catch { /* storage full/blocked — state still restores */ }
+  } catch {
+    /* storage full/blocked — state still restores */
+  }
 }
 
 export const createLayoutSlice = (set) => ({
@@ -247,129 +280,139 @@ export const createLayoutSlice = (set) => ({
   historyRedoStack: [],
 
   setSeed: (seed) => set((state) => ({ ...pushToUndo(state, true), seed })),
-  bumpSeed: () => set((state) => ({
-    ...pushToUndo(state, true),
-    seed: (state.seed ^ ((Math.random() * 0xffffffff) | 0)) >>> 0,
-  })),
+  bumpSeed: () =>
+    set((state) => ({
+      ...pushToUndo(state, true),
+      seed: (state.seed ^ ((Math.random() * 0xffffffff) | 0)) >>> 0,
+    })),
   /**
    * Re-roll one sub-seed stream (#305): the named stream gets a fresh random
    * offset while the master seed and the other three streams stay locked.
    * Undoable, like every other seed edit.
    */
-  mutateSeedOffset: (group) => set((state) => {
-    if (!SEED_OFFSET_GROUPS.includes(group)) return {};
-    return {
-      ...pushToUndo(state, true),
-      seedOffsets: {
-        ...normalizeSeedOffsets(state.seedOffsets),
-        [group]: ((Math.random() * 0xffffffff) | 0) >>> 0,
-      },
-    };
-  }),
+  mutateSeedOffset: (group) =>
+    set((state) => {
+      if (!SEED_OFFSET_GROUPS.includes(group)) return {};
+      return {
+        ...pushToUndo(state, true),
+        seedOffsets: {
+          ...normalizeSeedOffsets(state.seedOffsets),
+          [group]: ((Math.random() * 0xffffffff) | 0) >>> 0,
+        },
+      };
+    }),
   /** Set one stream's offset explicitly (project load, recipe recall). */
-  setSeedOffset: (group, value) => set((state) => {
-    if (!SEED_OFFSET_GROUPS.includes(group)) return {};
-    const v = Number(value);
-    if (!Number.isFinite(v)) return {};
-    const cur = normalizeSeedOffsets(state.seedOffsets);
-    if ((v >>> 0) === cur[group]) return {};
-    return {
-      ...pushToUndo(state, true),
-      seedOffsets: { ...cur, [group]: v >>> 0 },
-    };
-  }),
+  setSeedOffset: (group, value) =>
+    set((state) => {
+      if (!SEED_OFFSET_GROUPS.includes(group)) return {};
+      const v = Number(value);
+      if (!Number.isFinite(v)) return {};
+      const cur = normalizeSeedOffsets(state.seedOffsets);
+      if (v >>> 0 === cur[group]) return {};
+      return {
+        ...pushToUndo(state, true),
+        seedOffsets: { ...cur, [group]: v >>> 0 },
+      };
+    }),
   /** Lock every stream back to the master seed (all offsets zero). */
-  resetSeedOffsets: () => set((state) => {
-    const cur = normalizeSeedOffsets(state.seedOffsets);
-    if (SEED_OFFSET_GROUPS.every((g) => cur[g] === 0)) return {};
-    return { ...pushToUndo(state, true), seedOffsets: defaultSeedOffsets() };
-  }),
+  resetSeedOffsets: () =>
+    set((state) => {
+      const cur = normalizeSeedOffsets(state.seedOffsets);
+      if (SEED_OFFSET_GROUPS.every((g) => cur[g] === 0)) return {};
+      return { ...pushToUndo(state, true), seedOffsets: defaultSeedOffsets() };
+    }),
   /** #1365 — the artist picked or edited the palette (called on the artist's dispatch path only). */
   markPaletteChosen: () => set((state) => (state.paletteChosen ? {} : { paletteChosen: true })),
   // Switching catalog id clears overrides (AC6)
-  setPaletteId: (id) => set((state) => ({
-    ...pushToUndo(state, true),
-    paletteId: id,
-    voiceMix: null,
-    activeVoiceId: null,
-    paletteOverrides: null,
-  /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
-  paletteLocks: {},
-  })),
-
-  setPaletteSwatch: (index, hex) => set((state) => {
-    const n = normalizeHex(hex);
-    if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    if (index < 0 || index >= base.swatches.length) return {};
-    const prev = state.paletteOverrides?.swatches
-      ? [...state.paletteOverrides.swatches]
-      : [...base.swatches];
-    // Ensure length
-    while (prev.length < base.swatches.length) prev.push(base.swatches[prev.length]);
-    prev[index] = n;
-    // If identical to catalog, collapse that slot conceptually but keep array
-    const nextOverrides = {
-      ...editableOverrides(state.paletteOverrides),
-      swatches: prev,
-    };
-    // Drop if fully matches catalog
-    const matches = prev.every((s, i) => s === base.swatches[i])
-      && (!nextOverrides.bg || nextOverrides.bg === base.bg)
-      && (!nextOverrides.ink || nextOverrides.ink === base.ink);
-    return {
+  setPaletteId: (id) =>
+    set((state) => ({
       ...pushToUndo(state, true),
-      paletteOverrides: matches ? null : nextOverrides,
+      paletteId: id,
       voiceMix: null,
       activeVoiceId: null,
-    };
-  }),
+      paletteOverrides: null,
+      /** Swatch slots the operator pinned; harmony/shuffle leave these alone (#56). */
+      paletteLocks: {},
+    })),
 
-  setPaletteBg: (hex) => set((state) => {
-    const n = normalizeHex(hex);
-    if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const next = { ...editableOverrides(state.paletteOverrides), bg: n };
-    if (n === base.bg) delete next.bg;
-    const empty = !next.swatches && !next.bg && !next.ink;
-    return {
+  setPaletteSwatch: (index, hex) =>
+    set((state) => {
+      const n = normalizeHex(hex);
+      if (n == null) return {};
+      const base = getCatalogPalette(state.paletteId, state.userPalettes);
+      if (index < 0 || index >= base.swatches.length) return {};
+      const prev = state.paletteOverrides?.swatches ? [...state.paletteOverrides.swatches] : [...base.swatches];
+      // Ensure length
+      while (prev.length < base.swatches.length) prev.push(base.swatches[prev.length]);
+      prev[index] = n;
+      // If identical to catalog, collapse that slot conceptually but keep array
+      const nextOverrides = {
+        ...editableOverrides(state.paletteOverrides),
+        swatches: prev,
+      };
+      // Drop if fully matches catalog
+      const matches =
+        prev.every((s, i) => s === base.swatches[i]) &&
+        (!nextOverrides.bg || nextOverrides.bg === base.bg) &&
+        (!nextOverrides.ink || nextOverrides.ink === base.ink);
+      return {
+        ...pushToUndo(state, true),
+        paletteOverrides: matches ? null : nextOverrides,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  setPaletteBg: (hex) =>
+    set((state) => {
+      const n = normalizeHex(hex);
+      if (n == null) return {};
+      const base = getCatalogPalette(state.paletteId, state.userPalettes);
+      const next = { ...editableOverrides(state.paletteOverrides), bg: n };
+      if (n === base.bg) delete next.bg;
+      const empty = !next.swatches && !next.bg && !next.ink;
+      return {
+        ...pushToUndo(state, true),
+        paletteOverrides: empty ? null : next,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  setPaletteInk: (hex) =>
+    set((state) => {
+      const n = normalizeHex(hex);
+      if (n == null) return {};
+      const base = getCatalogPalette(state.paletteId, state.userPalettes);
+      const next = { ...editableOverrides(state.paletteOverrides), ink: n };
+      if (n === base.ink) delete next.ink;
+      const empty = !next.swatches && !next.bg && !next.ink;
+      return {
+        ...pushToUndo(state, true),
+        paletteOverrides: empty ? null : next,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
+
+  clearPaletteOverrides: () =>
+    set((state) => {
+      if (!state.paletteOverrides) return {};
+      return { ...pushToUndo(state, true), paletteOverrides: null, voiceMix: null, activeVoiceId: null };
+    }),
+
+  setPaletteOverrides: (overrides) =>
+    set((state) => ({
       ...pushToUndo(state, true),
-      paletteOverrides: empty ? null : next,
+      paletteOverrides: overrides,
       voiceMix: null,
       activeVoiceId: null,
-    };
-  }),
+    })),
 
-  setPaletteInk: (hex) => set((state) => {
-    const n = normalizeHex(hex);
-    if (n == null) return {};
-    const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const next = { ...editableOverrides(state.paletteOverrides), ink: n };
-    if (n === base.ink) delete next.ink;
-    const empty = !next.swatches && !next.bg && !next.ink;
-    return {
-      ...pushToUndo(state, true),
-      paletteOverrides: empty ? null : next,
-      voiceMix: null,
-      activeVoiceId: null,
-    };
-  }),
-
-  clearPaletteOverrides: () => set((state) => {
-    if (!state.paletteOverrides) return {};
-    return { ...pushToUndo(state, true), paletteOverrides: null, voiceMix: null, activeVoiceId: null };
-  }),
-
-  setPaletteOverrides: (overrides) => set((state) => ({
-    ...pushToUndo(state, true),
-    paletteOverrides: overrides,
-    voiceMix: null,
-    activeVoiceId: null,
-  })),
-
-  togglePaletteLock: (index) => set((state) => ({
-    paletteLocks: { ...state.paletteLocks, [index]: !state.paletteLocks[index] },
-  })),
+  togglePaletteLock: (index) =>
+    set((state) => ({
+      paletteLocks: { ...state.paletteLocks, [index]: !state.paletteLocks[index] },
+    })),
 
   clearPaletteLocks: () => set({ paletteLocks: {} }),
 
@@ -378,19 +421,20 @@ export const createLayoutSlice = (set) => ({
    * Base colour is the first locked swatch if there is one — so locking a
    * colour you like and shuffling builds around it — else swatch 0.
    */
-  applyHarmony: (scheme) => set((state) => {
-    const base = getCatalogPalette(state.paletteId, state.userPalettes);
-    const current = base.swatches.map((sw, i) => state.paletteOverrides?.swatches?.[i] || sw);
-    const lockedIdx = Object.keys(state.paletteLocks).find((k) => state.paletteLocks[k]);
-    const anchor = current[lockedIdx != null ? Number(lockedIdx) : 0] || current[0];
-    const generated = buildHarmony(anchor, scheme, current.length);
-    const swatches = applyWithLocks(current, generated, state.paletteLocks);
-    if (swatches.every((c, i) => c === current[i])) return {};
-    return {
-      ...pushToUndo(state, true),
-      paletteOverrides: { ...editableOverrides(state.paletteOverrides), swatches },
-    };
-  }),
+  applyHarmony: (scheme) =>
+    set((state) => {
+      const base = getCatalogPalette(state.paletteId, state.userPalettes);
+      const current = base.swatches.map((sw, i) => state.paletteOverrides?.swatches?.[i] || sw);
+      const lockedIdx = Object.keys(state.paletteLocks).find((k) => state.paletteLocks[k]);
+      const anchor = current[lockedIdx != null ? Number(lockedIdx) : 0] || current[0];
+      const generated = buildHarmony(anchor, scheme, current.length);
+      const swatches = applyWithLocks(current, generated, state.paletteLocks);
+      if (swatches.every((c, i) => c === current[i])) return {};
+      return {
+        ...pushToUndo(state, true),
+        paletteOverrides: { ...editableOverrides(state.paletteOverrides), swatches },
+      };
+    }),
 
   setPerfClampOverride: (overlay) => set({ perfClampOverride: overlay }),
 
@@ -416,77 +460,85 @@ export const createLayoutSlice = (set) => ({
    * it was), `false`/`null` = off, an object = patch. Undoable; a slider drag
    * coalesces through pushToUndo's debounce like any other param.
    */
-  setLight: (patch) => set((state) => {
-    let next;
-    if (patch === false || patch === null) next = null;
-    else if (patch === true) next = sanitizeLight(state.light || LIGHT_DEFAULT);
-    else next = sanitizeLight({ ...(state.light || LIGHT_DEFAULT), ...(patch || {}) });
-    if (JSON.stringify(next) === JSON.stringify(state.light ?? null)) return {};
-    return { ...pushToUndo(state), light: next };
-  }),
-  setLayoutParam: (key, value) => set((state) => {
-    if (state.layoutParams[key] === value) return {};
-    const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });
-    if (rejected.includes(key)) {
-      // Keep previous state entirely: do not push an undo entry for a write
-      // that did not happen, or Ctrl-Z stops lining up with what the operator
-      // actually did.
-      if (import.meta.env?.DEV) {
-        console.warn(`[state] rejected setLayoutParam(${key}):`, value);
+  setLight: (patch) =>
+    set((state) => {
+      let next;
+      if (patch === false || patch === null) next = null;
+      else if (patch === true) next = sanitizeLight(state.light || LIGHT_DEFAULT);
+      else next = sanitizeLight({ ...(state.light || LIGHT_DEFAULT), ...(patch || {}) });
+      if (JSON.stringify(next) === JSON.stringify(state.light ?? null)) return {};
+      return { ...pushToUndo(state), light: next };
+    }),
+  setLayoutParam: (key, value) =>
+    set((state) => {
+      if (state.layoutParams[key] === value) return {};
+      const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });
+      if (rejected.includes(key)) {
+        // Keep previous state entirely: do not push an undo entry for a write
+        // that did not happen, or Ctrl-Z stops lining up with what the operator
+        // actually did.
+        if (import.meta.env?.DEV) {
+          console.warn(`[state] rejected setLayoutParam(${key}):`, value);
+        }
+        return {};
       }
-      return {};
-    }
-    // A value that clamps to what is already there is not an edit. Without
-    // this, holding a slider past its maximum pushes an undo entry per event
-    // while the composition never changes, and Ctrl-Z then has to be pressed
-    // twenty times to get anywhere.
-    const cur = state.layoutParams[key];
-    const nextVal = params[key];
-    const unchanged = Array.isArray(nextVal) && Array.isArray(cur)
-      ? nextVal.length === cur.length && nextVal.every((v, i) => Object.is(v, cur[i]))
-      : Object.is(nextVal, cur);
-    if (unchanged) return {};
+      // A value that clamps to what is already there is not an edit. Without
+      // this, holding a slider past its maximum pushes an undo entry per event
+      // while the composition never changes, and Ctrl-Z then has to be pressed
+      // twenty times to get anywhere.
+      const cur = state.layoutParams[key];
+      const nextVal = params[key];
+      const unchanged =
+        Array.isArray(nextVal) && Array.isArray(cur)
+          ? nextVal.length === cur.length && nextVal.every((v, i) => Object.is(v, cur[i]))
+          : Object.is(nextVal, cur);
+      if (unchanged) return {};
 
-    const undoUpdate = pushToUndo(state, false);
-    const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
-    if (key === 'mode' && value === 'ca' && !state.caGrid) {
-      next.caGrid = createGrid(40, 28, state.seed);
-    }
-    return next;
-  }),
+      const undoUpdate = pushToUndo(state, false);
+      const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
+      if (key === 'mode' && value === 'ca' && !state.caGrid) {
+        next.caGrid = createGrid(40, 28, state.seed);
+      }
+      return next;
+    }),
 
   /**
    * STIMULI FEEL (#615): set the 8 reactivity params to a Gentle / Punchy /
    * Violent macro in ONE undo step. Locked params are left alone (a lock is
    * the performer's taste), same as applyPreset. Unknown id is a no-op.
    */
-  applyFeel: (id) => set((state) => {
-    const feel = FEEL_PRESETS.find((f) => f.id === id);
-    if (!feel) return {};
-    const merged = { ...state.layoutParams };
-    let changed = false;
-    for (const [k, v] of Object.entries(feel.params)) {
-      if (!state.lockedParams[k] && !Object.is(merged[k], v)) { merged[k] = v; changed = true; }
-    }
-    if (!changed) return {};
-    const { params, rejected } = validateLayoutParams(merged);
-    if (rejected.length) return {};
-    return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
-  }),
+  applyFeel: (id) =>
+    set((state) => {
+      const feel = FEEL_PRESETS.find((f) => f.id === id);
+      if (!feel) return {};
+      const merged = { ...state.layoutParams };
+      let changed = false;
+      for (const [k, v] of Object.entries(feel.params)) {
+        if (!state.lockedParams[k] && !Object.is(merged[k], v)) {
+          merged[k] = v;
+          changed = true;
+        }
+      }
+      if (!changed) return {};
+      const { params, rejected } = validateLayoutParams(merged);
+      if (rejected.length) return {};
+      return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
+    }),
 
-  setLayoutParams: (params) => set((state) => {
-    const { params: safe, rejected } = validateLayoutParams({ ...state.layoutParams, ...params });
-    if (rejected.length === 0) return { layoutParams: safe, voiceMix: null, activeVoiceId: null };
-    // Partial accept: a bad key in a machine-generated batch (a morph lerp
-    // that produced NaN, an evolve target off the end of a range) must not
-    // discard the good keys alongside it.
-    const kept = { ...safe };
-    for (const key of rejected) kept[key] = state.layoutParams[key];
-    if (import.meta.env?.DEV) {
-      console.warn('[state] rejected setLayoutParams keys:', rejected);
-    }
-    return { layoutParams: kept, voiceMix: null, activeVoiceId: null };
-  }),
+  setLayoutParams: (params) =>
+    set((state) => {
+      const { params: safe, rejected } = validateLayoutParams({ ...state.layoutParams, ...params });
+      if (rejected.length === 0) return { layoutParams: safe, voiceMix: null, activeVoiceId: null };
+      // Partial accept: a bad key in a machine-generated batch (a morph lerp
+      // that produced NaN, an evolve target off the end of a range) must not
+      // discard the good keys alongside it.
+      const kept = { ...safe };
+      for (const key of rejected) kept[key] = state.layoutParams[key];
+      if (import.meta.env?.DEV) {
+        console.warn('[state] rejected setLayoutParams keys:', rejected);
+      }
+      return { layoutParams: kept, voiceMix: null, activeVoiceId: null };
+    }),
 
   setMotionSmoothing: (smoothing) => set({ motionSmoothing: smoothing }),
   /** VJ MIX (#278): palette-switch crossfade seconds, clamped 0–8. */
@@ -505,102 +557,109 @@ export const createLayoutSlice = (set) => ({
     });
   },
   /** Sleight-of-hand v2 (#624, #625): FADE | WASH | INJECT. Unknown values fall back to FADE. */
-  setColorMode: (mode) => set({
-    colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',
-  }),
-  stepCaGrid: () => set((state) => ({
-    caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28, state.seed),
-  })),
+  setColorMode: (mode) =>
+    set({
+      colorMode: mode === 'WASH' || mode === 'INJECT' ? mode : 'FADE',
+    }),
+  stepCaGrid: () =>
+    set((state) => ({
+      caGrid: state.caGrid ? stepGrid(state.caGrid) : createGrid(40, 28, state.seed),
+    })),
   resetCaGrid: () => set((state) => ({ caGrid: createGrid(40, 28, state.seed) })),
 
-  applyPreset: (preset) => set((state) => {
-    const incoming = { ...preset.params, composition: preset.id };
-    const merged = { ...state.layoutParams };
-    // #964: LOOKS applies inside armed motion — a Look never stomps the
-    // pinned motion numbers.
-    const motionSkip = new Set(armedMotionParams(state.armedMotion) ? MOTION_KEYS : []);
-    let changed = false;
-    for (const [k, v] of Object.entries(incoming)) {
-      if (motionSkip.has(k)) continue;
-      if (!state.lockedParams[k] && merged[k] !== v) {
-        merged[k] = v;
-        changed = true;
+  applyPreset: (preset) =>
+    set((state) => {
+      const incoming = { ...preset.params, composition: preset.id };
+      const merged = { ...state.layoutParams };
+      // #964: LOOKS applies inside armed motion — a Look never stomps the
+      // pinned motion numbers.
+      const motionSkip = new Set(armedMotionParams(state.armedMotion) ? MOTION_KEYS : []);
+      let changed = false;
+      for (const [k, v] of Object.entries(incoming)) {
+        if (motionSkip.has(k)) continue;
+        if (!state.lockedParams[k] && merged[k] !== v) {
+          merged[k] = v;
+          changed = true;
+        }
       }
-    }
-    // Presets are layout-only: their palette / asset pairings (#284) are ignored
-    // so color and shapes stay on their own chip axes.
-    if (!changed && state.layoutParams.composition === preset.id) return {};
-    return openParamsMix(state, merged, { name: preset.name || preset.id });
-  }),
+      // Presets are layout-only: their palette / asset pairings (#284) are ignored
+      // so color and shapes stay on their own chip axes.
+      if (!changed && state.layoutParams.composition === preset.id) return {};
+      return openParamsMix(state, merged, { name: preset.name || preset.id });
+    }),
 
   /** #517 — a stub chip (a layout mode) rides the same MIX road as a preset. Layout axis only (#555): never touches motion, assets or palette. */
-  loadStubMode: (id) => set((state) => {
-    const stub = STUB_VOICES.find((v) => v.id === id);
-    if (!stub) return {};
-    const merged = { ...state.layoutParams };
-    let changed = false;
-    for (const [k, v] of Object.entries({ mode: stub.id })) {
-      if (!state.lockedParams[k] && merged[k] !== v) {
-        merged[k] = v;
-        changed = true;
+  loadStubMode: (id) =>
+    set((state) => {
+      const stub = STUB_VOICES.find((v) => v.id === id);
+      if (!stub) return {};
+      const merged = { ...state.layoutParams };
+      let changed = false;
+      for (const [k, v] of Object.entries({ mode: stub.id })) {
+        if (!state.lockedParams[k] && merged[k] !== v) {
+          merged[k] = v;
+          changed = true;
+        }
       }
-    }
-    if (!changed) return {};
-    return openParamsMix(state, merged, { name: stub.name });
-  }),
+      if (!changed) return {};
+      return openParamsMix(state, merged, { name: stub.name });
+    }),
 
   /** Motion axis (#555): a `behave` chip plus motion numbers, on the MIX road. Never touches layout, assets or palette. */
-  loadMotion: (id) => set((state) => {
-    const motion = MOTION_MODES.find((m) => m.id === id);
-    if (!motion) return {};
-    const merged = { ...state.layoutParams };
-    let changed = false;
-    for (const [k, v] of Object.entries(motion.params)) {
-      if (!state.lockedParams[k] && merged[k] !== v) {
-        merged[k] = v;
-        changed = true;
+  loadMotion: (id) =>
+    set((state) => {
+      const motion = MOTION_MODES.find((m) => m.id === id);
+      if (!motion) return {};
+      const merged = { ...state.layoutParams };
+      let changed = false;
+      for (const [k, v] of Object.entries(motion.params)) {
+        if (!state.lockedParams[k] && merged[k] !== v) {
+          merged[k] = v;
+          changed = true;
+        }
       }
-    }
-    if (!changed) return {};
-    return openParamsMix(state, merged, { name: motion.name });
-  }),
+      if (!changed) return {};
+      return openParamsMix(state, merged, { name: motion.name });
+    }),
 
   /**
    * Shapes axis (#555): swap the asset pool to a curated set, once, at the press.
    * The live loop's item-morph pairs nodes across the two pools, so there is no
    * MIX and no end-of-blend pop. Never touches layout, motion or color.
    */
-  loadShapeSet: (id) => set((state) => {
-    const def = SHAPE_SETS.find((x) => x.id === id);
-    if (!def) return {};
-    const known = new Set(ASSETS.map((a) => a.id));
-    for (const c of state.customAssets || []) known.add(c.id);
-    const map = {};
-    for (const assetId of def.ids) if (known.has(assetId)) map[assetId] = true;
-    if (!Object.keys(map).length) return {};
-    const cur = state.enabledAssets || {};
-    const curOn = Object.keys(cur).filter((k) => cur[k]);
-    if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
-    return { ...pushToUndo(state, true), enabledAssets: map };
-  }),
+  loadShapeSet: (id) =>
+    set((state) => {
+      const def = SHAPE_SETS.find((x) => x.id === id);
+      if (!def) return {};
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const map = {};
+      for (const assetId of def.ids) if (known.has(assetId)) map[assetId] = true;
+      if (!Object.keys(map).length) return {};
+      const cur = state.enabledAssets || {};
+      const curOn = Object.keys(cur).filter((k) => cur[k]);
+      if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
+      return { ...pushToUndo(state, true), enabledAssets: map };
+    }),
 
   /**
    * Tasteful dice — crown a finalist's cast. Same single-axis contract as
    * loadShapeSet: shapes only (the dice calls loadStubMode for the layout
    * axis separately), undoable, unknown ids refused, custom assets honored.
    */
-  loadDiceCast: (assetIds) => set((state) => {
-    if (!Array.isArray(assetIds) || !assetIds.length) return {};
-    const known = new Set(ASSETS.map((a) => a.id));
-    for (const c of state.customAssets || []) known.add(c.id);
-    const map = {};
-    for (const assetId of assetIds) if (known.has(assetId)) map[assetId] = true;
-    if (!Object.keys(map).length) return {};
-    const cur = state.enabledAssets || {};
-    const curOn = Object.keys(cur).filter((k) => cur[k]);
-    if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
-    return { ...pushToUndo(state, true), enabledAssets: map };
-  }),
+  loadDiceCast: (assetIds) =>
+    set((state) => {
+      if (!Array.isArray(assetIds) || !assetIds.length) return {};
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const map = {};
+      for (const assetId of assetIds) if (known.has(assetId)) map[assetId] = true;
+      if (!Object.keys(map).length) return {};
+      const cur = state.enabledAssets || {};
+      const curOn = Object.keys(cur).filter((k) => cur[k]);
+      if (curOn.length === Object.keys(map).length && curOn.every((k) => map[k])) return {};
+      return { ...pushToUndo(state, true), enabledAssets: map };
+    }),
 
   /**
    * Shape mixer (#733): tap a shape chip → off → 1 → 2 → 3 → off. Up to
@@ -610,157 +669,172 @@ export const createLayoutSlice = (set) => ({
    * pool renders nothing — so at 3 it stays 3. Same single-axis contract as
    * loadShapeSet: shapes only, no MIX, never touches layout/motion/colour.
    */
-  cycleShapeLevel: (id) => set((state) => {
-    if (!MIXABLE_SHAPE_IDS.includes(id)) return {};
-    const cur = liveShapeLevels(state.shapeLevels, state.enabledAssets);
-    const at = cur[id] || 0;
-    const on = Object.keys(cur).filter((k) => cur[k] > 0).length;
-    if (at === 0 && on >= SHAPE_MIX_MAX) return {}; // the refusal is the visible constraint
-    const next = { ...cur };
-    const level = (at + 1) % 4;
-    if (level === 0) delete next[id]; else next[id] = level;
-    if (!Object.keys(next).length) return {}; // never empty the pool
-    const known = new Set(ASSETS.map((a) => a.id));
-    for (const c of state.customAssets || []) known.add(c.id);
-    const map = {};
-    for (const assetId of shapeMixIds(next)) if (known.has(assetId)) map[assetId] = true;
-    if (!Object.keys(map).length) return {};
-    return { ...pushToUndo(state, true), enabledAssets: map, shapeLevels: next };
-  }),
+  cycleShapeLevel: (id) =>
+    set((state) => {
+      if (!MIXABLE_SHAPE_IDS.includes(id)) return {};
+      const cur = liveShapeLevels(state.shapeLevels, state.enabledAssets);
+      const at = cur[id] || 0;
+      const on = Object.keys(cur).filter((k) => cur[k] > 0).length;
+      if (at === 0 && on >= SHAPE_MIX_MAX) return {}; // the refusal is the visible constraint
+      const next = { ...cur };
+      const level = (at + 1) % 4;
+      if (level === 0) delete next[id];
+      else next[id] = level;
+      if (!Object.keys(next).length) return {}; // never empty the pool
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const map = {};
+      for (const assetId of shapeMixIds(next)) if (known.has(assetId)) map[assetId] = true;
+      if (!Object.keys(map).length) return {};
+      return { ...pushToUndo(state, true), enabledAssets: map, shapeLevels: next };
+    }),
 
-  toggleParamLock: (key) => set((state) => ({
-    lockedParams: { ...state.lockedParams, [key]: !state.lockedParams[key] },
-  })),
+  toggleParamLock: (key) =>
+    set((state) => ({
+      lockedParams: { ...state.lockedParams, [key]: !state.lockedParams[key] },
+    })),
 
-  randomizeParam: (key) => set((state) => {
-    const rolled = randomizeKey(key);
-    if (rolled === undefined) return {}; // not a randomizable key: refuse, like every other door
-    // #1550: the roll lands through the same validating door as every
-    // other write — clamped to the document spec and pair-migrated by
-    // validateLayoutParams, never written raw. (Before this, a density
-    // of 101–120 — legal dice output, illegal document value — sat in
-    // layoutParams until some later validated write happened to heal it.)
-    const { params } = validateLayoutParams({ [key]: rolled });
-    return {
-      ...pushToUndo(state, true),
-      layoutParams: { ...state.layoutParams, [key]: params[key] },
-      voiceMix: null,
-      activeVoiceId: null,
-    };
-  }),
+  randomizeParam: (key) =>
+    set((state) => {
+      const rolled = randomizeKey(key);
+      if (rolled === undefined) return {}; // not a randomizable key: refuse, like every other door
+      // #1550: the roll lands through the same validating door as every
+      // other write — clamped to the document spec and pair-migrated by
+      // validateLayoutParams, never written raw. (Before this, a density
+      // of 101–120 — legal dice output, illegal document value — sat in
+      // layoutParams until some later validated write happened to heal it.)
+      const { params } = validateLayoutParams({ [key]: rolled });
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: { ...state.layoutParams, [key]: params[key] },
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
 
-  randomizeUnlocked: () => set((state) => {
-    const rp = { ...state.layoutParams };
-    let changed = false;
-    for (const key of RANDOMIZABLE_KEYS) {
-      if (!state.lockedParams[key]) {
-        rp[key] = randomizeKey(key);
-        changed = true;
-      }
-    }
-    if (!changed) return {};
-    // #1550: same law as randomizeParam — the batch lands normalized.
-    const { params } = validateLayoutParams(rp);
-    return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
-  }),
-
-  curateUnlocked: () => set((state) => {
-    // The Curator: roll CURATE_CANDIDATES scenes over the unlocked params and
-    // keep the engine's pick. No trained engine on file yet -> honest dice
-    // roll; the bar says so (see curator/curate.js). Locked params are never
-    // touched, same as randomizeUnlocked.
-    const curator = getActiveCurator();
-    const unlocked = RANDOMIZABLE_KEYS.filter((key) => !state.lockedParams[key]);
-    // Everything locked: no-op — no candidate differs from current state, so
-    // push no undo entry (same guard as randomizeUnlocked).
-    if (unlocked.length === 0) return {};
-    // #518: every roll comes off one seeded stream keyed by (seed, press #), so
-    // presses differ but a given (seed, offsets, press #) replays the same pick.
-    const press = state.curatePress | 0;
-    const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
-    const candidates = [];
-    // #1145 — Davis's primaries: the room's kin_weight scales how many
-    // candidates each CURATOR press rolls (unleashed rooms roll more,
-    // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
-    // given the same room; a different room is a different deal.
-    const kinWeight = getDirector().tick({ feed: loisActivity.snapshot() }).gains.kinWeight;
-    const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
-    // #592 — the discrete choices are drawn from a transition chain
-    // conditioned on the value that LAST LANDED (the live layoutParams), so
-    // presses relate to each other instead of being strangers. Everything
-    // else still rolls uniform. Same rng, so the whole press stays one
-    // seeded stream and (seed, offsets, press #) still replays exactly.
-    let chainFellBack = false;
-    // #1144 — REFINE: the artist just kept something and is settling it, so the pool is local mutations of the
-    // live values (spread 0.10, locked by Matt 2026-10-11), not fresh dice. Only keys the dice already rolls move; composition
-    // and the modifiers are never touched, so a landing cannot leave refine by changing the room. Explore and no
-    // phase (null) keep yesterday's whole-range roll exactly.
-    const refining = getPhase() === PHASE_REFINE;
-    const refineSpread = refining ? DEFAULT_SPREAD : 0;
-    for (let n = 0; n < candidateCount; n++) {
+  randomizeUnlocked: () =>
+    set((state) => {
       const rp = { ...state.layoutParams };
-      for (const key of unlocked) {
-        if (refining) {
-          rp[key] = mutateKey(key, state.layoutParams[key], rng, refineSpread);
-        } else if (hasChain(key)) {
-          const step = markovPick(key, state.layoutParams[key], rng);
-          if (step.fellBack) chainFellBack = true;
-          rp[key] = step.value;
-        } else {
-          rp[key] = randomizeKey(key, rng);
+      let changed = false;
+      for (const key of RANDOMIZABLE_KEYS) {
+        if (!state.lockedParams[key]) {
+          rp[key] = randomizeKey(key);
+          changed = true;
         }
       }
-      candidates.push(rp);
-    }
-    const { index } = pickCurated(candidates, curator, rng, { refine: refining });
-    if (index < 0) return {};
-    // #1258: publish the sway from the latest Director tick (the persona
-    // picks above ticked during pickCurated) for the top-bar presence mark.
-    // Ephemeral module signal, NOT store state (deniability law: she must
-    // not appear in state). Written synchronously before the store commit
-    // below, so the mark's re-render reads it fresh.
-    setSwayMagnitude(swayMagnitude(getDirector().lastSway));
-    // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
-    // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
-    const pat = rollPatternLayers(state.layers, 'curate', rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets));
-    // #1365 Q2 — REFINE varies colour gently around the palette that was kept: a fresh small hue + warmth deal from
-    // the ANCHOR on every press (never a walk), on the colour channel keyed by (seed, press #), locked swatches held.
-    // Same store update as the layout pick, so one press is still one undo step. Explore never touches it here.
-    let colour = {};
-    if (refining) {
-      const keepCount = (state.keeps?.length ?? 0) + (state.favorites?.length ?? 0);
-      const anchor = anchorValid(state.refinePaletteAnchor, state, keepCount)
-        ? state.refinePaletteAnchor
-        : { paletteId: state.paletteId, overrides: state.paletteOverrides, keepCount };
-      const base = resolvePalette(anchor.paletteId, anchor.overrides, state.userPalettes);
-      const deal = colorDeal(rngForIndex(state.seed, CH.color, press + 0x20000, state.seedOffsets), refineSpread);
-      // The kept palette's swatch weights ride along (#1049 would otherwise drop them for any swatch override and
-      // re-derive, which shifts WHICH colours the marks get: a bigger change than the drift itself).
-      const overrides = {
-        ...(anchor.overrides || {}),
-        swatches: nudgeSwatches(base.swatches, deal, state.paletteLocks),
-        ...(Array.isArray(base.weights) ? { weights: [...base.weights] } : {}),
+      if (!changed) return {};
+      // #1550: same law as randomizeParam — the batch lands normalized.
+      const { params } = validateLayoutParams(rp);
+      return { ...pushToUndo(state, true), layoutParams: params, voiceMix: null, activeVoiceId: null };
+    }),
+
+  curateUnlocked: () =>
+    set((state) => {
+      // The Curator: roll CURATE_CANDIDATES scenes over the unlocked params and
+      // keep the engine's pick. No trained engine on file yet -> honest dice
+      // roll; the bar says so (see curator/curate.js). Locked params are never
+      // touched, same as randomizeUnlocked.
+      const curator = getActiveCurator();
+      const unlocked = RANDOMIZABLE_KEYS.filter((key) => !state.lockedParams[key]);
+      // Everything locked: no-op — no candidate differs from current state, so
+      // push no undo entry (same guard as randomizeUnlocked).
+      if (unlocked.length === 0) return {};
+      // #518: every roll comes off one seeded stream keyed by (seed, press #), so
+      // presses differ but a given (seed, offsets, press #) replays the same pick.
+      const press = state.curatePress | 0;
+      const rng = rngForIndex(state.seed, CH.curate, press, state.seedOffsets);
+      const candidates = [];
+      // #1145 — Davis's primaries: the room's kin_weight scales how many
+      // candidates each CURATOR press rolls (unleashed rooms roll more,
+      // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
+      // given the same room; a different room is a different deal.
+      const kinWeight = getDirector().tick({ feed: loisActivity.snapshot() }).gains.kinWeight;
+      const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
+      // #592 — the discrete choices are drawn from a transition chain
+      // conditioned on the value that LAST LANDED (the live layoutParams), so
+      // presses relate to each other instead of being strangers. Everything
+      // else still rolls uniform. Same rng, so the whole press stays one
+      // seeded stream and (seed, offsets, press #) still replays exactly.
+      let chainFellBack = false;
+      // #1144 — REFINE: the artist just kept something and is settling it, so the pool is local mutations of the
+      // live values (spread 0.10, locked by Matt 2026-10-11), not fresh dice. Only keys the dice already rolls move; composition
+      // and the modifiers are never touched, so a landing cannot leave refine by changing the room. Explore and no
+      // phase (null) keep yesterday's whole-range roll exactly.
+      const refining = getPhase() === PHASE_REFINE;
+      const refineSpread = refining ? DEFAULT_SPREAD : 0;
+      for (let n = 0; n < candidateCount; n++) {
+        const rp = { ...state.layoutParams };
+        for (const key of unlocked) {
+          if (refining) {
+            rp[key] = mutateKey(key, state.layoutParams[key], rng, refineSpread);
+          } else if (hasChain(key)) {
+            const step = markovPick(key, state.layoutParams[key], rng);
+            if (step.fellBack) chainFellBack = true;
+            rp[key] = step.value;
+          } else {
+            rp[key] = randomizeKey(key, rng);
+          }
+        }
+        candidates.push(rp);
+      }
+      const { index } = pickCurated(candidates, curator, rng, { refine: refining });
+      if (index < 0) return {};
+      // #1258: publish the sway from the latest Director tick (the persona
+      // picks above ticked during pickCurated) for the top-bar presence mark.
+      // Ephemeral module signal, NOT store state (deniability law: she must
+      // not appear in state). Written synchronously before the store commit
+      // below, so the mark's re-render reads it fresh.
+      setSwayMagnitude(swayMagnitude(getDirector().lastSway));
+      // PATTERN tracks are curated too, on their own seeded stream keyed by the same (seed, press #): the same press
+      // deals the same patterns again. (The taste engine scores layout params, not patterns: this is seeded dice.)
+      const pat = rollPatternLayers(
+        state.layers,
+        'curate',
+        rngForIndex(state.seed, CH.curate, press + 0x10000, state.seedOffsets),
+      );
+      // #1365 Q2 — REFINE varies colour gently around the palette that was kept: a fresh small hue + warmth deal from
+      // the ANCHOR on every press (never a walk), on the colour channel keyed by (seed, press #), locked swatches held.
+      // Same store update as the layout pick, so one press is still one undo step. Explore never touches it here.
+      let colour = {};
+      if (refining) {
+        const keepCount = (state.keeps?.length ?? 0) + (state.favorites?.length ?? 0);
+        const anchor = anchorValid(state.refinePaletteAnchor, state, keepCount)
+          ? state.refinePaletteAnchor
+          : { paletteId: state.paletteId, overrides: state.paletteOverrides, keepCount };
+        const base = resolvePalette(anchor.paletteId, anchor.overrides, state.userPalettes);
+        const deal = colorDeal(rngForIndex(state.seed, CH.color, press + 0x20000, state.seedOffsets), refineSpread);
+        // The kept palette's swatch weights ride along (#1049 would otherwise drop them for any swatch override and
+        // re-derive, which shifts WHICH colours the marks get: a bigger change than the drift itself).
+        const overrides = {
+          ...(anchor.overrides || {}),
+          swatches: nudgeSwatches(base.swatches, deal, state.paletteLocks),
+          ...(Array.isArray(base.weights) ? { weights: [...base.weights] } : {}),
+        };
+        colour = {
+          paletteOverrides: overrides,
+          refinePaletteAnchor: {
+            paletteId: anchor.paletteId,
+            overrides: anchor.overrides,
+            keepCount,
+            lastOverrides: overrides,
+          },
+        };
+      }
+      // #1550: the pick lands through the validating door, like every other
+      // write of rolled values — candidates are scored as rolled, but what
+      // lands is clamped to the document spec and pair-migrated.
+      const { params: landedParams } = validateLayoutParams(candidates[index]);
+      return {
+        ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
+        ...(pat.changed ? { layers: pat.layers } : {}),
+        ...colour,
+        layoutParams: landedParams,
+        curatePress: press + 1,
+        // Honest flag: if any chain had no row for the current value this press
+        // had no memory behind it, and the bar says so.
+        curateChainFallback: chainFellBack,
       };
-      colour = {
-        paletteOverrides: overrides,
-        refinePaletteAnchor: { paletteId: anchor.paletteId, overrides: anchor.overrides, keepCount, lastOverrides: overrides },
-      };
-    }
-    // #1550: the pick lands through the validating door, like every other
-    // write of rolled values — candidates are scored as rolled, but what
-    // lands is clamped to the document spec and pair-migrated.
-    const { params: landedParams } = validateLayoutParams(candidates[index]);
-    return {
-      ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
-      ...(pat.changed ? { layers: pat.layers } : {}),
-      ...colour,
-      layoutParams: landedParams,
-      curatePress: press + 1,
-      // Honest flag: if any chain had no row for the current value this press
-      // had no memory behind it, and the bar says so.
-      curateChainFallback: chainFellBack,
-    };
-  }),
+    }),
 
   /**
    * KINETIC button (#942) — naive full re-roll of the recipe. Placeholder
@@ -780,93 +854,97 @@ export const createLayoutSlice = (set) => ({
    * blend modes) as well as edit fields; 'layers' entries hold the whole
    * document and always apply on undo (#223).
    */
-  kineticRoll: () => set((state) => {
-    const undo = pushToUndo(state, true, UNDO_KIND_LAYERS);
+  kineticRoll: () =>
+    set((state) => {
+      const undo = pushToUndo(state, true, UNDO_KIND_LAYERS);
 
-    // 1. seed — nonzero uint32. The worker rebuilds placements from it (#710:
-    // same seed in → same picture out; the footer shows seed:{hex}).
-    let seed = (Math.random() * 0xffffffff) >>> 0;
-    if (seed === 0) seed = 1;
+      // 1. seed — nonzero uint32. The worker rebuilds placements from it (#710:
+      // same seed in → same picture out; the footer shows seed:{hex}).
+      let seed = (Math.random() * 0xffffffff) >>> 0;
+      if (seed === 0) seed = 1;
 
-    // 2. palette — random id from the full roll pool (#952: all 37 system
-    // palettes + saved user palettes), preferably not the current one.
-    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
+      // 2. palette — random id from the full roll pool (#952: all 37 system
+      // palettes + saved user palettes), preferably not the current one.
+      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
-    // 3. composition — random preset (carries composition + mode + behave +
-    // density/count), preferably a different composition; locked params hold.
-    // #964: an armed MODE keeps the composition and pins the mode instead of
-    // dealing a fresh preset — the roll reworks everything else.
-    let merged;
-    if (state.armedMode) {
-      merged = { ...state.layoutParams };
-    } else {
-      const preset = pickOtherPreset(COMPOSITION_PRESETS, state.layoutParams.composition);
-      merged = { ...state.layoutParams, composition: preset.id };
-      for (const [k, v] of Object.entries(preset.params)) {
-        if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+      // 3. composition — random preset (carries composition + mode + behave +
+      // density/count), preferably a different composition; locked params hold.
+      // #964: an armed MODE keeps the composition and pins the mode instead of
+      // dealing a fresh preset — the roll reworks everything else.
+      let merged;
+      if (state.armedMode) {
+        merged = { ...state.layoutParams };
+      } else {
+        const preset = pickOtherPreset(COMPOSITION_PRESETS, state.layoutParams.composition);
+        merged = { ...state.layoutParams, composition: preset.id };
+        for (const [k, v] of Object.entries(preset.params)) {
+          if (!state.lockedParams[k] && merged[k] !== v) merged[k] = v;
+        }
       }
-    }
-    // #964: pin the armed roll scope over whatever the roll dealt.
-    merged = pinRollScope(merged, state.armedMode, state.armedMotion);
+      // #964: pin the armed roll scope over whatever the roll dealt.
+      merged = pinRollScope(merged, state.armedMode, state.armedMotion);
 
-    // 4. assets — random shape set, mapped through known ids like loadShapeSet.
-    const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
-    const known = new Set(ASSETS.map((a) => a.id));
-    for (const c of state.customAssets || []) known.add(c.id);
-    const enabledAssets = {};
-    for (const assetId of shapeSet.ids) if (known.has(assetId)) enabledAssets[assetId] = true;
+      // 4. assets — random shape set, mapped through known ids like loadShapeSet.
+      const shapeSet = SHAPE_SETS[die(SHAPE_SETS.length)];
+      const known = new Set(ASSETS.map((a) => a.id));
+      for (const c of state.customAssets || []) known.add(c.id);
+      const enabledAssets = {};
+      for (const assetId of shapeSet.ids) if (known.has(assetId)) enabledAssets[assetId] = true;
 
-    // 5. FX + blend — one FX layer, 0–3 random menu effects with default
-    // params; content layers get a random blend mode. Never strands the
-    // project: an empty shape-set mapping keeps the current pool.
-    let layers = state.layers;
-    let fxLayer = layers.find(isFxLayer);
-    let selectedFxLayerId = state.selectedFxLayerId;
-    if (!fxLayer && !isTapeFull(state)) {
-      // Layer id derives from the roll's own seed — unique per roll, no wall
-      // clock (layoutSlice is a must-loop performer per #806).
-      fxLayer = {
-        id: `fx-${seed.toString(36)}`,
-        name: `FX ${layers.filter(isFxLayer).length + 1}`,
-        type: 'fx', visible: true, effects: [],
-        layerBlendMode: 'normal', layerOpacity: 1,
+      // 5. FX + blend — one FX layer, 0–3 random menu effects with default
+      // params; content layers get a random blend mode. Never strands the
+      // project: an empty shape-set mapping keeps the current pool.
+      let layers = state.layers;
+      let fxLayer = layers.find(isFxLayer);
+      let selectedFxLayerId = state.selectedFxLayerId;
+      if (!fxLayer && !isTapeFull(state)) {
+        // Layer id derives from the roll's own seed — unique per roll, no wall
+        // clock (layoutSlice is a must-loop performer per #806).
+        fxLayer = {
+          id: `fx-${seed.toString(36)}`,
+          name: `FX ${layers.filter(isFxLayer).length + 1}`,
+          type: 'fx',
+          visible: true,
+          effects: [],
+          layerBlendMode: 'normal',
+          layerOpacity: 1,
+        };
+        layers = [...layers, fxLayer];
+        selectedFxLayerId = fxLayer.id;
+      }
+      const fxKinds = shuffle(rollFxKinds(FX_MENU_KINDS)).slice(0, die(4)); // #1107: never INVERT in a roll
+      const effects = fxKinds.map((kind) => ({ kind, params: rollFxParams(kind) })); // ... and a gentle HAZE
+      // The LOWEST content layer composites over the bare canvas background, so it has nothing to blend
+      // with and stays normal (fx/rollSafety.js says why, with the measurements).
+      const bottomContent = layers.find((l) => !isFxLayer(l) && !isMathLayer(l));
+      layers = layers.map((l) => {
+        if (fxLayer && l.id === fxLayer.id) return { ...l, effects };
+        if (!isFxLayer(l)) return { ...l, layerBlendMode: rollBlend(l === bottomContent, () => pick(BLEND_MODES)) };
+        return l;
+      });
+
+      // PATTERN tracks are dealt too, from a stream derived from this roll's seed (so a roll stays one seeded event),
+      // and with none on the page a chaos roll may add one (patternRoll.js).
+      layers = rollPatternLayers(layers, 'chaos', mkRng((seed ^ 0x51ed270b) >>> 0 || 1), {
+        canAdd: !isTapeFull({ ...state, layers }),
+        makeId: () => `pt-${seed.toString(36)}`,
+      }).layers;
+
+      return {
+        ...undo,
+        seed,
+        paletteId,
+        paletteOverrides: null,
+        paletteLocks: {},
+        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
+        layoutParams: merged,
+        enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
+        layers,
+        selectedFxLayerId,
+        voiceMix: null,
+        activeVoiceId: null,
       };
-      layers = [...layers, fxLayer];
-      selectedFxLayerId = fxLayer.id;
-    }
-    const fxKinds = shuffle(rollFxKinds(FX_MENU_KINDS)).slice(0, die(4)); // #1107: never INVERT in a roll
-    const effects = fxKinds.map((kind) => ({ kind, params: rollFxParams(kind) })); // ... and a gentle HAZE
-    // The LOWEST content layer composites over the bare canvas background, so it has nothing to blend
-    // with and stays normal (fx/rollSafety.js says why, with the measurements).
-    const bottomContent = layers.find((l) => !isFxLayer(l) && !isMathLayer(l));
-    layers = layers.map((l) => {
-      if (fxLayer && l.id === fxLayer.id) return { ...l, effects };
-      if (!isFxLayer(l)) return { ...l, layerBlendMode: rollBlend(l === bottomContent, () => pick(BLEND_MODES)) };
-      return l;
-    });
-
-    // PATTERN tracks are dealt too, from a stream derived from this roll's seed (so a roll stays one seeded event),
-    // and with none on the page a chaos roll may add one (patternRoll.js).
-    layers = rollPatternLayers(layers, 'chaos', mkRng(((seed ^ 0x51ed270b) >>> 0) || 1), {
-      canAdd: !isTapeFull({ ...state, layers }),
-      makeId: () => `pt-${seed.toString(36)}`,
-    }).layers;
-
-    return {
-      ...undo,
-      seed,
-      paletteId,
-      paletteOverrides: null,
-      paletteLocks: {},
-      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-      layoutParams: merged,
-      enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
-      layers,
-      selectedFxLayerId,
-      voiceMix: null,
-      activeVoiceId: null,
-    };
-  }),
+    }),
 
   /**
    * KINETIC button — RULES layer (#943). A calm tap runs a compositional
@@ -898,52 +976,53 @@ export const createLayoutSlice = (set) => ({
    * from the stored state + seed (#710), not from the pass itself.
    * kineticRoll stays for #945's heat ceiling.
    */
-  kineticRulesPass: () => set((state) => {
-    // PATTERN tracks join the pass: a new tessellation of the same kind. The roll's own entry is a whole-document
-    // one when it touched a layer, an edit one otherwise (as before).
-    const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
-    const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
+  kineticRulesPass: () =>
+    set((state) => {
+      // PATTERN tracks join the pass: a new tessellation of the same kind. The roll's own entry is a whole-document
+      // one when it touched a layer, an edit one otherwise (as before).
+      const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
+      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
 
-    // #952 — every KIN tap deals a new palette from the full pool
-    // (37 system + saved user palettes), never the one already up.
-    // Overrides + swatch locks clear, exactly like setPaletteId.
-    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
+      // #952 — every KIN tap deals a new palette from the full pool
+      // (37 system + saved user palettes), never the one already up.
+      // Overrides + swatch locks clear, exactly like setPaletteId.
+      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
-    const preset = pickRulesPreset(state.layoutParams.composition);
-    // #964: an armed MODE constrains RULES — keep the composition too. The
-    // rules themselves (separation, focal hierarchy, edge-bleed) still apply.
-    const scopeSkip = new Set(state.armedMode ? ['composition', 'mode'] : []);
-    const merged0 = { ...state.layoutParams };
-    if (!state.armedMode && !state.lockedParams.composition) merged0.composition = preset.id;
-    for (const [k, v] of Object.entries(preset.params)) {
-      if (scopeSkip.has(k)) continue;
-      if (!state.lockedParams[k] && merged0[k] !== v) merged0[k] = v;
-    }
-    // #964: pin the armed roll scope over whatever the pass dealt.
-    const merged = pinRollScope(merged0, state.armedMode, state.armedMotion);
+      const preset = pickRulesPreset(state.layoutParams.composition);
+      // #964: an armed MODE constrains RULES — keep the composition too. The
+      // rules themselves (separation, focal hierarchy, edge-bleed) still apply.
+      const scopeSkip = new Set(state.armedMode ? ['composition', 'mode'] : []);
+      const merged0 = { ...state.layoutParams };
+      if (!state.armedMode && !state.lockedParams.composition) merged0.composition = preset.id;
+      for (const [k, v] of Object.entries(preset.params)) {
+        if (scopeSkip.has(k)) continue;
+        if (!state.lockedParams[k] && merged0[k] !== v) merged0[k] = v;
+      }
+      // #964: pin the armed roll scope over whatever the pass dealt.
+      const merged = pinRollScope(merged0, state.armedMode, state.armedMotion);
 
-    // Rule 1 — separation.
-    if (!state.lockedParams.overlap) merged.overlap = false;
-    if (!state.lockedParams.density && merged.density > 65) {
-      merged.density = 35 + die(31); // 35..65
-    }
-    // Rule 4 — edge-bleed allowed: rolled fresh, ~half the passes bleed.
-    if (!state.lockedParams.bleed) merged.bleed = die(2) === 0;
+      // Rule 1 — separation.
+      if (!state.lockedParams.overlap) merged.overlap = false;
+      if (!state.lockedParams.density && merged.density > 65) {
+        merged.density = 35 + die(31); // 35..65
+      }
+      // Rule 4 — edge-bleed allowed: rolled fresh, ~half the passes bleed.
+      if (!state.lockedParams.bleed) merged.bleed = die(2) === 0;
 
-    const next = {
-      ...undo,
-      ...(pat.changed ? { layers: pat.layers } : {}),
-      paletteId,
-      paletteOverrides: null,
-      paletteLocks: {},
-      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-      layoutParams: merged,
-      voiceMix: null,
-      activeVoiceId: null,
-    };
-    if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
-    return next;
-  }),
+      const next = {
+        ...undo,
+        ...(pat.changed ? { layers: pat.layers } : {}),
+        paletteId,
+        paletteOverrides: null,
+        paletteLocks: {},
+        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
+        layoutParams: merged,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+      if (merged.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
+      return next;
+    }),
 
   /**
    * KINETIC button — WEATHER layer (#944). A second tap while the button is
@@ -965,46 +1044,47 @@ export const createLayoutSlice = (set) => ({
    * matches kineticRulesPass/kineticRoll's convention: replayability comes
    * from the stored state + seed (#710), not from the pass itself.
    */
-  kineticWeatherPass: () => set((state) => {
-    // PATTERN tracks join the pass: same picture, the air moves (DRIFT and MIX nudge; a still pattern stays still).
-    const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
-    const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
+  kineticWeatherPass: () =>
+    set((state) => {
+      // PATTERN tracks join the pass: same picture, the air moves (DRIFT and MIX nudge; a still pattern stays still).
+      const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
+      const undo = pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true);
 
-    // 1. Palette weather — a different sky, never the one already up. Rolls
-    // from the full pool (#952: all 37 system palettes + saved user palettes).
-    const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
+      // 1. Palette weather — a different sky, never the one already up. Rolls
+      // from the full pool (#952: all 37 system palettes + saved user palettes).
+      const paletteId = pickOtherId(paletteRollPoolIds(state.userPalettes), state.paletteId);
 
-    // 2. Mood — move the sun if it's out.
-    let light = state.light;
-    if (light) {
-      light = sanitizeLight({
-        ...light,
-        x: -500 + die(2001),
-        y: -500 + die(1701),
-        intensity: 0.3 + Math.random() * 0.7,
-        ambient: 0.2 + Math.random() * 0.5,
-      });
-    }
+      // 2. Mood — move the sun if it's out.
+      let light = state.light;
+      if (light) {
+        light = sanitizeLight({
+          ...light,
+          x: -500 + die(2001),
+          y: -500 + die(1701),
+          intensity: 0.3 + Math.random() * 0.7,
+          ambient: 0.2 + Math.random() * 0.5,
+        });
+      }
 
-    // 3. Atmospheric FX — bloom + halation amount.
-    const merged = { ...state.layoutParams };
-    if (!state.lockedParams.accumulationOptics) {
-      merged.accumulationOptics = Math.random() * 0.25;
-    }
+      // 3. Atmospheric FX — bloom + halation amount.
+      const merged = { ...state.layoutParams };
+      if (!state.lockedParams.accumulationOptics) {
+        merged.accumulationOptics = Math.random() * 0.25;
+      }
 
-    return {
-      ...undo,
-      ...(pat.changed ? { layers: pat.layers } : {}),
-      paletteId,
-      paletteOverrides: null,
-      paletteLocks: {},
-      paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-      light,
-      layoutParams: merged,
-      voiceMix: null,
-      activeVoiceId: null,
-    };
-  }),
+      return {
+        ...undo,
+        ...(pat.changed ? { layers: pat.layers } : {}),
+        paletteId,
+        paletteOverrides: null,
+        paletteLocks: {},
+        paletteChosen: false, // #1365 — the roll picked this palette, not the artist
+        light,
+        layoutParams: merged,
+        voiceMix: null,
+        activeVoiceId: null,
+      };
+    }),
 
   // Entries are tagged with the layerId they were captured for (#92) and the
   // stack is shared across layers (never reset on switch). An 'edit' entry
@@ -1015,64 +1095,68 @@ export const createLayoutSlice = (set) => ({
   // (layer structure actions, #223) always apply: they hold the whole
   // pre-action document, so every layer's content lands back on its own
   // layer and the structure comes with it.
-  undo: () => set((state) => {
-    if (state.historyUndoStack.length === 0) return {};
-    const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
-    if (!entryApplies(previous, state.activeLayerId)) return {};
-    const current = captureUndoEntry(state, previous.kind);
-    // #1590: a 'shelf' entry restores the shelf only (a fill touched
-    // nothing else) and re-persists its three storage keys.
-    if (previous.kind === UNDO_KIND_SHELF) {
-      const shelfBack = shelfRestoreFields(previous);
-      persistShelfRestore(shelfBack);
+  undo: () =>
+    set((state) => {
+      if (state.historyUndoStack.length === 0) return {};
+      const previous = state.historyUndoStack[state.historyUndoStack.length - 1];
+      if (!entryApplies(previous, state.activeLayerId)) return {};
+      const current = captureUndoEntry(state, previous.kind);
+      // #1590: a 'shelf' entry restores the shelf only (a fill touched
+      // nothing else) and re-persists its three storage keys.
+      if (previous.kind === UNDO_KIND_SHELF) {
+        const shelfBack = shelfRestoreFields(previous);
+        persistShelfRestore(shelfBack);
+        return {
+          ...shelfBack,
+          historyUndoStack: state.historyUndoStack.slice(0, -1),
+          historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
+        };
+      }
+      const restore =
+        previous.kind === UNDO_KIND_LAYERS
+          ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
+          : editRestoreFields(previous);
       return {
-        ...shelfBack,
+        ...restore,
         historyUndoStack: state.historyUndoStack.slice(0, -1),
         historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
+        // #107 §7: an in-flight morph's rAF loop calls setLayoutParams every
+        // frame from its own morphFrom/morphTo/morphStart — left running, it
+        // would overwrite what undo just restored within one frame. Cancel it.
+        morphing: false,
+        morphFrom: null,
+        morphTo: null,
       };
-    }
-    const restore = previous.kind === UNDO_KIND_LAYERS
-      ? { ...editRestoreFields(previous), ...layersRestoreFields(previous) }
-      : editRestoreFields(previous);
-    return {
-      ...restore,
-      historyUndoStack: state.historyUndoStack.slice(0, -1),
-      historyRedoStack: trimUndoStack([...state.historyRedoStack, current]),
-      // #107 §7: an in-flight morph's rAF loop calls setLayoutParams every
-      // frame from its own morphFrom/morphTo/morphStart — left running, it
-      // would overwrite what undo just restored within one frame. Cancel it.
-      morphing: false,
-      morphFrom: null,
-      morphTo: null,
-    };
-  }),
+    }),
 
-  redo: () => set((state) => {
-    if (state.historyRedoStack.length === 0) return {};
-    const next = state.historyRedoStack[state.historyRedoStack.length - 1];
-    if (!entryApplies(next, state.activeLayerId)) return {};
-    const current = captureUndoEntry(state, next.kind);
-    // #1590: the shelf half of undo, mirrored.
-    if (next.kind === UNDO_KIND_SHELF) {
-      const shelfFwd = shelfRestoreFields(next);
-      persistShelfRestore(shelfFwd);
+  redo: () =>
+    set((state) => {
+      if (state.historyRedoStack.length === 0) return {};
+      const next = state.historyRedoStack[state.historyRedoStack.length - 1];
+      if (!entryApplies(next, state.activeLayerId)) return {};
+      const current = captureUndoEntry(state, next.kind);
+      // #1590: the shelf half of undo, mirrored.
+      if (next.kind === UNDO_KIND_SHELF) {
+        const shelfFwd = shelfRestoreFields(next);
+        persistShelfRestore(shelfFwd);
+        return {
+          ...shelfFwd,
+          historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
+          historyRedoStack: state.historyRedoStack.slice(0, -1),
+        };
+      }
+      const restore =
+        next.kind === UNDO_KIND_LAYERS
+          ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
+          : editRestoreFields(next);
       return {
-        ...shelfFwd,
+        ...restore,
         historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
         historyRedoStack: state.historyRedoStack.slice(0, -1),
+        // #107 §7: same in-flight-morph cancellation as undo() above.
+        morphing: false,
+        morphFrom: null,
+        morphTo: null,
       };
-    }
-    const restore = next.kind === UNDO_KIND_LAYERS
-      ? { ...editRestoreFields(next), ...layersRestoreFields(next) }
-      : editRestoreFields(next);
-    return {
-      ...restore,
-      historyUndoStack: trimUndoStack([...state.historyUndoStack, current]),
-      historyRedoStack: state.historyRedoStack.slice(0, -1),
-      // #107 §7: same in-flight-morph cancellation as undo() above.
-      morphing: false,
-      morphFrom: null,
-      morphTo: null,
-    };
-  }),
+    }),
 });

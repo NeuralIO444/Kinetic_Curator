@@ -5,12 +5,7 @@
 // every profile id has a matching scorer taste; the surface shows aliases,
 // never real artist names.
 import assert from 'node:assert';
-import {
-  RENDER_PROFILES,
-  RENDER_PROFILE_IDS,
-  getRenderProfile,
-  applyRenderProfile,
-} from './renderProfiles.js';
+import { RENDER_PROFILES, RENDER_PROFILE_IDS, getRenderProfile, applyRenderProfile } from './renderProfiles.js';
 import { PERSONA_TASTES } from './personaTastes.js';
 import { RANDOMIZABLE_KEYS, MORPHABLE_KEYS, randomizeKey, generateLayoutTargets } from '../state/paramUtils.js';
 import { PALETTES, normalizeHex } from '../data/palettes.js';
@@ -21,9 +16,18 @@ import { DEFAULT_LAYOUT_PARAMS, SYMMETRY_MODES, BEHAVE_MODES } from '../data/lay
 // ranges but never widen them.
 const ENGINE_BOUNDS = {
   count: [30, 600],
-  scale: [[0.1, 1.0], [1.0, 3.0]],
-  rotate: [[-180, 0], [0, 180]],
-  alpha: [[15, 60], [70, 100]],
+  scale: [
+    [0.1, 1.0],
+    [1.0, 3.0],
+  ],
+  rotate: [
+    [-180, 0],
+    [0, 180],
+  ],
+  alpha: [
+    [15, 60],
+    [70, 100],
+  ],
   jitter: [0, 150],
   density: [20, 120],
   zTiers: [1, 10],
@@ -33,7 +37,7 @@ const ENGINE_BOUNDS = {
   particleCount: [50, 300],
   swarmCohesion: [0.2, 4.0],
   gravityWells: [0.1, 3.0],
-  damping: [0.90, 0.98],
+  damping: [0.9, 0.98],
   // #518 motion keys (asserted against randomizeKey / Evolve below).
   wind: [0.2, 2.0],
   flap: [0.05, 0.9],
@@ -51,9 +55,11 @@ function variants(p) {
 
 // ─── registry shape ───
 {
-  assert.deepStrictEqual(RENDER_PROFILE_IDS,
+  assert.deepStrictEqual(
+    RENDER_PROFILE_IDS,
     ['davis', 'benjamin', 'reas', 'haeckel', 'molnar', 'mohr', 'anadol', 'menkman', 'oxman', 'stock'],
-    'all ten personas have profiles');
+    'all ten personas have profiles',
+  );
   assert.strictEqual(RENDER_PROFILES.length, 10, 'ten profiles');
   for (const p of RENDER_PROFILES) {
     assert.ok(p.id && p.name && p.paletteId, `${p.id}: identity`);
@@ -103,11 +109,15 @@ function checkBiasSubset(pid, vname, key, spec) {
   if (PAIR_KEYS.includes(key)) {
     const [[a, b], [c, d]] = spec;
     const [[ea, eb], [ec, ed]] = eng;
-    assert.ok(a >= ea && b <= eb && c >= ec && d <= ed && a <= b && c <= d,
-      `${pid}/${vname}.${key}: within engine bounds and ordered`);
+    assert.ok(
+      a >= ea && b <= eb && c >= ec && d <= ed && a <= b && c <= d,
+      `${pid}/${vname}.${key}: within engine bounds and ordered`,
+    );
   } else {
-    assert.ok(spec[0] >= eng[0] && spec[1] <= eng[1] && spec[0] <= spec[1],
-      `${pid}/${vname}.${key}: [${spec}] within engine [${eng}]`);
+    assert.ok(
+      spec[0] >= eng[0] && spec[1] <= eng[1] && spec[0] <= spec[1],
+      `${pid}/${vname}.${key}: [${spec}] within engine [${eng}]`,
+    );
   }
 }
 {
@@ -126,7 +136,8 @@ function checkBiasSubset(pid, vname, key, spec) {
       for (const [key, value] of Object.entries(v.forces)) {
         assert.ok(paramKeys.has(key), `${p.id}/${v.name}: force key '${key}' is a real layoutParam`);
         if (key === 'symmetry') assert.ok(SYMMETRY_MODES.includes(value), `${p.id}: symmetry value valid`);
-        if (key === 'accumulationOptics') assert.ok(typeof value === 'number' && value >= 0 && value <= 1, `${p.id}: optics valid`);
+        if (key === 'accumulationOptics')
+          assert.ok(typeof value === 'number' && value >= 0 && value <= 1, `${p.id}: optics valid`);
         if (key === 'accumulation') assert.ok(typeof value === 'boolean', `${p.id}: accumulation boolean`);
         if (key === 'behave') assert.ok(BEHAVE_MODES.includes(value), `${p.id}: behave value valid`);
       }
@@ -155,11 +166,28 @@ function checkValueInSpec(pid, vname, key, spec, v) {
 }
 {
   const base = {
-    count: 240, scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
-    jitter: 24, density: 78, zTiers: 4, noiseFreq: 0.005, noiseSpeed: 0.5,
-    displacement: 0, particleCount: 150, swarmCohesion: 0.6, gravityWells: 1.0,
-    damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0.2,
-    wind: 1, flap: 0.35, breath: 0, lifeDrift: 0.35, behave: 'cruise',
+    count: 240,
+    scale: [0.4, 1.6],
+    rotate: [-180, 180],
+    alpha: [40, 100],
+    jitter: 24,
+    density: 78,
+    zTiers: 4,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
+    displacement: 0,
+    particleCount: 150,
+    swarmCohesion: 0.6,
+    gravityWells: 1.0,
+    damping: 0.95,
+    symmetry: 'none',
+    accumulation: false,
+    accumulationOptics: 0.2,
+    wind: 1,
+    flap: 0.35,
+    breath: 0,
+    lifeDrift: 0.35,
+    behave: 'cruise',
   };
   for (const p of RENDER_PROFILES) {
     const vs = variants(p);
@@ -168,19 +196,26 @@ function checkValueInSpec(pid, vname, key, spec, v) {
     for (const v of vs) {
       for (const [key, spec] of Object.entries(v.biases)) {
         if (PAIR_KEYS.includes(key)) {
-          const u = union[key] ?? [[Infinity, -Infinity], [Infinity, -Infinity]];
-          u[0][0] = Math.min(u[0][0], spec[0][0]); u[0][1] = Math.max(u[0][1], spec[0][1]);
-          u[1][0] = Math.min(u[1][0], spec[1][0]); u[1][1] = Math.max(u[1][1], spec[1][1]);
+          const u = union[key] ?? [
+            [Infinity, -Infinity],
+            [Infinity, -Infinity],
+          ];
+          u[0][0] = Math.min(u[0][0], spec[0][0]);
+          u[0][1] = Math.max(u[0][1], spec[0][1]);
+          u[1][0] = Math.min(u[1][0], spec[1][0]);
+          u[1][1] = Math.max(u[1][1], spec[1][1]);
           union[key] = u;
         } else {
           const u = union[key] ?? [Infinity, -Infinity];
-          u[0] = Math.min(u[0], spec[0]); u[1] = Math.max(u[1], spec[1]);
+          u[0] = Math.min(u[0], spec[0]);
+          u[1] = Math.max(u[1], spec[1]);
           union[key] = u;
         }
       }
     }
     const unionForces = {};
-    for (const v of vs) for (const [k, val] of Object.entries(v.forces)) (unionForces[k] ??= new Set()).add(JSON.stringify(val));
+    for (const v of vs)
+      for (const [k, val] of Object.entries(v.forces)) (unionForces[k] ??= new Set()).add(JSON.stringify(val));
     for (let i = 0; i < 60; i++) {
       const out = applyRenderProfile(base, p.id);
       assert.notStrictEqual(out, base, `${p.id}: returns a new object`);
@@ -194,10 +229,14 @@ function checkValueInSpec(pid, vname, key, spec, v) {
   // #518: every profile shapes all four motion keys, and personas separate on them.
   for (const p of RENDER_PROFILES) {
     for (const v of variants(p)) {
-      for (const k of ['wind', 'flap', 'breath', 'lifeDrift']) assert.ok(k in v.biases, `${p.id}/${v.name}: ${k} biased`);
+      for (const k of ['wind', 'flap', 'breath', 'lifeDrift'])
+        assert.ok(k in v.biases, `${p.id}/${v.name}: ${k} biased`);
     }
   }
-  const mean = (id, k) => { const [a, b] = getRenderProfile(id).biases[k]; return (a + b) / 2; };
+  const mean = (id, k) => {
+    const [a, b] = getRenderProfile(id).biases[k];
+    return (a + b) / 2;
+  };
   assert.ok(mean('anadol', 'lifeDrift') > mean('molnar', 'lifeDrift'), 'anadol drifts more than molnar');
   assert.ok(mean('haeckel', 'breath') > mean('benjamin', 'breath'), 'haeckel breathes more than benjamin');
   assert.ok(mean('reas', 'wind') > mean('benjamin', 'wind'), 'reas pushes harder than benjamin');
@@ -234,7 +273,13 @@ function checkValueInSpec(pid, vname, key, spec, v) {
   // Math.random default; #1667 injects a seeded stream explicitly — the
   // property under test is the mode roll, not the fallback.)
   const seen = new Set();
-  const modeRng = (() => { let s = 7; return () => { s = (s * 16807) % 2147483647; return s / 2147483647; }; })();
+  const modeRng = (() => {
+    let s = 7;
+    return () => {
+      s = (s * 16807) % 2147483647;
+      return s / 2147483647;
+    };
+  })();
   for (let i = 0; i < 120; i++) {
     const o = applyRenderProfile(base, 'stock', modeRng);
     seen.add(o.density >= 90 ? 'field' : o.density <= 60 ? 'tubes' : 'ambiguous');
@@ -253,9 +298,16 @@ function checkValueInSpec(pid, vname, key, spec, v) {
   // Display policy (Matt's IP caution): the product surface shows aliases,
   // never real artist names. Real names live in `name` (code lineage only).
   const expectedAliases = {
-    davis: 'OVERLAP', benjamin: 'HARD EDGE', reas: 'PROCESS FIELD', haeckel: 'SPECIMEN',
-    molnar: 'NEAR GRID', mohr: 'MONO AXIS', anadol: 'LATENT DRIFT',
-    menkman: 'COMPRESSION', oxman: 'GROWN', stock: 'VORTEX',
+    davis: 'OVERLAP',
+    benjamin: 'HARD EDGE',
+    reas: 'PROCESS FIELD',
+    haeckel: 'SPECIMEN',
+    molnar: 'NEAR GRID',
+    mohr: 'MONO AXIS',
+    anadol: 'LATENT DRIFT',
+    menkman: 'COMPRESSION',
+    oxman: 'GROWN',
+    stock: 'VORTEX',
   };
   for (const t of PERSONA_TASTES) {
     assert.strictEqual(t.alias, expectedAliases[t.id], `${t.id}: alias`);
@@ -272,30 +324,73 @@ function checkValueInSpec(pid, vname, key, spec, v) {
   function mulberry32(seed) {
     let a = seed >>> 0;
     return function () {
-      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      a |= 0;
+      a = (a + 0x6d2b79f5) | 0;
       let t = Math.imul(a ^ (a >>> 15), 1 | a);
       t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
   const base = {
-    count: 240, scale: [0.4, 1.6], rotate: [-180, 180], alpha: [40, 100],
-    jitter: 24, density: 78, zTiers: 4, noiseFreq: 0.005, noiseSpeed: 0.5,
-    displacement: 0, particleCount: 150, swarmCohesion: 0.6, gravityWells: 1.0,
-    damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0.2,
-    wind: 1, flap: 0.35, breath: 0, lifeDrift: 0.35, behave: 'cruise',
+    count: 240,
+    scale: [0.4, 1.6],
+    rotate: [-180, 180],
+    alpha: [40, 100],
+    jitter: 24,
+    density: 78,
+    zTiers: 4,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
+    displacement: 0,
+    particleCount: 150,
+    swarmCohesion: 0.6,
+    gravityWells: 1.0,
+    damping: 0.95,
+    symmetry: 'none',
+    accumulation: false,
+    accumulationOptics: 0.2,
+    wind: 1,
+    flap: 0.35,
+    breath: 0,
+    lifeDrift: 0.35,
+    behave: 'cruise',
   };
   const a = applyRenderProfile(base, 'stock');
   const b = applyRenderProfile(base, 'stock');
   assert.deepStrictEqual(a, b, 'no-rng applyRenderProfile must be deterministic (was Math.random)');
-  assert.deepStrictEqual(a, applyRenderProfile(base, 'stock', () => 0), 'the no-rng profile is the rng=0 profile');
-  assert.deepStrictEqual(applyRenderProfile(base, 'stock', mulberry32(7)), {
-    count: 162, scale: [0.99, 1.98], rotate: [-86, 73], alpha: [55, 85],
-    jitter: 22, density: 51, zTiers: 5, noiseFreq: 0.0029, noiseSpeed: 0.66,
-    displacement: 31, particleCount: 129, swarmCohesion: 2.42, gravityWells: 1.59,
-    damping: 0.95, symmetry: 'none', accumulation: false, accumulationOptics: 0,
-    wind: 0.58, flap: 0.39, breath: 0.07, lifeDrift: 0.46, behave: 'cruise',
-  }, 'seeded profile unchanged by the fallback removal');
+  assert.deepStrictEqual(
+    a,
+    applyRenderProfile(base, 'stock', () => 0),
+    'the no-rng profile is the rng=0 profile',
+  );
+  assert.deepStrictEqual(
+    applyRenderProfile(base, 'stock', mulberry32(7)),
+    {
+      count: 162,
+      scale: [0.99, 1.98],
+      rotate: [-86, 73],
+      alpha: [55, 85],
+      jitter: 22,
+      density: 51,
+      zTiers: 5,
+      noiseFreq: 0.0029,
+      noiseSpeed: 0.66,
+      displacement: 31,
+      particleCount: 129,
+      swarmCohesion: 2.42,
+      gravityWells: 1.59,
+      damping: 0.95,
+      symmetry: 'none',
+      accumulation: false,
+      accumulationOptics: 0,
+      wind: 0.58,
+      flap: 0.39,
+      breath: 0.07,
+      lifeDrift: 0.46,
+      behave: 'cruise',
+    },
+    'seeded profile unchanged by the fallback removal',
+  );
 }
 
 console.log('renderProfiles.selfcheck: ok');

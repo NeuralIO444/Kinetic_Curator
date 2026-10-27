@@ -55,12 +55,13 @@ export function crownGate(stageKeeps, candidate) {
 // ── run-folder parsing ────────────────────────────────────────────────
 
 const recordKey = (rec) => JSON.stringify(rec ?? null);
-const fallbackKey = (rec) => [
-  rec?.seed ?? '',
-  rec?.config?.palette?.id ?? '',
-  rec?.config?.layout?.mode ?? '',
-  ...(Array.isArray(rec?.config?.assets) ? rec.config.assets : []),
-].join('|');
+const fallbackKey = (rec) =>
+  [
+    rec?.seed ?? '',
+    rec?.config?.palette?.id ?? '',
+    rec?.config?.layout?.mode ?? '',
+    ...(Array.isArray(rec?.config?.assets) ? rec.config.assets : []),
+  ].join('|');
 
 /**
  * Parse the miner's three artifacts into the tray model.
@@ -96,9 +97,7 @@ export function parseRunFolder({ run, finalists, candidates } = {}) {
       provenance,
       // The still the run baked for this finalist (component resolves the
       // actual file; a missing file renders the no-still state).
-      stillBase: sampleIndex != null
-        ? `finalist-${String(pick + 1).padStart(2, '0')}-sample-${sampleIndex}`
-        : null,
+      stillBase: sampleIndex != null ? `finalist-${String(pick + 1).padStart(2, '0')}-sample-${sampleIndex}` : null,
     };
   });
   // Yield by corner is the readout's tally of these same artifacts —

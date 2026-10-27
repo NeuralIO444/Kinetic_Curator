@@ -8,7 +8,15 @@
 // snapshots are refused, fail-closed.
 import assert from 'node:assert/strict';
 import { createCreatureSpawnState } from './spawnState.js';
-import { observeFormation, resetFormation, getFormedPins, getLimbPairs, getPinTraits, getDishHosted, getDishPressures } from './formationLive.js';
+import {
+  observeFormation,
+  resetFormation,
+  getFormedPins,
+  getLimbPairs,
+  getPinTraits,
+  getDishHosted,
+  getDishPressures,
+} from './formationLive.js';
 import { observeSpawn, resetSpawn, getSpawnHomes } from './spawnLive.js';
 import { fertilityField } from './formation.js';
 import { BAND_NORMAL } from './stress.js';
@@ -16,7 +24,8 @@ import { createLiveResolver, getLastSpawnDecisions, checkResolverSnapshot } from
 import { createHashChain } from '../gl/performanceFile.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
-const W = 1000; const H = 700;
+const W = 1000;
+const H = 700;
 const J = (v) => JSON.parse(JSON.stringify(v));
 
 // ── 1. old wiring ≡ new wiring, decision for decision ────────────────────────────────────────────────
@@ -24,9 +33,10 @@ const J = (v) => JSON.parse(JSON.stringify(v));
   // two fertile crowds on the seed-1234 field (found the way formation.selfcheck finds its pins)
   const f = fertilityField(1234, null, W, H);
   const fertile = [];
-  for (let x = 100; x < 900 && fertile.length < 2; x += 10) for (let y = 100; y < 600 && fertile.length < 2; y += 10) {
-    if (f.at(x, y) > 0.62 && fertile.every((p) => Math.hypot(p.x - x, p.y - y) > 300)) fertile.push({ x, y });
-  }
+  for (let x = 100; x < 900 && fertile.length < 2; x += 10)
+    for (let y = 100; y < 600 && fertile.length < 2; y += 10) {
+      if (f.at(x, y) > 0.62 && fertile.every((p) => Math.hypot(p.x - x, p.y - y) > 300)) fertile.push({ x, y });
+    }
   assert.equal(fertile.length, 2, 'fixture: two far-apart fertile patches');
   const crowd = (p) => Array.from({ length: 30 }, (_, i) => ({ x: p.x + (i % 6), y: p.y + Math.floor(i / 6) }));
   const output = [{ items: [...crowd(fertile[0]), ...crowd(fertile[1])] }];
@@ -34,7 +44,8 @@ const J = (v) => JSON.parse(JSON.stringify(v));
   const FRAMES = 210;
 
   // (a) the OLD wiring: a frame tap driving the facades, decisions read back through the getters
-  resetFormation(); resetSpawn();
+  resetFormation();
+  resetSpawn();
   const seqA = [];
   let pinsA = [];
   for (let fr = 0; fr < FRAMES; fr++) {
@@ -42,10 +53,16 @@ const J = (v) => JSON.parse(JSON.stringify(v));
     observeFormation(input, output, () => BAND_NORMAL);
     const homes = observeSpawn(input, output, { count: countAt(fr), formed: getFormedPins(), band: BAND_NORMAL });
     if (homes) pinsA = homes;
-    seqA.push(J({
-      dishPins: getSpawnHomes(), dishFormed: getFormedPins(), dishLimbs: getLimbPairs(),
-      dishTraits: getPinTraits(), dishHosted: getDishHosted(), dishPressure: getDishPressures(),
-    }));
+    seqA.push(
+      J({
+        dishPins: getSpawnHomes(),
+        dishFormed: getFormedPins(),
+        dishLimbs: getLimbPairs(),
+        dishTraits: getPinTraits(),
+        dishHosted: getDishHosted(),
+        dishPressure: getDishPressures(),
+      }),
+    );
   }
 
   // (b) the NEW wiring: one spawn state observing whole frames, count and band on the input
@@ -53,22 +70,49 @@ const J = (v) => JSON.parse(JSON.stringify(v));
   const seqB = [];
   let pinsB = [];
   for (let fr = 0; fr < FRAMES; fr++) {
-    const input = { dishPins: pinsB, canvasW: W, canvasH: H, seed: 1234, seedOffsets: null, creatureCount: countAt(fr), band: BAND_NORMAL };
+    const input = {
+      dishPins: pinsB,
+      canvasW: W,
+      canvasH: H,
+      seed: 1234,
+      seedOffsets: null,
+      creatureCount: countAt(fr),
+      band: BAND_NORMAL,
+    };
     const d = state.observe(input, output);
     if (d.homesChanged) pinsB = d.dishPins;
-    seqB.push(J({
-      dishPins: d.dishPins, dishFormed: d.dishFormed, dishLimbs: d.dishLimbs,
-      dishTraits: d.dishTraits, dishHosted: d.dishHosted, dishPressure: d.dishPressure,
-    }));
+    seqB.push(
+      J({
+        dishPins: d.dishPins,
+        dishFormed: d.dishFormed,
+        dishLimbs: d.dishLimbs,
+        dishTraits: d.dishTraits,
+        dishHosted: d.dishHosted,
+        dishPressure: d.dishPressure,
+      }),
+    );
   }
 
   assert.deepEqual(seqB, seqA, 'the resolver path decides exactly what the tap channel decided, frame for frame');
   // and the equivalence is not vacuous: the session formed moths, stamped traits, grew wings, hosted the dish creature
-  assert.ok(seqA.some((d) => d.dishFormed.some(Boolean)), 'pins formed');
-  assert.ok(seqA.some((d) => d.dishTraits.some(Boolean)), 'Davis stamped a birth');
-  assert.ok(seqA.some((d) => d.dishLimbs.some((n) => n >= 2)), 'a second pair of wings grew');
-  assert.ok(seqA.some((d) => d.dishHosted.some(Boolean)), 'the dish creature was hosted');
-  resetFormation(); resetSpawn();
+  assert.ok(
+    seqA.some((d) => d.dishFormed.some(Boolean)),
+    'pins formed',
+  );
+  assert.ok(
+    seqA.some((d) => d.dishTraits.some(Boolean)),
+    'Davis stamped a birth',
+  );
+  assert.ok(
+    seqA.some((d) => d.dishLimbs.some((n) => n >= 2)),
+    'a second pair of wings grew',
+  );
+  assert.ok(
+    seqA.some((d) => d.dishHosted.some(Boolean)),
+    'the dish creature was hosted',
+  );
+  resetFormation();
+  resetSpawn();
   console.log('spawnState: old tap wiring and resolver wiring decide identically over 210 frames');
 }
 
@@ -76,14 +120,39 @@ const J = (v) => JSON.parse(JSON.stringify(v));
 {
   const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
   const stable = {
-    canvasW: W, canvasH: H, layers: [L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seedOffsets: null,
-    paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
-    customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1, alphaBoost: 0,
-    phraseWrapGen: 0, reducedMotion: false, quality: 'balanced', perfTier1: false, assetThin: false, slowRender: false,
-    effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], assetAttach: {}, attractor: null,
+    canvasW: W,
+    canvasH: H,
+    layers: [L('lyr-a')],
+    activeLayerId: 'lyr-a',
+    layerSnapshots: {},
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    perfClampOverride: null,
+    scaleMul: 1,
+    alphaBoost: 0,
+    phraseWrapGen: 0,
+    reducedMotion: false,
+    quality: 'balanced',
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    assetAttach: {},
+    attractor: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 380, particleCount: 150 },
   };
-  const FRAMES = 210; const SNAP_AT = 150;
+  const FRAMES = 210;
+  const SNAP_AT = 150;
   const inputs = [];
   const live = createLiveResolver();
   let pins = [];
@@ -98,10 +167,19 @@ const J = (v) => JSON.parse(JSON.stringify(v));
     t += 16.7;
     const d = fr === 0 ? null : liveDecisions[fr - 1];
     const input = {
-      ...stable, seed: 4242, loopTimeMs: t, dtSec: 1 / 60, band: BAND_NORMAL, smoothed: 0.5, creatureCount: 2,
+      ...stable,
+      seed: 4242,
+      loopTimeMs: t,
+      dtSec: 1 / 60,
+      band: BAND_NORMAL,
+      smoothed: 0.5,
+      creatureCount: 2,
       dishPins: pins,
-      dishFormed: d ? d.dishFormed : [], dishLimbs: d ? d.dishLimbs : [], dishTraits: d ? d.dishTraits : [],
-      dishHosted: d ? d.dishHosted : [], dishPressure: d ? d.dishPressure : [],
+      dishFormed: d ? d.dishFormed : [],
+      dishLimbs: d ? d.dishLimbs : [],
+      dishTraits: d ? d.dishTraits : [],
+      dishHosted: d ? d.dishHosted : [],
+      dishPressure: d ? d.dishPressure : [],
     };
     inputs.push(input);
     const out = live.resolveLayers(input);
@@ -109,8 +187,15 @@ const J = (v) => JSON.parse(JSON.stringify(v));
     const nd = getLastSpawnDecisions();
     liveDecisions.push(nd);
     if (nd.homesChanged) pins = nd.dishPins;
-    if (fr === SNAP_AT - 1) { snap = J(live.snapshotState()); snapChainSeed = chain.value(); contChain = createHashChain(snapChainSeed); }
-    if (fr >= SNAP_AT) { contChain.push(out); liveHashes.push(contChain.value()); }
+    if (fr === SNAP_AT - 1) {
+      snap = J(live.snapshotState());
+      snapChainSeed = chain.value();
+      contChain = createHashChain(snapChainSeed);
+    }
+    if (fr >= SNAP_AT) {
+      contChain.push(out);
+      liveHashes.push(contChain.value());
+    }
   }
   live.dispose();
   assert.ok(snap && snap.spawn, 'the snapshot carries the spawn channel');
@@ -150,7 +235,9 @@ const J = (v) => JSON.parse(JSON.stringify(v));
     assert.equal(lc.value(), liveHashes[fr - SNAP_AT], `legacy-snapshot output at frame ${fr}`);
   }
   legacy.dispose();
-  console.log('spawnState: mid-session snapshot continues identically (outputs + decisions); pre-repipe snapshots stay valid');
+  console.log(
+    'spawnState: mid-session snapshot continues identically (outputs + decisions); pre-repipe snapshots stay valid',
+  );
 }
 
 // ── 4. fail-closed ───────────────────────────────────────────────────────────────────────────────────
@@ -158,7 +245,11 @@ const J = (v) => JSON.parse(JSON.stringify(v));
   const state = createCreatureSpawnState();
   assert.equal(state.restoreState(null), false);
   assert.equal(state.restoreState({ v: 2 }), false);
-  assert.equal(state.restoreState({ v: 1, formation: { v: 1, slots: [{ x: 'x' }] } }), false, 'a malformed tracker payload is refused');
+  assert.equal(
+    state.restoreState({ v: 1, formation: { v: 1, slots: [{ x: 'x' }] } }),
+    false,
+    'a malformed tracker payload is refused',
+  );
   const good = J(state.snapshotState());
   assert.equal(state.restoreState(good), true, 'a fresh channel snapshot restores');
   const badHomes = J(state.snapshotState());

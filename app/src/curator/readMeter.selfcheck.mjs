@@ -16,7 +16,10 @@ import { readsMetric, formatCensusReport, renderReachability } from './censusRep
 import { readsView } from './censusReadout.mjs';
 
 let checks = 0;
-const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
+const ok = (cond, msg) => {
+  assert.ok(cond, msg);
+  checks++;
+};
 
 // ── A. synthetic rasters ─────────────────────────────────────────────
 const W = 200;
@@ -24,7 +27,10 @@ const H = 140;
 const blank = () => new Uint8Array(W * H * 4);
 const setPx = (px, x, y, v) => {
   const o = (y * W + x) * 4;
-  px[o] = v; px[o + 1] = v; px[o + 2] = v; px[o + 3] = 255;
+  px[o] = v;
+  px[o + 1] = v;
+  px[o + 2] = v;
+  px[o + 3] = 255;
 };
 // Deterministic noise (mulberry-style hash, no Math.random).
 const hash01 = (n) => {
@@ -36,7 +42,8 @@ const hash01 = (n) => {
 {
   // Empty: no ink, honest 'empty', never a fake balance.
   const m = readMeter(blank(), W, H);
-  assert.strictEqual(m.verdict, 'empty'); assert.strictEqual(m.total, 0);
+  assert.strictEqual(m.verdict, 'empty');
+  assert.strictEqual(m.total, 0);
   checks += 2;
   // Malformed input meters empty, never throws.
   assert.strictEqual(readMeter(null, 0, 0).verdict, 'empty');
@@ -58,20 +65,25 @@ const hash01 = (n) => {
   const mn = readMeter(noise, W, H);
   ok(mn.shares.fine > 0.5, `white noise is fine (fine ${mn.shares.fine})`);
   ok(mn.shares.big < MUD_BIG_MAX, `white noise has no big read (big ${mn.shares.big})`);
-  assert.strictEqual(mn.verdict, 'mud'); checks++;
+  assert.strictEqual(mn.verdict, 'mud');
+  checks++;
 
   // All three by construction: a big block (big) + 12 px blobs (mid)
   // + per-pixel noise at low amplitude everywhere (fine).
   const mix = blank();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) setPx(mix, x, y, 40 + Math.floor(hash01(y * W + x) * 130));
   for (let y = 20; y < 120; y++) for (let x = 20; x < 90; x++) setPx(mix, x, y, 255);
-  for (let by = 0; by < 3; by++) for (let bx = 0; bx < 4; bx++) {
-    for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) setPx(mix, 110 + bx * 22 + x, 15 + by * 40 + y, 200);
-  }
+  for (let by = 0; by < 3; by++)
+    for (let bx = 0; bx < 4; bx++) {
+      for (let y = 0; y < 12; y++) for (let x = 0; x < 12; x++) setPx(mix, 110 + bx * 22 + x, 15 + by * 40 + y, 200);
+    }
   const mm = readMeter(mix, W, H);
-  ok(mm.shares.big > 0.1 && mm.shares.mid > 0.05 && mm.shares.fine > BALD_FINE_MAX,
-    `the mix carries all three levels: ${JSON.stringify(mm.shares)}`);
-  assert.strictEqual(mm.verdict, 'balanced'); checks++;
+  ok(
+    mm.shares.big > 0.1 && mm.shares.mid > 0.05 && mm.shares.fine > BALD_FINE_MAX,
+    `the mix carries all three levels: ${JSON.stringify(mm.shares)}`,
+  );
+  assert.strictEqual(mm.verdict, 'balanced');
+  checks++;
 
   // Determinism: same raster, same meter, bit for bit.
   assert.deepStrictEqual(readMeter(mix, W, H), mm);
@@ -102,19 +114,29 @@ const reads = readsMetric();
   assert.strictEqual(top.verdict, 'top-heavy', `top-heavy scene verdicts top-heavy: ${JSON.stringify(top.shares)}`);
   checks += 4;
   // The margins, eye-checkable (the numbers are the staging report's):
-  ok(bal.shares.fine > 2.5 * bald.shares.fine,
-    `fine separates balanced from bald: ${bal.shares.fine} vs ${bald.shares.fine} (${(bal.shares.fine / bald.shares.fine).toFixed(1)}×)`);
-  ok(bal.shares.big > 10 * mud.shares.big,
-    `big separates balanced from mud: ${bal.shares.big} vs ${mud.shares.big} (${(bal.shares.big / mud.shares.big).toFixed(1)}×)`);
-  ok(mud.shares.fine > 10 * top.shares.fine,
-    `fine separates mud from top-heavy: ${mud.shares.fine} vs ${top.shares.fine}`);
-  ok(top.shares.big > bal.shares.big + 0.1,
-    `big separates top-heavy from balanced: ${top.shares.big} vs ${bal.shares.big}`);
+  ok(
+    bal.shares.fine > 2.5 * bald.shares.fine,
+    `fine separates balanced from bald: ${bal.shares.fine} vs ${bald.shares.fine} (${(bal.shares.fine / bald.shares.fine).toFixed(1)}×)`,
+  );
+  ok(
+    bal.shares.big > 10 * mud.shares.big,
+    `big separates balanced from mud: ${bal.shares.big} vs ${mud.shares.big} (${(bal.shares.big / mud.shares.big).toFixed(1)}×)`,
+  );
+  ok(
+    mud.shares.fine > 10 * top.shares.fine,
+    `fine separates mud from top-heavy: ${mud.shares.fine} vs ${top.shares.fine}`,
+  );
+  ok(
+    top.shares.big > bal.shares.big + 0.1,
+    `big separates top-heavy from balanced: ${top.shares.big} vs ${bal.shares.big}`,
+  );
   // The corpus repeats bit-identically (the meter is a pure function
   // of the still pipeline's deterministic output).
   assert.deepStrictEqual(readsMetric(), reads, 'corpus meters identically on a second run');
   checks++;
-  console.log(`readMeter.selfcheck B corpus: bald ${JSON.stringify(bald.shares)} · mud ${JSON.stringify(mud.shares)} · balanced ${JSON.stringify(bal.shares)} · top-heavy ${JSON.stringify(top.shares)} — separation holds, S3's gate is OPEN`);
+  console.log(
+    `readMeter.selfcheck B corpus: bald ${JSON.stringify(bald.shares)} · mud ${JSON.stringify(mud.shares)} · balanced ${JSON.stringify(bal.shares)} · top-heavy ${JSON.stringify(top.shares)} — separation holds, S3's gate is OPEN`,
+  );
 }
 
 // ── C. the readout reshapes, never recomputes ────────────────────────

@@ -70,12 +70,18 @@ export function stratifiedFamilyFor(layoutId, size, index) {
 /** Davis state code → wildness 0..1. UGLY sifts wide, FLOW stays close to home. */
 export function wildnessForDavis(code) {
   switch (code) {
-    case 'UGLY': return 1.0;
-    case 'STUCK': return 0.8;
-    case 'SEEDLING': return 0.5;
-    case 'BLOOM': return 0.3;
-    case 'FLOW': return 0.2;
-    default: return 0.5; // Davis silent: honest middle
+    case 'UGLY':
+      return 1.0;
+    case 'STUCK':
+      return 0.8;
+    case 'SEEDLING':
+      return 0.5;
+    case 'BLOOM':
+      return 0.3;
+    case 'FLOW':
+      return 0.2;
+    default:
+      return 0.5; // Davis silent: honest middle
   }
 }
 
@@ -226,7 +232,15 @@ export function dealCast(assets, size, rng, wildness, crowns, anchorPool = null)
  * ({ tasteVersion, headKind }) rides along so records made from this
  * roll (the crown log) can stamp which head ordered it (spec §5).
  */
-export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, crowns = [], orderScorer = null, orderMeta = null }) {
+export function rollDice({
+  assets,
+  rng = Math.random,
+  davisCode = null,
+  scorer,
+  crowns = [],
+  orderScorer = null,
+  orderMeta = null,
+}) {
   if (!assets || !assets.length) throw new Error('[dice] no assets to deal from');
   if (!scorer || typeof scorer.score !== 'function') throw new Error('[dice] scorer missing');
   const wildness = wildnessForDavis(davisCode);
@@ -245,7 +259,10 @@ export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, 
     if (i >= n - stratCount) {
       const fam = stratifiedFamilyFor(layout.id, size, i);
       const pool = assets.filter((a) => a.category === fam);
-      if (pool.length) { anchorPool = pool; anchorFamily = fam; }
+      if (pool.length) {
+        anchorPool = pool;
+        anchorFamily = fam;
+      }
     }
     const assetIds = dealCast(assets, size, rng, wildness, crowns, anchorPool);
     const candidate = { layoutId: layout.id, assetIds };
@@ -269,7 +286,7 @@ export function rollDice({ assets, rng = Math.random, davisCode = null, scorer, 
   // dealt casts above are the same casts an unordered roll deals. Ties
   // fall to the persona score, then to deal order (the stratum arrays
   // start in deal order and Array#sort is stable).
-  const byModel = (a, b) => (b.xgbScore - a.xgbScore) || (b.score - a.score);
+  const byModel = (a, b) => b.xgbScore - a.xgbScore || b.score - a.score;
   const open = [];
   const anchored = [];
   candidates.forEach((c, i) => {

@@ -32,7 +32,7 @@ export const FEATURES_VERSION = 4;
 const PAIR_NUMS = {
   scale: (v) => ['scaleMid', ((v[0] + v[1]) / 2 - 0.1) / (3.0 - 0.1)],
   rotate: (v) => ['rotateSpread', (v[1] - v[0]) / 360],
-  alpha: (v) => ['alphaMid', ((v[0] + v[1]) / 2) / 100],
+  alpha: (v) => ['alphaMid', (v[0] + v[1]) / 2 / 100],
 };
 const clamp01 = (x) => (Number.isFinite(x) ? Math.min(1, Math.max(0, x)) : 0);
 
@@ -78,9 +78,8 @@ export function recipeFeatures({ layoutParams, paletteId, assets } = {}) {
   // today's behavior). A legacy array still works.
   const scalePair = Array.isArray(p.scale) ? p.scale : (p.scale?.x ?? [1, 1]);
   const [s0, s1] = scalePair;
-  const cast = Array.isArray(assets) && assets.length
-    ? [...new Set(assets.filter((x) => typeof x === 'string'))].sort()
-    : null;
+  const cast =
+    Array.isArray(assets) && assets.length ? [...new Set(assets.filter((x) => typeof x === 'string'))].sort() : null;
   return {
     v: FEATURES_VERSION,
     system: p.mode,

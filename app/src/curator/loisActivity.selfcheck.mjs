@@ -186,8 +186,21 @@ import {
 {
   let now = 8_000_000;
   const subs = [];
-  const fakeState = { seed: 1, layoutParams: { composition: 'flow' }, historyUndoStack: [], historyRedoStack: [], favorites: [], keeps: [] };
-  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fakeState = {
+    seed: 1,
+    layoutParams: { composition: 'flow' },
+    historyUndoStack: [],
+    historyRedoStack: [],
+    favorites: [],
+    keeps: [],
+  };
+  const fakeStore = {
+    getState: () => fakeState,
+    subscribe: (fn) => {
+      subs.push(fn);
+      return () => {};
+    },
+  };
   const fire = () => subs.forEach((fn) => fn(fakeState));
   const act = createLoisActivity({ now: () => now });
   act.start({ store: fakeStore });
@@ -195,31 +208,44 @@ import {
   const keep = (i) => ({ id: `k${i}`, seed: 1, config: { palette: { id: 'v01d' } } });
 
   // K: the keeps list grows by one, nothing on the bus
-  fakeState.keeps = [keep(1)]; now += 1000; fire();
+  fakeState.keeps = [keep(1)];
+  now += 1000;
+  fire();
   let snap = act.snapshot();
-  assert.strictEqual(snap.keepsLast5m, 1); assert.strictEqual(snap.frameKept, true, 'NOD while the kept frame is current');
+  assert.strictEqual(snap.keepsLast5m, 1);
+  assert.strictEqual(snap.frameKept, true, 'NOD while the kept frame is current');
   assert.strictEqual(snap.burning, false);
 
   // F: favorites AND keeps grow together in one update: one keep
-  fakeState.favorites = [keep(2)]; fakeState.keeps = [keep(1), keep(3)]; now += 1000; fire();
+  fakeState.favorites = [keep(2)];
+  fakeState.keeps = [keep(1), keep(3)];
+  now += 1000;
+  fire();
   snap = act.snapshot();
-  assert.strictEqual(snap.keepsLast5m, 2); assert.strictEqual(snap.favoriteCount, 1);
+  assert.strictEqual(snap.keepsLast5m, 2);
+  assert.strictEqual(snap.favoriteCount, 1);
   assert.strictEqual(snap.burning, false, 'two keeps is not yet a streak');
 
   // the star over the bus AND the store in the same tick: still one keep
   now += 1000;
   emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: keep(4) });
-  fakeState.favorites = [...fakeState.favorites, keep(4)]; fakeState.keeps = [...fakeState.keeps, keep(5)]; fire();
+  fakeState.favorites = [...fakeState.favorites, keep(4)];
+  fakeState.keeps = [...fakeState.keeps, keep(5)];
+  fire();
   snap = act.snapshot();
-  assert.strictEqual(snap.keepsLast5m, LOIS_BURN_KEEPS); assert.strictEqual(snap.favoriteCount, 2, 'the bus and the store are one favorite');
+  assert.strictEqual(snap.keepsLast5m, LOIS_BURN_KEEPS);
+  assert.strictEqual(snap.favoriteCount, 2, 'the bus and the store are one favorite');
   assert.strictEqual(snap.burning, true, `${LOIS_BURN_KEEPS} keeps inside the window is a hot streak`);
 
   // an import lands many entries at once: not a keep
-  fakeState.keeps = Array.from({ length: 12 }, (_, i) => keep(100 + i)); now += 1000; fire();
+  fakeState.keeps = Array.from({ length: 12 }, (_, i) => keep(100 + i));
+  now += 1000;
+  fire();
   assert.strictEqual(act.snapshot().keepsLast5m, LOIS_BURN_KEEPS, 'a bundle import is not a hot streak');
 
   // the streak ends when the window does
-  now += 6 * 60 * 1000; assert.strictEqual(act.snapshot().burning, false);
+  now += 6 * 60 * 1000;
+  assert.strictEqual(act.snapshot().burning, false);
   act.stop();
 }
 
@@ -235,11 +261,13 @@ import {
   assert.strictEqual(act.snapshot().frameKept, true, 'it holds while the frame is current');
   emit(Events.LAYOUT_CURATE);
   assert.strictEqual(act.snapshot().frameKept, false, 'a roll moves off it');
-  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 5, config: {} } }); now += 1000;
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 5, config: {} } });
+  now += 1000;
   assert.strictEqual(act.snapshot().frameKept, true);
   act.noteSeed(6, 'flow');
   assert.strictEqual(act.snapshot().frameKept, false, 'a new seed does too');
-  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 6, config: {} } }); now += 1000;
+  emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 6, config: {} } });
+  now += 1000;
   act.noteSeed(6, 'rails');
   assert.strictEqual(act.snapshot().frameKept, false, 'and so does a new composition');
   act.stop();
@@ -268,8 +296,14 @@ import {
   const un = on(Events.ACTIVITY_HEARTBEAT, (p) => beats.push(p));
   const act = createLoisActivity({
     now: () => now,
-    setInterval: (fn, ms) => { tickFn = fn; tickMs = ms; return 'timer-1'; },
-    clearInterval: (id) => { clearedWith = id; },
+    setInterval: (fn, ms) => {
+      tickFn = fn;
+      tickMs = ms;
+      return 'timer-1';
+    },
+    clearInterval: (id) => {
+      clearedWith = id;
+    },
   });
   act.start();
   assert.strictEqual(tickMs, ACTIVITY_HEARTBEAT_MS, 'heartbeat runs at the published cadence');
@@ -369,16 +403,32 @@ import {
   let now = 12_000_000;
   const subs = [];
   const fakeState = {
-    seed: 1, layoutParams: { composition: 'flow' },
-    historyUndoStack: [{}, {}, {}, {}], historyRedoStack: [], favorites: [], keeps: [],
+    seed: 1,
+    layoutParams: { composition: 'flow' },
+    historyUndoStack: [{}, {}, {}, {}],
+    historyRedoStack: [],
+    favorites: [],
+    keeps: [],
   };
-  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fakeStore = {
+    getState: () => fakeState,
+    subscribe: (fn) => {
+      subs.push(fn);
+      return () => {};
+    },
+  };
   const fire = () => subs.forEach((fn) => fn(fakeState));
   const act = createLoisActivity({ now: () => now });
   act.start({ store: fakeStore });
-  const undo = () => { fakeState.historyUndoStack.pop(); fakeState.historyRedoStack.push({}); now += 500; fire(); };
+  const undo = () => {
+    fakeState.historyUndoStack.pop();
+    fakeState.historyRedoStack.push({});
+    now += 500;
+    fire();
+  };
 
-  undo(); undo();
+  undo();
+  undo();
   assert.strictEqual(act.snapshot().undoBurstSize, LOIS_UNDO_BURST_MIN - 1);
   assert.strictEqual(act.snapshot().undoBurstCount, 0, 'two undos is not yet a burst');
   undo();
@@ -405,10 +455,22 @@ import {
   let now = 13_000_000;
   const subs = [];
   const fakeState = {
-    seed: 1, layoutParams: { composition: 'flow' }, historyUndoStack: [], historyRedoStack: [],
-    favorites: [], keeps: [], midiStatus: { state: 'off', inputs: [] }, midiLast: null,
+    seed: 1,
+    layoutParams: { composition: 'flow' },
+    historyUndoStack: [],
+    historyRedoStack: [],
+    favorites: [],
+    keeps: [],
+    midiStatus: { state: 'off', inputs: [] },
+    midiLast: null,
   };
-  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fakeStore = {
+    getState: () => fakeState,
+    subscribe: (fn) => {
+      subs.push(fn);
+      return () => {};
+    },
+  };
   const fire = () => subs.forEach((fn) => fn(fakeState));
   const act = createLoisActivity({ now: () => now });
   act.start({ store: fakeStore });
@@ -422,7 +484,8 @@ import {
   assert.strictEqual(snap.midiLastMsgAgoMs, null, 'connected is not the same as heard from');
 
   fakeState.midiLast = { type: 'noteon', note: 36 };
-  now += 2000; fire();
+  now += 2000;
+  fire();
   assert.strictEqual(act.snapshot().midiLastMsgAgoMs, 0);
   now += 3000;
   assert.strictEqual(act.snapshot().midiLastMsgAgoMs, 3000);
@@ -465,7 +528,9 @@ import {
   const act = createLoisActivity({ now: () => now });
   act.start();
   act.noteSeed(9, 'flow');
-  emit(Events.LAYOUT_CURATE); emit(Events.LAYOUT_CURATE); emit(Events.LAYOUT_CURATE);
+  emit(Events.LAYOUT_CURATE);
+  emit(Events.LAYOUT_CURATE);
+  emit(Events.LAYOUT_CURATE);
   let snap = act.snapshot();
   assert.strictEqual(snap.passClusterSeed, 9);
   assert.strictEqual(snap.passClusterLen, 3, 'three consecutive passes on one seed');
@@ -484,19 +549,38 @@ import {
   let now = 16_000_000;
   const subs = [];
   const fakeState = {
-    seed: 20, layoutParams: { composition: 'flow' }, historyUndoStack: [], historyRedoStack: [],
-    favorites: [], keeps: [], lastEvolveTs: 0,
+    seed: 20,
+    layoutParams: { composition: 'flow' },
+    historyUndoStack: [],
+    historyRedoStack: [],
+    favorites: [],
+    keeps: [],
+    lastEvolveTs: 0,
   };
-  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fakeStore = {
+    getState: () => fakeState,
+    subscribe: (fn) => {
+      subs.push(fn);
+      return () => {};
+    },
+  };
   const fire = () => subs.forEach((fn) => fn(fakeState));
   const act = createLoisActivity({ now: () => now });
   act.start({ store: fakeStore });
 
-  fakeState.seed = 21; fakeState.lastEvolveTs = 111; now += 1000; fire(); // evolve off an unkept seed
+  fakeState.seed = 21;
+  fakeState.lastEvolveTs = 111;
+  now += 1000;
+  fire(); // evolve off an unkept seed
   assert.strictEqual(act.snapshot().evolveFromKeptCount, 0);
 
-  fakeState.keeps = [{ id: 'k1', seed: 21, config: {} }]; now += 1000; fire(); // keep the live seed
-  fakeState.seed = 22; fakeState.lastEvolveTs = 222; now += 1000; fire(); // evolve off the kept seed
+  fakeState.keeps = [{ id: 'k1', seed: 21, config: {} }];
+  now += 1000;
+  fire(); // keep the live seed
+  fakeState.seed = 22;
+  fakeState.lastEvolveTs = 222;
+  now += 1000;
+  fire(); // evolve off the kept seed
   const snap = act.snapshot();
   assert.strictEqual(snap.evolveFromKeptCount, 1);
   assert.strictEqual(snap.lastEvolveFromKept.seed, 21, 'the flag names the kept seed it evolved from');
@@ -508,19 +592,34 @@ import {
   let now = 17_000_000;
   const subs = [];
   const fakeState = {
-    seed: 30, layoutParams: { composition: 'flow' }, historyUndoStack: [], historyRedoStack: [],
-    favorites: [], keeps: [], paletteId: 'v01d', enabledAssets: { a: true, b: true },
+    seed: 30,
+    layoutParams: { composition: 'flow' },
+    historyUndoStack: [],
+    historyRedoStack: [],
+    favorites: [],
+    keeps: [],
+    paletteId: 'v01d',
+    enabledAssets: { a: true, b: true },
   };
-  const fakeStore = { getState: () => fakeState, subscribe: (fn) => { subs.push(fn); return () => {}; } };
+  const fakeStore = {
+    getState: () => fakeState,
+    subscribe: (fn) => {
+      subs.push(fn);
+      return () => {};
+    },
+  };
   const fire = () => subs.forEach((fn) => fn(fakeState));
   const act = createLoisActivity({ now: () => now });
   act.start({ store: fakeStore });
 
-  fakeState.paletteId = 'hydra'; fire(); // before any roll: not mid-roll
+  fakeState.paletteId = 'hydra';
+  fire(); // before any roll: not mid-roll
   assert.strictEqual(act.snapshot().castChangeCount, 0);
 
   emit(Events.LAYOUT_CURATE); // a rolled frame is live
-  fakeState.paletteId = 'v01d'; now += 1000; fire();
+  fakeState.paletteId = 'v01d';
+  now += 1000;
+  fire();
   let snap = act.snapshot();
   assert.strictEqual(snap.castChangeCount, 1);
   assert.strictEqual(snap.lastCastChange.kind, 'palette');
@@ -528,14 +627,19 @@ import {
   assert.strictEqual(snap.lastCastChange.to, 'v01d');
   assert.strictEqual(snap.lastCastChange.seed, 30);
 
-  fakeState.enabledAssets = { a: true, b: false, c: true }; now += 1000; fire();
+  fakeState.enabledAssets = { a: true, b: false, c: true };
+  now += 1000;
+  fire();
   snap = act.snapshot();
   assert.strictEqual(snap.castChangeCount, 2);
   assert.strictEqual(snap.lastCastChange.kind, 'assets');
   assert.strictEqual(snap.lastCastChange.size, 2);
 
-  fakeState.keeps = [{ id: 'k1', seed: 30, config: {} }]; fire(); // the frame is kept now
-  fakeState.paletteId = 'hydra'; now += 1000; fire();
+  fakeState.keeps = [{ id: 'k1', seed: 30, config: {} }];
+  fire(); // the frame is kept now
+  fakeState.paletteId = 'hydra';
+  now += 1000;
+  fire();
   assert.strictEqual(act.snapshot().castChangeCount, 2, 'after a keep, a palette change is not mid-roll');
   act.stop();
 }
@@ -546,7 +650,10 @@ import {
   const act = createLoisActivity({ now: () => now });
   act.start();
   act.noteSeed(40, 'flow');
-  for (let i = 0; i < 6; i++) { emit(Events.LAYOUT_CURATE); now += 1000; } // a run of passes
+  for (let i = 0; i < 6; i++) {
+    emit(Events.LAYOUT_CURATE);
+    now += 1000;
+  } // a run of passes
   emit(Events.DAVIS_FAVORITE, { action: 'add', favorite: { seed: 40, config: {} } }); // the payoff: seed 40 blooms
   let snap = act.snapshot();
   assert.strictEqual(snap.bloomedSeedCount, 1);
@@ -586,4 +693,6 @@ import {
 }
 
 console.log('ok loisActivity: 7 instruments record real signals only');
-console.log('ok loisActivity #1391: G2–G4, G6, G7, G9–G15 gap signals recorded (G5 dwell pinned by the instrument-5 block above)');
+console.log(
+  'ok loisActivity #1391: G2–G4, G6, G7, G9–G15 gap signals recorded (G5 dwell pinned by the instrument-5 block above)',
+);

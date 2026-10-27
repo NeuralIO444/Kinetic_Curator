@@ -103,7 +103,11 @@ function queen(r) {
   if (r.lean !== undefined) {
     if (!isObj(r.lean)) return null;
     for (const k of ['wetness', 'evolve']) {
-      if (r.lean[k] !== undefined) { const v = unit(r.lean[k]); if (v === null) return null; lean[k] = v; }
+      if (r.lean[k] !== undefined) {
+        const v = unit(r.lean[k]);
+        if (v === null) return null;
+        lean[k] = v;
+      }
     }
   }
   return { mood, lean };
@@ -115,7 +119,11 @@ const BY_PERSONA = { davis, lois, queen };
 export function validateReply(persona, reply) {
   const f = BY_PERSONA[persona];
   if (!f || !isObj(reply)) return null;
-  try { return f(reply); } catch { return null; }
+  try {
+    return f(reply);
+  } catch {
+    return null;
+  }
 }
 
 /** True when a VALIDATED reply carries a state that is not one of the persona's canonical codes. */

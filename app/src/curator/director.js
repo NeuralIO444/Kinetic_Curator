@@ -33,7 +33,20 @@ import { resolveDavisState } from './davisState.js';
 import { resolveLoisFace } from './loisFace.js';
 import { createBeatTracker } from './beatConfidence.mjs';
 import { audioEnergyNow } from './keepContext.js';
-import { swayBiases, M2_FLOOR, MIN_KEEPS, keptCentroid, rankBiases, applyRankBias, warmCentre, tempoEase, wetnessLean, evolveLean, M8_EVOLVE_RANGE, surgeCall } from './queenLean.mjs';
+import {
+  swayBiases,
+  M2_FLOOR,
+  MIN_KEEPS,
+  keptCentroid,
+  rankBiases,
+  applyRankBias,
+  warmCentre,
+  tempoEase,
+  wetnessLean,
+  evolveLean,
+  M8_EVOLVE_RANGE,
+  surgeCall,
+} from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { emit, Events } from '../composition/eventBus.js';
@@ -216,7 +229,11 @@ export function setPresenceProvider(fn) {
 }
 /** Her presence right now, or null (unwired, or the reader threw). */
 export function currentPresence() {
-  try { return presenceProvider ? presenceProvider() : null; } catch { return null; }
+  try {
+    return presenceProvider ? presenceProvider() : null;
+  } catch {
+    return null;
+  }
 }
 
 // ─── pacing debt (#1145, 2026-10-09 spec; part 3) ─────────────────────────────
@@ -261,10 +278,14 @@ export function directorGains({ loisCode = null, davisCode = null, phase = null,
   // (The table already says 0; this is the backstop.)
   const loisWeight = loisCode === 'AWAY' ? 0 : clamp01(row.lois_weight);
   return {
-    temperature: quiet ? Math.min(DEBT_TEMP_CAP, effectiveTemp({ room: row, phase })) : effectiveTemp({ room: row, phase }),
+    temperature: quiet
+      ? Math.min(DEBT_TEMP_CAP, effectiveTemp({ room: row, phase }))
+      : effectiveTemp({ room: row, phase }),
     kinWeight: Math.min(quiet ? 1 : 2, Math.max(0.25, row.kin_weight)),
     loisWeight,
-    swayAllowance: SWAY_GATE_OPEN ? clamp01((quiet ? Math.max(DEBT_HOLD, row.sway_allowance) : row.sway_allowance) * presenceScale(presence)) : 0,
+    swayAllowance: SWAY_GATE_OPEN
+      ? clamp01((quiet ? Math.max(DEBT_HOLD, row.sway_allowance) : row.sway_allowance) * presenceScale(presence))
+      : 0,
     tiltLimit: TILT_GATE_OPEN && phase === 'explore' ? row.tilt_limit : 0,
     intensityBudget: row.intensity_budget,
     relaxSeconds: row.relax_seconds,
@@ -336,7 +357,10 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     const face = resolveLoisFace(feed);
     const davis = resolveDavisState(feed);
     const loisNow = face ? face.code : null;
-    if (loisNow !== lastLois) { debt = nextDebt(debt, lastLois, loisNow); lastLois = loisNow; }
+    if (loisNow !== lastLois) {
+      debt = nextDebt(debt, lastLois, loisNow);
+      lastLois = loisNow;
+    }
     owed = nextOwed(owed, debt);
     const base = directorGains({
       loisCode: loisNow,
@@ -388,7 +412,13 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     });
     const result = { gains: out, intensity: level, directorPhase, sway };
     // #1145 × Mind: tell the bus which room this is (a readout; the publisher sends only changes and no gains)
-    if (onRoom) { try { onRoom(result, phase); } catch { /* a listener must never take a pick down */ } }
+    if (onRoom) {
+      try {
+        onRoom(result, phase);
+      } catch {
+        /* a listener must never take a pick down */
+      }
+    }
     return result;
   }
 
@@ -419,7 +449,9 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     },
     reset() {
       intensity.reset();
-      debt = 0; owed = false; lastLois = null;
+      debt = 0;
+      owed = false;
+      lastLois = null;
       relaxUntil = 0;
       lastCoolAt = now();
     },
@@ -430,7 +462,10 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
 let singleton = null;
 /** The live Director. */
 export function getDirector() {
-  if (!singleton) singleton = createDirector({ onRoom: createRoomPublisher((p) => emit(Events.DIRECTOR_ROOM, p, { cause: 'director' })) });
+  if (!singleton)
+    singleton = createDirector({
+      onRoom: createRoomPublisher((p) => emit(Events.DIRECTOR_ROOM, p, { cause: 'director' })),
+    });
   return singleton;
 }
 /** Tests only: drop the singleton. */
@@ -448,7 +483,13 @@ export function initDirectorBeat(subscribe) {
   subscribe((s) => {
     const b = s && typeof s.beatPulse === 'number' ? s.beatPulse : 0;
     d.pushBeat(b);
-    if (s) d.setPullInputs({ keeps: s.keeps, bands: s.audioBands, enabled: !!s.audioEnabled, sourceType: s.audioSource && s.audioSource.type });
+    if (s)
+      d.setPullInputs({
+        keeps: s.keeps,
+        bands: s.audioBands,
+        enabled: !!s.audioEnabled,
+        sourceType: s.audioSource && s.audioSource.type,
+      });
   });
 }
 

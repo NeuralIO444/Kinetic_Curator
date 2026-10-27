@@ -24,15 +24,31 @@ export const BACKENDS = Object.freeze(['apple', 'rules', 'demo']); // 'demo': th
  * @param available () => boolean     is the model backend up right now
  * @param log       (kind, info) => void   dropped / late / error notices (never throws)
  */
-export function createThinker({ persona, mind = null, backend = 'apple', available = () => false, log = () => {}, maxLateBars = MAX_LATE_BARS } = {}) {
+export function createThinker({
+  persona,
+  mind = null,
+  backend = 'apple',
+  available = () => false,
+  log = () => {},
+  maxLateBars = MAX_LATE_BARS,
+} = {}) {
   if (!PERSONAS.includes(persona)) throw new TypeError(`[mind] unknown persona ${String(persona)}`);
   let lastBar = -Infinity; // the bar of the last decision made
   let flight = null; // { bar, seed, done: bool, reply: any, failed: bool }
-  const note = (kind, info) => { try { log(kind, { persona, ...info }); } catch { /* a logger must not break the loop */ } };
+  const note = (kind, info) => {
+    try {
+      log(kind, { persona, ...info });
+    } catch {
+      /* a logger must not break the loop */
+    }
+  };
 
   const decide = (bar, from, seed, raw) => {
     const reply = validateReply(persona, raw);
-    if (!reply) { note('dropped', { bar, backend: from, reason: 'malformed' }); return null; }
+    if (!reply) {
+      note('dropped', { bar, backend: from, reason: 'malformed' });
+      return null;
+    }
     lastBar = bar;
     return { persona, bar, backend: from, seed, invented: isInvented(persona, reply), reply };
   };
@@ -48,10 +64,14 @@ export function createThinker({ persona, mind = null, backend = 'apple', availab
       if (!Number.isInteger(bar) || bar === lastBar) return null; // one decision per bar
       // a model reply that came back since the last bar: use it if it is on time and valid
       if (flight && flight.done) {
-        const f = flight; flight = null;
+        const f = flight;
+        flight = null;
         if (f.failed) note('error', { bar });
         else if (bar - f.bar > maxLateBars) note('late', { bar, askedAt: f.bar, lateBars: bar - f.bar });
-        else { const d = decide(bar, backend, f.seed, f.reply); if (d) return d; }
+        else {
+          const d = decide(bar, backend, f.seed, f.reply);
+          if (d) return d;
+        }
         // nothing usable from the model this bar: the rules answer below, and the model is asked again next bar
         return decide(bar, 'rules', seed, rulesReply(persona, context, { seed, bar }));
       }
@@ -62,12 +82,24 @@ export function createThinker({ persona, mind = null, backend = 'apple', availab
         flight = f;
         Promise.resolve()
           .then(() => mind(context, { persona, seed, bar }))
-          .then((reply) => { f.reply = reply; f.done = true; }, () => { f.failed = true; f.done = true; });
+          .then(
+            (reply) => {
+              f.reply = reply;
+              f.done = true;
+            },
+            () => {
+              f.failed = true;
+              f.done = true;
+            },
+          );
       }
       return decide(bar, 'rules', seed, rulesReply(persona, context, { seed, bar }));
     },
     /** True while a model request is outstanding. */
     inFlight: () => flight !== null,
-    reset() { lastBar = -Infinity; flight = null; },
+    reset() {
+      lastBar = -Infinity;
+      flight = null;
+    },
   };
 }

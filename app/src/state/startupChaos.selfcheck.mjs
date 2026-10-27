@@ -13,14 +13,46 @@ const S = () => useStore.getState();
 
 // 1. decideBoot truth table — every input combination.
 const t = (inp) => decideBoot(inp).action;
-assert.strictEqual(t({ shareApplied: true, factoryRequested: false, startupMode: 'chaos', hasDoc: true }), 'shared', 'share link wins over everything');
-assert.strictEqual(t({ shareApplied: true, factoryRequested: true, startupMode: 'fixed', hasDoc: false }), 'shared', 'share link wins over factory+fixed');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: true, startupMode: 'chaos', hasDoc: true }), 'restore', '?boot=factory restores, never rolls');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: true, startupMode: 'chaos', hasDoc: false }), 'factory', '?boot=factory with no doc is the bare factory start');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: false, startupMode: 'fixed', hasDoc: true }), 'factory', 'FIXED skips the restore: the known opener is factory defaults');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: false, startupMode: 'fixed', hasDoc: false }), 'factory', 'FIXED with no doc is the factory start');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: false, startupMode: 'chaos', hasDoc: false }), 'roll', 'CHAOS fresh boot rolls');
-assert.strictEqual(t({ shareApplied: false, factoryRequested: false, startupMode: 'chaos', hasDoc: true }), 'restore-roll', 'CHAOS with a saved project restores first, then rolls');
+assert.strictEqual(
+  t({ shareApplied: true, factoryRequested: false, startupMode: 'chaos', hasDoc: true }),
+  'shared',
+  'share link wins over everything',
+);
+assert.strictEqual(
+  t({ shareApplied: true, factoryRequested: true, startupMode: 'fixed', hasDoc: false }),
+  'shared',
+  'share link wins over factory+fixed',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: true, startupMode: 'chaos', hasDoc: true }),
+  'restore',
+  '?boot=factory restores, never rolls',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: true, startupMode: 'chaos', hasDoc: false }),
+  'factory',
+  '?boot=factory with no doc is the bare factory start',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: false, startupMode: 'fixed', hasDoc: true }),
+  'factory',
+  'FIXED skips the restore: the known opener is factory defaults',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: false, startupMode: 'fixed', hasDoc: false }),
+  'factory',
+  'FIXED with no doc is the factory start',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: false, startupMode: 'chaos', hasDoc: false }),
+  'roll',
+  'CHAOS fresh boot rolls',
+);
+assert.strictEqual(
+  t({ shareApplied: false, factoryRequested: false, startupMode: 'chaos', hasDoc: true }),
+  'restore-roll',
+  'CHAOS with a saved project restores first, then rolls',
+);
 
 // 2. START mode setting: default chaos, sanitizes junk, session value sticks.
 assert.strictEqual(S().startupMode, 'chaos', 'default START mode is CHAOS');

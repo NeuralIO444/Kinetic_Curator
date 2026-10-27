@@ -124,8 +124,8 @@ export function parseShelfPrefs(text) {
       lines: ['preferences.json holds no settings object — shipped defaults in force (FULL WEIRD)'],
     };
   }
-  const shelf = (doc.shelf && typeof doc.shelf === 'object' && !Array.isArray(doc.shelf)) ? doc.shelf : {};
-  const rawTable = (shelf.table && typeof shelf.table === 'object' && !Array.isArray(shelf.table)) ? shelf.table : {};
+  const shelf = doc.shelf && typeof doc.shelf === 'object' && !Array.isArray(doc.shelf) ? doc.shelf : {};
+  const rawTable = shelf.table && typeof shelf.table === 'object' && !Array.isArray(shelf.table) ? shelf.table : {};
   const lines = [];
   const table = {};
   for (const rule of RULE_ORDER) {
@@ -141,14 +141,30 @@ export function parseShelfPrefs(text) {
       if (total <= TABLE_TOTAL_MAX) break;
       const cut = Math.min(table[rule], total - TABLE_TOTAL_MAX);
       if (cut > 0) {
-        lines.push(`shelf.table: the counts sum to ${over}, over the 16-slot stage — ${rule} trimmed ${table[rule]} → ${table[rule] - cut}`);
+        lines.push(
+          `shelf.table: the counts sum to ${over}, over the 16-slot stage — ${rule} trimmed ${table[rule]} → ${table[rule] - cut}`,
+        );
         table[rule] -= cut;
         total -= cut;
       }
     }
   }
-  const recencyWindow = readInt(shelf.recencyWindow, 'recencyWindow', DEFAULT_SHELF_PREFS.recencyWindow, 0, RECENCY_WINDOW_MAX, lines);
-  const collectionSoftBound = readInt(shelf.collectionSoftBound, 'collectionSoftBound', DEFAULT_SHELF_PREFS.collectionSoftBound, SOFT_BOUND_MIN, SOFT_BOUND_MAX, lines);
+  const recencyWindow = readInt(
+    shelf.recencyWindow,
+    'recencyWindow',
+    DEFAULT_SHELF_PREFS.recencyWindow,
+    0,
+    RECENCY_WINDOW_MAX,
+    lines,
+  );
+  const collectionSoftBound = readInt(
+    shelf.collectionSoftBound,
+    'collectionSoftBound',
+    DEFAULT_SHELF_PREFS.collectionSoftBound,
+    SOFT_BOUND_MIN,
+    SOFT_BOUND_MAX,
+    lines,
+  );
   return {
     prefs: { version: SHELF_PREFS_VERSION, table, recencyWindow, collectionSoftBound },
     source: 'file',
@@ -171,12 +187,17 @@ export function conflictCopyLine(name) {
 // self-documenting. JSON carries no comments — the _about string is
 // the comment. shelf.export is K3's namespace, present so the doc
 // Matt edits today is the doc K3 reads tomorrow.
-export const DEFAULT_PREFERENCES_TEXT = `${JSON.stringify({
-  _about: 'Kinetic Curator preferences. Human-editable; read on launch and on every loot rescan — edits take effect on the NEXT fill, never mid-fill. Bad values clamp to the nearest valid value and the correction is named in the dev panel (SHELF tab). Delete the file and the shipped defaults (FULL WEIRD) are in force.',
-  shelf: {
-    table: { ...FULL_WEIRD_TABLE },
-    recencyWindow: DEFAULT_SHELF_PREFS.recencyWindow,
-    collectionSoftBound: DEFAULT_SHELF_PREFS.collectionSoftBound,
-    export: { folder: 'looks', includeStills: true, includeSeeds: true, onSoftBound: 'export' },
+export const DEFAULT_PREFERENCES_TEXT = `${JSON.stringify(
+  {
+    _about:
+      'Kinetic Curator preferences. Human-editable; read on launch and on every loot rescan — edits take effect on the NEXT fill, never mid-fill. Bad values clamp to the nearest valid value and the correction is named in the dev panel (SHELF tab). Delete the file and the shipped defaults (FULL WEIRD) are in force.',
+    shelf: {
+      table: { ...FULL_WEIRD_TABLE },
+      recencyWindow: DEFAULT_SHELF_PREFS.recencyWindow,
+      collectionSoftBound: DEFAULT_SHELF_PREFS.collectionSoftBound,
+      export: { folder: 'looks', includeStills: true, includeSeeds: true, onSoftBound: 'export' },
+    },
   },
-}, null, 2)}\n`;
+  null,
+  2,
+)}\n`;

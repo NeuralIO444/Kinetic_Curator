@@ -19,10 +19,15 @@ import assert from 'node:assert';
 const mem = new Map();
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
 const { shelfCensusView, SHELF_CENSUS_FILL_WINDOW } = await import('./censusReadout.mjs');
 const { createDavisSlice, KEEPS_KEY, STAGE_KEY } = await import('../state/slices/davisSlice.js');
@@ -35,7 +40,10 @@ const lines = [];
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
 const deepFreeze = (o) => {
-  if (o && typeof o === 'object') { for (const v of Object.values(o)) deepFreeze(v); Object.freeze(o); }
+  if (o && typeof o === 'object') {
+    for (const v of Object.values(o)) deepFreeze(v);
+    Object.freeze(o);
+  }
   return o;
 };
 
@@ -44,10 +52,14 @@ const deepFreeze = (o) => {
 function handCount({ keeps, stageIds, history, stubs }) {
   const stageSet = new Set(stageIds);
   const staged = new Set(stageIds);
-  let exports = 0; let imports = 0;
+  let exports = 0;
+  let imports = 0;
   const fills = [];
   for (const r of history) {
-    if (r.kind === 'fill') { fills.push(r); for (const s of r.slots) staged.add(s.keepId); }
+    if (r.kind === 'fill') {
+      fills.push(r);
+      for (const s of r.slots) staged.add(s.keepId);
+    }
     if (r.kind === 'swap') staged.add(r.inId);
     if (r.kind === 'crown' && r.tier === 'stage') staged.add(r.keepId);
     if (r.kind === 'export') exports++;
@@ -65,29 +77,63 @@ function handCount({ keeps, stageIds, history, stubs }) {
     stagedEver: [...pop].filter((id) => staged.has(id)).length,
     fillsTotal: fills.length,
     fillsCounted: win.length,
-    dist, exports, imports,
+    dist,
+    exports,
+    imports,
     slotsTotal: Object.values(dist).reduce((n, x) => n + x, 0),
   };
 }
 
 // ── P: the pure fixture, counted by hand ──────────────────────────────
 {
-  const hand = (id, keptAt, extra = {}) => ({ id, seed: 1, keptAt, config: { layout: { mode: 'grid' }, palette: { id: 'bone' }, assets: [] }, ...extra });
+  const hand = (id, keptAt, extra = {}) => ({
+    id,
+    seed: 1,
+    keptAt,
+    config: { layout: { mode: 'grid' }, palette: { id: 'bone' }, assets: [] },
+    ...extra,
+  });
   const mined = (id, keptAt, extra = {}) => hand(id, keptAt, { provenance: { source: 'explorer' }, ...extra });
   const keeps = deepFreeze([
     // a1/a2 were dealt by fills 3/4 below — like the real store, the
     // dealt keeps carry the fill's stamps (stagedCount/lastStagedAt).
     hand('a1', 100, { stagedCount: 1, lastStagedAt: 3200 }),
     hand('a2', 200, { stagedCount: 1, lastStagedAt: 4200 }),
-    hand('a3', 300), hand('a4', 400),
-    mined('m1', 500), mined('m2', 600, { stagedCount: 1, lastStagedAt: 4500 }),
+    hand('a3', 300),
+    hand('a4', 400),
+    mined('m1', 500),
+    mined('m2', 600, { stagedCount: 1, lastStagedAt: 4500 }),
     hand('a5', 700, { stagedCount: 2, lastStagedAt: 5000 }),
     hand('a6', 800, { stagedCount: 1, lastStagedAt: 3000 }),
   ]);
   const stubs = deepFreeze({
-    d1: { id: 'd1', rel: 'looks/d1.json', label: 'disk one', keptAt: 50, stagedCount: null, lastStagedAt: null, missing: false },
-    d2: { id: 'd2', rel: 'looks/d2.json', label: 'disk two', keptAt: 150, stagedCount: null, lastStagedAt: null, missing: false },
-    d3: { id: 'd3', rel: 'looks/d3.json', label: 'disk three', keptAt: 250, stagedCount: null, lastStagedAt: null, missing: true },
+    d1: {
+      id: 'd1',
+      rel: 'looks/d1.json',
+      label: 'disk one',
+      keptAt: 50,
+      stagedCount: null,
+      lastStagedAt: null,
+      missing: false,
+    },
+    d2: {
+      id: 'd2',
+      rel: 'looks/d2.json',
+      label: 'disk two',
+      keptAt: 150,
+      stagedCount: null,
+      lastStagedAt: null,
+      missing: false,
+    },
+    d3: {
+      id: 'd3',
+      rel: 'looks/d3.json',
+      label: 'disk three',
+      keptAt: 250,
+      stagedCount: null,
+      lastStagedAt: null,
+      missing: true,
+    },
   });
   const diskRecords = deepFreeze({ d1: hand('d1', 50, { stagedCount: 3, lastStagedAt: 2000 }) });
   // 12 fills; the window keeps the last 10 (fills 3–12). Fill i deals
@@ -113,8 +159,14 @@ function handCount({ keeps, stageIds, history, stubs }) {
     { kind: 'import', keepId: 'd1', path: 'looks/d1.json', at: 9700 },
   ]);
   const input = deepFreeze({
-    keeps, stageIds: ['a5', 'm1'], history, stubs, diskRecords,
-    prefs: null, exportPrefs: null, labels: { a3: 'ay three' },
+    keeps,
+    stageIds: ['a5', 'm1'],
+    history,
+    stubs,
+    diskRecords,
+    prefs: null,
+    exportPrefs: null,
+    labels: { a3: 'ay three' },
   });
   const v = shelfCensusView(input);
   const v2 = shelfCensusView(input);
@@ -144,11 +196,18 @@ function handCount({ keeps, stageIds, history, stubs }) {
   assert.equal(v.fills.counted, 10, 'the stated window: last 10 fills');
   assert.equal(v.fills.window, SHELF_CENSUS_FILL_WINDOW);
   const distOf = Object.fromEntries(v.fills.rows.map((r) => [r.rule, r.dealt]));
-  assert.deepEqual(distOf, {
-    consensus: expect.dist.consensus || 0, neglected: expect.dist.neglected || 0,
-    wild: expect.dist.wild || 0, lois: expect.dist.lois || 0,
-    contrarian: 0, pinned: 0,
-  }, 'every rule\'s dealt count matches the hand count — including the zeros');
+  assert.deepEqual(
+    distOf,
+    {
+      consensus: expect.dist.consensus || 0,
+      neglected: expect.dist.neglected || 0,
+      wild: expect.dist.wild || 0,
+      lois: expect.dist.lois || 0,
+      contrarian: 0,
+      pinned: 0,
+    },
+    "every rule's dealt count matches the hand count — including the zeros",
+  );
   assert.equal(v.fills.slotsTotal, expect.slotsTotal);
   const loisRow = v.fills.rows.find((r) => r.rule === 'lois');
   assert.equal(loisRow.undealt, 2, 'lois named undealt in fills 11 + 12');
@@ -162,10 +221,17 @@ function handCount({ keeps, stageIds, history, stubs }) {
   assert.equal(v.neglect.neverStaged, 4, 'a3, a4, d2, d3 have never reached the stage');
   assert.equal(v.neglect.coverage, 7 / 11);
   assert.equal(v.neglect.tailTotal, 9, 'everyone off-stage is in the tail pool');
-  assert.deepEqual(v.neglect.tail.map((t) => t.id), ['d2', 'd3', 'a3', 'a4', 'a6', 'a1', 'a2', 'm2'],
-    'the tail reads neglect in the fill\'s own order: never-staged by oldest kept, then least-staged, then longest since staged (d1, staged 3×, falls past the cap)');
+  assert.deepEqual(
+    v.neglect.tail.map((t) => t.id),
+    ['d2', 'd3', 'a3', 'a4', 'a6', 'a1', 'a2', 'm2'],
+    "the tail reads neglect in the fill's own order: never-staged by oldest kept, then least-staged, then longest since staged (d1, staged 3×, falls past the cap)",
+  );
   assert.equal(v.neglect.tail.find((t) => t.id === 'a3').label, 'ay three', 'the tail names keeps');
-  assert.equal(v.neglect.tail.find((t) => t.id === 'a1').neverStaged, false, 'a dealt keep is not never-staged, stamps or no');
+  assert.equal(
+    v.neglect.tail.find((t) => t.id === 'a1').neverStaged,
+    false,
+    'a dealt keep is not never-staged, stamps or no',
+  );
   assert.equal(v.neglect.tail.find((t) => t.id === 'd3').location, 'missing');
   assert.ok(!v.neglect.tail.some((t) => t.id === 'd1'), 'd1 — staged 3× — is the least neglected keep on the shelf');
 
@@ -176,7 +242,9 @@ function handCount({ keeps, stageIds, history, stubs }) {
   assert.ok(wire.recencyWindow.setting.includes('recency window 2 fills'));
   assert.ok(wire.collectionSoftBound.footprint.includes('under the bound'));
   assert.ok(wire.export.footprint.startsWith('2 exports · 1 imports'));
-  lines.push('P: the pure readout matches a hand count from the fixture ledger — tiers, distribution (zeros shown), neglect, wiring');
+  lines.push(
+    'P: the pure readout matches a hand count from the fixture ledger — tiers, distribution (zeros shown), neglect, wiring',
+  );
 }
 
 // ── P2: empty + untouched shelves speak in words ───────────────────────
@@ -185,8 +253,13 @@ function handCount({ keeps, stageIds, history, stubs }) {
   assert.equal(empty.empty, true);
   assert.ok(empty.emptyLine.includes('the shelf is empty'), 'words, not zeros with confidence');
   const fresh = shelfCensusView({
-    keeps: [{ id: 'x1', seed: 1, keptAt: 5, config: { layout: { mode: 'grid' }, palette: { id: 'bone' }, assets: [] } }],
-    stageIds: ['x1'], history: [], stubs: {}, diskRecords: {},
+    keeps: [
+      { id: 'x1', seed: 1, keptAt: 5, config: { layout: { mode: 'grid' }, palette: { id: 'bone' }, assets: [] } },
+    ],
+    stageIds: ['x1'],
+    history: [],
+    stubs: {},
+    diskRecords: {},
   });
   assert.equal(fresh.empty, false);
   assert.equal(fresh.fills.none, true, 'no fills yet is its own line, not a table of zeros');
@@ -197,7 +270,10 @@ function handCount({ keeps, stageIds, history, stubs }) {
 
 // ── the store harness (shelfDiskRun's boot, verbatim shape) ───────────
 const K = (id, keptAt, extra = {}) => ({
-  id, seed: 100, timestamp: '2026-10-01T00:00:00.000Z', keptAt,
+  id,
+  seed: 100,
+  timestamp: '2026-10-01T00:00:00.000Z',
+  keptAt,
   config: { layout: { mode: 'grid', count: 30 }, palette: { id: 'bone' }, assets: [] },
   ...extra,
 });
@@ -206,20 +282,33 @@ function boot({ keeps = [], stage = [] } = {}) {
   mem.set(KEEPS_KEY, JSON.stringify(keeps));
   mem.set(STAGE_KEY, JSON.stringify(stage));
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set);
   return { get: () => state, set, call: (name, ...a) => state[name](...a) };
 }
-const viewOf = (s) => shelfCensusView({
-  keeps: s.keeps, stageIds: s.keepStage, history: s.shelfHistory,
-  stubs: s.shelfDiskStubs || {}, diskRecords: s.shelfDiskRecords || {},
-  prefs: s.shelfPrefs, exportPrefs: s.shelfExportPrefs, labels: {},
-});
-const recountOf = (s) => handCount({
-  keeps: s.keeps, stageIds: s.keepStage, history: s.shelfHistory, stubs: s.shelfDiskStubs || {},
-});
+const viewOf = (s) =>
+  shelfCensusView({
+    keeps: s.keeps,
+    stageIds: s.keepStage,
+    history: s.shelfHistory,
+    stubs: s.shelfDiskStubs || {},
+    diskRecords: s.shelfDiskRecords || {},
+    prefs: s.shelfPrefs,
+    exportPrefs: s.shelfExportPrefs,
+    labels: {},
+  });
+const recountOf = (s) =>
+  handCount({
+    keeps: s.keeps,
+    stageIds: s.keepStage,
+    history: s.shelfHistory,
+    stubs: s.shelfDiskStubs || {},
+  });
 const expectMatchesRecount = (s, tag) => {
-  const v = viewOf(s); const e = recountOf(s);
+  const v = viewOf(s);
+  const e = recountOf(s);
   assert.equal(v.tiers.total, e.total, `${tag}: total`);
   assert.equal(v.tiers.stage, e.stage, `${tag}: stage`);
   assert.equal(v.neglect.stagedEver, e.stagedEver, `${tag}: staged-ever`);
@@ -252,11 +341,15 @@ const expectMatchesRecount = (s, tag) => {
   const beforeIds = new Set(['s27', 's28', 's29', 's30']);
   const neglectedDealt = fill.slots.filter((x) => x.rule === 'neglected').map((x) => x.keepId);
   assert.ok(neglectedDealt.length > 0, 'the fill dealt neglected slots');
-  assert.ok(neglectedDealt.every((id) => !beforeIds.has(id)),
-    'every neglected deal was never-staged before this fill — the cure, measured');
+  assert.ok(
+    neglectedDealt.every((id) => !beforeIds.has(id)),
+    'every neglected deal was never-staged before this fill — the cure, measured',
+  );
   assert.ok(after.neglect.stagedEver > before.neglect.stagedEver, 'neglect coverage moved');
   assert.equal(after.neglect.stagedEver, recountOf(s).stagedEver);
-  lines.push(`S: neglect coverage moved ${before.neglect.stagedEver} → ${after.neglect.stagedEver} of 30 after one fill; every figure matches the ledger recount`);
+  lines.push(
+    `S: neglect coverage moved ${before.neglect.stagedEver} → ${after.neglect.stagedEver} of 30 after one fill; every figure matches the ledger recount`,
+  );
 }
 
 // ── W: the wiring is alive — knobs turned, readout follows ────────────
@@ -268,17 +361,27 @@ const expectMatchesRecount = (s, tag) => {
   assert.equal(v.tiers.overBy, 14, 'the bound knob bites in the readout: 24 in-app, bound 10');
   assert.ok(v.wiring.find((w) => w.key === 'collectionSoftBound').footprint.includes('14 over the bound'));
   // a consensus-only table: the next fill's deal must follow it
-  h.call('setShelfPrefs', {
-    ...DEFAULT_SHELF_PREFS, collectionSoftBound: 400,
-    table: { consensus: 16, neglected: 0, wild: 0, lois: 0, contrarian: 0 },
-  }, [], 'file');
+  h.call(
+    'setShelfPrefs',
+    {
+      ...DEFAULT_SHELF_PREFS,
+      collectionSoftBound: 400,
+      table: { consensus: 16, neglected: 0, wild: 0, lois: 0, contrarian: 0 },
+    },
+    [],
+    'file',
+  );
   v = viewOf(h.get());
-  assert.ok(v.wiring.find((w) => w.key === 'table').setting.includes('consensus 16'),
-    'the table in force is the table the readout names');
+  assert.ok(
+    v.wiring.find((w) => w.key === 'table').setting.includes('consensus 16'),
+    'the table in force is the table the readout names',
+  );
   h.call('fillStage');
   const fill = [...h.get().shelfHistory].reverse().find((r) => r.kind === 'fill');
-  assert.ok(fill.slots.every((x) => x.rule === 'consensus' || x.rule === 'pinned'),
-    'the deal followed the turned table — no neglected/wild/lois/contrarian slots');
+  assert.ok(
+    fill.slots.every((x) => x.rule === 'consensus' || x.rule === 'pinned'),
+    'the deal followed the turned table — no neglected/wild/lois/contrarian slots',
+  );
   v = expectMatchesRecount(h.get(), 'W after');
   assert.ok(v.fills.rows.find((r) => r.rule === 'neglected').dealt === 0);
   lines.push('W: bound + table knobs turned at the preferences door move the readout and the deal itself');
@@ -291,8 +394,12 @@ const expectMatchesRecount = (s, tag) => {
   const files = new Map();
   const folder = {
     files,
-    read: async (root, rel) => (files.has(rel) ? { ok: true, bytes: files.get(rel) } : { ok: false, reason: 'not there' }),
-    write: async (root, rel, bytes) => { files.set(rel, bytes); return { ok: true }; },
+    read: async (root, rel) =>
+      files.has(rel) ? { ok: true, bytes: files.get(rel) } : { ok: false, reason: 'not there' },
+    write: async (root, rel, bytes) => {
+      files.set(rel, bytes);
+      return { ok: true };
+    },
   };
   h.call('setShelfDiskScan', { root: '/loot', connected: true });
   h.call('setShelfPrefs', { ...DEFAULT_SHELF_PREFS, collectionSoftBound: 5 }, [], 'file');

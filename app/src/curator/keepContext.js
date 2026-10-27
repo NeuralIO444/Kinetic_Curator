@@ -150,9 +150,8 @@ export function sanitizeKeepContext(raw) {
   };
   const audio = num01(raw.audio);
   const warmth = num01(raw.paletteWarmth);
-  const dwellMs = Number.isFinite(Number(raw.dwellMs)) && Number(raw.dwellMs) >= 0
-    ? Math.floor(Number(raw.dwellMs))
-    : 0;
+  const dwellMs =
+    Number.isFinite(Number(raw.dwellMs)) && Number(raw.dwellMs) >= 0 ? Math.floor(Number(raw.dwellMs)) : 0;
   return {
     audio: audio == null || !Number.isFinite(audio) ? null : audio,
     ...(warmth == null || !Number.isFinite(warmth) ? {} : { paletteWarmth: warmth }),

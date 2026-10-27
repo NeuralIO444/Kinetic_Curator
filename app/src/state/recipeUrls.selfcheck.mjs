@@ -59,14 +59,28 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   const payload = url.slice(RECIPE_URL_PREFIX.length);
   const json = JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
   // rotateSpin is the one exception (#1127): always written, because a link without it predates spin and means 0
-  assert.deepStrictEqual(Object.keys(json.l).filter((k) => !['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath'].includes(k)).sort(), [...changedKeys].sort(), 'only non-default params encoded');
+  assert.deepStrictEqual(
+    Object.keys(json.l)
+      .filter((k) => !['rotateSpin', 'kinemeBreath', 'kinemeDrift', 'kinemePaletteBreath'].includes(k))
+      .sort(),
+    [...changedKeys].sort(),
+    'only non-default params encoded',
+  );
   // #1128: the living-motion floor is always written too: a link without it predates the floor and means 0
-  assert.deepStrictEqual([json.l.kinemeBreath, json.l.kinemeDrift], [FIELDS.layoutParams.kinemeBreath, FIELDS.layoutParams.kinemeDrift]);
+  assert.deepStrictEqual(
+    [json.l.kinemeBreath, json.l.kinemeDrift],
+    [FIELDS.layoutParams.kinemeBreath, FIELDS.layoutParams.kinemeDrift],
+  );
   // #1151: palette-breath likewise
-  assert.equal(json.l.kinemePaletteBreath, FIELDS.layoutParams.kinemePaletteBreath, 'palette-breath is written even at its default');
+  assert.equal(
+    json.l.kinemePaletteBreath,
+    FIELDS.layoutParams.kinemePaletteBreath,
+    'palette-breath is written even at its default',
+  );
   assert.equal(json.l.rotateSpin, FIELDS.layoutParams.rotateSpin, 'spin is written even at its default');
   // a carrier that never had the field (an old keep) writes 0, and a link without the key decodes as 0
-  const old = JSON.parse(JSON.stringify(FIELDS)); delete old.layoutParams.rotateSpin;
+  const old = JSON.parse(JSON.stringify(FIELDS));
+  delete old.layoutParams.rotateSpin;
   assert.equal(decodeRecipeUrl(encodeRecipeUrl(old)).recipe.layoutParams.rotateSpin, 0, 'no spin in, 0 out');
   const bare = 'kc-r/1.' + Buffer.from(JSON.stringify({ v: 1, s: 5 })).toString('base64url');
   assert.equal(decodeRecipeUrl(bare).recipe.layoutParams.rotateSpin, 0, 'an old link (no layout block) loads static');
@@ -128,13 +142,13 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
     '',
     '   ',
     'not-a-url',
-    '#r=abc',                    // missing version prefix
-    'kc-r/1.',                   // empty payload
-    'kc-r/1.!!!',                // bad alphabet
-    'kc-r/1.A',                  // truncated (length % 4 === 1)
-    'kc-r/2.e30',                // unknown version
+    '#r=abc', // missing version prefix
+    'kc-r/1.', // empty payload
+    'kc-r/1.!!!', // bad alphabet
+    'kc-r/1.A', // truncated (length % 4 === 1)
+    'kc-r/2.e30', // unknown version
     'kc-r/9.e30',
-    'kc-recipe/1.e30',           // wrong codec entirely
+    'kc-recipe/1.e30', // wrong codec entirely
     null,
     undefined,
     42,
@@ -147,8 +161,8 @@ const changedKeys = ['count', 'mode', 'scale', 'accumulation'];
   }
   // Valid prefix + corrupt payload: truncated JSON, wrong shapes.
   const corrupt = (json) =>
-    RECIPE_URL_PREFIX + Buffer.from(json, 'utf8').toString('base64')
-      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    RECIPE_URL_PREFIX +
+    Buffer.from(json, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   for (const json of ['{', '[1,2', '"str"', '42', 'null', '{"v":1}', '{"v":1,"s":"nope"}', '{"v":2,"s":1}']) {
     const r = decodeRecipeUrl(corrupt(json));
     assert.ok(!r.ok, `refuses payload ${json}`);

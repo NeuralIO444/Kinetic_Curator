@@ -33,7 +33,9 @@ const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 /** The weighted sum. Missing or junk signals count as 0 (degrade by reduction). */
 export function stressValue({ activity = 0, dish = 0, taste = 0 } = {}) {
   return clamp01(
-    STRESS_WEIGHTS.activity * clamp01(activity) + STRESS_WEIGHTS.dish * clamp01(dish) + STRESS_WEIGHTS.taste * clamp01(taste),
+    STRESS_WEIGHTS.activity * clamp01(activity) +
+      STRESS_WEIGHTS.dish * clamp01(dish) +
+      STRESS_WEIGHTS.taste * clamp01(taste),
   );
 }
 
@@ -90,7 +92,11 @@ export const quantizeStress = (v) => Math.round(clamp01(v) * STRESS_STEPS) / STR
  *   { type: 'stress', value }  the quantized smoothed stress changed
  * Same signal sequence in, same sequence out: no hidden state but the smoothed value and the band.
  */
-export function createStressTracker({ smoothFrames = SMOOTH_FRAMES, hysteresis = HYSTERESIS_GAP, initial = null } = {}) {
+export function createStressTracker({
+  smoothFrames = SMOOTH_FRAMES,
+  hysteresis = HYSTERESIS_GAP,
+  initial = null,
+} = {}) {
   const alpha = 2 / (Math.max(1, smoothFrames) + 1);
   const half = Math.max(0, hysteresis) / 2;
   // `initial` resumes a tracker mid-session ({ smoothed, band }): a recorded take starts from the live tracker's
@@ -99,8 +105,12 @@ export function createStressTracker({ smoothFrames = SMOOTH_FRAMES, hysteresis =
   let band = initial && BANDS.includes(initial.band) ? initial.band : null;
   let lastLogged = smoothed === null ? null : quantizeStress(smoothed);
   return {
-    get band() { return band; },
-    get smoothed() { return smoothed; },
+    get band() {
+      return band;
+    },
+    get smoothed() {
+      return smoothed;
+    },
     update(signals) {
       const stress = stressValue(signals);
       smoothed = smoothed === null ? stress : smoothed + (stress - smoothed) * alpha;

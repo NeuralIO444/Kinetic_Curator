@@ -15,7 +15,13 @@ const reading = (persona, ctx) => {
 };
 
 /** The mood a Davis state asks for (mirrors setLive.js's VIBES_FOR first choice). */
-const MOOD_FOR_DAVIS = Object.freeze({ FLOW: 'drive', SEEDLING: 'calm', STUCK: 'shift', UGLY: 'sparse', BLOOM: 'lift' });
+const MOOD_FOR_DAVIS = Object.freeze({
+  FLOW: 'drive',
+  SEEDLING: 'calm',
+  STUCK: 'shift',
+  UGLY: 'sparse',
+  BLOOM: 'lift',
+});
 
 export const RULES = Object.freeze({
   // #1483 — with audio live Davis conducts: one route to add, from the preset the energy and tempo ask for. Without a

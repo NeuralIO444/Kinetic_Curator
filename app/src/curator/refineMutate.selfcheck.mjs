@@ -26,7 +26,8 @@ for (const key of RANDOMIZABLE_KEYS) {
     }
   }
 }
-for (const key of Object.keys(REFINE_RANGES)) assert.ok(RANDOMIZABLE_KEYS.includes(key), `${key}: only dice keys are mutated`);
+for (const key of Object.keys(REFINE_RANGES))
+  assert.ok(RANDOMIZABLE_KEYS.includes(key), `${key}: only dice keys are mutated`);
 
 // 2. mutations stay in range, keep their rounding, keep pair order, and are deterministic.
 for (const key of RANDOMIZABLE_KEYS) {
@@ -90,8 +91,17 @@ assert.equal(mutateKey('nope', 5, rngOf(3), 0.1), undefined, 'unknown key = the 
 {
   const { useStore } = await import('../state/store.js');
   let cb = null;
-  initPhase((f) => { cb = f; });
-  const keep = (n) => ({ keeps: new Array(n).fill(0), favorites: [], seed: 1, activeVoiceId: null, voice: null, layoutParams: {} });
+  initPhase((f) => {
+    cb = f;
+  });
+  const keep = (n) => ({
+    keeps: new Array(n).fill(0),
+    favorites: [],
+    seed: 1,
+    activeVoiceId: null,
+    voice: null,
+    layoutParams: {},
+  });
   cb(keep(1), keep(0)); // a keep lands: REFINE
   assert.equal(getPhase(), PHASE_REFINE);
   const base = { ...useStore.getInitialState().layoutParams };

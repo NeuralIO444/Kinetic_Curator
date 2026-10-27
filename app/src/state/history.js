@@ -119,8 +119,7 @@ function stackBytes(stack) {
  */
 export function trimUndoStack(stack) {
   let trimmed = stack;
-  while (trimmed.length > 1 &&
-    (trimmed.length > UNDO_MAX_DEPTH || stackBytes(trimmed) > UNDO_MAX_BYTES)) {
+  while (trimmed.length > 1 && (trimmed.length > UNDO_MAX_DEPTH || stackBytes(trimmed) > UNDO_MAX_BYTES)) {
     trimmed = trimmed.slice(1);
   }
   if (trimmed.length > UNDO_MAX_DEPTH) trimmed = trimmed.slice(-UNDO_MAX_DEPTH);
@@ -157,7 +156,9 @@ export function pushToUndo(state, force = false, kind = UNDO_KIND_EDIT) {
 
 /** A top entry applies if it is structural, or its layer is active (#92). */
 export function entryApplies(entry, activeLayerId) {
-  return !!entry && (entry.kind === UNDO_KIND_LAYERS || entry.kind === UNDO_KIND_SHELF || entry.layerId === activeLayerId);
+  return (
+    !!entry && (entry.kind === UNDO_KIND_LAYERS || entry.kind === UNDO_KIND_SHELF || entry.layerId === activeLayerId)
+  );
 }
 
 /**
@@ -190,15 +191,17 @@ export function layersRestoreFields(entry) {
 
 /** Shelf fields a 'shelf' undo/redo restores INSTEAD of the content. */
 export function shelfRestoreFields(entry) {
-  return entry && entry.shelf ? {
-    keeps: entry.shelf.keeps,
-    keepStage: entry.shelf.keepStage,
-    shelfHistory: entry.shelf.shelfHistory,
-    // #1591: present only on entries the K3 snapshot wrote; absent
-    // fields restore nothing (an in-flight pre-K3 entry can't exist
-    // across a deploy, but the guard keeps the contract total).
-    ...(entry.shelf.shelfDiskRecords !== undefined ? { shelfDiskRecords: entry.shelf.shelfDiskRecords } : {}),
-    ...(entry.shelf.shelfDiskStubs !== undefined ? { shelfDiskStubs: entry.shelf.shelfDiskStubs } : {}),
-    ...(entry.shelf.shelfDiskRoot !== undefined ? { shelfDiskRoot: entry.shelf.shelfDiskRoot } : {}),
-  } : {};
+  return entry && entry.shelf
+    ? {
+        keeps: entry.shelf.keeps,
+        keepStage: entry.shelf.keepStage,
+        shelfHistory: entry.shelf.shelfHistory,
+        // #1591: present only on entries the K3 snapshot wrote; absent
+        // fields restore nothing (an in-flight pre-K3 entry can't exist
+        // across a deploy, but the guard keeps the contract total).
+        ...(entry.shelf.shelfDiskRecords !== undefined ? { shelfDiskRecords: entry.shelf.shelfDiskRecords } : {}),
+        ...(entry.shelf.shelfDiskStubs !== undefined ? { shelfDiskStubs: entry.shelf.shelfDiskStubs } : {}),
+        ...(entry.shelf.shelfDiskRoot !== undefined ? { shelfDiskRoot: entry.shelf.shelfDiskRoot } : {}),
+      }
+    : {};
 }

@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { BEATS, VIBES, LANES, STEPS, sanitizePattern, findBeat, BEAT_VERSION } from './beatLibrary.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('every built-in pattern passes its own validator, unchanged', () => {
   assert.equal(BEAT_VERSION, 'kc-beat/1');
@@ -18,9 +22,19 @@ ok('every built-in pattern passes its own validator, unchanged', () => {
 });
 
 ok('a wide variety: every mood is served, tempos span slow to fast, and the grids really differ', () => {
-  for (const v of VIBES) assert.ok(BEATS.some((b) => b.vibes.includes(v)), `a pattern for ${v}`);
-  assert.ok(Math.min(...BEATS.map((b) => b.bpm[0])) <= 70 && Math.max(...BEATS.map((b) => b.bpm[1])) >= 138, 'slow to fast');
-  assert.ok(BEATS.some((b) => b.swing >= 0.3), 'a hard shuffle');
+  for (const v of VIBES)
+    assert.ok(
+      BEATS.some((b) => b.vibes.includes(v)),
+      `a pattern for ${v}`,
+    );
+  assert.ok(
+    Math.min(...BEATS.map((b) => b.bpm[0])) <= 70 && Math.max(...BEATS.map((b) => b.bpm[1])) >= 138,
+    'slow to fast',
+  );
+  assert.ok(
+    BEATS.some((b) => b.swing >= 0.3),
+    'a hard shuffle',
+  );
   assert.ok(new Set(BEATS.map((b) => b.lanes.kick)).size >= 12, 'distinct kick grids');
   assert.ok(BEATS.some((b) => b.intensity <= 0.3) && BEATS.some((b) => b.intensity >= 0.85), 'quiet and loud');
   const everyOneHits = BEATS.every((b) => LANES.some((l) => /[xo]/.test(b.lanes[l])));
@@ -32,7 +46,11 @@ ok('the validator fails closed on anything malformed', () => {
   assert.equal(sanitizePattern(null), null);
   assert.equal(sanitizePattern({ ...good, id: 'Bad Id!' }), null, 'a bad id');
   assert.equal(sanitizePattern({ ...good, lanes: { ...good.lanes, kick: 'x...' } }), null, 'a short lane');
-  assert.equal(sanitizePattern({ ...good, lanes: { ...good.lanes, hat: 'z...............' } }), null, 'a bad step character');
+  assert.equal(
+    sanitizePattern({ ...good, lanes: { ...good.lanes, hat: 'z...............' } }),
+    null,
+    'a bad step character',
+  );
   assert.equal(sanitizePattern({ ...good, lanes: { kick: good.lanes.kick } }), null, 'a missing lane');
   assert.equal(sanitizePattern({ ...good, bpm: [200, 100] }), null, 'inverted tempo');
   assert.equal(sanitizePattern({ ...good, bpm: [10, 400] }), null, 'tempo out of range');

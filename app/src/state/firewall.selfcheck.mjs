@@ -59,9 +59,9 @@ function makeStore() {
   for (const bad of [NaN, Infinity, -Infinity, null, undefined, '', [], {}, true]) {
     s.setLayoutParam('count', bad);
     assert.strictEqual(
-      s.lp().count, before,
-      `setLayoutParam('count', ${JSON.stringify(bad)}) should have been rejected, `
-      + `got ${s.lp().count}`,
+      s.lp().count,
+      before,
+      `setLayoutParam('count', ${JSON.stringify(bad)}) should have been rejected, ` + `got ${s.lp().count}`,
     );
   }
   for (const bad of ['__proto__', 'constructor', 'nope', 42, null]) {
@@ -71,14 +71,17 @@ function makeStore() {
   for (const bad of [[null, null], ['a', 'b'], [1], 'big', null]) {
     s.setLayoutParam('scale', bad);
     // #1202 — scale is {x, y} now; a legacy array write normalizes to linked.
-    assert.deepStrictEqual(s.lp().scale, { x: [0.5, 2.5], y: [0.5, 2.5] }, `scale ${JSON.stringify(bad)} should be rejected`);
+    assert.deepStrictEqual(
+      s.lp().scale,
+      { x: [0.5, 2.5], y: [0.5, 2.5] },
+      `scale ${JSON.stringify(bad)} should be rejected`,
+    );
   }
   // A rejected write must not push an undo entry either — Ctrl-Z has to line
   // up with edits the operator actually made.
   const depth = (s.get().historyUndoStack || []).length;
   for (const bad of [NaN, null, '__proto__']) s.setLayoutParam('count', bad);
-  assert.strictEqual((s.get().historyUndoStack || []).length, depth,
-    'rejected writes must not create undo entries');
+  assert.strictEqual((s.get().historyUndoStack || []).length, depth, 'rejected writes must not create undo entries');
 }
 
 // ── §1: out-of-range but well-formed values CLAMP rather than reject ───────
@@ -92,7 +95,11 @@ function makeStore() {
   s.setLayoutParam('zTiers', 99.6);
   assert.strictEqual(s.lp().zTiers, 12, 'zTiers should clamp and stay integral');
   s.setLayoutParam('scale', [-5, 900]);
-  assert.deepStrictEqual(s.lp().scale, { x: [0.05, 6.0], y: [0.05, 6.0] }, 'range ends clamp to the HARD limits (#1127: the tap-name dialog can stretch a slider that far)');
+  assert.deepStrictEqual(
+    s.lp().scale,
+    { x: [0.05, 6.0], y: [0.05, 6.0] },
+    'range ends clamp to the HARD limits (#1127: the tap-name dialog can stretch a slider that far)',
+  );
   // Numeric strings still work; older projects wrote some fields that way.
   s.setLayoutParam('density', '55');
   assert.strictEqual(s.lp().density, 55);
@@ -132,9 +139,10 @@ function makeStore() {
   for (let i = 0; i < 20; i++) s.setLayoutParam('count', 900 + i);
   assert.strictEqual(s.lp().count, 800, 'stays clamped');
   assert.strictEqual(
-    s.lp(), ref,
-    'writes that clamp to the current value must not replace layoutParams — a new '
-    + 'reference re-runs the whole placement pipeline for no visible change',
+    s.lp(),
+    ref,
+    'writes that clamp to the current value must not replace layoutParams — a new ' +
+      'reference re-runs the whole placement pipeline for no visible change',
   );
   // Rejected writes must not churn the reference either.
   for (const bad of [NaN, null, '__proto__']) s.setLayoutParam('count', bad);
@@ -158,14 +166,12 @@ function makeStore() {
 {
   const s = makeStore();
   let seed = 7;
-  const rnd = () => ((seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff);
+  const rnd = () => (seed = (Math.imul(seed, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
   const GARBAGE = [NaN, Infinity, null, undefined, '', [], {}, true, '__proto__', -1e9, 1e9];
   const KEYS = Object.keys(DEFAULT_LAYOUT_PARAMS);
   for (let i = 0; i < 3000; i++) {
     const key = KEYS[Math.floor(rnd() * KEYS.length)];
-    const value = rnd() < 0.5
-      ? GARBAGE[Math.floor(rnd() * GARBAGE.length)]
-      : rnd() * 2000 - 1000;
+    const value = rnd() < 0.5 ? GARBAGE[Math.floor(rnd() * GARBAGE.length)] : rnd() * 2000 - 1000;
     if (rnd() < 0.5) s.setLayoutParam(key, value);
     else s.setLayoutParams({ [key]: value });
   }
@@ -174,8 +180,10 @@ function makeStore() {
     if (typeof def === 'number') {
       assert.ok(Number.isFinite(lp[k]), `after fuzz, ${k} is not finite: ${lp[k]}`);
     } else if (Array.isArray(def)) {
-      assert.ok(Array.isArray(lp[k]) && lp[k].length === 2 && lp[k].every(Number.isFinite),
-        `after fuzz, ${k} is not a finite pair: ${JSON.stringify(lp[k])}`);
+      assert.ok(
+        Array.isArray(lp[k]) && lp[k].length === 2 && lp[k].every(Number.isFinite),
+        `after fuzz, ${k} is not a finite pair: ${JSON.stringify(lp[k])}`,
+      );
     }
   }
   assert.strictEqual({}.polluted, undefined, 'prototype was polluted');
@@ -191,24 +199,34 @@ function makeStore() {
 // lifeDrift edit must not smuggle drifted siblings into state or the doc.
 {
   const s = makeStore();
-  assert.strictEqual('driftOverlay' in s.get(), false,
-    'driftOverlay slot must not exist in state');
-  assert.strictEqual(typeof s.get().setDriftOverlay, 'undefined',
-    'setDriftOverlay setter must not exist');
+  assert.strictEqual('driftOverlay' in s.get(), false, 'driftOverlay slot must not exist in state');
+  assert.strictEqual(typeof s.get().setDriftOverlay, 'undefined', 'setDriftOverlay setter must not exist');
 
   s.setLayoutParam('lifeDrift', 0.9);
-  assert.strictEqual(s.lp().jitter, DEFAULT_LAYOUT_PARAMS.jitter,
-    'life drift must not write jitter into document state');
-  assert.strictEqual(s.lp().displacement, DEFAULT_LAYOUT_PARAMS.displacement,
-    'life drift must not write displacement into document state');
-  assert.strictEqual(s.lp().noiseSpeed, DEFAULT_LAYOUT_PARAMS.noiseSpeed,
-    'life drift must not write noiseSpeed into document state');
+  assert.strictEqual(
+    s.lp().jitter,
+    DEFAULT_LAYOUT_PARAMS.jitter,
+    'life drift must not write jitter into document state',
+  );
+  assert.strictEqual(
+    s.lp().displacement,
+    DEFAULT_LAYOUT_PARAMS.displacement,
+    'life drift must not write displacement into document state',
+  );
+  assert.strictEqual(
+    s.lp().noiseSpeed,
+    DEFAULT_LAYOUT_PARAMS.noiseSpeed,
+    'life drift must not write noiseSpeed into document state',
+  );
 
   const { serializeProject } = await import('./projectDocument.js');
   const doc = serializeProject(s.get());
   assert.strictEqual(doc.driftOverlay, undefined, 'no drift overlay in the persisted doc');
-  assert.strictEqual(doc.layoutParams.jitter, DEFAULT_LAYOUT_PARAMS.jitter,
-    'persisted jitter must stay the authored value');
+  assert.strictEqual(
+    doc.layoutParams.jitter,
+    DEFAULT_LAYOUT_PARAMS.jitter,
+    'persisted jitter must stay the authored value',
+  );
 }
 
 // ── §6: autosave is a crash-only journal ──────────────────────────────────
@@ -219,20 +237,26 @@ function makeStore() {
   globalThis.localStorage = {
     getItem: (k) => (store.has(k) ? store.get(k) : null),
     setItem: (k, v) => {
-      if (failWrites) { const e = new Error('nope'); e.name = failWrites; throw e; }
+      if (failWrites) {
+        const e = new Error('nope');
+        e.name = failWrites;
+        throw e;
+      }
       store.set(k, String(v));
     },
     removeItem: (k) => store.delete(k),
   };
 
-  const {
-    readAutosave, writeAutosave, readQuarantine, AUTOSAVE_KEY, QUARANTINE_KEY,
-  } = await import('./projectDocument.js');
+  const { readAutosave, writeAutosave, readQuarantine, AUTOSAVE_KEY, QUARANTINE_KEY } =
+    await import('./projectDocument.js');
 
   // Round trip: a good document comes back.
   const doc = {
-    version: 1, seed: 0x1a4f, paletteId: 'praystation',
-    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, count: 321 }, quality: 'balanced',
+    version: 1,
+    seed: 0x1a4f,
+    paletteId: 'praystation',
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, count: 321 },
+    quality: 'balanced',
   };
   assert.deepStrictEqual(writeAutosave(doc), { ok: true });
   const stored = JSON.parse(store.get(AUTOSAVE_KEY));
@@ -260,10 +284,15 @@ function makeStore() {
   // A poisoned-but-parseable project is NOT quarantined — it is sanitized and
   // applied, which is what normalizeLayoutParams is for. Quarantine is for
   // documents we cannot read at all.
-  store.set(AUTOSAVE_KEY, JSON.stringify({
-    version: 1, seed: 1, paletteId: 'praystation',
-    layoutParams: { mode: '__proto__', count: 1e9, jitter: null },
-  }));
+  store.set(
+    AUTOSAVE_KEY,
+    JSON.stringify({
+      version: 1,
+      seed: 1,
+      paletteId: 'praystation',
+      layoutParams: { mode: '__proto__', count: 1e9, jitter: null },
+    }),
+  );
   const poisoned = readAutosave();
   assert.strictEqual(poisoned.quarantined, false);
   assert.strictEqual(poisoned.doc.layoutParams.mode, DEFAULT_LAYOUT_PARAMS.mode);

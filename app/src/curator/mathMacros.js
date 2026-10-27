@@ -31,40 +31,89 @@ export const MATH_MAX_NAME = 24;
 // atlas every frame — the sliders stay human-paced).
 const EXCLUDED_KEYS = new Set([
   ...ATLAS_AFFECTING_PARAMS, // count, particleCount, lsysDepth, body
-  'collideMask', 'contactRadius', 'contactRestitution', 'contactRepel',
+  'collideMask',
+  'contactRadius',
+  'contactRestitution',
+  'contactRepel',
   'dishTempo', // #1538 — dish law like the contact params: a macro must not sweep the dish's temperature every frame
   // #1042 — PATTERN reseeds. A macro must never sweep the seed every frame; SHUFFLE is a trigger, not a scalar.
-  'shuffle', 'seed',
+  'shuffle',
+  'seed',
 ]);
 
 const LABELS = {
-  jitter: 'JITTER', density: 'DENSITY', zTiers: 'Z TIERS', hueRotate: 'HUE ROTATE',
-  phylloDivergence: 'DIVERGENCE', lsysAngle: 'L-ANGLE', growthRate: 'GROWTH RATE',
-  growthBranch: 'BRANCHING', noiseFreq: 'NOISE FREQ', noiseSpeed: 'NOISE SPEED',
-  brushSize: 'BRUSH SIZE', brushSpacing: 'BRUSH SPACING', fieldScale: 'FIELD SCALE',
-  trailCount: 'TRAILS', wobbleAmp: 'WOBBLE AMP', wobbleFreq: 'WOBBLE FREQ',
-  displacement: 'DISPLACE', swarmCohesion: 'COHESION', gravityWells: 'GRAVITY',
-  damping: 'DAMPING', flap: 'FLAP', squash: 'SQUASH', crooked: 'CROOKED',
-  kinemeRate: 'KINEME RATE', kinemeBreath: 'KINEME BREATH',
-  kinemeDrift: 'KINEME DRIFT', kinemePulse: 'KINEME PULSE',
+  jitter: 'JITTER',
+  density: 'DENSITY',
+  zTiers: 'Z TIERS',
+  hueRotate: 'HUE ROTATE',
+  phylloDivergence: 'DIVERGENCE',
+  lsysAngle: 'L-ANGLE',
+  growthRate: 'GROWTH RATE',
+  growthBranch: 'BRANCHING',
+  noiseFreq: 'NOISE FREQ',
+  noiseSpeed: 'NOISE SPEED',
+  brushSize: 'BRUSH SIZE',
+  brushSpacing: 'BRUSH SPACING',
+  fieldScale: 'FIELD SCALE',
+  trailCount: 'TRAILS',
+  wobbleAmp: 'WOBBLE AMP',
+  wobbleFreq: 'WOBBLE FREQ',
+  displacement: 'DISPLACE',
+  swarmCohesion: 'COHESION',
+  gravityWells: 'GRAVITY',
+  damping: 'DAMPING',
+  flap: 'FLAP',
+  squash: 'SQUASH',
+  crooked: 'CROOKED',
+  kinemeRate: 'KINEME RATE',
+  kinemeBreath: 'KINEME BREATH',
+  kinemeDrift: 'KINEME DRIFT',
+  kinemePulse: 'KINEME PULSE',
   kinemePaletteBreath: 'PALETTE BREATH',
-  kinemeBrushWobble: 'BRUSH WOBBLE', kinemeBoilFps: 'BOIL FPS', tight: 'TIGHT',
-  wind: 'WIND', behaveSep: 'SEP', behaveAli: 'ALI', behaveCoh: 'COH',
-  behaveSepR: 'SEP R', behaveAliR: 'ALI R', behaveCohR: 'COH R',
-  behaveWind: 'B WIND', behaveOrbit: 'ORBIT', behaveAttract: 'ATTRACT',
-  metabolism: 'METABOLISM', breath: 'BREATH', graze: 'GRAZE',
-  accumulationFade: 'ACCUM FADE', leaveFade: 'LEAVE FADE', tunnelFade: 'TUNNEL FADE',
-  prismFade: 'PRISM FADE', flowFade: 'FLOW FADE', echoes: 'ECHOES',
-  accumulationOptics: 'OPTICS', accumulationTunnel: 'TUNNEL',
-  accumulationPrism: 'PRISM', accumulationFlow: 'FLOW', accumulationWetness: 'WETNESS',
-  audioModDepth: 'MOD DEPTH', audioScaleMod: 'SCALE MOD', audioAlphaMod: 'ALPHA MOD',
-  audioAttackMs: 'ATTACK', audioDecayMs: 'DECAY', audioSwell: 'SWELL',
-  lifeDrift: 'LIFE DRIFT', parallax: 'PARALLAX',
-  scale: 'SCALE', rotate: 'ROTATE', alpha: 'ALPHA',
+  kinemeBrushWobble: 'BRUSH WOBBLE',
+  kinemeBoilFps: 'BOIL FPS',
+  tight: 'TIGHT',
+  wind: 'WIND',
+  behaveSep: 'SEP',
+  behaveAli: 'ALI',
+  behaveCoh: 'COH',
+  behaveSepR: 'SEP R',
+  behaveAliR: 'ALI R',
+  behaveCohR: 'COH R',
+  behaveWind: 'B WIND',
+  behaveOrbit: 'ORBIT',
+  behaveAttract: 'ATTRACT',
+  metabolism: 'METABOLISM',
+  breath: 'BREATH',
+  graze: 'GRAZE',
+  accumulationFade: 'ACCUM FADE',
+  leaveFade: 'LEAVE FADE',
+  tunnelFade: 'TUNNEL FADE',
+  prismFade: 'PRISM FADE',
+  flowFade: 'FLOW FADE',
+  echoes: 'ECHOES',
+  accumulationOptics: 'OPTICS',
+  accumulationTunnel: 'TUNNEL',
+  accumulationPrism: 'PRISM',
+  accumulationFlow: 'FLOW',
+  accumulationWetness: 'WETNESS',
+  audioModDepth: 'MOD DEPTH',
+  audioScaleMod: 'SCALE MOD',
+  audioAlphaMod: 'ALPHA MOD',
+  audioAttackMs: 'ATTACK',
+  audioDecayMs: 'DECAY',
+  audioSwell: 'SWELL',
+  lifeDrift: 'LIFE DRIFT',
+  parallax: 'PARALLAX',
+  scale: 'SCALE',
+  rotate: 'ROTATE',
+  alpha: 'ALPHA',
 };
 
 function fallbackLabel(key) {
-  return String(key).replace(/([a-z])([A-Z])/g, '$1 $2').toUpperCase();
+  return String(key)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .toUpperCase();
 }
 
 /**
@@ -76,21 +125,29 @@ export const LEARNABLE_TARGETS = (() => {
   const out = [];
   for (const [key, spec] of Object.entries(PARAM_SPEC)) {
     if (EXCLUDED_KEYS.has(key)) continue;
-    out.push(Object.freeze({
-      key,
-      label: LABELS[key] || fallbackLabel(key),
-      min: spec.min, max: spec.max,
-      isRange: false, int: !!spec.int,
-    }));
+    out.push(
+      Object.freeze({
+        key,
+        label: LABELS[key] || fallbackLabel(key),
+        min: spec.min,
+        max: spec.max,
+        isRange: false,
+        int: !!spec.int,
+      }),
+    );
   }
   for (const [key, spec] of Object.entries(RANGE_SPEC)) {
     if (EXCLUDED_KEYS.has(key)) continue;
-    out.push(Object.freeze({
-      key,
-      label: LABELS[key] || fallbackLabel(key),
-      min: spec.min, max: spec.max,
-      isRange: true, int: false,
-    }));
+    out.push(
+      Object.freeze({
+        key,
+        label: LABELS[key] || fallbackLabel(key),
+        min: spec.min,
+        max: spec.max,
+        isRange: true,
+        int: false,
+      }),
+    );
   }
   return Object.freeze(out);
 })();
@@ -132,9 +189,7 @@ function sanitizeMacro(raw) {
   }
   return {
     id,
-    name: typeof raw.name === 'string' && raw.name.trim()
-      ? raw.name.trim().slice(0, MATH_MAX_NAME)
-      : 'MACRO',
+    name: typeof raw.name === 'string' && raw.name.trim() ? raw.name.trim().slice(0, MATH_MAX_NAME) : 'MACRO',
     targets,
   };
 }

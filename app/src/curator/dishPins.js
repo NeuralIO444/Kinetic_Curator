@@ -12,5 +12,8 @@ const finite = (n) => typeof n === 'number' && Number.isFinite(n);
 /** Keep only well-formed pins, at most MAX_PINS. Junk degrades by reduction. */
 export function sanitizePins(pins) {
   if (!Array.isArray(pins)) return [];
-  return pins.filter((p) => p && finite(p.x) && finite(p.y)).slice(0, MAX_PINS).map((p) => ({ x: p.x, y: p.y }));
+  return pins
+    .filter((p) => p && finite(p.x) && finite(p.y))
+    .slice(0, MAX_PINS)
+    .map((p) => ({ x: p.x, y: p.y }));
 }

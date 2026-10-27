@@ -88,7 +88,10 @@ export function rankLois(candidates, choose = null) {
   for (let i = 1; i < n; i++) if (allParts[i].score > allParts[best].score) best = i;
   if (typeof choose === 'function') {
     try {
-      const picked = choose(allParts.map((p) => p.score), candidates);
+      const picked = choose(
+        allParts.map((p) => p.score),
+        candidates,
+      );
       if (Number.isInteger(picked) && picked >= 0 && picked < n) best = picked;
     } catch {
       /* a chooser that throws is no chooser: the argmax stands */

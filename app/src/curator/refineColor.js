@@ -33,7 +33,10 @@ export function warmHex(hex, warm) {
   if (!h || !warm) return h ?? hex;
   const n = parseInt(h.slice(1), 16);
   const d = warm * WARM_K * 255;
-  const c = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  const c = (v) =>
+    Math.round(Math.min(255, Math.max(0, v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${c(((n >> 16) & 255) + d)}${c((n >> 8) & 255)}${c((n & 255) - d)}`;
 }
 
@@ -48,8 +51,10 @@ export function nudgeSwatches(swatches, deal, locks = null) {
  * overrides are not the ones the last nudge wrote (something else edited them), or when a keep landed since.
  */
 export function anchorValid(anchor, state, keepCount) {
-  return !!anchor
-    && anchor.paletteId === state.paletteId
-    && anchor.lastOverrides === state.paletteOverrides
-    && anchor.keepCount === keepCount;
+  return (
+    !!anchor &&
+    anchor.paletteId === state.paletteId &&
+    anchor.lastOverrides === state.paletteOverrides &&
+    anchor.keepCount === keepCount
+  );
 }

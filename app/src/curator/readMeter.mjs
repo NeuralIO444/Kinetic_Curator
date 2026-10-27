@@ -157,14 +157,15 @@ export function readMeter(pixels, w, h) {
   }
   big /= n;
   const total = big + mid + fine;
-  const shares = total > 0
-    ? { big: big / total, mid: mid / total, fine: fine / total }
-    : { big: 0, mid: 0, fine: 0 };
+  const shares = total > 0 ? { big: big / total, mid: mid / total, fine: fine / total } : { big: 0, mid: 0, fine: 0 };
   const r6 = (v) => +v.toFixed(6);
   return {
-    big: r6(big), mid: r6(mid), fine: r6(fine),
+    big: r6(big),
+    mid: r6(mid),
+    fine: r6(fine),
     shares: { big: r6(shares.big), mid: r6(shares.mid), fine: r6(shares.fine) },
-    total: r6(total), mean: r6(mean),
+    total: r6(total),
+    mean: r6(mean),
     verdict: readVerdict(shares),
   };
 }

@@ -58,7 +58,7 @@ const originOf = (keep) => (keep?.provenance?.source === 'explorer' ? 'explorer'
 // asset categories, or 'custom' when the cast names no library asset).
 function familiesOf(keep, assetsById) {
   const cats = new Set();
-  for (const id of (Array.isArray(keep?.config?.assets) ? keep.config.assets : [])) {
+  for (const id of Array.isArray(keep?.config?.assets) ? keep.config.assets : []) {
     const cat = assetsById?.get?.(id)?.category;
     if (cat) cats.add(cat);
   }
@@ -68,7 +68,11 @@ function familiesOf(keep, assetsById) {
 function featuresOf(keep) {
   const layout = keep?.config?.layout;
   if (!layout || typeof layout !== 'object') return null;
-  try { return extractFeatures(layout); } catch { return null; }
+  try {
+    return extractFeatures(layout);
+  } catch {
+    return null;
+  }
 }
 
 const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -86,8 +90,14 @@ const cmpStr = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
  * deals nothing changes nothing, and the receipt says why.
  */
 export function dealFill({
-  keeps = [], stageIds = [], history = [], prefs, seed = 0,
-  scoreOf = null, performingKeepId = null, assetsById = null,
+  keeps = [],
+  stageIds = [],
+  history = [],
+  prefs,
+  seed = 0,
+  scoreOf = null,
+  performingKeepId = null,
+  assetsById = null,
   // K3 (#1591, audit S5): how many disk keeps the anchor could NOT
   // read (their records live in files the folder didn't give up this
   // session). The anchor over the rest is partial, and the receipt
@@ -96,7 +106,7 @@ export function dealFill({
 } = {}) {
   const table = prefs.table;
   const notes = [];
-  const rng = mulberry32((seed >>> 0) || 1);
+  const rng = mulberry32(seed >>> 0 || 1);
   // One seeded draw per keep, assigned in id order — the deal's only
   // randomness, and the reason a seed replays bit-exactly.
   const draw = new Map();
@@ -107,7 +117,7 @@ export function dealFill({
   const stageSet = new Set((stageIds || []).filter((id) => byId.has(id)));
 
   // ── the pinned performing Look (S1): dealt around, never out ─────
-  const pinnedId = (performingKeepId && stageSet.has(performingKeepId)) ? performingKeepId : null;
+  const pinnedId = performingKeepId && stageSet.has(performingKeepId) ? performingKeepId : null;
   const pinnedIndex = pinnedId ? stageIds.indexOf(pinnedId) : -1;
   let budgetLeft = LOOK_SLOT_BUDGET - (pinnedId ? slotCostOf(byId.get(pinnedId)) : 0);
 
@@ -118,20 +128,29 @@ export function dealFill({
   for (const k of keeps) {
     const v = sanitizeGateVerdict(k?.gateVerdict);
     verdictOf.set(k.id, v);
-    if (v) { judged++; if (v.verdict === 'pass') passedOver++; }
+    if (v) {
+      judged++;
+      if (v.verdict === 'pass') passedOver++;
+    }
   }
   const gateFailed = (k) => verdictOf.get(k.id)?.verdict === 'pass';
-  notes.push(judged === 0
-    ? 'gate: no stored verdicts on file — every candidate unjudged (verdicts are recorded at bake time)'
-    : `gate: ${judged} stored verdict${judged === 1 ? '' : 's'} read — ${passedOver} passed over, never dealt`);
+  notes.push(
+    judged === 0
+      ? 'gate: no stored verdicts on file — every candidate unjudged (verdicts are recorded at bake time)'
+      : `gate: ${judged} stored verdict${judged === 1 ? '' : 's'} read — ${passedOver} passed over, never dealt`,
+  );
 
   // ── the anchor (hosted by the Director; never fed by swap history) ──
   const anchorInfo = keptAnchor(keeps);
   const anchor = anchorInfo.state;
   const centroid = anchorInfo.centroid;
-  if (anchor === 'identity') notes.push('anchor: identity — too few keeps to lean on; consensus deals in Davis\'s novelty order');
+  if (anchor === 'identity')
+    notes.push("anchor: identity — too few keeps to lean on; consensus deals in Davis's novelty order");
   if (anchor === 'none') notes.push('anchor: none — no counted keep carries a layout to lean toward');
-  if (anchorPartial > 0) notes.push(`anchor: partial — ${anchorPartial} keep${anchorPartial === 1 ? '' : 's'} on disk unread; the anchor leans on the rest at full weight`);
+  if (anchorPartial > 0)
+    notes.push(
+      `anchor: partial — ${anchorPartial} keep${anchorPartial === 1 ? '' : 's'} on disk unread; the anchor leans on the rest at full weight`,
+    );
 
   // ── features + novelty (distance from the current stage) ─────────
   const feats = new Map(keeps.map((k) => [k.id, featuresOf(k)]));
@@ -145,8 +164,10 @@ export function dealFill({
   // ── DAVIS drafts: pool of 48, stratified, novelty-weighted ───────
   const candidates = keeps.filter((k) => k.id !== pinnedId && !gateFailed(k));
   const nov = new Map(candidates.map((k) => [k.id, noveltyOf(k)]));
-  const draftOrder = [...candidates].sort((a, b) =>
-    ((nov.get(b.id) ?? -1) - (nov.get(a.id) ?? -1)) || (drawOf(a) - drawOf(b)) || cmpStr(String(a.id), String(b.id)));
+  const draftOrder = [...candidates].sort(
+    (a, b) =>
+      (nov.get(b.id) ?? -1) - (nov.get(a.id) ?? -1) || drawOf(a) - drawOf(b) || cmpStr(String(a.id), String(b.id)),
+  );
   const buckets = new Map();
   for (const k of draftOrder) {
     const key = `${familiesOf(k, assetsById)[0]}|${originOf(k)}`;
@@ -159,28 +180,37 @@ export function dealFill({
   for (const k of draftOrder) {
     if (pool.length >= FILL_POOL_SIZE) break;
     const key = `${familiesOf(k, assetsById)[0]}|${originOf(k)}`;
-    if ((buckets.get(key).filter((x) => inPool.has(x.id)).length) < quota) { pool.push(k); inPool.add(k.id); }
+    if (buckets.get(key).filter((x) => inPool.has(x.id)).length < quota) {
+      pool.push(k);
+      inPool.add(k.id);
+    }
   }
   for (const k of draftOrder) {
     if (pool.length >= FILL_POOL_SIZE) break;
-    if (!inPool.has(k.id)) { pool.push(k); inPool.add(k.id); }
+    if (!inPool.has(k.id)) {
+      pool.push(k);
+      inPool.add(k.id);
+    }
   }
 
   // ── suppression: recency + chronic swap-outs (consensus only) ────
   const window = Math.max(0, prefs.recencyWindow | 0);
   const recentIds = new Set(stageSet);
   const fillRecords = (history || []).filter((r) => r && r.kind === 'fill');
-  for (const rec of (window > 0 ? fillRecords.slice(-window) : [])) {
-    for (const s of (Array.isArray(rec.slots) ? rec.slots : [])) if (s && s.keepId) recentIds.add(s.keepId);
+  for (const rec of window > 0 ? fillRecords.slice(-window) : []) {
+    for (const s of Array.isArray(rec.slots) ? rec.slots : []) if (s && s.keepId) recentIds.add(s.keepId);
   }
   if (pinnedId) recentIds.delete(pinnedId);
   const swapOutCounts = new Map();
-  for (const r of (history || [])) {
+  for (const r of history || []) {
     if (r && r.kind === 'swap' && r.outId) swapOutCounts.set(r.outId, (swapOutCounts.get(r.outId) || 0) + 1);
   }
   const chronicIds = new Set([...swapOutCounts.entries()].filter(([, n]) => n >= CHRONIC_SWAP_OUTS).map(([id]) => id));
   const consensusBanned = new Set([...recentIds, ...chronicIds]);
-  if (chronicIds.size) notes.push(`suppression: ${chronicIds.size} chronic swap-out${chronicIds.size === 1 ? '' : 's'} (≥${CHRONIC_SWAP_OUTS}×) barred from consensus`);
+  if (chronicIds.size)
+    notes.push(
+      `suppression: ${chronicIds.size} chronic swap-out${chronicIds.size === 1 ? '' : 's'} (≥${CHRONIC_SWAP_OUTS}×) barred from consensus`,
+    );
 
   // ── the table deals ──────────────────────────────────────────────
   const dealt = [];
@@ -193,7 +223,10 @@ export function dealFill({
       if (n >= limit) break;
       if (dealtIds.has(k.id) || k.id === pinnedId || gateFailed(k)) continue;
       const cost = slotCostOf(k);
-      if (cost > budgetLeft) { budgetStopped = true; continue; }
+      if (cost > budgetLeft) {
+        budgetStopped = true;
+        continue;
+      }
       budgetLeft -= cost;
       dealtIds.add(k.id);
       dealt.push({ keepId: k.id, rule });
@@ -206,7 +239,12 @@ export function dealFill({
   // Consensus ← the draft pool, anchor-ranked (the scorer's only door).
   const anchorRank = (k) => {
     if (scoreOf) {
-      try { const s = scoreOf(k); if (Number.isFinite(s)) return s; } catch { /* head mismatch → centroid */ }
+      try {
+        const s = scoreOf(k);
+        if (Number.isFinite(s)) return s;
+      } catch {
+        /* head mismatch → centroid */
+      }
     }
     if (anchor === 'live') {
       const f = feats.get(k.id);
@@ -214,11 +252,18 @@ export function dealFill({
     }
     return null;
   };
-  take('consensus',
-    pool.filter((k) => !consensusBanned.has(k.id))
-      .sort((a, b) => ((anchorRank(b) ?? nov.get(b.id) ?? -1) - (anchorRank(a) ?? nov.get(a.id) ?? -1))
-        || ((nov.get(b.id) ?? -1) - (nov.get(a.id) ?? -1)) || (drawOf(a) - drawOf(b))),
-    table.consensus);
+  take(
+    'consensus',
+    pool
+      .filter((k) => !consensusBanned.has(k.id))
+      .sort(
+        (a, b) =>
+          (anchorRank(b) ?? nov.get(b.id) ?? -1) - (anchorRank(a) ?? nov.get(a.id) ?? -1) ||
+          (nov.get(b.id) ?? -1) - (nov.get(a.id) ?? -1) ||
+          drawOf(a) - drawOf(b),
+      ),
+    table.consensus,
+  );
 
   // Neglected ← the whole collection: least-staged first, the
   // never-staged at the front. Recency holds until the pool runs dry.
@@ -228,10 +273,10 @@ export function dealFill({
   const stampOf = (k, key) => (Number.isFinite(k?.[key]) ? k[key] : null);
   const keptMs = (k) => stampOf(k, 'keptAt') ?? 0;
   const byNeglect = (a, b) =>
-    ((a.stagedCount || 0) - (b.stagedCount || 0))
-    || ((stampOf(a, 'lastStagedAt') ?? -Infinity) - (stampOf(b, 'lastStagedAt') ?? -Infinity))
-    || (keptMs(a) - keptMs(b))
-    || (drawOf(a) - drawOf(b));
+    (a.stagedCount || 0) - (b.stagedCount || 0) ||
+    (stampOf(a, 'lastStagedAt') ?? -Infinity) - (stampOf(b, 'lastStagedAt') ?? -Infinity) ||
+    keptMs(a) - keptMs(b) ||
+    drawOf(a) - drawOf(b);
   const everyone = candidates;
   let liftedRecency = false;
   const neglectedWanted = table.neglected;
@@ -244,9 +289,11 @@ export function dealFill({
   // Wild ← farthest from her centroid (the anti-taste slot — still
   // gated, never scored). No anchor: Davis's novelty order stands in.
   const byWild = (a, b) => {
-    const da = (anchor === 'live' && feats.get(a.id)) ? 1 - featureProximity(feats.get(a.id), centroid) : (nov.get(a.id) ?? -1);
-    const db = (anchor === 'live' && feats.get(b.id)) ? 1 - featureProximity(feats.get(b.id), centroid) : (nov.get(b.id) ?? -1);
-    return (db - da) || (drawOf(a) - drawOf(b));
+    const da =
+      anchor === 'live' && feats.get(a.id) ? 1 - featureProximity(feats.get(a.id), centroid) : (nov.get(a.id) ?? -1);
+    const db =
+      anchor === 'live' && feats.get(b.id) ? 1 - featureProximity(feats.get(b.id), centroid) : (nov.get(b.id) ?? -1);
+    return db - da || drawOf(a) - drawOf(b);
   };
   got = take('wild', everyone.filter((k) => !recentIds.has(k.id)).sort(byWild), table.wild);
   if (got < table.wild) {
@@ -262,15 +309,15 @@ export function dealFill({
   const loisOrdered = [...everyone].sort((a, b) => {
     const ma = margins.get(a.id);
     const mb = margins.get(b.id);
-    if (ma !== null && mb !== null) return (mb - ma) || (drawOf(a) - drawOf(b));
+    if (ma !== null && mb !== null) return mb - ma || drawOf(a) - drawOf(b);
     if (ma !== null) return -1;
     if (mb !== null) return 1;
-    return (drawOf(a) - drawOf(b));
+    return drawOf(a) - drawOf(b);
   });
   take('lois', loisOrdered, table.lois);
   const loisIds = dealt.filter((d) => d.rule === 'lois').map((d) => d.keepId);
   if (loisIds.some((id) => margins.get(id) === null)) {
-    notes.push('lois\'s choice: dealt unjudged keeps — no gate margins on file for them');
+    notes.push("lois's choice: dealt unjudged keeps — no gate margins on file for them");
   }
 
   // Contrarian ← most unlike the other dealt (pinned included).
@@ -287,7 +334,7 @@ export function dealFill({
       const fb = feats.get(b.id);
       const da = fa ? 1 - featureProximity(fa, mean) : -1;
       const db = fb ? 1 - featureProximity(fb, mean) : -1;
-      return (db - da) || (drawOf(a) - drawOf(b));
+      return db - da || drawOf(a) - drawOf(b);
     });
   } else {
     contrarianBasis = 'family';
@@ -296,9 +343,11 @@ export function dealFill({
       const fam = familiesOf(byId.get(d.keepId), assetsById)[0];
       famCount.set(fam, (famCount.get(fam) || 0) + 1);
     }
-    contraOrdered = [...everyone].sort((a, b) =>
-      ((famCount.get(familiesOf(a, assetsById)[0]) || 0) - (famCount.get(familiesOf(b, assetsById)[0]) || 0))
-      || (drawOf(a) - drawOf(b)));
+    contraOrdered = [...everyone].sort(
+      (a, b) =>
+        (famCount.get(familiesOf(a, assetsById)[0]) || 0) - (famCount.get(familiesOf(b, assetsById)[0]) || 0) ||
+        drawOf(a) - drawOf(b),
+    );
   }
   take('contrarian', contraOrdered, table.contrarian);
   if (table.contrarian > 0 && dealtByRule.contrarian > 0 && contrarianBasis === 'family') {
@@ -307,8 +356,12 @@ export function dealFill({
 
   // ── assemble + account ───────────────────────────────────────────
   const totalWanted = RULE_ORDER.reduce((n, r) => n + table[r], 0);
-  if (totalWanted < LOOK_SLOT_BUDGET) notes.push(`table deals ${totalWanted} of ${LOOK_SLOT_BUDGET} — the rest of the stage stays empty by the table's own counts`);
-  if (budgetStopped && dealt.length < totalWanted) notes.push('the 16-unit stage budget ran out before the table finished — mined keeps cost 2');
+  if (totalWanted < LOOK_SLOT_BUDGET)
+    notes.push(
+      `table deals ${totalWanted} of ${LOOK_SLOT_BUDGET} — the rest of the stage stays empty by the table's own counts`,
+    );
+  if (budgetStopped && dealt.length < totalWanted)
+    notes.push('the 16-unit stage budget ran out before the table finished — mined keeps cost 2');
   const undealt = RULE_ORDER.filter((r) => table[r] > 0 && dealtByRule[r] === 0);
   const receipt = {
     seed: seed >>> 0,
@@ -321,9 +374,12 @@ export function dealFill({
     notes: notes.slice(0, 8),
   };
   if (!dealt.length) {
-    receipt.notes = [...receipt.notes, keeps.length === 0
-      ? 'the collection is empty — nothing to deal'
-      : 'nothing could be dealt — the stage stands as it was'].slice(0, 8);
+    receipt.notes = [
+      ...receipt.notes,
+      keeps.length === 0
+        ? 'the collection is empty — nothing to deal'
+        : 'nothing could be dealt — the stage stands as it was',
+    ].slice(0, 8);
     return { stageIds: null, dealt: [], receipt };
   }
   const dealtIdsOrdered = dealt.map((d) => d.keepId);

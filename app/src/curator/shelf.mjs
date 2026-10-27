@@ -48,9 +48,10 @@ export const SWAP_BUDGET_COPY = 'that swap overfills the stage';
 
 /** The favorites rider (audit S2): the favorites cap still trims, but it
  * speaks. n = how many records the trim dropped. */
-export const favoritesTrimCopy = (n) => (n === 1
-  ? 'favorites full — the oldest favorite was let go'
-  : `favorites full — the oldest ${n} favorites were let go`);
+export const favoritesTrimCopy = (n) =>
+  n === 1
+    ? 'favorites full — the oldest favorite was let go'
+    : `favorites full — the oldest ${n} favorites were let go`;
 
 /** #1642 — the load line: a stored shelf part that loses records on the
  * way in says so once, at boot, on the shelf's own surface. `one`/`many`
@@ -247,7 +248,8 @@ export const exportHistoryRecord = (keepId, path, at) => ({ kind: 'export', keep
 export const importHistoryRecord = (keepId, path, at) => ({ kind: 'import', keepId, path, at });
 
 /** A loot-relative looks/ path as the ledger may carry it. */
-const ledgerRel = (v) => (typeof v === 'string' && v.length <= 200 && /^looks\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/.test(v) ? v : null);
+const ledgerRel = (v) =>
+  typeof v === 'string' && v.length <= 200 && /^looks\/[A-Za-z0-9][A-Za-z0-9._-]*\.json$/.test(v) ? v : null;
 
 /** The slot rules a fill record may name (K2; 'pinned' is the S1 pin). */
 export const FILL_RULES = ['consensus', 'neglected', 'wild', 'lois', 'contrarian', 'pinned'];
@@ -260,7 +262,13 @@ export const FILL_RULES = ['consensus', 'neglected', 'wild', 'lois', 'contrarian
  * WEIRD'); `notes` carries the receipt's named degradations.
  */
 export const fillHistoryRecord = ({ seed, table, slots, undealt = [], notes = [], at }) => ({
-  kind: 'fill', seed, table, slots, undealt, notes, at,
+  kind: 'fill',
+  seed,
+  table,
+  slots,
+  undealt,
+  notes,
+  at,
 });
 
 /** Sanitize one stored history record; junk drops whole, never repairs. */
@@ -278,11 +286,13 @@ export function sanitizeHistoryRecord(raw) {
     return { kind: raw.kind, keepId: id(raw.keepId), path: ledgerRel(raw.path), at };
   }
   if (raw.kind === 'fill' && Number.isFinite(raw.seed) && Array.isArray(raw.slots)) {
-    const slots = raw.slots.slice(0, LOOK_SLOT_BUDGET).map((s) => (
-      s && typeof s === 'object' && id(s.keepId) && FILL_RULES.includes(s.rule)
-        ? { keepId: id(s.keepId), rule: s.rule }
-        : null
-    ));
+    const slots = raw.slots
+      .slice(0, LOOK_SLOT_BUDGET)
+      .map((s) =>
+        s && typeof s === 'object' && id(s.keepId) && FILL_RULES.includes(s.rule)
+          ? { keepId: id(s.keepId), rule: s.rule }
+          : null,
+      );
     if (slots.some((s) => s === null)) return null; // a torn receipt drops whole
     return {
       kind: 'fill',
@@ -293,7 +303,10 @@ export function sanitizeHistoryRecord(raw) {
         ? [...new Set(raw.undealt.filter((r) => FILL_RULES.includes(r) && r !== 'pinned'))].slice(0, 5)
         : [],
       notes: Array.isArray(raw.notes)
-        ? raw.notes.filter((n) => typeof n === 'string').slice(0, 8).map((n) => n.slice(0, 160))
+        ? raw.notes
+            .filter((n) => typeof n === 'string')
+            .slice(0, 8)
+            .map((n) => n.slice(0, 160))
         : [],
       at,
     };
@@ -353,21 +366,25 @@ export function shelfRow(keep, stageIds, { assetsById = new Map(), palettesById 
 /** Search + sort over built rows — the collection view's one reading
  * order, shared by the plain rows and the K3 merged rows below. */
 function searchSortShelfRows(rows, { query = '', sort = 'kept' } = {}) {
-  const q = String(query || '').trim().toLowerCase();
+  const q = String(query || '')
+    .trim()
+    .toLowerCase();
   const searched = q
-    ? rows.filter((r) => [r.label, r.mode, r.paletteId, r.origin, r.corner, String(r.keep?.seed ?? ''), ...r.families]
-      .join(' ').toLowerCase().includes(q))
+    ? rows.filter((r) =>
+        [r.label, r.mode, r.paletteId, r.origin, r.corner, String(r.keep?.seed ?? ''), ...r.families]
+          .join(' ')
+          .toLowerCase()
+          .includes(q),
+      )
     : rows;
   const keptKey = (r) => (r.keptAt != null ? r.keptAt : -Infinity);
   const stagedKey = (r) => (r.lastStagedAt != null ? r.lastStagedAt : -Infinity);
   const by = {
-    kept: (a, b) => (keptKey(b) - keptKey(a)) || (a._i - b._i),
-    staged: (a, b) => (stagedKey(b) - stagedKey(a)) || (a._i - b._i),
-    never: (a, b) => ((a.stagedCount ?? 0) - (b.stagedCount ?? 0))
-      || (keptKey(a) - keptKey(b)) || (a._i - b._i),
+    kept: (a, b) => keptKey(b) - keptKey(a) || a._i - b._i,
+    staged: (a, b) => stagedKey(b) - stagedKey(a) || a._i - b._i,
+    never: (a, b) => (a.stagedCount ?? 0) - (b.stagedCount ?? 0) || keptKey(a) - keptKey(b) || a._i - b._i,
   };
-  return searched.sort(by[SHELF_SORTS.includes(sort) ? sort : 'kept'])
-    .map(({ _i, ...r }) => r);
+  return searched.sort(by[SHELF_SORTS.includes(sort) ? sort : 'kept']).map(({ _i, ...r }) => r);
 }
 
 export function shelfRows(keeps, stageIds, { query = '', sort = 'kept', assetsById, palettesById } = {}) {
@@ -408,9 +425,11 @@ export function shelfStubRow(stub) {
  * locations, searched and sorted by the same reading order. A keep
  * appears exactly once: its stub never doubles a record row.
  */
-export function shelfDiskRows(keeps, stageIds, {
-  diskRecords = [], stubs = {}, query = '', sort = 'kept', assetsById, palettesById,
-} = {}) {
+export function shelfDiskRows(
+  keeps,
+  stageIds,
+  { diskRecords = [], stubs = {}, query = '', sort = 'kept', assetsById, palettesById } = {},
+) {
   const merged = [...(keeps || []), ...(diskRecords || [])];
   const diskIds = new Set((diskRecords || []).map((k) => k.id));
   const rows = merged.map((k, i) => ({

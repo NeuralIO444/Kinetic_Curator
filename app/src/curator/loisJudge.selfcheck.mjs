@@ -55,13 +55,19 @@ const brokeLow = judgeRender({ features: feats('low'), stats: stats({ ink: 0.7 }
 assert.strictEqual(brokeLow.verdict, 'pass', 'an over-filled whisper is passed');
 assert.ok(failedKeys(brokeLow).includes('promise'), 'promise names the over-fill');
 // mid density makes no promise
-assert.strictEqual(judgeRender({ features: feats('mid'), stats: stats({ ink: 0.02 }) }).verdict, 'keep',
-  'mid density is held to presence/contrast/exposure only');
+assert.strictEqual(
+  judgeRender({ features: feats('mid'), stats: stats({ ink: 0.02 }) }).verdict,
+  'keep',
+  'mid density is held to presence/contrast/exposure only',
+);
 
 // font-contingent cast: font-less ink reads blank (E1b F2), but LOIS
 // judges the ink a viewer sees — with-fonts — and records the basis
 const stampy = judgeRender({
-  features: feats(), stats: stats({ ink: 0, inkF: 0.2 }), fingerprint: 'fp2', fontContingent: true,
+  features: feats(),
+  stats: stats({ ink: 0, inkF: 0.2 }),
+  fingerprint: 'fp2',
+  fontContingent: true,
 });
 assert.strictEqual(stampy.verdict, 'keep', 'a stamp cast that draws with fonts is judged on that ink');
 assert.strictEqual(stampy.statsProvenance.judgedInk, 'with-fonts', 'the basis is recorded');
@@ -84,7 +90,12 @@ const finalist = {
       palette: { id: 'hydra' },
       assets: ['a1', 'a2'],
     },
-    provenance: { source: 'explorer', run: 'xpl-test', corner: 'haeckel', axes: { layout: 'grid', palette: 'hydra', castSize: 2 } },
+    provenance: {
+      source: 'explorer',
+      run: 'xpl-test',
+      corner: 'haeckel',
+      axes: { layout: 'grid', palette: 'hydra', castSize: 2 },
+    },
   },
   loisVerdict: healthy,
 };
@@ -95,9 +106,17 @@ assert.strictEqual(row.verdict, 'keep', 'the row carries the verdict');
 assert.strictEqual(row.provenance.corner, 'haeckel', 'the row carries provenance (run + corner)');
 assert.strictEqual(row.statsProvenance.fingerprint, 'fp1', 'the row carries the judged stats');
 assert.ok(!('timestamp' in row), 'no timestamp is invented — no artist pressed a key');
-assert.strictEqual(isLedgerRow(row), false,
-  'a LOIS row is NOT a human taste-ledger line (the schema itself refuses it)');
-assert.strictEqual(loisVerdictRow('xpl-test', { record: {}, loisVerdict: null }), null,
-  'an unjudged finalist writes no row');
+assert.strictEqual(
+  isLedgerRow(row),
+  false,
+  'a LOIS row is NOT a human taste-ledger line (the schema itself refuses it)',
+);
+assert.strictEqual(
+  loisVerdictRow('xpl-test', { record: {}, loisVerdict: null }),
+  null,
+  'an unjudged finalist writes no row',
+);
 
-console.log('loisJudge.selfcheck: OK (#1508 — gates name their failures, verdict is a pure function of the bake, font-contingent casts judged on seen ink, verdict rows judge-marked and ledger-distinct)');
+console.log(
+  'loisJudge.selfcheck: OK (#1508 — gates name their failures, verdict is a pure function of the bake, font-contingent casts judged on seen ink, verdict rows judge-marked and ledger-distinct)',
+);

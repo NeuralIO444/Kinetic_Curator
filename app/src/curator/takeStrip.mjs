@@ -25,7 +25,10 @@ export function takeStripModel(perf) {
   const durationMs = Math.max(0, (loopTimes[frames - 1] ?? t0) - t0);
   const clampFrame = (f) => Math.max(0, Math.min(frames - 1, Math.floor(Number.isFinite(f) ? f : 0)));
   return {
-    frames, hasBars, lastBar, durationMs,
+    frames,
+    hasBars,
+    lastBar,
+    durationMs,
     /** The text for the cursor at a frame. */
     labelFor(frame) {
       const f = clampFrame(frame);

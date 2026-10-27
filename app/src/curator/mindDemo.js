@@ -4,7 +4,8 @@
 // the face the room already shows. With ?debug=mind on the URL this stand-in answers instead, so the blend can be seen
 // end to end through the real path (thinker → request on the downbeat → face). Its decisions are recorded as
 // backend 'demo', never as 'apple'. Pure: a deterministic function of (persona, bar); no clock, no network.
-export const DEBUG_MIND = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mind';
+export const DEBUG_MIND =
+  typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === 'mind';
 
 const LOIS_SHOW = [
   { id: 'side-eye', intensity: 0.9, decay: 2 },
@@ -22,8 +23,12 @@ const DAVIS_SHOW = [
  */
 export function demoReply(persona, bar) {
   const k = Math.floor(bar / 8);
-  if (persona === 'lois') return bar % 8 < 2 ? { critique: null, state: LOIS_SHOW[k % LOIS_SHOW.length] } : { critique: null };
-  if (persona === 'davis') return bar % 8 >= 4 && bar % 8 < 6 ? { propose: null, state: DAVIS_SHOW[k % DAVIS_SHOW.length] } : { propose: null };
+  if (persona === 'lois')
+    return bar % 8 < 2 ? { critique: null, state: LOIS_SHOW[k % LOIS_SHOW.length] } : { critique: null };
+  if (persona === 'davis')
+    return bar % 8 >= 4 && bar % 8 < 6
+      ? { propose: null, state: DAVIS_SHOW[k % DAVIS_SHOW.length] }
+      : { propose: null };
   return { mood: 'calm', lean: {} };
 }
 

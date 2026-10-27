@@ -3,9 +3,25 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
-  STRESS_WEIGHTS, stressValue, tastePressure, activityPressure, bandFor, quantizeStress, createStressTracker,
-  BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN, BANDS, RELAX_BELOW, TIGHTEN_ABOVE, HYSTERESIS_GAP,
-  passShare, tasteWithVerdicts, VERDICT_WINDOW, VERDICT_MIN, PASS_SHARE_WEIGHT,
+  STRESS_WEIGHTS,
+  stressValue,
+  tastePressure,
+  activityPressure,
+  bandFor,
+  quantizeStress,
+  createStressTracker,
+  BAND_RELAX,
+  BAND_NORMAL,
+  BAND_TIGHTEN,
+  BANDS,
+  RELAX_BELOW,
+  TIGHTEN_ABOVE,
+  HYSTERESIS_GAP,
+  passShare,
+  tasteWithVerdicts,
+  VERDICT_WINDOW,
+  VERDICT_MIN,
+  PASS_SHARE_WEIGHT,
 } from './stress.js';
 
 // 1. three honest signals, weights sum to 1, and instrument load is NOT one of them (decision 2)
@@ -15,9 +31,15 @@ import {
   assert.ok(Math.abs(sum - 1) < 1e-12, `weights sum to 1 (got ${sum})`);
   assert.equal(stressValue({ activity: 1, dish: 1, taste: 1 }), 1);
   assert.equal(stressValue({}), 0);
-  assert.equal(stressValue({ activity: 1, dish: 1, taste: 1, load: 1, instrumentLoad: 1 }), 1, 'a load field is ignored');
+  assert.equal(
+    stressValue({ activity: 1, dish: 1, taste: 1, load: 1, instrumentLoad: 1 }),
+    1,
+    'a load field is ignored',
+  );
   assert.equal(stressValue({ load: 1, instrumentLoad: 1 }), 0, 'load alone is no stress: the governor owns load');
-  assert.ok(Math.abs(stressValue({ activity: 1 }) - 0.38) < 1e-12 && Math.abs(stressValue({ taste: 1 }) - 0.24) < 1e-12);
+  assert.ok(
+    Math.abs(stressValue({ activity: 1 }) - 0.38) < 1e-12 && Math.abs(stressValue({ taste: 1 }) - 0.24) < 1e-12,
+  );
   // junk degrades by reduction, never by invention
   assert.equal(stressValue({ activity: NaN, dish: -5, taste: 'x' }), 0);
   assert.equal(stressValue({ activity: 9, dish: 9, taste: 9 }), 1, 'clamped');
@@ -59,7 +81,11 @@ import {
   assert.ok(r.smoothed > 0.5 && r.smoothed < 0.6, `one frame of a step is a small move (${r.smoothed})`);
   assert.equal(r.stress, 1, 'the raw value is reported too');
   let last = r.smoothed;
-  for (let i = 0; i < 200; i++) { const n = t.update(all(1)).smoothed; assert.ok(n >= last); last = n; }
+  for (let i = 0; i < 200; i++) {
+    const n = t.update(all(1)).smoothed;
+    assert.ok(n >= last);
+    last = n;
+  }
   assert.ok(last > 0.999, 'it converges on the held value');
 }
 
@@ -102,7 +128,9 @@ import {
   const run = () => {
     const t = createStressTracker();
     const log = [];
-    seq.forEach((v, f) => { for (const e of t.update(all(v)).events) log.push([f, e.type, e.band ?? e.value]); });
+    seq.forEach((v, f) => {
+      for (const e of t.update(all(v)).events) log.push([f, e.type, e.band ?? e.value]);
+    });
     return log;
   };
   const a = run();
@@ -113,7 +141,8 @@ import {
   for (let i = 1; i < bands.length; i++) assert.notEqual(bands[i], bands[i - 1], 'a band event is always a change');
   const stress = a.filter((e) => e[1] === 'stress');
   for (const e of stress) assert.equal(e[2], quantizeStress(e[2]), 'logged stress is quantized to 1/100');
-  for (let i = 1; i < stress.length; i++) assert.notEqual(stress[i][2], stress[i - 1][2], 'a stress event is always a change');
+  for (let i = 1; i < stress.length; i++)
+    assert.notEqual(stress[i][2], stress[i - 1][2], 'a stress event is always a change');
   assert.ok(a.length < seq.length * 1.2, 'far fewer events than two per frame');
   // a held value logs once and then nothing
   const t = createStressTracker();
@@ -139,7 +168,8 @@ import {
   const allKeep = tasteWithVerdicts(6, ['keep', 'keep', 'keep', 'keep']);
   assert.ok(allPass > allKeep, 'passes raise taste pressure');
   assert.equal(allPass, Math.min(1, (1 - PASS_SHARE_WEIGHT) * tastePressure(6) + PASS_SHARE_WEIGHT * 1));
-  for (const t of [allPass, allKeep, tasteWithVerdicts(999, Array(8).fill('pass'))]) assert.ok(t >= 0 && t <= 1, 'stays in 0..1');
+  for (const t of [allPass, allKeep, tasteWithVerdicts(999, Array(8).fill('pass'))])
+    assert.ok(t >= 0 && t <= 1, 'stays in 0..1');
 }
 
 console.log('stress.selfcheck: ok (#1354, #1753)');

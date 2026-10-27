@@ -11,9 +11,15 @@
 // writes call setLayoutParam directly and never assign).
 import { genId } from '../id.js';
 import {
-  createMacro, addMacro, removeMacro, renameMacro,
-  assignTarget, unassignTarget, toggleInvert,
-  sanitizeMathMacros, drivePatch,
+  createMacro,
+  addMacro,
+  removeMacro,
+  renameMacro,
+  assignTarget,
+  unassignTarget,
+  toggleInvert,
+  sanitizeMathMacros,
+  drivePatch,
 } from '../../curator/mathMacros.js';
 
 export const createMathMacrosSlice = (set, get) => ({
@@ -23,52 +29,59 @@ export const createMathMacrosSlice = (set, get) => ({
 
   setMathMacros: (macros) => set({ mathMacros: sanitizeMathMacros(macros) }),
 
-  addMathMacro: () => set((state) => {
-    const macro = createMacro(genId(), `MACRO ${state.mathMacros.length + 1}`);
-    const next = addMacro(state.mathMacros, macro);
-    if (next === state.mathMacros) return {};
-    return { mathMacros: next };
-  }),
+  addMathMacro: () =>
+    set((state) => {
+      const macro = createMacro(genId(), `MACRO ${state.mathMacros.length + 1}`);
+      const next = addMacro(state.mathMacros, macro);
+      if (next === state.mathMacros) return {};
+      return { mathMacros: next };
+    }),
 
-  removeMathMacro: (id) => set((state) => {
-    const next = removeMacro(state.mathMacros, id);
-    if (next === state.mathMacros) return {};
-    return {
-      mathMacros: next,
-      mathLearnArmed: state.mathLearnArmed === id ? null : state.mathLearnArmed,
-    };
-  }),
+  removeMathMacro: (id) =>
+    set((state) => {
+      const next = removeMacro(state.mathMacros, id);
+      if (next === state.mathMacros) return {};
+      return {
+        mathMacros: next,
+        mathLearnArmed: state.mathLearnArmed === id ? null : state.mathLearnArmed,
+      };
+    }),
 
-  renameMathMacro: (id, name) => set((state) => {
-    const next = renameMacro(state.mathMacros, id, name);
-    return next === state.mathMacros ? {} : { mathMacros: next };
-  }),
+  renameMathMacro: (id, name) =>
+    set((state) => {
+      const next = renameMacro(state.mathMacros, id, name);
+      return next === state.mathMacros ? {} : { mathMacros: next };
+    }),
 
   /** Arm learn for a macro (or disarm when called with the armed id / null). */
-  mathLearnArm: (id) => set((state) => ({
-    mathLearnArmed: state.mathLearnArmed === id ? null : (id || null),
-  })),
+  mathLearnArm: (id) =>
+    set((state) => ({
+      mathLearnArmed: state.mathLearnArmed === id ? null : id || null,
+    })),
   mathLearnDisarm: () => set({ mathLearnArmed: null }),
 
   /**
    * A slider with `key` wiggled while learn is armed — called from
    * AppContext's SET_LAYOUT_PARAM funnel. Unknown keys refuse silently.
    */
-  mathLearnAssign: (key) => set((state) => {
-    if (!state.mathLearnArmed) return {};
-    const next = assignTarget(state.mathMacros, state.mathLearnArmed, key);
-    return next === state.mathMacros ? {} : { mathMacros: next };
-  }),
+  mathLearnAssign: (key) =>
+    set((state) => {
+      if (!state.mathLearnArmed) return {};
+      const next = assignTarget(state.mathMacros, state.mathLearnArmed, key);
+      return next === state.mathMacros ? {} : { mathMacros: next };
+    }),
 
-  mathUnassign: (macroId, key) => set((state) => {
-    const next = unassignTarget(state.mathMacros, macroId, key);
-    return next === state.mathMacros ? {} : { mathMacros: next };
-  }),
+  mathUnassign: (macroId, key) =>
+    set((state) => {
+      const next = unassignTarget(state.mathMacros, macroId, key);
+      return next === state.mathMacros ? {} : { mathMacros: next };
+    }),
 
-  mathToggleInvert: (macroId, key) => set((state) => {
-    const next = toggleInvert(state.mathMacros, macroId, key);
-    return next === state.mathMacros ? {} : { mathMacros: next };
-  }),
+  mathToggleInvert: (macroId, key) =>
+    set((state) => {
+      const next = toggleInvert(state.mathMacros, macroId, key);
+      return next === state.mathMacros ? {} : { mathMacros: next };
+    }),
 
   /**
    * Drive a macro's targets by a knob delta (1.0 = one full sweep). Each

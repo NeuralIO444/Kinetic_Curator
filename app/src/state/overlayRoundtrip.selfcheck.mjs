@@ -114,7 +114,11 @@ const ids = (s) => s.customAssets.map((a) => a.id);
   // Hostile replacement markup is refused; original survives.
   s().replaceCustomAsset('user:swappy', '<svg><script>x</script></svg>');
   assert.ok(s().ingestError, 'hostile SWAP refused');
-  assert.ok(s().customAssets.find((a) => a.id === 'user:swappy').svg.includes('<circle'));
+  assert.ok(
+    s()
+      .customAssets.find((a) => a.id === 'user:swappy')
+      .svg.includes('<circle'),
+  );
 }
 
 // ── Remove: old id fully gone from every id-keyed map ───────────────────────

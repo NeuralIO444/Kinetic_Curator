@@ -20,7 +20,11 @@ import { DIRECTOR_TABLE } from './directorTable.js';
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // Feeds shaped for resolveLoisFace/resolveDavisState (honest-feed shape).
 const feedBurnFlow = { burning: true, rollsLastMinute: 5, keepsLast5m: 3 };
@@ -61,11 +65,27 @@ ok('the gates: sway is open (2026-10-08), tilt is open (2026-10-11) and only app
   assert.equal(TILT_GATE_OPEN, true, 'tilt opened deliberately on 2026-10-11');
   for (const lois of ['NOD', 'VIBE', 'BURN', 'AWAY']) {
     const g = directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'explore' });
-    assert.equal(g.swayAllowance, DIRECTOR_TABLE[`${lois}×FLOW`].sway_allowance, `${lois}: the room's allowance is live`);
-    assert.equal(g.tiltLimit, DIRECTOR_TABLE[`${lois}×FLOW`].tilt_limit, `${lois}: tilt is the room's limit in explore`);
+    assert.equal(
+      g.swayAllowance,
+      DIRECTOR_TABLE[`${lois}×FLOW`].sway_allowance,
+      `${lois}: the room's allowance is live`,
+    );
+    assert.equal(
+      g.tiltLimit,
+      DIRECTOR_TABLE[`${lois}×FLOW`].tilt_limit,
+      `${lois}: tilt is the room's limit in explore`,
+    );
     // refine and an unknown phase never tilt: the keeps are being refined, not left
-    assert.equal(directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'refine' }).tiltLimit, 0, `${lois}: no tilt in refine`);
-    assert.equal(directorGains({ loisCode: lois, davisCode: 'FLOW', phase: null }).tiltLimit, 0, `${lois}: no tilt without a phase`);
+    assert.equal(
+      directorGains({ loisCode: lois, davisCode: 'FLOW', phase: 'refine' }).tiltLimit,
+      0,
+      `${lois}: no tilt in refine`,
+    );
+    assert.equal(
+      directorGains({ loisCode: lois, davisCode: 'FLOW', phase: null }).tiltLimit,
+      0,
+      `${lois}: no tilt without a phase`,
+    );
   }
 });
 
@@ -120,7 +140,7 @@ ok('a keep ends relax early (strong user action)', () => {
   assert.notEqual(r.directorPhase, 'relax', 'the keep broke the relax');
 });
 
-ok('relax lasts the room\'s derived seconds, then the room breathes again', () => {
+ok("relax lasts the room's derived seconds, then the room breathes again", () => {
   let t = 3000000;
   const d = createDirector({ now: () => t });
   const room = directorGains({ loisCode: 'BURN', davisCode: 'FLOW' });
@@ -176,7 +196,16 @@ ok('no UI-surface file references the director scheduler', () => {
     // the rng guard's allowlist names blendPick's default param (deliberate)
     'engine/mathRandomGuard.selfcheck.mjs',
   ]);
-  const ids = ['directorGains', 'getDirector', 'blendPick', 'directorSense', 'directorTable', 'effectiveTemp', 'initDirectorBeat', 'directorTrace'];
+  const ids = [
+    'directorGains',
+    'getDirector',
+    'blendPick',
+    'directorSense',
+    'directorTable',
+    'effectiveTemp',
+    'initDirectorBeat',
+    'directorTrace',
+  ];
   // whole-identifier match, not substring: loot/lootWrite.selfcheck.mjs mocks the
   // File System Access API's getDirectoryHandle, which contains 'getDirector' as a
   // substring but references no scheduler identifier (#1591).
@@ -186,7 +215,10 @@ ok('no UI-surface file references the director scheduler', () => {
     for (const e of readdirSync(dir)) {
       const p = join(dir, e);
       const st = statSync(p);
-      if (st.isDirectory()) { walk(p); continue; }
+      if (st.isDirectory()) {
+        walk(p);
+        continue;
+      }
       if (!/\.(js|mjs|jsx)$/.test(e)) continue;
       const rel = relative(srcRoot, p);
       if (allowed.has(rel)) continue;

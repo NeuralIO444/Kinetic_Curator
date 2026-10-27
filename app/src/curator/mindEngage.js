@@ -50,7 +50,11 @@ const num = (v, lo, hi) => (Number.isFinite(v) && v >= lo && v <= hi ? v : null)
 export function decodeEngagement(raw) {
   const out = Object.fromEntries(PERSONAS.map((p) => [p, fresh()]));
   let o;
-  try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch { return out; }
+  try {
+    o = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  } catch {
+    return out;
+  }
   if (!o || o.v !== 1 || !Array.isArray(o.p)) return out;
   PERSONAS.forEach((p, i) => {
     const r = o.p[i];
@@ -66,7 +70,13 @@ export function decodeEngagement(raw) {
 
 /** The scores as the string to save (personas by index: no name is written down). */
 export function encodeEngagement(state) {
-  return JSON.stringify({ v: 1, p: PERSONAS.map((p) => { const s = state[p]; return [Math.round(s.score * 100) / 100, s.peak, s.cool ? 1 : 0, s.lastAt]; }) });
+  return JSON.stringify({
+    v: 1,
+    p: PERSONAS.map((p) => {
+      const s = state[p];
+      return [Math.round(s.score * 100) / 100, s.peak, s.cool ? 1 : 0, s.lastAt];
+    }),
+  });
 }
 
 /** A score after `ms` away, on the persona's half-life (× the zodiac's halfLife multiplier). */
@@ -88,8 +98,15 @@ export function pointsFor(persona, s) {
   const w = WEIGHTS[persona];
   if (!w || !s || !s.active) return 0;
   const c = (v) => (Number.isFinite(v) && v > 0 ? v : 0);
-  return w.active + w.keep * c(s.keeps) + w.export * c(s.exports) + (s.dwelling ? w.dwell : 0) + w.return * c(s.returns)
-    + (s.audio ? w.audio : 0) + w.evolve * c(s.evolves);
+  return (
+    w.active +
+    w.keep * c(s.keeps) +
+    w.export * c(s.exports) +
+    (s.dwelling ? w.dwell : 0) +
+    w.return * c(s.returns) +
+    (s.audio ? w.audio : 0) +
+    w.evolve * c(s.evolves)
+  );
 }
 
 /**
@@ -105,7 +122,8 @@ export function createEngagement(state = decodeEngagement(null)) {
       if (!signals || !signals.active || !Number.isFinite(nowMs)) return false;
       for (const p of PERSONAS) {
         const b = book[p];
-        if (b.lastAt !== null && nowMs > b.lastAt) b.score = decayed(b.score, nowMs - b.lastAt, HALF_LIFE_DAYS[p], halfLifeMul[p]);
+        if (b.lastAt !== null && nowMs > b.lastAt)
+          b.score = decayed(b.score, nowMs - b.lastAt, HALF_LIFE_DAYS[p], halfLifeMul[p]);
         b.score = Math.min(SCORE_CAP, b.score + pointsFor(p, signals));
         b.peak = Math.max(b.peak, tierOf(b.score));
         b.cool = coolOf(b.score, b.peak, b.cool);
@@ -117,9 +135,19 @@ export function createEngagement(state = decodeEngagement(null)) {
     get(persona) {
       const b = book[persona];
       if (!b) return null;
-      return { score: b.score, tier: b.peak, cool: b.cool, floor: TIER_FLOORS[b.peak - 1], next: TIER_FLOORS[b.peak] ?? null };
+      return {
+        score: b.score,
+        tier: b.peak,
+        cool: b.cool,
+        floor: TIER_FLOORS[b.peak - 1],
+        next: TIER_FLOORS[b.peak] ?? null,
+      };
     },
-    snapshot() { return Object.fromEntries(PERSONAS.map((p) => [p, { ...book[p] }])); },
-    encode() { return encodeEngagement(book); },
+    snapshot() {
+      return Object.fromEntries(PERSONAS.map((p) => [p, { ...book[p] }]));
+    },
+    encode() {
+      return encodeEngagement(book);
+    },
   };
 }

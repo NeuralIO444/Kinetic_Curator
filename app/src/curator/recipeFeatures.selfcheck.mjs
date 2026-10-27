@@ -3,8 +3,26 @@ import assert from 'node:assert';
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
-const KEYS = ['v', 'system', 'symmetry', 'behave', 'blend', 'paletteShift', 'palette', 'accum', 'mirror',
-  'bleed', 'overlap', 'bodies', 'density', 'scale', 'cast', 'castSize', 'castCategories', 'num'];
+const KEYS = [
+  'v',
+  'system',
+  'symmetry',
+  'behave',
+  'blend',
+  'paletteShift',
+  'palette',
+  'accum',
+  'mirror',
+  'bleed',
+  'overlap',
+  'bodies',
+  'density',
+  'scale',
+  'cast',
+  'castSize',
+  'castCategories',
+  'num',
+];
 
 // shape is fixed: the model must see the same keys on every row
 const d = recipeFeatures();
@@ -14,8 +32,18 @@ assert.strictEqual(d.system, DEFAULT_LAYOUT_PARAMS.mode, 'empty recipe → defau
 assert.strictEqual(d.cast, null, 'no cast → the whole library (null), not an invented list');
 
 // deterministic + JSON-safe
-const r = { layoutParams: { mode: 'fibonacci', count: 24, scale: [1.6, 3.0], density: 50, accumulation: true, blendMode: 'normal' },
-  paletteId: 'chiaroscuro', assets: ['xsh07', 'xsh01', 'xsh01', 'xsh05', 'xsh03'] };
+const r = {
+  layoutParams: {
+    mode: 'fibonacci',
+    count: 24,
+    scale: [1.6, 3.0],
+    density: 50,
+    accumulation: true,
+    blendMode: 'normal',
+  },
+  paletteId: 'chiaroscuro',
+  assets: ['xsh07', 'xsh01', 'xsh01', 'xsh05', 'xsh03'],
+};
 const a = recipeFeatures(r);
 assert.deepStrictEqual(a, recipeFeatures(JSON.parse(JSON.stringify(r))), 'deterministic');
 assert.deepStrictEqual(JSON.parse(JSON.stringify(a)), a, 'JSON round-trips');
@@ -40,7 +68,11 @@ assert.strictEqual(recipeFeatures({ layoutParams: { mode: 'grid', count: 200 } }
 // seed-independent: the recipe, not the draw
 assert.deepStrictEqual(recipeFeatures({ ...r, seed: 1 }), recipeFeatures({ ...r, seed: 2 }));
 // hostile input stays in the fixed vocabulary
-const h = recipeFeatures({ layoutParams: { mode: 'nope', count: 'x', scale: 'big' }, paletteId: 7, assets: [1, 'user:mine', 'ghost'] });
+const h = recipeFeatures({
+  layoutParams: { mode: 'nope', count: 'x', scale: 'big' },
+  paletteId: 7,
+  assets: [1, 'user:mine', 'ghost'],
+});
 assert.deepStrictEqual(Object.keys(h), KEYS);
 assert.strictEqual(h.palette, null);
 assert.deepStrictEqual(h.cast, ['ghost', 'user:mine']);
@@ -48,7 +80,9 @@ assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
 
 // v2 (#762): `num` — every CURATE-varied key, normalized 0–1, fixed key order
 {
-  const n = recipeFeatures({ layoutParams: { count: 10, density: 100, scale: [0.1, 0.1], rotate: [-180, 180], alpha: [0, 0] } }).num;
+  const n = recipeFeatures({
+    layoutParams: { count: 10, density: 100, scale: [0.1, 0.1], rotate: [-180, 180], alpha: [0, 0] },
+  }).num;
   assert.strictEqual(Object.keys(n).length, 18, 'one number per RANDOMIZABLE_KEY');
   assert.strictEqual(n.count, 0, 'min → 0');
   assert.strictEqual(n.density, 1, 'max → 1');
@@ -71,8 +105,11 @@ assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
   assert.strictEqual(mid({ scale: [1.55, 1.55] }), 0.5, 'a mid-scale recipe reads a mid scaleMid');
   assert.strictEqual(mid({ scale: [3.0, 3.0] }), 1, 'the top pair pins to 1');
   assert.strictEqual(mid({ scale: [0.1, 3.0] }), 0.5, 'the pair MID is read, not an end');
-  assert.strictEqual(mid({ scale: { x: [0.2, 2.9], y: [0.1, 0.1] } }), 0.5,
-    'object scale reads the X pair — y does not leak in');
+  assert.strictEqual(
+    mid({ scale: { x: [0.2, 2.9], y: [0.1, 0.1] } }),
+    0.5,
+    'object scale reads the X pair — y does not leak in',
+  );
   assert.strictEqual(recipeFeatures().num.scaleMid, 0.3103, 'the default recipe reads its real mid');
   // corpus ladder: 40 X pairs [v, v] spanning the full 0.1–3.0 range —
   // the histogram is pinned to the measured run on the fixed code; the
@@ -86,8 +123,11 @@ assert.deepStrictEqual(h.castCategories, ['unknown', 'user']);
     else if (m <= 0.75) bands[3]++;
     else bands[4]++;
   }
-  assert.deepStrictEqual(bands, [1, 9, 10, 10, 10],
-    'ladder histogram: only the floor rung reads 0; every band above it is populated');
+  assert.deepStrictEqual(
+    bands,
+    [1, 9, 10, 10, 10],
+    'ladder histogram: only the floor rung reads 0; every band above it is populated',
+  );
   assert.ok(bands[2] + bands[3] > 0, 'the scale mid-band is non-zero across the corpus ladder');
 }
 

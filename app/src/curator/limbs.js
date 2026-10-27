@@ -36,16 +36,26 @@ export function createLimbTracker() {
       const next = new Array(states.length);
       for (let i = 0; i < states.length; i++) {
         const s = states[i];
-        if (!s || s.formed !== true) { out[i] = 1; next[i] = null; continue; }
+        if (!s || s.formed !== true) {
+          out[i] = 1;
+          next[i] = null;
+          continue;
+        }
         const prev = slots[i] && slots[i].x === s.x && slots[i].y === s.y ? slots[i] : null;
         const slot = prev ? { ...prev } : { pairs: 1, run: 0, x: s.x, y: s.y };
         const d = finite(s.density) ? s.density : 0;
         if (slot.pairs < MAX_PAIRS) {
           slot.run = d >= LIMB_GROW_AT ? slot.run + 1 : 0;
-          if (slot.run >= LIMB_GROW_FRAMES) { slot.pairs += 1; slot.run = 0; }
+          if (slot.run >= LIMB_GROW_FRAMES) {
+            slot.pairs += 1;
+            slot.run = 0;
+          }
         } else {
           slot.run = d <= LIMB_SHED_AT ? slot.run + 1 : 0;
-          if (slot.run >= LIMB_SHED_FRAMES) { slot.pairs -= 1; slot.run = 0; }
+          if (slot.run >= LIMB_SHED_FRAMES) {
+            slot.pairs -= 1;
+            slot.run = 0;
+          }
         }
         out[i] = slot.pairs;
         next[i] = slot;
@@ -53,15 +63,30 @@ export function createLimbTracker() {
       slots = next;
       return out;
     },
-    reset() { slots = []; },
+    reset() {
+      slots = [];
+    },
     // #1694 slice 1 — snapshot/restore for the resolver-owned spawn state (#1367's law, fail-closed).
-    snapshotState() { return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) }; },
+    snapshotState() {
+      return { v: 1, slots: slots.map((s) => (s ? { ...s } : null)) };
+    },
     restoreState(snap) {
       if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots)) return false;
       const next = [];
       for (const s of snap.slots) {
-        if (s === null) { next.push(null); continue; }
-        if (!s || typeof s !== 'object' || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.run) || (s.pairs !== 1 && s.pairs !== 2)) return false;
+        if (s === null) {
+          next.push(null);
+          continue;
+        }
+        if (
+          !s ||
+          typeof s !== 'object' ||
+          !Number.isFinite(s.x) ||
+          !Number.isFinite(s.y) ||
+          !Number.isFinite(s.run) ||
+          (s.pairs !== 1 && s.pairs !== 2)
+        )
+          return false;
         next.push({ pairs: s.pairs, run: s.run, x: s.x, y: s.y });
       }
       slots = next;

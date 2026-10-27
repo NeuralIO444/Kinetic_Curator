@@ -59,7 +59,10 @@ export const RESTYLE_MODES = Object.freeze(['accent-swap', 'outline', 'dash', 'g
 export const DASH_PATTERNS = Object.freeze(['5 4', '2 3', '9 3 2 3', '1 4']);
 /** Where generation happens, declared: offline, at deal time. */
 export const VARIANT_GENERATION = Object.freeze({
-  at: 'deal-time', perFrame: false, liveCost: 'none', tier: 'offline',
+  at: 'deal-time',
+  perFrame: false,
+  liveCost: 'none',
+  tier: 'offline',
 });
 export const MAX_VARIANTS_PER_RECORD = 256; // the cast cap (FAVORITE_CAST_MAX)
 
@@ -92,7 +95,10 @@ export function canonicalRecipe(recipe) {
   const params = {};
   for (const k of Object.keys(recipe?.params || {}).sort()) params[k] = recipe.params[k];
   return JSON.stringify({
-    parents: [...(recipe?.parents || [])], op: recipe?.op, seed: recipe?.seed, params,
+    parents: [...(recipe?.parents || [])],
+    op: recipe?.op,
+    seed: recipe?.seed,
+    params,
   });
 }
 
@@ -110,7 +116,10 @@ const PARAM_RULES = {
   restyle: { mode: ['enum', RESTYLE_MODES], dash: ['int', 0, DASH_PATTERNS.length - 1] },
   jitter: { amount: ['num', 0.05, 4] },
   superpose: {
-    rot: ['num', -180, 180], scaleB: ['num', 0.3, 2], dx: ['num', -30, 30], dy: ['num', -30, 30],
+    rot: ['num', -180, 180],
+    scaleB: ['num', 0.3, 2],
+    dx: ['num', -30, 30],
+    dy: ['num', -30, 30],
   },
   mask: {},
   splice: {},
@@ -195,7 +204,10 @@ export function splitNodes(svg) {
     const selfClosing = /\/>$/.test(tag);
     if (depth === 0 && !closing) {
       if (nodeStart < m.index && s.slice(nodeStart, m.index).trim()) push(m.index);
-      if (selfClosing) { push(TAG_RE.lastIndex); continue; }
+      if (selfClosing) {
+        push(TAG_RE.lastIndex);
+        continue;
+      }
       depth = 1;
       continue;
     }
@@ -248,8 +260,12 @@ export function parsePath(d) {
   const segs = [];
   let i = 0;
   let cmd = null;
-  let cx = 0; let cy = 0; let sx = 0; let sy = 0;
-  let prevC2 = null; let prevQ1 = null;
+  let cx = 0;
+  let cy = 0;
+  let sx = 0;
+  let sy = 0;
+  let prevC2 = null;
+  let prevQ1 = null;
   const readNums = (n) => {
     const out = [];
     for (let k = 0; k < n; k++) {
@@ -261,13 +277,18 @@ export function parsePath(d) {
     return out;
   };
   while (i < tokens.length) {
-    if (tokens[i].cmd) { cmd = tokens[i].cmd; i++; }
+    if (tokens[i].cmd) {
+      cmd = tokens[i].cmd;
+      i++;
+    }
     if (!cmd) return null;
     const upper = cmd.toUpperCase();
     const rel = cmd !== upper;
     if (upper === 'Z') {
       segs.push({ c: 'Z', p: [] });
-      cx = sx; cy = sy; prevC2 = prevQ1 = null;
+      cx = sx;
+      cy = sy;
+      prevC2 = prevQ1 = null;
       cmd = null;
       continue;
     }
@@ -275,14 +296,19 @@ export function parsePath(d) {
     if (arity === undefined) return null;
     const v = readNums(arity);
     if (!v) return null;
-    const ox = rel ? cx : 0; const oy = rel ? cy : 0;
+    const ox = rel ? cx : 0;
+    const oy = rel ? cy : 0;
     if (upper === 'M') {
-      cx = v[0] + ox; cy = v[1] + oy; sx = cx; sy = cy;
+      cx = v[0] + ox;
+      cy = v[1] + oy;
+      sx = cx;
+      sy = cy;
       segs.push({ c: 'M', p: [cx, cy] });
       prevC2 = prevQ1 = null;
       cmd = rel ? 'l' : 'L'; // implicit repeats of M are linetos
     } else if (upper === 'L') {
-      cx = v[0] + ox; cy = v[1] + oy;
+      cx = v[0] + ox;
+      cy = v[1] + oy;
       segs.push({ c: 'L', p: [cx, cy] });
       prevC2 = prevQ1 = null;
     } else if (upper === 'H') {
@@ -296,30 +322,39 @@ export function parsePath(d) {
     } else if (upper === 'C') {
       const p = [v[0] + ox, v[1] + oy, v[2] + ox, v[3] + oy, v[4] + ox, v[5] + oy];
       segs.push({ c: 'C', p });
-      prevC2 = [p[2], p[3]]; prevQ1 = null;
-      cx = p[4]; cy = p[5];
+      prevC2 = [p[2], p[3]];
+      prevQ1 = null;
+      cx = p[4];
+      cy = p[5];
     } else if (upper === 'S') {
       const c1 = prevC2 ? [2 * cx - prevC2[0], 2 * cy - prevC2[1]] : [cx, cy];
       const p = [c1[0], c1[1], v[0] + ox, v[1] + oy, v[2] + ox, v[3] + oy];
       segs.push({ c: 'C', p });
-      prevC2 = [p[2], p[3]]; prevQ1 = null;
-      cx = p[4]; cy = p[5];
+      prevC2 = [p[2], p[3]];
+      prevQ1 = null;
+      cx = p[4];
+      cy = p[5];
     } else if (upper === 'Q') {
       const p = [v[0] + ox, v[1] + oy, v[2] + ox, v[3] + oy];
       segs.push({ c: 'Q', p });
-      prevQ1 = [p[0], p[1]]; prevC2 = null;
-      cx = p[2]; cy = p[3];
+      prevQ1 = [p[0], p[1]];
+      prevC2 = null;
+      cx = p[2];
+      cy = p[3];
     } else if (upper === 'T') {
       const c1 = prevQ1 ? [2 * cx - prevQ1[0], 2 * cy - prevQ1[1]] : [cx, cy];
       const p = [c1[0], c1[1], v[0] + ox, v[1] + oy];
       segs.push({ c: 'Q', p });
-      prevQ1 = [p[0], p[1]]; prevC2 = null;
-      cx = p[2]; cy = p[3];
+      prevQ1 = [p[0], p[1]];
+      prevC2 = null;
+      cx = p[2];
+      cy = p[3];
     } else if (upper === 'A') {
       const p = [v[0], v[1], v[2], v[3], v[4], v[5] + ox, v[6] + oy];
       segs.push({ c: 'A', p });
       prevC2 = prevQ1 = null;
-      cx = p[5]; cy = p[6];
+      cx = p[5];
+      cy = p[6];
     }
   }
   return segs.length ? segs : null;
@@ -334,8 +369,14 @@ function splitSubpaths(segs) {
   const out = [];
   let cur = null;
   for (const s of segs) {
-    if (s.c === 'M') { cur = [s]; out.push(cur); } else if (cur) cur.push(s);
-    else { cur = [{ c: 'M', p: [0, 0] }, s]; out.push(cur); }
+    if (s.c === 'M') {
+      cur = [s];
+      out.push(cur);
+    } else if (cur) cur.push(s);
+    else {
+      cur = [{ c: 'M', p: [0, 0] }, s];
+      out.push(cur);
+    }
   }
   return out;
 }
@@ -399,8 +440,8 @@ function rewriteLeafTags(svg, fn) {
 }
 
 const getAttr = (tag, name) => {
-  const m = new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"`).exec(tag)
-    || new RegExp(`\\b${name}\\s*=\\s*'([^']*)'`).exec(tag);
+  const m =
+    new RegExp(`\\b${name}\\s*=\\s*"([^"]*)"`).exec(tag) || new RegExp(`\\b${name}\\s*=\\s*'([^']*)'`).exec(tag);
   return m ? m[1] : null;
 };
 const setAttr = (tag, name, value) => {
@@ -441,10 +482,7 @@ function opRestyle(frag, { mode, dash }) {
   if (mode === 'accent-swap') {
     if (!frag.includes(INK_TOK) && !frag.includes(ACCENT_TOK)) return null;
     const HOLD = '\u0001INK\u0001';
-    return frag
-      .split(INK_TOK).join(HOLD)
-      .split(ACCENT_TOK).join(INK_TOK)
-      .split(HOLD).join(ACCENT_TOK);
+    return frag.split(INK_TOK).join(HOLD).split(ACCENT_TOK).join(INK_TOK).split(HOLD).join(ACCENT_TOK);
   }
   let touched = false;
   const out = rewriteLeafTags(frag, (tag) => {
@@ -485,8 +523,15 @@ function opJitter(frag, { amount, seed }) {
       if (!segs) return tag;
       touched = true;
       for (const s of segs) {
-        if (s.c === 'A') { s.p[5] += off(); s.p[6] += off(); } // endpoint only — radii/flags are structure
-        else for (let k = 0; k + 1 < s.p.length; k += 2) { s.p[k] += off(); s.p[k + 1] += off(); }
+        if (s.c === 'A') {
+          s.p[5] += off();
+          s.p[6] += off();
+        } // endpoint only — radii/flags are structure
+        else
+          for (let k = 0; k + 1 < s.p.length; k += 2) {
+            s.p[k] += off();
+            s.p[k + 1] += off();
+          }
       }
       return setAttr(tag, 'd', serializePath(segs));
     }
@@ -497,16 +542,32 @@ function opJitter(frag, { amount, seed }) {
       return setAttr(t, attr, fmt(parseFloat(v) + off()));
     };
     let t = tag;
-    if (name === 'circle' || name === 'ellipse' || name === 'text') { t = bump(t, 'cx'); t = bump(t, 'cy'); t = bump(t, 'x'); t = bump(t, 'y'); }
-    else if (name === 'rect') { t = bump(t, 'x'); t = bump(t, 'y'); }
-    else if (name === 'line') { t = bump(t, 'x1'); t = bump(t, 'y1'); t = bump(t, 'x2'); t = bump(t, 'y2'); }
-    else if (name === 'polygon' || name === 'polyline') {
+    if (name === 'circle' || name === 'ellipse' || name === 'text') {
+      t = bump(t, 'cx');
+      t = bump(t, 'cy');
+      t = bump(t, 'x');
+      t = bump(t, 'y');
+    } else if (name === 'rect') {
+      t = bump(t, 'x');
+      t = bump(t, 'y');
+    } else if (name === 'line') {
+      t = bump(t, 'x1');
+      t = bump(t, 'y1');
+      t = bump(t, 'x2');
+      t = bump(t, 'y2');
+    } else if (name === 'polygon' || name === 'polyline') {
       const pts = getAttr(t, 'points');
       if (pts) {
-        const nums = pts.trim().split(/[\s,]+/).map(Number);
+        const nums = pts
+          .trim()
+          .split(/[\s,]+/)
+          .map(Number);
         if (nums.length >= 2 && nums.every(Number.isFinite)) {
           touched = true;
-          for (let k = 0; k + 1 < nums.length; k += 2) { nums[k] += off(); nums[k + 1] += off(); }
+          for (let k = 0; k + 1 < nums.length; k += 2) {
+            nums[k] += off();
+            nums[k + 1] += off();
+          }
           t = setAttr(t, 'points', nums.map(fmt).join(' '));
         }
       }
@@ -564,7 +625,10 @@ function opMorph(fragA, fragB, { t }) {
   let pi = 0;
   const out = [];
   for (const node of splitNodes(fragA)) {
-    if (nodeTag(node) !== 'path') { out.push(node); continue; }
+    if (nodeTag(node) !== 'path') {
+      out.push(node);
+      continue;
+    }
     const aSegs = parsePath(aPaths[pi].d);
     const bSegs = parsePath(bPaths[pi].d);
     pi++;
@@ -572,7 +636,7 @@ function opMorph(fragA, fragB, { t }) {
       const o = bSegs[k];
       if (s.c === 'Z') return s;
       const p = s.p.map((v, j) => {
-        if (s.c === 'A' && j >= 2 && j <= 4) return j === 2 ? v + (o.p[j] - v) * t : (t < 0.5 ? v : o.p[j]);
+        if (s.c === 'A' && j >= 2 && j <= 4) return j === 2 ? v + (o.p[j] - v) * t : t < 0.5 ? v : o.p[j];
         return v + (o.p[j] - v) * t;
       });
       return { c: s.c, p };
@@ -664,14 +728,23 @@ export function drawVariantParams(op, rng) {
   const rr = (lo, hi) => r3(lo + rng() * (hi - lo));
   const ri = (lo, hi) => lo + Math.floor(rng() * (hi - lo + 1));
   switch (op) {
-    case 'symmetry': return { folds: ri(2, 6), mirror: rng() < 0.5 };
-    case 'tile': return { count: ri(3, 6), radius: rr(8, 26), scale: rr(0.3, 0.65) };
-    case 'restyle': return { mode: RESTYLE_MODES[ri(0, RESTYLE_MODES.length - 1)], dash: ri(0, DASH_PATTERNS.length - 1) };
-    case 'jitter': return { amount: rr(0.6, 2.8) };
-    case 'superpose': return { rot: ri(-180, 180), scaleB: rr(0.5, 1.5), dx: ri(-20, 20), dy: ri(-20, 20) };
-    case 'mask': return {};
-    case 'splice': return {};
-    case 'morph': return { t: rr(0.2, 0.8) };
-    default: return null;
+    case 'symmetry':
+      return { folds: ri(2, 6), mirror: rng() < 0.5 };
+    case 'tile':
+      return { count: ri(3, 6), radius: rr(8, 26), scale: rr(0.3, 0.65) };
+    case 'restyle':
+      return { mode: RESTYLE_MODES[ri(0, RESTYLE_MODES.length - 1)], dash: ri(0, DASH_PATTERNS.length - 1) };
+    case 'jitter':
+      return { amount: rr(0.6, 2.8) };
+    case 'superpose':
+      return { rot: ri(-180, 180), scaleB: rr(0.5, 1.5), dx: ri(-20, 20), dy: ri(-20, 20) };
+    case 'mask':
+      return {};
+    case 'splice':
+      return {};
+    case 'morph':
+      return { t: rr(0.2, 0.8) };
+    default:
+      return null;
   }
 }

@@ -38,15 +38,16 @@ globalThis.localStorage = {
   setItem: (k, v) => lsData.set(k, String(v)),
   removeItem: (k) => lsData.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
-const {
-  randomizeKey, generateLayoutTargets, DICE_RANGES, EVOLVE_TARGET_OVERRIDES, RANDOMIZABLE_KEYS,
-} = await import('./paramUtils.js');
+const { randomizeKey, generateLayoutTargets, DICE_RANGES, EVOLVE_TARGET_OVERRIDES, RANDOMIZABLE_KEYS } =
+  await import('./paramUtils.js');
 const { REFINE_RANGES } = await import('../curator/refineMutate.js');
-const {
-  PARAM_SPEC, RANGE_SPEC, RANGE_HARD, validateLayoutParams, normalizeLayoutParams,
-} = await import('../data/layout-modes.js');
+const { PARAM_SPEC, RANGE_SPEC, RANGE_HARD, validateLayoutParams, normalizeLayoutParams } =
+  await import('../data/layout-modes.js');
 const { useStore } = await import('./store.js');
 
 // The standard mulberry32 (same algorithm as coverageReport's — the
@@ -69,9 +70,12 @@ const leavesOf = (v) => (Array.isArray(v) ? v : [v]);
 function withinDiceRange(key, v) {
   const d = DICE_RANGES[key];
   if (d.pair) {
-    return Array.isArray(v) && v.length === 2
-      && inClosed(v[0], d.pair[0][0], d.pair[0][1])
-      && inClosed(v[1], d.pair[1][0], d.pair[1][1]);
+    return (
+      Array.isArray(v) &&
+      v.length === 2 &&
+      inClosed(v[0], d.pair[0][0], d.pair[0][1]) &&
+      inClosed(v[1], d.pair[1][0], d.pair[1][1])
+    );
   }
   return inClosed(v, d.lo, d.hi);
 }
@@ -82,9 +86,14 @@ function withinDocSpec(key, v) {
   if (PARAM_SPEC[key]) return inClosed(v, PARAM_SPEC[key].min, PARAM_SPEC[key].max);
   const hard = RANGE_HARD[key];
   if (key === 'scale') {
-    return !!v && typeof v === 'object' && !Array.isArray(v)
-      && Array.isArray(v.x) && Array.isArray(v.y)
-      && [...v.x, ...v.y].every((x) => inClosed(x, hard.min, hard.max));
+    return (
+      !!v &&
+      typeof v === 'object' &&
+      !Array.isArray(v) &&
+      Array.isArray(v.x) &&
+      Array.isArray(v.y) &&
+      [...v.x, ...v.y].every((x) => inClosed(x, hard.min, hard.max))
+    );
   }
   return Array.isArray(v) && v.length === 2 && v.every((x) => inClosed(x, hard.min, hard.max));
 }
@@ -92,7 +101,8 @@ function withinDocSpec(key, v) {
 // ── §1+2 — one table, derived everywhere, inside the spec ──────────
 {
   assert.deepStrictEqual(
-    Object.keys(DICE_RANGES).sort(), [...RANDOMIZABLE_KEYS].sort(),
+    Object.keys(DICE_RANGES).sort(),
+    [...RANDOMIZABLE_KEYS].sort(),
     'DICE_RANGES covers exactly the randomizable keys — no more, no fewer',
   );
   assert.strictEqual(REFINE_RANGES, DICE_RANGES, 'REFINE_RANGES is DICE_RANGES (identity, not a mirror)');
@@ -106,7 +116,10 @@ function withinDocSpec(key, v) {
     if (d.pair) {
       const s = RANGE_SPEC[key];
       for (const [lo, hi] of d.pair) {
-        assert.ok(lo >= s.min && hi <= s.max, `${key}: pair element [${lo}, ${hi}] inside RANGE_SPEC [${s.min}, ${s.max}]`);
+        assert.ok(
+          lo >= s.min && hi <= s.max,
+          `${key}: pair element [${lo}, ${hi}] inside RANGE_SPEC [${s.min}, ${s.max}]`,
+        );
       }
     } else {
       const s = PARAM_SPEC[key];
@@ -122,14 +135,21 @@ function withinDocSpec(key, v) {
   // shared table, itself inside the document spec. Anything else in
   // the overrides object fails here — a second silent narrowing is
   // exactly the drift #1550 exists to kill.
-  assert.deepStrictEqual(Object.keys(EVOLVE_TARGET_OVERRIDES), ['swarmCohesion'],
-    'swarmCohesion is the only declared Evolve override');
+  assert.deepStrictEqual(
+    Object.keys(EVOLVE_TARGET_OVERRIDES),
+    ['swarmCohesion'],
+    'swarmCohesion is the only declared Evolve override',
+  );
   const ov = EVOLVE_TARGET_OVERRIDES.swarmCohesion;
   const dc = DICE_RANGES.swarmCohesion;
-  assert.ok(ov.lo > dc.lo && ov.hi < dc.hi && ov.dec === dc.dec,
-    `the override [${ov.lo}, ${ov.hi}] strictly narrows the dice range [${dc.lo}, ${dc.hi}]`);
-  assert.ok(ov.lo >= PARAM_SPEC.swarmCohesion.min && ov.hi <= PARAM_SPEC.swarmCohesion.max,
-    'the override itself sits inside the document spec');
+  assert.ok(
+    ov.lo > dc.lo && ov.hi < dc.hi && ov.dec === dc.dec,
+    `the override [${ov.lo}, ${ov.hi}] strictly narrows the dice range [${dc.lo}, ${dc.hi}]`,
+  );
+  assert.ok(
+    ov.lo >= PARAM_SPEC.swarmCohesion.min && ov.hi <= PARAM_SPEC.swarmCohesion.max,
+    'the override itself sits inside the document spec',
+  );
 
   // Derivation, measured: seeded Evolve targets never leave the
   // (override || shared table) range for their key — every key, every
@@ -142,11 +162,17 @@ function withinDocSpec(key, v) {
       for (const key of RANDOMIZABLE_KEYS) {
         const range = EVOLVE_TARGET_OVERRIDES[key] || DICE_RANGES[key];
         if (range.pair) {
-          assert.ok(Array.isArray(t[key]) && inClosed(t[key][0], range.pair[0][0], range.pair[0][1])
-            && inClosed(t[key][1], range.pair[1][0], range.pair[1][1]),
-          `draw ${i}: Evolve ${key} target inside its declared range`);
+          assert.ok(
+            Array.isArray(t[key]) &&
+              inClosed(t[key][0], range.pair[0][0], range.pair[0][1]) &&
+              inClosed(t[key][1], range.pair[1][0], range.pair[1][1]),
+            `draw ${i}: Evolve ${key} target inside its declared range`,
+          );
         } else {
-          assert.ok(inClosed(t[key], range.lo, range.hi), `draw ${i}: Evolve ${key} target ${t[key]} inside [${range.lo}, ${range.hi}]`);
+          assert.ok(
+            inClosed(t[key], range.lo, range.hi),
+            `draw ${i}: Evolve ${key} target ${t[key]} inside [${range.lo}, ${range.hi}]`,
+          );
         }
       }
     }
@@ -161,23 +187,33 @@ function withinDocSpec(key, v) {
 {
   RANDOMIZABLE_KEYS.forEach((key, idx) => {
     const spec = DICE_RANGES[key];
-    const rng = mulberry32(0xAA2 ^ (idx * 0x9E37));
+    const rng = mulberry32(0xaa2 ^ (idx * 0x9e37));
     let min = Infinity;
     let max = -Infinity;
     for (let i = 0; i < 4000; i++) {
       const roll = randomizeKey(key, rng);
-      assert.ok(withinDiceRange(key, roll), `${key} draw ${i}: raw roll ${JSON.stringify(roll)} inside its table range`);
+      assert.ok(
+        withinDiceRange(key, roll),
+        `${key} draw ${i}: raw roll ${JSON.stringify(roll)} inside its table range`,
+      );
       for (const leaf of leavesOf(roll)) {
         if (spec.int) assert.ok(Number.isInteger(leaf), `${key} draw ${i}: int shape holds (${leaf})`);
-        if (spec.dec) assert.strictEqual(leaf, +leaf.toFixed(spec.dec), `${key} draw ${i}: dec-${spec.dec} shape holds (${leaf})`);
+        if (spec.dec)
+          assert.strictEqual(leaf, +leaf.toFixed(spec.dec), `${key} draw ${i}: dec-${spec.dec} shape holds (${leaf})`);
         if (leaf < min) min = leaf;
         if (leaf > max) max = leaf;
       }
       const landed = validateLayoutParams({ [key]: roll }).params[key];
-      assert.ok(withinDocSpec(key, landed), `${key} draw ${i}: landed value ${JSON.stringify(landed)} inside the document spec`);
+      assert.ok(
+        withinDocSpec(key, landed),
+        `${key} draw ${i}: landed value ${JSON.stringify(landed)} inside the document spec`,
+      );
       if (key === 'density') {
-        assert.strictEqual(landed, Math.min(roll, PARAM_SPEC.density.max),
-          `density draw ${i}: a roll of ${roll} lands at exactly ${Math.min(roll, 100)}`);
+        assert.strictEqual(
+          landed,
+          Math.min(roll, PARAM_SPEC.density.max),
+          `density draw ${i}: a roll of ${roll} lands at exactly ${Math.min(roll, 100)}`,
+        );
       }
     }
     // The door actually uses its range (RA2's quartile honesty): the
@@ -200,7 +236,7 @@ function withinDocSpec(key, v) {
   // (same seed, read through randomizeKey) provably rolls past the
   // document cap — and every such roll lands at exactly 100.
   {
-    Math.random = mulberry32(0xD1550);
+    Math.random = mulberry32(0xd1550);
     const landed = [];
     try {
       for (let i = 0; i < 400; i++) {
@@ -210,7 +246,7 @@ function withinDocSpec(key, v) {
     } finally {
       Math.random = realRandom;
     }
-    const replay = mulberry32(0xD1550);
+    const replay = mulberry32(0xd1550);
     let overCap = 0;
     for (let i = 0; i < 400; i++) {
       const raw = randomizeKey('density', replay);
@@ -223,13 +259,15 @@ function withinDocSpec(key, v) {
   // randomizeParam, every key: whatever the roll, what sits in the
   // document afterwards is inside the spec (pairs in document shape).
   {
-    Math.random = mulberry32(0xD00D);
+    Math.random = mulberry32(0xd00d);
     try {
       for (const key of RANDOMIZABLE_KEYS) {
         for (let i = 0; i < 200; i++) {
           S().randomizeParam(key);
-          assert.ok(withinDocSpec(key, S().layoutParams[key]),
-            `randomizeParam ${key} draw ${i}: landed ${JSON.stringify(S().layoutParams[key])} inside the document spec`);
+          assert.ok(
+            withinDocSpec(key, S().layoutParams[key]),
+            `randomizeParam ${key} draw ${i}: landed ${JSON.stringify(S().layoutParams[key])} inside the document spec`,
+          );
         }
       }
     } finally {
@@ -249,15 +287,17 @@ function withinDocSpec(key, v) {
   // randomizeUnlocked: after one press, the whole document is in spec.
   {
     reset();
-    Math.random = mulberry32(0xBADA);
+    Math.random = mulberry32(0xbada);
     try {
       S().randomizeUnlocked();
     } finally {
       Math.random = realRandom;
     }
     for (const key of RANDOMIZABLE_KEYS) {
-      assert.ok(withinDocSpec(key, S().layoutParams[key]),
-        `randomizeUnlocked: ${key} landed ${JSON.stringify(S().layoutParams[key])} inside the document spec`);
+      assert.ok(
+        withinDocSpec(key, S().layoutParams[key]),
+        `randomizeUnlocked: ${key} landed ${JSON.stringify(S().layoutParams[key])} inside the document spec`,
+      );
     }
   }
 
@@ -283,10 +323,16 @@ function withinDocSpec(key, v) {
       } finally {
         Math.random = realRandom;
       }
-      assert.strictEqual(S().layoutParams.density, Math.min(raw.density, 100),
-        `seed ${seed}: Evolve direct landing clamps density (raw target ${raw.density})`);
-      assert.deepStrictEqual(S().layoutParams.scale, expectedScale,
-        `seed ${seed}: Evolve direct landing puts scale in the linked {x, y} shape`);
+      assert.strictEqual(
+        S().layoutParams.density,
+        Math.min(raw.density, 100),
+        `seed ${seed}: Evolve direct landing clamps density (raw target ${raw.density})`,
+      );
+      assert.deepStrictEqual(
+        S().layoutParams.scale,
+        expectedScale,
+        `seed ${seed}: Evolve direct landing puts scale in the linked {x, y} shape`,
+      );
 
       useStore.setState({ morphEvolve: true });
       Math.random = mulberry32(seed);
@@ -297,16 +343,23 @@ function withinDocSpec(key, v) {
       }
       const mt = S().morphTo;
       assert.ok(mt, `seed ${seed}: morph targets exist`);
-      assert.strictEqual(mt.density, Math.min(raw.density, 100),
-        `seed ${seed}: morph target density is clamped at the door (raw ${raw.density})`);
-      assert.deepStrictEqual(mt.scale, expectedScale,
-        `seed ${seed}: morph target scale is in the linked {x, y} shape`);
+      assert.strictEqual(
+        mt.density,
+        Math.min(raw.density, 100),
+        `seed ${seed}: morph target density is clamped at the door (raw ${raw.density})`,
+      );
+      assert.deepStrictEqual(mt.scale, expectedScale, `seed ${seed}: morph target scale is in the linked {x, y} shape`);
       useStore.setState({ morphEvolve: false, morphing: false, morphFrom: null, morphTo: null });
       reset();
     }
-    assert.ok(overCapTargets > 0, 'some seeded Evolve draws must roll density past the cap (else the clamp above proves nothing)');
+    assert.ok(
+      overCapTargets > 0,
+      'some seeded Evolve draws must roll density past the cap (else the clamp above proves nothing)',
+    );
   }
   reset();
 }
 
-console.log('writePathHonesty.selfcheck: OK (#1550 — one roll-ranges table derived by every door, density the only declared overhang, every store door lands validated)');
+console.log(
+  'writePathHonesty.selfcheck: OK (#1550 — one roll-ranges table derived by every door, density the only declared overhang, every store door lands validated)',
+);

@@ -18,9 +18,18 @@ export const isDesktop = () => isTauriRuntime();
 export function createAppleModel({ invoke }) {
   let info = { available: false, reason: 'not checked yet' };
   const setInfo = (s) => {
-    info = s && s.available === true
-      ? { available: true, model: typeof s.model === 'string' ? s.model : 'apple', os: typeof s.os === 'string' ? s.os : null }
-      : { available: false, reason: s && typeof s.reason === 'string' ? s.reason.slice(0, 200) : 'unavailable', os: s && typeof s.os === 'string' ? s.os : null };
+    info =
+      s && s.available === true
+        ? {
+            available: true,
+            model: typeof s.model === 'string' ? s.model : 'apple',
+            os: typeof s.os === 'string' ? s.os : null,
+          }
+        : {
+            available: false,
+            reason: s && typeof s.reason === 'string' ? s.reason.slice(0, 200) : 'unavailable',
+            os: s && typeof s.os === 'string' ? s.os : null,
+          };
     return info;
   };
   return {
@@ -30,7 +39,11 @@ export function createAppleModel({ invoke }) {
     info: () => ({ ...info }),
     /** The capability check: macOS version + Apple Intelligence availability. Never throws. */
     async check() {
-      try { return setInfo(await invoke('mind_status')); } catch (e) { return setInfo({ available: false, reason: String(e && e.message ? e.message : e) }); }
+      try {
+        return setInfo(await invoke('mind_status'));
+      } catch (e) {
+        return setInfo({ available: false, reason: String(e && e.message ? e.message : e) });
+      }
     },
     /** One persona's reply, or a rejection (timeout, error, unavailable): the rules then answer that bar. */
     async ask(persona, context, { seed = 0, bar = 0 } = {}) {

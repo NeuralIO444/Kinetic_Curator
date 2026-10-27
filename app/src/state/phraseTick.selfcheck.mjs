@@ -30,7 +30,12 @@ assert.strictEqual(s.phraseOriginSeed, 11);
 let stepped = 0;
 s = tickPhraseBeat(
   { ...base, phraseBeat: 3, phraseMode: 'step-ca', caGrid: { n: 1 } },
-  { stepGrid: (g) => { stepped += 1; return { n: g.n + 1 }; } },
+  {
+    stepGrid: (g) => {
+      stepped += 1;
+      return { n: g.n + 1 };
+    },
+  },
 );
 assert.strictEqual(s.seed, 10);
 assert.strictEqual(s.caGrid.n, 2);

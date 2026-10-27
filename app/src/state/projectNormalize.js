@@ -47,10 +47,12 @@ function sanitizeCaGrid(raw) {
     // #644 — cell values must be numeric before they reach the field
     // generator: coerce numeric strings, and replace anything non-finite
     // (NaN, Infinity, garbage) with 0 instead of letting it poison the CA.
-    out.push(row.map((cell) => {
-      const n = typeof cell === 'number' ? cell : Number(cell);
-      return Number.isFinite(n) ? n : 0;
-    }));
+    out.push(
+      row.map((cell) => {
+        const n = typeof cell === 'number' ? cell : Number(cell);
+        return Number.isFinite(n) ? n : 0;
+      }),
+    );
   }
   return out;
 }
@@ -157,9 +159,7 @@ export function normalizeSnapshots(raw, customAssets = [], root = {}, layerIds =
   // matches no layer in the document instead of persisting dead weight that
   // re-serializes into every future export. layerIds null (e.g. serialize
   // path, where snapshots are built from live layers) means no filtering.
-  const validIds = Array.isArray(layerIds)
-    ? new Set(layerIds.filter((id) => typeof id === 'string'))
-    : null;
+  const validIds = Array.isArray(layerIds) ? new Set(layerIds.filter((id) => typeof id === 'string')) : null;
   // #637 — a partial snapshot must not wipe good root values with defaults:
   // fields the snapshot omits fall back to the root document's values, so
   // importing a doc with root seed 9999 and an empty active snapshot keeps
@@ -216,7 +216,8 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     // #456 — the 4-content-track cap is a creation-time UI check only; a
     // document can still carry more. Skip the overflow rather than truncate
     // by raw array position, same "degrade, don't crash" posture as MAX_LAYERS.
-    if (type === 'content' || type === 'pattern') { // #1097 — a PATTERN track is content-group: same cap
+    if (type === 'content' || type === 'pattern') {
+      // #1097 — a PATTERN track is content-group: same cap
       if (contentCount >= MAX_CONTENT_TRACKS) continue;
       contentCount++;
     }
@@ -233,7 +234,9 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       // #520 Phase 1 — shed-report any grain-family moved to last position (#192: never silent).
       layer.effects = sanitizeFxEffects(l.effects, {
         onMove: ({ kinds }) => {
-          console.warn(`[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`);
+          console.warn(
+            `[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`,
+          );
         },
       });
     } else if (type === 'pattern') {
@@ -264,7 +267,9 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   const ordered = fxBeforeMath(layers);
   if (ordered.moved) {
     layers.splice(0, layers.length, ...ordered.layers);
-    console.warn('[normalize] FX tracks moved below MATH tracks (#1048: the tone grade folds last) — this project may render differently; save it to keep the new order');
+    console.warn(
+      '[normalize] FX tracks moved below MATH tracks (#1048: the tone grade folds last) — this project may render differently; save it to keep the new order',
+    );
   }
   // FX/MATH layers are never the content-active layer; a document with no
   // content layer at all is degenerate — treat it as invalid like an empty list.
@@ -275,8 +280,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   // on a missing target, so this doesn't need to also force `mode: 'off'`.
   for (const l of layers) {
     if (l.type !== 'content' || !l.patch || l.patch.to === null) continue;
-    const validTarget = l.patch.to !== l.id
-      && layers.some((o) => o.id === l.patch.to && o.type === 'content');
+    const validTarget = l.patch.to !== l.id && layers.some((o) => o.id === l.patch.to && o.type === 'content');
     if (!validTarget) l.patch = { ...l.patch, to: null };
   }
   let activeLayerId = typeof rawActiveId === 'string' ? rawActiveId : null;

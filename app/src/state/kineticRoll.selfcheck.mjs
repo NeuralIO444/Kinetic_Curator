@@ -41,7 +41,10 @@ assert.strictEqual(s.layoutParams.density, lockedDensity, 'locked density surviv
 // 4. assets — non-empty pool of known ids.
 const on = Object.keys(s.enabledAssets || {}).filter((k) => s.enabledAssets[k]);
 assert.ok(on.length > 0, 'asset pool is never empty after a roll');
-assert.ok(on.every((id) => assetIds.has(id)), 'every enabled asset is a known id');
+assert.ok(
+  on.every((id) => assetIds.has(id)),
+  'every enabled asset is a known id',
+);
 
 // 5. FX + blend — exactly one FX layer, valid menu effects, valid blends.
 const fxLayers = s.layers.filter(isFxLayer);

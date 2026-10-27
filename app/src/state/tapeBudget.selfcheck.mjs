@@ -20,8 +20,16 @@ assert.strictEqual(isTapeFull({ fps: 60, stageTimings: { gpuFrame: FRAME_BUDGET_
 
 const gpuUnder = tapeFillPct({ fps: 5, stageTimings: { gpuFrame: FRAME_BUDGET_MS * 0.5 } });
 assert.ok(Math.abs(gpuUnder - 50) < 1, 'GPU timing wins over a stale/low fps reading too');
-assert.strictEqual(isTapeFull({ stageTimings: { gpuFrame: FRAME_BUDGET_MS } }), true, `exactly ${TAPE_FULL_PCT}% counts as full`);
-assert.strictEqual(isTapeFull({ stageTimings: { gpuFrame: FRAME_BUDGET_MS * 0.99 } }), false, 'just under counts as not full');
+assert.strictEqual(
+  isTapeFull({ stageTimings: { gpuFrame: FRAME_BUDGET_MS } }),
+  true,
+  `exactly ${TAPE_FULL_PCT}% counts as full`,
+);
+assert.strictEqual(
+  isTapeFull({ stageTimings: { gpuFrame: FRAME_BUDGET_MS * 0.99 } }),
+  false,
+  'just under counts as not full',
+);
 
 // isTapeFull must NOT use the fps-derived fallback: at exactly 60fps (the
 // common steady state, and globalSlice's own initial default) that fallback
@@ -29,16 +37,38 @@ assert.strictEqual(isTapeFull({ stageTimings: { gpuFrame: FRAME_BUDGET_MS * 0.99
 // would refuse the very first track at app boot, before any GPU frame has
 // actually reported. tapeFillPct (the display number) still uses the
 // fallback; isTapeFull (the gate) must not.
-assert.strictEqual(tapeFillPct({ fps: 60, stageTimings: {} }), 100, 'display estimate reads ~full at 60fps with no GPU data (expected, informational)');
-assert.strictEqual(isTapeFull({ fps: 60, stageTimings: {} }), false, 'the gate ignores that estimate and does not refuse on it');
-assert.strictEqual(isTapeFull({ fps: 60, stageTimings: null }), false, 'same, with stageTimings entirely absent (fresh app boot)');
+assert.strictEqual(
+  tapeFillPct({ fps: 60, stageTimings: {} }),
+  100,
+  'display estimate reads ~full at 60fps with no GPU data (expected, informational)',
+);
+assert.strictEqual(
+  isTapeFull({ fps: 60, stageTimings: {} }),
+  false,
+  'the gate ignores that estimate and does not refuse on it',
+);
+assert.strictEqual(
+  isTapeFull({ fps: 60, stageTimings: null }),
+  false,
+  'same, with stageTimings entirely absent (fresh app boot)',
+);
 
 // --- arm gate: addLayer / addFxLayer / duplicateLayer refuse at tape-full --
 const { getState, setState } = useStore;
 
 function resetLayersToOne() {
   setState({
-    layers: [{ id: 'kc-1', name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1, patch: { mode: 'off', to: 1, strength: 0.16 } }],
+    layers: [
+      {
+        id: 'kc-1',
+        name: 'KC-1',
+        type: 'content',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
+        patch: { mode: 'off', to: 1, strength: 0.16 },
+      },
+    ],
     activeLayerId: 'kc-1',
     layerSnapshots: {},
   });
@@ -54,7 +84,11 @@ assert.strictEqual(getState().layers.filter((l) => l.type !== 'fx').length, 2, '
 setState({ fps: 0, stageTimings: { gpuFrame: FRAME_BUDGET_MS * 2 } }); // 200% — well past full
 resetLayersToOne();
 getState().addLayer();
-assert.strictEqual(getState().layers.filter((l) => l.type !== 'fx').length, 1, 'tape full: addLayer refuses (count unchanged)');
+assert.strictEqual(
+  getState().layers.filter((l) => l.type !== 'fx').length,
+  1,
+  'tape full: addLayer refuses (count unchanged)',
+);
 
 getState().addFxLayer();
 assert.strictEqual(getState().layers.filter((l) => l.type === 'fx').length, 0, 'tape full: addFxLayer refuses too');
@@ -66,7 +100,11 @@ assert.strictEqual(getState().layers.length, before, 'tape full: duplicateLayer 
 // Recovery: once headroom returns, the same actions succeed again.
 setState({ fps: 60, stageTimings: {} });
 getState().addLayer();
-assert.strictEqual(getState().layers.filter((l) => l.type !== 'fx').length, 2, 'headroom returns: addLayer succeeds again');
+assert.strictEqual(
+  getState().layers.filter((l) => l.type !== 'fx').length,
+  2,
+  'headroom returns: addLayer succeeds again',
+);
 
 // Cleanup: leave the store as this file found it (a fresh module-level
 // singleton — other selfchecks in the same run share it).

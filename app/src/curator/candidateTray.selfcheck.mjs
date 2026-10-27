@@ -35,13 +35,14 @@ globalThis.localStorage = {
   setItem: (k, v) => lsData.set(k, String(v)),
   removeItem: (k) => lsData.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
 const { sanitizeProvenance, isProvenance, isMined, cornerWord, provenanceLabel } = await import('./provenance.mjs');
-const {
-  LOOK_SLOT_BUDGET, HAND_SLOT_COST, MINED_SLOT_COST,
-  slotCostOf, lookSlotsUsed, crownGate, parseRunFolder,
-} = await import('./candidateTray.mjs');
+const { LOOK_SLOT_BUDGET, HAND_SLOT_COST, MINED_SLOT_COST, slotCostOf, lookSlotsUsed, crownGate, parseRunFolder } =
+  await import('./candidateTray.mjs');
 const { stageRecords, stageSlotsUsed, ON_SHELF_COPY } = await import('./shelf.mjs');
 const { sanitizeFavorite, KEEPS_KEY } = await import('../state/slices/davisSlice.js');
 const { ledgerRow, isLedgerRow, parseLedger, readLedgerText } = await import('./tasteLedger.js');
@@ -60,7 +61,9 @@ const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
 
 // ── fixtures: miner-shaped records (E2's finalists.json shape) ──────
-const radialIds = ASSETS.filter((a) => a.category === 'radial').slice(0, 3).map((a) => a.id);
+const radialIds = ASSETS.filter((a) => a.category === 'radial')
+  .slice(0, 3)
+  .map((a) => a.id);
 assert.ok(radialIds.length >= 2, 'fixture needs radial assets in the library');
 const minedRecord = {
   seed: 424242,
@@ -71,7 +74,9 @@ const minedRecord = {
     assets: radialIds,
   },
   provenance: {
-    source: 'explorer', run: 'xpl-fixture-1', corner: 'haeckel',
+    source: 'explorer',
+    run: 'xpl-fixture-1',
+    corner: 'haeckel',
     axes: { layout: 'radial', palette: 'hydra', castSize: radialIds.length },
   },
 };
@@ -83,27 +88,51 @@ const handRecord = {
 
 // ── provenance: the boundary ─────────────────────────────────────────
 {
-  assert.deepStrictEqual(sanitizeProvenance(minedRecord.provenance), minedRecord.provenance, 'a miner provenance survives sanitizing whole');
-  assert.strictEqual(sanitizeProvenance({ source: 'dice' }), undefined, 'an unrecognized origin is dropped whole — a record never claims a false origin');
+  assert.deepStrictEqual(
+    sanitizeProvenance(minedRecord.provenance),
+    minedRecord.provenance,
+    'a miner provenance survives sanitizing whole',
+  );
+  assert.strictEqual(
+    sanitizeProvenance({ source: 'dice' }),
+    undefined,
+    'an unrecognized origin is dropped whole — a record never claims a false origin',
+  );
   assert.strictEqual(sanitizeProvenance(null), undefined, 'absent stays absent (legacy records grow no provenance)');
-  assert.strictEqual(sanitizeProvenance({ source: 'explorer', run: 'x'.repeat(500) }).run.length, 80, 'provenance strings are bounded');
+  assert.strictEqual(
+    sanitizeProvenance({ source: 'explorer', run: 'x'.repeat(500) }).run.length,
+    80,
+    'provenance strings are bounded',
+  );
   assert.strictEqual(isProvenance(minedRecord.provenance), true);
   assert.strictEqual(isProvenance({ source: 'explorer', corner: 42 }), false, 'a malformed provenance is not one');
   assert.strictEqual(isMined(minedRecord), true);
   assert.strictEqual(isMined(handRecord), false, 'a hand record is not mined');
   assert.strictEqual(isMined({ provenance: { source: 'dice' } }), false);
-  lines.push('provenance boundary: explorer origin survives whole; unknown origins and malformed shapes dropped; absent stays absent; strings bounded');
+  lines.push(
+    'provenance boundary: explorer origin survives whole; unknown origins and malformed shapes dropped; absent stays absent; strings bounded',
+  );
 }
 
 // ── the label: plain words, aliases only, never a real name ─────────
 {
   const label = provenanceLabel(minedRecord, { assetsById, palettesById });
-  assert.strictEqual(label, 'radial cast · hydra palette · SPECIMEN corner', `label is corner + axes in plain words, got: ${label}`);
+  assert.strictEqual(
+    label,
+    'radial cast · hydra palette · SPECIMEN corner',
+    `label is corner + axes in plain words, got: ${label}`,
+  );
   assert.ok(!/reas|haeckel|davis|molnar/i.test(label), 'no real artist name reaches a product surface');
   assert.strictEqual(cornerWord('reas'), 'PROCESS FIELD');
   assert.strictEqual(cornerWord('wilderness'), 'wilderness', 'the wilderness names itself, plainly');
-  assert.strictEqual(provenanceLabel(handRecord, { assetsById, palettesById }), '', 'a hand record has no provenance label');
-  lines.push(`label: "${label}" — layout word from the cast's category, palette word lowercased, corner as its TE alias`);
+  assert.strictEqual(
+    provenanceLabel(handRecord, { assetsById, palettesById }),
+    '',
+    'a hand record has no provenance label',
+  );
+  lines.push(
+    `label: "${label}" — layout word from the cast's category, palette word lowercased, corner as its TE alias`,
+  );
 }
 
 // ── sanitizeFavorite carries provenance (the shelf door) ────────────
@@ -124,7 +153,11 @@ const handRecord = {
   assert.strictEqual(isLedgerRow(row), true, 'a provenance line is a valid ledger row');
   const handRow = ledgerRow({ ...handRecord, timestamp: '2026-10-14T00:00:00.000Z', context: null });
   assert.ok(!('provenance' in handRow), 'a hand line carries no provenance');
-  assert.strictEqual(isLedgerRow({ ...row, provenance: { source: 'forged' } }), false, 'a forged provenance line is off-schema');
+  assert.strictEqual(
+    isLedgerRow({ ...row, provenance: { source: 'forged' } }),
+    false,
+    'a forged provenance line is off-schema',
+  );
   lines.push('ledger door: keeps/passes lines carry provenance; the schema admits it optionally and rejects forgeries');
 }
 
@@ -134,33 +167,70 @@ const handRecord = {
   assert.strictEqual(slotCostOf(handRecord), HAND_SLOT_COST);
   assert.strictEqual(slotCostOf(minedRecord), MINED_SLOT_COST, 'an unearned (mined) keep counts double');
   assert.strictEqual(lookSlotsUsed([handRecord, handRecord, minedRecord]), 4);
-  assert.strictEqual(crownGate(Array(15).fill(handRecord), handRecord).ok, true, '15 hand + 1 hand = 16 takes the last stage slot');
+  assert.strictEqual(
+    crownGate(Array(15).fill(handRecord), handRecord).ok,
+    true,
+    '15 hand + 1 hand = 16 takes the last stage slot',
+  );
   const toCollection = crownGate(Array(15).fill(handRecord), minedRecord);
   assert.strictEqual(toCollection.ok, false, '15 hand + 1 mined (2) = 17 does not take a stage slot');
-  assert.ok(!('copy' in toCollection), 'there is no refusal copy anymore — a not-ok gate is a landing prediction, not a refusal');
+  assert.ok(
+    !('copy' in toCollection),
+    'there is no refusal copy anymore — a not-ok gate is a landing prediction, not a refusal',
+  );
   assert.strictEqual(crownGate(Array(14).fill(handRecord), minedRecord).ok, true, '14 + 2 = 16 fits the stage exactly');
-  lines.push('slots: budget 16 · hand 1 · mined 2 · 15+mined predicts the collection (no copy, no refusal) · 14+mined fits exactly');
+  lines.push(
+    'slots: budget 16 · hand 1 · mined 2 · 15+mined predicts the collection (no copy, no refusal) · 14+mined fits exactly',
+  );
 }
 
 // ── run-folder parsing ───────────────────────────────────────────────
 {
   const other = { ...handRecord, seed: 888 };
-  const cand = (index, corner, anchor, record) => ({ index, corner, anchor, bakePath: 'particles', fingerprint: 'f', fontContingent: false, features: {}, stats: {}, record });
+  const cand = (index, corner, anchor, record) => ({
+    index,
+    corner,
+    anchor,
+    bakePath: 'particles',
+    fingerprint: 'f',
+    fontContingent: false,
+    features: {},
+    stats: {},
+    record,
+  });
   const model = parseRunFolder({
     run: { runId: 'xpl-fixture-1', config: { runSeed: 1 }, report: { yield: {} } },
     finalists: [minedRecord, other],
-    candidates: [cand(114, 'haeckel', 'radial', minedRecord), cand(7, null, null, other), cand(9, 'reas', null, handRecord)],
+    candidates: [
+      cand(114, 'haeckel', 'radial', minedRecord),
+      cand(7, null, null, other),
+      cand(9, 'reas', null, handRecord),
+    ],
   });
   assert.strictEqual(model.runId, 'xpl-fixture-1');
   assert.strictEqual(model.cards.length, 2);
   assert.strictEqual(model.cards[0].sampleIndex, 114, 'the finalist joins its candidate by record identity');
-  assert.strictEqual(model.cards[0].stillBase, 'finalist-01-sample-114', 'the still name is the run\'s own (finalist-NN-sample-<index>)');
+  assert.strictEqual(
+    model.cards[0].stillBase,
+    'finalist-01-sample-114',
+    "the still name is the run's own (finalist-NN-sample-<index>)",
+  );
   assert.strictEqual(model.cards[0].anchor, 'radial');
   assert.strictEqual(model.cards[1].sampleIndex, 7);
   assert.strictEqual(model.cards[1].stillBase, 'finalist-02-sample-7');
-  const orphan = parseRunFolder({ run: { runId: 'r' }, finalists: [{ seed: 1, config: { layout: {}, palette: {}, assets: [] } }], candidates: [] });
-  assert.strictEqual(orphan.cards[0].stillBase, null, 'a finalist that joins nothing renders still-less, never with a fabricated still');
-  lines.push('run parsing: finalists join candidates by record (sample index + anchor ride along); orphans stay honest');
+  const orphan = parseRunFolder({
+    run: { runId: 'r' },
+    finalists: [{ seed: 1, config: { layout: {}, palette: {}, assets: [] } }],
+    candidates: [],
+  });
+  assert.strictEqual(
+    orphan.cards[0].stillBase,
+    null,
+    'a finalist that joins nothing renders still-less, never with a fabricated still',
+  );
+  lines.push(
+    'run parsing: finalists join candidates by record (sample index + anchor ride along); orphans stay honest',
+  );
 }
 
 // ── crown end-to-end + RA6 + pass + collection landing (the store) ──
@@ -179,9 +249,12 @@ const handRecord = {
     const gate = crownGate(stageRecords(s.keeps, s.keepStage), record);
     emit(Events.KEEP_ADD, {
       keep: {
-        seed: record.seed, seedOffsets: { ...record.seedOffsets },
-        timestamp: new Date().toISOString(), context: captureKeepContext(s.paletteId),
-        config: record.config, provenance: record.provenance,
+        seed: record.seed,
+        seedOffsets: { ...record.seedOffsets },
+        timestamp: new Date().toISOString(),
+        context: captureKeepContext(s.paletteId),
+        config: record.config,
+        provenance: record.provenance,
       },
     });
     return gate;
@@ -189,16 +262,25 @@ const handRecord = {
 
   const gate = crownAttempt(minedRecord);
   assert.strictEqual(gate.ok, true, 'the fixture crown fits the stage');
-  await tick(); await tick();
+  await tick();
+  await tick();
   let st = useStore.getState();
-  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), used0 + MINED_SLOT_COST, 'the mined crown takes a stage slot at double cost');
+  assert.strictEqual(
+    stageSlotsUsed(st.keeps, st.keepStage),
+    used0 + MINED_SLOT_COST,
+    'the mined crown takes a stage slot at double cost',
+  );
   assert.ok(st.keepStage.includes(st.keeps[st.keeps.length - 1].id), 'the crowned keep is staged');
   const keep = st.keeps[st.keeps.length - 1];
   assert.deepStrictEqual(keep.provenance, minedRecord.provenance, 'the shelf record carries the provenance');
   const keepRows = parseLedger(readLedgerText('keeps')).rows;
   assert.strictEqual(keepRows.length, keepsLines0 + 1, 'the keeps ledger gained exactly one line');
   const line = keepRows[keepRows.length - 1];
-  assert.deepStrictEqual(line.provenance, minedRecord.provenance, 'the ledger line carries the provenance (forever distinguishable)');
+  assert.deepStrictEqual(
+    line.provenance,
+    minedRecord.provenance,
+    'the ledger line carries the provenance (forever distinguishable)',
+  );
   lines.push('crown: mined radial finalist crowned through KEEP_ADD — shelf + keeps ledger both carry provenance');
 
   // RA6 — recall the mined keep; it must behave identically in kind to
@@ -209,24 +291,33 @@ const handRecord = {
     assert.strictEqual(s.paletteId, rec.config.palette.id, `${tag}: recall applies the palette`);
     assert.strictEqual(s.layoutParams.mode, rec.config.layout.mode, `${tag}: recall applies the layout mode`);
     assert.deepStrictEqual(
-      Object.keys(s.enabledAssets).filter((k) => s.enabledAssets[k]).sort(),
+      Object.keys(s.enabledAssets)
+        .filter((k) => s.enabledAssets[k])
+        .sort(),
       [...rec.config.assets].sort(),
       `${tag}: recall applies the cast`,
     );
   };
   recallAndCheck(keep, 'mined keep');
   assert.strictEqual(crownAttempt(handRecord).ok, true);
-  await tick(); await tick();
+  await tick();
+  await tick();
   st = useStore.getState();
   const handKeep = st.keeps[st.keeps.length - 1];
   assert.ok(!('provenance' in handKeep), 'the hand crown carries no provenance');
   recallAndCheck(handKeep, 'hand keep');
-  lines.push('RA6: the mined keep recalls identically in kind to a hand-built keep (palette, mode, cast all applied by the same recall)');
+  lines.push(
+    'RA6: the mined keep recalls identically in kind to a hand-built keep (palette, mode, cast all applied by the same recall)',
+  );
 
   // Persistence: what localStorage holds re-sanitizes with provenance.
   const stored = JSON.parse(lsData.get(KEEPS_KEY));
   const storedMined = stored.find((k) => k.seed === minedRecord.seed);
-  assert.deepStrictEqual(sanitizeFavorite(storedMined).provenance, minedRecord.provenance, 'provenance survives the storage round-trip (RA6 persist/reload)');
+  assert.deepStrictEqual(
+    sanitizeFavorite(storedMined).provenance,
+    minedRecord.provenance,
+    'provenance survives the storage round-trip (RA6 persist/reload)',
+  );
 
   // Pass: a passes-ledger line WITH provenance; never a keep.
   const passRows0 = parseLedger(readLedgerText('passes')).rows.length;
@@ -235,23 +326,37 @@ const handRecord = {
   applyAction({
     type: A.ADD_PASS,
     pass: {
-      seed: minedRecord.seed, seedOffsets: { ...minedRecord.seedOffsets },
-      timestamp: new Date().toISOString(), context: captureKeepContext(useStore.getState().paletteId),
-      config: minedRecord.config, provenance: minedRecord.provenance,
+      seed: minedRecord.seed,
+      seedOffsets: { ...minedRecord.seedOffsets },
+      timestamp: new Date().toISOString(),
+      context: captureKeepContext(useStore.getState().paletteId),
+      config: minedRecord.config,
+      provenance: minedRecord.provenance,
     },
   });
   const passRows = parseLedger(readLedgerText('passes')).rows;
   assert.strictEqual(passRows.length, passRows0 + 1, 'the pass wrote exactly one passes line');
-  assert.deepStrictEqual(passRows[passRows.length - 1].provenance, minedRecord.provenance, 'the pass line carries provenance (spec Q5: passes are recorded)');
+  assert.deepStrictEqual(
+    passRows[passRows.length - 1].provenance,
+    minedRecord.provenance,
+    'the pass line carries provenance (spec Q5: passes are recorded)',
+  );
   assert.strictEqual(useStore.getState().keeps.length, keepsBefore, 'a pass adds no keep');
-  assert.strictEqual(stageSlotsUsed(useStore.getState().keeps, useStore.getState().keepStage), usedBefore, 'a pass is never counted as a keep');
+  assert.strictEqual(
+    stageSlotsUsed(useStore.getState().keeps, useStore.getState().keepStage),
+    usedBefore,
+    'a pass is never counted as a keep',
+  );
   lines.push('pass: one passes-ledger line with provenance; keeps and stage usage untouched');
 
   // A full stage refuses NOTHING: the crown lands in the collection,
   // the line is spoken, the stage is untouched, nothing is evicted.
   st = useStore.getState();
   while (stageSlotsUsed(st.keeps, st.keepStage) < 15) {
-    applyAction({ type: A.ADD_KEEP, keep: { ...handRecord, seed: 1000 + st.keeps.length, timestamp: new Date().toISOString() } });
+    applyAction({
+      type: A.ADD_KEEP,
+      keep: { ...handRecord, seed: 1000 + st.keeps.length, timestamp: new Date().toISOString() },
+    });
     st = useStore.getState();
   }
   assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), 15);
@@ -262,7 +367,8 @@ const handRecord = {
   const landedGate = crownAttempt(minedRecord);
   assert.strictEqual(landedGate.ok, false, 'at 15 stage slots a mined crown (cost 2) does not take a stage slot');
   assert.ok(!('copy' in landedGate), 'the gate carries no refusal copy');
-  await tick(); await tick();
+  await tick();
+  await tick();
   st = useStore.getState();
   assert.strictEqual(st.keeps.length, keepsCountAtCap + 1, 'the crown still landed — in the collection');
   const landedKeep = st.keeps[st.keeps.length - 1];
@@ -272,8 +378,14 @@ const handRecord = {
   assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), 15, 'stage usage unchanged by the landing');
   assert.strictEqual(st.keeps[0].id, oldestId, 'nothing was evicted — the oldest keep still stands');
   assert.strictEqual(st.shelfNotice, ON_SHELF_COPY, 'the landing speaks the line: on the shelf — swap it in');
-  assert.strictEqual(parseLedger(readLedgerText('keeps')).rows.length, ledgerAtCap + 1, 'the landing wrote its keeps-ledger line like any crown');
-  lines.push('collection landing: full stage → the crown lands in the collection with the line, stage untouched, no eviction, ledger written');
+  assert.strictEqual(
+    parseLedger(readLedgerText('keeps')).rows.length,
+    ledgerAtCap + 1,
+    'the landing wrote its keeps-ledger line like any crown',
+  );
+  lines.push(
+    'collection landing: full stage → the crown lands in the collection with the line, stage untouched, no eviction, ledger written',
+  );
 }
 
 // ── the marker contract in the shipped components ────────────────────
@@ -281,18 +393,23 @@ const handRecord = {
   const tray = readFileSync(new URL('../panels/davis/CandidateTray.jsx', import.meta.url), 'utf8');
   assert.ok(tray.includes('data-source="explorer"'), 'candidate cards carry data-source="explorer"');
   assert.ok(tray.includes('cand-tag'), 'candidate cards carry the MINED tag element');
-  assert.ok(tray.includes('Events.KEEP_ADD'), 'the crown rides the dice crown\'s door');
+  assert.ok(tray.includes('Events.KEEP_ADD'), "the crown rides the dice crown's door");
   assert.ok(tray.includes('A.ADD_PASS'), 'the pass rides the X door');
   assert.ok(tray.includes('crownGate'), 'the crown gate predicts the landing before the write');
   assert.ok(tray.includes('ON_SHELF_COPY'), 'the tray speaks the shelf line when a crown lands in the collection');
   assert.ok(!tray.includes('SHELF_FULL'), 'the refusal copy is gone from the tray');
   const hits = readFileSync(new URL('../components/FavoritesTray.jsx', import.meta.url), 'utf8');
-  assert.ok(hits.includes('hit-mined') && hits.includes("provenance?.source === 'explorer'"), 'a crowned mined keep\'s hits pill carries the mined mark');
+  assert.ok(
+    hits.includes('hit-mined') && hits.includes("provenance?.source === 'explorer'"),
+    "a crowned mined keep's hits pill carries the mined mark",
+  );
   const panelsCss = readFileSync(new URL('../styles/panels.css', import.meta.url), 'utf8');
-  assert.ok(panelsCss.includes('.cand-card'), 'candidate cards have their own visual language (not the keeps\')');
+  assert.ok(panelsCss.includes('.cand-card'), "candidate cards have their own visual language (not the keeps')");
   const uxCss = readFileSync(new URL('../styles/ux-polish.css', import.meta.url), 'utf8');
   assert.ok(uxCss.includes('.hit-mined'), 'the mined mark is styled');
-  lines.push('marker contract: data-source + MINED tag on cards; the mined mark on crowned keeps\' pills; distinct card CSS');
+  lines.push(
+    "marker contract: data-source + MINED tag on cards; the mined mark on crowned keeps' pills; distinct card CSS",
+  );
 }
 
 console.log('candidateTray.selfcheck:');

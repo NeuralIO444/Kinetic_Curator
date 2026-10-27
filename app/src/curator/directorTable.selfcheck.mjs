@@ -4,7 +4,11 @@ import { DIRECTOR_TABLE, rowFor, relaxSecondsFor } from './directorTable.js';
 import { DIRECTORS_MATRIX } from './directorsMatrix.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('exactly one row per room in the readout matrix (20 rooms, no inventions)', () => {
   const matrixKeys = [];

@@ -21,7 +21,8 @@ export function sigilGeometry(seed) {
   const wedge = (Math.PI * 2) / SIGIL_FOLDS;
   const n = 24 + Math.floor(R() * 18);
   const els = [];
-  for (let i = 0; i < n; i++) els.push({ r: 8 + R() * 32, a: R() * wedge, s: 1 + R() * 3.2, o: 0.25 + R() * 0.65, ring: R() < 0.3 });
+  for (let i = 0; i < n; i++)
+    els.push({ r: 8 + R() * 32, a: R() * wedge, s: 1 + R() * 3.2, o: 0.25 + R() * 0.65, ring: R() < 0.3 });
   return { wedge, els };
 }
 
@@ -32,24 +33,47 @@ export function sigilGeometry(seed) {
  * @param {CanvasRenderingContext2D} cx
  */
 export function drawSigil(cx, geom, rgb = '255,205,130', px = SIGIL_SIZE) {
-  const size = SIGIL_SIZE; const k = px / size;
-  const C = size / 2; const { wedge, els } = geom;
+  const size = SIGIL_SIZE;
+  const k = px / size;
+  const C = size / 2;
+  const { wedge, els } = geom;
   cx.clearRect(0, 0, px, px);
-  cx.save(); cx.scale(k, k); cx.translate(C, C);
+  cx.save();
+  cx.scale(k, k);
+  cx.translate(C, C);
   // ornamental rings: rotationally symmetric, so invisible to the spin
-  cx.strokeStyle = `rgba(${rgb},0.28)`; cx.lineWidth = 1;
-  for (const r of SIGIL_RINGS) { cx.beginPath(); cx.arc(0, 0, r, 0, 7); cx.stroke(); }
+  cx.strokeStyle = `rgba(${rgb},0.28)`;
+  cx.lineWidth = 1;
+  for (const r of SIGIL_RINGS) {
+    cx.beginPath();
+    cx.arc(0, 0, r, 0, 7);
+    cx.stroke();
+  }
   for (let k = 0; k < SIGIL_FOLDS; k++) {
-    cx.save(); cx.rotate(k * wedge);
+    cx.save();
+    cx.rotate(k * wedge);
     for (const e of els) {
-      const x = Math.cos(e.a) * e.r; const y = Math.sin(e.a) * e.r;
+      const x = Math.cos(e.a) * e.r;
+      const y = Math.sin(e.a) * e.r;
       cx.fillStyle = `rgba(${rgb},${e.o.toFixed(2)})`;
-      cx.beginPath(); cx.arc(x, y, e.s, 0, 7); cx.fill();
-      cx.beginPath(); cx.arc(x, -y, e.s * 0.65, 0, 7); cx.fill(); // the mirror half
-      if (e.ring) { cx.strokeStyle = `rgba(${rgb},${(e.o * 0.7).toFixed(2)})`; cx.beginPath(); cx.arc(x, y, e.s + 2.5, 0, 7); cx.stroke(); }
+      cx.beginPath();
+      cx.arc(x, y, e.s, 0, 7);
+      cx.fill();
+      cx.beginPath();
+      cx.arc(x, -y, e.s * 0.65, 0, 7);
+      cx.fill(); // the mirror half
+      if (e.ring) {
+        cx.strokeStyle = `rgba(${rgb},${(e.o * 0.7).toFixed(2)})`;
+        cx.beginPath();
+        cx.arc(x, y, e.s + 2.5, 0, 7);
+        cx.stroke();
+      }
     }
     cx.restore();
   }
-  cx.fillStyle = `rgba(${rgb},0.95)`; cx.beginPath(); cx.arc(0, 0, 3.2, 0, 7); cx.fill();
+  cx.fillStyle = `rgba(${rgb},0.95)`;
+  cx.beginPath();
+  cx.arc(0, 0, 3.2, 0, 7);
+  cx.fill();
   cx.restore();
 }

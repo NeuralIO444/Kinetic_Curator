@@ -23,9 +23,17 @@ import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { STUB_VOICES } from '../data/voices.js';
 import {
-  STARVED_CATEGORIES, FONT_CONTINGENT_IDS, CORNERS,
-  sampleBatch, bakeSample, renderStats, renderStillPng, stillHash,
-  featuresOfKeep, runMiner, formatMinerReport,
+  STARVED_CATEGORIES,
+  FONT_CONTINGENT_IDS,
+  CORNERS,
+  sampleBatch,
+  bakeSample,
+  renderStats,
+  renderStillPng,
+  stillHash,
+  featuresOfKeep,
+  runMiner,
+  formatMinerReport,
 } from './miner.mjs';
 
 const byId = new Map(ASSETS.map((a) => [a.id, a]));
@@ -37,9 +45,33 @@ const SMOKE = { runSeed: 0x1506, batchSize: 24, finalistCount: 6 };
 // any record list in this shape, including a real ledger export.
 const firstOf = (cat) => ASSETS.find((a) => a.category === cat).id;
 const KEEPS = [
-  { seed: 11, seedOffsets: {}, config: { layout: { mode: 'grid', count: 40 }, palette: { id: 'praystation' }, assets: [firstOf('geometric'), firstOf('stamps')] } },
-  { seed: 12, seedOffsets: {}, config: { layout: { mode: 'eden', count: 60 }, palette: { id: 'hydra' }, assets: [firstOf('radial'), firstOf('linework')] } },
-  { seed: 13, seedOffsets: {}, config: { layout: { mode: 'orbit', count: 30 }, palette: { id: 'kiln-columns' }, assets: [firstOf('organic'), firstOf('dots')] } },
+  {
+    seed: 11,
+    seedOffsets: {},
+    config: {
+      layout: { mode: 'grid', count: 40 },
+      palette: { id: 'praystation' },
+      assets: [firstOf('geometric'), firstOf('stamps')],
+    },
+  },
+  {
+    seed: 12,
+    seedOffsets: {},
+    config: {
+      layout: { mode: 'eden', count: 60 },
+      palette: { id: 'hydra' },
+      assets: [firstOf('radial'), firstOf('linework')],
+    },
+  },
+  {
+    seed: 13,
+    seedOffsets: {},
+    config: {
+      layout: { mode: 'orbit', count: 30 },
+      palette: { id: 'kiln-columns' },
+      assets: [firstOf('organic'), firstOf('dots')],
+    },
+  },
 ];
 
 // ---------------------------------------------------------------- sampler
@@ -77,11 +109,23 @@ assert.deepStrictEqual(
 
 // ---------------------------------------------------------------- discards
 assert.deepStrictEqual(
-  bakeSample({ cast: [], layoutParams: normalizeLayoutParams({ mode: 'grid' }), paletteId: 'hydra', seed: 1, seedOffsets: {} }),
+  bakeSample({
+    cast: [],
+    layoutParams: normalizeLayoutParams({ mode: 'grid' }),
+    paletteId: 'hydra',
+    seed: 1,
+    seedOffsets: {},
+  }),
   { ok: false, reason: 'empty-cast' },
   'an empty cast is discarded, not repaired',
 );
-const bogus = bakeSample({ cast: ['no_such_asset'], layoutParams: normalizeLayoutParams({ mode: 'grid' }), paletteId: 'hydra', seed: 1, seedOffsets: {} });
+const bogus = bakeSample({
+  cast: ['no_such_asset'],
+  layoutParams: normalizeLayoutParams({ mode: 'grid' }),
+  paletteId: 'hydra',
+  seed: 1,
+  seedOffsets: {},
+});
 assert.strictEqual(bogus.ok, false, 'an unknown asset is discarded');
 assert.ok(bogus.reason.startsWith('unknown-asset:'), 'the discard carries its reason');
 
@@ -90,7 +134,9 @@ assert.ok(bogus.reason.startsWith('unknown-asset:'), 'the discard carries its re
 const swarm = bakeSample({
   cast: [firstOf('dots'), firstOf('linework')],
   layoutParams: normalizeLayoutParams({ mode: 'swarm', particleCount: 40 }),
-  paletteId: 'hydra', seed: 7, seedOffsets: {},
+  paletteId: 'hydra',
+  seed: 7,
+  seedOffsets: {},
 });
 assert.strictEqual(swarm.ok, true, 'a particle-mode sample bakes');
 assert.strictEqual(swarm.bakePath, 'particles', 'particle modes take the bakeParticles driver');
@@ -104,7 +150,9 @@ assert.ok(FONT_CONTINGENT_IDS.has(stampId), 'the probe stamp is in the F2 set');
 const stampSample = {
   cast: [stampId],
   layoutParams: normalizeLayoutParams({ mode: 'grid', count: 20 }),
-  paletteId: 'hydra', seed: 3, seedOffsets: {},
+  paletteId: 'hydra',
+  seed: 3,
+  seedOffsets: {},
 };
 const stampBake = bakeSample(stampSample);
 assert.strictEqual(stampBake.ok, true, 'a font-contingent stamp bakes like any asset');
@@ -118,7 +166,8 @@ const run2 = runMiner({ ...SMOKE, keeps: KEEPS });
 
 assert.strictEqual(run.report.yield.sampled, 24, 'yield counts the batch');
 assert.strictEqual(
-  run.report.yield.baked + run.report.yield.discarded, 24,
+  run.report.yield.baked + run.report.yield.discarded,
+  24,
   'every sample is baked or discarded — none vanish',
 );
 assert.deepStrictEqual(
@@ -159,16 +208,26 @@ for (const f of run.finalists) {
   assert.strictEqual(rec.provenance.run, run.runId, 'provenance names the run');
   assert.strictEqual(rec.provenance.corner, f.sample.corner, 'provenance names the corner');
   assert.strictEqual(rec.config.palette.id, f.sample.paletteId, 'record carries the palette');
-  assert.deepStrictEqual(rec.config.assets, [...new Set(f.sample.cast)].sort(), 'record carries the cast, ledger order');
-  assert.ok(!('timestamp' in rec) && !('keptAt' in rec) && !('context' in rec),
-    'no crown-time facts are invented — absent stays absent');
+  assert.deepStrictEqual(
+    rec.config.assets,
+    [...new Set(f.sample.cast)].sort(),
+    'record carries the cast, ledger order',
+  );
+  assert.ok(
+    !('timestamp' in rec) && !('keptAt' in rec) && !('context' in rec),
+    'no crown-time facts are invented — absent stays absent',
+  );
 }
 
 // parity spot-check — 3 finalists re-baked + re-rendered
 for (const f of run.finalists.slice(0, 3)) {
   const rebake = bakeSample(f.sample);
   assert.strictEqual(rebake.ok, true, `finalist sample ${f.sample.index} re-bakes`);
-  assert.strictEqual(rebake.fingerprint, f.fingerprint, `finalist sample ${f.sample.index}: re-bake matches the recorded bake`);
+  assert.strictEqual(
+    rebake.fingerprint,
+    f.fingerprint,
+    `finalist sample ${f.sample.index}: re-bake matches the recorded bake`,
+  );
   const palette = resolvePalette(f.sample.paletteId, null, []);
   const h1 = stillHash(renderStillPng(rebake.items, palette));
   const h2 = stillHash(renderStillPng(f.items, palette));
@@ -176,10 +235,14 @@ for (const f of run.finalists.slice(0, 3)) {
 }
 
 // keeps features read tolerantly (legacy record without a cast)
-assert.ok(featuresOfKeep({ seed: 1, config: { layout: { mode: 'flow' }, palette: { id: 'v01d' } } }),
-  'a castless keep still featurizes — absent stays absent, nothing invented');
+assert.ok(
+  featuresOfKeep({ seed: 1, config: { layout: { mode: 'flow' }, palette: { id: 'v01d' } } }),
+  'a castless keep still featurizes — absent stays absent, nothing invented',
+);
 assert.strictEqual(featuresOfKeep({ seed: 1 }), null, 'a record with no config featurizes to null, not a guess');
 assert.strictEqual(run.config.keepsCorpus, 3, 'the run reports the corpus it measured against');
 
 console.log(formatMinerReport(run));
-console.log('miner.selfcheck: OK (#1506 — determinism exact, quota by construction, spread beats the tray, parity holds, discards honest, font stamps accounted)');
+console.log(
+  'miner.selfcheck: OK (#1506 — determinism exact, quota by construction, spread beats the tray, parity holds, discards honest, font stamps accounted)',
+);

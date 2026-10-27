@@ -6,7 +6,10 @@
 import assert from 'node:assert';
 import { useStore } from './store.js';
 import {
-  serializeProject, parseProject, normalizeSnapshots, normalizeLayers,
+  serializeProject,
+  parseProject,
+  normalizeSnapshots,
+  normalizeLayers,
   PROJECT_VERSION,
 } from './projectDocument.js';
 import { normalizeLayoutParams } from '../data/layout-modes.js';
@@ -18,7 +21,11 @@ import { ParticleSystem } from '../engine/particles.js';
 import { registerBuiltinEffects } from '../gl/bridge/builtinEffects.mjs';
 
 let n = 0;
-const ok = (name, fn) => { n++; fn(); console.log(`  ok ${n} - ${name}`); };
+const ok = (name, fn) => {
+  n++;
+  fn();
+  console.log(`  ok ${n} - ${name}`);
+};
 
 // --- Export data-loss: custom SVG assets must survive save → load (#QA-2) ---
 ok('customAssets survive serialize → parse', () => {
@@ -82,17 +89,31 @@ ok('normalizeSnapshots rejects oversized/ragged caGrid', () => {
 
 // --- normalizeLayers: dedupe, all-FX rejection, FX never content-active (#QA-9) ---
 ok('normalizeLayers dedupes ids, rejects all-FX docs, never FX-activates', () => {
-  const dup = normalizeLayers([
-    { id: 'a', type: 'content' }, { id: 'a', type: 'content' }, { id: 'b', type: 'fx' },
-  ], 'a');
-  assert.deepStrictEqual(dup.layers.map((l) => l.id), ['a', 'b'], 'duplicate id dropped');
+  const dup = normalizeLayers(
+    [
+      { id: 'a', type: 'content' },
+      { id: 'a', type: 'content' },
+      { id: 'b', type: 'fx' },
+    ],
+    'a',
+  );
+  assert.deepStrictEqual(
+    dup.layers.map((l) => l.id),
+    ['a', 'b'],
+    'duplicate id dropped',
+  );
 
   const allFx = normalizeLayers([{ id: 'x', type: 'fx' }], 'x');
   assert.strictEqual(allFx.layers, null, 'all-FX doc invalid like an empty one');
   assert.strictEqual(allFx.activeLayerId, null);
 
   const fxActive = normalizeLayers(
-    [{ id: 'c', type: 'content' }, { id: 'f', type: 'fx' }], 'f');
+    [
+      { id: 'c', type: 'content' },
+      { id: 'f', type: 'fx' },
+    ],
+    'f',
+  );
   assert.strictEqual(fxActive.activeLayerId, 'c', 'FX active falls back to content');
 });
 
@@ -111,7 +132,10 @@ ok('removeLayer keeps a content layer active and clears dead FX selection', () =
   useStore.getState().removeLayer('f1');
   s = useStore.getState();
   assert.strictEqual(s.selectedFxLayerId, null, 'deleted FX selection cleared');
-  assert.deepStrictEqual(s.layers.map((l) => l.id), ['c2']);
+  assert.deepStrictEqual(
+    s.layers.map((l) => l.id),
+    ['c2'],
+  );
 });
 
 // --- prng: the 1.0 edge is clamped, every other value bit-identical (#QA-6m) ---
@@ -123,7 +147,7 @@ ok('mkRng never returns exactly 1.0', () => {
     for (let i = 0; i < 32; i++) {
       const yb = (y >>> i) & 1;
       const xp = i >= sh ? (x >>> (i - sh)) & 1 : 0;
-      x |= ((yb ^ xp) << i);
+      x |= (yb ^ xp) << i;
     }
     return x >>> 0;
   };
@@ -132,7 +156,7 @@ ok('mkRng never returns exactly 1.0', () => {
     for (let i = 31; i >= 0; i--) {
       const yb = (y >>> i) & 1;
       const xn = i + sh < 32 ? (x >>> (i + sh)) & 1 : 0;
-      x |= ((yb ^ xn) << i);
+      x |= (yb ^ xn) << i;
     }
     return x >>> 0;
   };
@@ -151,7 +175,8 @@ ok('mkRng never returns exactly 1.0', () => {
 // --- kernel RNG: string channels isolated, numeric channels frozen (#QA-7m) ---
 ok("hashU32 isolates 'field' vs 'ca'; numeric channels bit-identical", () => {
   assert.notStrictEqual(
-    hashU32(12345, 'field', 7), hashU32(12345, 'ca', 7),
+    hashU32(12345, 'field', 7),
+    hashU32(12345, 'ca', 7),
     "'field' and 'ca' must not share a stream",
   );
   // Pin the pre-fix formula for numeric channels: the fix must not move them.
@@ -162,9 +187,13 @@ ok("hashU32 isolates 'field' vs 'ca'; numeric channels bit-identical", () => {
     h = (h ^ (h >>> 16)) >>> 0;
     return h || 1;
   };
-  for (const [seed, ch, i] of [[1, 1, 0], [999, 4, 17], [42, 7, 7919], [0x1a4f, 3, 5]]) {
-    assert.strictEqual(hashU32(seed, ch, i), oldHashU32(seed, ch, i),
-      `numeric channel ${ch} must be bit-identical`);
+  for (const [seed, ch, i] of [
+    [1, 1, 0],
+    [999, 4, 17],
+    [42, 7, 7919],
+    [0x1a4f, 3, 5],
+  ]) {
+    assert.strictEqual(hashU32(seed, ch, i), oldHashU32(seed, ch, i), `numeric channel ${ch} must be bit-identical`);
   }
 });
 
@@ -173,7 +202,11 @@ ok('colorForPlacement reports the true slot with duplicate swatches', () => {
   const swatches = ['#111111', '#222222', '#111111', '#333333'];
   // band t=0.6 → slot 2 (the second '#111111'); indexOf would say slot 0.
   const { color, slot } = colorForPlacement({
-    swatches, strategy: 'band', t: 0.6, index: 0, rng: mkRng(1),
+    swatches,
+    strategy: 'band',
+    t: 0.6,
+    index: 0,
+    rng: mkRng(1),
   });
   assert.strictEqual(color, '#111111');
   assert.strictEqual(slot, 2, `slot must be 2, not indexOf's 0`);
@@ -217,7 +250,9 @@ ok('gaussian blur is gone from the GPU builtins (#308)', () => {
   const defs = {};
   registerBuiltinEffects({
     registerProgram() {},
-    defineEffect: (kind, def) => { defs[kind] = def; },
+    defineEffect: (kind, def) => {
+      defs[kind] = def;
+    },
   });
   assert.ok(!('blur' in defs), 'blur is not a registered builtin effect');
   assert.ok(!defs.blur?.passes, 'no blur pass machinery survives');

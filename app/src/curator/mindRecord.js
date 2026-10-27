@@ -35,25 +35,49 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
       if (!e || conduct.length >= CONDUCT_RECORD_MAX || !CONDUCT_STATUS.includes(e.status)) return;
       const op = validateRouteOp(e.op);
       if (!op) return;
-      conduct.push([getFrame() | 0, e.status, typeof e.reason === 'string' ? e.reason.slice(0, 16) : null, Number.isInteger(e.bar) ? e.bar : 0,
-        Number.isInteger(e.landBar) ? e.landBar : null, op, e.delta ? JSON.parse(JSON.stringify(e.delta)) : null]);
+      conduct.push([
+        getFrame() | 0,
+        e.status,
+        typeof e.reason === 'string' ? e.reason.slice(0, 16) : null,
+        Number.isInteger(e.bar) ? e.bar : 0,
+        Number.isInteger(e.landBar) ? e.landBar : null,
+        op,
+        e.delta ? JSON.parse(JSON.stringify(e.delta)) : null,
+      ]);
     },
     /** A decision as mindLive published it, and whether it asked the stage for something. */
     update(d, requested) {
       if (!d || rows.length >= MIND_RECORD_MAX) return;
-      const row = [getFrame() | 0, d.persona, d.bar, d.backend, d.seed >>> 0, d.invented ? 1 : 0, requested ? 1 : 0,
-        JSON.parse(JSON.stringify(d.reply))];
+      const row = [
+        getFrame() | 0,
+        d.persona,
+        d.bar,
+        d.backend,
+        d.seed >>> 0,
+        d.invented ? 1 : 0,
+        requested ? 1 : 0,
+        JSON.parse(JSON.stringify(d.reply)),
+      ];
       if (d.traits) row.push(JSON.parse(JSON.stringify(d.traits)));
       rows.push(row);
       if (d.backend !== 'rules' && !systems[d.backend]) {
         let s;
-        try { s = getSystem(); } catch { s = null; }
-        if (s && s.backend === d.backend) systems[d.backend] = { ...(s.model ? { model: String(s.model).slice(0, 64) } : {}), ...(s.os ? { os: String(s.os).slice(0, 32) } : {}) };
+        try {
+          s = getSystem();
+        } catch {
+          s = null;
+        }
+        if (s && s.backend === d.backend)
+          systems[d.backend] = {
+            ...(s.model ? { model: String(s.model).slice(0, 64) } : {}),
+            ...(s.os ? { os: String(s.os).slice(0, 32) } : {}),
+          };
       }
     },
     finish() {
       return {
-        version: rows.some((r) => r.length === 9) ? 2 : 1, decisions: rows.map((r) => r.slice()),
+        version: rows.some((r) => r.length === 9) ? 2 : 1,
+        decisions: rows.map((r) => r.slice()),
         ...(Object.keys(systems).length ? { systems: JSON.parse(JSON.stringify(systems)) } : {}),
         ...(conduct.length ? { conduct: JSON.parse(JSON.stringify(conduct)) } : {}), // absent when Davis did not conduct: the file is unchanged
       };
@@ -65,20 +89,23 @@ export function createMindRecorder({ getFrame = () => 0, getSystem = () => null 
 export function checkMindRecord(r) {
   if (!r || typeof r !== 'object' || !VERSIONS.includes(r.version) || !Array.isArray(r.decisions)) return null;
   if (r.decisions.length > MIND_RECORD_MAX) return null;
-  if (r.systems !== undefined) { // #1463 — optional: the model/system each non-rules backend ran on
+  if (r.systems !== undefined) {
+    // #1463 — optional: the model/system each non-rules backend ran on
     if (!r.systems || typeof r.systems !== 'object' || Array.isArray(r.systems)) return null;
     for (const [k, v] of Object.entries(r.systems)) {
       if (!BACKENDS.includes(k) || !v || typeof v !== 'object') return null;
       for (const f of Object.values(v)) if (typeof f !== 'string' || f.length > 64) return null;
     }
   }
-  if (r.conduct !== undefined) { // #1483 — optional: Davis's route proposals and what became of them
+  if (r.conduct !== undefined) {
+    // #1483 — optional: Davis's route proposals and what became of them
     if (!Array.isArray(r.conduct) || r.conduct.length > CONDUCT_RECORD_MAX) return null;
     let last = -1;
     for (const c of r.conduct) {
       if (!Array.isArray(c) || c.length !== 7) return null;
       const [frame, status, reason, bar, landBar, op, delta] = c;
-      if (!Number.isInteger(frame) || frame < last || !CONDUCT_STATUS.includes(status) || !Number.isInteger(bar)) return null;
+      if (!Number.isInteger(frame) || frame < last || !CONDUCT_STATUS.includes(status) || !Number.isInteger(bar))
+        return null;
       if (reason !== null && typeof reason !== 'string') return null;
       if (landBar !== null && !Number.isInteger(landBar)) return null;
       if (!validateRouteOp(op)) return null;
@@ -104,7 +131,15 @@ export function checkMindRecord(r) {
 /** A row back to the decision mindLive published. */
 export function decisionOf(row) {
   const [, persona, bar, backend, seed, invented, , reply, traits] = row;
-  return { persona, bar, backend, seed, invented: invented === 1, reply: JSON.parse(JSON.stringify(reply)), ...(traits ? { traits: JSON.parse(JSON.stringify(traits)) } : {}) };
+  return {
+    persona,
+    bar,
+    backend,
+    seed,
+    invented: invented === 1,
+    reply: JSON.parse(JSON.stringify(reply)),
+    ...(traits ? { traits: JSON.parse(JSON.stringify(traits)) } : {}),
+  };
 }
 
 /**
@@ -117,15 +152,26 @@ export function createMindReplay(record) {
   const cond = checkMindRecord(record) && Array.isArray(record.conduct) ? record.conduct : [];
   let next = 0; // the first row not yet returned
   let cnext = 0; // the first conducting row not yet returned
-  const firstAt = (frame) => { let i = 0; while (i < rows.length && rows[i][0] < frame) i++; return i; };
-  const cfirstAt = (frame) => { let i = 0; while (i < cond.length && cond[i][0] < frame) i++; return i; };
+  const firstAt = (frame) => {
+    let i = 0;
+    while (i < rows.length && rows[i][0] < frame) i++;
+    return i;
+  };
+  const cfirstAt = (frame) => {
+    let i = 0;
+    while (i < cond.length && cond[i][0] < frame) i++;
+    return i;
+  };
   return {
     step(frame) {
       const out = [];
       while (next < rows.length && rows[next][0] <= frame) out.push(rows[next++]);
       return out;
     },
-    seek(frame) { next = firstAt(frame); cnext = cfirstAt(frame); },
+    seek(frame) {
+      next = firstAt(frame);
+      cnext = cfirstAt(frame);
+    },
     /** The conducting outcomes recorded at frames the cursor has passed, as mind:route payloads. */
     conductStep(frame) {
       const out = [];
@@ -135,6 +181,8 @@ export function createMindReplay(record) {
       }
       return out;
     },
-    get size() { return rows.length; },
+    get size() {
+      return rows.length;
+    },
   };
 }

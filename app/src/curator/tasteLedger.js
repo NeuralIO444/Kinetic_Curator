@@ -95,23 +95,25 @@ export function serializeRow(row) {
 export function parseLedger(text, warn = (m) => console.warn(m)) {
   const rows = [];
   let skipped = 0;
-  String(text ?? '').split('\n').forEach((line, i) => {
-    if (!line.trim()) return;
-    let o;
-    try {
-      o = JSON.parse(line);
-    } catch {
-      skipped++;
-      warn(`[ledger] line ${i + 1}: not JSON — skipped`);
-      return;
-    }
-    if (!isLedgerRow(o)) {
-      skipped++;
-      warn(`[ledger] line ${i + 1}: not a ledger row — skipped`);
-      return;
-    }
-    rows.push(o);
-  });
+  String(text ?? '')
+    .split('\n')
+    .forEach((line, i) => {
+      if (!line.trim()) return;
+      let o;
+      try {
+        o = JSON.parse(line);
+      } catch {
+        skipped++;
+        warn(`[ledger] line ${i + 1}: not JSON — skipped`);
+        return;
+      }
+      if (!isLedgerRow(o)) {
+        skipped++;
+        warn(`[ledger] line ${i + 1}: not a ledger row — skipped`);
+        return;
+      }
+      rows.push(o);
+    });
   return { rows, skipped };
 }
 
@@ -135,7 +137,10 @@ export function readLedgerText(kind, storage = defaultStorage()) {
 
 /** Line counts for the PIPELINE readout. */
 export function ledgerCounts(storage = defaultStorage()) {
-  const count = (kind) => readLedgerText(kind, storage).split('\n').filter((l) => l.trim()).length;
+  const count = (kind) =>
+    readLedgerText(kind, storage)
+      .split('\n')
+      .filter((l) => l.trim()).length;
   return { keeps: count('keeps'), passes: count('passes') };
 }
 
@@ -163,7 +168,10 @@ export function appendToLedger(kind, rec, projectRef, opts = {}) {
   if (!LEDGER_KINDS.includes(kind)) throw new Error(`unknown ledger: ${kind}`);
   const report = opts.report || (() => {});
   const row = ledgerRow(rec, projectRef);
-  if (!row) { report('rejected'); return null; }
+  if (!row) {
+    report('rejected');
+    return null;
+  }
   const line = serializeRow(row);
   const storage = 'storage' in opts ? opts.storage : defaultStorage();
   const warn = opts.warn || ((m, e) => console.warn(m, e));
@@ -179,7 +187,7 @@ export function appendToLedger(kind, rec, projectRef, opts = {}) {
   } else {
     report('saved');
   }
-  const sink = 'fileSink' in opts ? opts.fileSink : (isTauri() ? appendToAppData : null);
+  const sink = 'fileSink' in opts ? opts.fileSink : isTauri() ? appendToAppData : null;
   if (sink) {
     Promise.resolve()
       .then(() => sink(kind, line))

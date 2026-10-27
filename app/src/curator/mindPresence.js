@@ -33,7 +33,14 @@ export const TIER_SHAPE = Object.freeze({
 /** Cool-down: multipliers on frequency and strength, and on the rest between moves. */
 export const COOL = Object.freeze({ freq: 0.4, strength: 0.6, gap: 2 });
 /** Which kind of presence a mood calls up in the third. */
-export const GHOST_FOR_MOOD = Object.freeze({ lift: 'warm', drive: 'warm', calm: 'drift', sparse: 'drift', shift: 'lean', weird: 'lean' });
+export const GHOST_FOR_MOOD = Object.freeze({
+  lift: 'warm',
+  drive: 'warm',
+  calm: 'drift',
+  sparse: 'drift',
+  shift: 'lean',
+  weird: 'lean',
+});
 export const GHOST_KINDS = Object.freeze(['warm', 'drift', 'lean']);
 export const METER_BAND_COUNT = 7;
 
@@ -47,7 +54,13 @@ export function shapeAt(level) {
   const b = TIER_SHAPE[Math.min(4, Math.floor(l) + 1)];
   const f = l - Math.floor(l);
   const mix = (k) => a[k] + (b[k] - a[k]) * f;
-  return { freq: mix('freq'), strength: mix('strength'), gap: mix('gap'), lineMax: Math.round(mix('lineMax')), ghostMax: mix('ghostMax') };
+  return {
+    freq: mix('freq'),
+    strength: mix('strength'),
+    gap: mix('gap'),
+    lineMax: Math.round(mix('lineMax')),
+    ghostMax: mix('ghostMax'),
+  };
 }
 
 /** A small seeded generator: the same (seed, salt) always rolls the same numbers. */
@@ -65,7 +78,8 @@ export function rng(seed, salt) {
 const SALT = { lois: 11, davis: 23, queen: 37 };
 
 /** Is this reply's state just the face the room already shows (a reading, not a move)? */
-const isReading = (persona, state, room) => !!state && room && state.id === room[persona] && state.intensity === 1 && state.decay === 0;
+const isReading = (persona, state, room) =>
+  !!state && room && state.id === room[persona] && state.intensity === 1 && state.decay === 0;
 
 /**
  * One persona's personality. The caller feeds it every decision (in bar order) with the persona's current tier and
@@ -81,7 +95,9 @@ export function createPresence(persona, { level = 1 } = {}) {
   let episode = null; // the third: { kind, from, until, strength, band }
 
   return {
-    get level() { return eased; },
+    get level() {
+      return eased;
+    },
     /**
      * @param d        a decision from the thinker { persona, bar, backend, seed, invented, reply }
      * @param tier     1..4 (the highest reached)
@@ -107,7 +123,13 @@ export function createPresence(persona, { level = 1 } = {}) {
         if (episode && bar >= episode.until) episode = null;
         if (!episode && !away && bar - lastMove >= gap && roll() < freq) {
           const len = temper.hold + Math.floor(eased);
-          episode = { kind: GHOST_FOR_MOOD[reply.mood] || 'drift', from: bar, until: bar + len, strength: round2(clamp(sh.ghostMax * temper.intensity * mod.intensity * (cool ? COOL.strength : 1), 0, 1)), band: Math.floor(roll() * METER_BAND_COUNT) };
+          episode = {
+            kind: GHOST_FOR_MOOD[reply.mood] || 'drift',
+            from: bar,
+            until: bar + len,
+            strength: round2(clamp(sh.ghostMax * temper.intensity * mod.intensity * (cool ? COOL.strength : 1), 0, 1)),
+            band: Math.floor(roll() * METER_BAND_COUNT),
+          };
           lastMove = bar;
         }
         if (episode) {
@@ -120,12 +142,14 @@ export function createPresence(persona, { level = 1 } = {}) {
 
       const moved = !!reply.line || (!!reply.state && !isReading(persona, reply.state, room));
       if (moved) {
-        if (bar - lastMove < gap) { // too soon after the last move: she rests, the face stays honest
+        if (bar - lastMove < gap) {
+          // too soon after the last move: she rests, the face stays honest
           if (reply.state && !isReading(persona, reply.state, room)) delete reply.state;
           delete reply.line;
           traits.r = 1;
         } else {
-          if (reply.state && !isReading(persona, reply.state, room)) reply.state = { ...reply.state, intensity: round2(clamp(reply.state.intensity * strength, 0.05, 1)) };
+          if (reply.state && !isReading(persona, reply.state, room))
+            reply.state = { ...reply.state, intensity: round2(clamp(reply.state.intensity * strength, 0.05, 1)) };
           if (reply.line && reply.line.length > sh.lineMax) delete reply.line; // longer lines are earned, never cut mid-thought
           lastMove = bar;
         }
@@ -137,7 +161,11 @@ export function createPresence(persona, { level = 1 } = {}) {
       }
       return { ...d, reply, invented: isInvented(persona, reply), traits };
     },
-    reset(nextLevel = eased) { eased = clamp(nextLevel, 1, 4); lastMove = -Infinity; episode = null; },
+    reset(nextLevel = eased) {
+      eased = clamp(nextLevel, 1, 4);
+      lastMove = -Infinity;
+      episode = null;
+    },
   };
 }
 
@@ -150,7 +178,8 @@ export function checkTraits(tr) {
   if (tr.r !== undefined && tr.r !== 1) return false;
   if (tr.gh !== undefined) {
     const g = tr.gh;
-    if (!g || typeof g !== 'object' || !GHOST_KINDS.includes(g.k) || !Number.isFinite(g.s) || g.s < 0 || g.s > 1) return false;
+    if (!g || typeof g !== 'object' || !GHOST_KINDS.includes(g.k) || !Number.isFinite(g.s) || g.s < 0 || g.s > 1)
+      return false;
     if (!Number.isInteger(g.b) || g.b < 0 || g.b >= METER_BAND_COUNT || Object.keys(g).length !== 3) return false;
   }
   return true;

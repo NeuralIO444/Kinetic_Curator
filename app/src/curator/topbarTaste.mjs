@@ -48,7 +48,13 @@ export function voiceBreathS(driftWeight) {
  */
 export const VOICE_ACT_MS = 20000;
 export function voiceLevel(lastRollAgoMs) {
-  if (typeof lastRollAgoMs !== 'number' || !Number.isFinite(lastRollAgoMs) || lastRollAgoMs < 0 || lastRollAgoMs >= VOICE_ACT_MS) return 0;
+  if (
+    typeof lastRollAgoMs !== 'number' ||
+    !Number.isFinite(lastRollAgoMs) ||
+    lastRollAgoMs < 0 ||
+    lastRollAgoMs >= VOICE_ACT_MS
+  )
+    return 0;
   return Math.max(1, Math.min(4, Math.ceil((1 - lastRollAgoMs / VOICE_ACT_MS) * 4)));
 }
 

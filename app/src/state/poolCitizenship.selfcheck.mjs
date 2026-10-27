@@ -29,7 +29,11 @@ import { createLiveResolver, getLastSpawnDecisions } from '../gl/liveResolve.mjs
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const S = () => useStore.getState();
 const clone = (o) => JSON.parse(JSON.stringify(o));
 
@@ -57,7 +61,10 @@ ok('toggle / solo / toggle-all speak for the citizen like any asset', () => {
   assert.equal(S().enabledAssets.creature, true);
   S().soloAsset('creature');
   assert.equal(S().enabledAssets.creature, true);
-  assert.ok(Object.entries(S().enabledAssets).every(([id, on]) => id === 'creature' || on === false), 'soloing the citizen leaves it alone on');
+  assert.ok(
+    Object.entries(S().enabledAssets).every(([id, on]) => id === 'creature' || on === false),
+    'soloing the citizen leaves it alone on',
+  );
   S().soloAsset('org_blob_01');
   assert.equal(S().enabledAssets.creature, false, 'soloing a mark switches the citizen off, explicitly');
   S().toggleAllAssets(true);
@@ -120,7 +127,11 @@ ok('sanitizeAssetOptions keeps only declared options at non-default values', () 
 // ── 3. the document round-trip ──────────────────────────────────────────────
 ok('the family option and the citizen switch ride the project document; the governor shed does not', () => {
   // #1694 S3 — the count is set through its BUILD param home (layoutParams.creatures)
-  useStore.setState({ assetOptions: { creature: { family: 'dish' } }, creatureShed: 2, layoutParams: { ...S().layoutParams, creatures: 3 } });
+  useStore.setState({
+    assetOptions: { creature: { family: 'dish' } },
+    creatureShed: 2,
+    layoutParams: { ...S().layoutParams, creatures: 3 },
+  });
   const doc = serializeProject(S());
   assert.deepEqual(doc.assetOptions, { creature: { family: 'dish' } });
   assert.equal(doc.layoutParams.creatures, 3, 'the count rides the document inside layoutParams');
@@ -140,20 +151,53 @@ ok('the family option and the citizen switch ride the project document; the gove
 
 // ── 4–5. the resolver: strip test + gates ───────────────────────────────────
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
-const PINS = [{ x: 400, y: 300 }, { x: 600, y: 300 }, { x: 400, y: 450 }, { x: 600, y: 450 }];
+const PINS = [
+  { x: 400, y: 300 },
+  { x: 600, y: 300 },
+  { x: 400, y: 450 },
+  { x: 600, y: 450 },
+];
 const ALL_ON = Object.fromEntries(ASSETS.filter((a) => a.id !== 'creature').map((a) => [a.id, true]));
 const baseInput = {
-  canvasW: 1000, canvasH: 700, layers: [L('a')], activeLayerId: 'a', layerSnapshots: {}, seed: 4242, seedOffsets: null,
-  paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, assetWeightOverrides: {}, customAssets: [],
-  quality: 'balanced', lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, perfTier1: false, assetThin: false,
-  slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
-  assetAttach: {}, creatureCount: 4,
+  canvasW: 1000,
+  canvasH: 700,
+  layers: [L('a')],
+  activeLayerId: 'a',
+  layerSnapshots: {},
+  seed: 4242,
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  caGrid: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  quality: 'balanced',
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  perfClampOverride: null,
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  scaleMul: 1,
+  alphaBoost: 0,
+  effectiveScale: [0.5, 1.5],
+  effectiveAlpha: [20, 100],
+  phraseWrapGen: 0,
+  attractor: null,
+  assetAttach: {},
+  creatureCount: 4,
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 300, particleCount: 150 },
 };
 const scene = (over) => ({
   ...baseInput,
-  dishPins: PINS, dishFormed: [true, true, true, true], dishLimbs: [2, 2, 2, 2],
-  dishHosted: [true, false, false, false], dishPressure: [1, 1, 1, 1], dishTraits: [],
+  dishPins: PINS,
+  dishFormed: [true, true, true, true],
+  dishLimbs: [2, 2, 2, 2],
+  dishHosted: [true, false, false, false],
+  dishPressure: [1, 1, 1, 1],
+  dishTraits: [],
   ...over,
 });
 const runScene = (input, frames = 90) => {
@@ -161,24 +205,39 @@ const runScene = (input, frames = 90) => {
   let out = null;
   for (let f = 0; f < frames; f++) out = r.resolveLayers({ ...input, loopTimeMs: f * 16.7, dtSec: 1 / 60 });
   const items = out[0].items;
-  const result = { items, creatureItems: items.filter((it) => it._creature).length, decisions: clone(getLastSpawnDecisions()) };
+  const result = {
+    items,
+    creatureItems: items.filter((it) => it._creature).length,
+    decisions: clone(getLastSpawnDecisions()),
+  };
   r.dispose();
   return result;
 };
 
 ok('strip test: citizen keys absent ≡ citizen at explicit defaults (byte-identical frames)', () => {
   const absent = runScene(scene({ enabledAssets: { ...ALL_ON } }));
-  const explicit = runScene(scene({
-    enabledAssets: { ...ALL_ON, creature: true },
-    assetOptions: { creature: { family: 'both' } },
-  }));
+  const explicit = runScene(
+    scene({
+      enabledAssets: { ...ALL_ON, creature: true },
+      assetOptions: { creature: { family: 'both' } },
+    }),
+  );
   assert.ok(absent.creatureItems > 0, 'the scene really bears creatures');
   assert.equal(JSON.stringify(absent.items), JSON.stringify(explicit.items), 'placements + creature items identical');
   assert.deepEqual(absent.decisions, explicit.decisions, 'spawn decisions identical');
 });
 
 ok('citizen off: nothing is born and no homes are sought', () => {
-  const off = runScene(scene({ enabledAssets: { ...ALL_ON, creature: false }, dishPins: [], dishFormed: [], dishHosted: [], dishLimbs: [], dishPressure: [] }));
+  const off = runScene(
+    scene({
+      enabledAssets: { ...ALL_ON, creature: false },
+      dishPins: [],
+      dishFormed: [],
+      dishHosted: [],
+      dishLimbs: [],
+      dishPressure: [],
+    }),
+  );
   assert.equal(off.creatureItems, 0);
   assert.deepEqual(off.decisions.dishPins, [], 'the spawn half seeks no homes while the citizen is off');
 });
@@ -186,10 +245,20 @@ ok('citizen off: nothing is born and no homes are sought', () => {
 ok('family selects: moth-only and dish-only partition the full stage', () => {
   // Two pins: pin 0 hosts the dish creature, pin 1 grows a moth (a hosted pin is the dish
   // creature's alone — the families partition by pin, so the stage must offer both kinds).
-  const twoPins = { dishPins: [PINS[0], PINS[1]], dishFormed: [true, true], dishLimbs: [2, 2], dishHosted: [true, false], dishPressure: [1, 1] };
+  const twoPins = {
+    dishPins: [PINS[0], PINS[1]],
+    dishFormed: [true, true],
+    dishLimbs: [2, 2],
+    dishHosted: [true, false],
+    dishPressure: [1, 1],
+  };
   const both = runScene(scene({ ...twoPins, enabledAssets: { ...ALL_ON } }));
-  const moth = runScene(scene({ ...twoPins, enabledAssets: { ...ALL_ON }, assetOptions: { creature: { family: 'moth' } } }));
-  const dish = runScene(scene({ ...twoPins, enabledAssets: { ...ALL_ON }, assetOptions: { creature: { family: 'dish' } } }));
+  const moth = runScene(
+    scene({ ...twoPins, enabledAssets: { ...ALL_ON }, assetOptions: { creature: { family: 'moth' } } }),
+  );
+  const dish = runScene(
+    scene({ ...twoPins, enabledAssets: { ...ALL_ON }, assetOptions: { creature: { family: 'dish' } } }),
+  );
   assert.ok(moth.creatureItems > 0 && dish.creatureItems > 0, 'each family appears alone');
   assert.equal(both.creatureItems, moth.creatureItems + dish.creatureItems, 'both = moth + dish, nothing else');
 });
@@ -218,13 +287,18 @@ ok('weight biases NEW home choice by fertility; unweighted is the legacy centre-
 // ── 7. pin-still (Q1) ───────────────────────────────────────────────────────
 ok('pin-still: the anchor holds (no drift), the animal keeps living (breath intact)', () => {
   const motion = (still) => ({
-    driverSec: 1.3, amounts: { drift: 1, breath: 1 }, canvasW: 1000, canvasH: 700,
+    driverSec: 1.3,
+    amounts: { drift: 1, breath: 1 },
+    canvasW: 1000,
+    canvasH: 700,
     ...(still ? { stillAssets: new Set(['creature']) } : {}),
   });
   const free = hoverPose(motion(false), 4242, 0);
   const held = hoverPose(motion(true), 4242, 0);
   assert.ok(free.dx !== 0 || free.dy !== 0, 'the un-pinned home drifts (the control case)');
-  assert.equal(held.dx, 0); assert.equal(held.dy, 0); assert.equal(held.rot, 0);
+  assert.equal(held.dx, 0);
+  assert.equal(held.dy, 0);
+  assert.equal(held.rot, 0);
   assert.equal(held.scale, free.scale, 'the breath scale is untouched — the animal keeps living');
 });
 

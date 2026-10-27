@@ -10,23 +10,53 @@ import { createClockRecorder } from './clockRecord.js';
 import { takeStripModel } from './takeStrip.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 const src = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
 
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
 const stable = {
-  canvasW: 640, canvasH: 480, layers: [L('a')], activeLayerId: 'a', layerSnapshots: {}, seedOffsets: null, paletteId: 'bone',
-  paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {}, customAssets: [],
-  lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1, alphaBoost: 0, phraseWrapGen: 0,
-  reducedMotion: false, quality: 'balanced', perfTier1: false, assetThin: false, slowRender: false,
-  effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], assetAttach: {}, attractor: null, dishPins: [],
+  canvasW: 640,
+  canvasH: 480,
+  layers: [L('a')],
+  activeLayerId: 'a',
+  layerSnapshots: {},
+  seedOffsets: null,
+  paletteId: 'bone',
+  paletteOverrides: null,
+  userPalettes: [],
+  caGrid: null,
+  enabledAssets: null,
+  assetWeightOverrides: {},
+  customAssets: [],
+  lockedParams: {},
+  batchPaused: false,
+  focusSwap: false,
+  perfClampOverride: null,
+  scaleMul: 1,
+  alphaBoost: 0,
+  phraseWrapGen: 0,
+  reducedMotion: false,
+  quality: 'balanced',
+  perfTier1: false,
+  assetThin: false,
+  slowRender: false,
+  effectiveScale: [0.5, 1.5],
+  effectiveAlpha: [20, 100],
+  assetAttach: {},
+  attractor: null,
+  dishPins: [],
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 30 },
 };
 /** An 8.3 s take at 120 BPM: bars at 2, 4, 6 and 8 s; the clock section is optional. */
 function take({ withClock }) {
   const rec = createPerformanceRecorder();
   const r = withResolveTap(createLiveResolver);
-  setResolveTap((i) => rec.onInput(i)); setResolveOutputTap((o) => rec.onOutput(o));
+  setResolveTap((i) => rec.onInput(i));
+  setResolveOutputTap((o) => rec.onOutput(o));
   let frame = 0;
   const clock = createClockRecorder({ initialBpm: 120, getFrame: () => frame });
   let t = 0;
@@ -34,20 +64,23 @@ function take({ withClock }) {
     t += 1000 / 60;
     r.resolveLayers({ ...stable, seed: 5, loopTimeMs: t, dtSec: 1 / 60 });
   }
-  setResolveTap(null); setResolveOutputTap(null); r.dispose();
+  setResolveTap(null);
+  setResolveOutputTap(null);
+  r.dispose();
   const perf = rec.finish();
   return withClock ? { ...perf, clock: clock.finish() } : perf;
 }
 const withBars = take({ withClock: true });
 const noBars = take({ withClock: false });
 
-ok('a take with a clock reads BAR n / m, and the last bar is the take\'s real count', () => {
+ok("a take with a clock reads BAR n / m, and the last bar is the take's real count", () => {
   const m = takeStripModel(withBars);
   assert.equal(m.hasBars, true);
   assert.ok(m.lastBar >= 3, `bars (${m.lastBar})`);
   assert.equal(m.labelFor(0), `BAR 1 / ${m.lastBar + 1}`);
   assert.equal(m.labelFor(withBars.frames - 1), `BAR ${m.lastBar + 1} / ${m.lastBar + 1}`);
-  assert.equal(m.positionOf(0), 0); assert.equal(m.positionOf(withBars.frames - 1), 1);
+  assert.equal(m.positionOf(0), 0);
+  assert.equal(m.positionOf(withBars.frames - 1), 1);
 });
 
 ok('a drag snaps to a downbeat, and the downbeat is the same frame the bar lookup gives', () => {

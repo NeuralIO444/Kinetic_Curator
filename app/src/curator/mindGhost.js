@@ -13,13 +13,24 @@ let current = NONE;
 const listeners = new Set();
 
 /** What the meter should lean toward right now: { kind, strength 0..1, band }. Strength 0 = nothing there. */
-export function getGhost() { return current; }
-export function subscribeGhost(fn) { listeners.add(fn); return () => listeners.delete(fn); }
+export function getGhost() {
+  return current;
+}
+export function subscribeGhost(fn) {
+  listeners.add(fn);
+  return () => listeners.delete(fn);
+}
 
 function set(next) {
   if (next.kind === current.kind && next.strength === current.strength && next.band === current.band) return;
   current = next;
-  for (const fn of listeners) { try { fn(); } catch { /* a listener must not break the bus */ } }
+  for (const fn of listeners) {
+    try {
+      fn();
+    } catch {
+      /* a listener must not break the bus */
+    }
+  }
 }
 
 /** Start following her decisions. Returns stop(). */
@@ -29,8 +40,13 @@ export function startGhost() {
     const g = d.traits && d.traits.gh;
     set(g ? Object.freeze({ kind: g.k, strength: g.s, band: g.b }) : NONE);
   });
-  return () => { off(); resetGhost(); };
+  return () => {
+    off();
+    resetGhost();
+  };
 }
 
 /** A take starts or ends: nothing lingers. */
-export function resetGhost() { set(NONE); }
+export function resetGhost() {
+  set(NONE);
+}

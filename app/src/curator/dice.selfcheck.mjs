@@ -59,10 +59,17 @@ for (let i = 0; i < 500; i++) {
 }
 
 // 3. A roll: 3 finalists, valid layouts, casts 2–5 of real unique assets.
-const mem = (() => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, v) }; })();
+const mem = (() => {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, v) };
+})();
 const roll = rollDice({ assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: readCrowns(mem) });
 assert.strictEqual(roll.finalists.length, DICE_FINALISTS, 'LOIS shortlists exactly 3');
-assert.strictEqual(roll.rolled, DICE_CANDIDATES_BASE + Math.round(0.2 * DICE_CANDIDATES_WILD), 'FLOW deals few candidates');
+assert.strictEqual(
+  roll.rolled,
+  DICE_CANDIDATES_BASE + Math.round(0.2 * DICE_CANDIDATES_WILD),
+  'FLOW deals few candidates',
+);
 assert.strictEqual(roll.kept, DICE_FINALISTS);
 for (const f of roll.finalists) {
   assert.ok(layoutIds.has(f.layoutId), `${f.layoutId} is a real layout`);
@@ -73,7 +80,11 @@ for (const f of roll.finalists) {
 }
 // Finalists are the top 3 by score, sorted.
 const sorted = [...roll.candidates].sort((a, b) => b.score - a.score).slice(0, 3);
-assert.deepStrictEqual(roll.finalists.map((f) => f.layoutId + f.assetIds.join(',')), sorted.map((f) => f.layoutId + f.assetIds.join(',')), 'finalists are the top-3 scored');
+assert.deepStrictEqual(
+  roll.finalists.map((f) => f.layoutId + f.assetIds.join(',')),
+  sorted.map((f) => f.layoutId + f.assetIds.join(',')),
+  'finalists are the top-3 scored',
+);
 
 // 4. Determinism: same seed, same dice.
 const again = rollDice({ assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: [] });
@@ -87,7 +98,9 @@ assert.ok(ugly.rolled > roll.rolled, 'UGLY proposes more than FLOW');
 // 6. Layout proposals are uniform-ish: every mode appears across many rolls.
 const seen = new Set();
 for (let i = 0; i < 40; i++) {
-  for (const c of rollDice({ assets: ASSETS, rng: mulberry32(1000 + i), davisCode: null, scorer, crowns: [] }).candidates) seen.add(c.layoutId);
+  for (const c of rollDice({ assets: ASSETS, rng: mulberry32(1000 + i), davisCode: null, scorer, crowns: [] })
+    .candidates)
+    seen.add(c.layoutId);
 }
 assert.strictEqual(seen.size, 15, `all 15 modes proposed, saw ${seen.size}`);
 
@@ -97,7 +110,14 @@ const swapped = rollDice({ assets: ASSETS, rng: mulberry32(7), davisCode: null, 
 assert.strictEqual(swapped.finalists.length, 3, 'swapped scorer still shortlists 3');
 
 // 8. Auto-absorb: a brand-new pack with none of the known tags still deals full casts.
-const alienPack = Array.from({ length: 30 }, (_, i) => ({ id: `alien_${i}`, category: 'xenomorphic', tags: ['unseen'], weight: 'medium', density: 'medium', svg: '<circle/>' }));
+const alienPack = Array.from({ length: 30 }, (_, i) => ({
+  id: `alien_${i}`,
+  category: 'xenomorphic',
+  tags: ['unseen'],
+  weight: 'medium',
+  density: 'medium',
+  svg: '<circle/>',
+}));
 const alienCast = dealCast(alienPack, 5, mulberry32(3), 0.5, []);
 assert.strictEqual(alienCast.length, 5, 'alien pack deals a full cast of 5');
 assert.strictEqual(new Set(alienCast).size, 5, 'alien cast has no duplicates');
@@ -136,30 +156,59 @@ assert.ok(affinity(kinA, farB, ev) > affinity(kinA, kinB, []), 'sustained crowne
 // (stream, casts, shares) is untouched; scores never gate; the anchored
 // stratum keeps a finalist voice in the deal's own proportion; a crown
 // from an ordered tray carries the model's stamp (spec §5/§6).
-const chainOf = (pairs, rest) => (pairs.length === 0
-  ? { leaf: rest }
-  : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) });
+const chainOf = (pairs, rest) =>
+  pairs.length === 0
+    ? { leaf: rest }
+    : { f: 0, op: '=', v: pairs[0][0], gain: 1, y: { leaf: pairs[0][1] }, n: chainOf(pairs.slice(1), rest) };
 const XGB_TASTE = validateTaste({
-  kind: 'kc-taste', version: 1, featuresVersion: FEATURES_VERSION, model: 'dice fixture',
-  dims: 1152, labels: { likes: 10, passes: 10 },
+  kind: 'kc-taste',
+  version: 1,
+  featuresVersion: FEATURES_VERSION,
+  model: 'dice fixture',
+  dims: 1152,
+  labels: { likes: 10, passes: 10 },
   head: {
-    kind: XGB_HEAD_KIND, objective: 'binary:logistic', baseScore: 0, fidelity: 0.9,
+    kind: XGB_HEAD_KIND,
+    objective: 'binary:logistic',
+    baseScore: 0,
+    fidelity: 0.9,
     features: ['system'],
-    trees: [chainOf([['fibonacci', 1.2], ['orbit', 0.9], ['grid', 0.4], ['swarm', -0.9], ['eden', -0.5]], 0)],
+    trees: [
+      chainOf(
+        [
+          ['fibonacci', 1.2],
+          ['orbit', 0.9],
+          ['grid', 0.4],
+          ['swarm', -0.9],
+          ['eden', -0.5],
+        ],
+        0,
+      ),
+    ],
   },
 }).taste;
 const xgbScorer = makeXgbScorer(XGB_TASTE);
 assert.ok(xgbScorer && xgbScorer.id === 'xgb-head-v1', 'fixture head yields the xgb scorer');
 const META = { tasteVersion: 1, headKind: XGB_HEAD_KIND };
-const orderedArgs = { assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: [], orderScorer: xgbScorer, orderMeta: META };
+const orderedArgs = {
+  assets: ASSETS,
+  rng: mulberry32(7),
+  davisCode: 'FLOW',
+  scorer,
+  crowns: [],
+  orderScorer: xgbScorer,
+  orderMeta: META,
+};
 const oroll = rollDice(orderedArgs);
 const oroll2 = rollDice({ ...orderedArgs, rng: mulberry32(7) });
 assert.deepStrictEqual(oroll2, oroll, 'ordered roll is deterministic');
 const plain7 = rollDice({ assets: ASSETS, rng: mulberry32(7), davisCode: 'FLOW', scorer, crowns: [] });
 const castKey = (c) => `${c.layoutId}|${c.assetIds.join(',')}`;
 assert.deepStrictEqual(
-  oroll.candidates.map(castKey).sort(), plain7.candidates.map(castKey).sort(),
-  'ordering deals the SAME casts — the stream is untouched, only the order changes');
+  oroll.candidates.map(castKey).sort(),
+  plain7.candidates.map(castKey).sort(),
+  'ordering deals the SAME casts — the stream is untouched, only the order changes',
+);
 // stamps: score + stratum on every candidate; anchored = the stratified tail.
 const stratCount7 = Math.max(1, Math.round(oroll.rolled * DICE_STRATIFIED_SHARE));
 const anchored7 = oroll.candidates.filter((c) => c.stratum === 'anchored');
@@ -172,17 +221,30 @@ for (const c of oroll.candidates) {
 }
 for (const c of open7) assert.strictEqual(c.anchorFamily, null, 'open candidates anchor nothing');
 for (const c of anchored7) {
-  assert.ok(STRATIFIED_FAMILIES.some((f) => f.category === c.anchorFamily), 'anchored family is a stratified family');
+  assert.ok(
+    STRATIFIED_FAMILIES.some((f) => f.category === c.anchorFamily),
+    'anchored family is a stratified family',
+  );
   assert.strictEqual(byId.get(c.assetIds[0]).category, c.anchorFamily, 'the cast leads with its anchor family');
 }
 // allocation: finalist slots follow the strata proportions — for this
 // roll (11 dealt, 3 anchored) exactly 1 anchored + 2 open — and each
 // slot goes to its stratum's model-best. Scores never gate: the
 // anchored finalist is a finalist by winning its stratum alone.
-const anchoredSlots7 = Math.min(anchored7.length, Math.max(1, Math.round((DICE_FINALISTS * anchored7.length) / oroll.rolled)));
-assert.strictEqual(oroll.finalists.filter((f) => f.stratum === 'anchored').length, anchoredSlots7, 'anchored finalist share = deal proportion');
+const anchoredSlots7 = Math.min(
+  anchored7.length,
+  Math.max(1, Math.round((DICE_FINALISTS * anchored7.length) / oroll.rolled)),
+);
+assert.strictEqual(
+  oroll.finalists.filter((f) => f.stratum === 'anchored').length,
+  anchoredSlots7,
+  'anchored finalist share = deal proportion',
+);
 assert.ok(oroll.finalists.includes(anchored7[0]), 'anchored finalist is the anchored stratum’s model-best');
-assert.ok(oroll.finalists.includes(open7[0]) && oroll.finalists.includes(open7[1]), 'open slots go to the open stratum’s model-best');
+assert.ok(
+  oroll.finalists.includes(open7[0]) && oroll.finalists.includes(open7[1]),
+  'open slots go to the open stratum’s model-best',
+);
 for (let i = 1; i < oroll.finalists.length; i++) {
   assert.ok(oroll.finalists[i - 1].xgbScore >= oroll.finalists[i].xgbScore, 'the tray is presented in model order');
 }
@@ -207,23 +269,39 @@ for (const c of flat.candidates) {
 // no head: the pre-T2 surface exactly — no stamps, no orderMeta.
 assert.ok(!('orderMeta' in plain7), 'unordered roll carries no orderMeta');
 for (const c of plain7.candidates) {
-  assert.ok(!('xgbScore' in c) && !('stratum' in c) && !('anchorFamily' in c), 'unordered candidates carry no T2 stamps');
+  assert.ok(
+    !('xgbScore' in c) && !('stratum' in c) && !('anchorFamily' in c),
+    'unordered candidates carry no T2 stamps',
+  );
 }
 // crown stamps: the trio round-trips through the log; persona crowns
 // and junk both file as honest nulls.
-const mem2 = (() => { const m = new Map(); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, v) }; })();
-recordCrown({ layoutId: 'grid', assetIds: ['a', 'b'], davisCode: null, xgbScore: 0.77, tasteVersion: 1, headKind: XGB_HEAD_KIND }, mem2);
+const mem2 = (() => {
+  const m = new Map();
+  return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => void m.set(k, v) };
+})();
+recordCrown(
+  { layoutId: 'grid', assetIds: ['a', 'b'], davisCode: null, xgbScore: 0.77, tasteVersion: 1, headKind: XGB_HEAD_KIND },
+  mem2,
+);
 recordCrown({ layoutId: 'grid', assetIds: ['a', 'c'], davisCode: null }, mem2);
-recordCrown({ layoutId: 'grid', assetIds: ['a', 'd'], davisCode: null, xgbScore: 'high', tasteVersion: -1, headKind: 42 }, mem2);
+recordCrown(
+  { layoutId: 'grid', assetIds: ['a', 'd'], davisCode: null, xgbScore: 'high', tasteVersion: -1, headKind: 42 },
+  mem2,
+);
 const logged2 = readCrowns(mem2);
 assert.strictEqual(logged2[0].xgbScore, 0.77, 'crown keeps the model score');
 assert.strictEqual(logged2[0].tasteVersion, 1, 'crown keeps the taste version');
 assert.strictEqual(logged2[0].headKind, XGB_HEAD_KIND, 'crown keeps the head kind');
 assert.deepStrictEqual(
-  [logged2[1].xgbScore, logged2[1].tasteVersion, logged2[1].headKind], [null, null, null],
-  'a persona crown files the trio as nulls');
+  [logged2[1].xgbScore, logged2[1].tasteVersion, logged2[1].headKind],
+  [null, null, null],
+  'a persona crown files the trio as nulls',
+);
 assert.deepStrictEqual(
-  [logged2[2].xgbScore, logged2[2].tasteVersion, logged2[2].headKind], [null, null, null],
-  'junk stamp values sanitize to nulls');
+  [logged2[2].xgbScore, logged2[2].tasteVersion, logged2[2].headKind],
+  [null, null, null],
+  'junk stamp values sanitize to nulls',
+);
 
 console.log('[dice] selfcheck OK — 15 layouts, casts 2–5, 3 finalists, crowns persist');

@@ -46,8 +46,13 @@ export { CORNERS };
 export function cornerDefinition(corner) {
   if (corner === 'wilderness') {
     return {
-      id: 'wilderness', kind: 'wilderness', word: 'wilderness',
-      paletteId: null, biases: null, forces: null, modes: null,
+      id: 'wilderness',
+      kind: 'wilderness',
+      word: 'wilderness',
+      paletteId: null,
+      biases: null,
+      forces: null,
+      modes: null,
     };
   }
   const p = getRenderProfile(corner);
@@ -81,7 +86,7 @@ export function cornerDefinition(corner) {
 // stays by design, not by need.)
 const pairRange = {
   rotate: ([[a, b], [c, d]]) => ['rotateSpread', [(c - b) / 360, (d - a) / 360]],
-  alpha: ([[a, b], [c, d]]) => ['alphaMid', [((a + c) / 2) / 100, ((b + d) / 2) / 100]],
+  alpha: ([[a, b], [c, d]]) => ['alphaMid', [(a + c) / 2 / 100, (b + d) / 2 / 100]],
 };
 
 // recipeFeatures' scale bucket edges over the X pair's mid.
@@ -229,18 +234,35 @@ export function yieldAccrual({ runs = [], ledgers = {} } = {}) {
   const runRows = [];
   for (const run of runs || []) {
     const present = new Set();
-    let rc = 0; let rf = 0; let rk = 0; let rp = 0;
-    for (const cand of run?.candidates || []) { row(cand?.corner).candidates++; rc++; }
+    let rc = 0;
+    let rf = 0;
+    let rk = 0;
+    let rp = 0;
+    for (const cand of run?.candidates || []) {
+      row(cand?.corner).candidates++;
+      rc++;
+    }
     for (const f of run?.finalists || []) {
       const r = row(f?.provenance?.corner);
-      r.finalists++; rf++;
+      r.finalists++;
+      rf++;
       present.add(r.corner);
-      if (f?.loisVerdict?.verdict === 'keep') { r.loisKeeps++; rk++; }
-      if (f?.loisVerdict?.verdict === 'pass') { r.loisPasses++; rp++; }
+      if (f?.loisVerdict?.verdict === 'keep') {
+        r.loisKeeps++;
+        rk++;
+      }
+      if (f?.loisVerdict?.verdict === 'pass') {
+        r.loisPasses++;
+        rp++;
+      }
     }
     for (const k of present) byCorner.get(k).runsPresent++;
     runRows.push({
-      runId: run?.runId ?? null, candidates: rc, finalists: rf, loisKeeps: rk, loisPasses: rp,
+      runId: run?.runId ?? null,
+      candidates: rc,
+      finalists: rf,
+      loisKeeps: rk,
+      loisPasses: rp,
     });
   }
   for (const k of ledgers?.keeps || []) {
@@ -249,12 +271,14 @@ export function yieldAccrual({ runs = [], ledgers = {} } = {}) {
   for (const p of ledgers?.passes || []) {
     if (p?.provenance?.source === 'explorer') row(p.provenance.corner).humanPasses++;
   }
-  const corners = [...byCorner.values()].map((r) => ({
-    ...r,
-    crownRate: r.finalists ? +(r.crowns / r.finalists).toFixed(4) : 0,
-    loisKeepRate: (r.loisKeeps + r.loisPasses) ? +(r.loisKeeps / (r.loisKeeps + r.loisPasses)).toFixed(4) : 0,
-    retire: r.runsPresent >= 2 && r.finalists > 0 && r.crowns === 0,
-  })).sort((a, b) => b.crowns - a.crowns || b.finalists - a.finalists || a.corner.localeCompare(b.corner));
+  const corners = [...byCorner.values()]
+    .map((r) => ({
+      ...r,
+      crownRate: r.finalists ? +(r.crowns / r.finalists).toFixed(4) : 0,
+      loisKeepRate: r.loisKeeps + r.loisPasses ? +(r.loisKeeps / (r.loisKeeps + r.loisPasses)).toFixed(4) : 0,
+      retire: r.runsPresent >= 2 && r.finalists > 0 && r.crowns === 0,
+    }))
+    .sort((a, b) => b.crowns - a.crowns || b.finalists - a.finalists || a.corner.localeCompare(b.corner));
   return {
     runs: runRows,
     corners,
@@ -274,21 +298,26 @@ export function formatYieldReport(accrual) {
   const L = [];
   const t = accrual.totals;
   L.push('EXPLORER YIELD BY CORNER — accrued (spec §6)');
-  L.push(`runs ${t.runs} · mined ${t.candidates} · finalists ${t.finalists} · LOIS keeps ${t.loisKeeps} · LOIS passes ${t.loisPasses} · crowns ${t.crowns} · human passes ${t.humanPasses}`);
-  L.push('crowns and human passes are counted from the taste ledgers’ explorer-provenance rows (E3’s wiring); LOIS keeps/passes from the runs’ own verdicts.');
+  L.push(
+    `runs ${t.runs} · mined ${t.candidates} · finalists ${t.finalists} · LOIS keeps ${t.loisKeeps} · LOIS passes ${t.loisPasses} · crowns ${t.crowns} · human passes ${t.humanPasses}`,
+  );
+  L.push(
+    'crowns and human passes are counted from the taste ledgers’ explorer-provenance rows (E3’s wiring); LOIS keeps/passes from the runs’ own verdicts.',
+  );
   L.push('');
   for (const r of accrual.corners) {
     L.push(
-      `  ${r.word.padEnd(16)} mined ${String(r.candidates).padStart(4)} · finalists ${String(r.finalists).padStart(3)}`
-      + ` · LOIS keep ${r.loisKeeps} / pass ${r.loisPasses} · crowns ${r.crowns} · human passes ${r.humanPasses}`
-      + ` · crown rate ${r.crownRate} · runs ${r.runsPresent}${r.retire ? ' · ⚠ RETIREMENT FLAG' : ''}`,
+      `  ${r.word.padEnd(16)} mined ${String(r.candidates).padStart(4)} · finalists ${String(r.finalists).padStart(3)}` +
+        ` · LOIS keep ${r.loisKeeps} / pass ${r.loisPasses} · crowns ${r.crowns} · human passes ${r.humanPasses}` +
+        ` · crown rate ${r.crownRate} · runs ${r.runsPresent}${r.retire ? ' · ⚠ RETIREMENT FLAG' : ''}`,
     );
   }
   const flagged = accrual.corners.filter((r) => r.retire);
   L.push('');
   if (flagged.length) {
     L.push('RETIREMENT FLAGS (finalists across ≥2 runs, zero crowns — flagged for retirement, NOT widened):');
-    for (const r of flagged) L.push(`  ⚠ ${r.word} (${r.corner}) — ${r.finalists} finalists over ${r.runsPresent} runs, 0 crowns`);
+    for (const r of flagged)
+      L.push(`  ⚠ ${r.word} (${r.corner}) — ${r.finalists} finalists over ${r.runsPresent} runs, 0 crowns`);
   } else {
     L.push('RETIREMENT FLAGS: none — no corner has finalists across ≥2 runs with zero crowns.');
   }

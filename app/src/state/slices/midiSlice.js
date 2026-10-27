@@ -10,8 +10,14 @@
 // `midiLearn` is live session state too: which target is waiting for a wiggle.
 import { sanitizeMidiMap, bindTarget, unbindTarget } from '../../midi/map.mjs';
 import {
-  DEFAULT_BANK_NAME, sanitizeMidiBanks, sanitizeMidiActiveBank, activeBankMap,
-  addBank, removeBank, renameBank, withBankMap,
+  DEFAULT_BANK_NAME,
+  sanitizeMidiBanks,
+  sanitizeMidiActiveBank,
+  activeBankMap,
+  addBank,
+  removeBank,
+  renameBank,
+  withBankMap,
 } from '../../midi/banks.mjs';
 import { createLearnState, armLearn, cancelLearn } from '../../midi/learn.mjs';
 
@@ -23,10 +29,8 @@ const syncBanks = (banks, active) => {
 };
 
 /** Edit the active bank's map, keeping the mirror in step. */
-const editActiveMap = (state, map) => syncBanks(
-  withBankMap(state.midiBanks, state.midiActiveBank, sanitizeMidiMap(map)),
-  state.midiActiveBank,
-);
+const editActiveMap = (state, map) =>
+  syncBanks(withBankMap(state.midiBanks, state.midiActiveBank, sanitizeMidiMap(map)), state.midiActiveBank);
 
 export const createMidiSlice = (set) => ({
   midiBanks: [{ name: DEFAULT_BANK_NAME, map: {} }],
@@ -47,46 +51,48 @@ export const createMidiSlice = (set) => ({
   unbindMidi: (targetId) => set((state) => editActiveMap(state, unbindTarget(state.midiMap || {}, targetId))),
 
   /** Flip to a bank by index (the panel's bank chooser). Out-of-range is refused. */
-  switchMidiBank: (index) => set((state) => (
-    Number.isInteger(index) && index >= 0 && index < state.midiBanks.length
-      ? syncBanks(state.midiBanks, index)
-      : {}
-  )),
+  switchMidiBank: (index) =>
+    set((state) =>
+      Number.isInteger(index) && index >= 0 && index < state.midiBanks.length ? syncBanks(state.midiBanks, index) : {},
+    ),
   /** The BANK NEXT target: advance to the next bank, wrapping at the end. */
-  cycleMidiBank: () => set((state) => syncBanks(
-    state.midiBanks,
-    (state.midiActiveBank + 1) % state.midiBanks.length,
-  )),
+  cycleMidiBank: () => set((state) => syncBanks(state.midiBanks, (state.midiActiveBank + 1) % state.midiBanks.length)),
   /** Append an empty bank and land on it, ready to learn into. Capped in banks.mjs. */
-  addMidiBank: () => set((state) => {
-    const next = addBank(state.midiBanks);
-    return next === state.midiBanks ? {} : syncBanks(next, next.length - 1);
-  }),
+  addMidiBank: () =>
+    set((state) => {
+      const next = addBank(state.midiBanks);
+      return next === state.midiBanks ? {} : syncBanks(next, next.length - 1);
+    }),
   /** Drop the active bank (never the last one); land on the previous bank. */
-  removeMidiBank: () => set((state) => {
-    const next = removeBank(state.midiBanks, state.midiActiveBank);
-    return next === state.midiBanks
-      ? {}
-      : syncBanks(next, Math.min(state.midiActiveBank, next.length - 1));
-  }),
-  renameMidiBank: (name) => set((state) => {
-    const next = renameBank(state.midiBanks, state.midiActiveBank, name);
-    return next === state.midiBanks ? {} : syncBanks(next, state.midiActiveBank);
-  }),
+  removeMidiBank: () =>
+    set((state) => {
+      const next = removeBank(state.midiBanks, state.midiActiveBank);
+      return next === state.midiBanks ? {} : syncBanks(next, Math.min(state.midiActiveBank, next.length - 1));
+    }),
+  renameMidiBank: (name) =>
+    set((state) => {
+      const next = renameBank(state.midiBanks, state.midiActiveBank, name);
+      return next === state.midiBanks ? {} : syncBanks(next, state.midiActiveBank);
+    }),
 
   setMidiEnabled: (on) => set({ midiEnabled: !!on }),
   setMidiStatus: (status) => set({ midiStatus: status }),
   setMidiLast: (msg) => set({ midiLast: msg }),
 
-  armMidiLearn: (targetId) => set((state) => ({ midiLearn: armLearn(state.midiLearn, targetId), midiLearnRefused: null })),
-  cancelMidiLearn: () => set((state) => (state.midiLearn?.armed || state.midiLearnRefused
-    ? { midiLearn: cancelLearn(state.midiLearn), midiLearnRefused: null }
-    : {})),
+  armMidiLearn: (targetId) =>
+    set((state) => ({ midiLearn: armLearn(state.midiLearn, targetId), midiLearnRefused: null })),
+  cancelMidiLearn: () =>
+    set((state) =>
+      state.midiLearn?.armed || state.midiLearnRefused
+        ? { midiLearn: cancelLearn(state.midiLearn), midiLearnRefused: null }
+        : {},
+    ),
   /** The wiggle landed: bind it into the ACTIVE bank (moving any earlier binding of either side) and disarm. */
-  completeMidiLearn: (key, targetId) => set((state) => ({
-    ...editActiveMap(state, bindTarget(state.midiMap || {}, key, targetId)),
-    midiLearn: cancelLearn(state.midiLearn),
-    midiLearnRefused: null,
-  })),
+  completeMidiLearn: (key, targetId) =>
+    set((state) => ({
+      ...editActiveMap(state, bindTarget(state.midiMap || {}, key, targetId)),
+      midiLearn: cancelLearn(state.midiLearn),
+      midiLearnRefused: null,
+    })),
   setMidiLearnRefused: (refused) => set({ midiLearnRefused: refused }),
 });

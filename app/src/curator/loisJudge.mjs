@@ -95,12 +95,18 @@ export function judgeRender({ features, stats, fingerprint, fontContingent = fal
     {
       key: 'promise',
       measured: judgedInk ?? null,
-      want: density === 'high' ? `ink >= ${PROMISE_HIGH_INK} at density high`
-        : density === 'low' ? `ink <= ${PROMISE_LOW_INK} at density low`
-          : 'density mid — no promise to keep',
-      ok: density === 'high' ? (Number.isFinite(judgedInk) && judgedInk >= PROMISE_HIGH_INK)
-        : density === 'low' ? (Number.isFinite(judgedInk) && judgedInk <= PROMISE_LOW_INK)
-          : true,
+      want:
+        density === 'high'
+          ? `ink >= ${PROMISE_HIGH_INK} at density high`
+          : density === 'low'
+            ? `ink <= ${PROMISE_LOW_INK} at density low`
+            : 'density mid — no promise to keep',
+      ok:
+        density === 'high'
+          ? Number.isFinite(judgedInk) && judgedInk >= PROMISE_HIGH_INK
+          : density === 'low'
+            ? Number.isFinite(judgedInk) && judgedInk <= PROMISE_LOW_INK
+            : true,
     },
   ];
   return {
@@ -133,13 +139,20 @@ export function sanitizeGateVerdict(raw) {
   if (raw.judge !== 'lois-render') return null;
   if (raw.verdict !== 'keep' && raw.verdict !== 'pass') return null;
   const num = (v) => (Number.isFinite(v) ? round(v) : null);
-  const sp = (raw.statsProvenance && typeof raw.statsProvenance === 'object') ? raw.statsProvenance : {};
+  const sp = raw.statsProvenance && typeof raw.statsProvenance === 'object' ? raw.statsProvenance : {};
   const checks = Array.isArray(raw.checks)
-    ? raw.checks.slice(0, 8).map((c) => (c && typeof c === 'object' ? {
-      key: typeof c.key === 'string' ? c.key.slice(0, 24) : '',
-      measured: num(c.measured),
-      ok: c.ok === true,
-    } : null)).filter((c) => c && c.key)
+    ? raw.checks
+        .slice(0, 8)
+        .map((c) =>
+          c && typeof c === 'object'
+            ? {
+                key: typeof c.key === 'string' ? c.key.slice(0, 24) : '',
+                measured: num(c.measured),
+                ok: c.ok === true,
+              }
+            : null,
+        )
+        .filter((c) => c && c.key)
     : [];
   return {
     judge: 'lois-render',

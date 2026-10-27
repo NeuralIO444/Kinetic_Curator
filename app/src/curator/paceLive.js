@@ -25,28 +25,69 @@ export function startPace({ getBpm, context }) {
   let silenced = false;
   const stop = [];
 
-  stop.push(on(Events.AUDIO_TEMPO, (p) => {
-    if (p && Number.isFinite(p.bpm)) target = { bpm: p.bpm, confidence: Number(p.confidence) || 0 };
-  }));
-  stop.push(on(Events.AUDIO_SILENCE_START, () => { target = null; setPaceMagnitude(0); }));
-  stop.push(on(Events.AUDIO_SILENCE_END, () => { silenced = false; }));
-  stop.push(on(Events.AUDIO_INPUT, () => { silenced = false; target = null; setPaceMagnitude(0); }));
+  stop.push(
+    on(Events.AUDIO_TEMPO, (p) => {
+      if (p && Number.isFinite(p.bpm)) target = { bpm: p.bpm, confidence: Number(p.confidence) || 0 };
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_SILENCE_START, () => {
+      target = null;
+      setPaceMagnitude(0);
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_SILENCE_END, () => {
+      silenced = false;
+    }),
+  );
+  stop.push(
+    on(Events.AUDIO_INPUT, () => {
+      silenced = false;
+      target = null;
+      setPaceMagnitude(0);
+    }),
+  );
   // anything that is not our own step is the artist (tap, preset, typed, MIDI): their BPM wins
-  stop.push(on(Events.BEAT_BPM, (p, meta) => {
-    if (meta && meta.cause === 'lean') return;
-    silenced = true; setPaceMagnitude(0);
-  }));
-  stop.push(on(Events.CLOCK_BAR, (p) => {
-    if (!p || p.bar % PHRASE_BARS !== 0) return;
-    if (silenced || !target) { setPaceMagnitude(0); return; }
-    let ctx;
-    try { ctx = context() || {}; } catch { ctx = {}; }
-    const current = getBpm();
-    const next = paceStep({ current, target: target.bpm, confidence: target.confidence, keeps: ctx.keeps, allowance: ctx.allowance });
-    if (next === null) { setPaceMagnitude(0); return; }
-    setPaceMagnitude(markFor(target.bpm - current));
-    emit(Events.BEAT_BPM, { bpm: next }, { cause: 'lean' });
-  }));
+  stop.push(
+    on(Events.BEAT_BPM, (p, meta) => {
+      if (meta && meta.cause === 'lean') return;
+      silenced = true;
+      setPaceMagnitude(0);
+    }),
+  );
+  stop.push(
+    on(Events.CLOCK_BAR, (p) => {
+      if (!p || p.bar % PHRASE_BARS !== 0) return;
+      if (silenced || !target) {
+        setPaceMagnitude(0);
+        return;
+      }
+      let ctx;
+      try {
+        ctx = context() || {};
+      } catch {
+        ctx = {};
+      }
+      const current = getBpm();
+      const next = paceStep({
+        current,
+        target: target.bpm,
+        confidence: target.confidence,
+        keeps: ctx.keeps,
+        allowance: ctx.allowance,
+      });
+      if (next === null) {
+        setPaceMagnitude(0);
+        return;
+      }
+      setPaceMagnitude(markFor(target.bpm - current));
+      emit(Events.BEAT_BPM, { bpm: next }, { cause: 'lean' });
+    }),
+  );
 
-  return () => { for (const off of stop) off(); setPaceMagnitude(0); };
+  return () => {
+    for (const off of stop) off();
+    setPaceMagnitude(0);
+  };
 }

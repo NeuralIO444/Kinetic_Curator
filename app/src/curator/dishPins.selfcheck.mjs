@@ -10,7 +10,10 @@ import { MAX_PINS, sanitizePins } from './dishPins.js';
   assert.equal(MAX_PINS, 4);
   assert.deepEqual(sanitizePins('x'), []);
   assert.deepEqual(sanitizePins(null), []);
-  assert.deepEqual(sanitizePins([{ x: 1, y: 2, extra: 3 }, null, { x: NaN, y: 0 }, { x: '1', y: 2 }, { x: Infinity, y: 1 }]), [{ x: 1, y: 2 }]);
+  assert.deepEqual(
+    sanitizePins([{ x: 1, y: 2, extra: 3 }, null, { x: NaN, y: 0 }, { x: '1', y: 2 }, { x: Infinity, y: 1 }]),
+    [{ x: 1, y: 2 }],
+  );
   assert.equal(sanitizePins(Array.from({ length: 9 }, (_, i) => ({ x: i, y: i }))).length, 4);
 }
 

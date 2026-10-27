@@ -17,9 +17,15 @@
 import assert from 'node:assert';
 
 const {
-  DEFAULT_SHELF_PREFS, FULL_WEIRD_TABLE, DEFAULT_PREFERENCES_TEXT,
-  parseShelfPrefs, isFullWeird, tableTotal, tableName,
-  isConflictCopyName, conflictCopyLine,
+  DEFAULT_SHELF_PREFS,
+  FULL_WEIRD_TABLE,
+  DEFAULT_PREFERENCES_TEXT,
+  parseShelfPrefs,
+  isFullWeird,
+  tableTotal,
+  tableName,
+  isConflictCopyName,
+  conflictCopyLine,
 } = await import('./shelfPrefs.mjs');
 
 const lines = [];
@@ -32,7 +38,9 @@ const lines = [];
   assert.strictEqual(DEFAULT_SHELF_PREFS.collectionSoftBound, 400, 'the K1 soft bound, now a real preference');
   assert.ok(isFullWeird(DEFAULT_SHELF_PREFS));
   assert.strictEqual(tableName(DEFAULT_SHELF_PREFS), 'FULL WEIRD');
-  lines.push('defaults: FULL WEIRD (8 consensus · 3 neglected · 2 wild · 2 lois · 1 contrarian), window 2, soft bound 400');
+  lines.push(
+    'defaults: FULL WEIRD (8 consensus · 3 neglected · 2 wild · 2 lois · 1 contrarian), window 2, soft bound 400',
+  );
 }
 
 // ── absent / unreadable → defaults + a named line ───────────────────
@@ -49,9 +57,15 @@ const lines = [];
 
 // ── a clean file parses clean ───────────────────────────────────────
 {
-  const r = parseShelfPrefs(JSON.stringify({
-    shelf: { table: { consensus: 10, neglected: 2, wild: 2, lois: 1, contrarian: 1 }, recencyWindow: 3, collectionSoftBound: 250 },
-  }));
+  const r = parseShelfPrefs(
+    JSON.stringify({
+      shelf: {
+        table: { consensus: 10, neglected: 2, wild: 2, lois: 1, contrarian: 1 },
+        recencyWindow: 3,
+        collectionSoftBound: 250,
+      },
+    }),
+  );
   assert.strictEqual(r.source, 'file');
   assert.deepStrictEqual(r.lines, [], 'no corrections for a valid file');
   assert.strictEqual(r.prefs.table.consensus, 10);
@@ -86,9 +100,11 @@ const lines = [];
 
 // ── clamp cases: each correction named ──────────────────────────────
 {
-  const r = parseShelfPrefs(JSON.stringify({
-    shelf: { table: { consensus: 99, lois: -2 }, recencyWindow: -1, collectionSoftBound: 3 },
-  }));
+  const r = parseShelfPrefs(
+    JSON.stringify({
+      shelf: { table: { consensus: 99, lois: -2 }, recencyWindow: -1, collectionSoftBound: 3 },
+    }),
+  );
   assert.strictEqual(r.prefs.table.consensus, 16, 'a rule count clamps to the stage size');
   assert.strictEqual(r.prefs.table.lois, 0);
   assert.strictEqual(r.prefs.recencyWindow, 0);
@@ -105,14 +121,16 @@ const lines = [];
   assert.strictEqual(r.prefs.table.consensus, 8, 'a non-number falls back to the default for that key');
   assert.match(r.lines.join('\n'), /shelf\.table\.consensus: "eight" is not a number/);
   assert.strictEqual(r.prefs.recencyWindow, 3, 'a fractional window rounds to nearest');
-  lines.push('types: a word where a number belongs → that key\'s default, named; fractions round');
+  lines.push("types: a word where a number belongs → that key's default, named; fractions round");
 }
 
 // ── the over-full table trims from the tail, named ──────────────────
 {
-  const r = parseShelfPrefs(JSON.stringify({
-    shelf: { table: { consensus: 8, neglected: 3, wild: 2, lois: 2, contrarian: 5 } },
-  }));
+  const r = parseShelfPrefs(
+    JSON.stringify({
+      shelf: { table: { consensus: 8, neglected: 3, wild: 2, lois: 2, contrarian: 5 } },
+    }),
+  );
   assert.strictEqual(tableTotal(r.prefs), 16);
   assert.strictEqual(r.prefs.table.contrarian, 1, 'the excess comes off the last rule first');
   assert.strictEqual(r.prefs.table.consensus, 8, 'the consensus spine is trimmed last');
@@ -122,13 +140,19 @@ const lines = [];
 
 // ── unknown keys tolerated (other namespaces live here too) ─────────
 {
-  const r = parseShelfPrefs(JSON.stringify({
-    shelf: { export: { folder: 'looks' } },
-    future: { anything: true },
-  }));
+  const r = parseShelfPrefs(
+    JSON.stringify({
+      shelf: { export: { folder: 'looks' } },
+      future: { anything: true },
+    }),
+  );
   assert.strictEqual(r.source, 'file');
-  assert.deepStrictEqual(r.prefs, DEFAULT_SHELF_PREFS, 'a file with no shelf settings reads as all-defaults, no complaint');
-  lines.push('namespaces: unknown keys (incl. K3\'s shelf.export) tolerated, never corrected');
+  assert.deepStrictEqual(
+    r.prefs,
+    DEFAULT_SHELF_PREFS,
+    'a file with no shelf settings reads as all-defaults, no complaint',
+  );
+  lines.push("namespaces: unknown keys (incl. K3's shelf.export) tolerated, never corrected");
 }
 
 // ── the shipped defaults document round-trips ───────────────────────
@@ -146,7 +170,10 @@ const lines = [];
   assert.ok(isConflictCopyName('preferences (conflicted copy).json'));
   assert.ok(isConflictCopyName('preferences (conflicted copy 2).json'));
   assert.ok(!isConflictCopyName('preferences.json'));
-  assert.match(conflictCopyLine('preferences (conflicted copy).json'), /ignored — the canonical preferences\.json wins/);
+  assert.match(
+    conflictCopyLine('preferences (conflicted copy).json'),
+    /ignored — the canonical preferences\.json wins/,
+  );
   lines.push('conflict copies are recognized so the loader can ignore them — by name, out loud');
 }
 

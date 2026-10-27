@@ -35,17 +35,16 @@ globalThis.localStorage = {
   setItem: (k, v) => lsData.set(k, String(v)),
   removeItem: (k) => lsData.delete(k),
 };
-globalThis.requestAnimationFrame = (fn) => { queueMicrotask(() => fn(performance.now())); return 1; };
+globalThis.requestAnimationFrame = (fn) => {
+  queueMicrotask(() => fn(performance.now()));
+  return 1;
+};
 
 const { ASSETS } = await import('../data/assets/index.js');
 const { PALETTES, resolvePalette } = await import('../data/palettes.js');
 const V = await import('./variants.mjs');
-const {
-  sanitizeProvenance, isProvenance, provenanceLabel,
-} = await import('./provenance.mjs');
-const {
-  sampleBatch, runMiner, bakeSample, composeStillSvg, recordFor, featuresOfKeep,
-} = await import('./miner.mjs');
+const { sanitizeProvenance, isProvenance, provenanceLabel } = await import('./provenance.mjs');
+const { sampleBatch, runMiner, bakeSample, composeStillSvg, recordFor, featuresOfKeep } = await import('./miner.mjs');
 const { recipeFeatures, FEATURES_VERSION } = await import('./recipeFeatures.js');
 const { sanitizeFavorite } = await import('../state/slices/davisSlice.js');
 const { ledgerRow, isLedgerRow } = await import('./tasteLedger.js');
@@ -61,7 +60,12 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     { parents: ['geo_circle_01'], op: 'tile', seed: 12, params: { count: 4, radius: 18, scale: 0.45 } },
     { parents: ['org_leaf_02'], op: 'restyle', seed: 13, params: { mode: 'outline', dash: 0 } },
     { parents: ['org_blob_02'], op: 'jitter', seed: 14, params: { amount: 2 } },
-    { parents: ['org_blob_01', 'dot_field_01'], op: 'superpose', seed: 15, params: { rot: 30, scaleB: 0.8, dx: 5, dy: -5 } },
+    {
+      parents: ['org_blob_01', 'dot_field_01'],
+      op: 'superpose',
+      seed: 15,
+      params: { rot: 30, scaleB: 0.8, dx: 5, dy: -5 },
+    },
     { parents: ['org_blob_01', 'line_cross_01'], op: 'mask', seed: 16, params: {} },
     { parents: ['org_leaf_01', 'org_petal_01'], op: 'splice', seed: 17, params: {} },
   ];
@@ -70,7 +74,11 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     const svg2 = V.generateVariantSvg(recipe, byId);
     assert.ok(svg1, `${recipe.op} generates`);
     assert.strictEqual(svg1, svg2, `${recipe.op}: same recipe + seed = identical svg, forever`);
-    assert.strictEqual(V.variantIdFor(recipe), V.variantIdFor({ ...recipe }), 'the id is a pure function of the recipe');
+    assert.strictEqual(
+      V.variantIdFor(recipe),
+      V.variantIdFor({ ...recipe }),
+      'the id is a pure function of the recipe',
+    );
     assert.ok(V.isVariantId(V.variantIdFor(recipe)), 'the id carries the variant shape');
   }
   const rec = V.variantRecord(fixtures[0], byId);
@@ -78,8 +86,13 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   assert.ok(rec.tags.includes('variant'), 'the record is tagged variant');
   assert.strictEqual(rec.variant, fixtures[0], 'the record carries its recipe');
   assert.strictEqual(rec.generation.at, 'deal-time', 'generation declares itself: deal-time, never per-frame');
-  assert.ok(!('regions' in rec), 'the lead’s baked region mattes are NOT inherited — they describe the lead’s shape, not the variant’s');
-  lines.push('engine: every op generates deterministically; ids are recipe hashes; the record inherits lead placement fields, never its mattes');
+  assert.ok(
+    !('regions' in rec),
+    'the lead’s baked region mattes are NOT inherited — they describe the lead’s shape, not the variant’s',
+  );
+  lines.push(
+    'engine: every op generates deterministically; ids are recipe hashes; the record inherits lead placement fields, never its mattes',
+  );
 }
 
 // ── domains across the real library ─────────────────────────────────
@@ -94,18 +107,27 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
     }
     // jitter: paths or leaf geometry — every authored asset has one or the other
     const jr = { parents: [a.id], op: 'jitter', seed: 5, params: { amount: 1.5 } };
-    if (V.opApplicable('jitter', a.svg)) { applicable++; assert.ok(V.generateVariantSvg(jr, byId), `jitter generates for ${a.id}`); }
+    if (V.opApplicable('jitter', a.svg)) {
+      applicable++;
+      assert.ok(V.generateVariantSvg(jr, byId), `jitter generates for ${a.id}`);
+    }
   }
   assert.strictEqual(generated, ASSETS.length * 2, 'symmetry + tile cover the whole library');
   assert.ok(applicable >= 280, `jitter's domain is nearly the whole library (${applicable})`);
   // restyle modes are honestly partial: each mode has assets it cannot touch
   const fillOnly = byId.get('geo_circle_01');
   assert.strictEqual(
-    V.generateVariantSvg({ parents: ['geo_circle_01'], op: 'restyle', seed: 1, params: { mode: 'dash', dash: 0 } }, byId),
-    null, 'dash on a stroke-less asset is an honest null, not a fake variant',
+    V.generateVariantSvg(
+      { parents: ['geo_circle_01'], op: 'restyle', seed: 1, params: { mode: 'dash', dash: 0 } },
+      byId,
+    ),
+    null,
+    'dash on a stroke-less asset is an honest null, not a fake variant',
   );
   assert.ok(fillOnly.svg.includes('var(--ink)'), 'fixture sanity: the circle is painted');
-  lines.push('domains: symmetry/tile are universal; jitter covers paths + leaf geometry; restyle modes refuse honestly where they do not apply');
+  lines.push(
+    'domains: symmetry/tile are universal; jitter covers paths + leaf geometry; restyle modes refuse honestly where they do not apply',
+  );
 }
 
 // ── morph: the honest subset ────────────────────────────────────────
@@ -113,25 +135,43 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const sigs = new Map();
   for (const a of ASSETS) {
     const s = V.pathSignature(a.svg);
-    if (s) { if (!sigs.has(s)) sigs.set(s, []); sigs.get(s).push(a.id); }
+    if (s) {
+      if (!sigs.has(s)) sigs.set(s, []);
+      sigs.get(s).push(a.id);
+    }
   }
   const group = [...sigs.values()].find((g) => g.length >= 2);
   assert.ok(group, 'the library holds morph-compatible families');
   const [idA, idB] = group;
-  assert.strictEqual(V.morphCompatible(byId.get(idA).svg, byId.get(idB).svg), true, 'signature equality is the compatibility rule');
+  assert.strictEqual(
+    V.morphCompatible(byId.get(idA).svg, byId.get(idB).svg),
+    true,
+    'signature equality is the compatibility rule',
+  );
   const at = (t) => V.generateVariantSvg({ parents: [idA, idB], op: 'morph', seed: 3, params: { t } }, byId);
   const pathD = (svg) => V.pathNodesOf(svg).map((p) => p.d);
-  assert.deepStrictEqual(pathD(at(0)), pathD(byId.get(idA).svg).map((d) => V.serializePath(V.parsePath(d))),
-    'morph at t=0 is the lead’s own geometry (canonicalized)');
-  assert.deepStrictEqual(pathD(at(1)), pathD(byId.get(idB).svg).map((d) => V.serializePath(V.parsePath(d))),
-    'morph at t=1 is the partner’s geometry');
+  assert.deepStrictEqual(
+    pathD(at(0)),
+    pathD(byId.get(idA).svg).map((d) => V.serializePath(V.parsePath(d))),
+    'morph at t=0 is the lead’s own geometry (canonicalized)',
+  );
+  assert.deepStrictEqual(
+    pathD(at(1)),
+    pathD(byId.get(idB).svg).map((d) => V.serializePath(V.parsePath(d))),
+    'morph at t=1 is the partner’s geometry',
+  );
   assert.notDeepStrictEqual(pathD(at(0.5)), pathD(at(0)), 'morph at t=0.5 is genuinely between');
-  const stranger = ASSETS.find((a) => V.pathSignature(a.svg) && V.pathSignature(a.svg) !== V.pathSignature(byId.get(idA).svg));
+  const stranger = ASSETS.find(
+    (a) => V.pathSignature(a.svg) && V.pathSignature(a.svg) !== V.pathSignature(byId.get(idA).svg),
+  );
   assert.strictEqual(
     V.generateVariantSvg({ parents: [idA, stranger.id], op: 'morph', seed: 3, params: { t: 0.5 } }, byId),
-    null, 'morph across structures is refused — superpose and mask carry that load',
+    null,
+    'morph across structures is refused — superpose and mask carry that load',
   );
-  lines.push(`morph: compatible families exist (e.g. ${idA} × ${idB}); t interpolates pointwise; incompatible pairs return null`);
+  lines.push(
+    `morph: compatible families exist (e.g. ${idA} × ${idB}); t interpolates pointwise; incompatible pairs return null`,
+  );
 }
 
 // ── jitter tolerance + splice/mask structure ────────────────────────
@@ -141,19 +181,36 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const out = V.generateVariantSvg({ parents: ['org_blob_01'], op: 'jitter', seed: 42, params: { amount } }, byId);
   const before = V.parsePath(V.pathNodesOf(src.svg)[0].d);
   const after = V.parsePath(V.pathNodesOf(out)[0].d);
-  assert.strictEqual(after.map((s) => s.c).join(''), before.map((s) => s.c).join(''), 'jitter preserves the path structure');
+  assert.strictEqual(
+    after.map((s) => s.c).join(''),
+    before.map((s) => s.c).join(''),
+    'jitter preserves the path structure',
+  );
   for (let k = 0; k < before.length; k++) {
     for (let j = 0; j < before[k].p.length; j++) {
-      assert.ok(Math.abs(after[k].p[j] - before[k].p[j]) <= amount + 0.001,
-        `jitter stays inside its tolerance (segment ${k})`);
+      assert.ok(
+        Math.abs(after[k].p[j] - before[k].p[j]) <= amount + 0.001,
+        `jitter stays inside its tolerance (segment ${k})`,
+      );
     }
   }
-  const spliced = V.generateVariantSvg({ parents: ['org_leaf_01', 'org_petal_01'], op: 'splice', seed: 7, params: {} }, byId);
+  const spliced = V.generateVariantSvg(
+    { parents: ['org_leaf_01', 'org_petal_01'], op: 'splice', seed: 7, params: {} },
+    byId,
+  );
   assert.ok(spliced.includes('M50 6') || spliced.includes('M 50 6'), 'splice carries the second parent’s segments');
   assert.ok(spliced.length > byId.get('org_leaf_01').svg.length * 0.8, 'splice carries both parents’ drawing streams');
-  const masked = V.generateVariantSvg({ parents: ['org_blob_01', 'line_cross_01'], op: 'mask', seed: 7, params: {} }, byId);
-  assert.ok(masked.includes('<clipPath id="vclip_') && masked.includes('clip-path="url(#vclip_'), 'mask clips by the lead’s silhouette through a recipe-keyed clipPath');
-  lines.push('jitter: structure preserved, every coordinate within tolerance · splice interleaves both streams · mask wires a clipPath');
+  const masked = V.generateVariantSvg(
+    { parents: ['org_blob_01', 'line_cross_01'], op: 'mask', seed: 7, params: {} },
+    byId,
+  );
+  assert.ok(
+    masked.includes('<clipPath id="vclip_') && masked.includes('clip-path="url(#vclip_'),
+    'mask clips by the lead’s silhouette through a recipe-keyed clipPath',
+  );
+  lines.push(
+    'jitter: structure preserved, every coordinate within tolerance · splice interleaves both streams · mask wires a clipPath',
+  );
 }
 
 // ── the recipe boundary (provenance) ────────────────────────────────
@@ -164,19 +221,38 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   assert.strictEqual(isProvenance(prov), true);
   const forged = { ...prov, variants: [{ parents: ['org_blob_01'], op: 'smelt', seed: 1, params: {} }] };
   const cleaned = sanitizeProvenance(forged);
-  assert.ok(cleaned && !('variants' in cleaned), 'a forged recipe is dropped; the provenance itself survives on its real facts');
+  assert.ok(
+    cleaned && !('variants' in cleaned),
+    'a forged recipe is dropped; the provenance itself survives on its real facts',
+  );
   assert.strictEqual(isProvenance(forged), false, 'a malformed variants list is off-schema');
-  const clamped = V.sanitizeRecipe({ parents: ['org_blob_01'], op: 'symmetry', seed: 1, params: { folds: 99, mirror: true, bogus: 1 } });
+  const clamped = V.sanitizeRecipe({
+    parents: ['org_blob_01'],
+    op: 'symmetry',
+    seed: 1,
+    params: { folds: 99, mirror: true, bogus: 1 },
+  });
   assert.strictEqual(clamped.params.folds, 8, 'params clamp to the declared span');
   assert.ok(!('bogus' in clamped.params), 'unknown params are dropped');
-  assert.strictEqual(V.sanitizeRecipe({ parents: ['a', 'b'], op: 'symmetry', seed: 1, params: { folds: 3, mirror: false } }), null,
-    'arity is law: a transform takes one parent');
+  assert.strictEqual(
+    V.sanitizeRecipe({ parents: ['a', 'b'], op: 'symmetry', seed: 1, params: { folds: 3, mirror: false } }),
+    null,
+    'arity is law: a transform takes one parent',
+  );
   const e3Fixture = {
-    source: 'explorer', run: 'xpl-fixture-1', corner: 'haeckel',
+    source: 'explorer',
+    run: 'xpl-fixture-1',
+    corner: 'haeckel',
     axes: { layout: 'radial', palette: 'hydra', castSize: 3 },
   };
-  assert.deepStrictEqual(sanitizeProvenance(e3Fixture), e3Fixture, 'a provenance without variants sanitizes EXACTLY as E3 left it');
-  lines.push('boundary: recipes survive whole when valid, drop when forged, clamp to declared spans; E3 shapes untouched');
+  assert.deepStrictEqual(
+    sanitizeProvenance(e3Fixture),
+    e3Fixture,
+    'a provenance without variants sanitizes EXACTLY as E3 left it',
+  );
+  lines.push(
+    'boundary: recipes survive whole when valid, drop when forged, clamp to declared spans; E3 shapes untouched',
+  );
 }
 
 // ── the shelf + ledger doors carry the recipe ───────────────────────
@@ -184,7 +260,8 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
   const recipe = { parents: ['org_blob_01'], op: 'symmetry', seed: 11, params: { folds: 5, mirror: true } };
   const vid = V.variantIdFor(recipe);
   const record = {
-    seed: 5150, seedOffsets: {},
+    seed: 5150,
+    seedOffsets: {},
     config: { layout: { mode: 'grid', count: 40 }, palette: { id: 'hydra' }, assets: [vid] },
     provenance: { source: 'explorer', run: 'xpl-fixture-5', corner: 'wilderness', variants: [recipe] },
   };
@@ -201,17 +278,25 @@ const tick = () => new Promise((r) => setTimeout(r, 0));
 const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFraction: 0.4 };
 {
   const off = sampleBatch({ runSeed: 0x1530, batchSize: 12 });
-  assert.ok(off.every((s) => !('variants' in s)), 'default: no sample carries variants — the axis is off');
-  assert.ok(off.every((s) => s.cast.every((id) => byId.has(id))), 'default: every cast member is a library asset');
+  assert.ok(
+    off.every((s) => !('variants' in s)),
+    'default: no sample carries variants — the axis is off',
+  );
+  assert.ok(
+    off.every((s) => s.cast.every((id) => byId.has(id))),
+    'default: every cast member is a library asset',
+  );
 
   const run = runMiner(SMOKE);
   const run2 = runMiner(SMOKE);
   assert.deepStrictEqual(
-    run2.finalists.map((f) => f.fingerprint), run.finalists.map((f) => f.fingerprint),
+    run2.finalists.map((f) => f.fingerprint),
+    run.finalists.map((f) => f.fingerprint),
     'determinism: the variant run reproduces its finalist bakes',
   );
   assert.deepStrictEqual(
-    run2.finalists.map((f) => f.record), run.finalists.map((f) => f.record),
+    run2.finalists.map((f) => f.record),
+    run.finalists.map((f) => f.record),
     'determinism: the variant records reproduce exactly',
   );
   const v = run.report.variants;
@@ -225,7 +310,8 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
     const variantIds = f.sample.cast.filter((id) => V.isVariantId(id));
     const recipes = f.record.provenance.variants || [];
     assert.deepStrictEqual(
-      recipes.map((r) => V.variantIdFor(r)).sort(), [...variantIds].sort(),
+      recipes.map((r) => V.variantIdFor(r)).sort(),
+      [...variantIds].sort(),
       'every variant member has its recipe in provenance; no recipe rides a plain cast',
     );
     for (const id of variantIds) {
@@ -233,7 +319,11 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
     }
     // bake parity for variant finalists: re-bake reproduces the still
     const rebake = bakeSample(f.sample);
-    assert.strictEqual(rebake.fingerprint, f.fingerprint, `finalist sample ${f.sample.index}: re-bake parity holds with variants in the cast`);
+    assert.strictEqual(
+      rebake.fingerprint,
+      f.fingerprint,
+      `finalist sample ${f.sample.index}: re-bake parity holds with variants in the cast`,
+    );
   }
 
   // census accounting: every cast member resolves, exactly once,
@@ -245,10 +335,19 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
       members++;
       const rec = recordFor(id, c.sample);
       if (rec && rec.category) resolved++;
-      if (V.isVariantId(id)) assert.strictEqual(rec.variant.parents[0], c.sample.variants[id].parents[0], 'resolution agrees with the sample’s recipe');
+      if (V.isVariantId(id))
+        assert.strictEqual(
+          rec.variant.parents[0],
+          c.sample.variants[id].parents[0],
+          'resolution agrees with the sample’s recipe',
+        );
     }
   }
-  assert.strictEqual(resolved, members, `census: all ${members} dealt members resolve exactly once — none lost, none doubled`);
+  assert.strictEqual(
+    resolved,
+    members,
+    `census: all ${members} dealt members resolve exactly once — none lost, none doubled`,
+  );
 
   // the still actually draws the variant (its generated svg is in the composed still)
   const vf = run.finalists.find((f) => f.sample.cast.some((id) => V.isVariantId(id)));
@@ -257,8 +356,17 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   const vsvg = recordFor(vid, vf.sample).svg;
   const window = [...vsvg.matchAll(/.{30}/g)].map((m) => m[0]).find((w) => !w.includes('var('));
   const stillSvg = composeStillSvg(vf.items, resolvePalette(vf.sample.paletteId, null, []));
-  assert.ok(window && stillSvg.includes(window), 'the composed still embeds the variant’s generated svg (bake → still, no explorer-only path)');
-  lines.push(`miner axis: dealt ${v.dealt} variants (${Object.entries(v.byOp).map(([k, n]) => `${k} ×${n}`).join(' · ')}), fallbacks ${v.fallbacks}, finalists carrying ${v.inFinalists} variant members; parity + census accounting hold`);
+  assert.ok(
+    window && stillSvg.includes(window),
+    'the composed still embeds the variant’s generated svg (bake → still, no explorer-only path)',
+  );
+  lines.push(
+    `miner axis: dealt ${v.dealt} variants (${Object.entries(v.byOp)
+      .map(([k, n]) => `${k} ×${n}`)
+      .join(
+        ' · ',
+      )}), fallbacks ${v.fallbacks}, finalists carrying ${v.inFinalists} variant members; parity + census accounting hold`,
+  );
 }
 
 // ── the doctrine: features at lead coordinates ──────────────────────
@@ -268,18 +376,31 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   // vector. FEATURES_VERSION legitimately moved to 4 when the scaleMid
   // axis was fixed; the doctrine is the deep-equals, not the number.
   const run = runMiner({ ...SMOKE, batchSize: 24 });
-  const vf = run.finalists.find((f) => f.sample.cast.some((id) => V.isVariantId(id)))
-    || run.baked.find((c) => c.sample.cast.some((id) => V.isVariantId(id)));
+  const vf =
+    run.finalists.find((f) => f.sample.cast.some((id) => V.isVariantId(id))) ||
+    run.baked.find((c) => c.sample.cast.some((id) => V.isVariantId(id)));
   assert.ok(vf, 'a variant carrier exists at this scale');
   const sample = vf.sample;
   const leadCast = sample.cast.map((id) => sample.variants?.[id]?.parents?.[0] ?? id);
   const direct = recipeFeatures({ layoutParams: sample.layoutParams, paletteId: sample.paletteId, assets: leadCast });
   const bakedOne = run.baked.find((c) => c.sample.index === sample.index);
-  assert.strictEqual(bakedOne.features.v, FEATURES_VERSION, 'candidate features carry the current FEATURES_VERSION — variants add no version of their own');
+  assert.strictEqual(
+    bakedOne.features.v,
+    FEATURES_VERSION,
+    'candidate features carry the current FEATURES_VERSION — variants add no version of their own',
+  );
   assert.deepStrictEqual(bakedOne.features.cast, direct.cast, 'candidate features: the cast reads as the lead cast');
-  assert.deepStrictEqual(bakedOne.features.castCategories, direct.castCategories, 'candidate features: categories are the lead families — no “unknown”, no variant axis');
+  assert.deepStrictEqual(
+    bakedOne.features.castCategories,
+    direct.castCategories,
+    'candidate features: categories are the lead families — no “unknown”, no variant axis',
+  );
   const keepFeat = featuresOfKeep(bakedOne.record);
-  assert.deepStrictEqual(keepFeat.castCategories, direct.castCategories, 'keep side agrees: a crowned variant keep featurizes at its leads');
+  assert.deepStrictEqual(
+    keepFeat.castCategories,
+    direct.castCategories,
+    'keep side agrees: a crowned variant keep featurizes at its leads',
+  );
   assert.ok(!keepFeat.castCategories.includes('unknown'), 'no variant ever featurizes as “unknown”');
   lines.push('doctrine: variant-ness is not a feature axis — both sides of the ledger read lead families');
 }
@@ -303,19 +424,30 @@ const SMOKE = { runSeed: 0x1530, batchSize: 36, finalistCount: 6, variantFractio
   assert.strictEqual(gate.ok, true, 'the variant crown fits the stage');
   emit(Events.KEEP_ADD, {
     keep: {
-      seed: rec.seed, seedOffsets: { ...rec.seedOffsets },
-      timestamp: new Date().toISOString(), context: captureKeepContext(useStore.getState().paletteId),
-      config: rec.config, provenance: rec.provenance,
+      seed: rec.seed,
+      seedOffsets: { ...rec.seedOffsets },
+      timestamp: new Date().toISOString(),
+      context: captureKeepContext(useStore.getState().paletteId),
+      config: rec.config,
+      provenance: rec.provenance,
     },
   });
-  await tick(); await tick();
+  await tick();
+  await tick();
   const st = useStore.getState();
-  assert.strictEqual(stageSlotsUsed(st.keeps, st.keepStage), used0 + MINED_SLOT_COST, 'the variant crown takes a stage slot at mined cost');
+  assert.strictEqual(
+    stageSlotsUsed(st.keeps, st.keepStage),
+    used0 + MINED_SLOT_COST,
+    'the variant crown takes a stage slot at mined cost',
+  );
   const keep = st.keeps[st.keeps.length - 1];
   assert.deepStrictEqual(keep.provenance, rec.provenance, 'the shelf keep carries the recipes (E3 door, E5 payload)');
   assert.doesNotThrow(() => st.recallFavorite(keep), 'recalling a variant keep does not throw at the store level');
   const enabled = Object.keys(useStore.getState().enabledAssets).filter((k) => useStore.getState().enabledAssets[k]);
-  assert.ok(enabled.some((id) => V.isVariantId(id)), 'recall enables the variant member by id (live-pool materialization is the promotion act — staging report)');
+  assert.ok(
+    enabled.some((id) => V.isVariantId(id)),
+    'recall enables the variant member by id (live-pool materialization is the promotion act — staging report)',
+  );
   lines.push('crown: a variant finalist crowns through KEEP_ADD with recipes intact and recalls without error');
 }
 

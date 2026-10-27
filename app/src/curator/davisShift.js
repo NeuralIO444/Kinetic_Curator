@@ -39,7 +39,7 @@ function hash32(str) {
 function signed(seed, offsets, key, trait) {
   const a = hashU01(seed, 'hierarchy', (hash32(key) + SALT[trait]) >>> 0, offsets);
   const b = hashU01(seed, 'hierarchy', (hash32(key) + SALT[trait] + 1) >>> 0, offsets);
-  return (a + b) - 1;
+  return a + b - 1;
 }
 
 /**
@@ -52,8 +52,16 @@ function signed(seed, offsets, key, trait) {
  * @param width       0..1: the share of each range the shift may use (shiftWidthFor(band) times the room's, later)
  * @param centre      traits to roll AROUND instead of the defaults (a nudge toward the recent keeps, step 5); null = defaults
  */
-export function shiftFor({ seed, seedOffsets = null, pin, ordinal = 0, slot = 0, width = SHIFT_WIDTH[BAND_NORMAL], centre = null }) {
-  const s = (seed >>> 0);
+export function shiftFor({
+  seed,
+  seedOffsets = null,
+  pin,
+  ordinal = 0,
+  slot = 0,
+  width = SHIFT_WIDTH[BAND_NORMAL],
+  centre = null,
+}) {
+  const s = seed >>> 0;
   const w = Number.isFinite(width) ? Math.min(1, Math.max(0, width)) : SHIFT_WIDTH[BAND_NORMAL];
   const key = `davis:${slot}:${ordinal}:${Math.round((pin && pin.x) || 0)}:${Math.round((pin && pin.y) || 0)}`;
   const R = TRAIT_RANGES;
@@ -69,7 +77,10 @@ export function shiftFor({ seed, seedOffsets = null, pin, ordinal = 0, slot = 0,
     wing: around(C.wing, R.wing, 'wing'),
     body: around(C.body, R.body, 'body'),
     // rank 0 is today's moth; a wider shift may reach further down the ranking
-    swatch: Math.min(R.swatch.max, Math.max(R.swatch.min, Math.floor(u * (1 + (R.swatch.max - R.swatch.min) * w + 0.5)) + Math.round(C.swatch))),
+    swatch: Math.min(
+      R.swatch.max,
+      Math.max(R.swatch.min, Math.floor(u * (1 + (R.swatch.max - R.swatch.min) * w + 0.5)) + Math.round(C.swatch)),
+    ),
   });
 }
 
@@ -89,9 +100,17 @@ export function createShiftTracker() {
       const traits = new Array(states.length);
       for (let i = 0; i < states.length; i++) {
         const s = states[i];
-        if (!s || s.formed !== true) { next[i] = null; traits[i] = null; continue; }
+        if (!s || s.formed !== true) {
+          next[i] = null;
+          traits[i] = null;
+          continue;
+        }
         const prev = slots[i] && slots[i].x === s.x && slots[i].y === s.y ? slots[i] : null;
-        if (prev) { next[i] = prev; traits[i] = prev.traits; continue; }
+        if (prev) {
+          next[i] = prev;
+          traits[i] = prev.traits;
+          continue;
+        }
         ordinals[i] = (ordinals[i] || 0) + 1;
         const r = typeof room === 'function' ? room() : room;
         const rw = r && Number.isFinite(r.width) ? r.width : roomWidth;
@@ -100,12 +119,23 @@ export function createShiftTracker() {
         const t = shiftFor({ seed, seedOffsets, pin: s, ordinal: ordinals[i], slot: i, width, centre: c });
         next[i] = { x: s.x, y: s.y, traits: t };
         traits[i] = t;
-        born.push({ pin: i, x: s.x, y: s.y, traits: t, band: band ?? null, width: +width.toFixed(4), room: (r && r.room) || null });
+        born.push({
+          pin: i,
+          x: s.x,
+          y: s.y,
+          traits: t,
+          band: band ?? null,
+          width: +width.toFixed(4),
+          room: (r && r.room) || null,
+        });
       }
       slots = next;
       return { traits, born };
     },
-    reset() { slots = []; ordinals.length = 0; },
+    reset() {
+      slots = [];
+      ordinals.length = 0;
+    },
     // #1694 slice 1 — snapshot/restore for the resolver-owned spawn state (#1367's law, fail-closed).
     // The ordinals ride along: a restored pin's NEXT birth must keep counting from where it left off.
     snapshotState() {
@@ -116,13 +146,33 @@ export function createShiftTracker() {
       };
     },
     restoreState(snap) {
-      if (!snap || typeof snap !== 'object' || snap.v !== 1 || !Array.isArray(snap.slots) || !Array.isArray(snap.ordinals)) return false;
+      if (
+        !snap ||
+        typeof snap !== 'object' ||
+        snap.v !== 1 ||
+        !Array.isArray(snap.slots) ||
+        !Array.isArray(snap.ordinals)
+      )
+        return false;
       const next = [];
       for (const s of snap.slots) {
-        if (s === null) { next.push(null); continue; }
+        if (s === null) {
+          next.push(null);
+          continue;
+        }
         const t = s && typeof s === 'object' ? s.traits : null;
-        if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !t || typeof t !== 'object'
-          || !Number.isFinite(t.spread) || !Number.isFinite(t.wing) || !Number.isFinite(t.body) || !Number.isFinite(t.swatch)) return false;
+        if (
+          !s ||
+          !Number.isFinite(s.x) ||
+          !Number.isFinite(s.y) ||
+          !t ||
+          typeof t !== 'object' ||
+          !Number.isFinite(t.spread) ||
+          !Number.isFinite(t.wing) ||
+          !Number.isFinite(t.body) ||
+          !Number.isFinite(t.swatch)
+        )
+          return false;
         next.push({ x: s.x, y: s.y, traits: { spread: t.spread, wing: t.wing, body: t.body, swatch: t.swatch } });
       }
       for (const n of snap.ordinals) if (!(n === null || (Number.isInteger(n) && n >= 0))) return false;
@@ -146,10 +196,21 @@ export function createShiftRecorder({ getFrame = () => 0 } = {}) {
   return {
     update(born) {
       for (const e of born) {
-        events.push([getFrame() | 0, e.pin, +e.traits.spread.toFixed(3), +e.traits.wing.toFixed(4), +e.traits.body.toFixed(4), e.traits.swatch,
-          e.room ? e.room.n : 0, e.room ? e.room.lois : null, e.room ? e.room.davis : null]);
+        events.push([
+          getFrame() | 0,
+          e.pin,
+          +e.traits.spread.toFixed(3),
+          +e.traits.wing.toFixed(4),
+          +e.traits.body.toFixed(4),
+          e.traits.swatch,
+          e.room ? e.room.n : 0,
+          e.room ? e.room.lois : null,
+          e.room ? e.room.davis : null,
+        ]);
       }
     },
-    finish() { return { version: SHIFT_RECORD_VERSION, events: events.map((e) => e.slice()) }; },
+    finish() {
+      return { version: SHIFT_RECORD_VERSION, events: events.map((e) => e.slice()) };
+    },
   };
 }

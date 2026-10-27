@@ -9,42 +9,86 @@ import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   MIN_KEEPS,
-  M1_BIAS, M1_PROXIMITY,
-  M2_T0, M2_CAP, M2_FLOOR,
+  M1_BIAS,
+  M1_PROXIMITY,
+  M2_T0,
+  M2_CAP,
+  M2_FLOOR,
   M3_DRIFT,
-  M4_ARM_MS, M4_HOLD_PCT,
+  M4_ARM_MS,
+  M4_HOLD_PCT,
   M5_GAIN_PEAK,
   BEAT_CONFIDENCE,
   NEUTRAL_SWAY,
-  proximity, keptCentroid, rankBiases, applyRankBias,
+  proximity,
+  keptCentroid,
+  rankBiases,
+  applyRankBias,
   warmedTemperature,
-  keptPaletteId, paletteDriftTarget,
+  keptPaletteId,
+  paletteDriftTarget,
   phraseTiming,
   reactivityGain,
   beatConfidentFromPeaks,
-  swayOpen, swayBiases,
-  M6_KEEPS, M6_STRENGTH, warmCentreOpen, warmCentre,
-  M7_CONFIDENCE, M7_STEP, M7_DEADBAND, M7_RANGE, tempoEaseOpen, tempoEase,
-  M8_WET_STEP, M8_WET_DEADBAND, M8_EVOLVE_RANGE, M8_EVOLVE_STEP, M8_EVOLVE_DEADBAND,
-  wetnessLeanOpen, wetnessLean, evolveLeanOpen, evolveLean,
-  surgeCallOpen, surgeCall,
+  swayOpen,
+  swayBiases,
+  M6_KEEPS,
+  M6_STRENGTH,
+  warmCentreOpen,
+  warmCentre,
+  M7_CONFIDENCE,
+  M7_STEP,
+  M7_DEADBAND,
+  M7_RANGE,
+  tempoEaseOpen,
+  tempoEase,
+  M8_WET_STEP,
+  M8_WET_DEADBAND,
+  M8_EVOLVE_RANGE,
+  M8_EVOLVE_STEP,
+  M8_EVOLVE_DEADBAND,
+  wetnessLeanOpen,
+  wetnessLean,
+  evolveLeanOpen,
+  evolveLean,
+  surgeCallOpen,
+  surgeCall,
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // ─── fixtures ───
 const layoutA = {
-  count: 300, scale: [0.7, 1.1], rotate: [-15, 15], alpha: [55, 70],
-  jitter: 18, displacement: 10, density: 70, zTiers: 4,
-  noiseSpeed: 0.6, noiseFreq: 0.006, swarmCohesion: 1.3, gravityWells: 0.7,
-  particleCount: 140, damping: 0.95, wind: 0.45, breath: 0.2, lifeDrift: 0.25, flap: 0.2,
+  count: 300,
+  scale: [0.7, 1.1],
+  rotate: [-15, 15],
+  alpha: [55, 70],
+  jitter: 18,
+  displacement: 10,
+  density: 70,
+  zTiers: 4,
+  noiseSpeed: 0.6,
+  noiseFreq: 0.006,
+  swarmCohesion: 1.3,
+  gravityWells: 0.7,
+  particleCount: 140,
+  damping: 0.95,
+  wind: 0.45,
+  breath: 0.2,
+  lifeDrift: 0.25,
+  flap: 0.2,
 };
 const keep = (id, paletteId, layout = layoutA) => ({
-  id, config: { layout: { ...layout }, palette: { id: paletteId } },
+  id,
+  config: { layout: { ...layout }, palette: { id: paletteId } },
 });
 const eightKeeps = Array.from({ length: 8 }, (_, i) => keep(`k${i}`, i < 5 ? 'tidepool' : 'ember'));
 const sevenKeeps = eightKeeps.slice(0, 7);
@@ -61,12 +105,31 @@ ok('M1: bias +0.06 only at proximity ≥ 0.72, never negative', () => {
   const near = rankBiases([{ ...layoutA }], centroid);
   assert.deepEqual(near, [M1_BIAS], 'identical layout is at proximity 1');
   assert.equal(M1_BIAS, 0.06);
-  const far = rankBiases([{
-    count: 40, scale: [0.15, 2.9], rotate: [-180, 180], alpha: [15, 100],
-    jitter: 150, displacement: 150, density: 22, zTiers: 2,
-    noiseSpeed: 1.9, noiseFreq: 0.014, swarmCohesion: 0.3, gravityWells: 0.2,
-    particleCount: 55, damping: 0.91, wind: 1.9, breath: 0.75, lifeDrift: 0.85, flap: 0.88,
-  }], centroid);
+  const far = rankBiases(
+    [
+      {
+        count: 40,
+        scale: [0.15, 2.9],
+        rotate: [-180, 180],
+        alpha: [15, 100],
+        jitter: 150,
+        displacement: 150,
+        density: 22,
+        zTiers: 2,
+        noiseSpeed: 1.9,
+        noiseFreq: 0.014,
+        swarmCohesion: 0.3,
+        gravityWells: 0.2,
+        particleCount: 55,
+        damping: 0.91,
+        wind: 1.9,
+        breath: 0.75,
+        lifeDrift: 0.85,
+        flap: 0.88,
+      },
+    ],
+    centroid,
+  );
   assert.deepEqual(far, [0], 'distant candidate gets no bias');
   assert.ok(near.every((b) => b >= 0) && far.every((b) => b >= 0), 'never demotes');
 });
@@ -206,15 +269,22 @@ ok('M6: below MIN_KEEPS, or with no hand (allowance 0), or with no moths remembe
   assert.equal(warmCentreOpen(null, DEF, 1, MIN_KEEPS), null);
 });
 
-ok('M6: the centre moves from the default toward the mean of the last M6_KEEPS keeps by M6_STRENGTH x allowance', () => {
-  const ring = [[mk(-18, 0.8, 0.85, 0)], [mk(10, 1.2, 1.0, 2)], [mk(14, 1.0, 1.2, 2)], [mk(12, 1.2, 1.1, 3)]]; // the first is older than 3
-  const c = warmCentreOpen(ring, DEF, 1, MIN_KEEPS);
-  const mean = (k) => (ring.slice(-M6_KEEPS).map((e) => e[0][k]).reduce((a, b) => a + b, 0)) / M6_KEEPS;
-  for (const k of Object.keys(DEF)) assert.ok(Math.abs(c[k] - (DEF[k] + M6_STRENGTH * (mean(k) - DEF[k]))) < 1e-9, k);
-  assert.ok(c.spread > 0, 'toward the kept moths, not away');
-  const half = warmCentreOpen(ring, DEF, 0.5, MIN_KEEPS);
-  assert.ok(Math.abs(half.spread - c.spread / 2) < 1e-9, 'a room that gives her half a hand halves the nudge');
-});
+ok(
+  'M6: the centre moves from the default toward the mean of the last M6_KEEPS keeps by M6_STRENGTH x allowance',
+  () => {
+    const ring = [[mk(-18, 0.8, 0.85, 0)], [mk(10, 1.2, 1.0, 2)], [mk(14, 1.0, 1.2, 2)], [mk(12, 1.2, 1.1, 3)]]; // the first is older than 3
+    const c = warmCentreOpen(ring, DEF, 1, MIN_KEEPS);
+    const mean = (k) =>
+      ring
+        .slice(-M6_KEEPS)
+        .map((e) => e[0][k])
+        .reduce((a, b) => a + b, 0) / M6_KEEPS;
+    for (const k of Object.keys(DEF)) assert.ok(Math.abs(c[k] - (DEF[k] + M6_STRENGTH * (mean(k) - DEF[k]))) < 1e-9, k);
+    assert.ok(c.spread > 0, 'toward the kept moths, not away');
+    const half = warmCentreOpen(ring, DEF, 0.5, MIN_KEEPS);
+    assert.ok(Math.abs(half.spread - c.spread / 2) < 1e-9, 'a room that gives her half a hand halves the nudge');
+  },
+);
 
 ok('M6: it never leaves the span between the default and the kept moths (a nudge, not a takeover)', () => {
   const ring = [[mk(18, 1.25, 1.2, 3)]];
@@ -239,7 +309,8 @@ ok('M7: below MIN_KEEPS, with no hand, or with a doubtful tempo, she does not mo
 });
 
 ok('M7: a bounded step toward the target, never past it, never chasing a wobble', () => {
-  const at = (cur, tgt, allowance = 1) => tempoEaseOpen({ current: cur, target: tgt, confidence: 0.9, nKeeps: MIN_KEEPS, allowance });
+  const at = (cur, tgt, allowance = 1) =>
+    tempoEaseOpen({ current: cur, target: tgt, confidence: 0.9, nKeeps: MIN_KEEPS, allowance });
   assert.equal(at(100, 130), 100 + M7_STEP, 'a full hand moves M7_STEP');
   assert.equal(at(130, 100), 130 - M7_STEP, 'and downwards');
   assert.ok(at(100, 130, 0.25) - 100 < M7_STEP && at(100, 130, 0.25) > 100, 'a small hand moves less');
@@ -247,7 +318,12 @@ ok('M7: a bounded step toward the target, never past it, never chasing a wobble'
   assert.equal(at(100, 100 + M7_DEADBAND), null);
   assert.equal(at(100, 104), 103, 'a gap of 4 moves by 3, not past');
   assert.equal(at(100, 102.5), 102.5, 'a gap just over the deadband closes exactly');
-  let v = 100; for (let i = 0; i < 40; i++) { const nx = at(v, 140); if (nx === null) break; v = nx; }
+  let v = 100;
+  for (let i = 0; i < 40; i++) {
+    const nx = at(v, 140);
+    if (nx === null) break;
+    v = nx;
+  }
   assert.ok(v >= 140 - M7_DEADBAND && v <= 140, `converges into the deadband (${v})`);
   assert.equal(at(100, 400), 103, 'a target above the span is clamped to it');
   assert.ok(M7_RANGE[0] < M7_RANGE[1]);
@@ -284,7 +360,12 @@ ok('M8 wetness: a bounded step toward the named wetness, never past it, never ch
   assert.equal(at(0.62, 0.62), null, 'arrived is arrived');
   assert.ok(near(at(0.59, 0.62), 0.62), 'a gap just over the dead-band closes exactly, never past');
   assert.ok(near(at(0.9, 2), 0.95), 'a target past the dial is clamped to the dial');
-  let v = 0; for (let i = 0; i < 40; i++) { const nx = at(v, 0.62); if (nx === null) break; v = nx; }
+  let v = 0;
+  for (let i = 0; i < 40; i++) {
+    const nx = at(v, 0.62);
+    if (nx === null) break;
+    v = nx;
+  }
   assert.ok(v >= 0.62 - M8_WET_DEADBAND && v <= 0.62, `converges into the dead-band (${v})`);
 });
 
@@ -297,9 +378,19 @@ ok('M8 evolve: the lean names a pace — 1 is the dial at its fastest, 0 at its 
   assert.equal(at(lo + 50, 1), null, 'within the dead-band of the fastest she is done');
   assert.equal(at(hi, 0), null, 'at the slowest, leaning slow, she is done');
   assert.equal(at(350, 1), lo, 'a gap just over the dead-band closes exactly, never past the dial');
-  let v = 2000; for (let i = 0; i < 60; i++) { const nx = at(v, 1); if (nx === null) break; v = nx; }
+  let v = 2000;
+  for (let i = 0; i < 60; i++) {
+    const nx = at(v, 1);
+    if (nx === null) break;
+    v = nx;
+  }
   assert.ok(v >= lo && v <= lo + M8_EVOLVE_DEADBAND, `converges into the dead-band of fast (${v})`);
-  v = 2000; for (let i = 0; i < 60; i++) { const nx = at(v, 0); if (nx === null) break; v = nx; }
+  v = 2000;
+  for (let i = 0; i < 60; i++) {
+    const nx = at(v, 0);
+    if (nx === null) break;
+    v = nx;
+  }
   assert.ok(v <= hi && v >= hi - M8_EVOLVE_DEADBAND, `converges into the dead-band of slow (${v})`);
 });
 
@@ -312,10 +403,24 @@ ok('M8: the gate decides: open reads through, on both dials', () => {
 
 // ─── M9: the surge call (#1576 Q3) — a keep landing near her centroid is answered ─────────────
 const layoutB = {
-  count: 40, scale: [0.15, 0.3], rotate: [150, 320], alpha: [8, 20],
-  jitter: 85, displacement: 90, density: 6, zTiers: 1,
-  noiseSpeed: 3.2, noiseFreq: 0.08, swarmCohesion: 0.1, gravityWells: 0.02,
-  particleCount: 900, damping: 0.4, wind: 0.02, breath: 0.95, lifeDrift: 0.9, flap: 0.95,
+  count: 40,
+  scale: [0.15, 0.3],
+  rotate: [150, 320],
+  alpha: [8, 20],
+  jitter: 85,
+  displacement: 90,
+  density: 6,
+  zTiers: 1,
+  noiseSpeed: 3.2,
+  noiseFreq: 0.08,
+  swarmCohesion: 0.1,
+  gravityWells: 0.02,
+  particleCount: 900,
+  damping: 0.4,
+  wind: 0.02,
+  breath: 0.95,
+  lifeDrift: 0.9,
+  flap: 0.95,
 };
 ok('M9: below MIN_KEEPS priors she does not call, however near the keep lands', () => {
   assert.equal(surgeCallOpen({ priorKeeps: sevenKeeps, newKeep: keep('n', 'tidepool') }), 0);

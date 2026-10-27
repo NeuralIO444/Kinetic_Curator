@@ -13,10 +13,24 @@ function rig() {
   const stop = initStress({
     getCounts: () => counts,
     isRunning: () => running,
-    raf: (f) => { cb = f; return 1; },
-    caf: () => { cb = null; },
+    raf: (f) => {
+      cb = f;
+      return 1;
+    },
+    caf: () => {
+      cb = null;
+    },
   });
-  return { counts, frame: (n = 1) => { for (let i = 0; i < n; i++) cb(); }, setRunning: (v) => { running = v; }, stop };
+  return {
+    counts,
+    frame: (n = 1) => {
+      for (let i = 0; i < n; i++) cb();
+    },
+    setRunning: (v) => {
+      running = v;
+    },
+    stop,
+  };
 }
 
 // 1. neutral before the first frame; a quiet room is RELAX; stop puts it back
@@ -37,7 +51,10 @@ function rig() {
 {
   const r = rig();
   r.frame(); // the first frame only sets the baseline (a count that was already 500 at start is not 500 actions)
-  for (let f = 0; f < 60; f++) { r.counts.activityCount += 1; r.frame(); }
+  for (let f = 0; f < 60; f++) {
+    r.counts.activityCount += 1;
+    r.frame();
+  }
   const busy = getStressState().activity;
   assert.equal(busy, 1, 'an action a frame saturates the signal');
   r.frame(ACTIVITY_WINDOW_FRAMES);
@@ -81,7 +98,11 @@ function rig() {
     return { bands, end };
   };
   const a = run();
-  assert.deepEqual(a.bands, [BAND_RELAX, BAND_NORMAL], 'activity + taste at full is 0.62: NORMAL, not TIGHTEN, while dish is 0');
+  assert.deepEqual(
+    a.bands,
+    [BAND_RELAX, BAND_NORMAL],
+    'activity + taste at full is 0.62: NORMAL, not TIGHTEN, while dish is 0',
+  );
   assert.ok(Math.abs(a.end.smoothed - 0.62) < 0.01, `settles at 0.38 + 0.24 (got ${a.end.smoothed})`);
   assert.deepEqual(run().bands, a.bands, 'same counts, same bands');
 }
@@ -101,8 +122,21 @@ function rig() {
 // 6. a feed that throws never breaks the loop
 {
   let cb = null;
-  const stop = initStress({ getCounts: () => { throw new Error('boom'); }, isRunning: () => true, raf: (f) => { cb = f; return 1; }, caf: () => {} });
-  assert.doesNotThrow(() => { cb(); cb(); });
+  const stop = initStress({
+    getCounts: () => {
+      throw new Error('boom');
+    },
+    isRunning: () => true,
+    raf: (f) => {
+      cb = f;
+      return 1;
+    },
+    caf: () => {},
+  });
+  assert.doesNotThrow(() => {
+    cb();
+    cb();
+  });
   assert.equal(getStressState().band, null, 'no reading is no band');
   stop();
 }
@@ -114,17 +148,26 @@ function rig() {
   r.frame();
   r.frame(30); // a quiet room: RELAX
   assert.equal(getStressState().band, BAND_RELAX);
-  for (let f = 0; f < 200; f++) { r.counts.activityCount += 1; r.counts.passRun = 40; r.frame(); } // busy: NORMAL
+  for (let f = 0; f < 200; f++) {
+    r.counts.activityCount += 1;
+    r.counts.passRun = 40;
+    r.frame();
+  } // busy: NORMAL
   assert.equal(getStressState().band, BAND_NORMAL);
   r.counts.passRun = 0; // a keep lands, the hands stop: the room settles back
   r.frame(300);
   const s = getStressState();
   assert.equal(s.band, BAND_RELAX);
   assert.equal(s.crossings, 2, 'RELAX -> NORMAL -> RELAX is two crossings, counted once each');
-  assert.equal(s.occupancy.relax + s.occupancy.normal + s.occupancy.tighten, s.frames,
-    'every presented frame is accounted to exactly one band');
-  assert.ok(s.occupancy.normal > 0 && s.occupancy.relax > 0 && s.occupancy.tighten === 0,
-    `the session's time per band is readable (R ${s.occupancy.relax} / N ${s.occupancy.normal} / T ${s.occupancy.tighten})`);
+  assert.equal(
+    s.occupancy.relax + s.occupancy.normal + s.occupancy.tighten,
+    s.frames,
+    'every presented frame is accounted to exactly one band',
+  );
+  assert.ok(
+    s.occupancy.normal > 0 && s.occupancy.relax > 0 && s.occupancy.tighten === 0,
+    `the session's time per band is readable (R ${s.occupancy.relax} / N ${s.occupancy.normal} / T ${s.occupancy.tighten})`,
+  );
   r.stop();
   assert.deepEqual(getStressState(), NEUTRAL_STRESS, 'stopped: counters zero with the rest of the state');
 }
@@ -140,11 +183,19 @@ function rig() {
   {
     let st = { passCount: 0, favorites: [], keeps: [] };
     const subs = new Set();
-    const fakeStore = { getState: () => st, subscribe: (fn) => { subs.add(fn); return () => subs.delete(fn); } };
+    const fakeStore = {
+      getState: () => st,
+      subscribe: (fn) => {
+        subs.add(fn);
+        return () => subs.delete(fn);
+      },
+    };
     const f2 = createLoisActivity({ now: () => 2000 });
     f2.start({ store: fakeStore });
-    st = { ...st, passCount: 1 }; for (const fn of subs) fn(st);
-    st = { ...st, passCount: 2 }; for (const fn of subs) fn(st);
+    st = { ...st, passCount: 1 };
+    for (const fn of subs) fn(st);
+    st = { ...st, passCount: 2 };
+    for (const fn of subs) fn(st);
     const v = f2.pressureCounts().verdicts;
     assert.deepEqual(v, ['pass', 'pass'], 'each landed pass is one verdict');
     v.push('keep');
@@ -152,7 +203,10 @@ function rig() {
     f2.stop();
   }
   const src = readFileSync(new URL('./stressLive.js', import.meta.url), 'utf8');
-  assert.ok(!/Date\.now|performance\.now|setTimeout|setInterval|new Date|Math\.random/.test(src), 'no clock, no randomness');
+  assert.ok(
+    !/Date\.now|performance\.now|setTimeout|setInterval|new Date|Math\.random/.test(src),
+    'no clock, no randomness',
+  );
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(app, /\{DEBUG_STRESS && <StressReadout \/>\}/, 'the readout mounts only behind ?debug=stress');
   assert.match(app, /getCounts: loisActivity\.pressureCounts/);

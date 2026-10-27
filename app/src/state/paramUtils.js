@@ -2,11 +2,25 @@
 import { PALETTES } from '../data/palettes.js';
 
 export const RANDOMIZABLE_KEYS = [
-  'count', 'scale', 'rotate', 'alpha', 'jitter', 'density', 'zTiers',
-  'noiseFreq', 'noiseSpeed', 'displacement', 'particleCount',
-  'swarmCohesion', 'gravityWells', 'damping',
+  'count',
+  'scale',
+  'rotate',
+  'alpha',
+  'jitter',
+  'density',
+  'zTiers',
+  'noiseFreq',
+  'noiseSpeed',
+  'displacement',
+  'particleCount',
+  'swarmCohesion',
+  'gravityWells',
+  'damping',
   // #518: motion factors — the curator shapes them, RANDOMIZE and Evolve roll them.
-  'wind', 'flap', 'breath', 'lifeDrift',
+  'wind',
+  'flap',
+  'breath',
+  'lifeDrift',
 ];
 
 export const MORPHABLE_KEYS = [...RANDOMIZABLE_KEYS];
@@ -40,37 +54,54 @@ const randInt = (lo, hi, rng) => Math.floor(rand(lo, hi + 1, rng));
  * { pair: [[lo, hi], [lo, hi]], ... } — the two element ranges.
  */
 export const DICE_RANGES = Object.freeze({
-  count:         { lo: 30, hi: 600, int: true },
-  scale:         { pair: [[0.1, 1.0], [1.0, 3.0]], dec: 2 },
-  rotate:        { pair: [[-180, 0], [0, 180]], int: true },
-  alpha:         { pair: [[15, 60], [70, 100]], int: true },
-  jitter:        { lo: 0, hi: 150, int: true },
-  density:       { lo: 20, hi: 120, int: true },
-  zTiers:        { lo: 1, hi: 10, int: true },
-  noiseFreq:     { lo: 0.002, hi: 0.015, dec: 4 },
-  noiseSpeed:    { lo: 0.1, hi: 2.0, dec: 2 },
-  displacement:  { lo: 0, hi: 150, int: true },
+  count: { lo: 30, hi: 600, int: true },
+  scale: {
+    pair: [
+      [0.1, 1.0],
+      [1.0, 3.0],
+    ],
+    dec: 2,
+  },
+  rotate: {
+    pair: [
+      [-180, 0],
+      [0, 180],
+    ],
+    int: true,
+  },
+  alpha: {
+    pair: [
+      [15, 60],
+      [70, 100],
+    ],
+    int: true,
+  },
+  jitter: { lo: 0, hi: 150, int: true },
+  density: { lo: 20, hi: 120, int: true },
+  zTiers: { lo: 1, hi: 10, int: true },
+  noiseFreq: { lo: 0.002, hi: 0.015, dec: 4 },
+  noiseSpeed: { lo: 0.1, hi: 2.0, dec: 2 },
+  displacement: { lo: 0, hi: 150, int: true },
   particleCount: { lo: 50, hi: 300, int: true },
   swarmCohesion: { lo: 0.2, hi: 4.0, dec: 2 },
-  gravityWells:  { lo: 0.1, hi: 3.0, dec: 2 },
-  damping:       { lo: 0.90, hi: 0.98, dec: 2 },
-  wind:          { lo: 0.2, hi: 2.0, dec: 2 },
-  flap:          { lo: 0.05, hi: 0.9, dec: 2 },
-  breath:        { lo: 0, hi: 0.8, dec: 2 },
-  lifeDrift:     { lo: 0.1, hi: 0.9, dec: 2 },
+  gravityWells: { lo: 0.1, hi: 3.0, dec: 2 },
+  damping: { lo: 0.9, hi: 0.98, dec: 2 },
+  wind: { lo: 0.2, hi: 2.0, dec: 2 },
+  flap: { lo: 0.05, hi: 0.9, dec: 2 },
+  breath: { lo: 0, hi: 0.8, dec: 2 },
+  lifeDrift: { lo: 0.1, hi: 0.9, dec: 2 },
 });
 for (const spec of Object.values(DICE_RANGES)) {
   if (spec.pair) spec.pair.forEach((el) => Object.freeze(el));
   Object.freeze(spec);
 }
 
-const rollElement = ([lo, hi], spec, rng) => (spec.int
-  ? randInt(lo, hi, rng)
-  : +(rand(lo, hi, rng).toFixed(spec.dec)));
+const rollElement = ([lo, hi], spec, rng) => (spec.int ? randInt(lo, hi, rng) : +rand(lo, hi, rng).toFixed(spec.dec));
 
-const rollSpec = (spec, rng) => (spec.pair
-  ? [rollElement(spec.pair[0], spec, rng), rollElement(spec.pair[1], spec, rng)]
-  : rollElement([spec.lo, spec.hi], spec, rng));
+const rollSpec = (spec, rng) =>
+  spec.pair
+    ? [rollElement(spec.pair[0], spec, rng), rollElement(spec.pair[1], spec, rng)]
+    : rollElement([spec.lo, spec.hi], spec, rng);
 
 /** rng is injectable (#518): CURATE passes a seeded stream; dice buttons keep Math.random. */
 export function randomizeKey(key, rng = Math.random) {

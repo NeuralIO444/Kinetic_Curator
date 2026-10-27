@@ -6,24 +6,38 @@ import assert from 'node:assert';
 const mem = new Map();
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 const { SEED_OFFSET_GROUPS } = await import('../engine/kernel/rng.js');
 const G = SEED_OFFSET_GROUPS[0];
-const { createDavisSlice, sanitizeFavorite, FAVORITES_KEY, KEEPS_KEY, captureFavorite, sanitizeCast, FAVORITE_CAST_MAX } = await import('./slices/davisSlice.js');
+const {
+  createDavisSlice,
+  sanitizeFavorite,
+  FAVORITES_KEY,
+  KEEPS_KEY,
+  captureFavorite,
+  sanitizeCast,
+  FAVORITE_CAST_MAX,
+} = await import('./slices/davisSlice.js');
 const { keepsFromKeeps } = await import('./hitsExport.js');
 
 /** A tiny zustand stand-in: one slice, real set semantics. */
 function boot() {
   let state;
-  const set = (p) => { state = { ...state, ...(typeof p === 'function' ? p(state) : p) }; };
+  const set = (p) => {
+    state = { ...state, ...(typeof p === 'function' ? p(state) : p) };
+  };
   state = createDavisSlice(set, () => state);
   return { api: state, get: () => state, call: (name, ...a) => state[name](...a) };
 }
 
 const fav = (seed) => ({
-  seed, seedOffsets: { [G]: 3 }, timestamp: '12:00:00',
+  seed,
+  seedOffsets: { [G]: 3 },
+  timestamp: '12:00:00',
   config: { layout: { mode: 'grid', count: 40 }, palette: { id: 'bone' } },
 });
 
@@ -38,7 +52,11 @@ const fav = (seed) => ({
   a.call('reorderFavorite', ids[2], -1);
   a.call('removeFavorite', ids[0]);
   const before = a.get().favorites;
-  assert.deepStrictEqual(before.map((f) => f.seed), [33, 22], 'reorder + remove applied');
+  assert.deepStrictEqual(
+    before.map((f) => f.seed),
+    [33, 22],
+    'reorder + remove applied',
+  );
 
   const b = boot(); // "reload": a fresh store over the same localStorage
   assert.deepStrictEqual(b.get().favorites, before, 'favorites are intact after a reload');
@@ -53,7 +71,9 @@ assert.strictEqual(sanitizeFavorite({ seed: 'NaN' }), null, 'no finite seed -> d
 assert.strictEqual(sanitizeFavorite({ seed: Infinity }), null);
 {
   const hostile = sanitizeFavorite({
-    seed: 5, id: 'x'.repeat(500), timestamp: 't'.repeat(500),
+    seed: 5,
+    id: 'x'.repeat(500),
+    timestamp: 't'.repeat(500),
     config: { layout: { mode: '__proto__', count: 1e12, jitter: NaN }, palette: { id: 42 } },
   });
   assert.ok(hostile.id.length <= 80 && hostile.timestamp.length <= 32, 'strings are bounded');
@@ -82,7 +102,9 @@ mem.delete(FAVORITES_KEY);
 // #719 — a keep records the full recipe, cast included, from ONE capture helper
 {
   const live = {
-    seed: 77, seedOffsets: { [G]: 5 }, layoutParams: { mode: 'grid', count: 40 },
+    seed: 77,
+    seedOffsets: { [G]: 5 },
+    layoutParams: { mode: 'grid', count: 40 },
     enabledAssets: { xsh07: true, xsh01: true, geo_hex_01: false },
   };
   const f = captureFavorite(live, 'chiaroscuro');
@@ -116,7 +138,8 @@ mem.delete(FAVORITES_KEY);
 // no localStorage at all (private mode / node) still works in memory
 delete globalThis.localStorage;
 {
-  const warn = console.warn; console.warn = () => {}; // the save-failed warning is the expected path
+  const warn = console.warn;
+  console.warn = () => {}; // the save-failed warning is the expected path
   const d = boot();
   d.call('addFavorite', fav(1));
   assert.strictEqual(d.get().favorites.length, 1, 'works without localStorage');
@@ -127,7 +150,9 @@ delete globalThis.localStorage;
 // leaves the keep. Same record shape, own storage key.
 globalThis.localStorage = {
   getItem: (k) => (mem.has(k) ? mem.get(k) : null),
-  setItem: (k, v) => { mem.set(k, String(v)); },
+  setItem: (k, v) => {
+    mem.set(k, String(v));
+  },
   removeItem: (k) => mem.delete(k),
 };
 mem.delete(FAVORITES_KEY);
@@ -150,7 +175,11 @@ mem.delete(KEEPS_KEY);
   assert.strictEqual(c.get().keeps.length, 2, 'keep survives un-favorite');
   // reload: keeps persist like favorites
   const r = boot();
-  assert.deepStrictEqual(r.get().keeps.map((k) => k.seed), [101, 102], 'keeps intact after a reload');
+  assert.deepStrictEqual(
+    r.get().keeps.map((k) => k.seed),
+    [101, 102],
+    'keeps intact after a reload',
+  );
 }
 
 // #996 — the export ledger: favorites as a subset of keeps
@@ -158,8 +187,16 @@ mem.delete(KEEPS_KEY);
   const keeps = [fav(1), fav(2)];
   const favorites = [fav(2), fav(9)]; // 9: legacy favorite, no keep row
   const rows = keepsFromKeeps(keeps, favorites);
-  assert.deepStrictEqual(rows.map((r) => r.seed), [1, 2, 9], 'deduped by seed; legacy favorites ride along');
-  assert.deepStrictEqual(rows.map((r) => r.favorite), [false, true, true], 'favorite flags = subset of keeps');
+  assert.deepStrictEqual(
+    rows.map((r) => r.seed),
+    [1, 2, 9],
+    'deduped by seed; legacy favorites ride along',
+  );
+  assert.deepStrictEqual(
+    rows.map((r) => r.favorite),
+    [false, true, true],
+    'favorite flags = subset of keeps',
+  );
   assert.deepStrictEqual(keepsFromKeeps([], []), [], 'empty in, empty out');
 }
 
@@ -216,17 +253,27 @@ mem.delete(KEEPS_KEY);
   assert.strictEqual(stamped, captured.keptAt, 'stored favorite carries the capture stamp');
   const b = boot(); // reload over the same storage
   assert.strictEqual(b.get().favorites.find((f) => f.seed === 987654).keptAt, stamped, 'keptAt survives a reload');
-  assert.strictEqual(b.get().keeps.find((k) => k.seed === 987654).keptAt, stamped, 'the implied keep carries the same stamp');
+  assert.strictEqual(
+    b.get().keeps.find((k) => k.seed === 987654).keptAt,
+    stamped,
+    'the implied keep carries the same stamp',
+  );
 
   // sanitizer: a real stamp round-trips (floored to whole ms); junk is
   // dropped whole, never repaired into a plausible time
   assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123, config: {} }).keptAt, 1_700_000_000_123);
   assert.strictEqual(sanitizeFavorite({ seed: 1, keptAt: 1_700_000_000_123.9, config: {} }).keptAt, 1_700_000_000_123);
-  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '12:34:56', config: {} })), 'legacy favorite: no keptAt, loads unchanged');
+  assert.ok(
+    !('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '12:34:56', config: {} })),
+    'legacy favorite: no keptAt, loads unchanged',
+  );
   // post-#948 legacy records carry a full ISO timestamp string but no
   // keptAt — the sanitizer must NOT backfill keptAt by parsing it (the
   // HH:MM:SS fixture above cannot catch that: Date.parse gives NaN there)
-  assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '2026-10-04T18:00:00.000Z', config: {} })), 'ISO-stamped legacy favorite: keptAt stays absent, never backfilled');
+  assert.ok(
+    !('keptAt' in sanitizeFavorite({ seed: 1, timestamp: '2026-10-04T18:00:00.000Z', config: {} })),
+    'ISO-stamped legacy favorite: keptAt stays absent, never backfilled',
+  );
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: 'yesterday', config: {} })), 'string keptAt dropped');
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: -5, config: {} })), 'negative keptAt dropped');
   assert.ok(!('keptAt' in sanitizeFavorite({ seed: 1, keptAt: NaN, config: {} })), 'NaN keptAt dropped');
@@ -235,13 +282,26 @@ mem.delete(KEEPS_KEY);
 // #1507 — provenance rides the shelf: a mined keep keeps its origin
 // through sanitize + the storage round-trip; a forged origin is dropped.
 {
-  const prov = { source: 'explorer', run: 'xpl-9', corner: 'reas', axes: { layout: 'grid', palette: 'bone', castSize: 2 } };
+  const prov = {
+    source: 'explorer',
+    run: 'xpl-9',
+    corner: 'reas',
+    axes: { layout: 'grid', palette: 'bone', castSize: 2 },
+  };
   const minedFav = { ...fav(909), provenance: prov };
   const a = boot();
   a.call('addFavorite', minedFav);
-  assert.deepStrictEqual(a.get().favorites.find((f) => f.seed === 909).provenance, prov, 'provenance survives addFavorite');
+  assert.deepStrictEqual(
+    a.get().favorites.find((f) => f.seed === 909).provenance,
+    prov,
+    'provenance survives addFavorite',
+  );
   const b = boot(); // reload over the same storage
-  assert.deepStrictEqual(b.get().favorites.find((f) => f.seed === 909).provenance, prov, 'provenance survives the reload round-trip');
+  assert.deepStrictEqual(
+    b.get().favorites.find((f) => f.seed === 909).provenance,
+    prov,
+    'provenance survives the reload round-trip',
+  );
   const forged = sanitizeFavorite({ ...fav(910), provenance: { source: 'forged', run: 'x' } });
   assert.ok(!('provenance' in forged), 'a forged origin never reaches the shelf');
   const plain = sanitizeFavorite(fav(911));

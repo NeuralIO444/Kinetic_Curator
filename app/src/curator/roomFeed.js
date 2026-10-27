@@ -44,12 +44,16 @@ export function roomLineFrom(event, p) {
     if (!p) return null;
     const desc = describeOp(p.op);
     if (p.status === 'applied') return desc ? { kind: 'room', text: `route landed · ${desc}` } : null;
-    if (p.status === 'dropped') return { kind: 'room', text: `route dropped · ${p.reason || desc || 'no reason given'}` };
+    if (p.status === 'dropped')
+      return { kind: 'room', text: `route dropped · ${p.reason || desc || 'no reason given'}` };
     return null;
   }
   if (event === Events.BLOOM) {
     const rolls = p && Number.isFinite(p.rolls) ? p.rolls : null;
-    return { kind: 'room', text: rolls !== null ? `bloom · a voice earned after ${rolls} rolls` : 'bloom · a voice earned' };
+    return {
+      kind: 'room',
+      text: rolls !== null ? `bloom · a voice earned after ${rolls} rolls` : 'bloom · a voice earned',
+    };
   }
   return null;
 }
@@ -63,7 +67,15 @@ export function createRoomFeed(max = ROOM_FEED_MAX) {
   const subs = new Set();
   let lastVerdict = null;
   let seq = 0;
-  const notify = () => { for (const fn of [...subs]) { try { fn(); } catch { /* a bad subscriber never breaks the feed */ } } };
+  const notify = () => {
+    for (const fn of [...subs]) {
+      try {
+        fn();
+      } catch {
+        /* a bad subscriber never breaks the feed */
+      }
+    }
+  };
   return {
     push(line) {
       if (!line || typeof line.text !== 'string' || !line.text) return false;
@@ -79,8 +91,18 @@ export function createRoomFeed(max = ROOM_FEED_MAX) {
     },
     records: () => records.slice(),
     depth: () => records.length,
-    subscribe(fn) { subs.add(fn); return () => { subs.delete(fn); }; },
-    clear() { records.length = 0; lastVerdict = null; seq = 0; notify(); },
+    subscribe(fn) {
+      subs.add(fn);
+      return () => {
+        subs.delete(fn);
+      };
+    },
+    clear() {
+      records.length = 0;
+      lastVerdict = null;
+      seq = 0;
+      notify();
+    },
   };
 }
 
@@ -119,15 +141,33 @@ function stopRoomFeed() {
   off(Events.MIND_ROUTE, onRoute);
   off(Events.BLOOM, onBloom);
 }
-const onDecision = (d) => { feed.push(personaLineFrom(d)); };
-const onRoom = (p) => { feed.push(roomLineFrom(Events.DIRECTOR_ROOM, p)); };
-const onCast = (p) => { feed.push(roomLineFrom(Events.DICE_CAST, p)); };
-const onRoute = (p) => { feed.push(roomLineFrom(Events.MIND_ROUTE, p)); };
-const onBloom = (p) => { feed.push(roomLineFrom(Events.BLOOM, p)); };
+const onDecision = (d) => {
+  feed.push(personaLineFrom(d));
+};
+const onRoom = (p) => {
+  feed.push(roomLineFrom(Events.DIRECTOR_ROOM, p));
+};
+const onCast = (p) => {
+  feed.push(roomLineFrom(Events.DICE_CAST, p));
+};
+const onRoute = (p) => {
+  feed.push(roomLineFrom(Events.MIND_ROUTE, p));
+};
+const onBloom = (p) => {
+  feed.push(roomLineFrom(Events.BLOOM, p));
+};
 
 /** The retained records, oldest first (at most ROOM_FEED_MAX). */
-export function getRoomFeed() { return feed.records(); }
+export function getRoomFeed() {
+  return feed.records();
+}
 /** How deep the bus window currently runs — the header's BUS readout. */
-export function getRoomDepth() { return feed.depth(); }
-export function subscribeRoomFeed(fn) { return feed.subscribe(fn); }
-export function resetRoomFeed() { feed.clear(); }
+export function getRoomDepth() {
+  return feed.depth();
+}
+export function subscribeRoomFeed(fn) {
+  return feed.subscribe(fn);
+}
+export function resetRoomFeed() {
+  feed.clear();
+}

@@ -3,11 +3,14 @@ import assert from 'node:assert';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from './rollScope.mjs';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('MOTION_KEYS covers every motion param', () => {
-  assert.deepEqual([...MOTION_KEYS].sort(),
-    ['behave', 'breath', 'flap', 'lifeDrift', 'noiseSpeed', 'wind'].sort());
+  assert.deepEqual([...MOTION_KEYS].sort(), ['behave', 'breath', 'flap', 'lifeDrift', 'noiseSpeed', 'wind'].sort());
 });
 
 ok('armedMotionParams: null/unknown → null, known → its numbers', () => {
@@ -32,10 +35,7 @@ ok('pinRollScope: armed mode pins mode, leaves the rest', () => {
 });
 
 ok('pinRollScope: armed motion pins every motion key, leaves the rest', () => {
-  const out = pinRollScope(
-    { mode: 'grid', behave: 'cruise', wind: 0.1, count: 10 },
-    null, 'flock',
-  );
+  const out = pinRollScope({ mode: 'grid', behave: 'cruise', wind: 0.1, count: 10 }, null, 'flock');
   const flock = armedMotionParams('flock');
   for (const k of MOTION_KEYS) assert.equal(out[k], flock[k], k);
   assert.equal(out.mode, 'grid');
@@ -43,10 +43,7 @@ ok('pinRollScope: armed motion pins every motion key, leaves the rest', () => {
 });
 
 ok('pinRollScope: both arms — "more like this, but different"', () => {
-  const out = pinRollScope(
-    { mode: 'grid', behave: 'scatter', wind: 9, seed: 1 },
-    'fibonacci', 'flock',
-  );
+  const out = pinRollScope({ mode: 'grid', behave: 'scatter', wind: 9, seed: 1 }, 'fibonacci', 'flock');
   assert.equal(out.mode, 'fibonacci');
   assert.equal(out.behave, 'flock');
   assert.equal(out.seed, 1); // everything else untouched
