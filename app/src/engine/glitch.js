@@ -150,7 +150,10 @@ export function applyGlitch(items, frame, gf) {
     const strip = Math.floor(ly / GLITCH.stripH);
     const off = stripSlip(gf, strip) + (lx > 0 ? gf.seam : lx < 0 ? -gf.seam : 0);
     const moved = off === 0 ? it : { ...it, x: it.x + ax.x * off, y: it.y + ax.y * off };
-    if (isHalo(it) || isHatch(it) || !(gf.split >= 0.5)) { out.push(moved); continue; }
+    if (isHalo(it) || isHatch(it) || !(gf.split >= 0.5)) {
+      out.push(moved);
+      continue;
+    }
     const ghost = (sign, keep) => ({
       ...moved,
       x: moved.x + ax.x * gf.split * sign,
@@ -165,12 +168,20 @@ export function applyGlitch(items, frame, gf) {
 
   // Hatch sorting: the fine marks trade places among their own slots, a seeded swap count graded by amount.
   const slots = [];
-  out.forEach((it, i) => { if (isHatch(it)) slots.push(i); });
+  out.forEach((it, i) => {
+    if (isHatch(it)) slots.push(i);
+  });
   const swaps = Math.round(gf.amount * slots.length);
   for (let s = 0; s < swaps && slots.length > 1; s++) {
-    const a = slots[Math.floor(draw(gf.seed, gf.creatureId, gf.frameIndex, `swap${s}a`, gf.seedOffsets) * slots.length)];
-    const b = slots[Math.floor(draw(gf.seed, gf.creatureId, gf.frameIndex, `swap${s}b`, gf.seedOffsets) * slots.length)];
-    if (a !== b) { const t = out[a]; out[a] = out[b]; out[b] = t; }
+    const a =
+      slots[Math.floor(draw(gf.seed, gf.creatureId, gf.frameIndex, `swap${s}a`, gf.seedOffsets) * slots.length)];
+    const b =
+      slots[Math.floor(draw(gf.seed, gf.creatureId, gf.frameIndex, `swap${s}b`, gf.seedOffsets) * slots.length)];
+    if (a !== b) {
+      const t = out[a];
+      out[a] = out[b];
+      out[b] = t;
+    }
   }
   return out;
 }

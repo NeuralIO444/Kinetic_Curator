@@ -13,7 +13,9 @@ test.describe('WebGL context loss (#263)', () => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     // GL-side errors only — ignore unrelated page noise. Note: headless
@@ -57,8 +59,7 @@ test.describe('WebGL context loss (#263)', () => {
 
     // While the context is down, the UI says so instead of pretending
     // everything is fine.
-    await expect(page.locator('.status-pill', { hasText: 'GL CONTEXT LOST' }))
-      .toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('.status-pill', { hasText: 'GL CONTEXT LOST' })).toBeVisible({ timeout: 10_000 });
 
     // Restore — the loop must come back on its own, no reload.
     await gl.evaluate(() => {

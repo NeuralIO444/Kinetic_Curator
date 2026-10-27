@@ -4,7 +4,11 @@ import { test, expect } from '@playwright/test';
 
 test('PATCH row is disabled until there are two KC tracks', async ({ page }) => {
   await page.addInitScript(() => {
-    try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
   });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });

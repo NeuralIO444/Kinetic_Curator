@@ -74,7 +74,8 @@
 import { choreoPlan, choreoWindow } from './beatChoreo.mjs';
 
 function dist2(a, b) {
-  const dx = a.x - b.x, dy = a.y - b.y;
+  const dx = a.x - b.x,
+    dy = a.y - b.y;
   return dx * dx + dy * dy;
 }
 
@@ -83,7 +84,10 @@ function groupByAsset(items) {
   for (const it of items) {
     const k = it.assetId || it.role || 'default';
     let g = groups.get(k);
-    if (!g) { g = []; groups.set(k, g); }
+    if (!g) {
+      g = [];
+      groups.set(k, g);
+    }
     g.push(it);
   }
   return groups;
@@ -104,42 +108,62 @@ function groupByAsset(items) {
  * index wins a tie exactly as before. Non-finite coordinates read as 0.
  */
 function greedyNearest(fs, ts) {
-  const n = fs.length, m = ts.length;
+  const n = fs.length,
+    m = ts.length;
   if (!n || !m) return [];
   const fin = (v) => (Number.isFinite(v) ? v : 0);
-  const tx = new Float64Array(m), ty = new Float64Array(m);
-  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  const tx = new Float64Array(m),
+    ty = new Float64Array(m);
+  let x0 = Infinity,
+    y0 = Infinity,
+    x1 = -Infinity,
+    y1 = -Infinity;
   for (let j = 0; j < m; j++) {
-    const x = tx[j] = fin(ts[j].x), y = ty[j] = fin(ts[j].y);
-    if (x < x0) x0 = x; if (x > x1) x1 = x;
-    if (y < y0) y0 = y; if (y > y1) y1 = y;
+    const x = (tx[j] = fin(ts[j].x)),
+      y = (ty[j] = fin(ts[j].y));
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
   }
-  const w = x1 - x0, h = y1 - y0;
+  const w = x1 - x0,
+    h = y1 - y0;
   const cell = Math.max(Math.sqrt((w * h) / m), Math.max(w, h) / m, 1);
-  const cols = Math.floor(w / cell) + 1, rows = Math.floor(h / cell) + 1;
+  const cols = Math.floor(w / cell) + 1,
+    rows = Math.floor(h / cell) + 1;
   const cellOf = (v, lo, cnt) => Math.min(cnt - 1, Math.max(0, Math.floor((v - lo) / cell)));
   const grid = Array.from({ length: cols * rows }, () => []);
   for (let j = 0; j < m; j++) grid[cellOf(ty[j], y0, rows) * cols + cellOf(tx[j], x0, cols)].push(j);
   const taken = new Uint8Array(m);
   const maxRing = Math.max(cols, rows);
 
-  let bestJ = -1, bestD = Infinity;
+  let bestJ = -1,
+    bestD = Infinity;
   const scan = (c, qx, qy) => {
     const g = grid[c];
     for (let k = 0; k < g.length; k++) {
       const j = g[k];
       if (taken[j]) continue;
-      const dx = qx - tx[j], dy = qy - ty[j];
+      const dx = qx - tx[j],
+        dy = qy - ty[j];
       const d = dx * dx + dy * dy;
-      if (d < bestD || (d === bestD && j < bestJ)) { bestD = d; bestJ = j; }
+      if (d < bestD || (d === bestD && j < bestJ)) {
+        bestD = d;
+        bestJ = j;
+      }
     }
   };
   const nearest = (qx, qy) => {
-    bestJ = -1; bestD = Infinity;
-    const cx = cellOf(qx, x0, cols), cy = cellOf(qy, y0, rows);
+    bestJ = -1;
+    bestD = Infinity;
+    const cx = cellOf(qx, x0, cols),
+      cy = cellOf(qy, y0, rows);
     for (let r = 0; r <= maxRing; r++) {
       if (bestJ >= 0 && (r - 1) * (r - 1) * cell * cell > bestD && r > 0) break;
-      const ya = cy - r, yb = cy + r, xa = cx - r, xb = cx + r;
+      const ya = cy - r,
+        yb = cy + r,
+        xa = cx - r,
+        xb = cx + r;
       for (let y = Math.max(0, ya); y <= Math.min(rows - 1, yb); y++) {
         if (y === ya || y === yb) {
           for (let x = Math.max(0, xa); x <= Math.min(cols - 1, xb); x++) scan(y * cols + x, qx, qy);
@@ -165,12 +189,14 @@ function greedyNearest(fs, ts) {
     }
   };
   const pop = () => {
-    const top = heap[0], last = heap.pop();
+    const top = heap[0],
+      last = heap.pop();
     if (heap.length) {
       heap[0] = last;
       let k = 0;
       for (;;) {
-        const l = 2 * k + 1, r = l + 1;
+        const l = 2 * k + 1,
+          r = l + 1;
         let s = k;
         if (l < heap.length && less(heap[l], heap[s])) s = l;
         if (r < heap.length && less(heap[r], heap[s])) s = r;
@@ -181,9 +207,11 @@ function greedyNearest(fs, ts) {
     }
     return top;
   };
-  const fx = new Float64Array(n), fy = new Float64Array(n);
+  const fx = new Float64Array(n),
+    fy = new Float64Array(n);
   for (let i = 0; i < n; i++) {
-    fx[i] = fin(fs[i].x); fy[i] = fin(fs[i].y);
+    fx[i] = fin(fs[i].x);
+    fy[i] = fin(fs[i].y);
     const j = nearest(fx[i], fy[i]);
     push({ d: bestD, i, j });
   }
@@ -191,7 +219,11 @@ function greedyNearest(fs, ts) {
   const picks = [];
   while (heap.length && picks.length < m) {
     const e = pop();
-    if (!taken[e.j]) { taken[e.j] = 1; picks.push([e.i, e.j]); continue; }
+    if (!taken[e.j]) {
+      taken[e.j] = 1;
+      picks.push([e.i, e.j]);
+      continue;
+    }
     const j = nearest(fx[e.i], fy[e.i]);
     if (j >= 0) push({ d: bestD, i: e.i, j });
   }
@@ -223,22 +255,36 @@ export function planMorph(fromItems, toItems, seed = 0) {
   for (const k of allKeys) {
     const fs = fromGroups.get(k) || [];
     const ts = (toGroups.get(k) || []).map((item, origIdx) => ({ item, origIdx, g: k }));
-    const usedF = new Uint8Array(fs.length), usedT = new Uint8Array(ts.length);
-    for (const [i, j] of greedyNearest(fs, ts.map((t) => t.item))) {
+    const usedF = new Uint8Array(fs.length),
+      usedT = new Uint8Array(ts.length);
+    for (const [i, j] of greedyNearest(
+      fs,
+      ts.map((t) => t.item),
+    )) {
       pairs.push({ f: fs[i], g: k, j: ts[j].origIdx });
-      usedF[i] = 1; usedT[j] = 1;
+      usedF[i] = 1;
+      usedT[j] = 1;
     }
-    fs.forEach((it, i) => { if (!usedF[i]) leftoverFrom.push(it); });
-    ts.forEach((t, j) => { if (!usedT[j]) leftoverTo.push(t); });
+    fs.forEach((it, i) => {
+      if (!usedF[i]) leftoverFrom.push(it);
+    });
+    ts.forEach((t, j) => {
+      if (!usedT[j]) leftoverTo.push(t);
+    });
   }
 
   // Pass 2: cross-asset nearest spatial matching (Always Alive: no optical cross-fade dissolve)
   // When modes or stub chips use different asset sets, nodes physically travel across the
   // canvas to their nearest destination slot rather than dissolving in place.
-  const usedF = new Uint8Array(leftoverFrom.length), usedT = new Uint8Array(leftoverTo.length);
-  for (const [i, j] of greedyNearest(leftoverFrom, leftoverTo.map((t) => t.item))) {
+  const usedF = new Uint8Array(leftoverFrom.length),
+    usedT = new Uint8Array(leftoverTo.length);
+  for (const [i, j] of greedyNearest(
+    leftoverFrom,
+    leftoverTo.map((t) => t.item),
+  )) {
     pairs.push({ f: leftoverFrom[i], g: leftoverTo[j].g, j: leftoverTo[j].origIdx });
-    usedF[i] = 1; usedT[j] = 1;
+    usedF[i] = 1;
+    usedT[j] = 1;
   }
 
   onlyFrom.push(...leftoverFrom.filter((_, i) => !usedF[i]));
@@ -247,7 +293,7 @@ export function planMorph(fromItems, toItems, seed = 0) {
   // of the transition reads the same downbeat. Computed over the flat
   // to-list (global to-indices), so blendItems can look it up by index.
   const choreo = choreoPlan(toItems || []);
-  return { pairs, onlyFrom, onlyTo, seed: (seed >>> 0), choreo };
+  return { pairs, onlyFrom, onlyTo, seed: seed >>> 0, choreo };
 }
 
 /**
@@ -266,14 +312,15 @@ export function matchItems(fromItems, toItems) {
   };
 }
 
-function lerp(a, b, t) { return a + (b - a) * t; }
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
 
 /** Shortest-path angle interpolation (degrees) — 350deg -> 10deg turns +20, not -340. */
 function lerpAngle(a, b, t) {
-  const d = ((b - a) % 360 + 540) % 360 - 180;
+  const d = ((((b - a) % 360) + 540) % 360) - 180;
   return a + d * t;
 }
-
 
 // ── #564 director: the seeded swap wave ─────────────────────────────────────
 // Each node owns a window [delay, delay+dur] inside the transition's [0,1].
@@ -329,11 +376,11 @@ function planNodeT(t, plan, i, seed) {
 
 /** Smootherstep — zero slope at both ends, so no node starts or stops with a jerk. */
 function ease(x) {
-  const c = x <= 0 ? 0 : (x >= 1 ? 1 : x);
+  const c = x <= 0 ? 0 : x >= 1 ? 1 : x;
   return c * c * c * (c * (c * 6 - 15) + 10);
 }
 
-const shrinkEnv = (u) => 1 - ease(u * 2);      // 1 -> 0 across the window's first half
+const shrinkEnv = (u) => 1 - ease(u * 2); // 1 -> 0 across the window's first half
 // (swapEnv died in #623: one scale-to-zero wave for every state change read
 // as a glitch, not a trick. Matched nodes now draw from the move vocabulary
 // below; growEnv died in #626 — joiners play pop or the wavefront now, and
@@ -350,7 +397,7 @@ function popEnv(u) {
 /** Any window's local progress: nodeT is this with the seeded stagger window. */
 function windowU(t, delay, dur) {
   const u = (t - delay) / dur;
-  return u <= 0 ? 0 : (u >= 1 ? 1 : u);
+  return u <= 0 ? 0 : u >= 1 ? 1 : u;
 }
 
 // ── #623: the move vocabulary ───────────────────────────────────────────────
@@ -360,9 +407,9 @@ function windowU(t, delay, dur) {
 // costume still comes from exactly one side, chosen at u=0.5 — but the
 // minimum is now each move's lowest-visibility moment (peak stretch, the
 // bottom of the breath, the bottom of the fade), never scale zero.
-export const MOVE_SMEAR = 0;   // the traveler: stretches along its motion, swaps at peak stretch
-export const MOVE_BREATH = 1;  // the sitter: dips to 40% (never zero), regrows with overshoot
-export const MOVE_FADE = 2;    // the quiet one: scale untouched, alpha dips, swaps at the bottom
+export const MOVE_SMEAR = 0; // the traveler: stretches along its motion, swaps at peak stretch
+export const MOVE_BREATH = 1; // the sitter: dips to 40% (never zero), regrows with overshoot
+export const MOVE_FADE = 2; // the quiet one: scale untouched, alpha dips, swaps at the bottom
 
 /** Scene units a node must travel to count as a traveler (smears). */
 export const SMEAR_TRAVEL = 48;
@@ -402,9 +449,9 @@ function breathEnv(u) {
 /** Alpha multiplier per move over the node's window u in [0,1]. */
 function moveAlpha(move, u) {
   const dip = Math.sin(Math.PI * u); // 0 → 1 → 0, peak mid-window
-  if (move === MOVE_SMEAR) return 1 - 0.3 * dip;  // opacity dips ~30% at peak stretch
-  if (move === MOVE_FADE) return 1 - 0.85 * dip;   // dips to ~15%; the swap hides at the bottom
-  return 1;                                        // breath: scale does the talking
+  if (move === MOVE_SMEAR) return 1 - 0.3 * dip; // opacity dips ~30% at peak stretch
+  if (move === MOVE_FADE) return 1 - 0.85 * dip; // dips to ~15%; the swap hides at the bottom
+  return 1; // breath: scale does the talking
 }
 
 /** Scale multiplier per move. Smear and fade never touch scale. */
@@ -420,10 +467,10 @@ const numOr = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
 // quiet (fade or shrink) and borrow a joiner's window so the exit lands
 // while the joiner's peak motion holds the eye. The invisible face doesn't
 // improvise — a leaver never plays a big move.
-export const JOIN_POP = 0;    // scale punch with overshoot — the legible arrival
-export const JOIN_WAVE = 1;   // fade-up along a center-out spatial wavefront
-export const LEAVE_FADE = 0;  // alpha fade, scale untouched — quiet
-export const LEAVE_SHRINK = 1;// shrink-out, alpha untouched — quiet
+export const JOIN_POP = 0; // scale punch with overshoot — the legible arrival
+export const JOIN_WAVE = 1; // fade-up along a center-out spatial wavefront
+export const LEAVE_FADE = 0; // alpha fade, scale untouched — quiet
+export const LEAVE_SHRINK = 1; // shrink-out, alpha untouched — quiet
 
 const JOIN_SALT = 0x6a6f696e;
 const LEAVE_SALT = 0x6c656176;
@@ -445,17 +492,21 @@ export function leaveMoveFor(i, seed) {
  */
 function wavefront(toList) {
   const n = toList.length;
-  let cx = 0, cy = 0;
+  let cx = 0,
+    cy = 0;
   for (const it of toList) {
-    const x = Number(it.x), y = Number(it.y);
+    const x = Number(it.x),
+      y = Number(it.y);
     cx += Number.isFinite(x) ? x : 0;
     cy += Number.isFinite(y) ? y : 0;
   }
-  cx /= n || 1; cy /= n || 1;
+  cx /= n || 1;
+  cy /= n || 1;
   const ds = new Array(n);
   let maxD = 0;
   for (let k = 0; k < n; k++) {
-    const x = Number(toList[k].x), y = Number(toList[k].y);
+    const x = Number(toList[k].x),
+      y = Number(toList[k].y);
     const d = Math.hypot(Number.isFinite(x) ? x - cx : 0, Number.isFinite(y) ? y - cy : 0);
     ds[k] = d;
     if (d > maxD) maxD = d;
@@ -549,9 +600,12 @@ export function blendItems(fromItems, toItems, t, plan = null) {
       // swaps at u=0.5 — each move's lowest-visibility moment — never a
       // blend of the two sides, so a node is never a third thing that
       // exists in neither pose (and never needs an atlas cell for one).
-      const ffx = Number.isFinite(f.x) ? f.x : 0, ffy = Number.isFinite(f.y) ? f.y : 0;
-      const ttx = Number.isFinite(to.x) ? to.x : 0, tty = Number.isFinite(to.y) ? to.y : 0;
-      const dx = ttx - ffx, dy = tty - ffy;
+      const ffx = Number.isFinite(f.x) ? f.x : 0,
+        ffy = Number.isFinite(f.y) ? f.y : 0;
+      const ttx = Number.isFinite(to.x) ? to.x : 0,
+        tty = Number.isFinite(to.y) ? to.y : 0;
+      const dx = ttx - ffx,
+        dy = tty - ffy;
       const travel = Math.hypot(dx, dy);
       const move = moveFor(i, seed, travel, toList.length >= DENSE_COUNT);
       const o = {
@@ -587,9 +641,10 @@ export function blendItems(fromItems, toItems, t, plan = null) {
       const baseAlpha = numOr(to.alpha, 100);
       out.push({
         k: toRank,
-        o: jm === JOIN_POP
-          ? { ...to, scale: baseScale * popEnv(ju), alpha: baseAlpha }
-          : { ...to, scale: baseScale, alpha: baseAlpha * ease(ju) },
+        o:
+          jm === JOIN_POP
+            ? { ...to, scale: baseScale * popEnv(ju), alpha: baseAlpha }
+            : { ...to, scale: baseScale, alpha: baseAlpha * ease(ju) },
       });
     }
   }
@@ -613,9 +668,7 @@ export function blendItems(fromItems, toItems, t, plan = null) {
     const baseAlpha = numOr(f.alpha, 100);
     out.push({
       k: (1 - w) * fromRank + w * 2,
-      o: lm === LEAVE_FADE
-        ? { ...f, alpha: baseAlpha * shrinkEnv(lu) }
-        : { ...f, scale: baseScale * shrinkEnv(lu) },
+      o: lm === LEAVE_FADE ? { ...f, alpha: baseAlpha * shrinkEnv(lu) } : { ...f, scale: baseScale * shrinkEnv(lu) },
     });
     wi++;
   }

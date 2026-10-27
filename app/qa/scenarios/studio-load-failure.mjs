@@ -6,7 +6,10 @@ export default {
     const page = await ctx.newPage();
     let blocking = true;
     let requests = 0;
-    await page.route('**/AssetStudioModal*', (r) => { requests++; blocking ? r.abort() : r.continue(); });
+    await page.route('**/AssetStudioModal*', (r) => {
+      requests++;
+      blocking ? r.abort() : r.continue();
+    });
     await ctx.openApp(page);
     await ctx.tab(page, /assets/i);
     const NEW = page.getByRole('button', { name: 'NEW', exact: true });
@@ -16,7 +19,15 @@ export default {
     await NEW.click();
     await page.waitForTimeout(800);
     ctx.check('blocked chunk → red banner appears', (await banner.count()) > 0);
-    ctx.check('…and tells the user to reload', /reload the page/i.test((await banner.first().innerText().catch(() => '')) || ''));
+    ctx.check(
+      '…and tells the user to reload',
+      /reload the page/i.test(
+        (await banner
+          .first()
+          .innerText()
+          .catch(() => '')) || '',
+      ),
+    );
     ctx.check('…and no modal opened', (await modal.count()) === 0);
     await ctx.snap(page, 'banner after the failed load', page.locator('.panel-assets, .panel').first());
 
@@ -24,14 +35,21 @@ export default {
     const before = requests;
     await NEW.click();
     await page.waitForTimeout(1200);
-    ctx.check('same-page retry makes no network request (browser replays the cached failure)', requests === before, `new requests: ${requests - before}`);
+    ctx.check(
+      'same-page retry makes no network request (browser replays the cached failure)',
+      requests === before,
+      `new requests: ${requests - before}`,
+    );
     ctx.check('same-page retry still shows the banner', (await banner.count()) > 0);
 
     await page.reload({ waitUntil: 'domcontentloaded' });
     await page.locator('.app').waitFor({ timeout: 30_000 });
     await ctx.tab(page, /assets/i);
     await page.getByRole('button', { name: 'NEW', exact: true }).click();
-    await modal.first().waitFor({ timeout: 10_000 }).catch(() => {});
+    await modal
+      .first()
+      .waitFor({ timeout: 10_000 })
+      .catch(() => {});
     ctx.check('after a reload the Studio opens', (await modal.count()) > 0);
     ctx.check('…and no banner is left', (await page.getByText(/STUDIO failed to load/).count()) === 0);
     await ctx.snap(page, 'Studio open after the reload');

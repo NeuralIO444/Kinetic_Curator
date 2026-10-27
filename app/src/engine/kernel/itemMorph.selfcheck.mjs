@@ -1,7 +1,23 @@
 import assert from 'node:assert/strict';
-import { matchItems, blendItems, planMorph, nodeWindow, moveFor,
-  MOVE_SMEAR, MOVE_BREATH, MOVE_FADE, SMEAR_VEL, SMEAR_TRAVEL, DENSE_COUNT,
-  joinMoveFor, leaveMoveFor, JOIN_POP, JOIN_WAVE, LEAVE_FADE, LEAVE_SHRINK } from './itemMorph.mjs';
+import {
+  matchItems,
+  blendItems,
+  planMorph,
+  nodeWindow,
+  moveFor,
+  MOVE_SMEAR,
+  MOVE_BREATH,
+  MOVE_FADE,
+  SMEAR_VEL,
+  SMEAR_TRAVEL,
+  DENSE_COUNT,
+  joinMoveFor,
+  leaveMoveFor,
+  JOIN_POP,
+  JOIN_WAVE,
+  LEAVE_FADE,
+  LEAVE_SHRINK,
+} from './itemMorph.mjs';
 // The kernel's own easing — liveResolve feeds blendItems morphEase(raw),
 // so the #564 contract sweeps below must drive it the same way.
 // (#1239: kernel-owned in ./easing.mjs; gl/paletteMix.mjs re-exports it,
@@ -12,16 +28,28 @@ import { morphEase } from './easing.mjs';
 // blendItems actually plays — instead of the seeded nodeWindow.
 import { choreoWindow } from './beatChoreo.mjs';
 
-let n = 0, fail = 0;
+let n = 0,
+  fail = 0;
 function ok(name, fn) {
   n++;
-  try { fn(); console.log(`  [ok] ${name}`); }
-  catch (e) { fail++; console.log(`  [FAIL] ${name}: ${e.message}`); }
+  try {
+    fn();
+    console.log(`  [ok] ${name}`);
+  } catch (e) {
+    fail++;
+    console.log(`  [FAIL] ${name}: ${e.message}`);
+  }
 }
 
 ok('matchItems pairs same-asset items nearest-first', () => {
-  const from = [{ assetId: 'a', x: 0, y: 0 }, { assetId: 'a', x: 100, y: 0 }];
-  const to = [{ assetId: 'a', x: 5, y: 0 }, { assetId: 'a', x: 95, y: 0 }];
+  const from = [
+    { assetId: 'a', x: 0, y: 0 },
+    { assetId: 'a', x: 100, y: 0 },
+  ];
+  const to = [
+    { assetId: 'a', x: 5, y: 0 },
+    { assetId: 'a', x: 95, y: 0 },
+  ];
   const { pairs, onlyFrom, onlyTo } = matchItems(from, to);
   assert.equal(pairs.length, 2);
   assert.equal(onlyFrom.length, 0);
@@ -44,7 +72,10 @@ ok('matchItems pairs across different assets spatially (no optical cross-fade di
 
 ok('matchItems handles count mismatch within one asset group', () => {
   const from = [{ assetId: 'a', x: 0, y: 0 }];
-  const to = [{ assetId: 'a', x: 0, y: 0 }, { assetId: 'a', x: 50, y: 0 }];
+  const to = [
+    { assetId: 'a', x: 0, y: 0 },
+    { assetId: 'a', x: 50, y: 0 },
+  ];
   const { pairs, onlyFrom, onlyTo } = matchItems(from, to);
   assert.equal(pairs.length, 1);
   assert.equal(onlyFrom.length, 0);
@@ -100,7 +131,14 @@ ok('#626: pop joiner punches with overshoot, then settles — alpha full through
   let pi = -1;
   for (let i = 0; i < 64 && pi < 0; i++) if (joinMoveFor(i, 11) === JOIN_POP) pi = i;
   assert.ok(pi >= 0, 'a pop joiner exists at seed 11');
-  const to = Array.from({ length: pi + 1 }, (_, k) => ({ assetId: 'a', x: k * 10, y: 0, scale: 2, alpha: 100, key: 'k' + k }));
+  const to = Array.from({ length: pi + 1 }, (_, k) => ({
+    assetId: 'a',
+    x: k * 10,
+    y: 0,
+    scale: 2,
+    alpha: 100,
+    key: 'k' + k,
+  }));
   const plan = planMorph([], to, 11);
   const at = (t) => blendItems([], to, t, plan).find((o) => o.key === 'k' + pi);
   const { delay, dur } = nodeWindow(pi, 11);
@@ -125,8 +163,10 @@ ok('#626: wave joiner fades up center-out — the middle arrives before the edge
   const plan = planMorph([], to, seed);
   const out = (t) => blendItems([], to, t, plan);
   const alpha = (t, k) => out(t).find((o) => o.key === 'w' + k).alpha;
-  assert.ok(alpha(0.25, 2) > alpha(0.25, 0),
-    `center leads the wavefront (${alpha(0.25, 2).toFixed(1)} vs edge ${alpha(0.25, 0).toFixed(1)})`);
+  assert.ok(
+    alpha(0.25, 2) > alpha(0.25, 0),
+    `center leads the wavefront (${alpha(0.25, 2).toFixed(1)} vs edge ${alpha(0.25, 0).toFixed(1)})`,
+  );
   assert.ok(Math.abs(alpha(0.999, 2) - 100) < 0.5, 'center lands at full alpha');
   assert.ok(Math.abs(alpha(0.999, 0) - 100) < 0.5, 'edge lands at full alpha');
   for (let t = 0.01; t <= 1; t += 0.1) {
@@ -154,12 +194,13 @@ ok('#626: leaver exits are quiet — fade touches only alpha, shrink only scale'
     assert.equal(s.alpha, 100, `shrink never touches alpha (t=${t.toFixed(2)})`);
     assert.ok(s.scale <= 3 && s.scale >= 0, `shrink scale stays in range (t=${t.toFixed(2)})`);
   }
-  const w0 = nodeWindow(0, seed), w1 = nodeWindow(1, seed);
+  const w0 = nodeWindow(0, seed),
+    w1 = nodeWindow(1, seed);
   assert.equal(at(w0.delay + w0.dur * 0.6, 'L0').alpha, 0, 'fade completes past its midpoint');
   assert.equal(at(w1.delay + w1.dur * 0.6, 'L1').scale, 0, 'shrink completes past its midpoint');
 });
 
-ok('#626: a leaver borrows a live joiner\'s window — gone while the joiner peaks', () => {
+ok("#626: a leaver borrows a live joiner's window — gone while the joiner peaks", () => {
   const from = [
     { assetId: 'a', x: 0, y: 0, scale: 2, alpha: 100, key: 'F0' },
     { assetId: 'a', x: 100, y: 0, scale: 2, alpha: 100, key: 'F1' },
@@ -211,7 +252,12 @@ ok('#626: mirror doubling rides the joiner path — the doubled half grows in st
 ok('#626 contract: every joiner has landed by t->1 — no held frames', () => {
   for (const seed of [0, 1, 7, 4096]) {
     const to = Array.from({ length: 48 }, (_, k) => ({
-      assetId: 'a', x: (k % 8) * 100, y: Math.floor(k / 8) * 100, scale: 2, alpha: 100, key: 'j' + k,
+      assetId: 'a',
+      x: (k % 8) * 100,
+      y: Math.floor(k / 8) * 100,
+      scale: 2,
+      alpha: 100,
+      key: 'j' + k,
     }));
     const plan = planMorph([], to, seed);
     const out = blendItems([], to, 0.999, plan);
@@ -323,13 +369,16 @@ ok('#444: once settled (t>=0.9) the blend emits raw to-order, fade-outs trailing
   ];
   const plan = planMorph(from, to); // group order [a, c, b] ≠ raw to order [b, a, b]
   const toKeys = to.map((i) => i.key);
-  for (const t of [0.9, 0.95, 0.999]) { // settled: draw order == raw to-order
+  for (const t of [0.9, 0.95, 0.999]) {
+    // settled: draw order == raw to-order
     const out = blendItems(from, to, t, plan);
-    assert.deepEqual(out.slice(0, to.length).map((i) => i.key), toKeys,
-      `first ${to.length} entries at t=${t} must be raw to-order`);
+    assert.deepEqual(
+      out.slice(0, to.length).map((i) => i.key),
+      toKeys,
+      `first ${to.length} entries at t=${t} must be raw to-order`,
+    );
     for (const o of out.slice(to.length)) {
-      assert.ok(!toKeys.includes(o.key),
-        `trailing entry ${o.key} at t=${t} must be a fade-out, not a to-item`);
+      assert.ok(!toKeys.includes(o.key), `trailing entry ${o.key} at t=${t} must be a fade-out, not a to-item`);
     }
   }
 });
@@ -359,7 +408,10 @@ ok('z-fight: matched items keep from draw-order at t->0+ and reach to-order by t
   // and it never jumps more than the ordering weight allows between adjacent frames
   // Stacking (not costume) is what must move gradually: compare the depth
   // order by the pairing's from-side, which the costume swap does not rename.
-  const stack = (t) => blendItems(from, to, t, plan).map((i) => i.x).join();
+  const stack = (t) =>
+    blendItems(from, to, t, plan)
+      .map((i) => i.x)
+      .join();
   const seen = new Set();
   for (let t = 0.001; t < 0.9; t += 0.01) seen.add(stack(t));
   assert.ok(seen.size <= 4, 'order transitions are gradual (a few swaps over the blend), not one flip');
@@ -387,12 +439,26 @@ ok('z-fight: fade-outs trail once settled (t>=0.9), never among the settled to-i
 // blendItems morphEase(raw), so the sweeps below do the same.
 
 const gridFrom = Array.from({ length: 24 }, (_, i) => ({
-  assetId: 'a', key: `old-${i}`, x: (i % 6) * 100, y: Math.floor(i / 6) * 100,
-  scale: 1, rotation: 0, alpha: 100, color: '#111111', accent: '#222222',
+  assetId: 'a',
+  key: `old-${i}`,
+  x: (i % 6) * 100,
+  y: Math.floor(i / 6) * 100,
+  scale: 1,
+  rotation: 0,
+  alpha: 100,
+  color: '#111111',
+  accent: '#222222',
 }));
 const gridTo = Array.from({ length: 24 }, (_, i) => ({
-  assetId: 'b', key: `new-${i}`, x: (i % 6) * 100 + 30, y: Math.floor(i / 6) * 100 + 30,
-  scale: 1.5, rotation: 40, alpha: 100, color: '#eeeeee', accent: '#dddddd',
+  assetId: 'b',
+  key: `new-${i}`,
+  x: (i % 6) * 100 + 30,
+  y: Math.floor(i / 6) * 100 + 30,
+  scale: 1.5,
+  rotation: 40,
+  alpha: 100,
+  color: '#eeeeee',
+  accent: '#dddddd',
 }));
 
 /** One 60fps MIX of `mixSeconds`, exactly as liveResolve drives it. */
@@ -420,8 +486,12 @@ const costume = (it) => `${it.assetId}|${it.color}|${it.accent}`;
 // (u=0.5 — peak stretch, bottom of the breath, bottom of the fade), and no
 // move ever takes a node to zero. Same seed replays the same choreography.
 
-const travelerFrom = [{ assetId: 'a', key: 'f0', x: 0, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#111111', accent: '#222222' }];
-const travelerTo = [{ assetId: 'b', key: 't0', x: 1000, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#eeeeee', accent: '#dddddd' }];
+const travelerFrom = [
+  { assetId: 'a', key: 'f0', x: 0, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#111111', accent: '#222222' },
+];
+const travelerTo = [
+  { assetId: 'b', key: 't0', x: 1000, y: 0, scale: 1, rotation: 0, alpha: 100, color: '#eeeeee', accent: '#dddddd' },
+];
 
 /** Per-node swap frame + its window progress then. Grid fixtures pair 1:1, so out[i] is node i. */
 function swapUs(from, to, mixSeconds, seed) {
@@ -433,7 +503,10 @@ function swapUs(from, to, mixSeconds, seed) {
     const { delay, dur } = choreoWindow(plan.choreo.slots[i], i, seed);
     let found = -1;
     for (let f = 1; f < frames.length; f++) {
-      if (costume(frames[f].items[i]) !== was) { found = f; break; }
+      if (costume(frames[f].items[i]) !== was) {
+        found = f;
+        break;
+      }
     }
     assert.ok(found > 0, `node ${i} swaps exactly once`);
     for (let f = found + 1; f < frames.length; f++) {
@@ -457,8 +530,11 @@ ok('#623: move picks are seeded, index-stable, and role-driven', () => {
   }
 });
 
-ok('#623: every swap lands on its move\'s lowest-visibility moment (u=0.5)', () => {
-  for (const [label, from, to] of [['sitters', gridFrom, gridTo], ['travelers', travelerFrom, travelerTo]]) {
+ok("#623: every swap lands on its move's lowest-visibility moment (u=0.5)", () => {
+  for (const [label, from, to] of [
+    ['sitters', gridFrom, gridTo],
+    ['travelers', travelerFrom, travelerTo],
+  ]) {
     const seed = 7;
     const swaps = swapUs(from, to, 2, seed);
     const dense = to.length >= DENSE_COUNT;
@@ -487,8 +563,10 @@ ok('#623: every swap lands on its move\'s lowest-visibility moment (u=0.5)', () 
         assert.ok(Math.abs(it.scale - 1.25) < 0.2, `${label} node ${i}: fade never scales (got ${it.scale})`);
       } else {
         assert.ok(it.alpha > 55 && it.alpha < 85, `${label} node ${i}: smear dips ~30% (got ${it.alpha})`);
-        assert.ok(Math.hypot(it.vx || 0, it.vy || 0) > SMEAR_VEL * 0.5,
-          `${label} node ${i}: stretched along travel at the swap`);
+        assert.ok(
+          Math.hypot(it.vx || 0, it.vy || 0) > SMEAR_VEL * 0.5,
+          `${label} node ${i}: stretched along travel at the swap`,
+        );
       }
     }
   }
@@ -514,7 +592,8 @@ ok('#623 known ceiling: fewer frames land the swap farther from the minimum', ()
   // frames per window to land near u=0.5 — the same ceiling #564 had, now
   // measured per move instead of in residual scale.
   const worst = (mix) => Math.max(...swapUs(gridFrom, gridTo, mix, 7).map((s) => Math.abs(s.u - 0.5)));
-  const short = worst(0.25), long = worst(4);
+  const short = worst(0.25),
+    long = worst(4);
   assert.ok(short > long, `fewer frames = farther from the minimum (${short.toFixed(3)} vs ${long.toFixed(3)})`);
   assert.ok(long < 0.03, `a 4s MIX lands the swap on the minimum (${long.toFixed(4)})`);
 });
@@ -523,10 +602,14 @@ ok('#623: fast travel happens mid-move, never at rest visibility', () => {
   // A 1000px traveler smears: its fastest hop must land while dimmed and
   // stretched — the eye follows the smear, it never sees a full-size jump.
   const { frames } = sweepT(travelerFrom, travelerTo, 2, 7);
-  let maxHop = 0, at = null;
+  let maxHop = 0,
+    at = null;
   for (let f = 1; f < frames.length; f++) {
     const hop = Math.abs(frames[f].items[0].x - frames[f - 1].items[0].x);
-    if (hop > maxHop) { maxHop = hop; at = frames[f].items[0]; }
+    if (hop > maxHop) {
+      maxHop = hop;
+      at = frames[f].items[0];
+    }
   }
   assert.ok(maxHop > 5, `the node actually travels (peak hop ${maxHop.toFixed(1)}px)`);
   assert.ok(at.alpha <= 80, `fastest hop happens while dimmed (alpha ${at.alpha.toFixed(1)})`);
@@ -539,8 +622,7 @@ ok('#564 contract: never two costumes in one node — identity comes from one si
       for (const it of items) {
         const fromSide = it.assetId === 'a' && it.color === '#111111' && it.accent === '#222222';
         const toSide = it.assetId === 'b' && it.color === '#eeeeee' && it.accent === '#dddddd';
-        assert.ok(fromSide || toSide,
-          `node is a blend of two costumes: ${it.assetId}/${it.color}/${it.accent}`);
+        assert.ok(fromSide || toSide, `node is a blend of two costumes: ${it.assetId}/${it.color}/${it.accent}`);
       }
     }
   }
@@ -559,8 +641,10 @@ ok('#564 contract: zero held frames — every window closes by t=1', () => {
   const frames = sweep(gridFrom, gridTo, 2);
   const last = frames[frames.length - 2]; // last frame still produced by the blend
   for (let i = 0; i < gridTo.length; i++) {
-    assert.ok(Math.hypot(last[i].x - gridTo[i].x, last[i].y - gridTo[i].y) < 0.5,
-      `node ${i} has landed before the handoff`);
+    assert.ok(
+      Math.hypot(last[i].x - gridTo[i].x, last[i].y - gridTo[i].y) < 0.5,
+      `node ${i} has landed before the handoff`,
+    );
     assert.ok(Math.abs(last[i].scale - gridTo[i].scale) < 0.01, `node ${i} is full size before the handoff`);
   }
 });
@@ -570,9 +654,13 @@ ok('#564 contract: the stagger is a seeded, index-stable wave', () => {
   assert.deepEqual(wave(7), wave(7), 'same seed replays the same wave');
   assert.notDeepEqual(wave(7), wave(8), 'a different seed is a different wave');
   // It is a WAVE, not one flip: the midpoints must actually spread out.
-  const mids = wave(7).map(({ delay, dur }) => delay + dur / 2).sort((a, b) => a - b);
-  assert.ok(mids[mids.length - 1] - mids[0] > 0.2,
-    `swaps spread across the transition (span ${mids[mids.length - 1] - mids[0]})`);
+  const mids = wave(7)
+    .map(({ delay, dur }) => delay + dur / 2)
+    .sort((a, b) => a - b);
+  assert.ok(
+    mids[mids.length - 1] - mids[0] > 0.2,
+    `swaps spread across the transition (span ${mids[mids.length - 1] - mids[0]})`,
+  );
 });
 
 // ── #572: the pairing must stay the SAME pairing, just not O(n^3) ──────────
@@ -593,22 +681,34 @@ function oraclePlan(fromItems, toItems) {
   const d2 = (a, b) => (a.x - b.x) ** 2 + (a.y - b.y) ** 2;
   const greedy = (fs, ts, pairs) => {
     while (fs.length && ts.length) {
-      let bi = 0, bj = 0, bd = Infinity;
-      for (let i = 0; i < fs.length; i++) for (let j = 0; j < ts.length; j++) {
-        const d = d2(fs[i], ts[j].item);
-        if (d < bd) { bd = d; bi = i; bj = j; }
-      }
+      let bi = 0,
+        bj = 0,
+        bd = Infinity;
+      for (let i = 0; i < fs.length; i++)
+        for (let j = 0; j < ts.length; j++) {
+          const d = d2(fs[i], ts[j].item);
+          if (d < bd) {
+            bd = d;
+            bi = i;
+            bj = j;
+          }
+        }
       pairs.push({ f: fs[bi], g: ts[bj].g, j: ts[bj].origIdx });
-      fs.splice(bi, 1); ts.splice(bj, 1);
+      fs.splice(bi, 1);
+      ts.splice(bj, 1);
     }
   };
-  const fg = group(fromItems), tg = group(toItems);
-  const pairs = [], lf = [], lt = [];
+  const fg = group(fromItems),
+    tg = group(toItems);
+  const pairs = [],
+    lf = [],
+    lt = [];
   for (const k of new Set([...fg.keys(), ...tg.keys()])) {
     const fs = (fg.get(k) || []).slice();
     const ts = (tg.get(k) || []).map((item, origIdx) => ({ item, origIdx, g: k }));
     greedy(fs, ts, pairs);
-    lf.push(...fs); lt.push(...ts);
+    lf.push(...fs);
+    lt.push(...ts);
   }
   greedy(lf, lt, pairs);
   return { pairs, onlyFrom: lf, onlyTo: lt.map((t) => ({ g: t.g, j: t.origIdx })) };
@@ -624,11 +724,14 @@ ok('#572: planMorph pairs exactly like the old O(n^3) greedy (ties, mixed assets
   for (let trial = 0; trial < 60; trial++) {
     const assets = ['a', 'b', 'c'].slice(0, 1 + Math.floor(rnd() * 3));
     const span = trial % 3 === 0 ? 4 : trial % 3 === 1 ? 40 : 1000; // tiny span = tie storm
-    const mk = (cnt) => Array.from({ length: cnt }, () => ({
-      assetId: assets[Math.floor(rnd() * assets.length)],
-      x: Math.floor(rnd() * span), y: Math.floor(rnd() * span),
-    }));
-    const from = mk(1 + Math.floor(rnd() * 40)), to = mk(1 + Math.floor(rnd() * 40));
+    const mk = (cnt) =>
+      Array.from({ length: cnt }, () => ({
+        assetId: assets[Math.floor(rnd() * assets.length)],
+        x: Math.floor(rnd() * span),
+        y: Math.floor(rnd() * span),
+      }));
+    const from = mk(1 + Math.floor(rnd() * 40)),
+      to = mk(1 + Math.floor(rnd() * 40));
     const want = oraclePlan(from, to);
     const got = planMorph(from, to, 7);
     assert.deepEqual(got.pairs, want.pairs, `pairs, trial ${trial}`);
@@ -643,17 +746,24 @@ ok('#572: planMorph survives empty sides, coincident points and non-finite coord
   assert.equal(planMorph([], [{ assetId: 'a', x: 1, y: 1 }]).onlyTo.length, 1);
   const same = Array.from({ length: 12 }, () => ({ assetId: 'a', x: 5, y: 5 }));
   assert.equal(planMorph(same, same).pairs.length, 12);
-  const junk = [{ assetId: 'a', x: NaN, y: 3 }, { assetId: 'a', x: 1, y: Infinity }];
+  const junk = [
+    { assetId: 'a', x: NaN, y: 3 },
+    { assetId: 'a', x: 1, y: Infinity },
+  ];
   const p = planMorph(junk, junk);
   assert.equal(p.pairs.length, 2, 'garbage coordinates still terminate with a full pairing');
 });
 
 ok('#572: an 800-count plan is one cheap pass, not a mid-set hitch', () => {
   const rnd = lcg(800);
-  const mk = () => Array.from({ length: 800 }, () => ({
-    assetId: ['a', 'b', 'c', 'd'][Math.floor(rnd() * 4)], x: rnd() * 1920, y: rnd() * 1080,
-  }));
-  const from = mk(), to = mk();
+  const mk = () =>
+    Array.from({ length: 800 }, () => ({
+      assetId: ['a', 'b', 'c', 'd'][Math.floor(rnd() * 4)],
+      x: rnd() * 1920,
+      y: rnd() * 1080,
+    }));
+  const from = mk(),
+    to = mk();
   planMorph(from, to); // warm
   const t0 = performance.now();
   const plan = planMorph(from, to);
@@ -699,7 +809,7 @@ ok('#951: the hero is mid-move while the far chorus still waits', () => {
 
 ok('#951: every choreo window still closes by t=1 — the handoff holds no frame', () => {
   for (const seed of [0, 7, 12345]) {
-    const to = Array.from({ length: 64 }, (_, i) => ({ x: i * 13 % 500, y: i * 7 % 300, scale: 1 + (i % 5) }));
+    const to = Array.from({ length: 64 }, (_, i) => ({ x: (i * 13) % 500, y: (i * 7) % 300, scale: 1 + (i % 5) }));
     const plan = planMorph([], to, seed);
     for (let i = 0; i < to.length; i++) {
       const { delay, dur } = choreoWindow(plan.choreo.slots[i], i, seed);
@@ -707,7 +817,14 @@ ok('#951: every choreo window still closes by t=1 — the handoff holds no frame
     }
   }
   // …and the blend actually lands: last frame before handoff is the target pose
-  const to = Array.from({ length: 24 }, (_, i) => ({ assetId: 'a', key: 'q' + i, x: i * 40, y: 0, scale: 2, alpha: 100 }));
+  const to = Array.from({ length: 24 }, (_, i) => ({
+    assetId: 'a',
+    key: 'q' + i,
+    x: i * 40,
+    y: 0,
+    scale: 2,
+    alpha: 100,
+  }));
   const from = to.map((o) => ({ ...o, x: o.x + 200 }));
   const plan = planMorph(from, to, 9);
   const last = blendItems(from, to, 0.9999, plan);

@@ -26,8 +26,14 @@ import { createGrid, stepGrid } from './ca-engine.js';
 {
   const g = createGrid(7, 3, 5);
   assert.equal(g.length, 3, 'rows');
-  assert.ok(g.every((row) => row.length === 7), 'cols');
-  assert.ok(g.flat().every((c) => c === 0 || c === 1), 'cells are 0 or 1');
+  assert.ok(
+    g.every((row) => row.length === 7),
+    'cols',
+  );
+  assert.ok(
+    g.flat().every((c) => c === 0 || c === 1),
+    'cells are 0 or 1',
+  );
 }
 
 // 4. Density holds the pre-fix semantics: alive when the draw beats 0.55, so ~45% alive.
@@ -42,7 +48,9 @@ import { createGrid, stepGrid } from './ca-engine.js';
 // 5. stepGrid is untouched Conway: a blinker oscillates with period 2.
 {
   const g = Array.from({ length: 5 }, () => Array(5).fill(0));
-  g[1][2] = 1; g[2][2] = 1; g[3][2] = 1; // vertical bar
+  g[1][2] = 1;
+  g[2][2] = 1;
+  g[3][2] = 1; // vertical bar
   const s1 = stepGrid(g);
   assert.deepEqual([s1[2][1], s1[2][2], s1[2][3]], [1, 1, 1], 'blinker turns horizontal');
   assert.deepEqual(stepGrid(s1), g, 'blinker returns — period 2');
@@ -53,6 +61,9 @@ import { createGrid, stepGrid } from './ca-engine.js';
 {
   const src = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'ca-engine.js'), 'utf8');
   const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '');
-  const code = noBlock.split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
+  const code = noBlock
+    .split('\n')
+    .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
+    .join('\n');
   assert.ok(!code.includes('Math.random'), 'ca-engine.js must not use Math.random — seeded kernel channels only');
 }

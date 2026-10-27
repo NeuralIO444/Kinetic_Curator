@@ -25,8 +25,16 @@
 import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import {
-  isStippleMaterial, STIPPLE_MATERIAL, STIPPLE_CELL, STIPPLE_BOX, STIPPLE_DOTS,
-  STIPPLE_DOT_SCALE, stippleShadeAt, STIPPLE_GLSL, stipplePatternDef, stippleDotScaleFrom,
+  isStippleMaterial,
+  STIPPLE_MATERIAL,
+  STIPPLE_CELL,
+  STIPPLE_BOX,
+  STIPPLE_DOTS,
+  STIPPLE_DOT_SCALE,
+  stippleShadeAt,
+  STIPPLE_GLSL,
+  stipplePatternDef,
+  stippleDotScaleFrom,
 } from './stippleBody.mjs';
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
@@ -41,7 +49,11 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 // ── the switch + the recovered def ───────────────────────────────────
 ok('isStippleMaterial: only the stipple material engages', () => {
@@ -59,7 +71,10 @@ ok('the screen is the retired def, dot for dot', () => {
   assert.equal(STIPPLE_BOX, 100);
   assert.deepEqual(
     STIPPLE_DOTS.map((d) => [d.cx, d.cy, d.r, d.color]),
-    [[1.5, 1.5, 0.8, 'ink'], [4.5, 4.2, 0.6, 'accent']],
+    [
+      [1.5, 1.5, 0.8, 'ink'],
+      [4.5, 4.2, 0.6, 'accent'],
+    ],
   );
   const inkDot = stippleShadeAt(1.5 / 100, 1.5 / 100);
   assert.equal(inkDot.color, 'ink', 'the large dot paints ink');
@@ -100,9 +115,18 @@ ok('the GLSL chunk and the SVG def read the same constants', () => {
     assert.ok(STIPPLE_GLSL.includes(frag), `GLSL carries ${frag}`);
   }
   const def = stipplePatternDef('sgX', '#abcdef', '#123456');
-  assert.ok(def.includes('<pattern id="sgX" width="6" height="6" patternUnits="userSpaceOnUse">'), 'def tile is the retired def');
-  assert.ok(def.includes('<circle cx="1.5" cy="1.5" r="2" fill="#123456"/>'), 'ink dot: ink channel, def radius at Matt\'s ×2.5 scale');
-  assert.ok(def.includes('<circle cx="4.5" cy="4.2" r="1.5" fill="#abcdef"/>'), 'accent dot: accent channel, def radius at Matt\'s ×2.5 scale');
+  assert.ok(
+    def.includes('<pattern id="sgX" width="6" height="6" patternUnits="userSpaceOnUse">'),
+    'def tile is the retired def',
+  );
+  assert.ok(
+    def.includes('<circle cx="1.5" cy="1.5" r="2" fill="#123456"/>'),
+    "ink dot: ink channel, def radius at Matt's ×2.5 scale",
+  );
+  assert.ok(
+    def.includes('<circle cx="4.5" cy="4.2" r="1.5" fill="#abcdef"/>'),
+    "accent dot: accent channel, def radius at Matt's ×2.5 scale",
+  );
 });
 
 // ── placements (the census fixture, plateBody's BASE shape) ─────────
@@ -142,15 +166,27 @@ ok('plate + wash + glass parity: their items gain no stipple flag; glass keeps t
 ok('glass wins: the layout glass toggle (#1129) suppresses the stipple flag', () => {
   const forced = place({ ...BASE, material: 'stipple' }, { rawParams: { glass: true } });
   assert.ok(forced.length > 0);
-  assert.ok(forced.every((i) => i.glass === true), 'layout glass flag set on every item');
-  assert.ok(forced.every((i) => i.stipple === false), 'glass-flagged items carry no stipple flag');
+  assert.ok(
+    forced.every((i) => i.glass === true),
+    'layout glass flag set on every item',
+  );
+  assert.ok(
+    forced.every((i) => i.stipple === false),
+    'glass-flagged items carry no stipple flag',
+  );
 });
 
 ok('repeat builds are identical (the flag never sticks to pooled items)', () => {
   const again = place({ ...BASE, material: 'stipple' });
-  assert.deepEqual(again.map((i) => i.stipple), stipple.map((i) => i.stipple));
+  assert.deepEqual(
+    again.map((i) => i.stipple),
+    stipple.map((i) => i.stipple),
+  );
   const after = place({ ...BASE, material: 'flat' });
-  assert.ok(after.every((i) => i.stipple === false), 'a later flat build reads no stale stipple flags');
+  assert.ok(
+    after.every((i) => i.stipple === false),
+    'a later flat build reads no stale stipple flags',
+  );
 });
 
 // ── the scene contract ───────────────────────────────────────────────
@@ -158,11 +194,16 @@ const enabledAssets = Object.fromEntries(ASSETS.map((a) => [a.id, true]));
 const caps = getRenderCaps('balanced', false);
 function docWith(material) {
   return {
-    version: 1, seed: 1234, paletteId: 'praystation', paletteOverrides: null,
+    version: 1,
+    seed: 1234,
+    paletteId: 'praystation',
+    paletteOverrides: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, count: 24, material },
-    enabledAssets, quality: 'balanced',
+    enabledAssets,
+    quality: 'balanced',
     layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'bg', layerSnapshots: {},
+    activeLayerId: 'bg',
+    layerSnapshots: {},
   };
 }
 const contractFor = (material) => {
@@ -174,22 +215,44 @@ ok('contract: stipple instances carry the flag; non-stipple contracts gain no ke
   const s = contractFor('stipple');
   const sInst = s.instances.filter((i) => i.layer === 'bg');
   assert.ok(sInst.length > 0, 'stipple doc produced instances');
-  assert.ok(sInst.every((i) => i.stipple === true), 'every instance of a stipple stratum carries stipple:true');
+  assert.ok(
+    sInst.every((i) => i.stipple === true),
+    'every instance of a stipple stratum carries stipple:true',
+  );
   const f = contractFor('flat');
   const fInst = f.instances.filter((i) => i.layer === 'bg');
   assert.ok(fInst.length > 0, 'flat doc produced instances');
-  assert.ok(fInst.every((i) => !('stipple' in i)), 'flat contract has no stipple key anywhere (hash parity)');
+  assert.ok(
+    fInst.every((i) => !('stipple' in i)),
+    'flat contract has no stipple key anywhere (hash parity)',
+  );
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
 ok('packInstanceData: 45-float stride, stipple packs body code 3 at the tail', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
-    asset: 'a1', tint: '#000000', accent: '#000000', x: 1, y: 2, scaleX: 3, scaleY: 3,
-    rotation: 0, opacity: 1, vx: 0, vy: 0, kineme: 0, kinemePhase: 0, ...extra,
+    asset: 'a1',
+    tint: '#000000',
+    accent: '#000000',
+    x: 1,
+    y: 2,
+    scaleX: 3,
+    scaleY: 3,
+    rotation: 0,
+    opacity: 1,
+    vx: 0,
+    vy: 0,
+    kineme: 0,
+    kinemePhase: 0,
+    ...extra,
   });
   const buf = packInstanceData([mk({ stipple: true }), mk({ wash: true }), mk({ plate: true }), mk({})], cells);
-  assert.equal(buf.length, 4 * 45, 'four instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)');
+  assert.equal(
+    buf.length,
+    4 * 45,
+    'four instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)',
+  );
   assert.equal(buf[24], 3, 'stipple instance: tail float is body code 3');
   assert.equal(buf[45 + 24], 2, 'wash instance: tail float is body code 2');
   assert.equal(buf[2 * 45 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
@@ -201,7 +264,7 @@ ok('packInstanceData: 45-float stride, stipple packs body code 3 at the tail', (
   assert.deepEqual([...moved.slice(25, 29)], [4, 0, 0, 0], 'stipple with a moved dot scale packs it');
 });
 
-ok('#1585: the dot scale moves the screen; defaults resolve to Matt\'s scale', () => {
+ok("#1585: the dot scale moves the screen; defaults resolve to Matt's scale", () => {
   // at ×1 the ink dot is r 0.8 — a point 1.2 units from its centre is a gap;
   // at Matt's ×2.5 (r 2.0) the same point is inside the dot.
   const pt = { x: (1.5 + 1.2) / 100, y: 1.5 / 100 };
@@ -213,16 +276,25 @@ ok('#1585: the dot scale moves the screen; defaults resolve to Matt\'s scale', (
   // the def at explicit defaults is byte-identical to the def at no argument
   assert.equal(stipplePatternDef('sgD', '#abcdef', '#123456', 2.5), stipplePatternDef('sgD', '#abcdef', '#123456'));
   const big = stipplePatternDef('sgB', '#abcdef', '#123456', 5);
-  assert.ok(big.includes('<circle cx="1.5" cy="1.5" r="4"'), 'at ×5 the ink dot radius doubles Matt\'s');
+  assert.ok(big.includes('<circle cx="1.5" cy="1.5" r="4"'), "at ×5 the ink dot radius doubles Matt's");
 });
 
 ok('shader: body code decoded, v_stipple wired, screen in both tint and baked paths', () => {
-  assert.ok(QUAD_VS.includes('v_stipple = a_plate == 3.0 ? 1.0 : 0.0'), 'vertex decodes body code 3 to the stipple flag');
+  assert.ok(
+    QUAD_VS.includes('v_stipple = a_plate == 3.0 ? 1.0 : 0.0'),
+    'vertex decodes body code 3 to the stipple flag',
+  );
   assert.ok(QUAD_FS.includes('in float v_stipple'), 'fragment receives the flag');
   assert.ok(QUAD_FS.includes('vec3 stippleShade('), 'the leaf screen is inlined in the fragment shader');
-  assert.ok(QUAD_FS.includes('else if (v_stipple > 0.5)'), 'the screen is gated on the flag in the tint branch — flat path untouched');
+  assert.ok(
+    QUAD_FS.includes('else if (v_stipple > 0.5)'),
+    'the screen is gated on the flag in the tint branch — flat path untouched',
+  );
   assert.ok(QUAD_FS.includes('float stippleCover('), 'the coverage form is inlined for the baked-sample path');
-  assert.ok(QUAD_FS.includes('float cover = stippleCover('), 'the baked path (studio export) screens the sample — stipple survives studio.py still');
+  assert.ok(
+    QUAD_FS.includes('float cover = stippleCover('),
+    'the baked path (studio export) screens the sample — stipple survives studio.py still',
+  );
 });
 
 // ── composed stills: the render-level measurement ────────────────────
@@ -233,32 +305,46 @@ ok('stills: stipple paints ink through the pattern def; the raster moves; flat g
   assert.ok(!flatSvg.includes('<pattern'), 'flat still has no pattern def');
   assert.ok(stippleSvg.includes('<pattern'), 'stipple still carries the pattern def');
   assert.ok(stippleSvg.includes('url(#sg0)'), 'stipple ink paint references the def');
-  const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+  const raster = (svg) =>
+    new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
   const a = raster(flatSvg);
   const b = raster(stippleSvg);
-  assert.equal(a.width, b.width); assert.equal(a.height, b.height);
+  assert.equal(a.width, b.width);
+  assert.equal(a.height, b.height);
   // Cache the pixel buffers ONCE before diffing: Resvg's .pixels is
   // a getter that materializes a fresh full-image buffer per access,
   // so indexing it inside the loop allocates one buffer per pixel
   // and the process OOMs (the #1564 lesson; censusReport/miner cache
   // the same way).
-  const ap = a.pixels; const bp = b.pixels;
+  const ap = a.pixels;
+  const bp = b.pixels;
   let sum = 0;
   for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
   const meanAbs = sum / ap.length;
-  assert.ok(meanAbs > 0.5, `stipple still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`);
+  assert.ok(
+    meanAbs > 0.5,
+    `stipple still raster differs measurably from flat (mean |Δ| ${meanAbs.toFixed(2)} / channel)`,
+  );
 });
 
 ok('#1585 stills: the dot scale moves the raster; defaults leave no matParams', () => {
-  assert.ok(stipple.every((i) => i.matParams === undefined), 'default stipple items carry no matParams field value');
+  assert.ok(
+    stipple.every((i) => i.matParams === undefined),
+    'default stipple items carry no matParams field value',
+  );
   const fine = place({ ...BASE, material: 'stipple', stippleDotScale: 1 });
-  assert.ok(fine.every((i) => Array.isArray(i.matParams)), 'moved stipple items carry matParams');
+  assert.ok(
+    fine.every((i) => Array.isArray(i.matParams)),
+    'moved stipple items carry matParams',
+  );
   assert.deepEqual(fine[0].matParams, [1, 0, 0, 0], 'matParams is (dotScale, 0, 0, 0)');
   const palette = resolvePalette('hydra', null, []);
-  const raster = (svg) => new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
+  const raster = (svg) =>
+    new Resvg(svg, { font: { loadSystemFonts: false }, fitTo: { mode: 'width', value: 500 } }).render();
   const a = raster(composeStillSvg(stipple, palette));
   const b = raster(composeStillSvg(fine, palette));
-  const ap = a.pixels; const bp = b.pixels;
+  const ap = a.pixels;
+  const bp = b.pixels;
   let sum = 0;
   for (let i = 0; i < ap.length; i++) sum += Math.abs(ap[i] - bp[i]);
   const meanAbs = sum / ap.length;

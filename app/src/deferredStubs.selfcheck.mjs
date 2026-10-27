@@ -6,7 +6,12 @@
 // changes no live state, opens nothing, publishes nothing), and carries the
 // exact hardware/verification requirement in its result.
 import assert from 'node:assert';
-import { startSyphonPublish, publishSyphonFrame, stopSyphonPublish, syphonCapability } from './panels/pipeline/syphonDeferred.js';
+import {
+  startSyphonPublish,
+  publishSyphonFrame,
+  stopSyphonPublish,
+  syphonCapability,
+} from './panels/pipeline/syphonDeferred.js';
 
 // ── #608 syphon stub: inert, deferred ─────────────────────────────────────
 {

@@ -31,7 +31,10 @@ assert.strictEqual(ladderFrame(0), 0);
 assert.strictEqual(ladderFrame(1), DEMO_LADDER_STEPS.length - 1);
 assert.strictEqual(ladderFrame(0.5), Math.round(0.5 * (DEMO_LADDER_STEPS.length - 1)));
 assert.strictEqual(ladderFrame(NaN), 0);
-assert.ok(DEMO_LADDER_STEPS.every((s) => typeof s === 'string' && s.includes('<')), 'frames are SVG, not path math');
+assert.ok(
+  DEMO_LADDER_STEPS.every((s) => typeof s === 'string' && s.includes('<')),
+  'frames are SVG, not path math',
+);
 
 // The system stores particles as SoA typed arrays (sys.x / sys.y / sys.u, live
 // range [0, physicsCount())) — the old `sys.particles` object array is gone.
@@ -59,7 +62,8 @@ assert.deepStrictEqual(a, b);
 // dish
 {
   const dish = run({}, 80).sys;
-  const xs = live(dish, 'x'), ys = live(dish, 'y');
+  const xs = live(dish, 'x'),
+    ys = live(dish, 'y');
   assert.ok(xs.length > 0);
   for (let i = 0; i < xs.length; i++) {
     assert.ok(xs[i] >= 0 && xs[i] <= 1000, `x[${i}]=${xs[i]} inside the dish`);

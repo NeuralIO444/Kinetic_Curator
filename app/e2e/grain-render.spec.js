@@ -13,8 +13,17 @@ const faulted = (page) => page.locator('.status-pill', { hasText: /RENDER FAULT|
 test('adding GRAIN to an FX layer does not hang or fault the live canvas', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await expect.poll(() => page.evaluate(() => !!window.__kcStore)).toBe(true);
@@ -27,7 +36,10 @@ test('adding GRAIN to an FX layer does not hang or fault the live canvas', async
   const fxId = await page.evaluate(() => window.__kcStore.getState().selectedFxLayerId);
   expect(fxId).toBeTruthy();
   await st('fxEffectAdd', fxId, 'grain');
-  const effects = await page.evaluate((id) => window.__kcStore.getState().layers.find((l) => l.id === id)?.effects, fxId);
+  const effects = await page.evaluate(
+    (id) => window.__kcStore.getState().layers.find((l) => l.id === id)?.effects,
+    fxId,
+  );
   expect(effects.some((f) => f.kind === 'grain')).toBe(true);
 
   // The old bake hung the main thread here for minutes on software GL; the

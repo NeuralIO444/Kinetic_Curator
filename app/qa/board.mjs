@@ -25,12 +25,12 @@ const LANES_FILE = join(HERE, 'lanes.json');
 // Built-in issue-number -> lane rules. A PR links its issue via "(#NNN)" in the
 // title or branch name. app/qa/lanes.json overrides these per PR number.
 const LANE_RULES = [
-  [/^(58[2-9]|59[0-2])$/, 'tropism'],                       // #582-#592 Tropism batch
-  [/^(564|623|624|625|626|631|632)$/, 'sleight-of-hand'],    // sleight v2 batch
-  [/^(503|533|561|628|655)$/, 'backend'],                   // invisible backend work
-  [/^532$/, 'fidelity'],                                    // ACES + dither
-  [/^(606|607|608)$/, 'pipeline'],                          // Pipeline tab phases
-  [/^(61[3-8])$/, 'davis-stimuli'],                         // Davis + Stimuli plan
+  [/^(58[2-9]|59[0-2])$/, 'tropism'], // #582-#592 Tropism batch
+  [/^(564|623|624|625|626|631|632)$/, 'sleight-of-hand'], // sleight v2 batch
+  [/^(503|533|561|628|655)$/, 'backend'], // invisible backend work
+  [/^532$/, 'fidelity'], // ACES + dither
+  [/^(606|607|608)$/, 'pipeline'], // Pipeline tab phases
+  [/^(61[3-8])$/, 'davis-stimuli'], // Davis + Stimuli plan
   [/^(630|646|647|648|649|650|651|652|653|654)$/, 'import-export'],
   [/^(519|558|560)$/, 'motion'],
   [/^(520|594)$/, 'fx'],
@@ -39,8 +39,15 @@ const LANE_RULES = [
 
 // Lanes whose PRs change what Matt sees (review lane); everything else is backend.
 const VISUAL_LANES = new Set([
-  'tropism', 'sleight-of-hand', 'fidelity', 'pipeline', 'davis-stimuli',
-  'import-export', 'motion', 'fx', 'shell',
+  'tropism',
+  'sleight-of-hand',
+  'fidelity',
+  'pipeline',
+  'davis-stimuli',
+  'import-export',
+  'motion',
+  'fx',
+  'shell',
 ]);
 
 function issueNumberOf(pr) {
@@ -54,7 +61,9 @@ function loadOverrides() {
     const out = {};
     for (const [k, v] of Object.entries(raw)) if (!k.startsWith('_')) out[k] = v;
     return out;
-  } catch { return {}; }
+  } catch {
+    return {};
+  }
 }
 
 export function laneFor(pr, overrides = loadOverrides()) {
@@ -64,7 +73,9 @@ export function laneFor(pr, overrides = loadOverrides()) {
   return 'other';
 }
 
-export function isVisual(lane) { return VISUAL_LANES.has(lane); }
+export function isVisual(lane) {
+  return VISUAL_LANES.has(lane);
+}
 
 // ---------------------------------------------------------------------------
 // status — Matt's exact words
@@ -100,19 +111,38 @@ function ghJson(args) {
 }
 
 async function fetchBoard() {
-  const prs = ghJson(['pr', 'list', '--repo', REPO, '--state', 'open', '--limit', '50',
-    '--json', 'number,title,headRefName,baseRefName,isDraft,updatedAt,author,url']);
+  const prs = ghJson([
+    'pr',
+    'list',
+    '--repo',
+    REPO,
+    '--state',
+    'open',
+    '--limit',
+    '50',
+    '--json',
+    'number,title,headRefName,baseRefName,isDraft,updatedAt,author,url',
+  ]);
   const overrides = loadOverrides();
-  const rows = await Promise.all(prs.map(async (pr) => {
-    let checks = [], merge = {};
-    try { checks = ghJson(['pr', 'checks', String(pr.number), '--repo', REPO, '--json', 'name,state']); }
-    catch { checks = []; }
-    try { merge = ghJson(['pr', 'view', String(pr.number), '--repo', REPO, '--json', 'mergeable,mergeStateStatus']); }
-    catch { merge = {}; }
-    const lane = laneFor(pr, overrides);
-    const { pill, section, note } = classify(pr, checks, merge);
-    return { ...pr, lane, visual: isVisual(lane), pill, section, note: note || '' };
-  }));
+  const rows = await Promise.all(
+    prs.map(async (pr) => {
+      let checks = [],
+        merge = {};
+      try {
+        checks = ghJson(['pr', 'checks', String(pr.number), '--repo', REPO, '--json', 'name,state']);
+      } catch {
+        checks = [];
+      }
+      try {
+        merge = ghJson(['pr', 'view', String(pr.number), '--repo', REPO, '--json', 'mergeable,mergeStateStatus']);
+      } catch {
+        merge = {};
+      }
+      const lane = laneFor(pr, overrides);
+      const { pill, section, note } = classify(pr, checks, merge);
+      return { ...pr, lane, visual: isVisual(lane), pill, section, note: note || '' };
+    }),
+  );
   rows.sort((a, b) => a.number - b.number);
   return rows;
 }
@@ -123,8 +153,11 @@ async function fetchBoard() {
 
 export function esc(s) {
   return String(s ?? '')
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function age(iso, now = Date.now()) {
@@ -135,7 +168,7 @@ export function age(iso, now = Date.now()) {
   return `${Math.round(hrs / 24)}d ago`;
 }
 
-const PILL_CLASS = { 'CI green': 'ok', 'BLOCKED': 'wait', 'CI red': 'bad', 'CONFLICTING': 'bad' };
+const PILL_CLASS = { 'CI green': 'ok', BLOCKED: 'wait', 'CI red': 'bad', CONFLICTING: 'bad' };
 
 const SECTIONS = [
   ['ready', 'Ready to merge', 'CI green, mergeable, not a draft. Your merge call.'],
@@ -147,30 +180,33 @@ const SECTIONS = [
 function rowHtml(r) {
   const pill = PILL_CLASS[r.pill] || 'wait';
   const kind = r.visual ? '<span class="kind vis">visual</span>' : '<span class="kind be">backend</span>';
-  return `<div class="row">`
-    + `<div class="main"><a href="${esc(r.url)}">#${r.number}</a> <span class="title">${esc(r.title)}</span></div>`
-    + `<div class="meta"><span class="lane">${esc(r.lane)}</span>${kind}`
-    + `<span class="pill ${pill}">${esc(r.pill)}</span>`
-    + `<span class="age">${esc(age(r.updatedAt))}</span>`
-    + `<span class="branch">${esc(r.headRefName)}</span>`
-    + (r.note ? `<span class="note">${esc(r.note)}</span>` : '')
-    + `</div></div>`;
+  return (
+    `<div class="row">` +
+    `<div class="main"><a href="${esc(r.url)}">#${r.number}</a> <span class="title">${esc(r.title)}</span></div>` +
+    `<div class="meta"><span class="lane">${esc(r.lane)}</span>${kind}` +
+    `<span class="pill ${pill}">${esc(r.pill)}</span>` +
+    `<span class="age">${esc(age(r.updatedAt))}</span>` +
+    `<span class="branch">${esc(r.headRefName)}</span>` +
+    (r.note ? `<span class="note">${esc(r.note)}</span>` : '') +
+    `</div></div>`
+  );
 }
 
 export function renderBoard(rows, { refreshSecs = 0 } = {}) {
   const when = new Date().toLocaleString('en-US', { timeZone: 'America/Los_Angeles' });
   const sections = SECTIONS.map(([key, title, sub]) => {
     const items = rows.filter((r) => r.section === key);
-    const body = items.length
-      ? items.map(rowHtml).join('\n')
-      : `<div class="empty">— none —</div>`;
-    return `<section><h2>${esc(title)} <span class="count">${items.length}</span></h2>`
-      + `<p class="sub">${esc(sub)}</p>\n${body}</section>`;
+    const body = items.length ? items.map(rowHtml).join('\n') : `<div class="empty">— none —</div>`;
+    return (
+      `<section><h2>${esc(title)} <span class="count">${items.length}</span></h2>` +
+      `<p class="sub">${esc(sub)}</p>\n${body}</section>`
+    );
   }).join('\n');
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8">`
-    + `<meta name="viewport" content="width=device-width, initial-scale=1">`
-    + (refreshSecs ? `<meta http-equiv="refresh" content="${refreshSecs}">` : '')
-    + `<title>KC build board</title><style>
+  return (
+    `<!doctype html><html lang="en"><head><meta charset="utf-8">` +
+    `<meta name="viewport" content="width=device-width, initial-scale=1">` +
+    (refreshSecs ? `<meta http-equiv="refresh" content="${refreshSecs}">` : '') +
+    `<title>KC build board</title><style>
 body{background:#111;color:#e8e8e8;font:14px/1.45 system-ui,sans-serif;margin:0;padding:16px;max-width:760px}
 h1{font-size:20px;margin:0 0 2px}.ts{color:#888;font-size:12px;margin-bottom:16px}
 section{margin-bottom:22px}h2{font-size:15px;margin:0 0 2px;text-transform:uppercase;letter-spacing:.04em}
@@ -184,9 +220,11 @@ section{margin-bottom:22px}h2{font-size:15px;margin:0 0 2px;text-transform:upper
 .ok{background:#12351f;color:#7fe0a0}.wait{background:#3a2f12;color:#f0c96a}.bad{background:#3d1515;color:#ff8a8a}
 .age{color:#888}.branch{font-family:ui-monospace,monospace;color:#999;font-size:11px}.note{color:#f0c96a}
 .empty{color:#555;font-size:12px}
-</style></head><body><h1>Kinetic_Curator build board</h1>`
-    + `<div class="ts">${rows.length} open PRs · refreshed ${esc(when)} PT</div>`
-    + sections + `</body></html>`;
+</style></head><body><h1>Kinetic_Curator build board</h1>` +
+    `<div class="ts">${rows.length} open PRs · refreshed ${esc(when)} PT</div>` +
+    sections +
+    `</body></html>`
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -199,7 +237,7 @@ function parseArgs(argv) {
     if (argv[i] === '--open') out.open = true;
     else if (argv[i] === '--serve') {
       const next = argv[i + 1];
-      out.serve = next && !next.startsWith('--') ? (parseInt(next, 10) || 8137) : 8137;
+      out.serve = next && !next.startsWith('--') ? parseInt(next, 10) || 8137 : 8137;
       if (next && !next.startsWith('--')) i++;
     }
   }
@@ -214,30 +252,35 @@ async function generate({ refreshSecs = 0 } = {}) {
   writeFileSync(file, html);
   const bySection = Object.fromEntries(SECTIONS.map(([k]) => [k, rows.filter((r) => r.section === k).length]));
   console.log(`board: ${rows.length} open PRs -> ${file}`);
-  console.log(`ready ${bySection.ready} · review ${bySection.review} · working ${bySection.working} · attention ${bySection.attention}`);
+  console.log(
+    `ready ${bySection.ready} · review ${bySection.review} · working ${bySection.working} · attention ${bySection.attention}`,
+  );
   return { file, html };
 }
 
 const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
 if (isMain) {
-const opts = parseArgs(process.argv.slice(2));
+  const opts = parseArgs(process.argv.slice(2));
 
-if (opts.serve) {
-  let current = '';
-  const regen = async () => {
-    try { current = (await generate({ refreshSecs: 60 })).html; }
-    catch (e) { console.error('regenerate failed:', e.message); }
-  };
-  await regen();
-  setInterval(regen, 60000);
-  createServer((req, res) => {
-    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
-    res.end(current);
-  }).listen(opts.serve, '127.0.0.1', () => {
-    console.log(`board serving at http://127.0.0.1:${opts.serve}/ (refreshes every 60s)`);
-  });
-} else {
-  const { file } = await generate();
-  if (opts.open) execFile('open', [file]);
-}
+  if (opts.serve) {
+    let current = '';
+    const regen = async () => {
+      try {
+        current = (await generate({ refreshSecs: 60 })).html;
+      } catch (e) {
+        console.error('regenerate failed:', e.message);
+      }
+    };
+    await regen();
+    setInterval(regen, 60000);
+    createServer((req, res) => {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(current);
+    }).listen(opts.serve, '127.0.0.1', () => {
+      console.log(`board serving at http://127.0.0.1:${opts.serve}/ (refreshes every 60s)`);
+    });
+  } else {
+    const { file } = await generate();
+    if (opts.open) execFile('open', [file]);
+  }
 }

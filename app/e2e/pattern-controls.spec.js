@@ -7,16 +7,24 @@ import { addStratum } from './strata-add.mjs';
 const addPattern = (page) => addStratum(page, 'PATTERN');
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   await expect(page.locator('.build-layer-stack')).toBeVisible();
 }
-const state = (page) => page.evaluate(() => {
-  const s = window.__kcStore.getState();
-  return { active: s.activeLayerId, layers: s.layers.map((l) => ({ id: l.id, type: l.type, pattern: l.pattern })) };
-});
+const state = (page) =>
+  page.evaluate(() => {
+    const s = window.__kcStore.getState();
+    return { active: s.activeLayerId, layers: s.layers.map((l) => ({ id: l.id, type: l.type, pattern: l.pattern })) };
+  });
 const patternOf = async (page) => (await state(page)).layers.find((l) => l.type === 'pattern')?.pattern;
 
 test('+ pattern adds a PT-1 track, opens its editor, and leaves the KC track active', async ({ page }) => {
@@ -57,7 +65,9 @@ test('mode tiles, density, mix, drift and SHUFFLE write through to the track', a
   await expect(ed.locator('.pattern-seed')).toContainText(`seed ${seed1.toString(16)}`);
 });
 
-test('honest UI: grout and hero are disabled outside QUILT, with the reason, and a disabled slider cannot move the value', async ({ page }) => {
+test('honest UI: grout and hero are disabled outside QUILT, with the reason, and a disabled slider cannot move the value', async ({
+  page,
+}) => {
   await boot(page);
   await addPattern(page);
   const ed = page.locator('.pattern-editor');
@@ -70,27 +80,41 @@ test('honest UI: grout and hero are disabled outside QUILT, with the reason, and
   }
   await expect(ed.locator('.fx-param').filter({ hasText: 'grout' }).locator('.fx-param-readout')).toHaveText('—');
   const g = (await patternOf(page)).grout;
-  await ed.getByRole('slider', { name: 'Pattern grout' }).evaluate((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+  await ed
+    .getByRole('slider', { name: 'Pattern grout' })
+    .evaluate((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
   expect((await patternOf(page)).grout).toBe(g);
   await ed.getByRole('tab', { name: /quilt/i }).click();
   await expect(ed.getByRole('slider', { name: 'Pattern hero' })).toBeEnabled();
 });
 
-test('44px rows, tabs, buttons and sliders; removing the track closes the editor and keeps the KC track', async ({ page }) => {
+test('44px rows, tabs, buttons and sliders; removing the track closes the editor and keeps the KC track', async ({
+  page,
+}) => {
   await boot(page);
   await addPattern(page);
   const ed = page.locator('.pattern-editor');
-  const heights = await ed.locator('.chip-btn, .big-btn, input[type=range]').evaluateAll((els) => els.map((e) => ({ t: e.className || e.type, h: Math.round(e.getBoundingClientRect().height) })));
+  const heights = await ed
+    .locator('.chip-btn, .big-btn, input[type=range]')
+    .evaluateAll((els) =>
+      els.map((e) => ({ t: e.className || e.type, h: Math.round(e.getBoundingClientRect().height) })),
+    );
   expect(heights.length).toBeGreaterThanOrEqual(9);
   for (const h of heights) expect(h.h, `${h.t} is a 44px target`).toBeGreaterThanOrEqual(43);
-  const kcCount = (await state(page)).layers.filter((l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math').length;
+  const kcCount = (await state(page)).layers.filter(
+    (l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math',
+  ).length;
   await page.locator('.strata-block.strata-pattern').getByTitle('Remove track (undoable)').click();
   await expect(page.locator('.strata-block.strata-pattern')).toHaveCount(0);
   await expect(page.locator('.pattern-editor')).toHaveCount(0);
-  expect((await state(page)).layers.filter((l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math').length).toBe(kcCount);
+  expect(
+    (await state(page)).layers.filter((l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math').length,
+  ).toBe(kcCount);
 });
 
-test('the last KC track cannot be removed even with a pattern track present, and the cap counts the pattern track', async ({ page }) => {
+test('the last KC track cannot be removed even with a pattern track present, and the cap counts the pattern track', async ({
+  page,
+}) => {
   await boot(page);
   const s0 = await state(page);
   const kc = s0.layers.filter((l) => l.type !== 'fx' && l.type !== 'math');
@@ -114,7 +138,9 @@ test('the last KC track cannot be removed even with a pattern track present, and
   await expect(page.locator('.layer-chooser').getByRole('button', { name: 'PATTERN', exact: true })).toBeDisabled();
 });
 
-test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later; with DROP off it lands at once', async ({ page }) => {
+test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later; with DROP off it lands at once', async ({
+  page,
+}) => {
   await boot(page);
   await addPattern(page);
   const ed = page.locator('.pattern-editor');
@@ -137,10 +163,18 @@ test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later
   expect((await patternOf(page)).seed).toBe(s1);
   // It lands on LOOP time, so a frozen loop holds it by design (the gate is proven in motion.selfcheck). On a slow
   // CI runner the watchdog freezes the loop (PERF PAUSED): then there is no bar to land on, and that is not a bug.
-  const outcome = async () => ((await patternOf(page)).seed !== s1 ? 'landed' : (await page.locator('.status-pill', { hasText: /PERF PAUSED/i }).count()) ? 'frozen' : 'waiting');
+  const outcome = async () =>
+    (await patternOf(page)).seed !== s1
+      ? 'landed'
+      : (await page.locator('.status-pill', { hasText: /PERF PAUSED/i }).count())
+        ? 'frozen'
+        : 'waiting';
   await expect.poll(outcome, { timeout: 6000, message: 'lands on the bar' }).not.toBe('waiting');
-  if (await outcome() === 'frozen') {
-    test.info().annotations.push({ type: 'note', description: 'loop frozen by the watchdog (slow runner): the held shuffle was not expected to land' });
+  if ((await outcome()) === 'frozen') {
+    test.info().annotations.push({
+      type: 'note',
+      description: 'loop frozen by the watchdog (slow runner): the held shuffle was not expected to land',
+    });
     return;
   }
   await expect(shuffle).not.toHaveAttribute('data-armed', 'true');

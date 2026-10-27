@@ -5,7 +5,9 @@ import { waitForLiveFrame } from './gl-helpers.js';
 async function boot(page, autosaveRaw) {
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   await page.addInitScript((raw) => {
     try {
       localStorage.setItem('kc:first-run-seen', '1');
@@ -13,7 +15,9 @@ async function boot(page, autosaveRaw) {
       sessionStorage.removeItem('kc:project:restored-session');
       if (raw === null) localStorage.removeItem('kc:project:v1');
       else localStorage.setItem('kc:project:v1', raw);
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   }, autosaveRaw);
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
@@ -44,9 +48,13 @@ test('unreadable autosave is quarantined, defaults boot, MasterBar says so', asy
 
 test('a good autosave still restores and shows no warning', async ({ page }) => {
   const doc = JSON.stringify({
-    version: 1, savedAt: new Date().toISOString(),
+    version: 1,
+    savedAt: new Date().toISOString(),
     doc: {
-      version: 1, seed: 0x1a4f, paletteId: 'praystation', quality: 'balanced',
+      version: 1,
+      seed: 0x1a4f,
+      paletteId: 'praystation',
+      quality: 'balanced',
       layoutParams: { mode: 'grid', count: 137 },
     },
   });

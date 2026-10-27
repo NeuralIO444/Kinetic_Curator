@@ -36,8 +36,22 @@ export const FLOURISH_PERIOD_FRAMES = 96;
 export const POSE_PARAMS = Object.freeze({
   open: Object.freeze({ foreDirDeg: 10, hindDirDeg: 6, bodyScale: 1.06, wingScale: 1.08, chainCurlDeg: 0, dim: 1 }),
   neutral: Object.freeze({ foreDirDeg: 0, hindDirDeg: 0, bodyScale: 1, wingScale: 1, chainCurlDeg: 0, dim: 1 }),
-  withered: Object.freeze({ foreDirDeg: -16, hindDirDeg: -12, bodyScale: 0.93, wingScale: 0.88, chainCurlDeg: 10, dim: 0.5 }),
-  flourish: Object.freeze({ foreDirDeg: 20, hindDirDeg: 12, bodyScale: 1.1, wingScale: 1.14, chainCurlDeg: -4, dim: 1 }),
+  withered: Object.freeze({
+    foreDirDeg: -16,
+    hindDirDeg: -12,
+    bodyScale: 0.93,
+    wingScale: 0.88,
+    chainCurlDeg: 10,
+    dim: 0.5,
+  }),
+  flourish: Object.freeze({
+    foreDirDeg: 20,
+    hindDirDeg: 12,
+    bodyScale: 1.1,
+    wingScale: 1.14,
+    chainCurlDeg: -4,
+    dim: 1,
+  }),
 });
 
 const clamp01 = (v) => Math.min(1, Math.max(0, v));
@@ -76,12 +90,11 @@ export function creaturePose({ band = null, stress = NaN, frame = 0 } = {}) {
   const neutral = 1 - open - withered - flourish;
   const weights = { open, neutral, withered, flourish };
 
-  const mix = (key) => (
-    weights.open * POSE_PARAMS.open[key]
-    + weights.neutral * POSE_PARAMS.neutral[key]
-    + weights.withered * POSE_PARAMS.withered[key]
-    + weights.flourish * POSE_PARAMS.flourish[key]
-  );
+  const mix = (key) =>
+    weights.open * POSE_PARAMS.open[key] +
+    weights.neutral * POSE_PARAMS.neutral[key] +
+    weights.withered * POSE_PARAMS.withered[key] +
+    weights.flourish * POSE_PARAMS.flourish[key];
 
   // The flourish's sway: a frame-indexed angle offset, in counterphase on the hind pair (the moth's own
   // hind beat runs at 0.7 against the fore pair — the same character, stated here as a pose constant).
@@ -89,9 +102,17 @@ export function creaturePose({ band = null, stress = NaN, frame = 0 } = {}) {
 
   let name = 'neutral';
   let best = weights.neutral;
-  if (weights.open > best) { name = 'open'; best = weights.open; }
-  if (weights.flourish > best) { name = 'flourish'; best = weights.flourish; }
-  if (weights.withered > best) { name = 'withered'; }
+  if (weights.open > best) {
+    name = 'open';
+    best = weights.open;
+  }
+  if (weights.flourish > best) {
+    name = 'flourish';
+    best = weights.flourish;
+  }
+  if (weights.withered > best) {
+    name = 'withered';
+  }
 
   return {
     name,
@@ -104,4 +125,3 @@ export function creaturePose({ band = null, stress = NaN, frame = 0 } = {}) {
     dim: mix('dim'),
   };
 }
-

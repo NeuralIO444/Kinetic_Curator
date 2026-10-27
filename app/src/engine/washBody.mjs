@@ -120,7 +120,11 @@ export function washRampAt(lx, ly, prm = WASH_PARAM_DEFAULTS) {
   let a = WASH_STOPS[0];
   let b = WASH_STOPS[WASH_STOPS.length - 1];
   for (let i = 0; i < WASH_STOPS.length - 1; i++) {
-    if (t >= WASH_STOPS[i].t && t <= WASH_STOPS[i + 1].t) { a = WASH_STOPS[i]; b = WASH_STOPS[i + 1]; break; }
+    if (t >= WASH_STOPS[i].t && t <= WASH_STOPS[i + 1].t) {
+      a = WASH_STOPS[i];
+      b = WASH_STOPS[i + 1];
+      break;
+    }
   }
   const f = b.t > a.t ? Math.min(1, Math.max(0, (t - a.t) / (b.t - a.t))) : 0;
   const mixOf = (s) => (s.color === 'accent' ? 0 : 1);
@@ -136,7 +140,7 @@ export function washRampAt(lx, ly, prm = WASH_PARAM_DEFAULTS) {
  * from WASH_PARAM_DEFAULTS when the Look never moved them). There is
  * no coverage term — the wash def never touches alpha.
  */
-export const WASH_GLSL = /* glsl */`
+export const WASH_GLSL = /* glsl */ `
 vec3 washShade(vec2 local, vec3 ink, vec3 accent, vec2 prm) {
   return mix(accent, ink, clamp(local.y / prm.y, 0.0, 1.0) * prm.x);
 }`;
@@ -145,7 +149,13 @@ vec3 washShade(vec2 local, vec3 ink, vec3 accent, vec2 prm) {
 function hexRgb(hex) {
   const m = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.exec(String(hex ?? ''));
   if (!m) return null;
-  const h = m[1].length === 3 ? m[1].split('').map((c) => c + c).join('') : m[1];
+  const h =
+    m[1].length === 3
+      ? m[1]
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : m[1];
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
 
@@ -176,19 +186,27 @@ function mixHex(accentHex, inkHex, f) {
  */
 export function washGradientDef(id, accentHex, inkHex, prm = WASH_PARAM_DEFAULTS) {
   if (prm.strength === 1 && prm.spread === 1) {
-    const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}"/>`;
+    const stop = (s) =>
+      `<stop offset="${Math.round(s.t * 100)}%" stop-color="${s.color === 'accent' ? accentHex : inkHex}"/>`;
     return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1">${WASH_STOPS.map(stop).join('')}</linearGradient>`;
   }
   const mixOf = (s) => (s.color === 'accent' ? 0 : 1);
-  const stop = (s) => `<stop offset="${Math.round(s.t * 100)}%" stop-color="${mixHex(accentHex, inkHex, mixOf(s) * prm.strength)}"/>`;
+  const stop = (s) =>
+    `<stop offset="${Math.round(s.t * 100)}%" stop-color="${mixHex(accentHex, inkHex, mixOf(s) * prm.strength)}"/>`;
   return `<linearGradient id="${id}" x1="0" y1="0" x2="0" y2="${prm.spread}">${WASH_STOPS.map(stop).join('')}</linearGradient>`;
 }
 
 registerCostTier('engine/wash-body', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1549: material wash body — one flag per placed instance at build time (carried as body code 2 in the plate tail slot); the ramp itself is a fragment-shader term in the existing quad pass (light/wash-gradient) and a bake-time gradient def in composed stills. No new pass, no texture, no per-frame CPU.',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1549: material wash body — one flag per placed instance at build time (carried as body code 2 in the plate tail slot); the ramp itself is a fragment-shader term in the existing quad pass (light/wash-gradient) and a bake-time gradient def in composed stills. No new pass, no texture, no per-frame CPU.',
 });
 registerCostTier('light/wash-gradient', {
-  tier: 0, memoryBytes: 0, timeMs: 0.05,
-  notes: '#1549: vertical accent→ink ramp on the ink channel for wash-flagged instances inside the existing QUAD_FS live-tint branch — one mix per fragment, wash instances only; alpha untouched (the def has no opacity stops).',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes:
+    '#1549: vertical accent→ink ramp on the ink channel for wash-flagged instances inside the existing QUAD_FS live-tint branch — one mix per fragment, wash instances only; alpha untouched (the def has no opacity stops).',
 });

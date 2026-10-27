@@ -43,9 +43,7 @@ const MARGIN = 1.5;
 /** Set a range input to an exact value and let React commit it. */
 async function setRange(page, slider, value) {
   await slider.evaluate((el, v) => {
-    const setter = Object.getOwnPropertyDescriptor(
-      window.HTMLInputElement.prototype, 'value',
-    ).set;
+    const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
     setter.call(el, String(v));
     el.dispatchEvent(new Event('input', { bubbles: true }));
     el.dispatchEvent(new Event('change', { bubbles: true }));
@@ -58,11 +56,17 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   // That sum is what timed out on main (37134040106) and on #896.
   test.setTimeout(120_000);
   const errors = [];
-  page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+  page.on('console', (m) => {
+    if (m.type() === 'error') errors.push(m.text());
+  });
   page.on('pageerror', (e) => errors.push(String(e)));
 
   await page.addInitScript(() => {
-    try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
     // #655 — disarm the performance governor for this spec. The node count
     // it asserts on used to be the LIVE post-shed count: under CI load the
     // governor shed COUNT=700 harder than COUNT=60 (wall-clock FPS driven),
@@ -97,16 +101,20 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   await setRange(page, count, 300);
   const high = await nodeCount(page);
   await setRange(page, count, 60);
-  await expect.poll(() => glNodeCount(page), {
-    message: 'COUNT=60 should place many fewer shapes than COUNT=300 (a stale cache stays high)',
-    timeout: CONVERGE_MS,
-  }).toBeLessThan(high / MARGIN);
+  await expect
+    .poll(() => glNodeCount(page), {
+      message: 'COUNT=60 should place many fewer shapes than COUNT=300 (a stale cache stays high)',
+      timeout: CONVERGE_MS,
+    })
+    .toBeLessThan(high / MARGIN);
   const low = await nodeCount(page);
   await setRange(page, count, 300);
-  await expect.poll(() => glNodeCount(page), {
-    message: 'returning COUNT to 300 should restore the high node count',
-    timeout: CONVERGE_MS,
-  }).toBeGreaterThan(low * MARGIN);
+  await expect
+    .poll(() => glNodeCount(page), {
+      message: 'returning COUNT to 300 should restore the high node count',
+      timeout: CONVERGE_MS,
+    })
+    .toBeGreaterThan(low * MARGIN);
   const restored = await nodeCount(page);
   console.log(`[cache] COUNT 300 -> ${high} nodes, 60 -> ${low}, back to 300 -> ${restored}`);
 
@@ -121,10 +129,8 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
   // which under CI load narrowed the ratio toward ~1.8x; 1.5x keeps a wide
   // margin below every CI-load ratio seen while staying decisive against the
   // real failure mode.
-  expect(high, 'COUNT=300 should place many more shapes than COUNT=60')
-    .toBeGreaterThan(low * MARGIN);
-  expect(restored, 'returning COUNT to 300 should restore the high node count')
-    .toBeGreaterThan(low * MARGIN);
+  expect(high, 'COUNT=300 should place many more shapes than COUNT=60').toBeGreaterThan(low * MARGIN);
+  expect(restored, 'returning COUNT to 300 should restore the high node count').toBeGreaterThan(low * MARGIN);
 
   expect(errors, `console errors: ${errors.join(' | ')}`).toHaveLength(0);
 });

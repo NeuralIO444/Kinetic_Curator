@@ -17,11 +17,7 @@ import { buildPlacements } from './buildPlacements.js';
 import { bakeParticles, BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import { createDishSession, enrolDishBody, armDish, runDishContacts, dishEnrolRadius } from './dishContacts.mjs';
 import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
-import {
-  DEFAULT_LAYOUT_PARAMS,
-  normalizeLayoutParams,
-  validateLayoutParams,
-} from '../data/layout-modes.js';
+import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams, validateLayoutParams } from '../data/layout-modes.js';
 
 const assets = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
 const palette = { swatches: ['#ff0000', '#00ff00', '#0000ff'] };
@@ -48,12 +44,18 @@ const CTX_BASE = {
 function headOnPair() {
   const sys = new ParticleSystem();
   sys.init(2, 1000, 700, assets, palette, SEED);
-  sys.x[0] = 400; sys.y[0] = 350;
-  sys.x[1] = 430; sys.y[1] = 350;
-  sys.vx[0] = 2; sys.vy[0] = 0;
-  sys.vx[1] = -2; sys.vy[1] = 0;
-  sys.mass[0] = 1; sys.mass[1] = 1;
-  sys.scale[0] = 1; sys.scale[1] = 1;
+  sys.x[0] = 400;
+  sys.y[0] = 350;
+  sys.x[1] = 430;
+  sys.y[1] = 350;
+  sys.vx[0] = 2;
+  sys.vy[0] = 0;
+  sys.vx[1] = -2;
+  sys.vy[1] = 0;
+  sys.mass[0] = 1;
+  sys.mass[1] = 1;
+  sys.scale[0] = 1;
+  sys.scale[1] = 1;
   return sys;
 }
 
@@ -94,7 +96,8 @@ function headOnPair() {
 // 4 — unequal masses: momentum conserved, lighter particle leaves faster.
 {
   const sys = headOnPair();
-  sys.mass[0] = 0.5; sys.mass[1] = 1.5;
+  sys.mass[0] = 0.5;
+  sys.mass[1] = 1.5;
   const px0 = sys.vx[0] * sys.mass[0] + sys.vx[1] * sys.mass[1];
   sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
   const px1 = sys.vx[0] * sys.mass[0] + sys.vx[1] * sys.mass[1];
@@ -109,7 +112,8 @@ function headOnPair() {
   const sys = headOnPair();
   assert.strictEqual(sys.assetIndex[0], 0);
   assert.strictEqual(sys.assetIndex[1], 1);
-  const g0 = sys.cgroup[0]; const g1 = sys.cgroup[1];
+  const g0 = sys.cgroup[0];
+  const g1 = sys.cgroup[1];
   sys._contactPass({ ...CTX_BASE, mode: 'swap' });
   assert.strictEqual(sys.assetIndex[0], 1, 'swap exchanges assetIx');
   assert.strictEqual(sys.assetIndex[1], 0, 'swap exchanges assetIx');
@@ -133,15 +137,29 @@ function headOnPair() {
 {
   const sys = new ParticleSystem();
   sys.init(3, 1000, 700, assets, palette, SEED);
-  sys.x[0] = 400; sys.y[0] = 350; sys.vx[0] = 2; sys.vy[0] = 0;
-  sys.x[1] = 430; sys.y[1] = 350; sys.vx[1] = -2; sys.vy[1] = 0;
-  sys.x[2] = 700; sys.y[2] = 350; sys.vx[2] = 0; sys.vy[2] = 0;
-  sys.mass[0] = 1; sys.mass[1] = 1; sys.mass[2] = 1;
-  sys.scale[0] = 1; sys.scale[1] = 1; sys.scale[2] = 1; // #1408 — uniform discs
+  sys.x[0] = 400;
+  sys.y[0] = 350;
+  sys.vx[0] = 2;
+  sys.vy[0] = 0;
+  sys.x[1] = 430;
+  sys.y[1] = 350;
+  sys.vx[1] = -2;
+  sys.vy[1] = 0;
+  sys.x[2] = 700;
+  sys.y[2] = 350;
+  sys.vx[2] = 0;
+  sys.vy[2] = 0;
+  sys.mass[0] = 1;
+  sys.mass[1] = 1;
+  sys.mass[2] = 1;
+  sys.scale[0] = 1;
+  sys.scale[1] = 1;
+  sys.scale[2] = 1; // #1408 — uniform discs
   sys._contactPass({ ...CTX_BASE, mode: 'die' });
   assert.deepStrictEqual([...sys._dead], [1]);
   // Bring particle 2 into contact with 0, approaching.
-  sys.x[2] = 425; sys.vx[2] = -2;
+  sys.x[2] = 425;
+  sys.vx[2] = -2;
   const nBefore = sys.n;
   sys._contactPass({ ...CTX_BASE, mode: 'breed', breedCap: 10 });
   assert.strictEqual(sys.n, nBefore, 'breed recycled the dead slot: no growth');
@@ -151,8 +169,10 @@ function headOnPair() {
   const mx = (sys.x[0] + sys.x[2]) / 2;
   const my = (sys.y[0] + sys.y[2]) / 2;
   assert.ok(Object.is(sys.x[1], mx) && Object.is(sys.y[1], my), 'child at midpoint');
-  assert.ok(sys.assetIndex[1] === sys.assetIndex[0] || sys.assetIndex[1] === sys.assetIndex[2],
-    'child inherits a parent costume');
+  assert.ok(
+    sys.assetIndex[1] === sys.assetIndex[0] || sys.assetIndex[1] === sys.assetIndex[2],
+    'child inherits a parent costume',
+  );
 }
 
 // 8 — breed respects the quality cap: no dead slots and n at cap → no child.
@@ -162,13 +182,14 @@ function headOnPair() {
   sys._contactPass({ ...CTX_BASE, mode: 'breed', breedCap: nBefore });
   assert.strictEqual(sys.n, nBefore, 'breed at cap does not grow the population');
   // Re-overlap (the first pass depenetrated them) and breed under the cap.
-  sys.x[0] = 400; sys.x[1] = 430;
-  sys.vx[0] = 2; sys.vx[1] = -2;
+  sys.x[0] = 400;
+  sys.x[1] = 430;
+  sys.vx[0] = 2;
+  sys.vx[1] = -2;
   sys._contactPass({ ...CTX_BASE, mode: 'breed', breedCap: nBefore + 1 });
   assert.strictEqual(sys.n, nBefore + 1, 'breed under cap grows by one');
   assert.strictEqual(sys.alive[nBefore], 1, 'the new row is alive');
-  assert.ok(Number.isFinite(sys.x[nBefore]) && Number.isFinite(sys.vx[nBefore]),
-    'the new row is fully initialised');
+  assert.ok(Number.isFinite(sys.x[nBefore]) && Number.isFinite(sys.vx[nBefore]), 'the new row is fully initialised');
 }
 
 // 9 — collideMask: a pair whose groups are masked out does not interact.
@@ -176,39 +197,41 @@ function headOnPair() {
   const sys = headOnPair();
   sys.cgroup[0] = 0;
   sys.cgroup[1] = 1;
-  const x0 = sys.x[0]; const x1 = sys.x[1];
+  const x0 = sys.x[0];
+  const x1 = sys.x[1];
   // Only group 0 participates: group 1's bit is clear → no pair.
   sys._contactPass({ ...CTX_BASE, mode: 'bounce', umask: 0b01 });
-  assert.ok(Object.is(sys.x[0], x0) && Object.is(sys.x[1], x1),
-    'masked-out pair is untouched');
-  assert.ok(Object.is(sys.vx[0], 2) && Object.is(sys.vx[1], -2),
-    'masked-out pair keeps its velocities');
+  assert.ok(Object.is(sys.x[0], x0) && Object.is(sys.x[1], x1), 'masked-out pair is untouched');
+  assert.ok(Object.is(sys.vx[0], 2) && Object.is(sys.vx[1], -2), 'masked-out pair keeps its velocities');
 }
 
 // 10 — repel pushes same-layer neighbours apart even when not approaching.
 {
   const sys = headOnPair();
-  sys.cgroup[0] = 5; sys.cgroup[1] = 5;
+  sys.cgroup[0] = 5;
+  sys.cgroup[1] = 5;
   // Same velocity → vn = 0: no bounce impulse, but repel still separates.
-  sys.vx[0] = 1; sys.vx[1] = 1;
+  sys.vx[0] = 1;
+  sys.vx[1] = 1;
   sys._contactPass({ ...CTX_BASE, mode: 'none', repel: 2 });
-  assert.ok(sys.vx[0] < 1 && sys.vx[1] > 1,
-    `repel separates same-layer pair: vx ${sys.vx[0]}, ${sys.vx[1]}`);
+  assert.ok(sys.vx[0] < 1 && sys.vx[1] > 1, `repel separates same-layer pair: vx ${sys.vx[0]}, ${sys.vx[1]}`);
 }
 {
   // Different layers: repel does not apply.
   const sys = headOnPair();
-  sys.cgroup[0] = 5; sys.cgroup[1] = 6;
-  sys.vx[0] = 1; sys.vx[1] = 1;
+  sys.cgroup[0] = 5;
+  sys.cgroup[1] = 6;
+  sys.vx[0] = 1;
+  sys.vx[1] = 1;
   sys._contactPass({ ...CTX_BASE, mode: 'none', repel: 2 });
-  assert.ok(Object.is(sys.vx[0], 1) && Object.is(sys.vx[1], 1),
-    'repel ignores cross-layer pairs');
+  assert.ok(Object.is(sys.vx[0], 1) && Object.is(sys.vx[1], 1), 'repel ignores cross-layer pairs');
 }
 
 // 11 — exactly coincident discs: deterministic, never NaN.
 {
   const sys = headOnPair();
-  sys.x[1] = sys.x[0]; sys.y[1] = sys.y[0];
+  sys.x[1] = sys.x[0];
+  sys.y[1] = sys.y[0];
   sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
   for (let i = 0; i < 2; i++) {
     for (const f of ['x', 'y', 'vx', 'vy']) {
@@ -221,18 +244,24 @@ function headOnPair() {
 
 // 12 — full-update determinism: two identical systems, contacts on, 60 steps.
 {
-  const lp = (mode) => normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode, particleCount: 60,
-    contactRadius: 12, contactRestitution: 0.7, contactRepel: 1,
-    contactMode: mode,
-  });
+  const lp = (mode) =>
+    normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode,
+      particleCount: 60,
+      contactRadius: 12,
+      contactRestitution: 0.7,
+      contactRepel: 1,
+      contactMode: mode,
+    });
   for (const mode of ['bounce', 'swap', 'breed']) {
     const mk = () => {
       const s = new ParticleSystem();
       s.init(60, 1000, 700, assets, palette, SEED);
       return s;
     };
-    const a = mk(); const b = mk();
+    const a = mk();
+    const b = mk();
     const la = { ...lp(mode), maxParticles: 120 };
     const lb = { ...lp(mode), maxParticles: 120 };
     for (let s = 0; s < 60; s++) {
@@ -243,8 +272,7 @@ function headOnPair() {
     assert.strictEqual(a.n, b.n, `${mode}: population identical after 60 steps`);
     for (const f of ['x', 'y', 'vx', 'vy', 'mass', 'rotation', 'alive']) {
       for (let i = 0; i < a.n; i++) {
-        assert.ok(Object.is(a[f][i], b[f][i]),
-          `${mode}: ${f}[${i}] deterministic (${a[f][i]} vs ${b[f][i]})`);
+        assert.ok(Object.is(a[f][i], b[f][i]), `${mode}: ${f}[${i}] deterministic (${a[f][i]} vs ${b[f][i]})`);
       }
     }
     for (let i = 0; i < a.n; i++) {
@@ -260,12 +288,23 @@ function headOnPair() {
 // inputs even with breed/die changing the population mid-bake.
 {
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 40,
-    contactRadius: 14, contactMode: 'breed', maxParticles: 80,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'swarm',
+    particleCount: 40,
+    contactRadius: 14,
+    contactMode: 'breed',
+    maxParticles: 80,
   });
   const opts = {
-    seed: SEED, count: 40, layoutParams: lp, activeAssets: assets,
-    palette, canvasW: 1000, canvasH: 700, steps: 90, maxParticles: 80,
+    seed: SEED,
+    count: 40,
+    layoutParams: lp,
+    activeAssets: assets,
+    palette,
+    canvasW: 1000,
+    canvasH: 700,
+    steps: 90,
+    maxParticles: 80,
   };
   const once = bakeParticles(opts);
   const twice = bakeParticles(opts);
@@ -282,8 +321,12 @@ function headOnPair() {
 {
   const baseLp = normalizeLayoutParams({
     ...DEFAULT_LAYOUT_PARAMS,
-    mode: 'grid', composition: 'default', count: 40,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+    mode: 'grid',
+    composition: 'default',
+    count: 40,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
   });
   const base = {
     layoutParams: baseLp,
@@ -299,21 +342,30 @@ function headOnPair() {
     ...base,
     layoutParams: {
       ...base.layoutParams,
-      contactRadius: 60, contactRestitution: 0.9, contactRepel: 3,
-      contactMode: 'breed', collideMask: 0b101,
+      contactRadius: 60,
+      contactRestitution: 0.9,
+      contactRepel: 3,
+      contactMode: 'breed',
+      collideMask: 0b101,
     },
   });
   assert.strictEqual(withContacts.safeCount, plain.safeCount);
   assert.strictEqual(withContacts.items.length, plain.items.length);
-  assert.deepStrictEqual(withContacts.items, plain.items,
-    'contact params must not leak into the static placement path');
+  assert.deepStrictEqual(
+    withContacts.items,
+    plain.items,
+    'contact params must not leak into the static placement path',
+  );
 }
 
 // 15 — the layout params allow-list (#107) carries the contact properties.
 {
   const lp = normalizeLayoutParams({
-    contactRadius: 45, contactRestitution: 0.8, contactRepel: 2.5,
-    contactMode: 'swap', collideMask: 0b101,
+    contactRadius: 45,
+    contactRestitution: 0.8,
+    contactRepel: 2.5,
+    contactMode: 'swap',
+    collideMask: 0b101,
   });
   assert.strictEqual(lp.contactRadius, 45);
   assert.strictEqual(lp.contactRestitution, 0.8);
@@ -326,7 +378,9 @@ function headOnPair() {
   assert.strictEqual(clamped.contactRestitution, 0);
   // Structural nonsense is rejected, not defaulted.
   const { rejected } = validateLayoutParams({
-    contactRadius: 'wide', contactMode: 'explode', collideMask: NaN,
+    contactRadius: 'wide',
+    contactMode: 'explode',
+    collideMask: NaN,
   });
   assert.ok(rejected.includes('contactRadius'), 'non-numeric radius rejected');
   assert.ok(rejected.includes('contactMode'), 'unknown mode rejected');
@@ -340,8 +394,13 @@ function headOnPair() {
 {
   const sys = new ParticleSystem();
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', particleCount: 24, body: 3,
-    contactRadius: 10, contactMode: 'bounce', contactRestitution: 0.6,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    particleCount: 24,
+    body: 3,
+    contactRadius: 10,
+    contactMode: 'bounce',
+    contactRestitution: 0.6,
     maxParticles: 60,
   });
   sys.init(24, 1000, 700, assets, palette, SEED);
@@ -349,12 +408,13 @@ function headOnPair() {
     sys.update(lp, assets, palette, SEED, 1_000_000 + s * (1000 / 60), null);
   }
   for (let i = 0; i < sys.n; i++) {
-    assert.ok(Number.isFinite(sys.x[i]) && Number.isFinite(sys.y[i]),
-      `moth ${i} finite after contact steps`);
+    assert.ok(Number.isFinite(sys.x[i]) && Number.isFinite(sys.y[i]), `moth ${i} finite after contact steps`);
     const sp = sys.spine[i];
     assert.ok(sp && sp.length > 0, `moth ${i} keeps its spine`);
-    assert.ok(Object.is(sp[0].x, sys.x[i]) && Object.is(sp[0].y, sys.y[i]),
-      `moth ${i} spine head pinned to contact-corrected head`);
+    assert.ok(
+      Object.is(sp[0].x, sys.x[i]) && Object.is(sp[0].y, sys.y[i]),
+      `moth ${i} spine head pinned to contact-corrected head`,
+    );
   }
 }
 
@@ -366,15 +426,35 @@ function headOnPair() {
     const mk = (x, vx, mass) => {
       const s = new ParticleSystem();
       s.init(1, 1000, 700, assets, palette, SEED);
-      s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+      s.x[0] = x;
+      s.y[0] = 350;
+      s.vx[0] = vx;
+      s.vy[0] = 0;
+      s.mass[0] = mass;
       s.scale[0] = 1; // #1408 — A1's pinned numbers are scale-1 physics
       return s;
     };
     const pearl = mk(400, 2, 1);
     const eaves = mk(430, -2, 3);
     const ses = createDishSession();
-    enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: modeA, umask: 0xffffffff, organism: false });
-    enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: modeB, umask: 0xffffffff, organism: false });
+    enrolDishBody(ses, {
+      key: 'pearl',
+      sys: pearl,
+      radius: 20,
+      restitution: 1,
+      contactMode: modeA,
+      umask: 0xffffffff,
+      organism: false,
+    });
+    enrolDishBody(ses, {
+      key: 'eaves',
+      sys: eaves,
+      radius: 20,
+      restitution: 1,
+      contactMode: modeB,
+      umask: 0xffffffff,
+      organism: false,
+    });
     return { pearl, eaves, ses };
   };
 
@@ -417,8 +497,24 @@ function headOnPair() {
   {
     const { pearl, eaves, ses } = dishPair();
     const ses2 = createDishSession();
-    enrolDishBody(ses2, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
-    enrolDishBody(ses2, { key: 'eaves', sys: eaves, radius: 0, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+    enrolDishBody(ses2, {
+      key: 'pearl',
+      sys: pearl,
+      radius: 20,
+      restitution: 1,
+      contactMode: 'bounce',
+      umask: 0xffffffff,
+      organism: false,
+    });
+    enrolDishBody(ses2, {
+      key: 'eaves',
+      sys: eaves,
+      radius: 0,
+      restitution: 1,
+      contactMode: 'bounce',
+      umask: 0xffffffff,
+      organism: false,
+    });
     assert.strictEqual(armDish(ses2, ['pearl', 'eaves']), false, 'one ghost stratum: the dish does not arm');
     assert.strictEqual(runDishContacts(ses2, pearl), false, 'unarmed session runs nothing');
     assert.ok(Object.is(pearl.x[0], 400) && Object.is(eaves.x[0], 430), 'overlapping strangers stay ghosts');
@@ -427,10 +523,15 @@ function headOnPair() {
 
   // (e) determinism + bake parity over 45 steps, and proof the dish acted.
   {
-    const lpFor = (count, radius, e) => normalizeLayoutParams({
-      ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
-      contactRadius: radius, contactRestitution: e, contactMode: 'bounce',
-    });
+    const lpFor = (count, radius, e) =>
+      normalizeLayoutParams({
+        ...DEFAULT_LAYOUT_PARAMS,
+        mode: 'swarm',
+        particleCount: count,
+        contactRadius: radius,
+        contactRestitution: e,
+        contactMode: 'bounce',
+      });
     const lpA = lpFor(40, 14, 0.7);
     const lpB = lpFor(35, 18, 0.4);
     const liveRun = (withDish) => {
@@ -439,10 +540,24 @@ function headOnPair() {
         const s = new ParticleSystem();
         s.init(lp.particleCount, 1000, 700, assets, palette, seed, null, { graze: lp.graze || 0 });
         enrolDishBody(ses, {
-          key, sys: s, radius: lp.contactRadius, restitution: lp.contactRestitution,
-          contactMode: lp.contactMode, umask: lp.collideMask, organism: false,
+          key,
+          sys: s,
+          radius: lp.contactRadius,
+          restitution: lp.contactRestitution,
+          contactMode: lp.contactMode,
+          umask: lp.collideMask,
+          organism: false,
         });
-        return { s, params: { ...lp, particleCount: lp.particleCount, maxParticles: 200, ...(withDish ? { dishSession: ses } : {}) }, seed };
+        return {
+          s,
+          params: {
+            ...lp,
+            particleCount: lp.particleCount,
+            maxParticles: 200,
+            ...(withDish ? { dishSession: ses } : {}),
+          },
+          seed,
+        };
       };
       const A = mk(lpA, SEED, 'pearl');
       const B = mk(lpB, SEED + 7, 'eaves');
@@ -466,17 +581,32 @@ function headOnPair() {
     const baked = bakeDishParticles({
       layers: [
         { key: 'pearl', seed: SEED, count: 40, layoutParams: lpA, activeAssets: assets, palette, maxParticles: 200 },
-        { key: 'eaves', seed: SEED + 7, count: 35, layoutParams: lpB, activeAssets: assets, palette, maxParticles: 200 },
+        {
+          key: 'eaves',
+          seed: SEED + 7,
+          count: 35,
+          layoutParams: lpB,
+          activeAssets: assets,
+          palette,
+          maxParticles: 200,
+        },
       ],
-      canvasW: 1000, canvasH: 700, steps: 45,
+      canvasW: 1000,
+      canvasH: 700,
+      steps: 45,
     });
-    for (const [key, sys] of [['pearl', run1.A], ['eaves', run1.B]]) {
+    for (const [key, sys] of [
+      ['pearl', run1.A],
+      ['eaves', run1.B],
+    ]) {
       const items = baked.get(key);
       const live = sys.getItems(assets);
       assert.strictEqual(items.length, live.length, `${key}: bake population equals live`);
       for (let i = 0; i < live.length; i++) {
-        assert.ok(Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
-          `${key}[${i}]: bake equals live (${items[i].x} vs ${live[i].x})`);
+        assert.ok(
+          Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
+          `${key}[${i}]: bake equals live (${items[i].x} vs ${live[i].x})`,
+        );
       }
     }
     // The dish acted: the no-session run (today's ghost strata) diverges.
@@ -496,18 +626,31 @@ function headOnPair() {
   {
     const baseLp = normalizeLayoutParams({
       ...DEFAULT_LAYOUT_PARAMS,
-      mode: 'grid', composition: 'default', count: 40,
-      scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
+      mode: 'grid',
+      composition: 'default',
+      count: 40,
+      scale: [0.4, 0.8],
+      rotate: [0, 45],
+      alpha: [60, 100],
     });
     const base = {
-      layoutParams: baseLp, seed: SEED, activeAssets: assets, palette,
+      layoutParams: baseLp,
+      seed: SEED,
+      activeAssets: assets,
+      palette,
       caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
-      canvasW: 1000, canvasH: 700,
+      canvasW: 1000,
+      canvasH: 700,
     };
     const plain = buildPlacements(base);
     const withDish = buildPlacements({
       ...base,
-      layoutParams: { ...base.layoutParams, contactRadius: 30, contactMode: 'bounce', dishSession: createDishSession() },
+      layoutParams: {
+        ...base.layoutParams,
+        contactRadius: 30,
+        contactMode: 'bounce',
+        dishSession: createDishSession(),
+      },
     });
     assert.deepStrictEqual(withDish.items, plain.items, 'dish state must not leak into the static placement path');
   }
@@ -522,26 +665,29 @@ function headOnPair() {
   sys.init(2, 1000, 700, trimAssets, palette, SEED);
   assert.strictEqual(sys.contactTrim[0], 1, 'trim defaults to 1 when the record omits it');
   assert.strictEqual(sys.contactTrim[1], 0.5, 'trim is read from the asset record at spawn');
-  sys.x[0] = 400; sys.y[0] = 350;
-  sys.x[1] = 430; sys.y[1] = 350;
-  sys.vx[0] = 2; sys.vy[0] = 0;
-  sys.vx[1] = -2; sys.vy[1] = 0;
-  sys.mass[0] = 1; sys.mass[1] = 1;
-  sys.scale[0] = 1; sys.scale[1] = 1;
+  sys.x[0] = 400;
+  sys.y[0] = 350;
+  sys.x[1] = 430;
+  sys.y[1] = 350;
+  sys.vx[0] = 2;
+  sys.vy[0] = 0;
+  sys.vx[1] = -2;
+  sys.vy[1] = 0;
+  sys.mass[0] = 1;
+  sys.mass[1] = 1;
+  sys.scale[0] = 1;
+  sys.scale[1] = 1;
   // Discs 20 and 20*1*0.5 = 10: sum 30 == dist 30 → no contact at all.
   sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
-  assert.ok(Object.is(sys.x[0], 400) && Object.is(sys.x[1], 430),
-    'trimmed discs just clear: positions untouched');
-  assert.ok(Object.is(sys.vx[0], 2) && Object.is(sys.vx[1], -2),
-    'trimmed discs just clear: no impulse');
+  assert.ok(Object.is(sys.x[0], 400) && Object.is(sys.x[1], 430), 'trimmed discs just clear: positions untouched');
+  assert.ok(Object.is(sys.vx[0], 2) && Object.is(sys.vx[1], -2), 'trimmed discs just clear: no impulse');
   // Grow body 1 threefold: disc 30, sum 50, overlap 20; equal masses
   // split it 10/10 and the elastic velocities exchange.
   sys.scale[1] = 3;
   sys._contactPass({ ...CTX_BASE, mode: 'bounce', restitution: 1 });
   assert.ok(Object.is(sys.x[0], 390), `growth displaces the neighbour: ${sys.x[0]}`);
   assert.ok(Object.is(sys.x[1], 440), `grown body is displaced in turn: ${sys.x[1]}`);
-  assert.ok(Object.is(sys.vx[0], -2) && Object.is(sys.vx[1], 2),
-    'the grown disc bounces like a body');
+  assert.ok(Object.is(sys.vx[0], -2) && Object.is(sys.vx[1], 2), 'the grown disc bounces like a body');
 }
 
 // 19 — petri dish A2 (#1408), cross-strata: scale 1 + trim 1 reproduces
@@ -552,15 +698,35 @@ function headOnPair() {
     const mk = (x, vx, mass) => {
       const s = new ParticleSystem();
       s.init(1, 1000, 700, assets, palette, SEED);
-      s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+      s.x[0] = x;
+      s.y[0] = 350;
+      s.vx[0] = vx;
+      s.vy[0] = 0;
+      s.mass[0] = mass;
       s.scale[0] = 1;
       return s;
     };
     const pearl = mk(400, 2, 1);
     const eaves = mk(430, -2, 3);
     const ses = createDishSession();
-    enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: modeA, umask: 0xffffffff, organism: false });
-    enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: modeB, umask: 0xffffffff, organism: false });
+    enrolDishBody(ses, {
+      key: 'pearl',
+      sys: pearl,
+      radius: 20,
+      restitution: 1,
+      contactMode: modeA,
+      umask: 0xffffffff,
+      organism: false,
+    });
+    enrolDishBody(ses, {
+      key: 'eaves',
+      sys: eaves,
+      radius: 20,
+      restitution: 1,
+      contactMode: modeB,
+      umask: 0xffffffff,
+      organism: false,
+    });
     return { pearl, eaves, ses };
   };
 
@@ -569,10 +735,11 @@ function headOnPair() {
     const { pearl, eaves, ses } = dishPair();
     armDish(ses, ['pearl', 'eaves']);
     runDishContacts(ses, pearl);
-    assert.ok(Object.is(pearl.x[0], 392.5) && Object.is(eaves.x[0], 432.5),
-      'scale 1 + trim 1 == A1 depenetration, exactly');
-    assert.ok(Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0),
-      'scale 1 + trim 1 == A1 impulse, exactly');
+    assert.ok(
+      Object.is(pearl.x[0], 392.5) && Object.is(eaves.x[0], 432.5),
+      'scale 1 + trim 1 == A1 depenetration, exactly',
+    );
+    assert.ok(Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0), 'scale 1 + trim 1 == A1 impulse, exactly');
   }
 
   // (b) growth across the seam: shrunken EAVES (disc 10, sum 30 == dist)
@@ -583,17 +750,17 @@ function headOnPair() {
     eaves.scale[0] = 0.5;
     armDish(ses, ['pearl', 'eaves']);
     runDishContacts(ses, pearl);
-    assert.ok(Object.is(pearl.x[0], 400) && Object.is(eaves.x[0], 430),
-      'shrunken neighbour does not touch');
-    assert.ok(Object.is(pearl.vx[0], 2) && Object.is(eaves.vx[0], -2),
-      'shrunken neighbour exchanges nothing');
+    assert.ok(Object.is(pearl.x[0], 400) && Object.is(eaves.x[0], 430), 'shrunken neighbour does not touch');
+    assert.ok(Object.is(pearl.vx[0], 2) && Object.is(eaves.vx[0], -2), 'shrunken neighbour exchanges nothing');
     eaves.scale[0] = 2;
     armDish(ses, ['pearl', 'eaves']);
     runDishContacts(ses, pearl);
     assert.ok(Object.is(pearl.x[0], 377.5), `growth displaces across strata: ${pearl.x[0]}`);
     assert.ok(Object.is(eaves.x[0], 437.5), `grown body yields by its mass share: ${eaves.x[0]}`);
-    assert.ok(Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0),
-      'the grown pair bounces with the same mass weighting');
+    assert.ok(
+      Object.is(pearl.vx[0], -4) && Object.is(eaves.vx[0], 0),
+      'the grown pair bounces with the same mass weighting',
+    );
   }
 }
 
@@ -603,17 +770,27 @@ function headOnPair() {
 // (the off-phase is the no-session engine from the same state), and
 // flipping back re-arms the grid.
 {
-  const lpFor = (count, radius, e, dish) => normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
-    contactRadius: radius, contactRestitution: e, contactMode: 'bounce', dish,
-  });
+  const lpFor = (count, radius, e, dish) =>
+    normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'swarm',
+      particleCount: count,
+      contactRadius: radius,
+      contactRestitution: e,
+      contactMode: 'bounce',
+      dish,
+    });
   const lpOnA = lpFor(40, 14, 0.7, true);
   const lpOnB = lpFor(35, 18, 0.4, true);
 
   // (a) the gate itself.
   assert.strictEqual(dishEnrolRadius({ contactRadius: 30, dish: false }), 0, 'OFF enrols 0 whatever the radius');
   assert.strictEqual(dishEnrolRadius({ contactRadius: 30, dish: true }), 30, 'ON enrols the radius');
-  assert.strictEqual(dishEnrolRadius({ contactRadius: 30 }), 30, 'a pre-A3 document (no key) enrols: ON is the default');
+  assert.strictEqual(
+    dishEnrolRadius({ contactRadius: 30 }),
+    30,
+    'a pre-A3 document (no key) enrols: ON is the default',
+  );
   assert.strictEqual(dishEnrolRadius(null), 0, 'no params, no enrolment');
   assert.strictEqual(dishEnrolRadius(lpFor(10, 20, 0.5, false)), 0, 'a normalized OFF enrols 0');
 
@@ -638,24 +815,64 @@ function headOnPair() {
         step++;
         if (ph.mode === 'drop') {
           A.update({ ...lpOnA, particleCount: lpOnA.particleCount, maxParticles: 200 }, assets, palette, SEED, t, null);
-          B.update({ ...lpOnB, particleCount: lpOnB.particleCount, maxParticles: 200 }, assets, palette, SEED + 7, t, null);
+          B.update(
+            { ...lpOnB, particleCount: lpOnB.particleCount, maxParticles: 200 },
+            assets,
+            palette,
+            SEED + 7,
+            t,
+            null,
+          );
           continue;
         }
         const dish = ph.mode === 'on';
         const a = { ...lpOnA, dish };
         const b = { ...lpOnB, dish };
-        enrolDishBody(ses, { key: 'pearl', sys: A, radius: dishEnrolRadius(a), restitution: a.contactRestitution, contactMode: a.contactMode, umask: a.collideMask, organism: false });
-        enrolDishBody(ses, { key: 'eaves', sys: B, radius: dishEnrolRadius(b), restitution: b.contactRestitution, contactMode: b.contactMode, umask: b.collideMask, organism: false });
+        enrolDishBody(ses, {
+          key: 'pearl',
+          sys: A,
+          radius: dishEnrolRadius(a),
+          restitution: a.contactRestitution,
+          contactMode: a.contactMode,
+          umask: a.collideMask,
+          organism: false,
+        });
+        enrolDishBody(ses, {
+          key: 'eaves',
+          sys: B,
+          radius: dishEnrolRadius(b),
+          restitution: b.contactRestitution,
+          contactMode: b.contactMode,
+          umask: b.collideMask,
+          organism: false,
+        });
         if (armDish(ses, ['pearl', 'eaves'])) armed = true;
-        A.update({ ...a, particleCount: a.particleCount, maxParticles: 200, dishSession: ses }, assets, palette, SEED, t, null);
-        B.update({ ...b, particleCount: b.particleCount, maxParticles: 200, dishSession: ses }, assets, palette, SEED + 7, t, null);
+        A.update(
+          { ...a, particleCount: a.particleCount, maxParticles: 200, dishSession: ses },
+          assets,
+          palette,
+          SEED,
+          t,
+          null,
+        );
+        B.update(
+          { ...b, particleCount: b.particleCount, maxParticles: 200, dishSession: ses },
+          assets,
+          palette,
+          SEED + 7,
+          t,
+          null,
+        );
       }
       armedPhases.push(armed);
     }
     return { A, B, armedPhases };
   };
   const assertSameSystems = (x, y, label) => {
-    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+    for (const [sx, sy] of [
+      [x.A, y.A],
+      [x.B, y.B],
+    ]) {
       for (const f of ['x', 'y', 'vx', 'vy']) {
         for (let i = 0; i < sx.n; i++) {
           assert.ok(Object.is(sx[f][i], sy[f][i]), `${label}: ${f}[${i}] ${sx[f][i]} vs ${sy[f][i]}`);
@@ -665,7 +882,10 @@ function headOnPair() {
   };
   const divergedCount = (x, y) => {
     let n = 0;
-    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+    for (const [sx, sy] of [
+      [x.A, y.A],
+      [x.B, y.B],
+    ]) {
       for (let i = 0; i < sx.n; i++) {
         if (!Object.is(sx.x[i], sy.x[i]) || !Object.is(sx.y[i], sy.y[i])) n++;
       }
@@ -682,18 +902,41 @@ function headOnPair() {
   {
     const bakedOff = bakeDishParticles({
       layers: [
-        { key: 'pearl', seed: SEED, count: 40, layoutParams: lpFor(40, 14, 0.7, false), activeAssets: assets, palette, maxParticles: 200 },
-        { key: 'eaves', seed: SEED + 7, count: 35, layoutParams: lpFor(35, 18, 0.4, false), activeAssets: assets, palette, maxParticles: 200 },
+        {
+          key: 'pearl',
+          seed: SEED,
+          count: 40,
+          layoutParams: lpFor(40, 14, 0.7, false),
+          activeAssets: assets,
+          palette,
+          maxParticles: 200,
+        },
+        {
+          key: 'eaves',
+          seed: SEED + 7,
+          count: 35,
+          layoutParams: lpFor(35, 18, 0.4, false),
+          activeAssets: assets,
+          palette,
+          maxParticles: 200,
+        },
       ],
-      canvasW: 1000, canvasH: 700, steps: 45,
+      canvasW: 1000,
+      canvasH: 700,
+      steps: 45,
     });
-    for (const [key, sys] of [['pearl', drop.A], ['eaves', drop.B]]) {
+    for (const [key, sys] of [
+      ['pearl', drop.A],
+      ['eaves', drop.B],
+    ]) {
       const items = bakedOff.get(key);
       const live = sys.getItems(assets);
       assert.strictEqual(items.length, live.length, `bake OFF ${key}: population equals the ghost run`);
       for (let i = 0; i < live.length; i++) {
-        assert.ok(Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
-          `bake OFF ${key}[${i}]: the gated bake is the ghost stack (${items[i].x} vs ${live[i].x})`);
+        assert.ok(
+          Object.is(items[i].x, live[i].x) && Object.is(items[i].y, live[i].y),
+          `bake OFF ${key}[${i}]: the gated bake is the ghost stack (${items[i].x} vs ${live[i].x})`,
+        );
       }
     }
   }
@@ -706,14 +949,27 @@ function headOnPair() {
   // (d) mid-performance flip: 20 steps ON, then OFF — the off-phase is
   // byte-identical to dropping the session at the flip from the same
   // state. No residue: the take after the flip is the per-system engine.
-  const flipped = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 25 }]);
-  const forked = runPhases([{ mode: 'on', steps: 20 }, { mode: 'drop', steps: 25 }]);
+  const flipped = runPhases([
+    { mode: 'on', steps: 20 },
+    { mode: 'off', steps: 25 },
+  ]);
+  const forked = runPhases([
+    { mode: 'on', steps: 20 },
+    { mode: 'drop', steps: 25 },
+  ]);
   assert.deepEqual(flipped.armedPhases, [true, false], 'the flip disarms from the flip step on');
   assertSameSystems(flipped, forked, 'post-flip == session dropped at the flip');
 
   // (e) flipping back re-arms and the dish acts again within the phase.
-  const backOn = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 10 }, { mode: 'on', steps: 15 }]);
-  const stayedOff = runPhases([{ mode: 'on', steps: 20 }, { mode: 'off', steps: 25 }]);
+  const backOn = runPhases([
+    { mode: 'on', steps: 20 },
+    { mode: 'off', steps: 10 },
+    { mode: 'on', steps: 15 },
+  ]);
+  const stayedOff = runPhases([
+    { mode: 'on', steps: 20 },
+    { mode: 'off', steps: 25 },
+  ]);
   assert.deepEqual(backOn.armedPhases, [true, false, true], 'the switch re-arms when flipped back');
   assert.ok(divergedCount(backOn, stayedOff) > 0, 'the re-armed dish displaces bodies again');
 }
@@ -728,21 +984,53 @@ function headOnPair() {
   const mk = (x, vx, mass) => {
     const s = new ParticleSystem();
     s.init(1, 1000, 700, assets, palette, SEED);
-    s.x[0] = x; s.y[0] = 350; s.vx[0] = vx; s.vy[0] = 0; s.mass[0] = mass;
+    s.x[0] = x;
+    s.y[0] = 350;
+    s.vx[0] = vx;
+    s.vy[0] = 0;
+    s.mass[0] = mass;
     s.scale[0] = 1;
     return s;
   };
   const pearl = mk(400, 2, 1);
   const eaves = mk(430, -2, 3);
   const ses = createDishSession();
-  enrolDishBody(ses, { key: 'pearl', sys: pearl, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
-  enrolDishBody(ses, { key: 'eaves', sys: eaves, radius: 20, restitution: 1, contactMode: 'bounce', umask: 0xffffffff, organism: false });
+  enrolDishBody(ses, {
+    key: 'pearl',
+    sys: pearl,
+    radius: 20,
+    restitution: 1,
+    contactMode: 'bounce',
+    umask: 0xffffffff,
+    organism: false,
+  });
+  enrolDishBody(ses, {
+    key: 'eaves',
+    sys: eaves,
+    radius: 20,
+    restitution: 1,
+    contactMode: 'bounce',
+    umask: 0xffffffff,
+    organism: false,
+  });
   armDish(ses, ['pearl', 'eaves']);
   runDishContacts(ses, pearl);
-  assert.ok(Math.abs(pearl.deformMem[0] - 0.36) < 1e-12, `dish feed: light body dented by its Δv (${pearl.deformMem[0]})`);
-  assert.ok(Math.abs(eaves.deformMem[0] - 0.125) < 1e-12, `dish feed: pressure floors the heavy body's dent (${eaves.deformMem[0]})`);
-  assert.ok(Object.is(pearl.deformMemX[0], 1) && Object.is(pearl.deformMemY[0], 0), 'dish feed: axis is the pair normal');
-  assert.ok(Object.is(eaves.deformMemX[0], 1) && Object.is(eaves.deformMemY[0], 0), 'dish feed: both bodies share the line of centres');
+  assert.ok(
+    Math.abs(pearl.deformMem[0] - 0.36) < 1e-12,
+    `dish feed: light body dented by its Δv (${pearl.deformMem[0]})`,
+  );
+  assert.ok(
+    Math.abs(eaves.deformMem[0] - 0.125) < 1e-12,
+    `dish feed: pressure floors the heavy body's dent (${eaves.deformMem[0]})`,
+  );
+  assert.ok(
+    Object.is(pearl.deformMemX[0], 1) && Object.is(pearl.deformMemY[0], 0),
+    'dish feed: axis is the pair normal',
+  );
+  assert.ok(
+    Object.is(eaves.deformMemX[0], 1) && Object.is(eaves.deformMemY[0], 0),
+    'dish feed: both bodies share the line of centres',
+  );
 }
 
 // 22 + 23 — petri dish B1 (#1410): deform is a render attribute only.
@@ -753,10 +1041,16 @@ function headOnPair() {
 //        wobble) while the physics stays bit-identical to the moving
 //        run — the stillness law restrains the render, never the world.
 {
-  const lpFor = (count, radius, e) => normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: count,
-    contactRadius: radius, contactRestitution: e, contactMode: 'bounce', dish: true,
-  });
+  const lpFor = (count, radius, e) =>
+    normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'swarm',
+      particleCount: count,
+      contactRadius: radius,
+      contactRestitution: e,
+      contactMode: 'bounce',
+      dish: true,
+    });
   const lpA = lpFor(40, 14, 0.7);
   const lpB = lpFor(35, 18, 0.4);
   const runDish = (extra = {}) => {
@@ -777,8 +1071,24 @@ function headOnPair() {
     let restEveryStep = true;
     for (let step = 0; step < 45; step++) {
       const t = BAKE_TIME_ORIGIN + step * BAKE_DT_MS;
-      enrolDishBody(ses, { key: 'pearl', sys: A, radius: dishEnrolRadius(lpA), restitution: lpA.contactRestitution, contactMode: lpA.contactMode, umask: lpA.collideMask, organism: false });
-      enrolDishBody(ses, { key: 'eaves', sys: B, radius: dishEnrolRadius(lpB), restitution: lpB.contactRestitution, contactMode: lpB.contactMode, umask: lpB.collideMask, organism: false });
+      enrolDishBody(ses, {
+        key: 'pearl',
+        sys: A,
+        radius: dishEnrolRadius(lpA),
+        restitution: lpA.contactRestitution,
+        contactMode: lpA.contactMode,
+        umask: lpA.collideMask,
+        organism: false,
+      });
+      enrolDishBody(ses, {
+        key: 'eaves',
+        sys: B,
+        radius: dishEnrolRadius(lpB),
+        restitution: lpB.contactRestitution,
+        contactMode: lpB.contactMode,
+        umask: lpB.collideMask,
+        organism: false,
+      });
       armDish(ses, ['pearl', 'eaves']);
       A.update({ ...lpA, maxParticles: 200, dishSession: ses, ...extra }, assets, palette, SEED, t, null);
       B.update({ ...lpB, maxParticles: 200, dishSession: ses, ...extra }, assets, palette, SEED + 7, t, null);
@@ -792,7 +1102,10 @@ function headOnPair() {
     return { A, B, maxAmt, restEveryStep };
   };
   const sameDishPhysics = (x, y, label) => {
-    for (const [sx, sy] of [[x.A, y.A], [x.B, y.B]]) {
+    for (const [sx, sy] of [
+      [x.A, y.A],
+      [x.B, y.B],
+    ]) {
       for (const f of ['x', 'y', 'vx', 'vy']) {
         for (let i = 0; i < sx.n; i++) {
           assert.ok(Object.is(sx[f][i], sy[f][i]), `${label}: ${f}[${i}] ${sx[f][i]} vs ${sy[f][i]}`);
@@ -812,11 +1125,16 @@ function headOnPair() {
   assert.ok(rm.restEveryStep, 'reduced-motion: rest at every step, dents and wobble held');
   sameDishPhysics(on, rm, 'reduced-motion == full motion across the dish');
   for (const s of [rm.A, rm.B]) {
-    assert.ok(s.getItems(assets).every((it) => !('deformAmt' in it)),
-      'reduced-motion items carry no deform fields');
+    assert.ok(
+      s.getItems(assets).every((it) => !('deformAmt' in it)),
+      'reduced-motion items carry no deform fields',
+    );
   }
 }
 
-console.log('contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark; #1409 — the per-Look dish switch; #1410 — deform feeds, physics byte-identity, reduced-motion rest)', {
-  scenarios: 23,
-});
+console.log(
+  'contacts.selfcheck: OK (#167 — one contact integrator: bounce/swap/stick/die/breed; #1407 — one shared dish grid; #1408 — radius from the mark; #1409 — the per-Look dish switch; #1410 — deform feeds, physics byte-identity, reduced-motion rest)',
+  {
+    scenarios: 23,
+  },
+);

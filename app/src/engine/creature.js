@@ -31,8 +31,10 @@ export const MOTH_PARTS = Object.freeze({ body: 'org_pod_02', wing: 'org_leaf_02
 
 /** Phase 2 S2 — hierarchy path segment → the skeleton chain that skins it (wingWarp.mjs). */
 const WARP_SEGMENTS = Object.freeze({
-  wingL: { chain: 'fore', side: 'L' }, wingR: { chain: 'fore', side: 'R' },
-  hindL: { chain: 'hind', side: 'L' }, hindR: { chain: 'hind', side: 'R' },
+  wingL: { chain: 'fore', side: 'L' },
+  wingR: { chain: 'fore', side: 'R' },
+  hindL: { chain: 'hind', side: 'L' },
+  hindR: { chain: 'hind', side: 'R' },
 });
 export const MOTH = Object.freeze({
   bodyScale: 1.7, // canvas px per asset unit (an asset box is 100 units)
@@ -120,16 +122,26 @@ export function groundTreatment(ground, x, y, slot, seed, seedOffsets = null) {
   const out = { dx: 0, dy: 0, recolor: (c, a) => [c, a], halo: null };
   if (!ground || !ground.dish) return out;
   const d = ground.dish;
-  const lean = num01(ground.lean); const snap = num01(ground.snap); const nudge = num01(ground.nudge);
+  const lean = num01(ground.lean);
+  const snap = num01(ground.snap);
+  const nudge = num01(ground.nudge);
   if (nudge > 0 && typeof d.groundCell === 'function') {
     const c = d.groundCell(x, y);
-    if (c && c.size > 0) { out.dx = nudgeAxis(c.u, nudge) * c.size; out.dy = nudgeAxis(c.v, nudge) * c.size; }
+    if (c && c.size > 0) {
+      out.dx = nudgeAxis(c.u, nudge) * c.size;
+      out.dy = nudgeAxis(c.v, nudge) * c.size;
+    }
   }
-  const tile = (lean > 0 || snap > 0 || num01(ground.shadow) > 0) && typeof d.ground === 'function' ? d.ground(x, y) : null;
+  const tile =
+    (lean > 0 || snap > 0 || num01(ground.shadow) > 0) && typeof d.ground === 'function' ? d.ground(x, y) : null;
   const roles = snap > 0 && typeof d.groundRoles === 'function' ? d.groundRoles(x, y) : null;
   // the whole moth snaps or does not, by its own slot in the same fixed per-seed set the marks use (an index past them)
   const snapped = !!(roles && roles.length) && snaps(seed >>> 0, 0x40000 + slot, snap, seedOffsets);
-  if (snapped) out.recolor = (c, a) => { const s = snapPair(c, a, roles); return [s.color, s.accent]; };
+  if (snapped)
+    out.recolor = (c, a) => {
+      const s = snapPair(c, a, roles);
+      return [s.color, s.accent];
+    };
   else if (lean > 0 && typeof tile === 'string') out.recolor = (c, a) => [applyLean(c, tile, lean), a];
   if (typeof tile === 'string') out.halo = tile;
   return out;
@@ -150,7 +162,10 @@ export function hoverPose(motion, seed, pinIndex) {
   const m = Math.min(Number(motion.canvasW) || 0, Number(motion.canvasH) || 0);
   const u = (tag) => kinemePhase(seed, `moth:${tag}${pinIndex}`);
   // anchored: each wave is measured from where it stood at driver time 0, so the creature is on its pin at rest
-  const wave = (hz, tag) => { const p = u(tag); return Math.sin(TAU * (hz * t + p)) - Math.sin(TAU * p); };
+  const wave = (hz, tag) => {
+    const p = u(tag);
+    return Math.sin(TAU * (hz * t + p)) - Math.sin(TAU * p);
+  };
   // #1694 slice 2, Q1 (Matt's ruling): the citizen pinned still — the ANCHOR holds, the animal keeps
   // living. assetStill names the citizen ('creature', the pool entry's id — curator/creatureCitizen.js),
   // and the floor ctx already carries the still set: the home stops drifting (no dx/dy/rot) while the
@@ -192,7 +207,13 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     const c = Math.cos(rad(theta));
     const s = Math.sin(rad(theta));
     // wing centre = root point on the body - R(theta) * (wing root offset), in body units
-    return { dx: p.x - (root.x * c - root.y * s) * k, dy: p.y - (root.x * s + root.y * c) * k, dRot: theta, dScaleX: k, dScaleY: k };
+    return {
+      dx: p.x - (root.x * c - root.y * s) * k,
+      dy: p.y - (root.x * s + root.y * c) * k,
+      dRot: theta,
+      dScaleX: k,
+      dScaleY: k,
+    };
   };
   // The hind pair: only in the recipe while it has any size, so one pair is exactly what step 4 drew.
   const withHind = hind > 0.02;
@@ -204,7 +225,13 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     const c = Math.cos(rad(theta));
     const s = Math.sin(rad(theta));
     const k2 = k * MOTH.hindScale * hind;
-    return { dx: p.x - (root.x * c - root.y * s) * k2, dy: p.y - (root.x * s + root.y * c) * k2, dRot: theta, dScaleX: k2, dScaleY: k2 };
+    return {
+      dx: p.x - (root.x * c - root.y * s) * k2,
+      dy: p.y - (root.x * s + root.y * c) * k2,
+      dRot: theta,
+      dScaleX: k2,
+      dScaleY: k2,
+    };
   };
   // The fan (S3): one surface child per part kind, counts from featherFan.js's FAN_COUNTS — the fan
   // layout (createFanScatter below) grows exactly those counts, so the recipe and the layout agree.
@@ -218,7 +245,10 @@ export function mothRecipe({ bodyPoints, wingPoints, beat = 0, hind = 0, traits 
     body: {
       asset: MOTH_PARTS.body,
       anchors: { wingR: anchorFor('right', 1), wingL: anchorFor('left', -1) },
-      children: [{ part: 'wing', anchor: 'wingR' }, { part: 'wing', anchor: 'wingL' }],
+      children: [
+        { part: 'wing', anchor: 'wingR' },
+        { part: 'wing', anchor: 'wingL' },
+      ],
     },
     wing: {
       asset: MOTH_PARTS.wing,
@@ -267,7 +297,9 @@ function createFanScatter({ seed, seedOffsets, creatureId, skel, anchors, bodyTr
       layouts.set(rightName, right);
     }
     const out = anchorName.endsWith('L')
-      ? Object.fromEntries(Object.entries(right).map(([kind, list]) => [kind, mirrorPlacements(list, FAN_PARTS[kind].axisDeg)]))
+      ? Object.fromEntries(
+          Object.entries(right).map(([kind, list]) => [kind, mirrorPlacements(list, FAN_PARTS[kind].axisDeg)]),
+        )
       : right;
     layouts.set(anchorName, out);
     return out;
@@ -318,7 +350,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
   };
   return {
     append(input, entries, pool, motionFor = null, groundFor = null) {
-      const myFrame = frame; frame += 1; // S5 — every resolver frame counts, even one that appends nothing
+      const myFrame = frame;
+      frame += 1; // S5 — every resolver frame counts, even one that appends nothing
       wingBeat = null; // #1469 — re-earned below only if this call actually appends a moth
       frameSkeletons = []; // S1 — likewise: only a frame that appends moths publishes skeletons
       framePoses = []; // S5 — likewise for poses
@@ -332,11 +365,15 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       let top = null;
       for (let i = entries.length - 1; i >= 0; i--) {
         const e = entries[i];
-        if (e && !e.isFx && !e.isPattern && Array.isArray(e.items)) { top = e; break; }
+        if (e && !e.isFx && !e.isPattern && Array.isArray(e.items)) {
+          top = e;
+          break;
+        }
       }
       if (!top) return;
       const swatches = (top.palette && top.palette.swatches) || [];
-      const sw = (i) => swatches.length ? swatches[((i % swatches.length) + swatches.length) % swatches.length] : '#ffffff';
+      const sw = (i) =>
+        swatches.length ? swatches[((i % swatches.length) + swatches.length) % swatches.length] : '#ffffff';
       // Read against the dish: body and wings in the palette's ink, a bg-coloured halo under them, scales in a swatch.
       const pal = top.palette || {};
       const ink = typeof pal.ink === 'string' ? pal.ink : sw(0);
@@ -344,7 +381,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       // Wings take the most vivid swatch (the dish is full of leaves: the moth must not read as more of them).
       // The palette ranked most vivid first (stable). The wings take rank `swatch` (0 = the most vivid: today's moth);
       // the hind pair takes the next rank, so the two pairs read apart.
-      const ranked = swatches.map((c, n) => ({ c, n })).sort((a, b) => chroma(b.c) - chroma(a.c) || a.n - b.n).map((e) => e.c);
+      const ranked = swatches
+        .map((c, n) => ({ c, n }))
+        .sort((a, b) => chroma(b.c) - chroma(a.c) || a.n - b.n)
+        .map((e) => e.c);
       const pick = (r) => ranked[Math.min(ranked.length - 1, Math.max(0, r))] || ink;
       assetCache.clear();
       const bodyPoints = pointsOf(pool, input.assetAttach, MOTH_PARTS.body);
@@ -367,7 +407,19 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // #1634 slice 2 — a pin the input marks hosted grows the DISH creature there instead (the second
         // family, engine/dishCreature.js); the moth builder leaves it entirely: no moth, no skeleton, no
         // pose. No dishHosted on the input (every take from before the slice) and nothing changes.
-        if (!formed[i] || (input.dishHosted && input.dishHosted[i]) || !pin || !Number.isFinite(pin.x) || !Number.isFinite(pin.y)) { ages[i] = 0; pair2[i] = 0; frameSkeletons[i] = null; framePoses[i] = null; continue; }
+        if (
+          !formed[i] ||
+          (input.dishHosted && input.dishHosted[i]) ||
+          !pin ||
+          !Number.isFinite(pin.x) ||
+          !Number.isFinite(pin.y)
+        ) {
+          ages[i] = 0;
+          pair2[i] = 0;
+          frameSkeletons[i] = null;
+          framePoses[i] = null;
+          continue;
+        }
         ages[i] = (ages[i] || 0) + 1;
         // the second pair eases toward what the crowd decided (1 pair = none, 2 = full), a step per resolver frame
         const want = input.dishLimbs && input.dishLimbs[i] >= 2 ? 1 : 0;
@@ -382,9 +434,16 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // the fan's kinds take the wing's colours (they are the wing's plumage), except the chevron
         // ornaments, which take the old scales' pairing — ink with a vivid accent — so the joints read
         const fanColours = (w, m) => ({
-          [FAN_PARTS.feather.asset]: w, [FAN_PARTS.plate.asset]: w, [FAN_PARTS.leaf.asset]: w, [FAN_PARTS.chevron.asset]: m,
+          [FAN_PARTS.feather.asset]: w,
+          [FAN_PARTS.plate.asset]: w,
+          [FAN_PARTS.leaf.asset]: w,
+          [FAN_PARTS.chevron.asset]: m,
         });
-        const colours = { [MOTH_PARTS.body]: [ink, vivid], [MOTH_PARTS.wing]: [vivid, ink], ...fanColours([vivid, ink], [ink, vivid]) };
+        const colours = {
+          [MOTH_PARTS.body]: [ink, vivid],
+          [MOTH_PARTS.wing]: [vivid, ink],
+          ...fanColours([vivid, ink], [ink, vivid]),
+        };
         const hindColours = { [MOTH_PARTS.wing]: [vivid2, ink], ...fanColours([vivid2, ink], [ink, vivid2]) };
         const hindAmt = easeOut(pair2[i]);
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: hindAmt, traits });
@@ -411,9 +470,15 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const beatG = beat * g; // NOT `bg` — that name is the palette background above (the halo colour)
         const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
         const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
-        const rootT = { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rotDeg: hover.rot, scale: MOTH.bodyScale * traits.body * g * hover.scale };
+        const rootT = {
+          x: pin.x + hover.dx + gt.dx,
+          y: pin.y + hover.dy + gt.dy,
+          rotDeg: hover.rot,
+          scale: MOTH.bodyScale * traits.body * g * hover.scale,
+        };
         const skelPose = {
-          bodyScale: traits.body, wingScale: traits.wing,
+          bodyScale: traits.body,
+          wingScale: traits.wing,
           foreDirDeg: MOTH.spread + traits.spread + beatG,
           hindDirDeg: MOTH.hindSpread + traits.spread * 0.5 - beat * MOTH.hindFlap * g,
           hindAmount: hindAmt,
@@ -426,31 +491,65 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           skelPose.chainCurlDeg = pose.chainCurlDeg;
         }
         framePoses[i] = pose;
-        const buildLocal = (flex) => buildSkeleton({
-          seed: input.seed, creatureId: `m${i}`, plan: MOTH_SKELETON_PLAN, attach: bodyPoints,
-          pose: {
-            ...skelPose,
-            foreFlexDeg: flex ? foreFlexDeg : 0,
-            hindFlexDeg: flex ? hindFlexDeg : 0,
-          },
-          seedOffsets: input.seedOffsets || null,
-        });
+        const buildLocal = (flex) =>
+          buildSkeleton({
+            seed: input.seed,
+            creatureId: `m${i}`,
+            plan: MOTH_SKELETON_PLAN,
+            attach: bodyPoints,
+            pose: {
+              ...skelPose,
+              foreFlexDeg: flex ? foreFlexDeg : 0,
+              hindFlexDeg: flex ? hindFlexDeg : 0,
+            },
+            seedOffsets: input.seedOffsets || null,
+          });
         const skel = buildLocal(false);
-        const worldSkel = skinning || input.wantSkeletons || wantEngraving ? transformSkeleton(buildLocal(true), rootT) : null;
-        frameSkeletons[i] = (skinning || input.wantSkeletons) ? worldSkel : null;
+        const worldSkel =
+          skinning || input.wantSkeletons || wantEngraving ? transformSkeleton(buildLocal(true), rootT) : null;
+        frameSkeletons[i] = skinning || input.wantSkeletons ? worldSkel : null;
         // The warp's bind pose: the same frame at flex 0, so the skin transforms are posed o bind^-1 and a
         // zero-beat frame skins to the identity. It is the fan's own skeleton, transformed — no third build.
         const flexActive = foreFlexDeg !== 0 || hindFlexDeg !== 0;
         const refSkel = skinning && flexActive ? transformSkeleton(skel, rootT) : null;
         const { items } = expandHierarchy(
-          { x: pin.x + hover.dx + gt.dx, y: pin.y + hover.dy + gt.dy, rot: hover.rot, scaleX: MOTH.bodyScale * traits.body * g * hover.scale, scaleY: MOTH.bodyScale * traits.body * g * hover.scale, part: 'body', key: `m${i}` },
+          {
+            x: pin.x + hover.dx + gt.dx,
+            y: pin.y + hover.dy + gt.dy,
+            rot: hover.rot,
+            scaleX: MOTH.bodyScale * traits.body * g * hover.scale,
+            scaleY: MOTH.bodyScale * traits.body * g * hover.scale,
+            part: 'body',
+            key: `m${i}`,
+          },
           recipe,
-          { seed: input.seed, scatter: createFanScatter({ seed: input.seed >>> 0, seedOffsets: input.seedOffsets || null, creatureId: `m${i}`, skel, anchors: recipe.parts.body.anchors, bodyTrait: traits.body }) },
+          {
+            seed: input.seed,
+            scatter: createFanScatter({
+              seed: input.seed >>> 0,
+              seedOffsets: input.seedOffsets || null,
+              creatureId: `m${i}`,
+              skel,
+              anchors: recipe.parts.body.anchors,
+              bodyTrait: traits.body,
+            }),
+          },
         );
         const mark = (it, color, accent, scale, tag) => ({
-          x: it.x, y: it.y, scale: it.scaleX * scale, scaleY: it.scaleY * scale, rotation: it.rotation, alpha: 100,
-          assetId: it.assetId, color, accent, key: `creature:${i}:${tag}${it._hier.path}`, zTier: 0, seedOffset: 0,
-          glass: false, _creature: true,
+          x: it.x,
+          y: it.y,
+          scale: it.scaleX * scale,
+          scaleY: it.scaleY * scale,
+          rotation: it.rotation,
+          alpha: 100,
+          assetId: it.assetId,
+          color,
+          accent,
+          key: `creature:${i}:${tag}${it._hier.path}`,
+          zTier: 0,
+          seedOffset: 0,
+          glass: false,
+          _creature: true,
         });
         // Phase 2 S2 — the wing-warp contexts for this moth: hierarchy segment → its chain's posed + bind
         // bones (world space) and the wing's own hierarchy item. Empty unless the skin is on AND this
@@ -479,16 +578,23 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // scales were, and the rule names the role, not an asset.
         const haloColour = gt.halo || bg;
         const mine = [];
-        for (const it of items) if (it._hier.anchorId !== 'surface') {
-          const mi = mark(it, haloColour, haloColour, MOTH.halo, 'halo:');
-          if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
-          mine.push(mi);
-        }
+        for (const it of items)
+          if (it._hier.anchorId !== 'surface') {
+            const mi = mark(it, haloColour, haloColour, MOTH.halo, 'halo:');
+            if (it.assetId === MOTH_PARTS.wing) {
+              const mesh = warpMeshFor(it, mi);
+              if (mesh) mi.mesh = mesh;
+            }
+            mine.push(mi);
+          }
         for (const it of items) {
           const [c0, a0] = (it._hier.path.includes('hind') ? hindColours[it.assetId] : null) || colours[it.assetId];
           const [color, accent] = gt.recolor(c0, a0);
           const mi = mark(it, color, accent, 1, '');
-          if (it.assetId === MOTH_PARTS.wing) { const mesh = warpMeshFor(it, mi); if (mesh) mi.mesh = mesh; }
+          if (it.assetId === MOTH_PARTS.wing) {
+            const mesh = warpMeshFor(it, mi);
+            if (mesh) mi.mesh = mesh;
+          }
           // Phase 2 S4 — the engraving rides ONLY on the true body stamp (not its halo
           // underlay, which takes the halo loop above; not wings or plumage): the spine
           // joints in this item's own quad frame, packed by engraveBody from the world
@@ -506,8 +612,17 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         // engine/glitch.js as a pure function of (seed, creature, frame, band): render-side only, the
         // skeleton above stays true. No band, or a band at/below the Tighten bar, and gf is null — the
         // items go out exactly as built, the uncorrupted path byte-identical.
-        const gf = glitchFrame({ seed: input.seed, creatureId: `m${i}`, frameIndex: ages[i], band: input.dishGlitch && input.dishGlitch[i], seedOffsets: input.seedOffsets || null });
-        if (gf) extra.push(...applyGlitch(mine, { cx: pin.x + hover.dx + gt.dx, cy: pin.y + hover.dy + gt.dy, rotDeg: hover.rot }, gf));
+        const gf = glitchFrame({
+          seed: input.seed,
+          creatureId: `m${i}`,
+          frameIndex: ages[i],
+          band: input.dishGlitch && input.dishGlitch[i],
+          seedOffsets: input.seedOffsets || null,
+        });
+        if (gf)
+          extra.push(
+            ...applyGlitch(mine, { cx: pin.x + hover.dx + gt.dx, cy: pin.y + hover.dy + gt.dy, rotDeg: hover.rot }, gf),
+          );
         else extra.push(...mine);
       }
       ages.length = pins.length;
@@ -524,22 +639,41 @@ export function createCreatureBuilder({ skinning = false } = {}) {
     // #1367 — the builder's accumulative state: per-pin grow-in ages, second-pair
     // growth, and its own frame count. (wingBeat/skeletons/poses are per-frame
     // publications, re-earned by the next append; assetCache is derived.)
-    snapshotState() { return { ages: [...ages], pair2: [...pair2], frame }; },
+    snapshotState() {
+      return { ages: [...ages], pair2: [...pair2], frame };
+    },
     restoreState(s) {
-      if (!s || !Array.isArray(s.ages) || !Array.isArray(s.pair2) || !Number.isInteger(s.frame) || s.frame < 0) return false;
+      if (!s || !Array.isArray(s.ages) || !Array.isArray(s.pair2) || !Number.isInteger(s.frame) || s.frame < 0)
+        return false;
       if (!s.ages.every(Number.isFinite) || !s.pair2.every(Number.isFinite)) return false;
-      ages.length = 0; ages.push(...s.ages);
-      pair2.length = 0; pair2.push(...s.pair2);
+      ages.length = 0;
+      ages.push(...s.ages);
+      pair2.length = 0;
+      pair2.push(...s.pair2);
       frame = s.frame;
       return true;
     },
-    lastWingBeat() { return wingBeat; },
+    lastWingBeat() {
+      return wingBeat;
+    },
     /** Phase 2 S1 — the last appended frame's skeletons in world (scene) space, per pin; null where no moth. */
-    lastSkeletons() { return frameSkeletons; },
+    lastSkeletons() {
+      return frameSkeletons;
+    },
     /** Phase 2 S5 — the last appended frame's band poses, per pin (one shared object: the pose is the room's);
      *  null where no moth, and all null when no band rode the input. S2's skinning and S4's material read the
      *  pose (dim above all) from here; the drawn items do not yet. */
-    lastPoses() { return framePoses; },
-    dispose() { ages.length = 0; pair2.length = 0; assetCache.clear(); wingBeat = null; frameSkeletons = []; framePoses = []; frame = 0; },
+    lastPoses() {
+      return framePoses;
+    },
+    dispose() {
+      ages.length = 0;
+      pair2.length = 0;
+      assetCache.clear();
+      wingBeat = null;
+      frameSkeletons = [];
+      framePoses = [];
+      frame = 0;
+    },
   };
 }

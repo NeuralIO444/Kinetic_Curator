@@ -20,7 +20,13 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { DEFAULT_LAYOUT_PARAMS } from '../src/data/layout-modes.js';
-import { unpackPerformance, packPerformance, checkPerformance, verifyPerformance, createHashChain } from '../src/gl/performanceFile.mjs';
+import {
+  unpackPerformance,
+  packPerformance,
+  checkPerformance,
+  verifyPerformance,
+  createHashChain,
+} from '../src/gl/performanceFile.mjs';
 import { createLiveResolver } from '../src/gl/liveResolve.mjs';
 import { replayInputs } from '../src/engine/kernel/replay/inputLog.js';
 
@@ -30,7 +36,8 @@ const sha = (b) => createHash('sha256').update(b).digest('hex');
 export function refreshCheckpoints(perf, { resolverFactory = createLiveResolver } = {}) {
   const p = checkPerformance(JSON.parse(JSON.stringify(perf)));
   const resolver = resolverFactory();
-  if (p.initialState && !resolver.restoreState(p.initialState.snapshot)) throw new Error('initialState snapshot refused');
+  if (p.initialState && !resolver.restoreState(p.initialState.snapshot))
+    throw new Error('initialState snapshot refused');
   const chain = createHashChain(p.initialState ? p.initialState.chainSeed : null);
   const want = new Set(p.checkpoints.map((c) => c.frame));
   const fresh = [];
@@ -62,7 +69,12 @@ export function diffLeaves(a, b, path = '$', acc = []) {
 /** The full refresh with its evidence. bytes: the packed file. */
 export async function refreshFile(bytes, { strip = [] } = {}) {
   const saved = {};
-  for (const k of strip) { if (k in DEFAULT_LAYOUT_PARAMS) { saved[k] = DEFAULT_LAYOUT_PARAMS[k]; delete DEFAULT_LAYOUT_PARAMS[k]; } }
+  for (const k of strip) {
+    if (k in DEFAULT_LAYOUT_PARAMS) {
+      saved[k] = DEFAULT_LAYOUT_PARAMS[k];
+      delete DEFAULT_LAYOUT_PARAMS[k];
+    }
+  }
   try {
     const perf = await unpackPerformance(new Uint8Array(bytes));
     const v = verifyPerformance(perf);
@@ -93,7 +105,9 @@ export async function refreshFile(bytes, { strip = [] } = {}) {
   }
 }
 
-const isMain = import.meta.url === new URL(process.argv[1], 'file://').href || process.argv[1]?.endsWith('refreshFixtureCheckpoints.mjs');
+const isMain =
+  import.meta.url === new URL(process.argv[1], 'file://').href ||
+  process.argv[1]?.endsWith('refreshFixtureCheckpoints.mjs');
 if (isMain && !process.argv[1]?.endsWith('.selfcheck.mjs')) {
   const argv = process.argv.slice(2);
   const files = argv.filter((a, i) => !a.startsWith('--') && argv[i - 1] !== '--strip');
@@ -116,7 +130,9 @@ if (isMain && !process.argv[1]?.endsWith('.selfcheck.mjs')) {
   if (asJson) console.log(JSON.stringify(r));
   else {
     console.log(`${files[0]}: ${r.frames} frames, ${r.checkpoints} checkpoints`);
-    console.log(`  original checkpoints verify on this tree${strip.length ? ` (stripped: ${strip.join(', ')})` : ''}: ${r.originalVerifies}`);
+    console.log(
+      `  original checkpoints verify on this tree${strip.length ? ` (stripped: ${strip.join(', ')})` : ''}: ${r.originalVerifies}`,
+    );
     console.log(`  deep diff: ${r.diffLeaves} leaves, ${r.nonCheckpointDiffs.length} outside checkpoint hashes`);
     console.log(`  deterministic: ${r.deterministic}`);
     console.log(`  sha256 ${r.inSha} → ${r.outSha} (${r.outBytes} bytes)`);
@@ -127,6 +143,9 @@ if (isMain && !process.argv[1]?.endsWith('.selfcheck.mjs')) {
       process.exit(1);
     }
     if (r.diffLeaves === 0) console.log('  nothing to write: the file already matches this tree');
-    else { writeFileSync(files[0], res.packed); console.log(`  wrote ${files[0]}`); }
+    else {
+      writeFileSync(files[0], res.packed);
+      console.log(`  wrote ${files[0]}`);
+    }
   }
 }

@@ -26,7 +26,11 @@ if (args.has('--sheet')) {
 const force = args.has('--force');
 const lines = readFileSync(FILE, 'utf8').split('\n');
 const out = [];
-let id = null; let wrote = 0; let kept = 0; let inSwatches = false; let indent = '';
+let id = null;
+let wrote = 0;
+let kept = 0;
+let inSwatches = false;
+let indent = '';
 for (let i = 0; i < lines.length; i++) {
   const line = lines[i];
   const idm = line.match(/^\s*id:\s*'([^']+)'/);
@@ -36,7 +40,10 @@ for (let i = 0; i < lines.length; i++) {
     kept += 1;
   }
   out.push(line);
-  if (/^\s*swatches:\s*\[/.test(line) && id) { inSwatches = true; indent = line.match(/^\s*/)[0]; }
+  if (/^\s*swatches:\s*\[/.test(line) && id) {
+    inSwatches = true;
+    indent = line.match(/^\s*/)[0];
+  }
   if (!inSwatches || !line.includes(']')) continue; // a swatches array may span several lines
   inSwatches = false;
   const p = PALETTES.find((q) => q.id === id);

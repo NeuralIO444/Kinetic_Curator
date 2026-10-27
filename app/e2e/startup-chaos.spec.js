@@ -36,7 +36,11 @@ test('fresh boot fires one full chaos roll and is alive', async ({ page }) => {
     .poll(
       async () =>
         (subtitle = (
-          (await page.locator('.panel-layout .panel-subtitle').first().textContent().catch(() => '')) || ''
+          (await page
+            .locator('.panel-layout .panel-subtitle')
+            .first()
+            .textContent()
+            .catch(() => '')) || ''
         ).trim()),
       { timeout: 15_000 },
     )
@@ -54,7 +58,17 @@ test('fresh boot fires one full chaos roll and is alive', async ({ page }) => {
   // place fewer (the smallest preset places 24, and some modes grow from a seed), so a threshold made this flaky
   // on about one boot in six. Alive means placed, and the count is polled because the roll lands a moment after load.
   await expect
-    .poll(async () => parseInt(await page.locator('body').textContent().then((t) => t.match(/(\d+) NODES/)?.[1] ?? '0'), 10), { timeout: 10_000 })
+    .poll(
+      async () =>
+        parseInt(
+          await page
+            .locator('body')
+            .textContent()
+            .then((t) => t.match(/(\d+) NODES/)?.[1] ?? '0'),
+          10,
+        ),
+      { timeout: 10_000 },
+    )
     .toBeGreaterThan(0);
 });
 

@@ -16,9 +16,18 @@ const text = renderModule(baked);
 const report = renderReport(baked, ASSETS);
 if (process.argv.includes('--check')) {
   let have = '';
-  try { have = readFileSync(MODULE, 'utf8'); } catch { /* missing */ }
-  if (have !== text) { console.error('regions.generated.js is out of date: run `npm run bake:regions`'); process.exit(1); }
-  console.log(`region mattes: ${Object.keys(baked).length} of ${ASSETS.length} assets, committed data matches the bake`);
+  try {
+    have = readFileSync(MODULE, 'utf8');
+  } catch {
+    /* missing */
+  }
+  if (have !== text) {
+    console.error('regions.generated.js is out of date: run `npm run bake:regions`');
+    process.exit(1);
+  }
+  console.log(
+    `region mattes: ${Object.keys(baked).length} of ${ASSETS.length} assets, committed data matches the bake`,
+  );
 } else {
   writeFileSync(MODULE, text);
   mkdirSync(dirname(REPORT), { recursive: true });

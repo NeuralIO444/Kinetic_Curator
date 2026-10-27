@@ -10,14 +10,28 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
 // 1. a click adds a plain point; a click on a point steps its role plain → H → L → gone (#1634); never more than four
 {
   let p = [];
-  for (const pt of [{ x: 10, y: 10 }, { x: 90, y: 10 }, { x: 10, y: 90 }, { x: 90, y: 90 }]) p = clickAttach(p, pt);
+  for (const pt of [
+    { x: 10, y: 10 },
+    { x: 90, y: 10 },
+    { x: 10, y: 90 },
+    { x: 90, y: 90 },
+  ])
+    p = clickAttach(p, pt);
   assert.equal(p.length, MAX_ATTACH);
   assert.equal(clickAttach(p, { x: 50, y: 50 }), p, 'at the limit a new click adds nothing and moves nothing');
   const h = clickAttach(p, { x: 90 + ATTACH_HIT / 2, y: 10 });
   assert.deepEqual(h[1], { x: 90, y: 10, role: 'H' }, 'a click near a plain point makes it the head');
   const l = clickAttach(h, { x: 90, y: 10 });
   assert.deepEqual(l[1], { x: 90, y: 10, role: 'L' }, 'a click on the head makes it a limb marker');
-  assert.deepEqual(clickAttach(l, { x: 90, y: 10 }), [{ x: 10, y: 10 }, { x: 10, y: 90 }, { x: 90, y: 90 }], 'a click on a limb marker removes that point only');
+  assert.deepEqual(
+    clickAttach(l, { x: 90, y: 10 }),
+    [
+      { x: 10, y: 10 },
+      { x: 10, y: 90 },
+      { x: 90, y: 90 },
+    ],
+    'a click on a limb marker removes that point only',
+  );
   // one head per asset: stepping another point to H steps the old head back to plain
   const two = clickAttach(h, { x: 10, y: 10 });
   assert.deepEqual(two[0], { x: 10, y: 10, role: 'H' }, 'the newly stepped point is the head');
@@ -28,16 +42,31 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
 // 2. junk and out-of-box clicks never become points
 {
   const p = [{ x: 1, y: 2 }];
-  for (const bad of [null, {}, { x: NaN, y: 1 }, { x: -1, y: 5 }, { x: 5, y: 100.1 }, { x: '5', y: 5 }]) assert.equal(clickAttach(p, bad), p);
+  for (const bad of [null, {}, { x: NaN, y: 1 }, { x: -1, y: 5 }, { x: 5, y: 100.1 }, { x: '5', y: 5 }])
+    assert.equal(clickAttach(p, bad), p);
   assert.deepEqual(sanitizeAttachPoints([{ x: 5, y: 5, z: 1 }, { x: 500, y: 5 }, null]), [{ x: 5, y: 5 }]);
   assert.deepEqual(
-    sanitizeAttachPoints([{ x: 5, y: 5, role: 'H' }, { x: 6, y: 6, role: 'H' }, { x: 7, y: 7, role: 'L' }, { x: 8, y: 8, role: 'X' }]),
-    [{ x: 5, y: 5, role: 'H' }, { x: 6, y: 6 }, { x: 7, y: 7, role: 'L' }, { x: 8, y: 8 }],
+    sanitizeAttachPoints([
+      { x: 5, y: 5, role: 'H' },
+      { x: 6, y: 6, role: 'H' },
+      { x: 7, y: 7, role: 'L' },
+      { x: 8, y: 8, role: 'X' },
+    ]),
+    [
+      { x: 5, y: 5, role: 'H' },
+      { x: 6, y: 6 },
+      { x: 7, y: 7, role: 'L' },
+      { x: 8, y: 8 },
+    ],
     'roles ride when valid; a second H is just a point; an unknown role is no role',
   );
   assert.equal(sanitizeAssetAttach(null), null);
   assert.equal(sanitizeAssetAttach({ b: 'x' }), null, 'nothing set = null, so an untouched project saves as before');
-  assert.deepEqual(sanitizeAssetAttach({ a: [{ x: 1, y: 2 }], b: [] }), { a: [{ x: 1, y: 2 }], b: [] }, 'an empty list is kept: the artist said "none"');
+  assert.deepEqual(
+    sanitizeAssetAttach({ a: [{ x: 1, y: 2 }], b: [] }),
+    { a: [{ x: 1, y: 2 }], b: [] },
+    'an empty list is kept: the artist said "none"',
+  );
 }
 
 // 3. the store action, and the round trip through a saved project
@@ -46,13 +75,21 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
   assert.ok(!before.includes('assetAttach'), 'a project with no points does not mention them');
   useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
   useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
-  assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: [{ x: 20, y: 30 }, { x: 70, y: 60 }] });
+  assert.deepEqual(useStore.getState().assetAttach, {
+    org_blob_01: [
+      { x: 20, y: 30 },
+      { x: 70, y: 60 },
+    ],
+  });
   // step the roles: first point to H; second to H (first demoted), then to L; first back to H
   useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
   useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
   useStore.getState().clickAssetAttach('org_blob_01', { x: 70, y: 60 });
   useStore.getState().clickAssetAttach('org_blob_01', { x: 20, y: 30 });
-  const marked = [{ x: 20, y: 30, role: 'H' }, { x: 70, y: 60, role: 'L' }];
+  const marked = [
+    { x: 20, y: 30, role: 'H' },
+    { x: 70, y: 60, role: 'L' },
+  ];
   assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: marked }, 'the cycle leaves one H and one L');
   const doc = JSON.parse(JSON.stringify(serializeProject(useStore.getState())));
   assert.deepEqual(doc.assetAttach, { org_blob_01: marked }, 'saved with the project, roles included');
@@ -69,7 +106,11 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
   const parsed = parseProject(doc); // the same gate a real file goes through
   assert.ok(parsed.ok, 'the saved project parses');
   assert.deepEqual(parsed.doc.assetAttach, doc.assetAttach, 'the parser keeps the points');
-  assert.deepEqual(parseProject({ ...doc, assetAttach: { x: [{ x: 'bad', y: 1 }], y: 'junk' } }).doc.assetAttach, { x: [] }, 'hostile points are dropped');
+  assert.deepEqual(
+    parseProject({ ...doc, assetAttach: { x: [{ x: 'bad', y: 1 }], y: 'junk' } }).doc.assetAttach,
+    { x: [] },
+    'hostile points are dropped',
+  );
   load(parsed.doc);
   assert.deepEqual(useStore.getState().assetAttach, { org_blob_01: marked }, 'reloaded, roles included');
 }
@@ -89,13 +130,45 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
   assert.ok(four >= ASSETS.length * 0.8, `most shapes read fully (${four} of ${ASSETS.length} get four points)`);
   // known shapes: a square's points are the middles of its sides; a triangle's top is its tip
   const sq = '<rect x="20" y="20" width="60" height="60"/>';
-  assert.deepEqual(autoAttachPoints(sq), [{ x: 50, y: 20 }, { x: 80, y: 50 }, { x: 50, y: 80 }, { x: 20, y: 50 }], 'top, right, bottom, left');
-  assert.deepEqual(autoAttachPoints('<circle cx="50" cy="50" r="40"/>'), [{ x: 50, y: 10 }, { x: 90, y: 50 }, { x: 50, y: 90 }, { x: 10, y: 50 }]);
+  assert.deepEqual(
+    autoAttachPoints(sq),
+    [
+      { x: 50, y: 20 },
+      { x: 80, y: 50 },
+      { x: 50, y: 80 },
+      { x: 20, y: 50 },
+    ],
+    'top, right, bottom, left',
+  );
+  assert.deepEqual(autoAttachPoints('<circle cx="50" cy="50" r="40"/>'), [
+    { x: 50, y: 10 },
+    { x: 90, y: 50 },
+    { x: 50, y: 90 },
+    { x: 10, y: 50 },
+  ]);
   assert.deepEqual(autoAttachPoints('<polygon points="50,10 90,86 10,86"/>')[0], { x: 50, y: 10 });
-  assert.deepEqual(autoAttachPoints('<line x1="10" y1="50" x2="90" y2="50"/>'), [{ x: 50, y: 50 }, { x: 90, y: 50 }, { x: 10, y: 50 }], 'extremes on the same spot collapse');
-  assert.deepEqual(autoAttachPoints('<text x="50" y="60">A</text>'), [{ x: 50, y: 50 }], 'no readable outline: the centre');
-  assert.deepEqual(autoAttachPoints(''), []); assert.deepEqual(autoAttachPoints(null), []);
-  assert.ok(!/Math\.random|Date\.now|document\.|window\./.test(readFileSync(new URL('./autoAttach.js', import.meta.url), 'utf8')), 'pure: no chance, no clock, no DOM');
+  assert.deepEqual(
+    autoAttachPoints('<line x1="10" y1="50" x2="90" y2="50"/>'),
+    [
+      { x: 50, y: 50 },
+      { x: 90, y: 50 },
+      { x: 10, y: 50 },
+    ],
+    'extremes on the same spot collapse',
+  );
+  assert.deepEqual(
+    autoAttachPoints('<text x="50" y="60">A</text>'),
+    [{ x: 50, y: 50 }],
+    'no readable outline: the centre',
+  );
+  assert.deepEqual(autoAttachPoints(''), []);
+  assert.deepEqual(autoAttachPoints(null), []);
+  assert.ok(
+    !/Math\.random|Date\.now|document\.|window\./.test(
+      readFileSync(new URL('./autoAttach.js', import.meta.url), 'utf8'),
+    ),
+    'pure: no chance, no clock, no DOM',
+  );
   // hand edits win
   const asset = { id: 'sq', svg: sq };
   assert.deepEqual(attachPointsFor(asset, {}), autoAttachPoints(sq));
@@ -104,7 +177,12 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
   // the first hand edit starts from what the lab showed: stepping the top auto point marks it the head,
   // and all four shown points become the artist's
   useStore.getState().clickAssetAttach('sq', { x: 50, y: 20 }, autoAttachPoints(sq));
-  assert.deepEqual(useStore.getState().assetAttach.sq, [{ x: 50, y: 20, role: 'H' }, { x: 80, y: 50 }, { x: 50, y: 80 }, { x: 20, y: 50 }]);
+  assert.deepEqual(useStore.getState().assetAttach.sq, [
+    { x: 50, y: 20, role: 'H' },
+    { x: 80, y: 50 },
+    { x: 50, y: 80 },
+    { x: 20, y: 50 },
+  ]);
   useStore.getState().autoAssetAttach('sq');
   assert.ok(!('sq' in useStore.getState().assetAttach));
 }
@@ -113,8 +191,14 @@ const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g,
 {
   const { readFileSync } = await import('node:fs');
   const panel = readFileSync(new URL('../panels/AssetPoolPanel.jsx', import.meta.url), 'utf8');
-  assert.ok(fre(/a\.svg \+ \(enabled\[a\.id\] \? attachMarks\(attachPointsFor\(a, attach\)/).test(flat(panel)), 'the tile preview of an asset in use draws its attach points');
-  assert.ok(fre(/data-attach[^`]*var\(--kc-red\)/).test(flat(panel)) && !/kc-davis/.test(readFileSync(new URL('../panels/WetLab.jsx', import.meta.url), 'utf8')));
+  assert.ok(
+    fre(/a\.svg \+ \(enabled\[a\.id\] \? attachMarks\(attachPointsFor\(a, attach\)/).test(flat(panel)),
+    'the tile preview of an asset in use draws its attach points',
+  );
+  assert.ok(
+    fre(/data-attach[^`]*var\(--kc-red\)/).test(flat(panel)) &&
+      !/kc-davis/.test(readFileSync(new URL('../panels/WetLab.jsx', import.meta.url), 'utf8')),
+  );
 }
 
 console.log('assetAttach.selfcheck: ok (#1355 attach points)');

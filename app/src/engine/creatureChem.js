@@ -75,7 +75,8 @@ export function tickChem(chem, ev = {}, gains = {}) {
   if (ev.modeChanged) chem[CHEM.boredom] *= 1 - R.boredomEase;
   else chem[CHEM.boredom] += R.boredomRise * g('boredom');
   // decay: drives leak slowly, the reinforcement chemicals fast (OHSS: short half-lives)
-  const dl = leak(R.driveHalfLife); const sl = leak(R.signalHalfLife);
+  const dl = leak(R.driveHalfLife);
+  const sl = leak(R.signalHalfLife);
   for (const k of DRIVE_SLOTS) chem[k] = clamp01(chem[k] * dl);
   chem[CHEM.reward] *= sl;
   chem[CHEM.punishment] *= sl;
@@ -93,8 +94,14 @@ const DRIVE_NAMES = Object.freeze(['approval', 'crowding', 'strain', 'boredom'])
 
 /** The dominant drive's name, or null when none stands out (no drive above DOMINANT_MIN). */
 export function dominantDrive(chem) {
-  let best = -1; let v = DOMINANT_MIN;
-  DRIVE_SLOTS.forEach((k, n) => { if (chem[k] > v) { v = chem[k]; best = n; } });
+  let best = -1;
+  let v = DOMINANT_MIN;
+  DRIVE_SLOTS.forEach((k, n) => {
+    if (chem[k] > v) {
+      v = chem[k];
+      best = n;
+    }
+  });
   return best < 0 ? null : DRIVE_NAMES[best];
 }
 
@@ -106,11 +113,19 @@ export function dominantDrive(chem) {
 export function materialFor(chem) {
   const d = dominantDrive(chem);
   const level = d ? chem[CHEM[d]] : 0;
-  let bodyScale = 1; let dim = 1;
-  if (d === 'approval') { bodyScale -= 0.08 * level; dim -= 0.2 * level; }
-  else if (d === 'strain') { bodyScale -= 0.04 * level; dim -= 0.1 * level; }
-  else if (d === 'crowding') { bodyScale -= 0.05 * level; }
-  else if (d === 'boredom') { dim -= 0.15 * level; }
+  let bodyScale = 1;
+  let dim = 1;
+  if (d === 'approval') {
+    bodyScale -= 0.08 * level;
+    dim -= 0.2 * level;
+  } else if (d === 'strain') {
+    bodyScale -= 0.04 * level;
+    dim -= 0.1 * level;
+  } else if (d === 'crowding') {
+    bodyScale -= 0.05 * level;
+  } else if (d === 'boredom') {
+    dim -= 0.15 * level;
+  }
   const bloom = chem[CHEM.reward];
   bodyScale += 0.07 * bloom;
   dim = Math.min(1, dim + 0.2 * bloom);

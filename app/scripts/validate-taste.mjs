@@ -16,12 +16,18 @@ if (!out.ok) {
 }
 const fid = out.taste.head.fidelity;
 const live = fid >= HEAD_MIN_FIDELITY;
-console.log(JSON.stringify({
-  ok: true,
-  model: out.taste.model,
-  dims: out.taste.dims,
-  fidelity: fid,
-  mlxLive: live,
-  labels: out.taste.labels,
-}, null, 2));
+console.log(
+  JSON.stringify(
+    {
+      ok: true,
+      model: out.taste.model,
+      dims: out.taste.dims,
+      fidelity: fid,
+      mlxLive: live,
+      labels: out.taste.labels,
+    },
+    null,
+    2,
+  ),
+);
 process.exit(live ? 0 : 0);

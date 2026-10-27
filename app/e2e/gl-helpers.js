@@ -5,16 +5,11 @@ import { expect } from '@playwright/test';
 
 /** Parse the "N NODES" pill in the CanvasPanel header. */
 export async function glNodeCount(page) {
-  const text = await page
-    .locator('.panel-canvas .meter-pill', { hasText: /NODES/i })
-    .first()
-    .textContent();
+  const text = await page.locator('.panel-canvas .meter-pill', { hasText: /NODES/i }).first().textContent();
   return parseInt(text || '0', 10) || 0;
 }
 
 /** Wait until the live loop has rendered at least one frame. */
 export async function waitForLiveFrame(page, timeout = 30_000) {
-  await expect
-    .poll(() => glNodeCount(page), { timeout })
-    .toBeGreaterThan(0);
+  await expect.poll(() => glNodeCount(page), { timeout }).toBeGreaterThan(0);
 }

@@ -2,6 +2,7 @@
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 import { sigilGeometry, drawSigil, sigilTempo, SIGIL_FOLDS, SIGIL_TEMPO_S, SIGIL_RINGS } from './davisSigil.js';
 import { DAVIS_STATES } from './davisState.js';
 
@@ -139,7 +140,7 @@ ok('wiring: a readout only, in his colour, still with less motion', () => {
   );
   assert.match(r('../panels/DavisPanel.jsx'), /<RoomCodec \/>/);
   const css = r('../styles/panels.css');
-  assert.match(css, /prefers-reduced-motion: reduce\) \{ \.davis-sigil\.turning \{ animation: none; \} \}/);
+  assert.match(flat(css), fre(/prefers-reduced-motion: reduce\) \{ \.davis-sigil\.turning \{ animation: none; \} \}/));
   assert.match(r('../styles/tokens.css'), /--kc-davis: #ffcd82;/);
 });
 

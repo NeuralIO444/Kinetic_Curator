@@ -7,6 +7,8 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 const mem = new Map();
 globalThis.localStorage = {
@@ -234,10 +236,10 @@ await ok("#1507: a mined record's provenance rides its ledger line; forged prove
 await ok('wiring: X is bound in App.jsx and documented on the help line', () => {
   const src = join(dirname(fileURLToPath(import.meta.url)), '..');
   const app = readFileSync(join(src, 'App.jsx'), 'utf8');
-  assert.match(app, /'x':\s*\(\)\s*=>\s*piped\(\{\s*type:\s*A\.ADD_PASS/);
+  assert.match(flat(app), fre(/'?x'?:\s*\(\)\s*=>\s*piped\(\{\s*type:\s*A\.ADD_PASS/)); // Prettier unquotes keys: 'x' and x are the same key
   const help = readFileSync(join(src, 'data/helpCopy.js'), 'utf8');
-  assert.match(help, /key: 'X', desc: 'Pass/);
-  assert.match(help, /key: 'J', desc: 'Keep/);
+  assert.match(flat(help), fre(/key: 'X', desc: 'Pass/));
+  assert.match(flat(help), fre(/key: 'J', desc: 'Keep/));
 });
 
 // ── #1643: a lost label answers at press time ─────────────────────────

@@ -8,7 +8,14 @@
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 }
@@ -16,12 +23,23 @@ const beats = (page) => page.evaluate(() => window.__kcMetroBeats || 0);
 const keepRunning = (page) => page.evaluate(() => window.__kcStore.getState().setRunning(true));
 // wait until `n` MORE attacks have been counted, keeping the instrument running; returns the elapsed milliseconds
 async function waitForBeats(page, n, timeout = 40_000) {
-  const from = await beats(page); const t0 = Date.now();
-  await expect.poll(async () => { await keepRunning(page); return (await beats(page)) - from; }, { timeout, intervals: [100] }).toBeGreaterThanOrEqual(n);
+  const from = await beats(page);
+  const t0 = Date.now();
+  await expect
+    .poll(
+      async () => {
+        await keepRunning(page);
+        return (await beats(page)) - from;
+      },
+      { timeout, intervals: [100] },
+    )
+    .toBeGreaterThanOrEqual(n);
   return Date.now() - t0;
 }
 
-test('on by default: real attacks and a live dot with no audio; the pulse switch stops them and starts them again', async ({ page }) => {
+test('on by default: real attacks and a live dot with no audio; the pulse switch stops them and starts them again', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   await boot(page);
   const dot = page.locator('.beat-dot');
@@ -34,24 +52,36 @@ test('on by default: real attacks and a live dot with no audio; the pulse switch
   await sw.dispatchEvent('click');
   await expect(sw).toHaveAttribute('aria-pressed', 'false', { timeout: 30_000 });
   await expect(dot).not.toHaveClass(/live/, { timeout: 30_000 });
-  const stopped = await beats(page); await keepRunning(page); await page.waitForTimeout(1600);
-  expect(await beats(page) - stopped).toBeLessThanOrEqual(1); // at most one attack already in flight
+  const stopped = await beats(page);
+  await keepRunning(page);
+  await page.waitForTimeout(1600);
+  expect((await beats(page)) - stopped).toBeLessThanOrEqual(1); // at most one attack already in flight
   await sw.dispatchEvent('click');
   await expect(sw).toHaveAttribute('aria-pressed', 'true', { timeout: 30_000 });
   await expect(dot).toHaveClass(/live/);
   await waitForBeats(page, 2);
 });
 
-test('the pulse follows the dialed tempo: the timer it asks for is 60000 / BPM (read from the request, not from wall time, which a starved runner cannot keep)', async ({ page }) => {
+test('the pulse follows the dialed tempo: the timer it asks for is 60000 / BPM (read from the request, not from wall time, which a starved runner cannot keep)', async ({
+  page,
+}) => {
   test.setTimeout(180_000);
   // record every interval the page asks for, before the app boots
   await page.addInitScript(() => {
-    window.__kcIntervals = []; const real = window.setInterval.bind(window);
-    window.setInterval = (fn, ms, ...rest) => { window.__kcIntervals.push(ms); return real(fn, ms, ...rest); };
+    window.__kcIntervals = [];
+    const real = window.setInterval.bind(window);
+    window.setInterval = (fn, ms, ...rest) => {
+      window.__kcIntervals.push(ms);
+      return real(fn, ms, ...rest);
+    };
   });
   await boot(page);
   const asked = () => page.evaluate(() => window.__kcIntervals.slice());
-  await page.evaluate(() => { const s = window.__kcStore.getState(); s.setBeatMetro(true); s.setBeatBpm(240); });
+  await page.evaluate(() => {
+    const s = window.__kcStore.getState();
+    s.setBeatMetro(true);
+    s.setBeatBpm(240);
+  });
   await expect.poll(asked, { timeout: 30_000 }).toContain(250);
   await page.evaluate(() => window.__kcStore.getState().setBeatBpm(60));
   await expect.poll(asked, { timeout: 30_000 }).toContain(1000);

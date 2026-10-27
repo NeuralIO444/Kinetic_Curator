@@ -31,12 +31,22 @@ for (const id of ['creature/moth', 'creature/dish']) {
   assert.ok(d, `${id} is declared in the cost registry`);
   assert.equal(d.tier, 0, `${id} is tier 0 (structural — sheds by the count cut, not the ladder)`);
   assert.ok(d.timeMs > 0, `${id} declares a measured, positive time`);
-  assert.ok(d.timeMs <= CREATURE_FRAME_ALLOWANCE_MS, `${id} at ${d.timeMs} ms BUSTS the ${CREATURE_FRAME_ALLOWANCE_MS} ms creature allowance`);
-  console.log(`  [declare] ${id}: ${d.timeMs} ms = ${(100 * d.timeMs / CREATURE_FRAME_ALLOWANCE_MS).toFixed(0)}% of the ${CREATURE_FRAME_ALLOWANCE_MS} ms allowance — ${verdict(d.timeMs)}`);
+  assert.ok(
+    d.timeMs <= CREATURE_FRAME_ALLOWANCE_MS,
+    `${id} at ${d.timeMs} ms BUSTS the ${CREATURE_FRAME_ALLOWANCE_MS} ms creature allowance`,
+  );
+  console.log(
+    `  [declare] ${id}: ${d.timeMs} ms = ${((100 * d.timeMs) / CREATURE_FRAME_ALLOWANCE_MS).toFixed(0)}% of the ${CREATURE_FRAME_ALLOWANCE_MS} ms allowance — ${verdict(d.timeMs)}`,
+  );
 }
 const combined = getCostTier('creature/moth').timeMs + getCostTier('creature/dish').timeMs;
-assert.ok(combined <= CREATURE_FRAME_ALLOWANCE_MS, `both families at their own caps (${combined} ms, conservative) BUST the allowance`);
-console.log(`  [declare] combined (conservative — the 4-pin cap means the caps cannot co-occur): ${combined.toFixed(2)} ms — ${verdict(combined)}`);
+assert.ok(
+  combined <= CREATURE_FRAME_ALLOWANCE_MS,
+  `both families at their own caps (${combined} ms, conservative) BUST the allowance`,
+);
+console.log(
+  `  [declare] combined (conservative — the 4-pin cap means the caps cannot co-occur): ${combined.toFixed(2)} ms — ${verdict(combined)}`,
+);
 
 // ── re-measurement (child process, resolver-probe pattern) ──────────────────
 const srcUrl = (p) => pathToFileURL(new URL(`../../${p}`, import.meta.url).pathname).href;
@@ -74,28 +84,45 @@ console.log(JSON.stringify({ moths: paired(MOTHS4), dish: paired(DISH1) }));
 `;
 const runs = [];
 for (let i = 0; i < 3; i++) {
-  const out = execFileSync(process.execPath, ['--no-warnings', '--input-type=module', '-e', CHILD], { encoding: 'utf8', timeout: 120000, stdio: ['ignore', 'pipe', 'ignore'] }).trim().split('\n').pop();
+  const out = execFileSync(process.execPath, ['--no-warnings', '--input-type=module', '-e', CHILD], {
+    encoding: 'utf8',
+    timeout: 120000,
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+    .trim()
+    .split('\n')
+    .pop();
   runs.push(JSON.parse(out));
 }
-const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
+const median = (xs) => {
+  const s = [...xs].sort((a, b) => a - b);
+  return s[Math.floor(s.length / 2)];
+};
 const measured = {
   moth: median(runs.map((r) => r.moths)),
   dish: median(runs.map((r) => r.dish)),
 };
-console.log(`  [measure] sandbox medians of 3 runs — moth ${measured.moth.toFixed(3)} ms, dish ${measured.dish.toFixed(3)} ms`);
+console.log(
+  `  [measure] sandbox medians of 3 runs — moth ${measured.moth.toFixed(3)} ms, dish ${measured.dish.toFixed(3)} ms`,
+);
 assert.ok(measured.moth > measured.dish, 'the moth family measures costlier than the dish creature (ordering truth)');
 for (const id of ['creature/moth', 'creature/dish']) {
   const fam = id.endsWith('moth') ? 'moth' : 'dish';
   const declared = getCostTier(id).timeMs;
   const m = measured[fam];
   assert.ok(m > 0, `${id}: the family really costs something on re-measurement`);
-  assert.ok(m >= declared / 3 && m <= Math.max(declared * 3, declared + 0.15),
-    `${id}: re-measured ${m.toFixed(3)} ms vs declared ${declared} ms — outside the sandbox band (an order-of-magnitude drift, not noise)`);
+  assert.ok(
+    m >= declared / 3 && m <= Math.max(declared * 3, declared + 0.15),
+    `${id}: re-measured ${m.toFixed(3)} ms vs declared ${declared} ms — outside the sandbox band (an order-of-magnitude drift, not noise)`,
+  );
   console.log(`  [measure] ${id}: declared ${declared} ms, re-measured ${m.toFixed(3)} ms — in band`);
 }
 
 // ── the budget report reads the registry, judged by the allowance ──────────
 const report = readFileSync(new URL('../../../scripts/costBudgetReport.mjs', import.meta.url), 'utf8');
-assert.ok(/allCostTiers\(\)/.test(report) && /CREATURE_FRAME_ALLOWANCE_MS/.test(report), 'the budget report reads creature rows from the registry against the allowance export');
+assert.ok(
+  /allCostTiers\(\)/.test(report) && /CREATURE_FRAME_ALLOWANCE_MS/.test(report),
+  'the budget report reads creature rows from the registry against the allowance export',
+);
 
 console.log('creatureCost.selfcheck: ok (#1694 S2 — declarations honest, in band, under the allowance)');

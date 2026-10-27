@@ -12,7 +12,13 @@ import { fileURLToPath } from 'node:url';
 export const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 export const REPORT_DIR = join(APP, 'qa-report');
 
-const up = async (url) => { try { return (await fetch(url)).ok; } catch { return false; } };
+const up = async (url) => {
+  try {
+    return (await fetch(url)).ok;
+  } catch {
+    return false;
+  }
+};
 
 /**
  * Use the server at QA_URL when it answers, otherwise start a private Vite dev
@@ -20,13 +26,19 @@ const up = async (url) => { try { return (await fetch(url)).ok; } catch { return
  */
 export async function ensureServer() {
   const given = process.env.QA_URL;
-  if (given && await up(given)) return { url: given, stop: () => {} };
+  if (given && (await up(given))) return { url: given, stop: () => {} };
   const port = 5199;
   const url = `http://127.0.0.1:${port}/Kinetic_Curator/`;
   if (await up(url)) return { url, stop: () => {} };
-  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: APP, stdio: 'ignore' });
+  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+    cwd: APP,
+    stdio: 'ignore',
+  });
   for (let i = 0; i < 60 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 500));
-  if (!(await up(url))) { child.kill(); throw new Error('dev server did not come up on ' + url); }
+  if (!(await up(url))) {
+    child.kill();
+    throw new Error('dev server did not come up on ' + url);
+  }
   return { url, stop: () => child.kill() };
 }
 
@@ -46,7 +58,13 @@ export async function runScenario(scn, baseUrl, { headed = false } = {}) {
       const c = await browser.newContext({ viewport: { width: 1280, height: 900 } });
       contexts.push(c);
       const page = await c.newPage();
-      await page.addInitScript(() => { try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ } });
+      await page.addInitScript(() => {
+        try {
+          localStorage.setItem('kc:first-run-seen', '1');
+        } catch {
+          /* ignore */
+        }
+      });
       return page;
     },
     async openApp(page) {
@@ -65,8 +83,10 @@ export async function runScenario(scn, baseUrl, { headed = false } = {}) {
     async snap(page, label, locator = null) {
       const file = `${String(++shotN).padStart(2, '0')}-${label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.png`;
       try {
-        if (locator) { await locator.scrollIntoViewIfNeeded(); await locator.screenshot({ path: join(dir, file) }); }
-        else await page.screenshot({ path: join(dir, file) });
+        if (locator) {
+          await locator.scrollIntoViewIfNeeded();
+          await locator.screenshot({ path: join(dir, file) });
+        } else await page.screenshot({ path: join(dir, file) });
         steps.push({ kind: 'shot', label, file: `${scn.name}/${file}` });
       } catch (e) {
         steps.push({ kind: 'check', label: `screenshot: ${label}`, pass: false, detail: e.message });
@@ -75,7 +95,12 @@ export async function runScenario(scn, baseUrl, { headed = false } = {}) {
   };
 
   let error = null;
-  try { await scn.run(ctx); } catch (e) { error = e; steps.push({ kind: 'check', label: 'scenario threw', pass: false, detail: e.stack || String(e) }); }
+  try {
+    await scn.run(ctx);
+  } catch (e) {
+    error = e;
+    steps.push({ kind: 'check', label: 'scenario threw', pass: false, detail: e.stack || String(e) });
+  }
   await Promise.all(contexts.map((c) => c.close().catch(() => {})));
   await browser.close();
   const pass = !error && steps.filter((s) => s.kind === 'check').every((s) => s.pass);

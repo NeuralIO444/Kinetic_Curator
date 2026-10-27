@@ -15,9 +15,15 @@ const flags = new Set(args.filter((a) => a.startsWith('--')));
 const wanted = args.filter((a) => !a.startsWith('--'));
 
 const dir = join(APP, 'qa', 'scenarios');
-const all = readdirSync(dir).filter((f) => f.endsWith('.mjs')).map((f) => f.replace(/\.mjs$/, '')).sort();
+const all = readdirSync(dir)
+  .filter((f) => f.endsWith('.mjs'))
+  .map((f) => f.replace(/\.mjs$/, ''))
+  .sort();
 const unknown = wanted.filter((w) => !all.includes(w));
-if (unknown.length) { console.error(`unknown scenario(s): ${unknown.join(', ')}\navailable: ${all.join(', ')}`); process.exit(2); }
+if (unknown.length) {
+  console.error(`unknown scenario(s): ${unknown.join(', ')}\navailable: ${all.join(', ')}`);
+  process.exit(2);
+}
 const names = wanted.length ? wanted : all;
 
 const server = await ensureServer();
@@ -29,9 +35,14 @@ try {
     const r = await runScenario({ ...scn, name: n }, server.url, { headed: flags.has('--headed') });
     results.push(r);
     console.log(r.pass ? 'PASS' : 'FAIL');
-    for (const s of r.steps.filter((x) => x.kind === 'check')) console.log(`   ${s.pass ? '✓' : '✗'} ${s.label}${s.detail && !s.pass ? `\n       ${s.detail.split('\n')[0]}` : ''}`);
+    for (const s of r.steps.filter((x) => x.kind === 'check'))
+      console.log(
+        `   ${s.pass ? '✓' : '✗'} ${s.label}${s.detail && !s.pass ? `\n       ${s.detail.split('\n')[0]}` : ''}`,
+      );
   }
-} finally { server.stop(); }
+} finally {
+  server.stop();
+}
 
 const file = writeReport(results, renderReport);
 console.log(`\nreport: ${file}`);

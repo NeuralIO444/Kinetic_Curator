@@ -2,7 +2,18 @@
 // Kernel K0 acceptance (#58)
 
 import assert from 'node:assert';
-import { CH, STRING_CHANNEL_GROUPS, hashU01, hashU32, rngForIndex, colorRngForIndex, pickWeightedIndexStable, noiseSeedFor, startStringChannelObservation, endStringChannelObservation } from './rng.js';
+import {
+  CH,
+  STRING_CHANNEL_GROUPS,
+  hashU01,
+  hashU32,
+  rngForIndex,
+  colorRngForIndex,
+  pickWeightedIndexStable,
+  noiseSeedFor,
+  startStringChannelObservation,
+  endStringChannelObservation,
+} from './rng.js';
 import { computePlacements } from '../placement.js';
 import { buildPlacements } from '../buildPlacements.js';
 import { assignColor } from './color/index.js';
@@ -24,8 +35,17 @@ assert.notStrictEqual(hashU01(seed, CH.dens, 3), hashU01(seed, CH.dens, 4));
 
 {
   const base = {
-    mode: 'grid', seed, scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false, canvasW: 1000, canvasH: 700,
+    mode: 'grid',
+    seed,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
   };
   const small = computePlacements({ ...base, count: 40 });
   const large = computePlacements({ ...base, count: 80 });
@@ -44,8 +64,17 @@ assert.notStrictEqual(hashU01(seed, CH.dens, 3), hashU01(seed, CH.dens, 4));
 
 {
   const base = {
-    mode: 'grid', seed, count: 50, scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, zTiers: 1, bleed: false, canvasW: 1000, canvasH: 700,
+    mode: 'grid',
+    seed,
+    count: 50,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
   };
   const full = computePlacements({ ...base, density: 100 });
   const sparse = computePlacements({ ...base, density: 40 });
@@ -72,14 +101,41 @@ assert.notStrictEqual(hashU01(seed, CH.dens, 3), hashU01(seed, CH.dens, 4));
   assert.strictEqual(pick(0), pick(0));
   const palette = { swatches: ['#111', '#222', '#333', '#444'] };
   const layout = {
-    mode: 'grid', composition: 'default', count: 20,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false, overlap: true,
-    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    mode: 'grid',
+    composition: 'default',
+    count: 20,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    mirror: false,
+    overlap: true,
+    displacement: 0,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
   };
   const caps = { maxCount: 420, maxCountMirrored: 360, allowMirror: true };
-  const g = buildPlacements({ layoutParams: layout, seed, activeAssets: assets, palette, caps, canvasW: 1000, canvasH: 700 });
-  const f = buildPlacements({ layoutParams: { ...layout, mode: 'fibonacci' }, seed, activeAssets: assets, palette, caps, canvasW: 1000, canvasH: 700 });
+  const g = buildPlacements({
+    layoutParams: layout,
+    seed,
+    activeAssets: assets,
+    palette,
+    caps,
+    canvasW: 1000,
+    canvasH: 700,
+  });
+  const f = buildPlacements({
+    layoutParams: { ...layout, mode: 'fibonacci' },
+    seed,
+    activeAssets: assets,
+    palette,
+    caps,
+    canvasW: 1000,
+    canvasH: 700,
+  });
   const gMap = Object.fromEntries(g.items.map((it) => [it.index, it.assetId]));
   const fMap = Object.fromEntries(f.items.map((it) => [it.index, it.assetId]));
   for (const i of Object.keys(gMap)) {
@@ -126,28 +182,42 @@ console.log('kernel/rng.selfcheck: OK (K0)');
 {
   const observed = startStringChannelObservation();
   const base = {
-    mode: 'grid', seed, count: 12, scale: [0.4, 0.8], rotate: [0, 45],
-    alpha: [60, 100], jitter: 10, density: 100, zTiers: 1, bleed: false,
-    canvasW: 1000, canvasH: 700,
+    mode: 'grid',
+    seed,
+    count: 12,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    canvasW: 1000,
+    canvasH: 700,
   };
-  computePlacements({ ...base, mode: 'voronoi' });              // hashes 'voronoi'
+  computePlacements({ ...base, mode: 'voronoi' }); // hashes 'voronoi'
   const grid = Array.from({ length: 8 }, () => Array(8).fill(1));
-  computePlacements({ ...base, mode: 'ca', caGrid: grid });     // hashes 'ca'
-  computePlacements({ ...base, mode: 'poisson' });              // hashes 'poisson' (#1193)
-  computePlacements({ ...base, mode: 'dla', growthTick: 2 });   // hashes 'growth' (#720)
-  sampleFieldPoint(makeCaField(grid, { softness: 0 }), seed, 3);// default 'field'
+  computePlacements({ ...base, mode: 'ca', caGrid: grid }); // hashes 'ca'
+  computePlacements({ ...base, mode: 'poisson' }); // hashes 'poisson' (#1193)
+  computePlacements({ ...base, mode: 'dla', growthTick: 2 }); // hashes 'growth' (#720)
+  sampleFieldPoint(makeCaField(grid, { softness: 0 }), seed, 3); // default 'field'
   const seen = endStringChannelObservation();
   assert.ok(seen.length > 0, 'expected to observe string channels');
   const unregistered = seen.filter((n) => !Object.hasOwn(STRING_CHANNEL_GROUPS, n));
-  assert.deepStrictEqual(unregistered, [],
-    `unregistered RNG string channels (silently locked to offset 0): ${unregistered.join(', ')}`);
+  assert.deepStrictEqual(
+    unregistered,
+    [],
+    `unregistered RNG string channels (silently locked to offset 0): ${unregistered.join(', ')}`,
+  );
   console.log(`kernel/rng.selfcheck: OK (#1238 — ${seen.length} string channels registered: ${seen.join(', ')})`);
 
   // Negative control: the tripwire must actually flag an unregistered channel.
   startStringChannelObservation();
   hashU32(seed, 'definitely-not-a-registered-channel', 0);
-  const flagged = endStringChannelObservation()
-    .filter((n) => !Object.hasOwn(STRING_CHANNEL_GROUPS, n));
-  assert.deepStrictEqual(flagged, ['definitely-not-a-registered-channel'],
-    'the #1238 tripwire must flag an unregistered channel');
+  const flagged = endStringChannelObservation().filter((n) => !Object.hasOwn(STRING_CHANNEL_GROUPS, n));
+  assert.deepStrictEqual(
+    flagged,
+    ['definitely-not-a-registered-channel'],
+    'the #1238 tripwire must flag an unregistered channel',
+  );
 }

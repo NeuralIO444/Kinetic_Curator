@@ -84,13 +84,19 @@ const mass = Array.from(sys.mass.slice(0, N));
   assert.ok(
     d > 0.18,
     `#558: mean pairwise phase distance ${d.toFixed(4)} is too close to lockstep — ` +
-    'siblings must diverge statistically, not by a single bit',
+      'siblings must diverge statistically, not by a single bit',
   );
   console.log(`[ok] phase offsets diverge: mean pairwise circular distance ${d.toFixed(4)} (uniform ≈ 0.25)`);
 }
 {
-  for (const [name, vals] of [['driftMul', driftMul], ['speedMul', speedMul]]) {
-    assert.ok(vals.every((v) => v >= 0.8 && v < 1.2), `#558: ${name} out of [0.8, 1.2)`);
+  for (const [name, vals] of [
+    ['driftMul', driftMul],
+    ['speedMul', speedMul],
+  ]) {
+    assert.ok(
+      vals.every((v) => v >= 0.8 && v < 1.2),
+      `#558: ${name} out of [0.8, 1.2)`,
+    );
     // Uniform [0.8,1.2) → mean pairwise |diff| ≈ 0.133. Threshold sits
     // far above lockstep (0) with wide margin for hash clumping.
     const d = meanPairwiseAbs(vals);
@@ -106,7 +112,10 @@ const mass = Array.from(sys.mass.slice(0, N));
 }
 {
   // mass = r() * 0.8 + 0.4, so [0.4, 1.2). Uniform mean pairwise ≈ 0.267.
-  assert.ok(mass.every((v) => v >= 0.4 && v < 1.2), '#558: mass out of [0.4, 1.2)');
+  assert.ok(
+    mass.every((v) => v >= 0.4 && v < 1.2),
+    '#558: mass out of [0.4, 1.2)',
+  );
   const d = meanPairwiseAbs(mass);
   assert.ok(d > 0.12, `#558: mass mean pairwise distance ${d.toFixed(4)} — mass in lockstep`);
   console.log(`[ok] mass in [0.4, 1.2), mean pairwise distance ${d.toFixed(4)} (uniform ≈ 0.267)`);
@@ -125,10 +134,7 @@ const mass = Array.from(sys.mass.slice(0, N));
     ['y', sys.y, again.y],
   ]) {
     for (let i = 0; i < N; i++) {
-      assert.ok(
-        Object.is(a[i], b[i]),
-        `#558: ${name}[${i}] not reproducible across reruns (${a[i]} vs ${b[i]})`,
-      );
+      assert.ok(Object.is(a[i], b[i]), `#558: ${name}[${i}] not reproducible across reruns (${a[i]} vs ${b[i]})`);
     }
   }
   console.log('[ok] same seed reproduces identical uniqueness channels and positions bit-for-bit');

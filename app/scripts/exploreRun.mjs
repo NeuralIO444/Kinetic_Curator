@@ -37,9 +37,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { resolvePalette } from '../src/data/palettes.js';
-import {
-  runMiner, formatMinerReport, renderStillPng, composeStillSvg, stillHash,
-} from '../src/curator/miner.mjs';
+import { runMiner, formatMinerReport, renderStillPng, composeStillSvg, stillHash } from '../src/curator/miner.mjs';
 import { queenEvidence, formatQueenSection } from './queenEvidence.mjs';
 
 const args = process.argv.slice(2);
@@ -63,9 +61,14 @@ const elapsedMs = Date.now() - t0;
 // The Queen's evidence over this run's finalists (queenEvidence.mjs):
 // her anchor is the keeps corpus handed to the run; the mined pool
 // is what she weighs. Telemetry only — it steers nothing here.
-const queen = queenEvidence(keeps, run.finalists.map((f) => ({
-  layoutParams: f.sample.layoutParams, corner: f.sample.corner, index: f.sample.index,
-})));
+const queen = queenEvidence(
+  keeps,
+  run.finalists.map((f) => ({
+    layoutParams: f.sample.layoutParams,
+    corner: f.sample.corner,
+    index: f.sample.index,
+  })),
+);
 
 const outDir = opt('out', join('explorer-runs', run.runId));
 mkdirSync(join(outDir, 'stills'), { recursive: true });
@@ -77,42 +80,74 @@ for (const [n, f] of run.finalists.entries()) {
   const stem = `finalist-${String(n + 1).padStart(2, '0')}-sample-${f.sample.index}`;
   writeFileSync(join(outDir, 'stills', `${stem}.png`), png);
   writeFileSync(join(outDir, 'stills', `${stem}.svg`), composeStillSvg(f.items, palette, { withBg: true }));
-  stillIndex.push({ file: `stills/${stem}.png`, sample: f.sample.index, stillSha256: stillHash(png), bakeFingerprint: f.fingerprint });
+  stillIndex.push({
+    file: `stills/${stem}.png`,
+    sample: f.sample.index,
+    stillSha256: stillHash(png),
+    bakeFingerprint: f.fingerprint,
+  });
 }
 
 const strip = ({ sample, features, stats, bakePath, fingerprint, fontContingent, record }) => ({
-  index: sample.index, corner: sample.corner, anchor: sample.anchor,
-  bakePath, fingerprint, fontContingent, features, stats, record,
+  index: sample.index,
+  corner: sample.corner,
+  anchor: sample.anchor,
+  bakePath,
+  fingerprint,
+  fontContingent,
+  features,
+  stats,
+  record,
 });
 writeFileSync(join(outDir, 'candidates.json'), JSON.stringify(run.baked.map(strip), null, 2));
-writeFileSync(join(outDir, 'finalists.json'), JSON.stringify(run.finalists.map((f) => f.record), null, 2));
+writeFileSync(
+  join(outDir, 'finalists.json'),
+  JSON.stringify(
+    run.finalists.map((f) => f.record),
+    null,
+    2,
+  ),
+);
 writeFileSync(join(outDir, 'verdicts.jsonl'), run.verdicts.map((v) => JSON.stringify(v)).join('\n') + '\n');
-writeFileSync(join(outDir, 'run.json'), JSON.stringify({
-  runId: run.runId,
-  config: run.config,
-  elapsedMs,
-  bakesPerSecond: +(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2),
-  report: run.report,
-  queen,
-  discards: run.discards,
-  stills: stillIndex,
-}, null, 2));
-writeFileSync(join(outDir, 'REPORT.md'), [
-  `# Miner run ${run.runId}`,
-  '',
-  '```',
-  formatMinerReport(run),
-  '',
-  formatQueenSection(queen),
-  '```',
-  '',
-  `Elapsed: ${(elapsedMs / 1000).toFixed(1)}s for ${run.report.yield.baked} bakes (${(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2)} bakes/s, sampler + bake + measure + select, this machine).`,
-  '',
-  '## Stills',
-  '',
-  ...stillIndex.map((s) => `- sample ${s.sample}: \`${s.file}\` (still sha256 ${s.stillSha256.slice(0, 12)}…, bake fingerprint ${s.bakeFingerprint.slice(0, 12)}…)`),
-  '',
-].join('\n'));
+writeFileSync(
+  join(outDir, 'run.json'),
+  JSON.stringify(
+    {
+      runId: run.runId,
+      config: run.config,
+      elapsedMs,
+      bakesPerSecond: +(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2),
+      report: run.report,
+      queen,
+      discards: run.discards,
+      stills: stillIndex,
+    },
+    null,
+    2,
+  ),
+);
+writeFileSync(
+  join(outDir, 'REPORT.md'),
+  [
+    `# Miner run ${run.runId}`,
+    '',
+    '```',
+    formatMinerReport(run),
+    '',
+    formatQueenSection(queen),
+    '```',
+    '',
+    `Elapsed: ${(elapsedMs / 1000).toFixed(1)}s for ${run.report.yield.baked} bakes (${(run.report.yield.baked / (elapsedMs / 1000)).toFixed(2)} bakes/s, sampler + bake + measure + select, this machine).`,
+    '',
+    '## Stills',
+    '',
+    ...stillIndex.map(
+      (s) =>
+        `- sample ${s.sample}: \`${s.file}\` (still sha256 ${s.stillSha256.slice(0, 12)}…, bake fingerprint ${s.bakeFingerprint.slice(0, 12)}…)`,
+    ),
+    '',
+  ].join('\n'),
+);
 
 console.log(formatMinerReport(run));
 console.log(`\nrun folder: ${outDir} · elapsed ${(elapsedMs / 1000).toFixed(1)}s`);

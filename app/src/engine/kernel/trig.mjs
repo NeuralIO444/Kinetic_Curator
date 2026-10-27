@@ -35,18 +35,18 @@ const PIO2_LO = 6.123233995736766e-17;
 const TWO_OVER_PI = 0.6366197723675814; // 2/π
 
 // Polynomial coefficients (fdlibm-derived): sin on [-π/4, π/4], degree 13.
-const S1 = -1.66666666666666324348e-01;
-const S2 = 8.33333333332248946124e-03;
-const S3 = -1.98412698298579493134e-04;
-const S4 = 2.75573137070700676768e-06;
-const S5 = -2.50507602534068634195e-08;
+const S1 = -1.66666666666666324348e-1;
+const S2 = 8.33333333332248946124e-3;
+const S3 = -1.98412698298579493134e-4;
+const S4 = 2.75573137070700676768e-6;
+const S5 = -2.50507602534068634195e-8;
 const S6 = 1.58969099521155010221e-10;
 // cos on [-π/4, π/4], degree 14.
-const C1 = 4.16666666666666019037e-02;
-const C2 = -1.38888888888741095749e-03;
-const C3 = 2.48015872894767294178e-05;
-const C4 = -2.75573143513906633035e-07;
-const C5 = 2.08757232129817482790e-09;
+const C1 = 4.16666666666666019037e-2;
+const C2 = -1.38888888888741095749e-3;
+const C3 = 2.48015872894767294178e-5;
+const C4 = -2.75573143513906633035e-7;
+const C5 = 2.0875723212981748279e-9;
 const C6 = -1.13596475577881948265e-11;
 
 function sinPoly(r) {
@@ -66,20 +66,28 @@ function cosPoly(r) {
 export function detSin(x) {
   if (!(x < Infinity && x > -Infinity)) return NaN;
   const q = Math.round(x * TWO_OVER_PI);
-  const r = (x - q * PIO2_HI) - q * PIO2_LO;
+  const r = x - q * PIO2_HI - q * PIO2_LO;
   const k = ((q % 8) + 8) % 8;
   const s = sinPoly(r);
   const c = cosPoly(r);
   // sin(q·π/2 + r) by octant.
   switch (k) {
-    case 0: return s;
-    case 1: return c;
-    case 2: return -s;
-    case 3: return -c;
-    case 4: return s;
-    case 5: return c;
-    case 6: return -s;
-    default: return -c; // k === 7
+    case 0:
+      return s;
+    case 1:
+      return c;
+    case 2:
+      return -s;
+    case 3:
+      return -c;
+    case 4:
+      return s;
+    case 5:
+      return c;
+    case 6:
+      return -s;
+    default:
+      return -c; // k === 7
   }
 }
 
@@ -90,20 +98,28 @@ export function detSin(x) {
 export function detCos(x) {
   if (!(x < Infinity && x > -Infinity)) return NaN;
   const q = Math.round(x * TWO_OVER_PI);
-  const r = (x - q * PIO2_HI) - q * PIO2_LO;
+  const r = x - q * PIO2_HI - q * PIO2_LO;
   const k = ((q % 8) + 8) % 8;
   const s = sinPoly(r);
   const c = cosPoly(r);
   // cos(q·π/2 + r) by octant.
   switch (k) {
-    case 0: return c;
-    case 1: return -s;
-    case 2: return -c;
-    case 3: return s;
-    case 4: return c;
-    case 5: return -s;
-    case 6: return -c;
-    default: return s; // k === 7
+    case 0:
+      return c;
+    case 1:
+      return -s;
+    case 2:
+      return -c;
+    case 3:
+      return s;
+    case 4:
+      return c;
+    case 5:
+      return -s;
+    case 6:
+      return -c;
+    default:
+      return s; // k === 7
   }
 }
 

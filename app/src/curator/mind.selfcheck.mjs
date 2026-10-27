@@ -19,6 +19,8 @@ import { startMind, setMindTap, replayMindFrame, endMindReplay } from './mindLiv
 import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRecord.js';
 import { Events, emit, on, releaseTick, clearPending } from '../composition/eventBus.js';
 import { EVENT_REGISTRY } from '../composition/eventRegistry.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = async (name, fn) => {
@@ -517,8 +519,10 @@ await ok('wired: a take records the mind section and playback replays it', () =>
   const app = src('../App.jsx');
   assert.match(app, /isReplaying: isPlaybackActive/);
   assert.match(
-    app,
-    /setPlaybackFrameTap\(\(frame, perf, o\) => \{ replayMindFrame\(frame, perf && perf\.mind, o\); replaySpectrumFrame\(frame, perf && perf\.spectrum, o\); \}\)/,
+    flat(app),
+    fre(
+      /setPlaybackFrameTap\(\(frame, perf, o\) => \{ replayMindFrame\(frame, perf && perf\.mind, o\); replaySpectrumFrame\(frame, perf && perf\.spectrum, o\); \}\)/,
+    ),
   );
   for (const e of ['MIND_REQUEST', 'MIND_STATUS']) assert.ok(EVENT_REGISTRY[e], `${e} is registered`);
 });

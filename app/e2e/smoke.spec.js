@@ -6,7 +6,9 @@ test.describe('Kinetic Curator smoke', () => {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     });
 
     await page.goto('/?boot=factory');

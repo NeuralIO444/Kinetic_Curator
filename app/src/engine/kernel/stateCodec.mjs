@@ -52,8 +52,18 @@ const KIND_CTOR = { f64: Float64Array, f32: Float32Array, i32: Int32Array, u8: U
 
 /** Encode a typed array as { kind, length, b64 }. The array's own kind is authoritative. */
 export function encodeTyped(arr) {
-  const kind = arr instanceof Float64Array ? 'f64' : arr instanceof Float32Array ? 'f32' : arr instanceof Int32Array ? 'i32' : arr instanceof Uint8Array ? 'u8' : null;
-  if (!kind) throw new Error(`[stateCodec] cannot encode ${arr && arr.constructor ? arr.constructor.name : typeof arr}`);
+  const kind =
+    arr instanceof Float64Array
+      ? 'f64'
+      : arr instanceof Float32Array
+        ? 'f32'
+        : arr instanceof Int32Array
+          ? 'i32'
+          : arr instanceof Uint8Array
+            ? 'u8'
+            : null;
+  if (!kind)
+    throw new Error(`[stateCodec] cannot encode ${arr && arr.constructor ? arr.constructor.name : typeof arr}`);
   const bytes = new Uint8Array(arr.buffer, arr.byteOffset, arr.byteLength);
   return { kind, length: arr.length, b64: bytesToBase64(bytes) };
 }

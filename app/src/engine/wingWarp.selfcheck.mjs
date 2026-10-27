@@ -20,20 +20,39 @@ import { ASSETS } from '../data/assets/index.js';
 import { createCreatureBuilder, MOTH, MOTH_PARTS } from './creature.js';
 import { buildSkeleton, MOTH_SKELETON_PLAN } from './skeleton.js';
 import {
-  buildWingWarp, warpPoint, spanWeights, chainJoints, boneTransform, applyTransform,
-  WARP_STATIONS, WARP_ROWS,
+  buildWingWarp,
+  warpPoint,
+  spanWeights,
+  chainJoints,
+  boneTransform,
+  applyTransform,
+  WARP_STATIONS,
+  WARP_ROWS,
 } from './wingWarp.mjs';
 import { attachPointsFor } from './autoAttach.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { sanitizeMesh } from '../gl/sceneContract.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
-const fnv = (s) => { let h = 0x811c9dc5; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; } return h.toString(16).padStart(8, '0'); };
+const fnv = (s) => {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 0x01000193) >>> 0;
+  }
+  return h.toString(16).padStart(8, '0');
+};
 const SW = ['#aa0000', '#222222', '#333333', '#444444', '#555555', '#666666'];
 const PAL = { bg: '#111111', ink: '#eeeeee', swatches: SW };
 const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
 const inp = (t, over = {}) => ({
-  dishPins: [{ x: 500, y: 350 }], dishFormed: [true], seed: 77, seedOffsets: null, loopTimeMs: t, assetAttach: {}, ...over,
+  dishPins: [{ x: 500, y: 350 }],
+  dishFormed: [true],
+  seed: 77,
+  seedOffsets: null,
+  loopTimeMs: t,
+  assetAttach: {},
+  ...over,
 });
 const FULL = MOTH.growFrames + 1;
 const PEAK_MS = MOTH.flapMs / 4; // beat = flap * sin(2πt/flapMs) peaks at a quarter period
@@ -41,8 +60,14 @@ const PEAK_MS = MOTH.flapMs / 4; // beat = flap * sin(2πt/flapMs) peaks at a qu
 function builderRun(skinning, bentT, over = {}) {
   const b = createCreatureBuilder({ skinning });
   let e;
-  for (let i = 0; i < FULL; i++) { e = entry(); b.append(inp(0, over), e, ASSETS); }
-  if (bentT != null) { e = entry(); b.append(inp(bentT, over), e, ASSETS); }
+  for (let i = 0; i < FULL; i++) {
+    e = entry();
+    b.append(inp(0, over), e, ASSETS);
+  }
+  if (bentT != null) {
+    e = entry();
+    b.append(inp(bentT, over), e, ASSETS);
+  }
   return { e, b };
 }
 
@@ -50,16 +75,24 @@ function builderRun(skinning, bentT, over = {}) {
 {
   const attach = attachPointsFor(ASSETS.find((a) => a.id === MOTH_PARTS.body).svg, null);
   const skel = buildSkeleton({
-    seed: 77, creatureId: 'm0', plan: MOTH_SKELETON_PLAN, attach,
+    seed: 77,
+    creatureId: 'm0',
+    plan: MOTH_SKELETON_PLAN,
+    attach,
     pose: { bodyScale: 1, wingScale: 1, foreDirDeg: 40, hindDirDeg: -30, hindAmount: 1 },
   });
   const fore = skel.bones.filter((b) => b.chain === 'fore' && b.side === 'L');
   assert.equal(fore.length, 3, 'the fore chain has three bones');
   const joints = chainJoints(fore);
-  assert.equal(joints.length, 4); assert.equal(joints[0], 0); assert.equal(joints[3], 1);
+  assert.equal(joints.length, 4);
+  assert.equal(joints[0], 0);
+  assert.equal(joints[3], 1);
   for (let s = 0; s <= 200; s++) {
     const w = spanWeights(s / 200, joints);
-    assert.ok(w.every((x) => x >= 0), 'weights are never negative');
+    assert.ok(
+      w.every((x) => x >= 0),
+      'weights are never negative',
+    );
     assert.ok(Math.abs(w.reduce((a, x) => a + x, 0) - 1) < 1e-9, 'weights are a partition of unity');
   }
   // smooth through the joints: adjacent samples never jump
@@ -72,14 +105,24 @@ function builderRun(skinning, bentT, over = {}) {
   // rigid transforms: posed == ref is the identity to float dust (the stored unit vectors are trig
   // products, not exactly unit) — and buildWingWarp's no-mesh gate below is the exactness that matters
   const id = boneTransform(fore[0], fore[0]);
-  for (const [got, want] of [[id.m00, 1], [id.m01, 0], [id.m10, 0], [id.m11, 1], [id.tx, 0], [id.ty, 0]]) {
+  for (const [got, want] of [
+    [id.m00, 1],
+    [id.m01, 0],
+    [id.m10, 0],
+    [id.m11, 1],
+    [id.tx, 0],
+    [id.ty, 0],
+  ]) {
     assert.ok(Math.abs(got - want) < 1e-12, 'posed == ref is the identity transform');
   }
   const [qx, qy] = applyTransform(id, 12.5, -7.25);
   assert.ok(Math.abs(qx - 12.5) < 1e-9 && Math.abs(qy + 7.25) < 1e-9, 'the identity transform moves nothing');
   // a flexed chain bends: posed != bind builds a mesh, bind == posed does not
   const bent = buildSkeleton({
-    seed: 77, creatureId: 'm0', plan: MOTH_SKELETON_PLAN, attach,
+    seed: 77,
+    creatureId: 'm0',
+    plan: MOTH_SKELETON_PLAN,
+    attach,
     pose: { bodyScale: 1, wingScale: 1, foreDirDeg: 40, hindDirDeg: -30, hindAmount: 1, foreFlexDeg: -4.5 },
   });
   const bentFore = bent.bones.filter((b) => b.chain === 'fore' && b.side === 'L');
@@ -90,8 +133,15 @@ function builderRun(skinning, bentT, over = {}) {
   assert.ok(mesh, 'a flexed chain emits a mesh');
   assert.equal(mesh.pos.length, WARP_STATIONS * WARP_ROWS * 2, 'the grid is 9x3 vertices');
   assert.equal(mesh.idx.length, (WARP_STATIONS - 1) * (WARP_ROWS - 1) * 6, 'the grid is fully triangulated');
-  assert.ok(mesh.idx.every((i) => i >= 0 && i < WARP_STATIONS * WARP_ROWS), 'indices stay inside the grid');
-  assert.equal(warpPoint({ x: 400, y: 300, wingItem: item, bones: fore, refBones: fore, wingPoints }).dRot, 0, 'no flex, no mark rotation');
+  assert.ok(
+    mesh.idx.every((i) => i >= 0 && i < WARP_STATIONS * WARP_ROWS),
+    'indices stay inside the grid',
+  );
+  assert.equal(
+    warpPoint({ x: 400, y: 300, wingItem: item, bones: fore, refBones: fore, wingPoints }).dRot,
+    0,
+    'no flex, no mark rotation',
+  );
 }
 
 // 2. IDENTITY PARITY at zero bend — the rest item stream, pinned. (Originally pinned from the pre-S2
@@ -133,17 +183,20 @@ function builderRun(skinning, bentT, over = {}) {
 // move — no behaviour changed.)
 const REST_BUILDER = '1dc2d9bb';
 const REST_RESOLVER = 'dfb2915f'; // re-based at the S3 integration (was c9a243c9 — see the note below);
-                                  // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below);
-                                  // re-pinned 2026-10-19 for #1694 S3 (was 9f0043e7 — see the note below);
-                                  // re-pinned 2026-10-20 for #1574 (was dc0897fb — see the note above)
-                                  // re-pinned 2026-10-20 for #1575 (was 41d885e1 — see the note above)
-                                  // re-pinned 2026-10-20 for #1576 (was 248580c4 — see the note above)
+// re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below);
+// re-pinned 2026-10-19 for #1694 S3 (was 9f0043e7 — see the note below);
+// re-pinned 2026-10-20 for #1574 (was dc0897fb — see the note above)
+// re-pinned 2026-10-20 for #1575 (was 41d885e1 — see the note above)
+// re-pinned 2026-10-20 for #1576 (was 248580c4 — see the note above)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
   assert.equal(fnv(JSON.stringify(off.e)), REST_BUILDER, 'the plain builder is the pinned moth');
   assert.equal(fnv(JSON.stringify(on.e)), REST_BUILDER, 'skinning at rest is the pinned moth, byte for byte');
-  assert.ok(on.e[0].items.every((i) => !('mesh' in i)), 'no mesh rides any item at rest');
+  assert.ok(
+    on.e[0].items.every((i) => !('mesh' in i)),
+    'no mesh rides any item at rest',
+  );
   assert.ok(on.b.lastSkeletons()[0], 'skinning is a standing skeleton consumer: the frame skeleton exists at rest');
   assert.deepEqual(off.b.lastSkeletons(), [null], 'no consumer still means no skeleton (the S1 gate)');
 }
@@ -151,11 +204,11 @@ const REST_RESOLVER = 'dfb2915f'; // re-based at the S3 integration (was c9a243c
 // 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
 const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
 const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
-                                  // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note);
-                                  // re-pinned 2026-10-19 for #1694 S3 (was 7b1c87a6 — see section 2's note);
-                                  // re-pinned 2026-10-20 for #1574 (was 017f6b2a — see section 2's note)
-                                  // re-pinned 2026-10-20 for #1575 (was 0287999c — see section 2's note)
-                                  // re-pinned 2026-10-20 for #1576 (was 9b978ad7 — see section 2's note)
+// re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note);
+// re-pinned 2026-10-19 for #1694 S3 (was 7b1c87a6 — see section 2's note);
+// re-pinned 2026-10-20 for #1574 (was 017f6b2a — see section 2's note)
+// re-pinned 2026-10-20 for #1575 (was 0287999c — see section 2's note)
+// re-pinned 2026-10-20 for #1576 (was 9b978ad7 — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);
@@ -164,7 +217,10 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   const items = run1.e[0].items.filter((i) => i._creature);
   const meshed = items.filter((i) => i.mesh);
   assert.equal(meshed.length, 4, 'two wings and their two halos carry meshes at peak beat');
-  assert.ok(meshed.every((i) => i.assetId === MOTH_PARTS.wing), 'only wing items mesh');
+  assert.ok(
+    meshed.every((i) => i.assetId === MOTH_PARTS.wing),
+    'only wing items mesh',
+  );
   for (const m of meshed) {
     assert.equal(m.mesh.pos.length, WARP_STATIONS * WARP_ROWS * 2);
     assert.equal(m.mesh.idx.length, (WARP_STATIONS - 1) * (WARP_ROWS - 1) * 6);
@@ -189,7 +245,8 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   const restByKey = new Map(flat.map((i) => [i.key, i]));
   const localIn = (fan, wing) => {
     const a = (-wing.rotation * Math.PI) / 180;
-    const dx = fan.x - wing.x, dy = fan.y - wing.y;
+    const dx = fan.x - wing.x,
+      dy = fan.y - wing.y;
     return [(dx * Math.cos(a) - dy * Math.sin(a)) / wing.scale, (dx * Math.sin(a) + dy * Math.cos(a)) / wing.scaleY];
   };
   for (const fan of fanItems) {
@@ -199,7 +256,10 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
     const restWing = restByKey.get(wing.key);
     const [bx, by] = localIn(fan, wing);
     const [rx, ry] = localIn(restFan, restWing);
-    assert.ok(Math.abs(bx - rx) < 1e-6 && Math.abs(by - ry) < 1e-6, `fan part ${fan.key} rides its wing rigidly (no warp displacement)`);
+    assert.ok(
+      Math.abs(bx - rx) < 1e-6 && Math.abs(by - ry) < 1e-6,
+      `fan part ${fan.key} rides its wing rigidly (no warp displacement)`,
+    );
   }
   // mirror honesty: the left mesh is the right mesh reflected about the body's x, vertex for vertex
   const body = items.find((i) => i.assetId === MOTH_PARTS.body);
@@ -216,7 +276,10 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   const pub = builderRun(false, PEAK_MS, { wantSkeletons: true });
   const plain = builderRun(false, PEAK_MS);
   assert.equal(fnv(JSON.stringify(pub.e)), fnv(JSON.stringify(plain.e)), 'wantSkeletons changes no item');
-  assert.ok(pub.e[0].items.every((i) => !('mesh' in i)), 'publication alone emits no mesh');
+  assert.ok(
+    pub.e[0].items.every((i) => !('mesh' in i)),
+    'publication alone emits no mesh',
+  );
   assert.ok(pub.b.lastSkeletons()[0], 'but the skeleton is published (the overlay has something to draw)');
 }
 
@@ -229,18 +292,57 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   assert.deepEqual(clean.idx, raw.idx, 'indices ride through');
   assert.equal(clean.pos.length, raw.pos.length);
   assert.equal(sanitizeMesh(null), null);
-  assert.equal(sanitizeMesh({ pos: [0, 0, 1, 1], uv: [0, 0, 1, 1], idx: [0, 1, 9] }), null, 'an index past the grid is dropped');
-  assert.equal(sanitizeMesh({ pos: [0, 0, 1, Number.NaN], uv: [0, 0, 1, 1], idx: [0, 1, 2] }), null, 'a non-finite vertex is dropped');
-  assert.equal(sanitizeMesh({ pos: new Array(300).fill(0), uv: new Array(300).fill(0), idx: [0, 1, 2] }), null, 'an oversized mesh is dropped');
+  assert.equal(
+    sanitizeMesh({ pos: [0, 0, 1, 1], uv: [0, 0, 1, 1], idx: [0, 1, 9] }),
+    null,
+    'an index past the grid is dropped',
+  );
+  assert.equal(
+    sanitizeMesh({ pos: [0, 0, 1, Number.NaN], uv: [0, 0, 1, 1], idx: [0, 1, 2] }),
+    null,
+    'a non-finite vertex is dropped',
+  );
+  assert.equal(
+    sanitizeMesh({ pos: new Array(300).fill(0), uv: new Array(300).fill(0), idx: [0, 1, 2] }),
+    null,
+    'an oversized mesh is dropped',
+  );
 
   const base = {
-    canvasW: 1000, canvasH: 700, layers: [{ id: 'a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
-    activeLayerId: 'a', layerSnapshots: {}, seed: 1234, seedOffsets: null, paletteId: 'bone', paletteOverrides: null,
-    userPalettes: [], layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 }, caGrid: null,
-    enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced', lockedParams: {}, batchPaused: false,
-    focusSwap: false, loopTimeMs: 0, dtSec: 1 / 60, perfClampOverride: null, perfTier1: false, assetThin: false,
-    slowRender: false, scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
-    dishPins: [{ x: 500, y: 350 }], dishFormed: [true], assetAttach: {},
+    canvasW: 1000,
+    canvasH: 700,
+    layers: [{ id: 'a', name: 'a', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
+    activeLayerId: 'a',
+    layerSnapshots: {},
+    seed: 1234,
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 },
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    quality: 'balanced',
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    loopTimeMs: 0,
+    dtSec: 1 / 60,
+    perfClampOverride: null,
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    scaleMul: 1,
+    alphaBoost: 0,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    phraseWrapGen: 0,
+    attractor: null,
+    dishPins: [{ x: 500, y: 350 }],
+    dishFormed: [true],
+    assetAttach: {},
   };
   const resolverRun = (t) => {
     const r = createLiveResolver();
@@ -254,7 +356,11 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   assert.equal(fnv(JSON.stringify(restOut)), REST_RESOLVER, 'the resolver at rest is the pinned output, byte for byte');
   const bentOut = resolverRun(PEAK_MS);
   assert.equal(fnv(JSON.stringify(bentOut)), BENT_RESOLVER, 'the resolver bent frame hashes to its golden');
-  assert.equal(bentOut.flatMap((x) => x.items || []).filter((i) => i.mesh).length, 4, 'the meshes survive the resolver');
+  assert.equal(
+    bentOut.flatMap((x) => x.items || []).filter((i) => i.mesh).length,
+    4,
+    'the meshes survive the resolver',
+  );
 }
 
 // 6. the determinism guard, in mathRandomGuard's pattern: no banned clocks or unseeded chance in the warp
@@ -263,7 +369,10 @@ const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0
   for (const file of ['wingWarp.mjs']) {
     const src = readFileSync(join(here, file), 'utf8');
     const noBlock = src.replace(/\/\*[\s\S]*?\*\//g, '');
-    const code = noBlock.split('\n').map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1')).join('\n');
+    const code = noBlock
+      .split('\n')
+      .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
+      .join('\n');
     for (const banned of ['Math.random', 'Date.now', 'performance.now']) {
       assert.ok(!code.includes(banned), `${file} must not use ${banned} — seeded kernel channels only`);
     }

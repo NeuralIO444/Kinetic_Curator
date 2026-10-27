@@ -18,8 +18,10 @@ assert.deepStrictEqual(manifestProblems(['node a.selfcheck.mjs'], ['a.selfcheck.
 assert.match(manifestProblems(['node a.mjs', 'node a.mjs'], [], exists).join('|'), /duplicate/);
 assert.match(manifestProblems(['python x.py'], [], exists).join('|'), /not a "node/);
 assert.match(manifestProblems(['node gone.mjs'], [], exists).join('|'), /file not found: gone\.mjs/);
-assert.match(manifestProblems(['node a.mjs'], ['a.mjs', 'orphan.selfcheck.mjs'], exists).join('|'),
-  /suite not in the manifest.*orphan\.selfcheck\.mjs/);
+assert.match(
+  manifestProblems(['node a.mjs'], ['a.mjs', 'orphan.selfcheck.mjs'], exists).join('|'),
+  /suite not in the manifest.*orphan\.selfcheck\.mjs/,
+);
 
 // the REAL manifest is clean (every suite on disk listed once, all files exist) — the runner
 // re-checks this on every run; asserting it here makes a bad manifest fail with a clear name.
@@ -36,12 +38,15 @@ assert.ok(real.length >= 90, `manifest has ${real.length} entries`);
   const run = (lines) => {
     writeFileSync(manifest, lines.join('\n') + '\n');
     return spawnSync(process.execPath, [join(APP, 'scripts/runSelfcheck.mjs')], {
-      env: { ...process.env, SELFCHECK_MANIFEST: manifest }, cwd: APP, encoding: 'utf8',
+      env: { ...process.env, SELFCHECK_MANIFEST: manifest },
+      cwd: APP,
+      encoding: 'utf8',
     });
   };
   const bad = run([`node ${join(dir, 'a.mjs')}`, `node ${join(dir, 'b.mjs')}`, `node ${join(dir, 'c.mjs')}`]);
   assert.strictEqual(bad.status, 7, 'exit code of the failing suite is propagated');
-  assert.match(bad.stdout, /A ran/); assert.match(bad.stdout, /B ran/);
+  assert.match(bad.stdout, /A ran/);
+  assert.match(bad.stdout, /B ran/);
   assert.doesNotMatch(bad.stdout, /C ran/, 'nothing after the first failure runs');
   assert.match(bad.stderr, /selfcheck FAILED: node .*b\.mjs/);
   const good = run([`node ${join(dir, 'a.mjs')}`, `node ${join(dir, 'c.mjs')}`]);

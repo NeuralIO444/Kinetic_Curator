@@ -1,5 +1,11 @@
 /* ─── Slider Controls ─── */
-.param-block { display: flex; flex-direction: column; gap: 2px; padding: 6px 0; border-top: 1px solid var(--line); }
+.param-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 0;
+  border-top: 1px solid var(--line);
+}
 .param-subheader {
   font-size: 8px;
   font-weight: 700;
@@ -8,96 +14,276 @@
   padding: 8px 0 4px 0;
   margin-top: 12px;
   margin-bottom: 6px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   text-transform: uppercase;
 }
-.range-row { display: grid; grid-template-columns: 84px 1fr 96px; align-items: center; gap: 6px; min-height: 44px; }
+.range-row {
+  display: grid;
+  grid-template-columns: 84px 1fr 96px;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+}
 /* #1027 — one slider. Only the thumb COLOR speaks the room: ink everywhere, BUILD
    yellow, STIMULI cyan (docs/DESIGN_SYSTEM.md §1.1, §2.1). The tokens are not in CSS
    yet, so the three values live here and nowhere else. */
-.range-row, .range-stack, .single-slider { --range-thumb: #e8e8e0; } /* the dual slider inherits its row's tone */
-[data-tone="build"] { --range-thumb: #ffd400; }
-[data-tone="stim"] { --range-thumb: #00d9ff; }
+.range-row,
+.range-stack,
+.single-slider {
+  --range-thumb: #e8e8e0;
+} /* the dual slider inherits its row's tone */
+[data-tone="build"] {
+  --range-thumb: #ffd400;
+}
+[data-tone="stim"] {
+  --range-thumb: #00d9ff;
+}
 /* layout="stack": label and readout above the slider */
-.range-stack { display: flex; flex-direction: column; gap: 0; margin-bottom: 6px; }
-.range-stack-head { display: flex; justify-content: space-between; align-items: center; gap: 6px; min-height: 16px; }
-.range-stack .range-label { font-size: 8px; letter-spacing: 0.08em; }
-.range-stack .range-readout { font-size: 8px; color: var(--dim); }
+.range-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-bottom: 6px;
+}
+.range-stack-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  min-height: 16px;
+}
+.range-stack .range-label {
+  font-size: 8px;
+  letter-spacing: 0.08em;
+}
+.range-stack .range-readout {
+  font-size: 8px;
+  color: var(--dim);
+}
 /* A control waiting on a driver (the mic) is dim, never struck through (UX-7). */
-.range-stack.range-waiting { opacity: 0.55; }
-.range-stack.range-waiting .range-label { text-decoration: none; }
-.range-disabled { opacity: 0.38; }
-.range-disabled .range-label { text-decoration: line-through; }
-.range-label { font-size: 9px; letter-spacing: 0.1em; color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.range-readout { font-size: 10px; color: var(--ink); text-align: right; }
+.range-stack.range-waiting {
+  opacity: 0.55;
+}
+.range-stack.range-waiting .range-label {
+  text-decoration: none;
+}
+.range-disabled {
+  opacity: 0.38;
+}
+.range-disabled .range-label {
+  text-decoration: line-through;
+}
+.range-label {
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  color: var(--dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.range-readout {
+  font-size: 10px;
+  color: var(--ink);
+  text-align: right;
+}
 
-.dual-slider { position: relative; height: 44px; display: flex; align-items: center; grid-column: 2; }
-.dual-slider input[type=range] {
-  position: absolute; inset: 0; width: 100%; margin: 0; background: transparent;
-  pointer-events: none; -webkit-appearance: none; appearance: none;
+.dual-slider {
+  position: relative;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  grid-column: 2;
 }
-.dual-slider input[type=range]::-webkit-slider-thumb {
-  -webkit-appearance: none; pointer-events: all;
-  width: 14px; height: 18px; background: var(--range-thumb); border: none; cursor: ew-resize;
+.dual-slider input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  margin: 0;
+  background: transparent;
+  pointer-events: none;
+  -webkit-appearance: none;
+  appearance: none;
 }
-.dual-slider input[type=range]::-moz-range-thumb {
-  pointer-events: all; width: 14px; height: 18px;
-  background: var(--range-thumb); border: none; cursor: ew-resize;
+.dual-slider input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  pointer-events: all;
+  width: 14px;
+  height: 18px;
+  background: var(--range-thumb);
+  border: none;
+  cursor: ew-resize;
 }
-.dual-track { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); height: 3px; background: var(--line-2); }
-.dual-fill { position: absolute; top: 50%; transform: translateY(-50%); height: 3px; background: var(--range-thumb); }
+.dual-slider input[type="range"]::-moz-range-thumb {
+  pointer-events: all;
+  width: 14px;
+  height: 18px;
+  background: var(--range-thumb);
+  border: none;
+  cursor: ew-resize;
+}
+.dual-track {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: var(--line-2);
+}
+.dual-fill {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 3px;
+  background: var(--range-thumb);
+}
 /* #961 — middle grab: drag the active range to slide both thumbs together,
    spread preserved. Revealed on hover; focusable for arrow-key nudging. */
 .dual-grab {
-  position: absolute; top: 50%; transform: translateY(-50%);
-  height: 18px; min-width: 16px;
-  background: rgba(255,255,255,0.10);
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 18px;
+  min-width: 16px;
+  background: rgba(255, 255, 255, 0.1);
   border: 1px solid transparent;
-  cursor: grab; opacity: 0; transition: opacity 120ms, background 120ms;
+  cursor: grab;
+  opacity: 0;
+  transition:
+    opacity 120ms,
+    background 120ms;
   touch-action: none;
 }
-.dual-slider:hover .dual-grab, .dual-grab:focus-visible { opacity: 1; }
-.dual-grab:hover { background: rgba(255,255,255,0.18); }
-.dual-grab:active { cursor: grabbing; opacity: 1; background: rgba(255,255,255,0.24); }
-.dual-grab:focus-visible { outline: 1px solid var(--accent3); outline-offset: 1px; }
-.range-locked .dual-grab { display: none; }
+.dual-slider:hover .dual-grab,
+.dual-grab:focus-visible {
+  opacity: 1;
+}
+.dual-grab:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.dual-grab:active {
+  cursor: grabbing;
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.24);
+}
+.dual-grab:focus-visible {
+  outline: 1px solid var(--accent3);
+  outline-offset: 1px;
+}
+.range-locked .dual-grab {
+  display: none;
+}
 
-.single-slider { width: 100%; height: 44px; min-width: 0; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; cursor: ew-resize; }
-.single-slider::-webkit-slider-runnable-track { height: 3px; background: var(--line-2); }
-.single-slider::-moz-range-track { height: 3px; background: var(--line-2); }
+.single-slider {
+  width: 100%;
+  height: 44px;
+  min-width: 0;
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: ew-resize;
+}
+.single-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  background: var(--line-2);
+}
+.single-slider::-moz-range-track {
+  height: 3px;
+  background: var(--line-2);
+}
 .single-slider::-webkit-slider-thumb {
-  -webkit-appearance: none; margin-top: -8px;
-  width: 14px; height: 18px; background: var(--range-thumb); border: none; cursor: ew-resize;
+  -webkit-appearance: none;
+  margin-top: -8px;
+  width: 14px;
+  height: 18px;
+  background: var(--range-thumb);
+  border: none;
+  cursor: ew-resize;
 }
-.single-slider::-moz-range-thumb { width: 14px; height: 18px; background: var(--range-thumb); border: none; cursor: ew-resize; }
-
-.range-label-group { display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
-.range-right { display: flex; align-items: center; justify-content: flex-end; gap: 3px; }
-.range-readout { cursor: text; padding: 0 2px; }
-.range-readout:hover { background: rgba(255,255,255,0.06); }
-
-.lock-btn, .dice-btn {
-  background: transparent; border: none; padding: 6px;
-  min-width: 26px; min-height: 26px;
-  font-size: 13px; cursor: pointer; opacity: 0.7;
-  transition: opacity 0.1s, transform 0.1s;
+.single-slider::-moz-range-thumb {
+  width: 14px;
+  height: 18px;
+  background: var(--range-thumb);
+  border: none;
+  cursor: ew-resize;
 }
-.lock-btn:hover, .dice-btn:hover { opacity: 1; }
-.lock-btn:active, .dice-btn:active { transform: scale(0.9); }
-.lock-btn.locked { opacity: 1.0; }
+
+.range-label-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.range-right {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+}
+.range-readout {
+  cursor: text;
+  padding: 0 2px;
+}
+.range-readout:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lock-btn,
+.dice-btn {
+  background: transparent;
+  border: none;
+  padding: 6px;
+  min-width: 26px;
+  min-height: 26px;
+  font-size: 13px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition:
+    opacity 0.1s,
+    transform 0.1s;
+}
+.lock-btn:hover,
+.dice-btn:hover {
+  opacity: 1;
+}
+.lock-btn:active,
+.dice-btn:active {
+  transform: scale(0.9);
+}
+.lock-btn.locked {
+  opacity: 1;
+}
 
 .range-locked .single-slider::-webkit-slider-thumb,
-.range-locked .dual-slider input[type=range]::-webkit-slider-thumb { background: var(--dim); cursor: not-allowed; }
+.range-locked .dual-slider input[type="range"]::-webkit-slider-thumb {
+  background: var(--dim);
+  cursor: not-allowed;
+}
 .range-locked .single-slider::-moz-range-thumb,
-.range-locked .dual-slider input[type=range]::-moz-range-thumb { background: var(--dim); cursor: not-allowed; }
-.range-locked .dual-fill { background: var(--dim); }
+.range-locked .dual-slider input[type="range"]::-moz-range-thumb {
+  background: var(--dim);
+  cursor: not-allowed;
+}
+.range-locked .dual-fill {
+  background: var(--dim);
+}
 
 .range-edit {
-  width: 28px; background: rgba(0,0,0,0.5); border: 1px solid var(--accent);
-  color: var(--ink); font-size: 9px; text-align: center; padding: 1px 0;
+  width: 28px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--accent);
+  color: var(--ink);
+  font-size: 9px;
+  text-align: center;
+  padding: 1px 0;
   outline: none;
 }
-.range-edit-dual { display: flex; align-items: center; gap: 2px; }
+.range-edit-dual {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
 
 /* #716 — live-glyph motion tiles. Pose is the slider value; reduced-motion
    drops the transition so the glyph still reports, it just doesn't ease. */
@@ -114,16 +300,53 @@
   min-height: 36px;
   margin: 2px 0;
 }
-.motion-glyph { grid-column: 1; grid-row: 1 / span 2; width: 32px; height: 32px; color: var(--ink); }
-.motion-glyph * { transition: transform 80ms linear; }
-.motion-readout { grid-column: 2 / span 2; grid-row: 1; font-size: 16px; font-weight: 700; letter-spacing: 0.02em; color: var(--ink); line-height: 1; }
-.motion-label { grid-column: 2; grid-row: 2; font-size: 9px; letter-spacing: 0.08em; color: var(--dim); text-transform: lowercase; }
-.motion-slider { grid-column: 3; grid-row: 2; min-width: 0; }
-.motion-tile .lock-btn { grid-column: 4; grid-row: 1 / span 2; }
-.motion-tile-disabled { opacity: 0.38; }
-.motion-tile-disabled .motion-label { text-decoration: line-through; }
+.motion-glyph {
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  width: 32px;
+  height: 32px;
+  color: var(--ink);
+}
+.motion-glyph * {
+  transition: transform 80ms linear;
+}
+.motion-readout {
+  grid-column: 2 / span 2;
+  grid-row: 1;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  line-height: 1;
+}
+.motion-label {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  color: var(--dim);
+  text-transform: lowercase;
+}
+.motion-slider {
+  grid-column: 3;
+  grid-row: 2;
+  min-width: 0;
+}
+.motion-tile .lock-btn {
+  grid-column: 4;
+  grid-row: 1 / span 2;
+}
+.motion-tile-disabled {
+  opacity: 0.38;
+}
+.motion-tile-disabled .motion-label {
+  text-decoration: line-through;
+}
 @media (prefers-reduced-motion: reduce) {
-  .motion-glyph, .motion-glyph * { transition: none; }
+  .motion-glyph,
+  .motion-glyph * {
+    transition: none;
+  }
 }
 
 /* ─── Print desk (#277) ─── */
@@ -132,28 +355,61 @@
  * slider has real travel. #1027: one thumb and one 44px row everywhere. */
 
 .randomize-bar {
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 4px 6px; margin-bottom: 6px;
-  background: rgba(255,255,255,0.02); border: 1px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 6px;
+  margin-bottom: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--line);
 }
 .randomize-btn {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 3px 6px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 6px;
   transition: all 100ms;
 }
-.randomize-btn:hover { background: var(--ink); color: var(--bg); }
-.randomize-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
+.randomize-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.randomize-hint {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+}
 
 /* #942 — KINETIC button: a breathing x-axis pill. Compact at rest (a
    comfortable touch target that keeps the menu row clean), swelling to the
    full label on hover/press/focus. Heat-driven swelling lands with #945. */
 .kinetic-btn {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 3px 6px; min-height: 22px;
-  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
-  white-space: nowrap; overflow: hidden; cursor: pointer;
-  transition: max-width 180ms ease, background-color 100ms, color 100ms, border-color 100ms, box-shadow 220ms ease;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  min-height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    max-width 180ms ease,
+    background-color 100ms,
+    color 100ms,
+    border-color 100ms,
+    box-shadow 220ms ease;
   /* #945 heat breathing: the width IS the heat meter. --heat (0..1) is set
      from React state; cool rests at the comfortable 48px touch target, max
      heat borrows out to the same 150px cap as the hover expansion.
@@ -162,13 +418,24 @@
   min-width: calc(48px + var(--heat, 0) * 102px);
   box-shadow: 0 0 calc(var(--heat, 0) * 16px) rgba(255, 45, 111, calc(var(--heat, 0) * 0.55));
 }
-.kinetic-btn:hover, .kinetic-btn:active, .kinetic-btn:focus-visible {
-  background: var(--ink); color: var(--bg); border-color: var(--ink);
+.kinetic-btn:hover,
+.kinetic-btn:active,
+.kinetic-btn:focus-visible {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
   max-width: 150px;
 }
 /* #1103 — while cooling, min-width eases between the 150 ms ticks: one continuous glide, not steps. Heating stays instant. */
-.kinetic-btn[data-cooling="true"] { transition: max-width 180ms ease, min-width 160ms linear, background-color 100ms, color 100ms, border-color 100ms, box-shadow 220ms ease; }
-
+.kinetic-btn[data-cooling="true"] {
+  transition:
+    max-width 180ms ease,
+    min-width 160ms linear,
+    background-color 100ms,
+    color 100ms,
+    border-color 100ms,
+    box-shadow 220ms ease;
+}
 
 /* #945 — at max heat the button earns its full name: the expansion reads as
    the word arriving, not empty space. */
@@ -176,100 +443,245 @@
 /* #945 — heat kineme: the ● circle pulses while warm, faster when hot.
    Cool buttons stay still (#942 chrome). */
 @keyframes kinetic-heat-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.8; }
-  50% { transform: scale(1.3); opacity: 1; }
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.3);
+    opacity: 1;
+  }
 }
 
 /* #1122 — mockup pill rhythm: uniform 10px between bar pills. */
-.curator-left-group { display: flex; align-items: center; gap: 10px; }
+.curator-left-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 
 /* #946 / #1772 — START: OFF · WEAK · MED · KOZ cycle (was CHAOS / FIXED). Sits next to the KIN button in the
    top bar: plainly named, one click, remembered across sessions. CHAOS is
    the default (accent dot lit); FIXED reads quiet. */
 .start-mode-btn {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 3px 6px; min-height: 22px; white-space: nowrap; cursor: pointer;
-  display: inline-flex; align-items: center; gap: 5px;
-  transition: background-color 100ms, color 100ms, border-color 100ms;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  min-height: 22px;
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition:
+    background-color 100ms,
+    color 100ms,
+    border-color 100ms;
 }
-.start-mode-btn:hover { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.start-mode-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
 .start-mode-btn::before {
-  content: ''; width: 6px; height: 6px;
-  border: 1px solid var(--dim); flex-shrink: 0;
+  content: "";
+  width: 6px;
+  height: 6px;
+  border: 1px solid var(--dim);
+  flex-shrink: 0;
 }
 /* #1772 — the marker fills with the scope: OFF hollow, WEAK a third, MED two thirds, KOZ solid accent (TE detents) */
-.start-mode-btn[data-mode="weak"]::before { background: linear-gradient(to top, var(--accent) 34%, transparent 34%); }
-.start-mode-btn[data-mode="med"]::before { background: linear-gradient(to top, var(--accent) 67%, transparent 67%); }
-.start-mode-btn[data-mode="koz"]::before { background: var(--accent); border-color: var(--accent); }
-.start-mode-btn .tb-start-deck { opacity: 0.6; font-variant-numeric: tabular-nums; letter-spacing: 0; }
-.curator-voice-wrap { position: relative; }
-.curator-voice-btn {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 3px 6px;
-  text-transform: uppercase; transition: all 100ms; white-space: nowrap;
+.start-mode-btn[data-mode="weak"]::before {
+  background: linear-gradient(to top, var(--accent) 34%, transparent 34%);
 }
-.curator-voice-btn:hover { background: var(--ink); color: var(--bg); }
+.start-mode-btn[data-mode="med"]::before {
+  background: linear-gradient(to top, var(--accent) 67%, transparent 67%);
+}
+.start-mode-btn[data-mode="koz"]::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.start-mode-btn .tb-start-deck {
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.curator-voice-wrap {
+  position: relative;
+}
+.curator-voice-btn {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 3px 6px;
+  text-transform: uppercase;
+  transition: all 100ms;
+  white-space: nowrap;
+}
+.curator-voice-btn:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
 .curator-voice-menu {
-  position: absolute; left: 0; bottom: calc(100% + 4px); z-index: 50;
-  display: flex; flex-direction: column; min-width: 160px;
-  background: var(--bg); border: 1px solid var(--line-2);
-  box-shadow: 0 -4px 16px rgba(0,0,0,0.4);
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 4px);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
 }
 .curator-voice-menu button {
-  background: transparent; border: none; color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  text-align: left; padding: 6px 8px; cursor: pointer; white-space: nowrap;
+  background: transparent;
+  border: none;
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 6px 8px;
+  cursor: pointer;
+  white-space: nowrap;
 }
-.curator-voice-menu button:hover { background: var(--ink); color: var(--bg); }
-.curator-voice-menu button.active { color: var(--accent); }
-.curator-voice-menu button.active:hover { background: var(--ink); color: var(--bg); }
-.curator-voice-menu.preset-menu { min-width: 260px; max-height: 60vh; overflow-y: auto; padding: 8px; }
+.curator-voice-menu button:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.curator-voice-menu button.active {
+  color: var(--accent);
+}
+.curator-voice-menu button.active:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.curator-voice-menu.preset-menu {
+  min-width: 260px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 8px;
+}
 
-.lock-badge, .drift-badge {
-  font-size: 8px; font-weight: 700; padding: 1px 5px;
-  letter-spacing: 0.05em; text-transform: uppercase;
+.lock-badge,
+.drift-badge {
+  font-size: 8px;
+  font-weight: 700;
+  padding: 1px 5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
-.lock-badge { background: rgba(255,255,255,0.1); color: var(--ink); }
-.drift-badge { background: rgba(255,212,0,0.15); color: #ffd400; border: 1px solid rgba(255,212,0,0.3); }
+.lock-badge {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+}
+.drift-badge {
+  background: rgba(255, 212, 0, 0.15);
+  color: #ffd400;
+  border: 1px solid rgba(255, 212, 0, 0.3);
+}
 
 /* #950 — BEAT master clock button. Collapsed `[B]`, expands to `[BEAT · 120]`
    on hover/focus/active, following the bar's breathing rules: the button
    flexes inside the fixed-width bar (max-width transition, like .kinetic-btn),
    so the bar never shifts. Tooltips on every abbreviated state. */
-.beat-wrap { position: relative; display: inline-flex; flex-shrink: 0; }
-.beat-btn {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
-  padding: 3px 6px; min-height: 22px; min-width: 30px;
-  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
-  white-space: nowrap; overflow: hidden; cursor: pointer;
-  transition: max-width 180ms ease, background-color 100ms, color 100ms, border-color 100ms;
+.beat-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
 }
-.beat-btn:hover, .beat-btn:focus-visible, .beat-btn.open {
-  background: var(--ink); color: var(--bg); border-color: var(--ink);
+.beat-btn {
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 3px 6px;
+  min-height: 22px;
+  min-width: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    max-width 180ms ease,
+    background-color 100ms,
+    color 100ms,
+    border-color 100ms;
+}
+.beat-btn:hover,
+.beat-btn:focus-visible,
+.beat-btn.open {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
   max-width: 150px;
 }
 /* The pulse readout: flashes on every beat at the dialed BPM. --beat interval
    is set from React (animation-duration); the flash itself is pure CSS. */
 .beat-dot {
-  width: 6px; height: 6px; flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
   background: var(--accent);
   opacity: 0.45; /* still: no real beat is driving the stage */
 }
-.beat-dot.live { animation: beat-flash 0.5s ease-in-out infinite; }
-.beat-metro {
-  min-height: 44px; width: 100%;
-  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
-  font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase;
+.beat-dot.live {
+  animation: beat-flash 0.5s ease-in-out infinite;
 }
-.beat-metro:hover { color: var(--ink); border-color: var(--ink); }
-.beat-metro.active { color: var(--ink); border-color: var(--kc-red); box-shadow: inset 0 2px 0 var(--kc-red); }
-.beat-btn:hover .beat-dot, .beat-btn.open .beat-dot { background: currentColor; }
+.beat-metro {
+  min-height: 44px;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.beat-metro:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+.beat-metro.active {
+  color: var(--ink);
+  border-color: var(--kc-red);
+  box-shadow: inset 0 2px 0 var(--kc-red);
+}
+.beat-btn:hover .beat-dot,
+.beat-btn.open .beat-dot {
+  background: currentColor;
+}
 @keyframes beat-flash {
-  0%, 100% { opacity: 0.25; transform: scale(0.8); }
-  15% { opacity: 1; transform: scale(1.25); }
-  40% { opacity: 0.5; transform: scale(1); }
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  40% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
 }
 /* #1258 — the presence mark next to BEATS. Davis rendering: sway is a
    continuous signal, so it breathes amber — never a TE blink. The glow and
@@ -277,126 +689,365 @@
    (law #1033): no border-radius anywhere near it. Below threshold the mark
    renders as null, not dimmed — silence is default. */
 .sway-mark {
-  display: inline-flex; align-items: center; justify-content: center;
-  font-size: 15px; line-height: 1; flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  line-height: 1;
+  flex-shrink: 0;
   filter: drop-shadow(0 0 calc(2px + 6px * var(--sway, 0)) rgba(255, 205, 130, calc(0.25 + 0.55 * var(--sway, 0))));
   animation: sway-breathe 3.2s ease-in-out infinite;
   pointer-events: none; /* never named, never interactive: no hover, no tooltip */
 }
 @keyframes sway-breathe {
-  0%, 100% { opacity: 0.55; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.12); }
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 @media (prefers-reduced-motion: reduce) {
-  .sway-mark { animation: none; opacity: 0.85; filter: none; }
+  .sway-mark {
+    animation: none;
+    opacity: 0.85;
+    filter: none;
+  }
 }
 /* The tempo dropdown. Rendered in a portal on document.body (position: fixed
    via inline style) because the top bar's .palette-switch clips overflow. */
 .beat-menu {
   z-index: 60;
-  display: flex; flex-direction: column; gap: 6px; min-width: 172px; padding: 10px;
-  background: var(--bg); border: 1px solid var(--line-2);
-  box-shadow: 0 4px 16px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 172px;
+  padding: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
-.beat-menu-label { font-size: 8px; font-weight: 800; letter-spacing: 0.12em; color: var(--dim); }
-.beat-presets { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+.beat-menu-label {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--dim);
+}
+.beat-presets {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+}
 .beat-preset {
-  background: transparent; border: 1px solid var(--line); color: var(--dim);
-  font-size: 10px; font-weight: 700; padding: 5px 0; cursor: pointer;
-  transition: background-color 100ms, color 100ms, border-color 100ms;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--dim);
+  font-size: 10px;
+  font-weight: 700;
+  padding: 5px 0;
+  cursor: pointer;
+  transition:
+    background-color 100ms,
+    color 100ms,
+    border-color 100ms;
 }
-.beat-preset:hover { color: var(--ink); border-color: var(--line-2); }
-.beat-preset.active { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.beat-preset:hover {
+  color: var(--ink);
+  border-color: var(--line-2);
+}
+.beat-preset.active {
+  background: var(--ink);
+  color: var(--bg);
+  border-color: var(--ink);
+}
 .beat-tap {
-  background: transparent; border: 1px dashed var(--line-2); color: var(--ink);
-  font-size: 10px; font-weight: 800; letter-spacing: 0.1em; padding: 8px 0; cursor: pointer;
+  background: transparent;
+  border: 1px dashed var(--line-2);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  padding: 8px 0;
+  cursor: pointer;
 }
-.beat-tap:hover { border-color: var(--ink); }
-.beat-tap:active { background: var(--ink); color: var(--bg); }
-.beat-exact { display: flex; gap: 4px; }
+.beat-tap:hover {
+  border-color: var(--ink);
+}
+.beat-tap:active {
+  background: var(--ink);
+  color: var(--bg);
+}
+.beat-exact {
+  display: flex;
+  gap: 4px;
+}
 .beat-exact input {
-  flex: 1; min-width: 0; background: transparent; border: 1px solid var(--line);
-  color: var(--ink); font-size: 10px; padding: 5px 6px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 10px;
+  padding: 5px 6px;
 }
 .beat-exact button {
-  background: transparent; border: 1px solid var(--line-2); color: var(--ink);
-  font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 5px 8px; cursor: pointer;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 5px 8px;
+  cursor: pointer;
 }
-.beat-exact button:hover { background: var(--ink); color: var(--bg); }
-.beat-hint { font-size: 8px; color: var(--dim); letter-spacing: 0.05em; text-transform: lowercase; }
+.beat-exact button:hover {
+  background: var(--ink);
+  color: var(--bg);
+}
+.beat-hint {
+  font-size: 8px;
+  color: var(--dim);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+}
 
 /* #1029 (M3) — casing lives in CSS. JSX chrome strings are written lowercase; the
    element's role class decides the case (docs/DESIGN_SYSTEM.md §5).
    .lbl labels/hints · .act commands · .ttl panel + section titles · .name proper names. */
-.lbl { text-transform: lowercase; }
-.act { text-transform: uppercase; }
-.ttl { text-transform: uppercase; }
-:where(.ttl) { letter-spacing: 0.12em; }
-.name { text-transform: none; }
+.lbl {
+  text-transform: lowercase;
+}
+.act {
+  text-transform: uppercase;
+}
+.ttl {
+  text-transform: uppercase;
+}
+:where(.ttl) {
+  letter-spacing: 0.12em;
+}
+.name {
+  text-transform: none;
+}
 
 /* #1032 (M7) — voice 1: LOIS at her bluntest, one line per panel, empty room only. */
-.lois-line { padding: 6px 0; color: var(--dim); font-size: 9px; letter-spacing: 0.04em; line-height: 1.5; }
+.lois-line {
+  padding: 6px 0;
+  color: var(--dim);
+  font-size: 9px;
+  letter-spacing: 0.04em;
+  line-height: 1.5;
+}
 
 /* #1103 — one expanding label for the top bar. The parent has `.xl`; the label rests short and
    opens on hover, keyboard focus, `.open` or a touch (`data-open`). The face is monospace, so a
    width is a character count: --xl-short / --xl-full and the per-letter --xl-ch are counts, never pixels.
    Opening is quick (the letters arrive left to right); cooling down is slow and goes the other way: the
    last letter lets go first, like heat leaving. */
-.xl { --xl-ch: calc(1ch + 0.06em); }
-.xl-word { display: inline-flex; overflow: hidden; }
-.xl-tail { display: inline-flex; }
+.xl {
+  --xl-ch: calc(1ch + 0.06em);
+}
+.xl-word {
+  display: inline-flex;
+  overflow: hidden;
+}
+.xl-tail {
+  display: inline-flex;
+}
 .xl-ch {
-  display: inline-block; max-width: 0; opacity: 0; overflow: hidden; white-space: pre;
+  display: inline-block;
+  max-width: 0;
+  opacity: 0;
+  overflow: hidden;
+  white-space: pre;
   /* cooling: reverse order, 40 ms apart, easing out */
-  transition: max-width 220ms cubic-bezier(0.2, 0.8, 0.25, 1) calc((var(--n) - 1 - var(--i)) * 40ms),
-              opacity 220ms ease calc((var(--n) - 1 - var(--i)) * 40ms);
+  transition:
+    max-width 220ms cubic-bezier(0.2, 0.8, 0.25, 1) calc((var(--n) - 1 - var(--i)) * 40ms),
+    opacity 220ms ease calc((var(--n) - 1 - var(--i)) * 40ms);
 }
-.xl:hover .xl-ch, .xl:focus-visible .xl-ch, .xl.open .xl-ch, .xl[data-open="true"] .xl-ch,
-.kinetic-btn:active .xl-ch, .kinetic-btn[data-heat-level="hot"] .xl-ch {
-  max-width: var(--xl-ch); opacity: 1;
+.xl:hover .xl-ch,
+.xl:focus-visible .xl-ch,
+.xl.open .xl-ch,
+.xl[data-open="true"] .xl-ch,
+.kinetic-btn:active .xl-ch,
+.kinetic-btn[data-heat-level="hot"] .xl-ch {
+  max-width: var(--xl-ch);
+  opacity: 1;
   /* opening: forward order, 22 ms apart, quick */
-  transition: max-width 120ms ease calc(var(--i) * 22ms), opacity 120ms ease calc(var(--i) * 22ms);
+  transition:
+    max-width 120ms ease calc(var(--i) * 22ms),
+    opacity 120ms ease calc(var(--i) * 22ms);
 }
-.xl-swap { position: relative; display: inline-flex; overflow: hidden; width: calc(var(--xl-short) * var(--xl-ch)); transition: width 420ms cubic-bezier(0.2, 0.8, 0.25, 1); }
-.xl-swap-short, .xl-swap-full { white-space: nowrap; transition: opacity 260ms ease; }
-.xl-swap-full { position: absolute; left: 0; opacity: 0; }
-.xl:hover .xl-swap, .xl:focus-visible .xl-swap, .xl.open .xl-swap, .xl[data-open="true"] .xl-swap { width: calc(var(--xl-full) * var(--xl-ch)); transition-duration: 180ms; }
-.xl:hover .xl-swap-short, .xl:focus-visible .xl-swap-short, .xl.open .xl-swap-short, .xl[data-open="true"] .xl-swap-short { opacity: 0; transition-duration: 120ms; }
-.xl:hover .xl-swap-full, .xl:focus-visible .xl-swap-full, .xl.open .xl-swap-full, .xl[data-open="true"] .xl-swap-full { opacity: 1; transition-duration: 120ms; }
+.xl-swap {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+  width: calc(var(--xl-short) * var(--xl-ch));
+  transition: width 420ms cubic-bezier(0.2, 0.8, 0.25, 1);
+}
+.xl-swap-short,
+.xl-swap-full {
+  white-space: nowrap;
+  transition: opacity 260ms ease;
+}
+.xl-swap-full {
+  position: absolute;
+  left: 0;
+  opacity: 0;
+}
+.xl:hover .xl-swap,
+.xl:focus-visible .xl-swap,
+.xl.open .xl-swap,
+.xl[data-open="true"] .xl-swap {
+  width: calc(var(--xl-full) * var(--xl-ch));
+  transition-duration: 180ms;
+}
+.xl:hover .xl-swap-short,
+.xl:focus-visible .xl-swap-short,
+.xl.open .xl-swap-short,
+.xl[data-open="true"] .xl-swap-short {
+  opacity: 0;
+  transition-duration: 120ms;
+}
+.xl:hover .xl-swap-full,
+.xl:focus-visible .xl-swap-full,
+.xl.open .xl-swap-full,
+.xl[data-open="true"] .xl-swap-full {
+  opacity: 1;
+  transition-duration: 120ms;
+}
 /* The invite: the AUDIO button's slow sheen (.stim-toggle.invite), on KINETIC and CURATOR only. It runs at rest
    and goes quiet the moment the button is in use (hover, focus, open, warm or hot). */
-.xl-shimmer { position: relative; overflow: hidden; }
-.xl-shimmer::after {
-  content: ''; position: absolute; inset: 0; pointer-events: none;
-  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.14) 50%, transparent 60%);
-  transform: translateX(-101%); animation: stim-shimmer 3.2s ease-in-out infinite;
+.xl-shimmer {
+  position: relative;
+  overflow: hidden;
 }
-.xl-shimmer:hover::after, .xl-shimmer:focus-visible::after, .xl-shimmer.open::after, .xl-shimmer[data-open="true"]::after,
-.xl-shimmer[data-heat-level="warm"]::after, .xl-shimmer[data-heat-level="hot"]::after { animation: none; opacity: 0; }
+.xl-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 255, 255, 0.14) 50%, transparent 60%);
+  transform: translateX(-101%);
+  animation: stim-shimmer 3.2s ease-in-out infinite;
+}
+.xl-shimmer:hover::after,
+.xl-shimmer:focus-visible::after,
+.xl-shimmer.open::after,
+.xl-shimmer[data-open="true"]::after,
+.xl-shimmer[data-heat-level="warm"]::after,
+.xl-shimmer[data-heat-level="hot"]::after {
+  animation: none;
+  opacity: 0;
+}
 /* The stage is dead quiet: no sheen on a fullscreen instrument. */
-.app-fullscreen .xl-shimmer::after { display: none; }
+.app-fullscreen .xl-shimmer::after {
+  display: none;
+}
 @media (prefers-reduced-motion: reduce) {
-  .xl-ch, .xl-swap, .xl-swap-short, .xl-swap-full { transition: none; }
-  .xl-shimmer::after { display: none; }
+  .xl-ch,
+  .xl-swap,
+  .xl-swap-short,
+  .xl-swap-full {
+    transition: none;
+  }
+  .xl-shimmer::after {
+    display: none;
+  }
 }
 
 /* #1127 — the tap-name dialog. A slider's NAME is a button (tap it); the dialog is square-cornered like everything
    else, 44px targets, and pink stays for "live": the spinner is amber. */
-.range-label-tap { cursor: pointer; }
-.range-label-tap:hover, .range-label-tap:focus-visible { text-decoration: underline dotted; text-underline-offset: 3px; }
-.slider-dialog-scrim { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; background: rgba(6, 6, 8, 0.72); }
-.slider-dialog { width: min(340px, calc(100vw - 32px)); padding: 16px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line-2); box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5); }
-.slider-dialog-field { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; }
-.slider-dialog-field .range-edit { width: 110px; min-height: 36px; text-align: right; }
-.slider-dialog-seg { display: flex; }
-.slider-dialog-seg .act { min-height: 44px; min-width: 76px; }
-.slider-dialog-seg .act[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
-.slider-dialog-note { margin: 0; color: var(--dim); font-size: 11px; line-height: 1.4; }
-.slider-dialog-error { margin: 0; color: var(--kc-warn); font-size: 11px; }
-.slider-dialog-actions { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
-.slider-dialog-actions .act { min-height: 44px; }
-.slider-dialog-apply { border-color: var(--ink); }
-.spin-readout { color: var(--kc-davis); }
-.spin-glyph { display: inline-block; animation: kc-spin-glyph 3.2s linear infinite; }
-@keyframes kc-spin-glyph { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .spin-glyph { animation: none; } }
+.range-label-tap {
+  cursor: pointer;
+}
+.range-label-tap:hover,
+.range-label-tap:focus-visible {
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.slider-dialog-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(6, 6, 8, 0.72);
+}
+.slider-dialog {
+  width: min(340px, calc(100vw - 32px));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
+}
+.slider-dialog-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+.slider-dialog-field .range-edit {
+  width: 110px;
+  min-height: 36px;
+  text-align: right;
+}
+.slider-dialog-seg {
+  display: flex;
+}
+.slider-dialog-seg .act {
+  min-height: 44px;
+  min-width: 76px;
+}
+.slider-dialog-seg .act[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--bg);
+}
+.slider-dialog-note {
+  margin: 0;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.4;
+}
+.slider-dialog-error {
+  margin: 0;
+  color: var(--kc-warn);
+  font-size: 11px;
+}
+.slider-dialog-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+.slider-dialog-actions .act {
+  min-height: 44px;
+}
+.slider-dialog-apply {
+  border-color: var(--ink);
+}
+.spin-readout {
+  color: var(--kc-davis);
+}
+.spin-glyph {
+  display: inline-block;
+  animation: kc-spin-glyph 3.2s linear infinite;
+}
+@keyframes kc-spin-glyph {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-glyph {
+    animation: none;
+  }
+}

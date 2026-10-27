@@ -45,7 +45,20 @@ function assertSameItems(got, want, label) {
   for (let i = 0; i < want.items.length; i++) {
     const g = got.items[i];
     const w = want.items[i];
-    for (const k of ['x', 'y', 'scale', 'rotation', 'alpha', 'index', 't', 'zTier', 'assetId', 'color', 'accent', 'key']) {
+    for (const k of [
+      'x',
+      'y',
+      'scale',
+      'rotation',
+      'alpha',
+      'index',
+      't',
+      'zTier',
+      'assetId',
+      'color',
+      'accent',
+      'key',
+    ]) {
       assert.strictEqual(g[k], w[k], `${label}: item[${i}].${k} — cached ${g[k]} vs uncached ${w[k]}`);
     }
   }
@@ -84,10 +97,13 @@ const STEPS = [
   ['scale while sorted', (a) => ({ ...a, scale: [0.2, 2.0] })],
   ['mirror on', (a) => ({ ...a, layoutParams: { ...a.layoutParams, mirror: true } })],
   ['scale while mirrored', (a) => ({ ...a, scale: [0.45, 1.25] })],
-  ['back to plain', (a) => ({
-    ...a,
-    layoutParams: { ...a.layoutParams, mirror: false, overlap: true, displacement: 0, bleed: false },
-  })],
+  [
+    'back to plain',
+    (a) => ({
+      ...a,
+      layoutParams: { ...a.layoutParams, mirror: false, overlap: true, displacement: 0, bleed: false },
+    }),
+  ],
   // Returning to the exact opening state must not resurrect anything stale.
   ['return to initial', () => ({ ...BASE })],
 ];
@@ -140,11 +156,17 @@ for (const [label, mutate] of STEPS) {
   let lastKeys = null;
   const tick = (extra) => {
     buildPlacements({ ...BASE, ...extra, cache: c });
-    if (c.soa !== lastSoa) { geoRuns++; lastSoa = c.soa; }
-    if (c.keys !== lastKeys) { bindRuns++; lastKeys = c.keys; }
+    if (c.soa !== lastSoa) {
+      geoRuns++;
+      lastSoa = c.soa;
+    }
+    if (c.keys !== lastKeys) {
+      bindRuns++;
+      lastKeys = c.keys;
+    }
   };
 
-  tick({});                                  // cold: both stages run
+  tick({}); // cold: both stages run
   for (let f = 1; f <= 60; f++) {
     // 60 frames of pure audio/life modulation — exactly what liveLoop
     // produces while the operator touches nothing.
@@ -166,11 +188,21 @@ for (const [label, mutate] of STEPS) {
 // is just an intermittent CI failure nobody can act on.
 {
   const MODES = [
-    'random', 'grid', 'fibonacci', 'radial', 'swarm', 'flow', 'layers',
-    'rails', 'orbit', 'abacus', 'stratified', 'noise',
+    'random',
+    'grid',
+    'fibonacci',
+    'radial',
+    'swarm',
+    'flow',
+    'layers',
+    'rails',
+    'orbit',
+    'abacus',
+    'stratified',
+    'noise',
   ];
   let s = 12345;
-  const rnd = () => ((s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff);
+  const rnd = () => (s = (Math.imul(s, 1103515245) + 12345) & 0x7fffffff) / 0x7fffffff;
   const pick = (a) => a[Math.floor(rnd() * a.length)];
 
   const cache = {};
@@ -204,9 +236,9 @@ for (const [label, mutate] of STEPS) {
     assertSameItems(
       buildPlacements({ ...args, cache }),
       buildPlacements({ ...args }),
-      `fuzz iter ${iter} (mode=${args.layoutParams.mode} count=${args.layoutParams.count} `
-      + `density=${args.layoutParams.density} mirror=${args.layoutParams.mirror} `
-      + `overlap=${args.layoutParams.overlap} disp=${args.layoutParams.displacement})`,
+      `fuzz iter ${iter} (mode=${args.layoutParams.mode} count=${args.layoutParams.count} ` +
+        `density=${args.layoutParams.density} mirror=${args.layoutParams.mirror} ` +
+        `overlap=${args.layoutParams.overlap} disp=${args.layoutParams.displacement})`,
     );
   }
   console.log(`  fuzz: ${ITERS}/${ITERS} randomised param sets, cached === uncached`);

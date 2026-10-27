@@ -26,8 +26,13 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import {
-  createMarkWeatherStore, pruneMarkWeatherStore, markWeatherSnapshot, stepMarkWeather,
-  BEAM_RADIUS_SHARE, SHADOW_GRACE_STEPS, MOTE_LIFE_STEPS,
+  createMarkWeatherStore,
+  pruneMarkWeatherStore,
+  markWeatherSnapshot,
+  stepMarkWeather,
+  BEAM_RADIUS_SHARE,
+  SHADOW_GRACE_STEPS,
+  MOTE_LIFE_STEPS,
 } from './markWeather.mjs';
 import { buildDishDensity } from './dishDensity.mjs';
 import { MARK_WEATHER_CAPS, markWeatherCapForDevice } from '../data/quality.js';
@@ -35,10 +40,23 @@ import { nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS } from '../hooks/go
 import { getCostTier } from './kernel/costRegistry.mjs';
 
 let checks = 0;
-const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
+const ok = (cond, msg) => {
+  assert.ok(cond, msg);
+  checks++;
+};
 const W = 1000;
 const H = 700;
-const SUN = { x: 500, y: 350, height: 260, intensity: 0.9, ambient: 0.35, slot: 'white', bevel: 0.6, spec: 0.8, pool: 0 };
+const SUN = {
+  x: 500,
+  y: 350,
+  height: 260,
+  intensity: 0.9,
+  ambient: 0.35,
+  slot: 'white',
+  bevel: 0.6,
+  spec: 0.8,
+  pool: 0,
+};
 // Marks clustered at the sun (beam), one traveling, all inside a
 // saturated density cell.
 const ITEMS = [];
@@ -49,11 +67,24 @@ const DENSE_FIELD = (() => {
   const cellStart = new Int32Array([0, 40, 40]);
   return buildDishDensity({ cellStart, cols: 1, rows: 1, cellSize: 2000, minCx: 0, minCy: 0 });
 })();
-const CONTACTS = [{ x: 500, y: 350, energy: 1 }, { x: 505, y: 345, energy: 0.8 }];
-const FULL = { seed: 42, sceneId: 'wx', canvasW: W, canvasH: H, items: ITEMS, light: SUN, densityField: DENSE_FIELD, contacts: CONTACTS };
-const moteHash = (motes) => createHash('sha256')
-  .update(motes.map((m) => `${m.kind},${m.x},${m.y},${m.age},${m.alpha}`).join('|'))
-  .digest('hex');
+const CONTACTS = [
+  { x: 500, y: 350, energy: 1 },
+  { x: 505, y: 345, energy: 0.8 },
+];
+const FULL = {
+  seed: 42,
+  sceneId: 'wx',
+  canvasW: W,
+  canvasH: H,
+  items: ITEMS,
+  light: SUN,
+  densityField: DENSE_FIELD,
+  contacts: CONTACTS,
+};
+const moteHash = (motes) =>
+  createHash('sha256')
+    .update(motes.map((m) => `${m.kind},${m.x},${m.y},${m.age},${m.alpha}`).join('|'))
+    .digest('hex');
 const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   const store = createMarkWeatherStore();
   const hashes = [];
@@ -78,12 +109,17 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   // spends the same steps and lands on the same state.
   const whole = runFrames(FULL, 4, [100]);
   const sliced = runFrames(FULL, 8, [50]);
-  assert.strictEqual(moteHash(markWeatherSnapshot(whole.store, 'wx').motes), moteHash(markWeatherSnapshot(sliced.store, 'wx').motes),
-    '50 ms slices == 100 ms slices');
+  assert.strictEqual(
+    moteHash(markWeatherSnapshot(whole.store, 'wx').motes),
+    moteHash(markWeatherSnapshot(sliced.store, 'wx').motes),
+    '50 ms slices == 100 ms slices',
+  );
   checks++;
   assert.strictEqual(markWeatherSnapshot(whole.store, 'wx').steps, 24, '400 ms at the locked step is 24 steps');
   checks++;
-  console.log(`markWeather.selfcheck A determinism: 300 frames identical on two fresh stores; kinds ${JSON.stringify(snap.counts)}`);
+  console.log(
+    `markWeather.selfcheck A determinism: 300 frames identical on two fresh stores; kinds ${JSON.stringify(snap.counts)}`,
+  );
 }
 
 // ── B. sources ───────────────────────────────────────────────────────
@@ -127,11 +163,21 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   ];
   // No items: nothing new spawns; only advection + shade run.
   for (let f = 0; f < SHADOW_GRACE_STEPS + 3; f++) {
-    stepMarkWeather(store, { seed: 42, sceneId: 'wx', canvasW: W, canvasH: H, items: [], light: SUN, frameMs: 1000 / 60 });
+    stepMarkWeather(store, {
+      seed: 42,
+      sceneId: 'wx',
+      canvasW: W,
+      canvasH: H,
+      items: [],
+      light: SUN,
+      frameMs: 1000 / 60,
+    });
   }
   const left = markWeatherSnapshot(store, 'wx').motes;
-  ok(left.length === 1 && Math.hypot(left[0].x - 500, left[0].y - 350) < 60,
-    `the shadow mote died within the grace (survivors: ${left.length}, at the sun)`);
+  ok(
+    left.length === 1 && Math.hypot(left[0].x - 500, left[0].y - 350) < 60,
+    `the shadow mote died within the grace (survivors: ${left.length}, at the sun)`,
+  );
   ok(BEAM_RADIUS_SHARE > 0, 'the beam has a radius');
   console.log('markWeather.selfcheck C shadow: motes die in shadow within the grace; the beam keeps its own');
 }
@@ -152,9 +198,14 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
     }
     const cap = markWeatherCapForDevice(ipadClass);
     ok(max <= cap, `${ipadClass ? 'ipad' : 'desktop'} population never exceeds its cap (${max} ≤ ${cap})`);
-    ok(max === cap, `${ipadClass ? 'ipad' : 'desktop'} storm actually reaches its cap (${max}) — the cap is the binding constraint`);
+    ok(
+      max === cap,
+      `${ipadClass ? 'ipad' : 'desktop'} storm actually reaches its cap (${max}) — the cap is the binding constraint`,
+    );
   }
-  console.log(`markWeather.selfcheck D cap: desktop ${MARK_WEATHER_CAPS.desktop}, ipad ${MARK_WEATHER_CAPS.ipad} — never exceeded under a contact storm`);
+  console.log(
+    `markWeather.selfcheck D cap: desktop ${MARK_WEATHER_CAPS.desktop}, ipad ${MARK_WEATHER_CAPS.ipad} — never exceeded under a contact storm`,
+  );
 }
 
 // ── E. shed ──────────────────────────────────────────────────────────
@@ -188,15 +239,35 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
       else if (cut.kind === 'travel') s = { ...s, travelShed: true };
       else if (cut.kind === 'quality') s = { ...s, quality: cut.quality };
       else if (cut.kind === 'assetThin') s = { ...s, assetThin: true };
-      else if (cut.kind === 'countClamp') s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
+      else if (cut.kind === 'countClamp')
+        s = { ...s, perfClampOverride: { count: cut.count }, effectiveCount: cut.count };
       else if (cut.kind === 'slowRender') s = { ...s, slowRender: true };
     }
     return kinds;
   };
-  const PRESSURE = { renderScale: 1, quality: 'high', assetThin: false, perfClampOverride: null, effectiveCount: 400, slowRender: false, gpuSaturated: true };
-  const kinds = walk({ ...PRESSURE, creatureCount: 2, creatureShed: 0, weatherActive: true, weatherShed: false, travelActive: true, travelShed: false });
-  assert.deepStrictEqual(kinds.slice(0, 7), ['renderScale', 'renderScale', 'renderScale', 'markWeather', 'creatureCount', 'creatureCount', 'travel'],
-    'pixel trim, then weather (1.4), then population (1.5), then travel (1.6)');
+  const PRESSURE = {
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
+    gpuSaturated: true,
+  };
+  const kinds = walk({
+    ...PRESSURE,
+    creatureCount: 2,
+    creatureShed: 0,
+    weatherActive: true,
+    weatherShed: false,
+    travelActive: true,
+    travelShed: false,
+  });
+  assert.deepStrictEqual(
+    kinds.slice(0, 7),
+    ['renderScale', 'renderScale', 'renderScale', 'markWeather', 'creatureCount', 'creatureCount', 'travel'],
+    'pixel trim, then weather (1.4), then population (1.5), then travel (1.6)',
+  );
   checks++;
   ok(kinds.indexOf('markWeather') < kinds.indexOf('quality'), 'weather sheds ahead of the quality tier');
   const noWeather = walk({ ...PRESSURE, creatureCount: 0, creatureShed: 0 });
@@ -204,15 +275,24 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   const entry = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'markWeather');
   ok(!!entry, 'markWeather has a restore entry');
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  ok(order.indexOf('markWeather') < order.indexOf('creatureCount') && order.indexOf('markWeather') < order.indexOf('travel'),
-    'restore table order matches shed order around the new rung');
+  ok(
+    order.indexOf('markWeather') < order.indexOf('creatureCount') &&
+      order.indexOf('markWeather') < order.indexOf('travel'),
+    'restore table order matches shed order around the new rung',
+  );
   assert.strictEqual(entry.needsRestore({ weatherShed: true }, { healthy: true }), true);
   assert.strictEqual(entry.needsRestore({ weatherShed: true }, { healthy: false }), false);
   assert.strictEqual(entry.needsRestore({ weatherShed: false }, { healthy: true }), false);
   checks += 3;
-  assert.deepStrictEqual(shedSummary({ renderScale: 1, weatherShed: true }), ['weather clear'], 'the badge is honest about a weather shed');
+  assert.deepStrictEqual(
+    shedSummary({ renderScale: 1, weatherShed: true }),
+    ['weather clear'],
+    'the badge is honest about a weather shed',
+  );
   checks++;
-  console.log('markWeather.selfcheck F governor: cut 1.4 sits ahead of creature 1.5, travel 1.6 and quality; restore + badge agree');
+  console.log(
+    'markWeather.selfcheck F governor: cut 1.4 sits ahead of creature 1.5, travel 1.6 and quality; restore + badge agree',
+  );
 }
 
 // ── G. cost ──────────────────────────────────────────────────────────
@@ -220,7 +300,11 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   const decl = getCostTier('weather/mark-motes');
   ok(!!decl && decl.timeMs > 0, 'weather/mark-motes is declared with a measured timeMs');
   const store = createMarkWeatherStore();
-  const ctx = { ...FULL, contacts: Array.from({ length: 60 }, (_, i) => ({ x: 500 + (i % 10), y: 350, energy: 1 })), frameMs: 1000 / 60 };
+  const ctx = {
+    ...FULL,
+    contacts: Array.from({ length: 60 }, (_, i) => ({ x: 500 + (i % 10), y: 350, energy: 1 })),
+    frameMs: 1000 / 60,
+  };
   for (let i = 0; i < 120; i++) stepMarkWeather(store, ctx); // reach the cap
   const medians = [];
   for (let run = 0; run < 7; run++) {
@@ -235,8 +319,13 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   }
   medians.sort((a, b) => a - b);
   const measured = medians[3];
-  ok(measured < 0.5, `measured ${measured.toFixed(3)} ms at the ${MARK_WEATHER_CAPS.desktop}-mote cap sits far inside the frame`);
-  console.log(`markWeather.selfcheck G cost: declared ${decl.timeMs} ms; re-measured median-of-medians ${measured.toFixed(3)} ms @cap, 1 step (sandbox)`);
+  ok(
+    measured < 0.5,
+    `measured ${measured.toFixed(3)} ms at the ${MARK_WEATHER_CAPS.desktop}-mote cap sits far inside the frame`,
+  );
+  console.log(
+    `markWeather.selfcheck G cost: declared ${decl.timeMs} ms; re-measured median-of-medians ${measured.toFixed(3)} ms @cap, 1 step (sandbox)`,
+  );
 }
 
 // ── H. state hygiene ─────────────────────────────────────────────────
@@ -247,7 +336,9 @@ const runFrames = (ctx, frames, dtSeq = [1000 / 60]) => {
   // A reseed starts the scene's weather over (state is keyed by seed).
   stepMarkWeather(store, { ...FULL, seed: 43, frameMs: 0 });
   const after = markWeatherSnapshot(store, 'wx');
-  assert.strictEqual(after.seed, 43); assert.strictEqual(after.steps, 0); assert.strictEqual(after.motes.length, 0);
+  assert.strictEqual(after.seed, 43);
+  assert.strictEqual(after.steps, 0);
+  assert.strictEqual(after.motes.length, 0);
   checks += 3;
   pruneMarkWeatherStore(store, new Set(['other']));
   assert.strictEqual(markWeatherSnapshot(store, 'wx'), null, 'prune drops a removed scene');

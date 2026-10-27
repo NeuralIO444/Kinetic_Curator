@@ -25,19 +25,26 @@ function rgb(hex) {
 
 /** Redmean colour distance (squared), or Infinity when either is not a hex colour. */
 export function colorDistance2(a, b) {
-  const p = rgb(a); const q = rgb(b);
+  const p = rgb(a);
+  const q = rgb(b);
   if (!p || !q) return Infinity;
   const rm = (p[0] + q[0]) / 2;
-  const dr = p[0] - q[0]; const dg = p[1] - q[1]; const db = p[2] - q[2];
+  const dr = p[0] - q[0];
+  const dg = p[1] - q[1];
+  const db = p[2] - q[2];
   return (2 + rm / 256) * dr * dr + 4 * dg * dg + (2 + (255 - rm) / 256) * db * db;
 }
 
 /** The candidate nearest to `color` (first wins a tie), or null when there are none. */
 export function nearestColor(color, candidates) {
-  let best = null; let bestD = Infinity;
+  let best = null;
+  let bestD = Infinity;
   for (const c of candidates || []) {
     const d = colorDistance2(color, c);
-    if (d < bestD) { bestD = d; best = c; }
+    if (d < bestD) {
+      bestD = d;
+      best = c;
+    }
   }
   return best;
 }
@@ -65,14 +72,22 @@ export function snaps(seed, index, share, seedOffsets = null) {
 export function applyGroundSnap({ soa, colors, accents, rolesAt, share, seed, seedOffsets = null }) {
   if (!(share > 0) || typeof rolesAt !== 'function' || !soa) return null;
   const n = soa.n | 0;
-  let outC = null; let outA = null; let flags = null;
+  let outC = null;
+  let outA = null;
+  let flags = null;
   for (let k = 0; k < n; k++) {
     if (!snaps(seed, soa.index[k], share, seedOffsets)) continue;
     const roles = rolesAt(soa.x[k], soa.y[k]);
     if (!Array.isArray(roles) || !roles.length) continue;
-    if (!outC) { outC = colors.slice(); outA = accents.slice(); flags = new Uint8Array(n); }
+    if (!outC) {
+      outC = colors.slice();
+      outA = accents.slice();
+      flags = new Uint8Array(n);
+    }
     const s = snapPair(colors[k], accents[k], roles);
-    outC[k] = s.color; outA[k] = s.accent; flags[k] = 1;
+    outC[k] = s.color;
+    outA[k] = s.accent;
+    flags[k] = 1;
   }
   return outC ? { colors: outC, accents: outA, snapped: flags } : null;
 }

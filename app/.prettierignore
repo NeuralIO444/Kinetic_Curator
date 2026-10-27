@@ -78,13 +78,21 @@ src/gl/**/*.html
 src/gl/**/*.json
 src/gl/**/*.md
 
-# Tooling and non-src trees: not yet adopted.
-/scripts/**
-/e2e/**
-/qa/**
+# ── Adopted (slice 10, #1684: the loose files of src/, src/engine/, src/engine/kernel/ — their source pins made layout-blind first) ──
+!src/*.js
+!src/*.jsx
+!src/*.mjs
+!src/engine/*.js
+!src/engine/*.mjs
+!src/engine/kernel/*.js
+!src/engine/kernel/*.mjs
+
+# ── Adopted (slice 11, #1684: the tooling trees and the stylesheets) ──
+!src/styles/
+# Static assets served as-is, and QA's data / notes.
 /public/**
-/index.html
-/vite.units.mjs
+/qa/**/*.json
+/qa/**/*.md
 
 # Lint test fixtures are data, never formatted.
 eslint-rules/fixtures/**

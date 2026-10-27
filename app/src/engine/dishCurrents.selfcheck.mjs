@@ -50,8 +50,14 @@ import { createNoise } from './noise.js';
 import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import {
-  clampCurrentStrength, dishCurrentsFor, NO_CURRENTS, advectAxis,
-  attractorDriftSign, CURRENT_SPEED, CURRENT_COUPLING, ATTRACTOR_DRIFT_SPEED,
+  clampCurrentStrength,
+  dishCurrentsFor,
+  NO_CURRENTS,
+  advectAxis,
+  attractorDriftSign,
+  CURRENT_SPEED,
+  CURRENT_COUPLING,
+  ATTRACTOR_DRIFT_SPEED,
 } from './dishCurrents.mjs';
 import { resolveBehave } from './organisms/behave.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
@@ -93,7 +99,11 @@ const EPS = 1e-12;
 const oneBody = (lp, { mass = 1, x = 500, y = 350, vx = 0, vy = 0 } = {}) => {
   const sys = new ParticleSystem();
   sys.init(1, 1000, 700, assets, palette, SEED);
-  sys.x[0] = x; sys.y[0] = y; sys.vx[0] = vx; sys.vy[0] = vy; sys.mass[0] = mass;
+  sys.x[0] = x;
+  sys.y[0] = y;
+  sys.vx[0] = vx;
+  sys.vy[0] = vy;
+  sys.mass[0] = mass;
   return sys;
 };
 const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
@@ -110,10 +120,21 @@ const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
 // own noise, seeded as the engine seeds it.
 {
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'cruise', particleCount: 1,
-    contactRadius: 16, contactMode: 'none', wind: 1, windMode: 'curl',
-    gravityWells: 0, damping: 0.98, metabolism: 0,
-    kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    behave: 'cruise',
+    particleCount: 1,
+    contactRadius: 16,
+    contactMode: 'none',
+    wind: 1,
+    windMode: 'curl',
+    gravityWells: 0,
+    damping: 0.98,
+    metabolism: 0,
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+    lifeDrift: 0,
   });
   const windMul = 1 * resolveBehave('cruise').wind; // update()'s own derivation
   const coupling = CURRENT_COUPLING * windMul;
@@ -126,19 +147,28 @@ const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
     const out = { x: 0, y: 0 };
     const nt = BAKE_TIME_ORIGIN * lp.noiseSpeed * 0.001;
     noise.curl2(500 * lp.noiseFreq, 350 * lp.noiseFreq, nt + so * 0.0001, 0.5, out);
-    const ux = out.x * CURRENT_SPEED; const uy = out.y * CURRENT_SPEED;
+    const ux = out.x * CURRENT_SPEED;
+    const uy = out.y * CURRENT_SPEED;
     const ax = ((ux - 0.3) * coupling) / mass;
     const ay = ((uy - -0.2) * coupling) / mass;
     return { sys, wantVx: (0.3 + ax) * dampDt, wantVy: (-0.2 + ay) * dampDt, ax, ay };
   };
   const light = run(0.5);
-  assert.ok(Math.abs(light.sys.vx[0] - light.wantVx) < EPS, `curl step, x: ${light.sys.vx[0]} vs closed form ${light.wantVx}`);
-  assert.ok(Math.abs(light.sys.vy[0] - light.wantVy) < EPS, `curl step, y: ${light.sys.vy[0]} vs closed form ${light.wantVy}`);
+  assert.ok(
+    Math.abs(light.sys.vx[0] - light.wantVx) < EPS,
+    `curl step, x: ${light.sys.vx[0]} vs closed form ${light.wantVx}`,
+  );
+  assert.ok(
+    Math.abs(light.sys.vy[0] - light.wantVy) < EPS,
+    `curl step, y: ${light.sys.vy[0]} vs closed form ${light.wantVy}`,
+  );
   // The same field, the same body, four times the mass: exactly a
   // quarter of the acceleration (the ratio is the law, data-free).
   const heavy = run(2);
-  assert.ok(Math.abs(heavy.ax - light.ax / 4) < EPS && Math.abs(heavy.ay - light.ay / 4) < EPS,
-    'the response is inverse-mass, exactly');
+  assert.ok(
+    Math.abs(heavy.ax - light.ax / 4) < EPS && Math.abs(heavy.ay - light.ay / 4) < EPS,
+    'the response is inverse-mass, exactly',
+  );
   assert.ok(Math.abs(heavy.sys.vx[0] - heavy.wantVx) < EPS, 'the heavy step also lands on the closed form');
   // Outside the gate the same step is the legacy force, at its own
   // closed form — the gate, not the field, is what changed.
@@ -148,30 +178,49 @@ const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
   stepOnce(out2, lpOut);
   const noise2 = createNoise(SEED);
   const o2 = { x: 0, y: 0 };
-  noise2.curl2(500 * lp.noiseFreq, 350 * lp.noiseFreq, BAKE_TIME_ORIGIN * lp.noiseSpeed * 0.001 + so2 * 0.0001, 0.5, o2);
+  noise2.curl2(
+    500 * lp.noiseFreq,
+    350 * lp.noiseFreq,
+    BAKE_TIME_ORIGIN * lp.noiseSpeed * 0.001 + so2 * 0.0001,
+    0.5,
+    o2,
+  );
   const legacyAx = (o2.x * 0.8 * windMul) / 0.5;
-  assert.ok(Math.abs(out2.vx[0] - (0.3 + legacyAx) * dampDt) < EPS,
-    `outside the dish, the legacy wind force runs: ${out2.vx[0]} vs ${((0.3 + legacyAx) * dampDt)}`);
+  assert.ok(
+    Math.abs(out2.vx[0] - (0.3 + legacyAx) * dampDt) < EPS,
+    `outside the dish, the legacy wind force runs: ${out2.vx[0]} vs ${(0.3 + legacyAx) * dampDt}`,
+  );
 }
 
 // (c) — one step of chemotaxis, closed form. The well sits due east
 // at d = 300, so the direction is exactly (1, 0) and the drift
 // target is exactly (±ATTRACTOR_DRIFT_SPEED, 0).
 {
-  const lpFor = (behave, extra = {}) => normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave, particleCount: 1,
-    contactRadius: 16, contactMode: 'none', wind: 0, gravityWells: 1,
-    damping: 0.98, metabolism: 0,
-    kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
-    ...extra,
-  });
+  const lpFor = (behave, extra = {}) =>
+    normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'hype',
+      behave,
+      particleCount: 1,
+      contactRadius: 16,
+      contactMode: 'none',
+      wind: 0,
+      gravityWells: 1,
+      damping: 0.98,
+      metabolism: 0,
+      kinemeBreath: 0,
+      kinemeDrift: 0,
+      kinemePaletteBreath: 0,
+      lifeDrift: 0,
+      ...extra,
+    });
   const row = resolveBehave('seek');
   const g = 1 * row.attract * Math.abs(row.seekGain); // wells × attract × |seek|
   const coupling = CURRENT_COUPLING * g;
   const well = { x: 700, y: 350 };
   const seek = oneBody(lpFor('seek'), { mass: 2, x: 400, y: 350 });
   stepOnce(seek, lpFor('seek'), well);
-  const wantSeek = ((ATTRACTOR_DRIFT_SPEED - 0) * coupling / 2) * 0.98;
+  const wantSeek = (((ATTRACTOR_DRIFT_SPEED - 0) * coupling) / 2) * 0.98;
   assert.ok(Math.abs(seek.vx[0] - wantSeek) < EPS, `seek step: ${seek.vx[0]} vs closed form ${wantSeek}`);
   assert.ok(Object.is(seek.vy[0], 0), 'no lateral drift on an axial approach');
   assert.ok(Math.abs(seek.x[0] - (400 + wantSeek)) < EPS, 'the position integrates the same step');
@@ -192,8 +241,10 @@ const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
   stepOnce(legacy, lpLegacy, well);
   const forceMag = (1 * row.attract * 8 * row.seekGain) / Math.max(20, 300 * 0.05);
   const wantLegacy = (forceMag / 2) * 0.98;
-  assert.ok(Math.abs(legacy.vx[0] - wantLegacy) < EPS,
-    `outside the dish, the legacy attractor runs: ${legacy.vx[0]} vs ${wantLegacy}`);
+  assert.ok(
+    Math.abs(legacy.vx[0] - wantLegacy) < EPS,
+    `outside the dish, the legacy attractor runs: ${legacy.vx[0]} vs ${wantLegacy}`,
+  );
 }
 
 // (d) — wind off = pre-C2 trajectories, exactly. A spaced hype cast
@@ -205,17 +256,28 @@ const stepOnce = (sys, lp, attractor = null, time = BAKE_TIME_ORIGIN) => {
     const sys = new ParticleSystem();
     sys.init(12, 1000, 700, assets, palette, SEED);
     for (let i = 0; i < 12; i++) {
-      sys.x[i] = 200 + (i % 4) * 150; sys.y[i] = 200 + Math.floor(i / 4) * 150;
-      sys.vx[i] = 0.1 * (i % 3); sys.vy[i] = 0;
+      sys.x[i] = 200 + (i % 4) * 150;
+      sys.y[i] = 200 + Math.floor(i / 4) * 150;
+      sys.vx[i] = 0.1 * (i % 3);
+      sys.vy[i] = 0;
     }
     const full = { ...lp, maxParticles: 40 };
     for (let s = 0; s < 240; s++) sys.update(full, assets, palette, SEED, BAKE_TIME_ORIGIN + s * BAKE_DT_MS, attractor);
     return sys;
   };
   const base = {
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave: 'cruise', particleCount: 12,
-    contactMode: 'none', wind: 0, gravityWells: 0, metabolism: 0,
-    kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'hype',
+    behave: 'cruise',
+    particleCount: 12,
+    contactMode: 'none',
+    wind: 0,
+    gravityWells: 0,
+    metabolism: 0,
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+    lifeDrift: 0,
   };
   const dishOff = grid(normalizeLayoutParams({ ...base, contactRadius: 0 }));
   const dishOn = grid(normalizeLayoutParams({ ...base, contactRadius: 16 }));
@@ -240,14 +302,22 @@ const runCast = (lp, massPin, steps) => {
   const sys = new ParticleSystem();
   sys.init(lp.particleCount, 1000, 700, assets, palette, SEED);
   if (massPin !== null) for (let i = 0; i < sys.n; i++) sys.mass[i] = massPin;
-  const x0 = Float64Array.from(sys.x); const y0 = Float64Array.from(sys.y);
-  let cx0 = 0; let cy0 = 0;
-  for (let i = 0; i < sys.n; i++) { cx0 += sys.x[i]; cy0 += sys.y[i]; }
+  const x0 = Float64Array.from(sys.x);
+  const y0 = Float64Array.from(sys.y);
+  let cx0 = 0;
+  let cy0 = 0;
+  for (let i = 0; i < sys.n; i++) {
+    cx0 += sys.x[i];
+    cy0 += sys.y[i];
+  }
   const full = { ...lp, maxParticles: 200 };
   for (let s = 0; s < steps; s++) sys.update(full, assets, palette, SEED, BAKE_TIME_ORIGIN + s * BAKE_DT_MS, null);
-  let cx = 0; let cy = 0; let disp = 0;
+  let cx = 0;
+  let cy = 0;
+  let disp = 0;
   for (let i = 0; i < sys.n; i++) {
-    cx += sys.x[i]; cy += sys.y[i];
+    cx += sys.x[i];
+    cy += sys.y[i];
     disp += Math.hypot(sys.x[i] - x0[i], sys.y[i] - y0[i]);
   }
   return {
@@ -261,10 +331,18 @@ const runCast = (lp, massPin, steps) => {
 // the STRAW stratum migrates, the PEARL stratum holds ground.
 {
   const lp = normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 40,
-    contactRadius: 16, contactMode: 'none', windMode: 'curl',
-    swarmCohesion: 0, gravityWells: 0,
-    kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
+    ...DEFAULT_LAYOUT_PARAMS,
+    mode: 'swarm',
+    particleCount: 40,
+    contactRadius: 16,
+    contactMode: 'none',
+    windMode: 'curl',
+    swarmCohesion: 0,
+    gravityWells: 0,
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+    lifeDrift: 0,
   });
   const straw = runCast(lp, 0.4, 480);
   const pearl = runCast(lp, 3.0, 480);
@@ -272,12 +350,16 @@ const runCast = (lp, massPin, steps) => {
   assert.ok(pearl.centroidShift < 30, `PEARL’s centroid barely moves: ${pearl.centroidShift.toFixed(1)}px`);
   assert.ok(straw.meanDisp > 300, `STRAW migrates: mean displacement ${straw.meanDisp.toFixed(1)}px`);
   assert.ok(straw.centroidShift > 60, `STRAW’s centroid travels with the current: ${straw.centroidShift.toFixed(1)}px`);
-  assert.ok(pearl.meanDisp < straw.meanDisp / 4,
-    `the discrimination is by kind, not degree: pearl ${pearl.meanDisp.toFixed(1)} vs straw ${straw.meanDisp.toFixed(1)}`);
+  assert.ok(
+    pearl.meanDisp < straw.meanDisp / 4,
+    `the discrimination is by kind, not degree: pearl ${pearl.meanDisp.toFixed(1)} vs straw ${straw.meanDisp.toFixed(1)}`,
+  );
   const again = runCast(lp, 0.4, 480);
   for (let i = 0; i < 4; i++) {
-    assert.ok(Object.is(again.sys.x[i], straw.sys.x[i]) && Object.is(again.sys.vx[i], straw.sys.vx[i]),
-      'the probe is deterministic (bake = live arithmetic)');
+    assert.ok(
+      Object.is(again.sys.x[i], straw.sys.x[i]) && Object.is(again.sys.vx[i], straw.sys.vx[i]),
+      'the probe is deterministic (bake = live arithmetic)',
+    );
   }
 
   // Pure casts: one body per seed, the current the only force.
@@ -286,39 +368,60 @@ const runCast = (lp, massPin, steps) => {
   // asserted where the field carries (curl) rather than turns.
   const pure = (windMode, mass) => {
     const lp1 = normalizeLayoutParams({
-      ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 1,
-      contactRadius: 16, contactMode: 'none', windMode,
-      swarmCohesion: 0, gravityWells: 0,
-      kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'swarm',
+      particleCount: 1,
+      contactRadius: 16,
+      contactMode: 'none',
+      windMode,
+      swarmCohesion: 0,
+      gravityWells: 0,
+      kinemeBreath: 0,
+      kinemeDrift: 0,
+      kinemePaletteBreath: 0,
+      lifeDrift: 0,
     });
-    let disp = 0; let spd = 0; let path = 0; const N = 24;
+    let disp = 0;
+    let spd = 0;
+    let path = 0;
+    const N = 24;
     for (let k = 0; k < N; k++) {
       const sys = new ParticleSystem();
       const seed = SEED + k * 131;
       sys.init(1, 1000, 700, assets, palette, seed);
       sys.mass[0] = mass;
-      const x0 = sys.x[0]; const y0 = sys.y[0];
-      let px = x0; let py = y0;
+      const x0 = sys.x[0];
+      const y0 = sys.y[0];
+      let px = x0;
+      let py = y0;
       const full = { ...lp1, particleCount: 1, maxParticles: 10 };
-      let sum = 0; let pl = 0;
+      let sum = 0;
+      let pl = 0;
       for (let s = 0; s < 480; s++) {
         sys.update(full, assets, palette, seed, BAKE_TIME_ORIGIN + s * BAKE_DT_MS, null);
         sum += Math.hypot(sys.vx[0], sys.vy[0]);
-        pl += Math.hypot(sys.x[0] - px, sys.y[0] - py); px = sys.x[0]; py = sys.y[0];
+        pl += Math.hypot(sys.x[0] - px, sys.y[0] - py);
+        px = sys.x[0];
+        py = sys.y[0];
       }
       disp += Math.hypot(sys.x[0] - x0, sys.y[0] - y0);
-      spd += sum / 480; path += pl;
+      spd += sum / 480;
+      path += pl;
     }
     return { meanDisp: disp / N, meanSpeed: spd / N, meanPath: path / N };
   };
   for (const wm of ['curl', 'point']) {
     const light = pure(wm, 0.4);
     const heavy = pure(wm, 3.0);
-    assert.ok(heavy.meanDisp < 40 && heavy.meanPath < 60,
-      `${wm}: a lone PEARL's whole journey is ${heavy.meanPath.toFixed(1)}px of path, ${heavy.meanDisp.toFixed(1)}px net — ground held`);
+    assert.ok(
+      heavy.meanDisp < 40 && heavy.meanPath < 60,
+      `${wm}: a lone PEARL's whole journey is ${heavy.meanPath.toFixed(1)}px of path, ${heavy.meanDisp.toFixed(1)}px net — ground held`,
+    );
     assert.ok(light.meanPath > 80, `${wm}: a lone STRAW rides ${light.meanPath.toFixed(1)}px of path in 480 steps`);
-    assert.ok(light.meanSpeed > 3 * heavy.meanSpeed && light.meanPath > 3 * heavy.meanPath,
-      `${wm}: riding is a speed, not a nudge — light ${light.meanSpeed.toFixed(3)} vs heavy ${heavy.meanSpeed.toFixed(3)} px/step`);
+    assert.ok(
+      light.meanSpeed > 3 * heavy.meanSpeed && light.meanPath > 3 * heavy.meanPath,
+      `${wm}: riding is a speed, not a nudge — light ${light.meanSpeed.toFixed(3)} vs heavy ${heavy.meanSpeed.toFixed(3)} px/step`,
+    );
     assert.ok(heavy.meanSpeed < 0.15, `${wm}: the heavy body never entrains (${heavy.meanSpeed.toFixed(3)} px/step)`);
   }
   assert.ok(pure('curl', 0.4).meanDisp > 40, 'curl: the light body’s net travel is downstream, not just motion');
@@ -329,12 +432,24 @@ const runCast = (lp, massPin, steps) => {
 {
   const probe = (behave, wells, mass) => {
     const lp = normalizeLayoutParams({
-      ...DEFAULT_LAYOUT_PARAMS, mode: 'hype', behave, particleCount: 1,
-      contactRadius: 16, contactMode: 'none', wind: 0, gravityWells: wells, metabolism: 0,
-      kinemeBreath: 0, kinemeDrift: 0, kinemePaletteBreath: 0, lifeDrift: 0,
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'hype',
+      behave,
+      particleCount: 1,
+      contactRadius: 16,
+      contactMode: 'none',
+      wind: 0,
+      gravityWells: wells,
+      metabolism: 0,
+      kinemeBreath: 0,
+      kinemeDrift: 0,
+      kinemePaletteBreath: 0,
+      lifeDrift: 0,
     });
     const well = { x: 700, y: 350 };
-    let d0 = 0; let d1 = 0; const N = 16;
+    let d0 = 0;
+    let d1 = 0;
+    const N = 16;
     for (let k = 0; k < N; k++) {
       const seed = SEED + k * 131;
       const sys = new ParticleSystem();
@@ -351,34 +466,67 @@ const runCast = (lp, massPin, steps) => {
   const seekHeavy = probe('seek', 1, 3.0);
   const fleeLight = probe('flee', 1, 0.4);
   const control = probe('seek', 0, 0.4);
-  assert.ok(seekLight.d1 < 0.45 * seekLight.d0,
-    `light seekers pool at the well: ${seekLight.d0.toFixed(0)} -> ${seekLight.d1.toFixed(0)}px`);
-  assert.ok(seekHeavy.d1 > 1.8 * seekLight.d1 && seekHeavy.d1 < seekHeavy.d0,
-    `heavy seekers drift but lag: ${seekHeavy.d0.toFixed(0)} -> ${seekHeavy.d1.toFixed(0)}px (light pooled at ${seekLight.d1.toFixed(0)})`);
-  assert.ok(fleeLight.d1 > 1.25 * fleeLight.d0,
-    `fleers are driven from the same well: ${fleeLight.d0.toFixed(0)} -> ${fleeLight.d1.toFixed(0)}px`);
-  assert.ok(control.d1 > 0.85 * control.d0,
-    `wells closed, no approach: ${control.d0.toFixed(0)} -> ${control.d1.toFixed(0)}px`);
+  assert.ok(
+    seekLight.d1 < 0.45 * seekLight.d0,
+    `light seekers pool at the well: ${seekLight.d0.toFixed(0)} -> ${seekLight.d1.toFixed(0)}px`,
+  );
+  assert.ok(
+    seekHeavy.d1 > 1.8 * seekLight.d1 && seekHeavy.d1 < seekHeavy.d0,
+    `heavy seekers drift but lag: ${seekHeavy.d0.toFixed(0)} -> ${seekHeavy.d1.toFixed(0)}px (light pooled at ${seekLight.d1.toFixed(0)})`,
+  );
+  assert.ok(
+    fleeLight.d1 > 1.25 * fleeLight.d0,
+    `fleers are driven from the same well: ${fleeLight.d0.toFixed(0)} -> ${fleeLight.d1.toFixed(0)}px`,
+  );
+  assert.ok(
+    control.d1 > 0.85 * control.d0,
+    `wells closed, no approach: ${control.d0.toFixed(0)} -> ${control.d1.toFixed(0)}px`,
+  );
 }
 
 // (h) — bake parity: the studio bake steps the same update(), so a
 // baked dish rides the currents — it repeats bit for bit, and it is
 // not the trajectory the contactless (legacy-force) bake draws.
 {
-  const lpFor = (radius) => normalizeLayoutParams({
-    ...DEFAULT_LAYOUT_PARAMS, mode: 'swarm', particleCount: 40,
-    contactRadius: radius, contactRestitution: 0.7, contactMode: 'bounce',
-    windMode: 'curl',
-  });
-  const bake = (radius) => bakeDishParticles({
-    layers: [
-      { key: 'pearl', seed: SEED, count: 40, layoutParams: lpFor(radius), activeAssets: assets, palette, maxParticles: 200 },
-      { key: 'eaves', seed: SEED + 7, count: 35, layoutParams: lpFor(radius), activeAssets: assets, palette, maxParticles: 200 },
-    ],
-    canvasW: 1000, canvasH: 700, steps: 45,
-  });
+  const lpFor = (radius) =>
+    normalizeLayoutParams({
+      ...DEFAULT_LAYOUT_PARAMS,
+      mode: 'swarm',
+      particleCount: 40,
+      contactRadius: radius,
+      contactRestitution: 0.7,
+      contactMode: 'bounce',
+      windMode: 'curl',
+    });
+  const bake = (radius) =>
+    bakeDishParticles({
+      layers: [
+        {
+          key: 'pearl',
+          seed: SEED,
+          count: 40,
+          layoutParams: lpFor(radius),
+          activeAssets: assets,
+          palette,
+          maxParticles: 200,
+        },
+        {
+          key: 'eaves',
+          seed: SEED + 7,
+          count: 35,
+          layoutParams: lpFor(radius),
+          activeAssets: assets,
+          palette,
+          maxParticles: 200,
+        },
+      ],
+      canvasW: 1000,
+      canvasH: 700,
+      steps: 45,
+    });
   const flat = (m) => JSON.stringify([...m.entries()].map(([k, items]) => [k, items.map((it) => [it.x, it.y])]));
-  const a = bake(16); const b = bake(16);
+  const a = bake(16);
+  const b = bake(16);
   assert.strictEqual(flat(a), flat(b), 'the currents bake is a pure function of its inputs');
   assert.notStrictEqual(flat(a), flat(bake(0)), 'the bake rides the currents, not the legacy wind force');
 }
@@ -389,12 +537,16 @@ const runCast = (lp, massPin, steps) => {
   const particles = readFileSync(new URL('./particles.js', import.meta.url), 'utf8');
   const law = readFileSync(new URL('./dishCurrents.mjs', import.meta.url), 'utf8');
   assert.ok(particles.includes('dishCurrentsFor(windMul)'), 'update() resolves the wind currents at the force pass');
-  assert.ok(particles.includes('dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul))'),
-    'update() resolves the attractor currents from its knobs and the row’s seek gain');
+  assert.ok(
+    particles.includes('dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul))'),
+    'update() resolves the attractor currents from its knobs and the row’s seek gain',
+  );
   assert.ok(particles.includes('advectAxis(this._curlOut.x * CURRENT_SPEED'), 'the curl branch advects');
   assert.ok(particles.includes('attractorDriftSign(seekMul)'), 'the attractor branch reads the group’s sign');
   assert.ok(!particles.includes('CURRENT_COUPLING'), 'no coupling arithmetic leaks into the integrator');
   assert.ok(!/Math\.random|Date\.now/.test(law), 'the currents law is deterministic by construction');
 }
 
-console.log('dishCurrents.selfcheck: OK (#1414 — law units, one-step wind + chemotaxis closed forms, wind-off bit-identity, STRAW/PEARL acceptance probe, chemotaxis horizon, bake parity, wiring)');
+console.log(
+  'dishCurrents.selfcheck: OK (#1414 — law units, one-step wind + chemotaxis closed forms, wind-off bit-identity, STRAW/PEARL acceptance probe, chemotaxis horizon, bake parity, wiring)',
+);

@@ -90,11 +90,17 @@ export function createRegistry(family, { payloadKey = 'fn', defaults = {} } = {}
       if (typeof gpu.vertexShader !== 'string' || !gpu.vertexShader) {
         throw new Error(`[registry:${family}] "${id}": gpu.vertexShader must be a non-empty string`);
       }
-      if (typeof gpu.fragmentShader !== 'undefined' && (typeof gpu.fragmentShader !== 'string' || !gpu.fragmentShader)) {
+      if (
+        typeof gpu.fragmentShader !== 'undefined' &&
+        (typeof gpu.fragmentShader !== 'string' || !gpu.fragmentShader)
+      ) {
         throw new Error(`[registry:${family}] "${id}": gpu.fragmentShader must be a non-empty string when present`);
       }
-      if (!Array.isArray(gpu.varyings) || gpu.varyings.length === 0 ||
-          !gpu.varyings.every((v) => typeof v === 'string' && v)) {
+      if (
+        !Array.isArray(gpu.varyings) ||
+        gpu.varyings.length === 0 ||
+        !gpu.varyings.every((v) => typeof v === 'string' && v)
+      ) {
         throw new Error(`[registry:${family}] "${id}": gpu.varyings must be a non-empty string array`);
       }
     }
@@ -105,13 +111,15 @@ export function createRegistry(family, { payloadKey = 'fn', defaults = {} } = {}
       writes: Object.freeze([...writes]),
       costTier,
       [payloadKey]: payload,
-      ...(gpu ? {
-        gpu: Object.freeze({
-          vertexShader: gpu.vertexShader,
-          varyings: Object.freeze([...gpu.varyings]),
-          ...(gpu.fragmentShader ? { fragmentShader: gpu.fragmentShader } : {}),
-        }),
-      } : {}),
+      ...(gpu
+        ? {
+            gpu: Object.freeze({
+              vertexShader: gpu.vertexShader,
+              varyings: Object.freeze([...gpu.varyings]),
+              ...(gpu.fragmentShader ? { fragmentShader: gpu.fragmentShader } : {}),
+            }),
+          }
+        : {}),
     });
     const prev = entries.get(id);
     if (prev && sigOf(prev) !== sigOf(entry)) {

@@ -13,18 +13,23 @@ const STIM = '#00d9ff';
 // per tone on the input. Here we check what the RUNNING APP resolves it to, that it is
 // a real house slider (.single-slider), and that its hit area is 44px.
 async function thumbs(page, scope) {
-  return page.locator(`${scope} input[type=range]`).evaluateAll((els) => els
-    .filter((el) => el.getBoundingClientRect().width > 0)
-    .map((el) => {
-      const cs = getComputedStyle(el);
-      const r = el.getBoundingClientRect();
-      return {
-        label: el.getAttribute('aria-label') || el.closest('[title]')?.getAttribute('title')?.slice(0, 30) || el.className,
-        color: cs.getPropertyValue('--range-thumb').trim().toLowerCase(),
-        cls: el.className, house: el.classList.contains('single-slider') || !!el.closest('.dual-slider'), // DualRangeRow's two inputs are the house control too
-        appearance: cs.appearance, hit: Math.round(r.height),
-      };
-    }));
+  return page.locator(`${scope} input[type=range]`).evaluateAll((els) =>
+    els
+      .filter((el) => el.getBoundingClientRect().width > 0)
+      .map((el) => {
+        const cs = getComputedStyle(el);
+        const r = el.getBoundingClientRect();
+        return {
+          label:
+            el.getAttribute('aria-label') || el.closest('[title]')?.getAttribute('title')?.slice(0, 30) || el.className,
+          color: cs.getPropertyValue('--range-thumb').trim().toLowerCase(),
+          cls: el.className,
+          house: el.classList.contains('single-slider') || !!el.closest('.dual-slider'), // DualRangeRow's two inputs are the house control too
+          appearance: cs.appearance,
+          hit: Math.round(r.height),
+        };
+      }),
+  );
 }
 
 const expectHouse = (list, color, where) => {
@@ -42,7 +47,9 @@ test('BUILD sliders are yellow, STIMULI cyan, PLAY ink; all with a 44px hit area
     try {
       localStorage.setItem('kc:first-run-seen', '1');
       localStorage.setItem('kc:strata-last-add', 'fx'); // #1203 — one-tap ADD STRATUM arms FX tracks
-    } catch { /* ignore */ }
+    } catch {
+      /* ignore */
+    }
   });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
@@ -51,21 +58,39 @@ test('BUILD sliders are yellow, STIMULI cyan, PLAY ink; all with a 44px hit area
   await page.getByRole('tab', { name: /build/i }).click();
   const stack = page.locator('.build-layer-stack');
   const addSlot = stack.locator('.strata-add');
-  await addSlot.click(); await addSlot.click(); await addSlot.click();   // FX 3: the Blur / Focus family
-  await stack.locator('.fx-editor .chip-btn').click();                   // + ADD SHARPEN (has two sliders)
+  await addSlot.click();
+  await addSlot.click();
+  await addSlot.click(); // FX 3: the Blur / Focus family
+  await stack.locator('.fx-editor .chip-btn').click(); // + ADD SHARPEN (has two sliders)
   await expect(stack.locator('.fx-editor input[type=range]')).toHaveCount(2);
   const build = await thumbs(page, '.panel-layout');
   // Motion tiles (glyph + pose sliders, e.g. wing beat) are ink wherever they sit; the spec's table says so.
-  expectHouse(build.filter((x) => !/motion-slider/.test(x.cls)), BUILD, 'BUILD (the whole panel: layout, appearance, layers)');
-  expectHouse(build.filter((x) => /motion-slider/.test(x.cls)), INK, 'BUILD motion tiles');
+  expectHouse(
+    build.filter((x) => !/motion-slider/.test(x.cls)),
+    BUILD,
+    'BUILD (the whole panel: layout, appearance, layers)',
+  );
+  expectHouse(
+    build.filter((x) => /motion-slider/.test(x.cls)),
+    INK,
+    'BUILD motion tiles',
+  );
 
   // STIMULI: the route-depth sliders, and GAIN once SETUP is open
   await page.getByRole('tab', { name: /stimuli/i }).click();
   await page.getByRole('button', { name: /setup/i }).click();
   const stimuli = await thumbs(page, '.panel-stimulus');
   // The LIFE motion tile lives here too; motion tiles are ink everywhere (the spec's table).
-  expectHouse(stimuli.filter((x) => !/motion-slider/.test(x.cls)), STIM, 'STIMULI');
-  expectHouse(stimuli.filter((x) => /motion-slider/.test(x.cls)), INK, 'STIMULI motion tile');
+  expectHouse(
+    stimuli.filter((x) => !/motion-slider/.test(x.cls)),
+    STIM,
+    'STIMULI',
+  );
+  expectHouse(
+    stimuli.filter((x) => /motion-slider/.test(x.cls)),
+    INK,
+    'STIMULI motion tile',
+  );
 
   // PLAY: the evolve interval, morph duration, phrase length, queue hold (the DAVIS controls)
   await page.getByRole('tab', { name: /play/i }).click();

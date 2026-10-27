@@ -171,7 +171,7 @@ export const LINK_COMPLIANCE = 1;
 // range is very soft without ever reaching "no constraint" (a
 // stiffness of exactly 0 is rejected by the gate instead).
 export function linkCompliance(stiffness) {
-  return LINK_COMPLIANCE * (1 - stiffness) / stiffness;
+  return (LINK_COMPLIANCE * (1 - stiffness)) / stiffness;
 }
 
 // — Bond formation (ruled by Matt 2026-10-16; the threshold
@@ -253,16 +253,24 @@ export function noteBondGrip(sys, a, b) {
 function formedBondLinks(sys, declared) {
   const st = sys._dishBonds;
   if (!st || st.formed.size === 0) return [];
-  const X = sys.x, Y = sys.y, ALIVE = sys.alive;
+  const X = sys.x,
+    Y = sys.y,
+    ALIVE = sys.alive;
   const declaredPairs = new Set();
   for (const d of declared) declaredPairs.add(pairKey(d.a, d.b));
   const out = [];
   for (const [key, bond] of st.formed) {
     const { a, b, rest } = bond;
-    if (!ALIVE[a] || !ALIVE[b]) { st.formed.delete(key); continue; }
+    if (!ALIVE[a] || !ALIVE[b]) {
+      st.formed.delete(key);
+      continue;
+    }
     if (declaredPairs.has(key)) continue;
     const d0 = Math.hypot(X[b] - X[a], Y[b] - Y[a]);
-    if (Math.abs(d0 - rest) > BOND_BREAK_STRAIN) { st.formed.delete(key); continue; }
+    if (Math.abs(d0 - rest) > BOND_BREAK_STRAIN) {
+      st.formed.delete(key);
+      continue;
+    }
     out.push({ a, b, rest, stiffness: 1 });
   }
   return out;
@@ -292,7 +300,8 @@ export function resolveDishLinks(sys, raw) {
   for (let k = 0; k < raw.length; k++) {
     const d = raw[k];
     if (!d || typeof d !== 'object') continue;
-    const a = d.a, b = d.b;
+    const a = d.a,
+      b = d.b;
     if (!Number.isInteger(a) || !Number.isInteger(b)) continue;
     if (a === b || a < 0 || b < 0 || a >= n || b >= n) continue;
     if (!alive[a] || !alive[b]) continue;
@@ -320,8 +329,12 @@ export function solveDishLinks(sys, raw, dtFrames) {
   const formed = formedBondLinks(sys, declared);
   const decls = formed.length ? declared.concat(formed) : declared;
   if (decls.length === 0) return 0;
-  const X = sys.x, Y = sys.y, VX = sys.vx, VY = sys.vy;
-  const MASS = sys.mass, SPINE = sys.spine;
+  const X = sys.x,
+    Y = sys.y,
+    VX = sys.vx,
+    VY = sys.vy;
+  const MASS = sys.mass,
+    SPINE = sys.spine;
   const h = dtFrames > 0 ? dtFrames : 1;
   const h2 = h * h;
 
@@ -337,29 +350,41 @@ export function solveDishLinks(sys, raw, dtFrames) {
   // Snapshot the endpoints' predicted positions: the velocity
   // fold is (solved − predicted)/h; the passes telescope, so the
   // endpoints' totals are all the fold needs.
-  const x0 = new Map(), y0 = new Map();
+  const x0 = new Map(),
+    y0 = new Map();
   for (let k = 0; k < m; k++) {
     const d = decls[k];
-    if (!x0.has(d.a)) { x0.set(d.a, X[d.a]); y0.set(d.a, Y[d.a]); }
-    if (!x0.has(d.b)) { x0.set(d.b, X[d.b]); y0.set(d.b, Y[d.b]); }
+    if (!x0.has(d.a)) {
+      x0.set(d.a, X[d.a]);
+      y0.set(d.a, Y[d.a]);
+    }
+    if (!x0.has(d.b)) {
+      x0.set(d.b, X[d.b]);
+      y0.set(d.b, Y[d.b]);
+    }
   }
 
   for (let iter = 0; iter < LINK_ITERATIONS; iter++) {
     for (let k = 0; k < m; k++) {
       const d = decls[k];
-      const a = d.a, b = d.b;
-      const wA = 1 / MASS[a], wB = 1 / MASS[b];
-      const dx = X[b] - X[a], dy = Y[b] - Y[a];
+      const a = d.a,
+        b = d.b;
+      const wA = 1 / MASS[a],
+        wB = 1 / MASS[b];
+      const dx = X[b] - X[a],
+        dy = Y[b] - Y[a];
       let dist = Math.sqrt(dx * dx + dy * dy);
       let nx, ny;
       if (dist > 1e-9) {
-        nx = dx / dist; ny = dy / dist;
+        nx = dx / dist;
+        ny = dy / dist;
       } else {
         // Coincident: the passes' golden-angle convention, keyed
         // on the index pair — deterministic, no RNG, same axis
         // D1/D2 separate along.
         const ang = (a * 2.399963229728653 + b * 1.2) % (Math.PI * 2);
-        nx = Math.cos(ang); ny = Math.sin(ang);
+        nx = Math.cos(ang);
+        ny = Math.sin(ang);
         dist = 0;
       }
       const C = dist - d.rest;
@@ -367,8 +392,10 @@ export function solveDishLinks(sys, raw, dtFrames) {
       if (dl === 0) continue;
       lambda[k] += dl;
       // Δx_i = w_i · ∇C_i · Δλ, with ∇C_a = −n̂ and ∇C_b = +n̂.
-      X[a] -= wA * dl * nx; Y[a] -= wA * dl * ny;
-      X[b] += wB * dl * nx; Y[b] += wB * dl * ny;
+      X[a] -= wA * dl * nx;
+      Y[a] -= wA * dl * ny;
+      X[b] += wB * dl * nx;
+      Y[b] += wB * dl * ny;
     }
   }
 
@@ -377,12 +404,16 @@ export function solveDishLinks(sys, raw, dtFrames) {
   // it after they move heads; a projection is a move, so the
   // same hygiene here).
   for (const [i, px] of x0) {
-    const ddx = X[i] - px, ddy = Y[i] - y0.get(i);
+    const ddx = X[i] - px,
+      ddy = Y[i] - y0.get(i);
     if (ddx !== 0 || ddy !== 0) {
       VX[i] += ddx / h;
       VY[i] += ddy / h;
       const sp = SPINE ? SPINE[i] : null;
-      if (sp && sp.length) { sp[0].x = X[i]; sp[0].y = Y[i]; }
+      if (sp && sp.length) {
+        sp[0].x = X[i];
+        sp[0].y = Y[i];
+      }
     }
   }
   return m;

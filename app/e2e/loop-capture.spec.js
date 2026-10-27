@@ -115,24 +115,46 @@ test('RENDER MOVIE exports a fixed-length seamless-loop WebM', async ({ page }, 
       // durationchange, give it a real budget, and fall back to where the seek
       // landed (Chromium clamps currentTime to the true end).
       let settled = false;
-      const done = (v) => { if (settled) return; settled = true; clearTimeout(to); clearInterval(poll); res(v); };
+      const done = (v) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(to);
+        clearInterval(poll);
+        res(v);
+      };
       const to = setTimeout(() => done(NaN), 40_000);
-      const poll = setInterval(() => { if (Number.isFinite(video.duration)) done(video.duration); }, 100);
-      video.addEventListener('loadedmetadata', () => {
+      const poll = setInterval(() => {
         if (Number.isFinite(video.duration)) done(video.duration);
-        else video.currentTime = 1e7;
-      }, { once: true });
+      }, 100);
+      video.addEventListener(
+        'loadedmetadata',
+        () => {
+          if (Number.isFinite(video.duration)) done(video.duration);
+          else video.currentTime = 1e7;
+        },
+        { once: true },
+      );
       video.addEventListener('seeked', () => {
         if (Number.isFinite(video.duration)) done(video.duration);
         else if (Number.isFinite(video.currentTime) && video.currentTime > 0) done(video.currentTime);
       });
-      video.onerror = () => { done(NaN); rej(new Error('webm decode failed')); };
+      video.onerror = () => {
+        done(NaN);
+        rej(new Error('webm decode failed'));
+      };
     });
     // The duration seek above parks the playhead at the end; rewind before
     // counting frames or play() ends immediately with a single callback.
     await new Promise((res) => {
       const to = setTimeout(res, 5_000);
-      video.addEventListener('seeked', () => { clearTimeout(to); res(); }, { once: true });
+      video.addEventListener(
+        'seeked',
+        () => {
+          clearTimeout(to);
+          res();
+        },
+        { once: true },
+      );
       video.currentTime = 0;
     });
     let frames = 0;

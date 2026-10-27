@@ -47,7 +47,11 @@ export function cellFor({ band = 'normal', pressure = 0, alignment = 0 } = {}) {
 }
 
 export function createPolicy() {
-  return { stw: new Float64Array(POLICY_SIZE), ltw: new Float64Array(POLICY_SIZE), elig: new Float64Array(POLICY_SIZE) };
+  return {
+    stw: new Float64Array(POLICY_SIZE),
+    ltw: new Float64Array(POLICY_SIZE),
+    elig: new Float64Array(POLICY_SIZE),
+  };
 }
 
 const clampW = (v) => (v > POLICY_RATES.wCap ? POLICY_RATES.wCap : v < -POLICY_RATES.wCap ? -POLICY_RATES.wCap : v);
@@ -61,14 +65,19 @@ export function chooseMode(policy, cell, { seed = 0, key = 0, tick = 0, temper =
   for (let i = 0; i < POLICY_SIZE; i++) policy.elig[i] *= P.eligDecay;
   let mode;
   if (hashU01(seed >>> 0, 'hierarchy', ((key * 7919) ^ (tick * 104729) ^ 0x50c1) >>> 0) < P.explore) {
-    mode = Math.floor(hashU01(seed >>> 0, 'hierarchy', ((key * 7919) ^ (tick * 104729) ^ 0x50c2) >>> 0) * N_MODES) % N_MODES;
+    mode =
+      Math.floor(hashU01(seed >>> 0, 'hierarchy', ((key * 7919) ^ (tick * 104729) ^ 0x50c2) >>> 0) * N_MODES) % N_MODES;
   } else {
-    let best = -Infinity; mode = 0;
+    let best = -Infinity;
+    mode = 0;
     for (let m = 0; m < N_MODES; m++) {
       const t = temper && Number.isFinite(temper[m]) ? temper[m] : 0;
       const tie = hashU01(seed >>> 0, 'hierarchy', ((key * 7919) ^ (m * 31) ^ 0x50c3) >>> 0) * 1e-6; // a fixed per-creature tie-break
       const v = policy.stw[cell * N_MODES + m] + t + tie;
-      if (v > best) { best = v; mode = m; }
+      if (v > best) {
+        best = v;
+        mode = m;
+      }
     }
   }
   policy.elig[cell * N_MODES + mode] = 1;

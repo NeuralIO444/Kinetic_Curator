@@ -30,7 +30,9 @@ export function hazeVeilLevel(lift) {
 
 /** The veil colour as '#rrggbb' (a pure grey, like the shaders' vec3(veil)). */
 export function hazeVeilHex(lift) {
-  const v = Math.round(hazeVeilLevel(lift) * 255).toString(16).padStart(2, '0');
+  const v = Math.round(hazeVeilLevel(lift) * 255)
+    .toString(16)
+    .padStart(2, '0');
   return `#${v}${v}${v}`;
 }
 
@@ -66,17 +68,21 @@ export function applyWeatherFade({ colors, accents, fade, veil }) {
   if (!veil || !fade) return { colors, accents };
   let any = false;
   for (let k = 0; k < colors.length; k++) {
-    if (fade[k] > 0) { any = true; break; }
+    if (fade[k] > 0) {
+      any = true;
+      break;
+    }
   }
   if (!any) return { colors, accents };
   const [vr, vg, vb] = hexToRgb255(veil);
-  const mixAll = (arr) => arr.map((c, k) => {
-    const f = fade[k];
-    if (!(f > 0)) return c;
-    const t = Math.min(1, f);
-    const [r, g, b] = hexToRgb255(c);
-    return toHexColor(r + (vr - r) * t, g + (vg - g) * t, b + (vb - b) * t);
-  });
+  const mixAll = (arr) =>
+    arr.map((c, k) => {
+      const f = fade[k];
+      if (!(f > 0)) return c;
+      const t = Math.min(1, f);
+      const [r, g, b] = hexToRgb255(c);
+      return toHexColor(r + (vr - r) * t, g + (vg - g) * t, b + (vb - b) * t);
+    });
   return { colors: mixAll(colors), accents: mixAll(accents) };
 }
 
@@ -92,5 +98,6 @@ registerCostTier('weather/haze-air', {
   tier: 1,
   memoryBytes: 0,
   timeMs: 0.6,
-  notes: '#1183 weather slice 1 (haze as air): measured 0.60 ms @800 marks in the resolver (2-octave field samples + pre-parsed veil mix, bit-identical to applyLean; cost ruling 2026-10-19). Tier 1 — the marks\u2019 weather response sheds with the finishes; the haze look itself never sheds (#192).',
+  notes:
+    '#1183 weather slice 1 (haze as air): measured 0.60 ms @800 marks in the resolver (2-octave field samples + pre-parsed veil mix, bit-identical to applyLean; cost ruling 2026-10-19). Tier 1 — the marks\u2019 weather response sheds with the finishes; the haze look itself never sheds (#192).',
 });

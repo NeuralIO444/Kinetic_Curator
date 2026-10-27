@@ -91,7 +91,10 @@ export function markWeatherSnapshot(store, sceneId) {
     seed: sc.seed,
     steps: sc.steps,
     motes: sc.motes.map((m) => ({ ...m })),
-    counts: sc.motes.reduce((acc, m) => { acc[m.kind] = (acc[m.kind] || 0) + 1; return acc; }, {}),
+    counts: sc.motes.reduce((acc, m) => {
+      acc[m.kind] = (acc[m.kind] || 0) + 1;
+      return acc;
+    }, {}),
   };
 }
 
@@ -119,7 +122,12 @@ function sceneFor(store, sceneId, seed) {
   } else if (sc.seed !== seed) {
     // The motes belong to the seed that dealt their marks (the travel
     // store's law): a reseed starts the weather over.
-    sc.seed = seed; sc.acc = 0; sc.steps = 0; sc.motes = []; sc.field = null; sc.fieldSeed = null;
+    sc.seed = seed;
+    sc.acc = 0;
+    sc.steps = 0;
+    sc.motes = [];
+    sc.field = null;
+    sc.fieldSeed = null;
   }
   return sc;
 }
@@ -192,12 +200,15 @@ export function stepMarkWeather(store, ctx) {
     // ── spawn (deterministic order: beam, pressure, trail, contact) ──
     const spawn = (kind, x, y, strength) => {
       sc.motes.push({
-        x, y, kind,
+        x,
+        y,
+        kind,
         age: 0,
         life: MOTE_LIFE_STEPS[kind],
         strength,
         shadeSteps: 0,
-        vx: 0, vy: 0,
+        vx: 0,
+        vy: 0,
       });
     };
     if (light && beamStrength > 0) {
@@ -207,7 +218,7 @@ export function stepMarkWeather(store, ctx) {
         const d = Math.hypot(it.x - light.x, it.y - light.y);
         if (d > beamR) continue;
         const fall = 1 - d / beamR;
-        if (hash01(seed, step, KIND_CODE.beam, k) < 0.10 * beamStrength * fall) {
+        if (hash01(seed, step, KIND_CODE.beam, k) < 0.1 * beamStrength * fall) {
           spawn('beam', it.x, it.y, beamStrength * fall);
         }
       }
@@ -303,5 +314,6 @@ registerCostTier('weather/mark-motes', {
   tier: 1,
   memoryBytes: 0,
   timeMs: 0.09,
-  notes: '#1627 S1 — mark-born motes: seeded step-clocked spawn from measured sources (sun spec pool, dish-density peaks, traveling marks, dish contacts), FLOW-field advection, device-capped (quality.js MARK_WEATHER_CAPS). CPU state only, no GPU pass, never saved. Sheds by governor cut 1.4 — FIRST, ahead of creatures (1.5) and travel (1.6). NOT the #1183 WEATHER dial (haze-as-air) — no shared code or data.',
+  notes:
+    '#1627 S1 — mark-born motes: seeded step-clocked spawn from measured sources (sun spec pool, dish-density peaks, traveling marks, dish contacts), FLOW-field advection, device-capped (quality.js MARK_WEATHER_CAPS). CPU state only, no GPU pass, never saved. Sheds by governor cut 1.4 — FIRST, ahead of creatures (1.5) and travel (1.6). NOT the #1183 WEATHER dial (haze-as-air) — no shared code or data.',
 });

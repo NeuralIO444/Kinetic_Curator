@@ -24,8 +24,13 @@ import { readFileSync } from 'node:fs';
 import { ParticleSystem } from './particles.js';
 import { createDishSession, enrolDishBody, armDish, runDishContacts } from './dishContacts.mjs';
 import {
-  buildDishDensity, sampleDishDensity, dishDensityShare,
-  publishDishDensity, getDishDensity, EMPTY_DISH_DENSITY, DISH_DENSITY_SATURATE,
+  buildDishDensity,
+  sampleDishDensity,
+  dishDensityShare,
+  publishDishDensity,
+  getDishDensity,
+  EMPTY_DISH_DENSITY,
+  DISH_DENSITY_SATURATE,
 } from './dishDensity.mjs';
 import { on, off, Events } from '../composition/eventBus.js';
 import { observeDishDensity, getDishDensityField } from '../curator/dishDensityLive.js';
@@ -37,8 +42,12 @@ const SEED = 0x1a4f;
 const body = (x, y) => {
   const sys = new ParticleSystem();
   sys.init(1, 1000, 700, assets, palette, SEED);
-  sys.x[0] = x; sys.y[0] = y; sys.vx[0] = 0; sys.vy[0] = 0;
-  sys.mass[0] = 1; sys.scale[0] = 1;
+  sys.x[0] = x;
+  sys.y[0] = y;
+  sys.vx[0] = 0;
+  sys.vy[0] = 0;
+  sys.mass[0] = 1;
+  sys.scale[0] = 1;
   sys._layout = { contactRadius: 20 };
   return sys;
 };
@@ -48,19 +57,53 @@ const body = (x, y) => {
 const scenario = () => {
   const A = new ParticleSystem();
   A.init(2, 1000, 700, assets, palette, SEED);
-  A.x[0] = 400; A.y[0] = 350; A.x[1] = 430; A.y[1] = 350;
-  A.vx[0] = 0; A.vy[0] = 0; A.vx[1] = 0; A.vy[1] = 0;
-  A.mass[0] = 1; A.mass[1] = 1; A.scale[0] = 1; A.scale[1] = 1;
+  A.x[0] = 400;
+  A.y[0] = 350;
+  A.x[1] = 430;
+  A.y[1] = 350;
+  A.vx[0] = 0;
+  A.vy[0] = 0;
+  A.vx[1] = 0;
+  A.vy[1] = 0;
+  A.mass[0] = 1;
+  A.mass[1] = 1;
+  A.scale[0] = 1;
+  A.scale[1] = 1;
   A._layout = { contactRadius: 20 };
   const B = new ParticleSystem();
   B.init(2, 1000, 700, assets, palette, SEED);
-  B.x[0] = 415; B.y[0] = 382; B.x[1] = 900; B.y[1] = 100;
-  B.vx[0] = 0; B.vy[0] = 0; B.vx[1] = 0; B.vy[1] = 0;
-  B.mass[0] = 1; B.mass[1] = 1; B.scale[0] = 1; B.scale[1] = 1;
+  B.x[0] = 415;
+  B.y[0] = 382;
+  B.x[1] = 900;
+  B.y[1] = 100;
+  B.vx[0] = 0;
+  B.vy[0] = 0;
+  B.vx[1] = 0;
+  B.vy[1] = 0;
+  B.mass[0] = 1;
+  B.mass[1] = 1;
+  B.scale[0] = 1;
+  B.scale[1] = 1;
   B._layout = { contactRadius: 20 };
   const ses = createDishSession();
-  enrolDishBody(ses, { key: 'A', sys: A, radius: 20, restitution: 0.5, contactMode: 'none', umask: 0xffffffff, organism: false });
-  enrolDishBody(ses, { key: 'B', sys: B, radius: 20, restitution: 0.5, contactMode: 'none', umask: 0xffffffff, organism: false });
+  enrolDishBody(ses, {
+    key: 'A',
+    sys: A,
+    radius: 20,
+    restitution: 0.5,
+    contactMode: 'none',
+    umask: 0xffffffff,
+    organism: false,
+  });
+  enrolDishBody(ses, {
+    key: 'B',
+    sys: B,
+    radius: 20,
+    restitution: 0.5,
+    contactMode: 'none',
+    umask: 0xffffffff,
+    organism: false,
+  });
   armDish(ses, ['A', 'B']);
   runDishContacts(ses, A);
   return ses;
@@ -81,7 +124,11 @@ const scenario = () => {
   assert.strictEqual(dishDensityShare(f, 400, 350), 2 / DISH_DENSITY_SATURATE, 'the share is count over saturation');
   const dense = buildDishDensity({
     cellStart: new Int32Array([0, DISH_DENSITY_SATURATE + 5, DISH_DENSITY_SATURATE + 5]),
-    cols: 2, rows: 1, cellSize: 40, minCx: 0, minCy: 0,
+    cols: 2,
+    rows: 1,
+    cellSize: 40,
+    minCx: 0,
+    minCy: 0,
   });
   assert.strictEqual(dishDensityShare(dense, 20, 20), 1, 'a cell at saturation reads full density');
   assert.strictEqual(sampleDishDensity(EMPTY_DISH_DENSITY, 400, 350), 0, 'the empty field samples 0 everywhere');
@@ -99,9 +146,26 @@ const scenario = () => {
   const lone = createDishSession();
   const one = body(500, 350);
   const two = body(900, 100);
-  enrolDishBody(lone, { key: 'A', sys: one, radius: 20, restitution: 0.5, contactMode: 'none', umask: 0xffffffff, organism: false });
-  enrolDishBody(lone, { key: 'B', sys: two, radius: 20, restitution: 0.5, contactMode: 'none', umask: 0xffffffff, organism: false });
-  one.alive[0] = 0; two.alive[0] = 0; // enrolled, but no living bodies
+  enrolDishBody(lone, {
+    key: 'A',
+    sys: one,
+    radius: 20,
+    restitution: 0.5,
+    contactMode: 'none',
+    umask: 0xffffffff,
+    organism: false,
+  });
+  enrolDishBody(lone, {
+    key: 'B',
+    sys: two,
+    radius: 20,
+    restitution: 0.5,
+    contactMode: 'none',
+    umask: 0xffffffff,
+    organism: false,
+  });
+  one.alive[0] = 0;
+  two.alive[0] = 0; // enrolled, but no living bodies
   armDish(lone, ['A', 'B']);
   runDishContacts(lone, one);
   assert.strictEqual(lone.densityTick, 1, 'the trivial pass still stamps');
@@ -111,7 +175,15 @@ const scenario = () => {
   // A single stratum never arms: nothing is stamped, and the
   // resolver's rule (tick not advanced → publish empty) applies.
   const solo = createDishSession();
-  enrolDishBody(solo, { key: 'A', sys: body(500, 350), radius: 20, restitution: 0.5, contactMode: 'none', umask: 0xffffffff, organism: false });
+  enrolDishBody(solo, {
+    key: 'A',
+    sys: body(500, 350),
+    radius: 20,
+    restitution: 0.5,
+    contactMode: 'none',
+    umask: 0xffffffff,
+    organism: false,
+  });
   assert.strictEqual(armDish(solo, ['A']), false, 'one stratum does not arm the dish');
   assert.strictEqual(solo.density, null, 'no pass, no field');
   publishDishDensity(solo.densityTick > 0 ? solo.density : EMPTY_DISH_DENSITY);
@@ -135,7 +207,11 @@ const scenario = () => {
   // A formation-style read, from the bus payload alone: how crowded
   // is the pin at the A pair? (No engine call beyond the field law's
   // own sampler — the acceptance is that readers need no engine change.)
-  assert.strictEqual(sampleDishDensity(seen[0].field, 415, 350), 2, 'a pin at the pair reads their density from the bus');
+  assert.strictEqual(
+    sampleDishDensity(seen[0].field, 415, 350),
+    2,
+    'a pin at the pair reads their density from the bus',
+  );
   assert.ok(dishDensityShare(seen[0].field, 415, 350) > 0, 'and as a share for a formation threshold');
   publishDishDensity(EMPTY_DISH_DENSITY);
   observeDishDensity();
@@ -160,10 +236,14 @@ const scenario = () => {
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   const bus = readFileSync(new URL('../composition/eventBus.js', import.meta.url), 'utf8');
   assert.ok(contacts.includes('stampDensity(session, buildDishDensity('), 'the shared pass stamps its counts');
-  assert.ok(resolve.includes('publishDishDensity(dishSession.densityTick > densityTickSeen'),
-    'the resolver publishes the frame\u2019s field, empty when no pass ran');
+  assert.ok(
+    resolve.includes('publishDishDensity(dishSession.densityTick > densityTickSeen'),
+    'the resolver publishes the frame\u2019s field, empty when no pass ran',
+  );
   assert.ok(app.includes('observeDishDensity();'), 'the App frame tap bridges the field to the bus');
   assert.ok(bus.includes("DISH_DENSITY: 'dish:density'"), 'the bus names the field signal');
 }
 
-console.log('dishDensity.selfcheck: OK (#1412 — grid-true counts, tick + empty-stamp honesty, bus publication + pin read, deterministic, resolver wiring)');
+console.log(
+  'dishDensity.selfcheck: OK (#1412 — grid-true counts, tick + empty-stamp honesty, bus publication + pin read, deterministic, resolver wiring)',
+);

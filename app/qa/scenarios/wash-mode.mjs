@@ -15,7 +15,8 @@
 // - Screenshots use the full page — element screenshots of the WebGL canvas
 //   go stale in headless Chromium, the page capture stays live.
 export default {
-  describe: 'Switch to WASH, tap palette chips 1–4, screenshot across the MIX window — the dye front should chase through the marks, nothing should scale or blink.',
+  describe:
+    'Switch to WASH, tap palette chips 1–4, screenshot across the MIX window — the dye front should chase through the marks, nothing should scale or blink.',
   async run(ctx) {
     const page = await ctx.newPage();
     const errors = [];

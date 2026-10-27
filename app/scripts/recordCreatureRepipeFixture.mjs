@@ -27,12 +27,30 @@ import { fileURLToPath } from 'node:url';
 
 import { createLiveResolver } from '../src/gl/liveResolve.mjs';
 import {
-  withResolveTap, setResolveTap, setResolveOutputTap,
-  setFormedProvider, setLimbsProvider, setTraitsProvider, setDishHostedProvider, setDishPressureProvider,
-  getFormedPins, getLimbPairs, getPinTraits, getDishHosted, getDishPressure,
+  withResolveTap,
+  setResolveTap,
+  setResolveOutputTap,
+  setFormedProvider,
+  setLimbsProvider,
+  setTraitsProvider,
+  setDishHostedProvider,
+  setDishPressureProvider,
+  getFormedPins,
+  getLimbPairs,
+  getPinTraits,
+  getDishHosted,
+  getDishPressure,
 } from '../src/gl/resolveTap.mjs';
 import { createPerformanceRecorder, checkPerformance, packPerformance } from '../src/gl/performanceFile.mjs';
-import { observeFormation, resetFormation, getFormedPins as liveFormed, getLimbPairs as liveLimbs, getPinTraits as liveTraits, getDishHosted as liveHosted, getDishPressures as livePressures } from '../src/curator/formationLive.js';
+import {
+  observeFormation,
+  resetFormation,
+  getFormedPins as liveFormed,
+  getLimbPairs as liveLimbs,
+  getPinTraits as liveTraits,
+  getDishHosted as liveHosted,
+  getDishPressures as livePressures,
+} from '../src/curator/formationLive.js';
 import { observeSpawn, resetSpawn } from '../src/curator/spawnLive.js';
 import { BAND_NORMAL, BAND_TIGHTEN, BAND_RELAX } from '../src/curator/stress.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../src/data/layout-modes.js';
@@ -49,19 +67,47 @@ const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'n
 
 /** One scripted session, wired as App + liveLoop wire the instrument today. Returns { perf, stats }. */
 function recordSession() {
-  resetFormation(); resetSpawn();
-  setFormedProvider(liveFormed); setLimbsProvider(liveLimbs); setTraitsProvider(liveTraits);
-  setDishHostedProvider(liveHosted); setDishPressureProvider(livePressures);
+  resetFormation();
+  resetSpawn();
+  setFormedProvider(liveFormed);
+  setLimbsProvider(liveLimbs);
+  setTraitsProvider(liveTraits);
+  setDishHostedProvider(liveHosted);
+  setDishPressureProvider(livePressures);
   const recorder = createPerformanceRecorder();
   const resolver = withResolveTap(createLiveResolver);
   setResolveTap((i) => recorder.onInput(i));
   setResolveOutputTap((o) => recorder.onOutput(o));
   const stable = {
-    canvasW: 1000, canvasH: 700, layers: [L('lyr-a')], activeLayerId: 'lyr-a', layerSnapshots: {}, seedOffsets: null,
-    paletteId: 'bone', paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {},
-    customAssets: [], lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, scaleMul: 1, alphaBoost: 0,
-    phraseWrapGen: 0, reducedMotion: false, quality: 'balanced', perfTier1: false, assetThin: false, slowRender: false,
-    effectiveScale: [0.5, 1.5], effectiveAlpha: [20, 100], assetAttach: {}, attractor: null,
+    canvasW: 1000,
+    canvasH: 700,
+    layers: [L('lyr-a')],
+    activeLayerId: 'lyr-a',
+    layerSnapshots: {},
+    seedOffsets: null,
+    paletteId: 'bone',
+    paletteOverrides: null,
+    userPalettes: [],
+    caGrid: null,
+    enabledAssets: null,
+    assetWeightOverrides: {},
+    customAssets: [],
+    lockedParams: {},
+    batchPaused: false,
+    focusSwap: false,
+    perfClampOverride: null,
+    scaleMul: 1,
+    alphaBoost: 0,
+    phraseWrapGen: 0,
+    reducedMotion: false,
+    quality: 'balanced',
+    perfTier1: false,
+    assetThin: false,
+    slowRender: false,
+    effectiveScale: [0.5, 1.5],
+    effectiveAlpha: [20, 100],
+    assetAttach: {},
+    attractor: null,
     layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 380, particleCount: 150 },
   };
   let pins = []; // the store's dishPins, written by the spawner (as App's tap writes them)
@@ -72,11 +118,19 @@ function recordSession() {
     t += 16.7;
     const band = bandAt(f);
     const input = {
-      ...stable, seed: SEED, loopTimeMs: t, dtSec: 1 / 60,
-      band, smoothed: 0.5 + 0.5 * Math.sin(f / 240),
+      ...stable,
+      seed: SEED,
+      loopTimeMs: t,
+      dtSec: 1 / 60,
+      band,
+      smoothed: 0.5 + 0.5 * Math.sin(f / 240),
       creatureCount: countAt(f),
-      dishPins: pins, dishFormed: getFormedPins(), dishLimbs: getLimbPairs(), dishTraits: getPinTraits(),
-      dishHosted: getDishHosted(), dishPressure: getDishPressure(),
+      dishPins: pins,
+      dishFormed: getFormedPins(),
+      dishLimbs: getLimbPairs(),
+      dishTraits: getPinTraits(),
+      dishHosted: getDishHosted(),
+      dishPressure: getDishPressure(),
     };
     const out = resolver.resolveLayers(input);
     // the frame tap, as App wires it: formation first (it reads the frame), then spawn (its homes are next frame's pins)
@@ -86,8 +140,13 @@ function recordSession() {
     if (pins.length > maxPins) maxPins = pins.length;
     last = out;
   }
-  setResolveTap(null); setResolveOutputTap(null);
-  setFormedProvider(null); setLimbsProvider(null); setTraitsProvider(null); setDishHostedProvider(null); setDishPressureProvider(null);
+  setResolveTap(null);
+  setResolveOutputTap(null);
+  setFormedProvider(null);
+  setLimbsProvider(null);
+  setTraitsProvider(null);
+  setDishHostedProvider(null);
+  setDishPressureProvider(null);
   resolver.dispose();
   const perf = recorder.finish();
   const flat = (last || []).flatMap((e) => e.items || []);
@@ -96,7 +155,8 @@ function recordSession() {
     finalPins: pins.length,
     moths: flat.filter((i) => i._creature && !(typeof i.key === 'string' && i.key.startsWith('dish:'))).length,
     dishItems: flat.filter((i) => i._creature && typeof i.key === 'string' && i.key.startsWith('dish:')).length,
-    births: perf.inputs.steps.filter((s) => s.k && Array.isArray(s.k.dishTraits) && s.k.dishTraits.some(Boolean)).length,
+    births: perf.inputs.steps.filter((s) => s.k && Array.isArray(s.k.dishTraits) && s.k.dishTraits.some(Boolean))
+      .length,
     hosted: perf.inputs.steps.some((s) => s.k && Array.isArray(s.k.dishHosted) && s.k.dishHosted.some(Boolean)),
     grew: perf.inputs.steps.some((s) => s.k && Array.isArray(s.k.dishLimbs) && s.k.dishLimbs.some((n) => n >= 2)),
   };
@@ -114,7 +174,8 @@ if (shaA !== shaB) throw new Error(`recording is not deterministic: ${shaA} vs $
 
 const { perf, stats } = a;
 console.log('session stats:', JSON.stringify(stats));
-if (!(stats.maxPins >= 2)) throw new Error('auto spawn did not find at least two homes — fixture would not exercise births');
+if (!(stats.maxPins >= 2))
+  throw new Error('auto spawn did not find at least two homes — fixture would not exercise births');
 if (!(stats.moths > 0)) throw new Error('no moths in the final frame — fixture carries no moth line');
 if (!(stats.dishItems > 0)) throw new Error('no dish creature in the final frame — fixture carries no dish family');
 if (!(stats.births >= 1)) throw new Error('no Davis-stamped birth recorded in the take');
@@ -125,7 +186,9 @@ if (perf.frames !== FRAMES) throw new Error(`take holds ${perf.frames} frames, w
 const head = execSync('git rev-parse --short HEAD', { cwd: APP, encoding: 'utf8' }).trim();
 mkdirSync(OUT_DIR, { recursive: true });
 writeFileSync(join(OUT_DIR, 'creatureRepipe.kcperf'), bytesA);
-writeFileSync(join(OUT_DIR, 'creatureRepipe.PROVENANCE.md'), `# Creature repipe gate fixture — provenance (#1694 slice 1, step 0)
+writeFileSync(
+  join(OUT_DIR, 'creatureRepipe.PROVENANCE.md'),
+  `# Creature repipe gate fixture — provenance (#1694 slice 1, step 0)
 
 - **What:** one scripted 15-second performance with the creature channel UP — auto spawn finding homes, the
   formation rule forming moths, Davis stamping traits at birth, the first formed pin hosting the dish creature —
@@ -151,5 +214,8 @@ writeFileSync(join(OUT_DIR, 'creatureRepipe.PROVENANCE.md'), `# Creature repipe 
   replays it through the repiped resolver and every checkpoint must match unmodified. If a later intentional
   behaviour change ever moves creature replay, that change re-records in its own PR and says so, with the
   reason — the gate's rule since #1638.
-`);
-console.log(`fixture: ${bytesA.length} bytes, ${perf.frames} frames, ${perf.checkpoints.length} checkpoints, sha256 ${shaA}, recorded twice identically in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+`,
+);
+console.log(
+  `fixture: ${bytesA.length} bytes, ${perf.frames} frames, ${perf.checkpoints.length} checkpoints, sha256 ${shaA}, recorded twice identically in ${((Date.now() - t0) / 1000).toFixed(1)}s`,
+);

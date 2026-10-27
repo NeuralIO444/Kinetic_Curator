@@ -23,7 +23,10 @@ const CASES = [
   {
     name: 'kc_hash22',
     body: 'o = vec4(kc_hash22(p), 0.0, 1.0);',
-    ref: (x, y) => { const h = ref.refHash22(x, y); return [h[0], h[1], 0]; },
+    ref: (x, y) => {
+      const h = ref.refHash22(x, y);
+      return [h[0], h[1], 0];
+    },
   },
   {
     name: 'kc_vnoise',
@@ -38,7 +41,10 @@ const CASES = [
   {
     name: 'kc_luma',
     body: 'o = vec4(vec3(kc_luma(vec3(p.x / 8.0, p.y / 8.0, 0.25))), 1.0);',
-    ref: (x, y) => { const l = ref.refLuma(x / 8, y / 8, 0.25); return [l, l, l]; },
+    ref: (x, y) => {
+      const l = ref.refLuma(x / 8, y / 8, 0.25);
+      return [l, l, l];
+    },
   },
   {
     name: 'kc_rgb2hsl',
@@ -73,16 +79,23 @@ const CASES = [
   {
     name: 'kc_uv_centered',
     body: 'vec2 c = kc_uv_centered(p / 8.0); o = vec4(c * 0.5 + 0.5, 0.0, 1.0);',
-    ref: (x, y) => { const c = ref.refUvCentered(x / 8, y / 8); return [c[0] * 0.5 + 0.5, c[1] * 0.5 + 0.5, 0]; },
+    ref: (x, y) => {
+      const c = ref.refUvCentered(x / 8, y / 8);
+      return [c[0] * 0.5 + 0.5, c[1] * 0.5 + 0.5, 0];
+    },
   },
   {
     name: 'kc_uv_aspect',
     body: 'vec2 c = kc_uv_aspect(p / 8.0, vec2(8.0, 4.0)); o = vec4(c * 0.25 + 0.5, 0.0, 1.0);',
-    ref: (x, y) => { const c = ref.refUvAspect(x / 8, y / 8, 8, 4); return [c[0] * 0.25 + 0.5, c[1] * 0.25 + 0.5, 0]; },
+    ref: (x, y) => {
+      const c = ref.refUvAspect(x / 8, y / 8, 8, 4);
+      return [c[0] * 0.25 + 0.5, c[1] * 0.25 + 0.5, 0];
+    },
   },
 ];
 
-const fsSrcFor = (body) => injectCommon(`#version 300 es
+const fsSrcFor = (body) =>
+  injectCommon(`#version 300 es
 precision highp float;
 out vec4 o;
 void main() {
@@ -93,49 +106,54 @@ void main() {
 
 /** Render one fragment source to W×H RGBA8 in the page; null when no WebGL2. */
 async function renderInPage(page, fsSrc) {
-  return page.evaluate(({ fsSrc, w, h }) => {
-    const canvas = document.createElement('canvas');
-    const gl = canvas.getContext('webgl2');
-    if (!gl) return null;
-    const compile = (type, src) => {
-      const s = gl.createShader(type);
-      gl.shaderSource(s, src);
-      gl.compileShader(s);
-      if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-        throw new Error('chunk shader compile failed: ' + gl.getShaderInfoLog(s));
+  return page.evaluate(
+    ({ fsSrc, w, h }) => {
+      const canvas = document.createElement('canvas');
+      const gl = canvas.getContext('webgl2');
+      if (!gl) return null;
+      const compile = (type, src) => {
+        const s = gl.createShader(type);
+        gl.shaderSource(s, src);
+        gl.compileShader(s);
+        if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+          throw new Error('chunk shader compile failed: ' + gl.getShaderInfoLog(s));
+        }
+        return s;
+      };
+      const vs = compile(
+        gl.VERTEX_SHADER,
+        '#version 300 es\nlayout(location=0) in vec2 a_pos;\nvoid main(){gl_Position=vec4(a_pos,0.,1.);}',
+      );
+      const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
+      const prog = gl.createProgram();
+      gl.attachShader(prog, vs);
+      gl.attachShader(prog, fs);
+      gl.linkProgram(prog);
+      if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
+        throw new Error('chunk program link failed: ' + gl.getProgramInfoLog(prog));
       }
-      return s;
-    };
-    const vs = compile(gl.VERTEX_SHADER,
-      '#version 300 es\nlayout(location=0) in vec2 a_pos;\nvoid main(){gl_Position=vec4(a_pos,0.,1.);}');
-    const fs = compile(gl.FRAGMENT_SHADER, fsSrc);
-    const prog = gl.createProgram();
-    gl.attachShader(prog, vs);
-    gl.attachShader(prog, fs);
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) {
-      throw new Error('chunk program link failed: ' + gl.getProgramInfoLog(prog));
-    }
-    const tex = gl.createTexture();
-    gl.bindTexture(gl.TEXTURE_2D, tex);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    const fb = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
-    gl.viewport(0, 0, w, h);
-    gl.useProgram(prog);
-    const vbo = gl.createBuffer();
-    gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-    const out = new Uint8Array(w * h * 4);
-    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
-    return Array.from(out);
-  }, { fsSrc, w: W, h: H });
+      const tex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+      gl.viewport(0, 0, w, h);
+      gl.useProgram(prog);
+      const vbo = gl.createBuffer();
+      gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+      gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+      gl.enableVertexAttribArray(0);
+      gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+      const out = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, out);
+      return Array.from(out);
+    },
+    { fsSrc, w: W, h: H },
+  );
 }
 
 test.describe('GLSL chunk library', () => {
