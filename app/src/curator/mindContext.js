@@ -54,6 +54,15 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
  * (an absent block changes nothing else in the summary). Everything is clamped and bounded: the route table is at most
  * 16 rows, owned targets are names only.
  */
+const unit = (v) => r3(Math.min(1, Math.max(0, v)));
+/** The spectrum summary { centroid, flux, flatness }, or null unless all three are finite numbers. */
+function spectrumOf(sp) {
+  if (!sp || typeof sp !== 'object') return null;
+  const { centroid, flux, flatness } = sp;
+  if (![centroid, flux, flatness].every((v) => typeof v === 'number' && Number.isFinite(v))) return null;
+  return { centroid: unit(centroid), flux: unit(flux), flatness: unit(flatness) };
+}
+
 export function showOf(s) {
   if (!s || typeof s !== 'object') return null;
   const routes = (Array.isArray(s.routes) ? s.routes : [])
@@ -75,6 +84,7 @@ export function showOf(s) {
     flatBars: Number.isFinite(s.flatBars) ? Math.max(0, Math.round(s.flatBars)) : 0,
     routes,
     owned: (Array.isArray(s.owned) ? s.owned : []).filter((t) => typeof t === 'string' && t.length <= 40).slice(0, 32),
+    ...(spectrumOf(s.spectrum) ? { spectrum: spectrumOf(s.spectrum) } : {}),
   };
 }
 
