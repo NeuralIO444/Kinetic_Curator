@@ -12,8 +12,9 @@ import { dealableRecords, dealMixedPool, dealPoolFor, poolToEnabled, POOL_MIN, P
 const records = dealableRecords(ASSETS);
 const rng = mkRng(1767);
 
-// 1. the old ceiling, measured: the shape sets reach 49 assets
-const setReach = new Set(SHAPE_SETS.flatMap((s) => s.ids));
+// 1. the old ceiling, measured: the 19 curated 4-shape sets reach 49 assets (#1771 later widened the layout-tile
+//    chips to 8 shapes — 92 — still a fraction of the library; the pre-#1767 deal was the 4-shape slice)
+const setReach = new Set(SHAPE_SETS.flatMap((s) => s.ids.slice(0, 4)));
 assert.ok(setReach.size < 60, `the old deck: ${setReach.size} assets`);
 
 // 2. every library family is dealt within a bounded number of rolls, and >200 unique assets become reachable
