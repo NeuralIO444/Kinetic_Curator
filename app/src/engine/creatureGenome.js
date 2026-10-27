@@ -57,7 +57,10 @@ const roll = (seed, key, salt) => hashU01(seed >>> 0, 'hierarchy', (hash32(key) 
 function gene(kind, id, value, { stage = 'embryo', mutate = true, dup = false, cut = false, cell = 0, mode = 0 } = {}) {
   // values rounded to 4 places: a genome stays a small, readable record (~1.5 KB), and rounding is part of the copy
   const g = { kind, id, value: Math.round(value * 1e4) / 1e4, stage, mutate, dup, cut };
-  if (kind === 'instinct') { g.cell = cell; g.mode = mode; } // only an instinct names a situation and a mode
+  if (kind === 'instinct') {
+    g.cell = cell;
+    g.mode = mode;
+  } // only an instinct names a situation and a mode
   if (kind === 'plan') g.protected = true;
   return g;
 }
@@ -79,7 +82,14 @@ export function genomeFromTraits(traits, seed = 0, key = 'wild') {
   for (let n = 0; n < 2; n++) {
     const cell = Math.floor(roll(seed, key, 0x6e0d0200 + n) * CELL_COUNT) % CELL_COUNT;
     const mode = Math.floor(roll(seed, key, 0x6e0d0300 + n) * MODES.length) % MODES.length;
-    genes.push(gene('instinct', `instinct${n}`, 0.4 + 0.4 * roll(seed, key, 0x6e0d0400 + n), { dup: true, cut: true, cell, mode }));
+    genes.push(
+      gene('instinct', `instinct${n}`, 0.4 + 0.4 * roll(seed, key, 0x6e0d0400 + n), {
+        dup: true,
+        cut: true,
+        cell,
+        mode,
+      }),
+    );
   }
   MODES.forEach((m, n) => {
     const u = roll(seed, key, 0x6e0d0500 + n);
@@ -91,7 +101,8 @@ export function genomeFromTraits(traits, seed = 0, key = 'wild') {
 
 /** Clamp one gene; null when it is not a gene at all (a mutation or a hand-edited file can carry anything). */
 function cleanGene(g) {
-  if (!g || typeof g !== 'object' || !KINDS.includes(g.kind) || typeof g.id !== 'string' || !g.id || g.id.length > 24) return null;
+  if (!g || typeof g !== 'object' || !KINDS.includes(g.kind) || typeof g.id !== 'string' || !g.id || g.id.length > 24)
+    return null;
   const stage = STAGE_NAMES.includes(g.stage) ? g.stage : 'embryo';
   const flags = { stage, mutate: g.mutate !== false, dup: g.dup === true, cut: g.cut === true };
   let value = Number.isFinite(g.value) ? g.value : 0;
@@ -147,7 +158,10 @@ export function expressGenome(genome, ageFrames = 0) {
   for (const x of g) {
     if ((STAGES[x.stage] ?? 0) > age) continue; // not switched on yet
     const k = `${x.kind}:${x.id}`;
-    if (x.kind === 'instinct') { out.instincts.push({ cell: x.cell, mode: x.mode, strength: x.value }); continue; }
+    if (x.kind === 'instinct') {
+      out.instincts.push({ cell: x.cell, mode: x.mode, strength: x.value });
+      continue;
+    }
     if (seen.has(k)) continue;
     seen.add(k);
     if (x.kind === 'trait') out.traits[x.id] = x.value;
@@ -177,7 +191,10 @@ export function mutateGenome(genome, seed = 0, key = 'mut') {
   if (!src) return null;
   const out = [];
   src.genes.forEach((g, n) => {
-    if (g.kind === 'plan') { out.push({ ...g }); return; } // protected: copied as it is
+    if (g.kind === 'plan') {
+      out.push({ ...g });
+      return;
+    } // protected: copied as it is
     const base = (n + 1) * 0x101;
     if (g.cut && roll(seed, key, base + 1) < MUTATION.cut) return; // omitted
     const copy = { ...g };
@@ -199,7 +216,8 @@ export function mutateGenome(genome, seed = 0, key = 'mut') {
  * both. The body plan always comes first and is never crossed out. Then copy errors (mutateGenome).
  */
 export function crossover(a, b, seed = 0, key = 'cross') {
-  const A = sanitizeGenome(a); const B = sanitizeGenome(b);
+  const A = sanitizeGenome(a);
+  const B = sanitizeGenome(b);
   if (!A || !B) return A ? mutateGenome(A, seed, key) : B ? mutateGenome(B, seed, key) : null;
   const P = [A.genes, B.genes];
   let from = roll(seed, key, 0x7c0) < 0.5 ? 0 : 1;
@@ -208,7 +226,10 @@ export function crossover(a, b, seed = 0, key = 'cross') {
   const len = Math.max(A.genes.length, B.genes.length);
   for (let n = 1; n < len; n++) {
     since += 1;
-    if (roll(seed, key, 0x7c1 + n) < Math.min(0.5, since * 0.08)) { from = 1 - from; since = 0; }
+    if (roll(seed, key, 0x7c1 + n) < Math.min(0.5, since * 0.08)) {
+      from = 1 - from;
+      since = 0;
+    }
     const g = P[from][n];
     if (g) out.push(g);
   }
@@ -217,13 +238,17 @@ export function crossover(a, b, seed = 0, key = 'cross') {
 
 /** How alike two genomes are, 0..1 (shared expressed trait/behaviour values): the breeding pool's diversity guard reads it. */
 export function genomeSimilarity(a, b) {
-  const ea = expressGenome(a, Infinity); const eb = expressGenome(b, Infinity);
+  const ea = expressGenome(a, Infinity);
+  const eb = expressGenome(b, Infinity);
   const parts = [];
   for (const k of Object.keys(TRAIT_DEFAULTS)) {
     const r = TRAIT_RANGES[k];
     parts.push(1 - Math.abs(ea.traits[k] - eb.traits[k]) / (r.max - r.min));
   }
-  for (const d of DRIVES) parts.push(1 - Math.abs(ea.drives[d] - eb.drives[d]) / (GENE_RANGES.drive.max - GENE_RANGES.drive.min));
-  ea.temper.forEach((v, n) => parts.push(1 - Math.abs(v - eb.temper[n]) / (GENE_RANGES.temper.max - GENE_RANGES.temper.min)));
+  for (const d of DRIVES)
+    parts.push(1 - Math.abs(ea.drives[d] - eb.drives[d]) / (GENE_RANGES.drive.max - GENE_RANGES.drive.min));
+  ea.temper.forEach((v, n) =>
+    parts.push(1 - Math.abs(v - eb.temper[n]) / (GENE_RANGES.temper.max - GENE_RANGES.temper.min)),
+  );
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }

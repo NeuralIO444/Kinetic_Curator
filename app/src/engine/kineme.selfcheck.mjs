@@ -3,9 +3,16 @@
 // clock, sine-free per-instance phase, anchored driver clock.
 import assert from 'node:assert';
 import {
-  BOIL_FPS_DEFAULT, BOIL_FPS_MIN, BOIL_FPS_MAX,
-  kinemeLoopSec, boilStep, boilSec, clampBoilFps,
-  kinemePhase2, createDriverClock, driverTimeSec,
+  BOIL_FPS_DEFAULT,
+  BOIL_FPS_MIN,
+  BOIL_FPS_MAX,
+  kinemeLoopSec,
+  boilStep,
+  boilSec,
+  clampBoilFps,
+  kinemePhase2,
+  createDriverClock,
+  driverTimeSec,
 } from './kineme.js';
 
 // ── loop seconds ─────────────────────────────────────────────────────────
@@ -40,7 +47,10 @@ assert.strictEqual(boilStep(2.0, 8), 16);
   for (let i = 0; i < 60; i++) seen.add(kinemePhase2(7, i).join(','));
   assert.ok(seen.size >= 50, 'copies do not move in lockstep');
   let same = 0;
-  for (let i = 0; i < 60; i++) { const [u, v] = kinemePhase2(7, i); if (u === v) same++; }
+  for (let i = 0; i < 60; i++) {
+    const [u, v] = kinemePhase2(7, i);
+    if (u === v) same++;
+  }
   assert.ok(same < 5, 'noise and boil offsets are decorrelated');
   assert.notDeepStrictEqual(kinemePhase2(7, 3), kinemePhase2(8, 3), 'seed matters');
 }
@@ -65,8 +75,12 @@ console.log('kineme.selfcheck: OK (time core)');
 
 // ── slice 2: driver API + evaluator ────────────────────────────────────────
 import {
-  KINEME_DRIVERS, getKinemeDriver, isKinemeDriver,
-  evaluateKineme, applyKinemeDrivers, kinemeStillSec,
+  KINEME_DRIVERS,
+  getKinemeDriver,
+  isKinemeDriver,
+  evaluateKineme,
+  applyKinemeDrivers,
+  kinemeStillSec,
 } from './kineme.js';
 
 // declarations
@@ -105,9 +119,12 @@ const mkSoa = (n, seed) => ({
   y: new Float64Array(n),
 });
 const ctx0 = {
-  seed: 42, driverSec: 3.25, boilStep: 26,
+  seed: 42,
+  driverSec: 3.25,
+  boilStep: 26,
   amounts: { breath: 0, drift: 0, pulse: 0, brushWobble: 0 },
-  canvasW: 1000, canvasH: 700,
+  canvasW: 1000,
+  canvasH: 700,
 };
 
 // amount 0 → hard gate: inactive, zeros, applier leaves channels untouched
@@ -128,7 +145,10 @@ const ctx0 = {
   const soa = mkSoa(24);
   const d = evaluateKineme(soa, { ...ctx0, amounts: { breath: 1 } });
   assert.ok(d.active);
-  assert.ok(d.dScale.every((v) => v >= -0.09 - 1e-12 && v <= 0.09 + 1e-12), '±9% bound');
+  assert.ok(
+    d.dScale.every((v) => v >= -0.09 - 1e-12 && v <= 0.09 + 1e-12),
+    '±9% bound',
+  );
   assert.ok(new Set([...d.dScale].map((v) => v.toFixed(6))).size > 12, 'phases differ');
   const d2 = evaluateKineme(soa, { ...ctx0, driverSec: 3.25 + 1 / 0.11, amounts: { breath: 1 } });
   for (let k = 0; k < 24; k++) assert.ok(Math.abs(d.dScale[k] - d2.dScale[k]) < 1e-9, 'one period returns');
@@ -161,7 +181,10 @@ const ctx0 = {
   assert.deepStrictEqual([...a], [...b], 'holds inside a boil frame');
   const d = evaluateKineme(soa, { ...c, boilStep: 27 }).dWobble;
   assert.ok(!a.every((v, k) => v === d[k]), 'jumps on the next frame');
-  assert.ok(a.every((v) => v >= -1 && v <= 1), '±1 edge-band fraction');
+  assert.ok(
+    a.every((v) => v >= -1 && v <= 1),
+    '±1 edge-band fraction',
+  );
 }
 
 // #1151 — palette-breath: bounded sweep in slots, periodic, per-instance
@@ -170,17 +193,35 @@ const ctx0 = {
   const pal = { swatches: ['#111', '#222', '#333', '#444'] };
   const d = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 1 }, palette: pal });
   assert.ok(d.active);
-  assert.ok(d.dPalette.every((v) => Math.abs(v) <= 4 + 1e-12), 'reach = amount × palette length (slots)');
+  assert.ok(
+    d.dPalette.every((v) => Math.abs(v) <= 4 + 1e-12),
+    'reach = amount × palette length (slots)',
+  );
   assert.ok(new Set([...d.dPalette].map((v) => v.toFixed(6))).size > 4, 'phases differ: traveling waves');
   const d2 = evaluateKineme(soa, { ...ctx0, driverSec: 3.25 + 25, amounts: { paletteBreath: 1 }, palette: pal });
   for (let k = 0; k < 8; k++) assert.ok(Math.abs(d.dPalette[k] - d2.dPalette[k]) < 1e-9, 'one period (25s) returns');
-  const d0 = evaluateKineme(soa, { ...ctx0, driverSec: 0, anchored: true, amounts: { paletteBreath: 1 }, palette: pal });
-  assert.ok(d0.dPalette.every((v) => v === 0), 'anchored: t=0 is rest, byte-identical still');
+  const d0 = evaluateKineme(soa, {
+    ...ctx0,
+    driverSec: 0,
+    anchored: true,
+    amounts: { paletteBreath: 1 },
+    palette: pal,
+  });
+  assert.ok(
+    d0.dPalette.every((v) => v === 0),
+    'anchored: t=0 is rest, byte-identical still',
+  );
   // amount 0 / no palette → hard gate: zeros
   const off = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 0 }, palette: pal });
-  assert.ok(off.dPalette.every((v) => v === 0), 'amount 0: no deltas');
+  assert.ok(
+    off.dPalette.every((v) => v === 0),
+    'amount 0: no deltas',
+  );
   const nopal = evaluateKineme(soa, { ...ctx0, amounts: { paletteBreath: 1 } });
-  assert.ok(nopal.dPalette.every((v) => v === 0), 'no palette: no deltas');
+  assert.ok(
+    nopal.dPalette.every((v) => v === 0),
+    'no palette: no deltas',
+  );
 }
 
 // #1151 — palette-breath applier: slots wrap modulo length, undo restores
@@ -193,8 +234,13 @@ const ctx0 = {
   const colors = [...baseColors];
   const accents = [...baseAccents];
   const ctx = {
-    ...ctx0, seed: 42, driverSec: 3.25, anchored: true,
-    amounts: { paletteBreath: 1 }, palette: { swatches }, colorArrays: { colors, accents },
+    ...ctx0,
+    seed: 42,
+    driverSec: 3.25,
+    anchored: true,
+    amounts: { paletteBreath: 1 },
+    palette: { swatches },
+    colorArrays: { colors, accents },
   };
   const undo = applyKinemeDrivers(soa, ctx);
   assert.ok(typeof undo === 'function', 'applier ran with palette ctx');
@@ -223,7 +269,12 @@ const ctx0 = {
     const accents = ['#444', '#111', '#222', '#333'];
     return { soa, colors, accents };
   };
-  const base = (p) => ({ ...ctx0, amounts: { paletteBreath: 1 }, palette: { swatches }, colorArrays: { colors: p.colors, accents: p.accents } });
+  const base = (p) => ({
+    ...ctx0,
+    amounts: { paletteBreath: 1 },
+    palette: { swatches },
+    colorArrays: { colors: p.colors, accents: p.accents },
+  });
   {
     const p = mkPal();
     const undo = applyKinemeDrivers(p.soa, base(p), new Uint8Array([1, 0, 0, 0]));
@@ -274,19 +325,39 @@ import { buildPlacements } from './buildPlacements.js';
   ];
   const palette = { swatches: ['#111', '#222', '#333'] };
   const layoutParams = {
-    mode: 'grid', composition: 'default', count: 40,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
-    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    mode: 'grid',
+    composition: 'default',
+    count: 40,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    mirror: false,
+    displacement: 0,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
   };
   const base = {
-    layoutParams, seed: 0x1a4f, activeAssets: assets, palette,
+    layoutParams,
+    seed: 0x1a4f,
+    activeAssets: assets,
+    palette,
     caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
-    canvasW: 1000, canvasH: 700,
+    canvasW: 1000,
+    canvasH: 700,
   };
   const kin = (amounts, extra = {}) => ({
-    driverSec: 3.25, boilStep: 26, seed: 0x1a4f, amounts,
-    canvasW: 1000, canvasH: 700, shedTier: 0, ...extra,
+    driverSec: 3.25,
+    boilStep: 26,
+    seed: 0x1a4f,
+    amounts,
+    canvasW: 1000,
+    canvasH: 700,
+    shedTier: 0,
+    ...extra,
   });
   const zero = { breath: 0, drift: 0, pulse: 0, brushWobble: 0 };
 
@@ -329,15 +400,24 @@ import { buildPlacements } from './buildPlacements.js';
 
 // ── #1198: the rhythm family ─────────────────────────────────────────────
 import {
-  KINEME_PATTERNS, isRhythmPattern, rhythmTypeForPattern, patternAmounts,
-  RHYTHM_SCALE, RHYTHM_ROT, RHYTHM_DX, RHYTHM_DY,
-  evaluateRhythm, applyRhythm,
+  KINEME_PATTERNS,
+  isRhythmPattern,
+  rhythmTypeForPattern,
+  patternAmounts,
+  RHYTHM_SCALE,
+  RHYTHM_ROT,
+  RHYTHM_DX,
+  RHYTHM_DY,
+  evaluateRhythm,
+  applyRhythm,
 } from './kineme.js';
 
 // the strip reads KINEME_PATTERNS: the new patterns appear automatically
 assert.deepStrictEqual([...KINEME_PATTERNS], ['DRIFT', 'SWELL', 'THUMP', 'ORGANIC', 'CADENCE']);
 assert.ok(isRhythmPattern('ORGANIC') && isRhythmPattern('CADENCE'));
-assert.ok(!isRhythmPattern('DRIFT') && !isRhythmPattern('SWELL') && !isRhythmPattern('THUMP') && !isRhythmPattern('nope'));
+assert.ok(
+  !isRhythmPattern('DRIFT') && !isRhythmPattern('SWELL') && !isRhythmPattern('THUMP') && !isRhythmPattern('nope'),
+);
 assert.strictEqual(rhythmTypeForPattern('ORGANIC'), 'perlin', 'ORGANIC = Perlin via createNoise');
 assert.strictEqual(rhythmTypeForPattern('CADENCE'), 'sine', 'CADENCE = sine');
 assert.strictEqual(rhythmTypeForPattern('DRIFT'), null);
@@ -372,8 +452,12 @@ const mkRhythmSoa = (n, W = 1000, H = 700) => {
   return soa;
 };
 const rctx = (type, extra = {}) => ({
-  seed: 42, canvasW: 1000, canvasH: 700, shedTier: 0,
-  rhythm: type ? { type } : null, ...extra,
+  seed: 42,
+  canvasW: 1000,
+  canvasH: 700,
+  shedTier: 0,
+  rhythm: type ? { type } : null,
+  ...extra,
 });
 
 // the gate: no rhythm type → inactive, zeros, applier is identity
@@ -390,7 +474,11 @@ const rctx = (type, extra = {}) => ({
     assert.deepStrictEqual([...soa.rotation], before.rotation);
   }
   assert.strictEqual(evaluateRhythm({ n: 0 }, rctx('perlin')).active, false, 'n=0 → inactive');
-  assert.strictEqual(evaluateRhythm(mkRhythmSoa(4), { ...rctx('perlin'), canvasW: 0 }).active, false, 'no canvas → inactive');
+  assert.strictEqual(
+    evaluateRhythm(mkRhythmSoa(4), { ...rctx('perlin'), canvasW: 0 }).active,
+    false,
+    'no canvas → inactive',
+  );
 }
 
 // perlin + sine: bounded, deterministic per seed, not one slab, seed matters
@@ -402,10 +490,22 @@ for (const type of ['perlin', 'sine']) {
   assert.deepStrictEqual([...a.dRot], [...b.dRot], `${type}: deterministic per seed`);
   assert.deepStrictEqual([...a.dx], [...b.dx], `${type}: deterministic per seed`);
   assert.deepStrictEqual([...a.dy], [...b.dy], `${type}: deterministic per seed`);
-  assert.ok(a.dScale.every((v) => Math.abs(v) <= RHYTHM_SCALE + 1e-12), `${type}: scale bound`);
-  assert.ok(a.dRot.every((v) => Math.abs(v) <= RHYTHM_ROT + 1e-12), `${type}: rotation bound`);
-  assert.ok(a.dx.every((v) => Math.abs(v) <= RHYTHM_DX * 700 + 1e-9), `${type}: dx bound`);
-  assert.ok(a.dy.every((v) => Math.abs(v) <= RHYTHM_DY * 700 + 1e-9), `${type}: dy bound`);
+  assert.ok(
+    a.dScale.every((v) => Math.abs(v) <= RHYTHM_SCALE + 1e-12),
+    `${type}: scale bound`,
+  );
+  assert.ok(
+    a.dRot.every((v) => Math.abs(v) <= RHYTHM_ROT + 1e-12),
+    `${type}: rotation bound`,
+  );
+  assert.ok(
+    a.dx.every((v) => Math.abs(v) <= RHYTHM_DX * 700 + 1e-9),
+    `${type}: dx bound`,
+  );
+  assert.ok(
+    a.dy.every((v) => Math.abs(v) <= RHYTHM_DY * 700 + 1e-9),
+    `${type}: dy bound`,
+  );
   assert.ok(new Set([...a.dScale].map((v) => v.toFixed(5))).size > 12, `${type}: not one slab`);
   const c = evaluateRhythm(mkRhythmSoa(24), rctx(type, { seed: 43 }));
   assert.ok(!a.dScale.every((v, k) => v === c.dScale[k]), `${type}: seed matters`);
@@ -421,7 +521,8 @@ for (const type of ['perlin', 'sine']) {
   const soa = mkRhythmSoa(8);
   const ctx = rctx('perlin');
   const r = evaluateRhythm(soa, ctx);
-  const bx = [...soa.x], by = [...soa.y];
+  const bx = [...soa.x],
+    by = [...soa.y];
   const undo = applyRhythm(soa, ctx);
   assert.ok(typeof undo === 'function', 'applier ran');
   for (let k = 0; k < 8; k++) {
@@ -439,7 +540,8 @@ for (const type of ['perlin', 'sine']) {
 // still-marked instances keep their placed everything; shed tier 3 is identity
 {
   const soa = mkRhythmSoa(4);
-  const bx = [...soa.x], brot = [...soa.rotation];
+  const bx = [...soa.x],
+    brot = [...soa.rotation];
   const undo = applyRhythm(soa, rctx('sine'), new Uint8Array([1, 0, 0, 0]));
   assert.strictEqual(soa.x[0], bx[0], 'still mark keeps its placed x');
   assert.strictEqual(soa.rotation[0], brot[0], 'still mark keeps its placed rotation');
@@ -464,25 +566,49 @@ for (const type of ['perlin', 'sine']) {
   ];
   const palette = { swatches: ['#111', '#222', '#333'] };
   const layoutParams = {
-    mode: 'grid', composition: 'default', count: 40,
-    scale: [0.4, 0.8], rotate: [0, 45], alpha: [60, 100],
-    jitter: 10, density: 100, zTiers: 1, bleed: false, mirror: false,
-    displacement: 0, noiseFreq: 0.005, noiseSpeed: 0.5,
+    mode: 'grid',
+    composition: 'default',
+    count: 40,
+    scale: [0.4, 0.8],
+    rotate: [0, 45],
+    alpha: [60, 100],
+    jitter: 10,
+    density: 100,
+    zTiers: 1,
+    bleed: false,
+    mirror: false,
+    displacement: 0,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
   };
   const cache = {};
   const mkBase = (kineme) => ({
-    layoutParams, seed: 0x1a4f, activeAssets: assets, palette,
+    layoutParams,
+    seed: 0x1a4f,
+    activeAssets: assets,
+    palette,
     caps: { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true },
-    canvasW: 1000, canvasH: 700, cache, kineme,
+    canvasW: 1000,
+    canvasH: 700,
+    cache,
+    kineme,
   });
   const zero = { breath: 0, drift: 0, pulse: 0, brushWobble: 0, paletteBreath: 0 };
   const rkin = (type) => ({
-    driverSec: 3.25, boilStep: 26, seed: 0x1a4f, amounts: zero,
-    canvasW: 1000, canvasH: 700, shedTier: 0, anchored: true, rhythm: { type },
+    driverSec: 3.25,
+    boilStep: 26,
+    seed: 0x1a4f,
+    amounts: zero,
+    canvasW: 1000,
+    canvasH: 700,
+    shedTier: 0,
+    anchored: true,
+    rhythm: { type },
   });
-  const snap = (items) => items
-    .map((it) => [it.key, it.x, it.y, it.scale, it.rotation])
-    .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // key order: the overlap sort shuffles slot order
+  const snap = (items) =>
+    items
+      .map((it) => [it.key, it.x, it.y, it.scale, it.rotation])
+      .sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0)); // key order: the overlap sort shuffles slot order
   const plain = snap(buildPlacements(mkBase(null)).items);
   const organic = snap(buildPlacements(mkBase(rkin('perlin'))).items);
   let moved = 0;

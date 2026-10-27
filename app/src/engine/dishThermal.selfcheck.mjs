@@ -26,8 +26,13 @@ import { readFileSync } from 'node:fs';
 import { ParticleSystem } from './particles.js';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import {
-  clampDishTempo, thermalJitterAmp, dishThermalFor, COLD_THERMAL,
-  crowdingRepelGain, DENSITY_PIVOT, THERMAL_JITTER_MAX,
+  clampDishTempo,
+  thermalJitterAmp,
+  dishThermalFor,
+  COLD_THERMAL,
+  crowdingRepelGain,
+  DENSITY_PIVOT,
+  THERMAL_JITTER_MAX,
 } from './dishThermal.mjs';
 import { DEFAULT_LAYOUT_PARAMS, PARAM_SPEC } from '../data/layout-modes.js';
 
@@ -49,12 +54,18 @@ const SEED = 0x1a4f;
   assert.strictEqual(thermalJitterAmp(0), 0, 'amp is exactly 0 at tempo 0 — the parity identity');
   assert.strictEqual(thermalJitterAmp(1), THERMAL_JITTER_MAX, 'amp is the max at tempo 1');
   assert.strictEqual(thermalJitterAmp(0.5), THERMAL_JITTER_MAX / 2, 'amp is linear — no hidden knee');
-  assert.deepStrictEqual(dishThermalFor(1, true), { tempo: 1, amp: 0 },
-    'stillness zeroes the amp at any knob value (spec §7)');
+  assert.deepStrictEqual(
+    dishThermalFor(1, true),
+    { tempo: 1, amp: 0 },
+    'stillness zeroes the amp at any knob value (spec §7)',
+  );
   assert.strictEqual(dishThermalFor(1, false).amp, THERMAL_JITTER_MAX, 'motion allowed: full amp');
 
-  assert.strictEqual(DENSITY_PIVOT, DEFAULT_LAYOUT_PARAMS.density,
-    'the crowding pivot IS the shipped density default — the two can never drift apart');
+  assert.strictEqual(
+    DENSITY_PIVOT,
+    DEFAULT_LAYOUT_PARAMS.density,
+    'the crowding pivot IS the shipped density default — the two can never drift apart',
+  );
   assert.strictEqual(crowdingRepelGain(DENSITY_PIVOT), 1, 'gain is exactly 1 at the pivot');
   assert.strictEqual(crowdingRepelGain(10), 10 / DENSITY_PIVOT, 'the knob floor presses at 10/78');
   assert.strictEqual(crowdingRepelGain(100), 100 / DENSITY_PIVOT, 'the knob ceiling presses at 100/78');
@@ -94,10 +105,22 @@ const settleKE = (sys) => {
   return ke;
 };
 const baseLp = (over = {}) => ({
-  mode: 'swarm', particleCount: 24, contactRadius: 28, contactMode: 'bounce',
-  contactRestitution: 0.4, contactRepel: 1.2, gravityWells: 0, swarmCohesion: 0,
-  flap: 0, metabolism: 0, wind: 0, kinemeBreath: 0, kinemeDrift: 0,
-  kinemePaletteBreath: 0, lifeDrift: 0, ...over,
+  mode: 'swarm',
+  particleCount: 24,
+  contactRadius: 28,
+  contactMode: 'bounce',
+  contactRestitution: 0.4,
+  contactRepel: 1.2,
+  gravityWells: 0,
+  swarmCohesion: 0,
+  flap: 0,
+  metabolism: 0,
+  wind: 0,
+  kinemeBreath: 0,
+  kinemeDrift: 0,
+  kinemePaletteBreath: 0,
+  lifeDrift: 0,
+  ...over,
 });
 // The crowded formation (the census's packed colony): a packed grid
 // placed by hand, falling together.
@@ -105,7 +128,10 @@ const placePack = (sys) => {
   for (let i = 0; i < sys.n; i++) {
     sys.x[i] = 412 + (i % 8) * 22;
     sys.y[i] = 150 + Math.floor(i / 8) * 22;
-    sys.vx[i] = 0; sys.vy[i] = 6; sys.scale[i] = 1.4; sys.mass[i] = 1.4;
+    sys.vx[i] = 0;
+    sys.vy[i] = 6;
+    sys.scale[i] = 1.4;
+    sys.mass[i] = 1.4;
   }
 };
 
@@ -136,8 +162,12 @@ for (const mode of ['bounce', 'breed']) {
 {
   const cold = runSys(baseLp({ dishTempo: 0 }), 240, placePack);
   const hot = runSys(baseLp({ dishTempo: 1 }), 240, placePack);
-  const keCold = settleKE(cold); const keHot = settleKE(hot);
-  assert.ok(keHot > keCold, `a hot dish keeps more settle energy than a cold one: ${keCold.toFixed(3)} -> ${keHot.toFixed(3)}`);
+  const keCold = settleKE(cold);
+  const keHot = settleKE(hot);
+  assert.ok(
+    keHot > keCold,
+    `a hot dish keeps more settle energy than a cold one: ${keCold.toFixed(3)} -> ${keHot.toFixed(3)}`,
+  );
   assert.ok(keHot > 1, `a hot dish is measurably awake, not numerically warm: KE ${keHot.toFixed(3)}`);
 }
 
@@ -152,12 +182,18 @@ for (const mode of ['bounce', 'breed']) {
 {
   const particles = readFileSync(new URL('./particles.js', import.meta.url), 'utf8');
   const law = readFileSync(new URL('./dishThermal.mjs', import.meta.url), 'utf8');
-  assert.ok(particles.includes('dishThermalFor(layoutParams.dishTempo, deformStill)'),
-    'update() resolves TEMPO at the dish gate, stillness-aware');
-  assert.ok(particles.includes('crowdingRepelGain(layoutParams.density)'),
-    'update() maps DENSITY onto the repel gain at the contact-pass call site');
+  assert.ok(
+    particles.includes('dishThermalFor(layoutParams.dishTempo, deformStill)'),
+    'update() resolves TEMPO at the dish gate, stillness-aware',
+  );
+  assert.ok(
+    particles.includes('crowdingRepelGain(layoutParams.density)'),
+    'update() maps DENSITY onto the repel gain at the contact-pass call site',
+  );
   assert.ok(particles.includes('thermal.amp > 0'), 'the kick is gated on a nonzero amp (cold path untouched)');
   assert.ok(!/Math\.random|Date\.now/.test(law), 'the §4 law is deterministic by construction');
 }
 
-console.log('dishThermal.selfcheck: OK (#1538 — TEMPO thermal jitter + DENSITY crowding pressure, defaults parity, stillness)');
+console.log(
+  'dishThermal.selfcheck: OK (#1538 — TEMPO thermal jitter + DENSITY crowding pressure, defaults parity, stillness)',
+);

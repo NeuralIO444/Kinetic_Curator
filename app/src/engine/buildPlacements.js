@@ -59,9 +59,7 @@ import { isPlateMaterial, plateGeoFrom, PLATE_GEO_DEFAULTS } from './plateBody.m
 import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.mjs'; // #1549 — material:'wash'
 import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
-import {
-  pickWeightedIndexStable,
-} from './kernel/rng.js';
+import { pickWeightedIndexStable } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
 export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
@@ -140,10 +138,12 @@ export function mirrorItems(items, mirrorState, W, H) {
     // #1410 — a reflected copy's deform axis reflects with it, like its
     // rotation. Only live swarm items carry the fields; placement items
     // never do, so their mirrored copies are exactly what they were.
-    ...(item.deformAmt > 0 ? {
-      deformAxisX: fx ? -item.deformAxisX : item.deformAxisX,
-      deformAxisY: fy ? -item.deformAxisY : item.deformAxisY,
-    } : null),
+    ...(item.deformAmt > 0
+      ? {
+          deformAxisX: fx ? -item.deformAxisX : item.deformAxisX,
+          deformAxisY: fy ? -item.deformAxisY : item.deformAxisY,
+        }
+      : null),
     key: item.key ? `${item.key}-m${fx ? 'x' : ''}${fy ? 'y' : ''}` : undefined,
   });
   if (st === 'x' || st === 'xy') {
@@ -244,9 +244,8 @@ export function buildPlacements({
 
   // #1202 — mirror is a 4-state enum now ('off'|'x'|'y'|'xy'); a legacy
   // boolean still reads (true → 'x') via mirrorMultiplier.
-  const mirrorState = typeof layoutParams.mirror === 'boolean'
-    ? (layoutParams.mirror ? 'x' : 'off')
-    : (layoutParams.mirror ?? 'off');
+  const mirrorState =
+    typeof layoutParams.mirror === 'boolean' ? (layoutParams.mirror ? 'x' : 'off') : (layoutParams.mirror ?? 'off');
   const safeCount = clampCount(layoutParams.count, mirrorState, caps);
   const countInt = Math.ceil(safeCount);
   const countFrac = safeCount - Math.floor(safeCount);
@@ -361,8 +360,7 @@ export function buildPlacements({
   // The sub-seed offsets ride as scalars (#305): a mutate changes a number,
   // never object identity, so Object.is comparison stays sound.
   const so = seedOffsets || {};
-  const bindSig = [activeAssets, palette, strategy, seed,
-    so.spatial || 0, so.color || 0, so.asset || 0, so.noise || 0];
+  const bindSig = [activeAssets, palette, strategy, seed, so.spatial || 0, so.color || 0, so.asset || 0, so.noise || 0];
   const bindHit = cache && geoHit && sameSignature(cache.bindSig, bindSig);
 
   let assetIds;
@@ -384,13 +382,9 @@ export function buildPlacements({
     palSlots = new Array(soa.n);
     for (let k = 0; k < soa.n; k++) {
       const index = soa.index[k];
-      const asset = pickWeightedIndexStable(
-        activeAssets, weights, totalWeight, seed, index, seedOffsets,
-      );
+      const asset = pickWeightedIndexStable(activeAssets, weights, totalWeight, seed, index, seedOffsets);
       // K5 (#64): colour comes from the kernel's colour channel only.
-      const { color, accent, slot } = assignColor(
-        { seed, index, t: soa.t[k], seedOffsets }, palette, strategy,
-      );
+      const { color, accent, slot } = assignColor({ seed, index, t: soa.t[k], seedOffsets }, palette, strategy);
       assetIds[k] = asset.id;
       colors[k] = color;
       accents[k] = accent;
@@ -440,7 +434,11 @@ export function buildPlacements({
     let snapped = null;
     if (dish.groundRoles && snap > 0) {
       const sn = applyGroundSnap({ soa, colors, accents, rolesAt: dish.groundRoles, share: snap, seed, seedOffsets });
-      if (sn) { colors = sn.colors; accents = sn.accents; snapped = sn.snapped; }
+      if (sn) {
+        colors = sn.colors;
+        accents = sn.accents;
+        snapped = sn.snapped;
+      }
     }
     if (dish.ground && lean > 0) {
       colors = colors.map((c, k) => (snapped && snapped[k] ? c : applyLean(c, dish.ground(soa.x[k], soa.y[k]), lean)));
@@ -484,7 +482,8 @@ export function buildPlacements({
   const undoKineme = kineme ? applyKinemeDrivers(soa, kineme, stillMarks) : null;
   // #1183 tile-edge nudge — after the motion drivers, so the PRESENTED position feels the (possibly drifting)
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
-  const undoNudge = dish && dish.groundCell && nudge > 0 ? applyGroundNudge(soa, dish.groundCell, nudge, stillMarks) : null;
+  const undoNudge =
+    dish && dish.groundCell && nudge > 0 ? applyGroundNudge(soa, dish.groundCell, nudge, stillMarks) : null;
   // #1574 — the transport pass runs LAST: home is the presented placement
   // (post rhythm/drivers/nudge), and the sim's offsets fold on top. The
   // gate is the parity contract: no ephemeral input, 'still', or leash 0
@@ -496,7 +495,8 @@ export function buildPlacements({
   // familyDefaultTransport's 'still', Q1 ruled). Unnamed families follow
   // the stratum's word, so P1's FLOW scenes roam exactly as they did.
   const transportMode = layoutParams.transport;
-  const travelOn = !!travel && (transportMode === 'flow' || transportMode === 'path') && layoutParams.transportLeash > 0;
+  const travelOn =
+    !!travel && (transportMode === 'flow' || transportMode === 'path') && layoutParams.transportLeash > 0;
   let travelStill = stillMarks;
   let travelDeform = null;
   if (travelOn) {
@@ -515,23 +515,29 @@ export function buildPlacements({
     travelDeform = travelDeformScratch(soa.n);
   }
   const undoTravel = travelOn
-    ? applyTransport(soa, {
-      seed, canvasW, canvasH,
-      travel: {
-        mode: transportMode,
-        leash: layoutParams.transportLeash,
-        flow: layoutParams.transportFlow,
-        path: layoutParams.transportPath,
-        speed: layoutParams.transportSpeed,
-        radius: layoutParams.transportRadius,
-        deform: travelDeform,
-        store: travel.store,
-        sceneId: travel.sceneId ?? layerId,
-        frameMs: travel.frameMs,
-        shed: travel.shed,
-        ipadClass: travel.ipadClass, // #1574 Q2 — the traveler budget's device class (undefined = desktop)
-      },
-    }, travelStill)
+    ? applyTransport(
+        soa,
+        {
+          seed,
+          canvasW,
+          canvasH,
+          travel: {
+            mode: transportMode,
+            leash: layoutParams.transportLeash,
+            flow: layoutParams.transportFlow,
+            path: layoutParams.transportPath,
+            speed: layoutParams.transportSpeed,
+            radius: layoutParams.transportRadius,
+            deform: travelDeform,
+            store: travel.store,
+            sceneId: travel.sceneId ?? layerId,
+            frameMs: travel.frameMs,
+            shed: travel.shed,
+            ipadClass: travel.ipadClass, // #1574 Q2 — the traveler budget's device class (undefined = desktop)
+          },
+        },
+        travelStill,
+      )
     : null;
 
   // #1576 — P3's passes run after transport, in sibling order: parallax
@@ -541,31 +547,41 @@ export function buildPlacements({
   // above, per sibling, so either can be removed without the other
   // noticing. The artist's pin (stillMarks) tames both; the family
   // anchor does not apply — neither pass roams a mark from its stratum.
-  const undoParallaxDrift = parallaxDrift && layoutParams.transportParallax > 0
-    ? applyParallaxDrift(soa, {
-      seed,
-      drift: {
-        amount: layoutParams.transportParallax,
-        store: parallaxDrift.store,
-        sceneId: parallaxDrift.sceneId ?? layerId,
-        frameMs: parallaxDrift.frameMs,
-        shed: parallaxDrift.shed,
-      },
-    }, stillMarks)
-    : null;
-  const undoSurge = surge && layoutParams.transportSurge > 0
-    ? applySurge(soa, {
-      seed,
-      surge: {
-        amount: layoutParams.transportSurge,
-        store: surge.store,
-        sceneId: surge.sceneId ?? layerId,
-        frameMs: surge.frameMs,
-        shed: surge.shed,
-        trigger: surge.trigger,
-      },
-    }, stillMarks)
-    : null;
+  const undoParallaxDrift =
+    parallaxDrift && layoutParams.transportParallax > 0
+      ? applyParallaxDrift(
+          soa,
+          {
+            seed,
+            drift: {
+              amount: layoutParams.transportParallax,
+              store: parallaxDrift.store,
+              sceneId: parallaxDrift.sceneId ?? layerId,
+              frameMs: parallaxDrift.frameMs,
+              shed: parallaxDrift.shed,
+            },
+          },
+          stillMarks,
+        )
+      : null;
+  const undoSurge =
+    surge && layoutParams.transportSurge > 0
+      ? applySurge(
+          soa,
+          {
+            seed,
+            surge: {
+              amount: layoutParams.transportSurge,
+              store: surge.store,
+              sceneId: surge.sceneId ?? layerId,
+              frameMs: surge.frameMs,
+              shed: surge.shed,
+              trigger: surge.trigger,
+            },
+          },
+          stillMarks,
+        )
+      : null;
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay
@@ -577,8 +593,8 @@ export function buildPlacements({
   // fully holds for this path), but nothing downstream holds a reference
   // across frames — useCanvasItems' useMemo hands out a fresh result each
   // call and Layer only ever reads the latest one.
-  const poolHit = cache && geoHit && bindHit && layoutParams.overlap
-    && cache.itemPool && cache.itemPool.length === soa.n;
+  const poolHit =
+    cache && geoHit && bindHit && layoutParams.overlap && cache.itemPool && cache.itemPool.length === soa.n;
 
   let mapped;
   if (poolHit) {
@@ -604,7 +620,9 @@ export function buildPlacements({
           item.deformAxisX = travelDeform.ax[k];
           item.deformAxisY = travelDeform.ay[k];
         } else if (item.deformAmt) {
-          item.deformAmt = 0; item.deformAxisX = 0; item.deformAxisY = 0;
+          item.deformAmt = 0;
+          item.deformAxisX = 0;
+          item.deformAxisY = 0;
         }
       }
     }
@@ -656,12 +674,16 @@ export function buildPlacements({
       item.accent = accents[k];
     }
   }
-  applyFieldMap(mapped, sanitizeFieldMap({
-    field: layoutParams.fieldMapField,
-    channel: layoutParams.fieldMapChannel,
-    amount: layoutParams.fieldMapAmount,
-    curve: layoutParams.fieldMapCurve,
-  }), { seed, canvasW, canvasH });
+  applyFieldMap(
+    mapped,
+    sanitizeFieldMap({
+      field: layoutParams.fieldMapField,
+      channel: layoutParams.fieldMapChannel,
+      amount: layoutParams.fieldMapAmount,
+      curve: layoutParams.fieldMapCurve,
+    }),
+    { seed, canvasW, canvasH },
+  );
 
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.
@@ -757,11 +779,17 @@ export function buildPlacements({
     // only when the stratum's knobs moved off the shipped defaults,
     // so a default build's items are field-for-field the pre-M4 items.
     it.matParams = undefined;
-    if (it.plate
-      && (plateGeo.cx !== PLATE_GEO_DEFAULTS.cx || plateGeo.cy !== PLATE_GEO_DEFAULTS.cy || plateGeo.radius !== PLATE_GEO_DEFAULTS.radius)) {
+    if (
+      it.plate &&
+      (plateGeo.cx !== PLATE_GEO_DEFAULTS.cx ||
+        plateGeo.cy !== PLATE_GEO_DEFAULTS.cy ||
+        plateGeo.radius !== PLATE_GEO_DEFAULTS.radius)
+    ) {
       it.matParams = [plateGeo.cx, plateGeo.cy, plateGeo.radius, 0];
-    } else if (it.wash
-      && (washPrm.strength !== WASH_PARAM_DEFAULTS.strength || washPrm.spread !== WASH_PARAM_DEFAULTS.spread)) {
+    } else if (
+      it.wash &&
+      (washPrm.strength !== WASH_PARAM_DEFAULTS.strength || washPrm.spread !== WASH_PARAM_DEFAULTS.spread)
+    ) {
       it.matParams = [washPrm.strength, washPrm.spread, 0, 0];
     } else if (it.stipple && stippleScale !== STIPPLE_DOT_SCALE) {
       it.matParams = [stippleScale, 0, 0, 0];

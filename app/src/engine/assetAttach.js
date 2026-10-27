@@ -53,7 +53,8 @@ export function sanitizeAssetAttach(raw) {
   for (const [assetId, pts] of Object.entries(raw)) {
     if (typeof assetId !== 'string' || !assetId || assetId.length > 120 || n >= 400) continue;
     if (!Array.isArray(pts)) continue;
-    out[assetId] = sanitizeAttachPoints(pts); n++;
+    out[assetId] = sanitizeAttachPoints(pts);
+    n++;
   }
   return n ? out : null;
 }

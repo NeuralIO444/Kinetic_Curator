@@ -73,7 +73,8 @@ registerCostTier('engine/dish-coalesce', {
   // the finish and only while a layer actually coalesces
   memoryBytes: 1920 * 1080 * 8,
   timeMs: 0.25,
-  notes: '#1411 coalescence: dwell tracking is free (contact-pass call site); the finish is one fullscreen threshold-blend pass per coalescing layer. Tier 1 — sheds with the FX finishes, first on the ladder.',
+  notes:
+    '#1411 coalescence: dwell tracking is free (contact-pass call site); the finish is one fullscreen threshold-blend pass per coalescing layer. Tier 1 — sheds with the FX finishes, first on the ladder.',
 });
 
 /** The merge factor for a dwell count: 0 below the gate, linear to 1. */
@@ -148,22 +149,39 @@ export function blendPairTint(colorA, colorB) {
  * tracks, so un-stilling resumes mid-merge honestly.
  */
 export function stepDishCoalesce(sys, { reducedMotion = false } = {}) {
-  const empty = () => { sys._coalesceFields = EMPTY_FIELDS; };
-  if (sys._coalesceOn === false) { empty(); return; }
+  const empty = () => {
+    sys._coalesceFields = EMPTY_FIELDS;
+  };
+  if (sys._coalesceOn === false) {
+    empty();
+    return;
+  }
   const tr = sys._coalesce;
-  if (!tr) { empty(); return; }
+  if (!tr) {
+    empty();
+    return;
+  }
   tr.step += 1;
   const fedStep = tr.step - 1;
   for (const [key, e] of tr.pairs) {
-    if (sys.alive[e.i] !== 1 || sys.alive[e.j] !== 1) { tr.pairs.delete(key); continue; }
+    if (sys.alive[e.i] !== 1 || sys.alive[e.j] !== 1) {
+      tr.pairs.delete(key);
+      continue;
+    }
     if (e.seen !== fedStep) {
       e.dwell -= COALESCE_DRAIN_PER_STEP;
       if (e.dwell <= 0) tr.pairs.delete(key);
     }
   }
-  if (reducedMotion) { empty(); return; }
+  if (reducedMotion) {
+    empty();
+    return;
+  }
   const baseR = sys._layout ? Number(sys._layout.contactRadius) || 0 : 0;
-  if (!(baseR > 0) || tr.pairs.size === 0) { empty(); return; }
+  if (!(baseR > 0) || tr.pairs.size === 0) {
+    empty();
+    return;
+  }
   const fields = [];
   for (const e of tr.pairs.values()) {
     const f = coalesceFactor(e.dwell);
@@ -187,9 +205,8 @@ export function stepDishCoalesce(sys, { reducedMotion = false } = {}) {
       _j: e.j,
     });
   }
-  fields.sort((a, b) => (b.f - a.f) || (a._i - b._i) || (a._j - b._j));
-  const capped = fields.slice(0, COALESCE_MAX_FIELDS)
-    .map(({ x, y, r, f, tint }) => ({ x, y, r, f, tint }));
+  fields.sort((a, b) => b.f - a.f || a._i - b._i || a._j - b._j);
+  const capped = fields.slice(0, COALESCE_MAX_FIELDS).map(({ x, y, r, f, tint }) => ({ x, y, r, f, tint }));
   sys._coalesceFields = capped.length ? capped : EMPTY_FIELDS;
 }
 
@@ -219,6 +236,6 @@ export function coalescePairs(sys) {
     if (f > 0) out.push({ i: e.i, j: e.j, f });
   }
   if (out.length === 0) return EMPTY_PAIRS;
-  out.sort((a, b) => (a.i - b.i) || (a.j - b.j));
+  out.sort((a, b) => a.i - b.i || a.j - b.j);
   return out;
 }

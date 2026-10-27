@@ -82,7 +82,8 @@ registerCostTier('engine/dish-pigment', {
   tier: 2,
   memoryBytes: 0,
   timeMs: 0.02,
-  notes: '#1412 petri dish B3: pigment exchange. A few flops per coalescing pair per step on the pigment working copy, plus a quantized write-back only when a traded body\u2019s hex actually changes. No passes, no textures. Tier 2 — sheds with deform when perfTier1 is on and quality has stepped to performance (dishPigmentShed); the shed stops the trade, earned colour stays.',
+  notes:
+    '#1412 petri dish B3: pigment exchange. A few flops per coalescing pair per step on the pigment working copy, plus a quantized write-back only when a traded body\u2019s hex actually changes. No passes, no textures. Tier 2 — sheds with deform when perfTier1 is on and quality has stepped to performance (dishPigmentShed); the shed stops the trade, earned colour stays.',
 });
 
 /** Share of the remaining colour gap a fully-merged body closes per
@@ -93,7 +94,8 @@ export const PIGMENT_RATE_PER_SEC = 0.05;
  *  once per visible shift, never per frame). */
 export const PIGMENT_WRITE_QUANTUM = 16;
 
-const qchan = (v) => Math.min(255, Math.round(Math.min(255, Math.max(0, v)) / PIGMENT_WRITE_QUANTUM) * PIGMENT_WRITE_QUANTUM);
+const qchan = (v) =>
+  Math.min(255, Math.round(Math.min(255, Math.max(0, v)) / PIGMENT_WRITE_QUANTUM) * PIGMENT_WRITE_QUANTUM);
 
 /** The visible hex for a working-copy triple, on the #287 write-back
  *  quantization — the same value #287's cadence would write, so the
@@ -110,7 +112,11 @@ function parseHex3(color) {
   const m = HEX.exec(String(color ?? ''));
   if (!m) return null;
   let v = m[1];
-  if (v.length === 3) v = v.split('').map((c) => c + c).join('');
+  if (v.length === 3)
+    v = v
+      .split('')
+      .map((c) => c + c)
+      .join('');
   const n = parseInt(v, 16);
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
@@ -127,7 +133,9 @@ export function syncDishPigment(sys) {
     const rgb = parseHex3(sys.color[i]);
     if (!rgb) continue; // fail-closed: an unparseable colour keeps its copy
     const o3 = i * 3;
-    LEAK[o3] = rgb[0]; LEAK[o3 + 1] = rgb[1]; LEAK[o3 + 2] = rgb[2];
+    LEAK[o3] = rgb[0];
+    LEAK[o3 + 1] = rgb[1];
+    LEAK[o3 + 2] = rgb[2];
   }
 }
 
@@ -162,18 +170,30 @@ export function stepDishPigment(sys, dtSec, { reducedMotion = false, shed = fals
     const dx = sys.x[j] - sys.x[i];
     const dy = sys.y[j] - sys.y[i];
     if (dx * dx + dy * dy > ((ri + rj) * COALESCE_TOUCH) ** 2) continue;
-    const io = i * 3; const jo = j * 3;
+    const io = i * 3;
+    const jo = j * 3;
     // Snapshot both triples: the delta is computed once, from the
     // pre-step state, and applied antisymmetrically (+d / −d) — the
     // pair's mean colour is conserved exactly.
-    const ar = LEAK[io]; const ag = LEAK[io + 1]; const ab = LEAK[io + 2];
-    const br = LEAK[jo]; const bg = LEAK[jo + 1]; const bb = LEAK[jo + 2];
+    const ar = LEAK[io];
+    const ag = LEAK[io + 1];
+    const ab = LEAK[io + 2];
+    const br = LEAK[jo];
+    const bg = LEAK[jo + 1];
+    const bb = LEAK[jo + 2];
     const k = baseK * f;
-    const dr = (br - ar) * k; const dg = (bg - ag) * k; const db = (bb - ab) * k;
+    const dr = (br - ar) * k;
+    const dg = (bg - ag) * k;
+    const db = (bb - ab) * k;
     if (dr === 0 && dg === 0 && db === 0) continue; // converged: nothing to write
-    LEAK[io] = ar + dr; LEAK[io + 1] = ag + dg; LEAK[io + 2] = ab + db;
-    LEAK[jo] = br - dr; LEAK[jo + 1] = bg - dg; LEAK[jo + 2] = bb - db;
-    traded.add(i); traded.add(j);
+    LEAK[io] = ar + dr;
+    LEAK[io + 1] = ag + dg;
+    LEAK[io + 2] = ab + db;
+    LEAK[jo] = br - dr;
+    LEAK[jo + 1] = bg - dg;
+    LEAK[jo + 2] = bb - db;
+    traded.add(i);
+    traded.add(j);
   }
   // Write-back on the #287 discipline: quantized hex, only on change,
   // so the atlas bakes once per visible shift instead of per frame.

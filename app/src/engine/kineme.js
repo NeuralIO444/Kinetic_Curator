@@ -137,7 +137,8 @@ export function evaluateRhythm(soa, ctx) {
   if (!n || !ctx) return out;
   const type = ctx.rhythm?.type;
   if (type !== 'perlin' && type !== 'sine') return out;
-  const W = Number(ctx.canvasW), H = Number(ctx.canvasH);
+  const W = Number(ctx.canvasW),
+    H = Number(ctx.canvasH);
   const m = Math.min(W, H);
   if (!(m > 0)) return out;
   const seed = ctx.seed | 0;
@@ -147,7 +148,8 @@ export function evaluateRhythm(soa, ctx) {
     const noise = noiseFor(seed);
     const F = RHYTHM_FIELD_FREQ;
     for (let k = 0; k < n; k++) {
-      const X = (soa.x[k] / W) * F, Y = (soa.y[k] / H) * F;
+      const X = (soa.x[k] / W) * F,
+        Y = (soa.y[k] / H) * F;
       out.dScale[k] = RHYTHM_SCALE * noise.noise3D(X, Y, RHYTHM_Z[0]);
       out.dRot[k] = RHYTHM_ROT * noise.noise3D(X, Y, RHYTHM_Z[1]);
       out.dx[k] = RHYTHM_DX * m * noise.noise3D(X, Y, RHYTHM_Z[2]);
@@ -156,7 +158,7 @@ export function evaluateRhythm(soa, ctx) {
   } else {
     const phase = hashPhase(seed, 'rhythm:cadence'); // [0,1): the wave's seed offset
     for (let k = 0; k < n; k++) {
-      const w = TAU * (((soa.x[k] / W) + (soa.y[k] / H)) * 0.5 * CADENCE_CYCLES + phase);
+      const w = TAU * ((soa.x[k] / W + soa.y[k] / H) * 0.5 * CADENCE_CYCLES + phase);
       out.dScale[k] = RHYTHM_SCALE * Math.sin(w + CADENCE_PHASES[0]);
       out.dRot[k] = RHYTHM_ROT * Math.sin(w + CADENCE_PHASES[1]);
       out.dx[k] = RHYTHM_DX * m * Math.sin(w + CADENCE_PHASES[2]);
@@ -190,8 +192,14 @@ export function applyRhythm(soa, ctx, still = null) {
   if (!r.active) return null;
   const n = soa.n | 0;
   let base = RHYTHM_BASE_XY.get(soa);
-  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; RHYTHM_BASE_XY.set(soa, base); }
-  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  if (!base || base.x.length < n) {
+    base = { x: new Float64Array(n), y: new Float64Array(n) };
+    RHYTHM_BASE_XY.set(soa, base);
+  }
+  for (let k = 0; k < n; k++) {
+    base.x[k] = soa.x[k];
+    base.y[k] = soa.y[k];
+  }
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
     // #1202 — scale AND scaleY: rhythm dScale is uniform scale modulation;
@@ -205,7 +213,10 @@ export function applyRhythm(soa, ctx, still = null) {
     soa.y[k] += r.dy[k];
   }
   return () => {
-    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+    for (let k = 0; k < n; k++) {
+      soa.x[k] = base.x[k];
+      soa.y[k] = base.y[k];
+    }
   };
 }
 
@@ -270,10 +281,21 @@ function phasesFor(seed, index) {
   }
   if (index >= c.have.length) {
     const len = Math.max(index + 1, c.have.length * 2, 64);
-    const grow = (a, T) => { const o = new T(len); o.set(a); return o; };
-    c.n = grow(c.n, Float64Array); c.b = grow(c.b, Float64Array); c.have = grow(c.have, Uint8Array);
+    const grow = (a, T) => {
+      const o = new T(len);
+      o.set(a);
+      return o;
+    };
+    c.n = grow(c.n, Float64Array);
+    c.b = grow(c.b, Float64Array);
+    c.have = grow(c.have, Uint8Array);
   }
-  if (!c.have[index]) { const p = kinemePhase2(seed, index); c.n[index] = p[0]; c.b[index] = p[1]; c.have[index] = 1; }
+  if (!c.have[index]) {
+    const p = kinemePhase2(seed, index);
+    c.n[index] = p[0];
+    c.b[index] = p[1];
+    c.have[index] = 1;
+  }
   return c;
 }
 
@@ -297,53 +319,55 @@ export function driverTimeSec(clock, loopMs, rate = 1) {
  * The v1 driver set (Matt decision 6: curated four).
  * amount: 0..1. Amount 0 = today's render exactly (hard gate below).
  */
-export const KINEME_DRIVERS = Object.freeze([
-  {
-    id: 'breath',
-    targets: ['scale'],
-    amountMeaning: 'scale swell depth, fraction of mark scale',
-    amountRange: [0, 1],
-    phaseMode: 'per-instance',
-    clock: 'smooth',
-    costTier: 'cpu-cheap',
-  },
-  {
-    id: 'drift',
-    targets: ['x', 'y'],
-    amountMeaning: 'wander reach, fraction of the smaller canvas dimension',
-    amountRange: [0, 1],
-    phaseMode: 'per-instance',
-    clock: 'smooth',
-    costTier: 'cpu-cheap',
-  },
-  {
-    id: 'pulse',
-    targets: ['scale'],
-    amountMeaning: 'scale thump depth, fraction of mark scale',
-    amountRange: [0, 1],
-    phaseMode: 'per-instance',
-    clock: 'smooth',
-    costTier: 'cpu-cheap',
-  },
-  {
-    id: 'brush-wobble',
-    targets: ['wobbleAmp'],
-    amountMeaning: 'boiled wobble reach, fraction of the edge band',
-    amountRange: [0, 1],
-    phaseMode: 'per-instance',
-    clock: 'boil',
-    costTier: 'cpu-cheap',
-  },
-  {
-    id: 'palette-breath', // #1151 — per-instance palette sweep (Davis colorOsc, homage)
-    targets: ['paletteShift'],
-    amountMeaning: 'palette sweep reach, fraction of palette length',
-    amountRange: [0, 1],
-    phaseMode: 'per-instance',
-    clock: 'smooth',
-    costTier: 'cpu-cheap',
-  },
-].map(Object.freeze));
+export const KINEME_DRIVERS = Object.freeze(
+  [
+    {
+      id: 'breath',
+      targets: ['scale'],
+      amountMeaning: 'scale swell depth, fraction of mark scale',
+      amountRange: [0, 1],
+      phaseMode: 'per-instance',
+      clock: 'smooth',
+      costTier: 'cpu-cheap',
+    },
+    {
+      id: 'drift',
+      targets: ['x', 'y'],
+      amountMeaning: 'wander reach, fraction of the smaller canvas dimension',
+      amountRange: [0, 1],
+      phaseMode: 'per-instance',
+      clock: 'smooth',
+      costTier: 'cpu-cheap',
+    },
+    {
+      id: 'pulse',
+      targets: ['scale'],
+      amountMeaning: 'scale thump depth, fraction of mark scale',
+      amountRange: [0, 1],
+      phaseMode: 'per-instance',
+      clock: 'smooth',
+      costTier: 'cpu-cheap',
+    },
+    {
+      id: 'brush-wobble',
+      targets: ['wobbleAmp'],
+      amountMeaning: 'boiled wobble reach, fraction of the edge band',
+      amountRange: [0, 1],
+      phaseMode: 'per-instance',
+      clock: 'boil',
+      costTier: 'cpu-cheap',
+    },
+    {
+      id: 'palette-breath', // #1151 — per-instance palette sweep (Davis colorOsc, homage)
+      targets: ['paletteShift'],
+      amountMeaning: 'palette sweep reach, fraction of palette length',
+      amountRange: [0, 1],
+      phaseMode: 'per-instance',
+      clock: 'smooth',
+      costTier: 'cpu-cheap',
+    },
+  ].map(Object.freeze),
+);
 
 const DRIVER_IDS = new Set(KINEME_DRIVERS.map((d) => d.id));
 
@@ -436,8 +460,11 @@ export function evaluateKineme(soa, ctx) {
     const reach = drift * DRIFT_REACH * m;
     if (reach > 0) {
       for (let k = 0; k < n; k++) {
-        const ph = phasesFor(seed, soa.index[k]); const uN = ph.n[soa.index[k]]; const uB = ph.b[soa.index[k]];
-        const sx = Math.sin(TAU * (DRIFT_HZ_X * t + uN)); const sy = Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
+        const ph = phasesFor(seed, soa.index[k]);
+        const uN = ph.n[soa.index[k]];
+        const uB = ph.b[soa.index[k]];
+        const sx = Math.sin(TAU * (DRIFT_HZ_X * t + uN));
+        const sy = Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
         out.dx[k] += reach * (anchored ? sx - Math.sin(TAU * uN) : sx);
         out.dy[k] += reach * (anchored ? sy - Math.sin(TAU * uB) : sy);
       }
@@ -523,8 +550,14 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
   if (!d.active) return null;
   const n = soa.n | 0;
   let base = BASE_XY.get(soa);
-  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; BASE_XY.set(soa, base); }
-  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  if (!base || base.x.length < n) {
+    base = { x: new Float64Array(n), y: new Float64Array(n) };
+    BASE_XY.set(soa, base);
+  }
+  for (let k = 0; k < n; k++) {
+    base.x[k] = soa.x[k];
+    base.y[k] = soa.y[k];
+  }
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue; // #1128: pinned still by the artist: this mark stays where it was placed
     soa.scale[k] *= 1 + d.dScale[k];
@@ -541,8 +574,14 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
   let palUndo = null;
   const swatches = ctx.palette?.swatches;
   const colorArrays = ctx.colorArrays;
-  if (num01(ctx.amounts?.paletteBreath) > 0 && Array.isArray(swatches) && swatches.length > 0
-      && colorArrays?.colors && colorArrays?.accents && soa.palSlot) {
+  if (
+    num01(ctx.amounts?.paletteBreath) > 0 &&
+    Array.isArray(swatches) &&
+    swatches.length > 0 &&
+    colorArrays?.colors &&
+    colorArrays?.accents &&
+    soa.palSlot
+  ) {
     const len = swatches.length;
     const { colors, accents } = colorArrays;
     const palSlot = soa.palSlot;
@@ -565,7 +604,10 @@ export function applyKinemeDrivers(soa, ctx, still = null) {
   }
 
   return () => {
-    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+    for (let k = 0; k < n; k++) {
+      soa.x[k] = base.x[k];
+      soa.y[k] = base.y[k];
+    }
     if (palUndo) palUndo();
   };
   // dWobble: no consumer on main — brush mode (#894/#897) applies it when
@@ -732,7 +774,15 @@ export function checkTravelStoreSnapshot(snap) {
   for (const e of snap.scenes) {
     if (!Array.isArray(e) || e.length !== 2 || typeof e[0] !== 'string') return false;
     const sc = e[1];
-    if (!sc || typeof sc !== 'object' || !Number.isInteger(sc.seed) || !Number.isFinite(sc.acc) || !Number.isInteger(sc.steps) || sc.steps < 0) return false;
+    if (
+      !sc ||
+      typeof sc !== 'object' ||
+      !Number.isInteger(sc.seed) ||
+      !Number.isFinite(sc.acc) ||
+      !Number.isInteger(sc.steps) ||
+      sc.steps < 0
+    )
+      return false;
     if (!Array.isArray(sc.states)) return false;
     for (const r of sc.states) {
       if (!Array.isArray(r) || r.length !== 5 || !Number.isInteger(r[0])) return false;
@@ -795,21 +845,27 @@ function stepTravelMark(s, hx, hy, env) {
     // The governor's travel shed: velocities zero, marks settle home.
     // What remains on screen is the placed picture, honestly at rest —
     // never a roam frozen mid-stride.
-    s.vx = 0; s.vy = 0;
+    s.vx = 0;
+    s.vy = 0;
     const d = Math.exp(-TRAVEL_STEP_SEC / TRAVEL_SETTLE_TAU);
-    s.ox *= d; s.oy *= d;
+    s.ox *= d;
+    s.oy *= d;
     if (Math.abs(s.ox) < 0.01) s.ox = 0;
     if (Math.abs(s.oy) < 0.01) s.oy = 0;
     return;
   }
   // FLOW: steer toward the curl of the shared noise field, sampled at the
   // mark's CURRENT position every step, so the path bends with the field.
-  travelCurl(env.noise,
+  travelCurl(
+    env.noise,
     ((hx + s.ox) / env.W) * TRAVEL_FLOW_FREQ,
     ((hy + s.oy) / env.H) * TRAVEL_FLOW_FREQ,
-    env.simSec * TRAVEL_FLOW_TIME, TRAVEL_TMP);
+    env.simSec * TRAVEL_FLOW_TIME,
+    TRAVEL_TMP,
+  );
   const mag = Math.hypot(TRAVEL_TMP.x, TRAVEL_TMP.y);
-  let tvx = 0, tvy = 0;
+  let tvx = 0,
+    tvy = 0;
   if (mag > 1e-6) {
     // Target speed scales with the field's strength at the mark: strong
     // currents carry, slack water dawdles — no floor, so the roam's
@@ -822,14 +878,16 @@ function stepTravelMark(s, hx, hy, env) {
   s.vx += (tvx - s.vx) * a;
   s.vy += (tvy - s.vy) * a;
   const damp = Math.exp(-TRAVEL_STEP_SEC / TRAVEL_DAMP_TAU);
-  s.vx *= damp; s.vy *= damp;
+  s.vx *= damp;
+  s.vy *= damp;
   // The leash: no home force inside radius L; outside it a spring toward
   // the leash circle, damped along the radial velocity only — slightly
   // underdamped, so a returning mark overshoots home before it settles.
   const r = Math.hypot(s.ox, s.oy);
   if (r > env.leash) {
     const wn = 2 * Math.PI * TRAVEL_SPRING_HZ;
-    const nx = s.ox / r, ny = s.oy / r;
+    const nx = s.ox / r,
+      ny = s.oy / r;
     const pull = wn * wn * (r - env.leash);
     const vr = s.vx * nx + s.vy * ny;
     const c = 2 * TRAVEL_SPRING_ZETA * wn;
@@ -848,8 +906,14 @@ const TRAVEL_BASE_XY = new WeakMap();
 // before anything reads it, and applyTransport never re-enters itself.
 let _pathOffX = new Float64Array(0);
 let _pathOffY = new Float64Array(0);
-function pathOffScratch(n) { if (_pathOffX.length < n) _pathOffX = new Float64Array(n); return _pathOffX; }
-function pathOffScratchY(n) { if (_pathOffY.length < n) _pathOffY = new Float64Array(n); return _pathOffY; }
+function pathOffScratch(n) {
+  if (_pathOffX.length < n) _pathOffX = new Float64Array(n);
+  return _pathOffX;
+}
+function pathOffScratchY(n) {
+  if (_pathOffY.length < n) _pathOffY = new Float64Array(n);
+  return _pathOffY;
+}
 
 // ── PATH transport (#1575 P2) ───────────────────────────────────────────
 // The anchor as a PURE function of (t, seed, params): no state, no store
@@ -930,7 +994,8 @@ export function pathAnchor(home, tSec, opts) {
 }
 
 function pathAnchorInto(home, tSec, opts, out) {
-  const W = Number(opts?.canvasW), H = Number(opts?.canvasH);
+  const W = Number(opts?.canvasW),
+    H = Number(opts?.canvasH);
   const t = Math.max(0, Number(tSec) || 0);
   const seed = opts?.seed | 0;
   const index = opts?.index | 0;
@@ -939,13 +1004,23 @@ function pathAnchorInto(home, tSec, opts, out) {
   const radius = Math.max(0, Number(opts?.radius) || 0);
   const lean = opts?.lean === undefined ? 1 : Number(opts.lean) || 0;
   const family = opts?.family;
-  const cx = W / 2, cy = H / 2;
+  const cx = W / 2,
+    cy = H / 2;
 
   if (family === 'orbit' || family === 'spiral') {
-    if (t <= 0) { out.x = home.x; out.y = home.y; return out; } // the anchored deal is home, bit-exact (no polar round-trip)
-    const vx = home.x - cx, vy = home.y - cy;
+    if (t <= 0) {
+      out.x = home.x;
+      out.y = home.y;
+      return out;
+    } // the anchored deal is home, bit-exact (no polar round-trip)
+    const vx = home.x - cx,
+      vy = home.y - cy;
     const r0 = Math.hypot(vx, vy);
-    if (!(r0 > 0.5)) { out.x = home.x; out.y = home.y; return out; }
+    if (!(r0 > 0.5)) {
+      out.x = home.x;
+      out.y = home.y;
+      return out;
+    }
     const ang0 = Math.atan2(vy, vx);
     const dir = hashPhase(seed, `path:s:${index}`) > 0.5 ? -1 : 1;
     const driftHz = family === 'orbit' ? PATH_ORBIT_HZ : PATH_ORBIT_HZ * 0.6;
@@ -957,7 +1032,9 @@ function pathAnchorInto(home, tSec, opts, out) {
       r = r0 + radius * (Math.sin(TAU * (PATH_SPIRAL_HZ * speed * t) + TAU * ph) - Math.sin(TAU * ph)) * departEnv(t);
       if (r < 0) r = 0;
     }
-    out.x = cx + r * Math.cos(ang); out.y = cy + r * Math.sin(ang); return out;
+    out.x = cx + r * Math.cos(ang);
+    out.y = cy + r * Math.sin(ang);
+    return out;
   }
 
   if (family === 'sweep') {
@@ -969,7 +1046,9 @@ function pathAnchorInto(home, tSec, opts, out) {
     if (p < 0.07) x -= PATH_LEAN_PX * lean * Math.sin(Math.PI * (p / 0.07)); // anticipation at each departure
     const phY = hashPhase(seed, `path:y:${index}`);
     const y = home.y + radius * 0.35 * Math.sin(TAU * p + TAU * phY);
-    out.x = x; out.y = y; return out;
+    out.x = x;
+    out.y = y;
+    return out;
   }
 
   // lissajous (the default family for an unknown name — the weave is the
@@ -978,16 +1057,24 @@ function pathAnchorInto(home, tSec, opts, out) {
   const uy = hashPhase(seed, `path:y:${index}`);
   const rawX = (tt) => radius * (Math.sin(TAU * (PATH_LISS_HZ_X * speed * tt) + TAU * ux) - Math.sin(TAU * ux));
   const rawY = (tt) => radius * 0.7 * (Math.sin(TAU * (PATH_LISS_HZ_Y * speed * tt) + TAU * uy) - Math.sin(TAU * uy));
-  const ox = rawX(t), oy = rawY(t);
+  const ox = rawX(t),
+    oy = rawY(t);
   const env = departEnv(t);
-  let lx = 0, ly = 0;
+  let lx = 0,
+    ly = 0;
   const la = leanAmt(t) * lean;
   if (la > 0) {
-    const dx = rawX(0.05), dy = rawY(0.05); // the initial departure direction
+    const dx = rawX(0.05),
+      dy = rawY(0.05); // the initial departure direction
     const dl = Math.hypot(dx, dy);
-    if (dl > 1e-9) { lx = -(dx / dl) * PATH_LEAN_WEAVE_PX * la; ly = -(dy / dl) * PATH_LEAN_WEAVE_PX * la; }
+    if (dl > 1e-9) {
+      lx = -(dx / dl) * PATH_LEAN_WEAVE_PX * la;
+      ly = -(dy / dl) * PATH_LEAN_WEAVE_PX * la;
+    }
   }
-  out.x = home.x + ox * env + lx; out.y = home.y + oy * env + ly; return out;
+  out.x = home.x + ox * env + lx;
+  out.y = home.y + oy * env + ly;
+  return out;
 }
 
 // ── Stretch along velocity (#1575) ───────────────────────────────────────
@@ -1049,7 +1136,8 @@ export function applyTransport(soa, ctx, still = null) {
   if (tr.mode !== 'flow' && tr.mode !== 'path') return null;
   const leash = Number(tr.leash);
   if (!(leash > 0)) return null;
-  const W = Number(ctx.canvasW), H = Number(ctx.canvasH);
+  const W = Number(ctx.canvasW),
+    H = Number(ctx.canvasH);
   const m = Math.min(W, H);
   if (!(m > 0)) return null;
   const seed = ctx.seed | 0;
@@ -1059,7 +1147,10 @@ export function applyTransport(soa, ctx, still = null) {
     sc = { seed, acc: 0, steps: 0, states: new Map() };
     tr.store.scenes.set(sceneId, sc);
   } else if (sc.seed !== seed) {
-    sc.seed = seed; sc.acc = 0; sc.steps = 0; sc.states.clear();
+    sc.seed = seed;
+    sc.acc = 0;
+    sc.steps = 0;
+    sc.states.clear();
   }
   const flowRaw = Number(tr.flow);
   const flow = Number.isFinite(flowRaw) ? Math.min(1, Math.max(0, flowRaw)) : 0;
@@ -1068,7 +1159,11 @@ export function applyTransport(soa, ctx, still = null) {
   // ax, ay }, sized to n): zeroed on entry, filled at present time for
   // marks fast enough to stretch. Absent → no stretch is computed.
   const deform = tr.deform && tr.deform.amt && tr.deform.amt.length >= n ? tr.deform : null;
-  if (deform) { deform.amt.fill(0); if (deform.ax) deform.ax.fill(0); if (deform.ay) deform.ay.fill(0); }
+  if (deform) {
+    deform.amt.fill(0);
+    if (deform.ax) deform.ax.fill(0);
+    if (deform.ay) deform.ay.fill(0);
+  }
 
   // #1575 — PATH shed: the governor's travel shed presents home and the
   // path clock FREEZES (steps do not advance), so a shed path resumes
@@ -1093,7 +1188,6 @@ export function applyTransport(soa, ctx, still = null) {
     for (const idx of [...sc.states.keys()]) if (idx >= travelers) sc.states.delete(idx);
   }
 
-
   // Fixed-step accumulation on the spine-A clock: bank the frame time,
   // spend whole steps, never bank a spiral of death.
   const frameMs = Number(tr.frameMs);
@@ -1110,7 +1204,9 @@ export function applyTransport(soa, ctx, still = null) {
       const env = {
         shed: !!tr.shed,
         noise: noiseFor(seed),
-        W, H, leash,
+        W,
+        H,
+        leash,
         cruise: TRAVEL_SPEED * m * flow,
         simSec: 0,
       };
@@ -1121,7 +1217,10 @@ export function applyTransport(soa, ctx, still = null) {
           const index = soa.index ? soa.index[k] : k;
           if (index >= travelers) continue; // #1574 Q2 — beyond the budget: not a traveler, no state
           let s = sc.states.get(index);
-          if (!s) { s = { ox: 0, oy: 0, vx: 0, vy: 0 }; sc.states.set(index, s); }
+          if (!s) {
+            s = { ox: 0, oy: 0, vx: 0, vy: 0 };
+            sc.states.set(index, s);
+          }
           if (!env.shed && flow <= 0 && s.ox === 0 && s.oy === 0 && s.vx === 0 && s.vy === 0) continue;
           stepTravelMark(s, soa.x[k], soa.y[k], env);
         }
@@ -1145,48 +1244,78 @@ export function applyTransport(soa, ctx, still = null) {
     if (!(tSec > 0)) return null;
     const pathOpts = {
       family: PATH_FAMILIES.includes(tr.path) ? tr.path : 'orbit',
-      seed, canvasW: W, canvasH: H,
-      radius: Number(tr.radius), speed: Number(tr.speed),
+      seed,
+      canvasW: W,
+      canvasH: H,
+      radius: Number(tr.radius),
+      speed: Number(tr.speed),
     };
     let any = false;
-    const offX = pathOffScratch(n), offY = pathOffScratchY(n);
+    const offX = pathOffScratch(n),
+      offY = pathOffScratchY(n);
     const homeScratch = { x: 0, y: 0 };
     // One reused opts object and two reused anchor outs for the whole
     // step — no per-mark allocation (see pathAnchor's note).
     const anchorOpts = { ...pathOpts, index: 0 };
-    const aOut = { x: 0, y: 0 }, prevOut = { x: 0, y: 0 };
+    const aOut = { x: 0, y: 0 },
+      prevOut = { x: 0, y: 0 };
     for (let k = 0; k < n; k++) {
       if (still && still[k]) continue;
       const index = soa.index ? soa.index[k] : k;
-      homeScratch.x = soa.x[k]; homeScratch.y = soa.y[k];
+      homeScratch.x = soa.x[k];
+      homeScratch.y = soa.y[k];
       anchorOpts.index = index;
       const a = pathAnchorInto(homeScratch, tSec, anchorOpts, aOut);
-      let ox = a.x - soa.x[k], oy = a.y - soa.y[k];
+      let ox = a.x - soa.x[k],
+        oy = a.y - soa.y[k];
       if (pathOpts.family === 'sweep') {
-        if (oy > leash) oy = leash; else if (oy < -leash) oy = -leash;
+        if (oy > leash) oy = leash;
+        else if (oy < -leash) oy = -leash;
       } else {
         const r = Math.hypot(ox, oy);
-        if (r > leash) { const f = leash / r; ox *= f; oy *= f; }
+        if (r > leash) {
+          const f = leash / r;
+          ox *= f;
+          oy *= f;
+        }
       }
-      offX[k] = ox; offY[k] = oy;
+      offX[k] = ox;
+      offY[k] = oy;
       if (ox !== 0 || oy !== 0) any = true;
       if (deform) {
         // Velocity by finite difference of the pure function itself —
         // pure in, pure out, no state to disagree with the anchor.
         const prev = pathAnchorInto(homeScratch, Math.max(0, tSec - TRAVEL_STEP_SEC), anchorOpts, prevOut);
-        const vx = (a.x - prev.x) / TRAVEL_STEP_SEC, vy = (a.y - prev.y) / TRAVEL_STEP_SEC;
+        const vx = (a.x - prev.x) / TRAVEL_STEP_SEC,
+          vy = (a.y - prev.y) / TRAVEL_STEP_SEC;
         const sp = Math.hypot(vx, vy);
         const amt = travelStretchAmount(sp);
-        if (amt > 0 && sp > 1e-9) { deform.amt[k] = amt; deform.ax[k] = -vy / sp; deform.ay[k] = vx / sp; }
+        if (amt > 0 && sp > 1e-9) {
+          deform.amt[k] = amt;
+          deform.ax[k] = -vy / sp;
+          deform.ay[k] = vx / sp;
+        }
       }
     }
     if (!any) return null;
     let base = TRAVEL_BASE_XY.get(soa);
-    if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
-    for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
-    for (let k = 0; k < n; k++) { soa.x[k] += offX[k]; soa.y[k] += offY[k]; }
+    if (!base || base.x.length < n) {
+      base = { x: new Float64Array(n), y: new Float64Array(n) };
+      TRAVEL_BASE_XY.set(soa, base);
+    }
+    for (let k = 0; k < n; k++) {
+      base.x[k] = soa.x[k];
+      base.y[k] = soa.y[k];
+    }
+    for (let k = 0; k < n; k++) {
+      soa.x[k] += offX[k];
+      soa.y[k] += offY[k];
+    }
     return () => {
-      for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+      for (let k = 0; k < n; k++) {
+        soa.x[k] = base.x[k];
+        soa.y[k] = base.y[k];
+      }
     };
   }
 
@@ -1196,12 +1325,21 @@ export function applyTransport(soa, ctx, still = null) {
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
     const s = sc.states.get(soa.index ? soa.index[k] : k);
-    if (s && (s.ox !== 0 || s.oy !== 0)) { any = true; break; }
+    if (s && (s.ox !== 0 || s.oy !== 0)) {
+      any = true;
+      break;
+    }
   }
   if (!any) return null;
   let base = TRAVEL_BASE_XY.get(soa);
-  if (!base || base.x.length < n) { base = { x: new Float64Array(n), y: new Float64Array(n) }; TRAVEL_BASE_XY.set(soa, base); }
-  for (let k = 0; k < n; k++) { base.x[k] = soa.x[k]; base.y[k] = soa.y[k]; }
+  if (!base || base.x.length < n) {
+    base = { x: new Float64Array(n), y: new Float64Array(n) };
+    TRAVEL_BASE_XY.set(soa, base);
+  }
+  for (let k = 0; k < n; k++) {
+    base.x[k] = soa.x[k];
+    base.y[k] = soa.y[k];
+  }
   for (let k = 0; k < n; k++) {
     if (still && still[k]) continue;
     const s = sc.states.get(soa.index ? soa.index[k] : k);
@@ -1211,11 +1349,18 @@ export function applyTransport(soa, ctx, still = null) {
     if (deform && !tr.shed) {
       const sp = Math.hypot(s.vx, s.vy);
       const amt = travelStretchAmount(sp);
-      if (amt > 0 && sp > 1e-9) { deform.amt[k] = amt; deform.ax[k] = -s.vy / sp; deform.ay[k] = s.vx / sp; }
+      if (amt > 0 && sp > 1e-9) {
+        deform.amt[k] = amt;
+        deform.ax[k] = -s.vy / sp;
+        deform.ay[k] = s.vx / sp;
+      }
     }
   }
   return () => {
-    for (let k = 0; k < n; k++) { soa.x[k] = base.x[k]; soa.y[k] = base.y[k]; }
+    for (let k = 0; k < n; k++) {
+      soa.x[k] = base.x[k];
+      soa.y[k] = base.y[k];
+    }
   };
 }
 
@@ -1234,7 +1379,8 @@ registerCostTier('travel/flow', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.39,
-  notes: '#1574 P1 — FLOW transport: fixed-step curl-flow sim + leash on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+  notes:
+    '#1574 P1 — FLOW transport: fixed-step curl-flow sim + leash on the resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
 });
 
 // #1575 P2 — PATH transport's declared cost, same doctrine as FLOW's:
@@ -1246,7 +1392,8 @@ registerCostTier('travel/path', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.66,
-  notes: '#1575 P2 — PATH transport: pure-function anchors on the step-count clock + leash cap + stretch finite-difference, resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
+  notes:
+    '#1575 P2 — PATH transport: pure-function anchors on the step-count clock + leash cap + stretch finite-difference, resolver CPU; no GPU pass (marks ride the structural item pass). timeMs MEASURED sandbox CPU at the 800-mark cap (see block comment); sheds by the governor travel cut (1.6), never the effect ladder.',
 });
 
 // ── #1574 Q2 — the traveler budget: governor-selected within a device-class cap ──
@@ -1320,7 +1467,8 @@ registerCostTier('travel/budget', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0,
-  notes: '#1574 Q2 — the governor traveler selection (min of requested marks vs the device-class cap in data/quality.js TRAVEL_BUDGETS): scalar arithmetic once per scene/resolve, measured in the low hundreds of ns/call (sandbox node) — 0 is the honest figure at the registry\'s ms scale. Structural; the cost it controls is travel/flow\'s, declared above.',
+  notes:
+    "#1574 Q2 — the governor traveler selection (min of requested marks vs the device-class cap in data/quality.js TRAVEL_BUDGETS): scalar arithmetic once per scene/resolve, measured in the low hundreds of ns/call (sandbox node) — 0 is the honest figure at the registry's ms scale. Structural; the cost it controls is travel/flow's, declared above.",
 });
 
 /**

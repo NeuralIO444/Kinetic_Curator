@@ -150,9 +150,17 @@ export function snapshotDishSession(session) {
   return {
     seq: session._seq,
     entries: session.entries.map((e) => ({
-      key: e.key, seq: e.seq, radius: e.radius, restitution: e.restitution,
-      contactMode: e.mode, umask: e.umask, organism: e.organism, wetness: e.wetness,
-      accum: !!e.trailOwn, ecology: e.ecology, cap: e.cap,
+      key: e.key,
+      seq: e.seq,
+      radius: e.radius,
+      restitution: e.restitution,
+      contactMode: e.mode,
+      umask: e.umask,
+      organism: e.organism,
+      wetness: e.wetness,
+      accum: !!e.trailOwn,
+      ecology: e.ecology,
+      cap: e.cap,
     })),
     trailTotal: session.trailTotal ? encodeTyped(session.trailTotal.cells) : null,
     trailsByKey,
@@ -203,9 +211,17 @@ export function restoreDishEntries(session, records, sysForKey) {
     const sys = sysForKey(rec.key);
     if (!sys) continue;
     const e = enrolDishBody(session, {
-      key: rec.key, sys, radius: rec.radius, restitution: rec.restitution,
-      contactMode: rec.contactMode, umask: rec.umask, organism: rec.organism,
-      wetness: rec.wetness, accum: rec.accum, ecology: rec.ecology, cap: rec.cap,
+      key: rec.key,
+      sys,
+      radius: rec.radius,
+      restitution: rec.restitution,
+      contactMode: rec.contactMode,
+      umask: rec.umask,
+      organism: rec.organism,
+      wetness: rec.wetness,
+      accum: rec.accum,
+      ecology: rec.ecology,
+      cap: rec.cap,
     });
     if (e) e.seq = rec.seq;
   }
@@ -257,7 +273,10 @@ export function restoreDishSession(session, snap) {
  *   (dishEcology.mjs) at that cap; absent or false enrols a stratum
  *   the mode does not govern.
  */
-export function enrolDishBody(session, { key, sys, radius, restitution, contactMode, umask, organism, wetness, accum, ecology, cap }) {
+export function enrolDishBody(
+  session,
+  { key, sys, radius, restitution, contactMode, umask, organism, wetness, accum, ecology, cap },
+) {
   let e = session._bySys.get(sys);
   if (!e) {
     e = { key, sys, seq: session._seq++ };
@@ -279,9 +298,10 @@ export function enrolDishBody(session, { key, sys, radius, restitution, contactM
   // honest budget when the governor named none), and the member's
   // living count refreshes here, before its update runs.
   e.ecology = !!ecology;
-  e.cap = Number.isFinite(cap) && cap > 0
-    ? Math.floor(cap)
-    : Math.max(0, (sys && sys._authoredCount) || (sys ? sys.n : 0) || 0);
+  e.cap =
+    Number.isFinite(cap) && cap > 0
+      ? Math.floor(cap)
+      : Math.max(0, (sys && sys._authoredCount) || (sys ? sys.n : 0) || 0);
   ensureEcologyEntry(session, e);
   // #1415 — an accumulating stratum deposits trails; enrolment creates
   // its field (and the session's total) here so the first tick can lay.
@@ -317,10 +337,12 @@ export function armDish(session, orderedKeys) {
 
 function activeEntries(session) {
   const rank = new Map();
-  session.order.forEach((k, i) => { if (!rank.has(k)) rank.set(k, i); });
+  session.order.forEach((k, i) => {
+    if (!rank.has(k)) rank.set(k, i);
+  });
   return session.entries
     .filter((e) => e.radius > 0 && rank.has(e.key))
-    .sort((a, b) => (rank.get(a.key) - rank.get(b.key)) || (a.seq - b.seq));
+    .sort((a, b) => rank.get(a.key) - rank.get(b.key) || a.seq - b.seq);
 }
 
 /**
@@ -342,9 +364,17 @@ const EMPTY_CELL_START = new Int32Array(1);
  *  the empty one, so a reader never mistakes last frame's crowd for
  *  this frame's. */
 function stampEmptyDensity(session) {
-  stampDensity(session, buildDishDensity({
-    cellStart: EMPTY_CELL_START, cols: 0, rows: 0, cellSize: 0, minCx: 0, minCy: 0,
-  }));
+  stampDensity(
+    session,
+    buildDishDensity({
+      cellStart: EMPTY_CELL_START,
+      cols: 0,
+      rows: 0,
+      cellSize: 0,
+      minCx: 0,
+      minCy: 0,
+    }),
+  );
 }
 
 export function runDishContacts(session, callerSys) {
@@ -353,12 +383,18 @@ export function runDishContacts(session, callerSys) {
   session.armed = false;
 
   const active = activeEntries(session);
-  if (active.length < 2) { stampEmptyDensity(session); return true; }
+  if (active.length < 2) {
+    stampEmptyDensity(session);
+    return true;
+  }
 
   // Flatten bodies in canonical order (stratum order, then particle index).
   let total = 0;
   for (const e of active) total += e.sys.n;
-  if (total < 2) { stampEmptyDensity(session); return true; }
+  if (total < 2) {
+    stampEmptyDensity(session);
+    return true;
+  }
 
   const bEntry = session._bEntry;
   bEntry.length = 0;
@@ -389,7 +425,10 @@ export function runDishContacts(session, callerSys) {
       nb++;
     }
   }
-  if (nb < 2 || !(maxR > 0)) { stampEmptyDensity(session); return true; }
+  if (nb < 2 || !(maxR > 0)) {
+    stampEmptyDensity(session);
+    return true;
+  }
 
   // One shared counting-sort hash over all bodies — the same construction
   // as _buildSpatialHash (cell extent from the bodies, never clamped to
@@ -401,8 +440,10 @@ export function runDishContacts(session, callerSys) {
     cellOf = new Int32Array(nb);
     session._cellOf = cellOf;
   }
-  let minCx = Infinity; let minCy = Infinity;
-  let maxCx = -Infinity; let maxCy = -Infinity;
+  let minCx = Infinity;
+  let minCy = Infinity;
+  let maxCx = -Infinity;
+  let maxCy = -Infinity;
   for (let b = 0; b < nb; b++) {
     const sys = active[bEntry[b]].sys;
     const cx = Math.floor(sys.x[bIdx[b]] / cellSize);
@@ -483,31 +524,39 @@ export function runDishContacts(session, callerSys) {
           if (!((eb.umask >>> ga) & 1) || !((eb.umask >>> gb) & 1)) continue;
           // #1408 — per-body disc sum; both discs positive, or no contact
           // (the same edge rule as the per-system pass).
-          const ra = bRad[a]; const rb = bRad[b];
+          const ra = bRad[a];
+          const rb = bRad[b];
           if (!(ra > 0) || !(rb > 0)) continue;
           const rr = ra + rb;
           const rr2 = rr * rr;
           // Re-read: a may already have moved this pass.
-          const xi = sysA.x[ia]; const yi = sysA.y[ia];
+          const xi = sysA.x[ia];
+          const yi = sysA.y[ia];
           const dx = sysB.x[ib] - xi;
           const dy = sysB.y[ib] - yi;
           const d2 = dx * dx + dy * dy;
           if (d2 >= rr2) continue;
           let dist = Math.sqrt(d2);
-          let nx; let ny;
+          let nx;
+          let ny;
           if (dist > 1e-9) {
-            nx = dx / dist; ny = dy / dist;
+            nx = dx / dist;
+            ny = dy / dist;
           } else {
             // Exactly coincident discs: deterministic golden-angle normal
             // from the canonical pair identity — never NaN, never random.
-            const sa = bEntry[a]; const sb = bEntry[b];
+            const sa = bEntry[a];
+            const sb = bEntry[b];
             const ang = ((sa * 131 + ia) * 2.399963229728653 + (sb * 131 + ib) * 1.2) % TAU;
-            nx = Math.cos(ang); ny = Math.sin(ang);
+            nx = Math.cos(ang);
+            ny = Math.sin(ang);
             dist = 0;
           }
           const overlap = rr - dist;
-          const m1 = sysA.mass[ia]; const m2 = sysB.mass[ib];
-          const w1 = 1 / m1; const w2 = 1 / m2;
+          const m1 = sysA.mass[ia];
+          const m2 = sysB.mass[ib];
+          const w1 = 1 / m1;
+          const w2 = 1 / m2;
           const wSum = w1 + w2;
           // 1 — positional depenetration, mass-weighted. Always: bodies
           // occupy space across strata regardless of either mode.
@@ -520,7 +569,8 @@ export function runDishContacts(session, callerSys) {
           // impulse modes; restitution is the pair's average (a stick
           // stratum contributes 0, so any pair touching one is inelastic
           // in proportion).
-          let dvA = 0; let dvB = 0; // #1410 — per-body normal Δv, for the feed
+          let dvA = 0;
+          let dvB = 0; // #1410 — per-body normal Δv, for the feed
           let jnTotal = 0; // #1595 (D1) — the normal impulse this pair exchanges this step; friction's budget
           // #1413 — the pair's medium: wetness averaged across the seam
           // (the restitution precedent above), resolved through the one
@@ -538,7 +588,8 @@ export function runDishContacts(session, callerSys) {
               sysA.vy[ia] -= ny * jimp * w1;
               sysB.vx[ib] += nx * jimp * w2;
               sysB.vy[ib] += ny * jimp * w2;
-              dvA = jimp * w1; dvB = jimp * w2;
+              dvA = jimp * w1;
+              dvB = jimp * w2;
               jnTotal = Math.abs(jimp);
             }
           }
@@ -557,7 +608,8 @@ export function runDishContacts(session, callerSys) {
                 sysA.vy[ia] -= ny * jc * w1;
                 sysB.vx[ib] += nx * jc * w2;
                 sysB.vy[ib] += ny * jc * w2;
-                dvA += Math.abs(jc) * w1; dvB += Math.abs(jc) * w2;
+                dvA += Math.abs(jc) * w1;
+                dvB += Math.abs(jc) * w2;
                 jnTotal += Math.abs(jc);
               }
             }
@@ -577,10 +629,14 @@ export function runDishContacts(session, callerSys) {
           // (D1's deliberate non-witness, carried).
           if (pairMed && pairMed.fricK > 0) {
             const mu = FRIC_MAX * pairMed.fricK;
-            const tx = -ny, ty = nx;
+            const tx = -ny,
+              ty = nx;
             const vt = spinContactVt(
               (sysB.vx[ib] - sysA.vx[ia]) * tx + (sysB.vy[ib] - sysA.vy[ia]) * ty,
-              sysA.omega[ia], ra, sysB.omega[ib], rb,
+              sysA.omega[ia],
+              ra,
+              sysB.omega[ib],
+              rb,
             );
             if (vt !== 0) {
               const iA = spinInertia(m1, ra);
@@ -614,7 +670,10 @@ export function runDishContacts(session, callerSys) {
     for (let s = 0; s < sys.n; s++) {
       if (!sys.alive[s]) continue;
       const sp = sys.spine[s];
-      if (sp && sp.length) { sp[0].x = sys.x[s]; sp[0].y = sys.y[s]; }
+      if (sp && sp.length) {
+        sp[0].x = sys.x[s];
+        sp[0].y = sys.y[s];
+      }
     }
   }
   return true;

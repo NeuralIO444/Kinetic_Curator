@@ -15,6 +15,8 @@ const ok = (name, fn) => {
   console.log(`  [ok] ${name}`);
 };
 const flat = (v) => Object.fromEntries(BANDS.map((k) => [k, v]));
+const srcFlat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const srcRe = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 const kick = (t) => {
   const ph = t % 500;
   const h = ph < 90 ? 1 - ph / 90 : 0;
@@ -94,8 +96,10 @@ ok('the registry names who listens; the app feeds them from the meter levels in 
   }
   const app = readFileSync(new URL('../App.jsx', import.meta.url), 'utf8');
   assert.match(
-    app,
-    /setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeAudio\(input && input\.loopTimeMs, readMeterBandLevels\(\)/,
+    srcFlat(app),
+    srcRe(
+      /setResolveFrameTap\(\(input, output\) => \{[\s\S]*?observeAudio\(input && input\.loopTimeMs, readMeterBandLevels\(\)/,
+    ),
   );
   const live = readFileSync(new URL('./audioLive.js', import.meta.url), 'utf8').replace(/\/\/.*$/gm, '');
   assert.ok(

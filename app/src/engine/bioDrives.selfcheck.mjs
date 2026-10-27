@@ -39,10 +39,20 @@ const mean = (arr) => arr.reduce((s, v) => s + v, 0) / arr.length;
 
 function baseLp(over = {}) {
   return {
-    mode: 'hype', behave: 'flock', particleCount: 40,
-    metabolism: 0, breath: 0, graze: 0,
-    noiseFreq: 0.005, noiseSpeed: 0.5, damping: 0.95,
-    scale: [0.4, 1.6], alpha: [40, 100], wind: 1, body: 3, tight: 0.55,
+    mode: 'hype',
+    behave: 'flock',
+    particleCount: 40,
+    metabolism: 0,
+    breath: 0,
+    graze: 0,
+    noiseFreq: 0.005,
+    noiseSpeed: 0.5,
+    damping: 0.95,
+    scale: [0.4, 1.6],
+    alpha: [40, 100],
+    wind: 1,
+    body: 3,
+    tight: 0.55,
     ...over,
   };
 }
@@ -88,12 +98,18 @@ ok('hunger boosts cohesion pull (starving pair closes ~1.17x faster)', () => {
   const closing = (e) => {
     const { ps, lp } = makeSystem(2, { metabolism: 2, behave: 'flock' });
     for (const i of [0, 1]) {
-      ps.mass[i] = 1; ps.vx[i] = 0; ps.vy[i] = 0;
-      ps.drive[i] = 0; ps.energy[i] = e;
+      ps.mass[i] = 1;
+      ps.vx[i] = 0;
+      ps.vy[i] = 0;
+      ps.drive[i] = 0;
+      ps.energy[i] = e;
     }
-    ps.x[0] = 400; ps.y[0] = 350; ps.x[1] = 465; ps.y[1] = 350;
+    ps.x[0] = 400;
+    ps.y[0] = 350;
+    ps.x[1] = 465;
+    ps.y[1] = 350;
     ps.update(lp, ASSETS, PAL, 999, 0, null);
-    return (ps.x[0] - 400) + (465 - ps.x[1]);
+    return ps.x[0] - 400 + (465 - ps.x[1]);
   };
   const ratio = closing(0) / closing(1);
   assert.ok(ratio > 1.1 && ratio < 1.25, `expected ~1.17, got ${ratio}`);
@@ -105,7 +121,10 @@ ok('mold climbs a seeded scent gradient; cruise does not (chemotaxis)', () => {
     ps.update(lp, ASSETS, PAL, 77, 0, null); // creates the scent field
     ps._scent.deposit(0.8, 0.5, 3);
     for (let k = 0; k < 40; k++) ps._scent.step();
-    ps.x[0] = 730; ps.y[0] = 350; ps.vx[0] = 0; ps.vy[0] = 0;
+    ps.x[0] = 730;
+    ps.y[0] = 350;
+    ps.vx[0] = 0;
+    ps.vy[0] = 0;
     ps.update(lp, ASSETS, PAL, 77, 16.7, null);
     return ps.vx[0];
   };
@@ -183,14 +202,23 @@ ok('capacity growth keeps leakRgb at 3 channels per agent (#287)', () => {
   const cap0 = ps._cap;
   assert.equal(ps.leakRgb.length, cap0 * 3, 'leakRgb starts at 3x capacity');
   // Mark a sentinel in the first agent's working pigment, then force growth.
-  ps.leakRgb[0] = 0.11; ps.leakRgb[1] = 0.22; ps.leakRgb[2] = 0.33;
+  ps.leakRgb[0] = 0.11;
+  ps.leakRgb[1] = 0.22;
+  ps.leakRgb[2] = 0.33;
   ps._ensureCapacity(cap0 + 1);
   assert.ok(ps._cap > cap0, 'capacity grew');
   assert.equal(ps.leakRgb.length, ps._cap * 3, 'leakRgb stays 3x after growth');
-  assert.ok(approx(ps.leakRgb[0], 0.11) && approx(ps.leakRgb[1], 0.22) && approx(ps.leakRgb[2], 0.33),
-    'working pigment survives the grow');
+  assert.ok(
+    approx(ps.leakRgb[0], 0.11) && approx(ps.leakRgb[1], 0.22) && approx(ps.leakRgb[2], 0.33),
+    'working pigment survives the grow',
+  );
   // Every other per-agent column must still be 1x.
-  for (const [name, arr] of [['energy', ps.energy], ['drive', ps.drive], ['grazer', ps.grazer], ['x', ps.x]]) {
+  for (const [name, arr] of [
+    ['energy', ps.energy],
+    ['drive', ps.drive],
+    ['grazer', ps.grazer],
+    ['x', ps.x],
+  ]) {
     assert.equal(arr.length, ps._cap, `${name} stays 1x after growth`);
   }
 });
@@ -232,7 +260,10 @@ ok('radial-6 emits a 6-fold pure-rotation fan; kaleido-6 mirrors; bilateral unch
   assert.equal(mirrored, 0, 'radial: pure rotation, no mirrors');
   const keys = new Set(wings.map((w) => w.key));
   assert.equal(keys.size, 40 * 6, 'fan keys must be unique');
-  assert.ok(wings.every((w) => typeof w.ladderId === 'string'), 'fan reuses MOTH_LADDERS');
+  assert.ok(
+    wings.every((w) => typeof w.ladderId === 'string'),
+    'fan reuses MOTH_LADDERS',
+  );
 
   const kal = makeSystem(40, { symmetry: 'kaleido-6', body: 3 });
   const kalWings = syncedItems(kal.ps, kal.lp).filter((it) => it.role === 'wing');

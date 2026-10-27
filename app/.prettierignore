@@ -78,6 +78,15 @@ src/gl/**/*.html
 src/gl/**/*.json
 src/gl/**/*.md
 
+# ── Adopted (slice 10, #1684: the loose files of src/, src/engine/, src/engine/kernel/ — their source pins made layout-blind first) ──
+!src/*.js
+!src/*.jsx
+!src/*.mjs
+!src/engine/*.js
+!src/engine/*.mjs
+!src/engine/kernel/*.js
+!src/engine/kernel/*.mjs
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

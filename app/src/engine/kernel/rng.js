@@ -79,8 +79,7 @@ export function noiseSeedFor(seed, seedOffsets) {
 export function hashU32(seed, channel, index = 0, offsets = null) {
   const ch = resolveChannel(channel);
   const off = offsetForChannel(ch, offsets);
-  let h = (seed | 0) ^ Math.imul(ch, 0x9e3779b9) ^ Math.imul(index | 0, 0x85ebca6b)
-    ^ Math.imul(off, 0x27d4eb2d);
+  let h = (seed | 0) ^ Math.imul(ch, 0x9e3779b9) ^ Math.imul(index | 0, 0x85ebca6b) ^ Math.imul(off, 0x27d4eb2d);
   h = Math.imul(h ^ (h >>> 16), 0x7feb352d);
   h = Math.imul(h ^ (h >>> 15), 0x846ca68b);
   h = (h ^ (h >>> 16)) >>> 0;
@@ -214,7 +213,7 @@ function offsetForChannel(ch, offsets) {
   const group = OFFSET_GROUP_OF.get(ch);
   if (!group) return 0;
   const v = Number(offsets[group]);
-  return Number.isFinite(v) ? (v >>> 0) : 0;
+  return Number.isFinite(v) ? v >>> 0 : 0;
 }
 
 /**
@@ -273,7 +272,7 @@ export function makeScratchStream() {
     },
     /** Reseed to (seed, channel, index): same state as rngForIndex. */
     reseed(seed, channel, index, offsets = null) {
-      s = (hashU32(seed, channel, index, offsets) | 0) || 1;
+      s = hashU32(seed, channel, index, offsets) | 0 || 1;
       return stream;
     },
   };
@@ -310,5 +309,5 @@ export function pickWeightedIndexStable(assets, weights, totalWeight, seed, inde
  */
 export function colorRngForIndex(seed, index, offsets = null) {
   let k = 0;
-  return () => hashU01(seed, CH.color, index * 8 + (k++), offsets);
+  return () => hashU01(seed, CH.color, index * 8 + k++, offsets);
 }

@@ -3,9 +3,17 @@
 // channel math, saturation compositing, density field, determinism per seed.
 import assert from 'node:assert';
 import {
-  FIELDMAP_FIELDS, FIELDMAP_CHANNELS, FIELDMAP_CURVES, FIELDMAP_STEPS,
-  FIELDMAP_RANGES, FIELDMAP_SAT_RANGE,
-  sanitizeFieldMap, fieldMapActive, curveResponse, saturateHex, applyFieldMap,
+  FIELDMAP_FIELDS,
+  FIELDMAP_CHANNELS,
+  FIELDMAP_CURVES,
+  FIELDMAP_STEPS,
+  FIELDMAP_RANGES,
+  FIELDMAP_SAT_RANGE,
+  sanitizeFieldMap,
+  fieldMapActive,
+  curveResponse,
+  saturateHex,
+  applyFieldMap,
 } from './fieldMap.mjs';
 
 const CTX = { seed: 1234, canvasW: 1000, canvasH: 800 };
@@ -17,8 +25,10 @@ function makeItems(n, xs) {
     items.push({
       x: xs ? xs[i] : (i + 0.5) * (1000 / n),
       y: 400,
-      scale: 1, scaleY: 1,
-      color: '#cc3322', accent: '#22aa88',
+      scale: 1,
+      scaleY: 1,
+      color: '#cc3322',
+      accent: '#22aa88',
     });
   }
   return items;
@@ -36,8 +46,11 @@ assert.ok(FIELDMAP_STEPS >= 2, 'stepped needs at least 2 steps');
   assert.deepStrictEqual(d, { field: 'off', channel: 'off', amount: 0, curve: 'smooth' });
   assert.deepStrictEqual(sanitizeFieldMap(null), d);
   const bad = sanitizeFieldMap({ field: 'lava', channel: 'nope', amount: 99, curve: 'wob' });
-  assert.deepStrictEqual(bad, { field: 'off', channel: 'off', amount: 1, curve: 'smooth' },
-    'unknown enums fall back; amount clamps to 1');
+  assert.deepStrictEqual(
+    bad,
+    { field: 'off', channel: 'off', amount: 1, curve: 'smooth' },
+    'unknown enums fall back; amount clamps to 1',
+  );
 }
 
 // amount clamps through clamp01
@@ -108,28 +121,43 @@ assert.strictEqual(saturateHex('#cc3322', 1, -1), '#cc3322', 'negative amount �
   const b = makeItems(40);
   applyFieldMap(a, cfg, CTX);
   applyFieldMap(b, cfg, CTX);
-  assert.deepStrictEqual(a.map((it) => it.scale), b.map((it) => it.scale), 'same seed → identical scales');
+  assert.deepStrictEqual(
+    a.map((it) => it.scale),
+    b.map((it) => it.scale),
+    'same seed → identical scales',
+  );
   const scales = a.map((it) => it.scale);
   const [lo, hi] = FIELDMAP_RANGES.scale;
-  assert.ok(scales.every((s) => s >= lo - 1e-9 && s <= hi + 1e-9), `scales stay in [${lo}, ${hi}]`);
+  assert.ok(
+    scales.every((s) => s >= lo - 1e-9 && s <= hi + 1e-9),
+    `scales stay in [${lo}, ${hi}]`,
+  );
   assert.ok(new Set(scales.map((s) => s.toFixed(6))).size > 10, 'the noise field actually varies the channel');
   // scaleY rides along
-  assert.deepStrictEqual(a.map((it) => it.scaleY), scales, 'scaleY matches scale');
+  assert.deepStrictEqual(
+    a.map((it) => it.scaleY),
+    scales,
+    'scaleY matches scale',
+  );
   // different seed → different mapping (overwhelmingly likely; assert not-all-equal)
   const c = makeItems(40);
   applyFieldMap(c, cfg, { ...CTX, seed: 9999 });
-  assert.ok(c.some((it, i) => Math.abs(it.scale - a[i].scale) > 1e-9), 'seed changes the field');
+  assert.ok(
+    c.some((it, i) => Math.abs(it.scale - a[i].scale) > 1e-9),
+    'seed changes the field',
+  );
 }
 
 // amount blends: half amount → halfway between 1 and the full mapping
 {
   const full = sanitizeFieldMap({ field: 'noise', channel: 'scale', amount: 1, curve: 'linear' });
   const half = sanitizeFieldMap({ field: 'noise', channel: 'scale', amount: 0.5, curve: 'linear' });
-  const a = makeItems(20); applyFieldMap(a, full, CTX);
-  const b = makeItems(20); applyFieldMap(b, half, CTX);
+  const a = makeItems(20);
+  applyFieldMap(a, full, CTX);
+  const b = makeItems(20);
+  applyFieldMap(b, half, CTX);
   for (let i = 0; i < 20; i++) {
-    assert.ok(Math.abs(b[i].scale - (1 + (a[i].scale - 1) * 0.5)) < 1e-9,
-      `amount 0.5 lands halfway (item ${i})`);
+    assert.ok(Math.abs(b[i].scale - (1 + (a[i].scale - 1) * 0.5)) < 1e-9, `amount 0.5 lands halfway (item ${i})`);
   }
 }
 
@@ -137,11 +165,19 @@ assert.strictEqual(saturateHex('#cc3322', 1, -1), '#cc3322', 'negative amount �
 {
   const w = sanitizeFieldMap({ field: 'noise', channel: 'weight', amount: 1, curve: 'linear' });
   const s = sanitizeFieldMap({ field: 'noise', channel: 'scale', amount: 1, curve: 'linear' });
-  const a = makeItems(30); applyFieldMap(a, w, CTX);
-  const b = makeItems(30); applyFieldMap(b, s, CTX);
+  const a = makeItems(30);
+  applyFieldMap(a, w, CTX);
+  const b = makeItems(30);
+  applyFieldMap(b, s, CTX);
   const [wlo, whi] = FIELDMAP_RANGES.weight;
-  assert.ok(a.every((it) => it.scale >= wlo - 1e-9 && it.scale <= whi + 1e-9), 'weight stays in its range');
-  assert.ok(b.some((it, i) => Math.abs(it.scale - a[i].scale) > 1e-9), 'weight ≠ scale ranges');
+  assert.ok(
+    a.every((it) => it.scale >= wlo - 1e-9 && it.scale <= whi + 1e-9),
+    'weight stays in its range',
+  );
+  assert.ok(
+    b.some((it, i) => Math.abs(it.scale - a[i].scale) > 1e-9),
+    'weight ≠ scale ranges',
+  );
 }
 
 // ── saturation channel on items ────────────────────────────────────────
@@ -150,21 +186,44 @@ assert.strictEqual(saturateHex('#cc3322', 1, -1), '#cc3322', 'negative amount �
   const items = makeItems(30);
   const before = items.map((it) => it.color);
   applyFieldMap(items, cfg, CTX);
-  assert.ok(items.every((it) => it.color !== before[items.indexOf(it)] || true), 'colors remapped');
-  assert.ok(items.some((it, i) => it.color !== before[i]), 'saturation channel moves colors');
-  assert.ok(items.every((it) => /^#[0-9a-f]{6}$/.test(it.color)), 'outputs are valid hex');
-  assert.ok(items.every((it) => /^#[0-9a-f]{6}$/.test(it.accent)), 'accents are valid hex');
+  assert.ok(
+    items.every((it) => it.color !== before[items.indexOf(it)] || true),
+    'colors remapped',
+  );
+  assert.ok(
+    items.some((it, i) => it.color !== before[i]),
+    'saturation channel moves colors',
+  );
+  assert.ok(
+    items.every((it) => /^#[0-9a-f]{6}$/.test(it.color)),
+    'outputs are valid hex',
+  );
+  assert.ok(
+    items.every((it) => /^#[0-9a-f]{6}$/.test(it.accent)),
+    'accents are valid hex',
+  );
   // determinism
   const items2 = makeItems(30);
   applyFieldMap(items2, cfg, CTX);
-  assert.deepStrictEqual(items.map((it) => it.color), items2.map((it) => it.color), 'same seed → same colors');
+  assert.deepStrictEqual(
+    items.map((it) => it.color),
+    items2.map((it) => it.color),
+    'same seed → same colors',
+  );
 }
 
 // ── density field: clusters read dense, loners read sparse ─────────────
 {
   // 20 marks in a tight cluster + 1 far outlier
   const xs = [...Array(20)].map((_, i) => 490 + (i % 5) * 2);
-  const items = xs.map((x, i) => ({ x, y: 390 + Math.floor(i / 5) * 2, scale: 1, scaleY: 1, color: '#cc3322', accent: '#22aa88' }));
+  const items = xs.map((x, i) => ({
+    x,
+    y: 390 + Math.floor(i / 5) * 2,
+    scale: 1,
+    scaleY: 1,
+    color: '#cc3322',
+    accent: '#22aa88',
+  }));
   items.push({ x: 50, y: 50, scale: 1, scaleY: 1, color: '#cc3322', accent: '#22aa88' });
   const cfg = sanitizeFieldMap({ field: 'density', channel: 'scale', amount: 1, curve: 'linear' });
   applyFieldMap(items, cfg, CTX);
@@ -176,10 +235,21 @@ assert.strictEqual(saturateHex('#cc3322', 1, -1), '#cc3322', 'negative amount �
   assert.ok(Math.abs(Math.max(...clusterScales) - hi) < 1e-9, 'densest point hits the top of the range');
   assert.ok(outlierScale < (lo + hi) / 2, 'outlier reads sparse');
   // determinism on density too
-  const items2 = xs.map((x, i) => ({ x, y: 390 + Math.floor(i / 5) * 2, scale: 1, scaleY: 1, color: '#cc3322', accent: '#22aa88' }));
+  const items2 = xs.map((x, i) => ({
+    x,
+    y: 390 + Math.floor(i / 5) * 2,
+    scale: 1,
+    scaleY: 1,
+    color: '#cc3322',
+    accent: '#22aa88',
+  }));
   items2.push({ x: 50, y: 50, scale: 1, scaleY: 1, color: '#cc3322', accent: '#22aa88' });
   applyFieldMap(items2, cfg, CTX);
-  assert.deepStrictEqual(items.map((it) => it.scale), items2.map((it) => it.scale), 'density deterministic');
+  assert.deepStrictEqual(
+    items.map((it) => it.scale),
+    items2.map((it) => it.scale),
+    'density deterministic',
+  );
 }
 
 // empty / degenerate inputs never throw

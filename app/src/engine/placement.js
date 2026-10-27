@@ -101,42 +101,66 @@ const Y_SCALE_INDEX_BASE = 0x4000000;
  * @param {PlacementSoA} [out] reuse these buffers (must have capacity >= count)
  * @returns {PlacementSoA}
  */
-export function computeGeometrySoA({
-  mode, count, seed, jitter, density, zTiers, bleed,
-  canvasW, canvasH, caGrid,
-  displacement = 0, noiseFreq = 0.005, noiseSpeed = 0.5,
-  seedOffsets = null,
-  phylloDivergence = 0,
-  lsysDepth = 4, lsysAngle = 25,
-  // #720 — DLA / Eden growth. growthRate/growthBranch are curator-driven
-  // knobs (exposed, not mapped); growthTick advances the aggregate one step
-  // per presented frame; audioEnergy (0..1, null when silent) is the default
-  // audio driver for the cells-per-tick rate.
-  growthRate = 3, growthBranch = 0.8, growthTick = 0, audioEnergy = null,
-  // Brush line: flow-field trail stamping. brushSize is the nominal stamp
-  // diameter in px (drives step length, not the stage-C scale range);
-  // brushSpacing is step length as a fraction of brushSize (≤ 0.7 reads as
-  // a continuous line); fieldScale is the simplex sampling scale per px.
-  brushSize = 24, brushSpacing = 0.5, fieldScale = 0.004, trailCount = 6,
-  // Slice 2 — the crooked: perpendicular trail wobble in px (0 = the trail
-  // exactly) and its frequency per stamp.
-  wobbleAmp = 0, wobbleFreq = 0.5,
-  // #1245 — optional layer id for the unknown-sampler diagnostic; rides the
-  // params so getSampler can key the once-per-(layer,mode) report. Not part
-  // of geometrySignature: the layer id is not geometry.
-  layerId = null,
-  // #1195 — circle packing: the BASE scale range ([lo, hi], the slider, never the audio-modulated one). Only the
-  // circlepack mode reads it; it joins geometrySignature for that mode alone.
-  packScale = null,
-  // #1200 — attractor density pooling. attractorCount/attractorRadius ride
-  // stage A and join geometrySignature. Heroes ride stage C only
-  // (applyAttributes) and never touch geometry. All default off:
-  // attractorCount=0 is byte-identical to current behavior.
-  attractorCount = 0,
-  attractorRadius = ATTRACTOR_RADIUS_DEFAULT,
-  // #1197 — space-colonization species knobs; ignored by every other mode.
-  colonizeInfluence = 90, colonizeKill = 18, colonizeBranch = 0.25, colonizeStep = 7,
-}, out) {
+export function computeGeometrySoA(
+  {
+    mode,
+    count,
+    seed,
+    jitter,
+    density,
+    zTiers,
+    bleed,
+    canvasW,
+    canvasH,
+    caGrid,
+    displacement = 0,
+    noiseFreq = 0.005,
+    noiseSpeed = 0.5,
+    seedOffsets = null,
+    phylloDivergence = 0,
+    lsysDepth = 4,
+    lsysAngle = 25,
+    // #720 — DLA / Eden growth. growthRate/growthBranch are curator-driven
+    // knobs (exposed, not mapped); growthTick advances the aggregate one step
+    // per presented frame; audioEnergy (0..1, null when silent) is the default
+    // audio driver for the cells-per-tick rate.
+    growthRate = 3,
+    growthBranch = 0.8,
+    growthTick = 0,
+    audioEnergy = null,
+    // Brush line: flow-field trail stamping. brushSize is the nominal stamp
+    // diameter in px (drives step length, not the stage-C scale range);
+    // brushSpacing is step length as a fraction of brushSize (≤ 0.7 reads as
+    // a continuous line); fieldScale is the simplex sampling scale per px.
+    brushSize = 24,
+    brushSpacing = 0.5,
+    fieldScale = 0.004,
+    trailCount = 6,
+    // Slice 2 — the crooked: perpendicular trail wobble in px (0 = the trail
+    // exactly) and its frequency per stamp.
+    wobbleAmp = 0,
+    wobbleFreq = 0.5,
+    // #1245 — optional layer id for the unknown-sampler diagnostic; rides the
+    // params so getSampler can key the once-per-(layer,mode) report. Not part
+    // of geometrySignature: the layer id is not geometry.
+    layerId = null,
+    // #1195 — circle packing: the BASE scale range ([lo, hi], the slider, never the audio-modulated one). Only the
+    // circlepack mode reads it; it joins geometrySignature for that mode alone.
+    packScale = null,
+    // #1200 — attractor density pooling. attractorCount/attractorRadius ride
+    // stage A and join geometrySignature. Heroes ride stage C only
+    // (applyAttributes) and never touch geometry. All default off:
+    // attractorCount=0 is byte-identical to current behavior.
+    attractorCount = 0,
+    attractorRadius = ATTRACTOR_RADIUS_DEFAULT,
+    // #1197 — space-colonization species knobs; ignored by every other mode.
+    colonizeInfluence = 90,
+    colonizeKill = 18,
+    colonizeBranch = 0.25,
+    colonizeStep = 7,
+  },
+  out,
+) {
   const cap = Math.max(0, count | 0);
   const soa = out && out.x.length >= cap ? out : allocSoA(cap);
   soa.n = 0;
@@ -148,9 +172,7 @@ export function computeGeometrySoA({
   const tiers = Math.max(1, zTiers || 1);
   const sample = getSampler(mode, layerId);
 
-  const noise = displacement > 0
-    ? createNoise(hashU32(seed, CH.noise, 0, seedOffsets))
-    : null;
+  const noise = displacement > 0 ? createNoise(hashU32(seed, CH.noise, 0, seedOffsets)) : null;
   const nt = noise ? (seed & 0xffff) * 0.02 * noiseSpeed : 0;
 
   // One reused context object instead of a fresh literal per point. Samplers
@@ -170,12 +192,18 @@ export function computeGeometrySoA({
   // #1200 — dish-level attractor field, built once per placement call
   // (init-time CPU, O(attractorCount) hashes). Null when unused: the pooling
   // block in the loop below never runs, so output is byte-identical.
-  const attractorField = attractorCount > 0
-    ? createAttractorField(seed, null, attractorCount, { radius: attractorRadius, seedOffsets })
-    : null;
+  const attractorField =
+    attractorCount > 0
+      ? createAttractorField(seed, null, attractorCount, { radius: attractorRadius, seedOffsets })
+      : null;
   const ctx = {
-    i: 0, count, w: effectiveW, h: effectiveH,
-    rng: null, jitter: jitter || 0, seed,
+    i: 0,
+    count,
+    w: effectiveW,
+    h: effectiveH,
+    rng: null,
+    jitter: jitter || 0,
+    seed,
     caGrid: mode === 'ca' ? caGrid : null,
     seedOffsets,
     scratch,
@@ -183,17 +211,29 @@ export function computeGeometrySoA({
     // treats a non-finite value as the golden angle.
     phylloDivergence,
     // sampler scalars; ignored by every other mode.
-    lsysDepth, lsysAngle,
+    lsysDepth,
+    lsysAngle,
     // #720 — DLA / Eden growth scalars; ignored by every other mode.
-    growthRate, growthBranch, growthTick, audioEnergy,
+    growthRate,
+    growthBranch,
+    growthTick,
+    audioEnergy,
     // Brush line scalars; ignored by every other mode.
-    brushSize, brushSpacing, fieldScale, trailCount,
+    brushSize,
+    brushSpacing,
+    fieldScale,
+    trailCount,
     // Slice 2 — the crooked; ignored by every other mode.
-    wobbleAmp, wobbleFreq,
+    wobbleAmp,
+    wobbleFreq,
     // #1195 — circle packing needs the tier count and the base scale range; ignored by every other mode.
-    zTiers: tiers, packScale,
+    zTiers: tiers,
+    packScale,
     // #1197 — space-colonization species knobs; ignored by every other mode.
-    colonizeInfluence, colonizeKill, colonizeBranch, colonizeStep,
+    colonizeInfluence,
+    colonizeKill,
+    colonizeBranch,
+    colonizeStep,
     // #1309 — column-writing mode; assigned below once the lanes exist.
     out: null,
     row: -1,
@@ -294,8 +334,10 @@ export function computeGeometrySoA({
     // and ±15% of the scale range around its midpoint, both from the
     // per-instance seed hash, so a reseed repeats the same crookedness.
     if (mode === 'brush') {
-      soa.uRot[n] = Math.min(0.9999, Math.max(0,
-        soa.uRot[n] + (hashU01(seed, CH.attr, i * 3 + 1, seedOffsets) - 0.5) * (20 / 360)));
+      soa.uRot[n] = Math.min(
+        0.9999,
+        Math.max(0, soa.uRot[n] + (hashU01(seed, CH.attr, i * 3 + 1, seedOffsets) - 0.5) * (20 / 360)),
+      );
       soa.uScale[n] = 0.5 + (soa.uScale[n] - 0.5) * 0.3;
     }
     n++;
@@ -378,29 +420,56 @@ export function computePlacementsSoA(params, out) {
 export function geometrySignature(p) {
   const o = p.seedOffsets || {};
   return [
-    p.mode, p.count, p.seed, p.jitter, p.density, p.zTiers, p.bleed,
-    p.canvasW, p.canvasH, p.caGrid,
-    p.displacement, p.noiseFreq, p.noiseSpeed, p.phylloDivergence, p.lsysDepth, p.lsysAngle,
+    p.mode,
+    p.count,
+    p.seed,
+    p.jitter,
+    p.density,
+    p.zTiers,
+    p.bleed,
+    p.canvasW,
+    p.canvasH,
+    p.caGrid,
+    p.displacement,
+    p.noiseFreq,
+    p.noiseSpeed,
+    p.phylloDivergence,
+    p.lsysDepth,
+    p.lsysAngle,
     // #720 — growthTick advances every presented frame for dla/eden layers,
     // busting the cache honestly (the CA grid's identity-change deal).
     // audioEnergy stays out: an ephemeral drive consumed at tick-advance
     // time, not geometry identity.
-    p.growthRate, p.growthBranch, p.growthTick,
+    p.growthRate,
+    p.growthBranch,
+    p.growthTick,
     // Brush line: every param the brush sampler reads. The staged-eval
     // cache compares element-wise, so a missing entry here would silently
     // serve stale trails after a param edit.
-    p.brushSize, p.brushSpacing, p.fieldScale, p.trailCount,
+    p.brushSize,
+    p.brushSpacing,
+    p.fieldScale,
+    p.trailCount,
     // Slice 2 — the crooked knobs.
-    p.wobbleAmp, p.wobbleFreq,
+    p.wobbleAmp,
+    p.wobbleFreq,
     // #1195 — the packing depends on the base scale range (circlepack only; 0 for every other mode).
-    p.packScale ? p.packScale[0] : 0, p.packScale ? p.packScale[1] : 0,
+    p.packScale ? p.packScale[0] : 0,
+    p.packScale ? p.packScale[1] : 0,
     // #1200 — attractor density is read in stage A; a missing entry here
     // would silently serve stale pools after a param edit. heroes is stage-C
     // only (always re-run), like scale/rotate/alpha, so it stays out.
-    p.attractorCount || 0, p.attractorRadius || 0,
+    p.attractorCount || 0,
+    p.attractorRadius || 0,
     // #1197 — the vein network depends on the species knobs (colonize only).
-    p.colonizeInfluence || 0, p.colonizeKill || 0, p.colonizeBranch || 0, p.colonizeStep || 0,
-    o.spatial || 0, o.color || 0, o.asset || 0, o.noise || 0,
+    p.colonizeInfluence || 0,
+    p.colonizeKill || 0,
+    p.colonizeBranch || 0,
+    p.colonizeStep || 0,
+    o.spatial || 0,
+    o.color || 0,
+    o.asset || 0,
+    o.noise || 0,
   ];
 }
 

@@ -38,8 +38,15 @@ export const DISH_DENSITY_SATURATE = 8;
 
 /** The empty field: no grid this frame — no bodies, no cells. */
 export const EMPTY_DISH_DENSITY = Object.freeze({
-  cellSize: 0, originX: 0, originY: 0, cols: 0, rows: 0,
-  counts: new Int32Array(0), total: 0, max: 0, tick: 0,
+  cellSize: 0,
+  originX: 0,
+  originY: 0,
+  cols: 0,
+  rows: 0,
+  counts: new Int32Array(0),
+  total: 0,
+  max: 0,
+  tick: 0,
 });
 
 /**
@@ -59,8 +66,15 @@ export function buildDishDensity({ cellStart, cols, rows, cellSize, minCx, minCy
     if (n > max) max = n;
   }
   return {
-    cellSize, originX: minCx * cellSize, originY: minCy * cellSize,
-    cols, rows, counts, total, max, tick: 0,
+    cellSize,
+    originX: minCx * cellSize,
+    originY: minCy * cellSize,
+    cols,
+    rows,
+    counts,
+    total,
+    max,
+    tick: 0,
   };
 }
 

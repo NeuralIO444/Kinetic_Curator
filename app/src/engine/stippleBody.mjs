@@ -152,7 +152,7 @@ export function stippleShadeAt(lx, ly, dotScale = STIPPLE_DOT_SCALE) {
  * lets stipple survive studio.py still while the colour-ramp
  * materials, plate and wash, are disclosed there instead).
  */
-export const STIPPLE_GLSL = /* glsl */`
+export const STIPPLE_GLSL = /* glsl */ `
 float stippleCover(vec2 local, float dotScale) {
   vec2 cell = mod(local * 100.0, 6.0);
   if (length(cell - vec2(1.5, 1.5)) < ${STIPPLE_DOTS[0].r.toFixed(2)} * dotScale) return 1.0;
@@ -176,15 +176,22 @@ vec3 stippleShade(vec2 local, vec3 ink, vec3 accent, float dotScale, out float a
  * to the pre-M4 def.
  */
 export function stipplePatternDef(id, accentHex, inkHex, dotScale = STIPPLE_DOT_SCALE) {
-  const dot = (d) => `<circle cx="${d.cx}" cy="${d.cy}" r="${scaledR(d, dotScale)}" fill="${d.color === 'accent' ? accentHex : inkHex}"/>`;
+  const dot = (d) =>
+    `<circle cx="${d.cx}" cy="${d.cy}" r="${scaledR(d, dotScale)}" fill="${d.color === 'accent' ? accentHex : inkHex}"/>`;
   return `<pattern id="${id}" width="${STIPPLE_CELL}" height="${STIPPLE_CELL}" patternUnits="userSpaceOnUse">${STIPPLE_DOTS.map(dot).join('')}</pattern>`;
 }
 
 registerCostTier('engine/stipple-body', {
-  tier: 0, memoryBytes: 0, timeMs: 0.01,
-  notes: '#1549: material stipple body — one flag per placed instance at build time (carried as body code 3 in the plate tail slot); the screen itself is a fragment-shader term in the existing quad pass (light/stipple-pattern) and a bake-time pattern def in composed stills. No new pass, no texture, no per-frame CPU.',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    '#1549: material stipple body — one flag per placed instance at build time (carried as body code 3 in the plate tail slot); the screen itself is a fragment-shader term in the existing quad pass (light/stipple-pattern) and a bake-time pattern def in composed stills. No new pass, no texture, no per-frame CPU.',
 });
 registerCostTier('light/stipple-pattern', {
-  tier: 0, memoryBytes: 0, timeMs: 0.05,
-  notes: '#1549: dot-field screen on the ink channel for stipple-flagged instances inside the existing QUAD_FS live-tint branch — a mod and two distance tests per fragment, stipple instances only.',
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes:
+    '#1549: dot-field screen on the ink channel for stipple-flagged instances inside the existing QUAD_FS live-tint branch — a mod and two distance tests per fragment, stipple instances only.',
 });

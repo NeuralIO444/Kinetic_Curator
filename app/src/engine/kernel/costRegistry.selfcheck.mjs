@@ -48,42 +48,67 @@ const EXPECTED_SCENT = {
   memoryGate: null,
 };
 
-assert.deepEqual(getCostTier('engine/scent-field'), EXPECTED_SCENT,
-  'kernel registry returns the same engine/scent-field declaration the gl registry did');
+assert.deepEqual(
+  getCostTier('engine/scent-field'),
+  EXPECTED_SCENT,
+  'kernel registry returns the same engine/scent-field declaration the gl registry did',
+);
 assert.equal(getCostTier('engine/scent-field').tier, 0, 'scent stays structural (never shed)');
 assert.equal(getCostTier('__unregistered__'), undefined, 'unknown ids stay undefined');
 console.log('[selfcheck] A scent declaration parity — kernel registry returns the exact gl-era values');
 
 // ---- B. fail-closed registry contract ------------------------------------
 
-assert.throws(() => registerCostTier('__sc__/bad-tier', { tier: 7 }), /tier must be/,
-  'out-of-range tier must throw');
-assert.throws(() => registerCostTier('__sc__/neg-mem', { tier: 3, memoryBytes: -1 }), /memoryBytes/,
-  'negative memoryBytes must throw');
-assert.throws(() => registerCostTier('__sc__/neg-time', { tier: 3, timeMs: -0.5 }), /timeMs/,
-  'negative timeMs must throw');
-assert.throws(() => registerCostTier('__sc__/empty', {}), /tier must be/,
-  'missing tier must throw');
+assert.throws(() => registerCostTier('__sc__/bad-tier', { tier: 7 }), /tier must be/, 'out-of-range tier must throw');
+assert.throws(
+  () => registerCostTier('__sc__/neg-mem', { tier: 3, memoryBytes: -1 }),
+  /memoryBytes/,
+  'negative memoryBytes must throw',
+);
+assert.throws(
+  () => registerCostTier('__sc__/neg-time', { tier: 3, timeMs: -0.5 }),
+  /timeMs/,
+  'negative timeMs must throw',
+);
+assert.throws(() => registerCostTier('__sc__/empty', {}), /tier must be/, 'missing tier must throw');
 // A CONFLICTING re-declaration of the scent id throws, naming it.
-assert.throws(() => registerCostTier('engine/scent-field', { tier: 2 }), /already registered/,
-  'a CONFLICTING re-registration of engine/scent-field must throw');
+assert.throws(
+  () => registerCostTier('engine/scent-field', { tier: 2 }),
+  /already registered/,
+  'a CONFLICTING re-registration of engine/scent-field must throw',
+);
 // #551: an identical re-declaration is a no-op.
 {
   const before = allCostTiers().length;
   const d = getCostTier('engine/scent-field');
   const { tier, memoryBytes, timeMs, notes, memoryGate } = d;
-  assert.equal(registerCostTier('engine/scent-field', { tier, memoryBytes, timeMs, notes, memoryGate }), 'engine/scent-field');
+  assert.equal(
+    registerCostTier('engine/scent-field', { tier, memoryBytes, timeMs, notes, memoryGate }),
+    'engine/scent-field',
+  );
   assert.equal(allCostTiers().length, before, 'identical re-declaration adds nothing');
   assert.deepEqual(getCostTier('engine/scent-field'), EXPECTED_SCENT, 'and changes nothing');
 }
-console.log('[selfcheck] B registry is fail-closed — bad tiers/estimates throw; identical re-declaration is idempotent');
+console.log(
+  '[selfcheck] B registry is fail-closed — bad tiers/estimates throw; identical re-declaration is idempotent',
+);
 
 // ---- C. reader surface present and pure -----------------------------------
 
-assert.deepEqual(Object.keys(COST_TIER_INFO).map(Number).sort((a, b) => a - b), [0, 1, 2, 3],
-  'COST_TIER_INFO covers tiers 0–3');
-assert.deepEqual(Object.keys(TIER_COST_BANDS).map(Number).sort((a, b) => a - b), [0, 1, 2, 3],
-  'TIER_COST_BANDS covers tiers 0–3');
+assert.deepEqual(
+  Object.keys(COST_TIER_INFO)
+    .map(Number)
+    .sort((a, b) => a - b),
+  [0, 1, 2, 3],
+  'COST_TIER_INFO covers tiers 0–3',
+);
+assert.deepEqual(
+  Object.keys(TIER_COST_BANDS)
+    .map(Number)
+    .sort((a, b) => a - b),
+  [0, 1, 2, 3],
+  'TIER_COST_BANDS covers tiers 0–3',
+);
 assert.ok(Array.isArray(tier1ShedIds()), 'tier1ShedIds is callable');
 {
   // Pure: shedOrder must not mutate its input.

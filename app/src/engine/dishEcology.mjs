@@ -305,7 +305,7 @@ export function stepDishEcology(sys, eco, { reducedMotion = false } = {}) {
   // The ripest die first; ties break by lowest index, so the choice
   // is a pure function of the state. The per-step budget is what
   // makes this thinning rather than a cull.
-  ripe.sort((a, b) => (E[b] - E[a]) || (a - b));
+  ripe.sort((a, b) => E[b] - E[a] || a - b);
   const deaths = Math.min(ECOLOGY_DIE_PER_STEP, ripe.length);
   for (let k = 0; k < deaths; k++) {
     const victim = ripe[k];

@@ -71,8 +71,7 @@ import { StageView } from './panels/pipeline/StageView.jsx';
 // #607 — the stage window (`?stage=1`) renders ONLY the stage canvas: no
 // store providers, no instrument chrome, no panels. The signal arrives over
 // BroadcastChannel from the instrument window's mirror.
-const STAGE_ONLY = typeof window !== 'undefined'
-  && new URLSearchParams(window.location.search).get('stage') === '1';
+const STAGE_ONLY = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('stage') === '1';
 
 const COLUMN_FRACTIONS = [0.62, 0.38];
 const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
@@ -86,9 +85,13 @@ function AppInner() {
 
   useCuratorIPC();
 
-  useEffect(() => subscribeDispatch((a) => {
-    if (import.meta.env.DEV) console.debug('[pipe]', a.type);
-  }), []);
+  useEffect(
+    () =>
+      subscribeDispatch((a) => {
+        if (import.meta.env.DEV) console.debug('[pipe]', a.type);
+      }),
+    [],
+  );
 
   // LOIS honest feed (#948/#956): records user-behavior signals only —
   // no UI, no store writes, nothing visible. Surfaces come later.
@@ -113,7 +116,11 @@ function AppInner() {
       // #1458: musical time on the loop clock (one call a frame; bus events only on whole beats and bars)
       observeClock(input && input.loopTimeMs, useStore.getState().beatBpm);
       // #1459: discrete audio detections (onset, tempo, energy, silence) from the meter's band levels
-      observeAudio(input && input.loopTimeMs, readMeterBandLevels(), useStore.getState().audioSource && useStore.getState().audioSource.type);
+      observeAudio(
+        input && input.loopTimeMs,
+        readMeterBandLevels(),
+        useStore.getState().audioSource && useStore.getState().audioSource.type,
+      );
       // #1469: the MOTION readout's publisher (read-only tap; the strip polls it, nothing is routed)
       observeMotion();
       observeDish(input, output);
@@ -124,7 +131,10 @@ function AppInner() {
       const feed = loisActivity.snapshot();
       const face = resolveLoisFace(feed);
       const davis = resolveDavisState(feed);
-      return { ...roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null), keeps: useStore.getState().keeps };
+      return {
+        ...roomWidthFromCodes(face ? face.code : null, davis ? davis.code : null),
+        keeps: useStore.getState().keeps,
+      };
     };
     setRoomProvider(roomNow);
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
@@ -136,7 +146,12 @@ function AppInner() {
       getEvolveInterval: () => useStore.getState().evolveInterval,
       context: roomNow,
     });
-    const roomCodes = () => { const f = loisActivity.snapshot(); const face = resolveLoisFace(f); const dv = resolveDavisState(f); return { lois: face ? face.code : null, davis: dv ? dv.code : null }; };
+    const roomCodes = () => {
+      const f = loisActivity.snapshot();
+      const face = resolveLoisFace(f);
+      const dv = resolveDavisState(f);
+      return { lois: face ? face.code : null, davis: dv ? dv.code : null };
+    };
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();
@@ -145,7 +160,14 @@ function AppInner() {
     // #1463 — Apple Intelligence through the desktop helper is the default whenever it is available; until the
     // startup check answers (and always on the web) the rules answer, silently.
     let apple = null;
-    desktopAppleModel().then((m) => { apple = m; }, () => { apple = null; });
+    desktopAppleModel().then(
+      (m) => {
+        apple = m;
+      },
+      () => {
+        apple = null;
+      },
+    );
     const appleModel = {
       name: 'apple',
       available: () => !!(apple && apple.available()),
@@ -161,9 +183,13 @@ function AppInner() {
         const f = loisActivity.snapshot();
         const st = useStore.getState();
         return {
-          active: !f.away && !f.tabHidden, dwelling: f.dwellMs >= LOIS_VIBE_DWELL_MS, audio: !!st.audioEnabled,
-          keeps: Array.isArray(st.keeps) ? st.keeps.length : 0, exports: f.exportCount,
-          returns: (f.recallCount || 0) + (f.bloomReturnCount || 0), evolves: f.evolveCount,
+          active: !f.away && !f.tabHidden,
+          dwelling: f.dwellMs >= LOIS_VIBE_DWELL_MS,
+          audio: !!st.audioEnabled,
+          keeps: Array.isArray(st.keeps) ? st.keeps.length : 0,
+          exports: f.exportCount,
+          returns: (f.recallCount || 0) + (f.bloomReturnCount || 0),
+          evolves: f.evolveCount,
         };
       },
     });
@@ -173,9 +199,15 @@ function AppInner() {
     const trio = startTrio({
       getRoutes: () => useStore.getState().audioRoutes,
       getTier: () => presence.contextFor('davis').tier,
-      getBands: () => { const b = readMeterBandLevels(); return b ? Object.values(b) : null; },
+      getBands: () => {
+        const b = readMeterBandLevels();
+        return b ? Object.values(b) : null;
+      },
       // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
-      getActivity: () => { const f = loisActivity.snapshot(); return { keeps: f.keepsLast5m, rolls: f.rollsLast5m }; },
+      getActivity: () => {
+        const f = loisActivity.snapshot();
+        return { keeps: f.keepsLast5m, rolls: f.rollsLast5m };
+      },
       isReplaying: isPlaybackActive,
       subscribe: (fn) => useStore.subscribe(fn),
     });
@@ -187,10 +219,17 @@ function AppInner() {
       getSnapshot: () => {
         const st = useStore.getState();
         return {
-          layers: st.layers, enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
-          paletteId: st.paletteId, room: roomCodes(), band: getStressState().band, keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
-          bpm: st.beatBpm, audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
-          creatures: st.layoutParams?.creatures ?? 0, director: getMindRoom(), show: trio.showBlock(),
+          layers: st.layers,
+          enabledAssetCount: st.enabledAssets ? Object.values(st.enabledAssets).filter(Boolean).length : 0,
+          paletteId: st.paletteId,
+          room: roomCodes(),
+          band: getStressState().band,
+          keepsCount: Array.isArray(st.keeps) ? st.keeps.length : 0,
+          bpm: st.beatBpm,
+          audio: st.audioEnabled ? (st.audioSource && st.audioSource.type === 'file' ? 'file' : 'mic') : 'none',
+          creatures: st.layoutParams?.creatures ?? 0,
+          director: getMindRoom(),
+          show: trio.showBlock(),
         };
       },
     });
@@ -199,19 +238,34 @@ function AppInner() {
     // the room shows nothing of it, and it asks nothing of the stage.
     const stopStory = startStoryLive({
       getSeed: () => useStore.getState().seed,
-      getTiers: () => Object.fromEntries(['davis', 'lois'].map((p) => [p, parseInt(String(presence.contextFor(p).tier).slice(1), 10) || 1])),
+      getTiers: () =>
+        Object.fromEntries(
+          ['davis', 'lois'].map((p) => [p, parseInt(String(presence.contextFor(p).tier).slice(1), 10) || 1]),
+        ),
       isReplaying: isPlaybackActive,
     });
     // #1462 — a take plays back its recorded decisions, frame by frame; no backend is asked
     // #1534 — and its recorded hearing: the take's spectrum feeds the live core in the analyser's place
-    setPlaybackFrameTap((frame, perf, o) => { replayMindFrame(frame, perf && perf.mind, o); replaySpectrumFrame(frame, perf && perf.spectrum, o); });
-    const offPlayback = subscribePlayback(() => { endMindReplay(); endSpectrumReplay(); resetMindFaces(); resetRoomFeed(); resetGhost(); }); // a take starts or ends: fresh faces, a fresh transcript window
+    setPlaybackFrameTap((frame, perf, o) => {
+      replayMindFrame(frame, perf && perf.mind, o);
+      replaySpectrumFrame(frame, perf && perf.spectrum, o);
+    });
+    const offPlayback = subscribePlayback(() => {
+      endMindReplay();
+      endSpectrumReplay();
+      resetMindFaces();
+      resetRoomFeed();
+      resetGhost();
+    }); // a take starts or ends: fresh faces, a fresh transcript window
     // #1475 — her set: after a while with nothing happening and no real audio, a beat from her library fades in and
     // plays silently into the band feed; the artist acting or real audio arriving makes it yield.
     const set = createSet({
       getBpm: () => useStore.getState().beatBpm,
       getIdleMs: () => loisActivity.snapshot().idleMs,
-      getRealLevel: () => { const b = useStore.getState().audioEnabled ? readMeterBandLevels() : null; return b ? Object.values(b).reduce((x, v) => x + v, 0) / Object.keys(b).length : 0; },
+      getRealLevel: () => {
+        const b = useStore.getState().audioEnabled ? readMeterBandLevels() : null;
+        return b ? Object.values(b).reduce((x, v) => x + v, 0) / Object.keys(b).length : 0;
+      },
       getRoom: roomCodes,
       getBand: () => getStressState().band,
       getSeed: () => useStore.getState().seed,
@@ -223,10 +277,30 @@ function AppInner() {
       isRunning: () => useStore.getState().running,
       getDish: getDishPressure,
     });
-    return () => { setResolveFrameTap(null); setRoomProvider(null); unKeep(); stopPace(); stopLean(); stopMind(); trio.stop(); stopFaces(); stopFeed(); stopStory(); stopSpectrum(); stopGhost(); stopRoom(); setPresenceProvider(null); setPlaybackFrameTap(null); offPlayback(); setSourceFeed(null); set.reset(); stop(); };
+    return () => {
+      setResolveFrameTap(null);
+      setRoomProvider(null);
+      unKeep();
+      stopPace();
+      stopLean();
+      stopMind();
+      trio.stop();
+      stopFaces();
+      stopFeed();
+      stopStory();
+      stopSpectrum();
+      stopGhost();
+      stopRoom();
+      setPresenceProvider(null);
+      setPlaybackFrameTap(null);
+      offPlayback();
+      setSourceFeed(null);
+      set.reset();
+      stop();
+    };
   }, []);
 
-  const { state } = useApp(s => ({
+  const { state } = useApp((s) => ({
     evolveMode: s.evolveMode,
     evolveSource: s.evolveSource,
     evolveInterval: s.evolveInterval,
@@ -325,7 +399,7 @@ function AppInner() {
   }, [state.lastEvolveTs, state.autoSnapshot, state.exportResolution, state.seed, glLoopRef]);
 
   useHotkeys({
-    's': () => {
+    s: () => {
       captureStill({
         loopRef: glLoopRef,
         resolution: state.exportResolution,
@@ -337,7 +411,12 @@ function AppInner() {
               seed: state.seed,
               seedOffsets: { ...(state.seedOffsets || {}) },
               format: 'PNG',
-              resolution: state.exportResolution === 1 ? '1000x700@1x' : state.exportResolution === 2 ? '1000x700@2x' : '1000x700@4x',
+              resolution:
+                state.exportResolution === 1
+                  ? '1000x700@1x'
+                  : state.exportResolution === 2
+                    ? '1000x700@2x'
+                    : '1000x700@4x',
               timestamp: new Date().toISOString().slice(11, 19),
               config: { layout: { ...state.layoutParams }, palette: { id: palette.id } },
               thumb,
@@ -347,61 +426,81 @@ function AppInner() {
       }).catch((e) => console.error('[snap] hotkey capture failed:', e));
     },
     // #719: same capture as the DAVIS ★ — this used to drop seedOffsets.
-    'f': () => piped({
-      type: A.ADD_FAVORITE,
-      favorite: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
-    }),
+    f: () =>
+      piped({
+        type: A.ADD_FAVORITE,
+        favorite: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
+      }),
     // #996: J keeps the plate without starring it. F (above) also keeps.
     // #1147: keep moved off K — K is KINETIC's tap (KineticButton.jsx).
-    'j': () => piped({
-      type: A.ADD_KEEP,
-      keep: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
-    }),
+    j: () =>
+      piped({
+        type: A.ADD_KEEP,
+        keep: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
+      }),
     // #1173: X passes on the plate — a deliberate "not this", one line in the
     // passes ledger the MLX loop reads as a negative. Nothing on screen changes.
-    'x': () => piped({
-      type: A.ADD_PASS,
-      pass: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
-    }),
-    'g': () => piped({ type: A.TOGGLE_FULLSCREEN }),
+    x: () =>
+      piped({
+        type: A.ADD_PASS,
+        pass: captureFavorite({ ...state, enabledAssets: state.enabled }, palette.id),
+      }),
+    g: () => piped({ type: A.TOGGLE_FULLSCREEN }),
     // #107 §7: while recording or batch/final-rendering, N/E are debounced —
     // a seed bump or evolve toggle mid-encode changes what's being captured
     // partway through, and there is no clean way to fix that after the fact.
-    'e': () => { if (!state.isRecording && !state.isRendering) piped({ type: A.SET_EVOLVE_MODE, payload: p => !p }); },
-    'n': () => { if (!state.isRecording && !state.isRendering) piped({ type: A.BUMP_SEED }); },
+    e: () => {
+      if (!state.isRecording && !state.isRendering) piped({ type: A.SET_EVOLVE_MODE, payload: (p) => !p });
+    },
+    n: () => {
+      if (!state.isRecording && !state.isRendering) piped({ type: A.BUMP_SEED });
+    },
     ' ': () => piped({ type: A.SET_RUNNING, payload: !state.running }),
-    'z': (e) => { if (e.metaKey || e.ctrlKey) { e.shiftKey ? history.redo() : history.undo(); } },
-    '?': () => { setHelpTab('help'); setShowHotkeys(s => !s); },
+    z: (e) => {
+      if (e.metaKey || e.ctrlKey) {
+        e.shiftKey ? history.redo() : history.undo();
+      }
+    },
+    '?': () => {
+      setHelpTab('help');
+      setShowHotkeys((s) => !s);
+    },
     // #107 §7: one panic key — always pause, always exit (never enter)
     // fullscreen, always close the hotkey sheet, regardless of current state.
-    'Escape': () => {
+    Escape: () => {
       piped({ type: A.SET_RUNNING, payload: false });
       if (state.isFullscreen) piped({ type: A.TOGGLE_FULLSCREEN });
       setShowHotkeys(false);
     },
   });
 
-  const onAudioStimulus = useCallback(v => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
-  const onAudioBands = useCallback(v => piped({ type: A.SET_AUDIO_BANDS, payload: v }), [piped]);
+  const onAudioStimulus = useCallback((v) => piped({ type: A.SET_AUDIO_STIMULUS, payload: v }), [piped]);
+  const onAudioBands = useCallback((v) => piped({ type: A.SET_AUDIO_BANDS, payload: v }), [piped]);
   // #107 §5: honesty on mic denial — flip audioEnabled back off (rather than
   // silently doing nothing) and surface it so MasterBar can explain why.
-  const onAudioDenied = useCallback((denied) => {
-    piped({ type: A.SET_AUDIO_DENIED, payload: denied });
-    if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
-  }, [piped]);
+  const onAudioDenied = useCallback(
+    (denied) => {
+      piped({ type: A.SET_AUDIO_DENIED, payload: denied });
+      if (denied) piped({ type: A.SET_AUDIO_ENABLED, payload: false });
+    },
+    [piped],
+  );
   // #1053: the chosen input went away. Say so, and shut audio off so the meter
   // reads idle (zero), not a frozen last value. AUDIO ON is the reconnect.
-  const onAudioLost = useCallback((name) => {
-    piped({ type: A.SET_AUDIO_LOST, payload: name });
-    piped({ type: A.SET_AUDIO_ENABLED, payload: false });
-    say('LOST'); // #1139 — "input's gone. i'm still listening."
-  }, [piped]);
+  const onAudioLost = useCallback(
+    (name) => {
+      piped({ type: A.SET_AUDIO_LOST, payload: name });
+      piped({ type: A.SET_AUDIO_ENABLED, payload: false });
+      say('LOST'); // #1139 — "input's gone. i'm still listening."
+    },
+    [piped],
+  );
   const onBeat = useCallback(() => {
     // beatPulse still drives the readouts (phrase pip, meters); the actual
     // consumers are routed through the beat arbiter so one attack is one
     // ordered spike — phrase (the clock) resolves first, evolve (the gate)
     // fires on the post-phrase state. #104: beat collisions.
-    piped({ type: A.SET_BEAT_PULSE, payload: p => Math.min(1, p + 0.55) });
+    piped({ type: A.SET_BEAT_PULSE, payload: (p) => Math.min(1, p + 0.55) });
     const s = useStore.getState();
     const { tickPhrase, fireEvolve } = routeBeat(s);
     if (tickPhrase) s.tickPhraseBeat();
@@ -443,7 +542,16 @@ function AppInner() {
 
   return (
     <div className={`app ${state.isFullscreen ? 'app-fullscreen' : ''}`}>
-      <HotkeyOverlay show={showHotkeys} onClose={() => setShowHotkeys(false)} initialTab={helpTab} key={helpTab} onTour={() => { setShowHotkeys(false); setTourOpen(true); }} />
+      <HotkeyOverlay
+        show={showHotkeys}
+        onClose={() => setShowHotkeys(false)}
+        initialTab={helpTab}
+        key={helpTab}
+        onTour={() => {
+          setShowHotkeys(false);
+          setTourOpen(true);
+        }}
+      />
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <PaletteStrip />
@@ -460,13 +568,35 @@ function AppInner() {
       <FavoritesTray />
       {DEBUG_STRESS && <StressReadout />}
       <footer className="footer-bar">
-        <span>KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}</span>
+        <span>
+          KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}
+        </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
-          <button type="button" className="micro-btn" title="Settings — no second prefs store"
-            style={{ opacity: 0.45 }} onClick={() => { setHelpTab('settings'); setShowHotkeys(true); }}>≡</button>
-          <button type="button" className="micro-btn" title="Help"
-            style={{ opacity: 0.45 }} onClick={() => { setHelpTab('help'); setShowHotkeys(true); }}>?</button>
+          <button
+            type="button"
+            className="micro-btn"
+            title="Settings — no second prefs store"
+            style={{ opacity: 0.45 }}
+            onClick={() => {
+              setHelpTab('settings');
+              setShowHotkeys(true);
+            }}
+          >
+            ≡
+          </button>
+          <button
+            type="button"
+            className="micro-btn"
+            title="Help"
+            style={{ opacity: 0.45 }}
+            onClick={() => {
+              setHelpTab('help');
+              setShowHotkeys(true);
+            }}
+          >
+            ?
+          </button>
         </span>
       </footer>
     </div>
@@ -475,5 +605,9 @@ function AppInner() {
 
 export default function App() {
   if (STAGE_ONLY) return <StageView />;
-  return <AppProvider><AppInner /></AppProvider>;
+  return (
+    <AppProvider>
+      <AppInner />
+    </AppProvider>
+  );
 }

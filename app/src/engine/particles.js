@@ -29,15 +29,34 @@
 import { createNoise } from './noise.js';
 import { runDishContacts, contactBodyRadius } from './dishContacts.mjs'; // #1407 — cross-strata shared grid (call site below); #1408 — the shared radius law
 import { feedDishDeform, stepDishDeform, clearDishDeform } from './dishDeform.mjs'; // #1410 — impact deform (call sites below; the law lives in the module)
-import { feedDishCoalesce, stepDishCoalesce, clearDishCoalesce, clearDishCoalesceSlot, COALESCE_TOUCH } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
+import {
+  feedDishCoalesce,
+  stepDishCoalesce,
+  clearDishCoalesce,
+  clearDishCoalesceSlot,
+  COALESCE_TOUCH,
+} from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
 import { dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction
 import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega, spinStepOmega, spinWrapAngle } from './dishSpin.mjs'; // #1596 (D2) — spin: ω/θ columns, torque from D1's jt (call sites below; the law lives in the module)
 import { solveDishLinks, noteBondGrip, BOND_TOUCH, BOND_GRIP_VT } from './dishLinks.mjs'; // #1597 (D3) — constraints: declared distance/spring links, XPBD-solved on predicted positions after the integration loop, and bonds formed from sustained wet grip (call sites below; the law lives in the module)
 import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
-import { dishCurrentsFor, advectAxis, attractorDriftSign, NO_CURRENTS, CURRENT_SPEED, ATTRACTOR_DRIFT_SPEED } from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
+import {
+  dishCurrentsFor,
+  advectAxis,
+  attractorDriftSign,
+  NO_CURRENTS,
+  CURRENT_SPEED,
+  ATTRACTOR_DRIFT_SPEED,
+} from './dishCurrents.mjs'; // #1414 — the medium II: currents by mass (call sites below; the law lives in the module)
 import { dishTrailsFor, sampleTrailReadGradient, NO_TRAILS, TRAIL_GAIN } from './dishTrails.mjs'; // #1415 — trails: the stigmergy substrate (call sites below; the law lives in the module)
-import { dishEcologyFor, ecologyBreedAllowed, ecologyNoteBirth, ecologyNoteDeath, stepDishEcology } from './dishEcology.mjs'; // #1416 — ecology: the dish's population regime (call sites below; the law lives in the module)
+import {
+  dishEcologyFor,
+  ecologyBreedAllowed,
+  ecologyNoteBirth,
+  ecologyNoteDeath,
+  stepDishEcology,
+} from './dishEcology.mjs'; // #1416 — ecology: the dish's population regime (call sites below; the law lives in the module)
 import { stepBehaveEase, BEHAVE_GAIN_EPS } from './organisms/behaveEase.mjs';
 import { CH, hashU01, rngForIndex } from './kernel/rng.js';
 // #1240 — deterministic trig (opt-in). ParticleSystem threads a trig source
@@ -47,10 +66,16 @@ import { resolveTrig, NATIVE_TRIG } from './kernel/trig.mjs';
 import { MOTH_LADDERS } from '../data/bodies/demoLadder.js';
 import { CONTACT_MODES, isOrganismMode, symmetryParts } from '../data/layout-modes.js';
 import {
-  resolveEffectiveBehave, resolveWindMode, orbitForce,
-  levyStep, LEVY_FLIGHT_FRAMES,
-  lorenzAdvance, lorenzSeed, LORENZ_DT,
-  resolveSeekGain, resolveBehave,
+  resolveEffectiveBehave,
+  resolveWindMode,
+  orbitForce,
+  levyStep,
+  LEVY_FLIGHT_FRAMES,
+  lorenzAdvance,
+  lorenzSeed,
+  LORENZ_DT,
+  resolveSeekGain,
+  resolveBehave,
 } from './organisms/behave.js';
 import { createScentField } from './kernel/field/scent.js';
 import { snapshotParticleSystem, restoreParticleSystem } from './particlesSnapshot.mjs'; // #1367 — state snapshot (the surface lives in its own module)
@@ -106,7 +131,13 @@ const MARGIN = 8;
  */
 function hexToRgb3(hex) {
   const h = String(hex || '').replace('#', '');
-  const v = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const v =
+    h.length === 3
+      ? h
+          .split('')
+          .map((c) => c + c)
+          .join('')
+      : h;
   const n = parseInt(v, 16);
   if (!Number.isFinite(n) || v.length !== 6) return [255, 255, 255];
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
@@ -114,7 +145,10 @@ function hexToRgb3(hex) {
 
 /** #287 — [r, g, b] 0..255 → '#rrggbb'. */
 function rgb3ToHex(r, g, b) {
-  const q = (v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0');
+  const q = (v) =>
+    Math.round(Math.min(255, Math.max(0, v)))
+      .toString(16)
+      .padStart(2, '0');
   return `#${q(r)}${q(g)}${q(b)}`;
 }
 
@@ -365,7 +399,8 @@ export class ParticleSystem {
    * (a new item-morph pairing had nothing to adopt from) keep their fresh,
    * seed-scattered position untouched.
    */
-  adoptPositions(pairs) { // pairs: [{ i, x, y }]
+  adoptPositions(pairs) {
+    // pairs: [{ i, x, y }]
     for (const { i, x, y } of pairs) {
       if (i < 0 || i >= this.n) continue;
       this.x[i] = x;
@@ -441,7 +476,9 @@ export class ParticleSystem {
       hashU01(seed >>> 0, CH.dyn, 16384 + i),
       hashU01(seed >>> 0, CH.dyn, 20480 + i),
     );
-    this.lorenzX[i] = l.x; this.lorenzY[i] = l.y; this.lorenzZ[i] = l.z;
+    this.lorenzX[i] = l.x;
+    this.lorenzY[i] = l.y;
+    this.lorenzZ[i] = l.z;
   }
 
   /**
@@ -534,12 +571,17 @@ export class ParticleSystem {
     const cellOf = this._cellOf;
     const alive = this.alive;
 
-    let minCx = Infinity; let minCy = Infinity;
-    let maxCx = -Infinity; let maxCy = -Infinity;
+    let minCx = Infinity;
+    let minCy = Infinity;
+    let maxCx = -Infinity;
+    let maxCy = -Infinity;
     let live = 0;
     for (let i = 0; i < n; i++) {
       // #167 — dead particles (die) are not neighbours of anyone.
-      if (!alive[i]) { cellOf[i] = -1; continue; }
+      if (!alive[i]) {
+        cellOf[i] = -1;
+        continue;
+      }
       live++;
       const cx = Math.floor(this.x[i] / cellSize);
       const cy = Math.floor(this.y[i] / cellSize);
@@ -548,7 +590,12 @@ export class ParticleSystem {
       if (cy < minCy) minCy = cy;
       if (cy > maxCy) maxCy = cy;
     }
-    if (live === 0) { minCx = 0; minCy = 0; maxCx = 0; maxCy = 0; }
+    if (live === 0) {
+      minCx = 0;
+      minCy = 0;
+      maxCx = 0;
+      maxCy = 0;
+    }
 
     const cols = maxCx - minCx + 1;
     const rows = maxCy - minCy + 1;
@@ -633,8 +680,21 @@ export class ParticleSystem {
    */
   _contactPass(ctx) {
     const {
-      radius, restitution, repel, mode, umask, breedCap, seed, organism,
-      minScale, maxScale, minAlpha, maxAlpha, seedOffsets, medium, ecology,
+      radius,
+      restitution,
+      repel,
+      mode,
+      umask,
+      breedCap,
+      seed,
+      organism,
+      minScale,
+      maxScale,
+      minAlpha,
+      maxAlpha,
+      seedOffsets,
+      medium,
+      ecology,
     } = ctx;
     // #1416 — ecology's governance of this pass (law in
     // dishEcology.mjs): absent/null = not in the dish (population
@@ -668,10 +728,11 @@ export class ParticleSystem {
     // 3x3 cells of 2*maxR cover every pair with dist < ri + rj. A second
     // grid — the boids grid keeps its exact cell size and visit order
     // (behaviour lock).
-    const { cellStart, order, cols, rows, minCx, minCy, cellSize } =
-      this._buildSpatialHash(maxR * 2);
-    const X = this.x; const Y = this.y;
-    const VX = this.vx; const VY = this.vy;
+    const { cellStart, order, cols, rows, minCx, minCy, cellSize } = this._buildSpatialHash(maxR * 2);
+    const X = this.x;
+    const Y = this.y;
+    const VX = this.vx;
+    const VY = this.vy;
     const MASS = this.mass;
     const OMEGA = this.omega; // #1596 (D2) — spin column (law in dishSpin.mjs)
     const ALIVE = this.alive;
@@ -715,7 +776,8 @@ export class ParticleSystem {
             if (!(rj > 0)) continue; // #1408 — both discs positive, or no contact
             const rsum = ri + rj; // #1408 — per-body disc sum
             // Re-read: i may already have moved this pass.
-            const xi = X[i]; const yi = Y[i];
+            const xi = X[i];
+            const yi = Y[i];
             const dx = X[j] - xi;
             const dy = Y[j] - yi;
             const d2 = dx * dx + dy * dy;
@@ -725,7 +787,7 @@ export class ParticleSystem {
             // of dwell. Per-system pairs only — the family gate: the
             // cross-strata pass never feeds, so different families never
             // merge. State only (law in dishCoalesce.mjs).
-            if (d2 < (rsum * COALESCE_TOUCH) * (rsum * COALESCE_TOUCH)) feedDishCoalesce(this, i, j);
+            if (d2 < rsum * COALESCE_TOUCH * (rsum * COALESCE_TOUCH)) feedDishCoalesce(this, i, j);
             if (d2 >= rsum * rsum) {
               // #1597 (D3) — bond grip at a NEAR touch: a resting pair
               // parks exactly at rsum, on this rejected side of the
@@ -737,31 +799,34 @@ export class ParticleSystem {
               // contact, the friction block's stick verdict is the
               // grip authority instead; a pair is never noted twice
               // for one step.
-              if (med.fricK > 0 && d2 < (rsum * BOND_TOUCH) * (rsum * BOND_TOUCH)) {
+              if (med.fricK > 0 && d2 < rsum * BOND_TOUCH * (rsum * BOND_TOUCH)) {
                 const dN = Math.sqrt(d2);
-                const gtx = -dy / dN, gty = dx / dN;
-                const gvt = spinContactVt(
-                  (VX[j] - VX[i]) * gtx + (VY[j] - VY[i]) * gty,
-                  OMEGA[i], ri, OMEGA[j], rj,
-                );
+                const gtx = -dy / dN,
+                  gty = dx / dN;
+                const gvt = spinContactVt((VX[j] - VX[i]) * gtx + (VY[j] - VY[i]) * gty, OMEGA[i], ri, OMEGA[j], rj);
                 if (Math.abs(gvt) <= BOND_GRIP_VT) noteBondGrip(this, i, j);
               }
               continue;
             }
             let dist = Math.sqrt(d2);
-            let nx; let ny;
+            let nx;
+            let ny;
             if (dist > 1e-9) {
-              nx = dx / dist; ny = dy / dist;
+              nx = dx / dist;
+              ny = dy / dist;
             } else {
               // Exactly coincident discs: deterministic golden-angle normal
               // from the index pair — never NaN, never random.
               const ang = (i * 2.399963229728653 + j * 1.2) % TAU;
-              nx = T.cos(ang); ny = T.sin(ang);
+              nx = T.cos(ang);
+              ny = T.sin(ang);
               dist = 0;
             }
             const overlap = rsum - dist;
-            const m1 = MASS[i]; const m2 = MASS[j];
-            const w1 = 1 / m1; const w2 = 1 / m2;
+            const m1 = MASS[i];
+            const m2 = MASS[j];
+            const w1 = 1 / m1;
+            const w2 = 1 / m2;
             const wSum = w1 + w2;
             // 1 — positional depenetration, mass-weighted.
             const corr = overlap / wSum;
@@ -773,7 +838,8 @@ export class ParticleSystem {
             const vn = (VX[j] - VX[i]) * nx + (VY[j] - VY[i]) * ny;
             // #1410 — per-body normal Δv this resolution hands out, for
             // the deform feed below (impulse magnitude, not direction).
-            let dvI = 0; let dvJ = 0;
+            let dvI = 0;
+            let dvJ = 0;
             // #1595 (D1) — the normal impulse this pair exchanges this
             // step (bounce + cling; repel is personal space, not contact
             // load, and stays out): friction's Coulomb budget.
@@ -785,19 +851,21 @@ export class ParticleSystem {
               VY[i] -= ny * jimp * w1;
               VX[j] += nx * jimp * w2;
               VY[j] += ny * jimp * w2;
-              dvI += jimp * w1; dvJ += jimp * w2;
+              dvI += jimp * w1;
+              dvJ += jimp * w2;
               jnTotal = Math.abs(jimp);
             }
             // 3 — repel: same-layer personal space, extra separating
             // velocity scaled by overlap fraction. Independent of approach:
             // personal space pushes even when the pair is drifting apart.
             if (repel > 0 && ga === gb) {
-              const jr = ((repel * (overlap / rsum)) * 0.5) / wSum;
+              const jr = (repel * (overlap / rsum) * 0.5) / wSum;
               VX[i] -= nx * jr * w1;
               VY[i] -= ny * jr * w1;
               VX[j] += nx * jr * w2;
               VY[j] += ny * jr * w2;
-              dvI += jr * w1; dvJ += jr * w2;
+              dvI += jr * w1;
+              dvJ += jr * w2;
             }
             // #1413 — cling: the wet medium's surface tension (law in
             // dishMedium.mjs). Read on the post-impulse, post-repel
@@ -818,7 +886,8 @@ export class ParticleSystem {
                   VY[i] -= ny * jc * w1;
                   VX[j] += nx * jc * w2;
                   VY[j] += ny * jc * w2;
-                  dvI += Math.abs(jc) * w1; dvJ += Math.abs(jc) * w2;
+                  dvI += Math.abs(jc) * w1;
+                  dvJ += Math.abs(jc) * w2;
                   jnTotal += Math.abs(jc);
                 }
               }
@@ -845,11 +914,9 @@ export class ParticleSystem {
             // and with it every ω write in the engine.
             if (med.fricK > 0) {
               const mu = FRIC_MAX * med.fricK;
-              const tx = -ny, ty = nx;
-              const vt = spinContactVt(
-                (VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty,
-                OMEGA[i], ri, OMEGA[j], rj,
-              );
+              const tx = -ny,
+                ty = nx;
+              const vt = spinContactVt((VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty, OMEGA[i], ri, OMEGA[j], rj);
               if (vt !== 0) {
                 const iI = spinInertia(MASS[i], ri);
                 const iJ = spinInertia(MASS[j], rj);
@@ -886,7 +953,9 @@ export class ParticleSystem {
             // strobe its response every step.
             if (vn >= 0) continue;
             if (wantSwap) {
-              const t = AI[i]; AI[i] = AI[j]; AI[j] = t;
+              const t = AI[i];
+              AI[i] = AI[j];
+              AI[j] = t;
               // #1408 — the disc follows the costume: trim swaps too.
               const tt = this.contactTrim[i];
               this.contactTrim[i] = this.contactTrim[j];
@@ -910,11 +979,7 @@ export class ParticleSystem {
               } else if (ecoOn && !ecologyBreedAllowed(eco, (xi + X[j]) / 2, (yi + Y[j]) / 2)) {
                 // gated — crowded ground, or the pool is full
               } else {
-                const cs = this._breed(
-                  i, j, seed, breedCap,
-                  minScale, maxScale, minAlpha, maxAlpha,
-                  seedOffsets,
-                );
+                const cs = this._breed(i, j, seed, breedCap, minScale, maxScale, minAlpha, maxAlpha, seedOffsets);
                 if (cs >= 0) {
                   newborn.add(cs);
                   if (ecoOn) ecologyNoteBirth(eco);
@@ -932,7 +997,10 @@ export class ParticleSystem {
       for (let s = 0; s < this.n; s++) {
         if (!ALIVE[s]) continue;
         const sp = this.spine[s];
-        if (sp && sp.length) { sp[0].x = X[s]; sp[0].y = Y[s]; }
+        if (sp && sp.length) {
+          sp[0].x = X[s];
+          sp[0].y = Y[s];
+        }
       }
     }
   }
@@ -962,13 +1030,14 @@ export class ParticleSystem {
     const r2 = hashU01(seed, CH.dyn, 7920 + seq * 4, seedOffsets);
     const r3 = hashU01(seed, CH.dyn, 7921 + seq * 4, seedOffsets);
     const r4 = hashU01(seed, CH.dyn, 7922 + seq * 4, seedOffsets);
-    const m1 = this.mass[i]; const m2 = this.mass[j];
+    const m1 = this.mass[i];
+    const m2 = this.mass[j];
     const tm = m1 + m2;
     const mx = (this.x[i] + this.x[j]) / 2;
     const my = (this.y[i] + this.y[j]) / 2;
     const cm = tm / 2;
-    const cvx = ((this.vx[i] * m1) + (this.vx[j] * m2)) / tm;
-    const cvy = ((this.vy[i] * m1) + (this.vy[j] * m2)) / tm;
+    const cvx = (this.vx[i] * m1 + this.vx[j] * m2) / tm;
+    const cvy = (this.vy[i] * m1 + this.vy[j] * m2) / tm;
     this.x[cs] = mx;
     this.y[cs] = my;
     this.vx[cs] = cvx + (r1 - 0.5) * 0.6;
@@ -1069,7 +1138,9 @@ export class ParticleSystem {
     if (this._authoredCount !== targetCap) {
       if (targetCap > this._cap) this._ensureCapacity(targetCap);
       if (this.n < targetCap) {
-        this._spawnRange(this.n, targetCap, activeAssets, palette, seed, seedOffsets, { graze: layoutParams.graze || 0 });
+        this._spawnRange(this.n, targetCap, activeAssets, palette, seed, seedOffsets, {
+          graze: layoutParams.graze || 0,
+        });
       }
       this.n = targetCap;
       this._authoredCount = targetCap;
@@ -1113,17 +1184,39 @@ export class ParticleSystem {
       }
     }
     const noise = this._noise;
-    const domainOffsetX = Number(layoutParams.noiseDomainOffsetX ?? layoutParams.noiseDomainOffset ?? (seedOffsets?.noise ? seedOffsets.noise * 100 : 0)) || 0;
-    const domainOffsetY = Number(layoutParams.noiseDomainOffsetY ?? layoutParams.noiseDomainOffset ?? (seedOffsets?.noise ? seedOffsets.noise * 100 : 0)) || 0;
+    const domainOffsetX =
+      Number(
+        layoutParams.noiseDomainOffsetX ??
+          layoutParams.noiseDomainOffset ??
+          (seedOffsets?.noise ? seedOffsets.noise * 100 : 0),
+      ) || 0;
+    const domainOffsetY =
+      Number(
+        layoutParams.noiseDomainOffsetY ??
+          layoutParams.noiseDomainOffset ??
+          (seedOffsets?.noise ? seedOffsets.noise * 100 : 0),
+      ) || 0;
     const {
-      noiseFreq = 0.005, noiseSpeed = 0.5, swarmCohesion = 1.5,
-      gravityWells = 1.0, damping = 0.95, scale: scaleParam = [0.4, 1.6], alpha = [40, 100],
-      wind = 1, body = 3, tight = 0.55,
+      noiseFreq = 0.005,
+      noiseSpeed = 0.5,
+      swarmCohesion = 1.5,
+      gravityWells = 1.0,
+      damping = 0.95,
+      scale: scaleParam = [0.4, 1.6],
+      alpha = [40, 100],
+      wind = 1,
+      body = 3,
+      tight = 0.55,
       // #167 — organism contacts. radius 0 disables the pass entirely.
-      contactRadius = 0, contactRestitution = 0.5, contactRepel = 0,
-      contactMode = 'none', collideMask = 0xffffffff, maxParticles,
+      contactRadius = 0,
+      contactRestitution = 0.5,
+      contactRepel = 0,
+      contactMode = 'none',
+      collideMask = 0xffffffff,
+      maxParticles,
       // #287 bio-drives. metabolism 0 = drives off (legacy behaviour).
-      metabolism = 0, breath = 0,
+      metabolism = 0,
+      breath = 0,
       // Spine C (#389): motionSmoothing knob wires heading spring lambda scale.
       motionSmoothing = true,
     } = layoutParams;
@@ -1178,7 +1271,7 @@ export class ParticleSystem {
     // step the original entry took and the seeded dance drifts.
     const lorenzPhase = organism && behaveId === 'lorenz';
     const lorenzGain = lorenzOn ? profile.lorenzGain : 0;
-    const lorenzRho = lorenzPhase ? (rawProfile.lorenzRho || profile.lorenzRho || 28) : 0;
+    const lorenzRho = lorenzPhase ? rawProfile.lorenzRho || profile.lorenzRho || 28 : 0;
     const leak = Math.min(1, Math.max(0, Number(palette?.leak) || 0));
     const leakOn = organism && leak > 0;
     const maxSpeed = organism ? MAX_SPEED_MOTH : MAX_SPEED_CLOUD;
@@ -1200,9 +1293,12 @@ export class ParticleSystem {
     // DAVIS readout can show it without duplicating this derivation.
     // #722 — explicit windMode/windType still wins. Otherwise hold the
     // kernel we were on until the behave ease completes (no mid-blend flip).
-    const useCurl = (layoutParams.windMode || layoutParams.windType)
-      ? resolveWindMode(layoutParams) === 'curl'
-      : (windHold ? windHold === 'curl' : resolveWindMode(layoutParams) === 'curl');
+    const useCurl =
+      layoutParams.windMode || layoutParams.windType
+        ? resolveWindMode(layoutParams) === 'curl'
+        : windHold
+          ? windHold === 'curl'
+          : resolveWindMode(layoutParams) === 'curl';
 
     const sepRadius = organism ? profile.sepR : 35;
     const aliRadius = organism ? profile.aliR : 60;
@@ -1227,9 +1323,7 @@ export class ParticleSystem {
     // the chips act in every mode, not just hype. resolveBehave (raw table)
     // suffices here: seekGain is table-only, never a per-layer override (see
     // BEHAVE_OVERRIDE_FIELDS), so it matches the effective row exactly.
-    const seekMul = organism
-      ? resolveSeekGain(profile)
-      : resolveSeekGain(resolveBehave(layoutParams.behave));
+    const seekMul = organism ? resolveSeekGain(profile) : resolveSeekGain(resolveBehave(layoutParams.behave));
     // #1414 — the currents, resolved once per system-step (law in
     // dishCurrents.mjs): in the dish (contactRadius > 0 — the gate
     // C1 set for the medium) the wind and the attractor stop pushing
@@ -1240,17 +1334,14 @@ export class ParticleSystem {
     // the row's seek gain together; a zero anywhere resolves off,
     // where the legacy term computes exactly zero anyway.
     const windCurrents = contactRadius > 0 ? dishCurrentsFor(windMul) : NO_CURRENTS;
-    const attractorCurrents = contactRadius > 0
-      ? dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul))
-      : NO_CURRENTS;
+    const attractorCurrents =
+      contactRadius > 0 ? dishCurrentsFor(gravityWells * attractMul * Math.abs(seekMul)) : NO_CURRENTS;
     // #1415 — the trail reading, resolved once per system-step (law in
     // dishTrails.mjs): this stratum's own trail field and the session's
     // total, behind the same gate C1 set (in the dish = contactRadius
     // > 0). NO_TRAILS whenever the dish holds no substrate — ACCUM
     // never up — and the read below then adds exactly zero.
-    const trails = contactRadius > 0
-      ? dishTrailsFor(layoutParams.dishSession || null, this)
-      : NO_TRAILS;
+    const trails = contactRadius > 0 ? dishTrailsFor(layoutParams.dishSession || null, this) : NO_TRAILS;
     const maxRadius = Math.max(sepRadius, aliRadius, cohRadius);
     const maxRadius2 = maxRadius * maxRadius;
     const sepRadius2 = sepRadius * sepRadius;
@@ -1263,15 +1354,22 @@ export class ParticleSystem {
 
     // Hoist the columns the inner loops touch. Property loads off `this`
     // inside a 3-deep loop are the one thing SoA can still get wrong.
-    const X = this.x; const Y = this.y;
-    const VX = this.vx; const VY = this.vy;
-    const AX = this.ax; const AY = this.ay;
+    const X = this.x;
+    const Y = this.y;
+    const VX = this.vx;
+    const VY = this.vy;
+    const AX = this.ax;
+    const AY = this.ay;
     const MASS = this.mass;
-    const OMEGA = this.omega; const THETA = this.theta; // #1596 (D2) — spin columns
+    const OMEGA = this.omega;
+    const THETA = this.theta; // #1596 (D2) — spin columns
     const ALIVE = this.alive;
     // #287 — drive columns (hoisted; the force loop reads them per agent).
-    const ENERGY = this.energy; const DRIVE = this.drive;
-    const LZX = this.lorenzX; const LZY = this.lorenzY; const LZZ = this.lorenzZ;
+    const ENERGY = this.energy;
+    const DRIVE = this.drive;
+    const LZX = this.lorenzX;
+    const LZY = this.lorenzY;
+    const LZZ = this.lorenzZ;
     const LEAKRGB = this.leakRgb;
     const SCENT = sharedScent || this._scent;
     const seedU = seed >>> 0;
@@ -1314,11 +1412,8 @@ export class ParticleSystem {
           nt + this.seedOffset[i] * 0.0001,
         );
         const windAngle = nval * TAU;
-        const windShape = (noise.noise3D(
-          pxi * noiseFreq + 200 + domainOffsetX,
-          pyi * noiseFreq + 200 + domainOffsetY,
-          nt,
-        ) + 1.0) * 0.4;
+        const windShape =
+          (noise.noise3D(pxi * noiseFreq + 200 + domainOffsetX, pyi * noiseFreq + 200 + domainOffsetY, nt) + 1.0) * 0.4;
         if (windCurrents.on) {
           // #1414 — point wind as a current: same shape, strength
           // factored out of the magnitude into the coupling, so the
@@ -1342,7 +1437,13 @@ export class ParticleSystem {
       // non-finite x/y here would otherwise divide dx/d to NaN below (the
       // speed clamp further down can't bound NaN — every NaN comparison
       // is false) and poison every particle's position permanently.
-      if (attractor && Number.isFinite(attractor.x) && Number.isFinite(attractor.y) && gravityWells > 0 && attractMul > 0) {
+      if (
+        attractor &&
+        Number.isFinite(attractor.x) &&
+        Number.isFinite(attractor.y) &&
+        gravityWells > 0 &&
+        attractMul > 0
+      ) {
         const dx = attractor.x - pxi;
         const dy = attractor.y - pyi;
         const d = Math.sqrt(dx * dx + dy * dy);
@@ -1366,12 +1467,20 @@ export class ParticleSystem {
         }
       }
 
-      let sepX = 0; let sepY = 0; let sepCount = 0;
-      let aliX = 0; let aliY = 0; let aliCount = 0;
-      let cohX = 0; let cohY = 0; let cohCount = 0;
+      let sepX = 0;
+      let sepY = 0;
+      let sepCount = 0;
+      let aliX = 0;
+      let aliY = 0;
+      let aliCount = 0;
+      let cohX = 0;
+      let cohY = 0;
+      let cohCount = 0;
       // #287 LEAK — pigment drift accumulators (neighbour average, folded
       // into the existing cohesion walk; no second traversal).
-      let leakR = 0; let leakG = 0; let leakB = 0;
+      let leakR = 0;
+      let leakG = 0;
+      let leakB = 0;
       // #287 DRIVES — hunger seeks density: the cohesion pull strengthens
       // as energy falls. Computed before the walk so the force below uses
       // the modulated weight.
@@ -1411,17 +1520,27 @@ export class ParticleSystem {
             // it alone pays for the real sqrt, and only when it is in range.
             if (d2 > 0 && d2 < sepRadius2) {
               const dist = Math.sqrt(d2);
-              sepX -= dx / dist; sepY -= dy / dist; sepCount++;
+              sepX -= dx / dist;
+              sepY -= dy / dist;
+              sepCount++;
             }
-            if (d2 > 0 && d2 < aliRadius2) { aliX += VX[j]; aliY += VY[j]; aliCount++; }
+            if (d2 > 0 && d2 < aliRadius2) {
+              aliX += VX[j];
+              aliY += VY[j];
+              aliCount++;
+            }
             if (d2 > 0 && d2 < cohRadius2) {
-              cohX += X[j]; cohY += Y[j]; cohCount++;
+              cohX += X[j];
+              cohY += Y[j];
+              cohCount++;
               // #287 LEAK — fold the neighbour's pigment into the drift
               // accumulators. Reads only; the sep/ali/coh sums above are
               // untouched, so the legacy force hashes can't move.
               if (leakOn) {
                 const jo3 = j * 3;
-                leakR += LEAKRGB[jo3]; leakG += LEAKRGB[jo3 + 1]; leakB += LEAKRGB[jo3 + 2];
+                leakR += LEAKRGB[jo3];
+                leakG += LEAKRGB[jo3 + 1];
+                leakB += LEAKRGB[jo3 + 2];
               }
             }
           }
@@ -1476,7 +1595,11 @@ export class ParticleSystem {
         // Curious agents wander: a smooth noise-field detour scaled by the
         // drive value and the metabolism rate.
         if (DRIVE[i] > 0.001) {
-          const wob = noise.noise3D(pxi * noiseFreq + 500, pyi * noiseFreq + 500, nt + this.seedOffset[i] * 0.0001 + 7.3);
+          const wob = noise.noise3D(
+            pxi * noiseFreq + 500,
+            pyi * noiseFreq + 500,
+            nt + this.seedOffset[i] * 0.0001 + 7.3,
+          );
           const wa = wob * TAU;
           const wmag = DRIVE[i] * meta * 0.6;
           fax += (T.cos(wa) * wmag) / m;
@@ -1519,7 +1642,9 @@ export class ParticleSystem {
         // #722 — phase is the #710 reseed (full step). The ride warms
         // through eased lorenzGain, applied only once the blend clears epsilon.
         const adv = lorenzAdvance(LZX[i], LZY[i], LZZ[i], lorenzRho, LORENZ_DT * dtFrames);
-        LZX[i] = adv.x; LZY[i] = adv.y; LZZ[i] = adv.z;
+        LZX[i] = adv.x;
+        LZY[i] = adv.y;
+        LZZ[i] = adv.z;
         if (lorenzOn) {
           const mag = Math.sqrt(adv.dx * adv.dx + adv.dy * adv.dy);
           if (mag > 1e-9) {
@@ -1625,13 +1750,14 @@ export class ParticleSystem {
         // #1416 — in the ecology mode the pooled ledger is the cap
         // (the pass's gate checks it before every birth), so the
         // per-system ceiling steps aside entirely.
-        breedCap: ecology && ecology.on
-          ? Infinity
-          : (Number.isFinite(maxParticles) ? maxParticles : this.n),
+        breedCap: ecology && ecology.on ? Infinity : Number.isFinite(maxParticles) ? maxParticles : this.n,
         seed: seed >>> 0,
         seedOffsets,
         organism,
-        minScale, maxScale, minAlpha, maxAlpha,
+        minScale,
+        maxScale,
+        minAlpha,
+        maxAlpha,
       });
     }
 
@@ -1709,7 +1835,7 @@ export class ParticleSystem {
       // Spine A (#387): dt-correct phase advance.
       const ph = (this.phase[i] + 0.004 * noiseSpeed * dtFrames) % 1;
       this.phase[i] = ph;
-      let sc = minScale + (mi * (maxScale - minScale));
+      let sc = minScale + mi * (maxScale - minScale);
       this.baseScale[i] = sc; // #451 — pre-breath, for order-stable sorting
       // #287 SWELL — breathing multiplies the base scale by
       // 1 + breath * 0.5 * energy * sin(phase + seedOffset). The 0.5 caps
@@ -1724,7 +1850,7 @@ export class ParticleSystem {
         sc *= 1 + breath * 0.5 * ENERGY[i] * T.sin(ph * TAU + this.seedOffset[i]);
       }
       this.scale[i] = sc;
-      this.alpha[i] = minAlpha + (mi * (maxAlpha - minAlpha));
+      this.alpha[i] = minAlpha + mi * (maxAlpha - minAlpha);
       const spdU = Math.max(0, Math.min(1, speed / maxSpeed));
       if (organism) {
         const flapU = 0.5 + 0.5 * T.sin(ph * TAU + this.seedOffset[i]);
@@ -1733,10 +1859,20 @@ export class ParticleSystem {
         this.u[i] = spdU;
       }
       if (organism) {
-        if (pxi < MARGIN) { pxi = MARGIN; vxi = Math.abs(vxi) * BOUNCE; }
-        else if (pxi > this.canvasW - MARGIN) { pxi = this.canvasW - MARGIN; vxi = -Math.abs(vxi) * BOUNCE; }
-        if (pyi < MARGIN) { pyi = MARGIN; vyi = Math.abs(vyi) * BOUNCE; }
-        else if (pyi > this.canvasH - MARGIN) { pyi = this.canvasH - MARGIN; vyi = -Math.abs(vyi) * BOUNCE; }
+        if (pxi < MARGIN) {
+          pxi = MARGIN;
+          vxi = Math.abs(vxi) * BOUNCE;
+        } else if (pxi > this.canvasW - MARGIN) {
+          pxi = this.canvasW - MARGIN;
+          vxi = -Math.abs(vxi) * BOUNCE;
+        }
+        if (pyi < MARGIN) {
+          pyi = MARGIN;
+          vyi = Math.abs(vyi) * BOUNCE;
+        } else if (pyi > this.canvasH - MARGIN) {
+          pyi = this.canvasH - MARGIN;
+          vyi = -Math.abs(vyi) * BOUNCE;
+        }
 
         let sp = this.spine[i];
         if (!sp || !sp.length) sp = [{ x: pxi, y: pyi }];
@@ -1862,7 +1998,7 @@ export class ParticleSystem {
   getItems(activeAssets) {
     if (!activeAssets || activeAssets.length === 0) return [];
     const lp = this._layout || {};
-    const frac = (this._floatCount && this._floatCount > 0) ? (this._floatCount - Math.floor(this._floatCount)) : 0;
+    const frac = this._floatCount && this._floatCount > 0 ? this._floatCount - Math.floor(this._floatCount) : 0;
     if (!isOrganismMode(lp.mode)) {
       // #167 — dead particles (die) render nothing.
       const items = [];
@@ -1875,21 +2011,25 @@ export class ParticleSystem {
         // #1596 (D2) — a spun body's roll (θ, radians) rides on
         // top of its heading rotation; θ = 0 forwards the heading
         // exactly as the pre-D2 item carried it.
-        const rotI = this.theta[i] !== 0
-          ? this.rotation[i] + this.theta[i] * (180 / Math.PI)
-          : this.rotation[i];
+        const rotI = this.theta[i] !== 0 ? this.rotation[i] + this.theta[i] * (180 / Math.PI) : this.rotation[i];
         items.push({
-          x: this.x[i], y: this.y[i], scale: this.scale[i], baseScale: this.baseScale[i],
-          rotation: rotI, alpha,
+          x: this.x[i],
+          y: this.y[i],
+          scale: this.scale[i],
+          baseScale: this.baseScale[i],
+          rotation: rotI,
+          alpha,
           asset: activeAssets[this.assetIndex[i] % activeAssets.length],
-          color: this.color[i], u: this.u[i],
+          color: this.color[i],
+          u: this.u[i],
           colorSlot: this.colorSlot[i], // #1237 — palette slot for accent derivation
           // #287 — grazer flag rides the item so the instance mapping can
           // stamp grazers in the palette bg (eroders).
           graze: this.grazer[i] === 1,
           // #343 — MOD coupling reads a source track's motionMetrics, which
           // needs per-item velocity. Scene units/tick, same as #309's smear.
-          vx: this.vx[i], vy: this.vy[i],
+          vx: this.vx[i],
+          vy: this.vy[i],
           // Spine C (#389): per-agent phase for layered life
           seedOffset: this.seedOffset[i],
           // #1410 — impact deform rides the item only while the body is
@@ -1921,9 +2061,7 @@ export class ParticleSystem {
       const pbaseScale = this.baseScale[i]; // #451 — pre-breath, for sort stability
       // #1596 (D2) — the body's roll rides its heading, as in the
       // flat path: θ = 0 forwards the heading untouched.
-      const protation = this.theta[i] !== 0
-        ? this.rotation[i] + this.theta[i] * (180 / Math.PI)
-        : this.rotation[i];
+      const protation = this.theta[i] !== 0 ? this.rotation[i] + this.theta[i] * (180 / Math.PI) : this.rotation[i];
       let palpha = this.alpha[i];
       if (i === this.n - 1 && frac > 0.001) {
         palpha *= frac;
@@ -1935,21 +2073,31 @@ export class ParticleSystem {
       const gz = this.grazer[i] === 1;
       // #1410 — the body's deform rides its spine segments (not the
       // wings: appendages at a reach offset are not the body mass).
-      const dfm = this.deformAmt[i] > 0
-        ? { deformAmt: this.deformAmt[i], deformAxisX: this.deformAxisX[i], deformAxisY: this.deformAxisY[i] }
-        : null;
+      const dfm =
+        this.deformAmt[i] > 0
+          ? { deformAmt: this.deformAmt[i], deformAxisX: this.deformAxisX[i], deformAxisY: this.deformAxisY[i] }
+          : null;
       const sp = this.spine[i] && this.spine[i].length ? this.spine[i] : [{ x: px, y: py }];
       const vx = this.vx[i];
       const vy = this.vy[i];
       for (let s = 0; s < bodyLen; s++) {
         const pt = sp[Math.min(s, sp.length - 1)];
         items.push({
-          x: pt.x, y: pt.y, scale: pscale * (1 - s * 0.1), baseScale: pbaseScale * (1 - s * 0.1),
+          x: pt.x,
+          y: pt.y,
+          scale: pscale * (1 - s * 0.1),
+          baseScale: pbaseScale * (1 - s * 0.1),
           rotation: protation,
-          alpha: palpha * (1 - s * 0.08), asset, color: pcolor, u: pu,
+          alpha: palpha * (1 - s * 0.08),
+          asset,
+          color: pcolor,
+          u: pu,
           colorSlot: this.colorSlot[i], // #1237
-          key: `o${i}-s${s}`, role: s === 0 ? 'body' : 'segment', graze: gz,
-          vx, vy,
+          key: `o${i}-s${s}`,
+          role: s === 0 ? 'body' : 'segment',
+          graze: gz,
+          vx,
+          vy,
           seedOffset: this.seedOffset[i],
           ...(dfm || null), // #1410 — see above
           ...this._uniqueness(i),
@@ -1964,18 +2112,45 @@ export class ParticleSystem {
         // #109A — one blend ladder per moth, round-robin over the shipped set.
         const ladderId = MOTH_LADDERS[i % MOTH_LADDERS.length].id;
         items.push({
-          x: px - pyh * reach, y: py + pxh * reach,
-          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation + amp * 18,
-          alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wl`, role: 'wing',
+          x: px - pyh * reach,
+          y: py + pxh * reach,
+          scale: pscale * 0.7,
+          baseScale: pbaseScale * 0.7,
+          rotation: protation + amp * 18,
+          alpha: palpha,
+          asset,
+          color: pcolor,
+          u: pu,
+          key: `o${i}-wl`,
+          role: 'wing',
           colorSlot: this.colorSlot[i], // #1237
-          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
+          ladderId,
+          graze: gz,
+          vx,
+          vy,
+          seedOffset: this.seedOffset[i],
+          ...this._uniqueness(i),
         });
         items.push({
-          x: px + pyh * reach, y: py - pxh * reach,
-          scale: pscale * 0.7, baseScale: pbaseScale * 0.7, rotation: protation - amp * 18,
-          alpha: palpha, asset, color: pcolor, u: pu, key: `o${i}-wr`, role: 'wing', _mirrored: true,
+          x: px + pyh * reach,
+          y: py - pxh * reach,
+          scale: pscale * 0.7,
+          baseScale: pbaseScale * 0.7,
+          rotation: protation - amp * 18,
+          alpha: palpha,
+          asset,
+          color: pcolor,
+          u: pu,
+          key: `o${i}-wr`,
+          role: 'wing',
+          _mirrored: true,
           colorSlot: this.colorSlot[i], // #1237
-          ladderId, graze: gz, vx, vy, seedOffset: this.seedOffset[i], ...this._uniqueness(i),
+          ladderId,
+          graze: gz,
+          vx,
+          vy,
+          seedOffset: this.seedOffset[i],
+          ...this._uniqueness(i),
         });
       } else {
         // #287 — radial fans. The bilateral pair above generalizes to an
@@ -1994,17 +2169,26 @@ export class ParticleSystem {
             const a = heading - Math.PI / 2 + (TAU * k) / folds;
             const mirrored = symKind === 'kaleido' && k % 2 === 1;
             // Fold axis between arm k-1 and arm k, in degrees (world frame).
-            const foldDeg = (heading - Math.PI / 2 + (TAU * (k - 0.5)) / folds) * 180 / Math.PI;
+            const foldDeg = ((heading - Math.PI / 2 + (TAU * (k - 0.5)) / folds) * 180) / Math.PI;
             const evenRot = protation + amp * 18;
             const ladderId = MOTH_LADDERS[(i + k) % MOTH_LADDERS.length].id;
             items.push({
-              x: px + T.cos(a) * reach, y: py + T.sin(a) * reach,
-              scale: pscale * 0.7, baseScale: pbaseScale * 0.7,
+              x: px + T.cos(a) * reach,
+              y: py + T.sin(a) * reach,
+              scale: pscale * 0.7,
+              baseScale: pbaseScale * 0.7,
               rotation: mirrored ? 2 * foldDeg - evenRot : evenRot,
-              alpha: palpha, asset, color: pcolor, u: pu,
-              key: `o${i}-f${k}`, role: 'wing', ladderId, graze: gz,
+              alpha: palpha,
+              asset,
+              color: pcolor,
+              u: pu,
+              key: `o${i}-f${k}`,
+              role: 'wing',
+              ladderId,
+              graze: gz,
               colorSlot: this.colorSlot[i], // #1237
-              vx, vy,
+              vx,
+              vy,
               seedOffset: this.seedOffset[i],
               ...this._uniqueness(i),
               ...(mirrored ? { _mirrored: true } : null),

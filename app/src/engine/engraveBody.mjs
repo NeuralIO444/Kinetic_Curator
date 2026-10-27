@@ -174,7 +174,8 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
     const qy = a.y + aby * t;
     const d2 = (au.x - qx) * (au.x - qx) + (au.y - qy) * (au.y - qy);
     if (d2 < bestD2) {
-      bestD2 = d2; bestS = acc + len * t;
+      bestD2 = d2;
+      bestS = acc + len * t;
       // the signed lateral distance from the spine: cross(segment dir, au - closest point)
       bestLat = len > 1e-6 ? (abx * (au.y - qy) - aby * (au.x - qx)) / len : 0;
     }
@@ -182,7 +183,7 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
     a = b;
   }
   const total = acc;
-  const dl = Math.abs(((bestS / spacing) % 1 + 1.5) % 1 - 0.5) * spacing;
+  const dl = Math.abs(((((bestS / spacing) % 1) + 1.5) % 1) - 0.5) * spacing;
   const AA = 0.8; // asset units; the shader derives its band from fwidth instead
   const half = width * 0.5;
   const line = 1 - smooth(dl, half - AA, half + AA);
@@ -192,7 +193,8 @@ export function engraveFactorAt(au, joints, params = ENGRAVE_DEFAULTS) {
   for (const off of ENGRAVE_SEAM_OFFSETS) dSeam = Math.min(dSeam, Math.abs(Math.abs(bestLat) - off));
   const seam = 1 - smooth(dSeam, half - AA, half + AA);
   const lineAll = Math.max(line, seam * ENGRAVE_SEAM_REL);
-  const endFade = smooth(bestS, -0.3 * spacing, 0.1 * spacing) * (1 - smooth(bestS, total - 0.1 * spacing, total + 0.3 * spacing));
+  const endFade =
+    smooth(bestS, -0.3 * spacing, 0.1 * spacing) * (1 - smooth(bestS, total - 0.1 * spacing, total + 0.3 * spacing));
   return 1 - strength * lineAll * endFade;
 }
 
@@ -207,7 +209,7 @@ function smooth(x, lo, hi) {
  * six joints (asset space), eP is [count, spacing, width, strength]. The
  * caller gates on eP.x > 1.5, so non-engraved instances never enter.
  */
-export const ENGRAVE_GLSL = /* glsl */`
+export const ENGRAVE_GLSL = /* glsl */ `
 float engraveShade(vec2 au, vec4 eA, vec4 eB, vec4 eC, vec4 eP) {
   vec2 J[6];
   J[0] = eA.xy; J[1] = eA.zw; J[2] = eB.xy; J[3] = eB.zw; J[4] = eC.xy; J[5] = eC.zw;

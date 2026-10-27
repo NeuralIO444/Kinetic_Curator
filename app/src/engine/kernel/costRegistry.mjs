@@ -41,9 +41,21 @@
  */
 
 export const COST_TIER_INFO = {
-  0: { name: 'structural', rule: 'never shed', detail: 'compositing, present plumbing, effectively-free scalar modulation' },
-  1: { name: 'shed first', rule: 'governor perfTier1 cut', detail: 'ACCUM passes, bloom extras, flow feedback, echoes' },
-  2: { name: 'quality scalers', rule: 'shed after tier 1', detail: 'turbulence octaves, blur radii — expensive but not first' },
+  0: {
+    name: 'structural',
+    rule: 'never shed',
+    detail: 'compositing, present plumbing, effectively-free scalar modulation',
+  },
+  1: {
+    name: 'shed first',
+    rule: 'governor perfTier1 cut',
+    detail: 'ACCUM passes, bloom extras, flow feedback, echoes',
+  },
+  2: {
+    name: 'quality scalers',
+    rule: 'shed after tier 1',
+    detail: 'turbulence octaves, blur radii — expensive but not first',
+  },
   3: { name: 'cosmetic', rule: 'shed last', detail: 'cheap color ops' },
 };
 
@@ -96,7 +108,11 @@ export function registerCostTier(id, decl = {}) {
     throw new Error(`[cost-tiers] "${id}": timeMs must be a non-negative number`);
   }
   if (memoryGate !== null) {
-    if (typeof memoryGate !== 'object' || !Number.isFinite(memoryGate.minWidth) || !Number.isInteger(memoryGate.maxTaps)) {
+    if (
+      typeof memoryGate !== 'object' ||
+      !Number.isFinite(memoryGate.minWidth) ||
+      !Number.isInteger(memoryGate.maxTaps)
+    ) {
       throw new Error(`[cost-tiers] "${id}": memoryGate must be { minWidth: number, maxTaps: int }`);
     }
   }
@@ -104,7 +120,9 @@ export function registerCostTier(id, decl = {}) {
   const prev = registry.get(id);
   if (prev) {
     if (JSON.stringify(prev) !== JSON.stringify(next)) {
-      throw new Error(`[cost-tiers] "${id}" is already registered with a different declaration — duplicate cost-tier declaration`);
+      throw new Error(
+        `[cost-tiers] "${id}" is already registered with a different declaration — duplicate cost-tier declaration`,
+      );
     }
     return id;
   }
@@ -156,7 +174,8 @@ export function shedOrder(ids, measuredMs) {
     return t === 0 ? 4 : t; // tier 0 never sheds: always last
   };
   return [...ids].sort((a, b) => {
-    const ra = rank(a), rb = rank(b);
+    const ra = rank(a),
+      rb = rank(b);
     if (ra !== rb) return ra - rb; // tier 1 before 2 before 3
     return costOf(b) - costOf(a); // costlier sheds first within a tier
   });
@@ -180,7 +199,8 @@ registerCostTier('engine/creature-feather-fan', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0,
-  notes: 'Phase 2 S3 feather fans: no new GPU pass; instanced sprites in the structural item pass. CPU emission cost measured by resolverProbe at the 4-creature cap; items bounded by HIER_GLOBAL_BUDGET (2000).',
+  notes:
+    'Phase 2 S3 feather fans: no new GPU pass; instanced sprites in the structural item pass. CPU emission cost measured by resolverProbe at the 4-creature cap; items bounded by HIER_GLOBAL_BUDGET (2000).',
 });
 
 // Phase 2 S4 — APPEND-ONLY creature-pass registrations.
@@ -211,7 +231,8 @@ registerCostTier('creature/engraving', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.05,
-  notes: 'in-shader engraving finish (body-space contour lines on the one body item per creature; gated branch in the quad FS, no pass, no target) — timeMs UNMEASURED by the sweep harness by construction; sandbox bench estimate, see engine/engraving.selfcheck.mjs',
+  notes:
+    'in-shader engraving finish (body-space contour lines on the one body item per creature; gated branch in the quad FS, no pass, no target) — timeMs UNMEASURED by the sweep harness by construction; sandbox bench estimate, see engine/engraving.selfcheck.mjs',
 });
 
 // Phase 2 S8 — APPEND-ONLY BLOCK (slices append their own; do not edit above
@@ -230,7 +251,8 @@ registerCostTier('creature:glitch', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0,
-  notes: 'Phase 2 S8 — glitch corruption: seeded item-stream math (strip slip, seam drift, channel-split ghosts, hatch sort); no GPU pass, no FBOs. Cost lives in item count and resolver CPU, measured via resolverProbe lineage.',
+  notes:
+    'Phase 2 S8 — glitch corruption: seeded item-stream math (strip slip, seam drift, channel-split ghosts, hatch sort); no GPU pass, no FBOs. Cost lives in item count and resolver CPU, measured via resolverProbe lineage.',
 });
 
 // --- #1694 S2: the creature citizen's families (curator/creatureCitizen.js) ---
@@ -258,13 +280,15 @@ registerCostTier('creature/moth', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 1.18,
-  notes: '#1694 S2 — the moth family at the 4-creature cap: skeleton + mirrored part fan + skinning on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
+  notes:
+    '#1694 S2 — the moth family at the 4-creature cap: skeleton + mirrored part fan + skinning on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
 });
 registerCostTier('creature/dish', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.05,
-  notes: '#1694 S2 — the dish creature (one hosted pin at most, by the formation rule): XPBD disc body + grown limbs on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
+  notes:
+    '#1694 S2 — the dish creature (one hosted pin at most, by the formation rule): XPBD disc body + grown limbs on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
 });
 
 // --- #1731 #1732 #1734-#1738: the creature loot on the dish creature ---
@@ -280,5 +304,6 @@ registerCostTier('creature/alife', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.014,
-  notes: '#1731 #1732 #1734-#1738 — dish creature bounds, facing and the ALife channel: resolver CPU only (no GPU pass, no items added). Measured sandbox builder bench delta (see block comment); sheds with the dish creature by the governor creatureCount cut.',
+  notes:
+    '#1731 #1732 #1734-#1738 — dish creature bounds, facing and the ALife channel: resolver CPU only (no GPU pass, no items added). Measured sandbox builder bench delta (see block comment); sheds with the dish creature by the governor creatureCount cut.',
 });

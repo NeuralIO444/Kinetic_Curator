@@ -18,7 +18,9 @@ assert.throws(() => reg.register({ id: 'a', fn() {}, reads: 'seed' }), /reads mu
 assert.throws(() => reg.register({ id: 'a', fn() {}, writes: [1] }), /writes must be an array/);
 
 // --- defaults fill the declaration ---
-function fnA() { return 1; }
+function fnA() {
+  return 1;
+}
 reg.register({ id: 'a', fn: fnA });
 {
   const d = reg.get('a');
@@ -33,15 +35,14 @@ assert.deepStrictEqual(reg.list(), ['a']);
 assert.strictEqual(reg.get('nope'), undefined);
 
 // --- identical re-declaration is a no-op that refreshes the payload (HMR, #551) ---
-function fnA2() { return 2; }
+function fnA2() {
+  return 2;
+}
 reg.register({ id: 'a', fn: fnA2 }); // same declaration, fresh closure → no throw
 assert.strictEqual(reg.get('a').fn, fnA2);
 
 // --- conflicting re-declaration throws ---
-assert.throws(
-  () => reg.register({ id: 'a', fn: fnA2, costTier: 2 }),
-  /conflicting declaration/,
-);
+assert.throws(() => reg.register({ id: 'a', fn: fnA2, costTier: 2 }), /conflicting declaration/);
 
 // --- entries are frozen ---
 assert.ok(Object.isFrozen(reg.get('a')));
