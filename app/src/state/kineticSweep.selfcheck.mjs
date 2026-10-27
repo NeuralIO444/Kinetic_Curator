@@ -190,6 +190,17 @@ const snap = () => {
   }
 }
 
+// ── 5b. #1768 through the store: across 20 voice passes the glow moves only when the dealt voice declares ACCUM ──
+{
+  S().setLayoutParam('accumulationOptics', 0.07);
+  for (let i = 0; i < 20; i++) {
+    const before = S().layoutParams.accumulationOptics;
+    S().kineticVoicePass();
+    const v = VOICE_DECK.find((x) => x.id === S().kineticVoiceId);
+    if (!v.accumulation) assert.equal(S().layoutParams.accumulationOptics, before, `${v.id}: no ACCUM, glow held`);
+  }
+}
+
 // ── 6. look pass purity: a pool coherent with every look, structure only ─────────────────────────────────────────
 {
   const st = { ...S(), armedMode: null, armedMotion: null, lockedParams: {} };

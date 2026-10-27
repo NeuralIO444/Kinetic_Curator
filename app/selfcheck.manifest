@@ -166,8 +166,6 @@ node src/engine/organisms.selfcheck.mjs
 node src/state/undoLayers.selfcheck.mjs
 node src/state/undoSeedOffsets.selfcheck.mjs
 node src/state/kineticRoll.selfcheck.mjs
-node src/state/kineticRulesPass.selfcheck.mjs
-node src/state/kineticWeatherPass.selfcheck.mjs
 node src/state/diceLanding.selfcheck.mjs
 node src/panels/layout/kineticHeat.selfcheck.mjs
 node src/panels/layout/chiaroscuro.selfcheck.mjs

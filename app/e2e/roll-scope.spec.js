@@ -61,8 +61,8 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     for (const k of PINNED) expect(b.lp[k], k).toBe(a.lp[k]);
     expect(b.seed).not.toBe(a.seed);
 
-    // RULES path (store action): same scope, composition held, mode pinned.
-    await page.evaluate(() => window.__kcStore.getState().kineticRulesPass());
+    // LOOK pass (store action, #1772): same scope, composition held, mode pinned.
+    await page.evaluate(() => window.__kcStore.getState().kineticLookPass());
     s = await snap(page);
     expect(s.lp.composition).toBe(compositionBefore);
     expect(s.lp.mode).toBe('fibonacci');

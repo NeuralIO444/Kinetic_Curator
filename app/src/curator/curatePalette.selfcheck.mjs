@@ -81,7 +81,7 @@ assert.strictEqual(
   assert.strictEqual(S().paletteChosen, true);
   S().kineticRoll();
   assert.strictEqual(S().paletteChosen, false, "a KINETIC roll replaces the palette: no longer the artist's");
-  for (const pass of ['kineticRulesPass', 'kineticWeatherPass']) {
+  for (const pass of ['kineticVoicePass']) {
     S().markPaletteChosen();
     S()[pass]();
     assert.strictEqual(S().paletteChosen, false, `${pass} clears it too`);

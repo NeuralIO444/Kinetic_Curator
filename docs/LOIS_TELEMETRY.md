@@ -48,7 +48,7 @@ model is trained on real favorites-vs-keeps.
   `EXPORT_CLEAR_SNAPSHOTS` (with confirm), `LAYER_REMOVE`, `ACCUM_GESTURE`
   (freeze/clear/swell), FX add/remove/param, palette ops. Nothing is logged —
   just dispatched — but every LOIS trigger already flows through here.
-- `app/src/panels/layout/KineticButton.jsx` + `kineticWarm.mjs` — tap routing
+- `app/src/panels/layout/KineticButton.jsx` + `kineticHeat.mjs` — tap routing
   with a component-local `lastTapRef` (ephemeral; #945's heat model lands on
   top of this).
 - `app/src/curator/curate.js` — `curated pick` / `curated pick · mlx` hints.
