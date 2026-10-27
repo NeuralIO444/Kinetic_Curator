@@ -47,6 +47,9 @@ const sliderCc = (key, label) => ({
   },
 });
 
+// The plate as it stands, in the shape every keep/favorite/pass record is captured in.
+const capturePlate = (s) => captureFavorite({ seed: s.seed, seedOffsets: s.seedOffsets, layoutParams: s.layoutParams, enabledAssets: s.enabledAssets, layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots }, s.paletteId);
+
 export const MIDI_TARGETS = Object.freeze([
   { id: 'evolve.toggle', kind: 'trigger', label: 'EVOLVE / STOP', run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { toggle: true }) },
   { id: 'seed.new', kind: 'trigger', label: 'NEW SEED', run: (ctx) => ctx.emit(ctx.Events.DAVIS_EVOLVE, { bumpSeed: true }) },
@@ -54,12 +57,14 @@ export const MIDI_TARGETS = Object.freeze([
     id: 'favorite.keep', kind: 'trigger', label: 'FAVORITE (keep)',
     run: (ctx) => {
       const s = ctx.getState();
-      ctx.emit(ctx.Events.DAVIS_FAVORITE, {
-        action: 'add',
-        favorite: captureFavorite({ seed: s.seed, seedOffsets: s.seedOffsets, layoutParams: s.layoutParams, enabledAssets: s.enabledAssets, layers: s.layers, activeLayerId: s.activeLayerId, layerSnapshots: s.layerSnapshots }, s.paletteId),
-      });
+      ctx.emit(ctx.Events.DAVIS_FAVORITE, { action: 'add', favorite: capturePlate(s) });
     },
   },
+  // #617 — the rest of the spec's trigger list: keep (J), pass (X) and phrase reset, through the same paths the keys
+  // use (KEEP_ADD on the bus; addPass on the store, as the X key's ADD_PASS does), so a pad and a key are one act.
+  { id: 'taste.keep', kind: 'trigger', label: 'KEEP', run: (ctx) => ctx.emit(ctx.Events.KEEP_ADD, { keep: capturePlate(ctx.getState()) }) },
+  { id: 'taste.pass', kind: 'trigger', label: 'PASS', run: (ctx) => { const s = ctx.getState(); s.addPass(capturePlate(s)); } },
+  { id: 'phrase.reset', kind: 'trigger', label: 'PHRASE RESET', run: (ctx) => ctx.emit(ctx.Events.DAVIS_RESET_PHRASE) },
   { id: 'accum.swell', kind: 'trigger', label: 'SWELL', run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'swell' }) },
   { id: 'accum.clear', kind: 'trigger', label: 'CLEAR trails', run: (ctx) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'clear' }) },
   { id: 'accum.freeze', kind: 'hold', label: 'FREEZE (hold)', run: (ctx, on) => ctx.emit(ctx.Events.ACCUM_GESTURE, { action: 'freeze', value: !!on }) },
@@ -69,6 +74,8 @@ export const MIDI_TARGETS = Object.freeze([
   sliderCc('audioAlphaMod', 'AUDIO ALPHA'),
   sliderCc('audioSwell', 'AUDIO SWELL'),
   sliderCc('lifeDrift', 'LIFE'),
+  // #617 — the vibe/preset morph: a fader on the MIX road between the loaded voices (VOICE_MIX { t } 0..1).
+  { id: 'voice.mix', kind: 'cc', label: 'VOICE MIX', run: (ctx, v01) => ctx.emit(ctx.Events.VOICE_MIX, { t: v01 }) },
   {
     id: 'evolve.interval', kind: 'cc', label: 'EVOLVE INTERVAL',
     // same 200–10000 ms range as the slider on DAVIS

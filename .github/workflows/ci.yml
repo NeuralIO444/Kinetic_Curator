@@ -33,6 +33,7 @@ jobs:
           cache-dependency-path: app/package-lock.json
       - run: npm ci --no-fund --no-audit
       - run: npm run lint
+      - run: npm run format:check # #1684: Prettier gate on the adopted set (.prettierignore shrinks per slice)
       - run: npm run selfcheck
       - run: npm run build
 
@@ -51,7 +52,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/Library/Caches/ms-playwright
-          key: playwright-1.49.1-${{ runner.os }}
+          key: playwright-1.64.1-${{ runner.os }}
       - run: npm ci --no-fund --no-audit
       - run: npx playwright install chromium
       - run: npm run build
@@ -83,7 +84,7 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-1.49.1-${{ runner.os }}
+          key: playwright-1.64.1-${{ runner.os }}
       - run: npm ci --no-fund --no-audit
       - run: npx playwright install chromium --with-deps
       - run: npm run selfcheck

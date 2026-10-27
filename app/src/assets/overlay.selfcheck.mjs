@@ -200,4 +200,27 @@ assert.strictEqual(pooled.asset.category, 'fragments');
     'replace must carry slot assignments (ID stability does the rest)');
 }
 
+// #1707 — project load enforces import's tag allowlist, not only isHostile. The two payloads from the issue pass
+// isHostile (tab / LF split inside the scheme) and used to load; they are now refused like import refuses them.
+{
+  const animateHref = '<a href="#x"><animate attributeName="href" values="java\tscript:alert(1)"/><circle r="1"/></a>';
+  const setHref = '<a href="#x"><set attributeName="href" to="java\nscript:alert(1)"/><circle r="1"/></a>';
+  for (const svg of [animateHref, setHref]) {
+    assert.strictEqual(sanitizeOverlay([{ id: 'user:evil', svg }]).length, 0, `load refuses: ${JSON.stringify(svg).slice(0, 40)}`);
+  }
+  for (const tag of ['use', 'foreignobject', 'style', 'filter', 'mask', 'image']) {
+    assert.strictEqual(sanitizeOverlay([{ id: 'user:t', svg: `<${tag}></${tag}><path d="M0 0"/>` }]).length, 0, `load refuses <${tag}>`);
+  }
+  // what import itself produces still loads
+  const fine = ingestIntoOverlay('<svg viewBox="0 0 400 400"><g><path d="M0 0 L10 10"/><circle r="2"/></g></svg>', [], 'fine');
+  assert.ok(fine.ok);
+  assert.strictEqual(sanitizeOverlay(fine.overlay).length, 1, 'an imported asset survives the load check');
+  // a duplicated canon <text> stamp (kept raw when re-ingest refuses <text>) survives a save/load round trip
+  const stamp = ASSETS.find((a) => /<text[\s>]/i.test(a.svg || ''));
+  assert.ok(stamp, 'canon still ships a <text> stamp');
+  const dup = duplicateIntoOverlay(stamp, []);
+  assert.ok(dup.ok);
+  assert.strictEqual(sanitizeOverlay(JSON.parse(JSON.stringify(dup.overlay))).length, 1, 'a duplicated <text> stamp is not dropped on load');
+}
+
 console.log('overlay.selfcheck: OK');

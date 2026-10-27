@@ -26,3 +26,6 @@ src/gl/*
 
 # Lint test fixtures are data, never formatted.
 eslint-rules/fixtures/**
+
+# Generated reports: written by scripts, never hand-formatted.
+docs/COST_BUDGETS.md

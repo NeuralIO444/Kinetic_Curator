@@ -1,5 +1,7 @@
 # KC-1 Roadmap: Petri Dish, Affective Layer, Determinism
 
+> **Ordering moved (2026-10-16):** the backlog order now lives in **#1647** ("KC-1 Roadmap: creature first") and the `roadmap:p0`…`roadmap:p4` / `roadmap:parked` labels; `blocked:hardware` marks items that need the Mac Studio, the iPad or a controller. This file stays as the record of the dish phases and the seven decisions. Ledger check 2026-10-26: Phase 4 step 6 shipped (#1356 closed, base types via #1660); #1636 (hysteresis) and #1173 (keep/pass flywheel) closed as shipped; decision 5's keeps-vs-passes share is #1753.
+
 **Status:** the current phases roadmap. Ordered by Matt, 2026-10-11.
 **Source:** Matt's draft of 2026-10-10 ("KC1_Roadmap_Petri_Dish_Affective"), revised with the six decisions recorded below.
 **Scope:** desktop and iPad first. Live stage use is welcome but is not the design driver. No cloud AI: on-device system intelligence (Apple Intelligence, #1463) is allowed, and every decision is recorded (Matt, 2026-10-13).
