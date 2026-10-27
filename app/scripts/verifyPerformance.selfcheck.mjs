@@ -16,17 +16,46 @@ const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', laye
 function take(frames = 130) {
   const rec = createPerformanceRecorder();
   const res = withResolveTap(createLiveResolver);
-  setResolveTap((i) => rec.onInput(i)); setResolveOutputTap((o) => rec.onOutput(o));
+  setResolveTap((i) => rec.onInput(i));
+  setResolveOutputTap((o) => rec.onOutput(o));
   for (let f = 0; f < frames; f++) {
     res.resolveLayers({
-      canvasW: 1000, canvasH: 700, layers: [L('a')], activeLayerId: 'a', layerSnapshots: {}, seed: 7, seedOffsets: null, paletteId: 'bone',
-      paletteOverrides: null, userPalettes: [], caGrid: null, enabledAssets: null, assetWeightOverrides: {}, customAssets: [], quality: 'balanced',
-      lockedParams: {}, batchPaused: false, focusSwap: false, perfClampOverride: null, perfTier1: false, assetThin: false, slowRender: false,
-      scaleMul: 1, alphaBoost: 0, effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)], effectiveAlpha: [20, 100], phraseWrapGen: 0, attractor: null,
-      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 }, loopTimeMs: f * 16.7, dtSec: 1 / 60,
+      canvasW: 1000,
+      canvasH: 700,
+      layers: [L('a')],
+      activeLayerId: 'a',
+      layerSnapshots: {},
+      seed: 7,
+      seedOffsets: null,
+      paletteId: 'bone',
+      paletteOverrides: null,
+      userPalettes: [],
+      caGrid: null,
+      enabledAssets: null,
+      assetWeightOverrides: {},
+      customAssets: [],
+      quality: 'balanced',
+      lockedParams: {},
+      batchPaused: false,
+      focusSwap: false,
+      perfClampOverride: null,
+      perfTier1: false,
+      assetThin: false,
+      slowRender: false,
+      scaleMul: 1,
+      alphaBoost: 0,
+      effectiveScale: [0.5, 1.5 + 0.2 * Math.sin(f / 9)],
+      effectiveAlpha: [20, 100],
+      phraseWrapGen: 0,
+      attractor: null,
+      layoutParams: { ...DEFAULT_LAYOUT_PARAMS, mode: 'random', count: 60, particleCount: 60 },
+      loopTimeMs: f * 16.7,
+      dtSec: 1 / 60,
     });
   }
-  setResolveTap(null); setResolveOutputTap(null); res.dispose();
+  setResolveTap(null);
+  setResolveOutputTap(null);
+  res.dispose();
   return rec.finish();
 }
 
@@ -50,8 +79,12 @@ const run = (...a) => spawnSync(process.execPath, ['--no-warnings', cli, ...a], 
   assert.equal(r.status, 0, r.stdout + r.stderr);
   assert.match(r.stdout, /^OK /);
   assert.match(r.stdout, /\d+ frames .* \d+ checkpoints/);
-  const j = JSON.parse(execFileSync(process.execPath, ['--no-warnings', cli, goodPath, '--json'], { encoding: 'utf8' }));
-  assert.equal(j.ok, true); assert.equal(j.firstMismatchFrame, null); assert.ok(j.checkpoints >= 2);
+  const j = JSON.parse(
+    execFileSync(process.execPath, ['--no-warnings', cli, goodPath, '--json'], { encoding: 'utf8' }),
+  );
+  assert.equal(j.ok, true);
+  assert.equal(j.firstMismatchFrame, null);
+  assert.ok(j.checkpoints >= 2);
 }
 
 // 2. a tampered take: exit 1, names the frame

@@ -5,7 +5,11 @@ import { test, expect } from '@playwright/test';
 
 test('PATCH target is pickable while OFF and survives a mode change', async ({ page }) => {
   await page.addInitScript(() => {
-    try { localStorage.setItem('kc:first-run-seen', '1'); } catch { /* ignore */ }
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+    } catch {
+      /* ignore */
+    }
   });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });

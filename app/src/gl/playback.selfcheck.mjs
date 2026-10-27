@@ -22,6 +22,8 @@ import {
   SCENE_KEYS,
 } from './playback.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = async (name, fn) => {
@@ -229,7 +231,7 @@ await ok(
     );
     assert.match(btn, /perf-dot/);
     const css = readFileSync(new URL('../styles/layout.css', import.meta.url), 'utf8');
-    assert.match(css, /\.perf-btn \.perf-dot \{ color: var\(--kc-red\); \}/);
+    assert.match(flat(css), fre(/\.perf-btn \.perf-dot \{ color: var\(--kc-red\); \}/));
     assert.match(css, /\.perf-btn \{[^}]*text-transform: uppercase;/, 'caps like STOP');
   },
 );

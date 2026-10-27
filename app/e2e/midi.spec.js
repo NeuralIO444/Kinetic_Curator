@@ -10,7 +10,9 @@ import { test, expect } from '@playwright/test';
 // the cap was timing out a healthy boot, not catching a hang.
 
 const DOC = {
-  version: 1, seed: 4242, autoQuality: false,
+  version: 1,
+  seed: 4242,
+  autoQuality: false,
   layoutParams: { mode: 'swarm', count: 40, accumulation: true },
   midiMap: { 'note:1:36': 'evolve.toggle', 'note:1:38': 'accum.freeze', 'cc:1:7': 'param.audioModDepth' },
 };
@@ -48,13 +50,21 @@ async function openEditor(page) {
 }
 
 async function boot(page, extraScript = '') {
-  await page.addInitScript(({ doc, extra }) => {
-    localStorage.setItem('kc:first-run-seen', '1');
-    localStorage.setItem('kc:project:v1', JSON.stringify({
-      version: 1, savedAt: new Date().toISOString(), doc,
-    }));
-    if (extra) eval(extra);
-  }, { doc: DOC, extra: extraScript || fakeAccessScript() });
+  await page.addInitScript(
+    ({ doc, extra }) => {
+      localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.setItem(
+        'kc:project:v1',
+        JSON.stringify({
+          version: 1,
+          savedAt: new Date().toISOString(),
+          doc,
+        }),
+      );
+      if (extra) eval(extra);
+    },
+    { doc: DOC, extra: extraScript || fakeAccessScript() },
+  );
   await page.goto('/Kinetic_Curator/?boot=factory', { waitUntil: 'domcontentloaded' });
   // 30s for the shell, same as director-regroup: software GL paints the
   // seeded project slowly, and a slow boot must fail as itself — not as a
@@ -151,7 +161,10 @@ test('MIDI: enable, pad, knob, hold, unplug', async ({ page }) => {
 });
 
 test('MIDI: a refused permission says so', async ({ page }) => {
-  const midi = await boot(page, `window.__kcMidiAccess = async () => { throw new DOMException('Permission denied', 'SecurityError'); };`);
+  const midi = await boot(
+    page,
+    `window.__kcMidiAccess = async () => { throw new DOMException('Permission denied', 'SecurityError'); };`,
+  );
   await enable(midi);
   await expect(midi.locator('.davis-midi-status')).toContainText('MIDI access refused', { timeout: 3_000 });
   await expect(midi.locator('.davis-midi-note')).toContainText('site settings', { timeout: 3_000 });

@@ -18,7 +18,10 @@ const IGNORED = new Set([]);
 
 /** Parse manifest text -> ['node src/x.selfcheck.mjs', ...]. Pure, exported for the test. */
 export function parseManifest(text) {
-  return text.split('\n').map((l) => l.trim()).filter((l) => l && !l.startsWith('#'));
+  return text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('#'));
 }
 
 /** Problems with a parsed manifest (empty = fine). Pure over the disk listing it is given. */

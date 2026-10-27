@@ -26,7 +26,7 @@ const PROBE_PATH = '/Kinetic_Curator/probes/kernel-worker-probe.html';
 test.describe('kernel worker webview probe (#1312)', () => {
   test.skip(
     !process.env.E2E_WEBKIT,
-    'WebKit-only probe: run with E2E_WEBKIT=1 (needs `npx playwright install webkit` + system deps). CI runs chromium only, so this skips there by design.'
+    'WebKit-only probe: run with E2E_WEBKIT=1 (needs `npx playwright install webkit` + system deps). CI runs chromium only, so this skips there by design.',
   );
 
   test('Worker + transferable Float32Array columns pass on WebKit (iPad emulation)', async () => {
@@ -42,11 +42,9 @@ test.describe('kernel worker webview probe (#1312)', () => {
       const pageErrors = [];
       page.on('pageerror', (err) => pageErrors.push(String(err)));
       await page.goto(PROBE_PATH);
-      await page.waitForFunction(
-        () => window.__kernelWorkerProbe && window.__kernelWorkerProbe.done,
-        null,
-        { timeout: 60_000 }
-      );
+      await page.waitForFunction(() => window.__kernelWorkerProbe && window.__kernelWorkerProbe.done, null, {
+        timeout: 60_000,
+      });
       const result = await page.evaluate(() => window.__kernelWorkerProbe);
       await test.info().attach('probe-result.json', {
         body: JSON.stringify(result, null, 2),

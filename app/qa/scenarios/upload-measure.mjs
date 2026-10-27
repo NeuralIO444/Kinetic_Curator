@@ -16,7 +16,8 @@ const fmtBytes = (n) => {
 };
 
 export default {
-  describe: 'Run the live canvas animated for 60s and read the #533 upload-byte meter (bufferSubData bytes vs byte-diffed changed bytes).',
+  describe:
+    'Run the live canvas animated for 60s and read the #533 upload-byte meter (bufferSubData bytes vs byte-diffed changed bytes).',
   async run(ctx) {
     const page = await ctx.newPage();
     // Seed the project document with autoQuality:false — on software GL
@@ -27,25 +28,33 @@ export default {
     await page.addInitScript(() => {
       try {
         localStorage.setItem('kc:first-run-seen', '1');
-        localStorage.setItem('kc:project:v1', JSON.stringify({
-          version: 1,
-          savedAt: new Date().toISOString(),
-          doc: {
+        localStorage.setItem(
+          'kc:project:v1',
+          JSON.stringify({
             version: 1,
-            seed: 5330533,
-            autoQuality: false,
-            layoutParams: { mode: 'swarm', count: 60 },
-          },
-        }));
-      } catch { /* ignore */ }
+            savedAt: new Date().toISOString(),
+            doc: {
+              version: 1,
+              seed: 5330533,
+              autoQuality: false,
+              layoutParams: { mode: 'swarm', count: 60 },
+            },
+          }),
+        );
+      } catch {
+        /* ignore */
+      }
     });
     await ctx.openApp(page);
 
     // The meter attaches when renderer.mjs loads; frames tick only once the
     // live canvas is actually drawing.
     await page.waitForFunction(
-      () => typeof window.__uploadMeter === 'function' || (window.__uploadMeter && typeof window.__uploadMeter.snapshot === 'function'),
-      null, { timeout: 30_000 },
+      () =>
+        typeof window.__uploadMeter === 'function' ||
+        (window.__uploadMeter && typeof window.__uploadMeter.snapshot === 'function'),
+      null,
+      { timeout: 30_000 },
     );
     await page.waitForFunction(() => window.__uploadMeter.snapshot().frames > 10, null, { timeout: 30_000 });
     await page.evaluate(() => window.__uploadMeter.reset());

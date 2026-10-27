@@ -8,6 +8,8 @@ import assert from 'node:assert';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { RANGE_TONES, RANGE_LAYOUTS, RANGE_TONE_COLORS } from './rangeTones.js';
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
+const fre = (re) => new RegExp(re.source.replace(/\\s[*+?]?/g, '').replace(/ /g, ''), re.flags); // the same pin as a layout-blind pattern
 
 let n = 0;
 const ok = (name, fn) => {
@@ -68,7 +70,7 @@ const css = readFileSync(join(root, 'styles/controls.css'), 'utf8');
 
 ok('controls.css: thumb colors per tone match the design system, default is ink', () => {
   assert.match(css, /--range-thumb:\s*#e8e8e0/);
-  assert.match(css, /\[data-tone="build"\]\s*\{\s*--range-thumb:\s*#ffd400/);
+  assert.match(flat(css), fre(/\[data-tone="build"\]\s*\{\s*--range-thumb:\s*#ffd400/));
   assert.match(css, /\[data-tone="stim"\]\s*\{\s*--range-thumb:\s*#00d9ff/);
 });
 

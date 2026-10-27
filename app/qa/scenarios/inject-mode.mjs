@@ -18,7 +18,8 @@
 // - Screenshots use the full page — element screenshots of the WebGL canvas
 //   go stale in headless Chromium, the page capture stays live.
 export default {
-  describe: 'Switch to INJECT, tap palette chips 1–4, screenshot across the MIX window — the field should dye first and the swarm should catch up on visibly different schedules.',
+  describe:
+    'Switch to INJECT, tap palette chips 1–4, screenshot across the MIX window — the field should dye first and the swarm should catch up on visibly different schedules.',
   async run(ctx) {
     const page = await ctx.newPage();
     const errors = [];

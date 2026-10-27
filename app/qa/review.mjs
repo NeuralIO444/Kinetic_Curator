@@ -20,7 +20,7 @@ const execFileAsync = promisify(execFile);
 export const APP = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 export const esc = (s) =>
-  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** Pull the checklist items out of the `## Review this` section of a PR body.
  * Accepts `- [ ]` / `- [x]` checkboxes, plain `-` bullets, and numbered lists. */
@@ -28,11 +28,17 @@ export function extractChecklist(body) {
   const items = [];
   let inSection = false;
   for (const line of String(body || '').split('\n')) {
-    if (/^##\s+review this/i.test(line)) { inSection = true; continue; }
+    if (/^##\s+review this/i.test(line)) {
+      inSection = true;
+      continue;
+    }
     if (inSection && /^##\s+/.test(line)) break;
     if (!inSection) continue;
     let m = line.match(/^\s*-\s*\[( |x|X)\]\s*(.+?)\s*$/);
-    if (m) { items.push({ text: m[2], checked: m[1].toLowerCase() === 'x' }); continue; }
+    if (m) {
+      items.push({ text: m[2], checked: m[1].toLowerCase() === 'x' });
+      continue;
+    }
     m = line.match(/^\s*(?:-\s*|\d+[.)]\s+)(.+?)\s*$/);
     if (m && m[1]) items.push({ text: m[1], checked: false });
   }
@@ -42,10 +48,18 @@ export function extractChecklist(body) {
 /** Build the single self-contained review page. Screenshots arrive as {caption,b64}. */
 export function buildReviewHtml(d) {
   const n = d.n;
-  const checks = d.checklist.map((c, i) =>
-    `<label class="check"><input type="checkbox" data-i="${i}"${c.checked ? ' checked' : ''}><span>${esc(c.text)}</span></label>`).join('\n');
-  const shots = d.shots.map((s) =>
-    `<figure><figcaption>${esc(s.caption)}</figcaption><img src="data:image/png;base64,${s.b64}" alt="${esc(s.caption)}" loading="lazy"></figure>`).join('\n');
+  const checks = d.checklist
+    .map(
+      (c, i) =>
+        `<label class="check"><input type="checkbox" data-i="${i}"${c.checked ? ' checked' : ''}><span>${esc(c.text)}</span></label>`,
+    )
+    .join('\n');
+  const shots = d.shots
+    .map(
+      (s) =>
+        `<figure><figcaption>${esc(s.caption)}</figcaption><img src="data:image/png;base64,${s.b64}" alt="${esc(s.caption)}" loading="lazy"></figure>`,
+    )
+    .join('\n');
   const badge = (ok, t, f) => `<span class="badge ${ok ? '' : 'bad'}">${ok ? t : f}</span>`;
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>Review PR #${esc(n)} — ${esc(d.title)}</title>
 <style>
@@ -81,9 +95,11 @@ code{background:#1a1a1a;padding:1px 6px;border-radius:3px}
 ${checks || '<p class="meta">No "Review this" checklist in the PR body.</p>'}
 
 <h2>QA scenarios ${d.qa.ran ? badge(d.qa.pass, 'PASS', 'FAIL') : '<span class="badge warn">SKIPPED</span>'}</h2>
-${d.qa.ran
-  ? `<p class="meta">${d.qa.shotCount} screenshot(s) · full harness report: <code>${esc(d.qa.reportPath)}</code></p>${shots || '<p class="meta">No screenshots captured.</p>'}`
-  : '<p class="meta">Browser scenarios skipped (--no-qa).</p>'}
+${
+  d.qa.ran
+    ? `<p class="meta">${d.qa.shotCount} screenshot(s) · full harness report: <code>${esc(d.qa.reportPath)}</code></p>${shots || '<p class="meta">No screenshots captured.</p>'}`
+    : '<p class="meta">Browser scenarios skipped (--no-qa).</p>'
+}
 ${d.degraded ? `<div class="note">⚠ QA capture degraded in this environment: ${esc(d.degraded)}</div>` : ''}
 
 <script>
@@ -124,19 +140,43 @@ async function ghText(args) {
 /** Run a command streaming to the terminal and teeing to a log file. Resolves exit code. */
 function runLogged(cmd, args, cwd, logFile, env = process.env) {
   return new Promise((resolve) => {
-    const child = spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], shell: process.platform === 'win32' });
+    const child = spawn(cmd, args, {
+      cwd,
+      env,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      shell: process.platform === 'win32',
+    });
     const chunks = [];
-    child.stdout.on('data', (d) => { chunks.push(d); process.stdout.write(d); });
-    child.stderr.on('data', (d) => { chunks.push(d); process.stderr.write(d); });
-    child.on('error', (e) => { console.error(`\n! failed to start ${cmd}: ${e.message}`); resolve(1); });
+    child.stdout.on('data', (d) => {
+      chunks.push(d);
+      process.stdout.write(d);
+    });
+    child.stderr.on('data', (d) => {
+      chunks.push(d);
+      process.stderr.write(d);
+    });
+    child.on('error', (e) => {
+      console.error(`\n! failed to start ${cmd}: ${e.message}`);
+      resolve(1);
+    });
     child.on('close', (code) => {
-      try { writeFileSync(logFile, Buffer.concat(chunks)); } catch { /* ignore */ }
+      try {
+        writeFileSync(logFile, Buffer.concat(chunks));
+      } catch {
+        /* ignore */
+      }
       resolve(code ?? 1);
     });
   });
 }
 
-const up = async (url) => { try { return (await fetch(url)).ok; } catch { return false; } };
+const up = async (url) => {
+  try {
+    return (await fetch(url)).ok;
+  } catch {
+    return false;
+  }
+};
 
 /** Same shape as the QA harness's ensureServer, but serves the given app dir on a free port. */
 async function startServer(appDir) {
@@ -147,10 +187,16 @@ async function startServer(appDir) {
     if (!(await up(url))) break;
   }
   if (port >= 5190) throw new Error('no free port in 5170-5189');
-  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
-    { cwd: appDir, stdio: 'ignore', shell: process.platform === 'win32' });
+  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+    cwd: appDir,
+    stdio: 'ignore',
+    shell: process.platform === 'win32',
+  });
   for (let i = 0; i < 60 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 500));
-  if (!(await up(url))) { child.kill(); throw new Error('dev server did not come up on ' + url); }
+  if (!(await up(url))) {
+    child.kill();
+    throw new Error('dev server did not come up on ' + url);
+  }
   return { url, stop: () => child.kill() };
 }
 
@@ -174,10 +220,13 @@ async function findWorktreeForBranch(repoRoot, branch) {
     let cur = null;
     for (const line of stdout.split('\n')) {
       if (line.startsWith('worktree ')) cur = line.slice('worktree '.length).trim();
-      else if (line.startsWith('branch ') && cur && line.slice('branch '.length).trim() === `refs/heads/${branch}`) return cur;
+      else if (line.startsWith('branch ') && cur && line.slice('branch '.length).trim() === `refs/heads/${branch}`)
+        return cur;
       else if (line === '') cur = null;
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return null;
 }
 
@@ -187,12 +236,17 @@ async function syncWorktree(wtPath, branch) {
     await execFileAsync('git', ['-C', wtPath, 'fetch', 'origin', branch]);
     await execFileAsync('git', ['-C', wtPath, 'pull', '--ff-only', 'origin', branch]);
     console.log('  fast-forwarded to latest PR head');
-  } catch { console.log('  (could not fast-forward; reviewing the checked-out commit)'); }
+  } catch {
+    console.log('  (could not fast-forward; reviewing the checked-out commit)');
+  }
 }
 
 function openBrowser(file) {
   const opener = process.platform === 'darwin' ? 'open' : process.platform === 'linux' ? 'xdg-open' : null;
-  if (!opener) { console.log(`open this file: ${file}`); return; }
+  if (!opener) {
+    console.log(`open this file: ${file}`);
+    return;
+  }
   const child = spawn(opener, [file], { stdio: 'ignore', detached: true });
   child.on('error', () => console.log(`could not auto-open; file is at ${file}`));
   child.unref();
@@ -256,8 +310,16 @@ async function main() {
 
   if (!existsSync(join(wtApp, 'node_modules'))) {
     console.log('▶ npm install (first time in this worktree) …');
-    const code = await runLogged('npm', ['install', '--no-audit', '--no-fund'], wtApp, join(APP, 'qa-report', `review-${pr}-install.log`));
-    if (code !== 0) { console.error('! npm install failed'); process.exit(1); }
+    const code = await runLogged(
+      'npm',
+      ['install', '--no-audit', '--no-fund'],
+      wtApp,
+      join(APP, 'qa-report', `review-${pr}-install.log`),
+    );
+    if (code !== 0) {
+      console.error('! npm install failed');
+      process.exit(1);
+    }
   } else {
     console.log('▶ node_modules present, skipping npm install');
   }
@@ -295,9 +357,10 @@ async function main() {
       console.log('▶ running QA scenarios …');
       const qaArgs = ['qa/run.mjs'];
       if (flags.has('--headed')) qaArgs.push('--headed');
-      const qaCode = await runLogged('node', qaArgs, wtApp,
-        join(APP, 'qa-report', `review-${pr}-qa.log`),
-        { ...process.env, QA_URL: server.url });
+      const qaCode = await runLogged('node', qaArgs, wtApp, join(APP, 'qa-report', `review-${pr}-qa.log`), {
+        ...process.env,
+        QA_URL: server.url,
+      });
       qa = { ran: true, pass: qaCode === 0, shotCount: 0, reportPath: join(wtPath, 'app', 'qa-report', 'index.html') };
       shots = collectShots(join(wtApp, 'qa-report'));
       qa.shotCount = shots.length;
@@ -314,9 +377,21 @@ async function main() {
   console.log(`▶ checklist: ${checklist.length} item(s)`);
 
   const html = buildReviewHtml({
-    n: pr, title: info.title, url: info.url, isDraft: info.isDraft,
-    branch, worktree: wtPath, commit, localhost: localhost || '(server stopped — rerun to review live)',
-    ciRaw: ci.text, ciPass, selfcheck, checklist, qa, shots, degraded,
+    n: pr,
+    title: info.title,
+    url: info.url,
+    isDraft: info.isDraft,
+    branch,
+    worktree: wtPath,
+    commit,
+    localhost: localhost || '(server stopped — rerun to review live)',
+    ciRaw: ci.text,
+    ciPass,
+    selfcheck,
+    checklist,
+    qa,
+    shots,
+    degraded,
   });
   const outFile = join(APP, 'qa-report', `review-${pr}.html`);
   writeFileSync(outFile, html);
@@ -325,10 +400,17 @@ async function main() {
 }
 
 const invokedAsMain = (() => {
-  try { return process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url; }
-  catch { return false; }
+  try {
+    return process.argv[1] && pathToFileURL(process.argv[1]).href === import.meta.url;
+  } catch {
+    return false;
+  }
 })();
 if (invokedAsMain) {
-  try { await main(); }
-  catch (e) { console.error(`! ${e.message || e}`); process.exit(1); }
+  try {
+    await main();
+  } catch (e) {
+    console.error(`! ${e.message || e}`);
+    process.exit(1);
+  }
 }

@@ -23,9 +23,16 @@ const APP = join(QA, '..');
 const ROOT = join(APP, '..');
 const REPORT_DIR = join(APP, 'qa-report');
 
-const up = async (url) => { try { return (await fetch(url)).ok; } catch { return false; } };
+const up = async (url) => {
+  try {
+    return (await fetch(url)).ok;
+  } catch {
+    return false;
+  }
+};
 
-const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 /** Run a command, return { ok, stdout, stderr, code }. Never throws. */
 function sh(cmd, args, opts = {}) {
@@ -33,7 +40,10 @@ function sh(cmd, args, opts = {}) {
   return { ok: r.status === 0, stdout: r.stdout || '', stderr: r.stderr || '', code: r.status };
 }
 
-function fail(msg) { console.error(`diff: ${msg}`); process.exit(2); }
+function fail(msg) {
+  console.error(`diff: ${msg}`);
+  process.exit(2);
+}
 
 /** Make sure a scratch worktree exists on origin/<ref>; update it if it does. */
 function ensureWorktree(pr, kind, ref) {
@@ -80,10 +90,15 @@ async function startServer(wtApp) {
     if (!(await up(url))) break;
   }
   if (port >= 5250) fail('no free port in 5199-5249');
-  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'],
-    { cwd: wtApp, stdio: 'ignore' });
+  const child = spawn('npx', ['vite', '--host', '127.0.0.1', '--port', String(port), '--strictPort'], {
+    cwd: wtApp,
+    stdio: 'ignore',
+  });
   for (let i = 0; i < 60 && !(await up(url)); i++) await new Promise((r) => setTimeout(r, 500));
-  if (!(await up(url))) { child.kill(); fail(`dev server did not come up for ${wtApp} on ${url}`); }
+  if (!(await up(url))) {
+    child.kill();
+    fail(`dev server did not come up for ${wtApp} on ${url}`);
+  }
   return { url, stop: () => child.kill() };
 }
 
@@ -94,8 +109,7 @@ async function runQA(wtApp, scenarios, label) {
   const server = await startServer(wtApp);
   try {
     const args = ['qa/run.mjs', ...scenarios];
-    const r = spawnSync('node', args,
-      { cwd: wtApp, encoding: 'utf8', env: { ...process.env, QA_URL: server.url } });
+    const r = spawnSync('node', args, { cwd: wtApp, encoding: 'utf8', env: { ...process.env, QA_URL: server.url } });
     const statuses = new Map();
     for (const line of (r.stdout || '').split('\n')) {
       const m = line.match(/^▶\s+(\S+)\s+…\s+(PASS|FAIL)/);
@@ -122,7 +136,13 @@ function collectShots(wtApp) {
     const shots = readdirSync(p)
       .filter((f) => f.endsWith('.png'))
       .sort()
-      .map((f) => ({ file: f, label: f.replace(/^\d+-/, '').replace(/\.png$/, '').replace(/-/g, ' ') }));
+      .map((f) => ({
+        file: f,
+        label: f
+          .replace(/^\d+-/, '')
+          .replace(/\.png$/, '')
+          .replace(/-/g, ' '),
+      }));
     if (shots.length) out[e] = shots;
   }
   return out;
@@ -139,7 +159,10 @@ async function main() {
   const sf = raw.find((a) => a.startsWith('--scenarios'));
   if (sf) {
     const v = sf.includes('=') ? sf.split('=').slice(1).join('=') : positional[1];
-    scenarios = (v || '').split(',').map((s) => s.trim()).filter(Boolean);
+    scenarios = (v || '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean);
     if (!scenarios.length) fail('--scenarios needs a comma-separated list');
   }
 
@@ -169,7 +192,10 @@ async function main() {
   for (const scn of scenariosAll) {
     const b = Object.fromEntries((baseShots[scn] || []).map((s) => [s.file, s]));
     const q = Object.fromEntries((prShots[scn] || []).map((s) => [s.file, s]));
-    for (const sdir of [['base', b, baseShots[scn]], ['pr', q, prShots[scn]]]) {
+    for (const sdir of [
+      ['base', b, baseShots[scn]],
+      ['pr', q, prShots[scn]],
+    ]) {
       const [side, , shots] = sdir;
       if (!shots) continue;
       const from = join(side === 'base' ? baseWt : prWt, 'app', 'qa-report', scn);
@@ -193,14 +219,19 @@ async function main() {
   console.log(`\ndiff: ${pairs.length} screenshot pair(s) across ${scenariosAll.length} scenario(s)\npage: ${page}`);
   if (flags.has('--open')) {
     const opener = process.platform === 'darwin' ? 'open' : 'xdg-open';
-    execFile(opener, [page], (e) => { if (e) console.error(`diff: could not open (${e.message})`); });
+    execFile(opener, [page], (e) => {
+      if (e) console.error(`diff: could not open (${e.message})`);
+    });
   }
 }
 
 function renderPage({ pr, title, url, baseRefName, headRefName, scenariosAll, baseRes, prRes, pairs }) {
-  const badge = (s) => s === 'PASS'
-    ? '<span class="badge ok">PASS</span>'
-    : s === 'FAIL' ? '<span class="badge bad">FAIL</span>' : '<span class="badge na">n/a</span>';
+  const badge = (s) =>
+    s === 'PASS'
+      ? '<span class="badge ok">PASS</span>'
+      : s === 'FAIL'
+        ? '<span class="badge bad">FAIL</span>'
+        : '<span class="badge na">n/a</span>';
   const byScenario = scenariosAll.map((scn) => ({
     scn,
     baseStatus: baseRes.statuses.get(scn) || null,
@@ -208,15 +239,22 @@ function renderPage({ pr, title, url, baseRefName, headRefName, scenariosAll, ba
     pairs: pairs.filter((p) => p.scenario === scn),
   }));
 
-  const sections = byScenario.map(({ scn, baseStatus, prStatus, pairs: ps }) => `
+  const sections = byScenario
+    .map(
+      ({ scn, baseStatus, prStatus, pairs: ps }) => `
 <section class="scn">
   <h2>${esc(scn)} <span class="run">base ${badge(baseStatus)}</span> <span class="run">PR ${badge(prStatus)}</span></h2>
   ${ps.length ? '' : '<p class="note">no screenshots captured on either side.</p>'}
-  ${ps.map((p) => `
+  ${ps
+    .map(
+      (p) => `
   <div class="pair" id="${p.id}">
     <h3>${esc(p.label)}</h3>
-    ${!p.base || !p.pr ? `<p class="note">only on ${!p.base ? 'PR branch' : 'base'} — no pair to compare.</p>
-      <figure><img src="${esc(p.base || p.pr)}" alt="${esc(p.label)}"></figure>` : `
+    ${
+      !p.base || !p.pr
+        ? `<p class="note">only on ${!p.base ? 'PR branch' : 'base'} — no pair to compare.</p>
+      <figure><img src="${esc(p.base || p.pr)}" alt="${esc(p.label)}"></figure>`
+        : `
     <div class="views" role="tablist">
       <button data-v="side" class="on">Side by side</button><button data-v="slider">Slider</button><button data-v="diff">Diff</button>
     </div>
@@ -231,9 +269,14 @@ function renderPage({ pr, title, url, baseRefName, headRefName, scenariosAll, ba
     <div class="view diffv" hidden>
       <canvas></canvas>
       <p class="diffcap">computing…</p>
-    </div>`}
-  </div>`).join('\n')}
-</section>`).join('\n');
+    </div>`
+    }
+  </div>`,
+    )
+    .join('\n')}
+</section>`,
+    )
+    .join('\n');
 
   return `<!doctype html><html lang="en"><meta charset="utf-8">
 <title>Before/after diff — PR #${esc(pr)}</title>

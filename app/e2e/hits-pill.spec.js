@@ -2,12 +2,24 @@
 import { test, expect } from '@playwright/test';
 
 async function boot(page) {
-  await page.addInitScript(() => { window.__KC_EXPOSE_STORE = true; try { localStorage.setItem('kc:first-run-seen', '1'); localStorage.removeItem('kc:favorites'); } catch { /* ignore */ } });
+  await page.addInitScript(() => {
+    window.__KC_EXPOSE_STORE = true;
+    try {
+      localStorage.setItem('kc:first-run-seen', '1');
+      localStorage.removeItem('kc:favorites');
+    } catch {
+      /* ignore */
+    }
+  });
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 }
 const pills = (page) => page.locator('.hit-pill');
-const state = (page) => page.evaluate(() => { const s = window.__kcStore.getState(); return { fav: s.favorites.length, keeps: s.keeps.length, seeds: s.favorites.map((f) => f.seed) }; });
+const state = (page) =>
+  page.evaluate(() => {
+    const s = window.__kcStore.getState();
+    return { fav: s.favorites.length, keeps: s.keeps.length, seeds: s.favorites.map((f) => f.seed) };
+  });
 
 test('F adds a pill: a name, not hex, and four bands (3 palette colours + heat)', async ({ page }) => {
   await boot(page);
@@ -18,20 +30,29 @@ test('F adds a pill: a name, not hex, and four bands (3 palette colours + heat)'
   await expect(p.locator('.hit-band')).toHaveCount(4);
   await expect(p.locator('.hit-band.heat')).toHaveCount(1);
   await expect(p.locator('.hit-pill-sep')).toHaveCount(1); // the actions sit behind a divider
-  for (const b of await p.locator('.hit-pill-act').all()) expect((await b.boundingBox()).width).toBeGreaterThanOrEqual(28);
+  for (const b of await p.locator('.hit-pill-act').all())
+    expect((await b.boundingBox()).width).toBeGreaterThanOrEqual(28);
 });
 
-test('duplicate makes a setlist copy and no new keep; delete removes the pill and leaves the keep', async ({ page }) => {
+test('duplicate makes a setlist copy and no new keep; delete removes the pill and leaves the keep', async ({
+  page,
+}) => {
   await boot(page);
   await page.keyboard.press('f');
   await expect(pills(page)).toHaveCount(1);
   const before = await state(page);
-  await pills(page).first().getByRole('button', { name: /^Duplicate hit/ }).click();
+  await pills(page)
+    .first()
+    .getByRole('button', { name: /^Duplicate hit/ })
+    .click();
   await expect(pills(page)).toHaveCount(2);
   const dup = await state(page);
   expect(dup.keeps).toBe(before.keeps); // two-ledger rule: copying is not finding
   expect(dup.seeds[0]).toBe(dup.seeds[1]);
-  await pills(page).nth(1).getByRole('button', { name: /^Delete hit/ }).click();
+  await pills(page)
+    .nth(1)
+    .getByRole('button', { name: /^Delete hit/ })
+    .click();
   await expect(pills(page)).toHaveCount(1);
   expect((await state(page)).keeps).toBe(before.keeps);
 });
@@ -53,7 +74,13 @@ test('the keyboard moves a hit: Alt+Right puts the cursor hit later in the setli
   await boot(page);
   await page.evaluate(() => {
     const s = window.__kcStore.getState();
-    for (const seed of [11, 22, 33]) s.addFavorite({ seed, seedOffsets: {}, timestamp: new Date().toISOString(), config: { layout: {}, palette: { id: 'praystation' } } });
+    for (const seed of [11, 22, 33])
+      s.addFavorite({
+        seed,
+        seedOffsets: {},
+        timestamp: new Date().toISOString(),
+        config: { layout: {}, palette: { id: 'praystation' } },
+      });
   });
   await expect(pills(page)).toHaveCount(3);
   await page.locator('.favorites-tray').focus();
@@ -67,10 +94,20 @@ test('a long setlist scrolls inside the HITS row: the page never grows wider tha
   await boot(page);
   await page.evaluate(() => {
     const s = window.__kcStore.getState();
-    for (let i = 0; i < 12; i++) s.addFavorite({ seed: 1000 + i * 977, seedOffsets: {}, timestamp: new Date().toISOString(), config: { layout: {}, palette: { id: 'praystation' } } });
+    for (let i = 0; i < 12; i++)
+      s.addFavorite({
+        seed: 1000 + i * 977,
+        seedOffsets: {},
+        timestamp: new Date().toISOString(),
+        config: { layout: {}, palette: { id: 'praystation' } },
+      });
   });
   await expect(pills(page)).toHaveCount(12);
-  const w = await page.evaluate(() => ({ vw: innerWidth, doc: document.documentElement.scrollWidth, topbar: Math.round(document.querySelector('.palette-strip').getBoundingClientRect().right) }));
+  const w = await page.evaluate(() => ({
+    vw: innerWidth,
+    doc: document.documentElement.scrollWidth,
+    topbar: Math.round(document.querySelector('.palette-strip').getBoundingClientRect().right),
+  }));
   expect(w.doc).toBeLessThanOrEqual(w.vw);
   expect(w.topbar).toBeLessThanOrEqual(w.vw);
 });

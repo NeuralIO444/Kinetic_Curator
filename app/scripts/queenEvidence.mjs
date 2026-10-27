@@ -35,11 +35,15 @@ export function queenEvidence(keeps, pool) {
     return {
       keeps: list.length,
       silent: true,
-      reason: list.length < MIN_KEEPS
-        ? `fewer than ${MIN_KEEPS} keeps — she is identity, as ever`
-        : 'no keep carries a layout — nothing to lean toward',
+      reason:
+        list.length < MIN_KEEPS
+          ? `fewer than ${MIN_KEEPS} keeps — she is identity, as ever`
+          : 'no keep carries a layout — nothing to lean toward',
       leaning: (pool || []).map((p) => ({
-        index: p.index ?? null, corner: p.corner ?? 'wilderness', proximity: null, bias: 0,
+        index: p.index ?? null,
+        corner: p.corner ?? 'wilderness',
+        proximity: null,
+        bias: 0,
       })),
       leaningByCorner: {},
       anchor: null,

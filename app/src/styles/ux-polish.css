@@ -25,33 +25,74 @@
   font-size: 8px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: color 100ms, background 100ms;
+  transition:
+    color 100ms,
+    background 100ms;
   cursor: pointer;
 }
-.panel-tab:last-child { border-right: none; }
-.panel-tab:hover { color: var(--ink); background: rgba(255,255,255,0.03); }
+.panel-tab:last-child {
+  border-right: none;
+}
+.panel-tab:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.03);
+}
 .panel-tab.active {
   color: var(--bg);
   background: var(--accent);
 }
-.panel-tab:focus-visible { outline-offset: -3px; }
-.panel-tab-icon { font-size: 11px; line-height: 1; }
-.panel-tab-label { font-size: 8px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.panel-tab:focus-visible {
+  outline-offset: -3px;
+}
+.panel-tab-icon {
+  font-size: 11px;
+  line-height: 1;
+}
+.panel-tab-label {
+  font-size: 8px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
 /* #248 Phase 1 — drawer trigger (ASSETS): same look as a tab, but not one;
    sits below the tablist, opens an overlay instead of switching content. */
 .panel-drawer-triggers {
-  display: flex; flex-shrink: 0; gap: 0;
-  border: 1px solid var(--line); border-top: none; background: var(--panel-2);
+  display: flex;
+  flex-shrink: 0;
+  gap: 0;
+  border: 1px solid var(--line);
+  border-top: none;
+  background: var(--panel-2);
 }
 .panel-drawer-trigger {
-  flex: 1 1 0; min-width: 0; min-height: 28px;
-  display: flex; align-items: center; justify-content: center; gap: 4px;
-  background: transparent; border: none; color: var(--dim);
-  cursor: pointer; transition: color 100ms, background 100ms;
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: var(--dim);
+  cursor: pointer;
+  transition:
+    color 100ms,
+    background 100ms;
 }
-.panel-drawer-trigger:hover { color: var(--ink); background: rgba(255,255,255,0.03); }
-.panel-drawer-trigger .panel-tab-icon { font-size: 11px; }
-.panel-drawer-trigger .panel-tab-label { font-size: 8px; font-weight: 700; }
+.panel-drawer-trigger:hover {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.03);
+}
+.panel-drawer-trigger .panel-tab-icon {
+  font-size: 11px;
+}
+.panel-drawer-trigger .panel-tab-label {
+  font-size: 8px;
+  font-weight: 700;
+}
 
 .panel-tab-content {
   flex: 1 1 auto;
@@ -61,7 +102,9 @@
   display: flex;
   flex-direction: column;
 }
-.panel-tab-content:focus-visible { outline-offset: -2px; }
+.panel-tab-content:focus-visible {
+  outline-offset: -2px;
+}
 .panel-tab-content > .panel {
   flex: 1 1 auto;
   border-top: none;
@@ -85,7 +128,7 @@
   text-align: center;
   background: var(--panel);
   border: 1px solid var(--line-2);
-  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
 }
 .first-run-mark {
   font-size: 28px;
@@ -115,9 +158,14 @@
   font-size: 13px;
   font-weight: 800;
   letter-spacing: 0.1em;
-  transition: filter 120ms, transform 120ms;
+  transition:
+    filter 120ms,
+    transform 120ms;
 }
-.first-run-play:hover { filter: brightness(1.08); transform: scale(1.01); }
+.first-run-play:hover {
+  filter: brightness(1.08);
+  transform: scale(1.01);
+}
 .first-run-skip {
   background: transparent;
   border: none;
@@ -126,7 +174,9 @@
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }
-.first-run-skip:hover { color: var(--dim); }
+.first-run-skip:hover {
+  color: var(--dim);
+}
 
 /* ─── Floating Favorites tray (#8) ─── */
 .favorites-tray {
@@ -184,12 +234,22 @@
   background: var(--panel);
   cursor: grab;
 }
-.hit-pill:active { cursor: grabbing; }
-.hit-pill[data-dragging="true"] { opacity: 0.4; }
-.hit-pill.active { border-color: var(--ink); }
+.hit-pill:active {
+  cursor: grabbing;
+}
+.hit-pill[data-dragging="true"] {
+  opacity: 0.4;
+}
+.hit-pill.active {
+  border-color: var(--ink);
+}
 /* playing = a flat red edge: a discrete fact, so TE (KC-1 DS rule 5): no glow, no pulse */
-.hit-pill[data-playing="true"] { border-color: var(--kc-red); }
-.hit-pill[data-playing="true"] .hit-pill-num { color: var(--kc-red); }
+.hit-pill[data-playing="true"] {
+  border-color: var(--kc-red);
+}
+.hit-pill[data-playing="true"] .hit-pill-num {
+  color: var(--kc-red);
+}
 .hit-pill-main {
   display: inline-flex;
   align-items: center;
@@ -202,24 +262,66 @@
   color: var(--ink);
   font-size: 10px;
 }
-.hit-pill-main:hover { background: rgba(255,255,255,0.04); }
-.hit-pill-num { color: var(--dim); font-size: 9px; font-weight: 700; }
-.hit-pill-name { letter-spacing: 0.1em; text-transform: uppercase; }
+.hit-pill-main:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+.hit-pill-num {
+  color: var(--dim);
+  font-size: 9px;
+  font-weight: 700;
+}
+.hit-pill-name {
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
 /* #1507 — the mined mark on a crowned explorer keep: a small amber
    diamond (amber = taste, KC-1 DS). A mined keep reads mined wherever
    it renders; hand keeps never carry it. */
-.hit-mined { width: 6px; height: 6px; flex-shrink: 0; margin: 0 2px; background: var(--kc-davis); transform: rotate(45deg); }
-.hit-bands { display: inline-flex; gap: 3px; }
-.hit-band { width: 7px; height: 18px; }
-.hit-band.heat, .hit-detail-legend i.heat { background: var(--line-2); }
-.hit-band.h1, .hit-detail-legend i.h1 { background: rgba(var(--kc-davis-rgb), .45); }
-.hit-band.h2, .hit-detail-legend i.h2 { background: var(--kc-davis); }
-.hit-band.h3, .hit-detail-legend i.h3 { background: var(--kc-red); }
+.hit-mined {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  margin: 0 2px;
+  background: var(--kc-davis);
+  transform: rotate(45deg);
+}
+.hit-bands {
+  display: inline-flex;
+  gap: 3px;
+}
+.hit-band {
+  width: 7px;
+  height: 18px;
+}
+.hit-band.heat,
+.hit-detail-legend i.heat {
+  background: var(--line-2);
+}
+.hit-band.h1,
+.hit-detail-legend i.h1 {
+  background: rgba(var(--kc-davis-rgb), 0.45);
+}
+.hit-band.h2,
+.hit-detail-legend i.h2 {
+  background: var(--kc-davis);
+}
+.hit-band.h3,
+.hit-detail-legend i.h3 {
+  background: var(--kc-red);
+}
 /* #1124 — the divider the identity sits in front of and the actions behind (the mockup's .sep metrics) */
-.hit-pill-sep { width: 1px; height: 18px; background: var(--line-2); flex: 0 0 auto; }
+.hit-pill-sep {
+  width: 1px;
+  height: 18px;
+  background: var(--line-2);
+  flex: 0 0 auto;
+}
 .hit-pill-act {
-  width: 32px; height: 32px;
-  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 0;
   background: transparent;
   border: none;
@@ -228,10 +330,23 @@
   font-size: 17px;
   line-height: 1;
 }
-.hit-pill-act:hover:not(:disabled) { color: var(--ink); background: rgba(255,255,255,0.06); }
-.hit-pill-act.del:hover:not(:disabled) { color: var(--kc-red); }
-.hit-pill-act:disabled { opacity: 0.3; cursor: default; }
-.hit-pill-grip { color: var(--dimmer); font-size: 10px; letter-spacing: 2px; padding: 0 2px; }
+.hit-pill-act:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgba(255, 255, 255, 0.06);
+}
+.hit-pill-act.del:hover:not(:disabled) {
+  color: var(--kc-red);
+}
+.hit-pill-act:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.hit-pill-grip {
+  color: var(--dimmer);
+  font-size: 10px;
+  letter-spacing: 2px;
+  padding: 0 2px;
+}
 /* hover / focus detail: the rest of a hit, drawn in the page above its pill (the tray sits at the foot and scrolls) */
 .hit-detail {
   position: fixed;
@@ -241,19 +356,52 @@
   border: 1px solid var(--line-2);
   z-index: 30;
 }
-.hit-detail-name { font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink); }
-.hit-detail-seed { font-size: 9px; color: var(--dim); margin: 2px 0 8px; }
-.hit-detail-legend { list-style: none; margin: 0 0 8px; padding: 0; font-size: 9px; color: var(--dim); line-height: 1.9; }
-.hit-detail-legend i { display: inline-block; width: 8px; height: 8px; margin-right: 6px; }
-.hit-detail-more { display: flex; gap: 6px; }
-.hit-detail-more button {
-  flex: 1; min-height: 28px;
-  background: transparent; border: 1px solid var(--line-2); color: var(--dim);
-  font-size: 9px; letter-spacing: 0.06em;
+.hit-detail-name {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink);
 }
-.hit-detail-more button:hover { border-color: var(--ink); color: var(--ink); }
+.hit-detail-seed {
+  font-size: 9px;
+  color: var(--dim);
+  margin: 2px 0 8px;
+}
+.hit-detail-legend {
+  list-style: none;
+  margin: 0 0 8px;
+  padding: 0;
+  font-size: 9px;
+  color: var(--dim);
+  line-height: 1.9;
+}
+.hit-detail-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+}
+.hit-detail-more {
+  display: flex;
+  gap: 6px;
+}
+.hit-detail-more button {
+  flex: 1;
+  min-height: 28px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--dim);
+  font-size: 9px;
+  letter-spacing: 0.06em;
+}
+.hit-detail-more button:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
 
-.app-fullscreen .favorites-tray { display: none; }
+.app-fullscreen .favorites-tray {
+  display: none;
+}
 
 /* ─── First-run tour (#222) ─── */
 .tour-overlay {
@@ -272,7 +420,7 @@
   padding: 16px 18px 14px;
   background: var(--panel);
   border: 1px solid var(--line-2);
-  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.5);
 }
 .tour-step-title {
   font-size: 12px;
@@ -297,7 +445,9 @@
   height: 3px;
   background: var(--line-2);
 }
-.tour-dot.on { background: var(--accent); }
+.tour-dot.on {
+  background: var(--accent);
+}
 .tour-nav {
   display: flex;
   align-items: center;

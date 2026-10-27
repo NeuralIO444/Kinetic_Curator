@@ -1,17 +1,26 @@
 // qa/report.mjs — pure HTML for the QA report (unit-tested in report.selfcheck.mjs).
-export const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+export const esc = (s) =>
+  String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 
 export function renderReport(results) {
   const total = results.length;
   const failed = results.filter((r) => !r.pass).length;
-  const body = results.map((r) => `
+  const body = results
+    .map(
+      (r) => `
 <section class="scn ${r.pass ? 'ok' : 'bad'}">
   <h2><span class="badge">${r.pass ? 'PASS' : 'FAIL'}</span> ${esc(r.name)}</h2>
   <p class="desc">${esc(r.describe)}</p>
-  ${r.steps.map((s) => s.kind === 'shot'
-    ? `<figure><figcaption>${esc(s.label)}</figcaption><a href="${esc(s.file)}"><img src="${esc(s.file)}" alt="${esc(s.label)}"></a></figure>`
-    : `<div class="step ${s.pass ? 'ok' : 'bad'}"><span class="badge">${s.pass ? 'PASS' : 'FAIL'}</span> ${esc(s.label)}${s.detail ? `<pre>${esc(s.detail)}</pre>` : ''}</div>`).join('\n')}
-</section>`).join('\n');
+  ${r.steps
+    .map((s) =>
+      s.kind === 'shot'
+        ? `<figure><figcaption>${esc(s.label)}</figcaption><a href="${esc(s.file)}"><img src="${esc(s.file)}" alt="${esc(s.label)}"></a></figure>`
+        : `<div class="step ${s.pass ? 'ok' : 'bad'}"><span class="badge">${s.pass ? 'PASS' : 'FAIL'}</span> ${esc(s.label)}${s.detail ? `<pre>${esc(s.detail)}</pre>` : ''}</div>`,
+    )
+    .join('\n')}
+</section>`,
+    )
+    .join('\n');
   return `<!doctype html><html lang="en"><meta charset="utf-8"><title>KC-1 QA report</title>
 <style>
 :root{color-scheme:dark light;--bg:#0d0d0d;--fg:#e8e8e0;--ok:#00c26e;--bad:#ff2d6f;--line:#2a2a2a}

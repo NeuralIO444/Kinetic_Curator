@@ -9,8 +9,12 @@ function sh(cmd, args, cwd) {
     const child = spawn(cmd, args, { cwd });
     let stdout = '';
     let stderr = '';
-    child.stdout?.on('data', (d) => { stdout += d; });
-    child.stderr?.on('data', (d) => { stderr += d; });
+    child.stdout?.on('data', (d) => {
+      stdout += d;
+    });
+    child.stderr?.on('data', (d) => {
+      stderr += d;
+    });
     child.on('close', (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 }
@@ -36,20 +40,43 @@ export function unitsDevPlugin(app) {
         const pr = url.searchParams.get('pr');
         res.setHeader('content-type', 'application/json');
         if (!pr) {
-          const listed = await sh('gh', ['pr', 'list', '--repo', 'NeuralIO444/Kinetic_Curator', '--state', 'open', '--limit', '12', '--json', 'number,title']);
-          res.end(JSON.stringify({ prs: listed.code === 0 ? JSON.parse(listed.stdout || '[]') : [], error: listed.code === 0 ? '' : listed.stderr }));
+          const listed = await sh('gh', [
+            'pr',
+            'list',
+            '--repo',
+            'NeuralIO444/Kinetic_Curator',
+            '--state',
+            'open',
+            '--limit',
+            '12',
+            '--json',
+            'number,title',
+          ]);
+          res.end(
+            JSON.stringify({
+              prs: listed.code === 0 ? JSON.parse(listed.stdout || '[]') : [],
+              error: listed.code === 0 ? '' : listed.stderr,
+            }),
+          );
           return;
         }
         const diff = await sh('gh', ['pr', 'diff', pr, '--name-only', '--repo', 'NeuralIO444/Kinetic_Curator']);
-        const files = diff.stdout.split('\n').map((l) => l.trim()).filter(Boolean);
+        const files = diff.stdout
+          .split('\n')
+          .map((l) => l.trim())
+          .filter(Boolean);
         const all = walk(app, join(app, 'src'));
-        const listing = (dir) => existsSync(join(app, dir)) ? readdirSync(join(app, dir)) : [];
+        const listing = (dir) => (existsSync(join(app, dir)) ? readdirSync(join(app, dir)) : []);
         listing.all = all;
         const suites = suitesFor(files, listing);
         const results = [];
         for (const suite of suites) {
           const run = await sh(process.execPath, ['--test', suite], app);
-          results.push({ suite, ok: run.code === 0, tail: (run.stderr || run.stdout).split('\n').slice(-4).join('\n') });
+          results.push({
+            suite,
+            ok: run.code === 0,
+            tail: (run.stderr || run.stdout).split('\n').slice(-4).join('\n'),
+          });
         }
         res.end(JSON.stringify({ pr, files, suites, results }));
       });

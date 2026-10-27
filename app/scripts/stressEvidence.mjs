@@ -27,7 +27,18 @@ for (const f of files) {
 
 if (asJson) {
   const strip = ({ _tally, ...rest }) => rest;
-  console.log(JSON.stringify({ takes: takes.map((t, i) => ({ file: files[i], ...strip(t) })), pooled: pooledStressEvidence(takes) }, null, 2));
+  console.log(
+    JSON.stringify(
+      { takes: takes.map((t, i) => ({ file: files[i], ...strip(t) })), pooled: pooledStressEvidence(takes) },
+      null,
+      2,
+    ),
+  );
 } else {
-  console.log(stressEvidenceMarkdown(takes, files.map((f) => basename(f))));
+  console.log(
+    stressEvidenceMarkdown(
+      takes,
+      files.map((f) => basename(f)),
+    ),
+  );
 }

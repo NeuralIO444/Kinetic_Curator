@@ -30,7 +30,13 @@
 import { readFileSync, existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extractAllFeatures, linearScore, scoreToTier, FEATURE_EXTRACTOR_VERSION, FEATURE_NAMES } from '../src/gl/mlx/extractFeatures.mjs';
+import {
+  extractAllFeatures,
+  linearScore,
+  scoreToTier,
+  FEATURE_EXTRACTOR_VERSION,
+  FEATURE_NAMES,
+} from '../src/gl/mlx/extractFeatures.mjs';
 import { declaredTier, DECLARED_TIERS_SCHEMA } from '../src/gl/mlx/declaredCostTiers.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -86,17 +92,24 @@ function main() {
   if (model.feature_extractor !== FEATURE_EXTRACTOR_VERSION) {
     fail(
       `cost_model.json was trained with feature extractor "${model.feature_extractor}" but the repo ` +
-      `extractor is "${FEATURE_EXTRACTOR_VERSION}" — re-train the model with the current extractor ` +
-      `(docs/MLX_HARNESS_RUNBOOK.md §3), features must match exactly`,
+        `extractor is "${FEATURE_EXTRACTOR_VERSION}" — re-train the model with the current extractor ` +
+        `(docs/MLX_HARNESS_RUNBOOK.md §3), features must match exactly`,
     );
   }
   const spec = model.feature_spec || [];
   if (JSON.stringify(spec) !== JSON.stringify([...FEATURE_NAMES])) {
-    fail(`cost_model.json feature_spec [${spec.join(', ')}] does not match the extractor's [${[...FEATURE_NAMES].join(', ')}]`);
+    fail(
+      `cost_model.json feature_spec [${spec.join(', ')}] does not match the extractor's [${[...FEATURE_NAMES].join(', ')}]`,
+    );
   }
-  if (!Array.isArray(model.weights) || !model.weights.every(Number.isFinite)) fail('weights must be an array of finite numbers');
+  if (!Array.isArray(model.weights) || !model.weights.every(Number.isFinite))
+    fail('weights must be an array of finite numbers');
   if (!Number.isFinite(model.intercept)) fail('intercept must be a finite number');
-  if (!Array.isArray(model.tier_boundaries) || model.tier_boundaries.length !== 3 || !model.tier_boundaries.every(Number.isFinite)) {
+  if (
+    !Array.isArray(model.tier_boundaries) ||
+    model.tier_boundaries.length !== 3 ||
+    !model.tier_boundaries.every(Number.isFinite)
+  ) {
     fail('tier_boundaries must be [b01, b12, b23]');
   }
   // Training standardises features (mean/std stored in the artifact) — CI
@@ -106,7 +119,11 @@ function main() {
   if (!Array.isArray(fmean) || fmean.length !== FEATURE_NAMES.length || !fmean.every(Number.isFinite)) {
     fail('feature_mean must be an array of finite numbers matching the feature spec');
   }
-  if (!Array.isArray(fstd) || fstd.length !== FEATURE_NAMES.length || !fstd.every((v) => Number.isFinite(v) && v !== 0)) {
+  if (
+    !Array.isArray(fstd) ||
+    fstd.length !== FEATURE_NAMES.length ||
+    !fstd.every((v) => Number.isFinite(v) && v !== 0)
+  ) {
     fail('feature_std must be an array of non-zero finite numbers matching the feature spec');
   }
   const standardise = (vec) => vec.map((x, i) => (x - fmean[i]) / fstd[i]);
@@ -132,7 +149,9 @@ function main() {
 
   for (const r of rows) {
     const ok = r.predicted === r.declared ? '✓' : '✗';
-    console.log(`  ${ok} ${r.kind}: score=${r.score.toFixed(3)} predicted=tier ${r.predicted} declared=tier ${r.declared}`);
+    console.log(
+      `  ${ok} ${r.kind}: score=${r.score.toFixed(3)} predicted=tier ${r.predicted} declared=tier ${r.declared}`,
+    );
   }
 
   if (mismatches.length) {
@@ -141,13 +160,15 @@ function main() {
     for (const m of mismatches) {
       console.error(
         `  ✗ ${m.kind}: predicted tier ${m.predicted}, declared tier ${m.declared} ` +
-        `(score ${m.score.toFixed(3)}). Biggest cost drivers: ${m.why}. ` +
-        `Either the declaration is wrong (update ${DECLARED_TIERS_SCHEMA}) or the shader got heavier (re-measure).`,
+          `(score ${m.score.toFixed(3)}). Biggest cost drivers: ${m.why}. ` +
+          `Either the declaration is wrong (update ${DECLARED_TIERS_SCHEMA}) or the shader got heavier (re-measure).`,
       );
     }
     process.exit(1);
   }
-  console.log(`[predict-cost-tier] OK — ${rows.length} effects: predicted tiers match declared tiers (model ${model.model || 'ridge'}, ${model.measurement_count ?? '?'} measurements)`);
+  console.log(
+    `[predict-cost-tier] OK — ${rows.length} effects: predicted tiers match declared tiers (model ${model.model || 'ridge'}, ${model.measurement_count ?? '?'} measurements)`,
+  );
 }
 
 main();
