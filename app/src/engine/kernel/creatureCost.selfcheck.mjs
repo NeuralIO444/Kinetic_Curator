@@ -55,14 +55,22 @@ const NONE = { dishPins: [], dishFormed: [], dishLimbs: [], dishHosted: [], dish
 const MOTHS4 = { dishPins: PINS, dishFormed: [true, true, true, true], dishLimbs: [2, 2, 2, 2], dishHosted: [false, false, false, false], dishPressure: [1, 1, 1, 1] };
 const DISH1 = { dishPins: [PINS[0]], dishFormed: [true], dishLimbs: [2], dishHosted: [true], dishPressure: [1] };
 const med = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
-const cost = (scene) => {
-  const r = createLiveResolver(); const t = [];
-  for (let f = 0; f < 420; f++) { const t0 = performance.now(); r.resolveLayers(frame(f, scene)); if (f >= 60) t.push(performance.now() - t0); }
-  r.dispose();
-  return med(t);
+// PAIRED: the family's resolver and an empty-stage resolver step in lockstep, the order alternating each frame, and
+// the cost is the median of the per-frame differences. Two medians taken one after the other drift apart by more
+// than the dish creature's whole ~0.05 ms (a flake: "dish -0.112 ms"); a paired difference cancels the drift.
+const paired = (scene) => {
+  const a = createLiveResolver(); const b = createLiveResolver(); const d = [];
+  const time = (r, f, sc) => { const t0 = performance.now(); r.resolveLayers(frame(f, sc)); return performance.now() - t0; };
+  for (let f = 0; f < 420; f++) {
+    let tn; let ts;
+    if (f % 2) { tn = time(a, f, NONE); ts = time(b, f, scene); } else { ts = time(b, f, scene); tn = time(a, f, NONE); }
+    if (f >= 60) d.push(ts - tn);
+  }
+  a.dispose(); b.dispose();
+  return med(d);
 };
-cost(NONE);
-console.log(JSON.stringify({ none: cost(NONE), moths: cost(MOTHS4), dish: cost(DISH1) }));
+paired(DISH1); // warm the JIT on both paths
+console.log(JSON.stringify({ moths: paired(MOTHS4), dish: paired(DISH1) }));
 `;
 const runs = [];
 for (let i = 0; i < 3; i++) {
@@ -71,8 +79,8 @@ for (let i = 0; i < 3; i++) {
 }
 const median = (xs) => { const s = [...xs].sort((a, b) => a - b); return s[Math.floor(s.length / 2)]; };
 const measured = {
-  moth: median(runs.map((r) => r.moths - r.none)),
-  dish: median(runs.map((r) => r.dish - r.none)),
+  moth: median(runs.map((r) => r.moths)),
+  dish: median(runs.map((r) => r.dish)),
 };
 console.log(`  [measure] sandbox medians of 3 runs — moth ${measured.moth.toFixed(3)} ms, dish ${measured.dish.toFixed(3)} ms`);
 assert.ok(measured.moth > measured.dish, 'the moth family measures costlier than the dish creature (ordering truth)');
