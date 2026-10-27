@@ -14,15 +14,33 @@ const REDEAL = {
   weather: (s) => s.kineticWeatherPass(),
   curate: (s) => s.curateUnlocked(),
 };
-const snap = () => { const s = useStore.getState(); return { seed: s.seed, paletteId: s.paletteId, layoutParams: s.layoutParams, layers: s.layers, undo: s.historyUndoStack }; };
-const same = (a, b) => a.seed === b.seed && a.paletteId === b.paletteId && a.layoutParams === b.layoutParams && a.layers === b.layers && a.undo === b.undo;
+const snap = () => {
+  const s = useStore.getState();
+  return {
+    seed: s.seed,
+    paletteId: s.paletteId,
+    layoutParams: s.layoutParams,
+    layers: s.layers,
+    undo: s.historyUndoStack,
+  };
+};
+const same = (a, b) =>
+  a.seed === b.seed &&
+  a.paletteId === b.paletteId &&
+  a.layoutParams === b.layoutParams &&
+  a.layers === b.layers &&
+  a.undo === b.undo;
 
 export function useRollGuard(loopRef) {
   useEffect(() => {
     const guard = createRollGuard({
       settle: async () => {
         const loop = loopRef?.current;
-        try { await loop?.waitForReady?.(5000); } catch { /* a frame that never got ready is judged as it stands */ }
+        try {
+          await loop?.waitForReady?.(5000);
+        } catch {
+          /* a frame that never got ready is judged as it stands */
+        }
         await new Promise((r) => setTimeout(r, SETTLE_MS));
       },
       capture: async () => {
@@ -42,7 +60,12 @@ export function useRollGuard(loopRef) {
         return snap();
       },
     });
-    const off = on(Events.ROLL_GUARD, ({ kind } = {}) => { guard.check(kind || 'chaos', snap()); });
-    return () => { off?.(); guard.cancel(); };
+    const off = on(Events.ROLL_GUARD, ({ kind } = {}) => {
+      guard.check(kind || 'chaos', snap());
+    });
+    return () => {
+      off?.();
+      guard.cancel();
+    };
   }, [loopRef]);
 }

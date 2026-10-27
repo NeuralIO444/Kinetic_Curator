@@ -12,8 +12,11 @@ assert.strictEqual(fpsFromCount(30, 500), 60, '30 frames in 500 ms is 60 fps');
 assert.strictEqual(fpsFromCount(17, 283), 60.1, 'fps rounds to one decimal');
 assert.strictEqual(fpsFromCount(0, 250), 0, 'no frames, no fps');
 
-assert.deepStrictEqual(frameStats([16.7, 16.7, 33.4]), { avg: 22.27, worst: 33.4 },
-  'avg is the rounded mean, worst is the rounded max');
+assert.deepStrictEqual(
+  frameStats([16.7, 16.7, 33.4]),
+  { avg: 22.27, worst: 33.4 },
+  'avg is the rounded mean, worst is the rounded max',
+);
 assert.deepStrictEqual(frameStats([100]), { avg: 100, worst: 100 }, 'single sample');
 assert.deepStrictEqual(frameStats([]), { avg: 0, worst: 0 }, 'empty window reads 0/0, never NaN');
 
@@ -24,11 +27,17 @@ assert.deepStrictEqual(frameStats([]), { avg: 0, worst: 0 }, 'empty window reads
     ['bake', { total: 7.777, n: 3 }],
   ]);
   const snap = drainStageAverages(samples);
-  assert.deepStrictEqual(snap, { kernel: 2.5, gl: 0, bake: 2.59 },
-    'snapshot holds per-stage rounded averages; an unsampled stage reads 0');
+  assert.deepStrictEqual(
+    snap,
+    { kernel: 2.5, gl: 0, bake: 2.59 },
+    'snapshot holds per-stage rounded averages; an unsampled stage reads 0',
+  );
   assert.deepStrictEqual(samples.get('kernel'), { total: 0, n: 0 }, 'draining resets the accumulator');
-  assert.deepStrictEqual(drainStageAverages(samples), { kernel: 0, gl: 0, bake: 0 },
-    'a second drain with no new samples reads all zeros');
+  assert.deepStrictEqual(
+    drainStageAverages(samples),
+    { kernel: 0, gl: 0, bake: 0 },
+    'a second drain with no new samples reads all zeros',
+  );
 }
 
 console.log('fpsMath.selfcheck: OK — fps pure core pinned');

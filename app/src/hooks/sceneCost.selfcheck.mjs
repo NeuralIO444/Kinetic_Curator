@@ -11,12 +11,7 @@ import '../gl/spectrumWarp.mjs'; // #1490 — registers gl/spectrum-warp (the fe
 import { MEASURED_COSTS } from '../gl/effects/measuredCosts.mjs';
 import { FX_EFFECT_DEFS } from '../fx/fxFilters.js';
 import { MATH_EFFECT_DEFS } from '../fx/mathFilters.js';
-import {
-  FX_KIND_TO_COST_ID,
-  costIdForFxKind,
-  sceneFxCost,
-  activeFxKinds,
-} from './sceneCost.js';
+import { FX_KIND_TO_COST_ID, costIdForFxKind, sceneFxCost, activeFxKinds } from './sceneCost.js';
 
 // Every layer effect kind resolves to a registered id (both ways: no
 // orphan kinds, no orphan map entries).

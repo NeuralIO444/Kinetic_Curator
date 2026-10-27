@@ -4,7 +4,11 @@ import { classifyAudioError, lostLine, audioInputs, selectedInputMissing } from 
 import { createAudioSlice } from '../state/slices/audioSlice.js';
 
 let n = 0;
-const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
+const ok = (name, fn) => {
+  fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
 
 ok('a refused permission is "denied"; a missing device is "lost"', () => {
   for (const name of ['NotAllowedError', 'SecurityError', 'PermissionDeniedError']) {
@@ -37,8 +41,16 @@ ok('lostLine names the device, or says so plainly when unnamed', () => {
 });
 
 ok('audioInputs keeps only audio inputs', () => {
-  const devs = [{ kind: 'audioinput', deviceId: 'a' }, { kind: 'videoinput', deviceId: 'v' }, { kind: 'audiooutput', deviceId: 'o' }, null];
-  assert.deepEqual(audioInputs(devs).map((d) => d.deviceId), ['a']);
+  const devs = [
+    { kind: 'audioinput', deviceId: 'a' },
+    { kind: 'videoinput', deviceId: 'v' },
+    { kind: 'audiooutput', deviceId: 'o' },
+    null,
+  ];
+  assert.deepEqual(
+    audioInputs(devs).map((d) => d.deviceId),
+    ['a'],
+  );
   assert.deepEqual(audioInputs(undefined), []);
 });
 
@@ -55,7 +67,9 @@ ok('selectedInputMissing: only a chosen device that left the list', () => {
 // The slice, against a tiny zustand-shaped set().
 function makeSlice() {
   let state = {};
-  const set = (fn) => { state = { ...state, ...(typeof fn === 'function' ? fn(state) : fn) }; };
+  const set = (fn) => {
+    state = { ...state, ...(typeof fn === 'function' ? fn(state) : fn) };
+  };
   state = createAudioSlice(set);
   return { get: () => state, act: (name, ...a) => state[name](...a) };
 }

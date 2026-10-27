@@ -15,18 +15,34 @@ export const inviteActive = (lastUsedAt, now, idleMs = INVITE_IDLE_MS) =>
   lastUsedAt == null || !Number.isFinite(lastUsedAt) || now - lastUsedAt >= idleMs;
 
 /** A tiny shared store: which buttons were pressed when. `setTimer` is injectable for the selfcheck. */
-export function createInvites({ idleMs = INVITE_IDLE_MS, now = () => Date.now(), setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
-  const last = new Map(); const timers = new Map(); const listeners = new Set();
+export function createInvites({
+  idleMs = INVITE_IDLE_MS,
+  now = () => Date.now(),
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
+} = {}) {
+  const last = new Map();
+  const timers = new Map();
+  const listeners = new Set();
   const notify = () => listeners.forEach((f) => f());
   return {
     /** The button was pressed: quiet now, back after `idleMs` of no presses. */
     use(key) {
       last.set(key, now());
       clearTimer(timers.get(key));
-      timers.set(key, setTimer(() => { timers.delete(key); notify(); }, idleMs));
+      timers.set(
+        key,
+        setTimer(() => {
+          timers.delete(key);
+          notify();
+        }, idleMs),
+      );
       notify();
     },
     active: (key) => inviteActive(last.get(key), now(), idleMs),
-    subscribe: (f) => { listeners.add(f); return () => listeners.delete(f); },
+    subscribe: (f) => {
+      listeners.add(f);
+      return () => listeners.delete(f);
+    },
   };
 }
