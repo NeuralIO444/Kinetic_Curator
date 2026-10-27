@@ -25,18 +25,18 @@ export function metroTickGated(state) {
 }
 
 export function usePhraseLoop() {
-  const phraseEnabled = useStore((s) => s.phraseEnabled);
-  const phraseLength = useStore((s) => s.phraseLength);
-  const phraseMode = useStore((s) => s.phraseMode);
-  const phraseClock = useStore((s) => s.phraseClock || 'audio');
+  const phraseEnabled = useStore(s => s.phraseEnabled);
+  const phraseLength = useStore(s => s.phraseLength);
+  const phraseMode = useStore(s => s.phraseMode);
+  const phraseClock = useStore(s => s.phraseClock || 'audio');
   // #964: the internal clocks (METRO/EUCLID) read the BEAT master clock —
   // one clock, not two. The old phraseBpm slider is gone from the panel.
-  const beatBpm = useStore((s) => s.beatBpm ?? BEAT_DEFAULT_BPM);
-  const euclidBeats = useStore((s) => s.euclidBeats);
-  const euclidSteps = useStore((s) => s.euclidSteps);
-  const euclidRotate = useStore((s) => s.euclidRotate);
-  const slowRender = useStore((s) => s.slowRender);
-  const batchPaused = useStore((s) => s.batchPaused);
+  const beatBpm = useStore(s => s.beatBpm ?? BEAT_DEFAULT_BPM);
+  const euclidBeats = useStore(s => s.euclidBeats);
+  const euclidSteps = useStore(s => s.euclidSteps);
+  const euclidRotate = useStore(s => s.euclidRotate);
+  const slowRender = useStore(s => s.slowRender);
+  const batchPaused = useStore(s => s.batchPaused);
 
   const armedRef = useRef(false);
 
@@ -94,16 +94,6 @@ export function usePhraseLoop() {
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [
-    phraseEnabled,
-    phraseClock,
-    beatBpm,
-    phraseLength,
-    phraseMode,
-    euclidBeats,
-    euclidSteps,
-    euclidRotate,
-    slowRender,
-    batchPaused,
-  ]);
+  }, [phraseEnabled, phraseClock, beatBpm, phraseLength, phraseMode,
+    euclidBeats, euclidSteps, euclidRotate, slowRender, batchPaused]);
 }

@@ -21,10 +21,7 @@ export function useVoiceMixDriver() {
       raf = requestAnimationFrame(tick);
       const s = useStore.getState();
       const mix = s.voiceMix;
-      if (!mix || !mix.auto) {
-        heldTicks = 0;
-        return;
-      }
+      if (!mix || !mix.auto) { heldTicks = 0; return; }
       // #806: the dissolve rides the loop clock — but a dissolve needs presented
       // frames. If the engine is held (paused / watchdog trip) the loop clock is
       // frozen, so a dissolve that never started can never progress: cut to the

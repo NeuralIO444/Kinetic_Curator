@@ -24,13 +24,16 @@ const MAX_TREE_NODES = 20000;
 /** Feature families that carry numbers and therefore split with '<':
  * recipe numerics (num.), mechanism estimates (mech.), device probes (probe.).
  * Everything else in the bag is a categorical and splits with '='. */
-const isNumericCostFeature = (name) => name.startsWith('num.') || name.startsWith('mech.') || name.startsWith('probe.');
+const isNumericCostFeature = (name) =>
+  name.startsWith('num.') || name.startsWith('mech.') || name.startsWith('probe.');
 
 // Tree-walk pure functions (copied from tasteHead.js so the evaluator is shared
 // in spirit; later extract to a common module if both grow).
 const finite = (x) => typeof x === 'number' && Number.isFinite(x);
 const treeEq = (a, b) =>
-  a === b || (typeof a === 'boolean' && String(a) === b) || (typeof b === 'boolean' && String(b) === a);
+  a === b ||
+  (typeof a === 'boolean' && String(a) === b) ||
+  (typeof b === 'boolean' && String(b) === a);
 
 function treeFeatureValue(features, name) {
   if (name.startsWith('num.')) return (features.num || {})[name.slice(4)] ?? 0;
@@ -43,7 +46,9 @@ function walkTree(node, features, names) {
   let cur = node;
   while (!('leaf' in cur)) {
     const val = treeFeatureValue(features, names[cur.f]);
-    const go = cur.op === '<' ? typeof val === 'number' && Number.isFinite(val) && val < cur.v : treeEq(val, cur.v);
+    const go = cur.op === '<'
+      ? typeof val === 'number' && Number.isFinite(val) && val < cur.v
+      : treeEq(val, cur.v);
     cur = go ? cur.y : cur.n;
   }
   return cur.leaf;
@@ -173,9 +178,9 @@ export function mechanismFeatures(layoutParams = {}, canvas = { w: 1920, h: 1080
   const drawCalls = Math.max(1, Math.ceil(instances / 64));
   return {
     instancesXprim: instances * primitives,
-    canvasXpasses: (pixels * passes) / 1e6,
+    canvasXpasses: pixels * passes / 1e6,
     overdraw,
-    transparencyXpixels: (transparency * pixels) / 1e6,
+    transparencyXpixels: transparency * pixels / 1e6,
     drawCalls,
     cpuDriver: drawCalls * 0.05, // rough ms
   };

@@ -20,11 +20,11 @@ export function resizeFractions(startFractions, index, deltaFraction, minFractio
 
   // Enforce minimums
   if (next[left] < minFraction) {
-    next[right] += next[left] - minFraction;
+    next[right] += (next[left] - minFraction);
     next[left] = minFraction;
   }
   if (next[right] < minFraction) {
-    next[left] += next[right] - minFraction;
+    next[left] += (next[right] - minFraction);
     next[right] = minFraction;
   }
 

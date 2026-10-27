@@ -18,30 +18,19 @@ for (const slowRender of [false, true]) {
   for (const batchPaused of [false, true]) {
     const metro = metroTickGated({ slowRender, batchPaused });
     const audio = routeBeat({ ...armed, slowRender, batchPaused }).gated;
-    assert.strictEqual(
-      metro,
-      audio,
-      `metroTickGated(slowRender=${slowRender}, batchPaused=${batchPaused}) must agree with AUDIO's gate (routeBeat().gated) -- got metro=${metro}, audio=${audio}`,
-    );
+    assert.strictEqual(metro, audio,
+      `metroTickGated(slowRender=${slowRender}, batchPaused=${batchPaused}) must agree with AUDIO's gate (routeBeat().gated) -- got metro=${metro}, audio=${audio}`);
   }
 }
 
 // Un-gated (both false): metro ticks are allowed.
-assert.strictEqual(
-  metroTickGated({ slowRender: false, batchPaused: false }),
-  true,
-  'no freeze active -> ticks allowed',
-);
+assert.strictEqual(metroTickGated({ slowRender: false, batchPaused: false }), true, 'no freeze active -> ticks allowed');
 // Either freeze source alone must hold it -- this is the exact row #458
 // reports as missing before the fix (a fresh clone of this test against
 // the pre-fix usePhraseLoop.js, which had no metroTickGated export at
 // all, would fail to even import).
 assert.strictEqual(metroTickGated({ slowRender: true, batchPaused: false }), false, 'slowRender alone must hold METRO');
-assert.strictEqual(
-  metroTickGated({ slowRender: false, batchPaused: true }),
-  false,
-  'batchPaused alone must hold METRO',
-);
+assert.strictEqual(metroTickGated({ slowRender: false, batchPaused: true }), false, 'batchPaused alone must hold METRO');
 assert.strictEqual(metroTickGated({ slowRender: true, batchPaused: true }), false, 'both must hold METRO');
 
-console.log("usePhraseLoop.selfcheck: OK (#458 METRO freeze gate matches AUDIO's)");
+console.log('usePhraseLoop.selfcheck: OK (#458 METRO freeze gate matches AUDIO\'s)');

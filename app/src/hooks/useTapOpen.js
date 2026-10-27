@@ -11,21 +11,16 @@ export function useTapOpen(ms = 1500) {
   const [open, setOpen] = useState(false);
   const timer = useRef(null);
   useEffect(() => () => clearTimeout(timer.current), []);
-  const pulse = useCallback(
-    (dur = ms) => {
-      setOpen(true);
-      clearTimeout(timer.current);
-      timer.current = setTimeout(() => setOpen(false), hold(dur));
-    },
-    [ms],
-  );
+  const pulse = useCallback((dur = ms) => {
+    setOpen(true);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => setOpen(false), hold(dur));
+  }, [ms]);
   return {
     open,
     pulse,
     props: {
-      onPointerDown: (e) => {
-        if (e.pointerType === 'touch') pulse(ms);
-      },
+      onPointerDown: (e) => { if (e.pointerType === 'touch') pulse(ms); },
     },
   };
 }

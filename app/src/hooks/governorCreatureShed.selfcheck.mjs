@@ -18,11 +18,7 @@ import { nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS } from './governorC
 import { useStore } from '../state/store.js';
 
 let n = 0;
-const ok = (name, fn) => {
-  fn();
-  n++;
-  console.log(`  [ok] ${name}`);
-};
+const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 
 // Drive the ladder the way the hook does: ask for the next cut, apply it to
 // the state, repeat — collecting the kinds in order.
@@ -45,23 +41,14 @@ const walk = (state, steps = 14) => {
 };
 
 const PRESSURE = {
-  fxaa: false,
-  renderScale: 1,
-  quality: 'high',
-  assetThin: false,
-  perfClampOverride: null,
-  effectiveCount: 400,
-  slowRender: false,
-  gpuSaturated: true,
+  fxaa: false, renderScale: 1, quality: 'high', assetThin: false,
+  perfClampOverride: null, effectiveCount: 400, slowRender: false, gpuSaturated: true,
 };
 
 ok('forced pressure sheds a creature by the ruled rung — before the quality tier moves', () => {
   const { kinds } = walk({ ...PRESSURE, creatureCount: 2, creatureShed: 0 });
-  assert.deepEqual(
-    kinds.slice(0, 5),
-    ['renderScale', 'renderScale', 'renderScale', 'creatureCount', 'creatureCount'],
-    'the pixel trim steps (they cost the picture nothing), then the population, one creature per step',
-  );
+  assert.deepEqual(kinds.slice(0, 5), ['renderScale', 'renderScale', 'renderScale', 'creatureCount', 'creatureCount'],
+    'the pixel trim steps (they cost the picture nothing), then the population, one creature per step');
   assert.ok(kinds.indexOf('creatureCount') < kinds.indexOf('quality'), 'population before finishes');
   assert.equal(kinds.filter((k) => k === 'creatureCount').length, 2, 'the shed stops at the artist\u2019s count');
 });
@@ -75,19 +62,7 @@ ok('with the pixel trim exhausted the creature rung is the FIRST content cut', (
 ok('a state that predates the citizen walks the historical ladder untouched', () => {
   const { kinds } = walk({ ...PRESSURE });
   assert.ok(!kinds.includes('creatureCount'), 'no creature fields → no creature rung');
-  assert.deepEqual(kinds, [
-    'renderScale',
-    'renderScale',
-    'renderScale',
-    'quality',
-    'quality',
-    'assetThin',
-    'countClamp',
-    'countClamp',
-    'countClamp',
-    'countClamp',
-    'slowRender',
-  ]);
+  assert.deepEqual(kinds, ['renderScale', 'renderScale', 'renderScale', 'quality', 'quality', 'assetThin', 'countClamp', 'countClamp', 'countClamp', 'countClamp', 'slowRender']);
 });
 
 ok('an artist count of zero sheds nothing (the rung is gated on a standing population)', () => {
@@ -99,11 +74,8 @@ ok('recovery restores the whole population in one pass, only when healthy', () =
   const entry = GOVERNOR_RESTORE_CUTS.find((c) => c.kind === 'creatureCount');
   assert.ok(entry, 'the rung has a restore entry (the #264 structural law)');
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
-  assert.ok(
-    order.indexOf('renderScale') < order.indexOf('creatureCount') &&
-      order.indexOf('creatureCount') < order.indexOf('quality'),
-    'the restore table keeps shed order — the population returns after pixels, before finishes',
-  );
+  assert.ok(order.indexOf('renderScale') < order.indexOf('creatureCount') && order.indexOf('creatureCount') < order.indexOf('quality'),
+    'the restore table keeps shed order — the population returns after pixels, before finishes');
   assert.equal(entry.needsRestore({ creatureShed: 2 }, { healthy: true }), true);
   assert.equal(entry.needsRestore({ creatureShed: 2 }, { healthy: false }), false, 'never while pressure stands');
   assert.equal(entry.needsRestore({ creatureShed: 0 }, { healthy: true }), false, 'nothing shed, nothing to restore');

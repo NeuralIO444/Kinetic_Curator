@@ -12,45 +12,35 @@ export function useColumnResize(initialFractions = [0.32, 0.34, 0.34], minPx = 2
   const containerRef = useRef(null);
   const dragRef = useRef({ active: false, index: -1, startX: 0, startFractions: [] });
 
-  const onDividerPointerDown = useCallback(
-    (index, e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragRef.current = {
-        active: true,
-        index,
-        startX: e.clientX,
-        startFractions: [...fractions],
-      };
-      e.target.setPointerCapture(e.pointerId);
-    },
-    [fractions],
-  );
+  const onDividerPointerDown = useCallback((index, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragRef.current = {
+      active: true,
+      index,
+      startX: e.clientX,
+      startFractions: [...fractions],
+    };
+    e.target.setPointerCapture(e.pointerId);
+  }, [fractions]);
 
-  const onDividerPointerMove = useCallback(
-    (e) => {
-      const d = dragRef.current;
-      if (!d.active || !containerRef.current) return;
+  const onDividerPointerMove = useCallback((e) => {
+    const d = dragRef.current;
+    if (!d.active || !containerRef.current) return;
 
-      const containerWidth = containerRef.current.offsetWidth;
-      const deltaFraction = (e.clientX - d.startX) / containerWidth;
-      const minFraction = minPx / containerWidth;
+    const containerWidth = containerRef.current.offsetWidth;
+    const deltaFraction = (e.clientX - d.startX) / containerWidth;
+    const minFraction = minPx / containerWidth;
 
-      // The shift/minimum/rejection math is columnResizeMath's (pinned);
-      // null = both sides can't hold the minimum, layout stays untouched.
-      const next = resizeFractions(d.startFractions, d.index, deltaFraction, minFraction);
-      if (next) setFractions(next);
-    },
-    [minPx],
-  );
+    // The shift/minimum/rejection math is columnResizeMath's (pinned);
+    // null = both sides can't hold the minimum, layout stays untouched.
+    const next = resizeFractions(d.startFractions, d.index, deltaFraction, minFraction);
+    if (next) setFractions(next);
+  }, [minPx]);
 
   const onDividerPointerUp = useCallback((e) => {
     dragRef.current.active = false;
-    try {
-      e.target.releasePointerCapture(e.pointerId);
-    } catch {
-      /* already released */
-    }
+    try { e.target.releasePointerCapture(e.pointerId); } catch { /* already released */ }
   }, []);
 
   // Double-click to reset
@@ -58,18 +48,15 @@ export function useColumnResize(initialFractions = [0.32, 0.34, 0.34], minPx = 2
     setFractions(initialFractions);
   }, [initialFractions]);
 
-  const dividerProps = useCallback(
-    (index) => ({
-      onPointerDown: (e) => onDividerPointerDown(index, e),
-      onPointerMove: onDividerPointerMove,
-      onPointerUp: onDividerPointerUp,
-      onPointerCancel: onDividerPointerUp,
-      onDoubleClick: onDividerDoubleClick,
-    }),
-    [onDividerPointerDown, onDividerPointerMove, onDividerPointerUp, onDividerDoubleClick],
-  );
+  const dividerProps = useCallback((index) => ({
+    onPointerDown: (e) => onDividerPointerDown(index, e),
+    onPointerMove: onDividerPointerMove,
+    onPointerUp: onDividerPointerUp,
+    onPointerCancel: onDividerPointerUp,
+    onDoubleClick: onDividerDoubleClick,
+  }), [onDividerPointerDown, onDividerPointerMove, onDividerPointerUp, onDividerDoubleClick]);
 
-  const gridTemplate = fractions.map((f) => `${(f * 100).toFixed(2)}%`).join(' 6px ');
+  const gridTemplate = fractions.map(f => `${(f * 100).toFixed(2)}%`).join(' 6px ');
 
   return { containerRef, fractions, gridTemplate, dividerProps };
 }

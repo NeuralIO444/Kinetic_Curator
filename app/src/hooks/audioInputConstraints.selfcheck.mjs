@@ -3,11 +3,7 @@ import assert from 'node:assert';
 import { RAW_AUDIO, audioInputConstraints, processingStillOn } from './audioInputConstraints.mjs';
 
 let n = 0;
-const ok = (name, fn) => {
-  fn();
-  n++;
-  console.log(`  [ok] ${name}`);
-};
+const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 
 ok('default device: all three processing switches are off, no deviceId', () => {
   for (const id of ['default', '', undefined, null]) {
@@ -33,10 +29,7 @@ ok('constraints never alias the frozen defaults', () => {
 
 ok('processingStillOn names what the browser kept on', () => {
   assert.deepEqual(processingStillOn({ echoCancellation: false, noiseSuppression: false, autoGainControl: false }), []);
-  assert.deepEqual(processingStillOn({ echoCancellation: false, noiseSuppression: true, autoGainControl: true }), [
-    'noiseSuppression',
-    'autoGainControl',
-  ]);
+  assert.deepEqual(processingStillOn({ echoCancellation: false, noiseSuppression: true, autoGainControl: true }), ['noiseSuppression', 'autoGainControl']);
 });
 
 ok('processingStillOn: unreported keys and junk are not "on"', () => {

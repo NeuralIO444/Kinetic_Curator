@@ -26,19 +26,7 @@ import {
 // goes through the shaped envelope. Silence decays to exact zeros, so the
 // no-op contracts downstream are preserved.
 
-export function useAudioInput({
-  enabled,
-  source,
-  gain,
-  monitor,
-  ballistics,
-  sidecar = null,
-  onStimulus,
-  onBands,
-  onBeat,
-  onDenied,
-  onLost,
-}) {
+export function useAudioInput({ enabled, source, gain, monitor, ballistics, sidecar = null, onStimulus, onBands, onBeat, onDenied, onLost }) {
   const ctxRef = useRef(null);
   const analyserRef = useRef(null);
   const sourceRef = useRef(null);
@@ -55,23 +43,15 @@ export function useAudioInput({
   // the source is a file) it is the truth: rms and beats come from the sidecar
   // at the playback position — deterministic, not re-derived from the FFT.
   const sidecarRef = useRef(sidecar);
-  useEffect(() => {
-    sidecarRef.current = sidecar;
-  }, [sidecar]);
+  useEffect(() => { sidecarRef.current = sidecar; }, [sidecar]);
   const envPrevTRef = useRef(null);
 
   const cbRef = useRef({ onStimulus, onBands, onBeat, onDenied, onLost });
   const gainRef = useRef(gain);
-  useEffect(() => {
-    cbRef.current = { onStimulus, onBands, onBeat, onDenied, onLost };
-  });
-  useEffect(() => {
-    gainRef.current = gain;
-  }, [gain]);
+  useEffect(() => { cbRef.current = { onStimulus, onBands, onBeat, onDenied, onLost }; });
+  useEffect(() => { gainRef.current = gain; }, [gain]);
   const ballisticsRef = useRef(ballistics);
-  useEffect(() => {
-    ballisticsRef.current = ballistics;
-  }, [ballistics]);
+  useEffect(() => { ballisticsRef.current = ballistics; }, [ballistics]);
   // Set in the catch block below, cleared on a successful start. Guards the
   // early-return clear just below: the denial handler itself flips `enabled`
   // back to false (SET_AUDIO_ENABLED false), which would otherwise re-run
@@ -103,10 +83,7 @@ export function useAudioInput({
       const bassEnd = Math.floor(len * 0.15);
       const midEnd = Math.floor(len * 0.5);
 
-      let bassSum = 0,
-        midSum = 0,
-        trebleSum = 0,
-        total = 0;
+      let bassSum = 0, midSum = 0, trebleSum = 0, total = 0;
       for (let i = 0; i < len; i++) {
         const v = data[i] / 255;
         total += v;
@@ -117,8 +94,8 @@ export function useAudioInput({
 
       let rms = total / len;
       let bass = bassEnd > 0 ? bassSum / bassEnd : 0;
-      let mid = midEnd - bassEnd > 0 ? midSum / (midEnd - bassEnd) : 0;
-      let treble = len - midEnd > 0 ? trebleSum / (len - midEnd) : 0;
+      let mid = (midEnd - bassEnd) > 0 ? midSum / (midEnd - bassEnd) : 0;
+      let treble = (len - midEnd) > 0 ? trebleSum / (len - midEnd) : 0;
 
       // #618: sidecar truth. LEVEL and BEAT come from the envelope at the file's
       // playback position; the sidecar carries no per-band data, so BASS/MID/
@@ -129,10 +106,7 @@ export function useAudioInput({
       if (env && el && source.type === 'file') {
         const tick = envelopeTick(env, el.currentTime, envPrevTRef.current);
         envPrevTRef.current = el.currentTime;
-        rms = tick.rms;
-        bass = 0;
-        mid = 0;
-        treble = 0;
+        rms = tick.rms; bass = 0; mid = 0; treble = 0;
         envBeat = tick.beats > 0;
       } else {
         envPrevTRef.current = null;
@@ -151,7 +125,7 @@ export function useAudioInput({
         follower,
         { bass, mid, treble, rms },
         dtMs,
-        sanitizeBallistics(ballisticsRef.current),
+        sanitizeBallistics(ballisticsRef.current)
       );
       cb.onStimulus?.(shaped.rms);
       cb.onBands?.(shaped);
@@ -173,10 +147,7 @@ export function useAudioInput({
         // Browsers start contexts suspended unless created inside a gesture.
         if (ctx.state === 'suspended') await ctx.resume();
         // #1746: turned off during the await — don't go on to ask for the mic.
-        if (cancelled) {
-          ctx.close().catch(() => {});
-          return;
-        }
+        if (cancelled) { ctx.close().catch(() => {}); return; }
 
         let srcNode;
         let stream = null;
@@ -190,34 +161,23 @@ export function useAudioInput({
           srcNode = ctx.createMediaElementSource(audio);
           audioElRef.current = audio;
           await audio.play();
-          if (cancelled) {
-            audio.pause();
-            ctx.close().catch(() => {});
-            return;
-          }
+          if (cancelled) { audio.pause(); ctx.close().catch(() => {}); return; }
         } else {
           // #1052: ask for the raw input — Chrome's speech processing (echo
           // cancel / noise suppress / auto gain) pumps and ducks music.
           stream = await navigator.mediaDevices.getUserMedia(audioInputConstraints(source.id));
-          if (cancelled) {
-            stream.getTracks().forEach((t) => t.stop());
-            ctx.close().catch(() => {});
-            return;
-          }
+          if (cancelled) { stream.getTracks().forEach(t => t.stop()); ctx.close().catch(() => {}); return; }
           srcNode = ctx.createMediaStreamSource(stream);
           // #1053: an unplugged device ends its track. Without this the
           // analyser just went silent with no word.
           const track = stream.getAudioTracks()[0];
           if (track) {
             const label = track.label;
-            track.onended = () => {
-              if (!cancelled) cbRef.current.onLost?.(label);
-            };
+            track.onended = () => { if (!cancelled) cbRef.current.onLost?.(label); };
           }
           // A browser may ignore the constraints. Say so rather than fail.
           stillOn = processingStillOn(stream.getAudioTracks()[0]?.getSettings?.());
-          if (stillOn.length)
-            console.warn('[useAudioInput] input is being processed by the browser:', stillOn.join(', '));
+          if (stillOn.length) console.warn('[useAudioInput] input is being processed by the browser:', stillOn.join(', '));
         }
 
         const gainNode = ctx.createGain();
@@ -251,12 +211,7 @@ export function useAudioInput({
         sourceRef.current = { node: srcNode, stream };
         gainNodeRef.current = gainNode;
         analyserRef.current = analyser;
-        setAudioMeterTap({
-          analyser: meterAnalyser,
-          spectrum: spectrumAnalyser,
-          sampleRate: ctx.sampleRate,
-          kind: source.type === 'file' ? 'FILE' : stillOn.length ? 'MIC·PROC' : 'MIC',
-        });
+        setAudioMeterTap({ analyser: meterAnalyser, spectrum: spectrumAnalyser, sampleRate: ctx.sampleRate, kind: source.type === 'file' ? 'FILE' : (stillOn.length ? 'MIC·PROC' : 'MIC') });
         runningRef.current = true;
         // #306: fresh session, fresh envelope — never resume from stale values.
         resetBallistics(follower);
@@ -273,9 +228,7 @@ export function useAudioInput({
         if (classifyAudioError(err, source.type) === 'lost') {
           // The chosen device (or file) is not there: that is not a refused permission.
           console.warn('[useAudioInput] audio input not available:', err?.message ?? err);
-          cbRef.current.onLost?.(
-            source.type === 'file' ? source.name || 'the audio file' : source.id === 'default' ? '' : source.id,
-          );
+          cbRef.current.onLost?.(source.type === 'file' ? (source.name || 'the audio file') : (source.id === 'default' ? '' : source.id));
         } else {
           console.warn('[useAudioInput] mic/audio access denied:', err?.message ?? err);
           deniedRef.current = true;
@@ -305,10 +258,7 @@ export function useAudioInput({
         audioElRef.current = null;
       }
       if (sourceRef.current?.stream) {
-        sourceRef.current.stream.getTracks().forEach((t) => {
-          t.onended = null;
-          t.stop();
-        });
+        sourceRef.current.stream.getTracks().forEach(t => { t.onended = null; t.stop(); });
       }
       sourceRef.current?.node?.disconnect();
       gainNodeRef.current?.disconnect();

@@ -24,13 +24,8 @@ for (const seconds of [2, 4, 8]) {
 }
 // Hostile inputs clamp, never produce degenerate plans.
 for (const bad of [
-  { seconds: 0 },
-  { seconds: -3 },
-  { seconds: 0.2 },
-  { fps: 0 },
-  { dissolveSeconds: 99 },
-  { seconds: 1000 },
-  {},
+  { seconds: 0 }, { seconds: -3 }, { seconds: 0.2 }, { fps: 0 }, { dissolveSeconds: 99 },
+  { seconds: 1000 }, {},
 ]) {
   const p = planLoopFrames(bad);
   assert.ok(Number.isInteger(p.totalFrames) && p.totalFrames >= 2, `totalFrames sane for ${JSON.stringify(bad)}`);
@@ -54,13 +49,10 @@ for (const D of [1, 15, 30, 120]) {
 for (const seconds of [2, 4, 8]) {
   const { totalFrames: T, dissolveFrames: D, bodyFrames: B } = planLoopFrames({ seconds });
   // Footage indices: pre-roll P[j] = F[j]; body O[i] = F[D+i]; tail blends F[T+j] with P[j].
-  const firstOutputFootageIdx = D; // O[0] = F[D]
-  const lastOutputHeadIdx = D - 1; // O[T-1] = P[D-1] = F[D-1]
-  assert.strictEqual(
-    lastOutputHeadIdx + 1,
-    firstOutputFootageIdx,
-    'loop point F[D-1] -> F[D] is consecutive: no cut, no rewind',
-  );
+  const firstOutputFootageIdx = D;          // O[0] = F[D]
+  const lastOutputHeadIdx = D - 1;          // O[T-1] = P[D-1] = F[D-1]
+  assert.strictEqual(lastOutputHeadIdx + 1, firstOutputFootageIdx,
+    'loop point F[D-1] -> F[D] is consecutive: no cut, no rewind');
   assert.strictEqual(B + D, T, 'output covers exactly T frames');
   // The tail's head-source walks the pre-roll in order (dissolve into the head).
   for (let j = 0; j < D; j++) {

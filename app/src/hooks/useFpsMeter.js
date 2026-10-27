@@ -57,8 +57,8 @@ export function timeStage(name, fn) {
 }
 
 export function useFpsMeter(enabled = true) {
-  const setFps = useStore((s) => s.setFps);
-  const setStageTimings = useStore((s) => s.setStageTimings);
+  const setFps = useStore(s => s.setFps);
+  const setStageTimings = useStore(s => s.setStageTimings);
   const framesRef = useRef(0);
   const lastReportRef = useRef(0);
   const rafRef = useRef(null);

@@ -5,13 +5,7 @@
 // device that is already gone when AUDIO is switched on. No DOM, no store.
 
 const DENIED = new Set(['NotAllowedError', 'SecurityError', 'PermissionDeniedError']);
-const GONE = new Set([
-  'NotFoundError',
-  'OverconstrainedError',
-  'NotReadableError',
-  'AbortError',
-  'DevicesNotFoundError',
-]);
+const GONE = new Set(['NotFoundError', 'OverconstrainedError', 'NotReadableError', 'AbortError', 'DevicesNotFoundError']);
 
 /**
  * Why did getUserMedia fail? A missing device is not a denied permission, and

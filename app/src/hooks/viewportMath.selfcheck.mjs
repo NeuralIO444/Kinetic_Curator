@@ -17,11 +17,8 @@ assert.strictEqual(nextZoom(9.99, -1000), 10, 'zoom clamps at 10');
 assert.strictEqual(nextZoom(0.2, 1000), 0.1, 'zoom clamps at 0.1');
 
 // Pan.
-assert.deepStrictEqual(
-  panFromDrag(10, 20, 100, 100, 130, 70),
-  { x: 40, y: -10 },
-  'pan follows the pointer from the drag start',
-);
+assert.deepStrictEqual(panFromDrag(10, 20, 100, 100, 130, 70), { x: 40, y: -10 },
+  'pan follows the pointer from the drag start');
 assert.deepStrictEqual(panFromDrag(0, 0, 50, 50, 50, 50), { x: 0, y: 0 }, 'no movement, no pan');
 
 // Attractor: rect 500x350 at origin, canvas 1000x700 (scale 2), client

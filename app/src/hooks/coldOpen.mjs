@@ -26,16 +26,9 @@ export const coldOpenWanted = ({ reducedMotion = false, stage = false } = {}) =>
 
 /** A tiny external store: `open` is true from start() until COLD_OPEN_MS later. */
 export function createColdOpen({ ms = COLD_OPEN_MS, setTimer = setTimeout, clearTimer = clearTimeout } = {}) {
-  let open = false;
-  let started = false;
-  let timer = null;
+  let open = false; let started = false; let timer = null;
   const listeners = new Set();
-  const set = (v) => {
-    if (open !== v) {
-      open = v;
-      listeners.forEach((f) => f());
-    }
-  };
+  const set = (v) => { if (open !== v) { open = v; listeners.forEach((f) => f()); } };
   return {
     /** Begin once. Returns whether it began (false when already begun, or unwanted). */
     start(env) {
@@ -43,23 +36,11 @@ export function createColdOpen({ ms = COLD_OPEN_MS, setTimer = setTimeout, clear
       started = true;
       if (!coldOpenWanted(env)) return false;
       set(true);
-      timer = setTimer(() => {
-        timer = null;
-        set(false);
-      }, ms);
+      timer = setTimer(() => { timer = null; set(false); }, ms);
       return true;
     },
-    cancel() {
-      if (timer != null) {
-        clearTimer(timer);
-        timer = null;
-      }
-      set(false);
-    },
+    cancel() { if (timer != null) { clearTimer(timer); timer = null; } set(false); },
     get: () => open,
-    subscribe: (f) => {
-      listeners.add(f);
-      return () => listeners.delete(f);
-    },
+    subscribe: (f) => { listeners.add(f); return () => listeners.delete(f); },
   };
 }

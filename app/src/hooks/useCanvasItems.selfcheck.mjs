@@ -16,7 +16,7 @@ assert(counts.heavy > counts.medium, 'heavy should be picked more than medium');
 assert(counts.medium > counts.light, 'medium should be picked more than light');
 assert(
   Math.abs(counts.heavy / counts.light - 4) < 0.5,
-  `heavy:light ratio should be ~4:1, got ${counts.heavy}:${counts.light}`,
+  `heavy:light ratio should be ~4:1, got ${counts.heavy}:${counts.light}`
 );
 
 const rngA = mkRng(7);

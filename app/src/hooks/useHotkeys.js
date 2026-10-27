@@ -12,9 +12,7 @@ export function useHotkeys(keyMap) {
   const mapRef = useRef(keyMap);
 
   // Refs must not be written during render.
-  useEffect(() => {
-    mapRef.current = keyMap;
-  });
+  useEffect(() => { mapRef.current = keyMap; });
 
   useEffect(() => {
     function onKey(e) {

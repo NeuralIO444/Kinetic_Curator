@@ -23,7 +23,8 @@ import { assertStillBlob } from './useMediaExport.js';
 // Missing/malformed blobs throw too — no silent undefined propagation.
 {
   for (const bad of [null, undefined, {}, { size: NaN }, { size: -3 }, { size: 'x' }]) {
-    assert.throws(() => assertStillBlob(bad), /empty|still file/, `malformed blob throws (${JSON.stringify(bad)})`);
+    assert.throws(() => assertStillBlob(bad), /empty|still file/,
+      `malformed blob throws (${JSON.stringify(bad)})`);
   }
   console.log('[selfcheck] still blob: malformed throws');
 }

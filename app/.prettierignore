@@ -55,7 +55,6 @@ src/gl/mlx/*.json
 !src/pattern/
 !src/composition/
 src/composition/fixtures/
-!src/hooks/
 !src/assets/
 
 # Tooling and non-src trees: not yet adopted.
