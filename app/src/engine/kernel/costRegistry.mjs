@@ -266,3 +266,19 @@ registerCostTier('creature/dish', {
   timeMs: 0.05,
   notes: '#1694 S2 — the dish creature (one hosted pin at most, by the formation rule): XPBD disc body + grown limbs on the resolver CPU; no GPU pass (items ride the structural item pass). Measured sandbox resolver-probe median (see block comment); sheds by the governor creatureCount cut, never the effect ladder.',
 });
+
+// --- #1731 #1732 #1734-#1738: the creature loot on the dish creature ---
+// APPEND-ONLY BLOCK (this stack's own; do not edit another slice's block).
+// Bounds (reflection), facing (the curl flow read at the head + the dot product) and the ALife channel (genome
+// expression, chemistry and policy ticked every 12 frames, instinct rehearsal at hatch / while paused) are scalar
+// math on the dish creature's resolver path: no GPU pass, no shader, no FBO, no new items (a hatching creature
+// draws one FEWER — the eye). Tier 0, structural, shed with the dish creature by the governor's creatureCount cut.
+// timeMs is MEASURED: builder-only bench, one hosted pin at pressure 1, per-frame median of 600 warm frames, median
+// of 7 runs, sandbox node 2026-10-27 — loot on 0.036 ms vs loot off 0.022 ms (+0.014 ms). Sandbox-indicative only;
+// real hardware authoritative.
+registerCostTier('creature/alife', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.014,
+  notes: '#1731 #1732 #1734-#1738 — dish creature bounds, facing and the ALife channel: resolver CPU only (no GPU pass, no items added). Measured sandbox builder bench delta (see block comment); sheds with the dish creature by the governor creatureCount cut.',
+});

@@ -118,12 +118,15 @@ Two rules make this replayable:
 | the whole thing, recorded and replayed | `gl/performanceCreatures.selfcheck.mjs` |
 | cost and leak | `gl/resolverProbe.selfcheck.mjs` |
 | worker parity | `gl/resolverInputParity.selfcheck.mjs` |
+| loot: bounds, facing, the ALife creature on the dish body | `engine/dishCreatureLoot.selfcheck.mjs` |
+| genome, chemistry, policy, dreaming | `engine/creatureGenome.selfcheck.mjs`, `engine/creatureChem.selfcheck.mjs`, `engine/creaturePolicy.selfcheck.mjs`, `engine/creatureDream.selfcheck.mjs` |
+| breeding from keeps | `curator/creatureBreeding.selfcheck.mjs` |
 
-## 9. Loot on file (not built)
+## 9. Loot on file (built 2026-10-27 — see §10)
 
 Filed 2026-10-24 from a reference reel (Justin Scott, game dev — the eight vector-math primitives under almost every
-game: https://www.instagram.com/reel/De2T_mYIsQp/). This section is a library record, not a plan: **nothing here is
-built, scheduled, or on the queue**, and §6's honesty rule applies to it — it is listed so the vocabulary is on file.
+game: https://www.instagram.com/reel/De2T_mYIsQp/). Filed as a library record; Matt called the seven issues below
+in on 2026-10-26 and they are built on the dish creature (§10 is the as-built record).
 
 The eight primitives in creature terms: **dot product** (facing/alignment), **length** (speed), **normalize**
 (direction without speed), **distance** (proximity, falloff), **reflection** (deflection off a surface), **clamp**
@@ -137,8 +140,7 @@ as issues:
 
 Filed 2026-10-25 from the Creatures (1996) research (report: KC-1 goal research library,
 `creatures-1996-alife-transfer-2026-10-25.md`). Creatures' ALife stack — genome, biochemistry, drive-manufactured
-reward, dreaming, breeding — read as five additive creature systems. All five are library records like the pair
-above: **not built, not scheduled, not on the queue.**
+reward, dreaming, breeding — read as five additive creature systems. Built with the pair above (§10).
 
 - **Genome** — the seeded body record formalized as an inheritable structure-gene record: per-gene
   mutate/duplicate/cut flags, life-stage switch-on times, protected genes: #1734
@@ -153,3 +155,28 @@ above: **not built, not scheduled, not on the queue.**
   KC-1 terms, instinct rehearsal at hatch/set breaks and the STW→LTW fold at export: #1737
 - **Breeding from keeps** — the keep-folder is the breeding pool: offspring of two kept creatures, crossover at
   gene boundaries, diversity guards against monoculture; genetics must change behaviour, not just looks: #1738
+
+## 10. The loot, as built (#1731 #1732 #1734-#1738)
+
+All of it lives on the **dish creature** (`engine/dishCreature.js`): the moth is kinematic — it hovers at its pin and
+has no velocity to reflect or a policy to drive. Every piece is gated on a resolver input field older takes do not
+carry, so every recorded take and fixture replays byte-identical (`gl/creatureGate`, `gl/performanceCreatures`,
+`engine/dishCreature`'s golden hash are unchanged).
+
+| Piece | Gate (input field) | What it does | Module |
+|---|---|---|---|
+| Bounds #1731 | `creatureBounds` (live: always on) | after integrate and after the solve, a disc past the stage edge is mirrored inside and its outward velocity flips (`v' = v − 2(v·n)n`, speed kept); a far overshoot clamps | `dishCreature.js reflectInBounds` |
+| Facing #1732 | `creatureFacing` (live: always on) | the heading's target leans toward the seed's curl flow at the head (by `flowTurn` × flow strength) and toward the attractor (`attractTurn`); `alignment = cos(heading − flow)` is kept and published on the head body | `dishCreature.js FACING` |
+| Genome #1734 | `creatureAlife` + `dishGenomes` | a gene list (trait, drive, temper, ornament, instinct; mutate/dup/cut flags; life-stage switch-on; a protected plan gene) whose traits ARE the creature's traits; the ornament gene flares limb growth | `engine/creatureGenome.js` |
+| Chemistry #1735 | same | four drives + reward/punishment ticked every 12 frames; reward/punishment made only from the CHANGE in total drive; the dominant drive plumps/dries the slime on top of the band's material | `engine/creatureChem.js` |
+| Learning #1736 | same | an 18-cell (band × crowd × with/against the flow) × 4-mode (hover, roam, school, rest) policy; STW/LTW + eligibility traces; caps, silence neutral, LTW moves only when reinforced. The mode sets the body: reach of the hover wander, school rides the flow | `engine/creaturePolicy.js` |
+| Dreaming #1737 | same | a newborn rehearses its instinct genes (3 passes) and dreams for 120 frames — eyes shut, dim, resting; a paused instrument (`slowRender`) is deep sleep and rehearses again; a keep (`creatureKeeps` rose) folds STW into LTW. `getCreatureRecords()` → `kc-creature/1` records (genome + LTW) | `engine/creatureDream.js` |
+| Breeding #1738 | same (spawn channel) | the genomes alive at each keep join a session pool (`curator/spawnState.js` noteKeep); a birth is a crossover of the least-alike of four seeded pairs, never the last pair; every 4th birth is a wild immigrant; a pool collapsed past 0.97 similarity breeds nothing | `curator/creatureBreeding.js` |
+
+The ALife channel is **opt-in while young: `?alife=1`** (gl/liveLoop.mjs stamps `creatureAlife`, `dishGenomes`,
+`creatureKeeps` only then). The genome rides the input, so a take replays the animal without the session's pool; the
+pool and the per-creature education are session state (the spawn channel's snapshot carries `alife` only when used).
+Cost: `creature/alife`, tier 0, +0.014 ms measured (sandbox builder bench).
+
+Not built here: importing a `kc-creature/1` record back into a live creature (the record exists and round-trips; no
+UI loads it), and a moth-side version of any of it.
