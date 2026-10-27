@@ -43,7 +43,10 @@ export function canStartBatch({ running, rendering, accumOn } = {}) {
     return { ok: false, reason: 'Batch needs ACCUM off — trails would bleed across seeds' };
   }
   if (!running) {
-    return { ok: false, reason: 'Batch needs the loop running — resume with Space first (a paused loop never settles)' };
+    return {
+      ok: false,
+      reason: 'Batch needs the loop running — resume with Space first (a paused loop never settles)',
+    };
   }
   return { ok: true, reason: null };
 }
@@ -51,8 +54,7 @@ export function canStartBatch({ running, rendering, accumOn } = {}) {
 export function isIOSDevice() {
   if (typeof navigator === 'undefined') return false;
   return (
-    /iPad|iPhone|iPod/.test(navigator.userAgent) ||
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   );
 }
 
@@ -64,7 +66,7 @@ function guardExportMemory(width, height, resolution) {
     throw new Error(
       `[capture] ${resolution}× export refused on iOS: it would allocate ~${mb}MB of GPU textures at once, ` +
         `over the ${EXPORT_TEXTURE_BUDGET_BYTES / (1024 * 1024)}MB mobile safety budget ` +
-        `(iOS jetsam kills Safari tabs near ~700MB). Use 2× on this device.`
+        `(iOS jetsam kills Safari tabs near ~700MB). Use 2× on this device.`,
     );
   }
 }
@@ -132,7 +134,8 @@ export async function captureStill({ loopRef, resolution = 1, seedStr = '', onTh
   const thumb = drawThumbnail(canvas);
   if (onThumbnail) onThumbnail(thumb, { upscaledFrom: upscaledFrom || null });
   const blob = await new Promise((res, rej) =>
-    canvas.toBlob((b) => (b ? res(b) : rej(new Error('still encode failed'))), 'image/png'));
+    canvas.toBlob((b) => (b ? res(b) : rej(new Error('still encode failed'))), 'image/png'),
+  );
   // #570 — fail loudly on the partial lie (zero-byte file) before download.
   assertStillBlob(blob);
   if (downloadFile) download(blob, `kinetic-curator-${seedStr}-${resolution}x.png`);
@@ -151,7 +154,14 @@ export async function renderFinal(opts) {
  * -> atlas rebake -> rendered frames), capture, download PNG + sidecar.
  */
 export async function renderBatch({
-  loopRef, count, startSeed, resolution, setSeed, getSidecar, onProgress, shouldCancel,
+  loopRef,
+  count,
+  startSeed,
+  resolution,
+  setSeed,
+  getSidecar,
+  onProgress,
+  shouldCancel,
 }) {
   const total = Math.max(1, Math.min(99, count || 1));
   for (let i = 0; i < total; i++) {
@@ -165,7 +175,10 @@ export async function renderBatch({
     await loopOrThrow(loopRef).waitForSettled();
     if (shouldCancel && shouldCancel()) return { cancelled: true, done: i };
     const { blob, thumb } = await captureStill({
-      loopRef, resolution, seedStr, downloadFile: false,
+      loopRef,
+      resolution,
+      seedStr,
+      downloadFile: false,
     });
     if (onProgress) onProgress({ done: i + 1, total, seed, thumb });
     const basename = `kc-edition-${seedStr}-${resolution}x`;
@@ -199,7 +212,11 @@ export function useVideoRecorder({ canvasRef, isRecording, seedStr, fps = 15, on
           download(blob, `kinetic-curator-${seedStr || 'rec'}.webm`);
           if (onDone) onDone(blob);
         };
-        try { rec.stop(); } catch (e) { if (onError) onError(e); }
+        try {
+          rec.stop();
+        } catch (e) {
+          if (onError) onError(e);
+        }
       }
       return;
     }
@@ -227,13 +244,25 @@ export function useVideoRecorder({ canvasRef, isRecording, seedStr, fps = 15, on
         return;
       }
     }
-    rec.ondataavailable = (e) => { if (e.data && e.data.size) chunksRef.current.push(e.data); };
-    rec.onerror = (e) => { if (onError) onError(e.error || new Error('recorder error')); };
+    rec.ondataavailable = (e) => {
+      if (e.data && e.data.size) chunksRef.current.push(e.data);
+    };
+    rec.onerror = (e) => {
+      if (onError) onError(e.error || new Error('recorder error'));
+    };
     recRef.current = rec;
-    try { rec.start(250); } catch (e) { if (onError) onError(e); }
+    try {
+      rec.start(250);
+    } catch (e) {
+      if (onError) onError(e);
+    }
     return () => {
       // Unmount while recording: stop tracks, leave the blob to the stop path.
-      try { stream.getTracks().forEach((t) => t.stop()); } catch { /* noop */ }
+      try {
+        stream.getTracks().forEach((t) => t.stop());
+      } catch {
+        /* noop */
+      }
     };
   }, [isRecording, canvasRef, seedStr, fps, onDone, onError]);
 }

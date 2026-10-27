@@ -57,6 +57,9 @@ src/gl/mlx/*.json
 src/composition/fixtures/
 !src/assets/
 
+# ── Adopted (slice 5, #1684: src/hooks — its source-text pins made layout-blind first) ──
+!src/hooks/
+
 # Tooling and non-src trees: not yet adopted.
 /scripts/**
 /e2e/**

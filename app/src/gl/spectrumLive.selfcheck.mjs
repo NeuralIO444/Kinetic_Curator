@@ -9,6 +9,7 @@ import { setSourceFeed, readSourceFeed, peekSourceFeed } from './sourceFeed.mjs'
 let n = 0;
 const ok = (name, fn) => { fn(); n++; console.log(`  [ok] ${name}`); };
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 const argmax = (a) => { let m = 0; for (let i = 1; i < a.length; i++) if (a[i] > a[m]) m = i; return m; };
 /** A fake AnalyserNode with one tone (dB) at a frequency. */
 const fakeAnalyser = (hz, db = -30, sr = 48000) => ({
@@ -61,10 +62,10 @@ ok('a provider that throws or answers mix 0 is no source', () => {
 
 ok('the meter and the modulation analysers are untouched: same sizes, same smoothing; the spectrum is a third node', () => {
   const hook = src('../hooks/useAudioInput.js');
-  assert.ok(/analyser\.fftSize = 256;\s*\n\s*analyser\.smoothingTimeConstant = 0\.8;/.test(hook), 'modulation analyser as before');
-  assert.ok(/meterAnalyser\.fftSize = METER_FFT_SIZE;\s*\n\s*meterAnalyser\.smoothingTimeConstant = 0\.6;/.test(hook), 'meter analyser as before');
-  assert.ok(/spectrumAnalyser\.smoothingTimeConstant = 0;/.test(hook) && /gainNode\.connect\(spectrumAnalyser\)/.test(hook));
-  assert.ok(/setAudioMeterTap\(\{ analyser: meterAnalyser, spectrum: spectrumAnalyser/.test(hook), 'the bands still read the meter analyser');
+  assert.ok(flat(hook).includes(flat('analyser.fftSize = 256; analyser.smoothingTimeConstant = 0.8;')), 'modulation analyser as before');
+  assert.ok(flat(hook).includes(flat('meterAnalyser.fftSize = METER_FFT_SIZE; meterAnalyser.smoothingTimeConstant = 0.6;')), 'meter analyser as before');
+  assert.ok(flat(hook).includes(flat('spectrumAnalyser.smoothingTimeConstant = 0;')) && flat(hook).includes(flat('gainNode.connect(spectrumAnalyser)')));
+  assert.ok(flat(hook).includes(flat('setAudioMeterTap({ analyser: meterAnalyser, spectrum: spectrumAnalyser')), 'the bands still read the meter analyser');
   const tap = src('../hooks/audioMeterTap.js');
   assert.ok(/tap\.analyser\.getByteFrequencyData/.test(tap) && !/tap\.spectrum/.test(tap), 'band levels never read the spectrum node');
 });

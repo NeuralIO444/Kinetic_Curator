@@ -39,6 +39,7 @@ let checks = 0;
 const ok = (cond, msg) => { assert.ok(cond, msg); checks++; };
 const eq = (a, b, msg) => { assert.equal(a, b, msg); checks++; };
 const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
+const flat = (s) => s.replace(/\s+/g, '').replace(/,(?=[)\]}])/g, ''); // layout-blind source pins (#1684): whitespace and trailing commas are Prettier's, not the code's
 const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32Array(LOG_BINS) });
 
 // ── A. the address ────────────────────────────────────────────────────────────────────────────────────
@@ -281,9 +282,9 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   // The event log's SHED_STEPS predates this rung (and 1.4/1.5/1.6): the hook's guarded record pattern
   // is the treatment — asserted here at the source so the guard is never "tidied" away.
   const hook = src('../hooks/usePerformanceGovernor.js');
-  ok(/recordCutEvent = \(e\) => \{ if \(LOG_KNOWN_KINDS\.has\(e\.cutKind\)\)/.test(hook), 'the hook still guards event-log kinds');
-  ok(hook.includes("case 'feedbackWarp': setFeedbackWarpShed(true);"), 'the hook applies the warp shed');
-  ok(hook.includes("case 'feedbackWarp': setFeedbackWarpShed(false);"), 'the hook restores the warp shed');
+  ok(flat(hook).includes(flat('recordCutEvent = (e) => { if (LOG_KNOWN_KINDS.has(e.cutKind))')), 'the hook still guards event-log kinds');
+  ok(flat(hook).includes(flat("case 'feedbackWarp': setFeedbackWarpShed(true);")), 'the hook applies the warp shed');
+  ok(flat(hook).includes(flat("case 'feedbackWarp': setFeedbackWarpShed(false);")), 'the hook restores the warp shed');
 
   // The live seam: amount gated, driver stepped off the shared spectrum state, only on the accum path.
   const loop = src('./liveLoop.mjs');

@@ -59,9 +59,7 @@ export const FX_KIND_TO_COST_ID = {
 
 /** Registry id for one layer effect kind, or null when unmapped. */
 export function costIdForFxKind(kind) {
-  return Object.prototype.hasOwnProperty.call(FX_KIND_TO_COST_ID, kind)
-    ? FX_KIND_TO_COST_ID[kind]
-    : null;
+  return Object.prototype.hasOwnProperty.call(FX_KIND_TO_COST_ID, kind) ? FX_KIND_TO_COST_ID[kind] : null;
 }
 
 function measuredMsFor(id) {

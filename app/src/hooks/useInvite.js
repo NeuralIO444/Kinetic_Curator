@@ -6,6 +6,10 @@ const invites = createInvites();
 
 /** [shimmering, markUsed] for a button. The sheen runs until the button is pressed, and returns after a minute idle. */
 export function useInvite(key) {
-  const shimmering = useSyncExternalStore(invites.subscribe, () => invites.active(key), () => true);
+  const shimmering = useSyncExternalStore(
+    invites.subscribe,
+    () => invites.active(key),
+    () => true,
+  );
   return [shimmering, () => invites.use(key)];
 }

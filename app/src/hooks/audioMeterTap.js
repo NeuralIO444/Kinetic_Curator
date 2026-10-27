@@ -33,6 +33,8 @@ export function readMeterBandLevels() {
   tap.analyser.getByteFrequencyData(freqBytes);
   const levels = meterBandLevels(freqBytes, tap.sampleRate);
   const out = {};
-  BAND_KEYS.forEach((k, i) => { out[k] = levels[i]; });
+  BAND_KEYS.forEach((k, i) => {
+    out[k] = levels[i];
+  });
   return out;
 }
