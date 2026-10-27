@@ -119,8 +119,8 @@ export function CuratorBar() {
   // #1122: V breathes only after the voice rolled, then decays to still. Read the honest feed once a second.
   const [voiceLvl, setVoiceLvl] = useState(0);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror of the feed, read on mount and each second
     if (!voiceOn) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- mirror of the feed, read on mount and each second
       setVoiceLvl(0);
       return undefined;
     }

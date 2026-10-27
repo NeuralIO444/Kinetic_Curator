@@ -100,8 +100,8 @@ export function DavisPanel() {
   // panel — but the live loop drops its own frozen flag when the ACCUM
   // session ends, so mirror that reset here or the button lies (THAW while
   // the loop is unfrozen: the two-press FREEZE trap, panel-side).
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mirror of the loop's own reset
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional mirror of the loop's own reset
     if (!accumOn) setAccumFrozen(false);
   }, [accumOn]);
 
