@@ -54,13 +54,21 @@ assert.strictEqual(
   'CHAOS with a saved project restores first, then rolls',
 );
 
-// 2. START mode setting: default chaos, sanitizes junk, session value sticks.
-assert.strictEqual(S().startupMode, 'chaos', 'default START mode is CHAOS');
+// 2. START mode setting (#1772: the OFF → WEAK → MED → KOZ cycle): default KOZ (#946's k.o.z.), legacy values
+//    read as their new states, junk sanitizes, the session value sticks.
+assert.strictEqual(S().startupMode, 'koz', 'default START is KOZ (was CHAOS)');
 S().setStartupMode('fixed');
-assert.strictEqual(S().startupMode, 'fixed', 'FIXED sticks for the session');
+assert.strictEqual(S().startupMode, 'off', "#946's FIXED reads as OFF");
+S().setStartupMode('med');
+assert.strictEqual(S().startupMode, 'med', 'MED sticks for the session');
 S().setStartupMode('bogus');
-assert.strictEqual(S().startupMode, 'chaos', 'junk sanitizes back to CHAOS');
-S().setStartupMode('chaos');
+assert.strictEqual(S().startupMode, 'koz', 'junk sanitizes back to KOZ');
+for (const m of ['off', 'weak', 'med', 'koz', 'fixed', 'chaos'])
+  assert.strictEqual(
+    t({ shareApplied: false, factoryRequested: false, startupMode: m, hasDoc: false }),
+    m === 'off' || m === 'fixed' ? 'factory' : 'roll',
+    `START ${m}: ${m === 'off' || m === 'fixed' ? 'the factory opener' : 'a rolled opener'}`,
+  );
 
 // 3. The factory opener is deterministic (checked before the roll below).
 assert.strictEqual(S().seed, 0xa17e9b21, 'factory opener seed is the known default');

@@ -131,7 +131,7 @@
   .kc-topbar-curator { width: 480px; }
   .kc-topbar-curator .tb-pill, .palette-strip .tb-pill { padding: 4px 6px; gap: 5px; }
   .curator-left-group { gap: 5px; }
-  .curator-voice-btn .tb-micro, .tb-start-key { display: none; }
+  .curator-voice-btn .tb-micro, .tb-start-key, .tb-start-deck { display: none; }
   .palette-harmony { width: 76px; margin-left: 0; }
   .palette-strip { gap: 6px; }
   .palette-strip .palette-switch > div { gap: 6px !important; }
@@ -904,7 +904,7 @@
 }
 @keyframes tb-breath { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
 
-/* ■ START marker — doubles as the mode indicator (accent in CHAOS) */
+/* ■ START marker — doubles as the scope indicator (fills OFF → KOZ, #1772) */
 .kc-topbar-curator .start-mode-btn::before {
   width: 11px; height: 11px;
 }

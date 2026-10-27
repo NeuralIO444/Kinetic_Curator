@@ -25,7 +25,16 @@ import { useColdOpen } from '../../hooks/useColdOpen.js';
 import { TAP_PULSE_MS } from '../../hooks/coldOpen.mjs';
 import { useInvite } from '../../hooks/useInvite.js';
 import { BeatButton } from '../../components/BeatButton.jsx';
+import { SCOPE_LABEL, sanitizeScope, nextScope, deckReadout } from '../../state/kineticScope.mjs';
 import { SwayMark } from '../../components/SwayMark.jsx';
+
+// #1772 — what each START state means, for the pill's tooltip (deadpan: the label is ≤4 chars, the tooltip explains).
+const SCOPE_HINT = {
+  off: 'launch opens on the factory scene; taps deal the original 33 looks, 19 voices and the curated shape sets.',
+  weak: 'launch deals a look + voice; taps add shapes from the whole library, same 33 looks and 19 voices.',
+  med: 'launch deals a look + voice; taps reach the whole library, all 64 looks and all 64 voices.',
+  koz: 'Kinetic Operation Zone — launch is one full wild roll; everything at full width, and hammering KIN breaks into chaos.',
+};
 
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
@@ -58,7 +67,8 @@ export function CuratorBar() {
   // #946 — START: CHAOS / FIXED. What a cold launch opens on: one full
   // wild roll (default), or the deterministic factory opener for
   // performance situations that need a known first frame.
-  const startupMode = useStore((s) => s.startupMode);
+  const scope = sanitizeScope(useStore((s) => s.startupMode)); // #1772 — OFF / WEAK / MED / KOZ
+  const readout = deckReadout(scope);
 
   // #1103 — every Curator roll (the button, and anything else that emits LAYOUT_CURATE) flashes CURATOR's full
   // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
@@ -177,22 +187,22 @@ export function CuratorBar() {
       : 'no locked params';
   return (
     <div className="curator-left-group kc-topbar-curator">
-      {/* #946 — START mode toggle: what a cold launch opens on. Sits left of KIN: [logo] [START] [KIN].
-            The ::before square is the ■ marker — accent-filled in CHAOS. */}
+      {/* #946 / #1772 — the START pill: one pill that CYCLES OFF → WEAK → MED → KOZ. It sets what a cold launch opens
+            on AND the ceiling over every KINETIC tap (state/kineticScope.mjs). Sits left of KIN: [logo] [START] [KIN].
+            The micro digits are the honest deck readout: assets · looks · voices a tap can reach at this state. */}
       <button
         type="button"
         className="tb-pill start-mode-btn act"
-        data-mode={startupMode}
-        onClick={() => emit(Events.STARTUP_MODE, { mode: startupMode === 'chaos' ? 'fixed' : 'chaos' })}
-        title={
-          startupMode === 'chaos'
-            ? 'START: K.O.Z. (Kinetic Operation Zone) — every cold launch opens on one full wild roll. Click for a fixed, deterministic opener.'
-            : 'START: FIXED — every cold launch opens on the factory default scene. Click for chaos.'
-        }
-        aria-label={`Start mode ${startupMode}. Activate to switch to ${startupMode === 'chaos' ? 'fixed' : 'chaos'}`}
+        data-mode={scope}
+        onClick={() => emit(Events.STARTUP_MODE, { mode: nextScope(scope) })}
+        title={`START: ${SCOPE_LABEL[scope]} — ${SCOPE_HINT[scope]} A tap can reach ${readout.assets} shapes · ${readout.looks} looks · ${readout.voices} voices. Click for ${SCOPE_LABEL[nextScope(scope)]}.`}
+        aria-label={`Start scope ${SCOPE_LABEL[scope]}: ${readout.assets} shapes, ${readout.looks} looks, ${readout.voices} voices. Activate for ${SCOPE_LABEL[nextScope(scope)]}`}
       >
         <span className="tb-start-key">start: </span>
-        {startupMode === 'chaos' ? 'k.o.z.' : 'fixed'}
+        {SCOPE_LABEL[scope]}
+        <span className="tb-micro tb-start-deck" aria-hidden="true">
+          {readout.assets}·{readout.looks}·{readout.voices}
+        </span>
       </button>
       <span className="tb-sep" aria-hidden="true" />
       {/* #942 — KINETIC: storm generator after the START toggle. */}

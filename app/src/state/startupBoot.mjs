@@ -15,9 +15,12 @@
 // - 'roll'        — one full wild roll on the fresh initial state.
 // - 'restore-roll'— restore the saved project first (it becomes the undo
 //                   base — yesterday is one Ctrl+Z away), then one roll.
+import { scopeDecks } from './kineticScope.mjs';
+
 export function decideBoot({ shareApplied, factoryRequested, startupMode, hasDoc }) {
   if (shareApplied) return { action: 'shared' };
   if (factoryRequested) return { action: hasDoc ? 'restore' : 'factory' };
-  if (startupMode === 'fixed') return { action: 'factory' };
+  // #1772: START: OFF (#946's FIXED) opens on the factory scene; WEAK / MED / KOZ roll (how wide: kineticScope.mjs)
+  if (scopeDecks(startupMode).launch === 'factory') return { action: 'factory' };
   return { action: hasDoc ? 'restore-roll' : 'roll' };
 }
