@@ -1,4 +1,5 @@
 import { resolveLookId } from './taxonomy.js';
+import { STYLE_LOOK_GROUPS, STYLE_LOOKS } from './styleLooks.js';
 // Each chip is a designer brief. params must make that brief visible on click.
 export const PRESET_GROUPS = [
   { id: 'firstlight', label: 'First Light' },
@@ -8,6 +9,7 @@ export const PRESET_GROUPS = [
   { id: 'ca', label: 'Cellular Automaton' },
   { id: 'davis', label: 'Ghost-Lineage' },
   { id: 'bio', label: 'Bio-Drives' },
+  ...STYLE_LOOK_GROUPS, // #1770 — Japanese, Grunge, Swiss, Bauhaus, Op Art, Memphis, Engraved
 ];
 
 export const COMPOSITION_PRESETS = [
@@ -17,6 +19,7 @@ export const COMPOSITION_PRESETS = [
     group: 'classic',
     desc: 'Dense glyph bloom — phi spiral, slow breath, no boids',
     categories: ['organic', 'radial', 'stamps'],
+    styles: ['organic', 'op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'fibonacci',
@@ -44,6 +47,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Hard scan — dense grid, zone color',
     categories: ['geometric', 'linework', 'crystalline'],
+    styles: ['techno', 'swiss'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'grid',
@@ -72,6 +76,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Glitch minimalism — sparse particle field, hard grid scanlines, one signal color on black. Pair with GLITCH.',
     categories: ['geometric', 'linework', 'dots'],
+    styles: ['techno', 'op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'grid',
@@ -96,6 +101,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Cosmic liquid ink — flow-field plumes colliding, pigment bleeding across the cast. Pair with INK NEBULA.',
     categories: ['organic', 'dots'],
+    styles: ['organic', 'grunge'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'flow',
@@ -122,6 +128,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Stacked dusk — six mirrored depth tiers, amber windows in concrete haze, dramatic light. Pair with MEGACITY.',
     categories: ['geometric', 'linework'],
+    styles: ['techno', 'swiss'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'layers',
@@ -146,6 +153,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Dirty and vibey — scattered hype organisms, scorched highlights, built for heavy grain. Pair with DIRTY.',
     categories: ['organic', 'dots'],
+    styles: ['grunge', 'techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'hype',
@@ -172,6 +180,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Cover star — bold graphic forms on dark neutrals, one red hit. The magazine identity as a look. Pair with RENDAH.',
     categories: ['geometric', 'linework'],
+    styles: ['swiss', 'techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
     params: {
       mode: 'grid',
@@ -196,6 +205,7 @@ export const COMPOSITION_PRESETS = [
     group: 'rendah',
     desc: 'Layered CGI bloom — mirrored hype scatter, zone-colored UV saturation, reality vs abstraction. Pair with NEONOIR.',
     categories: ['organic', 'dots'],
+    styles: ['organic', 'memphis'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'hype',
@@ -222,6 +232,7 @@ export const COMPOSITION_PRESETS = [
     group: 'davis',
     desc: 'Abacus rows — near-zero rotate',
     categories: ['geometric', 'fragments', 'stamps'],
+    styles: ['grunge', 'pixel'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
     params: {
       mode: 'abacus',
@@ -251,6 +262,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Dusk flock — cohesive swarm boids, tight damping, split ink on deep indigo',
     categories: ['organic', 'dots'],
+    styles: ['organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
     params: {
       mode: 'swarm',
@@ -284,6 +296,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Dark glass — a few large facets turning slowly, most of the plate left dark',
     categories: ['crystalline', 'geometric'],
+    styles: ['techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       // SPARSE and LARGE are the whole brief: chiaroscuro is mostly dark, and
@@ -329,6 +342,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Blacklight organism — moth·hype at full scatter, zone-colored neon on black',
     categories: ['organic', 'biosynthetic', 'dots'],
+    styles: ['organic', 'techno'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'hype',
@@ -353,6 +367,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Agar colonies — mirrored CA, band coloring on a pale ground',
     categories: ['organic', 'dots'],
+    styles: ['organic', 'op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'ca',
@@ -377,6 +392,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Sediment flow — banded flow-field drift, soft blobs marbling over linework',
     categories: ['linework', 'organic'],
+    styles: ['organic', 'japanese'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'flow',
@@ -402,6 +418,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Phosphor interference — noise-warped dots, hard split with red/green hits',
     categories: ['dots'],
+    styles: ['op', 'grunge'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
     params: {
       mode: 'noise',
@@ -427,6 +444,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Geological cut — mirrored layers mode, zone coloring, ochre over shale',
     categories: ['geometric', 'linework'],
+    styles: ['swiss', 'bauhaus'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'layers',
@@ -451,6 +469,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Metro diagram — rails with full rotation, five-line zone coloring on paper',
     categories: ['linework', 'geometric'],
+    styles: ['swiss', 'memphis'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'rails',
@@ -475,6 +494,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Coronal storm — mirrored radial bloom, band coloring from corona white to ember',
     categories: ['radial', 'organic'],
+    styles: ['op', 'engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'radial',
@@ -499,6 +519,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Deep orbit burn — orbit rails on near-black, one ember accent against cold greys',
     categories: ['radial', 'dots'],
+    styles: ['op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
     params: {
       mode: 'orbit',
@@ -526,6 +547,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'METABOLISM up — the cast tires, hungers, and clumps as it feeds. Pair with a dark palette.',
     categories: ['radial'],
+    styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'hype',
@@ -555,6 +577,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Slime-mold foraging — chemotaxis climbs its own scent trails. Slow. Pair with PETRI BLOOM.',
     categories: ['radial', 'linework'],
+    styles: ['engraved', 'organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'hype',
@@ -584,6 +607,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Grazers erase — bg-stamped agents mow trails through the accumulation. Leave ACCUM on.',
     categories: ['radial', 'linework'],
+    styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'hype',
@@ -615,6 +639,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Neighbors trade pigment as they crowd — colors bleed across the cast. Pair with KILN COLUMNS (a leak palette).',
     categories: ['organic', 'dots'],
+    styles: ['organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'hype',
@@ -644,6 +669,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'The cast breathes — scale swells with each agent’s energy. Tired creatures breathe shallow.',
     categories: ['radial', 'organic'],
+    styles: ['engraved', 'organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     params: {
       mode: 'hype',
@@ -673,6 +699,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Coral garden — mold foragers drift through Haeckel corals and plumes. Pair with CYANOTYPE.',
     categories: ['radial', 'linework'],
+    styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'hype',
@@ -705,6 +732,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Living reef — DLA growth crystallizes coral arms from a seed; the trail is the artwork. Pair with TIDEPOOL.',
     categories: ['organic', 'radial'],
+    styles: ['organic', 'engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'dla',
@@ -732,6 +760,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Specimen plate — Haeckel bodies pinned on a grid. Pair with LITHOGRAPH and watch the trails fall to the paper.',
     categories: ['radial'],
+    styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'grid',
@@ -761,6 +790,7 @@ export const COMPOSITION_PRESETS = [
     group: 'bio',
     desc: 'Radial organisms as plate specimens — six-fold mirrored fans. Pair with SEPIA PLATE.',
     categories: ['radial', 'linework'],
+    styles: ['engraved'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     params: {
       mode: 'hype',
@@ -796,6 +826,7 @@ export const COMPOSITION_PRESETS = [
     group: 'showcase',
     desc: 'Flow-field smoke — 400 hairline particles on a slow noise field, curl-advected ACCUM trails, monochrome. Built for Loop Capture.',
     categories: ['dots'],
+    styles: ['op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     // Palette + asset pool pair as one look: monochrome SMOKE palette and
     // tiny dots only, so the preset is one click, not a setup chore.
@@ -841,6 +872,7 @@ export const COMPOSITION_PRESETS = [
     group: 'firstlight',
     desc: 'Gentle wake-up — warm fibonacci bloom, slow breath, soft shapes.',
     categories: ['organic', 'radial'],
+    styles: ['organic', 'op'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     paletteId: 'praystation',
     assetIds: ['org_blob_01', 'rad_rings_01', 'org_petal_02'],
@@ -869,6 +901,7 @@ export const COMPOSITION_PRESETS = [
     group: 'firstlight',
     desc: 'Quiet machine — sparse dark grid, small signals blinking through.',
     categories: ['geometric', 'dots'],
+    styles: ['swiss', 'memphis'], // #1770 — the S3 styles it pairs with
     paletteShift: 'zone',
     paletteId: 'v01d',
     assetIds: ['geo_hex_01', 'mic_dotgrid_5', 'line_dash_01'],
@@ -897,6 +930,7 @@ export const COMPOSITION_PRESETS = [
     group: 'firstlight',
     desc: 'Still water — slow flow field, organic shapes drifting like leaves.',
     categories: ['organic', 'linework'],
+    styles: ['organic', 'japanese'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     paletteId: 'tidepool',
     assetIds: ['org_blob_02', 'line_squiggle_01', 'org_drop_01'],
@@ -925,6 +959,7 @@ export const COMPOSITION_PRESETS = [
     group: 'firstlight',
     desc: 'Playful scatter — bright confetti shapes tumbling on paper.',
     categories: ['geometric', 'stamps'],
+    styles: ['memphis', 'bauhaus'], // #1770 — the S3 styles it pairs with
     paletteShift: 'band',
     paletteId: 'solar-max',
     assetIds: ['geo_star5_01', 'geo_tri_01', 'stamp_glyph_01'],
@@ -947,6 +982,7 @@ export const COMPOSITION_PRESETS = [
       behave: 'cruise',
     },
   },
+  ...STYLE_LOOKS, // #1770 — 31 style looks (data/styleLooks.js): 33 → 64 dealable Looks
 ];
 
 export function getPreset(id) {
