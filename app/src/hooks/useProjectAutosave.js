@@ -8,6 +8,7 @@ import { projectDirty } from '../state/projectWatch.mjs'; // every field the doc
 import { recipeToProjectDoc } from '../state/recipes.js';
 import { parseBootHash, describePaletteFallback } from '../state/recipeUrls.js';
 import { scopeDecks } from '../state/kineticScope.mjs'; // #1772: START sets the opener's width
+import { projectFolderLive } from './useProjectFolder.js'; // #1709: a project folder, when one is open
 
 const DEBOUNCE_MS = 500;
 // General safety net: any sustained stream of edits (a held slider, a fast
@@ -102,6 +103,80 @@ function bootFromHash() {
 }
 
 /**
+ * The browser session's boot (#33 / #534 / #946): the scratch autosave, a share link, the startup roll. #1709 runs it
+ * only when no project folder reopens.
+ */
+function browserBoot() {
+  // #1646 — narrowed by progress below: a throw while the saved
+  // document is still at risk (the flag read, the hash, the
+  // autosave read, the apply) is a lost session and must say so;
+  // a throw after the document landed is not, and stays quiet.
+  let restoreAtRisk = true;
+  try {
+    // #946 — in START: CHAOS mode (the default) every cold page load
+    // gets its opening roll, even on a same-session reload or second tab
+    // (the #33 once-per-session gate below only governs the restore).
+    // ?boot=factory and START: FIXED never roll.
+    if (sessionStorage.getItem(RESTORED_FLAG)) {
+      const st = useStore.getState();
+      if (scopeDecks(st.startupMode).launch !== 'factory' && !bootFactoryRequested()) applyStartupChaos();
+      return;
+    }
+    // #534 — a share-link fragment boots the linked scene instead of the
+    // autosave. 'bad' was consumed but broken: fall through to the normal
+    // boot with the note already set. 'applied' wins over everything —
+    // an explicit paste is never rolled over.
+    const hashBoot = bootFromHash();
+    if (hashBoot === 'applied') return;
+    const st = useStore.getState();
+    const { doc, quarantined } = readPipelineAutosave();
+    restoreAtRisk = !!doc; // no document, nothing left to lose
+    const decision = decideBoot({
+      shareApplied: false,
+      factoryRequested: bootFactoryRequested(),
+      startupMode: st.startupMode,
+      hasDoc: !!doc,
+    });
+    if (quarantined) {
+      // Boot factory defaults and say so. Never silently apply a document
+      // we could not parse (#107 §6).
+      st.setPersistStatus('quarantined');
+    }
+    if (decision.action === 'restore' || decision.action === 'restore-roll') {
+      // #33 — the saved project is the undo base the startup roll lands
+      // on, so yesterday is one Ctrl+Z away. (START: FIXED skips the
+      // restore — the known opener is the factory defaults, not
+      // yesterday. ?boot=factory keeps its historical meaning: restore,
+      // no roll.)
+      st.applyProject(doc);
+      restoreAtRisk = false; // the session landed; what follows is not its loss
+      sessionStorage.setItem(RESTORED_FLAG, '1');
+    }
+    if (decision.action === 'roll' || decision.action === 'restore-roll') {
+      // #946 — replaces the #707 living boot: one full wild roll, then
+      // the instrument settles into normal tap behavior (heat starts
+      // cool, so the first KIN tap is a RULES pass).
+      // NOTE: the restored-session flag is deliberately NOT set on the
+      // fresh-boot roll, so a document written between load and reload
+      // (the e2e seedDoc pattern) is still picked up on the next boot,
+      // exactly as before.
+      applyStartupChaos();
+    }
+    // 'factory' — do nothing: the initial store state is the known,
+    // deterministic opener.
+  } catch {
+    // #1646 — the catch-all stays as the last resort, but it is no
+    // longer the only record: a boot that could not apply the saved
+    // document says so on the channel the quarantine path proved
+    // (MasterBar: RESTORE FAILED — "Last autosave could not be
+    // read"). Reachable via the session flag's storage access,
+    // the hash parse, a parseProject throw inside the autosave
+    // read, and applyProject itself — verified, not assumed.
+    if (restoreAtRisk) useStore.getState().setPersistStatus('quarantined');
+  }
+}
+
+/**
  * Subscribe to meaningful project fields, debounce write to localStorage.
  * On first mount, restore last project once per browser session.
  */
@@ -114,73 +189,28 @@ export function useProjectAutosave() {
     if (restored.current || bootFired) return;
     restored.current = true;
     bootFired = true;
-    // #1646 — narrowed by progress below: a throw while the saved
-    // document is still at risk (the flag read, the hash, the
-    // autosave read, the apply) is a lost session and must say so;
-    // a throw after the document landed is not, and stays quiet.
-    let restoreAtRisk = true;
-    try {
-      // #946 — in START: CHAOS mode (the default) every cold page load
-      // gets its opening roll, even on a same-session reload or second tab
-      // (the #33 once-per-session gate below only governs the restore).
-      // ?boot=factory and START: FIXED never roll.
-      if (sessionStorage.getItem(RESTORED_FLAG)) {
-        const st = useStore.getState();
-        if (scopeDecks(st.startupMode).launch !== 'factory' && !bootFactoryRequested()) applyStartupChaos();
-        return;
-      }
-      // #534 — a share-link fragment boots the linked scene instead of the
-      // autosave. 'bad' was consumed but broken: fall through to the normal
-      // boot with the note already set. 'applied' wins over everything —
-      // an explicit paste is never rolled over.
-      const hashBoot = bootFromHash();
-      if (hashBoot === 'applied') return;
-      const st = useStore.getState();
-      const { doc, quarantined } = readPipelineAutosave();
-      restoreAtRisk = !!doc; // no document, nothing left to lose
-      const decision = decideBoot({
-        shareApplied: false,
-        factoryRequested: bootFactoryRequested(),
-        startupMode: st.startupMode,
-        hasDoc: !!doc,
-      });
-      if (quarantined) {
-        // Boot factory defaults and say so. Never silently apply a document
-        // we could not parse (#107 §6).
-        st.setPersistStatus('quarantined');
-      }
-      if (decision.action === 'restore' || decision.action === 'restore-roll') {
-        // #33 — the saved project is the undo base the startup roll lands
-        // on, so yesterday is one Ctrl+Z away. (START: FIXED skips the
-        // restore — the known opener is the factory defaults, not
-        // yesterday. ?boot=factory keeps its historical meaning: restore,
-        // no roll.)
-        st.applyProject(doc);
-        restoreAtRisk = false; // the session landed; what follows is not its loss
-        sessionStorage.setItem(RESTORED_FLAG, '1');
-      }
-      if (decision.action === 'roll' || decision.action === 'restore-roll') {
-        // #946 — replaces the #707 living boot: one full wild roll, then
-        // the instrument settles into normal tap behavior (heat starts
-        // cool, so the first KIN tap is a RULES pass).
-        // NOTE: the restored-session flag is deliberately NOT set on the
-        // fresh-boot roll, so a document written between load and reload
-        // (the e2e seedDoc pattern) is still picked up on the next boot,
-        // exactly as before.
-        applyStartupChaos();
-      }
-      // 'factory' — do nothing: the initial store state is the known,
-      // deterministic opener.
-    } catch {
-      // #1646 — the catch-all stays as the last resort, but it is no
-      // longer the only record: a boot that could not apply the saved
-      // document says so on the channel the quarantine path proved
-      // (MasterBar: RESTORE FAILED — "Last autosave could not be
-      // read"). Reachable via the session flag's storage access,
-      // the hash parse, a parseProject throw inside the autosave
-      // read, and applyProject itself — verified, not assumed.
-      if (restoreAtRisk) useStore.getState().setPersistStatus('quarantined');
+    // #1709 — the last project folder reopens at launch: its latest session, applied with NO startup roll and no write.
+    // Only when it cannot be reached does the browser session boot (and the notice says why).
+    const folder = projectFolderLive();
+    const lastRoot = folder.unavailable() ? null : folder.lastRoot();
+    if (lastRoot) {
+      folder
+        .open(lastRoot)
+        .then((r) => {
+          if (r.ok) {
+            const st = folder.status();
+            useStore
+              .getState()
+              .setBootNotice(`Opened project ${st.name} · session ${String(st.session).padStart(2, '0')}`);
+            return;
+          }
+          useStore.getState().setBootNotice(`Project folder not reachable (${r.reason}) — opened your browser session`);
+          browserBoot();
+        })
+        .catch(() => browserBoot());
+      return;
     }
+    browserBoot();
   }, []);
 
   useEffect(() => {
@@ -190,6 +220,17 @@ export function useProjectAutosave() {
       if (timer.current) {
         clearTimeout(timer.current);
         timer.current = null;
+      }
+      // #1709 — a project folder is open: the session saves in place, and nothing goes to the browser slot
+      const folder = projectFolderLive();
+      if (folder.isOpen()) {
+        folder.save().then((res) => {
+          const store = useStore.getState();
+          if (store.persistStatus === 'quarantined') return;
+          const next = res.ok ? 'ok' : 'unsaved';
+          if (store.persistStatus !== next) store.setPersistStatus(next);
+        });
+        return;
       }
       const res = writePipelineAutosave(serializeProject(useStore.getState()));
       const store = useStore.getState();

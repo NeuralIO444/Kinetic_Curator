@@ -113,6 +113,8 @@ export const BUNDLE_STORAGE_KEYS = Object.freeze({
 export const BUNDLE_LEFT_OUT = Object.freeze({
   'kc:loot:v1':
     "#1479 the loot folder index: this machine's absolute folder path and file hashes. Never in a bundle, a project or a share link (it would leak the folder layout and mean nothing on another Mac)",
+  'kc:project-folder:last':
+    "#1709 which project folder was open, so the next launch reopens it: this machine's absolute path. Never in a bundle (it would leak the folder layout and mean nothing on another Mac); the project itself lives in its folder",
   'kc:weave:v1': 'per-machine display preference, not project content',
   'kc:fxaa:v1': 'per-machine display preference, not project content',
   'kc:pool-view:v1': 'per-machine display preference (asset pool layout)',

@@ -28,6 +28,7 @@ import { SnapshotGallery } from './pipeline/SnapshotGallery.jsx';
 import { LatestCapture } from './pipeline/LatestCapture.jsx';
 import { NativeLabBlock } from './pipeline/NativeLabBlock.jsx';
 import { LootRow } from './pipeline/LootRow.jsx'; // #1479: the loot folder
+import { ProjectFolderRow } from './pipeline/ProjectFolderRow.jsx'; // #1709: the project folder
 
 export function PipelinePanel() {
   const { palette, glCanvasRef, glLoopRef } = useApp();
@@ -177,6 +178,7 @@ export function PipelinePanel() {
         <SnapshotGallery snapshots={snapshots} />
 
         <div className="pipeline-section-label">PROJECT</div>
+        <ProjectFolderRow />
         <RecipeRow onMessage={setMessage} />
         <DataExportRow
           seed={seed}

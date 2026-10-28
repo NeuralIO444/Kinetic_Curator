@@ -500,6 +500,7 @@ node src/state/projectWatch.selfcheck.mjs
 node src/state/projectFile.selfcheck.mjs
 node src/state/projectSession.selfcheck.mjs
 node src/state/projectTauri.selfcheck.mjs
+node src/project/projectFolderLive.selfcheck.mjs
 node src/loot/lootPalettes.selfcheck.mjs
 node src/loot/lootWeb.selfcheck.mjs
 node src/loot/lootStarter.selfcheck.mjs
