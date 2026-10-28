@@ -24,6 +24,7 @@ import { setSpectrumTap } from '../gl/spectrumLive.mjs';
 import { createMindRecorder } from '../curator/mindRecord.js';
 import { setMindTap, getMindSystem } from '../curator/mindLive.js';
 import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
+import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
@@ -100,6 +101,21 @@ const spectrumSection = (getFrame) => {
   return {
     stop() {
       setSpectrumTap(null);
+      off();
+      return rec.finish();
+    },
+  };
+};
+
+// #1483 follow-up — the take carries its audio route table (the start and every change by frame), stored as `routes`:
+// playback hears through the take's routes, so Davis's conducting and the artist's matrix edits replay as they were.
+const routesSection = (getFrame) => {
+  const rec = createRouteRecorder({ initial: useStore.getState().audioRoutes, getFrame });
+  const off = useStore.subscribe((s, prev) => {
+    if (s.audioRoutes !== prev.audioRoutes) rec.set(s.audioRoutes);
+  });
+  return {
+    stop() {
       off();
       return rec.finish();
     },
@@ -183,6 +199,7 @@ export function PerformanceButton() {
             clock: clockSection,
             mind: mindSection,
             spectrum: spectrumSection,
+            routes: routesSection,
           },
         })
       ) {
