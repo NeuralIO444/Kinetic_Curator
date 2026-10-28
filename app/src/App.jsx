@@ -57,7 +57,7 @@ import { setSourceFeed } from './gl/sourceFeed.mjs';
 import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
-import { spectrumSummary } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
+import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum, readSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
@@ -204,7 +204,10 @@ function AppInner() {
         const b = readMeterBandLevels();
         return b ? Object.values(b) : null;
       },
-      getSpectrum: () => spectrumSummary(readSpectrum()),
+      getSpectrum: (
+        (bar) => () =>
+          bar.sample(readSpectrum())
+      )(createShowSpectrum()), // once a bar: flux is the bar's movement
       // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
       getActivity: () => {
         const f = loisActivity.snapshot();
