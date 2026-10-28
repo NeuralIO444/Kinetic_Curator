@@ -17,7 +17,7 @@ const ed = read('./PatternEditor.jsx');
 const stack = read('./LayerStack.jsx');
 
 ok('the editor offers every mode and the signed range; sliders are the house RangeRow, never a native input', () => {
-  for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD'].includes(m));
+  for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD', 'TIDES'].includes(m)); // #1797 TIDES
   assert.match(ed, /PATTERN_MODES\.map\(\(m\) => \(/);
   assert.match(flat(ed), fre(/min=\{PATTERN_DENSITY_MIN\} max=\{PATTERN_DENSITY_MAX\}/));
   assert.equal(PATTERN_DENSITY_MIN, 4);

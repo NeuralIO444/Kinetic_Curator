@@ -23,7 +23,8 @@ import {
   quiltMoverMap,
   glyphMoverMap,
 } from './engine.js';
-import { sanitizePattern } from '../state/patternTrack.js';
+import { assignTides, rasterTides, tidesCols } from './tides.js';
+import { sanitizePattern, PATTERN_FIELD_LIKE } from '../state/patternTrack.js';
 
 /** The palette fields a pattern reads. Anything else on the palette object is ignored. */
 export const patternPalette = (p) => ({
@@ -42,8 +43,8 @@ export function patternKey(pattern, palette, w, h, t = 0) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   const time = p.drift > 0 ? Number(t) || 0 : 0;
-  // kin and movers change pixels only while the pattern moves, and not at all in FIELD (no discrete elements)
-  const el = p.drift > 0 && p.mode !== 'FIELD' ? [p.kin, p.movers] : null;
+  // kin and movers change pixels only while the pattern moves, and not at all in FIELD or TIDES (no discrete elements)
+  const el = p.drift > 0 && !PATTERN_FIELD_LIKE.includes(p.mode) ? [p.kin, p.movers] : null;
   return JSON.stringify([
     p.mode,
     p.seed,
@@ -91,13 +92,17 @@ const staticKey = (p, pal, w, h) =>
     pal.weights ?? null,
     w,
     h,
-    p.mode === 'FIELD' ? null : [p.kin, p.movers],
+    PATTERN_FIELD_LIKE.includes(p.mode) ? null : [p.kin, p.movers],
   ]);
 
 function buildGrid(p, pal, bw, bh) {
   const tileW = bw / p.density;
   const rows = Math.max(1, Math.ceil(bh / tileW));
   if (p.mode === 'GLYPH') return { tileW, grid: assignGlyph(p.seed, p.density, p.mix, pal) };
+  if (p.mode === 'TIDES') {
+    const cell = bw / tidesCols(p.density);
+    return { tileW: cell, grid: assignTides(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(bh / cell))) };
+  }
   if (p.mode === 'FIELD') return { tileW, grid: assign(p.seed, p.density, p.mix, pal, rows) };
   return { tileW, grid: assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows) };
 }
@@ -108,6 +113,7 @@ function buildGrid(p, pal, bw, bh) {
  *   QUILT  the still picture is drawn once; each frame repaints just the turning tiles
  *   GLYPH  the marks pulse, so each frame redraws the (culled) marks over a ground fill
  *   FIELD  the pan shifts every pixel, so each frame is a full (hoisted) raster
+ *   TIDES the grid is fixed but every cell re-reads the moving field, so each frame is a full (span-filled) raster
  * Every frame is pixel-identical to the reference rasterizers (rasterFast.selfcheck proves it).
  * The pixels it returns belong to the source and are overwritten by the next frame: upload, do not keep.
  */
@@ -148,12 +154,14 @@ export function createPatternFrames() {
         if (!still) {
           if (p.mode === 'QUILT') still = plan.quilt.base;
           else if (p.mode === 'GLYPH') still = rasterGlyph(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
+          else if (p.mode === 'TIDES') still = rasterTides(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else still = rasterField(new Uint32Array(bw * bh), bw, bh, plan.grid, plan.tileW, panOffset(p.seed, 0, 0));
         }
         return { pixels: still, w: bw, h: bh, key };
       }
       if (p.mode === 'QUILT') plan.quilt.draw(out, p.drift, t);
       else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers);
+      else if (p.mode === 'TIDES') rasterTides(out, bw, bh, plan.grid, p.drift, t);
       else rasterField(out, bw, bh, plan.grid, plan.tileW, panOffset(p.seed, p.drift, t));
       return { pixels: out, w: bw, h: bh, key };
     },
