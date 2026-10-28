@@ -312,6 +312,7 @@ export async function renderAccumViaGL(
     echoes = 0,
     audio = null,
     swell = 1,
+    palette = null, // #1803: swatch hex list; forwarded to renderAccumSequence
   } = {},
 ) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
@@ -346,6 +347,7 @@ export async function renderAccumViaGL(
     echoes,
     audioFrames: audio,
     swell, // #306: audio→glow fader, forwarded to renderAccumSequence
+    palette, // #1803: forwarded to renderAccumSequence (halation tint)
     cells,
     atlasB64: b64Pieces(atlas.pixels),
     atlasW: atlas.width,

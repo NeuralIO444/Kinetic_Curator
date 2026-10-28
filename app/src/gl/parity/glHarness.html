@@ -115,6 +115,7 @@ window.__kcAccum = async (payload) => {
     audio: payload.audioFrames || null,
     swell: payload.swell ?? 1, // #306: audio→glow fader
     background: payload.bg,
+    palette: payload.palette ?? null, // #1803: halation tint derivation
   });
   return { pixelsB64: u8ToB64(pixels), width, height };
 };

@@ -1,56 +1,49 @@
-# STAGING REPORT — #1801 ACCUM highlight soft-ceiling (kill the bloom ratchet)
+# STAGING REPORT — #1803 ACCUM palette-driven halation (the glow takes the look's colours)
 
-Builder staging record, branch `feat/1801-soft-ceiling` (local only — not pushed, no PR; the coordinator publishes). Base: origin/main @ 4bd7a115 (post-#1816 TIDES; #1800 not yet merged — see "Composition with #1800" below). This file replaces the report that was at the worktree root (#1578 Slice C's); that report remains in git history.
-Issue: #1801 "ACCUM: highlight soft-ceiling in the loop (kill the bloom ratchet)". No comments on the issue; the body is the whole contract.
+Builder staging record, branch `feat/1803-palette-halation` (local only — not pushed, no PR; the coordinator publishes). This file replaces the report that was at the worktree root (#1800's, which landed with PR #1824); that report remains in git history.
+Issue: #1803 "ACCUM: palette-driven halation — the glow takes the look's colours". No comments on the issue; the body is the whole contract.
+
+## Premise check (the #1802 lesson, applied first)
+
+Before building, the codebase and git history were searched for the contracted behaviour already existing or a recorded decision contradicting the issue. Findings: `halationTint` was exactly what the issue says — a hardcoded constant `[1.0, 0.6, 0.35]` in `opticsDerived` (per #169), consumed by the GPU glow pass (`addGlow(..., p.halationTint)`) and the JS mirror. Nothing palette-driven fed it; no prior PR/issue ruled on a palette tint (halation history is #169's constant, #226's kernel parity, #250's sigma subdivision — none about the tint source). The premise holds; the build proceeded.
 
 ## What shipped (plain language)
 
-Bright cores no longer flatten to white. The glow pass used to hard-clamp every colour channel at 1.0 on every frame, so over a long loud sequence each channel pinned at exactly 1.0 one after another and the core converged to flat, hueless white — the bloom ratchet. Now the add-back passes through a soft ceiling instead: anything at or below 1.0 is completely untouched (bit-identical to before), and above 1.0 a smooth shoulder bends the value toward a 2.5 ceiling it never reaches. Hot cores stay in HDR, keep their hue separation, and settle instead of pinning. No new passes, no new controls — the same glow pass, shaped.
+The wide warm glow around bright cores (halation) used to wear the same stock amber tint on every look. It now takes the active palette's colours: the tint is derived from the palette — its bright colours' weighted average hue, muted (a bleed is never a neon), with its total energy pinned to the old constant's so GLOW is exactly as strong as before, only its colour belongs to the look. A teal look halates cool, an amber look halates warm, and a monochrome or single-colour palette keeps the classic warm constant — it is the documented fallback, bit-identical, so every existing render without palette input is unchanged. No new passes, targets, uniforms, or controls: the tint already travelled to the shader as a uniform; only its source changed. The tint is derived, never typed — it appears in no panel and no project field.
 
-Measured on the fixed test scene (amber block deposited for 12 steps, then black frames, FADE 0.95, optics 0.75; core pixel, linear float, run through each codebase's own JS mirror — main's for "before", this branch's for "after"):
-
-| step | before (hard clamp) | after (soft ceiling) |
-|---|---|---|
-| 12 | 1.000 / 0.636 / 0.138 | 1.180 / 0.636 / 0.138 |
-| 24 | 1.000 / 1.000 / 0.509 (r−b 0.491) | 1.357 / 1.312 / 0.510 (r−b 0.847) |
-| 60 | **1.000 / 1.000 / 1.000 (r−b 0.000 — flat white)** | 1.357 / 1.313 / 1.282 (r−b 0.075) |
-| 240 | 1.000 / 1.000 / 1.000 | 1.357 / 1.313 / 1.282 — settled, unchanged |
-
-Before: the ratchet finishes the job by step 60 — every channel at the pin, hue separation exactly zero, forever. After: the core works in HDR while the content is fresh (r−b 0.85 at step 24) and settles at a hue-ordered fixed point under the ceiling instead of at the pin.
-
-Stills: `docs/review/1801/before-clamp.png`, `docs/review/1801/after-ceiling.png` — the same fixed scene at step 24. One honest caveat: the repo's GPU probe harness reads the buffer back through an 8-bit clamp, which cannot express this difference (verified: probe samples are identical under both laws, because everything that differs sits above 1.0). The stills are therefore rendered from the JS mirror's float buffer — the same mirror the accum suite's GPU parity probes hold to ~3 LSB of the real GPU path — tonemapped as `(v / 2.5)^(1/2.2)` so the 2.5 headroom is the display range. Core/edge/skirt float samples are printed in the verification notes below.
+Measured (fixed scene: white block, mirror, halation tier isolated, optics 0.25): halo red-minus-blue on a saturated teal palette **negative (cool)**, on an amber palette **positive (warm)**, on the constant the warmest of the three; total halation energy for both derived tints within ±5% of the constant-tint baseline (the derivation pins the tint channel-sum to the constant's 1.95 exactly; the probe confirms the end-to-end number). Derived tints for the two test palettes: teal `[0.473, 0.748, 0.730]`, amber `[0.809, 0.663, 0.479]` — no channel reaches 1.0 (never neon). A GPU probe case additionally proves the GPU halo takes the palette hue with GPU↔mirror parity at 6 LSB. Stills: `docs/review/1803/before-constant.png` (warm halo) vs `docs/review/1803/after-palette.png` (teal halo) — same white-core scene, 24 steps, optics 0.75, rendered through the JS mirror (the parity-proven twin; the #1801 8-bit-readback caveat applies to GPU captures, the mirror is float-exact).
 
 ## How (specifics)
 
 - `app/src/gl/accum.mjs`
-  - New recipe constants `HIGHLIGHT_KNEE = 1.0` / `HIGHLIGHT_CEILING = 2.5` and the shaping law `highlightSoftCeiling(x)`: identity for x ≤ knee (bit-exact — the acceptance's sub-knee guarantee), else `knee + span·t/(span + t)` with `t = x − knee`, `span = ceiling − knee`. Reinhard-family shoulder: slope exactly 1 at the knee (C1 join, no seam), monotone, bounded by the ceiling, closed-form invertible — the in-loop shapes the 2026-10-27 eval sanctioned (invertible shoulder; published phosphor pipelines pin the linear buffer at 2.5). ACES is untouched and still runs only at the resolve (#532); nothing accumulates through a filmic curve.
-  - `GLOW_FS`: a `softCeil`/`softCeil3` GLSL pair with the constants **baked in from the JS constants at module load** (one source of truth; no new uniforms, so the createAccum uniform audit is untouched). The tail `min(lit, vec3(1.0))` is replaced by `softCeil3(lit)`. `GLOW_WET_FS` is string-built from `GLOW_FS` and inherits the ceiling through the shared tail — its replace anchors (the `vec3 lit = …` line and `uniform vec3 u_tint;`) are unchanged, and wet granulation still shapes before the ceiling, consistently with the dry pass.
-  - JS mirror (`mirrorAccumStep`): the ceiling is applied **per glow tier** — shape after the bloom add, then shape again after the halation add — exactly matching the GPU's two sequential passes (bloom writes back, halation reads the shaped result). The pre-#1801 mirror summed both tiers and clamped once; that agreed with the GPU only because a hard clamp of a monotone sum is order-blind. A shoulder is not, so the tiers now shape in sequence (the difference is ~0.018 on a uniform white frame — measured, and pinned by a dedicated test that also proves it can distinguish the two compositions).
-  - Module header recipe list gains step 7 documenting the ceiling.
-- `docs/ACCUM.md` — recipe gains step 7 (highlight soft-ceiling), and the B1 SWELL paragraph records that the ratchet is now also bounded in-loop; SWELL remains the musical fader, no longer the only defence.
-- Selfchecks: `app/src/gl/accum.selfcheck.mjs` gains 4 cases (49 → 53): the shaping law (bit-exact identity below the knee; hand values on the shoulder; monotonicity; ceiling asymptote; slope-1 at the knee; invertibility round-trip; hue-order preservation), the shader-baking pins (GLOW_FS/GLOW_WET_FS carry softCeil with numbers derived from the constants; the hard clamp is gone), the per-tier mirror composition test, and the 240-step ratchet acceptance test (mid-sequence r−b > 0.5; settled core > 1.2 on all channels, < 2.5, r−b > 0.04, one-more-step Δ < 0.005; optics-0 control never exceeds the deposit). No manifest change — the suite was already manifest-wired. No golden hashes exist in this suite, so there was nothing to re-pin.
+  - `HALATION_TINT_FALLBACK = [1.0, 0.6, 0.35]` (frozen, exported) — #169's constant, demoted to the fallback. `opticsDerived` now hands out a copy of it (its standalone contract is unchanged).
+  - `halationTintForPalette(palette)` (exported, pure): luminance-weighted centroid of the swatches (Rec601 weights — the same luma GLOW_FS reads), a chroma-spread gate (`HALATION_CHROMA_EPS = 0.02`: luminance-weighted RMS chroma distance from the centroid; a single colour and a monochrome ramp both sit at ~0 and fall back), desaturation toward the centroid's own grey (`HALATION_SATURATION_KEPT = 0.5`), then an energy pin scaling the channel sum to the fallback's 1.95. Garbage in (null / empty / unparseable / all-black) falls back, never throws, never emits a non-finite channel.
+  - `accumRecipeParams` gains a `palette` input (the active palette's swatch hex list, or null) and derives `halationTint` from it in exactly one place, after the optics spread. No palette → the fallback, bit-identical.
+  - `applyAudioEnvelope` re-carries `halationTint: p.halationTint` after its optics recompute — the tint is palette state, not optics state (the keepVec law from #1800, one field over). Silence remains a field-for-field identity.
+  - Module header: step 6 notes the tint source. No shader change — the tint already arrived as the `u_tint` uniform; recipe cost tier unchanged (no new pass, no new per-frame cost; the derivation runs where params are built).
+- `app/src/gl/spectrumWarp.mjs` — `applySpectrumWarp` re-carries the tint after its optics recompute, same law as the envelope.
+- Callers (the palette actually rides the calls):
+  - `app/src/gl/liveLoop.mjs` — `accumParams.palette = activePalette.swatches` (the palette the frame renders with; per-frame, so a palette change re-derives on the next frame).
+  - `app/src/gl/renderer.mjs` — `renderAccumSequence` accepts `palette` and forwards it to `accumRecipeParams`.
+  - `app/src/gl/parity/glDriver.mjs` + `app/src/gl/parity/glHarness.html` — `palette` forwarded through the still-render payload.
+  - `app/src/gl/accumStill.mjs` — passes the project's first-layer palette swatches (the same palette its background resolves from).
+  - `app/src/gl/parity/accumProbe.html` — the probe page forwards `p.palette` so selfchecks can drive palette scenes on the GPU.
+- `app/src/gl/accum.selfcheck.mjs` — +3 cases: the derivation law (fallback bit-identity, garbage/monochrome/single-colour fallbacks, teal-cool/amber-warm, energy pin, audio carry), a mirror probe (halo hue ordering + total halation energy within ±5% of baseline at optics 0.25, halation tier isolated), and a GPU probe (parity at 6 LSB + halo hue swing vs the constant). The probe helpers (`runProbe`/`mirrorSeq`) learned a `palette` argument. No manifest change — the suite was already wired.
+- `app/src/gl/spectrumWarp.selfcheck.mjs` — +2 checks: the warp carries a palette-derived tint through its optics recompute.
+- `docs/ACCUM.md` — step 6 records the derivation + fallback; the light-feel bullet now reads "the bleed takes the look's colours".
+- `docs/review/1803/before-constant.png`, `docs/review/1803/after-palette.png` — visual evidence.
 
 ## Deliberately NOT built
 
-- **No new passes, targets, or uniforms** — the issue scopes this to one shaping function in the existing composite/bloom step. The glow target stays RGBA8 (its ≤ 1 glow samples are unchanged); the feedback buffer stays RGBA16F.
-- **No panel control** — knee/ceiling are recipe constants v1, per the issue.
-- **No change to the resolve** — ACES still runs once at resolve (#532); the eval's rejected option (accumulating through a filmic curve) stays rejected.
-- **ACCUM_VERSION stays 2** — the buffer format didn't change, only the glow pass's shaping law.
-- **Nothing for #1800, #1802–#1808** — no hooks added beyond the recipe-constant pattern they already build on.
+- No contract field, no panel, no readout: the issue's honesty rule — the tint is derived, never typed. (`accum.seam`'s signature pin still passes: `palette` carries none of its banned words.)
+- No change to `opticsDerived`'s other fields, the bloom tier (its tint stays neutral `[1,1,1]`), the wet glow variant (it reads the same `p.halationTint` through `addGlow`), or fade-to-paper (#287): on paper grounds the derived tint is used as-is, per the issue.
+- Voices/looks declaring accumulation needed no data change: they inherit the derived tint with their palette, as the issue's scope states.
+- #1801 composition: PR #1825 was still open at build time; its GLOW_FS soft-ceiling and mirror rework touch the glow tail only. This slice changes what `p.halationTint` *is*, never how the add-back is shaped — the ceiling still applies after the tinted add-back, the recipe's existing order. Zero textual overlap with the #1801 diff (verified by diffing the branch: it touches none of this slice's lines).
 
-## Composition with #1800 (coordinator note)
+## Verification verdicts
 
-#1800 (PR #1824, branch `feat/1800-spectral-fade`) was still open when this slice was built, so this branch is based on pre-#1800 main. The two slices touch disjoint regions of `accum.mjs` — #1800's hunks are the fade (`FADE_FS` `u_keep` → vec3, `keepVec` derivation, mirror fade) and this slice's are the glow (`GLOW_FS` tail + softCeil, mirror glow, constants after `opticsDerived`) — so a rebase/merge composes textually except possibly the `accum.selfcheck.mjs` import list, where both slices add names to the same import block (trivial hand-merge). This slice deliberately adds **no fields** to `accumRecipeParams`' return object, avoiding #1800's `keepVec` restructuring entirely.
-
-## Verification
-
-- `app/src/gl/accum.selfcheck.mjs`: **OK — all 53 cases pass** (solo run, 3 GB heap), including the 4 new #1801 cases and the browser GPU↔mirror parity probes (mirror-vs-GPU parity holds under the new law — the probes compare the shaped mirror against the shaped GPU pass on optics-1 sequences). Run twice: once against the sandbox's shared module tree and once after a clean `npm ci` in this worktree — same verdict. Sandbox caveat (unchanged from main): at the default 2 GB heap the suite OOM-aborts during the large GPU probes; identical on unmodified main.
-- Neighbour suites (all PASS): accumGuard (torture peak 1.7, 4 poison fields refused), wetFeed (7 checks), spectrumWarp (88 checks), accum.inventory, accum.seam, canvasSizes (58 cases), trailMode (29 cases), audioBallistics, costTiers, clock.evolve-accum.
-- `npm run build` in app/: passes (after `npm ci` in this worktree — see setup note).
-- Prettier: all touched files formatted with the repo's pinned prettier (no changes needed — written in format).
-- Full manifest sweep (526 manifest commands, per-suite loop, 3 GB heap): **524 pass, 2 fail — both failures are the pre-existing sandbox-environment failures, verified base-identical on unmodified main in this session:** `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` (no cargo toolchain in this sandbox; exits 1 on main too) and `src/fx/rollSafety.selfcheck.mjs` (exits 1 on main too). Neither touches the accum path; CI is authoritative for both.
-- Visual evidence: `docs/review/1801/before-clamp.png` / `after-ceiling.png` (see the readback caveat above). Float samples at step 24 (96×96 scene, block 32×32): before core 1.000/1.000/0.510, edge 1.000/1.000/0.433, skirt 1.000/0.718/0.275 — red and green pinned at the clamp across core and edge (the plateau). After core 1.356/1.293/0.511, edge 1.351/1.237/0.434, skirt 1.333/0.737/0.276 — HDR headroom with core→edge gradation and channel separation.
-
-## Setup note
-
-This worktree was created without a local `node_modules`; module resolution initially fell through to a shared tree elsewhere in the sandbox (selfchecks ran, but `npm run build` failed on an unrelated missing `@tauri-apps/api`). Fixed with `npm ci` in `app/` (lockfile-exact); build and the accum suite were then re-verified against the local install with the same results. The failure was environmental, not a code regression — flagged here so the coordinator doesn't chase it.
+- **accum.selfcheck: OK — 54 cases** (solo run, 3 GB heap), including the 3 new #1803 cases and all GPU↔mirror parity probes. (51 on main + 3 new.)
+- **spectrumWarp.selfcheck: ok — 90 checks** (88 + the 2 new tint-carry checks).
+- **Neighbour suites: all PASS** — accumGuard, accum.inventory, accum.seam, wetFeed, canvasSizes (58), trailMode, audioBallistics, costTiers, clock.evolve-accum.
+- **Full manifest sweep: 524 of 526 commands pass.** Run per-suite (the stock runner is fail-fast) in two passes. The only failures are `swarmWasm` (no cargo toolchain in this sandbox) and `rollSafety` — both **verified base-identical on unmodified main** (exit 1 each, run firsthand in a clean main worktree); CI is authoritative for those two. Three suites needed a second look and all cleared: `accum` hit the sweep harness's 600 s per-suite timeout at 51/54 cases with zero assertion failures under load, then passed in-sweep in pass B (and solo, 54/54, twice); `livingMotion` failed a wall-clock perf-budget assertion (2.32 ms vs 2 ms) measured under full sweep load and passes solo (exit 0); `exportStill` hit a framebuffer-incomplete under concurrent browser load and passes solo (all checks passed).
+- **`npm run build` in app/: passes.** Prettier applied to all touched code files (repo-pinned, `--check` clean). `docs/ACCUM.md` was edited in house style only — it fails `prettier --check` on unmodified main too (pre-existing drift), so it was deliberately not reformatted.

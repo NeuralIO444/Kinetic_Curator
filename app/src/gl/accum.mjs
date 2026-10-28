@@ -59,6 +59,8 @@
  *      RGB channel at the edges. The wider warm pass (halation) reads a
  *      smaller mip with a red/warm bias:
  *      accum.rgb += halationAmount * warm * stippledGlow.
+ *      (#1803: `warm` is the active palette's derived tint —
+ *      halationTintForPalette; the #169 constant is its fallback.)
  *   7. Highlight soft-ceiling (#1801): each glow tier's add-back is
  *      shaped by softCeil() in GLOW_FS — identity at/below the knee
  *      (1.0), a smooth invertible shoulder above it, asymptoting at
@@ -106,6 +108,14 @@ export const STIPPLE_PITCH = 3;
 
 const clamp01 = (v) => Math.min(1, Math.max(0, Number(v) || 0));
 
+/** #169's halation tint: the fixed warm bias every look used to share.
+ *  #1803 demotes it to the FALLBACK — it is what the recipe carries when
+ *  no palette rides the call, and what a palette with no usable chroma
+ *  spread (single-colour / monochrome) falls back to, so monochrome work
+ *  keeps the classic warm halation. Frozen: opticsDerived hands out
+ *  copies, never this array. */
+export const HALATION_TINT_FALLBACK = Object.freeze([1.0, 0.6, 0.35]);
+
 /** All recipe fields derived from the optics amount — one place, so audio
  *  modulation (applyAudioEnvelope) recomputes exactly what the base params
  *  carry. o = 0 is exactly the old path (no glow). There are no blur
@@ -125,7 +135,7 @@ export function opticsDerived(o) {
     bloomLod: 1.0 + o, // 1.0 -> 2.0: the tight glow widens with the slider
     halationAmount: 0.16 * o,
     halationLod: 2.0 + o, // 2.0 -> 3.0: wider + warmer than bloom, per #169's role
-    halationTint: [1.0, 0.6, 0.35], // red/warm bias, per #169
+    halationTint: [...HALATION_TINT_FALLBACK], // #1803: the no-palette fallback; accumRecipeParams derives the tint from the palette when one rides the call
     // Stipple diffusion (#308): how pointillist the glow reads, 0..1. The
     // dot density still tracks local luminance (bright cores stay solid,
     // only the falloff dissolves into dots), so 1 is engraving, not noise.
@@ -196,6 +206,72 @@ export function highlightSoftCeiling(x) {
 // GLSL float literal for a recipe constant (1 -> "1.0", 2.5 -> "2.5").
 const glslFloat = (v) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
 
+/** #1803 — how much of the palette centroid's chroma the halation tint
+ *  keeps. Halation is a bleed, never a saturated neon: the centroid is
+ *  pulled halfway toward its own luminance grey before it tints light. */
+export const HALATION_SATURATION_KEPT = 0.5;
+
+/** #1803 — the chroma-spread floor. Below this luminance-weighted RMS
+ *  chroma spread the palette has no hue direction to give (a single
+ *  colour, a monochrome ramp) and the tint falls back to the constant. */
+export const HALATION_CHROMA_EPS = 0.02;
+
+// Rec601 luma — the weights GLOW_FS itself uses (dot(glow, vec3(...))),
+// so "luminance" in the derivation is the luminance the shader reads.
+const lum601 = ([r, g, b]) => 0.299 * r + 0.587 * g + 0.114 * b;
+
+/** #1803 — the halation tint derived from the active palette: the glow
+ *  takes the look's colours instead of the stock warm constant. Pure
+ *  (the JS mirror runs the same params code, so parity is free), and
+ *  costless per frame — computed where recipe params are built, it
+ *  changes only when the palette changes.
+ *
+ *  The derivation (the eval's picked shape): the palette colours'
+ *  luminance-weighted centroid — the palette's energy-weighted warm
+ *  pole — desaturated toward its own grey (HALATION_SATURATION_KEPT),
+ *  then scaled so the channel sum equals the fallback constant's. The
+ *  halation add-back is amount × tint × glow, so on a neutral core the
+ *  total added light is proportional to that sum: pinning it pins the
+ *  halation ENERGY to the constant's (the luminance response stays
+ *  within a few percent — the selfcheck measures both). A palette with
+ *  no usable chroma spread returns HALATION_TINT_FALLBACK untouched.
+ *
+ *  Input: the palette's swatch list (CSS hex strings, e.g.
+ *  resolvePalette(...).swatches). Anything else — null, empty, garbage
+ *  entries, an all-black palette — falls back too; unparseable entries
+ *  parse to black (hexToRgb01), carry zero luminance weight, and drop
+ *  out of the centroid on their own. The tint is derived, never typed:
+ *  it appears in no panel and no project field (the DS honesty rule). */
+export function halationTintForPalette(palette) {
+  const fallback = () => [...HALATION_TINT_FALLBACK];
+  if (!Array.isArray(palette) || palette.length === 0) return fallback();
+  const cols = palette.map((c) => hexToRgb01(c));
+  const lums = cols.map(lum601);
+  const total = lums.reduce((a, b) => a + b, 0);
+  if (!(total > 0)) return fallback(); // an all-black palette has no light to average
+  const cen = [0, 1, 2].map((c) => cols.reduce((a, col, i) => a + col[c] * lums[i], 0) / total);
+  const cenLum = lum601(cen);
+  // Chroma spread: the luminance-weighted RMS distance of each colour's
+  // chroma vector (colour minus its own grey) from the centroid's. A
+  // single colour and a monochrome ramp both sit at ~0 — no direction.
+  let varSum = 0;
+  for (let i = 0; i < cols.length; i++) {
+    let d2 = 0;
+    for (let c = 0; c < 3; c++) {
+      const d = cols[i][c] - lums[i] - (cen[c] - cenLum);
+      d2 += d * d;
+    }
+    varSum += lums[i] * d2;
+  }
+  if (Math.sqrt(varSum / total) < HALATION_CHROMA_EPS) return fallback();
+  // Desaturate, then pin the total energy to the constant's.
+  const desat = cen.map((v) => cenLum + (v - cenLum) * HALATION_SATURATION_KEPT);
+  const sum = desat.reduce((a, b) => a + b, 0);
+  if (!(sum > 0)) return fallback();
+  const target = HALATION_TINT_FALLBACK.reduce((a, b) => a + b, 0);
+  return desat.map((v) => (v * target) / sum);
+}
+
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
  *
@@ -207,7 +283,9 @@ const glslFloat = (v) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
  *   echoes  0..4 taps (0..3 at >= 2048px wide, the memory gate)
  * The per-frame result is re-checked by assertRecipeFinite() at step().
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
- *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate) }
+ *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate),
+ *   palette: the active palette's swatches (hex strings) or null — #1803 derives
+ *   the halation tint from it; absent, the tint is the #169 constant }
  */
 export function accumRecipeParams({
   fade = 0.88,
@@ -218,6 +296,7 @@ export function accumRecipeParams({
   echoes = 0,
   echoWidth = 0,
   background = '#000000',
+  palette = null,
   leave = false,
   ribbon = false,
   comet = false,
@@ -268,6 +347,13 @@ export function accumRecipeParams({
     keepVec: spectralKeep(keepFinal),
     bg,
     ...opticsDerived(o),
+    // #1803: the halation tint is the palette's, derived here — the one
+    // place — when a palette rides the call; the optics spread above
+    // carries the fallback constant for the no-palette path. The tint is
+    // palette state, not optics state: the modulators (audio envelope,
+    // spectrum warp) recompute the optics fields per frame and re-carry
+    // this value, exactly as they re-derive keepVec (#1800).
+    halationTint: halationTintForPalette(palette),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
     // each is derived so that amount 0 is exactly the identity transform.
     // Ranges are tuned for stills (~24 frames): tunnel = 1 is a strong
@@ -370,6 +456,10 @@ export function applyAudioEnvelope(p, a = {}, opts = {}) {
     // Optics is one amount driving the glow system: recompute every
     // derived field so the glow genuinely swells with the music.
     ...opticsDerived(clamp01(p.optics + (1 - p.optics) * swell * (0.3 * r + 0.1 * b))),
+    // #1803: the tint is palette state, not optics state — the recompute
+    // above would reset it to the fallback constant, so the gesture
+    // re-carries the params' own tint (the keepVec law, one field over).
+    halationTint: p.halationTint,
     tunnelZoom: 1 + (p.tunnelZoom - 1) * stretch,
     tunnelSpin: p.tunnelSpin * stretch,
     prismUv: p.prismUv * stretch,

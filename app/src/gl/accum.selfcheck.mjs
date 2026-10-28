@@ -16,6 +16,8 @@ import {
   accumRecipeParams,
   SPECTRAL_HALF_LIFE,
   spectralKeep,
+  HALATION_TINT_FALLBACK,
+  halationTintForPalette,
   sanitizeAccumOptics,
   sanitizeAccumTunnel,
   sanitizeAccumPrism,
@@ -124,6 +126,45 @@ ok('recipe params: one optics amount drives bloom + halation + stipple + chroma'
   assert.ok(half.bloomAmount < p.bloomAmount, 'amount scales with the slider');
   assert.ok(half.halationLod < p.halationLod, 'mip depth scales with the slider');
   assert.ok(half.stipple < p.stipple, 'stipple scales with the slider');
+});
+
+ok('halation tint: derived from the palette, the constant is the fallback (#1803)', () => {
+  const TEAL = ['#0e5a5a', '#12836f', '#17bebb', '#0a3d4d', '#7fe0d4'];
+  const AMBER = ['#b35c00', '#e07b00', '#ffb340', '#7a2e00', '#ffd9a0'];
+  const FB = [1.0, 0.6, 0.35];
+  // No palette: the #169 constant, bit-identical — existing goldens hold.
+  assert.deepEqual(HALATION_TINT_FALLBACK, FB);
+  assert.deepEqual(halationTintForPalette(null), FB);
+  assert.deepEqual(halationTintForPalette(undefined), FB);
+  assert.deepEqual(accumRecipeParams({ optics: 1 }).halationTint, FB, 'no palette in the call -> constant tint');
+  // Garbage in: fallback, never a throw, never a non-finite channel (#763 law).
+  for (const bad of [[], ['#000000', '#050505'], ['nope'], [42, null], 'teal', 7]) {
+    const t = halationTintForPalette(bad);
+    assert.deepEqual(t, FB, `garbage palette ${JSON.stringify(bad)} falls back`);
+    assert.ok(t.every(Number.isFinite), 'tint channels stay finite');
+  }
+  // No usable chroma spread: a monochrome ramp and a single colour both
+  // keep the classic warm halation rather than collapsing to grey.
+  assert.deepEqual(halationTintForPalette(['#111111', '#555555', '#999999', '#dddddd']), FB, 'monochrome -> fallback');
+  assert.deepEqual(halationTintForPalette(['#17bebb']), FB, 'single colour -> fallback');
+  // A saturated teal palette halates cool; an amber palette halates warm.
+  const teal = halationTintForPalette(TEAL);
+  const amber = halationTintForPalette(AMBER);
+  assert.ok(teal[2] > teal[0], `teal tint reads cool (b > r), got [${teal}]`);
+  assert.ok(amber[0] > amber[2], `amber tint reads warm (r > b), got [${amber}]`);
+  // A bleed, never a neon: desaturated — no channel reaches saturation.
+  assert.ok(Math.max(...teal) < 1 && Math.max(...amber) < 1, 'derived tints stay below 1 per channel');
+  // Energy pin: the channel sum equals the constant's, so the total
+  // halation add-back on a neutral core matches the constant's energy.
+  const sum = (t) => t[0] + t[1] + t[2];
+  assert.ok(Math.abs(sum(teal) - sum(FB)) < 1e-9, 'teal tint energy pinned to the constant');
+  assert.ok(Math.abs(sum(amber) - sum(FB)) < 1e-9, 'amber tint energy pinned to the constant');
+  // Through the params builder, and the audio gesture — which recomputes
+  // the optics fields every frame — carries the palette tint through.
+  const p = accumRecipeParams({ optics: 0.5, palette: TEAL });
+  assert.deepEqual(p.halationTint, teal, 'the recipe derives the tint from the call palette');
+  const loud = applyAudioEnvelope(p, { rms: 1, flux: 0, beatPulse: 1 });
+  assert.deepEqual(loud.halationTint, teal, 'audio recompute carries the palette tint, not the constant');
 });
 
 ok('sanitizeAccumOptics clamps to 0..1', () => {
@@ -790,6 +831,78 @@ ok('mirror: 240 hot steps no longer converge to flat white (#1801)', () => {
   assert.ok(acc0[o] <= 1 && acc0[o + 1] <= 0.55 && acc0[o + 2] <= 0.12, 'optics 0: nothing above the deposit');
 });
 
+ok('mirror: palette halation — the bleed takes the look’s colours (#1803)', () => {
+  const w = 64,
+    h = 64,
+    n4 = w * h * 4;
+  const block = new Float64Array(n4);
+  for (let y = 26; y < 38; y++) {
+    for (let x = 26; x < 38; x++) {
+      const o = (y * w + x) * 4;
+      block[o] = 1;
+      block[o + 1] = 1;
+      block[o + 2] = 1;
+      block[o + 3] = 1;
+    }
+  }
+  const TEAL = ['#0e5a5a', '#12836f', '#17bebb', '#0a3d4d', '#7fe0d4'];
+  const AMBER = ['#b35c00', '#e07b00', '#ffb340', '#7a2e00', '#ffd9a0'];
+  // Halation tier only: bloom amount zeroed, gate + chroma off (they have
+  // their own tests) — what remains in the halo is the tinted add-back.
+  const run = (palette) => {
+    const p = { ...accumRecipeParams({ fade: 1, optics: 0.25, palette }), bloomAmount: 0, stipple: 0, chromaTexels: 0 };
+    return mirrorAccumStep({ accum: new Float64Array(n4), frame: block, w, h, params: p });
+  };
+  const plain = mirrorAccumStep({
+    accum: new Float64Array(n4),
+    frame: block,
+    w,
+    h,
+    params: accumRecipeParams({ fade: 1, optics: 0 }),
+  });
+  const sum = (buf) => {
+    let s = 0;
+    for (let i = 0; i < buf.length; i += 4) s += buf[i] + buf[i + 1] + buf[i + 2];
+    return s;
+  };
+  // Halo hue: red-minus-blue over the pixels outside the block — the wide
+  // add-back region, where only the glow reaches (the white core abstains).
+  const haloHue = (buf) => {
+    let d = 0;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        if (x >= 26 && x < 38 && y >= 26 && y < 38) continue;
+        const o = (y * w + x) * 4;
+        d += buf[o] - buf[o + 2];
+      }
+    }
+    return d;
+  };
+  const base = run(null);
+  const teal = run(TEAL);
+  const amber = run(AMBER);
+  // Hue: the same scene halates cool on the teal palette, warm on amber,
+  // warmest on the constant — the bleed belongs to the look on stage.
+  assert.ok(haloHue(teal) < 0, `teal halo reads cool (r-b < 0), got ${haloHue(teal).toFixed(3)}`);
+  assert.ok(haloHue(amber) > 0, `amber halo reads warm (r-b > 0), got ${haloHue(amber).toFixed(3)}`);
+  assert.ok(haloHue(base) > haloHue(amber), 'the constant is the warmest of the three');
+  // Energy: total halation light at optics 0.25 within ±5% of the
+  // constant-tint baseline for both derived tints — the derivation must
+  // not quietly make GLOW stronger or weaker.
+  const eBase = sum(base) - sum(plain);
+  assert.ok(eBase > 0, 'halation adds measurable light at optics 0.25');
+  for (const [name, buf] of [
+    ['teal', teal],
+    ['amber', amber],
+  ]) {
+    const e = sum(buf) - sum(plain);
+    assert.ok(
+      Math.abs(e / eBase - 1) <= 0.05,
+      `${name} halation energy within ±5% of baseline (ratio ${(e / eBase).toFixed(4)})`,
+    );
+  }
+});
+
 const fbParams = (over) => ({ ...accumRecipeParams({ fade: 1, optics: 0 }), ...over });
 
 ok('mirror: tunnel zoom pulls a soft mark toward center', () => {
@@ -1234,6 +1347,7 @@ async function runBrowserTests() {
       echoes = 0,
       audio = null,
       stipple = null,
+      palette = null,
       frames,
     }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
@@ -1249,6 +1363,7 @@ async function runBrowserTests() {
         echoWidth: w,
         audio,
         stipple,
+        palette,
         frames: frames.map(bytesOf),
       });
       return { gpu: f64Of(res.pixels), w: res.width, h: res.height };
@@ -1265,6 +1380,7 @@ async function runBrowserTests() {
       echoes = 0,
       audio = null,
       stipple = null,
+      palette = null,
       frames,
     }) => {
       const bgV = [0, 1, 2].map((i) => parseInt(bg.slice(1 + i * 2, 3 + i * 2), 16) / 255);
@@ -1275,7 +1391,17 @@ async function runBrowserTests() {
         acc[i * 4 + 2] = bgV[2];
         acc[i * 4 + 3] = 1;
       }
-      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background: bg });
+      const base = accumRecipeParams({
+        fade,
+        optics,
+        tunnel,
+        prism,
+        flow,
+        echoes,
+        echoWidth: w,
+        background: bg,
+        palette,
+      });
       if (stipple !== null && stipple !== undefined) base.stipple = stipple;
       const echo = createEchoState();
       let i = 0;
@@ -1382,6 +1508,37 @@ async function runBrowserTests() {
       assert.ok(hal(gpu) > hal(plain.gpu), 'optics shift the added light warm/red');
       // The frame itself lands sharp — no blur-over-time.
       assert.ok(at(30, 30) > 0.99, 'the block interior is untouched at full weight');
+    });
+
+    await okAsync('probe: palette halation — the GPU halo takes the palette hue (#1803)', async () => {
+      const w = 64,
+        h = 64;
+      const frames = [whiteBlock(w, h, 26, 26, 12, 1)];
+      const TEAL = ['#0e5a5a', '#12836f', '#17bebb', '#0a3d4d', '#7fe0d4'];
+      const { gpu } = await runProbe({ w, h, fade: 1, optics: 1, stipple: 0, palette: TEAL, frames });
+      const ref = mirrorSeq({ w, h, bg: '#000000', fade: 1, optics: 1, stipple: 0, palette: TEAL, frames });
+      closeTo(gpu, ref, 6 * LSB, 'palette-tinted glow step (stipple off)');
+      // Halo hue against the same scene on the constant tint: every other
+      // contribution (bloom is neutral, the chroma fringe is identical)
+      // cancels, so the red-minus-blue delta over the halo region is the
+      // tint's alone — and it must swing cool on a teal palette.
+      const { gpu: warmGpu } = await runProbe({ w, h, fade: 1, optics: 1, stipple: 0, frames });
+      const haloRB = (buf) => {
+        let d = 0;
+        for (let y = 0; y < h; y++) {
+          for (let x = 0; x < w; x++) {
+            if (x >= 26 && x < 38 && y >= 26 && y < 38) continue;
+            const o = (y * w + x) * 4;
+            d += buf[o] - buf[o + 2];
+          }
+        }
+        return d;
+      };
+      assert.ok(
+        haloRB(gpu) < haloRB(warmGpu),
+        `teal halo swings cool vs the constant (Δ ${(haloRB(gpu) - haloRB(warmGpu)).toFixed(3)})`,
+      );
+      assert.ok(haloRB(warmGpu) > 0, 'the constant-tint halo reads warm, as before');
     });
 
     await okAsync('probe: stipple diffusion is live and statistically matches the mirror', async () => {

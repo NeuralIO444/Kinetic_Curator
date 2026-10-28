@@ -262,6 +262,9 @@ async function main(argv) {
       echoes: args.echoes,
       audio: audioFrames,
       swell: args.swell,
+      // #1803: the halation tint derives from the project's palette — the
+      // same first-layer palette the background above resolves from.
+      palette: firstLayers[0]?.palette?.swatches ?? null,
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);

@@ -78,6 +78,8 @@ window.__kcAccumProbe = (p) => {
       echoWidth: p.echoWidth ?? p.w,
       // #287 fade-to-paper: the fade target follows the probe background.
       background: p.bg || '#000000',
+      // #1803: the halation tint derives from the probe palette, if any.
+      palette: p.palette ?? null,
     });
     const audio = p.audio || null;
     let i = 0;

@@ -63,6 +63,14 @@ ping-pong, NEAREST):
    gaussian blur, add back: `accum.rgb += 0.55 × optics × blurred`.
 6. **Halation** (#169) — the same downsampled buffer blurred *wider*, added
    back with a red/warm bias: `accum.rgb += 0.45 × optics × (1.0, 0.6, 0.35) × blurredWide`.
+   #1803: the bias is no longer a constant — the tint is derived from the
+   active palette (its luminance-weighted centroid, desaturated, energy
+   pinned to the constant's), so a teal look halates cool and an amber
+   look halates warm. The constant above survives as the fallback: no
+   palette in the call, or a palette with no usable chroma spread
+   (single-colour / monochrome), keeps the classic warm halation. The
+   tint is derived, never typed — it appears in no panel and no project
+   field.
    The reference look is the full 3σ gaussian kernel the JS mirror evaluates
    (#226): halation σ runs 11→33px on the quarter-res buffer, whose 3σ radius
    (up to 99 taps) exceeds the blur shader's 64-tap loop, so the GPU
@@ -273,7 +281,8 @@ The acceptance bar for a trail still:
 - New ink **lands over** old light — the freshest frame is always the
   brightest thing in the buffer.
 - With GLOW up, bright cores **bloom**: light bleeds softly outward and the
-  core lifts past 1.0; the bleed runs **warm** (halation), never neutral gray.
+  core lifts past 1.0; the bleed takes the **look's colours** (halation,
+  #1803 — warm on the fallback palette), never neutral gray.
 - With GLOW at 0, a bright pixel **does not bleed** — the buffer is exactly
   fade + over.
 

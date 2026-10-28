@@ -288,6 +288,19 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   assertRecipeFinite(h);
   checks++;
 
+  // #1803: the halation tint is palette state, not optics state — a warp
+  // on palette-derived params carries the derived tint through its optics
+  // recompute instead of resetting it to the fallback constant.
+  const TEAL = ['#0e5a5a', '#12836f', '#17bebb', '#0a3d4d', '#7fe0d4'];
+  const palBase = accumRecipeParams({ fade: 0.88, optics: 0.1, palette: TEAL });
+  assert.notDeepEqual(palBase.halationTint, base.halationTint, 'the teal palette derives a non-constant tint');
+  assert.deepEqual(
+    applySpectrumWarp(palBase, hot, 1).halationTint,
+    palBase.halationTint,
+    'warp carries the palette tint',
+  );
+  checks++;
+
   // Partial amount scales the whole gesture; hostile warp values stay inside the clamps.
   const half = applySpectrumWarp(base, hot, 0.5);
   ok(Math.abs(half.tunnelSpin - (base.tunnelSpin + 0.0075)) < 1e-12, 'amount 0.5 halves the spin');
