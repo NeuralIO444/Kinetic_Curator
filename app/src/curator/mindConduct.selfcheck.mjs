@@ -462,6 +462,14 @@ ok(
       'bounded',
     );
     assert.equal(showOf(null), null);
+    assert.ok(!('spectrum' in showOf({})), 'absent spectrum: no key');
+    assert.ok(!('spectrum' in showOf({ spectrum: 'loud' })), 'a string is not a spectrum');
+    assert.ok(!('spectrum' in showOf({ spectrum: { centroid: NaN, flux: 0.1, flatness: 0.2 } })), 'NaN field: no key');
+    assert.deepEqual(showOf({ spectrum: { centroid: 1.5, flux: -1, flatness: 0.123456 } }).spectrum, {
+      centroid: 1,
+      flux: 0,
+      flatness: 0.123,
+    });
   },
 );
 

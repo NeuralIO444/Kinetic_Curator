@@ -22,7 +22,7 @@ const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
 const ADD = { op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.3 };
 /** A fresh trio on a fake store: state { audioRoutes, layoutParams }, a setter that mimics the bus -> store path. */
-function rig({ tier = 't3', replaying = false, activity = null } = {}) {
+function rig({ tier = 't3', replaying = false, activity = null, spectrum = undefined } = {}) {
   const st = { audioRoutes: null, layoutParams: { squash: 0, audioAlphaMod: 0.25 } };
   const subs = [];
   const set = (patch) => {
@@ -40,6 +40,7 @@ function rig({ tier = 't3', replaying = false, activity = null } = {}) {
     getTier: () => ctl.tier,
     getBands: () => [0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.1],
     getActivity: activity ? () => activity : null,
+    ...(spectrum !== undefined ? { getSpectrum: spectrum } : {}),
     isReplaying: () => ctl.replaying,
     subscribe: (f) => {
       subs.push(f);
@@ -395,5 +396,41 @@ ok(
       assert.ok(label.includes(`'${m[1]}'`), `${m[1]} is pickable in the MATRIX`);
   },
 );
+
+ok('the show block carries the spectrum summary only while audio is live and not silent', () => {
+  const SUM = { centroid: 0.4, flux: 0.2, flatness: 0.7 };
+  const g = rig({ spectrum: () => SUM });
+  audioOn();
+  g.bar(1);
+  assert.deepEqual(g.trio.showBlock().spectrum, SUM);
+  emit(Events.AUDIO_SILENCE_START, { ms: 2000 });
+  g.bar(2);
+  assert.ok(!('spectrum' in g.trio.showBlock()), 'silent: no key');
+  emit(Events.AUDIO_SILENCE_END, {});
+  g.bar(3);
+  assert.deepEqual(g.trio.showBlock().spectrum, SUM);
+  audioOn(); // a new input resets the show
+  assert.ok(!('spectrum' in g.trio.showBlock()), 'reset clears it');
+  g.done();
+  const n1 = rig({ spectrum: () => null });
+  audioOn();
+  n1.bar(1);
+  assert.ok(!('spectrum' in n1.trio.showBlock()), 'null summary: no key');
+  n1.done();
+  const n2 = rig();
+  audioOn();
+  n2.bar(1);
+  assert.ok(!('spectrum' in n2.trio.showBlock()), 'omitted getSpectrum: no key');
+  n2.done();
+  const n3 = rig({
+    spectrum: () => {
+      throw new Error('boom');
+    },
+  });
+  audioOn();
+  n3.bar(1);
+  assert.ok(!('spectrum' in n3.trio.showBlock()), 'a throw is null');
+  n3.done();
+});
 
 console.log(`trioLive.selfcheck: ${n} checks passed`);

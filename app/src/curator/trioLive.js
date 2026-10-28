@@ -71,6 +71,7 @@ const notify = () => {
  * @param getTier     () => 't1'..'t4' | null   Davis's engagement tier
  * @param getBands    () => number[7] | null    the band levels now (null: audio off)
  * @param getActivity () => { keeps, rolls } in the recent window (LOIS's keep-rate read); absent = no bias
+ * @param getSpectrum () => {centroid, flux, flatness} | null   the spectrum summary now (absent / null: none)
  * @param isReplaying () => boolean
  * @param subscribe   (fn(state, prev)) => unsubscribe   the store's subscribe: the artist's route and dial edits
  * @returns { showBlock(), conductor, stop() }
@@ -80,6 +81,7 @@ export function startTrio({
   getTier,
   getBands,
   getActivity = null,
+  getSpectrum = null,
   isReplaying = () => false,
   subscribe = null,
 }) {
@@ -99,6 +101,7 @@ export function startTrio({
   const log = []; // the last LOG_MAX outcomes, newest first
   let applying = false; // our own table write: not the artist
   let bar = 0;
+  let spectrum = null; // the latest spectrum summary, or null
   let bias = 0; // LOIS's keep-rate read, -1..+1
   const stops = [];
 
@@ -157,6 +160,7 @@ export function startTrio({
     audio.onsets = 0;
     audio.onsetsThisBar = 0;
     audio.sinceBars = 0;
+    spectrum = null;
     flatness.reset();
     pending = null;
   };
@@ -231,6 +235,14 @@ export function startTrio({
         bands = audio.silent ? null : getBands();
       } catch {
         bands = null;
+      }
+      if (audio.silent || !getSpectrum) spectrum = null;
+      else {
+        try {
+          spectrum = getSpectrum() || null;
+        } catch {
+          spectrum = null;
+        }
       }
       let act;
       try {
@@ -348,6 +360,7 @@ export function startTrio({
           ...(r.by ? { by: r.by } : {}),
         })),
         owned: conductor.owned(),
+        ...(spectrum ? { spectrum } : {}),
       };
     },
     stop() {
