@@ -19,7 +19,7 @@ Three composition modes, one engine. Mode is a track-level switch, persisted per
 
 **FIELD** (reference 3 — "Seamless Geometric Pattern") — each tile is itself a small repeating micro-pattern: stripe stacks, triangle fields, plus-sign grids, zigzag rows, diamond lattice, concentric arcs, pinstripes, ray bursts. Tiles are seamless — every micro-pattern wraps at the tile edge (designed on a torus), so the whole field can pan/zoom infinitely with no visible seams. No grout at all; tiles butt-joint into one continuous textile. The VJ move is slow drift across the field, not shuffling it.
 
-**READOUT** (#1797 — "threshold grid", reference loot from Sai Karlen) — a fixed grid of squircles that never moves position. A travelling noise field is sampled at every cell and read out two ways at once: colour by threshold (three states) and drawn size. The pattern depicts nothing; it makes an invisible field legible as patches, bands and pulse. See Composition (READOUT).
+**TIDES** (#1797 — "threshold grid", reference loot from Sai Karlen) — a fixed grid of squircles that never moves position. A travelling noise field is sampled at every cell and read out two ways at once: colour by threshold (three states) and drawn size. The pattern depicts nothing; it makes an invisible field legible as patches, bands and pulse. See Composition (TIDES).
 
 GLYPH and FIELD are not MIX extremes of QUILT. MIX cannot produce negative space or edge-wrapping. They are mode switches.
 
@@ -170,9 +170,9 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 - Palette: full active palette allowed, but each tile uses at most 3 hues.
 - Motion: slow infinite pan across the field. DRIFT controls speed. Direction is a seeded angle, stable for the seed. SHUFFLE re-seeds pattern assignment and does not interrupt the pan.
 
-## Composition (READOUT)
+## Composition (TIDES)
 
-(#1797, built on Matt's word 2026-10-28.) Code: `app/src/pattern/readout.js`; checks: `readout.selfcheck.mjs`.
+(#1797, built on Matt's word 2026-10-28.) Code: `app/src/pattern/tides.js`; checks: `readout.selfcheck.mjs`.
 
 - Grid of square cells, `cols = 2 × DENSITY` (DENSITY 10 → 20 across, the reference's ~20×20). Rows fill the frame height at the same cell. Cells never move.
 - One field per seed (`createNoise`, the kernel's simplex), sampled once per cell per frame, value in [0, 1].
@@ -182,7 +182,7 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 - Shape: superellipse, exponent 4. Hard edges, pixel-centre sampled, like every PATTERN mode.
 - MIX is the field's grain: low = broad patches, high = fine speckle. GROUT, HERO, KIN and MOVERS are not read (no separate elements).
 - Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, so existing seeded deals are unchanged.
-- Cost: tier 0 at registration (`pattern/readout`), CPU raster ≈ 3 ms per moving 1000×700 frame; still frames are drawn once and cached.
+- Cost: tier 0 at registration (`pattern/tides`), CPU raster ≈ 3 ms per moving 1000×700 frame; still frames are drawn once and cached.
 
 ## Composition (ESCHER) — parked
 
@@ -204,16 +204,16 @@ GLYPH further restricts to the 4–6 strongest roles. FIELD and QUILT may use th
 
 ## Parameters (artist units, all MOD-routable)
 
-| Param   | Range                           | Default                                         | Notes                                                                                                      |
-| ------- | ------------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| MODE    | QUILT / GLYPH / FIELD / READOUT | QUILT                                           | Track-level. ESCHER not in the enum until unparked.                                                        |
-| DENSITY | 4–12 tiles                      | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (READOUT) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped.                               |
-| MIX     | 0–100%                          | 55%                                             | Motif entropy inside the current mode's vocabulary.                                                        |
-| SEED    | uint32                          | stored integer                                  | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value.                       |
-| GROUT   | 0–8% of tile                    | 3% QUILT, 0 GLYPH, 0 FIELD                      | Fraction of tile size, not pixels. Resolution-independent.                                                 |
-| HERO    | 0–100%                          | 25%                                             | QUILT only. Probability on the coarser lattice. Capped, no adjacency. Ignored in GLYPH and FIELD.          |
-| DRIFT   | 0–100%                          | 20%                                             | Intensifies the mode's own motion. Does not swap motifs.                                                   |
-| DROP    | off / on                        | off                                             | Separate gate. When on, and BEAT is running, SHUFFLE quantizes to the bar. High DRIFT does not imply DROP. |
+| Param   | Range                         | Default                                       | Notes                                                                                                      |
+| ------- | ----------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| MODE    | QUILT / GLYPH / FIELD / TIDES | QUILT                                         | Track-level. ESCHER not in the enum until unparked.                                                        |
+| DENSITY | 4–12 tiles                    | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped.                               |
+| MIX     | 0–100%                        | 55%                                           | Motif entropy inside the current mode's vocabulary.                                                        |
+| SEED    | uint32                        | stored integer                                | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value.                       |
+| GROUT   | 0–8% of tile                  | 3% QUILT, 0 GLYPH, 0 FIELD                    | Fraction of tile size, not pixels. Resolution-independent.                                                 |
+| HERO    | 0–100%                        | 25%                                           | QUILT only. Probability on the coarser lattice. Capped, no adjacency. Ignored in GLYPH and FIELD.          |
+| DRIFT   | 0–100%                        | 20%                                           | Intensifies the mode's own motion. Does not swap motifs.                                                   |
+| DROP    | off / on                      | off                                           | Separate gate. When on, and BEAT is running, SHUFFLE quantizes to the bar. High DRIFT does not imply DROP. |
 
 ## Motion (never static — the house rule)
 
@@ -222,7 +222,7 @@ DRIFT means one thing per mode. It does not also mean hue cycle, motif morph, an
 - QUILT: slow per-tile rotation on pinwheels and medallions, phase-offset, so the field breathes rather than spins. Amount = DRIFT.
 - GLYPH: phase-offset scale pulse across the grid. Amount = DRIFT. Scale `1 + 0.2 * DRIFT * sin(phase + t)`, peak 72% of tile, trough 48%, never leaves the tile rect. No rotation over time. Construction and the filled-mark quota are in Composition (GLYPH).
 - FIELD: pan speed across the torus. Amount = DRIFT. Direction is seed-stable.
-- READOUT: the field's own clock. DRIFT scales time (DRIFT 0.5 at 4 s = DRIFT 1 at 2 s): the field travels downward, evolves, and breathes from blotchy patches into broad horizontal bands and back (one breath = 9 DRIFT-seconds). The grid stays put.
+- TIDES: the field's own clock. DRIFT scales time (DRIFT 0.5 at 4 s = DRIFT 1 at 2 s): the field travels downward, evolves, and breathes from blotchy patches into broad horizontal bands and back (one breath = 9 DRIFT-seconds). The grid stays put.
 - Accent hue cycle is not DRIFT. It is a MATH tone op (HUE ROTATE) on the palette. PATTERN does not re-key color.
 - Motif morph (diamond ↔ hexagon) is parked. No shape interpolator in v1.
 - SHUFFLE re-seeds assignment inside the current mode. If DROP is on and BEAT is running, the reseed lands on the bar. The pattern drop is the product.

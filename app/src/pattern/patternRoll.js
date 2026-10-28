@@ -39,7 +39,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** A freshly dealt block. DROP is a performance setting, so a deal keeps it. About half the deals are still. */
 export function dealPattern(prev, rng) {
   const p = sanitizePattern(prev);
-  const mode = PATTERN_DEAL_MODES[Math.floor(rng() * PATTERN_DEAL_MODES.length)]; // #1797: READOUT is hand-picked only
+  const mode = PATTERN_DEAL_MODES[Math.floor(rng() * PATTERN_DEAL_MODES.length)]; // #1797: TIDES is hand-picked only
   return sanitizePattern({
     ...p,
     mode,

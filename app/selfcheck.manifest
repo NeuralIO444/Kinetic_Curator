@@ -433,7 +433,7 @@ node src/pattern/patternRender.selfcheck.mjs
 node src/pattern/rasterFast.selfcheck.mjs
 node src/pattern/patternRoll.selfcheck.mjs
 node src/pattern/elements.selfcheck.mjs
-node src/pattern/readout.selfcheck.mjs
+node src/pattern/tides.selfcheck.mjs
 node src/panels/build/patternEditor.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs

@@ -1,4 +1,4 @@
-// readout.selfcheck.mjs — PATTERN READOUT: a threshold grid that reads out a moving field (#1797).
+// readout.selfcheck.mjs — PATTERN TIDES: a threshold grid that reads out a moving field (#1797).
 //
 // What the issue asks, as checks:
 //   a fixed grid that never moves position; a travelling field sampled per cell; THREE colour states by threshold
@@ -7,22 +7,22 @@
 //   registration.
 import assert from 'node:assert';
 import {
-  assignReadout,
-  rasterReadout,
-  readoutCells,
-  readoutCellOf,
-  readoutBand,
-  readoutCols,
-  readoutRoles,
-  readoutValue,
-  readoutTau,
-  READOUT_BREATH_S,
-  READOUT_SIZE_MIN,
-  READOUT_FILL,
-  READOUT_SQUIRCLE_N,
-  READOUT_EYE,
-  READOUT_EYE_MIN_SIZE,
-} from './readout.js';
+  assignTides,
+  rasterTides,
+  tidesCells,
+  tidesCellOf,
+  tidesBand,
+  tidesCols,
+  tidesRoles,
+  tidesValue,
+  tidesTau,
+  TIDES_BREATH_S,
+  TIDES_SIZE_MIN,
+  TIDES_FILL,
+  TIDES_SQUIRCLE_N,
+  TIDES_EYE,
+  TIDES_EYE_MIN_SIZE,
+} from './tides.js';
 import { createPatternFrames, patternPixels, patternKey } from './patternSource.js';
 import { patternGround } from './ground.js';
 import { dealPattern } from './patternRoll.js';
@@ -43,45 +43,45 @@ const PAL_ID = Object.keys(PALETTES).find((k) => (PALETTES[k].swatches || []).le
 const PAL = resolvePalette(PAL_ID, null, []);
 const W = 400;
 const H = 280;
-const block = (over = {}) => sanitizePattern({ ...defaultPattern('READOUT', 0x1797), ...over });
+const block = (over = {}) => sanitizePattern({ ...defaultPattern('TIDES', 0x1797), ...over });
 
-ok('READOUT is a pattern mode the editor offers, opening at 20 cells across; KIN/CURATOR do not deal it', () => {
-  assert.ok(PATTERN_MODES.includes('READOUT'));
-  assert.ok(!PATTERN_DEAL_MODES.includes('READOUT'), 'hand-picked only (parked library work)');
+ok('TIDES is a pattern mode the editor offers, opening at 20 cells across; KIN/CURATOR do not deal it', () => {
+  assert.ok(PATTERN_MODES.includes('TIDES'));
+  assert.ok(!PATTERN_DEAL_MODES.includes('TIDES'), 'hand-picked only (parked library work)');
   assert.deepEqual(PATTERN_DEAL_MODES, ['QUILT', 'GLYPH', 'FIELD'], 'existing seeded deals are unchanged');
   const rng = mkRng(7);
-  for (let i = 0; i < 400; i++) assert.notEqual(dealPattern(block(), rng).mode, 'READOUT');
-  assert.equal(readoutCols(block().density), 20);
-  assert.equal(readoutCols(4), 8);
-  assert.equal(readoutCols(12), 24);
+  for (let i = 0; i < 400; i++) assert.notEqual(dealPattern(block(), rng).mode, 'TIDES');
+  assert.equal(tidesCols(block().density), 20);
+  assert.equal(tidesCols(4), 8);
+  assert.equal(tidesCols(12), 24);
 });
 
 ok('cost tier declared at registration: tier 0 (CPU raster, never shed), with a time estimate', () => {
-  const d = getCostTier('pattern/readout');
-  assert.ok(d, 'pattern/readout is registered');
+  const d = getCostTier('pattern/tides');
+  assert.ok(d, 'pattern/tides is registered');
   assert.equal(d.tier, 0);
   assert.ok(d.timeMs > 0 && /1797/.test(d.notes));
 });
 
 ok('the value → cell map: three states at 1/3 and 2/3; deep values swell, threshold-adjacent values are dots', () => {
-  assert.equal(readoutCellOf(0).state, 0);
-  assert.equal(readoutCellOf(0.5).state, 1);
-  assert.equal(readoutCellOf(1).state, 2);
-  assert.equal(readoutCellOf(0).size, 1, 'the field floor is a full cell');
-  assert.equal(readoutCellOf(1).size, 1, 'the field ceiling is a full cell');
-  assert.equal(readoutCellOf(0.5).size, 1, 'the middle of the mid band is a full cell');
+  assert.equal(tidesCellOf(0).state, 0);
+  assert.equal(tidesCellOf(0.5).state, 1);
+  assert.equal(tidesCellOf(1).state, 2);
+  assert.equal(tidesCellOf(0).size, 1, 'the field floor is a full cell');
+  assert.equal(tidesCellOf(1).size, 1, 'the field ceiling is a full cell');
+  assert.equal(tidesCellOf(0.5).size, 1, 'the middle of the mid band is a full cell');
   for (const edge of [1 / 3, 2 / 3]) {
-    assert.ok(readoutCellOf(edge - 1e-9).size < READOUT_SIZE_MIN + 0.01, 'just under a threshold: a dot');
-    assert.ok(readoutCellOf(edge + 1e-9).size < READOUT_SIZE_MIN + 0.01, 'just over a threshold: a dot');
+    assert.ok(tidesCellOf(edge - 1e-9).size < TIDES_SIZE_MIN + 0.01, 'just under a threshold: a dot');
+    assert.ok(tidesCellOf(edge + 1e-9).size < TIDES_SIZE_MIN + 0.01, 'just over a threshold: a dot');
   }
   for (let v = 0; v <= 1; v += 0.01) {
-    const c = readoutCellOf(v);
-    assert.ok(c.size >= READOUT_SIZE_MIN && c.size <= 1);
+    const c = tidesCellOf(v);
+    assert.ok(c.size >= TIDES_SIZE_MIN && c.size <= 1);
   }
 });
 
 ok('palette only: ground + three states, sorted dark → light; every pixel is one of those four colours', () => {
-  const { ground, states } = readoutRoles(PAL);
+  const { ground, states } = tidesRoles(PAL);
   assert.equal(states.length, 3);
   const allowed = new Set([ground, ...states].map(toRgba));
   for (const t of [0, 3.3, 11]) {
@@ -90,7 +90,7 @@ ok('palette only: ground + three states, sorted dark → light; every pixel is o
   }
   // a one- or two-swatch palette still renders (cycles; never throws)
   const thin = { swatches: ['#000000', '#ff2200'], bg: '#000000', ink: '#ffffff' };
-  assert.equal(readoutRoles(thin).states.length, 3);
+  assert.equal(tidesRoles(thin).states.length, 3);
   patternPixels(block(), thin, 64, 48, 0);
 });
 
@@ -101,13 +101,13 @@ ok('a frame shows all three states, both swollen cells and dots, and eyes on the
   let dots = 0;
   let eyes = 0;
   for (const seed of [1, 2, 3]) {
-    const g = assignReadout(seed, 10, 0.4, PAL, 14);
+    const g = assignTides(seed, 10, 0.4, PAL, 14);
     for (const t of [0, 4, 9]) {
-      for (const c of readoutCells(g, 1, t)) {
+      for (const c of tidesCells(g, 1, t)) {
         states.add(c.state);
         if (c.size > 0.85) big++;
         if (c.size < 0.35) dots++;
-        if (c.state === 1 && c.size >= READOUT_EYE_MIN_SIZE) eyes++;
+        if (c.state === 1 && c.size >= TIDES_EYE_MIN_SIZE) eyes++;
       }
     }
   }
@@ -128,7 +128,7 @@ ok('replay law: same seed + params + t = identical pixels; another seed differs;
   const m1 = patternPixels(block({ drift: 0.5 }), PAL, W, H, 1);
   const m2 = patternPixels(block({ drift: 0.5 }), PAL, W, H, 1.5);
   assert.notDeepEqual(m1, m2, 'DRIFT above 0: the field moves');
-  // kin / movers are element motion; READOUT has no separate elements, so they change nothing
+  // kin / movers are element motion; TIDES has no separate elements, so they change nothing
   assert.deepEqual(
     patternPixels(block({ drift: 0.5, kin: 'SPIN', movers: 1 }), PAL, W, H, 1),
     patternPixels(block({ drift: 0.5, kin: 'OFF', movers: 0 }), PAL, W, H, 1),
@@ -136,11 +136,11 @@ ok('replay law: same seed + params + t = identical pixels; another seed differs;
 });
 
 ok('the grid never moves: every cell centre is always painted, in its cell, and every gap pixel is ground', () => {
-  const g = assignReadout(0x1797, 10, 0.4, PAL, Math.ceil(H / (W / 20)));
+  const g = assignTides(0x1797, 10, 0.4, PAL, Math.ceil(H / (W / 20)));
   const cell = W / g.cols;
   const groundPx = toRgba(g.ground);
   for (const t of [0, 2, 5]) {
-    const buf = rasterReadout(new Uint32Array(W * H), W, H, g, 1, t);
+    const buf = rasterTides(new Uint32Array(W * H), W, H, g, 1, t);
     for (let r = 0; r < g.rows; r++) {
       for (let c = 0; c < g.cols; c++) {
         const cy = Math.floor((r + 0.5) * cell);
@@ -149,7 +149,7 @@ ok('the grid never moves: every cell centre is always painted, in its cell, and 
         assert.notEqual(buf[cy * W + cx], groundPx, `cell ${c},${r} centre is painted at t=${t}`);
       }
     }
-    // the gutter between cells (outside READOUT_FILL of the cell) is never painted
+    // the gutter between cells (outside TIDES_FILL of the cell) is never painted
     for (let c = 1; c < g.cols; c++) {
       const x = Math.floor(c * cell);
       for (let y = 0; y < H; y++) assert.equal(buf[y * W + x], groundPx, `gutter column ${x} stays ground`);
@@ -159,10 +159,10 @@ ok('the grid never moves: every cell centre is always painted, in its cell, and 
 
 ok('span fill matches the per-pixel superellipse + eye reference (pixel centres, hard edges)', () => {
   const rows = Math.ceil(H / (W / 20));
-  const g = assignReadout(42, 10, 0.55, PAL, rows);
+  const g = assignTides(42, 10, 0.55, PAL, rows);
   const t = 3.7;
-  const fast = rasterReadout(new Uint32Array(W * H), W, H, g, 0.8, t);
-  const cells = readoutCells(g, 0.8, t);
+  const fast = rasterTides(new Uint32Array(W * H), W, H, g, 0.8, t);
+  const cells = tidesCells(g, 0.8, t);
   const cell = W / g.cols;
   let diff = 0;
   for (let y = 0; y < H; y++) {
@@ -172,13 +172,13 @@ ok('span fill matches the per-pixel superellipse + eye reference (pixel centres,
       let want = g.groundRgba;
       if (r < g.rows) {
         const { state, size } = cells[r * g.cols + c];
-        const R = size * READOUT_FILL * cell;
+        const R = size * TIDES_FILL * cell;
         const dx = Math.abs(x + 0.5 - (c + 0.5) * cell);
         const dy = Math.abs(y + 0.5 - (r + 0.5) * cell);
-        if (dx <= R && dy <= R && (dx / R) ** READOUT_SQUIRCLE_N + (dy / R) ** READOUT_SQUIRCLE_N <= 1) {
+        if (dx <= R && dy <= R && (dx / R) ** TIDES_SQUIRCLE_N + (dy / R) ** TIDES_SQUIRCLE_N <= 1) {
           want = g.rgba[state];
-          const e = R * READOUT_EYE;
-          if (state === 1 && size >= READOUT_EYE_MIN_SIZE && dx <= e && dy <= e) want = g.rgba[2];
+          const e = R * TIDES_EYE;
+          if (state === 1 && size >= TIDES_EYE_MIN_SIZE && dx <= e && dy <= e) want = g.rgba[2];
         }
       }
       if (fast[y * W + x] !== want) diff++;
@@ -189,9 +189,9 @@ ok('span fill matches the per-pixel superellipse + eye reference (pixel centres,
 });
 
 ok('it breathes: blotchy patches at the start of a breath, broad horizontal bands at its peak, blotchy again', () => {
-  assert.equal(readoutBand(0), 0);
-  assert.ok(Math.abs(readoutBand(READOUT_BREATH_S / 2) - 1) < 1e-12);
-  assert.ok(readoutBand(READOUT_BREATH_S) < 1e-12);
+  assert.equal(tidesBand(0), 0);
+  assert.ok(Math.abs(tidesBand(TIDES_BREATH_S / 2) - 1) < 1e-12);
+  assert.ok(tidesBand(TIDES_BREATH_S) < 1e-12);
   // horizontal coherence: share of horizontally adjacent cells in the same state, minus vertical
   const coherence = (tau) => {
     let h = 0;
@@ -199,8 +199,8 @@ ok('it breathes: blotchy patches at the start of a breath, broad horizontal band
     let hn = 0;
     let vn = 0;
     for (const seed of [1, 2, 3, 4, 5]) {
-      const g = assignReadout(seed, 10, 0.5, PAL, 20);
-      const st = (c, r) => readoutCellOf(readoutValue(g, c, r, tau)).state;
+      const g = assignTides(seed, 10, 0.5, PAL, 20);
+      const st = (c, r) => tidesCellOf(tidesValue(g, c, r, tau)).state;
       for (let r = 0; r < g.rows; r++) {
         for (let c = 0; c < g.cols; c++) {
           if (c + 1 < g.cols) {
@@ -217,17 +217,17 @@ ok('it breathes: blotchy patches at the start of a breath, broad horizontal band
     return h / hn - v / vn;
   };
   const blotchy = coherence(0);
-  const banded = coherence(READOUT_BREATH_S / 2);
+  const banded = coherence(TIDES_BREATH_S / 2);
   assert.ok(banded > 0.25, `at the peak, rows agree far more than columns (${banded.toFixed(3)})`);
   assert.ok(banded > blotchy + 0.2, `bands (${banded.toFixed(3)}) vs patches (${blotchy.toFixed(3)})`);
   assert.ok(Math.abs(blotchy) < 0.15, `patches have no strong direction (${blotchy.toFixed(3)})`);
 });
 
 ok('DRIFT scales time; it is not a different picture', () => {
-  assert.equal(readoutTau(0, 50), 0);
-  assert.equal(readoutTau(0.5, 4), 2);
-  const g = assignReadout(9, 10, 0.4, PAL, 14);
-  assert.deepEqual(readoutCells(g, 0.5, 4), readoutCells(g, 1, 2), 'half speed at twice the time = the same frame');
+  assert.equal(tidesTau(0, 50), 0);
+  assert.equal(tidesTau(0.5, 4), 2);
+  const g = assignTides(9, 10, 0.4, PAL, 14);
+  assert.deepEqual(tidesCells(g, 0.5, 4), tidesCells(g, 1, 2), 'half speed at twice the time = the same frame');
 });
 
 ok('ground sampler (#1183) agrees with the pixels: at() is the colour painted at the cell centre', () => {
@@ -236,7 +236,7 @@ ok('ground sampler (#1183) agrees with the pixels: at() is the colour painted at
   const frames = createPatternFrames();
   for (const t of [0, 1.5, 6]) {
     const f = frames.frame(p, PAL, W, H, t);
-    const cell = W / readoutCols(p.density);
+    const cell = W / tidesCols(p.density);
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 20; c += 3) {
         const x = (c + 0.5) * cell;
@@ -264,10 +264,10 @@ ok('cost: a moving 1000×700 frame stays inside the declared budget (median of 3
   }
   ms.sort((a, b) => a - b);
   const med = ms[15];
-  const declared = getCostTier('pattern/readout').timeMs;
+  const declared = getCostTier('pattern/tides').timeMs;
   console.log(`      moving frame 1000×700: median ${med.toFixed(2)} ms (declared ${declared} ms)`);
   // CI machines vary; the gate is generous (4× the declaration), the log line is the honest number
   assert.ok(med < declared * 4, `median ${med.toFixed(2)} ms is far over the ${declared} ms declaration`);
 });
 
-console.log(`readout.selfcheck: ${n} checks passed`);
+console.log(`tides.selfcheck: ${n} checks passed`);

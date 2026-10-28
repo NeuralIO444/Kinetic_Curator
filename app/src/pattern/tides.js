@@ -1,8 +1,8 @@
-// readout.js — PATTERN READOUT mode: a threshold grid that reads out a moving field (#1797).
+// readout.js — PATTERN TIDES mode: a threshold grid that reads out a moving field (#1797).
 //
-// Spec: docs/PATTERN_SPEC.md — Composition (READOUT).
+// Spec: docs/PATTERN_SPEC.md — Composition (TIDES).
 //
-// The other PATTERN modes lay tiles down and move them. READOUT is a display: a fixed grid of
+// The other PATTERN modes lay tiles down and move them. TIDES is a display: a fixed grid of
 // squircles that never moves position. One shared noise field drifts under it, and every cell
 // shows the field's local value two ways at once:
 //   colour  — the value thresholded into three states (low / mid / high), three palette swatches
@@ -20,30 +20,30 @@ import { registerCostTier } from '../engine/kernel/costRegistry.mjs';
 import { hash32, toRgba, parseHex, glyphRoles } from './engine.js';
 
 /** DENSITY 4..12 → 8..24 cells across (the reference grid is about 20 across). */
-export const READOUT_CELLS_PER_DENSITY = 2;
-export const READOUT_DEFAULT_DENSITY = 10;
-export const READOUT_DEFAULT_MIX = 0.4;
+export const TIDES_CELLS_PER_DENSITY = 2;
+export const TIDES_DEFAULT_DENSITY = 10;
+export const TIDES_DEFAULT_MIX = 0.4;
 
 /** Field frequency in noise units per cell: MIX 0 = broad patches, MIX 1 = fine speckle. */
-export const READOUT_FREQ_MIN = 0.07;
-export const READOUT_FREQ_MAX = 0.26;
+export const TIDES_FREQ_MIN = 0.07;
+export const TIDES_FREQ_MAX = 0.26;
 /** Seconds of DRIFT-scaled time for one blotchy → banded → blotchy breath. */
-export const READOUT_BREATH_S = 9;
+export const TIDES_BREATH_S = 9;
 /** How far the field squashes sideways at full band (1 = pure horizontal stripes). */
-export const READOUT_BAND_SQUASH = 0.9;
+export const TIDES_BAND_SQUASH = 0.9;
 /** Travelling wave: field units per DRIFT-second, downward. */
-export const READOUT_TRAVEL = 0.32;
+export const TIDES_TRAVEL = 0.32;
 /** The field's own slow evolution along z, per DRIFT-second. */
-export const READOUT_EVOLVE = 0.12;
+export const TIDES_EVOLVE = 0.12;
 /** Smallest drawn size (a dot), as a fraction of the full squircle. */
-export const READOUT_SIZE_MIN = 0.14;
+export const TIDES_SIZE_MIN = 0.14;
 /** The full squircle's half-width as a fraction of the cell: the rest is the gap between cells. */
-export const READOUT_FILL = 0.46;
+export const TIDES_FILL = 0.46;
 /** Superellipse exponent: 2 = circle, large = square. 4 reads as a squircle. */
-export const READOUT_SQUIRCLE_N = 4;
+export const TIDES_SQUIRCLE_N = 4;
 /** Eye half-width as a fraction of the drawn squircle half-width; drawn only when the cell is this big or more. */
-export const READOUT_EYE = 0.26;
-export const READOUT_EYE_MIN_SIZE = 0.5;
+export const TIDES_EYE = 0.26;
+export const TIDES_EYE_MIN_SIZE = 0.5;
 /** The noise sample is scaled by this before thresholding: simplex rarely leaves ±0.7. */
 const GAIN = 1.45;
 
@@ -55,9 +55,9 @@ const lum = (hex) => {
 };
 
 /** cols for a DENSITY. Rows follow the frame height at the same square cell. */
-export function readoutCols(density) {
-  const d = Math.round(Number(density) || READOUT_DEFAULT_DENSITY);
-  return Math.max(4, d * READOUT_CELLS_PER_DENSITY);
+export function tidesCols(density) {
+  const d = Math.round(Number(density) || TIDES_DEFAULT_DENSITY);
+  return Math.max(4, d * TIDES_CELLS_PER_DENSITY);
 }
 
 /**
@@ -65,7 +65,7 @@ export function readoutCols(density) {
  * dark → light. Low state = darkest, mid = middle (it carries the eye), high = lightest (the eye's colour).
  * Fewer than three swatches cycle; none falls back to ink.
  */
-export function readoutRoles(palette) {
+export function tidesRoles(palette) {
   const { ground, pool } = glyphRoles(palette);
   const src = pool.length ? pool : [palette?.ink || '#ffffff'];
   const three = [0, 1, 2].map((i) => src[i % src.length]);
@@ -75,42 +75,42 @@ export function readoutRoles(palette) {
 
 /**
  * The grid: pure function of its inputs. Holds no time — time enters at sample/raster.
- * @returns {{kind:'readout', cols, rows, ground, groundRgba, states, rgba, freq, noise}}
+ * @returns {{kind:'tides', cols, rows, ground, groundRgba, states, rgba, freq, noise}}
  */
-export function assignReadout(seed, density, mix, palette, rows) {
-  const cols = readoutCols(density);
+export function assignTides(seed, density, mix, palette, rows) {
+  const cols = tidesCols(density);
   const nrows = Math.max(1, Math.round(rows ?? cols));
-  const { ground, states } = readoutRoles(palette);
+  const { ground, states } = tidesRoles(palette);
   return {
-    kind: 'readout',
+    kind: 'tides',
     cols,
     rows: nrows,
     ground,
     groundRgba: toRgba(ground),
     states,
     rgba: states.map(toRgba),
-    freq: READOUT_FREQ_MIN + (READOUT_FREQ_MAX - READOUT_FREQ_MIN) * clamp01(Number(mix) || 0),
+    freq: TIDES_FREQ_MIN + (TIDES_FREQ_MAX - TIDES_FREQ_MIN) * clamp01(Number(mix) || 0),
     // One isolated field per seed (no shared perm table): the seed's own weather.
     noise: createNoise(hash32(seed, 0x0eadb0) | 0 || 1),
   };
 }
 
 /** The breath at DRIFT-time τ: 0 = blotchy patches, 1 = broad horizontal bands. Starts blotchy. */
-export function readoutBand(tau) {
-  return 0.5 - 0.5 * Math.cos((TAU * tau) / READOUT_BREATH_S);
+export function tidesBand(tau) {
+  return 0.5 - 0.5 * Math.cos((TAU * tau) / TIDES_BREATH_S);
 }
 
 /** DRIFT-scaled time: DRIFT 0 is frozen at τ = 0 whatever the loop clock says. */
-export const readoutTau = (drift, t) => {
+export const tidesTau = (drift, t) => {
   const d = clamp01(Number(drift) || 0);
   return d === 0 ? 0 : d * (Number(t) || 0);
 };
 
 /** The field value at cell (c, r) at DRIFT-time τ, in [0, 1]. */
-export function readoutValue(grid, c, r, tau) {
-  const band = readoutBand(tau);
-  const fx = grid.freq * (1 - READOUT_BAND_SQUASH * band);
-  const n = grid.noise.noise3D(c * fx, r * grid.freq - tau * READOUT_TRAVEL, tau * READOUT_EVOLVE);
+export function tidesValue(grid, c, r, tau) {
+  const band = tidesBand(tau);
+  const fx = grid.freq * (1 - TIDES_BAND_SQUASH * band);
+  const n = grid.noise.noise3D(c * fx, r * grid.freq - tau * TIDES_TRAVEL, tau * TIDES_EVOLVE);
   return clamp01(0.5 + 0.5 * GAIN * n);
 }
 
@@ -119,23 +119,23 @@ export function readoutValue(grid, c, r, tau) {
  * how deep the value sits in its state, measured from the threshold(s) it borders — the field's
  * extremes are full cells, the borders are dots.
  */
-export function readoutCellOf(v) {
+export function tidesCellOf(v) {
   const u = clamp01(v);
   const state = u < 1 / 3 ? 0 : u < 2 / 3 ? 1 : 2;
   let depth;
   if (state === 0) depth = (1 / 3 - u) * 3;
   else if (state === 2) depth = (u - 2 / 3) * 3;
   else depth = 1 - Math.abs((u - 0.5) * 6);
-  const size = READOUT_SIZE_MIN + (1 - READOUT_SIZE_MIN) * Math.sqrt(clamp01(depth));
+  const size = TIDES_SIZE_MIN + (1 - TIDES_SIZE_MIN) * Math.sqrt(clamp01(depth));
   return { state, size };
 }
 
 /** Every cell's {state, size} for a frame, row-major. */
-export function readoutCells(grid, drift, t) {
-  const tau = readoutTau(drift, t);
+export function tidesCells(grid, drift, t) {
+  const tau = tidesTau(drift, t);
   const out = new Array(grid.cols * grid.rows);
   for (let r = 0; r < grid.rows; r++) {
-    for (let c = 0; c < grid.cols; c++) out[r * grid.cols + c] = readoutCellOf(readoutValue(grid, c, r, tau));
+    for (let c = 0; c < grid.cols; c++) out[r * grid.cols + c] = tidesCellOf(tidesValue(grid, c, r, tau));
   }
   return out;
 }
@@ -145,19 +145,19 @@ export function readoutCells(grid, drift, t) {
  * then each cell's squircle by horizontal spans (pixel-centre sampled, hard edges like every PATTERN
  * mode), then the eye. Cells are square: side = bw / cols; rows overflow the bottom edge and clip.
  */
-export function rasterReadout(buf, bw, bh, grid, drift = 0, t = 0) {
+export function rasterTides(buf, bw, bh, grid, drift = 0, t = 0) {
   buf.fill(grid.groundRgba);
   const cell = bw / grid.cols;
-  const cells = readoutCells(grid, drift, t);
-  const N = READOUT_SQUIRCLE_N;
+  const cells = tidesCells(grid, drift, t);
+  const N = TIDES_SQUIRCLE_N;
   for (let r = 0; r < grid.rows; r++) {
     const cy = (r + 0.5) * cell;
     for (let c = 0; c < grid.cols; c++) {
       const { state, size } = cells[r * grid.cols + c];
       const cx = (c + 0.5) * cell;
-      const R = size * READOUT_FILL * cell;
+      const R = size * TIDES_FILL * cell;
       fillSquircle(buf, bw, bh, cx, cy, R, N, grid.rgba[state]);
-      if (state === 1 && size >= READOUT_EYE_MIN_SIZE) fillSquare(buf, bw, bh, cx, cy, R * READOUT_EYE, grid.rgba[2]);
+      if (state === 1 && size >= TIDES_EYE_MIN_SIZE) fillSquare(buf, bw, bh, cx, cy, R * TIDES_EYE, grid.rgba[2]);
     }
   }
   return buf;
@@ -191,26 +191,26 @@ function fillSquare(buf, bw, bh, cx, cy, e, rgba) {
  * Which cell scene point (x, y) is in, for a frame `w` wide: the ground sampler (#1183) uses this so
  * marks lean toward the state colour under them. Returns the cell's state colours, its u/v and side.
  */
-export function readoutCellAt(grid, w, x, y, drift, t) {
+export function tidesCellAt(grid, w, x, y, drift, t) {
   const cell = w / grid.cols;
   const gx = x / cell;
   const gy = y / cell;
   const c = ((Math.floor(gx) % grid.cols) + grid.cols) % grid.cols;
   const r = ((Math.floor(gy) % grid.rows) + grid.rows) % grid.rows;
-  const { state, size } = readoutCellOf(readoutValue(grid, c, r, readoutTau(drift, t)));
+  const { state, size } = tidesCellOf(tidesValue(grid, c, r, tidesTau(drift, t)));
   const main = grid.states[state];
-  const colors = state === 1 && size >= READOUT_EYE_MIN_SIZE ? [main, grid.states[2]] : [main];
+  const colors = state === 1 && size >= TIDES_EYE_MIN_SIZE ? [main, grid.states[2]] : [main];
   return { state, size, main, colors, u: gx - Math.floor(gx), v: gy - Math.floor(gy), side: cell };
 }
 
 // Cost tier, declared at registration (#1797 asked for it). A CPU raster, not a GPU pass, so the governor's
 // shed ladder never touches it: tier 0 like the kernel's scent grid. Per frame: cols×rows noise samples
 // (≤ 24×17 ≈ 400) plus span fills over the frame; the selfcheck times a moving 1000×700 frame against timeMs.
-registerCostTier('pattern/readout', {
+registerCostTier('pattern/tides', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 3,
   notes:
-    '#1797 PATTERN READOUT: CPU threshold grid — ≤400 simplex samples + span-filled squircles into the ' +
+    '#1797 PATTERN TIDES: CPU threshold grid — ≤400 simplex samples + span-filled squircles into the ' +
     "pattern track's own frame buffer (moving frames capped at 1000 px wide). Still frames are drawn once and cached.",
 });

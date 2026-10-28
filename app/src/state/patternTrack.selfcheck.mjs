@@ -40,7 +40,7 @@ const pt = () => S().layers.find(isPatternLayer);
 
 // ── sanitizePattern ─────────────────────────────────────────────────────────
 ok('defaults per mode: density 8 / 4 / 6, seed a stored uint32, DRIFT 0, DROP off', () => {
-  assert.deepEqual(PATTERN_DEFAULT_DENSITY, { QUILT: 8, GLYPH: 4, FIELD: 6, READOUT: 10 }); // READOUT #1797: 10 → 20 cells across
+  assert.deepEqual(PATTERN_DEFAULT_DENSITY, { QUILT: 8, GLYPH: 4, FIELD: 6, TIDES: 10 }); // TIDES #1797: 10 → 20 cells across
   for (const m of PATTERN_MODES) {
     const p = defaultPattern(m, 0xdeadbeef);
     assert.equal(p.mode, m);

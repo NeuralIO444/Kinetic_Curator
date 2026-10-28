@@ -1,4 +1,4 @@
-// #1797 — PATTERN READOUT (threshold grid), driven through the real UI.
+// #1797 — PATTERN TIDES (threshold grid), driven through the real UI.
 import { test, expect } from '@playwright/test';
 import { addStratum } from './strata-add.mjs';
 
@@ -19,19 +19,19 @@ async function boot(page) {
 const patternOf = (page) =>
   page.evaluate(() => window.__kcStore.getState().layers.find((l) => l.type === 'pattern')?.pattern);
 
-test('READOUT: the mode tile writes through, opens at density 10, and element motion is disabled with the reason', async ({
+test('TIDES: the mode tile writes through, opens at density 10, and element motion is disabled with the reason', async ({
   page,
 }, info) => {
   await boot(page);
   await addStratum(page, 'PATTERN');
   const ed = page.locator('.pattern-editor');
   await ed.getByRole('tab', { name: /readout/i }).click();
-  await expect.poll(async () => (await patternOf(page)).mode).toBe('READOUT');
+  await expect.poll(async () => (await patternOf(page)).mode).toBe('TIDES');
   expect((await patternOf(page)).density, 'an untouched density follows the mode').toBe(10);
   await expect(ed.getByRole('combobox', { name: 'Element motion' })).toBeDisabled();
   const movers = ed.getByRole('slider', { name: 'Pattern movers' });
   await expect(movers).toBeDisabled();
-  await expect(movers).toHaveAttribute('title', /READOUT has no separate elements/);
+  await expect(movers).toHaveAttribute('title', /TIDES has no separate elements/);
   await ed.getByRole('slider', { name: 'Pattern drift' }).fill('60');
   await expect.poll(async () => (await patternOf(page)).drift).toBeCloseTo(0.6, 2);
   // for the review picture: hide the KC marks so the ground reads on its own, and show the mode tiles

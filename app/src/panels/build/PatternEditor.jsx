@@ -22,7 +22,7 @@ const MODE_HINT = {
   QUILT: 'Dense tessellation: grout, 2×2 hero tiles, the full palette.',
   GLYPH: 'A poster: one bold mark per tile on a letterboxed 5:4 grid.',
   FIELD: 'A wallpaper: ten micro-patterns that wrap, and pan.',
-  READOUT: 'A display: a still grid of cells that reads out a moving field as three colours and a size.',
+  TIDES: 'A display: a still grid of cells that reads out a moving field as three colours and a size.',
 };
 const pct = (v) => Math.round(v * 100);
 // #1137 — the KINEME motion the pattern's individual elements take while DRIFT is up.
@@ -49,7 +49,7 @@ export function PatternEditor({ layer, ordinal }) {
   const pending = useSyncExternalStore(subscribePending, pendingSnapshot).has(layer.id);
   const p = sanitizePattern(layer.pattern);
   const quilt = p.mode === 'QUILT';
-  const fieldLike = PATTERN_FIELD_LIKE.includes(p.mode); // FIELD and READOUT have no separate elements to move
+  const fieldLike = PATTERN_FIELD_LIKE.includes(p.mode); // FIELD and TIDES have no separate elements to move
   const id = layer.id;
   return (
     <div className="fx-editor pattern-editor" title={`PT-${ordinal} · ${p.mode}`}>
@@ -82,7 +82,7 @@ export function PatternEditor({ layer, ordinal }) {
       </Param>
       <Param
         label="mix"
-        hint="Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. READOUT: the field's grain, broad patches to fine speckle."
+        hint="Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle."
         readout={`${pct(p.mix)}%`}
       >
         <RangeRow
@@ -136,7 +136,7 @@ export function PatternEditor({ layer, ordinal }) {
       </Param>
       <Param
         label="drift"
-        hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, READOUT runs the field under the grid. Zero holds still."
+        hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid. Zero holds still."
         readout={`${pct(p.drift)}%`}
       >
         <RangeRow
