@@ -14,6 +14,7 @@
  *
  *   node src/gl/parity/costBench.mjs [--out dataset.json] [--only id,id]
  *     [--width 1280] [--height 720] [--frames 30] [--reps 3] [--max-payload-mb 512]
+ *     [--gpu]
  *
  * Timing honesty:
  * - Frames are timed page-side with performance.now() around renderScene,
@@ -35,6 +36,15 @@
  * stamps its environment (renderer string included) so no one can mistake
  * one environment's labels for another's. Device-truth labels come from
  * running this same harness on the Studio / real devices.
+ *
+ * GPU mode (--gpu): the stock Playwright headless launch falls back to
+ * SwiftShader on macOS even on real hardware (observed on the Mac Studio,
+ * 2026-10-28 — the probes line named SwiftShader and the simplest recipe
+ * labelled ~63 ms). --gpu launches Chromium with ANGLE pointed at the
+ * platform's real GPU backend (glDriver.realGpuLaunchArgs) and REFUSES to
+ * measure if the renderer still reports a software rasterizer: an operator
+ * who asked for device truth gets a loud failure, never quiet software
+ * labels. Default runs are unchanged.
  */
 import { writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
@@ -43,7 +53,14 @@ import { COST_CORPUS, getCostScene, castIdsOf } from './costCorpus.mjs';
 import { buildSceneContract } from '../sceneContract.js';
 import { resolveLayers, whenSwarmWasmReady } from '../../../../studio/render.mjs';
 import { getRenderCaps } from '../../data/quality.js';
-import { buildRenderPayload, openHarnessPage, closeGlDriver, evaluateChunked } from './glDriver.mjs';
+import {
+  buildRenderPayload,
+  openHarnessPage,
+  closeGlDriver,
+  evaluateChunked,
+  setGlLaunchArgs,
+  realGpuLaunchArgs,
+} from './glDriver.mjs';
 import { costFeatures } from '../../hooks/costHead.mjs';
 import { FEATURES_VERSION } from '../../curator/recipeFeatures.js';
 import {
@@ -64,6 +81,7 @@ function parseArgs(argv) {
     frames: 30,
     reps: 3,
     maxPayloadMb: 512,
+    gpu: false,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -78,6 +96,7 @@ function parseArgs(argv) {
     else if (a === '--frames') args.frames = Number(argv[++i]);
     else if (a === '--reps') args.reps = Number(argv[++i]);
     else if (a === '--max-payload-mb') args.maxPayloadMb = Number(argv[++i]);
+    else if (a === '--gpu') args.gpu = true;
     else throw new Error(`unknown arg: ${a}`);
   }
   return args;
@@ -171,6 +190,18 @@ async function main() {
   console.log(
     `[costBench] ${scenes.length} recipes @ ${args.width}x${args.height}, ${args.reps} reps x ${args.frames} frames`,
   );
+  if (args.gpu) {
+    const gpuArgs = realGpuLaunchArgs();
+    if (!gpuArgs) {
+      console.error(
+        `[costBench] --gpu has no known GPU launch args for platform ${os.platform()} — refusing to run`,
+      );
+      process.exitCode = 1;
+      return;
+    }
+    setGlLaunchArgs(gpuArgs);
+    console.log(`[costBench] GPU mode: Chromium launch args ${gpuArgs.join(' ')}`);
+  }
   await whenSwarmWasmReady();
 
   const page = await ensureBenchPage();
@@ -179,6 +210,16 @@ async function main() {
   console.log(
     `[costBench] probes: fill ${probesStart.fillMs}ms, instanced ${probesStart.instancedMs}ms, blend ${probesStart.blendMs}ms, js ${probesStart.jsMs}ms — ${probesStart.renderer}`,
   );
+  const swiftShader = /swiftshader|llvmpipe/i.test(probesStart.renderer || '');
+  if (args.gpu && swiftShader) {
+    console.error(
+      `[costBench] --gpu was requested but the renderer is still software (${probesStart.renderer}) — ` +
+        'these labels would not be device truth. Not measuring; no dataset written.',
+    );
+    process.exitCode = 1;
+    await resetBrowser();
+    return;
+  }
 
   const rows = [];
   for (const scene of scenes) {
@@ -252,7 +293,7 @@ async function main() {
       renderer: probesStart.renderer,
       vendor: probesStart.vendor,
       webglVersion: probesStart.webglVersion,
-      swiftShader: /swiftshader|llvmpipe/i.test(probesStart.renderer || ''),
+      swiftShader,
       platform: `${os.platform()} ${os.arch()}`,
       cpus: os.cpus().length,
       totalMemGB: +(os.totalmem() / 1073741824).toFixed(1),
