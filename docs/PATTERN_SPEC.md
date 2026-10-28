@@ -119,21 +119,21 @@ Poster, not wallpaper. Each tile is an icon. The read at STAGE distance is the a
 
 All geometry is in tile-local units, tile size = 1, origin at center. Box limit is ±0.30 at DRIFT 0.
 
-| Mark           | Draw                                                                                                                                                                                                     | Roles                      |
-| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| Sunburst       | Disc r=0.10. 12 rays, length 0.16, stroke 0.015, from r=0.12, butt caps (outer reach 0.28: at 0.18 with round caps the mark kissed the box, #1041). Ray count is fixed so it reads as a sun, not a dial. | MARK disc, CUT rays        |
-| Pixel cluster  | 4×4 cell grid inside ±0.22. One tetromino (I, O, T, L, S, or the skew) seeded, plus 0–2 orphan cells. Cells are axis-aligned, gap 0.02.                                                                  | MARK cells                 |
-| Slashed circle | Ring r=0.20, stroke 0.04. Diagonal bar from (−0.16,−0.16) to (0.16,0.16), stroke 0.045, round caps. Bar is a stroke, not a clip.                                                                         | MARK ring, CUT bar         |
-| Squiggle       | One cubic wave, 1.5 periods, amplitude 0.08, across y=0, stroke 0.05, round caps. Endpoints inside the box.                                                                                              | MARK stroke                |
-| Chevron        | One or two V's, stroke 0.05, opening 0.28, point at center. Stack gap 0.08 if two. Seed picks count and up/down/left/right.                                                                              | MARK stroke                |
-| Bolt           | 6-vertex lightning polygon, filled, width 0.16, height 0.40, centered. Vertices are a fixed template, not a random walk, so it stays a bolt.                                                             | MARK fill                  |
-| Interlock      | Two rings r=0.14, centers at (−0.08,0) and (0.08,0), stroke 0.035. Vesica is the overlap, not a third shape.                                                                                             | MARK both rings, same role |
-| Eye            | Almond from two arcs, width 0.40, height 0.18. Triangle pupil, height 0.10, pointing up or down by seed.                                                                                                 | MARK almond, CUT pupil     |
-| Knot           | Circle r=0.16, stroke 0.03, plus a crosshair of two strokes through center, length 0.28, stroke 0.03. Not a Celtic weave.                                                                                | MARK circle, CUT cross     |
-| Capsule        | 3 stacked discs r=0.07, vertical, gap 0.02, or one pill (stadium) of height 0.36, width 0.16. Seed picks stack vs pill.                                                                                  | MARK fill                  |
-| Slab           | Parallelogram, width 0.36, height 0.22, shear 0.08. Optional second polygon offset by 0.04 in a second role, flat, no lighting.                                                                          | MARK face, ACCENT offset   |
-| Arrows         | 3 chevron heads in a row, gap 0.04, each width 0.12. Direction is the seeded pose.                                                                                                                       | MARK fill                  |
-| Crossed disc   | Filled disc r=0.18. X of two strokes, length 0.28, stroke 0.035, in the ground role so it knocks out.                                                                                                    | MARK disc, CUT (ground) X  |
+| Mark | Draw | Roles |
+|---|---|---|
+| Sunburst | Disc r=0.10. 12 rays, length 0.16, stroke 0.015, from r=0.12, butt caps (outer reach 0.28: at 0.18 with round caps the mark kissed the box, #1041). Ray count is fixed so it reads as a sun, not a dial. | MARK disc, CUT rays |
+| Pixel cluster | 4×4 cell grid inside ±0.22. One tetromino (I, O, T, L, S, or the skew) seeded, plus 0–2 orphan cells. Cells are axis-aligned, gap 0.02. | MARK cells |
+| Slashed circle | Ring r=0.20, stroke 0.04. Diagonal bar from (−0.16,−0.16) to (0.16,0.16), stroke 0.045, round caps. Bar is a stroke, not a clip. | MARK ring, CUT bar |
+| Squiggle | One cubic wave, 1.5 periods, amplitude 0.08, across y=0, stroke 0.05, round caps. Endpoints inside the box. | MARK stroke |
+| Chevron | One or two V's, stroke 0.05, opening 0.28, point at center. Stack gap 0.08 if two. Seed picks count and up/down/left/right. | MARK stroke |
+| Bolt | 6-vertex lightning polygon, filled, width 0.16, height 0.40, centered. Vertices are a fixed template, not a random walk, so it stays a bolt. | MARK fill |
+| Interlock | Two rings r=0.14, centers at (−0.08,0) and (0.08,0), stroke 0.035. Vesica is the overlap, not a third shape. | MARK both rings, same role |
+| Eye | Almond from two arcs, width 0.40, height 0.18. Triangle pupil, height 0.10, pointing up or down by seed. | MARK almond, CUT pupil |
+| Knot | Circle r=0.16, stroke 0.03, plus a crosshair of two strokes through center, length 0.28, stroke 0.03. Not a Celtic weave. | MARK circle, CUT cross |
+| Capsule | 3 stacked discs r=0.07, vertical, gap 0.02, or one pill (stadium) of height 0.36, width 0.16. Seed picks stack vs pill. | MARK fill |
+| Slab | Parallelogram, width 0.36, height 0.22, shear 0.08. Optional second polygon offset by 0.04 in a second role, flat, no lighting. | MARK face, ACCENT offset |
+| Arrows | 3 chevron heads in a row, gap 0.04, each width 0.12. Direction is the seeded pose. | MARK fill |
+| Crossed disc | Filled disc r=0.18. X of two strokes, length 0.28, stroke 0.035, in the ground role so it knocks out. | MARK disc, CUT (ground) X |
 
 Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero area after rasterization at 64px is a failed seed, not a legal solid-block. GLYPH has no solid-block mark. Empty tiles are a bug.
 
@@ -172,7 +172,7 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 
 ## Composition (TIDES)
 
-(#1797, built on Matt's word 2026-10-28.) Code: `app/src/pattern/tides.js`; checks: `readout.selfcheck.mjs`.
+(#1797, built on Matt's word 2026-10-28.) Code: `app/src/pattern/tides.js`; checks: `tides.selfcheck.mjs`.
 
 - Grid of square cells, `cols = 2 × DENSITY` (DENSITY 10 → 20 across, the reference's ~20×20). Rows fill the frame height at the same cell. Cells never move.
 - One field per seed (`createNoise`, the kernel's simplex), sampled once per cell per frame, value in [0, 1].
@@ -204,16 +204,16 @@ GLYPH further restricts to the 4–6 strongest roles. FIELD and QUILT may use th
 
 ## Parameters (artist units, all MOD-routable)
 
-| Param   | Range                         | Default                                       | Notes                                                                                                      |
-| ------- | ----------------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| MODE    | QUILT / GLYPH / FIELD / TIDES | QUILT                                         | Track-level. ESCHER not in the enum until unparked.                                                        |
-| DENSITY | 4–12 tiles                    | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped.                               |
-| MIX     | 0–100%                        | 55%                                           | Motif entropy inside the current mode's vocabulary.                                                        |
-| SEED    | uint32                        | stored integer                                | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value.                       |
-| GROUT   | 0–8% of tile                  | 3% QUILT, 0 GLYPH, 0 FIELD                    | Fraction of tile size, not pixels. Resolution-independent.                                                 |
-| HERO    | 0–100%                        | 25%                                           | QUILT only. Probability on the coarser lattice. Capped, no adjacency. Ignored in GLYPH and FIELD.          |
-| DRIFT   | 0–100%                        | 20%                                           | Intensifies the mode's own motion. Does not swap motifs.                                                   |
-| DROP    | off / on                      | off                                           | Separate gate. When on, and BEAT is running, SHUFFLE quantizes to the bar. High DRIFT does not imply DROP. |
+| Param | Range | Default | Notes |
+|---|---|---|---|
+| MODE | QUILT / GLYPH / FIELD / TIDES | QUILT | Track-level. ESCHER not in the enum until unparked. |
+| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. |
+| MIX | 0–100% | 55% | Motif entropy inside the current mode's vocabulary. |
+| SEED | uint32 | stored integer | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value. |
+| GROUT | 0–8% of tile | 3% QUILT, 0 GLYPH, 0 FIELD | Fraction of tile size, not pixels. Resolution-independent. |
+| HERO | 0–100% | 25% | QUILT only. Probability on the coarser lattice. Capped, no adjacency. Ignored in GLYPH and FIELD. |
+| DRIFT | 0–100% | 20% | Intensifies the mode's own motion. Does not swap motifs. |
+| DROP | off / on | off | Separate gate. When on, and BEAT is running, SHUFFLE quantizes to the bar. High DRIFT does not imply DROP. |
 
 ## Motion (never static — the house rule)
 

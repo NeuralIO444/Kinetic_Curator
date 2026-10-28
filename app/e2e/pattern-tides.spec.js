@@ -25,7 +25,7 @@ test('TIDES: the mode tile writes through, opens at density 10, and element moti
   await boot(page);
   await addStratum(page, 'PATTERN');
   const ed = page.locator('.pattern-editor');
-  await ed.getByRole('tab', { name: /readout/i }).click();
+  await ed.getByRole('tab', { name: /tides/i }).click();
   await expect.poll(async () => (await patternOf(page)).mode).toBe('TIDES');
   expect((await patternOf(page)).density, 'an untouched density follows the mode').toBe(10);
   await expect(ed.getByRole('combobox', { name: 'Element motion' })).toBeDisabled();
@@ -39,16 +39,16 @@ test('TIDES: the mode tile writes through, opens at density 10, and element moti
     const st = window.__kcStore;
     st.setState({ layers: st.getState().layers.map((l) => (l.type === 'pattern' ? l : { ...l, visible: false })) });
   });
-  await ed.getByRole('tab', { name: /readout/i }).scrollIntoViewIfNeeded();
+  await ed.getByRole('tab', { name: /tides/i }).scrollIntoViewIfNeeded();
   // a slow headless runner trips the watchdog at boot (PERF PAUSED holds the last frame); RUN resumes it
   const run = page.getByRole('button', { name: /^▶\s*run$/i });
   if (await run.count()) await run.first().click();
   await page.waitForTimeout(2500); // let the field run a moment
   const w = page.viewportSize().width;
-  await page.screenshot({ path: info.outputPath(`readout-${w}.png`), fullPage: false });
+  await page.screenshot({ path: info.outputPath(`tides-${w}.png`), fullPage: false });
   await page
     .locator('.panel-canvas')
     .first()
-    .screenshot({ path: info.outputPath(`readout-${w}-canvas.png`) });
-  await ed.screenshot({ path: info.outputPath(`readout-${w}-editor.png`) });
+    .screenshot({ path: info.outputPath(`tides-${w}-canvas.png`) });
+  await ed.screenshot({ path: info.outputPath(`tides-${w}-editor.png`) });
 });
