@@ -5,6 +5,13 @@
 export const FOLDER_PREFIX = 'KC1_Loot_';
 export const SESSION_EXT = '.kcproject';
 export const NAME_MAX = 64;
+/**
+ * The filesystem's own limit is 255 BYTES per name (APFS, ext4), and the longest name built from a project name is a
+ * session file (`<name>_<nnnn>.kcproject`). 64 four-byte characters plus the prefix would pass the character cap and
+ * fail on disk, so a name is also capped in UTF-8 bytes, with room for the prefix and a session suffix.
+ */
+export const NAME_MAX_BYTES = 200;
+const utf8Bytes = (s) => new TextEncoder().encode(s).length;
 
 const FORBIDDEN = /[/\\:*?"<>|\u0000-\u001f\u007f]/;
 const RESERVED = /^(con|prn|aux|nul|com[1-9]|lpt[1-9])$/i;
@@ -28,6 +35,9 @@ export function validateProjectName(input) {
   if (RESERVED.test(stem)) return { ok: false, reason: 'Name is reserved by Windows.' };
   if ([...name].length > NAME_MAX) {
     return { ok: false, reason: `Name is longer than ${NAME_MAX} characters.` };
+  }
+  if (utf8Bytes(name) > NAME_MAX_BYTES) {
+    return { ok: false, reason: 'Name is too long for a folder (too many wide characters).' };
   }
   return { ok: true, name };
 }
@@ -54,8 +64,10 @@ export function nameCollides(name, existingFolderNames) {
 }
 
 export function sessionFileName(name, n) {
+  const v = validateProjectName(name);
+  if (!v.ok) throw new Error(`projectNaming: invalid project name — ${v.reason}`);
   if (!Number.isInteger(n) || n < 1) throw new Error('projectNaming: session number must be an integer >= 1');
-  return `${name}_${String(n).padStart(2, '0')}${SESSION_EXT}`;
+  return `${v.name}_${String(n).padStart(2, '0')}${SESSION_EXT}`;
 }
 
 export function parseSessionNumber(name, file) {

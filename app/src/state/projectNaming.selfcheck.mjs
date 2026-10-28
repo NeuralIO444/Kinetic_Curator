@@ -90,8 +90,15 @@ const decomposed = 'café';
 const composed = 'café';
 assert.notEqual(decomposed, composed);
 assert.deepEqual(validateProjectName(decomposed), { ok: true, name: composed });
-assert.deepEqual(validateProjectName('🦋'.repeat(64)), { ok: true, name: '🦋'.repeat(64) });
+// the byte cap: 64 four-byte characters fit the character cap but not a folder name on disk (255 bytes)
+refuse('🦋'.repeat(64));
 refuse('🦋'.repeat(65));
+assert.deepEqual(validateProjectName('🦋'.repeat(50)), { ok: true, name: '🦋'.repeat(50) }); // 200 bytes: the cap
+refuse('🦋'.repeat(50) + 'x');
+const longest = sessionFileName('🦋'.repeat(50), 9999);
+assert.ok(new TextEncoder().encode(folderNameFor('🦋'.repeat(50))).length <= 255, 'the folder fits on disk');
+assert.ok(new TextEncoder().encode(longest).length <= 255, 'the longest session file fits on disk');
+assert.throws(() => sessionFileName('a/b', 1), 'a session file is never named from an invalid name');
 assert.equal(validateProjectName('x'.repeat(64)).ok, true);
 
 // --- folder names
