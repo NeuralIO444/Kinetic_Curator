@@ -515,4 +515,5 @@ node src/data/voiceDeck.selfcheck.mjs
 node src/state/kineticSweep.selfcheck.mjs
 node src/state/kineticScope.selfcheck.mjs
 node src/assets/tauriCsp.selfcheck.mjs
+node src/curator/trioAcceptance.selfcheck.mjs
 node src/curator/showSpectrum.selfcheck.mjs
