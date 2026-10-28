@@ -128,10 +128,14 @@ for (const { name, ev, peak } of results) {
 }
 console.log('');
 console.log('Edge reachability (steady-state stressValue):');
-console.log(`  taste alone at max ......... ${stressValue({ taste: 1 }).toFixed(2)}  (can never leave Relax: < ${RELAX_BELOW})`);
+console.log(
+  `  taste alone at max ......... ${stressValue({ taste: 1 }).toFixed(2)}  (can never leave Relax: < ${RELAX_BELOW})`,
+);
 console.log(`  one signal maxed (a or d) .. ${stressValue({ activity: 1 }).toFixed(2)}  (Normal, barely)`);
 console.log(`  activity + taste maxed ..... ${stressValue({ activity: 1, taste: 1 }).toFixed(2)}  (Normal only)`);
-console.log(`  activity + dish maxed ...... ${stressValue({ activity: 1, dish: 1 }).toFixed(2)}  (Tighten, barely: > ${TIGHTEN_ABOVE})`);
+console.log(
+  `  activity + dish maxed ...... ${stressValue({ activity: 1, dish: 1 }).toFixed(2)}  (Tighten, barely: > ${TIGHTEN_ABOVE})`,
+);
 console.log(`  all three maxed ............ ${stressValue({ activity: 1, dish: 1, taste: 1 }).toFixed(2)}`);
 console.log('');
 
@@ -146,14 +150,32 @@ const share = (name, band) => byName[name].ev.occupancy[band];
 
 check('ceiling profile lives in Tighten (>99%)', share('ceiling', 'tighten') > 0.99);
 check('idle is 100% Relax (matches the observed real takes)', share('idle', 'relax') >= 0.999);
-check('watcher stays in Relax (>=95%), never Tighten', share('watcher', 'relax') >= 0.95 && share('watcher', 'tighten') === 0);
-check('hands alone reaches Normal (>5%) but never Tighten', share('hands', 'normal') > 0.05 && share('hands', 'tighten') === 0);
-check('roller reaches Normal (>10%) but never Tighten', share('roller', 'normal') > 0.1 && share('roller', 'tighten') === 0);
-check('dish set reaches Normal (>30%) but never Tighten', share('dishSet', 'normal') > 0.3 && share('dishSet', 'tighten') === 0);
-check('full show reaches Tighten (>2%) and leaves Relax (<90% relax)', share('fullShow', 'tighten') > 0.02 && share('fullShow', 'relax') < 0.9);
+check(
+  'watcher stays in Relax (>=95%), never Tighten',
+  share('watcher', 'relax') >= 0.95 && share('watcher', 'tighten') === 0,
+);
+check(
+  'hands alone reaches Normal (>5%) but never Tighten',
+  share('hands', 'normal') > 0.05 && share('hands', 'tighten') === 0,
+);
+check(
+  'roller reaches Normal (>10%) but never Tighten',
+  share('roller', 'normal') > 0.1 && share('roller', 'tighten') === 0,
+);
+check(
+  'dish set reaches Normal (>30%) but never Tighten',
+  share('dishSet', 'normal') > 0.3 && share('dishSet', 'tighten') === 0,
+);
+check(
+  'full show reaches Tighten (>2%) and leaves Relax (<90% relax)',
+  share('fullShow', 'tighten') > 0.02 && share('fullShow', 'relax') < 0.9,
+);
 check('taste alone can never leave Relax', stressValue({ taste: 1 }) < RELAX_BELOW);
 check('activity + dish maxed barely reaches Tighten', stressValue({ activity: 1, dish: 1 }) > TIGHTEN_ABOVE);
-check('every synthetic record verifies against its own signals', results.every((r) => r.ev.consistent));
+check(
+  'every synthetic record verifies against its own signals',
+  results.every((r) => r.ev.consistent),
+);
 
 if (failures.length) {
   console.error(`stressSynthetic selfcheck FAILED (${failures.length}):`);
