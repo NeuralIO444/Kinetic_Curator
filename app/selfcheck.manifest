@@ -507,6 +507,7 @@ node src/loot/lootStarter.selfcheck.mjs
 node src/loot/lootSession.selfcheck.mjs
 node src/loot/lootAudio.selfcheck.mjs
 node src/hooks/costHead.selfcheck.mjs
+node src/hooks/deviceProbes.selfcheck.mjs
 node src/loot/lootCopy.selfcheck.mjs
 node src/loot/lootWrite.selfcheck.mjs
 node src/loot/shelfDiskRun.selfcheck.mjs

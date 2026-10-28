@@ -1,57 +1,116 @@
-# #1560 staging report — Slice 4: the lore bank (offline-curated lore.json + "on this day" cold opens)
+# STAGING REPORT — #1578 device probes slice (branch `feat/1578-device-probes`)
 
-Branch `ember/1560-s4-lore`, stacked locally on Slice 3's tip (`5d84bdf9`), not pushed, no PR — the coordinator publishes. Everything below was run and verified in this worktree. This file replaces Slice 3's report at the worktree root; that report remains in the S3 worktree and in git history. This is the final slice of #1560's Mind level (§§00–06).
+Coordinator: this branch is LOCAL ONLY (no push, no PR) — publish after verifying.
+Base: origin/main @ 7f371547. This file replaces the previous slice's report at
+the worktree root (that report remains in git history), per house convention.
 
-**What this is:** the room's knowledge, curated the way the design demands (05): heavy thinking offline, a cheap versioned artifact live, and no network anywhere near the stage. A curation pass read rights-clean structured sources, machine-verified every fact it took, and exported `lore.json`. The app validates that file fail-closed, and the story machine S3 built spends the bank's "on this day" entries as cold opens — through the existing callback machinery, with no new transcript path and no line invented anywhere.
+## What was built
 
-## lore.json: the artifact
+The runtime device-probes module for the governor cost head (XGBoost T4):
+four tiny self-run microbenchmarks (fill rate, instanced draw, blend, JS)
+producing the `features.probe` descriptor bag `{ fillRate, instanced, blend, js }`
+(measured ms) that `app/src/hooks/costHead.mjs` already consumes.
 
-- **Home and shape:** `app/src/curator/lore.json`, imported by the pure module `app/src/curator/loreBank.js` — taste.json's arrangement (05 names taste.json's shape as the precedent; `tasteHead.js`'s validator is the idiom). File: `{ kind: 'kc-lore', version: 1, bank_version, curated, entries }`. Entries keep 05's bank shape exactly as authored: `{ id, kind (maxim|ancestor|fact|onthisday), fact, tags {family, movement, mood}, source_id, source_url, rights, retrieved_date, bank_version }`; `onthisday` entries add `month`/`day` so a date matches as data, never by parsing prose.
-- **The validator** (`validateLore`) is fail-closed in the taste idiom — kind and version gates, clean rebuilt copies — with one deliberate strictness of its own: **one malformed entry refuses the whole file**. A bank that silently dropped records could not be audited against its own provenance; 05's pull-one-entry remedy works by editing the file, so a bad edit must be loud. Provenance is enforced structurally: no entry enters without a source id, an https source URL, a named rights basis, a real retrieval date, and the bank's own version stamp.
-- **The shipped bank is never re-read from anywhere else.** `getLoreBank()` validates the bundled file once; a file that fails validation yields *no lore* (honest absence), never a partial bank and never a crash.
+- **`app/src/hooks/deviceProbes.mjs`** (new) — the module. Placement: beside
+  `costHead.mjs` in `src/hooks/`, because costHead is its consumer and hooks/
+  is where the app's runtime (non-harness) modules live; `src/gl/parity/` is
+  Node harness tooling. API:
+  - `measureDeviceProbes({ budgetMs, now })` — runs the probes, never throws,
+    returns a bag holding ONLY honestly-measured descriptors.
+  - `getDeviceProbes({ storage, force, measure })` — cache-first entry point
+    (the future prime call site's one call); concurrent calls share one pass.
+  - `readCachedProbes` / `writeCachedProbes` — the persistence pair.
+  - `sanitizeProbeBag` — the single honesty gate shared by measurement and
+    cache reads; `timeBatches` / `jsProbeBatch` exported for the selfcheck.
+- **`app/src/hooks/deviceProbes.selfcheck.mjs`** (new) — pins: spec parity,
+  descriptor shape, absent-on-failure, cache versioning, the no-fake-numbers
+  law, and the end-to-end costHead contract (bag rides through `costFeatures`
+  verbatim; `predictMs` returns null when a probe a model splits on is absent).
+- **`app/selfcheck.manifest`** (+1 line) — the new suite, wired immediately
+  after `costHead.selfcheck.mjs`, per the house rule.
+- **`app/src/state/bundle.js`** (+2 lines) — the ONE existing-file touch, and
+  it is forced by the repo's own gate: `bundleKeys.selfcheck` requires every
+  `kc:` storage key to carry a bundle decision. `kc:device-probes:v1` is
+  registered in `BUNDLE_LEFT_OUT` with its reason (descriptors of THIS machine;
+  meaningless elsewhere; never project content). Declarative registry data
+  only — no behaviour change (bundle + bundleKeys suites green, below).
 
-## The bank: 58 entries, and where each came from
+## Laws honoured
 
-46 `onthisday` · 4 `ancestor` · 5 `fact` · 3 `maxim`, covering 43 distinct calendar dates. Retrieval date for every record: **2026-10-22** (this pass). Bank version `2026-10-22.1`.
+- **Work spec is PROBE_SPEC verbatim** (`src/gl/parity/costDataset.mjs`):
+  fill 512×512 / 16 draws / 48-iteration fragment loop; instanced 8192 quads /
+  8 draws; blend 512×512 / 24 quads at alpha 0.1; JS 2,000,000 iterations;
+  1 discarded warm-up + 5 timed batches, median; every GPU batch ends in
+  readPixels (the bench's timing law). The spec values are duplicated in the
+  module per the house convention (costBench.html duplicates them too) and
+  the selfcheck pins the copy `deepStrictEqual` against `PROBE_SPEC`.
+- **Honest signals:** any probe that fails, times out, or cannot run yields
+  NO descriptor (absent key) — never a guessed/default number. One gate
+  (`sanitizeProbeBag`) enforces it for live measurement and cache reads
+  alike: unknown keys, non-numbers, NaN/Infinity, ≤ 0 are dropped.
+- **Time budget:** `PROBE_TIME_BUDGET_MS = 2000` ms wall clock for the whole
+  pass, checked between probes; a probe that would start past budget is
+  skipped (absent), never rushed with fewer reps.
+- **Cache:** localStorage `kc:device-probes:v1` (app convention; injectable
+  `{getItem, setItem}` backend with memory fallback, diceCrowns pattern).
+  Record = `{ v: 1, at, probes }`; version mismatch / corrupt JSON / junk
+  probes = miss → re-measure. Only bags with ≥ 1 real descriptor are cached,
+  so a total failure retries next launch instead of freezing. A key missing
+  inside a cached bag stays missing until the version bumps — the version
+  key is the invalidation mechanism.
+- **Inertness:** nothing imports the module yet; no call sites anywhere; no
+  governor wiring; costHead untouched. `git diff --stat` vs main: only the
+  files above. Behaviour with the module present is bit-identical by
+  construction (it is dead code until the prime call-site slice).
 
-| source | what shipped | rights basis (recorded per entry) |
-| --- | --- | --- |
-| **Wikidata** | all 46 on-this-day entries; 4 ancestors; 4 of the facts (the Voronoi diagram, ordered dithering, Floyd–Steinberg dithering, *On Growth and Form*) | **CC0** — structured claims only (dates, places, occupations). No Wikipedia prose was fetched or shipped; the suite proves no record's source or text touches Wikipedia. |
-| **The Met** | 1 fact (the Great Wave's medium/date/record, object 45434, public domain) | **CC0** — Open Access object data. |
-| **KC-1 itself** | the 3 LOIS maxims | **Original wording** paraphrasing the philosophy, marked "in paraphrase" in the text — 05's homage boundary: the thinking is the homage, never a quotation. |
-| Art Institute of Chicago | **nothing** — its API refused this client (403) from the sandbox | — |
-| Rijksmuseum | **nothing** — the collection endpoint answered 410 (retired) | — |
-| Smithsonian | **nothing** — needs an api.data.gov key this pass does not hold | — |
-| Europeana | **nothing, by ruling** — discovery only; its cease-use clause is a tail risk for a shipped file (05) | — |
+## Dataset schema finding (coordinator's question)
 
-**Verification, not trust:** the pass (`studio/curate-lore.py`, shipped with this slice — the offline tool, in the `studio/curator.py` precedent) re-fetches every date it uses and ships it only when the source carries **exactly one distinct day-precision value** for it. Place names are the source's own labels; where a label was ambiguous bare (an arrondissement, a town sharing a name with a famous one), the fact omits or shortens it rather than embellishing. Facts are composed from those structured values in the curator's own wording; role nouns in the clauses are anchored to each person's fetched occupation record.
+The kc-cost-dataset v1 schema ALREADY has the slot: `validateDataset`
+requires `features.probe` with exactly the four finite keys
+`fillRate / instanced / blend / js` — this module's output shape matches it
+exactly, no schema change made or needed. Likewise, recording probe
+descriptors alongside labels in the corpus run needs NO schema change:
+`costBench.mjs` already records them (`probeBag()` from the bench page's
+`__kcProbes`, plus a start/end drift check) into every row. The runtime
+module produces the same bag names from the same spec, so runtime-measured
+and harness-measured descriptors are directly comparable.
 
-**The drop list — candidates the record would not let ship** (each is also a comment in the curation script): Cézanne's *death* (two day-values in the record: 22 and 23 Oct 1906 — the bank ships his birth instead, and takes the small irony that the ship-day cold open is Rauschenberg alone), Paul Rand's birth (15 Aug vs 15 Dec 1914), Tschichold's birth (2 Apr vs 2 May 1902), Malevich's birth (three values, Julian/Gregorian), Lange's birth (25 vs 26 May 1895 — her death is single and ships), Taeuber-Arp's death (13 vs 14 Jan 1943 — her birth ships), Lissitzky's birth (the record's single value is the Julian date — his death ships), Harold Cohen's death (the record's date conflicts with published obituaries — his birth ships), Ikko Tanaka (birth value conflicts with the commonly cited date). A contested date is not a fact with an asterisk; it is not in the bank.
+## Verification (run in this worktree)
 
-## Cold opens: how a bank entry becomes a beat
+- `node src/hooks/deviceProbes.selfcheck.mjs` — **OK**.
+- Full manifest chain (`npm run selfcheck`): **520 of 521 suites pass**,
+  including the new suite and `bundleKeys`/`bundle` after the registry entry.
+  The one exclusion: `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` fails
+  with "cargo not found on PATH" — this sandbox has no Rust toolchain
+  (`which cargo` is empty machine-wide; the suite's own output names the
+  cause). No Rust/wasm files are touched by this slice; the suite was
+  excluded via a filtered manifest copy (`SELFCHECK_MANIFEST`) so the
+  remaining 520 could run to the manifest's final suite (showSpectrum, OK).
+- `npm run selfcheck:sweep` — exits 0 with "SWEEP TESTS SKIPPED: no headless
+  Chromium" (Playwright browsers not installed in this sandbox; environmental).
+- `npm run build` — **✓ built in 2.63s** (the >500 kB chunk warning is
+  pre-existing).
+- `eslint` + `prettier --check` on all touched files — clean.
 
-- **Daily truth (Q10 default, flagged below):** at session start the driver takes the session's calendar date — as an injected input (`getDate`), because the pure machinery reads no clock; App passes nothing, so the live driver uses the machine's real date — and picks the bank's entry for that date through the driver's existing seeded roll stream. Same seed + session + date → same cold open, replaying exactly.
-- **Through S3's machinery, unchanged in shape:** the pick is seeded into the episode as a fresh pattern `{ kind: 'onthisday', loreId }`, and `onthisday` joins `BEAT_FORMS.callback`. The selector's existing callback branch fires it — **in the session's single callback slot, competing in the same shuffle-bag as the ledger callbacks** — as a story-class beat (it spends story budget like any callback), persona Davis (the existing branch's non-grudge default: the generator hosts the opening), referent `{ loreId }` and nothing else. The pure module never imports the bank; it knows the shape, not the contents.
-- **Where it surfaces — and where it does not:** the backstage beat log (the surface S3 established). The driver resolves the referent there: a fired cold open's view copy carries `loreFact`, and the dev Mind panel's Story table now prints it beside the beat. **The transcript is untouched** (law 1): no line is injected; a cold open reaches the room's transcript only when a persona backend someday emits a line through the existing decision machinery, exactly as S3 left it. A day with no entry seeds nothing — the episode opens in silence, which 04 counts a valid scene (rule 8). 43 of 365 days carry an entry in this first pass; that sparsity is the honest state of a small bank, stated rather than padded.
-- **The tag draw ships as the bank's seam:** `drawLore(bank, tags, roll)` implements 05's "the story generator draws by tags matching the room's actual state" — best-matching tier only, deterministic. It is **not wired to a live consumer in this slice**: the milestone forms S3 left abstract ('citation', …) are its natural first consumer, and wiring them is a line-source decision that belongs with the backends' story-context seam S3 flagged, not with the bank. Flagged here as the slice's one deliberate unwired edge.
+## Follow-ups flagged (NOT done here, by design)
 
-## Flagged 08 defaults taken (iteration points, per the brief)
-
-- **Q9 (bank size / who curates):** 05 states no v1 number. This pass: **58 entries** — small, every one verified, quality over count. The curator is this curation run, executed from the ranked sources with the drop discipline above; per 05, entries are "vetted by Matt or by a curation run he approves" — this PR is that approval point, and the curation script + this report are what he is approving.
-- **Q10 (daily truth vs session-relative):** **daily truth.** The cold open is the real calendar date's entry (08's "daily truth" reading); a session-relative rotation would manufacture anniversaries, which the honesty law forbids.
-- Smaller calls, same treatment: the cold open **shares the one callback slot** with ledger callbacks rather than taking a slot of its own (the episode still opens with exactly one callback — 04's shape); the cold open's persona is **Davis** (the selector's standing default for non-grudge callbacks); entry fields are kept **as authored** (05's snake-case shape) rather than translated at validation — validation is admission, not translation; February admits day 29 (a leap-day record is admissible).
-
-## Verification (this worktree, final tree)
-
-- `npm run build` ✓ · `npm run lint` 0 errors / 11 warnings (the pre-existing baseline, unchanged).
-- New suite: `loreBank.selfcheck` **6 checks** — the shipped bank validates; provenance complete on every record (and Wikipedia-free, by assertion); the validator's refusal list (kind/version/shape/every provenance field/date sanity/duplicate ids/cross-version entries); the date draw (Oct 22 = the Rauschenberg entry; a bare date = nothing; a two-entry date across the roll range; replay-exactness); the tag draw (best tier, determinism, silence on no match); wiring (the form, the driver's seeding, the pure module's ignorance of the bank).
-- Extended suites, additively: `storyState.selfcheck` **21 checks** (was 20 — the cold-open beat: fires as the callback, story class, referent is the id alone; unseeded = silence), `storyLive.selfcheck` **5 checks** (was 4 — the driver seeds the curation day's entry, the beat fires, the backstage view resolves its fact; a bare date seeds nothing).
-- Touched families all pass: mind (15), mindPresence (18), directorRoom (7), roomFeed, roomDither (11), queenDeniability (7), casingInCss, eventRegistry (161 events), audioBus (3), busChain (14).
-- **Gates: replayGate PASS · creatureGate PASS · wingWarp selfcheck PASS (pins unmoved).** No fixture re-recorded, no pin moved, no assertion weakened — the two story suites gained checks; none lost any.
-- **Full manifest sweep, run individually on the final tree: 496 PASS / 3 FAIL of 499 commands** (one more command than S3's manifest — this slice's loreBank line). The three failures are exactly the sandbox baseline S3 adjudicated against main: `swarmWasm` (exit 1 — the sandbox has no Rust toolchain; environment, not code), `rollSafety` (CPU-starvation timeouts under sweep load), `accum` (exit 134, a native abort in this toolchain). Nothing this slice touches is near any of them, and `composite` — load-starved to a timeout in S3's run — passed this time. (The sweep's first process was killed by a runtime restart at 285/499; the remainder was resumed from the tally's last recorded line, so every one of the 499 commands ran individually exactly once on the final tree.)
-
-## Files
-
-New: `app/src/curator/lore.json` (the artifact, 58 entries), `app/src/curator/loreBank.js`, `app/src/curator/loreBank.selfcheck.mjs`, `studio/curate-lore.py` (the offline curation pass that produced the artifact — re-runnable; it refuses contested data rather than shipping it). Edited: `app/src/curator/storyState.js` (the `onthisday` callback form + the loreId referent), `app/src/curator/storyLive.js` (the `getDate` input, the session-start seeding, the view's lore resolution), `app/src/panels/MindPanel.jsx` (the beat log prints a cold open's fact), `app/src/curator/storyState.selfcheck.mjs` + `app/src/curator/storyLive.selfcheck.mjs` (one additive check each), `app/selfcheck.manifest` (one line).
-
-**#1560's Mind level is now complete in slices:** S1 the codec panel + transcript (03), S2 the generative faces (06), S3 the story machine (04/01/02), S4 this lore bank (05). What remains deliberately unbuilt, unchanged from the design: §07 MegaMind (deferred with #1525–#1529), §09 the peephole (a later slice on Matt's word), and any persona *lines* from beats — the backends still speak no lines by standing design, and the seams for both (the selector, `getStoryView()`) are where a future consumer plugs in.
+1. **costHead's `runDeviceProbes()` placeholder still returns fake 1.0s**,
+   and `costFeatures()` falls back to it when no probes are passed. Replacing
+   that placeholder with `getDeviceProbes()` (or deleting it and making the
+   bag inject-only) belongs to the prime call-site slice — this slice was
+   forbidden from touching call sites.
+2. **Prime call site** (crown/load): call `getDeviceProbes()` once at first
+   launch and pass the bag into `costFeatures`/`primeGovernor`. Async by
+   design: `predictMs` already treats an absent bag as fallback, so the
+   first frame never has to wait for probes.
+3. **GPU probe paths are unverifiable in this sandbox** (no DOM/WebGL2): the
+   selfcheck pins everything Node can reach — in Node the GPU probes are
+   honestly ABSENT and only `js` measures, which is itself the
+   absent-on-failure proof. The GL work itself is a verbatim port of the
+   shipped `costBench.html __kcProbes` implementation; a browser smoke of
+   `measureDeviceProbes()` on a real device should ride along with the
+   Studio corpus run or the prime call-site slice.
+4. Partial-bag caching means a probe that failed once stays absent until
+   the version bumps (deliberate — see module header). If driver-drift
+   re-measurement is wanted sooner, that's a cache-policy decision for the
+   prime slice, not a silent change here.
