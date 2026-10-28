@@ -59,6 +59,14 @@
  *      RGB channel at the edges. The wider warm pass (halation) reads a
  *      smaller mip with a red/warm bias:
  *      accum.rgb += halationAmount * warm * stippledGlow.
+ *   7. Highlight soft-ceiling (#1801): each glow tier's add-back is
+ *      shaped by softCeil() in GLOW_FS — identity at/below the knee
+ *      (1.0), a smooth invertible shoulder above it, asymptoting at
+ *      the ceiling (2.5). It replaces the hard min(lit, 1.0) clamp
+ *      that pinned hot cores to flat white (the bloom ratchet,
+ *      docs/ACCUM.md B1). Sub-knee content is bit-identical to the
+ *      pre-#1801 loop, and optics = 0 never reaches the glow pass,
+ *      so the optics = 0 path is untouched.
  *
  * One amount drives 5/6: `optics` 0..1 (the GLOW slider next to FADE).
  * optics = 0 reduces the recipe to fade + over — the pass is a no-op, not a
@@ -152,6 +160,41 @@ export function spectralKeep(keep, ratios = SPECTRAL_HALF_LIFE) {
   const ch = (r) => (r === 1 ? k : Math.pow(k, 1 / r));
   return [ch(ratios[0]), ch(ratios[1]), ch(ratios[2])];
 }
+
+// #1801 highlight soft-ceiling — the in-loop answer to the bloom ratchet
+// (docs/ACCUM.md B1). The old GLOW_FS tail hard-clamped every channel at
+// 1.0, so each frame's glow add-back pinned hot cores a little flatter
+// until hue separation died and cores converged to flat white. The
+// ceiling shapes the add-back instead: identity at and below the knee
+// (sub-knee content is bit-identical to the pre-#1801 loop), then a
+// smooth invertible Reinhard shoulder — with t = x − knee and
+// span = ceiling − knee, S(x) = knee + span·t/(span + t) — asymptoting
+// at the ceiling. The eval (2026-10-27) rejected accumulating through a
+// filmic curve (ACES is non-invertible and compounds — it stays at the
+// resolve, #532); an invertible shoulder and a plain ceiling are the two
+// sanctioned in-loop shapes, and published WebGL phosphor pipelines pin
+// the linear buffer at min(x, 2.5), the ceiling adopted here. The slope
+// at the knee is exactly 1, so the join is seamless; the closed-form
+// inverse is x = knee + span·s/(span − s) for s = S(x) − knee. Recipe
+// constants v1 (no panel control, per the issue), baked into GLOW_FS at
+// module load so the GPU pass and the JS mirror share one source of
+// truth (the selfcheck pins the baked numbers).
+export const HIGHLIGHT_KNEE = 1.0;
+export const HIGHLIGHT_CEILING = 2.5;
+
+// The shaping law itself (scalar; the mirror applies it per channel).
+// At/below the knee it returns the input untouched — bit-exact — so the
+// optics = 0 and sub-knee behaviour of the loop cannot drift.
+export function highlightSoftCeiling(x) {
+  const v = Number(x);
+  const t = v - HIGHLIGHT_KNEE;
+  if (!(t > 0)) return v;
+  const span = HIGHLIGHT_CEILING - HIGHLIGHT_KNEE;
+  return HIGHLIGHT_KNEE + (span * t) / (span + t);
+}
+
+// GLSL float literal for a recipe constant (1 -> "1.0", 2.5 -> "2.5").
+const glslFloat = (v) => (Number.isInteger(v) ? `${v}.0` : `${v}`);
 
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
@@ -550,6 +593,20 @@ uint ihash(uvec2 p) {
   h ^= h >> 16u; h *= 2246822519u; h ^= h >> 13u;
   return h;
 }
+// #1801 highlight soft-ceiling: identity at/below the knee, a smooth
+// invertible Reinhard shoulder above it (slope exactly 1 at the knee),
+// asymptoting at the ceiling. Replaces the hard min(lit, 1.0) clamp —
+// the bloom ratchet that pinned hot cores to flat white. Constants are
+// baked from the JS HIGHLIGHT_KNEE / HIGHLIGHT_CEILING (one source of
+// truth; the selfcheck pins the baked numbers). The wet glow variant
+// inherits this through the shared tail below.
+float softCeil(float x) {
+  float t = x - ${glslFloat(HIGHLIGHT_KNEE)};
+  return t <= 0.0 ? x : ${glslFloat(HIGHLIGHT_KNEE)} + ${glslFloat(HIGHLIGHT_CEILING - HIGHLIGHT_KNEE)} * t / (${glslFloat(HIGHLIGHT_CEILING - HIGHLIGHT_KNEE)} + t);
+}
+vec3 softCeil3(vec3 v) {
+  return vec3(softCeil(v.r), softCeil(v.g), softCeil(v.b));
+}
 void main() {
   vec4 base = texture(u_base, v_cuv);
   // Chromatic offset: radial RGB shift at the edges, sized in texels of the
@@ -573,7 +630,7 @@ void main() {
   float lum = dot(glow, vec3(0.299, 0.587, 0.114));
   float gate = mix(1.0, step(h, clamp(lum * 2.0, 0.0, 1.0)), u_stipple);
   vec3 lit = base.rgb + u_amount * u_tint * glow * gate;
-  o = vec4(min(lit, vec3(1.0)), base.a);
+  o = vec4(softCeil3(lit), base.a);
 }`;
 
 // #970 slice 2/3 — wet programs. Built from the dry strings so FEED_FS /
@@ -1322,9 +1379,18 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
       const o = (y * w + x) * 4;
       const g1 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g1args);
       const g2 = mirrorGlowSample(chain, gw, gh, u, v, x, y, g2args);
-      out[o] = Math.min(1, comp[o] + p.bloomAmount * g1[0] + p.halationAmount * tr * g2[0]);
-      out[o + 1] = Math.min(1, comp[o + 1] + p.bloomAmount * g1[1] + p.halationAmount * tg * g2[1]);
-      out[o + 2] = Math.min(1, comp[o + 2] + p.bloomAmount * g1[2] + p.halationAmount * tb * g2[2]);
+      // #1801: the soft ceiling shapes each tier's add-back separately,
+      // exactly as the two GPU passes do (bloom pass writes back, then
+      // the halation pass reads the shaped result). The pre-#1801 code
+      // summed both tiers and clamped once at 1.0 — the same number the
+      // GPU got only because a hard clamp of a monotone sum is
+      // order-blind; a shoulder is not, so the tiers shape in sequence.
+      const sr = highlightSoftCeiling(comp[o] + p.bloomAmount * g1[0]);
+      const sg = highlightSoftCeiling(comp[o + 1] + p.bloomAmount * g1[1]);
+      const sb = highlightSoftCeiling(comp[o + 2] + p.bloomAmount * g1[2]);
+      out[o] = highlightSoftCeiling(sr + p.halationAmount * tr * g2[0]);
+      out[o + 1] = highlightSoftCeiling(sg + p.halationAmount * tg * g2[1]);
+      out[o + 2] = highlightSoftCeiling(sb + p.halationAmount * tb * g2[2]);
       out[o + 3] = comp[o + 3]; // the glow lifts light only; the buffer stays opaque
     }
   }
