@@ -85,12 +85,14 @@ ok('the ladder is derived from TIER_OPS: each tier line names exactly the ops th
   // The gate table's own shape, pinned so a table change forces a copy review.
   assert.deepEqual(TIER_OPS.t1, []);
   assert.deepEqual(TIER_OPS.t2, ['depth']);
-  assert.deepEqual(TIER_OPS.t3, ['depth', 'add', 'retarget']);
-  assert.deepEqual(TIER_OPS.t4, ['depth', 'add', 'retarget', 'remove']);
+  assert.deepEqual(TIER_OPS.t3, ['depth', 'add', 'retarget', 'spectrum']);
+  assert.deepEqual(TIER_OPS.t4, ['depth', 'add', 'retarget', 'remove', 'spectrum']);
   assert.match(lineIn({}, 'tier-2'), /[Dd]eepen or soften/);
   assert.doesNotMatch(lineIn({}, 'tier-2'), /open a new|move a route|close an audio/);
   assert.match(lineIn({}, 'tier-3'), /[Oo]pen a new audio route/);
   assert.match(lineIn({}, 'tier-3'), /move a route to a new target/);
+  assert.match(lineIn({}, 'tier-3'), /steer a mark from the song's spectrum/);
+  assert.doesNotMatch(lineIn({}, 'tier-4'), /spectrum/); // t4 adds only remove
   assert.match(lineIn({}, 'tier-4'), /[Cc]lose an audio route/);
 });
 
