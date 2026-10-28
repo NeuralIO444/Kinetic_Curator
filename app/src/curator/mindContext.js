@@ -82,6 +82,7 @@ export function showOf(s) {
     silent: !!s.silent,
     sinceBars: Number.isFinite(s.sinceBars) ? Math.max(0, Math.round(s.sinceBars)) : 0,
     flatBars: Number.isFinite(s.flatBars) ? Math.max(0, Math.round(s.flatBars)) : 0,
+    ...(s.brake === true ? { brake: true } : {}), // LOIS's brake on Davis (#1483)
     routes,
     owned: (Array.isArray(s.owned) ? s.owned : []).filter((t) => typeof t === 'string' && t.length <= 40).slice(0, 32),
     ...(spectrumOf(s.spectrum) ? { spectrum: spectrumOf(s.spectrum) } : {}),

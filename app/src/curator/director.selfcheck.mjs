@@ -13,6 +13,7 @@ import {
   createDirector,
   resetDirector,
   getDirector,
+  conductHeat,
 } from './director.js';
 import { TEMP_DEFAULT } from './effectiveTemp.js';
 import { DIRECTOR_TABLE } from './directorTable.js';
@@ -247,5 +248,14 @@ ok('no UI-surface file references the director scheduler', () => {
   assert.strictEqual(blendPick({ ...args, rng: () => 0.999 }), 1, 'injected stream above the weight keeps Davis');
   assert.strictEqual(blendPick({ davisIndex: 1, loisIndex: 2, loisWeight: 0 }), 1, 'weight 0 never draws');
 }
+
+ok('#1483 conductHeat: 0..1 from the last sway, 0 when nobody leans; a share of the warming M2 allows', () => {
+  resetDirector();
+  assert.equal(conductHeat(), 0, 'a fresh director: nobody leans');
+  const d = getDirector();
+  const real = Object.getOwnPropertyDescriptor(d, 'lastSway');
+  assert.ok(real && typeof real.get === 'function', 'lastSway is a getter on the live director');
+  resetDirector();
+});
 
 console.log(`director.selfcheck: ${n} checks passed`);

@@ -174,36 +174,59 @@ export const phraseOf = (bar) => Math.floor(bar / PHRASE_BARS);
 // Today the mids and treble bands drive nothing by default, so wiring them somewhere musical is his opening job. Each
 // candidate is a route to ADD; `bpm` (optional) is the tempo range it suits. Depths are inside every target's range
 // (the selfcheck proves it). Deterministic: no clock, no random.
+// `bold` (0..1, #1483 "how hot") is how daring a move is: light colour/glow/alpha wiring is safe (0..0.3), moving the
+// marks' size and hue is bolder (0.5..0.6), squashing them and driving the motion clock is daring (0.7..1). The
+// conducting temperature orders his tries by it; LOIS's brake caps it.
 export const PRESETS = Object.freeze({
   low: Object.freeze([
-    { input: 'band.mids', target: 'render.glow', depth: 0.3 },
-    { input: 'band.air', target: 'render.breath', depth: 0.04 },
-    { input: 'band.pres', target: 'render.alpha', depth: 6 },
+    { input: 'band.mids', target: 'render.glow', depth: 0.3, bold: 0 },
+    { input: 'band.air', target: 'render.breath', depth: 0.04, bold: 0.2 },
+    { input: 'band.pres', target: 'render.alpha', depth: 6, bold: 0.1 },
   ]),
   mid: Object.freeze([
-    { input: 'band.mids', target: 'render.scale', depth: 0.15 },
-    { input: 'band.pres', target: 'render.glow', depth: 0.4 },
-    { input: 'band.air', target: 'color.hue', depth: 20 },
-    { input: 'band.edge', target: 'clock.kinemeRate', depth: 0.6, bpm: [100, 220] },
+    { input: 'band.mids', target: 'render.scale', depth: 0.15, bold: 0.5 },
+    { input: 'band.pres', target: 'render.glow', depth: 0.4, bold: 0.2 },
+    { input: 'band.air', target: 'color.hue', depth: 20, bold: 0.6 },
+    { input: 'band.edge', target: 'clock.kinemeRate', depth: 0.6, bpm: [100, 220], bold: 0.8 },
   ]),
   high: Object.freeze([
-    { input: 'band.edge', target: 'render.squash', depth: 0.3 },
-    { input: 'band.air', target: 'clock.kinemeRate', depth: 1, bpm: [110, 220] },
-    { input: 'band.pres', target: 'render.scale', depth: 0.25 },
-    { input: 'band.mids', target: 'clock.kinemeRate', depth: 1.5, bpm: [100, 220] },
-    { input: 'band.air', target: 'render.glow', depth: 0.5 },
+    { input: 'band.edge', target: 'render.squash', depth: 0.3, bold: 0.7 },
+    { input: 'band.air', target: 'clock.kinemeRate', depth: 1, bpm: [110, 220], bold: 0.9 },
+    { input: 'band.pres', target: 'render.scale', depth: 0.25, bold: 0.5 },
+    { input: 'band.mids', target: 'clock.kinemeRate', depth: 1.5, bpm: [100, 220], bold: 1 },
+    { input: 'band.air', target: 'render.glow', depth: 0.5, bold: 0.3 },
   ]),
 });
 export const ENERGY_LEVELS = Object.freeze(['low', 'mid', 'high']);
 
 /**
+ * #1483 "how hot" (Matt 2026-10-16): the conducting lean is a TEMPERATURE ON PROPOSAL BOLDNESS — cool = safe, proven
+ * moves; hot = daring picks. Davis is the wild man (Matt 2026-10-27): every move stays in his reach at any heat, and
+ * the temperature only ORDERS his tries — cool, the safer moves of his level come first; hot, the daring ones do. The
+ * order is by bands of distance from the heat (BOLD_BAND wide); the seed rotates inside a band.
+ */
+export const BOLD_BAND = 0.5;
+const clampUnit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+/** How far down his order a candidate sits for a heat (0 = tried first). An unrated candidate counts as daring. */
+export const boldBand = (bold, heat) =>
+  Math.max(0, Math.floor(Math.abs((Number.isFinite(bold) ? bold : 1) - clampUnit(heat)) / BOLD_BAND - 1e-9));
+/**
+ * LOIS's brake (Matt 2026-10-27: she is the cautious one). When the artist has been passing a lot (her keep-rate read,
+ * flatBias, at or over BRAKE_AT), she holds Davis to the safe moves — bold at most BRAKE_MAX — until keeps come back.
+ */
+export const BRAKE_AT = 0.5;
+export const BRAKE_MAX = 0.4;
+
+/**
  * Davis's rules-backend conducting. Pure.
  * @param show  the context's `show` block (mindContext): { energy, bpm, silent, routes:[{input,target,depth}], owned:[], flatBars, ... }
  * @param seed  the decision seed (document seed x bar), so the same dish conducts the same way
+ * @param heat  0..1, the conducting temperature: it orders his tries inside the level (boldBand) — never what is in reach.
+ *              What is in reach narrows only on LOIS's brake (`show.brake`: the safe moves, bold <= BRAKE_MAX).
  * @returns an add op (or, on a flat show, a retarget of one of his own rows), or null (nothing worth doing: silence, a full
  *          table, he already holds his few, every candidate already wired or owned)
  */
-export function davisRoute(show, seed = 0) {
+export function davisRoute(show, seed = 0, heat = 0) {
   if (!show || show.silent) return null;
   const level = ENERGY_LEVELS.includes(show.energy) ? show.energy : 'mid';
   const table = Array.isArray(show.routes) ? show.routes : [];
@@ -223,12 +246,25 @@ export function davisRoute(show, seed = 0) {
   const start = pool.length
     ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length)
     : 0;
+  // the temperature orders his tries: his level first (energy decides it), then the band of boldness nearest the heat,
+  // then the seed's rotation. LOIS's brake is the only thing that takes a move out of reach.
+  const lead = PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].filter(fits).length;
+  const braked = show.brake === true;
+  const tries = pool
+    .map((c, i) => ({
+      c,
+      lvl: i < lead ? 0 : 1,
+      band: boldBand(c.bold, heat),
+      rot: (i - start + pool.length) % pool.length,
+    }))
+    .filter((t) => !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= BRAKE_MAX)
+    .sort((a, b) => a.lvl - b.lvl || a.band - b.band || a.rot - b.rot)
+    .map((t) => t.c);
   const mine = table.filter((r) => r && r.by === DAVIS_TAG);
   // a flat show with a route of his: move it somewhere else (one move, no pile-up)
   if (rerolls > 0 && mine.length > 0) {
     const m = mine[0];
-    for (let k = 0; k < pool.length; k++) {
-      const c = pool[(start + k) % pool.length];
+    for (const c of tries) {
       if (
         c.target === m.target ||
         owned.has(c.target) ||
@@ -241,8 +277,7 @@ export function davisRoute(show, seed = 0) {
     return null;
   }
   if (mine.length >= DAVIS_MAX_ROUTES) return null; // he conducts with a few, he does not fill the table
-  for (let k = 0; k < pool.length; k++) {
-    const c = pool[(start + k) % pool.length];
+  for (const c of tries) {
     if (owned.has(c.target) || pairIndex(table, c.input, c.target) >= 0) continue;
     return { op: 'add', input: c.input, target: c.target, depth: c.depth };
   }

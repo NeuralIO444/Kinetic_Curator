@@ -31,7 +31,7 @@ import { useStore } from './state/store.js';
 import { useMetroPulse } from './hooks/useMetroPulse.js';
 import { say } from './curator/whisper.js'; // #1139
 import { initWhisperTriggers } from './curator/whisperTriggers.js'; // #1139
-import { initDirectorBeat, setPresenceProvider } from './curator/director.js'; // #1145
+import { initDirectorBeat, setPresenceProvider, conductHeat } from './curator/director.js'; // #1145
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (the creature's posture consumes them since S5)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
@@ -234,6 +234,7 @@ function AppInner() {
     });
     const stopMind = startMind({
       presence,
+      conductHeat, // #1483: how bold Davis's conducting picks may run (engine-side only)
       isReplaying: isPlaybackActive,
       model: DEBUG_MIND ? demoModel : appleModel,
       getSeed: () => useStore.getState().seed,

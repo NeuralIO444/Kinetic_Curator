@@ -70,6 +70,7 @@ export function startMind({
   isReplaying = () => false,
   presence = null,
   log = () => {},
+  conductHeat = null,
 }) {
   const name = model && model.name === 'demo' ? 'demo' : 'apple';
   const available = () => {
@@ -123,6 +124,7 @@ export function startMind({
       available,
       backend: name,
       mind: model ? ask(persona) : null,
+      ...(persona === 'davis' && conductHeat ? { heat: conductHeat } : {}), // #1483: how bold his picks may run
     }),
   );
   let status = null;
