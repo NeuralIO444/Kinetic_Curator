@@ -26,13 +26,15 @@ const MOOD_FOR_DAVIS = Object.freeze({
 export const RULES = Object.freeze({
   // #1483 — with audio live Davis conducts: one route to add, from the preset the energy and tempo ask for. Without a
   // show block he is exactly as neutral as he was. The seed is the decision's, so the same dish conducts the same way.
+  // meta.heat (0..1) is the conducting temperature: how far toward daring picks he may reach (davisRoute). Engine-side
+  // only — never in the context a model is told, never in the record (the recorded reply is what replays).
   davis: (ctx, meta = {}) => {
     // a tier that may make no edits (tier 1, or none yet) does not propose them: the books stay honest
     const allowed = (ctx && TIER_OPS[ctx.tier]) || [];
     // stage 2: when the route table has nothing for him, he may re-tune the spectrum marks instead (davisSpectrum)
     let route =
       ctx && ctx.show && allowed.length
-        ? (davisRoute(ctx.show, meta.seed) ??
+        ? (davisRoute(ctx.show, meta.seed, meta.heat) ??
           (allowed.includes('spectrum') ? davisSpectrum(ctx.show, meta.seed) : null))
         : null;
     if (route && !allowed.includes(route.op)) route = null; // tier 2 may nudge a depth, not add: it does not ask

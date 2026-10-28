@@ -36,6 +36,7 @@ import { audioEnergyNow } from './keepContext.js';
 import {
   swayBiases,
   M2_FLOOR,
+  M2_CAP,
   MIN_KEEPS,
   keptCentroid,
   rankBiases,
@@ -582,4 +583,15 @@ export function leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance 
   } catch {
     return { wetness: null, evolveInterval: null, pull: 0 };
   }
+}
+
+/**
+ * #1483 — the conducting temperature, 0..1: how far the current pull warms the room's picks above the floor, as a
+ * share of the most it can (M2's floor..cap). 0 when nobody leans (the gate, the allowance, too few keeps). The mind
+ * engine reads it to bound how bold Davis's conducting picks may get; it never reaches a surface, a log or a file.
+ */
+export function conductHeat() {
+  const d = Number(getDirector().lastSway && getDirector().lastSway.temperatureDelta);
+  const span = M2_CAP - M2_FLOOR;
+  return Number.isFinite(d) && span > 0 ? Math.min(1, Math.max(0, d / span)) : 0;
 }
