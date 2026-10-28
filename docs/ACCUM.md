@@ -47,7 +47,14 @@ ping-pong, NEAREST):
    Phase A feedback transform (tunnel zoom/spin, prism drift). #287
    fade-to-paper: on light grounds (LITHOGRAPH, SEPIA PLATE) trails fall
    toward the paper instead of black; black grounds keep the old
-   `rgb *= keep` exactly.
+   `rgb *= keep` exactly. #1800: the keep is spectral — a vec3 whose
+   channels run on half-lives of FADE ×1.35 (R), ×1 (G), ×0.72 (B), so a
+   trail's colour becomes its age (whites cool through amber into ember
+   red as they die; on paper the mark warms as it falls). Green carries
+   the slider's rate exactly; unit spread (all ratios 1) is the old
+   scalar recipe bit-for-bit. The audio envelope and the spectrum warp
+   still modulate the scalar keep and re-derive the vec3, so the spread
+   ratios survive every gesture.
 3. **Blur-over-time** (#169) — the incoming frame is blurred with a small
    separable gaussian (σ = 5px × optics) *before* compositing, so old marks
    go soft instead of merely transparent.

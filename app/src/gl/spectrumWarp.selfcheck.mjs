@@ -33,7 +33,7 @@ import {
 } from './spectrumWarp.mjs';
 import { createSpectrumCore, quantizeSpectrum, LOG_BINS } from './spectrumCore.mjs';
 import { beginSpectrumPlayback, stepSpectrumPlayback, endSpectrumPlayback, readSpectrum } from './spectrumLive.mjs';
-import { accumRecipeParams, applyAudioEnvelope, assertRecipeFinite } from './accum.mjs';
+import { accumRecipeParams, applyAudioEnvelope, assertRecipeFinite, spectralKeep } from './accum.mjs';
 import {
   sanitizeFxEffects,
   defaultFxParams,
@@ -268,6 +268,10 @@ const blankState = () => ({ smooth: new Float32Array(LOG_BINS), rel: new Float32
   eq(n.prismUv, base.prismUv, 'neutral: prism untouched');
   eq(n.optics, base.optics, 'neutral: no grain');
   eq(n.keep, WARP_KEEP_MIN, 'neutral: keep is the warp decay (0.92)');
+  // #1800: the decay blend re-derives the spectral vec3 from the blended
+  // keep — the channels never sit on the pre-blend clocks.
+  assert.deepEqual(n.keepVec, spectralKeep(n.keep), 'neutral: keepVec follows the blended keep');
+  checks++;
 
   // A hot warp composes: zoom follows the deviation, spin/prism/grain rise with their bands, and the
   // artist's own tunnel/prism amounts are added onto, never replaced.

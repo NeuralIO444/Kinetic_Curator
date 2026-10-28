@@ -14,6 +14,8 @@ import assert from 'node:assert';
 import {
   ACCUM_VERSION,
   accumRecipeParams,
+  SPECTRAL_HALF_LIFE,
+  spectralKeep,
   sanitizeAccumOptics,
   sanitizeAccumTunnel,
   sanitizeAccumPrism,
@@ -54,6 +56,8 @@ ok('recipe params: defaults and clamps', () => {
   assert.equal(ACCUM_VERSION, 2);
   const d = accumRecipeParams();
   assert.equal(d.keep, 0.88);
+  assert.equal(d.keepVec[1], 0.88, 'green carries the FADE rate exactly (#1800)');
+  assert.ok(d.keepVec[0] > d.keep && d.keep > d.keepVec[2], 'red outlives the rate, blue dies first (#1800)');
   assert.equal(d.optics, 0);
   assert.equal(d.bloomAmount, 0);
   assert.equal(d.halationAmount, 0);
@@ -62,6 +66,39 @@ ok('recipe params: defaults and clamps', () => {
   assert.deepEqual(accumRecipeParams({ fade: -1 }).keep, 0, 'fade clamps at 0');
   assert.deepEqual(accumRecipeParams({ optics: 2 }).optics, 1, 'optics clamps at 1');
   assert.deepEqual(accumRecipeParams({ optics: 'bogus' }).optics, 0, 'optics NaN -> 0');
+});
+
+ok('spectral fade: per-channel half-lives derived from the FADE rate (#1800)', () => {
+  assert.deepEqual(SPECTRAL_HALF_LIFE, [1.35, 1.0, 0.72], 'the eval spread: R slowest, G the rate, B fastest');
+  const near = (a, b) => Math.abs(a - b) < 1e-9;
+  const v = spectralKeep(0.88);
+  assert.ok(near(v[0], 0.9096536227), `red keep at fade 0.88, got ${v[0]}`);
+  assert.equal(v[1], 0.88, 'green is the scalar keep itself, bit-exact');
+  assert.ok(near(v[2], 0.8373221891), `blue keep at fade 0.88, got ${v[2]}`);
+  // Half-life semantics, exactly: at keep 0.5 the FADE half-life is one
+  // frame — green halves in a frame, red in 1.35 frames, blue in 0.72.
+  const h = spectralKeep(0.5);
+  assert.ok(near(Math.pow(h[0], 1.35), 0.5), 'red halves after 1.35 frames');
+  assert.equal(h[1], 0.5, 'green halves after 1 frame');
+  assert.ok(near(Math.pow(h[2], 0.72), 0.5), 'blue halves after 0.72 frames');
+  // The ordering holds across the slider range.
+  for (const k of [0.1, 0.5, 0.9, 0.99]) {
+    const s = spectralKeep(k);
+    assert.ok(s[0] > k && k > s[2], `spread orders the channels at keep ${k}`);
+  }
+  // Floors and holds are channel-blind; garbage is the #763 safe 0.
+  assert.deepEqual(spectralKeep(0), [0, 0, 0]);
+  assert.deepEqual(spectralKeep(1), [1, 1, 1], 'the LEAVE hold keeps every channel');
+  assert.deepEqual(spectralKeep(NaN), [0, 0, 0]);
+  // Spread 0 (unit ratios) is the legacy scalar recipe, bit-exact.
+  assert.deepEqual(spectralKeep(0.8, [1, 1, 1]), [0.8, 0.8, 0.8]);
+  // The recipe params derive the vec3 from the final scalar keep, once.
+  assert.deepEqual(accumRecipeParams({ fade: 0.8 }).keepVec, spectralKeep(0.8));
+  assert.deepEqual(
+    accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keepVec,
+    [1, 1, 1],
+    'LEAVE holds all channels',
+  );
 });
 
 ok('recipe params: one optics amount drives bloom + halation + stipple + chroma', () => {
@@ -169,6 +206,11 @@ ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () =>
   assert.equal(onTheOne.keep, base.keep, 'beatPulse alone leaves keep alone');
   assert.ok(loud.keep > transient.keep, 'full RMS punches harder than flux alone');
   assert.equal(applyAudioEnvelope(base, { rms: 1 }).keep, Math.min(0.99, 0.9 + 0.08 * 1), 'keep math is exact');
+  // #1800: audio scales the spectral vec3 with the scalar — a modulated
+  // params' keepVec is always the derivation of its own keep, never the
+  // stale pre-gesture channels, so the spread ratios survive the gesture.
+  assert.deepEqual(loud.keepVec, spectralKeep(loud.keep), 'loud: keepVec re-derived, ratios preserved');
+  assert.deepEqual(transient.keepVec, spectralKeep(transient.keep), 'flux: same law');
   // #790 PR5 (render.accum): the assignable route's output rides keep in
   // hundredths, on top of the hardcoded gesture, clamped at the 0.99 ceiling.
   const dryBase = accumRecipeParams({ fade: 0.5, optics: 0.5, tunnel: 0.5, prism: 0.5 });
@@ -350,11 +392,33 @@ ok('mirror: fade-only step matches hand math', () => {
     params: accumRecipeParams({ fade: 0.8, optics: 0 }),
   });
   const [r, g, b, a] = px(out2, 3, 0);
+  // #1800 deliberate re-pin: the fade is spectral now — green keeps the
+  // old hand math (0.5 × 0.8), red decays at keep^(1/1.35), blue at
+  // keep^(1/0.72). The pre-#1800 scalar expectations live on in the
+  // unit-spread test below, where they belong.
+  const kv = spectralKeep(0.8);
   assert.ok(
-    Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
-    `fade *= keep, got ${r},${g},${b}`,
+    Math.abs(r - kv[0]) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.25 * kv[2]) < 1e-12,
+    `fade *= keepVec, got ${r},${g},${b}`,
   );
+  assert.ok(r > 0.8 && b < 0.2, 'the age read in one line: red outlives the old fade, blue dies sooner');
   assert.equal(a, 1, 'alpha is not faded');
+});
+
+ok('mirror: keepVec at unit spread is the legacy scalar fade, exactly (#1800)', () => {
+  // The acceptance, pinned: spread 0 (all channels on the FADE clock)
+  // reproduces the pre-#1800 recipe bit-for-bit — the optics no-op
+  // precedent one level down. keepVec is the ONLY channel through which
+  // the spectral spread enters the fade; equal components, old numbers.
+  const params = { ...accumRecipeParams({ fade: 0.8, optics: 0 }), keepVec: [0.8, 0.8, 0.8] };
+  const accum = f64(0);
+  const o = 3 * 4;
+  accum[o] = 1;
+  accum[o + 1] = 0.5;
+  accum[o + 2] = 0.25;
+  accum[o + 3] = 1;
+  const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
+  assert.deepEqual(px(out, 3, 0), [0.8, 0.4, 0.2, 1], 'legacy hand math, unchanged at unit spread');
 });
 
 ok('mirror: optics 0 blooms nothing', () => {
@@ -384,12 +448,17 @@ ok('mirror: fade falls toward the paper on light grounds (#287)', () => {
   }
   const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
   const [r, g, b, a] = px(out, 0, 0);
-  const want = paper.map((c) => c * 0.2 + 1 * 0.8);
+  // #1800: the mix was already per-channel, so the spectral keep composes
+  // with fade-to-paper — each channel falls toward its own channel of the
+  // paper at its own rate (deliberate re-pin of the scalar `want`).
+  const kv = params.keepVec;
+  const want = paper.map((c, i) => c * (1 - kv[i]) + 1 * kv[i]);
   assert.ok(
     Math.abs(r - want[0]) < 1e-12 && Math.abs(g - want[1]) < 1e-12 && Math.abs(b - want[2]) < 1e-12,
     `expected fade toward paper ${want}, got ${r},${g},${b}`,
   );
   assert.ok(r > 0.95, `light ground must stay light, got ${r}`);
+  assert.ok(r > g && g > b, `on paper the mark warms as it falls: r ${r} > g ${g} > b ${b}`);
   assert.equal(a, 1, 'alpha is not faded');
   // Many steps: the mark settles exactly onto the paper, never below it.
   let cur = out;
@@ -401,8 +470,12 @@ ok('mirror: fade falls toward the paper on light grounds (#287)', () => {
   );
 });
 
-// #287 — the default black ground keeps the legacy `rgb *= keep` exactly.
-ok('mirror: fade on the default black ground is unchanged (#287)', () => {
+// #287 — the default black ground adds no paper tint: the fade there is a
+// pure per-channel multiply toward zero. #1800 made the multiplier
+// spectral; #287's no-tint property is what survives — the scalar equality
+// it originally pinned is deliberately re-pinned here (and the legacy
+// numbers live on in the unit-spread test above).
+ok('mirror: black ground adds no tint; channels fade at their own rates (#287 × #1800)', () => {
   const params = accumRecipeParams({ fade: 0.8, optics: 0 });
   assert.deepEqual(params.bg, [0, 0, 0]);
   const accum = f64(0);
@@ -413,9 +486,10 @@ ok('mirror: fade on the default black ground is unchanged (#287)', () => {
   accum[o + 3] = 1;
   const out = mirrorAccumStep({ accum, frame: f64(0), w: W, h: H, params });
   const [r, g, b] = px(out, 3, 0);
+  const kv = params.keepVec;
   assert.ok(
-    Math.abs(r - 0.8) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.2) < 1e-12,
-    `black-ground fade must stay rgb *= keep, got ${r},${g},${b}`,
+    Math.abs(r - kv[0]) < 1e-12 && Math.abs(g - 0.4) < 1e-12 && Math.abs(b - 0.25 * kv[2]) < 1e-12,
+    `black-ground fade is rgb *= keepVec and nothing else, got ${r},${g},${b}`,
   );
 });
 
@@ -643,12 +717,15 @@ ok('mirror: prism separates the RGB channels radially', () => {
   const params = fbParams({ prismUv: 0.1 });
   const out = mirrorAccumStep({ accum: dot, frame: new Float64Array(n2), w: w2, h: h2, params });
   const close = (v, e) => Math.abs(v - e) < 1e-9;
-  assert.ok(close(out[8 * 4], 0.99), 'red fringes outward (x=8)');
+  // #1800 deliberate re-pin: each fringed channel lands at its own keep
+  // (was a flat 0.99 when the fade was scalar).
+  const kv = spectralKeep(0.99);
+  assert.ok(close(out[8 * 4], kv[0]), 'red fringes outward (x=8)');
   assert.ok(close(out[10 * 4 + 1], 0.99), 'green stays centered (x=10)');
-  assert.ok(close(out[12 * 4 + 2], 0.99), 'blue fringes inward (x=12)');
+  assert.ok(close(out[12 * 4 + 2], kv[2]), 'blue fringes inward (x=12)');
   // prism = 0: no separation, the dot is unchanged.
   const plain = mirrorAccumStep({ accum: dot, frame: new Float64Array(n2), w: w2, h: h2, params: fbParams({}) });
-  assert.ok(close(plain[10 * 4], 0.99));
+  assert.ok(close(plain[10 * 4], kv[0]));
   assert.equal(plain[8 * 4], 0, 'no prism -> no red fringe');
 });
 
@@ -671,22 +748,29 @@ ok('mirror: flow = 0 is a no-op, flow > 0 advects', () => {
   const fb0 = fbParams({ flowUv: 0 }); // keep = 0.99 (fade: 1 clamps)
   const still = mirrorAccumStep({ accum: blob, frame: new Float64Array(n3), w: w3, h: h3, params: fb0 });
   for (let i = 0; i < n3; i += 4) {
-    assert.ok(Math.abs(still[i] - blob[i] * fb0.keep) < 1e-12, 'flow 0: rgb only fades');
+    assert.ok(
+      Math.abs(still[i] - blob[i] * fb0.keepVec[0]) < 1e-12,
+      'flow 0: rgb only fades (red at its own rate, #1800)',
+    );
   }
   // flow > 0 on a uniform field: advection of a constant is the constant.
   const flat = new Float64Array(n3).fill(0.5);
   flat.forEach((_, i) => {
     if (i % 4 === 3) flat[i] = 1;
   });
+  const advParams = fbParams({ flowUv: 0.03 });
   const adv = mirrorAccumStep({
     accum: flat,
     frame: new Float64Array(n3),
     w: w3,
     h: h3,
-    params: fbParams({ flowUv: 0.03 }),
+    params: advParams,
   });
   for (let i = 0; i < n3; i += 4) {
-    assert.ok(Math.abs(adv[i] - 0.5 * 0.99) < 1e-9, `uniform field advects to itself, then fades (i=${i})`);
+    assert.ok(
+      Math.abs(adv[i] - 0.5 * advParams.keepVec[0]) < 1e-9,
+      `uniform field advects to itself, then fades (i=${i})`,
+    );
   }
 });
 
