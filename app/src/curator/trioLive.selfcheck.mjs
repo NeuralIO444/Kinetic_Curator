@@ -22,7 +22,7 @@ const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
 const ADD = { op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.3 };
 /** A fresh trio on a fake store: state { audioRoutes, layoutParams }, a setter that mimics the bus -> store path. */
-function rig({ tier = 't3', replaying = false, activity = null, spectrum = undefined } = {}) {
+function rig({ tier = 't3', replaying = false, activity = null, spectrum = undefined, marks = undefined } = {}) {
   const st = { audioRoutes: null, layoutParams: { squash: 0, audioAlphaMod: 0.25 } };
   const subs = [];
   const set = (patch) => {
@@ -35,6 +35,9 @@ function rig({ tier = 't3', replaying = false, activity = null, spectrum = undef
   const offRoute = on(Events.MIND_ROUTE, (e) => (e.status === 'applied' ? out.applied : out.dropped).push(e));
   setConductTap((e) => out.taps.push(e));
   const ctl = { replaying, tier };
+  // stage 2: the marks live in the fake store's layoutParams; setMarkParam is the programmatic write (no bus event)
+  const mk = marks ? { writes: [], locked: [] } : null;
+  if (marks) Object.assign(st.layoutParams, marks);
   const trio = startTrio({
     getRoutes: () => st.audioRoutes,
     getTier: () => ctl.tier,
@@ -42,6 +45,21 @@ function rig({ tier = 't3', replaying = false, activity = null, spectrum = undef
     getActivity: activity ? () => activity : null,
     ...(spectrum !== undefined ? { getSpectrum: spectrum } : {}),
     isReplaying: () => ctl.replaying,
+    ...(mk
+      ? {
+          getMarks: () => ({
+            map: st.layoutParams.spectrumMap,
+            scale: st.layoutParams.spectrumScale,
+            displace: st.layoutParams.spectrumDisplace,
+            colour: st.layoutParams.spectrumColour,
+            locked: mk.locked,
+          }),
+          setMarkParam: (key, value) => {
+            mk.writes.push([key, value]);
+            st.layoutParams = { ...st.layoutParams, [key]: value };
+          },
+        }
+      : {}),
     subscribe: (f) => {
       subs.push(f);
       return () => {};
@@ -62,7 +80,7 @@ function rig({ tier = 't3', replaying = false, activity = null, spectrum = undef
     offRoute();
     setConductTap(null);
   };
-  return { st, set, out, trio, ctl, bar, request, done };
+  return { st, set, out, trio, ctl, bar, request, done, mk };
 }
 const audioOn = () => emit(Events.AUDIO_INPUT, { source: 'mic' });
 
@@ -173,7 +191,10 @@ ok('the artist is sovereign: a route they edit owns its target; a dial they move
   assert.equal(g.trio.conductor.isOwned('render.hue'), false, 'a dial that is no route target owns nothing');
   assert.deepEqual(DIAL_FOR_TARGET['render.squash'], ['squash']);
   for (const t of Object.keys(DIAL_FOR_TARGET))
-    assert.ok(Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t), `${t} is a real route target`);
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t) || /^spectrum\.(map|scale|displace|colour)$/.test(t),
+      `${t} is a real route target (or, #1483 stage 2, a spectrum-marks dial)`,
+    );
   g.done();
 });
 
@@ -454,5 +475,147 @@ ok('the show block carries the spectrum summary only while audio is live and not
   assert.ok(!('spectrum' in n3.trio.showBlock()), 'a throw is null');
   n3.done();
 });
+
+const MARKS0 = { spectrumMap: 0, spectrumScale: 0, spectrumDisplace: 0, spectrumColour: 0 };
+const SPEC = { op: 'spectrum', key: 'scale', value: 0.3 };
+
+ok('a spectrum op lands on the phrase boundary as ONE programmatic write, with a recorded delta', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.bar(5);
+  g.request(5, SPEC);
+  g.bar(6);
+  g.bar(7);
+  assert.deepEqual(g.mk.writes, [], 'nothing yet: it waits for the boundary');
+  g.bar(8);
+  assert.deepEqual(g.mk.writes, [['spectrumScale', 0.3]], 'one write of the layout key');
+  assert.equal(g.st.layoutParams.spectrumScale, 0.3);
+  assert.equal(g.st.audioRoutes, null, 'the route table is untouched');
+  assert.equal(g.out.applied.length, 1);
+  const e = g.out.applied[0];
+  assert.deepEqual(e.delta, {
+    op: 'spectrum',
+    before: { key: 'scale', value: 0 },
+    after: { key: 'scale', value: 0.3 },
+  });
+  assert.equal(e.landBar, 8);
+  assert.equal(g.out.taps.length, 1, 'handed to the take recorder');
+  assert.deepEqual(getTrioView().marksMine, ['scale'], 'tracked as his');
+  assert.deepEqual(
+    g.trio.showBlock().marks,
+    { map: 0, scale: 0.3, displace: 0, colour: 0 },
+    'the block shows the marks',
+  );
+  g.done();
+});
+
+ok('moving that dial afterwards owns it: his mark clears and a later proposal on it is dropped as owned', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.bar(5);
+  g.request(5, SPEC);
+  g.bar(8);
+  assert.equal(g.out.applied.length, 1);
+  emit(Events.LAYOUT_PARAM, { key: 'spectrumScale', value: 0.9 }); // the artist's slider
+  assert.deepEqual(getTrioView().marksMine, [], 'no longer his');
+  assert.ok(g.trio.showBlock().owned.includes('spectrum.scale'), 'owned in the show block');
+  g.request(9, { op: 'spectrum', key: 'scale', value: 0.6 });
+  assert.equal(g.out.dropped.length, 1);
+  assert.equal(g.out.dropped[0].reason, 'owned');
+  g.bar(12);
+  assert.equal(g.mk.writes.length, 1, 'no second write');
+  // another dial is still his to tune
+  g.request(9, { op: 'spectrum', key: 'colour', value: 0.4 });
+  g.bar(16);
+  assert.deepEqual(g.mk.writes[1], ['spectrumColour', 0.4]);
+  g.done();
+});
+
+ok('a marks dial the artist locked is owned; one moved while the proposal waits is not overwritten', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.mk.locked.push('displace');
+  g.bar(1);
+  assert.ok(g.trio.showBlock().owned.includes('spectrum.displace'), 'a locked dial is owned');
+  g.request(1, { op: 'spectrum', key: 'displace', value: 0.4 });
+  assert.equal(g.out.dropped.at(-1).reason, 'owned');
+  g.request(1, SPEC); // held for bar 4
+  emit(Events.LAYOUT_PARAM, { key: 'spectrumScale', value: 0.8 }); // the artist moves it while it waits
+  g.bar(4);
+  assert.deepEqual(g.mk.writes, [], 'not written over the artist');
+  assert.equal(g.out.dropped.at(-1).reason, 'owned');
+  g.done();
+});
+
+ok('a spectrum op that changes nothing, or has no marks to write, is dropped as stale', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.bar(1);
+  g.request(1, { op: 'spectrum', key: 'scale', value: 0 }); // already 0
+  g.bar(4);
+  assert.deepEqual(g.mk.writes, []);
+  assert.equal(g.out.dropped.at(-1).reason, 'stale');
+  g.done();
+  const bare = rig(); // no getMarks / setMarkParam wired
+  audioOn();
+  bare.bar(1);
+  bare.request(1, SPEC);
+  bare.bar(4);
+  assert.equal(bare.out.dropped.at(-1).reason, 'stale');
+  assert.ok(!('marks' in bare.trio.showBlock()), 'no marks reader: no key');
+  bare.done();
+});
+
+ok('the tier gates a spectrum proposal on the bus: t2 is dropped, t3 lands', () => {
+  const g = rig({ marks: MARKS0, tier: 't2' });
+  audioOn();
+  g.bar(1);
+  g.request(1, SPEC);
+  assert.equal(g.out.dropped.at(-1).reason, 'tier');
+  g.ctl.tier = 't3';
+  g.request(1, SPEC);
+  g.bar(4);
+  assert.deepEqual(g.mk.writes, [['spectrumScale', 0.3]]);
+  g.done();
+});
+
+ok('end to end: with the marks off and a full route table Davis opens one mark by the energy', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  emit(Events.AUDIO_ENERGY, { level: 'high' });
+  for (let b = 1; b <= 3; b++) g.bar(b);
+  const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: g.trio.showBlock() });
+  // a full route table has nothing for him, so he falls to the marks
+  ctx.show.routes = Array.from({ length: 16 }, () => ({ input: 'bass', target: 'render.scale', depth: 0.1 }));
+  const reply = rulesReply('davis', ctx, { seed: 2 });
+  assert.deepEqual(reply.route, { op: 'spectrum', key: 'displace', value: 0.4 });
+  g.request(3, reply.route);
+  g.bar(4);
+  assert.deepEqual(g.mk.writes, [['spectrumDisplace', 0.4]]);
+  g.done();
+});
+
+ok(
+  'wired: App passes startTrio the spectrum summary AND the marks reader and programmatic writer; the take keeps the row',
+  () => {
+    const app = src('../App.jsx');
+    const call = app.slice(app.indexOf('startTrio({'), app.indexOf('const stopMind'));
+    for (const k of ['getSpectrum', 'getMarks', 'setMarkParam']) assert.ok(call.includes(`${k}:`), k);
+    assert.ok(/setMarkParam: \(key, value\) => useStore\.getState\(\)\.setLayoutParam\(key, value\)/.test(call));
+    const g = rig({ marks: MARKS0 });
+    audioOn();
+    g.bar(1);
+    g.request(1, SPEC);
+    g.bar(4);
+    const rec = createMindRecorder({ getFrame: () => 10 });
+    g.out.taps.forEach((e) => rec.conduct(e));
+    const fin = rec.finish();
+    assert.equal(fin.conduct.length, 1, 'the spectrum outcome is recorded');
+    assert.equal(fin.conduct[0][5].op, 'spectrum');
+    assert.equal(fin.conduct[0][6].op, 'spectrum');
+    assert.ok(checkMindRecord(fin), 'and the record passes its check');
+    g.done();
+  },
+);
 
 console.log(`trioLive.selfcheck: ${n} checks passed`);

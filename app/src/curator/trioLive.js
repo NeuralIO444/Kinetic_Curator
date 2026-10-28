@@ -17,6 +17,8 @@ import {
   flatBias,
   DAVIS_TAG,
   PHRASE_BARS,
+  SPECTRUM_PARAMS,
+  spectrumTarget,
 } from './mindConduct.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
@@ -30,7 +32,11 @@ export const DIAL_FOR_TARGET = Object.freeze({
   'render.accum': ['accumulation', 'accumulationFade'],
   'color.hue': ['hueRotate'],
   'clock.kinemeRate': ['kinemeRate'],
+  // stage 2 — the spectrum marks: moving a marks dial by hand owns it (STIMULI -> SPECTRUM)
+  ...Object.fromEntries(Object.entries(SPECTRUM_PARAMS).map(([k, param]) => [spectrumTarget(k), [param]])),
 });
+/** The `spectrum` op key a layout key belongs to (spectrumScale -> 'scale'), or null. */
+const SPECTRUM_KEY_OF = Object.freeze(Object.fromEntries(Object.entries(SPECTRUM_PARAMS).map(([k, p]) => [p, k])));
 
 const pairKey = (r) => `${r.input}>${r.target}`;
 const effective = (routes) => (Array.isArray(routes) ? routes : DEFAULT_ROUTES);
@@ -74,6 +80,10 @@ const notify = () => {
  * @param getSpectrum () => {centroid, flux, flatness} | null   the spectrum summary now (absent / null: none)
  * @param isReplaying () => boolean
  * @param subscribe   (fn(state, prev)) => unsubscribe   the store's subscribe: the artist's route and dial edits
+ * @param getMarks    () => { map, scale, displace, colour, locked: string[] } | null   stage 2: the spectrum marks now
+ *                    (locked = the `spectrum` keys whose dial the artist has locked: treated as owned)
+ * @param setMarkParam (layoutKey, value) => void   stage 2: a programmatic layout write (the store's setLayoutParam —
+ *                    NOT the slider's layout:param event, which is the artist's hand: learn mode, the honest feed)
  * @returns { showBlock(), conductor, stop() }
  */
 export function startTrio({
@@ -84,9 +94,23 @@ export function startTrio({
   getSpectrum = null,
   isReplaying = () => false,
   subscribe = null,
+  getMarks = null,
+  setMarkParam = null,
 }) {
   const conductor = createConductor();
   const flatness = createFlatness();
+  const mineMarks = new Set(); // stage 2: the marks dials (spectrum keys) Davis set and the artist has not touched since
+  /** The spectrum marks now, or null (no reader, or it threw / gave nothing usable). */
+  const readMarks = () => {
+    if (typeof getMarks !== 'function') return null;
+    try {
+      const m = getMarks();
+      return m && typeof m === 'object' ? m : null;
+    } catch {
+      return null;
+    }
+  };
+  const marksLocked = (m, key) => Array.isArray(m.locked) && m.locked.includes(key);
   const audio = {
     on: false,
     energy: null,
@@ -129,6 +153,7 @@ export function startTrio({
       owned: conductor.owned(),
       routes: table.length,
       mine: table.filter((r) => r.by === DAVIS_TAG).length,
+      marksMine: [...mineMarks].sort(),
       pending: pending ? { desc: describeOp(pending.op), landBar: pending.landBar } : null,
       log: log.slice(),
     };
@@ -203,10 +228,45 @@ export function startTrio({
     }),
   );
 
+  // stage 2: a `spectrum` op lands as one programmatic write of the marks dial (the take records it like any move)
+  const landMarks = (p, landBar) => {
+    const marks = readMarks();
+    const param = SPECTRUM_PARAMS[p.op.key];
+    const before = marks ? marks[p.op.key] : undefined;
+    // the artist moved or locked this dial while the proposal waited for the boundary: it is theirs, not his to write
+    if (conductor.isOwned(spectrumTarget(p.op.key)) || (marks && marksLocked(marks, p.op.key))) {
+      announce({ status: 'dropped', reason: 'owned', op: p.op, bar: p.bar, landBar });
+      return;
+    }
+    if (!marks || typeof setMarkParam !== 'function' || !param || !Number.isFinite(before) || before === p.op.value) {
+      announce({ status: 'dropped', reason: 'stale', op: p.op, bar: p.bar, landBar });
+      return;
+    }
+    applying = true;
+    try {
+      setMarkParam(param, p.op.value);
+    } finally {
+      applying = false;
+    }
+    mineMarks.add(p.op.key);
+    conductor.commit(landBar);
+    announce({
+      status: 'applied',
+      op: p.op,
+      delta: { op: 'spectrum', before: { key: p.op.key, value: before }, after: { key: p.op.key, value: p.op.value } },
+      bar: p.bar,
+      landBar,
+    });
+  };
+
   const land = (landBar) => {
     const p = pending;
     pending = null;
     if (!p) return;
+    if (p.op.op === 'spectrum') {
+      landMarks(p, landBar);
+      return;
+    }
     const table = effective(getRoutes());
     const res = applyRouteOp(table, p.op, DAVIS_TAG);
     if (!res) {
@@ -276,6 +336,14 @@ export function startTrio({
         announce({ status: 'dropped', reason: v.reason, op, bar: p.bar, landBar: null });
         return;
       }
+      if (op.op === 'spectrum') {
+        // a marks dial the artist locked is theirs, even if they never moved it this session
+        const m = readMarks();
+        if (m && marksLocked(m, op.key)) {
+          announce({ status: 'dropped', reason: 'owned', op, bar: p.bar, landBar: null });
+          return;
+        }
+      }
       if (pending) return; // one is already held for the boundary: the same conducting, said again on the next bar
       pending = { op, landBar: v.landBar, bar: p.bar };
       publish();
@@ -292,7 +360,15 @@ export function startTrio({
   };
   stops.push(
     on(Events.LAYOUT_PARAM, (p) => {
-      if (p && typeof p.key === 'string') owns(p.key);
+      if (!p || typeof p.key !== 'string') return;
+      owns(p.key);
+      // stage 2: the artist moving a marks dial Davis set undoes his move — it is theirs now, and it counts as a revert
+      const k = SPECTRUM_KEY_OF[p.key];
+      if (k && mineMarks.has(k)) {
+        mineMarks.delete(k);
+        conductor.revert(bar);
+        publish();
+      }
     }),
   );
   stops.push(
@@ -361,8 +437,20 @@ export function startTrio({
           depth: r.depth,
           ...(r.by ? { by: r.by } : {}),
         })),
-        owned: conductor.owned(),
+        owned: [
+          ...new Set([
+            ...conductor.owned(),
+            // a marks dial the artist locked is theirs too (stage 2)
+            ...((m) =>
+              m && Array.isArray(m.locked) ? m.locked.filter((k) => SPECTRUM_PARAMS[k]).map(spectrumTarget) : [])(
+              readMarks(),
+            ),
+          ]),
+        ],
         ...(spectrum ? { spectrum } : {}),
+        ...((m) => (m ? { marks: { map: m.map, scale: m.scale, displace: m.displace, colour: m.colour } } : {}))(
+          readMarks(),
+        ),
       };
     },
     stop() {
@@ -374,6 +462,7 @@ export function startTrio({
         }
       }
       pending = null;
+      mineMarks.clear();
       conductor.reset();
       view = null;
       notify();

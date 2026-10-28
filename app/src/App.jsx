@@ -58,6 +58,7 @@ import { startPace } from './curator/paceLive.js'; // #1460: the tempo ease
 import { startLean } from './curator/leanLive.js'; // #1640: the dial lean, applied in silence
 import { startTrio } from './curator/trioLive.js'; // #1483: Davis conducts the audio show
 import { createShowSpectrum } from './curator/showSpectrum.js'; // #1483 stage 2: the spectrum the personas are told
+import { SPECTRUM_PARAMS } from './curator/mindConduct.js'; // #1483 stage 2: the marks dials Davis may re-tune
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum, readSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
@@ -215,6 +216,21 @@ function AppInner() {
       },
       isReplaying: isPlaybackActive,
       subscribe: (fn) => useStore.subscribe(fn),
+      // #1483 stage 2 — the spectrum marks Davis may re-tune; his write is programmatic, never the slider's own event
+      getMarks: () => {
+        const st = useStore.getState();
+        const lp = st.layoutParams || {};
+        return {
+          map: lp.spectrumMap ?? 0,
+          scale: lp.spectrumScale ?? 0,
+          displace: lp.spectrumDisplace ?? 0,
+          colour: lp.spectrumColour ?? 0,
+          locked: Object.entries(SPECTRUM_PARAMS)
+            .filter(([, key]) => st.lockedParams?.[key])
+            .map(([k]) => k),
+        };
+      },
+      setMarkParam: (key, value) => useStore.getState().setLayoutParam(key, value),
     });
     const stopMind = startMind({
       presence,

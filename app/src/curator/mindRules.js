@@ -6,7 +6,7 @@
 // #1462 spec update: LOIS and Davis report the face the honest feed already shows (a canonical state, never invented),
 // so a rules decision is always a reading and never asks the stage for a change (mindContract.wantsStage).
 import { neutralReply, CANONICAL_STATES } from './mindContract.js';
-import { davisRoute, TIER_OPS } from './mindConduct.js';
+import { davisRoute, davisSpectrum, TIER_OPS } from './mindConduct.js';
 
 /** The face the room already shows, as a canonical state, or nothing. */
 const reading = (persona, ctx) => {
@@ -29,7 +29,12 @@ export const RULES = Object.freeze({
   davis: (ctx, meta = {}) => {
     // a tier that may make no edits (tier 1, or none yet) does not propose them: the books stay honest
     const allowed = (ctx && TIER_OPS[ctx.tier]) || [];
-    let route = ctx && ctx.show && allowed.length ? davisRoute(ctx.show, meta.seed) : null;
+    // stage 2: when the route table has nothing for him, he may re-tune the spectrum marks instead (davisSpectrum)
+    let route =
+      ctx && ctx.show && allowed.length
+        ? (davisRoute(ctx.show, meta.seed) ??
+          (allowed.includes('spectrum') ? davisSpectrum(ctx.show, meta.seed) : null))
+        : null;
     if (route && !allowed.includes(route.op)) route = null; // tier 2 may nudge a depth, not add: it does not ask
     return { ...neutralReply('davis'), ...(route ? { route } : {}), ...reading('davis', ctx) };
   },

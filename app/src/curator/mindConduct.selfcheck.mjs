@@ -23,8 +23,14 @@ import {
   ENERGY_LEVELS,
   DAVIS_MAX_ROUTES,
   describeOp,
+  ROUTE_OPS,
   flatBias,
   FLAT_BIAS_SWING,
+  davisSpectrum,
+  SPECTRUM_OPENERS,
+  SPECTRUM_PARAMS,
+  SPECTRUM_MAP_COUNT,
+  spectrumTarget,
 } from './mindConduct.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
@@ -537,6 +543,156 @@ ok(
     });
   },
 );
+
+// ── stage 2: Davis re-tunes the spectrum marks ──────────────────────────────────────────────────────────────────────
+const MARKS_OFF = { map: 0, scale: 0, displace: 0, colour: 0 };
+const MARKS_ON = { map: 1, scale: 0.3, displace: 0, colour: 0 };
+const FULL = Array.from({ length: MAX_ROUTES }, () => r('bass', 'render.scale'));
+const sshow = (extra = {}) => ({
+  energy: 'mid',
+  silent: false,
+  routes: [],
+  owned: [],
+  flatBars: 0,
+  marks: MARKS_OFF,
+  ...extra,
+});
+
+ok('spectrum ops validate: key in SPECTRUM_PARAMS, map an integer 0..3, amounts 0..1, a real number', () => {
+  assert.deepEqual(validateRouteOp({ op: 'spectrum', key: 'map', value: 2 }), { op: 'spectrum', key: 'map', value: 2 });
+  assert.deepEqual(validateRouteOp({ op: 'spectrum', key: 'map', value: 0 }), { op: 'spectrum', key: 'map', value: 0 });
+  assert.deepEqual(validateRouteOp({ op: 'spectrum', key: 'map', value: 3 }), { op: 'spectrum', key: 'map', value: 3 });
+  for (const key of ['scale', 'displace', 'colour']) {
+    assert.deepEqual(validateRouteOp({ op: 'spectrum', key, value: 0.5 }), { op: 'spectrum', key, value: 0.5 });
+    assert.deepEqual(validateRouteOp({ op: 'spectrum', key, value: 0 }), { op: 'spectrum', key, value: 0 });
+    assert.deepEqual(validateRouteOp({ op: 'spectrum', key, value: 1 }), { op: 'spectrum', key, value: 1 });
+  }
+  assert.equal(validateRouteOp({ op: 'spectrum', key: 'scale', value: 0.12345 }).value, 0.123, 'rounded to 3 places');
+  const bad = [
+    { op: 'spectrum', key: 'hue', value: 0.5 },
+    { op: 'spectrum', key: 'toString', value: 0.5 },
+    { op: 'spectrum', value: 0.5 },
+    { op: 'spectrum', key: 'map', value: 4 },
+    { op: 'spectrum', key: 'map', value: -1 },
+    { op: 'spectrum', key: 'map', value: 1.5 },
+    { op: 'spectrum', key: 'scale', value: 1.2 },
+    { op: 'spectrum', key: 'scale', value: -0.1 },
+    { op: 'spectrum', key: 'scale', value: NaN },
+    { op: 'spectrum', key: 'scale', value: Infinity },
+    { op: 'spectrum', key: 'scale' },
+    { op: 'spectrum', key: 'scale', value: null },
+    { op: 'spectrum', key: 'scale', value: '0.5' },
+    { op: 'spectrum', key: 'map', value: true },
+  ];
+  for (const b of bad) assert.equal(validateRouteOp(b), false, JSON.stringify(b));
+  assert.deepEqual(opTargets({ op: 'spectrum', key: 'colour', value: 0.2 }), ['spectrum.colour']);
+  assert.deepEqual(Object.keys(SPECTRUM_PARAMS), ['map', 'scale', 'displace', 'colour']);
+  assert.equal(describeOp({ op: 'spectrum', key: 'map', value: 2 }), 'marks listen by POSITION');
+});
+
+ok('the tier gates the spectrum op: t1 and t2 refuse it, t3 and t4 allow it', () => {
+  assert.ok(ROUTE_OPS.includes('spectrum'));
+  for (const t of ['t1', 't2']) assert.ok(!TIER_OPS[t].includes('spectrum'), t);
+  for (const t of ['t3', 't4']) assert.ok(TIER_OPS[t].includes('spectrum'), t);
+  const op = { op: 'spectrum', key: 'scale', value: 0.3 };
+  const c = createConductor();
+  assert.deepEqual(c.consider(op, { bar: 5, tier: 't2' }), { ok: false, reason: 'tier' });
+  assert.deepEqual(c.consider(op, { bar: 5, tier: 't3' }), { ok: true, landBar: 8 });
+  assert.equal(c.consider(op, { bar: 5, tier: 't4' }).ok, true);
+});
+
+ok('a marks dial the artist moves is owned: the conductor drops a spectrum op on it, and only on it', () => {
+  const c = createConductor();
+  c.touch(spectrumTarget('scale'));
+  assert.deepEqual(c.owned(), ['spectrum.scale']);
+  assert.deepEqual(c.consider({ op: 'spectrum', key: 'scale', value: 0.3 }, { bar: 5, tier: 't3' }), {
+    ok: false,
+    reason: 'owned',
+  });
+  assert.equal(c.consider({ op: 'spectrum', key: 'colour', value: 0.3 }, { bar: 5, tier: 't3' }).ok, true);
+  c.touch('spectrum.nope');
+  assert.deepEqual(c.owned(), ['spectrum.scale'], 'an unknown dial is not ownable');
+});
+
+ok('davisSpectrum: marks off -> the opener for the energy, unless that dial is owned', () => {
+  for (const level of ['low', 'mid', 'high']) {
+    const op = davisSpectrum(sshow({ energy: level }), 7);
+    assert.deepEqual(op, { op: 'spectrum', ...SPECTRUM_OPENERS[level] }, level);
+    assert.ok(validateRouteOp(op), 'the opener is itself a valid op');
+  }
+  assert.deepEqual(davisSpectrum(sshow({ energy: 'weird' }), 1), { op: 'spectrum', ...SPECTRUM_OPENERS.mid });
+  const own = spectrumTarget(SPECTRUM_OPENERS.high.key);
+  assert.equal(davisSpectrum(sshow({ energy: 'high', owned: [own] }), 1), null, 'owned opener dial: nothing');
+  assert.notEqual(davisSpectrum(sshow({ energy: 'high', owned: [spectrumTarget('map')] }), 1), null);
+});
+
+ok(
+  'davisSpectrum: marks on and the show not flat -> nothing; flat -> the next map, never the current or an owned one',
+  () => {
+    assert.equal(davisSpectrum(sshow({ marks: MARKS_ON }), 3), null, 'working marks are left alone');
+    const flat = sshow({ marks: MARKS_ON, flatBars: 4 });
+    for (let seed = 0; seed < 12; seed++) {
+      const op = davisSpectrum(flat, seed);
+      assert.equal(op.op, 'spectrum');
+      assert.equal(op.key, 'map');
+      assert.ok(validateRouteOp(op), `seed ${seed}: valid`);
+      assert.notEqual(op.value, MARKS_ON.map, `seed ${seed}: not the map already listening`);
+      assert.ok(Number.isInteger(op.value) && op.value >= 0 && op.value < SPECTRUM_MAP_COUNT);
+    }
+    assert.equal(
+      new Set([0, 1, 2, 3].map((s) => davisSpectrum(flat, s).value)).size > 1,
+      true,
+      'the seed picks among the other maps',
+    );
+    assert.equal(davisSpectrum({ ...flat, owned: [spectrumTarget('map')] }, 1), null, 'owned map: nothing');
+    const wrap = davisSpectrum(sshow({ marks: { ...MARKS_ON, map: 3 }, flatBars: 8 }), 0);
+    assert.notEqual(wrap.value, 3, 'wraps past the end');
+  },
+);
+
+ok('davisSpectrum: silent, no marks block, or a bad one -> null; deterministic for the same seed', () => {
+  assert.equal(davisSpectrum(sshow({ silent: true }), 1), null);
+  assert.equal(davisSpectrum(null, 1), null);
+  const { marks: _m, ...none } = sshow();
+  assert.equal(davisSpectrum(none, 1), null, 'no marks reported: nothing to tune');
+  assert.equal(davisSpectrum(sshow({ marks: 'on' }), 1), null);
+  const flat = sshow({ marks: MARKS_ON, flatBars: 4 });
+  assert.deepEqual(davisSpectrum(flat, 99), davisSpectrum(flat, 99));
+  assert.deepEqual(davisSpectrum(sshow(), 5), davisSpectrum(sshow(), 5));
+});
+
+ok('mindRules davis: the marks are asked only when davisRoute has nothing and the tier allows `spectrum`', () => {
+  const ctx = (tier, show) => ({ tier, show });
+  // the route table has a move: stage 1 conducting is unchanged
+  const open = sshow();
+  assert.ok(davisRoute(open, 4), 'precondition: an empty table has a move');
+  assert.equal(rulesReply('davis', ctx('t3', open), { seed: 4 }).route.op, davisRoute(open, 4).op);
+  // a full table: davisRoute is null, so t3/t4 fall back to the marks
+  const full = sshow({ routes: FULL });
+  assert.equal(davisRoute(full, 4), null, 'precondition: a full table has no route move');
+  for (const t of ['t3', 't4'])
+    assert.deepEqual(rulesReply('davis', ctx(t, full), { seed: 4 }).route, davisSpectrum(full, 4), t);
+  assert.equal(rulesReply('davis', ctx('t3', full), { seed: 4 }).route.op, 'spectrum');
+  // t2 may nudge a depth, not touch the marks; t1 and no tier make no edits
+  for (const t of ['t2', 't1', null])
+    assert.equal(rulesReply('davis', ctx(t, full), { seed: 4 }).route, undefined, String(t));
+  // nothing for the marks either (working marks, not flat): no route key
+  assert.equal(rulesReply('davis', ctx('t3', sshow({ routes: FULL, marks: MARKS_ON })), { seed: 4 }).route, undefined);
+  // the reply still validates as a whole
+  assert.ok(validateReply('davis', rulesReply('davis', ctx('t3', full), { seed: 4 })));
+});
+
+ok('the show block carries the marks, clamped; absent or malformed marks add no key', () => {
+  assert.deepEqual(showOf({ marks: { map: 2.2, scale: 1.5, displace: -1, colour: 0.12345 } }).marks, {
+    map: 2,
+    scale: 1,
+    displace: 0,
+    colour: 0.123,
+  });
+  assert.ok(!('marks' in showOf({})), 'absent');
+  assert.ok(!('marks' in showOf({ marks: 'on' })), 'a string is not marks');
+  assert.ok(!('marks' in showOf({ marks: { map: 1, scale: NaN, displace: 0, colour: 0 } })), 'NaN field: no key');
+});
 
 ok('pure: no clock, timers or randomness', () => {
   const code = readFileSync(new URL('./mindConduct.js', import.meta.url), 'utf8')
