@@ -10,6 +10,7 @@
  */
 
 import http from 'node:http';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright';
@@ -22,6 +23,51 @@ const GL_DIR = path.join(PARITY_DIR, '..'); // serve src/gl; harness at /parity/
 let server = null;
 let browser = null;
 let page = null;
+
+// Browser launch args (default: none — Playwright's stock headless launch).
+// Harness callers that need the REAL GPU (costBench --gpu, #1578) set these
+// BEFORE the first page opens: Playwright's headless Chromium falls back to
+// SwiftShader software rendering on macOS unless ANGLE is pointed at Metal,
+// and software labels are not device truth. Once the browser is up, the args
+// are frozen — asking for different ones is a programming error, not a
+// relaunch request, so it throws instead of silently measuring the wrong GPU.
+let launchArgs = null;
+let launchedArgs = null;
+
+/** ANGLE launch args that route WebGL to the platform's real GPU backend,
+ * or null on platforms with no known mapping. Pure — safe to unit-test. */
+export function realGpuLaunchArgs(platform = os.platform()) {
+  switch (platform) {
+    case 'darwin':
+      return ['--use-gl=angle', '--use-angle=metal'];
+    case 'win32':
+      return ['--use-gl=angle', '--use-angle=d3d11'];
+    case 'linux':
+      return ['--use-gl=angle', '--use-angle=vulkan'];
+    default:
+      return null;
+  }
+}
+
+/** Set the Chromium launch args for the shared browser. Must be called
+ * before the first page opens; afterwards only a matching re-set is a no-op.
+ * The setting survives closeGlDriver() (it is caller intent); what the live
+ * browser actually launched with does not. */
+export function setGlLaunchArgs(args) {
+  const next = Array.isArray(args) && args.length ? [...args] : null;
+  if (browser) {
+    if (JSON.stringify(next) !== JSON.stringify(launchedArgs)) {
+      throw new Error('[glDriver] launch args are frozen once the browser has launched');
+    }
+    return;
+  }
+  launchArgs = next;
+}
+
+/** The launch args currently in effect (test/inspection hook). */
+export function glLaunchArgs() {
+  return browser ? launchedArgs : launchArgs;
+}
 const atlasCache = new Map();
 
 // Single page.evaluate arguments much past ~100MB never arrive ("Target page,
@@ -118,7 +164,8 @@ async function ensurePage() {
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const port = server.address().port;
   try {
-    browser = await chromium.launch();
+    browser = launchArgs ? await chromium.launch({ args: [...launchArgs] }) : await chromium.launch();
+    launchedArgs = launchArgs;
   } catch (e) {
     // Launch failed (e.g. no Playwright browser installed in CI): don't
     // leak the just-opened server or the caller's process hangs forever.
@@ -149,6 +196,7 @@ export async function closeGlDriver() {
     /* noop */
   }
   page = browser = server = null;
+  launchedArgs = null;
 }
 
 /**
