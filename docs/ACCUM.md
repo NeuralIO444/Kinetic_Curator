@@ -70,6 +70,15 @@ ping-pong, NEAREST):
    (`blurPassSigmas`) — repeated gaussians convolve back to the full kernel.
    The old truncated-at-64 kernel (narrower, weaker glow at high optics) was
    the artifact, not the look.
+7. **Highlight soft-ceiling** (#1801) — each glow tier's add-back is shaped
+   as it lands: identity at/below the knee (1.0), a smooth invertible
+   shoulder above it, asymptoting at the ceiling (2.5) —
+   `highlightSoftCeiling` in `accum.mjs`, baked into the glow shader. It
+   replaces the hard clamp at 1.0 that pinned hot cores to flat white (the
+   ratchet B1 warns about): the buffer stays HDR through the loop and hot
+   cores keep their hue separation; ACES still runs only at the resolve
+   (#532). Sub-knee content and the optics = 0 path are bit-identical to
+   the pre-#1801 loop.
 
 One amount drives steps 3/5/6: **optics** 0..1 — the GLOW slider next to
 FADE in the toggle row (`layoutParams.accumulationOptics`, default 0).
@@ -193,7 +202,12 @@ no-audio contract below holds on every path.
   big optics swings ratchet bright content toward white over a long
   sequence. If a loud passage blows out the highlights, pull SWELL down
   (0 = the music never touches the glow) instead of touching the GLOW
-  slider. In the still path this is the `--swell` flag.
+  slider. In the still path this is the `--swell` flag. Since #1801 the
+  ratchet is also bounded in the loop itself: the highlight soft-ceiling
+  (recipe step 7) keeps hot cores under 2.5 with their hue separation
+  intact, so a loud passage saturates gracefully instead of converging
+  to flat white — SWELL stays the musical fader, no longer the only
+  defence.
 
 A missing or malformed sidecar warns on stderr and is a real no-op (renders
 without audio); the pre-research sketch (bare `[{t, rms, beat}]`) is still

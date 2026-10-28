@@ -1,48 +1,56 @@
-# STAGING REPORT — #1800 ACCUM spectral fade (per-channel decay)
+# STAGING REPORT — #1801 ACCUM highlight soft-ceiling (kill the bloom ratchet)
 
-Builder staging record, branch `feat/1800-spectral-fade` (local only — not pushed, no PR; the coordinator publishes). This file replaces the report that was at the worktree root (#1578 Slice C's); that report remains in git history.
-Issue: #1800 "ACCUM: spectral fade — per-channel decay (trails age in hue)". No comments on the issue; the body is the whole contract.
+Builder staging record, branch `feat/1801-soft-ceiling` (local only — not pushed, no PR; the coordinator publishes). Base: origin/main @ 4bd7a115 (post-#1816 TIDES; #1800 not yet merged — see "Composition with #1800" below). This file replaces the report that was at the worktree root (#1578 Slice C's); that report remains in git history.
+Issue: #1801 "ACCUM: highlight soft-ceiling in the loop (kill the bloom ratchet)". No comments on the issue; the body is the whole contract.
 
 ## What shipped (plain language)
 
-Trails now age in colour, not just in brightness. The accumulation buffer's fade used to dim every colour channel at the same rate, so an old trail was just a dimmer copy of itself. Now each channel decays on its own clock — red slowest, green at the FADE slider's rate, blue fastest — so a trail's colour tells you its age at a glance: fresh light lands in the frame's own colours, then cools through amber into deep ember red before black. Same single fade pass, no new controls, no new rendering cost: the FADE slider still means exactly what it meant (green decays at precisely the dialed rate).
+Bright cores no longer flatten to white. The glow pass used to hard-clamp every colour channel at 1.0 on every frame, so over a long loud sequence each channel pinned at exactly 1.0 one after another and the core converged to flat, hueless white — the bloom ratchet. Now the add-back passes through a soft ceiling instead: anything at or below 1.0 is completely untouched (bit-identical to before), and above 1.0 a smooth shoulder bends the value toward a 2.5 ceiling it never reaches. Hot cores stay in HDR, keep their hue separation, and settle instead of pinning. No new passes, no new controls — the same glow pass, shaped.
 
-Measured on the real GPU (fixed test scene: a cream mover sweeping right at FADE 0.94, sampled head / mid-tail / oldest tip, 0–255):
+Measured on the fixed test scene (amber block deposited for 12 steps, then black frames, FADE 0.95, optics 0.75; core pixel, linear float, run through each codebase's own JS mirror — main's for "before", this branch's for "after"):
 
-| sample | before (scalar) | after (spectral) |
+| step | before (hard clamp) | after (soft ceiling) |
 |---|---|---|
-| head (fresh) | 255, 245, 214 | 255, 245, 214 — identical |
-| mid-tail | 70, 67, 58 | 97, 67, 35 |
-| tip (oldest) | 23, 22, 19 (neutral gray) | 43, 22, 7 (ember) |
+| 12 | 1.000 / 0.636 / 0.138 | 1.180 / 0.636 / 0.138 |
+| 24 | 1.000 / 1.000 / 0.509 (r−b 0.491) | 1.357 / 1.312 / 0.510 (r−b 0.847) |
+| 60 | **1.000 / 1.000 / 1.000 (r−b 0.000 — flat white)** | 1.357 / 1.313 / 1.282 (r−b 0.075) |
+| 240 | 1.000 / 1.000 / 1.000 | 1.357 / 1.313 / 1.282 — settled, unchanged |
 
-Green is byte-identical at every age — the slider's rate is untouched; red lingers, blue dies first, the tail warms. Stills: `docs/review/1800/before-scalar.png`, `docs/review/1800/after-spectral.png` (rendered through the repo's own GPU probe harness; "before" rendered from main's code, "after" from this branch).
+Before: the ratchet finishes the job by step 60 — every channel at the pin, hue separation exactly zero, forever. After: the core works in HDR while the content is fresh (r−b 0.85 at step 24) and settles at a hue-ordered fixed point under the ceiling instead of at the pin.
+
+Stills: `docs/review/1801/before-clamp.png`, `docs/review/1801/after-ceiling.png` — the same fixed scene at step 24. One honest caveat: the repo's GPU probe harness reads the buffer back through an 8-bit clamp, which cannot express this difference (verified: probe samples are identical under both laws, because everything that differs sits above 1.0). The stills are therefore rendered from the JS mirror's float buffer — the same mirror the accum suite's GPU parity probes hold to ~3 LSB of the real GPU path — tonemapped as `(v / 2.5)^(1/2.2)` so the 2.5 headroom is the display range. Core/edge/skirt float samples are printed in the verification notes below.
 
 ## How (specifics)
 
 - `app/src/gl/accum.mjs`
-  - New `SPECTRAL_HALF_LIFE = [1.35, 1.0, 0.72]` (recipe constant v1, per the issue) and `spectralKeep(keep, ratios)`: since the FADE keep is `0.5^(1/H)` for half-life H frames (docs/ACCUM.md), channel c's keep is `keep^(1/ratio_c)`. G (ratio 1) is returned as the input itself — bit-exact. keep 0 → all-0, keep 1 → all-1, non-finite → 0 (the #763 safe direction). Unit ratios return `[k, k, k]` bit-exactly.
-  - `accumRecipeParams` derives `keepVec: spectralKeep(finalKeep)` in exactly one place, next to the scalar `keep` (which stays: the LEAVE gate and both modulators speak it).
-  - `FADE_FS`: `u_keep` is now `vec3`. The mix line itself is untouched — GLSL's component-wise `mix` does the per-channel work, so the wet variant `FADE_WET_FS` (built by string replacement on `FADE_FS`) inherits the change with its replacement anchors intact.
-  - JS mirror (`mirrorAccumStep`): the fade applies `p.keepVec` per channel in both the plain and the feedback-transform paths. Fade-to-paper (#287) composes unchanged — the mix was already per-channel; trails now warm as they fall toward paper.
-  - `applyAudioEnvelope`: the gesture still computes the scalar keep, then re-derives `keepVec` from it — the issue's "scale the vec3 uniformly, preserving the spread ratios," realized exactly (the ratios live in half-life space; re-derivation preserves them through the clamps, where per-channel addition would distort them).
-  - Both fade uniform uploads (dry + wet) now `uniform3f`. Zero new passes, zero new targets; the fade pass's declared cost tier is unchanged (tier 1, same numbers).
-- `app/src/gl/spectrumWarp.mjs` — `applySpectrumWarp` blends `keep`; it now re-derives `keepVec` from the blended keep (same law as the envelope), so a warp can never leave the channels on pre-blend clocks.
-- `app/src/gl/debug/sweepEffects.mjs` — the debug sweep's own declaration of the fade pass: `u_keep` kind `float` → `vec3`, uploaded as the equal-component triple (the sweep drives the shader's legacy shape; the spectral derivation lives in the recipe).
-- `docs/ACCUM.md` — the fade/decay step now records the spectral law.
-- Selfchecks: `app/src/gl/accum.selfcheck.mjs` gains a derivation suite (literal pins: `spectralKeep(0.88) = [0.9096536227, 0.88, 0.8373221891]`; the half-life identity — at keep 0.5, red halves after exactly 1.35 frames, blue after 0.72) and a unit-spread suite proving spread-0 reproduces the legacy hand math `[0.8, 0.4, 0.2]` bit-for-bit. Four existing expectations were **deliberately re-pinned** to the spectral math, each marked in place: fade-only hand math, #287 paper `want` (+ a new r > g > b "warms as it falls" pin), #287 black-ground (renamed — the no-tint property survives, scalar equality doesn't), prism fringe landings, flow fade factors. `spectrumWarp.selfcheck.mjs` gains the keepVec-follows-the-blend pin. No manifest change was needed — every touched suite was already manifest-wired.
+  - New recipe constants `HIGHLIGHT_KNEE = 1.0` / `HIGHLIGHT_CEILING = 2.5` and the shaping law `highlightSoftCeiling(x)`: identity for x ≤ knee (bit-exact — the acceptance's sub-knee guarantee), else `knee + span·t/(span + t)` with `t = x − knee`, `span = ceiling − knee`. Reinhard-family shoulder: slope exactly 1 at the knee (C1 join, no seam), monotone, bounded by the ceiling, closed-form invertible — the in-loop shapes the 2026-10-27 eval sanctioned (invertible shoulder; published phosphor pipelines pin the linear buffer at 2.5). ACES is untouched and still runs only at the resolve (#532); nothing accumulates through a filmic curve.
+  - `GLOW_FS`: a `softCeil`/`softCeil3` GLSL pair with the constants **baked in from the JS constants at module load** (one source of truth; no new uniforms, so the createAccum uniform audit is untouched). The tail `min(lit, vec3(1.0))` is replaced by `softCeil3(lit)`. `GLOW_WET_FS` is string-built from `GLOW_FS` and inherits the ceiling through the shared tail — its replace anchors (the `vec3 lit = …` line and `uniform vec3 u_tint;`) are unchanged, and wet granulation still shapes before the ceiling, consistently with the dry pass.
+  - JS mirror (`mirrorAccumStep`): the ceiling is applied **per glow tier** — shape after the bloom add, then shape again after the halation add — exactly matching the GPU's two sequential passes (bloom writes back, halation reads the shaped result). The pre-#1801 mirror summed both tiers and clamped once; that agreed with the GPU only because a hard clamp of a monotone sum is order-blind. A shoulder is not, so the tiers now shape in sequence (the difference is ~0.018 on a uniform white frame — measured, and pinned by a dedicated test that also proves it can distinguish the two compositions).
+  - Module header recipe list gains step 7 documenting the ceiling.
+- `docs/ACCUM.md` — recipe gains step 7 (highlight soft-ceiling), and the B1 SWELL paragraph records that the ratchet is now also bounded in-loop; SWELL remains the musical fader, no longer the only defence.
+- Selfchecks: `app/src/gl/accum.selfcheck.mjs` gains 4 cases (49 → 53): the shaping law (bit-exact identity below the knee; hand values on the shoulder; monotonicity; ceiling asymptote; slope-1 at the knee; invertibility round-trip; hue-order preservation), the shader-baking pins (GLOW_FS/GLOW_WET_FS carry softCeil with numbers derived from the constants; the hard clamp is gone), the per-tier mirror composition test, and the 240-step ratchet acceptance test (mid-sequence r−b > 0.5; settled core > 1.2 on all channels, < 2.5, r−b > 0.04, one-more-step Δ < 0.005; optics-0 control never exceeds the deposit). No manifest change — the suite was already manifest-wired. No golden hashes exist in this suite, so there was nothing to re-pin.
 
 ## Deliberately NOT built
 
-- **No performer-facing spread amount / no new panel or contract field** — the issue fixes the spread as a recipe constant v1 and defers an amount to a later slice. The "feature off" state exists as the unit-ratios limit of the derivation (pinned bit-exact in the selfcheck) rather than as a runtime gate, matching the scope as written.
-- **ACCUM_VERSION stays 2** — it has no consumers outside this module and its selfcheck; the buffer format didn't change, only the fade law's parameters.
-- **ACCUM_VISION §2.7's luminance→hue grade pass** — superseded by this slice per the issue (the true mechanism replaces the cheat); the doc's "true version" (dedicated age texture) is #1805's territory, untouched.
-- **Nothing for #1801–#1808** — no hooks added beyond keeping the params/modulator pattern consistent for them to build on.
+- **No new passes, targets, or uniforms** — the issue scopes this to one shaping function in the existing composite/bloom step. The glow target stays RGBA8 (its ≤ 1 glow samples are unchanged); the feedback buffer stays RGBA16F.
+- **No panel control** — knee/ceiling are recipe constants v1, per the issue.
+- **No change to the resolve** — ACES still runs once at resolve (#532); the eval's rejected option (accumulating through a filmic curve) stays rejected.
+- **ACCUM_VERSION stays 2** — the buffer format didn't change, only the glow pass's shaping law.
+- **Nothing for #1800, #1802–#1808** — no hooks added beyond the recipe-constant pattern they already build on.
+
+## Composition with #1800 (coordinator note)
+
+#1800 (PR #1824, branch `feat/1800-spectral-fade`) was still open when this slice was built, so this branch is based on pre-#1800 main. The two slices touch disjoint regions of `accum.mjs` — #1800's hunks are the fade (`FADE_FS` `u_keep` → vec3, `keepVec` derivation, mirror fade) and this slice's are the glow (`GLOW_FS` tail + softCeil, mirror glow, constants after `opticsDerived`) — so a rebase/merge composes textually except possibly the `accum.selfcheck.mjs` import list, where both slices add names to the same import block (trivial hand-merge). This slice deliberately adds **no fields** to `accumRecipeParams`' return object, avoiding #1800's `keepVec` restructuring entirely.
 
 ## Verification
 
-- `app/src/gl/accum.selfcheck.mjs`: **OK — all 51 cases pass** (solo run, 3 GB heap), including the 2 new #1800 suites and the #309 e2e probes (velocity smear, resDiv resample). Sandbox caveat: with the default 2 GB heap the suite OOM-aborts during the 512px prism probe — **identically on unmodified main** (verified: main aborts after 40 cases, this branch after 42 = main + the 2 new suites), so it is an environment limit, not a regression; run solo at a raised heap it completes clean.
-- Neighbour suites (all PASS): accumGuard, accum.inventory, accum.seam, canvasSizes, wetFeed, audioBallistics, trailMode, spectrumWarp, costTiers, clock.evolve-accum.
-- `npm run build` in app/: passes.
-- Prettier: all touched files formatted with the repo's pinned prettier.
-- Visual evidence: before/after stills + numeric samples above (`docs/review/1800/`).
-- **Full manifest sweep (525 manifest entries): 523 pass, 2 fail — both failures are pre-existing sandbox-environment failures, base-identical on unmodified main:** `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` (no cargo toolchain in this sandbox) and `src/fx/rollSafety.selfcheck.mjs` (verified failing with exit 1 on unmodified main in `kc-main-check` as well). CI is authoritative for both; neither touches the accum path.
+- `app/src/gl/accum.selfcheck.mjs`: **OK — all 53 cases pass** (solo run, 3 GB heap), including the 4 new #1801 cases and the browser GPU↔mirror parity probes (mirror-vs-GPU parity holds under the new law — the probes compare the shaped mirror against the shaped GPU pass on optics-1 sequences). Run twice: once against the sandbox's shared module tree and once after a clean `npm ci` in this worktree — same verdict. Sandbox caveat (unchanged from main): at the default 2 GB heap the suite OOM-aborts during the large GPU probes; identical on unmodified main.
+- Neighbour suites (all PASS): accumGuard (torture peak 1.7, 4 poison fields refused), wetFeed (7 checks), spectrumWarp (88 checks), accum.inventory, accum.seam, canvasSizes (58 cases), trailMode (29 cases), audioBallistics, costTiers, clock.evolve-accum.
+- `npm run build` in app/: passes (after `npm ci` in this worktree — see setup note).
+- Prettier: all touched files formatted with the repo's pinned prettier (no changes needed — written in format).
+- Full manifest sweep (526 manifest commands, per-suite loop, 3 GB heap): **524 pass, 2 fail — both failures are the pre-existing sandbox-environment failures, verified base-identical on unmodified main in this session:** `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` (no cargo toolchain in this sandbox; exits 1 on main too) and `src/fx/rollSafety.selfcheck.mjs` (exits 1 on main too). Neither touches the accum path; CI is authoritative for both.
+- Visual evidence: `docs/review/1801/before-clamp.png` / `after-ceiling.png` (see the readback caveat above). Float samples at step 24 (96×96 scene, block 32×32): before core 1.000/1.000/0.510, edge 1.000/1.000/0.433, skirt 1.000/0.718/0.275 — red and green pinned at the clamp across core and edge (the plateau). After core 1.356/1.293/0.511, edge 1.351/1.237/0.434, skirt 1.333/0.737/0.276 — HDR headroom with core→edge gradation and channel separation.
+
+## Setup note
+
+This worktree was created without a local `node_modules`; module resolution initially fell through to a shared tree elsewhere in the sandbox (selfchecks ran, but `npm run build` failed on an unrelated missing `@tauri-apps/api`). Fixed with `npm ci` in `app/` (lockfile-exact); build and the accum suite were then re-verified against the local install with the same results. The failure was environmental, not a code regression — flagged here so the coordinator doesn't chase it.

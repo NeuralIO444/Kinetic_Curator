@@ -33,6 +33,11 @@ import {
   createAccum,
   ACCUM_PROGRAMS,
   ACCUM_PASS_SOURCES,
+  HIGHLIGHT_KNEE,
+  HIGHLIGHT_CEILING,
+  highlightSoftCeiling,
+  GLOW_FS,
+  GLOW_WET_FS,
 } from './accum.mjs';
 import { buildSceneContract } from './sceneContract.js';
 import { resolveLayers } from '../../../studio/render.mjs';
@@ -653,6 +658,136 @@ ok('mirror: optics 1 glows — bleed, added light, warm bias, no frame blur', ()
     return d;
   };
   assert.ok(warm(out) > warm(plain), 'optics shift the added light warm/red');
+});
+
+ok('highlight soft-ceiling: the shaping law (#1801)', () => {
+  assert.equal(HIGHLIGHT_KNEE, 1.0, 'the knee is 1.0 (recipe constant v1)');
+  assert.equal(HIGHLIGHT_CEILING, 2.5, 'the ceiling is 2.5 (recipe constant v1)');
+  // Identity at/below the knee — bit-exact, so sub-knee content and the
+  // optics = 0 path cannot drift from the pre-#1801 loop.
+  for (const x of [0, 0.25, 0.5, 0.999999, HIGHLIGHT_KNEE]) {
+    assert.equal(highlightSoftCeiling(x), x, `identity at ${x}`);
+  }
+  // Hand values on the shoulder: S(x) = 1 + 1.5t/(1.5 + t), t = x - 1.
+  const near = (a, b) => Math.abs(a - b) < 1e-12;
+  assert.ok(near(highlightSoftCeiling(1.5), 1 + (1.5 * 0.5) / 2), 'S(1.5)');
+  assert.ok(near(highlightSoftCeiling(2), 1 + 1.5 / 2.5), 'S(2)');
+  assert.ok(near(highlightSoftCeiling(4), 1 + (1.5 * 3) / 4.5), 'S(4)');
+  // Bounded by the ceiling: approaches it, never reaches or crosses it.
+  assert.ok(highlightSoftCeiling(1e6) < HIGHLIGHT_CEILING, 'never reaches the ceiling');
+  assert.ok(HIGHLIGHT_CEILING - highlightSoftCeiling(1e6) < 1e-5, 'asymptotes at the ceiling');
+  // Monotone non-decreasing across the whole range.
+  let prev = -Infinity;
+  for (let x = 0; x <= 100; x += 0.05) {
+    const s = highlightSoftCeiling(x);
+    assert.ok(s >= prev, `monotone at ${x}`);
+    prev = s;
+  }
+  // C1 at the knee: left and right slopes both 1 — no visible seam where
+  // the shoulder takes over.
+  const h = 1e-6;
+  const leftSlope = (highlightSoftCeiling(1) - highlightSoftCeiling(1 - h)) / h;
+  const rightSlope = (highlightSoftCeiling(1 + h) - highlightSoftCeiling(1)) / h;
+  assert.ok(Math.abs(leftSlope - 1) < 1e-4 && Math.abs(rightSlope - 1) < 1e-4, 'slope 1 through the knee');
+  // Invertible on the shoulder (the eval's in-loop requirement): the
+  // closed-form inverse recovers the input.
+  const invert = (y) => {
+    const s = y - HIGHLIGHT_KNEE;
+    const span = HIGHLIGHT_CEILING - HIGHLIGHT_KNEE;
+    return HIGHLIGHT_KNEE + (span * s) / (span - s);
+  };
+  for (const x of [1.0001, 1.25, 1.8, 3, 12, 400]) {
+    assert.ok(Math.abs(invert(highlightSoftCeiling(x)) - x) < 1e-9 * x, `round-trip at ${x}`);
+  }
+  // Hue order survives shaping: a hot pixel's channel ordering is
+  // preserved and its ratios compress toward 1 (gradation, not a pin).
+  const [r, g, b] = [3.2, 2.1, 1.3].map(highlightSoftCeiling);
+  assert.ok(r > g && g > b && b > 1, 'channel order preserved above the knee');
+  assert.ok(r / b < 3.2 / 1.3, 'ratios compress toward 1');
+});
+
+ok('highlight soft-ceiling: baked into the glow shaders from the constants (#1801)', () => {
+  // One source of truth: GLOW_FS carries softCeil with the numbers from
+  // HIGHLIGHT_KNEE / HIGHLIGHT_CEILING, and the hard clamp is gone. The
+  // wet glow variant is string-built from GLOW_FS, so it inherits both.
+  assert.ok(GLOW_FS.includes('float softCeil(float x)'), 'glow shader defines softCeil');
+  assert.ok(GLOW_FS.includes(`float t = x - ${HIGHLIGHT_KNEE.toFixed(1)};`), 'knee baked from the constant');
+  const span = (HIGHLIGHT_CEILING - HIGHLIGHT_KNEE).toFixed(1);
+  assert.ok(GLOW_FS.includes(`${span} * t / (${span} + t)`), 'span baked from the constants');
+  assert.ok(!GLOW_FS.includes('min(lit, vec3(1.0))'), 'the hard clamp is gone from the glow pass');
+  assert.ok(GLOW_WET_FS.includes('float softCeil(float x)'), 'wet glow inherits softCeil');
+  assert.ok(!GLOW_WET_FS.includes('min(lit, vec3(1.0))'), 'wet glow: the hard clamp is gone');
+});
+
+ok('mirror: glow tiers are shaped per pass, not summed and clamped (#1801)', () => {
+  const w = 32,
+    h = 32,
+    n4 = w * h * 4;
+  const white = new Float64Array(n4).fill(1);
+  // Gate off + no chroma (as in the optics-1 test above): a uniform frame
+  // makes the glow sample exactly 1 everywhere, so the center value is
+  // pure composition — comp 1, the bloom tier shapes, then the halation
+  // tier shapes what the bloom pass wrote, exactly like the two GPU
+  // passes. A one-shot shaping of the summed tiers is a different number.
+  const p = { ...accumRecipeParams({ fade: 1, optics: 1 }), stipple: 0, chromaTexels: 0 };
+  const out = mirrorAccumStep({ accum: new Float64Array(n4), frame: white, w, h, params: p });
+  const o = (16 * w + 16) * 4;
+  const S = highlightSoftCeiling;
+  const perTier = S(S(1 + p.bloomAmount) + p.halationAmount * p.halationTint[0]);
+  assert.ok(Math.abs(out[o] - perTier) < 1e-12, `per-tier composition: got ${out[o]}, want ${perTier}`);
+  const oneShot = S(1 + p.bloomAmount + p.halationAmount * p.halationTint[0]);
+  assert.ok(Math.abs(out[o] - oneShot) > 1e-3, 'the test can tell per-tier from one-shot shaping');
+  assert.ok(out[o] > 1, 'the HDR lift survives the ceiling (the old clamp returned exactly 1)');
+  assert.ok(out[o + 2] < out[o + 1] && out[o + 1] < out[o], 'halation warm order preserved through the shoulder');
+});
+
+ok('mirror: 240 hot steps no longer converge to flat white (#1801)', () => {
+  const w = 48,
+    h = 48,
+    n4 = w * h * 4;
+  // A hot amber core deposited for the first 12 steps, then black frames:
+  // after the deposit the core lives purely on glow feedback — the exact
+  // regime where the old per-pass clamp flattened cores to (1, 1, 1).
+  const hot = new Float64Array(n4);
+  for (let y = 16; y < 32; y++) {
+    for (let x = 16; x < 32; x++) {
+      const o = (y * w + x) * 4;
+      hot[o] = 1;
+      hot[o + 1] = 0.55;
+      hot[o + 2] = 0.12;
+      hot[o + 3] = 1;
+    }
+  }
+  const black = new Float64Array(n4);
+  const p = accumRecipeParams({ fade: 0.95, optics: 0.75 });
+  let acc = new Float64Array(n4);
+  const o = (24 * w + 24) * 4;
+  let mid = null;
+  for (let i = 1; i <= 240; i++) {
+    acc = mirrorAccumStep({ accum: acc, frame: i <= 12 ? hot : black, w, h, params: p });
+    if (i === 24) mid = [acc[o], acc[o + 1], acc[o + 2]];
+  }
+  const [r, g, b] = [acc[o], acc[o + 1], acc[o + 2]];
+  // Mid-sequence the working core is strongly hue-separated (measured
+  // r - b ~ 0.85 at step 24): the glow is doing its job in HDR.
+  assert.ok(mid[0] - mid[2] > 0.5, `step 24: hue separation, r-b=${(mid[0] - mid[2]).toFixed(3)}`);
+  // Settled state: still hot (above the old pin of exactly 1.0 on every
+  // channel), bounded by the ceiling, hue order intact — the ratchet's
+  // flat-white fixed point (1, 1, 1) is gone.
+  assert.ok(r > 1.2 && g > 1.2 && b > 1.2, `settled core in HDR: ${r.toFixed(3)}/${g.toFixed(3)}/${b.toFixed(3)}`);
+  assert.ok(r < HIGHLIGHT_CEILING && g < HIGHLIGHT_CEILING && b < HIGHLIGHT_CEILING, 'bounded by the ceiling');
+  assert.ok(r - b > 0.04, `settled hue separation retained: r-b=${(r - b).toFixed(3)}`);
+  // Settled, not diverging: one more step barely moves the core.
+  const next = mirrorAccumStep({ accum: acc, frame: black, w, h, params: p });
+  assert.ok(Math.abs(next[o] - r) < 0.005, 'the sequence settles');
+  // Optics 0 control: the same sequence never lifts the core past the
+  // deposit — the ceiling lives in the glow pass, which optics 0 skips.
+  const p0 = accumRecipeParams({ fade: 0.95, optics: 0 });
+  let acc0 = new Float64Array(n4);
+  for (let i = 1; i <= 240; i++) {
+    acc0 = mirrorAccumStep({ accum: acc0, frame: i <= 12 ? hot : black, w, h, params: p0 });
+  }
+  assert.ok(acc0[o] <= 1 && acc0[o + 1] <= 0.55 && acc0[o + 2] <= 0.12, 'optics 0: nothing above the deposit');
 });
 
 const fbParams = (over) => ({ ...accumRecipeParams({ fade: 1, optics: 0 }), ...over });
