@@ -31,7 +31,7 @@
 // precedent (spectral-path.md P3: live-path only, stated on the section).
 import { LOG_BINS, logBinCentre } from './spectrumCore.mjs';
 import { registerCostTier } from './costTiers.mjs';
-import { opticsDerived } from './accum.mjs';
+import { opticsDerived, spectralKeep } from './accum.mjs';
 
 export const FEEDBACK_WARP_KIND = 'feedbackWarp';
 
@@ -162,9 +162,14 @@ export function applySpectrumWarp(p, warp, amount) {
   const a = unit(amount);
   if (!p || !warp || !(a > 0)) return { ...p };
   const grain = a * clamp(warp.attTreble || 0, 0, 1) * WARP_GRAIN_MAX;
+  const keep = clamp(p.keep + (clamp(warp.keep, WARP_KEEP_MIN, WARP_KEEP_MAX) - p.keep) * a, 0, 0.99);
   return {
     ...p,
-    keep: clamp(p.keep + (clamp(warp.keep, WARP_KEEP_MIN, WARP_KEEP_MAX) - p.keep) * a, 0, 0.99),
+    keep,
+    // #1800: the decay blend moves the spectral vec3 with the scalar —
+    // re-derived from the blended keep, exactly like the band envelope,
+    // so the warp can never leave the channels on the pre-blend clocks.
+    keepVec: spectralKeep(keep),
     ...opticsDerived(clamp(p.optics + (1 - p.optics) * grain, 0, 1)),
     tunnelZoom: clamp(1 + (p.tunnelZoom - 1) + a * WARP_ZOOM_MAX * clamp(warp.bassDev || 0, -1, 1), 0.95, 1.05),
     tunnelSpin: clamp(p.tunnelSpin + a * WARP_SPIN_MAX * clamp(warp.attMids || 0, 0, 1), -0.05, 0.05),

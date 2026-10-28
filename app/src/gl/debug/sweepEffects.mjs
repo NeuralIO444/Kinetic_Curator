@@ -751,7 +751,7 @@ export const SWEEP_EFFECTS = [
       'fade',
       {
         u_src: S(0),
-        u_keep: { kind: 'float' },
+        u_keep: { kind: 'vec3' },
         u_bg: { kind: 'vec3' },
         u_tunnelZoom: { kind: 'float' },
         u_tunnelSpin: { kind: 'float' },
@@ -759,7 +759,10 @@ export const SWEEP_EFFECTS = [
       },
       (c, lab) => ({
         u_src: lab.input.tex,
-        u_keep: c.params.keep,
+        // #1800: u_keep is the spectral vec3 now. The sweep drives the
+        // shader with equal components — the legacy scalar shape; the
+        // recipe's per-channel derivation lives in accum.mjs.
+        u_keep: [c.params.keep, c.params.keep, c.params.keep],
         // #287 fade-to-paper target — production sources this from the
         // palette bg (accum.mjs's real 'fade' pass); the sweep has no
         // palette, so a fixed stand-in is enough to satisfy the uniform

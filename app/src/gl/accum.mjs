@@ -34,6 +34,13 @@
  *      trails fall toward the paper, not black. The background rides in
  *      the recipe params (bg, parsed from the background CSS color);
  *      black (the default) keeps the old `rgb *= keep` exactly.
+ *      #1800: the keep is SPECTRAL — a vec3 whose channels decay on
+ *      different clocks (half-lives R ×1.35, G ×1, B ×0.72 around the
+ *      FADE rate), so a trail's colour becomes its age: fresh light in
+ *      the frame's own colours, warming through amber into deep ember
+ *      red as it dies — the P7 phosphor's two-layer decay, colour film's
+ *      uneven dye fade. Green carries the slider's rate exactly, so
+ *      FADE means what it always meant; only the other clocks differ.
  *      Sampled through the Phase A feedback transform — per-frame zoom +
  *      spin (TUNNEL, light-tunnels) and radial RGB channel separation
  *      (PRISM). All amounts 0/off by default: the transform is skipped and
@@ -121,6 +128,31 @@ export function opticsDerived(o) {
   };
 }
 
+/** #1800 — the spectral spread: per-channel half-lives as multiples of the
+ *  FADE half-life (docs/ACCUM.md: the slider's keep = 0.5^(1/FADE), so FADE
+ *  is a half-life in frames). Red decays slowest, green at the FADE rate,
+ *  blue fastest — the sim-validated starting point from the ACCUM eval
+ *  (2026-10-27). Recipe constant v1: no panel control, no contract field;
+ *  a performer-facing amount is a later slice's question, not this one's. */
+export const SPECTRAL_HALF_LIFE = Object.freeze([1.35, 1.0, 0.72]);
+
+/** Per-channel keeps for a scalar keep. keep = 2^(−1/H) for the FADE
+ *  half-life H, and channel c's half-life is H × ratio_c, so
+ *  keep_c = keep^(1/ratio_c). The G channel sits at ratio 1 and is
+ *  returned as the input itself — bit-exact, so the rate the performer
+ *  dialed is the rate green actually decays at. keep 0 and 1 map to
+ *  all-0 and all-1 (the fade floor and the LEAVE hold), non-finite to 0
+ *  (the #763 safe direction). Unit ratios [1, 1, 1] return [k, k, k]
+ *  bit-exactly: spread 0 IS the legacy scalar recipe, no drift — the
+ *  optics no-op precedent, one level down. */
+export function spectralKeep(keep, ratios = SPECTRAL_HALF_LIFE) {
+  const k = Number.isFinite(Number(keep)) ? Math.min(1, Math.max(0, Number(keep))) : 0;
+  if (k <= 0) return [0, 0, 0];
+  if (k >= 1) return [1, 1, 1];
+  const ch = (r) => (r === 1 ? k : Math.pow(k, 1 / r));
+  return [ch(ratios[0]), ch(ratios[1]), ch(ratios[2])];
+}
+
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
  *
@@ -173,17 +205,24 @@ export function accumRecipeParams({
   // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
   const bg = hexToRgb01(background);
   const held = !!leave;
+  const keepFinal = held
+    ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0)))
+    : ribbon
+      ? Math.max(keep, 0.96)
+      : comet
+        ? Math.min(keep, 0.72)
+        : keep;
   return {
     leave,
     ribbon: !!ribbon,
     comet: !!comet,
-    keep: held
-      ? Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0)))
-      : ribbon
-        ? Math.max(keep, 0.96)
-        : comet
-          ? Math.min(keep, 0.72)
-          : keep,
+    keep: keepFinal,
+    // #1800: the fade pass consumes the spectral vec3, derived here — the
+    // one place — so the scalar keep and its channels can never disagree.
+    // The scalar stays in the params: the LEAVE gate and the audio/warp
+    // modulators still speak it, and each modulator re-derives the vec3
+    // from its own modulated scalar (see applyAudioEnvelope).
+    keepVec: spectralKeep(keepFinal),
     bg,
     ...opticsDerived(o),
     // Phase A — feedback (tunnels + chromatic drift). All 0/off by default;
@@ -271,9 +310,15 @@ export function applyAudioEnvelope(p, a = {}, opts = {}) {
   // gesture rather than exploding it.
   const swell = clamp01(opts.swell ?? 1);
   const stretch = 1 + 2 * r + x + b;
+  const keep = Math.min(0.99, p.keep + 0.08 * r + 0.04 * x + accumAudio / 100);
   return {
     ...p,
-    keep: Math.min(0.99, p.keep + 0.08 * r + 0.04 * x + accumAudio / 100),
+    keep,
+    // #1800: the gesture scales the spectral vec3 by re-deriving it from
+    // the modulated keep — the half-life ratios (the spread itself)
+    // survive exactly, so loudness lengthens every channel's clock in
+    // proportion instead of flattening the age read against the clamps.
+    keepVec: spectralKeep(keep),
     // #273: optics modulation is headroom-relative — audio swells the glow
     // toward the slider's ceiling instead of adding past it, so loud audio
     // can never peg GLOW at 1. The gesture keeps its full strength at
@@ -337,7 +382,7 @@ function hexToRgb01(hex) {
 export const FADE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
-uniform float u_keep;
+uniform vec3 u_keep;  // #1800: per-channel keep (spectral fade); equal components = the legacy scalar fade
 uniform vec3 u_bg;  // #287 fade-to-paper: the fade target (palette background)
 uniform float u_tunnelZoom;  // 1.0 = off
 uniform float u_tunnelSpin;  // 0.0 = off (radians per frame)
@@ -1150,12 +1195,15 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
   const bg0 = p.bg[0],
     bg1 = p.bg[1],
     bg2 = p.bg[2];
-  const fadeTo = (c, b) => b * (1 - p.keep) + c * p.keep;
+  // #1800: each channel fades at its own keep (p.keepVec) — toward its own
+  // channel of the paper on light grounds, so trails warm as they fall.
+  const kv = p.keepVec;
+  const fadeTo = (c, b, k) => b * (1 - k) + c * k;
   if (!feedback) {
     for (let i = 0; i < n; i += 4) {
-      faded[i] = fadeTo(fed[i], bg0);
-      faded[i + 1] = fadeTo(fed[i + 1], bg1);
-      faded[i + 2] = fadeTo(fed[i + 2], bg2);
+      faded[i] = fadeTo(fed[i], bg0, kv[0]);
+      faded[i + 1] = fadeTo(fed[i + 1], bg1, kv[1]);
+      faded[i + 2] = fadeTo(fed[i + 2], bg2, kv[2]);
       faded[i + 3] = fed[i + 3];
     }
   } else {
@@ -1192,9 +1240,9 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
           a = nearest(tu, tv, 3);
         }
         const o = (y * w + x) * 4;
-        faded[o] = fadeTo(r, bg0);
-        faded[o + 1] = fadeTo(g, bg1);
-        faded[o + 2] = fadeTo(b, bg2);
+        faded[o] = fadeTo(r, bg0, kv[0]);
+        faded[o + 1] = fadeTo(g, bg1, kv[1]);
+        faded[o + 2] = fadeTo(b, bg2, kv[2]);
         faded[o + 3] = a;
       }
     }
@@ -1677,7 +1725,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       } else if (wetOn) {
         passWet('fadeWet', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
-          gl.uniform1f(u.u_keep, p.keep);
+          gl.uniform3f(u.u_keep, p.keepVec[0], p.keepVec[1], p.keepVec[2]);
           gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
           gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
           gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
@@ -1688,7 +1736,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       } else {
         pass('fade', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
-          gl.uniform1f(u.u_keep, p.keep);
+          gl.uniform3f(u.u_keep, p.keepVec[0], p.keepVec[1], p.keepVec[2]);
           gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
           gl.uniform1f(u.u_tunnelZoom, p.tunnelZoom);
           gl.uniform1f(u.u_tunnelSpin, p.tunnelSpin);
