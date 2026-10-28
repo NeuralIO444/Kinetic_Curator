@@ -150,6 +150,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1464: the personas' hidden engagement with the player on this machine; earned here, never carried in a project",
   'kc:room:story:v1':
     "#1560 S3: the room's story book — the personas' standings, grudges and episode ledger on this machine; earned here like the engagement scores, never carried in a project",
+  'kc:device-probes:v1':
+    "#1578: measured microbenchmark descriptors of THIS machine's GPU/CPU for the governor cost head. Meaningless on another device — the receiving machine measures its own at first launch — and never project content",
 });
 
 /**
