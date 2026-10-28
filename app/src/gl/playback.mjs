@@ -12,6 +12,7 @@
 //     (homes, formed, limbs, traits, scaleMul) ride the recorded inputs exactly as they did live
 import { replayInputs } from '../engine/kernel/replay/inputLog.js';
 import { checkPerformance } from './performanceFile.mjs';
+import { checkRouteRecord, routesAt } from './routeRecord.mjs';
 
 /** The scene-defining fields of a recorded input that the loop's store view takes from the take while it plays. */
 export const SCENE_KEYS = Object.freeze([
@@ -36,7 +37,7 @@ export const SCENE_KEYS = Object.freeze([
   'canvasH',
 ]);
 
-let active = null; // { perf, frames, index, ended, pendingSeek }
+let active = null; // { perf, frames, index, ended, pendingSeek, routes }
 let frameTap = null;
 /**
  * #1462 — observe each PLAYED frame: fn(frame, perf, { seeked }). Called once per frame the cursor plays (not while
@@ -68,7 +69,10 @@ export function startPlayback(perf) {
   const frames = [];
   for (const input of replayInputs(p.inputs)) frames.push(input);
   if (frames.length !== p.frames) return false;
-  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0 };
+  // #1483 follow-up: a take that carries its route table plays through it (routeRecord.mjs); an older take, or a
+  // malformed section, plays through the live table as before
+  const routes = checkRouteRecord(p.routes);
+  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0, routes };
   notify();
   return true;
 }
@@ -147,5 +151,6 @@ export function overlayScene(state) {
   const rec = active.frames[Math.min(active.index, active.frames.length - 1)];
   const out = { ...state };
   for (const k of SCENE_KEYS) if (rec[k] !== undefined) out[k] = rec[k];
+  if (active.routes) out.audioRoutes = routesAt(active.routes, active.index); // the take's routes, not today's
   return out;
 }
