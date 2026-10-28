@@ -8,7 +8,7 @@ Live: [neuralio444.github.io/Kinetic_Curator](https://neuralio444.github.io/Kine
 
 *A terrarium, not a DAW.* You curate plates, palettes, and voices. The seed and the wind do the rest.
 
-**Release on `main` (2026-10-15):** **[0.9.0](CHANGELOG.md)** + everything since: the petri dish, five materials, the Look Explorer, the loot folder, a second taste head, and the spectral path. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
+**Release on `main` (2026-10-27):** **[0.9.0](CHANGELOG.md)** + everything since: the petri dish, five materials, the Look Explorer, the loot folder, a second taste head, the spectral path — and now the creature system, the ROOM codec, 64 looks × 64 voices under a tap-cycled KINETIC ceiling, the Mind trio's first live stages, travel kinemes, and the determinism audit. Engine spines A–G merged, governor R1–R4 landed, Night Migration 30/60 sign-off recorded ([docs/EMBARGO.md](docs/EMBARGO.md) — Stage 1 unfrozen). Roadmap: [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md). See [Now](#now-on-main).
 
 ## Now on main
 
@@ -33,7 +33,7 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - **PATTERN tracks** (#1039–#1042) — FIELD / QUILT / GLYPH modes in BUILD (add / edit / shuffle), with per-mode DRIFT, DROP gate, bar-quantized shuffle, and per-element kinemes; KIN and CURATOR rolls deal element motion too.
 - **Slider dialogs** (#1127) — tap a slider's name for range expansion and mode switch; ROTATE defaults to continuous SPIN in rev/s, every mark with its own speed and direction.
 - **Keep recall + recipes** (#996) — clicking a keep brings its tracks back (recall + morph, one undo); K keeps without starring; share links, recipe text and keeps carry the whole layer stack.
-- **Web MIDI** (#617) — engine merged, mappings saved in the project; learn/bind remainder open, BLE-MIDI path needed for iPad.
+- **Web MIDI** (#617) — engine merged, mappings saved in the project; learn mode shipped (#1721: arm a row, touch a pad/knob, bound); setup is a popup modal with a bank layer and an on-screen key legend (#1724, #1726); note/CC binds (#1749). Remainder: the iPad BLE-MIDI path.
 - **Palette lab** (#953) — generate / edit / save / import / export; 37 palettes on the KIN strip.
 - **WET engine** (#970) — standalone wetness service (WETNESS slider, vortex-particle core); ACCUM is one consumer.
 - **MATH track** (#1010) — 12 tone ops on the FX fold, assignable macro knobs (#724).
@@ -57,15 +57,26 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - **Phyllotaxis sampler** — fibonacci's sibling; the DIVERGENCE slider re-counts the spiral arms.
 - **Joiner/leaver** — obvious face / invisible face pairing.
 - **DEV panel** — Shader Lab + X-Ray + Gov Tune in one place.
+- **Creature system** (#1634, #1657–#1662, #1694, #1723) — one seeded mirrored skeleton draws all four types: the moth, robots (0° / 45° / 90° detents), L-system growths, and the glitch; many layered parts with an engraving finish. Wet Lab H/L markers (tap cycles plain → H → L → gone) designate head and limbs; the dish body carries slime as a material; dish pressure sizes limb growth; the band's material reaction starves or flourishes the body. Creatures spawn through the normal asset path. **ALife** (#1731, #1732, #1734–#1738; PR #1757) — bounds, dot-product facing, genome / drives / dreaming in the engine.
+- **KINETIC variety** (#1766; slices #1767–#1772, PR #1778) — 64 looks, 64 voices, and roll pools dealt from the whole library; a tap sweeps look → voice → the curator's capped nudge. The START pill tap-cycles the ceiling OFF → WEAK → MED → KOZ, with the deck readout beside it: 49 assets / 33 looks / 19 voices at OFF, 294 library assets at WEAK, 64 looks + 64 voices at MED and KOZ. Warm taps no longer re-roll accumulation blur (#1768).
+- **ROOM codec** (#1560; PRs #1727–#1730) — the directors' room as a live codec: face windows over a bus transcript, generative faces (Davis colour-Bayer dither, LOIS glyph dither), a story machine (relationship model, story generator, suspicion arc), and an offline-curated lore bank (`lore.json`) whose cold opens run through the story machine.
+- **Mind trio** (#1483; PRs #1783–#1785) — a spectrum summary in the show block (centroid, flux, flatness); LOIS judges the spectrum (a held or noise-wall spectrum reads flat, a moving one rides); the trio wakes on the next bar and stops when the audio goes off. Stages 1–2 + acceptance shipped; MegaMind stays a design doc.
+- **Travel kinemes** (#1574–#1576, #1712–#1714) — transport core (FLOW sim + leash), PATH transports with per-stratum leashes, SURGE and parallax drift; the Queen stamps the trigger.
+- **WEATHER dial** (#1183; PR #1703) — slice 1: the per-content-layer dial drinks the haze of the nearest FX layer above it.
+- **The three reads** (#1627; PR #1717) — scale-band meter, mark-born weather, the duel. **STIMULI feedback warp** (#1490; PR #1722) — the previous frame, warped by the music. **Retroactive capture** (#1367; PR #1696) — save the last few minutes after something good happens.
+- **Nothing is ever silently lost** (#1641–#1646; PRs #1697–#1702) — shelf persistence, taste labels, loot index, bounded logs, catch-alls; nine surfaces speak.
+- **Determinism audit** (PRs #1663–#1681) — `Math.random` defaults dropped from the live path, an ESLint determinism wall, cache/uniform fixes. **CI replay gate** (#1638; PR #1693) — a recorded take replayed and hash-compared in selfcheck; takes record their spectrum (#1534; PR #1692). **Device budgets** (#1639; PR #1695) — frame budgets for desktop + iPad judged from the harness.
+- **Prettier** (PRs #1755–#1779) — a repo-wide format standard, enforced. **Desktop shell** — the Tauri build lives in `src-tauri`; CSP hardening (#1707; PR #1782) and fs-scope fixes (PR #1752).
 
 **Not done (do not advertise as shipped)**
 
 - Evolve seed-jitter glide, editable BEHAVE weights (#471 / #479).
 - Governor cost head (#1578) — the evaluator is merged and inert: no trained model, nothing calls it yet. The reactive governor remains the only governor.
-- Mind / MegaMind and the ROOM codec exist as committed design docs (`docs/research/`) — designed and deferred, not built.
+- MegaMind — designed and deferred. Mind's trio layer is live (above); its later stages are not built.
+- Band-pair closer (#1635) — band-edge evidence from real takes landed (#1758); the final phase (≥5 real sessions + the 0.28 / 0.72 edge verdict) is still open.
 - Syphon / NDI output (STAGE shows an honest not-linked state), colour space waits on #532 ACES.
 - Per-asset sub-animation frame strips (#699 — reverted; kinemes are the path).
-- OSC build, MIDI learn/bind remainder (#617; BLE-MIDI path needed for iPad), mobile pass, live-output path (roadmap Stages 2–3).
+- OSC build, mobile pass, live-output path (roadmap Stages 2–3); MIDI's remainder is the iPad BLE-MIDI path (#617).
 - Matt-only: icons (#346), M3 calibration (#298), iPhone pass (#270).
 
 **Embargo:** lifted 2026-09-23 (Night Migration sign-off). Stage 1 unfrozen; deferred pile still waits. Plan: [docs/EMBARGO.md](docs/EMBARGO.md). Agents: [AGENTS.md](AGENTS.md) + [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md).

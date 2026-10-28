@@ -23,6 +23,8 @@ export const BACKENDS = Object.freeze(['apple', 'rules', 'demo']); // 'demo': th
  * @param backend   the model backend's name in decisions (default 'apple')
  * @param available () => boolean     is the model backend up right now
  * @param log       (kind, info) => void   dropped / late / error notices (never throws)
+ * @param heat      () => 0..1   #1483: the conducting temperature the rules read (engine-side; never sent to a model,
+ *                  never recorded — the decision's reply is what a take keeps)
  */
 export function createThinker({
   persona,
@@ -31,6 +33,7 @@ export function createThinker({
   available = () => false,
   log = () => {},
   maxLateBars = MAX_LATE_BARS,
+  heat = null,
 } = {}) {
   if (!PERSONAS.includes(persona)) throw new TypeError(`[mind] unknown persona ${String(persona)}`);
   let lastBar = -Infinity; // the bar of the last decision made
@@ -43,6 +46,16 @@ export function createThinker({
     }
   };
 
+  const heatNow = () => {
+    if (typeof heat !== 'function') return 0;
+    try {
+      const h = Number(heat());
+      return Number.isFinite(h) ? Math.min(1, Math.max(0, h)) : 0;
+    } catch {
+      return 0;
+    }
+  };
+  const rules = (context, seed, bar) => rulesReply(persona, context, { seed, bar, heat: heatNow() });
   const decide = (bar, from, seed, raw) => {
     const reply = validateReply(persona, raw);
     if (!reply) {
@@ -73,7 +86,7 @@ export function createThinker({
           if (d) return d;
         }
         // nothing usable from the model this bar: the rules answer below, and the model is asked again next bar
-        return decide(bar, 'rules', seed, rulesReply(persona, context, { seed, bar }));
+        return decide(bar, 'rules', seed, rules(context, seed, bar));
       }
       // the model is asked at most once at a time; the request is made off the bar, and the rules answer THIS bar
       // (and every bar the model has not answered): a slow or absent model never silences a persona
@@ -93,7 +106,7 @@ export function createThinker({
             },
           );
       }
-      return decide(bar, 'rules', seed, rulesReply(persona, context, { seed, bar }));
+      return decide(bar, 'rules', seed, rules(context, seed, bar));
     },
     /** True while a model request is outstanding. */
     inFlight: () => flight !== null,

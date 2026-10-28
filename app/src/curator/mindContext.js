@@ -82,10 +82,24 @@ export function showOf(s) {
     silent: !!s.silent,
     sinceBars: Number.isFinite(s.sinceBars) ? Math.max(0, Math.round(s.sinceBars)) : 0,
     flatBars: Number.isFinite(s.flatBars) ? Math.max(0, Math.round(s.flatBars)) : 0,
+    ...(s.brake === true ? { brake: true } : {}), // LOIS's brake on Davis (#1483)
     routes,
     owned: (Array.isArray(s.owned) ? s.owned : []).filter((t) => typeof t === 'string' && t.length <= 40).slice(0, 32),
     ...(spectrumOf(s.spectrum) ? { spectrum: spectrumOf(s.spectrum) } : {}),
+    ...((m) => (m ? { marks: m } : {}))(marksOf(s.marks)),
   };
+}
+
+/**
+ * #1483 stage 2 — the spectrum marks as the trio hears them (STIMULI -> SPECTRUM): { map 0..3, scale, displace, colour
+ * 0..1 }, or null when absent or malformed (then the block has no `marks` key and nothing else changes).
+ */
+export function marksOf(m) {
+  if (!m || typeof m !== 'object') return null;
+  const u = (v) => (Number.isFinite(v) ? r3(Math.min(1, Math.max(0, v))) : null);
+  const map = Number.isFinite(m.map) ? Math.min(3, Math.max(0, Math.round(m.map))) : null;
+  const out = { map, scale: u(m.scale), displace: u(m.displace), colour: u(m.colour) };
+  return Object.values(out).some((v) => v === null) ? null : out;
 }
 
 const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
@@ -93,7 +107,7 @@ const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
 /**
  * @param snap { layers, enabledAssetCount, paletteId, room: { lois, davis }, band, keepsCount, bpm, audio: 'mic'|'file'|'none',
  *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac?, director?: { verdict, intensity },
- *               show?: { energy, bpm, confidence, onsets, silent, sinceBars, flatBars, routes, owned } (#1483) }
+ *               show?: { energy, bpm, confidence, onsets, silent, sinceBars, flatBars, routes, owned, marks? } (#1483) }
  */
 export function buildContext(input) {
   const snap = input && typeof input === 'object' ? input : {};
