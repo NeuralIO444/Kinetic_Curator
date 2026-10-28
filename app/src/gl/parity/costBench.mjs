@@ -193,9 +193,7 @@ async function main() {
   if (args.gpu) {
     const gpuArgs = realGpuLaunchArgs();
     if (!gpuArgs) {
-      console.error(
-        `[costBench] --gpu has no known GPU launch args for platform ${os.platform()} — refusing to run`,
-      );
+      console.error(`[costBench] --gpu has no known GPU launch args for platform ${os.platform()} — refusing to run`);
       process.exitCode = 1;
       return;
     }
