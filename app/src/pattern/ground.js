@@ -15,6 +15,7 @@
 import { assign, assignQuilt, assignGlyph, panOffset } from './engine.js';
 import { patternPalette } from './patternSource.js';
 import { sanitizePattern } from '../state/patternTrack.js';
+import { assignReadout, readoutCols, readoutCellAt } from './readout.js';
 
 /** The nearest visible PATTERN layer below `layerId` (bottom -> top order), or null. */
 export function nearestPatternBelow(layers, layerId) {
@@ -48,6 +49,14 @@ function gridFor(p, pal, w, h) {
   if (g) return g;
   const tileW = w / p.density;
   const rows = Math.max(1, Math.ceil(h / tileW));
+  if (p.mode === 'READOUT') {
+    // #1797: same cell size and row count as patternSource.buildGrid for a w x h frame
+    const cell = w / readoutCols(p.density);
+    g = { tileW: cell, grid: assignReadout(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(h / cell))) };
+    if (_grids.size >= CACHE_SIZE) _grids.delete(_grids.keys().next().value);
+    _grids.set(key, g);
+    return g;
+  }
   const grid =
     p.mode === 'GLYPH'
       ? assignGlyph(p.seed, p.density, p.mix, pal)
@@ -80,6 +89,18 @@ export function patternGround(pattern, palette, w, h) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   const { tileW, grid } = gridFor(p, pal, w, h);
+  if (grid.kind === 'readout') {
+    // #1797 READOUT: the grid never moves, but each cell's colour is the moving field's state under it. The main
+    // colour is the state colour; roles add the eye's colour on eyed cells; cell() is the fixed cell, unpanned.
+    return {
+      at: (x, y, t = 0) => readoutCellAt(grid, w, x, y, p.drift, t).main,
+      roles: (x, y, t = 0) => readoutCellAt(grid, w, x, y, p.drift, t).colors.map((c) => String(c).toLowerCase()),
+      cell(x, y, t = 0) {
+        const c = readoutCellAt(grid, w, x, y, p.drift, t);
+        return { u: c.u, v: c.v, size: c.side };
+      },
+    };
+  }
   return {
     at(x, y, t = 0) {
       const off = panOffset(p.seed, p.drift, p.drift > 0 ? Number(t) || 0 : 0);

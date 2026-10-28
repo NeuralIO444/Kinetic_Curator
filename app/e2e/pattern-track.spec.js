@@ -36,7 +36,7 @@ test('a PATTERN track draws in every mode, still and drifting, without faulting 
   const id = await page.evaluate(() => window.__kcStore.getState().layers.find((l) => l.type === 'pattern').id);
   expect(await page.evaluate(() => window.__kcStore.getState().layers.length)).toBe(kcLayers + 1);
 
-  for (const mode of ['QUILT', 'GLYPH', 'FIELD']) {
+  for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'READOUT']) {
     await st('setPatternMode', id, mode);
     for (const drift of [0, 0.6]) {
       await st('setPatternParam', id, 'drift', drift);

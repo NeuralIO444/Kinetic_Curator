@@ -9,7 +9,12 @@
 //                            press #) deals the same patterns again. The taste engine scores layout params, not
 //                            patterns, so the deal is seeded dice, said plainly.
 // Pure: it takes an rng (a () => [0,1) function) and returns the new layer list; the caller owns the undo entry.
-import { PATTERN_MODES, PATTERN_DENSITY_MIN, PATTERN_DENSITY_MAX, sanitizePattern } from '../state/patternTrack.js';
+import {
+  PATTERN_DEAL_MODES,
+  PATTERN_DENSITY_MIN,
+  PATTERN_DENSITY_MAX,
+  sanitizePattern,
+} from '../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from './engine.js';
 import { isFxLayer } from '../fx/fxFilters.js';
 import { isMathLayer } from '../fx/mathFilters.js';
@@ -34,7 +39,7 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** A freshly dealt block. DROP is a performance setting, so a deal keeps it. About half the deals are still. */
 export function dealPattern(prev, rng) {
   const p = sanitizePattern(prev);
-  const mode = PATTERN_MODES[Math.floor(rng() * PATTERN_MODES.length)];
+  const mode = PATTERN_DEAL_MODES[Math.floor(rng() * PATTERN_DEAL_MODES.length)]; // #1797: READOUT is hand-picked only
   return sanitizePattern({
     ...p,
     mode,

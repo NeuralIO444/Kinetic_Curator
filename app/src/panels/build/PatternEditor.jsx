@@ -6,6 +6,7 @@ import {
   PATTERN_DENSITY_MIN,
   PATTERN_DENSITY_MAX,
   PATTERN_KINS,
+  PATTERN_FIELD_LIKE,
   sanitizePattern,
 } from '../../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from '../../pattern/engine.js';
@@ -21,6 +22,7 @@ const MODE_HINT = {
   QUILT: 'Dense tessellation: grout, 2×2 hero tiles, the full palette.',
   GLYPH: 'A poster: one bold mark per tile on a letterboxed 5:4 grid.',
   FIELD: 'A wallpaper: ten micro-patterns that wrap, and pan.',
+  READOUT: 'A display: a still grid of cells that reads out a moving field as three colours and a size.',
 };
 const pct = (v) => Math.round(v * 100);
 // #1137 — the KINEME motion the pattern's individual elements take while DRIFT is up.
@@ -47,6 +49,7 @@ export function PatternEditor({ layer, ordinal }) {
   const pending = useSyncExternalStore(subscribePending, pendingSnapshot).has(layer.id);
   const p = sanitizePattern(layer.pattern);
   const quilt = p.mode === 'QUILT';
+  const fieldLike = PATTERN_FIELD_LIKE.includes(p.mode); // FIELD and READOUT have no separate elements to move
   const id = layer.id;
   return (
     <div className="fx-editor pattern-editor" title={`PT-${ordinal} · ${p.mode}`}>
@@ -79,7 +82,7 @@ export function PatternEditor({ layer, ordinal }) {
       </Param>
       <Param
         label="mix"
-        hint="Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary."
+        hint="Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. READOUT: the field's grain, broad patches to fine speckle."
         readout={`${pct(p.mix)}%`}
       >
         <RangeRow
@@ -133,7 +136,7 @@ export function PatternEditor({ layer, ordinal }) {
       </Param>
       <Param
         label="drift"
-        hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans. Zero holds still."
+        hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, READOUT runs the field under the grid. Zero holds still."
         readout={`${pct(p.drift)}%`}
       >
         <RangeRow
@@ -147,13 +150,13 @@ export function PatternEditor({ layer, ordinal }) {
           onChange={(v) => setParam(id, 'drift', v / 100)}
         />
       </Param>
-      <Param label="motion" hint={KIN_HINT} readout={p.mode === 'FIELD' ? '—' : p.kin}>
+      <Param label="motion" hint={KIN_HINT} readout={fieldLike ? '—' : p.kin}>
         <select
           className="blend-mode-select"
           aria-label="Element motion"
           value={p.kin}
-          disabled={p.mode === 'FIELD'}
-          title={p.mode === 'FIELD' ? 'FIELD is one continuous field: it has no separate elements to move' : KIN_HINT}
+          disabled={fieldLike}
+          title={fieldLike ? `${p.mode} is one continuous field: it has no separate elements to move` : KIN_HINT}
           onChange={(e) => setParam(id, 'kin', e.target.value)}
         >
           {PATTERN_KINS.map((k) => (
@@ -166,7 +169,7 @@ export function PatternEditor({ layer, ordinal }) {
       <Param
         label="movers"
         hint="How many of the elements move. A few is a composition with accents; all of them is wallpaper."
-        readout={p.mode === 'FIELD' || p.kin === 'OFF' ? '—' : `${pct(p.movers)}%`}
+        readout={fieldLike || p.kin === 'OFF' ? '—' : `${pct(p.movers)}%`}
       >
         <RangeRow
           layout="bare"
@@ -176,9 +179,9 @@ export function PatternEditor({ layer, ordinal }) {
           step={1}
           value={pct(p.movers)}
           ariaLabel="Pattern movers"
-          disabled={p.mode === 'FIELD' || p.kin === 'OFF'}
+          disabled={fieldLike || p.kin === 'OFF'}
           disabledLabel="No element motion"
-          disabledReason={p.mode === 'FIELD' ? 'FIELD has no separate elements' : 'motion is off'}
+          disabledReason={fieldLike ? `${p.mode} has no separate elements` : 'motion is off'}
           onChange={(v) => setParam(id, 'movers', v / 100)}
         />
       </Param>
