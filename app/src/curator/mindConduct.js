@@ -234,16 +234,33 @@ export function flatBias({ keeps, rolls } = {}) {
 }
 
 /**
- * The show is flat when the sound is on, and either every band has stopped moving over a phrase (a held tone, a pinned
- * signal) or the bands are all pinned near the top. Silence is not a failed show. Pure state machine fed one sample a bar.
+ * The show is flat when the sound is on and the picture has nothing to move with. LOIS reads it two ways:
+ *   - stage 2 (#1483), the spectrum, when every bar of the window carried one (the show block's `spectrum`):
+ *       HELD  the spectrum barely travelled bar to bar all phrase (mean flux under FLUX_HELD — a drone, a held chord,
+ *             a loop that never changes colour), or
+ *       NOISE it stayed a wall of noise all phrase (mean spectral flatness over NOISE_FLAT — no structure to follow);
+ *   - stage 1, the seven bands, otherwise: every band stopped moving (spread under eps) or all pinned near the top.
+ * Silence is not a failed show. Pure state machine fed one sample a bar. The keep-rate bias moves BOTH "how still is
+ * still" thresholds the same way (setBias), never the noise wall.
  */
+/** Mean bar-to-bar spectrum flux (showSpectrum's 0..1 unit) under which a phrase reads as held. A first value. */
+export const FLUX_HELD = 0.05;
+/** Mean spectral flatness (1 = white noise) over which a phrase reads as a wall of noise. A first value. */
+export const NOISE_FLAT = 0.9;
+
 export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel = 0.05, pinned = 0.92 } = {}) {
   const rows = [];
+  const specs = []; // one per row: { flux, flatness } or null (that bar carried no spectrum)
   let flatBars = 0;
-  let epsNow = eps; // eps, moved by the keep-rate bias
+  let scale = 1; // the keep-rate bias, as a factor on the "still" thresholds
+  let lastWhy = null; // 'held' | 'noise' | 'still' | 'pinned' | null
   const unit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+  const specOf = (sp) =>
+    sp && Number.isFinite(sp.flux) && Number.isFinite(sp.flatness)
+      ? { flux: unit(sp.flux), flatness: unit(sp.flatness) }
+      : null;
   const reading = () => {
-    if (rows.length === 0) return { level: 0, spread: 0, full: false };
+    if (rows.length === 0) return { level: 0, spread: 0, full: false, source: null };
     const n = rows[0].length;
     let level = 0;
     let spread = 0;
@@ -256,34 +273,61 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
       level += mean;
       spread += Math.sqrt(v / rows.length);
     }
-    return { level: level / n, spread: spread / n, full: rows.length >= windowBars };
+    const out = { level: level / n, spread: spread / n, full: rows.length >= windowBars, source: 'bands' };
+    if (specs.length && specs.every(Boolean)) {
+      out.source = 'spectrum';
+      out.flux = specs.reduce((a, s) => a + s.flux, 0) / specs.length;
+      out.flatness = specs.reduce((a, s) => a + s.flatness, 0) / specs.length;
+    }
+    return out;
   };
   return {
-    /** One sample per bar: an array of band levels (any length), or null for no audio (clears the run). */
-    push(bands) {
+    /**
+     * One sample per bar: an array of band levels (any length), or null for no audio (clears the run); and, from
+     * stage 2, that bar's spectrum summary { flux, flatness } (or null: this bar is judged on the bands).
+     */
+    push(bands, spectrum = null) {
       if (!Array.isArray(bands) || bands.length === 0) {
         rows.length = 0;
+        specs.length = 0;
         flatBars = 0;
+        lastWhy = null;
         return false;
       }
       rows.push(bands.map(unit));
-      if (rows.length > windowBars) rows.shift();
+      specs.push(specOf(spectrum));
+      if (rows.length > windowBars) {
+        rows.shift();
+        specs.shift();
+      }
       const r = reading();
-      const flat = r.full && r.level >= minLevel && (r.spread < epsNow || r.level > pinned);
-      flatBars = flat ? flatBars + 1 : 0;
-      return flat;
+      let why = null;
+      if (r.full && r.level >= minLevel) {
+        if (r.source === 'spectrum') {
+          if (r.flux < FLUX_HELD * scale) why = 'held';
+          else if (r.flatness > NOISE_FLAT) why = 'noise';
+        } else if (r.spread < eps * scale) why = 'still';
+        else if (r.level > pinned) why = 'pinned';
+      }
+      lastWhy = why;
+      flatBars = why ? flatBars + 1 : 0;
+      return why !== null;
     },
     flatBars: () => flatBars,
+    /** Why the last bar read flat ('held' | 'noise' on the spectrum, 'still' | 'pinned' on the bands), or null. */
+    why: () => lastWhy,
     /** LOIS's keep-rate read (flatBias): -1 loosens (how still it must be falls), +1 tightens (a livelier show is called flat). */
     setBias(b) {
-      epsNow = eps * (1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0));
+      scale = 1 + FLAT_BIAS_SWING * (Number.isFinite(b) ? Math.max(-1, Math.min(1, b)) : 0);
     },
-    /** The spread under which the bands read as held, as moved by the bias. */
-    threshold: () => epsNow,
+    /** The "still" threshold now, as moved by the bias: the spectrum's flux bar when it is judging, else the bands' spread. */
+    threshold: () => (reading().source === 'spectrum' ? FLUX_HELD : eps) * scale,
     reading,
     reset() {
       rows.length = 0;
+      specs.length = 0;
       flatBars = 0;
+      lastWhy = null;
     },
   };
 }

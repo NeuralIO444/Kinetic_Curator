@@ -13,6 +13,8 @@ import {
   PRESETS,
   davisRoute,
   createFlatness,
+  FLUX_HELD,
+  NOISE_FLAT,
   createConductor,
   PHRASE_BARS,
   TIER_OPS,
@@ -272,6 +274,69 @@ ok('LOIS: a pinned flat signal is a failed show within a phrase; music and silen
   assert.equal(f.flatBars(), 0, 'no audio clears the run');
   assert.equal(createFlatness().push([NaN, 'x', undefined]), false, 'junk is a silent sample, never a throw');
 });
+
+ok(
+  'stage 2: LOIS judges the spectrum when the phrase carried one — held or a noise wall is flat, a moving one is not',
+  () => {
+    const lively = [0.6, 0.55, 0.5, 0.4, 0.3, 0.3, 0.2]; // the same levels every bar: the BANDS alone would call it flat
+    const run = (spectra, bands = lively) => {
+      const f = createFlatness();
+      return { out: spectra.map((sp) => f.push(bands, sp)), f };
+    };
+    const moving = { flux: 0.4, flatness: 0.3 };
+    const held = { flux: FLUX_HELD / 2, flatness: 0.3 };
+    const noise = { flux: 0.4, flatness: (NOISE_FLAT + 1) / 2 };
+    // a moving spectrum overrules held bands: the picture has something to follow
+    const m = run(Array(PHRASE_BARS + 1).fill(moving));
+    assert.deepEqual(
+      m.out,
+      Array(PHRASE_BARS + 1).fill(false),
+      'a moving spectrum is not flat, whatever the bands say',
+    );
+    assert.equal(m.f.reading().source, 'spectrum');
+    const h = run(Array(PHRASE_BARS + 1).fill(held));
+    assert.deepEqual(h.out, [false, false, false, true, true], 'a held spectrum: flat once a phrase has filled');
+    assert.equal(h.f.why(), 'held');
+    const n = run(Array(PHRASE_BARS).fill(noise));
+    assert.equal(n.out[PHRASE_BARS - 1], true, 'a wall of noise for a phrase is flat');
+    assert.equal(n.f.why(), 'noise');
+    // one bar without a spectrum in the window: that phrase is judged on the bands (stage 1), never on a partial read
+    const gap = run([moving, null, moving, moving]);
+    assert.equal(gap.f.reading().source, 'bands');
+    assert.equal(gap.out[3], true, 'judged on the bands: held levels are flat');
+    assert.equal(gap.f.why(), 'still');
+    // silence clears both reads
+    const s = createFlatness();
+    for (let i = 0; i < PHRASE_BARS; i++) s.push(lively, held);
+    assert.equal(s.push(null, null), false);
+    assert.equal(s.flatBars(), 0);
+    assert.equal(s.reading().source, null);
+    // quiet is not a failed show, on either read
+    assert.deepEqual(
+      run(Array(PHRASE_BARS).fill(held), [0, 0.01, 0, 0, 0, 0, 0]).out.at(-1),
+      false,
+      'too quiet to judge',
+    );
+    // the keep-rate bias moves the spectrum's "still" bar the same way it moves the bands'
+    const tight = createFlatness();
+    tight.setBias(1);
+    const loose = createFlatness();
+    loose.setBias(-1);
+    const edge = { flux: FLUX_HELD * 1.2, flatness: 0.3 }; // just above the neutral bar
+    for (let i = 0; i < PHRASE_BARS; i++) {
+      tight.push(lively, edge);
+      loose.push(lively, edge);
+    }
+    assert.equal(tight.flatBars(), 1, 'passes piling up: a nearly held show is called flat');
+    assert.equal(loose.flatBars(), 0, 'keeping: the same show rides');
+    assert.ok(
+      Math.abs(tight.threshold() - FLUX_HELD * (1 + FLAT_BIAS_SWING)) < 1e-12,
+      'the spectrum bar is what she reports',
+    );
+    // malformed spectra are a missing read, not a crash
+    assert.doesNotThrow(() => createFlatness().push(lively, { flux: NaN, flatness: 'x' }));
+  },
+);
 
 ok(
   "LOIS's keep-rate read: keeping a lot loosens her flat-show threshold, passes piling up tighten it, little evidence is neutral",

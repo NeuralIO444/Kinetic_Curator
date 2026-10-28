@@ -261,6 +261,28 @@ ok('the show block reports what the audio is doing, and a flat signal counts fla
   g.done();
 });
 
+ok('stage 2: with a spectrum every bar, LOIS judges it — a moving one rides over held bands, a held one burns', () => {
+  // the rig's bands are the same every bar (held): on the bands alone the show is flat
+  const moving = rig({ spectrum: () => ({ centroid: 0.4, flux: 0.5, flatness: 0.3 }) });
+  audioOn();
+  emit(Events.AUDIO_ENERGY, { level: 'mid' });
+  for (let i = 1; i <= 6; i++) moving.bar(i);
+  assert.equal(moving.trio.showBlock().flatBars, 0, 'the spectrum is moving: not a failed show');
+  assert.equal(getTrioView().flatBy, 'spectrum');
+  const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: moving.trio.showBlock() });
+  assert.notEqual(rulesReply('lois', ctx, {}).state, 'BURN', 'no BURN on a moving spectrum');
+  moving.done();
+  const held = rig({ spectrum: () => ({ centroid: 0.4, flux: 0.01, flatness: 0.3 }) });
+  audioOn();
+  emit(Events.AUDIO_ENERGY, { level: 'mid' });
+  for (let i = 1; i <= 6; i++) held.bar(i);
+  assert.ok(held.trio.showBlock().flatBars >= 2, 'a held spectrum reads flat');
+  assert.equal(getTrioView().flatWhy, 'held');
+  const ctx2 = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: held.trio.showBlock() });
+  assert.equal(rulesReply('lois', ctx2, {}).state, 'BURN', 'a held spectrum for a phrase: a failed show');
+  held.done();
+});
+
 ok('end to end: the context carries the show, the rules conduct, LOIS burns the flat show', () => {
   const g = rig({ tier: 't3' });
   audioOn();

@@ -121,6 +121,8 @@ export function startTrio({
       sinceBars: audio.sinceBars,
       flatBars: flatness.flatBars(),
       flatBelow: flatness.threshold(),
+      flatBy: flatness.reading().source, // 'spectrum' | 'bands' | null — what LOIS is judging the show on
+      flatWhy: flatness.why(),
       bias,
       tier,
       cooling: conductor.cooling(bar),
@@ -252,7 +254,7 @@ export function startTrio({
       }
       bias = flatBias(act || {});
       flatness.setBias(bias);
-      flatness.push(bands);
+      flatness.push(bands, spectrum); // stage 2: LOIS judges the spectrum when every bar of the phrase carried one
       if (pending && p.bar >= pending.landBar) land(p.bar);
       publish();
     }),
