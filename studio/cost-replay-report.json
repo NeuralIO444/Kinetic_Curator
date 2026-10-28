@@ -1,0 +1,1737 @@
+{
+  "kind": "kc-cost-replay-report",
+  "issue": 1578,
+  "slice": "C — governor-replay ship/kill judge",
+  "generatedAt": "2026-10-28T17:45:09.136Z",
+  "inputs": {
+    "dataset": {
+      "path": "/home/hatch/workspace/goals/kinetic-curator-generative-art-instrument/hidden_files/cost-dataset-studio-2026-10-28.json",
+      "kind": "kc-cost-dataset",
+      "version": 1,
+      "generatedAt": "2026-10-28T17:17:54.629Z",
+      "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)",
+      "swiftShader": false,
+      "probeDrift": true
+    },
+    "headReport": {
+      "path": "/home/hatch/workspace/kc-1578-replay/studio/cost-head-report.json",
+      "calibration": 1.871554
+    },
+    "model": {
+      "path": "/home/hatch/workspace/kc-1578-replay/studio/cost-head-model.json",
+      "kind": "xgboost-cost",
+      "calibration": 1.871554,
+      "tau": 0.9,
+      "trees": 60
+    }
+  },
+  "definitions": {
+    "budgetMs": 33.333333333333336,
+    "targetFps": 30,
+    "sceneLengthS": 30,
+    "sustainS": 1.6,
+    "cooldownS": 8,
+    "renderScales": [
+      1,
+      0.75,
+      0.5,
+      0.33
+    ],
+    "overBudgetScene": "opening state (after any prime, before reactive correction) costs more than budget",
+    "retainedQuality": "settled state renderScale² × tier weight {high 1, balanced 0.85, performance 0.7}; equal := within 5% relative",
+    "falseCheap": "prediction-level P(pred < label) on out-of-fold predictions (Slice B’s metric); decision-level variant reported per strategy",
+    "pinball": "mean τ-pinball in ms at τ=0.9",
+    "assumptions": [
+      "A1 frame cost at renderScale s = label × s² (pixel-bound scaling)",
+      "A2 quality-tier steps are cost-neutral in the model (conservative against priming)",
+      "A3 modelled ladder = nextGovernorCut prefix: cut 1 renderScale, then cut 2 quality",
+      "A4 restore is a bounded climb into headroom; settled states are judged",
+      "A5 retained-quality tier weights {1, 0.85, 0.7}; renderScale² is the measured pixel fraction",
+      "A6 scene length 30 s; hitch timing from SUSTAIN_MS 1600 / COOLDOWN_MS 8000",
+      "A7 baselines calibrated on their train fold only (trainer’s ≥90% coverage law); the head keeps its shipped pooled-OOF calibration — the artifact under judgment",
+      "A8 labels are ground truth (median of per-rep p90s); failed rows excluded and named, never imputed",
+      "A9 baseline predictions winsorized to each fold’s train feature range (anti-extrapolation; the head’s own range-check law applied to the baselines)"
+    ]
+  },
+  "datasetRows": {
+    "scored": 25,
+    "excluded": [
+      {
+        "id": "grid-heavy-all",
+        "status": "failed",
+        "error": "payload too large for page memory: 799.7MB > 512MB cap"
+      }
+    ]
+  },
+  "folds": [
+    {
+      "heldOut": "grid",
+      "trainRows": 6,
+      "testRows": 19
+    },
+    {
+      "heldOut": "parity",
+      "trainRows": 19,
+      "testRows": 6
+    }
+  ],
+  "gate0Additivity": {
+    "rows": 19,
+    "columns": [
+      "intercept",
+      "log2(bodies/48)",
+      "cast-8",
+      "scaleMid-1",
+      "fxDepth",
+      "blend!=normal",
+      "mirror",
+      "swarm"
+    ],
+    "coefficients": {
+      "intercept": 31.133037,
+      "log2(bodies/48)": 7.215654,
+      "cast-8": -0.202929,
+      "scaleMid-1": 1.681054,
+      "fxDepth": -1.367591,
+      "blend!=normal": 2.13362,
+      "mirror": 3.93362,
+      "swarm": -38.561205
+    },
+    "r2": 0.9448,
+    "medianAbsRelResid": 0.028,
+    "meanAbsRelResid": 0.1103,
+    "maxAbsRelResid": 0.5857,
+    "rule": "additive iff R² ≥ 0.9 AND median |residual|/label ≤ 0.1 (pre-registered)",
+    "additive": true,
+    "residuals": [
+      {
+        "id": "grid-base",
+        "labelMs": 31.5,
+        "additivePredMs": 31.133,
+        "residMs": 0.367,
+        "relResid": 0.0116
+      },
+      {
+        "id": "grid-count-12",
+        "labelMs": 14.2,
+        "additivePredMs": 16.7017,
+        "residMs": -2.5017,
+        "relResid": -0.1762
+      },
+      {
+        "id": "grid-count-160",
+        "labelMs": 50.2,
+        "additivePredMs": 43.6664,
+        "residMs": 6.5336,
+        "relResid": 0.1302
+      },
+      {
+        "id": "grid-count-480",
+        "labelMs": 53.6,
+        "additivePredMs": 55.1029,
+        "residMs": -1.5029,
+        "relResid": -0.028
+      },
+      {
+        "id": "grid-cast-4",
+        "labelMs": 43.6,
+        "additivePredMs": 44.4781,
+        "residMs": -0.8781,
+        "relResid": -0.0201
+      },
+      {
+        "id": "grid-cast-24",
+        "labelMs": 40.2,
+        "additivePredMs": 40.4195,
+        "residMs": -0.2195,
+        "relResid": -0.0055
+      },
+      {
+        "id": "grid-scale-small",
+        "labelMs": 46,
+        "additivePredMs": 42.4896,
+        "residMs": 3.5104,
+        "relResid": 0.0763
+      },
+      {
+        "id": "grid-scale-large",
+        "labelMs": 45.7,
+        "additivePredMs": 45.6836,
+        "residMs": 0.0164,
+        "relResid": 0.0004
+      },
+      {
+        "id": "grid-fx-1",
+        "labelMs": 25.8,
+        "additivePredMs": 29.7654,
+        "residMs": -3.9654,
+        "relResid": -0.1537
+      },
+      {
+        "id": "grid-fx-2",
+        "labelMs": 26,
+        "additivePredMs": 28.3979,
+        "residMs": -2.3979,
+        "relResid": -0.0922
+      },
+      {
+        "id": "grid-fx-3",
+        "labelMs": 26.5,
+        "additivePredMs": 27.0303,
+        "residMs": -0.5303,
+        "relResid": -0.02
+      },
+      {
+        "id": "grid-fx-4",
+        "labelMs": 25.9,
+        "additivePredMs": 25.6627,
+        "residMs": 0.2373,
+        "relResid": 0.0092
+      },
+      {
+        "id": "grid-blend-screen",
+        "labelMs": 45.8,
+        "additivePredMs": 45.8,
+        "residMs": 0,
+        "relResid": 0
+      },
+      {
+        "id": "grid-mirror-x",
+        "labelMs": 47.6,
+        "additivePredMs": 47.6,
+        "residMs": 0,
+        "relResid": 0
+      },
+      {
+        "id": "grid-swarm-150",
+        "labelMs": 10.7,
+        "additivePredMs": 4.4333,
+        "residMs": 6.2667,
+        "relResid": 0.5857
+      },
+      {
+        "id": "grid-swarm-500",
+        "labelMs": 10.7,
+        "additivePredMs": 16.9667,
+        "residMs": -6.2667,
+        "relResid": -0.5857
+      },
+      {
+        "id": "grid-heavy-count-fx",
+        "labelMs": 50.3,
+        "additivePredMs": 51.0001,
+        "residMs": -0.7001,
+        "relResid": -0.0139
+      },
+      {
+        "id": "grid-heavy-scale-fx",
+        "labelMs": 48.7,
+        "additivePredMs": 42.9485,
+        "residMs": 5.7515,
+        "relResid": 0.1181
+      },
+      {
+        "id": "grid-heavy-count-scale",
+        "labelMs": 53.4,
+        "additivePredMs": 57.1202,
+        "residMs": -3.7202,
+        "relResid": -0.0697
+      }
+    ]
+  },
+  "strategies": {
+    "staticReactive": {
+      "name": "(a) static tiers — today's governor (no prime)",
+      "scenes": 25,
+      "overBudgetScenes": 11,
+      "meanHitchFrames": 21.12,
+      "totalHitchFrames": 528,
+      "meanSettledQuality": 0.8075,
+      "falseCheapPredRate": null,
+      "decisionFalseCheapRate": null,
+      "pinballMs": null,
+      "perScene": [
+        {
+          "id": "parity-single-basic",
+          "labelMs": 21.1,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 21.1
+        },
+        {
+          "id": "parity-multi-blend",
+          "labelMs": 23.8,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 23.8
+        },
+        {
+          "id": "parity-fx-chain-2",
+          "labelMs": 19.8,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.8
+        },
+        {
+          "id": "parity-fx-chain-3",
+          "labelMs": 19.4,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.4
+        },
+        {
+          "id": "parity-fx-invert-wrap",
+          "labelMs": 27,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 27
+        },
+        {
+          "id": "parity-fx-stack-3",
+          "labelMs": 11.1,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 11.1
+        },
+        {
+          "id": "grid-base",
+          "labelMs": 31.5,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 31.5
+        },
+        {
+          "id": "grid-count-12",
+          "labelMs": 14.2,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 14.2
+        },
+        {
+          "id": "grid-count-160",
+          "labelMs": 50.2,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2375
+        },
+        {
+          "id": "grid-count-480",
+          "labelMs": 53.6,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.15
+        },
+        {
+          "id": "grid-cast-4",
+          "labelMs": 43.6,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 24.525
+        },
+        {
+          "id": "grid-cast-24",
+          "labelMs": 40.2,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 22.6125
+        },
+        {
+          "id": "grid-scale-small",
+          "labelMs": 46,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.875
+        },
+        {
+          "id": "grid-scale-large",
+          "labelMs": 45.7,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7063
+        },
+        {
+          "id": "grid-fx-1",
+          "labelMs": 25.8,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.8
+        },
+        {
+          "id": "grid-fx-2",
+          "labelMs": 26,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26
+        },
+        {
+          "id": "grid-fx-3",
+          "labelMs": 26.5,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26.5
+        },
+        {
+          "id": "grid-fx-4",
+          "labelMs": 25.9,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.9
+        },
+        {
+          "id": "grid-blend-screen",
+          "labelMs": 45.8,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7625
+        },
+        {
+          "id": "grid-mirror-x",
+          "labelMs": 47.6,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 26.775
+        },
+        {
+          "id": "grid-swarm-150",
+          "labelMs": 10.7,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-swarm-500",
+          "labelMs": 10.7,
+          "predMs": null,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-heavy-count-fx",
+          "labelMs": 50.3,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2937
+        },
+        {
+          "id": "grid-heavy-scale-fx",
+          "labelMs": 48.7,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 27.3938
+        },
+        {
+          "id": "grid-heavy-count-scale",
+          "labelMs": 53.4,
+          "predMs": null,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.0375
+        }
+      ]
+    },
+    "staticTiers": {
+      "name": "(a') static tiers as an additive prime (record only)",
+      "scenes": 25,
+      "overBudgetScenes": 11,
+      "meanHitchFrames": 21.12,
+      "totalHitchFrames": 528,
+      "meanSettledQuality": 0.8075,
+      "falseCheapPredRate": 0.96,
+      "decisionFalseCheapRate": 0.44,
+      "pinballMs": 24.0435,
+      "perScene": [
+        {
+          "id": "parity-single-basic",
+          "labelMs": 21.1,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 21.1
+        },
+        {
+          "id": "parity-multi-blend",
+          "labelMs": 23.8,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 23.8
+        },
+        {
+          "id": "parity-fx-chain-2",
+          "labelMs": 19.8,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.8
+        },
+        {
+          "id": "parity-fx-chain-3",
+          "labelMs": 19.4,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.4
+        },
+        {
+          "id": "parity-fx-invert-wrap",
+          "labelMs": 27,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 27
+        },
+        {
+          "id": "parity-fx-stack-3",
+          "labelMs": 11.1,
+          "predMs": 0.0115,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 11.1
+        },
+        {
+          "id": "grid-base",
+          "labelMs": 31.5,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 31.5
+        },
+        {
+          "id": "grid-count-12",
+          "labelMs": 14.2,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 14.2
+        },
+        {
+          "id": "grid-count-160",
+          "labelMs": 50.2,
+          "predMs": 10.012,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2375
+        },
+        {
+          "id": "grid-count-480",
+          "labelMs": 53.6,
+          "predMs": 19.1475,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.15
+        },
+        {
+          "id": "grid-cast-4",
+          "labelMs": 43.6,
+          "predMs": 9.5543,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 24.525
+        },
+        {
+          "id": "grid-cast-24",
+          "labelMs": 40.2,
+          "predMs": 11.843,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 22.6125
+        },
+        {
+          "id": "grid-scale-small",
+          "labelMs": 46,
+          "predMs": 10.012,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.875
+        },
+        {
+          "id": "grid-scale-large",
+          "labelMs": 45.7,
+          "predMs": 10.012,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7063
+        },
+        {
+          "id": "grid-fx-1",
+          "labelMs": 25.8,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.8
+        },
+        {
+          "id": "grid-fx-2",
+          "labelMs": 26,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26
+        },
+        {
+          "id": "grid-fx-3",
+          "labelMs": 26.5,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26.5
+        },
+        {
+          "id": "grid-fx-4",
+          "labelMs": 25.9,
+          "predMs": 0.012,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.9
+        },
+        {
+          "id": "grid-blend-screen",
+          "labelMs": 45.8,
+          "predMs": 10.012,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7625
+        },
+        {
+          "id": "grid-mirror-x",
+          "labelMs": 47.6,
+          "predMs": 10.012,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 26.775
+        },
+        {
+          "id": "grid-swarm-150",
+          "labelMs": 10.7,
+          "predMs": 9.4754,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-swarm-500",
+          "labelMs": 10.7,
+          "predMs": 19.487,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-heavy-count-fx",
+          "labelMs": 50.3,
+          "predMs": 14.631,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2937
+        },
+        {
+          "id": "grid-heavy-scale-fx",
+          "labelMs": 48.7,
+          "predMs": 7.001,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 27.3938
+        },
+        {
+          "id": "grid-heavy-count-scale",
+          "labelMs": 53.4,
+          "predMs": 19.1475,
+          "opensOver": true,
+          "hitchFrames": 48,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.0375
+        }
+      ]
+    },
+    "countOnly": {
+      "name": "(b) count-only baseline prime",
+      "scenes": 25,
+      "overBudgetScenes": 0,
+      "meanHitchFrames": 0,
+      "totalHitchFrames": 0,
+      "meanSettledQuality": 0.8075,
+      "falseCheapPredRate": 0.04,
+      "decisionFalseCheapRate": 0,
+      "pinballMs": 2.1361,
+      "perScene": [
+        {
+          "id": "parity-single-basic",
+          "labelMs": 21.1,
+          "predMs": 35.8618,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 21.1
+        },
+        {
+          "id": "parity-multi-blend",
+          "labelMs": 23.8,
+          "predMs": 35.8618,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 23.8
+        },
+        {
+          "id": "parity-fx-chain-2",
+          "labelMs": 19.8,
+          "predMs": 35.8618,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.8
+        },
+        {
+          "id": "parity-fx-chain-3",
+          "labelMs": 19.4,
+          "predMs": 35.8618,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.4
+        },
+        {
+          "id": "parity-fx-invert-wrap",
+          "labelMs": 27,
+          "predMs": 35.8618,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 27
+        },
+        {
+          "id": "parity-fx-stack-3",
+          "labelMs": 11.1,
+          "predMs": 27.5746,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 11.1
+        },
+        {
+          "id": "grid-base",
+          "labelMs": 31.5,
+          "predMs": 31.4988,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 31.5
+        },
+        {
+          "id": "grid-count-12",
+          "labelMs": 14.2,
+          "predMs": 14.9888,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 14.2
+        },
+        {
+          "id": "grid-count-160",
+          "labelMs": 50.2,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2375
+        },
+        {
+          "id": "grid-count-480",
+          "labelMs": 53.6,
+          "predMs": 108.1437,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.15
+        },
+        {
+          "id": "grid-cast-4",
+          "labelMs": 43.6,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 24.525
+        },
+        {
+          "id": "grid-cast-24",
+          "labelMs": 40.2,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 22.6125
+        },
+        {
+          "id": "grid-scale-small",
+          "labelMs": 46,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.875
+        },
+        {
+          "id": "grid-scale-large",
+          "labelMs": 45.7,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7063
+        },
+        {
+          "id": "grid-fx-1",
+          "labelMs": 25.8,
+          "predMs": 31.4988,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.8
+        },
+        {
+          "id": "grid-fx-2",
+          "labelMs": 26,
+          "predMs": 31.4988,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26
+        },
+        {
+          "id": "grid-fx-3",
+          "labelMs": 26.5,
+          "predMs": 31.4988,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26.5
+        },
+        {
+          "id": "grid-fx-4",
+          "labelMs": 25.9,
+          "predMs": 31.4988,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.9
+        },
+        {
+          "id": "grid-blend-screen",
+          "labelMs": 45.8,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7625
+        },
+        {
+          "id": "grid-mirror-x",
+          "labelMs": 47.6,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 26.775
+        },
+        {
+          "id": "grid-swarm-150",
+          "labelMs": 10.7,
+          "predMs": 57.9948,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-swarm-500",
+          "labelMs": 10.7,
+          "predMs": 110.5347,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-heavy-count-fx",
+          "labelMs": 50.3,
+          "predMs": 108.1437,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2937
+        },
+        {
+          "id": "grid-heavy-scale-fx",
+          "labelMs": 48.7,
+          "predMs": 60.0349,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 27.3938
+        },
+        {
+          "id": "grid-heavy-count-scale",
+          "labelMs": 53.4,
+          "predMs": 108.1437,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.0375
+        }
+      ]
+    },
+    "ridge": {
+      "name": "(b) ridge baseline prime",
+      "scenes": 25,
+      "overBudgetScenes": 0,
+      "meanHitchFrames": 0,
+      "totalHitchFrames": 0,
+      "meanSettledQuality": 0.8075,
+      "falseCheapPredRate": 0.48,
+      "decisionFalseCheapRate": 0,
+      "pinballMs": 8.712,
+      "perScene": [
+        {
+          "id": "parity-single-basic",
+          "labelMs": 21.1,
+          "predMs": 28.358,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 21.1
+        },
+        {
+          "id": "parity-multi-blend",
+          "labelMs": 23.8,
+          "predMs": 28.358,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 23.8
+        },
+        {
+          "id": "parity-fx-chain-2",
+          "labelMs": 19.8,
+          "predMs": 28.358,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.8
+        },
+        {
+          "id": "parity-fx-chain-3",
+          "labelMs": 19.4,
+          "predMs": 28.358,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.4
+        },
+        {
+          "id": "parity-fx-invert-wrap",
+          "labelMs": 27,
+          "predMs": 28.358,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 27
+        },
+        {
+          "id": "parity-fx-stack-3",
+          "labelMs": 11.1,
+          "predMs": 27.7571,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 11.1
+        },
+        {
+          "id": "grid-base",
+          "labelMs": 31.5,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 31.5
+        },
+        {
+          "id": "grid-count-12",
+          "labelMs": 14.2,
+          "predMs": 15.042,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 14.2
+        },
+        {
+          "id": "grid-count-160",
+          "labelMs": 50.2,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2375
+        },
+        {
+          "id": "grid-count-480",
+          "labelMs": 53.6,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.15
+        },
+        {
+          "id": "grid-cast-4",
+          "labelMs": 43.6,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 24.525
+        },
+        {
+          "id": "grid-cast-24",
+          "labelMs": 40.2,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 22.6125
+        },
+        {
+          "id": "grid-scale-small",
+          "labelMs": 46,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.875
+        },
+        {
+          "id": "grid-scale-large",
+          "labelMs": 45.7,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7063
+        },
+        {
+          "id": "grid-fx-1",
+          "labelMs": 25.8,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.8
+        },
+        {
+          "id": "grid-fx-2",
+          "labelMs": 26,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26
+        },
+        {
+          "id": "grid-fx-3",
+          "labelMs": 26.5,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26.5
+        },
+        {
+          "id": "grid-fx-4",
+          "labelMs": 25.9,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.9
+        },
+        {
+          "id": "grid-blend-screen",
+          "labelMs": 45.8,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7625
+        },
+        {
+          "id": "grid-mirror-x",
+          "labelMs": 47.6,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 26.775
+        },
+        {
+          "id": "grid-swarm-150",
+          "labelMs": 10.7,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-swarm-500",
+          "labelMs": 10.7,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-heavy-count-fx",
+          "labelMs": 50.3,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2937
+        },
+        {
+          "id": "grid-heavy-scale-fx",
+          "labelMs": 48.7,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 27.3938
+        },
+        {
+          "id": "grid-heavy-count-scale",
+          "labelMs": 53.4,
+          "predMs": 27,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.0375
+        }
+      ]
+    },
+    "costHead": {
+      "name": "(c) cost head prime (OOF calibrated)",
+      "scenes": 25,
+      "overBudgetScenes": 0,
+      "meanHitchFrames": 0,
+      "totalHitchFrames": 0,
+      "meanSettledQuality": 0.8075,
+      "falseCheapPredRate": 0.08,
+      "decisionFalseCheapRate": 0,
+      "pinballMs": 2.7137,
+      "perScene": [
+        {
+          "id": "parity-single-basic",
+          "labelMs": 21.1,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 21.1
+        },
+        {
+          "id": "parity-multi-blend",
+          "labelMs": 23.8,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 23.8
+        },
+        {
+          "id": "parity-fx-chain-2",
+          "labelMs": 19.8,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.8
+        },
+        {
+          "id": "parity-fx-chain-3",
+          "labelMs": 19.4,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 19.4
+        },
+        {
+          "id": "parity-fx-invert-wrap",
+          "labelMs": 27,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 27
+        },
+        {
+          "id": "parity-fx-stack-3",
+          "labelMs": 11.1,
+          "predMs": 79.5558,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 11.1
+        },
+        {
+          "id": "grid-base",
+          "labelMs": 31.5,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 31.5
+        },
+        {
+          "id": "grid-count-12",
+          "labelMs": 14.2,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 14.2
+        },
+        {
+          "id": "grid-count-160",
+          "labelMs": 50.2,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2375
+        },
+        {
+          "id": "grid-count-480",
+          "labelMs": 53.6,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.15
+        },
+        {
+          "id": "grid-cast-4",
+          "labelMs": 43.6,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 24.525
+        },
+        {
+          "id": "grid-cast-24",
+          "labelMs": 40.2,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 22.6125
+        },
+        {
+          "id": "grid-scale-small",
+          "labelMs": 46,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.875
+        },
+        {
+          "id": "grid-scale-large",
+          "labelMs": 45.7,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7063
+        },
+        {
+          "id": "grid-fx-1",
+          "labelMs": 25.8,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.8
+        },
+        {
+          "id": "grid-fx-2",
+          "labelMs": 26,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26
+        },
+        {
+          "id": "grid-fx-3",
+          "labelMs": 26.5,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 26.5
+        },
+        {
+          "id": "grid-fx-4",
+          "labelMs": 25.9,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 25.9
+        },
+        {
+          "id": "grid-blend-screen",
+          "labelMs": 45.8,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 25.7625
+        },
+        {
+          "id": "grid-mirror-x",
+          "labelMs": 47.6,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 26.775
+        },
+        {
+          "id": "grid-swarm-150",
+          "labelMs": 10.7,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-swarm-500",
+          "labelMs": 10.7,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 1,
+          "settledQualityTier": "high",
+          "settledQuality": 1,
+          "settledCostMs": 10.7
+        },
+        {
+          "id": "grid-heavy-count-fx",
+          "labelMs": 50.3,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 28.2937
+        },
+        {
+          "id": "grid-heavy-scale-fx",
+          "labelMs": 48.7,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 27.3938
+        },
+        {
+          "id": "grid-heavy-count-scale",
+          "labelMs": 53.4,
+          "predMs": 50.3,
+          "opensOver": false,
+          "hitchFrames": 0,
+          "settledScale": 0.75,
+          "settledQualityTier": "high",
+          "settledQuality": 0.5625,
+          "settledCostMs": 30.0375
+        }
+      ]
+    }
+  },
+  "legs": {
+    "gate0Additivity": {
+      "pass": false,
+      "additive": true,
+      "detail": "costs prove additive within tolerance — the tier table already tells the truth"
+    },
+    "overBudget": {
+      "pass": true,
+      "reduction": 1,
+      "pathA": {
+        "pass": true,
+        "rule": "≥30% fewer over-budget scenes at equal retained quality (±5%)"
+      },
+      "pathB": {
+        "pass": false,
+        "rule": "≥15% more retained quality at equal hitches"
+      },
+      "headOverBudget": 0,
+      "staticOverBudget": 11,
+      "headMeanSettledQuality": 0.8075,
+      "staticMeanSettledQuality": 0.8075
+    },
+    "falseCheap": {
+      "pass": false,
+      "rate": 0.08,
+      "rule": "false-cheap ≤ 0.05 after calibration (prediction-level, OOF)"
+    },
+    "pinball": {
+      "pass": false,
+      "headPinballMs": 2.7137,
+      "countOnlyPinballMs": 2.1361,
+      "ridgePinballMs": 8.712,
+      "staticTiersPinballMs": 24.0435,
+      "rule": "≥15% pinball win over each baseline (τ=0.9, ms)"
+    },
+    "device": {
+      "status": "NOT EVIDENCED",
+      "pass": false,
+      "evidenced": false,
+      "devicesInEvidence": [
+        "ANGLE (Apple, ANGLE Metal Renderer: Apple M2 Max, Unspecified Version)"
+      ],
+      "detail": "one device in evidence; the contract judges ship on unseen-recipe × unseen-DEVICE replay. Labels for an unmeasured device would be fabrication, so this leg is not estimated.",
+      "closer": "run the same harness on a second device (node src/gl/parity/costBench.mjs --gpu --out <device2-dataset.json>) and re-run this judge with that dataset + the shipped artifact’s predictMs predictions as the head leg"
+    }
+  },
+  "killGain": false,
+  "verdict": {
+    "verdict": "KILL",
+    "reasons": [
+      "KILL — gate 0: costs prove additive (R² 0.9448, median |resid| 2.8% of label): the tier table already tells the truth, no model ships"
+    ]
+  }
+}
