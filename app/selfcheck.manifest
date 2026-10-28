@@ -497,6 +497,7 @@ node src/loot/lootNative.selfcheck.mjs
 node src/loot/lootRun.selfcheck.mjs
 node src/loot/lootIngest.selfcheck.mjs
 node src/state/projectWatch.selfcheck.mjs
+node src/state/projectFile.selfcheck.mjs
 node src/loot/lootPalettes.selfcheck.mjs
 node src/loot/lootWeb.selfcheck.mjs
 node src/loot/lootStarter.selfcheck.mjs
