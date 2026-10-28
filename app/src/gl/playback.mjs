@@ -13,6 +13,8 @@
 import { replayInputs } from '../engine/kernel/replay/inputLog.js';
 import { checkPerformance } from './performanceFile.mjs';
 import { checkRouteRecord, routesAt } from './routeRecord.mjs';
+import { checkGestureRecord, frozenAt } from './gestureRecord.mjs';
+import { emit, Events } from '../composition/eventBus.js';
 
 /** The scene-defining fields of a recorded input that the loop's store view takes from the take while it plays. */
 export const SCENE_KEYS = Object.freeze([
@@ -37,7 +39,7 @@ export const SCENE_KEYS = Object.freeze([
   'canvasH',
 ]);
 
-let active = null; // { perf, frames, index, ended, pendingSeek, routes }
+let active = null; // { perf, frames, index, ended, pendingSeek, routes, gestures, gNext }
 let frameTap = null;
 /**
  * #1462 — observe each PLAYED frame: fn(frame, perf, { seeked }). Called once per frame the cursor plays (not while
@@ -72,9 +74,41 @@ export function startPlayback(perf) {
   // #1483 follow-up: a take that carries its route table plays through it (routeRecord.mjs); an older take, or a
   // malformed section, plays through the live table as before
   const routes = checkRouteRecord(p.routes);
-  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0, routes };
+  // #1802: a take that carries its gestures re-fires them (gestureRecord.mjs); an older take, or a malformed
+  // section, fires none. The take's freeze state is asserted the moment it loads — it is the authority while
+  // the take plays, and the loop may be sitting in a live state the take never had.
+  const gestures = checkGestureRecord(p.gestures);
+  active = { perf: p, frames, index: 0, ended: false, pendingSeek: 0, routes, gestures, gNext: 0 };
+  if (gestures) {
+    emit(Events.ACCUM_GESTURE, { action: 'freeze', value: frozenAt(gestures, 0) }, { cause: 'playback' });
+  }
   notify();
   return true;
+}
+
+/** One recorded gesture back onto the bus, stamped as playback so a recording take never records it again. */
+function emitGestureEntry(e) {
+  const payload = e[1] === 'freeze' ? { action: 'freeze', value: e[2] } : { action: e[1] };
+  emit(Events.ACCUM_GESTURE, payload, { cause: 'playback' });
+}
+
+/**
+ * Fire the take's gestures due at `playedIndex`. Linear play fires each event as its frame arrives. A rewind
+ * (a seek, or the load itself) skips the frames before the landing frame: their momentaries are gone with
+ * them, but the freeze STATE they set is not — assert the state in force at the landing frame first, then
+ * let the landing frame's own events fire.
+ */
+function fireGestures(a, playedIndex, rewound) {
+  const evs = a.gestures.events;
+  if (rewound) {
+    a.gNext = 0; // the cursor restarts: events past the landing frame must fire again as play re-reaches them
+    while (a.gNext < evs.length && evs[a.gNext][0] < playedIndex) a.gNext += 1;
+    emit(Events.ACCUM_GESTURE, { action: 'freeze', value: frozenAt(a.gestures, playedIndex) }, { cause: 'playback' });
+  }
+  while (a.gNext < evs.length && evs[a.gNext][0] <= playedIndex) {
+    emitGestureEntry(evs[a.gNext]);
+    a.gNext += 1;
+  }
 }
 
 /** Leave playback: the live instrument is back on the next frame. */
@@ -133,6 +167,8 @@ export function playbackStep(liveInput) {
       frameTap = null;
     }
   }
+  // #1802 — the take's gestures re-fire as their frames play (held frames hold them too, with the picture).
+  if (!held && a.gestures) fireGestures(a, playedIndex, rewind);
   const input = held ? { ...recorded, slowRender: true } : recorded;
   if (!held) {
     if (a.index < a.frames.length - 1) {

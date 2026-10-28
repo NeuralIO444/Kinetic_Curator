@@ -478,6 +478,7 @@ node src/curator/clockRecord.selfcheck.mjs
 node src/curator/spectrumRecord.selfcheck.mjs
 node src/gl/playback.selfcheck.mjs
 node src/gl/routeRecord.selfcheck.mjs
+node src/gl/gestureRecord.selfcheck.mjs
 node src/gl/masterGain.selfcheck.mjs
 node src/curator/mind.selfcheck.mjs
 node src/curator/mindFace.selfcheck.mjs
