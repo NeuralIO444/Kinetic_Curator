@@ -11,7 +11,7 @@ import { startMind, setMindTap, replayMindFrame, endMindReplay } from './mindLiv
 import { createMindRecorder, checkMindRecord } from './mindRecord.js';
 import { applyRouteOp, DAVIS_TAG } from './mindConduct.js';
 import { buildContext } from './mindContext.js';
-import { rulesReply } from './mindRules.js';
+import { rulesReply, LOIS_BURN_BARS } from './mindRules.js';
 import { sanitizeAudioRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
@@ -110,13 +110,14 @@ ok(
     const g = rig();
     audioOn();
     emit(Events.AUDIO_ENERGY, { level: 'mid' });
-    for (let b = 1; b <= 6; b++) g.bar(b); // a held signal for a phrase: a flat show
+    for (let b = 1; b <= 8; b++) g.bar(b); // a held signal for two phrases: LOIS waits a second phrase (#1787)
     const withShow = g.ctx({ lois: 'NOD', davis: 'FLOW' });
     assert.ok(withShow.show, 'the context carries the show while audio is on');
+    assert.ok(withShow.show.flatBars >= LOIS_BURN_BARS, `flat for ${withShow.show.flatBars} bars`);
     assert.equal(rulesReply('lois', withShow, {}).state, 'BURN', 'audio on: LOIS burns the flat show');
-    const route = rulesReply('davis', withShow, { seed: 3, bar: 6 }).route;
+    const route = rulesReply('davis', withShow, { seed: 3, bar: 8 }).route;
     assert.ok(route, 'Davis has a proposal');
-    g.request(6, route);
+    g.request(8, route);
     assert.ok(getTrioView().pending, 'held for the boundary');
 
     audioOff();
@@ -124,8 +125,8 @@ ok(
     assert.equal(getTrioView().on, false);
     assert.equal(getTrioView().pending, null, 'the held proposal is dropped with the show');
     // his own later asks and further phrases change nothing
-    g.request(7, route);
-    for (let b = 7; b <= 17; b++) g.bar(b); // across the boundaries at 8, 12, 16
+    g.request(9, route);
+    for (let b = 9; b <= 21; b++) g.bar(b); // across the boundaries at 12, 16, 20
     assert.equal(g.applied.length, 0, 'no edit lands after audio off');
     assert.equal(g.st.audioRoutes, null, 'the table is untouched');
     // the faces: with no show block the rules read the room (the non-audio driver), they do not burn on flatBars

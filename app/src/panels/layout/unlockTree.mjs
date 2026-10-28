@@ -45,6 +45,7 @@ const OP_LINES = Object.freeze({
   add: 'open a new audio route',
   retarget: 'move a route to a new target',
   remove: 'close an audio route',
+  spectrum: "steer a mark from the song's spectrum",
 });
 
 const cap = (s) => (s ? s[0].toUpperCase() + s.slice(1) : s);

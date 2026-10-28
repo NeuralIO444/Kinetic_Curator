@@ -5,6 +5,9 @@
 //   LOIS judges: a show that stays pinned and flat is a failed show (BURN), and Davis re-rolls to the next preset.
 //   The artist is sovereign: a target the artist touched this session is owned, and a proposal against it is dropped.
 //   Boldness is tier-gated (the engagement tier, Mind 3): tier 1 makes no route edits.
+//   Stage 2: he may also re-tune the spectrum marks on the CONTENT strata (STIMULI -> SPECTRUM: which frequency a mark
+//   listens by, and how much it scales / displaces / colours by it) — the `spectrum` op, same gate, same phrase, same
+//   sovereignty (moving a marks dial by hand owns it), tier 3 and up.
 //
 // Nothing here touches the bus, the clock or the store. mindContract validates a reply's `route`; mindRules asks
 // davisRoute / flatShow; the live driver (a later PR) applies what passes the gate and records the delta.
@@ -12,14 +15,36 @@ import { ROUTE_INPUTS, ROUTE_TARGETS, MAX_ROUTES } from '../gl/audioRoutes.mjs';
 import { routeDepthRange } from '../data/audioRoutes.js';
 
 export const PHRASE_BARS = 4;
-export const ROUTE_OPS = Object.freeze(['add', 'remove', 'retarget', 'depth']);
-/** Which ops each engagement tier may make (Mind 3 tiers: t1 faces only · t2 depth nudges · t3 add/retarget · t4 all). */
+export const ROUTE_OPS = Object.freeze(['add', 'remove', 'retarget', 'depth', 'spectrum']);
+/**
+ * Which ops each engagement tier may make (Mind 3 tiers: t1 faces only · t2 depth nudges · t3 add/retarget · t4 all).
+ * Stage 2's `spectrum` op re-tunes how the marks listen — a structural change like a retarget, so tier 3 and up.
+ */
 export const TIER_OPS = Object.freeze({
   t1: Object.freeze([]),
   t2: Object.freeze(['depth']),
-  t3: Object.freeze(['depth', 'add', 'retarget']),
-  t4: Object.freeze(['depth', 'add', 'retarget', 'remove']),
+  t3: Object.freeze(['depth', 'add', 'retarget', 'spectrum']),
+  t4: Object.freeze(['depth', 'add', 'retarget', 'remove', 'spectrum']),
 });
+
+// ── stage 2: the spectrum marks (gl/spectrumMarks.mjs) ──────────────────────────────────────────────────────────────
+/** The marks' dials, by the name a `spectrum` op uses -> the layout key the STIMULI -> SPECTRUM panel moves. */
+export const SPECTRUM_PARAMS = Object.freeze({
+  map: 'spectrumMap',
+  scale: 'spectrumScale',
+  displace: 'spectrumDisplace',
+  colour: 'spectrumColour',
+});
+/** How many listening maps there are (INDEX, ANGLE, POSITION, HASH — gl/spectrumMarks.mjs SPECTRUM_MAPS). */
+export const SPECTRUM_MAP_COUNT = 4;
+const SPECTRUM_MAP_NAMES = Object.freeze(['INDEX', 'ANGLE', 'POSITION', 'HASH']);
+/** The sovereignty target a `spectrum` op touches (owned when the artist moves that dial by hand). */
+export const spectrumTarget = (key) => `spectrum.${key}`;
+const spectrumValue = (key, v) => {
+  if (!Number.isFinite(v)) return null;
+  if (key === 'map') return Number.isInteger(v) && v >= 0 && v < SPECTRUM_MAP_COUNT ? v : null;
+  return v >= 0 && v <= 1 ? Math.round(v * 1000) / 1000 : null;
+};
 /** A persona backs off for this many bars once the artist has reverted its edits BACKOFF_REVERTS times. */
 export const BACKOFF_REVERTS = 3;
 export const BACKOFF_BARS = 32;
@@ -28,6 +53,9 @@ export const DAVIS_MAX_ROUTES = 3;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasTarget = (t) => typeof t === 'string' && Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t);
+// a route target, or (stage 2) a spectrum-marks dial: both can be owned by the artist's hand
+const isOwnable = (t) =>
+  hasTarget(t) || (typeof t === 'string' && Object.keys(SPECTRUM_PARAMS).some((k) => t === `spectrum.${k}`));
 const hasInput = (i) => typeof i === 'string' && ROUTE_INPUTS.includes(i);
 // out of range is malformed, not clamped: an untrusted reply that says 90 has told us something is wrong
 const depthIn = (target, d) => {
@@ -39,11 +67,18 @@ const depthIn = (target, d) => {
 /**
  * A route edit as a clean object, or null when malformed. `undefined` in -> `undefined` out (nothing said).
  *   { op:'add', input, target, depth } · { op:'remove', input, target } · { op:'retarget', input, from, to } ·
- *   { op:'depth', input, target, depth }
+ *   { op:'depth', input, target, depth } · stage 2: { op:'spectrum', key: map|scale|displace|colour, value }
+ *   (map an integer 0..3, an amount 0..1)
  */
 export function validateRouteOp(raw) {
   if (raw === undefined) return undefined;
   if (raw === null) return null; // an explicit "no edit": the caller treats null as nothing, never as malformed
+  if (isObj(raw) && raw.op === 'spectrum') {
+    const key = Object.prototype.hasOwnProperty.call(SPECTRUM_PARAMS, raw.key) ? raw.key : null;
+    // a number only: Number(null) / Number('') / Number(true) would pass as 0 / 0 / 1
+    const value = key && typeof raw.value === 'number' ? spectrumValue(key, raw.value) : null;
+    return value === null ? false : { op: 'spectrum', key, value };
+  }
   if (!isObj(raw) || !ROUTE_OPS.includes(raw.op) || !hasInput(raw.input)) return false;
   if (raw.op === 'retarget')
     return hasTarget(raw.from) && hasTarget(raw.to) && raw.from !== raw.to
@@ -58,6 +93,7 @@ export function validateRouteOp(raw) {
 /** The targets an edit would touch (for the sovereignty check). */
 export function opTargets(op) {
   if (!op) return [];
+  if (op.op === 'spectrum') return [spectrumTarget(op.key)];
   return op.op === 'retarget' ? [op.from, op.to] : [op.target];
 }
 
@@ -118,6 +154,10 @@ export function describeOp(op) {
   if (op.op === 'remove') return `- ${op.input} > ${op.target}`;
   if (op.op === 'retarget') return `${op.input}: ${op.from} > ${op.to}`;
   if (op.op === 'depth') return `${op.input} > ${op.target} depth ${d(op.depth)}`;
+  if (op.op === 'spectrum')
+    return op.key === 'map'
+      ? `marks listen by ${SPECTRUM_MAP_NAMES[op.value] ?? '?'}`
+      : `marks ${op.key} ${d(op.value)}`;
   return '';
 }
 
@@ -134,36 +174,59 @@ export const phraseOf = (bar) => Math.floor(bar / PHRASE_BARS);
 // Today the mids and treble bands drive nothing by default, so wiring them somewhere musical is his opening job. Each
 // candidate is a route to ADD; `bpm` (optional) is the tempo range it suits. Depths are inside every target's range
 // (the selfcheck proves it). Deterministic: no clock, no random.
+// `bold` (0..1, #1483 "how hot") is how daring a move is: light colour/glow/alpha wiring is safe (0..0.3), moving the
+// marks' size and hue is bolder (0.5..0.6), squashing them and driving the motion clock is daring (0.7..1). The
+// conducting temperature orders his tries by it; LOIS's brake caps it.
 export const PRESETS = Object.freeze({
   low: Object.freeze([
-    { input: 'band.mids', target: 'render.glow', depth: 0.3 },
-    { input: 'band.air', target: 'render.breath', depth: 0.04 },
-    { input: 'band.pres', target: 'render.alpha', depth: 6 },
+    { input: 'band.mids', target: 'render.glow', depth: 0.3, bold: 0 },
+    { input: 'band.air', target: 'render.breath', depth: 0.04, bold: 0.2 },
+    { input: 'band.pres', target: 'render.alpha', depth: 6, bold: 0.1 },
   ]),
   mid: Object.freeze([
-    { input: 'band.mids', target: 'render.scale', depth: 0.15 },
-    { input: 'band.pres', target: 'render.glow', depth: 0.4 },
-    { input: 'band.air', target: 'color.hue', depth: 20 },
-    { input: 'band.edge', target: 'clock.kinemeRate', depth: 0.6, bpm: [100, 220] },
+    { input: 'band.mids', target: 'render.scale', depth: 0.15, bold: 0.5 },
+    { input: 'band.pres', target: 'render.glow', depth: 0.4, bold: 0.2 },
+    { input: 'band.air', target: 'color.hue', depth: 20, bold: 0.6 },
+    { input: 'band.edge', target: 'clock.kinemeRate', depth: 0.6, bpm: [100, 220], bold: 0.8 },
   ]),
   high: Object.freeze([
-    { input: 'band.edge', target: 'render.squash', depth: 0.3 },
-    { input: 'band.air', target: 'clock.kinemeRate', depth: 1, bpm: [110, 220] },
-    { input: 'band.pres', target: 'render.scale', depth: 0.25 },
-    { input: 'band.mids', target: 'clock.kinemeRate', depth: 1.5, bpm: [100, 220] },
-    { input: 'band.air', target: 'render.glow', depth: 0.5 },
+    { input: 'band.edge', target: 'render.squash', depth: 0.3, bold: 0.7 },
+    { input: 'band.air', target: 'clock.kinemeRate', depth: 1, bpm: [110, 220], bold: 0.9 },
+    { input: 'band.pres', target: 'render.scale', depth: 0.25, bold: 0.5 },
+    { input: 'band.mids', target: 'clock.kinemeRate', depth: 1.5, bpm: [100, 220], bold: 1 },
+    { input: 'band.air', target: 'render.glow', depth: 0.5, bold: 0.3 },
   ]),
 });
 export const ENERGY_LEVELS = Object.freeze(['low', 'mid', 'high']);
 
 /**
+ * #1483 "how hot" (Matt 2026-10-16): the conducting lean is a TEMPERATURE ON PROPOSAL BOLDNESS — cool = safe, proven
+ * moves; hot = daring picks. Davis is the wild man (Matt 2026-10-27): every move stays in his reach at any heat, and
+ * the temperature only ORDERS his tries — cool, the safer moves of his level come first; hot, the daring ones do. The
+ * order is by bands of distance from the heat (BOLD_BAND wide); the seed rotates inside a band.
+ */
+export const BOLD_BAND = 0.5;
+const clampUnit = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
+/** How far down his order a candidate sits for a heat (0 = tried first). An unrated candidate counts as daring. */
+export const boldBand = (bold, heat) =>
+  Math.max(0, Math.floor(Math.abs((Number.isFinite(bold) ? bold : 1) - clampUnit(heat)) / BOLD_BAND - 1e-9));
+/**
+ * LOIS's brake (Matt 2026-10-27: she is the cautious one). When the artist has been passing a lot (her keep-rate read,
+ * flatBias, at or over BRAKE_AT), she holds Davis to the safe moves — bold at most BRAKE_MAX — until keeps come back.
+ */
+export const BRAKE_AT = 0.5;
+export const BRAKE_MAX = 0.4;
+
+/**
  * Davis's rules-backend conducting. Pure.
  * @param show  the context's `show` block (mindContext): { energy, bpm, silent, routes:[{input,target,depth}], owned:[], flatBars, ... }
  * @param seed  the decision seed (document seed x bar), so the same dish conducts the same way
+ * @param heat  0..1, the conducting temperature: it orders his tries inside the level (boldBand) — never what is in reach.
+ *              What is in reach narrows only on LOIS's brake (`show.brake`: the safe moves, bold <= BRAKE_MAX).
  * @returns an add op (or, on a flat show, a retarget of one of his own rows), or null (nothing worth doing: silence, a full
  *          table, he already holds his few, every candidate already wired or owned)
  */
-export function davisRoute(show, seed = 0) {
+export function davisRoute(show, seed = 0, heat = 0) {
   if (!show || show.silent) return null;
   const level = ENERGY_LEVELS.includes(show.energy) ? show.energy : 'mid';
   const table = Array.isArray(show.routes) ? show.routes : [];
@@ -183,12 +246,25 @@ export function davisRoute(show, seed = 0) {
   const start = pool.length
     ? (seed >>> 0) % Math.min(pool.length, PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].length)
     : 0;
+  // the temperature orders his tries: his level first (energy decides it), then the band of boldness nearest the heat,
+  // then the seed's rotation. LOIS's brake is the only thing that takes a move out of reach.
+  const lead = PRESETS[ENERGY_LEVELS[(order + rerolls) % 3]].filter(fits).length;
+  const braked = show.brake === true;
+  const tries = pool
+    .map((c, i) => ({
+      c,
+      lvl: i < lead ? 0 : 1,
+      band: boldBand(c.bold, heat),
+      rot: (i - start + pool.length) % pool.length,
+    }))
+    .filter((t) => !braked || (Number.isFinite(t.c.bold) ? t.c.bold : 1) <= BRAKE_MAX)
+    .sort((a, b) => a.lvl - b.lvl || a.band - b.band || a.rot - b.rot)
+    .map((t) => t.c);
   const mine = table.filter((r) => r && r.by === DAVIS_TAG);
   // a flat show with a route of his: move it somewhere else (one move, no pile-up)
   if (rerolls > 0 && mine.length > 0) {
     const m = mine[0];
-    for (let k = 0; k < pool.length; k++) {
-      const c = pool[(start + k) % pool.length];
+    for (const c of tries) {
       if (
         c.target === m.target ||
         owned.has(c.target) ||
@@ -201,12 +277,46 @@ export function davisRoute(show, seed = 0) {
     return null;
   }
   if (mine.length >= DAVIS_MAX_ROUTES) return null; // he conducts with a few, he does not fill the table
-  for (let k = 0; k < pool.length; k++) {
-    const c = pool[(start + k) % pool.length];
+  for (const c of tries) {
     if (owned.has(c.target) || pairIndex(table, c.input, c.target) >= 0) continue;
     return { op: 'add', input: c.input, target: c.target, depth: c.depth };
   }
   return null;
+}
+
+// ── stage 2: Davis re-tunes the spectrum marks ──────────────────────────────────────────────────────────────────
+/** The amount he turns on first, by the energy of the show: quiet shows colour, busy ones push the marks around. */
+export const SPECTRUM_OPENERS = Object.freeze({
+  low: Object.freeze({ key: 'colour', value: 0.35 }),
+  mid: Object.freeze({ key: 'scale', value: 0.3 }),
+  high: Object.freeze({ key: 'displace', value: 0.4 }),
+});
+/**
+ * Davis's rules-backend move on the spectrum marks. Pure. Only asked when the route table has nothing for him (davisRoute
+ * returned null), so stage 1's conducting is unchanged; one edit a phrase either way (the conductor's ledger).
+ *   - marks off (every amount 0): turn one amount on — SPECTRUM_OPENERS[energy] — unless that dial is owned
+ *   - a flat show with the marks on: re-roll how they listen (the next map, past the owned and the current one)
+ *   - otherwise nothing: he does not fiddle with marks that are working
+ * @param show  the `show` block, with `marks: { map, scale, displace, colour }` (absent = no marks to tune: null)
+ * @returns a `spectrum` op or null
+ */
+export function davisSpectrum(show, seed = 0) {
+  if (!show || show.silent || !isObj(show.marks)) return null;
+  const m = show.marks;
+  const owned = new Set(Array.isArray(show.owned) ? show.owned : []);
+  const amounts = ['scale', 'displace', 'colour'];
+  const on = amounts.some((k) => Number(m[k]) > 0);
+  if (!on) {
+    const level = ENERGY_LEVELS.includes(show.energy) ? show.energy : 'mid';
+    const pick = SPECTRUM_OPENERS[level];
+    return owned.has(spectrumTarget(pick.key)) ? null : { op: 'spectrum', key: pick.key, value: pick.value };
+  }
+  const flat = Number(show.flatBars) > 0;
+  if (!flat || owned.has(spectrumTarget('map'))) return null;
+  const cur = Number.isInteger(m.map) && m.map >= 0 && m.map < SPECTRUM_MAP_COUNT ? m.map : 0;
+  // the next map along, offset by the seed so the same dish re-rolls the same way; never the one already listening
+  const step = 1 + ((seed >>> 0) % (SPECTRUM_MAP_COUNT - 1));
+  return { op: 'spectrum', key: 'map', value: (cur + step) % SPECTRUM_MAP_COUNT };
 }
 
 // ── LOIS: is the show flat? ─────────────────────────────────────────────────────────────────────────────────────────
@@ -348,7 +458,7 @@ export function createConductor() {
   let coolUntil = -Infinity;
   return {
     touch(targets) {
-      for (const t of Array.isArray(targets) ? targets : [targets]) if (hasTarget(t)) owned.add(t);
+      for (const t of Array.isArray(targets) ? targets : [targets]) if (isOwnable(t)) owned.add(t);
     },
     owned: () => [...owned].sort(),
     isOwned: (t) => owned.has(t),
