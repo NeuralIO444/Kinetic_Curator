@@ -6,6 +6,7 @@ mod curator;
 mod media;
 mod mind; // #1463: Apple Intelligence via the kc-mind sidecar
 mod loot; // #1479: the loot folder: list, hash and read, root-bound
+mod project; // #1709: a project folder: list, read, atomic write, make, rename — root-bound
 mod batch_frame; // #1742: write_batch_frame is bound to the temp folder
 
 use std::fs;
@@ -55,6 +56,14 @@ fn main() {
             loot::loot_hash,
             loot::loot_read,
             loot::loot_write,
+            project::project_list_names,
+            project::project_make_folder,
+            project::project_reachable,
+            project::project_list,
+            project::project_read,
+            project::project_write,
+            project::project_make_subfolder,
+            project::project_rename_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
