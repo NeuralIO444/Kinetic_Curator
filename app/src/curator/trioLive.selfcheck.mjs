@@ -172,7 +172,10 @@ ok('the artist is sovereign: a route they edit owns its target; a dial they move
   assert.equal(g.trio.conductor.isOwned('render.hue'), false, 'a dial that is no route target owns nothing');
   assert.deepEqual(DIAL_FOR_TARGET['render.squash'], ['squash']);
   for (const t of Object.keys(DIAL_FOR_TARGET))
-    assert.ok(Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t), `${t} is a real route target`);
+    assert.ok(
+      Object.prototype.hasOwnProperty.call(ROUTE_TARGETS, t) || /^spectrum\.(map|scale|displace|colour)$/.test(t),
+      `${t} is a real route target (or, #1483 stage 2, a spectrum-marks dial)`,
+    );
   g.done();
 });
 
