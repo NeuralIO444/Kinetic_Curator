@@ -240,6 +240,7 @@ node src/gl/retroCapture.selfcheck.mjs
 node src/gl/tracks.causal.selfcheck.mjs
 node src/gl/parity/diff.selfcheck.mjs
 node src/gl/parity/costDataset.selfcheck.mjs
+node src/gl/parity/costReplay.selfcheck.mjs
 node src/gl/parity/glDriver.selfcheck.mjs
 node src/gl/parity/deviceBudgets.selfcheck.mjs
 node src/gl/parity/parity.selfcheck.mjs
