@@ -6,7 +6,10 @@
 // #1462 spec update: LOIS and Davis report the face the honest feed already shows (a canonical state, never invented),
 // so a rules decision is always a reading and never asks the stage for a change (mindContract.wantsStage).
 import { neutralReply, CANONICAL_STATES } from './mindContract.js';
-import { davisRoute, davisSpectrum, TIER_OPS } from './mindConduct.js';
+import { davisRoute, davisSpectrum, TIER_OPS, PHRASE_BARS } from './mindConduct.js';
+
+/** Flat bars before LOIS burns a show: the window is a phrase, then one more phrase of rope (Matt 2026-10-27). */
+export const LOIS_BURN_BARS = PHRASE_BARS + 1;
 
 /** The face the room already shows, as a canonical state, or nothing. */
 const reading = (persona, ctx) => {
@@ -40,9 +43,10 @@ export const RULES = Object.freeze({
     if (route && !allowed.includes(route.op)) route = null; // tier 2 may nudge a depth, not add: it does not ask
     return { ...neutralReply('davis'), ...(route ? { route } : {}), ...reading('davis', ctx) };
   },
-  // #1483 — a show that has stayed pinned and flat for a phrase is a failed show: she burns it.
+  // #1483 — a show that has stayed flat is a failed show: she burns it. She is the cautious one (Matt 2026-10-27): she
+  // gives it a second phrase first (LOIS_BURN_BARS) — Davis already re-rolls on the first, so he gets the rope.
   lois: (ctx) => {
-    const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= 1); // the window is already a phrase of it
+    const flat = !!(ctx && ctx.show && !ctx.show.silent && ctx.show.flatBars >= LOIS_BURN_BARS);
     return { ...neutralReply('lois'), ...(flat ? { state: 'BURN' } : reading('lois', ctx)) };
   },
   queen: (ctx) => {

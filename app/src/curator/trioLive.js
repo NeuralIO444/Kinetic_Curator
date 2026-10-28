@@ -19,6 +19,7 @@ import {
   PHRASE_BARS,
   SPECTRUM_PARAMS,
   spectrumTarget,
+  BRAKE_AT,
 } from './mindConduct.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
 
@@ -148,6 +149,7 @@ export function startTrio({
       flatBy: flatness.reading().source, // 'spectrum' | 'bands' | null — what LOIS is judging the show on
       flatWhy: flatness.why(),
       bias,
+      brake: bias >= BRAKE_AT,
       tier,
       cooling: conductor.cooling(bar),
       owned: conductor.owned(),
@@ -431,6 +433,8 @@ export function startTrio({
         silent: audio.silent,
         sinceBars: audio.sinceBars,
         flatBars: flatness.flatBars(),
+        // LOIS's brake: passes piling up — she holds Davis to the safe moves until keeps come back (mindConduct BRAKE_AT)
+        ...(bias >= BRAKE_AT ? { brake: true } : {}),
         routes: effective(getRoutes()).map((r) => ({
           input: r.input,
           target: r.target,

@@ -12,8 +12,10 @@ import {
   phraseOf,
   PRESETS,
   davisRoute,
-  BOLD_COOL,
-  boldCeiling,
+  BOLD_BAND,
+  boldBand,
+  BRAKE_AT,
+  BRAKE_MAX,
   createFlatness,
   FLUX_HELD,
   NOISE_FLAT,
@@ -35,7 +37,7 @@ import {
   spectrumTarget,
 } from './mindConduct.js';
 import { validateReply, wantsStage, neutralReply } from './mindContract.js';
-import { rulesReply } from './mindRules.js';
+import { rulesReply, LOIS_BURN_BARS } from './mindRules.js';
 import { createThinker } from './mindThinker.js';
 import { readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -526,9 +528,14 @@ ok(
     const t3 = rulesReply('davis', ctx({ show, tier: 't3' }), { seed: 1 });
     assert.ok(t3.route && validateReply('davis', t3), 'tier 3: a valid proposal');
     assert.deepEqual(t3, rulesReply('davis', ctx({ show, tier: 't3' }), { seed: 1 }), 'deterministic');
-    assert.equal(rulesReply('lois', ctx({ show: { ...show, flatBars: 4 } }), {}).state, 'BURN');
+    assert.notEqual(
+      rulesReply('lois', ctx({ show: { ...show, flatBars: 4 } }), {}).state,
+      'BURN',
+      'one phrase: patience',
+    );
+    assert.equal(rulesReply('lois', ctx({ show: { ...show, flatBars: LOIS_BURN_BARS } }), {}).state, 'BURN');
     assert.equal(
-      rulesReply('lois', ctx({ show: { ...show, flatBars: 4, silent: true } }), {}).state,
+      rulesReply('lois', ctx({ show: { ...show, flatBars: LOIS_BURN_BARS, silent: true } }), {}).state,
       undefined,
       'silence is not flat',
     );
@@ -712,101 +719,95 @@ ok('pure: no clock, timers or randomness', () => {
   assert.ok(!/from '\.\.\/composition|from '\.\.\/state/.test(code), 'no bus and no store');
 });
 
-ok(
-  '#1483 the conducting temperature bounds how bold his picks may get — cool: safe moves only; hot: daring ones in reach',
-  () => {
-    for (const l of ENERGY_LEVELS)
-      for (const c of PRESETS[l])
-        assert.ok(Number.isFinite(c.bold) && c.bold >= 0 && c.bold <= 1, `${c.target}: rated`);
-    assert.ok(
-      ENERGY_LEVELS.every((l) => PRESETS[l].some((c) => c.bold <= BOLD_COOL)),
-      'every level has a move a cool conductor can make',
+ok('#1483 Davis is the wild man: every move in reach at any heat; the heat orders his tries; LOIS brakes him', () => {
+  for (const l of ENERGY_LEVELS)
+    for (const c of PRESETS[l]) assert.ok(Number.isFinite(c.bold) && c.bold >= 0 && c.bold <= 1, `${c.target}: rated`);
+  assert.ok(
+    ENERGY_LEVELS.every((l) => PRESETS[l].some((c) => c.bold <= BRAKE_MAX)),
+    'every level has a move LOIS lets through on the brake',
+  );
+  assert.equal(boldBand(0.2, 0), 0);
+  assert.equal(boldBand(0.5, 0), 0, 'the band is inclusive at its edge');
+  assert.equal(boldBand(0.8, 0), 1);
+  assert.equal(boldBand(1, 1), 0);
+  assert.equal(boldBand(undefined, 1), 0, 'unrated counts as daring');
+  assert.equal(boldBand(0.3, NaN), boldBand(0.3, 0), 'junk heat reads cool');
+  assert.ok(BOLD_BAND > 0 && BRAKE_AT > 0 && BRAKE_AT <= 1);
+  const all = ENERGY_LEVELS.flatMap((l) => PRESETS[l]);
+  const boldOf = (op) => all.find((c) => c.target === (op.op === 'retarget' ? op.to : op.target)).bold;
+  const show = (energy, extra = {}) => ({
+    energy,
+    bpm: 128,
+    silent: false,
+    routes: [],
+    owned: [],
+    flatBars: 0,
+    ...extra,
+  });
+  const seeds = Array.from({ length: 24 }, (_, i) => i * 7919 + 3);
+  const mean = (xs) => xs.reduce((a, b) => a + b, 0) / xs.length;
+  for (const energy of ENERGY_LEVELS) {
+    const cool = seeds.map((s) => davisRoute(show(energy), s, 0));
+    const hot = seeds.map((s) => davisRoute(show(energy), s, 1));
+    assert.ok(cool.every(Boolean) && hot.every(Boolean), `${energy}: he always has a move`);
+    assert.deepEqual(
+      seeds.map((s) => davisRoute(show(energy), s)),
+      cool,
+      'no heat given reads cool',
     );
-    assert.equal(boldCeiling(0), BOLD_COOL);
-    assert.equal(boldCeiling(1), 1);
-    assert.equal(boldCeiling(NaN), BOLD_COOL, 'junk reads cool');
-    assert.equal(boldCeiling(7), 1, 'clamped');
-    assert.ok(boldCeiling(0.3) > boldCeiling(0.1), 'warmer reaches further');
-    const boldOf = (op) => {
-      const t = op.op === 'retarget' ? op.to : op.target;
-      return ENERGY_LEVELS.flatMap((l) => PRESETS[l]).find(
-        (c) => c.target === t && (op.op !== 'add' || c.input === op.input),
-      ).bold;
-    };
-    const show = (energy, extra = {}) => ({
-      energy,
-      bpm: 128,
-      silent: false,
-      routes: [],
-      owned: [],
-      flatBars: 0,
-      ...extra,
-    });
-    const seeds = Array.from({ length: 24 }, (_, i) => i * 7919 + 3);
-    for (const energy of ENERGY_LEVELS) {
-      for (const seed of seeds) {
-        const cool = davisRoute(show(energy), seed, 0);
-        assert.ok(cool && boldOf(cool) <= BOLD_COOL, `${energy}/${seed}: cool, a safe move (${cool && cool.target})`);
-        assert.deepEqual(davisRoute(show(energy), seed, 0), cool, 'deterministic at a heat');
-        assert.deepEqual(davisRoute(show(energy), seed), cool, 'no heat given reads cool');
-      }
+    assert.deepEqual(
+      seeds.map((s) => davisRoute(show(energy), s, 0)),
+      cool,
+      'deterministic',
+    );
+    if (energy !== 'low')
+      assert.ok(mean(hot.map(boldOf)) > mean(cool.map(boldOf)), `${energy}: hot tries bolder moves first`);
+  }
+  // the wild man: a daring move stays in reach when it is the only one left, even stone cold
+  const highSafe = PRESETS.high.filter((c) => c.bold <= 0.6).map((c) => c.target);
+  const leftover = davisRoute(show('high', { owned: highSafe }), 1, 0);
+  assert.ok(leftover && boldOf(leftover) > 0.6, 'cool, the safe moves taken: he reaches for a daring one anyway');
+  // LOIS's brake: only safe moves, at any heat; nothing safe left -> he holds
+  for (const energy of ENERGY_LEVELS)
+    for (const s of seeds) {
+      const b = davisRoute(show(energy, { brake: true }), s, 1);
+      assert.ok(!b || boldOf(b) <= BRAKE_MAX, `${energy}/${s}: braked, a safe move (${b && b.target})`);
     }
-    // hot: a daring move comes within reach — the high level's motion-clock and squash wiring
-    const hot = new Set(seeds.map((s) => JSON.stringify(davisRoute(show('high'), s, 1))));
-    assert.ok(
-      [...hot].some((j) => boldOf(JSON.parse(j)) > BOLD_COOL),
-      'hot: some seed reaches a daring move a cool conductor never would',
-    );
-    // a re-roll on a flat show obeys the same bound
-    const mine = [{ input: 'band.mids', target: 'render.glow', depth: 0.3, by: 'davis' }];
-    for (const seed of seeds) {
-      const rr = davisRoute(show('mid', { routes: mine, flatBars: PHRASE_BARS }), seed, 0);
-      if (rr) assert.ok(boldOf(rr) <= BOLD_COOL, 'a cool re-roll stays safe');
-    }
-    // the rules read it from meta.heat; it never enters the context or the reply
-    const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: show('high') });
-    const replies = seeds.map((s) => rulesReply('davis', ctx, { seed: s, bar: 4, heat: 1 }).route);
-    assert.ok(
-      replies.some((r) => r && boldOf(r) > BOLD_COOL),
-      'meta.heat reaches davisRoute',
-    );
-    assert.ok(
-      seeds.every((s) => {
-        const r = rulesReply('davis', ctx, { seed: s, bar: 4, heat: 0 }).route;
-        return !r || boldOf(r) <= BOLD_COOL;
-      }),
-    );
-    assert.ok(!JSON.stringify(ctx).includes('heat'), 'the context a model is told carries no temperature');
-    // the thinker asks the heat for the rules, survives a throwing reader, and records no temperature
-    const hotThinker = createThinker({ persona: 'davis', heat: () => 1 });
-    const ds = seeds.map((s, i) => hotThinker.onBar({ bar: i + 1, context: ctx, seed: s }));
-    assert.ok(
-      ds.some((d) => d.reply.route && boldOf(d.reply.route) > BOLD_COOL),
-      'the thinker hands the heat to the rules',
-    );
-    assert.ok(
-      ds.every((d) => !JSON.stringify(d).includes('heat')),
-      'a decision (what a take records) carries no temperature',
-    );
-    const broken = createThinker({
-      persona: 'davis',
-      heat: () => {
-        throw new Error('x');
-      },
-    });
-    const b = broken.onBar({ bar: 1, context: ctx, seed: 3 });
-    assert.ok(b && (!b.reply.route || boldOf(b.reply.route) <= BOLD_COOL), 'a throwing reader reads cool');
-    // deniability: no surface names the temperature's source
-    const srcRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
-    const walk = (d) =>
-      readdirSync(d).flatMap((e) => (statSync(join(d, e)).isDirectory() ? walk(join(d, e)) : [join(d, e)]));
-    for (const dir of ['panels', 'components'])
-      for (const f of walk(join(srcRoot, dir)).filter((p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs')))
-        assert.ok(
-          !readFileSync(f, 'utf8').includes('conductHeat'),
-          `${f}: no surface reads the conducting temperature`,
-        );
-  },
-);
+  const allSafe = all.filter((c) => c.bold <= BRAKE_MAX).map((c) => c.target);
+  assert.equal(davisRoute(show('high', { brake: true, owned: allSafe }), 1, 1), null, 'braked, nothing safe: he holds');
+  // the rules read meta.heat; it never enters the context or the record
+  const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: show('high') });
+  assert.ok(!JSON.stringify(ctx).includes('heat'), 'the context a model is told carries no temperature');
+  const hotPicks = seeds.map((s) => rulesReply('davis', ctx, { seed: s, bar: 4, heat: 1 }).route);
+  const coolPicks = seeds.map((s) => rulesReply('davis', ctx, { seed: s, bar: 4, heat: 0 }).route);
+  assert.ok(mean(hotPicks.map(boldOf)) > mean(coolPicks.map(boldOf)), 'meta.heat reaches davisRoute');
+  const braked = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: show('high', { brake: true }) });
+  assert.equal(braked.show.brake, true, 'the brake is part of the show (LOIS is not hidden)');
+  const t = createThinker({ persona: 'davis', heat: () => 1 });
+  const ds = seeds.map((s, i) => t.onBar({ bar: i + 1, context: ctx, seed: s }));
+  assert.ok(mean(ds.map((d) => boldOf(d.reply.route))) > mean(coolPicks.map(boldOf)), 'the thinker hands the heat on');
+  assert.ok(
+    ds.every((d) => !JSON.stringify(d).includes('heat')),
+    'a decision (what a take records) carries no temperature',
+  );
+  const broken = createThinker({
+    persona: 'davis',
+    heat: () => {
+      throw new Error('x');
+    },
+  });
+  assert.deepEqual(
+    broken.onBar({ bar: 1, context: ctx, seed: 3 }).reply.route,
+    rulesReply('davis', ctx, { seed: 3, bar: 1, heat: 0 }).route,
+    'a throwing reader reads cool',
+  );
+  // deniability: no surface names the temperature's source
+  const srcRoot = join(dirname(fileURLToPath(import.meta.url)), '..');
+  const walk = (d) =>
+    readdirSync(d).flatMap((e) => (statSync(join(d, e)).isDirectory() ? walk(join(d, e)) : [join(d, e)]));
+  for (const dir of ['panels', 'components'])
+    for (const f of walk(join(srcRoot, dir)).filter((p) => /\.(jsx?|mjs)$/.test(p) && !p.endsWith('.selfcheck.mjs')))
+      assert.ok(!readFileSync(f, 'utf8').includes('conductHeat'), `${f}: no surface reads the conducting temperature`);
+});
 
 console.log(`mindConduct.selfcheck: ${n} checks passed`);

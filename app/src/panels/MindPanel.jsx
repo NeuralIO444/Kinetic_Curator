@@ -18,6 +18,7 @@ function Conducting() {
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
         Conducting: {t.on ? 'audio on' : 'audio off'} · tier {t.tier ?? 'none'}
         {t.cooling ? ' · backing off' : ''}
+        {t.brake ? ' · LOIS brakes him: safe moves only' : ''}
         {t.on
           ? ` · ${t.energy ?? 'no energy yet'}${t.bpm ? ` · ${Math.round(t.bpm)} bpm` : ''}${t.silent ? ' · silent' : ''} · flat ${t.flatBars} bar${t.flatBars === 1 ? '' : 's'}`
           : ''}

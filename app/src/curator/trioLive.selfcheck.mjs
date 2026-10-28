@@ -296,11 +296,11 @@ ok('stage 2: with a spectrum every bar, LOIS judges it — a moving one rides ov
   const held = rig({ spectrum: () => ({ centroid: 0.4, flux: 0.01, flatness: 0.3 }) });
   audioOn();
   emit(Events.AUDIO_ENERGY, { level: 'mid' });
-  for (let i = 1; i <= 6; i++) held.bar(i);
+  for (let i = 1; i <= 8; i++) held.bar(i);
   assert.ok(held.trio.showBlock().flatBars >= 2, 'a held spectrum reads flat');
   assert.equal(getTrioView().flatWhy, 'held');
   const ctx2 = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: held.trio.showBlock() });
-  assert.equal(rulesReply('lois', ctx2, {}).state, 'BURN', 'a held spectrum for a phrase: a failed show');
+  assert.equal(rulesReply('lois', ctx2, {}).state, 'BURN', 'a held spectrum for two phrases: a failed show');
   held.done();
 });
 
@@ -312,10 +312,13 @@ ok('end to end: the context carries the show, the rules conduct, LOIS burns the 
   const ctx = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: g.trio.showBlock() });
   const dv = rulesReply('davis', ctx, { seed: 7, bar: 6 });
   assert.ok(dv.route && dv.route.op === 'add', 'Davis proposes');
-  assert.equal(rulesReply('lois', ctx, {}).state, 'BURN', 'six bars of a held signal: a failed show');
+  assert.notEqual(rulesReply('lois', ctx, {}).state, 'BURN', 'six bars: she gives a flat show a second phrase first');
   g.request(6, dv.route);
+  g.bar(7);
   g.bar(8);
   assert.equal(g.out.applied.length, 1);
+  const late = buildContext({ layers: [], room: {}, audio: 'mic', tier: 't3', show: g.trio.showBlock() });
+  assert.equal(rulesReply('lois', late, {}).state, 'BURN', 'two phrases of a held signal: a failed show');
   g.done();
 });
 
@@ -356,7 +359,7 @@ ok("LOIS's keep-rate moves the threshold she calls a show flat at, and the dev v
     const g = rig({ activity });
     audioOn();
     g.bar(1);
-    const v = getTrioView();
+    const v = { ...getTrioView(), show: g.trio.showBlock() };
     g.done();
     return v;
   };
@@ -367,6 +370,12 @@ ok("LOIS's keep-rate moves the threshold she calls a show flat at, and the dev v
   assert.ok(passing.bias > 0.99 && passing.flatBelow > neutral.flatBelow, 'passes pile up: she calls it flat sooner');
   const keeping = read({ keeps: 5, rolls: 12 });
   assert.ok(keeping.bias < -0.99 && keeping.flatBelow < neutral.flatBelow, 'you are keeping: she lets it ride');
+  // her brake on Davis (#1483, Matt 2026-10-27: she is the cautious one): passes piling up hold him to safe moves
+  assert.equal(passing.brake, true);
+  assert.equal(passing.show.brake, true, 'the show block carries her brake to the conductor');
+  assert.equal(neutral.brake, false);
+  assert.equal('brake' in neutral.show, false);
+  assert.equal(keeping.brake, false, 'keeps: the brake is off');
   const broken = rig({ activity: null });
   broken.done();
 });
