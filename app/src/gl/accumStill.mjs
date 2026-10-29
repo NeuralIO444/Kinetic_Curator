@@ -14,6 +14,14 @@
  *     [--ramp param=from:to ...] [--motion auto]
  *     [--tunnel 0] [--prism 0] [--flow 0] [--echoes 0] [--audio env.json]
  *     [--attack-ms 0] [--decay-ms 0] [--response linear] [--swell 1]
+ *     [--age-out age.png]
+ *
+ * --age-out (#1805) requests the age buffer for the sequence and writes
+ * the final age field as a false-colour PNG alongside the trail still —
+ * every pixel's trail age as data, inspectable offline. The age clock is
+ * the sequence's own time: dt per step = duration / (steps - 1), the same
+ * interval the audio sampler uses. Without the flag nothing is allocated
+ * and the render is byte-identical to before.
  *
  * --attack-ms / --decay-ms / --response shape the audio envelope through the
  * #306 ballistics follower before it modulates the recipe (defaults are the
@@ -42,6 +50,7 @@ import { parseRes } from './exportStill.mjs';
 import { loadAudioEnvelope, sampleEnvelope } from './audioEnvelope.mjs';
 import { createBallisticsState, processBallistics, sanitizeBallistics, BALLISTICS_CURVES } from './audioBallistics.mjs';
 import { buildSceneContract, warnUnsupportedMaterials } from './sceneContract.js';
+import { ageFalseColour } from './accum.mjs';
 import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderAccumViaGL, closeGlDriver } from './parity/glDriver.mjs';
@@ -67,6 +76,7 @@ function parseArgs(argv) {
     decayMs: 0,
     response: 'linear',
     swell: 1,
+    ageOut: null, // #1805: --age-out <path> — false-colour age-map PNG
     res: '1',
     seed: null,
     uncapped: false,
@@ -101,6 +111,7 @@ function parseArgs(argv) {
       }
       out.response = v;
     } else if (a === '--swell') out.swell = num('--swell');
+    else if (a === '--age-out') out.ageOut = argv[++i];
     else if (a === '--res') out.res = argv[++i];
     else if (a === '--seed') out.seed = num('--seed') | 0;
     else if (a === '--uncapped') out.uncapped = true;
@@ -231,6 +242,9 @@ async function main(argv) {
             flow: args.flow,
             echoes: args.echoes,
             background,
+            // #1805: the age buffer rides the contract only when the
+            // still asks for the age map (key omitted otherwise).
+            ageBuffer: args.ageOut ? true : undefined,
           },
         }),
       );
@@ -250,7 +264,7 @@ async function main(argv) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
       }
     }
-    const { pixels, width, height } = await renderAccumViaGL(frames, {
+    const { pixels, width, height, age } = await renderAccumViaGL(frames, {
       width: w,
       height: h,
       bg: background,
@@ -265,9 +279,22 @@ async function main(argv) {
       // #1803: the halation tint derives from the project's palette — the
       // same first-layer palette the background above resolves from.
       palette: firstLayers[0]?.palette?.swatches ?? null,
+      // #1805: the age buffer, when --age-out asks for it. Its clock is
+      // the sequence's own: one step spans duration / (steps - 1), the
+      // interval the frame times (and the audio sampler) already use.
+      ageBuffer: !!args.ageOut,
+      dt: duration / Math.max(1, args.steps - 1),
     });
     await writePngFile(args.out, pixels, width, height);
     console.log(args.out);
+    if (args.ageOut) {
+      if (!age) throw new Error('--age-out requested but no age buffer came back');
+      // The ramp's deep end is the sequence's full duration — the oldest
+      // age light in the still can possibly carry.
+      const ramp = ageFalseColour(age.data, age.width, age.height, { maxAge: duration, flip: true });
+      await writePngFile(args.ageOut, ramp, age.width, age.height);
+      console.log(args.ageOut);
+    }
   } catch (e) {
     if (BROWSER_MISSING_RE.test(e.message || '')) {
       console.error(

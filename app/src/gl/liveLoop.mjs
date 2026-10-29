@@ -59,6 +59,7 @@ import { isLeave, isRibbon, isComet } from './trailMode.mjs';
 import { buildFlowField } from './flowField.mjs';
 import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { DEBUG_AGE, setAgeReader } from './ageLive.mjs'; // #1805: the ?debug=age readout's wire
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
@@ -1336,7 +1337,16 @@ export function createLiveLoop(
               // (useAudioInput); swell scales the glow gesture only.
               // #287 fade-to-paper: the fade target follows the scene bg.
               let rp = applyAudioEnvelope(
-                accumRecipeParams({ ...accumParams, background: bgCss }),
+                accumRecipeParams({
+                  ...accumParams,
+                  background: bgCss,
+                  // #1805: the age buffer's clock is the loop's own
+                  // clamped show-time step; the buffer itself is
+                  // requested only by the ?debug=age backstage readout
+                  // (no consumer, no allocation).
+                  dt: dtSec,
+                  ageBuffer: DEBUG_AGE,
+                }),
                 {
                   rms: audioOn ? bands.rms || 0 : 0,
                   flux: 0,
@@ -1356,6 +1366,9 @@ export function createLiveLoop(
               // #309: the frame is backing-store sized; the pair is logical.
               accumObj.step(target.tex, rp, { width: target.w, height: target.h });
               accumPoisonRun = 0;
+              // #1805: keep the backstage AGE readout's wire pointed at
+              // the live accum object (it reads the age field back).
+              if (DEBUG_AGE) setAgeReader(accumObj);
               // #520 Phase 2: apply grain-family finish chain post-accum.
               let accumTex = accumObj.texture();
               for (const { layerId, steps } of fxFinishChains) {
@@ -1378,6 +1391,7 @@ export function createLiveLoop(
             live.dropAccum();
             accumObj = null;
             accumActive = false;
+            if (DEBUG_AGE) setAgeReader(null); // #1805: the readout's wire ends with the session
             velPrev.clear(); // #309: the next session starts at zero velocity
             wetSlot.vortex = null;
             // #268: the session ended — reset the loop's own frozen flag

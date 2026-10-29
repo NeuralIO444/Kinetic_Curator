@@ -272,6 +272,72 @@ export function halationTintForPalette(palette) {
   return desat.map((v) => (v * target) / sum);
 }
 
+/** #1805 — the age buffer's void sentinel: an age below 0 is no age at all
+ *  (the pixel holds no living light). Ages are seconds of show time. */
+export const AGE_VOID = -1;
+
+/** #1805 — the aliveness floor: light has died when the faded buffer sits
+ *  within this much difference-luminance of the fade target (the ground).
+ *  1/255 — one 8-bit LSB: below it no output this instrument makes can
+ *  tell the mark from the ground, on black and paper grounds alike (the
+ *  fade-to-paper marks of #287 die by becoming the paper, which the
+ *  difference from the ground reads exactly). */
+export const AGE_LIGHT_FLOOR = 1 / 255;
+
+/** #1805 — bytes per pixel of ONE age target (R16F, a single channel) and
+ *  of the colour pair (RGBA16F × 2 targets). One age target is exactly
+ *  1/8 of the pair — the issue's memory bound, asserted in the selfcheck.
+ *  The age field ping-pongs (a pass may not sample the target it writes),
+ *  so the field as a whole is two targets; each stays within the bound. */
+export const AGE_BYTES_PER_PIXEL = 2;
+export const ACCUM_PAIR_BYTES_PER_PIXEL = 16;
+export const ageTargetBytes = (w, h) => Math.max(1, Math.round(w)) * Math.max(1, Math.round(h)) * AGE_BYTES_PER_PIXEL;
+
+/**
+ * #1805 — false-colour view of an age field. The backstage AGE view and
+ * the still's --age-out share this ramp: age is a continuous signal, so
+ * it renders Davis-continuous — a smooth phosphor-heat ramp (fresh light
+ * pale gold, cooling through amber to deep ember), never a stepped scale.
+ * Void is ink. data: Float32Array(w*h) of ages in seconds, bottom-first
+ * (the buffer's own order); flip: true returns top-first rows (PNG /
+ * canvas order). maxAge: the age that reaches the ramp's deep end.
+ */
+export const AGE_RAMP = Object.freeze([
+  [0, [255, 243, 196]],
+  [0.25, [255, 179, 64]],
+  [0.6, [224, 123, 0]],
+  [1, [122, 30, 0]],
+]);
+export function ageFalseColour(data, w, h, { maxAge = 4, flip = false } = {}) {
+  const out = new Uint8ClampedArray(w * h * 4);
+  const span = Number.isFinite(Number(maxAge)) && Number(maxAge) > 0 ? Number(maxAge) : 4;
+  for (let y = 0; y < h; y++) {
+    const sy = flip ? h - 1 - y : y;
+    for (let x = 0; x < w; x++) {
+      const a = data[sy * w + x];
+      const o = (y * w + x) * 4;
+      if (!(a >= 0)) {
+        out[o] = 10;
+        out[o + 1] = 10;
+        out[o + 2] = 14;
+        out[o + 3] = 255;
+        continue;
+      }
+      const t = Math.min(1, a / span);
+      let s = 0;
+      while (s < AGE_RAMP.length - 2 && t > AGE_RAMP[s + 1][0]) s++;
+      const [t0, c0] = AGE_RAMP[s];
+      const [t1, c1] = AGE_RAMP[s + 1];
+      const f = t1 > t0 ? (t - t0) / (t1 - t0) : 0;
+      out[o] = c0[0] + (c1[0] - c0[0]) * f;
+      out[o + 1] = c0[1] + (c1[1] - c0[1]) * f;
+      out[o + 2] = c0[2] + (c1[2] - c0[2]) * f;
+      out[o + 3] = 255;
+    }
+  }
+  return out;
+}
+
 /**
  * Map UI params to per-frame recipe numbers. Pure — unit-tested in Node.
  *
@@ -285,7 +351,10 @@ export function halationTintForPalette(palette) {
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate),
  *   palette: the active palette's swatches (hex strings) or null — #1803 derives
- *   the halation tint from it; absent, the tint is the #169 constant }
+ *   the halation tint from it; absent, the tint is the #169 constant,
+ *   ageBuffer: true when a consumer requests the #1805 age buffer (allocated
+ *   only then; unrequested the recipe is byte-identical), dt: this step's
+ *   show-time seconds (the age field's clock; garbage -> the 1/60 frame) }
  */
 export function accumRecipeParams({
   fade = 0.88,
@@ -309,6 +378,8 @@ export function accumRecipeParams({
   wetAmount = 0,
   wetVel = null,
   wetMask = null,
+  ageBuffer = false,
+  dt = 1 / 60,
 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
@@ -377,6 +448,14 @@ export function accumRecipeParams({
     // ring, no mix pass — exactly the old composite.
     echoTaps: gated,
     echoWeights: [0.5, 0.35, 0.25, 0.18].slice(0, gated),
+    // #1805 — the age buffer: requested only by a consumer (contract
+    // accum.ageBuffer, the still's --age-out, the ?debug=age readout);
+    // unrequested, nothing allocates and the recipe is byte-identical.
+    // dt is this step's show time in seconds (loop time, so a paused
+    // show's ages pause): non-finite falls back to the frame assumption,
+    // and one step never ages light by more than a second.
+    ageBuffer: sanitizeAccumAgeBuffer(ageBuffer),
+    dt: Number.isFinite(Number(dt)) ? Math.min(1, Math.max(0, Number(dt))) : 1 / 60,
   };
 }
 
@@ -494,6 +573,11 @@ export function sanitizeAccumFlow(v) {
 /** Sanitize the echo tap count for the scene contract (additive field). */
 export function sanitizeAccumEchoes(v) {
   return Math.min(4, Math.max(0, Math.round(Number(v) || 0)));
+}
+
+/** Sanitize the age-buffer request for the scene contract (additive field, #1805). */
+export function sanitizeAccumAgeBuffer(v) {
+  return v === true;
 }
 
 /** #287 — CSS hex ('#rgb' / '#rrggbb') → [r, g, b] 0..1. Unparseable → black. */
@@ -639,6 +723,60 @@ void main() {
   s.rgb *= u_headBoost;      // brighten the incoming head; the tail law is untouched
   vec4 d = texture(u_dst, v_cuv);
   o = s + d * (1.0 - s.a);   // premultiplied source-over
+}`;
+
+// #1805 — the age buffer's twin pass (the issue's builder's-call design:
+// one program beside FADE/OVER rather than a second output on the pair,
+// which is bridge-owned with a single attachment). One program, three
+// modes, dispatched at most twice per requested step:
+//   mode 0 (age, right after the fade): the age field advances with the
+//     light it tracks. The previous age is sampled through the fade's own
+//     feedback transform (tunnel/prism centre — age is one channel, it
+//     rides green's path), then: where the just-faded colour still holds
+//     light (difference-luminance from the ground above u_floor) the age
+//     grows by u_dt; light with no age (it appeared since the last step —
+//     bloom, advection) starts at u_dt; dead light's age is void (-1).
+//   mode 1 (reset, right after the over): where the incoming frame
+//     covered (alpha > 0), the newest light is this frame's — age 0.
+//   mode 2 (void): every pixel void — allocation and begin()/CLEAR.
+// Ages are seconds of show time; the target is R16F, so stored ages carry
+// half-float precision by design (the format is the issue's).
+export const AGE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_age;    // previous age field (R16F, .r is the age)
+uniform sampler2D u_src;    // mode 0: the just-faded colour; mode 1: the incoming frame (post-echo)
+uniform vec3 u_bg;          // the fade target (the ground), mode 0
+uniform float u_dt;         // show-time seconds this step, mode 0
+uniform float u_floor;      // aliveness floor (difference luminance), mode 0
+uniform float u_mode;       // 0 = age, 1 = reset on new light, 2 = void
+uniform float u_tunnelZoom; // the fade's feedback transform, mode 0 (1.0 = identity)
+uniform float u_tunnelSpin; // radians per frame, mode 0 (0.0 = identity)
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  if (u_mode > 1.5) {
+    o = vec4(-1.0, 0.0, 0.0, 1.0);
+    return;
+  }
+  if (u_mode > 0.5) {
+    float prev = texture(u_age, v_cuv).r;
+    float cov = texture(u_src, v_cuv).a;
+    o = vec4(cov > 0.0 ? 0.0 : prev, 0.0, 0.0, 1.0);
+    return;
+  }
+  vec2 tuv = v_cuv;
+  if (u_tunnelZoom != 1.0 || u_tunnelSpin != 0.0) {
+    vec2 off = v_cuv - vec2(0.5);
+    float ca = cos(u_tunnelSpin);
+    float sa = sin(u_tunnelSpin);
+    vec2 rot = vec2(ca * off.x - sa * off.y, sa * off.x + ca * off.y);
+    tuv = vec2(0.5) + rot * u_tunnelZoom;
+  }
+  float prev = texture(u_age, tuv).r;
+  vec3 faded = texture(u_src, v_cuv).rgb;
+  float lum = dot(abs(faded - u_bg), vec3(0.299, 0.587, 0.114));
+  float aged = prev < 0.0 ? u_dt : prev + u_dt;
+  o = vec4(lum > u_floor ? aged : -1.0, 0.0, 0.0, 1.0);
 }`;
 
 // 8x8 box downsample via texelFetch (filtering-independent, exact) into
@@ -888,6 +1026,22 @@ export const ACCUM_PROGRAMS = {
     uniforms: ['u_src', 'u_dst', 'u_headBoost'],
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 0.25, notes: 'chain plumbing: source-over, shed with the chain' },
   },
+  // #1805 — the age buffer's twin pass: ages ride the fade, resets ride
+  // the over; the target is R16F at pair size (2 bytes/px = FRAME_16F/4
+  // at 1080p, 1/8 of the colour pair per target). Allocated only when a
+  // step's params request it; tier 1, so the governor's ACCUM shed takes
+  // the age field down with the family.
+  age: {
+    fs: AGE_FS,
+    file: 'accum.mjs:AGE_FS',
+    uniforms: ['u_age', 'u_src', 'u_bg', 'u_dt', 'u_floor', 'u_mode', 'u_tunnelZoom', 'u_tunnelSpin'],
+    cost: {
+      tier: 1,
+      memoryBytes: FRAME_16F / 4,
+      timeMs: 0.3,
+      notes: '#1805 age buffer twin pass (R16F target, 1/8 of the pair per target); shed with ACCUM',
+    },
+  },
   down: {
     fs: DOWN_FS,
     file: 'accum.mjs:DOWN_FS',
@@ -982,6 +1136,29 @@ function makeTarget(gl, w, h) {
 function deleteTarget(gl, t) {
   gl.deleteTexture(t.tex);
   gl.deleteFramebuffer(t.fb);
+}
+
+/**
+ * #1805 — one age target: R16F, a single float per pixel (the age of the
+ * newest light there, in seconds of show time; AGE_VOID when the light
+ * has died). NEAREST like the pair — age is data, never filtered.
+ */
+function makeAgeTarget(gl, w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.R16F, w, h, 0, gl.RED, gl.HALF_FLOAT, null);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+    throw new Error('[accum] age framebuffer incomplete');
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fb, w, h };
 }
 
 /**
@@ -1214,12 +1391,24 @@ export function createEchoState() {
 }
 
 /**
+ * #1805 age-field state for the mirror (persists across steps, like the
+ * echo ring): one float per pixel — the age of the newest light there, in
+ * seconds of show time; AGE_VOID where the light has died. Starts void:
+ * a fresh buffer holds no light.
+ */
+export function createAgeState(w, h) {
+  return { data: new Float64Array(w * h).fill(AGE_VOID), scratch: null };
+}
+
+/**
  * Float64 mirror of one recipe step. accum/frame are Float64Array(w*h*4),
  * premultiplied, bottom-first. Returns a new Float64Array.
  * @param {object} [args.echo] — createEchoState() ring; required when
  *   params.echoTaps > 0, ignored otherwise.
+ * @param {object} [args.age] — createAgeState(w, h) field; required when
+ *   params.ageBuffer is set, ignored otherwise. Mutated in place.
  */
-export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
+export function mirrorAccumStep({ accum, frame, w, h, params, echo = null, age = null }) {
   const p = params;
   const n = w * h * 4;
   // 0. echoes — ring buffer of past frames, multi-tap mix. Tap i mixes the
@@ -1394,6 +1583,51 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
       }
     }
   }
+  // #1805 — the age step (AGE_FS mode 0's mirror): the age of the light
+  // at each pixel advances by dt where the faded buffer still holds
+  // light, sampled from the previous age field through the same feedback
+  // transform the fade just used (the centre path — age is one channel),
+  // so age travels with the light. Light with no age (it appeared since
+  // the last step) starts at dt; dead light's age goes void. The feed
+  // pass does not advect the age field in v1 — age rides the fade's
+  // sampling only (documented in docs/ACCUM.md).
+  if (p.ageBuffer) {
+    if (!age || !age.data || age.data.length !== w * h) {
+      throw new Error('[accum] mirrorAccumStep: ageBuffer requires an age state (createAgeState(w, h))');
+    }
+    const prev = age.data;
+    const next = age.scratch && age.scratch.length === w * h ? age.scratch : new Float64Array(w * h);
+    age.scratch = next;
+    const dtA = p.dt;
+    const alive = (i) =>
+      Math.abs(faded[i] - bg0) * 0.299 + Math.abs(faded[i + 1] - bg1) * 0.587 + Math.abs(faded[i + 2] - bg2) * 0.114 >
+      AGE_LIGHT_FLOOR;
+    if (!feedback) {
+      for (let pxI = 0, i = 0; pxI < w * h; pxI++, i += 4) {
+        const a = prev[pxI];
+        next[pxI] = alive(i) ? (a < 0 ? dtA : a + dtA) : AGE_VOID;
+      }
+    } else {
+      const caA = Math.cos(p.tunnelSpin),
+        saA = Math.sin(p.tunnelSpin);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const u = (x + 0.5) / w,
+            v = (y + 0.5) / h;
+          const ox = u - 0.5,
+            oy = v - 0.5;
+          const tu = 0.5 + (caA * ox - saA * oy) * p.tunnelZoom;
+          const tv = 0.5 + (saA * ox + caA * oy) * p.tunnelZoom;
+          const sx = Math.min(w - 1, Math.max(0, Math.floor(tu * w)));
+          const sy = Math.min(h - 1, Math.max(0, Math.floor(tv * h)));
+          const a = prev[sy * w + sx];
+          const pxI = y * w + x;
+          next[pxI] = alive(pxI * 4) ? (a < 0 ? dtA : a + dtA) : AGE_VOID;
+        }
+      }
+    }
+    age.data.set(next);
+  }
   // 3. (#308: removed) — no blur-over-time; the incoming frame lands sharp.
   const fIn = frameIn;
   // 4. over — mirrors OVER_FS exactly, including the #560 comet head-bright
@@ -1450,6 +1684,15 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null }) {
     comp[i + 1] = (1 - wet) * og + wet * pigment[1] * oa;
     comp[i + 2] = (1 - wet) * ob + wet * pigment[2] * oa;
     comp[i + 3] = oa;
+  }
+  // #1805 — the age reset (AGE_FS mode 1's mirror): where the incoming
+  // frame covered (alpha > 0), the newest light is this frame's — age 0.
+  // Runs after the composite regardless of optics, exactly as the GPU
+  // pass runs after the over.
+  if (p.ageBuffer) {
+    for (let pxI = 0, i = 0; pxI < w * h; pxI++, i += 4) {
+      if (fIn[i + 3] > 0) age.data[pxI] = 0;
+    }
   }
   if (p.optics <= 0) return comp;
   // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
@@ -1551,6 +1794,10 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         'u_amount',
         'u_tint',
         'u_srcSize',
+        'u_age',
+        'u_dt',
+        'u_floor',
+        'u_mode',
       ]) {
         L[u] = U(u);
       }
@@ -1658,6 +1905,44 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     echoRing = [];
     echoHead = 0;
     echoCount = 0;
+  };
+
+  // #1805 — the age buffer: an R16F ping-pong at pair size, allocated
+  // ONLY when a step's params request it (p.ageBuffer) — an unrequested
+  // recipe allocates nothing and runs byte-identically. Two targets
+  // because a pass may not sample the target it writes (the WebGL
+  // feedback rule); each target is 1/8 of the colour pair's bytes.
+  let ageCur = null; // target holding the current age field
+  let ageNext = null; // target the next age pass writes
+  const voidAgeTarget = (t) => {
+    pass('age', t, (u, bind) => {
+      gl.uniform1i(u.u_age, bind(0, flowTex));
+      gl.uniform1i(u.u_src, bind(1, flowTex));
+      gl.uniform3f(u.u_bg, 0, 0, 0);
+      gl.uniform1f(u.u_dt, 0);
+      gl.uniform1f(u.u_floor, AGE_LIGHT_FLOOR);
+      gl.uniform1f(u.u_mode, 2);
+      gl.uniform1f(u.u_tunnelZoom, 1);
+      gl.uniform1f(u.u_tunnelSpin, 0);
+    });
+  };
+  const ensureAge = () => {
+    if (ageCur) return;
+    ageCur = makeAgeTarget(gl, W, H);
+    ageNext = makeAgeTarget(gl, W, H);
+    voidAgeTarget(ageCur);
+    voidAgeTarget(ageNext);
+  };
+  const freeAge = () => {
+    if (ageCur) deleteTarget(gl, ageCur);
+    if (ageNext) deleteTarget(gl, ageNext);
+    ageCur = null;
+    ageNext = null;
+  };
+  const swapAge = () => {
+    const t = ageCur;
+    ageCur = ageNext;
+    ageNext = t;
   };
 
   let cur = L.t0; // target holding the current accum image
@@ -1779,6 +2064,12 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         gl.clear(gl.COLOR_BUFFER_BIT);
       }
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      // #1805: CLEAR is the only erase — a begun buffer holds no light,
+      // so every age is void (when the field is allocated at all).
+      if (ageCur) {
+        voidAgeTarget(ageCur);
+        voidAgeTarget(ageNext);
+      }
     },
 
     /**
@@ -1900,6 +2191,25 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         });
       }
       cur = write;
+      // #1805 — the age step (AGE_FS mode 0): age the light the fade just
+      // produced, sampled through the fade's transform. Only when the
+      // recipe requests the buffer. The LEAVE copy path holds the light
+      // still, so its ages advance unsampled (identity transform).
+      if (p.ageBuffer) {
+        ensureAge();
+        const held = p.leave && p.keep >= 1;
+        pass('age', ageNext, (u, bind) => {
+          gl.uniform1i(u.u_age, bind(0, ageCur.tex));
+          gl.uniform1i(u.u_src, bind(1, cur.tex));
+          gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
+          gl.uniform1f(u.u_dt, p.dt);
+          gl.uniform1f(u.u_floor, AGE_LIGHT_FLOOR);
+          gl.uniform1f(u.u_mode, 0);
+          gl.uniform1f(u.u_tunnelZoom, held ? 1 : p.tunnelZoom);
+          gl.uniform1f(u.u_tunnelSpin, held ? 0 : p.tunnelSpin);
+        });
+        swapAge();
+      }
       // 3. (#308: removed) — no blur-over-time; the frame lands sharp.
       // 4. over. Wet uses a different program so two pigments mix instead
       // of stacking. Dry is the old source-over, texture unbound.
@@ -1920,6 +2230,23 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         });
       }
       cur = write;
+      // #1805 — the age reset (AGE_FS mode 1): where the incoming frame
+      // covered, the newest light is this frame's — age 0. Runs after the
+      // over, before the glow (bloom is the buffer's own light, not a
+      // landing; halos start aging from the next step's age pass).
+      if (p.ageBuffer) {
+        pass('age', ageNext, (u, bind) => {
+          gl.uniform1i(u.u_age, bind(0, ageCur.tex));
+          gl.uniform1i(u.u_src, bind(1, frameIn));
+          gl.uniform3f(u.u_bg, 0, 0, 0);
+          gl.uniform1f(u.u_dt, 0);
+          gl.uniform1f(u.u_floor, AGE_LIGHT_FLOOR);
+          gl.uniform1f(u.u_mode, 1);
+          gl.uniform1f(u.u_tunnelZoom, 1);
+          gl.uniform1f(u.u_tunnelSpin, 0);
+        });
+        swapAge();
+      }
       // 5/6. glow (#308): mip-chain bloom + stipple diffusion + chromatic
       // offset. No gaussian anywhere. One shared downsampled mip chain;
       // two tiers read it — the tight bloom and the wider warm halation.
@@ -1961,12 +2288,38 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       return cur;
     },
 
+    /** #1805 — the current age texture (R16F), or null when the age
+     *  buffer was never requested (nothing allocated). */
+    ageTexture() {
+      return ageCur ? ageCur.tex : null;
+    },
+
+    /**
+     * #1805 — read the age field back: { data: Float32Array(w*h), width,
+     * height } (ages in seconds of show time, AGE_VOID where dead), or
+     * null when the buffer was never requested. Readout/still paths only —
+     * never a per-frame stage read.
+     */
+    readAge() {
+      if (!ageCur) return null;
+      const px = new Float32Array(W * H * 4);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, ageCur.fb);
+      gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      const err = gl.getError();
+      if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error reading the age buffer: 0x${err.toString(16)}`);
+      const data = new Float32Array(W * H);
+      for (let i = 0; i < W * H; i++) data[i] = px[i * 4];
+      return { data, width: W, height: H };
+    },
+
     resize(width, height) {
       W = Math.max(4, Math.round(width));
       H = Math.max(4, Math.round(height));
       for (const t of [scratch.rs, scratch.em, scratch.gm]) deleteTarget(gl, t);
       allocScratch();
       freeEcho(); // B3: ring targets are sized to the canvas
+      freeAge(); // #1805: reallocates lazily at the new size on the next requested step
       // Bridge-owned feedback targets resize via bridge.resize (caller-owned).
       L = bridge.layer(ACCUM_LAYER_ID, { div: RD });
       cur = L.t0;
@@ -1976,6 +2329,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       for (const t of [scratch.rs, scratch.em, scratch.gm]) deleteTarget(gl, t);
       scratch = null;
       freeEcho();
+      freeAge();
       for (const p of Object.values(progs)) gl.deleteProgram(p);
       for (const prog of Object.values(wetProgs)) gl.deleteProgram(prog);
       gl.deleteTexture(wetVelTex);
@@ -1998,6 +2352,7 @@ export const ACCUM_PASS_SOURCES = Object.freeze({
   echo: ECHO_FS,
   copy: COPY_FS,
   over: OVER_FS,
+  age: AGE_FS,
   down: DOWN_FS,
   glow: GLOW_FS,
   resample: RESAMPLE_FS,
