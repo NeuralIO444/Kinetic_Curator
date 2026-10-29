@@ -1,60 +1,144 @@
-# STAGING REPORT — #1815 warm-up exports (local only, not pushed)
+# STAGING REPORT — #1876 footprint stamps + suspended diffusion
 
-Builder staging record, branch `feat/1815-warmup-exports` in `~/workspace/kc-1815-build`, stacked on `feat/1813-wet-look` (37efae51, PR #1874) as assigned — not pushed, no PR; the coordinator verifies, rebases onto main, and publishes. This file replaces the report that was at the worktree root (#1813's); that report remains in git history.
+**Issue (verbatim):** "WET: footprint stamps + suspended diffusion —
+washes must form at rest (grid-dots defect)"
+**Branch:** `feat/1876-footprint-stamps` on origin/main 582250fd.
+Local only — no push, no PR (coordinator publishes). This file
+replaces the report that was at the worktree root (#1813's); that
+report remains in git history.
 
-Issue (verbatim): **"WET: warm-up exports — deterministic field for stills"**
+## Premise / diagnosis recap
 
-## Premise check (done before any code)
+Matt's 2026-10-29 screen recording: with WETNESS up, the wash resolves
+into a lattice of dark-cored dots. The diagnosis (goal library,
+`hidden_files/wet-dots-diagnosis-2026-10-29.md`) proved the dots are in
+the field data: every mark stamped water + pigment as a point (2×2
+bilinear splat at the centre, instance scale never read), suspended
+pigment spread only via vorton flow, stationary marks shed no
+vortons, no diffusion term existed, and the deposited layer never
+moves laterally — so each stationary mark left one saturated deposit
+dot. I reproduced the diagnosis on this tree before touching anything
+(centre 42.8893 vs midpoint 0.0000, autocorr 0.648, packed centre
+(29, 78, 137, 255), 1,044 saturated cells) — the numbers match the
+report exactly.
 
-- The premise **holds**. On the composed tree the wet field is entirely live-only in the still paths: no wet reference in `renderer.mjs`'s still paths or the export entrypoints; `renderAccumSequence` builds its recipe from opts only (wet terms default off in `accumRecipeParams`); `renderScene` has no wet consumption; `renderFrameOffscreen` drops the wet-look the live presentation applies (only `presentUpscaled` runs it). Nothing steps or reads the field for a still. ✔
-- The service is callable without a live loop (`createWetFrameService().frame(req)` is pure JS over its slot), so a Node-side rehearsal is possible without inventing a second sim. ✔
-- #1813's exports were kept as pure functions precisely so this slice can match live (`wetLook.mjs` header + its handoff). ✔
-- One pointer in the issue is stale: it names `docs/ACCUM.md` as carrying the live-only list. ACCUM.md contains no wet text at all (grep-verified); the list lives in `docs/BUGLIST.md`'s WETNESS row and the `vortex.mjs` header. Both were updated; flagged below.
+## What shipped (plain language)
 
-## What shipped, in plain language
+All in `app/src/gl/vortex.mjs`:
 
-A still of a wet project now exports wet. Before rendering, the export rehearses the project's wet field — the same simulation the live instrument runs — for a fixed warm-up of 90 steps over the project's own marks, then renders the still with the field that rehearsal built: the trails drink from it, the pigment (with its dried edges) sits in it, and the finished picture gets the same wet-look finish the audience sees live. Run the same export twice and the two files are byte-identical, because the field is a pure function of the project, the seed, and the warm-up length. The export says what it did: its readout prints **"wet: warm-up K=90"**. A project with WETNESS at zero skips the rehearsal entirely and exports exactly as it did before this change — byte for byte. Nothing new to operate: the still follows the WETNESS the performer already set.
+1. **Marks now stamp the area they draw.** A mark's water and pigment
+   land over its whole quad — sized by the instance's scale (semi-axis
+   99.75 × scale, the quad the renderer draws per QUAD_VS in
+   shaders.mjs), turned by its rotation, with a plateau profile (full
+   across the face, soft only at the rim). The total load is unchanged
+   — the same paint, spread over the mark instead of stacked on its
+   centre (the suite proves the totals match to 1e-6).
+2. **Suspended pigment now diffuses.** Inside the pigment move stage,
+   neighbouring cells exchange a small fraction (0.002) of their
+   suspended-pigment difference each step — pairwise, so nothing is
+   created or destroyed. It runs at rest (zero flow included), which
+   is what lets a wash form under stationary marks. The **deposited**
+   layer still never moves sideways — that rule is by design and
+   stands.
+3. **Diffusion only mixes a film that's being worked.** A pair of
+   cells exchanges only if a stamp touched one of them since the last
+   step. This gate exists because measurement demanded it (below): a
+   wash that is only *drying* must strand its pigment — that's
+   #1812's edge-darkening doctrine — and ungated diffusion measurably
+   eroded it. Marks that carry no scale (tests, legacy callers) keep
+   the old point stamp exactly; the live contract always carries
+   scale. Under the governor's shed, stamps land over footprints but
+   diffusion does not run — transport is shed as a unit, as before.
 
-## How
+## Before / after (the acceptance scenario)
 
-- **`app/src/gl/wetWarmup.mjs`** (new) — the warm-up contract as one module: `WET_WARMUP_STEPS = 90` (1.5 s of field time at the sim's fixed dt), `WET_WARMUP_CEILING_MS = 2000`, the readout string, `warmUpWetField` (a fresh service, K identical frames, returns the final served field or null when dry), `warmUpForScene` + `wetLayoutParamsOf` (THE derivation both still entrypoints share — contract seed/canvas/instances + the first non-FX resolved layer's layout params, motion via the live loop's own `motionAmount`), `wetExportPayload` (the ferried form: recipe terms with packs base64, plus the #1813 display state assembled exactly as liveLoop arms `setWetLook`, ground parsed from the still's own background), and `hashWetField` (the byte-identity probe). No new layout params — K is a recipe constant, never project state (replay-divergence trap).
-- **`app/src/gl/renderer.mjs`** — the one-shot renderer gains `applyStillWetLook`: the #1813 pass (same program, same constants, same uniform recipe) driven by the payload's display state, into the finished frame's ping-pong partner, in linear before the resolve. `renderScene` applies it when `payload.wet.display` rides in; `renderAccumSequence` takes a new `wet` opt — its recipe terms join the base params (the field held for the whole sequence, the service's freeze-hold semantics) and the final texture finishes through the same pass. The live renderer's `renderFrameOffscreen` gains the twin pass (`applyWetLookTo`, dedicated mask texture so the live one is never clobbered mid-frame) driven by a payload-carried display state; without one it returns through the exact pre-#1815 line. No new programs (the table stays at seven).
-- **`app/src/gl/liveLoop.mjs`** — `captureFrame` assembles the display state from the capture frame's OWN served field (the tick's `setWetLook` assembly, same gate: `wetStep === 1 && wetMask`) and hands it to `renderFrameOffscreen` in the payload. No field → no key → capture unchanged. The ACCUM-on readback branch is untouched (it already carries the field).
-- **`app/src/gl/exportStill.mjs`** — `renderExport` warms from its built contract, passes the payload form through, and returns `wetReadout`; the CLI prints it after the output path per seed.
-- **`app/src/gl/accumStill.mjs`** — warms from frame 0's contract (progress 0, the state the sequence rises from) + the first resolved layers, logs the readout, passes `wet` through `renderAccumViaGL`.
-- **`app/src/gl/parity/glDriver.mjs` + `glHarness.html`** — `wet` rides `buildRenderPayload` and the accum payload; the harness decodes the packs back to `{n, rgba}` for both still paths.
-- **`app/src/gl/parity/corpus.mjs`** — `KNOWN_DIVERGENCES` records the signed SVG divergence ("mask absent → static blend", #1815); the corpus itself stays at WETNESS 0, so the sweep is untouched.
-- **Doctrine** — `vortex.mjs` header + cost-tier notes, `wetFrame.mjs` header pointer, `docs/BUGLIST.md` WETNESS row, and `docs/WET_ENGINE.md` (status paragraph, §3 gap 1 closed, Phase C row landed) now state the warm-up contract where the live-only text stood.
-- **`app/src/gl/wetWarmup.selfcheck.mjs`** (new) + one manifest line — the acceptance suite below.
+Real wet-frame service, 266 stationary marks at the measured
+51.4-unit pitch, wetness 0.85, 900 steps; instances carry scale
+0.26 (a quad one module wide — see the instrument note below):
 
-## Verification (sandbox; CI is authoritative for the browser suites)
+- centre/midpoint deposited ratio: **~43 (midpoint exactly 0) → 1.28**
+  (the drifting control is ~1.2);
+- radial profile: 47.5 / 3.7 / 0.01 / 0 / 0 → **1.83 / 1.71 / 1.60 /
+  1.45 / 1.15** — a wash, no cores;
+- max deposited density ~74 → **3.96**; saturated cells 1,044 → none
+  (124 cells over 3.0, all in the wash body);
+- drifting marks: ratio 1.00, profiles flat — moving character
+  unchanged; total pigment conserved (50,271.7 of 50,274 stamped);
+- #1811's KM mix holds: overlap deposits the living green, centre
+  colour (0.166, 0.530, 0.242) vs (0.167, 0.532, 0.241) pre-fix;
+- robustness: scale 0.5 → ratio 0.90, flat ±12%; scale 0.13 → marks
+  are dabs their own size (peak 5.97, not 74), midpoints bare as
+  paint leaves them; 1800 steps → ratio 0.72 (over-levels slowly,
+  never re-lattices). Full tables: `docs/review/1876/`.
 
-All suites run solo on this tree, after the last code change and again after prettier.
+**Instrument note (read before re-measuring):** the diagnosis probe's
+instances carried **no scale**, so on any build they take the point
+path. The fix keys the footprint off the scale the live contract
+always supplies — a re-run of the unmodified diagnosis probe will
+still show dots, by design. Add `scaleX`/`scaleY` to its instances
+(0.26 for a module-wide quad) and it reads the numbers above; the
+method is spelled out in `docs/review/1876/probe.json`, and the
+vortex selfcheck carries the same scenario in miniature (5×5 grid,
+ratio: point stamps in the thousands → footprint stamps 1.33).
 
-| Suite | Result |
-|---|---|
-| wetWarmup (new) | **21/21** — incl. GL: wet export byte-identical across runs; wet ≠ dry; dry export byte-identical to the shared candidate render; wet accum sequence byte-identical across runs and ≠ dry sequence; corpus dryness + signed divergence record |
-| accum (solo, 3 GB heap) | **OK (83/83 cases)** |
-| vortex / wetFrame / wetLook | 34 · 15 · 16 |
-| composite | 15 (program table unchanged — no re-pin needed) |
-| grainFinish | PASS — its exact source-shape pins (`renderScene`/`renderFrameOffscreen` finish nesting) preserved verbatim, no re-pin |
-| accumFeed / accumGuard / accumInput / accum.seam / accum.inventory | PASS · PASS · OK (7) · PASS · PASS |
-| exportStill / canvasSizes / presentOrientation / contactShadow / spectrumMarks / atlas.skip | PASS ×6 |
-| parity / glDriver / uniformLocations / pigmentKM / costTiers / liveLoopSwell / clock.inventory | PASS ×7 |
-| `npm run build` | **exit 0** (✓ built in 2.43 s) |
-| eslint + prettier on touched code files | clean |
+## Tuning record (why these exact shapes — details in docs/review/1876/)
 
-Warm-up timing (the issue's pinned ceiling): K=90 at the 128-grid constants over still-shaped inputs (48 tinted instances, no velocities — a still's contract instances carry none) measured **476–514 ms** across runs in this sandbox, asserted `< 2000 ms` with the figure logged in the suite.
+- Centre-peaked stamp kernels (biweight ellipse/square, feathered
+  top-hat) were measured and rejected: they starve the quad's own rim,
+  and once diffusion is strong enough to compensate, the lift gradient
+  (lift ∝ wet²) sorts pigment wet→dry and the lattice returns as rim
+  rings / corner sinks (ellipse at D = 0.1: ratio 0.12). The plateau
+  is the coverage the renderer draws.
+- Ungated diffusion at D = 0.002 eroded #1812's scripted dry
+  (edge-to-centre ratio 1.6 → 1.15; centre accrual 0.0204 vs its
+  0.02 pin). Wetness-coupled pair rates (min/max) moved the failure
+  rather than fixing it. The worked-film gate removed the cause, and
+  the interim centre-accrual re-pin taken during development was
+  **reverted** — #1812 passes at its original pins.
+- D = 0.002 is the measured middle: footprint alone leaves ratio
+  ≈ 2.1; 0.002 → 1.28; 0.003 → 0.95; #1811's lift case passes at
+  0.002 and fails at 0.004, bounding it from the other side.
 
-Two things caught during the build, chased down rather than waved at:
+## Verification (this sandbox; CI is authoritative)
 
-- **A real GL bug in my first cut:** `renderFrameInto` returns a *spread copy* of its read target, so choosing the wet-look ping-pong partner by object identity missed, and the pass drew a texture into itself (GL 0x502, caught by renderScene's error check). Both still passes now choose the partner by **texture** identity. Worth knowing for #1814: any future pass over a composed frame has the same trap.
-- **`npm run build` failed on first run here** — not the known @tauri-apps environmental failure: this fresh worktree simply had no local `node_modules` (resolution fell through to a shared install that lacks the package). A fresh `npm install` fixed it; the base worktree (kc-1813-build) builds green too, and so does this build. `package-lock.json` untouched.
+- `vortex.selfcheck`: **39 passed** (34 pre-existing + 5 new #1876
+  cases: conservation/spread, quad geometry + rotation, diffusion
+  conservation + worked-film stranding, the acceptance grid in
+  miniature, constants pin).
+- `wetFrame.selfcheck`: 15 passed · `wetLook.selfcheck`: 16 passed ·
+  `composite.selfcheck`: 15 passed · `accum.selfcheck`: **83 passed**
+  (solo, `NODE_OPTIONS=--max-old-space-size=3072`) ·
+  `costRegistry.selfcheck`: OK · `liveLoopSwell.selfcheck`: OK.
+- `npm run build`: green.
+- Source-shape pins: grepped all selfchecks for assertions naming
+  the touched files — only vortex/wetFrame/wetLook suites touch this
+  territory (qaRegression's "vortex" hit is a palette id); all run
+  above. No other module references the new symbols.
+- Cost (docs/review/1876/probe-cost.json): same-session A/B on the
+  #1811 bench — pigment-live +0.3–0.5 ms/frame vs base, pigment-
+  absent unchanged.
 
-## Decisions flagged for #1814 / the coordinator
+## Re-pins (each with its cause — the complete list)
 
-1. **accumStill warms from frame 0** (progress 0 — the project state the sequence rises from), field held across the sequence. If #1814's dish/trails work wants the field rehearsed at a different anchor (e.g. mid-sequence motion), the anchor is one line in `accumStill.mjs` + the readout wording.
-2. **The readout's reach:** it prints on both CLIs and returns from `renderExport` (`wetReadout`). It does **not** land in studio.py's sidecar manifest: studio.py drops exportStill's stdout, and its sidecar block is deliberately seed-independent while the warm-up is seed-dependent. Wiring it per-edition needs a studio.py change (parse the CLI line) — the issue's acceptance ("appears in the export's manifest/readout") is met on the readout; the sidecar hook is a follow-up if Matt wants it.
-3. **`renderFrameOffscreen` takes its state from the capture frame, not the armed tick state** — one source of truth per render, assembled identically. If a future caller wants the armed state instead, the renderer's contract (payload-carried display state) is the seam.
-4. **No new cost tier was registered for the warm-up.** It runs the already-registered `gl/vortex` work on the export path (offline, not governor-shed); the issue's cost acceptance is the pinned ceiling + timing log, both in the suite. WET_ENGINE's Phase C row mentions "cost tier for the new sampling" — if the coordinator wants an export-path registration as well, it is a small follow-up, not part of the issue's acceptance text.
-5. **Issue pointer discrepancy (premise note above):** the live-only list the issue located in `docs/ACCUM.md` actually lives in `docs/BUGLIST.md`; ACCUM.md has no wet text. The BUGLIST row and the vortex header carry the replacement contract.
+1. **`gl/vortex` memoryBytes 1,507,328 → 1,523,712** (registration in
+   vortex.mjs + the formula in vortex.selfcheck): +16,384 B is the
+   new `wetWork` byte plane, counted exactly as #1812 counted its
+   planes.
+2. **timeMs: measured, pin stands at 6.6** — the A/B delta is the
+   size #1812 recorded inside this figure; the selfcheck comment and
+   registration notes now carry the #1876 A/B.
+3. **No golden hashes re-pinned. No #1811/#1812 behaviour pin
+   changed** (the one interim re-pin was reverted, above).
+
+## Notes for the coordinator
+
+- **PR #1875 (#1815) rebase:** it edits vortex.mjs header/doctrine
+  text; this build also adds a header paragraph (after #1812's) and
+  constants-block text. Both are additive; a textual conflict at
+  rebase is possible in the header region but should resolve by
+  keeping both paragraphs.
+- New state (`wetWork`) is a plain `Uint8Array` on the vortex state —
+  it rides the existing state object like `pigEdge`/`_wetPrev`; no
+  serialisation surface was touched.
+- Nothing added to DEFAULT_LAYOUT_PARAMS; no manifest change (the
+  vortex suite was already wired; no new suite files).

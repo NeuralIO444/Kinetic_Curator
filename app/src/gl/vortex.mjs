@@ -12,6 +12,17 @@
  * density's gradient and the wetness's fall through the damp band, and
  * applied where the deposited layer's reflectance is computed
  * (packPigmentDeposited) — no drying state machine, by the issue's word.
+ * #1876 fixes the grid-dots defect in the stamp/transport model itself:
+ * a mark stamps water + pigment over its drawn footprint (the instance
+ * quad, scaled by instance scale — see stampFootprint), conserving the
+ * stamp's total load, and the suspended compartment diffuses laterally
+ * inside MovePigment, so a wash forms at rest instead of settling as one
+ * saturated dot per mark. The diffusion mixes only the worked film —
+ * pairs touching a cell a stamp touched since the last step — so a wash
+ * that is only drying strands its pigment exactly as #1812's doctrine
+ * has it. The deposited layer still never moves laterally; instances
+ * that carry no scale keep the pre-#1876 point splat exactly (the field
+ * cannot know their size).
  *
  * Pure JS. No GL imports. Slice 2 (blocked on the ACCUM row, #961–#968)
  * uploads `velocityTex` as an *added* advect offset on the existing feed
@@ -63,11 +74,12 @@ registerCostTier('gl/vortex', {
   tier: 1,
   // 9 grid planes (omega, psi, psiNext, vx, vy, wet, wetNext + the #1812
   // edge-accrual plane and its wet-snapshot scratch) + the three #1811
-  // pigment RGBA arrays + vorton ring and its scratch.
-  memoryBytes: 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2,
+  // pigment RGBA arrays + vorton ring and its scratch + the #1876
+  // worked-film byte plane (wetWork).
+  memoryBytes: 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2 + 128 * 128,
   timeMs: 6.6,
   notes:
-    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order; #1812 accrues edge darkening on the deposit inside the same step (A/B on the #1811 session: +~0.3 ms/step vs the #1811 build, inside this figure — docs/review/1812/). timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Stills consume the same field via the #1815 warm-up (gl/wetWarmup.mjs).',
+    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order; #1812 accrues edge darkening on the deposit inside the same step (A/B on the #1811 session: +~0.3 ms/step vs the #1811 build, inside this figure — docs/review/1812/); #1876 stamps over the instance footprint and diffuses suspended pigment in the worked film (same-session A/B on the #1811 bench: +0.3–0.5 ms/frame vs the pre-#1876 build, scaled marks the dearer variant — inside this figure, docs/review/1876/). timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Stills consume the same field via the #1815 warm-up (gl/wetWarmup.mjs).',
 });
 
 // #1810 (Matt's ruling from the wet-engine eval): one field, one resolution —
@@ -98,6 +110,33 @@ export const EDGE_DARKEN_K = 1.35; // accrued excess per unit deposited-density 
 export const EDGE_DARKEN_CAP = 2; // accrued excess cap — displayed density never exceeds (1 + CAP) × deposited
 export const EDGE_BAND_LO = 0.05; // damp-band floor — WET_REGIMES' damp threshold (gl/wetFrame.mjs)
 export const EDGE_BAND_HI = 0.35; // damp-band ceiling — WET_REGIMES' wet threshold
+// #1876 footprint + diffusion constants (pinned — recipe constants like
+// the ones above; measured behaviour in docs/review/1876/). The grid-dots
+// defect: stamps were points, so a wash at rest was a lattice of deposit
+// dots. Two halves to the fix — the stamp gains the mark's area, and the
+// suspended compartment gains a rest transport:
+//   STAMP_FOOTPRINT_HALF — the drawn quad spans 199.5 asset units
+//     centred on the instance (gl/shaders.mjs QUAD_VS: au ∈
+//     [-49.75, 149.75], centred on the 100-box), so a mark's semi-axis
+//     on an axis is 99.75 × |instance scale| scene units. The field
+//     knows the quad, not the asset's ink bbox — the quad is the
+//     coverage the renderer itself draws.
+//   PIGMENT_DIFFUSE — per-step pairwise exchange fraction between
+//     neighbouring suspended cells (explicit diffusion, stable well
+//     under the 0.25 limit), gated to the worked film (wetWork).
+//     Suspended only: the deposited layer's no-lateral-move rule is
+//     by design and stands. The value is measured, not guessed
+//     (docs/review/1876/): at the 51.4-unit scene pitch with stamps
+//     landing every step, footprint stamps alone leave the
+//     centre/midpoint deposit ratio at ~2.1; 0.002 closes it to ~1.3
+//     (the drifting control is ~1.2); 0.003 already overshoots below
+//     1 — the transfer stage's lift gradient (lift ∝ wet²) sorts
+//     suspended pigment toward dry cells faster than the wash can
+//     level, and past the middle the lattice returns as rings and
+//     corner sinks. Moving-mark wash character (drift ratio, radial
+//     profile, totals) stays in its before bands at 0.002.
+export const STAMP_FOOTPRINT_HALF = 99.75; // quad semi-axis per unit instance scale, scene units
+export const PIGMENT_DIFFUSE = 0.002; // suspended-pigment neighbour exchange per step
 
 /**
  * Integer gate for the feed hook. 0 or 1 — never a float compare.
@@ -167,6 +206,14 @@ export function createVortex(opts = {}) {
     // — the falling test's memory. Scratch: only read by the edge stage
     // inside the same step that wrote it.
     _wetPrev: new Float32Array(cells),
+    // #1876: cells a stamp has touched since the last completed step —
+    // the worked film. Suspended diffusion (diffuseSuspended) mixes
+    // only pairs touching a worked cell: pigment mixes in a film that
+    // is being laid and worked, while a film that is only drying
+    // strands its pigment where it lies (#1812's doctrine — the dry
+    // has no transport). Set by every stamp applier, cleared by
+    // stepVortex at the end of the step that consumed it.
+    wetWork: new Uint8Array(cells),
     // Set by the first pigment stamp; until then the step skips the
     // pigment stages outright, so a pigment-free session's field is
     // byte-identical to the pre-#1811 sim (the no-op acceptance).
@@ -222,6 +269,125 @@ function stampWet(state, x, y, amount) {
   wet[j0 * n + i1] = Math.min(1, wet[j0 * n + i1] + w10);
   wet[j1 * n + i0] = Math.min(1, wet[j1 * n + i0] + w01);
   wet[j1 * n + i1] = Math.min(1, wet[j1 * n + i1] + w11);
+  const work = state.wetWork;
+  work[j0 * n + i0] = 1;
+  work[j0 * n + i1] = 1;
+  work[j1 * n + i0] = 1;
+  work[j1 * n + i1] = 1;
+}
+
+/**
+ * The stamp's face profile (#1876): full weight across the quad's face,
+ * a cosine falloff across the outer fifth of each semi-axis — the
+ * coverage a stamp makes, flat where it touches and soft only at its
+ * edge. Centre-peaked kernels (biweight ellipse / square, feathered
+ * top-hat) were measured against this one and rejected: they starve
+ * the quad's own rim and corners, and under the transfer stage's lift
+ * gradient the deposit re-forms the lattice as mounds or rim rings
+ * instead of a wash (docs/review/1876/).
+ */
+function stampFace(t) {
+  const a = Math.abs(t);
+  if (a <= 0.8) return 1;
+  return 0.5 + 0.5 * Math.cos((Math.PI * (a - 0.8)) / 0.2);
+}
+
+/**
+ * #1876 — the footprint distribution of one mark's stamp: the cells the
+ * mark's drawn quad covers, with normalised kernel weights (the weights
+ * sum to 1, so a stamp delivers exactly its point-stamp load, spread
+ * over the footprint — conservation is the normalisation). The kernel
+ * is the separable stampFace profile over the quad's local frame.
+ * Rotation is the contract's degrees-clockwise (sceneContract), the
+ * same convention the quad shader draws with.
+ *
+ * Returns null when the instance carries no usable scale, or when both
+ * semi-axes fit inside one field cell — in both cases the point splat
+ * is the finer instrument and the caller takes the pre-#1876 path
+ * byte-for-byte. (The live contract always carries scaleX/scaleY;
+ * scale-less instances are tests and legacy callers, whose size the
+ * field cannot know.) Deterministic: fixed cell order, no RNG.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {object} it the instance (x, y, scaleX/scaleY or scale, rotation)
+ * @returns {{cells: Array<[number, number]>, i0: number, j0: number, i1: number, j1: number}|null}
+ *   cells are [cellIndex, normalisedWeight]; the box is [i0, j0, i1, j1).
+ */
+
+function stampFootprint(state, it) {
+  const { n, width, height, h, hy } = state;
+  const sxRaw = Number.isFinite(it.scaleX) ? it.scaleX : it.scale;
+  const syRaw = Number.isFinite(it.scaleY) ? it.scaleY : sxRaw;
+  if (!Number.isFinite(sxRaw) || !Number.isFinite(syRaw)) return null;
+  const ax = STAMP_FOOTPRINT_HALF * Math.abs(sxRaw);
+  const ay = STAMP_FOOTPRINT_HALF * Math.abs(syRaw);
+  if (!(ax > 0) || !(ay > 0)) return null;
+  if (ax <= h && ay <= hy) return null; // sub-cell mark: the point splat is finer
+  const rot = Number.isFinite(it.rotation) ? (it.rotation * Math.PI) / 180 : 0;
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
+  // The rotated quad's scene-axis half extents (the stamp's bbox).
+  const ex = ax * Math.abs(cos) + ay * Math.abs(sin);
+  const ey = ax * Math.abs(sin) + ay * Math.abs(cos);
+  const gxScale = (n - 1) / width;
+  const gyScale = (n - 1) / height;
+  const i0 = Math.max(0, Math.floor((it.x - ex) * gxScale));
+  const i1 = Math.min(n, Math.ceil((it.x + ex) * gxScale) + 1);
+  const j0 = Math.max(0, Math.floor((it.y - ey) * gyScale));
+  const j1 = Math.min(n, Math.ceil((it.y + ey) * gyScale) + 1);
+  const cells = [];
+  let sum = 0;
+  for (let j = j0; j < j1; j++) {
+    const dy = j * hy - it.y;
+    for (let i = i0; i < i1; i++) {
+      const dx = i * h - it.x;
+      // Scene offset → the quad's local frame (inverse of the drawn
+      // clockwise rotation), normalised by the semi-axes.
+      const u = (cos * dx + sin * dy) / ax;
+      const v = (-sin * dx + cos * dy) / ay;
+      if (Math.abs(u) >= 1 || Math.abs(v) >= 1) continue;
+      const w = stampFace(u) * stampFace(v);
+      cells.push([j * n + i, w]);
+      sum += w;
+    }
+  }
+  if (!(sum > 0) || cells.length === 0) return null;
+  for (const c of cells) c[1] /= sum;
+  return { cells, i0, j0, i1, j1 };
+}
+
+/** Footprint water: the stamp's total add is the point stamp's,
+ * spread over the footprint; the mask still saturates per cell. */
+function stampWetFootprint(state, fp, amount) {
+  const { wet, wetWork } = state;
+  const a = amount > 1 ? 1 : amount;
+  for (const [cell, w] of fp.cells) {
+    const add = a * w;
+    if (add <= 0) continue;
+    wet[cell] = Math.min(1, wet[cell] + add);
+    wetWork[cell] = 1;
+  }
+}
+
+/** Footprint pigment: the same total load as the point stamp, blended
+ * per cell over the footprint; the occupied box grows to the stamp. */
+function stampPigmentFootprint(state, fp, rgb, amount) {
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  const { pigS } = state;
+  const col = sanitizeRgb(rgb);
+  for (const [cell, w] of fp.cells) {
+    if (w <= 0) continue;
+    blendPigmentCell(pigS, cell * 4, col, amount * w);
+    state.wetWork[cell] = 1;
+  }
+  state.pigmentLive = true;
+  const box = state.pigBox;
+  if (!box) state.pigBox = [fp.i0, fp.j0, fp.i1, fp.j1];
+  else {
+    if (fp.i0 < box[0]) box[0] = fp.i0;
+    if (fp.j0 < box[1]) box[1] = fp.j0;
+    if (fp.i1 > box[2]) box[2] = fp.i1;
+    if (fp.j1 > box[3]) box[3] = fp.j1;
+  }
 }
 
 /**
@@ -286,6 +452,7 @@ export function stampPigment(state, x, y, rgb, amount) {
   for (const [cell, w] of cells) {
     if (w <= 0) continue;
     blendPigmentCell(pigS, cell * 4, col, amount * w);
+    state.wetWork[cell] = 1;
   }
   state.pigmentLive = true;
   const box = state.pigBox;
@@ -341,11 +508,20 @@ export function emitFromInstances(state, instances) {
     if (!Number.isFinite(vy)) vy = 0;
     let speed = Math.hypot(vx, vy);
     const stampAmt = speed > 1 ? Math.min(1, speed / 40) : 0.35;
-    stampWet(state, it.x, it.y, stampAmt);
+    // #1876: a mark stamps over the footprint it draws — its quad,
+    // scaled by instance scale — with the point stamp's total load.
+    // Scale-less instances keep the point splat (their size is unknown
+    // to the field; every pinned session below is one of those).
+    const fp = stampFootprint(state, it);
+    if (fp) stampWetFootprint(state, fp, stampAmt);
+    else stampWet(state, it.x, it.y, stampAmt);
     // #1811: a mark carrying a colour stamps its pigment on the same
     // footprint — colour arrives wherever paint lands.
     const pigRgb = instancePigmentRgb(it);
-    if (pigRgb) stampPigment(state, it.x, it.y, pigRgb, stampAmt * PIGMENT_LOAD);
+    if (pigRgb) {
+      if (fp) stampPigmentFootprint(state, fp, pigRgb, stampAmt * PIGMENT_LOAD);
+      else stampPigment(state, it.x, it.y, pigRgb, stampAmt * PIGMENT_LOAD);
+    }
     if (speed < 1e-4) continue;
     if (speed > SMEAR_MAX_SPEED) {
       const f = SMEAR_MAX_SPEED / speed;
@@ -643,6 +819,12 @@ function advect(state, disp) {
  * mask there is no dry factor — pigment does not evaporate, it only
  * settles, lifts, and diffuses numerically at cell boundaries.
  *
+ * #1876 adds the second half of the stage: a conservative diffusion of
+ * the suspended compartment (diffuseSuspended), which runs whether or
+ * not the field flows — it is the wash's rest transport, the term
+ * whose absence left a stationary mark's pigment sitting exactly on
+ * its stamp cells. The deposited compartment is never diffused.
+ *
  * Work is bounded to the occupied box widened by the step's backtrace
  * margin (the farthest any velocity can pull pigment this step), so a
  * wash costs its own area, not the field's. The rescan afterwards
@@ -665,7 +847,12 @@ function movePigment(state, disp = 1) {
     if (ax > maxV) maxV = ax;
     if (ay > maxV) maxV = ay;
   }
-  if (maxV === 0 || disp === 0) return; // no flow: the resample is the identity
+  if (maxV === 0 || disp === 0) {
+    // No flow: the resample is the identity — but the wash still
+    // diffuses at rest (#1876). That is the whole point of the term.
+    diffuseSuspended(state);
+    return;
+  }
   const mx = Math.min(n, Math.ceil((maxV * Math.abs(disp)) / h) + 1);
   const my = Math.min(n, Math.ceil((maxV * Math.abs(disp)) / hy) + 1);
   const iLo = Math.max(0, box[0] - mx);
@@ -721,6 +908,105 @@ function movePigment(state, disp = 1) {
     for (let i = iLo; i < iHi; i++) {
       const o = (j * n + i) * 4;
       if (S[o + 3] > 0 || D[o + 3] > 0) {
+        if (i < ni0) ni0 = i;
+        if (j < nj0) nj0 = j;
+        if (i + 1 > ni1) ni1 = i + 1;
+        if (j + 1 > nj1) nj1 = j + 1;
+      }
+    }
+  }
+  state.pigBox = ni1 < 0 ? null : [ni0, nj0, ni1, nj1];
+  diffuseSuspended(state);
+}
+
+/**
+ * DiffuseSuspended (#1876) — lateral diffusion of the SUSPENDED
+ * compartment only: pairwise conservative exchanges between neighbour
+ * cells, PIGMENT_DIFFUSE of the difference per step, applied to all
+ * four density channels by the same linear operator (colour ratios
+ * diffuse with density, so a mixture spreads as itself). Pairwise
+ * fluxes cancel exactly, so the stage conserves total suspended
+ * pigment (float rounding aside) — it moves pigment, it never creates
+ * or destroys it. The deposited compartment is not touched: deposited
+ * pigment never moves laterally, by design (#1811's rule stands).
+ * The stage mixes only pairs touching a cell a stamp worked since
+ * the last step (the wetWork plane): diffusion is the worked film's
+ * mixing, and a film that is only drying strands its pigment where
+ * it lies — which is what keeps #1812's drying signature intact
+ * (steps with no stamps run this stage as a no-op).
+ *
+ * The work region is the occupied box widened by one cell; exchanges
+ * happen only inside it, so the field outside — zero in both
+ * compartments by the box invariant — stays zero, and the widened
+ * ring is where this step's spread lands. The box is rescanned after,
+ * over the same region. pigSN is the delta scratch (the advection
+ * stage is done with it by the time this runs).
+ * @param {ReturnType<typeof createVortex>} state
+ */
+function diffuseSuspended(state) {
+  const box = state.pigBox;
+  if (!box) return;
+  const { n, pigS, pigD, wetWork } = state;
+  const iLo = Math.max(0, box[0] - 1);
+  const jLo = Math.max(0, box[1] - 1);
+  const iHi = Math.min(n, box[2] + 1);
+  const jHi = Math.min(n, box[3] + 1);
+  // The worked-film gate: no stamp has touched the wash's region since
+  // the last step → the film is only drying, and a drying film strands
+  // its pigment (#1812). The stage is a no-op, box included.
+  let worked = false;
+  for (let j = jLo; j < jHi && !worked; j++) {
+    for (let i = iLo; i < iHi; i++) {
+      if (wetWork[j * n + i]) {
+        worked = true;
+        break;
+      }
+    }
+  }
+  if (!worked) return;
+  const delta = state.pigSN;
+  delta.fill(0);
+  const D = PIGMENT_DIFFUSE;
+  for (let j = jLo; j < jHi; j++) {
+    for (let i = iLo; i < iHi; i++) {
+      const cell = j * n + i;
+      const o = cell * 4;
+      // Each unordered pair once: right and down neighbours. A pair
+      // exchanges only when a stamp worked at least one of its cells
+      // since the last step — diffusion mixes the film where it is
+      // being laid, never across a drying front.
+      for (let dir = 0; dir < 2; dir++) {
+        const ni = dir === 0 ? i + 1 : i;
+        const nj = dir === 0 ? j : j + 1;
+        if (ni >= iHi || nj >= jHi) continue;
+        const ncell = nj * n + ni;
+        if (!wetWork[cell] && !wetWork[ncell]) continue;
+        const no = ncell * 4;
+        if (pigS[o + 3] === 0 && pigS[no + 3] === 0) continue; // empty pair: no flux
+        for (let ch = 0; ch < 4; ch++) {
+          const f = D * (pigS[no + ch] - pigS[o + ch]);
+          delta[o + ch] += f;
+          delta[no + ch] -= f;
+        }
+      }
+    }
+  }
+  for (let j = jLo; j < jHi; j++) {
+    for (let i = iLo; i < iHi; i++) {
+      const o = (j * n + i) * 4;
+      for (let ch = 0; ch < 4; ch++) pigS[o + ch] += delta[o + ch];
+    }
+  }
+  // Rescan: the box is what both compartments occupy inside the worked
+  // region (outside it, both are zero by the invariant).
+  let ni0 = Infinity,
+    nj0 = Infinity,
+    ni1 = -1,
+    nj1 = -1;
+  for (let j = jLo; j < jHi; j++) {
+    for (let i = iLo; i < iHi; i++) {
+      const o = (j * n + i) * 4;
+      if (pigS[o + 3] > 0 || pigD[o + 3] > 0) {
         if (i < ni0) ni0 = i;
         if (j < nj0) nj0 = j;
         if (i + 1 > ni1) ni1 = i + 1;
@@ -898,6 +1184,9 @@ export function stepVortex(state, opts = {}) {
     transferPigment(state);
     accrueEdgeDarkening(state, state._wetPrev);
   }
+  // #1876: the step has consumed the stamps that landed since the last
+  // one — the worked-film marks reset for the next step's stamps.
+  state.wetWork.fill(0);
   state.steps += 1;
   return state;
 }
