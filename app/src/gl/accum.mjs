@@ -347,6 +347,8 @@ export function ageFalseColour(data, w, h, { maxAge = 4, flip = false } = {}) {
  *                    (no feedback — the safe direction, not the loud one)
  *   optics, tunnel, prism, flow  0..1 (garbage → 0)
  *   echoes  0..4 taps (0..3 at >= 2048px wide, the memory gate)
+ *   scan    0..1 (garbage → 0) slit-scan steepness riding echoes (#1804);
+ *           scanDirection ±1 (anything not −1 is the unflipped ramp)
  * The per-frame result is re-checked by assertRecipeFinite() at step().
  * @param {object} p { fade: 0..0.99, optics: 0..1, tunnel: 0..1, prism: 0..1,
  *   flow: 0..1, echoes: 0..4 taps, echoWidth: render width in px (resolution gate),
@@ -357,7 +359,8 @@ export function ageFalseColour(data, w, h, { maxAge = 4, flip = false } = {}) {
  *   show-time seconds (the age field's clock; garbage -> the 1/60 frame),
  *   stats: true when a consumer requests the #1807 buffer statistics
  *   (reduction chain allocated only then; unrequested the recipe is
- *   byte-identical) }
+ *   byte-identical), scan: 0..1 slit-scan amount (#1804),
+ *   scanDirection: ±1 }
  */
 export function accumRecipeParams({
   fade = 0.88,
@@ -366,6 +369,8 @@ export function accumRecipeParams({
   prism = 0,
   flow = 0,
   echoes = 0,
+  scan = 0,
+  scanDirection = 1,
   echoWidth = 0,
   background = '#000000',
   palette = null,
@@ -465,6 +470,13 @@ export function accumRecipeParams({
     // observer); unrequested, nothing allocates and no reduction runs.
     // Session telemetry, not project state — no contract key.
     stats: sanitizeAccumStats(stats),
+    // #1804 — slit-scan: the echo mix becomes per-column tap selection.
+    // scan is the ramp steepness (0 = the plain additive mix, bit-exact);
+    // scanDirection flips the ramp. The delays themselves are derived
+    // from these two + echoTaps by scanDelayRamp — one derivation, shared
+    // by the GPU upload and the JS mirror.
+    scan: clamp01(scan),
+    scanDirection: sanitizeAccumScanDirection(scanDirection),
   };
 }
 
@@ -594,6 +606,60 @@ export function sanitizeAccumStats(v) {
   return v === true;
 }
 
+/** Sanitize the slit-scan amount for the scene contract (additive field, #1804). */
+export function sanitizeAccumScan(v) {
+  return clamp01(v);
+}
+
+/** Sanitize the slit-scan direction for the scene contract (#1804):
+ *  +1 = delay grows left→right (the deep past sits at the right edge),
+ *  −1 = the flip. Accepts the number or the panel's word; anything else
+ *  is the unflipped default — direction is presentation, never a hazard. */
+export function sanitizeAccumScanDirection(v) {
+  return Number(v) === -1 || v === 'rtl' || v === 'left' ? -1 : 1;
+}
+
+/** #1804 — the delay LUT's width in texels. The acceptance ceiling from
+ *  the issue: the scan map is a ≤256px texture, never a frame target. */
+export const SCAN_LUT_WIDTH = 256;
+
+/**
+ * #1804 — the slit-scan delay ramp: for each LUT texel, the quantised tap
+ * delay (0 = the live frame, d = the frame from d steps ago) that column
+ * of the frame samples. Pure and integer-only, so the GPU (sampling the
+ * uploaded LUT) and the JS mirror (reading this array) select identical
+ * taps by construction.
+ *
+ * delay(u) = floor(ramp(u) · scan · (taps + 1)), clamped to taps, where
+ * ramp(u) = u (direction +1: delay grows left→right) or 1 − u (−1, the
+ * flip). SCAN is the steepness: at scan = 1 the ramp sweeps the full ring
+ * depth across the frame; at scan = 0.5 it sweeps the recent half; at 0
+ * every texel is delay 0 (plain echoes). Quantisation to the available
+ * taps is the honest v1 look — banded staccato ribbons, not a smooth
+ * smear (docs/ACCUM.md B3).
+ */
+export function scanDelayRamp({ taps = 0, scan = 0, direction = 1 } = {}) {
+  const k = Math.min(4, Math.max(0, Math.round(Number(taps) || 0)));
+  const s = clamp01(scan);
+  const flip = sanitizeAccumScanDirection(direction) < 0;
+  const lut = new Uint8Array(SCAN_LUT_WIDTH);
+  for (let i = 0; i < SCAN_LUT_WIDTH; i++) {
+    const u = (i + 0.5) / SCAN_LUT_WIDTH;
+    const ramp = flip ? 1 - u : u;
+    lut[i] = Math.min(k, Math.floor(ramp * s * (k + 1)));
+  }
+  return lut;
+}
+
+/** The delay a frame of width w samples at pixel column x: the GPU reads
+ *  the LUT texture with NEAREST at v_cuv.x = (x + 0.5) / w, which lands on
+ *  texel floor((x + 0.5) / w · SCAN_LUT_WIDTH). The mirror uses this exact
+ *  indexing, so the two can never disagree about a column's tap. */
+export function scanDelayAt(lut, x, w) {
+  const i = Math.min(SCAN_LUT_WIDTH - 1, Math.max(0, Math.floor(((x + 0.5) / Math.max(1, w)) * SCAN_LUT_WIDTH)));
+  return lut[i];
+}
+
 /** #287 — CSS hex ('#rgb' / '#rrggbb') → [r, g, b] 0..1. Unparseable → black. */
 function hexToRgb01(hex) {
   const m = /^#?([0-9a-fA-F]{6}|[0-9a-fA-F]{3})$/.exec(String(hex || ''));
@@ -698,6 +764,19 @@ void main() {
 // Phase B3 — echoes. Mixes the live frame with ring-buffer taps:
 // tap i holds the frame from i+1 steps ago (delays 1..K). Additive
 // ghosts — the live frame stays at weight 1.0.
+//
+// #1804 — slit-scan: at u_scan > 0 the mix becomes per-column tap
+// SELECTION. The delay is a sampled value (the u_scanDelay LUT, 256
+// texels, R = quantised delay 0..K) — the shader never computes the
+// ramp, so a v2 map source (a field, an asset) is a LUT-source change,
+// not a new pass. A column shows ONE moment: the frame from d steps
+// ago, at that tap's echo weight (delay 0 = the live frame at full
+// weight) — the selected frame has a depth in the mix, not a stack of
+// ghosts, so motion smears sideways through time (the stargate look).
+// The delay clamps to u_ntaps: early in a sequence the ring holds fewer
+// frames than the ramp asks for, and the oldest held frame is the
+// honest answer. At u_scan = 0 the shader is the pre-#1804 mix,
+// operation for operation.
 export const ECHO_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;   // live frame
@@ -707,14 +786,29 @@ uniform sampler2D u_t2;
 uniform sampler2D u_t3;
 uniform vec4 u_w;          // per-tap weights
 uniform int u_ntaps;
+uniform sampler2D u_scanDelay; // #1804: delay LUT (R8-valued bytes 0..K), sampled at v_cuv.x
+uniform float u_scan;          // #1804: 0 = the additive mix below; > 0 = per-column selection
 in vec2 v_cuv;
 out vec4 o;
 void main() {
-  vec4 acc = texture(u_src, v_cuv);
-  if (u_ntaps > 0) acc += texture(u_t0, v_cuv) * u_w.x;
-  if (u_ntaps > 1) acc += texture(u_t1, v_cuv) * u_w.y;
-  if (u_ntaps > 2) acc += texture(u_t2, v_cuv) * u_w.z;
-  if (u_ntaps > 3) acc += texture(u_t3, v_cuv) * u_w.w;
+  vec4 acc;
+  if (u_scan > 0.0) {
+    int d = int(texture(u_scanDelay, vec2(v_cuv.x, 0.5)).r * 255.0 + 0.5);
+    if (d > u_ntaps) d = u_ntaps;
+    vec4 sel = texture(u_src, v_cuv);
+    float g = 1.0;
+    if (d == 1) { sel = texture(u_t0, v_cuv); g = u_w.x; }
+    else if (d == 2) { sel = texture(u_t1, v_cuv); g = u_w.y; }
+    else if (d == 3) { sel = texture(u_t2, v_cuv); g = u_w.z; }
+    else if (d >= 4) { sel = texture(u_t3, v_cuv); g = u_w.w; }
+    acc = sel * g;
+  } else {
+    acc = texture(u_src, v_cuv);
+    if (u_ntaps > 0) acc += texture(u_t0, v_cuv) * u_w.x;
+    if (u_ntaps > 1) acc += texture(u_t1, v_cuv) * u_w.y;
+    if (u_ntaps > 2) acc += texture(u_t2, v_cuv) * u_w.z;
+    if (u_ntaps > 3) acc += texture(u_t3, v_cuv) * u_w.w;
+  }
   // Additive RGB, but the result feeds source-over: clamp alpha to <= 1.
   o = vec4(acc.rgb, min(acc.a, 1.0));
 }`;
@@ -1054,15 +1148,19 @@ export const ACCUM_PROGRAMS = {
     cost: { tier: 1, memoryBytes: FRAME_16F, timeMs: 1.0, notes: 'flow feedback advection' },
   },
   // Echoes: mixes up to 4 past frames; the ring is the memory-heavy one.
+  // #1804: the same pass also does slit-scan selection — the delay LUT is
+  // a 256×1 RGBA8 texture (1 KB), no new target, no new pass, so the
+  // declared cost is unchanged; the memory gate stays the ring's.
   echo: {
     fs: ECHO_FS,
     file: 'accum.mjs:ECHO_FS',
-    uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps'],
+    uniforms: ['u_src', 'u_t0', 'u_t1', 'u_t2', 'u_t3', 'u_w', 'u_ntaps', 'u_scanDelay', 'u_scan'],
     cost: {
       tier: 1,
       memoryBytes: 5 * FRAME_16F,
       timeMs: 1.2,
-      notes: '4-frame ring + mix; ring dominates the working set',
+      notes:
+        '4-frame ring + mix; ring dominates the working set; #1804 slit-scan selection rides this pass (256px delay LUT)',
       memoryGate: { minWidth: 2048, maxTaps: 3 },
     },
   },
@@ -1550,7 +1648,31 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null, age =
   if (p.echoTaps > 0) {
     if (!echo) throw new Error('[accum] mirrorAccumStep: echoTaps > 0 requires an echo state (createEchoState())');
     const taps = Math.min(echo.frames.length, p.echoTaps);
-    if (taps > 0) {
+    if (p.scan > 0) {
+      // #1804 slit-scan: per-column tap SELECTION. Each column shows one
+      // moment — the frame from d steps ago at that tap's echo weight
+      // (delay 0 = the live frame at full weight) — never a stack. The
+      // delay comes from the same scanDelayRamp the GPU uploads, read
+      // with the same texel indexing (scanDelayAt), and clamps to the
+      // frames the ring actually holds, exactly like ECHO_FS's u_ntaps
+      // clamp. Integer delays: deterministic by construction.
+      const lut = scanDelayRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
+      frameIn = new Float64Array(n);
+      for (let x = 0; x < w; x++) {
+        const d = Math.min(scanDelayAt(lut, x, w), taps);
+        const src = d === 0 ? frame : echo.frames[echo.frames.length - d];
+        const g = d === 0 ? 1 : p.echoWeights[d - 1] || 0;
+        for (let y = 0; y < h; y++) {
+          const o = (y * w + x) * 4;
+          frameIn[o] = src[o] * g;
+          frameIn[o + 1] = src[o + 1] * g;
+          frameIn[o + 2] = src[o + 2] * g;
+          frameIn[o + 3] = src[o + 3] * g;
+        }
+      }
+      // The selection feeds source-over: clamp alpha to <= 1 (ECHO_FS).
+      for (let i = 3; i < n; i += 4) frameIn[i] = Math.min(1, frameIn[i]);
+    } else if (taps > 0) {
       frameIn = frame.slice();
       for (let t = 0; t < taps; t++) {
         const past = echo.frames[echo.frames.length - 1 - t];
@@ -1916,6 +2038,9 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         'u_t3',
         'u_w',
         'u_ntaps',
+        'u_scanDelay', // #1804: echo's slit-scan LUT + amount (a name missing
+        'u_scan', //      here makes its upload a silent no-op — the audit
+        //      checks ACCUM_PROGRAMS, not this list)
         'u_base',
         'u_glow',
         'u_glowSize',
@@ -2212,6 +2337,35 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     gl.bindTexture(gl.TEXTURE_2D, null);
   };
 
+  // #1804 — the slit-scan delay LUT: SCAN_LUT_WIDTH×1 RGBA8, NEAREST (the
+  // delay is an integer tap index; filtering it would invent moments).
+  // R carries the quantised delay 0..K from scanDelayRamp — the same
+  // derivation the JS mirror reads, so GPU and mirror select identically.
+  // Rebuilt only when (echoTaps, scan, scanDirection) changes; 1 KB.
+  const scanDelayTex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, scanDelayTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, 1, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, new Uint8Array([0, 0, 0, 255]));
+  gl.bindTexture(gl.TEXTURE_2D, null);
+  let scanKey = null;
+  const ensureScanLUT = (p) => {
+    const key = `${p.echoTaps}|${p.scan}|${p.scanDirection}`;
+    if (scanKey === key) return;
+    const lut = scanDelayRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
+    const rgba = new Uint8Array(SCAN_LUT_WIDTH * 4);
+    for (let i = 0; i < SCAN_LUT_WIDTH; i++) {
+      rgba[i * 4] = lut[i];
+      rgba[i * 4 + 3] = 255;
+    }
+    gl.bindTexture(gl.TEXTURE_2D, scanDelayTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, SCAN_LUT_WIDTH, 1, 0, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    scanKey = key;
+  };
+
   function pass(name, writeT, setup) {
     if (bridge.lost) throw new Error('[accum] context lost — chain paused');
     gl.bindFramebuffer(gl.FRAMEBUFFER, writeT.fb);
@@ -2328,6 +2482,9 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         const K = echoRing.length;
         const taps = Math.min(echoCount, p.echoTaps);
         if (taps > 0) {
+          // #1804: the delay LUT is (re)built only when the scan shape
+          // changes; u_scan = 0 keeps ECHO_FS on the pre-#1804 mix.
+          ensureScanLUT(p);
           pass('echo', scratch.em, (u, bind) => {
             gl.uniform1i(u.u_src, bind(0, frameIn));
             for (let i = 0; i < 4; i++) {
@@ -2338,6 +2495,8 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
             const wv = p.echoWeights;
             gl.uniform4f(u.u_w, wv[0] || 0, wv[1] || 0, wv[2] || 0, wv[3] || 0);
             gl.uniform1i(u.u_ntaps, taps);
+            gl.uniform1i(u.u_scanDelay, bind(5, scanDelayTex));
+            gl.uniform1f(u.u_scan, p.scan);
           });
           frameIn = scratch.em.tex;
         }
@@ -2596,6 +2755,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       for (const prog of Object.values(wetProgs)) gl.deleteProgram(prog);
       gl.deleteTexture(wetVelTex);
       gl.deleteTexture(wetMaskTex);
+      gl.deleteTexture(scanDelayTex);
       gl.deleteBuffer(vbo);
       // Bridge-owned feedback targets die with bridge.dispose().
     },

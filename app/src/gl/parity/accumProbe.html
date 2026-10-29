@@ -16,7 +16,7 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from '../accum.mjs
 //
 // window.__kcAccumProbe(p) -> { pixels, width, height, age, ageAllocated, stats, statsAllocated }
 //   p = { w, h, bg: '#rrggbb', fade, optics, tunnel, prism,
-//         flow, echoes, echoWidth, resDiv, ageBuffer, dt, stats,
+//         flow, echoes, scan, scanDirection, echoWidth, resDiv, ageBuffer, dt, stats,
 //         audio: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
 //         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
 // ageBuffer + dt (#1805): when requested, the return also carries the
@@ -83,6 +83,8 @@ window.__kcAccumProbe = (p) => {
       prism: p.prism ?? 0,
       flow: p.flow ?? 0,
       echoes: p.echoes ?? 0,
+      scan: p.scan ?? 0,
+      scanDirection: p.scanDirection ?? 1,
       echoWidth: p.echoWidth ?? p.w,
       // #287 fade-to-paper: the fade target follows the probe background.
       background: p.bg || '#000000',

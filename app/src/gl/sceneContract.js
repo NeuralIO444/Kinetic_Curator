@@ -30,6 +30,8 @@ import {
   sanitizeAccumFlow,
   sanitizeAccumEchoes,
   sanitizeAccumAgeBuffer,
+  sanitizeAccumScan,
+  sanitizeAccumScanDirection,
 } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { contractLight } from '../data/light.js';
@@ -304,7 +306,7 @@ function buildFxWraps(resolvedLayers, caps) {
  * @param {object} args.doc — project document (seed, quality, layers…)
  * @param {Array} args.resolvedLayers — resolveLayers(doc, {caps}) output
  * @param {object} [args.caps] — render caps (recorded for provenance)
- * @param {object|null} [args.accum] — { enabled, fade, optics, tunnel, prism, flow, echoes, background, ageBuffer } or null
+ * @param {object|null} [args.accum] — { enabled, fade, optics, tunnel, prism, flow, echoes, scan, scanDirection, background, ageBuffer } or null
  * @returns versioned, JSON-serializable scene object
  */
 const warnedMaterials = new Set();
@@ -770,6 +772,13 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
             prism: sanitizeAccumPrism(accum.prism ?? 0), // Phase A: chromatic drift amount
             flow: sanitizeAccumFlow(accum.flow ?? 0), // Phase B2: flow-advected feedback amount
             echoes: sanitizeAccumEchoes(accum.echoes ?? 0), // Phase B3: echo tap count
+            // #1804: slit-scan rides echoes. Keys present only while scan
+            // is live, so an unscanned contract (and its hash) is exactly
+            // what it was (the squash/cellShed additive-field precedent).
+            ...(() => {
+              const s = sanitizeAccumScan(accum.scan ?? 0);
+              return s > 0 ? { scan: s, scanDirection: sanitizeAccumScanDirection(accum.scanDirection ?? 1) } : {};
+            })(),
             background: hexColor(accum.background, '#000000'),
             // #1805: the age buffer exists only when a consumer requests
             // it. Key present only while requested, so an unrequested

@@ -120,6 +120,18 @@ export const DEFAULT_LAYOUT_PARAMS = {
   accumulationFade: 5.4, // #274: trail half-life in frames (was keep 0.88)
   trail: 'accum', // #560 Leave holds the stamps
   echoes: 0, // live echo taps, 0..4
+  // #1804: accumScan / accumScanFlip deliberately live OUTSIDE both this
+  // table and PARAM_SPEC. normalizeLayoutParams fills defaults into the
+  // resolver's output and the replay gates (#1638) hash that output — a
+  // new default key diverges every recorded take (proven by this slice:
+  // the gates went red until the defaults came out) — while PARAM_SPEC
+  // membership requires a default (normalize jitters every spec key and
+  // demands a finite value). So the params exist only once the performer
+  // sets them (AccumFamily / LAYOUT_PARAM, like the string/boolean
+  // params' event path), every reader treats absent as 0 / unflipped,
+  // the panel slider bounds the amount, and accumRecipeParams clamps it
+  // again at the recipe boundary — the value cannot reach the buffer
+  // unclamped.
   leaveFade: 0, // 0 holds the stamps, higher fades them
   tunnelFade: 0,
   prismFade: 0,
@@ -481,6 +493,7 @@ export const PARAM_SPEC = {
   prismFade: { min: 0, max: 1 },
   flowFade: { min: 0, max: 1 },
   echoes: { min: 0, max: 4 },
+  // #1804: no accumScan entry here either — see the DEFAULT_LAYOUT_PARAMS note.
   accumulationOptics: { min: 0, max: 0.25 }, // #308 review: remapped — full slider travel is the usable range
   accumulationTunnel: { min: 0, max: 1 },
   accumulationPrism: { min: 0, max: 1 },

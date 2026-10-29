@@ -812,6 +812,10 @@ export const SWEEP_EFFECTS = [
         u_t3: S(4),
         u_w: { kind: 'vec4' },
         u_ntaps: { kind: 'int' },
+        // #1804: the sweep drives the pre-#1804 mix (u_scan = 0); the LUT
+        // sampler just needs any valid texture bound.
+        u_scanDelay: S(5),
+        u_scan: { kind: 'float' },
       },
       (c, lab, aux) => ({
         u_src: lab.input.tex,
@@ -821,6 +825,8 @@ export const SWEEP_EFFECTS = [
         u_t3: lab.input.tex,
         u_w: [0.5, 0.35, 0.25, 0.18],
         u_ntaps: c.params.ntaps,
+        u_scanDelay: lab.input.tex,
+        u_scan: 0,
       }),
       { hdr: true },
     ),

@@ -1083,6 +1083,10 @@ export function createLiveLoop(
         comet: isComet(layoutParams.trail),
         leaveFade: layoutParams.leaveFade, // 0 holds, higher fades
         echoes: layoutParams.echoes,
+        // #1804: slit-scan rides the same recipe params (share-or-refuse:
+        // live and stills select from the same delay ramp derivation).
+        scan: layoutParams.accumScan ?? 0,
+        scanDirection: layoutParams.accumScanFlip ? -1 : 1,
         tunnelFade: layoutParams.tunnelFade,
         prismFade: layoutParams.prismFade,
         flowFade: layoutParams.flowFade,
