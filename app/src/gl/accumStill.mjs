@@ -54,6 +54,7 @@ import { ageFalseColour } from './accum.mjs';
 import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderAccumViaGL, closeGlDriver } from './parity/glDriver.mjs';
+import { warmUpForScene, wetLayoutParamsOf, wetExportPayload } from './wetWarmup.mjs';
 
 const BROWSER_MISSING_RE = /Executable doesn't exist/;
 
@@ -274,10 +275,25 @@ async function main(argv) {
         console.log(`  accum frame ${i + 1}/${args.steps}`);
       }
     }
+    // #1815 — warm-up exports: rehearse the wet field for a fixed K
+    // steps over the FIRST frame's instances (progress 0 — the
+    // project state the sequence rises from; the same derivation
+    // exportStill uses) and hold it across the sequence, the service's
+    // freeze-hold semantics. A dry project serves null and the
+    // sequence renders exactly as before.
+    const served = warmUpForScene({
+      seed: frames[0].seed || 0,
+      canvas: frames[0].canvas,
+      instances: frames[0].instances,
+      layoutParams: wetLayoutParamsOf(firstLayers),
+    });
+    const wet = wetExportPayload(served, background);
+    if (served) console.log(`  ${served.readout} (field held across the sequence)`);
     const { pixels, width, height, age } = await renderAccumViaGL(frames, {
       width: w,
       height: h,
       bg: background,
+      wet,
       fade: args.fade,
       optics: args.optics,
       tunnel: args.tunnel,

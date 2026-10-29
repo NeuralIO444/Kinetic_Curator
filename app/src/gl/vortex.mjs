@@ -23,9 +23,17 @@
  * the step and leaves the last velocity (and the wet mask) bound — dropping
  * them to zero would pop the flow on resume.
  *
- * Live-only. Live ACCUM is 1000×700; a still has no gesture history, so a
- * wet still will not match the live frame. Same class as audio / LFO /
- * Evolve. No studio.py slice in v1.
+ * Stills (#1815, superseding the old live-only doctrine): a still has
+ * no gesture history, so it REHEARSES the field instead — the export
+ * path runs the wet-frame service for a fixed warm-up of K = 90 steps
+ * over the project's instances at project-state positions/motion
+ * (gl/wetWarmup.mjs), and the still renders with the field that
+ * rehearsal builds: same seed + instances + K → byte-identical field →
+ * byte-identical wet contribution. The readout names it ("wet:
+ * warm-up K=90"). No gesture-history pretence; WETNESS = 0 skips the
+ * warm-up entirely and exports exactly as before. The SVG fallback
+ * diverges by signed record: mask absent → static blend
+ * (parity/corpus.mjs KNOWN_DIVERGENCES).
  *
  * Determinism (#806): fixed dt = 1/60, fixed Jacobi count, splat in
  * `layer|key` order (the same key attachVelocities uses), vortex *pairs*
@@ -59,7 +67,7 @@ registerCostTier('gl/vortex', {
   memoryBytes: 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2,
   timeMs: 6.6,
   notes:
-    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order; #1812 accrues edge darkening on the deposit inside the same step (A/B on the #1811 session: +~0.3 ms/step vs the #1811 build, inside this figure — docs/review/1812/). timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
+    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order; #1812 accrues edge darkening on the deposit inside the same step (A/B on the #1811 session: +~0.3 ms/step vs the #1811 build, inside this figure — docs/review/1812/). timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Stills consume the same field via the #1815 warm-up (gl/wetWarmup.mjs).',
 });
 
 // #1810 (Matt's ruling from the wet-engine eval): one field, one resolution —

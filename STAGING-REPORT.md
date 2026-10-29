@@ -1,63 +1,60 @@
-# STAGING REPORT — #1813 wet-look display pass (local only, not pushed)
+# STAGING REPORT — #1815 warm-up exports (local only, not pushed)
 
-Builder staging record, branch `feat/1813-wet-look` in `~/workspace/kc-1813-build`, stacked on `feat/1812-edge-darkening` (ca320bd8, PR #1873) as assigned — not pushed, no PR; the coordinator verifies, rebases onto main, and publishes. This file replaces the report that was at the worktree root (#1812's); that report remains in git history.
+Builder staging record, branch `feat/1815-warmup-exports` in `~/workspace/kc-1815-build`, stacked on `feat/1813-wet-look` (37efae51, PR #1874) as assigned — not pushed, no PR; the coordinator verifies, rebases onto main, and publishes. This file replaces the report that was at the worktree root (#1813's); that report remains in git history.
 
-Issue (verbatim): **"WET: wet-look display pass — saturation, luminance skew, sheen"**
+Issue (verbatim): **"WET: warm-up exports — deterministic field for stills"**
 
 ## Premise check (done before any code)
 
-- The wet-frame service (`gl/wetFrame.mjs`) publishes the packed wet mask + wetAmount per frame and owns the named regime thresholds (`WET_REGIMES`: damp 0.05 / wet 0.35 / soaked 0.8); its header names #1813 as the display consumer that reads regimes. ✔
-- No wet-look pass exists on the composed tree (grep for wet-look/wetLook: empty). ✔
-- The presentation seam is as the issue describes: ACCUM presents through `presentUpscaled` — manual-bilinear upscale into a 16F scratch, then RESOLVE_FS (ACES + dither). A linear pre-resolve pass slots exactly between them. ✔
-- The frame the pass reads already carries #1812's edge darkening (applied inside `packPigmentDeposited` in `vortex.mjs`, composited into the pair by the ACCUM step). Per the coordinator's binding note and the issue's Relations clause, the pass applies **no** rim/edge term of its own — the selfcheck pins the shader free of any edge term, so the two darkenings cannot double up. ✔
-- The fade's ground (`u_bg`) is the frame background parsed by #287's hex rule from `bgCss`; the pass takes the same value by the same rule. ✔
+- The premise **holds**. On the composed tree the wet field is entirely live-only in the still paths: no wet reference in `renderer.mjs`'s still paths or the export entrypoints; `renderAccumSequence` builds its recipe from opts only (wet terms default off in `accumRecipeParams`); `renderScene` has no wet consumption; `renderFrameOffscreen` drops the wet-look the live presentation applies (only `presentUpscaled` runs it). Nothing steps or reads the field for a still. ✔
+- The service is callable without a live loop (`createWetFrameService().frame(req)` is pure JS over its slot), so a Node-side rehearsal is possible without inventing a second sim. ✔
+- #1813's exports were kept as pure functions precisely so this slice can match live (`wetLook.mjs` header + its handoff). ✔
+- One pointer in the issue is stale: it names `docs/ACCUM.md` as carrying the live-only list. ACCUM.md contains no wet text at all (grep-verified); the list lives in `docs/BUGLIST.md`'s WETNESS row and the `vortex.mjs` header. Both were updated; flagged below.
 
 ## What shipped, in plain language
 
-Where the stage is wet, it now *looks* wet. A new fullscreen pass runs over the presented picture just before the final colour finish, only while the wet field is live, and only inside the wet areas: colours deepen and saturate, darks sink darker while bright highlights stay put (on light paper the whole sheet darkens instead, and nothing ever gets brighter), and the brightest wet spots pick up a faint sheen. Dry areas are not touched — not approximately, but bit-for-bit. When the wet field is off, the pass does not run at all and the picture is exactly what it was before this change. Nothing new to operate: the pass follows the WETNESS the performer already controls.
+A still of a wet project now exports wet. Before rendering, the export rehearses the project's wet field — the same simulation the live instrument runs — for a fixed warm-up of 90 steps over the project's own marks, then renders the still with the field that rehearsal built: the trails drink from it, the pigment (with its dried edges) sits in it, and the finished picture gets the same wet-look finish the audience sees live. Run the same export twice and the two files are byte-identical, because the field is a pure function of the project, the seed, and the warm-up length. The export says what it did: its readout prints **"wet: warm-up K=90"**. A project with WETNESS at zero skips the rehearsal entirely and exports exactly as it did before this change — byte for byte. Nothing new to operate: the still follows the WETNESS the performer already set.
 
 ## How
 
-- **`app/src/gl/wetLook.mjs`** (new) — the pass as one module: the recipe constants (`WET_LOOK`: saturation 0.35, skew 0.45, paperSkew 0.60, sheen 0.30, sheenPow 6, groundSplit 0.5), the regime ramp (0 at damp, full at soaked, smoothstep between), the ground parse (the fade target's rule), a pure JS mirror (`shadeWetPixel`), and the GLSL (`WET_LOOK_FS`) transcribed from the mirror formula-for-formula. The shader's below-damp path writes the sampled texel straight through (no unpremultiply round-trip) — that is what makes dry pixels bit-exact.
-- **`app/src/gl/renderer.mjs`** — the pass joins `RENDERER_PROGRAMS` as `wetlook` (cost auto-registers as `renderer/wetlook`, tier 0, 0.3 ms author's estimate in the upscale class, notes say unmeasured — the sweep harness measures it through the same table). The live renderer takes a per-frame `setWetLook(state)` (the setResolveOptions discipline), uploads the served mask pack into its own LINEAR texture, and `presentUpscaled` runs the pass from the upscale scratch into the ping-pong partner before resolving. Disarmed → the input target presents untouched. Mask texture freed in `dispose()`.
-- **`app/src/gl/liveLoop.mjs`** — beside `setResolveOptions`, the loop arms the pass from the field the service just served (the same `wetStep`/`wetMask`/`wetAmount` the recipe consumed), with thresholds from `WET_REGIMES` and the ground from `bgCss`. No new layout params (the replay-divergence trap is pinned shut in the selfcheck).
-- **`app/selfcheck.manifest`** — one line: `wetLook.selfcheck.mjs`.
-- **`docs/WET_ENGINE.md`** — the standing status paragraph, matching the #1810–#1812 entries.
-- **`docs/review/1813/`** — review evidence in the #1812 pattern: README, probe.json, three A/B stills (dark ground / light paper / monochrome, rendered from the mirror through the resolve's ACES curve).
-
-## One re-pin, with cause
-
-`composite.selfcheck.mjs` pinned the renderer program table at six keys. The renderer genuinely gains a seventh program through the audited table (the table is the contract: every renderer program is audit-registered there), so the pin now reads seven keys with `#1813` cited in the comment. The companion pin — every declared uniform is in its upload list — passes on the new program unmodified.
+- **`app/src/gl/wetWarmup.mjs`** (new) — the warm-up contract as one module: `WET_WARMUP_STEPS = 90` (1.5 s of field time at the sim's fixed dt), `WET_WARMUP_CEILING_MS = 2000`, the readout string, `warmUpWetField` (a fresh service, K identical frames, returns the final served field or null when dry), `warmUpForScene` + `wetLayoutParamsOf` (THE derivation both still entrypoints share — contract seed/canvas/instances + the first non-FX resolved layer's layout params, motion via the live loop's own `motionAmount`), `wetExportPayload` (the ferried form: recipe terms with packs base64, plus the #1813 display state assembled exactly as liveLoop arms `setWetLook`, ground parsed from the still's own background), and `hashWetField` (the byte-identity probe). No new layout params — K is a recipe constant, never project state (replay-divergence trap).
+- **`app/src/gl/renderer.mjs`** — the one-shot renderer gains `applyStillWetLook`: the #1813 pass (same program, same constants, same uniform recipe) driven by the payload's display state, into the finished frame's ping-pong partner, in linear before the resolve. `renderScene` applies it when `payload.wet.display` rides in; `renderAccumSequence` takes a new `wet` opt — its recipe terms join the base params (the field held for the whole sequence, the service's freeze-hold semantics) and the final texture finishes through the same pass. The live renderer's `renderFrameOffscreen` gains the twin pass (`applyWetLookTo`, dedicated mask texture so the live one is never clobbered mid-frame) driven by a payload-carried display state; without one it returns through the exact pre-#1815 line. No new programs (the table stays at seven).
+- **`app/src/gl/liveLoop.mjs`** — `captureFrame` assembles the display state from the capture frame's OWN served field (the tick's `setWetLook` assembly, same gate: `wetStep === 1 && wetMask`) and hands it to `renderFrameOffscreen` in the payload. No field → no key → capture unchanged. The ACCUM-on readback branch is untouched (it already carries the field).
+- **`app/src/gl/exportStill.mjs`** — `renderExport` warms from its built contract, passes the payload form through, and returns `wetReadout`; the CLI prints it after the output path per seed.
+- **`app/src/gl/accumStill.mjs`** — warms from frame 0's contract (progress 0, the state the sequence rises from) + the first resolved layers, logs the readout, passes `wet` through `renderAccumViaGL`.
+- **`app/src/gl/parity/glDriver.mjs` + `glHarness.html`** — `wet` rides `buildRenderPayload` and the accum payload; the harness decodes the packs back to `{n, rgba}` for both still paths.
+- **`app/src/gl/parity/corpus.mjs`** — `KNOWN_DIVERGENCES` records the signed SVG divergence ("mask absent → static blend", #1815); the corpus itself stays at WETNESS 0, so the sweep is untouched.
+- **Doctrine** — `vortex.mjs` header + cost-tier notes, `wetFrame.mjs` header pointer, `docs/BUGLIST.md` WETNESS row, and `docs/WET_ENGINE.md` (status paragraph, §3 gap 1 closed, Phase C row landed) now state the warm-up contract where the live-only text stood.
+- **`app/src/gl/wetWarmup.selfcheck.mjs`** (new) + one manifest line — the acceptance suite below.
 
 ## Verification (sandbox; CI is authoritative for the browser suites)
 
-Baselines were taken on the clean stacked base before editing.
+All suites run solo on this tree, after the last code change and again after prettier.
 
-| Suite | Base | This build |
-|---|---|---|
-| wetLook (new) | — | **16/16** |
-| accum (solo, 3 GB heap) | OK (83 cases) | **OK (83 cases)** |
-| composite | OK (15 cases) | **OK (15 cases)** |
-| wetFrame / vortex / pigmentKM | 15 / 34 / 7 | 15 / 34 / 7 |
-| accum.seam / accumFeed / accumGuard / accumInput / accum.inventory | — | 7/7 · OK (15) · OK · OK (7) · 6/6 |
-| wetFeed / resolve / resolveTap / uniformLocations | — | 9 · OK · OK · OK |
-| grainFinish / liveLoopSwell / clock.freeze | — | 4 · OK · 6/6 |
-| liveResolve.determinism / presentOrientation | — | ok · ok |
-| costTiers | — | OK (renderer/wetlook covered) |
-| `npm run build` | exit 0 | exit 0 |
-| eslint + prettier on touched files | — | clean (selfcheck file prettier-formatted, suite re-passed 16/16) |
+| Suite | Result |
+|---|---|
+| wetWarmup (new) | **21/21** — incl. GL: wet export byte-identical across runs; wet ≠ dry; dry export byte-identical to the shared candidate render; wet accum sequence byte-identical across runs and ≠ dry sequence; corpus dryness + signed divergence record |
+| accum (solo, 3 GB heap) | **OK (83/83 cases)** |
+| vortex / wetFrame / wetLook | 34 · 15 · 16 |
+| composite | 15 (program table unchanged — no re-pin needed) |
+| grainFinish | PASS — its exact source-shape pins (`renderScene`/`renderFrameOffscreen` finish nesting) preserved verbatim, no re-pin |
+| accumFeed / accumGuard / accumInput / accum.seam / accum.inventory | PASS · PASS · OK (7) · PASS · PASS |
+| exportStill / canvasSizes / presentOrientation / contactShadow / spectrumMarks / atlas.skip | PASS ×6 |
+| parity / glDriver / uniformLocations / pigmentKM / costTiers / liveLoopSwell / clock.inventory | PASS ×7 |
+| `npm run build` | **exit 0** (✓ built in 2.43 s) |
+| eslint + prettier on touched code files | clean |
 
-Notes on two sandbox artefacts, both chased down rather than waved at:
-- The baseline accum run's wrapper reported exit 2 while the suite's own log read "OK (83 cases)"; the changed-tree run exits 0 with the identical 83-case verdict. Treated as a teardown artefact of the baseline invocation, not a regression signal.
-- A first battery run of composite "failed" with a Playwright target-closed error — that was my own 120 s timeout killing its browser section. Run solo with a proper window it passes at base (15) and on this build (15).
-- The brief's caveat that `npm run build` fails in this sandbox (@tauri-apps/api) did **not** reproduce here: with a fresh `npm install` the base builds green, and so does this build — so no build failure needed a base-identical defence.
+Warm-up timing (the issue's pinned ceiling): K=90 at the 128-grid constants over still-shaped inputs (48 tinted instances, no velocities — a still's contract instances carry none) measured **476–514 ms** across runs in this sandbox, asserted `< 2000 ms` with the figure logged in the suite.
 
-**Acceptance wash** (probe.json; synthetic scenes, two soaked stamps, 16,797 wet px): dark ground — wet luma −19%, saturation +23%, dry Δ = 0, only brightening is the sheen on highlights (max +0.044); light paper — wet luma −26% (darkens more, per the issue's inversion), saturation +30%, max brightening **exactly 0**; monochrome — saturation stays 0, luma −11%, dry Δ = 0. The selfcheck asserts the same directions as region statistics plus the hard laws (dry identity, below-damp identity, paper never-brightens across a 343-pixel × 4-wetness sweep, HDR brights hold exactly).
+Two things caught during the build, chased down rather than waved at:
 
-## Decisions flagged for the next slice / coordinator
+- **A real GL bug in my first cut:** `renderFrameInto` returns a *spread copy* of its read target, so choosing the wet-look ping-pong partner by object identity missed, and the pass drew a texture into itself (GL 0x502, caught by renderScene's error check). Both still passes now choose the partner by **texture** identity. Worth knowing for #1814: any future pass over a composed frame has the same trap.
+- **`npm run build` failed on first run here** — not the known @tauri-apps environmental failure: this fresh worktree simply had no local `node_modules` (resolution fell through to a shared install that lacks the package). A fresh `npm install` fixed it; the base worktree (kc-1813-build) builds green too, and so does this build. `package-lock.json` untouched.
 
-1. **The pass consumes the field where the field is served** — the ACCUM presentation. It does not birth the field on its own (no wet look with ACCUM off): stepping the sim for display alone is a consumer-set decision for the #1814 family, recorded in `docs/review/1813/README.md`.
-2. **Paper's "brightens never" is a clamp, not a curve property** — the selfcheck's first sweep caught the saturation term lifting a dark saturated pixel's dominant channel ~0.03·f on paper; a per-channel `min(c, cIn)` on light grounds makes the law hold by construction.
-3. **The regime ramp tops out at soaked, not wet** — damp starts the effect, soaked completes it, so deep pools read wetter than damp edges.
-4. **Exports**: the pass is a pure function of (frame, field, ground) with no clock or state, so #1815's warm-up stills can run the identical math and match live — but this slice wires the live presentation only; the still path is #1815's to wire, exactly as the wetFrame header already records.
-5. **Cost figure is an estimate**: 0.3 ms declared for `renderer/wetlook` in the upscale class with the note saying so; the device-harness sweep (which reads `RENDERER_PROGRAMS`) is where the real number replaces it.
+## Decisions flagged for #1814 / the coordinator
+
+1. **accumStill warms from frame 0** (progress 0 — the project state the sequence rises from), field held across the sequence. If #1814's dish/trails work wants the field rehearsed at a different anchor (e.g. mid-sequence motion), the anchor is one line in `accumStill.mjs` + the readout wording.
+2. **The readout's reach:** it prints on both CLIs and returns from `renderExport` (`wetReadout`). It does **not** land in studio.py's sidecar manifest: studio.py drops exportStill's stdout, and its sidecar block is deliberately seed-independent while the warm-up is seed-dependent. Wiring it per-edition needs a studio.py change (parse the CLI line) — the issue's acceptance ("appears in the export's manifest/readout") is met on the readout; the sidecar hook is a follow-up if Matt wants it.
+3. **`renderFrameOffscreen` takes its state from the capture frame, not the armed tick state** — one source of truth per render, assembled identically. If a future caller wants the armed state instead, the renderer's contract (payload-carried display state) is the seam.
+4. **No new cost tier was registered for the warm-up.** It runs the already-registered `gl/vortex` work on the export path (offline, not governor-shed); the issue's cost acceptance is the pinned ceiling + timing log, both in the suite. WET_ENGINE's Phase C row mentions "cost tier for the new sampling" — if the coordinator wants an export-path registration as well, it is a small follow-up, not part of the issue's acceptance text.
+5. **Issue pointer discrepancy (premise note above):** the live-only list the issue located in `docs/ACCUM.md` actually lives in `docs/BUGLIST.md`; ACCUM.md has no wet text. The BUGLIST row and the vortex header carry the replacement contract.
