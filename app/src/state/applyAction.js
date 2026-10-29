@@ -241,6 +241,8 @@ export function applyAction(action, store = useStore.getState()) {
       return store.swapLayerPositions(action.idA, action.idB);
     case A.TOGGLE_LAYER_VISIBLE:
       return store.toggleLayerVisible(action.id);
+    case A.TOGGLE_LAYER_FEEDS_ACCUM:
+      return store.toggleLayerFeedsAccum(action.id);
     case A.RENAME_LAYER:
       return store.renameLayer(action.id, action.name);
     case A.SET_LAYER_BLEND_MODE:

@@ -1798,6 +1798,12 @@
   align-items: center;
   justify-content: center;
 }
+/* #1834 — FEEDS ACCUM off: the wave reads struck and dimmed (the stratum
+   still renders; it just leaves no trails). */
+.build-layer-stack .micro-btn.feed-off {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
 /* The number chip is the #716 .track-numeral tile (rules above) — the block
    header keeps it centered like the old rows did. */
 .build-layer-stack .strata-head .track-numeral {

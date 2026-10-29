@@ -504,6 +504,51 @@ renders on stage, still folds, still finishes.
   the composite and subset paths; the matte ruling; the governor
   rung's order, gating and restore. Stills: `docs/review/1833/`.
 
+## Selective accumulation (#1806) — slice 3: the BUILD flag + project JSON
+
+Slice 3 gives the flag its performer surface and its persistence —
+and with it #1806 is complete: seam (slice 1), recipe (slice 2),
+surface (here). Loop part: BUILD — the flag is recipe data riding the
+stratum, edited where the stratum's other properties live.
+
+- **The control:** a small toggle on the stratum row in BUILD's layer
+  stack, beside the visibility eye — a property of the stratum, not an
+  ACCUM amount (the ACCUM family stays amounts-only, per #1806's
+  design). Content and pattern strata only; FX/MATH rows never show
+  it, because they never feed. The signal is a plain binary, so it
+  renders TE like the eye: a wave glyph while the stratum's light
+  feeds the buffer, struck through and dimmed while it does not. The
+  collapsed block confesses the off state in words — `no feed` in the
+  amber summary line, the #1409 dish-off rule.
+- **One shape, everywhere:** the toggle writes the document layer
+  through the same event chain every layer control uses
+  (`layer:toggleFeedsAccum` → store setter), and it writes slice 2's
+  shape exactly: the key appears as `feedsAccum: false`, and toggling
+  back on *deletes* the key — absence is the on state, so the store,
+  the saved file and the contract never carry a second spelling.
+  A duplicate inherits the flag, like every other stratum property.
+  The governor's sensor needed no new wiring: it already derives
+  selection activity from the store's layers.
+- **Persistence:** project JSON carries the key per stratum (the
+  serializer writes the layer list as it stands). Loading keeps
+  exactly `false` on content/pattern layers and nothing else: a
+  spelled `true`, a non-boolean, or a flag on an FX/MATH layer all
+  load as absence — the on state. The key is assigned last in the
+  normalized layer, the same place the toggle appends it, so a
+  save → load → save round trip is byte-stable. Old projects load
+  with every stratum feeding, exactly as they played before the
+  flag existed.
+- **Proof** (`feedsAccumSurface.selfcheck.mjs`, 12 cases): the whole
+  bus chain driven for real (key appears as false, disappears on
+  re-enable, never true; undoable; a no-op on FX/MATH); duplicates
+  inherit; serialize writes the key only while off and only on the
+  flagged stratum (an all-on project contains no `feedsAccum`
+  anywhere); the round-trip pin — serialize → parse → apply →
+  serialize keeps the layers byte-identical; the normalize edges;
+  the round-tripped document builds slice 2's contract selection;
+  the collapsed summary confession. Screenshot:
+  `docs/review/1834/`.
+
 ## The documented light-feel
 
 The acceptance bar for a trail still:
