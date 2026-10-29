@@ -23,6 +23,15 @@ import {
   sanitizeAccumPrism,
   sanitizeAccumFlow,
   sanitizeAccumEchoes,
+  sanitizeAccumAgeBuffer,
+  AGE_VOID,
+  AGE_LIGHT_FLOOR,
+  AGE_BYTES_PER_PIXEL,
+  ACCUM_PAIR_BYTES_PER_PIXEL,
+  ageTargetBytes,
+  createAgeState,
+  ageFalseColour,
+  AGE_FS,
   sanitizeAudioSample,
   applyAudioEnvelope,
   mirrorFlowVec,
@@ -232,6 +241,27 @@ ok('sanitizeAccumFlow / sanitizeAccumEchoes', () => {
   assert.equal(sanitizeAccumEchoes(undefined), 0);
 });
 
+ok('age buffer: params request + dt sanitization (#1805)', () => {
+  const d = accumRecipeParams({});
+  assert.equal(d.ageBuffer, false, 'unrequested by default — the buffer is consumer-requested, never default-on');
+  assert.equal(d.dt, 1 / 60, 'dt defaults to the frame assumption');
+  const r = accumRecipeParams({ ageBuffer: true, dt: 0.04 });
+  assert.equal(r.ageBuffer, true, 'a true request rides the params');
+  assert.equal(r.dt, 0.04, 'a sane dt rides the params');
+  assert.equal(accumRecipeParams({ ageBuffer: 1 }).ageBuffer, false, 'only true requests (sanitizeAccumAgeBuffer)');
+  assert.equal(accumRecipeParams({ dt: NaN }).dt, 1 / 60, 'garbage dt -> the frame assumption');
+  assert.equal(accumRecipeParams({ dt: Infinity }).dt, 1 / 60, 'infinite dt -> the frame assumption');
+  assert.equal(accumRecipeParams({ dt: -2 }).dt, 0, 'negative dt clamps to 0');
+  assert.equal(accumRecipeParams({ dt: 42 }).dt, 1, 'one step never ages light by more than a second');
+  // The modulators spread the params, so a request survives both — the
+  // live loop's request reaches the buffer even in silence or warp.
+  const silent = applyAudioEnvelope(r, { rms: 0, flux: 0, beatPulse: 0 });
+  assert.equal(silent.ageBuffer, true, 'the audio envelope carries the request');
+  assert.equal(silent.dt, 0.04, 'the audio envelope carries dt');
+  assert.equal(sanitizeAccumAgeBuffer(true), true);
+  assert.equal(sanitizeAccumAgeBuffer('yes'), false);
+});
+
 ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () => {
   const base = accumRecipeParams({ fade: 0.9, optics: 0.5, tunnel: 0.5, prism: 0.5 });
   const silent = applyAudioEnvelope(base, { rms: 0, flux: 0, beatPulse: 0 });
@@ -406,6 +436,28 @@ ok('contract carries sanitized accum.optics (additive, no version bump)', () => 
   assert.equal(off.accum, null, 'no accum -> null (renderer stays on the plain path)');
 });
 
+ok('contract: accum.ageBuffer is additive, omitted unless requested (#1805)', () => {
+  const doc = fixtureDoc();
+  const rl = resolveLayers(doc, { caps });
+  const plain = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true } });
+  assert.ok(!('ageBuffer' in plain.accum), 'unrequested: no ageBuffer key (the contract and its hash are unchanged)');
+  const asked = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, ageBuffer: true } });
+  assert.equal(asked.accum.ageBuffer, true, 'requested: the key rides the contract');
+  const loose = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, ageBuffer: 1 } });
+  assert.ok(!('ageBuffer' in loose.accum), 'only a true request counts (sanitizeAccumAgeBuffer)');
+});
+
+ok('age buffer: one target is 1/8 of the colour pair (#1805 memory bound)', () => {
+  assert.equal(AGE_BYTES_PER_PIXEL, 2, 'R16F: one channel, two bytes');
+  for (const [w, h] of [
+    [1920, 1080],
+    [3840, 2160],
+    [1000, 700],
+  ]) {
+    assert.equal(ageTargetBytes(w, h) * 8, w * h * ACCUM_PAIR_BYTES_PER_PIXEL, `${w}x${h}: age target x8 = pair bytes`);
+  }
+});
+
 // --- mirror sanity (float64, hand-computed expectations) --------------------
 
 const W = 8,
@@ -544,8 +596,10 @@ ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => 
   // optimized, not hidden behind a quality flag), the audit table carries
   // glow instead of blur/add, and no shader source mentions a sigma.
   // resample is #309's structural half-res plumbing, not a blur.
+  // #1805 deliberate re-pin: 'age' joins the pass sources (a data pass,
+  // not a blur — the no-sigma/no-gauss scan below covers it too).
   const keys = Object.keys(ACCUM_PASS_SOURCES).sort();
-  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
+  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
   for (const [name, src] of Object.entries(ACCUM_PASS_SOURCES)) {
     assert.ok(!/sigma/i.test(src), `accum-${name}: no sigma in the shader source`);
     assert.ok(!/gauss/i.test(src), `accum-${name}: no gaussian in the shader source`);
@@ -1077,9 +1131,94 @@ const parseShaderUniforms = (src) => {
   return names;
 };
 
-ok('harness: ACCUM_PROGRAMS covers all eight GPU programs', () => {
+ok('mirror: age advances in show time, voids when the light dies (#1805)', () => {
+  const w = 8,
+    h = 8;
+  const start = new Float64Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) start[i * 4 + 3] = 1;
+  const dot = new Float64Array(w * h * 4);
+  const dof = (2 * w + 2) * 4;
+  dot[dof] = dot[dof + 1] = dot[dof + 2] = 1;
+  dot[dof + 3] = 1;
+  const empty = new Float64Array(w * h * 4);
+  const dt = 1 / 30;
+  const params = accumRecipeParams({ fade: 0.9, ageBuffer: true, dt });
+  const age = createAgeState(w, h);
+  assert.ok(
+    age.data.every((v) => v === AGE_VOID),
+    'a fresh field is all void',
+  );
+  let acc = mirrorAccumStep({ accum: start, frame: dot, w, h, params, age });
+  assert.equal(age.data[2 * w + 2], 0, 'newest light reads age 0 in the step it lands');
+  for (let k = 1; k <= 20; k++) acc = mirrorAccumStep({ accum: acc, frame: empty, w, h, params, age });
+  const a20 = age.data[2 * w + 2];
+  assert.ok(Math.abs(a20 - 20 * dt) < 1e-9, `after 20 steps the age is the elapsed show time (${a20} vs ${20 * dt})`);
+  assert.equal(age.data[0], AGE_VOID, 'never-lit pixels stay void');
+  for (let k = 21; k <= 240; k++) acc = mirrorAccumStep({ accum: acc, frame: empty, w, h, params, age });
+  assert.equal(age.data[2 * w + 2], AGE_VOID, 'once the light dies below the floor, the age is void');
+  // Unrequested: the field is never touched. Requested without a state:
+  // the same loud refusal the echo ring makes.
+  const idle = createAgeState(w, h);
+  mirrorAccumStep({ accum: start, frame: dot, w, h, params: accumRecipeParams({ fade: 0.9 }), age: idle });
+  assert.ok(
+    idle.data.every((v) => v === AGE_VOID),
+    'unrequested: the age field is untouched',
+  );
+  assert.throws(
+    () => mirrorAccumStep({ accum: start, frame: dot, w, h, params }),
+    /requires an age state/,
+    'requested without a state refuses, like the echo ring',
+  );
+});
+
+ok('mirror: overlapping trails keep independent ages — newest light wins (#1805)', () => {
+  const w = 8,
+    h = 8;
+  const mk = () => new Float64Array(w * h * 4);
+  const stamp = (f, x, y) => {
+    const o = (y * w + x) * 4;
+    f[o] = f[o + 1] = f[o + 2] = 1;
+    f[o + 3] = 1;
+    return f;
+  };
+  const start = mk();
+  for (let i = 0; i < w * h; i++) start[i * 4 + 3] = 1;
+  const dt = 1 / 30;
+  const params = accumRecipeParams({ fade: 0.95, ageBuffer: true, dt });
+  const age = createAgeState(w, h);
+  // Step 0: both pixels lit. Step 10: pixel B lit again. Read at step 15.
+  let acc = mirrorAccumStep({ accum: start, frame: stamp(stamp(mk(), 2, 2), 5, 5), w, h, params, age });
+  for (let k = 1; k <= 15; k++)
+    acc = mirrorAccumStep({ accum: acc, frame: k === 10 ? stamp(mk(), 5, 5) : mk(), w, h, params, age });
+  assert.ok(Math.abs(age.data[2 * w + 2] - 15 * dt) < 1e-9, 'the once-lit pixel carries its full age');
+  assert.ok(Math.abs(age.data[5 * w + 5] - 5 * dt) < 1e-9, 'the re-lit pixel carries only the newest light’s age');
+});
+
+ok('age false-colour: phosphor ramp, void is ink (#1805)', () => {
+  const data = new Float32Array([AGE_VOID, 0, 2.5, 5, 99]);
+  const out = ageFalseColour(data, 5, 1, { maxAge: 5 });
+  const pxAt = (i) => [out[i * 4], out[i * 4 + 1], out[i * 4 + 2], out[i * 4 + 3]];
+  assert.deepEqual(pxAt(0), [10, 10, 14, 255], 'void renders ink');
+  assert.deepEqual(pxAt(1), [255, 243, 196, 255], 'fresh light is pale gold');
+  assert.deepEqual(pxAt(3), [122, 30, 0, 255], 'the ramp deep end is ember');
+  assert.deepEqual(pxAt(4), [122, 30, 0, 255], 'past the window clamps at the deep end');
+  const mid = pxAt(2);
+  assert.ok(mid[0] > 200 && mid[1] > 100 && mid[1] < 170 && mid[2] < 40, `mid-age reads amber, got ${mid}`);
+  const flipped = ageFalseColour(new Float32Array([0, AGE_VOID]), 1, 2, { maxAge: 5, flip: true });
+  assert.deepEqual([flipped[0], flipped[1], flipped[2]], [10, 10, 14], 'flip: the void row lands first');
+});
+
+ok('age buffer: the twin pass is registered with its cost tier (#1805)', () => {
+  assert.equal(ACCUM_PROGRAMS.age.fs, AGE_FS, 'the registry carries the age shader');
+  assert.equal(ACCUM_PROGRAMS.age.cost.tier, 1, 'tier 1: the ACCUM shed takes it down with the family');
+  assert.equal(ACCUM_PASS_SOURCES.age, AGE_FS, 'the pass-source map agrees');
+  assert.ok(AGE_LIGHT_FLOOR > 0 && AGE_LIGHT_FLOOR < 0.01, 'the aliveness floor is one faint step of light');
+});
+
+// #1805 deliberate re-pin: eight programs -> nine (the age twin pass).
+ok('harness: ACCUM_PROGRAMS covers all nine GPU programs', () => {
   const keys = Object.keys(ACCUM_PROGRAMS).sort();
-  assert.deepEqual(keys, ['copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
+  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
   for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
     assert.equal(typeof def.fs, 'string', `${name}: has shader source`);
     assert.ok(def.fs.includes('void main'), `${name}: source is a shader`);
@@ -1348,6 +1487,8 @@ async function runBrowserTests() {
       audio = null,
       stipple = null,
       palette = null,
+      ageBuffer = false, // #1805
+      dt = 1 / 60, // #1805
       frames,
     }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
@@ -1364,9 +1505,11 @@ async function runBrowserTests() {
         audio,
         stipple,
         palette,
+        ageBuffer,
+        dt,
         frames: frames.map(bytesOf),
       });
-      return { gpu: f64Of(res.pixels), w: res.width, h: res.height };
+      return { gpu: f64Of(res.pixels), w: res.width, h: res.height, age: res.age, ageAllocated: res.ageAllocated };
     };
     const mirrorSeq = ({
       w,
@@ -1894,6 +2037,69 @@ async function runBrowserTests() {
         assert.ok(Math.abs(res.pixels[i + 2] - 50) <= 2, `b solid at ${i / 4}`);
         assert.equal(res.pixels[i + 3], 255, `a solid at ${i / 4}`);
       }
+    });
+
+    await okAsync('probe: age buffer — GPU ages match the mirror over 48 steps (#1805)', async () => {
+      const w = 16,
+        h = 16,
+        dt = 1 / 30;
+      const frames = [];
+      for (let i = 0; i < 48; i++) {
+        const f = new Float64Array(w * h * 4);
+        if (i === 0) {
+          const o = (3 * w + 3) * 4;
+          f[o] = f[o + 1] = f[o + 2] = 1;
+          f[o + 3] = 1;
+        }
+        if (i >= 20) {
+          for (let y = 10; y < 13; y++) {
+            for (let x = 10; x < 13; x++) {
+              const o = (y * w + x) * 4;
+              f[o] = f[o + 1] = f[o + 2] = 1;
+              f[o + 3] = 1;
+            }
+          }
+        }
+        frames.push(f);
+      }
+      const { age: gpuAge, ageAllocated } = await runProbe({
+        w,
+        h,
+        fade: 0.92,
+        optics: 0,
+        frames,
+        ageBuffer: true,
+        dt,
+      });
+      assert.equal(ageAllocated, true, 'requested: the age buffer allocated');
+      assert.ok(gpuAge, 'requested: the age field came back');
+      // The mirror in lockstep (float64 twin of the same recipe).
+      const params = accumRecipeParams({ fade: 0.92, ageBuffer: true, dt, background: '#000000' });
+      const age = createAgeState(w, h);
+      let acc = new Float64Array(w * h * 4);
+      for (let i = 0; i < w * h; i++) acc[i * 4 + 3] = 1;
+      for (const f of frames) acc = mirrorAccumStep({ accum: acc, frame: f, w, h, params, age });
+      let worst = 0;
+      for (let i = 0; i < w * h; i++) {
+        const m = age.data[i];
+        const g = gpuAge[i];
+        assert.equal(g < 0, m < 0, `void agreement at pixel ${i}: gpu ${g}, mirror ${m}`);
+        if (m >= 0) worst = Math.max(worst, Math.abs(g - m));
+      }
+      assert.ok(
+        worst <= dt,
+        `age parity within one frame over 48 steps: worst Δ ${worst.toFixed(4)} > dt ${dt.toFixed(4)}`,
+      );
+      assert.ok(Math.abs(gpuAge[3 * w + 3] - 47 * dt) <= dt, 'the step-0 mark reads its elapsed show time ±1 frame');
+      assert.ok(gpuAge[11 * w + 11] <= dt, 'the continuously re-lit block stays newborn');
+    });
+
+    await okAsync('probe: age buffer unrequested allocates nothing (#1805)', async () => {
+      const w = 12,
+        h = 12;
+      const { ageAllocated, age } = await runProbe({ w, h, fade: 0.9, frames: [whiteDot(w, h, 3, 3)] });
+      assert.equal(ageAllocated, false, 'unrequested: zero allocation');
+      assert.equal(age, null, 'unrequested: no age field');
     });
   } finally {
     await close();

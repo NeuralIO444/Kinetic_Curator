@@ -23,6 +23,13 @@ export const MEASURE_METHOD = {
   params: 'max-contract-case',
 };
 export const MEASURED_COSTS = {
+  // #1805: the age twin pass. Measured with the wall method on the
+  // sandbox rig at 15.3 ms/draw against fade's 16.1 and echo's 16.8 —
+  // at/below the family's measured passes, which all sit at this file's
+  // 0.3 floor on the reference rig (the #560 LEAVE precedent: commit the
+  // floor number the relative measurement supports). A reference-rig
+  // `npm run measure-costs` re-bless supersedes this row.
+  'accum/age': { ms: 0.3, method: 'wall', draws: 90 },
   'accum/copy': { ms: 0.3, method: 'wall', draws: 90 },
   // #560 LEAVE hold is the copy pass, not a new shader. Same wall number.
   'accum/leave': { ms: 0.3, method: 'wall', draws: 90 },

@@ -4,7 +4,7 @@
  *
  * Every shader effect routed through the checked builders gets a sweep:
  * the 5 template FX shaders (fxShaders.mjs), the 5 builtin FX modes
- * (EFFECT_FS via builtinEffects.mjs), and the 8 ACCUM passes (accum.mjs).
+ * (EFFECT_FS via builtinEffects.mjs), and the 9 ACCUM passes (accum.mjs).
  * The renderer programs (quad/composite/copy) are not effects — they have
  * no sweepable parameters — so they are covered by the compile+audit gate
  * only. The exception is the final resolve pass (#740): it carries FXAA
@@ -37,6 +37,8 @@
  *   by the GPU-vs-mirror parity checks in accum.selfcheck.mjs.)
  * - N/A (always-on, binary): solarize, edge, invert — off means dropped
  *   from the chain, so there is no zero-param identity to prove.
+ * - N/A (data, not light): age (#1805) — off means the buffer is never
+ *   allocated; there is no identity output to prove.
  * - rgbSplit at dx=0 is NOT a no-op (the screen-alpha recombine
  *   1-(1-a)^3 changes fractional alphas — matches the SVG reference, so
  *   this is as-designed, not a bug); off means dropped from the chain.
@@ -845,6 +847,43 @@ export const SWEEP_EFFECTS = [
       u_headBoost: 1.0,
     })),
     cases: [C('source-over', {}, { costly: true })],
+  },
+  {
+    ...accumDef(
+      'age',
+      {
+        u_age: S(0),
+        u_src: S(1),
+        u_bg: { kind: 'vec3' },
+        u_dt: { kind: 'float' },
+        u_floor: { kind: 'float' },
+        u_mode: { kind: 'float' },
+        u_tunnelZoom: { kind: 'float' },
+        u_tunnelSpin: { kind: 'float' },
+      },
+      (c, lab, aux) => ({
+        u_age: lab.input.tex,
+        u_src: aux.gray,
+        u_bg: [0, 0, 0],
+        u_dt: c.params.dt,
+        u_floor: 1 / 255, // AGE_LIGHT_FLOOR — one 8-bit step of luminance
+        u_mode: c.params.mode,
+        u_tunnelZoom: c.params.tz,
+        u_tunnelSpin: c.params.ts,
+      }),
+      // hdr: the output is DATA, not light — void is -1 and ages are
+      // unbounded seconds, so the [0,1] range assertion does not apply;
+      // finiteness is the contract (the echo precedent).
+      { hdr: true },
+    ),
+    cases: [
+      C('age a living field', { mode: 0, dt: 1 / 60, tz: 1, ts: 0 }, { costly: true }),
+      C('tunnel feedback', { mode: 0, dt: 1 / 60, tz: 1.01, ts: 0.01 }),
+      C('reset', { mode: 1, dt: 0, tz: 1, ts: 0 }),
+      C('void', { mode: 2, dt: 0, tz: 1, ts: 0 }),
+      H('hostile negative dt', { mode: 0, dt: -1, tz: 1, ts: 0 }),
+      H('hostile huge dt', { mode: 0, dt: 1000, tz: 1, ts: 0 }),
+    ],
   },
   {
     ...accumDef('down', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),

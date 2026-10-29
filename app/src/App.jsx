@@ -35,6 +35,8 @@ import { initDirectorBeat, setPresenceProvider, conductHeat } from './curator/di
 import { initPhase } from './curator/phase.js'; // #1144: the instrument knows the phase
 import { initStress, DEBUG_STRESS, getStressState } from './curator/stressLive.js'; // #1354: stress and bands (the creature's posture consumes them since S5)
 import { StressReadout } from './curator/StressReadout.jsx'; // #1354: ?debug=stress only
+import { AgeReadout } from './curator/AgeReadout.jsx'; // #1805: ?debug=age only
+import { DEBUG_AGE } from './gl/ageLive.mjs';
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
 import { setRoomProvider, noteKeep } from './curator/formationLive.js'; // #1694 slice 1: the facade over the resolver-owned spawn state (the room a birth reads; the keeps a birth leans toward)
 import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the contact-density field, onto the bus
@@ -589,6 +591,7 @@ function AppInner() {
       <MasterBar />
       <FavoritesTray />
       {DEBUG_STRESS && <StressReadout />}
+      {DEBUG_AGE && <AgeReadout />}
       <footer className="footer-bar">
         <span>
           KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}

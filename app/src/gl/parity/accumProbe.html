@@ -14,11 +14,15 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from '../accum.mjs
 // buffer back. Lets the selfcheck verify the GPU recipe against the JS
 // mirror (mirrorAccumStep) exactly, without a scene.
 //
-// window.__kcAccumProbe(p) -> { pixels, width, height }
+// window.__kcAccumProbe(p) -> { pixels, width, height, age, ageAllocated }
 //   p = { w, h, bg: '#rrggbb', fade, optics, tunnel, prism,
-//         flow, echoes, echoWidth, resDiv,
+//         flow, echoes, echoWidth, resDiv, ageBuffer, dt,
 //         audio: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
 //         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
+// ageBuffer + dt (#1805): when requested, the return also carries the
+// final age field (plain array of seconds, bottom-first) and whether the
+// age buffer was allocated at all (an unrequested run must allocate
+// nothing — ageAllocated false, age null).
 // resDiv (default 1): the feedback pair runs at w×h while the incoming
 // frames are w*resDiv × h*resDiv (#309 half-res feedback) — the resample
 // pass brings them down to the pair size first.
@@ -80,6 +84,9 @@ window.__kcAccumProbe = (p) => {
       background: p.bg || '#000000',
       // #1803: the halation tint derives from the probe palette, if any.
       palette: p.palette ?? null,
+      // #1805: the age buffer, when the probe requests it.
+      ageBuffer: p.ageBuffer ?? false,
+      dt: p.dt ?? 1 / 60,
     });
     const audio = p.audio || null;
     let i = 0;
@@ -120,7 +127,16 @@ window.__kcAccumProbe = (p) => {
     gl.deleteTexture(outT);
     gl.deleteFramebuffer(fb);
     if (err !== gl.NO_ERROR) throw new Error(`[probe] GL error 0x${err.toString(16)}`);
-    return { pixels: Array.from(px), width: w, height: h };
+    // #1805: the final age field, when requested (readAge is null until
+    // the buffer is allocated, which only a requesting step does).
+    const ageRead = p.ageBuffer ? accum.readAge() : null;
+    return {
+      pixels: Array.from(px),
+      width: w,
+      height: h,
+      age: ageRead ? Array.from(ageRead.data) : null,
+      ageAllocated: accum.ageTexture() !== null,
+    };
   } finally {
     for (const t of frameTexs) gl.deleteTexture(t);
     accum.dispose();

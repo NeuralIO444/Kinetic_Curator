@@ -1709,8 +1709,12 @@ export function createRenderer(canvas) {
    *
    * @param {Array<object>} frames per-frame render payloads (shared atlas)
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb',
-   *   palette: swatch hex list or null (#1803 halation tint derivation) }
-   * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
+   *   palette: swatch hex list or null (#1803 halation tint derivation),
+   *   ageBuffer: request the #1805 age buffer, dt: show-time seconds per step }
+   * @returns {{pixels: Uint8Array, width: number, height: number,
+   *   age: {data: Float32Array, width: number, height: number} | null}}
+   *   top-first RGBA; age is the final age field (bottom-first, buffer
+   *   order) when requested, else null — nothing allocated unrequested.
    */
   function renderAccumSequence(
     frames,
@@ -1725,6 +1729,8 @@ export function createRenderer(canvas) {
       swell = 1,
       background = '#000000',
       palette = null,
+      ageBuffer = false,
+      dt = 1 / 60,
     } = {},
   ) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
@@ -1739,7 +1745,19 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background, palette });
+      const base = accumRecipeParams({
+        fade,
+        optics,
+        tunnel,
+        prism,
+        flow,
+        echoes,
+        echoWidth: w,
+        background,
+        palette,
+        ageBuffer,
+        dt,
+      });
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
       const velPrev = new Map();
@@ -1765,9 +1783,13 @@ export function createRenderer(canvas) {
         finalTex = bridge.runChain(layerId, finalTex, steps);
       }
       const pixels = resolveTargetToBytes(finalTex, T, w, h);
+      // #1805: when the age buffer was requested, read the final age field
+      // back before the accum object is disposed (the still's --age-out
+      // consumes it). Unrequested this is null and nothing was allocated.
+      const age = ageBuffer ? accum.readAge() : null;
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum render: 0x${err.toString(16)}`);
-      return { pixels, width: w, height: h };
+      return { pixels, width: w, height: h, age };
     } finally {
       accum.dispose();
       freeFrameTargets(T);

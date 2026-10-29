@@ -95,6 +95,50 @@ not a second engine. Everything is off by default: the recipe only runs when
 the scene contract carries `accum.enabled`; a null `contract.accum` means a
 plain `renderScene` with zero new passes.
 
+## Age buffer (#1805)
+
+Every pixel of trail light carries its own age — seconds of show time since
+the newest light at that pixel — as data, independent of brightness. This
+is ACCUM_VISION §2.7's "true version": not a brightness clock, not an
+age-texture packed into a spare channel, but a dedicated field with its own
+update rule.
+
+- **Storage.** An R16F ping-pong at pair resolution, allocated ONLY when a
+  step's recipe requests it (`ageBuffer: true` on the recipe params,
+  `accum.ageBuffer` on the scene contract — the key is omitted unless
+  requested, so an unrequested contract and its hash are unchanged). One
+  target is 1/8 of the colour pair's bytes (2 B/px against the pair's
+  16 B/px); an unrequested recipe allocates nothing and renders
+  byte-identically.
+- **Update (a twin `age` pass, twice per step).** After the fade: each
+  pixel's age advances by the step's `dt` (the loop's clamped show-time
+  step; stills pass their frame interval) while its faded light still
+  differs from the ground by more than one 8-bit luminance step, sampled
+  through the fade's own feedback transform so ages ride TUNNEL like the
+  light does; where the light has died, the age is void (−1). After the
+  over: wherever the incoming frame covered, the age resets to 0 — newest
+  light wins, so re-lit and overlapped trails keep independent ages
+  instead of inheriting the oldest. The JS mirror (`createAgeState` +
+  `mirrorAccumStep`'s age block) is the float64 twin, proven equal within
+  one frame over a 48-step GPU probe.
+- **Cost.** The pass is registered tier 1 (`accum/age`) with the ACCUM
+  family — a governor shed that drops ACCUM drops the age work with it —
+  and carries a committed measurement row (wall-method relative standing
+  at/below fade; see `measuredCosts.mjs`).
+- **Consumers (v1).** The still CLI's `--age-out` writes the final age
+  field as a false-colour PNG (fresh gold → amber → deep ember; void is
+  ink; the ramp's deep end is the sequence duration). `?debug=age` mounts
+  a backstage readout that requests the buffer live and paints the same
+  ramp with the oldest living age and the lit fraction of the field.
+  Nothing on the performer's surface changes; no look, voice or panel
+  reads ages yet — that is future slices' work, now possible because the
+  ages exist.
+- **v1 limits, stated plainly.** The FEED pass does not advect the age
+  field (flow moves colour; ages stay in buffer space this slice). Bloom
+  light deposited by the glow starts aging from the step after it appears,
+  not the step it lands. R16F precision bounds the age quantum (~1 ms at
+  60 s ages) — far below one frame at any playable age.
+
 ## Phase A — feedback: TUNNEL + PRISM (light-tunnels + chromatic drift)
 
 Step 1 (fade) samples the buffer through an affine feedback transform

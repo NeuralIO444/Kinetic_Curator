@@ -295,8 +295,11 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
  * the page. One atlas is baked from the union of asset combos across frames.
  *
  * @param {Array<object>} frameContracts scene contracts v1, one per frame
- * @param {object} opts { width, height, bg, fade, optics, tunnel, prism }
- * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
+ * @param {object} opts { width, height, bg, fade, optics, tunnel, prism,
+ *   ageBuffer: request the #1805 age buffer, dt: show-time seconds per step }
+ * @returns {Promise<{pixels: Buffer, width: number, height: number,
+ *   age: {data: Float32Array, width: number, height: number} | null}>}
+ *   top-first RGBA; age = the final age field when requested, else null.
  */
 export async function renderAccumViaGL(
   frameContracts,
@@ -313,6 +316,8 @@ export async function renderAccumViaGL(
     audio = null,
     swell = 1,
     palette = null, // #1803: swatch hex list; forwarded to renderAccumSequence
+    ageBuffer = false, // #1805: forwarded to renderAccumSequence
+    dt = 1 / 60, // #1805: show-time seconds per step
   } = {},
 ) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
@@ -348,6 +353,8 @@ export async function renderAccumViaGL(
     audioFrames: audio,
     swell, // #306: audio→glow fader, forwarded to renderAccumSequence
     palette, // #1803: forwarded to renderAccumSequence (halation tint)
+    ageBuffer, // #1805: forwarded to renderAccumSequence (age buffer)
+    dt, // #1805: show-time seconds per step
     cells,
     atlasB64: b64Pieces(atlas.pixels),
     atlasW: atlas.width,
@@ -358,7 +365,17 @@ export async function renderAccumViaGL(
     })),
   };
   const res = await evaluateChunked(page, '__kcAccum', payload);
-  return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
+  // #1805: the age field crosses the page boundary as base64 of its
+  // Float32 bytes; copy through a fresh buffer (Buffer pooling would
+  // otherwise hand back a view over shared memory).
+  let age = null;
+  if (res.ageB64) {
+    const raw = Buffer.from(res.ageB64, 'base64');
+    const data = new Float32Array(raw.byteLength / 4);
+    new Uint8Array(data.buffer).set(raw);
+    age = { data, width: res.width, height: res.height };
+  }
+  return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height, age };
 }
 
 /**
