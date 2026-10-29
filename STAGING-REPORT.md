@@ -28,3 +28,7 @@ Capture was genuinely MISSING. The take recorder's taps see resolver inputs and 
 - playback.selfcheck OK · routeRecord.selfcheck OK · midi.selfcheck OK.
 - `npm run build`: green.
 - Diff audited by hand: 4 modified files (+66/−2) + 2 new files; every hunk serves the narrowed scope.
+
+## CI addendum (coordinator, 2026-10-28, before merge)
+
+PR #1826's first CI run failed both sweep jobs on `src/curator/formation.selfcheck.mjs` — a suite the recovery audit had not run. Root cause, proven locally (fails 3/3 on this tree, passes 3/3 on clean main and on the branch base): formation (with clockRecord and stressRecord) regex-pins the take sections registry's source shape — entries must be `name: identifier`. The recovered wiring registered gestures as an inline lambda, which the pattern cannot match. Fix: the factory is bound to a named const (`gesturesSectionForTake`) inside the component and registered by name, like every other section; the gestureRecord suite's own source assertion — which the builder had written against the lambda form — now pins the named registration + binding instead (same fact, house shape). All seven affected suites pass on the fixed tree (gestureRecord, formation, clockRecord, stressRecord, playback, routeRecord, midi); build green. Lesson recorded in AGENTS.md: when a change touches a file, grep the selfchecks for source-shape assertions on that file before declaring verification complete.

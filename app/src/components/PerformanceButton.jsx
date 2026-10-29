@@ -172,6 +172,10 @@ function downloadBytes(bytes, filename) {
 
 export function PerformanceButton() {
   const { glLoopRef } = useApp();
+  // #1802 — the gestures section factory also needs the loop ref; it is bound here so the
+  // sections registry below registers it by name, like every other section (that registry's
+  // shape is pinned by the take selfchecks — no inline lambdas in it).
+  const gesturesSectionForTake = (getFrame) => gesturesSection(getFrame, glLoopRef);
   const [recording, setRecording] = useState(isRecordingPerformance());
   const [frames, setFrames] = useState(0);
   // #1461 step 2 — playing a take back (the scrub strip is step 3)
@@ -223,7 +227,7 @@ export function PerformanceButton() {
             mind: mindSection,
             spectrum: spectrumSection,
             routes: routesSection,
-            gestures: (getFrame) => gesturesSection(getFrame, glLoopRef),
+            gestures: gesturesSectionForTake,
           },
         })
       ) {

@@ -296,7 +296,8 @@ await ok('wired: the take button records `gestures` off the bus, the loop owns t
   const pb = flat(readFileSync(new URL('../components/PerformanceButton.jsx', import.meta.url), 'utf8'));
   assert.ok(pb.includes(flat('const rec = createGestureRecorder({')));
   assert.ok(pb.includes(flat('on(Events.ACCUM_GESTURE, (p, meta) => rec.push(p, meta))')));
-  assert.ok(pb.includes(flat('gestures: (getFrame) => gesturesSection(getFrame, glLoopRef)')));
+  assert.ok(pb.includes(flat('const gesturesSectionForTake = (getFrame) => gesturesSection(getFrame, glLoopRef);')));
+  assert.ok(pb.includes(flat('gestures: gesturesSectionForTake')));
   assert.ok(pb.includes('getAccumFrozen'), 'the starting state is read from the loop itself');
   const loop = flat(readFileSync(new URL('./liveLoop.mjs', import.meta.url), 'utf8'));
   assert.ok(loop.includes(flat('getAccumFrozen: () => accumFrozen')));
