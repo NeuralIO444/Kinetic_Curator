@@ -67,7 +67,8 @@ import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* rout
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
 import { attachVelocities } from './velocitySmear.mjs';
-import { motionAmount, noteWetFrame } from './vortex.mjs';
+import { motionAmount } from './vortex.mjs';
+import { createWetFrameService } from './wetFrame.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
@@ -340,7 +341,11 @@ export function createLiveLoop(
   // frame-to-frame displacement attached as vx/vy. Cleared whenever the
   // ACCUM session ends so re-enabling starts at zero velocity.
   let velPrev = new Map();
-  const wetSlot = { vortex: null };
+  // #1809: the wet field is owned by the wet-frame service — session
+  // lifetime, need-based gate. Consumers (slice A: ACCUM) request it per
+  // frame; it survives ACCUM toggles and faults (service.dispose() at
+  // loop teardown is the only destroy).
+  const wetFrame = createWetFrameService();
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
   let flowFieldSeed = null;
@@ -395,7 +400,8 @@ export function createLiveLoop(
     accumObj = null;
     accumActive = false;
     velPrev.clear(); // #309: the retry starts at zero velocity
-    wetSlot.vortex = null;
+    // #1809: the wet field is NOT torn down — the wet-frame service owns
+    // it for the session, so a fault in the ACCUM chain leaves it standing.
     accumRetryAt = performance.now() + 2000;
     const now = performance.now();
     if (now - lastAccumErrTs > 5000) {
@@ -963,21 +969,25 @@ export function createLiveLoop(
     if (!!layoutParams.accumulation && !s.perfTier1 && accumActive) {
       attachVelocities(contract.instances, velPrev);
     }
-    // #970: step the vortex next to attachVelocities. Freeze holds the
-    // last field. Wetness 0 does not step and does not bind a texture.
-    const wet =
-      !!layoutParams.accumulation && !s.perfTier1
-        ? noteWetFrame(wetSlot, {
-            wetness: layoutParams.accumulationWetness,
-            freeze: accumFrozen || s.running === false || !!s.slowRender,
-            seed: s.seed,
-            width: canvasW,
-            height: canvasH,
-            instances: contract.instances,
-            behave: layoutParams.behave,
-            motion: motionAmount(layoutParams),
-          })
-        : { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+    // #970 step, #1809 service: ACCUM requests the wet field per frame
+    // and the wet-frame service owns and steps it. Freeze holds the last
+    // field. Wetness 0 does not step and does not bind a texture. At the
+    // tier-1 shed ACCUM is stood down as a unit (degradedOk stays false —
+    // the dish, slice B, is the first degraded consumer) and the result
+    // names the shed instead of going silent.
+    const wet = wetFrame.frame({
+      consumers: { accum: !!layoutParams.accumulation },
+      shed: s.perfTier1 ? 'perfTier1' : null,
+      degradedOk: false,
+      wetness: layoutParams.accumulationWetness,
+      freeze: accumFrozen || s.running === false || !!s.slowRender,
+      seed: s.seed,
+      width: canvasW,
+      height: canvasH,
+      instances: contract.instances,
+      behave: layoutParams.behave,
+      motion: motionAmount(layoutParams),
+    });
 
     // Static resource: the atlas, keyed by the combos the transformed instances use.
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
@@ -1041,6 +1051,11 @@ export function createLiveLoop(
       rh,
       accumOn: !!layoutParams.accumulation && !s.perfTier1,
       accumFrozen,
+      // #1809: how the wet field was served this frame ('live' |
+      // 'degraded' | 'shed' | 'off') and the shed that stood it down, if
+      // any — the show path reads the mode, never a silent gate.
+      wetMode: wet.wetMode,
+      wetShed: wet.wetShed,
       accumParams: {
         // #274: fade is trail half-life in frames — convert to keep at the
         // boundary. #268: SWELL breathes the half-life toward 40 frames and
@@ -1400,7 +1415,8 @@ export function createLiveLoop(
             if (DEBUG_AGE) setAgeReader(null); // #1805: the readout's wire ends with the session
             if (DEBUG_TRAILGRID) setTrailGridReader(null); // #1808: same, for the grid readout
             velPrev.clear(); // #309: the next session starts at zero velocity
-            wetSlot.vortex = null;
+            // #1809: the wet field survives the toggle — the wet-frame
+            // service owns it for the session; only ACCUM state resets.
             // #268: the session ended — reset the loop's own frozen flag
             // (not the frame's read-only copy), or re-enabling ACCUM shows
             // no trails while the panel reads inactive (two-press FREEZE trap).
@@ -1566,6 +1582,7 @@ export function createLiveLoop(
     canvas.removeEventListener('webglcontextrestored', onCtxRestored);
     paletteMix.cancel();
     lastFrameTarget = null;
+    wetFrame.dispose(); // #1809: the field's only sanctioned destroy — session end
     resolver.dispose();
     live.dispose();
   }

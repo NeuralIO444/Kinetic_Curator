@@ -553,14 +553,14 @@ export function hashPacked(packed) {
 }
 
 /**
- * One live frame of the wet hook. Freeze holds the last field (do not
- * zero it — resume would pop). Wetness 0 does not step and returns a
- * gain of exactly 0 so the feed hook does not bind the texture.
- * `slot` is caller-owned `{ vortex }`.
+ * The slot protocol's lifetime rule (#1809): the field is created on
+ * first use and reset ONLY on seed/size change — never on a consumer's
+ * toggle or a session fault. Shared by noteWetFrame and the wet-frame
+ * service (gl/wetFrame.mjs) so every path owns the field by exactly the
+ * same rule. Returns the live state.
+ * @param {{vortex: object|null, seed?: number, width?: number, height?: number}} slot caller-owned `{ vortex }`
  */
-export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion }) {
-  const step = wetnessStep(wetness);
-  if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+export function ensureVortex(slot, { seed, width, height } = {}) {
   const w = width > 0 ? width : 1000;
   const h = height > 0 ? height : 700;
   const s = Number(seed) | 0 || 970;
@@ -570,6 +570,20 @@ export function noteWetFrame(slot, { wetness, freeze, seed, width, height, insta
     slot.width = w;
     slot.height = h;
   }
+  return slot.vortex;
+}
+
+/**
+ * One live frame of the wet hook. Freeze holds the last field (do not
+ * zero it — resume would pop). Wetness 0 does not step and returns a
+ * gain of exactly 0 so the feed hook does not bind the texture.
+ * `slot` is caller-owned `{ vortex }`.
+ */
+export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion }) {
+  const step = wetnessStep(wetness);
+  if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+  const w = width > 0 ? width : 1000;
+  ensureVortex(slot, { seed, width, height });
   if (freeze) stepVortex(slot.vortex, { freeze: true });
   else {
     emitFromInstances(slot.vortex, instances || []);
