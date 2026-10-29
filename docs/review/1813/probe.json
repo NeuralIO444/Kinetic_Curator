@@ -1,0 +1,48 @@
+{
+  "recipe": {
+    "saturation": 0.35,
+    "skew": 0.45,
+    "paperSkew": 0.6,
+    "sheen": 0.3,
+    "sheenPow": 6,
+    "groundSplit": 0.5
+  },
+  "damp": 0.05,
+  "soaked": 0.8,
+  "amount": 1,
+  "scenes": {
+    "dark-ground": {
+      "ground": "#101014",
+      "wetPixels": 16797,
+      "dryPixels": 24163,
+      "wetMeanLumaBefore": 0.1443,
+      "wetMeanLumaAfter": 0.1169,
+      "wetMeanSatBefore": 1.085,
+      "wetMeanSatAfter": 1.335,
+      "dryMaxAbsDelta": 0,
+      "wetMaxChannelBrighten": 0.04404
+    },
+    "light-paper": {
+      "ground": "#f2ead8",
+      "wetPixels": 16797,
+      "dryPixels": 24163,
+      "wetMeanLumaBefore": 0.6927,
+      "wetMeanLumaAfter": 0.5138,
+      "wetMeanSatBefore": 0.258,
+      "wetMeanSatAfter": 0.335,
+      "dryMaxAbsDelta": 0,
+      "wetMaxChannelBrighten": 0
+    },
+    "monochrome": {
+      "ground": "#101014",
+      "wetPixels": 16797,
+      "dryPixels": 24163,
+      "wetMeanLumaBefore": 0.4327,
+      "wetMeanLumaAfter": 0.3861,
+      "wetMeanSatBefore": 0,
+      "wetMeanSatAfter": 0,
+      "dryMaxAbsDelta": 0,
+      "wetMaxChannelBrighten": 0
+    }
+  }
+}

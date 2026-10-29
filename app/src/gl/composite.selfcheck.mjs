@@ -151,15 +151,16 @@ ok('resolveLayerMattes: valid, self-cycle, 2-cycle, missing, fx source', () => {
 
 // --- harness coverage: every renderer program is audit-registered -----------
 // The #193 second pass routes the renderer programs (quad, composite,
-// resolve, copy, upscale — and, since Phase 2 S2, mesh) through the checked
+// resolve, copy, upscale — and, since Phase 2 S2, mesh; since #1813,
+// wetlook) through the checked
 // compile/link builders and the audit in createRenderer. The real compile
 // needs a GL context (covered in the debug harness's in-page suite); here
 // in Node we prove the audit table is complete and honest: every uniform
 // each shader declares is in its program's upload list — the exact
 // direction the checked audit throws on.
-ok('harness: RENDERER_PROGRAMS covers all six renderer programs', () => {
+ok('harness: RENDERER_PROGRAMS covers all seven renderer programs', () => {
   const keys = RENDERER_PROGRAMS.map((d) => d.key).sort();
-  assert.deepEqual(keys, ['composite', 'copy', 'mesh', 'quad', 'resolve', 'upscale']);
+  assert.deepEqual(keys, ['composite', 'copy', 'mesh', 'quad', 'resolve', 'upscale', 'wetlook']);
   for (const def of RENDERER_PROGRAMS) {
     assert.equal(typeof def.vs, 'string', `${def.key}: has vertex source`);
     assert.equal(typeof def.fs, 'string', `${def.key}: has fragment source`);
