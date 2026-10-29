@@ -145,6 +145,29 @@ export function accumFeedLayers(contract, layerIds) {
   return out;
 }
 
+/**
+ * #1806 slice 2 — the scene's OWN feed selection, read off its layers: a
+ * feed-capable stratum carries `feedsAccum: false` when the performer has
+ * flagged it off (buildSceneContract carries the flag from the document
+ * layer; absence means the stratum feeds — the default that preserves
+ * every existing scene exactly).
+ *
+ * Returns null when every feed-capable stratum feeds (no selection: the
+ * recipe takes the full composite, byte-identical to the pre-#1806
+ * path), otherwise the feeding strata's ids in compositeOrder — possibly
+ * empty (every stratum flagged off: the buffer is fed transparency and
+ * the trails die, while the stage renders untouched). The capability
+ * rule is accumFeedLayers' — this helper only reads the flags, so the
+ * recipe, the live loop and the governor's sensor can never disagree
+ * about who feeds. Pure; unit-tested in accumFeed.selfcheck.mjs.
+ */
+export function accumFeedSelection(contract) {
+  const layers = (contract && contract.layers) || [];
+  if (!layers.some((l) => isAccumFeedLayer(l) && l.feedsAccum === false)) return null;
+  const feeding = layers.filter((l) => isAccumFeedLayer(l) && l.feedsAccum !== false).map((l) => l.id);
+  return accumFeedLayers(contract, feeding).map((l) => l.id);
+}
+
 // All program builds go through the debug harness (#193): a compile/link
 // failure throws naming the program, source file, and line number.
 
@@ -492,6 +515,31 @@ registerCostTier('renderer/resolve-fxaa', {
   memoryBytes: 0,
   timeMs: 0.4,
   notes: 'resolve pass with FXAA 3.11 console (9 taps, ~+30 ALU); shed by governor cut 0, not by tier',
+});
+// #1806 slice 2: the selective-feed subset render — one extra PARTIAL
+// scene render per frame while a stratum selection is live (the selected
+// strata only, through the composite's own programs: no new pass, no new
+// shader, nothing for the pass sweep to drive). Tier 0 like the #740
+// FXAA declaration: the governor sheds it as its own cut (1.47, subset →
+// composite), not via this tier. The cost was MEASURED on the parity
+// bench scene (two content strata, 19 instances, + an invert FX
+// stratum; 512×512; page-side render loops in the harness, medians of
+// 7, 2026-10-29 — docs/review/1833/README.md carries the full table):
+// in SwiftShader wall time the subset render (one stratum of two) ran
+// 641.9 ms against the full composite's 903.7 ms — a ratio of 0.71,
+// placement-bound, scaling with the SELECTED strata's counts, which the
+// governor already budgets. timeMs is the author's estimate from that
+// ratio against the iPad render cap (FRAME_BUDGETS renderCapMs 5.0 ms
+// in data/quality.js): 0.71 × 5.0 ≈ 3.5 ms at 1080p iPad-class — a
+// hardware re-bless supersedes it. memoryBytes is the live wrapper's
+// dedicated target set at 1080p (6 RGBA16F + 1 RGBA8 targets); the
+// still path allocates the same set per sequence.
+registerCostTier('gl/accum-feed', {
+  tier: 0,
+  memoryBytes: 6 * 1920 * 1080 * 8 + 1920 * 1080 * 4,
+  timeMs: 3.5,
+  notes:
+    '#1806 slice 2 selective ACCUM feed: the subset render (selected strata only, existing composite programs); cost is the selected strata placement counts the governor already budgets; shed by governor cut 1.47 (subset -> composite), not by tier; timeMs = author estimate from the measured SwiftShader ratio (subset 641.9ms / full 903.7ms wall medians, 512x512, 19 instances, 2026-10-29) x the 5.0ms iPad render cap — hardware re-bless supersedes',
 });
 
 /**
@@ -1428,7 +1476,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
-    patternSeen = new Set();
+    // #1806 slice 2 — the pattern-texture sweep (the call at the end of
+    // this function) is owned by the FULL render: an accumInput render
+    // marks only its selected strata, so it starts from the full render's
+    // seen set instead of resetting it — its sweep then frees nothing the
+    // full render still needs when the two interleave per frame (the
+    // slice-1 seam alone re-created an unselected pattern's texture every
+    // frame). A pattern that leaves the scene is still freed by the next
+    // full render; a subset-only session merely holds textures longer,
+    // which costs memory, never correctness.
+    patternSeen = accumInput ? new Set(patternSeen) : new Set();
 
     const byLayer = new Map();
     for (const it of contract.instances) {
@@ -1792,6 +1849,11 @@ export function createRenderer(canvas) {
    * recipe (app/src/gl/accum.mjs): the SAME code the future live loop and
    * `studio.py render --accum` run. The buffer is off by default — this entry
    * is only called when the caller passes accum-enabled contracts.
+   * #1806 slice 2: a frame contract that flags strata off (feedsAccum)
+   * feeds the buffer the subset render instead of the composite — the
+   * selection is derived per frame from the contract itself
+   * (accumFeedSelection), so stills honour a project's flags through the
+   * shared contract builder with no still-side option to skew.
    *
    * @param {Array<object>} frames per-frame render payloads (shared atlas)
    * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb',
@@ -1832,6 +1894,7 @@ export function createRenderer(canvas) {
     const uploaded = uploadStatic(frames[0]);
     const T = allocFrameTargets(w, h);
     const accum = createAccum(gl, bridge, { width: w, height: h });
+    let subT = null; // #1806 slice 2: the subset render's targets (lazy, freed below)
     try {
       accum.begin(background);
       const base = accumRecipeParams({
@@ -1854,6 +1917,15 @@ export function createRenderer(canvas) {
       // as vx/vy — the stills/export path smears exactly like the live loop.
       const velPrev = new Map();
       let lastFxFinishChains = [];
+      // #1806 slice 2 — selective feed: a frame whose contract flags any
+      // stratum off steps the SUBSET render (the selected strata's own
+      // light, via the slice-1 seam) instead of the full composite. The
+      // subset renders into its own target set, allocated on first use;
+      // the full render still runs every frame — its finish chains land
+      // on the final buffer exactly as before — it is simply not what
+      // the buffer eats. No flags (every existing scene): the selection
+      // is null, no second render happens, and the step consumes the
+      // composite exactly as it did before #1806.
       let i = 0;
       for (const payload of frames) {
         if (payload.contract.version !== 1) {
@@ -1865,7 +1937,17 @@ export function createRenderer(canvas) {
         // B1: per-frame audio envelope modulates the recipe params.
         // #306: swell scales the glow gesture only (the washout control).
         const params = audio ? applyAudioEnvelope(base, audio[i] || {}, { swell }) : base;
-        accum.step(frameT.tex, params);
+        const feedIds = accumFeedSelection(payload.contract);
+        if (feedIds) {
+          if (!subT) subT = allocFrameTargets(w, h);
+          const subFrame = renderFrameInto(payload, subT, uploaded, {
+            transparent: true,
+            accumInput: { layerIds: feedIds },
+          });
+          accum.step(subFrame.tex, params);
+        } else {
+          accum.step(frameT.tex, params);
+        }
         lastFxFinishChains = frameT.fxFinishChains || [];
         i++;
       }
@@ -1888,6 +1970,7 @@ export function createRenderer(canvas) {
       return { pixels, width: w, height: h, age, stats: trailStats };
     } finally {
       accum.dispose();
+      if (subT) freeFrameTargets(subT);
       freeFrameTargets(T);
       freeStatic(uploaded);
     }
@@ -2235,12 +2318,42 @@ export function createLiveRenderer(canvas) {
     }
   }
 
+  // #1806 slice 2 — the live selective-feed render: the payload's feeding
+  // strata drawn again (the resolver's instances, never re-resolved) into
+  // a dedicated target set, returned as the frame accum.step() consumes
+  // while a subset selection is live. The full render always runs first
+  // in the tick — it owns the pattern-texture sweep and produces the
+  // grain finish chains — so this is the second, partial render the
+  // issue's cost paragraph prices: bounded by the selected strata's own
+  // placement counts, skipped entirely when no stratum is flagged off,
+  // and dropped by the governor's accum-feed shed (cut 1.47) under load.
+  let AT = null,
+    ATW = 0,
+    ATH = 0;
+  function renderAccumInputFrame(payload, layerIds) {
+    if (!atlasTex) throw new Error('[gl-live] renderAccumInputFrame: atlas not uploaded — call setAtlas first');
+    if (!T) throw new Error('[gl-live] renderAccumInputFrame: no live targets yet — renderFrame must run first');
+    if (!AT || ATW !== TW || ATH !== TH) {
+      if (AT) b.freeFrameTargets(AT);
+      AT = b.allocFrameTargets(TW, TH);
+      ATW = TW;
+      ATH = TH;
+    }
+    return b.renderFrameInto(
+      { ...payload, width: TW, height: TH },
+      AT,
+      { atlasTex },
+      { transparent: true, accumInput: { layerIds } },
+    );
+  }
+
   function dispose() {
     dropAccum();
     dropMixTargets();
     if (atlasTex) gl.deleteTexture(atlasTex);
     if (T) b.freeFrameTargets(T);
     if (OT) b.freeFrameTargets(OT);
+    if (AT) b.freeFrameTargets(AT);
     b.disposeBase();
   }
 
@@ -2249,6 +2362,7 @@ export function createLiveRenderer(canvas) {
     setResolveOptions: (o) => b.setResolveOptions(o),
     hasAtlas: () => !!atlasTex,
     renderFrame,
+    renderAccumInputFrame,
     renderFrameOffscreen,
     present,
     presentUpscaled,
