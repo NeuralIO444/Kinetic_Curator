@@ -1948,6 +1948,27 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
   let cur = L.t0; // target holding the current accum image
   const other = () => (cur === L.t0 ? L.t1 : L.t0);
 
+  // #1808 slice 1: recipe steps since begin(). The trail grid's
+  // deterministic stamp — it counts the step sequence itself, so two
+  // runs of the same steps carry the same stamps (never a wall clock).
+  let stepsTaken = 0;
+
+  // #1805's age readback, factored so readTrail() (#1808) shares the
+  // exact path: { data: Float32Array(w*h), width, height } or null when
+  // the age buffer was never requested.
+  const readAgeField = () => {
+    if (!ageCur) return null;
+    const px = new Float32Array(W * H * 4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, ageCur.fb);
+    gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    const err = gl.getError();
+    if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error reading the age buffer: 0x${err.toString(16)}`);
+    const data = new Float32Array(W * H);
+    for (let i = 0; i < W * H; i++) data[i] = px[i * 4];
+    return { data, width: W, height: H };
+  };
+
   const bindTex = (unit, tex) => {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -2056,6 +2077,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       cur = L.t0;
       echoHead = 0;
       echoCount = 0; // B3: the ring holds no valid frames after CLEAR
+      stepsTaken = 0; // #1808: CLEAR begins a new buffer epoch — stamps restart
       const [r, g, b] = hexToRgb(background);
       for (const t of [L.t0, L.t1]) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
@@ -2280,6 +2302,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       }
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error after step: 0x${err.toString(16)}`);
+      stepsTaken += 1; // #1808: the step landed — the stamp counts landed steps only
       return cur;
     },
 
@@ -2301,16 +2324,26 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
      * never a per-frame stage read.
      */
     readAge() {
-      if (!ageCur) return null;
+      return readAgeField();
+    },
+
+    /**
+     * #1808 slice 1 — read one trail snapshot back for the grid: the
+     * current colour buffer (premultiplied RGBA floats, bottom-first)
+     * plus the age field when it was requested (null otherwise), and
+     * the step stamp. { data, ageData, width, height, stamp }.
+     * Readout paths only (the ?debug=trailgrid backstage view's poll) —
+     * never a per-frame stage read.
+     */
+    readTrail() {
       const px = new Float32Array(W * H * 4);
-      gl.bindFramebuffer(gl.FRAMEBUFFER, ageCur.fb);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, cur.fb);
       gl.readPixels(0, 0, W, H, gl.RGBA, gl.FLOAT, px);
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
       const err = gl.getError();
-      if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error reading the age buffer: 0x${err.toString(16)}`);
-      const data = new Float32Array(W * H);
-      for (let i = 0; i < W * H; i++) data[i] = px[i * 4];
-      return { data, width: W, height: H };
+      if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error reading the trail buffer: 0x${err.toString(16)}`);
+      const age = readAgeField();
+      return { data: px, ageData: age ? age.data : null, width: W, height: H, stamp: stepsTaken };
     },
 
     resize(width, height) {

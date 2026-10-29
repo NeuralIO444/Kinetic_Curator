@@ -139,6 +139,45 @@ update rule.
   not the step it lands. R16F precision bounds the age quantum (~1 ms at
   60 s ages) — far below one frame at any playable age.
 
+## Trail grid (#1808 slice 1 — ACCUM as memory, rung 2's read surface)
+
+Creatures steer on fields they sample on CPU, never on raw textures.
+The trail grid is the buffer's coarse spatial read: a 32-column box
+downsample (`gl/trailGrid.mjs`, pure) carrying, per cell, the mean
+light energy, the mean colour — whose channel ratios are the spectral
+fade's age proxy (#1800) — and, when the age buffer rides along, the
+dominant age: the light-weighted mean age of the cell's living pixels
+(AGE_VOID where no pixel in the cell carries one). Rows follow the
+buffer's aspect, so cells stay square (32×22 at pair aspect, the #1183
+contact-grid shape). The grid is stamped with the buffer's own step
+count (steps since CLEAR, counted by `createAccum` — deterministic
+state, never a wall clock), and `sampleTrailGrid` reads it nearest-cell
+in buffer space: every sampled value is a real measured cell.
+
+- **Sources.** The derivation is source-agnostic: the JS mirror's
+  float64 state (the selfcheck's scripted scenes prove the grid against
+  an independent box-filter reference of that buffer — energy exact,
+  ages within one frame of the analytic truth) or the live object's
+  `readTrail()` snapshot, `readAge()`'s twin (colour readback + the age
+  field when requested). With no age source the grid's ages are void
+  and consumers use the channel ratios — the issue's v1 substitute.
+- **The one live consumer (slice 1).** `?debug=trailgrid` mounts a
+  backstage readout beside the AGE view: the live loop names it as an
+  age-buffer consumer (`ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID`, no
+  consumer = no allocation, as #1805), registers the ACCUM object on
+  `gl/trailGridLive.mjs`, and the readout polls a snapshot a few times
+  a second and paints the grid as a coarse thumbnail of the buffer with
+  its stamp, peak cell and lit fraction. Derivation at pair size
+  (1600×1100) measures ~37 ms in the sandbox — a backstage-poll cost in
+  this slice, stated plainly; a steering consumer's cadence and budget
+  are slice 2's device-harness question, not assumed here.
+- **Not built (the issue's own slicing).** No steering consumes the
+  grid yet: slice 2 (one ember-following drive on the moth) carries the
+  issue's feel gate — it does not leave the runway without Matt playing
+  it — and slice 3 (the sign flip) follows it. Nothing about creature
+  motion changes in this slice; replay and creature gates are untouched
+  by construction (no resolver input, no creature code).
+
 ## Phase A — feedback: TUNNEL + PRISM (light-tunnels + chromatic drift)
 
 Step 1 (fade) samples the buffer through an affine feedback transform
