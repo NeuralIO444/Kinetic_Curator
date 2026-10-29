@@ -7,6 +7,7 @@
 //   (see ./governorCuts.js, pure and unit-tested):
 //     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //     cut 1.45: spectral feedback warp (#1490 — after mark weather, before the population)
+//     cut 1.47: selective ACCUM feed (#1806 slice 2 — subset render drops to the composite path)
 //     cut 1.5: creature count (#1694 S2 — population sheds before finishes)
 //     cut 1.6: travel (#1574 — FLOW marks settle home; after the population, ahead of the tier)
 //     cut 2: quality tier step HIGH → BALANCED → PERF
@@ -31,11 +32,13 @@ import { useStore } from '../state/store.js';
 import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
 import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
+import { accumFeedSelection } from '../gl/renderer.mjs';
 
 // #1574 — the event log's ladder map (gl/governorEventLog.mjs SHED_STEPS)
 // predates the content rungs: it knows neither 'creatureCount' (cut 1.5)
-// nor 'travel' (cut 1.6) — nor 'feedbackWarp' (cut 1.45, #1490) or
-// 'markWeather' (cut 1.4) — and recordGovernorEvent throws on an unknown
+// nor 'travel' (cut 1.6) — nor 'feedbackWarp' (cut 1.45, #1490),
+// 'markWeather' (cut 1.4) or 'accumFeed' (cut 1.47, #1806) — and
+// recordGovernorEvent throws on an unknown
 // kind — inside this effect, at the moment a shed fires. Guard the two
 // generic record sites below so a rung the log has not learned can never
 // crash the governor; the shed itself, the badge (shedSummary) and the
@@ -169,6 +172,18 @@ export function usePerformanceGovernor() {
   const setFeedbackWarpShed = useStore((s) => s.setFeedbackWarpShed);
   const layers = useStore((s) => s.layers);
   const feedbackWarpActive = feedbackWarpAmount(layers, false) > 0 && !!layoutParams?.accumulation && !perfTier1;
+  // #1806 slice 2 — the accum-feed rung (cut 1.47): the shed overlay, and
+  // whether a selective feed is live on this scene — a feed-capable
+  // stratum is flagged off (the renderer's own derivation, run over the
+  // store layers so the sensor and the recipe can never disagree about
+  // who feeds), ACCUM is on (no buffer, no feed), and the tier-1 shed
+  // has not already killed the buffer the feed runs into.
+  const accumFeedShed = useStore((s) => s.accumFeedShed);
+  const setAccumFeedShed = useStore((s) => s.setAccumFeedShed);
+  const accumFeedActive =
+    !!layoutParams?.accumulation &&
+    !perfTier1 &&
+    accumFeedSelection({ layers, compositeOrder: (layers || []).map((l) => l && l.id) }) !== null;
   const light = useStore((s) => s.light);
   const weatherActive =
     !!(light && (light.spec ?? 0) > 0 && (light.intensity ?? 0) > 0) || layoutParams?.dish === true || travelActive;
@@ -342,6 +357,7 @@ export function usePerformanceGovernor() {
       travelShed,
       weatherShed,
       feedbackWarpShed,
+      accumFeedShed,
     };
     for (const cut of [...GOVERNOR_RESTORE_CUTS].reverse()) {
       if (!cut.needsRestore(snap, { healthy })) continue;
@@ -357,6 +373,9 @@ export function usePerformanceGovernor() {
           break;
         case 'feedbackWarp':
           setFeedbackWarpShed(false);
+          break;
+        case 'accumFeed':
+          setAccumFeedShed(false);
           break;
         case 'creatureCount':
           setCreatureShed(0);
@@ -430,6 +449,8 @@ export function usePerformanceGovernor() {
       weatherShed,
       feedbackWarpActive,
       feedbackWarpShed,
+      accumFeedActive,
+      accumFeedShed,
       travelActive,
       travelShed,
       slowRender,
@@ -449,6 +470,9 @@ export function usePerformanceGovernor() {
         break;
       case 'feedbackWarp':
         setFeedbackWarpShed(true);
+        break;
+      case 'accumFeed':
+        setAccumFeedShed(true);
         break;
       case 'creatureCount':
         setCreatureShed(cut.creatureShed);
@@ -513,6 +537,9 @@ export function usePerformanceGovernor() {
     feedbackWarpActive,
     feedbackWarpShed,
     setFeedbackWarpShed,
+    accumFeedActive,
+    accumFeedShed,
+    setAccumFeedShed,
     travelActive,
     travelShed,
     setTravelShed,

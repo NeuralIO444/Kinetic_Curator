@@ -35,6 +35,20 @@
 //          — no feedback buffer, no warp — and the rung is not already
 //          shed), so older callers and their pinned ladder walks see the
 //          ladder exactly as it was.
+//   cut 1.47: selective ACCUM feed (#1806 slice 2) — the subset render
+//          sheds after the feedback warp (cut 1.45, its ACCUM family) and
+//          BEFORE the creature count: the presented frame costs the
+//          picture nothing (only what the buffer remembers changes —
+//          every stratum trails again), and it drops a whole partial
+//          render. One boolean step off the accumFeedShed overlay — the
+//          strata's FEEDS ACCUM flags never move — restoring whole when
+//          pressure clears. Fires only when the caller says a selection
+//          is live (accumFeedActive: a feed-capable stratum is flagged
+//          off, ACCUM is on, and the rung is not already shed), so older
+//          callers and their pinned ladder walks see the ladder exactly
+//          as it was. Ahead of cut 3 by design: the subset degrades to
+//          the composite path BEFORE ACCUM itself sheds (the issue's
+//          cost paragraph).
 //   cut 1.5: creature count (#1694 slice 2, Matt's ruling Q2) — the population
 //          sheds FIRST among content cuts, before the quality tier and every
 //          finish below it; only edge AA and the pixel trim precede it, and
@@ -135,6 +149,14 @@ export const GOVERNOR_RESTORE_CUTS = [
     // reverse walk (it shed before it): finer sacrifices come back later.
     needsRestore: (s, ctx) => ctx.healthy && !!s.feedbackWarpShed,
     restoredLabel: 'feedback warp back — the music bends the trails again',
+  },
+  {
+    kind: 'accumFeed',
+    // #1806 slice 2 — cut 1.47: the selective feed restores after the
+    // warp in the reverse walk (it shed after it, before the population):
+    // finer sacrifices come back later.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.accumFeedShed,
+    restoredLabel: 'selective feed back — chosen strata only',
   },
   {
     kind: 'creatureCount',
@@ -259,6 +281,18 @@ export function nextGovernorCut(s) {
     return { kind: 'feedbackWarp', feedbackWarpShed: true, label: 'FEEDBACK WARP OFF — trails run straight' };
   }
 
+  // Cut 1.47 (#1806 slice 2): the selective ACCUM feed. After the
+  // feedback warp (cut 1.45 stands — the ACCUM family sheds together)
+  // and ahead of the creature count: dropping the subset render costs
+  // the presented frame nothing — the buffer simply eats the composite
+  // again and every stratum trails — and it buys back a whole partial
+  // render. Opt-in per caller (`accumFeedActive === true` = a stratum
+  // selection is live with ACCUM on, not already shed) so older callers
+  // and their pinned ladder walks keep the pre-#1806 ladder.
+  if (s.accumFeedActive === true && !s.accumFeedShed) {
+    return { kind: 'accumFeed', accumFeedShed: true, label: 'SELECTIVE FEED OFF — all strata trail' };
+  }
+
   // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
   // sheds FIRST among content cuts — population before finishes. One
   // creature per step, off the creatureShed overlay; the artist's count is
@@ -330,6 +364,9 @@ export function shedSummary(s) {
   if (s.weatherShed) out.push('weather clear');
   // #1490 — and about a warp shed: the trails run straight, the badge says so.
   if (s.feedbackWarpShed) out.push('feedback warp off');
+  // #1806 slice 2 — and about an accum-feed shed: the buffer eats every
+  // stratum again, the badge says so.
+  if (s.accumFeedShed) out.push('accum feed — all strata');
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);

@@ -460,6 +460,14 @@ export const createGlobalSlice = (set) => ({
    * restore table). */
   feedbackWarpShed: false,
   setFeedbackWarpShed: (on) => set({ feedbackWarpShed: !!on }),
+  /** #1806 slice 2 — the governor's accum-feed shed (cut 1.47): while
+   * true, liveLoop feeds the ACCUM buffer the full composite instead of
+   * the subset render, so every stratum trails again. A render-only
+   * overlay in the travelShed class — never serialized into a document;
+   * the strata's FEEDS ACCUM flags never move. Restores whole when
+   * pressure clears (governorCuts' restore table). */
+  accumFeedShed: false,
+  setAccumFeedShed: (on) => set({ accumFeedShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) =>
@@ -918,6 +926,8 @@ export const createGlobalSlice = (set) => ({
         weatherShed: false,
         // #1490 — the warp shed is likewise a governor claim on the OLD document's FX strata.
         feedbackWarpShed: false,
+        // #1806 slice 2 — the accum-feed shed is likewise a governor claim on the OLD document's selection.
+        accumFeedShed: false,
         layoutParams: normalizeLayoutParams(doc.layoutParams),
         customAssets: sanitizeOverlay(doc.customAssets),
         ingestError: null,

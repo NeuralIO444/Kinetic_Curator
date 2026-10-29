@@ -25,7 +25,7 @@
  * store's setNodeCount.
  */
 
-import { createLiveRenderer } from './renderer.mjs';
+import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver, getLastSpawnDecisions } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
@@ -1391,8 +1391,33 @@ export function createLiveLoop(
                 rp = applySpectrumWarp(rp, warpDriver.step(readSpectrum(), clampedDtMs), feedbackWarp);
               }
               if (accumParams.flowField) rp.flowField = accumParams.flowField;
+              // #1806 slice 2 — selective feed: when the scene flags any
+              // stratum off (accumFeedSelection reads the frame contract's
+              // own flags), the buffer eats the SUBSET render — the
+              // feeding strata's light alone — instead of the composite.
+              // The composite render above still ran: it owns the pattern
+              // sweep, the finish chains applied below, and the stage's
+              // pixels are never the buffer's business. Three honest
+              // fallbacks feed the composite instead, all visible in the
+              // open: the governor's accum-feed shed (cut 1.47 — the show
+              // block reports it), a palette dissolve in flight (the mix
+              // target IS the dissolved composite; a subset of it does
+              // not exist, so dissolve frames feed whole and selection
+              // resumes when the dissolve ends), and a subset render
+              // fault (logged, never silent — the buffer degrades to
+              // all-strata trails rather than dying with the seam).
+              let feedTarget = target;
+              const feedIds = accumFeedSelection(payload.contract);
+              if (feedIds && !getState().accumFeedShed && typeof mix !== 'number') {
+                try {
+                  feedTarget = live.renderAccumInputFrame(payload, feedIds);
+                } catch (e) {
+                  console.error('[gl-live] selective accum feed failed — feeding the composite this frame:', e);
+                  feedTarget = target;
+                }
+              }
               // #309: the frame is backing-store sized; the pair is logical.
-              accumObj.step(target.tex, rp, { width: target.w, height: target.h });
+              accumObj.step(feedTarget.tex, rp, { width: feedTarget.w, height: feedTarget.h });
               accumPoisonRun = 0;
               // #1805: keep the backstage AGE readout's wire pointed at
               // the live accum object (it reads the age field back).

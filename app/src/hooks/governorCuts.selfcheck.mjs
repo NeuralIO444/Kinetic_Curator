@@ -89,12 +89,17 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // #1490 — 'feedbackWarp' joins between markWeather and creatureCount
   // (cut 1.45): the warp sheds before body counts, weather still first
   // (the full walk is pinned in spectrumWarp.selfcheck G).
+  // #1806 slice 2 — 'accumFeed' joins between feedbackWarp and
+  // creatureCount (cut 1.47): the subset render sheds with its ACCUM
+  // family, before body counts (the full walk is pinned in
+  // accumFeed.selfcheck).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
   assert.deepStrictEqual(order, [
     'fxaa',
     'renderScale',
     'markWeather',
     'feedbackWarp',
+    'accumFeed',
     'creatureCount',
     'travel',
     'quality',

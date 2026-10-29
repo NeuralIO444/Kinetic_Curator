@@ -569,6 +569,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         opacity: clamp01(rl.layerOpacity ?? 1),
         blend: KNOWN_BLENDS.has(rl.layerBlendMode) ? rl.layerBlendMode : 'normal',
         matte: sanitizeMatte(docLayerById.get(String(rl.id))?.matte),
+        // #1806 slice 2 — FEEDS ACCUM, carried only while OFF (see the
+        // content branch below for the rule).
+        ...((off) => (off ? { feedsAccum: false } : {}))(
+          rl.layer?.feedsAccum === false || docLayerById.get(String(rl.id))?.feedsAccum === false,
+        ),
         pattern:
           pattern.drift > 0
             ? { ...pattern, t: Number.isFinite(Number(rl.t)) ? Math.round(Number(rl.t) * 1000) / 1000 : 0 }
@@ -587,6 +592,17 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       opacity: clamp01(rl.layerOpacity ?? 1),
       blend: KNOWN_BLENDS.has(rl.layerBlendMode) ? rl.layerBlendMode : 'normal',
       matte: sanitizeMatte(docLayerById.get(layerId)?.matte),
+      // #1806 slice 2 — the FEEDS ACCUM flag (#1806 design: a per-stratum
+      // property, default on). Carried ONLY while off: absence means the
+      // stratum feeds the ACCUM buffer, so an unflagged scene's contract
+      // — and its hash — is exactly what it was before the flag existed
+      // (the squash/cellShed additive-field precedent). Read from the
+      // resolver's layer or the document layer, like matte (#189): the
+      // document is the flag's home until slice 3's BUILD toggle edits
+      // it there. Slice 2 only wires the recipe to honour it.
+      ...((off) => (off ? { feedsAccum: false } : {}))(
+        rl.layer?.feedsAccum === false || docLayerById.get(layerId)?.feedsAccum === false,
+      ),
       layout: {
         blendMode: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
@@ -862,6 +878,13 @@ export function assertSceneContract(scene) {
       }
       if (m.mode !== 'alpha' && m.mode !== 'luma') fail(`layer ${l.id}: matte.mode must be alpha|luma`);
       if (typeof m.invert !== 'boolean') fail(`layer ${l.id}: matte.invert must be boolean`);
+    }
+    if (l.feedsAccum !== undefined) {
+      // #1806 slice 2 — the feed flag rides a layer only while OFF, and
+      // only a light-source stratum can carry it (MATH/FX never feed).
+      if (l.type !== 'content' && l.type !== 'pattern')
+        fail(`layer ${l.id}: only content/pattern layers carry a feed flag`);
+      if (l.feedsAccum !== false) fail(`layer ${l.id}: feedsAccum is only ever false (absence = feeds)`);
     }
     if (l.type === 'fx') {
       if (!Array.isArray(l.fx)) fail(`fx layer ${l.id}: fx must be an array`);

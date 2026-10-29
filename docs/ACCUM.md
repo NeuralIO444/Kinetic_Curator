@@ -446,6 +446,64 @@ nothing in production calls it yet.
   changes nothing, byte for byte; an empty selection is transparent.
   Stills: `docs/review/1806/`.
 
+## Selective accumulation (#1806) — slice 2: recipe wiring
+
+Slice 2 wires the seam into the recipe. A content or pattern stratum
+whose document layer carries `feedsAccum: false` no longer feeds the
+buffer; everything else about its frame is unchanged — it still
+renders on stage, still folds, still finishes.
+
+- **The flag's shape:** the key exists only while off. An unflagged
+  scene's contract is byte-identical to the pre-#1806 one (hash
+  stability — the squash/cellShed precedent), and spelling the flag
+  `true` builds the identical contract: absence IS the on state, so
+  the contract validator accepts the key only as exactly `false`,
+  and only on content/pattern layers. The field lives on the document
+  layer and reaches the contract through the shared scene builders,
+  so the still sequence, the studio renderer and the live loop all
+  read the same scene. (The BUILD toggle and the project-JSON
+  authoring/migration are slice 3, #1834.)
+- **The derivation:** `accumFeedSelection(contract)` (renderer.mjs)
+  returns null while every feed-capable stratum feeds — the
+  historical path: no second render, byte-identical — else the
+  feeding ids in composite order (possibly empty). Both consumers
+  derive it per frame from the frame's own contract; nothing is
+  cached in session state a project load could skew.
+- **What the buffer eats:** the subset render — the feeding strata's
+  own light through the slice-1 seam. The full render still runs
+  every frame and its finish chains land on the buffer exactly as
+  before; it is simply not what the buffer eats. An all-off
+  selection feeds transparency: the buffer sits at the background
+  and decays. Two honest fallbacks in the live loop: a
+  palette-dissolve frame and a failed subset render both feed the
+  composite for that frame — a dissolve is a blend of two whole
+  scenes, and one frame of lost selection beats a lost frame of
+  show.
+- **Matte ruling:** a feeding stratum renders into the buffer
+  exactly as it renders on stage — matte included, even when the
+  matte's source stratum does not feed. The source lends its shape,
+  never its light. Pinned in the proof suite: the matted subset's
+  light survives only inside the source's footprint.
+- **Pattern sweep:** the pattern-texture sweep stays owned by the
+  full render. A subset render seeds its seen set from the full
+  render's instead of resetting it, so interleaved subset renders
+  never free a texture an unselected pattern still needs (the
+  hazard slice 1's report flagged).
+- **Cost + the shed rung:** the extra render is real per-frame work
+  while a selection is live — measured at ≈0.71× a full scene
+  render of the same scene (SwiftShader bench, `docs/review/1833/`)
+  and declared as `gl/accum-feed` in the cost registry. The
+  governor sheds it as cut 1.47, after the feedback warp and before
+  the creature count: under cost pressure the subset render stops
+  and all strata trail until pressure lifts. The shed changes
+  trails, never the presented frame.
+- **Proof** (`accumFeed.selfcheck.mjs`, 15 cases): default sequences
+  byte-identical with the flag absent or spelled on; a flagged-off
+  stratum leaves zero trail (its buffer matches the scene without
+  it to ≤1 LSB); both-off holds the background; JS-mirror parity on
+  the composite and subset paths; the matte ruling; the governor
+  rung's order, gating and restore. Stills: `docs/review/1833/`.
+
 ## The documented light-feel
 
 The acceptance bar for a trail still:
