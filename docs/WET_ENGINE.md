@@ -1,6 +1,9 @@
 # WET ENGINE — a standalone wetness service (research + phases)
 
-**Status:** research, not yet built. Phases A–C below are the proposed path.
+**Status:** Phase A landed 2026-10-28 (#1809 slice A — the wet-frame
+service is `app/src/gl/wetFrame.mjs`, consumed by ACCUM through the live
+loop; the gate/ownership below reads as the pre-service state it
+replaced). Phases B–C are still the proposed path.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from *owner* to *one consumer among several*.
@@ -102,7 +105,7 @@ produce byte-identical `wetMask`/`wetVel` — the refactor is proven by
 
 | Phase | Content | Acceptance |
 |---|---|---|
-| **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change |
+| **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change — **landed (#1809 slice A, `app/src/gl/wetFrame.mjs` + `wetFrame.selfcheck`)** |
 | **B — consumer #2** | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact |
 | **C — exports + parity** | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling | screen vs PNG parity selfcheck; parity harness green with WET off |
 
