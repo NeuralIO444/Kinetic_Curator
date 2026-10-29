@@ -112,6 +112,39 @@ export function resolveLayerMattes(contract) {
   return out;
 }
 
+/**
+ * #1806 slice 1 — selective accumulation: which strata CAN feed the ACCUM
+ * buffer. Only the light-source strata feed: content tracks and pattern
+ * tracks (a pattern composites like a content track, #1098). MATH and FX
+ * strata never feed — they are transforms and finishes, not light sources,
+ * and the buffer receives the selected strata's pre-FX light (the grain
+ * law, #520/#820: finishes run after the buffer, never into it).
+ *
+ * Pure (no GL): the one definition slices 2 (recipe wiring) and 3 (the
+ * BUILD flag + project field) share, unit-tested in
+ * accumInput.selfcheck.mjs.
+ */
+export function isAccumFeedLayer(layer) {
+  return !!layer && (layer.type === 'content' || layer.type === 'pattern');
+}
+
+/**
+ * The contract layers that feed the buffer for a performer's selection:
+ * the feed-capable layers whose id is in `layerIds`, in compositeOrder
+ * (bottom -> top). Unknown ids and MATH/FX ids in the selection are
+ * ignored — naming a transform stratum can never make it a light source.
+ */
+export function accumFeedLayers(contract, layerIds) {
+  const wanted = new Set(layerIds || []);
+  const byId = new Map((contract.layers || []).map((l) => [l.id, l]));
+  const out = [];
+  for (const id of contract.compositeOrder || []) {
+    const layer = byId.get(id);
+    if (layer && wanted.has(layer.id) && isAccumFeedLayer(layer)) out.push(layer);
+  }
+  return out;
+}
+
 // All program builds go through the debug harness (#193): a compile/link
 // failure throws naming the program, source file, and line number.
 
@@ -1374,9 +1407,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   /**
    * Composite one scene contract into the main ping-pong.
+   * `accumInput` (#1806 slice 1): { layerIds } renders the ACCUM input
+   * frame instead — only the selected strata, pre-FX, over transparent.
    * @returns the 16F target holding the frame (one of T.mainA/mainB)
    */
-  function renderFrameInto(payload, T, uploaded, { transparent = false } = {}) {
+  function renderFrameInto(payload, T, uploaded, { transparent = false, accumInput = null } = {}) {
     uploadMeterBeginFrame(); // #533 PR1: measure-only — resets call-slot indexing for this frame
     const { width: w, height: h, contract, cells, bg } = payload;
     sceneW = payload.sceneW || 1000; // #606: scene units follow the authored canvas
@@ -1403,6 +1438,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const layerById = new Map(contract.layers.map((l) => [l.id, l]));
     const wrapByFx = new Map((contract.fxWraps || []).map((x) => [x.fxLayerId, x]));
     const matteMap = resolveLayerMattes(contract);
+    // #1806 slice 1 — in accumInput mode only the feeding strata draw
+    // (accumFeedLayers: selected content/pattern layers; MATH/FX can
+    // never feed). Null on every production path today: the full
+    // composite below is byte-identical to the pre-#1806 renderer.
+    const feedIds = accumInput ? new Set(accumFeedLayers(contract, accumInput.layerIds).map((l) => l.id)) : null;
 
     // Bake a matte source layer's raw group content into maskT (premultiplied).
     // The mask is the source layer's own content over transparent — its blend
@@ -1424,10 +1464,11 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       mWrite = mainB;
     gl.bindFramebuffer(gl.FRAMEBUFFER, mRead.fb);
     gl.viewport(0, 0, w, h);
-    if (transparent) {
+    if (transparent || feedIds) {
       // ACCUM input frames: transparent so the opaque project background
       // owned by accum.begin() shows through; opaque here would erase trails
-      // in the OVER pass (s.a=1 -> o=s).
+      // in the OVER pass (s.a=1 -> o=s). #1806 accumInput frames are ACCUM
+      // input by definition, so they take this clear regardless of the flag.
       gl.clearColor(0, 0, 0, 0);
     } else {
       const [br, bgc, bb] = hexToRgb(bg);
@@ -1487,6 +1528,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     for (const layerId of contract.compositeOrder) {
       const layer = layerById.get(layerId);
       if (!layer) throw new Error(`[gl] compositeOrder references unknown layer ${layerId}`);
+      // #1806 slice 1: in accumInput mode every non-feeding layer is
+      // skipped whole — an unselected stratum leaves no light in the
+      // frame, and MATH/FX strata (never in feedIds) get no wrap, no
+      // fold, and no finish chain. Selected strata draw through the
+      // exact compositeLayerTo path below, so their placements, blends,
+      // mattes, and per-instance data are the main render's own.
+      if (feedIds && !feedIds.has(layerId)) continue;
       // #1010 — MATH tracks ride the FX fold verbatim: seed the wrap with
       // the composite below, run the chain, composite back with wet/dry
       // opacity. No new plumbing — the branch is the same machine.
@@ -1659,7 +1707,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 /**
  * createRenderer(canvas) — one-shot stills/exports. Unchanged API:
  * renderScene(payload) and renderAccumSequence(frames, opts), each
- * allocating frame targets per render.
+ * allocating frame targets per render. #1806 slice 1 adds
+ * renderAccumInput(payload, layerIds): the selective-accumulation seam.
  */
 export function createRenderer(canvas) {
   const b = createRendererBase(canvas, { alpha: false });
@@ -1673,6 +1722,7 @@ export function createRenderer(canvas) {
     renderFrameInto,
     resolveTargetToBytes,
     applyFinishChains,
+    setResolveOptions,
   } = b;
   /**
    * @param {object} payload
@@ -1693,6 +1743,42 @@ export function createRenderer(canvas) {
       const pixels = resolveTargetToBytes(mRead, T, w, h);
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after render: 0x${err.toString(16)}`);
+      return { pixels, width: w, height: h };
+    } finally {
+      freeFrameTargets(T);
+      freeStatic(uploaded);
+    }
+  }
+
+  /**
+   * #1806 slice 1 — the selective-accumulation seam: render ONLY the
+   * selected strata (layerIds naming content/pattern layers; MATH/FX ids
+   * are ignored, they never feed) as an ACCUM input frame — pre-FX light
+   * over transparent, resolved to bytes in renderScene's layout. This is
+   * the frame accum.step() will consume when any stratum's FEEDS ACCUM
+   * flag is off (slice 2 wires the recipe and the live loop; slice 3 adds
+   * the flag itself). No finish chains run: grain never enters a buffer
+   * input (#520/#820). Nothing in production calls this yet — the seam
+   * ships proven by accumInput.selfcheck.mjs, per the slice spec.
+   *
+   * @param {object} payload same shape as renderScene's
+   * @param {Iterable<string>} layerIds the strata that feed the buffer
+   * @returns {{pixels: Uint8Array, width: number, height: number}} RGBA bytes
+   */
+  function renderAccumInput(payload, layerIds) {
+    const { width: w, height: h, contract } = payload;
+    if (contract.version !== 1) throw new Error(`[gl] unsupported contract version ${contract.version}`);
+    canvas.width = w;
+    canvas.height = h;
+    bridge.resize(w, h, 1);
+
+    const uploaded = uploadStatic(payload);
+    const T = allocFrameTargets(w, h);
+    try {
+      const mRead = renderFrameInto(payload, T, uploaded, { transparent: true, accumInput: { layerIds } });
+      const pixels = resolveTargetToBytes(mRead, T, w, h);
+      const err = gl.getError();
+      if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum-input render: 0x${err.toString(16)}`);
       return { pixels, width: w, height: h };
     } finally {
       freeFrameTargets(T);
@@ -1801,7 +1887,10 @@ export function createRenderer(canvas) {
     b.disposeBase();
   }
 
-  return { renderScene, renderAccumSequence, dispose };
+  // setResolveOptions is forwarded from the base like the live renderer
+  // forwards it (#1806: data-space proof renders — raw clamp, no ACES /
+  // dither — run through it; production callers never touch it).
+  return { renderScene, renderAccumSequence, renderAccumInput, setResolveOptions, dispose };
 }
 
 /**

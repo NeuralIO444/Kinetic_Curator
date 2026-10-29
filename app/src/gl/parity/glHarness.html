@@ -75,10 +75,45 @@ window.__kcPresentProbe = async (payload) => {
   return { shownB64: u8ToB64(shown), readbackB64: u8ToB64(readback), width: w, height: h };
 };
 
+/**
+ * #1806 — payload.rawResolve renders in DATA space (raw premultiplied
+ * clamp: no ACES, no dither) instead of presentation space. Pixel-math
+ * proofs need it: the resolve's tonemap is nonlinear in alpha, so
+ * byte-space folds of presentation renders cannot match. The ACCUM
+ * input frame is data in production too (consumed as a 16F texture,
+ * never resolved). The presentation defaults are always restored.
+ */
+function withResolve(payload, fn) {
+  if (!renderer) renderer = createRenderer(canvas);
+  if (!payload.rawResolve) return fn();
+  renderer.setResolveOptions({ aces: 0, dither: 0 });
+  try {
+    return fn();
+  } finally {
+    renderer.setResolveOptions({});
+  }
+}
+
 window.__kcRender = async (payload) => {
   if (!renderer) renderer = createRenderer(canvas);
-  const { pixels, width, height } = renderer.renderScene(renderArgs(payload));
-  return { pixelsB64: u8ToB64(pixels), width, height };
+  return withResolve(payload, () => {
+    const { pixels, width, height } = renderer.renderScene(renderArgs(payload));
+    return { pixelsB64: u8ToB64(pixels), width, height };
+  });
+};
+
+/**
+ * #1806 slice 1 — selective-accumulation seam. Payload is __kcRender's
+ * plus { layerIds: [...] }: renders ONLY the named strata as an ACCUM
+ * input frame (pre-FX light over transparent) via renderAccumInput.
+ * Returns { pixelsB64, width, height } like __kcRender.
+ */
+window.__kcAccumInput = async (payload) => {
+  if (!renderer) renderer = createRenderer(canvas);
+  return withResolve(payload, () => {
+    const { pixels, width, height } = renderer.renderAccumInput(renderArgs(payload), payload.layerIds || []);
+    return { pixelsB64: u8ToB64(pixels), width, height };
+  });
 };
 
 /**
