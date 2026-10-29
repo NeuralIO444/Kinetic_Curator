@@ -1,0 +1,121 @@
+{
+  "what": "#1812 scripted single wash (disc r=6 cells, blue, stamped wet at 1.0, settled by 400 direct transfers, dried by steps until max wetness < 0.04 \u2014 401 steps)",
+  "centre": {
+    "deposited": 0.9912,
+    "edge": 0.0084,
+    "displayed": 0.9995
+  },
+  "rimEast": {
+    "deposited": 0.9934,
+    "edge": 0.5959,
+    "displayed": 1.5854
+  },
+  "displayedRatioRimOverCentre": 1.586,
+  "centreRowEastWest": [
+    {
+      "i": 56,
+      "deposited": 0,
+      "edge": 0,
+      "displayed": 0
+    },
+    {
+      "i": 57,
+      "deposited": 0,
+      "edge": 0,
+      "displayed": 0
+    },
+    {
+      "i": 58,
+      "deposited": 0.9912,
+      "edge": 0.5991,
+      "displayed": 1.5851
+    },
+    {
+      "i": 59,
+      "deposited": 0.9928,
+      "edge": 0.0106,
+      "displayed": 1.0034
+    },
+    {
+      "i": 60,
+      "deposited": 0.9927,
+      "edge": 0.0026,
+      "displayed": 0.9952
+    },
+    {
+      "i": 61,
+      "deposited": 0.9924,
+      "edge": 0.006,
+      "displayed": 0.9983
+    },
+    {
+      "i": 62,
+      "deposited": 0.9915,
+      "edge": 0.0009,
+      "displayed": 0.9924
+    },
+    {
+      "i": 63,
+      "deposited": 0.9922,
+      "edge": 0.0017,
+      "displayed": 0.9939
+    },
+    {
+      "i": 64,
+      "deposited": 0.9912,
+      "edge": 0.0084,
+      "displayed": 0.9995
+    },
+    {
+      "i": 65,
+      "deposited": 0.9932,
+      "edge": 0.0105,
+      "displayed": 1.0037
+    },
+    {
+      "i": 66,
+      "deposited": 0.9932,
+      "edge": 0.003,
+      "displayed": 0.9962
+    },
+    {
+      "i": 67,
+      "deposited": 0.9927,
+      "edge": 0.001,
+      "displayed": 0.9937
+    },
+    {
+      "i": 68,
+      "deposited": 0.9931,
+      "edge": 0.0028,
+      "displayed": 0.9959
+    },
+    {
+      "i": 69,
+      "deposited": 0.9922,
+      "edge": 0.0019,
+      "displayed": 0.994
+    },
+    {
+      "i": 70,
+      "deposited": 0.9934,
+      "edge": 0.5959,
+      "displayed": 1.5854
+    },
+    {
+      "i": 71,
+      "deposited": 0,
+      "edge": 0,
+      "displayed": 0
+    },
+    {
+      "i": 72,
+      "deposited": 0,
+      "edge": 0,
+      "displayed": 0
+    }
+  ],
+  "keptWetControl": "same wash held at wetness 1 for 300 steps: pigEdge sum over the field = 0 exactly",
+  "cycles": "rim accrued after successive full dries (rewet to 1 between): 0.596, 1.194, 1.792, 2.000 (cap), 2.000",
+  "note": "Displayed density = deposited density x (1 + accrued pigEdge) - the quantity the formula defines and packPigmentDeposited renders from. The pack's alpha clamps at 1 and this wash's density (0.99) sits at that clamp, so the ratio is read on displayed density; the rim's pack reflectance also darkens measurably (selfcheck: rim luminance drops >= 10 summed bytes vs the accrual-zeroed pack, centre bytes within 1-2). still-edge-darkening.png renders displayed density as darkness, deposited alone (left) vs with the accrued rim (right), same wash, scale 0..2."
+}

@@ -15,6 +15,16 @@ light by the deposited layer's KM reflectance; the dish reads pigment as
 stain in the backstage field view only and never consumes it. A field
 with no coloured marks carries no pigment and steps byte-identically to
 the pre-pigment sim. Measurements in `docs/review/1811/`.
+**Edge darkening:** #1812 (2026-10-29) added the signature on the
+deposit: an accrued field channel darkens a cell's displayed density by
+`1 + accrued`, where the accrual grows by `K · |∇d|` (K = 1.35) scaled
+by how much of the damp band (wetness 0.35 → 0.05, this doc's regime
+thresholds) the cell's wetness fell through in a step. No state machine:
+no wet/drying/dry enum, no persistence timer — previous wetness is read,
+never stored as regime. Rewet cycles accrue again, capped at 2. The
+accrual is state (exported, hashed, warm-up-deterministic), lives in the
+deposited pack every reader already consumes, and accrues identically
+under the degraded shed path. Measurements in `docs/review/1812/`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from _owner_ to _one consumer among several_.

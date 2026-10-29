@@ -7,6 +7,11 @@
  * itself lands in #1811 — two compartments (suspended / deposited) in this
  * state, mixed by Kubelka-Munk (gl/pigmentKM.mjs), stepped in Curtis's
  * order (MoveWater → MovePigment → TransferPigment) inside stepVortex.
+ * #1812 adds the drying signature on top of the deposit: an accrued
+ * edge-darkening plane (pigEdge), updated in the step from the deposited
+ * density's gradient and the wetness's fall through the damp band, and
+ * applied where the deposited layer's reflectance is computed
+ * (packPigmentDeposited) — no drying state machine, by the issue's word.
  *
  * Pure JS. No GL imports. Slice 2 (blocked on the ACCUM row, #961–#968)
  * uploads `velocityTex` as an *added* advect offset on the existing feed
@@ -48,12 +53,13 @@ import { kmConstantsForRgb, mixColorsRgb, mixturePigmentColor, sanitizeRgb } fro
 // wet pair and the vorton scratch; the ledger below is the full count.
 registerCostTier('gl/vortex', {
   tier: 1,
-  // 7 grid planes (omega, psi, psiNext, vx, vy, wet, wetNext) + the three
-  // #1811 pigment RGBA arrays + vorton ring and its scratch.
-  memoryBytes: 128 * 128 * 4 * 7 + 128 * 128 * 16 * 3 + 4096 * 16 * 2,
+  // 9 grid planes (omega, psi, psiNext, vx, vy, wet, wetNext + the #1812
+  // edge-accrual plane and its wet-snapshot scratch) + the three #1811
+  // pigment RGBA arrays + vorton ring and its scratch.
+  memoryBytes: 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2,
   timeMs: 6.6,
   notes:
-    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order. timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
+    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order; #1812 accrues edge darkening on the deposit inside the same step (A/B on the #1811 session: +~0.3 ms/step vs the #1811 build, inside this figure — docs/review/1812/). timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
 });
 
 // #1810 (Matt's ruling from the wet-engine eval): one field, one resolution —
@@ -77,6 +83,13 @@ export const VORTEX_GAMMA_FLOOR = 1e-4;
 export const PIGMENT_LOAD = 0.6; // suspended density per unit wet stamp
 export const PIGMENT_SETTLE = 0.02; // per-step settled fraction at ρ = 1
 export const PIGMENT_LIFT = 0.05; // per-step lifted fraction at wet = 1, ω = 0
+// #1812 edge-darkening constants (pinned — a recipe constant, not a
+// panel slider, per the issue; feel quantities Matt judges by eye, like
+// the constants above; measured behaviour in docs/review/1812/).
+export const EDGE_DARKEN_K = 1.35; // accrued excess per unit deposited-density gradient, per full damp-band dry
+export const EDGE_DARKEN_CAP = 2; // accrued excess cap — displayed density never exceeds (1 + CAP) × deposited
+export const EDGE_BAND_LO = 0.05; // damp-band floor — WET_REGIMES' damp threshold (gl/wetFrame.mjs)
+export const EDGE_BAND_HI = 0.35; // damp-band ceiling — WET_REGIMES' wet threshold
 
 /**
  * Integer gate for the feed hook. 0 or 1 — never a float compare.
@@ -135,6 +148,17 @@ export function createVortex(opts = {}) {
     pigS: new Float32Array(cells * 4),
     pigSN: new Float32Array(cells * 4),
     pigD: new Float32Array(cells * 4),
+    // #1812: accrued edge darkening per cell — the excess multiplier the
+    // deposited layer's display density carries (displayed density =
+    // deposited × (1 + pigEdge)). Drying history is field state (the
+    // issue's parity requirement): it accrues in the step from measured
+    // gradient + measured drying, rides this state object, and is zero
+    // until a deposit has actually dried through the damp band.
+    pigEdge: new Float32Array(cells),
+    // Wetness at the start of the running step (post-stamp, pre-advect)
+    // — the falling test's memory. Scratch: only read by the edge stage
+    // inside the same step that wrote it.
+    _wetPrev: new Float32Array(cells),
     // Set by the first pigment stamp; until then the step skips the
     // pigment stages outright, so a pigment-free session's field is
     // byte-identical to the pre-#1811 sim (the no-op acceptance).
@@ -763,6 +787,78 @@ export function transferPigment(state) {
 }
 
 /**
+ * AccrueEdgeDarkening (#1812) — watercolor's signature without its
+ * state machine: as a deposit dries, its displayed density multiplies
+ * up near its spatial edges (the coffee-ring read: pinned contact line,
+ * edge-fastest evaporation, outward flow — Deegan et al. 1997). No
+ * wet/drying/dry states exist here; the accrual is an integral over
+ * measured drying:
+ *
+ *   · A cell accrues only while its wetness is FALLING through the
+ *     damp band [EDGE_BAND_LO, EDGE_BAND_HI] — the WET_REGIMES damp
+ *     band. A passage kept wet (held above the band, or held level
+ *     inside it) does not darken; a passage below the band is done.
+ *   · The step's contribution is EDGE_DARKEN_K · |∇d| · (the share of
+ *     the band this step's fall traversed), |∇d| the deposited
+ *     density's gradient at field resolution. A complete dry through
+ *     the whole band therefore accrues ≈ K·|∇d| — the issue's display
+ *     formula d′ = d × (1 + k·|∇d|) as the completed-dry limit.
+ *   · Rewet and dry again and it accrues again, capped at
+ *     EDGE_DARKEN_CAP — real paper darkens slightly more each cycle,
+ *     and the cap keeps cycles from cooking edges to black.
+ *
+ * The darkening is derived from measured gradient + measured drying,
+ * never painted by a look; the amount is the pinned recipe constant
+ * above. `wetPrev` is the wetness the step started from (stepVortex
+ * snapshots it). The wet-frame service's degraded path passes null:
+ * there the step's only wet change is the uniform in-place dry, so the
+ * previous wetness is the current one divided back through
+ * VORTEX_WET_DRY. Exported for that path, like transferPigment.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {Float32Array|null} wetPrev
+ */
+export function accrueEdgeDarkening(state, wetPrev) {
+  if (!state.pigmentLive) return;
+  const box = state.pigBox;
+  if (!box) return;
+  const { n, wet, pigD, pigEdge } = state;
+  const band = EDGE_BAND_HI - EDGE_BAND_LO;
+  const dep = (i, j) => pigD[(j * n + i) * 4 + 3];
+  for (let j = box[1]; j < box[3]; j++) {
+    for (let i = box[0]; i < box[2]; i++) {
+      const k = j * n + i;
+      if (pigD[k * 4 + 3] <= 0) continue;
+      const prev = wetPrev ? wetPrev[k] : Math.min(1, wet[k] / VORTEX_WET_DRY);
+      const cur = wet[k];
+      if (prev <= cur) continue; // not falling: no drying, no darkening
+      const overlap = Math.min(prev, EDGE_BAND_HI) - Math.max(cur, EDGE_BAND_LO);
+      if (overlap <= 0) continue; // the fall never entered the damp band
+      const iL = i > 0 ? i - 1 : i;
+      const iR = i < n - 1 ? i + 1 : i;
+      const jD = j > 0 ? j - 1 : j;
+      const jU = j < n - 1 ? j + 1 : j;
+      const gx = (dep(iR, j) - dep(iL, j)) * 0.5;
+      const gy = (dep(i, jU) - dep(i, jD)) * 0.5;
+      const g = Math.hypot(gx, gy);
+      if (g <= 0) continue; // the wash's flat interior does not darken
+      const next = pigEdge[k] + EDGE_DARKEN_K * g * (overlap / band);
+      pigEdge[k] = next > EDGE_DARKEN_CAP ? EDGE_DARKEN_CAP : next;
+    }
+  }
+}
+
+/** FNV-1a over the accrued edge-darkening plane, quantized like hashPigment. */
+export function hashEdgeDarkening(state) {
+  let h = 2166136261;
+  const { pigEdge } = state;
+  for (let i = 0; i < pigEdge.length; i++) {
+    h ^= Math.round(pigEdge[i] * 1e5) | 0;
+    h = Math.imul(h, 16777619);
+  }
+  return h >>> 0;
+}
+
+/**
  * One fixed-dt step. Freeze holds velocity, wet mask, and vortons — the
  * last texture stays bound.
  * @param {ReturnType<typeof createVortex>} state
@@ -776,6 +872,11 @@ export function stepVortex(state, opts = {}) {
     return state;
   }
   state.held = false;
+  // #1812: snapshot the wetness this step starts from (stamps have
+  // landed; advection has not run) — the edge stage's falling test
+  // compares against it after the water moves. Pigment-live steps only:
+  // a pigment-free session's step stays the pre-#1812 code path.
+  if (state.pigmentLive) state._wetPrev.set(state.wet);
   splat(state);
   poisson(state);
   velocityFromPsi(state);
@@ -787,6 +888,7 @@ export function stepVortex(state, opts = {}) {
   if (state.pigmentLive) {
     movePigment(state, disp);
     transferPigment(state);
+    accrueEdgeDarkening(state, state._wetPrev);
   }
   state.steps += 1;
   return state;
@@ -856,22 +958,29 @@ export function hashPigment(state) {
  * This pack is also the backstage stain read (the dish's only pigment
  * consumption in #1811); computing it is per-frame work only when a
  * consumer asks the service for the field.
+ *
+ * #1812: the density the reflectance is computed at — and the alpha —
+ * is the DISPLAY density: deposited × (1 + pigEdge), the accrued edge
+ * darkening. Where nothing has dried through the damp band pigEdge is
+ * 0 and this pack is byte-identical to the #1811 pack.
  */
 export function packPigmentDeposited(state) {
   const n = state.n;
   const rgba = new Uint8Array(n * n * 4);
-  const { pigD } = state;
+  const { pigD, pigEdge } = state;
   for (let k = 0; k < n * n; k++) {
     const o = k * 4;
     const tot = pigD[o + 3];
-    rgba[o + 3] = packByte(Math.min(1, tot));
     if (tot <= 0) {
       rgba[o] = 255;
       rgba[o + 1] = 255;
       rgba[o + 2] = 255;
+      rgba[o + 3] = 0;
       continue;
     }
-    const refl = mixColorsRgb([{ rgb: [pigD[o] / tot, pigD[o + 1] / tot, pigD[o + 2] / tot], c: tot }]);
+    const disp = tot * (1 + pigEdge[k]);
+    rgba[o + 3] = packByte(Math.min(1, disp));
+    const refl = mixColorsRgb([{ rgb: [pigD[o] / tot, pigD[o + 1] / tot, pigD[o + 2] / tot], c: disp }]);
     rgba[o] = packByte(refl[0]);
     rgba[o + 1] = packByte(refl[1]);
     rgba[o + 2] = packByte(refl[2]);
