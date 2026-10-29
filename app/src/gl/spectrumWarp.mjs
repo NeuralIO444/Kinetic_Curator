@@ -171,6 +171,10 @@ export function applySpectrumWarp(p, warp, amount) {
     // so the warp can never leave the channels on the pre-blend clocks.
     keepVec: spectralKeep(keep),
     ...opticsDerived(clamp(p.optics + (1 - p.optics) * grain, 0, 1)),
+    // #1803: the halation tint is palette state, not optics state — the
+    // recompute above would reset it to the fallback constant, so the
+    // warp re-carries the params' own tint (the keepVec law, one over).
+    halationTint: p.halationTint,
     tunnelZoom: clamp(1 + (p.tunnelZoom - 1) + a * WARP_ZOOM_MAX * clamp(warp.bassDev || 0, -1, 1), 0.95, 1.05),
     tunnelSpin: clamp(p.tunnelSpin + a * WARP_SPIN_MAX * clamp(warp.attMids || 0, 0, 1), -0.05, 0.05),
     prismUv: clamp(p.prismUv + a * WARP_PRISM_MAX * clamp(warp.attTreble || 0, 0, 1), 0, 0.004),

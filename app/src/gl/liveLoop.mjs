@@ -1047,6 +1047,10 @@ export function createLiveLoop(
           (layoutParams.accumulationFade ?? 5.4) + swellEnvelope() * (40 - (layoutParams.accumulationFade ?? 5.4)),
         ),
         optics: layoutParams.accumulationOptics,
+        // #1803: the halation tint derives from the active palette's
+        // swatches (the same palette the frame renders with) — derived in
+        // accumRecipeParams, never stored, never a panel field.
+        palette: activePalette.swatches,
         tunnel: layoutParams.accumulationTunnel,
         prism: layoutParams.accumulationPrism,
         flow: layoutParams.accumulationFlow, // #284: exposed via the FLOW slider

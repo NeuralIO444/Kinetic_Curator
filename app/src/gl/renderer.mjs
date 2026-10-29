@@ -1708,7 +1708,8 @@ export function createRenderer(canvas) {
    * is only called when the caller passes accum-enabled contracts.
    *
    * @param {Array<object>} frames per-frame render payloads (shared atlas)
-   * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb' }
+   * @param {object} opts { fade: 0..0.99, optics: 0..1, background: '#rrggbb',
+   *   palette: swatch hex list or null (#1803 halation tint derivation) }
    * @returns {{pixels: Uint8Array, width: number, height: number}} top-first RGBA
    */
   function renderAccumSequence(
@@ -1723,6 +1724,7 @@ export function createRenderer(canvas) {
       audio = null,
       swell = 1,
       background = '#000000',
+      palette = null,
     } = {},
   ) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
@@ -1737,7 +1739,7 @@ export function createRenderer(canvas) {
     const accum = createAccum(gl, bridge, { width: w, height: h });
     try {
       accum.begin(background);
-      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background });
+      const base = accumRecipeParams({ fade, optics, tunnel, prism, flow, echoes, echoWidth: w, background, palette });
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
       const velPrev = new Map();
