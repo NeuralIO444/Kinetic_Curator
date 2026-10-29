@@ -34,18 +34,26 @@ import { mkRng } from '../engine/prng.js';
 // Tier 1: sheds with the accum chain once the feed hook exists. Slice 1 does
 // not import this from renderer.mjs, so the governor's EXPECTED_TIER1 list
 // stays the 8 ACCUM passes until slice 2 adds a measurement and the id.
-// timeMs is the selfcheck budget, not a measured fact.
+// #1810: timeMs is now a MEASURED step cost (sandbox node, scripted session
+// at the vorton cap, median of batch medians — see docs/review/1810/), no
+// longer the selfcheck budget it admitted to being before. The #1695
+// device-harness confirmation on real hardware remains a separate gate.
 registerCostTier('gl/vortex', {
   tier: 1,
-  memoryBytes: 64 * 64 * 4 * 5 + 2048 * 16,
-  timeMs: 0.5,
+  memoryBytes: 128 * 128 * 4 * 5 + 4096 * 16,
+  timeMs: 2.7,
   notes:
-    '#970 vortex-particle core: 64×64 Poisson + ≤2048 vortons, CPU, fixed dt. Slice 2 adds the velocity texture as an offset on the existing feed (never a replacement). Live-only.',
+    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt. timeMs = measured sandbox step (scripted steady state 2.66 ms, filled cap 2.72 ms; median of batch medians, docs/review/1810/); device-harness verification pending. The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
 });
 
-export const VORTEX_GRID = 64;
-export const VORTEX_MAX = 2048;
-export const VORTEX_JACOBI = 30;
+// #1810 (Matt's ruling from the wet-engine eval): one field, one resolution —
+// 128 sim, fewer solver iterations. VORTEX_MAX re-derived with the grid:
+// emitted-pair density per cell stays in the band the 64-grid tuning lived
+// in (2048/64² = 0.5/cell → 4096/128² = 0.25/cell at the cap), pinned by the
+// measured cost gate in docs/review/1810/, not by taste.
+export const VORTEX_GRID = 128;
+export const VORTEX_MAX = 4096;
+export const VORTEX_JACOBI = 20;
 export const VORTEX_DT = 1 / 60;
 export const VORTEX_RELAX = 2 / 3;
 export const VORTEX_DECAY = 0.985;
@@ -513,7 +521,7 @@ function packByte(t) {
 
 /**
  * RG velocity for the feed hook. Centered at 128. LINEAR upload so the
- * 64×64 field bilinear-upsamples. Not bound when wetnessStep is 0.
+ * grid field bilinear-upsamples. Not bound when wetnessStep is 0.
  * @param {ReturnType<typeof createVortex>} state
  */
 export function packVelocity(state, pack = VORTEX_VEL_PACK) {

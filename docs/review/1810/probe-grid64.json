@@ -1,0 +1,76 @@
+{
+ "label": "grid64",
+ "constants": {
+  "grid": 64,
+  "max": 2048,
+  "jacobi": 30
+ },
+ "determinism": {
+  "twoRunsIdentical": true,
+  "warmMatches": true
+ },
+ "s1Stats": {
+  "grid": 64,
+  "count": 2048,
+  "steps": 240,
+  "hashVelocity": 2415311056,
+  "meanSpeed": 1.5753586322289463,
+  "p95Speed": 6.946487903594971,
+  "maxSpeed": 38.438107103975696,
+  "meanAbsOmega": 0.09255304394202457,
+  "intAbsOmega": 0.09551455479630452,
+  "wetMean": 0.03519051313976063,
+  "wetCov005": 0.2119140625,
+  "wetCov035": 0.007080078125
+ },
+ "s0Stats": {
+  "grid": 64,
+  "count": 720,
+  "steps": 120,
+  "hashVelocity": 807145449,
+  "meanSpeed": 1.4150978118097353,
+  "p95Speed": 6.372210502624512,
+  "maxSpeed": 33.79024142794994,
+  "meanAbsOmega": 0.08410605678511729,
+  "intAbsOmega": 0.08679728107630144,
+  "wetMean": 0.02521438725834303,
+  "wetCov005": 0.161865234375,
+  "wetCov035": 0.005126953125
+ },
+ "s1Timing": {
+  "median": 1.0092999499999982,
+  "batches": [
+   0.67,
+   0.678,
+   1.009,
+   1.086,
+   1.148
+  ]
+ },
+ "capCountBeforeTiming": 2046,
+ "capTiming": {
+  "median": 1.0745564833333332,
+  "batches": [
+   0.706,
+   0.729,
+   1.075,
+   1.151,
+   1.263
+  ]
+ },
+ "capCountAfterTiming": 2046,
+ "capStats": {
+  "grid": 64,
+  "count": 2046,
+  "steps": 390,
+  "hashVelocity": 2973810386,
+  "meanSpeed": 7.475294939439769,
+  "p95Speed": 30.09349822998047,
+  "maxSpeed": 86.74072371909091,
+  "meanAbsOmega": 0.3803993503854427,
+  "intAbsOmega": 0.3925713628568338,
+  "wetMean": 0.1416045309304177,
+  "wetCov005": 0.6376953125,
+  "wetCov035": 0.071533203125
+ }
+}

@@ -3,7 +3,10 @@
 **Status:** Phase A landed 2026-10-28 (#1809 slice A — the wet-frame
 service is `app/src/gl/wetFrame.mjs`, consumed by ACCUM through the live
 loop; the gate/ownership below reads as the pre-service state it
-replaced). Phases B–C are still the proposed path.
+replaced). Phases B–C are still the proposed path. **Resolution:**
+#1810 (2026-10-28) moved the sim to a 128 grid / 20 Jacobi iterations /
+4096 vorton cap with a measured cost registration — the "64×64" below is
+the pre-#1810 state; measurements in `docs/review/1810/`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from *owner* to *one consumer among several*.

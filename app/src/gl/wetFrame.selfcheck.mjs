@@ -53,8 +53,10 @@ const fnv = (bytes) => {
 };
 
 /** fnv(wetMask.rgba) ^ fnv(wetVel.rgba) of the scripted session's final
- * frame below. Re-pins only when the sim itself changes (#1810). */
-const GOLDEN_FINAL_FRAME = 2550213434;
+ * frame below. Re-pins only when the sim itself changes (#1810).
+ * #1810 re-pin: 2550213434 (64/30) → 3108730517 (128/20/4096), the
+ * resolution change itself; character evidence in docs/review/1810/. */
+const GOLDEN_FINAL_FRAME = 3108730517;
 
 ok('Phase A acceptance: service output is byte-identical to noteWetFrame over a scripted session', () => {
   const slot = { vortex: null };
@@ -182,7 +184,21 @@ ok('degraded service: stamps land, the mask dries in place, nothing advects, no 
 
   // A fresh stationary mark at a quiet corner, served degraded.
   const stampAt = { layer: 'content-1', key: 'z', x: 850, y: 620, vx: 0, vy: 0 };
-  const cellIdx = 56 * state.n + 54; // the stamp's largest-weight cell (i1, j1)
+  // The stamp's largest-weight cell, from stampWet's own bilinear mapping —
+  // computed, not hardcoded, so the case survives grid changes (#1810).
+  const sgx = (stampAt.x / state.width) * (state.n - 1);
+  const sgy = (stampAt.y / state.height) * (state.n - 1);
+  const si0 = sgx | 0;
+  const sj0 = sgy | 0;
+  const stx = sgx - si0;
+  const sty = sgy - sj0;
+  const [sci, scj] = [
+    [si0, sj0, (1 - stx) * (1 - sty)],
+    [si0 + 1, sj0, stx * (1 - sty)],
+    [si0, sj0 + 1, (1 - stx) * sty],
+    [si0 + 1, sj0 + 1, stx * sty],
+  ].reduce((a, b) => (b[2] > a[2] ? b : a));
+  const cellIdx = scj * state.n + sci;
   const cellBefore = state.wet[cellIdx];
   const out = svc.frame({
     consumers: { dish: true },
@@ -235,7 +251,12 @@ ok('degraded service can birth the field (first consumer arrives under the shed)
   assert.strictEqual(out.wetMode, 'degraded');
   assert.ok(svc.field(), 'field born');
   assert.strictEqual(svc.stats().births, 1);
-  const centre = (32 * svc.field().n + 32) * 4;
+  // The packed-mask byte of the cell containing the stamp at (500, 350) —
+  // computed from the field's own mapping, grid-agnostic since #1810.
+  const fn = svc.field().n;
+  const ci = Math.floor((500 / 1000) * (fn - 1));
+  const cj = Math.floor((350 / 700) * (fn - 1));
+  const centre = (cj * fn + ci) * 4;
   assert.ok(out.wetMask.rgba[centre] > 0, 'the stamp is in the published mask');
 });
 
