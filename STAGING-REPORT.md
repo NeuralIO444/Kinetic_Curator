@@ -1,54 +1,163 @@
-# STAGING REPORT — #1806 slice 1: selective accumulation, the renderer seam
+# STAGING REPORT — #1808 slice 1: the trail grid read (ACCUM as memory, rung 2)
 
-Builder staging record, branch `feat/1806-selective-accum` (local only — not pushed, no PR; the coordinator verifies and publishes). This file replaces the report that was at the worktree root (#1802's); that report remains in git history.
+Builder staging record, branch `feat/1808-stigmergy` (local only — not pushed, no PR; the coordinator verifies and publishes). This file replaces the report that was at the worktree root (#1805's, which landed with PR #1829); that report remains in git history.
+Issue: #1808 "ACCUM as memory, rung 2: creatures steer on the trail field (stigmergy)". No comments on the issue; the body is the whole contract. Base: origin/main 2eb2e360 (includes #1805 age buffer; #1807 rung 1 / PR #1831 still in CI at build time — not depended on).
 
-Issue: #1806 "ACCUM: selective per-layer accumulation — chosen strata feed the buffer". No comments on the issue; the body is the whole contract, and its slicing is part of the spec: **(1) renderer seam → (2) recipe wiring → (3) BUILD flag + project JSON.** "Each slice is its own PR… No slice ships a half-wired flag."
+## Premise verdict: TRUE for the issue, with one correction and one recorded gate
 
-**This build is slice 1, complete.** Slices 2 and 3 are NOT in this branch — they are the staged remainder, mapped at the bottom of this report.
+- **No creature reads the ACCUM trail field today.** Grep-verified: the
+  only consumers of the age/colour buffer are the AgeReadout debug view
+  and the still CLI's `--age-out`. Nothing in `engine/` or `curator/`
+  reads `readAge`/`ageBuffer` for motion.
+- **Correction to the issue's framing, recorded honestly:** a stigmergy
+  system already exists — `engine/dishTrails.mjs` (#1415, petri dish
+  C3): organisms climb gradients of their *own* deposit field, a CPU
+  substrate they write themselves. It is not the ACCUM light buffer and
+  not the creatures of the creatures spec. #1808's premise — creatures
+  reading the **ACCUM buffer** spatially — is unbuilt, and the two
+  fields stay distinct by design (one is deposits, the other is light).
+- **Dependencies:** the issue requires rung 1 and/or the age buffer
+  landed. The age buffer HAS landed (2eb2e360); rung 1 (#1807,
+  PR #1831) has not — this slice depends only on what is on main. The
+  derivation is source-agnostic, so rung 1's readback path and this
+  grid compose when both are in; no rework needed either way.
+- **Determinism:** preserved by construction. No creature code, no
+  resolver input, no take path changes in this slice. The grid's stamp
+  is the buffer's own step count (steps since CLEAR, counted inside
+  `createAccum`) — a function of the step sequence, never a wall clock.
 
-## Premise check (standing stop-rule — applied before any code)
+## Scope decision (first-class): slice 1 only — the issue slices itself, and slice 2 is gated
 
-- **Not already built:** no `accumInput` / `feedsAccum` / selective-accum surface exists anywhere in app/src (grep, zero hits); no commit in history implements it.
-- **No recorded decision contradicts it:** the strata fixed form (2 CONTENT + MATH + FX) is the contract's own layer model (`sceneContract.js`: layers typed `content` / `pattern` / `math` / `fx`); the pre-FX input the spec demands is the #520/#820 grain law generalized (finishes run after the buffer, never into it). docs/DECISIONS.md has no accum-feed ruling. The field-mod pointer ruling concerns MATH items' targets, not the buffer's input.
-- **Composition with the in-flight shelf:** #1804 (PR #1828) and #1805 (PR #1829) touch `renderAccumSequence`'s option plumbing only; this slice touches `renderFrameInto` + a new entry point — textually and semantically disjoint.
+The issue's Scope section prescribes three slices. This build is
+**slice 1, complete**: grid derivation + backstage view + selfcheck
+probes. Slices 2–3 are NOT bundled, for two recorded reasons:
+
+1. The issue's own acceptance carries a **feel gate on slice 2**: "slice
+   2 does not leave the runway without Matt playing it (review lane,
+   his merge, per standing rules)." Steering feel is exactly the class
+   the full-auto arm does not cover. Slice 2 needs Matt's eyes before
+   it is built to merge, and slice 3 follows slice 2's verdict.
+2. House rule: one slice per PR (the #1806 slices 1–3 pattern on this
+   same shelf).
+
+Flagged for the coordinator: if slice issues are wanted for the
+remainder (the #1832–#1834 pattern), slice 2 = "one drive:
+ember-following on the moth, drive-integrated, capped, look-declared;
+non-collapse + replay tests" and slice 3 = "the sign flip: fresh-light
+avoidance, Davis-declared per look; second creature type only if
+slice 2 plays well (Matt decides)".
 
 ## What shipped (plain language)
 
-The renderer can now draw **only the strata you name** — the moth stratum without the background plate — as the frame the accumulation buffer would consume. It is a new rendering mode of the existing scene renderer, not a second renderer: the chosen strata draw through the exact same per-layer path as the full picture (same placements, blends, mattes), skipping everything else, over transparency, with no FX wrap applied — the buffer gets the strata's own light, never the finished picture. Nothing in the app calls it yet (that is slices 2 and 3, per the issue's own slicing); it ships proven by a new selfcheck that folds the partial renders back together and matches them against the full composite pixel for pixel.
+The trail buffer can now be *read as a map*: a coarse 32-wide grid of
+cells, each reporting how much light it holds, its average colour, and
+— because the age buffer landed — the age of the light that dominates
+it. A backstage view (`?debug=trailgrid`, beside the AGE view) shows
+the grid live as a thumbnail of the buffer with its measured headline
+numbers. Nothing performs differently; no creature steers yet. The map
+exists, is proven accurate, and is stamped so a future steering
+consumer can label how stale its read is.
 
-Stills (the selfcheck's scene: two content strata under an invert FX stratum): `docs/review/1806/full-composite.png` (what the audience sees — inverted, light background) · `input-all-strata.png` (both strata's true colours, pre-FX — the buffer's would-be input) · `input-bg-only.png` · `input-top-only.png` (each stratum's light alone; their union is the all-strata input).
+## Files (11)
 
-## How (specifics)
-
-- `app/src/gl/renderer.mjs`
-  - `isAccumFeedLayer(layer)` + `accumFeedLayers(contract, layerIds)` (exported, pure): the one definition of who can feed — content and pattern strata (a pattern composites like a content track, #1098); MATH/FX never feed. Selection resolves in compositeOrder; unknown and MATH/FX ids are ignored, never errors. Slices 2/3 build on this so the rule can't drift between recipe and panel.
-  - `renderFrameInto` gains an `accumInput` option (`{ layerIds }`): computes the feeding id set once, clears transparent (an ACCUM input by definition), and skips every non-feeding layer whole in the composite loop — unselected strata leave no light; MATH/FX get no wrap, no fold, no finish chain. Selected strata draw through the untouched `compositeLayerTo` path. Option off (every production caller): the composite is byte-identical — the guard is a single Set lookup per layer on a null-checked path.
-  - `createRenderer().renderAccumInput(payload, layerIds)`: the one-shot entry (renderScene's shape: own targets, resolve to bytes, GL-error checked). **No finish chains** — grain never enters a buffer input (#520/#820). Also forwards the base's `setResolveOptions` (the live renderer already forwards it) for data-space proof renders.
-  - No new GL pass, target, or shader — so no new cost-tier registration: the seam reuses the composite's own programs and the caller's frame targets. Its per-frame cost lands with slice 2's wiring, bounded by the selected strata's placement counts (the issue's cost paragraph), and the shed rung the issue specifies (subset → composite fallback) is a slice-2 governor concern, recorded here so it isn't lost.
-- `app/src/gl/parity/glHarness.html` — `__kcAccumInput` entry + a `rawResolve` payload flag on it and `__kcRender`: renders in data space (raw premultiplied clamp, no ACES/dither), presentation defaults always restored after. **Why:** the presentation resolve tonemaps in straight space — nonlinear in alpha — so presentation bytes cannot be folded or compared as light (measured during this build: a premultiplied fold of ACES-resolved renders misses by up to 56 LSB at overlapping faint marks, 0 at opaque pixels). The buffer consumes the 16F texture, never a resolved picture, so data space is the quantity the seam promises.
-- `app/src/gl/parity/glDriver.mjs` — `renderAccumInputViaGL(contract, layerIds, opts)`; `renderViaGL` forwards `opts.rawResolve`. Both additive; every existing caller untouched.
-- `app/src/gl/accumInput.selfcheck.mjs` (new, manifest-wired) — 7 cases. Node: the feed definition and selection resolution. Browser (the suite's two-strata + invert-FX scene, all renders data-space):
-  - **subset = full render masked to the selected strata**: premultiplied fold over(subTop, over(subBg, background)) matches the no-FX full composite with zero channel values beyond ±3 LSB (measured worst 1.4); over(subTop, subBg) likewise reproduces the joint subset render. Because the subset draws the resolver's own instances, the fold matching is also the placement-parity proof: any placement/seed/count shift would break it.
-  - **Attribution**: each subset holds light only where its own stratum marks; where one subset is empty the joint render equals the other within ±2 (the 16F→8-bit floor).
-  - **Pre-FX**: naming the FX stratum in the selection changes nothing, byte for byte; the subset fold differs from the audience's inverted frame on >50% of pixels.
-  - Empty and unknown-only selections render transparent black, byte for byte.
-- `docs/ACCUM.md` — a "Selective accumulation (#1806) — slice 1" section (surgical, house style; the file's pre-existing prettier drift untouched).
-- `app/selfcheck.manifest` — +1 line.
-
-## Deliberately NOT built (the staged remainder, per the issue's slicing)
-
-- **Slice 2 — recipe wiring:** `accum.step()` consuming the subset frame when any flag is off (all-on keeps today's composite path byte-identical), the live renderer's one-wrapper surfacing of the seam, mirror parity for the subset path, the governor shed rung (subset → composite under load, reported in the show block), and `accumStill` subset behaviour. Two slice-2 notes from this build: (a) the pattern-texture sweep in `renderFrameInto` currently runs on every render — when full and subset renders interleave per frame, an unselected pattern's texture would be freed and re-uploaded each frame; the sweep should be owned by the full render (correctness is unaffected — the texture re-creates on demand — so slice 1 left the pinned line untouched); (b) a selected stratum's matte still reads its source stratum's content even when the source doesn't feed — the stratum renders as it renders; slice 2 should confirm that is the wanted buffer semantics.
-- **Slice 3 — surface:** the FEEDS ACCUM toggle on the stratum row in BUILD, the project-JSON field per stratum + migration (default on). Nothing here pre-empts its shape: the seam takes plain layer ids.
+- `app/src/gl/trailGrid.mjs` (new) — the pure derivation:
+  `trailGridDims` (32 cols, rows from aspect = 32×22 at pair aspect),
+  `deriveTrailGrid` (per cell: mean energy, channel means, dominant age
+  = light-weighted mean age of living pixels, AGE_VOID where none;
+  float64 throughout, the mirror's precision), `sampleTrailGrid`
+  (nearest measured cell, clamped, buffer space), `summarizeTrailGrid`
+  (peak cell, lit fraction, mean age). Stamp passthrough.
+- `app/src/gl/trailGridLive.mjs` (new) — the AGE-wire pattern:
+  `DEBUG_TRAILGRID` (`?debug=trailgrid`), `setTrailGridReader`,
+  `readTrailGridFrame()` (snapshot → derive; failures degrade to null).
+- `app/src/gl/accum.mjs` — `readTrail()` on the ACCUM object (colour
+  readback from the current target + the age field via #1805's
+  readback, factored into one `readAgeField` both methods share) and
+  the step counter behind the stamp (reset in `begin()`, incremented
+  only when a step lands). No pass, shader, or recipe change.
+- `app/src/gl/liveLoop.mjs` — the grid readout named as an age-buffer
+  consumer (`ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID`; no consumer, no
+  allocation — #1805's law), reader registered beside the AGE one and
+  cleared at session end. Four small hunks, all additive.
+- `app/src/curator/TrailGridReadout.jsx` (new) — the backstage view:
+  polls ~4 Hz, paints cells in their mean colour, header carries dims,
+  stamp, peak cell + its dominant age, lit %, mean age.
+- `app/src/App.jsx` — import + flag-gated mount beside AgeReadout.
+- `app/src/gl/trailGrid.selfcheck.mjs` (new, 7 cases) +
+  `app/selfcheck.manifest` (+1 line).
+- `docs/ACCUM.md` — one surgical section (the trail grid).
+- `docs/review/1808/README.md` — measured evidence (comet table + map).
+- `STAGING-REPORT.md` — this file, replacing #1805's at the root.
 
 ## Verification
 
-- **accumInput.selfcheck: OK, 7 cases** — solo and inside the full sweep.
-- **Full manifest sweep** (all 528 lines, run with a tolerant driver — the repo runner is fail-fast and stops at the first sandbox-env failure): **523 pass / 5 fail.**
-  - `swarmWasm`, `rollSafety` — the documented sandbox-environment pair (no cargo in this sandbox); CI is authoritative for both.
-  - `accum` — in-sweep failure was the documented default-heap OOM (V8 crash tail, spawn timeout under load); **solo with NODE_OPTIONS=--max-old-space-size=3072: OK, 58 cases.**
-  - `livingMotion` — failed in-sweep and in one loaded solo run (exact-equality assertion); **quiet solo re-run: 15 checks passed.** Both results reported; the suite never exercises the seam and the default render path is untouched.
-  - `exportStill` — failed in-sweep under load; **solo: all checks passed.**
-- Neighbours, all green: composite (15 cases, solo + sweep), accum.seam, accum.inventory, accumGuard, sceneContract, glDriver, patternRender (its renderer source-shape pin intact — the pinned sweep line was deliberately not touched), grainFinish, spectrumMarks, fxFilters, fxUniforms, costTiers.
-- Gate trio, all green in-sweep: replayGate, creatureGate, refreshFixtureCheckpoints.
-- `npm run build`: green. Prettier: clean on every touched code file. docs/ACCUM.md edited surgically (its pre-existing drift untouched).
-- Sandbox note: verification ran while a second builder lane shared the machine, and /tmp was wiped mid-run by the environment (the first sweep's logs went with it; the sweep was re-run in full with progress kept in the workspace). The worktree was never affected.
+- **trailGrid.selfcheck: 7/7 green** — dims; hand-computed cells exact
+  (incl. the light-weighted age (0.9·1 + 0.1·3) = 1.2 case and the
+  colour-present/age-void cell); **acceptance**: scripted two-block
+  scene through the JS mirror — every cell vs an independent
+  box-filter reference of the mirror's buffer (energy/means < 1e-9,
+  void pattern identical), analytic ages within one frame (block A
+  ≈ 29 frames, block B ≈ 9 frames at dt 1/30), the spectral proxy
+  agreeing (older cell's b/g below the fresher cell's); colour-only
+  fallback (identical energies, void ages, ratios carried); sampler
+  clamp; empty buffer invents nothing; the backstage wire pinned by
+  source assertions.
+- **Gates green:** creatureGate OK, replayGate OK,
+  refreshFixtureCheckpoints OK, performanceCreatures OK (recorded
+  takes replay byte-identical — the slice touches no input they carry).
+- **accum.selfcheck: OK (67 cases)** solo at raised heap, on the final
+  bytes after all edits.
+- **Source-pin neighbours for every touched shared file, green:**
+  davisShift, dishPins, dishPressure, formation, limbs, roomWidth,
+  refineMutate, setLive, audioBus (App.jsx/liveLoop readers);
+  accum.seam, accumGuard, accum.inventory (accum.mjs).
+- **Full manifest sweep:** attempted with a tolerant driver; under the
+  second builder's concurrent load it worked through the manifest's
+  first half in ~21 min and was stopped at the in-sweep accum run —
+  the known default-heap artifact (#1806/#1807 recorded the same;
+  accum solo at raised heap is green above). Its tally was lost with
+  the stop, so coverage stands on the enumerated runs: every suite
+  pinning a touched file, all gates, plus a back-half sample —
+  wetFeed, costTiers, mlxExport, trailMode, trioLive, clockRecord,
+  stressRecord, exportStill, all green; livingMotion failed under
+  load and passed its solo re-run (both results stated, per house
+  rule). CI remains authoritative for the sandbox pair (swarmWasm —
+  no cargo; rollSafety).
+- **Build green** (`npm run build`, ✓ built in ~4 s); prettier applied
+  to every touched file (only the new selfcheck needed formatting; the
+  manifest is not a prettier-parsed file).
+- **Measured evidence** (`docs/review/1808/README.md`): a comet laid
+  through the mirror reads back exactly as a trail should — head cell
+  energy 1.0000 at age 0.000 s, ages rising monotonically down the tail
+  to 1.485 s, b/g falling 1.000 → 0.161 in step with the true ages.
+
+## Costs, stated plainly
+
+- **No new GPU pass, shader, or target** — no cost tier registered
+  (the readback reuses readAge's pattern; the derivation is CPU math
+  on a snapshot, outside the GPU cost model).
+- **Derivation ≈ 37 ms at pair size** (1600×1100, fully lit worst
+  case; ~45 ms under the second builder's load) in this sandbox. In
+  this slice its only caller is the backstage readout's ~4 Hz poll,
+  and the live readback it feeds on is pair-resolution RGBA float
+  (~28 MB) per poll — debug-only costs, on the record. A steering
+  consumer's cadence (the issue prescribes throttled, frame-stamped
+  reads) and its device-harness budget are slice 2's acceptance to
+  prove; if the full-res derivation is too heavy there, the honest
+  paths are a dead-pixel skip (exact — dead pixels contribute zeros)
+  or rung 1's GPU reduction readback when it lands. Not assumed here.
+
+## What I deliberately did NOT build
+
+- **No steering** (slices 2–3) — see the scope decision above; the
+  moth drive, the sign flip, the non-collapse soak and the 2,000-frame
+  steering replay test all belong to the gated slices.
+- **No governor shed for steering** — there is nothing to shed yet;
+  it arrives with the drive it sheds (slice 2's acceptance).
+- **No grid in the take/recorder system** — the grid is derived state,
+  recomputed from the buffer; recording it would be a second source of
+  truth. Slice 2's replay test will pin that derivation-from-buffer
+  replays exactly.
+- **No change to dishTrails** — the petri organisms' deposit field is
+  a different substrate (see the premise correction); unifying them is
+  not this issue's ask.
