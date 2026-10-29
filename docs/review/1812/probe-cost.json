@@ -1,0 +1,11 @@
+{
+  "what": "gl/vortex step cost, #1812 edge-darkening build vs the #1811 build, identical scripted sessions (A/B)",
+  "method": "The #1811 cost session (docs/review/1811/probe-cost.json): createVortex seed 970 at 1000x700, 240 warm-up frames of 4 scripted marks/frame with tint on every mark, wetAdvect 0.6, then 5 batches x 60 steps timed with performance.now. Pigment ends across ~56% of cells in both builds. Base = origin/main vortex.mjs in a shadow copy of the same tree; new = this build. Sandbox node on a shared VM; CI/device numbers remain the #1695 harness's to confirm.",
+  "runs": [
+    { "build": "base (#1811)", "run": 1, "batchesMsPerStep": [3.9, 3.87, 4.19, 3.66, 3.66], "median": 3.87 },
+    { "build": "base (#1811)", "run": 2, "batchesMsPerStep": [3.79, 3.71, 3.71, 3.65, 3.64], "median": 3.71 },
+    { "build": "new (#1812)", "run": 1, "batchesMsPerStep": [7.1, 4.23, 4.32, 3.97, 4.74], "median": 4.32 },
+    { "build": "new (#1812)", "run": 2, "batchesMsPerStep": [5.0, 4.55, 3.85, 3.72, 3.74], "median": 3.85 }
+  ],
+  "verdict": "The edge stage (one wetness snapshot copy per pigment-live step + the gradient accrual over the pigment box) adds ~+0.3 ms/step at the medians (3.71-3.87 base vs 3.85-4.32 new) - inside the registered 6.6 ms figure, which was itself measured on a busier VM (medians 6.93 / 6.28). Registration UNCHANGED: timeMs stays 6.6 (the standing worst-case measurement; re-registering downward on a quieter machine would understate the governor's worst case). memoryBytes grows by the two new planes: 128*128*4*9 + 128*128*16*3 + 4096*16*2 = 1507328."
+}

@@ -1,91 +1,69 @@
-# STAGING REPORT — #1811: two-compartment pigment with Kubelka-Munk mixing (local only, not pushed)
+# STAGING REPORT — #1812: edge darkening on drying (local only, not pushed)
 
-Builder staging record, branch `feat/1811-pigment` in `~/workspace/kc-1811-build`, based on `origin/feat/1810-128-grid` (PR #1844, in CI) as assigned — not pushed, no PR; the coordinator verifies, rebases after #1844 merges, and publishes. This file replaces the report that was at the worktree root (#1810's); that report remains in git history.
+Builder staging record, branch `feat/1812-edge-darkening` in `~/workspace/kc-1812-build`, based on `origin/main` at 3aafc29d (#1811 merged) as assigned — not pushed, no PR; the coordinator verifies and publishes. This file replaces the report that was at the worktree root (#1811's); that report remains in git history.
 
-Issue (verbatim): **"WET: two-compartment pigment with Kubelka-Munk mixing"**
+Issue (verbatim): **"WET: edge darkening on drying (the signature, no state machine)"**
 
 ## Premise verdict: HOLDS — built
 
-Verified against the code and history with my own eyes before building. The field had **no pigment at all**: `vortex.mjs` carried omega, psi, vx, vy, wet + vortons, and its header deferred this exact work ("pigment mixing itself is slice 5 and is not in this module"). The tree's only "Kubelka" was a comment in `accum.mjs` naming what its wet composite colour average is **not** ("cheap pigment mix. Not Kubelka-Munk") — a display-side blend of the over pass, not a field representation; the other "pigment" in the tree (`dishPigment.mjs`, census/bioDrives) is creature colour, a different system. #1809's review README stages the compartments for this issue ("the compartments will live in this service's field"). No recorded decision contradicts the issue. The premise holds, so the slice was built as specified.
+Verified against the code before writing anything. #1809's service (`app/src/gl/wetFrame.mjs`) owns the shared field; #1811 (merged, PR #1845) added the two pigment compartments to `app/src/gl/vortex.mjs` — suspended + deposited, Kubelka-Munk — with the deposited reflectance computed in `packPigmentDeposited` and consumed by ACCUM's fade. **No edge darkening existed anywhere**: `pigment` greps hit only `pigmentKM` and the #1811 files; nothing in the tree multiplies displayed density by a gradient term, and no drying-history channel existed. Matt's standing ruling for this slice (edge darkening ONLY, no drying state machine, 2026-10-27) matches the issue body exactly; no conflict, nothing already shipped. The premise holds, so the slice was built as specified.
 
 ## What shipped (plain language)
 
-The wet field now carries colour. Every cell holds two pigment compartments: **suspended** pigment, which rides the water and can lift back off the paper when rewetted, and **deposited** pigment, which has settled into the paper and never moves sideways again. When two colours meet — in a stamp or in a settled cell — they mix by **Kubelka-Munk**, the paint physics the issue names: blue and yellow make a living green, not the grey a plain average gives, and dark mixtures darken the way real paint does. The issue's named mixture test passes in the colour module, in the field itself, and is visible in a still rendered from the field's own data. ACCUM is the first reader, exactly as the issue assigns: its fade now dims the buffer's light by the **deposited layer's KM-computed reflectance** (not a Beer-Lambert fudge), while the dish's physics never touches pigment — grip stays water; the deposited pack doubles as the backstage stain read. A scene with no coloured marks has no pigment at all and steps **byte-identically** to the pre-pigment field: both standing goldens hold unre-pinned.
+A dried wash now gets its dark rim — watercolor's signature — and it gets it the honest way: the field remembers how much each cell has dried at its edges, and the deposit reads darker there. Concretely: one new channel on the field state, `pigEdge`, holding each cell's **accrued darkening**. While the sim steps, a cell whose wetness is *falling through the damp band* (wetness 0.35 → 0.05 — the same thresholds the wet service already names its regimes by) accrues darkening in proportion to how steep its deposit's edge is right there and how much of the band it fell through. The accrual lands in the deposited layer's own pack (`packPigmentDeposited` computes reflectance at *displayed* density = deposited × (1 + accrued)), so every reader of the deposit — ACCUM's fade today, the #1813 wet-look pass and the backstage stain read when they read the pack — sees the rim. There is **no wet/drying/dry state machine**: no enum, no timers; the step compares two wetness numbers, that is all. Rewet a dried rim and dry it again and it darkens a little more, capped so cycles can't cook it black. The amount is a pinned recipe constant (`EDGE_DARKEN_K = 1.35`), not a panel slider, per the issue. Pigment that never wets, or a field with no pigment at all, is byte-identical to the #1811 build: both standing goldens hold un-re-pinned.
 
-## The mixture test (acceptance, by name)
+## The acceptance wash (by name)
 
-Blue (0.10, 0.25, 0.85) + yellow (0.95, 0.80, 0.10) at equal concentration, from `docs/review/1811/probe.json`:
+Scripted single wash: blue disc, radius 6 cells, stamped wet at 1.0, settled by direct transfer, dried by steps until the field's max wetness fell below 0.04 (401 steps). From `docs/review/1812/probe.json`:
 
-|                          | R     | G         | B     |
-| ------------------------ | ----- | --------- | ----- |
-| Kubelka-Munk (this code) | 0.165 | **0.560** | 0.253 |
-| naive RGB average        | 0.525 | 0.525     | 0.475 |
+| read          | deposited | accrued | displayed |
+| ------------- | --------- | ------- | --------- |
+| centre        | 0.991     | 0.008   | 0.999     |
+| rim (E/W/N/S) | ≈0.99     | ≈0.60   | ≈1.59     |
 
-`pigmentKM.selfcheck` check 3 asserts the green band (g > r + 0.25, g > b + 0.2, saturation ≥ 3× the naive mix's) — **a density-averaging or lerp implementation fails it by construction**, which is the discriminating case the build rules demand. In the field, two stamped wash discs settle to a deposited pack whose overlap samples **(0.161, 0.518, 0.251)** — green — between blue-only (0.102, 0.247, 0.863) and yellow-only (0.988, 0.800, 0.098); the still in `docs/review/1811/` is rendered from those pack bytes. Subtractive darkening is pinned too (blue + red lands darker than either input), as is concentration steering (25/75 and 75/25 land on either side of the 50/50 green).
+Displayed edge-to-centre ratio **1.586** — inside the issue's ~1.5–2× expectation; the centre's displayed density moved 0.8% (unchanged within tolerance). The same wash **kept wet for 300 steps accrues exactly zero** across the whole field — the gate is the mechanism, not an assumption, and the gate's other faces (level-in-band, rising, falls that never enter the band) are unit-pinned through the exported accrual. Rim accrual over five dry cycles: 0.596 → 1.194 → 1.792 → **2.000 (the cap)** → 2.000. `still-edge-darkening.png` renders displayed density as darkness, deposited alone vs with the accrued rim: the ring is visible, the centre is the same grey. (The ratio is read on displayed density because the pack's alpha clamps at 1 and this wash sits at that clamp; the rim's packed reflectance also darkens measurably — the selfcheck asserts a ≥10 summed-byte luminance drop at the rim against the accrual-zeroed pack, centre bytes within 1–2.)
 
 ## The measured cost gate
 
-Identical scripted sessions, pigment absent vs pigment live, sandbox node (this VM, shared with the second builder — indicative, not device claims; raw batches in `docs/review/1811/probe-cost.json`):
+A/B on the #1811 cost session (4 scripted marks/frame, tint on every mark, ~56% of cells pigment-occupied; sandbox node on a shared VM — indicative, raw batches in `docs/review/1812/probe-cost.json`):
 
-| Session                                    | Median of batch medians (two runs) |
-| ------------------------------------------ | ---------------------------------- |
-| Pigment absent (the #1810 path, untouched) | 2.12 / 2.52 ms per step            |
-| Pigment live (~58 % of cells occupied)     | 6.93 / 6.28 ms per step            |
+| Build        | Median ms/step (two runs) |
+| ------------ | ------------------------- |
+| base (#1811) | 3.87 / 3.71               |
+| this (#1812) | 4.32 / 3.85               |
 
-The registration follows the #1810 convention — the sim's worst case is the registered figure: **`gl/vortex` timeMs 2.7 → 6.6**, provenance in the notes. Memory re-registered at **1,376,256 B** with the full ledger written out (7 grid planes + 3 pigment RGBA arrays + vorton ring and scratch); note the old formula undercounted even the pre-#1811 state (it omitted the wet plane pair and the scratch) — the correction is called out in the registration comment and the selfcheck pin. The compartments proper are the issue's own figure: 2 × 128² × 16 B = 0.5 MB (the third array is the advection scratch). Per-step pigment work is bounded by the occupied region's bounding box, and pigment-free sessions run the pre-pigment path untouched — they pay nothing. Device confirmation stays with the #1695 harness, as #1810 already recorded.
+The stage (one wetness snapshot copy per pigment-live step + the gradient accrual over the pigment box) adds ~+0.3 ms/step — **inside the registered 6.6 ms figure**, which stands: it was measured on a busier VM (medians 6.93 / 6.28), and re-registering downward on a quieter machine would understate the governor's worst case. Memory registration grows honestly by the two new planes: 1,376,256 → **1,507,328** bytes (`128×128×4×9 + 128×128×16×3 + 4096×16×2`), pinned in the vortex cost case. The pigment-absent path never snapshots and never accrues.
 
-## Field character (pinned sessions, measured — all in `docs/review/1811/`)
+## Degraded parity
 
-- **Conservation**: one 2.0 stamp, no flow, 600 steps → total 2.0 → 2.0000004 (drift 0.00002 %); suspended empties into the deposit. Transfer computes both moves from start values and applies them together — per-cell conservation is by construction, the number is the float residue.
-- **Deposited never moves**: centroid drift **0.005 cells** over 600 steps of hard stirring 650 px away. There is no advection path for the deposited array at all; the residue is lift-and-resettle at the deposit's own edge.
-- **Suspended rides the flow**: a burst in an established vortex displaces **12.76 cells** in 40 steps vs 0.011 unstirred — the A/B is a selfcheck case.
-- **Lift**: a settled deposit rewetted hard for 120 frames loses **52 %** of its mass back into suspension (lift ∝ wetness² × (1 − stain resistance)).
-- **Determinism**: identical tinted sessions hash-identical compartments (`hashPigment`); freeze holds pigment; the degraded shed path stamps and keeps settling pigment, publishing the same pack shape.
+Under the perf shed the service replaces the sim step with an in-place dry (one fixed factor per frame). The degraded path calls the same accrual with the previous wetness reconstructed from that factor, so **deposits darken on schedule under the shed** exactly as on the full path — pinned by a new wetFrame case (degraded frames stamp, settle, then dry through the band; accrued max > 0.05 and the darkened pack is what degraded service publishes). Darkening is local arithmetic like transfer, so it belongs under the shed with transfer, not frozen with advection.
 
-## Files (staged by name)
+## Files staged (named, nothing else)
 
-- `app/src/gl/pigmentKM.mjs` — **new.** Pure Kubelka-Munk: 8-band spectra derived deterministically from sRGB (per-band-normalized R/G/B basis, so white/greys reconstruct exactly), single-pigment K/S inversion, finite-layer mixture reflectance over a paper backing, and per-pigment ρ/ω/γ from the same derivation via pinned heuristics; cached per colour with an allocation-free hot path.
-- `app/src/gl/pigmentKM.selfcheck.mjs` — **new, manifest-wired.** 7 checks incl. the mixture test by name and the anti-lerp discriminating assertions.
-- `app/src/gl/vortex.mjs` — the two compartments + scratch; `stampPigment` (ADD; a stamp onto another colour stores the KM mixture's colour); MovePigment (semi-Lagrangian, occupied-box bounded, early-out when pigment/flow absent); `transferPigment` exported for the degraded path; `emitFromInstances` stamps a mark's `rgb`/`tint`; `noteWetFrame` publishes `pigStep`/`pigDep`; `hashPigment`, `packPigmentDeposited`; cost registration re-based (above); header's Curtis sentence updated (the live-only paragraph stays — #1815 owns retiring it).
-- `app/src/gl/vortex.selfcheck.mjs` — 8 new cases (absent-identity, stamping forms, field mixture green, conservation, deposited-stationary/suspended-advects A/B, lift, freeze + determinism, pack semantics) + the cost pin re-based on the new measurement with the cause written in the case. **No golden re-pinned.**
-- `app/src/gl/wetFrame.mjs` — service contract documents `pigStep`/`pigDep`; the shed/absent shapes carry them; the degraded path runs the transfer and publishes the pack.
-- `app/src/gl/wetFrame.selfcheck.mjs` — 2 new cases (service publication incl. byte-equality with the direct path; degraded stamping + settling). The Phase A byte-identity golden case is untouched and green.
-- `app/src/gl/accum.mjs` — `FADE_PIG_FS` (exported): the wet fade string-derived with one added term, `rgb *= deposited KM reflectance`, exactly as the other wet variants derive; recipe params carry `pigStep`/`pigDep` with the wet gate discipline; mirror term identical; the pigment pack gets a linear texture beside the wet pair; `ACCUM_PROGRAMS` and the cost list are unchanged (wet variants were never in them).
-- `app/src/gl/wetFeed.selfcheck.mjs` — 2 new cases (variant gating/source shape; mirror absorption vs a no-pig control, bare-paper pack byte-exact no-op).
-- `app/src/gl/liveLoop.mjs` — two keys (`pigStep`, `pigDep`) passed from the wet frame result into the recipe params at the existing call — the issue's consumer wiring, nothing else.
-- `app/selfcheck.manifest` — one line: `node src/gl/pigmentKM.selfcheck.mjs` (after the vortex line). package.json untouched.
-- `docs/WET_ENGINE.md` — surgical status note (pigment paragraph in the header block, house style).
-- `docs/review/1811/` — README (premise, design, mixture tables, character, cost, simplifications, hand-offs) + `probe.json` + `probe-cost.json` + `still-deposited-reflectance.png` (rendered from the pack bytes).
+- `app/src/gl/vortex.mjs` — `pigEdge` + `_wetPrev` on the state; `accrueEdgeDarkening` + `hashEdgeDarkening` exported; the stage wired into `stepVortex` after TransferPigment; display density in `packPigmentDeposited`; the four pinned constants; cost registration (memory + notes).
+- `app/src/gl/vortex.selfcheck.mjs` — 6 new #1812 cases (34 total); the cost case's memory formula re-pinned ×7 → ×9 planes with the cause written in its comment. No golden re-pinned.
+- `app/src/gl/wetFrame.mjs` — the degraded path accrues after transfer (one guarded addition).
+- `app/src/gl/wetFrame.selfcheck.mjs` — 2 new #1812 cases (15 total): the band is the service's band (constants equal `WET_REGIMES` thresholds); degraded accrual.
+- `docs/WET_ENGINE.md` — an "Edge darkening" status paragraph in the header block's house style.
+- `docs/review/1812/` — README.md (design + decisions), probe.json (acceptance wash), probe-cost.json (A/B), still-edge-darkening.png.
 - `STAGING-REPORT.md` — this file.
 
-## Verification (final bytes)
+## Verification (sandbox, this VM)
 
-- **pigmentKM.selfcheck: 7 checks passed** — the new suite, incl. the mixture test by name.
-- **vortex.selfcheck: 28 checks passed** (20 standing + 8 new). Both standing goldens hold **unre-pinned**: hashVelocity 2493009798 and every wet character case pass on the changed tree — the pigment-absent path is the pre-pigment code path, not a re-tuned one.
-- **wetFrame.selfcheck: 13 checks passed** (11 + 2 new); the Phase A final-frame golden (3108730517) and the byte-identity case are untouched and green.
-- **wetFeed.selfcheck: 9 checks passed** (7 + 2 new).
-- **accum.selfcheck: OK (67 cases)** — solo, `NODE_OPTIONS=--max-old-space-size=3072`, run on the final bytes (this tree's base count; no ACCUM golden moved — the pigment fade variant is additive and gated off unless the field publishes pigment).
-- **Neighbours green**: costTiers, accum.inventory, accum.seam, accumGuard, debug (105 cases).
-- **Gates: replayGate ✔ (exit 0), creatureGate ✔ (exit 0), refreshFixtureCheckpoints ✔.**
-- **Full manifest sweep: 531 commands — 528 passed, 3 failed, all three triaged:**
-  - `swarmWasm` — needs the Rust toolchain this sandbox lacks; environmental, recorded identically on the #1810 sweep of the base stack; CI authoritative.
-  - `rollSafety` — fails inside the headless-GL parity driver (`glDriver renderViaGL` ← candidate ← rollSafety:231); the suite imports fx/data/state only and never reaches the wet sim. **Solo re-run fails identically** (same stack, same empty driver log) — it is the sandbox GL environment, not load; CI authoritative.
-  - `accum` in-sweep — default-heap OOM, the FATAL heap signature in its sweep log; solo at 3 GB green (above). Documented in-sweep behaviour on this stack.
-  - Note: `trailStats.selfcheck` does not exist on this base — it landed on main via #1807 after this WET stack forked; the trail suites that do exist here (dishTrails, trailGrid, trailMode) all pass. The coordinator's rebase onto main composes it; nothing in this slice touches trail statistics.
-- `npm run build` green; `npm run lint`: 0 errors (11 warnings — the base's count; none in touched files); `prettier --check .` green on the whole tree.
-- One process note: this sandbox restarted mid-verification and ate the first sweep's bookkeeping (213/214 recorded at that point, incl. the same swarmWasm failure); the tally above is from a single complete re-run kept outside `/tmp`. The worktree itself was untouched by the restart (verified by `git status`).
+- Solo suites: **vortex 34/34** (28 standing + 6 new; `hashVelocity` golden 2493009798 and all #1811 goldens un-re-pinned) · **wetFrame 15/15** (13 + 2; the Phase A byte-golden holds) · pigmentKM 7 · wetFeed 9 · costTiers OK · accum.inventory / accum.seam / accumGuard OK · **accum 83 cases OK** solo at `NODE_OPTIONS=--max-old-space-size=3072`.
+- Full manifest, run in two parts around the environmental suites (531 commands): lines 1–258 green (868 [ok] lines) and lines 260–end green (907 [ok] lines, runner exit 0). New params: none — nothing entered `DEFAULT_LAYOUT_PARAMS` (no new params exist; the amount is a module constant).
+- Source-shape pins: grepped the selfchecks for assertions naming every touched file — only the vortex and wetFrame suites reference `vortex.mjs`/`wetFrame.mjs` (as imports); both ran green. The full sweep covers the rest.
+- Lint: 0 errors (11 warnings, all pre-existing in untouched component files). Prettier: clean on all four touched code files (one `--write` pass on the selfcheck).
+- **Sandbox-environmental, base-identical (CI authoritative):** `npm run build` fails on clean `origin/main` in this sandbox with the same root cause (`@tauri-apps/api` unresolvable in the shared node_modules) — verified by building a scratch worktree at 3aafc29d; swarmWasm stops on the missing cargo/wasm toolchain; rollSafety fails identically on the base checkout and here (exit 1 at the same line, headless-GL "framebuffer incomplete"). In the first combined sweep run, accum was SIGKILLed while two browser suites ran concurrently against the same VM; solo it passes (above) — resource contention, not a failure of the code.
 
-## Decisions worth the coordinator's eye
+## Decisions taken inside the issue's latitude (flagged for the coordinator)
 
-1. **Water stamping left as-is (ADD + clamp), though the issue's asymmetry line says "water blends MAX."** The issue's own acceptance (4) requires a pigment-free field's wet outputs byte-identical to the pre-pigment service — changing the water blend rewrites every wet golden and the mass character #1809/#1810 pinned, in a slice whose subject is pigment. The asymmetry the slice _does_ implement is the load-bearing half: pigment blends ADD (and mixes by KM), which no existing behaviour had. If Matt wants water-MAX as its own change, it belongs in a slice that owns the re-pins.
-2. **A cell holds one colour — the mixture's — not a per-pigment concentration vector.** Storing concentrations per pigment per cell is unbounded state; the compartment instead stores the mixture's colour + total density, and every reported colour derives from that by the same KM law (a mixture's stored colour re-derives constants spectrally identical to the blend's — the round-trip is pinned). Named in the evidence README as the slice's Curtis-lite simplification, alongside linear resampling under advection. #1812/#1813 read deposited density and reflectance, both served exactly.
-3. **Registration carries the pigment-live worst case for all sessions.** The governor's model has one number per effect; a pigment-free session is governed as if pigment were live (6.6 ms). That is the #1810 filled-cap convention applied consistently, and the notes in the registration carry both figures so the trade is visible.
-4. **Warm-up export acceptance is pinned at field level only.** #1815 has not landed; identical-session compartment hashes are the half this slice can prove. The export-level half and the vortex header's live-only paragraph are #1815's, per its text.
-5. **`liveLoop.mjs` is a one-writer file (repo AGENTS.md) and the second builder is live in another worktree.** My edit there is the two-key pass-through the issue's consumer wiring requires, at the existing wet call; no other live-loop behaviour is touched. Flagging because the coordinator sequences the publishes.
+1. **The stage lives in the deposited pack, not the #1813 wet-look pass.** The issue names the deposited layer as the effect's home ("display density d′ = d × (1 + k·|∇d|)"); #1813 doesn't exist yet. One home in the pack serves the fade today and #1813 later — a second application site in #1813 would be the #1069 trap (a capability on one render path only). #1813's builder should read the pack as-is; noted in the review README.
+2. **Band-proportional accrual.** The fall's contribution scales with the share of the damp band traversed, so a completed dry accrues exactly the issue's `k·|∇d|`. An all-or-nothing trigger was rejected on the numbers: the full path dries at 0.998/step, crossing the 0.30-wide band over ~140 steps — a trigger armed inside the band would fire at an arbitrary depth and the total would depend on frame sampling. Proportional accrual is sampling-independent and makes the degraded path (single-factor frames) consistent by construction.
+3. **The wetness snapshot is scratch, not state.** `_wetPrev` is overwritten every pigment-live step and never exported as history; only the accrued `pigEdge` persists — that *is* the drying history the issue asks the state to carry, and it rides the existing export surface (plain data on the state object; `dishWet` and the held-frame carve-out untouched). Warm-up determinism is pinned by hash (`hashEdgeDarkening`) + byte-equal packs across two identical sessions.
 
-## For the later WET slices (staged remainder)
+## Hand-offs
 
-- **#1812** (edge darkening) builds on the deposited layer: `pigD` density + its gradient are in the field, and the pack's alpha is the same density at publication. The accrued-darkening channel is that slice's to add.
-- **#1813** (wet-look) consumes deposited reflectance — the pack's rgb is computed for exactly this and currently also feeds ACCUM's absorption.
-- **#1815** (warm-up exports) inherits field-level determinism (`hashPigment` over identical sessions) and owns the export path + the live-only header.
-- Dish backstage: the frame result now carries the deposit pack where backstage field views read; no dish code changed and none should — the issue's exclusion is deliberate (grip is water, not colour).
+- #1813 (wet-look pass): read the deposit pack — darkening is already in it. Do not re-apply a gradient term.
+- #1814 (strata soak at the dish): the dish's stain read now includes darkened rims; nothing to wire.
+- Feel: K = 1.35 is the issue's pinned starting constant. If Matt's eye wants a stronger or weaker rim on real renders, it is a one-line constant change with the selfcheck pin updated beside it — flagged, not tuned here.

@@ -2,7 +2,7 @@
 // and the Phase A acceptance (byte-identical wetMask/wetVel vs the
 // pre-service noteWetFrame path over fixed inputs).
 import assert from 'node:assert';
-import { noteWetFrame, VORTEX_WET_DRY } from './vortex.mjs';
+import { EDGE_BAND_HI, EDGE_BAND_LO, noteWetFrame, VORTEX_WET_DRY } from './vortex.mjs';
 import { createWetFrameService, WET_REGIMES, wetRegimeAt } from './wetFrame.mjs';
 
 let n = 0;
@@ -339,6 +339,41 @@ ok('#1811 degraded service: pigment stamps land and keep settling under the shed
   }
   assert.ok(s > 0, 'suspended pigment landed through the shed');
   assert.ok(d > 0, 'transfer settled pigment without any advection');
+});
+
+ok("#1812 the edge stage's damp band is the service's damp band", () => {
+  assert.strictEqual(EDGE_BAND_LO, WET_REGIMES[0].at, 'band floor = the damp regime threshold');
+  assert.strictEqual(EDGE_BAND_HI, WET_REGIMES[1].at, 'band ceiling = the wet regime threshold');
+});
+
+ok('#1812 degraded service: deposits darken on schedule under the shed', () => {
+  const svc = createWetFrameService();
+  const stamp = { layer: 'content-0', key: 'a', x: 500, y: 350, vx: 0, vy: 0, tint: '#1a4fd6' };
+  let out = null;
+  for (let i = 0; i < 30; i++) {
+    out = svc.frame({
+      consumers: { dish: true },
+      shed: 'perfTier1',
+      degradedOk: true,
+      ...frameInput(i, { instances: [stamp] }),
+    });
+  }
+  assert.strictEqual(out.pigStep, 1, 'pigment live under degraded service');
+  // The stamps stop; the mask now dries in place through the damp band,
+  // one VORTEX_WET_DRY factor per stamp-free degraded frame.
+  for (let i = 0; i < 500; i++) {
+    out = svc.frame({
+      consumers: { dish: true },
+      shed: 'perfTier1',
+      degradedOk: true,
+      ...frameInput(30 + i, { instances: [] }),
+    });
+  }
+  const state = svc.field();
+  let maxEdge = 0;
+  for (let k = 0; k < state.n * state.n; k++) if (state.pigEdge[k] > maxEdge) maxEdge = state.pigEdge[k];
+  assert.ok(maxEdge > 0.05, `edge darkening accrued under the shed (max ${maxEdge.toFixed(3)})`);
+  assert.ok(out.pigDep, 'the darkened deposit pack is what degraded service publishes');
 });
 
 console.log(`wetFrame.selfcheck: ${n} checks passed`);

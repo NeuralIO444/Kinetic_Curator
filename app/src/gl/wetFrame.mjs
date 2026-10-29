@@ -68,6 +68,7 @@
  */
 
 import {
+  accrueEdgeDarkening,
   advectGain,
   emitAmbientFrom,
   emitFromInstances,
@@ -173,7 +174,13 @@ export function createWetFrameService() {
       // #1811: pigment stamps rode the emit above; the compartment
       // transfer is local (no advection — advection is what the shed
       // sheds), so deposits keep settling under degraded service.
-      if (state.pigmentLive) transferPigment(state);
+      // #1812: edge darkening is local too — the mask just dried in
+      // place above, so deposits keep darkening on schedule under the
+      // shed (null wetPrev: the uniform dry reconstructs it).
+      if (state.pigmentLive) {
+        transferPigment(state);
+        accrueEdgeDarkening(state, null);
+      }
       degradedSteps += 1;
       return {
         wetStep: 1,

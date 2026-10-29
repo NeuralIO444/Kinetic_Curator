@@ -6,11 +6,13 @@ import assert from 'node:assert';
 import { getCostTier } from './costTiers.mjs';
 import { SMEAR_MAX_SPEED } from './velocitySmear.mjs';
 import {
+  accrueEdgeDarkening,
   advectGain,
   createVortex,
   emitAmbient,
   emitFromInstances,
   emitAmbientFrom,
+  hashEdgeDarkening,
   hashPacked,
   hashPigment,
   hashVelocity,
@@ -19,8 +21,13 @@ import {
   packPigmentDeposited,
   packVelocity,
   stampPigment,
+  transferPigment,
   stepVortex,
   wetnessStep,
+  EDGE_BAND_HI,
+  EDGE_BAND_LO,
+  EDGE_DARKEN_CAP,
+  EDGE_DARKEN_K,
   VORTEX_DECAY,
   VORTEX_GAMMA_PER_SPEED,
   VORTEX_GRID,
@@ -28,6 +35,7 @@ import {
   VORTEX_MAX,
   VORTEX_WET_DRY,
 } from './vortex.mjs';
+import { mixColorsRgb } from './pigmentKM.mjs';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -227,11 +235,12 @@ ok('cost tier is 1, and the registered step cost is the measured one', () => {
   // pigment-absent path still measures ~2.1–2.7). Moving this pin
   // requires a new measurement, not a new opinion (docs/review/1811/).
   assert.strictEqual(d.timeMs, 6.6);
-  // The full state ledger: 7 grid planes + 3 pigment RGBA arrays +
+  // The full state ledger: 9 grid planes + 3 pigment RGBA arrays +
   // vorton ring and scratch. The #1810 formula (5 planes + ring)
   // omitted the wet pair and the scratch; #1811 counts what the state
-  // actually allocates.
-  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 7 + 128 * 128 * 16 * 3 + 4096 * 16 * 2);
+  // actually allocates; #1812 adds the edge-accrual plane and its
+  // wet-snapshot scratch (docs/review/1812/).
+  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2);
 });
 
 ok('field character at 128/20 matches the 64/30 field on the same scripted input (#1810)', () => {
@@ -640,6 +649,202 @@ ok('#1811 deposited pack: bare paper where nothing settled, KM reflectance where
     `reflectance is the green's (${pack.rgba[o]}, ${pack.rgba[o + 1]}, ${pack.rgba[o + 2]})`,
   );
   assert.strictEqual(pack.rgba[0], 255, 'far corner is bare paper');
+});
+
+// ---- #1812: edge darkening on drying ------------------------------------
+// A scripted single wash: a disc of blue, radius 6 cells at the field's
+// centre, stamped wet (wetness 1) and settled by direct transfer (the
+// fluid never steps during settling, so the deposit is clean and the
+// wetness still stands at 1 when the dry begins).
+const WASH = { cx: 64, cy: 64, r: 6 };
+function makeWash() {
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  const { cx, cy, r } = WASH;
+  for (let j = cy - r; j <= cy + r; j++) {
+    for (let i = cx - r; i <= cx + r; i++) {
+      const dx = i - cx,
+        dy = j - cy;
+      if (dx * dx + dy * dy > r * r) continue;
+      stampPigment(v, (i / (v.n - 1)) * v.width, (j / (v.n - 1)) * v.height, PIG_BLUE, 1.0);
+      v.wet[j * v.n + i] = 1;
+    }
+  }
+  for (let s = 0; s < 400; s++) transferPigment(v);
+  return v;
+}
+function dryWash(v) {
+  // Step with no new water until the whole field is below the damp band.
+  for (let s = 0; s < 700; s++) {
+    stepVortex(v);
+    let m = 0;
+    for (let k = 0; k < v.n * v.n; k++) if (v.wet[k] > m) m = v.wet[k];
+    if (m < EDGE_BAND_LO - 0.01) break;
+  }
+}
+function rewetWash(v) {
+  const { cx, cy, r } = WASH;
+  for (let j = cy - r; j <= cy + r; j++) {
+    for (let i = cx - r; i <= cx + r; i++) {
+      const dx = i - cx,
+        dy = j - cy;
+      if (dx * dx + dy * dy <= r * r) v.wet[j * v.n + i] = 1;
+    }
+  }
+}
+const washCell = (v, i, j) => j * v.n + i;
+const rimK = (v) => washCell(v, WASH.cx + WASH.r, WASH.cy);
+const centreK = (v) => washCell(v, WASH.cx, WASH.cy);
+
+ok('#1812 a wash dried once darkens at its rim, not its centre (the signature)', () => {
+  const v = makeWash();
+  dryWash(v);
+  const rim = rimK(v),
+    centre = centreK(v);
+  const rimEdge = v.pigEdge[rim];
+  const centreEdge = v.pigEdge[centre];
+  // Measured (docs/review/1812/): rim accrues 0.596 (≈ K · the rim's
+  // density cliff 0.44), the centre — flat interior, gradient ≈ 0 —
+  // accrues 0.008. Displayed density = deposited × (1 + accrued).
+  assert.ok(rimEdge > 0.4 && rimEdge < 0.8, `rim accrued ${rimEdge.toFixed(3)}`);
+  assert.ok(centreEdge < 0.02, `centre accrued ${centreEdge.toFixed(4)} — the interior must not darken`);
+  const rimDisp = v.pigD[rim * 4 + 3] * (1 + rimEdge);
+  const centreDisp = v.pigD[centre * 4 + 3] * (1 + centreEdge);
+  const ratio = rimDisp / centreDisp;
+  assert.ok(ratio >= 1.45, `edge-to-centre displayed density ratio ${ratio.toFixed(2)} (expectation ~1.5–2×)`);
+  // The pack carries it: rim reflectance is darker than the same
+  // deposit packed with the accrual zeroed; the centre is untouched
+  // within a byte.
+  const pack = packPigmentDeposited(v);
+  const saved = Float32Array.from(v.pigEdge);
+  v.pigEdge.fill(0);
+  const ctrl = packPigmentDeposited(v);
+  v.pigEdge.set(saved);
+  const lum = (p, k) => p.rgba[k * 4] + p.rgba[k * 4 + 1] + p.rgba[k * 4 + 2];
+  assert.ok(lum(ctrl, rim) - lum(pack, rim) >= 10, `rim pack darkened (${lum(ctrl, rim)} -> ${lum(pack, rim)})`);
+  // Centre bytes: rgb within a byte; alpha within two — the centre's
+  // own ≤2% density excess (asserted above) crosses one extra byte
+  // boundary only because this wash's density (0.99) sits hard against
+  // the alpha clamp. The centre pin that carries weight is centreEdge.
+  for (let ch = 0; ch < 4; ch++) {
+    const tol = ch === 3 ? 2 : 1;
+    assert.ok(
+      Math.abs(pack.rgba[centre * 4 + ch] - ctrl.rgba[centre * 4 + ch]) <= tol,
+      `centre pack byte ${ch} moved (${ctrl.rgba[centre * 4 + ch]} -> ${pack.rgba[centre * 4 + ch]})`,
+    );
+  }
+});
+
+ok('#1812 kept wet, the same wash does not darken (the gate, not an assumption)', () => {
+  const v = makeWash();
+  // Hold the wash soaked — wetness restored above the band before every
+  // step, for longer than the dry in the signature case takes.
+  for (let s = 0; s < 300; s++) {
+    rewetWash(v);
+    stepVortex(v);
+  }
+  let sum = 0;
+  for (let k = 0; k < v.n * v.n; k++) sum += v.pigEdge[k];
+  assert.strictEqual(sum, 0, 'no drying through the band, no darkening');
+  // Unit level, the rest of the gate: level-in-band, rising, and
+  // falls that never enter the band all accrue nothing.
+  const u = makeWash();
+  const rim = rimK(u);
+  const before = Float32Array.from(u.pigEdge);
+  const drive = (prevVal, curVal) => {
+    const prev = Float32Array.from(u.wet);
+    for (let k = 0; k < u.n * u.n; k++) {
+      prev[k] = prevVal;
+      u.wet[k] = curVal;
+    }
+    accrueEdgeDarkening(u, prev);
+  };
+  drive(0.2, 0.2); // level inside the band
+  drive(0.1, 0.3); // rising through the band
+  drive(0.9, 0.5); // falling, but never enters the band
+  drive(0.04, 0.01); // falling, already below the band
+  assert.strictEqual(u.pigEdge[rim], before[rim], 'no gate passage, no accrual');
+  drive(EDGE_BAND_HI + 0.05, EDGE_BAND_LO - 0.01); // one full-band fall
+  const full = u.pigEdge[rim];
+  // Exactly K · |∇d| at the rim cell, the gradient read off the deposit
+  // itself (this wash settled by transfer alone, so its rim is softer
+  // than the dried wash's — the formula, not the wash, is what's pinned).
+  const depAt = (i, j) => u.pigD[(j * u.n + i) * 4 + 3];
+  const gx = (depAt(WASH.cx + WASH.r + 1, WASH.cy) - depAt(WASH.cx + WASH.r - 1, WASH.cy)) * 0.5;
+  const gy = (depAt(WASH.cx + WASH.r, WASH.cy + 1) - depAt(WASH.cx + WASH.r, WASH.cy - 1)) * 0.5;
+  const expect = EDGE_DARKEN_K * Math.hypot(gx, gy);
+  assert.ok(
+    Math.abs(full - expect) < 0.02,
+    `a full-band dry accrues K·|∇d| (${full.toFixed(3)} vs ${expect.toFixed(3)})`,
+  );
+});
+
+ok('#1812 rewet cycles darken again, and the accrued value never passes the cap', () => {
+  const v = makeWash();
+  const rim = rimK(v);
+  dryWash(v);
+  const e1 = v.pigEdge[rim];
+  assert.ok(e1 > 0.4, `first dry accrued (${e1.toFixed(3)})`);
+  rewetWash(v);
+  dryWash(v);
+  const e2 = v.pigEdge[rim];
+  assert.ok(e2 > e1 + 0.3, `second dry added darkening (${e1.toFixed(3)} -> ${e2.toFixed(3)})`);
+  // Three more full-band falls driven directly at the accrual: the
+  // value climbs to the cap and stops there, never above it.
+  for (let c = 0; c < 3; c++) {
+    const prev = Float32Array.from(v.wet);
+    for (let k = 0; k < v.n * v.n; k++) {
+      prev[k] = EDGE_BAND_HI + 0.05;
+      v.wet[k] = EDGE_BAND_LO - 0.01;
+    }
+    accrueEdgeDarkening(v, prev);
+    assert.ok(v.pigEdge[rim] <= EDGE_DARKEN_CAP, `cycle ${c + 3}: rim within cap (${v.pigEdge[rim]})`);
+  }
+  assert.strictEqual(v.pigEdge[rim], EDGE_DARKEN_CAP, 'five cycles land exactly on the cap');
+  for (let k = 0; k < v.n * v.n; k++) assert.ok(v.pigEdge[k] <= EDGE_DARKEN_CAP, 'no cell above the cap');
+});
+
+ok('#1812 pigment that never wets never darkens — the pack stays the #1811 pack', () => {
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  stampPigment(v, 500, 350, PIG_BLUE, 2.0);
+  for (let s = 0; s < 400; s++) transferPigment(v);
+  for (let s = 0; s < 50; s++) stepVortex(v); // steps run; the field was never wet
+  let sum = 0;
+  for (let k = 0; k < v.n * v.n; k++) sum += v.pigEdge[k];
+  assert.strictEqual(sum, 0, 'dry-from-birth: nothing accrued');
+  // Byte-exact against the pre-#1812 formula, computed directly.
+  const pack = packPigmentDeposited(v);
+  const gi = Math.round(0.5 * (v.n - 1));
+  const o = (gi * v.n + gi) * 4;
+  const tot = v.pigD[o + 3];
+  assert.ok(tot > 0, 'deposit present');
+  const refl = mixColorsRgb([{ rgb: [v.pigD[o] / tot, v.pigD[o + 1] / tot, v.pigD[o + 2] / tot], c: tot }]);
+  const byte = (t) => Math.max(0, Math.min(255, Math.round(t * 255)));
+  assert.strictEqual(pack.rgba[o], byte(refl[0]));
+  assert.strictEqual(pack.rgba[o + 1], byte(refl[1]));
+  assert.strictEqual(pack.rgba[o + 2], byte(refl[2]));
+  assert.strictEqual(pack.rgba[o + 3], byte(Math.min(1, tot)));
+});
+
+ok('#1812 identical drying sessions accrue identically; freeze accrues nothing', () => {
+  const session = () => {
+    const v = makeWash();
+    dryWash(v);
+    return v;
+  };
+  const a = session();
+  const b = session();
+  assert.strictEqual(hashEdgeDarkening(a), hashEdgeDarkening(b), 'two runs, one accrual (the warm-up determinism)');
+  assert.deepStrictEqual(packPigmentDeposited(a).rgba, packPigmentDeposited(b).rgba, 'packs byte-identical');
+  const held = hashEdgeDarkening(a);
+  stepVortex(a, { freeze: true });
+  assert.strictEqual(hashEdgeDarkening(a), held, 'a held frame does not dry, so it does not darken');
+});
+
+ok('#1812 the recipe constants are the pinned ones', () => {
+  assert.strictEqual(EDGE_DARKEN_K, 1.35);
+  assert.strictEqual(EDGE_DARKEN_CAP, 2);
+  assert.strictEqual(EDGE_BAND_LO, 0.05);
+  assert.strictEqual(EDGE_BAND_HI, 0.35);
 });
 
 console.log(`vortex.selfcheck: ${n} checks passed`);
