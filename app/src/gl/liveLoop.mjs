@@ -1078,6 +1078,10 @@ export function createLiveLoop(
         wetAmount: wet.wetAmount,
         wetVel: wet.wetVel,
         wetMask: wet.wetMask,
+        // #1811: the deposited layer's KM reflectance pack rides the wet
+        // result into the recipe (pigStep 0 / null until pigment is live).
+        pigStep: wet.pigStep,
+        pigDep: wet.pigDep,
         leave: isLeave(layoutParams.trail),
         ribbon: isRibbon(layoutParams.trail),
         comet: isComet(layoutParams.trail),

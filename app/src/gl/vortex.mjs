@@ -4,7 +4,9 @@
  * Gamito / Lopes / Gomes 1995: vortons carry circulation, a fixed-iteration
  * damped Jacobi solve recovers the stream function, velocity is the curl of
  * that stream. Curtis et al. 1997 is the watercolor vocabulary; pigment
- * mixing itself is slice 5 and is not in this module.
+ * itself lands in #1811 — two compartments (suspended / deposited) in this
+ * state, mixed by Kubelka-Munk (gl/pigmentKM.mjs), stepped in Curtis's
+ * order (MoveWater → MovePigment → TransferPigment) inside stepVortex.
  *
  * Pure JS. No GL imports. Slice 2 (blocked on the ACCUM row, #961–#968)
  * uploads `velocityTex` as an *added* advect offset on the existing feed
@@ -30,6 +32,8 @@
 import { registerCostTier } from './costTiers.mjs';
 import { SMEAR_MAX_SPEED } from './velocitySmear.mjs';
 import { mkRng } from '../engine/prng.js';
+import { hexToRgb255Strict } from '../engine/colorHex.mjs';
+import { kmConstantsForRgb, mixColorsRgb, mixturePigmentColor, sanitizeRgb } from './pigmentKM.mjs';
 
 // Tier 1: sheds with the accum chain once the feed hook exists. Slice 1 does
 // not import this from renderer.mjs, so the governor's EXPECTED_TIER1 list
@@ -38,12 +42,18 @@ import { mkRng } from '../engine/prng.js';
 // at the vorton cap, median of batch medians — see docs/review/1810/), no
 // longer the selfcheck budget it admitted to being before. The #1695
 // device-harness confirmation on real hardware remains a separate gate.
+// #1811: re-registered on the pigment build — timeMs is the measured
+// PIGMENT-LIVE step (the sim's worst case, the #1810 convention), and
+// memoryBytes now counts the whole state: the #1810 formula omitted the
+// wet pair and the vorton scratch; the ledger below is the full count.
 registerCostTier('gl/vortex', {
   tier: 1,
-  memoryBytes: 128 * 128 * 4 * 5 + 4096 * 16,
-  timeMs: 2.7,
+  // 7 grid planes (omega, psi, psiNext, vx, vy, wet, wetNext) + the three
+  // #1811 pigment RGBA arrays + vorton ring and its scratch.
+  memoryBytes: 128 * 128 * 4 * 7 + 128 * 128 * 16 * 3 + 4096 * 16 * 2,
+  timeMs: 6.6,
   notes:
-    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt. timeMs = measured sandbox step (scripted steady state 2.66 ms, filled cap 2.72 ms; median of batch medians, docs/review/1810/); device-harness verification pending. The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
+    '#970 vortex-particle core at #1810 resolution: 128×128 Poisson (20 Jacobi) + ≤4096 vortons, CPU, fixed dt; #1811 adds the two pigment compartments (Kubelka-Munk, gl/pigmentKM.mjs) stepped in Curtis order. timeMs = measured sandbox step with pigment live across ~58% of the field (two runs, medians 6.93 / 6.28 ms, median of batch medians, docs/review/1811/); the pigment-absent step is unchanged at ~2.1–2.7 ms (docs/review/1810/). Device-harness verification pending (#1695). The velocity texture rides the existing feed as an offset (never a replacement). Live-only.',
 });
 
 // #1810 (Matt's ruling from the wet-engine eval): one field, one resolution —
@@ -61,6 +71,12 @@ export const VORTEX_WET_DRY = 0.992;
 export const VORTEX_PAIR_SEP = 24;
 export const VORTEX_GAMMA_PER_SPEED = 8;
 export const VORTEX_GAMMA_FLOOR = 1e-4;
+// #1811 pigment constants (Curtis-lite, pinned — feel quantities Matt
+// judges by eye, like the wet constants above; derivations and measured
+// behaviour in docs/review/1811/).
+export const PIGMENT_LOAD = 0.6; // suspended density per unit wet stamp
+export const PIGMENT_SETTLE = 0.02; // per-step settled fraction at ρ = 1
+export const PIGMENT_LIFT = 0.05; // per-step lifted fraction at wet = 1, ω = 0
 
 /**
  * Integer gate for the feed hook. 0 or 1 — never a float compare.
@@ -109,6 +125,27 @@ export function createVortex(opts = {}) {
     vy: new Float32Array(cells),
     wet: new Float32Array(cells),
     wetNext: new Float32Array(cells),
+    // #1811 pigment compartments, RGBA-density at field resolution:
+    // rgb = density-weighted colour (premultiplied), a = total density.
+    // A cell's pigment colour is rgb/a; its KM character derives from
+    // that colour by the one pure function (gl/pigmentKM.mjs), so the
+    // compartments store no per-pigment approximations. Suspended rides
+    // the water and can lift/settle; deposited never moves laterally —
+    // it only gains by settling and loses by lift (transferPigment).
+    pigS: new Float32Array(cells * 4),
+    pigSN: new Float32Array(cells * 4),
+    pigD: new Float32Array(cells * 4),
+    // Set by the first pigment stamp; until then the step skips the
+    // pigment stages outright, so a pigment-free session's field is
+    // byte-identical to the pre-#1811 sim (the no-op acceptance).
+    pigmentLive: false,
+    // The occupied region [i0, j0, i1, j1) of the two compartments —
+    // maintained by stamping (expands), MovePigment (expands by the
+    // backtrace margin, shrinks by rescan) — so the pigment stages
+    // iterate the wash, not the whole field. Null while both
+    // compartments are empty. A conservative superset, always: cells
+    // outside it hold exactly zero in both compartments.
+    pigBox: null,
     // ring, insertion order: x, y, gamma, age. head is the next write.
     vortons: new Float32Array(VORTEX_MAX * 4),
     head: 0,
@@ -156,6 +193,94 @@ function stampWet(state, x, y, amount) {
 }
 
 /**
+ * Blend `add` density of colour `rgb` into one compartment cell
+ * (offset o). Pigments that meet in a cell mix by Kubelka-Munk, not by
+ * averaging: the stored colour becomes the mixture's own pigment
+ * colour (its R∞ colour — density rides separately in alpha, so a
+ * thin wash and a thick one hold the same pigment identity). The
+ * same-colour fast path keeps repeated palette stamps exact.
+ */
+function blendPigmentCell(arr, o, rgb, add) {
+  const tot = arr[o + 3];
+  if (tot <= 0) {
+    arr[o] = rgb[0] * add;
+    arr[o + 1] = rgb[1] * add;
+    arr[o + 2] = rgb[2] * add;
+    arr[o + 3] = add;
+    return;
+  }
+  const cur = [arr[o] / tot, arr[o + 1] / tot, arr[o + 2] / tot];
+  const same = Math.abs(cur[0] - rgb[0]) < 1e-6 && Math.abs(cur[1] - rgb[1]) < 1e-6 && Math.abs(cur[2] - rgb[2]) < 1e-6;
+  const col = same
+    ? cur
+    : mixturePigmentColor([
+        { rgb: cur, c: tot },
+        { rgb, c: add },
+      ]) || cur;
+  const nt = tot + add;
+  arr[o] = col[0] * nt;
+  arr[o + 1] = col[1] * nt;
+  arr[o + 2] = col[2] * nt;
+  arr[o + 3] = nt;
+}
+
+/**
+ * Stamp suspended pigment at a scene point — the same bilinear footprint
+ * as stampWet, but pigment blends ADD (the inkwash asymmetry the issue
+ * names: water saturates, colour accumulates). Lands in suspension;
+ * settling into the paper is transferPigment's work.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {[number, number, number]} rgb sRGB 0..1
+ */
+export function stampPigment(state, x, y, rgb, amount) {
+  const { n, width, height, pigS } = state;
+  if (!Number.isFinite(amount) || amount <= 0) return;
+  if (x < 0 || y < 0 || x > width || y > height) return;
+  const col = sanitizeRgb(rgb);
+  const gx = (x / width) * (n - 1);
+  const gy = (y / height) * (n - 1);
+  const i0 = gx | 0;
+  const j0 = gy | 0;
+  const tx = gx - i0;
+  const ty = gy - j0;
+  const i1 = i0 + 1 < n ? i0 + 1 : i0;
+  const j1 = j0 + 1 < n ? j0 + 1 : j0;
+  const cells = [
+    [j0 * n + i0, (1 - tx) * (1 - ty)],
+    [j0 * n + i1, tx * (1 - ty)],
+    [j1 * n + i0, (1 - tx) * ty],
+    [j1 * n + i1, tx * ty],
+  ];
+  for (const [cell, w] of cells) {
+    if (w <= 0) continue;
+    blendPigmentCell(pigS, cell * 4, col, amount * w);
+  }
+  state.pigmentLive = true;
+  const box = state.pigBox;
+  if (!box) state.pigBox = [i0, j0, i1 + 1, j1 + 1];
+  else {
+    if (i0 < box[0]) box[0] = i0;
+    if (j0 < box[1]) box[1] = j0;
+    if (i1 + 1 > box[2]) box[2] = i1 + 1;
+    if (j1 + 1 > box[3]) box[3] = j1 + 1;
+  }
+}
+
+/**
+ * The pigment colour a mark carries, if any: an `rgb` triple on the
+ * instance, or its `tint` hex (the live contract's ink). Unparseable or
+ * absent → null (the mark stamps water only, as before #1811).
+ */
+function instancePigmentRgb(it) {
+  if (Array.isArray(it.rgb) && it.rgb.length >= 3) return sanitizeRgb(it.rgb);
+  if (typeof it.tint === 'string') {
+    const p = hexToRgb255Strict(it.tint);
+    if (p) return [p[0] / 255, p[1] / 255, p[2] / 255];
+  }
+  return null;
+}
+
+/**
  * Shed a vortex pair per moving mark, in `layer|key` order. Stationary
  * marks still stamp the wet mask (paint landed) but shed nothing.
  * Does not mutate instance order.
@@ -183,7 +308,12 @@ export function emitFromInstances(state, instances) {
     if (!Number.isFinite(vx)) vx = 0;
     if (!Number.isFinite(vy)) vy = 0;
     let speed = Math.hypot(vx, vy);
-    stampWet(state, it.x, it.y, speed > 1 ? Math.min(1, speed / 40) : 0.35);
+    const stampAmt = speed > 1 ? Math.min(1, speed / 40) : 0.35;
+    stampWet(state, it.x, it.y, stampAmt);
+    // #1811: a mark carrying a colour stamps its pigment on the same
+    // footprint — colour arrives wherever paint lands.
+    const pigRgb = instancePigmentRgb(it);
+    if (pigRgb) stampPigment(state, it.x, it.y, pigRgb, stampAmt * PIGMENT_LOAD);
     if (speed < 1e-4) continue;
     if (speed > SMEAR_MAX_SPEED) {
       const f = SMEAR_MAX_SPEED / speed;
@@ -473,6 +603,166 @@ function advect(state, disp) {
 }
 
 /**
+ * MovePigment (#1811, Curtis's order: after MoveWater) — suspended
+ * pigment rides the same velocity field the wet mask advects through,
+ * at the same rate (the field velocity IS the feed shader's wet offset,
+ * so the buffer's trails and the pigment they carry travel together).
+ * Semi-Lagrangian backtrace of all four density channels; unlike the
+ * mask there is no dry factor — pigment does not evaporate, it only
+ * settles, lifts, and diffuses numerically at cell boundaries.
+ *
+ * Work is bounded to the occupied box widened by the step's backtrace
+ * margin (the farthest any velocity can pull pigment this step), so a
+ * wash costs its own area, not the field's. The rescan afterwards
+ * re-derives the box from what the move and the standing deposits
+ * actually occupy.
+ * @param {ReturnType<typeof createVortex>} state
+ * @param {number} [disp] the mask's backtrace scale for this step
+ */
+function movePigment(state, disp = 1) {
+  const box = state.pigBox;
+  if (!box) return;
+  const { n, vx, vy, width, height, h, hy } = state;
+  const pigS = state.pigS;
+  const pigSN = state.pigSN;
+  // Backtrace margin in cells: max |v| · disp in scene units, +1 guard.
+  let maxV = 0;
+  for (let k = 0; k < n * n; k++) {
+    const ax = Math.abs(vx[k]);
+    const ay = Math.abs(vy[k]);
+    if (ax > maxV) maxV = ax;
+    if (ay > maxV) maxV = ay;
+  }
+  if (maxV === 0 || disp === 0) return; // no flow: the resample is the identity
+  const mx = Math.min(n, Math.ceil((maxV * Math.abs(disp)) / h) + 1);
+  const my = Math.min(n, Math.ceil((maxV * Math.abs(disp)) / hy) + 1);
+  const iLo = Math.max(0, box[0] - mx);
+  const jLo = Math.max(0, box[1] - my);
+  const iHi = Math.min(n, box[2] + mx);
+  const jHi = Math.min(n, box[3] + my);
+  const gxScale = (n - 1) / width;
+  const gyScale = (n - 1) / height;
+  pigSN.fill(0);
+  for (let j = jLo; j < jHi; j++) {
+    const y = j * hy;
+    for (let i = iLo; i < iHi; i++) {
+      const x = i * h;
+      const k = j * n + i;
+      let xb = x - vx[k] * disp;
+      let yb = y - vy[k] * disp;
+      if (xb < 0) xb = 0;
+      else if (xb > width) xb = width;
+      if (yb < 0) yb = 0;
+      else if (yb > height) yb = height;
+      let i0 = (xb * gxScale) | 0;
+      let j0 = (yb * gyScale) | 0;
+      if (i0 < 0) i0 = 0;
+      else if (i0 > n - 2) i0 = n - 2;
+      if (j0 < 0) j0 = 0;
+      else if (j0 > n - 2) j0 = n - 2;
+      const tx = xb * gxScale - i0;
+      const ty = yb * gyScale - j0;
+      const i1 = i0 + 1;
+      const j1 = j0 + 1;
+      const r0 = j0 * n;
+      const r1 = j1 * n;
+      const o = k * 4;
+      for (let ch = 0; ch < 4; ch++) {
+        pigSN[o + ch] =
+          (pigS[(r0 + i0) * 4 + ch] * (1 - tx) + pigS[(r0 + i1) * 4 + ch] * tx) * (1 - ty) +
+          (pigS[(r1 + i0) * 4 + ch] * (1 - tx) + pigS[(r1 + i1) * 4 + ch] * tx) * ty;
+      }
+    }
+  }
+  state.pigS = pigSN;
+  state.pigSN = pigS;
+  // Rescan: the box is what the moved suspension and the standing
+  // deposits occupy inside the worked region (outside it, both are
+  // zero by the invariant the box maintains).
+  const S = state.pigS;
+  const D = state.pigD;
+  let ni0 = Infinity,
+    nj0 = Infinity,
+    ni1 = -1,
+    nj1 = -1;
+  for (let j = jLo; j < jHi; j++) {
+    for (let i = iLo; i < iHi; i++) {
+      const o = (j * n + i) * 4;
+      if (S[o + 3] > 0 || D[o + 3] > 0) {
+        if (i < ni0) ni0 = i;
+        if (j < nj0) nj0 = j;
+        if (i + 1 > ni1) ni1 = i + 1;
+        if (j + 1 > nj1) nj1 = j + 1;
+      }
+    }
+  }
+  state.pigBox = ni1 < 0 ? null : [ni0, nj0, ni1, nj1];
+}
+
+/** The field's paper grain at a cell — the same integer hash family the
+ * fade shader's granulation uses, at field resolution. Fixed per cell:
+ * the paper does not change between frames. */
+function paperGrain(i, j) {
+  const hh = Math.imul((i * 1664525 + j) ^ 1013904223, 2246822519) >>> 16;
+  return (hh & 65535) / 65535;
+}
+
+/**
+ * TransferPigment (#1811) — the exchange between the compartments, per
+ * cell, from the cell's own pigment character (derived from the colour
+ * present, by the one pure function):
+ *
+ *   settle  suspended → deposited at PIGMENT_SETTLE · ρ, granulated by
+ *           γ against the paper grain (pigment catches in the dips).
+ *           Deposited pigment never moves laterally again — this stage
+ *           and lift are its only doors.
+ *   lift    deposited → suspended at PIGMENT_LIFT · wet² · (1 − ω):
+ *           fresh water (wetness near 1) re-wets the deposit; a
+ *           staining pigment (ω near 1) refuses.
+ *
+ * Both moves are computed from the stage's starting values and applied
+ * together, so a cell's total pigment is conserved by the transfer
+ * itself (float rounding aside) — total pigment changes only by
+ * stamping and boundary loss, the issue's conservation acceptance.
+ * Exported for the wet-frame service's degraded path (stamps land and
+ * transfer under the shed; advection is what's shed).
+ * @param {ReturnType<typeof createVortex>} state
+ */
+export function transferPigment(state) {
+  if (!state.pigmentLive) return;
+  const box = state.pigBox;
+  if (!box) return;
+  const { n, wet, pigS, pigD } = state;
+  for (let j = box[1]; j < box[3]; j++) {
+    for (let i = box[0]; i < box[2]; i++) {
+      const k = j * n + i;
+      const o = k * 4;
+      const sTot = pigS[o + 3];
+      const dTot = pigD[o + 3];
+      if (sTot <= 0 && dTot <= 0) continue;
+      let settle = 0;
+      if (sTot > 0) {
+        const ch = kmConstantsForRgb(pigS[o] / sTot, pigS[o + 1] / sTot, pigS[o + 2] / sTot);
+        settle = Math.min(1, PIGMENT_SETTLE * ch.rho * (1 + ch.gamma * (paperGrain(i, j) - 0.5)));
+      }
+      let lift = 0;
+      if (dTot > 0) {
+        const chD = kmConstantsForRgb(pigD[o] / dTot, pigD[o + 1] / dTot, pigD[o + 2] / dTot);
+        const w = wet[k];
+        lift = Math.min(1, PIGMENT_LIFT * w * w * (1 - chD.omega));
+      }
+      if (settle <= 0 && lift <= 0) continue;
+      for (let ch = 0; ch < 4; ch++) {
+        const sMove = pigS[o + ch] * settle;
+        const lMove = pigD[o + ch] * lift;
+        pigS[o + ch] += lMove - sMove;
+        pigD[o + ch] += sMove - lMove;
+      }
+    }
+  }
+}
+
+/**
  * One fixed-dt step. Freeze holds velocity, wet mask, and vortons — the
  * last texture stays bound.
  * @param {ReturnType<typeof createVortex>} state
@@ -489,7 +779,15 @@ export function stepVortex(state, opts = {}) {
   splat(state);
   poisson(state);
   velocityFromPsi(state);
-  advect(state, Number.isFinite(opts.wetAdvect) ? opts.wetAdvect : 1);
+  const disp = Number.isFinite(opts.wetAdvect) ? opts.wetAdvect : 1;
+  advect(state, disp);
+  // #1811: Curtis's order — MoveWater (above) → MovePigment →
+  // TransferPigment. Skipped outright until the first pigment stamp,
+  // which is what keeps pigment-free sessions byte-identical.
+  if (state.pigmentLive) {
+    movePigment(state, disp);
+    transferPigment(state);
+  }
   state.steps += 1;
   return state;
 }
@@ -534,6 +832,51 @@ export function packVelocity(state, pack = VORTEX_VEL_PACK) {
     rgba[i * 4 + 3] = 255;
   }
   return { n, rgba, pack };
+}
+
+/** FNV-1a over both pigment compartments, quantized like hashVelocity. */
+export function hashPigment(state) {
+  let h = 2166136261;
+  for (const arr of [state.pigS, state.pigD]) {
+    for (let i = 0; i < arr.length; i++) {
+      h ^= Math.round(arr[i] * 1e5) | 0;
+      h = Math.imul(h, 16777619);
+    }
+  }
+  return h >>> 0;
+}
+
+/**
+ * #1811 — the deposited layer as ACCUM reads it: per cell, rgb = the
+ * KM-computed reflectance of the deposited mixture at its deposited
+ * density (finite-layer Kubelka-Munk over the paper — mixColorsRgb of
+ * the cell's colour at its total), a = deposited density (clamped).
+ * A cell with no deposit reads exactly (1, 1, 1, 0) — bare paper — so
+ * absorption by this pack is a no-op wherever nothing has settled.
+ * This pack is also the backstage stain read (the dish's only pigment
+ * consumption in #1811); computing it is per-frame work only when a
+ * consumer asks the service for the field.
+ */
+export function packPigmentDeposited(state) {
+  const n = state.n;
+  const rgba = new Uint8Array(n * n * 4);
+  const { pigD } = state;
+  for (let k = 0; k < n * n; k++) {
+    const o = k * 4;
+    const tot = pigD[o + 3];
+    rgba[o + 3] = packByte(Math.min(1, tot));
+    if (tot <= 0) {
+      rgba[o] = 255;
+      rgba[o + 1] = 255;
+      rgba[o + 2] = 255;
+      continue;
+    }
+    const refl = mixColorsRgb([{ rgb: [pigD[o] / tot, pigD[o + 1] / tot, pigD[o + 2] / tot], c: tot }]);
+    rgba[o] = packByte(refl[0]);
+    rgba[o + 1] = packByte(refl[1]);
+    rgba[o + 2] = packByte(refl[2]);
+  }
+  return { n, rgba };
 }
 
 /** R wet mask, 0..1. LINEAR upload — nearest would read as blocks. */
@@ -589,7 +932,8 @@ export function ensureVortex(slot, { seed, width, height } = {}) {
  */
 export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion }) {
   const step = wetnessStep(wetness);
-  if (step === 0) return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null };
+  if (step === 0)
+    return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null, pigStep: 0, pigDep: null };
   const w = width > 0 ? width : 1000;
   ensureVortex(slot, { seed, width, height });
   if (freeze) stepVortex(slot.vortex, { freeze: true });
@@ -601,11 +945,18 @@ export function noteWetFrame(slot, { wetness, freeze, seed, width, height, insta
     stepVortex(slot.vortex, { wetAdvect: advectGain(wetness) });
   }
   const amount = advectGain(wetness);
+  // #1811: pigment publishes beside the field, under the same discipline
+  // as the velocity — present only when the field holds pigment, and a
+  // frozen frame publishes the standing deposits (absorption must not
+  // pop when the transport holds).
+  const pigLive = !!slot.vortex.pigmentLive;
   return {
     wetStep: 1,
     wetGain: amount * (VORTEX_VEL_PACK / w),
     wetAmount: amount,
     wetVel: packVelocity(slot.vortex),
     wetMask: packWet(slot.vortex),
+    pigStep: pigLive ? 1 : 0,
+    pigDep: pigLive ? packPigmentDeposited(slot.vortex) : null,
   };
 }

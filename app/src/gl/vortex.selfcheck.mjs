@@ -12,10 +12,13 @@ import {
   emitFromInstances,
   emitAmbientFrom,
   hashPacked,
+  hashPigment,
   hashVelocity,
   motionAmount,
   noteWetFrame,
+  packPigmentDeposited,
   packVelocity,
+  stampPigment,
   stepVortex,
   wetnessStep,
   VORTEX_DECAY,
@@ -203,25 +206,32 @@ ok('a stirred field is not zero, and a step stays inside a loose budget', () => 
   const t0 = performance.now();
   for (let i = 0; i < 30; i++) stepVortex(v);
   const per = (performance.now() - t0) / 30;
-  // Loose sandbox bound, not the cost gate: the #1810 measurement (scripted
-  // steady state, filled cap) is 2.66–2.72 ms/step on this class of VM —
-  // the gate itself is the registered timeMs below. 6 ms catches an
-  // order-of-magnitude regression (a 256 grid, a doubled Jacobi) without
-  // flaking on shared-machine load.
-  console.log(`    step ${per.toFixed(3)} ms (measured gate 2.7, fail above 6)`);
+  // Loose sandbox bound, not the cost gate: this script is pigment-absent
+  // (the #1810 path, measured 2.66–2.72 ms/step on this class of VM; the
+  // registered gate below is the pigment-LIVE figure since #1811). 6 ms
+  // catches an order-of-magnitude regression (a 256 grid, a doubled
+  // Jacobi) without flaking on shared-machine load.
+  console.log(`    step ${per.toFixed(3)} ms (pigment-absent path; registered gate is the live 6.6, fail above 6)`);
   assert.ok(per < 6, `step ${per.toFixed(3)} ms exceeds the loose budget`);
 });
 
-ok('cost tier is 1, and the registered step cost is the #1810 measurement', () => {
+ok('cost tier is 1, and the registered step cost is the measured one', () => {
   const d = getCostTier('gl/vortex');
   assert.ok(d, 'gl/vortex registered');
   assert.strictEqual(d.tier, 1);
   // Was 0.5 by the module's own admission ("the selfcheck budget, not a
-  // measured fact"). #1810 measured the step on identical scripted sessions
-  // before/after the resolution change and registered the result; moving
-  // this pin requires a new measurement, not a new opinion.
-  assert.strictEqual(d.timeMs, 2.7);
-  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 5 + 4096 * 16);
+  // measured fact"). #1810 measured the step and registered 2.7 (the
+  // filled-cap figure). #1811 re-measured on the pigment build and
+  // registered the pigment-LIVE step — the sim's worst case, same
+  // convention (two sandbox runs, medians 6.93 / 6.28 ms; the
+  // pigment-absent path still measures ~2.1–2.7). Moving this pin
+  // requires a new measurement, not a new opinion (docs/review/1811/).
+  assert.strictEqual(d.timeMs, 6.6);
+  // The full state ledger: 7 grid planes + 3 pigment RGBA arrays +
+  // vorton ring and scratch. The #1810 formula (5 planes + ring)
+  // omitted the wet pair and the scratch; #1811 counts what the state
+  // actually allocates.
+  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 7 + 128 * 128 * 16 * 3 + 4096 * 16 * 2);
 });
 
 ok('field character at 128/20 matches the 64/30 field on the same scripted input (#1810)', () => {
@@ -376,6 +386,260 @@ ok('noteWetFrame seeds ambient from behave without dropping the dry gate', () =>
   const dry = noteWetFrame(slot, { wetness: 0, freeze: false, seed: 11, width: 200, height: 140, instances: [] });
   assert.strictEqual(dry.wetStep, 0);
   assert.strictEqual(dry.wetGain, 0);
+});
+
+ok('#1811 pigment absent: a session without coloured marks leaves both compartments zero', () => {
+  const v = runScript(); // SCRIPT's marks carry no tint/rgb
+  assert.strictEqual(v.pigmentLive, false);
+  for (let i = 0; i < v.pigS.length; i++) {
+    assert.strictEqual(v.pigS[i], 0);
+    assert.strictEqual(v.pigD[i], 0);
+  }
+  // And the frame publication stays in the absent shape.
+  const slot = {};
+  const out = noteWetFrame(slot, {
+    wetness: 0.6,
+    freeze: false,
+    seed: 970,
+    width: 1000,
+    height: 700,
+    instances: [mark('a', 'k', 200, 300, 12, -4)],
+  });
+  assert.strictEqual(out.pigStep, 0);
+  assert.strictEqual(out.pigDep, null);
+});
+
+const pigTotals = (v) => {
+  let s = 0,
+    d = 0;
+  for (let k = 0; k < v.n * v.n; k++) {
+    s += v.pigS[k * 4 + 3];
+    d += v.pigD[k * 4 + 3];
+  }
+  return [s, d];
+};
+const pigCentroid = (v, arr) => {
+  let m = 0,
+    cx = 0,
+    cy = 0;
+  for (let j = 0; j < v.n; j++)
+    for (let i = 0; i < v.n; i++) {
+      const w = arr[(j * v.n + i) * 4 + 3];
+      m += w;
+      cx += w * i;
+      cy += w * j;
+    }
+  return [cx / m, cy / m, m];
+};
+const PIG_BLUE = [0.1, 0.25, 0.85];
+const PIG_YELLOW = [0.95, 0.8, 0.1];
+
+ok('#1811 coloured marks stamp suspended pigment of their colour (rgb and tint forms)', () => {
+  const v = createVortex({ seed: 970 });
+  emitFromInstances(v, [{ layer: 'a', key: 'k', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE }]);
+  const gi = Math.round(0.5 * (v.n - 1));
+  const o = (gi * v.n + gi) * 4;
+  assert.ok(v.pigmentLive);
+  assert.ok(v.pigS[o + 3] > 0, 'suspended density landed');
+  assert.ok(Math.abs(v.pigS[o] / v.pigS[o + 3] - PIG_BLUE[0]) < 0.02, 'cell colour is the stamped colour');
+  const w = createVortex({ seed: 970 });
+  emitFromInstances(w, [{ layer: 'a', key: 'k', x: 500, y: 350, vx: 0, vy: 0, tint: '#1947d6' }]);
+  assert.ok(w.pigS[o + 3] > 0, 'tint hex stamps too');
+  assert.ok(Math.abs(w.pigS[o + 2] / w.pigS[o + 3] - 0xd6 / 255) < 0.02, 'tint parsed to its colour');
+  const u = createVortex({ seed: 970 });
+  emitFromInstances(u, [{ layer: 'a', key: 'k', x: 500, y: 350, vx: 0, vy: 0, tint: 'not-a-colour' }]);
+  assert.strictEqual(u.pigmentLive, false, 'unparseable tint stamps water only');
+});
+
+ok('#1811 field mixture is Kubelka-Munk: a blue + yellow overlap deposits green', () => {
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  const marks = [
+    { layer: 'a', key: 'b', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE },
+    { layer: 'a', key: 'y', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_YELLOW },
+  ];
+  for (let f = 0; f < 40; f++) {
+    emitFromInstances(v, marks);
+    stepVortex(v);
+  }
+  for (let f = 0; f < 300; f++) stepVortex(v);
+  const gi = Math.round(0.5 * (v.n - 1));
+  const o = (gi * v.n + gi) * 4;
+  const tot = v.pigD[o + 3];
+  assert.ok(tot > 0.5, `pigment deposited (${tot.toFixed(2)})`);
+  const col = [v.pigD[o] / tot, v.pigD[o + 1] / tot, v.pigD[o + 2] / tot];
+  // Measured (docs/review/1811/): the deposited colour is (0.167, 0.532,
+  // 0.241) — the KM module's green — where density-averaging the two
+  // colours would store their greyish mean (0.525, 0.525, 0.475).
+  assert.ok(col[1] > col[0] + 0.25, `deposited green dominates red (${col.map((x) => x.toFixed(3))})`);
+  assert.ok(col[1] > col[2] + 0.2, `deposited green dominates blue (${col.map((x) => x.toFixed(3))})`);
+});
+
+ok('#1811 transfer conserves total pigment; settling is one-way to the deposit', () => {
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  stampPigment(v, 500, 350, PIG_BLUE, 2.0);
+  const [s0, d0] = pigTotals(v);
+  assert.ok(s0 > 0 && d0 === 0);
+  for (let f = 0; f < 600; f++) stepVortex(v);
+  const [s1, d1] = pigTotals(v);
+  // No flow, no new stamps: the total moves only by float rounding
+  // (measured drift 2e-5 % — docs/review/1811/); the transfer itself
+  // conserves by construction (both moves computed from start values).
+  assert.ok(Math.abs(s1 + d1 - (s0 + d0)) / (s0 + d0) < 0.001, `total conserved (${s0 + d0} -> ${s1 + d1})`);
+  assert.ok(d1 > 0.99 * (s0 + d0), 'essentially everything settled in 600 steps');
+  assert.ok(s1 < 0.01 * (s0 + d0), 'suspension emptied into the deposit');
+});
+
+ok('#1811 deposited never moves laterally; suspended rides the flow', () => {
+  // Deposit at (150, 150), settle unstirred, then stir hard at the far
+  // corner (800, 550) for 600 steps with tintless movers.
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  const dep = [{ layer: 'a', key: 'd', x: 150, y: 150, vx: 0, vy: 0, rgb: PIG_BLUE }];
+  for (let f = 0; f < 30; f++) {
+    emitFromInstances(v, dep);
+    stepVortex(v);
+  }
+  for (let f = 0; f < 200; f++) stepVortex(v);
+  const c0 = pigCentroid(v, v.pigD);
+  for (let f = 0; f < 600; f++) {
+    const a = f * 0.05;
+    emitFromInstances(v, [
+      {
+        layer: 'b',
+        key: 'm0',
+        x: 800 + 60 * Math.cos(a),
+        y: 550 + 60 * Math.sin(a),
+        vx: -180 * Math.sin(a),
+        vy: 180 * Math.cos(a),
+      },
+      {
+        layer: 'b',
+        key: 'm1',
+        x: 800 + 60 * Math.cos(a + 3),
+        y: 550 + 60 * Math.sin(a + 3),
+        vx: -180 * Math.sin(a + 3),
+        vy: 180 * Math.cos(a + 3),
+      },
+    ]);
+    stepVortex(v, { wetAdvect: 0.6 });
+  }
+  const c1 = pigCentroid(v, v.pigD);
+  const drift = Math.hypot(c1[0] - c0[0], c1[1] - c0[1]);
+  // Measured drift 0.005 cells (docs/review/1811/): what little moves is
+  // lift-and-resettle beside the deposit under advected moisture, not
+  // lateral transport — deposited has no advection path at all.
+  assert.ok(drift < 0.5, `deposited centroid stationary (${drift.toFixed(3)} cells over 600 stirred steps)`);
+  // The other half: a suspended burst in an established vortex travels.
+  const burst = (stir) => {
+    const w = createVortex({ seed: 970, width: 1000, height: 700 });
+    const movers = (f) => {
+      const a = f * 0.05;
+      return [
+        {
+          layer: 'b',
+          key: 'm',
+          x: 500 + 120 * Math.cos(a),
+          y: 350 + 120 * Math.sin(a),
+          vx: -360 * Math.sin(a),
+          vy: 360 * Math.cos(a),
+        },
+        {
+          layer: 'b',
+          key: 'n',
+          x: 500 + 120 * Math.cos(a + 3),
+          y: 350 + 120 * Math.sin(a + 3),
+          vx: -360 * Math.sin(a + 3),
+          vy: 360 * Math.cos(a + 3),
+        },
+      ];
+    };
+    for (let f = 0; f < 60; f++) {
+      if (stir) emitFromInstances(w, movers(f));
+      stepVortex(w, { wetAdvect: 0.6 });
+    }
+    stampPigment(w, 620, 350, PIG_BLUE, 3);
+    const b0 = pigCentroid(w, w.pigS);
+    for (let f = 60; f < 100; f++) {
+      if (stir) emitFromInstances(w, movers(f));
+      stepVortex(w, { wetAdvect: 0.6 });
+    }
+    const b1 = pigCentroid(w, w.pigS);
+    return Math.hypot(b1[0] - b0[0], b1[1] - b0[1]);
+  };
+  // Measured: control 0.011 cells (settling only), stirred 12.8 cells.
+  assert.ok(burst(false) < 0.5, 'unstirred burst stays put');
+  assert.ok(burst(true) > 5, 'stirred burst rides the flow');
+});
+
+ok('#1811 lift: fresh water pulls deposited pigment back into suspension', () => {
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  const dep = [{ layer: 'a', key: 'd', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE }];
+  for (let f = 0; f < 30; f++) {
+    emitFromInstances(v, dep);
+    stepVortex(v);
+  }
+  for (let f = 0; f < 200; f++) stepVortex(v);
+  const [, dBefore] = pigTotals(v);
+  // Rewet hard with a tintless (pure water) stationary mark on the deposit.
+  const water = [{ layer: 'a', key: 'w', x: 500, y: 350, vx: 0, vy: 0 }];
+  for (let f = 0; f < 120; f++) {
+    emitFromInstances(v, water);
+    stepVortex(v);
+  }
+  const [sAfter, dAfter] = pigTotals(v);
+  // Measured: deposited 5.54 -> 2.67 (docs/review/1811/) — lift at
+  // wet ~0.99 overcomes resettling; some lifted pigment resettles, which
+  // is why the bound is a ratio, not the full lift rate.
+  assert.ok(dAfter < 0.7 * dBefore, `deposit lifted (${dBefore.toFixed(2)} -> ${dAfter.toFixed(2)})`);
+  assert.ok(sAfter > 0.3, 'lifted pigment is back in suspension');
+});
+
+ok('#1811 freeze holds pigment; identical tinted sessions hash identical compartments', () => {
+  const session = () => {
+    const v = createVortex({ seed: 970, width: 1000, height: 700 });
+    for (let f = 0; f < 60; f++) {
+      emitFromInstances(v, [
+        { layer: 'a', key: 'a', x: 200 + f * 5, y: 300, vx: 30, vy: 5, tint: '#1a4fd6' },
+        { layer: 'a', key: 'b', x: 700 - f * 4, y: 420, vx: -20, vy: 10, tint: '#e8c832' },
+      ]);
+      stepVortex(v, { wetAdvect: 0.6 });
+    }
+    return v;
+  };
+  const a = session();
+  const b = session();
+  assert.strictEqual(hashPigment(a), hashPigment(b), 'two runs, one field (the warm-up determinism)');
+  const held = hashPigment(a);
+  stepVortex(a, { freeze: true });
+  assert.strictEqual(hashPigment(a), held, 'freeze holds the compartments');
+});
+
+ok('#1811 deposited pack: bare paper where nothing settled, KM reflectance where it did', () => {
+  const empty = packPigmentDeposited(createVortex({ seed: 970 }));
+  for (let k = 0; k < empty.n * empty.n; k++) {
+    assert.strictEqual(empty.rgba[k * 4], 255);
+    assert.strictEqual(empty.rgba[k * 4 + 3], 0);
+  }
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  const marks = [
+    { layer: 'a', key: 'b', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE },
+    { layer: 'a', key: 'y', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_YELLOW },
+  ];
+  for (let f = 0; f < 40; f++) {
+    emitFromInstances(v, marks);
+    stepVortex(v);
+  }
+  for (let f = 0; f < 300; f++) stepVortex(v);
+  const pack = packPigmentDeposited(v);
+  const gi = Math.round(0.5 * (v.n - 1));
+  const o = (gi * v.n + gi) * 4;
+  // Measured pack at the overlap: (43, 136, 62) — the KM reflectance of
+  // the green deposit; bare-paper cells stay 255.
+  assert.ok(pack.rgba[o + 3] > 0, 'density published');
+  assert.ok(
+    pack.rgba[o + 1] > pack.rgba[o] + 40,
+    `reflectance is the green's (${pack.rgba[o]}, ${pack.rgba[o + 1]}, ${pack.rgba[o + 2]})`,
+  );
+  assert.strictEqual(pack.rgba[0], 255, 'far corner is bare paper');
 });
 
 console.log(`vortex.selfcheck: ${n} checks passed`);

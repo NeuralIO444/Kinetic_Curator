@@ -284,4 +284,61 @@ ok('dispose is the only destroy: after it, the next served frame rebirths', () =
   assert.strictEqual(svc.stats().births, 2);
 });
 
+ok('#1811 pigment rides the service: tinted frames publish the deposit pack; tintless stay absent', () => {
+  const svc = createWetFrameService();
+  let out = null;
+  for (let i = 0; i < 40; i++) {
+    out = svc.frame({ consumers: { accum: true }, ...frameInput(i) });
+    assert.strictEqual(out.pigStep, 0, `frame ${i}: no coloured marks yet`);
+    assert.strictEqual(out.pigDep, null);
+  }
+  const tinted = (i) =>
+    frameInput(i, {
+      instances: [
+        { layer: 'content-0', key: 'a', x: 500, y: 350, vx: 0, vy: 0, tint: '#1a4fd6' },
+        { layer: 'content-0', key: 'b', x: 520, y: 350, vx: 0, vy: 0, tint: '#e8c832' },
+      ],
+    });
+  for (let i = 0; i < 40; i++) out = svc.frame({ consumers: { accum: true }, ...tinted(i) });
+  assert.strictEqual(out.pigStep, 1, 'pigment live publishes');
+  assert.ok(out.pigDep && out.pigDep.n === svc.field().n, 'deposit pack at field resolution');
+  let stained = 0;
+  for (let k = 0; k < out.pigDep.n * out.pigDep.n; k++) if (out.pigDep.rgba[k * 4 + 3] > 0) stained++;
+  assert.ok(stained > 0, 'deposits settled under the stamps are in the pack');
+  // The service's full path is noteWetFrame's own result: same bytes.
+  const slot = { vortex: null };
+  const svc2 = createWetFrameService();
+  for (let i = 0; i < 10; i++) {
+    const direct = noteWetFrame(slot, tinted(i));
+    const served = svc2.frame({ consumers: { accum: true }, ...tinted(i) });
+    assert.strictEqual(served.pigStep, direct.pigStep);
+    assert.deepStrictEqual(served.pigDep.rgba, direct.pigDep.rgba, `frame ${i}: deposit pack bytes`);
+  }
+});
+
+ok('#1811 degraded service: pigment stamps land and keep settling under the shed', () => {
+  const svc = createWetFrameService();
+  const stamp = { layer: 'content-0', key: 'a', x: 500, y: 350, vx: 0, vy: 0, tint: '#1a4fd6' };
+  let out = null;
+  for (let i = 0; i < 30; i++) {
+    out = svc.frame({
+      consumers: { dish: true },
+      shed: 'perfTier1',
+      degradedOk: true,
+      ...frameInput(i, { instances: [stamp] }),
+    });
+  }
+  assert.strictEqual(out.wetMode, 'degraded');
+  assert.strictEqual(out.pigStep, 1, 'pigment published under degraded service');
+  const state = svc.field();
+  let s = 0,
+    d = 0;
+  for (let k = 0; k < state.n * state.n; k++) {
+    s += state.pigS[k * 4 + 3];
+    d += state.pigD[k * 4 + 3];
+  }
+  assert.ok(s > 0, 'suspended pigment landed through the shed');
+  assert.ok(d > 0, 'transfer settled pigment without any advection');
+});
+
 console.log(`wetFrame.selfcheck: ${n} checks passed`);

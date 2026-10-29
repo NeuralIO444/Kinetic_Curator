@@ -386,6 +386,8 @@ export function accumRecipeParams({
   wetAmount = 0,
   wetVel = null,
   wetMask = null,
+  pigStep = 0,
+  pigDep = null,
   ageBuffer = false,
   dt = 1 / 60,
   stats = false,
@@ -452,6 +454,11 @@ export function accumRecipeParams({
     wetAmount: wetStep === 1 && Number.isFinite(Number(wetAmount)) ? Math.min(1, Math.max(0, Number(wetAmount))) : 0,
     wetVel: wetStep === 1 ? wetVel : null,
     wetMask: wetStep === 1 ? wetMask : null,
+    // #1811: the deposited-pigment absorption gate — the same integer
+    // discipline as wetStep. 0 keeps the wet fade program and drops the
+    // pack, so a pigment-free field renders byte-identically.
+    pigStep: pigStep === 1 ? 1 : 0,
+    pigDep: pigStep === 1 ? pigDep : null,
     // Phase B3 — echoes. echoTaps K: tap i mixes the frame from i+1 steps
     // ago (delays 1..K), additive ghosts; weights decay with age. 0 = no
     // ring, no mix pass — exactly the old composite.
@@ -1067,6 +1074,26 @@ uniform float u_wetAmount;`,
   // Multiplicative granulation (see FADE_WET_FS): the glow pass writes back
   // into the feedback buffer, so additive grain would accumulate.
   lit *= 1.0 + (paper - 0.5) * 0.35 * (1.0 - wet) * u_wetAmount;`,
+);
+
+// #1811 — the fade gains a pigment variant: the buffer's light is
+// absorbed by the wet field's deposited layer, multiplied by the
+// deposit's Kubelka-Munk reflectance (packed on the CPU by the wet
+// service — gl/vortex.mjs packPigmentDeposited; exactly 1 where nothing
+// has settled, so a bound-but-empty field changes nothing). Built from
+// FADE_WET_FS so the wet terms can never drift apart; used only when
+// the recipe's pigStep is 1. KM reflectance is the display law here —
+// not Beer-Lambert (the issue's ruling).
+export const FADE_PIG_FS = FADE_WET_FS.replace(
+  'uniform float u_wetAmount;\nuint ihashWet',
+  `uniform float u_wetAmount;
+uniform sampler2D u_pigDep; // #1811 deposited KM reflectance (rgb), density (a). Not the wet program.
+uint ihashWet`,
+).replace(
+  'o = vec4(mix(u_bg, rgb, u_keep), c.a);',
+  `vec3 depRefl = texture(u_pigDep, tuv).rgb;
+  rgb *= depRefl;
+  o = vec4(mix(u_bg, rgb, u_keep), c.a);`,
 );
 
 // #970 slice 5 — cheap pigment mix. Not Kubelka-Munk. Dry OVER_FS is untouched.
@@ -1772,6 +1799,40 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null, age =
       }
     }
   }
+  // #1811 — deposited-pigment absorption, the FADE_PIG_FS term: the fed
+  // light is multiplied by the deposited layer's KM reflectance, sampled
+  // on the same field grid and at the same point in the step as the wet
+  // terms above (the fade pass's own position). The pack reads exactly
+  // 1 where no deposit sits, and the block is skipped entirely when the
+  // recipe's pigStep is 0 — the pre-pigment wet path, byte-identical.
+  if (wetOn && p.pigStep === 1 && p.pigDep) {
+    const dep = p.pigDep;
+    const gn = dep.n;
+    const dat = (j, i, c) => dep.rgba[(j * gn + i) * 4 + c] / 255;
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const u = (x + 0.5) / w;
+        const v = (y + 0.5) / h;
+        const gx = Math.max(0, Math.min(gn - 1.0001, u * (gn - 1)));
+        const gy = Math.max(0, Math.min(gn - 1.0001, v * (gn - 1)));
+        const i0 = gx | 0;
+        const j0 = gy | 0;
+        const tx = gx - i0;
+        const ty = gy - j0;
+        const i1 = Math.min(gn - 1, i0 + 1);
+        const j1 = Math.min(gn - 1, j0 + 1);
+        const chan = (c) =>
+          (1 - tx) * (1 - ty) * dat(j0, i0, c) +
+          tx * (1 - ty) * dat(j0, i1, c) +
+          (1 - tx) * ty * dat(j1, i0, c) +
+          tx * ty * dat(j1, i1, c);
+        const o = (y * w + x) * 4;
+        fed[o] = fed[o] * chan(0);
+        fed[o + 1] = fed[o + 1] * chan(1);
+        fed[o + 2] = fed[o + 2] * chan(2);
+      }
+    }
+  }
   // 2. fade (+ Phase A feedback transform). The feedback textures are
   // NEAREST + CLAMP_TO_EDGE, so the mirror samples the nearest texel:
   // sx = clamp(floor(u * w), 0, w - 1). At tunnel/prism = 0 the transform
@@ -2096,6 +2157,20 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     'u_wetMask',
     'u_wetAmount',
   ]);
+  // #1811: the wet fade's pigment variant — same pass plus the deposited
+  // layer's KM reflectance. Like the other wet variants it is not in
+  // ACCUM_PROGRAMS (same pass family, dry path never uses it).
+  buildWet('fadePig', FADE_PIG_FS, 'accum.mjs:FADE_PIG_FS', [
+    'u_src',
+    'u_keep',
+    'u_bg',
+    'u_tunnelZoom',
+    'u_tunnelSpin',
+    'u_prism',
+    'u_wetMask',
+    'u_wetAmount',
+    'u_pigDep',
+  ]);
   buildWet('glowWet', GLOW_WET_FS, 'accum.mjs:GLOW_WET_FS', [
     'u_base',
     'u_glow',
@@ -2330,6 +2405,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
   };
   const wetVelTex = makeLinear();
   const wetMaskTex = makeLinear();
+  const pigDepTex = makeLinear(); // #1811: deposited KM reflectance pack
   const uploadPacked = (tex, packed) => {
     if (!packed) return;
     gl.bindTexture(gl.TEXTURE_2D, tex);
@@ -2511,11 +2587,15 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       // does not bind the velocity texture on the dry path.
       let write = other();
       const wetOn = p.wetStep === 1 && p.wetVel && p.wetMask;
+      // #1811: deposited pigment absorbs — only on the wet path, only
+      // when the recipe carries a live deposited pack.
+      const pigOn = wetOn && p.pigStep === 1 && p.pigDep;
       if (p.flowUv > 0 || wetOn) {
         if (p.flowUv > 0) ensureFlow(p.flowField);
         if (wetOn) {
           uploadPacked(wetVelTex, p.wetVel);
           uploadPacked(wetMaskTex, p.wetMask);
+          if (pigOn) uploadPacked(pigDepTex, p.pigDep);
           passWet('feedWet', write, (u, bind) => {
             gl.uniform1i(u.u_src, bind(0, cur.tex));
             gl.uniform1i(u.u_flowField, bind(1, flowTex));
@@ -2542,7 +2622,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
         });
       } else if (wetOn) {
-        passWet('fadeWet', write, (u, bind) => {
+        passWet(pigOn ? 'fadePig' : 'fadeWet', write, (u, bind) => {
           gl.uniform1i(u.u_src, bind(0, cur.tex));
           gl.uniform3f(u.u_keep, p.keepVec[0], p.keepVec[1], p.keepVec[2]);
           gl.uniform3f(u.u_bg, p.bg[0], p.bg[1], p.bg[2]);
@@ -2551,6 +2631,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
           gl.uniform1f(u.u_prism, p.prismUv);
           gl.uniform1i(u.u_wetMask, bind(2, wetMaskTex));
           gl.uniform1f(u.u_wetAmount, p.wetAmount);
+          if (pigOn) gl.uniform1i(u.u_pigDep, bind(3, pigDepTex));
         });
       } else {
         pass('fade', write, (u, bind) => {
@@ -2756,6 +2837,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       gl.deleteTexture(wetVelTex);
       gl.deleteTexture(wetMaskTex);
       gl.deleteTexture(scanDelayTex);
+      gl.deleteTexture(pigDepTex);
       gl.deleteBuffer(vbo);
       // Bridge-owned feedback targets die with bridge.dispose().
     },

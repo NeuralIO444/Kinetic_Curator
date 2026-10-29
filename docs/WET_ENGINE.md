@@ -7,9 +7,17 @@ replaced). Phases B–C are still the proposed path. **Resolution:**
 #1810 (2026-10-28) moved the sim to a 128 grid / 20 Jacobi iterations /
 4096 vorton cap with a measured cost registration — the "64×64" below is
 the pre-#1810 state; measurements in `docs/review/1810/`.
+**Pigment:** #1811 (2026-10-29) added the two pigment compartments to the
+field — suspended + deposited, Kubelka-Munk mixing in
+`app/src/gl/pigmentKM.mjs`, stepped inside the sim in Curtis order
+(MoveWater → MovePigment → TransferPigment). ACCUM's fade absorbs buffer
+light by the deposited layer's KM reflectance; the dish reads pigment as
+stain in the backstage field view only and never consumes it. A field
+with no coloured marks carries no pigment and steps byte-identically to
+the pre-pigment sim. Measurements in `docs/review/1811/`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
-exports — with ACCUM demoted from *owner* to *one consumer among several*.
+exports — with ACCUM demoted from _owner_ to _one consumer among several_.
 
 Written up 2026-10-06 from the #1068 drill and the grain bug (#1069), which is
 the cautionary tale this document is built around: a capability that exists on
@@ -35,10 +43,10 @@ it (`perfTier1`) before the picture degrades — the repo's no-FX-cuts doctrine.
 
 ## 2. The only two things that tie it to ACCUM
 
-| Coupling | Where | What it is |
-|---|---|---|
-| **The gate** | `app/src/gl/liveLoop.mjs:718` — `const wet = (accumulation && !perfTier1) ? noteWetFrame(...) : { wetStep: 0, wetMask: null, … }` | the sim only *runs* when ACCUM is on and hasn't been shed |
-| **The single consumer** | `app/src/gl/accum.mjs:134,177-180` → feed shaders `u_wetVel` / `u_wetMask` (`accum.mjs:509-534`) | results are read only by the ACCUM feedback program |
+| Coupling                | Where                                                                                                                             | What it is                                                |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| **The gate**            | `app/src/gl/liveLoop.mjs:718` — `const wet = (accumulation && !perfTier1) ? noteWetFrame(...) : { wetStep: 0, wetMask: null, … }` | the sim only _runs_ when ACCUM is on and hasn't been shed |
+| **The single consumer** | `app/src/gl/accum.mjs:134,177-180` → feed shaders `u_wetVel` / `u_wetMask` (`accum.mjs:509-534`)                                  | results are read only by the ACCUM feedback program       |
 
 Everything else is already clean:
 
@@ -49,7 +57,7 @@ Everything else is already clean:
   node selfcheck with no GL.
 - **Cost-metered.** `registerCostTier` is already wired.
 
-So the coupling is two lines of *policy*, not architecture. That is what makes
+So the coupling is two lines of _policy_, not architecture. That is what makes
 this rescope cheap.
 
 ## 3. Known gaps this rescope must close
@@ -73,7 +81,7 @@ wet-frame service ──┼─ composite mask      (WET layer interaction — ne
 ```
 
 - **Gate becomes need-based:** `accum || anyWetRow || anyWetEffect` — the
-  service runs if *anything* reads it, and never for nothing.
+  service runs if _anything_ reads it, and never for nothing.
 - **ACCUM becomes a reader.** It passes `wetMask`/`wetVel` into the feed shader
   exactly as it does now; nothing about the trails changes.
 - **Ownership moves with the gate.** The vortex survives ACCUM toggling;
@@ -83,7 +91,7 @@ wet-frame service ──┼─ composite mask      (WET layer interaction — ne
 
 A before/after selfcheck over fixed inputs (seed, size, instance list) must
 produce byte-identical `wetMask`/`wetVel` — the refactor is proven by
-*identical output*, not by inspection.
+_identical output_, not by inspection.
 
 ## 5. The four decisions (the real work)
 
@@ -92,12 +100,12 @@ produce byte-identical `wetMask`/`wetVel` — the refactor is proven by
    agree with.
 2. **Governor.** At `perfTier1`, **degrade** (skip advection, keep static
    stamping) instead of killing it. A WET row must never silently stop being
-   wet — the #1069 rule, generalized: *if a mode is selectable, it must either
-   work or say why it can't.*
+   wet — the #1069 rule, generalized: _if a mode is selectable, it must either
+   work or say why it can't._
 3. **Exports — the hard one.** Because the sim is seeded and order-deterministic,
    `renderScene` / `renderFrameOffscreen` can run a **fixed warm-up of K steps**
    over the same instances and be byte-reproducible. Pick K, document it,
-   selfcheck it. This must ship *with* the first consumer, not after (same three
+   selfcheck it. This must ship _with_ the first consumer, not after (same three
    call sites as #1069).
 4. **Parity.** GL-only: the SVG reference cannot express an advected,
    time-varying mask. Because WET is **opt-in per row**, the default parity
@@ -106,11 +114,11 @@ produce byte-identical `wetMask`/`wetVel` — the refactor is proven by
 
 ## 6. Phases
 
-| Phase | Content | Acceptance |
-|---|---|---|
-| **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change — **landed (#1809 slice A, `app/src/gl/wetFrame.mjs` + `wetFrame.selfcheck`)** |
-| **B — consumer #2** | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact |
-| **C — exports + parity** | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling | screen vs PNG parity selfcheck; parity harness green with WET off |
+| Phase                            | Content                                                                                                                                     | Acceptance                                                                                                                                                                |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM                                                             | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change — **landed (#1809 slice A, `app/src/gl/wetFrame.mjs` + `wetFrame.selfcheck`)** |
+| **B — consumer #2**              | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact                                                                     |
+| **C — exports + parity**         | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling             | screen vs PNG parity selfcheck; parity harness green with WET off                                                                                                         |
 
 Phases A and C are well-scoped single-fix PRs. B is the feature. **C ships with
 B, not after it.**
@@ -130,13 +138,13 @@ five other subsystems in the tree fit it:
 
 **Candidates, ranked:**
 
-| Engine | Today | What it would serve if standalone |
-|---|---|---|
-| **MOD bus** — `app/src/gl/audioBallistics.mjs` (#306) + `MATH_MOD_SOURCES` (`none/rms/flux/beatPulse`) | envelope shaping is shared, but *subscription* is not: `applyMathMod` runs only for `layer.type === 'math'` (`renderer.mjs:745`) | any parameter anywhere: FX knobs, layer opacity, WET amount, palette mix. The wet interaction of Phase B wants exactly this (audio swelling the merge), and today content rows have no mod slot at all. Highest leverage of the five. |
-| **FIELD service** — `app/src/pattern/field.js` (#1039, #1061) | `samplePattern(name, x, y, p)`: a pure, period-1 spatial sampler, already stateless and headless | the *shape* input for any mask: wet stamping (B), layer interaction regions, FX masks, PATTERN tracks. Pairing it with the wet engine turns the field from "a pattern a track draws" into "structure other systems can read". |
-| **FLOW** — `app/src/gl/flowField.mjs` | 32×32 project-seed curl, consumed by the ACCUM recipe (`rp.flowField`) | advect the wet field and any layer drift through the *same* curl, so trails, wet and drifting layers all move coherently. Another ACCUM-owned field with the same ownership problem as wet. |
-| **CLOCK** — `app/src/gl/beatClock.mjs` (#950) | the BEAT master clock, already exposed as a control | BEAT-quantized transitions elsewhere — #1042 (PATTERN motion) explicitly wants BEAT-quantized shuffle and should share this clock rather than grow a second one. |
-| **MIX** — `app/src/gl/paletteMix.mjs` (#278) | VJ MIX crossfade state machine, driving palette transitions | layer-level colour interaction (a WET row whose blend *colour* crossfades on the same state machine). |
+| Engine                                                                                                 | Today                                                                                                                            | What it would serve if standalone                                                                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **MOD bus** — `app/src/gl/audioBallistics.mjs` (#306) + `MATH_MOD_SOURCES` (`none/rms/flux/beatPulse`) | envelope shaping is shared, but _subscription_ is not: `applyMathMod` runs only for `layer.type === 'math'` (`renderer.mjs:745`) | any parameter anywhere: FX knobs, layer opacity, WET amount, palette mix. The wet interaction of Phase B wants exactly this (audio swelling the merge), and today content rows have no mod slot at all. Highest leverage of the five. |
+| **FIELD service** — `app/src/pattern/field.js` (#1039, #1061)                                          | `samplePattern(name, x, y, p)`: a pure, period-1 spatial sampler, already stateless and headless                                 | the _shape_ input for any mask: wet stamping (B), layer interaction regions, FX masks, PATTERN tracks. Pairing it with the wet engine turns the field from "a pattern a track draws" into "structure other systems can read".         |
+| **FLOW** — `app/src/gl/flowField.mjs`                                                                  | 32×32 project-seed curl, consumed by the ACCUM recipe (`rp.flowField`)                                                           | advect the wet field and any layer drift through the _same_ curl, so trails, wet and drifting layers all move coherently. Another ACCUM-owned field with the same ownership problem as wet.                                           |
+| **CLOCK** — `app/src/gl/beatClock.mjs` (#950)                                                          | the BEAT master clock, already exposed as a control                                                                              | BEAT-quantized transitions elsewhere — #1042 (PATTERN motion) explicitly wants BEAT-quantized shuffle and should share this clock rather than grow a second one.                                                                      |
+| **MIX** — `app/src/gl/paletteMix.mjs` (#278)                                                           | VJ MIX crossfade state machine, driving palette transitions                                                                      | layer-level colour interaction (a WET row whose blend _colour_ crossfades on the same state machine).                                                                                                                                 |
 
 **SMEAR** (`velocitySmear.mjs`, #309) already passes the checklist — it is
 shared by the renderer and lives on the objects — and is the working example of
@@ -156,5 +164,5 @@ what the others should look like.
 - The failure mode this document is designed against: **#1069** — grain renders
   only on the ACCUM path because `fxFinishChains` is discarded at
   `liveLoop.mjs:1098-1100` and in `renderFrameOffscreen` / `renderScene`.
-- Related: #1048/#1066 (FX folds before MATH) fixed the *order* of the fold;
-  this document is about giving the fold another *input*.
+- Related: #1048/#1066 (FX folds before MATH) fixed the _order_ of the fold;
+  this document is about giving the fold another _input_.
