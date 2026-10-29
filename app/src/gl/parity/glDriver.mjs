@@ -316,6 +316,8 @@ export async function renderAccumViaGL(
     prism = 0,
     flow = 0,
     echoes = 0,
+    scan = 0,
+    scanDirection = 1,
     audio = null,
     swell = 1,
     palette = null, // #1803: swatch hex list; forwarded to renderAccumSequence
@@ -354,6 +356,8 @@ export async function renderAccumViaGL(
     prism,
     flow,
     echoes,
+    scan, // #1804: slit-scan amount, forwarded to renderAccumSequence
+    scanDirection,
     audioFrames: audio,
     swell, // #306: audio→glow fader, forwarded to renderAccumSequence
     palette, // #1803: forwarded to renderAccumSequence (halation tint)

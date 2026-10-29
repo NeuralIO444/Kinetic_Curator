@@ -12,7 +12,7 @@
  *     [--steps 24] [--fps 30] [--fade 0.88] [--optics 0] [--res 1000x700|2]
  *     [--seed N] [--uncapped] [--background #rrggbb]
  *     [--ramp param=from:to ...] [--motion auto]
- *     [--tunnel 0] [--prism 0] [--flow 0] [--echoes 0] [--audio env.json]
+ *     [--tunnel 0] [--prism 0] [--flow 0] [--echoes 0] [--scan 0] [--scan-direction ltr|rtl] [--audio env.json]
  *     [--attack-ms 0] [--decay-ms 0] [--response linear] [--swell 1]
  *     [--age-out age.png]
  *
@@ -69,6 +69,9 @@ function parseArgs(argv) {
     prism: 0,
     flow: 0,
     echoes: 0,
+    // #1804: slit-scan rides --echoes (the ring is its memory); 0 = plain mix.
+    scan: 0,
+    scanDirection: 1,
     audio: null,
     // #306: still-path ballistics default to the identity — existing renders
     // are byte-identical unless these flags are passed.
@@ -101,7 +104,12 @@ function parseArgs(argv) {
     else if (a === '--prism') out.prism = num('--prism');
     else if (a === '--flow') out.flow = num('--flow');
     else if (a === '--echoes') out.echoes = num('--echoes');
-    else if (a === '--audio') out.audio = argv[++i];
+    else if (a === '--scan') out.scan = num('--scan');
+    else if (a === '--scan-direction') {
+      const v = argv[++i];
+      if (v !== 'ltr' && v !== 'rtl') throw new Error(`bad --scan-direction ${v} (expected ltr or rtl)`);
+      out.scanDirection = v === 'rtl' ? -1 : 1;
+    } else if (a === '--audio') out.audio = argv[++i];
     else if (a === '--attack-ms') out.attackMs = num('--attack-ms');
     else if (a === '--decay-ms') out.decayMs = num('--decay-ms');
     else if (a === '--response') {
@@ -241,6 +249,8 @@ async function main(argv) {
             prism: args.prism,
             flow: args.flow,
             echoes: args.echoes,
+            scan: args.scan,
+            scanDirection: args.scanDirection,
             background,
             // #1805: the age buffer rides the contract only when the
             // still asks for the age map (key omitted otherwise).
@@ -274,6 +284,8 @@ async function main(argv) {
       prism: args.prism,
       flow: args.flow,
       echoes: args.echoes,
+      scan: args.scan,
+      scanDirection: args.scanDirection,
       audio: audioFrames,
       swell: args.swell,
       // #1803: the halation tint derives from the project's palette — the

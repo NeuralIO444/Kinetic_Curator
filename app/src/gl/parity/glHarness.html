@@ -147,6 +147,8 @@ window.__kcAccum = async (payload) => {
     prism: payload.prism ?? 0,
     flow: payload.flow ?? 0,
     echoes: payload.echoes ?? 0,
+    scan: payload.scan ?? 0, // #1804: slit-scan
+    scanDirection: payload.scanDirection ?? 1,
     audio: payload.audioFrames || null,
     swell: payload.swell ?? 1, // #306: audio→glow fader
     background: payload.bg,

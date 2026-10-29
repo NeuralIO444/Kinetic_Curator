@@ -395,6 +395,26 @@ ping-pong and scratch — it runs, but it is the heaviest thing the still
 pipeline allocates. If Chromium refuses the allocation the render fails
 loudly rather than rendering a different recipe.
 
+**Slit-scan (#1804).** `--scan 0..1` (plus `--scan-direction ltr|rtl`;
+SCAN slider + deep-past side toggle in the ACCUM family, shown only while
+echoes > 0) turns the echo mix into per-column tap *selection*: each
+column shows one moment — the frame from *d* steps ago, at that tap's
+echo weight — so a moving mark smears sideways through time, the 2001
+stargate / slit-scan look. The delay comes from a 256×1 LUT texture the
+recipe derives from (echoTaps, scan, direction) — `scanDelayRamp` in
+`accum.mjs`, one derivation shared by the GPU upload and the JS mirror.
+The ramp is linear across x, sweeping 0 → the full ring depth at scan = 1
+(less at lower scan — scan is the steepness); direction +1 puts the deep
+past at the right edge, −1 flips it. Delays quantise to the available
+taps: at 3 taps the smear is 4 discrete time slices, banded staccato
+ribbons — the honest v1 look; interpolation between taps is a named
+stretch goal, not v1. Early in a sequence the delay clamps to the frames
+the ring actually holds. The shader *samples* the delay, never computes
+the ramp, so the v2 general delay map (per-pixel delay from a field or
+an asset, cf. #1796) is a LUT-source change, not a new pass. No new
+targets, no new pass, the ring and its memory gate unchanged. SCAN = 0
+is the additive mix above, operation for operation — goldens hold.
+
 ## Selective accumulation (#1806) — slice 1: the renderer seam
 
 Phase C's "print-work killer feature" is sliced by its own spec:

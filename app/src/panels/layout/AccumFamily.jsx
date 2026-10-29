@@ -97,6 +97,44 @@ export function AccumFamily({ layoutParams }) {
             format={(v) => `${Math.round(v)}`}
             title={helpText('layout-echoes')}
           />
+          {(layoutParams.echoes ?? 0) > 0 && (
+            <>
+              <TrailValue
+                label="SCAN"
+                paramKey="accumScan"
+                value={layoutParams.accumScan ?? 0}
+                min={0}
+                max={1}
+                step={0.01}
+                title="SCAN: slit-scan — each column of the echo mix shows a different moment, so motion smears sideways through time (0 = plain echoes)"
+              />
+              {(layoutParams.accumScan ?? 0) > 0 && (
+                <div>
+                  <div className="davis-label lbl" style={{ marginBottom: 2 }}>
+                    deep past
+                  </div>
+                  <TeaMatrix
+                    ariaLabel="Scan direction"
+                    columns={2}
+                    value={layoutParams.accumScanFlip ? 'left' : 'right'}
+                    onChange={(id) => set('accumScanFlip', id === 'left')}
+                    options={[
+                      {
+                        id: 'right',
+                        label: 'RIGHT',
+                        title: 'The oldest echo sits at the right edge; the left edge is now',
+                      },
+                      {
+                        id: 'left',
+                        label: 'LEFT',
+                        title: 'The oldest echo sits at the left edge; the right edge is now',
+                      },
+                    ]}
+                  />
+                </div>
+              )}
+            </>
+          )}
           {trail === 'leave' && (
             <>
               <TrailValue

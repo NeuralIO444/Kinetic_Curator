@@ -36,6 +36,11 @@ import {
   createAgeState,
   ageFalseColour,
   AGE_FS,
+  sanitizeAccumScan,
+  sanitizeAccumScanDirection,
+  scanDelayRamp,
+  scanDelayAt,
+  SCAN_LUT_WIDTH,
   sanitizeAudioSample,
   applyAudioEnvelope,
   mirrorFlowVec,
@@ -281,6 +286,55 @@ ok('stats: params request sanitization (#1807)', () => {
   assert.equal(STATS_EVERY, 15, "the throttle is the issue's bound: at most one reduction per 15 steps");
 });
 
+ok('recipe params: #1804 slit-scan defaults off, clamps, direction sanitizes', () => {
+  const d = accumRecipeParams();
+  assert.equal(d.scan, 0, 'scan 0 = the plain echoes mix');
+  assert.equal(d.scanDirection, 1, 'unflipped by default');
+  assert.equal(accumRecipeParams({ scan: 0.5 }).scan, 0.5);
+  assert.equal(accumRecipeParams({ scan: 7 }).scan, 1, 'scan clamps at 1');
+  assert.equal(accumRecipeParams({ scan: 'bogus' }).scan, 0, 'scan garbage -> 0');
+  assert.equal(accumRecipeParams({ scanDirection: -1 }).scanDirection, -1);
+  assert.equal(accumRecipeParams({ scanDirection: 'rtl' }).scanDirection, -1, "the contract's word flips");
+  assert.equal(accumRecipeParams({ scanDirection: 42 }).scanDirection, 1, 'anything else is unflipped');
+});
+
+ok('sanitizeAccumScan / sanitizeAccumScanDirection', () => {
+  assert.equal(sanitizeAccumScan(0.5), 0.5);
+  assert.equal(sanitizeAccumScan(7), 1);
+  assert.equal(sanitizeAccumScan(NaN), 0);
+  assert.equal(sanitizeAccumScanDirection(-1), -1);
+  assert.equal(sanitizeAccumScanDirection('left'), -1);
+  assert.equal(sanitizeAccumScanDirection(1), 1);
+  assert.equal(sanitizeAccumScanDirection(undefined), 1);
+});
+
+ok('scanDelayRamp: quantised ramp, steepness, flip (#1804)', () => {
+  const lut = scanDelayRamp({ taps: 4, scan: 1 });
+  assert.equal(lut.length, SCAN_LUT_WIDTH, 'the map is a ≤256px LUT, never a frame target');
+  assert.equal(lut[0], 0, 'left edge is now');
+  assert.equal(lut[SCAN_LUT_WIDTH - 1], 4, 'right edge is the full ring depth');
+  for (let i = 1; i < lut.length; i++) assert.ok(lut[i] >= lut[i - 1], 'delay never decreases left→right');
+  assert.deepEqual([...new Set(lut)], [0, 1, 2, 3, 4], 'four taps + live = five discrete time slices');
+  assert.ok(
+    scanDelayRamp({ taps: 4, scan: 0 }).every((v) => v === 0),
+    'scan 0: every column takes the live frame',
+  );
+  assert.equal(Math.max(...scanDelayRamp({ taps: 4, scan: 0.5 })), 2, 'scan 0.5 sweeps the recent half of the ring');
+  assert.equal(Math.max(...scanDelayRamp({ taps: 3, scan: 1 })), 3, 'the ramp tops out at the gated ring depth');
+  const flip = scanDelayRamp({ taps: 4, scan: 1, direction: -1 });
+  assert.equal(flip[0], 4, 'flipped: left edge is the deep past');
+  assert.equal(flip[SCAN_LUT_WIDTH - 1], 0, 'flipped: right edge is now');
+  for (let i = 0; i < lut.length; i++) assert.equal(flip[i], lut[lut.length - 1 - i], 'the flip is the mirror image');
+});
+
+ok('scanDelayAt: the mirror reads the LUT texel the GPU samples (#1804)', () => {
+  const lut = scanDelayRamp({ taps: 4, scan: 1 });
+  // w = SCAN_LUT_WIDTH: column x samples texel x exactly.
+  for (const x of [0, 64, 128, 192, 255]) assert.equal(scanDelayAt(lut, x, SCAN_LUT_WIDTH), lut[x]);
+  // w = 8: texel floor((x + 0.5) / 8 · 256) = 32x + 16 (NEAREST at pixel centers).
+  for (let x = 0; x < 8; x++) assert.equal(scanDelayAt(lut, x, 8), lut[32 * x + 16]);
+});
+
 ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () => {
   const base = accumRecipeParams({ fade: 0.9, optics: 0.5, tunnel: 0.5, prism: 0.5 });
   const silent = applyAudioEnvelope(base, { rms: 0, flux: 0, beatPulse: 0 });
@@ -475,6 +529,24 @@ ok('age buffer: one target is 1/8 of the colour pair (#1805 memory bound)', () =
   ]) {
     assert.equal(ageTargetBytes(w, h) * 8, w * h * ACCUM_PAIR_BYTES_PER_PIXEL, `${w}x${h}: age target x8 = pair bytes`);
   }
+});
+
+ok('contract: #1804 scan keys ride only while scan is live', () => {
+  const doc = fixtureDoc();
+  const rl = resolveLayers(doc, { caps });
+  const plain = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, echoes: 2 } });
+  assert.ok(!('scan' in plain.accum), 'no scan key at 0 — unscanned contracts (and their hashes) are unchanged');
+  const scanned = buildSceneContract({
+    doc,
+    resolvedLayers: rl,
+    caps,
+    accum: { enabled: true, echoes: 2, scan: 0.5, scanDirection: -1 },
+  });
+  assert.equal(scanned.accum.scan, 0.5, 'scan rides the contract');
+  assert.equal(scanned.accum.scanDirection, -1, 'direction rides sanitized');
+  const clamped = buildSceneContract({ doc, resolvedLayers: rl, caps, accum: { enabled: true, echoes: 2, scan: 9 } });
+  assert.equal(clamped.accum.scan, 1, 'scan clamps at the contract boundary');
+  assert.equal(clamped.accum.scanDirection, 1, 'direction defaults unflipped');
 });
 
 // --- mirror sanity (float64, hand-computed expectations) --------------------
@@ -1135,6 +1207,48 @@ ok('mirror: echoes mix past frames, echoes = 0 is a no-op', () => {
   assert.throws(() => mirrorAccumStep({ accum: silent, frame: dotAt(0), w: w4, h: h4, params }), /echo state/);
 });
 
+ok('mirror: slit-scan selects one moment per column (#1804)', () => {
+  const w8 = 8,
+    h8 = 2,
+    n8 = w8 * h8 * 4;
+  const flatFrame = (v) => {
+    const f = new Float64Array(n8);
+    for (let i = 0; i < n8; i += 4) {
+      f[i] = v;
+      f[i + 3] = 1;
+    }
+    return f;
+  };
+  const silent = new Float64Array(n8);
+  // Four steps against an empty buffer: the echo mix is the whole story
+  // (fade of zeros is zeros, over onto zeros is the mix itself).
+  const run = (params) => {
+    const echo = createEchoState();
+    let out = null;
+    for (const v of [0.1, 0.3, 0.5, 0.7]) {
+      out = mirrorAccumStep({ accum: silent, frame: flatFrame(v), w: w8, h: h8, params, echo });
+    }
+    return out;
+  };
+  const row = (buf) => Array.from({ length: w8 }, (_, x) => buf[x * 4]);
+  const nearRow = (a, b) =>
+    a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-12, `col ${i}: got ${v}, want ${b[i]}`));
+  // Echoes 3 → weights [0.5, 0.35, 0.25]; after 4 steps the ring holds
+  // 0.1 / 0.3 / 0.5 and the live frame is 0.7. At w = 8 the ramp's delays
+  // are [0,0,1,1,2,2,3,3] (LUT texels 32x+16) — one moment per column at
+  // its tap's weight: live 0.7 · tap0 0.5×0.5 · tap1 0.3×0.35 · tap2 0.1×0.25.
+  const scanned = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 1 }));
+  nearRow(row(scanned), [0.7, 0.7, 0.25, 0.25, 0.105, 0.105, 0.025, 0.025]);
+  const r = row(scanned);
+  for (let x = 1; x < w8; x++) assert.ok(r[x] <= r[x - 1], 'monotonic time progression across x');
+  // The flip mirrors the frame: the deep past moves to the left edge.
+  const flipped = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 1, scanDirection: -1 }));
+  nearRow(row(flipped), [0.025, 0.025, 0.105, 0.105, 0.25, 0.25, 0.7, 0.7]);
+  // SCAN = 0 is the additive mix, unchanged: 0.7 + 0.5·0.5 + 0.3·0.35 + 0.1·0.25.
+  const plain = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 0 }));
+  nearRow(row(plain), Array(8).fill(0.7 + 0.5 * 0.5 + 0.35 * 0.3 + 0.25 * 0.1));
+});
+
 // --- harness coverage: every ACCUM program is audit-registered ---------------
 // The #193 second pass routes all seven ACCUM programs (fade/feed/echo/
 // copy/over/down/glow) through the checked compile/link builders and
@@ -1548,6 +1662,8 @@ async function runBrowserTests() {
       prism = 0,
       flow = 0,
       echoes = 0,
+      scan = 0,
+      scanDirection = 1,
       audio = null,
       stipple = null,
       palette = null,
@@ -1566,6 +1682,8 @@ async function runBrowserTests() {
         prism,
         flow,
         echoes,
+        scan,
+        scanDirection,
         echoWidth: w,
         audio,
         stipple,
@@ -1595,6 +1713,8 @@ async function runBrowserTests() {
       prism = 0,
       flow = 0,
       echoes = 0,
+      scan = 0,
+      scanDirection = 1,
       audio = null,
       stipple = null,
       palette = null,
@@ -1615,6 +1735,8 @@ async function runBrowserTests() {
         prism,
         flow,
         echoes,
+        scan,
+        scanDirection,
         echoWidth: w,
         background: bg,
         palette,
@@ -1942,6 +2064,41 @@ async function runBrowserTests() {
       };
       assert.ok(maxAlpha(gpu) <= 1 + 1e-6, `GPU echo alpha clamped, got max ${maxAlpha(gpu).toFixed(3)}`);
       assert.ok(maxAlpha(ref) <= 1 + 1e-6, `mirror echo alpha clamped, got max ${maxAlpha(ref).toFixed(3)}`);
+    });
+
+    await okAsync('probe: SCAN = 0 is byte-identical to the pre-#1804 echo mix', async () => {
+      const w = 12,
+        h = 12;
+      // Same moving-dot sequence as the echoes probe, run with scan
+      // absent (the default) and with scan explicitly 0: identical bytes
+      // out — the selection branch stays dark unless SCAN is live.
+      const frames = [whiteDot(w, h, 2, 6), whiteDot(w, h, 5, 6), whiteDot(w, h, 8, 6)];
+      const a = await runProbe({ w, h, fade: 0, optics: 0, echoes: 2, frames });
+      const b = await runProbe({ w, h, fade: 0, optics: 0, echoes: 2, scan: 0, frames });
+      assert.deepEqual(b.gpu, a.gpu, 'scan 0 changes nothing');
+    });
+
+    await okAsync('probe: slit-scan 24-step sequence (GPU = mirror, #1804)', async () => {
+      const w = 32,
+        h = 8;
+      // A dot crosses the frame over 24 steps (the issue's acceptance
+      // length): with scan = 1 each column of the echo mix shows a
+      // different moment, so the crossing smears sideways through time.
+      const frames = [];
+      for (let s = 0; s < 24; s++) frames.push(whiteDot(w, h, 4 + s, 4));
+      const args = { w, h, fade: 0.92, optics: 0, echoes: 3, scan: 1, frames };
+      const { gpu } = await runProbe(args);
+      const ref = mirrorSeq({ bg: '#000000', ...args });
+      closeTo(gpu, ref, 3 * LSB, '24-step scanned sequence');
+      // The flip selects from the same ring the other way: parity again,
+      // and the picture genuinely differs from the unflipped scan.
+      const flipArgs = { ...args, scanDirection: -1 };
+      const flipped = await runProbe(flipArgs);
+      const flipRef = mirrorSeq({ bg: '#000000', ...flipArgs });
+      closeTo(flipped.gpu, flipRef, 3 * LSB, '24-step scanned sequence (flipped)');
+      let worst = 0;
+      for (let i = 0; i < gpu.length; i++) worst = Math.max(worst, Math.abs(gpu[i] - flipped.gpu[i]));
+      assert.ok(worst > 0.05, `direction flip changes the smear (worst Δ ${worst.toFixed(3)})`);
     });
 
     await okAsync('probe: audio envelope modulates per-frame params (GPU = mirror)', async () => {
