@@ -69,7 +69,8 @@ import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity rou
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
 import { attachVelocities } from './velocitySmear.mjs';
 import { motionAmount } from './vortex.mjs';
-import { createWetFrameService } from './wetFrame.mjs';
+import { createWetFrameService, WET_REGIMES } from './wetFrame.mjs';
+import { wetGroundFromCss } from './wetLook.mjs';
 import { createGpuTimer } from './debug/gpuTimer.mjs';
 import { reportStage } from '../hooks/useFpsMeter.js';
 import { createBallisticsState, processBallistics, resetBallistics } from './audioBallistics.mjs';
@@ -1319,6 +1320,23 @@ export function createLiveLoop(
           // #741: gate weave — live canvas (and so WebM recording) only; stills stay exact.
           weave: st.weave ? gateWeaveOffset(performance.now(), frameCount) : null,
         });
+        // #1813: arm the wet-look display pass with the field the
+        // service just served (the same wetStep/wetMask/wetAmount the
+        // recipe consumed), the regime thresholds from the service's
+        // own table, and the frame's ground parsed the fade's way.
+        // Anything less than a served field disarms it — the pass does
+        // not run and presentation stays byte-identical.
+        live.setWetLook(
+          accumOn && accumParams && accumParams.wetStep === 1 && accumParams.wetMask
+            ? {
+                mask: accumParams.wetMask,
+                amount: accumParams.wetAmount,
+                bg: wetGroundFromCss(bgCss),
+                damp: WET_REGIMES[0].at,
+                full: WET_REGIMES[2].at,
+              }
+            : null,
+        );
       }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;

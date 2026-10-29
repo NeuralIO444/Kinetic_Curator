@@ -1,69 +1,63 @@
-# STAGING REPORT — #1812: edge darkening on drying (local only, not pushed)
+# STAGING REPORT — #1813 wet-look display pass (local only, not pushed)
 
-Builder staging record, branch `feat/1812-edge-darkening` in `~/workspace/kc-1812-build`, based on `origin/main` at 3aafc29d (#1811 merged) as assigned — not pushed, no PR; the coordinator verifies and publishes. This file replaces the report that was at the worktree root (#1811's); that report remains in git history.
+Builder staging record, branch `feat/1813-wet-look` in `~/workspace/kc-1813-build`, stacked on `feat/1812-edge-darkening` (ca320bd8, PR #1873) as assigned — not pushed, no PR; the coordinator verifies, rebases onto main, and publishes. This file replaces the report that was at the worktree root (#1812's); that report remains in git history.
 
-Issue (verbatim): **"WET: edge darkening on drying (the signature, no state machine)"**
+Issue (verbatim): **"WET: wet-look display pass — saturation, luminance skew, sheen"**
 
-## Premise verdict: HOLDS — built
+## Premise check (done before any code)
 
-Verified against the code before writing anything. #1809's service (`app/src/gl/wetFrame.mjs`) owns the shared field; #1811 (merged, PR #1845) added the two pigment compartments to `app/src/gl/vortex.mjs` — suspended + deposited, Kubelka-Munk — with the deposited reflectance computed in `packPigmentDeposited` and consumed by ACCUM's fade. **No edge darkening existed anywhere**: `pigment` greps hit only `pigmentKM` and the #1811 files; nothing in the tree multiplies displayed density by a gradient term, and no drying-history channel existed. Matt's standing ruling for this slice (edge darkening ONLY, no drying state machine, 2026-10-27) matches the issue body exactly; no conflict, nothing already shipped. The premise holds, so the slice was built as specified.
+- The wet-frame service (`gl/wetFrame.mjs`) publishes the packed wet mask + wetAmount per frame and owns the named regime thresholds (`WET_REGIMES`: damp 0.05 / wet 0.35 / soaked 0.8); its header names #1813 as the display consumer that reads regimes. ✔
+- No wet-look pass exists on the composed tree (grep for wet-look/wetLook: empty). ✔
+- The presentation seam is as the issue describes: ACCUM presents through `presentUpscaled` — manual-bilinear upscale into a 16F scratch, then RESOLVE_FS (ACES + dither). A linear pre-resolve pass slots exactly between them. ✔
+- The frame the pass reads already carries #1812's edge darkening (applied inside `packPigmentDeposited` in `vortex.mjs`, composited into the pair by the ACCUM step). Per the coordinator's binding note and the issue's Relations clause, the pass applies **no** rim/edge term of its own — the selfcheck pins the shader free of any edge term, so the two darkenings cannot double up. ✔
+- The fade's ground (`u_bg`) is the frame background parsed by #287's hex rule from `bgCss`; the pass takes the same value by the same rule. ✔
 
-## What shipped (plain language)
+## What shipped, in plain language
 
-A dried wash now gets its dark rim — watercolor's signature — and it gets it the honest way: the field remembers how much each cell has dried at its edges, and the deposit reads darker there. Concretely: one new channel on the field state, `pigEdge`, holding each cell's **accrued darkening**. While the sim steps, a cell whose wetness is *falling through the damp band* (wetness 0.35 → 0.05 — the same thresholds the wet service already names its regimes by) accrues darkening in proportion to how steep its deposit's edge is right there and how much of the band it fell through. The accrual lands in the deposited layer's own pack (`packPigmentDeposited` computes reflectance at *displayed* density = deposited × (1 + accrued)), so every reader of the deposit — ACCUM's fade today, the #1813 wet-look pass and the backstage stain read when they read the pack — sees the rim. There is **no wet/drying/dry state machine**: no enum, no timers; the step compares two wetness numbers, that is all. Rewet a dried rim and dry it again and it darkens a little more, capped so cycles can't cook it black. The amount is a pinned recipe constant (`EDGE_DARKEN_K = 1.35`), not a panel slider, per the issue. Pigment that never wets, or a field with no pigment at all, is byte-identical to the #1811 build: both standing goldens hold un-re-pinned.
+Where the stage is wet, it now *looks* wet. A new fullscreen pass runs over the presented picture just before the final colour finish, only while the wet field is live, and only inside the wet areas: colours deepen and saturate, darks sink darker while bright highlights stay put (on light paper the whole sheet darkens instead, and nothing ever gets brighter), and the brightest wet spots pick up a faint sheen. Dry areas are not touched — not approximately, but bit-for-bit. When the wet field is off, the pass does not run at all and the picture is exactly what it was before this change. Nothing new to operate: the pass follows the WETNESS the performer already controls.
 
-## The acceptance wash (by name)
+## How
 
-Scripted single wash: blue disc, radius 6 cells, stamped wet at 1.0, settled by direct transfer, dried by steps until the field's max wetness fell below 0.04 (401 steps). From `docs/review/1812/probe.json`:
+- **`app/src/gl/wetLook.mjs`** (new) — the pass as one module: the recipe constants (`WET_LOOK`: saturation 0.35, skew 0.45, paperSkew 0.60, sheen 0.30, sheenPow 6, groundSplit 0.5), the regime ramp (0 at damp, full at soaked, smoothstep between), the ground parse (the fade target's rule), a pure JS mirror (`shadeWetPixel`), and the GLSL (`WET_LOOK_FS`) transcribed from the mirror formula-for-formula. The shader's below-damp path writes the sampled texel straight through (no unpremultiply round-trip) — that is what makes dry pixels bit-exact.
+- **`app/src/gl/renderer.mjs`** — the pass joins `RENDERER_PROGRAMS` as `wetlook` (cost auto-registers as `renderer/wetlook`, tier 0, 0.3 ms author's estimate in the upscale class, notes say unmeasured — the sweep harness measures it through the same table). The live renderer takes a per-frame `setWetLook(state)` (the setResolveOptions discipline), uploads the served mask pack into its own LINEAR texture, and `presentUpscaled` runs the pass from the upscale scratch into the ping-pong partner before resolving. Disarmed → the input target presents untouched. Mask texture freed in `dispose()`.
+- **`app/src/gl/liveLoop.mjs`** — beside `setResolveOptions`, the loop arms the pass from the field the service just served (the same `wetStep`/`wetMask`/`wetAmount` the recipe consumed), with thresholds from `WET_REGIMES` and the ground from `bgCss`. No new layout params (the replay-divergence trap is pinned shut in the selfcheck).
+- **`app/selfcheck.manifest`** — one line: `wetLook.selfcheck.mjs`.
+- **`docs/WET_ENGINE.md`** — the standing status paragraph, matching the #1810–#1812 entries.
+- **`docs/review/1813/`** — review evidence in the #1812 pattern: README, probe.json, three A/B stills (dark ground / light paper / monochrome, rendered from the mirror through the resolve's ACES curve).
 
-| read          | deposited | accrued | displayed |
-| ------------- | --------- | ------- | --------- |
-| centre        | 0.991     | 0.008   | 0.999     |
-| rim (E/W/N/S) | ≈0.99     | ≈0.60   | ≈1.59     |
+## One re-pin, with cause
 
-Displayed edge-to-centre ratio **1.586** — inside the issue's ~1.5–2× expectation; the centre's displayed density moved 0.8% (unchanged within tolerance). The same wash **kept wet for 300 steps accrues exactly zero** across the whole field — the gate is the mechanism, not an assumption, and the gate's other faces (level-in-band, rising, falls that never enter the band) are unit-pinned through the exported accrual. Rim accrual over five dry cycles: 0.596 → 1.194 → 1.792 → **2.000 (the cap)** → 2.000. `still-edge-darkening.png` renders displayed density as darkness, deposited alone vs with the accrued rim: the ring is visible, the centre is the same grey. (The ratio is read on displayed density because the pack's alpha clamps at 1 and this wash sits at that clamp; the rim's packed reflectance also darkens measurably — the selfcheck asserts a ≥10 summed-byte luminance drop at the rim against the accrual-zeroed pack, centre bytes within 1–2.)
+`composite.selfcheck.mjs` pinned the renderer program table at six keys. The renderer genuinely gains a seventh program through the audited table (the table is the contract: every renderer program is audit-registered there), so the pin now reads seven keys with `#1813` cited in the comment. The companion pin — every declared uniform is in its upload list — passes on the new program unmodified.
 
-## The measured cost gate
+## Verification (sandbox; CI is authoritative for the browser suites)
 
-A/B on the #1811 cost session (4 scripted marks/frame, tint on every mark, ~56% of cells pigment-occupied; sandbox node on a shared VM — indicative, raw batches in `docs/review/1812/probe-cost.json`):
+Baselines were taken on the clean stacked base before editing.
 
-| Build        | Median ms/step (two runs) |
-| ------------ | ------------------------- |
-| base (#1811) | 3.87 / 3.71               |
-| this (#1812) | 4.32 / 3.85               |
+| Suite | Base | This build |
+|---|---|---|
+| wetLook (new) | — | **16/16** |
+| accum (solo, 3 GB heap) | OK (83 cases) | **OK (83 cases)** |
+| composite | OK (15 cases) | **OK (15 cases)** |
+| wetFrame / vortex / pigmentKM | 15 / 34 / 7 | 15 / 34 / 7 |
+| accum.seam / accumFeed / accumGuard / accumInput / accum.inventory | — | 7/7 · OK (15) · OK · OK (7) · 6/6 |
+| wetFeed / resolve / resolveTap / uniformLocations | — | 9 · OK · OK · OK |
+| grainFinish / liveLoopSwell / clock.freeze | — | 4 · OK · 6/6 |
+| liveResolve.determinism / presentOrientation | — | ok · ok |
+| costTiers | — | OK (renderer/wetlook covered) |
+| `npm run build` | exit 0 | exit 0 |
+| eslint + prettier on touched files | — | clean (selfcheck file prettier-formatted, suite re-passed 16/16) |
 
-The stage (one wetness snapshot copy per pigment-live step + the gradient accrual over the pigment box) adds ~+0.3 ms/step — **inside the registered 6.6 ms figure**, which stands: it was measured on a busier VM (medians 6.93 / 6.28), and re-registering downward on a quieter machine would understate the governor's worst case. Memory registration grows honestly by the two new planes: 1,376,256 → **1,507,328** bytes (`128×128×4×9 + 128×128×16×3 + 4096×16×2`), pinned in the vortex cost case. The pigment-absent path never snapshots and never accrues.
+Notes on two sandbox artefacts, both chased down rather than waved at:
+- The baseline accum run's wrapper reported exit 2 while the suite's own log read "OK (83 cases)"; the changed-tree run exits 0 with the identical 83-case verdict. Treated as a teardown artefact of the baseline invocation, not a regression signal.
+- A first battery run of composite "failed" with a Playwright target-closed error — that was my own 120 s timeout killing its browser section. Run solo with a proper window it passes at base (15) and on this build (15).
+- The brief's caveat that `npm run build` fails in this sandbox (@tauri-apps/api) did **not** reproduce here: with a fresh `npm install` the base builds green, and so does this build — so no build failure needed a base-identical defence.
 
-## Degraded parity
+**Acceptance wash** (probe.json; synthetic scenes, two soaked stamps, 16,797 wet px): dark ground — wet luma −19%, saturation +23%, dry Δ = 0, only brightening is the sheen on highlights (max +0.044); light paper — wet luma −26% (darkens more, per the issue's inversion), saturation +30%, max brightening **exactly 0**; monochrome — saturation stays 0, luma −11%, dry Δ = 0. The selfcheck asserts the same directions as region statistics plus the hard laws (dry identity, below-damp identity, paper never-brightens across a 343-pixel × 4-wetness sweep, HDR brights hold exactly).
 
-Under the perf shed the service replaces the sim step with an in-place dry (one fixed factor per frame). The degraded path calls the same accrual with the previous wetness reconstructed from that factor, so **deposits darken on schedule under the shed** exactly as on the full path — pinned by a new wetFrame case (degraded frames stamp, settle, then dry through the band; accrued max > 0.05 and the darkened pack is what degraded service publishes). Darkening is local arithmetic like transfer, so it belongs under the shed with transfer, not frozen with advection.
+## Decisions flagged for the next slice / coordinator
 
-## Files staged (named, nothing else)
-
-- `app/src/gl/vortex.mjs` — `pigEdge` + `_wetPrev` on the state; `accrueEdgeDarkening` + `hashEdgeDarkening` exported; the stage wired into `stepVortex` after TransferPigment; display density in `packPigmentDeposited`; the four pinned constants; cost registration (memory + notes).
-- `app/src/gl/vortex.selfcheck.mjs` — 6 new #1812 cases (34 total); the cost case's memory formula re-pinned ×7 → ×9 planes with the cause written in its comment. No golden re-pinned.
-- `app/src/gl/wetFrame.mjs` — the degraded path accrues after transfer (one guarded addition).
-- `app/src/gl/wetFrame.selfcheck.mjs` — 2 new #1812 cases (15 total): the band is the service's band (constants equal `WET_REGIMES` thresholds); degraded accrual.
-- `docs/WET_ENGINE.md` — an "Edge darkening" status paragraph in the header block's house style.
-- `docs/review/1812/` — README.md (design + decisions), probe.json (acceptance wash), probe-cost.json (A/B), still-edge-darkening.png.
-- `STAGING-REPORT.md` — this file.
-
-## Verification (sandbox, this VM)
-
-- Solo suites: **vortex 34/34** (28 standing + 6 new; `hashVelocity` golden 2493009798 and all #1811 goldens un-re-pinned) · **wetFrame 15/15** (13 + 2; the Phase A byte-golden holds) · pigmentKM 7 · wetFeed 9 · costTiers OK · accum.inventory / accum.seam / accumGuard OK · **accum 83 cases OK** solo at `NODE_OPTIONS=--max-old-space-size=3072`.
-- Full manifest, run in two parts around the environmental suites (531 commands): lines 1–258 green (868 [ok] lines) and lines 260–end green (907 [ok] lines, runner exit 0). New params: none — nothing entered `DEFAULT_LAYOUT_PARAMS` (no new params exist; the amount is a module constant).
-- Source-shape pins: grepped the selfchecks for assertions naming every touched file — only the vortex and wetFrame suites reference `vortex.mjs`/`wetFrame.mjs` (as imports); both ran green. The full sweep covers the rest.
-- Lint: 0 errors (11 warnings, all pre-existing in untouched component files). Prettier: clean on all four touched code files (one `--write` pass on the selfcheck).
-- **Sandbox-environmental, base-identical (CI authoritative):** `npm run build` fails on clean `origin/main` in this sandbox with the same root cause (`@tauri-apps/api` unresolvable in the shared node_modules) — verified by building a scratch worktree at 3aafc29d; swarmWasm stops on the missing cargo/wasm toolchain; rollSafety fails identically on the base checkout and here (exit 1 at the same line, headless-GL "framebuffer incomplete"). In the first combined sweep run, accum was SIGKILLed while two browser suites ran concurrently against the same VM; solo it passes (above) — resource contention, not a failure of the code.
-
-## Decisions taken inside the issue's latitude (flagged for the coordinator)
-
-1. **The stage lives in the deposited pack, not the #1813 wet-look pass.** The issue names the deposited layer as the effect's home ("display density d′ = d × (1 + k·|∇d|)"); #1813 doesn't exist yet. One home in the pack serves the fade today and #1813 later — a second application site in #1813 would be the #1069 trap (a capability on one render path only). #1813's builder should read the pack as-is; noted in the review README.
-2. **Band-proportional accrual.** The fall's contribution scales with the share of the damp band traversed, so a completed dry accrues exactly the issue's `k·|∇d|`. An all-or-nothing trigger was rejected on the numbers: the full path dries at 0.998/step, crossing the 0.30-wide band over ~140 steps — a trigger armed inside the band would fire at an arbitrary depth and the total would depend on frame sampling. Proportional accrual is sampling-independent and makes the degraded path (single-factor frames) consistent by construction.
-3. **The wetness snapshot is scratch, not state.** `_wetPrev` is overwritten every pigment-live step and never exported as history; only the accrued `pigEdge` persists — that *is* the drying history the issue asks the state to carry, and it rides the existing export surface (plain data on the state object; `dishWet` and the held-frame carve-out untouched). Warm-up determinism is pinned by hash (`hashEdgeDarkening`) + byte-equal packs across two identical sessions.
-
-## Hand-offs
-
-- #1813 (wet-look pass): read the deposit pack — darkening is already in it. Do not re-apply a gradient term.
-- #1814 (strata soak at the dish): the dish's stain read now includes darkened rims; nothing to wire.
-- Feel: K = 1.35 is the issue's pinned starting constant. If Matt's eye wants a stronger or weaker rim on real renders, it is a one-line constant change with the selfcheck pin updated beside it — flagged, not tuned here.
+1. **The pass consumes the field where the field is served** — the ACCUM presentation. It does not birth the field on its own (no wet look with ACCUM off): stepping the sim for display alone is a consumer-set decision for the #1814 family, recorded in `docs/review/1813/README.md`.
+2. **Paper's "brightens never" is a clamp, not a curve property** — the selfcheck's first sweep caught the saturation term lifting a dark saturated pixel's dominant channel ~0.03·f on paper; a per-channel `min(c, cIn)` on light grounds makes the law hold by construction.
+3. **The regime ramp tops out at soaked, not wet** — damp starts the effect, soaked completes it, so deep pools read wetter than damp edges.
+4. **Exports**: the pass is a pure function of (frame, field, ground) with no clock or state, so #1815's warm-up stills can run the identical math and match live — but this slice wires the live presentation only; the still path is #1815's to wire, exactly as the wetFrame header already records.
+5. **Cost figure is an estimate**: 0.3 ms declared for `renderer/wetlook` in the upscale class with the note saying so; the device-harness sweep (which reads `RENDERER_PROGRAMS`) is where the real number replaces it.

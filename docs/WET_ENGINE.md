@@ -25,6 +25,17 @@ never stored as regime. Rewet cycles accrue again, capped at 2. The
 accrual is state (exported, hashed, warm-up-deterministic), lives in the
 deposited pack every reader already consumes, and accrues identically
 under the degraded shed path. Measurements in `docs/review/1812/`.
+**Wet look:** #1813 (2026-10-29) added the display half: a fullscreen
+pass over the upscaled ACCUM presentation, in linear before the
+resolve, remapping the presented frame by the field sample read
+through this doc's regime thresholds (ramp damp → soaked) — saturation
+rises, luminance skews darker (per ground class: the glossy skew on
+dark grounds, a stronger never-brightening bend on paper), and a
+highlight-gated sheen lifts the brightest wet pixels. It reads the
+edge-darkened pack in the frame and adds no rim of its own. Strengths
+are recipe constants in `app/src/gl/wetLook.mjs`; the pass is a pure
+function of frame + field + ground so warm-up stills (#1815) match
+live. Measurements in `docs/review/1813/`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from _owner_ to _one consumer among several_.

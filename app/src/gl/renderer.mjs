@@ -34,6 +34,7 @@
 
 import { QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS, blendIdFor } from './shaders.mjs';
 import { RESOLVE_FS } from './resolveFs.mjs';
+import { WET_LOOK, WET_LOOK_FS } from './wetLook.mjs';
 import { bindResolveProbe } from './resolveBind.mjs';
 import { createUniformLocator } from './uniformLocations.mjs';
 import { buildProgramChecked, auditProgramChecked } from './debug/diagnostics.mjs';
@@ -430,6 +431,44 @@ export const RENDERER_PROGRAMS = [
       memoryBytes: 1920 * 1080 * 8,
       timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
+  },
+  {
+    // #1813: the wet-look display pass — one fullscreen pass over the
+    // upscaled ACCUM presentation, in linear before the resolve, run
+    // only while the wet-frame service serves a field (the loop arms it
+    // per frame via setWetLook; disarmed it costs nothing and the
+    // present path is byte-identical). Tier 0 like the upscale it
+    // follows: presentation plumbing, never shed. timeMs is the
+    // author's estimate (one frame tap + one mask tap at 1080p, the
+    // upscale/resolve class) — the sweep harness measures it through
+    // this same table; re-tier on a real measurement, not on vibes.
+    key: 'wetlook',
+    name: 'wetlook',
+    vs: FULL_VS,
+    fs: WET_LOOK_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'wetLook.mjs:WET_LOOK_FS',
+    uniforms: [
+      'u_src',
+      'u_wetMask',
+      'u_wetAmt',
+      'u_damp',
+      'u_full',
+      'u_bg',
+      'u_groundSplit',
+      'u_sat',
+      'u_skew',
+      'u_paperSkew',
+      'u_sheen',
+      'u_sheenPow',
+    ],
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes:
+        '#1813 wet-look: fullscreen remap of the upscaled presentation (saturation/skew/sheen by the wet field, in linear pre-resolve); only while the field is served; unmeasured estimate in the upscale class',
     },
   },
 ];
@@ -2120,13 +2159,71 @@ export function createLiveRenderer(canvas) {
     }
   }
 
+  // #1813 — the wet-look display state, re-pushed by the loop every
+  // frame (the setResolveOptions discipline): { mask, amount, bg, damp,
+  // full } while the wet-frame service serves a field beside ACCUM, or
+  // null. The mask pack uploads into a LINEAR texture of our own — the
+  // pack is fresh each served frame and small (the 128 grid is 64 KB).
+  let wetLookState = null;
+  let wetLookMaskTex = null;
+  function setWetLook(state) {
+    wetLookState = state && state.mask ? state : null;
+    if (!wetLookState) return;
+    if (!wetLookMaskTex) {
+      wetLookMaskTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, wetLookMaskTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    const packed = wetLookState.mask;
+    gl.bindTexture(gl.TEXTURE_2D, wetLookMaskTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, packed.n, packed.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed.rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+  }
+
+  /**
+   * #1813 — run the wet-look pass over an upscaled presentation target
+   * (linear, before the resolve) into the ping-pong partner target, and
+   * return the target to present. Disarmed — no field served — it
+   * returns the input untouched: no pass runs and the presentation is
+   * byte-identical to the pre-#1813 path.
+   */
+  function applyWetLook(src) {
+    if (!wetLookState || !wetLookMaskTex || !T) return src;
+    const out = T.mainB === src ? T.mainA : T.mainB;
+    const p = b.progs.wetlook;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fb);
+    gl.viewport(0, 0, out.w, out.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(p);
+    gl.uniform1i(b.U(p, 'u_src'), b.bindTex(0, src.tex));
+    gl.uniform1i(b.U(p, 'u_wetMask'), b.bindTex(1, wetLookMaskTex));
+    gl.uniform1f(b.U(p, 'u_wetAmt'), wetLookState.amount || 0);
+    gl.uniform1f(b.U(p, 'u_damp'), wetLookState.damp);
+    gl.uniform1f(b.U(p, 'u_full'), wetLookState.full);
+    const bg = wetLookState.bg || [0, 0, 0];
+    gl.uniform3f(b.U(p, 'u_bg'), bg[0], bg[1], bg[2]);
+    gl.uniform1f(b.U(p, 'u_groundSplit'), WET_LOOK.groundSplit);
+    gl.uniform1f(b.U(p, 'u_sat'), WET_LOOK.saturation);
+    gl.uniform1f(b.U(p, 'u_skew'), WET_LOOK.skew);
+    gl.uniform1f(b.U(p, 'u_paperSkew'), WET_LOOK.paperSkew);
+    gl.uniform1f(b.U(p, 'u_sheen'), WET_LOOK.sheen);
+    gl.uniform1f(b.U(p, 'u_sheenPow'), WET_LOOK.sheenPow);
+    b.drawFullscreen(p);
+    return out;
+  }
+
   /**
    * Present a smaller target — the half-res ACCUM feedback pair (#309) —
    * to the visible canvas. The pair is NEAREST-filtered, so it is upscaled
    * with the manual-bilinear upscale pass (soft, not blocky) into a
    * backing-size scratch target, then presented through the normal Y-flip
    * resolve path. T.mainA is the scratch: renderFrameInto() overwrites it
-   * every frame, so there is no cross-frame state.
+   * every frame, so there is no cross-frame state. #1813: while the wet
+   * field is served, the wet-look pass remaps that scratch (into mainB)
+   * in linear before the resolve — see applyWetLook.
    */
   function presentUpscaled(target) {
     if (!T) {
@@ -2142,7 +2239,7 @@ export function createLiveRenderer(canvas) {
     gl.uniform1i(b.U(up, 'u_src'), b.bindTex(0, target.tex));
     gl.uniform2f(b.U(up, 'u_srcSize'), target.w, target.h);
     b.drawFullscreen(up);
-    present(dst);
+    present(applyWetLook(dst));
   }
 
   /**
@@ -2350,6 +2447,7 @@ export function createLiveRenderer(canvas) {
   function dispose() {
     dropAccum();
     dropMixTargets();
+    if (wetLookMaskTex) gl.deleteTexture(wetLookMaskTex);
     if (atlasTex) gl.deleteTexture(atlasTex);
     if (T) b.freeFrameTargets(T);
     if (OT) b.freeFrameTargets(OT);
@@ -2360,6 +2458,7 @@ export function createLiveRenderer(canvas) {
   return {
     setAtlas,
     setResolveOptions: (o) => b.setResolveOptions(o),
+    setWetLook,
     hasAtlas: () => !!atlasTex,
     renderFrame,
     renderAccumInputFrame,
