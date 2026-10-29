@@ -1820,6 +1820,58 @@ export function createRenderer(canvas) {
     applyFinishChains,
     setResolveOptions,
   } = b;
+
+  // #1815 — the stills wet-look pass: the #1813 pass (same program,
+  // same constants, same uniform recipe as the live renderer's
+  // applyWetLook) driven by a payload-carried display state instead of
+  // the loop's per-frame setWetLook. The mask pack arrives with the
+  // payload — wetWarmup.mjs built it by rehearsing the field for a
+  // fixed K steps — and uploads into our own LINEAR texture; the pass
+  // writes the ping-pong partner of the finished frame, in linear,
+  // before the resolve (the live pass's exact place). Callers invoke
+  // this only when a field was warmed; without one the render is
+  // byte-identical to the pre-#1815 path.
+  let stillWetMaskTex = null;
+  function applyStillWetLook(T, src, display) {
+    if (!display || !display.mask) return src;
+    if (!stillWetMaskTex) {
+      stillWetMaskTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, stillWetMaskTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    const packed = display.mask;
+    gl.bindTexture(gl.TEXTURE_2D, stillWetMaskTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, packed.n, packed.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed.rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    // The ping-pong partner is chosen by TEXTURE, not by object:
+    // renderFrameInto returns a spread copy of its read target, so
+    // object identity would miss and draw a texture into itself.
+    const out = src.tex === T.mainB.tex ? T.mainA : T.mainB;
+    const p = b.progs.wetlook;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fb);
+    gl.viewport(0, 0, out.w, out.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(p);
+    gl.uniform1i(b.U(p, 'u_src'), b.bindTex(0, src.tex));
+    gl.uniform1i(b.U(p, 'u_wetMask'), b.bindTex(1, stillWetMaskTex));
+    gl.uniform1f(b.U(p, 'u_wetAmt'), display.amount || 0);
+    gl.uniform1f(b.U(p, 'u_damp'), display.damp);
+    gl.uniform1f(b.U(p, 'u_full'), display.full);
+    const bg = display.bg || [0, 0, 0];
+    gl.uniform3f(b.U(p, 'u_bg'), bg[0], bg[1], bg[2]);
+    gl.uniform1f(b.U(p, 'u_groundSplit'), WET_LOOK.groundSplit);
+    gl.uniform1f(b.U(p, 'u_sat'), WET_LOOK.saturation);
+    gl.uniform1f(b.U(p, 'u_skew'), WET_LOOK.skew);
+    gl.uniform1f(b.U(p, 'u_paperSkew'), WET_LOOK.paperSkew);
+    gl.uniform1f(b.U(p, 'u_sheen'), WET_LOOK.sheen);
+    gl.uniform1f(b.U(p, 'u_sheenPow'), WET_LOOK.sheenPow);
+    b.drawFullscreen(p);
+    return out;
+  }
+
   /**
    * @param {object} payload
    * @returns {{pixels: Uint8Array, width: number, height: number}} bottom-first RGBA
@@ -1836,7 +1888,11 @@ export function createRenderer(canvas) {
     try {
       // #1069 — one-shot stills never accumulate, so grain runs on the finished frame.
       const mRead = applyFinishChains(renderFrameInto(payload, T, uploaded));
-      const pixels = resolveTargetToBytes(mRead, T, w, h);
+      // #1815 — a warmed field rides the payload (payload.wet.display):
+      // the wet-look pass runs over the finished frame before the
+      // resolve. No warmed field → mRead resolves untouched.
+      const shown = payload.wet && payload.wet.display ? applyStillWetLook(T, mRead, payload.wet.display) : mRead;
+      const pixels = resolveTargetToBytes(shown, T, w, h);
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after render: 0x${err.toString(16)}`);
       return { pixels, width: w, height: h };
@@ -1921,6 +1977,7 @@ export function createRenderer(canvas) {
       ageBuffer = false,
       dt = 1 / 60,
       stats = false,
+      wet = null,
     } = {},
   ) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
@@ -1951,6 +2008,21 @@ export function createRenderer(canvas) {
         ageBuffer,
         dt,
         stats,
+        // #1815 — the warmed field, held for the whole sequence (the
+        // wet-frame service's freeze-hold semantics: the field was
+        // rehearsed before rendering, it does not step per frame).
+        // Absent, the recipe is exactly the pre-#1815 one.
+        ...(wet
+          ? {
+              wetStep: wet.wetStep,
+              wetGain: wet.wetGain,
+              wetAmount: wet.wetAmount,
+              wetVel: wet.wetVel,
+              wetMask: wet.wetMask,
+              pigStep: wet.pigStep,
+              pigDep: wet.pigDep,
+            }
+          : {}),
       });
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
@@ -1995,7 +2067,11 @@ export function createRenderer(canvas) {
       for (const { layerId, steps } of lastFxFinishChains) {
         finalTex = bridge.runChain(layerId, finalTex, steps);
       }
-      const pixels = resolveTargetToBytes(finalTex, T, w, h);
+      // #1815 — the wet-look pass over the finished sequence (the
+      // display state was assembled against this sequence's background
+      // in wetExportPayload). No warmed field → finalTex untouched.
+      const shownTex = wet && wet.display ? applyStillWetLook(T, finalTex, wet.display) : finalTex;
+      const pixels = resolveTargetToBytes(shownTex, T, w, h);
       // #1805: when the age buffer was requested, read the final age field
       // back before the accum object is disposed (the still's --age-out
       // consumes it). Unrequested this is null and nothing was allocated.
@@ -2016,6 +2092,7 @@ export function createRenderer(canvas) {
   }
 
   function dispose() {
+    if (stillWetMaskTex) gl.deleteTexture(stillWetMaskTex);
     b.disposeBase();
   }
 
@@ -2204,6 +2281,54 @@ export function createLiveRenderer(canvas) {
     gl.uniform1f(b.U(p, 'u_damp'), wetLookState.damp);
     gl.uniform1f(b.U(p, 'u_full'), wetLookState.full);
     const bg = wetLookState.bg || [0, 0, 0];
+    gl.uniform3f(b.U(p, 'u_bg'), bg[0], bg[1], bg[2]);
+    gl.uniform1f(b.U(p, 'u_groundSplit'), WET_LOOK.groundSplit);
+    gl.uniform1f(b.U(p, 'u_sat'), WET_LOOK.saturation);
+    gl.uniform1f(b.U(p, 'u_skew'), WET_LOOK.skew);
+    gl.uniform1f(b.U(p, 'u_paperSkew'), WET_LOOK.paperSkew);
+    gl.uniform1f(b.U(p, 'u_sheen'), WET_LOOK.sheen);
+    gl.uniform1f(b.U(p, 'u_sheenPow'), WET_LOOK.sheenPow);
+    b.drawFullscreen(p);
+    return out;
+  }
+
+  // #1815 — the offscreen twin of applyWetLook, for renderFrameOffscreen:
+  // a capture hands its wet display state in the payload (liveLoop
+  // assembles it from the capture frame's own served field — the
+  // setWetLook assembly), because the armed state belongs to the
+  // tick's frame, not the capture's. Same program, same constants,
+  // same uniform recipe; the mask uploads into a dedicated texture so
+  // the live mask texture is never clobbered mid-frame. No state →
+  // the input returns untouched.
+  let wetLookStillTex = null;
+  function applyWetLookTo(targetSet, src, state) {
+    if (!state || !state.mask) return src;
+    if (!wetLookStillTex) {
+      wetLookStillTex = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, wetLookStillTex);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    }
+    const packed = state.mask;
+    gl.bindTexture(gl.TEXTURE_2D, wetLookStillTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, packed.n, packed.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, packed.rgba);
+    gl.bindTexture(gl.TEXTURE_2D, null);
+    // Texture identity, not object identity (renderFrameInto returns a
+    // spread copy of its read target) — see applyStillWetLook.
+    const out = src.tex === targetSet.mainB.tex ? targetSet.mainA : targetSet.mainB;
+    const p = b.progs.wetlook;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, out.fb);
+    gl.viewport(0, 0, out.w, out.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(p);
+    gl.uniform1i(b.U(p, 'u_src'), b.bindTex(0, src.tex));
+    gl.uniform1i(b.U(p, 'u_wetMask'), b.bindTex(1, wetLookStillTex));
+    gl.uniform1f(b.U(p, 'u_wetAmt'), state.amount || 0);
+    gl.uniform1f(b.U(p, 'u_damp'), state.damp);
+    gl.uniform1f(b.U(p, 'u_full'), state.full);
+    const bg = state.bg || [0, 0, 0];
     gl.uniform3f(b.U(p, 'u_bg'), bg[0], bg[1], bg[2]);
     gl.uniform1f(b.U(p, 'u_groundSplit'), WET_LOOK.groundSplit);
     gl.uniform1f(b.U(p, 'u_sat'), WET_LOOK.saturation);
@@ -2407,7 +2532,13 @@ export function createLiveRenderer(canvas) {
       // pure sharpness, same trick governor renderScale uses below 1x.
       const mRead = b.renderFrameInto({ ...payload, width: w, height: h }, OT, { atlasTex }, { transparent });
       // #1069 — captures (PNG stills, batch, Print Desk) get their grain too.
-      return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
+      if (!payload.wet) return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
+      // #1815 — the capture frame's field was served (payload.wet is a
+      // wet-look display state, setWetLook's shape): the still gets the
+      // wet-look pass the audience sees, over the finished frame,
+      // before the resolve — instead of silently dropping it.
+      const finished = b.applyFinishChains(mRead);
+      return b.resolveTargetToBytes(applyWetLookTo(OT, finished, payload.wet), OT, w, h);
     } finally {
       // A capture can only run after the first live frame (waitForReady), so
       // liveW is set — the guard is belt-and-braces against a 0-size alloc.
@@ -2448,6 +2579,7 @@ export function createLiveRenderer(canvas) {
     dropAccum();
     dropMixTargets();
     if (wetLookMaskTex) gl.deleteTexture(wetLookMaskTex);
+    if (wetLookStillTex) gl.deleteTexture(wetLookStillTex);
     if (atlasTex) gl.deleteTexture(atlasTex);
     if (T) b.freeFrameTargets(T);
     if (OT) b.freeFrameTargets(OT);

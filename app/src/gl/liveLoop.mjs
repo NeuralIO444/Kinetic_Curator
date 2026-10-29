@@ -1568,7 +1568,7 @@ export function createLiveLoop(
     // needed: nothing here has anything left to roll back.
     const frame = buildFrame(0, loopTimeMs);
     if (!frame) throw new Error('[gl-live] textures baking — wait a moment and retry');
-    const { payload, transparent, accumOn } = frame;
+    const { payload, transparent, accumOn, accumParams, bgCss } = frame;
 
     if (accumOn && accumActive && accumObj) {
       // Capture the actual feedback image at live size, then upscale in 2D.
@@ -1581,10 +1581,25 @@ export function createLiveLoop(
       const upscaled = up.width !== payload.width || up.height !== payload.height;
       return { ...up, upscaledFrom: upscaled ? { width: payload.width, height: payload.height } : null };
     }
+    // #1815 — the offscreen render gets this frame's wet display state
+    // (the same assembly the tick arms via setWetLook, from THIS frame's
+    // served field): without it the capture silently drops the wet look
+    // the audience is seeing. No field served → no key → the capture is
+    // byte-identical to before.
+    const wet =
+      accumParams && accumParams.wetStep === 1 && accumParams.wetMask
+        ? {
+            mask: accumParams.wetMask,
+            amount: accumParams.wetAmount,
+            bg: wetGroundFromCss(bgCss),
+            damp: WET_REGIMES[0].at,
+            full: WET_REGIMES[2].at,
+          }
+        : null;
     // #267: offscreen targets at the capture size — the live canvas is never
     // resized, so no flash and no mid-stream resolution jump for recordings.
     // #270: export resolution is exact — no display-DPR multiplier here.
-    const pixels = live.renderFrameOffscreen({ ...payload, width, height }, { transparent });
+    const pixels = live.renderFrameOffscreen({ ...payload, width, height, ...(wet ? { wet } : {}) }, { transparent });
     return { pixels, width, height, upscaledFrom: null };
   }
 

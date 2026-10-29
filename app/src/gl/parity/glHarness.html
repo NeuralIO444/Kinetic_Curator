@@ -31,6 +31,20 @@ const u8ToB64 = (u8) => {
   for (let i = 0; i < u8.length; i += CH) s += String.fromCharCode.apply(null, u8.subarray(i, i + CH));
   return btoa(s);
 };
+// #1815 — the warmed field crosses with its packs base64'd
+// (wetWarmup.wetExportPayload); decode them back to { n, rgba }
+// Uint8Array packs for the renderer. Null stays null.
+const decodeWet = (wet) => {
+  if (!wet) return null;
+  const pack = (p) => (p ? { n: p.n, rgba: b64ToU8(p.rgba) } : null);
+  return {
+    ...wet,
+    wetVel: pack(wet.wetVel),
+    wetMask: pack(wet.wetMask),
+    pigDep: pack(wet.pigDep),
+    display: wet.display ? { ...wet.display, mask: pack(wet.display.mask) } : null,
+  };
+};
 
 /**
  * payload: { width, height, bg, contract, cells, atlasB64, atlasW, atlasH,
@@ -46,6 +60,7 @@ function renderArgs(payload) {
     width: payload.width,
     height: payload.height,
     bg: payload.bg,
+    wet: decodeWet(payload.wet), // #1815: warmed field for renderScene
     contract: payload.contract,
     cells: payload.cells,
     atlas: { pixels: atlasPx, width: payload.atlasW, height: payload.atlasH, mipmaps: atlasMips },
@@ -156,6 +171,7 @@ window.__kcAccum = async (payload) => {
     ageBuffer: payload.ageBuffer ?? false, // #1805: age buffer request
     dt: payload.dt ?? 1 / 60, // #1805: show-time seconds per step
     stats: payload.stats ?? false, // #1807: buffer statistics request
+    wet: decodeWet(payload.wet), // #1815: warmed field, held across the sequence
   });
   return {
     pixelsB64: u8ToB64(pixels),

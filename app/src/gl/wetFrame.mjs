@@ -56,8 +56,9 @@
  * IS noteWetFrame against the service's slot, so ACCUM consumes
  * byte-identically (the doc's Phase A acceptance, pinned in
  * wetFrame.selfcheck). The dish migration is slice B of #1809 (its own
- * issue, review lane); warm-up exports are #1815 — the live-only header
- * on vortex.mjs stands until that slice supersedes it.
+ * issue, review lane); warm-up exports landed as #1815 — the export
+ * paths run this service for a fixed K = 90 warm-up (gl/wetWarmup.mjs),
+ * superseding the old live-only header on vortex.mjs.
  *
  * Determinism (#806) is untouched: the sim steps with fixed dt and a
  * seeded RNG, as a function of the frame inputs — never wall clock.

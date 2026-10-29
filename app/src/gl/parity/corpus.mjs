@@ -30,6 +30,30 @@ export const POLICIES = Object.freeze({
   fx: FX_RELAXED_POLICY,
 });
 
+/**
+ * Known, signed divergences between the SVG reference and the GL path —
+ * recorded here, in the harness, so a divergence is a decision on file,
+ * never a silent sweep failure waiting to be discovered.
+ *
+ * - wet-warm-up (#1815): a project with WETNESS > 0 renders its wet
+ *   field on the GL path by rehearsing it (wetWarmup.mjs — a fixed
+ *   K=90-step warm-up of the wet-frame service over the project's
+ *   instances, then the recipe's wet/pigment terms and the #1813
+ *   wet-look pass). The SVG renderer has no mask to read: mask absent
+ *   → static blend. Signed as the documented behaviour, not a failure.
+ *   The corpus keeps WETNESS at 0 in every scene (the lp() default),
+ *   so the sweep itself never warms a field; wetWarmup.selfcheck pins
+ *   both this record and the corpus's dryness.
+ */
+export const KNOWN_DIVERGENCES = Object.freeze([
+  Object.freeze({
+    id: 'wet-warm-up',
+    gl: 'deterministic K=90 warm-up of the wet field (#1815)',
+    svg: 'mask absent → static blend',
+    signed: '#1815',
+  }),
+]);
+
 // Text is baked into these stamp assets as SVG <text>; keep them out of the
 // corpus so reference pixels never depend on font resolution.
 const TEXT_ASSET_IDS = new Set(ASSETS.filter((a) => a.svg.includes('<text')).map((a) => a.id));

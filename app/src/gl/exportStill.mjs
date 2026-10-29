@@ -17,6 +17,12 @@
  * (same function, same inputs); the resolution is the only difference.
  * That is #176's before/after rule, structurally guaranteed.
  *
+ * #1815: a project with WETNESS > 0 exports with its wet field —
+ * rehearsed for a fixed warm-up (wetWarmup.mjs, K=90 steps over the
+ * project's instances) and named in the readout. Still a pure function
+ * of (project, seed, resolution): same inputs, byte-identical field,
+ * byte-identical still. WETNESS = 0 → no warm-up, unchanged output.
+ *
  * Pixels cross page.evaluate in 16MB chunks (renderExportViaGL), so 8K
  * readbacks (~132MB RGBA / ~177MB base64) don't hit the ~100MB evaluate
  * limit. The PNG encoder streams rows through zlib: peak memory is one
@@ -53,6 +59,7 @@ import { resolveLayers, whenSwarmWasmReady } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { renderExportViaGL, closeGlDriver } from './parity/glDriver.mjs';
 import { writePngFile } from './png.mjs';
+import { warmUpForScene, wetLayoutParamsOf, wetExportPayload } from './wetWarmup.mjs';
 
 const BROWSER_MISSING_RE = /Executable doesn't exist/;
 
@@ -161,7 +168,10 @@ function parseRamps(list) {
  * render is width/height. Never touches any live store: caps, seed, and
  * background are all explicit arguments.
  *
- * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
+ * @returns {Promise<{pixels: Buffer, width: number, height: number,
+ *   wetReadout: string|null}>} top-first RGBA; wetReadout is the #1815
+ *   warm-up line ("wet: warm-up K=90") when the project's field was
+ *   rehearsed for the still, else null.
  */
 export async function renderExport({
   doc,
@@ -193,7 +203,19 @@ export async function renderExport({
   // as the parity candidate and accumStill).
   const paletteBg = resolvedLayers[0]?.palette?.bg || '#000000';
   const bg = /^#[0-9a-fA-F]{6}$/.test(background || '') ? background : paletteBg;
-  return renderExportViaGL(contract, { width, height, bg });
+  // #1815 — warm-up exports: rehearse the wet field for a fixed K steps
+  // over the contract's instances (wetWarmup.mjs — the same derivation
+  // accumStill uses) and hand it to the renderer with the still. A dry
+  // project serves null and the export is byte-identical to before.
+  const served = warmUpForScene({
+    seed: contract.seed || 0,
+    canvas: contract.canvas,
+    instances: contract.instances,
+    layoutParams: wetLayoutParamsOf(resolvedLayers),
+  });
+  const wet = wetExportPayload(served, bg);
+  const { pixels } = await renderExportViaGL(contract, { width, height, bg, wet });
+  return { pixels, width, height, wetReadout: served ? served.readout : null };
 }
 
 function outPathForSeed(template, seed) {
@@ -247,7 +269,7 @@ async function main(argv) {
   try {
     for (const seed of seeds) {
       const outPath = args.seeds ? outPathForSeed(args.out, seed) : args.out;
-      const { pixels, width, height } = await renderExport({
+      const { pixels, width, height, wetReadout } = await renderExport({
         doc,
         seed,
         width: size.w,
@@ -260,6 +282,8 @@ async function main(argv) {
       });
       await writePngFile(outPath, pixels, width, height);
       console.log(outPath);
+      // #1815 — the warm-up readout: derived and shown, never hidden.
+      if (wetReadout) console.log(wetReadout);
     }
   } catch (e) {
     if (isBrowserMissingError(e)) {

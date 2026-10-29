@@ -36,6 +36,26 @@ edge-darkened pack in the frame and adds no rim of its own. Strengths
 are recipe constants in `app/src/gl/wetLook.mjs`; the pass is a pure
 function of frame + field + ground so warm-up stills (#1815) match
 live. Measurements in `docs/review/1813/`.
+**Warm-up exports:** #1815 (2026-10-29) closed the stills gap: the
+export paths rehearse the field before rendering — `gl/wetWarmup.mjs`
+runs the wet-frame service for a fixed warm-up of K = 90 steps over
+the project's instances at project-state positions/motion, and every
+still call site consumes the served field: `renderScene` (the wet
+recipe terms ride the payload, the #1813 wet-look pass runs over the
+finished frame from the payload's display state), the `accumStill`
+sequence (the field held across the sequence, freeze-hold semantics),
+and `renderFrameOffscreen` (the capture frame's own served field,
+assembled by liveLoop exactly as the tick arms `setWetLook`). Same
+seed + instances + K → byte-identical field → byte-identical wet
+contribution; the export readout names it — "wet: warm-up K=90".
+WETNESS = 0 skips the warm-up entirely and exports byte-identically
+to before. Pigment and its edge darkening are field state and warm up
+with it (the pack is consumed as served, never re-applied). The SVG
+fallback divergence is signed in the parity harness ("mask absent →
+static blend", `parity/corpus.mjs` KNOWN_DIVERGENCES); the corpus
+keeps WETNESS at 0, so the sweep is untouched. The warm-up's cost is
+pinned: K steps at the 128-grid constants under a 2 s ceiling,
+asserted with a timing log in `wetWarmup.selfcheck`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from _owner_ to _one consumer among several_.
@@ -86,6 +106,9 @@ this rescope cheap.
 1. **Exports never see wet.** No `noteWetFrame` / `wetMask` reference exists in
    `renderer.mjs` or the still paths, and `renderAccumSequence` calls
    `accumRecipeParams` **without** the wet params. Wet is live-only today.
+   **Closed by #1815** — the still paths now warm the field up
+   deterministically (`gl/wetWarmup.mjs`) and consume it at all three
+   call sites; see the Warm-up exports status note at the top.
 2. **The history dies with the toggle.** `wetSlot.vortex = null` fires when ACCUM
    turns off (`liveLoop.mjs:1092`), so the field's memory is owned by a switch.
 3. **Freeze is borrowed.** `freeze = accumFrozen || !running || slowRender` —
@@ -139,7 +162,7 @@ _identical output_, not by inspection.
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM                                                             | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change — **landed (#1809 slice A, `app/src/gl/wetFrame.mjs` + `wetFrame.selfcheck`)** |
 | **B — consumer #2**              | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact                                                                     |
-| **C — exports + parity**         | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling             | screen vs PNG parity selfcheck; parity harness green with WET off                                                                                                         |
+| **C — exports + parity**         | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling             | screen vs PNG parity selfcheck; parity harness green with WET off — **landed (#1815, `app/src/gl/wetWarmup.mjs` + `wetWarmup.selfcheck`; the `accumStill` sequence consumes the held field too)** |
 
 Phases A and C are well-scoped single-fix PRs. B is the feature. **C ships with
 B, not after it.**

@@ -269,7 +269,7 @@ function regionAssetsFor(contract) {
  * Build the page payload for a scene contract (atlas + grain LUTs + wrap
  * boxes), shared by renderViaGL and the perf probe.
  */
-export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a' } = {}) {
+export function buildRenderPayload(contract, { width = 400, height = 280, bg = '#0a0a0a', wet = null } = {}) {
   const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
   const atlas = getAtlas(combos, regionAssetsFor(contract));
   const cells = {};
@@ -280,6 +280,7 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
     width,
     height,
     bg,
+    wet, // #1815: the warmed field (wetExportPayload form) or null
     contract,
     cells,
     atlasB64: b64Pieces(atlas.pixels),
@@ -324,6 +325,7 @@ export async function renderAccumViaGL(
     ageBuffer = false, // #1805: forwarded to renderAccumSequence
     dt = 1 / 60, // #1805: show-time seconds per step
     stats = false, // #1807: forwarded to renderAccumSequence
+    wet = null, // #1815: the warmed field (wetExportPayload form), forwarded to renderAccumSequence
   } = {},
 ) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
@@ -364,6 +366,7 @@ export async function renderAccumViaGL(
     ageBuffer, // #1805: forwarded to renderAccumSequence (age buffer)
     dt, // #1805: show-time seconds per step
     stats, // #1807: forwarded to renderAccumSequence (buffer statistics)
+    wet, // #1815: forwarded to renderAccumSequence (warmed field, held)
     cells,
     atlasB64: b64Pieces(atlas.pixels),
     atlasW: atlas.width,
@@ -452,7 +455,8 @@ export async function renderAccumInputViaGL(contract, layerIds, opts = {}) {
  * (app/src/gl/exportStill.mjs) uses this; the parity path keeps renderViaGL.
  *
  * @param {object} contract scene contract v1
- * @param {object} opts { width, height, bg }
+ * @param {object} opts { width, height, bg, wet } — wet is the #1815
+ *   warmed field (wetExportPayload form) or null
  * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
  */
 export async function renderExportViaGL(contract, opts = {}) {
