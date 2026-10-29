@@ -12,7 +12,12 @@
  *
  *   · Field — the vortex state itself: packed wet mask + packed velocity
  *     per frame (wetMask / wetVel), at the sim's grid (128 lands in #1810;
- *     the constants stay the sim's).
+ *     the constants stay the sim's). Since #1811 the field also carries
+ *     pigment: pigStep / pigDep publish the deposited layer's KM
+ *     reflectance pack beside the mask whenever pigment is live in the
+ *     field (absent — pigStep 0, pigDep null — until the first coloured
+ *     stamp lands; ACCUM is the first reader, the pack is also the
+ *     backstage stain read).
  *   · Regime thresholds — WET_REGIMES / wetRegimeAt: named bands over the
  *     mask value (damp / wet / soaked) so display consumers (#1813) read
  *     regimes, never raw floats interpreted ad hoc.
@@ -68,7 +73,9 @@ import {
   emitFromInstances,
   ensureVortex,
   noteWetFrame,
+  packPigmentDeposited,
   packWet,
+  transferPigment,
   VORTEX_WET_DRY,
   wetnessStep,
 } from './vortex.mjs';
@@ -95,7 +102,7 @@ export function wetRegimeAt(value) {
   return 'soaked';
 }
 
-const absent = () => ({ wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null });
+const absent = () => ({ wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null, pigStep: 0, pigDep: null });
 
 /**
  * @returns {{
@@ -163,6 +170,10 @@ export function createWetFrameService() {
       emitAmbientFrom(state, { behave: req.behave, motion: req.motion });
       const wet = state.wet;
       for (let i = 0; i < wet.length; i++) wet[i] *= VORTEX_WET_DRY;
+      // #1811: pigment stamps rode the emit above; the compartment
+      // transfer is local (no advection — advection is what the shed
+      // sheds), so deposits keep settling under degraded service.
+      if (state.pigmentLive) transferPigment(state);
       degradedSteps += 1;
       return {
         wetStep: 1,
@@ -170,6 +181,8 @@ export function createWetFrameService() {
         wetAmount: advectGain(req.wetness),
         wetVel: null,
         wetMask: packWet(state),
+        pigStep: state.pigmentLive ? 1 : 0,
+        pigDep: state.pigmentLive ? packPigmentDeposited(state) : null,
         wetMode: 'degraded',
         wetShed: shed,
       };

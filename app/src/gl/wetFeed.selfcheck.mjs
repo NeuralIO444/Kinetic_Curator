@@ -4,6 +4,7 @@ import assert from 'node:assert';
 import {
   accumRecipeParams,
   FADE_FS,
+  FADE_PIG_FS,
   FADE_WET_FS,
   FEED_FS,
   FEED_WET_FS,
@@ -151,6 +152,71 @@ ok('dry over does not mix; wet over makes a third color', () => {
   // Wet mix is neither pure blue nor white.
   assert.ok(mixed[0] > dry[0] + 0.05 && mixed[2] > 0.4, `mix kept both pigments (${mixed[0]}, ${mixed[2]})`);
   assert.ok(mixed[0] + mixed[1] + mixed[2] < 2.2, 'mix did not stack toward white');
+});
+
+ok('#1811 pigment fade: KM absorption lives only in the pigment variant, gated by pigStep', () => {
+  assert.doesNotMatch(FADE_FS, /u_pigDep/);
+  assert.doesNotMatch(FADE_WET_FS, /u_pigDep/);
+  assert.match(FADE_PIG_FS, /u_pigDep/);
+  assert.match(FADE_PIG_FS, /depRefl/);
+  // Derived from the wet fade, not rewritten: the wet terms ride along.
+  assert.match(FADE_PIG_FS, /edge \* u_wetAmount/);
+  assert.match(FADE_PIG_FS, /ihashWet/);
+  const pack = { n: 2, rgba: new Uint8Array(16).fill(255) };
+  const off = accumRecipeParams({ pigStep: 0, pigDep: pack });
+  assert.strictEqual(off.pigStep, 0);
+  assert.strictEqual(off.pigDep, null, 'the pack is dropped when the gate is 0');
+  const on = accumRecipeParams({ pigStep: 1, pigDep: pack });
+  assert.strictEqual(on.pigStep, 1);
+  assert.strictEqual(on.pigDep, pack);
+});
+
+ok('#1811 mirror: deposited KM reflectance absorbs buffer light; a paper pack is a no-op', () => {
+  const w = 4,
+    h = 4;
+  const frame = new Float64Array(w * h * 4);
+  const vel = { n: 2, rgba: new Uint8Array(16) };
+  const mask = { n: 2, rgba: new Uint8Array(16).fill(255) }; // soaked: edge 0, granulation 1
+  const wetParams = { fade: 1, wetStep: 1, wetGain: 0, wetAmount: 1, wetVel: vel, wetMask: mask };
+  const base = mirrorAccumStep({
+    accum: new Float64Array(w * h * 4).fill(0.8),
+    frame,
+    w,
+    h,
+    params: accumRecipeParams(wetParams),
+  });
+  // A deposit whose KM reflectance is (0.5, 0.25, 1.0)-ish in bytes.
+  const dep = { n: 2, rgba: new Uint8Array(16) };
+  for (let i = 0; i < 4; i++) {
+    dep.rgba[i * 4] = 128;
+    dep.rgba[i * 4 + 1] = 64;
+    dep.rgba[i * 4 + 2] = 255;
+    dep.rgba[i * 4 + 3] = 255;
+  }
+  const absorbed = mirrorAccumStep({
+    accum: new Float64Array(w * h * 4).fill(0.8),
+    frame,
+    w,
+    h,
+    params: accumRecipeParams({ ...wetParams, pigStep: 1, pigDep: dep }),
+  });
+  const tol = 0.01;
+  assert.ok(
+    Math.abs(absorbed[0] - base[0] * (128 / 255)) < tol,
+    `red absorbed (${absorbed[0]} vs ${base[0] * (128 / 255)})`,
+  );
+  assert.ok(Math.abs(absorbed[1] - base[1] * (64 / 255)) < tol, `green absorbed harder (${absorbed[1]})`);
+  assert.ok(Math.abs(absorbed[2] - base[2]) < tol, 'blue passes (reflectance 1)');
+  // Bare paper (reflectance exactly 1) changes nothing, byte for byte.
+  const paper = { n: 2, rgba: new Uint8Array(16).fill(255) };
+  const noop = mirrorAccumStep({
+    accum: new Float64Array(w * h * 4).fill(0.8),
+    frame,
+    w,
+    h,
+    params: accumRecipeParams({ ...wetParams, pigStep: 1, pigDep: paper }),
+  });
+  for (let i = 0; i < base.length; i++) assert.strictEqual(noop[i], base[i]);
 });
 
 console.log(`wetFeed.selfcheck: ${n} checks passed`);
