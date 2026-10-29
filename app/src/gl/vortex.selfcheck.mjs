@@ -20,7 +20,9 @@ import {
   wetnessStep,
   VORTEX_DECAY,
   VORTEX_GAMMA_PER_SPEED,
+  VORTEX_GRID,
   VORTEX_JACOBI,
+  VORTEX_MAX,
   VORTEX_WET_DRY,
 } from './vortex.mjs';
 
@@ -148,9 +150,9 @@ ok('wet mask advects downwind instead of fading in place (#998)', () => {
   const comX = () => {
     let m = 0,
       cx = 0;
-    for (let j = 0; j < 64; j++)
-      for (let i = 0; i < 64; i++) {
-        const w = v.wet[j * 64 + i];
+    for (let j = 0; j < v.n; j++)
+      for (let i = 0; i < v.n; i++) {
+        const w = v.wet[j * v.n + i];
         m += w;
         cx += w * i;
       }
@@ -181,13 +183,18 @@ ok('ambient emission is seeded: same seed matches, different seed does not', () 
   assert.notStrictEqual(hashVelocity(a), hashVelocity(c));
 });
 
-ok('golden: four scripted frames, fixed Jacobi, seed 970', () => {
-  assert.strictEqual(VORTEX_JACOBI, 30);
+ok('golden: four scripted frames at the #1810 constants, seed 970', () => {
+  // The constants are Matt's ruling (#1810): 128 grid, 20 Jacobi, cap 4096.
+  assert.strictEqual(VORTEX_GRID, 128);
+  assert.strictEqual(VORTEX_JACOBI, 20);
+  assert.strictEqual(VORTEX_MAX, 4096);
   const a = runScript();
   const b = runScript();
   assert.strictEqual(a.steps, 4);
   assert.strictEqual(hashVelocity(a), hashVelocity(b));
-  assert.strictEqual(hashVelocity(a), 3932816161);
+  // Re-pinned from 3932816161 (64/30) by the resolution change itself; the
+  // field-statistics case below is the character evidence for the re-pin.
+  assert.strictEqual(hashVelocity(a), 2493009798);
 });
 
 ok('a stirred field is not zero, and a step stays inside a loose budget', () => {
@@ -196,15 +203,100 @@ ok('a stirred field is not zero, and a step stays inside a loose budget', () => 
   const t0 = performance.now();
   for (let i = 0; i < 30; i++) stepVortex(v);
   const per = (performance.now() - t0) / 30;
-  console.log(`    step ${per.toFixed(3)} ms (budget 0.5, fail above 2)`);
-  assert.ok(per < 2, `step ${per.toFixed(3)} ms exceeds the loose budget`);
+  // Loose sandbox bound, not the cost gate: the #1810 measurement (scripted
+  // steady state, filled cap) is 2.66–2.72 ms/step on this class of VM —
+  // the gate itself is the registered timeMs below. 6 ms catches an
+  // order-of-magnitude regression (a 256 grid, a doubled Jacobi) without
+  // flaking on shared-machine load.
+  console.log(`    step ${per.toFixed(3)} ms (measured gate 2.7, fail above 6)`);
+  assert.ok(per < 6, `step ${per.toFixed(3)} ms exceeds the loose budget`);
 });
 
-ok('cost tier is 1 and sheds with the accum chain once the feed hook lands', () => {
+ok('cost tier is 1, and the registered step cost is the #1810 measurement', () => {
   const d = getCostTier('gl/vortex');
   assert.ok(d, 'gl/vortex registered');
   assert.strictEqual(d.tier, 1);
-  assert.ok(d.timeMs <= 0.5);
+  // Was 0.5 by the module's own admission ("the selfcheck budget, not a
+  // measured fact"). #1810 measured the step on identical scripted sessions
+  // before/after the resolution change and registered the result; moving
+  // this pin requires a new measurement, not a new opinion.
+  assert.strictEqual(d.timeMs, 2.7);
+  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 5 + 4096 * 16);
+});
+
+ok('field character at 128/20 matches the 64/30 field on the same scripted input (#1810)', () => {
+  // The issue's equivalence evidence: the same scripted session run on the
+  // old constants (measured on the parent branch, sandbox, 2026-10-28 —
+  // full tables in docs/review/1810/) vs this run at the new constants.
+  // The session never saturates either vorton cap (720 emitted), so the
+  // comparison isolates grid + iterations.
+  const REF64 = {
+    meanSpeed: 1.415098,
+    p95Speed: 6.372211,
+    maxSpeed: 33.790241,
+    intAbsOmega: 0.086797,
+    totalWet: 103.27813,
+  };
+  const inst = (i) => [
+    { layer: 'content-0', key: 'a', x: 100 + ((i * 7) % 800), y: 200 + (i % 5) * 3, vx: 30, vy: 5 },
+    { layer: 'content-0', key: 'b', x: 500 - ((i * 3) % 400), y: 400, vx: -12, vy: 20 },
+    { layer: 'content-1', key: 'c', x: 700, y: 150 + ((i * 2) % 500), vx: 0, vy: 0 },
+    { layer: 'content-1', key: 'd', x: 200 + ((i * 11) % 600), y: 550 - (i % 7) * 9, vx: 22, vy: -14 },
+  ];
+  const v = createVortex({ seed: 970, width: 1000, height: 700 });
+  for (let i = 0; i < 120; i++) {
+    emitFromInstances(v, inst(i));
+    stepVortex(v, { wetAdvect: 0.6 });
+  }
+  assert.strictEqual(v.count, 720, 'same session: same emitted vortons');
+  const cells = v.n * v.n;
+  const cellArea = (v.width / (v.n - 1)) * (v.height / (v.n - 1));
+  let sumSpeed = 0,
+    sumAbsOmega = 0,
+    totalWet = 0,
+    maxSpeed = 0;
+  const speeds = new Float32Array(cells);
+  for (let i = 0; i < cells; i++) {
+    const s = Math.hypot(v.vx[i], v.vy[i]);
+    speeds[i] = s;
+    sumSpeed += s;
+    if (s > maxSpeed) maxSpeed = s;
+    sumAbsOmega += Math.abs(v.omega[i]);
+    totalWet += v.wet[i];
+  }
+  const sorted = Float32Array.from(speeds).sort();
+  const got = {
+    meanSpeed: sumSpeed / cells,
+    p95Speed: sorted[Math.floor(0.95 * cells)],
+    maxSpeed,
+    intAbsOmega: (sumAbsOmega * cellArea) / (v.width * v.height),
+    totalWet,
+  };
+  // Bands are ≈1.5× the deviation measured for this change, each with its
+  // physical reason — they pin character, not bytes:
+  // - meanSpeed down (measured 0.66×): 20 damped-Jacobi iterations transport
+  //   the low-frequency modes less far on a finer grid — the accepted trade
+  //   the issue's research names ("finer structure instead of redundant
+  //   convergence"). p95 falls less (0.85×) for the same reason.
+  // - maxSpeed / ∫|ω| up (1.36× / 1.16×): near-vorton gradients the 64 splat
+  //   smeared over 4× the area now resolve.
+  // - totalWet conserved (1.05×): a stamp deposits the same mass at any
+  //   grid; it concentrates in ¼ the area, so per-cell means and threshold
+  //   coverage drop ~4× BY RESOLUTION — the sum is the invariant to pin.
+  const BANDS = {
+    meanSpeed: [0.55, 1.05],
+    p95Speed: [0.7, 1.1],
+    maxSpeed: [0.8, 1.6],
+    intAbsOmega: [0.75, 1.25],
+    totalWet: [0.9, 1.1],
+  };
+  for (const k of Object.keys(BANDS)) {
+    const [lo, hi] = BANDS[k];
+    assert.ok(
+      got[k] >= REF64[k] * lo && got[k] <= REF64[k] * hi,
+      `${k}: ${got[k].toFixed(4)} outside [${(REF64[k] * lo).toFixed(4)}, ${(REF64[k] * hi).toFixed(4)}] (64-grid ref ${REF64[k]})`,
+    );
+  }
 });
 
 ok('vortons decay, so a held pair does not live forever', () => {

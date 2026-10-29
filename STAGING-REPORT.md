@@ -1,61 +1,71 @@
-# STAGING REPORT — #1809 slice A: wet-frame service (local only, not pushed)
+# STAGING REPORT — #1810: 128-grid sim, fewer solver iterations (local only, not pushed)
 
-Builder staging record, branch `feat/1809-wet-frame` in `~/workspace/kc-1809-build` (local only — not pushed, no PR; the coordinator verifies and publishes). This file replaces the report that was at the worktree root (#1806 slice 1's); that report remains in git history.
+Builder staging record, branch `feat/1810-128-grid` in `~/workspace/kc-1810-build`, based on `origin/feat/1809-wet-frame` (PR #1842, in CI) as assigned — not pushed, no PR; the coordinator verifies, rebases after #1842 merges, and publishes. This file replaces the report that was at the worktree root (#1809 slice A's); that report remains in git history.
 
-Issue (verbatim): **"WET: wet-frame service — decouple the field, one wet for dish and trails"**
+Issue (verbatim): **"WET: 128-grid sim, fewer solver iterations (measured cost gate)"**
 
-## Premise verdict: HOLDS — built (slice A of the issue's own slicing)
+## Premise verdict: HOLDS — built
 
-Verified against code + git history before building:
-
-- No wet-frame service existed under any name (no module, no references). The vortex sim's only caller was `liveLoop.mjs`, gated on `accumulation && !perfTier1`, returning a hand-built absent shape otherwise.
-- The slot was destroyed in exactly the two places the issue names: ACCUM toggle-off (`wetSlot.vortex = null` in the session-end branch) and ACCUM fault teardown (`noteAccumFault`).
-- Freeze was derived from ACCUM's controls in the loop (`accumFrozen || !running || slowRender`); exports never called the sim (no other `noteWetFrame` callers exist).
-- `docs/WET_ENGINE.md` §4–§6 prescribes this extraction as Phase A with byte-identical acceptance, and the issue prescribes the slicing (A: service + ACCUM as reader; B: dish migration). No recorded decision contradicts it.
-
-**Scope decision (first-class):** the issue's body prescribes its own slicing, and this build is **slice A, complete**. Slice B (dish on the shared field) is NOT bundled: the issue assigns it re-pins "where the field source legitimately changes values" and behaviour goldens "judged by Matt's eyes in the review lane before merge" — it is review-lane work, not full-auto material. The dish today consumes no spatial field at all (per-contact-pair wetness scalars in `src/engine/dishMedium.mjs`, grip-step counters in `dishLinks.mjs`), so B is a genuine migration, staged and named, not a silent omission.
+Verified against the code with my own eyes before building: `VORTEX_GRID` was 64, `VORTEX_JACOBI` 30, `VORTEX_MAX` 2048, and the `gl/vortex` cost registration carried `timeMs: 0.5` under the module header's own admission — "the selfcheck budget, not a measured fact." No part of the sim already ran at 128; no recorded decision contradicts the move. Slice A's staging report named this slice's exact gates (real measurement of the field step, re-registration of the cost entry, the wetFrame golden re-pin) — all three are discharged below.
 
 ## What shipped (plain language)
 
-The wet field — the water under the trails — used to be a private state of the ACCUM switch: it existed only while accumulation was on, and flipping ACCUM off (or an ACCUM fault) threw the field away, so the water's memory reset with a checkbox. Now a **wet-frame service** owns the field for the whole session. Each frame, consumers *request* the field; the service steps the sim only when somebody asks (never for nothing), keeps it alive across toggles and faults, follows the one transport clock (freeze holds it, as before), and reports on every frame *how* the field was served — live, degraded, shed, or off — so a governor shed is named instead of silent. ACCUM, the only consumer wired in this slice, reads exactly the values it always read: over a scripted 60-frame session the service's output is byte-identical to the old direct path, proven per frame.
+The wet field — the water under the trails — now simulates on a 128×128 grid instead of 64×64, with 20 solver iterations instead of 30, and room for 4096 vortons instead of 2048. The water's *character* is unchanged, proven rather than asserted: on identical scripted input the total wetness the paper holds is the same within ~5%, the vorticity the flow carries is the same within ~18%, and the differences that do exist (broader drift a third weaker, sharp peaks a third stronger, the same water sitting in a quarter of the area) each have a named physical cause, written down in the evidence and pinned in a new selfcheck case so a future silent change fails loudly. The cost entry the governor reads is no longer an admitted guess: it carries a measured step cost (2.7 ms) with its provenance, replacing the placeholder 0.5.
 
-Also in the contract, for the slices that follow: the service *degrades* under the tier-1 shed for consumers that accept it (stamping continues, the mask dries in place, advection stops and no velocity is published) instead of the field dying; and it publishes the regime thresholds (damp / wet / soaked) that the wet-look pass (#1813) will read. The dish is the first degraded consumer when slice B lands — in slice A, ACCUM is shed as a tier-1 unit exactly as today, so the shed path is armed and selfcheck-proven but not yet exercised live.
+## The measured cost gate (the acceptance)
 
-## Files (8 paths, staged by name)
+Identical scripted sessions measured against the untouched base and the changed tree (probe preserved in `docs/review/1810/probe-grid64.json` / `probe-grid128.json`); median of 5 batches × 60 steps. **Sandbox numbers** — this VM, shared with the second builder lane throughout; indicative, not device claims.
 
-- `app/src/gl/wetFrame.mjs` (new) — the service: `createWetFrameService()` with `frame()` (need-based gate, ownership, shed/degraded policy, mode reporting), `stats()` (frame-profile counters), `field()` (read-only probe), `dispose()` (the only sanctioned destroy). Plus `WET_REGIMES` / `wetRegimeAt` (contract thresholds; provenance in the header: damp 0.05 = the dry-tail crossing of one stamp ≈4 s, wet 0.35 = one stationary stamp, soaked 0.8 = near the stamp clamp).
-- `app/src/gl/wetFrame.selfcheck.mjs` (new, 11 cases) — equivalence golden, determinism, need gate, toggle continuity, dry gate, freeze hold, shed stand-down, degraded semantics (stamp lands / float-exact dry-down / vortons unmoved / no velocity), degraded birth, regime bands, dispose.
-- `app/selfcheck.manifest` (+1 line, after wetFeed).
-- `app/src/gl/vortex.mjs` — one extraction: `ensureVortex(slot, …)` (the seed/size lifetime rule, verbatim) now shared by `noteWetFrame` and the service. Sim behaviour untouched.
-- `app/src/gl/liveLoop.mjs` — the slot becomes the service; the gate becomes a per-frame request with the identical inputs (freeze derivation unchanged); the two `wetSlot.vortex = null` destroys are gone (ownership comments in their place); the frame result gains `wetMode` / `wetShed`; `dispose()` calls the service's dispose.
-- `docs/WET_ENGINE.md` — surgical status: Phase A marked landed (header + §6 row); the body still describes the pre-service state it replaced, now dated as such.
-- `docs/review/1809/README.md` — premise, preservation proof, degraded measurements, cost table, slice map.
+| Load | 64 / 30 / 2048 | 128 / 20 / 4096 | Ratio |
+| --- | --- | --- | --- |
+| Scripted steady state (fed while timing) | 1.009 ms/step | 2.662 ms/step | 2.64× |
+| Vorton cap filled and held | 1.075 ms/step (held 2046) | 2.719 ms/step (held 4094) | 2.53× |
+
+The issue's cost model predicted ≈2.7× and its fallback order (iterations → cap → resolution) triggers only if the measurement *breaks* the budgeted envelope. The measurement lands **under** the prediction, so **no fallback step was applied** — iterations stay at the issue's 20, the cap at its named starting point 4096 (0.25 vortons/cell, inside the band the 64-grid tuning lived in). The registration's `timeMs` is now the measured filled-cap figure (2.7), `memoryBytes` recomputed by the registration's own formula at the new constants (393,216). What remains open, named honestly: the **#1695 device-harness measurement on Mac Studio + iPad-class hardware** cannot run from this sandbox and stays the later hardware gate (same class as #1719); the registration notes say so in the code.
+
+## Field character — the conversions, explicit
+
+Same scripted sessions, both grids (S0 = 120 frames, instances only, 720 vortons — saturates neither cap; S1 = 240 frames + ambient):
+
+- **Total wet mass conserved**: Σwet 103.278 → 108.544 (S0, +5.1%); 144.140 → 148.234 (S1, +2.8%). A stamp deposits the same mass at any grid.
+- **Per-cell mask means and threshold coverage drop ~4× BY RESOLUTION** (wetMean 0.0352 → 0.0090; coverage ≥0.05 0.212 → 0.050 in S1): the same water concentrated in ¼ the area — the 64-grid bilinear smear the issue names as the defect being fixed. Point semantics untouched: stamp amounts, clamp, dry factor, regime thresholds (damp 0.05 / wet 0.35 / soaked 0.8) are point values.
+- **Velocity redistributes, finer**: mean speed −34% (S0) / −35% (S1) — 20 damped-Jacobi iterations transport low-frequency modes less far on a finer grid, the trade the issue's research names; p95 −16/−19%; max speed +36%; area-normalized ∫|ω| +16/+18% (near-vorton gradients now resolve instead of smearing).
+- All of it is pinned as a character case in `vortex.selfcheck` against the recorded 64-grid reference, bands ≈1.5× the measured deviation with reasons in the case.
+
+## Files (staged by name)
+
+- `app/src/gl/vortex.mjs` — constants 128 / 20 / 4096 with the ruling + cap derivation in comments; cost registration re-based on the measurement (timeMs 2.7, memoryBytes at the new constants, provenance in notes); one stale comment ("64×64 field") corrected.
+- `app/src/gl/vortex.selfcheck.mjs` — golden re-pinned (3932816161 → **2493009798**), Jacobi pin 30 → 20, grid/cap pins added; budget case re-based on the measurement (prints the gate, loose fail bound 6 ms); cost case pins the measured registration exactly; mask-advection case de-hardcoded from 64 to `state.n`; **new** field-character case (above).
+- `app/src/gl/wetFrame.selfcheck.mjs` — final-frame golden re-pinned (2550213434 → **3108730517**, the re-pin slice A's report assigns to this issue); two degraded-service cases that hardcoded 64-grid cells now compute the cell from `stampWet`'s own mapping (same intent, any grid).
+- `docs/WET_ENGINE.md` — surgical status note (resolution line in the header; the body still describes the pre-#1810 state, dated as such — slice A's convention).
+- `docs/review/1810/` — README (premise, cost gate, character tables, re-pin ledger) + the probe JSONs + field stills: direct data renders of the same seeded 240-frame session at both grids (grayscale mask, false-colour speed). The live-look A/B is Matt's review-lane item per the issue's acceptance; the stills are the field data underneath it.
 - `STAGING-REPORT.md` — this file.
+
+No manifest change: no new selfcheck suite was added (the character case lives in the existing vortex suite).
 
 ## Verification (final bytes)
 
-- **wetFrame.selfcheck: 11 checks passed** — incl. the Phase A acceptance: 60 scripted frames (30 live → 5 frozen → 5 wetness-0 → 10 resumed → 5 new-seed → 5 new-size) byte-identical to `noteWetFrame` per frame; final-frame golden (fnv(mask) ^ fnv(vel)) = **2550213434**; stats births 3 / full steps 50 / held 5.
-- **Targeted battery: 46 suites, 46 passed, 0 failed** — every selfcheck that references a touched filename (incl. all liveLoop source-pin suites: accum.seam, accumGuard, atlas.skip, audioRoutes ×2, clock.capture/evolve/freeze/inventory, contactShadow, gestureRecord, grainFinish, liveLoopSwell, liveResolve, playback, spectrumMarks/Warp…), all dish suites (kernel/dish, dishLinks, dishMedium, dishGround, dishWeather, dishContacts, dishPins), formation, **replayGate ✔, creatureGate ✔, refreshFixtureCheckpoints ✔**, vortex (19, golden 3932816161 intact), wetFeed (7).
-- **accum.selfcheck: OK (67 cases)** — solo, `NODE_OPTIONS=--max-old-space-size=3072` (this tree's base count; the suite's subject files are untouched).
-- **Full manifest sweep: 529 commands — 525 passed, 4 failed, all four triaged.** swarmWasm (its log names `build-wasm.sh --verify` — needs the Rust toolchain this sandbox lacks; environmental, CI authoritative) · rollSafety (sandbox-environmental; the suite imports only fx/data/state modules — none touched by this slice; CI authoritative) · accum in-sweep (default-heap OOM, "JavaScript heap out of memory" in its own log → solo at 3 GB green, above) · livingMotion in-sweep (wall-clock budget: floor 2.81 ms vs 2 ms budget while two builders' suites shared the machine → **solo re-run: 15 checks passed**, floor 1.48 ms; both results reported per standing rule). The sweep ran in two segments (the first background session was reaped mid-run by the environment; the resume ran only the un-run commands — the union covers all 529 manifest commands exactly, verified by set difference).
-- `npm run build` green (verified twice); full `npm run lint`: 0 errors (11 warnings, none in touched files); the CI format gate (`prettier --check .` in app/) passes on the whole tree including the new files. Repo-root markdown is outside that gate (the pre-existing WET_ENGINE.md is not prettier-formatted either — the docs edits stay surgical rather than reformatting the doc).
-- Measured cost (sandbox VM, shared — indicative, in `docs/review/1809/`): full step via service 1.09/1.37 ms vs direct 1.43/1.98 ms (same call path — no measurable service overhead); degraded step 0.19/0.40 ms; idle frame ~0.01 ms.
+- **vortex.selfcheck: 20 checks passed** (19 + the new character case) — run twice, identical (the issue's byte-determinism acceptance; two runs of every probe session also hash-identical at both grids).
+- **wetFrame.selfcheck: 11 checks passed** (twice); **wetFeed.selfcheck: 7 passed, unmodified**; **costTiers green**.
+- **accum.selfcheck: OK (67 cases)** — solo, `NODE_OPTIONS=--max-old-space-size=3072` (this tree's base count; the suite passes unmodified — no ACCUM golden moved: the finer field changes no ACCUM pin, because the suite's wet cases pin the feed contract, not the field's bytes).
+- **Gates: replayGate ✔ (exit 0), creatureGate ✔ (exit 0), refreshFixtureCheckpoints ✔.**
+- **Full manifest sweep: 530 commands — 525 passed, 5 failed, all five triaged** (tally corrected by the builder post-handoff — segment sums 175 + 180 + 175 executed, 174 + 177 + 174 passed; coordinator-amended 2026-10-28):
+  - `swarmWasm` — needs the Rust toolchain this sandbox lacks; environmental, CI authoritative.
+  - `rollSafety` — sandbox-environmental pair member (imports fx/data/state only; never reaches the sim); CI authoritative.
+  - `accum` in-sweep — default-heap OOM in its own log; solo at 3 GB green (above).
+  - `livingMotion` — wall-clock floor vs its 2 ms budget, straddling the line with machine load on **both** trees (base branch: fail at 2.39 ms, passes on other runs; this branch: fail at 2.08/2.83/3.33 ms, pass at 15 checks on a quieter run). Base-identical load flake; both results reported; CI authoritative.
+  - `grainFinish` in-sweep — headless-browser "framebuffer incomplete" under GPU contention (renderer.mjs untouched by this slice); **solo re-run: 4 checks passed**.
+- `npm run build` green; `prettier --check .` green on the whole tree; `npm run lint`: 0 errors (11 warnings, none in touched files — same count as the base).
 
 ## Decisions worth the coordinator's eye
 
-1. **No new cost-tier registration.** The field's work stays registered once as `gl/vortex` (tier 1); the service is policy over that work, not a second cost centre (a duplicate registration would double-count the same step). The registered `timeMs: 0.5` is the sim's pre-existing selfcheck budget — its header admits it is not a measurement. The real-device measurement + re-registration is #1810's cost gate; my sandbox step numbers (~1.1–2.0 ms at 64² on a loaded VM) are recorded as sandbox numbers only, not a device claim.
-2. **Shed visibility.** The issue's acceptance asks that degradation at perfTier1 be "visible in the show block". In slice A the shed never coincides with a *served* consumer (ACCUM is the shed unit), so what ships is the reporting surface: every service result and every liveLoop frame result carries `wetMode`/`wetShed` — the state is a named field on the show path's data, never a silent gate outcome. The persona show-block line itself belongs with the first degraded consumer (slice B), and plumbing it now would cross PR #1831's in-flight show-block work (#1807). Flagged, not buried.
-3. **Fault path.** `noteAccumFault` no longer destroys the field (the issue's ownership rule). The fault path triggers only on ACCUM exceptions; the vortex is pure CPU and cannot be the fault's source; the retry now resumes against the standing field instead of a dry one. Named here because it is the one deliberate behaviour change beyond the toggle — both are the issue's explicit acceptance bullets.
-4. **Regime thresholds are builder-set contract constants** (provenance documented; ordering pinned). Matt has not ruled values; #1813 consumes them in the review lane, where they can be tuned by eye without renegotiating the contract shape.
-
-## Surprises
-
-- `docs/WET_ENGINE.md` §2's line numbers for the gate were stale (doc says liveLoop:718, actual ~968) — the doc's *description* was exact in every other particular; the extraction it prescribes mapped 1:1 onto the code as found.
-- No selfcheck pinned the loop's wet lines (the queue's usual trap did not fire here): the source-pin suites that read liveLoop.mjs pin other sections, and all pass unmodified.
-- The dispatch note "wetFeed selfcheck exists" understates the pin set: the ACCUM-side wet contract is pinned by wetFeed (shaders + recipe gate + mirror) — untouched, since accum.mjs is untouched.
+1. **Sandbox measurement, device gate deferred — deliberately.** The issue asks for the #1695 device harness on real hardware; that cannot run from this sandbox, and inventing device numbers would be fabrication. Following the slice-A report's own framing (its sandbox numbers "recorded as sandbox numbers only") and the house convention for CPU cost registrations (sandbox medians with provenance in the notes — cf. spectrumWarp, the #1694 creature costs), the registration now carries the honest sandbox measurement and names the device verification as pending in its notes. If the coordinator wants the PR held until a device run exists, the code change stands ready either way — but note the queue's hardware items (#1719) are Matt's-Mac runs.
+2. **No fallback applied.** The trigger is a measurement breaking the envelope the issue budgeted (≈2.7×); the measurement came in under it (2.53–2.64×). Dropping iterations to 16 anyway would have traded field character for cost nobody measured a need for.
+3. **The character bands are judgment, stated.** The selfcheck's equivalence bands (≈1.5× measured deviation) are wide enough to absorb the iteration trade the issue sanctions and narrow enough to catch a future halving/doubling of the field. The numbers and reasons are in the case and the evidence README for review.
 
 ## For the later WET slices (staged remainder)
 
-- **Slice B of #1809** (dish migration) — review lane per the issue; first `degradedOk: true` consumer; dish stamps will need a stamp-in API decision (the service currently stamps only from the frame's instance list — dish contacts are not instances; expect a `stamp` surface or a dish request shape in that slice).
-- #1810 re-pins the wetFrame golden (2550213434) and the vortex goldens with the 128-grid constants — expected and sanctioned by that issue.
-- #1815 removes the `vortex.mjs` live-only header (still accurate today — slice A deliberately leaves it).
+- #1811 (pigment compartments) inherits the 128 grid as-is — "the compartments adopt whatever grid exists when they land."
+- #1813 (wet look) reads the same regime thresholds; point semantics unchanged, so its contract is untouched.
+- #1815 still owns removing the `vortex.mjs` live-only header (slice A left it; this slice leaves it too — exports still don't step the sim).
+- The device-harness cost confirmation (#1695) joins the hardware-gated list alongside #1719.
