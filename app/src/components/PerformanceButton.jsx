@@ -25,6 +25,9 @@ import { createMindRecorder } from '../curator/mindRecord.js';
 import { setMindTap, getMindSystem } from '../curator/mindLive.js';
 import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
 import { createRouteRecorder } from '../gl/routeRecord.mjs';
+import { createGestureRecorder } from '../gl/gestureRecord.mjs';
+import { on, Events } from '../composition/eventBus.js';
+import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 
 // #1354 — the take carries its stress signals and band changes: started from the live tracker's state, fed by every
@@ -122,6 +125,25 @@ const routesSection = (getFrame) => {
   };
 };
 
+// #1802 — the take carries its ACCUM gestures (FREEZE / CLEAR / SWELL off the bus, by frame), stored as
+// `gestures`: they act on the loop beside the resolver, so without a section they left no trace in the take
+// and playback ran with the live loop's state instead. The starting frozen state is read from the loop
+// itself (the one truth — the bus carries changes, not state). Playback re-fires them through the same bus.
+const gesturesSection = (getFrame, glLoopRef) => {
+  const loop = glLoopRef && glLoopRef.current;
+  const rec = createGestureRecorder({
+    initial: !!(loop && typeof loop.getAccumFrozen === 'function' && loop.getAccumFrozen()),
+    getFrame,
+  });
+  const off = on(Events.ACCUM_GESTURE, (p, meta) => rec.push(p, meta));
+  return {
+    stop() {
+      off();
+      return rec.finish();
+    },
+  };
+};
+
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
 // stage), stored as `mind`: playback re-publishes these and never asks a backend.
 const mindSection = (getFrame) => {
@@ -149,6 +171,11 @@ function downloadBytes(bytes, filename) {
 }
 
 export function PerformanceButton() {
+  const { glLoopRef } = useApp();
+  // #1802 — the gestures section factory also needs the loop ref; it is bound here so the
+  // sections registry below registers it by name, like every other section (that registry's
+  // shape is pinned by the take selfchecks — no inline lambdas in it).
+  const gesturesSectionForTake = (getFrame) => gesturesSection(getFrame, glLoopRef);
   const [recording, setRecording] = useState(isRecordingPerformance());
   const [frames, setFrames] = useState(0);
   // #1461 step 2 — playing a take back (the scrub strip is step 3)
@@ -200,6 +227,7 @@ export function PerformanceButton() {
             mind: mindSection,
             spectrum: spectrumSection,
             routes: routesSection,
+            gestures: gesturesSectionForTake,
           },
         })
       ) {

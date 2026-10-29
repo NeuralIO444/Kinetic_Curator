@@ -1610,6 +1610,9 @@ export function createLiveLoop(
     stop,
     dispose,
     getLoopTimeMs: () => loopTimeMs,
+    // #1802: the take recorder reads the frozen state the take begins in from the loop itself (the one truth —
+    // the bus carries changes, not state). Read-only; the setter below is the only way the state moves.
+    getAccumFrozen: () => accumFrozen,
     setBgMode,
     setAccumFrozen: (f) => {
       accumFrozen = !!f;
