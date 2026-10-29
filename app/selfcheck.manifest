@@ -192,6 +192,7 @@ node src/gl/accum.inventory.selfcheck.mjs
 node src/gl/accum.seam.selfcheck.mjs
 node src/gl/accumInput.selfcheck.mjs
 node src/gl/accumFeed.selfcheck.mjs
+node src/state/feedsAccumSurface.selfcheck.mjs
 node src/gl/liveLoopSwell.selfcheck.mjs
 node src/gl/fx.upSlots.selfcheck.mjs
 node src/engine/particles.lorenzReseed.selfcheck.mjs

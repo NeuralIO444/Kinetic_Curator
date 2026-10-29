@@ -275,6 +275,9 @@ export const createLayersSlice = (set) => ({
           visible: src.visible,
           layerBlendMode: src.layerBlendMode,
           layerOpacity: src.layerOpacity,
+          // #1834 — a copy is the same stratum: its FEEDS ACCUM flag rides
+          // (key only while off, like the source).
+          ...(src.feedsAccum === false ? { feedsAccum: false } : {}),
           pattern: sanitizePattern(src.pattern),
         };
         const spliced = [...state.layers];
@@ -305,6 +308,9 @@ export const createLayersSlice = (set) => ({
         visible: src.visible,
         layerBlendMode: src.layerBlendMode,
         layerOpacity: src.layerOpacity,
+        // #1834 — FEEDS ACCUM rides a duplicate like every other stratum
+        // property (content only; FX/MATH never carry the flag).
+        ...(!isAdj && src.feedsAccum === false ? { feedsAccum: false } : {}),
         patch: src.patch ? { ...src.patch } : { mode: 'off', to: null, strength: 0.16 },
       };
       if (isAdj) copy.effects = structuredClone(src.effects || (isMath ? defaultMathEffects() : defaultFxEffects()));
@@ -458,6 +464,31 @@ export const createLayersSlice = (set) => ({
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),
       layers: state.layers.map((l) => (l.id === id ? { ...l, visible: !l.visible } : l)),
     })),
+  // #1834 (#1806 slice 3) — FEEDS ACCUM: the per-stratum flag the recipe
+  // honours (slice 2). The key exists only while OFF — absence is the on
+  // state — so toggling back on deletes the key rather than spelling
+  // `true`: the store, the saved document and the contract all stay in
+  // the one shape slice 2 defined, and an all-on project is byte-for-byte
+  // the project it was before the flag existed. FX/MATH strata never
+  // feed (they are transforms and finishes, not light sources), so the
+  // toggle is a no-op on them — no key, no undo entry.
+  toggleLayerFeedsAccum: (id) =>
+    set((state) => {
+      const target = state.layers.find((l) => l.id === id);
+      if (!target || isAdjustmentLayer(target)) return {};
+      return {
+        ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+        layers: state.layers.map((l) => {
+          if (l.id !== id) return l;
+          if (l.feedsAccum === false) {
+            const next = { ...l };
+            delete next.feedsAccum;
+            return next;
+          }
+          return { ...l, feedsAccum: false };
+        }),
+      };
+    }),
   renameLayer: (id, name) =>
     set((state) => ({
       ...pushToUndo(state, true, UNDO_KIND_LAYERS),

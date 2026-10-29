@@ -704,6 +704,28 @@ export function LayerStack() {
           >
             {soloed || mathSoloed ? 'S·' : 'S'}
           </button>
+          {/* #1834 (#1806 slice 3) — FEEDS ACCUM: the stratum's own toggle,
+              on the stratum row where #1806's design puts it (a property of
+              the stratum, not an ACCUM amount — the ACCUM family stays
+              amounts-only). Content + pattern strata only: FX/MATH never
+              feed. A plain binary signal, so it renders TE like the
+              visibility eye beside it: waves while the stratum's light
+              feeds the trails buffer, struck through while it does not. */}
+          {!adj && (
+            <button
+              className={`micro-btn${layer.feedsAccum === false ? ' feed-off' : ''}`}
+              aria-pressed={layer.feedsAccum !== false}
+              aria-label={`FEEDS ACCUM ${layer.feedsAccum === false ? 'off' : 'on'} for ${label}`}
+              title={
+                layer.feedsAccum === false
+                  ? 'FEEDS ACCUM is OFF — this stratum renders on stage but leaves no trails. Tap to feed the buffer again.'
+                  : 'FEEDS ACCUM — this stratum\u2019s light feeds the trails buffer. Tap to keep it on stage but out of the trails.'
+              }
+              onClick={() => emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: layer.id })}
+            >
+              ≈
+            </button>
+          )}
           <span className="strata-type" style={{ background: color }}>
             {STRATA_LABEL[fine]}
           </span>

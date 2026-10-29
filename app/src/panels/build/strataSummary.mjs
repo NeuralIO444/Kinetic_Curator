@@ -50,7 +50,9 @@ function fxSummary(layer) {
 /** PATTERN: density + mode ("cells 9 · quilt"). */
 function patternSummary(layer) {
   const p = sanitizePattern(layer.pattern);
-  return `cells ${p.density} · ${String(p.mode).toLowerCase()}`;
+  // #1834 — FEEDS ACCUM off confesses (the #1409 rule below): the stratum
+  // still paints the stage but leaves no trails.
+  return `cells ${p.density} · ${String(p.mode).toLowerCase()}${layer.feedsAccum === false ? ' · no feed' : ''}`;
 }
 
 /** CONTENT (KC): patch state, else blend, always wet ("screen · wet 80%"). */
@@ -58,6 +60,10 @@ function contentSummary(layer, wetPct, dishState) {
   const patch = layer.patch;
   const parts = [];
   if (patch && patch.mode && patch.mode !== 'off') parts.push(`patch ${patch.mode}`);
+  // #1834 — FEEDS ACCUM off joins the confessions (#1409's rule: an OFF
+  // choice the collapsed block must state): this stratum renders on stage
+  // but feeds the trails buffer nothing.
+  if (layer.feedsAccum === false) parts.push('no feed');
   // #1409 — the dish state joins the line only when it says something:
   // OFF is an artistic choice the collapsed block must confess (this
   // stratum ghosts through its neighbours), and ON shows only when this

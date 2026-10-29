@@ -257,6 +257,16 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       const to = typeof l.patch?.to === 'string' ? l.patch.to : null;
       layer.patch = { mode, to, strength };
     }
+    // #1834 (#1806 slice 3) — FEEDS ACCUM rides the document layer. Only
+    // the OFF state is a fact worth keeping: exactly `false` on a content
+    // or pattern layer survives the load; absence — and any other
+    // spelling, including `true` — is the on state, so the loaded layer
+    // carries no key. FX/MATH strata never feed, so the key never lands
+    // on them (a hand-edited flag there is dropped, matching the scene
+    // contract's law). Assigned last, after the type branches: the UI
+    // toggle appends the key the same way, so a save → load → save
+    // round trip is byte-stable.
+    if ((type === 'content' || type === 'pattern') && l.feedsAccum === false) layer.feedsAccum = false;
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null };
