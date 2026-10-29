@@ -401,7 +401,29 @@ export async function presentProbeViaGL(contract, opts = {}) {
 
 export async function renderViaGL(contract, opts = {}) {
   const page = await ensurePage();
-  const res = await evaluateChunked(page, '__kcRender', buildRenderPayload(contract, opts));
+  const payload = buildRenderPayload(contract, opts);
+  // #1806: opts.rawResolve renders in data space (raw premultiplied
+  // clamp, no ACES/dither) for pixel-math proofs; see glHarness.html.
+  if (opts.rawResolve) payload.rawResolve = true;
+  const res = await evaluateChunked(page, '__kcRender', payload);
+  return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
+}
+
+/**
+ * Render ONLY the selected strata as an ACCUM input frame (#1806 slice 1):
+ * the selected content/pattern strata's pre-FX light over transparent,
+ * through the renderer's renderAccumInput seam. MATH/FX ids in layerIds
+ * are ignored by the seam (they never feed).
+ * @param {object} contract scene contract v1
+ * @param {Iterable<string>} layerIds the strata that feed the buffer
+ * @param {object} opts { width, height, bg }
+ * @returns {Promise<{pixels: Buffer, width: number, height: number}>} top-first RGBA
+ */
+export async function renderAccumInputViaGL(contract, layerIds, opts = {}) {
+  const page = await ensurePage();
+  const payload = { ...buildRenderPayload(contract, opts), layerIds: [...(layerIds || [])] };
+  if (opts.rawResolve) payload.rawResolve = true; // #1806: data-space proof renders (see renderViaGL)
+  const res = await evaluateChunked(page, '__kcAccumInput', payload);
   return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height };
 }
 

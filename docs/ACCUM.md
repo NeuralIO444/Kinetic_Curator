@@ -314,6 +314,37 @@ ping-pong and scratch — it runs, but it is the heaviest thing the still
 pipeline allocates. If Chromium refuses the allocation the render fails
 loudly rather than rendering a different recipe.
 
+## Selective accumulation (#1806) — slice 1: the renderer seam
+
+Phase C's "print-work killer feature" is sliced by its own spec:
+(1) the renderer seam, (2) recipe wiring, (3) the BUILD flag + project
+field. Slice 1 ships only the seam — no contract field, no flag, and
+nothing in production calls it yet.
+
+- **Who can feed:** only the light-source strata — content tracks and
+  pattern tracks. MATH and FX strata never feed: they are transforms
+  and finishes, and the buffer receives the selected strata's *pre-FX*
+  light (the #520/#820 grain law, generalized). The one definition
+  lives in renderer.mjs (`isAccumFeedLayer` / `accumFeedLayers`);
+  slices 2 and 3 build on it, so the rule cannot drift between the
+  recipe and the panel.
+- **The seam:** `renderFrameInto` gains an `accumInput` mode — given a
+  set of stratum ids it draws only those strata, through the same
+  per-layer composite path (same placements, blends, mattes: the
+  resolver's instances drawn again, never re-resolved), over
+  transparent, with no FX wrap, no fold, and no finish chain.
+  `createRenderer().renderAccumInput(payload, layerIds)` is the
+  one-shot entry; the live renderer shares `renderFrameInto`, so
+  slice 2 surfaces it there with one wrapper. With the mode off —
+  every production caller today — the composite is byte-identical.
+- **Proof** (`accumInput.selfcheck.mjs`): in data space (raw resolve —
+  the buffer consumes the 16F texture, never a tonemapped picture) the
+  subset renders fold, premultiplied source-over, onto the full
+  composite pixel-for-pixel: subset = the full render masked to the
+  selected strata's instances. Naming the FX stratum in the selection
+  changes nothing, byte for byte; an empty selection is transparent.
+  Stills: `docs/review/1806/`.
+
 ## The documented light-feel
 
 The acceptance bar for a trail still:
