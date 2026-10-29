@@ -1817,6 +1817,7 @@ export function createRenderer(canvas) {
       palette = null,
       ageBuffer = false,
       dt = 1 / 60,
+      stats = false,
     } = {},
   ) {
     if (!frames.length) throw new Error('[gl] renderAccumSequence: no frames');
@@ -1843,6 +1844,7 @@ export function createRenderer(canvas) {
         palette,
         ageBuffer,
         dt,
+        stats,
       });
       // #309 velocity smear: per-frame displacement per instance, attached
       // as vx/vy — the stills/export path smears exactly like the live loop.
@@ -1873,9 +1875,13 @@ export function createRenderer(canvas) {
       // back before the accum object is disposed (the still's --age-out
       // consumes it). Unrequested this is null and nothing was allocated.
       const age = ageBuffer ? accum.readAge() : null;
+      // #1807: when the statistics were requested, the sequence's final
+      // stamped reading rides back too (computed on the throttle beat
+      // inside the step; a short sequence may honestly have none yet).
+      const trailStats = stats ? accum.readStats() : null;
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum render: 0x${err.toString(16)}`);
-      return { pixels, width: w, height: h, age };
+      return { pixels, width: w, height: h, age, stats: trailStats };
     } finally {
       accum.dispose();
       freeFrameTargets(T);

@@ -61,6 +61,7 @@ import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { DEBUG_AGE, setAgeReader } from './ageLive.mjs'; // #1805: the ?debug=age readout's wire
 import { DEBUG_TRAILGRID, setTrailGridReader } from './trailGridLive.mjs'; // #1808 slice 1: the ?debug=trailgrid readout's wire
+import { clearStatsSnapshot, publishStatsSnapshot, statsWanted } from './statsLive.mjs'; // #1807: the buffer statistics' wire
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
@@ -1364,6 +1365,11 @@ export function createLiveLoop(
                   // allocation.
                   dt: dtSec,
                   ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID,
+                  // #1807: the buffer statistics ride the same request
+                  // discipline — requested only while a consumer (the
+                  // show block's sampler, the governor, the ?debug=stats
+                  // readout) wants them; unrequested, nothing allocates.
+                  stats: statsWanted(),
                 }),
                 {
                   rms: audioOn ? bands.rms || 0 : 0,
@@ -1390,6 +1396,10 @@ export function createLiveLoop(
               // #1808 slice 1: same wire for the TRAILGRID readout (it
               // derives its grid from this object's readTrail()).
               if (DEBUG_TRAILGRID) setTrailGridReader(accumObj);
+              // #1807: publish the statistics snapshot for its consumers
+              // (cheap closure reads; the reduction itself is throttled
+              // inside the accum object).
+              if (rp.stats) publishStatsSnapshot(accumObj);
               // #520 Phase 2: apply grain-family finish chain post-accum.
               let accumTex = accumObj.texture();
               for (const { layerId, steps } of fxFinishChains) {
@@ -1414,6 +1424,7 @@ export function createLiveLoop(
             accumActive = false;
             if (DEBUG_AGE) setAgeReader(null); // #1805: the readout's wire ends with the session
             if (DEBUG_TRAILGRID) setTrailGridReader(null); // #1808: same, for the grid readout
+            clearStatsSnapshot(); // #1807: the statistics wire ends with the session too
             velPrev.clear(); // #309: the next session starts at zero velocity
             // #1809: the wet field survives the toggle — the wet-frame
             // service owns it for the session; only ACCUM state resets.

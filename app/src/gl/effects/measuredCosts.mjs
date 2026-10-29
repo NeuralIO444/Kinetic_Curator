@@ -30,6 +30,12 @@ export const MEASURED_COSTS = {
   // floor number the relative measurement supports). A reference-rig
   // `npm run measure-costs` re-bless supersedes this row.
   'accum/age': { ms: 0.3, method: 'wall', draws: 90 },
+  // #1807: the stats reduction tap. It runs at most once per 15 steps
+  // over a cascade totalling ~1/64 of the pair's texels, plus a 1-texel
+  // readback — amortized, it is far below any per-frame pass in the
+  // family; committed at the family floor on that basis (the #1805
+  // relative-standing precedent). A reference-rig re-bless supersedes.
+  'accum/stats': { ms: 0.3, method: 'wall', draws: 90 },
   'accum/copy': { ms: 0.3, method: 'wall', draws: 90 },
   // #560 LEAVE hold is the copy pass, not a new shader. Same wall number.
   'accum/leave': { ms: 0.3, method: 'wall', draws: 90 },

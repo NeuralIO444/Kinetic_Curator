@@ -886,6 +886,30 @@ export const SWEEP_EFFECTS = [
     ],
   },
   {
+    ...accumDef(
+      'stats',
+      { u_src: S(0), u_srcSize: { kind: 'vec2' }, u_knee: { kind: 'float' } },
+      (c, lab) => ({
+        u_src: lab.input.tex,
+        u_srcSize: [32, 32], // the lab input's size — one tap reads it in 8x8 boxes
+        u_knee: c.params.knee ?? 1.0, // HIGHLIGHT_KNEE — the #1801 ceiling's working point
+      }),
+      // hdr: the output is a MEAN OF HDR LIGHT (plus a fraction) — means of
+      // a buffer holding more than 1.0 legitimately exceed 1.0, so the
+      // [0,1] range assertion does not apply; finiteness is the contract.
+      { hdr: true },
+    ),
+    // Production shape (#1807): the tap chains pair -> 1 texel. The lab
+    // renders the tap at full lab size: boxes over the 32x32 input are
+    // real means, boxes wholly outside it read as no light (the shader
+    // stays total) — finiteness across the whole target is the check.
+    cases: [
+      C('box mean of the field', {}, { costly: true }),
+      C('saturation fraction at a low knee', { knee: 0.25 }),
+      H('hostile negative knee', { knee: -1 }),
+    ],
+  },
+  {
     ...accumDef('down', { u_src: S(0) }, (c, lab) => ({ u_src: lab.input.tex })),
     // Production shape (#308): the downsample pass box-filters 8x8 source
     // blocks (GLOW_DIV) via texelFetch into the glow target's base level.

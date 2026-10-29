@@ -184,7 +184,8 @@ console.log('[selfcheck] D echo memory gate — declared { minWidth: 2048, maxTa
 // (#308: the blur passes are gone — the tier-1 chain is the ACCUM passes
 // with accum/glow replacing accum/blur + accum/add. #1805 deliberate
 // re-pin: 'accum/age' joins the set — the age twin pass is tier 1, so
-// the shed takes it down with the whole ACCUM family.)
+// the shed takes it down with the whole ACCUM family. #1807 deliberate
+// re-pin: 'accum/stats' joins too — the reduction tap is tier 1.)
 const EXPECTED_TIER1 = [
   'accum/fade',
   'accum/feed',
@@ -192,6 +193,7 @@ const EXPECTED_TIER1 = [
   'accum/copy',
   'accum/over',
   'accum/age',
+  'accum/stats',
   'accum/down',
   'accum/glow',
   'accum/leave',
@@ -202,7 +204,7 @@ assert.deepEqual(
   [...EXPECTED_TIER1].sort(),
   'governor cut-3 coverage reads the registry (was hard-coded "ACCUM")',
 );
-console.log('[selfcheck] E governor cut-3 coverage is registry-driven — 9 ACCUM passes');
+console.log('[selfcheck] E governor cut-3 coverage is registry-driven — 10 ACCUM passes');
 
 // The shed ORDER is unchanged: walk the ladder end to end.
 {

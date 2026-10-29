@@ -178,6 +178,48 @@ in buffer space: every sampled value is a real measured cell.
   motion changes in this slice; replay and creature gates are untouched
   by construction (no resolver input, no creature code).
 
+## Buffer statistics (#1807) — ACCUM as memory, rung 1
+
+The colour buffer, read statistically: three honest numbers about the
+light the stage is holding, computed from the buffer itself — never
+modelled, never faked. **Trail energy** (the buffer's mean luminance),
+the **per-channel means** (under #1800's spectral fade their ratios are
+a coarse average age of the held light), and **saturation pressure**
+(the fraction of pixels at or above the #1801 knee — the pixels the
+soft ceiling is actually shaping).
+
+- **How they are read.** A GPU reduction, never a readback: an 8×8
+  box-mean pass (`stats`) chains the pair down to a single texel —
+  (r, g, b, saturation) — and that one texel is read back. The chain
+  runs at most once per 15 steps (`STATS_EVERY`) and only when a step's
+  params request it (`stats: true`, session-side — no scene-contract
+  key; unrequested, nothing allocates and the recipe is byte-identical).
+  Each reading is stamped with the step it describes; a consumer judges
+  staleness against the loop's own step count, and a reading consumed
+  more than 30 frames stale must be logged by its consumer (the sampler
+  and the governor both keep such a log). ACCUM off — or no reading
+  yet — means the statistics are ABSENT, never zero.
+- **Cost.** Registered tier 1 (`accum/stats`) with the ACCUM family, with
+  a committed measurement row at the family floor (the chain totals
+  ~1/64 of the pair's texels, throttled; see `measuredCosts.mjs`). The
+  JS mirror `accumStats` computes the identical statistics exactly; the
+  selfcheck holds GPU↔mirror parity at the issue's tolerances (energy
+  ±2%, saturation ±0.01) — saturation exact on uniform fields, and on
+  the dynamic scene within a wider bound the case documents (its only
+  saturated pixels sit exactly on the knee, where FP16 chain rounding
+  legitimately flips them).
+- **Consumers (v1).** The personas' `show` block gains the three numbers
+  beside the spectrum summary (`trail` in `mindContext`), so a persona
+  may cite the trail's state in its own words. The **pressure governor**
+  (`statsGovernor.mjs`) observes every stamped reading as a candidate
+  future shed input — it computes the optics scale its law would apply
+  (pull-down begins at pressure 0.30, fully in at 0.50, floor 0.25) but
+  ships **data-only**: its actuation flag is off, its scale is always
+  1, and nothing in the live recipe reads it. Actuation turns on only
+  after a session's worth of real numbers has been seen (the #1635
+  pattern). `?debug=stats` mounts a backstage readout with the numbers,
+  their stamp and age, and the governor's report.
+
 ## Phase A — feedback: TUNNEL + PRISM (light-tunnels + chromatic drift)
 
 Step 1 (fade) samples the buffer through an affine feedback transform

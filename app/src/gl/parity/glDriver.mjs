@@ -296,10 +296,13 @@ export function buildRenderPayload(contract, { width = 400, height = 280, bg = '
  *
  * @param {Array<object>} frameContracts scene contracts v1, one per frame
  * @param {object} opts { width, height, bg, fade, optics, tunnel, prism,
- *   ageBuffer: request the #1805 age buffer, dt: show-time seconds per step }
+ *   ageBuffer: request the #1805 age buffer, dt: show-time seconds per step,
+ *   stats: request the #1807 buffer statistics }
  * @returns {Promise<{pixels: Buffer, width: number, height: number,
- *   age: {data: Float32Array, width: number, height: number} | null}>}
- *   top-first RGBA; age = the final age field when requested, else null.
+ *   age: {data: Float32Array, width: number, height: number} | null,
+ *   stats: {frame: number, energy: number, channels: number[], saturation: number} | null}>}
+ *   top-first RGBA; age = the final age field when requested, else null;
+ *   stats = the final stamped statistics when requested, else null.
  */
 export async function renderAccumViaGL(
   frameContracts,
@@ -318,6 +321,7 @@ export async function renderAccumViaGL(
     palette = null, // #1803: swatch hex list; forwarded to renderAccumSequence
     ageBuffer = false, // #1805: forwarded to renderAccumSequence
     dt = 1 / 60, // #1805: show-time seconds per step
+    stats = false, // #1807: forwarded to renderAccumSequence
   } = {},
 ) {
   if (!frameContracts.length) throw new Error('[gl] renderAccumViaGL: no frame contracts');
@@ -355,6 +359,7 @@ export async function renderAccumViaGL(
     palette, // #1803: forwarded to renderAccumSequence (halation tint)
     ageBuffer, // #1805: forwarded to renderAccumSequence (age buffer)
     dt, // #1805: show-time seconds per step
+    stats, // #1807: forwarded to renderAccumSequence (buffer statistics)
     cells,
     atlasB64: b64Pieces(atlas.pixels),
     atlasW: atlas.width,
@@ -375,7 +380,13 @@ export async function renderAccumViaGL(
     new Uint8Array(data.buffer).set(raw);
     age = { data, width: res.width, height: res.height };
   }
-  return { pixels: Buffer.from(res.pixelsB64, 'base64'), width: res.width, height: res.height, age };
+  return {
+    pixels: Buffer.from(res.pixelsB64, 'base64'),
+    width: res.width,
+    height: res.height,
+    age,
+    stats: res.stats ?? null, // #1807: a plain object — no base64 ferry needed
+  };
 }
 
 /**

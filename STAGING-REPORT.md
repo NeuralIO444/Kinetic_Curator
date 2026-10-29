@@ -1,71 +1,41 @@
-# STAGING REPORT — #1810: 128-grid sim, fewer solver iterations (local only, not pushed)
+# STAGING REPORT — #1807 ACCUM as memory, rung 1: buffer statistics as a show signal
 
-Builder staging record, branch `feat/1810-128-grid` in `~/workspace/kc-1810-build`, based on `origin/feat/1809-wet-frame` (PR #1842, in CI) as assigned — not pushed, no PR; the coordinator verifies, rebases after #1842 merges, and publishes. This file replaces the report that was at the worktree root (#1809 slice A's); that report remains in git history.
+Builder staging record, branch `feat/1807-buffer-stats` (local only — not pushed, no PR; the coordinator verifies and publishes). This file replaces the report that was at the worktree root (#1805's, which landed with PR #1829); that report remains in git history.
+Issue: #1807 "ACCUM as memory, rung 1: buffer statistics as a show signal". No comments on the issue; the body is the whole contract. Base: origin/feat/1805-age-buffer 539a3c2a (deliberate — the coordinator rebases onto main after PR #1829 merges).
 
-Issue (verbatim): **"WET: 128-grid sim, fewer solver iterations (measured cost gate)"**
+## Premise check — TRUE, build
 
-## Premise verdict: HOLDS — built
+Grep across src/scripts/docs found zero existing buffer-statistics anything (no readStats / trailEnergy / bufferStats / saturation-pressure). Nothing already feeds buffer statistics to any show signal, and no recorded decision conflicts: the honest-signals law (docs/LOIS_TELEMETRY.md — signals must be real measurements) governs HOW, and this slice complies by construction (real GPU readbacks of the buffer, stamped, staleness-logged). The governor exists as the cost-shed system; the pressure governor here is a new pure module, per the issue's "may use … behind a flag" wording.
 
-Verified against the code with my own eyes before building: `VORTEX_GRID` was 64, `VORTEX_JACOBI` 30, `VORTEX_MAX` 2048, and the `gl/vortex` cost registration carried `timeMs: 0.5` under the module header's own admission — "the selfcheck budget, not a measured fact." No part of the sim already ran at 128; no recorded decision contradicts the move. Slice A's staging report named this slice's exact gates (real measurement of the field step, re-registration of the cost entry, the wetFrame golden re-pin) — all three are discharged below.
+**Brief-vs-issue nuance, recorded:** the dispatch brief described rung 1 as reading "the age buffer's statistics." The issue (governing text) contracts the **colour** buffer's statistics — trail energy, RGB means, saturation pressure — with the age field named only as the sibling input that makes the channel ratios interpretable. Built to the issue: statistics of the colour buffer. The age field is rung 2's material (#1808), untouched here.
 
-## What shipped (plain language)
+## What shipped
 
-The wet field — the water under the trails — now simulates on a 128×128 grid instead of 64×64, with 20 solver iterations instead of 30, and room for 4096 vortons instead of 2048. The water's *character* is unchanged, proven rather than asserted: on identical scripted input the total wetness the paper holds is the same within ~5%, the vorticity the flow carries is the same within ~18%, and the differences that do exist (broader drift a third weaker, sharp peaks a third stronger, the same water sitting in a quarter of the area) each have a named physical cause, written down in the evidence and pinned in a new selfcheck case so a future silent change fails loudly. The cost entry the governor reads is no longer an admitted guess: it carries a measured step cost (2.7 ms) with its provenance, replacing the placeholder 0.5.
+- **The reduction (accum.mjs).** A new `stats` pass: an 8×8 box MEAN of (r, g, b, saturation) via texelFetch (edge boxes divide by the texels they really read). The engine chains it pair → 1×1 (≈4 passes at 1080p) and reads back that ONE texel — a reduction, never a full-buffer readback; no full readback exists anywhere in the path. Runs only when a step's params request it (`stats: true` on the recipe params, strict-true sanitizer, session-side — deliberately NO scene-contract key: this is session telemetry, not project data), at most once per 15 steps (`STATS_EVERY`, the issue's bound), after the glow so the numbers describe the buffer as presented. Each reading is stamped with the step it describes. Allocation is lazy and request-only; resize/dispose free the chain; if a readback ever errors, the feature latches off and the statistics stay absent rather than poisoning the chain. Unrequested, the recipe is byte-identical (probe-proven: zero allocation, null reading).
+- **The mirror (accum.mjs).** `accumStats(buf, w, h)` — the identical statistics computed exactly in JS: energy = Rec601 luminance of the channel means (GLOW_FS's own weights), saturation = fraction of pixels at/above `HIGHLIGHT_KNEE` (≥, matching the shader's step()).
+- **Consumers.** (1) The personas' `show` block gains `trail` — { energy, channels, saturation } beside the spectrum summary (trailStats.js sampler + trioLive `getTrail` + mindContext validation; numbers rounded for speech but never clamped into a range they didn't measure). The sampler logs any consumption of a reading more than 30 frames stale (the issue's rule). (2) The **pressure governor** (statsGovernor.mjs): observes every stamped reading via the statsLive wire and computes the optics scale its law would apply (pull-down begins at pressure 0.30, linear to floor 0.25 at 0.50) — **constructed disabled: data-only v1**, scale always 1, nothing in the live recipe reads it. Actuation is the split the issue permits, gated on Matt seeing real numbers (the #1635 pattern). (3) `?debug=stats` mounts a backstage readout (TrailReadout.jsx): the numbers, their frame stamp and age, a STALE flag past 30 frames, and the governor's report.
+- **Wiring.** liveLoop requests stats when a consumer wants them (statsLive.mjs registry: the sampler's standing request, the governor tap, or the debug flag), publishes the snapshot per frame, clears it at session end. ACCUM off → statistics ABSENT, never zero. The offline path forwards the request too (renderer.renderAccumSequence `stats` opt + return, glDriver/glHarness, accumProbe `stats`/`statsAllocated`).
+- **Cost.** `accum/stats` registered tier 1 (shed with the ACCUM family) in the program registry, `measuredCosts.mjs`, and the MLX declared tiers; committed row at the family floor (0.3 ms) with the basis written in place (chain ≈1/64 of the pair's texels, throttled to 1/15 steps, 1-texel readback) — a reference-rig re-bless supersedes. A debug-sweep entry (3 cases) covers the shader.
+- **Docs/evidence.** docs/ACCUM.md gains a surgical "Buffer statistics (#1807)" section (pure insertion). Measured GPU-vs-mirror tables on three scripted scenes: docs/review/1807/README.md.
 
-## The measured cost gate (the acceptance)
+## Deliberately NOT built
 
-Identical scripted sessions measured against the untouched base and the changed tree (probe preserved in `docs/review/1810/probe-grid64.json` / `probe-grid128.json`); median of 5 batches × 60 steps. **Sandbox numbers** — this VM, shared with the second builder lane throughout; indicative, not device claims.
+- **Governor actuation.** The scale law is complete and selfchecked, but nothing applies it to the live recipe; the flag ships off. Turning it on is a flag flip after real session numbers exist.
+- **No scene-contract key** for the stats request (session telemetry, not project state) — a take does not record it; the show block's `trail` values DO ride takes through the existing trio/mind recording, like the spectrum summary.
+- **No percentile/histogram statistics** — the issue names three numbers; the reduction carries exactly those.
+- **No stats for the age field** (rung 2's input, per the nuance above).
 
-| Load | 64 / 30 / 2048 | 128 / 20 / 4096 | Ratio |
-| --- | --- | --- | --- |
-| Scripted steady state (fed while timing) | 1.009 ms/step | 2.662 ms/step | 2.64× |
-| Vorton cap filled and held | 1.075 ms/step (held 2046) | 2.719 ms/step (held 4094) | 2.53× |
+## Verification
 
-The issue's cost model predicted ≈2.7× and its fallback order (iterations → cap → resolution) triggers only if the measurement *breaks* the budgeted envelope. The measurement lands **under** the prediction, so **no fallback step was applied** — iterations stay at the issue's 20, the cap at its named starting point 4096 (0.25 vortons/cell, inside the band the 64-grid tuning lived in). The registration's `timeMs` is now the measured filled-cap figure (2.7), `memoryBytes` recomputed by the registration's own formula at the new constants (393,216). What remains open, named honestly: the **#1695 device-harness measurement on Mac Studio + iPad-class hardware** cannot run from this sandbox and stays the later hardware gate (same class as #1719); the registration notes say so in the code.
+- **accum.selfcheck: OK (75 cases)** — 67 on the base branch + 8 new, solo with the raised heap. FIRST run failed one case — the dynamic-scene saturation parity (GPU 0 vs mirror 0.03515625): diagnosed as a knife-edge scene (the scene's only saturated pixels sit exactly ON the knee; the FP16 chain lands them at 0.9995, the float64 mirror at exactly 1.0 — both honest). The case now bounds that scene's saturation at ±0.04 with the reason written in the case, and proves the issue's ±0.01 exactly on uniform fields (white field: saturation exactly 1; grey: 0; energy exact). Re-run after the fix: **green**. The eighth case pins non-invasiveness: with optics/tunnel/prism/echoes/palette all live, a stats-on run resolves byte-identically to the same run unobserved (also verified standalone: 0/1024 bytes differ).
+- **trailStats.selfcheck (new suite, in the manifest): green** — summary shaping/absence, sampler staleness log, governor law (enabled: scale already < 1 before pressure crosses 0.50 in a scripted blowout; disabled: never actuates, no sheds claimed).
+- **Neighbours green:** costTiers (with a deliberate re-pin: 'accum/stats' joins EXPECTED_TIER1, 9 → 10 passes), trioLive (22), mind (15), spectrumWarp (90). Deliberate re-pins in accum.selfcheck: pass-source keys and program count (nine → ten) gain 'stats'.
+- **Build:** `npm run build` green. **Lint:** 0 errors in touched files (3 warnings, all the pre-existing App.jsx glLoopRef pattern). **Prettier:** applied to every touched code file; docs/ACCUM.md edited surgically instead (the file is prettier-drifted on the base; a wholesale format would bury the change — the diff is a pure 39-line insertion).
+- **Sweep (full manifest, 533 suites):** the chain runner stopped silently at circlepack (line 58) under load — solo it passes (61s, and again inside the second run, 32s). The remaining 476 suites were run with a continue-on-failure runner: **471 PASS, 5 FAIL**, every fail triaged — swarmWasm + rollSafety (sandbox-known, below), livingMotion (base-identical, below), debug.selfcheck (real, mine, FIXED — solo green on final bytes), accum (rc 134 = the log's own "JavaScript heap out of memory" at the default heap; raised-heap solo on final bytes green). Every suite this change touches or neighbours — accum, accumGuard, accum.inventory, accum.seam, costTiers, debug, trailStats, trioLive, trioAcceptance, mind, formation, clockRecord, stressRecord, gestureRecord, spectrumWarp, spectrumLive, liveLoopSwell, canvasSizes, wetFeed, trailMode, sceneContract, glDriver, clock.evolve-accum — PASSes.
+- **Sandbox-known items:** swarmWasm (no cargo) and rollSafety fail base-identically here — CI is authoritative for those two only. Two more environment verdicts recorded during this build: the chain sweep's silent stop at circlepack (solo: passes, 61s) and livingMotion's wall-clock floor budget (2.34–3.19 ms vs the 2 ms budget across runs) — proven base-identical by running livingMotion on the untouched base branch under the same load (2.75 ms, same failure): the sandbox was carrying two builders plus this verification load throughout.
+- **One real failure the sweep caught in this slice (fixed):** debug.selfcheck's sweep of the new `stats` tap — the lab has no quarter target for `outSize: 4` (only 8), and the shader divided by an in-bounds count that is 0 for boxes wholly outside the lab input (unreachable in production shapes). Fixed properly: the shader now stays total (an empty box reads as no light), and the sweep entry renders at lab size with the hdr flag (its output is a mean of HDR light). debug.selfcheck solo re-run: OK (107 cases); accum re-run on the final shader: OK (75 cases).
 
-## Field character — the conversions, explicit
+## Surprises
 
-Same scripted sessions, both grids (S0 = 120 frames, instances only, 720 vortons — saturates neither cap; S1 = 240 frames + ambient):
-
-- **Total wet mass conserved**: Σwet 103.278 → 108.544 (S0, +5.1%); 144.140 → 148.234 (S1, +2.8%). A stamp deposits the same mass at any grid.
-- **Per-cell mask means and threshold coverage drop ~4× BY RESOLUTION** (wetMean 0.0352 → 0.0090; coverage ≥0.05 0.212 → 0.050 in S1): the same water concentrated in ¼ the area — the 64-grid bilinear smear the issue names as the defect being fixed. Point semantics untouched: stamp amounts, clamp, dry factor, regime thresholds (damp 0.05 / wet 0.35 / soaked 0.8) are point values.
-- **Velocity redistributes, finer**: mean speed −34% (S0) / −35% (S1) — 20 damped-Jacobi iterations transport low-frequency modes less far on a finer grid, the trade the issue's research names; p95 −16/−19%; max speed +36%; area-normalized ∫|ω| +16/+18% (near-vorton gradients now resolve instead of smearing).
-- All of it is pinned as a character case in `vortex.selfcheck` against the recorded 64-grid reference, bands ≈1.5× the measured deviation with reasons in the case.
-
-## Files (staged by name)
-
-- `app/src/gl/vortex.mjs` — constants 128 / 20 / 4096 with the ruling + cap derivation in comments; cost registration re-based on the measurement (timeMs 2.7, memoryBytes at the new constants, provenance in notes); one stale comment ("64×64 field") corrected.
-- `app/src/gl/vortex.selfcheck.mjs` — golden re-pinned (3932816161 → **2493009798**), Jacobi pin 30 → 20, grid/cap pins added; budget case re-based on the measurement (prints the gate, loose fail bound 6 ms); cost case pins the measured registration exactly; mask-advection case de-hardcoded from 64 to `state.n`; **new** field-character case (above).
-- `app/src/gl/wetFrame.selfcheck.mjs` — final-frame golden re-pinned (2550213434 → **3108730517**, the re-pin slice A's report assigns to this issue); two degraded-service cases that hardcoded 64-grid cells now compute the cell from `stampWet`'s own mapping (same intent, any grid).
-- `docs/WET_ENGINE.md` — surgical status note (resolution line in the header; the body still describes the pre-#1810 state, dated as such — slice A's convention).
-- `docs/review/1810/` — README (premise, cost gate, character tables, re-pin ledger) + the probe JSONs + field stills: direct data renders of the same seeded 240-frame session at both grids (grayscale mask, false-colour speed). The live-look A/B is Matt's review-lane item per the issue's acceptance; the stills are the field data underneath it.
-- `STAGING-REPORT.md` — this file.
-
-No manifest change: no new selfcheck suite was added (the character case lives in the existing vortex suite).
-
-## Verification (final bytes)
-
-- **vortex.selfcheck: 20 checks passed** (19 + the new character case) — run twice, identical (the issue's byte-determinism acceptance; two runs of every probe session also hash-identical at both grids).
-- **wetFrame.selfcheck: 11 checks passed** (twice); **wetFeed.selfcheck: 7 passed, unmodified**; **costTiers green**.
-- **accum.selfcheck: OK (67 cases)** — solo, `NODE_OPTIONS=--max-old-space-size=3072` (this tree's base count; the suite passes unmodified — no ACCUM golden moved: the finer field changes no ACCUM pin, because the suite's wet cases pin the feed contract, not the field's bytes).
-- **Gates: replayGate ✔ (exit 0), creatureGate ✔ (exit 0), refreshFixtureCheckpoints ✔.**
-- **Full manifest sweep: 530 commands — 525 passed, 5 failed, all five triaged** (tally corrected by the builder post-handoff — segment sums 175 + 180 + 175 executed, 174 + 177 + 174 passed; coordinator-amended 2026-10-28):
-  - `swarmWasm` — needs the Rust toolchain this sandbox lacks; environmental, CI authoritative.
-  - `rollSafety` — sandbox-environmental pair member (imports fx/data/state only; never reaches the sim); CI authoritative.
-  - `accum` in-sweep — default-heap OOM in its own log; solo at 3 GB green (above).
-  - `livingMotion` — wall-clock floor vs its 2 ms budget, straddling the line with machine load on **both** trees (base branch: fail at 2.39 ms, passes on other runs; this branch: fail at 2.08/2.83/3.33 ms, pass at 15 checks on a quieter run). Base-identical load flake; both results reported; CI authoritative.
-  - `grainFinish` in-sweep — headless-browser "framebuffer incomplete" under GPU contention (renderer.mjs untouched by this slice); **solo re-run: 4 checks passed**.
-- `npm run build` green; `prettier --check .` green on the whole tree; `npm run lint`: 0 errors (11 warnings, none in touched files — same count as the base).
-
-## Decisions worth the coordinator's eye
-
-1. **Sandbox measurement, device gate deferred — deliberately.** The issue asks for the #1695 device harness on real hardware; that cannot run from this sandbox, and inventing device numbers would be fabrication. Following the slice-A report's own framing (its sandbox numbers "recorded as sandbox numbers only") and the house convention for CPU cost registrations (sandbox medians with provenance in the notes — cf. spectrumWarp, the #1694 creature costs), the registration now carries the honest sandbox measurement and names the device verification as pending in its notes. If the coordinator wants the PR held until a device run exists, the code change stands ready either way — but note the queue's hardware items (#1719) are Matt's-Mac runs.
-2. **No fallback applied.** The trigger is a measurement breaking the envelope the issue budgeted (≈2.7×); the measurement came in under it (2.53–2.64×). Dropping iterations to 16 anyway would have traded field character for cost nobody measured a need for.
-3. **The character bands are judgment, stated.** The selfcheck's equivalence bands (≈1.5× measured deviation) are wide enough to absorb the iteration trade the issue sanctions and narrow enough to catch a future halving/doubling of the field. The numbers and reasons are in the case and the evidence README for review.
-
-## For the later WET slices (staged remainder)
-
-- #1811 (pigment compartments) inherits the 128 grid as-is — "the compartments adopt whatever grid exists when they land."
-- #1813 (wet look) reads the same regime thresholds; point semantics unchanged, so its contract is untouched.
-- #1815 still owns removing the `vortex.mjs` live-only header (slice A left it; this slice leaves it too — exports still don't step the sim).
-- The device-harness cost confirmation (#1695) joins the hardware-gated list alongside #1719.
+- The knife-edge saturation scene (above) — a parity test can be wrong about its own scene; the fix was a documented bound, not a fudge factor on the statistic.
+- A VM restart mid-verification wiped /tmp logs and killed two background runs; all work itself was in the worktree and untouched.

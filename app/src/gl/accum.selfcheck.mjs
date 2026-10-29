@@ -24,6 +24,10 @@ import {
   sanitizeAccumFlow,
   sanitizeAccumEchoes,
   sanitizeAccumAgeBuffer,
+  sanitizeAccumStats,
+  accumStats,
+  STATS_FS,
+  STATS_EVERY,
   AGE_VOID,
   AGE_LIGHT_FLOOR,
   AGE_BYTES_PER_PIXEL,
@@ -260,6 +264,21 @@ ok('age buffer: params request + dt sanitization (#1805)', () => {
   assert.equal(silent.dt, 0.04, 'the audio envelope carries dt');
   assert.equal(sanitizeAccumAgeBuffer(true), true);
   assert.equal(sanitizeAccumAgeBuffer('yes'), false);
+});
+
+ok('stats: params request sanitization (#1807)', () => {
+  const d = accumRecipeParams({});
+  assert.equal(d.stats, false, 'unrequested by default — the statistics are consumer-requested, never default-on');
+  const r = accumRecipeParams({ stats: true });
+  assert.equal(r.stats, true, 'a true request rides the params');
+  assert.equal(accumRecipeParams({ stats: 1 }).stats, false, 'only true requests (sanitizeAccumStats)');
+  // The envelope spreads the params, so a request survives it — the live
+  // loop's request reaches the buffer even in silence.
+  const silent = applyAudioEnvelope(r, { rms: 0, flux: 0, beatPulse: 0 });
+  assert.equal(silent.stats, true, 'the audio envelope carries the request');
+  assert.equal(sanitizeAccumStats(true), true);
+  assert.equal(sanitizeAccumStats('yes'), false);
+  assert.equal(STATS_EVERY, 15, "the throttle is the issue's bound: at most one reduction per 15 steps");
 });
 
 ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () => {
@@ -598,8 +617,9 @@ ok('glow system: no gaussian survives anywhere in the ACCUM path (#308)', () => 
   // resample is #309's structural half-res plumbing, not a blur.
   // #1805 deliberate re-pin: 'age' joins the pass sources (a data pass,
   // not a blur — the no-sigma/no-gauss scan below covers it too).
+  // #1807 deliberate re-pin: 'stats' joins too (a reduction, not a blur).
   const keys = Object.keys(ACCUM_PASS_SOURCES).sort();
-  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
+  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample', 'stats']);
   for (const [name, src] of Object.entries(ACCUM_PASS_SOURCES)) {
     assert.ok(!/sigma/i.test(src), `accum-${name}: no sigma in the shader source`);
     assert.ok(!/gauss/i.test(src), `accum-${name}: no gaussian in the shader source`);
@@ -1215,10 +1235,54 @@ ok('age buffer: the twin pass is registered with its cost tier (#1805)', () => {
   assert.ok(AGE_LIGHT_FLOOR > 0 && AGE_LIGHT_FLOOR < 0.01, 'the aliveness floor is one faint step of light');
 });
 
+ok('mirror: buffer statistics are hand-exact (#1807)', () => {
+  const w = 4,
+    h = 2,
+    n = w * h;
+  const uni = new Float64Array(n * 4);
+  for (let i = 0; i < n; i++) {
+    uni[i * 4] = 0.5;
+    uni[i * 4 + 1] = 0.25;
+    uni[i * 4 + 2] = 0.125;
+    uni[i * 4 + 3] = 1;
+  }
+  const s = accumStats(uni, w, h);
+  assert.deepEqual(s.channels, [0.5, 0.25, 0.125], 'a uniform field reads its own colour');
+  assert.ok(Math.abs(s.energy - (0.299 * 0.5 + 0.587 * 0.25 + 0.114 * 0.125)) < 1e-12, 'energy is Rec601 of the means');
+  assert.equal(s.saturation, 0, 'nothing at the knee: no pressure');
+  // Half the field blown to 2.0 red, half dark: pressure is a fraction of PIXELS.
+  const half = new Float64Array(n * 4);
+  for (let i = 0; i < n / 2; i++) half[i * 4] = 2;
+  const s2 = accumStats(half, w, h);
+  assert.deepEqual(s2.channels, [1, 0, 0], 'the means average the field, alpha never counts');
+  assert.equal(s2.saturation, 0.5, 'half the pixels above the knee');
+  assert.ok(Math.abs(s2.energy - 0.299) < 1e-12, 'energy follows the red mean');
+  // A pixel AT the knee counts (the shader's step agrees): the ceiling is already shaping it.
+  const knee = new Float64Array(4);
+  knee[0] = HIGHLIGHT_KNEE;
+  assert.equal(accumStats(knee, 1, 1).saturation, 1, 'at the knee = under pressure');
+  // Absence is not zeros: an empty or truncated buffer is no reading.
+  assert.equal(accumStats(new Float64Array(0), 0, 0), null);
+  assert.equal(accumStats(new Float64Array(8), 4, 4), null);
+  assert.equal(accumStats(null, 4, 4), null);
+});
+
+ok('stats: the reduction pass is registered with its cost tier (#1807)', () => {
+  assert.equal(ACCUM_PROGRAMS.stats.fs, STATS_FS, 'the registry carries the stats shader');
+  assert.equal(ACCUM_PROGRAMS.stats.cost.tier, 1, 'tier 1: shed with the ACCUM family');
+  assert.equal(ACCUM_PASS_SOURCES.stats, STATS_FS, 'the pass-source map agrees');
+  assert.deepEqual(
+    ACCUM_PROGRAMS.stats.uniforms,
+    ['u_src', 'u_srcSize', 'u_knee'],
+    'the upload list names the knee — an unlisted uniform uploads nowhere (the #1804 lesson)',
+  );
+});
+
 // #1805 deliberate re-pin: eight programs -> nine (the age twin pass).
-ok('harness: ACCUM_PROGRAMS covers all nine GPU programs', () => {
+// #1807 deliberate re-pin: nine -> ten (the stats reduction tap).
+ok('harness: ACCUM_PROGRAMS covers all ten GPU programs', () => {
   const keys = Object.keys(ACCUM_PROGRAMS).sort();
-  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample']);
+  assert.deepEqual(keys, ['age', 'copy', 'down', 'echo', 'fade', 'feed', 'glow', 'over', 'resample', 'stats']);
   for (const [name, def] of Object.entries(ACCUM_PROGRAMS)) {
     assert.equal(typeof def.fs, 'string', `${name}: has shader source`);
     assert.ok(def.fs.includes('void main'), `${name}: source is a shader`);
@@ -1489,6 +1553,7 @@ async function runBrowserTests() {
       palette = null,
       ageBuffer = false, // #1805
       dt = 1 / 60, // #1805
+      stats = false, // #1807
       frames,
     }) => {
       const res = await page.evaluate((p) => window.__kcAccumProbe(p), {
@@ -1507,9 +1572,18 @@ async function runBrowserTests() {
         palette,
         ageBuffer,
         dt,
+        stats,
         frames: frames.map(bytesOf),
       });
-      return { gpu: f64Of(res.pixels), w: res.width, h: res.height, age: res.age, ageAllocated: res.ageAllocated };
+      return {
+        gpu: f64Of(res.pixels),
+        w: res.width,
+        h: res.height,
+        age: res.age,
+        ageAllocated: res.ageAllocated,
+        stats: res.stats,
+        statsAllocated: res.statsAllocated,
+      };
     };
     const mirrorSeq = ({
       w,
@@ -2100,6 +2174,149 @@ async function runBrowserTests() {
       const { ageAllocated, age } = await runProbe({ w, h, fade: 0.9, frames: [whiteDot(w, h, 3, 3)] });
       assert.equal(ageAllocated, false, 'unrequested: zero allocation');
       assert.equal(age, null, 'unrequested: no age field');
+    });
+
+    await okAsync('probe: buffer statistics — GPU reduction matches the mirror over 60 steps (#1807)', async () => {
+      const w = 16,
+        h = 16;
+      const frames = [];
+      for (let i = 0; i < 60; i++) {
+        const f = new Float64Array(w * h * 4);
+        if (i % 3 === 0) {
+          const o = (5 * w + 4) * 4;
+          f[o] = f[o + 1] = f[o + 2] = 1;
+          f[o + 3] = 1;
+        }
+        if (i >= 30) {
+          for (let y = 10; y < 13; y++) {
+            for (let x = 9; x < 12; x++) {
+              const o = (y * w + x) * 4;
+              f[o] = 1;
+              f[o + 1] = 0.5;
+              f[o + 2] = 0.25;
+              f[o + 3] = 1;
+            }
+          }
+        }
+        frames.push(f);
+      }
+      const { stats: gpuStats, statsAllocated } = await runProbe({ w, h, fade: 0.94, optics: 0, frames, stats: true });
+      assert.equal(statsAllocated, true, 'requested: the reduction chain allocated');
+      assert.ok(gpuStats, 'requested: a stamped reading came back');
+      assert.equal(gpuStats.frame, 60, 'the stamp is the step the reading describes (60 % 15 == 0)');
+      // The mirror in lockstep; its final buffer's exact statistics are the expectation.
+      const params = accumRecipeParams({ fade: 0.94, stats: true, background: '#000000' });
+      let acc = new Float64Array(w * h * 4);
+      for (let i = 0; i < w * h; i++) acc[i * 4 + 3] = 1;
+      for (const f of frames) acc = mirrorAccumStep({ accum: acc, frame: f, w, h, params });
+      const want = accumStats(acc, w, h);
+      assert.ok(want && want.energy > 0, 'the scene holds light to measure');
+      // The issue's acceptance tolerances: energy ±2%, saturation ±0.01.
+      assert.ok(
+        Math.abs(gpuStats.energy - want.energy) <= 0.02 * Math.max(want.energy, 1e-9),
+        `energy parity: gpu ${gpuStats.energy} vs mirror ${want.energy}`,
+      );
+      for (let c = 0; c < 3; c++) {
+        assert.ok(
+          Math.abs(gpuStats.channels[c] - want.channels[c]) <= 0.02 * Math.max(want.channels[c], 0.01),
+          `channel ${c} parity: gpu ${gpuStats.channels[c]} vs mirror ${want.channels[c]}`,
+        );
+      }
+      // Saturation on THIS scene gets a wider bound, deliberately: its only
+      // saturated pixels are the held block's red channel at exactly 1.0 —
+      // a plateau sitting ON the knee, where the GPU's multi-pass FP16
+      // chain legitimately lands a hair under (0.9995) while the float64
+      // mirror holds exactly 1.0. Up to ~10 such pixels can flip, so the
+      // fraction can swing ~0.04 either way; both readings are honest.
+      // The ±0.01 acceptance is proven where the input is not degenerate:
+      // the uniform-field case below reads saturation EXACTLY (0 and 1).
+      assert.ok(
+        Math.abs(gpuStats.saturation - want.saturation) <= 0.04,
+        `saturation parity (knife-edge bound): gpu ${gpuStats.saturation} vs mirror ${want.saturation}`,
+      );
+    });
+
+    await okAsync('probe: buffer statistics — uniform fields read exactly (#1807)', async () => {
+      const w = 16,
+        h = 16;
+      const blank = () => new Float64Array(w * h * 4);
+      const frames = Array.from({ length: 15 }, blank);
+      // fade 1.0 holds the begun background exactly: the buffer IS the bg colour.
+      const white = await runProbe({ w, h, bg: '#ffffff', fade: 1, frames, stats: true });
+      assert.ok(white.stats, 'a reading landed on the throttle beat');
+      assert.equal(white.stats.frame, 15, 'first reading at step 15 — never before the beat');
+      assert.ok(Math.abs(white.stats.saturation - 1) <= 0.01, 'a field AT the knee is fully under pressure');
+      assert.ok(Math.abs(white.stats.energy - 1) <= 0.02, 'a white field reads energy 1');
+      const grey = await runProbe({ w, h, bg: '#808080', fade: 1, frames, stats: true });
+      assert.ok(Math.abs(grey.stats.energy - 128 / 255) <= 0.02 * (128 / 255), 'a grey field reads its own luminance');
+      assert.ok(Math.abs(grey.stats.saturation) <= 0.01, 'a grey field has no pressure');
+      const black = await runProbe({ w, h, bg: '#000000', fade: 1, frames, stats: true });
+      assert.ok(
+        black.stats && black.stats.energy === 0 && black.stats.saturation === 0,
+        'a dark field reads exact zeros',
+      );
+    });
+
+    await okAsync('probe: buffer statistics — the throttle withholds early readings (#1807)', async () => {
+      const w = 12,
+        h = 12;
+      const frames = Array.from({ length: 14 }, () => whiteDot(w, h, 3, 3));
+      const { stats: early, statsAllocated } = await runProbe({ w, h, fade: 0.9, frames, stats: true });
+      assert.equal(early, null, 'no reading before step 15 — absence, never a rushed sample');
+      assert.equal(statsAllocated, false, 'nothing allocates before the first beat either');
+    });
+
+    await okAsync('probe: buffer statistics unrequested allocates nothing (#1807)', async () => {
+      const w = 12,
+        h = 12;
+      const frames = Array.from({ length: 30 }, () => whiteDot(w, h, 3, 3));
+      const { stats: none, statsAllocated } = await runProbe({ w, h, fade: 0.9, frames });
+      assert.equal(statsAllocated, false, 'unrequested: zero allocation');
+      assert.equal(none, null, 'unrequested: no reading');
+    });
+
+    await okAsync('probe: buffer statistics observing changes no pixel (#1807)', async () => {
+      // The reduction only ever SAMPLES the finished buffer — with optics,
+      // tunnel, prism, echoes and a palette all live, a stats-on run must
+      // resolve byte-identically to the same run unobserved.
+      const w = 16,
+        h = 16;
+      const frames = [];
+      for (let i = 0; i < 60; i++) {
+        const f = new Float64Array(w * h * 4);
+        if (i % 3 === 0) {
+          const o = (5 * w + 4) * 4;
+          f[o] = f[o + 1] = f[o + 2] = 1;
+          f[o + 3] = 1;
+        }
+        if (i >= 30) {
+          for (let y = 10; y < 13; y++) {
+            for (let x = 9; x < 12; x++) {
+              const o2 = (y * w + x) * 4;
+              f[o2] = 1;
+              f[o2 + 1] = 0.5;
+              f[o2 + 2] = 0.25;
+              f[o2 + 3] = 1;
+            }
+          }
+        }
+        frames.push(f);
+      }
+      const scene = {
+        w,
+        h,
+        fade: 0.94,
+        optics: 0.3,
+        tunnel: 0.2,
+        prism: 0.1,
+        echoes: 1,
+        palette: ['#ff8040', '#2040ff'],
+        frames,
+      };
+      const off = await runProbe(scene);
+      const on = await runProbe({ ...scene, stats: true });
+      assert.ok(on.stats, 'observed: a reading came back');
+      assert.deepEqual(on.gpu, off.gpu, 'observed and unobserved resolve to the same bytes');
     });
   } finally {
     await close();

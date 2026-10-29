@@ -63,6 +63,21 @@ function spectrumOf(sp) {
   return { centroid: unit(centroid), flux: unit(flux), flatness: unit(flatness) };
 }
 
+/**
+ * The ACCUM buffer statistics { energy, channels: [r, g, b], saturation } (#1807), or null unless
+ * every number is finite — the trail summary beside the spectrum summary, re-validated here like
+ * every show fact. NOT clamped into [0,1]: energy and the channel means are means of HDR light,
+ * and a buffer holding more than 1.0 says so (honest signals); saturation is a fraction.
+ */
+function trailOf(t) {
+  if (!t || typeof t !== 'object') return null;
+  const ch = t.channels;
+  const fin = (v) => typeof v === 'number' && Number.isFinite(v);
+  if (!Array.isArray(ch) || ch.length !== 3 || !ch.every(fin)) return null;
+  if (!fin(t.energy) || !fin(t.saturation)) return null;
+  return { energy: r3(t.energy), channels: [r3(ch[0]), r3(ch[1]), r3(ch[2])], saturation: unit(t.saturation) };
+}
+
 export function showOf(s) {
   if (!s || typeof s !== 'object') return null;
   const routes = (Array.isArray(s.routes) ? s.routes : [])
@@ -86,6 +101,7 @@ export function showOf(s) {
     routes,
     owned: (Array.isArray(s.owned) ? s.owned : []).filter((t) => typeof t === 'string' && t.length <= 40).slice(0, 32),
     ...(spectrumOf(s.spectrum) ? { spectrum: spectrumOf(s.spectrum) } : {}),
+    ...(trailOf(s.trail) ? { trail: trailOf(s.trail) } : {}), // #1807: the buffer statistics, when the trail holds a reading
     ...((m) => (m ? { marks: m } : {}))(marksOf(s.marks)),
   };
 }
