@@ -49,7 +49,7 @@ No manifest change: no new selfcheck suite was added (the character case lives i
 - **wetFrame.selfcheck: 11 checks passed** (twice); **wetFeed.selfcheck: 7 passed, unmodified**; **costTiers green**.
 - **accum.selfcheck: OK (67 cases)** — solo, `NODE_OPTIONS=--max-old-space-size=3072` (this tree's base count; the suite passes unmodified — no ACCUM golden moved: the finer field changes no ACCUM pin, because the suite's wet cases pin the feed contract, not the field's bytes).
 - **Gates: replayGate ✔ (exit 0), creatureGate ✔ (exit 0), refreshFixtureCheckpoints ✔.**
-- **Full manifest sweep: 528 commands — 523 passed, 5 failed, all five triaged:**
+- **Full manifest sweep: 530 commands — 525 passed, 5 failed, all five triaged** (tally corrected by the builder post-handoff — segment sums 175 + 180 + 175 executed, 174 + 177 + 174 passed; coordinator-amended 2026-10-28):
   - `swarmWasm` — needs the Rust toolchain this sandbox lacks; environmental, CI authoritative.
   - `rollSafety` — sandbox-environmental pair member (imports fx/data/state only; never reaches the sim); CI authoritative.
   - `accum` in-sweep — default-heap OOM in its own log; solo at 3 GB green (above).
