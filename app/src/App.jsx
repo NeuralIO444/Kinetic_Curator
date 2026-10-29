@@ -39,6 +39,10 @@ import { AgeReadout } from './curator/AgeReadout.jsx'; // #1805: ?debug=age only
 import { DEBUG_AGE } from './gl/ageLive.mjs';
 import { TrailGridReadout } from './curator/TrailGridReadout.jsx'; // #1808 slice 1: ?debug=trailgrid only
 import { DEBUG_TRAILGRID } from './gl/trailGridLive.mjs';
+import { TrailReadout } from './curator/TrailReadout.jsx'; // #1807: ?debug=stats only
+import { DEBUG_STATS, requestStats, setStatsGovernor } from './gl/statsLive.mjs'; // #1807: the buffer statistics' wire
+import { createTrailSampler } from './curator/trailStats.js'; // #1807: the show block's trail reader
+import { createPressureGovernor } from './curator/statsGovernor.mjs'; // #1807: saturation pressure, data-only in v1
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
 import { setRoomProvider, noteKeep } from './curator/formationLive.js'; // #1694 slice 1: the facade over the resolver-owned spawn state (the room a birth reads; the keeps a birth leans toward)
 import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the contact-density field, onto the bus
@@ -213,6 +217,19 @@ function AppInner() {
         (bar) => () =>
           bar.sample(readSpectrum())
       )(createShowSpectrum()), // once a bar: flux is the bar's movement
+      // #1807 — the ACCUM buffer statistics for the show block: the sampler is a standing
+      // consumer (its existence requests the stats), the pressure governor observes every
+      // stamped reading data-only (its actuation flag ships off — observe first).
+      getTrail: (
+        (sampler) => () =>
+          sampler.sample()
+      )(
+        (() => {
+          requestStats();
+          setStatsGovernor(createPressureGovernor());
+          return createTrailSampler();
+        })(),
+      ),
       // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
       getActivity: () => {
         const f = loisActivity.snapshot();
@@ -595,6 +612,7 @@ function AppInner() {
       {DEBUG_STRESS && <StressReadout />}
       {DEBUG_AGE && <AgeReadout />}
       {DEBUG_TRAILGRID && <TrailGridReadout />}
+      {DEBUG_STATS && <TrailReadout />}
       <footer className="footer-bar">
         <span>
           KINETIC_CURATOR v{APP_VERSION} · {KERNEL_VERSION} · build {import.meta.env.VITE_BUILD_ID || 'dev'}

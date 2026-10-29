@@ -79,6 +79,7 @@ const notify = () => {
  * @param getBands    () => number[7] | null    the band levels now (null: audio off)
  * @param getActivity () => { keeps, rolls } in the recent window (LOIS's keep-rate read); absent = no bias
  * @param getSpectrum () => {centroid, flux, flatness} | null   the spectrum summary now (absent / null: none)
+ * @param getTrail    () => {energy, channels, saturation} | null   the ACCUM buffer statistics now (#1807; absent / null: none)
  * @param isReplaying () => boolean
  * @param subscribe   (fn(state, prev)) => unsubscribe   the store's subscribe: the artist's route and dial edits
  * @param getMarks    () => { map, scale, displace, colour, locked: string[] } | null   stage 2: the spectrum marks now
@@ -93,6 +94,7 @@ export function startTrio({
   getBands,
   getActivity = null,
   getSpectrum = null,
+  getTrail = null,
   isReplaying = () => false,
   subscribe = null,
   getMarks = null,
@@ -127,6 +129,7 @@ export function startTrio({
   let applying = false; // our own table write: not the artist
   let bar = 0;
   let spectrum = null; // the latest spectrum summary, or null
+  let trail = null; // #1807: the latest buffer statistics, or null (ACCUM off / no reading yet)
   let bias = 0; // LOIS's keep-rate read, -1..+1
   const stops = [];
 
@@ -190,6 +193,7 @@ export function startTrio({
     audio.onsetsThisBar = 0;
     audio.sinceBars = 0;
     spectrum = null;
+    trail = null; // #1807
     flatness.reset();
     pending = null;
   };
@@ -306,6 +310,17 @@ export function startTrio({
           spectrum = getSpectrum() || null;
         } catch {
           spectrum = null;
+        }
+      }
+      // #1807: the buffer statistics ride the same bar cadence — the trail
+      // is a visual signal, not an audio one, so silence does not void it;
+      // ACCUM off voids it (the sampler returns null, and stays honest).
+      if (!getTrail) trail = null;
+      else {
+        try {
+          trail = getTrail() || null;
+        } catch {
+          trail = null;
         }
       }
       let act;
@@ -452,6 +467,7 @@ export function startTrio({
           ]),
         ],
         ...(spectrum ? { spectrum } : {}),
+        ...(trail ? { trail } : {}), // #1807: beside the spectrum summary, per the issue
         ...((m) => (m ? { marks: { map: m.map, scale: m.scale, displace: m.displace, colour: m.colour } } : {}))(
           readMarks(),
         ),

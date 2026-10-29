@@ -14,15 +14,19 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from '../accum.mjs
 // buffer back. Lets the selfcheck verify the GPU recipe against the JS
 // mirror (mirrorAccumStep) exactly, without a scene.
 //
-// window.__kcAccumProbe(p) -> { pixels, width, height, age, ageAllocated }
+// window.__kcAccumProbe(p) -> { pixels, width, height, age, ageAllocated, stats, statsAllocated }
 //   p = { w, h, bg: '#rrggbb', fade, optics, tunnel, prism,
-//         flow, echoes, echoWidth, resDiv, ageBuffer, dt,
+//         flow, echoes, echoWidth, resDiv, ageBuffer, dt, stats,
 //         audio: [{ rms, flux, beat_phase, beatPulse } …] (per frame, optional),
 //         frames: [ [r,g,b,a …] … ] }   // premultiplied bytes, bottom-first
 // ageBuffer + dt (#1805): when requested, the return also carries the
 // final age field (plain array of seconds, bottom-first) and whether the
 // age buffer was allocated at all (an unrequested run must allocate
 // nothing — ageAllocated false, age null).
+// stats (#1807): when requested, the return also carries the final
+// stamped buffer statistics { frame, energy, channels, saturation } (or
+// null when no throttle beat landed inside the run) and whether the
+// reduction chain was allocated at all.
 // resDiv (default 1): the feedback pair runs at w×h while the incoming
 // frames are w*resDiv × h*resDiv (#309 half-res feedback) — the resample
 // pass brings them down to the pair size first.
@@ -87,6 +91,8 @@ window.__kcAccumProbe = (p) => {
       // #1805: the age buffer, when the probe requests it.
       ageBuffer: p.ageBuffer ?? false,
       dt: p.dt ?? 1 / 60,
+      // #1807: the buffer statistics, when the probe requests them.
+      stats: p.stats ?? false,
     });
     const audio = p.audio || null;
     let i = 0;
@@ -136,6 +142,9 @@ window.__kcAccumProbe = (p) => {
       height: h,
       age: ageRead ? Array.from(ageRead.data) : null,
       ageAllocated: accum.ageTexture() !== null,
+      // #1807: the final stamped statistics, when requested.
+      stats: p.stats ? accum.readStats() : null,
+      statsAllocated: accum.statsAllocated(),
     };
   } finally {
     for (const t of frameTexs) gl.deleteTexture(t);

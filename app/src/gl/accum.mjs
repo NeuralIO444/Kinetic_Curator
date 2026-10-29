@@ -354,7 +354,10 @@ export function ageFalseColour(data, w, h, { maxAge = 4, flip = false } = {}) {
  *   the halation tint from it; absent, the tint is the #169 constant,
  *   ageBuffer: true when a consumer requests the #1805 age buffer (allocated
  *   only then; unrequested the recipe is byte-identical), dt: this step's
- *   show-time seconds (the age field's clock; garbage -> the 1/60 frame) }
+ *   show-time seconds (the age field's clock; garbage -> the 1/60 frame),
+ *   stats: true when a consumer requests the #1807 buffer statistics
+ *   (reduction chain allocated only then; unrequested the recipe is
+ *   byte-identical) }
  */
 export function accumRecipeParams({
   fade = 0.88,
@@ -380,6 +383,7 @@ export function accumRecipeParams({
   wetMask = null,
   ageBuffer = false,
   dt = 1 / 60,
+  stats = false,
 } = {}) {
   // NaN slips through Math.max/min (they return NaN), which would poison the
   // feedback buffer — non-finite fade collapses to 0 (#763).
@@ -456,6 +460,11 @@ export function accumRecipeParams({
     // and one step never ages light by more than a second.
     ageBuffer: sanitizeAccumAgeBuffer(ageBuffer),
     dt: Number.isFinite(Number(dt)) ? Math.min(1, Math.max(0, Number(dt))) : 1 / 60,
+    // #1807 — the buffer statistics: requested only by a consumer (the
+    // show block's trail sampler, the ?debug=stats readout, the governor's
+    // observer); unrequested, nothing allocates and no reduction runs.
+    // Session telemetry, not project state — no contract key.
+    stats: sanitizeAccumStats(stats),
   };
 }
 
@@ -577,6 +586,11 @@ export function sanitizeAccumEchoes(v) {
 
 /** Sanitize the age-buffer request for the scene contract (additive field, #1805). */
 export function sanitizeAccumAgeBuffer(v) {
+  return v === true;
+}
+
+/** Sanitize the buffer-statistics request (session-side, #1807): strict true, like the age request. */
+export function sanitizeAccumStats(v) {
   return v === true;
 }
 
@@ -778,6 +792,49 @@ void main() {
   float aged = prev < 0.0 ? u_dt : prev + u_dt;
   o = vec4(lum > u_floor ? aged : -1.0, 0.0, 0.0, 1.0);
 }`;
+
+// #1807 — one tap of the buffer-statistics reduction: an 8x8 box MEAN of
+// (r, g, b, saturation) via texelFetch, exact like DOWN_FS. Saturation is
+// the fraction of the box's texels whose brightest channel reaches the
+// knee (u_knee = HIGHLIGHT_KNEE — the pixels the #1801 ceiling is
+// actually shaping). Boxes at the source edge divide by the texels they
+// really read, never by 64, so edge means stay honest. The engine chains
+// this tap from pair resolution down to a single texel and reads THAT
+// texel back — a reduction, never a full-buffer readback (the issue's
+// hard rule: a synchronous full readback would stall the pipeline).
+export const STATS_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_srcSize;
+uniform float u_knee;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  ivec2 base = ivec2(gl_FragCoord.xy - vec2(0.5, 0.5)) * 8;
+  vec3 sum = vec3(0.0);
+  float sat = 0.0;
+  float n = 0.0;
+  for (int j = 0; j < 8; j++) {
+    for (int i = 0; i < 8; i++) {
+      ivec2 t = base + ivec2(i, j);
+      if (float(t.x) >= u_srcSize.x || float(t.y) >= u_srcSize.y) continue;
+      vec3 c = texelFetch(u_src, t, 0).rgb;
+      sum += c;
+      sat += step(u_knee, max(c.r, max(c.g, c.b)));
+      n += 1.0;
+    }
+  }
+  // A box with no texels in bounds reads as no light, never NaN: the
+  // chain's own shapes (output = ceil(input/8)) always have n >= 1, but
+  // the shader stays total for any caller (the debug sweep renders the
+  // tap at lab size, where outer boxes fall wholly outside the input).
+  o = vec4(n > 0.0 ? sum / n : vec3(0.0), n > 0.0 ? sat / n : 0.0);
+}`;
+
+/** #1807 — the statistics throttle: the reduction runs at most once per
+ *  this many accum steps (the issue's bound), and the object it produces
+ *  is stamped with the step it describes. */
+export const STATS_EVERY = 15;
 
 // 8x8 box downsample via texelFetch (filtering-independent, exact) into
 // the glow target's base mip level.
@@ -1042,6 +1099,22 @@ export const ACCUM_PROGRAMS = {
       notes: '#1805 age buffer twin pass (R16F target, 1/8 of the pair per target); shed with ACCUM',
     },
   },
+  // #1807 — the buffer-statistics reduction tap: an 8x8 box mean of
+  // (r, g, b, saturation), chained from pair resolution to a single
+  // texel at most once per STATS_EVERY steps, only when a step's params
+  // request stats. The chain's targets total ~1/64 of the pair; tier 1,
+  // shed with the ACCUM family.
+  stats: {
+    fs: STATS_FS,
+    file: 'accum.mjs:STATS_FS',
+    uniforms: ['u_src', 'u_srcSize', 'u_knee'],
+    cost: {
+      tier: 1,
+      memoryBytes: FRAME_16F / 64,
+      timeMs: 0.3,
+      notes: '#1807 buffer-statistics reduction tap (throttled, 1-texel readback); shed with ACCUM',
+    },
+  },
   down: {
     fs: DOWN_FS,
     file: 'accum.mjs:DOWN_FS',
@@ -1156,6 +1229,29 @@ function makeAgeTarget(gl, w, h) {
   gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
   if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
     throw new Error('[accum] age framebuffer incomplete');
+  }
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  return { tex, fb, w, h };
+}
+
+/**
+ * #1807 — one reduction-chain target: RGBA16F (means are O(1) values, so
+ * half float's precision is ample and the format renders wherever the
+ * pair does). NEAREST — the chain is data, texelFetch-exact.
+ */
+function makeStatsTarget(gl, w, h) {
+  const tex = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA16F, w, h, 0, gl.RGBA, gl.HALF_FLOAT, null);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, tex, 0);
+  if (gl.checkFramebufferStatus(gl.FRAMEBUFFER) !== gl.FRAMEBUFFER_COMPLETE) {
+    throw new Error('[accum] stats framebuffer incomplete');
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
   return { tex, fb, w, h };
@@ -1398,6 +1494,41 @@ export function createEchoState() {
  */
 export function createAgeState(w, h) {
   return { data: new Float64Array(w * h).fill(AGE_VOID), scratch: null };
+}
+
+/**
+ * #1807 — the buffer statistics, computed exactly from a float buffer
+ * (the mirror's twin of the GPU reduction): trail energy (mean
+ * luminance, the Rec601 weights GLOW_FS itself reads), the per-channel
+ * means (under #1800's spectral fade their ratios are a coarse average
+ * age of the held light), and saturation pressure — the fraction of
+ * pixels whose brightest channel exceeds HIGHLIGHT_KNEE, the pixels the
+ * #1801 ceiling is actually shaping. Alpha is not light and never
+ * counts. An empty buffer is no reading: null, not zeros (the
+ * silence-is-default law, one level down).
+ * @returns {{ energy: number, channels: [number, number, number], saturation: number } | null}
+ */
+export function accumStats(buf, w, h) {
+  const n = w * h;
+  if (!buf || buf.length < n * 4 || n <= 0) return null;
+  let r = 0;
+  let g = 0;
+  let b = 0;
+  let sat = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    const cr = buf[o];
+    const cg = buf[o + 1];
+    const cb = buf[o + 2];
+    r += cr;
+    g += cg;
+    b += cb;
+    // >=, matching the shader's step(knee, c): a pixel AT the knee is a
+    // pixel the ceiling is already shaping.
+    if (Math.max(cr, cg, cb) >= HIGHLIGHT_KNEE) sat += 1;
+  }
+  const channels = [r / n, g / n, b / n];
+  return { energy: lum601(channels), channels, saturation: sat / n };
 }
 
 /**
@@ -1798,6 +1929,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         'u_dt',
         'u_floor',
         'u_mode',
+        'u_knee',
       ]) {
         L[u] = U(u);
       }
@@ -1945,6 +2077,62 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     ageNext = t;
   };
 
+  // #1807 — the buffer statistics: a reduction chain (pair → 1 texel by
+  // 8x8 box means), allocated ONLY when a step's params request stats
+  // (p.stats) — an unrequested recipe allocates nothing and runs
+  // byte-identically. The chain runs at most once per STATS_EVERY steps
+  // and ends in a ONE-TEXEL readback; a full-buffer readback never
+  // happens (the issue's hard rule). If the readback ever errors, the
+  // latch keeps stats absent rather than poisoning the chain — the
+  // feature degrades to silence, never to a fault or a fake number.
+  let statsChain = null; // reduction targets, pair-sized cascade to 1x1
+  let statsNow = null; // { frame, energy, channels, saturation } | null
+  let statsBroken = false;
+  let stepCount = 0; // steps since begin() — the stats frame stamp's clock
+  const ensureStats = () => {
+    if (statsChain) return;
+    statsChain = [];
+    let w = W;
+    let h = H;
+    while (w > 1 || h > 1) {
+      w = Math.max(1, Math.ceil(w / 8));
+      h = Math.max(1, Math.ceil(h / 8));
+      statsChain.push(makeStatsTarget(gl, w, h));
+    }
+    if (!statsChain.length) statsChain.push(makeStatsTarget(gl, 1, 1));
+  };
+  const freeStats = () => {
+    if (statsChain) for (const t of statsChain) deleteTarget(gl, t);
+    statsChain = null;
+    statsNow = null;
+  };
+  const runStats = () => {
+    let src = cur;
+    let w = W;
+    let h = H;
+    for (const t of statsChain) {
+      pass('stats', t, (u, bind) => {
+        gl.uniform1i(u.u_src, bind(0, src.tex));
+        gl.uniform2f(u.u_srcSize, w, h);
+        gl.uniform1f(u.u_knee, HIGHLIGHT_KNEE);
+      });
+      src = t;
+      w = t.w;
+      h = t.h;
+    }
+    const px = new Float32Array(4);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, src.fb);
+    gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.FLOAT, px);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    if (gl.getError() !== gl.NO_ERROR) {
+      statsNow = null;
+      statsBroken = true;
+      return;
+    }
+    const channels = [px[0], px[1], px[2]];
+    statsNow = { frame: stepCount, energy: lum601(channels), channels, saturation: px[3] };
+  };
+
   let cur = L.t0; // target holding the current accum image
   const other = () => (cur === L.t0 ? L.t1 : L.t0);
 
@@ -2078,6 +2266,8 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       echoHead = 0;
       echoCount = 0; // B3: the ring holds no valid frames after CLEAR
       stepsTaken = 0; // #1808: CLEAR begins a new buffer epoch — stamps restart
+      stepCount = 0; // #1807: a begun buffer holds no light and no stats yet
+      statsNow = null;
       const [r, g, b] = hexToRgb(background);
       for (const t of [L.t0, L.t1]) {
         gl.bindFramebuffer(gl.FRAMEBUFFER, t.fb);
@@ -2107,6 +2297,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     step(frameTex, params, frameSize) {
       const p = params;
       assertRecipeFinite(p);
+      stepCount += 1; // #1807: the stats frame stamp counts steps from begin()
       // Drain stale errors first so the post-step check below only reflects
       // this step's own passes (see drainGlErrors).
       drainGlErrors(gl);
@@ -2300,6 +2491,20 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
         addGlow(p.bloomLod, p.bloomAmount, [1, 1, 1]);
         addGlow(p.halationLod, p.halationAmount, p.halationTint);
       }
+      // #1807 — the buffer statistics: on the throttle beat, reduce the
+      // finished buffer to its three numbers. After the glow, so the
+      // stats describe the buffer exactly as presented. A failure here
+      // latches the feature off (stats stay absent) — it must never
+      // fault the chain it only observes.
+      if (p.stats && !statsBroken && stepCount % STATS_EVERY === 0) {
+        try {
+          ensureStats();
+          runStats();
+        } catch {
+          statsNow = null;
+          statsBroken = true;
+        }
+      }
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[accum] GL error after step: 0x${err.toString(16)}`);
       stepsTaken += 1; // #1808: the step landed — the stamp counts landed steps only
@@ -2346,6 +2551,28 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       return { data: px, ageData: age ? age.data : null, width: W, height: H, stamp: stepsTaken };
     },
 
+    /**
+     * #1807 — the latest buffer statistics { frame, energy, channels,
+     * saturation }, stamped with the step they describe, or null when no
+     * requesting step has produced one yet (never requested, just begun,
+     * or the readback latched off). Absence is the honest state — there
+     * is no zero-filled reading.
+     */
+    readStats() {
+      return statsNow;
+    },
+
+    /** #1807 — steps since begin(): the consumer's clock for judging a
+     *  stat's staleness against its frame stamp. */
+    statsFrame() {
+      return stepCount;
+    },
+
+    /** #1807 — whether the reduction chain is allocated (test/backstage). */
+    statsAllocated() {
+      return statsChain !== null;
+    },
+
     resize(width, height) {
       W = Math.max(4, Math.round(width));
       H = Math.max(4, Math.round(height));
@@ -2353,6 +2580,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       allocScratch();
       freeEcho(); // B3: ring targets are sized to the canvas
       freeAge(); // #1805: reallocates lazily at the new size on the next requested step
+      freeStats(); // #1807: the reduction chain is pair-sized too; reallocates lazily
       // Bridge-owned feedback targets resize via bridge.resize (caller-owned).
       L = bridge.layer(ACCUM_LAYER_ID, { div: RD });
       cur = L.t0;
@@ -2363,6 +2591,7 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
       scratch = null;
       freeEcho();
       freeAge();
+      freeStats();
       for (const p of Object.values(progs)) gl.deleteProgram(p);
       for (const prog of Object.values(wetProgs)) gl.deleteProgram(prog);
       gl.deleteTexture(wetVelTex);
@@ -2386,6 +2615,7 @@ export const ACCUM_PASS_SOURCES = Object.freeze({
   copy: COPY_FS,
   over: OVER_FS,
   age: AGE_FS,
+  stats: STATS_FS,
   down: DOWN_FS,
   glow: GLOW_FS,
   resample: RESAMPLE_FS,

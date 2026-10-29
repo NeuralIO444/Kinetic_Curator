@@ -140,7 +140,7 @@ window.__kcAccum = async (payload) => {
     cells: payload.cells,
     atlas,
   }));
-  const { pixels, width, height, age } = renderer.renderAccumSequence(frames, {
+  const { pixels, width, height, age, stats } = renderer.renderAccumSequence(frames, {
     fade: payload.fade,
     optics: payload.optics,
     tunnel: payload.tunnel ?? 0,
@@ -153,11 +153,14 @@ window.__kcAccum = async (payload) => {
     palette: payload.palette ?? null, // #1803: halation tint derivation
     ageBuffer: payload.ageBuffer ?? false, // #1805: age buffer request
     dt: payload.dt ?? 1 / 60, // #1805: show-time seconds per step
+    stats: payload.stats ?? false, // #1807: buffer statistics request
   });
   return {
     pixelsB64: u8ToB64(pixels),
     width,
     height,
+    // #1807: the final stamped statistics, when requested (plain object).
+    ...(stats ? { stats } : {}),
     // #1805: the final age field as base64 of its Float32 bytes, when requested.
     ...(age ? { ageB64: u8ToB64(new Uint8Array(age.data.buffer, age.data.byteOffset, age.data.byteLength)) } : {}),
   };
