@@ -68,6 +68,7 @@ export const EVENT_REGISTRY = {
   LAYER_SWAP_POSITIONS: { handler: 'wire' },
   LAYER_TOGGLE_VISIBLE: { handler: 'wire' },
   LAYER_TOGGLE_FEEDS_ACCUM: { handler: 'wire' },
+  LAYER_TOGGLE_WET_SOAK: { handler: 'wire' },
   LAYER_SET_BLEND_MODE: { handler: 'wire' },
   LAYER_SET_OPACITY: { handler: 'wire' },
   LAYER_DUPLICATE: { handler: 'wire' },

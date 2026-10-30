@@ -78,7 +78,7 @@ window.__kcPresentProbe = async (payload) => {
   const live = createLiveRenderer(pc);
   const a = renderArgs(payload);
   live.setAtlas(a.atlas.pixels, a.atlas.width, a.atlas.height, a.atlas.mipmaps);
-  const target = live.renderFrame({ width: a.width, height: a.height, bg: a.bg, contract: a.contract, cells: a.cells }, { dprScale: 1 });
+  const target = live.renderFrame({ width: a.width, height: a.height, bg: a.bg, wet: a.wet, contract: a.contract, cells: a.cells }, { dprScale: 1 });
   const readback = live.readback(target, a.width, a.height);
   live.present(target);
   const gl = live.getGL();

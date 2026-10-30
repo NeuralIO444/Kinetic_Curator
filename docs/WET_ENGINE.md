@@ -3,7 +3,8 @@
 **Status:** Phase A landed 2026-10-28 (#1809 slice A — the wet-frame
 service is `app/src/gl/wetFrame.mjs`, consumed by ACCUM through the live
 loop; the gate/ownership below reads as the pre-service state it
-replaced). Phases B–C are still the proposed path. **Resolution:**
+replaced). Phase C landed with #1815 and Phase B with #1814 (see the
+status notes below). **Resolution:**
 #1810 (2026-10-28) moved the sim to a 128 grid / 20 Jacobi iterations /
 4096 vorton cap with a measured cost registration — the "64×64" below is
 the pre-#1810 state; measurements in `docs/review/1810/`.
@@ -69,6 +70,33 @@ laterally; scale-less instances keep the pre-#1876 point splat
 exactly. Stationary-mark centre/midpoint deposit ratio at the
 51.4-unit pitch: ~43 → 1.28 (drifting control ~1.2). Measurements in
 `docs/review/1876/`.
+**Strata soak:** #1814 (2026-10-29) landed Phase B, the composite
+consumer: a CONTENT stratum can be put in WET interaction mode (a
+row-level toggle in BUILD beside the blend modes; the flag lives on
+the document layer and rides the scene contract only while on, so
+unflagged scenes hash and render exactly as before). Where the field
+is wet, the stratum's composite is rebuilt soaked inside the one
+composite program — its source smeared along the field's velocity and
+pre-multiplied by the field's local absorption (the deposited KM
+reflectance where pigment has landed, the ground colour alone where
+none has) — and mixed in by the local wetness, `w = mix(w_dry,
+w_soaked, fieldWetness)`; where the field is dry the pixel is the dry
+composite, bit for bit. The live loop requests the field for soak
+rows through the service's need-based gate (the service contract is
+unchanged), so a soaking stratum's marks stamp and wet their own
+ground even with ACCUM off. Warm-up exports soak identically (the
+#1815 ferry's packs are the composite's packs). At perfTier1 the
+service sheds: mask absent → static blend, and the row's WET
+indicator dims in BUILD. The soak's sampling carries its own cost
+registration (`gl/wet-soak`, tier 0 — the shed is the service's,
+never a silent thinning). Recipe + CPU mirror in
+`app/src/gl/wetSoak.mjs`; measurements in `docs/review/1814/`. One
+clause of the Phase B text is conditional on a layout kind that does
+not exist yet: no content stratum's layout uses the pattern FIELD
+sampler today (`samplePattern`'s only consumer is the PATTERN tile
+engine), so FIELD-shaped stamping has no antecedent to bind to — the
+stamping itself ships (above); the shaping binds the day a content
+layout adopts a FIELD pattern, at the stamp in `emitFromInstances`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from _owner_ to _one consumer among several_.
@@ -174,7 +202,7 @@ _identical output_, not by inspection.
 | Phase                            | Content                                                                                                                                     | Acceptance                                                                                                                                                                |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **A — decouple** (pure refactor) | Extract gate + ownership into a wet-frame service; still consumed only by ACCUM                                                             | byte-identical `wetMask`/`wetVel` for fixed inputs; full selfcheck green; no visual change — **landed (#1809 slice A, `app/src/gl/wetFrame.mjs` + `wetFrame.selfcheck`)** |
-| **B — consumer #2**              | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact                                                                     |
+| **B — consumer #2**              | Composite reads the mask for rows in a WET interaction mode; FIELD can shape the stamping (`samplePattern`, `app/src/pattern/field.js:112`) | selfcheck per behaviour: mask present → blend varies spatially; mask absent → static blend byte-exact — **landed (#1814, `app/src/gl/wetSoak.mjs` + `wetSoak.selfcheck`; the FIELD-shaping clause's antecedent does not exist for content strata yet — see the Strata soak status note)** |
 | **C — exports + parity**         | Deterministic K-step warm-up in `renderScene`/`renderFrameOffscreen`; document the SVG fallback; cost tier for the new sampling             | screen vs PNG parity selfcheck; parity harness green with WET off — **landed (#1815, `app/src/gl/wetWarmup.mjs` + `wetWarmup.selfcheck`; the `accumStill` sequence consumes the held field too)** |
 
 Phases A and C are well-scoped single-fix PRs. B is the feature. **C ships with

@@ -413,6 +413,7 @@ export function LayerStack() {
     layerSnapshots: s.layerSnapshots,
     enabledAssets: s.enabledAssets,
     customAssets: s.customAssets,
+    perfTier1: s.perfTier1,
   }));
   const {
     layers,
@@ -424,6 +425,7 @@ export function LayerStack() {
     layerSnapshots,
     enabledAssets,
     customAssets,
+    perfTier1,
   } = state;
   // #1409 (petri dish A3) — the DISH controls. The switch and the two
   // contact knobs are layout params (scene/Look state, PARAM_SPEC is the
@@ -799,6 +801,34 @@ export function LayerStack() {
                     </option>
                   ))}
                 </select>
+              )}
+              {/* #1814 — WET interaction mode, beside the blend modes as
+                  the issue's design puts it: a row-level control whose
+                  gate is visible. Content strata only. On: where the
+                  wet field is wet, this stratum soaks in — its marks
+                  bleed into the ground, blend deeper, and pick up the
+                  ground's colour at their edges. At perfTier1 the wet
+                  service sheds, the composite falls back to the plain
+                  blend, and this button DIMS to say so — no silent
+                  dead mode, ever. */}
+              {!adj && !pat && (
+                <button
+                  className={`micro-btn wet-soak-btn${layer.wetSoak === true ? ' active' : ''}${
+                    layer.wetSoak === true && perfTier1 ? ' wet-dim' : ''
+                  }`}
+                  aria-pressed={layer.wetSoak === true}
+                  aria-label={`WET interaction ${layer.wetSoak === true ? 'on' : 'off'} for ${label}`}
+                  title={
+                    layer.wetSoak === true
+                      ? perfTier1
+                        ? 'WET is ON, but the wet field is shed at this performance tier — this stratum blends plainly until the tier recovers.'
+                        : 'WET interaction is ON — where the field is wet, this stratum soaks in: marks bleed into the ground and pick up its colour. Tap to turn off.'
+                      : 'WET interaction — where the wet field is wet, this stratum soaks in instead of sitting on top, crisp. Tap to turn on.'
+                  }
+                  onClick={() => emit(Events.LAYER_TOGGLE_WET_SOAK, { id: layer.id })}
+                >
+                  WET
+                </button>
               )}
               {adj && <span className="wet-label lbl">wet</span>}
               <RangeRow

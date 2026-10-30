@@ -312,6 +312,11 @@ export const createLayersSlice = (set) => ({
         // property (content only; FX/MATH never carry the flag).
         ...(!isAdj && src.feedsAccum === false ? { feedsAccum: false } : {}),
         patch: src.patch ? { ...src.patch } : { mode: 'off', to: null, strength: 0.16 },
+        // #1814 — WET interaction mode rides a duplicate the same way
+        // (key only while on, like the source). After `patch`: the
+        // position projectNormalize assigns it, so a save → load →
+        // save round trip stays byte-stable.
+        ...(!isAdj && src.wetSoak === true ? { wetSoak: true } : {}),
       };
       if (isAdj) copy.effects = structuredClone(src.effects || (isMath ? defaultMathEffects() : defaultFxEffects()));
       const i = state.layers.findIndex((l) => l.id === id);
@@ -486,6 +491,33 @@ export const createLayersSlice = (set) => ({
             return next;
           }
           return { ...l, feedsAccum: false };
+        }),
+      };
+    }),
+  // #1814 — WET interaction mode: the per-stratum flag the composite
+  // honours (WET_ENGINE Phase B). The key exists only while ON —
+  // absence is the off state — so toggling back off deletes the key
+  // rather than spelling `false`: the store, the saved document and
+  // the contract all stay in the one shape the contract defined, and
+  // an all-off project is byte-for-byte the project it was before the
+  // mode existed. CONTENT strata only (isKcLayer): the mode modulates
+  // a stratum's own marks' blending — PATTERN strata draw a field,
+  // FX/MATH transform — so the toggle is a no-op on them: no key, no
+  // undo entry.
+  toggleLayerWetSoak: (id) =>
+    set((state) => {
+      const target = state.layers.find((l) => l.id === id);
+      if (!target || !isKcLayer(target)) return {};
+      return {
+        ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+        layers: state.layers.map((l) => {
+          if (l.id !== id) return l;
+          if (l.wetSoak === true) {
+            const next = { ...l };
+            delete next.wetSoak;
+            return next;
+          }
+          return { ...l, wetSoak: true };
         }),
       };
     }),

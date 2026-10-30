@@ -603,6 +603,18 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       ...((off) => (off ? { feedsAccum: false } : {}))(
         rl.layer?.feedsAccum === false || docLayerById.get(layerId)?.feedsAccum === false,
       ),
+      // #1814 — the WET interaction mode (WET_ENGINE Phase B): a
+      // per-stratum property, default OFF. Carried ONLY while on —
+      // absence means the stratum composites exactly as it always has,
+      // so an unflagged scene's contract — and its hash — is exactly
+      // what it was before the mode existed (the feedsAccum rule,
+      // mirrored). Content strata only: the mode modulates a stratum's
+      // own blending, and FX/MATH/PATTERN strata have no marks to soak.
+      // Read from the resolver's layer or the document layer, like
+      // matte (#189): the document is the flag's home.
+      ...((on) => (on ? { wetSoak: true } : {}))(
+        rl.layer?.wetSoak === true || docLayerById.get(layerId)?.wetSoak === true,
+      ),
       layout: {
         blendMode: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
@@ -885,6 +897,13 @@ export function assertSceneContract(scene) {
       if (l.type !== 'content' && l.type !== 'pattern')
         fail(`layer ${l.id}: only content/pattern layers carry a feed flag`);
       if (l.feedsAccum !== false) fail(`layer ${l.id}: feedsAccum is only ever false (absence = feeds)`);
+    }
+    if (l.wetSoak !== undefined) {
+      // #1814 — the soak flag rides a layer only while ON, and only a
+      // content stratum can carry it (the mode modulates a stratum's
+      // own blending; FX/MATH/PATTERN strata have no marks to soak).
+      if (l.type !== 'content') fail(`layer ${l.id}: only content layers carry a soak flag`);
+      if (l.wetSoak !== true) fail(`layer ${l.id}: wetSoak is only ever true (absence = off)`);
     }
     if (l.type === 'fx') {
       if (!Array.isArray(l.fx)) fail(`fx layer ${l.id}: fx must be an array`);

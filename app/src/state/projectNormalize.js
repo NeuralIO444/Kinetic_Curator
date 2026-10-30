@@ -267,6 +267,13 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     // toggle appends the key the same way, so a save → load → save
     // round trip is byte-stable.
     if ((type === 'content' || type === 'pattern') && l.feedsAccum === false) layer.feedsAccum = false;
+    // #1814 — WET interaction mode rides the document layer the other
+    // way: only the ON state is a fact worth keeping. Exactly `true`
+    // on a content layer survives the load; absence — and any other
+    // spelling — is the off state, so the loaded layer carries no key.
+    // Content strata only (a hand-edited flag elsewhere is dropped,
+    // matching the scene contract's law).
+    if (type === 'content' && l.wetSoak === true) layer.wetSoak = true;
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null };

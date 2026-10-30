@@ -977,8 +977,18 @@ export function createLiveLoop(
     // tier-1 shed ACCUM is stood down as a unit (degradedOk stays false —
     // the dish, slice B, is the first degraded consumer) and the result
     // names the shed instead of going silent.
+    // #1814: a stratum in WET interaction mode is the second consumer
+    // family — the need-based gate (WET_ENGINE §4) steps the field for
+    // a soak-only scene too, which is also what makes a soaking
+    // stratum's marks stamp and wet their own ground. degradedOk stays
+    // false for the soak as well: its perfTier1 answer is the shed
+    // itself — mask absent → static blend in the composite, and the
+    // row's WET indicator dims in BUILD (the issue's acceptance), never
+    // a silent half-field (a degraded serve carries no velocity pack,
+    // so the smear term could not run honestly anyway).
+    const anyWetSoak = contract.layers.some((l) => l.type === 'content' && l.wetSoak === true);
     const wet = wetFrame.frame({
-      consumers: { accum: !!layoutParams.accumulation },
+      consumers: { accum: !!layoutParams.accumulation, soak: anyWetSoak },
       shed: s.perfTier1 ? 'perfTier1' : null,
       degradedOk: false,
       wetness: layoutParams.accumulationWetness,
@@ -1046,6 +1056,21 @@ export function createLiveLoop(
               beatPulse: shapedAudio.beatPulse || 0,
             }
           : null,
+        // #1814 — the soak field rides the payload (the same keys the
+        // warm-up export ferry carries) whenever a stratum soaks and
+        // the service served a field; renderFrameInto normalises it
+        // for the composite. No soak rows, or no field (shed, dry):
+        // null — the composite runs the dry path, byte-identical.
+        wet:
+          anyWetSoak && wet.wetMask
+            ? {
+                wetStep: wet.wetStep,
+                wetMask: wet.wetMask,
+                wetVel: wet.wetVel,
+                wetAmount: wet.wetAmount,
+                pigDep: wet.pigDep,
+              }
+            : null,
       },
       transparent: !bgCss,
       bgCss: bgCss || activePalette.bg,
@@ -1584,9 +1609,14 @@ export function createLiveLoop(
     // #1815 — the offscreen render gets this frame's wet display state
     // (the same assembly the tick arms via setWetLook, from THIS frame's
     // served field): without it the capture silently drops the wet look
-    // the audience is seeing. No field served → no key → the capture is
-    // byte-identical to before.
-    const wet =
+    // the audience is seeing. No field served → no display state → the
+    // capture is byte-identical to before.
+    // #1814 — the display state nests under .display of the ONE wet
+    // shape: the capture frame's payload already carries the soak field
+    // (buildFrame put it there), and renderFrameOffscreen's renderer
+    // soaks from those packs while it finishes with the display pass.
+    // Merging — never replacing — keeps the soak packs alive.
+    const wetDisplay =
       accumParams && accumParams.wetStep === 1 && accumParams.wetMask
         ? {
             mask: accumParams.wetMask,
@@ -1596,6 +1626,8 @@ export function createLiveLoop(
             full: WET_REGIMES[2].at,
           }
         : null;
+    const wet =
+      payload.wet || wetDisplay ? { ...(payload.wet || {}), ...(wetDisplay ? { display: wetDisplay } : {}) } : null;
     // #267: offscreen targets at the capture size — the live canvas is never
     // resized, so no flash and no mid-stream resolution jump for recordings.
     // #270: export resolution is exact — no display-DPR multiplier here.

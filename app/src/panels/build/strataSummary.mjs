@@ -64,6 +64,10 @@ function contentSummary(layer, wetPct, dishState) {
   // choice the collapsed block must state): this stratum renders on stage
   // but feeds the trails buffer nothing.
   if (layer.feedsAccum === false) parts.push('no feed');
+  // #1814 — WET interaction mode on joins the line the same way: an ON
+  // choice the collapsed block must state (the mode is invisible in the
+  // block's own chrome otherwise).
+  if (layer.wetSoak === true) parts.push('wet soak');
   // #1409 — the dish state joins the line only when it says something:
   // OFF is an artistic choice the collapsed block must confess (this
   // stratum ghosts through its neighbours), and ON shows only when this

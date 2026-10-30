@@ -617,6 +617,10 @@ void main() {
  * (SVG filter region). Optional layer matte (#189): a mask texture sampled
  * at the same UV; the source's alpha is multiplied by the mask value
  * (mask alpha for mode 0, sRGB luminance for mode 1), optionally inverted.
+ * Optional strata soak (#1814): for a layer in WET interaction mode with
+ * a wet field served, the finished dry composite is mixed toward a
+ * soaked rebuild (velocity-smeared, ground/pigment-absorbed source) by
+ * the field's local wetness — see wetSoak.mjs for the recipe + mirror.
  */
 export const COMPOSITE_FS = `#version 300 es
 precision highp float;
@@ -632,6 +636,14 @@ uniform int u_maskMode;     // 0 = alpha, 1 = luma
 uniform float u_maskInvert;
 uniform float u_hueOn;      // 1 when layer.layout.hueRotate is nonzero (#262)
 uniform mat3 u_hueMat;      // SVG feColorMatrix type="hueRotate" matrix (#262)
+uniform float u_soakOn;         // 1 when this layer is in WET interaction mode and a field is served (#1814)
+uniform sampler2D u_soakMask;   // wet-frame mask pack: R = wetness 0..1, scene space
+uniform sampler2D u_soakVel;    // wet-frame velocity pack: RG centred at 0.5, scene space
+uniform sampler2D u_soakPig;    // deposited-pigment KM reflectance pack (#1811), scene space
+uniform float u_soakPigOn;      // 1 when the service served pigment (else absorption falls back to the ground)
+uniform float u_soakAmt;        // the served wet amount (WET_REGIMES scale)
+uniform vec3 u_soakGround;      // the frame's ground colour — term (a)'s no-pigment fallback
+uniform vec2 u_soakVelScale;    // scene velocity (±1 at the pack ends) → FBO-UV smear span
 in vec2 v_cuv;
 out vec4 o;
 
@@ -719,11 +731,12 @@ vec3 blendF(vec3 cb, vec3 cs, int m) {
 void main() {
   vec2 tuv = v_cuv;   // FBO textures share the renderer's y-up memory layout
   vec4 S = texture(u_src, tuv);
+  float matteM = 1.0;   // the matte factor, kept named: the soak re-applies it to its smeared source (#1814)
   if (u_maskOn > 0.5) {
     vec4 M = texture(u_mask, tuv);   // premultiplied mask group texture
-    float m = u_maskMode == 1 ? sLum(unpre(M.rgb, M.a)) : M.a;
-    if (u_maskInvert > 0.5) m = 1.0 - m;
-    S.rgb *= m; S.a *= m;
+    matteM = u_maskMode == 1 ? sLum(unpre(M.rgb, M.a)) : M.a;
+    if (u_maskInvert > 0.5) matteM = 1.0 - matteM;
+    S.rgb *= matteM; S.a *= matteM;
   }
   vec4 D = texture(u_dst, tuv);
   if (u_clipOn > 0.5) {
@@ -747,6 +760,40 @@ void main() {
     ? (as_ * (1.0 - ab) * cs + as_ * ab * b + (1.0 - as_) * ab * cb) / ao
     : vec3(0.0);
   o = vec4(co * ao, ao);
+  // #1814 — strata soak (WET_ENGINE Phase B): where the wet field is
+  // wet, this layer's composite is rebuilt soaked and mixed in by the
+  // field's wetness — w = mix(w_dry, w_soaked, fieldWetness). The dry
+  // output above is computed first and untouched, so a pixel at
+  // fieldWetness 0 IS the dry pixel, bit for bit; with u_soakOn 0 the
+  // branch never runs and the composite is exactly the pre-#1814 one.
+  if (u_soakOn > 0.5) {
+    // The field packs are scene space (y-down); FBO uv is y-up.
+    vec2 fuv = vec2(tuv.x, 1.0 - tuv.y);
+    float f = clamp(texture(u_soakMask, fuv).r * u_soakAmt, 0.0, 1.0);
+    if (f > 0.0) {
+      // Term (b) — smear: three taps trailing the local flow (spans
+      // 0 / 0.5 / 1 of one flow step, weights 0.5 / 0.3 / 0.2 — they
+      // sum to 1, so a still field re-samples the source exactly).
+      vec2 vel = texture(u_soakVel, fuv).rg * 2.0 - 1.0;
+      vec2 d = vec2(vel.x, -vel.y) * u_soakVelScale;
+      vec4 S2 = texture(u_src, tuv) * 0.5 + texture(u_src, tuv - d * 0.5) * 0.3 + texture(u_src, tuv - d) * 0.2;
+      S2.rgb *= matteM; S2.a *= matteM;
+      S2.rgb *= u_opacity; S2.a *= u_opacity;
+      vec3 cs2 = unpre(S2.rgb, S2.a);
+      if (u_hueOn > 0.5) cs2 = u_hueMat * cs2;   // the source's own colour property, as on the dry path
+      // Term (a) — absorption: the ground drinks the mark's light.
+      // Pigment served → its deposited KM reflectance tints the
+      // colour; none → the ground colour alone (the issue's fallback).
+      vec3 absorb = u_soakPigOn > 0.5 ? texture(u_soakPig, fuv).rgb : u_soakGround;
+      cs2 *= absorb;
+      vec3 b2 = blendF(cb, cs2, u_blend);
+      float ao2 = S2.a + ab - S2.a * ab;
+      vec3 co2 = ao2 > 1e-6
+        ? (S2.a * (1.0 - ab) * cs2 + S2.a * ab * b2 + (1.0 - S2.a) * ab * cb) / ao2
+        : vec3(0.0);
+      o = mix(o, vec4(co2 * ao2, ao2), f);
+    }
+  }
 }`;
 
 /**
