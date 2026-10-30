@@ -18,6 +18,7 @@ import { SliderEditor } from '../build/te/editors.jsx';
 // in physical units; only the slider position is remapped.
 const fadeTaper = getTaper('halfLife', { minFrames: 1, maxFrames: 40 });
 const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 review: old full-scale blew out at ~50% slider — full travel now sweeps the usable range only
+const wetTaper = getTaper('power', { min: 0, max: 1, exp: 2 }); // Matt 2026-10-30: linear travel crammed the whole response into 0–0.1 and the rest just got ugly — power-2 spreads the low end (0.1 sits at ~32% travel, wet 0.35 at ~59%, soaked 0.8 at ~89%); full range kept, stored values unchanged
 
 const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
 
@@ -203,7 +204,8 @@ export function AccumFamily({ layoutParams }) {
             min={0}
             max={1}
             step={0.01}
-            title={helpText('layout-wetness')}
+            taper={wetTaper}
+            title={`${helpText('layout-wetness')} Slider runs on a square curve — the low end gets most of the travel (wetness = slider²).`}
           />
           <TrailValue
             label="TUNNEL"
