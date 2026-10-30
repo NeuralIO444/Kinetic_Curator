@@ -888,7 +888,10 @@ ok('#1876 a footprint stamp delivers the point stamp load, spread over the quad'
     fs = support(foot);
   assert.ok(ps.cells <= 4, `point stamp touches ${ps.cells} cells`);
   assert.ok(fs.cells >= 40, `footprint stamp touches ${fs.cells} cells (the quad at scale 0.26)`);
-  assert.ok(fs.peak < ps.peak / 4, `footprint peak ${fs.peak.toFixed(4)} vs point peak ${ps.peak.toFixed(4)} — spread, not stacked`);
+  assert.ok(
+    fs.peak < ps.peak / 4,
+    `footprint peak ${fs.peak.toFixed(4)} vs point peak ${ps.peak.toFixed(4)} — spread, not stacked`,
+  );
   // Water conserves the same way: the summed mask add of one emit
   // matches (neither emit saturates a cell from dry at this amount).
   const wetSum = (v) => v.wet.reduce((s, x) => s + x, 0);
@@ -964,10 +967,16 @@ ok('#1876 suspended diffusion spreads the worked film, conserves pigment, and st
   // film's 0.51 (the advection resample's own smear, which saturates
   // immediately and never grows — the closed film strands).
   assert.ok(open.var > closed.var * 1.8, `worked spread ${open.var.toFixed(2)} vs unworked ${closed.var.toFixed(2)}`);
-  assert.ok(closed.var <= closedEarly.var * 1.05, `unworked spread grows ${closedEarly.var.toFixed(2)} -> ${closed.var.toFixed(2)} — a drying film strands its pigment`);
+  assert.ok(
+    closed.var <= closedEarly.var * 1.05,
+    `unworked spread grows ${closedEarly.var.toFixed(2)} -> ${closed.var.toFixed(2)} — a drying film strands its pigment`,
+  );
   // Spread is symmetric: the pigment's centroid stays on the stamp
   // (the deposited layer gains no lateral drift from the stage).
-  assert.ok(Math.abs(open.cx - closed.cx) < 0.5 && Math.abs(open.cy - closed.cy) < 0.5, 'centroid holds under diffusion');
+  assert.ok(
+    Math.abs(open.cx - closed.cx) < 0.5 && Math.abs(open.cy - closed.cy) < 0.5,
+    'centroid holds under diffusion',
+  );
 });
 
 ok('#1876 stationary marks wash at rest: the grid-dots acceptance in miniature', () => {
@@ -977,7 +986,15 @@ ok('#1876 stationary marks wash at rest: the grid-dots acceptance in miniature',
     let k = 0;
     for (let j = 0; j < 5; j++)
       for (let i = 0; i < 5; i++) {
-        const m = { layer: 'a', key: `m${k++}`, x: 500 + (i - 2) * 51.4, y: 350 + (j - 2) * 51.4, vx: 0, vy: 0, rgb: PIG_BLUE };
+        const m = {
+          layer: 'a',
+          key: `m${k++}`,
+          x: 500 + (i - 2) * 51.4,
+          y: 350 + (j - 2) * 51.4,
+          vx: 0,
+          vy: 0,
+          rgb: PIG_BLUE,
+        };
         if (scaled) {
           m.scaleX = 0.26;
           m.scaleY = 0.26;
