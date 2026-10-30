@@ -3305,6 +3305,62 @@ details.ds-dev > summary:hover {
   background: currentColor;
 }
 
+/* Mode row, block seat (#1608, Strata Q Phase 2): the same component laid
+   on one line inside the strata block editors — label · sign cell (bipolar
+   rows) · the modes · the exact readout — taking the flex place the bare
+   slider held in .fx-param / .strata-composite rows. The label matches
+   .fx-param label; the readout is the shelf readout's amber truth in the
+   block's compact size. */
+.te-mode-block {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.te-mode-block .te-matrix {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.te-mode-block .te-sign {
+  flex: 0 0 62px;
+}
+.te-mode-block .te-sign .te-matrix {
+  flex: none;
+}
+.te-block-label {
+  flex: 0 0 auto;
+  width: 52px;
+  font-size: 9px;
+  color: var(--dim);
+  text-transform: lowercase;
+  letter-spacing: 0.05em;
+}
+.te-block-readout {
+  flex: 0 0 auto;
+  min-width: 40px;
+  min-height: 30px;
+  padding: 4px 2px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--kc-davis);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  cursor: pointer;
+}
+.te-block-readout:hover {
+  border-color: var(--kc-davis);
+}
+.te-mode-block.is-disabled .te-block-readout {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.te-mode-block.is-disabled .te-block-readout:hover {
+  border-color: transparent;
+}
+
 /* Value dock: absolute inside the panel root, pinned to the panel's right
    edge. It overlays panel content, NEVER the canvas. */
 .panel {

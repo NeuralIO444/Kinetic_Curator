@@ -1,228 +1,265 @@
-# STAGING REPORT — #1607 Strata Q Phase 1: quantize the BUILD shelves
+# STAGING REPORT — #1608 Strata Q Phase 2: quantize the strata block editors
 
-**Issue (verbatim):** "Strata Q Phase 1 — quantize the BUILD shelves:
-mode rows + stop table"
-**Branch:** `feat/1607-strata-phase1-shelves`, based on
-`origin/feat/1606-strata-phase0-paper` (0da9a3d6). Local only — no push,
+**Issue (verbatim):** "Strata Q Phase 2 — quantize the strata block editors"
+**Branch:** `feat/1608-strata-phase2-blocks`, based on
+`origin/feat/1607-strata-phase1-shelves` (0e8ad17e). Local only — no push,
 no PR (coordinator publishes). This file replaces the report that was at
-the worktree root (#1606's); that report remains in git history. The
+the worktree root (#1607's); that report remains in git history. The
 "(DEFERRED)" language in the issue is stale — the lane was un-deferred
-2026-10-30 and Phase 0's paper is this branch's base.
+2026-10-30 and Phase 0's paper + Phase 1's component are this branch's base.
 
 ## What was built
 
-Every continuous value on the BUILD shelves (§1–§4) now renders as a
-**mode row**: the param's name + exact live readout over an
-OFF · LOW · MID · HIGH TeaMatrix (DS §2 detent amendment, #1606).
+Every bare RangeRow inside the strata blocks is now a mode row — Phase 1's
+`ModeRow` component, extended with a **block seat** (`variant="block"`:
+label · modes · exact readout on one line, in the flex place the slider
+held) — plus the shelf tiles Phase 1 parked with this phase. One mode-row
+component, two seats; no second component was invented.
 
-- **New component** `app/src/panels/build/te/ModeRow.jsx` — TeaMatrix kin.
-  A mode tap writes the authored stop value through the same
-  `LAYOUT_PARAM` event every shelf control already used (no write-path
-  change; `normalizeLayoutParams` untouched; stored values stay
-  continuous). The readout keeps the exact value in amber beside the
-  modes; a stored value that is not exactly a stop lights its nearest
-  mode and that cell **wears a dot — the off-detent mark** (DS §2.1),
-  rendered by a small additive `dot` option on `TeaMatrix`
-  (`app/src/panels/build/te/TeaMatrix.jsx`) + `.te-dot` CSS. Lock pips,
-  disabled-with-reason gating, and titles behave exactly as ValueButton's
-  did.
-- **Gesture per D2** — tap the readout opens the exact editor in the
-  **#1202 ValueDock** (the value editor's docked seat per Phase 0's
-  vocabulary — evolved, not replaced; no third popover). The dock's
-  editors are the same SliderEditors as before, now with **double-click
-  reset wired**: `SliderEditor` gained an optional `defaultValue`, passed
-  through to the RangeRow, and every shelf editor passes its param's
-  shipped default (in the editor's own units — percent editors pass
-  default×100, tapered editors pass the taper-mapped default).
-- **Converted shelves (38 params):** LayoutSliders (COUNT, JITTER,
-  DENSITY, GROUND, EDGE, SHADOW, SNAP, WEATHER), SwarmSliders (PARTICLES,
-  COHESION, GRAVITY, DAMPING, NOISE SPEED), HypeSliders (CREATURES, BODY,
-  TIGHT, METABOLISM), AccumFamily's TrailValue (ECHOES, SCAN, LEAVE /
-  TUNNEL / PRISM / FLOW fades, ACCUM FADE, GLOW, WETNESS, TUNNEL, PRISM,
-  CURL), AppearanceSliders (CROOKED, SQUASH, GROWTH RATE, BRANCHING),
-  MaterialSliders (GLASS ALPHA, PLATE RADIUS, WASH STRENGTH, WASH SPREAD,
-  STIPPLE DOTS).
-- **Exemptions kept as value buttons** (Phase 0's closed list): SCALE /
-  ROTATE / ALPHA dual ranges and DIVERGENCE in LayoutSliders; PLATE
-  CENTRE X/Y (position class) in MaterialSliders via an `exempt` flag on
-  its `btn()` helper. HUE stays the dial inside CHIAROSCURO.
+- **Strata-composite rows** (LayerStack.jsx): WET (0..cap — stops authored
+  for the full 0..1 range, scaled by the track's wet ceiling exactly as
+  the slider's max was; readout keeps its `.layer-opacity-readout`
+  address and % truth), PATCH strength ×3 (FEED/MOD/FIELD — one authored
+  table; the row gains the exact readout the bare slider never showed),
+  DISH bounce / repel / tempo (stops in PARAM_STOPS — they are layout
+  params; only their rows live in blocks).
+- **FX param rows** (FxEffectEditor, LayerStack.jsx): every param of
+  every FX_EFFECT_DEFS kind renders a mode row from `FX_PARAM_STOPS`.
+- **MATH param rows** (MathEffectEditor.jsx): every param of every
+  MATH_EFFECT_DEFS op renders a mode row from `MATH_PARAM_STOPS`; the
+  per-knob MOD selector (a discrete control) is untouched beside it.
+- **PATTERN editor** (PatternEditor.jsx): density / mix / grout / hero /
+  drift / movers are mode rows from `PATTERN_STOPS`; their dock editors
+  keep the editor's percent space — percent in the UI, fractions in the
+  store, exactly as before. The `kin` selector row is discrete and stays.
+- **MotionTiles in BUILD** (HypeSliders.jsx): flap / breath / wind are
+  mode rows via the shelf's `btn()` pattern (flap longhand — see re-pins),
+  stops added to PARAM_STOPS. Gating strings, locks, and write paths are
+  byte-identical.
+- **The exact editor** for every block row is the value editor's docked
+  seat (D2): tap the readout → the #1202 ValueDock with a SliderEditor at
+  the param's own range/step, its shipped default wired as the
+  double-click reset target — the reset the bare sliders' `onReset`
+  used to serve.
+- **Data law holds:** no write-path changes anywhere. Mode taps write the
+  authored stop through the same bus events the sliders used
+  (LAYOUT_PARAM / LAYER_SET_OPACITY / LAYER_PATCH / FX_EFFECT_SET_PARAM /
+  MATH_EFFECT_SET_PARAM / PATTERN_PARAM); stored values stay continuous;
+  dice/curator/governor untouched. Block summaries still show exact
+  values in amber — `strataSummary.mjs` is untouched and its suite passes
+  unmodified.
 
-## The stop table — home and shape
+## Where the catalog stop tables live
 
-`PARAM_STOPS` in `app/src/data/layout-modes.js`, immediately after
-`PARAM_SPEC` (the home the issue names). One entry per shelf param:
+- `app/src/panels/build/blockStops.mjs` (NEW) — `WET_STOPS` +
+  `wetStopsForCap`, `PATCH_STRENGTH_STOPS`, `FX_PARAM_STOPS`,
+  `MATH_PARAM_STOPS`, `PATTERN_STOPS`, keyed `${kind}.${param}` for the
+  catalogs, with `fxStopsFor` / `mathStopsFor` / `patternStopsFor`
+  lookups. Entry shape mirrors PARAM_STOPS (`{ stops, identity?,
+  inverse?, bipolar? }`).
+- `app/src/data/layout-modes.js` — PARAM_STOPS grows by the six layout
+  params Phase 2 quantized: flap / breath / wind (hype family section)
+  and contactRestitution / contactRepel / dishTempo (a new CAST section).
+- The sign math is pure and lives with Phase 1's mode math:
+  `bipolarStateFor` / `bipolarValueFor` in
+  `app/src/panels/build/te/modeStops.mjs`.
 
-```js
-count: { stops: [10, 120, 240, 800], atlas: true },
-damping: { stops: [0.95, 0.93, 0.89, 0.83], identity: true },
-accumulationFade: { stops: [1, 3, 5.4, 20], taper: { kind: 'halfLife', minFrames: 1, maxFrames: 40 } },
-```
+## The sign cell (Phase 0 paper, stop-table law rule 6)
 
-- `stops` — the four detent values in OFF · LOW · MID · HIGH **effect
-  order** (identity-class rows descend numerically on purpose: damping
-  LOW→HIGH runs toward more friction; glassAlpha toward more
-  attenuation, OFF = 1 = full rolled alpha kept).
-- `identity: true` — OFF is the param's neutral, never its range floor
-  (damping 0.95, glassAlpha 1, washSpread 1 — each ruled in a comment).
-- `atlas: true` — law rule 7 flag on the ATLAS_AFFECTING shelf counts
-  (count, particleCount, body).
-- `taper` — the curve descriptor the stops were authored against, where
-  one exists (accumulationFade half-life; GLOW power; WETNESS power —
-  see the #1882 note). Stops themselves are stored in physical units;
-  the selfcheck verifies their spread in taper space.
-- The pure mode math (nearest mode, ties to the lower mode, exact vs
-  off-detent) lives in `app/src/panels/build/te/modeStops.mjs`
-  (`stopsFor`, `modeStateFor`) — the component's pure half, in the
-  shiftLayer.mjs / ShiftRows.jsx pattern.
+Bipolar catalog params — exactly rule 6's list: `gain.exposure`,
+`lift.offset`, `tempTint.temperature`, `tempTint.tint`,
+`hueRotate.degrees` (MATH) and `grade.hue` (FX). Their tables store
+unsigned magnitudes `[0, low, mid, high]`; the row renders a `−`/`+`
+TeaMatrix pair at its left. Tapping a magnitude applies it under the
+row's current sign; tapping the sign cell flips the sign at the current
+magnitude (a nonzero value negates through the same SET_PARAM event).
+OFF is true 0 under either sign — `bipolarValueFor` never returns −0.
+At exactly 0 the cell shows the *armed* sign (component-local state: the
+sign the next magnitude tap will take); a stored nonzero value's own
+sign always wins for display. A dice-written −1.5 on gain lights MID,
+off-detent, sign `−`.
 
-Every shipped default is one of its stops (0.6 cohesion = HIGH, 0.78
-glass = MID, 1.05 plate radius = MID, 2.5 stipple = MID, 5.4 fade = MID,
-0.95 damping = OFF), so a mode tap can always return to Matt's tunes.
+Class rulings applied beyond Phase 0's four named identity params, each
+by the law's own definitions and flagged in the table comments:
+`channelMix.r_to_r` and `levelsFixed.white` are identity class (the
+shipped default IS the value at which the param contributes nothing —
+red passes as red; levels untouched), OFF = the default, detents in
+effect order. `posterize.levels` and `quantize.steps` are `inverse`
+(rule 4: fewer = stronger, so OFF is the least-effect end and the stops
+descend in effect order). Pure settings (seed, radii, thresholds,
+density, roundness) follow Phase 1's plateRadius precedent: authored
+stops ascending from the floor.
 
-## Re-pins (each with its cause)
+## MotionTiles + MixBar decisions (with grounds)
 
-1. **`e2e/cache-verify.spec.js`** (budgeted) — the opener selector
-   `.te-value-btn` → `.te-mode-readout` for COUNT, with the comment
-   rewritten: per D2 the test now opens the docked **exact editor** via
-   the readout and drives its RangeRow as before (mode buttons only
-   write authored stops, so the exact editor is the only surface that
-   can set an arbitrary COUNT — which is what the test exists to prove
-   reaches the cache).
-2. **Tour wording** (the budgeted "helpCopy interaction wording" — the
-   interaction copy lives in the tour, which helpCopy derives from):
-   `src/data/tour.js` step `slider` body: "Drag any BUILD slider…" →
-   "Tap a BUILD mode row — OFF · LOW · MID · HIGH — or tap its number
-   for the exact value…". Step id/title unchanged (derived copy stable).
-   No helpCopy.js entry described the shelf interaction, so no entry
-   changed; `helpCopy.selfcheck` passes unmodified.
-3. **New selfcheck** `src/panels/build/te/modeStops.selfcheck.mjs`
-   (budgeted) + one manifest line after `shiftLayer.selfcheck.mjs`.
-   11 checks: census exactness, exemptions absent, law clauses
-   (default-is-a-stop, OFF per class, range bounds, atlas flags,
-   taper-space spread), the mode math (incl. the dice case: wetness
-   0.37 → MID, off-detent), and shelf wiring pins.
-4. **No other re-pins needed.** Suites that source-pin the touched files
-   all pass unmodified — notably `spawn.selfcheck` (pins HypeSliders'
-   `btn('CREATURES', 'creatures'` shape and the editor's
-   `min={0} max={4} step={1}` text — both preserved verbatim),
-   `unlockTree.selfcheck` (pins the exact disabledReason census across
-   the five shelf files — all strings preserved), `chiaroscuro.selfcheck`
-   (AppearanceSliders still carries no `hueRotate`), `casingInCss`,
-   `motionGlyph`, `foldInCensus`, `rangeRow`, `helpCopy`.
+- **MotionTiles (flap / breath / wind) — CONVERTED.** Grounds: they are
+  stored layout params in PARAM_SPEC with ranges and shipped defaults —
+  the law applies honestly, with authored stops, default-is-a-stop, and
+  magnitude-class OFF (at 0 each contributes nothing: no beat, no swell,
+  no wind). Phase 0's exemptions list is closed and does not name them;
+  tracker ruling D1 scopes the law to "shelves, block editors, tiles,
+  MIX bar". The one cost is #716's glyph-as-display in BUILD; the
+  MotionTile component and its glyph math remain live in STIMULI (the
+  `life` tile), which the DS detent amendment does not reach.
+- **MixBar — STOPPED under the premise rule, not converted, not silently
+  exempted.** Grounds (code facts): MixBar is a transient crossfade
+  scrubber over `state.voiceMix` that exists only while a voice MIX is
+  in flight. It holds no stored param (no PARAM_SPEC entry, no catalog
+  entry), has no shipped default, persists nothing, and its position is
+  a *progress through a transition* that auto-advances — there is
+  nothing to author a stop table against, and detents would break the
+  scrub gesture that is the control's whole purpose. The stop-table law
+  governs param controls; this is not one. The slider stays exactly as
+  shipped, and `blockStops.selfcheck` pins that it stays (a recorded
+  stop, not an oversight). If Matt wants the MIX position quantized, it
+  needs a ruling of its own — flagged for the coordinator.
 
 ## Premise checks (stop-rule)
 
-- **Phase 0 paper on base** — TRUE. plan.md carries the "Phase 0 paper"
-  section (editor vocabulary, stop-table law, closed exemptions);
-  DESIGN_SYSTEM.md carries the §2 detent amendment + §2.1 BUILD
-  amendment, both citing #1606.
-- **~48 shelf values** — TRUE as a census: 38 mode-row params + 3 dual
-  ranges + DIVERGENCE + ROTATE SPIN (inside the dual's editor) + 3
-  MotionTiles + HEROES ≈ the QA count. The stop table covers the 38.
-- **The dock's current shape** — TRUE, with one discovery: the dock
-  editor's double-click reset was **inert** on this base — SliderEditor
-  never passed a `defaultValue` to its RangeRow, so D2's "reset survives
-  inside the editor" did not hold anywhere in the dock. Wiring it is
-  part of this build (above), not a premise failure.
-- **Census not UI-coupled** — TRUE (QA §6; `paramCensus` iterates
-  PARAM_SPEC; untouched).
-- **§④ as #1632 leaves it** — the CHIAROSCURO shelf surface is the
-  button; AppearanceSliders + MaterialSliders quantized as above.
+- **Catalog counts** — MATH = 12 ops, as the issue states. **FX = 14
+  kinds, not 13**: `feedbackWarp` (#1490) joined FX_EFFECT_DEFS after
+  QA counted 13 (2026-10-15). The issue's operative words are "*every*
+  FX param (from FX_EFFECT_DEFS…)"; the build covers all 14 kinds
+  (feedbackWarp's `amount` included) and the census suite pins the
+  table against the live catalog so the next addition fails loudly.
+  Recorded here rather than stopped: the count was stale, the intent
+  unambiguous, and stopping would have left a param unquantized.
+- **Composite rows as described** — TRUE, plus one the issue's list
+  predates: the DISH group carries a third knob, TEMPO (`dishTempo`),
+  as a bare RangeRow in the same block. Acceptance ("no bare RangeRow
+  remains on the BUILD surface except Phase-0-named exemptions")
+  requires it, so it is quantized with its siblings.
+- **Phase 1's component API** — TRUE: ModeRow / modeStops / PARAM_STOPS
+  / the dock all as the Phase 1 report describes; DockProvider wraps the
+  whole BUILD panel (LayerStack included), so block rows open the same
+  dock. Phase 1's open flag (the CHIAROSCURO section-editor tenants —
+  SunControls' RangeRows, the MapRow AMOUNT button) is outside this
+  issue's named surface (strata blocks), and SUN X/Y are exempt position
+  params regardless; not touched.
+- **No one-writer file is needed** — liveLoop.mjs / liveResolve.mjs /
+  particles.js untouched.
 
-## Scope boundaries (flagged, not built)
+## Re-pins (each with its cause)
 
-- **MotionTiles (flap / breath / wind)** — NOT converted. They are not
-  ValueButtons and don't use the dock; the tile glyph *is* the value
-  display (#716, pinned by motionGlyph.selfcheck). The Phase 0 paper's
-  closed exemptions list neither exempts nor schedules them; plan.md
-  parks their disposition with Phase 2. Converting them is a design
-  decision, not a Phase 1 mechanic — flagged for the coordinator.
-- **MixBar** — NOT converted. It is a transient crossfade scrubber over
-  `state.voiceMix` during a voice MIX, not a stored shelf param (no
-  PARAM_SPEC entry, nothing to author stops against).
-- **CHIAROSCURO section-editor tenants** (SunControls' RangeRows, the
-  MapRow AMOUNT value button) — NOT converted. They live inside the
-  section editor, not on the §④ shelf; SUN X/Y are exempt position
-  params regardless. If the law is read to reach inside the section
-  editor, that is a separate call — flagged.
-- **Bipolar sign cell** — no bipolar param exists on the Phase 1 shelves
-  (the only one, phylloDivergence, is exempt); the sign cell is a
-  Phase 2 catalog surface (gain / tempTint / grade). Not built.
-
-## ⚠ #1882 interaction (coordinator: compose at publish)
-
-PR #1882 (open, not on this base) adds a power taper to the WETNESS
-slider in AccumFamily.jsx (per its brief:
-`wetTaper = getTaper('power', {min:0, max:1, exp:2})` on the WETNESS
-TrailValue). This build converts that same TrailValue to a ModeRow. The
-two compose cleanly **if** the taper lands as an editor/display mapping
-only:
-
-- The stop entry for `accumulationWetness` was authored in exactly that
-  taper's space (physical stops [0, 0.15, 0.45, 1] = slider
-  0 / .39 / .67 / 1), and the entry records the descriptor.
-- Mode taps write physical stop values — taper-independent.
-- When composing: TrailValue keeps its current signature on this branch
-  (no `taper` prop on WETNESS today). #1882's hunk adds the prop; the
-  merged TrailValue must pass the taper to the editor exactly as #1882
-  does, and the editor's reset target for WETNESS resolves to
-  `wetTaper.toSlider(0) = 0` automatically through the existing
-  taper-aware line in TrailValue. AccumFamily.jsx is the only file the
-  two branches both touch.
+1. **`e2e/fx-row-opens-editor.spec.js`** (budgeted) — the WET drive:
+   `.strata-composite input[type=range]` no longer exists. The spec now
+   taps the WET readout to open the exact editor in the value dock and
+   drives the dock's slider (the Phase 1 cache-verify pattern), then
+   presses Escape before the block-tap steps — the open dock overlays
+   the panel's right edge, which the first run of the re-pin proved by
+   timing out on the DUP click. Header comment updated ("wet slider" →
+   "wet row"). **Passes in the sandbox** (31.5 s).
+2. **`e2e/pattern-controls.spec.js`** (cause: same conversion) — exact
+   values set via a `setExact` helper (readout tap → dock slider, with
+   an Escape first because the open dock covers the next row's readout);
+   the grout/hero honesty test now asserts on the readout button (name,
+   disabled state, reason in its title) and forces a mode tap through
+   the DOM to prove the disabled guard refuses it; the 44px test now
+   measures the detent form (buttons ≥43px as before; mode cells +
+   readouts ≥29px — the 44px law is RangeRow's per DS §2.1, the detent
+   cell's shipped height is 30px from Phase 1). **6/6 pass in the
+   sandbox.**
+3. **`e2e/pattern-tides.spec.js`** (same cause) — movers' disabled state
+   + reason asserted on the readout button; drift set via the dock.
+   **Passes in the sandbox.**
+4. **`e2e/patch-diag-interval.spec.js`** (same cause) — its render-churn
+   source was `.strata-block input[type="range"]` (the opacity slider).
+   It now taps the WET row's LOW/HIGH mode cells alternately — the same
+   LAYER_SET_OPACITY write at the same super-1 Hz rate the test exists
+   to survive; the interval assertion is unchanged. **Passes in the
+   sandbox.**
+5. **`patternEditor.selfcheck`** (budgeted) — the RangeRow count pin
+   (6) becomes mode-row pins (density's own ModeRow + the five pctRow
+   calls); the tone-loop pin is dropped with the RangeRows it scanned;
+   the grout/hero disabled pins re-express against pctRow's options
+   object (same strings, same order); the "percent in the UI, fractions
+   in the store" pin now names pctRow's shared `setParam(id, key, v /
+   100)`. All other checks (modes, density range on the dock editor,
+   the dash readout, no native input, casing, LayerStack pins) pass
+   unmodified.
+6. **`motionGlyph.selfcheck`** (cause: the MotionTiles disposition) —
+   the "#716 the four motion keys wear the tile" pin's BUILD half is
+   re-pinned: flap/breath/wind assert as mode rows in HypeSliders and
+   no `<MotionTile` remains there; the STIMULI `life` tile pin and the
+   glyph-math test pass unmodified.
+7. **`modeStops.selfcheck`** (extension, budgeted) — the PARAM_STOPS
+   census grows by the six Phase 2 layout params, named as a separate
+   BLOCK_LAYOUT_CENSUS list so a seventh cannot slip in silently; the
+   default-is-a-stop check iterates the union. Every other law check
+   covers the new entries through its generic loops, unmodified.
+8. **New selfcheck** `src/panels/build/blockStops.selfcheck.mjs`
+   (budgeted) + one manifest line after modeStops. 10 checks: the three
+   catalog censuses against the live defs, the law clauses per entry
+   (range, default-is-a-stop incl. every PATTERN mode default, OFF per
+   class), the identity/inverse/bipolar census sets, WET cap scaling,
+   PATCH's 0.16, the sign math, and the surface pins (mode rows in the
+   three editors, no RangeRow left in them, tiles converted, MixBar's
+   recorded stop).
+9. **No other re-pins.** Notably `unlockTree.selfcheck` passes
+   unmodified — flap is written longhand in HypeSliders because its
+   gate reason is long enough that prettier wraps an object property
+   (the census reads reason strings per line; a JSX attribute is never
+   wrapped — the same form the MotionTile prop had). `rangeRow`,
+   `spawn`, `foldInCensus`, `casingInCss`, `helpCopy`, `efRackTile`,
+   `wetSoak`, `wetCeiling`, `feedsAccumSurface`, `strataSummary` all
+   pass unmodified.
 
 ## Verification
 
-- `modeStops.selfcheck` — 11/11.
-- Pin-sensitive suites run individually, all green: spawn, unlockTree
-  (13 groups), chiaroscuro (10), foldInCensus (11), helpCopy,
-  casingInCss, motionGlyph, rangeRow (7), shiftLayer.
-- Full manifest sweep — 538 manifest commands run (continuing past
-  failures; Playwright chromium installed first, so browser sections
-  ran at full counts). Two failures, both proven environmental and
-  neither in touched territory:
+- New/extended suites: `blockStops` 10/10, `modeStops` 11/11,
+  `patternEditor` 6/6, `motionGlyph` 2/2.
+- Full manifest sweep (Playwright chromium installed first, so browser
+  sections ran at full counts): **537 pass / 3 fail**, the three proven
+  environmental and none in touched territory:
   - `src/gl/accum.selfcheck.mjs` — aborted (exit 134, sandbox heap)
     inside the sweep; solo re-run with
     `NODE_OPTIONS=--max-old-space-size=3072` on this tree: **83/83,
     exit 0**. The build touches no gl code.
-  - `src/fx/rollSafety.selfcheck.mjs` — exit 1 in the sweep; solo
-    re-runs on this tree and on the pristine Phase 0 base (0da9a3d6)
-    fail identically — same throw at rollSafety.selfcheck.mjs:231,
-    outputs identical modulo the node PID. Base-identical.
-  - `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` — excluded from
-    the continuing sweep after the first `npm run selfcheck` stopped
-    there; verified separately: fails identically on this tree and
-    the pristine base (`build-wasm.sh --verify` — no cargo in the
-    sandbox). Base-identical.
-  - Everything else passed, including the new modeStops suite (11/11).
-- e2e `cache-verify.spec.js` (the re-pinned spec) — attempted in the
-  sandbox: the re-pin itself works (the readout tap opens the dock;
-  the range locator resolves to the visible COUNT editor, value 300),
-  then `setRange`'s `slider.evaluate` hits the 120 s test timeout.
-  The pristine Phase 0 base with the ORIGINAL spec fails at the same
-  call with the same timeout — base-identical sandbox page stall,
-  not a re-pin failure. CI's e2e-smoke job is authoritative.
+  - `src/fx/rollSafety.selfcheck.mjs` — fails identically on this tree
+    and on the pristine Phase 1 base (0e8ad17e): same throw at
+    rollSafety.selfcheck.mjs:231, outputs identical modulo the node PID.
+  - `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` — fails identically
+    on the pristine base (`build-wasm.sh --verify` — no cargo in the
+    sandbox).
+- e2e in the sandbox (vite preview + Playwright chromium):
+  `fx-row-opens-editor` PASS, `pattern-controls` 6/6 PASS,
+  `pattern-tides` PASS, `patch-diag-interval` PASS.
+  `cache-verify` (Phase 1's spec, unmodified here) hits the 120 s
+  timeout at its `setRange` evaluate — proven base-identical on my own
+  run: the pristine Phase 1 base (0e8ad17e) in this sandbox fails at
+  the identical call (`setRange`, spec.js:45:16 ← 105:9, same
+  `locator.evaluate` timeout). A sandbox page stall, not the refactor —
+  the four dock-driving specs above exercise the same readout→dock→
+  slider path live and pass. CI's e2e-smoke job is authoritative.
 - `npm run build` — green. `npm run lint` — 0 errors (11 pre-existing
   warnings, none in touched files). `npm run format:check` — clean
-  (prettier --write applied to the one new selfcheck file only).
-- Dice-acceptance: a stored in-between value renders identically (no
-  write path changed anywhere) and displays nearest-mode + dot —
-  asserted in modeStops.selfcheck (wetness 0.37, count 373, damping 0.91).
+  (prettier --write applied to touched code files only).
+- Dice-acceptance: a stored in-between catalog value renders identically
+  (no write path changed) and displays nearest-mode + dot under its own
+  sign — the math is pinned in blockStops.selfcheck (gain −0.4 →
+  LOW-magnitude, off-detent, sign −).
 
 ## Files touched
 
-- `app/src/data/layout-modes.js` — PARAM_STOPS added (data only;
-  normalize/validate/write paths untouched).
-- `app/src/panels/build/te/ModeRow.jsx` — NEW.
-- `app/src/panels/build/te/modeStops.mjs` — NEW (pure half).
-- `app/src/panels/build/te/modeStops.selfcheck.mjs` — NEW + manifest line.
-- `app/src/panels/build/te/TeaMatrix.jsx` — additive `dot` option.
-- `app/src/panels/build/te/editors.jsx` — SliderEditor `defaultValue`.
-- `app/src/panels/build/te/ValueButton.jsx` — header comment only.
-- `app/src/panels/layout/LayoutSliders.jsx`, `SwarmSliders.jsx`,
-  `HypeSliders.jsx`, `AppearanceSliders.jsx`, `MaterialSliders.jsx`,
-  `AccumFamily.jsx` — shelf conversions.
-- `app/src/styles/panels.css` — `.te-mode*` + `.te-dot`; `.te-cell`
-  gains `position: relative`.
-- `app/src/data/tour.js` — one step body reworded.
-- `app/e2e/cache-verify.spec.js` — opener re-pin.
+- `app/src/data/layout-modes.js` — PARAM_STOPS +6 entries (data only).
+- `app/src/panels/build/te/ModeRow.jsx` — block seat + sign cell
+  (shelf behavior unchanged).
+- `app/src/panels/build/te/modeStops.mjs` — bipolarStateFor /
+  bipolarValueFor added.
+- `app/src/panels/build/blockStops.mjs` — NEW (the catalog tables).
+- `app/src/panels/build/blockStops.selfcheck.mjs` — NEW + manifest line.
+- `app/src/panels/build/LayerStack.jsx` — WET / PATCH / DISH /
+  FxEffectEditor conversions.
+- `app/src/panels/build/MathEffectEditor.jsx` — param-row conversion.
+- `app/src/panels/build/PatternEditor.jsx` — six-row conversion.
+- `app/src/panels/layout/HypeSliders.jsx` — flap / breath / wind tiles
+  → mode rows.
+- `app/src/styles/panels.css` — `.te-mode-block` family (+ readout
+  min-height for target parity).
+- `app/src/panels/build/te/modeStops.selfcheck.mjs` — census extension.
+- `app/src/panels/build/patternEditor.selfcheck.mjs`,
+  `app/src/components/motionGlyph.selfcheck.mjs` — re-pins (above).
+- `app/e2e/fx-row-opens-editor.spec.js`, `app/e2e/pattern-controls.spec.js`,
+  `app/e2e/pattern-tides.spec.js`, `app/e2e/patch-diag-interval.spec.js`
+  — re-pins (above).
 - `app/selfcheck.manifest` — one line.

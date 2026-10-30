@@ -16,28 +16,38 @@ const ok = (name, fn) => {
 const ed = read('./PatternEditor.jsx');
 const stack = read('./LayerStack.jsx');
 
-ok('the editor offers every mode and the signed range; sliders are the house RangeRow, never a native input', () => {
-  for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD', 'TIDES'].includes(m)); // #1797 TIDES
-  assert.match(ed, /PATTERN_MODES\.map\(\(m\) => \(/);
-  assert.match(flat(ed), fre(/min=\{PATTERN_DENSITY_MIN\} max=\{PATTERN_DENSITY_MAX\}/));
-  assert.equal(PATTERN_DENSITY_MIN, 4);
-  assert.equal(PATTERN_DENSITY_MAX, 12);
-  assert.ok(!/<input\b/.test(ed), 'no native <input>');
-  assert.equal((ed.match(/<RangeRow\b/g) || []).length, 6, 'density, mix, grout, hero, drift, movers');
-  for (const tone of ed.match(/tone="[a-z]+"/g)) assert.equal(tone, 'tone="build"', 'BUILD is yellow');
-});
+ok(
+  'the editor offers every mode and the signed range; the six params are mode rows (#1608), never a native input',
+  () => {
+    for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD', 'TIDES'].includes(m)); // #1797 TIDES
+    assert.match(ed, /PATTERN_MODES\.map\(\(m\) => \(/);
+    assert.match(flat(ed), fre(/min=\{PATTERN_DENSITY_MIN\} max=\{PATTERN_DENSITY_MAX\}/));
+    assert.equal(PATTERN_DENSITY_MIN, 4);
+    assert.equal(PATTERN_DENSITY_MAX, 12);
+    assert.ok(!/<input\b/.test(ed), 'no native <input>');
+    // #1608 re-pin (cause: Phase 2 quantization) — the six RangeRows are
+    // ModeRows now: density renders its own, the five percent params share
+    // the pctRow helper. The exact values still edit through the dock's
+    // SliderEditor (the range pin above is that editor's).
+    assert.ok(!/<RangeRow\b/.test(ed), 'no bare RangeRow remains in the pattern editor');
+    assert.match(ed, /<ModeRow\b/, 'density renders a mode row');
+    for (const key of ['mix', 'grout', 'hero', 'drift', 'movers']) {
+      assert.match(ed, new RegExp(`pctRow\\(\\s*'${key}'`), `${key} renders a mode row via pctRow`);
+    }
+  },
+);
 
 ok('honest UI: what a mode ignores is disabled WITH a reason, never hidden and never live', () => {
+  // #1608 re-pin (same cause) — the label + reason ride the mode row's
+  // props now, in pctRow's options object, with the same strings.
   assert.match(
     flat(ed),
-    fre(
-      /ariaLabel="Pattern grout" disabled=\{!quilt\} disabledLabel="Quilt only" disabledReason="only QUILT has grout"/,
-    ),
+    fre(/'Pattern grout', \{ disabled: !quilt, disabledLabel: 'Quilt only', disabledReason: 'only QUILT has grout'/),
   );
   assert.match(
     flat(ed),
     fre(
-      /ariaLabel="Pattern hero" disabled=\{!quilt\} disabledLabel="Quilt only" disabledReason="only QUILT has hero tiles"/,
+      /'Pattern hero', \{ disabled: !quilt, disabledLabel: 'Quilt only', disabledReason: 'only QUILT has hero tiles'/,
     ),
   );
   assert.match(
@@ -54,7 +64,9 @@ ok('every control writes through the slice, which sanitizes; nothing calls the s
   for (const ev of ['PATTERN_MODE', 'PATTERN_PARAM']) assert.match(ed, new RegExp(`Events\\.${ev}`));
   assert.match(ed, /requestPatternShuffle\(id\)/, 'SHUFFLE goes through the DROP gate, never straight to the seed');
   assert.ok(!/s\.shufflePattern/.test(ed));
-  assert.match(ed, /setParam\(id, 'grout', v \/ 100\)/, 'percent in the UI, fractions in the store');
+  // #1608 re-pin (same cause) — the percent→fraction write is pctRow's one
+  // shared mechanism for all five percent params, grout included.
+  assert.match(ed, /setParam\(id, key, v \/ 100\)/, 'percent in the UI, fractions in the store');
   assert.ok(!/setState|useStore\.getState/.test(ed));
 });
 

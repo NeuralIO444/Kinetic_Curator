@@ -600,7 +600,16 @@ export const PARAM_STOPS = {
   // ── ③ hype / moth ──
   creatures: { stops: [0, 1, 2, 4] },
   body: { stops: [1, 2, 3, 5], atlas: true },
+  // #1608 (Phase 2) — the #716 motion keys (flap / breath / wind) join the
+  // table: the closed Phase 0 exemptions list never named the tiles, and
+  // D1's scope covers them, so their BUILD form is the mode row like every
+  // neighbour. The MotionTile glyph form survives only in STIMULI (life),
+  // outside the amendment's BUILD scope. All three are magnitude class:
+  // at 0 the param contributes nothing (no beat, no swell, no wind).
+  flap: { stops: [0, 0.35, 0.65, 1] },
   tight: { stops: [0.05, 0.35, 0.55, 0.85] },
+  breath: { stops: [0, 0.3, 0.6, 1] },
+  wind: { stops: [0, 0.5, 1, 3] },
   metabolism: { stops: [0, 0.5, 1, 2] },
   // ── ③ ACCUM trail family ──
   echoes: { stops: [0, 1, 2, 4] },
@@ -640,6 +649,14 @@ export const PARAM_STOPS = {
   // detents spread in the working direction — a lazier, longer ramp.
   washSpread: { stops: [1, 1.6, 2.5, 4], identity: true },
   stippleDotScale: { stops: [0.5, 1.2, 2.5, 4.5] },
+  // ── ② CAST — the DISH knobs (#1409): layout params whose rows live
+  // inside the strata blocks, not on a shelf (#1608, Phase 2). Same law:
+  // authored stops, the shipped default always among them, magnitude
+  // class (0 = the knob contributes nothing: no bounce, no repel, a cold
+  // dish).
+  contactRestitution: { stops: [0, 0.25, 0.5, 1] },
+  contactRepel: { stops: [0, 1, 2.5, 5] },
+  dishTempo: { stops: [0, 0.3, 0.6, 1] },
 };
 
 /**

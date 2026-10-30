@@ -54,27 +54,31 @@ test('BUILD sliders are yellow, STIMULI cyan, PLAY ink; all with a 44px hit area
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
 
-  // BUILD: the layer wet slider (plus an FX parameter slider once one exists)
+  // BUILD: the shelf's surviving sliders (the exempt dual ranges), plus an
+  // FX parameter's exact-editor slider once one is opened.
   await page.getByRole('tab', { name: /build/i }).click();
   const stack = page.locator('.build-layer-stack');
   const addSlot = stack.locator('.strata-add');
   await addSlot.click();
   await addSlot.click();
   await addSlot.click(); // FX 3: the Blur / Focus family
-  await stack.locator('.fx-editor .chip-btn').click(); // + ADD SHARPEN (has two sliders)
-  await expect(stack.locator('.fx-editor input[type=range]')).toHaveCount(2);
+  await stack.locator('.fx-editor .chip-btn').click(); // + ADD SHARPEN (has two params)
+  // #1608 (Strata Q Phase 2) re-pin: FX params are mode rows now, not bare
+  // sliders — SHARPEN's two params show as two detent rows, and the slider
+  // this spec exists to tone-check lives in the param's exact editor (D2:
+  // tap the readout). Open it so the house slider joins the check below.
+  await expect(stack.locator('.fx-editor .te-mode')).toHaveCount(2);
+  await stack.locator('.fx-editor .te-block-readout').first().click();
+  await expect(page.locator('.te-dock.open input[type=range]')).toHaveCount(1);
   const build = await thumbs(page, '.panel-layout');
-  // Motion tiles (glyph + pose sliders, e.g. wing beat) are ink wherever they sit; the spec's table says so.
   expectHouse(
     build.filter((x) => !/motion-slider/.test(x.cls)),
     BUILD,
     'BUILD (the whole panel: layout, appearance, layers)',
   );
-  expectHouse(
-    build.filter((x) => /motion-slider/.test(x.cls)),
-    INK,
-    'BUILD motion tiles',
-  );
+  // #1608: BUILD's motion tiles (flap/breath/wind) are mode rows too, so no
+  // motion-slider remains in this panel — the BUILD motion branch is gone.
+  // The surviving slider-based MotionTile lives in STIMULI, checked below.
 
   // STIMULI: the route-depth sliders, and GAIN once SETUP is open
   await page.getByRole('tab', { name: /stimuli/i }).click();

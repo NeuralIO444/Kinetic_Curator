@@ -76,8 +76,15 @@ const SHELF_CENSUS = [
   'stippleDotScale',
 ];
 
-ok('the stop table covers exactly the shelf census', () => {
-  assert.deepStrictEqual(Object.keys(PARAM_STOPS).sort(), [...SHELF_CENSUS].sort());
+// #1608 (Phase 2) — the layout params whose rows Phase 2 quantized: the
+// #716 motion keys (shelf tiles in HypeSliders) and the DISH knobs (rows
+// inside the strata blocks, LayerStack). Same table, same law — the
+// census grows by exactly these six, named here so a seventh cannot
+// slip in silently.
+const BLOCK_LAYOUT_CENSUS = ['flap', 'breath', 'wind', 'contactRestitution', 'contactRepel', 'dishTempo'];
+
+ok('the stop table covers exactly the shelf census + the Phase 2 layout params', () => {
+  assert.deepStrictEqual(Object.keys(PARAM_STOPS).sort(), [...SHELF_CENSUS, ...BLOCK_LAYOUT_CENSUS].sort());
 });
 
 ok('the Phase 0 exemptions stay out of the table', () => {
@@ -120,7 +127,7 @@ ok('every stop sits inside the param range', () => {
 });
 
 ok('the shipped default is always one of the stops', () => {
-  for (const key of SHELF_CENSUS) {
+  for (const key of [...SHELF_CENSUS, ...BLOCK_LAYOUT_CENSUS]) {
     const def = key === 'accumScan' ? 0 : DEFAULT_LAYOUT_PARAMS[key];
     assert.ok(PARAM_STOPS[key].stops.includes(def), `${key}: default ${def} is a stop`);
   }
