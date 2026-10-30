@@ -329,6 +329,14 @@ function sanitizeMod(kind, raw) {
 }
 
 /**
+ * #1609 (Strata Q Phase 3, D5) — a MATH chain holds at most this many ops.
+ * The skeleton is one MATH layer; the cap is on the chain inside it. The
+ * slice refuses adds past it and the project loader trims longer chains
+ * on load (said out loud in the load receipt).
+ */
+export const MAX_MATH_OPS = 4;
+
+/**
  * Sanitize a raw math effects array: drop unknown kinds and non-objects,
  * clamp params to catalog ranges, fill defaults, sanitize mod routing.
  * Fail closed, never throw.

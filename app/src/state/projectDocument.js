@@ -277,7 +277,7 @@ export function parseProject(raw) {
     if (!seedRes.ok) return seedRes;
     const seed = seedRes.seed;
     const customAssets = sanitizeOverlay(raw.customAssets);
-    const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
+    const { layers, activeLayerId, trims } = normalizeLayers(raw.layers, raw.activeLayerId);
     // #643 — drop snapshots for layers that don't exist in the doc.
     const layerIds = (layers || []).map((l) => l && l.id);
     const doc = {
@@ -326,6 +326,10 @@ export function parseProject(raw) {
         layerIds,
       ),
     };
+    // #1609 — the skeleton trim's names ride the doc to the load receipt
+    // (loadedMessage names them). Absent when nothing trimmed, so a clean
+    // load's doc is exactly the doc it was before the skeleton.
+    if (trims && trims.length) doc.layerTrims = trims;
     landLegacyCreatureCount(raw, doc);
     return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
   }
@@ -342,7 +346,7 @@ export function parseProject(raw) {
   const seed = seedRes.seed;
 
   const customAssets = sanitizeOverlay(raw.customAssets);
-  const { layers, activeLayerId } = normalizeLayers(raw.layers, raw.activeLayerId);
+  const { layers, activeLayerId, trims } = normalizeLayers(raw.layers, raw.activeLayerId);
   // #643 — drop snapshots for layers that don't exist in the doc.
   const layerIds = (layers || []).map((l) => l && l.id);
   const doc = {
@@ -384,6 +388,10 @@ export function parseProject(raw) {
       layerIds,
     ),
   };
+  // #1609 — the skeleton trim's names ride the doc to the load receipt
+  // (loadedMessage names them). Absent when nothing trimmed, so a clean
+  // load's doc is exactly the doc it was before the skeleton.
+  if (trims && trims.length) doc.layerTrims = trims;
   landLegacyCreatureCount(raw, doc);
   return { ok: true, doc, sanitized: countRepairedFields(raw, doc) };
 }

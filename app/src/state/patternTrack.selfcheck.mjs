@@ -5,7 +5,7 @@ import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { useStore } from './store.js';
 import { MAX_CONTENT_TRACKS, isPatternLayer, isKcLayer, displayLayerName } from './slices/layersSlice.js';
-import { normalizeLayers } from './projectNormalize.js';
+import { normalizeLayers, MAX_LAYERS } from './projectNormalize.js';
 import { PATTERN_MODES, PATTERN_DEFAULT_DENSITY, defaultPattern, sanitizePattern } from './patternTrack.js';
 
 let n = 0;
@@ -147,13 +147,26 @@ ok(
   },
 );
 
-ok('the content cap counts PATTERN tracks (4 total)', () => {
-  seed();
-  for (let i = 0; i < 6; i++) S().addPatternLayer();
-  assert.equal(S().layers.filter((l) => !['fx', 'math'].includes(l.type)).length, MAX_CONTENT_TRACKS);
-  S().addLayer();
-  assert.equal(S().layers.length, MAX_CONTENT_TRACKS, 'a KC track is refused once the cap is full');
-});
+ok(
+  '#1609 (D4): PATTERN spends no content slot — ground grows to the document bound; KC adds gate on their own cap',
+  () => {
+    // Re-pinned from "the content cap counts PATTERN tracks (4 total)": D4
+    // puts the ground beneath the skeleton, outside the 2/4/4 count.
+    seed();
+    for (let i = 0; i < 6; i++) S().addPatternLayer();
+    assert.equal(
+      S().layers.filter(isPatternLayer).length,
+      6,
+      'every pattern lands — the content cap does not count ground',
+    );
+    S().addLayer(); // KC 1 → 2: allowed
+    assert.equal(S().layers.filter(isKcLayer).length, 2);
+    S().addLayer(); // the KC cap refuses on its own count, ground or no ground
+    assert.equal(S().layers.filter(isKcLayer).length, MAX_CONTENT_TRACKS);
+    for (let i = 0; i < 20; i++) S().addPatternLayer();
+    assert.equal(S().layers.length, MAX_LAYERS, 'the document bound, not the skeleton, stops the ground');
+  },
+);
 
 ok(
   'setPatternParam: clamps through the sanitizer, ignores unknown keys, mode and seed, and no-ops on an equal value',
@@ -263,24 +276,21 @@ ok('removing: a PATTERN track goes freely, the LAST KC track stays even if a pat
   assert.equal(S().activeLayerId, 'kc-b', 'the next active layer is a KC track, never the pattern track');
 });
 
-ok(
-  'duplicate: a copy of a PATTERN track is the same pattern, no snapshot; the cap and solo treat it as content',
-  () => {
-    seed();
-    S().addPatternLayer('GLYPH');
-    S().setPatternParam(pt().id, 'drift', 0.5);
-    const src = pt();
-    S().duplicateLayer(src.id);
-    const ps = S().layers.filter(isPatternLayer);
-    assert.equal(ps.length, 2);
-    assert.deepEqual(ps[1].pattern, src.pattern);
-    assert.ok(ps[1].id !== src.id && S().layerSnapshots[ps[1].id] === undefined);
-    assert.equal(S().layers.indexOf(ps[1]), S().layers.indexOf(ps[0]) + 1);
-    S().soloLayer(ps[0].id);
-    assert.ok(S().layers.find((l) => l.id === ps[0].id).visible);
-    assert.ok(!S().layers.find((l) => l.id === 'kc-a').visible, 'solo hides the other content tracks');
-  },
-);
+ok('duplicate: a copy of a PATTERN track is the same pattern, no snapshot; solo treats it as content', () => {
+  seed();
+  S().addPatternLayer('GLYPH');
+  S().setPatternParam(pt().id, 'drift', 0.5);
+  const src = pt();
+  S().duplicateLayer(src.id);
+  const ps = S().layers.filter(isPatternLayer);
+  assert.equal(ps.length, 2);
+  assert.deepEqual(ps[1].pattern, src.pattern);
+  assert.ok(ps[1].id !== src.id && S().layerSnapshots[ps[1].id] === undefined);
+  assert.equal(S().layers.indexOf(ps[1]), S().layers.indexOf(ps[0]) + 1);
+  S().soloLayer(ps[0].id);
+  assert.ok(S().layers.find((l) => l.id === ps[0].id).visible);
+  assert.ok(!S().layers.find((l) => l.id === 'kc-a').visible, 'solo hides the other content tracks');
+});
 
 ok('selection: adding a PATTERN track opens its editor; only a pattern id can be selected; removing clears it', () => {
   seed([kc('kc-a'), kc('kc-b')]);
@@ -353,10 +363,14 @@ ok('normalizeLayers keeps a valid pattern, repairs a broken one, and keeps the a
 });
 
 ok(
-  'normalizeLayers: PATTERN counts toward the content cap; a PATTERN-only document is invalid; PATCH never targets one',
+  'normalizeLayers: #1609 (D4) — PATTERN is outside the content cap; a PATTERN-only document is invalid; PATCH never targets one',
   () => {
+    // Re-pinned: ground is not rationed, so all five patterns survive
+    // beside the KC track and nothing is trimmed.
     const many = [kc('kc-a'), ...['p1', 'p2', 'p3', 'p4', 'p5'].map((id) => ({ id, type: 'pattern', pattern: {} }))];
-    assert.equal(normalizeLayers(many, 'kc-a').layers.length, MAX_CONTENT_TRACKS);
+    const kept = normalizeLayers(many, 'kc-a');
+    assert.equal(kept.layers.length, 6);
+    assert.deepEqual(kept.trims, []);
     assert.equal(
       normalizeLayers([{ id: 'p1', type: 'pattern', pattern: {} }], 'p1').layers,
       null,

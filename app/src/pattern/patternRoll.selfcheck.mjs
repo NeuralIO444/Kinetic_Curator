@@ -155,12 +155,22 @@ ok(
         1,
         'never a second one',
       );
-    const full = ['a', 'b', 'c', 'd'].map((id) => ({ id, type: 'content' }));
+    // #1609 (D4) re-pin: the birth gate is the document bound, not the
+    // content count — ground spends no skeleton slot, so even the
+    // skeleton's fullest stack (2 content strata) can still be born under.
+    const fullest = ['a', 'b'].map((id) => ({ id, type: 'content' }));
+    for (let i = 1; i < 80; i++)
+      assert.equal(
+        rollPatternLayers(fullest, 'chaos', mkRng(i), { addChance: 1 }).layers.length,
+        3,
+        'a full double exposure still births its ground',
+      );
+    const full = Array.from({ length: 16 }, (_, i) => ({ id: `c${i}`, type: 'content' }));
     for (let i = 1; i < 80; i++)
       assert.equal(
         rollPatternLayers(full, 'chaos', mkRng(i), { addChance: 1 }).layers.length,
-        4,
-        'at the 4-track cap nothing is added',
+        16,
+        'at the document bound (MAX_LAYERS) nothing is added',
       );
     for (let i = 1; i < 80; i++)
       assert.equal(

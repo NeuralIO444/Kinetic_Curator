@@ -193,20 +193,33 @@ ok('#520 Phase 1b: availableFxKinds — empty stack offers all live kinds in slo
   assert.deepEqual(kinds, [...ef1, ...ef2, ...ef3, ...ef4]);
   assert.ok(!kinds.some((k) => FX_RACK.find((s) => s.slot === 'EF-1').stubs.includes(k)), 'no stubs in offer-list');
 });
-ok('#520 Phase 1b: availableFxKinds — filled slot is removed from the offer-list', () => {
+ok('#1609 (D6): availableFxKinds — a present kind leaves the offer-list, its slot-mates stay', () => {
+  // Re-pinned from #520 Phase 1b's filled-slot law: D6 killed the per-slot
+  // ration, so only the kind itself is un-offered — free picks mean the
+  // rest of EF-2 (and every other family) stays reachable in one layer.
   const kinds = availableFxKinds([{ kind: 'rgbSplit', params: {} }]);
-  assert.ok(!kinds.includes('rgbSplit'), 'rgbSplit slot filled');
-  assert.ok(!kinds.includes('displace'), 'same EF-2 slot: displace gone too');
-  assert.ok(!kinds.includes('tear'), 'same EF-2 slot: tear gone too');
+  assert.ok(!kinds.includes('rgbSplit'), 'rgbSplit already in the layer');
+  assert.ok(kinds.includes('displace'), 'same EF-2 slot: displace still offered (free picks)');
+  assert.ok(kinds.includes('tear'), 'same EF-2 slot: tear still offered');
   assert.ok(kinds.includes('posterize'), 'EF-3 still available');
   assert.ok(kinds.includes('grain'), 'EF-4 still available');
 });
-ok('#520 Phase 1b: availableFxKinds — all slots filled returns empty', () => {
+ok('#1609 (D6): availableFxKinds — the CRT recipe is buildable in one layer', () => {
+  // The acceptance case: Scanlines + Halo + Grain (all EF-4) + RGB Split
+  // (EF-2) must each stay on offer until all four are in the layer.
+  let effects = [];
+  for (const kind of ['scanlines', 'halo', 'grain', 'rgbSplit']) {
+    assert.ok(availableFxKinds(effects).includes(kind), `${kind} on offer at ${effects.length} effects`);
+    effects = [...effects, { kind, params: {} }];
+  }
+  assert.equal(effects.length, 4);
+});
+ok('#1609 (D6): availableFxKinds — a full layer (MAX_FX_EFFECTS) returns empty', () => {
   const effects = [
-    { kind: 'sharpen', params: {} }, // EF-1 (#1022)
-    { kind: 'rgbSplit', params: {} }, // EF-2
-    { kind: 'posterize', params: {} }, // EF-3
-    { kind: 'grain', params: {} }, // EF-4
+    { kind: 'sharpen', params: {} },
+    { kind: 'rgbSplit', params: {} },
+    { kind: 'posterize', params: {} },
+    { kind: 'grain', params: {} },
   ];
   assert.deepEqual(availableFxKinds(effects), []);
 });
@@ -416,7 +429,10 @@ ok('setActiveLayer ignores FX targets', () => {
   api.setActiveLayer(fxId);
   assert.equal(get().activeLayerId, 'layer-1');
 });
-ok('duplicateLayer deep-clones the effect stack', () => {
+ok('#1609 (D6): duplicateLayer refuses a second FX layer at the skeleton cap', () => {
+  // Re-pinned from the deep-clone test: with one FX layer by law, its DUP
+  // can never produce a copy — the cap refuses first, so the effect-stack
+  // clone branch is unreachable for FX (it still serves content layers).
   const { api, get } = driveSlice();
   api.addFxLayer();
   const fxId = get().layers[1].id;
@@ -424,11 +440,8 @@ ok('duplicateLayer deep-clones the effect stack', () => {
   api.fxEffectSetParam(fxId, 0, 'dx', 10);
   api.duplicateLayer(fxId);
   const s = get();
-  assert.equal(s.layers.length, 3);
-  const copy = s.layers[2];
-  assert.equal(copy.type, 'fx');
-  assert.equal(copy.effects[0].params.dx, 10);
-  assert.notEqual(copy.effects, s.layers[1].effects); // deep clone
+  assert.equal(s.layers.length, 2); // refused — still one FX layer
+  assert.equal(s.layers[1].effects[0].params.dx, 10); // original untouched
 });
 ok('effect CRUD is fail-closed', () => {
   const { api, get } = driveSlice();
@@ -441,22 +454,27 @@ ok('effect CRUD is fail-closed', () => {
   // add rgbSplit (EF-2)
   api.fxEffectAdd(fxId, 'rgbSplit');
   assert.equal(get().layers[1].effects.length, 1);
-  // #520 Phase 1b: tear is EF-2, same slot as rgbSplit — rejected
+  // #1609 (D6) — free picks: tear is EF-2, same family as rgbSplit, and is
+  // ACCEPTED now (the #520 Phase 1b slot rejection died with the binding).
+  // Re-pinned: the fail-closed property that survives is the duplicate —
+  // a kind already in the layer is not offered again, so it refuses.
+  api.fxEffectAdd(fxId, 'rgbSplit');
+  assert.equal(get().layers[1].effects.length, 1); // still 1 — duplicate refused
   api.fxEffectAdd(fxId, 'tear');
-  assert.equal(get().layers[1].effects.length, 1); // still 1
-  // posterize is EF-3 (empty slot) — accepted, inserted after rgbSplit
-  api.fxEffectAdd(fxId, 'posterize');
   assert.equal(get().layers[1].effects.length, 2);
+  // posterize is EF-3 — accepted, inserted after the EF-2 pair (slot order)
+  api.fxEffectAdd(fxId, 'posterize');
+  assert.equal(get().layers[1].effects.length, 3);
   assert.deepEqual(
     get().layers[1].effects.map((e) => e.kind),
-    ['rgbSplit', 'posterize'],
+    ['rgbSplit', 'tear', 'posterize'],
   );
-  assert.deepEqual(get().layers[1].effects[1].params, defaultFxParams('posterize'));
+  assert.deepEqual(get().layers[1].effects[2].params, defaultFxParams('posterize'));
   api.fxEffectRemove(fxId, 99);
   api.fxEffectReorder(fxId, 0, 99);
   api.fxEffectSetParam(fxId, 0, 'dx', 'not-a-number');
   api.fxEffectSetParam(fxId, 0, 'bogus', 5);
-  assert.equal(get().layers[1].effects.length, 2);
+  assert.equal(get().layers[1].effects.length, 3);
   assert.equal(get().layers[1].effects[0].params.dx, 3); // NaN -> default
   api.fxEffectSetParam(fxId, 0, 'dx', 1000);
   assert.equal(get().layers[1].effects[0].params.dx, 24); // clamped
@@ -467,10 +485,10 @@ ok('effect CRUD is fail-closed', () => {
   api.fxEffectSetParam(fxId, 0, 'dx', Infinity);
   assert.equal(get().layers[1].effects[0].params.dx, 3); // non-finite -> default
   api.fxEffectSetParam(fxId, 0, 'dx', 24);
-  api.fxEffectReorder(fxId, 0, 1); // swap rgbSplit ↔ posterize
-  assert.equal(get().layers[1].effects[0].kind, 'posterize');
+  api.fxEffectReorder(fxId, 0, 1); // swap rgbSplit ↔ tear
+  assert.equal(get().layers[1].effects[0].kind, 'tear');
   api.fxEffectRemove(fxId, 0);
-  assert.equal(get().layers[1].effects.length, 1);
+  assert.equal(get().layers[1].effects.length, 2);
 });
 // #554 — the builtin u_p packers clamp for themselves (the GL harness serves
 // only src/gl, so they cannot import the catalog). This is the drift gate:

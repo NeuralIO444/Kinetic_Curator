@@ -9,14 +9,15 @@ import {
   availableFxKinds,
   fxEffectInsertIndex,
 } from '../../fx/fxFilters.js';
-import { kindsForFxOrdinal } from '../../fx/fxTrack.js';
 import {
   isMathLayer,
   defaultMathEffects,
   defaultMathParams,
   MATH_EFFECT_DEFS,
   MATH_MOD_SOURCES,
+  MAX_MATH_OPS,
 } from '../../fx/mathFilters.js';
+import { MAX_LAYERS } from '../projectNormalize.js';
 import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { removePatchSample } from '../../engine/kernel/tracks/patchDiag.mjs';
@@ -24,13 +25,19 @@ import { isTapeFull } from '../tapeBudget.js';
 import { fxBeforeMath, canTrade } from '../layerOrder.js';
 import { PATTERN_DEFAULT_DENSITY, PATTERN_PARAM_KEYS, defaultPattern, sanitizePattern } from '../patternTrack.js';
 
-export const MAX_CONTENT_TRACKS = 4;
-export const MAX_FX_TRACKS = 4;
+// #1609 (Strata Q Phase 3) — the fixed skeleton, Matt's rulings D3/D5/D6
+// (2026-10-15): exactly 2 CONTENT strata (a double exposure), 1 MATH layer,
+// 1 FX layer. These caps gate ADD/DUP here; the project loader trims legacy
+// stacks to the same shape on load, said out loud (projectNormalize.js).
+// PATTERN strata are the ground itself (D4): they spend no skeleton slot and
+// are bounded only by the document's MAX_LAYERS, like everything else.
+export const MAX_CONTENT_TRACKS = 2;
+export const MAX_FX_TRACKS = 1;
 // #1010 — MATH is a third track type: same grammar as FX (add/remove/hide/
 // solo/opacity/reorder), riding the same fold. Adjustment tracks (FX+MATH)
 // stay above KC tracks, and since #1048 every FX track folds before every
 // MATH track (layerOrder.js) — the tone grade is applied last.
-export const MAX_MATH_TRACKS = 4;
+export const MAX_MATH_TRACKS = 1;
 
 /** Adjustment track: FX or MATH — the two families that grade everything below. */
 export const isAdjustmentLayer = (layer) => isFxLayer(layer) || isMathLayer(layer);
@@ -115,17 +122,18 @@ export const createLayersSlice = (set) => ({
   // with a family). Boot/shuffle system arms build their layers directly in
   // layoutSlice, so they never touch these.
   // - KC: blend modes are free — one-tap replays the last-used blend.
-  // - FX: each FX ordinal is bound to one family (#520/#732: FX-1 Distort,
-  //   FX-2 Tonal, FX-3 Blur, FX-4 Finish) — one-tap replays the last-used
-  //   kind only when the new track's family can hold it, else the empty
-  //   rack. (Replaying cross-family would arm a phantom effect the row
-  //   editor can't show.) Replay goes live on remove/re-add at an ordinal.
+  // - FX: one-tap replays the last-used kind as the new layer's first pick.
+  //   (#520/#732 once bound each FX ordinal to one family and replayed only
+  //   in-family kinds; #1609 D6 killed the binding — picks are free, so any
+  //   last-used menu kind can arm the one FX layer.)
   lastUsedContentBlend: null, // blend-mode string
   lastUsedFxKind: null, // fx-kind string
 
   addLayer: (family) =>
     set((state) => {
-      const content = state.layers.filter((l) => !isAdjustmentLayer(l)).length;
+      // #1609 (D3/D4) — the content cap counts KC tracks only: PATTERN
+      // strata are ground beneath the two exposures, outside the count.
+      const content = state.layers.filter(isKcLayer).length;
       if (content >= MAX_CONTENT_TRACKS) return {};
       // #342 — tape pre-flight: refuse rather than let the governor's shed
       // ladder silently degrade the render to absorb a track the tape can't
@@ -160,12 +168,14 @@ export const createLayersSlice = (set) => ({
       };
     }),
 
-  // #1097 — PATTERN tracks. They share the content cap and the tape pre-flight with KC tracks, never
+  // #1097 — PATTERN tracks. They share the tape pre-flight with KC tracks, never
   // become the active layer, and keep their parameters on the layer. A new one is added as ground (#1183). Seed is a stored integer; SHUFFLE
   // writes a new one (the DROP gate that decides WHEN is #1100). Every write goes through sanitizePattern.
+  // #1609 (D4) — a pattern spends no skeleton slot: the gate is the document
+  // bound (MAX_LAYERS), not the content cap it used to share.
   addPatternLayer: (mode) =>
     set((state) => {
-      if (state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+      if (state.layers.length >= MAX_LAYERS) return {};
       if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
       const id = makeLayerId();
       const n = state.layers.filter(isPatternLayer).length + 1;
@@ -266,7 +276,8 @@ export const createLayersSlice = (set) => ({
       if (!src) return {};
       if (isPatternLayer(src)) {
         // #1097 — a copy is the same pattern (same seed), no snapshot
-        if (state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+        // #1609 (D4) — ground spends no skeleton slot: the document bound gates.
+        if (state.layers.length >= MAX_LAYERS) return {};
         if (isTapeFull(state)) return {};
         const copy = {
           id: makeLayerId(),
@@ -287,7 +298,10 @@ export const createLayersSlice = (set) => ({
       const isFx = isFxLayer(src);
       const isMath = isMathLayer(src);
       const isAdj = isFx || isMath;
-      if (!isAdj && state.layers.filter((l) => !isAdjustmentLayer(l)).length >= MAX_CONTENT_TRACKS) return {};
+      // #1609 — DUP gates at the skeleton caps: KC counts KC tracks only
+      // (D4: ground doesn't spend the slot); the one FX / one MATH layer
+      // cannot be duplicated into a second.
+      if (!isAdj && state.layers.filter(isKcLayer).length >= MAX_CONTENT_TRACKS) return {};
       if (isFx && state.layers.filter(isFxLayer).length >= MAX_FX_TRACKS) return {};
       if (isMath && state.layers.filter(isMathLayer).length >= MAX_MATH_TRACKS) return {};
       if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer/addFxLayer
@@ -303,7 +317,7 @@ export const createLayersSlice = (set) => ({
           ? `${src.name} copy`
           : isMath
             ? `${src.name} copy`
-            : `KC-${state.layers.filter((l) => !isAdjustmentLayer(l)).length + 1}`,
+            : `KC-${state.layers.filter(isKcLayer).length + 1}`,
         type: isFx ? 'fx' : isMath ? 'math' : 'content',
         visible: src.visible,
         layerBlendMode: src.layerBlendMode,
@@ -543,13 +557,13 @@ export const createLayersSlice = (set) => ({
       if (fxCount >= MAX_FX_TRACKS) return {};
       if (isTapeFull(state)) return {}; // #342 — same pre-flight as addLayer
       const id = makeLayerId();
-      // #1014 (mockup C) — the new track's family is fixed by its ordinal, so
-      // the valid kinds are the add-menu kinds in that family's slot. A
-      // chooser pick arms with it AND records it; one-tap "+" replays the
-      // last-used kind when the family can hold it, else the empty rack.
-      const slotKinds = kindsForFxOrdinal(fxCount + 1).filter((k) => FX_MENU_KINDS.includes(k));
-      const picked = typeof family === 'string' && slotKinds.includes(family);
-      const kind = picked ? family : slotKinds.includes(state.lastUsedFxKind) ? state.lastUsedFxKind : null;
+      // #1609 (D6) — picks are free: a chooser pick is any add-menu kind and
+      // arms the one FX layer with it as its first effect; one-tap "+"
+      // replays the last-used kind the same way, else the layer starts
+      // empty. (#1014's ordinal family binding — the pick had to belong to
+      // the new track's family slot — died with the track model.)
+      const picked = typeof family === 'string' && FX_MENU_KINDS.includes(family);
+      const kind = picked ? family : FX_MENU_KINDS.includes(state.lastUsedFxKind) ? state.lastUsedFxKind : null;
       const effects = kind ? [{ kind, params: defaultFxParams(kind) }] : [];
       return {
         ...pushToUndo(state, true, UNDO_KIND_LAYERS),
@@ -586,7 +600,9 @@ export const createLayersSlice = (set) => ({
         ...pushToUndo(state, true, UNDO_KIND_LAYERS),
         layers: state.layers.map((l) => {
           if (l.id !== layerId || !isFxLayer(l)) return l;
-          // #520 Phase 1b: one effect per rack slot — reject if this slot is filled.
+          // #1609 (D6): free picks — reject only what the offer-list rejects
+          // (kind already in the layer, or the layer already holds
+          // MAX_FX_EFFECTS). #520's one-per-slot rejection died with it.
           if (!availableFxKinds(l.effects).includes(kind)) return l;
           // Insert at the correct rack position so EF-1..EF-4 order is maintained.
           const effects = [...(l.effects || [])];
@@ -678,6 +694,9 @@ export const createLayersSlice = (set) => ({
         ...pushToUndo(state, true, UNDO_KIND_LAYERS),
         layers: state.layers.map((l) => {
           if (l.id !== layerId || !isMathLayer(l)) return l;
+          // #1609 (D5) — the chain is capped at MAX_MATH_OPS: a full chain
+          // refuses the add (the editor stops offering before this bites).
+          if ((l.effects || []).length >= MAX_MATH_OPS) return l;
           return { ...l, effects: [...(l.effects || []), { kind, params, mod: {} }] };
         }),
       };

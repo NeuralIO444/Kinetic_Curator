@@ -247,6 +247,12 @@ export const GRAIN_FAMILY_KINDS = ['grain'];
  * family. Phase 4 wires the rack UI; this is the data contract for offer-lists
  * and the slot enforcement added in phases 1-3.
  *
+ * #1609 (D6) — the slot enforcement is dead: picks are free (see
+ * availableFxKinds). The rack survives as the kind→family catalog: it names
+ * each kind's family for tile faces and gives the offer-list and insert
+ * order their canonical EF-1..EF-4 sequence. Families classify kinds; they
+ * no longer ration them.
+ *
  * `stubs` are planned kinds not yet in FX_EFFECT_DEFS — they appear in the
  * rack UI as disabled placeholders so the slot is never visually empty.
  */
@@ -279,22 +285,30 @@ export function isFxLayer(layer) {
 }
 
 /**
- * #520 Phase 1b — offer-list: which kinds can still be added to this stack?
- * A slot is filled once any of its kinds appears in effects. Returns live kinds
- * only (no stubs), ordered by slot (EF-1..EF-4). Used by FxEffectEditor for
- * the add picker and by fxEffectAdd to reject already-filled slots.
+ * #1609 (Strata Q Phase 3, D6) — the FX layer holds at most this many effects.
+ * The skeleton is one FX layer of any 4 kinds; the cap is per layer, and with
+ * MAX_FX_TRACKS at 1 there is only ever the one layer.
+ */
+export const MAX_FX_EFFECTS = 4;
+
+/**
+ * Offer-list: which kinds can still be added to this stack?
+ *
+ * #1609 (D6) supersedes the #520 Phase 1b slot law: picks are FREE — any live
+ * kind not already in the layer may be added, whatever family it belongs to,
+ * until the layer holds MAX_FX_EFFECTS effects. The CRT recipe (Scanlines +
+ * Halo + Grain + RGB Split) is the acceptance case: three EF-4 kinds and one
+ * EF-2 kind coexist in one layer. A kind already present is not offered again
+ * (one instance per kind per layer, as every prior UI assumed). Returns live
+ * kinds only (no stubs), ordered by slot (EF-1..EF-4) so the list is stable.
+ * Used by FxEffectEditor for the add picker and by fxEffectAdd to reject
+ * kinds that are not addable.
  */
 export function availableFxKinds(effects) {
-  const filledSlots = new Set();
-  for (const e of effects || []) {
-    for (const slot of FX_RACK) {
-      if (slot.kinds.includes(e.kind)) {
-        filledSlots.add(slot.slot);
-        break;
-      }
-    }
-  }
-  return FX_RACK.flatMap((slot) => (filledSlots.has(slot.slot) ? [] : slot.kinds));
+  const list = effects || [];
+  if (list.length >= MAX_FX_EFFECTS) return [];
+  const present = new Set(list.map((e) => e && e.kind));
+  return FX_RACK.flatMap((slot) => slot.kinds.filter((k) => !present.has(k)));
 }
 
 /**

@@ -3,13 +3,20 @@
 // A MATH track holds an ordered chain of tone ops (default GAIN → CONTRAST).
 // Each row: op dropdown, the op's knobs as sliders with artist-unit readouts,
 // a per-knob MOD source selector (none / rms / flux / beatPulse), remove and
-// reorder. "+ ADD OP" appends from the 12-op vocabulary.
+// reorder. "+ ADD OP" appends from the 12-op vocabulary — #1609 (D5): the
+// chain is capped at MAX_MATH_OPS (4); a full chain says so instead.
 //
 // MOD semantics (see fx/mathFilters.js applyMathMod): the envelope pushes the
 // knob toward its catalog max; silence is a true no-op.
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
-import { MATH_EFFECT_DEFS, MATH_OP_KINDS, MATH_MOD_SOURCES, formatMathParam } from '../../fx/mathFilters.js';
+import {
+  MATH_EFFECT_DEFS,
+  MATH_OP_KINDS,
+  MATH_MOD_SOURCES,
+  MAX_MATH_OPS,
+  formatMathParam,
+} from '../../fx/mathFilters.js';
 import { ModeRow } from './te/ModeRow.jsx';
 import { SliderEditor } from './te/editors.jsx';
 import { mathStopsFor } from './blockStops.mjs';
@@ -136,23 +143,32 @@ export function MathEffectEditor({ layer, mathOrdinal }) {
   const [pick, setPick] = useState('gain');
   const effects = layer.effects || [];
   const capped = effects.some((fx) => fx?.kind === 'hueRotate');
+  // #1609 (D5) — the chain is capped at MAX_MATH_OPS: a full chain swaps
+  // the add row for the honest note (the slice refuses the add regardless).
+  const chainFull = effects.length >= MAX_MATH_OPS;
   return (
     <div className="math-editor" title={`M ${mathOrdinal} — MATH chain. Order matters: the first op grades first.`}>
       {effects.map((fx, i) => (
         <MathOpRow key={`${fx.kind}-${i}`} layerId={layer.id} index={i} fx={fx} count={effects.length} />
       ))}
-      <div className="math-add-row">
-        <select value={pick} onChange={(e) => setPick(e.target.value)} title="Op to add">
-          {MATH_OP_KINDS.map((k) => (
-            <option key={k} value={k}>
-              {MATH_EFFECT_DEFS[k].label.toUpperCase()}
-            </option>
-          ))}
-        </select>
-        <button className="chip-btn" onClick={() => emit(Events.MATH_EFFECT_ADD, { layerId: layer.id, kind: pick })}>
-          + {MATH_EFFECT_DEFS[pick].label.toUpperCase()}
-        </button>
-      </div>
+      {chainFull ? (
+        <div className="math-order-note" title={`The fixed skeleton caps a MATH chain at ${MAX_MATH_OPS} ops (#1609).`}>
+          chain full — {MAX_MATH_OPS} ops
+        </div>
+      ) : (
+        <div className="math-add-row">
+          <select value={pick} onChange={(e) => setPick(e.target.value)} title="Op to add">
+            {MATH_OP_KINDS.map((k) => (
+              <option key={k} value={k}>
+                {MATH_EFFECT_DEFS[k].label.toUpperCase()}
+              </option>
+            ))}
+          </select>
+          <button className="chip-btn" onClick={() => emit(Events.MATH_EFFECT_ADD, { layerId: layer.id, kind: pick })}>
+            + {MATH_EFFECT_DEFS[pick].label.toUpperCase()}
+          </button>
+        </div>
+      )}
       {capped && (
         <div className="math-warn" title="HUE ROTATE is in this chain — wet capped at 50%.">
           ⚠ 50% wet ceiling active (HUE ROTATE)
