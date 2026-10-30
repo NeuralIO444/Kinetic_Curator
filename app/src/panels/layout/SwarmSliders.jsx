@@ -1,9 +1,10 @@
-// SWARM physics as amber TE value buttons (#1202).
+// SWARM physics as mode rows (#1202; detents #1607, Strata Q Phase 1).
 // PARTICLES / COHESION / GRAVITY / DAMPING plus NOISE SPEED.
-// Mode-gated per #272; locks ride on the button.
-import { isOrganismMode } from '../../data/layout-modes.js';
+// Mode-gated per #272; locks ride on the row.
+import { isOrganismMode, DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
-import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 const fmt2 = (v) => (Math.round(v * 100) / 100).toString();
@@ -18,9 +19,12 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
   const isHype = mode === 'hype';
 
   const btn = (label, key, display, editor, { disabled, disabledReason } = {}) => (
-    <ValueButton
+    <ModeRow
       label={label}
       display={display}
+      value={layoutParams[key] ?? DEFAULT_LAYOUT_PARAMS[key]}
+      stops={stopsFor(key)}
+      onSelect={(v) => set(key, v)}
       locked={lockedParams[key]}
       onToggleLock={() => lock(key)}
       disabled={disabled}
@@ -43,6 +47,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
             min={10}
             max={500}
             step={5}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.particleCount}
             onChange={(v) => set('particleCount', Math.round(v))}
           />,
           { disabled: !(isSwarm || isHype), disabledReason: 'Swarm or hype mode only' },
@@ -58,6 +63,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
             max={0.6}
             step={0.05}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.swarmCohesion}
             onChange={(v) => set('swarmCohesion', v)}
           />,
           {
@@ -76,6 +82,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
             max={5.0}
             step={0.1}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.gravityWells}
             onChange={(v) => set('gravityWells', v)}
           />,
           { disabled: !(isSwarm || isHype), disabledReason: 'Swarm or hype mode only' },
@@ -91,6 +98,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
             max={0.99}
             step={0.01}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.damping}
             onChange={(v) => set('damping', v)}
           />,
           {
@@ -109,6 +117,7 @@ export function SwarmSliders({ layoutParams, lockedParams }) {
             max={3.0}
             step={0.1}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.noiseSpeed}
             onChange={(v) => set('noiseSpeed', v)}
           />,
         )}

@@ -11,10 +11,12 @@
 // mode-gated: the stepper never was — a count set in any mode is the count
 // the dish gets.
 // #716 — wind/breath/flap keep the MotionTile glyph (the tile visualizes
-// the value); the rest are TE value buttons.
+// the value); the rest are mode rows (#1607, Strata Q Phase 1).
 import { MotionTile } from '../../components/MotionTile.jsx';
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
-import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 const fmt2 = (v) => (Math.round(v * 100) / 100).toString();
@@ -30,10 +32,16 @@ export function HypeSliders({ layoutParams, lockedParams }) {
   // #1202 — kaleido fans flap too.
   const radial = /^(?:radial|kaleido)-\d+$/.test(layoutParams.symmetry ?? 'none');
 
+  // #1607 — the family's value buttons are mode rows now (detents under the
+  // exact readout); the MotionTiles below keep their glyph form — their
+  // disposition is not Phase 1's (see the stop-table law's phasing).
   const btn = (label, key, display, editor, { disabled, disabledReason } = {}) => (
-    <ValueButton
+    <ModeRow
       label={label}
       display={display}
+      value={layoutParams[key] ?? DEFAULT_LAYOUT_PARAMS[key]}
+      stops={stopsFor(key)}
+      onSelect={(v) => set(key, v)}
       locked={lockedParams[key]}
       onToggleLock={() => lock(key)}
       disabled={disabled}
@@ -59,6 +67,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
             min={0}
             max={4}
             step={1}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.creatures}
             onChange={(v) => set('creatures', Math.round(v))}
           />,
         )}
@@ -72,6 +81,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
             min={1}
             max={7}
             step={1}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.body}
             onChange={(v) => set('body', Math.round(v))}
           />,
           { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
@@ -102,6 +112,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
             max={0.95}
             step={0.05}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.tight}
             onChange={(v) => set('tight', v)}
           />,
           { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
@@ -145,6 +156,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
             max={2}
             step={0.1}
             format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.metabolism}
             onChange={(v) => set('metabolism', v)}
           />,
           { disabled: !isHype, disabledReason: 'Hype mode only' },

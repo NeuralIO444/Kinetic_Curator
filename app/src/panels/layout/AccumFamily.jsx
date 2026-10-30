@@ -1,5 +1,5 @@
-// ACCUM trail family — TE matrices for the discrete, value buttons for the
-// continuous (#1202). Trails are time behavior, not appearance: the ACCUM
+// ACCUM trail family — TE matrices for the discrete, mode rows for the
+// continuous (#1202; detents #1607). Trails are time behavior, not appearance: the ACCUM
 // toggle plus the full trail family (LEAVE / RIBBON / COMET, ECHOES, TRAIL
 // FADE, tunnel / prism / flow fades, ACCUM FADE, GLOW, WETNESS, TUNNEL /
 // PRISM / CURL feedback). Lives in MOTION & BEHAVIOR.
@@ -7,9 +7,11 @@
 // from #317).
 import { emit, Events } from '../../composition/eventBus.js';
 import { getTaper } from '../../components/taper.js'; // #274: shared slider curves
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { helpText } from '../../data/helpCopy.js'; // #158: hover titles read the single map
 import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
-import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 // #273/#274: response curves at the panel→state boundary. Stored params stay
@@ -19,14 +21,26 @@ const glowTaper = getTaper('power', { min: 0, max: 0.25, exp: 2 }); // #317 revi
 
 const set = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
 
+// #1607 (Strata Q Phase 1) — a trail value is a mode row on the shelf: the
+// detents write authored stops in PHYSICAL units (PARAM_STOPS), the exact
+// readout opens the same dock editor as before, tapers and all. The
+// editor's double-click reset target is the shipped default mapped into
+// the editor's own (possibly tapered) units. accumScan has no
+// DEFAULT_LAYOUT_PARAMS entry by design (#1804) — its default is absence,
+// i.e. 0.
 function TrailValue({ label, paramKey, value, min = 0, max = 1, step = 0.01, taper, title, format }) {
   const sliderVal = taper ? taper.toSlider(value) : value;
   const display = format ? format(value) : (Math.round(value * 100) / 100).toString();
+  const rawDefault = paramKey === 'accumScan' ? 0 : DEFAULT_LAYOUT_PARAMS[paramKey];
+  const editorDefault = rawDefault === undefined ? undefined : taper ? taper.toSlider(rawDefault) : rawDefault;
   return (
-    <ValueButton
+    <ModeRow
       label={label}
       display={display}
       title={title}
+      value={value}
+      stops={stopsFor(paramKey)}
+      onSelect={(v) => set(paramKey, v)}
       onOpen={() => (
         <SliderEditor
           ariaLabel={label}
@@ -35,6 +49,7 @@ function TrailValue({ label, paramKey, value, min = 0, max = 1, step = 0.01, tap
           max={max}
           step={step}
           format={format}
+          defaultValue={editorDefault}
           onChange={(v) => set(paramKey, taper ? taper.toParam(v) : v)}
         />
       )}

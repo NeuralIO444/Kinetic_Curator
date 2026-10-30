@@ -542,6 +542,107 @@ export const PARAM_SPEC = {
 };
 
 /**
+ * #1607 (Strata Q Phase 1) — the stop table: the authored OFF · LOW · MID ·
+ * HIGH detents for every continuous value on the BUILD shelves (§1–§4).
+ * Authored under the stop-table law (docs/research/strata-quantized/plan.md,
+ * Phase 0 paper):
+ *
+ *  1. Stops are authored per param, never derived from PARAM_SPEC ranges.
+ *  2. The shipped default (DEFAULT_LAYOUT_PARAMS) is always one of the
+ *     stops — a mode tap can always return to Matt's by-eye tune.
+ *  3. Where a taper exists, stops are authored in taper space — chosen
+ *     where the hand travels, then mapped through the taper. The `taper`
+ *     descriptor records the curve each tapered entry was authored
+ *     against (modeStops.selfcheck verifies the slider-space spread).
+ *  4. Detent labels name effect strength, not numeric order: an entry
+ *     whose effect strengthens as its number falls lists its stops in
+ *     effect order (descending numbers).
+ *  5. OFF = this param contributes nothing. Magnitude class (the default
+ *     sits at the range's no-effect end): OFF is that value, usually the
+ *     PARAM_SPEC min. Identity class (`identity: true` — the param's
+ *     no-effect value is its neutral, not its floor): OFF is the neutral,
+ *     never the range minimum.
+ *  7. Int counts in ATLAS_AFFECTING_PARAMS carry `atlas: true` — a coarse
+ *     stop there changes rebake behaviour, not just feel.
+ *
+ * The table governs HAND INPUT ONLY (the data law): stored values stay
+ * continuous, dice/curator/governor keep writing in-between values, and a
+ * row holding one lights its nearest stop with the off-detent mark.
+ * Exempt shelf params are absent by design (Phase 0's closed list):
+ * phylloDivergence (precision), plateCenterX / plateCenterY (position),
+ * hueRotate (the dial), and the SCALE / ROTATE / ALPHA dual ranges.
+ * accumScan is here despite having no PARAM_SPEC entry (#1804 keeps it
+ * out of the spec on purpose); its stops are authored against its panel
+ * range 0..1 like every other entry.
+ */
+export const PARAM_STOPS = {
+  // ── ① LAYOUT ──
+  count: { stops: [10, 120, 240, 800], atlas: true },
+  jitter: { stops: [0, 24, 80, 200] },
+  density: { stops: [10, 40, 78, 100] },
+  // The #1183 ground family: plain 0..1 amounts, 0 = today's frame exactly.
+  groundLean: { stops: [0, 0.25, 0.55, 1] },
+  groundNudge: { stops: [0, 0.25, 0.55, 1] },
+  groundShadow: { stops: [0, 0.25, 0.55, 1] },
+  groundSnap: { stops: [0, 0.25, 0.5, 1] },
+  weatherAir: { stops: [0, 0.25, 0.55, 1] },
+  // ── ③ swarm physics ──
+  particleCount: { stops: [10, 80, 150, 400], atlas: true },
+  // The editor's honest max is 0.6 (#272 retune) — the stops live inside it;
+  // the shipped default sits at HIGH.
+  swarmCohesion: { stops: [0, 0.2, 0.4, 0.6] },
+  gravityWells: { stops: [0, 1, 2.5, 5] },
+  // Identity class (Phase 0 names damping explicitly): OFF is the tuned
+  // neutral 0.95, and LOW→HIGH runs toward MORE friction — lower numbers,
+  // per rule 4. The stops descend on purpose; do not "fix" the order.
+  damping: { stops: [0.95, 0.93, 0.89, 0.83], identity: true },
+  noiseSpeed: { stops: [0.1, 0.5, 1.2, 3] },
+  // ── ③ hype / moth ──
+  creatures: { stops: [0, 1, 2, 4] },
+  body: { stops: [1, 2, 3, 5], atlas: true },
+  tight: { stops: [0.05, 0.35, 0.55, 0.85] },
+  metabolism: { stops: [0, 0.5, 1, 2] },
+  // ── ③ ACCUM trail family ──
+  echoes: { stops: [0, 1, 2, 4] },
+  accumScan: { stops: [0, 0.3, 0.65, 1] },
+  // The LEAVE fade editor spans 0..0.2 (its usable range) — stops live there.
+  leaveFade: { stops: [0, 0.05, 0.1, 0.2] },
+  tunnelFade: { stops: [0, 0.25, 0.55, 1] },
+  prismFade: { stops: [0, 0.25, 0.55, 1] },
+  flowFade: { stops: [0, 0.25, 0.55, 1] },
+  // Authored in half-life taper space (slider 0 / .30 / .46 / .81): OFF is
+  // the 1-frame strobe, MID is the shipped 5.4-frame default.
+  accumulationFade: { stops: [1, 3, 5.4, 20], taper: { kind: 'halfLife', minFrames: 1, maxFrames: 40 } },
+  // Authored in GLOW's power taper space (slider 0 / .40 / .63 / 1).
+  accumulationOptics: { stops: [0, 0.04, 0.1, 0.25], taper: { kind: 'power', min: 0, max: 0.25, exp: 2 } },
+  // Authored in the power taper space of #1882's WETNESS taper (slider
+  // 0 / .39 / .67 / 1) — that PR adds the taper to this row's editor; the
+  // stops were chosen against the same curve so the two compose.
+  accumulationWetness: { stops: [0, 0.15, 0.45, 1], taper: { kind: 'power', min: 0, max: 1, exp: 2 } },
+  accumulationTunnel: { stops: [0, 0.25, 0.55, 1] },
+  accumulationPrism: { stops: [0, 0.25, 0.55, 1] },
+  accumulationFlow: { stops: [0, 0.25, 0.55, 1] },
+  // ── ④ APPEARANCE ──
+  crooked: { stops: [0, 0.25, 0.55, 1] },
+  squash: { stops: [0, 0.3, 0.65, 1] },
+  growthRate: { stops: [0, 3, 6, 12] },
+  growthBranch: { stops: [0, 0.4, 0.8, 1] },
+  // ── ④ materials (M4) ──
+  // Identity by meaning: at 1 the glass keeps its full rolled alpha — the
+  // param contributes nothing — so OFF is 1, never the vanishing 0. The
+  // effect (attenuation) strengthens as the number falls, so the stops
+  // descend in effect order; MID is the shipped 0.78 tune.
+  glassAlpha: { stops: [1, 0.9, 0.78, 0.5], identity: true },
+  plateRadius: { stops: [0.2, 0.65, 1.05, 1.8] },
+  washStrength: { stops: [0, 0.4, 0.7, 1] },
+  // Identity class: 1 is the wash ramp exactly as authored (the param
+  // contributes no change), so OFF is the shipped default itself; the
+  // detents spread in the working direction — a lazier, longer ramp.
+  washSpread: { stops: [1, 1.6, 2.5, 4], identity: true },
+  stippleDotScale: { stops: [0.5, 1.2, 2.5, 4.5] },
+};
+
+/**
  * #764 — params that can change WHICH assets get placed, and so the live
  * atlas key (liveLoop atlasKeyFor: asset ids + FX layers). The Hold rule
  * (docs/PLENUM.md): a MIX may lerp these per frame only while the placed

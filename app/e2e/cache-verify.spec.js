@@ -86,10 +86,12 @@ test('staged-eval cache does not swallow geometry edits', async ({ page }) => {
 
   // COUNT is a stage-A input: if the geometry cache went stale, changing it
   // would not move the node count. Node count cannot be faked by animation.
-  // #1202: COUNT is a TE value button now — click it to open the docked
-  // editor, then drive the dock's slider (the house RangeRow, a native
-  // input[type=range] in bare layout) with the setRange helper.
-  await page.locator('.panel-layout .te-value-btn', { hasText: 'COUNT' }).click();
+  // #1607: COUNT is a mode row now — per D2, tap its readout to open the
+  // docked exact editor, then drive the editor's slider (the house
+  // RangeRow, a native input[type=range] in bare layout) with the setRange
+  // helper. The mode buttons themselves only write authored stops, so the
+  // exact editor is the surface that can set an arbitrary COUNT.
+  await page.locator('.panel-layout .te-mode-readout', { hasText: 'COUNT' }).click();
   const count = page.locator('.te-dock.open input[type="range"]');
   await expect(count).toBeVisible({ timeout: 15_000 });
 

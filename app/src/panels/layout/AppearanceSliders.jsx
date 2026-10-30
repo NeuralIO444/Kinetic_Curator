@@ -1,11 +1,13 @@
-// APPEARANCE as amber TE value buttons (#1202).
+// APPEARANCE as mode rows (#1202; detents #1607, Strata Q Phase 1).
 // Mark shape + organism finish: CROOKED / SQUASH (mark shape),
 // GROWTH RATE / BRANCHING (DLA / Eden organisms, mode-gated per #272).
-// Locks ride on the button.
+// Locks ride on the row.
 // #1587: HUE ROTATE (the whole-canvas finish) moved into the CHIAROSCURO
 // section's floating editor — it is render-engine, not mark finish.
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
-import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 export function AppearanceSliders({ layoutParams, lockedParams }) {
@@ -15,10 +17,13 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
   const growthGated = mode !== 'dla' && mode !== 'eden';
 
   const btn = (label, display, key, editor, { disabled, disabledReason, hint } = {}) => (
-    <ValueButton
+    <ModeRow
       label={label}
       display={display}
       title={hint}
+      value={layoutParams[key] ?? DEFAULT_LAYOUT_PARAMS[key]}
+      stops={stopsFor(key)}
+      onSelect={(v) => set(key, v)}
       locked={lockedParams[key]}
       onToggleLock={() => lock(key)}
       disabled={disabled}
@@ -47,6 +52,7 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
             max={1}
             step={0.01}
             format={(v) => `${Math.round(v * 100)}%`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.crooked}
             onChange={(v) => set('crooked', v)}
           />,
           { hint: "Zero is today's quad. Higher shears and pinches each mark from its own seed." },
@@ -62,6 +68,7 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
             max={1}
             step={0.05}
             format={(v) => `${Math.round(v * 100)}%`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.squash}
             onChange={(v) => set('squash', v)}
           />,
           { hint: 'Moving marks thin across their motion as they stretch — 1 keeps their mass, 0 is stretch only' },
@@ -81,6 +88,7 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
             max={12}
             step={0.5}
             format={(v) => `${v.toFixed(1)}/tick`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.growthRate}
             onChange={(v) => set('growthRate', v)}
           />,
           {
@@ -100,6 +108,7 @@ export function AppearanceSliders({ layoutParams, lockedParams }) {
             max={1}
             step={0.01}
             format={(v) => `${Math.round(v * 100)}%`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.growthBranch}
             onChange={(v) => set('growthBranch', v)}
           />,
           {
