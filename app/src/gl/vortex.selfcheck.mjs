@@ -28,6 +28,8 @@ import {
   EDGE_BAND_LO,
   EDGE_DARKEN_CAP,
   EDGE_DARKEN_K,
+  PIGMENT_DIFFUSE,
+  STAMP_FOOTPRINT_HALF,
   VORTEX_DECAY,
   VORTEX_GAMMA_PER_SPEED,
   VORTEX_GRID,
@@ -234,13 +236,19 @@ ok('cost tier is 1, and the registered step cost is the measured one', () => {
   // convention (two sandbox runs, medians 6.93 / 6.28 ms; the
   // pigment-absent path still measures ~2.1–2.7). Moving this pin
   // requires a new measurement, not a new opinion (docs/review/1811/).
+  // #1876 measured its A/B on the same bench in one sandbox session
+  // (base 3.53–3.73 ms vs this build 3.98 ms scale-less tinted, 3.84–
+  // 4.31 ms scaled; pigment-absent unchanged) — a +0.3–0.5 ms delta of
+  // the same size #1812 recorded inside this figure, so the pin stands
+  // (docs/review/1876/).
   assert.strictEqual(d.timeMs, 6.6);
   // The full state ledger: 9 grid planes + 3 pigment RGBA arrays +
   // vorton ring and scratch. The #1810 formula (5 planes + ring)
   // omitted the wet pair and the scratch; #1811 counts what the state
   // actually allocates; #1812 adds the edge-accrual plane and its
-  // wet-snapshot scratch (docs/review/1812/).
-  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2);
+  // wet-snapshot scratch (docs/review/1812/); #1876 adds the
+  // worked-film byte plane (docs/review/1876/).
+  assert.strictEqual(d.memoryBytes, 128 * 128 * 4 * 9 + 128 * 128 * 16 * 3 + 4096 * 16 * 2 + 128 * 128);
 });
 
 ok('field character at 128/20 matches the 64/30 field on the same scripted input (#1810)', () => {
@@ -845,6 +853,185 @@ ok('#1812 the recipe constants are the pinned ones', () => {
   assert.strictEqual(EDGE_DARKEN_CAP, 2);
   assert.strictEqual(EDGE_BAND_LO, 0.05);
   assert.strictEqual(EDGE_BAND_HI, 0.35);
+});
+
+// ---- #1876: footprint stamps + suspended diffusion -----------------------
+// The grid-dots fix. A mark stamps over the quad it draws (scaled by
+// instance scale), conserving the stamp's load; suspended pigment
+// diffuses inside the worked film, so a wash forms at rest. Measured
+// behaviour in docs/review/1876/.
+
+ok('#1876 a footprint stamp delivers the point stamp load, spread over the quad', () => {
+  const oneEmit = (extra) => {
+    const v = createVortex({ seed: 970, width: 1000, height: 700 });
+    emitFromInstances(v, [{ layer: 'a', key: 'm', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE, ...extra }]);
+    return v;
+  };
+  const point = oneEmit({});
+  const foot = oneEmit({ scaleX: 0.26, scaleY: 0.26, rotation: 0 });
+  const [pTot] = pigTotals(point);
+  const [fTot] = pigTotals(foot);
+  // Conservation is the normalisation: same suspended total to float
+  // tolerance (measured identical to ~1e-7 relative).
+  assert.ok(Math.abs(fTot - pTot) <= 1e-6 * pTot, `footprint load ${fTot} vs point load ${pTot}`);
+  const support = (v) => {
+    let cells = 0,
+      peak = 0;
+    for (let k = 0; k < v.n * v.n; k++) {
+      const a = v.pigS[k * 4 + 3];
+      if (a > 1e-9) cells++;
+      if (a > peak) peak = a;
+    }
+    return { cells, peak };
+  };
+  const ps = support(point),
+    fs = support(foot);
+  assert.ok(ps.cells <= 4, `point stamp touches ${ps.cells} cells`);
+  assert.ok(fs.cells >= 40, `footprint stamp touches ${fs.cells} cells (the quad at scale 0.26)`);
+  assert.ok(
+    fs.peak < ps.peak / 4,
+    `footprint peak ${fs.peak.toFixed(4)} vs point peak ${ps.peak.toFixed(4)} — spread, not stacked`,
+  );
+  // Water conserves the same way: the summed mask add of one emit
+  // matches (neither emit saturates a cell from dry at this amount).
+  const wetSum = (v) => v.wet.reduce((s, x) => s + x, 0);
+  assert.ok(Math.abs(wetSum(foot) - wetSum(point)) < 1e-6, 'footprint water total = point water total');
+});
+
+ok('#1876 the footprint is the drawn quad: anisotropic scale, rotation turns it', () => {
+  const bbox = (extra) => {
+    const v = createVortex({ seed: 970, width: 1000, height: 700 });
+    emitFromInstances(v, [{ layer: 'a', key: 'm', x: 500, y: 350, vx: 0, vy: 0, rgb: PIG_BLUE, ...extra }]);
+    let i0 = 1e9,
+      j0 = 1e9,
+      i1 = -1,
+      j1 = -1;
+    for (let j = 0; j < v.n; j++)
+      for (let i = 0; i < v.n; i++)
+        if (v.pigS[(j * v.n + i) * 4 + 3] > 1e-9) {
+          if (i < i0) i0 = i;
+          if (j < j0) j0 = j;
+          if (i > i1) i1 = i;
+          if (j > j1) j1 = j;
+        }
+    return { w: i1 - i0 + 1, h: j1 - j0 + 1 };
+  };
+  // scaleX 0.5 → ±49.9 scene units; scaleY 0.13 → ±13 units. In cells
+  // the axes differ (h = 7.87, hy = 5.51): ±49.9 units spans ~13 cells
+  // in x but ~18 in y. Rotation 90° (clockwise, the contract's
+  // convention) turns the long axis from x to y.
+  const wide = bbox({ scaleX: 0.5, scaleY: 0.13, rotation: 0 });
+  const tall = bbox({ scaleX: 0.5, scaleY: 0.13, rotation: 90 });
+  assert.ok(wide.w >= 11 && wide.w <= 15, `wide footprint width ${wide.w} cells`);
+  assert.ok(wide.h >= 4 && wide.h <= 7, `wide footprint height ${wide.h} cells`);
+  assert.ok(Math.abs(tall.w - wide.h) <= 1, `rotated width ${tall.w} vs unrotated height ${wide.h}`);
+  assert.ok(tall.h >= 17 && tall.h <= 19, `rotated height ${tall.h} cells — the long axis now spans y's finer cells`);
+});
+
+ok('#1876 suspended diffusion spreads the worked film, conserves pigment, and strands a drying film', () => {
+  const spread = (water, frames) => {
+    const v = createVortex({ seed: 970, width: 1000, height: 700 });
+    stampPigment(v, 500, 350, PIG_BLUE, 2.0);
+    const wmark = [{ layer: 'a', key: 'w', x: 500, y: 350, vx: 0, vy: 0 }];
+    for (let f = 0; f < frames; f++) {
+      if (water) emitFromInstances(v, wmark);
+      stepVortex(v);
+    }
+    let tot = 0,
+      mx = 0,
+      my = 0;
+    for (let j = 0; j < v.n; j++)
+      for (let i = 0; i < v.n; i++) {
+        const a = v.pigS[(j * v.n + i) * 4 + 3] + v.pigD[(j * v.n + i) * 4 + 3];
+        tot += a;
+        mx += a * i;
+        my += a * j;
+      }
+    mx /= tot;
+    my /= tot;
+    let varr = 0;
+    for (let j = 0; j < v.n; j++)
+      for (let i = 0; i < v.n; i++) {
+        const a = v.pigS[(j * v.n + i) * 4 + 3] + v.pigD[(j * v.n + i) * 4 + 3];
+        varr += a * ((i - mx) ** 2 + (j - my) ** 2);
+      }
+    return { var: varr / tot, tot, cx: mx, cy: my };
+  };
+  const open = spread(true, 240);
+  const closed = spread(false, 240);
+  const closedEarly = spread(false, 120);
+  // Conservation: diffusion + transfer move pigment; nothing is
+  // created or destroyed (measured exact to 4 decimals).
+  assert.ok(Math.abs(open.tot - 2) < 1e-6 && Math.abs(closed.tot - 2) < 1e-6, `totals ${open.tot} / ${closed.tot}`);
+  // The worked film spreads: measured variance 1.32 vs the unworked
+  // film's 0.51 (the advection resample's own smear, which saturates
+  // immediately and never grows — the closed film strands).
+  assert.ok(open.var > closed.var * 1.8, `worked spread ${open.var.toFixed(2)} vs unworked ${closed.var.toFixed(2)}`);
+  assert.ok(
+    closed.var <= closedEarly.var * 1.05,
+    `unworked spread grows ${closedEarly.var.toFixed(2)} -> ${closed.var.toFixed(2)} — a drying film strands its pigment`,
+  );
+  // Spread is symmetric: the pigment's centroid stays on the stamp
+  // (the deposited layer gains no lateral drift from the stage).
+  assert.ok(
+    Math.abs(open.cx - closed.cx) < 0.5 && Math.abs(open.cy - closed.cy) < 0.5,
+    'centroid holds under diffusion',
+  );
+});
+
+ok('#1876 stationary marks wash at rest: the grid-dots acceptance in miniature', () => {
+  const gridRun = (scaled) => {
+    const v = createVortex({ seed: 970, width: 1000, height: 700 });
+    const marks = [];
+    let k = 0;
+    for (let j = 0; j < 5; j++)
+      for (let i = 0; i < 5; i++) {
+        const m = {
+          layer: 'a',
+          key: `m${k++}`,
+          x: 500 + (i - 2) * 51.4,
+          y: 350 + (j - 2) * 51.4,
+          vx: 0,
+          vy: 0,
+          rgb: PIG_BLUE,
+        };
+        if (scaled) {
+          m.scaleX = 0.26;
+          m.scaleY = 0.26;
+          m.rotation = 0;
+        }
+        marks.push(m);
+      }
+    for (let f = 0; f < 900; f++) {
+      emitFromInstances(v, marks);
+      stepVortex(v);
+    }
+    const dep = (x, y) => v.pigD[(Math.round(y / v.hy) * v.n + Math.round(x / v.h)) * 4 + 3];
+    let c = 0,
+      m = 0,
+      cnt = 0;
+    for (let j = 1; j < 4; j++)
+      for (let i = 1; i < 4; i++) {
+        c += dep(500 + (i - 2) * 51.4, 350 + (j - 2) * 51.4);
+        m += dep(500 + (i - 2) * 51.4 + 25.7, 350 + (j - 2) * 51.4 + 25.7);
+        cnt++;
+      }
+    return c / Math.max(m, 1e-9); // ratio of the sums = ratio of the averages
+  };
+  // The defect, reproduced in-suite: scale-less (point) stamps leave
+  // the midpoints empty — ratio in the thousands.
+  const pointRatio = gridRun(false);
+  assert.ok(pointRatio > 10, `point-stamp grid ratio ${pointRatio.toFixed(1)} — the defect`);
+  // The fix at the same pitch and step count: measured 1.33 (the full
+  // 266-mark probe measures 1.28; docs/review/1876/). Band keeps the
+  // lattice dead without pinning the exact float.
+  const footRatio = gridRun(true);
+  assert.ok(footRatio > 0.6 && footRatio < 2.0, `footprint grid ratio ${footRatio.toFixed(2)} — a wash, not a lattice`);
+});
+
+ok('#1876 the recipe constants are the pinned ones', () => {
+  assert.strictEqual(STAMP_FOOTPRINT_HALF, 99.75);
+  assert.strictEqual(PIGMENT_DIFFUSE, 0.002);
 });
 
 console.log(`vortex.selfcheck: ${n} checks passed`);

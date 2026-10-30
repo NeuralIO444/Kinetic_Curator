@@ -56,6 +56,19 @@ static blend", `parity/corpus.mjs` KNOWN_DIVERGENCES); the corpus
 keeps WETNESS at 0, so the sweep is untouched. The warm-up's cost is
 pinned: K steps at the 128-grid constants under a 2 s ceiling,
 asserted with a timing log in `wetWarmup.selfcheck`.
+**Footprint stamps + diffusion:** #1876 (2026-10-29) fixed the
+grid-dots defect in the stamp/transport model: a mark now stamps water
++ pigment over the quad it draws (semi-axis 99.75 × instance scale,
+plateau profile across the face), conserving the stamp's total load,
+and the suspended compartment diffuses laterally inside MovePigment
+(PIGMENT_DIFFUSE 0.002, pairwise-conservative) — gated to the worked
+film (cells a stamp touched since the last step), so a wash forms at
+rest while a wash that is only drying still strands its pigment per
+the edge-darkening doctrine above. The deposited layer never moves
+laterally; scale-less instances keep the pre-#1876 point splat
+exactly. Stationary-mark centre/midpoint deposit ratio at the
+51.4-unit pitch: ~43 → 1.28 (drifting control ~1.2). Measurements in
+`docs/review/1876/`.
 **Scope:** decouple the wetness (2D) engine from ACCUM so it becomes an
 independent service other systems can subscribe to — layer interaction, FX,
 exports — with ACCUM demoted from _owner_ to _one consumer among several_.
