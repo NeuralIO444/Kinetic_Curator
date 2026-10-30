@@ -8,8 +8,12 @@ import { GRAIN_FAMILY_KINDS, sanitizeFxEffects } from '../fx/fxFilters.js';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 
-test('#820 grain family is only grain today', () => {
-  assert.deepEqual(GRAIN_FAMILY_KINDS, ['grain']);
+test('#820 grain family is the finish family — grain, plus dither since #1610', () => {
+  // Re-pinned for #1610: dither joins GRAIN_FAMILY_KINDS as EF-4's second
+  // real kind. The seam property this suite guards is unchanged — every
+  // family member runs in the finish chain, after ACCUM, never inside
+  // the keep loop; the family simply has two members now.
+  assert.deepEqual(GRAIN_FAMILY_KINDS, ['grain', 'dither']);
 });
 
 test('#820 sanitize parks grain last', () => {

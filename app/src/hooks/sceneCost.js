@@ -31,6 +31,7 @@ export const FX_KIND_TO_COST_ID = {
   invert: 'builtin/invert',
   posterize: 'builtin/posterize',
   scanlines: 'fx/scanlines',
+  dither: 'fx/dither',
   displace: 'fx/displace',
   tear: 'fx/tear',
   solarize: 'fx/solarize',

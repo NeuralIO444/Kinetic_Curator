@@ -221,6 +221,7 @@ node src/state/beatArbiter.selfcheck.mjs
 node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
+node src/fx/dither.selfcheck.mjs
 node src/fx/mathFilters.selfcheck.mjs
 node src/fx/rollSafety.selfcheck.mjs
 node src/fx/rollGuard.selfcheck.mjs

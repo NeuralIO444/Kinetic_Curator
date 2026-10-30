@@ -65,6 +65,10 @@ export const FX_PARAM_STOPS = {
   'grade.lift': { stops: [1, 1.15, 1.3, 1.5], identity: true },
   // EF-4 · Finish
   'grain.amount': { stops: [0, 0.4, 0.7, 1] },
+  // #1610 — dither: cell is a setting (pattern pitch, the halo.radius
+  // precedent — stops ascend from the floor); amount is a plain magnitude.
+  'dither.cell': { stops: [1, 2, 4, 8] },
+  'dither.amount': { stops: [0, 0.5, 0.75, 1] },
   'scanlines.density': { stops: [0.05, 0.35, 0.65, 1] }, // line frequency — a setting from the floor
   'scanlines.amount': { stops: [0, 0.5, 0.8, 1] },
   'halo.amount': { stops: [0, 0.4, 0.8, 1.5] },

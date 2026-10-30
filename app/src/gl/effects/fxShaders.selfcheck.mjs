@@ -175,9 +175,12 @@ function makeFxBridge(gl) {
   return bridge;
 }
 
-ok('all Phase-2 kinds are declared', () => {
+ok('all template kinds are declared', () => {
+  // Re-pinned for #1610: dither joins the template registry as EF-4's
+  // Bayer finish (the Phase-2 five plus sharpen/haze/halo/grade before it).
   assert.deepEqual([...FX_SHADER_KINDS].sort(), [
     'displace',
+    'dither',
     'edge',
     'grade',
     'halo',

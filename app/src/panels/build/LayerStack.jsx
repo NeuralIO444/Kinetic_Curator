@@ -259,7 +259,7 @@ function FxEffectEditor({ layer, fxOrdinal }) {
         </div>
       )}
       <div className="fx-note" title="Planned — not yet available">
-        planned: dither, stipple
+        planned: stipple
       </div>
     </div>
   );
