@@ -37,7 +37,15 @@ import {
   COALESCE_TOUCH,
 } from './dishCoalesce.mjs'; // #1411 — coalescence (call sites below; the law lives in the module)
 import { stepDishPigment, syncDishPigment } from './dishPigment.mjs'; // #1412 — pigment exchange (call sites below; the law lives in the module)
-import { dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX, DRY_MEDIUM } from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction
+import {
+  dishMediumFor,
+  mediumClingCapture,
+  mediumDampRetention as mediumDampRetentionAt,
+  mediumFrictionImpulse,
+  noteDishContactStamp,
+  FRIC_MAX,
+  DRY_MEDIUM,
+} from './dishMedium.mjs'; // #1413 — the medium: WETNESS as viscosity + cling (call sites below; the law lives in the module); #1595 (D1) — its friction; #1841 — its field source + contact stamps (the retention law is aliased: update() has a local of the function's name)
 import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega, spinStepOmega, spinWrapAngle } from './dishSpin.mjs'; // #1596 (D2) — spin: ω/θ columns, torque from D1's jt (call sites below; the law lives in the module)
 import { solveDishLinks, noteBondGrip, BOND_TOUCH, BOND_GRIP_VT } from './dishLinks.mjs'; // #1597 (D3) — constraints: declared distance/spring links, XPBD-solved on predicted positions after the integration loop, and bonds formed from sustained wet grip (call sites below; the law lives in the module)
 import { dishThermalFor, crowdingRepelGain, COLD_THERMAL } from './dishThermal.mjs'; // #1538 — petri §4's missing rows: TEMPO as thermal jitter, DENSITY as crowding pressure on the repel gain (call sites below; the law lives in the module)
@@ -675,8 +683,13 @@ export class ParticleSystem {
    * @param {object} ctx radius, restitution, repel, mode, umask, breedCap,
    *   seed, organism, minScale, maxScale, minAlpha, maxAlpha, medium
    *   (#1413 — the resolved dishMediumFor() curves; absent = dry),
-   *   ecology (#1416 — the resolved dishEcologyFor() state; absent =
-   *   outside the dish, the pass exactly as #167 shipped it)
+   *   wetSampler (#1841 — the shared field's read, or null: with it,
+   *   each pair's medium resolves from the field at the pair's
+   *   midpoint and `medium` never runs), wetStamps (#1841 — the
+   *   session's contact-stamp list, or null when no field is
+   *   attached), ecology (#1416 — the resolved dishEcologyFor()
+   *   state; absent = outside the dish, the pass exactly as #167
+   *   shipped it)
    */
   _contactPass(ctx) {
     const {
@@ -694,6 +707,8 @@ export class ParticleSystem {
       maxAlpha,
       seedOffsets,
       medium,
+      wetSampler,
+      wetStamps,
       ecology,
     } = ctx;
     // #1416 — ecology's governance of this pass (law in
@@ -741,8 +756,12 @@ export class ParticleSystem {
     const canImpulse = mode === 'bounce' || mode === 'stick';
     // stick is bounce with restitution 0. #1413 — the medium biases
     // the bounce toward stick as the dish gets wetter (restK is 1
-    // when dry: the pre-C1 coefficient bit for bit).
-    const e = mode === 'bounce' ? restitution * med.restK : 0;
+    // when dry: the pre-C1 coefficient bit for bit). #1841 — the
+    // medium (and with it the bounce coefficient e) resolves PER
+    // PAIR inside the loop: with the shared field attached, from
+    // the field sampled at the pair's midpoint; without it, every
+    // pair takes the step's one resolved medium (med) exactly as
+    // #1413 shipped — medPair === med, e as computed here before.
     const wantSwap = mode === 'swap';
     const wantDie = mode === 'die';
     const wantBreed = mode === 'breed';
@@ -788,6 +807,11 @@ export class ParticleSystem {
             // cross-strata pass never feeds, so different families never
             // merge. State only (law in dishCoalesce.mjs).
             if (d2 < rsum * COALESCE_TOUCH * (rsum * COALESCE_TOUCH)) feedDishCoalesce(this, i, j);
+            // #1841 — this pair's medium (the note at canImpulse
+            // above): the field's answer at the pair's midpoint, or
+            // the step's resolved medium when no field is attached.
+            const medPair = wetSampler ? dishMediumFor(wetSampler(xi + dx / 2, yi + dy / 2)) : med;
+            const e = mode === 'bounce' ? restitution * medPair.restK : 0;
             if (d2 >= rsum * rsum) {
               // #1597 (D3) — bond grip at a NEAR touch: a resting pair
               // parks exactly at rsum, on this rejected side of the
@@ -799,7 +823,7 @@ export class ParticleSystem {
               // contact, the friction block's stick verdict is the
               // grip authority instead; a pair is never noted twice
               // for one step.
-              if (med.fricK > 0 && d2 < rsum * BOND_TOUCH * (rsum * BOND_TOUCH)) {
+              if (medPair.fricK > 0 && d2 < rsum * BOND_TOUCH * (rsum * BOND_TOUCH)) {
                 const dN = Math.sqrt(d2);
                 const gtx = -dy / dN,
                   gty = dx / dN;
@@ -876,10 +900,10 @@ export class ParticleSystem {
             // still key on the approach velocity, which cling (a
             // separation effect) never touches. Dry (clingK 0) skips
             // the branch entirely.
-            if (med.clingK > 0) {
+            if (medPair.clingK > 0) {
               const vnNow = (VX[j] - VX[i]) * nx + (VY[j] - VY[i]) * ny;
               if (vnNow > 0) {
-                const cap = mediumClingCapture(med.clingK, vnNow);
+                const cap = mediumClingCapture(medPair.clingK, vnNow);
                 if (cap > 0) {
                   const jc = -cap / wSum;
                   VX[i] -= nx * jc * w1;
@@ -912,8 +936,8 @@ export class ParticleSystem {
             // for after the stage plays (D1's deliberate non-witness,
             // carried). Dry (fricK 0) skips the block entirely —
             // and with it every ω write in the engine.
-            if (med.fricK > 0) {
-              const mu = FRIC_MAX * med.fricK;
+            if (medPair.fricK > 0) {
+              const mu = FRIC_MAX * medPair.fricK;
               const tx = -ny,
                 ty = nx;
               const vt = spinContactVt((VX[j] - VX[i]) * tx + (VY[j] - VY[i]) * ty, OMEGA[i], ri, OMEGA[j], rj);
@@ -949,6 +973,12 @@ export class ParticleSystem {
             // file takes the call site only). State only — positions and
             // velocities are already final for this pair.
             feedDishDeform(this, i, this, j, nx, ny, dvI, dvJ, overlap, rsum);
+            // #1841 — the press (law in dishMedium.mjs): this pair's
+            // contact stamps the shared field at its midpoint, scaled
+            // by the wet it carries (medPair.wet). Recorded on the
+            // session's list for the driver to serve with the next
+            // wet-frame request; null when no field is attached.
+            if (wetStamps) noteDishContactStamp(wetStamps, xi + dx / 2, yi + dy / 2, medPair.wet);
             // 4 — events fire on approach only, so a resting pair doesn't
             // strobe its response every step.
             if (vn >= 0) continue;
@@ -1697,6 +1727,11 @@ export class ParticleSystem {
     // bit-identical to the #167 engine alone. Logic lives in
     // dishContacts.mjs; this file takes the call site only.
     const dishSession = layoutParams.dishSession || null;
+    // #1841 — the shared wet field's read, attached to the session by
+    // the driver (law in dishMedium.mjs): with it, this step's medium
+    // is the field's, sampled per pair and per body; without it, the
+    // knob's, exactly as #1413 shipped.
+    const wetSampler = dishSession ? dishSession.wetSampler || null : null;
     if (dishSession && dishSession.armed) runDishContacts(dishSession, this);
 
     // #1416 — petri dish C4: this step's ecology resolution (law in
@@ -1720,6 +1755,11 @@ export class ParticleSystem {
     // contact-less swarm keeps the pre-C1 path bit for bit, and dry
     // (WETNESS 0, the default) is the identity on all three curves.
     let mediumDampRetention = 1;
+    // #1841 — with the field attached, the integrator's drag samples
+    // per body (below), so the step's uniform retention stays the
+    // identity and the knob medium serves only as the pass's
+    // no-field fallback (which, with a sampler attached, never runs).
+    let wetDrag = null;
     // #1538 — TEMPO resolved beside the medium (law in
     // dishThermal.mjs): the dish's thermal energy, read from the
     // dishTempo param and the frame's stillness flag (spec §7 —
@@ -1729,7 +1769,8 @@ export class ParticleSystem {
     let thermal = COLD_THERMAL;
     if (contactRadius > 0 && this.n > 1) {
       const medium = dishMediumFor(layoutParams.accumulationWetness);
-      mediumDampRetention = medium.dampRetention;
+      if (wetSampler) wetDrag = wetSampler;
+      else mediumDampRetention = medium.dampRetention;
       thermal = dishThermalFor(layoutParams.dishTempo, deformStill);
       this._contactPass({
         radius: contactRadius,
@@ -1742,6 +1783,8 @@ export class ParticleSystem {
         mode: CONTACT_MODES.includes(contactMode) ? contactMode : 'none',
         umask: collideMask >>> 0,
         medium,
+        wetSampler,
+        wetStamps: wetSampler ? dishSession.wetStamps : null,
         ecology,
         // #167 — breed grows the population only under the quality cap.
         // Callers thread it in (useSwarmTick: caps.maxParticles; studio
@@ -1782,8 +1825,15 @@ export class ParticleSystem {
       if (!this.alive[i]) continue;
       // Spine A (#387): dt-correct integration.
       // v_new = (v_old + a * dtFrames) * dampDt
-      let vxi = (VX[i] + AX[i] * dtFrames) * dampDt;
-      let vyi = (VY[i] + AY[i] * dtFrames) * dampDt;
+      // #1841 — with the shared field attached, the medium's drag is
+      // sampled at the body (the same retention law, read here): a
+      // dry reading resolves the identity retention, so the product
+      // below is the uniform dry product exactly, per body.
+      const dampI = wetDrag
+        ? Math.pow(damp, dtFrames) * Math.pow(mediumDampRetentionAt(wetDrag(X[i], Y[i])), dtFrames)
+        : dampDt;
+      let vxi = (VX[i] + AX[i] * dtFrames) * dampI;
+      let vyi = (VY[i] + AY[i] * dtFrames) * dampI;
       // #1538 — TEMPO: the thermal kick (law in dishThermal.mjs).
       // A Brownian velocity impulse, one draw per axis per body per
       // step from the dyn channel — step-mixed keys in the curiosity

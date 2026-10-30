@@ -3,6 +3,12 @@
 // Petri dish C1 (#1413) — the medium: WETNESS as viscosity and cling.
 // The law in dishMedium.mjs, pinned.
 //
+// #1841 re-pin (slice B of #1809): the (i) wiring pins named the
+// per-system medium local `med.` — the medium now resolves PER
+// PAIR in that pass (the shared field sampled at the pair, or the
+// step's medium as fallback), so the local is `medPair.` and the
+// pins follow it. The curves and call sites they pin are unchanged.
+//
 //   (a) the three curves, unit-pinned at five points of the knob, with
 //       the clamps (junk reads dry) and monotonicity the spec's
 //       wet→dry sentence requires;
@@ -39,6 +45,7 @@ import { readFileSync } from 'node:fs';
 import { ParticleSystem } from './particles.js';
 import { createDishSession, enrolDishBody, armDish, runDishContacts } from './dishContacts.mjs';
 import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
+import { createWetFrameService } from '../gl/wetFrame.mjs'; // #1841: injected into the (h) bakes (the kernel imports no gl)
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import {
   clampWetness,
@@ -533,8 +540,11 @@ const assertSamePhysics = (a, b, label) => {
       contactMode: 'bounce',
       accumulationWetness: wet,
     });
-  const bake = (wet) =>
-    bakeDishParticles({
+  // #1841: the bake takes the wet-frame service by injection (the
+  // kernel imports no gl) — a fresh one per bake, disposed here.
+  const bake = (wet) => {
+    const svc = createWetFrameService();
+    const out = bakeDishParticles({
       layers: [
         {
           key: 'pearl',
@@ -558,7 +568,11 @@ const assertSamePhysics = (a, b, label) => {
       canvasW: 1000,
       canvasH: 700,
       steps: 45,
+      wetFrame: svc,
     });
+    svc.dispose();
+    return out;
+  };
   const dry = bake(0);
   const wetA = bake(1);
   const wetB = bake(1);
@@ -583,10 +597,13 @@ const assertSamePhysics = (a, b, label) => {
     particles.includes('Math.pow(mediumDampRetention, dtFrames)'),
     'the drag rides the integrator damping at the call site',
   );
-  assert.ok(particles.includes('mediumClingCapture(med.clingK, vnNow)'), 'the per-system pass applies the capture law');
+  assert.ok(
+    particles.includes('mediumClingCapture(medPair.clingK, vnNow)'),
+    'the per-system pass applies the capture law',
+  );
   assert.ok(
     particles.includes('mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum') &&
-      particles.includes('FRIC_MAX * med.fricK'),
+      particles.includes('FRIC_MAX * medPair.fricK'),
     'the per-system pass applies the friction law (D1; contact-point slide + spin mass since D2)',
   );
   assert.ok(

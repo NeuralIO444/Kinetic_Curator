@@ -46,13 +46,37 @@
 // top: the per-Look `dish` param gates enrolment itself (dishEnrolRadius),
 // so OFF never enrols a radius and the session can never arm — the ghost
 // stack, chosen per Look, with #167 per-system contacts untouched.
+//
+// #1841 (slice B of #1809) — the medium's source moves to the shared
+// wet field. The driver attaches a sampler to the session per frame /
+// step (session.wetSampler: (x, y) → wetness, the wet-frame service's
+// read — liveResolve attaches the live loop's service, dishBake its
+// own; spread-only in spirit: never stored on a system, never
+// serialized, re-attached by every driver every step). With a sampler
+// attached, a pair's wetness is the field sampled at the pair's
+// midpoint — one answer, instrument-wide — and each contacting pair
+// records a press into session.wetStamps (the law in dishMedium.mjs),
+// which the driver drains into the next wet-frame request: the dish
+// reads the field and stamps into it through the service, and its
+// per-entry wetness scalars stop being the source. With NO sampler
+// attached, the pair's wetness is the enrolment average exactly as
+// #1413 shipped it and no stamp is recorded — a driver without the
+// service describes the uniform field the knob always meant, bit for
+// bit (pinned in dishWet.selfcheck).
 
 import { feedDishDeform } from './dishDeform.mjs'; // #1410 — the dent across the seam (feed call site below)
 import { buildDishDensity } from './dishDensity.mjs'; // #1412 — the pass's per-cell counts, published as a field
 import { ensureEntryTrails, createDishTrailField, TRAIL_CELLS } from './dishTrails.mjs'; // #1415 — the trail substrate's enrolment (the law lives in the module)
 import { encodeTyped, decodeTyped } from './kernel/stateCodec.mjs'; // #1367 — session snapshots
 import { ensureEcologyEntry, removeEcologyEntry } from './dishEcology.mjs'; // #1416 — the ecology ledger's enrolment (the law lives in the module)
-import { clampWetness, dishMediumFor, mediumClingCapture, mediumFrictionImpulse, FRIC_MAX } from './dishMedium.mjs'; // #1413 — the medium across the seam; #1595 (D1) — its friction
+import {
+  clampWetness,
+  dishMediumFor,
+  mediumClingCapture,
+  mediumFrictionImpulse,
+  noteDishContactStamp,
+  FRIC_MAX,
+} from './dishMedium.mjs'; // #1413 — the medium across the seam; #1595 (D1) — its friction; #1841 — its contact stamps
 import { spinContactVt, spinInertia, spinInvMassT, spinDeltaOmega } from './dishSpin.mjs'; // #1596 (D2) — spin: torque from D1's jt across the seam
 
 const TAU = Math.PI * 2;
@@ -114,6 +138,19 @@ export function createDishSession() {
     // until then — its absence is the dish's "ecology was never
     // dealt" fact, and every ecology resolution reads off it.
     ecology: undefined,
+    // #1841 — the shared wet field's read for this session, attached
+    // by the driver per frame / step: (x, y) → wetness 0..1, or null
+    // when the driver runs without the wet-frame service (the pair
+    // medium then resolves from the enrolment scalars, as #1413
+    // shipped). Never serialized: snapshotDishSession does not carry
+    // it — the driver re-attaches it every step, like the arm.
+    wetSampler: null,
+    // #1841 — the contact presses the passes record while a sampler
+    // is attached ({x, y, amount}), drained by the driver into the
+    // next wet-frame request and cleared. Scratch, not state: a
+    // stamp not yet served is a press on water that has not been
+    // served either.
+    wetStamps: [],
     // Grid scratch, grown on demand and reused across passes.
     _bEntry: [],
     _bIdx: null,
@@ -576,7 +613,13 @@ export function runDishContacts(session, callerSys) {
           // (the restitution precedent above), resolved through the one
           // law (dishMedium.mjs). A dry pair resolves no medium at all:
           // the pre-C1 numbers below run bit for bit.
-          const pairWet = (ea.wetness + eb.wetness) / 2;
+          // #1841 — with the shared field attached, the pair's wetness
+          // is the field sampled at the pair's midpoint (the positions
+          // the pair test just read): "how wet is it here" has one
+          // answer, and it is not a per-stratum scalar any more.
+          const pairWet = session.wetSampler
+            ? session.wetSampler(xi + dx / 2, yi + dy / 2)
+            : (ea.wetness + eb.wetness) / 2;
           const pairMed = pairWet > 0 ? dishMediumFor(pairWet) : null;
           if (ea.impulse && eb.impulse) {
             const vn = (sysB.vx[ib] - sysA.vx[ia]) * nx + (sysB.vy[ib] - sysA.vy[ia]) * ny;
@@ -657,6 +700,14 @@ export function runDishContacts(session, callerSys) {
           // dishDeform.mjs). State only — the pass's positions and
           // velocities are already final for this pair.
           feedDishDeform(sysA, ia, sysB, ib, nx, ny, dvA, dvB, overlap, rr);
+          // #1841 — the press: a contacting pair stamps the shared
+          // field at its midpoint, scaled by the wet it carries (the
+          // law in dishMedium.mjs). Recorded, not applied — the
+          // driver serves the stamps with the next frame request, so
+          // the field stays the service's alone to step.
+          if (session.wetSampler) {
+            noteDishContactStamp(session.wetStamps, xi + dx / 2, yi + dy / 2, pairWet);
+          }
         }
       }
     }

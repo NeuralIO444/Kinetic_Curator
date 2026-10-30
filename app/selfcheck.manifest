@@ -210,6 +210,7 @@ node src/engine/dishLinks.selfcheck.mjs
 node src/engine/dishThermal.selfcheck.mjs
 node src/engine/dishCurrents.selfcheck.mjs
 node src/engine/dishTrails.selfcheck.mjs
+node src/engine/dishWet.selfcheck.mjs
 node src/engine/dishEcology.selfcheck.mjs
 node src/engine/stagedEval.selfcheck.mjs
 node src/engine/perf.selfcheck.mjs

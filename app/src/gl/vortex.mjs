@@ -277,6 +277,29 @@ function stampWet(state, x, y, amount) {
 }
 
 /**
+ * #1841 (slice B of #1809) — the dish's contact stamps: the presses
+ * the contact passes recorded while the dish stepped, as
+ * { x, y, amount } in scene coordinates. Each lands as a plain wet
+ * stamp (the same bilinear splat the marks use, worked-film marks
+ * included): a contact deposits the wet the pair already carries —
+ * the recording side (engine/dishMedium.mjs) scales the amount by
+ * the pair's sampled wetness, so a dry contact stamps nothing and
+ * no water is created. Absent/empty is the pre-#1841 frame, bit for
+ * bit. Returns the number of stamps applied.
+ */
+export function stampDishContacts(state, stamps) {
+  if (!stamps || !stamps.length) return 0;
+  let applied = 0;
+  for (let k = 0; k < stamps.length; k++) {
+    const s = stamps[k];
+    if (!s || !Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.amount) || !(s.amount > 0)) continue;
+    stampWet(state, s.x, s.y, s.amount);
+    applied += 1;
+  }
+  return applied;
+}
+
+/**
  * The stamp's face profile (#1876): full weight across the quad's face,
  * a cosine falloff across the outer fifth of each semi-axis — the
  * coverage a stamp makes, flat where it touches and soft only at its
@@ -1336,15 +1359,26 @@ export function ensureVortex(slot, { seed, width, height } = {}) {
  * gain of exactly 0 so the feed hook does not bind the texture.
  * `slot` is caller-owned `{ vortex }`.
  */
-export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion }) {
+export function noteWetFrame(slot, { wetness, freeze, seed, width, height, instances, behave, motion, stamps }) {
   const step = wetnessStep(wetness);
   if (step === 0)
     return { wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetMask: null, pigStep: 0, pigDep: null };
   const w = width > 0 ? width : 1000;
   ensureVortex(slot, { seed, width, height });
-  if (freeze) stepVortex(slot.vortex, { freeze: true });
-  else {
+  if (freeze) {
+    // #1841 — a frozen transport holds the field, but the dish's
+    // contact stamps still land: bodies press the film even while
+    // the water cannot flow. They sit where they were pressed until
+    // the transport moves again (the freeze step below is a pure
+    // hold — no drying, no advection).
+    stampDishContacts(slot.vortex, stamps);
+    stepVortex(slot.vortex, { freeze: true });
+  } else {
     emitFromInstances(slot.vortex, instances || []);
+    // #1841 — the dish's contact stamps (slice B of #1809): the
+    // presses the contact passes recorded this frame, applied with
+    // the marks' own stamps, before the step moves any water.
+    stampDishContacts(slot.vortex, stamps);
     emitAmbientFrom(slot.vortex, { behave, motion });
     // #998: the wet mask advects at the same rate as the feed shader's wet
     // offset, so the splotch rims travel with the smeared trails.

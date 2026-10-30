@@ -376,4 +376,84 @@ ok('#1812 degraded service: deposits darken on schedule under the shed', () => {
   assert.ok(out.pigDep, 'the darkened deposit pack is what degraded service publishes');
 });
 
+ok('#1841 the dish alone requests the field: need gate answers a second consumer', () => {
+  const svc = createWetFrameService();
+  const nobody = svc.frame({ consumers: {}, shed: null, degradedOk: false, ...frameInput(0) });
+  assert.strictEqual(nobody.wetMode, 'off', 'no consumer: off');
+  assert.strictEqual(svc.field(), null, 'no consumer: the field is never born');
+  const served = svc.frame({ consumers: { dish: true }, shed: null, degradedOk: true, ...frameInput(0) });
+  assert.strictEqual(served.wetStep, 1, 'the dish alone steps the field');
+  assert.strictEqual(served.wetMode, 'live', 'full service for the dish');
+  assert.ok(svc.field(), 'the field stands after the dish’s frame');
+});
+
+ok('#1841 sampleWet reads the standing field: stamped point wet, far point dry, no field dry', () => {
+  const svc = createWetFrameService();
+  assert.strictEqual(svc.sampleWet(700, 150), 0, 'no field yet: dry');
+  assert.strictEqual(svc.sampleWet(-5, 150), 0, 'out of stage: dry');
+  assert.strictEqual(svc.sampleWet(NaN, 150), 0, 'junk point: dry');
+  for (let i = 0; i < 8; i++) svc.frame({ consumers: { dish: true }, shed: null, degradedOk: true, ...frameInput(i) });
+  // frameInput's instance c rests at (700, 150 + i*2) and stamps 0.35 a frame.
+  const atMark = svc.sampleWet(700, 157);
+  assert.ok(atMark >= 0.35, `the resting mark's point reads wet (got ${atMark.toFixed(3)})`);
+  assert.strictEqual(wetRegimeAt(atMark) === 'dry', false, 'and not in the dry regime');
+  const far = svc.sampleWet(60, 660);
+  assert.ok(far < 0.05, `a far corner stays under the damp threshold (got ${far.toFixed(3)})`);
+});
+
+ok('#1841 dish contact stamps land on the full path and under the shed; dropped unserved', () => {
+  const stamps = [{ x: 300, y: 300, amount: 0.35 }];
+  const plain = createWetFrameService();
+  const pressed = createWetFrameService();
+  for (let i = 0; i < 6; i++) {
+    plain.frame({ consumers: { dish: true }, shed: null, degradedOk: true, ...frameInput(i, { instances: [] }) });
+    pressed.frame({
+      consumers: { dish: true },
+      shed: null,
+      degradedOk: true,
+      stamps,
+      ...frameInput(i, { instances: [] }),
+    });
+  }
+  assert.ok(pressed.sampleWet(300, 300) > plain.sampleWet(300, 300), 'the press is in the field');
+  assert.ok(pressed.sampleWet(300, 300) > 0.1, `and it reads (got ${pressed.sampleWet(300, 300).toFixed(3)})`);
+  // Degraded: stamps-only service still takes the dish's stamps.
+  const shedSvc = createWetFrameService();
+  let out = null;
+  for (let i = 0; i < 6; i++) {
+    out = shedSvc.frame({
+      consumers: { dish: true },
+      shed: 'perfTier1',
+      degradedOk: true,
+      stamps,
+      ...frameInput(i, { instances: [] }),
+    });
+  }
+  assert.strictEqual(out.wetMode, 'degraded', 'the dish is served degraded under the shed');
+  assert.ok(shedSvc.sampleWet(300, 300) > 0.1, 'the press landed through the shed');
+  // Unserved: the stamps belong to a field nobody requested — dropped.
+  const idle = createWetFrameService();
+  const off = idle.frame({ consumers: {}, shed: null, degradedOk: false, stamps, ...frameInput(0) });
+  assert.strictEqual(off.wetMode, 'off', 'no consumer: off');
+  assert.strictEqual(idle.field(), null, 'and no field is born to receive them');
+});
+
+ok('#1841 dish stamps are deterministic: same presses, same field', () => {
+  const run = () => {
+    const svc = createWetFrameService();
+    let last = null;
+    for (let i = 0; i < 10; i++) {
+      last = svc.frame({
+        consumers: { accum: true, dish: true },
+        shed: null,
+        degradedOk: true,
+        stamps: [{ x: 300 + i, y: 300, amount: 0.3 }],
+        ...frameInput(i),
+      });
+    }
+    return fnv(last.wetMask.rgba) >>> 0;
+  };
+  assert.strictEqual(run(), run(), 'two runs of the same presses agree byte for byte');
+});
+
 console.log(`wetFrame.selfcheck: ${n} checks passed`);

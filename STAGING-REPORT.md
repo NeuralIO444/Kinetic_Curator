@@ -1,191 +1,184 @@
-# STAGING REPORT — #1814 strata soak (WET Phase B)
+# STAGING REPORT — #1841 WET slice B: dish migration onto the wet-frame service
 
-**Issue (verbatim):** "WET: layer interaction — strata soak where the
-field is wet (Phase B)"
-**Branch:** `feat/1814-strata-soak` on origin/main `302f738a`.
-Local only — no push, no PR (coordinator publishes). This file
-replaces the report that was at the worktree root (#1876's); that
-report remains in git history.
+**Issue (verbatim):** "WET slice B: dish migration onto the wet-frame
+service (of #1809) — REVIEW LANE"
+**Branch:** `feat/1841-dish-migration` on origin/main 302f738a.
+Local only — no push, no PR (coordinator publishes, Matt merges —
+review lane). This file replaces the report that was at the worktree
+root (#1876's); that report remains in git history.
 
-## Premise check
+## Premise verdict: HOLDS
 
-The issue's premise is TRUE against main as it stood: the wet field
-(#1809–#1813, #1815, #1876) had exactly one wired consumer family
-(ACCUM), CONTENT strata had no interaction mode, and the wet-frame
-service's consumer gate was already generic — the soak could join as a
-named consumer without renegotiating the service contract. #1814 has
-zero comments; the body is the whole contract.
+Checked against the code on main before building: the wet-frame
+service exists at `app/src/gl/wetFrame.mjs` with slice A's contract
+(need-based gate, `degradedOk`, modes live/degraded/shed/off, regimes
+damp 0.05 / wet 0.35 / soaked 0.8); the dish consumed no spatial
+field (enrolment `wetness` scalars in `dishContacts.mjs` from the
+`accumulationWetness` knob, per-system medium resolved from the knob
+in `particles.js`, grip counters in `dishLinks.mjs` gated by the
+knob's friction curve); slice A's staging report stages exactly
+this slice (first `degradedOk` consumer, a stamp-in API decision
+expected, the persona show-block shed line owed). Nothing
+contradicted → built. #1814's scope (strata soak / composite-mask
+consumer) was not touched.
 
-One sub-clause is a VACUOUS ANTECEDENT, flagged rather than improvised:
-term (c)'s second half ("…and FIELD shapes the stamping via
-`samplePattern` when the stratum's layout uses one"). Verified by grep:
-`samplePattern`'s only consumer is the PATTERN tile engine
-(`src/pattern/engine.js`); no content layout sampler calls it (layout
-modes are fibonacci/grid/swarm/etc.). The stamping half of (c) IS
-implemented and asserted (a WET stratum's marks stamp the field — the
-consumer gate births the field for a soak-only scene; resting marks wet
-their ground and deposit pigment). The shaping half has no antecedent
-for content strata today; the binding point is the footprint stamp in
-the live loop, named in `docs/WET_ENGINE.md`. If a pattern-driven
-content layout lands later, that is where FIELD-shaping plugs in.
+One reading, stated plainly: the issue's "pressure support" names
+no symbol in the code or docs; it is read as the medium-biased
+impulse/deform-feed path, which now follows the sampled medium like
+every other wet quantity.
 
 ## What shipped (plain language)
 
-A CONTENT stratum can now be put in **WET** interaction mode from its
-BUILD row (a WET button beside the blend modes; default OFF). Where the
-stage's wet field is actually wet, that stratum's picture changes the
-way wet paper changes a wash: its colours are drunk by the ground —
-tinted by whatever pigment is already deposited there, or by the bare
-ground colour where none is — and its edges bleed a little along the
-direction the water is moving. Where the field is dry, nothing changes
-at all — the pixel values are byte-for-byte the dry ones. Turn the mode
-off and the project is exactly what it was before this slice existed
-(the flag doesn't even appear in the saved file while it's off). If the
-machine sheds the field to hold frame rate (perfTier1), the stratum
-falls back to its ordinary blend and its WET button dims in the row —
-the issue's own shed answer, not a silent half-effect. It works live,
-in stills, and in the warmed-up film exports equally, because all
-three drink from the same served field.
+The dish now gets "how wet is it here" from the one shared wet
+field, through the service slice A built — and presses its contacts
+back into that field.
 
-## How, per file
+- **The read** (`gl/wetFrame.mjs`): the service gains
+  `sampleWet(x, y)` — the standing field's wetness at a scene
+  point. The resolver attaches it to the dish session through a
+  module channel (`gl/liveResolve.mjs` `setLiveWetSampler`, wired
+  in `gl/liveLoop.mjs`) — deliberately not a frame input, because
+  inputs are recorded for takes and a closure cannot be; a take
+  replays through the same loop and the field re-derives, exactly
+  as it already does for ACCUM.
+- **The physics** (`engine/dishMedium.mjs`, `dishContacts.mjs`,
+  `particles.js`): with a sampler attached, each contact pair's
+  medium (bounce, cling, friction, grip gate) resolves from the
+  field at the pair's midpoint, and the integrator's drag samples
+  the field per body. The XPBD solver and every curve are
+  unchanged. With no sampler, the original knob arithmetic runs in
+  the original order — the fallback is bit-identical (goldens
+  below), so drivers without the service (unit suites, census)
+  are untouched.
+- **The write** (`gl/vortex.mjs`, `gl/wetFrame.mjs`): contact
+  presses (one per contacting pair per pass, at the midpoint,
+  amount = 0.35 × the pair's wetness — a pair deposits the wet it
+  carries; a dry pair creates nothing) ride the frame request as
+  `stamps` and land in the field on the full path, on the
+  stamps-only degraded path, and pressed (not flowed) onto a
+  frozen hold. Dropped when no consumer is served.
+- **The degraded path, live for the first time**: the dish
+  enrols as a consumer beside ACCUM with `degradedOk` — under
+  the tier-1 perf shed the field degrades to stamps-only for the
+  dish instead of dying. ACCUM's own behaviour at tier 1 is
+  unchanged (it is already stood down as a unit there).
+- **The shed line**: the loop publishes the served mode on a new
+  wire (`gl/wetLive.mjs`); the personas' show block carries
+  `{ mode, shed }` only while degraded/shed (`curator/trioLive.js`
+  `getWet` option, wired in `App.jsx`) — the line slice A owed
+  this slice.
+- **The bake** (`engine/kernel/bake/dishBake.mjs`): the driver
+  takes a caller-supplied service by injection (`wetFrame`
+  option) and serves it per bake step, so an injected wet bake
+  settles by the field's law. Injection, not ownership: the
+  first cut had the bake create the service, and the kernel
+  boundary suites (#1239 glBoundary, #1310 purity) correctly
+  rejected a kernel→gl import — the kernel stays worker-pure.
+  Without injection the bake is the pre-#1841 bake, bit for bit.
+  Census bakes are dry and unaffected either way.
 
-- `app/src/gl/wetSoak.mjs` (new) — the soak recipe (`WET_SOAK`: smear
-  spans/weights), the CPU mirror of the shader math, and
-  `soakFieldState`, the one normaliser every render entry point uses.
-  The velocity pack scale is a mirrored literal (32), pinned equal to
-  vortex's constant by the suite — importing the sim from here would
-  drag its cost-tier registration into the renderer's import chain
-  (this actually broke costTiers coverage during the build; see
-  Verification).
-- `app/src/gl/shaders.mjs` — COMPOSITE_FS: the dry composite is computed
-  first and untouched; an appended soak block rebuilds the composite
-  from a velocity-smeared source (3 taps trailing the flow — the smear
-  machinery, no new blur), multiplies the source colour by the
-  absorption (pigment reflectance pack, else the ground), and mixes by
-  the field's local wetness. f = 0 returns the dry pixel bit-exact. The
-  matte factor is hoisted to a named variable and re-applied to the
-  smeared source (pixel-identical refactor). No second rim/edge term —
-  the #1813 binding direction holds.
-- `app/src/gl/renderer.mjs` — composite program gains the soak uniforms
-  (bound off + dummy textures when no soak → byte-identical);
-  `registerCostTier('gl/wet-soak', tier 0, …)` — Phase C's "cost tier
-  for the new sampling," never shed here (the shed is the service's);
-  three 128² pack textures uploaded keyed on pack identity;
-  `renderFrameInto`/`renderFrameOffscreen` (both)/`renderAccumSequence`
-  all read the ONE unified `payload.wet` shape
-  `{wetMask, wetVel, pigDep, wetAmount, display?}`.
-- `app/src/gl/liveLoop.mjs` — the frame request names
-  `consumers: {accum, soak}`; `degradedOk` stays false (the shed IS
-  the soak's perfTier1 answer, per the issue's acceptance). The soak
-  field rides the frame payload; captures MERGE the display state
-  under `.display` instead of replacing the wet key, so stills soak
-  too. The capture path still calls `wetGroundFromCss` exactly twice
-  (standing pin).
-- Flag plumbing (mirrors `feedsAccum`, #1806): `sceneContract.js`
-  carries `wetSoak: true` on content layers only while on;
-  `projectNormalize.js` keeps exactly-`true` on content only;
-  `layersSlice.js` `toggleLayerWetSoak` (key deleted on toggle-off,
-  no-op + no undo entry on pattern/FX/MATH; duplicates inherit);
-  `actions.js` / `applyAction.js` / `eventBus.js` / `eventRegistry.js`
-  / `wireEventBus.js` wire `LAYER_TOGGLE_WET_SOAK`.
-- `app/src/panels/build/LayerStack.jsx` — the WET button in the
-  expanded stratum row, content strata only, `wet-dim` class when on
-  while perfTier1; `strataSummary.mjs` confesses `wet soak`;
-  `panels.css` the dim rule (opacity 0.45, beside the feed-off rule).
-- `app/src/gl/parity/glHarness.html` — the present probe forwards the
-  wet payload (test harness only).
-- `docs/WET_ENGINE.md` — status line + Phase B row marked landed; the
-  strata-soak status paragraph incl. the vacuous-antecedent note.
+## Preservation proof (measured, not asserted)
 
-## Measurements (evidence: docs/review/1814/)
+Goldens measured on the unmodified tree first, then re-measured
+on the final tree:
 
-- Mode on + no field = mode off, **byte-identical**; mode on + all-zero
-  mask = byte-identical; dry half of a half-wet scene byte-exact vs
-  mode-off on both render shells.
-- Term (a): coverage-isolated pixels recover the pigment pack's
-  reflectance (pack 64/128/192 → ratios within 0.035 of
-  0.251/0.502/0.753 per channel; strongest pixel 251 → 63, ×0.251
-  exactly). No pigment → absorption is the ground colour alone.
-- Term (b): one isolated mark — dry edges [116, 283]; +flow
-  [116, 289]; −flow [110, 283]. One-sided trailing smear; the leading
-  edge never moves; the sign follows the velocity.
-- Parity: candidate render vs chunked export with WET on —
-  byte-identical. Warm-up export (K=90) soaks: flagged ≠ unflagged by
-  > 50 px, two runs byte-identical.
+- Per-system wet scene, no field attached: **2258814921** —
+  unchanged bit for bit (the knob fallback is exact).
+- Cross-strata wet scene through a dish session, no sampler:
+  **3750751918** — unchanged bit for bit.
+- Dry bake: **3304663090** — unchanged.
+- Wet-frame Phase A golden: **3108730517** — unchanged (slice A's
+  behaviour is untouched; the service gained a read + a request
+  field, nothing else).
+- Uniform-field exactness: a constant sampler at 0.65 reproduces
+  2258814921 exactly — the field path IS the knob path when the
+  field is flat, so the live dish changes only where the field
+  actually varies.
+- Bake≡live survives the migration: dishLinks' parity harness
+  now serves the field on both sides and the equality assertions
+  hold bit for bit (this also cross-validates the bake wiring).
 
-## Verification (real counts, this tree, suites run solo)
+## The one re-pin (with cause)
 
-- `wetSoak.selfcheck` — **31 checks passed** (new suite; wired into
-  `app/selfcheck.manifest`).
-- `wetFrame` 15 ✓ · `wetLook` 16 ✓ · `wetWarmup` 21 ✓ ·
-  `sceneContract` 15 cases ✓ · `feedsAccumSurface` 12 cases ✓ ·
-  `eventRegistry` ok (163 events) · `busChain` 14 ✓ · `costTiers` OK ·
-  `uniformLocations` ok · `grainFinish` 4 ✓ · `accumFeed` 15 ✓ ·
-  `accumGuard` OK · `accumInput` 7 ✓ · `projectDocument` OK ·
-  `projectDocument.fuzz` ok (400 mutated documents).
-- `npm run build` ✓ (built in 4.92s). `npm run format:check` ✓ — all
-  files pass (prettier --write run on every touched code file before
-  committing). ESLint on all touched files: clean.
-- `accum` — **OK (83 cases)**, run solo at
-  `NODE_OPTIONS=--max-old-space-size=3072` — the same count as the
-  pristine base at `302f738a` (also OK, 83 cases). Earlier attempts in
-  this session aborted mid-run (exit 134) under self-inflicted sandbox
-  contention (overlapping heavy suites); with the box quiet the suite
-  completes green on both trees. No failing check appeared in any
-  attempt.
-- **composite — OK (15 cases)** in a full batch run on this tree. The
-  sandbox browser is flaky about it, though: a later solo run stalled
-  at a 200 s cap mid-section-A (53 checks reached, no failures), and
-  the pristine base's own section A reports 2 failures here — the
-  pass stands, but CI remains the authoritative word for this suite.
-- swarmWasm / rollSafety: not run — no cargo in the sandbox and no
-  wasm/roll surface touched; per the dispatch these are
-  environmental/base-identical.
+- Wet bake golden **212945750 → 2527199455**. Cause: the bake now
+  steps an injected wet field and the dish reads it (spatially
+  varying medium instead of the uniform knob) — the change #1809
+  slice B's acceptance allows ("re-pinned only where the field
+  source legitimately changes values, each named with cause").
+  The new value repeats bit for bit. Pinned in
+  `src/engine/dishWet.selfcheck.mjs` (f).
 
-Two findings from the build, both fixed and now pinned by the suite:
+Suite-source pins re-worded, no assertion weakened: three suites
+(dishMedium (i), dishFriction (e), dishSpin (f)) pinned the
+per-system medium local as `med.`; the medium now resolves per
+pair, so the local is `medPair.` and the pins follow it — each
+suite header records the re-pin and cause. dishLinks' bake≡live
+harness and dishMedium's (h) bake were updated to inject/serve
+the field (the equality and settle assertions themselves are
+unchanged).
 
-1. **Import-chain cost coverage.** wetSoak originally imported the
-   velocity-pack constant from vortex.mjs; that dragged the sim's
-   tier-1 registration into the renderer's import chain and costTiers
-   failed (`gl/vortex` declared, unmeasured). Fixed by mirroring the
-   constant (above); costTiers green.
-2. **Key-order round-trip.** The duplicate-layer literal originally
-   placed the wetSoak spread before `patch:` while projectNormalize
-   assigns `[…, patch, feedsAccum, wetSoak]` — serialize→parse→apply→
-   serialize was not byte-stable. Spread moved after `patch:`; the
-   round-trip is asserted byte-stable in the suite.
+## Verification
 
-## Golden re-pins (each with its cause)
+- New/changed suites: `dishWet.selfcheck` **7 checks** (new —
+  fallback goldens, uniform-field exactness, sample-point probes
+  that prove pair outcomes key on the field at the midpoint, bond
+  formation following the field over a decoy knob both ways,
+  stamp law, bake goldens, the wire + interleave);
+  `wetFrame.selfcheck` **19 checks** (+4: dish alone passes the
+  need gate, `sampleWet`, stamps on full/degraded paths, stamp
+  determinism); `trioLive.selfcheck` **23 checks** (+1: the show
+  block's shed line, present only when served degraded/shed).
+- Targeted battery (60 suites — every suite referencing a
+  touched file: the whole dish family, contacts, kernel/dish,
+  vortex, the wet/accum suites, replay/take/census/trio suites):
+  first run 55 pass / 5 fail — the four pin/harness items above
+  plus a wetWarmup browser crash under box contention. All five
+  re-run green on the final tree (wetWarmup solo, 21 checks) —
+  recorded here so the trail is honest.
+- Full manifest sweep (final tree): **535 of 537 commands pass.**
+  The two failures are the documented sandbox-environmental pair
+  — `swarmWasm` (checked-in kernel wasm not reproducing
+  bit-for-bit from the sandbox rust toolchain) and `rollSafety`
+  — base-identical, untouched by this slice.
+- `accum.selfcheck`: passed in the sweep at **83 cases** (3 GB
+  heap). Two earlier solo runs died in its browser phase
+  (Chromium target crash / process kill) while three agents'
+  sweeps shared the box — every check that executed passed, no
+  assertion failed in any run, and wetWarmup crashed the same
+  way under the same load before passing solo on both trees
+  (21 checks). Sandbox contention, not a tree signal.
+- `npm run build` green; `npm run lint` 0 errors (the 3 warnings
+  in touched files are pre-existing App.jsx hook warnings in
+  untouched code).
+- `npm run format:check` clean on the final tree.
 
-1. `wetWarmup.selfcheck` source pin:
-   `applyWetLookTo(payload, finished, wet)` →
-   `applyWetLookTo(OT, finished, payload.wet.display)`. Cause: the
-   unified `payload.wet` shape — the display state now nests under
-   `.display` of the same key that carries the soak packs (three call
-   sites read one shape). Behaviour unchanged; all 21 checks pass.
-2. `parity/corpus.mjs`, `wet-warm-up` divergence: the gl text now
-   names the strata soak alongside the warm-up render, and the entry
-   is signed `'#1815, #1814'`. The id and the SVG text are unchanged —
-   'mask absent → static blend' is the soak's shed behaviour too, the
-   same already-signed divergence. No golden bytes changed anywhere;
-   mode-off output is byte-identical by construction and by assertion.
+## Flags for the coordinator
 
-## Boundaries & flags for the coordinator
-
-- **#1841 (dish migration) untouched** — review lane. The soak adds a
-  consumer name to the shared gate only; nothing in the dish path
-  changed. If #1841 later wants a degraded (stamps-only) serve for the
-  dish, the soak keeps its shed semantics per its own acceptance —
-  the two consumers' flags are independent.
-- **`attachVelocities` gate left ACCUM-only.** A soak-only scene
-  stamps via footprints plus behave-driven vorton drift; extending
-  instance-velocity plumbing to soak-only scenes risks plain-render
-  byte-identity and was out of scope. Flagged, not hidden: the smear
-  term reads the field's velocity (vortons), which is the field the
-  issue's terms describe.
-- **Cross-shell dry gap (pre-existing, not this slice).** The live
-  shell (present probe) and the offline shell already differ on a
-  bone-dry scene in this sandbox (max Δ223, mean Δ2.83 — live-shell
-  resolve-option defaults). Parity for this slice is asserted within
-  each shell, where it is byte-exact. Worth a look from whoever owns
-  the live shell's resolve defaults; untouched here.
+1. **Behaviour change, surfaced not smoothed**: in the live
+   instrument the dish's medium is now spatial — grip, cling,
+   friction, bounce and drag follow the local wash, and contacts
+   feed the wash back. That is the slice's purpose; the goldens
+   for it are Matt's eyes (review lane). Physics under a FLAT
+   field is proven identical to the knob, so any felt difference
+   is the field's variation, not a solver change.
+2. **Bake fields are each run's own**: the bake serves its
+   injected service from the dish bodies only; the live field
+   also takes non-dish marks' stamps. A bake is the dish's own
+   weather, not a replay of a performance's field. Named in the
+   dishBake header.
+3. **Takes**: the field is not added to the take snapshot
+   protocol (slice A precedent — ACCUM's field is not snapshotted
+   either); it re-derives from recorded inputs on replay. The
+   sampler channel follows the established module-channel
+   precedent (getLastSpawnDecisions / resolveTap's snapshotter).
+4. **First frame reads dry**: a session's field is born at its
+   first wet-frame request, so frame one's dish physics reads
+   dry. That is the service's birth semantics, not a special
+   case in this slice.
+5. **liveLoop.mjs hunks are small and delimited** (import line,
+   sampler registration after service creation, the request
+   block, teardown) for composition with #1837's hunks at
+   publish.
+6. No on-device numbers are claimed anywhere in this slice: the
+   sampler is one bilinear read per contact pair per step; any
+   perf measurement belongs to the #1695 harness on Matt's Mac.

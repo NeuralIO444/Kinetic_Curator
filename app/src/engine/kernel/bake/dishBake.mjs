@@ -13,11 +13,22 @@
 // JS only, by construction: the wasm module has no contact solver, and a
 // dish scene is contact-active by definition (see contactsBakePolicy in
 // ./index.js — the policy's answer for contacts is the JS integrator).
+//
+// #1841 (slice B of #1809): when the caller supplies a wet-frame
+// service (the `wetFrame` option), the bake's dish reads the shared
+// wet field through it, stepped per bake step (below) — the same
+// service contract the live loop serves, so "how wet is it here"
+// has one answer in the bake too. The service is the CALLER's: the
+// kernel imports nothing from gl/ (the #1239 boundary, the #1310
+// worker purity), so the driver takes the instance by injection
+// and never creates or disposes it. Without one, the bake reads
+// the enrolled knob scalars — the pre-#1841 bake, bit for bit.
 
 import { ParticleSystem } from '../../particles.js';
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './index.js';
 import { createDishSession, enrolDishBody, armDish, dishEnrolRadius } from '../../dishContacts.mjs';
 import { tickDishTrails } from '../../dishTrails.mjs'; // #1415 — the trail substrate ticks once per bake step (the law lives in the module)
+import { clampWetness } from '../../dishMedium.mjs'; // #1841 — the bake field's wetness input, read honestly
 import { isOrganismMode } from '../../../data/layout-modes.js';
 
 /**
@@ -34,9 +45,22 @@ import { isOrganismMode } from '../../../data/layout-modes.js';
  *   dish pass simply stops involving them once done).
  * @param {number} [opts.dt=BAKE_DT_MS]
  * @param {{x:number,y:number}|null} [opts.attractor=null]
+ * @param {object} [opts.wetFrame=null] — #1841: a caller-owned
+ *   wet-frame service (gl/wetFrame.mjs's createWetFrameService),
+ *   injected: with it, the bake's dish reads the shared field and
+ *   this driver serves it once per step; the caller disposes it.
+ *   Absent: the knob bookkeeping, bit-identical to the pre-#1841 bake.
  * @returns {Map<string, Array>} layer key → baked items (getItems shape).
  */
-export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = BAKE_DT_MS, attractor = null }) {
+export function bakeDishParticles({
+  layers,
+  canvasW,
+  canvasH,
+  steps = 180,
+  dt = BAKE_DT_MS,
+  attractor = null,
+  wetFrame = null,
+}) {
   const session = createDishSession();
   const keys = [];
   const units = layers.map((layer) => {
@@ -80,6 +104,25 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
     return { layer, sys, params, steps: layer.steps ?? steps };
   });
 
+  // #1841 (slice B of #1809) — with a caller-supplied service, the
+  // bake's dish reads the shared wet field like the live dish does:
+  // the injected service steps once per bake step, after every
+  // unit's update, with the bodies as the stamp instances and the
+  // contact presses the passes recorded. The sampler is attached
+  // before the first update; it reads the standing field (dry until
+  // the first served step), exactly the live interleave. Two honest
+  // limits, named: the field's wetness input is the wettest enrolled
+  // layer's knob (one field, one input — the live loop's store knob
+  // is the same shape of answer), and its seed is the first layer's;
+  // and the bake's stamps are the bodies only — the live field also
+  // takes the non-dish marks' stamps, so a bake's field is the
+  // dish's own weather, not a replay of a performance's. The dish's
+  // wet LAW is one in both drivers; the fields are each run's own.
+  if (wetFrame) session.wetSampler = (x, y) => wetFrame.sampleWet(x, y);
+  const dishPresent = session.entries.some((e) => e.radius > 0);
+  const bakeWetness = layers.reduce((m, l) => Math.max(m, clampWetness(l.layoutParams.accumulationWetness)), 0);
+  const bakeSeed = layers.length ? layers[0].seed : 0;
+
   const maxSteps = Math.max(0, ...units.map((u) => u.steps));
   for (let s = 0; s < maxSteps; s++) {
     armDish(session, keys);
@@ -101,8 +144,43 @@ export function bakeDishParticles({ layers, canvasW, canvasH, steps = 180, dt = 
     // and a finished unit (skipped above) lays no phantom trail — the
     // tick's step-counter guard sees its frozen _step.
     tickDishTrails(session);
+    // #1841 — serve the field for the next step's reads: the bodies
+    // stamp it (post-integration positions, the live contract's
+    // shape) and the step's contact presses land with them. No
+    // service injected, or no dish enrolled: no request, no field
+    // (and at wetness 0 the service answers 'off' and the field is
+    // never born, so a dry bake reads dry throughout).
+    if (wetFrame && dishPresent) {
+      const instances = [];
+      for (const u of units) {
+        const sys = u.sys;
+        for (let i = 0; i < sys.n; i++) {
+          if (!sys.alive[i]) continue;
+          instances.push({
+            x: sys.x[i],
+            y: sys.y[i],
+            vx: sys.vx[i],
+            vy: sys.vy[i],
+            scale: sys.scale[i],
+            layer: u.layer.key,
+            key: i,
+          });
+        }
+      }
+      wetFrame.frame({
+        consumers: { dish: true },
+        shed: null,
+        degradedOk: true,
+        wetness: bakeWetness,
+        freeze: false,
+        seed: bakeSeed,
+        width: canvasW,
+        height: canvasH,
+        instances,
+        stamps: session.wetStamps.splice(0, session.wetStamps.length),
+      });
+    }
   }
-
   const out = new Map();
   for (const u of units) out.set(u.layer.key, u.sys.getItems(u.layer.activeAssets));
   return out;

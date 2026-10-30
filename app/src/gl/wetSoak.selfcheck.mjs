@@ -376,7 +376,10 @@ ok('service: no consumer → off; perfTier1 shed → named shed, no mask (the st
 // --- surface pins ----------------------------------------------------------------------
 ok('surface: liveLoop gates on the soak, ferries the field, and the capture merges (never replaces)', () => {
   const loop = read('app/src/gl/liveLoop.mjs');
-  assert.ok(loop.includes('consumers: { accum: !!layoutParams.accumulation, soak: anyWetSoak }'), 'need-based gate');
+  assert.ok(
+    loop.includes('consumers: { accum: !!layoutParams.accumulation, soak: anyWetSoak, dish: dishWet.present }'),
+    'need-based gate',
+  );
   assert.ok(loop.includes("l.type === 'content' && l.wetSoak === true"), 'the soak test reads the contract');
   assert.ok(loop.includes('display: wetDisplay'), 'capture display state nests under .display');
   assert.ok(loop.includes('...(payload.wet || {})'), 'capture merges the payload field');

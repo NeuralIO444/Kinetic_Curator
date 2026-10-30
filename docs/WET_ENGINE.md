@@ -57,6 +57,22 @@ static blend", `parity/corpus.mjs` KNOWN_DIVERGENCES); the corpus
 keeps WETNESS at 0, so the sweep is untouched. The warm-up's cost is
 pinned: K steps at the 128-grid constants under a 2 s ceiling,
 asserted with a timing log in `wetWarmup.selfcheck`.
+**Dish migration:** #1841 (2026-10-29) landed slice B of #1809: the
+dish is the service's second consumer. Its wet quantities — the pair
+medium's curves, the grip verdicts behind bond formation, the
+integrator's drag — read the field through the service's `sampleWet`
+(the standing state at the pair's midpoint / at each body), and its
+contacts stamp into the field through the frame request's `stamps`,
+applied with the marks' own on the full and degraded paths alike.
+The dish is the first `degradedOk` consumer: at the tier-1 shed the
+field degrades to stamps-only service for it instead of dying, and
+the served mode is published to the personas' show block as its shed
+line (`gl/wetLive.mjs`). The bake runs the same contract through a
+caller-injected service, stepped per bake step from the bodies (the
+kernel imports no gl, so the driver takes the service by
+injection). A driver with no service attached keeps the
+knob-uniform medium bit for bit. Measurements in
+`docs/review/1841/`.
 **Footprint stamps + diffusion:** #1876 (2026-10-29) fixed the
 grid-dots defect in the stamp/transport model: a mark now stamps water
 + pigment over the quad it draws (semi-axis 99.75 × instance scale,

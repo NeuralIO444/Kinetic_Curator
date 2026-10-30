@@ -73,6 +73,19 @@
  *   - Cross-strata pairs take the pair's averaged wetness, exactly
  *     as cross-strata restitution is averaged (A1's precedent); the
  *     drag stays per-system, in each stratum's own integrator.
+ *   - THE SOURCE (#1841, slice B of #1809): "how wet is it here"
+ *     has one answer, instrument-wide — the shared wet field. When
+ *     the session carries a field sampler (the drivers attach one:
+ *     the live resolver the loop's wet-frame service, the bake its
+ *     own), a pair's wetness is the field sampled at the pair's
+ *     midpoint and the drag samples at each body; the curves above
+ *     are unchanged, only their input moves. A session with no
+ *     field attached keeps the knob-uniform source exactly as
+ *     before (the enrolment average across the seam, the knob per
+ *     system) — the uniform field the knob always described, and
+ *     the only honest answer a driver without the service can
+ *     give. The knob itself remains the field's own input (its
+ *     stamp gate and gain), never a second medium.
  *   - Determinism: curves are pure arithmetic on a param — no state,
  *     no step counter, nothing to drift between live and bake. The
  *     studio bake runs the same update(), so bakes settle exactly as
@@ -215,3 +228,27 @@ export function dishMediumFor(w) {
 
 /** The dry medium, frozen: what a call site with no WETNESS means. */
 export const DRY_MEDIUM = Object.freeze(dishMediumFor(0));
+
+/** The contact stamp's rate (#1841): a contacting pair presses the
+ *  shared field at the field's own resting-stamp unit — the amount
+ *  emitFromInstances lays for a resting mark (gl/vortex.mjs) — scaled
+ *  by the pair's wetness. A pair deposits the wet it carries: at
+ *  pair wetness 1 a full resting stamp; at 0, nothing — a contact
+ *  can move water onto the contact point, it cannot create it. */
+export const MEDIUM_CONTACT_STAMP = 0.35;
+
+/**
+ * Record one contact press for the shared field: the pair at
+ * (x, y) with sampled/averaged wetness `pairWet` appends
+ * { x, y, amount } to `list` (the dish session's stamp scratch,
+ * drained by the driver into the wet-frame request). A dry pair
+ * records nothing. The list is the ONLY write the passes make
+ * toward the field — the field itself is the service's, and the
+ * stamp lands when the driver serves the next frame.
+ */
+export function noteDishContactStamp(list, x, y, pairWet) {
+  if (!list) return;
+  const amount = MEDIUM_CONTACT_STAMP * clampWetness(pairWet);
+  if (!(amount > 0)) return;
+  list.push({ x, y, amount });
+}

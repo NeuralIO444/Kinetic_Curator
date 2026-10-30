@@ -41,6 +41,7 @@ import { TrailGridReadout } from './curator/TrailGridReadout.jsx'; // #1808 slic
 import { DEBUG_TRAILGRID } from './gl/trailGridLive.mjs';
 import { TrailReadout } from './curator/TrailReadout.jsx'; // #1807: ?debug=stats only
 import { DEBUG_STATS, requestStats, setStatsGovernor } from './gl/statsLive.mjs'; // #1807: the buffer statistics' wire
+import { getWetModeLine } from './gl/wetLive.mjs'; // #1841: the wet field's shed-line wire
 import { createTrailSampler } from './curator/trailStats.js'; // #1807: the show block's trail reader
 import { createPressureGovernor } from './curator/statsGovernor.mjs'; // #1807: saturation pressure, data-only in v1
 import { observeDish, getDishPressure } from './curator/dishPressure.js'; // #1355: dish pressure around the pins
@@ -230,6 +231,11 @@ function AppInner() {
           return createTrailSampler();
         })(),
       ),
+      // #1841 — the wet field's shed line for the show block: the loop
+      // publishes the service's mode per frame on the wet wire; the
+      // line exists only while the field is degraded or a wanting
+      // consumer stands shed (degradation is visible, never silent).
+      getWet: () => getWetModeLine(),
       // LOIS's keep-rate read (Matt, 2026-10-14): keeping a lot lets a steady show ride; passes piling up make her call it flat sooner
       getActivity: () => {
         const f = loisActivity.snapshot();
