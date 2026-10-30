@@ -135,7 +135,7 @@ test('target sizes hold (buttons 44px, detent cells at the mode-row size); remov
   ).toBe(kcCount);
 });
 
-test('the last KC track cannot be removed even with a pattern track present, and the cap counts the pattern track', async ({
+test('the last KC track cannot be removed even with a pattern track present, and patterns spend no content slot', async ({
   page,
 }) => {
   await boot(page);
@@ -146,8 +146,11 @@ test('the last KC track cannot be removed even with a pattern track present, and
     const kcRow = page.locator('.strata-block.strata-content:not(.strata-pattern)').first();
     await expect(kcRow.getByTitle('Remove track (undoable)')).toBeDisabled();
   }
-  // Fill the content cap with patterns; the unified slot still offers FX/MATH
-  // room, but the PATTERN type itself disables at the cap.
+  // #1609 re-pin (D4): a PATTERN track no longer spends the content cap —
+  // ground is gated only by the document bound (MAX_LAYERS; the bound's
+  // refusal is pinned at store level in patternTrack.selfcheck). Fill past
+  // the old shared cap of 4: the PATTERN pick must still be enabled there,
+  // and picking it must land another ground track.
   for (let i = 0; i < 4; i++) {
     const n = (await state(page)).layers.filter((l) => l.type !== 'fx' && l.type !== 'math').length;
     if (n >= 4) break;
@@ -158,7 +161,12 @@ test('the last KC track cannot be removed even with a pattern track present, and
   await slot.dispatchEvent('pointerdown');
   await expect(page.locator('.layer-chooser')).toBeVisible({ timeout: 10000 });
   await slot.dispatchEvent('pointerup');
-  await expect(page.locator('.layer-chooser').getByRole('button', { name: 'PATTERN', exact: true })).toBeDisabled();
+  const patternPick = page.locator('.layer-chooser').getByRole('button', { name: 'PATTERN', exact: true });
+  await expect(patternPick).toBeEnabled();
+  await patternPick.click();
+  await expect
+    .poll(async () => (await state(page)).layers.filter((l) => l.type !== 'fx' && l.type !== 'math').length)
+    .toBe(5);
 });
 
 test('DROP: the toggle writes through, an armed SHUFFLE shows it and lands later; with DROP off it lands at once', async ({
