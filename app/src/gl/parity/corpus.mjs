@@ -48,9 +48,9 @@ export const POLICIES = Object.freeze({
 export const KNOWN_DIVERGENCES = Object.freeze([
   Object.freeze({
     id: 'wet-warm-up',
-    gl: 'deterministic K=90 warm-up of the wet field (#1815)',
+    gl: 'deterministic K=90 warm-up of the wet field (#1815); strata soak reads the same packs in the composite (#1814)',
     svg: 'mask absent → static blend',
-    signed: '#1815',
+    signed: '#1815, #1814',
   }),
 ]);
 

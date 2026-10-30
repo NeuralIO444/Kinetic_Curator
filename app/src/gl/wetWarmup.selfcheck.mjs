@@ -198,8 +198,8 @@ ok('call sites: renderScene, renderAccumSequence, renderFrameOffscreen all consu
   );
   assert.ok(renderer.includes('wetStep: wet.wetStep'), 'the sequence recipe takes the warmed wet terms');
   assert.ok(
-    renderer.includes('applyWetLookTo(OT, finished, payload.wet)'),
-    'renderFrameOffscreen runs the pass from the payload state',
+    renderer.includes('applyWetLookTo(OT, finished, payload.wet.display)'),
+    'renderFrameOffscreen runs the pass from the payload display state (#1814: payload.wet is the one wet shape — field packs + .display)',
   );
   const loop = read('app/src/gl/liveLoop.mjs');
   assert.equal(

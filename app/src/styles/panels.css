@@ -1804,6 +1804,12 @@
   opacity: 0.45;
   text-decoration: line-through;
 }
+/* #1814 — WET interaction on but the wet field is shed at perfTier1: the
+   mode's indicator dims (the stratum blends plainly until the tier
+   recovers — the mode says why it can't, never dies silently). */
+.build-layer-stack .micro-btn.wet-dim {
+  opacity: 0.45;
+}
 /* The number chip is the #716 .track-numeral tile (rules above) — the block
    header keeps it centered like the old rows did. */
 .build-layer-stack .strata-head .track-numeral {

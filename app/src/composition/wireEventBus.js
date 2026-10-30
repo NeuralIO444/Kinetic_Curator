@@ -104,6 +104,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_SWAP_POSITIONS, ({ idA, idB }) => dispatch({ type: A.SWAP_LAYER_POSITIONS, idA, idB }));
   on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
   on(Events.LAYER_TOGGLE_FEEDS_ACCUM, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_FEEDS_ACCUM, id }));
+  on(Events.LAYER_TOGGLE_WET_SOAK, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_WET_SOAK, id }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
   on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));

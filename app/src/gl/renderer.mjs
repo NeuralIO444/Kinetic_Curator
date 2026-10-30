@@ -49,6 +49,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
 const GRAIN_FAMILY_KINDS = ['grain'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
+import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser
 import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
 import { kinemePhase } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id)
@@ -366,7 +367,15 @@ export const RENDERER_PROGRAMS = [
       'u_maskInvert',
       'u_hueOn',
       'u_hueMat',
-    ], // hueRotate (#262)
+      'u_soakOn',
+      'u_soakMask',
+      'u_soakVel',
+      'u_soakPig',
+      'u_soakPigOn',
+      'u_soakAmt',
+      'u_soakGround',
+      'u_soakVelScale',
+    ], // hueRotate (#262); strata soak uniforms (#1814)
     cost: {
       tier: 0,
       memoryBytes: 1920 * 1080 * 8,
@@ -497,6 +506,21 @@ registerCostTier('gl/sun', {
   memoryBytes: 0,
   timeMs: 0.02,
   notes: '#594 PR1 sun: per-instance diffuse in QUAD_VS/FS; zero passes; live + GL stills',
+});
+// #1814 — the strata soak's sampling (WET_ENGINE Phase C's "cost tier
+// for the new sampling"): no pass and no new program — three extra
+// source taps + three field taps inside the existing composite, only
+// for strata flagged WET and only while a field is served, plus the
+// three 128² field-pack textures. Tier 0, never shed: the governor's
+// answer for the soak is the wet service's own shed (perfTier1 → mask
+// absent → static blend, with the row's indicator dimmed in BUILD) —
+// a user-selected interaction mode is never silently thinned here.
+registerCostTier('gl/wet-soak', {
+  tier: 0,
+  memoryBytes: 3 * 128 * 128 * 4,
+  timeMs: 0.05,
+  notes:
+    '#1814 wet soak: in-composite sampling for WET-flagged strata only (3 src taps + mask/vel/pigment taps per soaked composite); zero passes; live + captures + GL stills; shed is the wet service shed at perfTier1 (mask absent → static blend), never a silent thinning',
 });
 // #781 KINEME Build A: whole-mark motion (spin/rock/pulse/blink/bob) evaluated
 // per vertex in the existing quad shader, only for instances with a kineme;
@@ -967,7 +991,19 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * hueRotate: degrees from layer.layout.hueRotate (0 = off) — hue-rotation
    *   color matrix in the shader (#262).
    */
-  function composite(prog, u, srcTex, dstRead, dstWrite, blend, opacity, clip, mask = null, hueRotate = 0) {
+  function composite(
+    prog,
+    u,
+    srcTex,
+    dstRead,
+    dstWrite,
+    blend,
+    opacity,
+    clip,
+    mask = null,
+    hueRotate = 0,
+    soak = false,
+  ) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, dstWrite.fb);
     gl.viewport(0, 0, dstWrite.w, dstWrite.h);
     gl.disable(gl.BLEND);
@@ -992,6 +1028,24 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const hue = Number(hueRotate) || 0;
     gl.uniform1f(u.u_hueOn, hue ? 1 : 0);
     gl.uniformMatrix3fv(u.u_hueMat, false, hue ? hueRotateMatrix(hue) : HUE_IDENTITY);
+    // Strata soak (#1814): the field packs bind on their own units for
+    // a WET-flagged layer while a field is served; otherwise dummies
+    // bind (the matte discipline) and u_soakOn stays 0 — the shader
+    // branch never runs and the composite is byte-identical.
+    const soakOn = !!(soak && soakField);
+    gl.uniform1i(u.u_soakMask, bindTex(3, soakOn ? soakMaskTex : dstRead.tex));
+    gl.uniform1i(u.u_soakVel, bindTex(4, soakOn && soakField.vel ? soakVelTex : dstRead.tex));
+    gl.uniform1i(u.u_soakPig, bindTex(5, soakOn && soakField.pig ? soakPigTex : dstRead.tex));
+    gl.uniform1f(u.u_soakOn, soakOn ? 1 : 0);
+    gl.uniform1f(u.u_soakPigOn, soakOn && soakField.pig ? 1 : 0);
+    gl.uniform1f(u.u_soakAmt, soakOn ? soakField.amount : 0);
+    const sg = soakOn ? soakField.ground : [0, 0, 0];
+    gl.uniform3f(u.u_soakGround, sg[0], sg[1], sg[2]);
+    gl.uniform2f(
+      u.u_soakVelScale,
+      soakOn ? (soakField.velPack * WET_SOAK.smear) / sceneW : 0,
+      soakOn ? (soakField.velPack * WET_SOAK.smear) / sceneH : 0,
+    );
     drawFullscreen(prog);
   }
   const compU = {
@@ -1007,6 +1061,14 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     u_maskInvert: U(compProg, 'u_maskInvert'),
     u_hueOn: U(compProg, 'u_hueOn'),
     u_hueMat: U(compProg, 'u_hueMat'),
+    u_soakOn: U(compProg, 'u_soakOn'),
+    u_soakMask: U(compProg, 'u_soakMask'),
+    u_soakVel: U(compProg, 'u_soakVel'),
+    u_soakPig: U(compProg, 'u_soakPig'),
+    u_soakPigOn: U(compProg, 'u_soakPigOn'),
+    u_soakAmt: U(compProg, 'u_soakAmt'),
+    u_soakGround: U(compProg, 'u_soakGround'),
+    u_soakVelScale: U(compProg, 'u_soakVelScale'),
   };
 
   // #1183 — the contact shadow's programs go through the same checked build + uniform audit as the renderer's.
@@ -1054,6 +1116,52 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let spec = null;
   let specTex = null;
   let specUploaded = false;
+  // #1814: the frame's soak field (wetSoak.soakFieldState over the
+  // payload's wet packs) and its three pack textures. Set per
+  // renderFrameInto; null = no field served (dry project, perfTier1
+  // shed) = every composite runs the dry path — mask absent → static
+  // blend, the signed fallback. Uploads key on pack identity: the live
+  // service hands fresh packs per frame, a still's packs upload once.
+  let soakField = null;
+  let soakMaskTex = null,
+    soakVelTex = null,
+    soakPigTex = null;
+  const soakUploaded = { mask: null, vel: null, pig: null };
+  function ensureSoakTextures() {
+    if (soakMaskTex) return;
+    const mk = () => {
+      const t = gl.createTexture();
+      gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+      return t;
+    };
+    soakMaskTex = mk();
+    soakVelTex = mk();
+    soakPigTex = mk();
+  }
+  function syncSoakTextures() {
+    if (!soakField) return;
+    ensureSoakTextures();
+    const up = (tex, pack) => {
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, pack.n, pack.n, 0, gl.RGBA, gl.UNSIGNED_BYTE, pack.rgba);
+    };
+    if (soakUploaded.mask !== soakField.mask) {
+      up(soakMaskTex, soakField.mask);
+      soakUploaded.mask = soakField.mask;
+    }
+    if (soakField.vel && soakUploaded.vel !== soakField.vel) {
+      up(soakVelTex, soakField.vel);
+      soakUploaded.vel = soakField.vel;
+    }
+    if (soakField.pig && soakUploaded.pig !== soakField.pig) {
+      up(soakPigTex, soakField.pig);
+      soakUploaded.pig = soakField.pig;
+    }
+  }
   const SPEC_UNIT = 3; // the quad program uses unit 0 (atlas); 3 stays clear of the composite's 0..2
   function uploadSpectrum() {
     if (specUploaded || !spec || !spec.tex) return;
@@ -1512,6 +1620,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     kinemeTime = contract.kinemeTime || 0;
     cellShed = !!contract.cellShed; // #1431
     regionAnim = contract.regionAnim || null; // #1433
+    // #1814: the frame's soak field, normalised from the payload's wet
+    // packs (the live service result and the warm-up export ferry carry
+    // one shape). No packs → null → every composite runs the dry path
+    // (mask absent → static blend). The ground is the frame's own bg —
+    // term (a)'s no-pigment absorption fallback.
+    soakField = soakFieldState(payload.wet, hexToRgb(bg || '#000000'));
+    syncSoakTextures();
     const { atlasTex } = uploaded;
     const { layerT, scratchT, blendT, maskT, mainA, mainB } = T;
     const fxFinishChains = [];
@@ -1609,7 +1724,19 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         });
         base = blendT;
       }
-      composite(compProg, compU, srcTex, base, dWrite, blendIdFor(layer.blend), layer.opacity, null, mask, hueRotate);
+      composite(
+        compProg,
+        compU,
+        srcTex,
+        base,
+        dWrite,
+        blendIdFor(layer.blend),
+        layer.opacity,
+        null,
+        mask,
+        hueRotate,
+        layer.wetSoak === true, // #1814: WET interaction mode — the composite soaks where the field is wet
+      );
     };
 
     let pending = []; // content layers accumulated below the next FX layer (SVG pushAcc fold)
@@ -2043,15 +2170,19 @@ export function createRenderer(canvas) {
           throw new Error(`[gl] unsupported contract version ${payload.contract.version}`);
         }
         attachVelocities(payload.contract.instances, velPrev);
+        // #1814 — the held field rides each frame's payload, so a WET
+        // stratum soaks through the sequence exactly as in a one-shot
+        // still (the same renderFrameInto consumption; the #1069 rule).
+        const framePayload = wet ? { ...payload, wet } : payload;
         // Transparent: accum.begin() owns the opaque project background.
-        const frameT = renderFrameInto(payload, T, uploaded, { transparent: true });
+        const frameT = renderFrameInto(framePayload, T, uploaded, { transparent: true });
         // B1: per-frame audio envelope modulates the recipe params.
         // #306: swell scales the glow gesture only (the washout control).
         const params = audio ? applyAudioEnvelope(base, audio[i] || {}, { swell }) : base;
         const feedIds = accumFeedSelection(payload.contract);
         if (feedIds) {
           if (!subT) subT = allocFrameTargets(w, h);
-          const subFrame = renderFrameInto(payload, subT, uploaded, {
+          const subFrame = renderFrameInto(framePayload, subT, uploaded, {
             transparent: true,
             accumInput: { layerIds: feedIds },
           });
@@ -2532,13 +2663,17 @@ export function createLiveRenderer(canvas) {
       // pure sharpness, same trick governor renderScale uses below 1x.
       const mRead = b.renderFrameInto({ ...payload, width: w, height: h }, OT, { atlasTex }, { transparent });
       // #1069 — captures (PNG stills, batch, Print Desk) get their grain too.
-      if (!payload.wet) return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
-      // #1815 — the capture frame's field was served (payload.wet is a
-      // wet-look display state, setWetLook's shape): the still gets the
-      // wet-look pass the audience sees, over the finished frame,
-      // before the resolve — instead of silently dropping it.
+      if (!payload.wet || !payload.wet.display) return b.resolveTargetToBytes(b.applyFinishChains(mRead), OT, w, h);
+      // #1815 — the capture frame's field was served (payload.wet is
+      // the one wet shape: the field packs renderFrameInto soaks from,
+      // plus the wet-look display state under .display): the still
+      // gets the wet-look pass the audience sees, over the finished
+      // frame, before the resolve — instead of silently dropping it.
+      // #1814 unified the shape: pre-#1814 this site read the display
+      // state off payload.wet directly, which would have clobbered
+      // the soak packs the same key now carries.
       const finished = b.applyFinishChains(mRead);
-      return b.resolveTargetToBytes(applyWetLookTo(OT, finished, payload.wet), OT, w, h);
+      return b.resolveTargetToBytes(applyWetLookTo(OT, finished, payload.wet.display), OT, w, h);
     } finally {
       // A capture can only run after the first live frame (waitForReady), so
       // liveW is set — the guard is belt-and-braces against a 0-size alloc.
