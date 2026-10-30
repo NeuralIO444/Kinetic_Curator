@@ -126,17 +126,13 @@ three drink from the same served field.
 - `npm run build` ✓ (built in 4.92s). `npm run format:check` ✓ — all
   files pass (prettier --write run on every touched code file before
   committing). ESLint on all touched files: clean.
-- **accum — environmental, base-identical.** The suite never prints a
-  verdict in this sandbox: the process aborts (real exit 134, SIGABRT,
-  measured unmasked) with no failing check — the abort point varies
-  (once early, twice after 72 green checks, deep in the probe
-  sections). Control: the identical command
-  (`NODE_OPTIONS=--max-old-space-size=3072`) on a pristine worktree at
-  the base commit `302f738a` produces no verdict either. Not this
-  slice; CI's selfcheck-browser job (pinned Chromium) is
-  authoritative. The sandbox Playwright cache churn is the standing
-  suspect (my `npx playwright install chromium` returned in ~2 s with
-  no output — it did not actually install).
+- `accum` — **OK (83 cases)**, run solo at
+  `NODE_OPTIONS=--max-old-space-size=3072` — the same count as the
+  pristine base at `302f738a` (also OK, 83 cases). Earlier attempts in
+  this session aborted mid-run (exit 134) under self-inflicted sandbox
+  contention (overlapping heavy suites); with the box quiet the suite
+  completes green on both trees. No failing check appeared in any
+  attempt.
 - **composite — OK (15 cases)** in a full batch run on this tree. The
   sandbox browser is flaky about it, though: a later solo run stalled
   at a 200 s cap mid-section-A (53 checks reached, no failures), and
