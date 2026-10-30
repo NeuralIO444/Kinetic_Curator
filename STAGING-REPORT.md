@@ -134,10 +134,11 @@ three drink from the same served field.
   authoritative. The sandbox Playwright cache churn is the standing
   suspect (my `npx playwright install chromium` returned in ~2 s with
   no output — it did not actually install).
-- **composite — environmental, same caveat.** Browser sections stall
-  in this sandbox; a 200 s-capped run reached 53 section-A checks with
-  no failures before the cap, and the pristine base's own section A
-  reports 2 failures here. CI is authoritative.
+- **composite — OK (15 cases)** in a full batch run on this tree. The
+  sandbox browser is flaky about it, though: a later solo run stalled
+  at a 200 s cap mid-section-A (53 checks reached, no failures), and
+  the pristine base's own section A reports 2 failures here — the
+  pass stands, but CI remains the authoritative word for this suite.
 - swarmWasm / rollSafety: not run — no cargo in the sandbox and no
   wasm/roll surface touched; per the dispatch these are
   environmental/base-identical.
