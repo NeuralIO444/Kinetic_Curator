@@ -73,6 +73,8 @@ import {
   noteBondGrip,
 } from './dishLinks.mjs';
 import { bakeDishParticles } from './kernel/bake/dishBake.mjs';
+import { createDishSession } from './dishContacts.mjs'; // #1841: the hand driver's session (the bake≡live harness below)
+import { createWetFrameService } from '../gl/wetFrame.mjs'; // #1841: the hand driver's own wet-frame service
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 
@@ -492,6 +494,7 @@ const stepN = (sys, lp, steps) => {
     { a: 1, b: 2, rest: rests[1] },
     { a: 0, b: 2, rest: rests[2] },
   ];
+  const bakeWet = createWetFrameService(); // #1841: the bake takes the service by injection (the kernel imports no gl)
   const baked = bakeDishParticles({
     layers: [
       {
@@ -506,13 +509,53 @@ const stepN = (sys, lp, steps) => {
     canvasW: 2000,
     canvasH: 1400,
     steps: 120,
+    wetFrame: bakeWet,
   }).get('l');
+  bakeWet.dispose();
   const hand = new ParticleSystem();
   hand.init(3, 2000, 1400, assets, palette, SEED);
-  const handLp = { ...layerParams, dishLinks: bakeLinks, particleCount: 3, maxParticles: 3 };
+  // #1841 (slice B of #1809): the hand driver runs the same wet-field
+  // contract the bake driver (and the live loop) runs — a wet-frame
+  // service of its own, attached to the session the system steps
+  // against, served once per step from the bodies with the step's
+  // contact presses drained in. Before the migration both sides read
+  // the knob and this harness needed no field; the field is the
+  // medium's source now, so a live-vs-bake harness that served it on
+  // only one side would be comparing two different dishes. The
+  // equality assertions below are unchanged.
+  const handSession = createDishSession();
+  const handWet = createWetFrameService();
+  handSession.wetSampler = (x, y) => handWet.sampleWet(x, y);
+  const handLp = { ...layerParams, dishLinks: bakeLinks, particleCount: 3, maxParticles: 3, dishSession: handSession };
   for (let s = 0; s < 120; s++) {
     hand.update(handLp, assets, palette, SEED, BAKE_TIME_ORIGIN + s * BAKE_DT_MS, null);
+    const instances = [];
+    for (let i = 0; i < hand.n; i++) {
+      if (!hand.alive[i]) continue;
+      instances.push({
+        x: hand.x[i],
+        y: hand.y[i],
+        vx: hand.vx[i],
+        vy: hand.vy[i],
+        scale: hand.scale[i],
+        layer: 'l',
+        key: i,
+      });
+    }
+    handWet.frame({
+      consumers: { dish: true },
+      shed: null,
+      degradedOk: true,
+      wetness: 1,
+      freeze: false,
+      seed: SEED,
+      width: 2000,
+      height: 1400,
+      instances,
+      stamps: handSession.wetStamps.splice(0, handSession.wetStamps.length),
+    });
   }
+  handWet.dispose();
   const handItems = hand.getItems(assets);
   assert.strictEqual(baked.length, handItems.length, 'bake vs live: item count');
   for (let i = 0; i < baked.length; i++) {

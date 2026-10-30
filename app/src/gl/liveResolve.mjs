@@ -258,6 +258,42 @@ export function getLastSpawnDecisions() {
   return lastSpawnDecisions;
 }
 
+/**
+ * #1841 (slice B of #1809) — the last resolved frame's DISH-WET facts,
+ * published by the resolver for the loop's wet-frame request (the
+ * getLastSpawnDecisions pattern): whether a dish was present on the
+ * frame just resolved (an enrolled stratum with a contact radius in
+ * the frame's stack order), and the contact stamps its passes
+ * recorded, drained by the read — the loop serves them with the
+ * frame's request and the dish reads the field they land in on the
+ * NEXT frame, the one-frame interleave the service contract names.
+ * Module-level, last-resolver-wins; the empty shape until the first
+ * resolve completes.
+ * Shape: { present: boolean, stamps: Array<{x, y, amount}> }.
+ */
+let lastDishWet = { present: false, stamps: [] };
+export function getLastDishWet() {
+  const out = lastDishWet;
+  lastDishWet = { present: false, stamps: [] };
+  return out;
+}
+
+/**
+ * #1841 — the live loop's wet-field read, registered by the loop at
+ * creation (and cleared at its dispose): (x, y) → the standing
+ * field's wetness, served by the loop's wet-frame service. A module
+ * channel, NOT a frame input — inputs are recorded for takes, and a
+ * closure cannot be; a take replays through the same loop, which
+ * re-registers its own service, and the field re-derives from the
+ * recorded inputs exactly as it already does for ACCUM. Resolvers
+ * built without a loop (suites, census) never register: the dish
+ * reads its enrolment scalars, as #1413 shipped.
+ */
+let liveWetSampler = null;
+export function setLiveWetSampler(fn) {
+  liveWetSampler = typeof fn === 'function' ? fn : null;
+}
+
 export function createLiveResolver() {
   const placementCaches = new Map();
   const swarmState = new Map();
@@ -470,6 +506,9 @@ export function createLiveResolver() {
       // #1413 — the stratum's medium rides enrolment (the bake driver
       // enrols the same field through the same helper — live and bake
       // cannot disagree about how wet the dish is).
+      // #1841 — this scalar is now the no-field fallback: with the
+      // service attached (input.wetSampler → session.wetSampler) the
+      // pair's wetness is the field's, sampled at the pair.
       wetness: ctx.layoutParams.accumulationWetness,
       // #1415 — the stratum's ACCUMULATION switch rides enrolment the
       // same way: up, the stratum deposits trails into the shared
@@ -576,6 +615,11 @@ export function createLiveResolver() {
     registerSpawnState(spawnState); // #1694 slice 1 — whichever resolver ran last owns the live channel (the getLastFrameMotion law)
     W = input.canvasW || CANVAS_W;
     H = input.canvasH || CANVAS_H;
+    // #1841 — the loop's registered wet-field read (setLiveWetSampler
+    // above) rides the dish session for this frame's steps; absent
+    // (no loop), the dish resolves its medium from the enrolment
+    // scalars as #1413 shipped.
+    dishSession.wetSampler = liveWetSampler;
     const caps = getQualityCaps(input.quality || 'balanced');
     const pool = mergePool(ASSETS, input.customAssets || []);
     if (overlayRevSrc !== input.customAssets) {
@@ -1292,6 +1336,20 @@ export function createLiveResolver() {
     // shell bridges the holder to the bus (curator/dishDensityLive.js).
     publishDishDensity(dishSession.densityTick > densityTickSeen ? dishSession.density : EMPTY_DISH_DENSITY);
     densityTickSeen = dishSession.densityTick;
+    // #1841 — publish the frame's dish-wet facts for the loop's
+    // wet-frame request (getLastDishWet above): a dish is present
+    // when an enrolled stratum with a contact radius sits in this
+    // frame's stack order (the arm's visibility rule, at one stratum
+    // — a lone stratum's per-system dish still reads the field). The
+    // session's recorded contact stamps drain with the publish:
+    // served or not, they were this frame's presses.
+    {
+      const inOrder = new Set(dishSession.order);
+      lastDishWet = {
+        present: dishSession.entries.some((e) => e.radius > 0 && inOrder.has(e.key)),
+        stamps: dishSession.wetStamps.splice(0, dishSession.wetStamps.length),
+      };
+    }
     // #1355: formed pins grow a moth (no pin formed: nothing happens). It hovers on the layer's own living-motion floor.
     // #1694 slice 2 — the citizen's switch + family option gate the append: citizen off (or family
     // set to dish-only) and no moth is born. The builders keep the full pool (their part lookups).

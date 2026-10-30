@@ -55,10 +55,20 @@
  * same inputs the loop always passed noteWetFrame — the full-step path
  * IS noteWetFrame against the service's slot, so ACCUM consumes
  * byte-identically (the doc's Phase A acceptance, pinned in
- * wetFrame.selfcheck). The dish migration is slice B of #1809 (its own
- * issue, review lane); warm-up exports landed as #1815 — the export
+ * wetFrame.selfcheck). Warm-up exports landed as #1815 — the export
  * paths run this service for a fixed K = 90 warm-up (gl/wetWarmup.mjs),
  * superseding the old live-only header on vortex.mjs.
+ *
+ * Slice B (#1841) wires the second consumer: the dish. The loop adds
+ * `dish` to the frame's consumers whenever a dish is present on stage
+ * and passes `degradedOk` for it — the dish is the first consumer to
+ * exercise the degraded path live. The dish reads the field through
+ * `sampleWet` (the standing state's value at a scene point, between
+ * served frames — the physics steps before the frame's request, so
+ * it reads the field the last request left) and writes through the
+ * request's `stamps` (its contact presses, recorded by the contact
+ * passes and applied with the marks' stamps, on the degraded path
+ * too: stamping is the service the shed keeps).
  *
  * Determinism (#806) is untouched: the sim steps with fixed dt and a
  * seeded RNG, as a function of the frame inputs — never wall clock.
@@ -77,6 +87,7 @@ import {
   noteWetFrame,
   packPigmentDeposited,
   packWet,
+  stampDishContacts,
   transferPigment,
   VORTEX_WET_DRY,
   wetnessStep,
@@ -113,6 +124,7 @@ const absent = () => ({ wetStep: 0, wetGain: 0, wetAmount: 0, wetVel: null, wetM
  *   stats: () => {frames: number, fullSteps: number, degradedSteps: number,
  *     shedFrames: number, heldFrames: number, births: number},
  *   field: () => object|null,
+ *   sampleWet: (x: number, y: number) => number,
  *   dispose: () => void,
  * }}
  */
@@ -132,6 +144,12 @@ export function createWetFrameService() {
    *   shed       — governor shed id (e.g. 'perfTier1') or null.
    *   degradedOk — the wanting consumer accepts stamps-only service
    *                under the shed.
+   *   stamps     — #1841: the dish's contact stamps recorded since
+   *                the last served frame ({x, y, amount} scene
+   *                points); applied with the marks' stamps on the
+   *                full and degraded paths alike. Dropped when the
+   *                field is not served (off / shed): nobody pressed a
+   *                field that wasn't there.
    *   wetness, freeze, seed, width, height, instances, behave, motion —
    *                the sim inputs, unchanged from noteWetFrame's.
    */
@@ -161,6 +179,7 @@ export function createWetFrameService() {
           instances: req.instances,
           behave: req.behave,
           motion: req.motion,
+          stamps: req.stamps,
         });
         if (held.wetStep === 1) heldFrames += 1;
         return { ...held, wetMode: 'degraded', wetShed: shed };
@@ -169,6 +188,9 @@ export function createWetFrameService() {
       const state = ensureVortex(slot, { seed: req.seed, width: req.width, height: req.height });
       if (slot.vortex !== before) births += 1;
       emitFromInstances(state, req.instances || []);
+      // #1841: the dish's stamps land under the shed too — stamping
+      // is exactly the service degraded mode keeps.
+      stampDishContacts(state, req.stamps);
       emitAmbientFrom(state, { behave: req.behave, motion: req.motion });
       const wet = state.wet;
       for (let i = 0; i < wet.length; i++) wet[i] *= VORTEX_WET_DRY;
@@ -207,6 +229,7 @@ export function createWetFrameService() {
       instances: req.instances,
       behave: req.behave,
       motion: req.motion,
+      stamps: req.stamps,
     });
     if (slot.vortex && slot.vortex !== before) births += 1;
     if (out.wetStep === 1) {
@@ -222,6 +245,35 @@ export function createWetFrameService() {
     stats: () => ({ frames, fullSteps, degradedSteps, shedFrames, heldFrames, births }),
     /** The live field state, or null before its first served frame. Read-only probe surface. */
     field: () => slot.vortex,
+    /**
+     * #1841 — the dish's read: the standing field's wetness at a
+     * scene point, bilinear over the sim's own grid mapping (the
+     * mapping stampWet writes with). Between served frames the
+     * field stands where the last request left it, which is what
+     * the physics — stepping ahead of the frame's request — reads.
+     * No field (never served, or disposed) and out-of-stage points
+     * read 0: dry is the honest answer in both cases.
+     */
+    sampleWet: (x, y) => {
+      const state = slot.vortex;
+      if (!state || !Number.isFinite(x) || !Number.isFinite(y)) return 0;
+      const { n, width, height, wet } = state;
+      if (x < 0 || y < 0 || x > width || y > height) return 0;
+      const gx = (x / width) * (n - 1);
+      const gy = (y / height) * (n - 1);
+      const i0 = gx | 0;
+      const j0 = gy | 0;
+      const i1 = i0 + 1 < n ? i0 + 1 : i0;
+      const j1 = j0 + 1 < n ? j0 + 1 : j0;
+      const tx = gx - i0;
+      const ty = gy - j0;
+      return (
+        wet[j0 * n + i0] * (1 - tx) * (1 - ty) +
+        wet[j0 * n + i1] * tx * (1 - ty) +
+        wet[j1 * n + i0] * (1 - tx) * ty +
+        wet[j1 * n + i1] * tx * ty
+      );
+    },
     /** Session end — the only sanctioned destroy. Toggles and faults never call this. */
     dispose: () => {
       slot.vortex = null;

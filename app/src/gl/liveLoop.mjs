@@ -27,7 +27,7 @@
 
 import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
-import { createLiveResolver, getLastSpawnDecisions } from './liveResolve.mjs';
+import { createLiveResolver, getLastSpawnDecisions, getLastDishWet, setLiveWetSampler } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
@@ -62,6 +62,7 @@ import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { DEBUG_AGE, setAgeReader } from './ageLive.mjs'; // #1805: the ?debug=age readout's wire
 import { DEBUG_TRAILGRID, setTrailGridReader } from './trailGridLive.mjs'; // #1808 slice 1: the ?debug=trailgrid readout's wire
 import { clearStatsSnapshot, publishStatsSnapshot, statsWanted } from './statsLive.mjs'; // #1807: the buffer statistics' wire
+import { clearWetMode, publishWetMode } from './wetLive.mjs'; // #1841: the wet mode's wire (the show block's shed line)
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
 import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
@@ -348,6 +349,12 @@ export function createLiveLoop(
   // frame; it survives ACCUM toggles and faults (service.dispose() at
   // loop teardown is the only destroy).
   const wetFrame = createWetFrameService();
+  // #1841 (slice B): the dish's read of this service, registered for
+  // the resolver's dish session (a module channel, not a frame input —
+  // see setLiveWetSampler in liveResolve.mjs). The resolver is created
+  // above this point and reads the registration per frame; cleared at
+  // teardown below, beside the service's dispose.
+  setLiveWetSampler((x, y) => wetFrame.sampleWet(x, y));
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
   let flowFieldSeed = null;
@@ -974,23 +981,33 @@ export function createLiveLoop(
     // #970 step, #1809 service: ACCUM requests the wet field per frame
     // and the wet-frame service owns and steps it. Freeze holds the last
     // field. Wetness 0 does not step and does not bind a texture. At the
-    // tier-1 shed ACCUM is stood down as a unit (degradedOk stays false —
-    // the dish, slice B, is the first degraded consumer) and the result
-    // names the shed instead of going silent.
-    // #1814: a stratum in WET interaction mode is the second consumer
-    // family — the need-based gate (WET_ENGINE §4) steps the field for
-    // a soak-only scene too, which is also what makes a soaking
+    // tier-1 shed ACCUM is stood down as a unit and the result names the
+    // shed instead of going silent.
+    // #1814: a stratum in WET interaction mode is a consumer family —
+    // the need-based gate (WET_ENGINE §4) steps the field for a
+    // soak-only scene too, which is also what makes a soaking
     // stratum's marks stamp and wet their own ground. degradedOk stays
     // false for the soak as well: its perfTier1 answer is the shed
     // itself — mask absent → static blend in the composite, and the
     // row's WET indicator dims in BUILD (the issue's acceptance), never
     // a silent half-field (a degraded serve carries no velocity pack,
     // so the smear term could not run honestly anyway).
+    // #1841 (slice B): the dish is the first degraded consumer. The
+    // resolver just published this frame's dish-wet facts
+    // (getLastDishWet): a dish on stage requests the field beside
+    // ACCUM and the soak, and it accepts degraded service — under the
+    // tier-1 shed the field degrades to stamps-only for the dish
+    // instead of dying (ACCUM's own reads stay gated off at tier 1,
+    // as they were). The contact stamps the dish's passes recorded
+    // this frame ride the request and land in the field the dish
+    // reads next frame. The served mode is published on the wet wire
+    // for the show block's shed line.
     const anyWetSoak = contract.layers.some((l) => l.type === 'content' && l.wetSoak === true);
+    const dishWet = getLastDishWet();
     const wet = wetFrame.frame({
-      consumers: { accum: !!layoutParams.accumulation, soak: anyWetSoak },
+      consumers: { accum: !!layoutParams.accumulation, soak: anyWetSoak, dish: dishWet.present },
       shed: s.perfTier1 ? 'perfTier1' : null,
-      degradedOk: false,
+      degradedOk: dishWet.present,
       wetness: layoutParams.accumulationWetness,
       freeze: accumFrozen || s.running === false || !!s.slowRender,
       seed: s.seed,
@@ -999,7 +1016,9 @@ export function createLiveLoop(
       instances: contract.instances,
       behave: layoutParams.behave,
       motion: motionAmount(layoutParams),
+      stamps: dishWet.stamps,
     });
+    publishWetMode(wet.wetMode, wet.wetShed);
 
     // Static resource: the atlas, keyed by the combos the transformed instances use.
     const combos = contract.instances.map((it) => ({ asset: it.asset, ink: it.tint, accent: it.accent }));
@@ -1692,6 +1711,8 @@ export function createLiveLoop(
     paletteMix.cancel();
     lastFrameTarget = null;
     wetFrame.dispose(); // #1809: the field's only sanctioned destroy — session end
+    setLiveWetSampler(null); // #1841: the dish's read dies with the loop that served it
+    clearWetMode(); // #1841: the show block's shed line clears with the session
     resolver.dispose();
     live.dispose();
   }

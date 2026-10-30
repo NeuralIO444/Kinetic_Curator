@@ -5,6 +5,12 @@
 // pinned in (a) here); this suite pins the issue's ACCEPTANCE
 // probes at both passes and at the integrator:
 //
+// #1841 re-pin (slice B of #1809): the (f) wiring pins named the
+// per-system medium local `med.` — the medium now resolves PER
+// PAIR in that pass (the shared field sampled at the pair, or
+// the step's medium as fallback), so the local is `medPair.` and
+// the pins follow it. The guards they pin are unchanged.
+//
 //   (a) the leaf: inertia, contact-point velocity, the spin-
 //       inclusive tangential mass, Δω, the damping step + clamp,
 //       the θ wrap.
@@ -430,7 +436,7 @@ const cpVt = (sys) => sys.vy[1] - sys.omega[1] * 20 - (sys.vy[0] + sys.omega[0] 
   };
   order(
     particles,
-    'mediumClingCapture(med.clingK, vnNow)',
+    'mediumClingCapture(medPair.clingK, vnNow)',
     'mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum',
     'feedDishDeform',
     'per-system pass',
@@ -457,7 +463,7 @@ const cpVt = (sys) => sys.vy[1] - sys.omega[1] * 20 - (sys.vy[0] + sys.omega[0] 
     'the integrator damps, clamps, and advances θ from the leaf',
   );
   assert.ok(
-    particles.includes('if (med.fricK > 0)') && dish.includes('if (pairMed && pairMed.fricK > 0)'),
+    particles.includes('if (medPair.fricK > 0)') && dish.includes('if (pairMed && pairMed.fricK > 0)'),
     'both spin-feeding blocks stay behind the medium guards (dry writes no ω)',
   );
   assert.ok(!/Math\.random|Date\.now/.test(law), 'the spin law is deterministic by construction');

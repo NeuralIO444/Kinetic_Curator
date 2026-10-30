@@ -22,7 +22,14 @@ const src = (p) => readFileSync(new URL(p, import.meta.url), 'utf8');
 
 const ADD = { op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.3 };
 /** A fresh trio on a fake store: state { audioRoutes, layoutParams }, a setter that mimics the bus -> store path. */
-function rig({ tier = 't3', replaying = false, activity = null, spectrum = undefined, marks = undefined } = {}) {
+function rig({
+  tier = 't3',
+  replaying = false,
+  activity = null,
+  spectrum = undefined,
+  marks = undefined,
+  wet = undefined,
+} = {}) {
   const st = { audioRoutes: null, layoutParams: { squash: 0, audioAlphaMod: 0.25 } };
   const subs = [];
   const set = (patch) => {
@@ -44,6 +51,7 @@ function rig({ tier = 't3', replaying = false, activity = null, spectrum = undef
     getBands: () => [0.5, 0.4, 0.3, 0.3, 0.2, 0.2, 0.1],
     getActivity: activity ? () => activity : null,
     ...(spectrum !== undefined ? { getSpectrum: spectrum } : {}),
+    ...(wet !== undefined ? { getWet: () => wet } : {}),
     isReplaying: () => ctl.replaying,
     ...(mk
       ? {
@@ -626,5 +634,23 @@ ok(
     g.done();
   },
 );
+
+ok('#1841 the show block carries the wet shed line only while the field is not whole', () => {
+  const g = rig({ wet: { mode: 'degraded', shed: 'perfTier1' } });
+  audioOn();
+  for (let i = 1; i <= 4; i++) g.bar(i);
+  assert.deepEqual(g.trio.showBlock().wet, { mode: 'degraded', shed: 'perfTier1' }, 'the shed line, named');
+  g.done();
+  const whole = rig({ wet: null });
+  audioOn();
+  for (let i = 1; i <= 4; i++) whole.bar(i);
+  assert.ok(!('wet' in whole.trio.showBlock()), 'a whole field: the line is absent, not zero');
+  whole.done();
+  const unwired = rig();
+  audioOn();
+  for (let i = 1; i <= 4; i++) unwired.bar(i);
+  assert.ok(!('wet' in unwired.trio.showBlock()), 'no getter wired: no line');
+  unwired.done();
+});
 
 console.log(`trioLive.selfcheck: ${n} checks passed`);

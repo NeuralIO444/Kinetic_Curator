@@ -80,6 +80,7 @@ const notify = () => {
  * @param getActivity () => { keeps, rolls } in the recent window (LOIS's keep-rate read); absent = no bias
  * @param getSpectrum () => {centroid, flux, flatness} | null   the spectrum summary now (absent / null: none)
  * @param getTrail    () => {energy, channels, saturation} | null   the ACCUM buffer statistics now (#1807; absent / null: none)
+ * @param getWet      () => {mode, shed} | null   the wet field's shed line now (#1841: 'degraded' | 'shed' while the field is not whole; null: whole or none)
  * @param isReplaying () => boolean
  * @param subscribe   (fn(state, prev)) => unsubscribe   the store's subscribe: the artist's route and dial edits
  * @param getMarks    () => { map, scale, displace, colour, locked: string[] } | null   stage 2: the spectrum marks now
@@ -95,6 +96,7 @@ export function startTrio({
   getActivity = null,
   getSpectrum = null,
   getTrail = null,
+  getWet = null,
   isReplaying = () => false,
   subscribe = null,
   getMarks = null,
@@ -130,6 +132,7 @@ export function startTrio({
   let bar = 0;
   let spectrum = null; // the latest spectrum summary, or null
   let trail = null; // #1807: the latest buffer statistics, or null (ACCUM off / no reading yet)
+  let wet = null; // #1841: the wet field's shed line, or null (the field whole / no reading yet)
   let bias = 0; // LOIS's keep-rate read, -1..+1
   const stops = [];
 
@@ -194,6 +197,7 @@ export function startTrio({
     audio.sinceBars = 0;
     spectrum = null;
     trail = null; // #1807
+    wet = null; // #1841
     flatness.reset();
     pending = null;
   };
@@ -321,6 +325,18 @@ export function startTrio({
           trail = getTrail() || null;
         } catch {
           trail = null;
+        }
+      }
+      // #1841: the wet field's shed line rides the same cadence, on
+      // the same honesty: the getter returns a line only while the
+      // field is degraded or a wanting consumer stands shed — a
+      // whole field is silence, not a zero.
+      if (!getWet) wet = null;
+      else {
+        try {
+          wet = getWet() || null;
+        } catch {
+          wet = null;
         }
       }
       let act;
@@ -468,6 +484,7 @@ export function startTrio({
         ],
         ...(spectrum ? { spectrum } : {}),
         ...(trail ? { trail } : {}), // #1807: beside the spectrum summary, per the issue
+        ...(wet ? { wet } : {}), // #1841: the wet field's shed line, beside the trail — present only while the field is not whole
         ...((m) => (m ? { marks: { map: m.map, scale: m.scale, displace: m.displace, colour: m.colour } } : {}))(
           readMarks(),
         ),

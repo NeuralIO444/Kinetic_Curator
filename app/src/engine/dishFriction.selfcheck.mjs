@@ -36,6 +36,13 @@
 // stopping). Everything D1 pinned about budgets, dry parity,
 // and energy is unchanged and still asserted below; the spin
 // probes proper live in dishSpin.selfcheck.mjs.
+//
+// #1841 re-pin (slice B of #1809): the (e) wiring pins named the
+// per-system medium local `med.` — the medium now resolves PER
+// PAIR in that pass (the shared field sampled at the pair, or the
+// step's medium as fallback), so the local is `medPair.` and the
+// pins follow it. The ordering they guard (cling < friction <
+// deform feed) and every behavioural pin are unchanged.
 
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
@@ -377,7 +384,7 @@ const vtOf = (sys) => sys.vy[1] - sys.vy[0];
   };
   order(
     particles,
-    'mediumClingCapture(med.clingK, vnNow)',
+    'mediumClingCapture(medPair.clingK, vnNow)',
     'mediumFrictionImpulse(mu, jnTotal, vt, spinInvMassT(wSum',
     'feedDishDeform',
     'per-system pass',
@@ -389,7 +396,7 @@ const vtOf = (sys) => sys.vy[1] - sys.vy[0];
     'feedDishDeform',
     'cross-strata pass',
   );
-  assert.ok(particles.includes('if (med.fricK > 0)'), 'per-system friction is guarded by the medium');
+  assert.ok(particles.includes('if (medPair.fricK > 0)'), 'per-system friction is guarded by the medium');
   assert.ok(dish.includes('if (pairMed && pairMed.fricK > 0)'), 'cross-strata friction is guarded by the pair medium');
 }
 
