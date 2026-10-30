@@ -14,6 +14,14 @@
 > feasibility map is the QA report's. Plan draft:
 > `kc1-strata-quantized-plan-draft-2026-10-15.md`.
 
+> **PHASE 0 CORRECTION (2026-10-30, #1606): §2 below is rewritten.** The
+> field→channel pointer it originally specified (a MATH item retargeted at
+> the bottom CONTENT stratum) was overruled by Matt 2026-10-16: the map
+> stays in the CHIAROSCURO editor and #1204's home ruling stands. §3's
+> gesture (double-click opens the editor) and stop derivation ("derived
+> from PARAM_SPEC ranges") are likewise superseded — by D2 and by the
+> stop-table law in `plan.md` (Phase 0 paper), which governs.
+
 Status: DESIGN, approved by Matt 2026-10-15 ("Love it"). Local only — not filed, not built.
 Amends: the approved strata BUILD redesign (Oct 12–13) and its UX pass
 (`kc-strata-build-ux-pass-2026-10-13.md`). Mockup:
@@ -38,13 +46,29 @@ same rationing as the dice tray and the 16-Look keeps stage.
 Stack reads ▲ FRONT (FX) → GROUND (CONTENT 1) ▼, as in the approved strata
 mockups. Type language unchanged: CONTENT teal, MATH red, FX purple.
 
-## 2. The field-mod pointer
+## 2. The field→channel map — home ruled, no pointer
 
-A field→channel MATH item (field drives a visual channel) carries a **pointer**,
-and the pointer aims at the **bottom CONTENT stratum**. The ground exposure is
-the one the field plays on — drives its channel, warps it, breathes through it —
-while the top exposure rides clean above it. (This narrows the general strata
-rule "MATH modifies what is below it" for field-mod items only.)
+**Corrected in Phase 0 (#1606) per Matt's ruling of 2026-10-16.** As
+originally written, this section specified a field→channel MATH item whose
+pointer aims at the **bottom CONTENT stratum**. That premise is overruled:
+
+- Field→channel is the **MapRow** — a per-layer layout-param system
+  (`fieldMapField` / `fieldMapChannel` / `fieldMapAmount`), an
+  Appearance-family scene control, **not a MATH op**. Its home per **#1204**
+  stands: it is not a MATH-layer item, it does not retarget to the bottom
+  stratum, and it applies to the active layer's own marks.
+- Since 2026-10-16 (PR #1632, on Matt's ruling that the CHIAROSCURO
+  section collapses to a button launching its floating editor) the MapRow
+  **renders inside the CHIAROSCURO section editor**, below the sun + hue —
+  the same control, same state, same stored keys. (`MapRow.jsx`'s header
+  carries the record in code.)
+- It is named apart from **PATCH FIELD**, which already exists in the
+  shipped stack: a per-block patch mode (`LayerStack.jsx`) whose `to` is
+  its own target pointer at another layer. The field→channel map (the
+  MapRow) and PATCH FIELD (the patch mode) are different controls that
+  happen to share the word *field*; no document or label may blur them.
+
+The stack-shape half of this amendment (§1) is unaffected by the ruling.
 
 ## 3. Quantized controls — sliders abolished in BUILD
 
@@ -61,6 +85,21 @@ until he says so.
 - Mode stops come from a per-parameter table (neutral point + three stops
   derived from PARAM_SPEC ranges). Bipolar parameters get OFF + three
   magnitudes, sign preserved.
+
+**Phase 0 corrections (#1606).** Three claims in this section are
+superseded and do not govern: (1) the gesture — double-click does **not**
+open the exact editor; per **D2**, tap the row's readout opens it, and
+double-click reset survives inside the editor (double-click was already
+spent: reset-to-default per DS §2.1, rename in VoicesShelf — QA report
+§4). (2) Stop derivation — stops are **not** derived from PARAM_SPEC
+ranges; they are authored per param under the stop-table law (`plan.md`,
+Phase 0 paper): the shipped default is always one of the stops, and stops
+are authored in taper space where a taper exists. (3) The angle detents
+and the sun exception — the 0°/15°/45°/90° set applies only to a future
+per-stratum rotation param (**D7**); the HUE dial stays a dial,
+divergence-class precision params are exempt, and no sun disc exists in
+the app: SUN X/Y are **position params**, exempt as a class under the
+same paper.
 
 ### The data law (non-negotiable)
 

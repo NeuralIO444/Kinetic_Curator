@@ -1,6 +1,9 @@
 # KC-1 Strata + Quantized Controls — PLAN DRAFT
 
-Status: DRAFT for Matt's review, 2026-10-15. Nothing filed, nothing built.
+Status: D1–D8 ruled by Matt 2026-10-15. The lane was un-deferred
+2026-10-30; Phase 0 paper landed the same day (#1606) — the DS amendment
+is in `docs/DESIGN_SYSTEM.md` §2/§2.1 and the written law is the
+"Phase 0 paper" section below.
 Inputs: the amendment (`amendment.md (this folder)`,
 Matt's rulings stand) + the QA report
 (`qa-report.md (this folder)`,
@@ -32,6 +35,133 @@ double-click-reset canon must be amended on paper, or a later agent will
 "fix" BUILD back). Also in this phase: name the floating-editor patterns —
 CHIAROSCURO's over-canvas section editor vs the per-param value editor —
 so #1587 and this lane stop growing competing popovers.
+
+**Landed 2026-10-30 (#1606).** The DS amendment is in
+`docs/DESIGN_SYSTEM.md` §2/§2.1; the editor vocabulary, the stop-table
+law, the exemptions list, and the field→channel record are written in
+the next section.
+
+## Phase 0 paper — the written law (landed 2026-10-30, #1606)
+
+### Editor patterns — one vocabulary
+
+Two named patterns. There is no third.
+
+- **Section editor** — owns a *family* of related controls;
+  section-scale; floats **over the canvas**; no backdrop; the live
+  canvas stays visible and running underneath; Esc or click-away
+  closes; no apply/confirm. The one shipped instance: **CHIAROSCURO**
+  (`src/panels/layout/ChiaroscuroSection.jsx`, launched from its BUILD
+  button per Matt's 2026-10-16 collapse ruling). The sun controls, the
+  HUE dial, and the field→channel MapRow live inside it.
+- **Value editor** — owns *exactly one param*; it is the exact-value
+  editor. Two seats, one pattern: **inline** (RangeRow's click-to-type
+  readout, DS §2.1) and **docked** (the #1202 ValueDock — popped from a
+  ValueButton, and under D1/D2 from a mode row's readout tap; docked to
+  the panel edge, it **never covers the canvas**). Double-click reset
+  lives in the value editor (D2).
+
+Any new floating surface declares which of the two it is before it is
+built. The amendment's original third shape — a per-param popover
+floating over the panel — is retired: a mode row's exact editor *is*
+the value editor, docked.
+
+### Stop-table law
+
+1. **Stops are authored per param, never derived blind.** No formula
+   over PARAM_SPEC ranges produces a stop table.
+2. **The shipped default is always one of the stops.** This protects
+   Matt's by-eye tunes: M4's stipple dot scale **2.5**
+   (`STIPPLE_DOT_SCALE`, `src/engine/stippleBody.mjs`), plate radius
+   **1.05** (`PLATE_RADIUS`), and glass alpha **0.78**
+   (`GLASS_BODY_ALPHA`) must each be a stop on their rows, or the first
+   mode tap strands the tune where buttons can never return to it.
+3. **Stops are authored in taper space where a taper exists** — author
+   the stops where the hand travels, then map through the taper.
+   Shipped tapers: `accumulationFade` (half-life) and GLOW (power,
+   exp 2) — `src/panels/layout/AccumFamily.jsx`, `getTaper` (#274).
+4. **Detent labels name effect strength, not numeric order.** Stops are
+   authored, so a param whose effect strengthens as its number falls
+   gets its LOW/MID/HIGH in effect order.
+5. **OFF — one meaning per param class.** The unifying meaning, every
+   class: **OFF = this param contributes nothing.** The number that
+   means it is per param; the meaning never varies.
+   - *Magnitude class* (the default sits at the range's no-effect end —
+     most params): OFF = that no-effect value, usually 0/min.
+   - *Identity class* (the shipped default **is** the identity — the
+     value at which the param contributes nothing), ruled explicitly:
+     **saturate** (MATH `saturate.saturation`, def 1 of 0..2),
+     **chroma** (FX `grade.chroma`, def 1), **lift** (FX `grade.lift`,
+     def 1 of 0.5..1.5), **damping** (def ≈0.9 of 0.80..0.99 — the tuned
+     neutral). For this class OFF = the identity/default value, **never
+     the range minimum**: saturate at 0 is full desaturation — an
+     effect, not an off. Above OFF the detents spread in the param's
+     authored working direction; for damping, LOW→HIGH runs toward
+     *more* friction (lower numbers), per rule 4.
+6. **Bipolar params — the sign answer.** Bipolar rows (MATH
+   `gain.exposure` −3..+3 st, `lift.offset`, `tempTint.temperature` /
+   `tempTint.tint`, FX `grade.hue`, MATH `hueRotate.degrees`) carry a
+   **sign cell** at the row's left (`−`/`+`, a TeaMatrix pair). The
+   detents are unsigned magnitudes; tapping a magnitude applies it
+   under the row's current sign; tapping the sign cell flips the sign
+   at the current magnitude. OFF on a bipolar row = true 0 (no sign).
+   Sign is a hand gesture on the row — never editor-only — because for
+   gain and tempTint the sign *is* the creative axis (warm vs cool).
+   (`phylloDivergence` is bipolar too, but exempt as a precision param —
+   see the exemptions.)
+7. **Counts are authored like everything else.** Int counts in
+   `ATLAS_AFFECTING_PARAMS` get their stops flagged at authoring time —
+   a coarse stop there changes rebake behaviour, not just feel.
+   (`collideMask` is a bitmask, not a knob: PARAM_SPEC membership alone
+   never puts a param under this law. The law governs controls.)
+
+**Display honesty.** Every mode row keeps its exact numeric readout
+beside the modes, and a stored value that is not exactly a stop carries
+the **off-detent mark** — the lit mode wears a dot (named here and in
+DS §2.1, so Phase 1 builds one mark, not three).
+
+### Exemptions — named, closed list
+
+Under D1's full-BUILD scope, these continuous controls are **exempt
+from mode rows**; each keeps its current editor. The list is closed —
+Phases 1–2 may not silently add to it.
+
+1. **Dual ranges** — SCALE, SCALE Y, ROTATE, ALPHA (`DualEditor`,
+   `LayoutSliders.jsx`): a mode row cannot express a *span*; the two
+   ends are one control.
+2. **The HUE dial (D7)** — `DialEditor`, 0..360° wrapping: stays a dial.
+3. **Divergence-class precision params** — `phylloDivergence`
+   (−20..+20° at 0.1° steps): the precision is the control's purpose; a
+   fraction of a degree re-counts the spiral arms.
+4. **Position params — one class ruling**: SUN X / SUN Y (−500..1500 /
+   −500..1200, `SunControls.jsx`) and M4's plate centre
+   (`plateCenterX` / `plateCenterY`). Coordinates are not magnitudes;
+   OFF/LOW/MID/HIGH has no meaning for them. Their sanctioned form is
+   the exact editor today, and a **2D pad inside the editor** is the
+   sanctioned future form (#1587's sketch). This class ruling
+   *replaces* the amendment's sun-disc exemption — no sun disc exists
+   in the app.
+5. **Macro jogs (#724)** — the MathSection macro knobs: spring-back
+   pointer-drag jogs whose concept is "nudges, never snaps." Exempt by
+   concept; quantizing them would delete the feature.
+6. **Enum-index params wearing slider clothes** — the `spectrumMap`
+   class ({0..3, `int`} — an index into a selector, not a magnitude):
+   these are selectors and render as selectors (TeaMatrix), per DS
+   rule 5. A mode row would mislabel a mode choice as a magnitude.
+
+The 0°/15°/45°/90° detent set (D7) applies only to a **future
+per-stratum rotation param**, when one exists; no shipped angle control
+takes it.
+
+### Field→channel — the record
+
+Settled, and not re-opened by Phase 3: Matt ruled **2026-10-16** that
+the field→channel map stays in the CHIAROSCURO editor; **#1204's home
+ruling stands** (it is not a MATH op, and it is not retargeted at the
+bottom content stratum). PR #1632 moved the MapRow into the editor on
+that ruling. The full record is `amendment.md` §2, as corrected in this
+phase; the map is named apart from PATCH FIELD there. Phase 3 carries
+no field→channel work.
 
 ## Phase 1 — Quantize the dock (shelves §1–§4)
 
@@ -70,9 +200,10 @@ so #1587 and this lane stop growing competing popovers.
   Finish kind per FX track. Under one layer of 4, either the slot law
   becomes per-layer (Scanlines + Halo + Grain can coexist — the CRT
   recipe becomes legal) or it doesn't (they can't). Rule it knowingly.
-- Field→channel: re-open #1204's home ruling on the record
-  (Appearance/MapRow → MATH layer) and name the pointer apart from
-  PATCH FIELD, which already has a target pointer in the shipped stack.
+- Field→channel: **SETTLED in Phase 0 — no Phase 3 work.** #1204's home
+  ruling stands (Matt, 2026-10-16); the MapRow stays in the CHIAROSCURO
+  editor and is not a MATH item. Record: the Phase 0 paper above and
+  `amendment.md` §2 as corrected.
 
 ## Phase 4 — Dither (independent; can run any time)
 
