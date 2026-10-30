@@ -43,6 +43,20 @@ test('#646 sanitized count shown only when repairs happened', () => {
   assert.match(loadedMessage('h.json', doc, 3), /3 fields sanitized/);
 });
 
+test('#1609 the skeleton trim is spoken in the receipt — dropped strata named, silence when clean', () => {
+  const trimmed = {
+    seed: 7,
+    layers: [{}, {}],
+    paletteId: 'praystation',
+    layerTrims: ['content stratum "Gamma"', 'content stratum "Delta"'],
+  };
+  const msg = loadedMessage('legacy.json', trimmed);
+  assert.match(msg, /trimmed to the fixed skeleton: content stratum "Gamma"; content stratum "Delta"/);
+  const clean = { seed: 7, layers: [{}], paletteId: 'praystation' };
+  assert.doesNotMatch(loadedMessage('c.json', clean), /trimmed/);
+  assert.doesNotMatch(loadedMessage('c.json', { ...clean, layerTrims: [] }), /trimmed/);
+});
+
 test('#649 #651 export names the title and confirms', () => {
   const name = exportFilename({ title: 'Night Migration', seed: 16 }, 3);
   assert.equal(name, 'night-migration-v3-10.project.json');

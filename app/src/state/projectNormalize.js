@@ -7,10 +7,10 @@
 // (data/layout-modes, data/assets, data/quality, fx/fxFilters,
 // engine/kernel/rng → engine/prng) and is safe to import from anywhere.
 import { normalizeLayoutParams } from '../data/layout-modes.js';
-import { sanitizeFxEffects } from '../fx/fxFilters.js';
+import { sanitizeFxEffects, FX_EFFECT_DEFS, MAX_FX_EFFECTS } from '../fx/fxFilters.js';
 import { fxBeforeMath } from './layerOrder.js';
 import { sanitizePattern } from './patternTrack.js';
-import { sanitizeMathEffects } from '../fx/mathFilters.js';
+import { sanitizeMathEffects, MATH_EFFECT_DEFS, MAX_MATH_OPS } from '../fx/mathFilters.js';
 import { ASSETS } from '../data/assets/index.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
@@ -26,8 +26,20 @@ export const MAX_LAYERS = 16;
  * hand-edited or legacy document can still carry more content tracks than
  * the cap allows, which would otherwise silently violate the tape-budget/
  * governor contract that assumes it holds.
+ *
+ * #1609 (Strata Q Phase 3, D3/D5) — the value is now the fixed skeleton's:
+ * 2 content strata, and the FX/MATH mirrors below join it. A legacy stack
+ * over the skeleton TRIMs on load to its first strata, and the trim is said
+ * out loud — normalizeLayers returns the dropped strata's names in `trims`,
+ * parseProject carries them on the doc, and the import receipt names them
+ * (pipelineNotices.loadedMessage). PATTERN strata are ground (D4): no
+ * skeleton count applies to them, only MAX_LAYERS.
  */
-export const MAX_CONTENT_TRACKS = 4;
+export const MAX_CONTENT_TRACKS = 2;
+/** #1609 — mirrors `slices/layersSlice.js`'s `MAX_FX_TRACKS` (same cycle rule). */
+export const MAX_FX_TRACKS = 1;
+/** #1609 — mirrors `slices/layersSlice.js`'s `MAX_MATH_TRACKS` (same cycle rule). */
+export const MAX_MATH_TRACKS = 1;
 
 /**
  * #269 — cap hostile CA grids from project snapshots. Real grids are 40×28
@@ -198,28 +210,56 @@ export function normalizeSnapshots(raw, customAssets = [], root = {}, layerIds =
  * so a hand-edited or older document can never crash the filter compiler.
  * Also repairs activeLayerId: FX layers are never the content-active layer,
  * so a doc pointing at one falls back to the first content layer.
+ *
+ * #1609 — the fixed skeleton trims on load: content past the first 2, FX
+ * and MATH tracks past the first, FX effects past MAX_FX_EFFECTS and MATH
+ * chain ops past MAX_MATH_OPS are dropped, and every drop is recorded in
+ * the returned `trims` (names, in document order) so the load receipt can
+ * say it out loud (D3/D5: nothing vanishes silently). PATTERN strata are
+ * ground (D4) and are never skeleton-trimmed.
  */
 export function normalizeLayers(rawLayers, rawActiveId) {
   if (!Array.isArray(rawLayers) || rawLayers.length === 0) {
-    return { layers: null, activeLayerId: typeof rawActiveId === 'string' ? rawActiveId : null };
+    return { layers: null, activeLayerId: typeof rawActiveId === 'string' ? rawActiveId : null, trims: [] };
   }
   // #103 Track B — bound the doc up front; the live loop resolves every
   // layer per frame, so a 200-layer document is a perf cliff, not a project.
   const layers = [];
   const seen = new Set();
+  const trims = [];
   let contentCount = 0;
+  let fxCount = 0;
+  let mathCount = 0;
   for (const l of rawLayers) {
     if (layers.length >= MAX_LAYERS) break;
     if (!l || typeof l !== 'object' || typeof l.id !== 'string') continue;
     if (seen.has(l.id)) continue; // duplicate IDs collide in React keys and the snapshot map
     const type = l.type === 'fx' ? 'fx' : l.type === 'math' ? 'math' : l.type === 'pattern' ? 'pattern' : 'content';
-    // #456 — the 4-content-track cap is a creation-time UI check only; a
-    // document can still carry more. Skip the overflow rather than truncate
-    // by raw array position, same "degrade, don't crash" posture as MAX_LAYERS.
-    if (type === 'content' || type === 'pattern') {
-      // #1097 — a PATTERN track is content-group: same cap
-      if (contentCount >= MAX_CONTENT_TRACKS) continue;
+    // #456 — the track caps are creation-time UI checks only; a document
+    // can still carry more. Skip the overflow rather than truncate by raw
+    // array position, same "degrade, don't crash" posture as MAX_LAYERS.
+    // #1609 — the caps are the skeleton's (2 / 1 / 1), the overflow is a
+    // TRIM, and a trim is named in `trims`, never silent. PATTERN (D4)
+    // spends no skeleton slot and skips this gate entirely.
+    const rawName = typeof l.name === 'string' && l.name ? l.name : 'Layer';
+    if (type === 'content') {
+      if (contentCount >= MAX_CONTENT_TRACKS) {
+        trims.push(`content stratum "${rawName}"`);
+        continue;
+      }
       contentCount++;
+    } else if (type === 'fx') {
+      if (fxCount >= MAX_FX_TRACKS) {
+        trims.push(`FX track "${rawName}"`);
+        continue;
+      }
+      fxCount++;
+    } else if (type === 'math') {
+      if (mathCount >= MAX_MATH_TRACKS) {
+        trims.push(`MATH track "${rawName}"`);
+        continue;
+      }
+      mathCount++;
     }
     seen.add(l.id);
     const layer = {
@@ -231,8 +271,20 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       layerOpacity: Number.isFinite(l.layerOpacity) ? Math.min(1, Math.max(0, l.layerOpacity)) : 1,
     };
     if (type === 'fx') {
+      // #1609 (D6) — the cap reads the STORED order: the first
+      // MAX_FX_EFFECTS valid kinds stay (the same first-N rule as content
+      // strata and MATH chains) and surplus effects trim with their names.
+      // Only then does the sanitizer clamp and re-seat grain last inside
+      // the kept set — sanitize-first would drop an early-stored grain
+      // instead of the true surplus.
+      const storedFx = Array.isArray(l.effects) ? l.effects : [];
+      const validFx = storedFx.filter((e) => e && typeof e === 'object' && FX_EFFECT_DEFS[e.kind]);
+      if (validFx.length > MAX_FX_EFFECTS) {
+        const dropped = validFx.slice(MAX_FX_EFFECTS);
+        trims.push(`FX effects ${dropped.map((e) => FX_EFFECT_DEFS[e.kind].label).join(', ')} (from "${rawName}")`);
+      }
       // #520 Phase 1 — shed-report any grain-family moved to last position (#192: never silent).
-      layer.effects = sanitizeFxEffects(l.effects, {
+      layer.effects = sanitizeFxEffects(validFx.slice(0, MAX_FX_EFFECTS), {
         onMove: ({ kinds }) => {
           console.warn(
             `[normalize] fx layer ${l.id}: grain-family (${kinds.join(', ')}) moved to finish position — save the project to persist the fix`,
@@ -247,6 +299,15 @@ export function normalizeLayers(rawLayers, rawActiveId) {
       // dropped, params clamped, mod routing cleaned); the op + knobs + mod
       // routing persist in the project doc exactly like FX chains.
       layer.effects = sanitizeMathEffects(l.effects);
+      // #1609 (D5) — the chain is capped at MAX_MATH_OPS: ops past the cap
+      // trim, named — the same said-out-loud treatment as dropped strata.
+      if (layer.effects.length > MAX_MATH_OPS) {
+        const dropped = layer.effects.slice(MAX_MATH_OPS);
+        trims.push(
+          `MATH ops ${dropped.map((e) => MATH_EFFECT_DEFS[e.kind]?.label || e.kind).join(', ')} (from "${rawName}")`,
+        );
+        layer.effects = layer.effects.slice(0, MAX_MATH_OPS);
+      }
     } else {
       // #456 — patches were dropped entirely on load (never copied from the
       // raw doc into the normalized layer). `to` is a stable layer id
@@ -276,7 +337,15 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     if (type === 'content' && l.wetSoak === true) layer.wetSoak = true;
     layers.push(layer);
   }
-  if (layers.length === 0) return { layers: null, activeLayerId: null };
+  if (layers.length === 0) return { layers: null, activeLayerId: null, trims };
+  // #1609 — a trim is said out loud on every load path, not only the ones
+  // with a receipt: the console carries it where no message surface runs
+  // (boot autosave, recipe stacks), in the #1048 style.
+  if (trims.length) {
+    console.warn(
+      `[normalize] strata trimmed to the fixed skeleton (#1609): ${trims.join('; ')} — save the project to persist the trim`,
+    );
+  }
   // #1048 — FX folds before MATH. A project saved while the engine let them
   // interleave is moved into that order on load; only adjustment tracks move,
   // content keeps its place. This can change how such a project renders (a
@@ -290,7 +359,7 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   }
   // FX/MATH layers are never the content-active layer; a document with no
   // content layer at all is degenerate — treat it as invalid like an empty list.
-  if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null }; // a PATTERN track alone is not a project: a KC track must exist
+  if (!layers.some((l) => l.type === 'content')) return { layers: null, activeLayerId: null, trims }; // a PATTERN track alone is not a project: a KC track must exist
   // #456 — a patch target that no longer exists (dropped by the cap above,
   // a stale/self id, or an id pointing at an FX layer) goes inert (`to:
   // null`) rather than pointing at nothing; `liveResolve.mjs` already no-ops
@@ -305,5 +374,5 @@ export function normalizeLayers(rawLayers, rawActiveId) {
   if (!active || active.type === 'fx' || active.type === 'math' || active.type === 'pattern') {
     activeLayerId = layers.find((l) => l.type === 'content').id;
   }
-  return { layers, activeLayerId };
+  return { layers, activeLayerId, trims };
 }

@@ -3,55 +3,78 @@
 // FX_SELECT the name button emits); the block's icon buttons, the wet
 // row, and the editor's own controls keep their own handlers and must
 // not move the editor.
+//
+// #1609 re-pin (D6): there is ONE FX layer now, not a rack of tracks —
+// the two-track choreography (editor moving FX 1 ↔ FX 2, DUP minting a
+// third block) is re-staged: the block boots unselected from a restored
+// project so the header tap is what opens it, and DUP reads the cap
+// (disabled) rather than minting a copy.
 import { test, expect } from '@playwright/test';
 import { seedAddType } from './strata-add.mjs';
 
+// A stored project with one content stratum and one FX layer. Restoring
+// it boots with nothing selected, so the FX editor starts closed.
+const PROJECT = JSON.stringify({
+  version: 1,
+  seed: 7,
+  paletteId: 'praystation',
+  layers: [
+    { id: 'kc-a', name: 'KC-1', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    {
+      id: 'fx-a',
+      name: 'FX 1',
+      type: 'fx',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      effects: [{ kind: 'invert', params: {} }],
+    },
+  ],
+  activeLayerId: 'kc-a',
+});
+
 test('FX block header tap opens the effect editor; controls stay independent', async ({ page }) => {
-  await seedAddType(page, 'fx'); // one-tap ADD STRATUM arms FX tracks
+  await page.addInitScript((doc) => {
+    try {
+      localStorage.setItem('kc:project:v1', doc);
+    } catch {
+      /* ignore */
+    }
+  }, PROJECT);
+  await seedAddType(page, 'fx');
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   const stack = page.locator('.build-layer-stack');
 
-  // Arm two FX tracks via the ADD STRATUM slot. Adding selects the new
-  // track, so FX 2's editor is open; FX 1's block is the tap target.
-  const addSlot = stack.locator('.strata-add');
-  await addSlot.click();
-  await addSlot.click();
   const fxBlocks = stack.locator('.strata-block.strata-fx');
-  await expect(fxBlocks).toHaveCount(2);
-  // Blocks are listed frontmost first, so the newest track (FX 2) is the top block.
-  const fx1 = fxBlocks.nth(1);
-  const fx2 = fxBlocks.nth(0);
-  await expect(fx2.locator('.fx-editor')).toBeVisible();
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
+  await expect(fxBlocks).toHaveCount(1);
+  const fx = fxBlocks.nth(0);
+  await expect(fx.locator('.fx-editor')).toHaveCount(0);
 
-  // (1) Tap the FX 1 block header — not the name button (use the number
-  // chip, which is pure header) — the editor opens on FX 1.
-  await fx1.locator('.track-numeral').click();
-  await expect(fx1.locator('.fx-editor')).toBeVisible();
-  await expect(fx1).toHaveClass(/strata-expanded/);
-  await expect(fx2).not.toHaveClass(/strata-expanded/);
+  // (1) Tap the FX block header — not the name button (use the number
+  // chip, which is pure header) — the editor opens on the FX layer.
+  await fx.locator('.track-numeral').click();
+  await expect(fx.locator('.fx-editor')).toBeVisible();
+  await expect(fx).toHaveClass(/strata-expanded/);
 
-  // Tap another bare header spot (the type tag) — still the editor,
-  // and the correct effect ordinal (FX 1) is selected.
-  await fx2.locator('.strata-type').click();
-  await expect(fx2.locator('.fx-editor')).toBeVisible();
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
+  // Tap another bare header spot (the type tag) — still the editor.
+  await fx.locator('.strata-type').click();
+  await expect(fx.locator('.fx-editor')).toBeVisible();
 
   // (2) Icon buttons act on themselves and don't move the editor.
-  // Visibility toggle on FX 1: the block dims, editor stays on FX 2.
-  await fx1.getByTitle('Toggle visibility').click();
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
-  await expect(fx2.locator('.fx-editor')).toBeVisible();
-  await fx1.getByTitle('Toggle visibility').click();
+  // Visibility toggle: the editor stays open across both taps.
+  await fx.getByTitle('Toggle visibility').click();
+  await expect(fx.locator('.fx-editor')).toBeVisible();
+  await fx.getByTitle('Toggle visibility').click();
+  await expect(fx.locator('.fx-editor')).toBeVisible();
 
-  // Wet control inside the expanded block (FX 2): a mode row since #1608 —
+  // Wet control inside the expanded FX block: a mode row since #1608 —
   // tap its readout to open the exact editor in the value dock and drive
   // the dock's slider. The readout moves and the editor stays open on
-  // FX 2 and nothing collapses or re-arms. (#1203: collapsed blocks
-  // render no controls.)
-  const readout = fx2.locator('.layer-opacity-readout');
+  // the FX layer and nothing collapses or re-arms. (#1203: collapsed
+  // blocks render no controls.)
+  const readout = fx.locator('.layer-opacity-readout');
   await readout.click();
   const slider = page.locator('.te-dock.open input[type=range]');
   await expect(slider).toBeVisible();
@@ -63,31 +86,25 @@ test('FX block header tap opens the effect editor; controls stay independent', a
     el.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await expect(readout).toHaveText('50%');
-  await expect(fx2.locator('.fx-editor')).toBeVisible();
-  await expect(fx1.locator('.fx-editor')).toHaveCount(0);
+  await expect(fx.locator('.fx-editor')).toBeVisible();
   // Dismiss the value dock (Esc) so the steps below tap the blocks
   // themselves — the dock overlays the panel's right edge while open.
   await page.keyboard.press('Escape');
   await expect(page.locator('.te-dock.open')).toHaveCount(0);
 
-  // DUP on FX 1: a third FX block appears (DUP selects the new duplicate by
-  // design — pre-existing behavior). FX 1's own editor was not opened by
-  // the button tap.
-  await fx1.getByTitle('Duplicate').click();
-  await expect(stack.locator('.strata-block.strata-fx')).toHaveCount(3);
-  // Top-first order is now [FX 2, copy, FX 1]: the copy sits above the track it duplicated.
-  await expect(stack.locator('.strata-block.strata-fx').nth(2).locator('.fx-editor')).toHaveCount(0);
-  const fxCopy = stack.locator('.strata-block.strata-fx').nth(1);
-  await expect(fxCopy.locator('.fx-editor')).toBeVisible();
+  // DUP on the FX block reads the skeleton cap: disabled, no second
+  // FX block can be minted (#1609, D6 — the slice refuses it too).
+  await expect(fx.getByTitle('Track cap reached')).toBeDisabled();
+  await expect(stack.locator('.strata-block.strata-fx')).toHaveCount(1);
 
-  // × on the last FX block: the block is removed, the open editor is untouched.
-  await stack.locator('.strata-block.strata-fx').nth(2).getByTitle('Remove track (undoable)').click();
-  await expect(stack.locator('.strata-block.strata-fx')).toHaveCount(2);
-  await expect(stack.locator('.strata-block.strata-fx .fx-editor')).toHaveCount(1);
+  // × on the FX block: the block is removed; the KC block is untouched.
+  await fx.getByTitle('Remove track (undoable)').click();
+  await expect(stack.locator('.strata-block.strata-fx')).toHaveCount(0);
+  await expect(stack.locator('.strata-block.strata-content:not(.strata-pattern)')).toHaveCount(1);
 
   // (3) KC block behavior: tap = edit — tapping the header selects the
-  // track (same as the name button). Add a second KC track first (factory
-  // boots with one).
+  // track (same as the name button). Add a second KC track first (the
+  // restored project boots with one).
   await seedAddType(page, 'content');
   await page.reload();
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });

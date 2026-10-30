@@ -20,10 +20,11 @@ import { useApp } from '../../state/AppContext.jsx';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
 import { emit, Events } from '../../composition/eventBus.js';
 import { BLEND_MODES, DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
-import { FX_EFFECT_DEFS, FX_MENU_KINDS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
+import { FX_EFFECT_DEFS, FX_MENU_KINDS, MAX_FX_EFFECTS, availableFxKinds, isFxLayer } from '../../fx/fxFilters.js';
 import { isMathLayer, mathTrackHitsHard, wetDisplay } from '../../fx/mathFilters.js';
 import { MathEffectEditor } from './MathEffectEditor.jsx';
-import { rackSlotForFxOrdinal } from '../../fx/fxTrack.js';
+import { rackSlotForKind } from '../../fx/fxTrack.js';
+import { MAX_LAYERS } from '../../state/projectNormalize.js';
 import { efTileFace } from '../../fx/efRackTile.mjs';
 import {
   displayLayerName,
@@ -166,105 +167,100 @@ function EfTile({ slot, kind, onBypass, children }) {
   );
 }
 
-// #520 Phase 4 — rack UI: slot-driven display, one row per EF slot.
+// #1609 (Strata Q Phase 3, D6) — free-pick editor: the one FX layer holds
+// up to MAX_FX_EFFECTS effects of ANY kinds. One tile per effect in the
+// layer (its family faces the tile, as the rack tiles always have — the
+// CRT recipe's Scanlines + Halo + Grain + RGB Split tiles stand side by
+// side here), then one add row offering every live kind not already in
+// the layer. (#520 Phase 4's slot-driven editor — one tile per track, the
+// track's family fixed by its ordinal, one effect per track — died with
+// the track model it described.)
 // #716 — TX-6 tile; #1046 — header strip, no glyph, nothing but controls below.
 function FxEffectEditor({ layer, fxOrdinal }) {
   const [pick, setPick] = useState(null);
-  const slot = rackSlotForFxOrdinal(fxOrdinal);
   const effects = layer.effects || [];
-  if (!slot) return null;
-  const filledIdx = effects.findIndex((fx) => slot.kinds.includes(fx.kind));
-  const filled = filledIdx >= 0 ? effects[filledIdx] : null;
-  const slotKinds = slot.kinds.filter((k) => availableFxKinds(effects).includes(k) || (filled && filled.kind === k));
-
-  if (filled) {
-    const def = FX_EFFECT_DEFS[filled.kind];
-    if (!def) return null;
-    const paramCount = Object.keys(def.params).length;
-    return (
-      <div className="fx-editor" title={`FX ${fxOrdinal} · ${slot.label}`}>
-        <EfTile
-          slot={slot}
-          kind={filled.kind}
-          onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}
-        >
-          {Object.entries(def.params).map(([key, p]) => {
-            const v = filled.params?.[key] ?? p.def;
-            const entry = fxStopsFor(filled.kind, key);
-            const setFxParam = (nv) =>
-              emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: nv });
-            return (
-              <div className="fx-param" key={key}>
-                {/* #1608 — the param's slider is a mode row (blockStops table);
-                    the exact editor in the dock carries the double-click
-                    reset the bare slider's onReset used to serve (D2). */}
-                <ModeRow
-                  variant="block"
-                  label={p.label}
-                  title={p.hint}
-                  display={trimNum(v)}
-                  value={v}
-                  stops={entry ? entry.stops : null}
-                  bipolar={!!entry?.bipolar}
-                  onSelect={setFxParam}
-                  onOpen={() => (
-                    <SliderEditor
-                      ariaLabel={p.label}
-                      value={v}
-                      min={p.min}
-                      max={p.max}
-                      step={p.step}
-                      defaultValue={p.def}
-                      onChange={setFxParam}
-                    />
-                  )}
-                />
-              </div>
-            );
-          })}
-          {/* An effect with almost nothing to set says so plainly, never a void. */}
-          {paramCount <= 1 && <div className="fx-note">{paramCount === 0 ? 'no controls' : 'no other controls'}</div>}
-        </EfTile>
-      </div>
-    );
-  }
-
-  // Empty slot: one clear call to action, never a bare "empty" and a dead control.
-  const effectiveKind = slotKinds.includes(pick) ? pick : (slotKinds[0] ?? null);
+  const addable = availableFxKinds(effects);
+  const effectiveKind = addable.includes(pick) ? pick : (addable[0] ?? null);
   return (
-    <div className="fx-editor" title={`${slot.label} · one family`}>
-      <EfTile slot={slot} kind={null}>
-        {effectiveKind ? (
-          <>
-            {slotKinds.length > 1 && (
-              <select
-                aria-label={`Choose ${slot.label} effect`}
-                value={effectiveKind}
-                onChange={(e) => setPick(e.target.value)}
-              >
-                {slotKinds.map((k) => (
-                  <option key={k} value={k}>
-                    {FX_EFFECT_DEFS[k].label.toUpperCase()}
-                  </option>
-                ))}
-              </select>
-            )}
-            <button
-              className="chip-btn"
-              onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}
-            >
-              + ADD {FX_EFFECT_DEFS[effectiveKind].label.toUpperCase()}
-            </button>
-          </>
-        ) : (
-          <div className="fx-note">nothing to add to this slot yet</div>
-        )}
-        {slot.stubs.length > 0 && (
-          <div className="fx-note" title="Planned — not yet available">
-            planned: {slot.stubs.join(', ')}
-          </div>
-        )}
-      </EfTile>
+    <div className="fx-editor" title={`FX ${fxOrdinal} · free picks — any ${MAX_FX_EFFECTS} kinds`}>
+      {effects.map((fx, idx) => {
+        const def = FX_EFFECT_DEFS[fx.kind];
+        if (!def) return null;
+        const paramCount = Object.keys(def.params).length;
+        return (
+          <EfTile
+            key={`${fx.kind}-${idx}`}
+            slot={rackSlotForKind(fx.kind)}
+            kind={fx.kind}
+            onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: idx })}
+          >
+            {Object.entries(def.params).map(([key, p]) => {
+              const v = fx.params?.[key] ?? p.def;
+              const entry = fxStopsFor(fx.kind, key);
+              const setFxParam = (nv) =>
+                emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: idx, key, value: nv });
+              return (
+                <div className="fx-param" key={key}>
+                  {/* #1608 — the param's slider is a mode row (blockStops table);
+                      the exact editor in the dock carries the double-click
+                      reset the bare slider's onReset used to serve (D2). */}
+                  <ModeRow
+                    variant="block"
+                    label={p.label}
+                    title={p.hint}
+                    display={trimNum(v)}
+                    value={v}
+                    stops={entry ? entry.stops : null}
+                    bipolar={!!entry?.bipolar}
+                    onSelect={setFxParam}
+                    onOpen={() => (
+                      <SliderEditor
+                        ariaLabel={p.label}
+                        value={v}
+                        min={p.min}
+                        max={p.max}
+                        step={p.step}
+                        defaultValue={p.def}
+                        onChange={setFxParam}
+                      />
+                    )}
+                  />
+                </div>
+              );
+            })}
+            {/* An effect with almost nothing to set says so plainly, never a void. */}
+            {paramCount <= 1 && <div className="fx-note">{paramCount === 0 ? 'no controls' : 'no other controls'}</div>}
+          </EfTile>
+        );
+      })}
+      {/* The add row: one clear call to action while the layer has room,
+          an honest note when it doesn't — never a dead control. */}
+      {effectiveKind ? (
+        <div className="fx-add-row">
+          {addable.length > 1 && (
+            <select aria-label="Choose effect to add" value={effectiveKind} onChange={(e) => setPick(e.target.value)}>
+              {addable.map((k) => (
+                <option key={k} value={k}>
+                  {FX_EFFECT_DEFS[k].label.toUpperCase()}
+                </option>
+              ))}
+            </select>
+          )}
+          <button
+            className="chip-btn"
+            onClick={() => emit(Events.FX_EFFECT_ADD, { layerId: layer.id, kind: effectiveKind })}
+          >
+            + ADD {FX_EFFECT_DEFS[effectiveKind].label.toUpperCase()}
+          </button>
+        </div>
+      ) : (
+        <div className="fx-note">
+          {effects.length >= MAX_FX_EFFECTS ? `layer full — ${MAX_FX_EFFECTS} effects` : 'nothing to add yet'}
+        </div>
+      )}
+      <div className="fx-note" title="Planned — not yet available">
+        planned: dither, stipple
+      </div>
     </div>
   );
 }
@@ -487,7 +483,8 @@ export function LayerStack() {
   const contentCount = layers.filter((l) => !isAdj(l)).length;
   const fxCount = layers.filter(isFxLayer).length;
   const mathCount = layers.filter(isMathLayer).length;
-  const kcCount = layers.filter(isKcLayer).length; // #1099 — a PATTERN track is content for the cap, but not a KC track
+  const kcCount = layers.filter(isKcLayer).length; // #1099 — a PATTERN track is not a KC track; #1609 (D4) — nor does it spend the content cap
+  const patternCount = layers.filter(isPatternLayer).length;
   const singleTrack = kcCount < 2; // PATCH has nothing to point at (a patched block can still be set back to OFF)
   // #1019 — PATCH one-liner for newcomers ("route one track's motion into
   // another"): visible the first time a second KC track exists, then it gets
@@ -519,12 +516,12 @@ export function LayerStack() {
       /* private mode */
     }
   };
-  // The next FX track's family is fixed by its ordinal (#520/#732) — the
-  // chooser only offers that family's add-menu kinds.
+  // #1609 (D6) — there is no next-track family: the one FX layer takes free
+  // picks, so the chooser offers the whole add-menu to arm it with a first
+  // effect. (#520/#732 fixed the family by ordinal; that binding is dead.)
   const nextFxOrdinal = fxCount + 1;
-  const nextFxSlot = rackSlotForFxOrdinal(nextFxOrdinal);
-  const nextFxKinds = (nextFxSlot?.kinds ?? []).filter((k) => FX_MENU_KINDS.includes(k));
-  const nextFxSlotLabel = nextFxSlot ? `${nextFxSlot.slot} · ${nextFxSlot.label}` : 'No family';
+  const nextFxKinds = FX_MENU_KINDS;
+  const nextFxSlotLabel = 'FX · FREE PICKS';
 
   const doAdd = (t) => {
     recordAddType(t);
@@ -538,7 +535,9 @@ export function LayerStack() {
       ? fxCount < MAX_FX_TRACKS
       : t === 'math'
         ? mathCount < MAX_MATH_TRACKS
-        : contentCount < MAX_CONTENT_TRACKS;
+        : t === 'pattern'
+          ? layers.length < MAX_LAYERS // #1609 (D4) — ground spends no skeleton slot; the document bound gates
+          : kcCount < MAX_CONTENT_TRACKS;
   const addTarget = typeHasRoom(lastAddType) ? lastAddType : ADD_TYPES.find(typeHasRoom) || null;
 
   let contentOrdinal = 0;
@@ -628,8 +627,17 @@ export function LayerStack() {
     const hitsHard = math && mathTrackHitsHard(layer);
     // #1015 — DUP at cap used to click through silently. Cap the button
     // instead: disabled + tooltip so the cap reads instead of swallowing
-    // the click. MATH blocks are out of scope — their DUP is untouched.
-    const dupCapped = math ? false : fx ? fxCount >= MAX_FX_TRACKS : contentCount >= MAX_CONTENT_TRACKS;
+    // the click. #1609 — the caps are the skeleton's, and MATH joins the
+    // rule: at one MATH layer its DUP must read the cap like the others
+    // (the slice refuses it either way). PATTERN gates on the document
+    // bound — ground spends no skeleton slot (D4).
+    const dupCapped = math
+      ? mathCount >= MAX_MATH_TRACKS
+      : fx
+        ? fxCount >= MAX_FX_TRACKS
+        : pat
+          ? layers.length >= MAX_LAYERS
+          : kcCount >= MAX_CONTENT_TRACKS;
     // #1409 — a KC block's collapsed line carries the Look's dish state
     // (off, or on-and-armed); FX/MATH/PATTERN blocks never enrol, so the
     // dish says nothing on them.
@@ -1098,14 +1106,16 @@ export function LayerStack() {
   // order — the fold invariants in state/layerOrder.js hold it).
   const stack = rowsTopFirst(layers);
   const stackSize = stack.length;
-  const strataCap = MAX_CONTENT_TRACKS + MAX_FX_TRACKS + MAX_MATH_TRACKS;
   const addTitle = addTarget
     ? `Add ${ADD_TYPE_LABEL[addTarget]} stratum — tap · long-press: choose type`
     : 'All strata caps reached';
+  // #1609 — the header reads the fixed form: the skeleton's three rationed
+  // slots with their live counts, ground named apart (it is not rationed).
+  const skeletonForm = `CONTENT ${kcCount}/${MAX_CONTENT_TRACKS} · MATH ${mathCount}/${MAX_MATH_TRACKS} · FX ${fxCount}/${MAX_FX_TRACKS}${patternCount > 0 ? ` · GROUND ${patternCount}` : ''}`;
 
   return (
     <div className="build-layer-stack">
-      <PanelHeader tag="P08" title="LAYERS" subtitle={`${stackSize} / ${strataCap} strata`}>
+      <PanelHeader tag="P08" title="LAYERS" subtitle={skeletonForm}>
         {/* Gate: header ADD buttons retired — the dashed ADD STRATUM slot
             below is the add affordance (#1203 block stack). */}
       </PanelHeader>

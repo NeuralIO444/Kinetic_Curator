@@ -141,17 +141,20 @@ assert.deepStrictEqual(
 // Each hostile doc must parse to safe defaults and apply without throwing,
 // without store bloat, leaving a playable canvas.
 
-// 200-layer hostile doc → truncated to the general safety cap on parse.
-// FX layers (unlike content, #456) aren't subject to a per-type cap in
-// projectNormalize, so this mix proves MAX_LAYERS still backstops a
-// hostile doc overall rather than being shadowed by the new content cap.
+// 200-layer hostile doc → truncated on parse. Re-pinned for #1609: FX
+// layers ARE subject to a per-type cap in projectNormalize now (D6: one
+// FX layer), so the skeleton trims the 199 surplus FX tracks long before
+// the general MAX_LAYERS backstop is reached — and the trim is spoken:
+// every dropped track is named on the doc for the load receipt.
 const manyLayers = [
   { id: 'c0', name: 'C0', type: 'content' },
   ...Array.from({ length: 200 }, (_, i) => ({ id: `fx${i}`, name: `FX${i}`, type: 'fx' })),
 ];
 const capped = parseProject({ version: 1, seed: 1, layers: manyLayers, activeLayerId: 'c0' });
 assert.ok(capped.ok, 'hostile 200-layer doc must still parse');
-assert.strictEqual(capped.doc.layers.length, MAX_LAYERS, 'layers truncated to the general cap on parse');
+assert.strictEqual(capped.doc.layers.length, 2, 'the skeleton keeps 1 content + 1 FX track');
+assert.ok(capped.doc.layers.length <= MAX_LAYERS, 'and the general cap still backstops the result');
+assert.strictEqual(capped.doc.layerTrims.length, 199, 'every trimmed FX track is named for the receipt');
 
 // 100k-key enabledAssets hostile doc → only known ids survive.
 const hostileAssets = {};
@@ -262,7 +265,8 @@ const noPatchField = parseProject({
 assert.ok(noPatchField.ok);
 assert.deepStrictEqual(noPatchField.doc.layers[0].patch, { mode: 'off', to: null, strength: 0.16 });
 
-// ── #456 — the 4-content-track cap is bypassable on load ────────────────
+// ── #456 — the content-track cap is bypassable on load ──────────────────
+// (#1609: the cap itself is now 2, the skeleton's D3.)
 // The cap was enforced only at creation time in the UI; a document with
 // more than MAX_CONTENT_TRACKS content layers passed straight through.
 const tooManyContent = Array.from({ length: 6 }, (_, i) => ({ id: `c${i}`, name: `C${i}`, type: 'content' }));
@@ -300,6 +304,83 @@ assert.strictEqual(
   MAX_CONTENT_TRACKS,
   'applied doc must respect the content-track cap',
 );
+
+// ── #1609 — the skeleton trim is SPOKEN: dropped strata are named ──────
+// The acceptance case: a legacy 4-content Look loads as its first 2, and
+// the load receipt (via doc.layerTrims → loadedMessage) names the drops.
+{
+  const legacy = parseProject({
+    version: 1,
+    seed: 1,
+    layers: [
+      { id: 'a', name: 'Alpha', type: 'content' },
+      { id: 'b', name: 'Beta', type: 'content' },
+      { id: 'g', name: 'Gamma', type: 'content' },
+      { id: 'd', name: 'Delta', type: 'content' },
+    ],
+    activeLayerId: 'a',
+  });
+  assert.ok(legacy.ok);
+  assert.deepStrictEqual(
+    legacy.doc.layers.map((l) => l.name),
+    ['Alpha', 'Beta'],
+    'a legacy 4-content Look loads as its first 2',
+  );
+  assert.deepStrictEqual(legacy.doc.layerTrims, ['content stratum "Gamma"', 'content stratum "Delta"']);
+  // A clean load carries no trim at all — the receipt stays silent.
+  const clean = parseProject({
+    version: 1,
+    seed: 1,
+    layers: [{ id: 'a', name: 'Alpha', type: 'content' }],
+    activeLayerId: 'a',
+  });
+  assert.ok(clean.ok);
+  assert.strictEqual(clean.doc.layerTrims, undefined, 'no trim, no layerTrims field');
+  // MATH: a second track and an over-long chain trim the same spoken way (D5).
+  const mathy = parseProject({
+    version: 1,
+    seed: 1,
+    layers: [
+      { id: 'a', name: 'Alpha', type: 'content' },
+      {
+        id: 'm1',
+        name: 'M1',
+        type: 'math',
+        effects: ['gain', 'contrast', 'lift', 'saturate', 'threshold'].map((kind) => ({ kind, params: {} })),
+      },
+      { id: 'm2', name: 'M2', type: 'math', effects: [] },
+    ],
+    activeLayerId: 'a',
+  });
+  assert.ok(mathy.ok);
+  const mathLayer = mathy.doc.layers.find((l) => l.type === 'math');
+  assert.equal(mathLayer.effects.length, 4, 'the chain caps at 4 ops');
+  assert.deepStrictEqual(mathy.doc.layerTrims, ['MATH ops Threshold (from "M1")', 'MATH track "M2"']);
+  // FX: over-stuffed effects trim to 4, and grain still lands last (D6).
+  const foxy = parseProject({
+    version: 1,
+    seed: 1,
+    layers: [
+      { id: 'a', name: 'Alpha', type: 'content' },
+      {
+        id: 'f1',
+        name: 'F1',
+        type: 'fx',
+        effects: ['grain', 'rgbSplit', 'posterize', 'invert', 'solarize'].map((kind) => ({ kind, params: {} })),
+      },
+    ],
+    activeLayerId: 'a',
+  });
+  assert.ok(foxy.ok);
+  const fxLayer = foxy.doc.layers.find((l) => l.type === 'fx');
+  assert.equal(fxLayer.effects.length, 4, 'the layer caps at 4 effects');
+  assert.equal(
+    fxLayer.effects[fxLayer.effects.length - 1].kind,
+    'grain',
+    'grain renders last regardless of stored order',
+  );
+  assert.deepStrictEqual(foxy.doc.layerTrims, ['FX effects Solarize (from "F1")']);
+}
 
 // #646 — sanitized-field counting: a clean round-trip repairs nothing,
 // hostile fields count honestly.

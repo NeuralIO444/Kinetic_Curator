@@ -21,6 +21,11 @@ export function loadedMessage(fileName, doc, sanitized = 0) {
   if (palette) msg += ` · ${palette}`;
   const n = Math.max(0, Math.floor(Number(sanitized) || 0));
   if (n > 0) msg += ` · ${n} field${n === 1 ? '' : 's'} sanitized`;
+  // #1609 (D3/D5) — the skeleton trim is said out loud in the receipt: the
+  // dropped strata and ops are named, never silently vanished. parseProject
+  // carries them on the doc as `layerTrims`.
+  const trims = Array.isArray(doc?.layerTrims) ? doc.layerTrims.filter((t) => typeof t === 'string' && t) : [];
+  if (trims.length) msg += ` · trimmed to the fixed skeleton: ${trims.join('; ')}`;
   return msg;
 }
 

@@ -130,11 +130,26 @@ ok('pattern stratum: the same chain toggles its flag', () => {
 });
 
 ok('a duplicate inherits the flag — content', () => {
-  install(); // fresh world: 3 content-group strata, one duplicate fits the cap
+  // #1609 re-pin: the shared world already holds both content strata, so
+  // a content dup there refuses at the D3 cap — install a one-content
+  // world, where the dup fits, and restore the shared world after.
+  const solo = parseProject({
+    version: 1,
+    seed: 0xbeef,
+    paletteId: 'praystation',
+    layers: [
+      { id: 'kc-b', name: 'B', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+      { id: 'pt-1', name: 'P', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    ],
+    activeLayerId: 'kc-b',
+  });
+  assert.ok(solo.ok, `solo world parses: ${solo.error || ''}`);
+  S().applyProject(solo.doc);
   emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
   S().duplicateLayer('kc-b');
   const copyB = S().layers.find((l) => l.id !== 'kc-b' && l.type === 'content' && l.feedsAccum === false);
   assert.ok(copyB, 'the content copy carries feedsAccum: false');
+  install(); // restore the shared world
 });
 
 ok('a duplicate inherits the flag — pattern', () => {
@@ -186,7 +201,6 @@ ok('normalize edges: only exactly false on content/pattern survives a load', () 
     layers: [
       { id: 'a', type: 'content', feedsAccum: true },
       { id: 'b', type: 'content', feedsAccum: 'no' },
-      { id: 'c', type: 'content', feedsAccum: false },
       { id: 'p', type: 'pattern', feedsAccum: false },
       { id: 'f', type: 'fx', feedsAccum: false, effects: [] },
       { id: 'm', type: 'math', feedsAccum: false, effects: [] },
@@ -198,10 +212,20 @@ ok('normalize edges: only exactly false on content/pattern survives a load', () 
   const byId = Object.fromEntries(res.doc.layers.map((l) => [l.id, l]));
   assert.ok(!('feedsAccum' in byId.a), 'spelled true loads as absence (on)');
   assert.ok(!('feedsAccum' in byId.b), 'a non-boolean loads as absence (on)');
-  assert.equal(byId.c.feedsAccum, false, 'content false survives');
   assert.equal(byId.p.feedsAccum, false, 'pattern false survives');
   assert.ok(!('feedsAccum' in byId.f), 'an FX flag is dropped — FX never feeds');
   assert.ok(!('feedsAccum' in byId.m), 'a MATH flag is dropped — MATH never feeds');
+  // #1609: the content false-survivor gets its own doc — in the shared
+  // fixture it would be a third content stratum and trim under the D3
+  // cap before its flag could ever be read.
+  const contentFalse = parseProject({
+    version: 1,
+    seed: 99,
+    layers: [{ id: 'c', type: 'content', feedsAccum: false }],
+    activeLayerId: 'c',
+  });
+  assert.ok(contentFalse.ok);
+  assert.equal(contentFalse.doc.layers[0].feedsAccum, false, 'content false survives');
 });
 
 await okAsync('contract link: the round-tripped document derives the same selection slice 2 proved', async () => {

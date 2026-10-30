@@ -1594,6 +1594,17 @@
   flex-direction: column;
   gap: 4px;
 }
+/* #1609 — the free-pick add row under the FX layer's tiles (the math
+   add row's shape: select grows, the ADD chip keeps its size). */
+.fx-add-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.fx-add-row select {
+  flex: 1;
+  min-width: 0;
+}
 /* #520 Phase 4 — rack UI: slot rows replace the flat effect list */
 .fx-slot {
   border: 1px solid var(--line);

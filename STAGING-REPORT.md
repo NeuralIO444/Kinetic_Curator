@@ -1,265 +1,247 @@
-# STAGING REPORT — #1608 Strata Q Phase 2: quantize the strata block editors
+# STAGING REPORT — #1609 Strata Q Phase 3: the fixed skeleton
 
-**Issue (verbatim):** "Strata Q Phase 2 — quantize the strata block editors"
-**Branch:** `feat/1608-strata-phase2-blocks`, based on
-`origin/feat/1607-strata-phase1-shelves` (0e8ad17e). Local only — no push,
+**Issue (verbatim title):** "Strata Q Phase 3 — the fixed skeleton: 2 content / 1 MATH ≤4 / 1 FX free picks"
+**Branch:** `feat/1609-strata-phase3-skeleton`, based on
+`origin/feat/1608-strata-phase2-blocks` (41db04c5). Local only — no push,
 no PR (coordinator publishes). This file replaces the report that was at
-the worktree root (#1607's); that report remains in git history. The
+the worktree root (#1608's); that report remains in git history. The
 "(DEFERRED)" language in the issue is stale — the lane was un-deferred
-2026-10-30 and Phase 0's paper + Phase 1's component are this branch's base.
+2026-10-30 and Phases 0–2 are this branch's base.
+
+**Overruled bullet — NOT built, per the recorded ruling:** the issue
+body's field-mod bullet (field→channel moves into MATH) is overruled by
+the issue's own comment thread, Matt's 2026-10-16 ruling, and Phase 0's
+merged paper: field→channel STAYS in the CHIAROSCURO editor, #1204's home
+stands, it is NOT a MATH op, there is NO bottom-stratum retarget. Nothing
+in this branch touches the CHIAROSCURO editor, PATCH FIELD, or patch
+targets.
 
 ## What was built
 
-Every bare RangeRow inside the strata blocks is now a mode row — Phase 1's
-`ModeRow` component, extended with a **block seat** (`variant="block"`:
-label · modes · exact readout on one line, in the flex place the slider
-held) — plus the shelf tiles Phase 1 parked with this phase. One mode-row
-component, two seats; no second component was invented.
+The shipped #1203 stack (caps 4 content / 4 FX / 4 MATH, per-track FX
+family binding by ordinal) is now the fixed skeleton Matt ruled on
+2026-10-15 (tracker #1605, D3–D6):
 
-- **Strata-composite rows** (LayerStack.jsx): WET (0..cap — stops authored
-  for the full 0..1 range, scaled by the track's wet ceiling exactly as
-  the slider's max was; readout keeps its `.layer-opacity-readout`
-  address and % truth), PATCH strength ×3 (FEED/MOD/FIELD — one authored
-  table; the row gains the exact readout the bare slider never showed),
-  DISH bounce / repel / tempo (stops in PARAM_STOPS — they are layout
-  params; only their rows live in blocks).
-- **FX param rows** (FxEffectEditor, LayerStack.jsx): every param of
-  every FX_EFFECT_DEFS kind renders a mode row from `FX_PARAM_STOPS`.
-- **MATH param rows** (MathEffectEditor.jsx): every param of every
-  MATH_EFFECT_DEFS op renders a mode row from `MATH_PARAM_STOPS`; the
-  per-knob MOD selector (a discrete control) is untouched beside it.
-- **PATTERN editor** (PatternEditor.jsx): density / mix / grout / hero /
-  drift / movers are mode rows from `PATTERN_STOPS`; their dock editors
-  keep the editor's percent space — percent in the UI, fractions in the
-  store, exactly as before. The `kin` selector row is discrete and stays.
-- **MotionTiles in BUILD** (HypeSliders.jsx): flap / breath / wind are
-  mode rows via the shelf's `btn()` pattern (flap longhand — see re-pins),
-  stops added to PARAM_STOPS. Gating strings, locks, and write paths are
-  byte-identical.
-- **The exact editor** for every block row is the value editor's docked
-  seat (D2): tap the readout → the #1202 ValueDock with a SliderEditor at
-  the param's own range/step, its shipped default wired as the
-  double-click reset target — the reset the bare sliders' `onReset`
-  used to serve.
-- **Data law holds:** no write-path changes anywhere. Mode taps write the
-  authored stop through the same bus events the sliders used
-  (LAYOUT_PARAM / LAYER_SET_OPACITY / LAYER_PATCH / FX_EFFECT_SET_PARAM /
-  MATH_EFFECT_SET_PARAM / PATTERN_PARAM); stored values stay continuous;
-  dice/curator/governor untouched. Block summaries still show exact
-  values in amber — `strataSummary.mjs` is untouched and its suite passes
-  unmodified.
+- **CONTENT 4→2, locked (D3).** `MAX_CONTENT_TRACKS = 2` in the slice and
+  its projectNormalize mirror. ADD/DUP gate on the KC-track count. A Look
+  with 3–4 content strata loads as its first 2 — and the trim is **said
+  out loud** (next section).
+- **PATTERN beneath (D4).** Pattern strata no longer spend the content
+  cap anywhere: not in the slice's ADD gate (now the document bound,
+  `MAX_LAYERS` = 16), not in DUP, not in normalizeLayers, not in the
+  chaos-birth gate in patternRoll (was content-count, now total < 16 —
+  otherwise a full double exposure would starve ground birth forever).
+  The stack header names ground apart: `· GROUND n` when patterns exist.
+- **MATH 4 tracks → 1 layer, chains ≤ 4 ops (D5).** `MAX_MATH_TRACKS = 1`;
+  new `MAX_MATH_OPS = 4` in mathFilters.js. mathEffectAdd refuses a 5th
+  op; MathEffectEditor swaps its add row for a "chain full — 4 ops" note
+  at the cap. Extra tracks and over-long chains trim on load, spoken.
+- **FX 4 tracks → 1 layer of any 4 kinds (D6).** `MAX_FX_TRACKS = 1`; new
+  `MAX_FX_EFFECTS = 4` in fxFilters.js. The per-track family binding is
+  dead: `availableFxKinds` now offers every live kind not already in the
+  layer (rack order kept), and the editor renders one tile per effect in
+  the layer plus one add row. `sanitizeFxEffects`' grain-last invariant
+  is untouched, so the **CRT recipe (Scanlines + Halo + Grain + RGB
+  Split) is buildable in one FX layer** — pinned in fxFilters.selfcheck.
+  The add chooser for a fresh layer offers the whole add-menu
+  (FX_MENU_KINDS) under the label "FX · FREE PICKS". Last-used replay is
+  now ordinal-free: a menu-kind pick arms the layer; one-tap replays the
+  last-used menu kind.
+- **The header reads the fixed form.** The LAYERS panel subtitle is no
+  longer `n / 12 strata`; it reads
+  `CONTENT k/2 · MATH m/1 · FX f/1` (+ ` · GROUND p` when patterns
+  exist), from the live counts.
+- **Fold invariants hold.** layerOrder.js is untouched; its suite is
+  re-pinned to the skeleton (below) and green: content never crosses the
+  adjustment line, FX never crosses MATH, in load migration, in the
+  scene contract, and in the store's trade guards.
 
-## Where the catalog stop tables live
+## How trim-on-load speaks
 
-- `app/src/panels/build/blockStops.mjs` (NEW) — `WET_STOPS` +
-  `wetStopsForCap`, `PATCH_STRENGTH_STOPS`, `FX_PARAM_STOPS`,
-  `MATH_PARAM_STOPS`, `PATTERN_STOPS`, keyed `${kind}.${param}` for the
-  catalogs, with `fxStopsFor` / `mathStopsFor` / `patternStopsFor`
-  lookups. Entry shape mirrors PARAM_STOPS (`{ stops, identity?,
-  inverse?, bipolar? }`).
-- `app/src/data/layout-modes.js` — PARAM_STOPS grows by the six layout
-  params Phase 2 quantized: flap / breath / wind (hype family section)
-  and contactRestitution / contactRepel / dishTempo (a new CAST section).
-- The sign math is pure and lives with Phase 1's mode math:
-  `bipolarStateFor` / `bipolarValueFor` in
-  `app/src/panels/build/te/modeStops.mjs`.
+The load receipt already existed (`loadedMessage` in
+panels/pipeline/pipelineNotices.mjs, shown by DataExportRow on project
+open) — no new notification system was built. The smallest honest
+channel, wired through it:
 
-## The sign cell (Phase 0 paper, stop-table law rule 6)
+1. `normalizeLayers` (state/projectNormalize.js) now returns `trims`:
+   name strings in document order — `content stratum "Gamma"`,
+   `FX track "FX2"`, `MATH track "M2"`, and for in-layer surplus
+   `FX effects Solarize (from "F1")` / `MATH ops Threshold (from "M1")`
+   (catalog labels). The FX cap reads the **stored** order (first 4
+   valid kinds stay — the same first-N rule as strata and chains); only
+   then does the sanitizer clamp and re-seat grain last inside the kept
+   set, so an early-stored grain is never the effect dropped.
+2. `parseProject` (both branches) attaches `doc.layerTrims` **only when
+   non-empty** — a clean load's doc is byte-identical to before.
+3. `loadedMessage` appends ` · trimmed to the fixed skeleton: <names>`
+   when the doc carries them.
+4. Boot/autosave/recipe loads have no receipt surface; for those, the
+   trim also fires a `console.warn` in normalizeLayers in the existing
+   #1048 style (`[normalize] strata trimmed to the fixed skeleton
+   (#1609): … — save the project to persist the trim`). Voice/recipe
+   stacks funnel through the same normalizeLayers, so their trims are
+   spoken the same way (their expandos don't surface a receipt — the
+   console line is the record there, as with #1048's fold before it).
 
-Bipolar catalog params — exactly rule 6's list: `gain.exposure`,
-`lift.offset`, `tempTint.temperature`, `tempTint.tint`,
-`hueRotate.degrees` (MATH) and `grade.hue` (FX). Their tables store
-unsigned magnitudes `[0, low, mid, high]`; the row renders a `−`/`+`
-TeaMatrix pair at its left. Tapping a magnitude applies it under the
-row's current sign; tapping the sign cell flips the sign at the current
-magnitude (a nonzero value negates through the same SET_PARAM event).
-OFF is true 0 under either sign — `bipolarValueFor` never returns −0.
-At exactly 0 the cell shows the *armed* sign (component-local state: the
-sign the next magnitude tap will take); a stored nonzero value's own
-sign always wins for display. A dice-written −1.5 on gain lights MID,
-off-detent, sign `−`.
+## Design decisions (recorded, all reversible in one place)
 
-Class rulings applied beyond Phase 0's four named identity params, each
-by the law's own definitions and flagged in the table comments:
-`channelMix.r_to_r` and `levelsFixed.white` are identity class (the
-shipped default IS the value at which the param contributes nothing —
-red passes as red; levels untouched), OFF = the default, detents in
-effect order. `posterize.levels` and `quantize.steps` are `inverse`
-(rule 4: fewer = stronger, so OFF is the least-effect end and the stops
-descend in effect order). Pure settings (seed, radii, thresholds,
-density, roundness) follow Phase 1's plateRadius precedent: authored
-stops ascending from the floor.
+- **One instance per kind per FX layer.** A kind already in the layer is
+  not offered again (every prior UI assumed this). Enforced by
+  availableFxKinds; fxEffectAdd refuses duplicates.
+- **Insert order kept.** fxEffectInsertIndex's slot-order insertion is
+  unchanged: pick order is free, render order stays canonical, and the
+  grain-last pass invariant is preserved regardless.
+- **Skeleton constants live where their kin already lived:** track caps
+  in layersSlice (with projectNormalize's pre-existing duplicated
+  mirrors updated per the #456 cycle rule, plus new MAX_FX_TRACKS /
+  MAX_MATH_TRACKS mirrors), MAX_FX_EFFECTS in fxFilters.js, MAX_MATH_OPS
+  in mathFilters.js, MAX_LAYERS reused from projectNormalize.
+- **FX chooser vs editor offers.** Arming a fresh layer offers the
+  curated add-menu (8 kinds, the #310/#704 curation); the in-layer add
+  row offers all live kinds not present (14). The EF-4 stub note
+  ("planned: dither, stipple") is preserved under the editor as
+  Phase 4's signpost.
+- **MATH DUP joins the capped buttons.** LayerStack's dupCapped now
+  covers MATH (the #1015 comment scoped MATH out when its DUP could
+  still succeed; at one layer it cannot, so the button reads the cap
+  like the others). PATTERN's DUP gates on the document bound.
+- **fxTrack.js's binding helpers stay as a historical record** (header
+  rewritten; `rackSlotForKind` added for tile faces). kindsForFxOrdinal
+  has no remaining callers; FX_RACK itself remains the kind→family
+  catalog for tiles, insert order, and the grain split.
 
-## MotionTiles + MixBar decisions (with grounds)
+## Premise verification (checked against the tree before building)
 
-- **MotionTiles (flap / breath / wind) — CONVERTED.** Grounds: they are
-  stored layout params in PARAM_SPEC with ranges and shipped defaults —
-  the law applies honestly, with authored stops, default-is-a-stop, and
-  magnitude-class OFF (at 0 each contributes nothing: no beat, no swell,
-  no wind). Phase 0's exemptions list is closed and does not name them;
-  tracker ruling D1 scopes the law to "shelves, block editors, tiles,
-  MIX bar". The one cost is #716's glyph-as-display in BUILD; the
-  MotionTile component and its glyph math remain live in STIMULI (the
-  `life` tile), which the DS detent amendment does not reach.
-- **MixBar — STOPPED under the premise rule, not converted, not silently
-  exempted.** Grounds (code facts): MixBar is a transient crossfade
-  scrubber over `state.voiceMix` that exists only while a voice MIX is
-  in flight. It holds no stored param (no PARAM_SPEC entry, no catalog
-  entry), has no shipped default, persists nothing, and its position is
-  a *progress through a transition* that auto-advances — there is
-  nothing to author a stop table against, and detents would break the
-  scrub gesture that is the control's whole purpose. The stop-table law
-  governs param controls; this is not one. The slider stays exactly as
-  shipped, and `blockStops.selfcheck` pins that it stays (a recorded
-  stop, not an oversight). If Matt wants the MIX position quantized, it
-  needs a ruling of its own — flagged for the coordinator.
+- Shipped #1203 shape confirmed: caps were 4/4/4 in layersSlice; header
+  subtitle was `${stackSize} / ${strataCap} strata` (cap 12); PATTERN
+  counted toward the content cap in slice, normalize, and pins.
+- Load path confirmed: normalizeLayers silently skipped overflow; no
+  FX/MATH track caps, no chain cap, no effect cap on load; the load
+  receipt existed (above). Boot loads have no receipt — precedent for
+  spoken-via-console is #1048's fold warning inside the same function.
+- One-writer files (liveLoop.mjs / liveResolve.mjs / particles.js) were
+  NOT needed and NOT touched. liveResolve's defensive MAX_TRACKS is its
+  own constant and already tolerates the skeleton.
+- Census: the curator census suite pins no track counts; it passes
+  unmodified. The layers-census acceptance is the layerOrder +
+  layers-family suites, re-pinned below.
 
-## Premise checks (stop-rule)
+## Re-pins — every one, with its cause
 
-- **Catalog counts** — MATH = 12 ops, as the issue states. **FX = 14
-  kinds, not 13**: `feedbackWarp` (#1490) joined FX_EFFECT_DEFS after
-  QA counted 13 (2026-10-15). The issue's operative words are "*every*
-  FX param (from FX_EFFECT_DEFS…)"; the build covers all 14 kinds
-  (feedbackWarp's `amount` included) and the census suite pins the
-  table against the live catalog so the next addition fails loudly.
-  Recorded here rather than stopped: the count was stale, the intent
-  unambiguous, and stopping would have left a param unquantized.
-- **Composite rows as described** — TRUE, plus one the issue's list
-  predates: the DISH group carries a third knob, TEMPO (`dishTempo`),
-  as a bare RangeRow in the same block. Acceptance ("no bare RangeRow
-  remains on the BUILD surface except Phase-0-named exemptions")
-  requires it, so it is quantized with its siblings.
-- **Phase 1's component API** — TRUE: ModeRow / modeStops / PARAM_STOPS
-  / the dock all as the Phase 1 report describes; DockProvider wraps the
-  whole BUILD panel (LayerStack included), so block rows open the same
-  dock. Phase 1's open flag (the CHIAROSCURO section-editor tenants —
-  SunControls' RangeRows, the MapRow AMOUNT button) is outside this
-  issue's named surface (strata blocks), and SUN X/Y are exempt position
-  params regardless; not touched.
-- **No one-writer file is needed** — liveLoop.mjs / liveResolve.mjs /
-  particles.js untouched.
+Cause key: **[D3]** content 4→2 · **[D4]** pattern leaves the count ·
+**[D5]** MATH 1 layer / ≤4 ops · **[D6]** FX 1 layer / free picks ·
+**[HDR]** header reads the fixed form. No golden hashes were weakened;
+no re-pin touches a value the skeleton law did not itself change.
 
-## Re-pins (each with its cause)
+Selfchecks:
 
-1. **`e2e/fx-row-opens-editor.spec.js`** (budgeted) — the WET drive:
-   `.strata-composite input[type=range]` no longer exists. The spec now
-   taps the WET readout to open the exact editor in the value dock and
-   drives the dock's slider (the Phase 1 cache-verify pattern), then
-   presses Escape before the block-tap steps — the open dock overlays
-   the panel's right edge, which the first run of the re-pin proved by
-   timing out on the DUP click. Header comment updated ("wet slider" →
-   "wet row"). **Passes in the sandbox** (31.5 s).
-2. **`e2e/pattern-controls.spec.js`** (cause: same conversion) — exact
-   values set via a `setExact` helper (readout tap → dock slider, with
-   an Escape first because the open dock covers the next row's readout);
-   the grout/hero honesty test now asserts on the readout button (name,
-   disabled state, reason in its title) and forces a mode tap through
-   the DOM to prove the disabled guard refuses it; the 44px test now
-   measures the detent form (buttons ≥43px as before; mode cells +
-   readouts ≥29px — the 44px law is RangeRow's per DS §2.1, the detent
-   cell's shipped height is 30px from Phase 1). **6/6 pass in the
-   sandbox.**
-3. **`e2e/pattern-tides.spec.js`** (same cause) — movers' disabled state
-   + reason asserted on the readout button; drift set via the dock.
-   **Passes in the sandbox.**
-4. **`e2e/patch-diag-interval.spec.js`** (same cause) — its render-churn
-   source was `.strata-block input[type="range"]` (the opacity slider).
-   It now taps the WET row's LOW/HIGH mode cells alternately — the same
-   LAYER_SET_OPACITY write at the same super-1 Hz rate the test exists
-   to survive; the interval assertion is unchanged. **Passes in the
-   sandbox.**
-5. **`patternEditor.selfcheck`** (budgeted) — the RangeRow count pin
-   (6) becomes mode-row pins (density's own ModeRow + the five pctRow
-   calls); the tone-loop pin is dropped with the RangeRows it scanned;
-   the grout/hero disabled pins re-express against pctRow's options
-   object (same strings, same order); the "percent in the UI, fractions
-   in the store" pin now names pctRow's shared `setParam(id, key, v /
-   100)`. All other checks (modes, density range on the dock editor,
-   the dash readout, no native input, casing, LayerStack pins) pass
-   unmodified.
-6. **`motionGlyph.selfcheck`** (cause: the MotionTiles disposition) —
-   the "#716 the four motion keys wear the tile" pin's BUILD half is
-   re-pinned: flap/breath/wind assert as mode rows in HypeSliders and
-   no `<MotionTile` remains there; the STIMULI `life` tile pin and the
-   glyph-math test pass unmodified.
-7. **`modeStops.selfcheck`** (extension, budgeted) — the PARAM_STOPS
-   census grows by the six Phase 2 layout params, named as a separate
-   BLOCK_LAYOUT_CENSUS list so a seventh cannot slip in silently; the
-   default-is-a-stop check iterates the union. Every other law check
-   covers the new entries through its generic loops, unmodified.
-8. **New selfcheck** `src/panels/build/blockStops.selfcheck.mjs`
-   (budgeted) + one manifest line after modeStops. 10 checks: the three
-   catalog censuses against the live defs, the law clauses per entry
-   (range, default-is-a-stop incl. every PATTERN mode default, OFF per
-   class), the identity/inverse/bipolar census sets, WET cap scaling,
-   PATCH's 0.16, the sign math, and the surface pins (mode rows in the
-   three editors, no RangeRow left in them, tiles converted, MixBar's
-   recorded stop).
-9. **No other re-pins.** Notably `unlockTree.selfcheck` passes
-   unmodified — flap is written longhand in HypeSliders because its
-   gate reason is long enough that prettier wraps an object property
-   (the census reads reason strings per line; a JSX attribute is never
-   wrapped — the same form the MotionTile prop had). `rangeRow`,
-   `spawn`, `foldInCensus`, `casingInCss`, `helpCopy`, `efRackTile`,
-   `wetSoak`, `wetCeiling`, `feedsAccumSurface`, `strataSummary` all
-   pass unmodified.
+- `fx/fxFilters.selfcheck.mjs` — [D6] "filled slot removed from
+  offer-list" → only the present kind leaves the list, slot-mates stay;
+  "all slots filled returns empty" → the full-layer (4 effects) case;
+  NEW pin: the CRT recipe stays on offer step by step until all four
+  kinds are in. Slice tests: FX DUP deep-clone test → DUP refuses at
+  the cap (the clone branch is unreachable for FX now); CRUD test: the
+  #520 slot rejection of tear-after-rgbSplit → accepted under free
+  picks, duplicate-kind add is the surviving refusal. 51 cases green.
+- `state/patternTrack.selfcheck.mjs` — [D4] "the content cap counts
+  PATTERN tracks (4 total)" → ground grows to the document bound while
+  KC adds gate on their own cap; normalize pin → five patterns survive
+  beside a KC track with zero trims; one test title drops its stale
+  cap clause (no assertion change). 17 green.
+- `state/projectDocument.selfcheck.mjs` — [D6] the #103 hostile-doc pin
+  ("FX layers aren't subject to a per-type cap") inverted by the law:
+  200 FX tracks now parse to 1 content + 1 FX with 199 named trims;
+  #456 section header updated (cap is 2). NEW #1609 block: the
+  acceptance cases — legacy 4-content Look loads as its first 2 with
+  `layerTrims` naming Gamma/Delta; clean load carries no layerTrims;
+  MATH track + chain trims named; FX effects trim named with grain
+  still last. Green.
+- `state/layerOrder.selfcheck.mjs` — [D6] load-migration fixture made
+  skeleton-legal (1 FX / 1 MATH); NEW pin: the old two-FX fixture loads
+  folded AND trimmed, both announced (one #1048 warn, one #1609 warn).
+  Store adds: second FX/MATH adds refuse at the caps. Trade-guard test
+  now seeds its 2-FX/2-MATH state directly (creation caps can't build
+  it; the guards must hold for any state — the suite's charter). DUP
+  test: both dups refuse at the caps, order holds. Scene-contract test:
+  two adjustment wraps, not three (f2 trimmed). 12 green.
+- `state/layersPlusPattern.selfcheck.mjs` — rewritten choreography:
+  the #1014 last-used flows re-staged inside the caps (remove-to-make-
+  room), with NEW refusal pins (third content ADD, second FX ADD, FX
+  DUP). The FX half's premise (per-ordinal family binding, cross-family
+  fallback, ordinal replay) is dead law [D6]; replaced by the live
+  semantics: menu pick arms any family, non-menu pick is a one-tap,
+  replay is ordinal-free. layoutSlice isolation pin unchanged. Green.
+- `state/feedsAccumSurface.selfcheck.mjs` — [D3] the content-DUP test
+  moves to a one-content world (the shared world is already at cap;
+  the property — a duplicate inherits the flag — is unchanged);
+  normalize-edges: the content false-survivor gets its own doc (as a
+  third content stratum it would trim before its flag could be read).
+  12 cases green.
+- `gl/wetSoak.selfcheck.mjs` — [D3] same DUP re-stage as
+  feedsAccumSurface (one-content world; fixture restored after;
+  round-trip assertions unchanged in substance). 31 green.
+- `pattern/patternRoll.selfcheck.mjs` — [D4] the "at the 4-track cap
+  nothing is added" fixture → a full document (16 layers) adds nothing,
+  and a NEW positive pin: a full double exposure (2 content) still
+  births its ground. 7 green.
+- `panels/pipeline/pipelineNotices.selfcheck.mjs` — NEW pin: the
+  receipt names the trimmed strata; silence when clean or empty. 10
+  green.
 
-## Verification
+E2E (CI's e2e-smoke job is authoritative; both re-pinned specs also
+pass in this sandbox):
 
-- New/extended suites: `blockStops` 10/10, `modeStops` 11/11,
-  `patternEditor` 6/6, `motionGlyph` 2/2.
-- Full manifest sweep (Playwright chromium installed first, so browser
-  sections ran at full counts): **537 pass / 3 fail**, the three proven
-  environmental and none in touched territory:
-  - `src/gl/accum.selfcheck.mjs` — aborted (exit 134, sandbox heap)
-    inside the sweep; solo re-run with
-    `NODE_OPTIONS=--max-old-space-size=3072` on this tree: **83/83,
-    exit 0**. The build touches no gl code.
-  - `src/fx/rollSafety.selfcheck.mjs` — fails identically on this tree
-    and on the pristine Phase 1 base (0e8ad17e): same throw at
-    rollSafety.selfcheck.mjs:231, outputs identical modulo the node PID.
-  - `src/engine/kernel/bake/swarmWasm.selfcheck.mjs` — fails identically
-    on the pristine base (`build-wasm.sh --verify` — no cargo in the
-    sandbox).
-- e2e in the sandbox (vite preview + Playwright chromium):
-  `fx-row-opens-editor` PASS, `pattern-controls` 6/6 PASS,
-  `pattern-tides` PASS, `patch-diag-interval` PASS.
-  `cache-verify` (Phase 1's spec, unmodified here) hits the 120 s
-  timeout at its `setRange` evaluate — proven base-identical on my own
-  run: the pristine Phase 1 base (0e8ad17e) in this sandbox fails at
-  the identical call (`setRange`, spec.js:45:16 ← 105:9, same
-  `locator.evaluate` timeout). A sandbox page stall, not the refactor —
-  the four dock-driving specs above exercise the same readout→dock→
-  slider path live and pass. CI's e2e-smoke job is authoritative.
-- `npm run build` — green. `npm run lint` — 0 errors (11 pre-existing
-  warnings, none in touched files). `npm run format:check` — clean
-  (prettier --write applied to touched code files only).
-- Dice-acceptance: a stored in-between catalog value renders identically
-  (no write path changed) and displays nearest-mode + dot under its own
-  sign — the math is pinned in blockStops.selfcheck (gain −0.4 →
-  LOW-magnitude, off-detent, sign −).
+- `e2e/fx-row-opens-editor.spec.js` — [D6] two-FX choreography
+  re-staged: the block boots unselected from a restored project so the
+  header tap is what opens the editor; visibility/wet-readout
+  independence kept; DUP now asserted disabled at the cap ("Track cap
+  reached") instead of minting a third block; remove leaves KC
+  untouched; the KC↔KC section is unchanged (2 content is legal [D3]).
+  Passes in-sandbox (31s).
+- `e2e/fx-editor-size.spec.js` — [D6] the four-track measurement loop
+  re-staged on the one layer: empty-layer add row measured, then every
+  catalogue kind (14) added/measured/removed one tile at a time; the
+  measure helper now unions the editor's children (tiles + add row +
+  notes) instead of one tile's children. PAD unchanged. Passes
+  in-sandbox (23s).
 
-## Files touched
+## Suite results
 
-- `app/src/data/layout-modes.js` — PARAM_STOPS +6 entries (data only).
-- `app/src/panels/build/te/ModeRow.jsx` — block seat + sign cell
-  (shelf behavior unchanged).
-- `app/src/panels/build/te/modeStops.mjs` — bipolarStateFor /
-  bipolarValueFor added.
-- `app/src/panels/build/blockStops.mjs` — NEW (the catalog tables).
-- `app/src/panels/build/blockStops.selfcheck.mjs` — NEW + manifest line.
-- `app/src/panels/build/LayerStack.jsx` — WET / PATCH / DISH /
-  FxEffectEditor conversions.
-- `app/src/panels/build/MathEffectEditor.jsx` — param-row conversion.
-- `app/src/panels/build/PatternEditor.jsx` — six-row conversion.
-- `app/src/panels/layout/HypeSliders.jsx` — flap / breath / wind tiles
-  → mode rows.
-- `app/src/styles/panels.css` — `.te-mode-block` family (+ readout
-  min-height for target parity).
-- `app/src/panels/build/te/modeStops.selfcheck.mjs` — census extension.
-- `app/src/panels/build/patternEditor.selfcheck.mjs`,
-  `app/src/components/motionGlyph.selfcheck.mjs` — re-pins (above).
-- `app/e2e/fx-row-opens-editor.spec.js`, `app/e2e/pattern-controls.spec.js`,
-  `app/e2e/pattern-tides.spec.js`, `app/e2e/patch-diag-interval.spec.js`
-  — re-pins (above).
-- `app/selfcheck.manifest` — one line.
+- Build: `npm run build` green. Lint: 0 errors (11 warnings, all in
+  files this branch does not touch). `npm run format:check`: clean
+  (prettier --write applied to touched code files only; no docs).
+- Full manifest sweep (545 lines; chromium installed first): segment 1
+  (through line 85) all-pass until swarmWasm; remainder run to
+  completion — 460 commands, 4 failures, all adjudicated:
+  - `swarmWasm` — fails identically on the pristine Phase 2 base
+    (sandbox has no cargo). Environmental.
+  - `rollSafety` — fails identically on the pristine Phase 2 base
+    (exit 1, re-run on base this session). Environmental.
+  - `phase6` — failed once inside the long sweep; passes standalone on
+    this tree (exit 0, full OK line). Load flake, not a code failure.
+  - kineticSweep did not fail in either sweep run.
+  - `wetSoak`, `patternRoll` — mine; re-pinned above, green.
+  - accum ran solo inside the sweep with
+    NODE_OPTIONS=--max-old-space-size=3072 — passed at full count.
+- E2E spot-checks in-sandbox: fx-row-opens-editor PASS, fx-editor-size
+  PASS (both re-pinned). pattern-track and poisoned-project (×2) fail
+  in-sandbox and fail **identically on the pristine Phase 2 base**
+  (ERR_TUNNEL_CONNECTION_FAILED — the sandbox proxy blocks a resource
+  the specs await); not this branch's failures. The hostile-200 spec's
+  assertions were read by eye against the skeleton: 200 content layers
+  trim to 2, trims speak via console.warn (the spec only fails on
+  console *errors*), canvas renders — CI-safe. The rest of e2e is
+  CI-authoritative, as in Phases 1–2.
+- Source-shape pins: selfchecks were grepped for every touched file
+  name; all suites naming them ran in the sweep (layerRows,
+  foldInCensus, efRackTile, trackNumeral, casingInCss, helpCopy,
+  blockStops 10/10, modeStops 11/11, census — all green unmodified).
+
+## Not done / notes for the coordinator
+
+- MixBar was Phase 2's stop, not this phase's; untouched.
+- Phase 4 (#1610, EF-4 dither kind) is the remaining Strata Q phase;
+  the "planned: dither, stipple" note still stands in the FX editor.
+- The strata-quantized paper (plan.md/amendment.md) was NOT updated by
+  this phase — Phase 0's paper already describes the skeleton as ruled;
+  no doc claims needed correction.

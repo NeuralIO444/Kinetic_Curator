@@ -18,7 +18,7 @@ import {
 import { QUILT_MAX_GROUT } from './engine.js';
 import { isFxLayer } from '../fx/fxFilters.js';
 import { isMathLayer } from '../fx/mathFilters.js';
-import { MAX_CONTENT_TRACKS } from '../state/projectNormalize.js';
+import { MAX_LAYERS } from '../state/projectNormalize.js';
 
 // Matt 2026-10-08: a tessellation laid over the marks reads as a flat 2D overlay (the 1995 layer-mix look), and KIN was
 // dealing one 30% of the time on a hammered tap. It is rare now (8%), and a quiet veil when it does come. CURATOR never
@@ -97,12 +97,14 @@ export function rollPatternLayers(
     return { ...l, pattern: fn(l.pattern, rng) };
   });
   if (kind === 'chaos' && canAdd && !out.some(isPattern)) {
-    const content = out.filter((l) => !isFxLayer(l) && !isMathLayer(l)).length;
+    // #1609 (D4) — a pattern is ground and spends no skeleton slot, so the
+    // birth gate is the document bound, not the content count: a full
+    // double exposure (2 content strata) must not starve the ground.
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
     const roll = rng();
     const born = dealPattern(undefined, rng);
     const id = makeId();
-    if (roll < addChance && content < MAX_CONTENT_TRACKS) {
+    if (roll < addChance && out.length < MAX_LAYERS) {
       // one rule everywhere: a pattern is ground, directly below the lowest KC track (bottom -> top)
       const layer = {
         id,

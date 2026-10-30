@@ -294,6 +294,30 @@ ok('the toggle is undoable on content, a no-op on pattern/FX (no key, no undo en
 });
 
 ok('a duplicate inherits the mode; the saved project round-trips byte-stable', () => {
+  // #1609 re-pin: the fixture world already holds both content strata, so
+  // a content dup there refuses at the D3 cap — run the dup in a
+  // one-content world (the round-trip below is world-agnostic), then
+  // restore the fixture world at the end.
+  const solo = parseProject({
+    version: 1,
+    seed: 0xbeef,
+    paletteId: 'praystation',
+    layers: [
+      {
+        id: 'kc-b',
+        name: 'B',
+        type: 'content',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
+        wetSoak: true,
+      },
+      { id: 'pt-1', name: 'P', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
+    ],
+    activeLayerId: 'kc-b',
+  });
+  assert.ok(solo.ok, `solo world parses: ${solo.error || ''}`);
+  S().applyProject(solo.doc);
   emit(Events.LAYER_DUPLICATE, { id: 'kc-b' });
   const copy = S().layers.find((l) => l.id !== 'kc-b' && l.type === 'content' && l.wetSoak === true);
   assert.ok(copy, 'the duplicate carries wetSoak');
@@ -310,6 +334,7 @@ ok('a duplicate inherits the mode; the saved project round-trips byte-stable', (
     !JSON.stringify(serializeProject(S())).includes('wetSoak'),
     'an all-off project spells no wetSoak anywhere',
   );
+  S().applyProject(parsed.doc); // restore the fixture world
 });
 
 ok('the collapsed BUILD block confesses the mode in words', () => {

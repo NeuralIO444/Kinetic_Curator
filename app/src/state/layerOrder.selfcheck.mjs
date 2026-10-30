@@ -88,6 +88,31 @@ const doc = () => [
 ];
 
 ok('loading an interleaved project migrates it, warns once, and keeps content in place', () => {
+  // #1609 re-pin: the fixture is skeleton-legal now (one FX, one MATH —
+  // doc()'s second FX track trims on load under D6, pinned separately
+  // below). The fold property is unchanged: FX crosses to before MATH,
+  // content keeps its exact slots.
+  const interleaved = [
+    mk('kc', 'content', { patch: { mode: 'off', to: null, strength: 0.16 } }),
+    mk('m1', 'math', { effects: [{ kind: 'gain', params: {} }] }),
+    mk('f1', 'fx', { effects: [{ kind: 'rgbSplit', params: { dx: 3 } }] }),
+    mk('kc2', 'content', { patch: { mode: 'off', to: null, strength: 0.16 } }),
+  ];
+  const warns = [];
+  const w = console.warn;
+  console.warn = (...a) => warns.push(a.join(' '));
+  let r;
+  try {
+    r = normalizeLayers(interleaved, 'kc');
+  } finally {
+    console.warn = w;
+  }
+  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'm1', 'kc2'], 'FX crosses MATH; content keeps its exact slots');
+  assert.equal(warns.filter((m) => /#1048/.test(m)).length, 1, 'the render change is announced');
+  assert.equal(r.activeLayerId, 'kc');
+});
+
+ok('#1609: the pre-skeleton fixture (two FX tracks) loads folded AND trimmed, both said out loud', () => {
   const warns = [];
   const w = console.warn;
   console.warn = (...a) => warns.push(a.join(' '));
@@ -97,9 +122,10 @@ ok('loading an interleaved project migrates it, warns once, and keeps content in
   } finally {
     console.warn = w;
   }
-  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'f2', 'kc2', 'm1']);
-  assert.equal(warns.filter((m) => /#1048/.test(m)).length, 1, 'the render change is announced');
-  assert.equal(r.activeLayerId, 'kc');
+  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'm1', 'kc2'], 'f2 trims (D6); the fold still lands FX before MATH');
+  assert.deepEqual(r.trims, ['FX track "f2"']);
+  assert.equal(warns.filter((m) => /#1048/.test(m)).length, 1, 'the fold is announced');
+  assert.equal(warns.filter((m) => /#1609/.test(m)).length, 1, 'the trim is announced');
 });
 
 ok('a project already in order loads silently and is untouched; normalizing twice is a fixed point', () => {
@@ -141,13 +167,29 @@ ok('adding FX after MATH puts the FX below it; adding MATH always lands last', (
   S().addMathLayer();
   S().addFxLayer();
   assert.deepEqual(adjOrder(), ['fx', 'math'], 'a new FX goes under the existing MATH');
+  // #1609 re-pin: a second FX or MATH add is refused at the skeleton cap
+  // (D5/D6) — the pair above is all the stack can hold.
   S().addFxLayer();
   S().addMathLayer();
-  assert.deepEqual(adjOrder(), ['fx', 'fx', 'math', 'math']);
+  assert.deepEqual(adjOrder(), ['fx', 'math'], 'second FX/MATH adds refuse at the cap');
   assert.ok(holds());
 });
 
 ok('reorderLayer and swapLayerPositions refuse FX <-> MATH, and still trade same kinds', () => {
+  // #1609 — creation caps can no longer build a 2-FX / 2-MATH state, so
+  // seed one directly: the trade guards must hold for ANY state the store
+  // can be handed (a hostile or mid-migration stack), which is this
+  // suite's charter.
+  const cur = S().layers;
+  useStore.setState({
+    layers: [
+      ...cur.filter((l) => l.type === 'content'),
+      cur.find((l) => l.type === 'fx'),
+      mk('fx-b', 'fx', { effects: [] }),
+      cur.find((l) => l.type === 'math'),
+      mk('math-b', 'math', { effects: [] }),
+    ],
+  });
   const fx = S().layers.filter((l) => l.type === 'fx');
   const math = S().layers.filter((l) => l.type === 'math');
   const before = S().layers.map((l) => l.id);
@@ -184,15 +226,21 @@ ok('reorderLayer and swapLayerPositions refuse FX <-> MATH, and still trade same
 });
 
 ok('duplicating the last FX, or the last MATH, never breaks the order', () => {
+  // #1609 re-pin: at the skeleton caps both duplications now REFUSE (the
+  // counts cannot grow) — the order holds trivially, and the refusal is
+  // the behavior worth pinning.
+  const before = S().layers.length;
   const lastFx = S()
     .layers.filter((l) => l.type === 'fx')
     .at(-1);
   S().duplicateLayer(lastFx.id);
+  assert.equal(S().layers.length, before, 'FX dup refuses at the cap');
   assert.ok(holds(), 'copy of the FX that sits right under MATH');
   const lastMath = S()
     .layers.filter((l) => l.type === 'math')
     .at(-1);
   S().duplicateLayer(lastMath.id);
+  assert.equal(S().layers.length, before, 'MATH dup refuses at the cap');
   assert.ok(holds());
 });
 
@@ -232,7 +280,9 @@ ok('scene contract: for a migrated project, every FX wrap precedes every MATH wr
   const scene = buildSceneContract({ doc: docObj, resolvedLayers: resolved, caps });
   const kindOf = (id) => layers.find((l) => l.id === id).type;
   const seq = scene.fxWraps.map((x) => kindOf(x.fxLayerId));
-  assert.ok(seq.length >= 3, 'all three adjustment tracks wrap');
+  // #1609 re-pin: doc()'s second FX track trims on load (D6), so the
+  // migrated project wraps exactly the skeleton's two adjustment tracks.
+  assert.equal(seq.length, 2, 'both adjustment tracks wrap');
   assert.ok(seq.lastIndexOf('fx') < seq.indexOf('math'), `fold order ${seq.join(' → ')}`);
 });
 
