@@ -22,6 +22,7 @@ import { engraveDataFor } from './engraveBody.mjs';
 import { creaturePose } from './creaturePose.js';
 import { glitchFrame, applyGlitch } from './glitch.js';
 import { attachPointsFor } from './autoAttach.js';
+import { emberField, emberSteerStep, emberRelaxStep } from './emberDrive.mjs';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
 import { snapPair, snaps } from './groundSnap.js';
@@ -338,6 +339,12 @@ function chroma(hex) {
 export function createCreatureBuilder({ skinning = false } = {}) {
   const ages = []; // frames each pin's creature has been formed
   const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
+  // #1837 — the ember drive's borrowed offsets, per pin (scene px from the pin). Steering state,
+  // so it rides the snapshot like the ages: a take restored mid-drift continues the same drift.
+  const steerX = [];
+  const steerY = [];
+  let fieldFor = null; // the trail grid the cached ember field was derived from (identity-keyed)
+  let fieldCached = null; // the cached ember field — derived state, recomputed, never snapshotted
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
   let wingBeat = null; // #1469 — the last appended frame's wing beat as 0..1 openness; null when no moth was appended
   let frameSkeletons = []; // Phase 2 S1 — the last appended frame's skeletons (world space), per pin; null where unformed
@@ -360,6 +367,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       if (!Array.isArray(pins) || !Array.isArray(formed) || !formed.some(Boolean)) {
         if (ages.length) ages.length = 0;
         if (pair2.length) pair2.length = 0;
+        if (steerX.length) steerX.length = 0;
+        if (steerY.length) steerY.length = 0;
         return;
       }
       let top = null;
@@ -395,6 +404,38 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
       // the dials and ground this layer rests on (null when it rests on none: the moth is exactly as before)
       const ground = typeof groundFor === 'function' ? groundFor(top) : null;
+      // #1837 — the EMBER DRIVE (ACCUM rung 2 slice 2): the trail grid and the look's declared
+      // weight ride the resolver input like every other decision (the loop derives the grid from
+      // the live buffer at cadence and stamps it; a take records both, so a take replays its
+      // steering exactly). The drive is OFF — and any borrowed offset walks home below — when
+      // there is no grid on the input (every take from before this slice; ACCUM off), no weight
+      // is declared, the governor's steering shed is stamped (input.trailSteerShed), the citizen
+      // is pinned still (its anchor holds, #1694 Q1), or reduced motion is on. The ember field
+      // is derived from the grid once per grid and cached on its identity (derived state).
+      const trailGrid =
+        input.trailGrid &&
+        Number.isInteger(input.trailGrid.cols) &&
+        input.trailGrid.cols > 0 &&
+        Number.isInteger(input.trailGrid.rows) &&
+        input.trailGrid.rows > 0 &&
+        input.trailGrid.energy &&
+        input.trailGrid.g &&
+        input.trailGrid.b &&
+        input.trailGrid.age
+          ? input.trailGrid
+          : null;
+      const emberWeight =
+        trailGrid && !input.trailSteerShed ? Math.min(1, Math.max(0, Number(input.trailEmber) || 0)) : 0;
+      const citizenStill = !!(motion && motion.stillAssets && motion.stillAssets.has('creature'));
+      const emberOn = emberWeight > 0 && !citizenStill && !input.reducedMotion;
+      let ember = null;
+      if (emberOn) {
+        if (fieldFor !== trailGrid) {
+          fieldFor = trailGrid;
+          fieldCached = emberField(trailGrid);
+        }
+        ember = fieldCached;
+      }
       // Phase 2 S5 — the room's POSTURE for this frame, from the band the reader settled on. The band rides
       // the resolver input (input.band + input.smoothed, the stress tracker's filtered outputs) like every
       // other decision; no band on the input — every take recorded before S5, every golden — means NO pose,
@@ -416,6 +457,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         ) {
           ages[i] = 0;
           pair2[i] = 0;
+          steerX[i] = 0;
+          steerY[i] = 0;
           frameSkeletons[i] = null;
           framePoses[i] = null;
           continue;
@@ -449,6 +492,33 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: hindAmt, traits });
         // the ground beneath the PIN (its home), so a hovering moth does not change colour with every wobble
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
+        // #1837 — this moth's ember step: with the drive on, the borrowed offset climbs the
+        // ember gradient sampled at the moth's steered position (pin + offset), capped and
+        // leashed by emberDrive; with it off, the offset walks home (emberRelaxStep) and the
+        // moth falls back to today's drives. An offset of exactly 0 with the drive off is
+        // never touched, so a steering-less frame stays bit-identical.
+        let sox = steerX[i] || 0;
+        let soy = steerY[i] || 0;
+        if (ember) {
+          const s = emberSteerStep({
+            grid: trailGrid,
+            field: ember,
+            x: pin.x + sox,
+            y: pin.y + soy,
+            canvasW: input.canvasW,
+            canvasH: input.canvasH,
+            weight: emberWeight,
+            off: { x: sox, y: soy },
+          });
+          sox = s.x;
+          soy = s.y;
+        } else if (sox !== 0 || soy !== 0) {
+          const s = emberRelaxStep({ x: sox, y: soy });
+          sox = s.x;
+          soy = s.y;
+        }
+        steerX[i] = sox;
+        steerY[i] = soy;
         // Phase 2 S1 — this moth's SKELETON, built from the same attach points and the same angles the recipe
         // just used (so the frame provably describes the moth being drawn), placed by the root transform the
         // hierarchy root gets below. Phase 2 S2 — the pose also carries per-joint FLEX derived from the
@@ -471,8 +541,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const foreFlexDeg = -beatG * WARP_FLEX_RATIO;
         const hindFlexDeg = beatG * MOTH.hindFlap * WARP_FLEX_RATIO;
         const rootT = {
-          x: pin.x + hover.dx + gt.dx,
-          y: pin.y + hover.dy + gt.dy,
+          x: pin.x + hover.dx + gt.dx + sox, // #1837: + the ember drive's borrowed offset (0 = today's moth)
+          y: pin.y + hover.dy + gt.dy + soy,
           rotDeg: hover.rot,
           scale: MOTH.bodyScale * traits.body * g * hover.scale,
         };
@@ -514,8 +584,8 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const refSkel = skinning && flexActive ? transformSkeleton(skel, rootT) : null;
         const { items } = expandHierarchy(
           {
-            x: pin.x + hover.dx + gt.dx,
-            y: pin.y + hover.dy + gt.dy,
+            x: pin.x + hover.dx + gt.dx + sox, // #1837: the same borrowed offset the root transform carries
+            y: pin.y + hover.dy + gt.dy + soy,
             rot: hover.rot,
             scaleX: MOTH.bodyScale * traits.body * g * hover.scale,
             scaleY: MOTH.bodyScale * traits.body * g * hover.scale,
@@ -621,12 +691,18 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         });
         if (gf)
           extra.push(
-            ...applyGlitch(mine, { cx: pin.x + hover.dx + gt.dx, cy: pin.y + hover.dy + gt.dy, rotDeg: hover.rot }, gf),
+            ...applyGlitch(
+              mine,
+              { cx: pin.x + hover.dx + gt.dx + sox, cy: pin.y + hover.dy + gt.dy + soy, rotDeg: hover.rot },
+              gf,
+            ),
           );
         else extra.push(...mine);
       }
       ages.length = pins.length;
       pair2.length = pins.length;
+      steerX.length = pins.length;
+      steerY.length = pins.length;
       frameSkeletons.length = pins.length;
       framePoses.length = pins.length;
       // #1469 — publish the wing beat this frame actually used (the global beat above, before the
@@ -639,17 +715,35 @@ export function createCreatureBuilder({ skinning = false } = {}) {
     // #1367 — the builder's accumulative state: per-pin grow-in ages, second-pair
     // growth, and its own frame count. (wingBeat/skeletons/poses are per-frame
     // publications, re-earned by the next append; assetCache is derived.)
+    // #1837 — the ember offsets ride along (steerX/steerY). OPTIONAL keys, in
+    // the resolver snapshot's own convention: a snapshot from before this slice
+    // carries neither, and restores with every moth on its pin.
     snapshotState() {
-      return { ages: [...ages], pair2: [...pair2], frame };
+      return { ages: [...ages], pair2: [...pair2], frame, steerX: [...steerX], steerY: [...steerY] };
     },
     restoreState(s) {
       if (!s || !Array.isArray(s.ages) || !Array.isArray(s.pair2) || !Number.isInteger(s.frame) || s.frame < 0)
         return false;
       if (!s.ages.every(Number.isFinite) || !s.pair2.every(Number.isFinite)) return false;
+      const hasSteer = s.steerX !== undefined || s.steerY !== undefined;
+      if (
+        hasSteer &&
+        (!Array.isArray(s.steerX) ||
+          !Array.isArray(s.steerY) ||
+          !s.steerX.every(Number.isFinite) ||
+          !s.steerY.every(Number.isFinite))
+      )
+        return false;
       ages.length = 0;
       ages.push(...s.ages);
       pair2.length = 0;
       pair2.push(...s.pair2);
+      steerX.length = 0;
+      steerY.length = 0;
+      if (hasSteer) {
+        steerX.push(...s.steerX);
+        steerY.push(...s.steerY);
+      }
       frame = s.frame;
       return true;
     },
@@ -669,6 +763,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
     dispose() {
       ages.length = 0;
       pair2.length = 0;
+      steerX.length = 0;
+      steerY.length = 0;
+      fieldFor = null;
+      fieldCached = null;
       assetCache.clear();
       wingBeat = null;
       frameSkeletons = [];

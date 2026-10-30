@@ -329,6 +329,7 @@ node src/curator/spawn.selfcheck.mjs
 node src/curator/spawnState.selfcheck.mjs
 node src/engine/assetAttach.selfcheck.mjs
 node src/engine/creature.selfcheck.mjs
+node src/engine/emberDrive.selfcheck.mjs
 node src/engine/dishCreature.selfcheck.mjs
 node src/engine/creatureGenome.selfcheck.mjs
 node src/engine/creatureChem.selfcheck.mjs

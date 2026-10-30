@@ -49,6 +49,19 @@
 //          as it was. Ahead of cut 3 by design: the subset degrades to
 //          the composite path BEFORE ACCUM itself sheds (the issue's
 //          cost paragraph).
+//   cut 1.48: ember steering (#1837, ACCUM rung 2 slice 2) — the moths'
+//          trail-following drive sheds after the selective feed (cut 1.47,
+//          its ACCUM family) and BEFORE the creature count: the population
+//          stays on stage whole, it just stops grazing the light — the
+//          grid freezes, the borrowed offsets walk home, and the moths
+//          fall back to today's drives (the issue's own shed law: steering
+//          sheds before the buffer itself, cut 3). One boolean step off
+//          the trailSteerShed overlay — the look's declared weight never
+//          moves — restoring whole when pressure clears. Fires only when
+//          the caller says steering is live (trailSteerActive: a look
+//          declaring an ember weight is up, creatures may exist, ACCUM is
+//          on, and the rung is not already shed), so older callers and
+//          their pinned ladder walks see the ladder exactly as it was.
 //   cut 1.5: creature count (#1694 slice 2, Matt's ruling Q2) — the population
 //          sheds FIRST among content cuts, before the quality tier and every
 //          finish below it; only edge AA and the pixel trim precede it, and
@@ -157,6 +170,14 @@ export const GOVERNOR_RESTORE_CUTS = [
     // finer sacrifices come back later.
     needsRestore: (s, ctx) => ctx.healthy && !!s.accumFeedShed,
     restoredLabel: 'selective feed back — chosen strata only',
+  },
+  {
+    kind: 'trailSteer',
+    // #1837 — cut 1.48: ember steering restores after the selective feed
+    // in the reverse walk (it shed after it, before the population): the
+    // moths graze the cooling light again.
+    needsRestore: (s, ctx) => ctx.healthy && !!s.trailSteerShed,
+    restoredLabel: 'ember steering back — moths graze the light again',
   },
   {
     kind: 'creatureCount',
@@ -293,6 +314,20 @@ export function nextGovernorCut(s) {
     return { kind: 'accumFeed', accumFeedShed: true, label: 'SELECTIVE FEED OFF — all strata trail' };
   }
 
+  // Cut 1.48 (#1837): ember steering. After the selective feed (cut 1.47
+  // stands — the ACCUM family sheds together) and ahead of the creature
+  // count: holding the drive costs the picture nothing but the grazing —
+  // the moths stay, whole and hovering, on today's drives — and it buys
+  // back the grid's readback + derivation at cadence. Ahead of cut 3 by
+  // design: steering degrades BEFORE the buffer it reads is stood down
+  // (the issue's shed law). Opt-in per caller (`trailSteerActive ===
+  // true` = a declaring look is up with creatures and ACCUM live, not
+  // already shed) so older callers and their pinned ladder walks keep
+  // the pre-#1837 ladder exactly as it was.
+  if (s.trailSteerActive === true && !s.trailSteerShed) {
+    return { kind: 'trailSteer', trailSteerShed: true, label: 'EMBER STEERING HELD — moths keep to their pins' };
+  }
+
   // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
   // sheds FIRST among content cuts — population before finishes. One
   // creature per step, off the creatureShed overlay; the artist's count is
@@ -367,6 +402,9 @@ export function shedSummary(s) {
   // #1806 slice 2 — and about an accum-feed shed: the buffer eats every
   // stratum again, the badge says so.
   if (s.accumFeedShed) out.push('accum feed — all strata');
+  // #1837 — and about an ember-steering shed: the moths keep to their
+  // pins on today's drives, the badge says so (the show block's report).
+  if (s.trailSteerShed) out.push('ember steering held');
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);
