@@ -27,6 +27,17 @@ const state = (page) =>
   });
 const patternOf = async (page) => (await state(page)).layers.find((l) => l.type === 'pattern')?.pattern;
 
+// #1608 — the pattern params are mode rows: an exact value is set the
+// panel's one way (D2) — tap the row's readout to open the value dock,
+// then drive the dock's slider (percent space, as the bare sliders were).
+// Escape first: the open dock overlays the panel's right edge, where the
+// next row's readout sits.
+const setExact = async (page, name, value) => {
+  await page.keyboard.press('Escape');
+  await page.getByRole('button', { name }).click();
+  await page.locator('.te-dock.open input[type=range]').fill(value);
+};
+
 test('+ pattern adds a PT-1 track, opens its editor, and leaves the KC track active', async ({ page }) => {
   await boot(page);
   const before = await state(page);
@@ -51,11 +62,11 @@ test('mode tiles, density, mix, drift and SHUFFLE write through to the track', a
   await expect.poll(async () => (await patternOf(page)).mode).toBe('GLYPH');
   expect((await patternOf(page)).density, 'an untouched density follows the mode').toBe(4);
   await ed.getByRole('tab', { name: /quilt/i }).click();
-  await ed.getByRole('slider', { name: 'Pattern density' }).fill('10');
+  await setExact(page, 'Pattern density', '10');
   await expect.poll(async () => (await patternOf(page)).density).toBe(10);
-  await ed.getByRole('slider', { name: 'Pattern drift' }).fill('40');
+  await setExact(page, 'Pattern drift', '40');
   await expect.poll(async () => (await patternOf(page)).drift).toBeCloseTo(0.4, 2);
-  await ed.getByRole('slider', { name: 'Pattern mix' }).fill('20');
+  await setExact(page, 'Pattern mix', '20');
   await expect.poll(async () => (await patternOf(page)).mix).toBeCloseTo(0.2, 2);
   const seed0 = (await patternOf(page)).seed;
   await expect(ed.locator('.pattern-seed')).toContainText(`seed ${seed0.toString(16)}`);
@@ -65,42 +76,54 @@ test('mode tiles, density, mix, drift and SHUFFLE write through to the track', a
   await expect(ed.locator('.pattern-seed')).toContainText(`seed ${seed1.toString(16)}`);
 });
 
-test('honest UI: grout and hero are disabled outside QUILT, with the reason, and a disabled slider cannot move the value', async ({
+test('honest UI: grout and hero are disabled outside QUILT, with the reason, and a disabled row cannot move the value', async ({
   page,
 }) => {
   await boot(page);
   await addPattern(page);
   const ed = page.locator('.pattern-editor');
-  await expect(ed.getByRole('slider', { name: 'Pattern grout' })).toBeEnabled();
+  // #1608 — the row's readout button carries the name, the disabled state
+  // and the reason now (the slider lives in the value dock).
+  await expect(ed.getByRole('button', { name: 'Pattern grout' })).toBeEnabled();
   await ed.getByRole('tab', { name: /field/i }).click();
   for (const name of ['Pattern grout', 'Pattern hero']) {
-    const s = ed.getByRole('slider', { name });
+    const s = ed.getByRole('button', { name });
     await expect(s).toBeDisabled();
-    await expect(s).toHaveAttribute('title', /Quilt only — only QUILT has/); // the reason rides the slider itself
+    await expect(s).toHaveAttribute('title', /Quilt only — only QUILT has/); // the reason rides the row itself
   }
-  await expect(ed.locator('.fx-param').filter({ hasText: 'grout' }).locator('.fx-param-readout')).toHaveText('—');
+  await expect(ed.locator('.fx-param').filter({ hasText: 'grout' }).locator('.te-block-readout')).toHaveText('—');
   const g = (await patternOf(page)).grout;
+  // Force a mode tap through the DOM: the disabled row's guard refuses it.
   await ed
-    .getByRole('slider', { name: 'Pattern grout' })
-    .evaluate((el) => el.dispatchEvent(new Event('input', { bubbles: true })));
+    .locator('.fx-param')
+    .filter({ hasText: 'grout' })
+    .locator('.te-cell')
+    .nth(3)
+    .evaluate((el) => el.click());
   expect((await patternOf(page)).grout).toBe(g);
   await ed.getByRole('tab', { name: /quilt/i }).click();
-  await expect(ed.getByRole('slider', { name: 'Pattern hero' })).toBeEnabled();
+  await expect(ed.getByRole('button', { name: 'Pattern hero' })).toBeEnabled();
 });
 
-test('44px rows, tabs, buttons and sliders; removing the track closes the editor and keeps the KC track', async ({
+test('target sizes hold (buttons 44px, detent cells at the mode-row size); removing the track closes the editor and keeps the KC track', async ({
   page,
 }) => {
   await boot(page);
   await addPattern(page);
   const ed = page.locator('.pattern-editor');
+  // #1608 — the editor's continuous controls are detent rows: the buttons
+  // keep the 44px law, the mode cells + readouts keep the detent form's
+  // shipped 30px (DS §2 detent amendment; the 44px law is RangeRow's).
   const heights = await ed
-    .locator('.chip-btn, .big-btn, input[type=range]')
+    .locator('.chip-btn, .big-btn, .te-cell, .te-block-readout')
     .evaluateAll((els) =>
       els.map((e) => ({ t: e.className || e.type, h: Math.round(e.getBoundingClientRect().height) })),
     );
   expect(heights.length).toBeGreaterThanOrEqual(9);
-  for (const h of heights) expect(h.h, `${h.t} is a 44px target`).toBeGreaterThanOrEqual(43);
+  for (const h of heights) {
+    const min = /te-cell|te-block-readout/.test(h.t) ? 29 : 43;
+    expect(h.h, `${h.t} is a ${min}px target`).toBeGreaterThanOrEqual(min);
+  }
   const kcCount = (await state(page)).layers.filter(
     (l) => l.type !== 'pattern' && l.type !== 'fx' && l.type !== 'math',
   ).length;

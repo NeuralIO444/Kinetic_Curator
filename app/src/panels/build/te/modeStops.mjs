@@ -51,3 +51,39 @@ export function modeStateFor(stops, value) {
   });
   return { index, id: MODE_IDS[index], exact };
 }
+
+/**
+ * #1608 (Phase 2) — the bipolar half of the math (Phase 0 paper, stop-table
+ * law rule 6). A bipolar row's stops are UNSIGNED magnitudes [0, low, mid,
+ * high]; the value's sign rides separately (the row's sign cell). Returns
+ * { sign, index, id, exact }: the value's sign (−1 / 0 / +1 — 0 at exactly
+ * zero, where OFF is true 0 and carries no sign), the nearest magnitude's
+ * mode (ties to the lower mode, as above), and whether |value| IS that
+ * magnitude. Null under the same conditions as modeStateFor.
+ */
+export function bipolarStateFor(stops, value) {
+  if (!stops || !Number.isFinite(value)) return null;
+  const mag = Math.abs(value);
+  let index = 0;
+  let best = Infinity;
+  let exact = false;
+  stops.forEach((stop, i) => {
+    const d = Math.abs(stop - mag);
+    if (d <= EPS) exact = true;
+    if (d < best - EPS) {
+      best = d;
+      index = i;
+    }
+  });
+  return { sign: value < 0 ? -1 : value > 0 ? 1 : 0, index, id: MODE_IDS[index], exact };
+}
+
+/**
+ * The value a magnitude tap writes on a bipolar row: the stop under the
+ * row's current sign. OFF (index 0) is true 0 under either sign — never −0.
+ */
+export function bipolarValueFor(stops, sign, index) {
+  const stop = stops ? stops[index] : NaN;
+  if (!Number.isFinite(stop) || stop === 0) return 0;
+  return (sign < 0 ? -1 : 1) * stop;
+}

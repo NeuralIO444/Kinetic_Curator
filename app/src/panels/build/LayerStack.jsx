@@ -52,7 +52,10 @@ import {
   writePatchOneLinerSeen,
 } from './patchOneLiner.mjs';
 import { strataSummary, trimNum } from './strataSummary.mjs';
-import { RangeRow } from '../../components/RangeRow.jsx';
+import { ModeRow } from './te/ModeRow.jsx';
+import { SliderEditor } from './te/editors.jsx';
+import { stopsFor } from './te/modeStops.mjs';
+import { wetStopsForCap, PATCH_STRENGTH_STOPS, fxStopsFor } from './blockStops.mjs';
 import { ASSETS } from '../../data/assets/index.js';
 import { defaultTransportForCast, nextTransportMode, transportChipLabel } from '../../engine/kineme.js'; // #1575 — the travel mode chip's pure helpers
 
@@ -185,26 +188,40 @@ function FxEffectEditor({ layer, fxOrdinal }) {
           kind={filled.kind}
           onBypass={() => emit(Events.FX_EFFECT_REMOVE, { layerId: layer.id, index: filledIdx })}
         >
-          {Object.entries(def.params).map(([key, p]) => (
-            <div className="fx-param" key={key}>
-              <label title={p.hint}>{p.label}</label>
-              <RangeRow
-                layout="bare"
-                tone="build"
-                min={p.min}
-                max={p.max}
-                step={p.step}
-                value={filled.params?.[key] ?? p.def}
-                onReset={() =>
-                  emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: p.def })
-                }
-                onChange={(v) =>
-                  emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: v })
-                }
-              />
-              <span className="fx-param-readout">{filled.params?.[key] ?? p.def}</span>
-            </div>
-          ))}
+          {Object.entries(def.params).map(([key, p]) => {
+            const v = filled.params?.[key] ?? p.def;
+            const entry = fxStopsFor(filled.kind, key);
+            const setFxParam = (nv) =>
+              emit(Events.FX_EFFECT_SET_PARAM, { layerId: layer.id, index: filledIdx, key, value: nv });
+            return (
+              <div className="fx-param" key={key}>
+                {/* #1608 — the param's slider is a mode row (blockStops table);
+                    the exact editor in the dock carries the double-click
+                    reset the bare slider's onReset used to serve (D2). */}
+                <ModeRow
+                  variant="block"
+                  label={p.label}
+                  title={p.hint}
+                  display={trimNum(v)}
+                  value={v}
+                  stops={entry ? entry.stops : null}
+                  bipolar={!!entry?.bipolar}
+                  onSelect={setFxParam}
+                  onOpen={() => (
+                    <SliderEditor
+                      ariaLabel={p.label}
+                      value={v}
+                      min={p.min}
+                      max={p.max}
+                      step={p.step}
+                      defaultValue={p.def}
+                      onChange={setFxParam}
+                    />
+                  )}
+                />
+              </div>
+            );
+          })}
           {/* An effect with almost nothing to set says so plainly, never a void. */}
           {paramCount <= 1 && <div className="fx-note">{paramCount === 0 ? 'no controls' : 'no other controls'}</div>}
         </EfTile>
@@ -433,6 +450,33 @@ export function LayerStack() {
   // every other param control — which is also what makes the honest feed
   // record them as the artist's hand, never the system's.
   const setParam = (key, value) => emit(Events.LAYOUT_PARAM, { key, value });
+  // #1608 — the DISH knobs are mode rows: their stops live in PARAM_STOPS
+  // (they are layout params; only their rows live in the blocks), and the
+  // dock editor carries the double-click reset the bare sliders' onReset
+  // used to serve (D2).
+  const dishRow = (label, key, value, max, step, hint) => (
+    <ModeRow
+      variant="block"
+      label={label}
+      title={hint}
+      display={trimNum(value)}
+      value={value}
+      stops={stopsFor(key)}
+      onSelect={(v) => setParam(key, v)}
+      onOpen={() => (
+        <SliderEditor
+          ariaLabel={`Dish ${label}`}
+          value={value}
+          min={0}
+          max={max}
+          step={step}
+          format={trimNum}
+          defaultValue={DEFAULT_LAYOUT_PARAMS[key]}
+          onChange={(v) => setParam(key, v)}
+        />
+      )}
+    />
+  );
   const dishOn = layoutParams?.dish !== false;
   const dishRadius = layoutParams?.contactRadius || 0;
   const dishRestitution = layoutParams?.contactRestitution ?? 0.5;
@@ -592,6 +636,34 @@ export function LayerStack() {
     const summary = expanded
       ? ''
       : strataSummary(layer, fine, wetPct, !adj && !pat ? { on: dishOn, armed: dishRadius > 0 } : undefined);
+    // #1608 — PATCH strength is a mode row in all three modes (one authored
+    // table, PATCH_STRENGTH_STOPS); the row gains the exact readout the
+    // bare slider never showed (display honesty, Phase 0 paper).
+    const patchStrengthRow = (mode, hintKey) => (
+      <ModeRow
+        variant="block"
+        labelHidden
+        label="PATCH strength"
+        ariaLabel="PATCH strength"
+        title={helpText(hintKey)}
+        display={trimNum(patch.strength ?? 0.16)}
+        value={patch.strength ?? 0.16}
+        stops={PATCH_STRENGTH_STOPS}
+        onSelect={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode, to, strength: v } })}
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="PATCH strength"
+            value={patch.strength ?? 0.16}
+            min={0}
+            max={1}
+            step={0.01}
+            format={trimNum}
+            defaultValue={0.16}
+            onChange={(v) => emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode, to, strength: v } })}
+          />
+        )}
+      />
+    );
     const selectIt = () =>
       pat
         ? emit(Events.PATTERN_SELECT, { id: layer.id })
@@ -831,19 +903,39 @@ export function LayerStack() {
                 </button>
               )}
               {adj && <span className="wet-label lbl">wet</span>}
-              <RangeRow
-                layout="bare"
-                tone="build"
-                min={0}
-                max={wet.cap}
-                step={0.01}
+              {/* #1608 — WET is a mode row: stops authored for the full 0..1
+                  range, scaled by the track's wet ceiling exactly as the
+                  slider's max was (wetStopsForCap). The readout keeps its
+                  .layer-opacity-readout address and its % truth; tapping it
+                  opens the exact editor in the dock (D2). */}
+              <ModeRow
+                variant="block"
+                labelHidden
+                label="Wet"
+                ariaLabel={`Wet — ${wetPct}%`}
+                title={
+                  math
+                    ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.'
+                    : 'Wet/dry — how much of this stratum shows'
+                }
+                display={`${wetPct}%${wet.capped ? ' max' : ''}`}
+                readoutClassName={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}
                 value={wet.wet}
-                hint={math ? 'Wet/dry — how much of the grade shows. HUE ROTATE caps this track at 50%.' : undefined}
-                onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })}
+                stops={wetStopsForCap(wet.cap)}
+                onSelect={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })}
+                onOpen={() => (
+                  <SliderEditor
+                    ariaLabel="Wet"
+                    value={wet.wet}
+                    min={0}
+                    max={wet.cap}
+                    step={0.01}
+                    format={(v) => `${Math.round(v * 100)}%`}
+                    defaultValue={1}
+                    onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })}
+                  />
+                )}
               />
-              <span className={`layer-opacity-readout${wet.capped ? ' capped' : ''}`}>
-                {wetPct}%{wet.capped ? ' max' : ''}
-              </span>
             </div>
             {!adj && !pat && (
               <>
@@ -892,48 +984,9 @@ export function LayerStack() {
                       </option>
                     ))}
                   </select>
-                  {patch.mode === 'feed' && (
-                    <RangeRow
-                      layout="bare"
-                      tone="build"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={patch.strength ?? 0.16}
-                      hint={helpText('layers-patch-feed')}
-                      onChange={(v) =>
-                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'feed', to, strength: v } })
-                      }
-                    />
-                  )}
-                  {patch.mode === 'mod' && (
-                    <RangeRow
-                      layout="bare"
-                      tone="build"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={patch.strength ?? 0.16}
-                      hint={helpText('layers-patch-mod')}
-                      onChange={(v) =>
-                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'mod', to, strength: v } })
-                      }
-                    />
-                  )}
-                  {patch.mode === 'field' && (
-                    <RangeRow
-                      layout="bare"
-                      tone="build"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={patch.strength ?? 0.16}
-                      hint={helpText('layers-patch-field')}
-                      onChange={(v) =>
-                        emit(Events.LAYER_PATCH, { id: layer.id, patch: { mode: 'field', to, strength: v } })
-                      }
-                    />
-                  )}
+                  {patch.mode === 'feed' && patchStrengthRow('feed', 'layers-patch-feed')}
+                  {patch.mode === 'mod' && patchStrengthRow('mod', 'layers-patch-mod')}
+                  {patch.mode === 'field' && patchStrengthRow('field', 'layers-patch-field')}
                 </div>
                 {/* #1019 — one plain-language PATCH line for newcomers, shown once
                   (first time a second KC track exists), under the first KC
@@ -980,46 +1033,29 @@ export function LayerStack() {
                     <option value="on">ON</option>
                     <option value="off">OFF</option>
                   </select>
-                  {dishOn && (
-                    <>
-                      <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
-                        bounce
-                      </span>
-                      <RangeRow
-                        layout="bare"
-                        tone="build"
-                        min={0}
-                        max={1}
-                        step={0.01}
-                        value={dishRestitution}
-                        hint="BOUNCE — contact restitution across strata: 0 sticks, 1 is fully elastic"
-                        onReset={() => setParam('contactRestitution', 0.5)}
-                        onChange={(v) => setParam('contactRestitution', v)}
-                      />
-                      <span className="fx-param-readout">{trimNum(dishRestitution)}</span>
-                    </>
-                  )}
+                  {dishOn &&
+                    dishRow(
+                      'bounce',
+                      'contactRestitution',
+                      dishRestitution,
+                      1,
+                      0.01,
+                      'BOUNCE — contact restitution across strata: 0 sticks, 1 is fully elastic',
+                    )}
                 </div>
                 {dishOn && (
                   <div
                     className="strata-composite"
                     title="REPEL — personal-space force: same-group neighbours push apart before they touch"
                   >
-                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
-                      repel
-                    </span>
-                    <RangeRow
-                      layout="bare"
-                      tone="build"
-                      min={0}
-                      max={5}
-                      step={0.05}
-                      value={dishRepel}
-                      hint="REPEL — personal-space force gain vs same-group neighbours"
-                      onReset={() => setParam('contactRepel', 0)}
-                      onChange={(v) => setParam('contactRepel', v)}
-                    />
-                    <span className="fx-param-readout">{trimNum(dishRepel)}</span>
+                    {dishRow(
+                      'repel',
+                      'contactRepel',
+                      dishRepel,
+                      5,
+                      0.05,
+                      'REPEL — personal-space force gain vs same-group neighbours',
+                    )}
                   </div>
                 )}
                 {dishOn && (
@@ -1027,21 +1063,14 @@ export function LayerStack() {
                     className="strata-composite"
                     title="TEMPO — the dish's thermal energy (petri spec §4): Brownian jitter on every body in the dish. Hot never settles; 0 is the cold dish, exactly as before. DENSITY (the Layout %) is the dish's crowding pressure on REPEL."
                   >
-                    <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
-                      tempo
-                    </span>
-                    <RangeRow
-                      layout="bare"
-                      tone="build"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={dishTempo}
-                      hint="TEMPO — thermal energy: Brownian jitter amplitude in the dish"
-                      onReset={() => setParam('dishTempo', 0)}
-                      onChange={(v) => setParam('dishTempo', v)}
-                    />
-                    <span className="fx-param-readout">{trimNum(dishTempo)}</span>
+                    {dishRow(
+                      'tempo',
+                      'dishTempo',
+                      dishTempo,
+                      1,
+                      0.01,
+                      'TEMPO — thermal energy: Brownian jitter amplitude in the dish',
+                    )}
                   </div>
                 )}
                 {dishOn && dishRadius === 0 && (

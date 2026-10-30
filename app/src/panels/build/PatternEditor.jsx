@@ -1,5 +1,4 @@
 import { useSyncExternalStore } from 'react';
-import { RangeRow } from '../../components/RangeRow.jsx';
 import { useStore } from '../../state/store.js';
 import {
   PATTERN_MODES,
@@ -8,16 +7,25 @@ import {
   PATTERN_KINS,
   PATTERN_FIELD_LIKE,
   sanitizePattern,
+  defaultPattern,
 } from '../../state/patternTrack.js';
 import { QUILT_MAX_GROUT } from '../../pattern/engine.js';
 import { requestPatternShuffle, subscribePending, pendingSnapshot } from '../../state/patternShuffle.js';
 import { barMs } from '../../pattern/shuffleGate.js';
 import { emit, Events } from '../../composition/eventBus.js';
+import { ModeRow } from './te/ModeRow.jsx';
+import { SliderEditor } from './te/editors.jsx';
+import { patternStopsFor } from './blockStops.mjs';
 
 // The PATTERN track's editor (#1099). It opens under the row like the FX editor, and every control
 // writes through the slice (which sanitizes). Controls a mode ignores are DISABLED with the reason,
 // never hidden and never live: the UI cannot show what the renderer does not read.
 // DROP gates SHUFFLE to the bar (state/patternShuffle.js). It never touches DRIFT.
+// #1608 (Strata Q Phase 2) — the six continuous params are mode rows now
+// (blockStops.mjs PATTERN_STOPS; the shipped per-mode defaults are stops).
+// Their exact editors live in the value dock, work in the editor's percent
+// space exactly as the bare sliders did, and store fractions — percent in
+// the UI, fractions in the store, as before.
 const MODE_HINT = {
   QUILT: 'Dense tessellation: grout, 2×2 hero tiles, the full palette.',
   GLYPH: 'A poster: one bold mark per tile on a letterboxed 5:4 grid.',
@@ -51,6 +59,45 @@ export function PatternEditor({ layer, ordinal }) {
   const quilt = p.mode === 'QUILT';
   const fieldLike = PATTERN_FIELD_LIKE.includes(p.mode); // FIELD and TIDES have no separate elements to move
   const id = layer.id;
+  const defaults = defaultPattern(p.mode);
+  // A percent-space param (mix / grout / hero / drift / movers): the mode
+  // row speaks stored fractions; its dock editor speaks percents, with the
+  // mode's shipped default as the double-click reset target (D2).
+  const pctRow = (
+    key,
+    label,
+    hint,
+    ariaLabel,
+    { disabled, disabledLabel, disabledReason, display, step = 1, max = 100, format } = {},
+  ) => (
+    <div className="fx-param">
+      <ModeRow
+        variant="block"
+        label={label}
+        title={hint}
+        display={display ?? `${pct(p[key])}%`}
+        value={p[key]}
+        stops={patternStopsFor(key)?.stops ?? null}
+        ariaLabel={ariaLabel}
+        disabled={disabled}
+        disabledLabel={disabledLabel}
+        disabledReason={disabledReason}
+        onSelect={(v) => setParam(id, key, v)}
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel={ariaLabel}
+            value={pct(p[key])}
+            min={0}
+            max={max}
+            step={step}
+            format={format ?? ((v) => `${Math.round(v)}%`)}
+            defaultValue={pct(defaults[key])}
+            onChange={(v) => setParam(id, key, v / 100)}
+          />
+        )}
+      />
+    </div>
+  );
   return (
     <div className="fx-editor pattern-editor" title={`PT-${ordinal} · ${p.mode}`}>
       <div className="pattern-modes" role="tablist" aria-label="Pattern mode">
@@ -68,88 +115,62 @@ export function PatternEditor({ layer, ordinal }) {
           </button>
         ))}
       </div>
-      <Param label="density" hint="Tiles across. GLYPH grows both axes and keeps 5:4." readout={p.density}>
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={PATTERN_DENSITY_MIN}
-          max={PATTERN_DENSITY_MAX}
-          step={1}
+      <div className="fx-param">
+        <ModeRow
+          variant="block"
+          label="density"
+          title="Tiles across. GLYPH grows both axes and keeps 5:4."
+          display={p.density}
           value={p.density}
+          stops={patternStopsFor('density')?.stops ?? null}
           ariaLabel="Pattern density"
-          onChange={(v) => setParam(id, 'density', v)}
+          onSelect={(v) => setParam(id, 'density', v)}
+          onOpen={() => (
+            <SliderEditor
+              ariaLabel="Pattern density"
+              value={p.density}
+              min={PATTERN_DENSITY_MIN}
+              max={PATTERN_DENSITY_MAX}
+              step={1}
+              defaultValue={defaults.density}
+              onChange={(v) => setParam(id, 'density', v)}
+            />
+          )}
         />
-      </Param>
-      <Param
-        label="mix"
-        hint="Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle."
-        readout={`${pct(p.mix)}%`}
-      >
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={0}
-          max={100}
-          step={1}
-          value={pct(p.mix)}
-          ariaLabel="Pattern mix"
-          onChange={(v) => setParam(id, 'mix', v / 100)}
-        />
-      </Param>
-      <Param
-        label="grout"
-        hint="The dark seam between tiles, as a fraction of a tile."
-        readout={quilt ? `${(p.grout * 100).toFixed(1)}%` : '—'}
-      >
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={0}
-          max={QUILT_MAX_GROUT * 100}
-          step={0.5}
-          value={p.grout * 100}
-          ariaLabel="Pattern grout"
-          disabled={!quilt}
-          disabledLabel="Quilt only"
-          disabledReason="only QUILT has grout"
-          onChange={(v) => setParam(id, 'grout', v / 100)}
-        />
-      </Param>
-      <Param
-        label="hero"
-        hint="How often a 2×2 hero tile (cube, medallion) is placed, capped and never touching."
-        readout={quilt ? `${pct(p.hero)}%` : '—'}
-      >
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={0}
-          max={100}
-          step={1}
-          value={pct(p.hero)}
-          ariaLabel="Pattern hero"
-          disabled={!quilt}
-          disabledLabel="Quilt only"
-          disabledReason="only QUILT has hero tiles"
-          onChange={(v) => setParam(id, 'hero', v / 100)}
-        />
-      </Param>
-      <Param
-        label="drift"
-        hint="Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid. Zero holds still."
-        readout={`${pct(p.drift)}%`}
-      >
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={0}
-          max={100}
-          step={1}
-          value={pct(p.drift)}
-          ariaLabel="Pattern drift"
-          onChange={(v) => setParam(id, 'drift', v / 100)}
-        />
-      </Param>
+      </div>
+      {pctRow(
+        'mix',
+        'mix',
+        "Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle.",
+        'Pattern mix',
+      )}
+      {pctRow('grout', 'grout', 'The dark seam between tiles, as a fraction of a tile.', 'Pattern grout', {
+        disabled: !quilt,
+        disabledLabel: 'Quilt only',
+        disabledReason: 'only QUILT has grout',
+        display: quilt ? `${(p.grout * 100).toFixed(1)}%` : '—',
+        step: 0.5,
+        max: QUILT_MAX_GROUT * 100,
+        format: (v) => `${v.toFixed(1)}%`,
+      })}
+      {pctRow(
+        'hero',
+        'hero',
+        'How often a 2×2 hero tile (cube, medallion) is placed, capped and never touching.',
+        'Pattern hero',
+        {
+          disabled: !quilt,
+          disabledLabel: 'Quilt only',
+          disabledReason: 'only QUILT has hero tiles',
+          display: quilt ? `${pct(p.hero)}%` : '—',
+        },
+      )}
+      {pctRow(
+        'drift',
+        'drift',
+        'Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid. Zero holds still.',
+        'Pattern drift',
+      )}
       <Param label="motion" hint={KIN_HINT} readout={fieldLike ? '—' : p.kin}>
         <select
           className="blend-mode-select"
@@ -166,25 +187,18 @@ export function PatternEditor({ layer, ordinal }) {
           ))}
         </select>
       </Param>
-      <Param
-        label="movers"
-        hint="How many of the elements move. A few is a composition with accents; all of them is wallpaper."
-        readout={fieldLike || p.kin === 'OFF' ? '—' : `${pct(p.movers)}%`}
-      >
-        <RangeRow
-          layout="bare"
-          tone="build"
-          min={0}
-          max={100}
-          step={1}
-          value={pct(p.movers)}
-          ariaLabel="Pattern movers"
-          disabled={fieldLike || p.kin === 'OFF'}
-          disabledLabel="No element motion"
-          disabledReason={fieldLike ? `${p.mode} has no separate elements` : 'motion is off'}
-          onChange={(v) => setParam(id, 'movers', v / 100)}
-        />
-      </Param>
+      {pctRow(
+        'movers',
+        'movers',
+        'How many of the elements move. A few is a composition with accents; all of them is wallpaper.',
+        'Pattern movers',
+        {
+          disabled: fieldLike || p.kin === 'OFF',
+          disabledLabel: 'No element motion',
+          disabledReason: fieldLike ? `${p.mode} has no separate elements` : 'motion is off',
+          display: fieldLike || p.kin === 'OFF' ? '—' : `${pct(p.movers)}%`,
+        },
+      )}
       <div className="pattern-seed">
         <button
           type="button"

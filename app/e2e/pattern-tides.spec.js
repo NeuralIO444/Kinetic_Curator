@@ -29,10 +29,13 @@ test('TIDES: the mode tile writes through, opens at density 10, and element moti
   await expect.poll(async () => (await patternOf(page)).mode).toBe('TIDES');
   expect((await patternOf(page)).density, 'an untouched density follows the mode').toBe(10);
   await expect(ed.getByRole('combobox', { name: 'Element motion' })).toBeDisabled();
-  const movers = ed.getByRole('slider', { name: 'Pattern movers' });
+  // #1608 — the params are mode rows: the readout button carries the name,
+  // the disabled state and the reason (the slider lives in the value dock).
+  const movers = ed.getByRole('button', { name: 'Pattern movers' });
   await expect(movers).toBeDisabled();
   await expect(movers).toHaveAttribute('title', /TIDES has no separate elements/);
-  await ed.getByRole('slider', { name: 'Pattern drift' }).fill('60');
+  await page.getByRole('button', { name: 'Pattern drift' }).click();
+  await page.locator('.te-dock.open input[type=range]').fill('60');
   await expect.poll(async () => (await patternOf(page)).drift).toBeCloseTo(0.6, 2);
   // for the review picture: hide the KC marks so the ground reads on its own, and show the mode tiles
   await page.evaluate(() => {

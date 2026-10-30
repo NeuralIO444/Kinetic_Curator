@@ -10,9 +10,11 @@
 // Mode-gated per #272; locks ride on the button. CREATURES itself is not
 // mode-gated: the stepper never was — a count set in any mode is the count
 // the dish gets.
-// #716 — wind/breath/flap keep the MotionTile glyph (the tile visualizes
-// the value); the rest are mode rows (#1607, Strata Q Phase 1).
-import { MotionTile } from '../../components/MotionTile.jsx';
+// #716 — wind/breath/flap wore the MotionTile glyph (the tile visualized
+// the value) through Phase 1; #1608 (Strata Q Phase 2) converts them to
+// mode rows like every neighbour: the Phase 0 exemptions list is closed
+// and never named the tiles, and D1's scope covers them. The MotionTile
+// survives in STIMULI (life), outside the amendment's BUILD scope.
 import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ModeRow } from '../build/te/ModeRow.jsx';
@@ -33,8 +35,7 @@ export function HypeSliders({ layoutParams, lockedParams }) {
   const radial = /^(?:radial|kaleido)-\d+$/.test(layoutParams.symmetry ?? 'none');
 
   // #1607 — the family's value buttons are mode rows now (detents under the
-  // exact readout); the MotionTiles below keep their glyph form — their
-  // disposition is not Phase 1's (see the stop-table law's phasing).
+  // exact readout); #1608 — the motion keys join them (see the header).
   const btn = (label, key, display, editor, { disabled, disabledReason } = {}) => (
     <ModeRow
       label={label}
@@ -86,20 +87,33 @@ export function HypeSliders({ layoutParams, lockedParams }) {
           />,
           { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
         )}
-        {/* #716 — the motion keys wear the tile (glyph visualizes the value). */}
-        <MotionTile
-          kind="flap"
-          label="flap"
-          value={layoutParams.flap ?? 0.35}
-          min={0}
-          max={1}
-          step={0.05}
-          hint="Wing beat amplitude on bilateral wings and radial fans"
-          disabled={!(isHype && (bilateral || radial))}
-          disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
-          onChange={(v) => set('flap', v)}
+        {/* #716's tile is a mode row since #1608 — same param, same gating.
+            Written longhand, not via btn(): the gate reason is long enough
+            that prettier wraps an object property, and unlockTree's reason
+            census reads these strings per line (a JSX attribute is never
+            wrapped). */}
+        <ModeRow
+          label="FLAP"
+          display={fmt2(layoutParams.flap ?? 0.35)}
+          value={layoutParams.flap ?? DEFAULT_LAYOUT_PARAMS.flap}
+          stops={stopsFor('flap')}
+          onSelect={(v) => set('flap', v)}
           locked={lockedParams.flap}
           onToggleLock={() => lock('flap')}
+          disabled={!(isHype && (bilateral || radial))}
+          disabledReason="Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)"
+          onOpen={() => (
+            <SliderEditor
+              ariaLabel="Flap"
+              value={layoutParams.flap ?? 0.35}
+              min={0}
+              max={1}
+              step={0.05}
+              format={fmt2}
+              defaultValue={DEFAULT_LAYOUT_PARAMS.flap}
+              onChange={(v) => set('flap', v)}
+            />
+          )}
         />
         {btn(
           'TIGHT',
@@ -117,34 +131,38 @@ export function HypeSliders({ layoutParams, lockedParams }) {
           />,
           { disabled: !isHype, disabledReason: 'Moth bodies only (hype mode)' },
         )}
-        <MotionTile
-          kind="breath"
-          label="breath"
-          value={layoutParams.breath ?? 0}
-          min={0}
-          max={1}
-          step={0.05}
-          hint="Breathing swell on body scale — amplitude follows each creature's energy, so tired creatures breathe shallow"
-          disabled={!(isSwarm || isHype)}
-          disabledReason="Swarm or hype mode only"
-          onChange={(v) => set('breath', v)}
-          locked={lockedParams.breath}
-          onToggleLock={() => lock('breath')}
-        />
-        <MotionTile
-          kind="wind"
-          label="wind"
-          value={layoutParams.wind ?? 1}
-          min={0}
-          max={3}
-          step={0.1}
-          hint="Hype-only multiplier on the noise wind"
-          disabled={!isHype}
-          disabledReason="Hype mode only"
-          onChange={(v) => set('wind', v)}
-          locked={lockedParams.wind}
-          onToggleLock={() => lock('wind')}
-        />
+        {btn(
+          'BREATH',
+          'breath',
+          fmt2(layoutParams.breath ?? 0),
+          <SliderEditor
+            ariaLabel="Breath"
+            value={layoutParams.breath ?? 0}
+            min={0}
+            max={1}
+            step={0.05}
+            format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.breath}
+            onChange={(v) => set('breath', v)}
+          />,
+          { disabled: !(isSwarm || isHype), disabledReason: 'Swarm or hype mode only' },
+        )}
+        {btn(
+          'WIND',
+          'wind',
+          fmt2(layoutParams.wind ?? 1),
+          <SliderEditor
+            ariaLabel="Wind"
+            value={layoutParams.wind ?? 1}
+            min={0}
+            max={3}
+            step={0.1}
+            format={fmt2}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.wind}
+            onChange={(v) => set('wind', v)}
+          />,
+          { disabled: !isHype, disabledReason: 'Hype mode only' },
+        )}
         {btn(
           'METABOLISM',
           'metabolism',

@@ -1,7 +1,7 @@
 // #1018 — the whole FX block header opens the effect editor (F8), #1203
 // block stack. Header taps anywhere on an FX block arm the editor (same
 // FX_SELECT the name button emits); the block's icon buttons, the wet
-// slider, and the editor's own controls keep their own handlers and must
+// row, and the editor's own controls keep their own handlers and must
 // not move the editor.
 import { test, expect } from '@playwright/test';
 import { seedAddType } from './strata-add.mjs';
@@ -46,11 +46,15 @@ test('FX block header tap opens the effect editor; controls stay independent', a
   await expect(fx2.locator('.fx-editor')).toBeVisible();
   await fx1.getByTitle('Toggle visibility').click();
 
-  // Wet slider inside the expanded block (FX 2): the readout moves and the
-  // slider's own handler runs — the editor stays open on FX 2 and nothing
-  // collapses or re-arms. (#1203: collapsed blocks render no sliders.)
-  const slider = fx2.locator('.strata-composite input[type=range]');
+  // Wet control inside the expanded block (FX 2): a mode row since #1608 —
+  // tap its readout to open the exact editor in the value dock and drive
+  // the dock's slider. The readout moves and the editor stays open on
+  // FX 2 and nothing collapses or re-arms. (#1203: collapsed blocks
+  // render no controls.)
   const readout = fx2.locator('.layer-opacity-readout');
+  await readout.click();
+  const slider = page.locator('.te-dock.open input[type=range]');
+  await expect(slider).toBeVisible();
   // Native value setter: React's controlled input ignores a direct
   // el.value assignment, so go through the prototype setter.
   await slider.evaluate((el) => {
@@ -61,6 +65,10 @@ test('FX block header tap opens the effect editor; controls stay independent', a
   await expect(readout).toHaveText('50%');
   await expect(fx2.locator('.fx-editor')).toBeVisible();
   await expect(fx1.locator('.fx-editor')).toHaveCount(0);
+  // Dismiss the value dock (Esc) so the steps below tap the blocks
+  // themselves — the dock overlays the panel's right edge while open.
+  await page.keyboard.press('Escape');
+  await expect(page.locator('.te-dock.open')).toHaveCount(0);
 
   // DUP on FX 1: a third FX block appears (DUP selects the new duplicate by
   // design — pre-existing behavior). FX 1's own editor was not opened by

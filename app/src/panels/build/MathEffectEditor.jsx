@@ -10,7 +10,9 @@
 import { useState } from 'react';
 import { emit, Events } from '../../composition/eventBus.js';
 import { MATH_EFFECT_DEFS, MATH_OP_KINDS, MATH_MOD_SOURCES, formatMathParam } from '../../fx/mathFilters.js';
-import { RangeRow } from '../../components/RangeRow.jsx';
+import { ModeRow } from './te/ModeRow.jsx';
+import { SliderEditor } from './te/editors.jsx';
+import { mathStopsFor } from './blockStops.mjs';
 
 const MOD_LABELS = { none: '—', rms: 'RMS', flux: 'FLUX', beatPulse: 'BEAT' };
 
@@ -79,23 +81,37 @@ function MathOpRow({ layerId, index, fx, count }) {
       </div>
       {Object.entries(def.params).map(([key, p]) => {
         const v = fx.params?.[key] ?? p.def;
+        const entry = mathStopsFor(fx.kind, key);
+        const setMathParam = (nv) => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: nv });
         return (
           <div className="fx-param" key={key}>
-            <label title={p.hint}>{p.label}</label>
-            <RangeRow
-              layout="bare"
-              tone="build"
-              min={p.min}
-              max={p.max}
-              step={p.step}
+            {/* #1608 — the knob is a mode row (blockStops table; the bipolar
+                catalog params carry the Phase 0 sign cell). The exact editor
+                in the dock carries the double-click reset the bare slider's
+                onReset used to serve (D2). The MOD selector is a discrete
+                control and stays as it was. */}
+            <ModeRow
+              variant="block"
+              label={p.label}
+              title={p.hint}
+              display={formatMathParam(fx.kind, key, v)}
               value={v}
-              hint={p.hint}
-              onReset={() => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: p.def })}
-              onChange={(v) => emit(Events.MATH_EFFECT_SET_PARAM, { layerId, index, key, value: v })}
+              stops={entry ? entry.stops : null}
+              bipolar={!!entry?.bipolar}
+              onSelect={setMathParam}
+              onOpen={() => (
+                <SliderEditor
+                  ariaLabel={p.label}
+                  value={v}
+                  min={p.min}
+                  max={p.max}
+                  step={p.step}
+                  format={(nv) => formatMathParam(fx.kind, key, nv)}
+                  defaultValue={p.def}
+                  onChange={setMathParam}
+                />
+              )}
             />
-            <span className="fx-param-readout" title={p.hint}>
-              {formatMathParam(fx.kind, key, v)}
-            </span>
             <ModSelect
               value={fx.mod?.[key] || 'none'}
               title={`${p.label} — audio modulation source. The envelope pushes the knob toward its max; silence is a no-op.`}
