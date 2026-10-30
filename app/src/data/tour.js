@@ -20,7 +20,7 @@ export const TOUR_STEPS = [
     id: 'slider',
     tab: 'build',
     title: '2 · Push it around',
-    body: 'Drag any BUILD slider. The canvas answers live — nothing here can break, so push it around.',
+    body: 'Tap a BUILD mode row — OFF · LOW · MID · HIGH — or tap its number for the exact value. The canvas answers live — nothing here can break, so push it around.',
   },
   {
     id: 'play',

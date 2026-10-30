@@ -1,8 +1,13 @@
-// Amber value button — the ONE continuous-value control (#1202).
+// Amber value button — the #1202 continuous-value control.
 //
 // Values render amber (KC-1 DS #1121 r6); discrete states never do (r5).
 // Tap opens the dock editor; the readout is always the live value. A lock
 // pip marks life-drift-locked params — tap it to unlock without opening.
+// #1607 (Strata Q Phase 1): BUILD shelf params render as ModeRows now;
+// this button remains the shelf form of the Phase 0 exemptions — the
+// SCALE / ROTATE / ALPHA dual ranges and DIVERGENCE in LayoutSliders, the
+// plate centre in MaterialSliders — and of the map AMOUNT inside the
+// CHIAROSCURO section editor (MapRow).
 import { useRef } from 'react';
 import { useDock } from './useDock.js';
 

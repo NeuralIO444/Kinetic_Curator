@@ -10,11 +10,24 @@ function fmtVal(value, format, unit) {
   return unit ? `${s}${unit}` : s;
 }
 
-export function SliderEditor({ value, min, max, step = 1, unit, format, onChange, ariaLabel }) {
+export function SliderEditor({ value, min, max, step = 1, unit, format, onChange, ariaLabel, defaultValue }) {
   return (
     <div className="te-editor">
       <div className="te-editor-readout">{fmtVal(value, format, unit)}</div>
-      <RangeRow layout="bare" ariaLabel={ariaLabel} min={min} max={max} step={step} value={value} onChange={onChange} />
+      {/* #1607 (D2) — double-click reset lives inside the exact editor: the
+          RangeRow's reset speaks the editor's own units, so a caller whose
+          editor works in taper/percent space passes its default mapped
+          into that space. Absent = no reset target, as before. */}
+      <RangeRow
+        layout="bare"
+        ariaLabel={ariaLabel}
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={onChange}
+        defaultValue={defaultValue}
+      />
       <div className="te-editor-scale">
         <span>{fmtVal(min, format, unit)}</span>
         <span>{fmtVal(max, format, unit)}</span>

@@ -1,4 +1,6 @@
-// MATERIAL body tunables as amber TE value buttons (#1585, Materials M4).
+// MATERIAL body tunables as mode rows (#1585, Materials M4; detents #1607,
+// Strata Q Phase 1 — the plate centre keeps the value button: position
+// params are exempt from mode rows as a class, Phase 0 stop-table law).
 // The four material bodies' scalar settings, live per-Look: glass alpha,
 // plate radius + centre, wash strength + spread, stipple dot scale.
 // Each knob is gated on the stratum's material — visible but inert under
@@ -10,8 +12,11 @@
 // (There is no material picker in BUILD — material itself is voice-set
 // since #268 — so the knobs sit with the appearance controls, beside
 // the finish knobs in AppearanceSliders.)
+import { DEFAULT_LAYOUT_PARAMS } from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor } from '../build/te/editors.jsx';
 
 export function MaterialSliders({ layoutParams, lockedParams }) {
@@ -19,18 +24,37 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
   const lock = (key) => emit(Events.LAYOUT_LOCK, { key });
   const material = layoutParams.material;
 
-  const btn = (label, display, key, editor, { disabled, disabledReason, hint } = {}) => (
-    <ValueButton
-      label={label}
-      display={display}
-      title={hint}
-      locked={lockedParams[key]}
-      onToggleLock={() => lock(key)}
-      disabled={disabled}
-      disabledReason={disabledReason}
-      onOpen={() => editor}
-    />
-  );
+  // #1607 — the magnitude knobs are mode rows (Strata Q Phase 1). The plate
+  // CENTRE rows pass `exempt`: coordinates are position params, exempt as a
+  // class under the stop-table law — OFF/LOW/MID/HIGH has no meaning for a
+  // point, so they keep the value button and its exact editor.
+  const btn = (label, display, key, editor, { disabled, disabledReason, hint, exempt } = {}) =>
+    exempt ? (
+      <ValueButton
+        label={label}
+        display={display}
+        title={hint}
+        locked={lockedParams[key]}
+        onToggleLock={() => lock(key)}
+        disabled={disabled}
+        disabledReason={disabledReason}
+        onOpen={() => editor}
+      />
+    ) : (
+      <ModeRow
+        label={label}
+        display={display}
+        title={hint}
+        value={layoutParams[key] ?? DEFAULT_LAYOUT_PARAMS[key]}
+        stops={stopsFor(key)}
+        onSelect={(v) => set(key, v)}
+        locked={lockedParams[key]}
+        onToggleLock={() => lock(key)}
+        disabled={disabled}
+        disabledReason={disabledReason}
+        onOpen={() => editor}
+      />
+    );
   const NAMES = { glass: 'Glass', plate: 'Plate', wash: 'Wash', stipple: 'Stipple' };
   const gate = (m) => (material === m ? {} : { disabled: true, disabledReason: `${NAMES[m]} material only` });
   const pct = (v) => `${Math.round((v ?? 0) * 100)}%`;
@@ -49,6 +73,7 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             max={1}
             step={0.01}
             format={(v) => pct(v)}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.glassAlpha}
             onChange={(v) => set('glassAlpha', v)}
           />,
           { ...gate('glass'), hint: 'How much of its rolled alpha a glass body keeps — 0.78 is the shipped tune' },
@@ -64,6 +89,7 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             max={2}
             step={0.05}
             format={(v) => `×${v.toFixed(2)}`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.plateRadius}
             onChange={(v) => set('plateRadius', v)}
           />,
           { ...gate('plate'), hint: "The plate gradient's radius in glyph-box units — 1.05 is the shipped tune" },
@@ -81,7 +107,11 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             format={(v) => pct(v)}
             onChange={(v) => set('plateCenterX', v)}
           />,
-          { ...gate('plate'), hint: "Where the plate gradient's core sits across the glyph — 36% is the shipped tune" },
+          {
+            ...gate('plate'),
+            exempt: true,
+            hint: "Where the plate gradient's core sits across the glyph — 36% is the shipped tune",
+          },
         )}
         {btn(
           'PLATE CENTRE Y',
@@ -96,7 +126,11 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             format={(v) => pct(v)}
             onChange={(v) => set('plateCenterY', v)}
           />,
-          { ...gate('plate'), hint: "Where the plate gradient's core sits down the glyph — 30% is the shipped tune" },
+          {
+            ...gate('plate'),
+            exempt: true,
+            hint: "Where the plate gradient's core sits down the glyph — 30% is the shipped tune",
+          },
         )}
         {btn(
           'WASH STRENGTH',
@@ -109,6 +143,7 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             max={1}
             step={0.01}
             format={(v) => pct(v)}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.washStrength}
             onChange={(v) => set('washStrength', v)}
           />,
           { ...gate('wash'), hint: 'How far the wash ramp travels from accent to ink — 100% is the shipped ramp' },
@@ -124,6 +159,7 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             max={4}
             step={0.05}
             format={(v) => `×${v.toFixed(2)}`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.washSpread}
             onChange={(v) => set('washSpread', v)}
           />,
           {
@@ -142,6 +178,7 @@ export function MaterialSliders({ layoutParams, lockedParams }) {
             max={5}
             step={0.1}
             format={(v) => `×${v.toFixed(2)}`}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.stippleDotScale}
             onChange={(v) => set('stippleDotScale', v)}
           />,
           {

@@ -1,10 +1,22 @@
-// LAYOUT values as amber TE value buttons (#1202). Each opens a dock editor
-// (slider/dual/dial/stepper per DS #1121 r2); discrete = ink/red, values =
-// amber (r5/r6). Locks ride on the button; the tap-name dialogs for
-// SCALE/ROTATE/ALPHA move into the dock as range editors.
-import { RANGE_HARD, PARAM_SPEC, ROTATE_SPIN_START, MIRROR_STATES, mirrorMultiplier } from '../../data/layout-modes.js';
+// LAYOUT values on the shelf (#1202; mode rows #1607). Continuous values
+// render as mode rows — OFF · LOW · MID · HIGH detents under the exact
+// readout, which opens the dock editor (Strata Q Phase 1). The Phase 0
+// exemptions keep the value button: SCALE / ROTATE / ALPHA (dual ranges —
+// a mode row cannot express a span) and DIVERGENCE (a precision param).
+// Discrete = ink/red, values = amber (r5/r6). Locks ride on the row; the
+// tap-name dialogs for SCALE/ROTATE/ALPHA live in the dock as range editors.
+import {
+  RANGE_HARD,
+  PARAM_SPEC,
+  DEFAULT_LAYOUT_PARAMS,
+  ROTATE_SPIN_START,
+  MIRROR_STATES,
+  mirrorMultiplier,
+} from '../../data/layout-modes.js';
 import { emit, Events } from '../../composition/eventBus.js';
 import { ValueButton } from '../build/te/ValueButton.jsx';
+import { ModeRow } from '../build/te/ModeRow.jsx';
+import { stopsFor } from '../build/te/modeStops.mjs';
 import { SliderEditor, DualEditor } from '../build/te/editors.jsx';
 import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 import { useStore } from '../../state/store.js';
@@ -46,10 +58,13 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
 
   return (
     <div className="slider-stack">
-      <ValueButton
+      <ModeRow
         label="COUNT"
         display={`${Math.round(layoutParams.count)}${mirrorMult > 1 ? ` ×${mirrorMult}` : ''}`}
         title={mirrorMult > 1 ? `Count ×${mirrorMult} with mirror — tap to edit` : 'Count — tap to edit'}
+        value={layoutParams.count}
+        stops={stopsFor('count')}
+        onSelect={(v) => set('count', v)}
         locked={lockedParams.count}
         onToggleLock={() => lock('count')}
         onOpen={() => (
@@ -59,6 +74,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             min={10}
             max={800}
             step={1}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.count}
             onChange={(v) => set('count', Math.round(v))}
           />
         )}
@@ -153,6 +169,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
                 max={PARAM_SPEC.rotateSpin.max}
                 step={0.01}
                 format={(v) => v.toFixed(2)}
+                defaultValue={DEFAULT_LAYOUT_PARAMS.rotateSpin}
                 onChange={(v) => set('rotateSpin', v)}
               />
             )}
@@ -179,9 +196,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
         )}
       />
 
-      <ValueButton
+      <ModeRow
         label="JITTER"
         display={`${Math.round(layoutParams.jitter ?? 0)}`}
+        value={layoutParams.jitter ?? 0}
+        stops={stopsFor('jitter')}
+        onSelect={(v) => set('jitter', v)}
         locked={lockedParams.jitter}
         onToggleLock={() => lock('jitter')}
         onOpen={() => (
@@ -191,14 +211,18 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             min={0}
             max={200}
             step={1}
+            defaultValue={DEFAULT_LAYOUT_PARAMS.jitter}
             onChange={(v) => set('jitter', Math.round(v))}
           />
         )}
       />
 
-      <ValueButton
+      <ModeRow
         label="DENSITY"
         display={`${Math.round(layoutParams.density ?? 80)}%`}
+        value={layoutParams.density ?? 80}
+        stops={stopsFor('density')}
+        onSelect={(v) => set('density', v)}
         locked={lockedParams.density}
         onToggleLock={() => lock('density')}
         onOpen={() => (
@@ -209,6 +233,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.density}
             onChange={(v) => set('density', Math.round(v))}
           />
         )}
@@ -216,9 +241,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
 
       {/* #1183: how far this layer's marks take the colour of the pattern tile beneath them. Per layer; 0 is today's
             frame exactly. Visible but inert without a pattern below, with the reason (#272). */}
-      <ValueButton
+      <ModeRow
         label="GROUND"
         display={`${Math.round((layoutParams.groundLean ?? 0) * 100)}%`}
+        value={layoutParams.groundLean ?? 0}
+        stops={stopsFor('groundLean')}
+        onSelect={(v) => set('groundLean', v)}
         locked={lockedParams.groundLean}
         onToggleLock={() => lock('groundLean')}
         disabled={!hasGround}
@@ -231,6 +259,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.groundLean * 100}
             onChange={(v) => set('groundLean', Math.round(v) / 100)}
           />
         )}
@@ -238,9 +267,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
 
       {/* #1183 tile-edge nudge: marks ease off the edges of the pattern tile beneath them, so the grid reads
             through the layout. Per layer; 0 is today's frame exactly. Inert without a pattern below (#272). */}
-      <ValueButton
+      <ModeRow
         label="EDGE"
         display={`${Math.round((layoutParams.groundNudge ?? 0) * 100)}%`}
+        value={layoutParams.groundNudge ?? 0}
+        stops={stopsFor('groundNudge')}
+        onSelect={(v) => set('groundNudge', v)}
         locked={lockedParams.groundNudge}
         onToggleLock={() => lock('groundNudge')}
         disabled={!hasGround}
@@ -253,6 +285,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.groundNudge * 100}
             onChange={(v) => set('groundNudge', Math.round(v) / 100)}
           />
         )}
@@ -261,9 +294,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
       {/* #1183 contact shadow: this layer's marks cast a soft shadow onto what lies beneath them, toward the sun
             when it is on, straight under them when it is off, in the palette's darkest colour. Per layer; 0 is
             today's frame exactly. Inert without a pattern below (#272). */}
-      <ValueButton
+      <ModeRow
         label="SHADOW"
         display={`${Math.round((layoutParams.groundShadow ?? 0) * 100)}%`}
+        value={layoutParams.groundShadow ?? 0}
+        stops={stopsFor('groundShadow')}
+        onSelect={(v) => set('groundShadow', v)}
         locked={lockedParams.groundShadow}
         onToggleLock={() => lock('groundShadow')}
         disabled={!hasGround}
@@ -276,6 +312,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.groundShadow * 100}
             onChange={(v) => set('groundShadow', Math.round(v) / 100)}
           />
         )}
@@ -284,9 +321,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
       {/* #1183 palette snap: this share of the layer's marks take the exact colours of the pattern tile beneath
             them (main and accent); the same marks every frame for a seed. Per layer; 0 is today's frame exactly.
             Inert without a pattern below (#272). */}
-      <ValueButton
+      <ModeRow
         label="SNAP"
         display={`${Math.round((layoutParams.groundSnap ?? 0) * 100)}%`}
+        value={layoutParams.groundSnap ?? 0}
+        stops={stopsFor('groundSnap')}
+        onSelect={(v) => set('groundSnap', v)}
         locked={lockedParams.groundSnap}
         onToggleLock={() => lock('groundSnap')}
         disabled={!hasGround}
@@ -299,6 +339,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.groundSnap * 100}
             onChange={(v) => set('groundSnap', Math.round(v) / 100)}
           />
         )}
@@ -307,9 +348,12 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
       {/* #1183 weather slice 1 (FX as weather): this layer's marks fade into the haze of the nearest FX
             layer above them — colour toward the veil, alpha thinning in the thick mist. Per layer; 0 is
             today's frame exactly. Inert without a hazy FX layer above (#272). */}
-      <ValueButton
+      <ModeRow
         label="WEATHER"
         display={`${Math.round((layoutParams.weatherAir ?? 0) * 100)}%`}
+        value={layoutParams.weatherAir ?? 0}
+        stops={stopsFor('weatherAir')}
+        onSelect={(v) => set('weatherAir', v)}
         locked={lockedParams.weatherAir}
         onToggleLock={() => lock('weatherAir')}
         disabled={!hasWeather}
@@ -322,6 +366,7 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             max={100}
             step={1}
             unit="%"
+            defaultValue={DEFAULT_LAYOUT_PARAMS.weatherAir * 100}
             onChange={(v) => set('weatherAir', Math.round(v) / 100)}
           />
         )}

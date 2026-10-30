@@ -3122,6 +3122,7 @@ details.ds-dev > summary:hover {
   gap: 2px;
 }
 .te-cell {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -3251,6 +3252,57 @@ details.ds-dev > summary:hover {
 .te-lock.locked {
   color: var(--kc-davis);
   border-color: var(--kc-davis);
+}
+
+/* Mode row (#1607, Strata Q Phase 1): a BUILD shelf param's detent form —
+   the value button's head (label + exact amber readout, tap opens the
+   value editor) over the OFF · LOW · MID · HIGH matrix. The off-detent
+   mark (DS §2.1): the lit cell wears a dot in its corner when the stored
+   value is not exactly the stop it lights. */
+.te-mode {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.te-mode-head {
+  display: flex;
+  gap: 2px;
+  align-items: stretch;
+}
+.te-mode-readout {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 8px;
+  background: transparent;
+  border: 1px solid var(--line-2);
+  color: var(--kc-davis);
+  cursor: pointer;
+  min-height: 30px;
+}
+.te-mode-readout:hover {
+  border-color: var(--kc-davis);
+}
+.te-mode.is-disabled .te-mode-readout {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.te-mode.is-disabled .te-mode-readout:hover {
+  border-color: var(--line-2);
+}
+.te-mode.is-disabled .te-matrix {
+  opacity: 0.45;
+  pointer-events: none;
+}
+.te-dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 4px;
+  height: 4px;
+  background: currentColor;
 }
 
 /* Value dock: absolute inside the panel root, pinned to the panel's right

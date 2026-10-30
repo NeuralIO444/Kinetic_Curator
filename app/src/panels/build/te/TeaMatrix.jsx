@@ -37,6 +37,10 @@ export function TeaMatrix({ options, value, onChange, tone = 'ink', ariaLabel, c
                 ))}
               </span>
             )}
+            {/* #1607 — the off-detent mark (DS §2.1): on a mode row, the lit
+                cell wears a dot when the stored value is not exactly the
+                stop it lights. */}
+            {typeof opt !== 'string' && opt.dot && <span className="te-dot" aria-hidden="true" />}
           </button>
         );
       })}
