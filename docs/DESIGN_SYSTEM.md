@@ -119,6 +119,26 @@ Scale: `2 / 4 / 6 / 8 / 12 / 16 / 24` px. No other gaps.
 one track row. New work converges variants onto these. A new component must replace
 at least two existing variants to earn its place (the "earn your surface" gate, §8).
 
+**BUILD detent amendment (Matt, 2026-10-15, D1/D2 — lane #1605, paper #1606).**
+In the BUILD panel only, the §2.1 slider's *shelf form* is a mode row:
+**OFF · LOW · MID · HIGH** (TE detents, TeaMatrix kin — the same quantized row
+§2.9 already uses for second functions). The amendment is scoped, not a repeal:
+the one-slider doctrine stands everywhere else, and the slider itself survives
+inside the exact editor (§2.1). The law:
+
+- **Detents govern hand input, not the document.** Stored values stay
+  continuous; dice, curator, governor and presets keep writing in-between
+  values, and a row holding one lights its nearest mode — beside the exact
+  readout and the off-detent mark (§2.1).
+- **Scope (D1):** BUILD shelf controls *and* per-block controls (the strata
+  block editors). Exemptions are named in the lane's stop-table law
+  (`docs/research/strata-quantized/plan.md`, Phase 0 paper): dual ranges,
+  the HUE dial, precision params, position params, macro jogs, enum-index
+  params.
+- **Gesture (D2):** tap the row's readout opens the exact editor; the
+  double-click reset of §2.1 does not live on a mode row — it survives
+  *inside* the editor.
+
 ### 2.1 The slider — `RangeRow`
 
 - 44px tall hit area (the 44px touch target *is* the default).
@@ -126,6 +146,7 @@ at least two existing variants to earn its place (the "earn your surface" gate, 
 - Thumb color = panel accent: BUILD `--kc-build`, STIMULI `--kc-stim`, everything else `--kc-ink`. Form never changes; only the color speaks the room.
 - Label + click-to-type readout + double-click reset + lock, per the existing `RangeRow` behavior (lock glyphs become `▪`/`▫` per §6 — the lock emoji dies).
 - Every `input[type=range]` in the app goes through this. No bare ranges, no browser-blue thumbs. (Migration item M1.)
+- **BUILD amendment (D1/D2, #1606):** on a BUILD shelf or block row, this slider is represented by the §2 mode row (OFF · LOW · MID · HIGH) and lives, unchanged, inside the row's exact editor — where click-to-type and double-click reset keep their meanings above. The row itself always shows the exact live value beside the modes, and a stored value that is not exactly a stop carries the **off-detent mark**: the lit mode wears a dot. (The lock pips `▪`/`▫` keep their own meaning — one signal, one meaning, rule 5.) Outside BUILD, RangeRow is untouched.
 
 ### 2.2 The button
 
