@@ -211,6 +211,34 @@ export const FX_EFFECT_DEFS = {
       amount: { label: 'Amount', min: 0, max: 1, step: 0.05, def: 0.5, hint: 'Line darkness' },
     },
   },
+  // #1610 — EF-4's dither kind, out of the stub list and into the grain
+  // family. The math is the shared ordered-Bayer stage the ROOM codec
+  // faces run on (curator/roomDither.js — BAYER4 / orderedLevel, #1560
+  // §09): one pipeline, two tenants. The codec lane reuses that stage;
+  // this kind applies the same stage per channel to the plate — never
+  // re-derive a second Bayer here.
+  dither: {
+    label: 'Dither',
+    hint: 'Ordered Bayer dithering: tones re-cut into a one-bit dot weave — the print finish. Amount 0 is the layer untouched.',
+    params: {
+      cell: {
+        label: 'Cell',
+        min: 1,
+        max: 8,
+        step: 1,
+        def: 2,
+        hint: 'Pixels per Bayer step — the 4×4 pattern repeats every 4×cell px. Small is fine print, large is chunky.',
+      },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.5,
+        hint: 'How far the one-bit cut takes over. 0 is the layer untouched; 1 is the full one-bit weave.',
+      },
+    },
+  },
   posterize: {
     label: 'Posterize',
     hint: 'Reduce each channel to a fixed number of tonal steps. Flat poster look, one primitive.',
@@ -238,8 +266,10 @@ export const FX_EFFECT_DEFS = {
 export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
 
 // #520 Phase 1 — grain-family kinds that may only occupy the last (EF-4 FINISH)
-// position. Phase 3 adds Dither and Stipple here.
-export const GRAIN_FAMILY_KINDS = ['grain'];
+// position. #1610: Dither joins — the family's second kind (ordered Bayer,
+// post-accum like grain: a dither inside the feedback loop would compound
+// its own weave). Stipple still to come.
+export const GRAIN_FAMILY_KINDS = ['grain', 'dither'];
 
 /**
  * #520 — EF rack: 4 fixed slots per FX layer, applied bottom-up (EF-1 first,
@@ -261,7 +291,7 @@ export const FX_RACK = [
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
   { slot: 'EF-2', label: 'Distort', kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
-  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo'], stubs: ['dither', 'stipple'] },
+  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither'], stubs: ['stipple'] },
 ];
 
 /**
@@ -670,6 +700,36 @@ function buildScanlines(params, ctx, rid, src, srcAlpha) {
   ];
 }
 
+/**
+ * #1610 — the SVG half of DITHER, an honest approximation like grade/halo:
+ * SVG filters have no pixel-addressable threshold, so the print path can
+ * make the one-bit CUT but not the Bayer WEAVE — each channel quantizes
+ * at the mid threshold (the weave's average behaviour), blended toward
+ * the source by amount exactly as the GL pass mixes. `cell` has no SVG
+ * analog and is ignored here. Kept in sync anyway for the standing
+ * reason: an unknown kind is DROPPED by sanitizeFxEffects, so a GL-only
+ * dither would silently vanish from the print path — a dithered canvas
+ * would print smooth, with no warning. Amount 0 emits the identity
+ * pass-through the other builders use.
+ */
+function buildDither(params, ctx, rid, src) {
+  const amount = Math.min(1, Math.max(0, Number(params.amount) || 0));
+  if (amount <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const q = rid();
+  const cut = (prim) => ({ prim, attrs: { type: 'discrete', tableValues: '0 1' } });
+  return [
+    {
+      prim: 'feComponentTransfer',
+      attrs: { in: src, result: q },
+      children: [cut('feFuncR'), cut('feFuncG'), cut('feFuncB')],
+    },
+    {
+      prim: 'feComposite',
+      attrs: { in: q, in2: src, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: r3(1 - amount), k4: 0 },
+    },
+  ];
+}
+
 function buildPosterize(params, ctx, rid, src) {
   const levels = Math.max(2, Math.min(8, Math.round(params.levels)));
   const table = Array.from({ length: levels }, (_, i) => r3(i / (levels - 1))).join(' ');
@@ -775,6 +835,7 @@ const BUILDERS = {
   tear: buildTear,
   grain: buildGrain,
   scanlines: buildScanlines,
+  dither: buildDither,
   posterize: buildPosterize,
   invert: buildInvert,
   solarize: buildSolarize,

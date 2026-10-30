@@ -217,6 +217,80 @@ export const FX_SCANLINES_DESCRIPTOR = {
   },
 };
 
+// #1610 — DITHER (EF-4 Finish, grain family): ordered Bayer, one-bit.
+// The threshold stage is the SHARED one: curator/roomDither.js's BAYER4 /
+// orderedLevel, the stage the ROOM codec faces quantize through (#1560,
+// §09) — one pipeline, two tenants. The rank is rebuilt from bits rather
+// than read from a table: over the cell's mod-4 coordinates,
+//   r = ((x0^y0)<<3) | (y0<<2) | ((x1^y1)<<1) | y1,  t = (r + 0.5) / 16
+// reproduces BAYER4 exactly (fx/dither.selfcheck.mjs pins all sixteen
+// cells against it). Levels are fixed at 2 — this kind IS the one-bit
+// finish; posterize owns multi-level cuts. Premultiplied plate
+// discipline (grain, #748): the straight colour is quantized and
+// re-premultiplied, so the weave never paints outside the plate's
+// alpha and a silhouette never grows.
+export const FX_DITHER_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform int u_cell;
+uniform float u_amount;
+in vec2 v_cuv;
+out vec4 o;
+float bayerThreshold(vec2 cellPx) {
+  ivec2 c = ivec2(mod(cellPx, 4.0));
+  int x0 = c.x & 1;
+  int x1 = (c.x >> 1) & 1;
+  int y0 = c.y & 1;
+  int y1 = (c.y >> 1) & 1;
+  int r = ((x0 ^ y0) << 3) | (y0 << 2) | ((x1 ^ y1) << 1) | y1;
+  return (float(r) + 0.5) / 16.0;
+}
+void main() {
+  vec4 s = texture(u_tex, v_cuv);
+  float amt = clamp(u_amount, 0.0, 1.0);
+  if (amt <= 0.0) {
+    o = s;
+    return;
+  }
+  vec2 cellPx = floor(v_cuv * u_res / max(1.0, float(u_cell)));
+  float t = bayerThreshold(cellPx);
+  vec3 straight = s.a > 0.0 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
+  vec3 base = floor(straight);
+  vec3 q = clamp(base + vec3(greaterThan(straight - base, vec3(t))), 0.0, 1.0);
+  o = vec4(mix(s.rgb, q * s.a, amt), s.a);
+}
+`;
+
+export const FX_DITHER_DESCRIPTOR = {
+  label: 'Dither',
+  hint: 'Ordered Bayer dithering: tones re-cut into a one-bit dot weave — the print finish. Amount 0 is the layer untouched.',
+  pad: 0,
+  animated: false,
+  params: {
+    cell: {
+      type: 'int',
+      label: 'Cell',
+      min: 1,
+      max: 8,
+      step: 1,
+      def: 2,
+      ui: 'slider',
+      hint: 'Pixels per Bayer step — the 4×4 pattern repeats every 4×cell px. Small is fine print, large is chunky.',
+    },
+    amount: {
+      type: 'float',
+      label: 'Amount',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      def: 0.5,
+      ui: 'slider',
+      hint: 'How far the one-bit cut takes over. 0 is the layer untouched; 1 is the full one-bit weave.',
+    },
+  },
+};
+
 export const FX_SOLARIZE_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_tex;
@@ -612,6 +686,15 @@ export const FX_SHADER_EFFECTS = [
       descriptor: FX_SCANLINES_DESCRIPTOR,
       file: 'fxShaders.mjs:scanlines',
       cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.3, notes: 'cheap mask multiply' },
+    },
+  ],
+  [
+    'dither',
+    {
+      fs: FX_DITHER_FS,
+      descriptor: FX_DITHER_DESCRIPTOR,
+      file: 'fxShaders.mjs:dither',
+      cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU Bayer threshold, no taps' },
     },
   ],
   [
