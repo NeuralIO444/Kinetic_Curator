@@ -35,3 +35,12 @@
   streamlineTraces,streamlineSteps,streamlineStep`) the pre-refresh fixture verifies
   byte-for-byte on this tree — the divergence is the keys, only the keys; the refresh is
   deterministic (two runs, identical sha256).
+- **#1854 checkpoint refresh (2026-10-31):** the Marks chapter pool added 18 authored asset
+  records to the catalog; the resolver's hashed output embeds asset state, so every
+  checkpoint moves while the recorded inputs stay untouched — the sanctioned shape (same as
+  #1794 / #1356). Checkpoint-only refresh via `scripts/refreshFixtureCheckpoints.mjs
+  --write`: sha256 a51ba1e4… → 9253b8bf…, 144276 → 144283 bytes; deep diff = 61 checkpoint
+  hashes changed, nothing else (nonCheckpointDiffs []). Control: with only ASSETS_MARKS
+  removed from the authored index (scratch tree, every other #1854 file in place) the
+  pre-refresh fixture verifies byte-for-byte on this tree — the divergence is the catalog
+  growth, only the growth; the refresh is deterministic (the tool's two-run check).

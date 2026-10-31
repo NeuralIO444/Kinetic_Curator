@@ -5,11 +5,17 @@ publishes after S1 merges; the coordinator rebases and publishes. Issue title (v
 the Marks chapter pool (primitive marks, glyphs, stamps)". D1 is ruled (Matt, 2026-10-31: "Author Marks
 first") and recorded on this issue; D2–D6 were not needed and were not touched.
 
-## STATUS: STOPPED at a scope decision — the pool is built; two calls sit above the builder
+## STATUS: STOPPED at a scope decision — the pool is built; three calls sit above the builder
 
 Everything the issue scopes as content is authored and verified (below). The build stops on ONE decision
-the issue's own text creates, plus one coordinator band call the suite itself reserves. Neither is a defect
-in the work; both are exactly the "don't rule it yourself" class. Details under THE STOP.
+the issue's own text creates, plus two coordinator calls the suites themselves reserve. None is a defect
+in the work; all three are exactly the "don't rule it yourself" class. Details under THE STOP.
+
+**Correction note (same builder, later commit):** the first version of this report carried a wrong sweep
+tally (546/3) from a garbled run readout. The authoritative full-manifest result is **535 pass / 14 fail**,
+and every one of the 14 is adjudicated below — 8 fixed in the correction commit (bake, refresh, content
+fix, proven re-pins), 3 environmental/in-sweep casualties (accum since green standalone, 83/83), and the
+3 decisions. The final-battery re-runs in Verification are the numbers to trust.
 
 ## What shipped
 
@@ -87,6 +93,22 @@ band call is the staging report's, flagged for the coordinator, not silently re-
 re-baselined. Flagged, with the numbers, for the coordinator's call. (No content was tuned to chase the
 seed — that would be fixing the test, not the product.)
 
+## Coordinator call — decision 3: wetSoak's channel-2 precondition (a re-rolled draw)
+
+`wetSoak.selfcheck` fails at its term-(a) absorption check: *"solid mark pixels present in channel 2"* —
+the median-ratio helper needs >10 pixels with coverage > 0.97 and dry blue > 100, and this tree's render
+has too few. Mechanism, proven: the scene is the parity corpus's `single-basic`
+(`src/gl/parity/corpus.mjs:61` enables EVERY catalog asset; 36 items, seed 0xc0ffee, palette
+praystation). The pool grew 295 → 313, so the seeded 36-item draw is a different draw; the blue-core
+population is luck-of-that-draw. Everything else in the suite passes on this tree — dry-side byte
+exactness, wet-side absorption, channels 0/1 ratios ≈ reflectance within tolerance — the physics is
+verified; only the channel-2 population precondition starved. Attribution proof: in a scratch tree with
+only ASSETS_MARKS removed (every other #1854 file in place), the suite passes (the one check that skipped
+there was the warm-up *export* check — sandbox browser availability, unrelated). Base standalone: 31/31.
+Options for the coordinator: pin the corpus scene's pool, give the soak test its own subset doc, or
+re-baseline the precondition — all three touch shared test infrastructure used by accum/composite/
+exportStill, so none is a builder's unilateral move. Nothing was tuned to chase it.
+
 ## Re-pins made (each with its cause; no check deleted or weakened)
 
 1. `chapters.selfcheck` §3 — Marks {0,0,0} → {5,0,18}; Now {64,64,294} → {69,64,312}. Cause: this issue's
@@ -103,33 +125,76 @@ seed — that would be fixing the test, not the product.)
    Cause: ochre-wall + bone-dust. (`chipWindowStart(37, …)` calls are abstract-list arithmetic — untouched.)
 8. `censusReadout.selfcheck` — radial category size 26 → 27 (real-artifact assertion only; the frozen
    fixture in the same file is synthetic and untouched). Cause: mrk_ring_01 joins radial.
+9. `kineticScope.selfcheck` §2 — MED deck looks 64 → 69. The readout derives deck sizes from the library
+   (WEAK's assets already float in the same assertion); MED mirrors the full look library, so the count is
+   observed, not a cap. Voices stay 64 (they move only if decision 1 is authorized).
+10. `wingWarp.selfcheck` — the two RESOLVER pins re-based (REST 4b47bdad → 0981f009; BENT a88fdc98 →
+    a0e112d4), each with the dated note in the suite's own format. Proven before re-pinning, per the
+    suite's #1794 protocol: with only ASSETS_MARKS removed (scratch tree), the old pins reproduce exactly
+    and the builder pins never moved — the delta is catalog growth in the resolver's full-library output,
+    no behaviour change.
+11. `allEraGolden.selfcheck` — first-render hash re-pinned (da8cf4fa… → a52e3bd7…), the #702 precedent
+    (catalog pack added → hash re-pinned with an inline note). Same scratch proof: without the marks, the
+    old hash reproduces (295 assets).
+12. `regionAssignment.selfcheck` — the baked-assignment census: perFamily {floral 15, radial 26 → 27,
+    linework 31 → 36}, assignedRegions 292 → 309. Measured from the bake; every per-asset assertion
+    (baked assignments == the family rule) already held for the six qualifying marks assets.
+13. `regionLines.selfcheck` — the bend/bob census: bend 35 → 36, bob 54 → 66 (linework's assigned regions
+    89 → 102; the spear's shaft region bends, and bend still appears nowhere outside linework).
+
+## Fixes that are not re-pins
+
+- **Region mattes baked** (`npm run bake:regions` — the step regionBake's own failure prescribes):
+  `regions.generated.js` gains the 18 marks' mattes and nothing else (after the house prettier pass the
+  diff is pure additions, 935 lines; existing assets' matte data verified value-identical), and the bake
+  report updates (312 assets, 1189 regions, 309 kineme-assigned). Six marks assets qualify for
+  family-default region kinemes — the marks are region citizens too, not just deck citizens.
+- **chiaroscuro drift law** (content fix, not a check change): chiaroscuro is pinned as the
+  slowest-drifting look in the instrument (noiseSpeed 0.1 = the floor). The Marks looks' first draft
+  drifted slower (0.05–0.08) and broke the superlative; their noiseSpeed now sits at 0.1–0.12 — the quiet
+  end of the legal range. lifeDrift and wind unchanged; the chapter still barely breathes.
+- **Fixture checkpoint refresh** (the fixtures' own sanctioned protocol, per their PROVENANCE files —
+  "never re-record just to make a red gate green"; this is the intentional-change shape with the control
+  run): checkpoint-only refresh via `scripts/refreshFixtureCheckpoints.mjs --write` — replayGate
+  a51ba1e4… → 9253b8bf… (61/61 checkpoint hashes, nonCheckpointDiffs [], deterministic), creatureRepipe
+  b6effd90… → d17d2233… (16/16, []). Control: in the scratch tree (marks removed, everything else in
+  place) both committed fixtures verify and reproduce byte-for-byte. Provenance entries appended to both
+  PROVENANCE.md files in the house format.
 
 ## Verification
 
 Full manifest sweep, continue-on-failure over all **549** manifest commands (the stock runner stops at the
-first failure): **546 pass / 3 fail** — and the 3 are exactly the calls documented above, plus one flake:
+first failure): **535 pass / 14 fail** (authoritative tally — see the correction note at the top). The 14,
+each adjudicated against the S1 base in this sandbox:
 
-1. `voiceDeck.selfcheck` §4 — **decision 1** (THE STOP).
-2. `coverage.selfcheck` seed 0x1505 — **decision 2** (coordinator band call; passes on the S1 base,
-   measured exceedance +0.022 pp with reach and never-tray improved on all 8 seeds).
-3. `cellKinemePlayback.selfcheck` — **flake**: failed in the sweep with "output.wasm is stale (pre-#1917)"
-   (a wasm artifact stamp; this build touches no rust/kernel/bake input — the diff is data-only) and
-   PASSES on isolated re-run on this tree (node contract OK, GPU OK) and on the S1 base. Noted, not
-   chased — same family as the kineticSweep flake (#1822), which passed in this sweep.
+- **Decisions (3):** `voiceDeck` §4 (decision 1), `coverage` seed 0x1505 (decision 2), `wetSoak`
+  channel-2 precondition (decision 3) — all documented above.
+- **Fixed in the correction commit (8):** `regionBake` (ran the prescribed bake), `replayGate` +
+  `creatureGate` + `refreshFixtureCheckpoints` (sanctioned checkpoint refresh), `wingWarp` (resolver
+  pins re-based with proof), `allEraGolden` (hash re-pinned with proof), `chiaroscuro` (content fix:
+  Marks noiseSpeed raised to the legal floor), `kineticScope` (MED looks re-pin).
+- **Environmental (2):** `swarmWasm` (build-wasm.sh --verify cannot reproduce the kernel wasm without
+  cargo, absent in the sandbox; S1 proved it base-identical on pristine origin/main; the stock
+  `npm run selfcheck` halts there) and `fx/rollSafety` (node sections pass standalone; its browser
+  section wedges or throws inside the sandbox Chromium across repeated runs — the failure S1 documented
+  as base-identical on pristine main). `accum` also died in the sweep without an assertion, in the same
+  browser layer — but standalone on the final tree it is fully green (83/83 cases, no skipped sections),
+  so it counts as an in-sweep casualty of the sandbox, not a failure of the tree. Sandbox
+  `npm run build` is likewise broken identically on pristine main (@tauri-apps/api) — CI is
+  authoritative for all of it.
 
-Environmental, as on S1: the stock `npm run selfcheck` halts at `swarmWasm` (build-wasm.sh --verify cannot
-reproduce the kernel wasm without cargo, absent in the sandbox; S1 proved it base-identical on pristine
-origin/main — and the same suite passed inside the continue-loop run above). Sandbox `npm run build` is
-broken identically on pristine main (@tauri-apps/api) — CI is authoritative. accum passed inside the sweep;
-a solo confirmation re-run hung in the sandbox browser layer (0% CPU for ~9 min, killed, orphan browsers
-cleaned) — the sweep verdict stands and CI owns the browser sections.
-
-Targeted suites green on this tree: chapters, assetStyle, styleLooks (all 69 looks render headless),
-palettes, census, censusReadout, rollPool, regionAssignment, engraving (the issue's
-"engraving-finish-compatible" premise — the marks ride the same category/style axes the finish reads),
-poolCitizenship. Prettier: all touched code + selfcheck files clean (the sandbox's `npm run format:check`
-can't find its prettier binary — same broken shared install as S1; `npx prettier` verifies the touched
-files directly; CI is authoritative).
+Final battery — every previously-failing or blast-radius suite re-run on the corrected tree after the
+last change: chapters ✓, assetStyle ✓, styleLooks ✓ (all 69 looks render headless), palettes ✓,
+censusReadout ✓, kineticScope ✓, chiaroscuro ✓, wingWarp ✓, allEraGolden ✓, replayGate ✓, creatureGate
+✓, refreshFixtureCheckpoints ✓, regionBake ✓ (312 assets, 1189 regions), regionMattes ✓,
+regionAssignment ✓, regionPlayback ✓ (GPU OK), regionLines ✓, overlay ✓, accum ✓ (standalone, 83/83).
+In the sweep and still green:
+census, rollPool, engraving (the issue's "engraving-finish-compatible" premise — the marks ride the same
+category/style axes the finish reads), poolCitizenship, cellKinemePlayback, kineticSweep. Still red, by
+design, awaiting the calls above: voiceDeck §4, coverage, wetSoak. Prettier: all touched code + selfcheck
+files clean, including the baked regions file (the sandbox's `npm run format:check` can't find its
+prettier binary — same broken shared install as S1; `npx prettier` verifies the touched files directly;
+CI is authoritative).
 
 ## Lois pass — the blunt version (9 rules)
 

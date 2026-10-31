@@ -129,12 +129,14 @@ console.log('regionAssignment (family table): OK');
   // #1435 R4: linework drops 33 -> 31 assets / 294 -> 292 regions —
   // line_squiggle_01/_02 became strip assets (the authored cell track
   // owns them, so the strip exclusion removes their defaults).
+  // #1854: the Marks pool's baked regions qualify six of its assets under the same rule —
+  // mrk_ring_01 (radial 26 -> 27) and five linework marks (31 -> 36); regions 292 -> 309.
   assert.deepEqual(
     perFamily,
-    { floral: 15, radial: 26, linework: 31 },
+    { floral: 15, radial: 27, linework: 36 },
     'the table names three families in this library',
   );
-  assert.strictEqual(assignedRegions, 292, 'every region of a named family is assigned');
+  assert.strictEqual(assignedRegions, 309, 'every region of a named family is assigned');
   console.log(`regionAssignment (bake): OK — ${assignedAssets} assets, ${assignedRegions} regions assigned`);
 
   const flora = ASSETS.find((a) => a.id === 'flora_flower_01');

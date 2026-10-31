@@ -12,7 +12,10 @@ import { renderSvg } from '../../../studio/render.mjs';
 import { ASSETS } from '../data/assets/index.js';
 
 /** First-render SVG SHA-256 of the all-era fixture — bump only on intentional render changes. */
-export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = 'da8cf4fa8bb494039016e3e0c63d44630fe2d5d6a16ad962d036e7fd80fdb899'; // re-pinned: #702 added the pixel-glyph stamp pack to the catalog;
+export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = 'a52e3bd7ba4722aa7fa5fe53b74e6e3bc289507213a7b197d622fe5c80fa7c6b'; // re-pinned: #1854 added the Marks pool (18 records) to the catalog —
+// the 'all' pool is the full catalog, so its first render gains the new marks. Proven before re-pinning:
+// with only ASSETS_MARKS removed from the authored index (scratch tree), this suite reproduces
+// da8cf4fa… exactly (295 assets) — the delta is the catalog growth, not the render pipeline.
 
 const raw = JSON.parse(readFileSync(new URL('./fixtures/all-era-project.json', import.meta.url), 'utf8'));
 

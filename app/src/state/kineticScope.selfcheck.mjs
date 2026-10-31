@@ -39,7 +39,7 @@ assert.equal(nextScope('fixed'), 'weak', "a legacy FIXED pill's next tap is WEAK
 assert.deepEqual(deckReadout('off'), { assets: 49, looks: 33, voices: 19 }, "OFF: today's smallest decks");
 assert.deepEqual(deckReadout('weak').looks, 33);
 assert.ok(deckReadout('weak').assets > 250, 'WEAK: the whole library');
-assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 64, voices: 64 });
+assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 69, voices: 64 }); // #1854 re-pin: MED mirrors the full look library (64 → 69 with the Marks group); the count is observed from the decks, not a cap
 assert.deepEqual(deckReadout('koz'), deckReadout('med'));
 assert.equal(CURATED_SETS.length, 19);
 const styleIds = new Set(STYLE_LOOKS.map((l) => l.id));

@@ -100,3 +100,12 @@ deep diff = 16 of 16 checkpoint hashes changed, recorded inputs byte-identical, 
 (nonCheckpointDiffs []). Control: with the three keys stripped the pre-refresh fixture
 verifies byte-for-byte on this tree; the refresh is deterministic (two runs, identical
 sha256).
+
+**#1854 checkpoint refresh (2026-10-31):** same cause as the replayGate refresh in this PR —
+the Marks chapter pool added 18 authored asset records to the catalog, and the new assets'
+state echoes into the hashed resolver output from frame 0. Checkpoint-only refresh via
+`scripts/refreshFixtureCheckpoints.mjs --write`: sha256 b6effd90… → d17d2233… (17764 →
+17768 bytes); deep diff = 16 of 16 checkpoint hashes changed, recorded inputs byte-identical,
+nothing else (nonCheckpointDiffs []). Control: with only ASSETS_MARKS removed from the
+authored index (scratch tree) the pre-refresh fixture verifies byte-for-byte on this tree;
+the refresh is deterministic (the tool's two-run check).
