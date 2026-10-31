@@ -1,5 +1,6 @@
 // node src/data/styleLooks.selfcheck.mjs
-// #1770 (epic #1766, slice 4) — 64 dealable Looks. Pins: the count reads 64 from data; every look names its group,
+// #1770 (epic #1766, slice 4) — 64 dealable Looks; #1854 (BOOK S1b) grows the rack to 69 with the Marks
+// chapter's 5 looks. Pins: the count reads 69 from data; every look names its group,
 // its asset categories and its S3 styles; every recipe validates clean through the #1550 door; no near-duplicate
 // padding (inside a style group no two looks share a mode; across all 64 no two share a recipe signature); every
 // look's pairing deals a COHERENT pool from the real library; and every look survives a headless render — the
@@ -17,13 +18,13 @@ import { mkRng } from '../engine/prng.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 
 // 1. the count, from data
-assert.equal(COMPOSITION_PRESETS.length, 64, `the dealable Look count reads 64, got ${COMPOSITION_PRESETS.length}`);
-assert.equal(STYLE_LOOKS.length, 31, '33 + 31 style looks');
-assert.equal(PRESET_GROUPS.length, 14, '7 original groups + 7 style groups');
+assert.equal(COMPOSITION_PRESETS.length, 69, `the dealable Look count reads 69, got ${COMPOSITION_PRESETS.length}`); // #1854: 64 + 5 Marks looks
+assert.equal(STYLE_LOOKS.length, 36, '33 + 36 style looks'); // #1854: 31 + 5 Marks looks
+assert.equal(PRESET_GROUPS.length, 15, '7 original groups + 8 style groups'); // #1854: + Marks group
 const ids = COMPOSITION_PRESETS.map((p) => p.id);
 assert.equal(new Set(ids).size, ids.length, 'look ids stay unique');
 const menuCount = getPresetsByGroup().reduce((n, g) => n + g.presets.length, 0);
-assert.equal(menuCount, 64, 'the LOOKS menu lists all 64 (no look orphaned from its group)');
+assert.equal(menuCount, 69, 'the LOOKS menu lists all 69 (no look orphaned from its group)'); // #1854
 assert.ok(
   getPresetsByGroup().every((g) => g.presets.length > 0),
   'the LOOKS menu shows no empty group',

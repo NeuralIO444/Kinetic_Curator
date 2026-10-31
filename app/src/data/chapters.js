@@ -23,8 +23,10 @@
 // deckReport() — backstage, by name, with the short axes listed — rather than silently borrowing a neighbour's
 // pool. The minimums are the library's own floor: the smallest look/voice/asset counts among the seven
 // movement chapters that exist today (a chapter smaller than the smallest deck the instrument already deals
-// as a movement is not yet a chapter you can land in). Marks is that report's first honest entry: D1 put it
-// first in the spine, and its pool is authored content (#1854) — until then it deals nothing and says so.
+// as a movement is not yet a chapter you can land in). Marks was that report's first honest entry: D1 put it
+// first in the spine, and its pool is authored content (#1854) — looks, assets, and (under Matt's
+// 2026-10-31 ruling, in the same slice) its own voice family — so it now meets the floor on every axis
+// without borrowing a neighbour's deck.
 
 import { ASSETS } from './assets/index.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
@@ -40,16 +42,19 @@ export const CHAPTER_DECK_MINIMUM = Object.freeze({ looks: 4, voices: 8, assets:
 // The spine, in order (D1). `prev`/`next` are attached from this order below — the order IS the neighbours.
 const SPINE = [
   {
-    // The primitive chapter. No look group, style, or family in the library is Marks yet — its pool is
-    // authored content (#1854: cave signs, stamps, glyphs, tallies), and its card waits for that issue's
-    // ochre/bone/carbon palettes. Until then every axis is empty and deckReport() says so.
+    // The primitive chapter. Its pool is authored content (#1854: cave signs, tallies, hands, a beast —
+    // the `marks` family/style in assetStyle, the `marks` look group in styleLooks, the ochre/bone/carbon
+    // palettes in palettes.js), and it joins here by declaring those axes — derivation does the rest.
+    // Its voices are its own family too: #1854 first scoped them to a later call, but the voiceDeck §4
+    // law (every look group carries ≥6 family voices) made the group undealable without them, so Matt
+    // ruled (2026-10-31) to author the Marks voice family in this slice rather than borrow or exempt.
     id: 'marks',
     name: 'Marks',
-    lookGroups: [],
-    assetStyles: [],
-    assetFamilies: [],
-    voiceStyles: [],
-    card: { paletteId: null, marks: [] },
+    lookGroups: ['marks'],
+    assetStyles: ['marks'],
+    assetFamilies: ['marks'],
+    voiceStyles: ['marks'],
+    card: { paletteId: 'ochre-wall', marks: ['mrk_hand_01', 'mrk_ring_01', 'mrk_beast_01'] },
   },
   {
     id: 'engraving',

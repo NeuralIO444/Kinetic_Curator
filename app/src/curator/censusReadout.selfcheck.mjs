@@ -150,7 +150,7 @@ const coverageArtifact = deepFreeze({
     assert.strictEqual(row.alarm, alarmFor(row.inTray, row.inLibrary), `alarm consistency for ${row.name}`);
   }
   const radial = v.categories.find((r) => r.name === 'radial');
-  assert.ok(radial && radial.inLibrary === 26, 'radial is in the readout with its library size');
+  assert.ok(radial && radial.inLibrary === 27, 'radial is in the readout with its library size'); // #1854 re-pin: 26 → 27 (mrk_ring_01)
   lines.push(
     `real artifact: E1a coverage renders (tray ${v.trayDistinct}/${v.library.assets}, radial tray ${radial.inTray}/${radial.inLibrary}); every alarm consistent`,
   );

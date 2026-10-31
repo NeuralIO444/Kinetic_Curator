@@ -379,6 +379,28 @@ export const PALETTES = [
     swatches: ['#ff5a1f', '#ff2d78', '#ffd400', '#7a3cff', '#3d2b1f', '#f5e6d0'],
     weights: [0.73, 0.65, 0.95, 0.6, 0.13, 0.49],
   },
+  {
+    // #1854 — the first chapter's sky: pigment straight off the cave wall (BOOK S1b).
+    id: 'ochre-wall',
+    name: 'OCHRE WALL',
+    era: 'Cave wall · pigment & bone',
+    bg: '#191008',
+    ink: '#d9c096',
+    swatches: ['#a6491f', '#c07f2a', '#d9c096', '#6e4a26', '#3a2a1a', '#845231'],
+    weights: [0.62, 0.7, 0.5, 0.74, 0.66, 0.58],
+    leak: 0.5, // pigment settles into the stone, it does not run
+  },
+  {
+    // #1854 — the same pigments on the light ground: bone dust, carbon lines.
+    id: 'bone-dust',
+    name: 'BONE DUST',
+    era: 'Bone ground · carbon & ochre',
+    bg: '#e7dcbf',
+    ink: '#2b1d11',
+    swatches: ['#2b1d11', '#a6491f', '#c07f2a', '#6e4a26', '#8a7a5f', '#4a3220'],
+    weights: [0.58, 0.66, 0.62, 0.7, 0.48, 0.6],
+    leak: 0.5,
+  },
 ];
 
 // ── #1365 Q3 (Matt, 2026-10-12): persona palette FAMILIES ───────────────────

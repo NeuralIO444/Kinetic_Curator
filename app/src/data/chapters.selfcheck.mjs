@@ -1,8 +1,8 @@
 // node src/data/chapters.selfcheck.mjs
 // #1853 (BOOK S1): the chapter registry derives every chapter's deck from the existing groups/styles/families,
 // the spine round-trips Marks → Now, the union of chapters covers the dealable library with the creature
-// citizen undealt, chapter cards point at real palettes and real members, and a thin chapter (Marks) reports
-// itself instead of borrowing. The registry reads no palette `era` string and imports no palettes module.
+// citizen undealt, chapter cards point at real palettes and real members, and a chapter below the floor
+// reports itself instead of borrowing. The registry reads no palette `era` string and imports no palettes module.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -60,7 +60,10 @@ CHAPTERS.forEach((c, i) => {
 
 // 3. deck counts per chapter (pinned — the derivation over today's library)
 const EXPECTED_COUNTS = {
-  marks: { looks: 0, voices: 0, assets: 0 },
+  // #1854 landed the Marks pool: 5 authored looks + 18 authored assets + 8 authored family voices
+  // (the voice family was ruled into the same slice, Matt 2026-10-31 — voiceDeck §4 leaves no
+  // look group voiceless, and borrowing was never an option).
+  marks: { looks: 5, voices: 8, assets: 18 },
   engraving: { looks: 4, voices: 11, assets: 20 },
   bauhaus: { looks: 4, voices: 8, assets: 16 },
   swiss: { looks: 5, voices: 11, assets: 61 },
@@ -68,7 +71,7 @@ const EXPECTED_COUNTS = {
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
   grunge: { looks: 5, voices: 8, assets: 39 },
-  now: { looks: 64, voices: 64, assets: 294 },
+  now: { looks: 69, voices: 72, assets: 312 }, // #1854: Now sums the grown library (64+5 looks, 64+8 voices, 294+18 assets)
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
@@ -80,19 +83,19 @@ for (const c of CHAPTERS) {
   assert.equal(new Set(d.assets).size, d.assets.length, `${c.id}: no asset dealt twice inside a deck`);
 }
 
-// 4. coverage: the union of all chapters is exactly the dealable library (294) — the creature citizen is in
+// 4. coverage: the union of all chapters is exactly the dealable library (312) — the creature citizen is in
 //    no chapter's deck, and Now alone is the full library of looks, voices and assets
 {
   const union = new Set();
   for (const c of CHAPTERS) for (const id of chapterAssets(c)) union.add(id);
   const dealable = dealableAssetRecords();
-  assert.equal(dealable.length, 294, 'the dealable library is 294 (295 authored + citizen − citizen)');
-  assert.equal(union.size, 294, 'the chapters together cover the dealable library');
+  assert.equal(dealable.length, 312, 'the dealable library is 312 (313 in the library − the citizen; #1854 added 18)');
+  assert.equal(union.size, 312, 'the chapters together cover the dealable library');
   for (const r of dealable) assert.ok(union.has(r.id), `${r.id}: covered by some chapter`);
   for (const id of NEVER_DEALT) assert.ok(!union.has(id), `${id}: never in a chapter deck`);
   assert.deepEqual(CHAPTER_UNDEALT, NEVER_DEALT, 'the registry exclusion is the roll pool exclusion');
   assert.equal(chapterLooks('now').length, COMPOSITION_PRESETS.length, 'Now holds every look');
-  assert.equal(chapterVoices('now').length, 64, 'Now holds every voice');
+  assert.equal(chapterVoices('now').length, 72, 'Now holds every voice');
 }
 
 // 5. the taxonomy in code is the taxonomy: DIAGONAL GRID is a swiss look, not a bauhaus one
@@ -109,7 +112,9 @@ assert.equal(chapterForStyle('techno'), null, 'techno has no movement chapter �
 
 // 6. deck discipline: the minimums are the library's own floor (each axis is met by every movement chapter,
 //    and some movement chapter sits exactly on each axis minimum — the constants are observed, not padded);
-//    Marks reports short on every axis; every other chapter reports ok
+//    Marks meets the floor on every axis after #1854 (its voice family authored in-slice under Matt's
+//    2026-10-31 ruling), so every chapter reports ok — the shortfall branch below stands ready for the
+//    next chapter that lands thin
 assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the deck floor');
 {
   const report = deckReport();
@@ -121,26 +126,19 @@ assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the
     );
   }
   for (const r of report) {
-    if (r.id === 'marks') {
-      assert.equal(r.ok, false, 'Marks reports itself — it has no pool yet (#1854 authors it)');
-      assert.deepEqual(r.shortfalls, ['looks', 'voices', 'assets'], 'Marks is short on every axis, by name');
-    } else {
-      assert.equal(r.ok, true, `${r.id}: deck meets the floor on every axis`);
-      assert.deepEqual(r.shortfalls, [], `${r.id}: no shortfalls`);
-    }
+    // #1854 follow-up (Matt's ruling, 2026-10-31): the Marks voice family was authored in the same
+    // slice, so Marks retired from the shortfall branch to this generic one — every chapter meets
+    // the floor on every axis, by its own content.
+    assert.equal(r.ok, true, `${r.id}: deck meets the floor on every axis`);
+    assert.deepEqual(r.shortfalls, [], `${r.id}: no shortfalls`);
   }
 }
 
 // 7. chapter cards: a real palette, paired by one of the chapter's own looks, and representative marks that
-//    are members of the chapter's own deck. Marks' card is honestly unfilled until #1854 declares its palettes.
+//    are members of the chapter's own deck. Marks' card is filled by #1854 and passes the same checks.
 {
   const paletteIds = new Set(PALETTES.map((p) => p.id));
   for (const c of CHAPTERS) {
-    if (c.id === 'marks') {
-      assert.equal(c.card.paletteId, null, 'Marks card: no palette declared yet (#1854)');
-      assert.deepEqual(c.card.marks, [], 'Marks card: no marks declared yet (#1854)');
-      continue;
-    }
     assert.ok(paletteIds.has(c.card.paletteId), `${c.id}: card palette ${c.card.paletteId} exists`);
     if (c.id !== 'now') {
       assert.ok(
@@ -169,7 +167,11 @@ assert.deepEqual(
   assert.ok(!/\.era\b/.test(src), 'the registry never reads a palette era string');
   assert.ok(!/from '\.\/palettes\.js'/.test(src), 'the registry does not import palettes.js');
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
-  assert.equal(ASSETS.length, 295, 'the authored library is untouched: 295 records');
+  assert.equal(
+    ASSETS.length,
+    313,
+    'the library is 313: the 295 S1 found + #1854’s 18 authored marks (no existing record edited)',
+  );
 }
 
 console.log('chapters.selfcheck: OK');

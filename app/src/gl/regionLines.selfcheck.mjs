@@ -178,6 +178,8 @@ console.log('regionLines node (strip bake): OK');
   assert.ok(!isStrokeRegion(null) && bendSlicesFor(null) === 0, 'no record, no stroke');
   // The baked census (measured at build): of linework's 89 assigned
   // regions, 35 ride bend and 54 ride bob; bend appears nowhere else.
+  // #1854 re-measure: the Marks pool's linework regions join the census —
+  // 102 assigned linework regions, 36 bend (the spear's shaft among them), 66 bob.
   let bend = 0,
     bob = 0,
     bendOutsideLine = 0;
@@ -190,8 +192,8 @@ console.log('regionLines node (strip bake): OK');
       if (kid === 'bob') bob++;
     }
   }
-  assert.strictEqual(bend, 35, 'library-wide: 35 regions default to bend');
-  assert.strictEqual(bob, 54, 'library-wide: 54 regions default to bob');
+  assert.strictEqual(bend, 36, 'library-wide: 36 regions default to bend'); // #1854 re-measure (was 35)
+  assert.strictEqual(bob, 66, 'library-wide: 66 regions default to bob'); // #1854 re-measure (was 54)
   assert.strictEqual(bendOutsideLine, 0, 'bend defaults live only in the line family');
   // The defaults the contract will read for the fixtures:
   assert.deepEqual(regionAssignmentFor(SQ3, null), { [sq3Region.id]: 'bend' }, 'squiggle_03 defaults to bend');

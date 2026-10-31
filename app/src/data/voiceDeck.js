@@ -1,11 +1,13 @@
-// #1771 (epic #1766, slice 5) — the dealable voice deck: 64 full costumes for the KINETIC voice pass.
+// #1771 (epic #1766, slice 5) — the dealable voice deck: 72 full costumes for the KINETIC voice pass.
 //
 //   4  flagships — FLAGSHIP_VOICES, untouched (byte-identical; this module only reads them and adds a sidecar)
 //  15  promoted stubs — every layout tile becomes a full voice: its mode + motion + a catalog palette + the full
 //      8-shape wardrobe (data/voices.js `fullShapeSet`), so a stub's SHAPES chip lights exactly when the voice's
 //      whole set is the pool
-//  45  family variants — per S4 style group (Japanese, Grunge, Swiss, Bauhaus, Op Art, Memphis, Engraved), each a
-//      different recipe: its own mode, motion, palette and count, wearing an S3-coherent pool for its family
+//  53  family variants — per S4 style group (Japanese, Grunge, Swiss, Bauhaus, Op Art, Memphis, Engraved, Marks),
+//      each a different recipe: its own mode, motion, palette and count, wearing an S3-coherent pool for its
+//      family. Marks joined last (#1854, Matt's 2026-10-31 ruling): the first chapter's family, authored in
+//      the same slice as its pool rather than borrowed from another era.
 //
 // Every deck voice is kc-voice/1-shaped (resolveVoiceState reads it unchanged — no schema change) and declares:
 //   categories / styles — its S3 asset pairing (data/assetStyle.js)
@@ -229,7 +231,7 @@ const PROMOTED = [
   ],
 ];
 
-// ── the 45 family variants ─────────────────────────────────────────────────────────────────────────────────────
+// ── the 53 family variants ─────────────────────────────────────────────────────────────────────────────────────
 /** Each S4 style group's asset pairing (categories the family's style actually lives in, per `npm run audit:assets`). */
 export const FAMILY_PAIRING = Object.freeze({
   japanese: ['floral', 'organic', 'radial'],
@@ -239,6 +241,7 @@ export const FAMILY_PAIRING = Object.freeze({
   op: ['radial', 'dots', 'linework'],
   memphis: ['geometric', 'dots', 'linework'],
   engraved: ['radial', 'linework'],
+  marks: ['stamps', 'linework', 'dots'],
 });
 // [id, title, vibe, mode, motion chip, palette, count, accumulation, costTier]
 const VARIANTS = {
@@ -749,6 +752,98 @@ const VARIANTS = {
       48,
       ACCUM_OFF,
       'light',
+    ],
+  ],
+  // The first chapter's family (#1854): pigment, bone and carbon, placed once and left alone — every
+  // motion is still or a slow lean, and only the pit keeps an after-image (the wall remembering).
+  marks: [
+    [
+      'ochre-hand',
+      'Ochre Hand',
+      'Blown pigment: a hand held to the wall, sprayed around, left as a ghost.',
+      'poisson',
+      'still',
+      'ochre-wall',
+      44,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'tally-row',
+      'Tally Row',
+      'Notches in rows on bone: somebody counted something here, and meant it.',
+      'stratified',
+      'still',
+      'bone-dust',
+      88,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'ring-dance',
+      'Ring Dance',
+      'Rings around a centre, turning at the speed of a ceremony — which is barely.',
+      'radial',
+      'orbit',
+      'ochre-wall',
+      56,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'dot-chant',
+      'Dot Chant',
+      'Finger dots dabbed one breath apart: a chant you can count.',
+      'grid',
+      'still',
+      'bone-dust',
+      96,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'rain-line',
+      'Rain Line',
+      'Falling strokes on a dark ground: weather, remembered indoors.',
+      'flow',
+      'drift',
+      'ochre-wall',
+      64,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'sun-sign',
+      'Sun Sign',
+      'Rayed suns packed shoulder to shoulder, none of them touching.',
+      'circlepack',
+      'still',
+      'bone-dust',
+      48,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'spear-sign',
+      'Spear Sign',
+      'One barbed sign repeated along a border: this far, no further.',
+      'random',
+      'drift',
+      'bone-dust',
+      36,
+      ACCUM_OFF,
+      'light',
+    ],
+    [
+      'pigment-pit',
+      'Pigment Pit',
+      'The grinding hollow: marks made here leave an after-image — the wall remembers.',
+      'gaussian',
+      'still',
+      'ochre-wall',
+      54,
+      accum(12, 0.03),
+      'medium',
     ],
   ],
 };

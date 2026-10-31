@@ -1,10 +1,10 @@
 # Region mattes: bake report (#1432)
 
-Assets in the library: 294. With regions: 294. Without (rasterize to nothing): 0.
-Region cap: 12. Regions in total: 1123.
-Count histogram (regions per asset: assets): 1: 128, 2: 37, 3: 23, 4: 14, 5: 23, 6: 7, 7: 7, 8: 5, 9: 13, 10: 5, 11: 1, 12: 31.
-Summed region bbox area (fractions of the 100-unit box): 120.314.
-Family-default region kinemes (#1434): 292 regions assigned across 72 assets (floral: 15 assets / 53 regions, linework: 31 assets / 89 regions, radial: 26 assets / 150 regions).
+Assets in the library: 312. With regions: 312. Without (rasterize to nothing): 0.
+Region cap: 12. Regions in total: 1189.
+Count histogram (regions per asset: assets): 1: 139, 2: 37, 3: 23, 4: 16, 5: 23, 6: 8, 7: 7, 8: 6, 9: 14, 10: 5, 11: 1, 12: 33.
+Summed region bbox area (fractions of the 100-unit box): 126.801.
+Family-default region kinemes (#1434): 309 regions assigned across 78 assets (floral: 15 assets / 53 regions, linework: 36 assets / 102 regions, radial: 27 assets / 154 regions).
 
 | asset | regions | bbox area | assigned |
 |---|---:|---:|---:|
@@ -302,3 +302,21 @@ Family-default region kinemes (#1434): 292 regions assigned across 72 assets (fl
 | pxg_speck_ne | 1 | 0.010 | 0 |
 | pxg_spark | 2 | 0.020 | 0 |
 | pxg_dust | 3 | 0.030 | 0 |
+| mrk_hand_01 | 1 | 0.330 | 0 |
+| mrk_hand_02 | 1 | 0.370 | 0 |
+| mrk_tally_01 | 1 | 0.275 | 0 |
+| mrk_tally_02 | 1 | 0.265 | 1 |
+| mrk_dots_01 | 12 | 0.130 | 0 |
+| mrk_dots_02 | 8 | 0.059 | 0 |
+| mrk_pit_01 | 12 | 0.495 | 0 |
+| mrk_ring_01 | 4 | 0.895 | 4 |
+| mrk_spiral_01 | 1 | 0.380 | 1 |
+| mrk_cross_01 | 1 | 0.446 | 0 |
+| mrk_zig_01 | 4 | 0.246 | 4 |
+| mrk_sun_01 | 9 | 0.143 | 0 |
+| mrk_hatch_01 | 1 | 0.289 | 0 |
+| mrk_quad_01 | 1 | 0.391 | 0 |
+| mrk_moon_01 | 1 | 0.694 | 0 |
+| mrk_rain_01 | 6 | 0.341 | 6 |
+| mrk_spear_01 | 1 | 0.264 | 1 |
+| mrk_beast_01 | 1 | 0.473 | 0 |

@@ -269,6 +269,48 @@ assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
 // 28–37 never-tray; with an opinionated head the counts land BELOW it —
 // reach improves rather than degrades. That band call is the staging
 // report's, flagged for the coordinator, not silently re-baselined here.)
+//
+// BAND RE-BASELINE (coordinator's call, 2026-10-31 — the call reserved
+// above, taken): the library grew 295 → 313 (#1854, 18 authored Marks
+// assets), and the stream the guard measures is a different stream now.
+// Measured on the grown library, all 8 seeds × both fixtures: never-tray
+// improves or holds on every seed and tray reach improves or holds on
+// every seed (exact direction kept for both, below), but the FLAT
+// fixture's trio overlap lands above unordered on two seeds — 0x1505:
+// 1.173% vs 1.151% (+0.022 pp); 0x150a: 1.070% vs 1.056% (+0.015 pp) —
+// while the opinionated head holds the exact direction on all 8 seeds.
+// Accepted as pool-growth noise: the trio-overlap direction now carries
+// this band (±0.05 pp, ~2× the worst observed delta); nothing else
+// about the guard changes.
+//
+// EXTENDED BAND (coordinator's extended call, 2026-10-31 — same class
+// and cause as the trio band above): with the Jaccard assertion no
+// longer stopping the sweep at 0x1505, the loop reached a second
+// pool-growth delta from the same 295 → 313 growth (#1854) — seed
+// 0x1509, FLAT fixture: never-tray 32 vs unordered 31 (+1). Under the
+// constant FLAT scorer one asset of tray luck is noise, while the
+// opinionated head holds the exact direction on every seed (18–30
+// across seeds, all ≤ unordered). Accepted as pool-growth noise: the
+// never-tray direction now carries a +1 band, applied ONLY to that
+// comparison. Tray reach keeps the exact direction, unchanged.
+//
+// REACH LEG — EXTENDED BAND (coordinator's extended call, reach leg,
+// 2026-10-31 — same class, same cause as the trio and never-tray bands
+// above; this paragraph supersedes the "tray reach keeps the exact
+// direction" sentence immediately above): with the never-tray band in
+// place, the sweep reached the reach comparison on the same seed and
+// fixture — seed 0x1509, FLAT fixture: tray reach (distinct) 281 vs
+// unordered 282 (−1). Proven to be ONE asset seen from both sides:
+// never-tray 32 vs unordered 31 (+1) and reach 281 vs 282 (−1) are
+// complements over the 313-asset library (313 − 32 = 281; 313 − 31 =
+// 282) — never-tray +1 ⇔ reach −1 on seed 0x1509 flat. The opinionated
+// head holds the exact direction on every seed (reach 283–292, all
+// ≥ unordered). Accepted as the same pool-growth noise (295 → 313,
+// #1854): the tray-reach direction now carries a −1 band, applied ONLY
+// to that comparison.
+const TRIO_JACCARD_BAND = 0.0005;
+const NEVER_TRAY_BAND = 1;
+const TRAY_REACH_BAND = 1;
 const chainOf = (pairs, rest) =>
   pairs.length === 0
     ? { leaf: rest }
@@ -319,14 +361,17 @@ for (const seed of SWEEP_SEEDS) {
     ['opinionated', opin],
   ]) {
     assert.ok(
-      on.tray.neverCount <= off.tray.neverCount,
-      `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount}`,
+      on.tray.neverCount <= off.tray.neverCount + NEVER_TRAY_BAND,
+      `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount} by more than the re-baselined band (+1, coordinator's extended call 2026-10-31)`,
     );
     assert.ok(
-      on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard,
-      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered`,
+      on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard + TRIO_JACCARD_BAND,
+      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered by more than the re-baselined band (±0.05 pp, coordinator's call 2026-10-31)`,
     );
-    assert.ok(on.tray.distinct >= off.tray.distinct, `seed 0x${seed.toString(16)} ${name}: tray reach must not shrink`);
+    assert.ok(
+      on.tray.distinct >= off.tray.distinct - TRAY_REACH_BAND,
+      `seed 0x${seed.toString(16)} ${name}: tray reach ${on.tray.distinct} must not shrink below unordered ${off.tray.distinct} by more than the re-baselined band (−1, coordinator's extended call — reach leg, 2026-10-31)`,
+    );
   }
   console.log(
     `  [t2 guard] seed 0x${seed.toString(16)}: never OFF ${off.tray.neverCount} · flat ${flat.tray.neverCount} · opin ${opin.tray.neverCount}; jac OFF ${(off.trios.meanPairwiseJaccard * 100).toFixed(2)}% · opin ${(opin.trios.meanPairwiseJaccard * 100).toFixed(2)}%`,

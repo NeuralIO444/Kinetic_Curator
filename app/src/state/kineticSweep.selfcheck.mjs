@@ -50,7 +50,7 @@ const snap = () => {
   S().kineticLookPass();
   const b = snap();
   const dLook = paramDiff(a.lp, b.lp);
-  assert.ok(lookIds.has(S().layoutParams.composition), 'LOOK lands on one of the 64 looks');
+  assert.ok(lookIds.has(S().layoutParams.composition), 'LOOK lands on one of the dealt looks');
   assert.notEqual(b.lp.composition, a.lp.composition, 'LOOK deals a different look');
   assert.ok(dLook.every(STRUCT_OK), `LOOK moved motion keys: ${dLook.filter((k) => !STRUCT_OK(k))}`);
   assert.notEqual(b.assets, a.assets, 'LOOK re-deals the pool');
@@ -68,7 +68,7 @@ const snap = () => {
   const c = snap();
   const dVoice = paramDiff(b.lp, c.lp);
   const voice = VOICE_DECK.find((v) => v.id === S().kineticVoiceId);
-  assert.ok(voice, 'VOICE deals one of the 64 voices');
+  assert.ok(voice, 'VOICE deals one of the dealt voices');
   assert.ok(dVoice.every(VOICE_OK), `VOICE moved structure: ${dVoice.filter((k) => !VOICE_OK(k))}`);
   if (!voice.accumulation)
     assert.ok(!dVoice.some((k) => ACCUM_KEYS.includes(k)), 'a voice without ACCUM never deals the glow');
