@@ -16,8 +16,12 @@
 //
 // Pure: no clock, no Math.random. Every roll is hashU01 on the 'hierarchy' channel (the spatial stream creatures already
 // ride), keyed by the caller's key, so the same parents and seed give the same child, and a take replays it.
+//
+// BEAST S1 (#1864): measure genes added. 13 Jansen bars relative to a, plus legCount, per-leg phase, scale.
+// Measure genes are the explicit exception to the non-brittle rule; mutation uses seeded check-retry (S2 feasibility).
 import { hashU01 } from './kernel/rng.js';
 import { TRAIT_DEFAULTS, TRAIT_RANGES, normalizeTraits } from './creature.js';
+import { MEASURE_RANGES, MEASURE_IDS, JANSEN_RELATIVE } from './jansenMeasures.js';
 
 export const GENOME_VERSION = 1;
 /** A genome never holds more genes than this (duplications stop at the cap). */
@@ -34,16 +38,18 @@ export const DRIVES = Object.freeze(['approval', 'crowding', 'strain', 'boredom'
 /** Concept cells an instinct can name (#1736: band 3 x crowd 3 x alignment 2). */
 export const CELL_COUNT = 18;
 
-/** Value ranges per gene kind: everything is clamped into these, so a mutation can never break a creature. */
+/** Value ranges per gene kind: everything is clamped into these, so a mutation can never break a creature.
+ *  measure is the exception (see MEASURE_RANGES). */
 export const GENE_RANGES = Object.freeze({
   drive: Object.freeze({ min: 0.25, max: 2 }), // a drive's gain (how fast it rises): 1 = the species norm
   instinct: Object.freeze({ min: 0, max: 1 }), // how strongly the newborn rehearses its instinct
   temper: Object.freeze({ min: -0.5, max: 0.5 }), // a standing bias added to a mode's score
   ornament: Object.freeze({ min: 0, max: 0.5 }), // extra limb growth target once the gene switches on
+  measure: MEASURE_RANGES, // per-id ranges for Jansen bars + legCount + scale + phase
 });
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
-const KINDS = Object.freeze(['plan', 'trait', 'drive', 'instinct', 'temper', 'ornament']);
+const KINDS = Object.freeze(['plan', 'trait', 'drive', 'instinct', 'temper', 'ornament', 'measure']);
 
 /** FNV-1a of a string: a stable 32-bit index for the registered channel. */
 function hash32(str) {
@@ -68,6 +74,7 @@ function gene(kind, id, value, { stage = 'embryo', mutate = true, dup = false, c
 /**
  * The wild-type genome for a creature Davis rolled: his four traits as trait genes, plus behaviour genes rolled from
  * the seed around the species norm. `key` names the birth (slot, ordinal, place), so every birth is its own animal.
+ * For beasts, call with measure genes added separately (see addJansenMeasures).
  */
 export function genomeFromTraits(traits, seed = 0, key = 'wild') {
   const t = normalizeTraits(traits);
@@ -99,6 +106,21 @@ export function genomeFromTraits(traits, seed = 0, key = 'wild') {
   return { v: GENOME_VERSION, genes };
 }
 
+/** Add the Jansen measure set (relative to a) plus legCount and scale as measure genes. */
+export function addJansenMeasures(genome, measures = JANSEN_RELATIVE, legCount = 12, scale = 1.0) {
+  const genes = [...(genome.genes || [])];
+  for (const id of MEASURE_IDS) {
+    genes.push(gene('measure', id, measures[id] ?? 1.0));
+  }
+  genes.push(gene('measure', 'legCount', legCount));
+  genes.push(gene('measure', 'scale', scale));
+  // per-leg phases as measure genes named phase0..phase11 (only as many as legCount)
+  for (let i = 0; i < legCount; i++) {
+    genes.push(gene('measure', `phase${i}`, i / legCount));
+  }
+  return sanitizeGenome({ v: GENOME_VERSION, genes });
+}
+
 /** Clamp one gene; null when it is not a gene at all (a mutation or a hand-edited file can carry anything). */
 function cleanGene(g) {
   if (!g || typeof g !== 'object' || !KINDS.includes(g.kind) || typeof g.id !== 'string' || !g.id || g.id.length > 24)
@@ -115,6 +137,12 @@ function cleanGene(g) {
   }
   if (g.kind === 'drive' && !DRIVES.includes(g.id)) return null;
   if (g.kind === 'temper' && !MODES.includes(g.id)) return null;
+  if (g.kind === 'measure') {
+    const r = MEASURE_RANGES[g.id] || MEASURE_RANGES.phase;
+    value = clamp(value, r.min, r.max);
+    if (g.id === 'legCount') value = Math.round(value);
+    return gene('measure', g.id, value, flags);
+  }
   const r = GENE_RANGES[g.kind];
   value = clamp(value, r.min, r.max);
   const cell = Number.isInteger(g.cell) ? clamp(g.cell, 0, CELL_COUNT - 1) : 0;
@@ -125,7 +153,7 @@ function cleanGene(g) {
 /**
  * Any genome-shaped thing → a valid genome, or null when it carries no body plan. Unknown genes are dropped, values
  * clamped, the gene count capped, and a missing trait gene reads as the species default — so a mutated or hand-edited
- * genome always yields a creature (the non-brittle rule).
+ * genome always yields a creature (the non-brittle rule). Measure genes are clamped to their ranges.
  */
 export function sanitizeGenome(raw) {
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.genes)) return null;
@@ -143,6 +171,7 @@ export function sanitizeGenome(raw) {
 /**
  * What a genome expresses at an age (frames): only genes whose stage has been reached act. The first gene of a kind+id
  * wins for traits / drives / tempers (a duplicate is spare, as in Creatures); every switched-on instinct is listed.
+ * Measure genes are collected into out.measures.
  */
 export function expressGenome(genome, ageFrames = 0) {
   const out = {
@@ -151,6 +180,7 @@ export function expressGenome(genome, ageFrames = 0) {
     temper: MODES.map(() => 0),
     instincts: [],
     flare: 0,
+    measures: {},
   };
   const g = genome && Array.isArray(genome.genes) ? genome.genes : [];
   const age = Number.isFinite(ageFrames) ? ageFrames : 0;
@@ -168,6 +198,7 @@ export function expressGenome(genome, ageFrames = 0) {
     else if (x.kind === 'drive') out.drives[x.id] = x.value;
     else if (x.kind === 'temper') out.temper[MODES.indexOf(x.id)] = x.value;
     else if (x.kind === 'ornament') out.flare = x.value;
+    else if (x.kind === 'measure') out.measures[x.id] = x.value;
   }
   out.traits = normalizeTraits(out.traits);
   return out;
@@ -185,6 +216,7 @@ export const MUTATION = Object.freeze({ point: 0.12, dup: 0.04, cut: 0.04, point
  * Copy errors, Creatures' way: per gene, honouring its flags — a POINT mutation nudges a value by up to pointSpan of
  * its range, a DUP copies the gene (offspring grow longer), a CUT omits it (shorter). Protected genes are copied as
  * they are. The result is re-sanitized, so it is always a valid genome.
+ * Measure genes use the same point mutation but are expected to be re-checked for feasibility by the caller (S2).
  */
 export function mutateGenome(genome, seed = 0, key = 'mut') {
   const src = sanitizeGenome(genome);
@@ -199,7 +231,7 @@ export function mutateGenome(genome, seed = 0, key = 'mut') {
     if (g.cut && roll(seed, key, base + 1) < MUTATION.cut) return; // omitted
     const copy = { ...g };
     if (copy.mutate && roll(seed, key, base + 2) < MUTATION.point) {
-      const r = copy.kind === 'trait' ? TRAIT_RANGES[copy.id] : GENE_RANGES[copy.kind];
+      const r = copy.kind === 'trait' ? TRAIT_RANGES[copy.id] : (copy.kind === 'measure' ? (MEASURE_RANGES[copy.id] || MEASURE_RANGES.phase) : GENE_RANGES[copy.kind]);
       const span = (r.max - r.min) * MUTATION.pointSpan;
       copy.value += (roll(seed, key, base + 3) * 2 - 1) * span;
     }
@@ -250,5 +282,12 @@ export function genomeSimilarity(a, b) {
   ea.temper.forEach((v, n) =>
     parts.push(1 - Math.abs(v - eb.temper[n]) / (GENE_RANGES.temper.max - GENE_RANGES.temper.min)),
   );
+  // measures contribute to similarity as well
+  for (const id of Object.keys(ea.measures)) {
+    if (eb.measures[id] != null) {
+      const r = MEASURE_RANGES[id] || MEASURE_RANGES.phase;
+      parts.push(1 - Math.abs(ea.measures[id] - eb.measures[id]) / (r.max - r.min));
+    }
+  }
   return parts.reduce((s, v) => s + v, 0) / parts.length;
 }
