@@ -22,9 +22,33 @@ export function steerCrankRates(headingError, maxDiff = 0.3) {
   return Math.round(raw * steps) / steps;
 }
 
-export function stepBeast(state, measures, drives, queenBias, dt, dishRadius) {
-  // state: { x, y, heading, thetaL, thetaR, rate }
-  const diff = steerCrankRates(drives.targetHeading - state.heading + queenBias);
+/** Mass-based push: lighter body is shoved more; stance feet slip visibly (slip factor). */
+export function pushCollision(stateA, massA, stateB, massB, slip = 0.3) {
+  const dx = stateB.x - stateA.x;
+  const dy = stateB.y - stateA.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const total = massA + massB;
+  const pushA = (massB / total) * 0.05;
+  const pushB = (massA / total) * 0.05;
+  stateA.x -= (dx / dist) * pushA;
+  stateA.y -= (dy / dist) * pushA;
+  stateB.x += (dx / dist) * pushB;
+  stateB.y += (dy / dist) * pushB;
+  // Lighter slips more
+  if (massA < massB) stateA.slip = slip;
+  else stateB.slip = slip;
+  return { stateA, stateB };
+}
+
+export function stepBeast(state, measures, drives, queenBias, dt, dishRadius, log = []) {
+  // state: { x, y, heading, thetaL, thetaR, rate, cycle }
+  state.cycle = (state.cycle || 0) + 1;
+  const headingError = (drives.targetHeading || 0) - state.heading + (queenBias || 0);
+  const diff = steerCrankRates(headingError);
+  // Log once per crank cycle (approx every 60 frames at 1 rad/s)
+  if (state.cycle % 60 === 0) {
+    log.push({ cycle: state.cycle, diff, bias: queenBias, heading: state.heading });
+  }
   state.thetaL = (state.thetaL + (state.rate + diff) * dt) % (Math.PI * 2);
   state.thetaR = (state.thetaR + (state.rate - diff) * dt) % (Math.PI * 2);
   const speed = bodySpeedFromStance(measures, state.thetaL, measures.scale || 1, dt);
