@@ -1,10 +1,23 @@
 // app/src/engine/jansenSolver.js — #1865 BEAST S2: pure closed-form Jansen kinematics.
 //
 // No stage, no drawing, no state. (lengths, θ) → joints + foot.
-// Circle-circle intersections only. Branch chosen by continuity from θ=0 (not signed area).
-// Explicit epsilon for near-tangent sqrt. Ground-coverage check (some foot in stance at every angle).
-// Golden tests against holy numbers expected in the companion selfcheck.
-// Deterministic: pure, no Math.random.
+// Circle-circle intersections only, in the canonical chain order
+// (docs/design/strandbeest-linkage-research-2026-10-29.md §2).
+//
+// Branch selection is pinned by a fixed geometric rule — the signed-area
+// (cross-product) side of each joint relative to the directed line through
+// its two parent joints: J2 +, J3 +, J4 +, J5 −, F +. This is the assembly
+// mode that reproduces the published wild-type gait (see jansenMeasures.js
+// WANG_ANCHORS and beast.selfcheck.mjs). The signs are constant over the
+// whole crank cycle for the wild type with wide margins (signed heights at
+// a=38 stay within J2 +[36.5, 41.5], J3 +40.0, J4 +[15.4, 39.3],
+// J5 −[−36.6, −31.2], F +48.4 — never near the parent line), so the rule
+// never wavers near a singularity. An earlier version seeded θ=0 with an
+// arbitrary candidate and chained by continuity; that silently assembled
+// the leg in the flipped-J5 mode, whose foot curve is a tall loop instead
+// of the flat-bottomed Jansen ovoid. A pure function of (lengths, θ) also
+// keeps the solver replay-legal: no call-history dependence.
+// Deterministic: pure, no Math.random, no clocks.
 
 const EPS = 1e-8;
 
@@ -28,27 +41,25 @@ function circ(p1, r1, p2, r2) {
   ];
 }
 
-/** Choose the branch continuous with the previous pose. */
-function chooseBranch(candidates, prev) {
+/**
+ * Pick the intersection candidate on the pinned side of the directed line
+ * P→Q: sign +1 keeps the candidate with cross(Q−P, X−P) > 0, −1 the other.
+ * (circ's candidate 0 is always the positive-cross one when h > 0.) At a
+ * tangent configuration h ≈ 0 the candidates coincide, so either is right.
+ */
+function pickBranch(candidates, P, Q, sign) {
   if (!candidates || candidates.length === 0) return null;
-  if (!prev) return candidates[0]; // pin at θ=0
-  let best = candidates[0];
-  let bestD = Infinity;
-  for (const c of candidates) {
-    const d = Math.hypot(c.x - prev.x, c.y - prev.y);
-    if (d < bestD) {
-      bestD = d;
-      best = c;
-    }
-  }
-  return best;
+  if (candidates.length === 1) return candidates[0];
+  const c0 = (Q.x - P.x) * (candidates[0].y - P.y) - (Q.y - P.y) * (candidates[0].x - P.x);
+  if (Math.abs(c0) < 1e-12) return candidates[0];
+  return c0 > 0 === sign > 0 ? candidates[0] : candidates[1];
 }
 
 /**
  * Solve one pose. lengths relative to a=1; absolute = relative * scale.
  * Returns { joints: {J1..J5, F}, ok: boolean } or null on failure.
  */
-export function solvePose(lengths, theta, scale = 1, prev = null) {
+export function solvePose(lengths, theta, scale = 1) {
   const a = (lengths.a ?? 1) * scale;
   const b = (lengths.b ?? 1) * scale;
   const c = (lengths.c ?? 1) * scale;
@@ -67,108 +78,87 @@ export function solvePose(lengths, theta, scale = 1, prev = null) {
   const G = { x: -a, y: -l };
   const J1 = { x: O.x + m * Math.cos(theta), y: O.y + m * Math.sin(theta) };
 
-  const j2c = circ(J1, j, G, b);
-  const J2 = chooseBranch(j2c, prev?.J2);
+  const J2 = pickBranch(circ(J1, j, G, b), J1, G, +1);
   if (!J2) return null;
 
-  const j3c = circ(J2, e, G, d);
-  const J3 = chooseBranch(j3c, prev?.J3);
+  const J3 = pickBranch(circ(J2, e, G, d), J2, G, +1);
   if (!J3) return null;
 
-  const j4c = circ(J1, k, G, c);
-  const J4 = chooseBranch(j4c, prev?.J4);
+  const J4 = pickBranch(circ(J1, k, G, c), J1, G, +1);
   if (!J4) return null;
 
-  const j5c = circ(J3, f, J4, g);
-  const J5 = chooseBranch(j5c, prev?.J5);
+  const J5 = pickBranch(circ(J3, f, J4, g), J3, J4, -1);
   if (!J5) return null;
 
-  const fc = circ(J4, i, J5, h);
-  const F = chooseBranch(fc, prev?.F);
+  const F = pickBranch(circ(J4, i, J5, h), J4, J5, +1);
   if (!F) return null;
 
-  return { joints: { J1, J2, J3, J4, J5, F }, ok: true, prev: { J2, J3, J4, J5, F } };
+  return { joints: { J1, J2, J3, J4, J5, F }, ok: true };
 }
 
-/** Full cycle feasibility + Wang gait metrics. 361 samples. */
+/**
+ * Full cycle feasibility + Wang gait metrics (definitions per
+ * docs/design/strandbeest-linkage-research-2026-10-29.md §3, Wang 2026):
+ * one sweep of 360 crank steps. Stance = the samples with the foot within
+ * the lowest 15% of its height range (Wang's operational stance).
+ *   step      — horizontal distance the foot travels during stance
+ *   clearance — max foot height above the ground line (the stance mean
+ *               height) during the cycle
+ *   flatness  — RMS deviation of foot height from its stance mean,
+ *               normalized by step length (dimensionless; the published
+ *               0.0281 is this ratio — the absolute RMS is 1.21 at a=38)
+ *   ripple    — std/mean of the foot's horizontal velocity during stance,
+ *               central differences over the cycle samples
+ *   duty      — fraction of the cycle in stance
+ * flatness, ripple and duty are scale-free; step and clearance scale
+ * linearly with `scale`.
+ */
 export function evaluateGenome(lengths, scale = 1) {
-  const samples = 361;
-  let prev = null;
+  const STEPS = 360;
+  const feet = [];
+
+  for (let s = 0; s < STEPS; s++) {
+    const theta = (s / STEPS) * Math.PI * 2;
+    const pose = solvePose(lengths, theta, scale);
+    if (!pose) return { feasible: false, stillborn: true };
+    feet.push(pose.joints.F);
+  }
+
   let minY = Infinity;
   let maxY = -Infinity;
-  let failed = false;
-  const feet = [];
-  const thetas = [];
-
-  for (let s = 0; s < samples; s++) {
-    const theta = (s / samples) * Math.PI * 2;
-    const pose = solvePose(lengths, theta, scale, prev);
-    if (!pose) {
-      failed = true;
-      break;
-    }
-    prev = pose.prev;
-    const f = pose.joints.F;
-    feet.push(f);
-    thetas.push(theta);
+  for (const f of feet) {
     minY = Math.min(minY, f.y);
     maxY = Math.max(maxY, f.y);
   }
 
-  if (failed || feet.length === 0) return { feasible: false, stillborn: true };
-
   const heightRange = maxY - minY || 1;
   const stanceThreshold = minY + 0.15 * heightRange;
-  let stanceYSum = 0;
-  let stanceCount = 0;
+  const stanceIdx = [];
+  for (let s = 0; s < STEPS; s++) {
+    if (feet[s].y <= stanceThreshold) stanceIdx.push(s);
+  }
+  if (stanceIdx.length === 0) return { feasible: false, stillborn: true };
+
+  const stanceMean = stanceIdx.reduce((sum, s) => sum + feet[s].y, 0) / stanceIdx.length;
   let minStanceX = Infinity;
   let maxStanceX = -Infinity;
-  let prevStanceX = null;
-  let velSum = 0;
-  let velSqSum = 0;
-  let velCount = 0;
-
-  for (let i = 0; i < feet.length; i++) {
-    const fy = feet[i].y;
-    if (fy <= stanceThreshold) {
-      stanceYSum += fy;
-      stanceCount++;
-      const fx = feet[i].x;
-      minStanceX = Math.min(minStanceX, fx);
-      maxStanceX = Math.max(maxStanceX, fx);
-      if (prevStanceX !== null) {
-        const dx = fx - prevStanceX;
-        const dtheta = thetas[i] - thetas[i - 1] || (2 * Math.PI / samples);
-        const vel = dx / dtheta;
-        velSum += vel;
-        velSqSum += vel * vel;
-        velCount++;
-      }
-      prevStanceX = fx;
-    } else {
-      prevStanceX = null;
-    }
+  for (const s of stanceIdx) {
+    minStanceX = Math.min(minStanceX, feet[s].x);
+    maxStanceX = Math.max(maxStanceX, feet[s].x);
   }
+  const step = maxStanceX - minStanceX;
 
-  if (stanceCount === 0) return { feasible: false, stillborn: true };
+  const rms = Math.sqrt(stanceIdx.reduce((sum, s) => sum + (feet[s].y - stanceMean) ** 2, 0) / stanceIdx.length);
+  const flatness = step > 0 ? rms / step : 0;
 
-  const stanceMean = stanceYSum / stanceCount;
-  let flatnessSq = 0;
-  for (let i = 0; i < feet.length; i++) {
-    if (feet[i].y <= stanceThreshold) {
-      const dy = feet[i].y - stanceMean;
-      flatnessSq += dy * dy;
-    }
-  }
-  const flatness = Math.sqrt(flatnessSq / stanceCount);
-
-  const meanVel = velCount ? velSum / velCount : 0;
-  const varVel = velCount ? (velSqSum / velCount) - meanVel * meanVel : 0;
+  const dTheta = (Math.PI * 2) / STEPS;
+  const vels = stanceIdx.map((s) => (feet[(s + 1) % STEPS].x - feet[(s - 1 + STEPS) % STEPS].x) / (2 * dTheta));
+  const meanVel = vels.reduce((sum, v) => sum + v, 0) / vels.length;
+  const varVel = vels.reduce((sum, v) => sum + (v - meanVel) ** 2, 0) / vels.length;
   const ripple = meanVel ? Math.sqrt(Math.max(0, varVel)) / Math.abs(meanVel) : 0;
 
-  const step = maxStanceX - minStanceX;
-  const clearance = maxY - minY;
-  const duty = stanceCount / samples;
+  const clearance = maxY - stanceMean;
+  const duty = stanceIdx.length / STEPS;
 
   return {
     feasible: true,
@@ -181,7 +171,6 @@ export function evaluateGenome(lengths, scale = 1) {
     step,
     clearance,
     duty,
-    // Normalized against holy (wild type = 1.0) left to caller / selfcheck
   };
 }
 

@@ -231,7 +231,12 @@ export function mutateGenome(genome, seed = 0, key = 'mut') {
     if (g.cut && roll(seed, key, base + 1) < MUTATION.cut) return; // omitted
     const copy = { ...g };
     if (copy.mutate && roll(seed, key, base + 2) < MUTATION.point) {
-      const r = copy.kind === 'trait' ? TRAIT_RANGES[copy.id] : (copy.kind === 'measure' ? (MEASURE_RANGES[copy.id] || MEASURE_RANGES.phase) : GENE_RANGES[copy.kind]);
+      const r =
+        copy.kind === 'trait'
+          ? TRAIT_RANGES[copy.id]
+          : copy.kind === 'measure'
+            ? MEASURE_RANGES[copy.id] || MEASURE_RANGES.phase
+            : GENE_RANGES[copy.kind];
       const span = (r.max - r.min) * MUTATION.pointSpan;
       copy.value += (roll(seed, key, base + 3) * 2 - 1) * span;
     }

@@ -316,11 +316,13 @@ registerCostTier('beast/solver', {
   tier: 0,
   memoryBytes: 0,
   timeMs: 0.08,
-  notes: 'BEAST S2 closed-form Jansen solver (5 circle intersections per leg per frame). Pure CPU; measured later via resolverProbe. Sheds with creature count.',
+  notes:
+    'BEAST S2 closed-form Jansen solver (5 circle intersections per leg per frame). Pure CPU; measured later via resolverProbe. Sheds with creature count.',
 });
 registerCostTier('beast/trails', {
-  tier: 1,
+  tier: 0,
   memoryBytes: 0,
   timeMs: 0.02,
-  notes: 'BEAST S5 signature trail deposits. Counts writes; sheds first if over budget. Fallback to plain fading graphic when wet field is unavailable.',
+  notes:
+    'BEAST S5 signature trail deposits. Pure CPU (curve -> fading segments); like beast/solver it sheds with the creature/deposit budget, NOT the governor perfTier1 cut — tier 1 is exactly the GL pass set that mechanism covers, so a CPU deposit does not belong in it. Fallback to plain fading graphic when wet field is unavailable.',
 });

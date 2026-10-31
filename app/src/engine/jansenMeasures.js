@@ -7,14 +7,29 @@
 // Measure genes are the explicit exception to the non-brittle mutation rule: mutation uses
 // seeded mutate→feasibility-check→retry (feasibility arrives in S2).
 //
-// Published gait anchors (absolute units, a=38): flatness 0.0281, ripple 0.267, step 2.73,
-// clearance 1.12, duty 0.249. Relative solver (a=1) produces proportional values;
-// multiply by scale * a to recover absolute for golden comparison.
+// Published gait anchors for the holy numbers (Wang 2026, via
+// docs/design/strandbeest-linkage-research-2026-10-29.md §3): flatness 0.0281,
+// ripple 0.0956, step 43.3, clearance 25.7, duty ≈ 0.202. flatness, ripple
+// and duty are dimensionless; step and clearance are absolute at a=38 and
+// scale linearly. (An earlier transcription here carried ripple 0.267,
+// step 2.73, clearance 1.12, duty 0.249 — none of those match the source;
+// step 2.73 in particular is physically impossible for a leg whose bars
+// run 40–66 long. Corrected 2026-10-30; see STAGING-REPORT.md.)
 
 export const JANSEN_HOLY = Object.freeze({
-  a: 38.0, b: 41.5, c: 39.3, d: 40.1, e: 55.8,
-  f: 39.4, g: 36.7, h: 65.7, i: 49.0, j: 50.0,
-  k: 61.9, l: 7.8, m: 15.0,
+  a: 38.0,
+  b: 41.5,
+  c: 39.3,
+  d: 40.1,
+  e: 55.8,
+  f: 39.4,
+  g: 36.7,
+  h: 65.7,
+  i: 49.0,
+  j: 50.0,
+  k: 61.9,
+  l: 7.8,
+  m: 15.0,
 });
 
 export const JANSEN_RELATIVE = Object.freeze({
@@ -33,13 +48,18 @@ export const JANSEN_RELATIVE = Object.freeze({
   m: JANSEN_HOLY.m / JANSEN_HOLY.a,
 });
 
-/** Published absolute anchors (a=38). Relative results scale by (scale * JANSEN_HOLY.a). */
+/**
+ * Published wild-type gait anchors (Wang 2026). flatness is the RMS stance
+ * height deviation normalized by step length; ripple and duty are
+ * dimensionless; step and clearance are in absolute units at a=38
+ * (relative solver results scale by scale * JANSEN_HOLY.a for those two).
+ */
 export const WANG_ANCHORS = Object.freeze({
   flatness: 0.0281,
-  ripple: 0.267,
-  step: 2.73,
-  clearance: 1.12,
-  duty: 0.249,
+  ripple: 0.0956,
+  step: 43.3,
+  clearance: 25.7,
+  duty: 0.202,
 });
 
 /** Ranges for relative measures. k is narrow (±0.02 around holy relative). Others ±0.30. */
@@ -62,9 +82,7 @@ export const MEASURE_RANGES = Object.freeze({
   phase: Object.freeze({ min: 0, max: 1 }), // per-leg phase offset 0..1
 });
 
-export const MEASURE_IDS = Object.freeze([
-  'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm',
-]);
+export const MEASURE_IDS = Object.freeze(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm']);
 
 /** Wild-type relative genome values (for tests and the type specimen). */
 export function wildTypeMeasures() {

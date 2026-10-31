@@ -8,7 +8,7 @@
 
 import { solvePose } from './jansenSolver.js';
 
-export function bodySpeedFromStance(measures, theta, scale, dt) {
+export function bodySpeedFromStance(measures, theta, scale) {
   const pose = solvePose(measures, theta, scale);
   if (!pose) return 0;
   // Simplified: stance foot velocity magnitude as body advance (full calc in follow-up)
@@ -51,15 +51,19 @@ export function stepBeast(state, measures, drives, queenBias, dt, dishRadius, lo
   }
   state.thetaL = (state.thetaL + (state.rate + diff) * dt) % (Math.PI * 2);
   state.thetaR = (state.thetaR + (state.rate - diff) * dt) % (Math.PI * 2);
-  const speed = bodySpeedFromStance(measures, state.thetaL, measures.scale || 1, dt);
+  const speed = bodySpeedFromStance(measures, state.thetaL, measures.scale || 1);
   state.x += Math.cos(state.heading) * speed * dt;
   state.y += Math.sin(state.heading) * speed * dt;
   // Rim: bounce or reverse
   const r = Math.hypot(state.x, state.y);
   if (r > dishRadius) {
     const mass = (measures.scale || 1) * (measures.legCount || 12);
-    if (mass > 8) state.heading += Math.PI; // reverse
-    else { state.x *= dishRadius / r; state.y *= dishRadius / r; } // bounce
+    if (mass > 8)
+      state.heading += Math.PI; // reverse
+    else {
+      state.x *= dishRadius / r;
+      state.y *= dishRadius / r;
+    } // bounce
   }
   return state;
 }

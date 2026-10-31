@@ -1,4 +1,4 @@
-// app/src/engine/queenLean.js — BEAST S4: the Queen's 6th bounded "herding" lean.
+// app/src/engine/herdingLean.js — BEAST S4: the Queen's 6th bounded "herding" lean.
 //
 // Biases each beast's target heading toward the user's kept taste.
 // Enabled for beasts NOW, independent of the proof gate (#762).
@@ -12,7 +12,11 @@ export function queenHerdingLean(tasteHeading, currentHeading, strength = 0.5) {
   return Math.max(-LEAN_CAP, Math.min(LEAN_CAP, raw));
 }
 
-export function logBias(cycle, bias, log = []) {
-  log.push({ cycle, bias, t: Date.now() }); // timestamp only for debug; replay uses the bias value
+export function logBias(cycle, bias, t, log = []) {
+  // `t` is loop time, passed in by the caller — engine code never reads the
+  // wall clock (determinism law, eslint-rules/determinism.mjs), so a replay
+  // re-derives the same log. The stamp is debug context only; replay keys
+  // on the bias value.
+  log.push({ cycle, bias, t });
   return bias;
 }
