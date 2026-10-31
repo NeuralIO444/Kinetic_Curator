@@ -41,7 +41,7 @@ ok('patternPixels: a deterministic frame of the right size, in every mode, from 
       return ((255 << 24) | (b << 16) | (g << 8) | r) >>> 0;
     }),
   );
-  for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'TIDES']) {
+  for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'TIDES', 'REWRITE']) {
     const a = patternPixels(P({ mode }), PAL, 160, 112, 0);
     assert.equal(a.length, 160 * 112);
     assert.deepEqual(a, patternPixels(P({ mode }), PAL, 160, 112, 0), `${mode} is deterministic`);
