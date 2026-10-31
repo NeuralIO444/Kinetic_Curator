@@ -332,6 +332,8 @@ node src/engine/creature.selfcheck.mjs
 node src/engine/emberDrive.selfcheck.mjs
 node src/engine/dishCreature.selfcheck.mjs
 node src/engine/creatureGenome.selfcheck.mjs
+node src/engine/beast.selfcheck.mjs
+node src/engine/jansenSolver.selfcheck.mjs
 node src/engine/creatureChem.selfcheck.mjs
 node src/engine/creaturePolicy.selfcheck.mjs
 node src/engine/creatureDream.selfcheck.mjs

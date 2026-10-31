@@ -99,4 +99,15 @@ export const MEASURED_COSTS = {
   // stage (no extra pass, no extra draw), so there is no pass to sweep. 0.05 ms is that work at the lab's 90 draws,
   // errring up. Tier 2 carries no cost band, so the number is informational. Re-bless on hardware (gpu timer).
   'gl/spectrum-marks': { ms: 0.05, method: 'estimate', draws: 90 },
+  // #1868 — added by hand, following the #1482 precedent: beast/trails is a
+  // CPU deposit (beastTrails.writeTrail maps a 72-point foot curve to fading
+  // segments), not a GL pass, so the sweep has nothing to draw. Measured
+  // directly instead: 0.0034 ms/deposit (node, wall clock, median of
+  // 5 x 2000 deposits of the wild-type curve, sandbox CPU, 2026-10-30).
+  // Committed at the registry's declared 0.02 ms — erring up ~6x from the
+  // measurement. beast/trails declares tier 0 (structural — it sheds with
+  // the creature/deposit budget, not the governor's perfTier1 GL-pass cut),
+  // so it is exempt from measurement by contract; the row is kept anyway
+  // as the honest price on record.
+  'beast/trails': { ms: 0.02, method: 'wall', draws: 90 },
 };
