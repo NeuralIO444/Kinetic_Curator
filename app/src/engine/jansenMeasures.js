@@ -6,6 +6,10 @@
 // k has a narrow range (±2% of holy relative) because research shows it breaks assembly outside that.
 // Measure genes are the explicit exception to the non-brittle mutation rule: mutation uses
 // seeded mutate→feasibility-check→retry (feasibility arrives in S2).
+//
+// Published gait anchors (absolute units, a=38): flatness 0.0281, ripple 0.267, step 2.73,
+// clearance 1.12, duty 0.249. Relative solver (a=1) produces proportional values;
+// multiply by scale * a to recover absolute for golden comparison.
 
 export const JANSEN_HOLY = Object.freeze({
   a: 38.0, b: 41.5, c: 39.3, d: 40.1, e: 55.8,
@@ -27,6 +31,15 @@ export const JANSEN_RELATIVE = Object.freeze({
   k: JANSEN_HOLY.k / JANSEN_HOLY.a,
   l: JANSEN_HOLY.l / JANSEN_HOLY.a,
   m: JANSEN_HOLY.m / JANSEN_HOLY.a,
+});
+
+/** Published absolute anchors (a=38). Relative results scale by (scale * JANSEN_HOLY.a). */
+export const WANG_ANCHORS = Object.freeze({
+  flatness: 0.0281,
+  ripple: 0.267,
+  step: 2.73,
+  clearance: 1.12,
+  duty: 0.249,
 });
 
 /** Ranges for relative measures. k is narrow (±0.02 around holy relative). Others ±0.30. */
