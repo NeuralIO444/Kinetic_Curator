@@ -126,6 +126,24 @@ ok('spectral fade: per-channel half-lives derived from the FADE rate (#1800)', (
   );
 });
 
+ok('LEAVE composes the longer fade — ACCUM FADE included (#1894)', () => {
+  // Matt ruling 2026-10-31, #1894: LEAVE's keep is
+  // max(1 − trailFade, 0.5^(1/accumFadeFrames)) — the `fade` input here is
+  // the ACCUM FADE keep (callers convert with halfLifeToKeep).
+  const keep12f = 0.5 ** (1 / 12);
+  const p = accumRecipeParams({ fade: keep12f, leave: true, leaveFade: 0.2 });
+  assert.equal(p.keep, keep12f, 'ACCUM FADE 12f beats trail fade 0.2 in LEAVE');
+  // The spectral vec3 derives from the composed scalar, once — the channels
+  // can never disagree with the winning fade.
+  assert.deepEqual(p.keepVec, spectralKeep(keep12f), 'keepVec follows the composed keep');
+  // The max() never shortens a hold: fastest ACCUM FADE + TRAIL FADE 0.
+  assert.equal(
+    accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keep,
+    1,
+    'TRAIL FADE 0 holds exactly, whatever ACCUM FADE says',
+  );
+});
+
 ok('recipe params: one optics amount drives bloom + halation + stipple + chroma', () => {
   // #308: the glow system. No gaussian anywhere — one optics slider drives
   // the mip lod of each tier, the stipple gate, and the chromatic offset.
