@@ -1,57 +1,65 @@
-# STAGING REPORT — #1794 Loot: streamlines — the field drawn as structure (node-influence field)
+# STAGING REPORT — #1853 BOOK S1: chapter registry — derive design-history chapters from movement groups
 
-Review-lane build (Matt judges feel and merges). Branch `feat/1794-streamlines`, base `origin/main` 9deca870. Not pushed, no PR — coordinator publishes.
+**Branch:** `feat/1853-book-s1-chapters` in worktree `~/workspace/kc-1853-build`, based on `origin/main` 4378b336. (This file replaces the previous lane's report, per the staging ritual.) Not pushed, no PR — coordinator publishes. **Review posture: backend/data lane — the registry changes nothing the performer sees; Matt merges on the coordinator's tech check.**
 
-## What was built
+## What shipped
 
-Both halves of the issue, as peers of the existing machinery:
+One new module + its selfcheck + one manifest line. Nothing else.
 
-1. **Node-influence field** — `app/src/engine/kernel/field/nodeField.js`, registered in the field registry as `nodes` (`reads: ['seed']`, costTier 0, the field family rate). A seed-deterministic graph of 26 nodes (hash-placed with attractor-style spacing rejection): each node links to its 3 nearest neighbours; 3 hash-chosen **sources** hold influence 1 and it propagates node-to-node with decay 0.82 per hop (proven in the selfcheck to converge to exactly decay^graph-distance). `sample()` returns the falloff-weighted mean influence (the density any field consumer already reads); `sampleVector()` returns the flow: every node's flow points at its highest-influence neighbour, and **sources are sinks that pull radially inward** (see decision 2). The field appears in the kernel tiles UI automatically (the panels roster is the registry roster).
+- **`app/src/data/chapters.js`** — the chapter registry, derived the way `data/assetStyle.js` derives style: a frozen table over what the library already declares, zero edits to authored records, pure functions, no RNG (decks are a function of the library — the replay law's precondition for S2's seeded landing).
+  - `CHAPTERS` — the 9 chapters in the D1 spine order, each carrying `id`, `name`, `position`, `prev`/`next` neighbours (attached from the order itself), its `lookGroups`, `assetStyles`, `assetFamilies`, `voiceStyles`, and its `card` (`{ paletteId, marks }` — data only; rendering is S2's work).
+  - Read API in the assetStyle shape: `chapterById`, `nextChapter` / `prevChapter` (null at the ends — the walk terminates, never cycles), `chapterForLookGroup`, `chapterForStyle`, `chapterLooks` / `chapterVoices` / `chapterAssets` / `chapterDeck` (all take injectable data params with library defaults), `dealableAssetRecords`, and `deckReport()` — the backstage honesty read.
+  - Membership is derivation, never borrowing: looks by group ∈ `lookGroups` over `COMPOSITION_PRESETS`; voices whose declared `styles` meet `voiceStyles` over `VOICE_DECK`; assets whose derived style ∈ `assetStyles` or derived family ∈ `assetFamilies` over the dealable records. The creature citizen is excluded from every deck (`CHAPTER_UNDEALT`, pinned identical to `rollPool`'s `NEVER_DEALT` by the selfcheck). The palette `era` strings are never read — the module does not import `palettes.js` at all; card palette ids are declared data for S2 to resolve.
+- **`app/src/data/chapters.selfcheck.mjs`** — registered in `app/selfcheck.manifest` after `voiceDeck.selfcheck`. Proves: spine order + neighbour round-trip (forward walk visits all 9 exactly once, backward mirrors, ends null); pinned deck counts per chapter; union of chapters = the 294 dealable assets with the citizen in no deck and Now = 64 looks / 64 voices / 294 assets; the taxonomy pin (**DIAGONAL GRID reads in Swiss, not Bauhaus**); deck-discipline derivation (below); card validity (palette exists and — for movement chapters — is paired by one of the chapter's own looks; card marks are members of the chapter's own deck); purity (same library in, same deck out); source hygiene (no `.era` read, no palettes import, no one-writer files).
+- **`app/selfcheck.manifest`** — +1 line.
 
-2. **Streamline trace sampler** — `app/src/engine/kernel/sample/streamline.js`, registered in the sampler registry at **costTier 2** (see decision 5). Traces start at nodes and integrate the field's flow with midpoint steps until they reach a source's doorstep, leave the plate, hit a dead zone, or exhaust their step budget. The trace set is built once per (seed, seedOffsets, plate, knobs) and cached (colonize/brush scheme); the sampler deals the traces' points round-robin — `t` is progress along the trace, `rot01` is the trace tangent, so stamps aim along the line. The picture is the paths themselves: marks are dealt *along* lines, never scattered and then connected.
+## The spine, and what each chapter holds today (measured)
 
-Plumbing follows the sibling path exactly: registry → `placement.js` (knobs + geometry signature) → `buildPlacements.js` → `layout-modes.js` (`LAYOUT_MODES` entry `streamline`, name "streamlines", glyph "stream"; `DEFAULT_LAYOUT_PARAMS` + `PARAM_RANGES` for the three knobs). The mode is dealt by KINETIC rolls like its kernel siblings — the Markov table gained it in the **growth** family (transitions.js), beside dla/eden/colonize.
+| position | chapter | lookGroups | deck (looks / voices / assets) |
+|---|---|---|---|
+| 0 | Marks | — | **0 / 0 / 0 — reports short on every axis** |
+| 1 | Engraving | engraved | 4 / 11 / 20 |
+| 2 | Bauhaus | bauhaus | 4 / 8 / 16 |
+| 3 | Swiss | swiss | 5 / 11 / 61 |
+| 4 | Op Art | op | 4 / 11 / 14 |
+| 5 | Japan | japanese | 5 / 11 / 25 |
+| 6 | Memphis | memphis | 4 / 14 / 25 |
+| 7 | Grunge | grunge | 5 / 8 / 39 |
+| 8 | Now | all 14 groups | 64 / 64 / 294 |
 
-## Design decisions (each one Matt-overruleable at review)
+Now's lists are built from the source tables (`PRESET_GROUPS`, `STYLES`) at module load, so the sum chapter cannot drift from the library it sums.
 
-1. **Flow ascends influence; sources are sinks.** "Sources" in the filing could read as emitters; I built the opposite polarity — traces grow from ordinary nodes *toward* the 3 source hearts and terminate there — because that is what makes lines *connect* nodes into structure (a trace is a drawn graph path). Flipping polarity is a small change if Matt wants fountains instead of rivers.
-2. **Sources contribute radial inflow to the vector blend, not their zero node-flow.** First cut had the textbook sink (zero flow), and it numerically *repelled*: the source's high falloff weight diluted neighbours' onward flow near the heart, and only 0–4 of 42 traces ever arrived. With inflow, 25–42 of 42 arrive across test seeds. Pinned by a new field selfcheck (flow near a source points at the heart, dot > 0.5).
-3. **Traces seed at nodes, not uniformly.** Sibling traces off one node fan out via a hash offset inside the node's radius. Uniform seeding would draw the field's weather; node seeding draws the *graph's* structure, which is the issue's claim.
-4. **Node count (26) and influence radius (0.24) are named constants in nodeField.js, not panel knobs.** Only the trace knobs are plumbed (`streamlineTraces` 42 · `streamlineSteps` 180 · `streamlineStep` 6, all bounded: traces ≤ 96, steps ≤ 400, step 2–24). If Matt wants to play the graph's density, promoting the constants is a follow-up.
-5. **Cost tier 2 for the sampler** — the registry's written scale: tier 2 = "cached per-seed structure + per-point reads" (colonize, brush, voronoi, ca). The trace build is a one-off CPU cost per seed (bounded: ≤ 96 traces × 400 steps of O(nodes) vector blends, cached in a 6-entry cache); per frame and per point it is O(1) array reads — zero per-frame cost shape, nothing for the governor to shed at runtime. The field itself rides tier 0 like every registered field.
-6. **No BUILD-panel tile and no stub voice.** The composition grid is built from STUB_VOICES; the whole kernel sampler family (brush, colonize, voronoi, poisson, circlepack…) has no tile and no voice — they are dealt by rolls. Streamline matches its siblings; a tile + voice (asset pools, vibe copy) is curated content for Matt to commission, not for a builder to invent.
-7. **Dealing is brush's count-dependent round-robin; the traces themselves are count-independent** (same seed + knobs = same traces regardless of mark count; only the dealing stride moves).
+## Design choices (each one Matt-overruleable)
 
-## Premise results
+1. **Marks derives nothing today — on purpose.** D1 ruled the book opens at Marks, and #1854 (S1b) is the issue that authors its pool "as a coherent visual language, not assembled from leftovers" — its own premise is that Marks "has no pool at all today." So S1 does not raid the glyph/stamp/letterform families to fake a deck; the chapter exists first in the spine with empty derivation axes, an unfilled card (`paletteId: null`, `marks: []` — the slot #1854's ochre/bone/carbon palettes will fill), and `deckReport()` naming it short on looks, voices and assets. The `assetFamilies` axis is the documented join point: when #1854's records declare their family/style, this derivation reads them with no change to the code below the table.
+2. **The deck floor is the library's own floor.** `CHAPTER_DECK_MINIMUM = { looks: 4, voices: 8, assets: 14 }` — exactly the smallest counts among the seven movement chapters that exist today (Bauhaus/Grunge voices = 8; Op Art assets = 14; four chapters sit at 4 looks). Not a round number and not padded: a chapter smaller than the smallest deck the instrument already deals as a movement is not yet landable. The selfcheck asserts a movement chapter sits exactly on each axis minimum, so if the floor ever stops being the observed floor, the check says so.
+3. **Card palettes are paired, not picked.** Each movement chapter's card palette is one its own looks already pair with (Engraving → `persona-haeckel`, Bauhaus → `solar-max`, Swiss → `transit` — DIAGONAL GRID's own pairing, Japan → `sepia-plate`, Op Art → `hydra`, Memphis → `neon-brood`, Grunge → `dirty`); the selfcheck enforces the pairing so a card can never drift off its chapter's authored sky. Now's card is `praystation` (the factory opener's palette — Davis's home chapter wears the instrument's own colours) with pixel-glyph marks: the one chapter whose signature is the instrument itself.
+4. **Chapter ids are movement nouns, group ids stay as they are.** `engraving` (group `engraved`), `japan` (group `japanese`), `op-art` (group `op`) — the mapping lives in the table, which is the registry's whole job; no authored group was renamed to fit.
+5. **The undealt exclusion is declared in the registry and policed, not imported.** `state/rollPool.mjs` is the deal-time owner of `NEVER_DEALT`; a data module importing state would invert the layering `rollPool` itself observes (it imports `data/assetStyle`). So `chapters.js` declares `CHAPTER_UNDEALT` with the reason in the header, and the selfcheck — which may cross layers — asserts the two are identical.
 
-All filing premises verified true against the tree before building: kernel fields are scalar `{kind, sample}` registrations in `FIELDS`; samplers are declared registrations returning `{x, y, t, rot01}`; colonize (#1197) is the cached-graph sibling; the plumbing path is registry → placement → buildPlacements → layout-modes. One premise needed a correction in-flight, not a stop: the field layer's vector story lives on the *sampler* side in today's code (fields are scalar-only), so the flow vector is an extension method on the node-field instance (`sampleVector`), not a registry-contract change — no existing consumer is affected.
+**D2–D6:** none required. The registry needs no cut shape (D2), no CURATOR behaviour (D3), no settle trigger (D4), no Queen memory (D5), and no cost gate (D6) — it deals nothing and gates nothing. **Premise check:** every premise in the issue verified true against this tree before building (no era/chapter field anywhere; 7 movement groups in `styleLooks.js`; 10 derived styles; 295 authored records + citizen = 294 dealable via `rollPool.dealableRecords`; DIAGONAL GRID in `swiss`). No premise stop.
+
+## Lois pass (the 9 rules, applied to the chapter table — the only design surface S1 has)
+
+- **The nanosecond:** Nine chapters, one word each — Marks, Engraving, Bauhaus, Swiss, Op Art, Japan, Memphis, Grunge, Now. A child reads the spine in one breath and knows where they are in the book. Pass.
+- **Creativity solves problems:** The problem was mush — every deal from everywhere. The spine is a decision, not a sort: design history as the order of battle, and the taxonomy in code (Swiss is Swiss, DIAGONAL GRID stays home) over any tidier story. Pass.
+- **Defeat habit:** Every registry on earth backfills the empty slot so the chart looks finished. This one prints Marks at 0/0/0 and calls it honest. The habit broken is cosmetics. Pass.
+- **Cautious or creative:** Opening the book on an empty chapter is the creative choice — and it only works because the emptiness is admitted in writing (the deck report) instead of padded with glyph leftovers. The moment someone "fixes" Marks by borrowing, kill it.
+- **Assume smart:** No wizard, no explainer surface, no new panel. The registry is silent until S2; the backstage report assumes the reader can handle a shortfall list. Pass.
+- **No trends:** "AI personas playing a game" is the trend; a card catalogue with neighbours and a floor is a position. The word *genre* appears nowhere in the module — chapters and styles are the vocabulary, the rest is plumbing. Pass.
+- **Discovered, not created:** The chapters were already in the library — in the group names the looks were filed under. S1 discovers them and writes down the order; it manufactures nothing but Marks' empty chair. Pass.
+- **Work is worship / True to self:** The registry does the unglamorous derivation work once so every later slice (landing, round, narrowing) reads instead of re-deriving — and the order is Matt's ruling (D1), not the machine's convenience. Pass.
+- **Kill list:** Kill any future slice that lets a thin chapter borrow a neighbour's pool silently. Kill any card whose palette isn't paired by the chapter's own looks. Kill "genre" on any performer surface.
 
 ## Verification
 
-- **New suites:** `nodeField.selfcheck` 12/12 · `streamline.selfcheck` 8/8 (determinism, count-independence of traces, step spacing == the named step, rot01 == tangent, arrival + doorstep bound, column-mode parity, knob clamps).
-- **Live-path smoke (headless, real placement):** `computePlacements` with mode `streamline` dealt 600/600 marks spanning the full plate, `t` ∈ [0, 1]; changing seed, trace count (585/600 points move) and step (560/600) all re-deal.
-- **Full manifest sweep:** 544 suites. 12 failed on first pass; every one adjudicated:
-  - **8 were this change's legitimate blast radius — fixed by re-pin / registration, each with its cause:**
-    - `registry.tiers` — built-in count 27 → 28, `streamline` added to the tier-2 list.
-    - `census` — distinct layout signatures 22 → 23 (streamline's signature is distinct; collision list unchanged).
-    - `kernelTiles` — field tile roster + `nodes`; field registry count 6 → 7. Same count pin re-pinned in `dishWeather`.
-    - `transitions` — `streamline` added to the Markov **growth** family (the file's own #720 invariant: an unfamilied mode is unreachable from brush's row); seeded-chain pin re-derived (the walk legitimately diverges when the domain grows; the stochastic / reachability / kin-affinity / stationary checks pin the mechanics independently).
-    - `wingWarp` — REST/BENT resolver pins re-based (`dfb2915f` → `4b47bdad`, `981bdefe` → `a88fdc98`). Strip proof first, per the file's own precedent chain (#1183/#1694/#1574–6): with the 3 new default keys stripped, the suite reproduces the old pins exactly — the only delta is the keys at parity defaults; builder pins unmoved.
-    - `replayGate` + `creatureGate` + `refreshFixtureCheckpoints` — both `.kcperf` fixtures re-recorded with the sanctioned checkpoint-only tool (`scripts/refreshFixtureCheckpoints.mjs --write`): replayGate 61/61 checkpoint hashes moved, creatureRepipe 16/16, `nonCheckpointDiffs: []`, inputs byte-identical, deterministic across two runs; strip proofs attached (with the 3 keys stripped, both originals verify byte-for-byte). Provenance entries appended to both PROVENANCE.md files with the sha256s.
-  - **4 proven environmental (re-run on pristine base, identical behaviour):** `swarmWasm` (base fails identically: `cargo not found on PATH`), `rollSafety` (headless Chromium target crashes at the same GL render on base, same 5 checks passed first), `livingMotion` (wall-clock perf delta straddles its 2 ms budget on *both* trees interleaved: base +1.57/+2.06, mine +3.06/+1.94 — sandbox noise, CI authoritative), `wetSoak` (300 s sweep timeout under contention; solo on this tree: 31/31 pass).
-  - After all fixes, every adjudicated suite was re-run solo on this tree: green (except the environmental four above, as documented). The touched-file pin sweep (grep selfchecks for every touched file, run those suites) is included in the above.
-- `npm run format:check` — clean. `npm run build` — clean.
-- No control surface was converted (a mode and its knobs were *added* through the generic PARAM_RANGES surface), so the #1885 e2e-selector sweep does not apply; no e2e spec references the new mode.
-
-## Visual evidence
-
-- `~/workspace/kc-1794-shots/before-factory-stage.png` — the real built app in the headless harness (factory fibonacci stage; footer shows the base build hash — the harness serves the preview build of this branch).
-- `~/workspace/kc-1794-shots/offline-traces.png` (+ `.svg`) — **an offline render of the sampler's actual output** (seed 1234567, real `buildStreamlines` points drawn as polylines; green = traces that arrived at a source, pink rings = the 3 sources, faint lines = the node graph). It is *not* a stage screenshot: the kernel sampler family has no BUILD tile to click (decision 6) and the harness could not force the mode through the remaining supported surfaces, so no honest live-stage shot of streamline exists yet. First thing to do at review: roll KINETIC until streamline deals (growth family — it follows colonize/dla/eden), or ask for the tile.
-- In the offline render the structure reads as intended: traces leave nodes all over the plate, bundle along shared flow, and fan *into* the source hearts.
-
-## Files
-
-New: `kernel/field/nodeField.js` + selfcheck · `kernel/sample/streamline.js` + selfcheck.
-Edited: field/sample registries, `placement.js`, `buildPlacements.js`, `layout-modes.js`, `transitions.js`, `selfcheck.manifest` (+2 lines), 2 fixtures + their provenance notes.
-Re-pinned (causes above): `registry.tiers`, `census`, `kernelTiles`, `dishWeather`, `transitions`, `wingWarp` selfchecks.
-Untouched, per orders: `liveLoop.mjs` / `liveResolve.mjs` / `particles.js`.
+- `chapters.selfcheck` — green (see the suite; every acceptance bullet in #1853 is an assertion).
+- Zero diffs to the 295 authored asset records and to look/voice/palette data files: `git status` shows exactly three paths — `app/src/data/chapters.js` (new), `app/src/data/chapters.selfcheck.mjs` (new), `app/selfcheck.manifest` (+1 line).
+- Touched-file pin sweep: no other selfcheck references the new module (grep); no control surface exists in this build, and `grep chapter e2e/` is empty — the e2e selector sweep has nothing to re-pin.
+- Full manifest sweep: **all 547 commands accounted for — 545 pass, 2 environmental failures** (below). The official runner passed everything up to `swarmWasm`; the remainder ran in tracked segments (464 pass in place, `chapters.selfcheck` among them), with the two segment failures adjudicated individually.
+- `gl/accum` — heap-aborted under segment load; solo with `NODE_OPTIONS=--max-old-space-size=3072`: **OK (83 cases)**.
+- `swarmWasm` — exit 1 on this tree and on pristine `origin/main` with the identical error; no `cargo` on PATH in the sandbox. Environmental, base-identical.
+- `fx/rollSafety` — on this tree and on pristine `origin/main` alike: 5 checks pass, then the sandbox GL/browser dies at the identical stack (`gl/parity/glDriver.mjs` renderViaGL ← `rollSafety.selfcheck.mjs:231`). Environmental, base-identical; CI's browser job is authoritative.
+- `kineticSweep` passed in the segments — the ~1.5% flake (#1822) did not fire.
+- `npm run format:check` — clean (run as `npx prettier --check .`, the script's exact command; the worktree has no local `node_modules/.bin`). `npx eslint` on both new files: 0 errors.
+- `npm run build`: the sandbox fails identically on pristine main (checked in the untouched reference checkout) and on this tree — `@tauri-apps/api` unresolvable from the shared sandbox install; the failing import is in `useCuratorIPC.js`, untouched by this build, and `chapters.js` is not in the app import graph. CI's `lint-build-selfcheck` (which installs dependencies) is authoritative.
