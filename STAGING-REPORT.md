@@ -233,9 +233,11 @@ the code half rides the backend lane as usual.
 
 ## FINISHER — the three decisions, resolved (2026-10-31)
 
-The stop above is cleared: all three calls were taken, and this section is the record. Decisions 1 and 3 are
-fully landed and green. Decision 2 is landed as authorized — and its measurement turned up one adjacent
-delta the original summary missed, flagged at the end for the coordinator rather than silently absorbed.
+The stop above is cleared: all three calls were taken, and this section is the record. Decisions 1, 2 and 3
+are fully landed and green. Decision 2 is landed as authorized, including the coordinator's extended call
+on both legs (never-tray and tray reach — see the resolved flags below, final green) — and its measurement
+turned up one adjacent delta the original summary missed, flagged at the end for the coordinator rather
+than silently absorbed.
 
 ### Decision 1 — the Marks voice family, authored (Matt's ruling, 2026-10-31)
 
@@ -284,7 +286,7 @@ Mechanical re-pins that followed (each cause named at the assertion):
 7. `kineticSweep.selfcheck` — two assertion MESSAGES ("one of the 64 looks/voices") de-pinned to "one of
    the dealt looks/voices"; the assertions themselves derive from the decks and are unchanged.
 
-### Decision 2 — coverage band re-baselined (coordinator's call) — with one flag
+### Decision 2 — coverage band re-baselined (coordinator's call, extended call both legs) — RESOLVED, final green
 
 Implemented as authorized: the trio-overlap direction in `coverage.selfcheck` now carries a named band,
 `TRIO_JACCARD_BAND = 0.0005` (±0.05 pp), with the full measurement and the cause (pool growth 295 → 313,
@@ -294,7 +296,7 @@ Implemented as authorized: the trio-overlap direction in `coverage.selfcheck` no
 Never-tray and tray reach keep the exact direction in the code, per the call. Nothing else in the suite
 changed.
 
-**THE FLAG:** with the Jaccard assertion no longer stopping the sweep at 0x1505, the loop now reaches a
+**THE FLAG — RESOLVED (extended call, never-tray leg; see the resolution at the end of the SECOND FLAG):** with the Jaccard assertion no longer stopping the sweep at 0x1505, the loop now reaches a
 second delta the original report's summary did not catch — **seed 0x1509, FLAT fixture: never-tray 32 vs
 unordered 31 (+1)**. The report's premise "never-tray improves on every seed" holds for the opinionated
 fixture (18–30 across seeds, all ≤ unordered) but not for flat on 0x1509. I did **not** extend the band to
@@ -304,7 +306,7 @@ guard (all 8 seeds × both fixtures: banded Jaccard, reach improving or holding 
 scratch census and the suite's own run to 0x1509 both show. Coordinator: a ±1 never-tray band in the same
 comment, or a named per-seed exception, closes it in one line — your call.
 
-**SECOND FLAG — extended band landed, reach then failed on the same seed (finisher follow-up, 2026-10-31):**
+**SECOND FLAG — RESOLVED (extended call, reach leg; resolution at the end of this flag):** extended band landed, reach then failed on the same seed (finisher follow-up, 2026-10-31):
 the coordinator's extended call was implemented exactly as authorized — `NEVER_TRAY_BAND = 1`, applied
 ONLY to the never-tray comparison, with the cause (coordinator's extended call, 2026-10-31; pool growth
 295 → 313, #1854; flat-fixture +1 on 0x1509 measured) written into the guard's comment block beside the
@@ -319,6 +321,20 @@ complements over the 313-asset library); opinionated — tray distinct 291, neve
 held). I did **not** band the reach comparison or anything else: per the finisher instruction, that is
 the coordinator's decision from these real numbers. `coverage.selfcheck` therefore still fails, now on
 exactly that one reach assertion.
+
+**RESOLUTION — both Decision 2 flags resolved (coordinator's extended call, both legs, 2026-10-31):** the
+coordinator extended the same call to the reach comparison — same class, same cause (pool growth
+295 → 313 via #1854; the opinionated head holds the exact direction on every seed — reach 283–292, all
+≥ unordered). The two seed-0x1509 FLAT deltas are proven to be ONE asset seen from both sides: never-tray
+32 vs unordered 31 (+1) and tray reach (distinct) 281 vs 282 (−1) are complements over the 313-asset
+library (313 − 32 = 281; 313 − 31 = 282). Landed: `TRAY_REACH_BAND = 1`, applied ONLY to the reach
+comparison (`on.tray.distinct >= off.tray.distinct - TRAY_REACH_BAND`, message citing the band), with the
+cause and the complement proof written into the guard's comment block beside the existing re-baseline
+notes. Nothing else in the suite changed. Re-run: `node src/curator/coverage.selfcheck.mjs` is **FULLY
+green** — all 8 seeds × both fixtures plus the headline family-reach assertions, closing line
+`coverage.selfcheck: OK`. Both flags (never-tray leg and reach leg) therefore read resolved. Sanity pair
+stayed green: `chapters.selfcheck: OK` and `voiceDeck.selfcheck: ok` (72 voices); `npx prettier --check`
+on the coverage file: clean.
 
 ### Decision 3 — wetSoak has its own fixed scene (coordinator's call)
 
@@ -346,8 +362,8 @@ checks passed**, matching the pre-#1854 base standalone count, both term-(a) che
   Chromium; base-identical per S1) are the known environmental pair; `accum` aborted in-sweep without an
   assertion (the same sandbox casualty S1b recorded) and is **fully green standalone, 83/83**; `coverage`
   fails on the single flagged never-tray assertion above, by design, awaiting the coordinator's extended
-  call. (Superseded in part by the SECOND FLAG under Decision 2 above: the extended band has since landed,
-  and `coverage` now fails on the 0x1509 flat tray-reach assertion instead, awaiting the coordinator's
-  decision on those measured numbers.)
+  call. (Superseded by the resolutions under Decision 2 above: the extended call landed on both legs —
+  never-tray `NEVER_TRAY_BAND = 1` and tray reach `TRAY_REACH_BAND = 1` — and `coverage` is now **FULLY
+  green** on re-run, all 8 seeds × both fixtures plus the headline family-reach assertions.)
 - `npx prettier --check` clean on all nine touched code files. One-writer files untouched. D2–D6
   untouched — the voice authoring needed none of them.
