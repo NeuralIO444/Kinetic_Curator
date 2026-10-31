@@ -1,67 +1,165 @@
-# STAGING REPORT — #1798 Loot: merged-cell blocks (Colour Block) → PATTERN BLOCKS mode
+# STAGING REPORT — #1854 BOOK S1b: the Marks pool (coordinator's copy)
 
-**Branch:** `feat/1798-merged-cell-blocks` off `origin/main` (9deca870). Local only — no push, no PR (coordinator publishes). Review lane: Matt judges feel and merges.
+Branch `feat/1854-book-s1b-marks`, stacked on `feat/1853-book-s1-chapters` @ a5b2d4a8 (S1). Local only —
+publishes after S1 merges; the coordinator rebases and publishes. Issue title (verbatim): "BOOK S1b: author
+the Marks chapter pool (primitive marks, glyphs, stamps)". D1 is ruled (Matt, 2026-10-31: "Author Marks
+first") and recorded on this issue; D2–D6 were not needed and were not touched.
+
+## STATUS: STOPPED at a scope decision — the pool is built; two calls sit above the builder
+
+Everything the issue scopes as content is authored and verified (below). The build stops on ONE decision
+the issue's own text creates, plus one coordinator band call the suite itself reserves. Neither is a defect
+in the work; both are exactly the "don't rule it yourself" class. Details under THE STOP.
 
 ## What shipped
 
-A fifth PATTERN mode, **BLOCKS**, built as a peer of TIDES (#1797, the sibling loot mode from the same artist): `app/src/pattern/blocks.js` (pure engine) + registration in `state/patternTrack.js`, `pattern/patternSource.js`, `pattern/ground.js`, a mode hint + honest disabled DRIFT in `panels/build/PatternEditor.jsx`, a Composition (BLOCKS) section in `docs/PATTERN_SPEC.md`, a new selfcheck (12 checks), a new e2e spec, and two coverage extensions (patternRender, rasterFast).
+The first chapter now has a pool, and it's authored, not assembled — not one record is raided from the
+glyph/stamp/letterform families (every Marks record's SVG is new, drawn for this chapter).
 
-The generator, per the issue's two moves:
+- **`app/src/data/assets/assets-marks.js` (new)** — 18 primitive marks in the library's own record format,
+  prefix `mrk_`: two hands (a filled stencil and an outline), a tally bundle and a notch row, finger-dot
+  clusters and an arc, a pigment pit, concentric rings with an ochre centre, a spiral, a tally cross, a
+  zigzag band (water), a rayed sun, a tectiform, a divided quadrangle, a crescent, rain strokes, a barbed
+  spear sign, and one beast. Categories ride the core vocabulary (stamps 6, linework 5, dots 3, geometric 3,
+  radial 1); every tag is existing library vocabulary; every tier is declared (16× tier 1; rings + spiral
+  tier 2 — costlier only in the honest sense: more geometry per mark). First-draft spiral didn't draw a
+  spiral; it was redrawn until it did (see the contact sheet).
+- **`app/src/data/assetStyle.js`** — one new family `marks` (prefix `mrk`) and one new style `marks`, joined
+  by a single family rule placed ahead of the category fallbacks. Every record derives cleanly (assetStyle
+  suite: 313 assets, 11 styles, every tag with a canonical home).
+- **`app/src/data/assets/index.js`** — `ASSETS_MARKS` spread into `ASSETS_AUTHORED`. Library 295 → 313;
+  no existing record was edited.
+- **`app/src/data/palettes.js`** — the chapter's palettes, in the house record shape: **OCHRE WALL**
+  (`ochre-wall`, cave-dark ground, bone ink, red/yellow ochre swatches) and **BONE DUST** (`bone-dust`, the
+  same pigments on a light bone ground with carbon ink). Palette count 37 → 39.
+- **`app/src/data/styleLooks.js`** — a `marks` look group and **5 looks** in the sibling record shape
+  (FIRST WALL, TALLY KEEPER, HAND CAVE, DOT SONG, RAIN MARKS): sparse counts, low density, big quiet scale,
+  slow near-still motion — the chapter barely moves, because marks were made to stay. No `multiply`
+  anywhere; the styleLooks suite deals and renders every look headless (69/69 on canvas, Marks included).
+- **`app/src/data/chapters.js`** — the join, and only the join: the Marks SPINE row declares
+  `lookGroups/assetStyles/assetFamilies: ['marks']` and a filled card (`ochre-wall`; the hand, the rings,
+  the beast). Nothing below the table changed — S1's derivation reads the pool exactly as designed.
+  `voiceStyles` is still `[]` — see THE STOP.
 
-1. **Merge before you colour.** A seeded pass walks the grid row-major; at each free cell a MIX appetite draw decides whether a merge is attempted; attempts place a drawn polyomino over the anchor and keep the first that fits. Vocabulary is the reference's: single, bars 2–4, 2×2 square, L tromino, L tetromino, T tetromino, plus pentomino (all rotations generated, none hand-listed).
-2. **Colour once per block.** One flat colour per merged block from the palette's non-ground swatches. Greedy in deal order + a bounded repair pass: touching blocks never share a colour unless the block's neighbours already use the whole pool (the selfcheck proves that structural claim, not a fuzzy rate).
-3. **The series is the same generator re-dealt.** Nothing changes but the seed; SHUFFLE is the mode's motion. A deal is a still.
+Deck counts (chapters §3 + deckReport): **Marks looks 5** (floor 4 ✓), **assets 18** (floor 14 ✓),
+**voices 0** (floor 8 — the stop below). Now (union): looks 69, voices 64, assets 312. Every other
+chapter's counts unchanged.
 
-Grid: cols = 2 × DENSITY (default density 10 → 20 across, TIDES' mapping), rows fill the frame. Gaps: every block is inset 0.085 of a cell on each side facing another block or the frame edge, outer corners rounded at 0.24 of a cell — squircle blocks on a ground lattice. Ground sampler (#1183) support included: marks lean toward the block colour under them.
+## THE STOP — decision 1: the look group legally drags a voice family behind it
 
-## Design choices (all Matt-overruleable)
+The issue scopes voices as: *"at most a minimal pairing via existing voice styles; a dedicated Marks voice
+deck is a later call."* The tree disagrees with the premise that looks can land while voices wait:
 
-1. **A new mode, not a QUILT merge pass.** The issue says "most naturally QUILT", but QUILT's atom is the motif tile (3 hues, heroes, grout, rotation); BLOCKS' atom is a flat merged block. TIDES set the precedent that a Karlen loot with a different atom ships as its own mode beside QUILT. Mode id `BLOCKS`; the spec section carries the reference's name ("Colour Block").
-2. **Colour rails = QUILT's `paletteRoles`, not the GLYPH/TIDES weight-ranked pool.** First cut rode `glyphRoles`; its top-6-by-weight cut left the lattice **purple** on the factory palette (the near-black ranked out). The reference lattice is black and its palette is wide, so BLOCKS takes ground = the palette's darkest swatch and pool = all other swatches. (The purple-lattice renders from the first cut were regenerated; the shipped screenshots are the black-lattice ones.)
-3. **MIX = merge appetite** (per-anchor probability of attempting a merge). MIX 0 is exactly the plain per-cell grid — the honest "before" picture from the same generator; mean block size grows monotonically with MIX (measured across seeds: 1.00 @ 0, >1.1 @ 0.25, ~1.8 @ 0.55, ~2.35 @ 1.0).
-4. **The gap is the mode's own constant; the track GROUT is not read.** Matches TIDES (its gutter is internal, `TIDES_FILL`). Making GROUT live for BLOCKS is a small follow-up if Matt wants the knob; it would need the editor's "Quilt only" reason re-worded and the pattern-controls e2e re-pinned.
-5. **DRIFT has no clock in this cut** — the deal never moves. The editor disables DRIFT for BLOCKS with the reason on the row ("Still deal — a BLOCKS deal is a still — SHUFFLE re-deals it"), `patternKey` excludes time for BLOCKS, and pixels are asserted identical at any DRIFT/t. Open door if Matt wants motion later: a slow re-deal, or a field read à la TIDES.
-6. **Not dealt by KIN/CURATOR** (`PATTERN_DEAL_MODES` unchanged), hand-picked only — same as TIDES, so every existing seeded deal and replay deals what it always did.
-7. **Defaults are existing detents**: density 10 and mix 0.55 are already PATTERN_STOPS stops, so `blockStops.mjs` needed no change. Cost tier 0 declared at registration (`pattern/blocks`); measured 30–40 ms for a fresh 1000×700 still in the sandbox, declared 60.
+- **`voiceDeck.selfcheck` §4 is a standing invariant:** for EVERY group in `STYLE_LOOK_GROUPS` there must be
+  ≥6 voices in `VOICE_DECK` with `kind: 'family'` and `def.family === group.id` — "every S4 style group has
+  its family." Registering the `marks` look group (required: chapters derive a chapter's looks BY GROUP, and
+  the LOOKS menu lists by group) makes this suite fail with `Marks: at least six family voices`. Verified
+  failing on this tree; the suite passes on the S1 base.
+- **Borrowing is still dead** (and now doubly so): pairing existing styles was the raid-by-another-name —
+  the only single styles reaching the floor are grunge (photocopy-era) or bauhaus (machine geometry) — and
+  it wouldn't satisfy §4 anyway, which wants a family, not a pairing.
+- **Exempting Marks in §4 would weaken an acceptance check to reach green.** Not done, per standing orders.
 
-## Files
+**The decision (Matt's, via coordinator): authorize authoring the Marks voice family in this slice** —
+overriding the issue's "later call" — **or hold S1b's look group until the voice call is taken.** The
+authorized fix is small and fully scoped (the family machinery is table-driven in `voiceDeck.js`):
 
-- NEW `app/src/pattern/blocks.js` — engine: vocabulary, merge pass, colour pass, sampler, raster, ground-sampler cell, cost registration.
-- NEW `app/src/pattern/blocks.selfcheck.mjs` — 12 checks (manifest-registered).
-- NEW `app/e2e/pattern-blocks.spec.js` — UI: mode writes through, density follows to 10, DRIFT/movers disabled with reasons, SHUFFLE re-deals; takes the review screenshots.
-- `app/src/state/patternTrack.js` — PATTERN_MODES + BLOCKS; PATTERN_FIELD_LIKE + BLOCKS; per-mode defaults.
-- `app/src/pattern/patternSource.js` — buildGrid + still-frame routing + patternKey time exclusion.
-- `app/src/pattern/ground.js` — gridFor + patternGround branches (kept in step with patternSource).
-- `app/src/panels/build/PatternEditor.jsx` — MODE_HINT, MIX hint clause, DRIFT disabled for BLOCKS.
-- `app/src/pattern/patternRender.selfcheck.mjs` — "every mode" loops extended to BLOCKS (node pixel checks + the GL rendered-frame loop). Coverage added, nothing re-pinned.
-- `app/src/pattern/rasterFast.selfcheck.mjs` — frames-equal-reference loop extended to BLOCKS with its reference branch. Coverage added.
-- `app/e2e/pattern-track.spec.js` — live-loop survival sweep extended to BLOCKS (cause: the list enumerates modes).
-- `docs/PATTERN_SPEC.md` — Modes entry, Composition (BLOCKS), Parameters + Motion rows.
-- `app/selfcheck.manifest` — +1 line (blocks suite).
+1. `FAMILY_PAIRING.marks = ['stamps', 'linework', 'dots']` (14 marks assets in those categories; each
+   family voice wears 8 same-style shapes by the seeded `familyPool`, satisfying §3's wear ≥ 4);
+2. a `VARIANTS.marks` block of **8 rows** `[id, title, vibe, mode, motion, palette, count, acc, tier]` —
+   8, not 6, because chapters' floor is 8 voices by style and family voices carry `styles: [family]`;
+   modes/motions distinct within the family (§4's second clause); palettes ochre-wall / bone-dust;
+3. `chapters.js`: Marks `voiceStyles: ['marks']` → chapter voices 8 = floor, deck report fully ok;
+4. re-pins that follow mechanically: chapters §3 marks voices 0 → 8 and §6's Marks special-case retires to
+   the generic ok branch; `voiceDeck` count 64 → 72 (45 → 53 family); `kineticScope` voice counts 64 → 72.
 
-## Re-pins (each with its cause — nothing weakened, no check deleted)
+If authorized, this is a short follow-up build on this same branch; everything else here stands.
 
-1. `state/patternTrack.selfcheck.mjs` — `PATTERN_DEFAULT_DENSITY` deep-equal gains `BLOCKS: 10`. Cause: #1798 adds the mode (the pin enumerates per-mode defaults).
-2. `panels/build/patternEditor.selfcheck.mjs` — the mode whitelist gains `'BLOCKS'`. Cause: #1798 (the pin enumerates the editor's modes, as it did for TIDES #1797).
+## Coordinator band call — decision 2: coverage guard, seed 0x1505
+
+`coverage.selfcheck` (the #1546/#1547 ordering kill-criterion) fails on exactly one assertion: seed 0x1505,
+flat ordering, `trio overlap must not exceed unordered` — measured **flat 1.173% vs unordered 1.151%**
+(+0.022 pp). It passes on the S1 base. Full context, measured on this tree across the guard's 8 seeds:
+never-tray IMPROVES under ordering on every seed (e.g. 0x1505: 34 → 30), tray reach improves on every seed
+(279 → 283), and the Jaccard direction holds on 7 of 8 seeds. The library grew by 18 same-family assets —
+the stream the guard measures is a different stream now. The suite's own comment reserves this call: *"That
+band call is the staging report's, flagged for the coordinator, not silently re-baselined here."* So: not
+re-baselined. Flagged, with the numbers, for the coordinator's call. (No content was tuned to chase the
+seed — that would be fixing the test, not the product.)
+
+## Re-pins made (each with its cause; no check deleted or weakened)
+
+1. `chapters.selfcheck` §3 — Marks {0,0,0} → {5,0,18}; Now {64,64,294} → {69,64,312}. Cause: this issue's
+   pool landed; counts re-measured from the derivation.
+2. `chapters.selfcheck` §4 — dealable library 294 → 312 (two assertions). Cause: 313 records − the citizen.
+3. `chapters.selfcheck` §6 — Marks shortfalls `['looks','voices','assets']` → `['voices']`, ok stays false,
+   cause written into the assertion. (Retires entirely if decision 1 is authorized — see above.)
+4. `chapters.selfcheck` §7 — the Marks card special-case (null palette, empty marks) REMOVED; Marks now
+   passes the generic card assertions every other chapter passes. A strengthening, not a re-pin.
+5. `chapters.selfcheck` §9 — library size 295 → 313. Cause: 18 authored records added, none edited.
+6. `styleLooks.selfcheck` — rack 64 → 69, style looks 31 → 36, groups 14 → 15, menu 64 → 69. Cause: the
+   Marks group and its 5 looks.
+7. `palettes.selfcheck` — catalog 37 → 39 and its roll-pool consequences (39; 41 with users; 40 deduped).
+   Cause: ochre-wall + bone-dust. (`chipWindowStart(37, …)` calls are abstract-list arithmetic — untouched.)
+8. `censusReadout.selfcheck` — radial category size 26 → 27 (real-artifact assertion only; the frozen
+   fixture in the same file is synthetic and untouched). Cause: mrk_ring_01 joins radial.
 
 ## Verification
 
-- blocks.selfcheck: 12/12 — partition exact-cover + vocabulary membership on 15 seed/mix combos; the vocabulary actually deals (incl. square/L/T/plus); MIX appetite incl. MIX 0 = all singles and monotone growth; colour-once-per-block + pool-exhaustion-only conflicts; palette-only pixels; lattice seams/frame edge/rounded corners; replay law incl. DRIFT-stillness and patternKey stillness; raster ≡ sampler; ground sampler ≡ pixels; cost median inside the declaration.
-- Every suite naming a touched file, run individually: patternTrack 17 ✓, tides 12 ✓, patternRoll 7 ✓, elements 10 ✓, rasterFast 8 ✓, patternEditor 6 ✓, blockStops 10 ✓, groundNudge ✓, groundSnap ✓, dishGround ✓, patternAudio 7 ✓, creature ✓, accumFeed ✓, contactShadow ✓, liveResolve.determinism ✓, performanceFile ✓, resolveTap ✓, patternRender 28 ✓ (incl. GL BLOCKS frame parity in headless Chromium), costTiers ✓ (in sweep).
-- Full manifest sweep, run in segments (the runner halts at first failure): **543 suites accounted for — 540 pass in-run**, including blocks.selfcheck in-manifest and kineticSweep (the ~1.5% flake #1822 did not fire). The 3 failures are all environmental, each proven:
-  - `swarmWasm` — sandbox has no `cargo`; fails identically on pristine `origin/main` (base-identical).
-  - `fx/rollSafety` — Playwright "Target crashed" in the sandbox browser; fails identically on pristine `origin/main` (base-identical, same signature).
-  - `gl/accum` — JS heap OOM at the default 2 GB in the parallel segment; re-run solo with `NODE_OPTIONS=--max-old-space-size=3072`: **OK, 83/83 cases**.
-- e2e: pattern-blocks ✓ (real UI, 17 s), pattern-tides ✓, pattern-controls 6/6 ✓. pattern-track: all modes incl. BLOCKS draw without faulting; the spec's final page-error audit fails on `ERR_TUNNEL_CONNECTION_FAILED` (a sandbox-proxy resource fetch) — **identical failure on pristine `origin/main`** (base-identical, environmental; CI's network is authoritative).
-- format:check clean (prettier --write applied to the flagged files, code only); lint 0 errors (11 warnings, pre-existing); build ✓.
+Full manifest sweep, continue-on-failure over all **549** manifest commands (the stock runner stops at the
+first failure): **546 pass / 3 fail** — and the 3 are exactly the calls documented above, plus one flake:
 
-## Visual evidence (~/workspace/kc-1798-shots/)
+1. `voiceDeck.selfcheck` §4 — **decision 1** (THE STOP).
+2. `coverage.selfcheck` seed 0x1505 — **decision 2** (coordinator band call; passes on the S1 base,
+   measured exceedance +0.022 pp with reach and never-tray improved on all 8 seeds).
+3. `cellKinemePlayback.selfcheck` — **flake**: failed in the sweep with "output.wasm is stale (pre-#1917)"
+   (a wasm artifact stamp; this build touches no rust/kernel/bake input — the diff is data-only) and
+   PASSES on isolated re-run on this tree (node contract OK, GPU OK) and on the S1 base. Noted, not
+   chased — same family as the kineticSweep flake (#1822), which passed in this sweep.
 
-- `live-canvas-blocks.png` — the REAL app (captured by the e2e spec, factory palette, KC marks hidden): BLOCKS on the canvas, black lattice, one colour per merged block.
-- `live-editor-blocks.png` — the real editor: BLOCKS chip active, density 10, mix 55%, the rows BLOCKS ignores (grout/hero/drift/movers) disabled with dash readouts.
-- `before-mix0-unmerged.png` / `after-mix055-merged.png` — engine renders (`patternPixels` → PNG, labelled as such) of the same seed + palette with merging off vs on: the merge-first difference, isolated.
-- `redealt-seed-babe.png` — a second seed at MIX 0.55: the series point (same generator, fresh permutation).
+Environmental, as on S1: the stock `npm run selfcheck` halts at `swarmWasm` (build-wasm.sh --verify cannot
+reproduce the kernel wasm without cargo, absent in the sandbox; S1 proved it base-identical on pristine
+origin/main — and the same suite passed inside the continue-loop run above). Sandbox `npm run build` is
+broken identically on pristine main (@tauri-apps/api) — CI is authoritative. accum passed inside the sweep;
+a solo confirmation re-run hung in the sandbox browser layer (0% CPU for ~9 min, killed, orphan browsers
+cleaned) — the sweep verdict stands and CI owns the browser sections.
 
-## Not done / open doors (deliberately, slice 1)
+Targeted suites green on this tree: chapters, assetStyle, styleLooks (all 69 looks render headless),
+palettes, census, censusReadout, rollPool, regionAssignment, engraving (the issue's
+"engraving-finish-compatible" premise — the marks ride the same category/style axes the finish reads),
+poolCitizenship. Prettier: all touched code + selfcheck files clean (the sandbox's `npm run format:check`
+can't find its prettier binary — same broken shared install as S1; `npx prettier` verifies the touched
+files directly; CI is authoritative).
 
-- No DRIFT behaviour (choice 5); GROUT not read (choice 4); concave corners of L/T blocks stay square (only convex outer corners are rounded); no numbered-series exhibit view (the issue's presentation idea — the re-deal exists; a side-by-side series is later presentation work); KIN/CURATOR never deal it (choice 6).
+## Lois pass — the blunt version (9 rules)
+
+1. **Creativity is a solution, not decoration.** Marks wasn't a missing theme, it was a broken promise —
+   the book opened on an empty room. Now the room has walls, and things on them.
+2. **Defeat the habit of expected form.** Expected form says: borrow the glyphs, rename them, ship. Killed.
+   Every mark here was drawn for this chapter or not at all.
+3. **The big idea in a nanosecond.** One look at the contact sheet: hands, tallies, a beast, ochre. You
+   know where you are before language starts — which is the entire point of the chapter.
+4. **Assume everyone is smart.** The deck report still says Marks is short on voices, and this report stops
+   rather than papering over why. The audience — and Matt — can handle the truth.
+5. **Caution is death.** Five looks, not forty. Eighteen marks, not a hundred. The first chapter should
+   feel like scarcity, because it was. (Caution would also have exempted a selfcheck to go green. Also death.)
+6. **Work is worship.** The spiral's first path didn't draw a spiral, so it was redrawn until it did. The
+   pit was too round; it's less round now. Nobody would have filed a ticket. That's not the standard.
+7. **Trends are the enemy.** No "cavecore" mood-board cosplay, no texture pack. Pigment, bone, carbon —
+   the materials are the style.
+8. **Don't create, discover.** The tally, the hand, the ring — nobody invented these. They were found,
+   again, the way they were found the first time.
+9. **True to yourself.** KINETIC deals these marks like citizens, Davis reads them like a chapter, and the
+   book opens where a person would open it: at the beginning.
+
+**Kill list:** the borrowed voice deck (grunge machines do not voice the first fire); the §4 exemption
+(never weaken the check to pass it); padding the pool past what a wall can hold; "primitive" as a filter
+effect over modern glyphs (that was the raid, wearing a costume); tuning content to a seeded statistic.
+
+## Visual evidence
+
+`~/workspace/kc-1854-shots/marks-contact-sheet.png` — all 18 marks, labelled, on both chapter palettes
+(offline render of the authored SVGs — honest label: this is the content sheet, not an in-app capture; the
+in-instrument proof is the styleLooks headless render, which deals all 5 Marks looks onto a canvas).
+Coordinator: this is content, so the issue's acceptance is Matt's glance (review-lane sign-off on the pool);
+the code half rides the backend lane as usual.

@@ -7,6 +7,7 @@ import { ASSETS_PART5 } from './assets-haeckel.js';
 import { ASSETS_MICRO } from './assets-micro-hud.js';
 import { ASSETS_LETTERS } from './assets-letterforms.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
+import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
 
 /** The catalogue as authored, before the baked mattes are attached (what the bake reads). */
@@ -19,6 +20,7 @@ export const ASSETS_AUTHORED = [
   ...ASSETS_MICRO,
   ...ASSETS_LETTERS,
   ...ASSETS_PIXEL,
+  ...ASSETS_MARKS, // #1854 — the Marks chapter pool, authored content (BOOK S1b)
 ];
 
 // #1432 — every built-in carries `regions` + `regionSlots`, the exact shape overlay.js validates for user imports. An

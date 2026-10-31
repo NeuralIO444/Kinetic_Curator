@@ -186,6 +186,7 @@ export const FAMILIES = Object.freeze([
   'micro-hud',
   'letterforms',
   'pixel-glyphs',
+  'marks', // #1854 — the first chapter's authored pool (BOOK S1b)
   'creature',
   'imported',
 ]);
@@ -205,6 +206,7 @@ export const FAMILY_BY_PREFIX = Object.freeze({
   mic: 'micro-hud',
   typ: 'letterforms',
   pxg: 'pixel-glyphs',
+  mrk: 'marks',
   creature: 'creature',
 });
 
@@ -227,6 +229,7 @@ export const STYLES = Object.freeze([
   'organic', // blob, cell, root, colony
   'op', // optical: halftone, concentric, hatch, moiré
   'memphis', // confetti, squiggle, zigzag, star
+  'marks', // #1854 — the primitive chapter: pigment, tally, hand (BOOK S1b)
 ]);
 
 /**
@@ -240,6 +243,7 @@ export const STYLE_RULES = Object.freeze([
   { family: ['micro-hud'], style: 'techno' },
   { family: ['letterforms'], style: 'swiss' },
   { family: ['creature'], style: 'organic' },
+  { family: ['marks'], style: 'marks' },
   // experimental: print-y scanlines are grunge (riso, misregistration); the rest of the pack is techno or organic
   { category: ['scanlines'], tags: ['print'], style: 'grunge' },
   { category: ['scanlines'], style: 'techno' },

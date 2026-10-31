@@ -60,7 +60,8 @@ CHAPTERS.forEach((c, i) => {
 
 // 3. deck counts per chapter (pinned — the derivation over today's library)
 const EXPECTED_COUNTS = {
-  marks: { looks: 0, voices: 0, assets: 0 },
+  // #1854 landed the Marks pool: 5 authored looks + 18 authored assets; voices 0 by that issue's scope.
+  marks: { looks: 5, voices: 0, assets: 18 },
   engraving: { looks: 4, voices: 11, assets: 20 },
   bauhaus: { looks: 4, voices: 8, assets: 16 },
   swiss: { looks: 5, voices: 11, assets: 61 },
@@ -68,7 +69,7 @@ const EXPECTED_COUNTS = {
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
   grunge: { looks: 5, voices: 8, assets: 39 },
-  now: { looks: 64, voices: 64, assets: 294 },
+  now: { looks: 69, voices: 64, assets: 312 }, // #1854: Now sums the grown library (64+5 looks, 294+18 assets)
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
@@ -86,8 +87,8 @@ for (const c of CHAPTERS) {
   const union = new Set();
   for (const c of CHAPTERS) for (const id of chapterAssets(c)) union.add(id);
   const dealable = dealableAssetRecords();
-  assert.equal(dealable.length, 294, 'the dealable library is 294 (295 authored + citizen − citizen)');
-  assert.equal(union.size, 294, 'the chapters together cover the dealable library');
+  assert.equal(dealable.length, 312, 'the dealable library is 312 (313 in the library − the citizen; #1854 added 18)');
+  assert.equal(union.size, 312, 'the chapters together cover the dealable library');
   for (const r of dealable) assert.ok(union.has(r.id), `${r.id}: covered by some chapter`);
   for (const id of NEVER_DEALT) assert.ok(!union.has(id), `${id}: never in a chapter deck`);
   assert.deepEqual(CHAPTER_UNDEALT, NEVER_DEALT, 'the registry exclusion is the roll pool exclusion');
@@ -109,7 +110,8 @@ assert.equal(chapterForStyle('techno'), null, 'techno has no movement chapter �
 
 // 6. deck discipline: the minimums are the library's own floor (each axis is met by every movement chapter,
 //    and some movement chapter sits exactly on each axis minimum — the constants are observed, not padded);
-//    Marks reports short on every axis; every other chapter reports ok
+//    Marks meets looks + assets after #1854 and still reports short on voices (that issue's scope cap);
+//    every other chapter reports ok
 assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the deck floor');
 {
   const report = deckReport();
@@ -122,8 +124,11 @@ assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the
   }
   for (const r of report) {
     if (r.id === 'marks') {
-      assert.equal(r.ok, false, 'Marks reports itself — it has no pool yet (#1854 authors it)');
-      assert.deepEqual(r.shortfalls, ['looks', 'voices', 'assets'], 'Marks is short on every axis, by name');
+      // #1854: looks + assets landed and meet the floor. Voices stay short BY THAT ISSUE'S SCOPE — it caps
+      // voice work at a minimal pairing and defers the dedicated Marks voice deck to a later call — so the
+      // report keeps naming the gap instead of the chapter borrowing a neighbour's voices to clear it.
+      assert.equal(r.ok, false, 'Marks still reports itself — voices unbuilt by scope (#1854)');
+      assert.deepEqual(r.shortfalls, ['voices'], 'Marks is short on voices only, by name');
     } else {
       assert.equal(r.ok, true, `${r.id}: deck meets the floor on every axis`);
       assert.deepEqual(r.shortfalls, [], `${r.id}: no shortfalls`);
@@ -132,15 +137,10 @@ assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the
 }
 
 // 7. chapter cards: a real palette, paired by one of the chapter's own looks, and representative marks that
-//    are members of the chapter's own deck. Marks' card is honestly unfilled until #1854 declares its palettes.
+//    are members of the chapter's own deck. Marks' card is filled by #1854 and passes the same checks.
 {
   const paletteIds = new Set(PALETTES.map((p) => p.id));
   for (const c of CHAPTERS) {
-    if (c.id === 'marks') {
-      assert.equal(c.card.paletteId, null, 'Marks card: no palette declared yet (#1854)');
-      assert.deepEqual(c.card.marks, [], 'Marks card: no marks declared yet (#1854)');
-      continue;
-    }
     assert.ok(paletteIds.has(c.card.paletteId), `${c.id}: card palette ${c.card.paletteId} exists`);
     if (c.id !== 'now') {
       assert.ok(
@@ -169,7 +169,11 @@ assert.deepEqual(
   assert.ok(!/\.era\b/.test(src), 'the registry never reads a palette era string');
   assert.ok(!/from '\.\/palettes\.js'/.test(src), 'the registry does not import palettes.js');
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
-  assert.equal(ASSETS.length, 295, 'the authored library is untouched: 295 records');
+  assert.equal(
+    ASSETS.length,
+    313,
+    'the library is 313: the 295 S1 found + #1854’s 18 authored marks (no existing record edited)',
+  );
 }
 
 console.log('chapters.selfcheck: OK');

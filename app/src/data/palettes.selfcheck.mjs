@@ -105,14 +105,15 @@ for (const [pid, name] of [
 }
 
 // ── #952 KIN roll pool + strip window ───────────────────────────────────────
-// The roll pool is all 37 system palettes plus saved user palettes, system
+// The roll pool is all 39 system palettes plus saved user palettes, system
 // first, deduped. The strip window always keeps the active palette visible.
 {
-  assert.strictEqual(PALETTES.length, 37, `37 system palettes ship, got ${PALETTES.length}`);
-  assert.strictEqual(new Set(PALETTES.map((p) => p.id)).size, 37, 'system ids unique');
+  // #1854 re-pin: the catalog grew 37 → 39 (ochre-wall + bone-dust, the Marks chapter's palettes).
+  assert.strictEqual(PALETTES.length, 39, `39 system palettes ship, got ${PALETTES.length}`);
+  assert.strictEqual(new Set(PALETTES.map((p) => p.id)).size, 39, 'system ids unique');
 
   const pool = paletteRollPoolIds();
-  assert.strictEqual(pool.length, 37, 'no user palettes → 37');
+  assert.strictEqual(pool.length, 39, 'no user palettes → 39');
   assert.deepStrictEqual(
     pool,
     PALETTES.map((p) => p.id),
@@ -124,13 +125,13 @@ for (const [pid, name] of [
     { id: 'user-abc', name: 'MINE' },
     { id: 'user-def', name: 'YOURS' },
   ]);
-  assert.strictEqual(withUsers.length, 39, '37 + 2 user palettes');
+  assert.strictEqual(withUsers.length, 41, '39 + 2 user palettes'); // #1854 re-pin (catalog 39)
   assert.deepStrictEqual(
-    withUsers.slice(0, 37),
+    withUsers.slice(0, 39),
     PALETTES.map((p) => p.id),
     'system first',
   );
-  assert.deepStrictEqual(withUsers.slice(37), ['user-abc', 'user-def'], 'user ids appended');
+  assert.deepStrictEqual(withUsers.slice(39), ['user-abc', 'user-def'], 'user ids appended');
 
   const deduped = paletteRollPoolIds([
     { id: 'v01d', name: 'shadow' }, // shadows a catalog id → one slot
@@ -140,7 +141,7 @@ for (const [pid, name] of [
     { id: '' },
     { name: 'no id' },
   ]);
-  assert.strictEqual(deduped.length, 38, 'shadow + junk collapse to one user slot');
+  assert.strictEqual(deduped.length, 40, 'shadow + junk collapse to one user slot'); // #1854 re-pin (39 + 1)
   assert.ok(deduped.includes('user-abc'), 'valid user id kept');
   assert.strictEqual(deduped.filter((x) => x === 'v01d').length, 1, 'no double v01d');
 

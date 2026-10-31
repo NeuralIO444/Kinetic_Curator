@@ -24,7 +24,8 @@
 // pool. The minimums are the library's own floor: the smallest look/voice/asset counts among the seven
 // movement chapters that exist today (a chapter smaller than the smallest deck the instrument already deals
 // as a movement is not yet a chapter you can land in). Marks is that report's first honest entry: D1 put it
-// first in the spine, and its pool is authored content (#1854) — until then it deals nothing and says so.
+// first in the spine; its looks and assets are authored content (#1854) and meet the floor, and its voices
+// stay short by that issue's own scope — the report says so instead of the chapter borrowing a voice deck.
 
 import { ASSETS } from './assets/index.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
@@ -40,16 +41,19 @@ export const CHAPTER_DECK_MINIMUM = Object.freeze({ looks: 4, voices: 8, assets:
 // The spine, in order (D1). `prev`/`next` are attached from this order below — the order IS the neighbours.
 const SPINE = [
   {
-    // The primitive chapter. No look group, style, or family in the library is Marks yet — its pool is
-    // authored content (#1854: cave signs, stamps, glyphs, tallies), and its card waits for that issue's
-    // ochre/bone/carbon palettes. Until then every axis is empty and deckReport() says so.
+    // The primitive chapter. Its pool is authored content (#1854: cave signs, tallies, hands, a beast —
+    // the `marks` family/style in assetStyle, the `marks` look group in styleLooks, the ochre/bone/carbon
+    // palettes in palettes.js), and it joins here by declaring those axes — derivation does the rest.
+    // voiceStyles stays empty on purpose: #1854 caps voice work at a minimal pairing and defers the
+    // dedicated Marks voice deck to a later call, so deckReport() keeps naming Marks short on voices
+    // rather than borrowing a neighbour's voices to clear the floor.
     id: 'marks',
     name: 'Marks',
-    lookGroups: [],
-    assetStyles: [],
-    assetFamilies: [],
+    lookGroups: ['marks'],
+    assetStyles: ['marks'],
+    assetFamilies: ['marks'],
     voiceStyles: [],
-    card: { paletteId: null, marks: [] },
+    card: { paletteId: 'ochre-wall', marks: ['mrk_hand_01', 'mrk_ring_01', 'mrk_beast_01'] },
   },
   {
     id: 'engraving',
