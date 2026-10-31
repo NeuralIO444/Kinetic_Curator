@@ -468,5 +468,7 @@ export function loisInk(level, tint, warmth, inkRgb, redRgb) {
   return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
 }
 
-/** Every LOIS state the honest feed can show has a face parameter set (plus CUT, from audio direction). */
-export const LOIS_FACE_CODES = Object.freeze([...Object.keys(LOIS_FACES), 'CUT']);
+/** Every LOIS state the honest feed can show has a face parameter set. CUT rode onto this list by
+ * hand (from audio direction) until #1856 gave it a real face in the table (curator/loisFace.js);
+ * the table is the list now — appending CUT again would deal its code twice. */
+export const LOIS_FACE_CODES = Object.freeze(Object.keys(LOIS_FACES));

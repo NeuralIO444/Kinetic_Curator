@@ -180,14 +180,17 @@ ok('Davis fills his frame: the art overflows the window — no dead margins at a
   }
 });
 
-ok('LOIS: every honest state (and CUT) has a parameter set and a fixed glyph vocabulary', () => {
+ok('LOIS: every honest state (CUT included, #1856) has a parameter set and a fixed glyph vocabulary', () => {
   for (const code of LOIS_FACE_CODES) {
     const p = loisFaceParams(code);
     assert.ok(LOIS_GLYPHS[p.glyphs], `${code}: a glyph set`);
     assert.equal(LOIS_GLYPHS[p.glyphs].length, LOIS_LEVELS, 'one glyph per level');
     assert.ok(p.tint >= 0 && p.tint <= 1 && p.dim === 1, `${code}: full light — she never fades (Matt, 2026-10-23)`);
   }
-  assert.deepEqual(Object.keys(LOIS_FACE_PARAMS).sort(), [...Object.keys(LOIS_FACES), 'CUT'].sort());
+  // re-pin (#1856): CUT is a key of LOIS_FACES now, so the params table keys are the face keys
+  // exactly — the old form appended 'CUT' to the face keys by hand, which double-counted it
+  assert.deepEqual(Object.keys(LOIS_FACE_PARAMS).sort(), Object.keys(LOIS_FACES).sort());
+  assert.deepEqual(LOIS_FACE_CODES, Object.keys(LOIS_FACES), 'the code list is the face table, no appends');
   for (const f of LOIS_EXTRA_FACES)
     assert.ok(LOIS_EXTRA_EXPRS[f], `${f}: a micro-expression has a construction preset`);
   assert.ok(loisFaceParams('BURN').tint > loisFaceParams('VIBE').tint, 'her red floods a burn, barely touches a vibe');
