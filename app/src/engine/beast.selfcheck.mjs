@@ -12,7 +12,11 @@ if (!ev.feasible) {
   console.error('FAIL S2: wild-type stillborn');
   process.exit(1);
 }
-console.log('PASS S2: feasible');
+if (![ev.flatness, ev.ripple, ev.step, ev.clearance, ev.duty].every(Number.isFinite)) {
+  console.error('FAIL S2: Wang metrics not finite');
+  process.exit(1);
+}
+console.log('PASS S2: feasible + Wang metrics (flatness, ripple, step, clearance, duty)');
 
 const curve = sampleFootCurve(holy, 1);
 if (curve.length < 36) {
