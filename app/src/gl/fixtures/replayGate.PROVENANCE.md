@@ -25,3 +25,13 @@
   the recorder on clean main `bd9a181d` reproduces main's fixture byte-for-byte; the
   branch recording is deterministic across two runs. A first re-record staged 2026-10-20
   against the pre-travel fixture was superseded by the publish rebase and re-done here.
+- **#1794 checkpoint refresh (2026-10-30):** the streamline sampler added its knob family
+  (streamlineTraces / streamlineSteps / streamlineStep) to the shared layout defaults; a new
+  default key echoes into the hashed resolver output, so every checkpoint moves while the
+  recorded inputs stay untouched — the sanctioned shape (same as #1183 / #1694 S3 / travel).
+  Checkpoint-only refresh via `scripts/refreshFixtureCheckpoints.mjs --write`: sha256
+  a47a2967… → a51ba1e4…, 144276 bytes; deep diff = 61 checkpoint hashes changed, nothing else
+  (nonCheckpointDiffs []). Control: with the three keys stripped (`--strip
+  streamlineTraces,streamlineSteps,streamlineStep`) the pre-refresh fixture verifies
+  byte-for-byte on this tree — the divergence is the keys, only the keys; the refresh is
+  deterministic (two runs, identical sha256).

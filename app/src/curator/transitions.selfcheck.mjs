@@ -148,17 +148,22 @@ for (const key of MARKOV_KEYS) {
     [
       'random',
       'phyllotaxis',
-      'orbit',
-      'hype',
-      'colonize',
-      'dla',
-      'radial',
-      'fibonacci',
-      'radial',
-      'fibonacci',
-      'orbit',
+      'abacus',
+      'lsystem',
+      'voronoi',
+      'ca',
+      'random',
+      'noise',
+      'layers',
+      'grid',
+      'abacus',
       'fibonacci',
     ],
+    // Re-pinned 2026-10-30 for #1794: the mode domain grew by one value
+    // (streamline, growth family), so every row's far/kin splits moved and
+    // the cumulative-distribution walk legitimately diverges from step 3.
+    // The stream mechanics are unchanged — the row-stochastic, reachability,
+    // kin-affinity and stationary checks above pin those independently.
     'seeded chain unchanged by the fallback removal',
   );
 }

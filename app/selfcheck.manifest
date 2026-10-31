@@ -59,6 +59,7 @@ node src/engine/kernel/sample/poisson.selfcheck.mjs
 node src/engine/kernel/sample/circlepack.selfcheck.mjs
 node src/engine/kernel/sample/gaussian.selfcheck.mjs
 node src/engine/kernel/sample/colonize.selfcheck.mjs
+node src/engine/kernel/sample/streamline.selfcheck.mjs
 node src/engine/kernel/sample/quadtree.selfcheck.mjs
 node src/engine/kernel/sample/quadtreeSignal.selfcheck.mjs
 node src/biology/biology.selfcheck.mjs
@@ -66,6 +67,7 @@ node src/engine/kernel/field/field.selfcheck.mjs
 node src/engine/kernel/field/caBlur.selfcheck.mjs
 node src/engine/kernel/field/registry.selfcheck.mjs
 node src/engine/kernel/field/attractors.selfcheck.mjs
+node src/engine/kernel/field/nodeField.selfcheck.mjs
 node src/engine/kernel/field/scent.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.field.selfcheck.mjs
 node src/engine/kernel/tracks/trackGraph.noop.selfcheck.mjs

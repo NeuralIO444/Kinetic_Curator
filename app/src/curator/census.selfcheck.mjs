@@ -317,7 +317,7 @@ const jello = jelloMetric();
   assert.deepStrictEqual(reach.palettes.stillCollisions, [], 'palette still collisions');
   assert.deepStrictEqual(reach.palettes.resolvedCollisions, [], 'palette resolved-colour collisions');
 
-  assert.strictEqual(reach.layouts.distinct, 22, `distinct layout signatures: ${reach.layouts.distinct}`);
+  assert.strictEqual(reach.layouts.distinct, 23, `distinct layout signatures: ${reach.layouts.distinct}`); // 22 + #1794 streamline (distinct signature, no new collisions)
   assert.deepStrictEqual(
     reach.layouts.collisions,
     [

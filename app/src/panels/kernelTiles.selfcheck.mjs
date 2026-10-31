@@ -32,7 +32,7 @@ import { tileFace, tileRowsFor, registryTileRows, registryCounts, probeField } f
   }
   assert.deepStrictEqual(
     row.tiles.map((t) => t.id),
-    ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor'],
+    ['constant', 'ca', 'noise', 'scent', 'quadtree', 'attractor', 'nodes'], // + nodes: #1794 node-influence field
   );
   for (const t of row.tiles) {
     assert.ok(t.face.length > 0 && t.face.length <= 4, `${t.id}: face "${t.face}" must be 1–4 chars`);
@@ -52,7 +52,7 @@ import { tileFace, tileRowsFor, registryTileRows, registryCounts, probeField } f
   assert.deepStrictEqual(FEATURES.list(), [], 'feature registry starts empty');
   const counts = registryCounts();
   assert.deepStrictEqual(counts, [
-    { family: 'field', n: 6 },
+    { family: 'field', n: 7 }, // 6 + nodes (#1794)
     { family: 'weather', n: 1 },
     { family: 'feature', n: 0 },
   ]);
