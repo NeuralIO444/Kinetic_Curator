@@ -21,6 +21,8 @@ Three composition modes, one engine. Mode is a track-level switch, persisted per
 
 **TIDES** (#1797 — "threshold grid", reference loot from Sai Karlen) — a fixed grid of squircles that never moves position. A travelling noise field is sampled at every cell and read out two ways at once: colour by threshold (three states) and drawn size. The pattern depicts nothing; it makes an invisible field legible as patches, bands and pulse. See Composition (TIDES).
 
+**REWRITE** (#1823 — "growth grid", loot from Maxim Gumin's MarkovJunior) — the one mode that is not dealt: seeded growth tips rewrite an empty grid rule by rule (extend, bud, seal) into a maze of corridors, and each cell is coloured by the step it was born, so the finished picture is also its own history. See Composition (REWRITE).
+
 GLYPH and FIELD are not MIX extremes of QUILT. MIX cannot produce negative space or edge-wrapping. They are mode switches.
 
 **ESCHER — parked, not v1.** True interlocking tessellation. Specified below so it is not reinvented later. Do not build it until FIELD's torus assert is green. Hex grids stay parked with it. v1 is square tiles only.
@@ -184,6 +186,20 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 - Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, so existing seeded deals are unchanged.
 - Cost: tier 0 at registration (`pattern/tides`), CPU raster ≈ 3 ms per moving 1000×700 frame; still frames are drawn once and cached.
 
+## Composition (REWRITE)
+
+(#1823, loot lane, built on Matt's unpark word.) Code: `app/src/engine/kernel/markov.js` (the rewrite engine) + `app/src/pattern/rewrite.js` (the mode); checks: `markov.selfcheck.mjs`, `rewrite.selfcheck.mjs`.
+
+- Grid of square cells, `cols = 2 × DENSITY` (DENSITY 10 → 20 across, the TIDES rhythm). Rows fill the frame height at the same cell. Cells never move; what changes is which of them have been born.
+- The growth is a MarkovJunior-style program over the grid (pattern → match → rewrite, one rule application per step, the match chosen from the seed): **extend** (a head advances into void, leaving path), **spawn** (a path cell buds a new head into adjacent void), **seal** (once growth stalls, leftover heads die into path). One written rule matches in every direction (dihedral symmetries). The engine lives in the kernel so the creature work (#1734–#1738) can grow by the same rules later; this slice wires only the pattern home.
+- Seeds: the run opens with 1–4 growth heads placed from the seed (count from MIX). Every path cell is connected to a head by construction — growth only extends what already grew.
+- Colour: palette only. A path cell wears the palette's non-ground swatches sorted dark → light, stepped by its birth step as a fraction of the whole run — oldest growth darkest, the sealed dead ends lightest. Live heads wear the ramp's lightest colour. Unborn cells are ground.
+- MIX is the branching appetite: the spawn rule's weight (0 at MIX 0 — a single winding trunk per head) and the opening head count (1 at MIX 0, 4 at MIX 1). GROUT, HERO, KIN and MOVERS are not read (no separate elements; the ground seam between cells does grout's job).
+- Budget: growth is hard-capped at 1024 rule applications per run (`REWRITE_MAX_STEPS`) — the reference's search is unbounded, KC-1's is not. A budget-cut run renders mid-growth, heads still lit.
+- Time: DRIFT 0 = the finished growth, drawn once and cached. DRIFT above 0 replays the growth over 6 DRIFT-seconds, holds the finished maze for 2, and regrows. A frame is the state after k steps, k a pure function of (seed, params, drift, t) — replay law holds step for step.
+- Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, like TIDES, so existing seeded deals are unchanged.
+- Cost: tier 0 at registration (`pattern/rewrite`). The growth is a one-off per (seed, density, mix, size) when the plan is built (single-digit ms at the default size); per frame is the raster only.
+
 ## Composition (ESCHER) — parked
 
 Do not implement in v1. Recorded so the parked line cannot be re-litigated as forgetfulness.
@@ -206,8 +222,8 @@ GLYPH further restricts to the 4–6 strongest roles. FIELD and QUILT may use th
 
 | Param | Range | Default | Notes |
 |---|---|---|---|
-| MODE | QUILT / GLYPH / FIELD / TIDES | QUILT | Track-level. ESCHER not in the enum until unparked. |
-| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. |
+| MODE | QUILT / GLYPH / FIELD / TIDES / REWRITE | QUILT | Track-level. ESCHER not in the enum until unparked. |
+| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES), 10 (REWRITE) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. TIDES and REWRITE: cols = 2 × DENSITY. |
 | MIX | 0–100% | 55% | Motif entropy inside the current mode's vocabulary. |
 | SEED | uint32 | stored integer | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value. |
 | GROUT | 0–8% of tile | 3% QUILT, 0 GLYPH, 0 FIELD | Fraction of tile size, not pixels. Resolution-independent. |
@@ -223,6 +239,7 @@ DRIFT means one thing per mode. It does not also mean hue cycle, motif morph, an
 - GLYPH: phase-offset scale pulse across the grid. Amount = DRIFT. Scale `1 + 0.2 * DRIFT * sin(phase + t)`, peak 72% of tile, trough 48%, never leaves the tile rect. No rotation over time. Construction and the filled-mark quota are in Composition (GLYPH).
 - FIELD: pan speed across the torus. Amount = DRIFT. Direction is seed-stable.
 - TIDES: the field's own clock. DRIFT scales time (DRIFT 0.5 at 4 s = DRIFT 1 at 2 s): the field travels downward, evolves, and breathes from blotchy patches into broad horizontal bands and back (one breath = 9 DRIFT-seconds). The grid stays put.
+- REWRITE: the growth's own clock. DRIFT scales time the same way: the growth replays from the seed over 6 DRIFT-seconds, the finished maze holds for 2, then it regrows. DRIFT 0 is the finished growth, still.
 - Accent hue cycle is not DRIFT. It is a MATH tone op (HUE ROTATE) on the palette. PATTERN does not re-key color.
 - Motif morph (diamond ↔ hexagon) is parked. No shape interpolator in v1.
 - SHUFFLE re-seeds assignment inside the current mode. If DROP is on and BEAT is running, the reseed lands on the bar. The pattern drop is the product.

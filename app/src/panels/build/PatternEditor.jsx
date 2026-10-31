@@ -31,6 +31,7 @@ const MODE_HINT = {
   GLYPH: 'A poster: one bold mark per tile on a letterboxed 5:4 grid.',
   FIELD: 'A wallpaper: ten micro-patterns that wrap, and pan.',
   TIDES: 'A display: a still grid of cells that reads out a moving field as three colours and a size.',
+  REWRITE: 'A growth: seeded tips rewrite the grid rule by rule into a maze, coloured by the order it grew.',
 };
 const pct = (v) => Math.round(v * 100);
 // #1137 — the KINEME motion the pattern's individual elements take while DRIFT is up.
@@ -141,7 +142,7 @@ export function PatternEditor({ layer, ordinal }) {
       {pctRow(
         'mix',
         'mix',
-        "Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle.",
+        "Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle. REWRITE: how freely the growth buds new tips, and how many tips it opens with.",
         'Pattern mix',
       )}
       {pctRow('grout', 'grout', 'The dark seam between tiles, as a fraction of a tile.', 'Pattern grout', {
@@ -168,7 +169,7 @@ export function PatternEditor({ layer, ordinal }) {
       {pctRow(
         'drift',
         'drift',
-        'Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid. Zero holds still.',
+        'Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid, REWRITE replays the growth and regrows it. Zero holds still.',
         'Pattern drift',
       )}
       <Param label="motion" hint={KIN_HINT} readout={fieldLike ? '—' : p.kin}>
