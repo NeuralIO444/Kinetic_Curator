@@ -65,7 +65,8 @@ const TIER_2 = [
   'circlepack',
   'voronoi-cells',
   'colonize',
-]; // #1196, #1197
+  'streamline',
+]; // #1196, #1197, #1794 (streamline: node field + traces built once per seed and cached)
 
 ok('every built-in sampler declares its true tier', () => {
   const expect = new Map([
@@ -73,7 +74,7 @@ ok('every built-in sampler declares its true tier', () => {
     ...TIER_1.map((id) => [id, 1]),
     ...TIER_2.map((id) => [id, 2]),
   ]);
-  assert.strictEqual(expect.size, 27, 'the registry owns exactly the 27 built-ins'); // #1196 voronoi-cells + #1197 colonize
+  assert.strictEqual(expect.size, 28, 'the registry owns exactly the 28 built-ins'); // #1196 voronoi-cells + #1197 colonize + #1794 streamline
   for (const id of listSamplers()) {
     const d = getSamplerDecl(id);
     assert.ok(d, `missing declaration for ${id}`);

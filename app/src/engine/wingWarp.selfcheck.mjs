@@ -182,12 +182,19 @@ function builderRun(skinning, bentT, over = {}) {
 // reproduce dc0897fb / 017f6b2a exactly (the pre-#1574 pins), and the builder pins did not
 // move — no behaviour changed.)
 const REST_BUILDER = '1dc2d9bb';
-const REST_RESOLVER = 'dfb2915f'; // re-based at the S3 integration (was c9a243c9 — see the note below);
+const REST_RESOLVER = '4b47bdad'; // re-based at the S3 integration (was c9a243c9 — see the note below);
 // re-pinned 2026-10-19 for #1183 (was 7d901919 — see the note below);
 // re-pinned 2026-10-19 for #1694 S3 (was 9f0043e7 — see the note below);
 // re-pinned 2026-10-20 for #1574 (was dc0897fb — see the note above)
 // re-pinned 2026-10-20 for #1575 (was 41d885e1 — see the note above)
 // re-pinned 2026-10-20 for #1576 (was 248580c4 — see the note above)
+// re-pinned 2026-10-30 for #1794 (was dfb2915f — see the note below)
+// (Re-pinned 2026-10-30 for #1794: the two RESOLVER pins only. #1794 added the streamline
+// sampler's knob family (streamlineTraces / streamlineSteps / streamlineStep, defaults
+// 42/180/6) to the shared layout defaults, so the hashed resolver output gained exactly
+// those three keys at their parity defaults. Proven before re-pinning: with the three
+// keys stripped from the shared defaults (scratch tree), this suite reproduces
+// dfb2915f / 981bdefe exactly, and the builder pins did not move — no behaviour changed.)
 {
   const on = builderRun(true, null);
   const off = builderRun(false, null);
@@ -203,12 +210,13 @@ const REST_RESOLVER = 'dfb2915f'; // re-based at the S3 integration (was c9a243c
 
 // 3. the BENT golden — peak beat, pinned hash, real meshes, plumage riding its wing rigidly
 const BENT_BUILDER = 'd245251e'; // re-based at the S3 integration (was f28c4bd5 — see section 2's note)
-const BENT_RESOLVER = '981bdefe'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
+const BENT_RESOLVER = 'a88fdc98'; // re-based at the S3 integration (was 8e0c1b0f — see section 2's note);
 // re-pinned 2026-10-19 for #1183 (was 03421894 — see section 2's note);
 // re-pinned 2026-10-19 for #1694 S3 (was 7b1c87a6 — see section 2's note);
 // re-pinned 2026-10-20 for #1574 (was 017f6b2a — see section 2's note)
 // re-pinned 2026-10-20 for #1575 (was 0287999c — see section 2's note)
 // re-pinned 2026-10-20 for #1576 (was 9b978ad7 — see section 2's note)
+// re-pinned 2026-10-30 for #1794 (was 981bdefe — see section 2's note)
 {
   const run1 = builderRun(true, PEAK_MS);
   const run2 = builderRun(true, PEAK_MS);

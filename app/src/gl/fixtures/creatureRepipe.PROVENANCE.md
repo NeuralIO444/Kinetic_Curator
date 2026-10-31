@@ -91,3 +91,12 @@ identical sha256), and the #1718 refresh tool and the verify-mirror refresh
 agree byte-for-byte. A first re-record staged 2026-10-20 against the
 pre-travel fixture was superseded by the publish rebase and re-done here; the
 staged dish-golden re-pins (dishCreature suite) reproduced exactly.
+
+**#1794 checkpoint refresh (2026-10-30):** same cause as the replayGate refresh in this PR —
+the streamline sampler's knob family joined the shared layout defaults, and the new keys echo
+into the hashed resolver output from frame 0. Checkpoint-only refresh via
+`scripts/refreshFixtureCheckpoints.mjs --write`: sha256 8500ab22… → b6effd90… (17764 bytes);
+deep diff = 16 of 16 checkpoint hashes changed, recorded inputs byte-identical, nothing else
+(nonCheckpointDiffs []). Control: with the three keys stripped the pre-refresh fixture
+verifies byte-for-byte on this tree; the refresh is deterministic (two runs, identical
+sha256).

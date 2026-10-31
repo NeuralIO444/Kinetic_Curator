@@ -156,7 +156,7 @@ const GRAIN = { kind: 'grain', params: { amount: 0.4 } };
   const v = field.sample(0.5, 0.5);
   assert.ok(v >= 0 && v <= 1, 'the created field samples in range');
   assert.deepStrictEqual(registryCounts(), [
-    { family: 'field', n: 6 },
+    { family: 'field', n: 7 }, // 6 + nodes (#1794)
     { family: 'weather', n: 1 },
     { family: 'feature', n: 0 },
   ]);

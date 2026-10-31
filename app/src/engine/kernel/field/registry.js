@@ -14,6 +14,7 @@
 import { createRegistry } from '../registry.js';
 import { makeConstantField, makeCaField, makeNoiseField } from './index.js';
 import { createAttractorField } from './attractors.js';
+import { createNodeField } from './nodeField.js';
 import { createScentField, SCENT_COLS, SCENT_ROWS } from './scent.js';
 import { makeQuadtreeField } from '../sample/quadtreeSignal.js';
 
@@ -79,4 +80,21 @@ FIELDS.register({
       minSpacing: opts?.minSpacing,
       seedOffsets: opts?.seedOffsets ?? null,
     }),
+});
+
+/**
+ * Node-influence field (#1794) — points as influence sources, influence
+ * propagated node to node along a k-nearest graph. The field-as-structure
+ * counterpart to the noise field's weather: sample() reads the propagated
+ * influence density, and the instance also carries sampleVector() — the
+ * flow the streamline trace consumer follows. Tier 0 like every field in
+ * this family (init/placement-time CPU, structural). Standalone module:
+ * kernel/field/nodeField.js. create(seed, { count, radius, sources, links,
+ * decay, propagation, minSpacing, seedOffsets }).
+ */
+FIELDS.register({
+  id: 'nodes',
+  reads: ['seed'],
+  costTier: 0,
+  create: (seed, opts) => createNodeField(seed, { ...(opts ?? {}), seedOffsets: opts?.seedOffsets ?? null }),
 });

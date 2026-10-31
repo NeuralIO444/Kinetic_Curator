@@ -305,6 +305,12 @@ export function buildPlacements({
     colonizeKill: layoutParams.colonizeKill,
     colonizeBranch: layoutParams.colonizeBranch,
     colonizeStep: layoutParams.colonizeStep,
+    // Streamlines (#1794) — forwarded like colonize/brush: the document's
+    // stored values must reach computeGeometrySoA, and geometrySignature
+    // lists all three, so a streamline edit busts the geometry stage.
+    streamlineTraces: layoutParams.streamlineTraces,
+    streamlineSteps: layoutParams.streamlineSteps,
+    streamlineStep: layoutParams.streamlineStep,
     displacement: layoutParams.displacement,
     noiseFreq: layoutParams.noiseFreq,
     noiseSpeed: layoutParams.noiseSpeed,

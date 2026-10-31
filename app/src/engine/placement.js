@@ -30,6 +30,7 @@ import {
   sampleDensity,
   applyHeroes,
 } from './kernel/field/attractors.js';
+import { STREAMLINE_TRACES, STREAMLINE_STEPS, STREAMLINE_STEP } from './kernel/sample/streamline.js';
 
 /**
  * @typedef {object} PlacementSoA
@@ -158,6 +159,10 @@ export function computeGeometrySoA(
     colonizeKill = 18,
     colonizeBranch = 0.25,
     colonizeStep = 7,
+    // #1794 — streamline trace knobs; ignored by every other mode.
+    streamlineTraces = STREAMLINE_TRACES,
+    streamlineSteps = STREAMLINE_STEPS,
+    streamlineStep = STREAMLINE_STEP,
   },
   out,
 ) {
@@ -234,6 +239,10 @@ export function computeGeometrySoA(
     colonizeKill,
     colonizeBranch,
     colonizeStep,
+    // #1794 — streamline trace knobs; ignored by every other mode.
+    streamlineTraces,
+    streamlineSteps,
+    streamlineStep,
     // #1309 — column-writing mode; assigned below once the lanes exist.
     out: null,
     row: -1,
@@ -466,6 +475,10 @@ export function geometrySignature(p) {
     p.colonizeKill || 0,
     p.colonizeBranch || 0,
     p.colonizeStep || 0,
+    // #1794 — the traces depend on the trace knobs (streamline only).
+    p.streamlineTraces || 0,
+    p.streamlineSteps || 0,
+    p.streamlineStep || 0,
     o.spatial || 0,
     o.color || 0,
     o.asset || 0,

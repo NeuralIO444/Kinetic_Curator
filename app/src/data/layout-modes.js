@@ -40,6 +40,7 @@ export const LAYOUT_MODES = [
   { id: 'circlepack', name: 'circle pack', glyph: 'pack' }, // #1195
   { id: 'colonize', name: 'colonize', glyph: 'branch' }, // #1197
   { id: 'voronoi-cells', name: 'voronoi cells', glyph: 'cell' }, // #1196
+  { id: 'streamline', name: 'streamlines', glyph: 'stream' }, // #1794
   // #280 — murmuration is a curated voice, not a new engine: it runs on the
   // swarm engine (see isLiveSwarmMode below) with its own palette + motion
   // character. Kept out of the stub list so it never falls back to a bare
@@ -160,6 +161,10 @@ export const DEFAULT_LAYOUT_PARAMS = {
   colonizeKill: 18,
   colonizeBranch: 0.25,
   colonizeStep: 7,
+  // #1794 — streamlines: trace count, max steps per trace, step size (px).
+  streamlineTraces: 42,
+  streamlineSteps: 180,
+  streamlineStep: 6,
   noiseFreq: 0.005,
   noiseSpeed: 0.5,
   displacement: 0,
@@ -411,6 +416,12 @@ export const PARAM_SPEC = {
   colonizeKill: { min: 2, max: 60 },
   colonizeBranch: { min: 0, max: 1 },
   colonizeStep: { min: 2, max: 24 },
+  // #1794 — streamlines: traces/steps caps mirror the sampler's hard caps;
+  // step is the stamp spacing along the trace (brushSpacing's lesson:
+  // at or under the stamp size the line reads continuous).
+  streamlineTraces: { min: 4, max: 96, int: true },
+  streamlineSteps: { min: 16, max: 400, int: true },
+  streamlineStep: { min: 2, max: 24 },
   noiseFreq: { min: 0.001, max: 0.03 },
   noiseSpeed: { min: 0.1, max: 3.0 },
   // Brush line: spacing ≤ 0.7 reads as a continuous line; wider is a

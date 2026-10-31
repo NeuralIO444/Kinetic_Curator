@@ -27,6 +27,7 @@ import { poisson } from './poisson.js'; // #1193 — Poisson-disc blue noise
 import { gaussian } from './gaussian.js'; // #1194 — Gaussian cluster mixture
 import { circlepack } from './circlepack.js'; // #1195 — circle packing
 import { colonize } from './colonize.js'; // #1197 — space-colonization growth
+import { streamline } from './streamline.js'; // #1794 — streamline trace over the node field
 import { voronoiCells } from './voronoiCells.js'; // #1196 — true Voronoi cells
 import { createNoise } from '../../noise.js';
 import { makeSmallCache } from '../cache.js'; // #1243 — one cache discipline
@@ -985,6 +986,17 @@ registerSampler({
   fn: colonize,
 });
 registerSampler({
+  // #1794 — tier 2: the node-influence field is built and every trace is
+  // integrated once per (seed, plate, knobs) and cached; sampling deals
+  // points off the traces. No jitter, no ctx.rng — the line is the
+  // structure (brush/colonize precedent).
+  id: 'streamline',
+  reads: ['i', 'count', 'w', 'h', 'seed', 'seedOffsets', 'streamlineTraces', 'streamlineSteps', 'streamlineStep'],
+  writes: ['points', 'points.t', 'points.rot01'],
+  costTier: 2,
+  fn: streamline,
+});
+registerSampler({
   // #1196 — tier 2: Poisson seeds + nearest-cell rejection, cached seeds.
   id: 'voronoi-cells',
   reads: ['i', 'w', 'h', 'seed', 'seedOffsets', 'rng', 'jitter'],
@@ -1018,4 +1030,5 @@ export {
   gaussian, // #1194
   circlepack, // #1195
   colonize, // #1197
+  streamline, // #1794
 };
