@@ -307,3 +307,20 @@ registerCostTier('creature/alife', {
   notes:
     '#1731 #1732 #1734-#1738 — dish creature bounds, facing and the ALife channel: resolver CPU only (no GPU pass, no items added). Measured sandbox builder bench delta (see block comment); sheds with the dish creature by the governor creatureCount cut.',
 });
+
+// --- BEAST S2/S5 (#1865 #1868) — APPEND-ONLY BLOCK ---
+// Pure closed-form solver + trail writes. No GPU pass; CPU only on the resolver path.
+// Tier 0 (structural to the beast family). timeMs is an estimate pending real measurement at the 4-creature cap.
+// Trail writes counted here so the Governor can shed them if over budget.
+registerCostTier('beast/solver', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.08,
+  notes: 'BEAST S2 closed-form Jansen solver (5 circle intersections per leg per frame). Pure CPU; measured later via resolverProbe. Sheds with creature count.',
+});
+registerCostTier('beast/trails', {
+  tier: 1,
+  memoryBytes: 0,
+  timeMs: 0.02,
+  notes: 'BEAST S5 signature trail deposits. Counts writes; sheds first if over budget. Fallback to plain fading graphic when wet field is unavailable.',
+});
