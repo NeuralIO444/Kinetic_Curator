@@ -304,6 +304,22 @@ guard (all 8 seeds × both fixtures: banded Jaccard, reach improving or holding 
 scratch census and the suite's own run to 0x1509 both show. Coordinator: a ±1 never-tray band in the same
 comment, or a named per-seed exception, closes it in one line — your call.
 
+**SECOND FLAG — extended band landed, reach then failed on the same seed (finisher follow-up, 2026-10-31):**
+the coordinator's extended call was implemented exactly as authorized — `NEVER_TRAY_BAND = 1`, applied
+ONLY to the never-tray comparison, with the cause (coordinator's extended call, 2026-10-31; pool growth
+295 → 313, #1854; flat-fixture +1 on 0x1509 measured) written into the guard's comment block beside the
+trio band note. The reach comparison was not touched. Re-running `node src/curator/coverage.selfcheck.mjs`
+then passes the never-tray assertion on 0x1509 and fails on the next comparison in the same iteration —
+the known suspect. The suite's exact failure line is:
+`AssertionError [ERR_ASSERTION]: seed 0x1509 flat: tray reach must not shrink`
+(at `coverage.selfcheck.mjs:355`). Measured on this tree with the suite's own fixtures (600 rolls, seed
+0x1509, direct `diceTrayCoverage` census): unordered — tray distinct 282, never-tray 31; FLAT — tray
+distinct 281, never-tray 32 (reach −1, never-tray +1 — the same single asset: distinct and never-tray are
+complements over the 313-asset library); opinionated — tray distinct 291, never-tray 22 (exact direction
+held). I did **not** band the reach comparison or anything else: per the finisher instruction, that is
+the coordinator's decision from these real numbers. `coverage.selfcheck` therefore still fails, now on
+exactly that one reach assertion.
+
 ### Decision 3 — wetSoak has its own fixed scene (coordinator's call)
 
 `wetSoak.selfcheck` no longer renders the parity corpus's `single-basic`. It builds its own scene in the
@@ -330,6 +346,8 @@ checks passed**, matching the pre-#1854 base standalone count, both term-(a) che
   Chromium; base-identical per S1) are the known environmental pair; `accum` aborted in-sweep without an
   assertion (the same sandbox casualty S1b recorded) and is **fully green standalone, 83/83**; `coverage`
   fails on the single flagged never-tray assertion above, by design, awaiting the coordinator's extended
-  call.
+  call. (Superseded in part by the SECOND FLAG under Decision 2 above: the extended band has since landed,
+  and `coverage` now fails on the 0x1509 flat tray-reach assertion instead, awaiting the coordinator's
+  decision on those measured numbers.)
 - `npx prettier --check` clean on all nine touched code files. One-writer files untouched. D2–D6
   untouched — the voice authoring needed none of them.
