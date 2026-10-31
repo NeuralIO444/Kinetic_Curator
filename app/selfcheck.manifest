@@ -232,6 +232,7 @@ node src/fx/wetCeiling.selfcheck.mjs
 node src/gl/renderFault.selfcheck.mjs
 node src/gl/sceneContract.selfcheck.mjs
 node src/gl/resolve.selfcheck.mjs
+node src/gl/exposureModel.selfcheck.mjs
 node src/gl/presentOrientation.selfcheck.mjs
 node src/gl/liveAtlas.selfcheck.mjs
 node src/gl/liveResolve.selfcheck.mjs

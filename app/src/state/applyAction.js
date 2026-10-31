@@ -354,6 +354,8 @@ export function applyAction(action, store = useStore.getState()) {
       return store.setFxaa(action.on);
     case A.SET_WEAVE:
       return store.setWeave(action.on);
+    case A.SET_EXPOSURE_STOPS:
+      return store.setExposureStops(action.stops);
     case A.LOAD_VOICE:
       return store.loadVoice(action.id);
     case A.DELETE_USER_VOICE:

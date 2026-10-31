@@ -1,65 +1,200 @@
-# STAGING REPORT — #1853 BOOK S1: chapter registry — derive design-history chapters from movement groups
+# STAGING REPORT — #1830 exposure: a cinematic photoreal light model at the resolve
 
-**Branch:** `feat/1853-book-s1-chapters` in worktree `~/workspace/kc-1853-build`, based on `origin/main` 4378b336. (This file replaces the previous lane's report, per the staging ritual.) Not pushed, no PR — coordinator publishes. **Review posture: backend/data lane — the registry changes nothing the performer sees; Matt merges on the coordinator's tech check.**
+**Verdict: BUILT.** The previous staging pass verified every premise,
+designed the build, and stopped at the one-writer boundary in
+`app/src/gl/liveLoop.mjs`, exactly as ordered. The coordinator routed the
+decision: **exactly one field** in that file was authorized. This pass
+executed the plan as written. Base `origin/main` 888efe24; branch
+`feat/1830-exposure`. Not pushed, no PR — the coordinator publishes.
 
-## What shipped
+---
 
-One new module + its selfcheck + one manifest line. Nothing else.
+## 1. Premise verification + the boundary (record of the previous pass, kept)
 
-- **`app/src/data/chapters.js`** — the chapter registry, derived the way `data/assetStyle.js` derives style: a frozen table over what the library already declares, zero edits to authored records, pure functions, no RNG (decks are a function of the library — the replay law's precondition for S2's seeded landing).
-  - `CHAPTERS` — the 9 chapters in the D1 spine order, each carrying `id`, `name`, `position`, `prev`/`next` neighbours (attached from the order itself), its `lookGroups`, `assetStyles`, `assetFamilies`, `voiceStyles`, and its `card` (`{ paletteId, marks }` — data only; rendering is S2's work).
-  - Read API in the assetStyle shape: `chapterById`, `nextChapter` / `prevChapter` (null at the ends — the walk terminates, never cycles), `chapterForLookGroup`, `chapterForStyle`, `chapterLooks` / `chapterVoices` / `chapterAssets` / `chapterDeck` (all take injectable data params with library defaults), `dealableAssetRecords`, and `deckReport()` — the backstage honesty read.
-  - Membership is derivation, never borrowing: looks by group ∈ `lookGroups` over `COMPOSITION_PRESETS`; voices whose declared `styles` meet `voiceStyles` over `VOICE_DECK`; assets whose derived style ∈ `assetStyles` or derived family ∈ `assetFamilies` over the dealable records. The creature citizen is excluded from every deck (`CHAPTER_UNDEALT`, pinned identical to `rollPool`'s `NEVER_DEALT` by the selfcheck). The palette `era` strings are never read — the module does not import `palettes.js` at all; card palette ids are declared data for S2 to resolve.
-- **`app/src/data/chapters.selfcheck.mjs`** — registered in `app/selfcheck.manifest` after `voiceDeck.selfcheck`. Proves: spine order + neighbour round-trip (forward walk visits all 9 exactly once, backward mirrors, ends null); pinned deck counts per chapter; union of chapters = the 294 dealable assets with the citizen in no deck and Now = 64 looks / 64 voices / 294 assets; the taxonomy pin (**DIAGONAL GRID reads in Swiss, not Bauhaus**); deck-discipline derivation (below); card validity (palette exists and — for movement chapters — is paired by one of the chapter's own looks; card marks are members of the chapter's own deck); purity (same library in, same deck out); source hygiene (no `.era` read, no palettes import, no one-writer files).
-- **`app/selfcheck.manifest`** — +1 line.
+Every premise in the issue is TRUE against the tree (issue read in full;
+it has 0 comments, so the body is the whole spec):
 
-## The spine, and what each chapter holds today (measured)
+| # | Issue premise | Evidence |
+| --- | --- | --- |
+| 1 | #1800 spectral fade shipped (film-like colour aging, in the loop) | `app/src/gl/accum.mjs` — the fade pass consumes a per-channel spectral keep vec3 (`u_keep`) from per-channel half-lives. |
+| 2 | #1801 shipped: a highlight shoulder in the loop, invertible, because ACES in the loop was rejected | `app/src/gl/accum.mjs` — `highlightSoftCeiling`, Reinhard shoulder, knee 1.0 / ceiling 2.5; header records: *"ACES is non-invertible and compounds — it stays at the resolve, #532"*. |
+| 3 | #1803 shipped: palette halation | `app/src/gl/accum.mjs` — halation tint derived from the active palette's centroid chroma. |
+| 4 | #532 keeps ACES at the resolve | `app/src/gl/resolveFs.mjs` — Narkowicz ACES in `RESOLVE_FS`; `resolveBind.mjs` live defaults ACES on, Bayer on, exposure 1.0, "No panel this PR." |
+| 5 | Settled law: filmic curves at the resolve only, never in the loop | Held in the tree before this build; this build adds nothing upstream of the resolve. |
+| 6 | What is missing is the _model_: an exposure stage in stops + the resolve read as one system | Confirmed missing: `u_exposure` existed as a bare linear multiplier bound to the constant 1; no stops semantics, no stop table, no performer control, no module naming the resolve as one lighting model. |
 
-| position | chapter | lookGroups | deck (looks / voices / assets) |
-|---|---|---|---|
-| 0 | Marks | — | **0 / 0 / 0 — reports short on every axis** |
-| 1 | Engraving | engraved | 4 / 11 / 20 |
-| 2 | Bauhaus | bauhaus | 4 / 8 / 16 |
-| 3 | Swiss | swiss | 5 / 11 / 61 |
-| 4 | Op Art | op | 4 / 11 / 14 |
-| 5 | Japan | japanese | 5 / 11 / 25 |
-| 6 | Memphis | memphis | 4 / 14 / 25 |
-| 7 | Grunge | grunge | 5 / 8 / 39 |
-| 8 | Now | all 14 groups | 64 / 64 / 294 |
+**The boundary.** The final-image resolve chain is `resolveFs.mjs` (shader)
+← `resolveBind.mjs` (binder) ← `renderer.mjs` `setResolveOptions` bag ←
+pushed from exactly one place: `liveLoop.mjs` (one-writer). An exposure
+control built everywhere except that block would be a **dead control** —
+the panel would move and the canvas would never change. The previous pass
+specified the needed change to the line and stopped.
 
-Now's lists are built from the source tables (`PRESET_GROUPS`, `STYLES`) at module load, so the sum chapter cannot drift from the library it sums.
+**The routing (this pass).** The coordinator authorized exactly one change
+in `liveLoop.mjs`: the single `exposureStops` field in the existing
+`setResolveOptions` bag. It is the only line-set changed in that file
+(§2); `liveResolve.mjs` and `particles.js` are untouched (0 diff lines).
 
-## Design choices (each one Matt-overruleable)
+## 2. The authorized one-writer change (verbatim diff, complete)
 
-1. **Marks derives nothing today — on purpose.** D1 ruled the book opens at Marks, and #1854 (S1b) is the issue that authors its pool "as a coherent visual language, not assembled from leftovers" — its own premise is that Marks "has no pool at all today." So S1 does not raid the glyph/stamp/letterform families to fake a deck; the chapter exists first in the spine with empty derivation axes, an unfilled card (`paletteId: null`, `marks: []` — the slot #1854's ochre/bone/carbon palettes will fill), and `deckReport()` naming it short on looks, voices and assets. The `assetFamilies` axis is the documented join point: when #1854's records declare their family/style, this derivation reads them with no change to the code below the table.
-2. **The deck floor is the library's own floor.** `CHAPTER_DECK_MINIMUM = { looks: 4, voices: 8, assets: 14 }` — exactly the smallest counts among the seven movement chapters that exist today (Bauhaus/Grunge voices = 8; Op Art assets = 14; four chapters sit at 4 looks). Not a round number and not padded: a chapter smaller than the smallest deck the instrument already deals as a movement is not yet landable. The selfcheck asserts a movement chapter sits exactly on each axis minimum, so if the floor ever stops being the observed floor, the check says so.
-3. **Card palettes are paired, not picked.** Each movement chapter's card palette is one its own looks already pair with (Engraving → `persona-haeckel`, Bauhaus → `solar-max`, Swiss → `transit` — DIAGONAL GRID's own pairing, Japan → `sepia-plate`, Op Art → `hydra`, Memphis → `neon-brood`, Grunge → `dirty`); the selfcheck enforces the pairing so a card can never drift off its chapter's authored sky. Now's card is `praystation` (the factory opener's palette — Davis's home chapter wears the instrument's own colours) with pixel-glyph marks: the one chapter whose signature is the instrument itself.
-4. **Chapter ids are movement nouns, group ids stay as they are.** `engraving` (group `engraved`), `japan` (group `japanese`), `op-art` (group `op`) — the mapping lives in the table, which is the registry's whole job; no authored group was renamed to fit.
-5. **The undealt exclusion is declared in the registry and policed, not imported.** `state/rollPool.mjs` is the deal-time owner of `NEVER_DEALT`; a data module importing state would invert the layering `rollPool` itself observes (it imports `data/assetStyle`). So `chapters.js` declares `CHAPTER_UNDEALT` with the reason in the header, and the selfcheck — which may cross layers — asserts the two are identical.
+```diff
+           weave: st.weave ? gateWeaveOffset(performance.now(), frameCount) : null,
++          // #1830: resolve exposure in stops — the exposure model's
++          // countable, hand-played quantity; resolveBind turns stops
++          // into the linear gain the resolve shader applies pre-curve.
++          exposureStops: st.exposureStops ?? 0,
+         });
+```
 
-**D2–D6:** none required. The registry needs no cut shape (D2), no CURATOR behaviour (D3), no settle trigger (D4), no Queen memory (D5), and no cost gate (D6) — it deals nothing and gates nothing. **Premise check:** every premise in the issue verified true against this tree before building (no era/chapter field anywhere; 7 movement groups in `styleLooks.js`; 10 derived styles; 295 authored records + citizen = 294 dealable via `rollPool.dealableRecords`; DIAGONAL GRID in `swiss`). No premise stop.
++4 lines (3 comment + 1 field), nothing else in the file. It rides the
+standing #740/#741 discipline: the loop re-pushes the store value every
+frame, so a recreated live renderer never loses it. The bag feeds both
+the live present and the readback/export path — what you see is what you
+export, exposure included.
 
-## Lois pass (the 9 rules, applied to the chapter table — the only design surface S1 has)
+## 3. What was built (the plan, executed as written)
 
-- **The nanosecond:** Nine chapters, one word each — Marks, Engraving, Bauhaus, Swiss, Op Art, Japan, Memphis, Grunge, Now. A child reads the spine in one breath and knows where they are in the book. Pass.
-- **Creativity solves problems:** The problem was mush — every deal from everywhere. The spine is a decision, not a sort: design history as the order of battle, and the taxonomy in code (Swiss is Swiss, DIAGONAL GRID stays home) over any tidier story. Pass.
-- **Defeat habit:** Every registry on earth backfills the empty slot so the chart looks finished. This one prints Marks at 0/0/0 and calls it honest. The habit broken is cosmetics. Pass.
-- **Cautious or creative:** Opening the book on an empty chapter is the creative choice — and it only works because the emptiness is admitted in writing (the deck report) instead of padded with glyph leftovers. The moment someone "fixes" Marks by borrowing, kill it.
-- **Assume smart:** No wizard, no explainer surface, no new panel. The registry is silent until S2; the backstage report assumes the reader can handle a shortfall list. Pass.
-- **No trends:** "AI personas playing a game" is the trend; a card catalogue with neighbours and a floor is a position. The word *genre* appears nowhere in the module — chapters and styles are the vocabulary, the rest is plumbing. Pass.
-- **Discovered, not created:** The chapters were already in the library — in the group names the looks were filed under. S1 discovers them and writes down the order; it manufactures nothing but Marks' empty chair. Pass.
-- **Work is worship / True to self:** The registry does the unglamorous derivation work once so every later slice (landing, round, narrowing) reads instead of re-deriving — and the order is Matt's ruling (D1), not the machine's convenience. Pass.
-- **Kill list:** Kill any future slice that lets a thin chapter borrow a neighbour's pool silently. Kill any card whose palette isn't paired by the chapter's own looks. Kill "genre" on any performer surface.
+1. **`app/src/gl/exposureModel.mjs`** (new) — the exposure model as one
+   named system:
+   - `EXPOSURE_STOPS`: the detent table — half-stop detents
+     `[-2, -1.5, -1, -0.5, 0, 0.5, 1, 1.5, 2]`, authored frozen data in the
+     Strata Q stop-table style.
+   - `stopsToGain(stops) = 2^stops` (exactly 1 at 0), `gainToStops`,
+     `snapExposureStops` (clamp + nearest detent; ties land low, the
+     modeStops precedent; junk rests at 0), `formatExposureStops`
+     (`+1.0 EV` / `0 EV` / `−1.5 EV`).
+   - `acesNarkowiczMirror` + `ACES_NARKOWICZ`: a JS mirror of the shader
+     curve for CPU probes, constants copied from `resolveFs.mjs` and
+     pinned to its source text by the selfcheck (the #1801 GPU/JS-mirror
+     pattern). `resolveCurveMirror` composes gain-then-curve per pixel.
+   - The composition law is documented in the module header: #1800 (fade),
+     #1801 (invertible shoulder) and #1803 (halation) shape the HDR buffer
+     in the loop; the resolve is the buffer's only exit — **exposure
+     (stops) → filmic curve → dither last** — and no curve ever moves
+     upstream (ACES compounds; #532/#1801 law). ACES stays the curve.
+2. **`app/src/gl/resolveBind.mjs`** — `bindResolveProbe` accepts
+   `exposureStops`: precedence is **explicit linear `exposure` wins**
+   (probes/goldens untouched), else stops → `stopsToGain(snap(stops))`,
+   else the default. The `exposure = 1` default literal is intact, so the
+   existing `resolve.selfcheck` pin passes unmodified. **No shader change**
+   — `RESOLVE_FS` already applies `u_exposure` first, pre-ACES.
+3. **`app/src/state/slices/globalSlice.js`** — `exposureStops` as a
+   per-machine display pref on the exact fxaa/weave pattern: own
+   localStorage key `kc:exposure:v1`, default 0, snapped on write and on
+   read, persisted on change, **never project content**. Reason entry
+   added to `bundle.js` `BUNDLE_LEFT_OUT` beside `kc:fxaa:v1` /
+   `kc:weave:v1` (the `bundleKeys` scan requires the decision in code).
+4. **Event chain** (mirroring `DISPLAY_FXAA`/`DISPLAY_WEAVE` end to end):
+   `Events.DISPLAY_EXPOSURE` (`display:exposure`, `{ stops }`) →
+   `eventRegistry` wire entry → `wireEventBus` → `A.SET_EXPOSURE_STOPS` →
+   `applyAction` → `store.setExposureStops`.
+5. **`app/src/panels/pipeline/DisplayBlock.jsx`** — an **EXPOSURE** row
+   beside FXAA/weave in the Pipeline display block: an `AmberValue`
+   stepper (the DS primitive for editable values — its button IS the
+   readout) over the detent table, step 0.5, formatted by
+   `formatExposureStops`. Help copy added (`output-exposure`).
+6. **Selfchecks** — new `app/src/gl/exposureModel.selfcheck.mjs`
+   (13 checks, §5), registered in `app/selfcheck.manifest` (one line).
+   `app/src/state/fxaa.selfcheck.mjs` extended with the exposure pref
+   (default 0, persistence, snap/clamp on write, refused storage → 0) and
+   its project-document pin now also names `exposureStops`.
+7. **Cost** — governor Δ = 0 by construction: exposure is a uniform on
+   the existing resolve pass, whose registry entry already reads
+   _"final resolve: exposure + ACES + dither, one tap; structural, never
+   shed"_ (tier 0). No new pass, nothing to shed, no registration change
+   needed; `costTiers.selfcheck` green.
 
-## Verification
+**Recorded defaults (Matt-overruleable at review, built as planned):**
+half-stop detents −2…+2 · ACES stays the curve · performer-control-first,
+**Look-stamping deferred** (it composes with Davis's his-only tier
+grades; bolting it on here would entangle two systems — recorded as the
+follow-up question, not silently decided) · control shape = stepper with
+the stop readout as its value.
 
-- `chapters.selfcheck` — green (see the suite; every acceptance bullet in #1853 is an assertion).
-- Zero diffs to the 295 authored asset records and to look/voice/palette data files: `git status` shows exactly three paths — `app/src/data/chapters.js` (new), `app/src/data/chapters.selfcheck.mjs` (new), `app/selfcheck.manifest` (+1 line).
-- Touched-file pin sweep: no other selfcheck references the new module (grep); no control surface exists in this build, and `grep chapter e2e/` is empty — the e2e selector sweep has nothing to re-pin.
-- Full manifest sweep: **all 547 commands accounted for — 545 pass, 2 environmental failures** (below). The official runner passed everything up to `swarmWasm`; the remainder ran in tracked segments (464 pass in place, `chapters.selfcheck` among them), with the two segment failures adjudicated individually.
-- `gl/accum` — heap-aborted under segment load; solo with `NODE_OPTIONS=--max-old-space-size=3072`: **OK (83 cases)**.
-- `swarmWasm` — exit 1 on this tree and on pristine `origin/main` with the identical error; no `cargo` on PATH in the sandbox. Environmental, base-identical.
-- `fx/rollSafety` — on this tree and on pristine `origin/main` alike: 5 checks pass, then the sandbox GL/browser dies at the identical stack (`gl/parity/glDriver.mjs` renderViaGL ← `rollSafety.selfcheck.mjs:231`). Environmental, base-identical; CI's browser job is authoritative.
-- `kineticSweep` passed in the segments — the ~1.5% flake (#1822) did not fire.
-- `npm run format:check` — clean (run as `npx prettier --check .`, the script's exact command; the worktree has no local `node_modules/.bin`). `npx eslint` on both new files: 0 errors.
-- `npm run build`: the sandbox fails identically on pristine main (checked in the untouched reference checkout) and on this tree — `@tauri-apps/api` unresolvable from the shared sandbox install; the failing import is in `useCuratorIPC.js`, untouched by this build, and `chapters.js` is not in the app import graph. CI's `lint-build-selfcheck` (which installs dependencies) is authoritative.
+## 4. Byte-identity at rest — proven, not asserted
+
+At stops 0 the gain is exactly 1, so the resting frame must be the frame
+the instrument has always resolved. Proven at three levels:
+
+- **Unit (uniform stream):** `exposureModel.selfcheck` deep-equals the
+  full uniform stream of `bindResolveProbe({ exposureStops: 0 })`
+  against both `bindResolveProbe({})` and `bindResolveProbe({ exposure: 1 })`
+  — identical, `u_exposure === 1`.
+- **End to end (real shader, both trees):** a synthetic HDR buffer
+  (deep-shadow gradient, flat graphic blocks, an 8-step wedge 0.01→4.0,
+  an HDR highlight core at 6.0 with a palette-tinted halation bleed, a
+  specular streak at 12) was resolved through the production `RESOLVE_FS`
+  + `bindResolveProbe` at production defaults (ACES on, Bayer on), on
+  this tree via `exposureStops: 0` and on a pristine `origin/main`
+  checkout via its linear `exposure: 1`. **Raw RGBA: 0 differing bytes,
+  0 differing pixels of 368,640 (desktop 768×480) and 0 of 230,400
+  (phone 360×640); the PNGs are byte-identical too.** Re-proven on fresh
+  renders after a sandbox restart wiped the first run's working files —
+  the render is deterministic (saved shot == fresh render).
+- **System (goldens):** the full manifest sweep (§5) — every golden,
+  parity and replay suite in the tree passes unmodified. No golden was
+  re-recorded, no check re-pinned, for this build.
+
+## 5. Verification (final tree)
+
+- **New/changed suites:** `exposureModel.selfcheck` 13/13 ·
+  `resolve.selfcheck` green (the `exposure = 1` pin passes unmodified) ·
+  `fxaa.selfcheck` green (incl. the new exposure section) ·
+  `bundleKeys.selfcheck` 5/5.
+- **Touched-file sweep:** every suite naming a touched file was grepped
+  and run — `resolveTap`, `presentOrientation`, `wetLook` (16),
+  `grainFinish`, `liveLoopSwell`, `costTiers`, `eventRegistry`
+  (164 events), `eventBus`, `busChain` (142 wired events), `helpCopy`,
+  `labelCase`, `census`, `chiaroscuro` (10), `overlayRoundtrip` — all
+  green. No e2e spec references the display block's selectors (nothing
+  was converted; a row was added with existing DS primitives) — the
+  e2e grep for `FXAA|gate weave|DisplayBlock` returns no hits.
+- **Full manifest sweep: 543 of 545 commands pass.** The official
+  `npm run selfcheck` halted at command 80 (`swarmWasm`); the sweep was
+  completed in three tracked segments over the whole manifest. The two
+  non-passes are environmental, each **proven base-identical on pristine
+  `origin/main`**:
+  - `swarmWasm` — `build-wasm: cargo not found on PATH` (the sandbox has
+    no Rust toolchain); pristine fails with the identical assertion and
+    exit code, outputs differing only in the tree path.
+  - `fx/rollSafety` — `page.evaluate: Target crashed` (sandbox Chromium),
+    failing at the same point (5 checks in) solo on pristine main, solo
+    on this tree, and in-sweep. This diff touches neither `fx/` nor the
+    candidate renderer.
+  - The `kineticSweep` ~1.5% flake (#1822) did not fire.
+- `npm run lint`: exit 0 (0 errors; 11 warnings, all pre-existing in
+  untouched files — `App.jsx`, `FavoritesTray`, `ShelfView`,
+  `DataExportRow`, `LootRow`). `npm run build`: clean.
+  `npm run format:check`: clean (prettier `--write` applied to
+  `exposureModel.mjs` only, after which its suite re-passed 13/13).
+
+## 6. Visual evidence
+
+`~/workspace/kc-1830-shots/` — the synthetic HDR buffer of §4 resolved at
+**−1 / 0 / +1 / +2 stops**, desktop (768×480) and phone (360×640), plus
+the pristine-main 0-stop frame and a README stating exactly what the
+frames are (probe renders through the production resolve — **not stage
+captures**; the live stage shot belongs to the review lane on Matt's
+machine, where the EXPOSURE row can be played). Measured size of the
+change at played stops (share of pixels differing from the 0-stop frame
+— the change's size, not a parity claim; a global gain moves nearly
+every pixel): −1 EV 99.97% / +1 EV 99.19% / +2 EV 99.19% (+1 and +2
+differ from each other — mid-tones keep separating). What the frames
+show: at +2 the halation halo blooms and the shadow ground lifts while
+the highlight core stays a soft disc (the ACES shoulder rolls it off —
+no hard clip); at −1 the wedge's bright end separates into distinct
+greys and the halo tightens to the core. That is the issue's thesis in
+one frame set: photoreal light, graphic picture.
+
+## 7. What was NOT done
+
+- `resolveFs.mjs` untouched (no shader change); `liveResolve.mjs` and
+  `particles.js` untouched; `liveLoop.mjs` changed by the one authorized
+  field only (§2).
+- No Look-stamping of exposure (deferred by the plan, §3); no new pass,
+  no governor change; no panel beyond the one DisplayBlock row.
+- The probe page/driver that produced §6's frames are evidence tooling
+  kept with the build's working papers, not committed — no shipped
+  selfcheck consumes them; the byte-identity claim is independently
+  carried by the committed `exposureModel.selfcheck` uniform-stream
+  proof and the golden sweep.
