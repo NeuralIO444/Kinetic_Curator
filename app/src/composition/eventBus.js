@@ -234,6 +234,7 @@ export const Events = {
   CANVAS_SWAP: 'canvas:swap', // swap width and height
   DISPLAY_FXAA: 'display:fxaa', // { on } per-machine FXAA
   DISPLAY_WEAVE: 'display:weave', // { on } per-machine gate weave
+  DISPLAY_EXPOSURE: 'display:exposure', // { stops } per-machine resolve exposure, EV detents (#1830)
   VOICE_LOAD: 'voice:load', // { id }
   VOICE_DELETE: 'voice:delete', // { id } a performer voice
   VOICE_RENAME: 'voice:rename', // { id, name }

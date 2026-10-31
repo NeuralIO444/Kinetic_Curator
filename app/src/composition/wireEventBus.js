@@ -175,6 +175,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.CANVAS_SWAP, () => dispatch({ type: A.SWAP_CANVAS_ORIENTATION }));
   on(Events.DISPLAY_FXAA, (p = {}) => dispatch({ type: A.SET_FXAA, on: p.on }));
   on(Events.DISPLAY_WEAVE, (p = {}) => dispatch({ type: A.SET_WEAVE, on: p.on }));
+  on(Events.DISPLAY_EXPOSURE, (p = {}) => dispatch({ type: A.SET_EXPOSURE_STOPS, stops: p.stops }));
   on(Events.VOICE_LOAD, (p = {}) => dispatch({ type: A.LOAD_VOICE, id: p.id }));
   on(Events.VOICE_DELETE, (p = {}) => dispatch({ type: A.DELETE_USER_VOICE, id: p.id }));
   on(Events.VOICE_RENAME, (p = {}) => dispatch({ type: A.RENAME_USER_VOICE, id: p.id, name: p.name }));
