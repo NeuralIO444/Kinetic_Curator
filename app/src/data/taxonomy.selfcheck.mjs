@@ -49,6 +49,11 @@ for (const [from, to] of Object.entries(LOOK_ALIASES)) {
 assert.equal(resolveLookId('praystation'), 'praystation');
 assert.equal(resolveLookId('dusk-flock'), 'dusk-flock');
 assert.equal(resolveLookId('murmuration'), 'dusk-flock');
+// #1855 regression pin: a Look id that names an Object.prototype member is not an alias — the bare
+// LOOK_ALIASES[id] read returned the inherited value (a function), the composition enum rejected it,
+// and dealing the Bauhaus look 'constructor' silently stored the default look instead.
+assert.equal(resolveLookId('constructor'), 'constructor');
+assert.equal(getPreset('constructor').id, 'constructor');
 assert.equal(getPreset('murmuration').id, 'dusk-flock');
 assert.equal(getPreset('dusk-flock').id, 'dusk-flock');
 assert.ok(COMPOSITION_IDS.includes('dusk-flock'));

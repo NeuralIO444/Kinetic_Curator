@@ -66,7 +66,11 @@ export function bumpSemver(version, kind) {
 /** Canonical Look id. Unknown strings pass through (normalizeLayoutParams still enums them). */
 export function resolveLookId(id) {
   if (typeof id !== 'string' || !id) return id;
-  return LOOK_ALIASES[id] || id;
+  // Own-property lookup only: LOOK_ALIASES is a plain object, so a bare LOOK_ALIASES['constructor']
+  // reads Object.prototype.constructor — the Bauhaus look named 'constructor' resolved to a function
+  // and failed the composition enum, silently storing the default look instead (found by #1855's
+  // chapter-membership pins, where a 4-look deck makes the hit frequent).
+  return Object.hasOwn(LOOK_ALIASES, id) ? LOOK_ALIASES[id] : id;
 }
 
 export function isFrozenVoiceId(id) {
