@@ -16,7 +16,16 @@ if (![ev.flatness, ev.ripple, ev.step, ev.clearance, ev.duty].every(Number.isFin
   console.error('FAIL S2: Wang metrics not finite');
   process.exit(1);
 }
-console.log('PASS S2: feasible + Wang metrics (flatness, ripple, step, clearance, duty)');
+// Order-of-magnitude checks against published (relative scale; absolute differs by a=38)
+if (ev.duty < 0.1 || ev.duty > 0.4) {
+  console.error('FAIL S2: duty factor outside expected range');
+  process.exit(1);
+}
+if (ev.clearance < 0.3 || ev.clearance > 2.0) {
+  console.error('FAIL S2: clearance outside expected relative range');
+  process.exit(1);
+}
+console.log('PASS S2: feasible + Wang metrics in range (flatness, ripple, step, clearance, duty)');
 
 const curve = sampleFootCurve(holy, 1);
 if (curve.length < 36) {
