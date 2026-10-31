@@ -185,7 +185,8 @@
   }
   .curator-voice-btn .tb-micro,
   .tb-start-key,
-  .tb-start-deck {
+  .tb-start-deck,
+  .tb-start-chapter {
     display: none;
   }
   .palette-harmony {

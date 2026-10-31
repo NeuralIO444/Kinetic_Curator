@@ -16,6 +16,7 @@ import {
   CURATED_SETS,
 } from './kineticScope.mjs';
 import { paramDiff, NUDGE_MAX_KEYS, nudgeWithinCap } from './kineticSweep.mjs';
+import { chapterScopeDeck } from './chapterWalk.mjs';
 import { routeKineticTapHeat } from '../panels/layout/kineticHeat.mjs';
 import { STYLE_LOOKS } from '../data/styleLooks.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
@@ -79,6 +80,11 @@ assert.deepEqual(
 );
 
 // 4. through the store: each state's taps deal only from its decks; the curator cap is the same everywhere
+// #1855 re-pin (cause: BOOK S2, issue #1855 scope item 2): a cold flip no longer deals from the scope deck
+// directly — it lands in a chapter and deals from the chapter ∩ the scope deck, re-dealing at the nearest
+// wider scope when the chapter has no deck at the performer's scope. The invariant below is that S2 form:
+// every deal resolves inside the standing chapter's effective deck. The pre-S2 readings survive exactly
+// where they still hold — a Now landing at OFF deals one curated set + the 33 looks + the 19 voices.
 const setKeys = new Set(CURATED_SETS.map((s) => s.join('|')));
 const smallVoices = new Set(scopeDecks('off').voices.map((v) => v.id));
 const smallLooks = new Set(scopeDecks('off').looks.map((l) => l.id));
@@ -86,11 +92,39 @@ for (const m of SCOPE_CYCLE) {
   S().setStartupMode(m);
   for (let i = 0; i < 25; i++) {
     S().kineticLookPass();
-    if (m === 'off') assert.ok(setKeys.has(on().join('|')), `OFF: the pool is one curated 4-shape set, got ${on()}`);
-    if (m === 'off' || m === 'weak')
+    const landing = S().kineticLanding;
+    assert.ok(landing, `${m}: the cold tap landed in a chapter`);
+    const eff = chapterScopeDeck(landing.chapterId, landing.dealtScope);
+    assert.ok(
+      eff.looks.some((l) => l.id === S().layoutParams.composition),
+      `${m}: the dealt look is inside ${landing.chapterId} ∩ ${landing.dealtScope}`,
+    );
+    if (eff.poolKind === 'sets') {
+      assert.ok(setKeys.has(on().join('|')), `${m}: the pool is one curated 4-shape set, got ${on()}`);
+    } else {
+      const effIds = new Set(eff.records.map((r) => r.id));
+      assert.ok(
+        on().every((id) => effIds.has(id)),
+        `${m}: the pool is inside ${landing.chapterId} ∩ ${landing.dealtScope}`,
+      );
+    }
+    if ((m === 'off' || m === 'weak') && landing.chapterId === 'now') {
+      assert.equal(landing.redealt, false, `${m}: Now deals at the performer's scope, no re-deal`);
       assert.ok(smallLooks.has(S().layoutParams.composition), `${m}: a look from the original 33`);
+    }
+    if ((m === 'off' || m === 'weak') && landing.chapterId !== 'now')
+      assert.deepEqual(
+        { s: landing.dealtScope, r: landing.redealt },
+        { s: 'med', r: true },
+        `${m}: ${landing.chapterId} has no deck here — re-dealt at MED, confessed`,
+      );
     S().kineticVoicePass();
-    if (m === 'off' || m === 'weak') assert.ok(smallVoices.has(S().kineticVoiceId), `${m}: a voice from the 19`);
+    assert.ok(
+      eff.voices.some((v) => v.id === S().kineticVoiceId),
+      `${m}: the dealt voice is inside ${landing.chapterId} ∩ ${landing.dealtScope}`,
+    );
+    if ((m === 'off' || m === 'weak') && landing.chapterId === 'now')
+      assert.ok(smallVoices.has(S().kineticVoiceId), `${m}: a voice from the 19`);
     const before = { ...S().layoutParams };
     S().kineticCuratorPass();
     const moves = S().kineticNudge.moves;

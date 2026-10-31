@@ -46,7 +46,9 @@ import {
 import { ASSETS } from '../../data/assets/index.js';
 import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
 import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
-import { scopeDecks, CURATED_SETS } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
+import { scopeDecks, sanitizeScope, CURATED_SETS } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
+import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
+import { chapterById } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -80,6 +82,46 @@ function scopedLook(state) {
     sets: CURATED_SETS,
     records: dealableRecords(ASSETS, state.customAssets),
   });
+}
+
+/**
+ * #1855 — a COLD look pass lands in a chapter first (BOOK S2): the walk deals the landing (novelty-weighted,
+ * state/chapterWalk.mjs), then the look pass deals inside the landed chapter's deck ∩ the scope deck, at the
+ * nearest scope where the chapter has a deck. Returns the pass result plus the landing record and the
+ * session's updated coverage ledger, so the action writes them in the same single undo step as the deal.
+ */
+function scopedChapterLook(state) {
+  const records = dealableRecords(ASSETS, state.customAssets);
+  const walk = dealLanding(dieRng, { fromId: state.kineticChapterId, visits: state.kineticChapterVisits });
+  const eff = effectiveChapterScope(walk.chapterId, state.startupMode, { records });
+  const d = chapterScopeDeck(walk.chapterId, eff.scope, { records });
+  const r = lookPass(state, dieRng, { looks: d.looks, pool: d.poolKind, sets: d.sets, records: d.records });
+  const visits = {
+    ...(state.kineticChapterVisits || {}),
+    [walk.chapterId]: ((state.kineticChapterVisits || {})[walk.chapterId] || 0) + 1,
+  };
+  const landing = {
+    chapterId: walk.chapterId,
+    name: chapterById(walk.chapterId)?.name ?? walk.chapterId,
+    path: walk.path,
+    scope: sanitizeScope(state.startupMode),
+    dealtScope: eff.scope,
+    redealt: eff.redealt,
+    seq: (state.kineticLanding?.seq || 0) + 1,
+  };
+  return { r, landing, visits };
+}
+
+/**
+ * #1855 — the voice deck for a warm pass: the standing chapter's voices ∩ the scope deck (at the scope the
+ * chapter's deals are made), or the plain scope deck when no chapter stands (a voice pass before any cold
+ * flip, or after CHAOS / a launch opener left the book).
+ */
+function scopedChapterVoices(state) {
+  if (!state.kineticChapterId) return scopeDecks(state.startupMode).voices;
+  const records = dealableRecords(ASSETS, state.customAssets);
+  const eff = effectiveChapterScope(state.kineticChapterId, state.startupMode, { records });
+  return chapterScopeDeck(state.kineticChapterId, eff.scope, { records }).voices;
 }
 
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
@@ -192,6 +234,19 @@ export const createLayoutSlice = (set) => ({
   curatePress: 0,
   /** #1772 — the deck voice the last KINETIC voice pass dealt (so the next deals a different one). Session-only. */
   kineticVoiceId: null,
+  /** #1855 — the chapter the last cold KINETIC flip landed in (BOOK S2). Session-only, never serialized. */
+  kineticChapterId: null,
+  /**
+   * #1855 — the session coverage ledger: chapter id → landings this session. The walk's novelty term reads
+   * it (state/chapterWalk.mjs); backstage-inspectable like every honest record. Session-only, never serialized.
+   */
+  kineticChapterVisits: {},
+  /**
+   * #1855 — the last landing, backstage and honest: { chapterId, name, path, scope, dealtScope, redealt, seq }.
+   * `scope` is the performer's START state; `dealtScope` is where the deal was actually made — `redealt`
+   * says they differ (the chapter had no deck at the performer's scope). Session-only, never serialized.
+   */
+  kineticLanding: null,
   /**
    * #1772 — the last KINETIC curator pass, backstage and honest: { curator, index, moves: [{ key, from, to }] }.
    * `moves: []` means the curator passed (kept the piece as it stood). Session-only, never serialized.
@@ -937,16 +992,25 @@ export const createLayoutSlice = (set) => ({
         selectedFxLayerId,
         voiceMix: null,
         activeVoiceId: null,
+        // #1855 — CHAOS is the escape hatch out of the book: the standing piece after a chaos roll was
+        // dealt from no chapter, so no chapter stands (the session coverage ledger keeps its history).
+        kineticChapterId: null,
+        kineticLanding: null,
       };
     }),
 
   /**
    * #1772 — KINETIC LOOK pass (tap 1 of the sweep): a fresh Look from the 64 + a pool coherent with its pairing.
    * Structure and shapes move; motion, palette and seed hold. One undo step. Pure logic: state/kineticSweep.mjs.
+   * #1855 — the pass is a chapter landing (BOOK S2): the look and its pool come from the one chapter the
+   * flip walked to, inside the scope ceiling — never from the whole library at once.
    */
   kineticLookPass: () =>
     set((state) => {
-      const r = scopedLook(state);
+      // #1855 — a cold tap is a landing: the flip walks the spine and this pass deals inside the one
+      // chapter it lands in (scopedChapterLook). The chapter state rides in the same store update, so a
+      // tap stays one undo step (#1772's law) and the record can never disagree with the deal.
+      const { r, landing, visits } = scopedChapterLook(state);
       // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
       // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
@@ -957,6 +1021,9 @@ export const createLayoutSlice = (set) => ({
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         voiceMix: null,
         activeVoiceId: null,
+        kineticChapterId: landing.chapterId,
+        kineticChapterVisits: visits,
+        kineticLanding: landing,
       };
       if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
@@ -968,7 +1035,8 @@ export const createLayoutSlice = (set) => ({
    */
   kineticVoicePass: () =>
     set((state) => {
-      const r = voicePass(state, dieRng, { deck: scopeDecks(state.startupMode).voices });
+      // #1855 — a warm tap stays inside the standing chapter: its voices ∩ the scope deck (scopedChapterVoices).
+      const r = voicePass(state, dieRng, { deck: scopedChapterVoices(state) });
       // The air moves with the costume (what the retired WEATHER pass dealt): PATTERN tracks drift and mix over the
       // same picture, and the chiaroscuro sun, if it is out, moves to a new position and intensity. Off stays off.
       const pat = rollPatternLayers(state.layers, 'weather', mkRng(die(0x7fffffff) || 1));
@@ -1016,6 +1084,10 @@ export const createLayoutSlice = (set) => ({
         kineticVoiceId: voice.voiceId,
         voiceMix: null,
         activeVoiceId: null,
+        // #1855 — the launch opener deals the whole book, not a chapter: no chapter stands after it
+        // (the first cold KINETIC tap walks and lands). The coverage ledger keeps its session history.
+        kineticChapterId: null,
+        kineticLanding: null,
       };
     }),
 
