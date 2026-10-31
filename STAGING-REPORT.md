@@ -1,65 +1,67 @@
-# STAGING REPORT — #1853 BOOK S1: chapter registry — derive design-history chapters from movement groups
+# STAGING REPORT — #1798 Loot: merged-cell blocks (Colour Block) → PATTERN BLOCKS mode
 
-**Branch:** `feat/1853-book-s1-chapters` in worktree `~/workspace/kc-1853-build`, based on `origin/main` 4378b336. (This file replaces the previous lane's report, per the staging ritual.) Not pushed, no PR — coordinator publishes. **Review posture: backend/data lane — the registry changes nothing the performer sees; Matt merges on the coordinator's tech check.**
+**Branch:** `feat/1798-merged-cell-blocks` off `origin/main` (9deca870). Local only — no push, no PR (coordinator publishes). Review lane: Matt judges feel and merges.
 
 ## What shipped
 
-One new module + its selfcheck + one manifest line. Nothing else.
+A fifth PATTERN mode, **BLOCKS**, built as a peer of TIDES (#1797, the sibling loot mode from the same artist): `app/src/pattern/blocks.js` (pure engine) + registration in `state/patternTrack.js`, `pattern/patternSource.js`, `pattern/ground.js`, a mode hint + honest disabled DRIFT in `panels/build/PatternEditor.jsx`, a Composition (BLOCKS) section in `docs/PATTERN_SPEC.md`, a new selfcheck (12 checks), a new e2e spec, and two coverage extensions (patternRender, rasterFast).
 
-- **`app/src/data/chapters.js`** — the chapter registry, derived the way `data/assetStyle.js` derives style: a frozen table over what the library already declares, zero edits to authored records, pure functions, no RNG (decks are a function of the library — the replay law's precondition for S2's seeded landing).
-  - `CHAPTERS` — the 9 chapters in the D1 spine order, each carrying `id`, `name`, `position`, `prev`/`next` neighbours (attached from the order itself), its `lookGroups`, `assetStyles`, `assetFamilies`, `voiceStyles`, and its `card` (`{ paletteId, marks }` — data only; rendering is S2's work).
-  - Read API in the assetStyle shape: `chapterById`, `nextChapter` / `prevChapter` (null at the ends — the walk terminates, never cycles), `chapterForLookGroup`, `chapterForStyle`, `chapterLooks` / `chapterVoices` / `chapterAssets` / `chapterDeck` (all take injectable data params with library defaults), `dealableAssetRecords`, and `deckReport()` — the backstage honesty read.
-  - Membership is derivation, never borrowing: looks by group ∈ `lookGroups` over `COMPOSITION_PRESETS`; voices whose declared `styles` meet `voiceStyles` over `VOICE_DECK`; assets whose derived style ∈ `assetStyles` or derived family ∈ `assetFamilies` over the dealable records. The creature citizen is excluded from every deck (`CHAPTER_UNDEALT`, pinned identical to `rollPool`'s `NEVER_DEALT` by the selfcheck). The palette `era` strings are never read — the module does not import `palettes.js` at all; card palette ids are declared data for S2 to resolve.
-- **`app/src/data/chapters.selfcheck.mjs`** — registered in `app/selfcheck.manifest` after `voiceDeck.selfcheck`. Proves: spine order + neighbour round-trip (forward walk visits all 9 exactly once, backward mirrors, ends null); pinned deck counts per chapter; union of chapters = the 294 dealable assets with the citizen in no deck and Now = 64 looks / 64 voices / 294 assets; the taxonomy pin (**DIAGONAL GRID reads in Swiss, not Bauhaus**); deck-discipline derivation (below); card validity (palette exists and — for movement chapters — is paired by one of the chapter's own looks; card marks are members of the chapter's own deck); purity (same library in, same deck out); source hygiene (no `.era` read, no palettes import, no one-writer files).
-- **`app/selfcheck.manifest`** — +1 line.
+The generator, per the issue's two moves:
 
-## The spine, and what each chapter holds today (measured)
+1. **Merge before you colour.** A seeded pass walks the grid row-major; at each free cell a MIX appetite draw decides whether a merge is attempted; attempts place a drawn polyomino over the anchor and keep the first that fits. Vocabulary is the reference's: single, bars 2–4, 2×2 square, L tromino, L tetromino, T tetromino, plus pentomino (all rotations generated, none hand-listed).
+2. **Colour once per block.** One flat colour per merged block from the palette's non-ground swatches. Greedy in deal order + a bounded repair pass: touching blocks never share a colour unless the block's neighbours already use the whole pool (the selfcheck proves that structural claim, not a fuzzy rate).
+3. **The series is the same generator re-dealt.** Nothing changes but the seed; SHUFFLE is the mode's motion. A deal is a still.
 
-| position | chapter | lookGroups | deck (looks / voices / assets) |
-|---|---|---|---|
-| 0 | Marks | — | **0 / 0 / 0 — reports short on every axis** |
-| 1 | Engraving | engraved | 4 / 11 / 20 |
-| 2 | Bauhaus | bauhaus | 4 / 8 / 16 |
-| 3 | Swiss | swiss | 5 / 11 / 61 |
-| 4 | Op Art | op | 4 / 11 / 14 |
-| 5 | Japan | japanese | 5 / 11 / 25 |
-| 6 | Memphis | memphis | 4 / 14 / 25 |
-| 7 | Grunge | grunge | 5 / 8 / 39 |
-| 8 | Now | all 14 groups | 64 / 64 / 294 |
+Grid: cols = 2 × DENSITY (default density 10 → 20 across, TIDES' mapping), rows fill the frame. Gaps: every block is inset 0.085 of a cell on each side facing another block or the frame edge, outer corners rounded at 0.24 of a cell — squircle blocks on a ground lattice. Ground sampler (#1183) support included: marks lean toward the block colour under them.
 
-Now's lists are built from the source tables (`PRESET_GROUPS`, `STYLES`) at module load, so the sum chapter cannot drift from the library it sums.
+## Design choices (all Matt-overruleable)
 
-## Design choices (each one Matt-overruleable)
+1. **A new mode, not a QUILT merge pass.** The issue says "most naturally QUILT", but QUILT's atom is the motif tile (3 hues, heroes, grout, rotation); BLOCKS' atom is a flat merged block. TIDES set the precedent that a Karlen loot with a different atom ships as its own mode beside QUILT. Mode id `BLOCKS`; the spec section carries the reference's name ("Colour Block").
+2. **Colour rails = QUILT's `paletteRoles`, not the GLYPH/TIDES weight-ranked pool.** First cut rode `glyphRoles`; its top-6-by-weight cut left the lattice **purple** on the factory palette (the near-black ranked out). The reference lattice is black and its palette is wide, so BLOCKS takes ground = the palette's darkest swatch and pool = all other swatches. (The purple-lattice renders from the first cut were regenerated; the shipped screenshots are the black-lattice ones.)
+3. **MIX = merge appetite** (per-anchor probability of attempting a merge). MIX 0 is exactly the plain per-cell grid — the honest "before" picture from the same generator; mean block size grows monotonically with MIX (measured across seeds: 1.00 @ 0, >1.1 @ 0.25, ~1.8 @ 0.55, ~2.35 @ 1.0).
+4. **The gap is the mode's own constant; the track GROUT is not read.** Matches TIDES (its gutter is internal, `TIDES_FILL`). Making GROUT live for BLOCKS is a small follow-up if Matt wants the knob; it would need the editor's "Quilt only" reason re-worded and the pattern-controls e2e re-pinned.
+5. **DRIFT has no clock in this cut** — the deal never moves. The editor disables DRIFT for BLOCKS with the reason on the row ("Still deal — a BLOCKS deal is a still — SHUFFLE re-deals it"), `patternKey` excludes time for BLOCKS, and pixels are asserted identical at any DRIFT/t. Open door if Matt wants motion later: a slow re-deal, or a field read à la TIDES.
+6. **Not dealt by KIN/CURATOR** (`PATTERN_DEAL_MODES` unchanged), hand-picked only — same as TIDES, so every existing seeded deal and replay deals what it always did.
+7. **Defaults are existing detents**: density 10 and mix 0.55 are already PATTERN_STOPS stops, so `blockStops.mjs` needed no change. Cost tier 0 declared at registration (`pattern/blocks`); measured 30–40 ms for a fresh 1000×700 still in the sandbox, declared 60.
 
-1. **Marks derives nothing today — on purpose.** D1 ruled the book opens at Marks, and #1854 (S1b) is the issue that authors its pool "as a coherent visual language, not assembled from leftovers" — its own premise is that Marks "has no pool at all today." So S1 does not raid the glyph/stamp/letterform families to fake a deck; the chapter exists first in the spine with empty derivation axes, an unfilled card (`paletteId: null`, `marks: []` — the slot #1854's ochre/bone/carbon palettes will fill), and `deckReport()` naming it short on looks, voices and assets. The `assetFamilies` axis is the documented join point: when #1854's records declare their family/style, this derivation reads them with no change to the code below the table.
-2. **The deck floor is the library's own floor.** `CHAPTER_DECK_MINIMUM = { looks: 4, voices: 8, assets: 14 }` — exactly the smallest counts among the seven movement chapters that exist today (Bauhaus/Grunge voices = 8; Op Art assets = 14; four chapters sit at 4 looks). Not a round number and not padded: a chapter smaller than the smallest deck the instrument already deals as a movement is not yet landable. The selfcheck asserts a movement chapter sits exactly on each axis minimum, so if the floor ever stops being the observed floor, the check says so.
-3. **Card palettes are paired, not picked.** Each movement chapter's card palette is one its own looks already pair with (Engraving → `persona-haeckel`, Bauhaus → `solar-max`, Swiss → `transit` — DIAGONAL GRID's own pairing, Japan → `sepia-plate`, Op Art → `hydra`, Memphis → `neon-brood`, Grunge → `dirty`); the selfcheck enforces the pairing so a card can never drift off its chapter's authored sky. Now's card is `praystation` (the factory opener's palette — Davis's home chapter wears the instrument's own colours) with pixel-glyph marks: the one chapter whose signature is the instrument itself.
-4. **Chapter ids are movement nouns, group ids stay as they are.** `engraving` (group `engraved`), `japan` (group `japanese`), `op-art` (group `op`) — the mapping lives in the table, which is the registry's whole job; no authored group was renamed to fit.
-5. **The undealt exclusion is declared in the registry and policed, not imported.** `state/rollPool.mjs` is the deal-time owner of `NEVER_DEALT`; a data module importing state would invert the layering `rollPool` itself observes (it imports `data/assetStyle`). So `chapters.js` declares `CHAPTER_UNDEALT` with the reason in the header, and the selfcheck — which may cross layers — asserts the two are identical.
+## Files
 
-**D2–D6:** none required. The registry needs no cut shape (D2), no CURATOR behaviour (D3), no settle trigger (D4), no Queen memory (D5), and no cost gate (D6) — it deals nothing and gates nothing. **Premise check:** every premise in the issue verified true against this tree before building (no era/chapter field anywhere; 7 movement groups in `styleLooks.js`; 10 derived styles; 295 authored records + citizen = 294 dealable via `rollPool.dealableRecords`; DIAGONAL GRID in `swiss`). No premise stop.
+- NEW `app/src/pattern/blocks.js` — engine: vocabulary, merge pass, colour pass, sampler, raster, ground-sampler cell, cost registration.
+- NEW `app/src/pattern/blocks.selfcheck.mjs` — 12 checks (manifest-registered).
+- NEW `app/e2e/pattern-blocks.spec.js` — UI: mode writes through, density follows to 10, DRIFT/movers disabled with reasons, SHUFFLE re-deals; takes the review screenshots.
+- `app/src/state/patternTrack.js` — PATTERN_MODES + BLOCKS; PATTERN_FIELD_LIKE + BLOCKS; per-mode defaults.
+- `app/src/pattern/patternSource.js` — buildGrid + still-frame routing + patternKey time exclusion.
+- `app/src/pattern/ground.js` — gridFor + patternGround branches (kept in step with patternSource).
+- `app/src/panels/build/PatternEditor.jsx` — MODE_HINT, MIX hint clause, DRIFT disabled for BLOCKS.
+- `app/src/pattern/patternRender.selfcheck.mjs` — "every mode" loops extended to BLOCKS (node pixel checks + the GL rendered-frame loop). Coverage added, nothing re-pinned.
+- `app/src/pattern/rasterFast.selfcheck.mjs` — frames-equal-reference loop extended to BLOCKS with its reference branch. Coverage added.
+- `app/e2e/pattern-track.spec.js` — live-loop survival sweep extended to BLOCKS (cause: the list enumerates modes).
+- `docs/PATTERN_SPEC.md` — Modes entry, Composition (BLOCKS), Parameters + Motion rows.
+- `app/selfcheck.manifest` — +1 line (blocks suite).
 
-## Lois pass (the 9 rules, applied to the chapter table — the only design surface S1 has)
+## Re-pins (each with its cause — nothing weakened, no check deleted)
 
-- **The nanosecond:** Nine chapters, one word each — Marks, Engraving, Bauhaus, Swiss, Op Art, Japan, Memphis, Grunge, Now. A child reads the spine in one breath and knows where they are in the book. Pass.
-- **Creativity solves problems:** The problem was mush — every deal from everywhere. The spine is a decision, not a sort: design history as the order of battle, and the taxonomy in code (Swiss is Swiss, DIAGONAL GRID stays home) over any tidier story. Pass.
-- **Defeat habit:** Every registry on earth backfills the empty slot so the chart looks finished. This one prints Marks at 0/0/0 and calls it honest. The habit broken is cosmetics. Pass.
-- **Cautious or creative:** Opening the book on an empty chapter is the creative choice — and it only works because the emptiness is admitted in writing (the deck report) instead of padded with glyph leftovers. The moment someone "fixes" Marks by borrowing, kill it.
-- **Assume smart:** No wizard, no explainer surface, no new panel. The registry is silent until S2; the backstage report assumes the reader can handle a shortfall list. Pass.
-- **No trends:** "AI personas playing a game" is the trend; a card catalogue with neighbours and a floor is a position. The word *genre* appears nowhere in the module — chapters and styles are the vocabulary, the rest is plumbing. Pass.
-- **Discovered, not created:** The chapters were already in the library — in the group names the looks were filed under. S1 discovers them and writes down the order; it manufactures nothing but Marks' empty chair. Pass.
-- **Work is worship / True to self:** The registry does the unglamorous derivation work once so every later slice (landing, round, narrowing) reads instead of re-deriving — and the order is Matt's ruling (D1), not the machine's convenience. Pass.
-- **Kill list:** Kill any future slice that lets a thin chapter borrow a neighbour's pool silently. Kill any card whose palette isn't paired by the chapter's own looks. Kill "genre" on any performer surface.
+1. `state/patternTrack.selfcheck.mjs` — `PATTERN_DEFAULT_DENSITY` deep-equal gains `BLOCKS: 10`. Cause: #1798 adds the mode (the pin enumerates per-mode defaults).
+2. `panels/build/patternEditor.selfcheck.mjs` — the mode whitelist gains `'BLOCKS'`. Cause: #1798 (the pin enumerates the editor's modes, as it did for TIDES #1797).
 
 ## Verification
 
-- `chapters.selfcheck` — green (see the suite; every acceptance bullet in #1853 is an assertion).
-- Zero diffs to the 295 authored asset records and to look/voice/palette data files: `git status` shows exactly three paths — `app/src/data/chapters.js` (new), `app/src/data/chapters.selfcheck.mjs` (new), `app/selfcheck.manifest` (+1 line).
-- Touched-file pin sweep: no other selfcheck references the new module (grep); no control surface exists in this build, and `grep chapter e2e/` is empty — the e2e selector sweep has nothing to re-pin.
-- Full manifest sweep: **all 547 commands accounted for — 545 pass, 2 environmental failures** (below). The official runner passed everything up to `swarmWasm`; the remainder ran in tracked segments (464 pass in place, `chapters.selfcheck` among them), with the two segment failures adjudicated individually.
-- `gl/accum` — heap-aborted under segment load; solo with `NODE_OPTIONS=--max-old-space-size=3072`: **OK (83 cases)**.
-- `swarmWasm` — exit 1 on this tree and on pristine `origin/main` with the identical error; no `cargo` on PATH in the sandbox. Environmental, base-identical.
-- `fx/rollSafety` — on this tree and on pristine `origin/main` alike: 5 checks pass, then the sandbox GL/browser dies at the identical stack (`gl/parity/glDriver.mjs` renderViaGL ← `rollSafety.selfcheck.mjs:231`). Environmental, base-identical; CI's browser job is authoritative.
-- `kineticSweep` passed in the segments — the ~1.5% flake (#1822) did not fire.
-- `npm run format:check` — clean (run as `npx prettier --check .`, the script's exact command; the worktree has no local `node_modules/.bin`). `npx eslint` on both new files: 0 errors.
-- `npm run build`: the sandbox fails identically on pristine main (checked in the untouched reference checkout) and on this tree — `@tauri-apps/api` unresolvable from the shared sandbox install; the failing import is in `useCuratorIPC.js`, untouched by this build, and `chapters.js` is not in the app import graph. CI's `lint-build-selfcheck` (which installs dependencies) is authoritative.
+- blocks.selfcheck: 12/12 — partition exact-cover + vocabulary membership on 15 seed/mix combos; the vocabulary actually deals (incl. square/L/T/plus); MIX appetite incl. MIX 0 = all singles and monotone growth; colour-once-per-block + pool-exhaustion-only conflicts; palette-only pixels; lattice seams/frame edge/rounded corners; replay law incl. DRIFT-stillness and patternKey stillness; raster ≡ sampler; ground sampler ≡ pixels; cost median inside the declaration.
+- Every suite naming a touched file, run individually: patternTrack 17 ✓, tides 12 ✓, patternRoll 7 ✓, elements 10 ✓, rasterFast 8 ✓, patternEditor 6 ✓, blockStops 10 ✓, groundNudge ✓, groundSnap ✓, dishGround ✓, patternAudio 7 ✓, creature ✓, accumFeed ✓, contactShadow ✓, liveResolve.determinism ✓, performanceFile ✓, resolveTap ✓, patternRender 28 ✓ (incl. GL BLOCKS frame parity in headless Chromium), costTiers ✓ (in sweep).
+- Full manifest sweep, run in segments (the runner halts at first failure): **543 suites accounted for — 540 pass in-run**, including blocks.selfcheck in-manifest and kineticSweep (the ~1.5% flake #1822 did not fire). The 3 failures are all environmental, each proven:
+  - `swarmWasm` — sandbox has no `cargo`; fails identically on pristine `origin/main` (base-identical).
+  - `fx/rollSafety` — Playwright "Target crashed" in the sandbox browser; fails identically on pristine `origin/main` (base-identical, same signature).
+  - `gl/accum` — JS heap OOM at the default 2 GB in the parallel segment; re-run solo with `NODE_OPTIONS=--max-old-space-size=3072`: **OK, 83/83 cases**.
+- e2e: pattern-blocks ✓ (real UI, 17 s), pattern-tides ✓, pattern-controls 6/6 ✓. pattern-track: all modes incl. BLOCKS draw without faulting; the spec's final page-error audit fails on `ERR_TUNNEL_CONNECTION_FAILED` (a sandbox-proxy resource fetch) — **identical failure on pristine `origin/main`** (base-identical, environmental; CI's network is authoritative).
+- format:check clean (prettier --write applied to the flagged files, code only); lint 0 errors (11 warnings, pre-existing); build ✓.
+
+## Visual evidence (~/workspace/kc-1798-shots/)
+
+- `live-canvas-blocks.png` — the REAL app (captured by the e2e spec, factory palette, KC marks hidden): BLOCKS on the canvas, black lattice, one colour per merged block.
+- `live-editor-blocks.png` — the real editor: BLOCKS chip active, density 10, mix 55%, the rows BLOCKS ignores (grout/hero/drift/movers) disabled with dash readouts.
+- `before-mix0-unmerged.png` / `after-mix055-merged.png` — engine renders (`patternPixels` → PNG, labelled as such) of the same seed + palette with merging off vs on: the merge-first difference, isolated.
+- `redealt-seed-babe.png` — a second seed at MIX 0.55: the series point (same generator, fresh permutation).
+
+## Not done / open doors (deliberately, slice 1)
+
+- No DRIFT behaviour (choice 5); GROUT not read (choice 4); concave corners of L/T blocks stay square (only convex outer corners are rounded); no numbered-series exhibit view (the issue's presentation idea — the re-deal exists; a side-by-side series is later presentation work); KIN/CURATOR never deal it (choice 6).

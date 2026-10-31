@@ -25,6 +25,7 @@ import {
 } from './engine.js';
 import { assignTides, rasterTides, tidesCols } from './tides.js';
 import { assignRewrite, rasterRewrite, rewriteCols } from './rewrite.js';
+import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
 import { sanitizePattern, PATTERN_FIELD_LIKE } from '../state/patternTrack.js';
 
 /** The palette fields a pattern reads. Anything else on the palette object is ignored. */
@@ -43,7 +44,8 @@ export const patternPalette = (p) => ({
 export function patternKey(pattern, palette, w, h, t = 0) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
-  const time = p.drift > 0 ? Number(t) || 0 : 0;
+  // #1798: a BLOCKS deal is a still — time never changes its pixels, whatever DRIFT says.
+  const time = p.drift > 0 && p.mode !== 'BLOCKS' ? Number(t) || 0 : 0;
   // kin and movers change pixels only while the pattern moves, and not at all in the field-like modes (no discrete elements)
   const el = p.drift > 0 && !PATTERN_FIELD_LIKE.includes(p.mode) ? [p.kin, p.movers] : null;
   return JSON.stringify([
@@ -109,6 +111,10 @@ function buildGrid(p, pal, bw, bh) {
     return { tileW: cell, grid: assignRewrite(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(bh / cell))) };
   }
   if (p.mode === 'FIELD') return { tileW, grid: assign(p.seed, p.density, p.mix, pal, rows) };
+  if (p.mode === 'BLOCKS') {
+    const cell = bw / blocksCols(p.density);
+    return { tileW: cell, grid: assignBlocks(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(bh / cell))) };
+  }
   return { tileW, grid: assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows) };
 }
 
@@ -120,6 +126,7 @@ function buildGrid(p, pal, bw, bh) {
  *   FIELD  the pan shifts every pixel, so each frame is a full (hoisted) raster
  *   TIDES the grid is fixed but every cell re-reads the moving field, so each frame is a full (span-filled) raster
  *   REWRITE the growth runs once per plan (hard-bounded); each frame re-rasters the state at its step
+ *   BLOCKS a deal is a still whatever DRIFT says, so it always takes the drawn-once path
  * Every frame is pixel-identical to the reference rasterizers (rasterFast.selfcheck proves it).
  * The pixels it returns belong to the source and are overwritten by the next frame: upload, do not keep.
  */
@@ -156,12 +163,13 @@ export function createPatternFrames() {
         if (!out || out.length !== bw * bh) out = new Uint32Array(bw * bh);
       }
       const key = patternKey(p, pal, bw, bh, t);
-      if (p.drift === 0) {
+      if (p.drift === 0 || p.mode === 'BLOCKS') {
         if (!still) {
           if (p.mode === 'QUILT') still = plan.quilt.base;
           else if (p.mode === 'GLYPH') still = rasterGlyph(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else if (p.mode === 'TIDES') still = rasterTides(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else if (p.mode === 'REWRITE') still = rasterRewrite(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
+          else if (p.mode === 'BLOCKS') still = rasterBlocks(new Uint32Array(bw * bh), bw, bh, plan.grid);
           else still = rasterField(new Uint32Array(bw * bh), bw, bh, plan.grid, plan.tileW, panOffset(p.seed, 0, 0));
         }
         return { pixels: still, w: bw, h: bh, key };
