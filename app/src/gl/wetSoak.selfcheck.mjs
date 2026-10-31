@@ -64,9 +64,10 @@ const { createWetFrameService } = await import('./wetFrame.mjs');
 const { buildSceneContract, assertSceneContract } = await import('./sceneContract.js');
 const { getCostTier } = await import('./costTiers.mjs');
 const { COMPOSITE_FS } = await import('./shaders.mjs');
-const { getScene } = await import('./parity/corpus.mjs');
 const { resolveLayers } = await import('../../../studio/render.mjs');
 const { getRenderCaps } = await import('../data/quality.js');
+const { DEFAULT_LAYOUT_PARAMS } = await import('../data/layout-modes.js');
+const { ASSETS } = await import('../data/assets/index.js');
 
 // --- the recipe -----------------------------------------------------------------
 ok('recipe: taps sum to 1 (a still field re-samples the source exactly)', () => {
@@ -192,8 +193,42 @@ const buildContractFromDoc = (doc) => {
   return buildSceneContract({ doc, resolvedLayers: resolveLayers(doc, { caps }), caps });
 };
 
+// The soak's own scene (#1854 decision 3 — coordinator's call, 2026-10-31). This suite
+// used to render the parity corpus's `single-basic`, whose doc enables EVERY catalog
+// asset: the seeded draw is a draw over the whole library, so any catalog growth
+// silently re-rolls it. #1854's 18 marks re-rolled it and the solid-core population
+// term (a) counts on starved (channel 2) — the physics was never wrong; the scene's
+// population was luck. The soak tests wet physics, not catalog coverage, so its scene
+// is its own: the corpus doc's exact shape (same seed, palette, count, one content
+// layer) over a FROZEN subset of big single-silhouette fills, whose solid mark cores
+// exist by construction whatever the catalog grows into. The shared corpus is
+// untouched (accum / composite / exportStill keep their scene; the divergence check
+// below still pins it dry).
+const SOAK_ASSET_IDS = Object.freeze([
+  'geo_circle_01',
+  'geo_square_01',
+  'geo_square_03',
+  'geo_tri_01',
+  'geo_diamond_01',
+  'geo_star4_01',
+  'org_leaf_01',
+  'org_petal_01',
+]);
+const soakDoc = () => ({
+  version: 1,
+  seed: 0xc0ffee,
+  paletteId: 'praystation',
+  paletteOverrides: null,
+  layoutParams: { ...DEFAULT_LAYOUT_PARAMS, lifeDrift: 0, count: 36 },
+  enabledAssets: Object.fromEntries(ASSETS.map((a) => [a.id, SOAK_ASSET_IDS.includes(a.id)])),
+  quality: 'balanced',
+  layers: [{ id: 'bg', name: 'BG', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 }],
+  activeLayerId: 'bg',
+  layerSnapshots: {},
+});
+
 ok('contract: the flag rides only while on; unflagged scenes are untouched', () => {
-  const base = getScene('single-basic').doc;
+  const base = soakDoc();
   const off = buildContractFromDoc(JSON.parse(JSON.stringify(base)));
   assert.ok(!JSON.stringify(off).includes('wetSoak'), 'no flag anywhere in an unflagged contract');
   const onDoc = JSON.parse(JSON.stringify(base));
@@ -207,7 +242,7 @@ ok('contract: the flag rides only while on; unflagged scenes are untouched', () 
 });
 
 ok('contract validator: wetSoak is only ever true, and only on content', () => {
-  const doc = JSON.parse(JSON.stringify(getScene('single-basic').doc));
+  const doc = JSON.parse(JSON.stringify(soakDoc()));
   doc.layers[0].wetSoak = true;
   const contract = buildContractFromDoc(doc);
   assert.doesNotThrow(() => assertSceneContract(contract));
@@ -446,7 +481,7 @@ try {
   const H = 280;
   const buildContract = async (doc) => buildContractFromDoc(doc);
   const docWith = (on) => {
-    const doc = JSON.parse(JSON.stringify(getScene('single-basic').doc));
+    const doc = JSON.parse(JSON.stringify(soakDoc()));
     if (on) doc.layers[0].wetSoak = true;
     return doc;
   };

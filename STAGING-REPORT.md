@@ -228,3 +228,108 @@ effect over modern glyphs (that was the raid, wearing a costume); tuning content
 in-instrument proof is the styleLooks headless render, which deals all 5 Marks looks onto a canvas).
 Coordinator: this is content, so the issue's acceptance is Matt's glance (review-lane sign-off on the pool);
 the code half rides the backend lane as usual.
+
+---
+
+## FINISHER — the three decisions, resolved (2026-10-31)
+
+The stop above is cleared: all three calls were taken, and this section is the record. Decisions 1 and 3 are
+fully landed and green. Decision 2 is landed as authorized — and its measurement turned up one adjacent
+delta the original summary missed, flagged at the end for the coordinator rather than silently absorbed.
+
+### Decision 1 — the Marks voice family, authored (Matt's ruling, 2026-10-31)
+
+Exactly the scoped fix the report laid out, nothing wider:
+
+- **`voiceDeck.js`** — `FAMILY_PAIRING.marks = ['stamps', 'linework', 'dots']` (the 14 marks assets in
+  those categories; each voice's seeded `familyPool` wears 8 of them), and a `VARIANTS.marks` block of
+  **8 authored rows**. The register is the chapter's: pigment, bone, carbon; placed once and left alone —
+  seven voices ride `still`/`drift` at sparse counts (36–96), and only the pit keeps an after-image:
+  - **Ochre Hand** (poisson/still, ochre-wall, 44, light) — blown pigment: a hand held to the wall, sprayed
+    around, left as a ghost. The stencil hand, performed.
+  - **Tally Row** (stratified/still, bone-dust, 88, light) — notches in rows on bone: somebody counted
+    something here, and meant it.
+  - **Ring Dance** (radial/orbit, ochre-wall, 56, light) — rings around a centre, turning at the speed of
+    a ceremony, which is barely. The family's one circling voice.
+  - **Dot Chant** (grid/still, bone-dust, 96, light) — finger dots dabbed one breath apart: a chant you
+    can count.
+  - **Rain Line** (flow/drift, ochre-wall, 64, light) — falling strokes on a dark ground: weather,
+    remembered indoors.
+  - **Sun Sign** (circlepack/still, bone-dust, 48, light) — rayed suns packed shoulder to shoulder, none
+    touching.
+  - **Spear Sign** (random/drift, bone-dust, 36, light) — one barbed sign repeated along a border: this
+    far, no further. The sparsest voice in the family.
+  - **Pigment Pit** (gaussian/still, ochre-wall, 54, accum(12, 0.03), medium) — the grinding hollow: marks
+    made here leave an after-image; the wall remembers. The family's one ACCUM voice (never 'light', per
+    the deck's law).
+  All eight mode/motion signatures are distinct (§4's second clause); all eight render headless in tier —
+  measured peaks 27–65 marks, properly sparse against the light budget of 320. §4 passes with the family
+  at 8 ≥ 6, no borrowing, no exemption.
+- **`chapters.js`** — Marks `voiceStyles: ['marks']`; the row's comment and the module header now record
+  the ruling instead of the deferral.
+- **The deck, verified from `deckReport()`:** Marks **{looks 5, voices 8, assets 18}, ok = true,
+  shortfalls []** — every chapter in the book now reports ok. Now reads voices 72.
+
+Mechanical re-pins that followed (each cause named at the assertion):
+
+1. `voiceDeck.selfcheck` — deck count 64 → 72; kinds family 45 → 53 (header + §1 + closing line).
+2. `chapters.selfcheck` §3 — Marks voices 0 → 8; Now voices 64 → 72.
+3. `chapters.selfcheck` §4 — "Now holds every voice" 64 → 72 (§4's stale "(294)" header comment → 312).
+4. `chapters.selfcheck` §6 — the Marks shortfall special-case retires to the generic ok branch (a
+   strengthening: Marks now passes the same assertions every other chapter passes); section comment and
+   the file header updated to match.
+5. `kineticScope.selfcheck` — MED/KOZ readout voices 64 → 72; `VOICE_DECK.length === 64` → 72; header
+   "64/64" → "69/72".
+6. `kineticScope.mjs` — the MED prose line: 64 looks / 64 voices → 69 / 72.
+7. `kineticSweep.selfcheck` — two assertion MESSAGES ("one of the 64 looks/voices") de-pinned to "one of
+   the dealt looks/voices"; the assertions themselves derive from the decks and are unchanged.
+
+### Decision 2 — coverage band re-baselined (coordinator's call) — with one flag
+
+Implemented as authorized: the trio-overlap direction in `coverage.selfcheck` now carries a named band,
+`TRIO_JACCARD_BAND = 0.0005` (±0.05 pp), with the full measurement and the cause (pool growth 295 → 313,
+#1854) written into the guard's comment block. Measured on this tree (the suite's own fixtures, 600 rolls,
+8 seeds): the band absorbs exactly the two flat-fixture deltas — 0x1505: 1.173% vs 1.151% (+0.022 pp),
+0x150a: 1.070% vs 1.056% (+0.015 pp) — and the opinionated head holds the exact direction on all 8 seeds.
+Never-tray and tray reach keep the exact direction in the code, per the call. Nothing else in the suite
+changed.
+
+**THE FLAG:** with the Jaccard assertion no longer stopping the sweep at 0x1505, the loop now reaches a
+second delta the original report's summary did not catch — **seed 0x1509, FLAT fixture: never-tray 32 vs
+unordered 31 (+1)**. The report's premise "never-tray improves on every seed" holds for the opinionated
+fixture (18–30 across seeds, all ≤ unordered) but not for flat on 0x1509. I did **not** extend the band to
+never-tray: the coordinator's call named the Jaccard delta, and widening it is a ruling, not a re-pin.
+`coverage.selfcheck` therefore still fails on exactly that one assertion; every other comparison in the
+guard (all 8 seeds × both fixtures: banded Jaccard, reach improving or holding everywhere) passes, as the
+scratch census and the suite's own run to 0x1509 both show. Coordinator: a ±1 never-tray band in the same
+comment, or a named per-seed exception, closes it in one line — your call.
+
+### Decision 3 — wetSoak has its own fixed scene (coordinator's call)
+
+`wetSoak.selfcheck` no longer renders the parity corpus's `single-basic`. It builds its own scene in the
+corpus doc's exact shape (seed 0xc0ffee, praystation, count 36, lifeDrift 0, one content layer) over a
+frozen subset of eight big single-silhouette fills — geo_circle_01, geo_square_01, geo_square_03,
+geo_tri_01, geo_diamond_01, geo_star4_01, org_leaf_01, org_petal_01 — so the solid cores the absorption
+terms measure exist by construction, whatever the catalog grows into. The precondition numbers were NOT
+tuned; the shared corpus was NOT pinned or touched (accum / composite / exportStill keep their scene, and
+the suite's "corpus stays dry" check still pins it). Measured margin on the fixed scene: 579 solid-core
+pixels (coverage > 0.97); qualifying pixels per channel R 566 / G 551 / B 73 against the helper's > 10
+floor — blue, the starved channel, now sits 7× above the floor, fixed by construction. **wetSoak: 31/31
+checks passed**, matching the pre-#1854 base standalone count, both term-(a) checks included.
+
+### Finisher verification
+
+- **Final battery, re-run after the last change:** chapters ✓ · voiceDeck ✓ (72 voices; 4 flagship, 15
+  promoted, 53 family; all render in tier) · kineticScope ✓ · kineticSweep ✓ · assetStyle ✓ · styleLooks ✓
+  (69/69 render) · palettes ✓ · censusReadout ✓ · chiaroscuro ✓ · wingWarp ✓ · allEraGolden ✓ ·
+  regionAssignment ✓ · regionLines ✓ · overlay ✓ · wetSoak ✓ (31/31) · accum ✓ standalone (83/83 cases).
+  The remaining battery names (regionBake, regionMattes, regionPlayback, replayGate, creatureGate,
+  refreshFixtureCheckpoints) ran inside the full sweep below — all pass.
+- **Full manifest sweep** (continue-on-failure over all 549 commands): **545 pass / 4 fail** — `swarmWasm`
+  (no cargo in the sandbox; base-identical per S1) and `fx/rollSafety` (browser section wedges in sandbox
+  Chromium; base-identical per S1) are the known environmental pair; `accum` aborted in-sweep without an
+  assertion (the same sandbox casualty S1b recorded) and is **fully green standalone, 83/83**; `coverage`
+  fails on the single flagged never-tray assertion above, by design, awaiting the coordinator's extended
+  call.
+- `npx prettier --check` clean on all nine touched code files. One-writer files untouched. D2–D6
+  untouched — the voice authoring needed none of them.

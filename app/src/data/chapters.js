@@ -23,9 +23,10 @@
 // deckReport() — backstage, by name, with the short axes listed — rather than silently borrowing a neighbour's
 // pool. The minimums are the library's own floor: the smallest look/voice/asset counts among the seven
 // movement chapters that exist today (a chapter smaller than the smallest deck the instrument already deals
-// as a movement is not yet a chapter you can land in). Marks is that report's first honest entry: D1 put it
-// first in the spine; its looks and assets are authored content (#1854) and meet the floor, and its voices
-// stay short by that issue's own scope — the report says so instead of the chapter borrowing a voice deck.
+// as a movement is not yet a chapter you can land in). Marks was that report's first honest entry: D1 put it
+// first in the spine, and its pool is authored content (#1854) — looks, assets, and (under Matt's
+// 2026-10-31 ruling, in the same slice) its own voice family — so it now meets the floor on every axis
+// without borrowing a neighbour's deck.
 
 import { ASSETS } from './assets/index.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
@@ -44,15 +45,15 @@ const SPINE = [
     // The primitive chapter. Its pool is authored content (#1854: cave signs, tallies, hands, a beast —
     // the `marks` family/style in assetStyle, the `marks` look group in styleLooks, the ochre/bone/carbon
     // palettes in palettes.js), and it joins here by declaring those axes — derivation does the rest.
-    // voiceStyles stays empty on purpose: #1854 caps voice work at a minimal pairing and defers the
-    // dedicated Marks voice deck to a later call, so deckReport() keeps naming Marks short on voices
-    // rather than borrowing a neighbour's voices to clear the floor.
+    // Its voices are its own family too: #1854 first scoped them to a later call, but the voiceDeck §4
+    // law (every look group carries ≥6 family voices) made the group undealable without them, so Matt
+    // ruled (2026-10-31) to author the Marks voice family in this slice rather than borrow or exempt.
     id: 'marks',
     name: 'Marks',
     lookGroups: ['marks'],
     assetStyles: ['marks'],
     assetFamilies: ['marks'],
-    voiceStyles: [],
+    voiceStyles: ['marks'],
     card: { paletteId: 'ochre-wall', marks: ['mrk_hand_01', 'mrk_ring_01', 'mrk_beast_01'] },
   },
   {

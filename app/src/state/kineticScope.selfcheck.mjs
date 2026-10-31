@@ -2,7 +2,7 @@
 // #1772 follow-up — the START pill cycles OFF → WEAK → MED → KOZ and is the ceiling over every KINETIC tap. Pins the
 // cycle and legacy reads, the decks and readout per state, and — through the real store — that each state's taps deal
 // only from its decks: OFF a curated 4-shape set + the 33 looks + 19 voices, WEAK the whole library with the same
-// looks/voices, MED/KOZ the 64/64; hammering reaches CHAOS only at KOZ; the curator's cap is the same everywhere; and
+// looks/voices, MED/KOZ the 69/72; hammering reaches CHAOS only at KOZ; the curator's cap is the same everywhere; and
 // WEAK/MED's launch opener is one look + voice pass in ONE undo entry.
 import assert from 'node:assert/strict';
 import { useStore } from './store.js';
@@ -39,7 +39,7 @@ assert.equal(nextScope('fixed'), 'weak', "a legacy FIXED pill's next tap is WEAK
 assert.deepEqual(deckReadout('off'), { assets: 49, looks: 33, voices: 19 }, "OFF: today's smallest decks");
 assert.deepEqual(deckReadout('weak').looks, 33);
 assert.ok(deckReadout('weak').assets > 250, 'WEAK: the whole library');
-assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 69, voices: 64 }); // #1854 re-pin: MED mirrors the full look library (64 → 69 with the Marks group); the count is observed from the decks, not a cap
+assert.deepEqual(deckReadout('med'), { ...deckReadout('weak'), looks: 69, voices: 72 }); // #1854 re-pins: MED mirrors the full libraries — looks 64 → 69 (the Marks group) and voices 64 → 72 (the Marks voice family, ruled into the same slice by Matt, 2026-10-31); the counts are observed from the decks, not caps
 assert.deepEqual(deckReadout('koz'), deckReadout('med'));
 assert.equal(CURATED_SETS.length, 19);
 const styleIds = new Set(STYLE_LOOKS.map((l) => l.id));
@@ -98,7 +98,7 @@ for (const m of SCOPE_CYCLE) {
     assert.deepEqual(paramDiff(before, S().layoutParams), moves.map((x) => x.key).sort());
   }
 }
-assert.ok(VOICE_DECK.length === 64);
+assert.ok(VOICE_DECK.length === 72); // #1854: 64 + the 8 Marks family voices
 
 // 5. WEAK / MED's launch opener: one look + voice pass, ONE undo entry
 for (const m of ['weak', 'med']) {

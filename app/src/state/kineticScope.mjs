@@ -7,7 +7,7 @@
 //         Launch: the deterministic factory opener (what FIXED was).
 //   WEAK  one notch wider — pools dealt from the whole library (S1), the same 33 looks and 19 voices.
 //         Launch: one look + voice pass under this deck.
-//   MED   the expanded decks — the whole library, the 64 looks (S4) and the 64 voices (S5).
+//   MED   the expanded decks — the whole library, the 69 looks (S4) and the 72 voices (S5).
 //         Launch: one look + voice pass under this deck.
 //   KOZ   everything at full width, plus the chaos roll (kineticRoll) when the button is hammered.
 //         Launch: one full wild roll (what K.O.Z. was).

@@ -1,6 +1,7 @@
 // node src/data/voiceDeck.selfcheck.mjs
-// #1771 (epic #1766, slice 5) — 64 dealable voices. Pins: the count reads 64 from data (4 flagships + 15 promoted
-// stubs + 45 family variants); the flagships are the SAME objects, byte-identical; every voice is kc-voice/1-shaped
+// #1771 (epic #1766, slice 5) — 72 dealable voices. Pins: the count reads 72 from data (4 flagships + 15 promoted
+// stubs + 53 family variants — Marks added 8 under #1854, Matt's 2026-10-31 ruling); the flagships are the SAME
+// objects, byte-identical; every voice is kc-voice/1-shaped
 // (resolveVoiceState, clean validation, a real mode, a full palette, real assets) and declares its S3 pairing, its
 // accumulation and its cost tier truthfully; a promoted stub's SHAPES chip lights exactly when its full set is the
 // pool; and every voice renders headless within its tier's mark budget.
@@ -24,9 +25,9 @@ import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams } from './layout-modes.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 
 // 1. the count, from data
-assert.equal(VOICE_DECK_COUNT, 64, `the dealable voice count reads 64, got ${VOICE_DECK_COUNT}`);
+assert.equal(VOICE_DECK_COUNT, 72, `the dealable voice count reads 72, got ${VOICE_DECK_COUNT}`);
 const kinds = VOICE_DECK.reduce((m, v) => ({ ...m, [v.kind]: (m[v.kind] || 0) + 1 }), {});
-assert.deepEqual(kinds, { flagship: 4, promoted: 15, family: 45 });
+assert.deepEqual(kinds, { flagship: 4, promoted: 15, family: 53 });
 const ids = VOICE_DECK.map((v) => v.id);
 assert.equal(new Set(ids).size, ids.length, 'voice ids are unique');
 assert.equal(deckVoice('kintsugi').def.title, 'Kintsugi');
@@ -151,5 +152,5 @@ for (const v of VOICE_DECK) {
 if (process.env.DECK_VERBOSE) for (const r of rows) console.log(r.join(' '));
 
 console.log(
-  `voiceDeck.selfcheck: ok (#1771 — ${VOICE_DECK_COUNT} voices: 4 flagship, 15 promoted, 45 family; all render in tier)`,
+  `voiceDeck.selfcheck: ok (#1771 — ${VOICE_DECK_COUNT} voices: 4 flagship, 15 promoted, 53 family; all render in tier)`,
 );

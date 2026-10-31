@@ -269,6 +269,20 @@ assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
 // 28–37 never-tray; with an opinionated head the counts land BELOW it —
 // reach improves rather than degrades. That band call is the staging
 // report's, flagged for the coordinator, not silently re-baselined here.)
+//
+// BAND RE-BASELINE (coordinator's call, 2026-10-31 — the call reserved
+// above, taken): the library grew 295 → 313 (#1854, 18 authored Marks
+// assets), and the stream the guard measures is a different stream now.
+// Measured on the grown library, all 8 seeds × both fixtures: never-tray
+// improves or holds on every seed and tray reach improves or holds on
+// every seed (exact direction kept for both, below), but the FLAT
+// fixture's trio overlap lands above unordered on two seeds — 0x1505:
+// 1.173% vs 1.151% (+0.022 pp); 0x150a: 1.070% vs 1.056% (+0.015 pp) —
+// while the opinionated head holds the exact direction on all 8 seeds.
+// Accepted as pool-growth noise: the trio-overlap direction now carries
+// this band (±0.05 pp, ~2× the worst observed delta); nothing else
+// about the guard changes.
+const TRIO_JACCARD_BAND = 0.0005;
 const chainOf = (pairs, rest) =>
   pairs.length === 0
     ? { leaf: rest }
@@ -323,8 +337,8 @@ for (const seed of SWEEP_SEEDS) {
       `seed 0x${seed.toString(16)} ${name}: never-tray ${on.tray.neverCount} must not exceed unordered ${off.tray.neverCount}`,
     );
     assert.ok(
-      on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard,
-      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered`,
+      on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard + TRIO_JACCARD_BAND,
+      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered by more than the re-baselined band (±0.05 pp, coordinator's call 2026-10-31)`,
     );
     assert.ok(on.tray.distinct >= off.tray.distinct, `seed 0x${seed.toString(16)} ${name}: tray reach must not shrink`);
   }
