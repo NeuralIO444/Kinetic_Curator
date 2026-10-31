@@ -1,169 +1,151 @@
-# STAGING REPORT — #1610 Strata Q Phase 4: EF-4 dither kind, grain family
+# STAGING REPORT — #1837: ember-following drive on the moth (of #1808)
 
-**Issue (verbatim title):** "Strata Q Phase 4 — EF-4 dither kind, grain family"
-**Branch:** `feat/1610-strata-phase4-dither`. Local only — no push, no PR
-(coordinator publishes). This file replaces the report that was at the
-worktree root (#1609's); that report remains in git history. The
-"(DEFERRED)" language in the issue is stale — the lane was un-deferred
-2026-10-30 and Phases 0–3 are this branch's base.
+**Issue (verbatim title):** "ACCUM as memory, rung 2 slice 2:
+ember-following drive on the moth (of #1808)"
+**Branch:** `feat/1837-ember-following` on origin/main 302f738a.
+Local only — no push, no PR (coordinator runs the review lane; this is
+a feel slice, Matt reviews and merges). This file replaces the report
+that was at the worktree root (#1876's); that report remains in git
+history.
 
-**Base deviation, recorded:** the dispatch named
-`origin/feat/1609-strata-phase3-skeleton` as the base, but that branch was
-never pushed — `git ls-remote origin` has no such ref (Phase 3 was built
-local-only under the local-stack rule). This worktree is based on the
-identical **local** ref `feat/1609-strata-phase3-skeleton` @ `14cf6dd9`,
-which is the Phase 3 commit itself (stack: 14cf6dd9 ← 41db04c5 Phase 2 ←
-64b6fdaa Phase 1 ← dfc7d420 Phase 0). Nothing else about the dispatch
-changed.
+## Premise check — TRUE, with the record straight
 
-## What was built
+- Slice 1 (#1839) is on main as assumed: the trail grid
+  (`gl/trailGrid.mjs`, 32×22 at pair aspect), its backstage wire, and
+  its selfcheck all exist and pass (7/7). The grid's shape matched the
+  issue's assumption exactly; nothing had to be improvised.
+- The ruling comment is on the issue (Matt, 2026-10-29: "Played it —
+  build the ember-following slice"). #1838 (sign flip, second creature
+  type) was NOT touched and stays gated on his play of this slice.
+- Two things the dispatch context got slightly wrong, for the record:
+  slice 1 shipped the grid + readout only (no deposit steering — the
+  deposit-side stigmergy on main is the separate #1415 dish-trails
+  field, which stays distinct by design), and the "device harness" is
+  the #1695 rig on Matt's Mac — its numbers cannot be produced in this
+  sandbox (see Budget honesty, below).
 
-**Dither is a real EF-4 Finish kind** — ordered Bayer dithering in the
-grain family, end to end on every surface a sibling kind touches:
+## What shipped, in plain language
 
-- `src/fx/fxFilters.js` — the catalog def (`cell` 1–8 step 1 def 2,
-  `amount` 0–1 step 0.05 def 0.5, label "Dither"); `GRAIN_FAMILY_KINDS`
-  becomes `['grain', 'dither']`; the EF-4 rack seat lists dither in
-  `kinds` and its `stubs` shrink to `['stipple']` — stipple stays a stub,
-  only dither ships. The SVG builder `buildDither` joins BUILDERS: an
-  honest approximation in the grade/halo line — a discrete
-  feComponentTransfer one-bit cut per channel blended by amount via
-  feComposite arithmetic; amount 0 emits the identity pass-through;
-  `cell` has no SVG analog and the comment says so. (A GL-only kind
-  would be *dropped* by sanitize on the print path — the weave would
-  silently print smooth.)
-- `src/gl/effects/fxShaders.mjs` — `FX_DITHER_FS` + descriptor +
-  registry entry, cost tier 3 (pure ALU, no taps). The threshold is the
-  **shared stage**: `curator/roomDither.js`'s `BAYER4` / `orderedLevel`,
-  the matrix the deferred ROOM codec faces quantize through (#1560 §09)
-  — one pipeline, two tenants, and the code comment says so where the
-  codec lane will find it. GLSL ES 3.00 has no portable
-  constant-array indexing in this codebase's idiom, so the rank is
-  rebuilt from bits — `r = ((x0^y0)<<3) | (y0<<2) | ((x1^y1)<<1) | y1`,
-  `t = (r + 0.5) / 16` — which reproduces BAYER4 exactly (pinned below).
-  Levels are fixed at 2: this kind *is* the one-bit finish; posterize
-  owns multi-level cuts. Premultiplied plate discipline like grain
-  (#748): the straight colour is quantized and re-premultiplied, alpha
-  untouched, so the weave never paints outside the plate.
-- `src/gl/renderer.mjs` — the renderer's synced local copy of
-  `GRAIN_FAMILY_KINDS` gains dither (the parity harness serves only
-  `src/gl/`, so the constant is duplicated by design and fxFilters'
-  selfcheck regex-pins the two copies equal). That one line is the
-  whole render wiring: the finish chain is selected by family
-  membership, so dither now runs post-ACCUM through the existing bridge
-  like grain. **No one-writer file was touched** (liveLoop.mjs /
-  liveResolve.mjs / particles.js untouched; no wiring need arose).
-- Census/registration, one line each in the house pattern:
-  `hooks/sceneCost.js` (`dither: 'fx/dither'`), `gl/effects/
-  measuredCosts.mjs` (hand-added measured row, #1022 precedent for
-  pure-ALU tier-3 passes), `fx/efRackTile.mjs` (tile face DTH/dither),
-  `gl/mlx/declaredCostTiers.json` (tier 3 — see "caught by the sweep").
-- `panels/build/blockStops.mjs` — Phase 2 stop tables for the new
-  params, authored per Phase 0's law: `dither.cell` stops `[1, 2, 4, 8]`
-  (a *setting* — pattern pitch, the halo.radius precedent: stops ascend
-  from the floor, never centred on the default); `dither.amount` stops
-  `[0, 0.5, 0.75, 1]` (identity class, OFF = 0). Both shipped defaults
-  (2, 0.5) are stops; the blockStops census requires the rows and its
-  law checks validate them.
-- `panels/build/LayerStack.jsx` — the add path's "planned:" note now
-  reads "planned: stipple" only. Dither is **not** added to
-  FX_MENU_KINDS: like grain and scanlines it is picked through the FX
-  layer's own editor (`availableFxKinds` reads the rack kinds — exactly
-  the path Phase 3 leaves), never the roll menu.
+Under a look that declares an ember weight, the moth now grazes the
+ACCUM buffer's cooling light. The loop derives the trail grid from the
+live buffer at cadence (every 15 steps) with true ages requested, and
+stamps grid + weight on the resolver input; the moth builder integrates
+a capped, leashed drift toward mid-age cells (new pure module
+`engine/emberDrive.mjs`). Off — no declaring look, ACCUM off, the
+governor's new shed — the moth is bit-for-bit today's moth.
 
-## Parity measurement (the acceptance number)
+- **Declaration:** `trailEmber: 0.6` on DUSK FLOCK + a
+  `trailEmberWeight(id)` reader in `data/presets.js`. Look data, like
+  `categories`/`paletteId` — never a layout param, so no
+  DEFAULT_LAYOUT_PARAMS entry and no replay divergence from the
+  declaration itself. Undeclared looks read 0 (off).
+- **The drive:** ember = energy × a triangular age window (fresh
+  deadband 0.5 s → peak at 2.1 s → dead at 6 s), from true ages when
+  they ride, else the spectral b/g proxy (slice 1's measured fallback).
+  Steering is gradient ascent read at a 2-cell sensor reach, speed
+  capped at 0.55 px/frame × weight, leash 5 cells. Three modes: climb,
+  graze (hold on food), walk home (no slope, nothing underfoot). The
+  walk-home + deadband are load-bearing: the first soak run camped for
+  70 s on the moths' own fresh deposits; with them, the worst
+  >40%-occupancy streak is **3.9 s** against the 30 s bound.
+- **State:** per-pin offsets ride the creature builder's
+  snapshot/restore as OPTIONAL keys (pre-slice snapshots restore with
+  moths on their pins; malformed steering state fails closed).
+- **Governor:** new rung **cut 1.48** — after the selective feed
+  (1.47), before the creature count (1.5), long before ACCUM itself
+  (cut 3), per the issue's shed law. Store overlay `trailSteerShed`
+  (travelShed class, cleared on document apply), hook sensor + restore
+  entry + badge line `ember steering held` (the show block's report,
+  same as cut 1.47's). A shed frame replays shed (the shed rides the
+  resolver input).
+- **Derivation optimisation:** `deriveTrailGrid` rewritten as a banded
+  loop with the dead-pixel skip slice 1's report named — **bit-identical
+  output** (proven against the original implementation over randomized
+  scenes at seven buffer sizes, plus slice 1's suite at 7/7).
 
-New suite `src/fx/dither.selfcheck.mjs` (7 checks, one manifest line):
+## Behaviour evidence (`docs/review/1837/README.md`)
 
-- **Reference:** the shared stage itself — `roomDither.orderedLevel`
-  applied per channel at 2 levels over a seeded Look (deterministic
-  PRNG, seed 0x1610; 96×64 raster: horizontal gradient + radial blob +
-  flat bands, tones at every level).
-- **Candidate:** the shader's math transcribed 1:1 (bit-formula
-  threshold, premultiplied cut, amount mix).
-- **Result: 0 / 6144 differing pixels (0.000%) at cell sizes 1, 2 and
-  3** — diffed under `gl/parity/diff.mjs` DEFAULT_POLICY, the house bar
-  (Matt's rule: under 10% differing pixels passes). The bit formula is
-  additionally pinned cell-by-cell against BAYER4 (all sixteen cells,
-  plus mod-4 wrap). No parity-corpus scene was added: the template
-  family's standing precedent is that none of its nine kinds carries
-  one — SVG/GL divergence there is structural, and corpus scenes pin
-  byte-level agreement this family never claims.
-- The suite also pins: amount 0 identity / amount 1 pure one-bit /
-  linear mix between; premultiplied discipline (transparent stays
-  transparent, rgb never exceeds plate alpha); sanitize re-seating
-  (dither after a non-grain kind fires onMove with `['dither']`;
-  grain+dither keep relative order silently); the add path
-  (`availableFxKinds` offers dither, never stipple, never twice);
-  sanitize clamps (cell 99→8, amount −1→0); the SVG prim shape.
+- Distance-to-ember trace through the real builder: weight 0 holds
+  175 px for 600 frames; weight 0.6 closes 175 → 25 px and settles.
+- Non-collapse soak (10 min, 6 moths, weight 0.6): worst streak 3.9 s
+  (bound 30 s); max drift 148 px of the 250 px leash; mean 37.7 px.
+- Derivation at pair size, paired before/after in this sandbox: fully
+  lit with age 28.3 → 22.3 ms; colour-only 21.6 → 15.0; 16% lit
+  21.9 → 14.2; 2% lit 24.4 → 9.8. At the 15-step cadence the worst case
+  amortizes to ≈1.5 ms/frame before readback.
+- Live boot smoke (vite preview + headless Chromium, route
+  interception): the app boots on this build (footer build 302f738a),
+  stage renders, no page errors. Steering itself is proven in data
+  space above; the feel is Matt's review.
 
-## Premise results (verified against this base before building)
+## Budget honesty
 
-All premises in the issue held; its line numbers are stale, its facts
-are not. `GRAIN_FAMILY_KINDS = ['grain']` stood at fxFilters.js:242 with
-EF-4 `stubs: ['dither', 'stipple']` at :264; sanitize's family-last
-enforcement present; Phase 3's add path is LayerStack's FxEffectEditor
-over `availableFxKinds` with the literal note "planned: dither,
-stipple"; the shared stage `BAYER4`/`orderedLevel` exists in
-`curator/roomDither.js` from #1560; renderer.mjs splits FX chains
-pre/fin by the family list and runs the fin chain post-ACCUM. One
-premise sharpened by recon: the blockStops census auto-requires stop
-rows for **every** FX_EFFECT_DEFS param, so dither's stops were never
-optional. No item hit the stop-rule.
+The acceptance asks for a device-harness cadence/budget proof. What is
+proven here: the derivation's CPU cost (above, sandbox), the cadence
+arithmetic, and that the feed costs exactly nothing while off (no
+readback, no derivation — the loop only calls the wire while live).
+What is NOT proven here: the on-device cost of `readTrail()`'s
+full-buffer readback + derivation spike at 4 Hz on iPad-class hardware
+— that number lives on the #1695 harness (Matt's Mac), the #1807/#1808
+precedent. If the spike hurts on device, the governor rung ships in
+this same slice, and the GPU grid reduction slice 1 named is the
+follow-up optimisation. I did not invent a device number.
+
+## Verification (run in this worktree, final formatted tree)
+
+- `emberDrive.selfcheck` (new, wired into `app/selfcheck.manifest`):
+  **14/14** — window + both field paths, declaration, steer caps/leash,
+  graze + walk-home modes, builder steering, inert off paths, snapshot
+  round-trip + pre-slice restore, **2,000-frame replay-exactness**,
+  **10-min non-collapse soak**, governor walk, live-wire
+  cadence/identity.
+- `creatureGate`: **green** — the pre-repipe fixture replays
+  identically (the strongest proof the off path changed nothing).
+- `replayGate`, `resolverSnapshot`, `inputLog`, `playback`,
+  `resolveTap`, `liveLoopSwell`: pass.
+- `trailGrid` 7/7 (on the optimised derivation); `governorCuts` pass
+  (with the one re-pin below); `accumFeed`, `phase6`, `spectrumWarp`,
+  `markWeather`: pass — their pinned ladder walks are unchanged; the
+  rung is opt-in exactly like 1.45/1.47 were.
+- Creature/resolver families: `creature`, `creaturePose`,
+  `dishCreature`, `engraving`, `glitch`, `skeleton`, `wingWarp`,
+  `featherFan`, `spawn`, `davisShift`, `dishPins`, `limbs`, `setLive`:
+  pass.
+- Data/state families: `styleLooks`, `taxonomy`, `swatchWeights`,
+  `audioRoutes`, `voices`, `chiaroscuro`, `growthTiles`, `sessionOnly`,
+  `overlayRoundtrip`, `projectDocument`, `fxaa`, `motionMeterTap`,
+  `foldInCensus`, accum seam/guard/inventory, `atlas.skip`, `bandFeed`,
+  `contactShadow`, `gestureRecord`, `grainFinish`, `paletteMix`,
+  `patternAudio`, `performanceCapture`, `routesStartEmpty`,
+  `spectrumMarks`, `wetLook`: pass.
+- `accum` solo at `NODE_OPTIONS=--max-old-space-size=3072`: **67/67**.
+- `npm run build`: green. `npm run format:check`: all files pass
+  (prettier --write run on every touched code file before committing).
 
 ## Re-pins (each with its cause)
 
-1. `src/gl/accum.seam.selfcheck.mjs` — the `#820` pin
-   `GRAIN_FAMILY_KINDS == ['grain']` becomes `['grain', 'dither']`,
-   test renamed ("the finish family — grain, plus dither since
-   #1610"). Cause: #1610 adds the family's second kind; the seam
-   property the suite guards (family members run in the finish chain,
-   after ACCUM, never inside the keep loop) is unchanged.
-2. `src/gl/effects/fxShaders.selfcheck.mjs` — the sorted
-   FX_SHADER_KINDS expectation gains `'dither'`; the check is renamed
-   from "all Phase-2 kinds" to "all template kinds" (it has outgrown
-   the name through four additions now). Cause: #1610 registers the
-   tenth template kind.
+1. `governorCuts.selfcheck` — the pinned GOVERNOR_RESTORE_CUTS order
+   gains `'trailSteer'` between `'accumFeed'` and `'creatureCount'`.
+   Cause: the new cut 1.48 itself; the file's own convention narrates
+   each join, and the comment was extended the same way. No other
+   expectation in the file moved.
+2. No golden hashes, no checkpoint hashes, no fixture changes. The
+   creatureGate fixture stands unmodified and green.
 
-**Caught by the sweep, fixed in-build (not a re-pin):** the first full
-sweep failed `gl/mlx/mlxExport` — "shader sources for \"dither\" but no
-declared tier". The MLX export censuses every template kind against
-`gl/mlx/declaredCostTiers.json`, a registry the recon greps missed.
-Fixed by declaring dither at tier 3 with rationale, matching the
-registerCostTier declaration; the suite now passes at 28 effects (base:
-27, green — the failure was this change's, and it is gone).
+## Notes for the coordinator
 
-## Verification
-
-- **Touched-file pin sweep:** every selfcheck naming a touched file
-  was grepped out and run — fxFilters (51 cases), fxShaders (15),
-  blockStops (10), accum.seam (7 pass), efRackTile (6 pass), sceneCost,
-  costTiers, grainFinish, fxUniforms, deferredStubs, shelfCensus,
-  shelfDisk, voiceDeck, canvasSizes, spectrumWarp, costDataset,
-  shelfDiskRun, mlxExport — all green.
-- **Full manifest sweep** (Playwright chromium installed first, so
-  browser sections ran at full counts): **537/541 passed.** The four
-  failures, each dispositioned:
-  - `engine/kernel/bake/swarmWasm` — fails **identically on the
-    pristine Phase 3 base** (build-wasm.sh --verify; the sandbox has
-    no cargo toolchain). Environmental.
-  - `fx/rollSafety` — fails on **both** trees inside the headless-GL
-    render section (mine: "framebuffer incomplete"; base: "Target
-    crashed" — the sandbox's Chromium GL harness, same section). Every
-    logic check passes identically on both trees. Environmental.
-  - `gl/accum` — heap-aborted inside the sweep (exit 134, the known
-    sandbox behaviour); run solo with
-    `NODE_OPTIONS=--max-old-space-size=3072`: **OK, 83/83, exit 0** —
-    the full count, browser sections live.
-  - `gl/mlx/mlxExport` — mine; fixed (above); green at 28 effects.
-- `npm run format:check` — clean on the final tree (no prettier writes
-  needed). `npm run build` — exit 0.
-- Known flakes not encountered this run: kineticSweep (#1822) passed
-  in-sweep; pattern-controls e2e is CI-side, not in this sweep.
-
-## Not built / out of scope
-
-Stipple remains a stub (the issue ships dither only). No new menu
-surface, no corpus scene, no one-writer edits — dither inherits the
-finish chain purely by family membership, which is the design working
-as Phase 3 left it.
+- **One-writer files:** this build edits `liveLoop.mjs` (small,
+  delimited hunks: imports, the stamp computation, two lines in the
+  resolver input, the recipe's ageBuffer flag, the post-step wire
+  call, the session-end clear). It does NOT touch `liveResolve.mjs` or
+  `particles.js`. If the concurrent #1814 build also edits liveLoop,
+  expect a textual merge, not a semantic one.
+- Sandbox note: the first `npm run build` attempt failed inside the
+  shared `~/node_modules` (@tauri-apps/api resolution — the known
+  stale-modules failure) while another worktree's install was in
+  flight; a local `npm install` in this worktree + rebuild is green,
+  and the boot smoke only worked after that install. CI builds clean,
+  so this is sandbox-only.
+- `swarmWasm` / `rollSafety` were not run (environmental in this
+  sandbox per house record — no cargo / base-identical); CI is
+  authoritative for them.

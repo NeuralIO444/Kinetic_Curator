@@ -468,6 +468,14 @@ export const createGlobalSlice = (set) => ({
    * pressure clears (governorCuts' restore table). */
   accumFeedShed: false,
   setAccumFeedShed: (on) => set({ accumFeedShed: !!on }),
+  /** #1837 — the governor's ember-steering shed (cut 1.48): while true,
+   * liveLoop stamps trailSteerShed on the resolver input and stops
+   * deriving the trail grid, so the moths fall back to today's drives.
+   * A render-only overlay in the travelShed class — never serialized
+   * into a document; the look's declared ember weight never moves.
+   * Restores whole when pressure clears (governorCuts' restore table). */
+  trailSteerShed: false,
+  setTrailSteerShed: (on) => set({ trailSteerShed: !!on }),
   dishPins: [],
   setDishPins: (pins) => set({ dishPins: sanitizePins(pins) }),
   setSlowRender: (slow, source) =>
@@ -928,6 +936,8 @@ export const createGlobalSlice = (set) => ({
         feedbackWarpShed: false,
         // #1806 slice 2 — the accum-feed shed is likewise a governor claim on the OLD document's selection.
         accumFeedShed: false,
+        // #1837 — the steering shed is likewise a governor claim on the OLD document's look.
+        trailSteerShed: false,
         layoutParams: normalizeLayoutParams(doc.layoutParams),
         customAssets: sanitizeOverlay(doc.customAssets),
         ingestError: null,

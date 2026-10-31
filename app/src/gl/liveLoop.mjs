@@ -60,7 +60,14 @@ import { buildFlowField } from './flowField.mjs';
 import { createNoise } from '../engine/noise.js';
 import { accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 import { DEBUG_AGE, setAgeReader } from './ageLive.mjs'; // #1805: the ?debug=age readout's wire
-import { DEBUG_TRAILGRID, setTrailGridReader } from './trailGridLive.mjs'; // #1808 slice 1: the ?debug=trailgrid readout's wire
+import {
+  DEBUG_TRAILGRID,
+  setTrailGridReader,
+  updateTrailSteerGrid,
+  getTrailSteerGrid,
+  clearTrailSteerGrid,
+} from './trailGridLive.mjs'; // #1808 slice 1: the ?debug=trailgrid readout's wire · #1837: the ember steering feed's wire
+import { trailEmberWeight } from '../data/presets.js'; // #1837: the current look's declared ember weight (look data, not a param)
 import { clearStatsSnapshot, publishStatsSnapshot, statsWanted } from './statsLive.mjs'; // #1807: the buffer statistics' wire
 import { clearWetMode, publishWetMode } from './wetLive.mjs'; // #1841: the wet mode's wire (the show block's shed line)
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
@@ -728,6 +735,20 @@ export function createLiveLoop(
       surgeTrigger = nx.stamp;
       queenSeenKeeps = nx.seen;
     }
+    // #1837 — the ember steering feed (ACCUM rung 2 slice 2): live only while the current look
+    // declares an ember weight (data/presets.js reads the `composition` param's look — look
+    // data, never a layout param), the frame's creature count net of the governor's shed is
+    // above zero, and the governor's steering shed (cut 1.48) is off. The grid is derived
+    // after the ACCUM step (below) and held by trailGridLive; here it is only read and
+    // stamped, in the alife channel's shape: the keys ride the input only while the feed is
+    // live, so a take recorded without steering carries exactly the older input shape, and a
+    // steering take records the grid it steered on — it replays its steering exactly.
+    const trailEmberW = trailEmberWeight(layoutParams.composition);
+    const trailSteerLive =
+      trailEmberW > 0 &&
+      Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)) > 0 &&
+      !s.trailSteerShed;
+    const trailGridNow = trailSteerLive ? getTrailSteerGrid() : null;
     const resolved = resolver.resolveLayers({
       canvasW,
       canvasH,
@@ -793,6 +814,12 @@ export function createLiveLoop(
             creatureKeeps: (spawnDecisions && spawnDecisions.creatureKeeps) || 0,
           }
         : {}),
+      // #1837 — the ember steering channel (see the stamp above buildFrame's resolver call):
+      // the look's weight and the held grid, present only while the feed is live; the
+      // governor's shed rides on its own key whenever it stands, so a shed frame replays shed
+      // and its moths walk home on the recorded word.
+      ...(trailSteerLive ? { trailEmber: trailEmberW, ...(trailGridNow ? { trailGrid: trailGridNow } : {}) } : {}),
+      ...(s.trailSteerShed ? { trailSteerShed: true } : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,
       alphaBoost,
@@ -1429,12 +1456,14 @@ export function createLiveLoop(
                   background: bgCss,
                   // #1805: the age buffer's clock is the loop's own
                   // clamped show-time step; the buffer itself is
-                  // requested only by the backstage readouts —
-                  // ?debug=age (#1805) or ?debug=trailgrid, whose grid
-                  // ages ride it (#1808 slice 1). No consumer, no
-                  // allocation.
+                  // requested only by its consumers — the backstage
+                  // readouts (?debug=age, #1805; ?debug=trailgrid, whose
+                  // grid ages ride it, #1808 slice 1) and, since #1837,
+                  // the ember steering feed while it is live: the grid
+                  // the moths steer on carries true ages, not just the
+                  // channel-ratio proxy. No consumer, no allocation.
                   dt: dtSec,
-                  ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID,
+                  ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID || trailSteerLive,
                   // #1807: the buffer statistics ride the same request
                   // discipline — requested only while a consumer (the
                   // show block's sampler, the governor, the ?debug=stats
@@ -1495,6 +1524,12 @@ export function createLiveLoop(
               // (cheap closure reads; the reduction itself is throttled
               // inside the accum object).
               if (rp.stats) publishStatsSnapshot(accumObj);
+              // #1837: the ember steering feed derives its grid at
+              // cadence from the buffer this step just landed; the moths
+              // steer on it from the NEXT frame's input (the spawn
+              // decisions' one-frame rhythm). Not live: no readback, no
+              // derivation — the feed costs nothing while it is off.
+              if (trailSteerLive) updateTrailSteerGrid(accumObj);
               // #520 Phase 2: apply grain-family finish chain post-accum.
               let accumTex = accumObj.texture();
               for (const { layerId, steps } of fxFinishChains) {
@@ -1520,6 +1555,7 @@ export function createLiveLoop(
             if (DEBUG_AGE) setAgeReader(null); // #1805: the readout's wire ends with the session
             if (DEBUG_TRAILGRID) setTrailGridReader(null); // #1808: same, for the grid readout
             clearStatsSnapshot(); // #1807: the statistics wire ends with the session too
+            clearTrailSteerGrid(); // #1837: the steering wire ends with the session too
             velPrev.clear(); // #309: the next session starts at zero velocity
             // #1809: the wet field survives the toggle — the wet-frame
             // service owns it for the session; only ACCUM state resets.

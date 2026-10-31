@@ -261,6 +261,9 @@ export const COMPOSITION_PRESETS = [
     name: 'DUSK FLOCK',
     group: 'showcase',
     desc: 'Dusk flock — cohesive swarm boids, tight damping, split ink on deep indigo',
+    // #1837 — the ember declaration (ACCUM rung 2 slice 2): under ACCUM, this look's moths
+    // graze the cooling light (trailEmberWeight below reads the field; undeclared = 0 = off).
+    trailEmber: 0.6,
     categories: ['organic', 'dots'],
     styles: ['organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
@@ -988,6 +991,23 @@ export const COMPOSITION_PRESETS = [
 export function getPreset(id) {
   const canon = resolveLookId(id);
   return COMPOSITION_PRESETS.find((p) => p.id === canon) || COMPOSITION_PRESETS[0];
+}
+
+/**
+ * #1837 — a look's declared EMBER weight (ACCUM rung 2 slice 2, of #1808):
+ * how strongly the moths under this look follow the mid-age light in the
+ * ACCUM buffer (engine/emberDrive.mjs). Declared as a top-level field on
+ * the look record — like `categories` or `paletteId`, it is look data,
+ * not a layout param: it never enters layoutParams, so it cannot diverge
+ * a replay. Undeclared (almost every look), unknown, or malformed reads
+ * 0 — the drive is off and the moth is exactly today's moth. Davis's
+ * per-look SIGN is slice 3's (#1838) to add; v1 declares the weight only.
+ */
+export function trailEmberWeight(id) {
+  const canon = resolveLookId(id);
+  const look = COMPOSITION_PRESETS.find((p) => p.id === canon);
+  const w = Number(look?.trailEmber);
+  return Number.isFinite(w) ? Math.min(1, Math.max(0, w)) : 0;
 }
 
 /** The LOOKS menu's groups, each with its looks. A group with no looks is left out (#1772 cleanup: an empty

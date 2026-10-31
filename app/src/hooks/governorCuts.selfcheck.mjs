@@ -93,6 +93,10 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // creatureCount (cut 1.47): the subset render sheds with its ACCUM
   // family, before body counts (the full walk is pinned in
   // accumFeed.selfcheck).
+  // #1837 — 'trailSteer' joins between accumFeed and creatureCount
+  // (cut 1.48): ember steering sheds with its ACCUM family, ahead of the
+  // population it steers (the full walk is pinned in
+  // emberDrive.selfcheck).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
   assert.deepStrictEqual(order, [
     'fxaa',
@@ -100,6 +104,7 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
     'markWeather',
     'feedbackWarp',
     'accumFeed',
+    'trailSteer',
     'creatureCount',
     'travel',
     'quality',

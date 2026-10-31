@@ -11,9 +11,11 @@
 // Pure: a function of the buffer snapshot it is handed, nothing else. The
 // snapshot may come from the JS mirror (selfcheck probes, stills) or from
 // the live object's readTrail() (the backstage view); the derivation does
-// not know or care which. Slice 1 ships the grid, its sampler and the
-// backstage view only — no steering consumes it yet (that is slice 2,
-// gated on Matt playing it, per the issue).
+// not know or care which. Slice 1 shipped the grid, its sampler and the
+// backstage view; slice 2 (#1837) puts a steering consumer on it (the
+// moth's ember drive, engine/emberDrive.mjs, fed at cadence by
+// trailGridLive.mjs) — the derivation itself is unchanged in meaning and
+// bit-identical in output (see the banded loop in deriveTrailGrid).
 
 import { AGE_VOID } from './accum.mjs';
 
@@ -79,26 +81,51 @@ export function deriveTrailGrid({ data, ageData = null, width, height, stamp = 0
   const sumAgeW = new Float64Array(n);
   const sumAge = new Float64Array(n);
   const count = new Float64Array(n);
-  for (let y = 0; y < h; y++) {
-    const cy = Math.min(rows - 1, Math.floor((y * rows) / h));
-    for (let x = 0; x < w; x++) {
-      const cx = Math.min(cols - 1, Math.floor((x * cols) / w));
-      const cell = cy * cols + cx;
-      const o = (y * w + x) * 4;
-      const pr = data[o];
-      const pg = data[o + 1];
-      const pb = data[o + 2];
-      const light = (pr + pg + pb) / 3;
-      sumL[cell] += light;
-      sumR[cell] += pr;
-      sumG[cell] += pg;
-      sumB[cell] += pb;
-      count[cell] += 1;
-      if (hasAge) {
-        const a = ageData[y * w + x];
-        if (a >= 0 && light > 0) {
-          sumAgeW[cell] += light;
-          sumAge[cell] += light * a;
+  // #1837 — the banded loop: the steering cadence (trailGridLive) derives
+  // this grid live, so slice 1's per-pixel floor divisions and scattered
+  // accumulator writes had to go. The optimisation is EXACT — the output
+  // is bit-identical to the naive loop, by construction:
+  //   · cell boundaries are pure geometry: column cx owns the x-range
+  //     [ceil(cx·w/cols), ceil((cx+1)·w/cols)) (the floor map is monotone,
+  //     so each cell's pixels form one contiguous band per row), and the
+  //     per-cell pixel count is the band widths' product — no counting.
+  //   · pixels are still visited in the same y-major, x-minor order, so
+  //     every cell's float64 sums accumulate in the same order as before.
+  //   · a dead pixel (r = g = b = 0) adds exactly 0 to every sum and can
+  //     never enter the age sums (they require light > 0), so skipping it
+  //     changes nothing — the dead-pixel skip slice 1's report named.
+  const xStart = new Int32Array(cols + 1);
+  for (let cx = 0; cx <= cols; cx++) xStart[cx] = Math.ceil((cx * w) / cols);
+  const yStart = new Int32Array(rows + 1);
+  for (let cy = 0; cy <= rows; cy++) yStart[cy] = Math.ceil((cy * h) / rows);
+  for (let cy = 0; cy < rows; cy++) {
+    const rowCount = yStart[cy + 1] - yStart[cy];
+    for (let cx = 0; cx < cols; cx++) count[cy * cols + cx] = rowCount * (xStart[cx + 1] - xStart[cx]);
+  }
+  for (let cy = 0; cy < rows; cy++) {
+    const cellRow = cy * cols;
+    for (let y = yStart[cy]; y < yStart[cy + 1]; y++) {
+      const rowBase = y * w;
+      for (let cx = 0; cx < cols; cx++) {
+        const cell = cellRow + cx;
+        for (let x = xStart[cx]; x < xStart[cx + 1]; x++) {
+          const o = (rowBase + x) * 4;
+          const pr = data[o];
+          const pg = data[o + 1];
+          const pb = data[o + 2];
+          if (pr === 0 && pg === 0 && pb === 0) continue; // dead: contributes exact zeros only
+          const light = (pr + pg + pb) / 3;
+          sumL[cell] += light;
+          sumR[cell] += pr;
+          sumG[cell] += pg;
+          sumB[cell] += pb;
+          if (hasAge) {
+            const a = ageData[rowBase + x];
+            if (a >= 0 && light > 0) {
+              sumAgeW[cell] += light;
+              sumAge[cell] += light * a;
+            }
+          }
         }
       }
     }
