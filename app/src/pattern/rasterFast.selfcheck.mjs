@@ -27,6 +27,7 @@ import {
   PATTERN_LIVE_MAX_W,
 } from './patternSource.js';
 import { GLYPH_MARKS, POSES, buildMark, sampleMark } from './glyph.js';
+import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
 import { defaultPattern } from '../state/patternTrack.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { mkRng } from '../engine/prng.js';
@@ -232,12 +233,18 @@ ok(
           tileW,
           panOffset(p.seed, p.drift, t),
         );
+      if (p.mode === 'BLOCKS') {
+        // #1798: the reference is the deal built fresh at patternSource's own geometry; a deal is a still, so t is ignored
+        const cell = w / blocksCols(p.density);
+        const brows = Math.max(1, Math.ceil(h / cell));
+        return rasterBlocks(b, w, h, assignBlocks(p.seed, p.density, p.mix, pal, brows));
+      }
       const q = assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows); // #1137: a new track carries element motion (kin MIX)
       return rasterQuiltReference(b, w, h, q, tileW, p.grout, p.drift, t, quiltMoverMap(q, p.seed, p.kin, p.movers));
     };
     const pal2 = resolvePalette('v01d', null);
     const script = [];
-    for (const mode of ['QUILT', 'GLYPH', 'FIELD']) {
+    for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'BLOCKS']) {
       const base = { ...defaultPattern(mode, 9), density: mode === 'GLYPH' ? 4 : 6 };
       script.push(
         [base, PAL, 320, 224, 0],
