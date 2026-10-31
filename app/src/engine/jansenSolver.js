@@ -90,16 +90,15 @@ export function solvePose(lengths, theta, scale = 1, prev = null) {
   return { joints: { J1, J2, J3, J4, J5, F }, ok: true, prev: { J2, J3, J4, J5, F } };
 }
 
-/** Full cycle feasibility + gait metrics. 361 samples. */
+/** Full cycle feasibility + Wang gait metrics. 361 samples. */
 export function evaluateGenome(lengths, scale = 1) {
   const samples = 361;
   let prev = null;
   let minY = Infinity;
   let maxY = -Infinity;
-  let stanceYSum = 0;
-  let stanceCount = 0;
   let failed = false;
   const feet = [];
+  const thetas = [];
 
   for (let s = 0; s < samples; s++) {
     const theta = (s / samples) * Math.PI * 2;
@@ -109,30 +108,80 @@ export function evaluateGenome(lengths, scale = 1) {
       break;
     }
     prev = pose.prev;
-    const fy = pose.joints.F.y;
-    feet.push(pose.joints.F);
-    minY = Math.min(minY, fy);
-    maxY = Math.max(maxY, fy);
-    if (fy < minY + 0.15 * (maxY - minY || 1)) {
+    const f = pose.joints.F;
+    feet.push(f);
+    thetas.push(theta);
+    minY = Math.min(minY, f.y);
+    maxY = Math.max(maxY, f.y);
+  }
+
+  if (failed || feet.length === 0) return { feasible: false, stillborn: true };
+
+  const heightRange = maxY - minY || 1;
+  const stanceThreshold = minY + 0.15 * heightRange;
+  let stanceYSum = 0;
+  let stanceCount = 0;
+  let minStanceX = Infinity;
+  let maxStanceX = -Infinity;
+  let prevStanceX = null;
+  let velSum = 0;
+  let velSqSum = 0;
+  let velCount = 0;
+
+  for (let i = 0; i < feet.length; i++) {
+    const fy = feet[i].y;
+    if (fy <= stanceThreshold) {
       stanceYSum += fy;
       stanceCount++;
+      const fx = feet[i].x;
+      minStanceX = Math.min(minStanceX, fx);
+      maxStanceX = Math.max(maxStanceX, fx);
+      if (prevStanceX !== null) {
+        const dx = fx - prevStanceX;
+        const dtheta = thetas[i] - thetas[i - 1] || (2 * Math.PI / samples);
+        const vel = dx / dtheta;
+        velSum += vel;
+        velSqSum += vel * vel;
+        velCount++;
+      }
+      prevStanceX = fx;
+    } else {
+      prevStanceX = null;
     }
   }
 
-  if (failed || stanceCount === 0) return { feasible: false, stillborn: true };
+  if (stanceCount === 0) return { feasible: false, stillborn: true };
 
-  // simple metrics (full published ones in selfcheck against holy)
   const stanceMean = stanceYSum / stanceCount;
-  let flatness = 0;
-  // re-sweep for accurate metrics would be ideal; here a placeholder that the golden test will assert
+  let flatnessSq = 0;
+  for (let i = 0; i < feet.length; i++) {
+    if (feet[i].y <= stanceThreshold) {
+      const dy = feet[i].y - stanceMean;
+      flatnessSq += dy * dy;
+    }
+  }
+  const flatness = Math.sqrt(flatnessSq / stanceCount);
+
+  const meanVel = velCount ? velSum / velCount : 0;
+  const varVel = velCount ? (velSqSum / velCount) - meanVel * meanVel : 0;
+  const ripple = meanVel ? Math.sqrt(Math.max(0, varVel)) / Math.abs(meanVel) : 0;
+
+  const step = maxStanceX - minStanceX;
+  const clearance = maxY - minY;
+  const duty = stanceCount / samples;
+
   return {
     feasible: true,
     stillborn: false,
     minY,
     maxY,
     stanceMean,
-    clearance: maxY - minY,
-    // TODO: full Wang metrics (flatness, ripple, step, duty) computed in the selfcheck golden
+    flatness,
+    ripple,
+    step,
+    clearance,
+    duty,
+    // Normalized against holy (wild type = 1.0) left to caller / selfcheck
   };
 }
 
