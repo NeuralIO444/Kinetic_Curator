@@ -117,6 +117,7 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1709 which project folder was open, so the next launch reopens it: this machine's absolute path. Never in a bundle (it would leak the folder layout and mean nothing on another Mac); the project itself lives in its folder",
   'kc:weave:v1': 'per-machine display preference, not project content',
   'kc:fxaa:v1': 'per-machine display preference, not project content',
+  'kc:exposure:v1': 'per-machine display preference, not project content',
   'kc:pool-view:v1': 'per-machine display preference (asset pool layout)',
   'kc:startup-mode:v1': 'per-machine startup preference',
   'kc:active-panel-tab': 'a remembered tab, a convenience',

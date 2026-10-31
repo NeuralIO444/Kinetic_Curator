@@ -1390,6 +1390,10 @@ export function createLiveLoop(
           fxaa: st.fxaa !== false && !st.fxaaShed,
           // #741: gate weave — live canvas (and so WebM recording) only; stills stay exact.
           weave: st.weave ? gateWeaveOffset(performance.now(), frameCount) : null,
+          // #1830: resolve exposure in stops — the exposure model's
+          // countable, hand-played quantity; resolveBind turns stops
+          // into the linear gain the resolve shader applies pre-curve.
+          exposureStops: st.exposureStops ?? 0,
         });
         // #1813: arm the wet-look display pass with the field the
         // service just served (the same wetStep/wetMask/wetAmount the
