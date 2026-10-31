@@ -221,6 +221,12 @@ export const HELP_TOPICS = [
     text: 'A whisper of projector wobble: the whole frame drifts under one pixel. Live canvas and recordings only — still snaps stay exact. Off by default.',
   },
   {
+    id: 'output-exposure',
+    group: 'Pipeline',
+    title: 'exposure',
+    text: 'The resolve exposure, in stops: half-stop detents from −2 to +2 EV, applied before the filmic curve — photoreal light over a graphic picture. 0 EV is gain exactly 1: the frame as it always resolved. A per-machine display preference, never project content; it rides the live canvas and exports alike.',
+  },
+  {
     id: 'output-taste',
     group: 'Pipeline',
     title: 'taste',

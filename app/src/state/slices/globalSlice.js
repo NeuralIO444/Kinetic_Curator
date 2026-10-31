@@ -35,6 +35,7 @@ import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
+import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
 const DEFAULT_4_ASSETS = ['org_blob_01', 'rad_rings_01', 'stamp_glyph_01', 'rad_orbit_01'];
@@ -110,6 +111,25 @@ export function readWeave() {
 function persistWeave(on) {
   try {
     localStorage.setItem(WEAVE_KEY, on ? '1' : '0');
+  } catch {
+    // private window / quota — the session value still works. Deliberately silent.
+  }
+}
+
+// #1830: resolve exposure in stops — the same kind of per-machine display
+// pref (the exposure model's detents, gl/exposureModel.mjs), never project
+// content. Default 0 EV = gain exactly 1 = the frame as it always resolved.
+const EXPOSURE_KEY = 'kc:exposure:v1';
+export function readExposureStops() {
+  try {
+    return snapExposureStops(Number.parseFloat(localStorage.getItem(EXPOSURE_KEY)));
+  } catch {
+    return 0;
+  }
+}
+function persistExposureStops(stops) {
+  try {
+    localStorage.setItem(EXPOSURE_KEY, String(stops));
   } catch {
     // private window / quota — the session value still works. Deliberately silent.
   }
@@ -366,6 +386,12 @@ export const createGlobalSlice = (set) => ({
   },
   fxaa: readFxaa(),
   weave: readWeave(),
+  exposureStops: readExposureStops(),
+  setExposureStops: (stops) => {
+    const snapped = snapExposureStops(stops);
+    persistExposureStops(snapped);
+    set({ exposureStops: snapped });
+  },
   setWeave: (on) => {
     persistWeave(!!on);
     set({ weave: !!on });

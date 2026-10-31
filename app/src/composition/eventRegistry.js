@@ -163,6 +163,7 @@ export const EVENT_REGISTRY = {
   CANVAS_SWAP: { handler: 'wire' },
   DISPLAY_FXAA: { handler: 'wire' },
   DISPLAY_WEAVE: { handler: 'wire' },
+  DISPLAY_EXPOSURE: { handler: 'wire' },
   VOICE_LOAD: { handler: 'wire' },
   VOICE_DELETE: { handler: 'wire' },
   VOICE_RENAME: { handler: 'wire' },
