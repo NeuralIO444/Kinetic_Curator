@@ -19,7 +19,7 @@ const stack = read('./LayerStack.jsx');
 ok(
   'the editor offers every mode and the signed range; the six params are mode rows (#1608), never a native input',
   () => {
-    for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD', 'TIDES', 'REWRITE'].includes(m)); // #1797 TIDES · #1823 REWRITE (re-pin cause: the new mode joins the offered list)
+    for (const m of PATTERN_MODES) assert.ok(['QUILT', 'GLYPH', 'FIELD', 'TIDES', 'REWRITE', 'BLOCKS'].includes(m)); // #1797 TIDES · #1798 BLOCKS · #1823 REWRITE (re-pin cause: the new modes join the offered list)
     assert.match(ed, /PATTERN_MODES\.map\(\(m\) => \(/);
     assert.match(flat(ed), fre(/min=\{PATTERN_DENSITY_MIN\} max=\{PATTERN_DENSITY_MAX\}/));
     assert.equal(PATTERN_DENSITY_MIN, 4);

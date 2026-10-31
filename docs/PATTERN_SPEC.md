@@ -22,6 +22,7 @@ Three composition modes, one engine. Mode is a track-level switch, persisted per
 **TIDES** (#1797 — "threshold grid", reference loot from Sai Karlen) — a fixed grid of squircles that never moves position. A travelling noise field is sampled at every cell and read out two ways at once: colour by threshold (three states) and drawn size. The pattern depicts nothing; it makes an invisible field legible as patches, bands and pulse. See Composition (TIDES).
 
 **REWRITE** (#1823 — "growth grid", loot from Maxim Gumin's MarkovJunior) — the one mode that is not dealt: seeded growth tips rewrite an empty grid rule by rule (extend, bud, seal) into a maze of corridors, and each cell is coloured by the step it was born, so the finished picture is also its own history. See Composition (REWRITE).
+**BLOCKS** (#1798 — "Colour Block", reference loot from Sai Karlen) — the atom is the merged block, not the cell: a seeded pass fuses adjacent cells into polyomino blocks (singles, bars 2–4, 2×2 squares, L / T / plus), then colour is assigned once per block. Black gaps separate every block, so the ground reads as a thin lattice. A deal is a still; SHUFFLE re-deals the same generator. See Composition (BLOCKS).
 
 GLYPH and FIELD are not MIX extremes of QUILT. MIX cannot produce negative space or edge-wrapping. They are mode switches.
 
@@ -199,6 +200,17 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 - Time: DRIFT 0 = the finished growth, drawn once and cached. DRIFT above 0 replays the growth over 6 DRIFT-seconds, holds the finished maze for 2, and regrows. A frame is the state after k steps, k a pure function of (seed, params, drift, t) — replay law holds step for step.
 - Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, like TIDES, so existing seeded deals are unchanged.
 - Cost: tier 0 at registration (`pattern/rewrite`). The growth is a one-off per (seed, density, mix, size) when the plan is built (single-digit ms at the default size); per frame is the raster only.
+## Composition (BLOCKS)
+
+(#1798, built on Matt's word 2026-10-30.) Code: `app/src/pattern/blocks.js`; checks: `blocks.selfcheck.mjs`.
+
+- Grid of square cells, `cols = 2 × DENSITY` (DENSITY 10 → 20 across, TIDES' mapping). Rows fill the frame height at the same cell.
+- Merge first: a seeded pass walks the cells row-major. At each free cell the MIX appetite draw decides whether a merge is attempted; attempts place a drawn polyomino over the anchor and keep the first that fits. Vocabulary: single, bars 2–4, 2×2 square, L tromino, L tetromino, T tetromino, plus pentomino (all rotations). Nothing fits → the cell stays a single. MIX 0 merges nothing: the plain per-cell grid.
+- Colour once per block: one flat colour from the palette's non-ground swatches, on QUILT's rails (`paletteRoles`) — the ground is the palette's darkest swatch, so the lattice reads near-black as in the reference. Greedy in deal order plus a bounded repair pass: touching blocks never share a colour unless the block's neighbours already use the whole pool.
+- Gaps: every block is inset (0.085 of a cell) on each side facing another block or the frame edge, with outer corners rounded (radius 0.24 of a cell) — squircle blocks on a ground lattice. The track's GROUT is not read in this cut; the gap is the mode's own constant.
+- A deal is a still: DRIFT, HERO, KIN and MOVERS are not read. DRIFT is disabled in the editor with that reason; SHUFFLE (a new seed) is the mode's motion — the same generator, re-dealt, exactly the reference carousel's second slide.
+- Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, so existing seeded deals are unchanged.
+- Cost: tier 0 at registration (`pattern/blocks`), CPU raster ≈ 30–40 ms measured for a still 1000×700 frame (declared 60), drawn once and cached.
 
 ## Composition (ESCHER) — parked
 
@@ -222,8 +234,8 @@ GLYPH further restricts to the 4–6 strongest roles. FIELD and QUILT may use th
 
 | Param | Range | Default | Notes |
 |---|---|---|---|
-| MODE | QUILT / GLYPH / FIELD / TIDES / REWRITE | QUILT | Track-level. ESCHER not in the enum until unparked. |
-| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES), 10 (REWRITE) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. TIDES and REWRITE: cols = 2 × DENSITY. |
+| MODE | QUILT / GLYPH / FIELD / TIDES / REWRITE / BLOCKS | QUILT | Track-level. ESCHER not in the enum until unparked. |
+| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES), 10 (REWRITE), 10 (BLOCKS) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. TIDES, REWRITE and BLOCKS: cols = 2 × DENSITY. |
 | MIX | 0–100% | 55% | Motif entropy inside the current mode's vocabulary. |
 | SEED | uint32 | stored integer | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value. |
 | GROUT | 0–8% of tile | 3% QUILT, 0 GLYPH, 0 FIELD | Fraction of tile size, not pixels. Resolution-independent. |
@@ -240,6 +252,7 @@ DRIFT means one thing per mode. It does not also mean hue cycle, motif morph, an
 - FIELD: pan speed across the torus. Amount = DRIFT. Direction is seed-stable.
 - TIDES: the field's own clock. DRIFT scales time (DRIFT 0.5 at 4 s = DRIFT 1 at 2 s): the field travels downward, evolves, and breathes from blotchy patches into broad horizontal bands and back (one breath = 9 DRIFT-seconds). The grid stays put.
 - REWRITE: the growth's own clock. DRIFT scales time the same way: the growth replays from the seed over 6 DRIFT-seconds, the finished maze holds for 2, then it regrows. DRIFT 0 is the finished growth, still.
+- BLOCKS: none in this cut. A deal is a still; SHUFFLE re-deals it. The editor disables DRIFT for BLOCKS with that reason.
 - Accent hue cycle is not DRIFT. It is a MATH tone op (HUE ROTATE) on the palette. PATTERN does not re-key color.
 - Motif morph (diamond ↔ hexagon) is parked. No shape interpolator in v1.
 - SHUFFLE re-seeds assignment inside the current mode. If DROP is on and BEAT is running, the reseed lands on the bar. The pattern drop is the product.
