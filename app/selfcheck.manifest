@@ -512,6 +512,8 @@ node src/curator/directorDebt.selfcheck.mjs
 node src/curator/fieldDirector.selfcheck.mjs
 node src/curator/fieldEval.selfcheck.mjs
 node src/poets/placement.selfcheck.mjs
+node src/poets/fieldStampPath.selfcheck.mjs
+node src/curator/fieldSilence.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs
@@ -559,6 +561,7 @@ node src/curator/loisCut.selfcheck.mjs
 node src/state/roundWiring.selfcheck.mjs
 node src/state/chapterNarrow.selfcheck.mjs
 node src/state/chapterNarrowWiring.selfcheck.mjs
+node src/state/fieldDeal.selfcheck.mjs
 node src/assets/tauriCsp.selfcheck.mjs
 node src/curator/trioAcceptance.selfcheck.mjs
 node src/curator/showSpectrum.selfcheck.mjs

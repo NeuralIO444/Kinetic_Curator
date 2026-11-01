@@ -59,10 +59,22 @@ import { isPlateMaterial, plateGeoFrom, PLATE_GEO_DEFAULTS } from './plateBody.m
 import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.mjs'; // #1549 — material:'wash'
 import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
+import { sanitizeFieldForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data
 import { pickWeightedIndexStable } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
 export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
+
+/**
+ * #1904 — FIELD: placement `em` (glyph cap height as a fraction of dish
+ * height) → item scale units. Item scale is sized against the canvas
+ * height in the scene contract, and a letter's cap is ~0.4 of its baked
+ * cell, so one em of cap height reads at roughly this many scale units.
+ * Calibrated on the live stage (kc-field-shots, build eb929fd4+): a
+ * two-line Greenleaf form at em ≈ 0.05 reads as a held text block, neither
+ * whisper nor billboard, beside scale-~1 marks.
+ */
+export const FIELD_EM_SCALE = 12.5;
 
 /**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
@@ -690,6 +702,49 @@ export function buildPlacements({
     }),
     { seed, canvasW, canvasH },
   );
+
+  // #1904 — FIELD: an armed poet's form reaches the dish. The form was
+  // placed at pick time (poets/placement.js) and rides the layer's recipe
+  // data (layoutParams.fieldForm); here it is only drawn — stamps become
+  // items at exactly the placed positions, coloured by this layer's own
+  // colour strategy, at the top of the layer's alpha range (a held form is
+  // present, not a ghost). They join the item list before the overlap sort
+  // and the material flag loop, so mirror / glass / materials treat them
+  // as ordinary marks of the layer. The dish lean/snap/weather above reads
+  // the SoA and does not move them: a held form is not loose marks.
+  // No form — the default, and every pre-FIELD document — sanitize returns
+  // null and the item list is byte-identical to the pre-FIELD pipeline.
+  const fieldForm = sanitizeFieldForm(layoutParams.fieldForm);
+  if (fieldForm) {
+    const fieldAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
+    const fieldItems = new Array(fieldForm.stamps.length);
+    for (let j = 0; j < fieldForm.stamps.length; j++) {
+      const s = fieldForm.stamps[j];
+      const { color, accent } = assignColor(
+        { seed, index: soa.n + j, t: 0.5, seedOffsets },
+        palette,
+        strategy,
+      );
+      fieldItems[j] = {
+        x: (s.x / fieldForm.aspect) * canvasW,
+        y: s.y * canvasH,
+        scale: s.em * FIELD_EM_SCALE,
+        scaleY: s.em * FIELD_EM_SCALE,
+        rotation: s.rotation,
+        alpha: fieldAlpha,
+        index: soa.n + j,
+        t: 0.5,
+        zTier: 0,
+        assetId: s.assetId,
+        color,
+        accent,
+        key: `field-${fieldForm.poetId}-${fieldForm.pieceId}-${j}`,
+      };
+    }
+    // On a pool hit `mapped` IS cache.itemPool — never append to it. The
+    // copy costs one array of references, only while a form is armed.
+    mapped = [...mapped, ...fieldItems];
+  }
 
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.
