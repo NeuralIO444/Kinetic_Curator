@@ -31,6 +31,7 @@ import {
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
+import { fieldFormForDeal } from '../../poets/fieldForm.js'; // #1904 — FIELD: the shuffle deals a poet
 import { FEEL_PRESETS } from '../../data/feels.js';
 import {
   resolveVoiceState,
@@ -963,7 +964,8 @@ export const createLayoutSlice = (set) => ({
       // candidates each CURATOR press rolls (unleashed rooms roll more,
       // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
       // given the same room; a different room is a different deal.
-      const kinWeight = getDirector().tick({ feed: loisActivity.snapshot() }).gains.kinWeight;
+      const tickResult = getDirector().tick({ feed: loisActivity.snapshot() });
+      const kinWeight = tickResult.gains.kinWeight;
       const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
       // #592 — the discrete choices are drawn from a transition chain
       // conditioned on the value that LAST LANDED (the live layoutParams), so
@@ -1056,6 +1058,21 @@ export const createLayoutSlice = (set) => ({
       // write of rolled values — candidates are scored as rolled, but what
       // lands is clamped to the document spec and pair-migrated.
       const { params: landedParams } = validateLayoutParams(candidates[index]);
+      // #1904 — FIELD: this press is a kinetic book shuffle deal, and the
+      // Director tick above already dealt (or declined) a poet. The form is
+      // placed off the press's own seeded stream (the colour deal's sub-deal
+      // pattern, +0x30000) and rides the landed params in this same commit;
+      // a silent deal clears the standing form. Nothing else writes the
+      // key, so a dealt form is HELD across voice passes until the next
+      // Curator press deals again.
+      const fieldDeal = fieldFormForDeal(
+        tickResult.poet,
+        rngForIndex(state.seed, CH.curate, press + 0x30000, state.seedOffsets),
+        Number.isFinite(state.canvasW / state.canvasH) ? { aspect: state.canvasW / state.canvasH } : {},
+      );
+      const landed = { ...landedParams };
+      if (fieldDeal) landed.fieldForm = fieldDeal;
+      else delete landed.fieldForm;
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1064,7 +1081,7 @@ export const createLayoutSlice = (set) => ({
         // everything else this press does). No settled board, no field: the press leaves the
         // narrowing record alone.
         ...(funnel ? { kineticNotch: funnel.notch } : {}),
-        layoutParams: landedParams,
+        layoutParams: landed,
         curatePress: press + 1,
         // Honest flag: if any chain had no row for the current value this press
         // had no memory behind it, and the bar says so.

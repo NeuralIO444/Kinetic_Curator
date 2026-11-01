@@ -337,3 +337,20 @@ registerCostTier('field/poet-choice', {
   notes:
     'FIELD poet choice (genre vector + slow debt + room adjacency). Pure CPU at pick time only. Deterministic. Sheds with the Director, never the effect ladder.',
 });
+
+// --- FIELD placement on the stamp path (poets/placement.js) — #1904 ---
+// The append inside buildPlacements: while a form is armed it validates the
+// form (measured 0.005 ms at 19 stamps; ~0.05 ms at the 200-stamp ceiling)
+// and builds one item per stamp, plus one item-array copy on a pool hit.
+// Unarmed — the default — it is a single null check (~0.00003 ms). No GPU
+// pass, no new upload: the stamps ride the layer's existing instances.
+// Placement itself is computed once, at pick time; nothing here is
+// per-frame opinion. Sheds with the layer's placements (asset thinning
+// does not remove it — the form is the layer's dealt data, not pool fat).
+registerCostTier('field/placement', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.05,
+  notes:
+    'FIELD placement append in buildPlacements (validate + stamp items while a form is armed; null check when not). Pure CPU, deterministic, no GPU cost. Estimate is the measured 200-stamp ceiling, not the typical ~20-stamp form (0.005 ms).',
+});
