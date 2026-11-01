@@ -85,7 +85,10 @@ ok('absent beastHosts (every pre-S3 take): the builder is inert', () => {
 ok('null host, unformed pin, dish-hosted pin: no beast', () => {
   assert(makeRig(null).step(0).length === 0, 'null host drew');
   assert(makeRig(wildHost, { formed: false }).step(0).length === 0, 'unformed pin drew');
-  assert(makeRig(wildHost, { hosted: true }).step(0).length === 0, 'dish-hosted pin drew a beast over the dish creature');
+  assert(
+    makeRig(wildHost, { hosted: true }).step(0).length === 0,
+    'dish-hosted pin drew a beast over the dish creature',
+  );
 });
 
 ok('a stillbirth draws nothing (the gate is S2s, inside legal ranges)', () => {
@@ -104,7 +107,10 @@ ok('item accounting at the wild type: 12 legs × (12 bars + 8 nodes) + 1 beam, a
   const nodes = items.filter((it) => it.assetId === BEAST.nodeAsset);
   assert(items.length === 241, `expected 241 items, got ${items.length}`);
   assert(bars.length === 145 && nodes.length === 96, `bars ${bars.length} / nodes ${nodes.length}`);
-  assert(items.every((it) => it._creature === true), 'an item lacks the creature flag');
+  assert(
+    items.every((it) => it._creature === true),
+    'an item lacks the creature flag',
+  );
   assert(new Set(items.map((it) => it.key)).size === items.length, 'item keys are not unique');
 });
 
@@ -150,7 +156,10 @@ ok('acceptance 1: flat stance on the ground line, monotone backward stroke, lift
   const q = Math.floor(stance.length / 4);
   const mid = stance.slice(q, stance.length - q);
   const midRange = Math.max(...mid.map((p) => p.y)) - Math.min(...mid.map((p) => p.y));
-  assert(midRange / step < 0.05, `mid-stance height range/step ${(midRange / step).toFixed(4)} >= 0.05 — stance not flat`);
+  assert(
+    midRange / step < 0.05,
+    `mid-stance height range/step ${(midRange / step).toFixed(4)} >= 0.05 — stance not flat`,
+  );
   // no foot-skate: through stance the foot strokes backward (screen −x for a
   // right-facing beast), one direction only, while it stays on the ground line
   const stanceSeq = track.filter((p) => p.y >= band);
@@ -239,13 +248,19 @@ ok('ground treatment reaches the beast (offset + recolour), like the marks', () 
     shadow: 0,
   });
   rig.entries[0].items = [];
-  rig.builder.append(rig.input, rig.entries, [], () => ({
-    driverSec: 0,
-    amounts: { drift: 0, breath: 0, pulse: 0 },
-    canvasW: 1200,
-    canvasH: 800,
-    stillAssets: new Set(),
-  }), groundFor);
+  rig.builder.append(
+    rig.input,
+    rig.entries,
+    [],
+    () => ({
+      driverSec: 0,
+      amounts: { drift: 0, breath: 0, pulse: 0 },
+      canvasW: 1200,
+      canvasH: 800,
+      stillAssets: new Set(),
+    }),
+    groundFor,
+  );
   const dressed = rig.entries[0].items;
   assert(dressed.length === plain.length, 'ground changed the item count');
   const dx = dressed[0].x - plain[0].x;
