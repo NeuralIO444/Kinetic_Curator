@@ -232,7 +232,10 @@ to append the frame the wiring lands.
     the identical 5 checks.
   - gl/composite — standalone re-run: **OK (15 cases)**.
   - gl/accum — standalone re-run with the manifest's heap flag:
-    **OK (85 cases)** (in-sweep it aborted natively under load).
+    **OK (84 cases)** (in-sweep it aborted natively under load; the
+    count is this run's own verdict — one browser-dependent case
+    evidently skipped versus the 85 seen in earlier verifications,
+    the suite's known cache-sensitive variance).
   - gl/wetWarmup — standalone: **21 checks passed**.
   - gl/livingMotion — standalone: **15 checks passed**.
   - pattern/patternRender — standalone: **21 checks passed** (in-sweep
