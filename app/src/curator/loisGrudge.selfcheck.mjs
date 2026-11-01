@@ -104,9 +104,13 @@ assert.ok(other, 'a second tally key exists in the book');
   assert.equal(tally.snapshot().permabans.length, 1, 'the ban can be re-earned after a reset');
 }
 
-// ── Decay: the machinery is real; the standing law applies none of it.
+// ── Decay: the machinery is real, and the standing law applies it (D6).
 {
-  assert.equal(GRUDGE_DECAY_HALF_LIFE_MS, null, 'D6 unruled: the standing half-life is null (no decay)');
+  assert.equal(
+    GRUDGE_DECAY_HALF_LIFE_MS,
+    30 * 86_400_000,
+    'D6 RULED (Matt, 2026-11-01): the standing half-life is 30 days',
+  );
   const HL = 86_400_000; // one day, a test value — NOT the ruling
   assert.equal(decayedWeight([0, 0, 0, 0], HL, HL), 2, 'one half-life halves the weight');
   assert.equal(decayedWeight([0, 0], HL * 10, null), 2, 'no half-life, no decay');
@@ -123,13 +127,21 @@ assert.ok(other, 'a second tally key exists in the book');
     'aged one half-life, the weight halves',
   );
   assert.equal(aged.permabans.length, 0, 'aged past the floor, the ban softens away — when a half-life is ruled');
+  // Re-pinned (was: the standing snapshot never ages a cut) — D6 ruled
+  // decay ON at a 30-day half-life (Matt, 2026-11-01), so the standing
+  // snapshot ages cuts: a year on, the five cuts weigh ~nothing and the
+  // ban has softened away. The no-decay law survives under an explicit
+  // null half-life, asserted just below.
   const standing = tally.snapshot({ at: cutAt + HL * 365 });
+  assert.ok(standing.rows[0].weight < 0.01, 'the standing snapshot ages cuts at the ruled 30-day half-life');
+  assert.equal(standing.permabans.length, 0, 'under the standing law an old ban softens away');
+  const noDecay = tally.snapshot({ at: cutAt + HL * 365, halfLifeMs: null });
   assert.equal(
-    standing.rows[0].weight,
+    noDecay.rows[0].weight,
     GRUDGE_PERMABAN_MIN_CUTS,
-    'the standing snapshot never ages a cut (D6 unruled)',
+    'with an explicit null half-life, no cut ever ages out',
   );
-  assert.equal(standing.permabans.length, 1, 'under the standing law the ban does not soften');
+  assert.equal(noDecay.permabans.length, 1, 'with decay explicitly off, the ban stands');
 }
 
 // ── The readout: character, or the honest absence of one.
@@ -146,5 +158,5 @@ assert.ok(other, 'a second tally key exists in the book');
 }
 
 console.log(
-  'loisGrudge.selfcheck: ok (#1858 — cuts tallied by genre, permaban derived, overrule resets, decay built but unruled-off)',
+  'loisGrudge.selfcheck: ok (#1858 — cuts tallied by genre, permaban derived, overrule resets, decay ruled on at a 30-day half-life)',
 );

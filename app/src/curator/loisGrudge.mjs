@@ -34,8 +34,10 @@ export const GRUDGE_PERMABAN_MIN_CUTS = 5;
  * values — no ruling names them; flagged for Matt's feel check in the S5
  * staging report, not cited as decided anywhere.) */
 export const GRUDGE_PERMABAN_SHARE = 0.5;
-/** D6 — UNRULED: the grudge's decay half-life, ms. null = no decay applied. */
-export const GRUDGE_DECAY_HALF_LIFE_MS = null;
+/** D6 — RULED (Matt, 2026-11-01): the grudge's decay half-life, ms — 30
+ * days. A ban softens as its cuts age; a keep still overrules instantly.
+ * null would mean no decay applied (the pre-ruling standing value). */
+export const GRUDGE_DECAY_HALF_LIFE_MS = 30 * 86_400_000;
 
 /**
  * The genre a look carries inside its chapter, or null (chapter grain).
@@ -85,11 +87,11 @@ export function createGrudgeTally({ now = () => Date.now() } = {}) {
   const effective = (e) => e.cuts.filter((ts) => ts > lastReset(e));
 
   /**
-   * The standing picture. With a half-life (a number, D6's to rule), each
-   * genre's weight is its decayed effective cuts and the permaban judges
-   * the decayed values — the ban softens as the cuts age. Without one
-   * (the standing GRUDGE_DECAY_HALF_LIFE_MS = null), weight IS the
-   * effective count and no cut ever ages out.
+   * The standing picture. With a half-life (the standing
+   * GRUDGE_DECAY_HALF_LIFE_MS — 30 days by D6's ruling), each genre's
+   * weight is its decayed effective cuts and the permaban judges the
+   * decayed values — the ban softens as the cuts age. With an explicit
+   * halfLifeMs: null, weight IS the effective count and no cut ages out.
    */
   function snapshot({ at = now(), halfLifeMs = GRUDGE_DECAY_HALF_LIFE_MS } = {}) {
     const rows = [];
