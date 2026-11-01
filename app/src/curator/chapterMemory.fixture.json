@@ -1,0 +1,938 @@
+{
+ "cases": {
+  "decay": {
+   "expected": {
+    "byChapter": {
+     "engraving": {
+      "keeps": 1.0,
+      "passes": 1.0
+     },
+     "marks": {
+      "keeps": 0.75,
+      "passes": 1.707107
+     }
+    },
+    "byNotch": {
+     "engraving": {
+      "0": {
+       "keeps": 1.0,
+       "passes": 1.0
+      }
+     },
+     "marks": {
+      "0": {
+       "keeps": 0,
+       "passes": 1.0
+      },
+      "1": {
+       "keeps": 0.5,
+       "passes": 0.707107
+      },
+      "2": {
+       "keeps": 0.25,
+       "passes": 0
+      }
+     }
+    },
+    "memory": {
+     "halfLifeDays": 14,
+     "kind": "recency"
+    },
+    "totals": {
+     "keeps": 3,
+     "passes": 3
+    },
+    "version": 1
+   },
+   "halfLifeDays": 14,
+   "keeps": [
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 101,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "first-wall",
+      "chapter": "marks",
+      "keyword": "linework",
+      "level": 1
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "first-wall"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 102,
+     "timestamp": "2026-10-15T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "first-wall",
+      "chapter": "marks",
+      "keyword": "linework",
+      "level": 2
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "first-wall"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 103,
+     "timestamp": "2026-10-01T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 104,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "atlantis",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 105,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 106,
+     "timestamp": "not-a-date"
+    }
+   ],
+   "now": "2026-10-29T00:00:00.000Z",
+   "passes": [
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 201,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "first-wall",
+      "chapter": "marks",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "first-wall"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 202,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "first-wall",
+      "chapter": "marks",
+      "keyword": "linework",
+      "level": 1
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "first-wall"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 203,
+     "timestamp": "2026-10-22T00:00:00.000Z"
+    }
+   ]
+  },
+  "season": {
+   "expectedCanon": {
+    "byChapter": {
+     "engraving": {
+      "keeps": 10,
+      "passes": 6
+     },
+     "grunge": {
+      "keeps": 10,
+      "passes": 10
+     }
+    },
+    "byNotch": {
+     "engraving": {
+      "0": {
+       "keeps": 10,
+       "passes": 6
+      }
+     },
+     "grunge": {
+      "0": {
+       "keeps": 10,
+       "passes": 10
+      }
+     }
+    },
+    "memory": {
+     "halfLifeDays": null,
+     "kind": "canon"
+    },
+    "totals": {
+     "keeps": 20,
+     "passes": 16
+    },
+    "version": 1
+   },
+   "expectedRecency": {
+    "byChapter": {
+     "engraving": {
+      "keeps": 10,
+      "passes": 6
+     },
+     "grunge": {
+      "keeps": 0.15625,
+      "passes": 8.03125
+     }
+    },
+    "byNotch": {
+     "engraving": {
+      "0": {
+       "keeps": 10,
+       "passes": 6
+      }
+     },
+     "grunge": {
+      "0": {
+       "keeps": 0.15625,
+       "passes": 8.03125
+      }
+     }
+    },
+    "memory": {
+     "halfLifeDays": 14,
+     "kind": "recency"
+    },
+    "totals": {
+     "keeps": 20,
+     "passes": 16
+    },
+    "version": 1
+   },
+   "halfLifeDays": 14,
+   "keeps": [
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 301,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 302,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 303,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 304,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 305,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 306,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 307,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 308,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 309,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 310,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 311,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 312,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 313,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 314,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 315,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 316,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 317,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 318,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 319,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 320,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    }
+   ],
+   "now": "2026-10-29T00:00:00.000Z",
+   "passes": [
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 321,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 322,
+     "timestamp": "2026-08-06T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 323,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 324,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 325,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 326,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 327,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 328,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 329,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "photocopy",
+      "chapter": "grunge",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "photocopy"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 330,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 331,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 332,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 333,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 334,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 335,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    },
+    {
+     "keepContext": null,
+     "notch": {
+      "anchor": "kunstformen",
+      "chapter": "engraving",
+      "keyword": null,
+      "level": 0
+     },
+     "projectRef": null,
+     "recipe": {
+      "layoutParams": {
+       "composition": "kunstformen"
+      },
+      "paletteId": "ember"
+     },
+     "seed": 336,
+     "timestamp": "2026-10-29T00:00:00.000Z"
+    }
+   ]
+  }
+ },
+ "comment": "#1858 \u2014 the chapter-memory round trip, asserted by BOTH studio/curator.py selfcheck (the builder reproduces 'expected*' from the ledger rows) and app/src/curator/chapterMemory.selfcheck.mjs (validateTaste accepts them; the walk consumes them). Rows are ledger lines in tasteLedger.js's shape; only rows whose notch stamp names a real chapter are chapter evidence."
+}

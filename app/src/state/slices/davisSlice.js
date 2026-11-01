@@ -18,6 +18,7 @@ import { captureKeepContext, sanitizeKeepContext, seedAgeMsNow } from '../../cur
 import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #1124
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
+import { loisGrudge } from '../../curator/loisGrudge.mjs'; // #1858: a keep can overrule LOIS's grudge
 import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
 import { notchContextFor, sanitizeNotchContext } from '../chapterNarrow.mjs'; // #1857: the keeps-ledger notch context (BOOK S4)
 import {
@@ -1069,6 +1070,14 @@ export const createDavisSlice = (set) => {
           if (routed.landed === 'collection') crownLine = ON_SHELF_COPY;
           // #1173 — the keep is a deliberate act: one line in the keeps ledger.
           appendLedgerSpoken('keeps', routed.entry, state.projectTitle, 'keep');
+          // #1858 — and a verdict on the grudge: keeping a look whose genre
+          // LOIS has permabanned overrules him, and that genre's grudge
+          // resets (curator/loisGrudge.mjs). Read off the same record the
+          // ledger took; passes never reach this door.
+          loisGrudge.noteKeep({
+            chapterId: state.kineticChapterId,
+            lookId: routed.entry?.config?.layout?.composition ?? state.layoutParams?.composition ?? null,
+          });
         } else {
           // #1643 — the favorite landed, but its implied keep could not be
           // captured: say so on the same line the crown speaks on.
@@ -1131,6 +1140,12 @@ export const createDavisSlice = (set) => {
         persistKeeps(routed.keeps);
         persistStage(routed.keepStage);
         appendLedgerSpoken('keeps', routed.entry, state.projectTitle, 'keep'); // #1173
+        // #1858 — the grudge hears this keep too (see addFavorite): a keep
+        // in a permabanned genre is an overrule, and the grudge resets.
+        loisGrudge.noteKeep({
+          chapterId: state.kineticChapterId,
+          lookId: routed.entry?.config?.layout?.composition ?? state.layoutParams?.composition ?? null,
+        });
         return {
           keeps: routed.keeps,
           keepStage: routed.keepStage,

@@ -5,8 +5,13 @@
 //
 // The walk's weighting is honest weights + a novelty term (spec §7, the diversity pressure): a chapter
 // nobody has visited this session weighs UNVISITED_WEIGHT; a visited chapter weighs 1/visits, so the more a
-// chapter has been dealt the less it pulls. That is the ONLY weighting — no taste, no keeps histogram (the
-// Queen's per-chapter sway is S5), no cost gate (D6 stays out of v1). The path the walk takes is the spine
+// chapter has been dealt the less it pulls. S5 (#1858) adds the one further term the spec reserved: the
+// per-chapter lean from the imported taste file's histograms (curator/chapterMemory.mjs) — an optional,
+// additive bias inside her standing bounds (never negative, never above the +0.06 cap, identity below
+// the 8-keeps floor — the derivation owns those laws; this module clamps at the point of application so
+// no caller can exceed them). Novelty stays separate and stronger: the largest visited weight is
+// 1 + 0.06, the smallest unvisited weight is 3, so the lean can aim the walk but can never wall off the
+// book. Still no cost gate (D6 stays out of v1). The path the walk takes is the spine
 // traversal from the standing chapter — or from Marks when none stands (D1: the book opens at Marks) —
 // through every neighbour to the landing: in a book you get anywhere by passing the adjacent chapters, and
 // the path is what the landing card display walks (panels/layout/ChapterCard.jsx).
@@ -23,6 +28,7 @@
 //
 // Pure: no store, no clock, no Math.random — the caller passes rng, like every dealer (#710).
 import { CHAPTERS, chapterById, chapterLooks, chapterVoices, chapterAssets } from '../data/chapters.js';
+import { CHAPTER_LEAN_CAP } from '../curator/chapterMemory.mjs'; // #1858: her cap, enforced here
 import { SCOPE_CYCLE, sanitizeScope, scopeDecks, CURATED_SETS } from './kineticScope.mjs';
 import { dealableRecords } from './rollPool.mjs';
 import { ASSETS } from '../data/assets/index.js';
@@ -36,11 +42,24 @@ export function chapterWeight(visits) {
   return n === 0 ? UNVISITED_WEIGHT : 1 / n;
 }
 
-/** The walk's table: every chapter's session visits and weight, in spine order (the coverage ledger's math). */
-export function chapterWeights(visits = {}) {
+/** One chapter's lean as the walk may apply it: a finite bias clamped into [0, CHAPTER_LEAN_CAP]. */
+const leanOf = (lean, id) => {
+  const b = lean ? Number(lean[id]) : 0;
+  return Number.isFinite(b) ? Math.min(CHAPTER_LEAN_CAP, Math.max(0, b)) : 0;
+};
+
+/**
+ * The walk's table: every chapter's session visits and weight, in spine order (the coverage ledger's
+ * math). With a lean map (chapterMemory's chapterLeanBiases over the imported taste), each weight is
+ * novelty + lean and the row names its lean; with none, the table is S2's exactly — same rows, same
+ * weights, no lean field.
+ */
+export function chapterWeights(visits = {}, lean = null) {
   return CHAPTERS.map((c) => {
     const n = Math.max(0, (visits[c.id] || 0) | 0);
-    return { id: c.id, visits: n, weight: chapterWeight(n) };
+    if (!lean) return { id: c.id, visits: n, weight: chapterWeight(n) };
+    const bias = leanOf(lean, c.id);
+    return { id: c.id, visits: n, weight: chapterWeight(n) + bias, lean: bias };
   });
 }
 
@@ -49,8 +68,8 @@ export function chapterWeights(visits = {}) {
  * term included); the path is the contiguous spine traversal from `fromId` (the standing chapter, or Marks
  * when none stands) to the landing, in walking order — neighbours only, the ends never wrap.
  */
-export function dealLanding(rng, { fromId = null, visits = {} } = {}) {
-  const weights = chapterWeights(visits);
+export function dealLanding(rng, { fromId = null, visits = {}, lean = null } = {}) {
+  const weights = chapterWeights(visits, lean);
   const total = weights.reduce((a, w) => a + w.weight, 0);
   let roll = rng() * total;
   let target = weights[weights.length - 1].id;
