@@ -14,6 +14,7 @@
 // - Local-first: localStorage always; in the desktop app, also mirrored to
 //   $APPDATA/ledgers/<kind>.jsonl. No cloud, no account.
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
+import { sanitizeNotchContext, isNotchContext } from '../state/chapterNarrow.mjs';
 import { sanitizeKeepContext } from './keepContext.js';
 import { sanitizeProvenance, isProvenance } from './provenance.mjs';
 import { isTauriRuntime } from '../platform/desktop.mjs'; // one desktop check for the whole app
@@ -51,6 +52,10 @@ export function ledgerRow(rec, projectRef) {
   // pass on a mined render is a judgment WITH its origin, or it is a
   // weaker label than the ledger promises. Absent stays absent.
   const provenance = sanitizeProvenance(rec.provenance);
+  // #1857 — a keep made while a chapter narrowing stands carries its notch
+  // context, sanitized by the notch machine's own schema (state/chapterNarrow).
+  // Absent stays absent: a keep with no narrowing standing writes no field.
+  const notch = sanitizeNotchContext(rec.notch);
   return {
     seed: seed >>> 0,
     recipe: {
@@ -63,6 +68,7 @@ export function ledgerRow(rec, projectRef) {
     keepContext: sanitizeKeepContext(rec.context) ?? null,
     projectRef: ref || null,
     ...(provenance ? { provenance } : {}),
+    ...(notch ? { notch } : {}),
   };
 }
 
@@ -80,6 +86,10 @@ export function isLedgerRow(o) {
   // #1507 — provenance is optional (legacy lines carry none) but, when a
   // line claims one, it must be a real one.
   if ('provenance' in o && !isProvenance(o.provenance)) return false;
+  // #1857 — notch context is optional (lines written before the funnel, or
+  // with no narrowing standing, carry none) but, when a line claims one, it
+  // must be a real one. Readers that predate the field ignore it whole.
+  if ('notch' in o && !isNotchContext(o.notch)) return false;
   return true;
 }
 
