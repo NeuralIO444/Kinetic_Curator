@@ -46,8 +46,10 @@ import {
 import { ASSETS } from '../../data/assets/index.js';
 import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
 import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
-import { scopeDecks, sanitizeScope, CURATED_SETS } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
+import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
+import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
+import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
 import { chapterById } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
@@ -122,6 +124,100 @@ function scopedChapterVoices(state) {
   const records = dealableRecords(ASSETS, state.customAssets);
   const eff = effectiveChapterScope(state.kineticChapterId, state.startupMode, { records });
   return chapterScopeDeck(state.kineticChapterId, eff.scope, { records }).voices;
+}
+
+/** #1856 — close the standing round on its honest exit (a fresh flip, the CHAOS escape, the launch opener). */
+function closeStandingRound(state, via) {
+  const round = state.kineticRound;
+  return round && round.phase !== 'closed' ? closeRound(round, via) : round;
+}
+
+/**
+ * #1856 — the round at the voice-pass commit (BOOK S3): the deal is complete (look + voice, chapter-scoped),
+ * so the table sits inside this one store update — open, LOIS's slot, her spend or her pass, and (D4, Matt
+ * 2026-10-31) the automatic settle the moment the hand stands. Returns { kineticRound, layoutParams?,
+ * enabledAssets?, cut } — the extra fields only when her kill redealt the hand, so the stage shows the
+ * hand the record claims.
+ *
+ * D2 (Matt 2026-10-31) lives here, in the executor: kill only — the redeal is the sweep's own lookPass over
+ * the chapter deck minus the killed look, at the scope the deal was made (walking S2's scope cycle wider
+ * only when that smaller pool is empty there, and recording the scope actually used). The judge reads the
+ * dealt look's own params against the deck's params (loisCut's battery form); when the standing composition
+ * is not a deck member — an armed MODE or a locked composition held a foreign look — it reads the completed
+ * deal's landed params against the same pile. Honesty guard: a cut whose executor cannot produce a
+ * different hand (an empty smaller pool, a redeal held to the killed look) is not spent — the slot closes
+ * as a pass rather than log a kill that changed nothing. A voice pass landing while an unclosed round
+ * already stands is a warm tap on that round: absorbed, the record untouched.
+ */
+function runRound(state, r) {
+  const standing = state.kineticRound;
+  if (standing && standing.phase !== 'closed') return { kineticRound: absorbWarmTap(standing), cut: false };
+  const landing = state.kineticLanding;
+  if (!landing?.chapterId) return { kineticRound: standing ?? null, cut: false };
+  const records = dealableRecords(ASSETS, state.customAssets);
+  const deck = chapterScopeDeck(landing.chapterId, landing.dealtScope, { records });
+  const lookId = state.layoutParams?.composition ?? null;
+  const dealtLook = deck.looks.find((l) => l.id === lookId) || null;
+  const deal = {
+    chapterId: landing.chapterId,
+    lookId,
+    voiceId: r.voiceId,
+    dealtScope: landing.dealtScope,
+    redealt: landing.redealt,
+    pool: deck.looks.map((l) => l.id),
+  };
+  let round = openJudgement(openRound({ seq: landing.seq, chapterId: landing.chapterId, deal }));
+  const verdict = judgeDeal(
+    dealtLook ? dealtLook.params : r.layoutParams,
+    deck.looks.map((l) => l.params),
+  );
+  if (verdict.cut) {
+    let scope = landing.dealtScope;
+    let scopeDeck = deck;
+    let pool = deck.looks.filter((l) => l.id !== lookId);
+    for (let i = SCOPE_CYCLE.indexOf(scope) + 1; pool.length === 0 && i < SCOPE_CYCLE.length; i++) {
+      scope = SCOPE_CYCLE[i];
+      scopeDeck = chapterScopeDeck(landing.chapterId, scope, { records });
+      pool = scopeDeck.looks.filter((l) => l.id !== lookId);
+    }
+    const redeal = pool.length
+      ? lookPass({ ...state, layoutParams: r.layoutParams }, dieRng, {
+          looks: pool,
+          pool: scopeDeck.poolKind,
+          sets: scopeDeck.sets,
+          records: scopeDeck.records,
+        })
+      : null;
+    if (redeal && redeal.lookId && redeal.lookId !== lookId) {
+      const after = {
+        chapterId: landing.chapterId,
+        lookId: redeal.lookId,
+        voiceId: r.voiceId,
+        dealtScope: scope,
+        redealt: true,
+        pool: pool.map((l) => l.id),
+      };
+      round = settle(
+        spendCut(round, {
+          verdict: {
+            reason: verdict.reason,
+            gate: verdict.gate.key,
+            value: verdict.gate.value,
+            limit: verdict.gate.limit,
+          },
+          deal: after,
+        }),
+      );
+      return {
+        kineticRound: round,
+        layoutParams: redeal.layoutParams,
+        enabledAssets: Object.keys(redeal.enabledAssets).length ? redeal.enabledAssets : null,
+        cut: !!round.cut,
+      };
+    }
+    // the executor could not produce a different hand: the cut is not spent (see the honesty guard above)
+  }
+  return { kineticRound: settle(passCut(round)), cut: false };
 }
 
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
@@ -247,6 +343,12 @@ export const createLayoutSlice = (set) => ({
    * says they differ (the chapter had no deck at the performer's scope). Session-only, never serialized.
    */
   kineticLanding: null,
+  /**
+   * #1856 — the standing round (BOOK S3): the roundTable record { seq, chapterId, phase, deal, cut, settled,
+   * log } — opened at the voice-pass commit and settled in the same update (D4); closed by the next fresh
+   * flip, CHAOS roll or launch opener. S4's CURATOR pass reads this settled board. Session-only, never serialized.
+   */
+  kineticRound: null,
   /**
    * #1772 — the last KINETIC curator pass, backstage and honest: { curator, index, moves: [{ key, from, to }] }.
    * `moves: []` means the curator passed (kept the piece as it stood). Session-only, never serialized.
@@ -996,6 +1098,8 @@ export const createLayoutSlice = (set) => ({
         // dealt from no chapter, so no chapter stands (the session coverage ledger keeps its history).
         kineticChapterId: null,
         kineticLanding: null,
+        // #1856 — and the escape closes the standing round, unsettled if it never settled (roundTable).
+        kineticRound: closeStandingRound(state, 'chaos'),
       };
     }),
 
@@ -1024,6 +1128,9 @@ export const createLayoutSlice = (set) => ({
         kineticChapterId: landing.chapterId,
         kineticChapterVisits: visits,
         kineticLanding: landing,
+        // #1856 — a fresh flip is the settled round's only honest exit: it closes (via 'flip') in the
+        // same update, and the closed record stays inspectable until the next voice pass opens a round.
+        kineticRound: closeStandingRound(state, 'flip'),
       };
       if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
@@ -1033,7 +1140,12 @@ export const createLayoutSlice = (set) => ({
    * #1772 — KINETIC VOICE pass (tap 2): a fresh voice from the 64-voice deck over the standing look. Motion + palette
    * move, and the glow only when the voice declares accumulation (#1768). Structure and the pool hold. One undo step.
    */
-  kineticVoicePass: () =>
+  kineticVoicePass: () => {
+    // #1856 — if LOIS spends her cut at this commit, the feed notes it AFTER the store update lands:
+    // the kill's own redeal changes the composition, and the feed's seed watcher would clear a flag
+    // set inside the updater as if a fresh frame had arrived. Post-commit, the CUT flag stands until
+    // the next roll or seed change (loisActivity.noteCut, frameKept's lifecycle).
+    let spentCut = false;
     set((state) => {
       // #1855 — a warm tap stays inside the standing chapter: its voices ∩ the scope deck (scopedChapterVoices).
       const r = voicePass(state, dieRng, { deck: scopedChapterVoices(state) });
@@ -1049,20 +1161,29 @@ export const createLayoutSlice = (set) => ({
             ambient: 0.2 + dieRng() * 0.5,
           })
         : state.light;
+      // #1856 — the deal is complete, so the table sits in this same update (runRound): open, LOIS's
+      // slot, her spend (D2: kill, redeal from the chapter deck minus the killed look) or her pass,
+      // and the automatic settle (D4). A kill's redeal overrides the layout and pool below.
+      const round = runRound(state, r);
+      spentCut = round.cut;
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
         light,
-        layoutParams: r.layoutParams,
+        layoutParams: round.layoutParams ?? r.layoutParams,
         paletteId: r.paletteId,
         paletteOverrides: r.paletteOverrides,
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
+        ...(round.enabledAssets ? { enabledAssets: round.enabledAssets } : {}),
         kineticVoiceId: r.voiceId,
+        kineticRound: round.kineticRound,
         voiceMix: null,
         activeVoiceId: null,
       };
-    }),
+    });
+    if (spentCut) loisActivity.noteCut();
+  },
 
   /**
    * #1772 — the START pill's WEAK / MED launch opener: one look pass and one voice pass under that state's decks, in
@@ -1088,6 +1209,8 @@ export const createLayoutSlice = (set) => ({
         // (the first cold KINETIC tap walks and lands). The coverage ledger keeps its session history.
         kineticChapterId: null,
         kineticLanding: null,
+        // #1856 — leaving the book through the opener closes the standing round (via 'opener').
+        kineticRound: closeStandingRound(state, 'opener'),
       };
     }),
 
@@ -1101,11 +1224,15 @@ export const createLayoutSlice = (set) => ({
       const curator = getActiveCurator();
       const r = curatorPass(state, curator, dieRng, pickCurated);
       const kineticNudge = { curator: curator?.name ?? null, index: r.index, moves: r.moves };
-      if (!r.layoutParams) return { kineticNudge };
+      // #1856 — a warm tap lands on the table and is absorbed (roundTable.absorbWarmTap): the settled
+      // round is the board this pass plays on, and the record provably does not move.
+      const kineticRound = state.kineticRound ? absorbWarmTap(state.kineticRound) : state.kineticRound;
+      if (!r.layoutParams) return { kineticNudge, kineticRound };
       return {
         ...pushToUndo(state, true),
         layoutParams: r.layoutParams,
         kineticNudge,
+        kineticRound,
         voiceMix: null,
         activeVoiceId: null,
       };

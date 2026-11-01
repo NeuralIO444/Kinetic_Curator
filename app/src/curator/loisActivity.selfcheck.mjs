@@ -692,6 +692,24 @@ import {
   act.stop();
 }
 
+// --- #1856 (BOOK S3): the CUT flag — LOIS's spend, on frameKept's lifecycle -----------------------
+// noteCut is the spend's note (layoutSlice calls it post-commit); the flag stands until the next
+// roll or seed change, exactly like frameKept, and resolveLoisFace reads it off the snapshot.
+{
+  let now = 11_000_000;
+  const act = createLoisActivity({ now: () => now });
+  act.start();
+  assert.strictEqual(act.snapshot().cut, false, 'no spend yet: no CUT');
+  act.noteCut();
+  assert.strictEqual(act.snapshot().cut, true, 'the spend stands on the frame');
+  emit(Events.KINETIC_TAP, { kind: 'look' }); // the next roll clears it
+  assert.strictEqual(act.snapshot().cut, false, 'a fresh roll clears the CUT flag');
+  act.noteCut();
+  act.noteSeed(7, 'flow'); // a seed change clears it too
+  assert.strictEqual(act.snapshot().cut, false, 'a seed change clears the CUT flag');
+  act.stop();
+}
+
 console.log('ok loisActivity: 7 instruments record real signals only');
 console.log(
   'ok loisActivity #1391: G2–G4, G6, G7, G9–G15 gap signals recorded (G5 dwell pinned by the instrument-5 block above)',

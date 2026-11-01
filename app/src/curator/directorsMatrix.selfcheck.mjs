@@ -46,10 +46,18 @@ ok('the document has 20 rooms and the data has exactly those 20, in the same wor
   assert.equal(count, 20, 'and nothing else is in the data');
 });
 
-ok('every pair of real states has a room: 4 LOIS x 5 Davis', () => {
-  assert.deepEqual(Object.keys(DIRECTORS_MATRIX).sort(), Object.keys(LOIS_FACES).sort());
-  for (const l of Object.keys(LOIS_FACES))
+// Re-pin (#1856): LOIS_FACES gained CUT (BOOK S3 — the round's spent cut is a rendered face now).
+// The matrix is not CUT's home: its rooms are Matt's signed copy, re-parsed verbatim from the
+// document above, and CUT — an event at the table, not a state of the honest feed — has no room
+// in that document. No line may be invented to give it one (this module's first law), so coverage
+// is pinned over the four feed faces and CUT's absence is asserted as a fact, not an oversight.
+ok('every pair of feed states has a room: 4 LOIS x 5 Davis; CUT has no room and none may be invented', () => {
+  const feedFaces = Object.keys(LOIS_FACES).filter((k) => k !== 'CUT');
+  assert.deepEqual(feedFaces.sort(), ['AWAY', 'BURN', 'NOD', 'VIBE']);
+  assert.deepEqual(Object.keys(DIRECTORS_MATRIX).sort(), feedFaces);
+  for (const l of feedFaces)
     assert.deepEqual(Object.keys(DIRECTORS_MATRIX[l]).sort(), Object.keys(DAVIS_STATES).sort(), l);
+  assert.ok(!('CUT' in DIRECTORS_MATRIX), 'CUT has no room: its copy is not in the signed document');
 });
 
 ok("the five verdicts are the matrix's, and they sit on the rooms the issue names", () => {

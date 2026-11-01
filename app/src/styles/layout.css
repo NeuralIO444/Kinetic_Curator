@@ -357,6 +357,9 @@
 .lois-pill[data-tone="mustard"] {
   color: #d9a441;
 }
+.lois-pill[data-tone="red"] {
+  color: var(--kc-red); /* #1856 — the cut wears LOIS's own red (tokens.css) */
+}
 /* #1588 — the verdict line's ticker, in the place the kaomoji face held: the chip's left segment, and
    (Matt, 2026-10-22) a TAPE: two copies of line+divider running right to left by exactly one copy per
    loop — the endpoints arrive as --tk-from / --tk-to from loisTicker.mjs, so the wrap lands on an
