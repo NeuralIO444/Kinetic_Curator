@@ -326,3 +326,14 @@ registerCostTier('beast/trails', {
   notes:
     'BEAST S5 signature trail deposits. Pure CPU (curve -> fading segments); like beast/solver it sheds with the creature/deposit budget, NOT the governor perfTier1 cut — tier 1 is exactly the GL pass set that mechanism covers, so a CPU deposit does not belong in it. Fallback to plain fading graphic when wet field is unavailable.',
 });
+
+// --- FIELD poet choice (curator/fieldDirector.js) — APPEND-ONLY BLOCK ---
+// Pure pick-time function. No GPU pass, no live loop, no per-frame cost.
+// Tier 0 (structural to the Director's pick). timeMs is an estimate.
+registerCostTier('field/poet-choice', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.01,
+  notes:
+    'FIELD poet choice (genre vector + slow debt + room adjacency). Pure CPU at pick time only. Deterministic. Sheds with the Director, never the effect ladder.',
+});
