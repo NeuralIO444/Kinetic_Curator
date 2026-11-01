@@ -21,6 +21,7 @@ import { loisActivity } from '../../curator/loisActivity.js';
 import { KineticButton } from './KineticButton.jsx';
 import { ChapterCard } from './ChapterCard.jsx';
 import { chapterDeckReadout } from '../../state/chapterWalk.mjs';
+import { notchLabel } from '../../state/chapterNarrow.mjs'; // #1857: the funnel's label (BOOK S4)
 import { dealableRecords } from '../../state/rollPool.mjs';
 import { ASSETS } from '../../data/assets/index.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
@@ -81,6 +82,16 @@ export function CuratorBar() {
     () => (chapterId ? chapterDeckReadout(chapterId, scope, { records: dealableRecords(ASSETS, customAssets) }) : null),
     [chapterId, scope, customAssets],
   );
+  // #1857 — the funnel's label (BOOK S4): while a settled board's narrowing stands in this chapter,
+  // the chapter span names the notch — chapter at 0, chapter · genre keyword at 1, the anchor
+  // artist's own name at 2 — so the board says which job CURATOR is doing (D3, Matt 2026-10-31).
+  // The digits above stay the chapter deck readout: they are the START scope's contract (what a
+  // KINETIC tap can reach), not the funnel's.
+  const kineticNotch = useStore((s) => s.kineticNotch);
+  const notchText =
+    kineticNotch && chapterReadout && kineticNotch.chapterId === chapterId
+      ? (notchLabel(kineticNotch)?.text ?? null)
+      : null;
 
   // #1103 — every Curator roll (the button, and anything else that emits LAYOUT_CURATE) flashes CURATOR's full
   // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
@@ -213,6 +224,10 @@ export function CuratorBar() {
                 chapterReadout.redealt
                   ? ` — ${chapterReadout.name} has no deck at ${SCOPE_LABEL[scope]}, so its deals are made at ${SCOPE_LABEL[chapterReadout.dealtScope]} (the pill stays where you put it)`
                   : ''
+              }${
+                notchText && kineticNotch.notch > 0
+                  ? ` Narrowed to ${notchText}: CURATOR presses roll inside it until the board changes.`
+                  : ''
               }. Click for ${SCOPE_LABEL[nextScope(scope)]}.`
             : `START: ${SCOPE_LABEL[scope]} — ${SCOPE_HINT[scope]} A tap can reach ${readout.assets} shapes · ${readout.looks} looks · ${readout.voices} voices. Click for ${SCOPE_LABEL[nextScope(scope)]}.`
         }
@@ -235,7 +250,7 @@ export function CuratorBar() {
             data-redealt={chapterReadout.redealt ? 'true' : undefined}
             aria-hidden="true"
           >
-            {chapterReadout.name}
+            {notchText ?? chapterReadout.name}
           </span>
         )}
       </button>

@@ -19,6 +19,7 @@ import { captureBands, sanitizeBands } from '../../curator/hitBands.js'; // #112
 import { shownHeat, heatStep } from '../../panels/layout/kineticHeat.mjs';
 import { appendToLedger } from '../../curator/tasteLedger.js'; // #1173: keep/pass ledgers for the MLX loop
 import { sanitizeProvenance } from '../../curator/provenance.mjs'; // #1507: mined ≠ rolled ≠ hand-built, on the record
+import { notchContextFor, sanitizeNotchContext } from '../chapterNarrow.mjs'; // #1857: the keeps-ledger notch context (BOOK S4)
 import {
   // #1589 (Keeps K1): the shelf's tiers — stage membership, crown routing, swaps, migration
   deriveStageIds,
@@ -118,8 +119,14 @@ export function sanitizeCast(raw) {
 export function captureFavorite(state, paletteId) {
   const enabled = state.enabledAssets || {};
   const stack = stackOf(state); // null for a plain one-track scene: the keep is exactly what it was
+  // #1857 — a keep made while a chapter narrowing stands (a settled board whose funnel is open,
+  // BOOK S4) carries the notch context, so the ledger line records which chapter, how deep, and
+  // around which anchor it was loved (tasteLedger reads it off the record). No narrowing standing,
+  // no field — absent stays absent.
+  const notch = notchContextFor(state.kineticNotch);
   return {
     ...(stack ? { stack } : {}),
+    ...(notch ? { notch } : {}),
     seed: state.seed,
     seedOffsets: { ...(state.seedOffsets || {}) },
     bands: captureBands(paletteId, state.paletteOverrides, state.userPalettes, heatStep(shownHeat())), // #1124: the vibe, frozen
@@ -181,6 +188,9 @@ export function sanitizeFavorite(raw) {
   // #1507 — provenance rides along when it is a real one (explorer-mined);
   // hand-built and dice-crowned records carry none and none is invented.
   const provenance = sanitizeProvenance(raw.provenance);
+  // #1857 — a keep's notch context rides along when it is a real one (the funnel standing at
+  // capture), so the ledger line can carry it; absent or garbled stays absent.
+  const notch = sanitizeNotchContext(raw.notch);
   // #1590 — a stored Lois gate verdict (E4, recorded at bake time)
   // rides the keep when a real one is present, so the fill's gate has
   // verdicts to read; absent stays absent (unjudged, never failed).
@@ -189,6 +199,7 @@ export function sanitizeFavorite(raw) {
     ...(stackOk ? { stack: JSON.parse(JSON.stringify(raw.stack)) } : {}),
     ...(bands ? { bands } : {}),
     ...(provenance ? { provenance } : {}),
+    ...(notch ? { notch } : {}),
     ...(gateVerdict ? { gateVerdict } : {}),
     id: typeof raw.id === 'string' && raw.id ? raw.id.slice(0, 80) : genId(),
     seed,

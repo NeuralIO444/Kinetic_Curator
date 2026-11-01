@@ -4,12 +4,12 @@
 // explicit step back. This module is the pure machinery for that funnel — the pools, the notch
 // state, the readout label, and the keeps-ledger notch context.
 //
-// D3 STOP: whether the settled board hands this machine to the CURATOR button (the spec's shape)
-// or narrowing lives on a different gesture is D3, and D3 is UNRULED. Nothing here is wired:
-// curateUnlocked, the store, and the CuratorBar are untouched, and no notch state exists in the
-// live app. What is built is everything the ruling does not change — when D3 lands, the wiring
-// pass connects a gesture to narrow()/widen() and a pool to the candidate roll, and nothing in
-// this file needs to move.
+// D3 RULED (Matt, 2026-10-31): Option A — the CURATOR button does both jobs and the board says
+// which. The wiring pass connected the gesture without moving this file: the store holds the
+// notch state beside the round (layoutSlice's kineticNotch), curateUnlocked advances narrow()
+// one notch per settled press and deals its candidates from poolFor() ∩ the dealt scope's deck,
+// the START pill's chapter span renders notchLabel(), and keeps made while a narrowing stands
+// are stamped with notchContextFor() (davisSlice's captureFavorite).
 //
 // The anchor is the settled deal's look (kineticRound.deal.lookId): the funnel narrows AROUND
 // what settled. Genres and hands are DERIVED from the look records' own declared keywords
@@ -200,7 +200,8 @@ export function notchLabel(state, { looks = COMPOSITION_PRESETS } = {}) {
 // stands carries { chapter, level, keyword, anchor } beside the row's other fields; a keep made
 // with no narrowing standing carries nothing — absent stays absent, and old readers (the Studio
 // trainer's hits_bridge.py included) ignore the field whole. S5's per-chapter learning consumes
-// exactly this. Nothing stamps it yet: the stamp is wiring, and wiring waits on D3.
+// exactly this. The stamp is wiring: davisSlice's captureFavorite writes it whenever a narrowing
+// stands (D3 ruled 2026-10-31), and sanitizeFavorite carries it to the ledger door.
 
 /** The notch context for a machine state — what a keep at this notch would record. */
 export function notchContextFor(state) {

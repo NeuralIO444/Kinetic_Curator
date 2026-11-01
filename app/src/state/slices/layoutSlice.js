@@ -50,7 +50,8 @@ import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kinetic
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
-import { chapterById } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
+import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
+import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
@@ -223,6 +224,45 @@ function runRound(state, r) {
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
 const dieRng = () => die(0x40000000) / 0x40000000;
 
+/**
+ * #1857 — the narrowing a round's settle opens: the funnel standing at notch 0 (the chapter pool),
+ * anchored on the look the round settled with. Null when the settled look is not a chapter member —
+ * the dealt look always is (it was dealt from the chapter deck), so null is the honest impossible,
+ * never a funnel anchored on air.
+ */
+function notchForRound(round) {
+  if (!round || !round.settled || round.phase !== 'settled') return null;
+  return openNarrowing(round.chapterId, round.deal?.lookId);
+}
+
+/**
+ * #1857 — the settled board's funnel for one CURATOR press (D3, Matt 2026-10-31): the standing
+ * narrowing advanced one notch (the machine refuses at the floor and returns the same state — the
+ * press then rolls inside the floor pool), and the look records the press's candidates may be based
+ * on: poolFor intersected with the chapter deck at the scope the round's deal was made, the same
+ * deck runRound dealt from — S2's scope honesty composes, it is not re-derived. A stored narrowing
+ * that does not match the standing round (chapter or anchor moved) is re-opened from the round
+ * rather than trusted. Null when no settled board stands — the press is then today's whole-book
+ * roll, unchanged — or when the anchor is not a chapter member (see notchForRound).
+ */
+function settledFunnel(state) {
+  const round = state.kineticRound;
+  if (!round || !round.settled || round.phase !== 'settled') return null;
+  const standing = state.kineticNotch;
+  const base =
+    standing && standing.chapterId === round.chapterId && standing.anchorLookId === round.deal?.lookId
+      ? standing
+      : openNarrowing(round.chapterId, round.deal?.lookId);
+  if (!base) return null;
+  const records = dealableRecords(ASSETS, state.customAssets);
+  const deck = chapterScopeDeck(round.chapterId, round.deal.dealtScope, { records });
+  const advanced = narrow(base);
+  const ids = poolFor(advanced, deck.looks.map((l) => l.id));
+  if (!ids.length) return null;
+  const idSet = new Set(ids);
+  return { notch: advanced, looks: chapterLooks(round.chapterId).filter((l) => idSet.has(l.id)) };
+}
+
 /** Pick a random id from `ids`, preferring one that differs from `current`. */
 function pickOtherId(ids, current) {
   if (!ids.length) return current;
@@ -349,6 +389,14 @@ export const createLayoutSlice = (set) => ({
    * flip, CHAOS roll or launch opener. S4's CURATOR pass reads this settled board. Session-only, never serialized.
    */
   kineticRound: null,
+  /**
+   * #1857 — the standing narrowing (BOOK S4): the chapterNarrow state of the settled board — opened
+   * fresh at notch 0 when a round settles, advanced one notch per settled CURATOR press (D3, Matt
+   * 2026-10-31), and cleared when the board ends: a fresh flip, a CHAOS roll or the launch opener
+   * (widening is implicit in the exits — there is no widen gesture). S5 reads this record; its
+   * shape is chapterNarrow's, not this file's. Session-only, never serialized.
+   */
+  kineticNotch: null,
   /**
    * #1772 — the last KINETIC curator pass, backstage and honest: { curator, index, moves: [{ key, from, to }] }.
    * `moves: []` means the curator passed (kept the piece as it stood). Session-only, never serialized.
@@ -893,6 +941,16 @@ export const createLayoutSlice = (set) => ({
       // Everything locked: no-op — no candidate differs from current state, so
       // push no undo entry (same guard as randomizeUnlocked).
       if (unlocked.length === 0) return {};
+      // #1857 — D3 (Matt 2026-10-31): the board says which job this press does. On a SETTLED board
+      // the press narrows: the funnel advances one notch and the candidates are dealt from inside
+      // the narrowed pool (settledFunnel). On any other board the press is today's whole-book roll,
+      // exactly as before. The funnel state advances even when the candidates cannot be re-based —
+      // REFINE (it mutates the standing piece, whose composition is the anchor, a member of every
+      // pool by construction) or a HELD look (a MODE armed, or the composition locked: the same hold
+      // lookPass honours — a lock is never stomped) — because the funnel describes the board, and
+      // the next free press deals from where it stands.
+      const funnel = settledFunnel(state);
+      const held = !!state.armedMode || !!state.lockedParams?.composition;
       // #518: every roll comes off one seeded stream keyed by (seed, press #), so
       // presses differ but a given (seed, offsets, press #) replays the same pick.
       const press = state.curatePress | 0;
@@ -918,7 +976,25 @@ export const createLayoutSlice = (set) => ({
       const refineSpread = refining ? DEFAULT_SPREAD : 0;
       for (let n = 0; n < candidateCount; n++) {
         const rp = { ...state.layoutParams };
+        // #1857 — settled, exploring, look not held: the candidate is BASED on a look inside the
+        // narrowed pool, drawn off the press's own seeded stream. The base deals the composition
+        // (membership of a dealt candidate IS its composition — chapterNarrow) and the params the
+        // look declares, locked keys excepted; the dice then roll every unlocked key the look does
+        // NOT declare. Motion keys always roll: motion is the voice's axis, never taken from a look
+        // (the same discipline as lookPass's merge). The taste head still only ranks the finished
+        // candidates — it never filters the pool.
+        const base =
+          funnel && !refining && !held ? funnel.looks[Math.floor(rng() * funnel.looks.length)] : null;
+        if (base) {
+          rp.composition = base.id;
+          for (const [k, v] of Object.entries(base.params || {})) {
+            if (MOTION_KEYS.includes(k) || state.lockedParams[k]) continue;
+            rp[k] = v;
+          }
+        }
         for (const key of unlocked) {
+          // #1857 — a key the base look declares (and may speak for: non-motion) keeps the look's word.
+          if (base && !MOTION_KEYS.includes(key) && base.params && key in base.params) continue;
           if (refining) {
             rp[key] = mutateKey(key, state.layoutParams[key], rng, refineSpread);
           } else if (hasChain(key)) {
@@ -982,6 +1058,10 @@ export const createLayoutSlice = (set) => ({
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
         ...colour,
+        // #1857 — the advanced funnel commits with the press that advanced it (one undo step, like
+        // everything else this press does). No settled board, no field: the press leaves the
+        // narrowing record alone.
+        ...(funnel ? { kineticNotch: funnel.notch } : {}),
         layoutParams: landedParams,
         curatePress: press + 1,
         // Honest flag: if any chain had no row for the current value this press
@@ -1100,6 +1180,8 @@ export const createLayoutSlice = (set) => ({
         kineticLanding: null,
         // #1856 — and the escape closes the standing round, unsettled if it never settled (roundTable).
         kineticRound: closeStandingRound(state, 'chaos'),
+        // #1857 — CHAOS leaves the book, so the narrowing leaves with it (D3's implicit widening).
+        kineticNotch: null,
       };
     }),
 
@@ -1131,6 +1213,9 @@ export const createLayoutSlice = (set) => ({
         // #1856 — a fresh flip is the settled round's only honest exit: it closes (via 'flip') in the
         // same update, and the closed record stays inspectable until the next voice pass opens a round.
         kineticRound: closeStandingRound(state, 'flip'),
+        // #1857 — the flip ends the settled board, so its narrowing ends with it (D3: widening is
+        // implicit in the exits; the next settled round opens a fresh funnel at notch 0).
+        kineticNotch: null,
       };
       if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
@@ -1166,6 +1251,14 @@ export const createLayoutSlice = (set) => ({
       // and the automatic settle (D4). A kill's redeal overrides the layout and pool below.
       const round = runRound(state, r);
       spentCut = round.cut;
+      // #1857 — the narrowing rides beside the round: a NEW settled round opens a fresh narrowing at
+      // notch 0; an absorbed warm tap (runRound returned the standing record itself) or no round at
+      // all leaves the standing narrowing exactly as it was — narrowing reads the settled board, it
+      // never reopens a round (S3's absorb law, unchanged).
+      const kineticNotch =
+        round.kineticRound && round.kineticRound !== state.kineticRound
+          ? notchForRound(round.kineticRound)
+          : state.kineticNotch;
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1178,6 +1271,7 @@ export const createLayoutSlice = (set) => ({
         ...(round.enabledAssets ? { enabledAssets: round.enabledAssets } : {}),
         kineticVoiceId: r.voiceId,
         kineticRound: round.kineticRound,
+        kineticNotch,
         voiceMix: null,
         activeVoiceId: null,
       };
@@ -1211,6 +1305,8 @@ export const createLayoutSlice = (set) => ({
         kineticLanding: null,
         // #1856 — leaving the book through the opener closes the standing round (via 'opener').
         kineticRound: closeStandingRound(state, 'opener'),
+        // #1857 — the opener deals the whole book: no board stands, so no narrowing stands (D3).
+        kineticNotch: null,
       };
     }),
 
