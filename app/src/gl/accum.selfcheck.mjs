@@ -119,28 +119,67 @@ ok('spectral fade: per-channel half-lives derived from the FADE rate (#1800)', (
   assert.deepEqual(spectralKeep(0.8, [1, 1, 1]), [0.8, 0.8, 0.8]);
   // The recipe params derive the vec3 from the final scalar keep, once.
   assert.deepEqual(accumRecipeParams({ fade: 0.8 }).keepVec, spectralKeep(0.8));
+  // Re-pinned (was [1, 1, 1], 'LEAVE holds all channels'): TRAIL FADE off
+  // hands the fade to ACCUM FADE, so the vec3 derives from the ACCUM FADE
+  // keep (0.5) alone — Matt ruling 2026-10-31, #1910.
   assert.deepEqual(
     accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keepVec,
-    [1, 1, 1],
-    'LEAVE holds all channels',
+    spectralKeep(0.5),
+    'LEAVE with TRAIL FADE off derives its channels from the ACCUM FADE keep',
   );
 });
 
 ok('LEAVE composes the longer fade — ACCUM FADE included (#1894)', () => {
-  // Matt ruling 2026-10-31, #1894: LEAVE's keep is
+  // Matt ruling 2026-10-31, #1894: with TRAIL FADE on, LEAVE's keep is
   // max(1 − trailFade, 0.5^(1/accumFadeFrames)) — the `fade` input here is
-  // the ACCUM FADE keep (callers convert with halfLifeToKeep).
+  // the ACCUM FADE keep (callers convert with halfLifeToKeep). TRAIL FADE
+  // off is the #1910 handover, pinned in its own block below.
   const keep12f = 0.5 ** (1 / 12);
   const p = accumRecipeParams({ fade: keep12f, leave: true, leaveFade: 0.2 });
   assert.equal(p.keep, keep12f, 'ACCUM FADE 12f beats trail fade 0.2 in LEAVE');
   // The spectral vec3 derives from the composed scalar, once — the channels
   // can never disagree with the winning fade.
   assert.deepEqual(p.keepVec, spectralKeep(keep12f), 'keepVec follows the composed keep');
-  // The max() never shortens a hold: fastest ACCUM FADE + TRAIL FADE 0.
+  // Re-pinned (was 1, 'TRAIL FADE 0 holds exactly, whatever ACCUM FADE
+  // says'): TRAIL FADE off hands the fade to ACCUM FADE — the fastest
+  // ACCUM FADE keep (0.5) governs LEAVE alone. Matt ruling 2026-10-31,
+  // #1910. The full measured battery for the handover is the #1910 block
+  // below.
   assert.equal(
     accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keep,
-    1,
-    'TRAIL FADE 0 holds exactly, whatever ACCUM FADE says',
+    0.5,
+    'TRAIL FADE 0 hands the fade to ACCUM FADE',
+  );
+});
+
+ok('LEAVE with TRAIL FADE off: ACCUM FADE governs alone (#1910)', () => {
+  // Matt ruling 2026-10-31, #1910: in LEAVE, TRAIL FADE off
+  // (leaveFade = 0) hands the fade to ACCUM FADE — the keep is the ACCUM
+  // FADE keep alone, 0.5^(1/frames). Measured cases, not eyeballed.
+  assert.equal(
+    accumRecipeParams({ fade: 0.5 ** (1 / 12), leave: true, leaveFade: 0 }).keep,
+    0.5 ** (1 / 12),
+    'ACCUM FADE 12f is the LEAVE keep when TRAIL FADE is off',
+  );
+  assert.equal(
+    accumRecipeParams({ fade: 0.5 ** (1 / 5.4), leave: true, leaveFade: 0 }).keep,
+    0.5 ** (1 / 5.4),
+    'ACCUM FADE 5.4f (Matt’s reported state) is the LEAVE keep when TRAIL FADE is off',
+  );
+  // The spectral vec3 derives from the handed-over keep, once.
+  assert.deepEqual(
+    accumRecipeParams({ fade: 0.5 ** (1 / 12), leave: true, leaveFade: 0 }).keepVec,
+    spectralKeep(0.5 ** (1 / 12)),
+    'keepVec follows the handed-over keep',
+  );
+  // Both fades off: TRAIL FADE off hands over to an ACCUM FADE keep of 0,
+  // so the composition honestly yields keep 0 — the buffer holds nothing
+  // (each frame fully replaces). Pinned explicitly; no silent fall-out
+  // to the pre-#1910 hold of 1.
+  assert.equal(
+    accumRecipeParams({ fade: 0, leave: true, leaveFade: 0 }).keep,
+    0,
+    'both fades off: ACCUM FADE governs alone and says no hold — keep 0',
   );
 });
 

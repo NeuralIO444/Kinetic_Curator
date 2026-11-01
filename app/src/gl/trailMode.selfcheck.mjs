@@ -7,7 +7,10 @@ import { isLeave } from './trailMode.mjs';
 test('#560 Leave holds the stamps until its fade is raised', () => {
   const held = accumRecipeParams({ fade: 0.5, tunnel: 1, prism: 1, flow: 1, leave: true });
   assert.equal(held.leave, true);
-  assert.equal(held.keep, 1);
+  // Re-pinned (was 1): leaveFade defaults to 0 here, and TRAIL FADE off
+  // now hands the fade to ACCUM FADE, so the keep is the ACCUM FADE keep
+  // (0.5) alone — Matt ruling 2026-10-31, #1910.
+  assert.equal(held.keep, 0.5);
   assert.ok(held.flowUv > 0);
   assert.equal(isLeave('nope'), false);
 });
@@ -19,7 +22,10 @@ test('#560 accum still fades', () => {
 });
 
 test('#560 Leave fade is optional', () => {
-  assert.equal(accumRecipeParams({ leave: true, leaveFade: 0 }).keep, 1);
+  // Re-pinned (was 1): TRAIL FADE off hands the fade to ACCUM FADE, so
+  // with no fade input the keep is the recipe default 0.88 alone —
+  // Matt ruling 2026-10-31, #1910.
+  assert.equal(accumRecipeParams({ leave: true, leaveFade: 0 }).keep, 0.88);
   // Re-pinned (was 0.8): the default fade 0.88 is the longer fade here, so
   // it wins the LEAVE composition — Matt ruling 2026-10-31, #1894.
   assert.equal(accumRecipeParams({ leave: true, leaveFade: 0.2 }).keep, 0.88);
@@ -43,9 +49,10 @@ test('#1894 LEAVE takes the longer fade — ACCUM FADE works in LEAVE', () => {
   // reported state (trail 0.05 ≈ 13.5f half-life vs ACCUM FADE 12f) the
   // composed keep is the trail fade's 0.95, unchanged.
   assert.equal(accumRecipeParams({ fade: keep12f, leave: true, leaveFade: 0.05 }).keep, 0.95);
-  // The max() never shortens a hold: ACCUM FADE at its fastest (keep 0.5)
-  // with TRAIL FADE 0 still holds at exactly 1.
-  assert.equal(accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keep, 1);
+  // Re-pinned (was 1, "TRAIL FADE 0 still holds at exactly 1"): TRAIL
+  // FADE off hands the fade to ACCUM FADE, so ACCUM FADE at its fastest
+  // (keep 0.5) governs LEAVE alone — Matt ruling 2026-10-31, #1910.
+  assert.equal(accumRecipeParams({ fade: 0.5, leave: true, leaveFade: 0 }).keep, 0.5);
 });
 
 test('#560 tunnel prism and flow can fade in Leave', () => {
