@@ -509,6 +509,8 @@ node src/curator/mindPresence.selfcheck.mjs
 node src/curator/directorRoom.selfcheck.mjs
 node src/curator/directorPresence.selfcheck.mjs
 node src/curator/directorDebt.selfcheck.mjs
+node src/curator/fieldDirector.selfcheck.mjs
+node src/curator/fieldEval.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs

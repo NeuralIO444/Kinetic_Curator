@@ -8,6 +8,8 @@
 //
 // The traffic is one-way. The Director reads the honest feed only; no mind (Apple, the rules, a future local MegaMind)
 // ever moves a gain.
+//
+// FIELD (2026-10-31): poetId is included when a form is armed, null when silence. Still a readout only.
 import { DIRECTORS_MATRIX } from './directorsMatrix.js';
 
 /** Every verdict a room can carry (from the 20-room copy matrix). */
@@ -30,11 +32,12 @@ export function bandOf(level, directorPhase) {
 }
 
 /**
- * The event payload for one tick: { verdict, n, lois, davis, intensity, relaxing, phase }. Silence (no room) has a null
- * verdict and room. Deliberately built field by field from the tick: nothing else can ride along.
+ * The event payload for one tick: { verdict, n, lois, davis, intensity, relaxing, phase, poetId }. Silence (no room) has a null
+ * verdict and room. poetId is null when no form is armed. Deliberately built field by field from the tick: nothing else can ride along.
  */
 export function roomPayload(tick, phase = null) {
   const room = tick && tick.gains && tick.gains.room;
+  const poet = tick && tick.poet;
   return {
     verdict: room && ROOM_VERDICTS.includes(room.verdict) ? room.verdict : null,
     n: room && Number.isInteger(room.n) ? room.n : null,
@@ -43,6 +46,7 @@ export function roomPayload(tick, phase = null) {
     intensity: bandOf(tick && tick.intensity, tick && tick.directorPhase),
     relaxing: !!(tick && tick.directorPhase === 'relax'),
     phase: PHASES.includes(phase) ? phase : null,
+    poetId: poet && typeof poet.poetId === 'string' ? poet.poetId : null,
   };
 }
 

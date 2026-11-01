@@ -20,6 +20,10 @@
 // effectiveTemp. Runs on roll/keep/seed/evolve events (i.e. at pick time),
 // never in the live loop. Each tick that changes the room publishes `director:room` (directorRoom.js: a readout for
 // the personas' minds — no gains, no sway, no tilt). Nothing a mind answers ever comes back in.
+//
+// FIELD (2026-10-31, PR #1907): at pick time the pure fieldEval.step is called and the
+// chosen poet (or null for silence) is attached to the tick result and the room readout.
+// No live loop. No inventing candidates. Seeded RNG only.
 import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
@@ -50,6 +54,7 @@ import {
 } from './queenLean.mjs';
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
+import { step as fieldStep, INITIAL_STATE as FIELD_INITIAL } from './fieldEval.js';
 import { emit, Events } from '../composition/eventBus.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
@@ -334,7 +339,7 @@ function liveAudio() {
  * The stateful scheduler: intensity tracker, beat tracker, relax machine.
  * Tick it on roll/keep/seed/evolve events — never per frame.
  */
-export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
+export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng = null } = {}) {
   const intensity = createIntensityTracker({ now });
   const beats = createBeatTracker();
   let relaxUntil = 0;
@@ -346,13 +351,15 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
   let debt = 0; // pacing debt (#1145 part 3): honest LOIS transitions only, never serialized
   let owed = false;
   let lastLois = null;
+  let fieldState = { ...FIELD_INITIAL }; // FIELD (#1907): the pure field step's state, pick time only
+  const rng = typeof fieldRng === 'function' ? fieldRng : () => 0.5;
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
    *   feed: loisActivity.snapshot(); audio: 0..1 or null to read live;
    *   keep: a keep just landed (strong user action — ends relax early);
    *   phase: 'refine'|'explore'|null (#1144's interface; null = unmodulated).
-   * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax' }
+   * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax', sway, poet: { poetId, pieceId, layout } | null }
    */
   function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
     const face = resolveLoisFace(feed);
@@ -411,7 +418,21 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
       owed,
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
-    const result = { gains: out, intensity: level, directorPhase, sway };
+    // FIELD pure step (#1907) at pick time only. Silence when no decision.
+    const fieldResult = fieldStep(
+      fieldState,
+      { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false },
+      rng,
+    );
+    fieldState = fieldResult.nextState;
+    const poet = fieldResult.decision
+      ? {
+          poetId: fieldResult.decision.poetId,
+          pieceId: fieldResult.decision.pieceId,
+          layout: fieldResult.decision.layout,
+        }
+      : null;
+    const result = { gains: out, intensity: level, directorPhase, sway, poet };
     // #1145 × Mind: tell the bus which room this is (a readout; the publisher sends only changes and no gains)
     if (onRoom) {
       try {
@@ -448,6 +469,10 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     get pacing() {
       return { debt, owed };
     },
+    /** FIELD state as of the last tick, for the selfcheck (#1907). Never rendered. */
+    get fieldState() {
+      return fieldState;
+    },
     reset() {
       intensity.reset();
       debt = 0;
@@ -455,6 +480,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
       lastLois = null;
       relaxUntil = 0;
       lastCoolAt = now();
+      fieldState = { ...FIELD_INITIAL };
     },
   };
 }
