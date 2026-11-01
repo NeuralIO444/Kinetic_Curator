@@ -42,12 +42,20 @@ const eq = (a, b, msg) => {
 // ── 1. derivation pins — small chapters, read off the authored records ──────
 {
   const s = openNarrowing('marks', 'tally-keeper');
-  eq(s.genre, { keyword: 'linework', members: ['tally-keeper', 'dot-song', 'rain-marks'] }, 'tally-keeper narrows to linework');
+  eq(
+    s.genre,
+    { keyword: 'linework', members: ['tally-keeper', 'dot-song', 'rain-marks'] },
+    'tally-keeper narrows to linework',
+  );
   eq(s.hand, { keyword: 'stamps', members: ['tally-keeper'] }, 'the tally-keeper hand is the artist alone');
   eq(narrowDepth(s), 2, 'tally-keeper narrows twice');
 
   const fw = openNarrowing('marks', 'first-wall');
-  eq(fw.genre, { keyword: 'stamps', members: ['first-wall', 'tally-keeper', 'hand-cave'] }, 'first-wall narrows to stamps');
+  eq(
+    fw.genre,
+    { keyword: 'stamps', members: ['first-wall', 'tally-keeper', 'hand-cave'] },
+    'first-wall narrows to stamps',
+  );
   eq(fw.hand, { keyword: 'radial', members: ['first-wall', 'hand-cave'] }, 'the first-wall hand is the radial pair');
   eq(narrowDepth(fw), 2, 'first-wall narrows twice');
 
@@ -62,7 +70,11 @@ const eq = (a, b, msg) => {
   ok(narrow(sd) === sd, 'a press at the floor returns the identical object');
 
   const kf = openNarrowing('engraving', 'kunstformen');
-  eq(kf.genre, { keyword: 'linework', members: ['kunstformen', 'etched-colony', 'copperplate'] }, 'kunstformen narrows to linework');
+  eq(
+    kf.genre,
+    { keyword: 'linework', members: ['kunstformen', 'etched-colony', 'copperplate'] },
+    'kunstformen narrows to linework',
+  );
 
   const ww = openNarrowing('bauhaus', 'weaving-workshop');
   eq(ww.genre, null, 'weaving-workshop does not narrow — the bridge look’s keywords are whole-chapter or singleton');
@@ -103,10 +115,12 @@ for (const c of CHAPTERS) {
     // pools strictly shrink, the anchor is in every pool, no foreign member anywhere
     for (let n = 0; n < s.pools.length; n++) {
       ok(s.pools[n].includes(look.id), `${c.id}/${look.id}: the anchor is in pool ${n}`);
-      for (const id of s.pools[n]) ok(lookIds.has(id), `${c.id}/${look.id}: pool ${n} member ${id} belongs to the chapter`);
+      for (const id of s.pools[n])
+        ok(lookIds.has(id), `${c.id}/${look.id}: pool ${n} member ${id} belongs to the chapter`);
       if (n > 0) {
         ok(s.pools[n].length < s.pools[n - 1].length, `${c.id}/${look.id}: pool ${n} strictly narrows pool ${n - 1}`);
-        for (const id of s.pools[n]) ok(s.pools[n - 1].includes(id), `${c.id}/${look.id}: pool ${n} is a subset of pool ${n - 1}`);
+        for (const id of s.pools[n])
+          ok(s.pools[n - 1].includes(id), `${c.id}/${look.id}: pool ${n} is a subset of pool ${n - 1}`);
       }
     }
     // walk to the floor: presses past depth are refused identically
@@ -121,7 +135,10 @@ for (const c of CHAPTERS) {
     // widen back: every step restores the wider pool EXACTLY — the same frozen array
     while (cur.notch > NOTCH_CHAPTER) {
       cur = widen(cur);
-      ok(poolFor(cur) === seen[cur.notch], `${c.id}/${look.id}: widening to notch ${cur.notch} restores the exact pool`);
+      ok(
+        poolFor(cur) === seen[cur.notch],
+        `${c.id}/${look.id}: widening to notch ${cur.notch} restores the exact pool`,
+      );
     }
     ok(widen(cur) === cur, `${c.id}/${look.id}: widening at the chapter notch is refused (identical object)`);
     // a foreign look is in no pool, at any notch
@@ -152,7 +169,10 @@ ok(narrow(null) === null && widen(null) === null, 'transitions on no state are n
   const deckIds = chapterScopeDeck('marks', eff.scope).looks.map((l) => l.id);
   eq(poolFor(s, deckIds), poolFor(s), 'at the scope Marks deals at, the chapter pool is the deck’s looks');
   const hand = narrow(narrow(s));
-  ok(poolFor(hand, deckIds).every((id) => deckIds.includes(id)), 'the hand pool never leaves the dealt deck');
+  ok(
+    poolFor(hand, deckIds).every((id) => deckIds.includes(id)),
+    'the hand pool never leaves the dealt deck',
+  );
 
   const now = openNarrowing('now', 'praystation');
   const offDeck = chapterScopeDeck('now', 'off').looks.map((l) => l.id);
@@ -198,7 +218,11 @@ ok(narrow(null) === null && widen(null) === null, 'transitions on no state are n
 
   const s = narrow(narrow(openNarrowing('marks', 'tally-keeper')));
   const ctx = notchContextFor(s);
-  eq(ctx, { chapter: 'marks', level: 2, keyword: 'linework', anchor: 'tally-keeper' }, 'the context names chapter, level, keyword, anchor');
+  eq(
+    ctx,
+    { chapter: 'marks', level: 2, keyword: 'linework', anchor: 'tally-keeper' },
+    'the context names chapter, level, keyword, anchor',
+  );
   ok(isNotchContext(ctx), 'the machine’s own context validates');
 
   const row = ledgerRow({ ...base, notch: ctx }, '');
@@ -210,15 +234,28 @@ ok(narrow(null) === null && widen(null) === null, 'transitions on no state are n
 
   const garbled = ledgerRow({ ...base, notch: { chapter: 'nope', level: 2, keyword: 'x', anchor: 'y' } }, '');
   ok(!('notch' in garbled), 'a garbled notch context is dropped, never written');
-  const badLine = JSON.stringify({ ...plain, notch: { chapter: 'marks', level: 7, keyword: null, anchor: 'tally-keeper' } });
+  const badLine = JSON.stringify({
+    ...plain,
+    notch: { chapter: 'marks', level: 7, keyword: null, anchor: 'tally-keeper' },
+  });
   ok(!isLedgerRow(JSON.parse(badLine)), 'a claimed-but-impossible notch context fails the schema check');
   const skipped = parseLedger(badLine, () => {});
   eq(skipped.skipped, 1, 'the reader skips the bad line with a warning, never silently');
 
-  eq(sanitizeNotchContext({ chapter: 'marks', level: 0, keyword: null, anchor: 'first-wall' })?.level, 0, 'a chapter-level context is real');
-  eq(sanitizeNotchContext({ chapter: 'marks', level: 1, keyword: '', anchor: 'first-wall' }), null, 'an empty keyword is not a context');
+  eq(
+    sanitizeNotchContext({ chapter: 'marks', level: 0, keyword: null, anchor: 'first-wall' })?.level,
+    0,
+    'a chapter-level context is real',
+  );
+  eq(
+    sanitizeNotchContext({ chapter: 'marks', level: 1, keyword: '', anchor: 'first-wall' }),
+    null,
+    'an empty keyword is not a context',
+  );
   eq(notchContextFor(null), null, 'no state, no context');
 }
 
 assert.ok(checks > 0);
-console.log(`chapterNarrow.selfcheck: ok (${checks} checks — the notch machine: derivation pins, the exhaustive chapter × anchor battery, scope composition, labels, the ledger notch schema)`);
+console.log(
+  `chapterNarrow.selfcheck: ok (${checks} checks — the notch machine: derivation pins, the exhaustive chapter × anchor battery, scope composition, labels, the ledger notch schema)`,
+);
