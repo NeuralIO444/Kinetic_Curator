@@ -19,6 +19,10 @@ import { getPersonaTaste } from '../../curator/personaTastes.js';
 import { verdictDetent, voiceBreathS, voiceLevel, litPills } from '../../curator/topbarTaste.mjs';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { KineticButton } from './KineticButton.jsx';
+import { ChapterCard } from './ChapterCard.jsx';
+import { chapterDeckReadout } from '../../state/chapterWalk.mjs';
+import { dealableRecords } from '../../state/rollPool.mjs';
+import { ASSETS } from '../../data/assets/index.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
 import { useColdOpen } from '../../hooks/useColdOpen.js';
@@ -69,6 +73,14 @@ export function CuratorBar() {
   // performance situations that need a known first frame.
   const scope = sanitizeScope(useStore((s) => s.startupMode)); // #1772 — OFF / WEAK / MED / KOZ
   const readout = deckReadout(scope);
+  // #1855 — inside a chapter, the honest readout is what a tap can reach in THERE: the landed chapter's
+  // deck ∩ the scope deck (at the scope its deals are made — chapterWalk.mjs). No chapter, plain scope.
+  const chapterId = useStore((s) => s.kineticChapterId);
+  const customAssets = useStore((s) => s.customAssets);
+  const chapterReadout = useMemo(
+    () => (chapterId ? chapterDeckReadout(chapterId, scope, { records: dealableRecords(ASSETS, customAssets) }) : null),
+    [chapterId, scope, customAssets],
+  );
 
   // #1103 — every Curator roll (the button, and anything else that emits LAYOUT_CURATE) flashes CURATOR's full
   // name, then it cools down. Subscribed to the event, not the click, so a roll from anywhere is acknowledged.
@@ -195,14 +207,37 @@ export function CuratorBar() {
         className="tb-pill start-mode-btn act"
         data-mode={scope}
         onClick={() => emit(Events.STARTUP_MODE, { mode: nextScope(scope) })}
-        title={`START: ${SCOPE_LABEL[scope]} — ${SCOPE_HINT[scope]} A tap can reach ${readout.assets} shapes · ${readout.looks} looks · ${readout.voices} voices. Click for ${SCOPE_LABEL[nextScope(scope)]}.`}
-        aria-label={`Start scope ${SCOPE_LABEL[scope]}: ${readout.assets} shapes, ${readout.looks} looks, ${readout.voices} voices. Activate for ${SCOPE_LABEL[nextScope(scope)]}`}
+        title={
+          chapterReadout
+            ? `START: ${SCOPE_LABEL[scope]} — ${SCOPE_HINT[scope]} Inside ${chapterReadout.name} now: a tap can reach ${chapterReadout.assets} shapes · ${chapterReadout.looks} looks · ${chapterReadout.voices} voices of its deck${
+                chapterReadout.redealt
+                  ? ` — ${chapterReadout.name} has no deck at ${SCOPE_LABEL[scope]}, so its deals are made at ${SCOPE_LABEL[chapterReadout.dealtScope]} (the pill stays where you put it)`
+                  : ''
+              }. Click for ${SCOPE_LABEL[nextScope(scope)]}.`
+            : `START: ${SCOPE_LABEL[scope]} — ${SCOPE_HINT[scope]} A tap can reach ${readout.assets} shapes · ${readout.looks} looks · ${readout.voices} voices. Click for ${SCOPE_LABEL[nextScope(scope)]}.`
+        }
+        aria-label={
+          chapterReadout
+            ? `Start scope ${SCOPE_LABEL[scope]}, inside the ${chapterReadout.name} chapter: ${chapterReadout.assets} shapes, ${chapterReadout.looks} looks, ${chapterReadout.voices} voices${chapterReadout.redealt ? `, dealt at ${SCOPE_LABEL[chapterReadout.dealtScope]}` : ''}. Activate for ${SCOPE_LABEL[nextScope(scope)]}`
+            : `Start scope ${SCOPE_LABEL[scope]}: ${readout.assets} shapes, ${readout.looks} looks, ${readout.voices} voices. Activate for ${SCOPE_LABEL[nextScope(scope)]}`
+        }
       >
         <span className="tb-start-key">start: </span>
         {SCOPE_LABEL[scope]}
         <span className="tb-micro tb-start-deck" aria-hidden="true">
-          {readout.assets}·{readout.looks}·{readout.voices}
+          {chapterReadout
+            ? `${chapterReadout.assets}·${chapterReadout.looks}·${chapterReadout.voices}`
+            : `${readout.assets}·${readout.looks}·${readout.voices}`}
         </span>
+        {chapterReadout && (
+          <span
+            className="tb-micro tb-start-chapter"
+            data-redealt={chapterReadout.redealt ? 'true' : undefined}
+            aria-hidden="true"
+          >
+            {chapterReadout.name}
+          </span>
+        )}
       </button>
       <span className="tb-sep" aria-hidden="true" />
       {/* #942 — KINETIC: storm generator after the START toggle. */}
@@ -356,6 +391,8 @@ export function CuratorBar() {
       <BeatButton />
       {/* #1258 — the presence mark sits immediately right of BEATS. Never named: no title, no tooltip, no label. */}
       <SwayMark />
+      {/* #1855 — the landing card: fixed-position, shows only in the seconds after a cold flip lands. */}
+      <ChapterCard />
     </div>
   );
 }

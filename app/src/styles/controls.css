@@ -512,6 +512,77 @@
   font-variant-numeric: tabular-nums;
   letter-spacing: 0;
 }
+/* #1855 — the standing chapter's name rides the START pill next to its deck digits. When the chapter
+   re-dealt at a wider scope the name carries the accent underline: the deal moved, the pill didn't. */
+.start-mode-btn .tb-start-chapter {
+  color: var(--ink);
+  letter-spacing: 0.08em;
+}
+.start-mode-btn .tb-start-chapter[data-redealt="true"] {
+  text-decoration: underline dotted var(--accent) 1px;
+  text-underline-offset: 2px;
+}
+/* #1855 — the landing card: the chapter's S1 card, shown while the walk passes and while the landing
+   rests. Fixed under the top bar's left end; never in the bar's own flow (the row's order is law). */
+.chapter-card {
+  position: fixed;
+  top: 46px;
+  left: 10px;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 250ms ease;
+}
+.chapter-card.leaving {
+  opacity: 0;
+}
+.chapter-card-face {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 118px;
+  padding: 8px 10px 9px;
+  border: 1px solid;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+  animation: chapter-card-breathe 3.2s ease-in-out infinite;
+}
+.chapter-card-name {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.chapter-card-marks {
+  display: flex;
+  gap: 4px;
+}
+.chapter-card-glyph {
+  width: 26px;
+  height: 26px;
+}
+.chapter-card-swatches {
+  display: flex;
+  gap: 2px;
+}
+.chapter-card-swatches span {
+  width: 12px;
+  height: 4px;
+}
+@keyframes chapter-card-breathe {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chapter-card-face {
+    animation: none;
+  }
+}
 .curator-voice-wrap {
   position: relative;
 }
