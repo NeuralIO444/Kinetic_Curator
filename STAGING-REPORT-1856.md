@@ -369,5 +369,94 @@ wiring pass executing the map above, exactly as written:
 
 ## Verification (wiring pass)
 
-_(filled in at the end of the pass: wiring selfcheck, touched-file sweep,
-full manifest sweep, format:check, screenshots.)_
+- **New suite `state/roundWiring.selfcheck.mjs`** (manifest line after
+  `loisCut`): drives the real store — no-chapter voice pass opens no round;
+  rounds complete and settle inside the voice-pass update (log
+  `deal → judging → pass|cut → settle`); on a cut, the standing stage
+  composition IS the redealt look, the pool is exactly the chapter deck at
+  the dealt scope minus the killed look, the voice rides, and the feed's
+  CUT flag stands post-commit; a fresh flip closes via `'flip'` in the same
+  update; curator pass and stray voice pass leave the settled record
+  identical (===); CHAOS closes via `'chaos'`, the opener via `'opener'`.
+  The loop runs until 3 cuts and 3 passes have been seen live (8–9 rounds
+  per run, three consecutive green runs). **Live cut rate printed, not
+  pinned: 33–50% over wired rounds** (small samples, walk-weighted
+  chapters) against the isolated battery's 24% — reported here as feel
+  data per the standing order; no constant was tuned.
+- **`loisActivity.selfcheck`** gains the CUT-flag lifecycle block (set on
+  spend; cleared by the next roll and by a seed change). Green.
+- **Re-pin, one suite, cause named in the suite (D2, Matt 2026-10-31):**
+  `kineticSweep.selfcheck` §1's voice audit and §5b's glow law. The old
+  audit charged all structure/pool movement in the voice-pass update to
+  the voice; with the round sitting at that commit, a spent kill moves
+  structure *by ruling* — the suite failed reproducibly whenever its
+  measured sequence drew a cut (this was the wiring's own collision, NOT
+  the #1822 flake). §1 now branches on the round record: uncut, the
+  original assertions stand verbatim; cut, every moved key must be the
+  voice's own or the redealt look's params, the standing pool must be
+  coherent with the new look's pairing, and the record must name the
+  killed look. §5b attributes a glow move on a spent cut to the redealt
+  look (the same #1768 law). Nothing deleted — the audits now name *who*
+  moved what. kineticSweep: **0 failures in 12 consecutive runs** after
+  the re-pin. (§3's locks and §4's armed scope needed no amendment: the
+  redeal respects locked params, and under an armed MODE the executor's
+  hold trips the honesty guard, so no cut can land there — both verified
+  by those sections staying green across the sweep.)
+- **Touched-file sweep:** every suite naming a touched file was run —
+  chapterWalk, kineticScope, kineticSweep, kineticRoll, roundTable,
+  roundWiring, loisCut, loisActivity, loisFace, roomDither,
+  directorsMatrix, mindFace, mind, loisRank, loisJudge, loisTicker,
+  directorRoom, queenDeniability (7 — no Queen tokens in the wiring; the
+  sway stays hidden), swayMark, curate, davisState, director, phase,
+  refineMutate, roomWidth, stressLive, light, harmony, clock.inventory,
+  diceLanding, earnedVoices, firewall, layersPlusPattern, retiredEmoji,
+  fx/dither — all green.
+- **Full manifest sweep (559 lines): 557 pass / 2 fail** — the two proven
+  environmental suites, re-proven base-identical with my own eyes during
+  this pass: `swarmWasm` (no cargo in the sandbox) and `fx/rollSafety`
+  (node checks byte-identical ok on the pristine S2 base and on this
+  tree; the browser section dies in the shared harness on both). CI is
+  authoritative. `npm run format:check`: clean on the final tree.
+- **e2e sweep:** every spec mentioning LOIS/KINETIC surfaces was read for
+  a path to a spend: `room-codec.spec.js` (asserts `data-code`
+  VIBE/NOD) never runs a voice pass — its taps are favorites (`f`) — so
+  no cut can intervene; `roll-scope.spec.js` drives `kineticRoll` +
+  `kineticLookPass` only; `startup-chaos.spec.js` exercises the roll.
+  **No e2e re-pin needed and none skipped.**
+
+## Screenshots (wiring pass) — `~/workspace/kc-1856-shots/`
+
+Driven in the real app (vite build + Playwright route interception;
+taps are the performer's own K cadence; labels verified against the
+store's round record at the moment of the shot):
+
+- **`01-marks-round-cut.png`** — Marks: dealt **first-wall**, LOIS cut
+  ("Too close to the pile. Habit.", originality), redealt from the deck
+  minus first-wall; **tally-keeper** stands (the BUILD panel names it),
+  BONE DUST palette, MARKS card still up, pill `KOZ 18·5·8 MARKS`, and
+  the LOIS pill reads **CUT** in her red. (A debug transcript of a second
+  Marks round — hand-cave killed → dot-song — is in the build log.)
+- **`03-memphis-round-settled-cut.png`** — Memphis (movement chapter):
+  LOIS cut ("Too close to the pile. Habit."), redealt to
+  **confetti-flock**, settled; pill `KOZ 25·4·14 MEMPHIS`, LOIS · CUT.
+  (Named `03-` because the first driver session's `02-` Marks pass shot
+  was never taken — that session's walk simply never landed Marks in its
+  attempt budget, and its fallback label claimed a pass that hadn't
+  happened; the Marks evidence was re-driven honestly rather than
+  relabelled. No `02-` file exists.)
+- Both frames show the headless watchdog's PERF PAUSED pill re-tripped
+  during capture (the standing sandbox note) — the frames had already
+  drawn; the stage content is the settled piece.
+
+## Files (wiring pass)
+
+Created: `app/src/state/roundWiring.selfcheck.mjs`.
+Edited: `app/src/state/slices/layoutSlice.js` (imports, `runRound` +
+`closeStandingRound`, `kineticRound` field, the four action hooks),
+`app/src/curator/loisActivity.js` (the `cut` flag + `noteCut` + snapshot),
+`app/src/curator/loisActivity.selfcheck.mjs` (lifecycle block),
+`app/src/state/kineticSweep.selfcheck.mjs` (the D2 re-pin above),
+`app/selfcheck.manifest` (one line).
+Untouched: all one-writer files; the store's shape beyond the one session
+field; S4's narrowing (not built — the settled board is its input, as
+the map specifies).
