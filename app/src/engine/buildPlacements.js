@@ -720,11 +720,7 @@ export function buildPlacements({
     const fieldItems = new Array(fieldForm.stamps.length);
     for (let j = 0; j < fieldForm.stamps.length; j++) {
       const s = fieldForm.stamps[j];
-      const { color, accent } = assignColor(
-        { seed, index: soa.n + j, t: 0.5, seedOffsets },
-        palette,
-        strategy,
-      );
+      const { color, accent } = assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
       fieldItems[j] = {
         x: (s.x / fieldForm.aspect) * canvasW,
         y: s.y * canvasH,

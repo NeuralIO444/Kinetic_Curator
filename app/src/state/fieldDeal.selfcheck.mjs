@@ -55,7 +55,11 @@ ok('the deal replays: same (seed, press #) -> identical form', () => {
 
 ok('the form is HELD across a voice pass', () => {
   S().kineticVoicePass();
-  assert.equal(JSON.stringify(S().layoutParams.fieldForm), JSON.stringify(dealtForm), 'the voice pass leaves the form standing');
+  assert.equal(
+    JSON.stringify(S().layoutParams.fieldForm),
+    JSON.stringify(dealtForm),
+    'the voice pass leaves the form standing',
+  );
 });
 
 ok('a no-op press (everything locked) deals nothing and keeps the standing form', () => {

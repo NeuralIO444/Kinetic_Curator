@@ -37,12 +37,15 @@ const makeRng = (seed) => {
     for (const slowDebt of [0, 3, 6]) {
       for (let seed = 1; seed <= 40; seed++) {
         total++;
-        if (choosePoet({ intensity, slowDebt, rng: makeRng(seed * 131 + intensity * 1000), lastRejected: false })) armed++;
+        if (choosePoet({ intensity, slowDebt, rng: makeRng(seed * 131 + intensity * 1000), lastRejected: false }))
+          armed++;
       }
     }
   }
   assert.strictEqual(armed, total, 'without a rejection, the pick arms on every draw (no arming gate exists)');
-  console.log(`fieldSilence: pick grid without rejection — armed ${armed}/${total} (${((armed / total) * 100).toFixed(1)}%)`);
+  console.log(
+    `fieldSilence: pick grid without rejection — armed ${armed}/${total} (${((armed / total) * 100).toFixed(1)}%)`,
+  );
 
   let dampArmed = 0;
   let dampTotal = 0;
@@ -57,8 +60,13 @@ const makeRng = (seed) => {
     if (choosePoet({ intensity: 0.5, slowDebt: 0, rng, lastRejected: true })) dampArmed++;
   }
   const dampRate = dampArmed / dampTotal;
-  assert.ok(dampRate > 0.15 && dampRate < 0.45, `after a rejection, the damp arms at its design rate (~30%), measured ${(dampRate * 100).toFixed(1)}%`);
-  console.log(`fieldSilence: pick grid after rejection — armed ${dampArmed}/${dampTotal} (${((dampArmed / dampTotal) * 100).toFixed(1)}%)`);
+  assert.ok(
+    dampRate > 0.15 && dampRate < 0.45,
+    `after a rejection, the damp arms at its design rate (~30%), measured ${(dampRate * 100).toFixed(1)}%`,
+  );
+  console.log(
+    `fieldSilence: pick grid after rejection — armed ${dampArmed}/${dampTotal} (${((dampArmed / dampTotal) * 100).toFixed(1)}%)`,
+  );
 }
 
 // ── The shipped eval loop over its scenarios (the offline pick path) ─────
@@ -117,11 +125,19 @@ for (const name of Object.keys(SCENARIOS)) {
   assert.strictEqual(fieldCount(dish(params)), 0, 'unarmed room: zero FIELD stamps reach the dish');
 
   // A live decision from the real step function arms the chain end to end.
-  const { decision } = step({ ...INITIAL_STATE }, { intensity: 0.8, verdict: 'FULL BURN', rejected: false }, makeRng(99));
+  const { decision } = step(
+    { ...INITIAL_STATE },
+    { intensity: 0.8, verdict: 'FULL BURN', rejected: false },
+    makeRng(99),
+  );
   assert.ok(decision, 'the hot-room step deals a poet');
   const form = fieldFormForDeal(decision, mkRng(5));
   assert.ok(form, 'the dealt poet produces a form');
-  assert.strictEqual(fieldCount(dish({ ...params, fieldForm: form })), form.stamps.length, 'armed: every stamp reaches the dish');
+  assert.strictEqual(
+    fieldCount(dish({ ...params, fieldForm: form })),
+    form.stamps.length,
+    'armed: every stamp reaches the dish',
+  );
 }
 
 console.log('fieldSilence.selfcheck: all assertions passed');
