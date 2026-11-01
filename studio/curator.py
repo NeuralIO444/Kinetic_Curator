@@ -96,13 +96,14 @@ CHAPTER_MEMORY_VERSION = 1
 # The Book's spine, mirroring app/src/data/chapters.js CHAPTERS order.
 CHAPTER_IDS = ["marks", "engraving", "bauhaus", "swiss", "op-art",
                "japan", "memphis", "grunge", "now"]
-# D5 — UNRULED (Matt's decision, one at a time): recency-weighted memory
-# (she tracks the current period) vs canon (she tracks all-time taste). The
-# machinery is one parameter, declared here and recorded in every file it
-# shapes: the half-life below, in days; None = canon. THIS VALUE IS A
-# PLACEHOLDER, not a ruling — the ruling changes this default and nothing
-# else. --memory / --memory-half-life-days override it per train.
-HISTOGRAM_RECENCY_HALF_LIFE_DAYS = 14.0
+# D5 — RULED (Matt, 2026-11-01): CANON. She tracks all-time taste; a dead
+# era's lean never fades (the absorption trap was shown to him with the
+# suite's numbers — ~40% of long-run landings — and he chose canon anyway).
+# The machinery is one parameter, declared here and recorded in every file
+# it shapes: the half-life below, in days; None = canon. The ruled default
+# is None. --memory / --memory-half-life-days override it per train
+# (recency remains available as a trainer option, not the standing law).
+HISTOGRAM_RECENCY_HALF_LIFE_DAYS = None
 NOTCH_LEVELS = (0, 1, 2)  # chapterNarrow.mjs NOTCH_CHAPTER..NOTCH_HAND
 CHAPTER_MEMORY_FIXTURE = HERE.parent / "app" / "src" / "curator" / "chapterMemory.fixture.json"
 
