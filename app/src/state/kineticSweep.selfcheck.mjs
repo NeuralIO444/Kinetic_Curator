@@ -69,11 +69,34 @@ const snap = () => {
   const dVoice = paramDiff(b.lp, c.lp);
   const voice = VOICE_DECK.find((v) => v.id === S().kineticVoiceId);
   assert.ok(voice, 'VOICE deals one of the dealt voices');
-  assert.ok(dVoice.every(VOICE_OK), `VOICE moved structure: ${dVoice.filter((k) => !VOICE_OK(k))}`);
-  if (!voice.accumulation)
-    assert.ok(!dVoice.some((k) => ACCUM_KEYS.includes(k)), 'a voice without ACCUM never deals the glow');
-  assert.equal(c.assets, b.assets, 'VOICE keeps the pool (the look owns the shapes)');
-  assert.equal(c.lp.composition, b.lp.composition, 'VOICE keeps the look');
+  // #1856 re-pin (cause: D2 — LOIS's kill, Matt 2026-10-31): the voice-pass commit is also where the
+  // round sits (BOOK S3). If LOIS spent her one cut, the look was killed and redealt inside the same
+  // update, and the structure / pool / composition movement is the KILL's — the audit now proves the
+  // attribution against the round record instead of charging it to the voice. When no cut was spent,
+  // the original audit stands exactly as written.
+  const round = S().kineticRound;
+  if (round?.cut) {
+    assert.equal(round.cut.before.lookId, b.lp.composition, 'the kill names the look the LOOK pass dealt');
+    assert.equal(round.deal.lookId, c.lp.composition, 'the standing look is the redealt hand');
+    assert.notEqual(c.lp.composition, b.lp.composition, 'the killed look does not stand');
+    const newLook = COMPOSITION_PRESETS.find((p) => p.id === c.lp.composition);
+    const killKeys = new Set([...Object.keys(newLook.params), 'composition']);
+    assert.ok(
+      dVoice.every((k) => VOICE_OK(k) || killKeys.has(k)),
+      `VOICE+KILL moved an unnamed key: ${dVoice.filter((k) => !VOICE_OK(k) && !killKeys.has(k))}`,
+    );
+    const poolIds = Object.keys(S().enabledAssets).filter((k) => S().enabledAssets[k]);
+    assert.ok(
+      poolIds.every((id) => newLook.categories.includes(recById.get(id).category)),
+      `the redealt pool is coherent with ${newLook.id}'s pairing`,
+    );
+  } else {
+    assert.ok(dVoice.every(VOICE_OK), `VOICE moved structure: ${dVoice.filter((k) => !VOICE_OK(k))}`);
+    if (!voice.accumulation)
+      assert.ok(!dVoice.some((k) => ACCUM_KEYS.includes(k)), 'a voice without ACCUM never deals the glow');
+    assert.equal(c.assets, b.assets, 'VOICE keeps the pool (the look owns the shapes)');
+    assert.equal(c.lp.composition, b.lp.composition, 'VOICE keeps the look');
+  }
   assert.notEqual(c.palette, b.palette, 'VOICE deals a palette');
   assert.equal(c.undo, b.undo + 1, 'VOICE = one undo step');
 
@@ -195,9 +218,15 @@ const snap = () => {
   S().setLayoutParam('accumulationOptics', 0.07);
   for (let i = 0; i < 20; i++) {
     const before = S().layoutParams.accumulationOptics;
+    const roundBefore = S().kineticRound;
     S().kineticVoicePass();
     const v = VOICE_DECK.find((x) => x.id === S().kineticVoiceId);
-    if (!v.accumulation) assert.equal(S().layoutParams.accumulationOptics, before, `${v.id}: no ACCUM, glow held`);
+    // #1856 (cause: D2, Matt 2026-10-31): if this pass sat a round and LOIS spent her cut, a glow move
+    // is the redealt LOOK's (looks deal the glow under the same #1768 law), not the voice's — the
+    // voice's own law is asserted on every pass where no cut was spent.
+    const spentCut = S().kineticRound !== roundBefore && !!S().kineticRound?.cut;
+    if (!v.accumulation && !spentCut)
+      assert.equal(S().layoutParams.accumulationOptics, before, `${v.id}: no ACCUM, glow held`);
   }
 }
 
