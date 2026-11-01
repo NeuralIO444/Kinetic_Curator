@@ -36,7 +36,7 @@ await ok('every room of the matrix resolves to a known verdict; the five verdict
     }
 });
 
-await ok('the payload is a readout: room, band, relaxing, phase — no gain, temperature, sway or tilt', () => {
+await ok('the payload is a readout: room, band, relaxing, phase, poetId — no gain, temperature, sway or tilt', () => {
   const g = directorGains({ loisCode: 'BURN', davisCode: 'FLOW', phase: 'explore' });
   const p = roomPayload(
     { gains: g, intensity: 0.9, directorPhase: 'peak', sway: { temperatureDelta: 0.1 } },
@@ -50,6 +50,7 @@ await ok('the payload is a readout: room, band, relaxing, phase — no gain, tem
     intensity: 'peak',
     relaxing: false,
     phase: 'explore',
+    poetId: null, // #1907: the payload gained the poet readout (null = silence)
   });
   const text = JSON.stringify(p);
   assert.ok(
@@ -58,7 +59,7 @@ await ok('the payload is a readout: room, band, relaxing, phase — no gain, tem
   );
   assert.deepEqual(
     roomPayload({ gains: directorGains({}), intensity: 0.1, directorPhase: 'build' }),
-    { verdict: null, n: null, lois: null, davis: null, intensity: 'low', relaxing: false, phase: null },
+    { verdict: null, n: null, lois: null, davis: null, intensity: 'low', relaxing: false, phase: null, poetId: null },
     'silence',
   );
   assert.equal(bandOf(0.2, 'build'), 'low');
@@ -104,6 +105,7 @@ await ok(
       'lois',
       'n',
       'phase',
+      'poetId',
       'relaxing',
       'verdict',
     ]);

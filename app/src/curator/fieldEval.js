@@ -1,7 +1,7 @@
 // fieldEval.js — pure step function + offline eval loop for the Director / FIELD.
 // Deterministic. No live path. No inventing candidates. Seeded RNG only.
 
-import { choosePoet, nextSlowDebt, preferredNext, POETS } from './fieldDirector.js';
+import { choosePoet, nextSlowDebt, preferredNext } from './fieldDirector.js';
 
 export const INITIAL_STATE = Object.freeze({
   intensity: 0.5,
@@ -41,8 +41,8 @@ export function step(state, input, rng) {
 
 /** Scenario generators. Pure. */
 export const SCENARIOS = {
-  steadyCool: (i) => ({ intensity: 0.2, verdict: 'AGREEMENT', rejected: false }),
-  steadyHot: (i) => ({ intensity: 0.8, verdict: 'FULL BURN', rejected: false }),
+  steadyCool: () => ({ intensity: 0.2, verdict: 'AGREEMENT', rejected: false }),
+  steadyHot: () => ({ intensity: 0.8, verdict: 'FULL BURN', rejected: false }),
   hotStreak: (i) => ({
     intensity: i < 12 ? 0.85 : 0.4,
     verdict: i < 12 ? 'FULL BURN' : 'THE ROOM',

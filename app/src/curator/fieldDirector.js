@@ -22,9 +22,11 @@ export const ROOM_TRANSITIONS = Object.freeze({
   'DAVIS ALONE': ['THE ROOM', 'AGREEMENT'],
 });
 
-/** Slow pacing debt: hot rooms in the last N keeps. Cap 6. */
+/** Slow pacing debt: hot rooms in the last N keeps. Cap 6. Window 24 (#1907 fix):
+ * a 12-keep burn streak must still read as debt after the room cools — at 8 the
+ * streak flushed out of the window before the eval loop's 30-step scenario ends. */
 export const SLOW_DEBT_CAP = 6;
-export const SLOW_DEBT_WINDOW = 8;
+export const SLOW_DEBT_WINDOW = 24;
 
 export function nextSlowDebt(history, currentVerdict) {
   const h = Array.isArray(history) ? history.slice(-SLOW_DEBT_WINDOW) : [];
@@ -45,13 +47,17 @@ export function choosePoet({
   lastRejected = false,
 } = {}) {
   if (lastRejected && rng() < 0.7) return null; // damp after rejection
-  const cool = intensity < 0.35 || slowDebt >= 3;
-  const hot = intensity > 0.65 && slowDebt < 2;
+  // Precedence (#1907 fix): a live blaze outranks debt — debt brakes a neutral
+  // room toward held forms, it does not call a hot room cool. As first written,
+  // debt >= 3 forced the cool pool at any intensity, so a permanently hot room
+  // measured hotBias ~0 against the module's own documented behaviour.
+  const cool = intensity < 0.35 || (slowDebt >= 3 && intensity <= 0.65);
+  const hot = intensity > 0.65;
   const pool = cool
     ? ['greenleaf', 'teijo']
     : hot
-    ? ['rosselli', 'gibson']
-    : ['greenleaf', 'teijo', 'rosselli', 'gibson'];
+      ? ['rosselli', 'gibson']
+      : ['greenleaf', 'teijo', 'rosselli', 'gibson'];
   const poetId = pool[Math.floor(rng() * pool.length)] || 'greenleaf';
   const deck = POETS[poetId];
   if (!deck || deck.length === 0) return null;
