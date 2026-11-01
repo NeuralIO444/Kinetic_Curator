@@ -106,17 +106,82 @@ standing law (fidelity untouched). D5/D6 are UNRULED — see "Where D5/D6 sit" b
   the app's book line: "which memory the Queen is playing from" is data, per the issue's KC-1 DS note).
   Canon is the same machinery at half-life = None. The ruling changes a default value only → **no stop
   was needed**; the exact decision for Matt is recorded at the end of this report.
-- **D6 (the grudge's decay half-life)** — machinery built, application OFF: `decayedCounts(tally, now,
-  halfLifeMs)` is a pure function proven by tests with fixture half-lives; the standing constant
-  `GRUDGE_DECAY_HALF_LIFE_MS = null` (null = no decay applied) is what the live snapshot reads. The
-  absorption acceptance pair is built the same way: the trap is proven with decay off (canon fixture),
-  re-entry with decay on at the fixture's declared half-life, the horizon computed from that declared
-  value — never from a magic number. The ruling changes a constant only → **no stop was needed**.
+- **D6 (the grudge's decay half-life)** — machinery built, application OFF: `decayedWeight(timestamps,
+  at, halfLifeMs)` is a pure function, and `snapshot({ halfLifeMs })` judges the permaban on decayed
+  weights when given one — both proven by tests with a test half-life (one day, explicitly not a ruling).
+  The standing constant `GRUDGE_DECAY_HALF_LIFE_MS = null` (null = no decay applied) is what the live
+  snapshot reads, and the suite pins that a standing snapshot never ages a cut. The ruling changes a
+  constant only → **no stop was needed**. (The absorption acceptance pair belongs to D5's side: the
+  trap with the canon fixture, re-entry with the recency fixture at its declared 14-day half-life, the
+  horizon — 6 half-lives, era weight ≤ 1/32 — asserted on the extension itself, never a magic number.)
 
-## Verification (filled in at the end)
+## Verification (run on the final tree, 2026-11-01)
 
-- (pending)
+- **New suites**: `chapterMemory.selfcheck` ok (boundary drop-on-bad ×9 malformed shapes, cap/floor
+  cross-pins vs queenLean by value, trainer CHAPTER_IDS mirror pin, walk direction sim, absorption
+  pair: canon grunge 39.6% of long-run landings ≥ 35% trap bound; recency grunge 18.0% < 30% and
+  engraving out-lands it; horizon ≤ 1/32 asserted on the extension). `loisGrudge.selfcheck` ok
+  (tally by genre incl. chapter grain, permaban floor+share, overrule reset with record preserved,
+  decay machinery with a test half-life, standing snapshot never ages a cut).
+- **Targeted suites** (every suite naming a touched file, run directly): 12/12 ok — queenDeniability
+  (the hidden-sway law holds: no new imports of the hidden modules, no /queen/i on surfaces,
+  no sway*/queen*/lean_* keys in state), chapterWalk, tasteHead, chapterNarrow, chapterNarrowWiring,
+  roundWiring, loisCut, loisActivity, tasteLedger, favorites, bundleParts, bundleFile. **Zero re-pins**:
+  the no-lean/no-extension paths are byte-identical to S2/S4 behaviour by construction.
+- **Python**: `python3 studio/curator.py selfcheck` → "chapter memory check OK" / "curator selfcheck OK"
+  (the numpy/sklearn taste-train section skips in this sandbox by design; its --ledgers assertions run
+  where sklearn exists). `py_compile` ok.
+- **Format**: `npm run format:check` in app/ → "All matched files use Prettier code style!" (the two
+  new suites needed one --write pass; re-verified green after).
+- **e2e grep**: no spec references the new surfaces; the one spec on the neighbouring surface
+  (`e2e/taste-experimental.spec.js`) locates only `.taste-status`, untouched by the two added lines.
+- **Full manifest sweep** (continue-on-error loop over `app/selfcheck.manifest`, 566 suites), final
+  line verbatim: `SWEEP DONE total=566 pass=563 fail=3`. The three failures, each proven environmental:
+  - `engine/kernel/bake/swarmWasm` — log: "build-wasm: cargo not found on PATH" (no Rust in sandbox).
+  - `fx/rollSafety` — pure sections all [ok], then the shared-harness Chromium crash (known sandbox
+    environmental; CI's selfcheck-browser job is authoritative).
+  - `gl/accum` — native abort under in-sweep memory load; standalone re-run with
+    `NODE_OPTIONS=--max-old-space-size=3072` exits 0. This build touches no gl code.
+  (The first sweep attempt was lost when the sandbox wiped /tmp mid-run; the sweep was re-run whole
+  with logging outside /tmp — the numbers above are from the completed run.)
 
-## Files touched (filled in at the end)
+## Files touched
 
-- (pending)
+**New**
+- `app/src/curator/chapterMemory.mjs` — extension validation, lean derivation, backstage line.
+- `app/src/curator/chapterMemory.fixture.json` — the shared trainer↔runtime fixture (literal weights).
+- `app/src/curator/chapterMemory.selfcheck.mjs` — boundary, bounds, walk direction, absorption pair.
+- `app/src/curator/loisGrudge.mjs` — the grudge tally (+ `decayedWeight`, `grudgeSummary`).
+- `app/src/curator/loisGrudge.selfcheck.mjs` — tally, permaban, overrule reset, decay-off law.
+- `STAGING-REPORT-1858.md` — this report.
+
+**Edited**
+- `studio/curator.py` — `build_chapter_memory` + `--ledgers` / `--memory` / `--memory-half-life-days`,
+  inspect line, selfcheck section ("chapter memory check OK").
+- `studio/mlx_run.py` — phase 2 forwards `--ledgers` so the trained taste.json carries the extension.
+- `app/src/curator/tasteHead.js` — validateTaste carries a validated `chapters` section (drop-on-bad).
+- `app/src/state/chapterWalk.mjs` — `chapterWeights(visits, lean)` / `dealLanding(…, lean)`, cap clamped
+  at the point of application; no-lean shape byte-identical to S2.
+- `app/src/state/slices/layoutSlice.js` — landing reads the lean fresh from the imported taste; the
+  round's spent cut also feeds the grudge tally (post-commit, beside `loisActivity.noteCut()`).
+- `app/src/state/slices/davisSlice.js` — both keep doors note the keep to the grudge (overrule check).
+- `app/src/state/slices/globalSlice.js` — `bookStatus` refreshed at the four taste sites.
+- `app/src/panels/pipeline/DataExportRow.jsx` — book-memory line + grudge line under the lois line.
+- `app/selfcheck.manifest` — the two new suites registered.
+
+**Explicitly NOT touched** — the one-writer files (`gl/liveLoop.mjs`, `gl/liveResolve.mjs`,
+`particles.js`); the fidelity law and every head gate; the Queen's hidden modules and their bounds
+(cross-pinned by value only); the ledger row format (the S4 stamp is consumed, never amended).
+
+## Decisions for Matt (one at a time — nothing here blocks the machinery)
+
+- **D5 — the Queen's memory.** Options: **recency** (a declared half-life; the season she plays from is
+  the current one; the standing placeholder is 14.0 days) vs **canon** (all-time; a dead era's lean
+  never fades — the absorption trap is proven real in the suite: ~40% of long-run landings in the dead
+  era after novelty spends). Recommendation: **recency**, with the half-life itself as the feel knob.
+- **D6 — the grudge's decay half-life.** Options: a half-life in ms (the ban softens as cuts age) vs
+  **null** (standing: no decay — a ban stands until a keep overrules it). Recommendation: rule it after
+  living with the tally a while; the overrule already gives the performer the release valve.
+- **Feel-check flags (not decisions the build needed):** the permaban thresholds (5 cuts / 0.5 share)
+  are builder machinery values; the histogram is gated on its own counted-keeps floor, not on head
+  fidelity (it is data, not a head — the 0.3 fidelity law is untouched and still gates the heads).
