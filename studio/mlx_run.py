@@ -253,9 +253,15 @@ def phase2(p, args):
     elif p.run("embed", [sys.executable, "studio/curator.py", "embed", str(pool)]) is None:
         return
     # 5. train -> taste.json (probe + distilled head)
-    out = p.run("train", [sys.executable, "studio/curator.py", "train",
-                          "--index", str(index), "--labels", "labels.json",
-                          "--features", "features.json", "--out", "taste.json"])
+    # #1858 — with --ledgers, the chapter histograms ride in from the same
+    # ledgers (curator.py train --ledgers): the taste.json carries the
+    # chapters extension alongside the head.
+    train_cmd = [sys.executable, "studio/curator.py", "train",
+                 "--index", str(index), "--labels", "labels.json",
+                 "--features", "features.json", "--out", "taste.json"]
+    if args.ledgers:
+        train_cmd += ["--ledgers", str(Path(args.ledgers).resolve())]
+    out = p.run("train", train_cmd)
     if out is None:
         return
     m1, m2 = AUC_RE.search(out), FID_RE.search(out)
