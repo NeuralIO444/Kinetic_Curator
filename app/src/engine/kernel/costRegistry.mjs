@@ -327,6 +327,26 @@ registerCostTier('beast/trails', {
     'BEAST S5 signature trail deposits. Pure CPU (curve -> fading segments); like beast/solver it sheds with the creature/deposit budget, NOT the governor perfTier1 cut — tier 1 is exactly the GL pass set that mechanism covers, so a CPU deposit does not belong in it. Fallback to plain fading graphic when wet field is unavailable.',
 });
 
+// --- BEAST S3 (#1866) — APPEND-ONLY BLOCK ---
+// The drawn beast: the third builder's append at the standing 4-creature
+// cap (4 wild-type beasts × 12 legs = 964 stamp items/frame: 12 bars +
+// 8 nodes per leg, plus the body beam). timeMs is MEASURED, builder-only
+// bench (the creature/alife method): per-frame median of 600 warm frames,
+// median of 7 runs, sandbox node 2026-11-01 — append 0.271 ms total, of
+// which the S2 solver leaf is 0.022 ms (48 poses), so the drawing itself
+// is 0.249 ms. (The beast/solver entry above declares 0.08 as an estimate;
+// the same bench measures the leaf at 0.022 — its block is S2's, left as
+// declared.) Sandbox-indicative only; real hardware authoritative.
+// No GPU pass: items ride the structural item pass like both families.
+// Sheds by the governor creatureCount cut, never the effect ladder.
+registerCostTier('beast/draw', {
+  tier: 0,
+  memoryBytes: 0,
+  timeMs: 0.25,
+  notes:
+    'BEAST S3 drawn beast at the 4-creature cap: bar/node stamp items built on the resolver CPU (964 items/frame at cap). Measured sandbox builder bench (see block comment); sheds with the creature count.',
+});
+
 // --- FIELD poet choice (curator/fieldDirector.js) — APPEND-ONLY BLOCK ---
 // Pure pick-time function. No GPU pass, no live loop, no per-frame cost.
 // Tier 0 (structural to the Director's pick). timeMs is an estimate.
