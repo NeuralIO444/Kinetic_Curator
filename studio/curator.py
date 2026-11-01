@@ -84,6 +84,124 @@ HEAD_MIN_FIDELITY = 0.3
 TERM_SKIP = {"v", "cast", "castSize", "num"}
 TERM_FIXTURE = HERE.parent / "app" / "src" / "curator" / "tasteTerms.fixture.json"
 
+# ── #1858 (BOOK S5) chapter memory: per-chapter keep/pass histograms ─────
+#
+# The repeated game, trainer-side. Ledger rows (keeps.jsonl / passes.jsonl)
+# whose notch stamp (BOOK S4, app/src/state/chapterNarrow.mjs) names a real
+# chapter are chapter evidence; rows without a stamp are not — attribution is
+# recorded in the app, never inferred here from the recipe. The histograms
+# distil into the taste file as an additive, versioned extension
+# (taste["chapters"]); a file without it is a v1 file exactly as before.
+CHAPTER_MEMORY_VERSION = 1
+# The Book's spine, mirroring app/src/data/chapters.js CHAPTERS order.
+CHAPTER_IDS = ["marks", "engraving", "bauhaus", "swiss", "op-art",
+               "japan", "memphis", "grunge", "now"]
+# D5 — UNRULED (Matt's decision, one at a time): recency-weighted memory
+# (she tracks the current period) vs canon (she tracks all-time taste). The
+# machinery is one parameter, declared here and recorded in every file it
+# shapes: the half-life below, in days; None = canon. THIS VALUE IS A
+# PLACEHOLDER, not a ruling — the ruling changes this default and nothing
+# else. --memory / --memory-half-life-days override it per train.
+HISTOGRAM_RECENCY_HALF_LIFE_DAYS = 14.0
+NOTCH_LEVELS = (0, 1, 2)  # chapterNarrow.mjs NOTCH_CHAPTER..NOTCH_HAND
+CHAPTER_MEMORY_FIXTURE = HERE.parent / "app" / "src" / "curator" / "chapterMemory.fixture.json"
+
+
+def _ledger_ts(ts):
+    """A ledger row's ISO timestamp as an aware UTC datetime, or None.
+
+    The app writes full epoch ISO (captureFavorite); anything else — legacy
+    time-of-day strings, garbage — is unreadable as an age and returns None.
+    """
+    if not isinstance(ts, str) or not ts:
+        return None
+    try:
+        dt = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return dt if dt.tzinfo is not None else dt.replace(tzinfo=timezone.utc)
+
+
+def _notch_stamp(row):
+    """(chapter, level) a ledger row honestly claims, or None.
+
+    Mirrors the app's isNotchContext on the two fields the histogram reads:
+    the chapter must be one of the Book's nine, the level a real notch.
+    """
+    n = row.get("notch") if isinstance(row, dict) else None
+    if not isinstance(n, dict):
+        return None
+    ch, lvl = n.get("chapter"), n.get("level")
+    if ch not in CHAPTER_IDS:
+        return None
+    if not isinstance(lvl, int) or isinstance(lvl, bool) or lvl not in NOTCH_LEVELS:
+        return None
+    return ch, lvl
+
+
+def chapter_row_weight(ts, now, half_life_days) -> float:
+    """One row's vote in the histogram: canon weighs every row 1; recency
+    weighs it 0.5 ** (age / half-life). A row stamped in the future weighs
+    as fresh — never more than 1."""
+    if half_life_days is None:
+        return 1.0
+    age_days = (now - ts).total_seconds() / 86400.0
+    return 1.0 if age_days <= 0 else 0.5 ** (age_days / half_life_days)
+
+
+def build_chapter_memory(keeps, passes, *, half_life_days=HISTOGRAM_RECENCY_HALF_LIFE_DAYS,
+                         now=None) -> dict | None:
+    """Ledger rows -> the taste file's `chapters` extension, or None when no
+    row carries chapter evidence (the file then stays exactly a v1 file).
+
+    totals are RAW counted rows (the runtime's identity floor reads them);
+    byChapter / byNotch are the weighted sums the walk's rates derive from.
+    A stamped row whose timestamp cannot be read cannot be aged, so it is
+    not counted at all — an honest skip, never an invented age.
+    """
+    if half_life_days is not None and half_life_days <= 0:
+        raise ValueError("half-life must be positive, or None for canon")
+    now = now or datetime.now(timezone.utc)
+    by_chapter: dict = {}
+    by_notch: dict = {}
+    totals = {"keeps": 0, "passes": 0}
+    for kind, rows in (("keeps", keeps), ("passes", passes)):
+        for r in rows or []:
+            stamp = _notch_stamp(r)
+            if stamp is None:
+                continue
+            ts = _ledger_ts(r.get("timestamp"))
+            if ts is None:
+                continue
+            ch, lvl = stamp
+            w = chapter_row_weight(ts, now, half_life_days)
+            totals[kind] += 1
+            by_chapter.setdefault(ch, {"keeps": 0.0, "passes": 0.0})[kind] += w
+            by_notch.setdefault(ch, {}).setdefault(str(lvl), {"keeps": 0.0, "passes": 0.0})[kind] += w
+    if not totals["keeps"] and not totals["passes"]:
+        return None
+    rnd = lambda v: round(float(v), 6)  # noqa: E731 — the file's weight convention
+    clean = lambda d: {k: {"keeps": rnd(v["keeps"]), "passes": rnd(v["passes"])}
+                       for k, v in sorted(d.items())}  # noqa: E731
+    return {
+        "version": CHAPTER_MEMORY_VERSION,
+        "memory": {"kind": "canon" if half_life_days is None else "recency",
+                   "halfLifeDays": None if half_life_days is None else rnd(half_life_days)},
+        "totals": totals,
+        "byChapter": clean(by_chapter),
+        "byNotch": {ch: clean(levels) for ch, levels in sorted(by_notch.items())},
+    }
+
+
+def attach_chapter_memory(taste, keeps, passes, *,
+                          half_life_days=HISTOGRAM_RECENCY_HALF_LIFE_DAYS, now=None):
+    """#1858 — fold the chapter histograms into a built taste (attach_lois's
+    pattern: an optional section, present only when it has something to say)."""
+    cm = build_chapter_memory(keeps, passes, half_life_days=half_life_days, now=now)
+    if cm is not None:
+        taste["chapters"] = cm
+    return taste
+
 
 def feature_terms(features: dict) -> list[str]:
     """#762 — the ONE term rule (mirrored by app/src/curator/tasteHead.js).
@@ -425,6 +543,8 @@ def cmd_train(a) -> None:
     if out.suffix == ".npz":  # legacy format, still readable by rank/similar
         if a.bold:
             sys.exit("legacy .npz cannot carry the Lois probe — write taste.json")
+        if a.ledgers:
+            sys.exit("legacy .npz cannot carry the chapter memory — write taste.json")
         np.savez(out, w=clf.coef_[0].astype("float32"),
                  b=np.float32(clf.intercept_[0]), model=idx["model"], n=len(y),
                  cv_acc=stats["acc"], cv_auc=stats["auc"], baseline=stats["baseline"])
@@ -449,6 +569,28 @@ def cmd_train(a) -> None:
             if lh:
                 print(f"  lois head fidelity {lh['fidelity']:.3f}")
                 print(f"  lois {describe_head(lh)}")
+        if a.ledgers:
+            # #1858 — the chapter histograms ride in from the same ledgers
+            # hits_bridge turns into labels (its reader, reused whole: a row
+            # the bridge would skip never reaches the histogram either).
+            from hits_bridge import read_ledgers
+
+            keeps_rows, passes_rows = read_ledgers(Path(a.ledgers))
+            hl = None if a.memory == "canon" else a.memory_half_life_days
+            if hl is not None and hl <= 0:
+                sys.exit("--memory-half-life-days must be positive (or use --memory canon)")
+            attach_chapter_memory(taste, keeps_rows, passes_rows, half_life_days=hl)
+            cm = taste.get("chapters")
+            if cm:
+                mem = cm["memory"]
+                memline = "canon (all-time)" if mem["kind"] == "canon" else \
+                    f"recency (half-life {mem['halfLifeDays']:g}d)"
+                print(f"  book memory {memline} · {cm['totals']['keeps']} keeps / "
+                      f"{cm['totals']['passes']} passes counted across "
+                      f"{len(cm['byChapter'])} chapters")
+            else:
+                print("  book memory: no chapter-stamped ledger rows — "
+                      "the taste carries no chapter memory")
         out.write_text(json.dumps(taste, indent=1, sort_keys=True))
         h = taste.get("head")
         if h:
@@ -965,6 +1107,20 @@ def cmd_inspect(a) -> None:
                 print("  WARNING: the Lois head can't reproduce boldness — CRIT stays parked")
         else:
             print("  lois probe only — train with --features to give the app a boldness head")
+    cm = t.get("chapters")
+    if cm:
+        mem = cm.get("memory") or {}
+        tot = cm.get("totals") or {}
+        chapters = cm.get("byChapter") or {}
+        memline = "canon (all-time)" if mem.get("kind") == "canon" else \
+            f"recency (half-life {mem.get('halfLifeDays', 0):g}d)"
+        line = (f"  book memory · {memline} · {tot.get('keeps', 0)} keeps / "
+                f"{tot.get('passes', 0)} passes counted")
+        if chapters:
+            lean = max(chapters.items(),
+                       key=lambda kv: kv[1]["keeps"] / max(1e-9, kv[1]["keeps"] + kv[1]["passes"]))
+            line += f" · leans {lean[0]} (kept {lean[1]['keeps']:g} / passed {lean[1]['passes']:g})"
+        print(line)
 
 
 def cmd_rank(a) -> None:
@@ -1057,6 +1213,9 @@ def cmd_selfcheck(_a=None) -> None:
     except SystemExit as e:
         assert "re-embed required" in str(e)
 
+    # #1858 — the chapter-memory builder, against the fixture the app also asserts
+    _selfcheck_chapter_memory()
+
     # #762 — the numeric path end to end (needs numpy + scikit-learn, as train does)
     try:
         import numpy  # noqa: F401
@@ -1067,6 +1226,43 @@ def cmd_selfcheck(_a=None) -> None:
         _selfcheck_taste_train()
 
     print("curator selfcheck OK")
+
+
+def _selfcheck_chapter_memory() -> None:
+    """#1858 — ledger rows -> the chapters extension, exactly as the shared
+    fixture (app/src/curator/chapterMemory.fixture.json) derives by hand.
+    Stdlib only: no train, no embeddings — the builder is pure."""
+    fx = json.loads(CHAPTER_MEMORY_FIXTURE.read_text())
+    for name, case in fx["cases"].items():
+        now = _ledger_ts(case["now"])
+        assert now is not None
+        got = build_chapter_memory(case["keeps"], case["passes"],
+                                   half_life_days=case["halfLifeDays"], now=now)
+        want = case.get("expected") or case.get("expectedRecency")
+        assert got == want, (name, got, want)
+        if "expectedCanon" in case:
+            got_c = build_chapter_memory(case["keeps"], case["passes"],
+                                         half_life_days=None, now=now)
+            assert got_c == case["expectedCanon"], (name, got_c)
+    # no chapter evidence -> no extension: the pre-S5 world, unchanged
+    assert build_chapter_memory([{"seed": 1, "timestamp": "2026-10-29T00:00:00Z"}], []) is None
+    assert build_chapter_memory([], []) is None
+    # a stamped row with an unreadable timestamp is skipped, never aged by invention
+    bad = [{"seed": 1, "timestamp": "25:61:00",
+            "notch": {"chapter": "marks", "level": 0, "keyword": None, "anchor": "x"}}]
+    assert build_chapter_memory(bad, [], now=_ledger_ts("2026-10-29T00:00:00Z")) is None
+    # a future row weighs as fresh — never more than 1
+    future = [{"seed": 1, "timestamp": "2027-01-01T00:00:00Z",
+               "notch": {"chapter": "marks", "level": 0, "keyword": None, "anchor": "x"}}]
+    got = build_chapter_memory(future, [], half_life_days=14.0, now=_ledger_ts("2026-10-29T00:00:00Z"))
+    assert got["byChapter"]["marks"]["keeps"] == 1.0, got
+    # a non-positive half-life is a broken parameter, not a quiet canon
+    try:
+        build_chapter_memory([], [], half_life_days=0)
+        raise AssertionError("half-life 0 must refuse")
+    except ValueError:
+        pass
+    print("  chapter memory check OK")
 
 
 def _selfcheck_taste_train() -> None:
@@ -1102,6 +1298,7 @@ def _selfcheck_taste_train() -> None:
         assert len(t["manifest"]) == n and all(len(m["sha256"]) == 64 for m in t["manifest"])
         assert "png" in t["manifest"][0] and "image" not in json.dumps(t["manifest"][0]), "hashes, never images"
         assert t["featuresVersion"] == 2
+        assert "chapters" not in t, "no --ledgers, no chapter memory: the v1 file is unchanged"
         h = t["head"]
         assert h["terms"]["scale=large"] > 0 > h["terms"]["scale=small"], h["terms"]
         assert h["fidelity"] > 0.5, h["fidelity"]
@@ -1136,6 +1333,22 @@ def _selfcheck_taste_train() -> None:
         else:
             raise AssertionError("bold-on-a-pass should refuse")
         assert "large marks" in describe_head(h)
+        # #1858 — the same train with --ledgers folds the chapter histograms
+        # in: totals are raw counted rows (time-invariant), whatever the
+        # decay weights land on today.
+        fx = json.loads(CHAPTER_MEMORY_FIXTURE.read_text())["cases"]["decay"]
+        leddir = root / "ledgers"
+        leddir.mkdir()
+        (leddir / "keeps.jsonl").write_text("".join(json.dumps(r) + "\n" for r in fx["keeps"]))
+        (leddir / "passes.jsonl").write_text("".join(json.dumps(r) + "\n" for r in fx["passes"]))
+        main(["train", "--index", str(root / "idx.npz"), "--labels", str(root / "labels.json"),
+              "--features", str(root / "features.json"), "--ledgers", str(leddir),
+              "--out", str(out)])
+        t = json.loads(out.read_text())
+        assert t["chapters"]["version"] == CHAPTER_MEMORY_VERSION
+        assert t["chapters"]["totals"] == {"keeps": 3, "passes": 3}, t["chapters"]["totals"]
+        assert t["chapters"]["memory"]["kind"] == "recency"
+        assert set(t["chapters"]["byChapter"]) == {"engraving", "marks"}
         # rank reads taste.json and refuses a mismatched index
         m = load_model(out)
         assert m["dims"] == dims
@@ -1195,6 +1408,14 @@ def main(argv=None) -> None:
                     help="#762 features.json from hits_bridge build — distils the head the app runs")
     sp.add_argument("--bold", default=None,
                     help="#954 bold.json: 1=favorite, 0=kept-not-favorited, keeps only")
+    sp.add_argument("--ledgers", default=None,
+                    help="#1858 dir with keeps.jsonl/passes.jsonl — the per-chapter "
+                         "histograms (BOOK S5) ride into the taste file as its chapters extension")
+    sp.add_argument("--memory", choices=("recency", "canon"), default="recency",
+                    help="#1858 (D5, unruled): which memory the chapter histograms keep — "
+                         "recency-weighted (current period) or canon (all-time)")
+    sp.add_argument("--memory-half-life-days", type=float, default=HISTOGRAM_RECENCY_HALF_LIFE_DAYS,
+                    help="#1858 (D5, unruled): recency half-life in days; recorded in the file")
     sp.add_argument("--head-alpha", type=float, default=1.0, help="ridge strength for the distilled head")
     sp.add_argument("--xgb", action="store_true",
                     help="T1: also distil an XGBoost tree head — it ships only if it beats "
