@@ -70,11 +70,14 @@ export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
  * height) → item scale units. Item scale is sized against the canvas
  * height in the scene contract, and a letter's cap is ~0.4 of its baked
  * cell, so one em of cap height reads at roughly this many scale units.
- * Calibrated on the live stage (kc-field-shots, build eb929fd4+): a
- * two-line Greenleaf form at em ≈ 0.05 reads as a held text block, neither
- * whisper nor billboard, beside scale-~1 marks.
+ * Calibrated on the live stage (kc-field-shots, 2026-11-01): at 12.5 a
+ * form's glyphs landed at scale ≈ 0.69 (em ≈ 0.055) and vanished among
+ * the room's ordinary scale 0.8–1.8 marks; at 20 the same forms land at
+ * scale ≈ 0.83–1.10 — the size of ordinary marks, which is what the
+ * baked letter stamps are. The form reads as a held block of type among
+ * the marks, neither whisper nor billboard.
  */
-export const FIELD_EM_SCALE = 12.5;
+export const FIELD_EM_SCALE = 20;
 
 /**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).

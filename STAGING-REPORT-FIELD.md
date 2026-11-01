@@ -53,8 +53,22 @@ What the shipped pick module actually does, measured by driving the real pick pa
 (`fieldEval` loop over all four scenarios × seeds, plus the Director with the live
 singleton's constant `() => 0.5` field rng):
 
-- (numbers filled in at verification — suite `curator/fieldSilence.selfcheck.mjs`
-  prints them; this section is completed from its output, not asserted.)
+Measured by `curator/fieldSilence.selfcheck.mjs` (this branch, run 2026-11-01):
+
+- Pick grid (intensity × slowDebt × 40 seeds), no rejection: **armed 600/600 —
+  100.0%**. There is no arming gate to measure around; the rate is structural.
+- Same grid immediately after a rejection (damp active): **armed 120/400 —
+  30.0%**, exactly the damp's design rate. (Method note: the damp draw must be
+  taken from a warmed stream — both seeded prngs in this repo deal first draws
+  clustered near zero from small seeds, which fakes a 0% rate. Production
+  streams are warm or hash-decorrelated; the suite measures like them.)
+- evalLoop (the pick path as it ships), 300 steps per scenario: steadyCool
+  **silence 0.0%**, steadyHot **silence 0.0%**, hotStreak **silence 0.0%**,
+  withRejection **silence 14.7%** (armed 85.3%).
+- Live-config Director (the app singleton: constant `() => 0.5` field rng,
+  `rejected: false` on every tick — director.tick hardcodes it): **armed
+  24/24 ticks**. In the live app today the rejection damp never engages via
+  tick at all, so live arming is 100% of Director ticks.
 
 Structural finding, stated plainly: `choosePoet` returns null ONLY on the
 rejection-damp draw (`lastRejected && rng() < 0.7`) or an empty deck. There is no
@@ -103,10 +117,103 @@ Room bias (#1905) · whisper/overlay (#1906) · font-ingest bake · any live web
 one-writer file touched (liveLoop / liveResolve / particles) · Governor shed
 order unchanged · decks unchanged.
 
-## Verification (filled in at the end)
+## Verification
 
-- (pending)
+New suites (all registered in `app/selfcheck.manifest`, all green):
+
+- `poets/placement.selfcheck.mjs` — **1726 passed, 0 failed**: charset law over
+  every deck line, determinism bit-for-bit, per-poet recipe invariants,
+  density monotonicity.
+- `poets/fieldStampPath.selfcheck.mjs` — all assertions passed: deal ==
+  placement stamp-for-stamp; sanitize round-trip + every refusal case;
+  **parity measured byte-identical** for no-form / undefined-form /
+  garbage-form params; armed build appends exactly the stamps at the exact
+  positions with the layer's own marks byte-identical; replay determinism;
+  shared-cache pool safety (no duplication; baseline restored exactly after
+  clearing).
+- `curator/fieldSilence.selfcheck.mjs` — all assertions passed; the measured
+  arming rates are in the silence section above.
+- `state/fieldDeal.selfcheck.mjs` — 4 checks passed against the real store:
+  a landed press deals a form onto the landed params; the deal replays from
+  (seed, press #); the form is held across a voice pass; a no-op press deals
+  nothing.
+
+Touched-file families, each run standalone, exit 0: buildPlacements,
+goldenPlacement, stagedEval, costRegistry, liveResolve, director,
+directorRoom, queenDeniability, curate, census, fieldDirector, fieldEval,
+travel, surge, parallaxDrift, markWeather, fieldMap, normalize,
+useCanvasItems, kineticRoll, roundWiring, chapterNarrowWiring, voiceSlice.
+
+Full manifest sweep — the honest account: this sandbox was under extreme
+multi-lane contention during verification (load average 10–14; background
+job duplication in the harness corrupted the first run's log and tally).
+Three runs were made. Run 1 (475 PASS / 100 FAIL) is **disproven as
+contention**: run 2 completed the full manifest at **PASS=563 FAIL=12
+TOTAL=575**, and every suite family my change touches passes standalone.
+The only FAIL lines surviving in any sweep log are the two documented
+sandbox environmentals — `engine/kernel/bake/swarmWasm` (no cargo in the
+sandbox) and `fx/rollSafety` (Chromium crash in the shared harness) — both
+re-run standalone at handoff with the same disposition (swarmWasm exit 1;
+rollSafety cannot finish in this harness). A third run with a unique log
+(`~/workspace/field-sweep-FINAL-b7.log`) was still in flight at handoff.
+The coordinator's publish sweep on a quiet box is the deciding run.
+
+e2e: no UI surface changed, so no selector re-pins; the only FIELD grep
+hits in `app/e2e/` are the unrelated pattern modes (FEED/MOD/FIELD) in
+pattern-controls / pattern-track.
+
+`npm run format:check` in app/: **clean** (full tree).
+
+### Screenshots (~/workspace/kc-field-shots/, dist of this branch)
+
+- `unarmed-scatter.png` — factory scene, no form: plain scatter untouched.
+- `curate-deal-live.png` — after a genuine CURATOR press in the running app;
+  the deal (Teijo t3, 24 stamps) was read back from the store in-page.
+- `rosselli-r3-room.png` — **the form held in a live room**: Rosselli r3
+  "DENSE LINE / EDGE TO EDGE" as a green edge-to-edge block among the
+  room's marks (count thinned to 60 for legibility; 70 nodes total).
+- `rosselli-r3-isolated.png` — the same form alone on the dish (count 0).
+- `rosselli-r3-square-armed.png`, `gibson-w3-two-armed.png`,
+  `unarmed-after-form.png` — armed/removed states in the dense factory
+  room; see the bake note below for why the letterforms are not yet
+  visible in those particular frames.
+
+**Bake-latency finding (headless artifact, diagnosed, not a wiring
+defect):** the GL renderer skips instances whose (asset|tint|accent) cell
+is not yet baked (renderer.mjs, Spine B #388: "new combos simply do not
+draw until baked"). A dealt form introduces ~20 new combos; on this
+starved sandbox (0.1–1.3 fps under load 10–14) the atlas bake took ~45 s
+on a static scene and never caught up inside a playing dense scene —
+hence the dense-room frames above show the form counted in the stage's
+nodes but not yet drawn. With a static or sparse scene the same build
+draws the form exactly as placed (the two Rosselli shots). On real
+hardware the bake is the ordinary sub-second async raster every new
+combo already goes through. **FIELD_EM_SCALE calibrated 12.5 → 20** from
+the first dense-room frames (glyphs at scale ≈ 0.69 vanished among
+ordinary 0.8–1.8 marks; at 20 they land at ≈ 0.83–1.10, the size of
+ordinary marks — see the comment at the constant).
+
+Screenshot provenance: frames are from `vite build` output of this
+branch served on a fake host (the sandbox blocks localhost and its dev
+server is too slow under load); driven through the app's own e2e hooks
+(`__KC_EXPOSE_STORE`, `__KC_GOVERNOR_OFF`, `?boot=factory`). The footer
+reads build e85331b6 — the git HEAD baked at build time; the dist also
+carried the FIELD_EM_SCALE calibration, committed in the final commit
+below. One environment fix was needed and is NOT in the tree:
+`@tauri-apps/api` (a declared dependency) is missing from this sandbox's
+shared node_modules and was installed `--no-save` into this worktree's
+gitignored node_modules only, so the bundle could resolve it; it fails
+identically on pristine main here.
 
 ## Commit map
 
-- (filled in at the end — which commits close #1902 scope, which close #1904)
+- `eb929fd4` — **#1902 scope**: pure placement function
+  (`poets/placement.js`) + its suite + manifest line + this report's
+  premise/design record.
+- `7a763559` — **#1904 scope**: `poets/fieldForm.js` (deal + sanitize),
+  the buildPlacements stamp-path append, the layoutSlice deal,
+  `field/placement` cost entry, three suites (fieldStampPath, fieldDeal,
+  fieldSilence) + manifest lines.
+- `e85331b6` — prettier pass on the slice files (formatting only).
+- Final commit — FIELD_EM_SCALE calibration (12.5 → 20) + this completed
+  report.
