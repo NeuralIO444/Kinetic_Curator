@@ -53,13 +53,66 @@ Ruling: Matt, 2026-10-31 — "Change it — TRAIL FADE off in LEAVE hands the fa
 
 ## Tests
 
-_(filled in as the suites land)_
+- **Re-pins** (each carries its cause in the assertion comment: Matt
+  ruling 2026-10-31, #1910):
+  - `trailMode.selfcheck.mjs` ×3 — '#560 Leave holds the stamps…' keep
+    1 → 0.5 (leaveFade defaulted 0, fade 0.5); '#560 Leave fade is
+    optional' keep 1 → 0.88 (default fade alone); the #1894 block's
+    TRAIL FADE 0 case keep 1 → 0.5.
+  - `accum.selfcheck.mjs` ×2 — the spectral block's LEAVE keepVec
+    [1,1,1] → spectralKeep(0.5); the #1894 block's 'TRAIL FADE 0 holds
+    exactly' keep 1 → 0.5.
+  - Every leaveFade > 0 pin is unchanged and passing (incl. the
+    acceptance case keep12f + leaveFade 0.2 → keep12f, both suites).
+- **New measured battery** (`accum.selfcheck.mjs`, block 'LEAVE with
+  TRAIL FADE off: ACCUM FADE governs alone (#1910)'):
+  - leaveFade 0 + ACCUM FADE 12f → keep = 0.5^(1/12) exactly; + 5.4f →
+    0.5^(1/5.4) exactly; keepVec follows the handed-over keep.
+  - Both fades off (fade keep 0, leaveFade 0) → keep 0, pinned by name:
+    ACCUM FADE governs alone and says no hold; no fall-out to the old 1.
+- **Suite results on this tree:** accum **85 cases OK** (84 + the new
+  block); trailMode **7 tests, 7 pass, 0 fail**.
 
-## Screenshots
+## Screenshots — ~/workspace/kc-1910-shots/
 
-_(before/after pair, LEAVE + TRAIL FADE off + ACCUM FADE MID —
-~/workspace/kc-1910-shots/)_
+Identical panel state in both, driven through the real UI (BUILD panel):
+trail **LEAVE**, **TRAIL FADE OFF**, **ACCUM FADE MID (5.4f)**; shots at
+~6 s and ~12 s after the settings landed.
+
+- `before-main-58f8784e-t12.png` (footer: build 58f8784e = current main)
+  — the stage is a wall-to-wall saturated smear: every mark ever drawn
+  is still on the buffer (keep 1.0), chromatic ghosts stacked hundreds
+  deep. The immortal accumulation Matt hit.
+- `after-1910-branch-t12.png` (footer: build f0a98c55 = this branch) —
+  discrete marks with short decaying wakes; the background reads
+  between shapes. ACCUM FADE 5.4f visibly governs.
+- t06 pair tells the same story earlier in the accumulation.
+
+Honest labels: the two runs booted different stages (before: petri-bloom;
+after: moire) — the boot deal is not seed-locked between runs, so this is
+not a pixel A/B of one stage. The panel state is identical, and the
+difference shown is the keep law itself (1.0 vs 0.5^(1/5.4)): either
+stage smears solid at keep 1 and decays at the handed-over keep.
+PERF PAUSED shows in both frames (the headless watchdog re-trips under
+SwiftShader); stages are fully drawn in both.
 
 ## Verification
 
-_(format:check + full sweep, runner's own line, at the end)_
+- `npm run format:check` in app/: clean (exit 0).
+- Full manifest sweep, continue-on-error (the repo runner stops at the
+  first failure by design; this is the coordinator method so counts
+  compare across slices). The sweep's own final line, verbatim:
+  **`SWEEP-RESULT lines=557 PASS=554 FAIL=3`** — per-suite record in
+  `~/workspace/kc1910-sweep-results.txt`. The 3 failures, each proven
+  environmental / base-identical on pristine 58f8784e:
+  - `swarmWasm` — "build-wasm: cargo not found on PATH", identical
+    standalone on branch and base (no cargo in the sandbox).
+  - `fx/rollSafety` — "page.evaluate: Target crashed", identical
+    standalone on branch and base (exit 1 both; Chromium dies in the
+    shared harness).
+  - `gl/accum` in-sweep only (under-load heap abort) — standalone on
+    this final tree: **OK (85 cases)**.
+  The kineticSweep flake (#1822) did not fire. CI remains authoritative
+  for all three.
+- No acceptance check weakened or deleted; the only changed assertions
+  are the five re-pins above, each with its cause named.
