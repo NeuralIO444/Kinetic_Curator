@@ -1124,6 +1124,11 @@ export function createLiveLoop(
       rh,
       accumOn: !!layoutParams.accumulation && !s.perfTier1,
       accumFrozen,
+      // #1914: tick() reads the steering flag off the frame — the
+      // buildFrame-local const of the same name is invisible in tick's
+      // scope, and the bare read there threw on every accum frame
+      // (ReferenceError → silent plain-render fallback, live since #1878).
+      trailSteerLive,
       // #1809: how the wet field was served this frame ('live' |
       // 'degraded' | 'shed' | 'off') and the shed that stood it down, if
       // any — the show path reads the mode, never a silent gate.
@@ -1467,7 +1472,7 @@ export function createLiveLoop(
                   // the moths steer on carries true ages, not just the
                   // channel-ratio proxy. No consumer, no allocation.
                   dt: dtSec,
-                  ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID || trailSteerLive,
+                  ageBuffer: DEBUG_AGE || DEBUG_TRAILGRID || frame.trailSteerLive,
                   // #1807: the buffer statistics ride the same request
                   // discipline — requested only while a consumer (the
                   // show block's sampler, the governor, the ?debug=stats
@@ -1533,7 +1538,7 @@ export function createLiveLoop(
               // steer on it from the NEXT frame's input (the spawn
               // decisions' one-frame rhythm). Not live: no readback, no
               // derivation — the feed costs nothing while it is off.
-              if (trailSteerLive) updateTrailSteerGrid(accumObj);
+              if (frame.trailSteerLive) updateTrailSteerGrid(accumObj);
               // #520 Phase 2: apply grain-family finish chain post-accum.
               let accumTex = accumObj.texture();
               for (const { layerId, steps } of fxFinishChains) {
