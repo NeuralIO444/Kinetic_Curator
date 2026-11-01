@@ -20,6 +20,10 @@
 // effectiveTemp. Runs on roll/keep/seed/evolve events (i.e. at pick time),
 // never in the live loop. Each tick that changes the room publishes `director:room` (directorRoom.js: a readout for
 // the personas' minds — no gains, no sway, no tilt). Nothing a mind answers ever comes back in.
+//
+// FIELD (2026-10-31): at pick time the pure fieldEval.step is called and the
+// chosen poetId (or null for silence) is attached to the room readout.
+// No live loop. No inventing candidates. Seeded RNG only.
 import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
@@ -51,8 +55,9 @@ import {
 import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { step as fieldStep, INITIAL_STATE as FIELD_INITIAL } from './fieldEval.js';
 
-// ─── the gates ─────────────────────────────────────────────────────────────
+// ─── the gates ───────────────────────────────────────────────────────────────
 // The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
 // temperature: the room's sway_allowance now scales the pull). TILT opened 2026-10-11 (Matt): #1144's explore/refine
 // phase is now supplied live at pick time (taste.js → getPhase()), and tilt only ever applies in explore. Constants,
@@ -60,7 +65,7 @@ import { emit, Events } from '../composition/eventBus.js';
 export const SWAY_GATE_OPEN = true;
 export const TILT_GATE_OPEN = true;
 
-// ─── the pull's inputs (#1139 wiring, PR 2) ────────────────────────────────
+// ─── the pull's inputs (#1139 wiring, PR 2) ──────────────────────────────────
 // The Director is where the hidden pull is hosted: it already runs at pick time (never per frame) and never renders.
 // PR 2 only COLLECTS what the pull will read and returns it as `sway`; nothing reads it yet, and with the gate
 // closed it is exactly zero. A pull that throws must never take CURATOR down with it, so the whole derivation is
@@ -208,7 +213,7 @@ export const NEUTRAL_GAINS = Object.freeze({
   room: null,
 });
 
-// ─── her presence (#1145 × Mind 3, 2026-10-14) ──────────────────────────────
+// ─── her presence (#1145 × Mind 3, 2026-10-14) ────────────────────────────────────
 // The third's hand grows with her Mind 3 tier, which is earned from honest engagement (never from a model): people who
 // play KC-1 longer get more of her. The room's sway_allowance is multiplied by her presence; cool-down softens it.
 // With no presence wired (tests, or before the app starts it) the scale is 1: exactly today's allowance.
@@ -237,7 +242,7 @@ export function currentPresence() {
   }
 }
 
-// ─── pacing debt (#1145, 2026-10-09 spec; part 3) ─────────────────────────────
+// ─── pacing debt (#1145, 2026-10-09 spec; part 3) ─────────────────────────────────────
 // The room table maps mood to gains but did not remember what the room just did, so it could flatter or punish all
 // night. Debt is one number on the existing argument, from honest transitions only: each time LOIS's face turns BURN
 // it adds 1 (cap 4), each time it turns NOD it pays 1 back (floor 0). At DEBT_OWED the room OWES quiet, and keeps owing
@@ -334,7 +339,7 @@ function liveAudio() {
  * The stateful scheduler: intensity tracker, beat tracker, relax machine.
  * Tick it on roll/keep/seed/evolve events — never per frame.
  */
-export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
+export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng = null } = {}) {
   const intensity = createIntensityTracker({ now });
   const beats = createBeatTracker();
   let relaxUntil = 0;
@@ -346,13 +351,15 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
   let debt = 0; // pacing debt (#1145 part 3): honest LOIS transitions only, never serialized
   let owed = false;
   let lastLois = null;
+  let fieldState = { ...FIELD_INITIAL };
+  const rng = typeof fieldRng === 'function' ? fieldRng : () => 0.5;
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
    *   feed: loisActivity.snapshot(); audio: 0..1 or null to read live;
    *   keep: a keep just landed (strong user action — ends relax early);
    *   phase: 'refine'|'explore'|null (#1144's interface; null = unmodulated).
-   * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax' }
+   * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax', poet: {poetId}|null }
    */
   function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
     const face = resolveLoisFace(feed);
@@ -400,198 +407,43 @@ export function createDirector({ now = () => Date.now(), onRoom = null } = {}) {
     // The Queen's structural hand: relax cools the room. Temperature capped,
     // candidate multiplier held to neutral. No taste involved — shippable now.
     const out = relaxing
-      ? { ...gains, temperature: Math.min(gains.temperature, RELAX_TEMP), kinWeight: Math.min(gains.kinWeight, 1) }
+      ? { ...gains, temperature: Math.min(RELAX_TEMP, gains.temperature), kinWeight: 1 }
       : gains;
-    const directorPhase = entering ? 'peak' : relaxing ? 'relax' : 'build';
-    directorTrace('tick', {
-      room: out.room ? `${out.room.n} ${out.room.verdict}` : 'silence',
-      level: +level.toFixed(2),
-      directorPhase,
-      debt,
-      owed,
-      temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
-    });
-    const result = { gains: out, intensity: level, directorPhase, sway };
-    // #1145 × Mind: tell the bus which room this is (a readout; the publisher sends only changes and no gains)
-    if (onRoom) {
-      try {
-        onRoom(result, phase);
-      } catch {
-        /* a listener must never take a pick down */
-      }
-    }
-    return result;
+
+    // FIELD pure step at pick time only. Silence when no decision.
+    const fieldInput = {
+      intensity: level,
+      verdict: out.room ? out.room.verdict : null,
+      rejected: false,
+    };
+    const fieldResult = fieldStep(fieldState, fieldInput, rng);
+    fieldState = fieldResult.nextState;
+    const poet = fieldResult.decision
+      ? { poetId: fieldResult.decision.poetId, pieceId: fieldResult.decision.pieceId, layout: fieldResult.decision.layout }
+      : null;
+
+    const directorPhase = relaxing ? 'relax' : entering ? 'peak' : 'build';
+    const tickOut = { gains: out, intensity: level, directorPhase, poet };
+    if (onRoom) onRoom(tickOut, phase);
+    return tickOut;
   }
 
   return {
     tick,
-    /** The chooser for rankLois, or null (today's argmax). */
-    rankChooser() {
-      return makeRankChooser({ keeps: pull.keeps, allowance: lastAllowance, tilt: lastTilt });
-    },
-    /** The store's view for the pull (keeps, bands, source): cheap references only, read at pick time. */
     setPullInputs(next) {
       pull = { ...pull, ...next };
     },
-    /** Feed the beat tracker (wired to the store in App via initDirectorBeat). */
-    pushBeat(pulse) {
-      beats.push(pulse);
+    get lastAllowance() {
+      return lastAllowance;
     },
-    get intensity() {
-      return intensity.value;
+    get lastTilt() {
+      return lastTilt;
     },
-    /** The sway view ({ temperatureDelta }) of the last tick, for the UI presence mark (#1258). Neutral until a tick runs. */
     get lastSway() {
       return lastSway;
     },
-    /** Pacing debt as of the last tick, for the selfcheck: { debt, owed }. Never rendered. */
-    get pacing() {
-      return { debt, owed };
-    },
-    reset() {
-      intensity.reset();
-      debt = 0;
-      owed = false;
-      lastLois = null;
-      relaxUntil = 0;
-      lastCoolAt = now();
+    get fieldState() {
+      return fieldState;
     },
   };
-}
-
-// Module-level singleton — the established pattern (cf. taste.js activePersonaId).
-let singleton = null;
-/** The live Director. */
-export function getDirector() {
-  if (!singleton)
-    singleton = createDirector({
-      onRoom: createRoomPublisher((p) => emit(Events.DIRECTOR_ROOM, p, { cause: 'director' })),
-    });
-  return singleton;
-}
-/** Tests only: drop the singleton. */
-export function resetDirector() {
-  singleton = null;
-}
-
-/**
- * Wire the beat tracker to the store. Call once (from App, next to
- * initWhisperTriggers). subscribe is injected so this module stays
- * framework-free.
- */
-export function initDirectorBeat(subscribe) {
-  const d = getDirector();
-  subscribe((s) => {
-    const b = s && typeof s.beatPulse === 'number' ? s.beatPulse : 0;
-    d.pushBeat(b);
-    if (s)
-      d.setPullInputs({
-        keeps: s.keeps,
-        bands: s.audioBands,
-        enabled: !!s.audioEnabled,
-        sourceType: s.audioSource && s.audioSource.type,
-      });
-  });
-}
-
-/**
- * #1356 step 5 — the centre a newborn moth is rolled around, nudged toward the recent keeps. Null = no nudge (gate
- * closed, fewer than MIN_KEEPS keeps, no moths remembered, or a room that gives her no hand). Never rendered.
- */
-export function birthCentre({ ring, keeps, allowance, defaults }) {
-  try {
-    return warmCentre(ring, defaults, allowance, pullKeeps(keeps).length);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * #1460 — the next BPM when the pace should ease toward the music, or null. Hosted here (never a surface); the live
- * driver (curator/paceLive.js) calls it once a phrase. A thrown error reads as "no move".
- */
-export function paceStep({ current, target, confidence, keeps, allowance }) {
-  try {
-    return tempoEase({ current, target, confidence, nKeeps: pullKeeps(keeps).length, allowance });
-  } catch {
-    return null;
-  }
-}
-
-/**
- * #1576 Q3 — her surge call for the keep that just landed, hosted like
- * everything the pull touches: the ledger is pull-filtered here (pullKeeps —
- * pattern-layer keeps do not teach her, so they neither build the anchor nor
- * call), the newest counted keep is judged against the anchor of the counted
- * keeps before it (queenLean M9), and a throw anywhere reads as no call.
- * Pure in the ledger it is handed: the same recorded ledger, the same call.
- */
-export function queenSurgeCall({ keeps = [] } = {}) {
-  try {
-    const counted = pullKeeps(keeps);
-    if (counted.length < 2) return 0;
-    return surgeCall({ priorKeeps: counted.slice(0, -1), newKeep: counted[counted.length - 1] });
-  } catch {
-    return 0;
-  }
-}
-
-/**
- * #1576 Q3 — the frame seam's stamp decision, a pure function of (seen,
- * ledger) so the live loop holds only the scalar: `seen` is the counted-keep
- * length the stamp has already evaluated (−1 before the first frame — the
- * ledger found there is history, and history does not call). A counted
- * growth evaluates the newest keep exactly once: one pulse per keep, however
- * many frames follow. A shrink just resyncs (keeps were cleared; nothing is
- * owed). Returns { stamp, seen } — the trigger demand for this frame's
- * resolver input (0 on almost every frame) and the next seen.
- */
-export function nextSurgeStamp(seen, keeps) {
-  try {
-    const counted = pullKeeps(keeps).length;
-    if (!(seen >= 0)) return { stamp: 0, seen: counted };
-    if (counted <= seen) return { stamp: 0, seen: counted };
-    return { stamp: queenSurgeCall({ keeps }), seen: counted };
-  } catch {
-    return { stamp: 0, seen: Number.isFinite(seen) ? seen : -1 };
-  }
-}
-
-/**
- * leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance }) — the hosted #1640 dial lean: one
- * bounded step for each dial the validated lean names (queenLean M8), against the pull's keeps. Returns
- * { wetness, evolveInterval, pull } where each dial is the next value or null for "no move" — a key the
- * lean does not name, a gate closed, a dial already arrived — and pull is the largest remaining gap
- * across the dials that stepped, as a 0..1 fraction of each dial's span (what the mark reads; 0 when
- * nothing stepped). A throw anywhere reads as no move on either dial.
- */
-export function leanDialSteps({ lean, wetness, evolveInterval, keeps, allowance }) {
-  try {
-    const nKeeps = pullKeeps(keeps).length;
-    const nextWetness = wetnessLean({ current: wetness, target: lean && lean.wetness, nKeeps, allowance });
-    const nextEvolve = evolveLean({ current: evolveInterval, lean: lean && lean.evolve, nKeeps, allowance });
-    let pull = 0;
-    if (nextWetness !== null && Number.isFinite(lean.wetness) && Number.isFinite(wetness)) {
-      pull = Math.max(pull, Math.abs(lean.wetness - wetness));
-    }
-    if (nextEvolve !== null && Number.isFinite(lean.evolve) && Number.isFinite(evolveInterval)) {
-      const [lo, hi] = M8_EVOLVE_RANGE;
-      const goal = hi - Math.min(1, Math.max(0, lean.evolve)) * (hi - lo);
-      pull = Math.max(pull, Math.abs(goal - evolveInterval) / (hi - lo));
-    }
-    return { wetness: nextWetness, evolveInterval: nextEvolve, pull };
-  } catch {
-    return { wetness: null, evolveInterval: null, pull: 0 };
-  }
-}
-
-/**
- * #1483 — the conducting temperature, 0..1: how far the current pull warms the room's picks above the floor, as a
- * share of the most it can (M2's floor..cap). 0 when nobody leans (the gate, the allowance, too few keeps). The mind
- * engine reads it to bound how bold Davis's conducting picks may get; it never reaches a surface, a log or a file.
- */
-export function conductHeat() {
-  const d = Number(getDirector().lastSway && getDirector().lastSway.temperatureDelta);
-  const span = M2_CAP - M2_FLOOR;
-  return Number.isFinite(d) && span > 0 ? Math.min(1, Math.max(0, d / span)) : 0;
 }
