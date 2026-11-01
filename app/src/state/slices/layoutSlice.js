@@ -48,15 +48,7 @@ import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs';
 import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
 import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
-import {
-  openRound,
-  openJudgement,
-  passCut,
-  spendCut,
-  settle,
-  absorbWarmTap,
-  closeRound,
-} from '../roundTable.mjs'; // #1856: the round (BOOK S3)
+import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
 import { chapterById } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
@@ -189,11 +181,12 @@ function runRound(state, r) {
       pool = scopeDeck.looks.filter((l) => l.id !== lookId);
     }
     const redeal = pool.length
-      ? lookPass(
-          { ...state, layoutParams: r.layoutParams },
-          dieRng,
-          { looks: pool, pool: scopeDeck.poolKind, sets: scopeDeck.sets, records: scopeDeck.records },
-        )
+      ? lookPass({ ...state, layoutParams: r.layoutParams }, dieRng, {
+          looks: pool,
+          pool: scopeDeck.poolKind,
+          sets: scopeDeck.sets,
+          records: scopeDeck.records,
+        })
       : null;
     if (redeal && redeal.lookId && redeal.lookId !== lookId) {
       const after = {
