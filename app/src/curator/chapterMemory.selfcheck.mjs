@@ -48,7 +48,11 @@ assert.equal(CHAPTER_MEMORY_MIN_KEEPS, 8);
   const m = py.match(/CHAPTER_IDS = \[([^\]]+)\]/);
   assert.ok(m, 'curator.py declares CHAPTER_IDS');
   const ids = [...m[1].matchAll(/["']([a-z-]+)["']/g)].map((x) => x[1]);
-  assert.deepEqual(ids, CHAPTERS.map((c) => c.id), 'trainer CHAPTER_IDS mirror the book spine order');
+  assert.deepEqual(
+    ids,
+    CHAPTERS.map((c) => c.id),
+    'trainer CHAPTER_IDS mirror the book spine order',
+  );
 }
 
 // ── 1. The trainer's own extensions validate clean, verbatim.
@@ -249,10 +253,7 @@ function simulate(lean, { burns = 40, deals = 3000, seed = 1858 } = {}) {
     recency.grunge < 0.3,
     `recency re-opens: grunge falls to ${(recency.grunge * 100).toFixed(1)}% of landings (<30%)`,
   );
-  assert.ok(
-    recency.engraving > recency.grunge,
-    'recency re-opens: the current season out-lands the dead era',
-  );
+  assert.ok(recency.engraving > recency.grunge, 'recency re-opens: the current season out-lands the dead era');
 }
 
 // ── 7. The backstage line says which memory, in the file's own words.

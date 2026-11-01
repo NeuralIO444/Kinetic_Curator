@@ -35,8 +35,7 @@ assert.ok(grained, 'the book has at least one look at chapter grain (no narrowin
 assert.equal(genreOfLook(grained.chapterId, grained.lookId), null, 'chapter grain reads as genre null');
 assert.equal(genreOfLook('atlantis', genred.lookId), null, 'an unknown chapter has no genre');
 assert.equal(genreOfLook(genred.chapterId, 'no-such-look'), null, 'a foreign look has no genre');
-const other =
-  genred.chapterId === grained.chapterId && genred.lookId === grained.lookId ? null : grained;
+const other = genred.chapterId === grained.chapterId && genred.lookId === grained.lookId ? null : grained;
 assert.ok(other, 'a second tally key exists in the book');
 
 // ── The tally: bogus cuts record nothing; real cuts land by genre.
@@ -119,10 +118,17 @@ assert.ok(other, 'a second tally key exists in the book');
   const fresh = tally.snapshot({ at: cutAt, halfLifeMs: HL });
   assert.equal(fresh.permabans.length, 1, 'fresh cuts at the floor ban');
   const aged = tally.snapshot({ at: cutAt + HL, halfLifeMs: HL });
-  assert.ok(Math.abs(aged.rows[0].weight - GRUDGE_PERMABAN_MIN_CUTS / 2) < 1e-9, 'aged one half-life, the weight halves');
+  assert.ok(
+    Math.abs(aged.rows[0].weight - GRUDGE_PERMABAN_MIN_CUTS / 2) < 1e-9,
+    'aged one half-life, the weight halves',
+  );
   assert.equal(aged.permabans.length, 0, 'aged past the floor, the ban softens away — when a half-life is ruled');
   const standing = tally.snapshot({ at: cutAt + HL * 365 });
-  assert.equal(standing.rows[0].weight, GRUDGE_PERMABAN_MIN_CUTS, 'the standing snapshot never ages a cut (D6 unruled)');
+  assert.equal(
+    standing.rows[0].weight,
+    GRUDGE_PERMABAN_MIN_CUTS,
+    'the standing snapshot never ages a cut (D6 unruled)',
+  );
   assert.equal(standing.permabans.length, 1, 'under the standing law the ban does not soften');
 }
 
@@ -139,4 +145,6 @@ assert.ok(other, 'a second tally key exists in the book');
   assert.ok(line.includes(genred.genre), 'the readout names the banned genre');
 }
 
-console.log('loisGrudge.selfcheck: ok (#1858 — cuts tallied by genre, permaban derived, overrule resets, decay built but unruled-off)');
+console.log(
+  'loisGrudge.selfcheck: ok (#1858 — cuts tallied by genre, permaban derived, overrule resets, decay built but unruled-off)',
+);
