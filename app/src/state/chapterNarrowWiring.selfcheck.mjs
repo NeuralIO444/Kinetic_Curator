@@ -59,7 +59,11 @@ let board = null; // { round, notch }
   for (let i = 0; i < 200 && !board; i++) {
     S().kineticLookPass();
     if (prevRound) {
-      assert.equal(S().kineticNotch, null, 'a fresh flip ends the settled board: its narrowing is gone in the same update');
+      assert.equal(
+        S().kineticNotch,
+        null,
+        'a fresh flip ends the settled board: its narrowing is gone in the same update',
+      );
       assert.equal(S().kineticRound.phase, 'closed', 'and the round closed on the flip via');
     }
     S().kineticVoicePass();
@@ -98,7 +102,11 @@ ok('settled presses narrow: genre, then hand, then the floor holds — every lan
   assert.equal(S().kineticNotch.notch, 2, 'press 2: the funnel stands at the hand notch');
   assert.ok(inCurrentPool(), `press 2 landed inside the hand pool (${S().layoutParams.composition})`);
   const anchorName = chapterLooks(board.round.chapterId).find((l) => l.id === board.round.deal.lookId)?.name;
-  assert.equal(notchLabel(S().kineticNotch).text, anchorName, 'at the hand notch the label is the anchor artist’s own name');
+  assert.equal(
+    notchLabel(S().kineticNotch).text,
+    anchorName,
+    'at the hand notch the label is the anchor artist’s own name',
+  );
   const floorState = S().kineticNotch;
   S().curateUnlocked();
   assert.equal(S().kineticNotch, floorState, 'press 3 at the floor: the machine refuses — the identical state stands');

@@ -257,7 +257,10 @@ function settledFunnel(state) {
   const records = dealableRecords(ASSETS, state.customAssets);
   const deck = chapterScopeDeck(round.chapterId, round.deal.dealtScope, { records });
   const advanced = narrow(base);
-  const ids = poolFor(advanced, deck.looks.map((l) => l.id));
+  const ids = poolFor(
+    advanced,
+    deck.looks.map((l) => l.id),
+  );
   if (!ids.length) return null;
   const idSet = new Set(ids);
   return { notch: advanced, looks: chapterLooks(round.chapterId).filter((l) => idSet.has(l.id)) };
@@ -983,8 +986,7 @@ export const createLayoutSlice = (set) => ({
         // NOT declare. Motion keys always roll: motion is the voice's axis, never taken from a look
         // (the same discipline as lookPass's merge). The taste head still only ranks the finished
         // candidates — it never filters the pool.
-        const base =
-          funnel && !refining && !held ? funnel.looks[Math.floor(rng() * funnel.looks.length)] : null;
+        const base = funnel && !refining && !held ? funnel.looks[Math.floor(rng() * funnel.looks.length)] : null;
         if (base) {
           rp.composition = base.id;
           for (const [k, v] of Object.entries(base.params || {})) {
