@@ -62,6 +62,8 @@ import { getPhase, PHASE_REFINE } from '../../curator/phase.js'; // #1144: refin
 import { mutateKey, DEFAULT_SPREAD } from '../../curator/refineMutate.js';
 import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; // #1258: publish sway for the presence mark (ephemeral, not store state)
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
+import { getTaste } from '../../curator/tasteStore.js'; // #1858: the imported taste, for its chapter memory
+import { chapterLeanBiases } from '../../curator/chapterMemory.mjs'; // #1858: the walk's per-chapter lean
 import { mkRng } from '../../engine/prng.js';
 import { colorDeal, nudgeSwatches, anchorValid } from '../../curator/refineColor.js'; // #1365 Q2
 
@@ -96,7 +98,12 @@ function scopedLook(state) {
  */
 function scopedChapterLook(state) {
   const records = dealableRecords(ASSETS, state.customAssets);
-  const walk = dealLanding(dieRng, { fromId: state.kineticChapterId, visits: state.kineticChapterVisits });
+  // #1858 — the lean rides in from the imported taste's chapter memory, read
+  // fresh at the landing and never stored: no state key carries it, and a
+  // taste without the extension (or below the keeps floor) leaves the walk
+  // exactly S2's novelty.
+  const lean = chapterLeanBiases(getTaste()?.chapters);
+  const walk = dealLanding(dieRng, { fromId: state.kineticChapterId, visits: state.kineticChapterVisits, lean });
   const eff = effectiveChapterScope(walk.chapterId, state.startupMode, { records });
   const d = chapterScopeDeck(walk.chapterId, eff.scope, { records });
   const r = lookPass(state, dieRng, { looks: d.looks, pool: d.poolKind, sets: d.sets, records: d.records });

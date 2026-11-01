@@ -15,6 +15,7 @@
 // The term rule MUST match studio/curator.py `feature_terms` — both sides assert
 // app/src/curator/tasteTerms.fixture.json.
 import { recipeFeatures, FEATURES_VERSION } from './recipeFeatures.js';
+import { validateChapterMemory } from './chapterMemory.mjs';
 
 export const TASTE_KIND = 'kc-taste';
 export const TASTE_VERSION = 1;
@@ -139,6 +140,16 @@ export function validateTaste(raw) {
       }
       taste.queen = { labels, head: queenHead.head };
     }
+  }
+  // #1858 — optional chapters extension (BOOK S5): the per-chapter keep/pass
+  // histograms the trainer distils from the ledgers. Same law as the queen
+  // section above: an unreadable one neutralizes the chapter lean without
+  // touching the heads — a garbled memory must never break the taste that
+  // exists. Absent (every pre-S5 file) stays absent, and the walk runs on
+  // novelty alone exactly as it did.
+  if (raw.chapters != null) {
+    const cm = validateChapterMemory(raw.chapters);
+    if (cm) taste.chapters = cm;
   }
   return { ok: true, taste };
 }

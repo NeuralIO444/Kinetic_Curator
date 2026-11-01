@@ -21,6 +21,7 @@ import {
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
+import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
 import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
@@ -358,6 +359,9 @@ export const createGlobalSlice = (set) => ({
   // #997 — the Lois boldness line mirrors the taste line: three honest states
   // (not trained / fidelity too low / boldness live). Never picks, never scores.
   loisStatus: loisSummary(getTaste(), { experimental: experimentalOn() }),
+  // #1858 — the book-memory line mirrors the taste lines: which memory the
+  // chapter lean plays from (recency + half-life, or canon), or none.
+  bookStatus: chapterMemorySummary(getTaste()),
   tasteRev: 0,
   // #762 — the artist's experimental switch (curator/tasteGate.js): a below-bar taste may steer, and says so.
   tasteExperimental: experimentalOn(),
@@ -367,6 +371,7 @@ export const createGlobalSlice = (set) => ({
       tasteExperimental: experimental,
       tasteStatus: tasteSummary(getTaste(), { experimental }),
       loisStatus: loisSummary(getTaste(), { experimental }),
+      bookStatus: chapterMemorySummary(getTaste()),
       tasteRev: (s.tasteRev || 0) + 1,
     }));
   },
@@ -376,13 +381,19 @@ export const createGlobalSlice = (set) => ({
       set((s) => ({
         tasteStatus: tasteSummary(r.taste, { experimental: experimentalOn() }),
         loisStatus: loisSummary(r.taste, { experimental: experimentalOn() }),
+        bookStatus: chapterMemorySummary(r.taste),
         tasteRev: (s.tasteRev || 0) + 1,
       }));
     return r;
   },
   clearTaste: () => {
     dropTaste();
-    set((s) => ({ tasteStatus: tasteSummary(null), loisStatus: loisSummary(null), tasteRev: (s.tasteRev || 0) + 1 }));
+    set((s) => ({
+      tasteStatus: tasteSummary(null),
+      loisStatus: loisSummary(null),
+      bookStatus: chapterMemorySummary(null),
+      tasteRev: (s.tasteRev || 0) + 1,
+    }));
   },
   fxaa: readFxaa(),
   weave: readWeave(),
