@@ -409,14 +409,22 @@ export function accumRecipeParams({
   // color. Black keeps the legacy `rgb *= keep` exactly (0 * (1 - keep) = 0).
   const bg = hexToRgb01(background);
   const held = !!leave;
-  // #1894 (Matt ruling 2026-10-31): LEAVE takes the longer of the two fades.
-  // The #560 override set LEAVE's keep to 1 − leaveFade alone, which left
-  // ACCUM FADE silently inert in this mode. Now the ACCUM FADE keep (the
-  // `keep` above — callers pass halfLifeToKeep(accumulationFade), i.e.
-  // 0.5^(1/frames)) composes by max(): it can only lengthen the hold, never
-  // shorten it, so TRAIL FADE 0 still holds at exactly 1.
+  // LEAVE fade law (Matt rulings 2026-10-31, #1894 + #1910): the ACCUM
+  // FADE keep (the `keep` above — callers pass
+  // halfLifeToKeep(accumulationFade), i.e. 0.5^(1/frames)) always
+  // composes in LEAVE; TRAIL FADE decides how:
+  //   TRAIL FADE off (leaveFade = 0): OFF hands the fade over — the keep
+  //     is the ACCUM FADE keep alone, so ACCUM FADE fully governs LEAVE
+  //     (#1910; #1894's max() alone composed max(1 − 0, keep) = 1 here —
+  //     an immortal buffer, no fade at any ACCUM FADE setting).
+  //   TRAIL FADE on (leaveFade > 0): the longer of the two fades wins —
+  //     max(1 − leaveFade, accumKeep) (#1894, PR #1895). That composition
+  //     can only lengthen the hold, never shorten it.
+  const lf = Number(leaveFade) || 0;
   const keepFinal = held
-    ? Math.max(Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0))), keep)
+    ? lf === 0
+      ? keep
+      : Math.max(Math.min(1, Math.max(0, 1 - lf)), keep)
     : ribbon
       ? Math.max(keep, 0.96)
       : comet
