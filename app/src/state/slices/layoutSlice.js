@@ -64,6 +64,7 @@ import { swayMagnitude, setSwayMagnitude } from '../../curator/swayView.mjs'; //
 import { loisActivity } from '../../curator/loisActivity.js'; // #1145: the honest feed
 import { getTaste } from '../../curator/tasteStore.js'; // #1858: the imported taste, for its chapter memory
 import { chapterLeanBiases } from '../../curator/chapterMemory.mjs'; // #1858: the walk's per-chapter lean
+import { loisGrudge } from '../../curator/loisGrudge.mjs'; // #1858: LOIS's grudge tally (backstage record)
 import { mkRng } from '../../engine/prng.js';
 import { colorDeal, nudgeSwatches, anchorValid } from '../../curator/refineColor.js'; // #1365 Q2
 
@@ -1257,6 +1258,7 @@ export const createLayoutSlice = (set) => ({
     // set inside the updater as if a fresh frame had arrived. Post-commit, the CUT flag stands until
     // the next roll or seed change (loisActivity.noteCut, frameKept's lifecycle).
     let spentCut = false;
+    let spentCutInfo = null; // #1858: the cut's chapter + killed look, for the grudge tally's genre
     set((state) => {
       // #1855 — a warm tap stays inside the standing chapter: its voices ∩ the scope deck (scopedChapterVoices).
       const r = voicePass(state, dieRng, { deck: scopedChapterVoices(state) });
@@ -1277,6 +1279,11 @@ export const createLayoutSlice = (set) => ({
       // and the automatic settle (D4). A kill's redeal overrides the layout and pool below.
       const round = runRound(state, r);
       spentCut = round.cut;
+      if (round.kineticRound?.cut)
+        spentCutInfo = {
+          chapterId: round.kineticRound.chapterId,
+          lookId: round.kineticRound.cut.before?.lookId ?? null,
+        };
       // #1857 — the narrowing rides beside the round: a NEW settled round opens a fresh narrowing at
       // notch 0; an absorbed warm tap (runRound returned the standing record itself) or no round at
       // all leaves the standing narrowing exactly as it was — narrowing reads the settled board, it
@@ -1302,7 +1309,13 @@ export const createLayoutSlice = (set) => ({
         activeVoiceId: null,
       };
     });
-    if (spentCut) loisActivity.noteCut();
+    if (spentCut) {
+      loisActivity.noteCut();
+      // #1858 — the grudge tallies the same spend, by the killed look's
+      // genre. Post-commit like the flag: the tally is a record of the
+      // spend, and the redeal's own churn must not rewrite it.
+      if (spentCutInfo) loisGrudge.noteCut(spentCutInfo);
+    }
   },
 
   /**

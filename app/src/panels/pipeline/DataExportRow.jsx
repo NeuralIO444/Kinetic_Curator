@@ -16,6 +16,7 @@ import { useStore } from '../../state/store.js';
 import { helpText } from '../../data/helpCopy.js';
 import { retrainNudge, dismissRetrainNudge } from '../../curator/tasteHead.js';
 import { getTaste } from '../../curator/tasteStore.js';
+import { loisGrudge, grudgeSummary } from '../../curator/loisGrudge.mjs'; // #1858: the grudge readout
 import { downloadLedgers, ledgerCounts } from '../../curator/tasteLedger.js';
 import { importBiologyPolicy } from '../../biology/policy.js';
 import { writeUserPresets } from '../../data/canvasPresets.js';
@@ -63,6 +64,16 @@ export function DataExportRow({
   const tasteStatus = useStore((s) => s.tasteStatus);
   const tasteExperimental = useStore((s) => s.tasteExperimental);
   const loisStatus = useStore((s) => s.loisStatus);
+  const bookStatus = useStore((s) => s.bookStatus); // #1858: which memory the chapter lean plays from
+  const kineticRound = useStore((s) => s.kineticRound); // #1858: a cut lands in a round — the grudge line's pulse
+  // #1858 — LOIS's grudge, read off the tally at render; the round
+  // subscription is what re-renders this panel when a cut (or a keep that
+  // overrules one) lands.
+  const grudgeLine = useMemo(
+    () => grudgeSummary(loisGrudge.snapshot()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kineticRound, bookStatus],
+  );
   const importTasteToStore = useStore((s) => s.importTaste);
   const importShelf = useStore((s) => s.importShelf); // #1051
   const userVoices = useStore((s) => s.userVoices); // #1063
@@ -461,6 +472,17 @@ export function DataExportRow({
             fidelity too low, or boldness live. Honest either way; never a picker. */}
         <div className="lois-status" style={{ fontSize: 10, opacity: 0.6, margin: '0 0 6px' }}>
           {loisStatus}
+        </div>
+        {/* #1858 — the book-memory line: which memory the chapter lean plays
+            from (recency + its half-life, or canon), or none. The file
+            declares it; the readout repeats the declaration — no silent drift. */}
+        <div className="book-status" style={{ fontSize: 10, opacity: 0.6, margin: '0 0 6px' }}>
+          {bookStatus}
+        </div>
+        {/* #1858 — LOIS's grudge as character: the permaban backstage, or the
+            honest count of cuts with no ban yet. A record, never a gate. */}
+        <div className="grudge-status" style={{ fontSize: 10, opacity: 0.6, margin: '0 0 6px' }}>
+          {grudgeLine}
         </div>
         {/* #925 — retrain nudge: one tap dismisses, stays quiet until ~50 more keeps */}
         {nudgeLine && (
