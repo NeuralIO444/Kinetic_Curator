@@ -177,7 +177,7 @@ the store, all one-writer files, the sweep's curator nudge pass,
   — parses, labels build, hits convert; the trainer ignores the field
   whole.
 - **Full manifest sweep** (line-by-line past failures so the whole
-  manifest reports): **PASS 557 / FAIL 4**, every failure proven
+  manifest reports): **PASS 552 / FAIL 4**, every failure proven
   environmental, none in code this slice touches:
   - `swarmWasm` — `build-wasm: cargo not found on PATH` (verbatim; no
     Rust toolchain in the sandbox).
