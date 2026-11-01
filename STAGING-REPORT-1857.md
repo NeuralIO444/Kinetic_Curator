@@ -337,3 +337,143 @@ composition, deck-intersected), notch state held beside the round,
 the pill label live, the ledger field written at keep time in settled
 mode, a roundWiring-style suite over the real store, and the two
 screenshot chapters (Marks + one movement chapter).
+
+## WIRING — D3 ruled, built (2026-10-31)
+
+**D3 RULED (Matt, 2026-10-31): Option A confirmed** (comment on #1857).
+CURATOR does both jobs; the board says which. The wiring below follows
+the decision document's "What unblocks" map point for point; nothing
+in `chapterNarrow.mjs`'s machinery moved (two header comments updated
+to the ruled/wired state, comment-only).
+
+### What was built
+
+- **Notch state beside the round** — `kineticNotch` in layoutSlice,
+  session-only, never serialized, not in undo snapshots (same
+  discipline as `kineticRound`). Opened fresh at notch 0 by
+  `kineticVoicePass` whenever runRound settles a NEW round (an absorbed
+  warm tap returns the standing record itself, and the narrowing is
+  left identical — narrowing reads the settled board, it never reopens
+  a round). Cleared in the same updates that end the board:
+  `kineticLookPass` (flip), `kineticRoll` (chaos), `kineticOpenPass`
+  (opener) — D3's implicit widening, no widen gesture anywhere.
+- **The curate seam** — `curateUnlocked` asks `settledFunnel(state)`:
+  on a settled board it advances the standing narrowing one notch
+  (the machine's floor refusal returns the identical state, and the
+  press rolls inside the floor pool) and builds the deck-intersected
+  pool: `poolFor(advanced, chapterScopeDeck(round.chapterId,
+  round.deal.dealtScope).looks)` — the same deck and scope the round's
+  deal was made from. Candidates on a free explore press are BASED on
+  pool looks drawn off the press's own seeded stream: the base deals
+  the composition (a dealt candidate's membership IS its composition)
+  and the params the look declares, locked keys excepted; the dice
+  still roll every unlocked key the look does not declare, and motion
+  keys always roll (motion is the voice's axis, never taken from a
+  look — lookPass's own merge discipline). `pickCurated` is untouched:
+  the taste head ranks inside the pool, it never filters it. No
+  settled board → `settledFunnel` is null → the press is today's
+  whole-book roll, byte-for-byte the old path.
+- **Two disciplines named** (inside the map, recorded here): REFINE
+  presses advance the funnel but mutate the standing piece as before —
+  its composition is the anchor, a member of every pool by
+  construction, so membership holds there too. A HELD look (a MODE
+  armed, or the composition locked — the hold lookPass honours) is
+  never re-based: the funnel state still advances (it describes the
+  board), but a lock is never stomped. The suite pins the locked case.
+- **The pill label live** — CuratorBar subscribes to `kineticNotch`;
+  while a narrowing stands in the standing chapter, the START pill's
+  chapter span renders `notchLabel()`'s text (chapter → chapter ·
+  genre keyword → the anchor artist's own name), and the tooltip
+  confesses the narrowing ("Narrowed to …: CURATOR presses roll
+  inside it until the board changes."). The digits stay the chapter
+  deck readout — they are the START scope's contract (what a KINETIC
+  tap can reach), not the funnel's.
+- **The ledger field at keep time** — `captureFavorite` (the ONE
+  capture place, #719) stamps `notch: notchContextFor(state.
+  kineticNotch)` whenever a narrowing stands, so every door that
+  captures through it (DAVIS star, K, X, the dice crown, MIDI) writes
+  the field identically; `sanitizeFavorite` carries a real one
+  through (the provenance pattern), and the core's `ledgerRow` schema
+  writes it. No narrowing standing → no field, at any of the three
+  doors. A keep made after a settle but before any CURATOR press
+  already stamps level 0 — settled mode exists from the settle.
+- **The suite** — `src/state/chapterNarrowWiring.selfcheck.mjs`
+  (roundWiring's shape, over the real store), registered in
+  `selfcheck.manifest` after `chapterNarrow`. 7 checks: unsettled
+  press unchanged and opens nothing; every settle opens its funnel at
+  notch 0 on the settled anchor (asserted across every round of the
+  hunt, not just the target board); warm taps leave the record
+  identical; presses land inside the pool at genre, hand and floor;
+  the hand-notch label is the anchor's name; the keep → sanitize →
+  ledger-row path carries the context at level 2; a locked
+  composition is never re-based; CHAOS clears the funnel and a keep
+  afterwards carries no field. Stable across 6 consecutive runs.
+
+Commits: `e7426b71` (wiring), `18d53c5c` (suite + manifest),
+`395c700b` (prettier — see Verification).
+
+### Verification (this tree, sandbox)
+
+- Targeted first: chapterNarrow (10,239 checks), roundWiring,
+  roundTable, tasteLedger, curate, favorites — then every suite that
+  names a touched file (35 more: curate/shelf/director families,
+  clock.inventory, writePathHonesty, firewall, …) — all green.
+- `npm run format:check` — flagged exactly the two files this pass
+  wrote (layoutSlice.js, chapterNarrowWiring.selfcheck.mjs); fixed
+  with prettier and committed as `395c700b`; re-check clean, suites
+  re-run green after the formatting.
+- Full manifest sweep. The repo runner (`npm run selfcheck`,
+  stop-at-first-failure by design) halts in this sandbox at the first
+  environmental failure, so the sweep ran continue-on-error over
+  every manifest line — the core pass's method, so the counts
+  compare. Its own final line, verbatim:
+  `SWEEP-RESULT lines=557 PASS=555 FAIL=2`
+  (556 core lines + the new wiring suite, which passes in-sweep.
+  Core pass on the pre-wiring tree: PASS 552 / FAIL 4.)
+  The 2 failures are the core pass's environmental pair, proven
+  base-identical (both failed on the pre-wiring tree under the same
+  method) and reproduced standalone here:
+  - `swarmWasm` — "build-wasm: cargo not found on PATH" (no Rust
+    toolchain in the sandbox; CI's cargo-check is authoritative).
+  - `fx/rollSafety` — "page.evaluate: Target crashed" at
+    `gl/parity/glDriver.mjs:124` (the sandbox browser tab dies under
+    SwiftShader).
+  The core's other two environmental failures did not recur:
+  `gl/accum` and `gl/livingMotion` both pass in this sweep, and the
+  known kineticSweep flake (#1822) did not fire. CI remains the
+  authority for all four suites.
+- e2e sweep for the touched surface: the only spec referencing the
+  START pill is `e2e/topbar-expand.spec.js`, which pins button
+  classes/order and boots with no chapter standing — nothing to
+  re-pin. **Re-pins in this pass: NONE** (no acceptance check was
+  weakened, moved, or deleted).
+
+### Screenshots (~/workspace/kc-1857-shots/, build 18d53c5c)
+
+Six frames, driven through the real UI (KINETIC heat cadence: cool
+tap = look pass, warm tap = voice pass/settle; CURATOR = the
+.randomize button), state read from the pill's own text:
+
+- Marks: `marks-01-settled-board.png` (pill: **Marks**) →
+  `marks-02-notch1.png` (**Marks · linework**) →
+  `marks-03-after-press2.png` (**TALLY KEEPER** — the hand notch is
+  the anchor artist's name). An earlier Marks board in the same hunts
+  floored honestly at its genre (`Marks · dots`, press 2 unchanged).
+- Grunge (movement chapter): `grunge-01-settled-board.png`
+  (**Grunge**) → `grunge-02-notch1.png` (**Grunge · fragments**) →
+  `grunge-03-after-press2.png` (**TORN POSTER**).
+
+Harness honesty: the frames are shot at 1920px wide, the pill bar's
+full-width layout — below 1760px the compact bar hides the micro
+spans by design (#1122), and hovering the pill inverts it and washes
+the light micro text out, so the frames are taken at rest. The
+watchdog's PERF PAUSED pill shows in some frames (it re-trips under
+SwiftShader; a held frame keeps what had already drawn — the stages
+are fully drawn). One hunt observation, not hidden: a single Marks
+board in the browser hunts did not move its label on a press and the
+anomaly never reproduced at store level (every Marks anchor has
+depth ≥ 1 in the core's exhaustive battery, and the suite pins the
+seam deterministically) — most plausibly a synthetic tap swallowed
+during the landing-card animation. S5's record shape is untouched:
+the settled/narrowed records are exactly the core's, and no S5
+learning was built.
