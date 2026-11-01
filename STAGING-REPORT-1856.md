@@ -288,3 +288,86 @@ Edited: `app/src/curator/loisFace.js`, `app/src/curator/loisFace.selfcheck.mjs`,
 (comment only), `app/src/styles/layout.css`, `app/selfcheck.manifest`.
 Untouched on purpose: `layoutSlice.js`, the store, `loisActivity`, all
 one-writer files, `STAGING-REPORT-1855.md`, `STAGING-REPORT.md`.
+
+---
+
+# WIRING — post-ruling pass (2026-10-31)
+
+Both rulings landed on the issue (comments, 2026-10-31) and this section is the
+wiring pass executing the map above, exactly as written:
+
+- **D2 RULED: Kill only.** LOIS's cut kills the dealt look; the table redeals
+  from the chapter deck minus the killed look. No trim executor ships.
+- **D4 RULED: Automatic settle.** `settle()` fires the moment the round enters
+  `standing`, inside the same store update. No lock gesture, no new surface.
+
+## What the wiring does (map → tree)
+
+- **`curator/loisActivity.js`** gains the `cut` flag + `noteCut`, following the
+  `frameKept` pattern: set on spend, cleared on the next roll (`noteRoll`) or
+  seed/composition change (`noteSeed`); `snapshot()` exposes it and
+  `LoisPill` already passes the snapshot to `resolveLoisFace`, so the pill
+  paints CUT in red with no component change. `noteCut` is called by the slice
+  **after** the voice-pass `set()` commits — deliberately: the kill's own
+  redeal changes the composition, and the feed's store subscription would read
+  that as a seed change and clear a flag set inside the updater. Post-commit,
+  the flag stands until the *next* change, which is the map's lifecycle.
+- **`state/slices/layoutSlice.js`**:
+  - Session field `kineticRound` beside `kineticLanding` — session-only,
+    never serialized, not in undo snapshots (S2 precedent: `history.js`
+    restores no kinetic fields).
+  - At the `kineticVoicePass` commit, `runRound(state, voiceResult)` builds
+    the deal snapshot from `kineticLanding` + the dealt look (the standing
+    `layoutParams.composition`, looked up in the chapter deck at the landing's
+    `dealtScope`) + the dealt voice; `openRound` + `openJudgement` in the
+    same update; the judge runs; the round settles (D4) in the same update.
+    The store therefore never rests in `dealt`/`judging`/`standing` — the
+    performer's round is the settled record, and S4 reads exactly that.
+  - **Judge call, battery-proven form:** `judgeDeal(dealtLook.params,
+    deck.looks.map(l => l.params))` — the loisCut battery's own idiom. When
+    the standing composition is not a chapter-deck member (an armed MODE or a
+    locked composition held a foreign look, or a hand edit intervened), the
+    judge reads the completed deal's landed layoutParams against the same
+    pile instead. Named fallback, not a silent one: the deal snapshot's
+    `lookId` is the standing composition either way — the hand on the table.
+  - **Kill executor (D2):** the smaller pool is the chapter deck's looks
+    minus the killed look, at the landing's dealt scope. Only if that pool is
+    empty does the executor walk `SCOPE_CYCLE` wider (S2's own honest-scope
+    mechanism — the chapter re-deals where it has a deck), recomputing the
+    chapter deck per scope; the post-cut deal records the scope actually
+    used and `redealt: true`. The redeal itself is the sweep's own
+    `lookPass` over the smaller pool (look + coherent asset pool; the voice's
+    motion and the palette ride, because a look pass never moves them), and
+    its `layoutParams`/`enabledAssets` land in the same store update, so the
+    stage shows the redealt hand the record claims. The verdict crosses into
+    `spendCut` as `{ reason, gate: gate.key, value, limit }` — the machine's
+    pinned cut-record shape; the reason is `loisVerdict`'s line, mandatory.
+  - **Honesty guard (named):** if the executor cannot produce a *different*
+    hand — the smaller pool is empty even at KOZ (impossible while chapters
+    §6's deck floor holds), or the redeal is held to the killed look by an
+    armed MODE / locked composition — the cut is **not spent**: the slot
+    closes as a pass. A recorded cut whose before and after are the same
+    hand would be a lie in the log; a pass records that the round completed
+    uncut. Matt can overrule at review.
+  - **Warm taps:** `kineticCuratorPass` calls `absorbWarmTap` on the standing
+    round in both return paths (the seam is identity — the record provably
+    does not move). A voice pass that lands while an unclosed round already
+    stands is likewise absorbed by `runRound`: the round belongs to the deal
+    that opened it, and the next cold flip closes it. (Through the heat
+    router a voice pass follows its landing's look pass, so this is a guard,
+    not a path.)
+  - **`closeRound` vias:** `kineticLookPass` closes via `'flip'` (the closed
+    record rides the same update as the new landing, so it stays inspectable
+    until the next voice pass opens the next round), `kineticRoll` via
+    `'chaos'`, `kineticOpenPass` via `'opener'`.
+  - No round without a chapter: with no landing standing (before any flip,
+    after CHAOS / the opener), the voice pass behaves exactly as S2 left it
+    and `kineticRound` stays null.
+- **S4's board:** `kineticRound` after a voice pass is the settled record —
+  `settled: true`, the standing `deal`, the `cut` record when spent, and the
+  full log. S4 (#1857) consumes it as-is; no narrowing is built here.
+
+## Verification (wiring pass)
+
+_(filled in at the end of the pass: wiring selfcheck, touched-file sweep,
+full manifest sweep, format:check, screenshots.)_
