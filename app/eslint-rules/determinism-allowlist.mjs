@@ -99,6 +99,12 @@ export const DETERMINISM_ALLOWLIST = {
       why: 'injectable now seam, defaulting to the wall clock — LOIS activity stamps (persona telemetry)',
     },
   },
+  'curator/loisGrudge.mjs': {
+    'Date.now': {
+      count: 1,
+      why: 'injectable now seam, defaulting to the wall clock — the grudge tally is performer activity bookkeeping, and D6 (Matt ruling, 2026-11-01) ages bans by REAL days (30-day half-life across sessions); never replayed state, tests inject now (#1858)',
+    },
+  },
   'curator/mindLive.js': {
     'performance.now': {
       count: 2,
