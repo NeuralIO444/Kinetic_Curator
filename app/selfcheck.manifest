@@ -557,6 +557,7 @@ node src/state/roundTable.selfcheck.mjs
 node src/curator/loisCut.selfcheck.mjs
 node src/state/roundWiring.selfcheck.mjs
 node src/state/chapterNarrow.selfcheck.mjs
+node src/state/chapterNarrowWiring.selfcheck.mjs
 node src/assets/tauriCsp.selfcheck.mjs
 node src/curator/trioAcceptance.selfcheck.mjs
 node src/curator/showSpectrum.selfcheck.mjs
