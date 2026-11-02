@@ -97,7 +97,27 @@ await ok(
     bare.tick({ feed, audio: 0 });
     off();
     resetDirector();
-    assert.equal(got.length, 1, 'one publish for an unchanged room');
+    // #1917 re-pin (cause: the defect this issue fixes): this assertion used
+    // to read "exactly one publish", which only held because the live deal
+    // was stuck on the constant () => 0.5 — two identical ticks always dealt
+    // the same poet, so the payload never changed. poetId is part of the
+    // payload by #1907's design, so two identical ticks that deal DIFFERENT
+    // poets now legitimately publish twice. What this pin still guarantees:
+    // the room itself did not change (every room field identical across
+    // publishes), the cause is the director, and the bare Director below
+    // published nothing. Exact-count dedup of identical payloads stays
+    // pinned by 'the publisher sends only changes' above.
+    assert.ok(got.length >= 1, 'the live Director publishes its room');
+    const roomOf = (p) => ({
+      verdict: p.verdict,
+      n: p.n,
+      lois: p.lois,
+      davis: p.davis,
+      intensity: p.intensity,
+      relaxing: p.relaxing,
+      phase: p.phase,
+    });
+    for (const [p] of got) assert.deepEqual(roomOf(p), roomOf(got[0][0]), 'the room is unchanged across publishes');
     assert.equal(got[0][1], 'director');
     assert.deepEqual(Object.keys(got[0][0]).sort(), [
       'davis',
