@@ -56,6 +56,7 @@ import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { step as fieldStep, INITIAL_STATE as FIELD_INITIAL } from './fieldEval.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { rngForIndex } from '../engine/kernel/rng.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
@@ -336,6 +337,14 @@ function liveAudio() {
 }
 
 /**
+ * #1917 — the seed the live Director's FIELD deal stream is dealt from.
+ * Fixed and arbitrary: the deal must replay, so it can never come from the
+ * wall clock or Math.random (the determinism law). Changing this constant
+ * re-deals every show's poem sequence.
+ */
+const FIELD_DEAL_SEED = 1917;
+
+/**
  * The stateful scheduler: intensity tracker, beat tracker, relax machine.
  * Tick it on roll/keep/seed/evolve events — never per frame.
  */
@@ -352,7 +361,16 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
   let owed = false;
   let lastLois = null;
   let fieldState = { ...FIELD_INITIAL }; // FIELD (#1907): the pure field step's state, pick time only
-  const rng = typeof fieldRng === 'function' ? fieldRng : () => 0.5;
+  let fieldTicks = 0; // #1917: ticks dealt so far — the index the next tick's deal stream derives from
+  // #1917 — the FIELD deal stream. An injected fieldRng wins (tests pin exact
+  // draws). Otherwise each tick deals from a FRESH hash stream keyed by the
+  // tick index — the placement path's per-press pattern (layoutSlice deals
+  // the form off rngForIndex(seed, channel, press + offset)) — so the deal
+  // varies across the whole deck, while a fresh Director dealt the same tick
+  // sequence replays the same poems. The pre-#1917 fallback was the constant
+  // () => 0.5: pool index 1, piece index 2, forever — cool → teijo t3,
+  // neutral → rosselli r3, hot → gibson w3, and Whittier unreachable.
+  const injectedFieldRng = typeof fieldRng === 'function' ? fieldRng : null;
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -419,10 +437,17 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
     // FIELD pure step (#1907) at pick time only. Silence when no decision.
+    // #1917: the deal draws from this tick's own seeded stream (see the
+    // createDirector notes) unless a fieldRng was injected.
+    let dealRng = injectedFieldRng;
+    if (!dealRng) {
+      dealRng = rngForIndex(FIELD_DEAL_SEED, 'field-deal', fieldTicks);
+      fieldTicks += 1;
+    }
     const fieldResult = fieldStep(
       fieldState,
       { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false },
-      rng,
+      dealRng,
     );
     fieldState = fieldResult.nextState;
     const poet = fieldResult.decision
@@ -481,6 +506,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       relaxUntil = 0;
       lastCoolAt = now();
       fieldState = { ...FIELD_INITIAL };
+      fieldTicks = 0; // #1917: a reset Director re-deals the same stream from the top
     },
   };
 }

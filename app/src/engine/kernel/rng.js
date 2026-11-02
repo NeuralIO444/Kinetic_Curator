@@ -189,6 +189,12 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // jitter, spatial never does). buildHarmony passes no offsets, so the group offset is
   // the identity for its draws.
   harmony: 'color',
+  // #1917 — the Director's FIELD poet deal (curator/director.js) is dealt per
+  // Director tick off a construction-fixed seed, accompanying the curate
+  // press: a SPATIAL decision. The Director passes no offsets, so the group
+  // offset is the identity for its draws; the registration keeps the name
+  // accounted for (the #1238 rule).
+  'field-deal': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

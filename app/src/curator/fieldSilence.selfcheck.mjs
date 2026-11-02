@@ -77,9 +77,13 @@ for (const name of Object.keys(SCENARIOS)) {
   );
 }
 
-// ── The real Director, live-singleton configuration (field rng = 0.5) ────
+// ── The real Director, live-singleton configuration ─────────────────────
+// #1917: the live construction carries NO injected fieldRng — it deals off
+// the shipped per-tick seeded stream (the pre-#1917 build injected nothing
+// either, and silently fell back to the constant () => 0.5; this block used
+// to pin that fallback as the "live configuration", which was the defect).
 {
-  const d = createDirector({ now: () => 1000, fieldRng: () => 0.5 });
+  const d = createDirector({ now: () => 1000 });
   let armed = 0;
   const ticks = 24;
   for (let i = 0; i < ticks; i++) {
