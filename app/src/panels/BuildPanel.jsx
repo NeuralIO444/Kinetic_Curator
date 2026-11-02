@@ -70,7 +70,8 @@ export function BuildPanel() {
   const [pullOpen, setPullOpen] = useState(false);
   const rollPress = useLongPress(() => setPullOpen((o) => !o));
 
-  const lockCount = Object.values(lockedParams).filter(Boolean).length;
+  // #1918: HOLD (lockedParams.fieldForm) is the poem row's own signal, not a param lock (DS rule 5)
+  const lockCount = Object.entries(lockedParams).filter(([k, v]) => v && k !== 'fieldForm').length;
 
   return (
     <RangeTone tone="build">

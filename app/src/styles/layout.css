@@ -5,7 +5,8 @@
   /* one column that may shrink to the window: without minmax(0, 1fr) the column grows to its widest child's minimum, and a
      long HITS row (12 pills) pushed the whole page 700px wider than the window, hiding the top bar and clipping the panels */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 38px 26px 1fr 38px auto 20px;
+  /* row 2 is the strip stack (#1918): the 26px mode strip, plus the 26px poem row while a poem stands */
+  grid-template-rows: 38px auto 1fr 38px auto 20px;
   background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.02), transparent 40%), var(--bg);
 }
 .grid {
@@ -68,6 +69,7 @@
 .app-fullscreen .master-bar,
 .app-fullscreen .palette-strip,
 .app-fullscreen .mode-strip,
+.app-fullscreen .poem-row,
 .app-fullscreen .footer-bar {
   display: none;
 }
@@ -241,7 +243,13 @@
 
 /* Mode strip — mode/behave quick-access, same role as palette-strip but
    for the other axis. Sits directly below it. */
+.strip-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .mode-strip {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -263,6 +271,58 @@
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+/* #1918 — FIELD poem row: the mode strip's twin, one row, no new panel. Discrete state → TE
+   (KC-1 DS rule 2): hard states, lock glyphs, one red. Casing in CSS (§5): the label rides the mode
+   strip's own label style, KEEP/HOLD are commands, the poem's words stay as authored, and the poet's
+   surname and the FORM readout are set in caps here. */
+.poem-row .mode-strip-chips {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.poem-row .poem-id {
+  text-transform: none;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.poem-row .poem-id-poet {
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.poem-row .poem-id:disabled {
+  cursor: default;
+  opacity: 1; /* held reads by the HOLD chip, not by a fade (rule 7: never opacity alone) */
+}
+.poem-row .poem-id:disabled:hover {
+  color: var(--dim);
+  border-color: var(--line-2);
+}
+.poem-row .poem-form {
+  border-style: dotted; /* a readout, not a control */
+  color: var(--dimmer);
+  cursor: default;
+  text-transform: uppercase;
+}
+.poem-row .poem-form:hover {
+  color: var(--dimmer);
+  border-color: var(--line-2);
+}
+.poem-row .poem-act {
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.poem-row .poem-lock {
+  margin-right: 3px;
+}
+/* the row's one red: HOLD engaged (structure/action, rule 6) */
+.poem-row .poem-hold.held {
+  color: var(--kc-red);
+  border-color: var(--kc-red);
 }
 
 /* KC-1 compact badge — blooms into the full name on hover. */

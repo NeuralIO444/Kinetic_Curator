@@ -44,7 +44,10 @@ const SCOPE_HINT = {
 export function CuratorBar() {
   const composition = useStore((s) => s.layoutParams.composition);
   useStore((s) => s.curatePress); // re-read the LOIS line after a pick
-  const lockCount = useStore((s) => Object.values(s.lockedParams || {}).filter(Boolean).length);
+  // #1918: HOLD (lockedParams.fieldForm) is the poem row's own signal, not a param lock (DS rule 5)
+  const lockCount = useStore(
+    (s) => Object.entries(s.lockedParams || {}).filter(([k, v]) => v && k !== 'fieldForm').length,
+  );
   const armedMode = useStore((s) => s.armedMode);
   const armedMotion = useStore((s) => s.armedMotion);
   const keepsCount = useStore((s) => s.keeps?.length ?? 0);

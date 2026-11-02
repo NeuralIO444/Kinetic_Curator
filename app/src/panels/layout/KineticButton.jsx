@@ -87,8 +87,9 @@ export function KineticButton() {
     else if (r.layer === 'curator') kineticCuratorPass();
     else if (r.layer === 'voice') kineticVoicePass();
     else kineticLookPass();
-    // #1107 — the guard re-deals a dead frame by undoing the roll; a curator pass that kept the piece pushed no undo
-    // entry, so there is nothing of its own to undo (and undoing would eat the voice pass before it). #1772
+    // #1107 — the guard re-deals a dead frame by undoing the roll; a curator pass that kept the piece moved no param,
+    // so the guard skips it (undoing could eat the voice pass before it). #1772 · #1918: such a pass may still have
+    // re-dealt the poem (its own undo entry) — that lands stamps over a frame already judged live, so it stays unguarded.
     const passed = r.layer === 'curator' && !useStore.getState().kineticNudge?.moves?.length;
     if (!passed) emit(Events.ROLL_GUARD, { kind: r.layer });
     restartCooling();

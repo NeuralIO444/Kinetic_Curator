@@ -371,6 +371,8 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
   // () => 0.5: pool index 1, piece index 2, forever — cool → teijo t3,
   // neutral → rosselli r3, hot → gibson w3, and Whittier unreachable.
   const injectedFieldRng = typeof fieldRng === 'function' ? fieldRng : null;
+  let lastLevel = null; // #1918: the room's intensity as of the last tick, for a poem-only deal
+  let lastVerdict = null; // #1918: the room's verdict as of the last tick
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
@@ -436,6 +438,8 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       owed,
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
+    lastLevel = level;
+    lastVerdict = out.room ? out.room.verdict : null;
     // FIELD pure step (#1907) at pick time only. Silence when no decision.
     // #1917: the deal draws from this tick's own seeded stream (see the
     // createDirector notes) unless a fieldRng was injected.
@@ -494,6 +498,36 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     get pacing() {
       return { debt, owed };
     },
+    /**
+     * #1918 — a poem-only deal: the FIELD step against the room as it stood at the last tick, without
+     * ticking the room (no intensity, gains, relax or debt move). KINETIC presses and the poem row's
+     * identity chip deal through here. `avoidPieceId` re-draws (same stream) when the step lands on the
+     * piece already standing, so the dislike path sheds the poem it was asked to shed.
+     * @returns {{ poetId, pieceId, layout } | null}
+     */
+    dealPoet({ fieldRng: pickRng = null, avoidPieceId = null } = {}) {
+      // The row always passes its document's seeded poem stream; a bare call falls back to the
+      // Director's own deal stream exactly as a tick would draw it (main's #1917 law).
+      let draw = typeof pickRng === 'function' ? pickRng : injectedFieldRng;
+      if (!draw) {
+        draw = rngForIndex(FIELD_DEAL_SEED, 'field-deal', fieldTicks);
+        fieldTicks += 1;
+      }
+      const input = {
+        intensity: lastLevel == null ? FIELD_INITIAL.intensity : lastLevel,
+        verdict: lastVerdict,
+        rejected: false,
+      };
+      let r = fieldStep(fieldState, input, draw);
+      for (let i = 0; i < 4 && avoidPieceId && r.decision && r.decision.pieceId === avoidPieceId; i++) {
+        r = fieldStep(fieldState, input, draw);
+      }
+      // Commit only the dealt poet. The room's slow debt and its walk belong to ticks: a burst of KINETIC taps
+      // re-reading the last tick's verdict must not count as fresh hot observations and steer the next
+      // CURATOR press's pool (#1918 review).
+      fieldState = { ...fieldState, lastPoet: r.decision ? r.decision.poetId : null };
+      return r.decision ? { poetId: r.decision.poetId, pieceId: r.decision.pieceId, layout: r.decision.layout } : null;
+    },
     /** FIELD state as of the last tick, for the selfcheck (#1907). Never rendered. */
     get fieldState() {
       return fieldState;
@@ -507,6 +541,8 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       lastCoolAt = now();
       fieldState = { ...FIELD_INITIAL };
       fieldTicks = 0; // #1917: a reset Director re-deals the same stream from the top
+      lastLevel = null;
+      lastVerdict = null;
     },
   };
 }
