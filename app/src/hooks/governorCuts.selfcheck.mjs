@@ -9,6 +9,9 @@ import {
   nextGovernorCut,
   shedSummary,
   GOVERNOR_RESTORE_CUTS,
+  watchdogMayTrip,
+  frameStalled,
+  FRAME_STALL_MS,
 } from './governorCuts.js';
 
 // Absent timing → Infinity → governor reduces exactly to the rAF rate.
@@ -199,4 +202,162 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   assert.deepStrictEqual(shedSummary({ renderScale: 1, fxaaShed: true }), ['edge AA off']);
   assert.strictEqual(shedSummary({ renderScale: 1, fxaaShed: false }), null);
   console.log('[selfcheck] governorCuts (#740 cut 0 edge AA): 10 cases passed');
+}
+
+// #1919 — ladder-first (Matt's ruling, 2026-11-01): the watchdog is the
+// ladder's LAST rung. This section REPLACES the pre-#1919 contract the
+// header of governorCuts.js used to state — "the watchdog is a separate,
+// faster mechanism" — under which the fps-critical trip fired after
+// 800 ms below 10 regardless of ladder state. Now: while a rung the
+// ladder is eligible to apply remains, watchdogMayTrip is false (the
+// hook's critical window does not even run); only an exhausted ladder
+// arms it, and the hook then runs the unchanged 800 ms window.
+// The walk below drives the ladder the way usePerformanceGovernor does —
+// ask for the next cut, apply it — under sustained critical pressure
+// (effFps 5, far below CRITICAL_FPS 10) the whole way down.
+{
+  const apply = (s, c) => {
+    if (c.kind === 'fxaa') return { ...s, fxaaShed: true };
+    if (c.kind === 'renderScale') return { ...s, renderScale: c.scale };
+    if (c.kind === 'quality') return { ...s, quality: c.quality };
+    if (c.kind === 'assetThin') return { ...s, assetThin: true };
+    if (c.kind === 'countClamp') return { ...s, perfClampOverride: { count: c.count, mirror: false } };
+    if (c.kind === 'slowRender') return { ...s, slowRender: true };
+    assert.fail(`walk met an unhandled cut kind ${c.kind}`);
+  };
+  const query = (s) => ({
+    fxaa: !s.fxaaShed,
+    renderScale: s.renderScale,
+    quality: s.quality,
+    assetThin: s.assetThin,
+    perfClampOverride: s.perfClampOverride,
+    effectiveCount: s.effectiveCount,
+    slowRender: s.slowRender,
+    gpuSaturated: true,
+  });
+  let s = {
+    fxaaShed: false,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
+  };
+  let cuts = 0;
+  for (let guard = 0; guard < 64; guard++) {
+    const c = nextGovernorCut(query(s));
+    if (!c) break;
+    assert.strictEqual(
+      watchdogMayTrip(query(s), { effFps: 5, shedFps: 28 }),
+      false,
+      `sustained effFps 5 with rungs remaining (after ${cuts} cuts) → the watchdog waits, no trip`,
+    );
+    s = apply(s, c);
+    cuts++;
+  }
+  assert.ok(cuts > 0, 'the walk landed cuts before the ladder exhausted');
+  assert.strictEqual(nextGovernorCut(query(s)), null, 'the walk ends exhausted');
+  assert.strictEqual(
+    watchdogMayTrip(query(s), { effFps: 5, shedFps: 28 }),
+    true,
+    'rungs exhausted + sustained effFps 5 → the watchdog is armed (the hook runs its 800 ms window)',
+  );
+
+  // Boot (the ruling's explicit check): the store's fresh state —
+  // quality 'balanced', full pixels, nothing shed, motion unfrozen
+  // (globalSlice defaults) — always holds rungs, in every sensor
+  // combination, so a starved first 800 ms cannot trip before the
+  // ladder has even started: the gate holds from the first frame.
+  const boot = {
+    renderScale: 1,
+    quality: 'balanced',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 0,
+    slowRender: false,
+  };
+  for (const gpuSaturated of [true, false]) {
+    for (const fxaa of [true, false]) {
+      assert.strictEqual(
+        watchdogMayTrip({ ...boot, gpuSaturated, fxaa }, { effFps: 5, shedFps: 28 }),
+        false,
+        `boot state (gpuSaturated ${gpuSaturated}, fxaa ${fxaa}) → the watchdog waits`,
+      );
+    }
+  }
+  assert.strictEqual(
+    watchdogMayTrip({ ...boot, quality: 'performance', gpuSaturated: false }, { effFps: 5, shedFps: 28 }),
+    false,
+    'even at the lowest tier a fresh ladder holds rungs (asset thinning, the freeze) → the watchdog waits',
+  );
+
+  // A GOV TUNE shed floor tuned below the rate takes the ladder out of
+  // play at that rate — its effect will not fire there — so there is
+  // nothing for the watchdog to wait for and the gate releases.
+  const fresh = {
+    fxaa: true,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
+    gpuSaturated: true,
+  };
+  assert.strictEqual(
+    watchdogMayTrip(fresh, { effFps: 8, shedFps: 5 }),
+    true,
+    'ladder tuned out of play at this rate → the watchdog is armed even with rungs standing',
+  );
+  assert.strictEqual(
+    watchdogMayTrip(fresh, { effFps: 5, shedFps: 28 }),
+    false,
+    'the same state inside the shed region → the watchdog waits',
+  );
+  console.log('[selfcheck] governorCuts (#1919 ladder-first gate): walk + boot + tuned-floor cases passed');
+}
+
+// #1919 carve-out — the frozen frame: frameStalled keys on frame
+// COMPLETION, never on ladder state, and the two watchdog gates never
+// consult each other. Both directions pinned:
+//  (a) a throttled-but-alive scene — frames completing slowly — keeps
+//      its heartbeat fresh: no stall, and (above) the ladder gate also
+//      holds. The carve-out stays out of ladder territory.
+//  (b) silence past the bound on a FRESH ladder: the fps-critical gate
+//      still says wait (rungs remain), yet the stall predicate fires —
+//      the hook trips 'fps-stalled' without waiting minutes for
+//      exhaustion.
+{
+  const now = 1_000_000;
+  assert.strictEqual(FRAME_STALL_MS, 2000, 'the ruled bound: 2s of frame silence');
+  // (a) slow but alive: last frame 200 ms ago at a crawling rate.
+  assert.strictEqual(frameStalled(now - 200, now), false, 'a frame 200ms ago (slow scene) → no stall');
+  assert.strictEqual(frameStalled(now - (FRAME_STALL_MS - 1), now), false, 'one ms inside the bound → no stall');
+  // (b) frozen: exactly at the bound the silence is a hang.
+  assert.strictEqual(frameStalled(now - FRAME_STALL_MS, now), true, 'silence at the bound → stalled');
+  assert.strictEqual(frameStalled(now - FRAME_STALL_MS * 10, now), true, 'long silence → stalled');
+  // The ladder gate on the same fresh state still refuses the
+  // fps-critical trip — the carve-out does not borrow its permission.
+  const fresh = {
+    fxaa: true,
+    renderScale: 1,
+    quality: 'high',
+    assetThin: false,
+    perfClampOverride: null,
+    effectiveCount: 400,
+    slowRender: false,
+    gpuSaturated: true,
+  };
+  assert.strictEqual(
+    watchdogMayTrip(fresh, { effFps: 5, shedFps: 28 }),
+    false,
+    'fresh ladder: fps-critical still waits while the stall fires — the gates are independent',
+  );
+  // No frame observed yet (a scene that has never drawn) never stalls,
+  // and garbage never stalls.
+  assert.strictEqual(frameStalled(null, now), false, 'no frame observed yet → no stall');
+  assert.strictEqual(frameStalled(undefined, now), false, 'undefined heartbeat → no stall');
+  assert.strictEqual(frameStalled(now - FRAME_STALL_MS * 10, NaN), false, 'garbage clock → no stall');
+  console.log('[selfcheck] governorCuts (#1919 frozen-frame carve-out): both directions pinned');
 }

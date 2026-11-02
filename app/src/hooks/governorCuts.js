@@ -83,7 +83,8 @@
 //   cut 4: cost-aware asset thinning
 //   cut 5: render-only count clamp below the PERF floor
 //   cut 6: freeze motion via slowRender
-//   cut 7: watchdog hard stop
+//   cut 7: watchdog hard stop (armed only once the ladder above is
+//          exhausted — #1919 ladder-first, see watchdogMayTrip)
 //
 // Phase 6 change: cuts 1–2 of the old ladder (FX simplify, then FX bypass —
 // the fxShedLevel mechanism) are GONE. On the GPU, FX compositing is one
@@ -255,8 +256,8 @@ export function perfTier1Passes() {
  *   Omitted (older callers, selfchecks) defaults to true: resolution still
  *   sheds first when the signal is unknown.
  * @returns {{ kind: string, label: string, ... } | null} the cut to apply,
- *   or null when the ladder is exhausted (the hook then holds — the
- *   watchdog is a separate, faster mechanism).
+ *   or null when the ladder is exhausted (the hook then holds — and only
+ *   then is the watchdog armed: #1919 ladder-first, see watchdogMayTrip).
  */
 export function nextGovernorCut(s) {
   const gpuSaturated = s.gpuSaturated !== false; // unknown signal: shed as before
@@ -382,8 +383,75 @@ export function nextGovernorCut(s) {
     return { kind: 'slowRender', label: 'FREEZE FRAME — motion held' };
   }
 
-  // Ladder exhausted — hold. The watchdog (cut 7) is a separate mechanism.
+  // Ladder exhausted — hold. Only from here is the watchdog (cut 7)
+  // armed: the hook gates its trip on this null (#1919 ladder-first).
   return null;
+}
+
+/**
+ * #1919 — ladder-first (Matt's ruling, 2026-11-01): the watchdog (cut 7)
+ * is the ladder's LAST rung, not a separate trigger racing it. The hook's
+ * critical effect asks this gate before its 800 ms window may run:
+ *
+ *   - While a rung the ladder is eligible to apply remains
+ *     (nextGovernorCut answers non-null on the same snapshot the ladder
+ *     effect applies from) AND the rate is inside the ladder's own shed
+ *     region (effFps < shedFps), the watchdog WAITS. The ladder's own
+ *     cadence — sustain window, then one cut per cooldown — governs how
+ *     fast the rungs land; there is no separate grace timer.
+ *   - Once the ladder is exhausted (nextGovernorCut null), the watchdog
+ *     is armed exactly as before: the caller runs its sustained window
+ *     below CRITICAL_FPS and trips.
+ *   - A shed floor tuned below the current rate (GOV TUNE) takes the
+ *     ladder out of play at that rate — its effect will not fire there —
+ *     so there is nothing for the watchdog to wait for and the gate
+ *     releases even with rungs standing.
+ *
+ * Pure like the rest of this module, so the ordering is unit-testable:
+ * governorCuts.selfcheck.mjs walks the ladder under sustained critical
+ * pressure and pins the gate at every step, boot state included.
+ *
+ * @param {object} s the same snapshot nextGovernorCut consumes.
+ * @param {object} ctx { effFps, shedFps } — the rate being judged and
+ *   the ladder's live shed floor.
+ * @returns {boolean} true when the watchdog may run its trip window.
+ */
+export function watchdogMayTrip(s, ctx = {}) {
+  if (nextGovernorCut(s) == null) return true; // ladder exhausted — armed
+  const { effFps, shedFps } = ctx;
+  // Rungs remain: wait — unless the rate sits outside the ladder's shed
+  // region (a tuned floor below this rate), where the ladder cannot act.
+  return Number.isFinite(effFps) && Number.isFinite(shedFps) && effFps >= shedFps;
+}
+
+/**
+ * The frozen-frame bound (#1919 carve-out): how long the stage may go
+ * without completing a frame before the watchdog calls it a hang.
+ * Sized off the living floor: at 1 fps a frame lands every 1000 ms and
+ * the patrol syncs the loop's reports at ~4 Hz, so the widest gap
+ * between observed completions in a scene that is still alive is
+ * ~1.3 s — the bound must clear it, or slow scenes would read as
+ * frozen. 2000 ms clears it with room, a single long hitch or a
+ * shader-compile pause inside it never trips, and a true hang still
+ * stops in about two seconds.
+ */
+export const FRAME_STALL_MS = 2000;
+
+/**
+ * #1919 carve-out — has the frame stream gone silent past the bound?
+ * The third hard trip, alongside 'accum-nan' and 'render-error': a
+ * frozen frame is a hang, not a perf problem, so this predicate is
+ * deliberately NOT gated on ladder state (watchdogMayTrip above is the
+ * fps-critical gate; the two never consult each other). It keys on
+ * frame COMPLETION, not on a rate average: a throttled-but-alive scene
+ * (frames completing at 1–9 fps) keeps its heartbeat fresh and stays
+ * ladder territory. `lastFrameAt` is the wall time of the last
+ * completed frame the caller observed; null (no frame observed yet —
+ * a scene that has never drawn) never stalls: that is the rate path's
+ * problem, not a hang.
+ */
+export function frameStalled(lastFrameAt, now, boundMs = FRAME_STALL_MS) {
+  return Number.isFinite(lastFrameAt) && Number.isFinite(now) && now - lastFrameAt >= boundMs;
 }
 
 /**

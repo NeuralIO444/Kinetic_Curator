@@ -82,7 +82,11 @@ const APP_SRC = path.resolve(HERE, '..');
     `ladder order wrong: ${kinds.join(',')}`,
   );
   assert.ok(!kinds.some((k) => k.toLowerCase().includes('fx')), 'no FX-culling cut may exist');
-  assert.equal(nextGovernorCut(s), null, 'exhausted ladder returns null (watchdog is separate)');
+  assert.equal(
+    nextGovernorCut(s),
+    null,
+    'exhausted ladder returns null (only then is the watchdog armed — #1919 ladder-first, Matt ruling 2026-11-01; was: "watchdog is separate")',
+  );
 
   // Unknown/NaN scale snaps to full before stepping down.
   assert.equal(nextGovernorCut({ ...base, renderScale: NaN }).scale, 0.75);
