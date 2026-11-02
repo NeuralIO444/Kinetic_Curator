@@ -35,6 +35,7 @@ import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../asse
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
+import { assembleCreature, sanitizeCreatureRecords, MAX_CREATURE_RECORDS } from '../../engine/creatureAssembler.js'; // #1849
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
 
@@ -333,6 +334,8 @@ export const createGlobalSlice = (set) => ({
    * default removes the key), ridden by the document, read by the resolver off the input. */
   assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
+  creatureRecords: [], // #1849 — creature records assembled in the wet lab (data only: no stage reads them yet)
+  creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   customAssets: [],
   ingestError: null,
   /**
@@ -840,6 +843,29 @@ export const createGlobalSlice = (set) => ({
       delete next[assetId];
       return { assetAttach: next };
     }),
+  /**
+   * #1849 — the wet lab's assembler: build a creature record from this asset and the points the lab is showing (its
+   * own, or the shape's AUTO ones), dealt off the project seed. Reassembling the same asset + points + seed lands the
+   * identical record, so it is never banked twice. Rides the document like attach edits; no stage reads it yet.
+   */
+  assembleCreature: (assetId, shown) =>
+    set((state) => {
+      const rec = assembleCreature({ assetId, points: shown, seed: state.seed });
+      if (!rec) return {};
+      const cur = state.creatureRecords || [];
+      // the lab says what the press did (session-only, never saved): banked, already banked, or the bank is full —
+      // a full bank refuses rather than silently evicting another asset's creature
+      if (cur.some((r) => r.id === rec.id)) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+      if (cur.length >= MAX_CREATURE_RECORDS) return { creatureAssembleNote: { id: rec.id, status: 'full' } };
+      return { creatureRecords: [...cur, rec], creatureAssembleNote: { id: rec.id, status: 'banked' } };
+    }),
+  /** #1849 — drop one assembled record. */
+  removeCreatureRecord: (id) =>
+    set((state) => {
+      const cur = state.creatureRecords || [];
+      const next = cur.filter((r) => r.id !== id);
+      return next.length === cur.length ? {} : { creatureRecords: next };
+    }),
   setAssetKineme: (assetId, kinemeId) =>
     set((state) => {
       const cur = state.assetKineme || {};
@@ -1008,6 +1034,7 @@ export const createGlobalSlice = (set) => ({
       next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
       next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
       next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
+      next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
       // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
       // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
       // there). Homes are found again for the new dish either way.
