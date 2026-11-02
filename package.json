@@ -1,6 +1,7 @@
 {
   "name": "kinetic-curator-root",
   "private": true,
+  "license": "MIT",
   "scripts": {
     "dev": "npm run dev --prefix app",
     "build": "npm run build --prefix app",
