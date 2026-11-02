@@ -401,7 +401,15 @@ export function usePerformanceGovernor() {
       const s = useStore.getState();
       // #263's precedent: while the context restores, no frame CAN
       // complete — the silence is the rebake's, not a hang. Hold.
-      if (s.glContext !== 'ok') return;
+      // Arm the resume-restart on the way out (QA finding, #1919):
+      // the restored session's first heartbeat reaches the store up
+      // to a drain (~250 ms) after 'ok' flips, and without this the
+      // first poll back would judge the pre-loss heartbeat — by then
+      // arbitrarily old — and false-trip on a successful restore.
+      if (s.glContext !== 'ok') {
+        stallWasStoppedRef.current = true;
+        return;
+      }
       // A hidden tab completes no frames by platform design; that
       // silence is the browser parking the page, not the stage
       // hanging, so hidden time never counts toward the bound.
