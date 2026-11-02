@@ -20,6 +20,10 @@
 //       #1919 ladder-first (Matt's ruling): the critical effect below
 //       arms ONLY once the ladder is exhausted; while a rung remains,
 //       the pause waits for the sheds, at the ladder's own cadence.
+//       Two hang-class carve-outs bypass the gate by design (the poll
+//       below): a frozen frame ('fps-stalled') and a loop-time crawl
+//       ('fps-crawl', Option B) — neither is a perf problem the ladder
+//       sheds its way out of.
 // - Every cut is a render-only overlay: it never writes layoutParams, never
 //   serializes into project JSON, and auto-clears on recovery — except the
 //   hard stop, which needs manual resume (panic-key precedent, #107).
@@ -40,8 +44,12 @@ import {
   watchdogMayTrip,
   frameStalled,
   FRAME_STALL_MS,
+  measureLoopRate,
+  CRAWL_WINDOW_MS,
+  CRAWL_MAX_LOOP_RATIO,
   effectiveGovernorFps,
 } from './governorCuts.js';
+import { getFrameDeltas, clearFrameDeltas } from './useFpsMeter.js';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
 import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 import { accumFeedSelection } from '../gl/renderer.mjs';
@@ -78,7 +86,7 @@ const SUSTAIN_MS = 1600; // must stay low this long before acting
 const CRITICAL_SUSTAIN_MS = 800; // react faster — this is the worse case
 const TIER1_SUSTAIN_MS = 2000; // #107 §4 spec: 2s sustained below TIER1_FPS
 const COOLDOWN_MS = 8000; // don't auto-step again for a while
-const STALL_POLL_MS = 250; // #1919 carve-out: how often the frozen-frame check wakes
+const STALL_POLL_MS = 250; // #1919 carve-outs: how often the frozen-frame + crawl checks wake
 
 export function usePerformanceGovernor() {
   const fps = useStore((s) => s.fps);
@@ -382,6 +390,21 @@ export function usePerformanceGovernor() {
   // window — so a sync with gpuFrame > 0 IS a heartbeat. A scene
   // crawling at 1–9 fps keeps that heartbeat fresh and stays ladder
   // territory; only silence past FRAME_STALL_MS trips.
+  //
+  // #1919 Option B — the crawl, a fourth hard trip sharing this poll:
+  // frames completing (the stall check above them passes) can still
+  // starve the instrument — each completion books at most 50 ms of
+  // loop time (the loop's dt clamp) while wall time runs full, so at
+  // 3–5 fps the thread saturates and loop-time landings take minutes
+  // of wall time, all while the gate holds the fps-critical trip for
+  // the whole ladder walk (the PR #1920 e2e failure, diagnosed in the
+  // goal's hidden_files). The poll therefore also judges the RATE
+  // loop time advances — governorCuts.measureLoopRate over the meter's
+  // delta ring — and trips 'fps-crawl' when it stays under the crawl
+  // threshold across the window. Same guards, same episode restarts:
+  // the measurement restarts wherever the stall bound restarts, and
+  // the delta ring is cleared at those moments so a window never
+  // spans a stop, a restore, or a hidden tab.
   const lastFrameAtRef = useRef(null);
   const stallWasStoppedRef = useRef(false);
   useEffect(() => {
@@ -395,6 +418,10 @@ export function usePerformanceGovernor() {
     const onVisible = () => {
       // Returning from a hidden tab restarts the bound (below).
       if (!document.hidden) lastFrameAtRef.current = Date.now();
+      // The crawl window restarts with it: the delta spanning the
+      // hidden span lands in the meter's ring when rAF resumes, and
+      // it was the browser parking the page, not the stage crawling.
+      if (!document.hidden) clearFrameDeltas();
     };
     document.addEventListener('visibilitychange', onVisible);
     const id = setInterval(() => {
@@ -428,25 +455,61 @@ export function usePerformanceGovernor() {
       if (stallWasStoppedRef.current) {
         stallWasStoppedRef.current = false;
         lastFrameAtRef.current = Date.now();
+        // The crawl window restarts from the same moment: the ring
+        // still holds the stopped episode's deltas, and a window must
+        // never span a stop (or a restore — the context-down branch
+        // above arms this same restart, per the QA fix).
+        clearFrameDeltas();
         return;
       }
-      if (!frameStalled(lastFrameAtRef.current, Date.now())) return;
-      s.tripWatchdog('fps-stalled');
+      if (frameStalled(lastFrameAtRef.current, Date.now())) {
+        s.tripWatchdog('fps-stalled');
+        // Event-log only: the carve-out fires under the watchdog kind.
+        recordGovernorEvent({
+          type: 'shed',
+          cutKind: 'watchdog',
+          label: 'watchdog hard stop — frame stalled',
+          fps: {
+            at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
+            threshold: 0,
+            sustainedMs: FRAME_STALL_MS,
+          },
+          detail: `no completed frame for ${FRAME_STALL_MS / 1000}s`,
+        });
+        console.info(
+          '[Kinetic] Perf critical: watchdog tripped — frame stalled (no completed frame for',
+          FRAME_STALL_MS / 1000 + 's)',
+        );
+        return;
+      }
+      // #1919 Option B — the crawl. The stall check just passed, so
+      // frames ARE completing; judge the rate loop time is advancing
+      // over the trailing window. Disarmed until the first presented
+      // frame (the same null heartbeat that disarms the stall), and
+      // not gated on ladder state — like the stall, it is a hang-class
+      // trip, and the gate holding for the ladder is precisely the
+      // condition it exists under. At healthy rates the measured
+      // ratio is 1 by arithmetic (raw dt under the loop's clamp
+      // ceiling), so this can only fire in a genuine crawl.
+      if (lastFrameAtRef.current == null) return;
+      const rate = measureLoopRate(getFrameDeltas());
+      if (!rate || rate.ratio >= CRAWL_MAX_LOOP_RATIO) return;
+      s.tripWatchdog('fps-crawl');
       // Event-log only: the carve-out fires under the watchdog kind.
       recordGovernorEvent({
         type: 'shed',
         cutKind: 'watchdog',
-        label: 'watchdog hard stop — frame stalled',
+        label: 'watchdog hard stop — loop time crawling',
         fps: {
           at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
           threshold: 0,
-          sustainedMs: FRAME_STALL_MS,
+          sustainedMs: CRAWL_WINDOW_MS,
         },
-        detail: `no completed frame for ${FRAME_STALL_MS / 1000}s`,
+        detail: `loop time advanced ${Math.round(rate.ratio * 100)}% of wall across ${(rate.wallMs / 1000).toFixed(1)}s (${rate.frames} frames)`,
       });
       console.info(
-        '[Kinetic] Perf critical: watchdog tripped — frame stalled (no completed frame for',
-        FRAME_STALL_MS / 1000 + 's)',
+        '[Kinetic] Perf critical: watchdog tripped — loop time crawling (loop clock at',
+        Math.round(rate.ratio * 100) + '% of wall)',
       );
     }, STALL_POLL_MS);
     return () => {

@@ -20,12 +20,27 @@ const stageSamples = new Map();
  * tick below. Exposed for the dev-only GOV TUNE panel's frame-time
  * histogram — the FPS average lies (one 200ms hitch vanishes inside a 60fps
  * average), the histogram doesn't. Bounded at 240 (~4s at 60fps).
+ * The governor's crawl trip (#1919 Option B) reads the same ring: it
+ * replays the live loop's dt clamp over the deltas to measure how fast
+ * loop time is advancing — another question the average can't answer.
  */
 const frameDeltas = [];
 
 /** Snapshot copy of the recent frame deltas, oldest → newest. */
 export function getFrameDeltas() {
   return [...frameDeltas];
+}
+
+/**
+ * Drop every collected delta. The governor's crawl trip calls this at
+ * the moments its measurement episode restarts — a resume after a
+ * stop, a context restore, a return from a hidden tab (the one delta
+ * spanning the hidden span would otherwise poison the window: a
+ * multi-second "frame" that was the browser parking the page, not
+ * the stage crawling). The GOV TUNE histogram simply starts refilling.
+ */
+export function clearFrameDeltas() {
+  frameDeltas.length = 0;
 }
 
 /**

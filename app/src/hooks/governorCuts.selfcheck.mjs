@@ -12,6 +12,13 @@ import {
   watchdogMayTrip,
   frameStalled,
   FRAME_STALL_MS,
+  measureLoopRate,
+  loopTimeCrawling,
+  CRAWL_WINDOW_MS,
+  CRAWL_MIN_FRAMES,
+  CRAWL_MAX_LOOP_RATIO,
+  LOOP_DT_MIN_MS,
+  LOOP_DT_MAX_MS,
 } from './governorCuts.js';
 
 // Absent timing → Infinity → governor reduces exactly to the rAF rate.
@@ -360,4 +367,121 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   assert.strictEqual(frameStalled(undefined, now), false, 'undefined heartbeat → no stall');
   assert.strictEqual(frameStalled(now - FRAME_STALL_MS * 10, NaN), false, 'garbage clock → no stall');
   console.log('[selfcheck] governorCuts (#1919 frozen-frame carve-out): both directions pinned');
+}
+
+// #1919 Option B — the crawl (Matt's ruling, 2026-11-01 22:00 PT):
+// the ladder-first gate holds the fps-critical trip for the whole
+// ladder walk (~70–95 s under load), so a loop running at 3–5 fps
+// starves the main thread and stretches loop-time landings past any
+// reasonable wait — yet never trips anything: frames keep completing
+// inside the stall bound, and PERF PAUSED never occurs (the PR #1920
+// e2e failure). The crawl predicate measures the rate loop time
+// advances — the patrol's delta stream replayed through the loop's
+// own dt clamp — and the hook trips 'fps-crawl' when it stays under
+// the threshold across the window. Both directions pinned below,
+// the healthy direction BY ARITHMETIC: at 41 fps the raw delta
+// (~24.4 ms) is under the 50 ms clamp ceiling, so every frame books
+// its full delta and the booked share of wall time is exactly 1.
+{
+  const seq = (d, n) => Array.from({ length: n }, () => d);
+  // The ruled sketch's numbers, pinned so they can't drift silently.
+  assert.strictEqual(CRAWL_WINDOW_MS, 4000, 'the crawl window: ~4s of trailing wall time');
+  assert.strictEqual(CRAWL_MIN_FRAMES, 8, 'a window needs 8 presented frames to read as a rate');
+  assert.strictEqual(CRAWL_MAX_LOOP_RATIO, 0.25, 'the crawl threshold: loop time under 25% of wall');
+  assert.strictEqual(LOOP_DT_MAX_MS, 50, 'the loop dt clamp ceiling (liveLoop.mjs tick, Spine A)');
+  assert.strictEqual(LOOP_DT_MIN_MS, 8, 'the loop dt clamp floor (liveLoop.mjs tick, Spine A)');
+
+  // NEVER FIRES AT HEALTHY RATES — Matt's incident: rAF 41 fps.
+  // Raw dt = 1000/41 ≈ 24.39 ms < 50 ms clamp → each frame books its
+  // full delta → loopMs accumulates the identical sum as wallMs.
+  const at41 = measureLoopRate(seq(1000 / 41, 240));
+  assert.ok(at41, 'a full window of 41 fps deltas measures');
+  assert.strictEqual(at41.ratio, 1, 'at 41 fps loop time == wall time (raw dt 24.4ms < the 50ms clamp)');
+  assert.strictEqual(loopTimeCrawling(seq(1000 / 41, 240)), false, '41 fps → no crawl trip');
+  // Jitter entirely under the ceiling books whole too.
+  const jitter = Array.from({ length: 300 }, (_, i) => (i % 2 ? 12 : 21));
+  assert.strictEqual(measureLoopRate(jitter).ratio, 1, 'sub-clamp jitter books whole: ratio exactly 1');
+  assert.strictEqual(loopTimeCrawling(jitter), false, 'jittered healthy deltas → no crawl trip');
+  // The clamp ceiling itself (an even 20 fps, delta exactly 50) is
+  // not a crawl: every frame still books its full delta.
+  assert.strictEqual(loopTimeCrawling(seq(50, 200)), false, '20 fps (delta == clamp) → ratio 1 → no crawl trip');
+  // The critical band is the ladder's, not this trip's: an even
+  // 10 fps books half of wall — bars land in seconds, the gate governs.
+  const at10 = measureLoopRate(seq(100, 100));
+  assert.strictEqual(at10.ratio, 0.5, 'an even 10 fps books exactly half of wall');
+  assert.strictEqual(loopTimeCrawling(seq(100, 100)), false, '10 fps → ratio 0.5 → no crawl trip');
+  // The boundary: an even 5 fps books exactly the threshold rate
+  // (50 of every 200 ms); the trip needs strictly below it.
+  const at5 = measureLoopRate(seq(200, 40));
+  assert.strictEqual(at5.ratio, 0.25, 'an even 5 fps books exactly the 0.25 threshold');
+  assert.strictEqual(loopTimeCrawling(seq(200, 40)), false, 'an even 5 fps sits AT the threshold → no crawl trip');
+
+  // FIRES IN THE DIAGNOSED CRAWL — an even ~4 fps: 16 frames fill
+  // the window, each booking 50 of its 250 ms.
+  const at4 = measureLoopRate(seq(250, 32));
+  assert.strictEqual(at4.wallMs, 4000, 'the walk stops once the window is full');
+  assert.strictEqual(at4.loopMs, 800, '16 frames × the 50ms clamp ceiling');
+  assert.strictEqual(at4.frames, 16);
+  assert.strictEqual(at4.ratio, 0.2, '~4 fps books a fifth of wall');
+  assert.strictEqual(loopTimeCrawling(seq(250, 32)), true, '~4 fps sustained → crawl trip');
+  // The A/B probe's crawl (2.7 fps, deltas ~370 ms): deeper still.
+  const probe = measureLoopRate(seq(370, 30));
+  assert.strictEqual(probe.loopMs, 550, '11 frames × 50ms booked');
+  assert.strictEqual(probe.wallMs, 4070, '11 frames × 370ms of wall');
+  assert.strictEqual(loopTimeCrawling(seq(370, 30)), true, '2.7 fps sustained → crawl trip');
+  // Variance only lowers the booked share (the clamp is concave
+  // above 50): a stream averaging 6 fps that mixes fast and slow
+  // frames books (16 + 50) / (16 + 317) ≈ 0.198.
+  const mixed = Array.from({ length: 60 }, (_, i) => (i % 2 ? 317 : 16));
+  assert.strictEqual(loopTimeCrawling(mixed), true, 'mixed fast/slow stream averaging 6 fps → crawl trip');
+
+  // A crawl younger than the window does not trip: the trailing
+  // window blends it with the healthy stream ahead of it until the
+  // crawl fills the window (3 s healthy + 2 s crawl → booked share
+  // (400 + 2000) / 4000 = 0.6; the same crawl at 5 s fills the
+  // window outright).
+  const young = [...seq(1000 / 60, 180), ...seq(250, 8)];
+  assert.strictEqual(
+    loopTimeCrawling(young),
+    false,
+    '2s into a crawl the window is still mostly healthy → no trip yet',
+  );
+  const filled = [...seq(1000 / 60, 180), ...seq(250, 20)];
+  assert.strictEqual(loopTimeCrawling(filled), true, 'once the crawl fills the trailing window → crawl trip');
+  // Recovery reads clean: the window is trailing, so a crawl that
+  // has ended no longer measures (whether a trip latches is the
+  // hook's affair, not the predicate's).
+  const recovered = [...seq(250, 20), ...seq(1000 / 60, 300)];
+  assert.strictEqual(loopTimeCrawling(recovered), false, 'crawl followed by healthy frames → window reads healthy');
+
+  // A lone hitch is not a rate: one 5 s delta at the tail ends the
+  // measurable episode before a single frame is counted (and in the
+  // live wiring a silence that long is the stall trip's catch long
+  // before this window would judge — the two carve-outs compose).
+  const hitch = [...seq(1000 / 60, 200), 5000];
+  assert.strictEqual(measureLoopRate(hitch), null, 'a stall-bound silence at the tail → no measurement');
+  assert.strictEqual(loopTimeCrawling(hitch), false, 'one 5s hitch + healthy stream → no crawl trip');
+  // A silence mid-stream bounds the episode the same way: judged on
+  // the completing stream after it — enough crawl frames after the
+  // gap fill the window and fire; four frames are not a window yet.
+  const afterGap = [...seq(250, 20), 3000, ...seq(250, 20)];
+  assert.strictEqual(
+    loopTimeCrawling(afterGap),
+    true,
+    'crawl filling the window after a gap → crawl trip (gap never reached)',
+  );
+  const gapNear = [...seq(250, 20), 3000, ...seq(250, 4)];
+  assert.strictEqual(
+    loopTimeCrawling(gapNear),
+    false,
+    'four crawl frames since a gap → no measurable window → no crawl trip',
+  );
+
+  // Too little history is no verdict, and garbage never crawls.
+  assert.strictEqual(measureLoopRate([]), null, 'no deltas → no measurement');
+  assert.strictEqual(loopTimeCrawling([]), false, 'no deltas → no crawl trip');
+  assert.strictEqual(loopTimeCrawling(seq(250, 4)), false, 'four crawl frames (1s) is not a sustained window');
+  assert.strictEqual(loopTimeCrawling(null), false, 'a non-stream → no crawl trip');
+  assert.strictEqual(loopTimeCrawling([NaN, -5, 'hot']), false, 'garbage deltas are skipped → no crawl trip');
+  console.log('[selfcheck] governorCuts (#1919 crawl carve-out, Option B): healthy + crawl + episode cases pinned');
 }
