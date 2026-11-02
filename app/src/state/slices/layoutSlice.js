@@ -972,7 +972,13 @@ export const createLayoutSlice = (set) => ({
       // candidates each CURATOR press rolls (unleashed rooms roll more,
       // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
       // given the same room; a different room is a different deal.
-      const tickResult = getDirector().tick({ feed: loisActivity.snapshot() });
+      // #1917: the poet is dealt off this press's own seeded stream (+0x40000, the
+      // sub-deal pattern beside FIELD placement's +0x30000), so picks vary
+      // across the whole deck and a (seed, offsets, press #) replays its poem.
+      const tickResult = getDirector().tick({
+        feed: loisActivity.snapshot(),
+        fieldRng: rngForIndex(state.seed, CH.curate, press + 0x40000, state.seedOffsets),
+      });
       const kinWeight = tickResult.gains.kinWeight;
       const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
       // #592 — the discrete choices are drawn from a transition chain

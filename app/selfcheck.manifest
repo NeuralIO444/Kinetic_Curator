@@ -516,6 +516,7 @@ node src/curator/fieldEval.selfcheck.mjs
 node src/poets/placement.selfcheck.mjs
 node src/poets/fieldStampPath.selfcheck.mjs
 node src/curator/fieldSilence.selfcheck.mjs
+node src/curator/fieldLiveRng.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs

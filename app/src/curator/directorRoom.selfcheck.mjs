@@ -91,8 +91,11 @@ await ok(
     const got = [];
     const off = on(Events.DIRECTOR_ROOM, (p, m) => got.push([p, m && m.cause]));
     const feed = { keepsLast5m: 0 };
-    getDirector().tick({ feed, audio: 0 });
-    getDirector().tick({ feed, audio: 0 });
+    // #1917: the live Director now deals off a varying stream, and poetId is part of the
+    // readout — hold the deal fixed on both ticks so only the room is under test here.
+    const sameDeal = () => 0.5;
+    getDirector().tick({ feed, audio: 0, fieldRng: sameDeal });
+    getDirector().tick({ feed, audio: 0, fieldRng: sameDeal });
     const bare = createDirector();
     bare.tick({ feed, audio: 0 });
     off();

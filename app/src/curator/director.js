@@ -56,6 +56,7 @@ import { GATE_OPEN } from './queenChannel.js';
 import { createRoomPublisher } from './directorRoom.js';
 import { step as fieldStep, INITIAL_STATE as FIELD_INITIAL } from './fieldEval.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { rngForIndex, CH } from '../engine/kernel/rng.js';
 
 // ─── the gates ─────────────────────────────────────────────────────────────
 // The room table's two taste-derived columns. #762's proof cleared on 2026-10-08 and Matt opened SWAY (rank and
@@ -361,7 +362,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
    *   phase: 'refine'|'explore'|null (#1144's interface; null = unmodulated).
    * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax', sway, poet: { poetId, pieceId, layout } | null }
    */
-  function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
+  function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now(), fieldRng: pickRng = null } = {}) {
     const face = resolveLoisFace(feed);
     const davis = resolveDavisState(feed);
     const loisNow = face ? face.code : null;
@@ -422,7 +423,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     const fieldResult = fieldStep(
       fieldState,
       { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false },
-      rng,
+      typeof pickRng === 'function' ? pickRng : rng, // #1917: a press passes its own seeded stream (replayable)
     );
     fieldState = fieldResult.nextState;
     const poet = fieldResult.decision
@@ -469,6 +470,10 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     get pacing() {
       return { debt, owed };
     },
+    /** #1917: true when this Director was built with a real field stream (not the constant fallback). */
+    get fieldRngWired() {
+      return typeof fieldRng === 'function';
+    },
     /** FIELD state as of the last tick, for the selfcheck (#1907). Never rendered. */
     get fieldState() {
       return fieldState;
@@ -485,12 +490,25 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
   };
 }
 
+/**
+ * #1917 — the live Director's field stream. Seeded and VARYING: each draw
+ * comes off its own hash-decorrelated index, so poet and piece picks spread
+ * across the whole deck. Ticks that pass a per-press stream (the Curator
+ * press, CH.curate + 0x40000) use that instead, so a take replays its poems.
+ */
+export const LIVE_FIELD_SEED = 1917;
+export function createLiveFieldRng(seed = LIVE_FIELD_SEED) {
+  let n = 0;
+  return () => rngForIndex(seed, CH.curate, n++)();
+}
+
 // Module-level singleton — the established pattern (cf. taste.js activePersonaId).
 let singleton = null;
 /** The live Director. */
 export function getDirector() {
   if (!singleton)
     singleton = createDirector({
+      fieldRng: createLiveFieldRng(),
       onRoom: createRoomPublisher((p) => emit(Events.DIRECTOR_ROOM, p, { cause: 'director' })),
     });
   return singleton;
