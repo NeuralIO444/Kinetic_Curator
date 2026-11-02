@@ -14,7 +14,8 @@
  *     with EVERY cut active the X-ray marks no tier-0 pass shed.
  *  C. the ladder walk is deterministic (two runs, identical sequence) and
  *     follows the step contract: fxaa → renderScale → quality → assetThin →
- *     countClamp → slowRender, then null (hold; the watchdog is separate).
+ *     countClamp → slowRender, then null (hold — only then is the
+ *     watchdog armed: #1919 ladder-first).
  *  D. the event log records every cut with its step and reason (detail +
  *     the FPS window that fired it).
  */

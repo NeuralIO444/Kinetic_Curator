@@ -83,7 +83,8 @@
 //   cut 4: cost-aware asset thinning
 //   cut 5: render-only count clamp below the PERF floor
 //   cut 6: freeze motion via slowRender
-//   cut 7: watchdog hard stop
+//   cut 7: watchdog hard stop (armed only once the ladder above is
+//          exhausted — #1919 ladder-first, see watchdogMayTrip)
 //
 // Phase 6 change: cuts 1–2 of the old ladder (FX simplify, then FX bypass —
 // the fxShedLevel mechanism) are GONE. On the GPU, FX compositing is one
@@ -255,8 +256,8 @@ export function perfTier1Passes() {
  *   Omitted (older callers, selfchecks) defaults to true: resolution still
  *   sheds first when the signal is unknown.
  * @returns {{ kind: string, label: string, ... } | null} the cut to apply,
- *   or null when the ladder is exhausted (the hook then holds — the
- *   watchdog is a separate, faster mechanism).
+ *   or null when the ladder is exhausted (the hook then holds — and only
+ *   then is the watchdog armed: #1919 ladder-first, see watchdogMayTrip).
  */
 export function nextGovernorCut(s) {
   const gpuSaturated = s.gpuSaturated !== false; // unknown signal: shed as before
@@ -382,8 +383,186 @@ export function nextGovernorCut(s) {
     return { kind: 'slowRender', label: 'FREEZE FRAME — motion held' };
   }
 
-  // Ladder exhausted — hold. The watchdog (cut 7) is a separate mechanism.
+  // Ladder exhausted — hold. Only from here is the watchdog (cut 7)
+  // armed: the hook gates its trip on this null (#1919 ladder-first).
   return null;
+}
+
+/**
+ * #1919 — ladder-first (Matt's ruling, 2026-11-01): the watchdog (cut 7)
+ * is the ladder's LAST rung, not a separate trigger racing it. The hook's
+ * critical effect asks this gate before its 800 ms window may run:
+ *
+ *   - While a rung the ladder is eligible to apply remains
+ *     (nextGovernorCut answers non-null on the same snapshot the ladder
+ *     effect applies from) AND the rate is inside the ladder's own shed
+ *     region (effFps < shedFps), the watchdog WAITS. The ladder's own
+ *     cadence — sustain window, then one cut per cooldown — governs how
+ *     fast the rungs land; there is no separate grace timer.
+ *   - Once the ladder is exhausted (nextGovernorCut null), the watchdog
+ *     is armed exactly as before: the caller runs its sustained window
+ *     below CRITICAL_FPS and trips.
+ *   - A shed floor tuned below the current rate (GOV TUNE) takes the
+ *     ladder out of play at that rate — its effect will not fire there —
+ *     so there is nothing for the watchdog to wait for and the gate
+ *     releases even with rungs standing.
+ *
+ * Pure like the rest of this module, so the ordering is unit-testable:
+ * governorCuts.selfcheck.mjs walks the ladder under sustained critical
+ * pressure and pins the gate at every step, boot state included.
+ *
+ * @param {object} s the same snapshot nextGovernorCut consumes.
+ * @param {object} ctx { effFps, shedFps } — the rate being judged and
+ *   the ladder's live shed floor.
+ * @returns {boolean} true when the watchdog may run its trip window.
+ */
+export function watchdogMayTrip(s, ctx = {}) {
+  if (nextGovernorCut(s) == null) return true; // ladder exhausted — armed
+  const { effFps, shedFps } = ctx;
+  // Rungs remain: wait — unless the rate sits outside the ladder's shed
+  // region (a tuned floor below this rate), where the ladder cannot act.
+  return Number.isFinite(effFps) && Number.isFinite(shedFps) && effFps >= shedFps;
+}
+
+/**
+ * The frozen-frame bound (#1919 carve-out): how long the stage may go
+ * without completing a frame before the watchdog calls it a hang.
+ * Sized off the living floor: at 1 fps a frame lands every 1000 ms and
+ * the patrol syncs the loop's reports at ~4 Hz, so the widest gap
+ * between observed completions in a scene that is still alive is
+ * ~1.3 s — the bound must clear it, or slow scenes would read as
+ * frozen. 2000 ms clears it with room, a single long hitch or a
+ * shader-compile pause inside it never trips, and a true hang still
+ * stops in about two seconds.
+ */
+export const FRAME_STALL_MS = 2000;
+
+/**
+ * #1919 carve-out — has the frame stream gone silent past the bound?
+ * The third hard trip, alongside 'accum-nan' and 'render-error': a
+ * frozen frame is a hang, not a perf problem, so this predicate is
+ * deliberately NOT gated on ladder state (watchdogMayTrip above is the
+ * fps-critical gate; the two never consult each other). It keys on
+ * frame COMPLETION, not on a rate average: a throttled-but-alive scene
+ * (frames completing at 1–9 fps) keeps its heartbeat fresh and stays
+ * ladder territory. `lastFrameAt` is the wall time of the last
+ * completed frame the caller observed; null (no frame observed yet —
+ * a scene that has never drawn) never stalls: that is the rate path's
+ * problem, not a hang.
+ */
+export function frameStalled(lastFrameAt, now, boundMs = FRAME_STALL_MS) {
+  return Number.isFinite(lastFrameAt) && Number.isFinite(now) && now - lastFrameAt >= boundMs;
+}
+
+/**
+ * The live loop's dt clamp (Spine A, liveLoop.mjs's tick): every
+ * presented frame advances loopTimeMs by the frame's real delta
+ * clamped to [8, 50] ms, so a tab-switch or GC stall can't spike the
+ * physics into a single huge step. The crawl measurement below
+ * replays this exact arithmetic over the patrol's frame-delta
+ * stream — if the loop's clamp ever moves, these constants must
+ * move with it.
+ */
+export const LOOP_DT_MIN_MS = 8;
+export const LOOP_DT_MAX_MS = 50;
+
+/**
+ * The crawl window (#1919 Option B, Matt's ruling 2026-11-01): the
+ * trailing span of wall time the crawl predicate judges. ~4 s is
+ * long enough that a hitch or a shader compile inside it cannot
+ * swing the verdict (and any silence long enough to dominate it is
+ * the stall trip's catch first), and short enough that a true crawl
+ * trips in seconds — the failure this answers gave the specs 60 s
+ * while the ladder gate held the watchdog for a 70–95 s walk.
+ */
+export const CRAWL_WINDOW_MS = 4000;
+
+/**
+ * The crawl floor: the window must hold at least this many presented
+ * frames before it reads as a RATE. A couple of giant gaps is a
+ * silence — the stall trip's story — not a crawl; eight frames
+ * spanning the window is a tempo.
+ */
+export const CRAWL_MIN_FRAMES = 8;
+
+/**
+ * The crawl threshold: loop time gaining less than this fraction of
+ * wall time across the window is a crawl. In even-cadence terms the
+ * booked share is fps × 50 / 1000 below 20 fps, so 0.25 is a
+ * sustained ~5 fps — deep under CRITICAL_FPS, in the band the
+ * fps-critical watchdog used to own outright. Above it (10 fps
+ * books 0.5) the ladder-first gate governs untouched: this trip
+ * never reaches into the shed band.
+ */
+export const CRAWL_MAX_LOOP_RATIO = 0.25;
+
+/**
+ * #1919 Option B — measure how fast loop time is advancing against
+ * wall time over the trailing window, from the patrol's rAF delta
+ * stream (useFpsMeter's ring — the same honest distribution the GOV
+ * TUNE histogram reads, because the FPS average lies about exactly
+ * this). Each delta is one presented-frame interval on the shared
+ * main thread; replaying the loop's own clamp over the stream gives
+ * the advance loopTimeMs actually booked: a delta at or under the
+ * 50 ms ceiling books itself whole, a longer one books 50.
+ *
+ * The walk runs newest → oldest until it holds BOTH the full window
+ * of wall time and the minimum frame count (a sparse stream fills
+ * the frame count past the window; the measurement is then over
+ * that longer span, and "sustained" is satisfied a fortiori). A
+ * delta at or over FRAME_STALL_MS ends the measurable episode: that
+ * silence is the stall trip's jurisdiction (in the live wiring its
+ * trip latches first), and the rate is judged on the completing
+ * stream since it. Returns null when the stream cannot fill the
+ * window — too little history is no verdict, never a trip.
+ *
+ * The healthy invariant is arithmetic, not tuning: at 41 fps the
+ * raw delta is ~24.4 ms, under the clamp ceiling, so every frame
+ * books its full delta and loop time gains exactly wall time
+ * (ratio 1) — the crawl trip cannot fire there, or anywhere at or
+ * above 20 fps, whatever the ladder is doing. Matt's incident ran
+ * at rAF 41 fps: this trip is silent there by construction.
+ *
+ * @param {number[]} deltas frame deltas, oldest → newest (ms)
+ * @returns {{ wallMs: number, loopMs: number, frames: number, ratio: number } | null}
+ */
+export function measureLoopRate(deltas, windowMs = CRAWL_WINDOW_MS, minFrames = CRAWL_MIN_FRAMES) {
+  if (!Array.isArray(deltas)) return null;
+  let wallMs = 0;
+  let loopMs = 0;
+  let frames = 0;
+  for (let i = deltas.length - 1; i >= 0; i--) {
+    const d = deltas[i];
+    if (!Number.isFinite(d) || d < 0) continue;
+    // A stall-bound silence inside the stream ends the episode —
+    // judge only the completing stream after it (see above).
+    if (d >= FRAME_STALL_MS) break;
+    wallMs += d;
+    loopMs += Math.max(LOOP_DT_MIN_MS, Math.min(LOOP_DT_MAX_MS, d));
+    frames++;
+    if (wallMs >= windowMs && frames >= minFrames) break;
+  }
+  if (wallMs < windowMs || frames < minFrames) return null;
+  return { wallMs, loopMs, frames, ratio: loopMs / wallMs };
+}
+
+/**
+ * #1919 Option B — is loop time crawling? The second carve-out,
+ * sibling to frameStalled: frames are COMPLETING (the stall
+ * heartbeat is fresh), yet each completion books at most 50 ms of
+ * loop time while wall time runs full — bars stretch to many times
+ * their length, loop-time landings crawl, and the main thread
+ * saturates behind frames that take hundreds of ms to present.
+ * Like the stall, this predicate is deliberately NOT gated on
+ * ladder state: the crawl is a hang-class pathology (the thread is
+ * drowning), not a perf problem the ladder sheds its way out of —
+ * and left alone it holds the fps-critical trip hostage for the
+ * whole ladder walk behind the gate. Unlike the stall, it keys on
+ * the RATE loop time advances, not on silence.
+ */
+export function loopTimeCrawling(deltas, opts = {}) {
+  const m = measureLoopRate(deltas, opts.windowMs ?? CRAWL_WINDOW_MS, opts.minFrames ?? CRAWL_MIN_FRAMES);
+  return m != null && m.ratio < (opts.maxRatio ?? CRAWL_MAX_LOOP_RATIO);
 }
 
 /**

@@ -16,7 +16,14 @@
 //     cut 4: cost-aware asset thinning (drop highest-cost assets first)
 //     cut 5: render-only count clamp below the PERF floor
 //     cut 6: freeze motion via slowRender (a still instrument beats a dead one)
-//     cut 7: watchdog hard stop (existing tier 2, manual resume)
+//     cut 7: watchdog hard stop (existing tier 2, manual resume) —
+//       #1919 ladder-first (Matt's ruling): the critical effect below
+//       arms ONLY once the ladder is exhausted; while a rung remains,
+//       the pause waits for the sheds, at the ladder's own cadence.
+//       Two hang-class carve-outs bypass the gate by design (the poll
+//       below): a frozen frame ('fps-stalled') and a loop-time crawl
+//       ('fps-crawl', Option B) — neither is a perf problem the ladder
+//       sheds its way out of.
 // - Every cut is a render-only overlay: it never writes layoutParams, never
 //   serializes into project JSON, and auto-clears on recovery — except the
 //   hard stop, which needs manual resume (panic-key precedent, #107).
@@ -28,9 +35,21 @@
 //   ever sheds, the UI says so: see TapeCounter in MasterBar.jsx (the
 //   merged readout — #295 built it, #177/#483 own the design).
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useStore } from '../state/store.js';
-import { nextGovernorCut, isGpuBinding, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
+import {
+  nextGovernorCut,
+  isGpuBinding,
+  GOVERNOR_RESTORE_CUTS,
+  watchdogMayTrip,
+  frameStalled,
+  FRAME_STALL_MS,
+  measureLoopRate,
+  CRAWL_WINDOW_MS,
+  CRAWL_MAX_LOOP_RATIO,
+  effectiveGovernorFps,
+} from './governorCuts.js';
+import { getFrameDeltas, clearFrameDeltas } from './useFpsMeter.js';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
 import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 import { accumFeedSelection } from '../gl/renderer.mjs';
@@ -67,6 +86,7 @@ const SUSTAIN_MS = 1600; // must stay low this long before acting
 const CRITICAL_SUSTAIN_MS = 800; // react faster — this is the worse case
 const TIER1_SUSTAIN_MS = 2000; // #107 §4 spec: 2s sustained below TIER1_FPS
 const COOLDOWN_MS = 8000; // don't auto-step again for a while
+const STALL_POLL_MS = 250; // #1919 carve-outs: how often the frozen-frame + crawl checks wake
 
 export function usePerformanceGovernor() {
   const fps = useStore((s) => s.fps);
@@ -211,6 +231,63 @@ export function usePerformanceGovernor() {
   const criticalSinceRef = useRef(null);
   const tier1SinceRef = useRef(null);
 
+  // #1919 — the ladder snapshot, built once per render: the ladder
+  // effect applies its cuts from this object and the watchdog gate
+  // reads eligibility from the SAME object, so the two can never
+  // disagree about whether a rung remains. The gate itself is pure
+  // (governorCuts.watchdogMayTrip): it answers whether the watchdog
+  // may run its trip window at this rate — false while the ladder
+  // still has a rung it is eligible to apply, true once the ladder is
+  // exhausted (or tuned out of play at this rate).
+  const ladderQuery = useMemo(
+    () => ({
+      fxaa: fxaa !== false && !fxaaShed,
+      renderScale,
+      quality,
+      assetThin,
+      perfClampOverride,
+      effectiveCount: layoutParams?.count,
+      creatureCount,
+      creatureShed,
+      weatherActive,
+      weatherShed,
+      feedbackWarpActive,
+      feedbackWarpShed,
+      accumFeedActive,
+      accumFeedShed,
+      trailSteerActive,
+      trailSteerShed,
+      travelActive,
+      travelShed,
+      slowRender,
+      gpuSaturated,
+    }),
+    [
+      fxaa,
+      fxaaShed,
+      renderScale,
+      quality,
+      assetThin,
+      perfClampOverride,
+      layoutParams,
+      creatureCount,
+      creatureShed,
+      weatherActive,
+      weatherShed,
+      feedbackWarpActive,
+      feedbackWarpShed,
+      accumFeedActive,
+      accumFeedShed,
+      trailSteerActive,
+      trailSteerShed,
+      travelActive,
+      travelShed,
+      slowRender,
+      gpuSaturated,
+    ],
+  );
+  const watchdogMayTripNow = watchdogMayTrip(ladderQuery, { effFps, shedFps });
+
   useEffect(() => {
     // #264 — clear a motion freeze, logging the restore under the cutKind
     // the flap detector can pair with the shed: 'watchdog' for the hard
@@ -255,6 +332,20 @@ export function usePerformanceGovernor() {
       criticalSinceRef.current = null;
       return;
     }
+    // #1919 — ladder-first (Matt's ruling): while the shed ladder still
+    // has a rung it is eligible to apply, the critical window does not
+    // run — the watchdog waits for the ladder, whose own cadence (the
+    // sustain + cooldown in the ladder effect below) governs how fast
+    // the rungs land. Holding the window at null means the 800 ms is
+    // measured from exhaustion: once the ladder is exhausted and the
+    // rate remains below CRITICAL_FPS for the full window, the trip
+    // fires exactly as it did before this gate existed. (The
+    // 'accum-nan' and 'render-error' trip callers are correctness
+    // stops; they never pass through this effect and are untouched.)
+    if (!watchdogMayTripNow) {
+      criticalSinceRef.current = null;
+      return;
+    }
     const now = Date.now();
     if (criticalSinceRef.current == null) {
       criticalSinceRef.current = now;
@@ -286,7 +377,146 @@ export function usePerformanceGovernor() {
     clearWatchdogReason,
     recoverFps,
     glContext,
+    watchdogMayTripNow,
   ]);
+
+  // #1919 carve-out — the frozen frame, a third hard trip alongside
+  // 'accum-nan' and 'render-error', and like them NOT gated on ladder
+  // state: walking the ladder to exhaustion can take minutes, and a
+  // genuinely frozen frame is a hang, not a perf problem. The criterion
+  // is frame COMPLETION, not a rate: the live loop times every frame it
+  // completes into the patrol (reportStage 'gpuFrame'), and the meter's
+  // 4 Hz drain reads 0 for a stage that produced no sample in the
+  // window — so a sync with gpuFrame > 0 IS a heartbeat. A scene
+  // crawling at 1–9 fps keeps that heartbeat fresh and stays ladder
+  // territory; only silence past FRAME_STALL_MS trips.
+  //
+  // #1919 Option B — the crawl, a fourth hard trip sharing this poll:
+  // frames completing (the stall check above them passes) can still
+  // starve the instrument — each completion books at most 50 ms of
+  // loop time (the loop's dt clamp) while wall time runs full, so at
+  // 3–5 fps the thread saturates and loop-time landings take minutes
+  // of wall time, all while the gate holds the fps-critical trip for
+  // the whole ladder walk (the PR #1920 e2e failure, diagnosed in the
+  // goal's hidden_files). The poll therefore also judges the RATE
+  // loop time advances — governorCuts.measureLoopRate over the meter's
+  // delta ring — and trips 'fps-crawl' when it stays under the crawl
+  // threshold across the window. Same guards, same episode restarts:
+  // the measurement restarts wherever the stall bound restarts, and
+  // the delta ring is cleared at those moments so a window never
+  // spans a stop, a restore, or a hidden tab.
+  const lastFrameAtRef = useRef(null);
+  const stallWasStoppedRef = useRef(false);
+  useEffect(() => {
+    if (gpuFrameMs > 0) lastFrameAtRef.current = Date.now();
+  }, [stageTimings, gpuFrameMs]);
+
+  useEffect(() => {
+    if (!governorArmed) return;
+    // The poll runs on timers, not rAF: it must still be awake when
+    // the frame stream is not. Every read is fresh store state.
+    const onVisible = () => {
+      // Returning from a hidden tab restarts the bound (below).
+      if (!document.hidden) lastFrameAtRef.current = Date.now();
+      // The crawl window restarts with it: the delta spanning the
+      // hidden span lands in the meter's ring when rAF resumes, and
+      // it was the browser parking the page, not the stage crawling.
+      if (!document.hidden) clearFrameDeltas();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    const id = setInterval(() => {
+      const s = useStore.getState();
+      // #263's precedent: while the context restores, no frame CAN
+      // complete — the silence is the rebake's, not a hang. Hold.
+      // Arm the resume-restart on the way out (QA finding, #1919):
+      // the restored session's first heartbeat reaches the store up
+      // to a drain (~250 ms) after 'ok' flips, and without this the
+      // first poll back would judge the pre-loss heartbeat — by then
+      // arbitrarily old — and false-trip on a successful restore.
+      if (s.glContext !== 'ok') {
+        stallWasStoppedRef.current = true;
+        return;
+      }
+      // A hidden tab completes no frames by platform design; that
+      // silence is the browser parking the page, not the stage
+      // hanging, so hidden time never counts toward the bound.
+      if (typeof document !== 'undefined' && document.hidden) {
+        lastFrameAtRef.current = Date.now();
+        return;
+      }
+      // Paused by the performer, frozen by cut 6, or already stopped:
+      // the stage is not supposed to be completing frames. The bound
+      // restarts from the moment it is expected to run again, so a
+      // resume always gets a full bound to produce a frame.
+      if (!s.running || s.slowRender) {
+        stallWasStoppedRef.current = true;
+        return;
+      }
+      if (stallWasStoppedRef.current) {
+        stallWasStoppedRef.current = false;
+        lastFrameAtRef.current = Date.now();
+        // The crawl window restarts from the same moment: the ring
+        // still holds the stopped episode's deltas, and a window must
+        // never span a stop (or a restore — the context-down branch
+        // above arms this same restart, per the QA fix).
+        clearFrameDeltas();
+        return;
+      }
+      if (frameStalled(lastFrameAtRef.current, Date.now())) {
+        s.tripWatchdog('fps-stalled');
+        // Event-log only: the carve-out fires under the watchdog kind.
+        recordGovernorEvent({
+          type: 'shed',
+          cutKind: 'watchdog',
+          label: 'watchdog hard stop — frame stalled',
+          fps: {
+            at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
+            threshold: 0,
+            sustainedMs: FRAME_STALL_MS,
+          },
+          detail: `no completed frame for ${FRAME_STALL_MS / 1000}s`,
+        });
+        console.info(
+          '[Kinetic] Perf critical: watchdog tripped — frame stalled (no completed frame for',
+          FRAME_STALL_MS / 1000 + 's)',
+        );
+        return;
+      }
+      // #1919 Option B — the crawl. The stall check just passed, so
+      // frames ARE completing; judge the rate loop time is advancing
+      // over the trailing window. Disarmed until the first presented
+      // frame (the same null heartbeat that disarms the stall), and
+      // not gated on ladder state — like the stall, it is a hang-class
+      // trip, and the gate holding for the ladder is precisely the
+      // condition it exists under. At healthy rates the measured
+      // ratio is 1 by arithmetic (raw dt under the loop's clamp
+      // ceiling), so this can only fire in a genuine crawl.
+      if (lastFrameAtRef.current == null) return;
+      const rate = measureLoopRate(getFrameDeltas());
+      if (!rate || rate.ratio >= CRAWL_MAX_LOOP_RATIO) return;
+      s.tripWatchdog('fps-crawl');
+      // Event-log only: the carve-out fires under the watchdog kind.
+      recordGovernorEvent({
+        type: 'shed',
+        cutKind: 'watchdog',
+        label: 'watchdog hard stop — loop time crawling',
+        fps: {
+          at: Math.round(effectiveGovernorFps(Number(s.fps) || 0, s.stageTimings) * 10) / 10,
+          threshold: 0,
+          sustainedMs: CRAWL_WINDOW_MS,
+        },
+        detail: `loop time advanced ${Math.round(rate.ratio * 100)}% of wall across ${(rate.wallMs / 1000).toFixed(1)}s (${rate.frames} frames)`,
+      });
+      console.info(
+        '[Kinetic] Perf critical: watchdog tripped — loop time crawling (loop clock at',
+        Math.round(rate.ratio * 100) + '% of wall)',
+      );
+    }, STALL_POLL_MS);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [governorArmed]);
 
   // Tier 1 (#107 §4): a milder, self-clearing shed. Independent sustain
   // window from the critical tier above — this one fires first, at a higher
@@ -454,29 +684,8 @@ export function usePerformanceGovernor() {
 
     if (!sustained || !cooled) return;
 
-    const cut = nextGovernorCut({
-      fxaa: fxaa !== false && !fxaaShed,
-      renderScale,
-      quality,
-      assetThin,
-      perfClampOverride,
-      effectiveCount: layoutParams.count,
-      creatureCount,
-      creatureShed,
-      weatherActive,
-      weatherShed,
-      feedbackWarpActive,
-      feedbackWarpShed,
-      accumFeedActive,
-      accumFeedShed,
-      trailSteerActive,
-      trailSteerShed,
-      travelActive,
-      travelShed,
-      slowRender,
-      gpuSaturated,
-    });
-    if (!cut) return; // ladder exhausted — hold; the watchdog is separate
+    const cut = nextGovernorCut(ladderQuery);
+    if (!cut) return; // ladder exhausted — hold; the watchdog is armed from here (#1919)
 
     switch (cut.kind) {
       case 'fxaa':
@@ -575,5 +784,6 @@ export function usePerformanceGovernor() {
     shedFps,
     recoverFps,
     gpuSaturated,
+    ladderQuery,
   ]);
 }
