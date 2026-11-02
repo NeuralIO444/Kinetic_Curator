@@ -186,6 +186,7 @@ ok('no UI-surface file references the director scheduler', () => {
     'curator/directorPresence.selfcheck.mjs', // #1145 part 2: her tier scales her allowance
     'curator/directorDebt.selfcheck.mjs', // #1145 part 3: pacing debt
     'curator/fieldLiveDeal.selfcheck.mjs', // #1917: pins the live Director's FIELD deal stream (drives getDirector)
+    'poets/poemRow.selfcheck.mjs', // #1918: proves poem-only deals leave the room's slow debt alone
     // deliberate wiring: the pick path and the candidate count (logic, not surface)
     'curator/taste.js',
     'curator/curate.js',

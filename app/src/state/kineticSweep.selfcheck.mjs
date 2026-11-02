@@ -31,6 +31,12 @@ const records = assetRecords(ASSETS);
 const recById = new Map(records.map((r) => [r.id, r]));
 const STRUCT_OK = (k) => !MOTION_KEYS.includes(k); // a look moves structure, never motion
 const VOICE_OK = (k) => MOTION_KEYS.includes(k) || ACCUM_KEYS.includes(k);
+// #1918 re-pin (cause: ruling 1, Matt 2026-11-01 — every KINETIC press re-deals the FIELD poem): the
+// poem (layoutParams.fieldForm) now moves on every tap, but it is no pass's axis — LOOK, VOICE and CURATOR
+// own exactly what they owned before. The audit below diffs the axes without it; the poem's own deal,
+// HOLD and undo are measured in poets/poemRow.selfcheck.mjs.
+const axisDiff = (a, b) => paramDiff(a, b).filter((k) => k !== 'fieldForm');
+const poemMoved = (a, b) => JSON.stringify(a.fieldForm ?? null) !== JSON.stringify(b.fieldForm ?? null);
 const EPS = 1e-6;
 const capOk = (m) => nudgeWithinCap(m.key, m.from, m.to);
 const snap = () => {
@@ -49,7 +55,7 @@ const snap = () => {
   const a = snap();
   S().kineticLookPass();
   const b = snap();
-  const dLook = paramDiff(a.lp, b.lp);
+  const dLook = axisDiff(a.lp, b.lp);
   assert.ok(lookIds.has(S().layoutParams.composition), 'LOOK lands on one of the dealt looks');
   assert.notEqual(b.lp.composition, a.lp.composition, 'LOOK deals a different look');
   assert.ok(dLook.every(STRUCT_OK), `LOOK moved motion keys: ${dLook.filter((k) => !STRUCT_OK(k))}`);
@@ -66,7 +72,7 @@ const snap = () => {
 
   S().kineticVoicePass();
   const c = snap();
-  const dVoice = paramDiff(b.lp, c.lp);
+  const dVoice = axisDiff(b.lp, c.lp);
   const voice = VOICE_DECK.find((v) => v.id === S().kineticVoiceId);
   assert.ok(voice, 'VOICE deals one of the dealt voices');
   // #1856 re-pin (cause: D2 — LOIS's kill, Matt 2026-10-31): the voice-pass commit is also where the
@@ -104,7 +110,7 @@ const snap = () => {
   const d = snap();
   const nudge = S().kineticNudge;
   assert.ok(nudge && Array.isArray(nudge.moves), 'the CURATOR pass leaves its backstage record');
-  const dCur = paramDiff(c.lp, d.lp);
+  const dCur = axisDiff(c.lp, d.lp);
   assert.deepEqual(dCur, nudge.moves.map((m) => m.key).sort(), 'the record names exactly what moved');
   assert.ok(dCur.length <= NUDGE_MAX_KEYS, `CURATOR moved ${dCur.length} keys`);
   assert.ok(
@@ -114,10 +120,11 @@ const snap = () => {
   assert.ok(nudge.moves.every(capOk), `CURATOR stayed within its cap: ${JSON.stringify(nudge.moves)}`);
   assert.equal(d.assets, c.assets, 'CURATOR keeps the pool');
   assert.equal(d.palette, c.palette, 'CURATOR keeps the palette');
-  assert.equal(d.undo, c.undo + (dCur.length ? 1 : 0), 'CURATOR = one undo step, or none when it passed');
+  const curMoved = dCur.length > 0 || poemMoved(c.lp, d.lp); // #1918: a re-dealt poem is a change too
+  assert.equal(d.undo, c.undo + (curMoved ? 1 : 0), 'CURATOR = one undo step, or none when it passed');
 
   // one undo per tap, all the way back
-  if (dCur.length) S().undo();
+  if (curMoved) S().undo();
   assert.deepEqual(snap().lp, c.lp, 'undo takes the curator nudge back');
   S().undo();
   assert.deepEqual(snap().lp, b.lp, 'undo takes the voice back');
@@ -148,15 +155,23 @@ const snap = () => {
   // a curator that keeps the piece: a store pass with no change and no undo entry
   const keep = curatorPass(st, null, mkRng(1), () => ({ index: 0 }));
   assert.equal(keep.layoutParams, null, 'index 0 is a pass');
+  // #1918: HOLD needs a poem standing to hold (silence has no value to lock) — deal one first.
+  for (let i = 0; i < 8 && !S().layoutParams.fieldForm; i++) S().redealPoem();
+  assert.ok(S().layoutParams.fieldForm, 'a poem stands to hold');
   const depth = S().historyUndoStack.length;
   const before = JSON.stringify(S().layoutParams);
   // with every dice-rollable key locked there is nothing to nudge: the pass passes
   for (const k of RANDOMIZABLE_KEYS) if (!S().lockedParams[k]) S().toggleParamLock(k);
+  // #1918 re-pin (cause: ruling 1 — every KINETIC press re-deals the poem): "everything locked" now
+  // includes the poem's own lock, HOLD. Unheld, the poem re-deals even when Davis passes.
+  const poemWasHeld = !!S().lockedParams.fieldForm;
+  if (!poemWasHeld) S().togglePoemHold();
   S().kineticCuratorPass();
   assert.equal(JSON.stringify(S().layoutParams), before, 'everything locked: the curator changes nothing');
   assert.equal(S().historyUndoStack.length, depth, 'a pass pushes no undo entry');
   assert.deepEqual(S().kineticNudge.moves, []);
   for (const k of RANDOMIZABLE_KEYS) if (S().lockedParams[k]) S().toggleParamLock(k);
+  if (!poemWasHeld && S().lockedParams.fieldForm) S().togglePoemHold();
 }
 
 // ── 3. locked params hold at every stage ──────────────────────────────────────────────────────────────────────────

@@ -32,6 +32,7 @@ import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
 import { fieldFormForDeal } from '../../poets/fieldForm.js'; // #1904 — FIELD: the shuffle deals a poet
+import { POEM_PICK_BASE, POEM_PLACE_BASE, keepPoem as bankPoem, isPoemKept } from '../../poets/poemRow.mjs'; // #1918
 import { FEEL_PRESETS } from '../../data/feels.js';
 import {
   resolveVoiceState,
@@ -232,6 +233,44 @@ function runRound(state, r) {
 
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
 const dieRng = () => die(0x40000000) / 0x40000000;
+
+/** #1918 — HOLD: the standing poem is locked against re-deals (lockedParams.fieldForm, and a poem stands). */
+const poemHeld = (state) => !!state.lockedParams?.fieldForm && !!state.layoutParams?.fieldForm;
+
+/** The dish aspect a form is placed for (FIELD S3's own read). */
+const fieldAspect = (state) =>
+  Number.isFinite(state.canvasW / state.canvasH) ? { aspect: state.canvasW / state.canvasH } : {};
+
+/**
+ * #1918 — the poem's write site for every deal outside the CURATOR press (KINETIC passes, the
+ * identity chip). Returns { layoutParams, poemDeal } to spread into the same commit as the rest of
+ * the press, so the form, its HOLD flag and the deal counter can never disagree.
+ *  - HOLD passes the deal by: the standing form is carried onto `layoutParams` untouched (Resolume's
+ *    Ignore Column Trigger — the value is locked, not the generator), and the counter does not move.
+ *  - Otherwise the Director deals a poet without ticking the room (dealPoet), off the seeded varying
+ *    stream at poemDeal; the form is placed off its sibling stream. Silence clears the standing form.
+ * `avoidPieceId` (the dislike path) asks for a different piece than the one standing.
+ */
+function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
+  const lp = { ...layoutParams };
+  const n = state.poemDeal | 0;
+  if (poemHeld(state)) {
+    lp.fieldForm = state.layoutParams.fieldForm;
+    return { layoutParams: lp, poemDeal: n };
+  }
+  const poet = getDirector().dealPoet({
+    fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
+    avoidPieceId,
+  });
+  const form = fieldFormForDeal(
+    poet,
+    rngForIndex(state.seed, CH.curate, POEM_PLACE_BASE + n, state.seedOffsets),
+    fieldAspect(state),
+  );
+  if (form) lp.fieldForm = form;
+  else delete lp.fieldForm;
+  return { layoutParams: lp, poemDeal: n + 1 };
+}
 
 /**
  * #1857 — the narrowing a round's settle opens: the funnel standing at notch 0 (the chapter pool),
@@ -434,6 +473,12 @@ export const createLayoutSlice = (set) => ({
   refinePaletteAnchor: null,
   layoutParams: { ...DEFAULT_LAYOUT_PARAMS },
   lockedParams: {},
+  /**
+   * #1918 — FIELD poem deals made outside the CURATOR press (KINETIC passes, the identity chip): the
+   * index of the seeded stream the next one draws from. The dealt form itself is document data
+   * (layoutParams.fieldForm), so replay never re-derives a poem from this. Session-only.
+   */
+  poemDeal: 0,
   /**
    * Render-only overlay for the performance governor's last-resort density
    * cut (#107 §5): null, or a partial { count?, mirror? } merged over
@@ -908,6 +953,46 @@ export const createLayoutSlice = (set) => ({
       lockedParams: { ...state.lockedParams, [key]: !state.lockedParams[key] },
     })),
 
+  /**
+   * #1918 — the identity chip: a poem-only re-deal. Look, voice and everything else stand; only the
+   * poem moves (the dislike path). Inert while held. One undo step.
+   */
+  redealPoem: () =>
+    set((state) => {
+      if (poemHeld(state)) return {};
+      const standing = state.layoutParams.fieldForm || null;
+      const poem = landPoem(state, state.layoutParams, { avoidPieceId: standing ? standing.pieceId : null });
+      if (Object.is(poem.layoutParams.fieldForm ?? null, standing)) return { poemDeal: poem.poemDeal };
+      return { ...pushToUndo(state, true), layoutParams: poem.layoutParams, poemDeal: poem.poemDeal };
+    }),
+
+  /**
+   * #1918 — HOLD: lock the materialized poem against KINETIC and CURATOR re-deals (lockedParams.fieldForm,
+   * the house lock idiom). Document-long — chapter changes do not clear it. Refused with no poem standing:
+   * there is no value to hold. Releasing always works.
+   */
+  togglePoemHold: () =>
+    set((state) => {
+      const held = !!state.lockedParams?.fieldForm;
+      if (!held && !state.layoutParams?.fieldForm) return {};
+      return { lockedParams: { ...state.lockedParams, fieldForm: !held } };
+    }),
+
+  /** #1918 — KEEP: bank this exact materialized poem into the take. KEEP twice is one keeper. */
+  // The bank is document data beside the poem itself (layoutParams.poemKeeps): a take records it (layoutParams
+  // is a scene key), the project saves it, and it is re-validated on every read (poemRow.sanitizePoemKeeps).
+  // One undo step, like every other write to layoutParams.
+  keepPoem: () =>
+    set((state) => {
+      const form = state.layoutParams?.fieldForm;
+      const keeps = state.layoutParams?.poemKeeps;
+      if (!form || isPoemKept(keeps, form)) return {};
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: { ...state.layoutParams, poemKeeps: bankPoem(keeps, form) },
+      };
+    }),
+
   randomizeParam: (key) =>
     set((state) => {
       const rolled = randomizeKey(key);
@@ -1070,16 +1155,18 @@ export const createLayoutSlice = (set) => ({
       // Director tick above already dealt (or declined) a poet. The form is
       // placed off the press's own seeded stream (the colour deal's sub-deal
       // pattern, +0x30000) and rides the landed params in this same commit;
-      // a silent deal clears the standing form. Nothing else writes the
-      // key, so a dealt form is HELD across voice passes until the next
-      // Curator press deals again.
+      // a silent deal clears the standing form. #1918: KINETIC presses
+      // and the poem row re-deal it too (landPoem); HOLD passes every deal
+      // by, this press included.
       const fieldDeal = fieldFormForDeal(
         tickResult.poet,
         rngForIndex(state.seed, CH.curate, press + 0x30000, state.seedOffsets),
-        Number.isFinite(state.canvasW / state.canvasH) ? { aspect: state.canvasW / state.canvasH } : {},
+        fieldAspect(state),
       );
       const landed = { ...landedParams };
-      if (fieldDeal) landed.fieldForm = fieldDeal;
+      // #1918 — HOLD: the CURATOR press passes a held poem by (the Director still dealt; the value stands).
+      if (poemHeld(state)) landed.fieldForm = state.layoutParams.fieldForm;
+      else if (fieldDeal) landed.fieldForm = fieldDeal;
       else delete landed.fieldForm;
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
@@ -1188,6 +1275,8 @@ export const createLayoutSlice = (set) => ({
         makeId: () => `pt-${seed.toString(36)}`,
       }).layers;
 
+      // #1918 ruling 1 — every KINETIC press re-deals the poem (HOLD passes it by).
+      const poem = landPoem(state, merged);
       return {
         ...undo,
         seed,
@@ -1195,7 +1284,8 @@ export const createLayoutSlice = (set) => ({
         paletteOverrides: null,
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
-        layoutParams: merged,
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
         enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
         layers,
         selectedFxLayerId,
@@ -1227,10 +1317,12 @@ export const createLayoutSlice = (set) => ({
       // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
       // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
+      const poem = landPoem(state, r.layoutParams); // #1918 ruling 1 — the press re-deals the poem
       const next = {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
-        layoutParams: r.layoutParams,
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         voiceMix: null,
         activeVoiceId: null,
@@ -1244,7 +1336,7 @@ export const createLayoutSlice = (set) => ({
         // implicit in the exits; the next settled round opens a fresh funnel at notch 0).
         kineticNotch: null,
       };
-      if (r.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
+      if (poem.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
     }),
 
@@ -1292,11 +1384,13 @@ export const createLayoutSlice = (set) => ({
         round.kineticRound && round.kineticRound !== state.kineticRound
           ? notchForRound(round.kineticRound)
           : state.kineticNotch;
+      const poem = landPoem(state, round.layoutParams ?? r.layoutParams); // #1918 ruling 1
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
         light,
-        layoutParams: round.layoutParams ?? r.layoutParams,
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
         paletteId: r.paletteId,
         paletteOverrides: r.paletteOverrides,
         paletteLocks: {},
@@ -1362,14 +1456,19 @@ export const createLayoutSlice = (set) => ({
       // #1856 — a warm tap lands on the table and is absorbed (roundTable.absorbWarmTap): the settled
       // round is the board this pass plays on, and the record provably does not move.
       const kineticRound = state.kineticRound ? absorbWarmTap(state.kineticRound) : state.kineticRound;
-      if (!r.layoutParams) return { kineticNudge, kineticRound };
+      // #1918 ruling 1 — the poem re-deals even when Davis keeps the piece. A held poem stands, and a
+      // kept piece under a held poem is still a true pass: no change, no undo entry (#1772).
+      const poem = landPoem(state, r.layoutParams ?? state.layoutParams);
+      const poemMoved = !Object.is(poem.layoutParams.fieldForm, state.layoutParams.fieldForm);
+      if (!r.layoutParams && !poemMoved) return { kineticNudge, kineticRound, poemDeal: poem.poemDeal };
       return {
         ...pushToUndo(state, true),
-        layoutParams: r.layoutParams,
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
         kineticNudge,
         kineticRound,
-        voiceMix: null,
-        activeVoiceId: null,
+        // only a real nudge ends the running voice MIX — a poem-only re-deal is no voice axis
+        ...(r.layoutParams ? { voiceMix: null, activeVoiceId: null } : {}),
       };
     }),
 

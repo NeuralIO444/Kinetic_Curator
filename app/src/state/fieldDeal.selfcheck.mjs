@@ -53,13 +53,22 @@ ok('the deal replays: same (seed, press #) -> identical form', () => {
   assert.equal(JSON.stringify(again.fieldForm), JSON.stringify(dealtForm), 'bit-for-bit the same deal');
 });
 
-ok('the form is HELD across a voice pass', () => {
+// #1918 re-pin (cause: ruling 1, Matt 2026-11-01 — the poem re-deals on every KINETIC press, over the
+// research's CURATOR-only recommendation). S3's "held across voice passes" is now the HOLD chip's job:
+// held, a voice pass leaves the form standing exactly; unheld, the voice pass deals off the poem stream.
+ok('HOLD keeps the form across a voice pass; unheld, the voice pass re-deals', () => {
+  S().togglePoemHold();
   S().kineticVoicePass();
   assert.equal(
     JSON.stringify(S().layoutParams.fieldForm),
     JSON.stringify(dealtForm),
-    'the voice pass leaves the form standing',
+    'a held form stands through the voice pass',
   );
+  S().togglePoemHold();
+  const deal = S().poemDeal;
+  S().kineticVoicePass();
+  assert.equal(S().poemDeal, deal + 1, 'unheld, the voice pass drew a poem deal');
+  useStore.setState({ layoutParams: { ...S().layoutParams, fieldForm: dealtForm } });
 });
 
 ok('a no-op press (everything locked) deals nothing and keeps the standing form', () => {

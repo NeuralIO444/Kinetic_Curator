@@ -129,7 +129,10 @@ for (const m of SCOPE_CYCLE) {
     S().kineticCuratorPass();
     const moves = S().kineticNudge.moves;
     assert.ok(moves.length <= NUDGE_MAX_KEYS && moves.every((x) => nudgeWithinCap(x.key, x.from, x.to)), `${m}: cap`);
-    assert.deepEqual(paramDiff(before, S().layoutParams), moves.map((x) => x.key).sort());
+    // #1918 re-pin (cause: ruling 1 — every KINETIC press re-deals the FIELD poem): the nudge record names the
+    // curator's axes; the poem is no axis of the pass (poets/poemRow.selfcheck.mjs measures its deal).
+    const axes = paramDiff(before, S().layoutParams).filter((k) => k !== 'fieldForm');
+    assert.deepEqual(axes, moves.map((x) => x.key).sort());
   }
 }
 assert.ok(VOICE_DECK.length === 72); // #1854: 64 + the 8 Marks family voices

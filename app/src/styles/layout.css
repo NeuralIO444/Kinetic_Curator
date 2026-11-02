@@ -68,6 +68,7 @@
 .app-fullscreen .master-bar,
 .app-fullscreen .palette-strip,
 .app-fullscreen .mode-strip,
+.app-fullscreen .poem-row,
 .app-fullscreen .footer-bar {
   display: none;
 }
@@ -263,6 +264,58 @@
   display: flex;
   gap: 4px;
   flex-shrink: 0;
+}
+
+/* #1918 — FIELD poem row: the mode strip's twin, one row, no new panel. Discrete state → TE
+   (KC-1 DS rule 2): hard states, lock glyphs, one red. Casing in CSS (§5): the label rides the mode
+   strip's own label style, KEEP/HOLD are commands, the poem's words stay as authored, and the poet's
+   surname and the FORM readout are set in caps here. */
+.poem-row .mode-strip-chips {
+  min-width: 0;
+  flex-shrink: 1;
+}
+.poem-row .poem-id {
+  text-transform: none;
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.poem-row .poem-id-poet {
+  color: var(--ink);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.poem-row .poem-id:disabled {
+  cursor: default;
+  opacity: 1; /* held reads by the HOLD chip, not by a fade (rule 7: never opacity alone) */
+}
+.poem-row .poem-id:disabled:hover {
+  color: var(--dim);
+  border-color: var(--line-2);
+}
+.poem-row .poem-form {
+  border-style: dotted; /* a readout, not a control */
+  color: var(--dimmer);
+  cursor: default;
+  text-transform: uppercase;
+}
+.poem-row .poem-form:hover {
+  color: var(--dimmer);
+  border-color: var(--line-2);
+}
+.poem-row .poem-act {
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.poem-row .poem-lock {
+  margin-right: 3px;
+}
+/* the row's one red: HOLD engaged (structure/action, rule 6) */
+.poem-row .poem-hold.held {
+  color: var(--kc-red);
+  border-color: var(--kc-red);
 }
 
 /* KC-1 compact badge — blooms into the full name on hover. */
