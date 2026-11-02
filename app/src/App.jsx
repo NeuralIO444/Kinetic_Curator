@@ -605,8 +605,11 @@ function AppInner() {
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <PaletteStrip />
-      <ModeStrip />
-      <PoemRow />
+      {/* #1918 — the mode strip and the poem row share the strip track: one grid child, so the shell keeps its row */}
+      <div className="strip-stack">
+        <ModeStrip />
+        <PoemRow />
+      </div>
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}

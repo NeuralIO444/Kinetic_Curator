@@ -5,7 +5,8 @@
   /* one column that may shrink to the window: without minmax(0, 1fr) the column grows to its widest child's minimum, and a
      long HITS row (12 pills) pushed the whole page 700px wider than the window, hiding the top bar and clipping the panels */
   grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 38px 26px 1fr 38px auto 20px;
+  /* row 2 is the strip stack (#1918): the 26px mode strip, plus the 26px poem row while a poem stands */
+  grid-template-rows: 38px auto 1fr 38px auto 20px;
   background: radial-gradient(circle at 20% 0%, rgba(255, 255, 255, 0.02), transparent 40%), var(--bg);
 }
 .grid {
@@ -242,7 +243,13 @@
 
 /* Mode strip — mode/behave quick-access, same role as palette-strip but
    for the other axis. Sits directly below it. */
+.strip-stack {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
 .mode-strip {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 8px;
