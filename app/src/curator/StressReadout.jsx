@@ -1,6 +1,7 @@
 // StressReadout.jsx — #1354: the DEV-ONLY stress and band readout. It mounts only with ?debug=stress on the URL, so
 // the shipped instrument has no extra chrome (roadmap: a dev overlay, never shipped). It shows measurements: the
-// three signals, the smoothed stress and the band. Nothing reads the band yet (Phase 4).
+// three signals, the smoothed stress and the band. The band is live: creature posture and formation read it,
+// and every frame's resolver input carries it.
 import { useEffect, useState } from 'react';
 import { getStressState } from './stressLive.js';
 import { getFormationState, getLimbPairs, getPinTraits } from './formationLive.js'; // #1355 step 3
