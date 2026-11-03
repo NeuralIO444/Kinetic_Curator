@@ -301,7 +301,14 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
   S().assembleCreature(a.id, marked(a));
   const after = snapshot();
   const moved = Object.keys(after).filter((k) => after[k] !== before[k]);
-  assert.deepEqual(moved.sort(), ['creatureAssembleNote', 'creatureRecords'], `assemble moved: ${moved.join(', ')}`);
+  // #1850 re-pin (cause: Matt's ruling 2026-11-02 — an assembled creature joins the asset pool as a tile): an ASSEMBLE
+  // press now also adds that tile to the overlay (customAssets). Still nothing else moves — no layout, no pool switch,
+  // no seed: the tile reaches the stage only when the artist turns it on (creatureInjection.selfcheck.mjs).
+  assert.deepEqual(
+    moved.sort(),
+    ['creatureAssembleNote', 'creatureRecords', 'customAssets'],
+    `assemble moved: ${moved.join(', ')}`,
+  );
   assert.ok(!SCENE_KEYS.includes('creatureRecords'), 'takes do not carry records (nothing on stage reads them)');
   // the only readers are the assembler, the store, the project file and the wet lab
   const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -312,6 +319,13 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'state/projectDocument.js',
     'state/projectWatch.mjs',
     'panels/WetLab.jsx',
+    // #1850: the deal filter imports only the tile-id test (keeps creature tiles undealt) — it never reads a record;
+    // the stage reaches a creature through its pool TILE, never through creatureRecords
+    'state/rollPool.mjs',
+    'engine/creatureInjection.selfcheck.mjs',
+    // #1850: the one-file bundle carries the records with their tiles — persistence, like projectDocument, not stage
+    'hooks/useProjectPayload.js',
+    'panels/pipeline/DataExportRow.jsx',
   ]);
   const hits = [];
   const walk = (dir) => {

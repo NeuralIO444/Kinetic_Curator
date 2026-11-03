@@ -24,6 +24,7 @@ export function buildProjectPayload({
   midiBanks,
   midiActiveBank,
   customAssets,
+  creatureRecords, // #1850 — a bundle carries each creature with its pool tile, never the tile alone
   layers,
   activeLayerId,
   layerSnapshots,
@@ -49,6 +50,7 @@ export function buildProjectPayload({
     midiBanks,
     midiActiveBank,
     customAssets,
+    creatureRecords, // #1850 — a bundle carries each creature with its pool tile, never the tile alone
     layers,
     activeLayerId,
     layerSnapshots,
