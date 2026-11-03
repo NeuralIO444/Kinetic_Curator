@@ -1,11 +1,12 @@
-// fieldStampPath.selfcheck.mjs — FIELD S3 (#1904): placement reaches the dish.
+// fieldStampPath.selfcheck.mjs — FIELD S3 (#1904), re-pinned by #1928.
 //
-// The parity law is MEASURED, not asserted: the same buildPlacements call
-// with no form, an undefined form, and a garbage form must produce
-// byte-identical item lists; with an armed form, the layer's own marks are
-// untouched and the form's stamps appear at exactly the placement positions.
+// #1928 re-pin (cause: Matt's ruling 2026-11-02 — the poem is a clean TYPE PLATE, not marks): S3's law was "the
+// form's stamps appear in the item list at exactly the placement positions, and mirror reflects them with the
+// layer". Under the plate the form never enters the item list at all, so the parity law is now total: no form,
+// a garbage form AND an armed form all build byte-identical marks, mirrored or not. Where the poem goes instead
+// (the contract's plate, drawn after the frame) is measured in poets/typePlate.selfcheck.mjs.
 import assert from 'node:assert';
-import { buildPlacements, FIELD_EM_SCALE } from '../engine/buildPlacements.js';
+import { buildPlacements } from '../engine/buildPlacements.js';
 import { fieldFormForDeal, sanitizeFieldForm, MAX_FIELD_STAMPS } from './fieldForm.js';
 import { placePiece } from './placement.js';
 import { mkRng } from '../engine/prng.js';
@@ -87,43 +88,21 @@ assert.strictEqual(itemsJson(undefForm), itemsJson(baseline), 'undefined form: b
 assert.strictEqual(itemsJson(garbageForm), itemsJson(baseline), 'garbage form: byte-identical items');
 assert.ok(baseline.items.every((it) => !String(it.key).startsWith('field-')), 'baseline carries no field items');
 
-// ── Armed: the layer's marks untouched, the form at exact positions ──────
+// ── Armed (#1928): the poem never joins the marks — byte-identical, every time ─
 const armed = build({ ...baseParams, fieldForm: deal });
-assert.strictEqual(armed.items.length, baseline.items.length + deal.stamps.length, 'the form appends, nothing else moves');
-assert.strictEqual(
-  itemsJson({ items: armed.items.slice(0, baseline.items.length) }),
-  itemsJson(baseline),
-  "the layer's own marks are byte-identical under an armed form",
-);
-const fieldItems = armed.items.slice(baseline.items.length);
-fieldItems.forEach((it, j) => {
-  const s = deal.stamps[j];
-  assert.strictEqual(it.assetId, s.assetId, `stamp ${j}: asset`);
-  assert.strictEqual(it.x, (s.x / deal.aspect) * W, `stamp ${j}: x is exactly the placement position`);
-  assert.strictEqual(it.y, s.y * H, `stamp ${j}: y is exactly the placement position`);
-  assert.strictEqual(it.scale, s.em * FIELD_EM_SCALE, `stamp ${j}: scale is the placement em`);
-  assert.strictEqual(it.rotation, 0, `stamp ${j}: held upright`);
-  assert.strictEqual(it.key, `field-rosselli-r3-${j}`, `stamp ${j}: field key`);
-  assert.ok(typeof it.color === 'string' && it.color.length > 0, `stamp ${j}: coloured by the layer strategy`);
-});
+assert.strictEqual(itemsJson(armed), itemsJson(baseline), 'an armed form leaves the marks byte-identical');
+assert.ok(armed.items.every((it) => !String(it.key).startsWith('field-')), 'no field items, ever');
 
-// ── Replay determinism ───────────────────────────────────────────────────
-const armed2 = build({ ...baseParams, fieldForm: deal });
-assert.strictEqual(itemsJson(armed2), itemsJson(armed), 'same form, same build: identical items every time');
-
-// ── Pool safety: armed builds on a shared cache never accumulate ─────────
+// ── Pool safety: armed builds on a shared cache stay the baseline ────────
 const cache = {};
 const c1 = build({ ...baseParams, fieldForm: deal }, { cache });
 const c2 = build({ ...baseParams, fieldForm: deal }, { cache });
-assert.strictEqual(itemsJson(c2), itemsJson(c1), 'second armed build on the pool: identical, no duplication');
-assert.strictEqual(c2.items.filter((it) => String(it.key).startsWith('field-')).length, deal.stamps.length, 'field items appear exactly once');
 const c3 = build(baseParams, { cache });
-assert.strictEqual(itemsJson(c3), itemsJson(baseline), 'form cleared on the same cache: baseline restored exactly');
-const c4 = build(baseParams, { cache });
-assert.strictEqual(itemsJson(c4), itemsJson(baseline), 'pool healed: baseline stable');
+for (const c of [c1, c2, c3]) assert.strictEqual(itemsJson(c), itemsJson(baseline), 'cache: always the baseline');
 
-// ── Mirror treats the form as ordinary marks of the layer ────────────────
-const mirrored = build({ ...baseParams, mirror: 'x', fieldForm: deal });
-assert.strictEqual(mirrored.items.length, 2 * armed.items.length, 'mirror reflects the form with the layer');
+// ── Mirror never reflects the poem (#1928: it is not a mark) ─────────────
+const mirroredBase = build({ ...baseParams, mirror: 'x' });
+const mirroredArmed = build({ ...baseParams, mirror: 'x', fieldForm: deal });
+assert.strictEqual(itemsJson(mirroredArmed), itemsJson(mirroredBase), 'mirror: the armed dish is the plain dish');
 
 console.log('fieldStampPath.selfcheck: all assertions passed');

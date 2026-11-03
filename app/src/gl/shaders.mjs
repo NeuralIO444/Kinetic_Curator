@@ -858,6 +858,28 @@ void main() {
 export { RESOLVE_FS } from './resolveFs.mjs';
 
 /** Plain texture copy, no flip (FBO-to-FBO). */
+/**
+ * #1928 — the FIELD type plate's blit: the plate's coverage mask (premultiplied, uploaded top-row-last), tinted and
+ * composited over a
+ * finished, RESOLVED frame. u_flip mirrors the resolve's own convention: 0 when drawing to the presented canvas,
+ * 1 when drawing into the top-first readback target (stills, captures, takes).
+ */
+export const PLATE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;   // the plate's coverage mask: r = glyph, g = backing-only (premultiplied)
+uniform float u_flip;
+uniform vec3 u_ink;        // the frame's plate colours, display-referred — tinted here so colour never repaints
+uniform vec3 u_back;
+uniform float u_backA;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec4 m = texture(u_src, vec2(v_cuv.x, u_flip > 0.5 ? 1.0 - v_cuv.y : v_cuv.y));
+  float g = m.r;
+  float b = m.g * u_backA;
+  o = vec4(u_ink * g + u_back * b, g + b); // glyph over backing, premultiplied
+}`;
+
 export const COPY_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
