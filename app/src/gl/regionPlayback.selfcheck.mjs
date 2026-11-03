@@ -18,6 +18,7 @@
 // low budget animates fewer petals while the mark stays complete.
 import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
+import { RESVG_FONT } from '../assets/resvgFont.mjs'; // #1950 — the pinned font
 import { ASSETS, ASSETS_AUTHORED } from '../data/assets/index.js';
 import { detectRegions } from '../assets/regionMattes.js';
 import { capRegions, canonicalSvg, REGION_CAP } from '../assets/regionBake.mjs';
@@ -50,7 +51,7 @@ assert.strictEqual(PETALS.length, 4, 'fixture: 4 petals');
 // ── the tracked cap merge IS the bake's cap merge (library-wide) ──────
 {
   for (const a of ASSETS_AUTHORED) {
-    const img = new Resvg(canonicalSvg(a.svg)).render();
+    const img = new Resvg(canonicalSvg(a.svg), { font: RESVG_FONT }).render();
     const { regions } = detectRegions(new Uint8Array(img.pixels), img.width, img.height);
     const tracked = capRegionsTracked(regions, REGION_CAP);
     assert.deepEqual(tracked.kept, capRegions(regions, REGION_CAP), `${a.id}: tracked cap == bake cap`);
@@ -69,7 +70,7 @@ console.log('regionPlayback node (cap merge): OK');
 // ── the partition: every record matched, pixels tile, no drift ────────
 for (const id of [FLORA, 'dot_field_01', 'geo_burst_01']) {
   const asset = ASSETS.find((a) => a.id === id);
-  const img = new Resvg(canonicalSvg(asset.svg)).render();
+  const img = new Resvg(canonicalSvg(asset.svg), { font: RESVG_FONT }).render();
   const px = new Uint8Array(img.pixels);
   const part = buildRegionPartition(px, img.width, img.height, asset.regions);
   assert.strictEqual(part.matched, asset.regions.length, `${id}: every record matched by id`);
