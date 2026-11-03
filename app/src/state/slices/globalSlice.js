@@ -217,6 +217,9 @@ function withTaggedRegions(asset, regions) {
   };
 }
 
+/** #1851 — the same tile: the same drawing and the same bones. */
+const sameTile = (a, b) => a.svg === b.svg && JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null);
+
 export const createGlobalSlice = (set) => ({
   running: true,
   fps: 60,
@@ -912,7 +915,15 @@ export const createGlobalSlice = (set) => ({
         return { creatureAssembleNote: { id: rec.id, status: 'nobody' } };
       if (cur.some((r) => r.id === rec.id)) {
         // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
-        if (standing) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        if (standing && sameTile(standing, tile)) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        // #1851 — a tile drawn before the rig (limbs painted on, no bones) is redrawn: the body alone plus its
+        // invisible bones. The pool switch, weight, still pin and options stay (same id).
+        if (standing) {
+          return {
+            customAssets: overlay.map((a) => (a.id === tileId ? tile : a)),
+            creatureAssembleNote: { id: rec.id, status: 'redrawn' },
+          };
+        }
         if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
         return { customAssets: [...overlay, tile], creatureAssembleNote: { id: rec.id, status: 'restored' } };
       }

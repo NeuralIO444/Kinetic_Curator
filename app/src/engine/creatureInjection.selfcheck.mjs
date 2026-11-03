@@ -58,21 +58,19 @@ ok('citizen: the tile is an ordinary overlay asset that passes the overlay door 
   assert.equal(creatureTile(record, null), null, 'no body, no tile');
 });
 
-ok('dressing: the body scaled into the box, head and limbs drawn in the stage colours only', () => {
+ok('dressing: the body scaled into the box in the stage colours; head and limbs are bones, not drawing', () => {
   const svg = creatureTileSvg(record, body.svg);
-  assert.ok(svg.includes(`scale(${TILE_BODY_SCALE})`) && svg.includes(body.svg), 'the body is the shape itself');
-  const added = svg.slice(svg.indexOf('</g>') + 4);
-  assert.equal((added.match(/<path /g) || []).length, record.limbs.length, 'one limb per L point');
-  assert.equal((added.match(/<circle /g) || []).length, 2, 'the head ring on the H point');
-  const fills = [...added.matchAll(/fill="([^"]+)"/g)].map((m) => m[1]);
-  assert.ok(
-    fills.every((f) => f === 'var(--ink)' || f === 'var(--accent)'),
-    'stage colours only — the stage dresses it',
-  );
-  const bare = assembleCreature({ assetId: body.id, points: [], seed: 1 });
+  // #1851 re-pin (cause: Matt's 2026-11-02 ruling — the head and limbs are invisible bones carried as data on the tile;
+  // their visible parts are dealt from the stage at contract time; creatureRig.selfcheck owns the rig's own proof)
+  const off = Math.round(((100 * (1 - TILE_BODY_SCALE)) / 2) * 1000) / 1000;
   assert.equal(
-    creatureTileSvg(bare, body.svg),
-    `<g transform="translate(15 15) scale(${TILE_BODY_SCALE})">${body.svg}</g>`,
+    svg,
+    `<g transform="translate(${off} ${off}) scale(${TILE_BODY_SCALE})">${body.svg}</g>`,
+    'the body alone',
+  );
+  assert.ok(
+    tile.rig && tile.rig.bones.length === 1 + 2 * record.limbs.length,
+    'a head bone + a two-bone chain per limb',
   );
 });
 
