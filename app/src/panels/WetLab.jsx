@@ -11,6 +11,7 @@ import { useStore } from '../state/store.js';
 import { MAX_ATTACH, ATTACH_BOX } from '../engine/assetAttach.js';
 import { autoAttachPoints } from '../engine/autoAttach.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { lookName, voiceName, MAX_CREATURE_RECORDS } from '../engine/creatureAssembler.js'; // #1849
 
 const PREVIEW_PX = 320;
 
@@ -21,6 +22,10 @@ export function WetLab({ assetId, onClose }) {
   const isOwn = Array.isArray(own); // the artist edited this asset by hand; otherwise the points come from its shape
   const autoAssetAttach = useStore((s) => s.autoAssetAttach);
   const clickAssetAttach = useStore((s) => s.clickAssetAttach);
+  const assembleCreature = useStore((s) => s.assembleCreature); // #1849
+  const removeCreatureRecord = useStore((s) => s.removeCreatureRecord);
+  const allRecords = useStore((s) => s.creatureRecords);
+  const note = useStore((s) => s.creatureAssembleNote);
   const wrapRef = useRef(null);
 
   // Subscribe ONCE, and read onClose through a ref. Escape is also the app's panic key: its handler changes the store
@@ -54,6 +59,10 @@ export function WetLab({ assetId, onClose }) {
     );
   };
   const full = points.length >= MAX_ATTACH;
+  // #1849 — this asset's assembled records (the body is this shape). Data only: no stage reads them yet.
+  const records = (allRecords || []).filter((r) => r.body === asset.id);
+  const heads = points.filter((p) => p.role === 'H').length;
+  const limbCount = points.filter((p) => p.role === 'L').length;
 
   return (
     <div style={veil} onClick={() => onClose()} role="presentation">
@@ -153,6 +162,54 @@ export function WetLab({ assetId, onClose }) {
                 </button>
               )}
             </div>
+            {/* #1849 — the assembler: this shape + its points → a creature record (body, head, limbs, empty drive
+                slots, a Look and a Voice, and a genome). Discrete state → TE readout (DS rule 2). */}
+            <div style={{ ...secTitle, ...caps, marginTop: 6 }} data-testid="assemble-title">
+              creature · h {heads} · l {limbCount} · {(allRecords || []).length}/{MAX_CREATURE_RECORDS}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
+              Assemble a creature from this shape: the H point is its head, the L points its limbs. The record is saved
+              with the project; it does not enter the stage yet.
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="chip-btn act"
+                data-testid="assemble"
+                title="Assemble a creature record from this shape and its points, dealt off the project seed"
+                onClick={() => assembleCreature(asset.id, points)}
+              >
+                assemble
+              </button>
+              {/* what the press did, announced politely: never a silent no-op or a silent eviction */}
+              <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="assemble-note">
+                {note && note.status === 'banked' && `banked ${note.id}`}
+                {note && note.status === 'already' && `already banked ${note.id}`}
+                {note && note.status === 'full' && `bank full (${MAX_CREATURE_RECORDS}) — remove one first`}
+              </span>
+            </div>
+            {records.length > 0 && (
+              <ul style={recList} data-testid="creature-records">
+                {records.map((r) => (
+                  <li key={r.id} style={recRow} data-testid="creature-record">
+                    <span style={{ color: 'var(--ink)' }}>{r.id}</span>
+                    <span>
+                      <span style={caps}>{r.head ? 'h' : '–'}</span> · {r.limbs.length}
+                      <span style={caps}>l</span> · {lookName(r.look)} · {voiceName(r.voice)}
+                    </span>
+                    <button
+                      type="button"
+                      className="chip-btn act"
+                      title={`Remove ${r.id}`}
+                      aria-label={`Remove creature record ${r.id}`}
+                      onClick={() => removeCreatureRecord(r.id)}
+                    >
+                      ✕
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
         <footer style={foot}>
@@ -208,3 +265,16 @@ const body = {
 };
 const foot = { display: 'flex', gap: 6, padding: '8px 10px', borderTop: '1px solid var(--line)', flex: '0 0 auto' };
 const secTitle = { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: 'var(--dim)' };
+const recList = { listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 4 };
+const recRow = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  fontSize: 10,
+  color: 'var(--dim)',
+  letterSpacing: '0.06em',
+  borderTop: '1px solid var(--line)',
+  paddingTop: 4,
+};
+const caps = { textTransform: 'uppercase' }; // DS §5: casing lives in style, JSX stays lowercase
+const noteText = { fontSize: 10, color: 'var(--dim)', alignSelf: 'center', letterSpacing: '0.06em' };
