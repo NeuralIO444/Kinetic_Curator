@@ -3,6 +3,7 @@ import { getQualityCaps } from '../../data/quality.js';
 import { normalizeLayoutParams } from '../../data/layout-modes.js';
 import {
   sanitizeOverlay,
+  OVERLAY_CAP, // #1850
   duplicateIntoOverlay,
   ingestIntoOverlay,
   removeFromOverlay,
@@ -35,7 +36,15 @@ import { normalizeRegionSlots, assignRegionSlot, REGION_SLOTS } from '../../asse
 import { queueRegionDetect } from '../../assets/regionRaster.js';
 import { sanitizePins } from '../../curator/dishPins.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
-import { assembleCreature, sanitizeCreatureRecords, MAX_CREATURE_RECORDS } from '../../engine/creatureAssembler.js'; // #1849
+import {
+  assembleCreature,
+  sanitizeCreatureRecords,
+  MAX_CREATURE_RECORDS,
+  creatureTile,
+  creatureTileId,
+  isCreatureTile,
+  recordIdOfTile,
+} from '../../engine/creatureAssembler.js'; // #1849 / #1850
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
 
@@ -160,6 +169,33 @@ function persistStartupMode(mode) {
 
 function findAsset(id, overlay) {
   return overlay.find((a) => a.id === id) || ASSETS.find((a) => a.id === id) || null;
+}
+
+/** #1850 — the pool refuses to rename, duplicate or swap a creature tile: it is one creature, made in the wet lab. */
+const CREATURE_TILE_LOCKED = 'A creature tile is its creature — change it in the wet lab (assemble or remove)';
+
+/**
+ * #1850 — remove one creature, whole: its record, its tile, and every id-keyed map that names the tile (the pool
+ * switch, the weight override, pin-still and tile options — the #134 law: no dead id survives into a saved document).
+ * Both doors that can remove a creature — the wet lab's ✕ and the pool panel's delete — come through here, so the
+ * record and its tile can never part.
+ */
+function dropCreature(state, recordId) {
+  const tileId = creatureTileId(recordId);
+  const strip = (map) => {
+    if (!map || !(tileId in map)) return map;
+    const next = { ...map };
+    delete next[tileId];
+    return next;
+  };
+  return {
+    creatureRecords: (state.creatureRecords || []).filter((r) => r.id !== recordId),
+    customAssets: (state.customAssets || []).filter((a) => a && a.id !== tileId),
+    enabledAssets: strip(state.enabledAssets || {}),
+    assetWeightOverrides: strip(state.assetWeightOverrides || {}),
+    assetStill: strip(state.assetStill || {}),
+    assetOptions: strip(state.assetOptions || {}),
+  };
 }
 
 /**
@@ -334,7 +370,7 @@ export const createGlobalSlice = (set) => ({
    * default removes the key), ridden by the document, read by the resolver off the input. */
   assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
-  creatureRecords: [], // #1849 — creature records assembled in the wet lab (data only: no stage reads them yet)
+  creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   customAssets: [],
   ingestError: null,
@@ -633,6 +669,7 @@ export const createGlobalSlice = (set) => ({
     set((state) => {
       const src = findAsset(id, sanitizeOverlay(state.customAssets));
       if (!src) return {};
+      if (isCreatureTile(src)) return { ingestError: CREATURE_TILE_LOCKED }; // #1850
       const result = duplicateIntoOverlay(src, state.customAssets);
       if (!result.ok) return { ingestError: result.hint || result.error };
       // #1434 — a duplicate is a new arrival: it inherits its source's
@@ -682,6 +719,10 @@ export const createGlobalSlice = (set) => ({
 
   removeCustomAsset: (id) =>
     set((state) => {
+      // #1850 — deleting a creature tile from the pool removes the creature (record and tile together)
+      const own = (state.customAssets || []).find((a) => a && a.id === id);
+      if (isCreatureTile(own) && recordIdOfTile(id))
+        return { ...dropCreature(state, recordIdOfTile(id)), ingestError: null };
       const result = removeFromOverlay(id, state.customAssets);
       if (!result.ok) return { ingestError: result.hint || result.error };
       const enabled = { ...state.enabledAssets };
@@ -698,6 +739,8 @@ export const createGlobalSlice = (set) => ({
 
   renameCustomAsset: (id, name) =>
     set((state) => {
+      if (isCreatureTile((state.customAssets || []).find((a) => a && a.id === id)))
+        return { ingestError: CREATURE_TILE_LOCKED }; // #1850
       const result = renameOverlayAsset(id, name, state.customAssets);
       if (!result.ok) return { ingestError: result.hint || result.error };
       const enabled = { ...state.enabledAssets };
@@ -726,6 +769,8 @@ export const createGlobalSlice = (set) => ({
 
   replaceCustomAsset: (id, svg) =>
     set((state) => {
+      if (isCreatureTile((state.customAssets || []).find((a) => a && a.id === id)))
+        return { ingestError: CREATURE_TILE_LOCKED }; // #1850
       const result = replaceOverlayAsset(id, svg, state.customAssets);
       if (!result.ok) return { ingestError: result.hint || result.error };
       // #725: re-detect regions for the new artwork; stale-guard as above.
@@ -846,26 +891,44 @@ export const createGlobalSlice = (set) => ({
   /**
    * #1849 — the wet lab's assembler: build a creature record from this asset and the points the lab is showing (its
    * own, or the shape's AUTO ones), dealt off the project seed. Reassembling the same asset + points + seed lands the
-   * identical record, so it is never banked twice. Rides the document like attach edits; no stage reads it yet.
+   * identical record, so it is never banked twice. Rides the document like attach edits; #1850: its pool tile is how it reaches the stage.
    */
   assembleCreature: (assetId, shown) =>
     set((state) => {
       const rec = assembleCreature({ assetId, points: shown, seed: state.seed });
       if (!rec) return {};
       const cur = state.creatureRecords || [];
-      // the lab says what the press did (session-only, never saved): banked, already banked, or the bank is full —
-      // a full bank refuses rather than silently evicting another asset's creature
-      if (cur.some((r) => r.id === rec.id)) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+      const overlay = state.customAssets || [];
+      const tileId = creatureTileId(rec.id);
+      const standing = overlay.find((a) => a && a.id === tileId);
+      // #1850 — an import that merely shares the tile's id (an SVG named cr-xxxxxxxx.svg) is never evicted
+      if (standing && !isCreatureTile(standing)) return { creatureAssembleNote: { id: rec.id, status: 'id-taken' } };
+      // #1850 — the creature joins the pool as an ordinary tile (the overlay, where imports live): placed by the same
+      // asset path as every shape once the artist turns it on. The tile must pass the overlay's own door (the one
+      // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
+      // become a tile, so it is refused here rather than lost on reload.
+      const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)));
+      if (!tile || sanitizeOverlay([tile]).length !== 1)
+        return { creatureAssembleNote: { id: rec.id, status: 'nobody' } };
+      if (cur.some((r) => r.id === rec.id)) {
+        // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
+        if (standing) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
+        return { customAssets: [...overlay, tile], creatureAssembleNote: { id: rec.id, status: 'restored' } };
+      }
+      // the lab says what the press did (session-only, never saved); a full bank or a full pool refuses rather than
+      // silently evicting anything, and record and tile are one — never a record that cannot reach the stage
       if (cur.length >= MAX_CREATURE_RECORDS) return { creatureAssembleNote: { id: rec.id, status: 'full' } };
-      return { creatureRecords: [...cur, rec], creatureAssembleNote: { id: rec.id, status: 'banked' } };
+      if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
+      return {
+        creatureRecords: [...cur, rec],
+        customAssets: [...overlay, tile],
+        creatureAssembleNote: { id: rec.id, status: 'banked' },
+      };
     }),
-  /** #1849 — drop one assembled record. */
+  /** #1849 — drop one assembled creature: its record and (#1850) its pool tile, together (dropCreature). */
   removeCreatureRecord: (id) =>
-    set((state) => {
-      const cur = state.creatureRecords || [];
-      const next = cur.filter((r) => r.id !== id);
-      return next.length === cur.length ? {} : { creatureRecords: next };
-    }),
+    set((state) => ((state.creatureRecords || []).some((r) => r.id === id) ? dropCreature(state, id) : {})),
   setAssetKineme: (assetId, kinemeId) =>
     set((state) => {
       const cur = state.assetKineme || {};

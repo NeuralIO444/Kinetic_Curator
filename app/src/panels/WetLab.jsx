@@ -168,8 +168,8 @@ export function WetLab({ assetId, onClose }) {
               creature · h {heads} · l {limbCount} · {(allRecords || []).length}/{MAX_CREATURE_RECORDS}
             </div>
             <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
-              Assemble a creature from this shape: the H point is its head, the L points its limbs. The record is saved
-              with the project; it does not enter the stage yet.
+              Assemble a creature from this shape: the H point is its head, the L points its limbs. It joins the asset
+              pool as a creature tile — turn it on there and the stage places it like any shape.
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button
@@ -183,9 +183,15 @@ export function WetLab({ assetId, onClose }) {
               </button>
               {/* what the press did, announced politely: never a silent no-op or a silent eviction */}
               <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="assemble-note">
-                {note && note.status === 'banked' && `banked ${note.id}`}
+                {note && note.status === 'banked' && `banked ${note.id} — its tile is in the asset pool`}
                 {note && note.status === 'already' && `already banked ${note.id}`}
                 {note && note.status === 'full' && `bank full (${MAX_CREATURE_RECORDS}) — remove one first`}
+                {note && note.status === 'pool-full' && 'the asset pool is full — remove an import or a creature first'}
+                {note && note.status === 'nobody' && 'this shape cannot be drawn as a body'}
+                {note && note.status === 'restored' && `${note.id}'s tile was missing — it is back in the asset pool`}
+                {note &&
+                  note.status === 'id-taken' &&
+                  'an import already uses this creature’s pool id — rename that import first'}
               </span>
             </div>
             {records.length > 0 && (
