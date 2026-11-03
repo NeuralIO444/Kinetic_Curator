@@ -164,6 +164,11 @@ export function kinShimmer(family, t) {
   return 1 - SHIMMER_DEPTH * (0.5 + 0.5 * Math.sin(2 * Math.PI * ((Number(t) || 0) / period + phase)));
 }
 
+/** #1949 — Davis's mood → how varied his deal is. BLOOM / FLOW open it up; STUCK / SIFT (UGLY) tighten it; any other
+ * state (SEEDLING, none) deals as the rig always has. */
+export const DAVIS_VARIETY = Object.freeze({ BLOOM: 'wide', FLOW: 'wide', STUCK: 'tight', UGLY: 'tight' });
+export const varietyFor = (davis) => DAVIS_VARIETY[davis] || null;
+
 /**
  * LOIS's gait table — how the creatures move in each of her moods (curator/loisFace.js codes). period = one stride
  * (s); swing = the thigh's swing (±°); knee = the lower bones' flex (±°); head = the head's look about (±°);
@@ -229,8 +234,22 @@ export function poseRig(rig, t, gait = gaitFor(null), phase = 0) {
  * redresses it. The head and the limbs draw from the same pile; each bone gets its own deal, but a chain's bones are
  * dealt together (thigh, shin, foot of one limb share a hand) so a limb reads as one design.
  */
-export function dealPart(stageAssets, seed, tileId, bone) {
+export function dealPart(stageAssets, seed, tileId, bone, variety = null, index = 0) {
   if (!stageAssets.length) return null;
+  // #1949 — Davis's mood sets how varied the deal is (Matt, 2026-11-03)
+  if (variety === 'wide') {
+    // open: every bone its own shape — a seeded order of the pile, one per bone (distinct while the pile allows)
+    const order = stageAssets
+      .map((id) => ({ id, k: u01(`davis-wide|${seed >>> 0}|${tileId}|${id}`) }))
+      .sort((a, b) => a.k - b.k || (a.id < b.id ? -1 : 1));
+    return order[index % order.length].id;
+  }
+  if (variety === 'tight' && bone.role === 'limb') {
+    // stuck / sifting: every limb of the creature wears one shape — a tight, graphic look
+    return stageAssets[
+      Math.floor(u01(`davis-tight|${seed >>> 0}|${tileId}`) * stageAssets.length) % stageAssets.length
+    ];
+  }
   const hand = bone.role === 'head' ? 'h' : `l${bone.chain}`;
   const depth = bone.role === 'head' ? 0 : Number(bone.id.split('.')[1]) || 0;
   const base = Math.floor(u01(`davis|${seed >>> 0}|${tileId}|${hand}`) * stageAssets.length);
@@ -251,13 +270,14 @@ export function dealPart(stageAssets, seed, tileId, bone) {
  *
  * @param {Array} instances the contract's instances (not mutated)
  * @param {Map<string, object>|null} overlayById customAssets by id
- * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string }} opts
+ * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string, davis?: string }} opts
+ *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
  * @returns {Array} the original array when nothing expands, else a new one
  */
 export function expandCreatureInstances(
   instances,
   overlayById,
-  { seed = 0, t = 0, frozen = false, collapsed = false, face = null } = {},
+  { seed = 0, t = 0, frozen = false, collapsed = false, face = null, davis = null } = {},
 ) {
   if (!overlayById || collapsed) return instances;
   const rigOf = (id) => {
@@ -272,6 +292,7 @@ export function expandCreatureInstances(
     ...new Set(instances.map((it) => it.asset).filter((id) => !rigOf(id) && id !== 'creature')),
   ].sort();
   const gait = gaitFor(face);
+  const variety = varietyFor(davis);
   const out = [];
   for (const it of instances) {
     const rig = rigOf(it.asset);
@@ -294,7 +315,7 @@ export function expandCreatureInstances(
     const co = Math.cos(th);
     const si = Math.sin(th);
     const flip = it.scaleX < 0 ? -1 : 1;
-    const parts = pose.map((p) => {
+    const parts = pose.map((p, boneIndex) => {
       const bone = rig.bones.find((b) => b.id === p.id);
       const lx = ((p.x + p.tx) / 2 - 50) * it.scaleX;
       const ly = ((p.y + p.ty) / 2 - 50) * it.scaleY;
@@ -303,7 +324,7 @@ export function expandCreatureInstances(
         role: p.role,
         inst: {
           ...it,
-          asset: dealPart(pile, seed, hand, bone),
+          asset: dealPart(pile, seed, hand, bone, variety, boneIndex),
           opacity: r3(it.opacity * glow),
           key: `${it.key}#${p.id}`,
           x: r3(it.x + lx * co - ly * si),
