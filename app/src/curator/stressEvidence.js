@@ -1,6 +1,6 @@
 // stressEvidence.js — #1635: the band edges' evidence, read from real takes. Pure.
 //
-// The 0.28 / 0.72 band edges (curator/stress.js RELAX_BELOW / TIGHTEN_ABOVE) were picked. #1635 asks that they be
+// The 0.28 / 0.52 band edges (curator/stress.js RELAX_BELOW / TIGHTEN_ABOVE) were picked. #1635 asks that they be
 // tuned — or kept — from what real sessions actually do, never from feel. Every take already carries its stress
 // record (curator/stressRecord.js, stored on the performance as `stress`); this module reads one or more of them
 // back into the summary the closing PR cites:

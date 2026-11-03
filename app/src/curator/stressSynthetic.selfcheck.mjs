@@ -1,6 +1,6 @@
 // stressSynthetic.selfcheck.mjs — #1635: synthetic sessions for the band edges.
 //
-// The 0.28 / 0.72 edges can only be tuned from session evidence, and real sessions are scarce
+// The 0.28 / 0.52 edges can only be tuned from session evidence, and real sessions are scarce
 // (five takes of actual play). This unit answers the question that does NOT need Matt's time:
 // under modeled play, can the stress signal reach the edges at all, and what does it take?
 // It generates deterministic synthetic sessions (pressure-space signals: activity / dish / taste,
@@ -14,9 +14,11 @@
 //   - the observed real takes (100% Relax, p50 ~0.03) are exactly what idle/watcher play
 //     produces here — the model and the instrument agree;
 //   - leaving Relax needs roughly two of the three signals hot at once;
-//   - Tighten is reachable, but only by a full show: near-maxed hands + a crowded dish +
-//     a rolling streak together. No single signal, and no pair short of hands+dish maxed,
-//     can reach it. Taste alone (max 0.24) can never leave Relax at all.
+//   - Tighten (edge retuned to 0.52 by the #1635 ruling, 2026-11-02) is reachable by a
+//     crowded dish set (~52% of the session in Tighten) and by a full show (~56%) — no
+//     longer only by a full show, as under the original 0.72 edge. Hands alone (peak 0.36)
+//     and rolling alone (peak 0.43) still can never reach it. Taste alone (max 0.24) can
+//     never leave Relax at all.
 import { createStressTracker, stressValue, RELAX_BELOW, TIGHTEN_ABOVE } from './stress.js';
 import { createStressRecorder } from './stressRecord.js';
 import { stressTakeEvidence, UPDATES_PER_MINUTE } from './stressEvidence.js';
@@ -132,7 +134,9 @@ console.log(
   `  taste alone at max ......... ${stressValue({ taste: 1 }).toFixed(2)}  (can never leave Relax: < ${RELAX_BELOW})`,
 );
 console.log(`  one signal maxed (a or d) .. ${stressValue({ activity: 1 }).toFixed(2)}  (Normal, barely)`);
-console.log(`  activity + taste maxed ..... ${stressValue({ activity: 1, taste: 1 }).toFixed(2)}  (Normal only)`);
+console.log(
+  `  activity + taste maxed ..... ${stressValue({ activity: 1, taste: 1 }).toFixed(2)}  (Tighten, in steady state)`,
+);
 console.log(
   `  activity + dish maxed ...... ${stressValue({ activity: 1, dish: 1 }).toFixed(2)}  (Tighten, barely: > ${TIGHTEN_ABOVE})`,
 );
@@ -163,8 +167,8 @@ check(
   share('roller', 'normal') > 0.1 && share('roller', 'tighten') === 0,
 );
 check(
-  'dish set reaches Normal (>30%) but never Tighten',
-  share('dishSet', 'normal') > 0.3 && share('dishSet', 'tighten') === 0,
+  'dish set reaches Normal (>30%) and Tighten (>30%) under the ruled 0.52 edge',
+  share('dishSet', 'normal') > 0.3 && share('dishSet', 'tighten') > 0.3,
 );
 check(
   'full show reaches Tighten (>2%) and leaves Relax (<90% relax)',

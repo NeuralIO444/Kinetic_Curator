@@ -33,7 +33,7 @@ import { TIGHTEN_ABOVE } from '../curator/stress.js';
   }
   assert.equal(corruptionAmount(1), 1, 'full Tighten is full corruption');
   assert.ok(
-    Math.abs(corruptionAmount(0.86) - 0.25) < 1e-12,
+    Math.abs(corruptionAmount(0.76) - 0.25) < 1e-12,
     'halfway past the bar is a quarter corruption (quadratic)',
   );
   let prev = 0;
@@ -159,7 +159,7 @@ const fixture = () => [
     if (JSON.stringify(markKeys(o)) !== JSON.stringify(markKeys(clean))) resorted = true;
   }
   assert.ok(resorted, 'at full corruption the hatch order is re-sorted on some frame');
-  const thin = applyGlitch(fixture(), FRAME, glitchFrame({ seed: 77, creatureId: 'm0', frameIndex: 12, band: 0.73 }));
+  const thin = applyGlitch(fixture(), FRAME, glitchFrame({ seed: 77, creatureId: 'm0', frameIndex: 12, band: 0.53 }));
   assert.deepEqual(markKeys(thin), markKeys(clean), 'a hair past the bar: graded swaps round to zero, order untouched');
 }
 

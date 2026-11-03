@@ -59,16 +59,16 @@ import {
   assert.ok(!/Math\.random/.test(src), 'and no randomness');
 }
 
-// 3. the bands, at the roadmap's edges
+// 3. the bands, at the ruled edges (#1635: relax kept at 0.28, tighten retuned to 0.52 on session evidence)
 {
   assert.deepEqual([...BANDS], [BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN]);
   assert.equal(RELAX_BELOW, 0.28);
-  assert.equal(TIGHTEN_ABOVE, 0.72);
+  assert.equal(TIGHTEN_ABOVE, 0.52);
   assert.equal(bandFor(0), BAND_RELAX);
   assert.equal(bandFor(0.2799), BAND_RELAX);
   assert.equal(bandFor(0.28), BAND_NORMAL);
-  assert.equal(bandFor(0.72), BAND_NORMAL);
-  assert.equal(bandFor(0.7201), BAND_TIGHTEN);
+  assert.equal(bandFor(0.52), BAND_NORMAL);
+  assert.equal(bandFor(0.5201), BAND_TIGHTEN);
   assert.equal(bandFor(1), BAND_TIGHTEN);
 }
 
@@ -97,7 +97,7 @@ import {
     let changes = 0;
     t.update(all(0.5));
     for (let i = 0; i < 400; i++) {
-      const wobble = 0.72 + 0.015 * (i % 2 === 0 ? 1 : -1); // straddles the TIGHTEN edge every frame
+      const wobble = 0.52 + 0.015 * (i % 2 === 0 ? 1 : -1); // straddles the TIGHTEN edge every frame
       if (t.update(all(wobble)).events.some((e) => e.type === 'band')) changes += 1;
     }
     return changes;
@@ -107,10 +107,10 @@ import {
   // a real crossing still goes through, both ways, and needs to clear the edge by half the gap
   const t = createStressTracker({ smoothFrames: 1, hysteresis: 0.04 });
   t.update(all(0.5));
-  assert.equal(t.update(all(0.73)).band, BAND_NORMAL, 'just over the edge is not enough');
-  assert.equal(t.update(all(0.75)).band, BAND_TIGHTEN);
-  assert.equal(t.update(all(0.71)).band, BAND_TIGHTEN, 'and it holds until clearly back');
-  assert.equal(t.update(all(0.69)).band, BAND_NORMAL);
+  assert.equal(t.update(all(0.53)).band, BAND_NORMAL, 'just over the edge is not enough');
+  assert.equal(t.update(all(0.55)).band, BAND_TIGHTEN);
+  assert.equal(t.update(all(0.51)).band, BAND_TIGHTEN, 'and it holds until clearly back');
+  assert.equal(t.update(all(0.49)).band, BAND_NORMAL);
   assert.equal(t.update(all(0.27)).band, BAND_NORMAL);
   assert.equal(t.update(all(0.25)).band, BAND_RELAX);
   assert.equal(t.update(all(0.29)).band, BAND_RELAX);

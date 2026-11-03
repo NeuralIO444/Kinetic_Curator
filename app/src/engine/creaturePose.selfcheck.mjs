@@ -27,7 +27,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(w.chainCurlDeg, 10);
   assert.equal(w.dim, 0.5, 'the wither leads with the material: the dim is its deepest cut');
 
-  const n = creaturePose({ band: BAND_NORMAL, stress: 0.5, frame: 0 });
+  const n = creaturePose({ band: BAND_NORMAL, stress: 0.4, frame: 0 });
   assert.deepEqual(n.weights, { open: 0, neutral: 1, withered: 0, flourish: 0 });
   assert.equal(n.name, 'neutral');
   assert.deepEqual(
@@ -52,7 +52,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   const halfOpen = creaturePose({ band: BAND_NORMAL, stress: 0.28, frame: 0 });
   assert.ok(near(halfOpen.weights.open, 0.5, 1e-9), `half open at the edge (got ${halfOpen.weights.open})`);
   assert.ok(near(halfOpen.foreDirDeg, 5, 1e-9));
-  const halfWither = creaturePose({ band: BAND_NORMAL, stress: 0.72, frame: 0 });
+  const halfWither = creaturePose({ band: BAND_NORMAL, stress: 0.52, frame: 0 });
   assert.ok(near(halfWither.weights.withered, 0.5, 1e-9));
   assert.ok(near(halfWither.dim, 0.75, 1e-9), 'the material is already dimming halfway across the edge');
   const halfFlourish = creaturePose({ band: BAND_RELAX, stress: 0.11, frame: 0 });
@@ -146,7 +146,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
     .split('\n')
     .map((l) => l.replace(/(^|[^:'"`])\/\/.*$/, '$1'))
     .join('\n');
-  assert.ok(!/0\.28|0\.72/.test(code), 'no band-edge literals in the pose module: the edges live in stress.js');
+  assert.ok(!/0\.28|0\.52/.test(code), 'no band-edge literals in the pose module: the edges live in stress.js');
   assert.ok(
     /RELAX_BELOW/.test(code) && /TIGHTEN_ABOVE/.test(code) && /from '\.\.\/curator\/stress\.js'/.test(code),
     'the edges are imported from the band reader',
@@ -177,8 +177,8 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
     return vs;
   };
   const seen = [
-    ...transitions(t, [0.6]),
-    ...transitions(t, ramp(0.601, 0.85, 0.001)),
+    ...transitions(t, [0.4]),
+    ...transitions(t, ramp(0.401, 0.85, 0.001)),
     ...transitions(t, ramp(0.849, 0.15, -0.001)),
     ...transitions(t, ramp(0.151, 0.4, 0.001)),
   ];
@@ -195,13 +195,13 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   let bandEvents = 0;
   for (let i = 0; i < 120; i++) {
     // settle INTO the park first: the smoothed value climbs to the edge and stays
-    bandEvents += parked.update(all(i % 2 === 0 ? 0.71 : 0.73)).events.filter((e) => e.type === 'band').length;
+    bandEvents += parked.update(all(i % 2 === 0 ? 0.51 : 0.53)).events.filter((e) => e.type === 'band').length;
   }
   assert.equal(parked.band, BAND_NORMAL, 'even settling onto the edge does not flip the band');
   let minFore = Infinity;
   let maxFore = -Infinity;
   for (let i = 0; i < 480; i++) {
-    const r = parked.update(all(i % 2 === 0 ? 0.71 : 0.73));
+    const r = parked.update(all(i % 2 === 0 ? 0.51 : 0.53));
     bandEvents += r.events.filter((e) => e.type === 'band').length;
     const p = creaturePose({ band: r.band, stress: r.smoothed, frame: i });
     minFore = Math.min(minFore, p.foreDirDeg);
@@ -260,7 +260,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   // identity this section guards is the bandless skeleton hash above, still S1's bit for bit.
   assert.equal(plain.e[0].items.filter((it) => it._creature).length, 58, 'the drawn moth is unchanged');
 
-  const neutral = grow({ wantSkeletons: true, band: BAND_NORMAL, smoothed: 0.5 });
+  const neutral = grow({ wantSkeletons: true, band: BAND_NORMAL, smoothed: 0.4 });
   assert.equal(
     neutral.b.lastSkeletons()[0].hash,
     S1_WORLD_HASH,
@@ -311,11 +311,14 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
 //    machines running it produce this hash — what remains for hardware is rendering it, not re-deriving it.
 {
   const all = (v) => ({ activity: v, dish: v, taste: v });
+  // Levels re-derived for the ruled edges (#1635, 2026-11-02): the rest is mid-Normal (0.4), the peak is
+  // deep Tighten (0.95), and the descent completes by frame 450 so the recovery is exact inside the clip.
   const script = (f) => {
-    if (f < 120) return 0.5;
-    if (f < 240) return 0.5 + 0.45 * ((f - 120) / 120);
-    if (f < 360) return 0.95;
-    return 0.95 - 0.45 * ((f - 360) / 120);
+    if (f < 120) return 0.4;
+    if (f < 240) return 0.4 + 0.55 * ((f - 120) / 120);
+    if (f < 330) return 0.95;
+    if (f < 450) return 0.95 - 0.55 * ((f - 330) / 120);
+    return 0.4;
   };
   const PAL = { bg: '#111111', ink: '#eeeeee', swatches: ['#aa0000', '#222222'] };
   const entry = () => [{ id: 'a', items: [{ x: 1, y: 1, assetId: 'x' }], palette: PAL }];
@@ -359,7 +362,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
     'the clip opens at rest',
   );
   assert.ok(
-    names.slice(300, 360).every((n) => n === 'withered'),
+    names.slice(300, 330).every((n) => n === 'withered'),
     'the hold is fully withered',
   );
   assert.ok(
@@ -375,8 +378,10 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   }
   // Pinned 2026-10-16 from the first verified run: every structural assertion above (band crossings,
   // pose plateaus, exact recovery) passed on the sequence this hash summarizes before it was pinned.
+  // Re-pinned 2026-11-02 (#1635): the Tighten edge retuned 0.72 → 0.52 and the clip's levels were
+  // re-derived for the ruled edges; every structural assertion above passed again before this pin.
   const CLIP_HASH = chain.toString(16).padStart(8, '0');
-  assert.equal(CLIP_HASH, '4c71aad3', `the clip's frame-sequence hash (got ${CLIP_HASH})`);
+  assert.equal(CLIP_HASH, 'd50dc11a', `the clip's frame-sequence hash (got ${CLIP_HASH})`);
 }
 
 console.log(
