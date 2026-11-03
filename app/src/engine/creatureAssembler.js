@@ -23,7 +23,7 @@ import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { creatureTileId } from './creatureTileId.js';
-import { creatureTileSvg } from './creatureBody.js';
+import { creatureTileSvg, buildRig } from './creatureRig.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 
 export const CREATURE_ASSEMBLY_KIND = 'kc-assembled/1';
@@ -275,17 +275,15 @@ export function sanitizeCreatureRecords(raw) {
 // code, with no creature branch anywhere. Like the creature citizen it is never DEALT by the library pools (the
 // artist turns it on, like any tile): state/rollPool.mjs dealableRecords skips creature tiles.
 //
-// The tile's drawing is the creature at rest: its body shape, its head (the H point) and its limbs (the L points)
-// reaching outward, each cut free of the body by a joint gap so the stage can move it (#1851, engine/creatureBody.js)
-// — in var(--ink) / var(--accent), so the STAGE dresses it (Matt, 2026-10-29: the stage overrides the creature's own
-// Look / Voice; the references stay in the genome for breeding). Body language is slice 3 (#1851): the parts ride the
-// stage's own per-region animation.
+// The tile's drawing is the body alone, in var(--ink) / var(--accent), so the STAGE dresses it. Its head and limbs are
+// invisible bones carried as data (`rig`, #1851, engine/creatureRig.js): at contract time each bone gets a part dealt
+// from the stage's own shapes and moved by Lois's gait (Matt, 2026-10-29: the stage overrides the creature's own
+// Look / Voice; the references stay in the genome for breeding).
 
 export { creatureTileId, isCreatureTileId, recordIdOfTile, isCreatureTile } from './creatureTileId.js';
 
-// #1851: the drawing lives in engine/creatureBody.js — parts (limbs, head) cut free of the body by a joint gap, so
-// the stage's per-region animation can move them. Re-exported here so callers keep one import.
-export { TILE_BODY_SCALE, creatureTileSvg } from './creatureBody.js';
+// #1851: the drawing and the bones live in engine/creatureRig.js. Re-exported here so callers keep one import.
+export { TILE_BODY_SCALE, creatureTileSvg, buildRig } from './creatureRig.js';
 
 /**
  * The overlay entry for a record — an ordinary pool asset. `bodyAsset` is the body's own pool record (library or
@@ -302,5 +300,7 @@ export function creatureTile(record, bodyAsset) {
     compound: true,
     source: 'wetlab',
     svg,
+    // #1851 — the invisible bones (the head, the limb chains); parts are dealt onto them from the stage
+    ...((rig) => (rig ? { rig } : {}))(buildRig(record)),
   };
 }

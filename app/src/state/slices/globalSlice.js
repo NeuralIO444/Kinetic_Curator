@@ -217,20 +217,8 @@ function withTaggedRegions(asset, regions) {
   };
 }
 
-/**
- * #1851 — a creature tile's parts become regions the way an import's do (queueRegionDetect → withTaggedRegions, the
- * #1434 pipeline): detected from its drawing, capped, and given the family defaults — for a creature, its limbs stride
- * or bend and its head looks about (data/regionDefaults.js). Stale-guarded on the drawing, like every import.
- */
-function queueCreatureRegions(set, tile) {
-  queueRegionDetect(tile.id, tile.svg, (rid, regions) => {
-    set((st) => {
-      const cur = findAsset(rid, sanitizeOverlay(st.customAssets));
-      if (!cur || cur.svg !== tile.svg) return {};
-      return { customAssets: st.customAssets.map((a) => (a.id === rid ? withTaggedRegions(a, regions) : a)) };
-    });
-  });
-}
+/** #1851 — the same tile: the same drawing and the same bones. */
+const sameTile = (a, b) => a.svg === b.svg && JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null);
 
 export const createGlobalSlice = (set) => ({
   running: true,
@@ -927,30 +915,22 @@ export const createGlobalSlice = (set) => ({
         return { creatureAssembleNote: { id: rec.id, status: 'nobody' } };
       if (cur.some((r) => r.id === rec.id)) {
         // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
-        if (standing && standing.svg === tile.svg) {
-          // #1851 — a current tile whose parts never became regions (a detect that failed, or a save before it
-          // landed) is healed by pressing again: the detect is queued once more
-          if (!Array.isArray(standing.regions) || !standing.regions.length) queueCreatureRegions(set, standing);
-          return { creatureAssembleNote: { id: rec.id, status: 'already' } };
-        }
-        // #1851 — a tile drawn before the body could move (one solid picture) is redrawn in parts; the pool switch,
-        // weight, still pin and options stay (same id). Its old regions go with the old drawing — fresh ones follow.
+        if (standing && sameTile(standing, tile)) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        // #1851 — a tile drawn before the rig (limbs painted on, no bones) is redrawn: the body alone plus its
+        // invisible bones. The pool switch, weight, still pin and options stay (same id).
         if (standing) {
-          queueCreatureRegions(set, tile);
           return {
             customAssets: overlay.map((a) => (a.id === tileId ? tile : a)),
             creatureAssembleNote: { id: rec.id, status: 'redrawn' },
           };
         }
         if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
-        queueCreatureRegions(set, tile);
         return { customAssets: [...overlay, tile], creatureAssembleNote: { id: rec.id, status: 'restored' } };
       }
       // the lab says what the press did (session-only, never saved); a full bank or a full pool refuses rather than
       // silently evicting anything, and record and tile are one — never a record that cannot reach the stage
       if (cur.length >= MAX_CREATURE_RECORDS) return { creatureAssembleNote: { id: rec.id, status: 'full' } };
       if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
-      queueCreatureRegions(set, tile);
       return {
         creatureRecords: [...cur, rec],
         customAssets: [...overlay, tile],

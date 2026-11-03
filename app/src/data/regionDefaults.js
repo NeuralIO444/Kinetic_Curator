@@ -22,12 +22,6 @@
  *             kineme. The stroke test is geometry (regionKinemes.js
  *             isStrokeRegion): a solid bar fills its bbox and keeps the
  *             bob; a squiggle wanders its box and bends.
- *   creature  #1851 — a wet-lab creature tile (engine/creatureBody.js):
- *             its drawing declares its parts, so the defaults read
- *             them back. A limb strides (`stride`, an osc in its
- *             socket); the head looks about
- *             (`rock`); the body is still. Body language rides the
- *             stage's own per-region animation, nothing else.
  *   (others)  no default: the region is still. Silence is a valid
  *             state, and a family earns a default by being named in
  *             the table, not by analogy.
@@ -44,7 +38,6 @@ import { stripFramesFor } from './cellKinemes.js';
 import { capRegionsTracked } from '../assets/regionPartition.js';
 import { normalizeRegions } from '../assets/regionSlots.js';
 import { REGION_TAG_CAP, isStrokeRegion } from './regionKinemes.js';
-import { creaturePartRegions } from '../engine/creatureBody.js';
 
 /** The kineme each family role defaults to (ids from data/kinemes.js). */
 export const FAMILY_DEFAULT_KINEMES = Object.freeze({
@@ -52,8 +45,6 @@ export const FAMILY_DEFAULT_KINEMES = Object.freeze({
   pulse: 'pulse', // the centre, and radial everywhere
   bob: 'bob', // linework under boil
   bend: 'bend', // #1435 R4 — linework strokes: the travelling bend
-  stride: 'stride', // #1851 — a creature's limb swinging in its socket
-  look: 'rock', // #1851 — a creature's head turning (the osc kineme, on a head that has a facing)
 });
 
 /**
@@ -114,14 +105,6 @@ export function familyDefaultRegionKinemes(asset, regions) {
         out[r.id] = isStrokeRegion(r) ? FAMILY_DEFAULT_KINEMES.bend : FAMILY_DEFAULT_KINEMES.bob;
       }
       break;
-    case 'creature': {
-      const roles = creaturePartRegions(asset.svg, regions);
-      for (const r of regions) {
-        if (roles[r.id] === 'limb') out[r.id] = FAMILY_DEFAULT_KINEMES.stride;
-        else if (roles[r.id] === 'head') out[r.id] = FAMILY_DEFAULT_KINEMES.look;
-      }
-      break;
-    }
     default:
       return null; // no default in the table: still
   }

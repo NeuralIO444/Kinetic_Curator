@@ -58,24 +58,19 @@ ok('citizen: the tile is an ordinary overlay asset that passes the overlay door 
   assert.equal(creatureTile(record, null), null, 'no body, no tile');
 });
 
-ok('dressing: the body scaled into the box, head and limbs drawn in the stage colours only', () => {
+ok('dressing: the body scaled into the box in the stage colours; head and limbs are bones, not drawing', () => {
   const svg = creatureTileSvg(record, body.svg);
-  assert.ok(svg.includes(`scale(${TILE_BODY_SCALE})`) && svg.includes(body.svg), 'the body is the shape itself');
-  // #1851 re-pin (cause: the tile is drawn in PARTS so the stage can move them — each limb and the head is its own
-  // classed path, cut free of the body by a clip moat; creatureBody.selfcheck owns the parts' own proof)
-  const added = [...svg.matchAll(/<path class="cr-(limb|head)"[^>]*>/g)].map((m) => m[0]);
-  assert.equal(added.filter((p) => p.includes('cr-limb')).length, record.limbs.length, 'one limb per L point');
-  assert.equal(added.filter((p) => p.includes('cr-head')).length, 1, 'the head on the H point');
-  const fills = added.map((p) => /fill="([^"]+)"/.exec(p)[1]);
-  assert.ok(
-    fills.every((f) => f === 'var(--ink)' || f === 'var(--accent)'),
-    'stage colours only — the stage dresses it',
-  );
-  const bare = assembleCreature({ assetId: body.id, points: [], seed: 1 });
-  const off = Math.round(((100 * (1 - TILE_BODY_SCALE)) / 2) * 100) / 100;
+  // #1851 re-pin (cause: Matt's 2026-11-02 ruling — the head and limbs are invisible bones carried as data on the tile;
+  // their visible parts are dealt from the stage at contract time; creatureRig.selfcheck owns the rig's own proof)
+  const off = Math.round(((100 * (1 - TILE_BODY_SCALE)) / 2) * 1000) / 1000;
   assert.equal(
-    creatureTileSvg(bare, body.svg),
+    svg,
     `<g transform="translate(${off} ${off}) scale(${TILE_BODY_SCALE})">${body.svg}</g>`,
+    'the body alone',
+  );
+  assert.ok(
+    tile.rig && tile.rig.bones.length === 1 + 2 * record.limbs.length,
+    'a head bone + a two-bone chain per limb',
   );
 });
 

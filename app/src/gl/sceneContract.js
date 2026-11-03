@@ -34,6 +34,7 @@ import {
   sanitizeAccumScanDirection,
 } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
+import { expandCreatureInstances } from '../engine/creatureRig.js'; // #1851 — creature rigs
 import { contractLight } from '../data/light.js';
 import {
   KINEME_KINDS,
@@ -631,6 +632,29 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       const inst = toInstance(item, layerId, itemBlend, deformShed);
       if (layerSpin) spinning.set(inst, layerSpin);
       instances.push(inst);
+    }
+  }
+
+  // #1851 — creature rigs: a placed wet-lab creature tile expands into its body + one part per invisible bone, each part
+  // an ordinary instance dealt from the stage's own shapes (Davis) and posed by Lois's gait at this frame's motion time
+  // (engine/creatureRig.js). Done here, before kinemes and the atlas list, so the parts are honest instances every
+  // path bakes, counts and records. The #1433 governor rungs apply: frozen → the rest pose, collapsed → the body alone.
+  // A scene without a creature tile returns the very same array (its contract — and hash — unchanged).
+  {
+    const overlay = Array.isArray(doc.customAssets) && doc.customAssets.length ? doc.customAssets : null;
+    if (overlay && overlay.some((a) => a && a.rig)) {
+      const expanded = expandCreatureInstances(instances, new Map(overlay.map((a) => [a && a.id, a])), {
+        seed: Number(doc.seed) || 0,
+        t: Number(doc.kinemeTime) || 0,
+        frozen: regionKinemesFrozen(doc) || !!doc.reducedMotion,
+        collapsed: regionCollapseShed(doc),
+        face: typeof doc.loisFace === 'string' ? doc.loisFace : null,
+      });
+      if (expanded !== instances) {
+        instances.length = 0;
+        instances.push(...expanded);
+        for (const it of expanded) assetIds.add(it.asset);
+      }
     }
   }
 

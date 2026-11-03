@@ -326,9 +326,9 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #1850: the one-file bundle carries the records with their tiles — persistence, like projectDocument, not stage
     'hooks/useProjectPayload.js',
     'panels/pipeline/DataExportRow.jsx',
-    // #1851: the body-language suite assembles through the store (redraw on re-assembly) — a test, not a stage reader;
-    // the stage moves a creature's parts through its pool TILE's regions, never through creatureRecords
-    'engine/creatureBody.selfcheck.mjs',
+    // #1851: the rig suite assembles through the store (redraw on re-assembly) — a test, not a stage reader; the stage
+    // poses a creature through its pool TILE's rig, never through creatureRecords
+    'engine/creatureRig.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {
