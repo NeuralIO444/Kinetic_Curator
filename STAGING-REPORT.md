@@ -1,162 +1,127 @@
-# STAGING REPORT — #1932: FIELD: the poem as stage material
+# #1894 — ACCUM: LEAVE takes the longer fade (ACCUM FADE works in LEAVE)
 
-Branch `feat/1932-poem-stage-material`, local commits only (coordinator publishes).
-Contract: issue #1932 body + the 2026-11-03 expansion comment (6609003994) folding in
-Matt's clarification — the stage letters FORM the poem; silence is the default and the
-poem is earned; type in the deal is genre-gated. Built in the order the spec lists.
+**Matt's ruling (2026-10-31), implemented verbatim:** in LEAVE mode the
+effective keep is `max(1 − trailFade, 0.5^(1 / accumFadeFrames))` — the
+longer fade wins. ACCUM FADE units untouched (half-life frames; default
+5.4; stops [1, 3, 5.4, 20]); non-LEAVE modes byte-unchanged.
 
-## What was built, per spec point
+## Premises verified before building
 
-### 1. Genre gate for type eligibility
-- `app/src/curator/fieldDirector.js`: **`TYPE_NATIVE_FAMILIES = { swiss, bauhaus, japanese }`**
-  — the ONE named constant set, with the #1932 ruling in its comment (Swiss/Bauhaus
-  lettering genres; japanese for the kanji contexts; everything else — grunge, op,
-  memphis, engraved, marks, and the core looks whose groups live outside the style
-  families — is not type-native). Plus `isTypeNativeFamily(family)`.
-- `choosePoet` gains `typeEligible` (default **false** — silence is the default; a
-  caller must affirm eligibility). The gate is checked before temperature and before
-  rejection-damping: a non-eligible room returns null, full stop.
-- `app/src/curator/fieldEval.js`: `step` computes eligibility from `input.lookFamily`
-  and passes it in. The offline SCENARIOS now stand in a type-native room
-  (`lookFamily: 'swiss'`) — they measure temperature behaviour; the gate is measured
-  in fieldSilence.
-- `app/src/curator/director.js`: `tick({ ..., lookFamily })` and
-  `dealPoet({ ..., lookFamily })`. The Director remembers the last family named at
-  pick time (`lastLookFamily`); unnamed calls read the remembered room; `reset()`
-  forgets it (no room named = silence).
-- `app/src/state/slices/layoutSlice.js`: `lookFamilyOf(compositionId)` reads a look's
-  family from COMPOSITION_PRESETS (its styleLooks `group`). The CURATOR press's tick
-  hears the CURRENT dealt look's family (the look standing as the press begins);
-  `landPoem` names the family of the params the poem will stand with (the press's
-  landed look). Both reads are "the look dealt at the moment the FIELD decision is
-  made" — the Director's existing pick-time discipline.
-- Standing behaviour deliberately untouched: rejection-damping (70% silence after a
-  reject, measured 30.0% armed), HOLD / KEEP / re-deal, the poem row, poets own
-  words+form only, `fieldForm` payload shape unchanged (no migration), baked `typ_*`
-  stamps only.
+- The #560 LEAVE override was exactly where the audit said:
+  `accumRecipeParams` in `app/src/gl/accum.mjs` set LEAVE's `keepFinal` to
+  `clamp01(1 − leaveFade)`, ignoring the ACCUM FADE keep entirely.
+- The recipe's `fade` input IS the ACCUM FADE keep: `liveLoop.mjs` passes
+  `fade: halfLifeToKeep(accumulationFade …)` (with the #268 swell envelope
+  applied to the frame count first), so composing against the recipe's
+  clamped `keep` is composing against `0.5^(1/accumFadeFrames)`.
+- The composition point is entirely in `accum.mjs` — **no one-writer file
+  touched** (liveLoop.mjs / liveResolve.mjs / particles.js untouched;
+  liveLoop only supplies params, as before). `applyAudioEnvelope` and the
+  spectrum warp modulate the composed scalar downstream; neither
+  re-composes it per mode.
 
-### 2. Silence gate + threshold
-- `app/src/poets/fieldForm.js`: **`FIELD_POEM_MIN_STAMPS = 12`**. Derivation, measured
-  with `placePiece` itself over the shipped decks (every piece × densities
-  {0, .25, .5, .8, 1} × aspects {0.6, 1, 10/7, 16/9, 2.6}; the count is structural —
-  one stamp per non-space glyph — and did not move): **every real piece places
-  15–35 stamps**; the smallest is Gibson w2 ('CHROME' / 'AND THE CUT') at 15, the
-  largest Teijo t2 at 35. The gate sits at 12 — under every complete poem in the
-  decks, over any fragment (the longest single word in any deck is 9 letters).
-- `fieldFormForDeal` returns null under the threshold: the dealt piece does not
-  materialize, and every landing path already treats a null form as silence
-  (clears the standing form). The derivation is pinned in-suite
-  (fieldStampPath: gate ≤ smallest placed piece, gate > longest word, a fragment
-  piece places under the gate).
+## The change (one expression, `app/src/gl/accum.mjs`)
 
-### 3. The poem lives on the dish as stamps; the plate is retired
-- `app/src/engine/buildPlacements.js`: the #1904 stamp block is RESTORED (it was
-  lifted out by #1928): `sanitizeFieldForm` + `FIELD_EM_SCALE = 20` (original
-  calibration comment kept, plus a #1932 note: #1928 grew placement's em to true
-  cap heights ~0.054–0.092, so forms now land at item scale ≈ 1.1–1.8 — still the
-  ordinary-mark band; a live-stage recalibration read is Matt's feel gate). Stamps
-  become items at exactly the placed positions, coloured by the layer's own
-  strategy, at the top of the layer's alpha range, appended copy-on-pool-hit as
-  before. They join BEFORE the overlap sort and the material flag loop, so mirror,
-  glass and materials treat them as ordinary marks; the SoA weather above them
-  (lean/snap/air) does not move them — a held form is not loose marks, exactly the
-  pre-#1928 law.
-- `app/src/gl/sceneContract.js`: the `plate` key IIFE removed — the poem is in
-  `instances` now; poem-less contracts are byte-what-they-were.
-- `app/src/gl/renderer.mjs`: the plate composite removed entire — mask texture
-  cache, `overlayPlate`, the `framePlate` read, the readback `plate` option, the
-  present-path overlay call, the program's disposal and the base export.
-- `app/src/gl/shaders.mjs`: `PLATE_FS` removed.
-- **Retired with cause: `app/src/poets/typePlate.mjs` and
-  `app/src/poets/typePlate.selfcheck.mjs` are deleted, and the suite's line is
-  removed from `app/selfcheck.manifest`.** Cause: #1932 supersedes #1928's plate as
-  the poem's home (Matt, 2026-11-03: the plate made KC-1 read as a background
-  maker). Its assertions were NOT silently dropped:
-  - The **spacing floor** — the guarantee that was real — is re-asserted against
-    placement itself in `poets/placement.selfcheck.mjs` (re-homed blocks: measured
-    glyph metrics; ink boxes never overlap within a word or across lines and never
-    leave the dish, over **1,920 placements** = every piece × densities {0,.4,.8,1}
-    × aspects {0.6,1,10/7,16/9,2.6} × 6 seeds; the strict-grid word-break rule).
-    The full placement suite now runs 560,366 assertions, 0 failed.
-  - The plate-only guarantees (backing geometry, WCAG plate colours, mask painter,
-    contract `plate` key, renderer overlay order) retired WITH the presentation
-    they described — they have no object under the new law.
+```js
+const keepFinal = held
+  ? Math.max(Math.min(1, Math.max(0, 1 - (Number(leaveFade) || 0))), keep)
+  : … // ribbon / comet / plain branches untouched
+```
 
-### Weather / legibility note (spec point 3's honesty clause)
-v1 default stands: the letters live in the layer like assets. Measured: mirror
-reflects the form with the layer (item count doubles exactly — fieldStampPath);
-the layer's material flags reach the stamps (they join before the material loop);
-ACCUM/FX finish now touch the poem because the poem is in the frame — that is the
-issue's intent ("what plays is what renders" is now trivially true: there is one
-render). The SPACING floor is a placement property and is intact (above). What no
-suite can measure is poem-vs-ground contrast under finish FX — that is the issue's
-own acceptance gate (Matt's eyes), not quietly exempted here: the stamps take the
-layer's colour strategy at the top of its alpha range, and no exemption was built.
+`keepVec` still derives from `keepFinal` in the one place (#1800), so the
+spectral channels follow the winning fade automatically. A comment at the
+site names the ruling and the date.
 
-## Measured silence/armed rates under the gate (fieldSilence, printed by the suite)
-- Pick grid, eligible, no rejection: **armed 600/600 (100.0%)** — temperature alone
-  still never silences (the #1904 pin, re-pinned with the gate named as its condition).
-- Pick grid, no eligibility affirmed: **armed 0/600 (0.0%)**.
-- Step grid, hot room (intensity 0.9): **grunge armed 0/200, japanese armed 200/200**.
-- Pick grid after rejection (eligible): armed 120/400 (30.0%) — the damp, unchanged.
-- evalLoop scenarios (type-native rooms): silence 0.0% steady/hot/streak, 14.7%
-  withRejection — unchanged from #1904's prints, as designed.
-- Live-config Director: **no room named → armed 0/24 ticks; swiss room → 24/24**.
-- Real store (poemRow): across look/curator/chaos presses, a poem stands **iff**
-  the landed look's family is type-native (biconditional asserted per press);
-  (fieldDeal): a CURATOR press in the default classic room lands no form.
+## Measurements — real renderer + recipe, before vs after
 
-## Every re-pin, with its cause
-- `fieldDirector.selfcheck` — temperature assertions now pass `typeEligible: true`
-  (cause: the pick requires affirmed eligibility, #1932); new gate assertions added
-  (silence at any temperature un-affirmed; the ruled set membership). 11 passed.
-- `fieldSilence.selfcheck` — rewritten around the gate its header always said was
-  Matt's call (cause: #1932 rules and builds it). Plate assertions replaced by the
-  dish assertion (armed ⇒ every stamp on the dish). Rates above.
-- `fieldLiveDeal.selfcheck` — all drives name `lookFamily: 'swiss'` (cause: a tick
-  must name its room now); the "arms on every tick" pin now reads "in a type-native
-  room"; new block: the same bands in a grunge room deal silence on every tick.
-  Deal spreads unchanged (cool pieces 8, neutral 16, hot 8; greenleaf reachable). 9 checks.
-- `fieldDeal.selfcheck` — fixture room stands in swiss 'raster' (cause: the press's
-  room must be type-native for a form to deal); new block: the same press in
-  'praystation' lands no form. 5 checks.
-- `poemRow.selfcheck` — fixture room stands in swiss 'raster' (cause: the default
-  room is silent by design now); ruling 1 asserted in gated form (voice: varying
-  poems as before; look/curator/chaos: the biconditional above); the HOLD-under-undo
-  block's "dealt is not undefined" pin replaced by "a form or silence, and a form
-  passes its own door" (cause: a look pass may now honestly land silence). 13 checks.
-- `kineticSweep.selfcheck` — its HOLD block stands the room in swiss 'raster'
-  before re-dealing a poem to hold (cause: re-deals land only in type-native
-  rooms; the default room is silent). No assertion weakened.
-- `fieldStampPath.selfcheck` — the #1928 re-pin REVERTED to S3's law (cause: #1932
-  restores the stamp path), plus the threshold pins. All assertions pass.
-- `placement.selfcheck` — spacing-floor blocks re-homed from the retired typePlate
-  suite (cause above). 560,366 assertions.
-- `composite.selfcheck` — renderer program keys: 8 → 7, 'plate' removed (cause:
-  the plate program retired with the plate).
-- `fieldEval.selfcheck` — NOT re-pinned: passes unchanged (scenarios carry the
-  family in fieldEval.js itself).
+Method: the audit's probe approach (headless Chromium, real
+`createLiveRenderer` + `ensureAccum` + `accumRecipeParams` + `accum.step`;
+one disc stamped, then empty steps; disc-centre peak read back through the
+ACES resolve per step). Readback adds the audit's documented ~+0.02
+shoulder bias toward 1, so fitted ratios sit above the raw keep, ordering
+exact; the param keep is exact. Probe scripts preserved in
+`~/workspace/kc-1894-shots/probes/` (they ran from /tmp, which a VM
+restart wiped mid-verification; the scripts and all numbers here are
+reproduced verbatim in that folder).
 
-## Verification (all by file, from app/)
-- FIELD family: fieldDirector ✓, fieldEval ✓, fieldSilence ✓, fieldLiveDeal ✓,
-  fieldDeal ✓, fieldStampPath ✓, placement ✓, poemRow ✓.
-- Touched-module sweep: 105 suites selected by import/surface greps over every
-  module touched (director, fieldDirector/Eval, fieldForm, buildPlacements,
-  sceneContract, renderer, shaders, layoutSlice/store surfaces). 101 passed in the
-  loop; the 4 loop failures were adjudicated standalone: glassBody OK (8 cases —
-  loop abort under parallel npm-install load), accum OK (85 cases — same abort),
-  composite OK (15 cases, after its re-pin), kineticSweep OK (after its re-pin).
-  Plus lootWrite ✓ and directorPresence ✓ (Director consumers outside the grep set).
-- `npm run format:check` clean (prettier applied to 4 touched files);
-  `npm run lint` 0 errors (11 warnings, all pre-existing in untouched files);
-  `npm run build` ✓.
-- e2e: grepped ALL of app/e2e/ for plate/poem/field selectors — **no hits exist**;
-  nothing to re-pin.
-- The full 571-suite sweep was NOT run (per instructions — the coordinator runs
-  it at publish). app/package-lock.json churn from the verification `npm install`
-  was reverted; it is not part of this change.
+| Case | Param keep BEFORE | Param keep AFTER | Measured/step BEFORE | Measured/step AFTER |
+|---|---|---|---|---|
+| A · Matt's exact state (LEAVE, trail 0.05, ACCUM FADE 12f, echoes 2) | 0.9500 | 0.9500 | 0.9654 | 0.9654 |
+| B · LEAVE, trail 0.20, ACCUM FADE 12f | 0.8000 | **0.9439** | 0.8558 | **0.9597** |
+| C · LEAVE, trail 0.05, ACCUM FADE 34f | 0.9500 | **0.9798** | 0.9654 | **0.9894** |
+| D · LEAVE, trail 0, ACCUM FADE fastest (1f) | 1.0000 | 1.0000 | 1.0000 (flat 144 ×12) | 1.0000 (flat 144 ×12) |
+| E · non-LEAVE control, plain fade 12f | 0.9439 | 0.9439 | 0.9589 | 0.9589 |
 
-## Not built / not touched
-- No stress/creature/gl code beyond what the FIELD path already imports.
-- The SLOW_DEBT_WINDOW flag and the choosePoet temperature pools are untouched.
-- DISH LIFE (#1923), #1905/#1906: untouched, as ordered.
+Reading the acceptance bullets against this table, honestly:
+
+- **Case B is the acceptance case in discriminating form.** The issue's
+  bullet pairs TRAIL FADE 0.05 with ACCUM FADE 12f — but at those values
+  the trail fade is itself the longer fade (keep 0.95 ≈ 13.5-frame
+  half-life vs the 12-frame ACCUM FADE), so the ruled max() keeps 0.95 and
+  Case A is byte-identical peaks before/after (142,141,138,134,…). With
+  TRAIL FADE 0.20 (keep 0.8, ~3.1f half-life) against the same ACCUM FADE
+  12f, the composition is decisive: before, the mark decays on the trail
+  curve (param 0.8000, gone by step ~20); after, it decays on the
+  **12-frame half-life** (param 0.9439, measured/step 0.9597 — matching
+  the non-LEAVE 12f control's 0.9589 within readback noise). Case C shows
+  the other direction of the same law: dial ACCUM FADE to 34f and it wins
+  over trail 0.05.
+- **Case D:** ACCUM FADE at its fastest + TRAIL FADE 0 → hold stays
+  exactly 1.0000, peaks flat — the max() never shortens a hold. ✓
+- **Case E + A:** non-LEAVE renders and Matt's exact state are unchanged
+  (identical param keeps, identical peak sequences). No golden re-records
+  anywhere in the sweep; no e2e spec drives LEAVE (no LEAVE/leaveFade
+  selectors exist in e2e/), so no golden legitimately covers this change.
+
+Visual proof (case B state, steps 0/5/10/20/40 montaged):
+`~/workspace/kc-1894-shots/before-leave-trail020-fade12-strip.png` (marks
+nearly gone by step 20) and
+`~/workspace/kc-1894-shots/after-leave-trail020-fade12-strip.png` (marks
+readable at 20, still present at 40).
+
+## Selfchecks
+
+- **New assertions:** `trailMode.selfcheck` gains '#1894 LEAVE takes the
+  longer fade' (ACCUM wins at 12f vs trail 0.2; ACCUM wins dialed to 34f
+  vs trail 0.05; trail wins at Matt's values; fastest-ACCUM + trail 0
+  holds exactly 1). `accum.selfcheck` gains 'LEAVE composes the longer
+  fade (#1894)' including the keepVec derivation from the composed keep.
+  accum suite: **OK (84 cases)** — 83 baseline + 1 new.
+- **Re-pin (one, cause named in the assertion's comment):**
+  `trailMode.selfcheck` '#560 Leave fade is optional' —
+  `accumRecipeParams({ leave: true, leaveFade: 0.2 }).keep` was 0.8, now
+  **0.88**: the call leaves `fade` at its 0.88 default, and under the
+  ruling that ACCUM FADE keep is the longer fade, so it wins. The comment
+  at the assertion reads "Matt ruling 2026-10-31, #1894". The original
+  intent (trail fade drives the keep when it is the longer fade) is kept
+  as an explicit case with `fade: 0.5` → 0.8. No check was weakened or
+  deleted; the other #560 pins (hold at trail 0, non-LEAVE ignoring
+  leaveFade, tunnel/prism/flow fades, ribbon/comet) pass unchanged.
+- Suites run individually and green: trailMode (7/7), accum (84),
+  accum.seam, accumGuard, accumFeed, accumInput (7), modeStops.
+- `npm run format:check` — clean.
+- Full manifest sweep: **551 of 551 suites pass** (the manifest run to
+  its final line, `trailStats`, zero FAILED; kineticSweep passed — the
+  #1822 flake did not fire; accumInput passed inside the sweep on the
+  re-run). Two suites were carved out of the sweep and proven
+  environmental, base-identical on pristine origin/main:
+  `swarmWasm` (fails identically on both trees — `cargo` not on PATH in
+  this sandbox) and `fx/rollSafety` (the sandbox browser target crashes
+  mid-probe on pristine main — `page.evaluate: Target crashed` — and on
+  this tree the same way; no assertion is reached in either). One
+  mid-verification VM restart wiped the first sweep attempt's /tmp logs;
+  the sweep was re-run end-to-end afterwards with logs kept in
+  `~/workspace/kc-1894-shots/sweep-full.log`. CI remains authoritative
+  for the two carved-out suites.
+
+## Files
+
+- `app/src/gl/accum.mjs` — the composed keep (+ ruling comment).
+- `app/src/gl/accum.selfcheck.mjs` — LEAVE composition block.
+- `app/src/gl/trailMode.selfcheck.mjs` — composition test + the one
+  re-pin above.
+
+NOT done: no panel/shelf change (the ACCUM FADE row now simply works in
+LEAVE; signalling/greying was the other ruling option and was not chosen),
+no units change, no change to ribbon/comet/plain composition, no
+one-writer file edits.

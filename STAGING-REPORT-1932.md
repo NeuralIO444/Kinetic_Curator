@@ -160,3 +160,17 @@ layer's colour strategy at the top of its alpha range, and no exemption was buil
 - No stress/creature/gl code beyond what the FIELD path already imports.
 - The SLOW_DEBT_WINDOW flag and the choosePoet temperature pools are untouched.
 - DISH LIFE (#1923), #1905/#1906: untouched, as ordered.
+
+## QA addendum (coordinator, 2026-11-03)
+
+QA Review of head b181f0e4 found one should-fix: the branch's root `STAGING-REPORT.md`
+had been overwritten with a duplicate of this report, silently replacing the #1894
+ACCUM staging record that lives at that path on main — unmentioned in the report
+above. Fixed coordinator-side: `STAGING-REPORT.md` restored from base (net diff for
+that file is now zero); this per-issue file remains the #1932 record. QA also noted
+the poemRow HOLD pin accepts either branch of the gate where the seeded outcome
+could be pinned exactly — recorded here as a known, spec-justified softening
+(silence is a legal deal under #1932), not changed in this PR. All other QA checks
+reproduced clean: gate membership, threshold derivation (min 15 / max 35 / longest
+word 9, independently re-measured), plate retirement, spacing-floor re-home
+(560,366 assertions), silence rates.
