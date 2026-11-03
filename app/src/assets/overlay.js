@@ -2,7 +2,7 @@ import { ingestSvg, duplicateAsset, isHostile, disallowedTag, overlayId, errorHi
 import { sanitizeGradient } from './gradient.js';
 import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
 import { sanitizeRegionKinemes } from '../data/regionKinemes.js';
-import { sanitizeRig } from '../engine/creatureRig.js';
+import { sanitizeRig, sanitizeKin } from '../engine/creatureRig.js';
 
 export const OVERLAY_CAP = 32;
 
@@ -64,6 +64,10 @@ export function sanitizeOverlay(list) {
       // #1851 — a wet-lab creature tile's invisible bones, re-validated here like every field (never passed through raw)
       ...((rig) => (rig ? { rig } : {}))(
         raw.category === 'creature' && raw.source === 'wetlab' ? sanitizeRig(raw.rig) : null,
+      ),
+      // #1947 — a creature tile's family (the founder its skeleton descends from), re-validated like every field
+      ...((kin) => (kin ? { kin } : {}))(
+        raw.category === 'creature' && raw.source === 'wetlab' ? sanitizeKin(raw.kin) : null,
       ),
     });
   }

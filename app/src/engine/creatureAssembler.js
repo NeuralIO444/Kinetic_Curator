@@ -358,10 +358,32 @@ export { creatureTileId, isCreatureTileId, recordIdOfTile, isCreatureTile } from
 export { TILE_BODY_SCALE, creatureTileSvg, buildRig } from './creatureRig.js';
 
 /**
+ * #1947 — the founder a record's skeleton descends from: follow the skeleton's source (the head / limbs / joints genes
+ * travel as one linkage group, #1852) parent by parent through the bank until an assembled (unbred) creature. A
+ * parent the bank no longer holds ends the walk at that id — the nearest known ancestor. Bounded and cycle-safe.
+ */
+export function skeletonFounder(record, bank = []) {
+  const byId = new Map((bank || []).map((r) => [r && r.id, r]));
+  let cur = record;
+  const seen = new Set();
+  for (let i = 0; i < 64 && cur && !seen.has(cur.id); i++) {
+    seen.add(cur.id);
+    if (!cur.lineage) return cur.id;
+    const src = (cur.genome || []).find((g) => g.id === 'limbs')?.source || '';
+    const m = /^(?:parent|mut):(cr-[0-9a-f]{8})$/.exec(src);
+    if (!m) return cur.id;
+    const next = byId.get(m[1]);
+    if (!next) return m[1];
+    cur = next;
+  }
+  return cur ? cur.id : null;
+}
+
+/**
  * The overlay entry for a record — an ordinary pool asset. `bodyAsset` is the body's own pool record (library or
  * import). Returns null when the body cannot be drawn (no such asset): no creature tile without a body.
  */
-export function creatureTile(record, bodyAsset) {
+export function creatureTile(record, bodyAsset, kin = null) {
   const svg = creatureTileSvg(record, bodyAsset && bodyAsset.svg);
   if (!svg) return null;
   return {
@@ -374,5 +396,7 @@ export function creatureTile(record, bodyAsset) {
     svg,
     // #1851 — the invisible bones (the head, the limb chains); parts are dealt onto them from the stage
     ...((rig) => (rig ? { rig } : {}))(buildRig(record)),
+    // #1947 — a bred creature's family: the founder its skeleton descends from (a founder carries none — it is its own)
+    ...(typeof kin === 'string' && kin !== record.id && /^cr-[0-9a-f]{8}$/.test(kin) ? { kin } : {}),
   };
 }
