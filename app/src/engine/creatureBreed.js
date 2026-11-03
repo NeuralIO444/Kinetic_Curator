@@ -1,0 +1,179 @@
+// engine/creatureBreed.js — #1852 (creatures, slice 4 of #1848): WetLab breeding — three-source gene inheritance.
+//
+// (Not to be confused with curator/creatureBreeding.js — #1738's breeding of moth genomes from keeps. This module
+// breeds wet-lab creature RECORDS, kc-assembled/1, engine/creatureAssembler.js.)
+//
+// Matt's rulings (2026-10-29, #1852 / #1848):
+//   - three sources, never two: "taking 3 artists style to get something new" — the KC-1 triad;
+//   - a source is a creature record or an asset + Look + Voice assembly — never a whole stage;
+//   - mutation is lively, ~1 gene in 8, pinned as a NAMED CONSTANT (MUTATION_RATE) a selfcheck asserts.
+//
+// The merge law (the anti-mush rule at the DNA level):
+//   - DISCRETE genes pick a parent — inherited whole, never averaged: the body shape, the skeleton, the Look, the
+//     Voice, the material. The skeleton (head + limbs + joints) is ONE linkage group, inherited together from one
+//     parent, the way genes on one chromosome travel together — a head from one parent and four limbs from another
+//     would break the four-point body plan, and half a skeleton is mush.
+//   - CONTINUOUS genes may blend, inside their legal range only: the drives — a seeded weighting of the three
+//     parents' values (a convex blend, so it can never leave the range its parents span).
+//   - MUTATION re-rolls ~1 gene in 8 from the seed and is recorded: a discrete gene mutates by re-picking another
+//     PARENT's value (so no discrete gene ever holds a value none of the parents held — the acceptance line); a
+//     continuous gene re-rolls anywhere inside its legal range.
+//   - LINEAGE is data: the child names its three parents, its seed, every mutation, and every gene's source
+//     (parent:<id> / cross:<a>~<b>~<c> / mut:<id>), inspectable like every other honest signal.
+//
+// Deterministic: same trio (in any order) + same seed = the same child, byte for byte. Pure: no clock, no Math.random.
+
+import {
+  assembleCreature,
+  sanitizeCreatureRecord,
+  CREATURE_ASSEMBLY_KIND,
+  DRIVE_RANGE,
+  BIRTH_DRIVES,
+} from './creatureAssembler.js';
+
+/** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
+export const MUTATION_RATE = 1 / 8;
+/** The triad: a child has exactly this many parents. */
+export const BREED_PARENTS = 3;
+
+/** FNV-1a: a stable 32-bit key (the assembler's own hash shape). */
+function hash32(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 0x01000193);
+  return h >>> 0;
+}
+const u01 = (str) => hash32(str) / 4294967296;
+const r3 = (n) => Math.round(n * 1000) / 1000;
+
+/**
+ * A breeding source made legal (ruling 3): a banked creature record, or an asset + Look + Voice assembly — the asset
+ * with its ATTACH points, wearing a Look and a Voice the artist chose. An assembly becomes a record the same way the
+ * assembler builds one (it is never banked by being a parent). Anything else — a stage, a half-record — is refused.
+ *
+ * @param {{kind:'creature', record:object} | {kind:'assembly', assetId:string, points:Array, lookId:string,
+ *   voiceId:string}} src
+ * @param {number} seed the project seed (an assembly's own id is a function of it, like ASSEMBLE)
+ * @returns {object|null} a clean record, or null
+ */
+export function sourceRecord(src, seed = 0) {
+  if (!src || typeof src !== 'object') return null;
+  if (src.kind === 'creature') return sanitizeCreatureRecord(src.record);
+  if (src.kind === 'assembly') {
+    // the Look and Voice are the artist's choice here, not a deal: a missing or unknown one refuses the source
+    const rec = assembleCreature({
+      assetId: src.assetId,
+      points: src.points,
+      seed,
+      lookId: src.lookId,
+      voiceId: src.voiceId,
+    });
+    if (!rec || rec.look !== src.lookId || rec.voice !== src.voiceId) return null;
+    return sanitizeCreatureRecord(rec);
+  }
+  return null;
+}
+
+/** The genes, in the record's canonical order, and how each is inherited. */
+const LAW = Object.freeze([
+  { family: 'FORM', id: 'body', kind: 'discrete' },
+  { family: 'FORM', id: 'head', kind: 'skeleton' },
+  { family: 'FORM', id: 'limbs', kind: 'skeleton' },
+  { family: 'FORM', id: 'joints', kind: 'skeleton' },
+  { family: 'LOOK', id: 'look', kind: 'discrete' },
+  { family: 'VOICE', id: 'voice', kind: 'discrete' },
+  { family: 'MATERIAL', id: 'material', kind: 'discrete' },
+  ...BIRTH_DRIVES.map((d) => ({ family: 'DRIVE', id: d, kind: 'continuous' })),
+]);
+/** The inheritance law, as data a suite (and a backstage readout) can read. */
+export const BREED_LAW = LAW;
+
+const geneOf = (rec, id) => rec.genome.find((g) => g.id === id).value;
+// A child carries the BREED_LAW genes only: a gene this build does not know (a newer build's addition kept by the
+// door) is not inherited — add it to LAW, with its kind, when it should pass down.
+
+/**
+ * Breed a child from three parents.
+ *
+ * @param {Array<object>} parents three clean records (sourceRecord's output); order does not matter
+ * @param {number} seed the project seed
+ * @returns {object|null} the child record (kc-assembled/1, passing sanitizeCreatureRecord), or null when the trio is
+ *   not three distinct, clean records
+ */
+export function breedCreature(parents, seed = 0) {
+  if (!Array.isArray(parents) || parents.length !== BREED_PARENTS) return null;
+  const clean = parents.map((p) => sanitizeCreatureRecord(p));
+  if (clean.some((p) => !p)) return null;
+  // order-free: the trio is sorted by id, so (A, B, C) and (C, A, B) are one pairing
+  const trio = clean.slice().sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  if (new Set(trio.map((p) => p.id)).size !== BREED_PARENTS) return null; // three different parents
+  const s = seed >>> 0;
+  const key = `${s}|${trio.map((p) => p.id).join('|')}`;
+  const pick = (salt) => trio[Math.floor(u01(`${key}|${salt}`) * BREED_PARENTS) % BREED_PARENTS];
+  // another parent whose value differs (a swap to the same value is no mutation at all); null when none does
+  const other = (salt, not, valueOf) => {
+    const rest = trio.filter((p) => p !== not && valueOf(p) !== valueOf(not));
+    return rest.length ? rest[Math.floor(u01(`${key}|${salt}`) * rest.length) % rest.length] : null;
+  };
+  const skelOf = (p) => JSON.stringify(['head', 'limbs', 'joints'].map((id) => geneOf(p, id)));
+  const genome = [];
+  const mutations = [];
+  // the skeleton linkage group travels together — and mutates together, as one gene, by re-picking another parent
+  let skeleton = pick('skeleton');
+  let skeletonSource = `parent:${skeleton.id}`;
+  const skelTo = u01(`${key}|mut?|skeleton`) < MUTATION_RATE ? other('mut|skeleton', skeleton, skelOf) : null;
+  if (skelTo) {
+    const to = skelTo;
+    mutations.push({ gene: 'FORM.skeleton', kind: 'swap', from: skeleton.id, to: to.id });
+    skeleton = to;
+    skeletonSource = `mut:${to.id}`;
+  }
+  for (const law of LAW) {
+    const mutates = law.kind !== 'skeleton' && u01(`${key}|mut?|${law.id}`) < MUTATION_RATE;
+    let value;
+    let source;
+    if (law.kind === 'continuous') {
+      if (mutates) {
+        const v = r3(DRIVE_RANGE.min + u01(`${key}|mut|${law.id}`) * (DRIVE_RANGE.max - DRIVE_RANGE.min));
+        mutations.push({ gene: `${law.family}.${law.id}`, kind: 'reroll', value: v });
+        value = v;
+        source = `mut:${law.id}`;
+      } else {
+        // a convex blend of the three: seeded weights that sum to 1, so the value stays inside the parents' span
+        const w = trio.map((p) => 0.2 + u01(`${key}|w|${law.id}|${p.id}`));
+        const sum = w.reduce((a, b) => a + b, 0);
+        value = r3(trio.reduce((acc, p, i) => acc + (geneOf(p, law.id) * w[i]) / sum, 0));
+        value = Math.min(DRIVE_RANGE.max, Math.max(DRIVE_RANGE.min, value));
+        source = `cross:${trio.map((p) => p.id).join('~')}`;
+      }
+    } else {
+      let from = law.kind === 'skeleton' ? skeleton : pick(law.id);
+      if (law.kind === 'skeleton') source = skeletonSource;
+      else if (mutates && other(`mut|${law.id}`, from, (p) => JSON.stringify(geneOf(p, law.id)))) {
+        // a discrete mutation re-picks ANOTHER parent's (different) value — never a value none of them held; where
+        // every parent holds the same value there is nothing to mutate to, and nothing is recorded
+        const to = other(`mut|${law.id}`, from, (p) => JSON.stringify(geneOf(p, law.id)));
+        mutations.push({ gene: `${law.family}.${law.id}`, kind: 'swap', from: from.id, to: to.id });
+        from = to;
+        source = `mut:${from.id}`;
+      } else source = `parent:${from.id}`;
+      value = JSON.parse(JSON.stringify(geneOf(from, law.id)));
+    }
+    genome.push({ family: law.family, id: law.id, value, source });
+  }
+  const gene = (id) => genome.find((g) => g.id === id).value;
+  const child = {
+    kind: CREATURE_ASSEMBLY_KIND,
+    id: `cr-${hash32(`breed|${key}`).toString(16).padStart(8, '0')}`,
+    seed: s,
+    body: gene('body'),
+    head: gene('head'),
+    limbs: gene('limbs'),
+    joints: gene('joints'),
+    drives: Object.fromEntries(BIRTH_DRIVES.map((d) => [d, gene(d)])),
+    look: gene('look'),
+    voice: gene('voice'),
+    genome,
+    lineage: { parents: trio.map((p) => p.id), seed: s, mutations },
+  };
+  return sanitizeCreatureRecord(child);
+}

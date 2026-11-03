@@ -248,7 +248,79 @@ export function sanitizeCreatureRecord(raw) {
   if (JSON.stringify(gene('head')) !== JSON.stringify(head)) return null;
   if (JSON.stringify(gene('limbs')) !== JSON.stringify(limbs)) return null;
   if (JSON.stringify(gene('joints')) !== JSON.stringify(joints)) return null;
-  return { ...rec, look: raw.look, voice: raw.voice, genome };
+  // #1852 — a bred child's lineage: its three parents, its seed, every mutation. Kept only when it is whole and honest;
+  // a record with a malformed lineage is refused (a child that lies about its parents is not loaded half-true).
+  if (raw.lineage === undefined || raw.lineage === null) return { ...rec, look: raw.look, voice: raw.voice, genome };
+  const lineage = sanitizeLineage(raw.lineage);
+  if (!lineage || !lineageAgrees(lineage, { ...rec, genome })) return null;
+  return { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+}
+
+/**
+ * #1852 — a lineage and its genome must tell the same story: the seed is the record's; the child is not its own parent;
+ * every gene came from the three (parent:/cross: over exactly them) or from a mutation; every mut: gene has exactly
+ * one lineage entry and every entry its mut: gene (a reroll's value IS its gene's); and a bred child's drive slots
+ * are its drive genes. A child whose lineage disagrees with its genes is refused whole.
+ */
+function lineageAgrees(lineage, rec) {
+  if (lineage.seed !== rec.seed || lineage.parents.includes(rec.id)) return false;
+  const parents = new Set(lineage.parents);
+  const trio = [...lineage.parents].sort().join('~');
+  const SKELETON = new Set(['head', 'limbs', 'joints']);
+  const geneName = (g) => (g.family === 'FORM' && SKELETON.has(g.id) ? 'FORM.skeleton' : `${g.family}.${g.id}`);
+  const byGene = new Map();
+  for (const m of lineage.mutations) {
+    if (byGene.has(m.gene)) return false; // one mutation per gene
+    byGene.set(m.gene, m);
+  }
+  const mutated = new Set();
+  for (const g of rec.genome) {
+    const at = g.source.indexOf(':');
+    const kind = at > 0 ? g.source.slice(0, at) : g.source;
+    const rest = at > 0 ? g.source.slice(at + 1) : '';
+    const m = byGene.get(geneName(g));
+    if (kind === 'parent') {
+      if (!parents.has(rest) || m) return false;
+    } else if (kind === 'cross') {
+      if (g.family !== 'DRIVE' || rest.split('~').sort().join('~') !== trio || m) return false;
+    } else if (kind === 'mut') {
+      if (!m) return false;
+      if (m.kind === 'swap' && (m.to !== rest || g.family === 'DRIVE')) return false;
+      if (m.kind === 'reroll' && (g.family !== 'DRIVE' || rest !== g.id || m.value !== g.value)) return false;
+      mutated.add(m.gene);
+    } else return false;
+    if (g.family === 'DRIVE' && rec.drives[g.id] !== g.value) return false;
+  }
+  return mutated.size === byGene.size; // no mutation entry without its gene
+}
+
+const RECORD_ID_RE = /^cr-[0-9a-f]{8}$/;
+const MUT_GENE_RE = /^[A-Z]{2,16}\.[a-z][a-z0-9_-]{0,31}$/;
+/** #1852 — the lineage door: exactly three distinct parent ids, the breeding seed, and a short list of mutations. */
+function sanitizeLineage(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const parents = raw.parents;
+  if (
+    !Array.isArray(parents) ||
+    parents.length !== 3 ||
+    !parents.every((p) => typeof p === 'string' && RECORD_ID_RE.test(p))
+  )
+    return null;
+  if (new Set(parents).size !== 3) return null;
+  if (!Number.isInteger(raw.seed) || raw.seed < 0 || raw.seed > 0xffffffff) return null;
+  if (!Array.isArray(raw.mutations) || raw.mutations.length > MAX_RECORD_GENES) return null;
+  const mutations = [];
+  for (const m of raw.mutations) {
+    if (!m || typeof m !== 'object' || typeof m.gene !== 'string' || !MUT_GENE_RE.test(m.gene)) return null;
+    if (m.kind === 'swap') {
+      if (!parents.includes(m.from) || !parents.includes(m.to) || m.from === m.to) return null;
+      mutations.push({ gene: m.gene, kind: 'swap', from: m.from, to: m.to });
+    } else if (m.kind === 'reroll') {
+      if (!inDriveRange(m.value)) return null;
+      mutations.push({ gene: m.gene, kind: 'reroll', value: m.value });
+    } else return null;
+  }
+  return { parents: [...parents], seed: raw.seed, mutations };
 }
 
 /** The project's record list: every entry re-validated, de-duplicated by id (first wins), capped (newest kept). */
