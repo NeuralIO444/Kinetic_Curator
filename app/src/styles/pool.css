@@ -523,14 +523,17 @@
 .insp-chip.suggested .insp-chip-main:hover {
   color: var(--ink);
 }
-.insp-add,
-.insp-free,
-.asset-inspector select {
+.insp-free {
   min-height: 26px;
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid var(--line);
   color: var(--ink);
   font-size: 9px;
+}
+/* selects take the one dropdown style (tokens.css, #1033): layout only here */
+.insp-add,
+.asset-inspector select {
+  min-height: 26px;
 }
 .insp-free {
   width: 110px;
