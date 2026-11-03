@@ -343,7 +343,7 @@ export function WetLab({ assetId, onClose }) {
                   {child.lineage.mutations.length === 1 ? '' : 's'}
                   {child.lineage.mutations.map((m) => (
                     <div key={`${m.gene}-${m.kind}`}>
-                      {m.gene.toLowerCase()} {m.kind === 'swap' ? `from ${m.to}` : `→ ${m.value}`}
+                      <span style={lower}>{m.gene}</span> {m.kind === 'swap' ? `from ${m.to}` : `→ ${m.value}`}
                     </div>
                   ))}
                 </div>
@@ -416,5 +416,6 @@ const recRow = {
   paddingTop: 4,
 };
 const breedRow = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--dim)', flexWrap: 'wrap' };
-const caps = { textTransform: 'uppercase' }; // DS §5: casing lives in style, JSX stays lowercase
+const caps = { textTransform: 'uppercase' };
+const lower = { textTransform: 'lowercase' }; // DS §5: casing lives in style // DS §5: casing lives in style, JSX stays lowercase
 const noteText = { fontSize: 10, color: 'var(--dim)', alignSelf: 'center', letterSpacing: '0.06em' };
