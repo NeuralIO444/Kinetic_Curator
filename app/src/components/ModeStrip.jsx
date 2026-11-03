@@ -16,6 +16,7 @@ import { useStore } from '../state/store.js';
 import { LAYOUT_MODES } from '../data/layout-modes.js';
 import { MOTION_MODES, isMotionActive } from '../data/voices.js';
 import { emit, Events } from '../composition/eventBus.js';
+import { PoemRow } from './PoemRow.jsx'; // #1918 — the poem rides this strip, to the right of motion (Matt 2026-11-02)
 
 const MODE_FAVORITES = LAYOUT_MODES.slice(0, 4);
 
@@ -95,6 +96,7 @@ export function ModeStrip() {
           ✕
         </button>
       )}
+      <PoemRow />
     </div>
   );
 }

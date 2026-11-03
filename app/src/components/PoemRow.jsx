@@ -1,4 +1,4 @@
-// FIELD poem row (#1918) — one slim strip under the mode strip, mirroring it:
+// FIELD poem group (#1918) — rides the mode strip, to the right of motion (Matt 2026-11-02; was its own row):
 //   poem  [WHITTIER — THE SNOW LIES…] [HELD] [keep] [▫ hold]
 //
 // Matt's rulings (2026-11-01). The identity chip names the standing poem and TAP re-deals the poem
@@ -6,7 +6,7 @@
 // readout. KEEP banks this exact materialized poem into the take. HOLD locks the poem's VALUE against
 // KINETIC and CURATOR re-deals (lockedParams.fieldForm). Discrete state → TE (KC-1 DS rule 2): hard
 // states, the lock glyphs, one red (HOLD engaged) at most. Silence is default (rule 4): no poem
-// standing, no row. All writes go through the store; the row only reads.
+// standing, no group. All writes go through the store; the group only reads.
 import { useStore } from '../state/store.js';
 import { poemIdentity, isPoemKept } from '../poets/poemRow.mjs';
 
@@ -24,7 +24,7 @@ export function PoemRow() {
   const words = `${id.firstWords}${id.truncated ? '…' : ''}`;
 
   return (
-    <div className="mode-strip poem-row" role="group" aria-label="Poem">
+    <div className="poem-row" role="group" aria-label="Poem">
       <span className="mode-strip-label lbl">poem</span>
       <div className="mode-strip-chips">
         <button
