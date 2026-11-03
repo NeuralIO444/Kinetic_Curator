@@ -50,6 +50,7 @@ import { observeDishDensity } from './curator/dishDensityLive.js'; // #1412: the
 import { roomWidthFromCodes } from './curator/roomWidth.js'; // #1145 step 3: the room tightens or loosens Davis's shifts
 import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
+import { setRoomCodesProvider } from './curator/roomCodes.js'; // #1949
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
@@ -148,6 +149,8 @@ function AppInner() {
       };
     };
     setRoomProvider(roomNow);
+    // #1949 — the room's persona codes for the frame: the live loop stamps them on the resolver input (a take keeps
+    // them) and the creature rigs walk Lois's gait and wear Davis's deal. Registered below, once roomCodes exists.
     // #1460 — the pace: once a phrase it may ease the BEAT toward a confident audio tempo (her mark shows while it does)
     const stopPace = startPace({ getBpm: () => useStore.getState().beatBpm, context: roomNow });
     // #1640 — the dial lean: in silence, once a phrase, she may lean the WETNESS and EVOLVE dials toward her
@@ -163,6 +166,7 @@ function AppInner() {
       const dv = resolveDavisState(f);
       return { lois: face ? face.code : null, davis: dv ? dv.code : null };
     };
+    setRoomCodesProvider(roomCodes);
     // #1462 — Mind 1: once a bar each persona thinks about the room (Apple when available, rules otherwise):
     // decisions are telemetry and recorded in a take; rules never request a stage change. Muted while a take plays.
     const stopFaces = startMindFaces();

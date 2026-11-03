@@ -334,6 +334,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/creatureBreed.selfcheck.mjs',
     // #1947: the kin suite banks and breeds through the store (a test, not a stage reader)
     'engine/creatureKin.selfcheck.mjs',
+    // #1949: the mood suite assembles a creature to pose (a test, not a stage reader)
+    'engine/creatureMoods.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

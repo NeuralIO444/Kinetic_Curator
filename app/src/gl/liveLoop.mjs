@@ -29,6 +29,7 @@ import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver, getLastSpawnDecisions, getLastDishWet, setLiveWetSampler } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
+import { lastResolvedInput } from './resolveTap.mjs'; // #1949: the frame's effective input (a take's own, while one plays)
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
@@ -72,6 +73,7 @@ import { clearStatsSnapshot, publishStatsSnapshot, statsWanted } from './statsLi
 import { clearWetMode, publishWetMode } from './wetLive.mjs'; // #1841: the wet mode's wire (the show block's shed line)
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
 import { applyKinemeRateAudio } from './kinemeRateAudio.mjs'; // #790: clock.kinemeRate route → kineme clock rate
+import { readRoomCodes, roomContractFields } from '../curator/roomCodes.js'; // #1949
 import { applyPatternAudio } from './patternAudio.mjs'; // #1110: pattern.* routes → pattern track params
 import { applyLightAudio } from './lightAudio.mjs'; // #790: light.intensity route → sun intensity
 import { squashWithAudio } from './squashAudio.mjs'; // #790: render.squash route → scene squash
@@ -776,6 +778,7 @@ export function createLiveLoop(
       focusSwap,
       wantSkeletons, // Phase 2 S1 — a skeleton consumer is live (the ?debug=skeleton overlay); the creature builder builds bones only then
       wantEngraving, // Phase 2 S4 — the engraved body finish is a shipped look (default on in createLiveLoop); the builder binds spine joints to body items only when asked. A future governor shed rung flips this input, the way perfTier1 sheds passes
+      room: readRoomCodes(), // #1949 — Lois's face + Davis's state for the creature rigs; recorded with the take, replayed from it
       band: getStressState().band, // Phase 2 S5 — the band reader's filtered band for this frame (null until it runs); recorded with the take, so a take replays its creatures' postures exactly
       smoothed: getStressState().smoothed, // Phase 2 S5 — the reader's smoothed stress; the pose blend rides it, never the raw value
 
@@ -919,6 +922,7 @@ export function createLiveLoop(
         reducedMotion:
           typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
         regionBudget: regionBudgetForDevice(isIpadClassDevice()),
+        ...roomContractFields(lastResolvedInput()), // #1949 — the rigs' gait (Lois) and deal (Davis), from the frame's effective input
       },
       resolvedLayers: resolved,
       caps: null,

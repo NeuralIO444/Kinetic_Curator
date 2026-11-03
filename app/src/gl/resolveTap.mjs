@@ -107,6 +107,12 @@ export function snapshotLiveResolver() {
 
 let resetRequested = false;
 
+/** #1949 — the input the resolver actually ran this frame: a take's recorded input during playback, else the live one. */
+let lastInput = null;
+export function lastResolvedInput() {
+  return lastInput;
+}
+
 /**
  * Ask for a FRESH resolver before the next frame (#1353 step 4: `rec` restarts the scene). A performance replays
  * from a fresh resolver, so a take has to begin on one: the swarm, the feed delay, the shared scent and the morph
@@ -150,6 +156,7 @@ export function withResolveTap(createResolver) {
         inner = createResolver();
         notifyResolverSwap();
       }
+      lastInput = input; // #1949 — the frame's effective input (the contract reads the room's codes from it)
       if (!pb) tapResolveInput(input); // a take being played is never re-recorded
       const output = inner.resolveLayers(input);
       if (!pb) tapResolveOutput(output);

@@ -648,6 +648,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         frozen: regionKinemesFrozen(doc) || !!doc.reducedMotion,
         collapsed: regionCollapseShed(doc),
         face: typeof doc.loisFace === 'string' ? doc.loisFace : null,
+        davis: typeof doc.davisMood === 'string' ? doc.davisMood : null, // #1949 — Davis's live state
       });
       if (expanded !== instances) {
         instances.length = 0;
