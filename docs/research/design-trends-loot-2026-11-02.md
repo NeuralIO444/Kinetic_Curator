@@ -60,6 +60,29 @@ Heart, iOS Core, Ethereal, New Maximalism. (Ethereal and New Maximalism are
 near-opposites of each other; the deck already has quiet and maximal rooms
 of its own.)
 
+## Addendum — 20 animation styles (added at Matt's word, same evening)
+
+A third reel, sent later the same night with the instruction "add to recent
+loot": **Byron** (@buildwithbyron, posted 2026-10-15) —
+https://www.instagram.com/reel/Dei6J0AvlXw/ — "20 animation styles you can
+ask Claude for", a prompt-vocabulary list rather than a trend list. Verbatim:
+
+Liquid morph · ASCII art · Holographic foil · Bauhaus shapes · Neon glow ·
+Dithering · Clay 3D · Halftone dots · Kinetic typography · Pixel art ·
+Particle swarm · Risograph print · Glitch effect · Topographic lines ·
+Glassmorphism · Paper cutout · Vaporwave grid · Flow fields · Metaballs ·
+Ray-marched fractals
+
+KC-1 overlap is heavier here than in the trend lists, because these name
+motion treatments, not just surfaces: **ASCII art** (the ASCII Magic loot
+note filed the same night), **Risograph print** (again), **Glitch effect**
+(the Tighten-band corruption), **Kinetic typography** (FIELD), **Particle
+swarm** and **Flow fields** (the stage's native kinetics), **Dithering**
+(the room dither system). Plausible-but-unbuilt: Halftone dots, Paper
+cutout, Metaballs, Topographic lines, Liquid morph. The rest recorded
+unmapped: Holographic foil, Bauhaus shapes, Neon glow, Clay 3D, Pixel art,
+Glassmorphism, Vaporwave grid, Ray-marched fractals.
+
 ## Provenance
 
 Identified and transcribed by the coordinator from the reels' captions and
