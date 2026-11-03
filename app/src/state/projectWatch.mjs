@@ -22,6 +22,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'light',
   'assetKineme',
   'regionKinemes',
+  'assetTags', // #1942
   'assetStill',
   'assetOptions',
   'assetAttach',
