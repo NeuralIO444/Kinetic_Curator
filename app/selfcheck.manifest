@@ -315,6 +315,7 @@ node src/assets/ingest.selfcheck.mjs
 node src/assets/gradient.selfcheck.mjs
 node src/assets/overlay.selfcheck.mjs
 node src/assets/regionMattes.selfcheck.mjs
+node src/assets/resvgFont.selfcheck.mjs
 node src/assets/regionBake.selfcheck.mjs
 node src/assets/regionSlots.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs
@@ -522,7 +523,6 @@ node src/curator/fieldEval.selfcheck.mjs
 node src/poets/placement.selfcheck.mjs
 node src/poets/poemRow.selfcheck.mjs
 node src/poets/fieldStampPath.selfcheck.mjs
-node src/poets/typePlate.selfcheck.mjs
 node src/curator/fieldSilence.selfcheck.mjs
 node src/curator/fieldLiveDeal.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs

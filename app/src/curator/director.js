@@ -24,6 +24,8 @@
 // FIELD (2026-10-31, PR #1907): at pick time the pure fieldEval.step is called and the
 // chosen poet (or null for silence) is attached to the tick result and the room readout.
 // No live loop. No inventing candidates. Seeded RNG only.
+// FIELD #1932 (2026-11-03): the step also hears the CURRENT dealt look's family — the
+// genre gate: only type-native families (swiss / bauhaus / japanese) may hold a poem.
 import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
@@ -373,15 +375,21 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
   const injectedFieldRng = typeof fieldRng === 'function' ? fieldRng : null;
   let lastLevel = null; // #1918: the room's intensity as of the last tick, for a poem-only deal
   let lastVerdict = null; // #1918: the room's verdict as of the last tick
+  let lastLookFamily = null; // #1932: the CURRENT dealt look's family (a data/styleLooks group id), as last
+  // reported at pick time by a tick or a poem deal. The FIELD genre gate reads it: only a type-native
+  // family (fieldDirector's TYPE_NATIVE_FAMILIES) may hold a poem. Null — no look ever named — is silence.
 
   /**
    * @param {object} p { feed, audio?, keep?, phase?, nowTs? }
    *   feed: loisActivity.snapshot(); audio: 0..1 or null to read live;
    *   keep: a keep just landed (strong user action — ends relax early);
    *   phase: 'refine'|'explore'|null (#1144's interface; null = unmodulated).
+   *   lookFamily: the CURRENT dealt look's family (#1932; a data/styleLooks group id). The tick
+   *   remembers it — later poem-only deals read the room as it stands — and the FIELD step's genre
+   *   gate decides from it. Omit it and the remembered family stands; no family ever named = silence.
    * @returns { gains, intensity, directorPhase: 'build'|'peak'|'relax', sway, poet: { poetId, pieceId, layout } | null }
    */
-  function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now() } = {}) {
+  function tick({ feed = {}, audio = null, keep = false, phase = null, nowTs = now(), lookFamily = undefined } = {}) {
     const face = resolveLoisFace(feed);
     const davis = resolveDavisState(feed);
     const loisNow = face ? face.code : null;
@@ -448,9 +456,12 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       dealRng = rngForIndex(FIELD_DEAL_SEED, 'field-deal', fieldTicks);
       fieldTicks += 1;
     }
+    // #1932 — the genre gate reads the room as dealt at pick time: a tick that
+    // names the current look's family updates the Director's read of the room.
+    if (typeof lookFamily === 'string') lastLookFamily = lookFamily;
     const fieldResult = fieldStep(
       fieldState,
-      { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false },
+      { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false, lookFamily: lastLookFamily },
       dealRng,
     );
     fieldState = fieldResult.nextState;
@@ -505,7 +516,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
      * piece already standing, so the dislike path sheds the poem it was asked to shed.
      * @returns {{ poetId, pieceId, layout } | null}
      */
-    dealPoet({ fieldRng: pickRng = null, avoidPieceId = null } = {}) {
+    dealPoet({ fieldRng: pickRng = null, avoidPieceId = null, lookFamily = undefined } = {}) {
       // The row always passes its document's seeded poem stream; a bare call falls back to the
       // Director's own deal stream exactly as a tick would draw it (main's #1917 law).
       let draw = typeof pickRng === 'function' ? pickRng : injectedFieldRng;
@@ -513,10 +524,14 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
         draw = rngForIndex(FIELD_DEAL_SEED, 'field-deal', fieldTicks);
         fieldTicks += 1;
       }
+      // #1932 — a poem deal names the look the poem will stand with (the press's landed params);
+      // naming it updates the room read, exactly as a tick does. Unnamed, the remembered family stands.
+      if (typeof lookFamily === 'string') lastLookFamily = lookFamily;
       const input = {
         intensity: lastLevel == null ? FIELD_INITIAL.intensity : lastLevel,
         verdict: lastVerdict,
         rejected: false,
+        lookFamily: lastLookFamily,
       };
       let r = fieldStep(fieldState, input, draw);
       for (let i = 0; i < 4 && avoidPieceId && r.decision && r.decision.pieceId === avoidPieceId; i++) {
@@ -543,6 +558,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       fieldTicks = 0; // #1917: a reset Director re-deals the same stream from the top
       lastLevel = null;
       lastVerdict = null;
+      lastLookFamily = null; // #1932: a reset Director has been told no room — silence until one is named
     },
   };
 }

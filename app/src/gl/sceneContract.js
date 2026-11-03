@@ -55,7 +55,6 @@ import {
   REGION_TAG_CAP,
 } from '../data/regionKinemes.js';
 import { resolvePalette } from '../data/palettes.js';
-import { plateFromForm, selectPlate } from '../poets/typePlate.mjs'; // #1928 — the FIELD poem as a type plate
 import { darkestSwatch } from './contactShadow.mjs'; // #1183 contact shadow colour
 import { COALESCE_MAX_FIELDS } from '../engine/dishCoalesce.mjs'; // #1411 coalescence field cap
 import { sanitizePattern } from '../state/patternTrack.js';
@@ -795,18 +794,11 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       };
     })(),
     instances, // draw order = array order within each layer's slice
-    // #1928 — the FIELD poem as a clean type plate: "the poem", singular (selectPlate: identical plates are one, and
-    // when distinct poems stand on several layers the top-most is drawn). Not instances: the renderer composites the
-    // plate over the finished frame (after FX, ACCUM and mirror), so the poem is never reflected, trailed or
-    // shredded. Key omitted when no poem stands — every poem-less contract (and its hash) is exactly as before.
-    ...(() => {
-      const plate = selectPlate(
-        resolvedLayers
-          .filter((rl) => !rl.isFx && rl.layoutParams && rl.layoutParams.fieldForm)
-          .map((rl) => plateFromForm(rl.layoutParams.fieldForm, rl.palette)),
-      );
-      return plate ? { plate } : {};
-    })(),
+    // #1932 — no `plate` key: #1928 carried the FIELD poem here as a clean type plate for the renderer to
+    // composite over the finished frame; Matt's 2026-11-03 clarification superseded the plate — the poem is
+    // stage material, and its letters are already IN `instances` (buildPlacements deals the armed form's
+    // stamps as items of their layer). A poem-less contract is exactly as before, and so is a poem contract:
+    // the poem is marks, and marks are the contract's one language.
     // #594 — the ONE scene sun. Key omitted when off, so an unlit contract (and
     // its hash) is exactly what it was before lighting existed. Colour comes
     // from a palette slot: callers that already resolved the palette (live,

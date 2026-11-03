@@ -1,13 +1,15 @@
-// fieldStampPath.selfcheck.mjs — FIELD S3 (#1904), re-pinned by #1928.
-//
-// #1928 re-pin (cause: Matt's ruling 2026-11-02 — the poem is a clean TYPE PLATE, not marks): S3's law was "the
-// form's stamps appear in the item list at exactly the placement positions, and mirror reflects them with the
-// layer". Under the plate the form never enters the item list at all, so the parity law is now total: no form,
-// a garbage form AND an armed form all build byte-identical marks, mirrored or not. Where the poem goes instead
-// (the contract's plate, drawn after the frame) is measured in poets/typePlate.selfcheck.mjs.
+// fieldStampPath.selfcheck.mjs — FIELD S3 (#1904): placement reaches the dish.
+// Restored by #1932 (cause: Matt's clarification 2026-11-03 — the poem is stage material,
+// made OF the stage's letters). The #1928 re-pin of this suite (the poem is a clean TYPE
+// PLATE, never among the marks) is superseded with the plate itself: S3's law stands again —
+// the form's stamps appear in the item list at exactly the placement positions, coloured by
+// the layer, and mirror reflects them with the layer. The parity law is MEASURED, not
+// asserted: the same buildPlacements call with no form, an undefined form, and a garbage
+// form must produce byte-identical item lists; with an armed form, the layer's own marks
+// are untouched and the form's stamps are appended at the placement positions.
 import assert from 'node:assert';
-import { buildPlacements } from '../engine/buildPlacements.js';
-import { fieldFormForDeal, sanitizeFieldForm, MAX_FIELD_STAMPS } from './fieldForm.js';
+import { buildPlacements, FIELD_EM_SCALE } from '../engine/buildPlacements.js';
+import { fieldFormForDeal, sanitizeFieldForm, MAX_FIELD_STAMPS, FIELD_POEM_MIN_STAMPS, POET_DECKS } from './fieldForm.js';
 import { placePiece } from './placement.js';
 import { mkRng } from '../engine/prng.js';
 
@@ -56,6 +58,25 @@ assert.deepStrictEqual(
 const denser = fieldFormForDeal({ poetId: 'rosselli', pieceId: 'r3', density: 0.1 }, mkRng(42));
 assert.ok(denser.stamps[0].em < deal.stamps[0].em, "the decision's density wins over the deck's");
 
+// ── #1932 — the poem threshold, pinned against the decks it was derived from ──
+// FIELD_POEM_MIN_STAMPS was measured off these decks (see fieldForm.js): the gate
+// must sit UNDER every real piece (else it silences a poem) and OVER any fragment.
+{
+  let minPlaced = Infinity;
+  let longestWord = 0;
+  for (const deck of Object.values(POET_DECKS)) {
+    for (const piece of deck) {
+      const { stamps } = placePiece(piece, mkRng(7), { aspect: 10 / 7 });
+      minPlaced = Math.min(minPlaced, stamps.length);
+      for (const line of piece.lines) for (const w of line.split(' ')) longestWord = Math.max(longestWord, w.length);
+    }
+  }
+  assert.ok(FIELD_POEM_MIN_STAMPS <= minPlaced, `the gate (${FIELD_POEM_MIN_STAMPS}) never silences a real poem (smallest places ${minPlaced})`);
+  assert.ok(FIELD_POEM_MIN_STAMPS > longestWord, `the gate (${FIELD_POEM_MIN_STAMPS}) refuses any single word (longest in the decks: ${longestWord})`);
+  const fragment = placePiece({ id: 'frag', lines: ['CHROME'], layout: 'single', density: 0.3 }, mkRng(7), { aspect: 10 / 7 });
+  assert.ok(fragment.stamps.length < FIELD_POEM_MIN_STAMPS, 'a fragment places under the gate — dealt, it would be silence');
+}
+
 // ── sanitizeFieldForm: the document door ─────────────────────────────────
 assert.deepStrictEqual(sanitizeFieldForm(deal), deal, 'an honest form round-trips');
 assert.strictEqual(sanitizeFieldForm(null), null);
@@ -88,21 +109,43 @@ assert.strictEqual(itemsJson(undefForm), itemsJson(baseline), 'undefined form: b
 assert.strictEqual(itemsJson(garbageForm), itemsJson(baseline), 'garbage form: byte-identical items');
 assert.ok(baseline.items.every((it) => !String(it.key).startsWith('field-')), 'baseline carries no field items');
 
-// ── Armed (#1928): the poem never joins the marks — byte-identical, every time ─
+// ── Armed: the layer's marks untouched, the form at exact positions ──────
 const armed = build({ ...baseParams, fieldForm: deal });
-assert.strictEqual(itemsJson(armed), itemsJson(baseline), 'an armed form leaves the marks byte-identical');
-assert.ok(armed.items.every((it) => !String(it.key).startsWith('field-')), 'no field items, ever');
+assert.strictEqual(armed.items.length, baseline.items.length + deal.stamps.length, 'the form appends, nothing else moves');
+assert.strictEqual(
+  itemsJson({ items: armed.items.slice(0, baseline.items.length) }),
+  itemsJson(baseline),
+  "the layer's own marks are byte-identical under an armed form",
+);
+const fieldItems = armed.items.slice(baseline.items.length);
+fieldItems.forEach((it, j) => {
+  const s = deal.stamps[j];
+  assert.strictEqual(it.assetId, s.assetId, `stamp ${j}: asset`);
+  assert.strictEqual(it.x, (s.x / deal.aspect) * W, `stamp ${j}: x is exactly the placement position`);
+  assert.strictEqual(it.y, s.y * H, `stamp ${j}: y is exactly the placement position`);
+  assert.strictEqual(it.scale, s.em * FIELD_EM_SCALE, `stamp ${j}: scale is the placement em`);
+  assert.strictEqual(it.rotation, 0, `stamp ${j}: held upright`);
+  assert.strictEqual(it.key, `field-rosselli-r3-${j}`, `stamp ${j}: field key`);
+  assert.ok(typeof it.color === 'string' && it.color.length > 0, `stamp ${j}: coloured by the layer strategy`);
+});
 
-// ── Pool safety: armed builds on a shared cache stay the baseline ────────
+// ── Replay determinism ───────────────────────────────────────────────────
+const armed2 = build({ ...baseParams, fieldForm: deal });
+assert.strictEqual(itemsJson(armed2), itemsJson(armed), 'same form, same build: identical items every time');
+
+// ── Pool safety: armed builds on a shared cache never accumulate ─────────
 const cache = {};
 const c1 = build({ ...baseParams, fieldForm: deal }, { cache });
 const c2 = build({ ...baseParams, fieldForm: deal }, { cache });
+assert.strictEqual(itemsJson(c2), itemsJson(c1), 'second armed build on the pool: identical, no duplication');
+assert.strictEqual(c2.items.filter((it) => String(it.key).startsWith('field-')).length, deal.stamps.length, 'field items appear exactly once');
 const c3 = build(baseParams, { cache });
-for (const c of [c1, c2, c3]) assert.strictEqual(itemsJson(c), itemsJson(baseline), 'cache: always the baseline');
+assert.strictEqual(itemsJson(c3), itemsJson(baseline), 'form cleared on the same cache: baseline restored exactly');
+const c4 = build(baseParams, { cache });
+assert.strictEqual(itemsJson(c4), itemsJson(baseline), 'pool healed: baseline stable');
 
-// ── Mirror never reflects the poem (#1928: it is not a mark) ─────────────
-const mirroredBase = build({ ...baseParams, mirror: 'x' });
-const mirroredArmed = build({ ...baseParams, mirror: 'x', fieldForm: deal });
-assert.strictEqual(itemsJson(mirroredArmed), itemsJson(mirroredBase), 'mirror: the armed dish is the plain dish');
+// ── Mirror treats the form as ordinary marks of the layer ────────────────
+const mirrored = build({ ...baseParams, mirror: 'x', fieldForm: deal });
+assert.strictEqual(mirrored.items.length, 2 * armed.items.length, 'mirror reflects the form with the layer');
 
 console.log('fieldStampPath.selfcheck: all assertions passed');

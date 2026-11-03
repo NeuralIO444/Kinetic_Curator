@@ -1,7 +1,7 @@
 // fieldEval.js — pure step function + offline eval loop for the Director / FIELD.
 // Deterministic. No live path. No inventing candidates. Seeded RNG only.
 
-import { choosePoet, nextSlowDebt, preferredNext } from './fieldDirector.js';
+import { choosePoet, nextSlowDebt, preferredNext, isTypeNativeFamily } from './fieldDirector.js';
 
 export const INITIAL_STATE = Object.freeze({
   intensity: 0.5,
@@ -26,6 +26,10 @@ export function step(state, input, rng) {
     genreLean: input.genreLean || null,
     rng,
     lastRejected: state.lastRejected,
+    // #1932 — the genre gate: the caller names the CURRENT dealt look's
+    // family (input.lookFamily); only a type-native family is eligible.
+    // No family named → not eligible → silence (the default).
+    typeEligible: isTypeNativeFamily(input.lookFamily),
   });
   const nextRoom = preferredNext(verdict, rng);
   const nextState = {
@@ -39,19 +43,24 @@ export function step(state, input, rng) {
   return { nextState, decision };
 }
 
-/** Scenario generators. Pure. */
+/** Scenario generators. Pure. #1932: every scenario stands in a type-native
+ * room (lookFamily 'swiss') — these scenarios measure the TEMPERATURE
+ * behaviour of the pick; the genre gate itself is measured in
+ * curator/fieldSilence.selfcheck.mjs. */
 export const SCENARIOS = {
-  steadyCool: () => ({ intensity: 0.2, verdict: 'AGREEMENT', rejected: false }),
-  steadyHot: () => ({ intensity: 0.8, verdict: 'FULL BURN', rejected: false }),
+  steadyCool: () => ({ intensity: 0.2, verdict: 'AGREEMENT', rejected: false, lookFamily: 'swiss' }),
+  steadyHot: () => ({ intensity: 0.8, verdict: 'FULL BURN', rejected: false, lookFamily: 'swiss' }),
   hotStreak: (i) => ({
     intensity: i < 12 ? 0.85 : 0.4,
     verdict: i < 12 ? 'FULL BURN' : 'THE ROOM',
     rejected: false,
+    lookFamily: 'swiss',
   }),
   withRejection: (i) => ({
     intensity: 0.5,
     verdict: 'THE ROOM',
     rejected: i % 5 === 0,
+    lookFamily: 'swiss',
   }),
 };
 

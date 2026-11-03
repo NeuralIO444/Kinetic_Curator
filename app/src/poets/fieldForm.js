@@ -28,6 +28,21 @@ export const POET_DECKS = Object.freeze({
 /** Hard ceiling on a form's stamp count (a poem is dozens of glyphs, not thousands). */
 export const MAX_FIELD_STAMPS = 200;
 
+/**
+ * #1932 — the poem threshold (Matt's clarification, 2026-11-03: a poem forms
+ * only once enough letters are on stage to form one — "not just three random
+ * shapes"). Measured over the shipped decks with placePiece itself (every
+ * piece × densities {0, 0.25, 0.5, 0.8, 1} × aspects {0.6, 1, 10/7, 16/9,
+ * 2.6}; the count is structural — one stamp per non-space glyph — so it does
+ * not move): every real piece places 15–35 stamps, the smallest being Gibson
+ * w2 ('CHROME' / 'AND THE CUT') at 15. The gate sits at 12 — under every
+ * complete poem in the decks, and over any fragment: the longest single word
+ * in any deck is 9 letters, so no word, and no scrap of two short words,
+ * clears it. A dealt piece that places fewer stamps than this is a fragment,
+ * not a poem, and the deal is silence.
+ */
+export const FIELD_POEM_MIN_STAMPS = 12;
+
 export const DEFAULT_FIELD_ASPECT = 10 / 7;
 
 /**
@@ -37,7 +52,8 @@ export const DEFAULT_FIELD_ASPECT = 10 / 7;
  * a decision names a piece, it does not carry one). The decision's density
  * (genre-lean adjusted at pick time) wins over the deck's when present.
  * Returns the layoutParams.fieldForm payload, or null for silence
- * (null decision, unknown poet/piece, or a piece that places no stamps).
+ * (null decision, unknown poet/piece, or a piece that places fewer than
+ * FIELD_POEM_MIN_STAMPS stamps — #1932: a fragment is not a poem).
  */
 export function fieldFormForDeal(decision, rng, { aspect = DEFAULT_FIELD_ASPECT } = {}) {
   if (!decision || typeof decision !== 'object') return null;
@@ -48,7 +64,7 @@ export function fieldFormForDeal(decision, rng, { aspect = DEFAULT_FIELD_ASPECT 
   const density = Number.isFinite(decision.density) ? decision.density : piece.density;
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
   const { layout, stamps } = placePiece({ ...piece, density }, rng, { aspect: asp });
-  if (!stamps.length) return null;
+  if (stamps.length < FIELD_POEM_MIN_STAMPS) return null; // #1932 — the threshold: under it, silence
   return {
     poetId: decision.poetId,
     pieceId: piece.id,
