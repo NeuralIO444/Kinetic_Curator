@@ -191,8 +191,16 @@ const ring = (cx, cy, n, r) =>
   };
   assert.equal(run(() => 1).band, BAND_TIGHTEN, 'busy hands, a long pass run and a crowded pin: TIGHTEN');
   assert.equal(run(() => 1).dish, 1);
-  assert.equal(run(() => 0).band, BAND_NORMAL, 'no dish pressure: 0.62, NORMAL');
-  assert.equal(run(undefined).band, BAND_NORMAL, 'no reader given: 0, not a guess');
+  assert.equal(
+    run(() => 0).band,
+    BAND_TIGHTEN,
+    'no dish pressure: hands alone settle at 0.62, past the ruled 0.52 edge — TIGHTEN without the dish (#1635 retune, 2026-11-02)',
+  );
+  assert.equal(
+    run(undefined).band,
+    BAND_TIGHTEN,
+    'no reader given: the dish still reads 0, not a guess — and hands alone carry the session to TIGHTEN',
+  );
   assert.equal(
     run(() => {
       throw new Error('x');
