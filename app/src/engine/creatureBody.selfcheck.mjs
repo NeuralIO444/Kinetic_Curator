@@ -12,10 +12,14 @@
 //              body + parts, each part pivoting on its own centre, with its own seed-hash phase (no two parts in step)
 //   shed       the governor's rungs apply as to any regioned mark: budget 0 = at rest, tier-2 = frozen, collapse = one
 //              quad, byte-identical to a creature that never moved
-//   store      a tile's regions land through the import pipeline and carry the defaults; a tile drawn before #1851 is
-//              redrawn in parts on re-assembly, keeping its pool switch
+//   store      assembly queues the tile's detect through the browser's own door (queueRegionDetect, stood up in Node
+//              on the bake's raster): the regions land with the defaults, a stale land is dropped, a press heals a tile
+//              whose regions never landed, and a tile drawn before #1851 is redrawn in parts, keeping its pool switch
+//   nesting    a creature built on another creature's tile reads only its OWN parts
 //   still      placements never move (body language is pack-time only) and the drawing is deterministic in the record
 import assert from 'node:assert/strict';
+import { resolveObjectURL } from 'node:buffer';
+import { Resvg } from '@resvg/resvg-js';
 import { creatureTileSvg, creaturePartsFromSvg, creaturePartRegions, TILE_BODY_SCALE } from './creatureBody.js';
 import { assembleCreature, creatureTile, creatureTileId } from './creatureAssembler.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -31,6 +35,11 @@ import { useStore } from '../state/store.js';
 let n = 0;
 const ok = (name, fn) => {
   fn();
+  n++;
+  console.log(`  [ok] ${name}`);
+};
+const okA = async (name, fn) => {
+  await fn();
   n++;
   console.log(`  [ok] ${name}`);
 };
@@ -244,36 +253,119 @@ ok('still: body language never moves a placement', () => {
   );
 });
 
-ok('store: the tile’s regions land through the import pipeline with the defaults; an old tile is redrawn', () => {
-  useStore.setState({ seed: 0x1851, creatureRecords: [], customAssets: [], creatureAssembleNote: null });
-  S().assembleCreature(body.id, points);
-  const rec = S().creatureRecords[0];
-  const id = creatureTileId(rec.id);
-  const t = S().customAssets.find((a) => a.id === id);
-  assert.equal(S().creatureAssembleNote.status, 'banked');
-  // the regions arrive as an import's do (the browser rasterizes; here the bake's raster stands in)
-  S().setAssetRegions(id, bakeAsset(t.svg).regions);
-  const landed = S().customAssets.find((a) => a.id === id);
-  const k = landed.regionKinemes;
-  assert.equal(Object.values(k).filter((v) => v === 'stride').length, 3, 'three limbs stride');
-  assert.equal(Object.values(k).filter((v) => v === 'rock').length, 1, 'the head looks about');
-  // a tile drawn before #1851 (one solid picture, its own old regions): re-assembly redraws it in parts and keeps the
-  // artist's pool switch; the old regions go with the old drawing
-  const old = {
-    ...landed,
-    svg: `<g transform="translate(15 15) scale(0.7)">${body.svg}</g>`,
-    regions: landed.regions.slice(0, 1),
-  };
-  delete old.regionKinemes;
-  useStore.setState({ customAssets: [old], enabledAssets: { ...S().enabledAssets, [id]: true } });
-  S().assembleCreature(body.id, points);
-  assert.equal(S().creatureAssembleNote.status, 'redrawn');
-  const re = S().customAssets.find((a) => a.id === id);
-  assert.equal(re.svg, landed.svg, 'drawn in parts');
-  assert.ok(!re.regions && !re.regionKinemes, 'the old drawing’s regions are gone; fresh ones follow');
-  assert.equal(S().enabledAssets[id], true, 'the pool switch stays');
-  S().assembleCreature(body.id, points);
-  assert.equal(S().creatureAssembleNote.status, 'already', 'a current tile is left alone');
+ok('nesting: a creature built on another creature’s tile reads only its OWN parts', () => {
+  const outerPts = [
+    { x: 92, y: 30, role: 'H' },
+    { x: 20, y: 85, role: 'L' },
+  ];
+  const outer = creatureTile(assembleCreature({ assetId: tile.id, points: outerPts, seed: 7 }), tile);
+  assert.deepEqual(
+    creaturePartsFromSvg(outer.svg).map((p) => p.role),
+    ['limb', 'head'],
+    'the inner creature’s parts are body',
+  );
+  const o = { ...outer, ...tagImportedRegions(outer, bakeAsset(outer.svg).regions) };
+  const r = creaturePartRegions(o.svg, o.regions);
+  const head = o.regions.find((x) => r[x.id] === 'head');
+  assert.ok(head && head.cx > 0.6 && head.cy < 0.5, 'the head that turns is the outer one, on its H point');
 });
+
+// The browser's own detect door (assets/regionRaster.js queueRegionDetect → rasterizeRegions: an <img> of the
+// canonical SVG drawn to a 200px canvas, read back as straight-alpha RGBA), stood up in Node with the bake's raster —
+// so the store's REAL queue, callback and stale guard run, not a stand-in for them.
+const flush = () => new Promise((r) => setTimeout(r, 0));
+async function settle(pred, tries = 200) {
+  for (let i = 0; i < tries; i++) {
+    if (pred()) return true;
+    await flush();
+  }
+  return pred();
+}
+function installBrowserRaster() {
+  globalThis.Image = class {
+    set src(url) {
+      resolveObjectURL(url)
+        .text()
+        .then(
+          (svg) => {
+            this.svg = svg;
+            this.onload && this.onload();
+          },
+          (e) => this.onerror && this.onerror(e),
+        );
+    }
+  };
+  globalThis.document = {
+    createElement: () => {
+      let px = null;
+      return {
+        getContext: () => ({
+          clearRect() {},
+          drawImage(img) {
+            const r = new Resvg(img.svg).render();
+            px = new Uint8ClampedArray(r.pixels);
+            for (let i = 0; i < px.length; i += 4) {
+              const a = px[i + 3];
+              if (a > 0 && a < 255)
+                for (let c = 0; c < 3; c++) px[i + c] = Math.min(255, Math.round((px[i + c] * 255) / a));
+            }
+          },
+          getImageData: () => ({ data: px }),
+        }),
+      };
+    },
+  };
+}
+
+await okA(
+  'store: assembly queues the tile’s detect; its regions land with the defaults; stale lands are dropped',
+  async () => {
+    installBrowserRaster();
+    useStore.setState({ seed: 0x1851, creatureRecords: [], customAssets: [], creatureAssembleNote: null });
+    S().assembleCreature(body.id, points);
+    const rec = S().creatureRecords[0];
+    const id = creatureTileId(rec.id);
+    const tileNow = () => S().customAssets.find((a) => a.id === id);
+    assert.equal(S().creatureAssembleNote.status, 'banked');
+    assert.ok(!tileNow().regions, 'nothing yet: the detect is asynchronous');
+    assert.ok(await settle(() => !!tileNow().regionKinemes), 'the queued detect lands');
+    const landed = tileNow();
+    const k = landed.regionKinemes;
+    assert.equal(Object.values(k).filter((v) => v === 'stride').length, 3, 'three limbs stride');
+    assert.equal(Object.values(k).filter((v) => v === 'rock').length, 1, 'the head looks about');
+    // heal: a current tile whose regions never landed gets the detect again on the next press
+    const bare = { ...landed };
+    delete bare.regions;
+    delete bare.regionKinemes;
+    useStore.setState({ customAssets: [bare] });
+    S().assembleCreature(body.id, points);
+    assert.equal(S().creatureAssembleNote.status, 'already');
+    assert.ok(await settle(() => !!tileNow().regionKinemes), 'pressed again: the regions land');
+    // a tile drawn before #1851 (one solid picture, its own old regions): re-assembly redraws it in parts and keeps the
+    // artist's pool switch; the old regions go with the old drawing, and the fresh detect lands on the new one
+    const old = {
+      ...landed,
+      svg: `<g transform="translate(15 15) scale(0.7)">${body.svg}</g>`,
+      regions: landed.regions.slice(0, 1),
+    };
+    delete old.regionKinemes;
+    useStore.setState({ customAssets: [old], enabledAssets: { ...S().enabledAssets, [id]: true } });
+    S().assembleCreature(body.id, points);
+    assert.equal(S().creatureAssembleNote.status, 'redrawn');
+    assert.equal(tileNow().svg, landed.svg, 'drawn in parts');
+    assert.ok(!tileNow().regions && !tileNow().regionKinemes, 'the old drawing’s regions are gone');
+    assert.equal(S().enabledAssets[id], true, 'the pool switch stays');
+    assert.ok(await settle(() => !!tileNow().regionKinemes), 'fresh regions follow');
+    S().assembleCreature(body.id, points);
+    assert.equal(S().creatureAssembleNote.status, 'already', 'a current tile is left alone');
+    // stale: the drawing changes before the detect lands — the late result is dropped, never pasted onto it
+    useStore.setState({ seed: 0x1852, creatureRecords: [], customAssets: [], creatureAssembleNote: null });
+    S().assembleCreature(body.id, points);
+    const id2 = creatureTileId(S().creatureRecords[0].id);
+    useStore.setState({ customAssets: S().customAssets.map((a) => (a.id === id2 ? { ...a, svg: body.svg } : a)) });
+    for (let i = 0; i < 50; i++) await flush();
+    assert.ok(!S().customAssets.find((a) => a.id === id2).regions, 'a stale land is dropped');
+  },
+);
 
 console.log(`creatureBody.selfcheck: ${n} checks passed`);

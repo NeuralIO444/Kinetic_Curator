@@ -35,9 +35,10 @@ export const KINEMES = Object.freeze(
     // quad-wide shader warp stays parked). Anywhere else — a compact region,
     // a whole mark — it is simply the gentle osc it declares.
     { id: 'bend', kind: 'osc', period: 3.6, amp: 6 },
-    // #1851 — the stride: a creature's limb swinging in its socket (an osc about the limb region's centre — small
-    // enough that the root stays inside the joint gap, quick enough to read as a gait). The creature family default
-    // gives it to every limb (data/regionDefaults.js).
+    // #1851 — the stride: a creature's limb swinging in its socket — an osc about the limb region's centre, so the
+    // root moves by about (half the limb's length) x sin 9°: ~2 units for a limb from the body's edge (about the joint
+    // gap), more for a long limb from an L point deep inside the body. Quick enough to read as a gait. The creature
+    // family default gives it to every limb (data/regionDefaults.js).
     { id: 'stride', kind: 'osc', period: 1.5, amp: 9 },
   ].map(Object.freeze),
 );

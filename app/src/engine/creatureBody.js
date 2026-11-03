@@ -160,7 +160,13 @@ export function creatureTileSvg(record, bodySvg) {
 export function creaturePartsFromSvg(svg) {
   const out = [];
   const re = /<path class="(cr-limb|cr-head)"[^>]*?\sd="([^"]*)"/g;
-  for (const m of String(svg || '').matchAll(re)) {
+  // Only THIS creature's parts: they are drawn after the body (whose wrappers all close with </g>) and are bare
+  // paths. A body that is itself a creature tile carries its own classed parts INSIDE the body — in its own frame,
+  // not this one — and those are body, not parts.
+  const text = String(svg || '');
+  const close = text.lastIndexOf('</g>');
+  const tail = close < 0 ? text : text.slice(close + 4);
+  for (const m of tail.matchAll(re)) {
     const nums = (m[2].match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
     if (nums.length < 6) continue;
     let x0 = Infinity;

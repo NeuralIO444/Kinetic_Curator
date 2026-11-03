@@ -927,7 +927,12 @@ export const createGlobalSlice = (set) => ({
         return { creatureAssembleNote: { id: rec.id, status: 'nobody' } };
       if (cur.some((r) => r.id === rec.id)) {
         // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
-        if (standing && standing.svg === tile.svg) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        if (standing && standing.svg === tile.svg) {
+          // #1851 — a current tile whose parts never became regions (a detect that failed, or a save before it
+          // landed) is healed by pressing again: the detect is queued once more
+          if (!Array.isArray(standing.regions) || !standing.regions.length) queueCreatureRegions(set, standing);
+          return { creatureAssembleNote: { id: rec.id, status: 'already' } };
+        }
         // #1851 — a tile drawn before the body could move (one solid picture) is redrawn in parts; the pool switch,
         // weight, still pin and options stay (same id). Its old regions go with the old drawing — fresh ones follow.
         if (standing) {
