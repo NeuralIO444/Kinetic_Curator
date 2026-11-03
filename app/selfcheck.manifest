@@ -340,6 +340,7 @@ node src/engine/creatureAssembler.selfcheck.mjs
 node src/engine/creatureInjection.selfcheck.mjs
 node src/engine/creatureRig.selfcheck.mjs
 node src/engine/creatureBreed.selfcheck.mjs
+node src/engine/creatureKin.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
 node src/engine/beastDraw.selfcheck.mjs
 node src/engine/jansenSolver.selfcheck.mjs

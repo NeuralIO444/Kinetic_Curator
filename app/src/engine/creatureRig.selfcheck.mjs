@@ -225,7 +225,14 @@ ok('process: copies stride out of step; a creature rotated on stage carries its 
 ok('shed: the freeze holds the rest pose; the collapse is the body alone; reduced motion rests', () => {
   const frozen = (t) => partsOf(contract({ kinemeTime: t, perfTier1: true, quality: 'performance' }));
   assert.deepEqual(frozen(0.3), frozen(1.2), 'frozen: still over time');
-  assert.deepEqual(frozen(0.9), partsOf(contract({ kinemeTime: 0 })), 'frozen = the rest pose');
+  // #1947 re-pin (cause: the family shimmer — parts' opacity breathes with time; frozen, it rests at full): the pose
+  // is compared without opacity, and a frozen part keeps its body's opacity
+  const pose = (parts) => parts.map(({ opacity, ...rest }) => rest);
+  assert.deepEqual(pose(frozen(0.9)), pose(partsOf(contract({ kinemeTime: 0 }))), 'frozen = the rest pose');
+  assert.ok(
+    frozen(0.9).every((p) => p.opacity === 1),
+    'frozen: no shimmer',
+  );
   const reduced = (t) => partsOf(contract({ kinemeTime: t, reducedMotion: true }));
   assert.deepEqual(reduced(0.3), reduced(1.2), 'reduced motion: still');
   const collapsed = contract({ kinemeTime: 0.3, perfTier1: true, quality: 'performance', assetThin: true });

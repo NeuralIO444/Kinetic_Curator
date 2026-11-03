@@ -150,6 +150,20 @@ export function sanitizeRig(raw) {
   return { body, bones: out };
 }
 
+/** #1947 — a tile's family: the founder record id its skeleton descends from (cr-xxxxxxxx), or null. */
+export const sanitizeKin = (raw) => (typeof raw === 'string' && /^cr-[0-9a-f]{8}$/.test(raw) ? raw : null);
+/** The shimmer's depth: at most this much opacity dips at the trough (subtle — ruling 4). */
+export const SHIMMER_DEPTH = 0.12;
+/**
+ * #1947 — the family shimmer: a faint opacity pulse whose period and phase come from the family key alone, so kin on
+ * stage breathe in unison and strangers do not. 1 at the crest, 1 - SHIMMER_DEPTH at the trough.
+ */
+export function kinShimmer(family, t) {
+  const period = 2.6 + 1.4 * u01(`kin-period|${family}`);
+  const phase = u01(`kin-phase|${family}`);
+  return 1 - SHIMMER_DEPTH * (0.5 + 0.5 * Math.sin(2 * Math.PI * ((Number(t) || 0) / period + phase)));
+}
+
 /**
  * LOIS's gait table — how the creatures move in each of her moods (curator/loisFace.js codes). period = one stride
  * (s); swing = the thigh's swing (±°); knee = the lower bones' flex (±°); head = the head's look about (±°);
@@ -250,6 +264,9 @@ export function expandCreatureInstances(
     const rec = overlayById.get(id);
     return rec && rec.category === 'creature' && rec.source === 'wetlab' ? sanitizeRig(rec.rig) : null;
   };
+  // #1947 — the family: the founder whose skeleton this creature carries (a founder is its own); its parts are dealt
+  // by the founder's hand, so kin resemble each other, and kin shimmer together
+  const familyOf = (id) => sanitizeKin(overlayById.get(id)?.kin) || String(id).replace(/^user:/, '');
   if (!instances.some((it) => rigOf(it.asset))) return instances;
   const stageAssets = [
     ...new Set(instances.map((it) => it.asset).filter((id) => !rigOf(id) && id !== 'creature')),
@@ -269,6 +286,9 @@ export function expandCreatureInstances(
       continue;
     }
     const phase = u01(`lois|${it.key}|${it.seedOffset}`);
+    const family = familyOf(it.asset);
+    const hand = `user:${family}`; // a founder's own tile id — so a founder's deal is exactly what it always was
+    const glow = frozen ? 1 : kinShimmer(family, t);
     const pose = poseRig(rig, frozen ? 0 : t, gait, phase);
     const th = rad(it.rotation);
     const co = Math.cos(th);
@@ -283,7 +303,8 @@ export function expandCreatureInstances(
         role: p.role,
         inst: {
           ...it,
-          asset: dealPart(pile, seed, it.asset, bone),
+          asset: dealPart(pile, seed, hand, bone),
+          opacity: r3(it.opacity * glow),
           key: `${it.key}#${p.id}`,
           x: r3(it.x + lx * co - ly * si),
           y: r3(it.y + lx * si + ly * co),

@@ -332,6 +332,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #1852: breeding reads records to make records (the wet lab's backstage work) — no stage path reads either
     'engine/creatureBreed.js',
     'engine/creatureBreed.selfcheck.mjs',
+    // #1947: the kin suite banks and breeds through the store (a test, not a stage reader)
+    'engine/creatureKin.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

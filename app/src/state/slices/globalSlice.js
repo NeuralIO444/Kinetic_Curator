@@ -44,6 +44,7 @@ import {
   creatureTileId,
   isCreatureTile,
   recordIdOfTile,
+  skeletonFounder,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850
 import { sourceRecord, breedCreature, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
@@ -234,7 +235,8 @@ function bankCreature(state, rec, noteKey = 'creatureAssembleNote') {
   // asset path as every shape once the artist turns it on. The tile must pass the overlay's own door (the one
   // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
   // become a tile, so it is refused here rather than lost on reload.
-  const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)));
+  // #1947 — the tile knows its family (the founder its skeleton descends from), so kin resemble and shimmer together
+  const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)), skeletonFounder(rec, cur));
   if (!tile || sanitizeOverlay([tile]).length !== 1) return note('nobody');
   if (cur.some((r) => r.id === rec.id)) {
     // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
@@ -262,7 +264,10 @@ function bankCreature(state, rec, noteKey = 'creatureAssembleNote') {
 }
 
 /** #1851 — the same tile: the same drawing and the same bones. */
-const sameTile = (a, b) => a.svg === b.svg && JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null);
+const sameTile = (a, b) =>
+  a.svg === b.svg &&
+  JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null) &&
+  (a.kin || null) === (b.kin || null);
 
 export const createGlobalSlice = (set) => ({
   running: true,
