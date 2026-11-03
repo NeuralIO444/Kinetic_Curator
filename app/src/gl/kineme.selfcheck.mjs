@@ -27,9 +27,10 @@ import { useStore } from '../state/store.js';
 // #1435 R4: the library grows 'bend' — an osc kineme whose id doubles as
 // the region-subdivision signal (regionKinemes.js); kind osc is measured
 // below via rock, bend's own per-slice behaviour is regionLines' subject.
+// #1851 re-pin (cause: creatures' limbs stride in their sockets) appended 'stride', after 'bend'.
 assert.deepStrictEqual(
   KINEMES.map((k) => k.id),
-  ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend'],
+  ['spin', 'rock', 'pulse', 'blink', 'bob', 'bend', 'stride'],
 );
 assert.deepStrictEqual(getKineme('bend'), { id: 'bend', kind: 'osc', period: 3.6, amp: 6 });
 for (const k of KINEMES) assert.ok(KINEME_KINDS[k.kind] > 0 && k.period > 0, `${k.id} is well-formed`);

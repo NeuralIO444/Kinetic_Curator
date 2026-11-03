@@ -61,18 +61,21 @@ ok('citizen: the tile is an ordinary overlay asset that passes the overlay door 
 ok('dressing: the body scaled into the box, head and limbs drawn in the stage colours only', () => {
   const svg = creatureTileSvg(record, body.svg);
   assert.ok(svg.includes(`scale(${TILE_BODY_SCALE})`) && svg.includes(body.svg), 'the body is the shape itself');
-  const added = svg.slice(svg.indexOf('</g>') + 4);
-  assert.equal((added.match(/<path /g) || []).length, record.limbs.length, 'one limb per L point');
-  assert.equal((added.match(/<circle /g) || []).length, 2, 'the head ring on the H point');
-  const fills = [...added.matchAll(/fill="([^"]+)"/g)].map((m) => m[1]);
+  // #1851 re-pin (cause: the tile is drawn in PARTS so the stage can move them — each limb and the head is its own
+  // classed path, cut free of the body by a clip moat; creatureBody.selfcheck owns the parts' own proof)
+  const added = [...svg.matchAll(/<path class="cr-(limb|head)"[^>]*>/g)].map((m) => m[0]);
+  assert.equal(added.filter((p) => p.includes('cr-limb')).length, record.limbs.length, 'one limb per L point');
+  assert.equal(added.filter((p) => p.includes('cr-head')).length, 1, 'the head on the H point');
+  const fills = added.map((p) => /fill="([^"]+)"/.exec(p)[1]);
   assert.ok(
     fills.every((f) => f === 'var(--ink)' || f === 'var(--accent)'),
     'stage colours only — the stage dresses it',
   );
   const bare = assembleCreature({ assetId: body.id, points: [], seed: 1 });
+  const off = Math.round(((100 * (1 - TILE_BODY_SCALE)) / 2) * 100) / 100;
   assert.equal(
     creatureTileSvg(bare, body.svg),
-    `<g transform="translate(15 15) scale(${TILE_BODY_SCALE})">${body.svg}</g>`,
+    `<g transform="translate(${off} ${off}) scale(${TILE_BODY_SCALE})">${body.svg}</g>`,
   );
 });
 

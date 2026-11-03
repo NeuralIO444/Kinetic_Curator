@@ -23,6 +23,7 @@ import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { creatureTileId } from './creatureTileId.js';
+import { creatureTileSvg } from './creatureBody.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 
 export const CREATURE_ASSEMBLY_KIND = 'kc-assembled/1';
@@ -274,58 +275,17 @@ export function sanitizeCreatureRecords(raw) {
 // code, with no creature branch anywhere. Like the creature citizen it is never DEALT by the library pools (the
 // artist turns it on, like any tile): state/rollPool.mjs dealableRecords skips creature tiles.
 //
-// The tile's drawing is the creature at rest: its body shape, its head (the H point) ringed, and its limbs (the L
-// points) reaching outward — in var(--ink) / var(--accent), so the STAGE dresses it (Matt, 2026-10-29: the stage
-// overrides the creature's own Look / Voice; the references stay in the genome for breeding). Body language is
-// slice 3 (#1851).
+// The tile's drawing is the creature at rest: its body shape, its head (the H point) and its limbs (the L points)
+// reaching outward, each cut free of the body by a joint gap so the stage can move it (#1851, engine/creatureBody.js)
+// — in var(--ink) / var(--accent), so the STAGE dresses it (Matt, 2026-10-29: the stage overrides the creature's own
+// Look / Voice; the references stay in the genome for breeding). Body language is slice 3 (#1851): the parts ride the
+// stage's own per-region animation.
 
 export { creatureTileId, isCreatureTileId, recordIdOfTile, isCreatureTile } from './creatureTileId.js';
 
-/** Where the body sits inside the tile's 100-unit box: scaled to leave room for the limbs to reach out. */
-export const TILE_BODY_SCALE = 0.7;
-const TILE_BODY_OFFSET = (100 * (1 - TILE_BODY_SCALE)) / 2;
-/** A body point (0..100 in the body's box) in the tile's box. */
-const toTile = (p) => ({ x: TILE_BODY_OFFSET + p.x * TILE_BODY_SCALE, y: TILE_BODY_OFFSET + p.y * TILE_BODY_SCALE });
-const r2 = (n) => Math.round(n * 100) / 100;
-
-/**
- * The tile's SVG (inner content, the 100-unit box every asset is drawn in): the body asset's own drawing scaled into
- * the middle, each limb a tapered stroke reaching from its L point outward (away from the body's centre) to the
- * tile's edge, and the head a ring on the H point. Only allowlisted tags (g, path, circle) — the overlay's door
- * re-checks it on every load.
- */
-export function creatureTileSvg(record, bodySvg) {
-  if (!record || typeof bodySvg !== 'string' || !bodySvg) return null;
-  const parts = [
-    `<g transform="translate(${r2(TILE_BODY_OFFSET)} ${r2(TILE_BODY_OFFSET)}) scale(${TILE_BODY_SCALE})">${bodySvg}</g>`,
-  ];
-  for (const l of record.limbs) {
-    const a = toTile(l);
-    const dx = l.x - 50;
-    const dy = l.y - 50;
-    const m = Math.hypot(dx, dy);
-    const ux = m > 1 ? dx / m : 0;
-    const uy = m > 1 ? dy / m : 1;
-    const reach = 13; // tile units past the body's edge
-    const b = { x: Math.min(98, Math.max(2, a.x + ux * reach)), y: Math.min(98, Math.max(2, a.y + uy * reach)) };
-    // a tapered limb: a thin quad from a 3-unit root to a 1-unit tip
-    const nx = -uy;
-    const ny = ux;
-    const pts = [
-      [a.x + nx * 1.5, a.y + ny * 1.5],
-      [b.x + nx * 0.5, b.y + ny * 0.5],
-      [b.x - nx * 0.5, b.y - ny * 0.5],
-      [a.x - nx * 1.5, a.y - ny * 1.5],
-    ];
-    parts.push(`<path d="M${pts.map(([x, y]) => `${r2(x)} ${r2(y)}`).join('L')}Z" fill="var(--accent)"/>`);
-  }
-  if (record.head) {
-    const h = toTile(record.head);
-    parts.push(`<circle cx="${r2(h.x)}" cy="${r2(h.y)}" r="5" fill="var(--accent)"/>`);
-    parts.push(`<circle cx="${r2(h.x)}" cy="${r2(h.y)}" r="2" fill="var(--ink)"/>`);
-  }
-  return parts.join('');
-}
+// #1851: the drawing lives in engine/creatureBody.js — parts (limbs, head) cut free of the body by a joint gap, so
+// the stage's per-region animation can move them. Re-exported here so callers keep one import.
+export { TILE_BODY_SCALE, creatureTileSvg } from './creatureBody.js';
 
 /**
  * The overlay entry for a record — an ordinary pool asset. `bodyAsset` is the body's own pool record (library or

@@ -189,6 +189,7 @@ export function WetLab({ assetId, onClose }) {
                 {note && note.status === 'pool-full' && 'the asset pool is full — remove an import or a creature first'}
                 {note && note.status === 'nobody' && 'this shape cannot be drawn as a body'}
                 {note && note.status === 'restored' && `${note.id}'s tile was missing — it is back in the asset pool`}
+                {note && note.status === 'redrawn' && `${note.id} redrawn in parts — its limbs and head now move`}
                 {note &&
                   note.status === 'id-taken' &&
                   'an import already uses this creature’s pool id — rename that import first'}
