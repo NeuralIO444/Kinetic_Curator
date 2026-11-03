@@ -27,7 +27,8 @@ import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
-import { sanitizeAssetTags, sanitizeAssetTagsDoc } from '../../data/assetFacets.js';
+import { sanitizeAssetTags, sanitizeAssetTagsDoc, editTags, suggestTags } from '../../data/assetFacets.js';
+import { libraryTraits } from '../../data/assetDescriptor.js';
 import { tagImportedRegions } from '../../data/regionDefaults.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
@@ -1049,6 +1050,66 @@ export const createGlobalSlice = (set) => ({
       else delete next[id];
       return { assetTags: next };
     }),
+  /**
+   * #1943 — apply one tag edit (data/assetFacets.js editTags) to every id in `ids`, in a single write: the inspector's
+   * confirm / reject / free-tag actions and its bulk edit are this one action. Unknown ids are skipped.
+   */
+  editAssetTags: (ids, edit) =>
+    set((state) => {
+      const list = [...new Set((Array.isArray(ids) ? ids : []).filter((x) => typeof x === 'string'))];
+      if (!list.length || !edit || typeof edit !== 'object') return {};
+      const overlay = sanitizeOverlay(state.customAssets);
+      const tags = { ...(state.assetTags || {}) };
+      let custom = state.customAssets;
+      let touched = false;
+      for (const id of list) {
+        if (id.startsWith('user:')) {
+          const a = overlay.find((x) => x.id === id);
+          if (!a) continue;
+          const next = editTags(a.tagEdits, edit, suggestTags(a, a.traits || null));
+          custom = custom.map((c) => {
+            if (c.id !== id) return c;
+            const rest = { ...c };
+            delete rest.tagEdits;
+            return next ? { ...rest, tagEdits: next } : rest;
+          });
+          touched = true;
+        } else {
+          const a = ASSETS.find((x) => x.id === id);
+          if (!a) continue;
+          const next = editTags(tags[id], edit, suggestTags(a, libraryTraits(id)));
+          if (next) tags[id] = next;
+          else delete tags[id];
+          touched = true;
+        }
+      }
+      return touched ? { assetTags: tags, customAssets: custom } : {};
+    }),
+
+  /** #1943 — set the weight of several assets at once (the inspector's bulk H/M/L). */
+  setAssetsWeight: (ids, weight) =>
+    set((state) => {
+      if (!WEIGHT_CYCLE.includes(weight)) return {};
+      const overlay = sanitizeOverlay(state.customAssets);
+      const next = { ...state.assetWeightOverrides };
+      for (const id of new Set(Array.isArray(ids) ? ids : [])) {
+        const asset = findAsset(id, overlay);
+        if (!asset) continue;
+        if (asset.weight === weight) delete next[id];
+        else next[id] = weight;
+      }
+      return { assetWeightOverrides: next };
+    }),
+
+  /** #1943 — switch several assets on or off at once (the inspector's bulk on/off). */
+  setAssetsEnabled: (ids, on) =>
+    set((state) => {
+      const overlay = sanitizeOverlay(state.customAssets);
+      const next = { ...state.enabledAssets };
+      for (const id of new Set(Array.isArray(ids) ? ids : [])) if (findAsset(id, overlay)) next[id] = !!on;
+      return { enabledAssets: next };
+    }),
+
   setAssetWeight: (id, weight) =>
     set((state) => {
       if (!WEIGHT_CYCLE.includes(weight)) return {};
@@ -1107,7 +1168,8 @@ export const createGlobalSlice = (set) => ({
     set((state) => {
       if (!WEIGHT_CYCLE.includes(weight)) return {};
       const next = { ...state.assetWeightOverrides };
-      ASSETS.forEach((a) => {
+      // #1943: imports count too (was the canon library only)
+      [...ASSETS, ...sanitizeOverlay(state.customAssets)].forEach((a) => {
         if (a.category !== category) return;
         if (a.weight === weight) delete next[a.id];
         else next[a.id] = weight;

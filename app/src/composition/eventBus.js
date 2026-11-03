@@ -153,6 +153,8 @@ export const Events = {
   ASSETS_WEIGHT_SET: 'assets:weightSet',
   ASSETS_CATEGORY_WEIGHT: 'assets:categoryWeight',
   ASSETS_WEIGHT_CLEAR: 'assets:weightClear',
+  ASSETS_TAGS: 'assets:tags', // #1943 — { ids, edit }: confirm / reject / free-tag, one asset or a selection
+  ASSETS_BULK: 'assets:bulk', // #1943 — { ids, weight? , enabled? }: the selection's weight / on-off
   ASSETS_DUPLICATE: 'assets:duplicate',
   ASSETS_INGEST: 'assets:ingest',
   ASSETS_REMOVE: 'assets:remove',

@@ -143,3 +143,43 @@ export function sanitizeAssetTagsDoc(raw) {
   }
   return Object.keys(out).length ? out : null;
 }
+
+/**
+ * One edit to an asset's overrides (#1943), pure: returns the new sanitized overrides (or null when nothing is left).
+ *   { op: 'confirm', facet, tag }  a suggestion becomes the artist's (solid chip) — or a new term is added
+ *   { op: 'reject',  facet, tag }  tombstone it: a suggestion the artist does not want
+ *   { op: 'remove',  facet, tag }  take back a confirmed tag (a tag that is also suggested is tombstoned, not left to reappear)
+ *   { op: 'free',    tag }         add a free word          { op: 'unfree', tag }  remove one
+ *   { op: 'clear' }                forget every edit
+ * `suggested` is the asset's computed suggestions, so a remove knows whether the tag would come back.
+ */
+export function editTags(overrides, edit, suggested = []) {
+  const cur = sanitizeAssetTags(overrides) || {};
+  const add = { ...(cur.add || {}) };
+  const drop = { ...(cur.drop || {}) };
+  const put = (m, f, t) => {
+    m[f] = [...(m[f] || []).filter((x) => x !== t), t];
+  };
+  const del = (m, f, t) => {
+    m[f] = (m[f] || []).filter((x) => x !== t);
+    if (!m[f].length) delete m[f];
+  };
+  if (!edit || typeof edit !== 'object') return sanitizeAssetTags(cur);
+  if (edit.op === 'clear') return null;
+  if (edit.op === 'free') put(add, 'free', String(edit.tag));
+  else if (edit.op === 'unfree') del(add, 'free', String(edit.tag));
+  else if (FACETS.includes(edit.facet)) {
+    const { facet, tag } = edit;
+    if (edit.op === 'confirm') {
+      del(drop, facet, tag);
+      put(add, facet, tag);
+    } else if (edit.op === 'reject') {
+      del(add, facet, tag);
+      put(drop, facet, tag);
+    } else if (edit.op === 'remove') {
+      del(add, facet, tag);
+      if (suggested.some((s) => s.facet === facet && s.tag === tag)) put(drop, facet, tag);
+    }
+  }
+  return sanitizeAssetTags({ add, drop });
+}

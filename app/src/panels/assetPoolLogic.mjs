@@ -1,0 +1,95 @@
+// panels/assetPoolLogic.mjs — #1943: the asset pool's filtering, counts and selection, as pure data logic.
+// The panel renders; this decides. Everything here is deterministic and browser-safe.
+import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js';
+import { FACETS } from '../data/assetFacets.js';
+import { ROLES } from '../assets/assetRoles.js';
+
+/** Descriptor records for the pool: library assets read baked traits + the document's edits, imports their own. */
+export function poolDescriptors(assets, assetTags = {}) {
+  return (Array.isArray(assets) ? assets : []).map((a) => {
+    const isUser = String(a.id).startsWith('user:');
+    return assetDescriptor(a, isUser ? a.traits || null : libraryTraits(a.id), isUser ? a.tagEdits : assetTags[a.id]);
+  });
+}
+
+/** Every searchable word of a record: id, family, style, category, raw tags and every effective tag (and free words). */
+export function searchText(rec) {
+  const eff = rec.descriptor.tags.effective;
+  return [rec.id, rec.family, rec.style, rec.category, ...rec.tags, ...FACETS.flatMap((f) => eff[f]), ...eff.free]
+    .join(' ')
+    .toLowerCase();
+}
+
+/** facets: { facet: [terms] } — OR within a facet, AND across facets. role: { role: min fit }. */
+export function matchesFilters(rec, { cat = 'all', text = '', facets = {}, role = {} } = {}) {
+  if (cat === 'user') {
+    if (!String(rec.id).startsWith('user:')) return false;
+  } else if (cat !== 'all' && rec.category !== cat) return false;
+  const q = String(text).trim().toLowerCase();
+  if (q && !q.split(/\s+/).every((w) => searchText(rec).includes(w))) return false;
+  const eff = rec.descriptor.tags.effective;
+  for (const f of FACETS) {
+    const want = facets[f];
+    if (want && want.length && !want.some((t) => eff[f].includes(t))) return false;
+  }
+  for (const r of ROLES) if (role[r] != null && rec.descriptor.roles[r] < role[r]) return false;
+  return true;
+}
+
+export function filterRecords(recs, filters) {
+  return recs.filter((r) => matchesFilters(r, filters));
+}
+
+/** Facet chip counts over a record list: { facet: { term: n } } (terms with no assets are absent). */
+export function facetCounts(recs) {
+  const out = Object.fromEntries(FACETS.map((f) => [f, {}]));
+  for (const r of recs)
+    for (const f of FACETS) for (const t of r.descriptor.tags.effective[f]) out[f][t] = (out[f][t] || 0) + 1;
+  return out;
+}
+
+/** Category chip counts: { category: n } plus `all` and `user`. */
+export function categoryCounts(recs) {
+  const out = { all: recs.length, user: 0 };
+  for (const r of recs) {
+    if (String(r.id).startsWith('user:')) out.user++;
+    out[r.category] = (out[r.category] || 0) + 1;
+  }
+  return out;
+}
+
+/** The active filters as a removable chip row: [{ key, label, kind, facet?, term?, role? }]. */
+export function activeChips({ cat = 'all', text = '', facets = {}, role = {} } = {}) {
+  const chips = [];
+  if (cat !== 'all') chips.push({ key: `cat:${cat}`, kind: 'cat', label: cat });
+  if (String(text).trim()) chips.push({ key: 'text', kind: 'text', label: `“${String(text).trim()}”` });
+  for (const f of FACETS)
+    for (const t of facets[f] || [])
+      chips.push({ key: `${f}:${t}`, kind: 'facet', facet: f, term: t, label: `${f}: ${t}` });
+  for (const r of ROLES)
+    if (role[r] != null) chips.push({ key: `role:${r}`, kind: 'role', role: r, label: `${r} ≥ ${role[r]}` });
+  return chips;
+}
+
+/** Toggle a facet term in a filter map (immutable). */
+export function toggleFacet(facets, facet, term) {
+  const cur = facets[facet] || [];
+  const next = cur.includes(term) ? cur.filter((t) => t !== term) : [...cur, term];
+  const out = { ...facets };
+  if (next.length) out[facet] = next;
+  else delete out[facet];
+  return out;
+}
+
+/**
+ * Selection (shift- or ctrl-click). `order` is the visible id order. A plain toggle adds/removes `id`; a range
+ * (shift) selects everything between the anchor and `id`, inclusive, in the visible order.
+ */
+export function nextSelection(sel, order, id, { range = false, anchor = null } = {}) {
+  const cur = sel.filter((x) => order.includes(x));
+  if (range && anchor && order.includes(anchor)) {
+    const [a, b] = [order.indexOf(anchor), order.indexOf(id)].sort((x, y) => x - y);
+    return [...new Set([...cur, ...order.slice(a, b + 1)])];
+  }
+  return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
+}

@@ -111,6 +111,12 @@ export function applyAction(action, store = useStore.getState()) {
       return store.cycleAssetOption(action.id, action.key); // #1694 S2
     case 'TOGGLE_ASSET_STILL':
       return store.toggleAssetStill(action.id); // #1128
+    case 'EDIT_ASSET_TAGS':
+      return store.editAssetTags(action.ids, action.edit); // #1943
+    case 'SET_ASSETS_WEIGHT':
+      return store.setAssetsWeight(action.ids, action.weight); // #1943
+    case 'SET_ASSETS_ENABLED':
+      return store.setAssetsEnabled(action.ids, action.enabled); // #1943
     case 'DUPLICATE_ASSET':
       return store.duplicateAsset(action.id);
     case 'INGEST_ASSET':

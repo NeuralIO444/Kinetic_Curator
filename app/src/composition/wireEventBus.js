@@ -72,6 +72,11 @@ export function wireEventBus(rawDispatch) {
   on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) =>
     dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }),
   );
+  on(Events.ASSETS_TAGS, ({ ids, edit }) => dispatch({ type: 'EDIT_ASSET_TAGS', ids, edit })); // #1943
+  on(Events.ASSETS_BULK, ({ ids, weight, enabled }) => {
+    if (weight) dispatch({ type: 'SET_ASSETS_WEIGHT', ids, weight });
+    if (typeof enabled === 'boolean') dispatch({ type: 'SET_ASSETS_ENABLED', ids, enabled });
+  });
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
   on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_ASSET', id }));
   on(Events.ASSETS_INGEST, ({ svg, hint, category, source }) =>
