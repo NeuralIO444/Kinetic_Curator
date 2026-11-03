@@ -1,6 +1,6 @@
-// poets/poemRow.mjs — FIELD poem row (#1918): the pure half.
+// poets/poemRow.mjs — FIELD poem group (#1918): the pure half.
 //
-// Matt's rulings (2026-11-01): one slim row `poem: [POET — FIRST WORDS…] [FORM] [KEEP] [HOLD]`.
+// Matt's rulings (2026-11-01): one slim group `poem: [POET — FIRST WORDS…] [FORM] [KEEP] [HOLD]`. On the mode strip, right of motion (Matt 2026-11-02).
 // This module names the standing poem for that row (the decks carry ids + lines, no display names),
 // banks a kept poem, and fixes the seeded sub-streams every poem re-deal draws from. No store, no
 // React — layoutSlice is the single write site and the row only reads.

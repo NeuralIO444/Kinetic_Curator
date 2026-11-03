@@ -5,7 +5,6 @@ import { MasterBar } from './components/MasterBar.jsx';
 import { PaletteStrip } from './components/PaletteStrip.jsx';
 import { useMidi } from './hooks/useMidi.js';
 import { ModeStrip } from './components/ModeStrip.jsx';
-import { PoemRow } from './components/PoemRow.jsx'; // #1918 — FIELD poem row
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
@@ -605,11 +604,7 @@ function AppInner() {
       <FirstRunOverlay onPlay={onPlayMe} onTour={() => setTourOpen(true)} />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <PaletteStrip />
-      {/* #1918 — the mode strip and the poem row share the strip track: one grid child, so the shell keeps its row */}
-      <div className="strip-stack">
-        <ModeStrip />
-        <PoemRow />
-      </div>
+      <ModeStrip />
       <ErrorBoundary critical>
         <Shell
           dispatchPipe={piped}
