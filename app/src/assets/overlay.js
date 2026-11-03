@@ -3,6 +3,8 @@ import { sanitizeGradient } from './gradient.js';
 import { normalizeRegions, normalizeRegionSlots, REGION_SLOTS } from './regionSlots.js';
 import { sanitizeRegionKinemes } from '../data/regionKinemes.js';
 import { sanitizeRig, sanitizeKin } from '../engine/creatureRig.js';
+import { sanitizeAssetTags } from '../data/assetFacets.js';
+import { sanitizeTraits } from './assetTraits.js';
 
 export const OVERLAY_CAP = 32;
 
@@ -24,6 +26,14 @@ const LOAD_EXTRA_TAGS = Object.freeze(['text']);
  * indistinguishable from one that never had the field, and `hasGradient()`
  * / the `raw.gradient` checks in liveLoop.mjs stay false as intended.
  */
+/** #1942: the raw tag list's door — strings only, ≤ 32 chars, deduped, ≤ 24 (was passed through unvalidated). */
+function cleanRawTags(tags) {
+  if (!Array.isArray(tags)) return ['overlay'];
+  const out = [];
+  for (const t of tags) if (typeof t === 'string' && t.length > 0 && t.length <= 32 && !out.includes(t)) out.push(t);
+  return out.slice(0, 24);
+}
+
 export function sanitizeOverlay(list) {
   if (!Array.isArray(list)) return [];
   const out = [];
@@ -53,7 +63,7 @@ export function sanitizeOverlay(list) {
       id,
       category: raw.category || 'fragments',
       weight: raw.weight || 'medium',
-      tags: Array.isArray(raw.tags) ? raw.tags : ['overlay'],
+      tags: cleanRawTags(raw.tags),
       compound: !!raw.compound,
       source: raw.source || 'overlay',
       svg: String(raw.svg),
@@ -61,6 +71,9 @@ export function sanitizeOverlay(list) {
       ...(regions.length ? { regions } : {}),
       ...(REGION_SLOTS.some((s) => regionSlots[s]) ? { regionSlots } : {}),
       ...(regionKinemes ? { regionKinemes } : {}),
+      // #1942 — measured traits (computed on arrival) and the artist's tag edits, each re-validated here
+      ...((traits) => (traits ? { traits } : {}))(sanitizeTraits(raw.traits)),
+      ...((tagEdits) => (tagEdits ? { tagEdits } : {}))(sanitizeAssetTags(raw.tagEdits)),
       // #1851 — a wet-lab creature tile's invisible bones, re-validated here like every field (never passed through raw)
       ...((rig) => (rig ? { rig } : {}))(
         raw.category === 'creature' && raw.source === 'wetlab' ? sanitizeRig(raw.rig) : null,
@@ -167,6 +180,7 @@ export function replaceOverlayAsset(id, rawSvg, overlay) {
     ...parsed.asset,
     id,
     source: 'replace',
+    ...(prev?.tagEdits ? { tagEdits: prev.tagEdits } : {}), // #1942: a swap keeps the artist's tags; traits recompute
     ...(REGION_SLOTS.some((s) => slots[s]) ? { regionSlots: slots } : {}),
   };
   return {

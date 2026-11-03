@@ -320,7 +320,7 @@ export function assetRecords(assets) {
  * The asset ids matching a filter, in input order. Every named dimension must match (any of its values):
  * { families, categories, styles, tags, exclude: [ids] }. An empty filter returns every id but the excluded.
  */
-export function assetsWhere(records, { families, categories, styles, tags, exclude } = {}) {
+export function assetsWhere(records, { families, categories, styles, tags, exclude, facets, minRole } = {}) {
   const ex = new Set(exclude || []);
   return records
     .filter(
@@ -329,7 +329,11 @@ export function assetsWhere(records, { families, categories, styles, tags, exclu
         (!families || families.includes(r.family)) &&
         (!categories || categories.includes(r.category)) &&
         (!styles || styles.includes(r.style)) &&
-        (!tags || tags.some((t) => r.tags.includes(t))),
+        (!tags || tags.some((t) => r.tags.includes(t))) &&
+        // #1942: descriptor filters — facets { facet: [terms] } (any term per named facet), minRole { role: fit }
+        (!facets ||
+          Object.entries(facets).every(([f, ts]) => ts.some((t) => r.descriptor?.tags.effective[f]?.includes(t)))) &&
+        (!minRole || Object.entries(minRole).every(([role, v]) => (r.descriptor?.roles[role] ?? 0) >= v)),
     )
     .map((r) => r.id);
 }

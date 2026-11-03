@@ -28,6 +28,7 @@
     "evidence:stress": "node scripts/stressEvidence.mjs",
     "audit:assets": "node scripts/assetCounts.mjs",
     "bake:regions": "node scripts/bakeRegionMattes.mjs",
+    "bake:traits": "node scripts/bakeAssetTraits.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check ."
   },
