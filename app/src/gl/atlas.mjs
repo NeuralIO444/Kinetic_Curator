@@ -17,6 +17,7 @@
  */
 
 import { Resvg } from '@resvg/resvg-js';
+import { RESVG_FONT } from '../assets/resvgFont.mjs'; // #1950 — the pinned font
 import { ASSETS } from '../data/assets/index.js';
 import { applyGradient } from '../assets/gradient.js';
 import { stripFramesFor } from '../data/cellKinemes.js';
@@ -69,7 +70,7 @@ function bakeCombo(assetId, ink, accent) {
     `viewBox="${x0} ${y0} ${(x1 - x0) * n} ${y1 - y0}">` +
     body +
     `</svg>`;
-  const img = new Resvg(svg).render();
+  const img = new Resvg(svg, { font: RESVG_FONT }).render();
   const pixels = Buffer.from(img.pixels);
   // Note: no alpha-bleed. Bleeding ink RGB into transparent texels breaks
   // premultiplied mipmap filtering (saturated RGB at partial alpha reads
@@ -124,7 +125,7 @@ function regionCellsFor(asset, wholePixels, partCache) {
   if (stripFramesFor(asset.id)) return [];
   let part = partCache.get(asset.id);
   if (!part) {
-    const img = new Resvg(canonicalSvg(asset.svg)).render();
+    const img = new Resvg(canonicalSvg(asset.svg), { font: RESVG_FONT }).render();
     part = buildRegionPartition(new Uint8Array(img.pixels), img.width, img.height, asset.regions);
     partCache.set(asset.id, part);
   }

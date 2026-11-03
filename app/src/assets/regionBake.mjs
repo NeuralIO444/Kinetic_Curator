@@ -17,6 +17,7 @@
 //             receives on arrival. Deterministic from the capped records + category.
 // Deterministic: the same SVGs give the same bytes (the selfcheck re-runs it against the committed data).
 import { Resvg } from '@resvg/resvg-js';
+import { RESVG_FONT } from './resvgFont.mjs'; // #1950 — the pinned font
 import { detectRegions } from './regionMattes.js';
 import { REGION_SLOTS, normalizeRegionSlots } from './regionSlots.js';
 import { capRegionsTracked } from './regionPartition.js';
@@ -76,7 +77,7 @@ const clean = (r) => ({
  * `regions` are in reading order; `regionSlots` maps A..D to the first four.
  */
 export function bakeAsset(svg) {
-  const img = new Resvg(canonicalSvg(svg)).render();
+  const img = new Resvg(canonicalSvg(svg), { font: RESVG_FONT }).render();
   const px = new Uint8Array(img.pixels);
   const { regions } = detectRegions(px, img.width, img.height);
   if (!regions.length) return null;
