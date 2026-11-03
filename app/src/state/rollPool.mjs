@@ -11,6 +11,7 @@
 // Pure: the caller passes `rng` (() => [0,1)). The store passes the same honest die its rolls already use; the
 // selfchecks pass a seeded stream. The creature citizen is never dealt — it rides its own pool toggle.
 import { assetRecords, assetsWhere } from '../data/assetStyle.js';
+import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
 
 /** Pool size range — matches the old 4-asset sets, with a little more room for a mixed deal. */
 export const POOL_MIN = 4;
@@ -32,7 +33,10 @@ function sampleWithout(rng, arr, k) {
 
 /** The dealable records: the library plus the artist's imports, minus anything never dealt. */
 export function dealableRecords(assets, customAssets = []) {
-  return assetRecords([...(assets || []), ...(customAssets || [])]).filter((r) => !NEVER_DEALT.includes(r.id));
+  // #1850 — a wet-lab creature tile is a pool citizen like the creature citizen: placed when the artist turns it on,
+  // never dealt by a pool. Judged by what the record IS (category + source), never by its id.
+  const imports = (customAssets || []).filter((a) => !isCreatureTile(a));
+  return assetRecords([...(assets || []), ...imports]).filter((r) => !NEVER_DEALT.includes(r.id));
 }
 
 /**

@@ -54,6 +54,7 @@ export function DataExportRow({
   keeps,
   onMessage,
 }) {
+  const creatureRecords = useStore((s) => s.creatureRecords); // #1850 — creatures ride the bundle with their tiles
   const fileInputRef = useRef(null);
   const [pendingBundle, setPendingBundle] = useState(null); // #1051 — { fileName, parsed }
   const [recent, setRecent] = useState(() => readRecent());
@@ -109,6 +110,7 @@ export function DataExportRow({
     midiBanks,
     midiActiveBank,
     customAssets,
+    creatureRecords,
     layers,
     activeLayerId,
     layerSnapshots,
