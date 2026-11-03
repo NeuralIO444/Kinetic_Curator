@@ -9,6 +9,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../data/regionKinemes.js';
+import { sanitizeAssetTagsDoc } from '../data/assetFacets.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js'; // #1849
 import { sanitizeCount } from '../curator/spawn.js';
@@ -171,6 +172,9 @@ export function serializeProject(state) {
   // Written only when set: a piece with no region edits exports as before.
   const regionKinemes = sanitizeRegionKinemesDoc(state.regionKinemes);
   if (regionKinemes) doc.regionKinemes = regionKinemes;
+  // #1942 — the artist's tag edits on library assets. Written only when set.
+  const assetTags = sanitizeAssetTagsDoc(state.assetTags);
+  if (assetTags) doc.assetTags = assetTags;
   // #1128 — assets pinned still (the living-motion floor skips them). Written only when set.
   const still = sanitizeAssetStill(state.assetStill);
   if (still) doc.assetStill = still;
@@ -308,6 +312,7 @@ export function parseProject(raw) {
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
+      assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
@@ -369,6 +374,7 @@ export function parseProject(raw) {
     light: sanitizeLight(raw.light), // #594 — absent → null (off)
     assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
     regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
+    assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942
     assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
     assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
     assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355

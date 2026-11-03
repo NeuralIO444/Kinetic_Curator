@@ -10,6 +10,7 @@
  * Not in the selfcheck manifest: needs DOM/canvas.
  */
 import { detectRegions } from './regionMattes.js';
+import { traitsFromRaster } from './assetTraits.js';
 
 export const REGION_RASTER_PX = 200;
 
@@ -67,7 +68,8 @@ export async function rasterizeRegions(svg) {
   ctx.drawImage(img, 0, 0, REGION_RASTER_PX, REGION_RASTER_PX);
   const px = ctx.getImageData(0, 0, REGION_RASTER_PX, REGION_RASTER_PX).data;
   const { regions, idMap, width, height } = detectRegions(px, REGION_RASTER_PX, REGION_RASTER_PX, { wantMap: true });
-  const out = { regions, idMap, w: width, h: height };
+  // #1942: the descriptor's measured traits ride the same raster — one rasterize, one queue, one stale guard
+  const out = { regions, idMap, w: width, h: height, traits: traitsFromRaster(px, REGION_RASTER_PX, REGION_RASTER_PX) };
   if (cache.size > 64) cache.clear();
   cache.set(key, out);
   return out;
@@ -97,7 +99,7 @@ export function queueRegionDetect(id, svg, cb) {
   const key = `${id}:${cacheKey(String(svg || ''))}`;
   if (pending.has(key)) return;
   const p = rasterizeRegions(svg)
-    .then((r) => cb(id, r.regions))
+    .then((r) => cb(id, r.regions, r.traits))
     .catch(() => {})
     .finally(() => pending.delete(key));
   pending.set(key, p);
