@@ -962,6 +962,9 @@ export const createGlobalSlice = (set) => ({
       );
       if (parents.length !== BREED_PARENTS || parents.some((p) => !p))
         return { creatureBreedNote: { id: null, status: 'need-three' } };
+      // three slots, but two of them the same creature (this shape, as a parent, IS that banked creature): refused
+      if (new Set(parents.map((p) => p.id)).size !== BREED_PARENTS)
+        return { creatureBreedNote: { id: null, status: 'same-parent' } };
       const child = breedCreature(parents, state.seed);
       if (!child) return { creatureBreedNote: { id: null, status: 'need-three' } };
       return bankCreature(state, child, 'creatureBreedNote');

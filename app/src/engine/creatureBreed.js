@@ -88,6 +88,8 @@ const LAW = Object.freeze([
 export const BREED_LAW = LAW;
 
 const geneOf = (rec, id) => rec.genome.find((g) => g.id === id).value;
+// A child carries the BREED_LAW genes only: a gene this build does not know (a newer build's addition kept by the
+// door) is not inherited — add it to LAW, with its kind, when it should pass down.
 
 /**
  * Breed a child from three parents.
@@ -107,17 +109,20 @@ export function breedCreature(parents, seed = 0) {
   const s = seed >>> 0;
   const key = `${s}|${trio.map((p) => p.id).join('|')}`;
   const pick = (salt) => trio[Math.floor(u01(`${key}|${salt}`) * BREED_PARENTS) % BREED_PARENTS];
-  const other = (salt, not) => {
-    const rest = trio.filter((p) => p !== not);
-    return rest[Math.floor(u01(`${key}|${salt}`) * rest.length) % rest.length];
+  // another parent whose value differs (a swap to the same value is no mutation at all); null when none does
+  const other = (salt, not, valueOf) => {
+    const rest = trio.filter((p) => p !== not && valueOf(p) !== valueOf(not));
+    return rest.length ? rest[Math.floor(u01(`${key}|${salt}`) * rest.length) % rest.length] : null;
   };
+  const skelOf = (p) => JSON.stringify(['head', 'limbs', 'joints'].map((id) => geneOf(p, id)));
   const genome = [];
   const mutations = [];
   // the skeleton linkage group travels together — and mutates together, as one gene, by re-picking another parent
   let skeleton = pick('skeleton');
   let skeletonSource = `parent:${skeleton.id}`;
-  if (u01(`${key}|mut?|skeleton`) < MUTATION_RATE) {
-    const to = other('mut|skeleton', skeleton);
+  const skelTo = u01(`${key}|mut?|skeleton`) < MUTATION_RATE ? other('mut|skeleton', skeleton, skelOf) : null;
+  if (skelTo) {
+    const to = skelTo;
     mutations.push({ gene: 'FORM.skeleton', kind: 'swap', from: skeleton.id, to: to.id });
     skeleton = to;
     skeletonSource = `mut:${to.id}`;
@@ -143,9 +148,10 @@ export function breedCreature(parents, seed = 0) {
     } else {
       let from = law.kind === 'skeleton' ? skeleton : pick(law.id);
       if (law.kind === 'skeleton') source = skeletonSource;
-      else if (mutates) {
-        // a discrete mutation re-picks ANOTHER parent's value — never a value none of them held
-        const to = other(`mut|${law.id}`, from);
+      else if (mutates && other(`mut|${law.id}`, from, (p) => JSON.stringify(geneOf(p, law.id)))) {
+        // a discrete mutation re-picks ANOTHER parent's (different) value — never a value none of them held; where
+        // every parent holds the same value there is nothing to mutate to, and nothing is recorded
+        const to = other(`mut|${law.id}`, from, (p) => JSON.stringify(geneOf(p, law.id)));
         mutations.push({ gene: `${law.family}.${law.id}`, kind: 'swap', from: from.id, to: to.id });
         from = to;
         source = `mut:${from.id}`;

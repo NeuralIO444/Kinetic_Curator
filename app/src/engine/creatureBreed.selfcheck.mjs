@@ -84,7 +84,7 @@ const varied = [
   withDrives(trio[1], { approval: 1.0, crowding: 0.6, strain: 1.9, boredom: 0.4 }),
   withDrives(trio[2], { approval: 1.4, crowding: 1.1, strain: 0.3, boredom: 1.8 }),
 ];
-const SEEDS = Array.from({ length: 600 }, (_, i) => i * 7919 + 13);
+const SEEDS = Array.from({ length: 2000 }, (_, i) => i * 7919 + 13);
 const children = SEEDS.map((s) => breedCreature(varied, s));
 const DISCRETE = BREED_LAW.filter((l) => l.kind !== 'continuous').map((l) => l.id);
 const geneOf = (rec, id) => rec.genome.find((g) => g.id === id);
@@ -92,11 +92,16 @@ const geneOf = (rec, id) => rec.genome.find((g) => g.id === id);
 ok('rate: the mutation fraction is the named constant 1/8, and the breeder honours it', () => {
   assert.equal(MUTATION_RATE, 1 / 8, 'Matt: lively, ~1 gene in 8');
   assert.equal(BREED_PARENTS, 3, 'the triad');
-  // mutation sites: each discrete gene, the skeleton (one linkage group), each drive
-  const sites = BREED_LAW.filter((l) => l.kind !== 'skeleton').length + 1;
+  // mutation sites in this trio (every parent differs in body, skeleton, Look, Voice; all share the null material,
+  // which therefore has nothing to mutate to): body, skeleton, look, voice + the four drives = 8
+  const sites = 8;
   const total = children.reduce((a, c) => a + c.lineage.mutations.length, 0);
   const rate = total / (children.length * sites);
-  assert.ok(Math.abs(rate - MUTATION_RATE) < 0.03, `observed ${rate.toFixed(3)} ≈ ${MUTATION_RATE}`);
+  assert.ok(Math.abs(rate - MUTATION_RATE) < 0.01, `observed ${rate.toFixed(4)} ≈ ${MUTATION_RATE}`);
+  assert.ok(
+    children.every((c) => !c.lineage.mutations.some((m) => m.gene === 'MATERIAL.material')),
+    'a gene every parent holds alike never "mutates" (no recorded no-ops)',
+  );
   assert.ok(
     children.some((c) => c.lineage.mutations.length === 0) && children.some((c) => c.lineage.mutations.length >= 2),
   );
@@ -157,6 +162,19 @@ ok('discrete: no discrete gene holds a value none of the parents held; the skele
       `${p.body} is passed on`,
     );
   assert.ok(new Set(children.map((c) => c.look)).size === 3, 'each parent’s Look turns up');
+  // the picks are fair: un-mutated discrete genes come from each parent about a third of the time
+  for (const id of ['body', 'look', 'voice', 'head']) {
+    const share = new Map(varied.map((p) => [p.id, 0]));
+    let picks = 0;
+    for (const c of children) {
+      const src = geneOf(c, id).source;
+      if (!src.startsWith('parent:')) continue;
+      share.set(src.slice(7), share.get(src.slice(7)) + 1);
+      picks++;
+    }
+    for (const [pid, k] of share)
+      assert.ok(Math.abs(k / picks - 1 / 3) < 0.05, `${id}: ${pid} gives ${(k / picks).toFixed(3)}`);
+  }
 });
 
 ok('continuous: drives blend inside their range — inside the parents’ own span unless mutated', () => {
@@ -187,6 +205,11 @@ ok('mutations: each one is in the lineage, and each mut: gene has its entry', ()
       if (!g.source.startsWith('mut:')) continue;
       const fam = ['head', 'limbs', 'joints'].includes(g.id) ? 'FORM.skeleton' : `${g.family}.${g.id}`;
       assert.ok(muts.has(fam), `${g.id} is a recorded mutation`);
+    }
+    // and the reverse: every lineage entry is a gene that says mut:
+    for (const m of c.lineage.mutations) {
+      const ids = m.gene === 'FORM.skeleton' ? ['head', 'limbs', 'joints'] : [m.gene.split('.')[1]];
+      for (const id of ids) assert.ok(geneOf(c, id).source.startsWith('mut:'), `${m.gene} is marked mut: on its gene`);
     }
     for (const m of c.lineage.mutations) {
       if (m.kind === 'reroll')
@@ -232,7 +255,35 @@ ok('door: a child that lies about its lineage is refused whole', () => {
   assert.equal(lie({ mutations: [{ gene: 'DRIVE.strain', kind: 'reroll', value: 99 }] }), null, 'out of range');
   assert.equal(lie({ mutations: [{ gene: '<x>', kind: 'reroll', value: 1 }] }), null);
   assert.equal(sanitizeCreatureRecord({ ...c, lineage: 'x' }), null);
+  // the lineage must agree with the genes it explains
+  const muted = children.find((x) => x.lineage.mutations.some((m) => m.kind === 'reroll'));
+  const L = (rec, patch) => sanitizeCreatureRecord({ ...rec, lineage: { ...rec.lineage, ...patch } });
+  assert.ok(sanitizeCreatureRecord(muted), 'the honest child loads');
+  assert.equal(L(muted, { mutations: [] }), null, 'an erased mutation');
+  assert.equal(L(c, { seed: c.lineage.seed + 1 }), null, 'a different seed');
+  assert.equal(L(c, { parents: [c.id, ...c.lineage.parents.slice(1)] }), null, 'its own parent');
+  assert.equal(
+    L(muted, { mutations: [...muted.lineage.mutations, muted.lineage.mutations[0]] }),
+    null,
+    'a mutation twice',
+  );
+  assert.equal(
+    L(c, { mutations: [...c.lineage.mutations, { gene: 'LOOK.look', kind: 'reroll', value: 1 }] }),
+    null,
+    'a mutation with no gene to show for it',
+  );
+  assert.equal(
+    sanitizeCreatureRecord({ ...c, drives: { ...c.drives, approval: c.drives.approval === 2 ? 1 : 2 } }),
+    null,
+    'a drive slot that is not its gene',
+  );
   const born = assembleCreature({ assetId: 'org_blob_01', points: SHAPES[0][1], seed: 3 });
+  assert.equal(
+    sanitizeCreatureRecord({ ...born, lineage: { parents: c.lineage.parents, seed: born.seed, mutations: [] } }),
+    null,
+    'an assembled creature cannot claim parents',
+  );
+  assert.ok(sanitizeCreatureRecord({ ...born, lineage: null }), 'a null lineage is no lineage');
   assert.ok(!('lineage' in sanitizeCreatureRecord(born)), 'an assembled creature has no lineage');
 });
 
@@ -254,7 +305,7 @@ ok('store: BREED banks the child with its tile and bones; a bad trio is refused;
   assert.equal(S().creatureBreedNote.status, 'need-three', 'two sources: refused with a note');
   assert.equal(S().creatureRecords.length, 2, 'nothing banked');
   S().breedCreature([{ kind: 'creature', id: a.id }, { kind: 'creature', id: a.id }, assembly(2)]);
-  assert.equal(S().creatureBreedNote.status, 'need-three', 'a parent twice: refused');
+  assert.equal(S().creatureBreedNote.status, 'same-parent', 'a parent twice: refused, and said so');
   S().breedCreature([{ kind: 'creature', id: a.id }, { kind: 'creature', id: b.id }, assembly(2)]);
   assert.equal(S().creatureBreedNote.status, 'banked');
   const child = S().creatureRecords[2];

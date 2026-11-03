@@ -36,6 +36,9 @@ export function WetLab({ assetId, onClose }) {
   const breedCreature = useStore((s) => s.breedCreature); // #1852
   const breedNote = useStore((s) => s.creatureBreedNote);
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
+  // a slot naming a creature that has since been removed reads as empty (never a stale id sent to BREED)
+  const bankIds = new Set((allRecords || []).map((r) => r.id));
+  const liveSlots = slots.map((sl) => (sl.kind === 'creature' && !bankIds.has(sl.id) ? EMPTY_SLOT : sl));
   const wrapRef = useRef(null);
 
   // Subscribe ONCE, and read onClose through a ref. Escape is also the app's panic key: its handler changes the store
@@ -240,7 +243,7 @@ export function WetLab({ assetId, onClose }) {
               parent; drives blend; about one gene in eight mutates.
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} data-testid="breed-slots">
-              {slots.map((slot, i) => {
+              {liveSlots.map((slot, i) => {
                 const setSlot = (patch) => setSlots((cur) => cur.map((s2, j) => (j === i ? { ...s2, ...patch } : s2)));
                 const value = slot.kind === 'assembly' ? '@shape' : slot.kind === 'creature' ? slot.id : '';
                 return (
@@ -303,7 +306,7 @@ export function WetLab({ assetId, onClose }) {
                 title="Breed a child from the three parents, dealt off the project seed"
                 onClick={() =>
                   breedCreature(
-                    slots.map((sl) =>
+                    liveSlots.map((sl) =>
                       sl.kind === 'assembly'
                         ? { kind: 'assembly', assetId: asset.id, points, lookId: sl.lookId, voiceId: sl.voiceId }
                         : { kind: sl.kind, id: sl.id },
@@ -315,6 +318,9 @@ export function WetLab({ assetId, onClose }) {
               </button>
               <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="breed-note">
                 {breedNote && breedNote.status === 'need-three' && 'pick three different parents'}
+                {breedNote &&
+                  breedNote.status === 'same-parent' &&
+                  'two of the three are the same creature — this shape in that Look and Voice is already banked'}
                 {breedNote && breedNote.status === 'banked' && `bred ${breedNote.id} — its tile is in the asset pool`}
                 {breedNote && breedNote.status === 'already' && `already bred ${breedNote.id}`}
                 {breedNote && breedNote.status === 'full' && `bank full (${MAX_CREATURE_RECORDS}) — remove one first`}
@@ -336,7 +342,7 @@ export function WetLab({ assetId, onClose }) {
                   {child.id} ← {child.lineage.parents.join(' · ')} · {child.lineage.mutations.length} mutation
                   {child.lineage.mutations.length === 1 ? '' : 's'}
                   {child.lineage.mutations.map((m) => (
-                    <div key={m.gene}>
+                    <div key={`${m.gene}-${m.kind}`}>
                       {m.gene.toLowerCase()} {m.kind === 'swap' ? `from ${m.to}` : `→ ${m.value}`}
                     </div>
                   ))}
