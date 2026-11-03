@@ -29,7 +29,7 @@ import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver, getLastSpawnDecisions, getLastDishWet, setLiveWetSampler } from './liveResolve.mjs';
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
-import { lastResolvedInput } from './resolveTap.mjs'; // #1949: the frame's effective input (a take's, in playback)
+import { lastResolvedInput } from './resolveTap.mjs'; // #1949: the frame's effective input (a take's own, while one plays)
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
