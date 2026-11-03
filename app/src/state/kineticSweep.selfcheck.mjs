@@ -156,6 +156,10 @@ const snap = () => {
   const keep = curatorPass(st, null, mkRng(1), () => ({ index: 0 }));
   assert.equal(keep.layoutParams, null, 'index 0 is a pass');
   // #1918: HOLD needs a poem standing to hold (silence has no value to lock) — deal one first.
+  // #1932 re-pin (cause: the genre gate, Matt's clarification 2026-11-03): a re-deal only lands
+  // in a type-native room, and the store's standing room here is the default (classic) — silent
+  // by design. Stand the room in a swiss look first, then deal.
+  useStore.setState({ layoutParams: { ...S().layoutParams, composition: 'raster' } });
   for (let i = 0; i < 8 && !S().layoutParams.fieldForm; i++) S().redealPoem();
   assert.ok(S().layoutParams.fieldForm, 'a poem stands to hold');
   const depth = S().historyUndoStack.length;

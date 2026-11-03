@@ -5,6 +5,10 @@
 // onto the landed params in the same commit, the deal replays from
 // (seed, press #), the form is HELD across voice passes, and a no-op press
 // deals nothing.
+// #1932 re-pin (cause: the genre gate, Matt's clarification 2026-11-03): the press's
+// room must be type-native for a form to deal at all, so the fixture stands in a
+// swiss look ('raster'); the last block proves the same press in the store's
+// default room (praystation, classic) deals silence — no form, by design.
 import assert from 'node:assert/strict';
 import { useStore } from './store.js';
 import { RANDOMIZABLE_KEYS } from './paramUtils.js';
@@ -13,14 +17,14 @@ import { sanitizeFieldForm, POET_DECKS } from '../poets/fieldForm.js';
 
 const S = () => useStore.getState();
 
-const press = (seed, curatePress) => {
+const press = (seed, curatePress, composition = 'raster') => {
   resetDirector();
   useStore.setState({
     seed,
     seedOffsets: { spatial: 0, color: 0, asset: 0, noise: 0 },
     curatePress,
     lockedParams: {},
-    layoutParams: { ...useStore.getInitialState().layoutParams },
+    layoutParams: { ...useStore.getInitialState().layoutParams, composition },
     kineticRound: null,
     kineticNotch: null,
     armedMode: null,
@@ -78,6 +82,12 @@ ok('a no-op press (everything locked) deals nothing and keeps the standing form'
   S().curateUnlocked();
   assert.equal(S().curatePress, pressBefore, 'the no-op press did not land');
   assert.equal(JSON.stringify(S().layoutParams.fieldForm), before, 'the standing form is untouched');
+});
+
+ok('#1932: the same press in a non-type-native room deals silence — no form lands', () => {
+  const params = press(4242, 0, 'praystation');
+  assert.equal(S().curatePress, 1, 'the press landed');
+  assert.equal(params.fieldForm, undefined, 'a classic room holds no poem (the genre gate, through the real store)');
 });
 
 console.log(`fieldDeal.selfcheck: ${n} checks passed`);

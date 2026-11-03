@@ -59,10 +59,29 @@ import { isPlateMaterial, plateGeoFrom, PLATE_GEO_DEFAULTS } from './plateBody.m
 import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.mjs'; // #1549 — material:'wash'
 import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
+import { sanitizeFieldForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data
 import { pickWeightedIndexStable } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
 export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
+
+/**
+ * #1904 — FIELD: placement `em` (glyph cap height as a fraction of dish
+ * height) → item scale units. Item scale is sized against the canvas
+ * height in the scene contract, and a letter's cap is ~0.4 of its baked
+ * cell, so one em of cap height reads at roughly this many scale units.
+ * Calibrated on the live stage (kc-field-shots, 2026-11-01): at 12.5 a
+ * form's glyphs landed at scale ≈ 0.69 (em ≈ 0.055) and vanished among
+ * the room's ordinary scale 0.8–1.8 marks; at 20 the same forms land at
+ * scale ≈ 0.83–1.10 — the size of ordinary marks, which is what the
+ * baked letter stamps are. The form reads as a held block of type among
+ * the marks, neither whisper nor billboard.
+ * #1932 note: placement's recipes grew their em in #1928 (true cap
+ * heights, ~0.054–0.092 before the fit clamp), so forms now land at
+ * scale ≈ 1.1–1.8 — still the ordinary-mark band. A live-stage
+ * recalibration read belongs to Matt's feel gate on this issue.
+ */
+export const FIELD_EM_SCALE = 20;
 
 /**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
@@ -691,10 +710,56 @@ export function buildPlacements({
     { seed, canvasW, canvasH },
   );
 
-  // #1904 → #1928 (Matt ruling 2026-11-02): the poem is a clean TYPE PLATE, not marks. The armed form stays document
-  // data (layoutParams.fieldForm, unchanged — no migration) but never joins this item list: the scene contract turns
-  // it into a plate (poets/typePlate.mjs) that the renderer composites over the finished frame, so mirror, ACCUM
-  // trails, materials and FX never touch it. The item list is the marks, and only the marks.
+  // #1904 — FIELD: an armed poet's form reaches the dish. The form was
+  // placed at pick time (poets/placement.js) and rides the layer's recipe
+  // data (layoutParams.fieldForm); here it is only drawn — stamps become
+  // items at exactly the placed positions, coloured by this layer's own
+  // colour strategy, at the top of the layer's alpha range (a held form is
+  // present, not a ghost). They join the item list before the overlap sort
+  // and the material flag loop, so mirror / glass / materials treat them
+  // as ordinary marks of the layer. The dish lean/snap/weather above reads
+  // the SoA and does not move them: a held form is not loose marks.
+  // No form — the default, and every pre-FIELD document — sanitize returns
+  // null and the item list is byte-identical to the pre-FIELD pipeline.
+  //
+  // #1932 (Matt's clarification, 2026-11-03): this block is RESTORED. #1928
+  // lifted the poem off the dish onto a clean type plate composited over
+  // the finished frame (poets/typePlate.mjs, now retired); played live,
+  // the plate made the poem a headline and the marks its background —
+  // "KC1 looks like a background maker". The poem is stage material again:
+  // citizens of the layer, in the same world as the assets, taking the
+  // layer's mirror, materials and finish like any mark. What #1928 got
+  // right STANDS and is not restored away: placement's measured metrics
+  // (the spacing floor — glyph ink never overlaps, within a word or across
+  // lines, at every density and aspect) live in poets/placement.js and
+  // are asserted in poets/placement.selfcheck.mjs.
+  const fieldForm = sanitizeFieldForm(layoutParams.fieldForm);
+  if (fieldForm) {
+    const fieldAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
+    const fieldItems = new Array(fieldForm.stamps.length);
+    for (let j = 0; j < fieldForm.stamps.length; j++) {
+      const s = fieldForm.stamps[j];
+      const { color, accent } = assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
+      fieldItems[j] = {
+        x: (s.x / fieldForm.aspect) * canvasW,
+        y: s.y * canvasH,
+        scale: s.em * FIELD_EM_SCALE,
+        scaleY: s.em * FIELD_EM_SCALE,
+        rotation: s.rotation,
+        alpha: fieldAlpha,
+        index: soa.n + j,
+        t: 0.5,
+        zTier: 0,
+        assetId: s.assetId,
+        color,
+        accent,
+        key: `field-${fieldForm.poetId}-${fieldForm.pieceId}-${j}`,
+      };
+    }
+    // On a pool hit `mapped` IS cache.itemPool — never append to it. The
+    // copy costs one array of references, only while a form is armed.
+    mapped = [...mapped, ...fieldItems];
+  }
 
   if (!layoutParams.overlap) {
     // `mapped` is already a fresh array we own — no defensive copy needed.

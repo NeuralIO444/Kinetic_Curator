@@ -1,7 +1,12 @@
 // placement.selfcheck.mjs — FIELD S1 (#1902): the placement law.
 // Charset (every deck line maps to existing stamps), determinism (same seed
 // -> identical stamp list, bit-for-bit), and the per-poet recipe invariants.
-import { placePiece, stampIdForChar, lineMapsToStamps, LETTER_STAMP_IDS, PLACEMENT_LAYOUTS, SQUARE_CELL } from './placement.js';
+// #1932: this suite is also the home of the SPACING FLOOR (the last section) —
+// re-homed from poets/typePlate.selfcheck.mjs when the plate retired. The floor
+// was never the plate's: it is placement's measured metrics (every glyph's ink
+// box clear of every other's, within a word and across lines, at every density
+// and aspect), and it stands unchanged now that the stamps ride the dish.
+import { placePiece, stampIdForChar, lineMapsToStamps, LETTER_STAMP_IDS, PLACEMENT_LAYOUTS, SQUARE_CELL, glyphWidthEm, GLYPH_MAX_W, GLYPH_CAP_UNITS } from './placement.js';
 import { POETS } from '../curator/fieldDirector.js';
 import { mkRng } from '../engine/prng.js';
 
@@ -156,6 +161,56 @@ const withDensity = (piece, d) => ({ ...piece, density: d });
   const wLo = placePiece(withDensity(w, 0.05), mkRng(3), { aspect: ASPECT });
   const wHi = placePiece(withDensity(w, 0.95), mkRng(3), { aspect: ASPECT });
   assert(wHi.stamps[0].em > wLo.stamps[0].em, 'single: higher density -> larger type');
+}
+
+// ── The spacing floor (#1932, re-homed from typePlate.selfcheck) ────────
+// Metrics are measured from the baked glyphs: every letter has a width, the
+// widest is W, and 1 em of cap height is GLYPH_CAP_UNITS of the glyph box.
+for (const ch of 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789') {
+  assert(glyphWidthEm(ch) > 0.15 && glyphWidthEm(ch) <= GLYPH_MAX_W, `${ch} has a measured width`);
+}
+assert(glyphWidthEm('W') === GLYPH_MAX_W, 'W is the widest glyph');
+assert(GLYPH_CAP_UNITS === 80, 'cap height is 80 of the 100-unit glyph box');
+
+const inkBox = (s) => {
+  const hw = (glyphWidthEm(s.ch) * s.em) / 2;
+  return { l: s.x - hw, r: s.x + hw, t: s.y - s.em / 2, b: s.y + s.em / 2 };
+};
+{
+  let forms = 0;
+  for (const deck of Object.values(POETS)) {
+    for (const piece of deck) {
+      for (const density of [0, 0.4, 0.8, 1]) {
+        for (const aspect of [0.6, 1, 10 / 7, 16 / 9, 2.6]) {
+          for (let seed = 1; seed <= 6; seed++) {
+            const { stamps } = placePiece({ ...piece, density }, mkRng(seed * 31 + 7), { aspect });
+            forms++;
+            const boxes = stamps.map(inkBox);
+            for (const b of boxes) {
+              assert(b.l >= -1e-9 && b.r <= aspect + 1e-9 && b.t >= -1e-9 && b.b <= 1 + 1e-9, `${piece.id}: glyph ink on the dish`);
+            }
+            for (let i = 0; i < boxes.length; i++) {
+              for (let j = i + 1; j < boxes.length; j++) {
+                const a = boxes[i];
+                const c = boxes[j];
+                const ix = Math.min(a.r, c.r) - Math.max(a.l, c.l);
+                const iy = Math.min(a.b, c.b) - Math.max(a.t, c.t);
+                assert(!(ix > 1e-9 && iy > 1e-9), `${piece.id} d${density} a${aspect.toFixed(2)} s${seed}: glyphs collide`);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  assert(forms === 1920, `the spacing sweep covered every piece × density × aspect × seed (${forms})`);
+}
+{
+  const { stamps } = placePiece({ id: 'g', lines: ['THE SNOW LIES', 'ON THE HILL'], layout: 'grid', density: 0.4 }, mkRng(3));
+  const row = stamps.filter((s) => Math.abs(s.y - stamps[0].y) < 1e-9);
+  const gaps = row.slice(1).map((s, i) => inkBox(s).l - inkBox(row[i]).r);
+  const inWord = [0, 1, 3, 4, 5, 7, 8, 9].map((i) => gaps[i]); // THE·SNOW·LIES: indexes 2 and 6 are word breaks
+  assert(Math.min(gaps[2], gaps[6]) > Math.max(...inWord), 'grid: word breaks read as breaks (wider than any in-word gap)');
 }
 
 console.log(`placement.selfcheck: ${pass} passed, ${fail} failed`);

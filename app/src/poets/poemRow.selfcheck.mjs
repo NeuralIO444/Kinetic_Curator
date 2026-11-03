@@ -5,10 +5,19 @@
 //             KEEP banks the exact materialized poem; HOLD locks the VALUE against KINETIC and CURATOR
 //   laws      HOLD is document-long (a chapter landing does not clear it) and rides the take beside the
 //             poem (both are scene keys); re-deals draw from the seeded varying stream (replayable)
+//
+// #1932 re-pin (cause: the genre gate, Matt's clarification 2026-11-03): a poem may stand only in a
+// type-native room (swiss / bauhaus / japanese). The fixture therefore stands in a swiss look
+// ('raster') — the store's default room (praystation, classic) is silent by design now — and
+// ruling 1's press law is asserted in its gated form: the voice pass (which never moves the look)
+// still deals varying poems, while the look-moving presses obey the biconditional — a poem
+// stands after the press if and only if the LANDED look's family is type-native.
 import assert from 'node:assert';
 import { useStore } from '../state/store.js';
 import { resetDirector, getDirector } from '../curator/director.js';
-import { fieldFormForDeal, POET_DECKS } from './fieldForm.js';
+import { isTypeNativeFamily } from '../curator/fieldDirector.js';
+import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { fieldFormForDeal, sanitizeFieldForm, POET_DECKS } from './fieldForm.js';
 import { poemIdentity, keepPoem, isPoemKept, sanitizePoemKeeps, MAX_POEM_KEEPS, POET_FORMS } from './poemRow.mjs';
 import { SCENE_KEYS } from '../gl/playback.mjs';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
@@ -29,7 +38,8 @@ function reset(extra = {}) {
   resetDirector();
   useStore.setState({
     seed: 0x1918,
-    layoutParams: { ...BASE.layoutParams, fieldForm: standing },
+    // #1932: the room stands in a type-native look (swiss 'raster') so poems may stand at all.
+    layoutParams: { ...BASE.layoutParams, composition: 'raster', fieldForm: standing },
     lockedParams: {},
     poemDeal: 0,
     curatePress: 0,
@@ -72,16 +82,37 @@ ok('identity: every deck piece names its poet (surname), first words, and FORM i
 });
 
 ok('ruling 1: every KINETIC press re-deals the poem off the varying stream (look, voice, curator, chaos)', () => {
-  for (const [name, press] of Object.entries(PRESSES)) {
+  // The voice pass never moves the look: the room stays swiss, and the stream deals varying poems.
+  reset();
+  const seen = new Set();
+  for (let i = 0; i < 8; i++) {
+    PRESSES.voice();
+    const f = S().layoutParams.fieldForm;
+    seen.add(f ? `${f.poetId}/${f.pieceId}` : 'silence');
+  }
+  assert.equal(S().poemDeal, 8, 'voice: every press advanced the poem stream');
+  assert.ok(seen.size >= 3, `voice: presses deal varying poems (saw ${[...seen].join(', ')})`);
+
+  // #1932: the look-moving presses re-deal the poem UNDER THE GATE — after each press a poem
+  // stands if and only if the landed look's family is type-native, and the stream still advances.
+  const familyOf = (lp) => COMPOSITION_PRESETS.find((p) => p.id === lp.composition)?.group ?? null;
+  for (const name of ['look', 'curator', 'chaos']) {
     reset();
-    const seen = new Set();
+    const outcomes = new Set();
     for (let i = 0; i < 8; i++) {
-      press();
-      const f = S().layoutParams.fieldForm;
-      seen.add(f ? `${f.poetId}/${f.pieceId}` : 'silence');
+      PRESSES[name]();
+      const lp = S().layoutParams;
+      const fam = familyOf(lp);
+      const f = lp.fieldForm;
+      assert.equal(
+        !!f,
+        isTypeNativeFamily(fam),
+        `${name} press ${i}: poem ${f ? 'stands' : 'absent'} ⟺ landed family ${fam} ${isTypeNativeFamily(fam) ? 'is' : 'is not'} type-native`,
+      );
+      outcomes.add(f ? `${f.poetId}/${f.pieceId}` : `silence(${fam})`);
     }
     assert.equal(S().poemDeal, 8, `${name}: every press advanced the poem stream`);
-    assert.ok(seen.size >= 3, `${name}: presses deal varying poems (saw ${[...seen].join(', ')})`);
+    assert.ok(outcomes.size >= 2, `${name}: presses deal varying gated outcomes (saw ${[...outcomes].join(', ')})`);
   }
 });
 
@@ -165,7 +196,9 @@ ok('HOLD under undo behaves like every param lock: undo restores the lock state 
   S().undo();
   assert.ok(!S().lockedParams.fieldForm, 'undo takes back the press and the lock state it saw (house lock idiom)');
   assert.deepEqual(S().layoutParams.fieldForm, standing, 'the poem before the press is back');
-  assert.notDeepEqual(dealt, undefined);
+  // #1932: what the press dealt is a form or silence, by the landed look's family — either is honest;
+  // a form, when present, must pass its own door.
+  assert.ok(dealt === undefined || JSON.stringify(sanitizeFieldForm(dealt)) === JSON.stringify(dealt), 'the press dealt a form or silence');
 });
 
 ok('a poem-only deal does not move the room: KINETIC taps never count as fresh room observations', () => {

@@ -14,6 +14,13 @@
 // replays exactly. Mutation property: restoring the constant fallback fails
 // nearly every assertion below (one poet per band, one piece per band,
 // greenleaf at zero).
+//
+// #1932 re-pin (cause: the genre gate, Matt's clarification 2026-11-03): a tick
+// must now NAME the room's look family, and only a type-native family deals.
+// Every drive below names 'swiss' — this suite measures the deal stream in an
+// eligible room, as it always did in spirit — and the last block measures the
+// gate itself through the live path: the same bands in a grunge room deal
+// silence on every tick.
 import assert from 'node:assert/strict';
 import { createDirector, getDirector, resetDirector } from './director.js';
 
@@ -35,7 +42,7 @@ function runBand(audio, ticks = TICKS) {
   const pieces = {};
   let silent = 0;
   for (let i = 0; i < ticks; i++) {
-    const r = d.tick({ feed: {}, audio, nowTs: T0 + i * 1000 });
+    const r = d.tick({ feed: {}, audio, nowTs: T0 + i * 1000, lookFamily: 'swiss' });
     if (!r.poet) {
       silent++;
       continue;
@@ -55,8 +62,23 @@ console.log(
     `hot poets=${JSON.stringify(hot.poets)} pieces=${Object.keys(hot.pieces).length}`,
 );
 
-ok('the tick path arms a poet on every tick (silence needs a rejection; this path never rejects)', () => {
-  assert.equal(cool.silent + neutral.silent + hot.silent, 0);
+ok(
+  'the tick path arms a poet on every tick in a type-native room (silence needs a rejection; this path never rejects)',
+  () => {
+    assert.equal(cool.silent + neutral.silent + hot.silent, 0);
+  },
+);
+
+ok('#1932: the same bands in a non-type-native room deal silence on every tick (the genre gate, live path)', () => {
+  resetDirector();
+  const d = getDirector();
+  let silent = 0;
+  for (let i = 0; i < TICKS; i++) {
+    const r = d.tick({ feed: {}, audio: [0.1, 0.5, 0.8][i % 3], nowTs: T0 + i * 1000, lookFamily: 'grunge' });
+    if (!r.poet) silent++;
+  }
+  assert.equal(silent, TICKS, 'grunge room: no poet at any temperature');
+  resetDirector();
 });
 
 ok('cool band deals BOTH cool poets and only cool poets, with a spread of pieces', () => {
@@ -94,7 +116,7 @@ function runScript() {
   const audios = [0.1, 0.5, 0.8, 0.5];
   const seq = [];
   for (let i = 0; i < 48; i++) {
-    const r = d.tick({ feed: {}, audio: audios[i % audios.length], nowTs: T0 + i * 1000 });
+    const r = d.tick({ feed: {}, audio: audios[i % audios.length], nowTs: T0 + i * 1000, lookFamily: 'swiss' });
     seq.push(r.poet ? `${r.poet.poetId}/${r.poet.pieceId}/${r.poet.layout}` : 'null');
   }
   return seq;
@@ -112,7 +134,7 @@ ok('reset() re-deals the same stream from the top', () => {
   const script = () => {
     const seq = [];
     for (let i = 0; i < 24; i++) {
-      const r = d.tick({ feed: {}, audio: 0.5, nowTs: T0 + i * 1000 });
+      const r = d.tick({ feed: {}, audio: 0.5, nowTs: T0 + i * 1000, lookFamily: 'swiss' });
       seq.push(r.poet ? `${r.poet.poetId}/${r.poet.pieceId}` : 'null');
     }
     return seq;
@@ -124,7 +146,7 @@ ok('reset() re-deals the same stream from the top', () => {
 
 ok('an injected fieldRng still wins exactly (the test seam the fix must not break)', () => {
   const d = createDirector({ now: () => T0, fieldRng: () => 0.5 });
-  const r = d.tick({ feed: {}, audio: 0.1, nowTs: T0 });
+  const r = d.tick({ feed: {}, audio: 0.1, nowTs: T0, lookFamily: 'swiss' });
   assert.equal(r.poet.poetId, 'teijo', 'constant 0.5 in a cool room still picks pool index 1');
   assert.equal(r.poet.pieceId, 't3', 'constant 0.5 still picks piece index 2');
 });

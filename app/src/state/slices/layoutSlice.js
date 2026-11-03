@@ -237,6 +237,18 @@ const dieRng = () => die(0x40000000) / 0x40000000;
 /** #1918 — HOLD: the standing poem is locked against re-deals (lockedParams.fieldForm, and a poem stands). */
 const poemHeld = (state) => !!state.lockedParams?.fieldForm && !!state.layoutParams?.fieldForm;
 
+/**
+ * #1932 — the genre gate's read: the family (a data/styleLooks group id) of a
+ * composition id, or null when the look carries no style family (the core
+ * presets group outside the style families, and an unknown id has none).
+ * The Director hears this family at pick time; only TYPE_NATIVE_FAMILIES
+ * rooms (curator/fieldDirector.js) may hold a poem.
+ */
+const lookFamilyOf = (compositionId) => {
+  const preset = COMPOSITION_PRESETS.find((p) => p.id === compositionId);
+  return preset && typeof preset.group === 'string' ? preset.group : null;
+};
+
 /** The dish aspect a form is placed for (FIELD S3's own read). */
 const fieldAspect = (state) =>
   Number.isFinite(state.canvasW / state.canvasH) ? { aspect: state.canvasW / state.canvasH } : {};
@@ -261,6 +273,8 @@ function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
   const poet = getDirector().dealPoet({
     fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
     avoidPieceId,
+    // #1932 — the poem will stand with THESE params: their look's family is the gate's read.
+    lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
   });
   const form = fieldFormForDeal(
     poet,
@@ -1057,7 +1071,12 @@ export const createLayoutSlice = (set) => ({
       // candidates each CURATOR press rolls (unleashed rooms roll more,
       // settled rooms roll fewer). Silence → 1 → yesterday's 8. Deterministic
       // given the same room; a different room is a different deal.
-      const tickResult = getDirector().tick({ feed: loisActivity.snapshot() });
+      // #1932 — the tick hears the CURRENT dealt look's family (the look standing as the press
+      // begins): the FIELD genre gate decides this press's poem from the room as dealt.
+      const tickResult = getDirector().tick({
+        feed: loisActivity.snapshot(),
+        lookFamily: lookFamilyOf(state.layoutParams.composition),
+      });
       const kinWeight = tickResult.gains.kinWeight;
       const candidateCount = Math.max(2, Math.min(16, Math.round(CURATE_CANDIDATES * kinWeight)));
       // #592 — the discrete choices are drawn from a transition chain

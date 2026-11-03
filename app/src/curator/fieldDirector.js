@@ -13,6 +13,22 @@ export const POETS = Object.freeze({
   gibson: GIBSON,
 });
 
+/**
+ * #1932 — the genre gate: the look families whose rooms are TYPE-NATIVE
+ * (Matt's clarification, 2026-11-03). Type belongs where lettering is the
+ * room's own language — Swiss and Bauhaus design, and Japanese rooms (the
+ * kanji contexts) — and stays out of the rest: organic fields (the Team
+ * Lab-style rooms), grunge, op, memphis, engraved, marks, and every core
+ * look that carries no style family. The Director reads the CURRENT dealt
+ * look's family at pick time and passes eligibility in; a room outside
+ * this set hears silence from FIELD, whatever its temperature. Membership
+ * is a ruling, not a heuristic — change it here, by name.
+ */
+export const TYPE_NATIVE_FAMILIES = Object.freeze(new Set(['swiss', 'bauhaus', 'japanese']));
+
+/** True when a look family (a data/styleLooks group id) is type-native (#1932). */
+export const isTypeNativeFamily = (family) => typeof family === 'string' && TYPE_NATIVE_FAMILIES.has(family);
+
 /** Preferred next rooms (adjacency). Data only. Used at pick time. */
 export const ROOM_TRANSITIONS = Object.freeze({
   'THE CLASH': ['THE ROOM', 'AGREEMENT'],
@@ -38,6 +54,14 @@ export function nextSlowDebt(history, currentVerdict) {
 /**
  * Pure poet choice. Seeded. Cool / high-keep → greenleaf|teijo. Hot → rosselli|gibson.
  * Returns { poetId, piece, layout, density } or null (silence).
+ *
+ * #1932 — silence is the default and the poem is earned twice over: the
+ * room must be TYPE-ELIGIBLE (its dealt look's family is type-native —
+ * TYPE_NATIVE_FAMILIES above; the Director reads the family and affirms
+ * eligibility), and the dealt piece must still clear the stamp threshold
+ * where it is placed (poets/fieldForm.js, FIELD_POEM_MIN_STAMPS).
+ * Eligibility defaults to false: a caller that cannot name the room's
+ * family gets silence, not a poem.
  */
 export function choosePoet({
   intensity = 0.5,
@@ -45,7 +69,11 @@ export function choosePoet({
   genreLean = null,
   rng = () => 0.5,
   lastRejected = false,
+  typeEligible = false,
 } = {}) {
+  // #1932 — the genre gate outranks temperature: a non-type-native room is
+  // silent, full stop.
+  if (!typeEligible) return null;
   if (lastRejected && rng() < 0.7) return null; // damp after rejection
   // Precedence (#1907 fix): a live blaze outranks debt — debt brakes a neutral
   // room toward held forms, it does not call a hot room cool. As first written,

@@ -158,9 +158,11 @@ ok('resolveLayerMattes: valid, self-cycle, 2-cycle, missing, fx source', () => {
 // in Node we prove the audit table is complete and honest: every uniform
 // each shader declares is in its program's upload list — the exact
 // direction the checked audit throws on.
-ok('harness: RENDERER_PROGRAMS covers all eight renderer programs', () => {
+ok('harness: RENDERER_PROGRAMS covers all seven renderer programs', () => {
   const keys = RENDERER_PROGRAMS.map((d) => d.key).sort();
-  assert.deepEqual(keys, ['composite', 'copy', 'mesh', 'plate', 'quad', 'resolve', 'upscale', 'wetlook']); // #1928: + plate
+  // #1932 re-pin (cause: the plate program retired with the plate — the FIELD poem is instances
+  // now, so the #1928 tint-blit program no longer exists): eight programs → seven.
+  assert.deepEqual(keys, ['composite', 'copy', 'mesh', 'quad', 'resolve', 'upscale', 'wetlook']);
   for (const def of RENDERER_PROGRAMS) {
     assert.equal(typeof def.vs, 'string', `${def.key}: has vertex source`);
     assert.equal(typeof def.fs, 'string', `${def.key}: has fragment source`);
