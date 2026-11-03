@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { initStress, getStressState, NEUTRAL_STRESS, ACTIVITY_WINDOW_FRAMES } from './stressLive.js';
-import { BAND_RELAX, BAND_NORMAL, tastePressure } from './stress.js';
+import { BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN, tastePressure } from './stress.js';
 import { createLoisActivity } from './loisActivity.js';
 
 function rig() {
@@ -100,8 +100,8 @@ function rig() {
   const a = run();
   assert.deepEqual(
     a.bands,
-    [BAND_RELAX, BAND_NORMAL],
-    'activity + taste at full is 0.62: NORMAL, not TIGHTEN, while dish is 0',
+    [BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN],
+    'activity + taste at full is 0.62: past the ruled 0.52 edge it lands in TIGHTEN, while dish is 0 (#1635 retune, 2026-11-02)',
   );
   assert.ok(Math.abs(a.end.smoothed - 0.62) < 0.01, `settles at 0.38 + 0.24 (got ${a.end.smoothed})`);
   assert.deepEqual(run().bands, a.bands, 'same counts, same bands');
@@ -152,21 +152,25 @@ function rig() {
     r.counts.activityCount += 1;
     r.counts.passRun = 40;
     r.frame();
-  } // busy: NORMAL
-  assert.equal(getStressState().band, BAND_NORMAL);
+  } // busy: hands alone settle at 0.62 — past the ruled 0.52 edge, TIGHTEN (#1635 retune, 2026-11-02)
+  assert.equal(getStressState().band, BAND_TIGHTEN);
   r.counts.passRun = 0; // a keep lands, the hands stop: the room settles back
   r.frame(300);
   const s = getStressState();
   assert.equal(s.band, BAND_RELAX);
-  assert.equal(s.crossings, 2, 'RELAX -> NORMAL -> RELAX is two crossings, counted once each');
+  assert.equal(
+    s.crossings,
+    4,
+    'RELAX -> NORMAL -> TIGHTEN -> NORMAL -> RELAX is four crossings, counted once each (#1635 retune: the busy phase now crosses the 0.52 edge on the way up and back)',
+  );
   assert.equal(
     s.occupancy.relax + s.occupancy.normal + s.occupancy.tighten,
     s.frames,
     'every presented frame is accounted to exactly one band',
   );
   assert.ok(
-    s.occupancy.normal > 0 && s.occupancy.relax > 0 && s.occupancy.tighten === 0,
-    `the session's time per band is readable (R ${s.occupancy.relax} / N ${s.occupancy.normal} / T ${s.occupancy.tighten})`,
+    s.occupancy.normal > 0 && s.occupancy.relax > 0 && s.occupancy.tighten > 0,
+    `the session's time per band is readable, all three bands visited (R ${s.occupancy.relax} / N ${s.occupancy.normal} / T ${s.occupancy.tighten})`,
   );
   r.stop();
   assert.deepEqual(getStressState(), NEUTRAL_STRESS, 'stopped: counters zero with the rest of the state');

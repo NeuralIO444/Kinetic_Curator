@@ -203,10 +203,13 @@ import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
   assert.ok(back.stress.bands.length >= 1, 'band changes were logged');
   assert.equal(
     back.stress.occupancy.tighten,
-    0,
-    'dish pressure is 0 until pins exist, so a live take cannot reach TIGHTEN yet',
+    118,
+    "under the ruled 0.52 edge (#1635 retune, 2026-11-02) this take's hands-alone stress reaches TIGHTEN for 118 of its 200 updates — dish pressure is still 0 (no pins in this take); under the retired 0.72 edge it never could",
   );
-  assert.ok(back.stress.occupancy.normal > 0 && back.stress.occupancy.relax > 0, 'it moved between RELAX and NORMAL');
+  assert.ok(
+    back.stress.occupancy.normal > 0 && back.stress.occupancy.relax > 0,
+    'it moved through RELAX and NORMAL too',
+  );
 }
 
 // 5. #1635 — the per-frame readback: the same record expands to one { frame, stress, band } per update,

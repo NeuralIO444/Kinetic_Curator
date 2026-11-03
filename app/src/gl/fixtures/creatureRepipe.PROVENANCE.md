@@ -109,3 +109,13 @@ state echoes into the hashed resolver output from frame 0. Checkpoint-only refre
 nothing else (nonCheckpointDiffs []). Control: with only ASSETS_MARKS removed from the
 authored index (scratch tree) the pre-refresh fixture verifies byte-for-byte on this tree;
 the refresh is deterministic (the tool's two-run check).
+
+**#1635 checkpoint refresh (2026-11-02):** Matt's retune ruling moved the stress TIGHTEN
+edge 0.72 → 0.52 (evidence: his pooled live takes never entered the old band). This take's
+stress crosses the new edge, so its creature poses replay differently from frame 60 — the
+first checkpoint divergence. Checkpoint-only refresh via
+`scripts/refreshFixtureCheckpoints.mjs --write`: sha256 d17d2233… → 902d98fe… (17768 →
+17765 bytes); deep diff = 15 of 16 checkpoint hashes changed, recorded inputs
+byte-identical, nothing else (nonCheckpointDiffs []). The refresh is deterministic (the
+tool's two-run check). replayGate.kcperf was not refreshed: it still verifies as committed
+(its take never crosses the new edge).

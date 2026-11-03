@@ -7,7 +7,7 @@
 // lands byte-identical; drop the band and the body returns to byte-exact truth.
 //
 // Ruling 3 (Matt, 2026-10-16): corruption IS the glitch's band response. Tighten corrupts, Relax restores.
-// The mapping (corruptionAmount) keys off the same Tighten bar S5's poses use (0.72): at or below it there is
+// The mapping (corruptionAmount) keys off the same Tighten bar S5's poses use (0.52): at or below it there is
 // no corruption at all — Normal and Relax are both truth — and above it corruption grows quadratically to
 // full at band 1, in density (how many strips slip) as well as magnitude.
 //
@@ -69,7 +69,7 @@ const finite = (v, d) => (Number.isFinite(v) ? v : d);
 
 /**
  * The band mapping — ruling 3 as a function. band is the room's 0..1 band scalar (the formation/pose scale:
- * Relax < 0.28, Normal between, Tighten > 0.72). Returns the corruption amount 0..1: exactly 0 at or below
+ * Relax < 0.28, Normal between, Tighten > 0.52). Returns the corruption amount 0..1: exactly 0 at or below
  * the Tighten bar (and for any missing/non-finite band — no signal, no corruption), then quadratic to 1 at
  * band 1, so corruption creeps at the bar and blooms at full Tighten.
  */

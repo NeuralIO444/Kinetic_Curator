@@ -16,7 +16,7 @@ import { createStressTracker, activityPressure, tasteWithVerdicts } from './stre
 export const ACTIVITY_WINDOW_FRAMES = 120;
 // #1635 — the session's telemetry rides the state: `occupancy` counts the frames presented in each band and
 // `crossings` the band changes between them, so a session can be read backstage (the ?debug=stress readout)
-// and the 0.28 / 0.72 edges tuned from evidence instead of feel. Zero here; a live session's counters are
+// and the 0.28 / 0.52 edges tuned from evidence instead of feel. Zero here; a live session's counters are
 // its own objects, built in initStress — this frozen shape is only the never-started / stopped state.
 export const NEUTRAL_STRESS = Object.freeze({
   stress: 0,

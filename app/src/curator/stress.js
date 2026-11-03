@@ -8,8 +8,11 @@
 // different art. Nothing here reads time: every "window" is counted in frames or in actions (KC-1 DS: no timers with
 // opinions).
 //
-// Bands: RELAX < 0.28 <= NORMAL <= 0.72 < TIGHTEN, with light smoothing and hysteresis so the band does not chatter
-// at an edge. The numbers below are the roadmap's starting values and its OPEN TUNABLES: telemetry sets them later.
+// Bands: RELAX < 0.28 <= NORMAL <= 0.52 < TIGHTEN, with light smoothing and hysteresis so the band does not chatter
+// at an edge. The numbers below began as the roadmap's starting values, its OPEN TUNABLES — telemetry has now set
+// one of them: the tighten edge was retuned 0.72 → 0.52 on session evidence and Matt's ruling (#1635, 2026-11-02:
+// five real sessions pooled, tighten never entered or approached at 0.72; 0.52 sits above the busiest take's p90
+// and below the observed peak). The relax edge was ruled KEEP at 0.28 on the same evidence.
 //
 // THE LOG IS THE AUTHORITY (decision 1). The tracker reports band changes and the quantized stress value only when
 // it changes; those are what get recorded, and on replay the recorded band is applied, not recomputed.
@@ -21,7 +24,7 @@ export const BAND_TIGHTEN = 'tighten';
 export const BANDS = Object.freeze([BAND_RELAX, BAND_NORMAL, BAND_TIGHTEN]);
 /** Band edges on the smoothed stress value. */
 export const RELAX_BELOW = 0.28;
-export const TIGHTEN_ABOVE = 0.72;
+export const TIGHTEN_ABOVE = 0.52;
 /** Open tunables (roadmap): the hysteresis gap straddles each edge; smoothing is an EMA over about this many frames. */
 export const HYSTERESIS_GAP = 0.04;
 export const SMOOTH_FRAMES = 12;
