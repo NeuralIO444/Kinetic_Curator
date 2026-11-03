@@ -5,13 +5,20 @@
  * grow), gone (#1634; one H per asset) — and the asset uses yours from then on.
  * Same popup shell as RegionPicker. The window is where the asset's creature settings will grow.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
 import { MAX_ATTACH, ATTACH_BOX } from '../engine/assetAttach.js';
 import { autoAttachPoints } from '../engine/autoAttach.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { lookName, voiceName, MAX_CREATURE_RECORDS } from '../engine/creatureAssembler.js'; // #1849
+import { MUTATION_RATE, BREED_PARENTS } from '../engine/creatureBreed.js'; // #1852
+import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { VOICE_DECK } from '../data/voiceDeck.js';
+
+const LOOKS = COMPOSITION_PRESETS.map((p) => ({ id: p.id, name: p.name }));
+const VOICES = VOICE_DECK.map((v) => ({ id: v.id, name: v.def?.name ?? v.id }));
+const EMPTY_SLOT = { kind: '', id: '', lookId: LOOKS[0]?.id || '', voiceId: VOICES[0]?.id || '' };
 
 const PREVIEW_PX = 320;
 
@@ -26,6 +33,9 @@ export function WetLab({ assetId, onClose }) {
   const removeCreatureRecord = useStore((s) => s.removeCreatureRecord);
   const allRecords = useStore((s) => s.creatureRecords);
   const note = useStore((s) => s.creatureAssembleNote);
+  const breedCreature = useStore((s) => s.breedCreature); // #1852
+  const breedNote = useStore((s) => s.creatureBreedNote);
+  const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
   const wrapRef = useRef(null);
 
   // Subscribe ONCE, and read onClose through a ref. Escape is also the app's panic key: its handler changes the store
@@ -219,6 +229,120 @@ export function WetLab({ assetId, onClose }) {
                 ))}
               </ul>
             )}
+            {/* #1852 — BREED: three sources → one child (Matt: "taking 3 artists style to get something new"). A source
+                is a banked creature, or this shape wearing a Look and a Voice — never a stage. Discrete genes pick a
+                parent, continuous ones blend, ~1 gene in 8 mutates, and the child names its parents. */}
+            <div style={{ ...secTitle, ...caps, marginTop: 6 }} data-testid="breed-title">
+              breed · {BREED_PARENTS} sources · mutation 1/{Math.round(1 / MUTATION_RATE)}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
+              Pick three parents — banked creatures, or this shape in a Look and a Voice. Each gene comes whole from one
+              parent; drives blend; about one gene in eight mutates.
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }} data-testid="breed-slots">
+              {slots.map((slot, i) => {
+                const setSlot = (patch) => setSlots((cur) => cur.map((s2, j) => (j === i ? { ...s2, ...patch } : s2)));
+                const value = slot.kind === 'assembly' ? '@shape' : slot.kind === 'creature' ? slot.id : '';
+                return (
+                  <div key={i} style={breedRow} data-testid="breed-slot">
+                    <span style={{ ...caps, width: 14 }}>{i + 1}</span>
+                    <select
+                      aria-label={`Parent ${i + 1}`}
+                      value={value}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v === '@shape') setSlot({ kind: 'assembly' });
+                        else if (v) setSlot({ kind: 'creature', id: v });
+                        else setSlot({ kind: '', id: '' });
+                      }}
+                    >
+                      <option value="">pick a parent</option>
+                      <option value="@shape">this shape · {asset.id}</option>
+                      {(allRecords || []).map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.id} · {lookName(r.look)} · {voiceName(r.voice)}
+                          {r.lineage ? ' · bred' : ''}
+                        </option>
+                      ))}
+                    </select>
+                    {slot.kind === 'assembly' && (
+                      <>
+                        <select
+                          aria-label={`Parent ${i + 1} look`}
+                          value={slot.lookId}
+                          onChange={(e) => setSlot({ lookId: e.target.value })}
+                        >
+                          {LOOKS.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.name}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          aria-label={`Parent ${i + 1} voice`}
+                          value={slot.voiceId}
+                          onChange={(e) => setSlot({ voiceId: e.target.value })}
+                        >
+                          {VOICES.map((v) => (
+                            <option key={v.id} value={v.id}>
+                              {v.name}
+                            </option>
+                          ))}
+                        </select>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="chip-btn act"
+                data-testid="breed"
+                title="Breed a child from the three parents, dealt off the project seed"
+                onClick={() =>
+                  breedCreature(
+                    slots.map((sl) =>
+                      sl.kind === 'assembly'
+                        ? { kind: 'assembly', assetId: asset.id, points, lookId: sl.lookId, voiceId: sl.voiceId }
+                        : { kind: sl.kind, id: sl.id },
+                    ),
+                  )
+                }
+              >
+                breed
+              </button>
+              <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="breed-note">
+                {breedNote && breedNote.status === 'need-three' && 'pick three different parents'}
+                {breedNote && breedNote.status === 'banked' && `bred ${breedNote.id} — its tile is in the asset pool`}
+                {breedNote && breedNote.status === 'already' && `already bred ${breedNote.id}`}
+                {breedNote && breedNote.status === 'full' && `bank full (${MAX_CREATURE_RECORDS}) — remove one first`}
+                {breedNote &&
+                  breedNote.status === 'pool-full' &&
+                  'the asset pool is full — remove an import or a creature first'}
+                {breedNote && breedNote.status === 'nobody' && 'the child’s body cannot be drawn'}
+                {breedNote && breedNote.status === 'id-taken' && 'an import already uses the child’s pool id'}
+                {breedNote &&
+                  (breedNote.status === 'restored' || breedNote.status === 'redrawn') &&
+                  `${breedNote.id}’s tile is back in the asset pool`}
+              </span>
+            </div>
+            {(() => {
+              const child = breedNote && (allRecords || []).find((r) => r.id === breedNote.id && r.lineage);
+              if (!child) return null;
+              return (
+                <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.6 }} data-testid="breed-lineage">
+                  {child.id} ← {child.lineage.parents.join(' · ')} · {child.lineage.mutations.length} mutation
+                  {child.lineage.mutations.length === 1 ? '' : 's'}
+                  {child.lineage.mutations.map((m) => (
+                    <div key={m.gene}>
+                      {m.gene.toLowerCase()} {m.kind === 'swap' ? `from ${m.to}` : `→ ${m.value}`}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </div>
         <footer style={foot}>
@@ -285,5 +409,6 @@ const recRow = {
   borderTop: '1px solid var(--line)',
   paddingTop: 4,
 };
+const breedRow = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--dim)', flexWrap: 'wrap' };
 const caps = { textTransform: 'uppercase' }; // DS §5: casing lives in style, JSX stays lowercase
 const noteText = { fontSize: 10, color: 'var(--dim)', alignSelf: 'center', letterSpacing: '0.06em' };

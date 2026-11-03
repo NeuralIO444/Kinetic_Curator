@@ -45,6 +45,7 @@ import {
   isCreatureTile,
   recordIdOfTile,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850
+import { sourceRecord, breedCreature, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
 
@@ -217,6 +218,49 @@ function withTaggedRegions(asset, regions) {
   };
 }
 
+/**
+ * #1849 / #1850 / #1852 — bank one creature record with its pool tile, or say why not (the lab's note). Shared by
+ * ASSEMBLE and BREED: a bred child enters the bank and the pool by exactly the doors an assembled creature does.
+ */
+function bankCreature(state, rec, noteKey = 'creatureAssembleNote') {
+  const note = (status) => ({ [noteKey]: { id: rec.id, status } });
+  const cur = state.creatureRecords || [];
+  const overlay = state.customAssets || [];
+  const tileId = creatureTileId(rec.id);
+  const standing = overlay.find((a) => a && a.id === tileId);
+  // #1850 — an import that merely shares the tile's id (an SVG named cr-xxxxxxxx.svg) is never evicted
+  if (standing && !isCreatureTile(standing)) return note('id-taken');
+  // #1850 — the creature joins the pool as an ordinary tile (the overlay, where imports live): placed by the same
+  // asset path as every shape once the artist turns it on. The tile must pass the overlay's own door (the one
+  // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
+  // become a tile, so it is refused here rather than lost on reload.
+  const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)));
+  if (!tile || sanitizeOverlay([tile]).length !== 1) return note('nobody');
+  if (cur.some((r) => r.id === rec.id)) {
+    // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
+    if (standing && sameTile(standing, tile)) return note('already');
+    // #1851 — a tile drawn before the rig (limbs painted on, no bones) is redrawn: the body alone plus its
+    // invisible bones. The pool switch, weight, still pin and options stay (same id).
+    if (standing) {
+      return {
+        customAssets: overlay.map((a) => (a.id === tileId ? tile : a)),
+        ...note('redrawn'),
+      };
+    }
+    if (overlay.length >= OVERLAY_CAP) return note('pool-full');
+    return { customAssets: [...overlay, tile], ...note('restored') };
+  }
+  // the lab says what the press did (session-only, never saved); a full bank or a full pool refuses rather than
+  // silently evicting anything, and record and tile are one — never a record that cannot reach the stage
+  if (cur.length >= MAX_CREATURE_RECORDS) return note('full');
+  if (overlay.length >= OVERLAY_CAP) return note('pool-full');
+  return {
+    creatureRecords: [...cur, rec],
+    customAssets: [...overlay, tile],
+    ...note('banked'),
+  };
+}
+
 /** #1851 — the same tile: the same drawing and the same bones. */
 const sameTile = (a, b) => a.svg === b.svg && JSON.stringify(a.rig || null) === JSON.stringify(b.rig || null);
 
@@ -374,6 +418,7 @@ export const createGlobalSlice = (set) => ({
   assetOptions: {},
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
+  creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   customAssets: [],
   ingestError: null,
@@ -899,43 +944,27 @@ export const createGlobalSlice = (set) => ({
   assembleCreature: (assetId, shown) =>
     set((state) => {
       const rec = assembleCreature({ assetId, points: shown, seed: state.seed });
-      if (!rec) return {};
-      const cur = state.creatureRecords || [];
-      const overlay = state.customAssets || [];
-      const tileId = creatureTileId(rec.id);
-      const standing = overlay.find((a) => a && a.id === tileId);
-      // #1850 — an import that merely shares the tile's id (an SVG named cr-xxxxxxxx.svg) is never evicted
-      if (standing && !isCreatureTile(standing)) return { creatureAssembleNote: { id: rec.id, status: 'id-taken' } };
-      // #1850 — the creature joins the pool as an ordinary tile (the overlay, where imports live): placed by the same
-      // asset path as every shape once the artist turns it on. The tile must pass the overlay's own door (the one
-      // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
-      // become a tile, so it is refused here rather than lost on reload.
-      const tile = creatureTile(rec, findAsset(rec.body, sanitizeOverlay(overlay)));
-      if (!tile || sanitizeOverlay([tile]).length !== 1)
-        return { creatureAssembleNote: { id: rec.id, status: 'nobody' } };
-      if (cur.some((r) => r.id === rec.id)) {
-        // already banked: heal a missing tile (an older document, or a one-file bundle from before #1850)
-        if (standing && sameTile(standing, tile)) return { creatureAssembleNote: { id: rec.id, status: 'already' } };
-        // #1851 — a tile drawn before the rig (limbs painted on, no bones) is redrawn: the body alone plus its
-        // invisible bones. The pool switch, weight, still pin and options stay (same id).
-        if (standing) {
-          return {
-            customAssets: overlay.map((a) => (a.id === tileId ? tile : a)),
-            creatureAssembleNote: { id: rec.id, status: 'redrawn' },
-          };
-        }
-        if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
-        return { customAssets: [...overlay, tile], creatureAssembleNote: { id: rec.id, status: 'restored' } };
-      }
-      // the lab says what the press did (session-only, never saved); a full bank or a full pool refuses rather than
-      // silently evicting anything, and record and tile are one — never a record that cannot reach the stage
-      if (cur.length >= MAX_CREATURE_RECORDS) return { creatureAssembleNote: { id: rec.id, status: 'full' } };
-      if (overlay.length >= OVERLAY_CAP) return { creatureAssembleNote: { id: rec.id, status: 'pool-full' } };
-      return {
-        creatureRecords: [...cur, rec],
-        customAssets: [...overlay, tile],
-        creatureAssembleNote: { id: rec.id, status: 'banked' },
-      };
+      return rec ? bankCreature(state, rec) : {};
+    }),
+  /**
+   * #1852 — BREED: three sources (banked creatures, or this shape + a Look + a Voice) → one child, banked with its tile
+   * like any creature. sources: [{ kind: 'creature', id } | { kind: 'assembly', assetId, points, lookId, voiceId }].
+   * A trio that is not three legal, distinct sources is refused with a note, never half-bred.
+   */
+  breedCreature: (sources) =>
+    set((state) => {
+      const bank = state.creatureRecords || [];
+      const list = Array.isArray(sources) ? sources : [];
+      const parents = list.map((src) =>
+        src && src.kind === 'creature'
+          ? sourceRecord({ kind: 'creature', record: bank.find((r) => r.id === src.id) }, state.seed)
+          : sourceRecord(src, state.seed),
+      );
+      if (parents.length !== BREED_PARENTS || parents.some((p) => !p))
+        return { creatureBreedNote: { id: null, status: 'need-three' } };
+      const child = breedCreature(parents, state.seed);
+      if (!child) return { creatureBreedNote: { id: null, status: 'need-three' } };
+      return bankCreature(state, child, 'creatureBreedNote');
     }),
   /** #1849 — drop one assembled creature: its record and (#1850) its pool tile, together (dropCreature). */
   removeCreatureRecord: (id) =>
