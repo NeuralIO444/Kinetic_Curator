@@ -166,7 +166,9 @@ const ring = (cx, cy, n, r) =>
   fresh.dispose();
 }
 
-// 6. with dish pressure the TIGHTEN band is reachable; without it the old ceiling stands
+// 6. dish pressure adds its weight on top of the hands — and since the #1635 retune (edge
+//    0.72 → 0.52, 2026-11-02) busy hands alone can reach TIGHTEN too; the dish is a
+//    contributor now, not the gatekeeper it was under the retired edge
 {
   const run = (dish) => {
     let cb = null;
