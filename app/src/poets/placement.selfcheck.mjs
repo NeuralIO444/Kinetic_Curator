@@ -1,7 +1,7 @@
 // placement.selfcheck.mjs — FIELD S1 (#1902): the placement law.
 // Charset (every deck line maps to existing stamps), determinism (same seed
 // -> identical stamp list, bit-for-bit), and the per-poet recipe invariants.
-import { placePiece, stampIdForChar, lineMapsToStamps, LETTER_STAMP_IDS, PLACEMENT_LAYOUTS } from './placement.js';
+import { placePiece, stampIdForChar, lineMapsToStamps, LETTER_STAMP_IDS, PLACEMENT_LAYOUTS, SQUARE_CELL } from './placement.js';
 import { POETS } from '../curator/fieldDirector.js';
 import { mkRng } from '../engine/prng.js';
 
@@ -121,20 +121,23 @@ for (const piece of POETS.gibson.filter((p) => p.layout === 'two')) {
 for (const piece of POETS.rosselli) {
   const { stamps } = byLayout('square', piece);
   const em = stamps[0].em;
+  // #1928 re-pin (cause: em is now the glyph's TRUE cap height, and a square cell is SQUARE_CELL em on both axes so
+  // the widest glyph fits with tracking): cells are still square, edge-to-edge, and the origin still on the grid.
+  const cell = SQUARE_CELL * em;
   const rows = rowsOf(stamps);
   for (const row of rows) {
     const xs = row.map((s) => s.x).sort((a, b) => a - b);
     for (let i = 1; i < xs.length; i++) {
       const gap = xs[i] - xs[i - 1];
-      assert(Math.abs(gap - em) < 1e-9 || gap > em, `square ${piece.id}: cells edge-to-edge (gap ${gap} vs em ${em})`);
+      assert(Math.abs(gap - cell) < 1e-9 || gap > cell, `square ${piece.id}: cells edge-to-edge (gap ${gap} vs cell ${cell})`);
     }
   }
   if (rows.length > 1) {
     const pitch = rows[1][0].y - rows[0][0].y;
-    assert(Math.abs(pitch - em) < 1e-9, `square ${piece.id}: row pitch == em (square cells)`);
+    assert(Math.abs(pitch - cell) < 1e-9, `square ${piece.id}: row pitch == column pitch (square cells)`);
   }
-  const minX = Math.min(...stamps.map((s) => s.x)) - em / 2;
-  assert(Math.abs(minX / em - Math.round(minX / em)) < 1e-6, `square ${piece.id}: module origin snapped to the cell grid`);
+  const minX = Math.min(...stamps.map((s) => s.x)) - cell / 2;
+  assert(Math.abs(minX / cell - Math.round(minX / cell)) < 1e-6, `square ${piece.id}: module origin snapped to the cell grid`);
 }
 
 // ── Density moves the recipe's own dial, monotonically ───────────────────

@@ -49,7 +49,33 @@ export function lineMapsToStamps(line) {
 
 export const PLACEMENT_LAYOUTS = Object.freeze(['grid', 'bands', 'single', 'two', 'square']);
 
-const ADV = 0.62; // glyph advance, em units (condensed grotesque)
+/**
+ * #1928 — the type plate's metrics are MEASURED from the baked glyphs, not guessed. Every letter stamp is drawn in a
+ * 100-unit box with its cap height spanning GLYPH_CAP_UNITS (y 10..90), so 1 em of cap height = 80 box units. A glyph's
+ * advance is its own ink width plus TRACK — proportional, so an M or W never overruns its neighbour (the old flat 0.62 em
+ * advance was narrower than M/W at 0.78–0.80 em, and with the stage scale 2.3x too large every word collided).
+ */
+export const GLYPH_CAP_UNITS = 80;
+const GLYPH_W = (() => {
+  const out = {};
+  for (const a of ASSETS_LETTERS) {
+    const nums = (a.svg.match(/d="([^"]+)"/g) || []).join(' ').match(/-?\d+(?:\.\d+)?/g) || [];
+    const xs = nums.filter((_, i) => i % 2 === 0).map(Number);
+    out[a.id.slice(4)] = xs.length ? (Math.max(...xs) - Math.min(...xs)) / GLYPH_CAP_UNITS : 0.5;
+  }
+  return Object.freeze(out);
+})();
+/** The widest glyph's ink width, em units (W). The grid and square recipes use it as their even cell. */
+export const GLYPH_MAX_W = Math.max(...Object.values(GLYPH_W));
+/** A glyph's ink width in em units (0 for a space or a character with no stamp). */
+export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
+const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through
+const ADV = GLYPH_MAX_W + TRACK; // the grid's even cell: the widest glyph plus tracking, so no glyph overruns
+/**
+ * Rosselli's square cell, in em (cap heights), on BOTH axes: wide enough for the widest glyph plus tracking, and a
+ * touch of leading so packed rows never kiss. Cells stay square and edge-to-edge — the quadro is the cell grid.
+ */
+export const SQUARE_CELL = Math.max(1.12, GLYPH_MAX_W + TRACK);
 const SPACE_ADV = 0.42; // a space: a gap, wider than nothing, narrower than a glyph
 const MARGIN = 0.05; // dish margin, height units
 const MAX_W = 0.88; // module max width, fraction of dish width (in height units: * aspect)
@@ -57,11 +83,24 @@ const MAX_H = 0.88; // module max height, fraction of dish height
 
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
-/** Advance width of a line in em units (spaces count as gaps). */
+/**
+ * A glyph's advance in em units. `adv` null = proportional (its own width + TRACK); a number = an even cell (grid),
+ * which must be at least the glyph's width + TRACK, so even cells never overlap either.
+ */
+const advanceOf = (ch, adv, spaceAdv) =>
+  ch === ' '
+    ? adv == null
+      ? spaceAdv
+      : adv // on a strict grid a word break is one empty cell, so words never run together
+    : adv == null
+      ? glyphWidthEm(ch) + TRACK
+      : Math.max(adv, glyphWidthEm(ch) + TRACK);
+
+/** Advance width of a line in em units (spaces count as gaps). The last glyph's tracking is not counted. */
 function lineAdvanceEm(line, adv, spaceAdv) {
   let w = 0;
-  for (const ch of line) w += ch === ' ' ? spaceAdv : adv;
-  return w;
+  for (const ch of line) w += advanceOf(ch, adv, spaceAdv);
+  return Math.max(0, w - (line.length && line.at(-1) !== ' ' ? TRACK : 0));
 }
 
 /** Lay one line's stamps along a baseline. Returns stamps in unit space. */
@@ -69,13 +108,14 @@ function layLine(line, { ox, oy, em, adv, spaceAdv }) {
   const out = [];
   let cursor = 0;
   for (const ch of line) {
-    const a = ch === ' ' ? spaceAdv : adv;
+    const a = advanceOf(ch, adv, spaceAdv);
     if (ch !== ' ') {
       out.push(
         Object.freeze({
           assetId: stampIdForChar(ch),
           ch,
-          x: ox + (cursor + adv / 2) * em,
+          // the glyph's ink centred in its own advance (minus the trailing track)
+          x: ox + (cursor + (a - TRACK) / 2) * em,
           y: oy,
           rotation: 0,
           em,
@@ -122,7 +162,7 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     // Even advance for every glyph (the grid is the law); spacing widens a
     // little with density (Greenleaf hot: "slightly wider spacing").
     const adv = ADV * (1 + 0.35 * density);
-    let em = 0.042 + 0.02 * density;
+    let em = 0.062 + 0.03 * density; // #1928: em is now TRUE cap height (exact stage scale); sized to read as a plate
     const pitchEm = 1.5;
     const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
@@ -134,8 +174,8 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
   } else if (layout === 'bands') {
     // Stratified bands: each line its own band on a locked baseline, bands
     // separated by air; each band's x-offset is dealt (stratified, not justified).
-    const adv = ADV * (1 + 0.25 * density);
-    let em = 0.04 + 0.018 * density;
+    const adv = null; // #1928: proportional (each band is a run of type, not a grid)
+    let em = 0.06 + 0.027 * density;
     const pitchEm = 1.9;
     const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
@@ -152,16 +192,16 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     // (line breaks become gaps). Generous negative space: the module is
     // small against the dish and fit-clamped well inside it.
     const joined = lines.join(' ');
-    const adv = ADV;
-    let em = 0.036 + 0.022 * density;
+    const adv = null; // #1928: proportional
+    let em = 0.054 + 0.033 * density;
     const wEm = lineAdvanceEm(joined, adv, SPACE_ADV);
     em = fitEm(em, wEm, 1, asp);
     const { ox, oy } = moduleOrigin(draw, wEm * em, em, asp);
     stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV });
   } else if (layout === 'two') {
     // Two-line module, locked baselines, generous negative space.
-    const adv = ADV;
-    let em = 0.036 + 0.02 * density;
+    const adv = null; // #1928: proportional
+    let em = 0.054 + 0.03 * density;
     const pitchEm = 1.45;
     const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
@@ -175,13 +215,21 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     // letters packed edge-to-edge, module origin snapped to the cell grid.
     const cellOf = (line) => [...line].length; // every character is one cell; spaces are empty cells
     const cellsWide = Math.max(0, ...lines.map(cellOf));
-    let em = cellsWide > 0 ? (0.34 + 0.4 * density) / cellsWide : 0.05;
-    const wEm = cellsWide; // in cell units where 1 cell == 1 em of advance
-    const hEm = lines.length;
+    // #1928: a cell is square and must hold the widest glyph with tracking, so the cell is CELL em on both axes
+    // (letters still pack edge-to-edge on the cell grid — Rosselli's quadro — but never into each other).
+    const CELL = SQUARE_CELL;
+    let em = cellsWide > 0 ? (0.34 + 0.4 * density) / (cellsWide * CELL) : 0.05;
+    const wEm = cellsWide * CELL;
+    const hEm = lines.length * CELL;
     em = fitEm(em, wEm, hEm, asp);
     const raw = moduleOrigin(draw, wEm * em, hEm * em, asp);
-    const ox = Math.round(raw.ox / em) * em;
-    const oy = Math.round(raw.oy / em) * em;
+    const step = CELL * em;
+    // snap to the cell grid; if the snap pushed the module past the far margin, step back whole cells — the origin
+    // stays on the grid and the module stays on the dish
+    let ox = Math.round(raw.ox / step) * step;
+    let oy = Math.round(raw.oy / step) * step;
+    while (ox + wEm * em > asp - MARGIN + 1e-12 && ox - step >= 0) ox -= step;
+    while (oy + hEm * em > 1 - MARGIN + 1e-12 && oy - step >= 0) oy -= step;
     lines.forEach((line, r) => {
       let cell = 0;
       for (const ch of line) {
@@ -190,8 +238,8 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
             Object.freeze({
               assetId: stampIdForChar(ch),
               ch,
-              x: ox + (cell + 0.5) * em,
-              y: oy + (r + 0.5) * em,
+              x: ox + (cell + 0.5) * step,
+              y: oy + (r + 0.5) * step,
               rotation: 0,
               em,
             }),

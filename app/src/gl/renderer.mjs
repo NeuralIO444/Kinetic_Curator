@@ -32,7 +32,18 @@
  *   capture. One instrument, one pipeline.
  */
 
-import { QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS, blendIdFor } from './shaders.mjs';
+import {
+  QUAD_VS,
+  QUAD_FS,
+  MESH_VS,
+  FULL_VS,
+  COMPOSITE_FS,
+  COPY_FS,
+  PLATE_FS,
+  UPSCALE_FS,
+  blendIdFor,
+} from './shaders.mjs';
+import { paintPlateMask, hexToUnit } from '../poets/typePlate.mjs'; // #1928 — the FIELD type plate
 import { RESOLVE_FS } from './resolveFs.mjs';
 import { WET_LOOK, WET_LOOK_FS } from './wetLook.mjs';
 import { bindResolveProbe } from './resolveBind.mjs';
@@ -409,6 +420,23 @@ export const RENDERER_PROGRAMS = [
       timeMs: 0.3,
       notes:
         'final resolve: exposure + ACES + dither, one tap; structural, never shed (FXAA is its own governor cut, see renderer/resolve-fxaa)',
+    },
+  },
+  {
+    // #1928 — the FIELD poem's type plate, composited over the resolved frame on every exit (present + readback).
+    // Structural like copy: one fullscreen draw, only while a poem stands.
+    key: 'plate',
+    name: 'plate',
+    vs: FULL_VS,
+    fs: PLATE_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'shaders.mjs:PLATE_FS',
+    uniforms: ['u_src', 'u_flip', 'u_ink', 'u_back', 'u_backA'],
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 4,
+      timeMs: 0.2,
+      notes: 'structural: the FIELD type plate blit (#1928); draws only while a poem stands; never shed',
     },
   },
   {
@@ -1191,6 +1219,73 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
 
   let sceneW = 1000,
     sceneH = 700;
+
+  // ── #1928 — the FIELD type plate ─────────────────────────────────────────────────────────────────────────────
+  // The poem is not a mark: the contract carries it as `plate` (poets/typePlate.mjs), and it is composited here
+  // AFTER the resolve — over the finished frame, past FX, ACCUM trails and mirror — on every exit: the presented
+  // canvas and every byte readback (stills, captures, take frames, the stage mirror). The texture is the plate's
+  // COVERAGE MASK, painted once per (plate geometry, target size) and tinted in the shader with the frame's colours,
+  // so a palette change or a voice MIX never repaints it, and a take capturing at 1000×700 beside a 2000×1400 live
+  // canvas holds two cached masks instead of repainting both every frame.
+  const PLATE_TEX_MAX = 3;
+  let framePlate = null;
+  const plateTexCache = new Map(); // `${plate.key}@${w}x${h}` -> texture (insertion order = recency)
+  function plateMaskTexture(plate, w, h) {
+    const key = `${plate.key}@${w}x${h}`;
+    const hit = plateTexCache.get(key);
+    if (hit) {
+      plateTexCache.delete(key);
+      plateTexCache.set(key, hit); // most recent last
+      return hit;
+    }
+    let surface = null;
+    if (typeof OffscreenCanvas !== 'undefined') surface = new OffscreenCanvas(w, h);
+    else if (typeof document !== 'undefined')
+      surface = Object.assign(document.createElement('canvas'), { width: w, height: h });
+    const ctx = surface && surface.getContext('2d');
+    if (!ctx) return null;
+    paintPlateMask(ctx, plate, w, h);
+    const tex = gl.createTexture();
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, tex);
+    const flipWas = gl.getParameter(gl.UNPACK_FLIP_Y_WEBGL);
+    const premulWas = gl.getParameter(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, gl.RGBA, gl.UNSIGNED_BYTE, surface);
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, flipWas);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, premulWas);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    plateTexCache.set(key, tex);
+    while (plateTexCache.size > PLATE_TEX_MAX) {
+      const [oldKey, oldTex] = plateTexCache.entries().next().value;
+      gl.deleteTexture(oldTex);
+      plateTexCache.delete(oldKey);
+    }
+    return tex;
+  }
+  /** Composite the frame's plate over the currently bound framebuffer (already resolved, viewport w × h). */
+  function overlayPlate(w, h, flip) {
+    if (!framePlate || !(w > 0) || !(h > 0)) return;
+    const tex = plateMaskTexture(framePlate, Math.round(w), Math.round(h));
+    if (!tex) return;
+    const prog = progs.plate;
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    gl.blendEquation(gl.FUNC_ADD);
+    gl.useProgram(prog);
+    gl.uniform1i(U(prog, 'u_src'), bindTex(0, tex));
+    gl.uniform1f(U(prog, 'u_flip'), flip ? 1 : 0);
+    gl.uniform3fv(U(prog, 'u_ink'), hexToUnit(framePlate.ink));
+    gl.uniform3fv(U(prog, 'u_back'), hexToUnit(framePlate.backingColour));
+    gl.uniform1f(U(prog, 'u_backA'), framePlate.backingAlpha);
+    drawFullscreen(prog);
+    gl.disable(gl.BLEND);
+  }
+
   function drawInstances(data, atlasTex, w, h) {
     if (data.length === 0) return;
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
@@ -1612,6 +1707,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     const { width: w, height: h, contract, cells, bg } = payload;
     sceneW = payload.sceneW || 1000; // #606: scene units follow the authored canvas
     sceneH = payload.sceneH || 700;
+    framePlate = contract.plate || null; // #1928 — the frame's type plate (or none)
     sun = contract.light || null;
     hands = contract.hands || { crooked: 0, open: 0 };
     spec = contract.spectrum || null; // #1482 P3
@@ -1858,7 +1954,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   }
 
   /** Resolve a 16F premultiplied target to RGBA8 bytes (top-first rows). */
-  function resolveTargetToBytes(mRead, T, w, h) {
+  function resolveTargetToBytes(mRead, T, w, h, { plate = true } = {}) {
     gl.bindFramebuffer(gl.FRAMEBUFFER, T.outT.fb);
     gl.viewport(0, 0, w, h);
     gl.disable(gl.BLEND);
@@ -1867,6 +1963,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // #741: stills/exports never take the weave offset — they stay exact.
     bindResolveProbe(gl, (n) => U(resProg, n), { ...resolveOpts, weave: null });
     drawFullscreen(resProg);
+    // #1928 — the type plate rides every byte exit (the readback target is top-first). The one exception is the
+    // ACCUM-input seam (renderAccumInput: the light the buffer eats) — a plate there would trail.
+    if (plate) overlayPlate(w, h, true);
     const pixels = new Uint8Array(w * h * 4);
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
     return pixels;
@@ -1878,7 +1977,9 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     bridge.dispose();
     for (const e of patternTex.values()) gl.deleteTexture(e.tex);
     patternTex.clear();
-    for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
+    for (const p of [quadProg, compProg, resProg, copyProg, progs.plate]) gl.deleteProgram(p);
+    for (const t of plateTexCache.values()) gl.deleteTexture(t); // #1928
+    plateTexCache.clear();
     gl.deleteBuffer(fullVbo);
     gl.deleteBuffer(cornerVbo);
     gl.deleteBuffer(instVbo);
@@ -1922,6 +2023,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     renderFrameInto,
     resolveTargetToBytes,
     applyFinishChains,
+    overlayPlate, // #1928
     disposeBase,
     setResolveOptions,
     getResolveOptions: () => resolveOpts,
@@ -2056,7 +2158,7 @@ export function createRenderer(canvas) {
     const T = allocFrameTargets(w, h);
     try {
       const mRead = renderFrameInto(payload, T, uploaded, { transparent: true, accumInput: { layerIds } });
-      const pixels = resolveTargetToBytes(mRead, T, w, h);
+      const pixels = resolveTargetToBytes(mRead, T, w, h, { plate: false }); // #1928: the buffer's input never carries the plate
       const err = gl.getError();
       if (err !== gl.NO_ERROR) throw new Error(`[gl] GL error after accum-input render: 0x${err.toString(16)}`);
       return { pixels, width: w, height: h };
@@ -2366,6 +2468,8 @@ export function createLiveRenderer(canvas) {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     }
+    // #1928 — the type plate over the presented frame. After the weave restore: the plate rebinds texture unit 0.
+    b.overlayPlate(canvas.width, canvas.height, false);
   }
 
   // #1813 — the wet-look display state, re-pushed by the loop every

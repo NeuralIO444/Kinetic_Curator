@@ -5,7 +5,7 @@
 // function director.tick calls — plus a real Director) and measures how
 // often a poet is armed. It then proves the wired consequence end to end:
 // an unarmed (null) deal puts ZERO field stamps on the dish, through the
-// real stamp path; an armed deal puts the form there.
+// real stamp path; an armed deal puts the form on the plate (#1928: never among the marks).
 //
 // The measured rates are printed, not hidden: as shipped, choosePoet arms
 // on essentially every pick (see the report's silence section). The wiring
@@ -19,6 +19,7 @@ import { createDirector } from './director.js';
 import { loisActivity } from './loisActivity.js';
 import { fieldFormForDeal } from '../poets/fieldForm.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
+import { plateFromForm } from '../poets/typePlate.mjs';
 import { mkRng } from '../engine/prng.js';
 
 const makeRng = (seed) => {
@@ -137,11 +138,13 @@ for (const name of Object.keys(SCENARIOS)) {
   assert.ok(decision, 'the hot-room step deals a poet');
   const form = fieldFormForDeal(decision, mkRng(5));
   assert.ok(form, 'the dealt poet produces a form');
-  assert.strictEqual(
-    fieldCount(dish({ ...params, fieldForm: form })),
-    form.stamps.length,
-    'armed: every stamp reaches the dish',
-  );
+  // #1928 re-pin (cause: Matt's ruling 2026-11-02 — the poem is a type plate, not marks): an armed form reaches
+  // the frame as the contract's PLATE, every glyph of it, and never as dish items.
+  assert.strictEqual(fieldCount(dish({ ...params, fieldForm: form })), 0, 'armed: the poem is never a mark');
+  const plate = plateFromForm(form, { bg: '#0a0a0a', ink: '#f0f0e8', swatches: palette.swatches });
+  assert.ok(plate, 'armed: the form becomes a plate');
+  assert.strictEqual(plate.glyphs.length, form.stamps.length, 'armed: every stamp reaches the plate');
+  assert.strictEqual(plateFromForm(silentForm, { bg: '#000000' }), null, 'silence: no plate');
 }
 
 console.log('fieldSilence.selfcheck: all assertions passed');
