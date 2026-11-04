@@ -342,6 +342,7 @@ node src/engine/creatureGenome.selfcheck.mjs
 node src/engine/creatureAssembler.selfcheck.mjs
 node src/engine/creatureInjection.selfcheck.mjs
 node src/engine/creatureRig.selfcheck.mjs
+node src/engine/creatureRole.selfcheck.mjs
 node src/engine/creatureBreed.selfcheck.mjs
 node src/engine/creatureKin.selfcheck.mjs
 node src/engine/creatureMoods.selfcheck.mjs
