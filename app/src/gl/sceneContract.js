@@ -656,6 +656,12 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         collapsed: regionCollapseShed(doc),
         face: typeof doc.loisFace === 'string' ? doc.loisFace : null,
         davis: typeof doc.davisMood === 'string' ? doc.davisMood : null, // #1949 — Davis's live state
+        // #1867 — the beast's travelling home. `beastRoam: false` (or window.__KC_BEAST_ROAM_OFF = true) walks it in place;
+        // an object overrides the ruled tuning (turnGain, holdMin/holdMax, …); window.__KC_BEAST_ROAM tunes the live app
+        beastRoam:
+          doc.beastRoam === false || globalThis.__KC_BEAST_ROAM_OFF === true
+            ? false
+            : doc.beastRoam || globalThis.__KC_BEAST_ROAM || null,
       });
       if (expanded !== instances) {
         instances.length = 0;
