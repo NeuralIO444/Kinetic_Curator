@@ -329,6 +329,7 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #1851: the rig suite assembles through the store (redraw on re-assembly) — a test, not a stage reader; the stage
     // poses a creature through its pool TILE's rig, never through creatureRecords
     'engine/creatureRig.selfcheck.mjs',
+    'engine/creatureRole.selfcheck.mjs', // #1945 — builds a real creature to test Davis's role deal
     // #1852: breeding reads records to make records (the wet lab's backstage work) — no stage path reads either
     'engine/creatureBreed.js',
     'engine/creatureBreed.selfcheck.mjs',
