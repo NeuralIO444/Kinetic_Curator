@@ -478,6 +478,9 @@ function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, 
  *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
  * @returns {Array} the original array when nothing expands, else a new one
  */
+/** The library stroke a beast wears when no other shape is on the stage. */
+export const BEAST_BARE_BAR = 'line_solid_01';
+
 export function expandCreatureInstances(
   instances,
   overlayById,
@@ -520,7 +523,14 @@ export function expandCreatureInstances(
       continue;
     }
     // the stage's shapes; with none (the creature soloed), the shape it is made of; with neither, the body alone
-    const pile = stageAssets.length ? stageAssets : rig.body && !rigOf(rig.body) ? [rig.body] : [];
+    // a beast alone on a bare stage (every other shape off) wears plain bars, so it still walks — never an empty tile
+    const pile = stageAssets.length
+      ? stageAssets
+      : rig.linkage
+        ? [BEAST_BARE_BAR]
+        : rig.body && !rigOf(rig.body)
+          ? [rig.body]
+          : [];
     if (!pile.length) {
       out.push(it);
       continue;

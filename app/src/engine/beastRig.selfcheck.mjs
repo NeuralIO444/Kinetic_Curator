@@ -17,7 +17,7 @@ import { sanitizeMeasures, BEAST_BARS, legPoints } from './beastBuilder.js';
 import { evaluateGenome, isStillborn } from './jansenSolver.js';
 import { wildTypeMeasures } from './jansenMeasures.js';
 import { poseLinkage, sanitizeLinkage, LINKAGE_TILE_K, LINKAGE_CRANK_HZ } from './beastRig.js';
-import { sanitizeRig, expandCreatureInstances, partFit, dealBodyPart } from './creatureRig.js';
+import { sanitizeRig, expandCreatureInstances, partFit, dealBodyPart, BEAST_BARE_BAR } from './creatureRig.js';
 
 const ids = ASSETS.map((a) => a.id).filter((id) => libraryTraits(id));
 const fitOf = (id) => partFit(libraryTraits(id));
@@ -126,6 +126,16 @@ const scene = [...stage.map((id, i) => inst(id, `s${i}`)), inst('user:beast', 'b
 const opts = { seed: 7, t: 0.9, fitOf };
 const out = expandCreatureInstances(scene, overlay, opts);
 const mine = out.filter((i) => i.key.startsWith('b#'));
+
+// a bare stage (every other shape off): the beast still walks, in plain bars — never an empty tile
+{
+  const bare = expandCreatureInstances([inst('user:beast', 'b')], overlay, opts);
+  assert.equal(bare.length, 1 + wild.legCount * 12, 'beam + every bar, with nothing else on the stage');
+  assert.ok(
+    bare.every((i) => i.asset === BEAST_BARE_BAR),
+    'dressed in the bare bar',
+  );
+}
 
 {
   assert.equal(mine.length, 1 + wild.legCount * 12, 'beam + every bar of every leg');
