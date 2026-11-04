@@ -8,6 +8,7 @@ import { ShelfView } from './ShelfView.jsx'; // #1589: the keeps shelf lives in 
 import { ALL_CATEGORIES } from '../data/categories.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { AssetInspector, BulkBar } from './AssetInspector.jsx';
+import { KitBar } from './KitBar.jsx';
 import { FACETS, FACET_TERMS } from '../data/assetFacets.js';
 import { ROLES } from '../assets/assetRoles.js';
 import {
@@ -285,6 +286,13 @@ export function AssetPoolPanel() {
               ))}
             </div>
           )}
+          <KitBar
+            filters={filters}
+            canSave={
+              chips.some((c) => c.kind === 'facet' || c.kind === 'role') ||
+              (catFilter !== 'all' && catFilter !== 'user')
+            }
+          />
           <div className="pool-search">
             <span className="prompt">⟩</span>
             <input

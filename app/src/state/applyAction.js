@@ -111,6 +111,12 @@ export function applyAction(action, store = useStore.getState()) {
       return store.cycleAssetOption(action.id, action.key); // #1694 S2
     case 'TOGGLE_ASSET_STILL':
       return store.toggleAssetStill(action.id); // #1128
+    case 'SET_KIT_TRIAD':
+      return store.setKitTriad(action.ids); // #1944
+    case 'SAVE_KIT':
+      return store.saveKit(action.kit);
+    case 'REMOVE_KIT':
+      return store.removeKit(action.id);
     case 'EDIT_ASSET_TAGS':
       return store.editAssetTags(action.ids, action.edit); // #1943
     case 'SET_ASSETS_WEIGHT':

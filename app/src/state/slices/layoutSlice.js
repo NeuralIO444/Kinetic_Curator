@@ -46,7 +46,8 @@ import {
   shapeMixIds,
 } from '../../data/voices.js';
 import { ASSETS } from '../../data/assets/index.js';
-import { dealableRecords, dealMixedPool, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal
+import { dealableRecords, dealMixedPool, dealKitTriad, kitDescriptors, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
+import { kitsById } from '../../data/kits.js';
 import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
 import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
@@ -81,6 +82,24 @@ const editableOverrides = (ov) => {
 
 /** One honest die for #942's naive roll — every result lands in serialized state. */
 const die = (n) => (Math.random() * n) | 0;
+/** #1944 — the named note for a kit deal that came up short (what the panel shows beside the kit picker). */
+function kitNoteText(notes, kits) {
+  const name = (id) => kits.find((k) => k.id === id)?.name || id;
+  const empties = notes.filter((n) => n.note === 'empty').map((n) => name(n.kit));
+  if (empties.length)
+    return `${empties.join(', ')}: nothing in the pool matches — dealt without ${empties.length > 1 ? 'them' : 'it'}`;
+  return 'kits: nothing to deal — dealt the usual way';
+}
+/** #1944 — what the kit deal reads, built only when kits are in play (descriptors cost a pass over the library). */
+const kitContextFor = (state) => () => ({
+  artistKits: state.kits || [],
+  descriptors: kitDescriptors(dealableRecords(ASSETS, state.customAssets), {
+    assets: ASSETS,
+    customAssets: state.customAssets,
+    assetTags: state.assetTags,
+    weightOverrides: state.assetWeightOverrides,
+  }),
+});
 /** #1772 — a look pass under the START pill's ceiling (kineticScope.mjs): its look deck and its pool kind. */
 function scopedLook(state) {
   const d = scopeDecks(state.startupMode);
@@ -89,6 +108,7 @@ function scopedLook(state) {
     pool: d.pool,
     sets: CURATED_SETS,
     records: dealableRecords(ASSETS, state.customAssets),
+    kitContext: kitContextFor(state),
   });
 }
 
@@ -108,7 +128,13 @@ function scopedChapterLook(state) {
   const walk = dealLanding(dieRng, { fromId: state.kineticChapterId, visits: state.kineticChapterVisits, lean });
   const eff = effectiveChapterScope(walk.chapterId, state.startupMode, { records });
   const d = chapterScopeDeck(walk.chapterId, eff.scope, { records });
-  const r = lookPass(state, dieRng, { looks: d.looks, pool: d.poolKind, sets: d.sets, records: d.records });
+  const r = lookPass(state, dieRng, {
+    looks: d.looks,
+    pool: d.poolKind,
+    sets: d.sets,
+    records: d.records,
+    kitContext: kitContextFor(state),
+  });
   const visits = {
     ...(state.kineticChapterVisits || {}),
     [walk.chapterId]: ((state.kineticChapterVisits || {})[walk.chapterId] || 0) + 1,
@@ -1253,7 +1279,20 @@ export const createLayoutSlice = (set) => ({
 
       // 4. assets — #1767: a mixed-family pool dealt from the WHOLE library (+ the artist's imports), not one of the
       // 19 shape sets (49 of 295 assets). Same size as a set, so density/count behave as before (state/rollPool.mjs).
-      const enabledAssets = poolToEnabled(dealMixedPool(dealableRecords(ASSETS, state.customAssets), dieRng).ids);
+      // #1944 — a standing kit triad deals the pool when one is set (a kit that deals nothing falls back to today's deal,
+      // and the reason lands in `kitNote`); with no triad this line is exactly as before.
+      let kitNote = null;
+      const chaosRecords = dealableRecords(ASSETS, state.customAssets);
+      const triad = kitsById(state.kitTriad, state.kits);
+      let chaosIds = null;
+      if (triad.length) {
+        const deal = dealKitTriad(triad, Math.floor(dieRng() * 0x100000000), {
+          records: kitContextFor(state)().descriptors,
+        });
+        if (deal.ids.length) chaosIds = deal.ids;
+        kitNote = deal.notes.length ? kitNoteText(deal.notes, triad) : null;
+      }
+      const enabledAssets = poolToEnabled(chaosIds || dealMixedPool(chaosRecords, dieRng).ids);
 
       // 5. FX + blend — one FX layer, 0–3 random menu effects with default
       // params; content layers get a random blend mode. Never strands the
@@ -1306,6 +1345,7 @@ export const createLayoutSlice = (set) => ({
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
+        kitNote, // #1944 — a kit that dealt nothing is named, never a silent mixed deal
         layers,
         selectedFxLayerId,
         voiceMix: null,
@@ -1343,6 +1383,7 @@ export const createLayoutSlice = (set) => ({
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
+        kitNote: r.kitNotes ? kitNoteText(r.kitNotes, kitsById(state.kitTriad, state.kits)) : null, // #1944
         voiceMix: null,
         activeVoiceId: null,
         kineticChapterId: landing.chapterId,
@@ -1444,6 +1485,7 @@ export const createLayoutSlice = (set) => ({
         ...pushToUndo(state, true),
         layoutParams: voice.layoutParams,
         enabledAssets: Object.keys(look.enabledAssets).length ? look.enabledAssets : state.enabledAssets,
+        kitNote: look.kitNotes ? kitNoteText(look.kitNotes, kitsById(state.kitTriad, state.kits)) : null, // #1944
         paletteId: voice.paletteId,
         paletteOverrides: voice.paletteOverrides,
         paletteLocks: {},

@@ -199,3 +199,22 @@ S().setCategoryWeight(S().customAssets.find((a) => a.id === uid).category, 'ligh
 assert.equal(S().assetWeightOverrides[uid], 'light', 'a category weight covers imports');
 
 console.log('assetPool.selfcheck: ok');
+
+// ---- #1944 kitFromFilters
+{
+  const { kitFromFilters } = await import('./assetPoolLogic.mjs');
+  const assertK = (await import('node:assert/strict')).default;
+  assertK.equal(kitFromFilters('x', {}), null, 'no filter, no kit');
+  assertK.equal(kitFromFilters('  ', { cat: 'radial' }), null, 'no name, no kit');
+  const k = kitFromFilters('My Kit!', { cat: 'radial', facets: { subject: ['leaf'] }, role: { body: 0.6 } }, [
+    'my-kit',
+  ]);
+  assertK.deepEqual(k, {
+    id: 'my-kit-2',
+    name: 'My Kit!',
+    where: { facets: { subject: ['leaf'] }, categories: ['radial'], minRole: { body: 0.6 } },
+    weights: {},
+    cap: 4,
+  });
+  assertK.equal(kitFromFilters('u', { cat: 'user' }), null, 'the USER tab is not a category');
+}

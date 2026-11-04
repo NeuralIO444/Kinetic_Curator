@@ -29,6 +29,7 @@ import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEM
 import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
 import { sanitizeAssetTags, sanitizeAssetTagsDoc, editTags, suggestTags } from '../../data/assetFacets.js';
 import { libraryTraits } from '../../data/assetDescriptor.js';
+import { sanitizeKit, sanitizeKitsDoc, sanitizeKitTriad, SEED_KITS, KITS_MAX } from '../../data/kits.js';
 import { tagImportedRegions } from '../../data/regionDefaults.js';
 import { sanitizeAudioRoutes } from '../../data/audioRoutes.js';
 import { sanitizeCanvasSpec } from '../../data/canvasPresets.js';
@@ -419,6 +420,11 @@ export const createGlobalSlice = (set) => ({
   regionKinemes: {},
   /** #1942 — { libraryAssetId: { add, drop } }: the artist's tag edits over the computed suggestions. Rides the document. */
   assetTags: {},
+  /** #1944 — the artist's own kits (named weighted recipes), and the standing triad of up to three kit ids a roll deals from. Both ride the document. */
+  kits: [],
+  kitTriad: [],
+  /** #1944 — why the last deal was short a kit (never persisted): a named note, never a silent mixed deal. */
+  kitNote: null,
   /** #1128 — { assetId: true }: assets pinned still. The living-motion floor (breath, drift) leaves their marks where they were placed. */
   assetStill: {},
   /** #1694 S2 — { assetId: { key: choice } }: tile options a record declares (the creature citizen's
@@ -1086,6 +1092,28 @@ export const createGlobalSlice = (set) => ({
       return touched ? { assetTags: tags, customAssets: custom } : {};
     }),
 
+  /** #1944 — the standing kit triad: up to three distinct kit ids (seed or the artist's) a KINETIC / CHAOS roll deals from. [] clears it. */
+  setKitTriad: (ids) =>
+    set((state) => ({ kitTriad: sanitizeKitTriad(ids, [...SEED_KITS, ...(state.kits || [])]), kitNote: null })),
+
+  /** #1944 — save an artist kit (replacing the one with its id); the record crosses sanitizeKit. Refused past the cap or onto a seed id. */
+  saveKit: (kit) =>
+    set((state) => {
+      const clean = sanitizeKit(kit);
+      if (!clean || SEED_KITS.some((k) => k.id === clean.id)) return {};
+      const rest = (state.kits || []).filter((k) => k.id !== clean.id);
+      if (rest.length >= KITS_MAX) return {};
+      return { kits: [...rest, clean] };
+    }),
+
+  /** #1944 — remove an artist kit; a triad slot that held it empties. */
+  removeKit: (id) =>
+    set((state) => {
+      if (!(state.kits || []).some((k) => k.id === id)) return {};
+      const kits = state.kits.filter((k) => k.id !== id);
+      return { kits, kitTriad: state.kitTriad.filter((k) => k !== id) };
+    }),
+
   /** #1943 — set the weight of several assets at once (the inspector's bulk H/M/L). */
   setAssetsWeight: (ids, weight) =>
     set((state) => {
@@ -1245,6 +1273,9 @@ export const createGlobalSlice = (set) => ({
       next.dishPins = [];
       next.assetKineme = { ...DEFAULT_ASSET_KINEME, ...sanitizeAssetKineme(doc.assetKineme) }; // #781 — a doc without kinemes is still; #705 — doc values win over the micro-HUD defaults
       next.assetTags = sanitizeAssetTagsDoc(doc.assetTags) || {}; // #1942
+      next.kits = sanitizeKitsDoc(doc.kits) || []; // #1944
+      next.kitTriad = sanitizeKitTriad(doc.kitTriad, [...SEED_KITS, ...next.kits]); // #1944
+      next.kitNote = null;
       next.regionKinemes = sanitizeRegionKinemesDoc(doc.regionKinemes) || {}; // #1434 — a doc without region edits leaves the family defaults alone
       next.assetOptions = sanitizeAssetOptions(doc.assetOptions, next.customAssets) || {}; // #1694 S2 — a doc without tile options is all-defaults (citizen family: both)
       next.audioRoutes = sanitizeAudioRoutes(doc.audioRoutes); // #790

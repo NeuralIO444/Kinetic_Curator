@@ -10,6 +10,7 @@ import { sanitizeLight } from '../data/light.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../data/regionKinemes.js';
 import { sanitizeAssetTagsDoc } from '../data/assetFacets.js';
+import { sanitizeKitsDoc, sanitizeKitTriad, SEED_KITS } from '../data/kits.js';
 import { sanitizeAssetAttach } from '../engine/assetAttach.js';
 import { sanitizeCreatureRecords } from '../engine/creatureAssembler.js'; // #1849
 import { sanitizeCount } from '../curator/spawn.js';
@@ -175,6 +176,11 @@ export function serializeProject(state) {
   // #1942 — the artist's tag edits on library assets. Written only when set.
   const assetTags = sanitizeAssetTagsDoc(state.assetTags);
   if (assetTags) doc.assetTags = assetTags;
+  // #1944 — the artist's kits and the standing triad. Written only when set.
+  const kits = sanitizeKitsDoc(state.kits);
+  if (kits) doc.kits = kits;
+  const kitTriad = sanitizeKitTriad(state.kitTriad, [...SEED_KITS, ...(kits || [])]);
+  if (kitTriad.length) doc.kitTriad = kitTriad;
   // #1128 — assets pinned still (the living-motion floor skips them). Written only when set.
   const still = sanitizeAssetStill(state.assetStill);
   if (still) doc.assetStill = still;
@@ -313,6 +319,8 @@ export function parseProject(raw) {
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
       assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942
+      kits: sanitizeKitsDoc(raw.kits) || [], // #1944
+      kitTriad: sanitizeKitTriad(raw.kitTriad, [...SEED_KITS, ...(sanitizeKitsDoc(raw.kits) || [])]), // #1944
       assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
       assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
       assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
@@ -375,6 +383,8 @@ export function parseProject(raw) {
     assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
     regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
     assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942
+    kits: sanitizeKitsDoc(raw.kits) || [], // #1944
+    kitTriad: sanitizeKitTriad(raw.kitTriad, [...SEED_KITS, ...(sanitizeKitsDoc(raw.kits) || [])]), // #1944
     assetStill: sanitizeAssetStill(raw.assetStill) || {}, // #1128
     assetOptions: sanitizeAssetOptions(raw.assetOptions, customAssets) || {}, // #1694 S2
     assetAttach: sanitizeAssetAttach(raw.assetAttach) || {}, // #1355
