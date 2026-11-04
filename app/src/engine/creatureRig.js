@@ -21,7 +21,15 @@
 // pure, deterministic: same record → same bones; same seed + same stage → same parts; same time → same pose.
 
 import { roleFits } from '../assets/assetRoles.js'; // #1945 — Davis reads role fits, never re-derives them
-import { sanitizeLinkage, poseLinkage, restBarLengths, LINKAGE_BAR_NAMES, BEAM_ID } from './beastRig.js'; // #1960 — the beast's linkage rig
+import {
+  sanitizeLinkage,
+  poseLinkage,
+  restBarLengths,
+  strideTileUnits,
+  LINKAGE_BAR_NAMES,
+  BEAM_ID,
+} from './beastRig.js';
+import { roamAt, sanitizeRoam } from './beastRoam.js'; // #1867 — the travelling home
 import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
@@ -403,10 +411,36 @@ export function dealBodyPart(pile, seed, tileId, fitOf = null) {
  * once (a bar is dealt as a depth-0 limb of its own hand) and every leg wears the same set; the beam takes a body-fit
  * deal and stands in for the tile's own mark (the beast IS the linkage, so `it` is not pushed). A stillbirth → [].
  */
-function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase }) {
+function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt }) {
   const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
-  const pose = poseLinkage(linkage, frozen ? 0 : t, 1);
+  // #1867 — the travelling home: the body advances by its own stance stroke and steers by differential crank phase
+  // (engine/beastRoam.js). A frozen frame is home at rest; `roamOpt === false` is the A/B switch (S3b's walk in place).
+  const params = sanitizeRoam(roamOpt);
+  const roam =
+    roamOpt === false
+      ? null
+      : roamAt(
+          { seedKey: `${seed >>> 0}|${hand}|${it.key}`, stride: strideTileUnits(rig.linkage.measures), params },
+          frozen ? 0 : t,
+        );
+  const crank = roam ? { a: roam.phaseA, b: roam.phaseB } : null;
+  let pose = poseLinkage(linkage, frozen ? 0 : t, 1, crank);
   if (!pose) return [];
+  if (roam && (roam.x || roam.y || roam.heading)) {
+    // lay the body's place and heading over the posed bones: rotate about the tile's centre, then travel
+    const c = Math.cos(roam.heading);
+    const s = Math.sin(roam.heading);
+    const to = (x, y) => ({
+      x: 50 + (x - 50) * c - (y - 50) * s + roam.x,
+      y: 50 + (x - 50) * s + (y - 50) * c + roam.y,
+    });
+    const deg = (roam.heading * 180) / Math.PI;
+    pose = pose.map((p) => {
+      const a = to(p.x, p.y);
+      const b = to(p.tx, p.ty);
+      return { ...p, x: a.x, y: a.y, tx: b.x, ty: b.y, angle: p.angle + deg };
+    });
+  }
   const lens = restBarLengths(rig.linkage);
   const dealt = new Map();
   LINKAGE_BAR_NAMES.forEach((name, i) => {
@@ -447,7 +481,17 @@ function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, 
 export function expandCreatureInstances(
   instances,
   overlayById,
-  { seed = 0, t = 0, frozen = false, collapsed = false, face = null, davis = null, fitOf = null, pileOnly = null } = {},
+  {
+    seed = 0,
+    t = 0,
+    frozen = false,
+    collapsed = false,
+    face = null,
+    davis = null,
+    fitOf = null,
+    pileOnly = null,
+    beastRoam = null,
+  } = {},
 ) {
   if (!overlayById || collapsed) return instances;
   const rigOf = (id) => {
@@ -486,7 +530,9 @@ export function expandCreatureInstances(
     const hand = `user:${family}`; // a founder's own tile id — so a founder's deal is exactly what it always was
     const glow = frozen ? 1 : kinShimmer(family, t);
     if (rig.linkage) {
-      out.push(...expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase }));
+      out.push(
+        ...expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt: beastRoam }),
+      );
       continue;
     }
     const pose = poseRig(rig, frozen ? 0 : t, gait, phase);

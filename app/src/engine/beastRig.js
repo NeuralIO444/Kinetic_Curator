@@ -42,7 +42,12 @@ export function linkageInfo(measures) {
   let info = feasibleCache.get(key);
   if (!info) {
     const ev = evaluateGenome(measures, measures.scale);
-    info = { feasible: !!ev.feasible, stanceMean: ev.feasible ? ev.stanceMean : 0 };
+    info = {
+      feasible: !!ev.feasible,
+      stanceMean: ev.feasible ? ev.stanceMean : 0,
+      // the body's advance per crank turn, solver units: the stance stroke over the share of the cycle it takes (S4)
+      stride: ev.feasible && ev.duty > 0 ? ev.step / ev.duty : 0,
+    };
     if (feasibleCache.size >= 64) feasibleCache.delete(feasibleCache.keys().next().value);
     feasibleCache.set(key, info);
   }
@@ -87,7 +92,7 @@ const bone = (id, role, name, leg, a, b) => {
  * @param {{measures: object, phase: number}} linkage a sanitised linkage
  * @returns {Array<{id, role: 'body'|'limb', name, leg, x, y, tx, ty, angle, len}>|null}
  */
-export function poseLinkage(linkage, t = 0, drive = 1) {
+export function poseLinkage(linkage, t = 0, drive = 1, crank = null) {
   if (!linkage) return null;
   const m = linkage.measures;
   const info = linkageInfo(m);
@@ -102,7 +107,10 @@ export function poseLinkage(linkage, t = 0, drive = 1) {
   for (let li = 0; li < n; li++) {
     const legPhase = Number.isFinite(m[`phase${li}`]) ? m[`phase${li}`] : li / n;
     // the crank runs backwards (θ falls as time rises) so the stance foot strokes backward under a right-facing body
-    const theta = TAU * (linkage.phase + legPhase - LINKAGE_CRANK_HZ * drive * (Number(t) || 0));
+    // #1867 — a roaming beast hands in each bank's own accumulated crank phase (turns; even legs = bank A, odd = bank B):
+    // the banks drift apart to steer, and a stopped crank is a standing beast. Without it the crank is the clock's.
+    const turns = crank ? (li % 2 === 0 ? crank.a : crank.b) : LINKAGE_CRANK_HZ * drive * (Number(t) || 0);
+    const theta = TAU * (linkage.phase + legPhase - turns);
     const pts = legPoints(m, theta, m.scale);
     if (!pts) continue; // a pose the gate passed but this angle fails: skip the leg, never crash
     const at = (name) => ({ x: cx(li) + pts[name].x * k, y: cy - pts[name].y * k });
@@ -112,6 +120,9 @@ export function poseLinkage(linkage, t = 0, drive = 1) {
   }
   return out;
 }
+
+/** The body's advance per crank turn in tile units (the S4 roam's stride): 0 for a stillbirth. */
+export const strideTileUnits = (measures) => linkageInfo(measures).stride * LINKAGE_TILE_K;
 
 /** The bar names, in deal order (the beam is dealt apart). */
 export const LINKAGE_BAR_NAMES = Object.freeze(BEAST_BARS.map(([name]) => name));
