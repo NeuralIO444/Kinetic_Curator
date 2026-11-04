@@ -374,6 +374,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
   // neutral → rosselli r3, hot → gibson w3, and Whittier unreachable.
   const injectedFieldRng = typeof fieldRng === 'function' ? fieldRng : null;
   let lastLevel = null; // #1918: the room's intensity as of the last tick, for a poem-only deal
+  let lastKeepPressure = 0; // #1905 (S4): the room's keep/pass velocity as of the last tick, same pattern
   let lastVerdict = null; // #1918: the room's verdict as of the last tick
   let lastLookFamily = null; // #1932: the CURRENT dealt look's family (a data/styleLooks group id), as last
   // reported at pick time by a tick or a poem deal. The FIELD genre gate reads it: only a type-native
@@ -447,6 +448,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       temp: +base.temperature.toFixed(2), // the room's own, before any pull: a trace must not reveal one
     });
     lastLevel = level;
+    lastKeepPressure = signals.keepPass; // #1905: the FIELD step's keep-pressure read of this room
     lastVerdict = out.room ? out.room.verdict : null;
     // FIELD pure step (#1907) at pick time only. Silence when no decision.
     // #1917: the deal draws from this tick's own seeded stream (see the
@@ -461,7 +463,13 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     if (typeof lookFamily === 'string') lastLookFamily = lookFamily;
     const fieldResult = fieldStep(
       fieldState,
-      { intensity: level, verdict: out.room ? out.room.verdict : null, rejected: false, lookFamily: lastLookFamily },
+      {
+        intensity: level,
+        verdict: out.room ? out.room.verdict : null,
+        rejected: false,
+        lookFamily: lastLookFamily,
+        keepPressure: signals.keepPass,
+      },
       dealRng,
     );
     fieldState = fieldResult.nextState;
@@ -532,6 +540,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
         verdict: lastVerdict,
         rejected: false,
         lookFamily: lastLookFamily,
+        keepPressure: lastKeepPressure,
       };
       let r = fieldStep(fieldState, input, draw);
       for (let i = 0; i < 4 && avoidPieceId && r.decision && r.decision.pieceId === avoidPieceId; i++) {
@@ -557,6 +566,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       fieldState = { ...FIELD_INITIAL };
       fieldTicks = 0; // #1917: a reset Director re-deals the same stream from the top
       lastLevel = null;
+      lastKeepPressure = 0;
       lastVerdict = null;
       lastLookFamily = null; // #1932: a reset Director has been told no room — silence until one is named
     },
