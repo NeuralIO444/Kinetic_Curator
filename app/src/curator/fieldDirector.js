@@ -44,6 +44,19 @@ export const ROOM_TRANSITIONS = Object.freeze({
 export const SLOW_DEBT_CAP = 6;
 export const SLOW_DEBT_WINDOW = 24;
 
+/**
+ * FIELD S4 (#1905) — keep pressure, the Curator's keep/pass velocity as the
+ * intensity tracker already reads it (the sense module's normalizeKeepPassVelocity:
+ * keeps-per-minute / 2, saturating at 2 decisions a minute). At or above this
+ * line the pressure is HIGH: the room is being actively kept, and the pick
+ * leans held and upright (spec: "Higher keep pressure or a cool room leans
+ * toward Greenleaf or Teijo held forms"). 0.5 = a sustained one keep/pass
+ * decision per minute. Like slow debt, pressure brakes a room that is not
+ * already blazing — a live blaze (intensity > 0.65) outranks it, the #1907
+ * precedence — so pressure never calls a hot room cool.
+ */
+export const KEEP_PRESSURE_HIGH = 0.5;
+
 export function nextSlowDebt(history, currentVerdict) {
   const h = Array.isArray(history) ? history.slice(-SLOW_DEBT_WINDOW) : [];
   h.push(currentVerdict === 'FULL BURN' || currentVerdict === 'THE CLASH' ? 1 : 0);
@@ -66,6 +79,7 @@ export function nextSlowDebt(history, currentVerdict) {
 export function choosePoet({
   intensity = 0.5,
   slowDebt = 0,
+  keepPressure = 0,
   genreLean = null,
   rng = () => 0.5,
   lastRejected = false,
@@ -79,7 +93,12 @@ export function choosePoet({
   // room toward held forms, it does not call a hot room cool. As first written,
   // debt >= 3 forced the cool pool at any intensity, so a permanently hot room
   // measured hotBias ~0 against the module's own documented behaviour.
-  const cool = intensity < 0.35 || (slowDebt >= 3 && intensity <= 0.65);
+  // S4 (#1905): high keep pressure brakes the same way debt does — held and
+  // upright in any room not already blazing — and loses to the same blaze.
+  const cool =
+    intensity < 0.35 ||
+    (slowDebt >= 3 && intensity <= 0.65) ||
+    (keepPressure >= KEEP_PRESSURE_HIGH && intensity <= 0.65);
   const hot = intensity > 0.65;
   const pool = cool
     ? ['greenleaf', 'teijo']
