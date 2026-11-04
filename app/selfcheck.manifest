@@ -527,6 +527,7 @@ node src/curator/directorPresence.selfcheck.mjs
 node src/curator/directorDebt.selfcheck.mjs
 node src/curator/fieldDirector.selfcheck.mjs
 node src/curator/fieldEval.selfcheck.mjs
+node src/curator/fieldBattery.selfcheck.mjs
 node src/poets/placement.selfcheck.mjs
 node src/poets/poemRow.selfcheck.mjs
 node src/poets/fieldStampPath.selfcheck.mjs

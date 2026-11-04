@@ -31,7 +31,7 @@ import {
 import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
-import { fieldFormForDeal } from '../../poets/fieldForm.js'; // #1904 — FIELD: the shuffle deals a poet
+import { fieldDealReport } from '../../poets/fieldForm.js'; // #1904 — FIELD: the shuffle deals a poet
 import { POEM_PICK_BASE, POEM_PLACE_BASE, keepPoem as bankPoem, isPoemKept } from '../../poets/poemRow.mjs'; // #1918
 import { FEEL_PRESETS } from '../../data/feels.js';
 import {
@@ -281,8 +281,8 @@ const fieldAspect = (state) =>
 
 /**
  * #1918 — the poem's write site for every deal outside the CURATOR press (KINETIC passes, the
- * identity chip). Returns { layoutParams, poemDeal } to spread into the same commit as the rest of
- * the press, so the form, its HOLD flag and the deal counter can never disagree.
+ * identity chip). Returns { layoutParams, poemDeal, fieldGateRefusal } to spread into the same
+ * commit as the rest of the press, so the form, its HOLD flag and the deal counter can never disagree.
  *  - HOLD passes the deal by: the standing form is carried onto `layoutParams` untouched (Resolume's
  *    Ignore Column Trigger — the value is locked, not the generator), and the counter does not move.
  *  - Otherwise the Director deals a poet without ticking the room (dealPoet), off the seeded varying
@@ -294,7 +294,8 @@ function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
   const n = state.poemDeal | 0;
   if (poemHeld(state)) {
     lp.fieldForm = state.layoutParams.fieldForm;
-    return { layoutParams: lp, poemDeal: n };
+    // HOLD passes the gate record by too: no deal happened, so no new verdict.
+    return { layoutParams: lp, poemDeal: n, fieldGateRefusal: state.fieldGateRefusal ?? null };
   }
   const poet = getDirector().dealPoet({
     fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
@@ -302,14 +303,21 @@ function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
     // #1932 — the poem will stand with THESE params: their look's family is the gate's read.
     lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
   });
-  const form = fieldFormForDeal(
+  // #1905 (S4) — the deal reports its stillborn-gate verdict: a refused deal
+  // lands as silence AND banks the refusal on the commit (fieldGateRefusal),
+  // so the gate's decision is in the record, never a silent clear.
+  const { form, gate } = fieldDealReport(
     poet,
     rngForIndex(state.seed, CH.curate, POEM_PLACE_BASE + n, state.seedOffsets),
     fieldAspect(state),
   );
   if (form) lp.fieldForm = form;
   else delete lp.fieldForm;
-  return { layoutParams: lp, poemDeal: n + 1 };
+  return {
+    layoutParams: lp,
+    poemDeal: n + 1,
+    fieldGateRefusal: gate ? { reason: gate.reason, poetId: poet.poetId, pieceId: poet.pieceId } : null,
+  };
 }
 
 /**
@@ -498,6 +506,16 @@ export const createLayoutSlice = (set) => ({
   kineticNudge: null,
   // #592 — did the last CURATE press fall back to an unconditioned roll?
   curateChainFallback: false,
+  /**
+   * #1905 (FIELD S4) — the stillborn gate's last word: null, or
+   * { reason: 'charset'|'fit'|'overlap', poetId, pieceId } when the last
+   * poem deal was refused because the form would have spawned unreadable.
+   * Written by every deal commit (landPoem / the CURATOR press) in the same
+   * commit as the deal itself; a deal that spawns or is plain silence
+   * clears it. Session-only, never serialized — the gate's decision is a
+   * record, never a silent clear.
+   */
+  fieldGateRefusal: null,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -1005,8 +1023,14 @@ export const createLayoutSlice = (set) => ({
       if (poemHeld(state)) return {};
       const standing = state.layoutParams.fieldForm || null;
       const poem = landPoem(state, state.layoutParams, { avoidPieceId: standing ? standing.pieceId : null });
-      if (Object.is(poem.layoutParams.fieldForm ?? null, standing)) return { poemDeal: poem.poemDeal };
-      return { ...pushToUndo(state, true), layoutParams: poem.layoutParams, poemDeal: poem.poemDeal };
+      if (Object.is(poem.layoutParams.fieldForm ?? null, standing))
+        return { poemDeal: poem.poemDeal, fieldGateRefusal: poem.fieldGateRefusal };
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: poem.layoutParams,
+        poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
+      };
     }),
 
   /**
@@ -1206,7 +1230,10 @@ export const createLayoutSlice = (set) => ({
       // a silent deal clears the standing form. #1918: KINETIC presses
       // and the poem row re-deal it too (landPoem); HOLD passes every deal
       // by, this press included.
-      const fieldDeal = fieldFormForDeal(
+      // #1905 (S4): the deal reports its stillborn-gate verdict alongside
+      // the form; a refusal banks on this commit as fieldGateRefusal (a
+      // HOLD pass leaves the record standing, as it leaves the form).
+      const { form: fieldDeal, gate: fieldGate } = fieldDealReport(
         tickResult.poet,
         rngForIndex(state.seed, CH.curate, press + 0x30000, state.seedOffsets),
         fieldAspect(state),
@@ -1229,6 +1256,12 @@ export const createLayoutSlice = (set) => ({
         // Honest flag: if any chain had no row for the current value this press
         // had no memory behind it, and the bar says so.
         curateChainFallback: chainFellBack,
+        // #1905 — the gate's last word for this press (HOLD: the record stands).
+        fieldGateRefusal: poemHeld(state)
+          ? (state.fieldGateRefusal ?? null)
+          : fieldGate
+            ? { reason: fieldGate.reason, poetId: tickResult.poet.poetId, pieceId: tickResult.poet.pieceId }
+            : null,
       };
     }),
 
@@ -1347,6 +1380,7 @@ export const createLayoutSlice = (set) => ({
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
         enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
         kitNote, // #1944 — a kit that dealt nothing is named, never a silent mixed deal
         layers,
@@ -1385,6 +1419,7 @@ export const createLayoutSlice = (set) => ({
         ...(pat.changed ? { layers: pat.layers } : {}),
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         kitNote: r.kitNotes ? kitNoteText(r.kitNotes, kitsById(state.kitTriad, state.kits)) : null, // #1944
         voiceMix: null,
@@ -1454,6 +1489,7 @@ export const createLayoutSlice = (set) => ({
         light,
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
         paletteId: r.paletteId,
         paletteOverrides: r.paletteOverrides,
         paletteLocks: {},
@@ -1524,11 +1560,13 @@ export const createLayoutSlice = (set) => ({
       // kept piece under a held poem is still a true pass: no change, no undo entry (#1772).
       const poem = landPoem(state, r.layoutParams ?? state.layoutParams);
       const poemMoved = !Object.is(poem.layoutParams.fieldForm, state.layoutParams.fieldForm);
-      if (!r.layoutParams && !poemMoved) return { kineticNudge, kineticRound, poemDeal: poem.poemDeal };
+      if (!r.layoutParams && !poemMoved)
+        return { kineticNudge, kineticRound, poemDeal: poem.poemDeal, fieldGateRefusal: poem.fieldGateRefusal };
       return {
         ...pushToUndo(state, true),
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
+        fieldGateRefusal: poem.fieldGateRefusal,
         kineticNudge,
         kineticRound,
         // only a real nudge ends the running voice MIX — a poem-only re-deal is no voice axis
