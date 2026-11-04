@@ -18,6 +18,7 @@ import { VOICE_DECK } from '../data/voiceDeck.js';
 import { ASSETS } from '../data/assets/index.js';
 import { SEED_KITS, kitsById, resolveKit } from '../data/kits.js'; // #1946
 import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
+import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 
 const LOOKS = COMPOSITION_PRESETS.map((p) => ({ id: p.id, name: p.name }));
@@ -62,6 +63,7 @@ export function WetLab({ assetId, onClose }) {
     () => kitDescriptors(dealableRecords(ASSETS, customAssets), { assets: ASSETS, customAssets, assetTags }),
     [customAssets, assetTags],
   );
+  const beasts = useMemo(() => beastRows(customAssets), [customAssets]); // #1868
   const descById = useMemo(() => new Map(descs.map((r) => [r.id, r])), [descs]);
   const allKits = [...SEED_KITS, ...(kits || [])];
 
@@ -289,6 +291,38 @@ export function WetLab({ assetId, onClose }) {
                 {beastNote && beastNote.status === 'nobody' && 'no new beast could be dealt on this seed'}
               </span>
             </div>
+            {/* #1868 — the family-resemblance readout: each beast's foot-path signature, the solver's own curve, drawn to one
+                frame with its nearest relative's (dim) so a mutation's kink is something the eye judges. Inspection
+                surface only: the stage is never annotated. */}
+            {beasts.length > 0 && (
+              <ul style={recList} data-testid="beast-rows">
+                {beasts.map((b) => (
+                  <li key={b.id} style={{ ...recRow, alignItems: 'center', gap: 8 }} data-testid="beast-row">
+                    <svg
+                      width="132"
+                      height="72"
+                      viewBox="0 0 132 72"
+                      role="img"
+                      aria-label={`foot-path signature of ${b.id}`}
+                      data-testid="beast-signature"
+                      style={{ flex: '0 0 auto', maxWidth: '100%' }}
+                    >
+                      {b.kin && <path d={b.kin.path} fill="none" stroke="var(--dim)" strokeWidth="1" opacity="0.6" />}
+                      <path d={b.path} fill="none" stroke="var(--ink)" strokeWidth="1.6" />
+                    </svg>
+                    <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+                      <span style={{ color: 'var(--ink)', overflowWrap: 'anywhere' }}>{b.id}</span>
+                      <span style={caps}>
+                        {b.legs} legs · scale {b.scale}
+                      </span>
+                      <span style={noteText} data-testid="beast-kin">
+                        {b.kin ? `${b.kin.label} ${b.kin.distance} · ${b.kin.id}` : 'no relative yet'}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
             {records.length > 0 && (
               <ul style={recList} data-testid="creature-records">
                 {records.map((r) => (
