@@ -45,6 +45,8 @@ export const EVENT_REGISTRY = {
   },
   ASSETS_CATEGORY_WEIGHT: { handler: 'wire', note: 'reserved: same' },
   ASSETS_WEIGHT_CLEAR: { handler: 'wire', note: 'reserved: same' },
+  ASSETS_TAGS: { handler: 'wire' },
+  ASSETS_BULK: { handler: 'wire' },
   ASSETS_DUPLICATE: { handler: 'wire' },
   ASSETS_INGEST: { handler: 'wire' },
   ASSETS_REMOVE: { handler: 'wire' },

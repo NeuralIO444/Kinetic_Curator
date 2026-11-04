@@ -46,7 +46,9 @@ test('DUP sits next to STILL on a tile in use; nothing depends on hover; a tile 
   await expect(off.locator('.tile-foot')).toHaveCount(0);
   await off.hover();
   await expect(off.getByRole('button', { name: /dup/i })).toHaveCount(0); // no hover strip any more
-  await expect(off.locator('.tile-solo')).toHaveCount(0);
+  // #1943: solo is a visible tile control now (it was alt-click only), with its tooltip; the tile still has no foot strip
+  await expect(off.locator('.tile-solo')).toBeVisible();
+  await expect(off.locator('.tile-solo')).toHaveAttribute('title', /solo/i);
   await off.locator('.tile-toggle').click({ position: { x: 40, y: 28 } });
   await expect(off).toHaveClass(/tile-on/);
 });
