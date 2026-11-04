@@ -21,6 +21,7 @@
 // pure, deterministic: same record → same bones; same seed + same stage → same parts; same time → same pose.
 
 import { roleFits } from '../assets/assetRoles.js'; // #1945 — Davis reads role fits, never re-derives them
+import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
 export const TILE_BODY_SCALE = 0.55;
@@ -279,6 +280,12 @@ export function partFit(traits) {
   const r = roleFits(traits);
   return { limb: r.limb, head: r.head, mass: Number(traits.mass) || 0, elong: Number(traits.elong) || 0 };
 }
+
+/**
+ * The one id → fit lookup the contract AND the wet lab's part preview (#1946) deal with: an import's traits ride its
+ * overlay record, the library's are baked. `overlayById` = Map<id, overlay record>.
+ */
+export const davisFitOf = (overlayById) => (id) => partFit(overlayById.get(id)?.traits || libraryTraits(String(id)));
 
 /** The weight of one asset for one bar. `bar` = { role: 'limb' | 'head', len, depth }. Pure. */
 export function partWeight(fit, bar) {

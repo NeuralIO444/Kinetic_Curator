@@ -319,6 +319,8 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'state/projectDocument.js',
     'state/projectWatch.mjs',
     'panels/WetLab.jsx',
+    'panels/wetLabLogic.mjs', // #1946 — the wet lab's own logic: the shape card, breed filters and part preview
+    'panels/wetLab.selfcheck.mjs',
     // #1850: the deal filter imports only the tile-id test (keeps creature tiles undealt) — it never reads a record;
     // the stage reaches a creature through its pool TILE, never through creatureRecords
     'state/rollPool.mjs',

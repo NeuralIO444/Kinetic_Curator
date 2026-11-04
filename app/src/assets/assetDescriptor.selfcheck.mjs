@@ -258,7 +258,7 @@ for (const f of ['../gl/liveLoop.mjs', '../gl/liveResolve.mjs']) {
 }
 {
   const src = readFileSync(new URL('../gl/sceneContract.js', import.meta.url), 'utf8');
-  assert.ok(/libraryTraits/.test(src), 'the contract reads library traits for Davis (#1945)');
+  assert.ok(/davisFitOf/.test(src), 'the contract reads traits for Davis through davisFitOf (#1945)');
   assert.ok(!/assetFacets|suggestTags|layerTags/.test(src), 'the contract never reads tags');
 }
 console.log('assetDescriptor.selfcheck: ok');
