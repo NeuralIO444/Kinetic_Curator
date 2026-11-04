@@ -12,6 +12,9 @@
 // selfchecks pass a seeded stream. The creature citizen is never dealt — it rides its own pool toggle.
 import { assetRecords, assetsWhere } from '../data/assetStyle.js';
 import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
+import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js'; // #1944
+import { resolveKit, kitsById } from '../data/kits.js'; // #1944
+import { mkRng } from '../engine/prng.js'; // #1944
 
 /** Pool size range — matches the old 4-asset sets, with a little more room for a mixed deal. */
 export const POOL_MIN = 4;
@@ -68,7 +71,26 @@ export function dealMixedPool(records, rng) {
  * matching set (styles narrow when they leave enough to deal; categories alone otherwise). Fewer than POOL_MIN
  * matches → the mixed deal, so a pairing never strands the stage.
  */
-export function dealPoolFor(records, rng, { categories, styles } = {}) {
+export function dealPoolFor(records, rng, { categories, styles, kits, kitContext } = {}) {
+  // #1944 — kits first: a Look (or the artist's standing triad) that names kits deals from them, as a triad, and only
+  // when they deal nothing does today's behaviour run — with the reason named, never a silent mixed deal. No kits → this
+  // block is skipped without touching `rng`, so every roll without kits is byte-identical to before.
+  let kitNotes = [];
+  if (Array.isArray(kits) && kits.length && typeof kitContext === 'function') {
+    const ctx = kitContext();
+    const resolved = kitsById(kits, ctx.artistKits);
+    const kitDeal = dealKitTriad(resolved, Math.floor(rng() * 0x100000000), { records: ctx.descriptors });
+    if (kitDeal.ids.length) {
+      const fam = new Set(records.filter((r) => kitDeal.ids.includes(r.id)).map((r) => r.family));
+      return { ids: kitDeal.ids, families: [...fam], coherent: true, kitDeal, notes: kitDeal.notes };
+    }
+    kitNotes = kitDeal.notes.length ? kitDeal.notes : [{ kit: null, note: 'no-kits' }];
+  }
+  const rest = dealPoolForLegacy(records, rng, { categories, styles });
+  return kitNotes.length ? { ...rest, notes: kitNotes } : rest;
+}
+
+function dealPoolForLegacy(records, rng, { categories, styles } = {}) {
   let ids = [];
   if ((categories && categories.length) || (styles && styles.length)) {
     const both = assetsWhere(records, {
@@ -92,4 +114,108 @@ export function poolToEnabled(ids) {
   const out = {};
   for (const id of ids) out[id] = true;
   return out;
+}
+
+// ─── #1944 — kits: the three-kit deal ───────────────────────────────────────────────────────────────────────────────
+
+/** No kit in a triad is dealt under this share of the pool (the "no kit under 20%" rule). */
+export const KIT_MIN_SHARE = 0.2;
+
+const hashStr = (str) => {
+  let h = 2166136261;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return h >>> 0;
+};
+
+/** Largest-remainder split of `n` seats by `shares`, every share given at least one seat while n allows. */
+function allocate(n, shares) {
+  const counts = shares.map(() => (n >= shares.length ? 1 : 0));
+  let left = n - counts.reduce((a, b) => a + b, 0);
+  const rem = shares.map((s, i) => ({ i, r: s * n - counts[i] }));
+  while (left > 0) {
+    rem.sort((a, b) => b.r - a.r || a.i - b.i);
+    counts[rem[0].i]++;
+    rem[0].r -= 1;
+    left--;
+  }
+  return counts;
+}
+
+/** Weighted draw of up to k ids without replacement, seeded. */
+function drawWeighted(rng, ids, weightOf, k) {
+  const pool = ids.map((id) => ({ id, w: Math.max(1e-6, weightOf(id)) }));
+  const out = [];
+  while (out.length < k && pool.length) {
+    const total = pool.reduce((a, b) => a + b.w, 0);
+    let x = rng() * total;
+    let at = 0;
+    for (; at < pool.length - 1; at++) {
+      x -= pool[at].w;
+      if (x < 0) break;
+    }
+    out.push(pool.splice(at, 1)[0].id);
+  }
+  return out;
+}
+
+/**
+ * The three-kit deal. `kits` are kit records (data/kits.js), one to three; `seed` an integer; `records` the descriptor
+ * records the kits resolve over. Returns { ids, kits: [{ id, count, share }], size, notes }.
+ *   - Each kit resolves to its own sub-pool; assets are never merged across kits, and every dealt asset belongs to at
+ *     least one kit it was dealt for (no fourth source).
+ *   - A seeded share per kit, none under KIT_MIN_SHARE, splits a 4..6 asset deal (largest remainder, ≥ 1 each).
+ *   - Deterministic in (kit ids, seed, records): the kits are taken in id order and each draws from its own stream, so the
+ *     order they were passed in changes nothing.
+ *   - A kit that resolves to nothing is named in `notes` and its seats are dropped: a smaller deal, never a random one.
+ */
+export function dealKitTriad(kits, seed, { records } = {}) {
+  const uniq = [];
+  for (const k of Array.isArray(kits) ? kits : []) if (k && !uniq.some((u) => u.id === k.id)) uniq.push(k);
+  const ordered = uniq.slice(0, 3).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  const notes = [];
+  if (!ordered.length) return { ids: [], kits: [], size: 0, notes: [{ kit: null, note: 'no-kits' }] };
+  const s = seed >>> 0;
+  const rng = mkRng((s ^ hashStr('triad')) | 0);
+  const us = ordered.map(() => 0.05 + rng());
+  const sum = us.reduce((a, b) => a + b, 0);
+  const free = 1 - KIT_MIN_SHARE * ordered.length;
+  const shares = us.map((u) => KIT_MIN_SHARE + (free * u) / sum);
+  const size = POOL_MIN + pickIndex(rng, POOL_MAX - POOL_MIN + 1);
+  const counts = allocate(size, shares);
+  const taken = new Set();
+  const ids = [];
+  const used = [];
+  ordered.forEach((kit, i) => {
+    const sub = resolveKit(kit, records || []);
+    if (!sub.ids.length) {
+      notes.push({ kit: kit.id, note: 'empty' });
+      return;
+    }
+    const avail = sub.ids.filter((id) => !taken.has(id));
+    const want = Math.min(counts[i], kit.cap || counts[i], avail.length);
+    const got = drawWeighted(mkRng((s ^ hashStr(kit.id)) | 0), avail, sub.weightOf, want);
+    for (const id of got) {
+      taken.add(id);
+      ids.push(id);
+    }
+    used.push({ id: kit.id, count: got.length, share: Math.round(shares[i] * 1000) / 1000 });
+  });
+  return { ids, kits: used, size, notes };
+}
+
+/**
+ * Descriptor records for the kit deal (computed only when kits are in play): each dealable record, with the traits
+ * (baked for the library, the record's own for an import), the artist's tag edits and its effective H/M/L weight.
+ */
+export function kitDescriptors(records, { assets = [], customAssets = [], assetTags = {}, weightOverrides = {} } = {}) {
+  const byId = new Map([...assets, ...customAssets].map((a) => [a.id, a]));
+  return records
+    .map((r) => {
+      const a = byId.get(r.id);
+      if (!a) return null;
+      const user = String(r.id).startsWith('user:');
+      const d = assetDescriptor(a, user ? a.traits || null : libraryTraits(r.id), user ? a.tagEdits : assetTags[r.id]);
+      return { ...d, weight: weightOverrides[r.id] || a.weight || 'medium' };
+    })
+    .filter(Boolean);
 }

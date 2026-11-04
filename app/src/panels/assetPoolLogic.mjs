@@ -93,3 +93,30 @@ export function nextSelection(sel, order, id, { range = false, anchor = null } =
   }
   return cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id];
 }
+
+/**
+ * #1944 — a kit from the filters on screen: facets → `where.facets`, a category chip → `where.categories`, role chips →
+ * `where.minRole`. Returns the record for `saveKit`, or null when no filter is active (a kit must constrain something) or
+ * the name leaves no slug.
+ */
+export function kitFromFilters(name, { cat = 'all', facets = {}, role = {} } = {}, takenIds = []) {
+  const label = String(name || '')
+    .trim()
+    .slice(0, 24);
+  const slug = label
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 32);
+  if (!slug) return null;
+  const where = {};
+  if (Object.keys(facets).length)
+    where.facets = Object.fromEntries(Object.entries(facets).map(([k, v]) => [k, [...v]]));
+  if (cat !== 'all' && cat !== 'user') where.categories = [cat];
+  const minRole = Object.fromEntries(Object.entries(role).filter(([, v]) => v != null));
+  if (Object.keys(minRole).length) where.minRole = minRole;
+  if (!Object.keys(where).length) return null;
+  let id = slug;
+  for (let n = 2; takenIds.includes(id); n++) id = `${slug.slice(0, 29)}-${n}`;
+  return { id, name: label, where, weights: {}, cap: 4 };
+}

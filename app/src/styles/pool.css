@@ -586,3 +586,43 @@
 .panel-pool .pool-body {
   min-height: 140px;
 }
+
+/* ─── #1944 — kit slots (selects keep the tokens.css dropdown style; layout only) ─── */
+.pool-kits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+  padding: 4px 0;
+}
+.pool-kits select {
+  min-height: 26px;
+  min-width: 0;
+  flex: 1 1 90px;
+  max-width: 140px;
+}
+.pool-kit-name {
+  display: inline-flex;
+  gap: 4px;
+}
+.pool-kit-name input {
+  min-height: 26px;
+  width: 110px;
+  padding: 0 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--line-2);
+  color: var(--ink);
+  font-size: 10px;
+}
+.pool-kit-note {
+  flex: 1 1 100%;
+  color: var(--kc-warn);
+  font-size: 10px;
+}
+@media (max-width: 600px) {
+  .pool-kits select,
+  .pool-kit-name input,
+  .pool-kits button {
+    min-height: 36px;
+  }
+}

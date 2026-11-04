@@ -154,6 +154,9 @@ export const Events = {
   ASSETS_CATEGORY_WEIGHT: 'assets:categoryWeight',
   ASSETS_WEIGHT_CLEAR: 'assets:weightClear',
   ASSETS_TAGS: 'assets:tags', // #1943 — { ids, edit }: confirm / reject / free-tag, one asset or a selection
+  ASSETS_KIT_TRIAD: 'assets:kitTriad', // #1944 — [ids]: the standing kit triad (up to three)
+  ASSETS_KIT_SAVE: 'assets:kitSave', // #1944 — a kit record (the artist's own)
+  ASSETS_KIT_REMOVE: 'assets:kitRemove', // #1944 — { id }
   ASSETS_BULK: 'assets:bulk', // #1943 — { ids, weight? , enabled? }: the selection's weight / on-off
   ASSETS_DUPLICATE: 'assets:duplicate',
   ASSETS_INGEST: 'assets:ingest',

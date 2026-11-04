@@ -62,7 +62,7 @@ export function paramDiff(before, after) {
 export function lookPass(
   state,
   rng,
-  { looks = COMPOSITION_PRESETS, records, pool: poolKind = 'library', sets = [] } = {},
+  { looks = COMPOSITION_PRESETS, records, pool: poolKind = 'library', sets = [], kitContext } = {},
 ) {
   const lp = state.layoutParams || {};
   const locked = state.lockedParams || {};
@@ -82,12 +82,18 @@ export function lookPass(
   const pool =
     poolKind === 'sets' && sets.length
       ? { ids: [...sets[pickIndex(rng, sets.length)]], coherent: false }
-      : dealPoolFor(records, rng, look || {});
+      : dealPoolFor(records, rng, {
+          ...(look || {}),
+          // #1944 — the artist's standing triad wins; otherwise the Look's own kits; otherwise today's deal
+          kits: Array.isArray(state.kitTriad) && state.kitTriad.length ? state.kitTriad : look && look.kits,
+          kitContext,
+        });
   return {
     layoutParams: validateLayoutParams(merged).params, // #1550: rolled values land through the validating door
     enabledAssets: poolToEnabled(pool.ids),
     lookId: look ? look.id : null,
     coherent: pool.coherent,
+    ...(pool.notes && pool.notes.length ? { kitNotes: pool.notes } : {}), // #1944: a kit that dealt nothing is named
   };
 }
 
