@@ -8,6 +8,38 @@ import { useEffect } from 'react';
 import { useStore } from '../state/store.js';
 import { loopClock } from '../gl/loopClock.js';
 
+/**
+ * #1935 — the bounded-crawl ceiling factor (RULED, Matt, 2026-11-02).
+ *
+ * The engine's presentation states are running / HELD / DRAGGING. While the
+ * engine DRAGS (alive and advancing, but presented frames arrive slower
+ * than real time), a MIX dissolve keeps blending on simulation time — the
+ * gesture is unchanged — but no dissolve may outlive a wall-clock ceiling
+ * of 1.5× its authored duration: past the ceiling it lands, through the
+ * same commitVoiceMix landing as a natural t=1 (final state applied in
+ * one undo step, bookkeeping settled).
+ *
+ * "Wall clock" here is presented time: loopClock.presentedMs, liveLoop's
+ * accumulation of real frame deltas. It freezes while the engine is HELD
+ * or the tab is hidden (no frames present), so held time can never bring
+ * a landing closer — the freeze-holds-dissolve law (#806) is untouched,
+ * and this file still reads no wall-clock API: both of its clocks arrive
+ * via loopClock.
+ */
+export const MIX_WALL_CEILING_FACTOR = 1.5;
+
+/**
+ * #1935 — pure ceiling test, exported for the headless pin. True when the
+ * mix's presented age has reached the bounded-crawl ceiling. A mix with
+ * no presented stamp (or a not-yet-observed presented clock) never hits:
+ * the ceiling governs DRAGGING, and an unstamped mix has no measured drag.
+ */
+export function mixCeilingHit(mix, presentedMs) {
+  if (!mix || !Number.isFinite(mix.durationMs) || mix.durationMs <= 0) return false;
+  if (!Number.isFinite(mix.presentedAt) || !Number.isFinite(presentedMs)) return false;
+  return presentedMs - mix.presentedAt >= mix.durationMs * MIX_WALL_CEILING_FACTOR;
+}
+
 export function useVoiceMixDriver() {
   useEffect(() => {
     let raf = 0;
@@ -44,6 +76,17 @@ export function useVoiceMixDriver() {
       const t = Math.min(1, Math.max(0, nowMs - mix.startedAt) / mix.durationMs);
       if (t >= 1) {
         // commitVoiceMix is a plain store action — no setState-in-effect.
+        s.commitVoiceMix();
+        return;
+      }
+      // #1935 bounded crawl: on a DRAGGING engine the sim-time t above can
+      // take unbounded wall time to reach 1 (the loop credits at most
+      // 50 ms of sim per presented frame). Past the presented-age ceiling
+      // the dissolve lands instead — the same commit as t=1, never a
+      // partial snap. Gated on running: while HELD, presentedMs is frozen
+      // anyway, but the gate states the law — a held dissolve is never
+      // landed by the ceiling.
+      if (s.running && mixCeilingHit(mix, loopClock.presentedMs)) {
         s.commitVoiceMix();
         return;
       }

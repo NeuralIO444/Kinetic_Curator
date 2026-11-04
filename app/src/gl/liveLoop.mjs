@@ -125,6 +125,15 @@ function isIpadClassDevice() {
 export const SWELL_DURATION_MS = 2000;
 
 /**
+ * #1935 — per-frame cap on the presented-wall credit (presentedMs). Real
+ * frame deltas at 4 fps or better pass through whole; a longer gap (GC
+ * stall, tab restore, debugger) credits at most this much, so one stall
+ * cannot masquerade as minutes of presented time. Exported so the seam
+ * can be pinned headlessly, like the swell envelope above.
+ */
+export const PRESENTED_FRAME_MAX_MS = 250;
+
+/**
  * The pure #268 swell envelope — a function of LOOP time only (audit
  * fix 5, #1680): 0 when no gesture is in flight (null start), rising
  * as sin(pi * p) to a peak of 1 at the midpoint, back to 0 at
@@ -328,6 +337,16 @@ export function createLiveLoop(
   // dtSec is clamped to [8, 50] ms → [0.008, 0.05] s.
   let prevTime = 0;
   let loopTimeMs = 0;
+  // #1935 — presentedMs is loopTimeMs's wall-clock sibling: the real time
+  // between presented frames (rawDtMs), credited per frame up to
+  // PRESENTED_FRAME_MAX_MS. It advances only inside tick(), so it freezes
+  // exactly when the audience's clock freezes — engine HELD (tick does not
+  // run) or tab hidden (no rAF) — and rejected frames roll it back with
+  // loopTimeMs, so a frame the audience never got credits nothing. The gap
+  // between presentedMs and loopTimeMs is the DRAGGING measure: how far
+  // behind real time the simulation has fallen. The MIX driver's bounded
+  // crawl (#1935) reads it via loopClock; nothing else consumes it yet.
+  let presentedMs = 0;
 
   // Static resources (atlas), uploaded once per combo set.
   // cells is a plain object: "asset|tint|accent" -> {u0,v0,u1,v1}, exactly
@@ -1297,6 +1316,12 @@ export function createLiveLoop(
     const clampedDtMs = Math.max(8, Math.min(50, rawDtMs));
     const dtSec = clampedDtMs / 1000;
     loopTimeMs += clampedDtMs;
+    // #1935: credit the presented-wall sibling (see the declaration). The
+    // per-frame cap keeps one stall (GC, tab restore) from counting as
+    // minutes of audience time; at any presentation rate of 4 fps or
+    // better the credit is exact.
+    const presentedDtMs = Math.min(rawDtMs, PRESENTED_FRAME_MAX_MS);
+    presentedMs += presentedDtMs;
 
     // #421 — buildFrame unconditionally advances loopLifeT, ballistics, and
     // the breath springs before either rejection path below is known. Both
@@ -1338,6 +1363,7 @@ export function createLiveLoop(
       if (!frame) {
         // Cold boot: atlas not baked yet (!cells). Roll back loopTimeMs since frame did not simulate/present.
         loopTimeMs -= clampedDtMs;
+        presentedMs -= presentedDtMs;
         rollBackLifeClocks();
         return;
       }
@@ -1362,6 +1388,7 @@ export function createLiveLoop(
       if (paused) {
         // Spine B (#388): paused holds the last presented frame; roll back loopTimeMs since physics did not step.
         loopTimeMs -= clampedDtMs;
+        presentedMs -= presentedDtMs;
         rollBackLifeClocks();
         return;
       }
@@ -1378,6 +1405,7 @@ export function createLiveLoop(
       // a GPU freeze.
       if (getState().slowRender) {
         loopTimeMs -= clampedDtMs;
+        presentedMs -= presentedDtMs;
       }
 
       if (wrapEl) {
@@ -1827,6 +1855,9 @@ export function createLiveLoop(
     stop,
     dispose,
     getLoopTimeMs: () => loopTimeMs,
+    // #1935: the presented-wall sibling of getLoopTimeMs (see the
+    // declaration at the dt clock). Read-only, like the loop clock.
+    getPresentedMs: () => presentedMs,
     // #1802: the take recorder reads the frozen state the take begins in from the loop itself (the one truth —
     // the bus carries changes, not state). Read-only; the setter below is the only way the state moves.
     getAccumFrozen: () => accumFrozen,

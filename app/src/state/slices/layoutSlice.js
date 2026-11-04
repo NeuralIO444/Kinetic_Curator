@@ -416,6 +416,9 @@ function openParamsMix(state, merged, { name }) {
       // #806: MIX dissolve is a must-loop performer — stamp in loop ms
       // (useVoiceMixDriver reads loopClock.ms), never wall clock.
       startedAt: loopClock.ms,
+      // #1935: the bounded-crawl ceiling's stamp — presented wall ms
+      // (loopClock.presentedMs), the sibling of startedAt.
+      presentedAt: loopClock.presentedMs,
       targetVoiceId: null,
       targetName: name,
     },

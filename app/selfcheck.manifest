@@ -22,6 +22,7 @@ node src/engine/markWeather.selfcheck.mjs
 node src/engine/fieldMap.selfcheck.mjs
 node src/hooks/useCanvasItems.selfcheck.mjs
 node src/hooks/useLoopCapture.selfcheck.mjs
+node src/hooks/useVoiceMixDriver.selfcheck.mjs
 node src/hooks/batchGate.selfcheck.mjs
 node src/hooks/viewportMath.selfcheck.mjs
 node src/hooks/columnResizeMath.selfcheck.mjs

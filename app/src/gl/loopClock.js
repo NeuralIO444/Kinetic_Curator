@@ -5,9 +5,20 @@
 // so interval math never touches Date.now(). The mirror starts at 0
 // ("not observed yet") — readers must treat 0 as unknown, not as a stamp.
 
-/** Loop ms at the last observed presented frame. 0 = not observed yet. */
 export const loopClock = {
+  /** Loop ms at the last observed presented frame. 0 = not observed yet. */
   ms: 0,
+  /**
+   * #1935 — presented wall ms: real time between presented frames,
+   * accumulated by liveLoop beside loopTimeMs (per-frame credit capped at
+   * PRESENTED_FRAME_MAX_MS; rejected frames roll it back; it freezes while
+   * the engine is HELD or the tab hidden because tick() does not run).
+   * Unlike `ms`, 0 is a true zero (no frames presented yet), not "unknown":
+   * readers use differences, and a difference against a not-yet-started
+   * loop is honestly small. The gap `presentedMs − ms` growth is the
+   * DRAGGING measure — simulation time falling behind the audience's clock.
+   */
+  presentedMs: 0,
 };
 
 /**

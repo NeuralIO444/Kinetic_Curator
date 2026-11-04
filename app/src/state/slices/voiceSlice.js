@@ -159,7 +159,7 @@ export function findVoiceDef(id, userVoices) {
 
 export const createVoiceSlice = (set) => ({
   userVoices: readStored(),
-  /** null | { from, to, t, durationMs, auto, startedAt, targetVoiceId, targetName } */
+  /** null | { from, to, t, durationMs, auto, startedAt, presentedAt, targetVoiceId, targetName } */
   voiceMix: null,
   /** Voice id whose chip is lit — cleared the moment hands touch a param. */
   activeVoiceId: null,
@@ -188,6 +188,10 @@ export const createVoiceSlice = (set) => ({
           // #806: MIX dissolve is a must-loop performer — stamp in loop ms
           // (useVoiceMixDriver reads loopClock.ms), never wall clock.
           startedAt: loopClock.ms,
+          // #1935: the bounded-crawl ceiling's stamp — presented wall ms
+          // (loopClock.presentedMs, liveLoop's rAF-delta accumulation), the
+          // sibling of startedAt on the audience's clock.
+          presentedAt: loopClock.presentedMs,
           targetVoiceId: voiceId,
           targetName: def.displayName || def.name || voiceId,
         },
@@ -227,7 +231,14 @@ export const createVoiceSlice = (set) => ({
       return {
         // #806: MIX dissolve is a must-loop performer — re-anchor in loop ms,
         // preserving the scrubbed position, never wall clock.
-        voiceMix: { ...mix, auto: true, startedAt: loopClock.ms - mix.t * mix.durationMs },
+        // #1935: the presented stamp re-anchors in lockstep, so a resumed
+        // mix gets a fresh bounded-crawl budget from the resume point.
+        voiceMix: {
+          ...mix,
+          auto: true,
+          startedAt: loopClock.ms - mix.t * mix.durationMs,
+          presentedAt: loopClock.presentedMs - mix.t * mix.durationMs,
+        },
       };
     }),
 
