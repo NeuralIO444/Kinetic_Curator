@@ -405,6 +405,9 @@ function AppInner() {
       raf = requestAnimationFrame(tick);
       const ms = glLoopRef?.current?.getLoopTimeMs?.();
       if (Number.isFinite(ms)) loopClock.ms = ms;
+      // #1935: mirror the presented-wall sibling alongside (same frame).
+      const pms = glLoopRef?.current?.getPresentedMs?.();
+      if (Number.isFinite(pms)) loopClock.presentedMs = pms;
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);

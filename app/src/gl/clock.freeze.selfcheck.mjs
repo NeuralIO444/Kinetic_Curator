@@ -27,8 +27,8 @@ test('#823 liveLoop tick rolls the clock advance back on a governor freeze', () 
   assert.match(src, /#823/, 'the freeze-hold must be marked #823');
   assert.match(
     src,
-    /if \(getState\(\)\.slowRender\) \{\s*\n\s*loopTimeMs -= clampedDtMs;\s*\n\s*\}/,
-    "slowRender must roll back the tick's loopTimeMs advance like the paused path",
+    /if \(getState\(\)\.slowRender\) \{\s*\n\s*loopTimeMs -= clampedDtMs;\s*\n\s*presentedMs -= presentedDtMs;\s*\n\s*\}/,
+    "slowRender must roll back the tick's loopTimeMs advance like the paused path (#1935: the presented-wall sibling rolls back with it, so frozen time never counts toward the bounded-crawl ceiling)",
   );
 });
 
