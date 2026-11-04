@@ -49,6 +49,7 @@ import {
   recordIdOfTile,
   skeletonFounder,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850
+import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { sourceRecord, breedCreature, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
@@ -434,6 +435,7 @@ export const createGlobalSlice = (set) => ({
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
+  beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   customAssets: [],
   ingestError: null,
@@ -966,6 +968,24 @@ export const createGlobalSlice = (set) => ({
     set((state) => {
       const rec = assembleCreature({ assetId, points: shown, seed: state.seed });
       return rec ? bankCreature(state, rec) : {};
+    }),
+  /**
+   * #1962 — ASSEMBLE A BEAST: deal the next Strandbeest off the project seed (inside the S2 gate — never a stillbirth)
+   * and bank it as a pool tile carrying its linkage. The nth press on a seed is the nth animal, so it is never banked
+   * twice; a full pool refuses rather than evicting. It reaches the stage like every tile: turn it on, place it.
+   */
+  assembleBeast: () =>
+    set((state) => {
+      const overlay = state.customAssets || [];
+      const taken = new Set(overlay.map((a) => a && a.id));
+      let tile = null;
+      for (let n = 0; n < 256 && !tile; n++) {
+        const t = beastTile(dealBeastMeasures(state.seed, n));
+        if (t && !taken.has(t.id)) tile = t;
+      }
+      if (!tile || sanitizeOverlay([tile]).length !== 1) return { beastAssembleNote: { id: null, status: 'nobody' } };
+      if (overlay.length >= OVERLAY_CAP) return { beastAssembleNote: { id: tile.id, status: 'pool-full' } };
+      return { customAssets: [...overlay, tile], beastAssembleNote: { id: tile.id, status: 'banked' } };
     }),
   /**
    * #1852 — BREED: three sources (banked creatures, or this shape + a Look + a Voice) → one child, banked with its tile
