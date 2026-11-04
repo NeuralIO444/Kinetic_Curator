@@ -319,6 +319,7 @@ node src/assets/regionMattes.selfcheck.mjs
 node src/assets/resvgFont.selfcheck.mjs
 node src/assets/assetDescriptor.selfcheck.mjs
 node src/panels/assetPool.selfcheck.mjs
+node src/panels/wetLab.selfcheck.mjs
 node src/assets/regionBake.selfcheck.mjs
 node src/assets/regionSlots.selfcheck.mjs
 node src/state/overlayRoundtrip.selfcheck.mjs

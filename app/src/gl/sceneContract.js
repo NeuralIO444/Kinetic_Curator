@@ -34,8 +34,7 @@ import {
   sanitizeAccumScanDirection,
 } from './accum.mjs';
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
-import { expandCreatureInstances, partFit } from '../engine/creatureRig.js'; // #1851 — creature rigs
-import { libraryTraits } from '../data/assetDescriptor.js'; // #1945 — Davis reads the baked traits
+import { expandCreatureInstances, davisFitOf } from '../engine/creatureRig.js'; // #1851 — creature rigs, #1945 role deal
 import { contractLight } from '../data/light.js';
 import {
   KINEME_KINDS,
@@ -647,9 +646,7 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       // #1945 — Davis deals by role fit: library traits are baked, an import's ride its overlay record. `davisRoleDeal:
       // false` (or window.__KC_DAVIS_ROLE_OFF = true, for the live app) is the named A/B switch (the deal is then exactly what it was). `kitPool` (optional ids) narrows the pile.
       const fitOf =
-        doc.davisRoleDeal === false || globalThis.__KC_DAVIS_ROLE_OFF === true
-          ? null
-          : (id) => partFit(overlayById.get(id)?.traits || libraryTraits(String(id)));
+        doc.davisRoleDeal === false || globalThis.__KC_DAVIS_ROLE_OFF === true ? null : davisFitOf(overlayById);
       const expanded = expandCreatureInstances(instances, overlayById, {
         fitOf,
         pileOnly: Array.isArray(doc.kitPool) && doc.kitPool.length ? new Set(doc.kitPool.map(String)) : null,
