@@ -12,6 +12,7 @@
 import assert from 'node:assert/strict';
 import { ASSETS } from '../data/assets/index.js';
 import { libraryTraits } from '../data/assetDescriptor.js';
+import { mkRng } from './prng.js';
 import { sanitizeMeasures, BEAST_BARS, legPoints } from './beastBuilder.js';
 import { evaluateGenome, isStillborn } from './jansenSolver.js';
 import { wildTypeMeasures } from './jansenMeasures.js';
@@ -169,11 +170,11 @@ const mine = out.filter((i) => i.key.startsWith('b#'));
 {
   let dead = null;
   for (let i = 0; i < 4000 && !dead; i++) {
-    const r = (n) => Math.sin(i * 12.9898 + n * 78.233) * 43758.5453;
-    const f = (n) => r(n) - Math.floor(r(n));
+    const rng = mkRng(i * 7919 + 13);
+    const f = () => rng();
     const m = sanitizeMeasures({
       ...wild,
-      ...Object.fromEntries('abcdefghijl'.split('').map((c, n) => [c, wild[c] * (0.5 + 1.5 * f(n))])),
+      ...Object.fromEntries('abcdefghijl'.split('').map((c) => [c, wild[c] * (0.5 + 1.5 * f())])),
     });
     if (isStillborn(m, m.scale)) dead = m;
   }
