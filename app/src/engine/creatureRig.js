@@ -20,6 +20,8 @@
 // Units: the tile's 100-unit box, y down, angles in degrees clockwise (the SVG / contract convention). Browser-safe,
 // pure, deterministic: same record → same bones; same seed + same stage → same parts; same time → same pose.
 
+import { roleFits } from '../assets/assetRoles.js'; // #1945 — Davis reads role fits, never re-derives them
+
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
 export const TILE_BODY_SCALE = 0.55;
 const OFF = (100 * (1 - TILE_BODY_SCALE)) / 2;
@@ -234,8 +236,11 @@ export function poseRig(rig, t, gait = gaitFor(null), phase = 0) {
  * redresses it. The head and the limbs draw from the same pile; each bone gets its own deal, but a chain's bones are
  * dealt together (thigh, shin, foot of one limb share a hand) so a limb reads as one design.
  */
-export function dealPart(stageAssets, seed, tileId, bone, variety = null, index = 0) {
+export function dealPart(stageAssets, seed, tileId, bone, variety = null, index = 0, roleDeal = null) {
   if (!stageAssets.length) return null;
+  if (roleDeal && typeof roleDeal.fitOf === 'function') {
+    return dealPartByRole(stageAssets, seed, tileId, bone, variety, index, roleDeal.fitOf);
+  }
   // #1949 — Davis's mood sets how varied the deal is (Matt, 2026-11-03)
   if (variety === 'wide') {
     // open: every bone its own shape — a seeded order of the pile, one per bone (distinct while the pile allows)
@@ -258,6 +263,89 @@ export function dealPart(stageAssets, seed, tileId, bone, variety = null, index 
   return stageAssets[(base + depth * step) % stageAssets.length];
 }
 
+// ─── #1945 — Davis deals by role fit ─────────────────────────────────────────────────────────────────────────────
+/** The draw is over fit^k: sharp enough that long thin shapes win the limbs, soft enough that the choice stays varied. */
+export const ROLE_DEAL_K = 2;
+/** A fit of 0 (or an asset with no traits) still has this much weight: nothing is ever impossible, only unlikely. */
+export const ROLE_FIT_FLOOR = 0.05;
+/** Down a chain, a part's weight is scaled by (1 − this × its mass): lower bones prefer lighter shapes than the thigh. */
+export const LOWER_MASS_PENALTY = 0.9;
+/** A bar at least this long (tile units) also leans toward elongated shapes. */
+export const LONG_BAR = 15;
+
+/** What Davis needs from a descriptor: { limb, head, mass, elong } (role fits are precomputed data), or null. */
+export function partFit(traits) {
+  if (!traits || typeof traits !== 'object') return null;
+  const r = roleFits(traits);
+  return { limb: r.limb, head: r.head, mass: Number(traits.mass) || 0, elong: Number(traits.elong) || 0 };
+}
+
+/** The weight of one asset for one bar. `bar` = { role: 'limb' | 'head', len, depth }. Pure. */
+export function partWeight(fit, bar) {
+  const f = fit ? (bar.role === 'head' ? fit.head : fit.limb) : 0;
+  let w = Math.pow(Math.max(ROLE_FIT_FLOOR, f), ROLE_DEAL_K);
+  if (fit && bar.role === 'limb') {
+    if ((Number(bar.len) || 0) >= LONG_BAR) w *= 0.5 + fit.elong;
+    if (bar.depth > 0) w *= 1 - LOWER_MASS_PENALTY * fit.mass;
+  }
+  return w;
+}
+
+/** Seeded weighted pick (Efraimidis–Spirakis): argmax of u^(1/w). `skip` = ids already worn down the chain. */
+function weightedPick(pile, keyOf, weightOf, skip = null) {
+  let best = null;
+  let bestK = -1;
+  for (const id of pile) {
+    if (skip && skip.has(id)) continue;
+    const k = Math.pow(u01(keyOf(id)), 1 / weightOf(id));
+    if (k > bestK || (k === bestK && (best === null || id < best))) {
+      best = id;
+      bestK = k;
+    }
+  }
+  return best;
+}
+
+/**
+ * The role-weighted deal. The API is a bar — `{ role, len, chain, id }` — not a creature bone: the Strandbeest's linkage
+ * bars (#1863) deal through the same call. Deterministic: the pile is the caller's (sorted) list, the draw is a seeded
+ * hash. Mood still applies: `wide` = every bone its own shape (a weighted seeded order), `tight` = one shape on all limbs.
+ */
+function dealPartByRole(pile, seed, tileId, bone, variety, index, fitOf) {
+  const fits = new Map(pile.map((id) => [id, fitOf(id) || null]));
+  const wOf = (depth) => (id) => partWeight(fits.get(id), { role: bone.role, len: bone.len, depth });
+  if (variety === 'wide') {
+    // every bone its own shape. The head takes the pile's best head fit (a seeded weighted pick); the limbs take
+    // consecutive places in one seeded, limb-weighted order of what is left — distinct while the pile allows
+    const headKey = (id) => `davis-wide-h|${seed >>> 0}|${tileId}|${id}`;
+    const headPick = weightedPick(pile, headKey, (id) =>
+      partWeight(fits.get(id), { role: 'head', len: bone.len, depth: 0 }),
+    );
+    if (bone.role === 'head') return headPick;
+    const rest = pile.length > 1 ? pile.filter((id) => id !== headPick) : pile;
+    const w = wOf(0);
+    const order = rest
+      .map((id) => ({ id, k: Math.pow(u01(`davis-wide|${seed >>> 0}|${tileId}|${id}`), 1 / w(id)) }))
+      .sort((a, b) => b.k - a.k || (a.id < b.id ? -1 : 1));
+    return order[index % order.length].id;
+  }
+  if (variety === 'tight' && bone.role === 'limb') {
+    return weightedPick(pile, (id) => `davis-tight|${seed >>> 0}|${tileId}|${id}`, wOf(0));
+  }
+  const hand = bone.role === 'head' ? 'h' : `l${bone.chain}`;
+  const depth = bone.role === 'head' ? 0 : Number(bone.id.split('.')[1]) || 0;
+  // a chain's bones are dealt together from one hand: each depth draws from the same hashes, and never repeats a part
+  // already worn higher up the same limb while the pile allows
+  const worn = new Set();
+  let pick = null;
+  for (let d = 0; d <= depth; d++) {
+    const skip = pile.length > d ? worn : null;
+    pick = weightedPick(pile, (id) => `davis-role|${seed >>> 0}|${tileId}|${hand}|${id}`, wOf(d), skip);
+    worn.add(pick);
+  }
+  return pick;
+}
+
 /**
  * The contract-time expansion: every placed creature tile (an instance whose overlay record carries a rig) becomes
  * its body + one instance per bone. Limb parts draw behind the body, the head in front of it. A part takes the body's
@@ -270,14 +358,17 @@ export function dealPart(stageAssets, seed, tileId, bone, variety = null, index 
  *
  * @param {Array} instances the contract's instances (not mutated)
  * @param {Map<string, object>|null} overlayById customAssets by id
- * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string, davis?: string }} opts
+ * @param {{ seed: number, t: number, frozen: boolean, collapsed: boolean, face?: string, davis?: string,
+ *   fitOf?: (id: string) => object|null, pileOnly?: Set<string>|null }} opts
+ *   fitOf = #1945's id → { limb, head, mass, elong } (absent = Davis deals as he always did, byte for byte);
+ *   pileOnly = #1945's kit triad pool: the pile is the stage's assets ∩ it, and with no overlap the stage's pile
  *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
  * @returns {Array} the original array when nothing expands, else a new one
  */
 export function expandCreatureInstances(
   instances,
   overlayById,
-  { seed = 0, t = 0, frozen = false, collapsed = false, face = null, davis = null } = {},
+  { seed = 0, t = 0, frozen = false, collapsed = false, face = null, davis = null, fitOf = null, pileOnly = null } = {},
 ) {
   if (!overlayById || collapsed) return instances;
   const rigOf = (id) => {
@@ -288,9 +379,14 @@ export function expandCreatureInstances(
   // by the founder's hand, so kin resemble each other, and kin shimmer together
   const familyOf = (id) => sanitizeKin(overlayById.get(id)?.kin) || String(id).replace(/^user:/, '');
   if (!instances.some((it) => rigOf(it.asset))) return instances;
-  const stageAssets = [
+  let stageAssets = [
     ...new Set(instances.map((it) => it.asset).filter((id) => !rigOf(id) && id !== 'creature')),
   ].sort();
+  if (pileOnly && pileOnly.size) {
+    const inKits = stageAssets.filter((id) => pileOnly.has(id));
+    if (inKits.length) stageAssets = inKits; // no overlap → the stage pile, untouched
+  }
+  const roleDeal = typeof fitOf === 'function' ? { fitOf } : null;
   const gait = gaitFor(face);
   const variety = varietyFor(davis);
   const out = [];
@@ -324,7 +420,7 @@ export function expandCreatureInstances(
         role: p.role,
         inst: {
           ...it,
-          asset: dealPart(pile, seed, hand, bone, variety, boneIndex),
+          asset: dealPart(pile, seed, hand, bone, variety, boneIndex, roleDeal),
           opacity: r3(it.opacity * glow),
           key: `${it.key}#${p.id}`,
           x: r3(it.x + lx * co - ly * si),
