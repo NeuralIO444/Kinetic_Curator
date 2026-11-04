@@ -351,6 +351,7 @@ node src/engine/creatureMoods.selfcheck.mjs
 node src/engine/beast.selfcheck.mjs
 node src/engine/beastDraw.selfcheck.mjs
 node src/engine/beastRig.selfcheck.mjs
+node src/engine/beastTile.selfcheck.mjs
 node src/engine/jansenSolver.selfcheck.mjs
 node src/engine/creatureChem.selfcheck.mjs
 node src/engine/creaturePolicy.selfcheck.mjs

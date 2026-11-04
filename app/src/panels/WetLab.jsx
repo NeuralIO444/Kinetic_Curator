@@ -37,6 +37,8 @@ export function WetLab({ assetId, onClose }) {
   const removeCreatureRecord = useStore((s) => s.removeCreatureRecord);
   const allRecords = useStore((s) => s.creatureRecords);
   const note = useStore((s) => s.creatureAssembleNote);
+  const assembleBeast = useStore((s) => s.assembleBeast); // #1962
+  const beastNote = useStore((s) => s.beastAssembleNote);
   const breedCreature = useStore((s) => s.breedCreature); // #1852
   const breedNote = useStore((s) => s.creatureBreedNote);
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
@@ -267,6 +269,24 @@ export function WetLab({ assetId, onClose }) {
                 {note &&
                   note.status === 'id-taken' &&
                   'an import already uses this creature’s pool id — rename that import first'}
+              </span>
+            </div>
+            {/* #1962 — a Strandbeest needs no shape: its linkage is the skeleton. One press deals the next animal off the
+                project seed (inside the S2 gate) and banks it as a pool tile; the stage hangs its parts on the bars. */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+              <button
+                type="button"
+                className="chip-btn act"
+                data-testid="assemble-beast"
+                title="Deal the next Strandbeest off the project seed and add its tile to the asset pool"
+                onClick={() => assembleBeast()}
+              >
+                assemble a beast
+              </button>
+              <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="beast-note">
+                {beastNote && beastNote.status === 'banked' && `banked ${beastNote.id} — its tile is in the asset pool`}
+                {beastNote && beastNote.status === 'pool-full' && 'the asset pool is full — remove an import first'}
+                {beastNote && beastNote.status === 'nobody' && 'no new beast could be dealt on this seed'}
               </span>
             </div>
             {records.length > 0 && (
