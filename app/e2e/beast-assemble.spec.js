@@ -48,6 +48,16 @@ test('ASSEMBLE A BEAST banks a linkage tile, a second press banks a different on
   expect(beasts.length).toBe(2);
   expect(new Set(beasts.map((b) => b.id)).size).toBe(2);
   expect(beasts.every((b) => b.bones === 0 && b.legs >= 6 && b.legs <= 12)).toBe(true);
+  // #1868 — the signature readout: a closed foot-path curve per beast, each naming its nearest relative
+  await expect(lab.getByTestId('beast-row')).toHaveCount(2);
+  const paths = await lab
+    .getByTestId('beast-signature')
+    .evaluateAll((els) => els.map((e) => [...e.querySelectorAll('path')].map((p) => p.getAttribute('d'))));
+  for (const ds of paths) {
+    expect(ds.length).toBe(2); // its own, and its relative's behind it
+    expect(ds.every((d) => d.startsWith('M') && d.endsWith('Z'))).toBe(true);
+  }
+  await expect(lab.getByTestId('beast-kin').first()).toHaveText(/^(kin|cousin|stranger) \d/);
   // turn the first on: the stage places it like any shape, and nothing throws
   await page.evaluate((id) => {
     const s = window.__kcStore;
@@ -61,6 +71,9 @@ test('the beast button holds at phone width: no horizontal scroll', async ({ pag
   const errors = await boot(page, { width: 390, height: 800 });
   await openLab(page);
   await expect(page.getByTestId('assemble-beast')).toBeVisible();
+  await page.getByTestId('assemble-beast').click();
+  await page.getByTestId('assemble-beast').click();
+  await expect(page.getByTestId('beast-row')).toHaveCount(2);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   expect(errors).toEqual([]);
 });
