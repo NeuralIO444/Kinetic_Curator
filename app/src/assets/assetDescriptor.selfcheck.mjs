@@ -250,9 +250,15 @@ assert.deepEqual(
   assert.deepEqual(S().assetTags, {}, 'a junk map loads as none');
 }
 
-// ---- inert: no stage reads a descriptor
-for (const f of ['../gl/liveLoop.mjs', '../gl/liveResolve.mjs', '../gl/sceneContract.js']) {
+// ---- inert: the live loop and the resolver read no descriptor; the contract (#1945, Davis's role deal) reads only the
+// baked traits through assetDescriptor — never the tag facets, which are the artist's view of the pool, not a stage input
+for (const f of ['../gl/liveLoop.mjs', '../gl/liveResolve.mjs']) {
   const src = readFileSync(new URL(f, import.meta.url), 'utf8');
   assert.ok(!/assetDescriptor|assetFacets|assetRoles|assetTraits/.test(src), `${f} does not read descriptors yet`);
+}
+{
+  const src = readFileSync(new URL('../gl/sceneContract.js', import.meta.url), 'utf8');
+  assert.ok(/libraryTraits/.test(src), 'the contract reads library traits for Davis (#1945)');
+  assert.ok(!/assetFacets|suggestTags|layerTags/.test(src), 'the contract never reads tags');
 }
 console.log('assetDescriptor.selfcheck: ok');
