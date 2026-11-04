@@ -21,6 +21,7 @@
 // pure, deterministic: same record → same bones; same seed + same stage → same parts; same time → same pose.
 
 import { roleFits } from '../assets/assetRoles.js'; // #1945 — Davis reads role fits, never re-derives them
+import { sanitizeLinkage, poseLinkage, restBarLengths, LINKAGE_BAR_NAMES, BEAM_ID } from './beastRig.js'; // #1960 — the beast's linkage rig
 import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
@@ -133,6 +134,13 @@ const isNum = (n) => typeof n === 'number' && Number.isFinite(n);
  * parents listed before children, numbers inside sane bounds. Null when nothing valid remains.
  */
 export function sanitizeRig(raw) {
+  if (raw && typeof raw === 'object' && raw.linkage) {
+    // #1960 — a beast: the linkage is the skeleton (bars are the bones), so it carries no `bones` of its own
+    const linkage = sanitizeLinkage(raw.linkage);
+    if (!linkage) return null;
+    const lbody = typeof raw.body === 'string' && raw.body.length <= 120 && !/[<>"'&]/.test(raw.body) ? raw.body : '';
+    return { body: lbody, bones: [], linkage };
+  }
   if (!raw || typeof raw !== 'object' || !Array.isArray(raw.bones)) return null;
   const out = [];
   const seen = new Set();
@@ -278,7 +286,7 @@ export const LONG_BAR = 15;
 export function partFit(traits) {
   if (!traits || typeof traits !== 'object') return null;
   const r = roleFits(traits);
-  return { limb: r.limb, head: r.head, mass: Number(traits.mass) || 0, elong: Number(traits.elong) || 0 };
+  return { limb: r.limb, head: r.head, body: r.body, mass: Number(traits.mass) || 0, elong: Number(traits.elong) || 0 };
 }
 
 /**
@@ -289,7 +297,7 @@ export const davisFitOf = (overlayById) => (id) => partFit(overlayById.get(id)?.
 
 /** The weight of one asset for one bar. `bar` = { role: 'limb' | 'head', len, depth }. Pure. */
 export function partWeight(fit, bar) {
-  const f = fit ? (bar.role === 'head' ? fit.head : fit.limb) : 0;
+  const f = fit ? (bar.role === 'head' ? fit.head : bar.role === 'body' ? fit.body : fit.limb) : 0;
   let w = Math.pow(Math.max(ROLE_FIT_FLOOR, f), ROLE_DEAL_K);
   if (fit && bar.role === 'limb') {
     if ((Number(bar.len) || 0) >= LONG_BAR) w *= 0.5 + fit.elong;
@@ -353,6 +361,70 @@ function dealPartByRole(pile, seed, tileId, bone, variety, index, fitOf) {
   return pick;
 }
 
+/** One bone's part as an instance: centred on the bone, its box spanning PART_FILL of the bone's length, its "up" along it. */
+function placePart(it, p, asset, glow, co, si, flip) {
+  const lx = ((p.x + p.tx) / 2 - 50) * it.scaleX;
+  const ly = ((p.y + p.ty) / 2 - 50) * it.scaleY;
+  const s = (p.len * PART_FILL) / 100;
+  return {
+    ...it,
+    asset,
+    opacity: r3(it.opacity * glow),
+    key: `${it.key}#${p.id}`,
+    x: r3(it.x + lx * co - ly * si),
+    y: r3(it.y + lx * si + ly * co),
+    scaleX: r3(Math.abs(it.scaleX) * s * flip),
+    scaleY: r3(it.scaleY * s),
+    // the part's "up" (its box's -y) runs along the bone, root to tip
+    rotation: r3(it.rotation + flip * (p.angle + 90)),
+  };
+}
+
+/**
+ * #1960 — Davis deals the beast's body beam by BODY fit (the pile's best body-shaped shapes win the beam). Seeded and
+ * hand-keyed, so every copy of one beast on one stage wears the same beam; without a fit table (the role-deal switch
+ * off) the pile is dealt by a plain seeded hash, as the rest of the legacy deal is.
+ */
+export function dealBodyPart(pile, seed, tileId, fitOf = null) {
+  if (!pile.length) return null;
+  if (typeof fitOf !== 'function') {
+    return pile[Math.floor(u01(`davis-body|${seed >>> 0}|${tileId}`) * pile.length) % pile.length];
+  }
+  const fits = new Map(pile.map((id) => [id, fitOf(id) || null]));
+  return weightedPick(
+    pile,
+    (id) => `davis-body|${seed >>> 0}|${tileId}|${id}`,
+    (id) => partWeight(fits.get(id), { role: 'body', len: 0, depth: 0 }),
+  );
+}
+
+/**
+ * #1960 — a beast tile's expansion: the linkage posed bar by bar, each bar bone wearing a part. The 12 bar NAMES are dealt
+ * once (a bar is dealt as a depth-0 limb of its own hand) and every leg wears the same set; the beam takes a body-fit
+ * deal and stands in for the tile's own mark (the beast IS the linkage, so `it` is not pushed). A stillbirth → [].
+ */
+function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase }) {
+  const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
+  const pose = poseLinkage(linkage, frozen ? 0 : t, 1);
+  if (!pose) return [];
+  const lens = restBarLengths(rig.linkage);
+  const dealt = new Map();
+  LINKAGE_BAR_NAMES.forEach((name, i) => {
+    const b = { id: `l${i}.0`, role: 'limb', chain: i, len: lens[name] };
+    dealt.set(name, dealPart(pile, seed, hand, b, variety, i, roleDeal));
+  });
+  dealt.set(BEAM_ID, dealBodyPart(pile, seed, hand, roleDeal && roleDeal.fitOf));
+  const th = rad(it.rotation);
+  const co = Math.cos(th);
+  const si = Math.sin(th);
+  const flip = it.scaleX < 0 ? -1 : 1;
+  const legs = pose
+    .filter((p) => p.role === 'limb')
+    .map((p) => placePart(it, p, dealt.get(p.name), glow, co, si, flip));
+  const beam = placePart(it, pose[0], dealt.get(BEAM_ID), glow, co, si, flip);
+  return [...legs, beam]; // legs behind, the body beam over them
+}
+
 /**
  * The contract-time expansion: every placed creature tile (an instance whose overlay record carries a rig) becomes
  * its body + one instance per bone. Limb parts draw behind the body, the head in front of it. A part takes the body's
@@ -413,6 +485,10 @@ export function expandCreatureInstances(
     const family = familyOf(it.asset);
     const hand = `user:${family}`; // a founder's own tile id — so a founder's deal is exactly what it always was
     const glow = frozen ? 1 : kinShimmer(family, t);
+    if (rig.linkage) {
+      out.push(...expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase }));
+      continue;
+    }
     const pose = poseRig(rig, frozen ? 0 : t, gait, phase);
     const th = rad(it.rotation);
     const co = Math.cos(th);
@@ -420,23 +496,9 @@ export function expandCreatureInstances(
     const flip = it.scaleX < 0 ? -1 : 1;
     const parts = pose.map((p, boneIndex) => {
       const bone = rig.bones.find((b) => b.id === p.id);
-      const lx = ((p.x + p.tx) / 2 - 50) * it.scaleX;
-      const ly = ((p.y + p.ty) / 2 - 50) * it.scaleY;
-      const s = (p.len * PART_FILL) / 100;
       return {
         role: p.role,
-        inst: {
-          ...it,
-          asset: dealPart(pile, seed, hand, bone, variety, boneIndex, roleDeal),
-          opacity: r3(it.opacity * glow),
-          key: `${it.key}#${p.id}`,
-          x: r3(it.x + lx * co - ly * si),
-          y: r3(it.y + lx * si + ly * co),
-          scaleX: r3(Math.abs(it.scaleX) * s * flip),
-          scaleY: r3(it.scaleY * s),
-          // the part's "up" (its box's -y) runs along the bone, root to tip
-          rotation: r3(it.rotation + flip * (p.angle + 90)),
-        },
+        inst: placePart(it, p, dealPart(pile, seed, hand, bone, variety, boneIndex, roleDeal), glow, co, si, flip),
       };
     });
     for (const p of parts) if (p.role === 'limb') out.push(p.inst);
