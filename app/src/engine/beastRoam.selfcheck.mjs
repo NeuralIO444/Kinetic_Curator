@@ -166,7 +166,7 @@ near(stride, (ev.step / ev.duty) * LINKAGE_TILE_K, 1e-9, 'the stride is the stan
   const scene = [...stage.map((id, i) => inst(id, `s${i}`, 60 + i * 150)), inst('user:beast', 'b', 400)];
   const at = (t, extra = {}) => {
     const out = expandCreatureInstances(scene, overlay, { seed: 7, t, ...extra });
-    const parts = out.filter((i) => i.key.startsWith('b#'));
+    const parts = out.filter((i) => i.key.startsWith('b#') && !i.key.startsWith('b#trace'));
     const beam = parts.find((p) => p.key === 'b#beam');
     return { parts, beam, out };
   };
