@@ -72,5 +72,10 @@ assert.ok(!/assetInk\([^,]+, \{\}\)/.test(censusReport), 'the census never raste
 const censusSuite = src('../curator/census.selfcheck.mjs');
 assert.ok(!/assetInk\([^,]+, \{\}\)/.test(censusSuite), 'the census suite never rasterizes with resvg defaults');
 console.log('  [ok] wired: the bake and the GL atlas raster with the pinned font');
+// #1970 — the miner's "with fonts" ink figure is the pinned font too (the second consumer behind the census: its stamp
+// assertion failed on the CI runner once the census stopped failing first)
+const miner = src('../curator/miner.mjs');
+assert.match(miner, /font: fonts \? RESVG_FONT :/, 'the miner rasterizes its with-fonts figure with the pinned font');
+assert.ok(!/\.\.\.\(fonts \? \{\} :/.test(miner), 'the miner never rasterizes with resvg defaults');
 console.log('  [ok] wired: the census confirmation raster is the pinned font, never resvg defaults (#1970)');
-console.log('resvgFont.selfcheck: 4 checks passed');
+console.log('resvgFont.selfcheck: 6 checks passed');
