@@ -169,7 +169,10 @@ node src/engine/dishLife.selfcheck.mjs
 node src/engine/dishLifeSeed.selfcheck.mjs
 node src/engine/dishLifePhase.selfcheck.mjs
 node src/engine/dishLifeRender.selfcheck.mjs
+node src/engine/dishLifeStage.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
+node src/gl/dishLifeTouchDom.selfcheck.mjs
+node src/gl/liveResolve.dishLife.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs
 node src/engine/organisms/behave.selfcheck.mjs
 node src/engine/organisms.selfcheck.mjs

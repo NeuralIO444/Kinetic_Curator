@@ -9,6 +9,7 @@ import { useStore } from '../state/store.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { createMidiEngine } from '../midi/engine.mjs';
 import { routeLearnMessage } from '../midi/learn.mjs';
+import { noteTouch } from '../engine/dishLifeTouch.mjs'; // #1923: a MIDI message is a touch (ends an idle culture)
 
 export function useMidi() {
   const enabled = useStore((s) => s.midiEnabled);
@@ -27,7 +28,10 @@ export function useMidi() {
       onStatus: (status) => useStore.getState().setMidiStatus(status),
       // Learn mode claims the gesture: a claimed message binds (or is refused loudly)
       // and never also fires a mapping — the engine honours the `true` return.
-      onMessage: (msg) => routeLearnMessage(useStore.getState(), msg),
+      onMessage: (msg) => {
+        noteTouch('midi');
+        return routeLearnMessage(useStore.getState(), msg);
+      },
     });
     engine.start();
     return () => {
