@@ -165,6 +165,7 @@ node src/curator/whisper.selfcheck.mjs
 node src/engine/mothBodies.selfcheck.mjs
 node eslint-rules/determinism.selfcheck.mjs
 node src/engine/ca-engine.selfcheck.mjs
+node src/engine/dishLife.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs
 node src/engine/organisms/behave.selfcheck.mjs
 node src/engine/organisms.selfcheck.mjs
