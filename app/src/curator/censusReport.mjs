@@ -44,6 +44,7 @@ import { createGrid, stepGrid } from '../engine/ca-engine.js';
 import { tickDishTrails } from '../engine/dishTrails.mjs';
 import { countEcologyAlive } from '../engine/dishEcology.mjs';
 import { canonicalSvg } from '../assets/regionBake.mjs';
+import { RESVG_FONT } from '../assets/resvgFont.mjs'; // #1970 — the bake's pinned font, shared with every Node asset raster (#1950)
 import { patternAmounts, rhythmTypeForPattern, createTravelStore } from '../engine/kineme.js';
 import { createSurgeStore } from '../engine/surge.js'; // #1576 — the census surge context
 import { createParallaxStore } from '../engine/parallaxDrift.js'; // #1576 — the census drift context
@@ -1751,6 +1752,15 @@ export function dishMatrix() {
 // plus the resolved swatch record itself. Every layout mode must
 // produce a distinct arrangement signature (placement fingerprint).
 const RASTER_OPTS_FAST = { font: { loadSystemFonts: false } };
+// #1970 — the confirmation raster is the bake's own raster: the ONE
+// pinned bundled font (#1950, assets/resvgFont.mjs), exactly as
+// regionBake constructs it. It used to be resvg's defaults ({}), which
+// load the host's system fonts — so a text stamp's verdict depended on
+// the machine's font inventory, and the 2026-11-01 CI runner image,
+// whose fonts resvg cannot resolve for the stamps' generic families,
+// read all ten font-contingent stamps as dead. The pinned raster reads
+// identical pixels on every machine.
+const RASTER_OPTS_BAKE = { font: RESVG_FONT };
 
 export function assetInk(svg, opts = RASTER_OPTS_FAST) {
   const img = new Resvg(canonicalSvg(svg), opts).render();
@@ -1761,13 +1771,15 @@ export function assetInk(svg, opts = RASTER_OPTS_FAST) {
 }
 
 export function renderReachability() {
-  // Assets: ink + placement presence. The fast raster (no system
-  // fonts — 100x faster, bit-identical on path art) is the sweep; any
-  // asset it finds blank is re-rasterized with the bake's own default
-  // options before it may be called unreached. The assets that differ
-  // are the <text> stamps: their ink is font-contingent — it exists
-  // exactly when a monospace font does — which the census reports as
-  // a property of the asset, not a defect of the sweep.
+  // Assets: ink + placement presence. The fast raster (no fonts at
+  // all — 100x faster, bit-identical on path art) is the sweep; any
+  // asset it finds blank is re-rasterized with the bake's own raster
+  // (RASTER_OPTS_BAKE — the pinned bundled font, #1950) before it may
+  // be called unreached. The assets that differ are the <text> stamps:
+  // their ink is font-contingent — it exists exactly when the pinned
+  // font renders the glyph — which the census reports as a property
+  // of the asset, not a defect of the sweep. Both rasters are
+  // machine-independent, so the verdict is too (#1970).
   const assetRows = [];
   const REACH_LAYOUTS = ['grid', 'fibonacci', 'radial'];
   for (const a of ASSETS) {
@@ -1775,7 +1787,7 @@ export function renderReachability() {
     let ink = fast.ink;
     let fontContingent = false;
     if (fast.ink === 0) {
-      const confirmed = assetInk(a.svg, {}); // the bake's own options: system fonts load
+      const confirmed = assetInk(a.svg, RASTER_OPTS_BAKE); // the bake's own raster: the pinned font
       fontContingent = confirmed.ink > 0;
       ink = confirmed.ink;
     }

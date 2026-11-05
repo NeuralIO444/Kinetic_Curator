@@ -45,6 +45,7 @@
 // byte-identical.
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
+import { RESVG_FONT } from '../assets/resvgFont.mjs'; // #1970 — the bake's pinned font, never the host's
 import { ASSETS } from '../data/assets/index.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
@@ -448,7 +449,9 @@ export function composeStillSvg(items, palette, { withBg = true } = {}) {
 
 function rasterize(svg, { fonts = false, width = W } = {}) {
   const resvg = new Resvg(svg, {
-    ...(fonts ? {} : { font: { loadSystemFonts: false } }),
+    // `fonts` = the bake's own raster: the ONE pinned bundled font (#1950), identical pixels on every machine. It used to
+    // be resvg's defaults, i.e. the host's system fonts — so a text stamp's "with fonts" ink depended on the machine (#1970).
+    font: fonts ? RESVG_FONT : { loadSystemFonts: false },
     fitTo: { mode: 'width', value: width },
   });
   const rendered = resvg.render();

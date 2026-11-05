@@ -158,7 +158,7 @@ const stampBake = bakeSample(stampSample);
 assert.strictEqual(stampBake.ok, true, 'a font-contingent stamp bakes like any asset');
 const stampStats = renderStats(stampBake.items, resolvePalette('hydra', null, []));
 assert.strictEqual(stampStats.inkCoverage, 0, 'font-less, the text stamp reads blank (E1b F2)');
-assert.ok(stampStats.inkCoverageWithFonts > 0, 'with system fonts, the stamp draws');
+assert.ok(stampStats.inkCoverageWithFonts > 0, 'with the pinned font, the stamp draws');
 
 // ---------------------------------------------------------------- the run
 const run = runMiner({ ...SMOKE, keeps: KEEPS });
