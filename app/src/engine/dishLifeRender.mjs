@@ -159,3 +159,70 @@ export function cultureFrame(marks, culture, nearest, opts = {}) {
   const cells = cultureItems(culture, marks, nearest, opts);
   return cells.length ? scene.concat(cells) : scene;
 }
+
+// ── tertiary read: the specks ────────────────────────────────────────────────────────────────────────────────
+// KC-1's picture reads in layers: the marks and the Directors are primary, the marks' own breathing and fray is
+// secondary (the Kineme culture source), and these specks are tertiary — a few faint points of the same colony
+// showing in the gaps BETWEEN marks, where nothing else is. They add detail to the dead space and never sit on a mark.
+
+/** Most specks emitted per frame (a quiet layer's detail, not a second picture). */
+export const SPECK_MAX = 64;
+/** The most a speck can show: a fraction of the nearest mark's own alpha, before the layer's strength and envelope. */
+export const SPECK_ALPHA = 0.22;
+/** A speck's size against one grid cell (live cells are CELL_RADIUS, a speck is smaller). */
+export const SPECK_SIZE = 0.35;
+/** A cell is a gap when it is at least this many mark-radii from the nearest mark. */
+export const SPECK_GAP = 1.5;
+
+/**
+ * The tertiary specks for a quiet culture: the strongest live cells that sit in a gap between marks, each wearing the
+ * nearest mark's asset and colour (palette-true) at a sliver of its alpha. `strength` is the layer's (dial × idle
+ * boost) and `envelope` the cycle's 0..1 breath, so a speck fades with the layer and never pops. Pure and bounded.
+ */
+export function speckItems(
+  culture,
+  marks,
+  nearest,
+  { canvasW, canvasH, strength = 0, envelope = 1, maxItems = SPECK_MAX } = {},
+) {
+  const str = Math.max(0, Math.min(1, Number(strength) || 0));
+  const env = Math.max(0, Math.min(1, Number(envelope) || 0));
+  if (!culture || !Array.isArray(marks) || marks.length === 0 || !(str * env > 0)) return [];
+  const { cols, rows, field } = culture;
+  const cw = canvasW / cols;
+  const ch = canvasH / rows;
+  const short = Math.min(canvasW, canvasH);
+  const cellScale = (SPECK_SIZE * Math.min(cw, ch)) / (MARK_FRAC * short);
+  const level = field.level;
+  const gap = [];
+  for (let i = 0; i < level.length; i++) {
+    if (!(level[i] > 0) || nearest[i] < 0) continue;
+    const m = marks[nearest[i]];
+    const x = i % cols;
+    const y = (i - x) / cols;
+    const dx = (x + 0.5) * cw - m.x;
+    const dy = (y + 0.5) * ch - m.y;
+    const radius = Math.max(0.2, Number(m.scale) || 1) * MARK_FRAC * short;
+    if (dx * dx + dy * dy >= SPECK_GAP * SPECK_GAP * radius * radius) gap.push(i);
+  }
+  gap.sort((a, b) => level[b] - level[a] || a - b);
+  const n = Math.min(gap.length, Math.max(0, maxItems | 0));
+  const out = new Array(n);
+  for (let k = 0; k < n; k++) {
+    const i = gap[k];
+    const m = marks[nearest[i]];
+    const x = i % cols;
+    const y = (i - x) / cols;
+    out[k] = {
+      ...m,
+      x: (x + 0.5) * cw,
+      y: (y + 0.5) * ch,
+      scale: cellScale,
+      scaleY: cellScale,
+      alpha: alpha01(m.alpha) * level[i] * SPECK_ALPHA * str * env * 100,
+      index: i,
+      key: `speck:${i}`,
+    };
+  }
+  return out;
+}

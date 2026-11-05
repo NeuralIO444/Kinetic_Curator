@@ -290,7 +290,7 @@ export const HELP_TOPICS = [
     id: 'dish-life-on',
     group: 'Master',
     title: 'dish life · running',
-    text: 'DISH LIFE is running (solid glider): a quiet Game of Life colony makes nearby marks breathe and fray a little, and it breathes a bit more when the room goes idle. Click to turn it off.',
+    text: 'DISH LIFE is running (solid glider): a quiet Game of Life colony makes nearby marks breathe and fray a little, a few faint specks of it show in the gaps between marks, and it breathes a bit more when the room goes idle. Click to turn it off.',
   },
   {
     id: 'dish-life-slowed',

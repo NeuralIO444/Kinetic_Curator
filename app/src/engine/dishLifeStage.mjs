@@ -20,8 +20,8 @@
 
 import { createCulture, stepCulture, setBedrock, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
-import { nearestMarks, cultureFrame } from './dishLifeRender.mjs';
-import { cultureSampler } from './dishLifeQuiet.mjs';
+import { nearestMarks, cultureFrame, speckItems } from './dishLifeRender.mjs';
+import { cultureSampler, envelope } from './dishLifeQuiet.mjs';
 
 /** Culture grid resolution (the spike's grid). */
 export const STAGE_COLS = 96;
@@ -30,6 +30,8 @@ export const STAGE_ROWS = 54;
 export const SHED_STEPS = Object.freeze([4, 1, 0]);
 
 /** A mark that is terrain: a held FIELD poem, a locked look. */
+/** A tertiary speck this stage drew (never a seed, never a mark). */
+export const isSpeck = (it) => !!it && typeof it.key === 'string' && it.key.startsWith('speck:');
 export const isTerrain = (it) => !!it && (it.held === true || it.locked === true);
 
 // the frozen seed keeps the WHOLE mark (shallow copy): the dissolving scene is drawn from it, and the cells inherit
@@ -71,7 +73,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
    * Apply the frame's stamp to the resolved layers. Mutates the layer entries' `items` (new arrays) when a culture
    * is showing and returns true; returns false (touching nothing) when there is no stamp or nothing to seed.
    */
-  function apply(dl, layers, W, H) {
+  function apply(dl, layers, W, H, { specks = true } = {}) {
     if (!dl || typeof dl !== 'object' || !Number.isFinite(dl.wakeMs)) {
       st = null;
       return false;
@@ -83,7 +85,8 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const bedrock = bedrockOf(terrain, W, H);
     if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H) {
       const marks = [];
-      for (const e of content) for (const it of e.items) if (it && !isTerrain(it)) marks.push(freeze(it));
+      for (const e of content)
+        for (const it of e.items) if (it && !isTerrain(it) && !isSpeck(it)) marks.push(freeze(it));
       if (!marks.length) return false;
       build(dl.wakeMs, marks, W, H, bedrock);
     } else {
@@ -98,7 +101,22 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
-    if (quiet) return true; // the secondary read: the culture is only a field (field()); no layer is touched
+    if (quiet) {
+      // the secondary read: the culture is a field (field()) the marks read. The tertiary read: a few faint specks in
+      // the gaps between marks ride the top content layer — added to it, never taking a mark's place.
+      const speckList = specks
+        ? speckItems(st.culture, st.marks, st.nearest, {
+            ...geom(W, H),
+            strength: st.quiet.strength,
+            envelope: envelope(st.culture.gen, st.quiet.cycleGens),
+          })
+        : [];
+      if (speckList.length) {
+        const top = content[content.length - 1];
+        top.items = top.items.filter((it) => !isSpeck(it)).concat(speckList); // never stack on a previous frame's specks
+      }
+      return true;
+    }
     if (st.frameGen !== st.culture.gen) {
       st.frame = cultureFrame(st.marks, st.culture, st.nearest, geom(W, H));
       st.frameGen = st.culture.gen;

@@ -16,6 +16,10 @@ import {
   DISSOLVE_GENS,
   MAX_CELL_ITEMS,
   DECAY_SCALE_MIN,
+  speckItems,
+  SPECK_MAX,
+  SPECK_ALPHA,
+  SPECK_GAP,
 } from './dishLifeRender.mjs';
 import { createCulture, stepCulture } from './dishLife.mjs';
 
@@ -228,5 +232,47 @@ const aliveCulture = (cells, gen = 0) => {
   assert.deepEqual(cultureItems(c, null, near, G), []);
   const orphan = new Int32Array(G.cols * G.rows).fill(-1);
   assert.deepEqual(cultureItems(c, MARKS, orphan, G), [], 'cells with no nearest mark are not drawn');
+}
+// ---- S: the tertiary specks — faint points in the gaps between marks, never on a mark
+{
+  const near = nearestMarks(MARKS, G);
+  const onMark = [4, 10]; // x≈112px: right on the left mark
+  const inGap = [20, 10]; // x≈512px: far from both marks
+  const c = aliveCulture([onMark, inGap]);
+  const sp = speckItems(c, MARKS, near, { ...G, strength: 0.5, envelope: 1 });
+  assert.equal(sp.length, 1, 'only the gap cell makes a speck — the cell on a mark makes none');
+  assert.equal(sp[0].index, cell(20, 10));
+  assert.ok(sp[0].key.startsWith('speck:'), 'keyed apart from the cells and the marks');
+  const nearest = MARKS[near[cell(20, 10)]];
+  assert.equal(sp[0].assetId, nearest.assetId, "it wears the nearest mark's asset");
+  assert.equal(sp[0].color, nearest.color, 'and its colour (palette-true)');
+  assert.ok(
+    sp[0].alpha > 0 && sp[0].alpha <= nearest.alpha * SPECK_ALPHA + 1e-9,
+    'a sliver of its alpha, never the mark itself',
+  );
+  const half = speckItems(c, MARKS, near, { ...G, strength: 0.25, envelope: 1 });
+  assert.ok(Math.abs(half[0].alpha - sp[0].alpha / 2) < 1e-9, 'half the strength, half the speck');
+  assert.deepEqual(speckItems(c, MARKS, near, { ...G, strength: 0, envelope: 1 }), [], 'strength 0 is silence');
+  assert.deepEqual(
+    speckItems(c, MARKS, near, { ...G, strength: 0.5, envelope: 0 }),
+    [],
+    'envelope 0: the layer at rest',
+  );
+  const live = cultureItems(aliveCulture([onMark, inGap], 20), MARKS, near, {
+    canvasW: G.canvasW,
+    canvasH: G.canvasH,
+  }).find((it) => it.index === cell(20, 10));
+  assert.ok(sp[0].scale < live.scale, 'a speck is smaller than a live cell');
+  const many = [];
+  for (let x = 12; x < 28; x++) for (let y = 2; y < 18; y++) many.push([x, y]);
+  const big = aliveCulture(many);
+  const a = speckItems(big, MARKS, near, { ...G, strength: 1, envelope: 1, maxItems: 10 });
+  const b = speckItems(big, MARKS, near, { ...G, strength: 1, envelope: 1, maxItems: 10 });
+  assert.equal(a.length, 10, 'bounded by maxItems');
+  assert.deepEqual(a, b, 'same inputs, same specks');
+  assert.ok(speckItems(big, MARKS, near, { ...G, strength: 1, envelope: 1 }).length <= SPECK_MAX);
+  assert.deepEqual(speckItems(null, MARKS, near, { ...G, strength: 1, envelope: 1 }), []);
+  assert.deepEqual(speckItems(c, [], near, { ...G, strength: 1, envelope: 1 }), []);
+  assert.ok(SPECK_GAP > 1, 'a gap is farther than the mark itself');
 }
 console.log('dishLifeRender.selfcheck: ok');
