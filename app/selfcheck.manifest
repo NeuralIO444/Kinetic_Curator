@@ -171,6 +171,8 @@ node src/engine/dishLifeSeed.selfcheck.mjs
 node src/engine/dishLifePhase.selfcheck.mjs
 node src/engine/dishLifeRender.selfcheck.mjs
 node src/engine/dishLifeStage.selfcheck.mjs
+node src/engine/dishLifeQuiet.selfcheck.mjs
+node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
 node src/gl/dishLifeTouchDom.selfcheck.mjs
 node src/gl/liveResolve.dishLife.selfcheck.mjs

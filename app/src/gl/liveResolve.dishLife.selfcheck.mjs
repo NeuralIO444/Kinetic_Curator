@@ -11,6 +11,8 @@ import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { quietStamp, CYCLE_GENS, QUIET_GPS } from '../engine/dishLifeQuiet.mjs';
+import { CULTURE_SCALE, CULTURE_FRAY } from '../engine/kineme.js';
 
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
 const lp = (over = {}) => ({ ...DEFAULT_LAYOUT_PARAMS, count: 60, particleCount: 60, ...over });
@@ -184,6 +186,84 @@ let stampedRun;
   assert.ok(r.snapshotState().dishLife, 'running');
   r.dispose();
   assert.equal(r.snapshotState().dishLife, undefined, 'dispose resets the stage');
+}
+
+// 6. the QUIET culture — the secondary read (the rebalanced design): marks stay put, nothing is replaced or drawn, the
+//    Kineme culture source lets marks near a living colony swell and fray a little; deterministic; replayable.
+{
+  const QN = 130; // ~16 s: several cycles
+  const qIn = (f, strength = 0.8) =>
+    baseInput({ loopTimeMs: f * 100, dtSec: 0.1, dishLife: quietStamp(f * 100, { strength }) ?? undefined });
+  const plainIn = (f) => baseInput({ loopTimeMs: f * 100, dtSec: 0.1 });
+  const marksOf = (out) => out.flatMap((l) => (Array.isArray(l.items) ? l.items : []));
+  const plain = createLiveResolver();
+  const q = createLiveResolver();
+  const q2 = createLiveResolver();
+  let moved = 0;
+  let maxSwell = 1;
+  let maxMove = 0;
+  const qh = [];
+  const qh2 = [];
+  for (let f = 0; f < QN; f++) {
+    const po = marksOf(plain.resolveLayers(plainIn(f)));
+    const qo = marksOf(q.resolveLayers(qIn(f)));
+    qh.push(hash(qo));
+    qh2.push(hash(marksOf(q2.resolveLayers(qIn(f)))));
+    assert.equal(qo.length, po.length, 'nothing is added, dissolved or removed');
+    assert.ok(
+      qo.every((m) => !String(m.key).startsWith('life:')),
+      'no cell is drawn as a mark in the quiet layer',
+    );
+    for (let i = 0; i < qo.length; i++) {
+      assert.equal(qo[i].key, po[i].key, 'the same marks, in the same order');
+      const s = qo[i].scale / po[i].scale;
+      if (Math.abs(s - 1) > 1e-9 || qo[i].x !== po[i].x) moved++;
+      maxSwell = Math.max(maxSwell, s);
+      maxMove = Math.max(maxMove, Math.hypot(qo[i].x - po[i].x, qo[i].y - po[i].y));
+    }
+  }
+  assert.ok(moved > 0, 'the secondary read is real: marks near a colony move');
+  assert.ok(maxSwell <= 1 + CULTURE_SCALE + 1e-9, `swell stays secondary (${maxSwell})`);
+  assert.ok(maxMove <= CULTURE_FRAY * 720 * Math.SQRT2 + 1e-6, `fray stays secondary (${maxMove})`);
+  assert.deepEqual(qh, qh2, 'the same stamps give the same frames on two fresh resolvers');
+
+  // dial 0: no stamp, no change — byte-identical with a resolver that never heard of the culture
+  const z = createLiveResolver();
+  const p2 = createLiveResolver();
+  for (let f = 0; f < 30; f++)
+    assert.equal(
+      hash(
+        z.resolveLayers(
+          baseInput({ loopTimeMs: f * 100, dtSec: 0.1, dishLife: quietStamp(f * 100, { strength: 0 }) ?? undefined }),
+        ),
+      ),
+      hash(p2.resolveLayers(plainIn(f))),
+    );
+  // reduced motion (DS rule 7) damps the secondary read to nothing, like the other motion drivers
+  const rm = createLiveResolver();
+  const rp = createLiveResolver();
+  for (let f = 0; f < 60; f++)
+    assert.equal(
+      hash(rm.resolveLayers({ ...qIn(f), reducedMotion: true })),
+      hash(rp.resolveLayers({ ...plainIn(f), reducedMotion: true })),
+      'reduced motion: the quiet layer is silent',
+    );
+  rm.dispose();
+  rp.dispose();
+  // snapshot mid-cycle through JSON: the continuation is bit-identical (the field rides the snapshot)
+  const SNAPF = 77;
+  const a = createLiveResolver();
+  for (let f = 0; f < SNAPF; f++) a.resolveLayers(qIn(f));
+  const snap = JSON.parse(JSON.stringify(a.snapshotState()));
+  assert.ok(snap.dishLife && snap.dishLife.quiet, 'the quiet dial rides the snapshot');
+  assert.equal(checkResolverSnapshot(snap), true);
+  assert.equal(checkResolverSnapshot({ ...snap, dishLife: { ...snap.dishLife, quiet: { strength: 'x' } } }), false);
+  const b = createLiveResolver();
+  assert.equal(b.restoreState(snap), true);
+  for (let f = SNAPF; f < QN; f++)
+    assert.equal(hash(marksOf(b.resolveLayers(qIn(f)))), qh[f], `restored frame ${f} matches the control`);
+  assert.equal(CYCLE_GENS / QUIET_GPS, 6, 'a 6 s cycle');
+  [plain, q, q2, z, p2, a, b].forEach((r) => r.dispose());
 }
 
 console.log('liveResolve.dishLife selfcheck: ok');

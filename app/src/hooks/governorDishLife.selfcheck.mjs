@@ -1,8 +1,8 @@
 // governorDishLife.selfcheck.mjs — #1923: the DISH LIFE rung of the governor ladder (cut 1.39).
 //
-// The idle culture is the lightest sacrifice there is: it exists only while the performer's hands are off. So it is
-// the first cut after the pixel trim (edge AA and pixels cost the picture nothing; the culture costs the picture
-// nothing while someone is playing), ahead of weather, the ACCUM family, the population and the tier. It falls in two
+// The quiet culture is the lightest sacrifice there is: a secondary read, never the picture itself. So it is
+// the first cut after the pixel trim (edge AA and pixels cost the picture nothing; the quiet layer costs the picture
+// nothing either), ahead of weather, the ACCUM family, the population and the tier. It falls in two
 // balanced steps — TRICKLE (the dish slows) then HELD (it stops, still drawn) — and restores whole. Opt-in per caller
 // (dishLifeActive === true), so every older ladder walk stays exactly as it was.
 import assert from 'node:assert';

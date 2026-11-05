@@ -151,8 +151,8 @@ export const GOVERNOR_RESTORE_CUTS = [
   },
   {
     kind: 'dishLife',
-    // #1923 — cut 1.39: the idle culture sheds BEFORE weather (it is the lightest sacrifice: it only
-    // exists while the performer's hands are off), so it restores AFTER weather in the reverse walk.
+    // #1923 — cut 1.39: the quiet culture sheds BEFORE weather (it is the lightest sacrifice: a
+    // secondary read, never the picture itself), so it restores AFTER weather in the reverse walk.
     needsRestore: (s, ctx) => ctx.healthy && (s.dishLifeShed | 0) > 0,
     restoredLabel: 'culture back — the dish catches up',
   },
@@ -289,10 +289,10 @@ export function nextGovernorCut(s) {
     };
   }
 
-  // Cut 1.39 (#1923): the idle culture (DISH LIFE). The first sacrifice after the pixel trim — it exists only
-  // while the performer's hands are off, so shedding it costs nothing they are playing. Two steps, a balanced
+  // Cut 1.39 (#1923): the quiet culture (DISH LIFE). The first sacrifice after the pixel trim — it is a
+  // secondary read (marks breathing near living colonies), so shedding it costs the picture nothing. Two steps, a balanced
   // fall: TRICKLE (one generation per frame — it keeps moving, slowly), then HELD (the generation freezes; the
-  // frame still draws). Opt-in per caller (`dishLifeActive === true` = a culture is awake) so older callers and
+  // frame still draws). Opt-in per caller (`dishLifeActive === true` = the quiet layer is on) so older callers and
   // their pinned ladder walks keep the pre-#1923 ladder exactly as it was.
   if (s.dishLifeActive === true && (s.dishLifeShed | 0) < 2) {
     const dishLifeShed = (s.dishLifeShed | 0) + 1;

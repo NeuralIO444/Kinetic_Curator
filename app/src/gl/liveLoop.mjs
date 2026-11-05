@@ -44,6 +44,7 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
+import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
 import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
@@ -390,6 +391,7 @@ export function createLiveLoop(
   // touch listeners only note a pending touch — this loop consumes it per frame on the loop clock.
   const dishLifePhase = createDishLifePhase({ enabled: false });
   let dishLifeWasAwake = false;
+  let dishLifeBoost = 0; // the idle boost, eased on the loop's dt (the eased value is what gets stamped)
   const disposeDishLifeTouch = typeof window !== 'undefined' ? installDishLifeTouch(window) : () => {};
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -793,7 +795,17 @@ export function createLiveLoop(
         dishLifePhase.touch(loopTimeMs, 'audio', top);
       }
       const tk = dishLifePhase.tick(loopTimeMs, { hasMarks: !!s.running });
-      if (tk.status !== 'asleep') dishLifeStamp = { wakeMs: tk.wakeMs, gen: tk.gen, shed: s.dishLifeShed | 0 };
+      // #1923 (rebalanced): DISH LIFE is a SECONDARY read — a quiet layer the marks' Kineme culture source reads,
+      // never a takeover. It runs all the time at the dial's strength; hands off long enough (the idle clock) and
+      // it breathes a little more, eased — a touch eases it back down but never ends it.
+      const toward = tk.status !== 'asleep' ? 1 : 0;
+      const tau = toward > dishLifeBoost ? 2.5 : 0.6;
+      dishLifeBoost += (toward - dishLifeBoost) * (1 - Math.exp(-Math.max(0, dtSec) / tau));
+      dishLifeStamp = quietStamp(loopTimeMs, {
+        strength: Number.isFinite(s.dishLifeStrength) ? s.dishLifeStrength : DEFAULT_STRENGTH,
+        boost: dishLifeBoost,
+        shed: s.dishLifeShed | 0,
+      });
     } else {
       clearTouch();
     }
