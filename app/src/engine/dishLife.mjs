@@ -33,6 +33,16 @@ import { hashU01 } from './kernel/rng.js';
 /** Default Generations rule: Conway birth/survival with a 6-state life (alive + 4 decay + dead). */
 export const DEFAULT_RULE = Object.freeze({ birth: [3], survive: [2, 3], states: 6 });
 
+/**
+ * The rule the idle pickup runs (#1923 slice 2 spike). Raw Conway (DEFAULT_RULE) fails on real
+ * compositions: from a 30%-dense scene it collapses to scattered still-lifes by ~generation 12
+ * and 83% of runs die or freeze inside 30 generations. B3/S234 keeps the colonies growing out
+ * of the scene's own shape (every one of 138 preset runs stays alive and moving past 100
+ * generations) with 8 states for long decay tails. It matures into a maze that fills the dish
+ * (~generation 60-100), so the harvest must fire inside that arc.
+ */
+export const CULTURE_RULE = Object.freeze({ birth: [3], survive: [2, 3, 4], states: 8 });
+
 /** Per-step easing of the activity field (higher = longer memory of change). */
 export const ACTIVITY_KEEP = 0.7;
 
