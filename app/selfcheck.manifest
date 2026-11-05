@@ -36,6 +36,7 @@ node src/panels/pipeline/pipelineNotices.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/governorCreatureShed.selfcheck.mjs
+node src/hooks/governorDishLife.selfcheck.mjs
 node src/hooks/governorHostileScene.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
 node src/hooks/usePhraseLoop.selfcheck.mjs

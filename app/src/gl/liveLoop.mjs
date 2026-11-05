@@ -389,6 +389,7 @@ export function createLiveLoop(
   // #1923 DISH LIFE: the idle clock. Off unless the flag is set (state.dishLife or window.__KC_DISH_LIFE); the
   // touch listeners only note a pending touch — this loop consumes it per frame on the loop clock.
   const dishLifePhase = createDishLifePhase({ enabled: false });
+  let dishLifeWasAwake = false;
   const disposeDishLifeTouch = typeof window !== 'undefined' ? installDishLifeTouch(window) : () => {};
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -795,6 +796,10 @@ export function createLiveLoop(
       if (tk.status !== 'asleep') dishLifeStamp = { wakeMs: tk.wakeMs, gen: tk.gen, shed: s.dishLifeShed | 0 };
     } else {
       clearTouch();
+    }
+    if ((dishLifeStamp !== null) !== dishLifeWasAwake) {
+      dishLifeWasAwake = dishLifeStamp !== null;
+      s.setDishLifeAwake?.(dishLifeWasAwake); // the governor's sensor — published on transitions only
     }
     const resolved = resolver.resolveLayers({
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),

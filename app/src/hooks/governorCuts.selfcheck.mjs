@@ -107,10 +107,13 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // (cut 1.48): ember steering sheds with its ACCUM family, ahead of the
   // population it steers (the full walk is pinned in
   // emberDrive.selfcheck).
+  // #1923 — 'dishLife' joins between renderScale and markWeather (cut 1.39): the idle culture is the first
+  // sacrifice after the pixel trim (the full walk is pinned in governorDishLife.selfcheck).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
   assert.deepStrictEqual(order, [
     'fxaa',
     'renderScale',
+    'dishLife',
     'markWeather',
     'feedbackWarp',
     'accumFeed',
