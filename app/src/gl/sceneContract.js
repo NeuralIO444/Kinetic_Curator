@@ -662,6 +662,12 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
           doc.beastRoam === false || globalThis.__KC_BEAST_ROAM_OFF === true
             ? false
             : doc.beastRoam || globalThis.__KC_BEAST_ROAM || null,
+        // #1868 S5b — the feet's fading trace: `beastTrace: false` (or window.__KC_BEAST_TRACE_OFF = true) leaves none; an object
+        // overrides the ruled tuning (count, fade, alpha, ramp, size); window.__KC_BEAST_TRACE tunes the live app
+        beastTrace:
+          doc.beastTrace === false || globalThis.__KC_BEAST_TRACE_OFF === true
+            ? false
+            : doc.beastTrace || globalThis.__KC_BEAST_TRACE || null,
       });
       if (expanded !== instances) {
         instances.length = 0;

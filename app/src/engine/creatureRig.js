@@ -30,6 +30,7 @@ import {
   BEAM_ID,
 } from './beastRig.js';
 import { roamAt, sanitizeRoam } from './beastRoam.js'; // #1867 — the travelling home
+import { traceMarks } from './beastTrace.js'; // #1868 S5b — the dish writing
 import { libraryTraits } from '../data/assetDescriptor.js'; // the baked traits of the library
 
 /** Where the body sits inside the tile's 100-unit box: small enough that the bones have room to reach. */
@@ -411,18 +412,13 @@ export function dealBodyPart(pile, seed, tileId, fitOf = null) {
  * once (a bar is dealt as a depth-0 limb of its own hand) and every leg wears the same set; the beam takes a body-fit
  * deal and stands in for the tile's own mark (the beast IS the linkage, so `it` is not pushed). A stillbirth → [].
  */
-function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt }) {
+function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt, trace }) {
   const linkage = { ...rig.linkage, phase: rig.linkage.phase + phase };
   // #1867 — the travelling home: the body advances by its own stance stroke and steers by differential crank phase
   // (engine/beastRoam.js). A frozen frame is home at rest; `roamOpt === false` is the A/B switch (S3b's walk in place).
   const params = sanitizeRoam(roamOpt);
-  const roam =
-    roamOpt === false
-      ? null
-      : roamAt(
-          { seedKey: `${seed >>> 0}|${hand}|${it.key}`, stride: strideTileUnits(rig.linkage.measures), params },
-          frozen ? 0 : t,
-        );
+  const spec = { seedKey: `${seed >>> 0}|${hand}|${it.key}`, stride: strideTileUnits(rig.linkage.measures), params };
+  const roam = roamOpt === false ? null : roamAt(spec, frozen ? 0 : t);
   const crank = roam ? { a: roam.phaseA, b: roam.phaseB } : null;
   let pose = poseLinkage(linkage, frozen ? 0 : t, 1, crank);
   if (!pose) return [];
@@ -456,7 +452,32 @@ function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, 
     .filter((p) => p.role === 'limb')
     .map((p) => placePart(it, p, dealt.get(p.name), glow, co, si, flip));
   const beam = placePart(it, pose[0], dealt.get(BEAM_ID), glow, co, si, flip);
-  return [...legs, beam]; // legs behind, the body beam over them
+  // #1868 S5b — the feet's signed trace, set down behind everything: a fading ovoid per crank turn. A frozen frame, a
+  // beast walking in place, and `trace === false` (the A/B switch) leave none.
+  const trail =
+    roam && !frozen && trace !== false
+      ? traceMarks(rig.linkage.measures, spec, t, trace).map((m, i) => placeMark(it, m, i, glow, co, si, flip))
+      : [];
+  return [...trail, ...legs, beam]; // the trace behind, the legs, the body beam over them
+}
+
+/** One trace mark as an instance: an ellipse of the signature's extent, its long axis along the beast's heading. */
+function placeMark(it, m, i, glow, co, si, flip) {
+  const lx = (m.x - 50) * it.scaleX;
+  const ly = (m.y - 50) * it.scaleY;
+  const sx = Math.abs(it.scaleX) * (Math.max(m.w, 2) / 80);
+  const sy = it.scaleY * (Math.max(m.h, 2) / 80);
+  return {
+    ...it,
+    asset: BEAST_TRACE_MARK,
+    opacity: r3(it.opacity * glow * m.alpha),
+    key: `${it.key}#trace${i}`,
+    x: r3(it.x + lx * co - ly * si),
+    y: r3(it.y + lx * si + ly * co),
+    scaleX: r3(sx * flip),
+    scaleY: r3(sy),
+    rotation: r3(it.rotation + flip * ((m.heading * 180) / Math.PI)),
+  };
 }
 
 /**
@@ -478,6 +499,8 @@ function expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, 
  *   face = Lois's live face (her gait), davis = Davis's live state (how varied his deal is) — #1949
  * @returns {Array} the original array when nothing expands, else a new one
  */
+/** The library solid a beast's trace marks are drawn with (a plain ellipse when stretched). */
+export const BEAST_TRACE_MARK = 'geo_circle_01';
 /** The library stroke a beast wears when no other shape is on the stage. */
 export const BEAST_BARE_BAR = 'line_solid_01';
 
@@ -494,6 +517,7 @@ export function expandCreatureInstances(
     fitOf = null,
     pileOnly = null,
     beastRoam = null,
+    beastTrace = null,
   } = {},
 ) {
   if (!overlayById || collapsed) return instances;
@@ -541,7 +565,18 @@ export function expandCreatureInstances(
     const glow = frozen ? 1 : kinShimmer(family, t);
     if (rig.linkage) {
       out.push(
-        ...expandBeast(it, rig, pile, { seed, t, frozen, variety, roleDeal, hand, glow, phase, roamOpt: beastRoam }),
+        ...expandBeast(it, rig, pile, {
+          seed,
+          t,
+          frozen,
+          variety,
+          roleDeal,
+          hand,
+          glow,
+          phase,
+          roamOpt: beastRoam,
+          trace: beastTrace,
+        }),
       );
       continue;
     }
