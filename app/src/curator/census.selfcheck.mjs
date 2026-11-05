@@ -45,6 +45,7 @@ const {
   CAST,
   CAST_IDS,
 } = await import('./censusReport.mjs');
+const { RESVG_FONT } = await import('../assets/resvgFont.mjs'); // #1970 — the bake raster's pinned font (#1950)
 const { PARAM_SPEC, RANGE_SPEC, DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } =
   await import('../data/layout-modes.js');
 const { ASSETS } = await import('../data/assets/index.js');
@@ -303,12 +304,14 @@ const jello = jelloMetric();
   );
 
   // The fast raster is honest: on a fixed sample of path art it agrees
-  // with the bake's own default raster to the pixel.
+  // with the bake's own raster to the pixel. The bake raster is the
+  // pinned-font construction (#1950) — NOT resvg's defaults, which
+  // would make the comparison depend on the machine's fonts (#1970).
   for (const id of ['org_blob_01', 'geo_tri_01', 'rad_rings_01', 'xsh01', 'dot_field_01', 'line_squiggle_01']) {
     const a = byId.get(id);
     assert.strictEqual(
       assetInk(a.svg).ink,
-      assetInk(a.svg, {}).ink,
+      assetInk(a.svg, { font: RESVG_FONT }).ink,
       `${id}: fast raster disagrees with the bake raster`,
     );
   }

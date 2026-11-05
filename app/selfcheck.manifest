@@ -353,6 +353,7 @@ node src/engine/beastDraw.selfcheck.mjs
 node src/engine/beastRig.selfcheck.mjs
 node src/engine/beastRoam.selfcheck.mjs
 node src/engine/beastTrace.selfcheck.mjs
+node src/platform/saveTake.selfcheck.mjs
 node src/engine/beastTile.selfcheck.mjs
 node src/panels/beastReadout.selfcheck.mjs
 node src/engine/jansenSolver.selfcheck.mjs

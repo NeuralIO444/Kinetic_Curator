@@ -2,6 +2,7 @@
 // Two states, one button: `rec` starts a take; while recording it reads `● stop ↓` and a click ends the take and
 // downloads the .kcperf file. The file replays to the same frames (performanceFile.selfcheck); `▶ take` plays one back
 // through the instrument (#1461). The frame count in the tooltip is a measurement, read from the recorder.
+import { saveTake } from '../platform/saveTake.mjs';
 import { useEffect, useRef, useState } from 'react';
 import {
   isRecordingPerformance,
@@ -159,17 +160,7 @@ const mindSection = (getFrame) => {
   };
 };
 
-function downloadBytes(bytes, filename) {
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/gzip' }));
-  a.download = filename;
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
-}
-
+// #1938 — saving a take is platform-specific (the desktop webview swallows the browser's <a download>): platform/saveTake.mjs
 export function PerformanceButton() {
   const { glLoopRef } = useApp();
   // #1802 — the gestures section factory also needs the loop ref; it is bound here so the
@@ -187,14 +178,14 @@ export function PerformanceButton() {
   // last minutes, so a moment can be saved after it happens. A deliberate take suspends it
   // (performanceCapture restarts it on the take's fresh scene).
   const [retroNote, setRetroNote] = useState('');
+  const [saveNote, setSaveNote] = useState(''); // #1938 — where the take went (desktop), or why it could not be saved
   useEffect(() => {
     startRetroCapture();
   }, []);
   const onRetro = async () => {
     const take = await saveRetroPerformance(3);
     if (take) {
-      downloadBytes(take.bytes, take.filename);
-      setRetroNote('');
+      setRetroNote(await saveTake(take.bytes, take.filename));
     } else setRetroNote('Nothing to save yet: give the ring a few seconds of playing first.');
   };
   const onFile = async (e) => {
@@ -238,7 +229,7 @@ export function PerformanceButton() {
     }
     setRecording(false);
     const take = await stopPerformance();
-    if (take) downloadBytes(take.bytes, take.filename);
+    if (take) setSaveNote(await saveTake(take.bytes, take.filename));
   };
 
   return (
@@ -253,7 +244,7 @@ export function PerformanceButton() {
             ? 'Playing a take: stop playback to record.'
             : recording
               ? `Recording a performance: ${frames} frames. Click to stop and download it.`
-              : 'Record a performance: your session as a small file that replays to the same frames.'
+              : saveNote || 'Record a performance: your session as a small file that replays to the same frames.'
         }
         onClick={onClick}
       >

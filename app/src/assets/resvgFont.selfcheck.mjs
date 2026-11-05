@@ -4,7 +4,8 @@
 //
 //   font       the bundled file is present and renders the text stamps' glyphs (ink, not blank)
 //   isolation  the pinned raster ignores the machine's fonts: the same pixels with or without a decoy font offered
-//   wired      the bake, the GL atlas and its region partition construct resvg with the pinned font (source guard)
+//   wired      the bake, the GL atlas and its region partition construct resvg with the pinned font (source guard);
+//              the census confirmation raster too (#1970 — the one consumer #1950 missed)
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
@@ -52,5 +53,29 @@ assert.equal(
   (atlas.match(/\{ font: RESVG_FONT \}/g) || []).length,
   'the atlas',
 );
+// #1970 — the census is wired too: its confirmation raster is the bake
+// raster (RASTER_OPTS_BAKE), never resvg's defaults. The census with {}
+// defaults was the one Node asset raster #1950 missed, and it turned
+// main red when the CI runner's system fonts changed.
+const censusReport = src('../curator/censusReport.mjs');
+assert.match(
+  censusReport,
+  /RASTER_OPTS_BAKE = \{ font: RESVG_FONT \}/,
+  'the census confirmation raster is the pinned font',
+);
+assert.match(
+  censusReport,
+  /assetInk\(a\.svg, RASTER_OPTS_BAKE\)/,
+  'the census confirms blank assets with the bake raster',
+);
+assert.ok(!/assetInk\([^,]+, \{\}\)/.test(censusReport), 'the census never rasterizes with resvg defaults');
+const censusSuite = src('../curator/census.selfcheck.mjs');
+assert.ok(!/assetInk\([^,]+, \{\}\)/.test(censusSuite), 'the census suite never rasterizes with resvg defaults');
 console.log('  [ok] wired: the bake and the GL atlas raster with the pinned font');
-console.log('resvgFont.selfcheck: 3 checks passed');
+// #1970 — the miner's "with fonts" ink figure is the pinned font too (the second consumer behind the census: its stamp
+// assertion failed on the CI runner once the census stopped failing first)
+const miner = src('../curator/miner.mjs');
+assert.match(miner, /font: fonts \? RESVG_FONT :/, 'the miner rasterizes its with-fonts figure with the pinned font');
+assert.ok(!/\.\.\.\(fonts \? \{\} :/.test(miner), 'the miner never rasterizes with resvg defaults');
+console.log('  [ok] wired: the census confirmation raster is the pinned font, never resvg defaults (#1970)');
+console.log('resvgFont.selfcheck: 6 checks passed');
