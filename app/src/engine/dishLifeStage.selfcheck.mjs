@@ -289,4 +289,60 @@ const stamp = (gen, wakeMs = 5000, shed = 0) => ({ wakeMs, gen, shed });
   z.restore({ marks: [] });
   assert.equal(z.active, false, 'junk snapshots restore nothing');
 }
+
+// ---- Q: the QUIET (secondary-read) mode — the culture is only a field; no layer is touched
+{
+  const quiet = (gen, wakeMs = 5000, strength = 0.5) => ({
+    mode: 'quiet',
+    wakeMs,
+    gen,
+    cycleGens: 48,
+    shed: 0,
+    strength,
+  });
+  const stage = createDishLifeStage();
+  const ls = layers();
+  const before = ls.map((l) => l.items);
+  assert.equal(stage.field(), null, 'nothing yet: no field');
+  assert.equal(stage.apply(quiet(0), ls, W, H), true, 'a quiet frame is applied');
+  ls.forEach((l, i) =>
+    assert.equal(l.items, before[i], 'quiet: the very same item arrays — nothing replaced or drawn'),
+  );
+  assert.equal(stage.generation, 0);
+  assert.equal(stage.field().strength, 0, 'the envelope is 0 at the seed: the layer breathes in');
+  for (let g = 1; g <= 24; g++) stage.apply(quiet(g), ls, W, H);
+  const f = stage.field();
+  assert.ok(f && Math.abs(f.strength - 0.5) < 1e-9, 'mid-cycle the field reads the dial at full envelope');
+  assert.equal(f.gen, 24);
+  const out = { level: 0, activity: 0 };
+  let live = 0;
+  for (let y = 0; y < H; y += 20) for (let x = 0; x < W; x += 20) if (f.sample(x, y, out) && out.level > 0) live++;
+  assert.ok(live > 0, 'the field has living cells over the scene');
+  stage.apply(quiet(25, 5000, 0.9), ls, W, H);
+  assert.ok(
+    Math.abs(stage.field().strength - 0.9 * Math.sin((Math.PI * 25) / 48)) < 1e-9,
+    'the dial is live frame to frame',
+  );
+  // a new cycle re-seeds from what the scene is now
+  const g1 = stage.generation;
+  stage.apply(quiet(0, 11000), ls, W, H);
+  assert.equal(stage.generation, 0, 'a new cycle starts again');
+  assert.ok(g1 > 0);
+  // snapshot keeps the dial: a take that begins mid-cycle reads the field on its first frame
+  for (let g = 1; g <= 10; g++) stage.apply(quiet(g, 11000), ls, W, H);
+  const snap = JSON.parse(JSON.stringify(stage.snapshot()));
+  assert.deepEqual(snap.quiet, { strength: 0.5, cycleGens: 48 });
+  const r = createDishLifeStage();
+  r.restore(snap);
+  assert.ok(
+    Math.abs(r.field().strength - stage.field().strength) < 1e-9,
+    'restored field matches before any new stamp',
+  );
+  // no stamp: the field is gone; a non-quiet stamp has no field
+  stage.apply(undefined, ls, W, H);
+  assert.equal(stage.field(), null);
+  const t = createDishLifeStage();
+  t.apply(stamp(3), layers(), W, H);
+  assert.equal(t.field(), null, 'the takeover mode publishes no quiet field');
+}
 console.log('dishLifeStage.selfcheck: ok');

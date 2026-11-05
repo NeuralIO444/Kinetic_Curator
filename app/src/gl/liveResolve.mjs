@@ -165,7 +165,18 @@ export function nodePhase(base, it) {
  * #1198 — the rhythm layer: ORGANIC/CADENCE select a placement-layer modulation (Perlin/sine over spacing, scale,
  * rotation) that switches on even when every motion amount is 0 — the pattern is the gate, not the amounts.
  */
-function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive, assetStill, reducedMotion) {
+function livingMotion(
+  layoutParams,
+  seed,
+  driverSec,
+  W,
+  H,
+  slowRender,
+  beatDrive,
+  assetStill,
+  reducedMotion,
+  culture = null,
+) {
   if (slowRender) return null;
   const amounts = patternAmounts(
     { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
@@ -183,8 +194,11 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
   amounts.brushWobble = layoutParams.kinemeBrushWobble;
   const rhythmType = rhythmTypeForPattern(layoutParams.kinemePattern);
   const rhythm = rhythmType ? { type: rhythmType } : null;
+  // #1923 — the quiet culture is one more motion source on this system (a secondary read; engine/kineme.js)
+  const cultureSrc = culture && !reducedMotion && culture.strength > 0 ? culture : null;
   if (
     !rhythm &&
+    !cultureSrc &&
     !(amounts.breath > 0) &&
     !(amounts.drift > 0) &&
     !(amounts.pulse > 0) &&
@@ -203,6 +217,7 @@ function livingMotion(layoutParams, seed, driverSec, W, H, slowRender, beatDrive
     shedTier: 0,
     anchored: true,
     rhythm,
+    ...(cultureSrc ? { culture: cultureSrc } : {}),
     ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}),
   };
 }
@@ -635,6 +650,8 @@ export function createLiveResolver() {
       );
     }
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
+    // #1923 — the quiet culture's field, read ONE-WAY by the marks' kineme (the last applied frame's; null = none)
+    const cultureField = dishLife.field();
     // #1574 — this frame's travel delta on the spine-A clock, measured once
     // for every layer (high-water: a rolled-back frame credits nothing).
     // slowRender frames advance the mark without travelling, so a freeze
@@ -923,6 +940,7 @@ export function createLiveResolver() {
           input.beatDrive,
           input.assetStill,
           input.reducedMotion,
+          cultureField,
         );
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;
@@ -1695,6 +1713,8 @@ export function checkResolverSnapshot(snap) {
     const d = snap.dishLife;
     if (!d || typeof d !== 'object' || !Array.isArray(d.marks) || !Number.isFinite(d.wakeMs)) return false;
     if (!Number.isFinite(d.W) || !Number.isFinite(d.H) || !Number.isInteger(d.gen) || d.gen < 0) return false;
+    if (d.quiet !== undefined && (!d.quiet || typeof d.quiet !== 'object' || !Number.isFinite(d.quiet.strength)))
+      return false;
   }
   return true;
 }

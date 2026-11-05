@@ -21,6 +21,7 @@
 import { createCulture, stepCulture, setBedrock, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
 import { nearestMarks, cultureFrame } from './dishLifeRender.mjs';
+import { cultureSampler } from './dishLifeQuiet.mjs';
 
 /** Culture grid resolution (the spike's grid). */
 export const STAGE_COLS = 96;
@@ -88,6 +89,8 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     } else {
       setBedrock(st.culture, bedrock);
     }
+    const quiet = dl.mode === 'quiet';
+    st.quiet = quiet ? { strength: Number(dl.strength) || 0, cycleGens: Number(dl.cycleGens) || undefined } : null;
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
     if (target < st.culture.gen) {
       // a replay seeking back: rebuild from the frozen seed, so generation g is always the same culture
@@ -95,6 +98,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
+    if (quiet) return true; // the secondary read: the culture is only a field (field()); no layer is touched
     if (st.frameGen !== st.culture.gen) {
       st.frame = cultureFrame(st.marks, st.culture, st.nearest, geom(W, H));
       st.frameGen = st.culture.gen;
@@ -112,6 +116,14 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     reset() {
       st = null;
     },
+    /**
+     * #1923 — the quiet culture's read-only sampler for the marks (the Kineme culture source), or null when no quiet
+     * culture is running. It is the FIELD of the last applied frame: the marks read it one frame behind, which is
+     * deterministic (the stamp stream decides it) and invisible (the culture moves at generation speed).
+     */
+    field() {
+      return st && st.quiet ? cultureSampler(st.culture, { canvasW: st.W, canvasH: st.H, ...st.quiet }) : null;
+    },
     get generation() {
       return st ? st.culture.gen : -1;
     },
@@ -121,7 +133,14 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     /** JSON-safe snapshot for a take that begins mid-culture (the #1367 surface). null when nothing is running. */
     snapshot() {
       return st
-        ? { wakeMs: st.wakeMs, W: st.W, H: st.H, marks: st.marks.map((m) => ({ ...m })), gen: st.culture.gen }
+        ? {
+            wakeMs: st.wakeMs,
+            W: st.W,
+            H: st.H,
+            marks: st.marks.map((m) => ({ ...m })),
+            gen: st.culture.gen,
+            ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
+          }
         : null;
     },
     /** Restore a snapshot(): rebuild from the frozen seed and step to the recorded generation. */
@@ -136,6 +155,9 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         null,
       );
       for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
+      if (snap.quiet && typeof snap.quiet === 'object') {
+        st.quiet = { strength: Number(snap.quiet.strength) || 0, cycleGens: Number(snap.quiet.cycleGens) || undefined };
+      }
     },
   };
 }
