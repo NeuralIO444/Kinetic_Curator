@@ -74,6 +74,7 @@ import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: 
 import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
 import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnState.js'; // #1694 slice 1: the spawn channel, resolver-owned
 import { CREATURE_ASSET_ID, mothsAllowed, dishAllowed } from '../curator/creatureCitizen.js'; // #1694 slice 2: the pool citizen's reads
+import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 
 const HOP_MAX_PX = 4;
 
@@ -299,6 +300,9 @@ export function createLiveResolver() {
   const swarmState = new Map();
   const feedLive = createFeedLive(CANVAS_W, CANVAS_H);
   const dish = createResolverDish(); // #1183: one dish per document
+  // #1923 DISH LIFE — the idle-pickup culture. A pure function of the recorded input stamp `input.dishLife`; holds no
+  // state while the stamp is absent, so a build without a stamp is byte-identical to one without this stage.
+  const dishLife = createDishLifeStage();
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -1327,6 +1331,11 @@ export function createLiveResolver() {
       e.items = shown;
     }
 
+    // #1923 DISH LIFE — after the morph blend, so a chip click never fights the culture: while the loop stamps
+    // input.dishLife, the visible layers' marks are the culture (the scene dissolved into it, drawn on the top
+    // layer; held terrain stays put). Display only: the feeds, scent and dish above read the scene as it was dealt.
+    // No stamp = the stage drops its state and touches nothing.
+    dishLife.apply(input.dishLife, out, W, H);
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from
@@ -1445,6 +1454,7 @@ export function createLiveResolver() {
     feedLive.reset();
     worldNoise = null;
     worldNoiseSeed = null;
+    dishLife.reset();
   }
 
   // ── #1367 — mid-session state snapshot ─────────────────────────────────────
@@ -1466,6 +1476,7 @@ export function createLiveResolver() {
     for (const [layerId, v] of lastShown) lastShownSnap[layerId] = { sig: v.sig, items: deepCopyData(v.items) };
     const morphSnap = {};
     for (const [layerId, v] of morphState) morphSnap[layerId] = snapshotMorphEntry(v);
+    const dishLifeSnap = dishLife.snapshot();
     return {
       v: 1,
       W,
@@ -1487,6 +1498,7 @@ export function createLiveResolver() {
       densityTickSeen,
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
+      ...(dishLifeSnap ? { dishLife: dishLifeSnap } : {}), // #1923 — OPTIONAL key: present only while a culture runs, so every other snapshot is exactly what it was
       spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
       // travel kinemes (#1574/#1575) — the roam is accumulative state: each mark's offset + velocity, each scene's
       // step bank, and the clock's last frame. OPTIONAL key: a pre-travel snapshot restores with every mark home.
@@ -1561,6 +1573,7 @@ export function createLiveResolver() {
     // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
     if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn);
     else spawnState.reset();
+    dishLife.restore(snap.dishLife); // #1923 — absent (every pre-DISH-LIFE snapshot) = no culture, as a fresh resolver's
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
     if (snap.travel !== undefined) {
       restoreTravelStore(travelStore, snap.travel.store);
@@ -1677,5 +1690,11 @@ export function checkResolverSnapshot(snap) {
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn)))
     return false;
   if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
+  // #1923 — the culture's frozen seed is optional; when present it must carry its marks, canvas and generation
+  if (snap.dishLife !== undefined) {
+    const d = snap.dishLife;
+    if (!d || typeof d !== 'object' || !Array.isArray(d.marks) || !Number.isFinite(d.wakeMs)) return false;
+    if (!Number.isFinite(d.W) || !Number.isFinite(d.H) || !Number.isInteger(d.gen) || d.gen < 0) return false;
+  }
   return true;
 }
