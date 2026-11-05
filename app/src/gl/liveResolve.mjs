@@ -1362,7 +1362,7 @@ export function createLiveResolver() {
     // input.dishLife, the visible layers' marks are the culture (the scene dissolved into it, drawn on the top
     // layer; held terrain stays put). Display only: the feeds, scent and dish above read the scene as it was dealt.
     // No stamp = the stage drops its state and touches nothing.
-    dishLife.apply(input.dishLife, out, W, H);
+    dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from

@@ -202,14 +202,22 @@ let stampedRun;
   let moved = 0;
   let maxSwell = 1;
   let maxMove = 0;
+  let specksSeen = 0;
+  const isSpeckKey = (m) => String(m.key).startsWith('speck:');
   const qh = [];
   const qh2 = [];
   for (let f = 0; f < QN; f++) {
     const po = marksOf(plain.resolveLayers(plainIn(f)));
-    const qo = marksOf(q.resolveLayers(qIn(f)));
-    qh.push(hash(qo));
+    const qAll = marksOf(q.resolveLayers(qIn(f)));
+    const qo = qAll.filter((m) => !isSpeckKey(m)); // the tertiary specks are added on top; the marks are what they were
+    specksSeen += qAll.length - qo.length;
+    assert.ok(
+      qAll.filter(isSpeckKey).every((m) => m.alpha > 0 && m.alpha < 25),
+      'specks are faint',
+    );
+    qh.push(hash(qAll)); // specks included: the whole frame is deterministic
     qh2.push(hash(marksOf(q2.resolveLayers(qIn(f)))));
-    assert.equal(qo.length, po.length, 'nothing is added, dissolved or removed');
+    assert.equal(qo.length, po.length, 'no mark is dissolved or removed');
     assert.ok(
       qo.every((m) => !String(m.key).startsWith('life:')),
       'no cell is drawn as a mark in the quiet layer',
@@ -223,9 +231,19 @@ let stampedRun;
     }
   }
   assert.ok(moved > 0, 'the secondary read is real: marks near a colony move');
+  assert.ok(specksSeen > 0, 'the tertiary read is real: specks show in the gaps over the run');
   assert.ok(maxSwell <= 1 + CULTURE_SCALE + 1e-9, `swell stays secondary (${maxSwell})`);
   assert.ok(maxMove <= CULTURE_FRAY * 720 * Math.SQRT2 + 1e-6, `fray stays secondary (${maxMove})`);
   assert.deepEqual(qh, qh2, 'the same stamps give the same frames on two fresh resolvers');
+
+  // reduced motion: the specks hold still (none drawn), exactly like the marks' culture source
+  {
+    const rm = createLiveResolver();
+    for (let f = 0; f < QN; f++) {
+      const o = marksOf(rm.resolveLayers({ ...qIn(f), reducedMotion: true }));
+      assert.ok(!o.some(isSpeckKey), 'reduced motion: no specks');
+    }
+  }
 
   // dial 0: no stamp, no change — byte-identical with a resolver that never heard of the culture
   const z = createLiveResolver();

@@ -7,7 +7,7 @@
 //   E terrain   held/locked marks are never seeded or consumed, stay on their own layer exactly as dealt, colonies grow around them
 //   F snapshot  a take can begin mid-culture: restore() continues bit-identically
 import assert from 'node:assert/strict';
-import { createDishLifeStage, isTerrain, SHED_STEPS } from './dishLifeStage.mjs';
+import { createDishLifeStage, isTerrain, isSpeck, SHED_STEPS } from './dishLifeStage.mjs';
 
 const W = 1000;
 const H = 500;
@@ -344,5 +344,57 @@ const stamp = (gen, wakeMs = 5000, shed = 0) => ({ wakeMs, gen, shed });
   const t = createDishLifeStage();
   t.apply(stamp(3), layers(), W, H);
   assert.equal(t.field(), null, 'the takeover mode publishes no quiet field');
+}
+
+// ---- R: the tertiary specks ride the top layer in quiet mode — added, never replacing a mark, never stacking
+{
+  const quiet = (gen, strength = 0.8) => ({ mode: 'quiet', wakeMs: 5000, gen, cycleGens: 48, shed: 0, strength });
+  const stage = createDishLifeStage();
+  const small = () => scene().map((m) => ({ ...m, scale: 2, scaleY: 2 })); // gaps open up between small marks
+  const layersS = () => [
+    { id: 'L1', layoutParams: {}, items: small() },
+    { id: 'L2', layoutParams: {}, items: [] },
+  ];
+  // run to mid-cycle on freshly dealt layers each frame, as the resolver does
+  let last = null;
+  for (let g = 0; g <= 24; g++) {
+    last = layersS();
+    stage.apply(quiet(g), last, W, H);
+  }
+  const top = last[last.length - 1];
+  const specks = top.items.filter(isSpeck);
+  assert.ok(specks.length > 0, 'mid-cycle: specks appear in the gaps');
+  assert.equal(
+    last[0].items.length + top.items.filter((it) => !isSpeck(it)).length,
+    small().length,
+    'every dealt mark is still there on its own layer; specks are only added',
+  );
+  for (let i = 0; i < last.length - 1; i++)
+    assert.equal(last[i].items.filter(isSpeck).length, 0, 'only the top layer carries them');
+  assert.ok(
+    specks.every((s) => s.alpha > 0 && s.alpha < 25),
+    'faint',
+  );
+  // the same layers applied twice never stack a previous frame's specks
+  const again = layersS();
+  stage.apply(quiet(24), again, W, H);
+  const once = again[again.length - 1].items.length;
+  stage.apply(quiet(24), again, W, H);
+  assert.equal(again[again.length - 1].items.length, once, 'no stacking across frames');
+  // reduced motion / specks off: the layers are exactly the dealt ones
+  const off = layersS();
+  const beforeOff = off.map((l) => l.items);
+  stage.apply(quiet(24), off, W, H, { specks: false });
+  off.forEach((l, i) => assert.equal(l.items, beforeOff[i], 'specks:false touches nothing'));
+  // strength 0 → no specks even if stamped
+  const zero = layersS();
+  stage.apply(quiet(24, 0), zero, W, H);
+  assert.equal(zero[zero.length - 1].items.filter(isSpeck).length, 0, 'strength 0 is silence');
+  // a speck is never a seed: the next wake's marks exclude specks
+  const wake = layersS();
+  wake[wake.length - 1].items.push({ ...scene()[0], key: 'speck:1', x: 5, y: 5 });
+  const fresh = createDishLifeStage();
+  fresh.apply({ mode: 'quiet', wakeMs: 1, gen: 0, cycleGens: 48, shed: 0, strength: 0.5 }, wake, W, H);
+  assert.equal(fresh.snapshot().marks.length, small().length, 'specks are not marks');
 }
 console.log('dishLifeStage.selfcheck: ok');
