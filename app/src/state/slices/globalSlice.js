@@ -585,6 +585,10 @@ export const createGlobalSlice = (set) => ({
   /** #1923 — the governor's culture shed: 0 catch up, 1 trickle, 2 hold (the stage's SHED_STEPS). A render-only
    * overlay in the creatureShed class — never serialized; stamped on the resolver input with the wake. */
   dishLifeShed: 0,
+  /** #1923 — a culture is awake right now. The live loop publishes the transitions; it is the governor's sensor for
+   * its rung, so the ladder never spends a cut on a dish that is asleep. Runtime only, never serialized. */
+  dishLifeAwake: false,
+  setDishLifeAwake: (on) => set({ dishLifeAwake: !!on }),
   /** #1923 — the ONE dial for the secondary read (0 off .. 1 full; full is still a quiet layer). Runtime only for now. */
   dishLifeStrength: 0.35,
   setDishLifeStrength: (v) =>

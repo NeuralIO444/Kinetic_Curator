@@ -4,6 +4,7 @@ import { useApp } from '../state/AppContext.jsx';
 import { TapeCounter } from './TapeCounter.jsx';
 import { TallyLight } from './TallyLight.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
+import { DishLifeChip } from './DishLifeChip.jsx';
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -276,6 +277,8 @@ export function MasterBar() {
             ↷{history.redoDepth > 0 ? ` ${history.redoDepth}` : ''}
           </button>
         </div>
+
+        <DishLifeChip />
       </div>
       <TakeStrip />
       <div className="master-right">

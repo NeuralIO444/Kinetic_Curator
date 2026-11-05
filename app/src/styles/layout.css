@@ -1021,6 +1021,39 @@
   cursor: default;
 }
 
+/* DISH LIFE chip (#1923): a glider that lights while the quiet Game of Life layer runs. */
+.dish-life {
+  margin-left: 6px;
+}
+.dish-life-chip.disabled {
+  opacity: 0.45; /* off still reads as a control, not a disabled one */
+}
+.dish-life-chip[data-dish-life="arming"] {
+  opacity: 0.7;
+}
+.dish-life-chip:not(.disabled) {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+.dish-life-chip[data-dish-life="slowed"] {
+  opacity: 0.75;
+}
+.dish-life-chip[data-dish-life="held"] {
+  opacity: 0.55;
+}
+.dish-life-glyph {
+  display: block;
+}
+.dish-life {
+  flex: none;
+}
+.dish-life .dish-life-dial {
+  flex: 0 0 72px;
+  width: 72px;
+  min-width: 0;
+  margin-left: 4px;
+}
+
 @media (max-width: 1023px) {
   .app {
     height: auto;

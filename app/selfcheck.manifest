@@ -36,6 +36,7 @@ node src/panels/pipeline/pipelineNotices.selfcheck.mjs
 node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/governorCreatureShed.selfcheck.mjs
+node src/hooks/governorDishLife.selfcheck.mjs
 node src/hooks/governorHostileScene.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
 node src/hooks/usePhraseLoop.selfcheck.mjs
@@ -149,6 +150,7 @@ node src/styles/radii.selfcheck.mjs
 node src/styles/selects.selfcheck.mjs
 node src/components/retiredEmoji.selfcheck.mjs
 node src/components/casingInCss.selfcheck.mjs
+node src/components/dishLifeChip.selfcheck.mjs
 node src/state/enabledAssetsRoundTrip.selfcheck.mjs
 node src/state/bundle.selfcheck.mjs
 node src/state/bundleParts.selfcheck.mjs
