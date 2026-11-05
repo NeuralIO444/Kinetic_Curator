@@ -578,6 +578,18 @@ export const createGlobalSlice = (set) => ({
    * resolver input. Restores whole when pressure clears (governorCuts' restore table). */
   creatureShed: 0,
   setCreatureShed: (n) => set({ creatureShed: Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0 }),
+  /** #1923 DISH LIFE — the idle-only Game-of-Life culture is opt-in (off by default until the feel gate). Never
+   * serialized into a document; window.__KC_DISH_LIFE is the runtime switch. */
+  dishLife: false,
+  setDishLife: (on) => set({ dishLife: !!on }),
+  /** #1923 — the governor's culture shed: 0 catch up, 1 trickle, 2 hold (the stage's SHED_STEPS). A render-only
+   * overlay in the creatureShed class — never serialized; stamped on the resolver input with the wake. */
+  dishLifeShed: 0,
+  /** #1923 — the ONE dial for the secondary read (0 off .. 1 full; full is still a quiet layer). Runtime only for now. */
+  dishLifeStrength: 0.35,
+  setDishLifeStrength: (v) =>
+    set({ dishLifeStrength: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0.35 }),
+  setDishLifeShed: (n) => set({ dishLifeShed: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0 }),
   /** #1574 — the governor's travel shed: while true, liveLoop stamps
    * travelShed on the resolver input and FLOW marks settle home. A
    * render-only overlay in the creatureShed class — never serialized
@@ -1243,6 +1255,7 @@ export const createGlobalSlice = (set) => ({
         qualityShedFrom: null,
         // #1694 S2 — the creature shed is likewise a governor claim on the OLD document's population.
         creatureShed: 0,
+        dishLifeShed: 0, // #1923 — a governor claim on the OLD document's culture
         // #1574 — the travel shed is likewise a governor claim on the OLD document's roam.
         travelShed: false,
         // #1627 S1 — the weather shed is likewise a governor claim on the OLD document's air.

@@ -42,6 +42,10 @@ import { readSpectrum } from './spectrumLive.mjs'; // #1490: the warp reads the 
 import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469: the loop notes its LIFE reading for the STIMULI readout
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
+import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
+import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
+import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
+import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
 import { createPaletteMix } from './paletteMix.mjs'; // #278: VJ MIX crossfade state machine
@@ -383,6 +387,11 @@ export function createLiveLoop(
   // above this point and reads the registration per frame; cleared at
   // teardown below, beside the service's dispose.
   setLiveWetSampler((x, y) => wetFrame.sampleWet(x, y));
+  // #1923 DISH LIFE: the idle clock. Off unless the flag is set (state.dishLife or window.__KC_DISH_LIFE); the
+  // touch listeners only note a pending touch — this loop consumes it per frame on the loop clock.
+  const dishLifePhase = createDishLifePhase({ enabled: false });
+  let dishLifeBoost = 0; // the idle boost, eased on the loop's dt (the eased value is what gets stamped)
+  const disposeDishLifeTouch = typeof window !== 'undefined' ? installDishLifeTouch(window) : () => {};
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
   let flowFieldSeed = null;
@@ -770,7 +779,37 @@ export function createLiveLoop(
       Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)) > 0 &&
       !s.trailSteerShed;
     const trailGridNow = trailSteerLive ? getTrailSteerGrid() : null;
+    // #1923: the idle clock ticks on the loop clock; the stamp rides the input only while a culture is awake,
+    // so a take recorded with the flag off (or never idle) carries exactly the older input shape.
+    const dishLifeOn = !!s.dishLife || (typeof window !== 'undefined' && !!window.__KC_DISH_LIFE);
+    dishLifePhase.setEnabled(dishLifeOn);
+    let dishLifeStamp = null;
+    if (dishLifeOn) {
+      const touched = consumeTouch();
+      if (touched) dishLifePhase.touch(loopTimeMs, touched.source, touched.level);
+      const bands = readMeterBandLevels();
+      if (bands) {
+        let top = 0;
+        for (const k in bands) if (bands[k] > top) top = bands[k];
+        dishLifePhase.touch(loopTimeMs, 'audio', top);
+      }
+      const tk = dishLifePhase.tick(loopTimeMs, { hasMarks: !!s.running });
+      // #1923 (rebalanced): DISH LIFE is a SECONDARY read — a quiet layer the marks' Kineme culture source reads,
+      // never a takeover. It runs all the time at the dial's strength; hands off long enough (the idle clock) and
+      // it breathes a little more, eased — a touch eases it back down but never ends it.
+      const toward = tk.status !== 'asleep' ? 1 : 0;
+      const tau = toward > dishLifeBoost ? 2.5 : 0.6;
+      dishLifeBoost += (toward - dishLifeBoost) * (1 - Math.exp(-Math.max(0, dtSec) / tau));
+      dishLifeStamp = quietStamp(loopTimeMs, {
+        strength: Number.isFinite(s.dishLifeStrength) ? s.dishLifeStrength : DEFAULT_STRENGTH,
+        boost: dishLifeBoost,
+        shed: s.dishLifeShed | 0,
+      });
+    } else {
+      clearTouch();
+    }
     const resolved = resolver.resolveLayers({
+      ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
       canvasW,
       canvasH,
       layers: s.layers,
@@ -1788,6 +1827,8 @@ export function createLiveLoop(
     paletteMix.cancel();
     lastFrameTarget = null;
     wetFrame.dispose(); // #1809: the field's only sanctioned destroy — session end
+    disposeDishLifeTouch(); // #1923
+    clearTouch();
     setLiveWetSampler(null); // #1841: the dish's read dies with the loop that served it
     clearWetMode(); // #1841: the show block's shed line clears with the session
     resolver.dispose();
