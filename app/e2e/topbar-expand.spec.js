@@ -330,19 +330,44 @@ test('KIN cools by gliding: its width passes through many in-between values, nev
   } // the K key: click() waits for the opening label to settle, and the taps would drift apart
   await expect.poll(async () => width(kin)).toBeGreaterThan(rest + 40);
   await page.mouse.move(600, 600);
-  const widths = await page.evaluate(async () => {
+  // each sample carries its own timestamp: a loaded runner stretches the frame tick (a stalled tick would otherwise read
+  // as a "jump"), so the glide is judged by its SPEED between samples, never by the size of one step
+  const samples = await page.evaluate(async () => {
     const el = document.querySelector('.kc-topbar-curator .kinetic-btn');
     const out = [];
     const t0 = performance.now();
     while (performance.now() - t0 < 8000) {
-      out.push(el.getBoundingClientRect().width);
-      await new Promise((r) => setTimeout(r, 40));
+      out.push([performance.now(), el.getBoundingClientRect().width]);
+      await new Promise((r) => requestAnimationFrame(r));
     }
     return out;
   });
-  const distinct = new Set(widths.map((w) => Math.round(w))).size;
-  expect(distinct, 'a glide passes through many widths').toBeGreaterThan(12);
-  let maxStep = 0;
-  for (let i = 1; i < widths.length; i++) maxStep = Math.max(maxStep, Math.abs(widths[i] - widths[i - 1]));
-  expect(maxStep, `the biggest jump between 40 ms samples was ${maxStep.toFixed(1)}px`).toBeLessThan(14);
+  const widths = samples.map((s) => s[1]);
+  // "many in-between values" is counted in ticks the glide actually spans, not in a fixed 12 distinct widths: a loaded
+  // runner stretches the tick, so the same glide lands on fewer of them. A step has ~0 samples between its two ends.
+  const lo = Math.min(...widths) + 1;
+  const hi = Math.max(...widths) - 1;
+  const between = widths.filter((w) => w > lo && w < hi);
+  expect(between.length, 'a glide passes through many widths').toBeGreaterThanOrEqual(8);
+  expect(new Set(between.map((w) => Math.round(w))).size, 'and they are not one width repeated').toBeGreaterThanOrEqual(
+    4,
+  );
+  // a glide moves on (nearly) every frame; a stepped cool holds a width for a whole 150 ms heat tick and then jumps. Counted
+  // over frame PAIRS inside the glide, so it does not depend on how fast the runner ticks (glide ≈ .8, stepped ≈ .13)
+  let moved = 0;
+  let pairs = 0;
+  for (let i = 1; i < widths.length; i++) {
+    if (!(widths[i] > lo && widths[i] < hi && widths[i - 1] > lo && widths[i - 1] < hi)) continue;
+    pairs++;
+    if (Math.abs(widths[i] - widths[i - 1]) > 0.1) moved++;
+  }
+  expect(pairs, 'the glide was sampled').toBeGreaterThanOrEqual(8);
+  expect(moved / pairs, `it moved on ${moved} of ${pairs} frames inside the glide`).toBeGreaterThan(0.5);
+  // and never an outright collapse: even a stalled frame stays well under 1.5 px/ms
+  let maxSpeed = 0;
+  for (let i = 1; i < samples.length; i++) {
+    const dt = Math.max(1, samples[i][0] - samples[i - 1][0]);
+    maxSpeed = Math.max(maxSpeed, Math.abs(samples[i][1] - samples[i - 1][1]) / dt);
+  }
+  expect(maxSpeed, `the fastest stretch was ${maxSpeed.toFixed(2)} px/ms`).toBeLessThan(1.5);
 });
