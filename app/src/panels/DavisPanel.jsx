@@ -14,6 +14,7 @@ import { RoomCodec } from './directors/RoomCodec.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js';
 import { RangeRow } from '../components/RangeRow.jsx';
+import { DavisRoleDealSwitch } from '../components/BeastSettings.jsx';
 // #310: FavoritesList removed from the panel — the bottom tray is canonical.
 // (FavoritesList.jsx stays in the tree, unreferenced.)
 
@@ -476,6 +477,12 @@ export function DavisPanel() {
             )}
           </>
         )}
+
+        {/* the role-deal switch rides sectionless at the foot of the panel — the DIRECTORS section set is pinned
+            (e2e/director-regroup), so it adds no section label */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+          <DavisRoleDealSwitch />
+        </div>
 
         {/* #1126 → #1560 S1 — THE ROOM at the foot of the panel (Matt): re-cut to the codec — two face windows
               and the transcript between them, readout only (docs/research/room-codec/03) */}

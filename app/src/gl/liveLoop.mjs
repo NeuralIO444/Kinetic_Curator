@@ -25,6 +25,7 @@
  * store's setNodeCount.
  */
 
+import { beastDocFields } from '../engine/beastSettings.mjs';
 import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
 import { createLiveResolver, getLastSpawnDecisions, getLastDishWet, setLiveWetSampler } from './liveResolve.mjs';
@@ -985,6 +986,7 @@ export function createLiveLoop(
         reducedMotion:
           typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
         regionBudget: regionBudgetForDevice(isIpadClassDevice()),
+        ...beastDocFields(s.beastSettings), // the beast's roam/trace and Davis's role deal; default settings add no key
         ...roomContractFields(lastResolvedInput()), // #1949 — the rigs' gait (Lois) and deal (Davis), from the frame's effective input
       },
       resolvedLayers: resolved,
