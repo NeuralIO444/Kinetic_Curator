@@ -41,12 +41,22 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **Rust advisory scanning** | **Added** (advisory-audit CI job): `npm audit --omit=dev` and `cargo audit` on the Rust crates. Informational, not a required check. |
 | **Four moths can overlap at count 4** | **Accepted as intentional.** No code change. |
 
+## Closed in the 2026-11-04 sweep
+
+| Item | Resolution |
+|------|------------|
+| **ACCUM never engaged** | `liveLoop` `tick()` read `trailSteerLive` off the frame — a build-local variable out of scope — and threw on every accum frame since PR #1878. Accumulation silently never ran. Fixed with a scope guard (#1914, PR #1915). |
+| **Band-pair closer (#1635)** | Closed on session evidence: Relax kept at 0.28, Tighten retuned 0.72 → 0.52 (PR #1934). |
+
 ## Open
 
 | Item | Status |
 |------|--------|
+| **Desktop recording produces no `.kcperf` file (#1938)** | Stopping a recording in the Tauri app downloads nothing — the WebView swallows the blob download. Fix shape is recorded on the issue; desktop lane, unfixed. |
+| **kineticSweep selfcheck flake (#1822)** | LOOK can re-deal the current look in ~1.5% of runs. Intermittent, unfixed. |
 | **Dev-dependency advisories** (`@babel/core`, `browserslist`, `nanoid`, ...) | Low. `npm audit fix` when convenient; not applied to avoid lockfile churn. `npm audit --omit=dev` is clean. |
-| **Deferred seam** (`panels/pipeline/syphonDeferred.js`) | Intentional; waits on #608. (`midi/learnDeferred.mjs` was un-deferred into `midi/learn.mjs` by the #617 learn build; hardware verification pending.) |
+| **Deferred seam** (`panels/pipeline/syphonDeferred.js`) | Intentional; waits on #608. (`midi/learnDeferred.mjs` was un-deferred into `midi/learn.mjs` by the #617 learn build; #617 itself was deferred by Matt 2026-10-21 — hardware acceptance and the iPad BLE-MIDI ruling wait on his FM-1 arrival-day session.) |
+| **e2e `topbar-expand` "KIN cools by gliding"** | Runner-load sensitive: the spec samples a wall-clock animation at fixed 40 ms intervals, so a loaded self-hosted runner starves the sampler and the step size reads large. Failed identically on main's own CI run 2026-11-04 — pre-existing, not a build defect. Durable fix is time-normalized sampling; no issue filed yet. |
 
 ## Fixed in 0.8.0 (reference)
 
@@ -74,4 +84,4 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 - Chip-stutter pair: continuous life-drift phase (#431 / PR #435), integrated warp phase (#432 / PR #436)
 - Unwired selfcheck suites now in manifest: `evalContext`, `itemMorph`, `feedLive` (#438)
 
-*Last updated: 2026-10-13 — sweep closed out.*
+*Last updated: 2026-11-04 — maintenance sweep.*
