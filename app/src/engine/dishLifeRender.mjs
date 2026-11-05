@@ -8,7 +8,8 @@
 //   THE SCENE'S OWN ASSETS — each live cell takes the asset, colour and tier of the NEAREST original
 //   mark (assigned once at wake), so the culture reads as the performer's scene growing, in their
 //   palette. Alpha follows the cell's level (alive → decaying → gone) and the nearest mark's alpha;
-//   scale shrinks with decay, so colonies rot with tails instead of blinking off.
+//   scale shrinks with decay, so colonies rot with tails instead of blinking off. Output alpha is the placement
+//   engine's 0..100 (a mark's own alpha is read as 0..100, or 0..1).
 //
 //   THE SCENE DISSOLVES INTO IT — the original marks fade out over the first DISSOLVE_GENS generations
 //   while the cells fade in, so the dish shows the culture, not both. Generation 0 IS the scene; touching
@@ -98,7 +99,7 @@ export function dissolveMarks(marks, gen, dissolveGens = DISSOLVE_GENS) {
   const keep = sceneKeep(gen, dissolveGens);
   if (keep >= 1) return marks;
   if (keep <= 0) return [];
-  return marks.map((m) => (m ? { ...m, alpha: alpha01(m.alpha) * keep } : m));
+  return marks.map((m) => (m ? { ...m, alpha: alpha01(m.alpha) * keep * 100 } : m));
 }
 
 /**
@@ -134,18 +135,17 @@ export function cultureItems(
     const l = level[i];
     const x = i % cols;
     const y = (i - x) / cols;
+    const scale = liveScale * (DECAY_SCALE_MIN + (1 - DECAY_SCALE_MIN) * l);
+    // the cell IS the nearest mark's kind: every field it carries (asset, colour, tier, glass/plate/wash/stipple,
+    // matParams, rotation, t) rides along, so the stamp/Look path draws it exactly as it draws that mark
     out[k] = {
+      ...m,
       x: (x + 0.5) * cw,
       y: (y + 0.5) * ch,
-      scale: liveScale * (DECAY_SCALE_MIN + (1 - DECAY_SCALE_MIN) * l),
-      rotation: Number.isFinite(Number(m.rotation)) ? Number(m.rotation) : 0,
-      alpha: alpha01(m.alpha) * l * show,
+      scale,
+      scaleY: scale,
+      alpha: alpha01(m.alpha) * l * show * 100, // placement alpha is 0..100
       index: i,
-      t: Number.isFinite(Number(m.t)) ? Number(m.t) : 0,
-      zTier: m.zTier || 0,
-      assetId: m.assetId,
-      color: m.color,
-      accent: m.accent,
       key: `life:${i}`,
     };
   }

@@ -64,8 +64,8 @@ const aliveCulture = (cells, gen = 0) => {
     'a cell stamps at its centre, in canvas px',
   );
   assert.ok(
-    Math.abs(l.alpha - 1) < 1e-9 && Math.abs(r.alpha - 0.5) < 1e-9,
-    "alpha is the nearest mark's alpha (0..100 or 0..1) × level × show",
+    Math.abs(l.alpha - 100) < 1e-9 && Math.abs(r.alpha - 50) < 1e-9,
+    "alpha is the nearest mark's alpha × level × show, in placement units (0..100)",
   );
   // junk marks are skipped, never nearest
   const junk = nearestMarks([null, { x: NaN, y: 1 }, { x: 50, y: 50 }, 'x'], G);
@@ -79,6 +79,39 @@ const aliveCulture = (cells, gen = 0) => {
     nearestMarks([{ x: NaN, y: NaN }], G).every((v) => v === -1),
     'only junk marks: nothing is nearest',
   );
+}
+
+// ---- A2: the cell is the mark's kind — every field rides along, so the Look path draws it as that mark
+{
+  const rich = {
+    x: 100,
+    y: 250,
+    scale: 3,
+    scaleY: 3,
+    alpha: 80,
+    assetId: 'g',
+    color: '#123',
+    accent: '#456',
+    glass: true,
+    plate: false,
+    wash: true,
+    stipple: false,
+    matParams: { k: 1 },
+    t: 0.25,
+    key: 'p9-g',
+    index: 9,
+    zTier: 2,
+  };
+  const near = nearestMarks([rich], G);
+  const c = aliveCulture([[4, 10]], 20);
+  const [it] = cultureItems(c, [rich], near, G);
+  for (const k of ['assetId', 'color', 'accent', 'glass', 'plate', 'wash', 'stipple', 't', 'zTier'])
+    assert.equal(it[k], rich[k], `${k} rides along`);
+  assert.deepEqual(it.matParams, rich.matParams, 'matParams ride along');
+  assert.equal(it.scaleY, it.scale, 'isotropic, like the placement engine');
+  assert.equal(it.key, `life:${cell(4, 10)}`, "its own key, not the mark's");
+  assert.equal(it.index, cell(4, 10), 'its own index');
+  assert.ok(it.alpha > 0 && it.alpha <= 80, "placement alpha, never above the mark's");
 }
 
 // ---- B: decay
@@ -121,7 +154,7 @@ const aliveCulture = (cells, gen = 0) => {
   assert.equal(dissolveMarks(MARKS, 0), MARKS, 'generation 0 is the scene, untouched (same array)');
   const half = dissolveMarks(MARKS, DISSOLVE_GENS / 2);
   assert.equal(half.length, 2);
-  assert.ok(Math.abs(half[0].alpha - 0.5) < 1e-9, 'halfway: the scene is half-faded');
+  assert.ok(Math.abs(half[0].alpha - 50) < 1e-9, 'halfway: the scene is half-faded (placement units, 0..100)');
   assert.equal(L.alpha, 100, 'the originals are never edited');
   assert.deepEqual(dissolveMarks(MARKS, DISSOLVE_GENS), [], 'fully dissolved: the scene marks are dropped');
   assert.deepEqual(dissolveMarks(null, 5), []);
@@ -130,7 +163,7 @@ const aliveCulture = (cells, gen = 0) => {
   const frame = cultureFrame(MARKS, c, near, G);
   assert.equal(frame.length, 2 + 1, 'mid-dissolve: the fading scene and the fading-in cells share the frame');
   const cellItem = frame.find((i) => String(i.key).startsWith('life:'));
-  assert.ok(Math.abs(cellItem.alpha - 0.5) < 1e-9, 'cells are half-shown halfway through the dissolve');
+  assert.ok(Math.abs(cellItem.alpha - 50) < 1e-9, 'cells are half-shown halfway through the dissolve');
   const late = cultureFrame(MARKS, aliveCulture([[2, 10]], DISSOLVE_GENS), near, G);
   assert.ok(
     late.every((i) => String(i.key).startsWith('life:')),
