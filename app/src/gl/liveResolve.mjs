@@ -74,6 +74,12 @@ import { createCreatureBuilder } from '../engine/creature.js'; // #1355 step 4: 
 import { createDishCreatureBuilder } from '../engine/dishCreature.js'; // #1634 slice 2: the dish creature, on the hosted pin
 import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnState.js'; // #1694 slice 1: the spawn channel, resolver-owned
 import { CREATURE_ASSET_ID, mothsAllowed, dishAllowed } from '../curator/creatureCitizen.js'; // #1694 slice 2: the pool citizen's reads
+import { ASSETS_KANA } from '../data/assets/assets-kana.js'; // #1982: the poem-only kana stamps
+
+// #1982 — the kana stamps are catalogue members for the census and the stage
+// atlas, but they are dealt by the FIELD director alone (Teijo's native
+// script): never a placeable mark, excluded here by id alongside the citizen.
+const POEM_ONLY_IDS = new Set(ASSETS_KANA.map((a) => a.id));
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 
 const HOP_MAX_PX = 4;
@@ -827,7 +833,10 @@ export function createLiveResolver() {
       // are exactly as they were before the citizen joined the pool. By id, not by category: a
       // user duplicate of the citizen is an ordinary mark and stays placeable.
       let activeAssets = pool
-        .filter((a) => a.id !== CREATURE_ASSET_ID && (!src.enabledAssets || src.enabledAssets[a.id]))
+        .filter(
+          (a) =>
+            a.id !== CREATURE_ASSET_ID && !POEM_ONLY_IDS.has(a.id) && (!src.enabledAssets || src.enabledAssets[a.id]),
+        )
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a))
         .map((a) => (mixW && mixW[a.id] ? { ...a, mixWeight: mixW[a.id] } : a));
       // #564 — identity of the pool this layer actually draws: which assets,

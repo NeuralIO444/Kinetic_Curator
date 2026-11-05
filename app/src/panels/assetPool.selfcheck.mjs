@@ -76,7 +76,15 @@ assert.deepEqual(editTags(a1, { op: 'nonsense' }, sug), a1, 'an unknown op chang
 
 // ---- filters
 const recs = poolDescriptors(ASSETS);
-assert.equal(recs.length, ASSETS.length);
+// #1982 — the pool covers the library MINUS the poem-only kana stamps (Matt's
+// hard requirement: FIELD's stamps never become pool tiles). The exclusion is
+// exactly the kana pack, by id — nothing else may drop out of the records,
+// and every count below is taken over this pool-visible set.
+const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
+const kanaIds = new Set(ASSETS_KANA.map((k) => k.id));
+const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));
+assert.equal(recs.length, poolVisible.length);
+assert.ok(!recs.some((r) => kanaIds.has(r.id)), 'no kana record in the pool');
 const lines = filterRecords(recs, { facets: { form: ['line'] } });
 assert.ok(lines.length > 0 && lines.length < recs.length, 'a facet filter narrows');
 for (const r of lines) assert.ok(r.descriptor.tags.effective.form.includes('line'));
@@ -111,9 +119,9 @@ for (const f of Object.keys(fc))
   for (const [t, n] of Object.entries(fc[f]))
     assert.equal(n, recs.filter((r) => r.descriptor.tags.effective[f].includes(t)).length, `${f}:${t} count`);
 const cc = categoryCounts(recs);
-const by = countBy(assetRecords(ASSETS), 'category');
+const by = countBy(assetRecords(poolVisible), 'category');
 for (const [c, n] of Object.entries(by)) assert.equal(cc[c], n, `category ${c} count equals countBy`);
-assert.equal(cc.all, ASSETS.length);
+assert.equal(cc.all, poolVisible.length);
 assert.equal(cc.user, 0);
 const withUser = categoryCounts(
   poolDescriptors([

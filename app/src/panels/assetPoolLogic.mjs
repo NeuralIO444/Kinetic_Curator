@@ -3,13 +3,21 @@
 import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js';
 import { FACETS } from '../data/assetFacets.js';
 import { ROLES } from '../assets/assetRoles.js';
+import { ASSETS_KANA } from '../data/assets/assets-kana.js';
+
+// #1982 — the kana stamps are poem-only (FIELD): catalogue members so the
+// census and the stage atlas resolve them, but they never become pool
+// records — no tiles, no facet counts, no change to the pool's numbers.
+const POEM_ONLY_IDS = new Set(ASSETS_KANA.map((a) => a.id));
 
 /** Descriptor records for the pool: library assets read baked traits + the document's edits, imports their own. */
 export function poolDescriptors(assets, assetTags = {}) {
-  return (Array.isArray(assets) ? assets : []).map((a) => {
-    const isUser = String(a.id).startsWith('user:');
-    return assetDescriptor(a, isUser ? a.traits || null : libraryTraits(a.id), isUser ? a.tagEdits : assetTags[a.id]);
-  });
+  return (Array.isArray(assets) ? assets : [])
+    .filter((a) => !POEM_ONLY_IDS.has(a.id))
+    .map((a) => {
+      const isUser = String(a.id).startsWith('user:');
+      return assetDescriptor(a, isUser ? a.traits || null : libraryTraits(a.id), isUser ? a.tagEdits : assetTags[a.id]);
+    });
 }
 
 /** Every searchable word of a record: id, family, style, category, raw tags and every effective tag (and free words). */

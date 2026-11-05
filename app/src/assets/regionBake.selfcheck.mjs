@@ -93,13 +93,22 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   // #1694 S2 — the pool holds ONE entry beyond the authored library: the creature citizen,
   // appended after the bake (it is not a mark and carries no mattes). It is the single,
   // asserted exception to the equality below; every authored asset keeps the invariant.
-  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + 1);
+  // #1982 — a second post-authored block rides the same road: the poem-only kana
+  // stamps (catalogue members for the census and the atlas; the bake never sees
+  // them either, and they carry no mattes). The exceptions are exactly these two.
+  const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
+  const kanaIds = new Set(ASSETS_KANA.map((k) => k.id));
+  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + ASSETS_KANA.length + 1);
   const citizen = ASSETS[ASSETS.length - 1];
   assert.equal(citizen.id, 'creature');
   assert.ok(!('regions' in citizen) && !('regionSlots' in citizen), 'the citizen carries no baked mattes');
   let withRegions = 0;
   for (const a of ASSETS) {
     if (a.id === 'creature') continue; // the citizen, asserted above — the bake never sees it
+    if (kanaIds.has(a.id)) {
+      assert.ok(!('regions' in a) && !('regionSlots' in a), `${a.id}: a kana stamp carries no baked mattes`);
+      continue;
+    }
     const base = byId(a.id);
     assert.equal(a.svg, base.svg, `${a.id}: the art itself is untouched`);
     if (!a.regions) {

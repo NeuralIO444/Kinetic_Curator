@@ -6,6 +6,7 @@ import { ASSETS_PART4 } from './assets-experimental.js';
 import { ASSETS_PART5 } from './assets-haeckel.js';
 import { ASSETS_MICRO } from './assets-micro-hud.js';
 import { ASSETS_LETTERS } from './assets-letterforms.js';
+import { ASSETS_KANA } from './assets-kana.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
@@ -50,5 +51,14 @@ const CREATURE_CITIZEN = {
 
 export const ASSETS = [
   ...ASSETS_AUTHORED.map((a) => (BAKED_REGIONS[a.id] ? { ...a, ...BAKED_REGIONS[a.id] } : a)),
+  // #1982 (FIELD stamps slice 1) — the kana stamps ride the citizen's road in:
+  // catalogue members (the census measures them, the stage atlas resolves
+  // them) but NOT authored content — ASSETS_AUTHORED never sees them, so no
+  // region/traits bake names them. They are poem-only: the pool panel
+  // (panels/assetPoolLogic.js), the chapter decks (data/chapters.js), the
+  // KINETIC roll (state/rollPool.mjs) and the placeable pool
+  // (gl/liveResolve.mjs) exclude them by id, and only the FIELD director
+  // deals them, as Teijo's native script in Japanese-context rooms.
+  ...ASSETS_KANA,
   CREATURE_CITIZEN,
 ];
