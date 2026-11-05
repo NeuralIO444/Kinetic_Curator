@@ -393,6 +393,18 @@ const PULSE_DEPTH = 0.16; // 16% thump at the beat
 const PULSE_HZ = 0.5; // 2s period
 const PALETTE_HZ = 0.04; // #1151 — ~25s color breath; Davis's freq-5 cycling is the FULL BURN setting, not the default
 
+// #1923 — the quiet culture's secondary read, in real units (amount 1.0 → these peaks).
+export const CULTURE_SCALE = 0.05; // up to +5% scale where the dish is alive
+export const CULTURE_FRAY = 0.006; // up to 0.6% of the smaller canvas side of fray where it is changing
+
+/** Integer hash of (generation, mark): deterministic, no strings, no allocation. */
+function cultureHash(gen, index) {
+  let h = Math.imul((gen | 0) ^ 0x9e3779b9, 0x85ebca6b) ^ Math.imul((index | 0) + 0x7f4a7c15, 0xc2b2ae35);
+  h = Math.imul(h ^ (h >>> 15), 0x2c1b3c6d);
+  h = Math.imul(h ^ (h >>> 12), 0x297a2d39);
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
 function num01(v) {
   const n = Number(v);
   return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
@@ -513,6 +525,35 @@ export function evaluateKineme(soa, ctx) {
         const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
         const s = Math.sin(TAU * (PALETTE_HZ * t + uN));
         out.dPalette[k] += reach * (anchored ? s - Math.sin(TAU * uN) : s);
+      }
+    }
+  }
+
+  // #1923 — DISH LIFE as a SECONDARY read. The quiet culture (engine/dishLifeQuiet.mjs) is one more motion source on
+  // this system, read-only like weather: it never owns a mark, it only lets the marks near a living colony breathe a
+  // little and fray a little. ctx.culture = { strength 0..1, gen, sample(x, y, out) }; strength 0 / no culture = this
+  // block is skipped (the hard gate), so a scene without it is byte-identical. Small by design: at full strength the
+  // swell is CULTURE_SCALE of the mark and the fray CULTURE_FRAY of the smaller canvas side — the primary read
+  // (the marks, the Director, the other drivers) always outweighs it.
+  const culture = ctx.culture;
+  const cs = num01(culture?.strength);
+  if (cs > 0 && typeof culture.sample === 'function') {
+    const m = Math.min(Number(ctx.canvasW) || 0, Number(ctx.canvasH) || 0);
+    const reach = cs * CULTURE_FRAY * m;
+    const gen = culture.gen | 0;
+    const local = { level: 0, activity: 0 };
+    for (let k = 0; k < n; k++) {
+      if (!culture.sample(soa.x[k], soa.y[k], local)) continue;
+      const a = local.activity;
+      const v = Math.min(1, 0.5 * local.level + a);
+      if (!(v > 0)) continue;
+      out.active = true;
+      out.dScale[k] += cs * CULTURE_SCALE * v;
+      if (a > 0 && reach > 0) {
+        // the fray: boiled to the generation (the culture's own tick), per mark — a flicker, not a drift
+        const h = cultureHash(gen, soa.index[k]);
+        out.dx[k] += reach * a * ((h & 0xffff) / 32767.5 - 1);
+        out.dy[k] += reach * a * (((h >>> 16) & 0xffff) / 32767.5 - 1);
       }
     }
   }

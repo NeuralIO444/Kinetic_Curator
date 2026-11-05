@@ -585,6 +585,10 @@ export const createGlobalSlice = (set) => ({
   /** #1923 — the governor's culture shed: 0 catch up, 1 trickle, 2 hold (the stage's SHED_STEPS). A render-only
    * overlay in the creatureShed class — never serialized; stamped on the resolver input with the wake. */
   dishLifeShed: 0,
+  /** #1923 — the ONE dial for the secondary read (0 off .. 1 full; full is still a quiet layer). Runtime only for now. */
+  dishLifeStrength: 0.35,
+  setDishLifeStrength: (v) =>
+    set({ dishLifeStrength: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0.35 }),
   setDishLifeShed: (n) => set({ dishLifeShed: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0 }),
   /** #1574 — the governor's travel shed: while true, liveLoop stamps
    * travelShed on the resolver input and FLOW marks settle home. A
