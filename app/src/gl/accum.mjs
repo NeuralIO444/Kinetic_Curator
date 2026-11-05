@@ -672,6 +672,36 @@ export function scanDelayRamp({ taps = 0, scan = 0, direction = 1 } = {}) {
   return lut;
 }
 
+/** The share of each band, at its far edge, that crossfades into the next tap.
+ *  A hard band edge is a visible seam: with ECHOES at one tap the slit-scan is
+ *  two bands, so the picture splits at exactly x = 50% — the live frame at full
+ *  weight on one side, a one-frame-old copy at the tap's weight on the other. The
+ *  last SCAN_FEATHER of each band now eases into the next tap, so the delay (and
+ *  the weight with it) is continuous across every edge. Bands still read as bands. */
+export const SCAN_FEATHER = 0.5;
+
+/**
+ * The crossfade toward the next tap for each LUT texel, 0..255 (0 = this
+ * band's tap alone). Same ramp and quantisation as scanDelayRamp — the GPU
+ * samples this as the LUT's G channel and the mirror reads this array, so the
+ * two cannot disagree. Smoothstep over the band's last SCAN_FEATHER, reaching
+ * 1 exactly at the edge where the next band begins, so nothing steps.
+ */
+export function scanBlendRamp({ taps = 0, scan = 0, direction = 1 } = {}) {
+  const k = Math.min(4, Math.max(0, Math.round(Number(taps) || 0)));
+  const s = clamp01(scan);
+  const flip = sanitizeAccumScanDirection(direction) < 0;
+  const lut = new Uint8Array(SCAN_LUT_WIDTH);
+  for (let i = 0; i < SCAN_LUT_WIDTH; i++) {
+    const u = (i + 0.5) / SCAN_LUT_WIDTH;
+    const f = (flip ? 1 - u : u) * s * (k + 1);
+    if (f >= k) continue; // the last tap has no next band to ease into
+    const t = Math.min(1, Math.max(0, (f - Math.floor(f) - (1 - SCAN_FEATHER)) / SCAN_FEATHER));
+    lut[i] = Math.round(t * t * (3 - 2 * t) * 255);
+  }
+  return lut;
+}
+
 /** The delay a frame of width w samples at pixel column x: the GPU reads
  *  the LUT texture with NEAREST at v_cuv.x = (x + 0.5) / w, which lands on
  *  texel floor((x + 0.5) / w · SCAN_LUT_WIDTH). The mirror uses this exact
@@ -811,18 +841,26 @@ uniform sampler2D u_scanDelay; // #1804: delay LUT (R8-valued bytes 0..K), sampl
 uniform float u_scan;          // #1804: 0 = the additive mix below; > 0 = per-column selection
 in vec2 v_cuv;
 out vec4 o;
+// One moment at its tap's weight: delay 0 = the live frame at full weight.
+vec4 scanPick(int d) {
+  if (d == 1) return texture(u_t0, v_cuv) * u_w.x;
+  if (d == 2) return texture(u_t1, v_cuv) * u_w.y;
+  if (d == 3) return texture(u_t2, v_cuv) * u_w.z;
+  if (d >= 4) return texture(u_t3, v_cuv) * u_w.w;
+  return texture(u_src, v_cuv);
+}
 void main() {
   vec4 acc;
   if (u_scan > 0.0) {
-    int d = int(texture(u_scanDelay, vec2(v_cuv.x, 0.5)).r * 255.0 + 0.5);
+    vec4 lut = texture(u_scanDelay, vec2(v_cuv.x, 0.5));
+    int d = int(lut.r * 255.0 + 0.5);
     if (d > u_ntaps) d = u_ntaps;
-    vec4 sel = texture(u_src, v_cuv);
-    float g = 1.0;
-    if (d == 1) { sel = texture(u_t0, v_cuv); g = u_w.x; }
-    else if (d == 2) { sel = texture(u_t1, v_cuv); g = u_w.y; }
-    else if (d == 3) { sel = texture(u_t2, v_cuv); g = u_w.z; }
-    else if (d >= 4) { sel = texture(u_t3, v_cuv); g = u_w.w; }
-    acc = sel * g;
+    int d1 = d + 1;
+    if (d1 > u_ntaps) d1 = u_ntaps;
+    // G = the crossfade toward the next tap (0 = this band alone — the
+    // pre-feather selection, operation for operation).
+    acc = scanPick(d);
+    if (lut.g > 0.0) acc = mix(acc, scanPick(d1), lut.g);
   } else {
     acc = texture(u_src, v_cuv);
     if (u_ntaps > 0) acc += texture(u_t0, v_cuv) * u_w.x;
@@ -1698,17 +1736,23 @@ export function mirrorAccumStep({ accum, frame, w, h, params, echo = null, age =
       // frames the ring actually holds, exactly like ECHO_FS's u_ntaps
       // clamp. Integer delays: deterministic by construction.
       const lut = scanDelayRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
+      const blend = scanBlendRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
       frameIn = new Float64Array(n);
+      const pick = (d) => ({
+        src: d === 0 ? frame : echo.frames[echo.frames.length - d],
+        g: d === 0 ? 1 : p.echoWeights[d - 1] || 0,
+      });
       for (let x = 0; x < w; x++) {
         const d = Math.min(scanDelayAt(lut, x, w), taps);
-        const src = d === 0 ? frame : echo.frames[echo.frames.length - d];
-        const g = d === 0 ? 1 : p.echoWeights[d - 1] || 0;
+        const t = scanDelayAt(blend, x, w) / 255; // the band-edge feather: ease into the next tap
+        const a = pick(d);
+        const b = t > 0 ? pick(Math.min(d + 1, taps)) : null;
         for (let y = 0; y < h; y++) {
           const o = (y * w + x) * 4;
-          frameIn[o] = src[o] * g;
-          frameIn[o + 1] = src[o + 1] * g;
-          frameIn[o + 2] = src[o + 2] * g;
-          frameIn[o + 3] = src[o + 3] * g;
+          for (let c = 0; c < 4; c++) {
+            const va = a.src[o + c] * a.g;
+            frameIn[o + c] = b ? va + (b.src[o + c] * b.g - va) * t : va;
+          }
         }
       }
       // The selection feeds source-over: clamp alpha to <= 1 (ECHO_FS).
@@ -2429,8 +2473,9 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
 
   // #1804 — the slit-scan delay LUT: SCAN_LUT_WIDTH×1 RGBA8, NEAREST (the
   // delay is an integer tap index; filtering it would invent moments).
-  // R carries the quantised delay 0..K from scanDelayRamp — the same
-  // derivation the JS mirror reads, so GPU and mirror select identically.
+  // R carries the quantised delay 0..K from scanDelayRamp, G the crossfade
+  // toward the next tap from scanBlendRamp (the band-edge feather) — the
+  // same derivations the JS mirror reads, so GPU and mirror select identically.
   // Rebuilt only when (echoTaps, scan, scanDirection) changes; 1 KB.
   const scanDelayTex = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, scanDelayTex);
@@ -2445,9 +2490,11 @@ export function createAccum(gl, bridge, { width, height, resDiv = 1 }) {
     const key = `${p.echoTaps}|${p.scan}|${p.scanDirection}`;
     if (scanKey === key) return;
     const lut = scanDelayRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
+    const blend = scanBlendRamp({ taps: p.echoTaps, scan: p.scan, direction: p.scanDirection });
     const rgba = new Uint8Array(SCAN_LUT_WIDTH * 4);
     for (let i = 0; i < SCAN_LUT_WIDTH; i++) {
       rgba[i * 4] = lut[i];
+      rgba[i * 4 + 1] = blend[i];
       rgba[i * 4 + 3] = 255;
     }
     gl.bindTexture(gl.TEXTURE_2D, scanDelayTex);
