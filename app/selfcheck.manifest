@@ -506,6 +506,7 @@ node src/curator/curatePalette.selfcheck.mjs
 node src/gl/contactShadow.selfcheck.mjs
 node src/engine/groundSnap.selfcheck.mjs
 node src/engine/weatherAir.selfcheck.mjs
+node src/engine/riftShear.selfcheck.mjs
 node src/curator/formation.selfcheck.mjs
 node src/curator/refineColor.selfcheck.mjs
 node src/state/projectDocument.fuzz.selfcheck.mjs

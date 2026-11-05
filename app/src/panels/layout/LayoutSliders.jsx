@@ -22,6 +22,7 @@ import { TeaMatrix } from '../build/te/TeaMatrix.jsx';
 import { useStore } from '../../state/store.js';
 import { nearestPatternBelow } from '../../pattern/ground.js'; // #1183: is there ground under this layer?
 import { nearestWeatherAbove } from '../../gl/dishWeather.mjs'; // #1183 weather: is there haze over this layer?
+import { nearestRiftAbove } from '../../gl/dishRift.mjs'; // #1183 rift: is there a tear over this layer?
 
 const fmt1 = (v) => (Math.round(v * 10) / 10).toString();
 
@@ -50,6 +51,8 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
   const hasGround = useStore((st) => !!nearestPatternBelow(st.layers, st.activeLayerId));
   // #1183 weather — WEATHER only does something when an FX layer with HAZE sits above this one.
   const hasWeather = useStore((st) => !!nearestWeatherAbove(st.layers, st.activeLayerId));
+  // #1183 rift — RIFT only does something when an FX layer with a TEAR sits above this one.
+  const hasRift = useStore((st) => !!nearestRiftAbove(st.layers, st.activeLayerId));
 
   const { x: sx, y: sy, linked } = scaleRanges(layoutParams.scale);
   const setScale = (x, y) => set('scale', { x, y });
@@ -368,6 +371,33 @@ export function LayoutSliders({ layoutParams, lockedParams }) {
             unit="%"
             defaultValue={DEFAULT_LAYOUT_PARAMS.weatherAir * 100}
             onChange={(v) => set('weatherAir', Math.round(v) / 100)}
+          />
+        )}
+      />
+
+      {/* #1183 rift slice 1: the TEAR of the nearest FX layer above shears this layer's marks sideways, row by
+            row, by what it does to the picture. Per layer; 0 (or no key) is today's frame exactly. The dial
+            adds no default layout key (no hash moves), so it reads `?? 0`. Inert without a tear above (#272). */}
+      <ModeRow
+        label="RIFT"
+        display={`${Math.round((layoutParams.riftShear ?? 0) * 100)}%`}
+        value={layoutParams.riftShear ?? 0}
+        stops={[0, 0.25, 0.55, 1]}
+        onSelect={(v) => set('riftShear', v)}
+        locked={lockedParams.riftShear}
+        onToggleLock={() => lock('riftShear')}
+        disabled={!hasRift}
+        disabledReason="Needs an FX layer with TEAR above this one"
+        onOpen={() => (
+          <SliderEditor
+            ariaLabel="Rift: how far marks tear sideways with the tear above them"
+            value={Math.round((layoutParams.riftShear ?? 0) * 100)}
+            min={0}
+            max={100}
+            step={1}
+            unit="%"
+            defaultValue={0}
+            onChange={(v) => set('riftShear', Math.round(v) / 100)}
           />
         )}
       />

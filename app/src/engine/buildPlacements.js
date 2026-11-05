@@ -24,6 +24,7 @@ import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — paralla
 import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
+import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
 import { applyWeatherFade, weatherAlphaScale } from './weatherAir.mjs'; // #1183 weather slice 1: haze as air
 
@@ -244,6 +245,9 @@ export function buildPlacements({
   // air = 0 (or no dish.air) → today's path exactly.
   air = 0,
   airVeil = null,
+  // #1183 rift slice 1 — { bands, amount, strength, W, H } from gl/dishRift.mjs when an FX layer above carries a
+  // tear and this layer's RIFT dial is up: marks shear sideways by what the shader shears the picture. null = off.
+  rift = null,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -509,6 +513,8 @@ export function buildPlacements({
   // tile it is over. Per frame, undone below like the drivers; nudge 0 or no ground never calls it.
   const undoNudge =
     dish && dish.groundCell && nudge > 0 ? applyGroundNudge(soa, dish.groundCell, nudge, stillMarks) : null;
+  // #1183 rift — after the nudge: the presented mark shears with the tear above it. Per frame, undone below.
+  const undoRift = rift ? applyRiftShear(soa, rift, rift.W, rift.H, rift.strength, stillMarks) : null;
   // #1574 — the transport pass runs LAST: home is the presented placement
   // (post rhythm/drivers/nudge), and the sim's offsets fold on top. The
   // gate is the parity contract: no ephemeral input, 'still', or leash 0
@@ -876,6 +882,7 @@ export function buildPlacements({
   if (undoSurge) undoSurge(); // #1576 — reverse of application
   if (undoParallaxDrift) undoParallaxDrift(); // #1576 — reverse of application
   if (undoTravel) undoTravel(); // #1574 — reverse of application
+  if (undoRift) undoRift(); // #1183 rift — reverse of application
   if (undoNudge) undoNudge(); // #1183 — reverse of application
   if (undoKineme) undoKineme();
   if (undoRhythm) undoRhythm(); // #1198 — reverse of application
