@@ -274,6 +274,42 @@ export const HELP_TOPICS = [
     title: 'feed',
     text: 'Blends this track toward where the source was a frame ago. Strength is blend per frame — 0.16 breathes, 1.00 smears.',
   },
+  {
+    id: 'dish-life-off',
+    group: 'Master',
+    title: 'dish life · off',
+    text: 'DISH LIFE — a quiet Game of Life layer under the picture: marks near a living colony breathe and fray a little. The Director, the trio and the KINETIC buttons keep doing their thing. Off now (outline glider). Click to turn it on.',
+  },
+  {
+    id: 'dish-life-arming',
+    group: 'Master',
+    title: 'dish life · armed',
+    text: 'DISH LIFE is on (dotted glider) but waiting — it starts with the run. Click to turn it off.',
+  },
+  {
+    id: 'dish-life-on',
+    group: 'Master',
+    title: 'dish life · running',
+    text: 'DISH LIFE is running (solid glider): a quiet Game of Life colony makes nearby marks breathe and fray a little, and it breathes a bit more when the room goes idle. Click to turn it off.',
+  },
+  {
+    id: 'dish-life-slowed',
+    group: 'Master',
+    title: 'dish life · slowed',
+    text: 'DISH LIFE is running slowed (glider with a single bar): the frame-rate governor is spending it first to protect smoothness. It comes back by itself when the frame rate recovers. Click to turn it off.',
+  },
+  {
+    id: 'dish-life-held',
+    group: 'Master',
+    title: 'dish life · held',
+    text: 'DISH LIFE is held still (glider with pause bars): the governor has frozen the colony to protect the frame rate. It resumes by itself when the frame rate recovers. Click to turn it off.',
+  },
+  {
+    id: 'dish-life-strength',
+    group: 'Master',
+    title: 'dish life · strength',
+    text: 'How present the quiet layer is. It is always subtle — this only sets how much; 0 would be silent. Double-click to reset to 35%.',
+  },
 ];
 
 // #158: the single source of truth. Hover `title` attributes and the `?`
