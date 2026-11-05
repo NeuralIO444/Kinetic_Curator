@@ -1,6 +1,7 @@
 // node src/components/dishLifeChip.selfcheck.mjs
 // #1923 — the footer DISH LIFE chip's states and its per-viewer preference, pinned without a DOM.
 import assert from 'node:assert/strict';
+import { helpText } from '../data/helpCopy.js';
 import { readFileSync } from 'node:fs';
 import {
   dishLifeChipModel,
@@ -35,7 +36,8 @@ ok('off: the flag is not set (or the dial is 0) — the glyph is dark', () => {
 ok('the symbol lights only while the culture is actually running', () => {
   const m = dishLifeChipModel(on());
   assert.deepEqual([m.state, m.lit, m.percent], ['on', true, 35]);
-  assert.match(m.title, /Running at 35%/);
+  assert.match(m.title, /is running/);
+  assert.match(m.title, /\(35%\)$/);
   const arming = dishLifeChipModel(on({ dishLifeAwake: false }));
   assert.deepEqual([arming.state, arming.lit], ['arming', false], 'on but not yet running: armed, not lit');
 });
@@ -45,14 +47,25 @@ ok('the governor shows through: slowed, then held — both still lit, and the ti
   const b = dishLifeChipModel(on({ dishLifeShed: 2 }));
   assert.deepEqual([a.state, a.lit, b.state, b.lit], ['slowed', true, 'held', true]);
   assert.match(a.title, /governor/);
-  assert.match(b.title, /Held still/);
+  assert.match(b.title, /held still/);
   assert.equal(dishLifeChipModel(on({ dishLifeShed: 7 })).state, 'held', 'any deeper shed is held');
 });
 
-ok('the title promises the balance: a quiet layer, the other systems keep doing their thing', () => {
-  const t = dishLifeChipModel(on()).title;
+ok('the off title promises the balance: a quiet layer, the other systems keep doing their thing', () => {
+  const t = dishLifeChipModel({}).title;
   assert.match(t, /quiet/);
   assert.match(t, /Director, the trio and the KINETIC buttons/);
+});
+
+ok('every state reads its details from the help copy, each distinct', () => {
+  const states = [{}, on({ dishLifeAwake: false }), on(), on({ dishLifeShed: 1 }), on({ dishLifeShed: 2 })];
+  const titles = states.map((s) => dishLifeChipModel(s).title);
+  assert.equal(new Set(titles).size, 5, 'five states, five copies');
+  for (const s of states) {
+    const m = dishLifeChipModel(s);
+    assert.ok(m.title.startsWith(helpText(`dish-life-${m.state}`)), m.state);
+  }
+  assert.ok(helpText('dish-life-strength').length > 0);
 });
 
 ok('the percent is the dial, clamped, junk falls back to the default', () => {

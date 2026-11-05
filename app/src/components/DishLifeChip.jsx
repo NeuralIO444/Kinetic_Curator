@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { useStore } from '../state/store.js';
+import { helpText } from '../data/helpCopy.js';
 import { RangeRow } from './RangeRow.jsx';
 import {
   dishLifeChipModel,
@@ -63,10 +64,31 @@ export function DishLifeChip() {
         aria-label={m.label}
         title={m.title}
       >
-        <svg className="dish-life-glyph" viewBox="0 0 3 3" width="12" height="12" aria-hidden="true">
-          {GLIDER.map(([x, y]) => (
-            <rect key={`${x}${y}`} x={x + 0.1} y={y + 0.1} width="0.8" height="0.8" fill="currentColor" />
-          ))}
+        <svg className="dish-life-glyph" viewBox="0 0 5 3" width="20" height="12" aria-hidden="true">
+          {GLIDER.map(([x, y]) =>
+            m.state === 'off' || m.state === 'arming' ? (
+              <rect
+                key={`${x}${y}`}
+                x={x + 0.15}
+                y={y + 0.15}
+                width="0.7"
+                height="0.7"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="0.15"
+                strokeDasharray={m.state === 'arming' ? '0.3 0.2' : undefined}
+              />
+            ) : (
+              <rect key={`${x}${y}`} x={x + 0.1} y={y + 0.1} width="0.8" height="0.8" fill="currentColor" />
+            ),
+          )}
+          {m.state === 'slowed' ? <rect x="4" y="0.6" width="0.5" height="1.8" fill="currentColor" /> : null}
+          {m.state === 'held' ? (
+            <>
+              <rect x="3.7" y="0.6" width="0.45" height="1.8" fill="currentColor" />
+              <rect x="4.45" y="0.6" width="0.45" height="1.8" fill="currentColor" />
+            </>
+          ) : null}
         </svg>
       </button>
       {dishLife ? (
@@ -80,7 +102,7 @@ export function DishLifeChip() {
           defaultValue={35}
           onChange={onDial}
           ariaLabel="Dish life strength"
-          hint={`Dish life strength — ${m.percent}%. Always a quiet layer; this only sets how present it is.`}
+          hint={`${helpText('dish-life-strength')} (${m.percent}%)`}
         />
       ) : null}
     </div>
