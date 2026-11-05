@@ -14,6 +14,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { CREATURE_ASSET_ID } from '../app/src/curator/creatureCitizen.js'; // #1694 S2 — the pool citizen is never a placeable mark, here either
+import { ASSETS_KANA } from '../app/src/data/assets/assets-kana.js'; // #1982 — the poem-only kana stamps are never placeable marks either
+
+const KANA_IDS = new Set(ASSETS_KANA.map((a) => a.id));
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
 import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';
 import { resolvePalette } from '../app/src/data/palettes.js';
@@ -182,8 +185,10 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       // in gl/liveResolve.mjs: a still of an 'all'-era (or any) document must not place the
       // citizen as a mark. (A still also never BAKES creatures — the stills path has no spawn
       // channel; that predates citizenship and is unchanged by it.)
+      // #1982 — the kana stamps ride the same exclusion: poem-only, dealt by the
+      // FIELD director alone; a still must not place them as marks.
       const activeAssets = ASSETS
-        .filter((a) => a.id !== CREATURE_ASSET_ID && (!enabled || enabled[a.id]))
+        .filter((a) => a.id !== CREATURE_ASSET_ID && !KANA_IDS.has(a.id) && (!enabled || enabled[a.id]))
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
 
       const isSwarm = layoutParams.mode === 'swarm' || layoutParams.mode === 'hype';

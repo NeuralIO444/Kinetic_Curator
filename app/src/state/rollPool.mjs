@@ -11,6 +11,7 @@
 // Pure: the caller passes `rng` (() => [0,1)). The store passes the same honest die its rolls already use; the
 // selfchecks pass a seeded stream. The creature citizen is never dealt — it rides its own pool toggle.
 import { assetRecords, assetsWhere } from '../data/assetStyle.js';
+import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
 import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js'; // #1944
 import { resolveKit, kitsById } from '../data/kits.js'; // #1944
@@ -22,8 +23,8 @@ export const POOL_MAX = 6;
 /** How many families a mixed deal spans. */
 export const POOL_FAMILIES_MIN = 2;
 export const POOL_FAMILIES_MAX = 3;
-/** Never dealt by a roll. */
-export const NEVER_DEALT = Object.freeze(['creature']);
+/** Never dealt by a roll. #1982: the poem-only kana stamps ride with the citizen. */
+export const NEVER_DEALT = Object.freeze(['creature', ...ASSETS_KANA.map((a) => a.id)]);
 
 const pickIndex = (rng, n) => Math.min(n - 1, Math.floor(rng() * n));
 

@@ -23,7 +23,15 @@ import { GREENLEAF } from './greenleaf.js';
 import { TEIJO } from './teijo.js';
 import { ROSSELLI } from './rosselli.js';
 import { GIBSON } from './gibson.js';
-import { placePiece, stampIdForChar, glyphWidthEm, LETTER_STAMP_IDS, PLACEMENT_LAYOUTS } from './placement.js';
+import {
+  placePiece,
+  stampIdForChar,
+  kanaStampIdForChar,
+  glyphWidthEm,
+  LETTER_STAMP_IDS,
+  KANA_STAMP_IDS,
+  PLACEMENT_LAYOUTS,
+} from './placement.js';
 
 export const POET_DECKS = Object.freeze({
   greenleaf: GREENLEAF,
@@ -77,8 +85,13 @@ const GATE_EPS = 1e-6;
  * constraint, and returns a frozen verdict:
  *   { ok: true, reason: 'ok' }
  *   { ok: false, reason: 'charset' | 'fit' | 'overlap', stampIndex }
- * - charset: a stamp whose assetId is not the letter stamp for its glyph —
- *   the charset law (A-Z + 0-9 only) failed, so the stamp does not exist.
+ * - charset: a stamp whose assetId is not the stamp for its glyph — the
+ *   charset law failed, so the stamp does not exist. The letter law stands
+ *   (A-Z + 0-9); #1982 adds the kana set as a second, CONTEXT-BOUND charset:
+ *   a kana stamp passes only when the caller affirms the kana context
+ *   (`allowKana` — a kana deal at the deal site, a declared kana form at
+ *   the document door). Everywhere else kana is refused, exactly as any
+ *   other non-letter glyph always was.
  * - fit: a stamp that cannot fit its module — crushed below
  *   FIELD_MIN_LEGIBLE_EM by the fit shrink, or ink that lands off the dish.
  * - overlap: two stamps whose ink boxes intersect — glyphs piled into each
@@ -87,14 +100,15 @@ const GATE_EPS = 1e-6;
  * a stamp's ink is glyphWidthEm(ch)*em wide and em tall, centred on (x, y).
  * Pure: same stamps in, same verdict out.
  */
-export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT } = {}) {
+export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana = false } = {}) {
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
   if (!Array.isArray(stamps) || stamps.length === 0) return Object.freeze({ ok: false, reason: 'fit', stampIndex: -1 });
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
-    if (!s || typeof s !== 'object' || !LETTER_STAMP_IDS.has(s.assetId) || stampIdForChar(s.ch) !== s.assetId) {
-      return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
-    }
+    if (!s || typeof s !== 'object') return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
+    if (LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId) continue;
+    if (allowKana && KANA_STAMP_IDS.has(s.assetId) && kanaStampIdForChar(s.ch) === s.assetId) continue;
+    return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
   }
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
@@ -146,12 +160,20 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   if (!piece) return silent;
   const density = Number.isFinite(decision.density) ? decision.density : piece.density;
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
-  const { layout, stamps } = placePiece({ ...piece, density }, rng, { aspect: asp });
+  // #1982 — the script is the Director's visual call, carried on the decision
+  // (choosePoet sets it only for a Teijo pick in a Japanese-context room).
+  // A kana deal places the piece's kanaLines through the same recipes; a
+  // piece with no kanaLines deals its Latin lines — the deck is the
+  // authority, the script is a face it may or may not carry.
+  const kana = decision.script === 'kana' && Array.isArray(piece.kanaLines) && piece.kanaLines.length > 0;
+  const { layout, stamps } = placePiece({ ...piece, lines: kana ? piece.kanaLines : piece.lines, density }, rng, {
+    aspect: asp,
+  });
   if (stamps.length < FIELD_POEM_MIN_STAMPS) return silent; // #1932 — the threshold: a fragment is not a poem
   // S4 (#1905) — the stillborn gate: a form that would spawn unreadable
   // never spawns. The deal falls back to silence and the verdict rides the
   // record (layoutSlice banks it on the commit as fieldGateRefusal).
-  const gate = gateFieldForm(stamps, { aspect: asp });
+  const gate = gateFieldForm(stamps, { aspect: asp, allowKana: kana });
   if (!gate.ok) return { form: null, gate };
   return {
     form: {
@@ -159,6 +181,7 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
       pieceId: piece.id,
       layout,
       aspect: asp,
+      ...(kana ? { script: 'kana' } : {}),
       stamps: stamps.map((s) => ({
         assetId: s.assetId,
         ch: s.ch,
@@ -192,23 +215,34 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  * Validate a raw fieldForm payload (document data). Returns a normalized
  * copy carrying only the known fields, or null when the form is absent or
  * dishonest in any particular — unknown poet or layout, a stamp id that is
- * not a letter stamp or does not match its glyph, a position off the dish,
- * a non-finite size/rotation, or a stamp count outside 1..MAX_FIELD_STAMPS.
+ * not a stamp for its glyph, a position off the dish, a non-finite
+ * size/rotation, or a stamp count outside 1..MAX_FIELD_STAMPS. #1982: a
+ * kana stamp is honest only inside a declared kana form (script: 'kana')
+ * under Teijo, the one poet whose deck carries the script in this slice.
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps } = raw;
+  const { poetId, pieceId, layout, aspect, stamps, script } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
   if (!Number.isFinite(aspect) || aspect < 0.5 || aspect > 3) return null;
   if (!Array.isArray(stamps) || stamps.length === 0 || stamps.length > MAX_FIELD_STAMPS) return null;
+  // #1982 — the script marker: absent/'latin' is the letter charset; 'kana'
+  // is a declared kana form. Kana is Teijo's face in this slice — a kana
+  // form under any other poet, or kana stamps under any other marker, is
+  // dishonest data and is refused whole.
+  if (script !== undefined && script !== 'latin' && script !== 'kana') return null;
+  const kanaForm = script === 'kana';
+  if (kanaForm && poetId !== 'teijo') return null;
   const out = new Array(stamps.length);
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
     if (!s || typeof s !== 'object') return null;
-    if (!LETTER_STAMP_IDS.has(s.assetId)) return null;
-    if (typeof s.ch !== 'string' || s.ch.length !== 1 || stampIdForChar(s.ch) !== s.assetId) return null;
+    if (typeof s.ch !== 'string' || s.ch.length !== 1) return null;
+    const isLetter = LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId;
+    const isKana = KANA_STAMP_IDS.has(s.assetId) && kanaStampIdForChar(s.ch) === s.assetId;
+    if (kanaForm ? !isKana : !isLetter) return null;
     if (!Number.isFinite(s.x) || s.x < 0 || s.x > aspect) return null;
     if (!Number.isFinite(s.y) || s.y < 0 || s.y > 1) return null;
     if (!Number.isFinite(s.rotation)) return null;
@@ -219,6 +253,6 @@ export function sanitizeFieldForm(raw) {
   // whose stamps are individually honest but jointly unreadable (ink off
   // the dish, glyphs overlapping, type crushed under the legibility
   // floor) is refused whole, exactly as at the deal.
-  if (!gateFieldForm(out, { aspect }).ok) return null;
-  return { poetId, pieceId, layout, aspect, stamps: out };
+  if (!gateFieldForm(out, { aspect, allowKana: kanaForm }).ok) return null;
+  return { poetId, pieceId, layout, aspect, ...(kanaForm ? { script: 'kana' } : {}), stamps: out };
 }

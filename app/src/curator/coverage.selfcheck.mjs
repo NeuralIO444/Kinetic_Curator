@@ -18,6 +18,7 @@
 import { AUDIO_RIG_KEYS } from '../state/audioRig.js';
 import assert from 'node:assert';
 import { ASSETS } from '../data/assets/index.js';
+import { CHAPTER_UNDEALT } from '../data/chapters.js';
 import { MORPHABLE_KEYS } from '../state/paramUtils.js';
 import {
   diceTrayCoverage,
@@ -182,9 +183,13 @@ assert.ok(
   dice.candidates.distinct >= 285,
   `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 282-292 by seed)`,
 );
+// #1982 — the ceiling guards DEALABLE assets: the never-dealt class (the
+// creature citizen + the poem-only kana stamps, CHAPTER_UNDEALT) never trays
+// by design, so it is excluded by name; the catalogue-wide count rides along.
+const dealableNever = dice.tray.neverIds.filter((id) => !CHAPTER_UNDEALT.includes(id)).length;
 assert.ok(
-  dice.tray.neverCount <= 40,
-  `never-tray ceiling: ${dice.tray.neverCount} (#1546 measured 31 on this stream; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
+  dealableNever <= 40,
+  `never-tray ceiling: ${dealableNever} dealable (${dice.tray.neverCount} catalogue-wide; #1546 measured 31 on this stream; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
 );
 assert.ok(
   cat.radial.inTray >= 15,

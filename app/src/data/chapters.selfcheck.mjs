@@ -169,8 +169,8 @@ assert.deepEqual(
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
   assert.equal(
     ASSETS.length,
-    313,
-    'the library is 313: the 295 S1 found + #1854’s 18 authored marks (no existing record edited)',
+    476,
+    'the library is 476: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps, which CHAPTER_UNDEALT keeps out of every deck',
   );
 }
 

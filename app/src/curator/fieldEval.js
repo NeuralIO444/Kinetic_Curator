@@ -34,6 +34,10 @@ export function step(state, input, rng) {
     // family (input.lookFamily); only a type-native family is eligible.
     // No family named → not eligible → silence (the default).
     typeEligible: isTypeNativeFamily(input.lookFamily),
+    // #1982 — the kana context is narrower than type-eligibility: only a
+    // Japanese room deals Teijo in her native script (a Swiss room is
+    // type-native too, and deals her Latin face).
+    japaneseContext: input.lookFamily === 'japanese',
   });
   const nextRoom = preferredNext(verdict, rng);
   const nextState = {

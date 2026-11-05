@@ -14,7 +14,9 @@
 //
 // Glyph metrics: Anton is a condensed grotesque; letters sit on a shared
 // advance so lines are measurable. A space is a placement GAP (wider advance,
-// no stamp) — the charset law: only A-Z + 0-9 exist as typ_* stamps.
+// no stamp) — the charset law: A-Z + 0-9 exist as letter stamps, and (#1982)
+// the kana set exists as poem-only stamps for eligible Teijo deals; any other
+// character has no stamp and a line carrying one does not map.
 //
 // Recipes (spec table, docs/design/field-poets-spec-2026-10-31.md):
 //   grid   Greenleaf — strict grid, even spacing, no rotation.
@@ -28,6 +30,7 @@
 // hot/cool behaviour in data form); it never changes the recipe's constraints.
 
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js';
+import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -38,11 +41,32 @@ export function stampIdForChar(ch) {
   return LETTER_STAMP_IDS.has(id) ? id : null;
 }
 
+/**
+ * #1982 (FIELD stamps slice 1) — the kana stamps: 163 poem-only stamps baked
+ * from the kana pack (46 basic + 25 dakuten/handakuten + 10 small per script,
+ * plus the long-vowel mark). They exist for the poem system alone: the pack
+ * joins the catalogue after the authored bake so the census and the stage
+ * atlas resolve them, and the pool panel (panels/assetPoolLogic.js) and the
+ * placeable pool (gl/liveResolve.mjs) exclude them by this same id set.
+ */
+export const KANA_STAMP_IDS = Object.freeze(new Set(ASSETS_KANA.map((a) => a.id)));
+const KANA_ID_BY_CHAR = new Map(ASSETS_KANA.map((a) => [a.glyph, a.id]));
+
+/** 'あ' -> 'typ_h_a', 'ガ' -> 'typ_k_ga'; anything else -> null (no kana stamp exists). */
+export function kanaStampIdForChar(ch) {
+  return KANA_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/** Any glyph the poem system can stamp: a letter/digit stamp or a kana stamp. */
+export function stampIdForGlyph(ch) {
+  return stampIdForChar(ch) ?? kanaStampIdForChar(ch);
+}
+
 /** True when every non-space character of the line maps to an existing stamp. */
 export function lineMapsToStamps(line) {
   for (const ch of String(line)) {
     if (ch === ' ') continue;
-    if (!stampIdForChar(ch)) return false;
+    if (!stampIdForGlyph(ch)) return false;
   }
   return true;
 }
@@ -56,17 +80,26 @@ export const PLACEMENT_LAYOUTS = Object.freeze(['grid', 'bands', 'single', 'two'
  * advance was narrower than M/W at 0.78–0.80 em, and with the stage scale 2.3x too large every word collided).
  */
 export const GLYPH_CAP_UNITS = 80;
+const inkWidthEm = (svg) => {
+  const nums = (svg.match(/d="([^"]+)"/g) || []).join(' ').match(/-?\d+(?:\.\d+)?/g) || [];
+  const xs = nums.filter((_, i) => i % 2 === 0).map(Number);
+  return xs.length ? (Math.max(...xs) - Math.min(...xs)) / GLYPH_CAP_UNITS : 0.5;
+};
 const GLYPH_W = (() => {
   const out = {};
-  for (const a of ASSETS_LETTERS) {
-    const nums = (a.svg.match(/d="([^"]+)"/g) || []).join(' ').match(/-?\d+(?:\.\d+)?/g) || [];
-    const xs = nums.filter((_, i) => i % 2 === 0).map(Number);
-    out[a.id.slice(4)] = xs.length ? (Math.max(...xs) - Math.min(...xs)) / GLYPH_CAP_UNITS : 0.5;
-  }
+  for (const a of ASSETS_LETTERS) out[a.id.slice(4)] = inkWidthEm(a.svg);
+  // #1982 — kana measured by the same ruler (the kana pack bakes to the same
+  // 100-unit box, body height = GLYPH_CAP_UNITS), keyed by the glyph itself.
+  for (const a of ASSETS_KANA) out[a.glyph] = inkWidthEm(a.svg);
   return Object.freeze(out);
 })();
-/** The widest glyph's ink width, em units (W). The grid and square recipes use it as their even cell. */
-export const GLYPH_MAX_W = Math.max(...Object.values(GLYPH_W));
+/**
+ * The widest LETTER's ink width, em units (W). The grid and square recipes use it as their even
+ * cell — deliberately letters only: those recipes are the Latin poets' (Greenleaf's grid,
+ * Rosselli's quadro), and a kana deal rides the proportional recipes (bands/single), where each
+ * glyph advances by its own measured width. Kana widths never move a Latin placement.
+ */
+export const GLYPH_MAX_W = Math.max(...ASSETS_LETTERS.map((a) => GLYPH_W[a.id.slice(4)]));
 /** A glyph's ink width in em units (0 for a space or a character with no stamp). */
 export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
 const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through
@@ -112,7 +145,7 @@ function layLine(line, { ox, oy, em, adv, spaceAdv }) {
     if (ch !== ' ') {
       out.push(
         Object.freeze({
-          assetId: stampIdForChar(ch),
+          assetId: stampIdForGlyph(ch),
           ch,
           // the glyph's ink centred in its own advance (minus the trailing track)
           x: ox + (cursor + (a - TRACK) / 2) * em,
@@ -236,7 +269,7 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
         if (ch !== ' ') {
           stamps.push(
             Object.freeze({
-              assetId: stampIdForChar(ch),
+              assetId: stampIdForGlyph(ch),
               ch,
               x: ox + (cell + 0.5) * step,
               y: oy + (r + 0.5) * step,

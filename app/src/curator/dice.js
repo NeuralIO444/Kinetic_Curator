@@ -12,6 +12,15 @@
 //   - wildness from Davis's state: UGLY wilder, FLOW calmer
 //   - same-category weak prior + learned co-occurrence from the crown log
 import { STUB_VOICES } from '../data/voices.js';
+import { ASSETS_KANA } from '../data/assets/assets-kana.js';
+
+// #1982 — the poem-only kana stamps are never dealt as marks, by any caller:
+// the FIELD director deals them alone, as poem type. dealCast is the cast
+// chokepoint (the dice tray and the miner both deal through it), so the pack
+// is filtered here, by id — every other asset, the creature citizen
+// included, rides exactly as before.
+const KANA_IDS = new Set(ASSETS_KANA.map((a) => a.id));
+const withoutKana = (list) => (list.some((a) => KANA_IDS.has(a.id)) ? list.filter((a) => !KANA_IDS.has(a.id)) : list);
 
 /** Candidates dealt per roll before shortlisting (the Lois pass: show this count). */
 export const DICE_CANDIDATES_BASE = 8;
@@ -181,7 +190,9 @@ function pickWeighted(pool, picked, crowns, rng, wildness) {
  * one displaced draw — the size-2 coin flip — is consumed explicitly), so
  * anchoring one candidate never perturbs the dealing of any other.
  */
-export function dealCast(assets, size, rng, wildness, crowns, anchorPool = null) {
+export function dealCast(assetsIn, size, rng, wildness, crowns, anchorPoolIn = null) {
+  const assets = withoutKana(assetsIn);
+  const anchorPool = anchorPoolIn ? withoutKana(anchorPoolIn) : null;
   const picked = [];
   const take = (pred) => {
     const a = pickWeighted(poolFor(assets, pred), picked, crowns, rng, wildness);

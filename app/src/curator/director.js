@@ -550,7 +550,15 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       // re-reading the last tick's verdict must not count as fresh hot observations and steer the next
       // CURATOR press's pool (#1918 review).
       fieldState = { ...fieldState, lastPoet: r.decision ? r.decision.poetId : null };
-      return r.decision ? { poetId: r.decision.poetId, pieceId: r.decision.pieceId, layout: r.decision.layout } : null;
+      return r.decision
+        ? {
+            poetId: r.decision.poetId,
+            pieceId: r.decision.pieceId,
+            layout: r.decision.layout,
+            // #1982 — the script call (Teijo in kana, Japanese rooms only) rides the deal.
+            ...(r.decision.script ? { script: r.decision.script } : {}),
+          }
+        : null;
     },
     /** FIELD state as of the last tick, for the selfcheck (#1907). Never rendered. */
     get fieldState() {

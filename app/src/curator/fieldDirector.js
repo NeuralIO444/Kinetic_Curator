@@ -84,6 +84,7 @@ export function choosePoet({
   rng = () => 0.5,
   lastRejected = false,
   typeEligible = false,
+  japaneseContext = false,
 } = {}) {
   // #1932 — the genre gate outranks temperature: a non-type-native room is
   // silent, full stop.
@@ -116,6 +117,11 @@ export function choosePoet({
     lines: piece.lines,
     layout: piece.layout || 'bands',
     density,
+    // #1982 — script is a visual, so it is the Director's call (the poets own
+    // words + form): in a Japanese-context room a Teijo pick deals in her
+    // native script. The marker rides the decision; fieldForm places the
+    // deck's kanaLines for it, and a Swiss/Bauhaus room never sees it.
+    ...(poetId === 'teijo' && japaneseContext ? { script: 'kana' } : {}),
   };
 }
 
