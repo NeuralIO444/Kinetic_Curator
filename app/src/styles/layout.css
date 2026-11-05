@@ -190,7 +190,7 @@
     display: none;
   }
   .palette-harmony {
-    width: 76px;
+    width: 100px; /* #1973 — wide enough for "ANALOGOUS" whole (76px cut its final S) */
     margin-left: 0;
   }
   .palette-strip {
@@ -931,6 +931,20 @@
   display: inline-flex;
   gap: 3px;
   align-items: center;
+}
+/* #1973 — the chip strip yields, the controls never do: with long palette names the four chips used to push the
+   lab / harmony / shuffle block past the window's right edge (shuffle unreachable). The row shrinks, the track clips
+   its tail (the active chip scrolls itself into view), and the controls keep their full width. */
+.palette-strip .palette-row > .palette-chip-track {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.palette-strip .palette-row > .palette-controls {
+  flex: 0 0 auto;
+}
+.palette-strip .palette-harmony {
+  flex: 0 0 auto;
 }
 
 .run-btn {

@@ -347,7 +347,10 @@ export function PaletteStrip() {
         className="palette-switch"
         style={{ flex: 1, minWidth: 0, width: '100%', display: 'flex', alignItems: 'center' }}
       >
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        <div
+          className="palette-row"
+          style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}
+        >
           <span className="palette-mix" style={{ flexShrink: 0, marginLeft: 0 }}>
             <button
               type="button"
