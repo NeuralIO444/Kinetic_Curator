@@ -478,8 +478,9 @@ export function DavisPanel() {
           </>
         )}
 
-        <div className="davis-section-label ttl">the deal</div>
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 6 }}>
+        {/* the role-deal switch rides sectionless at the foot of the panel — the DIRECTORS section set is pinned
+            (e2e/director-regroup), so it adds no section label */}
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
           <DavisRoleDealSwitch />
         </div>
 
