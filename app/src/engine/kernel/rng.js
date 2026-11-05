@@ -195,6 +195,9 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // offset is the identity for its draws; the registration keeps the name
   // accounted for (the #1238 rule).
   'field-deal': 'spatial',
+  // #1923 — DISH LIFE's random test/seed fill (engine/dishLife.mjs seedRandom) is placement: the spatial
+  // stream. The rule itself draws nothing, so a culture is a pure function of its seeded grid.
+  'dish-life': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

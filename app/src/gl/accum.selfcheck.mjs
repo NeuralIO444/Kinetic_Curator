@@ -39,6 +39,8 @@ import {
   sanitizeAccumScan,
   sanitizeAccumScanDirection,
   scanDelayRamp,
+  scanBlendRamp,
+  SCAN_FEATHER,
   scanDelayAt,
   SCAN_LUT_WIDTH,
   sanitizeAudioSample,
@@ -390,6 +392,69 @@ ok('scanDelayAt: the mirror reads the LUT texel the GPU samples (#1804)', () => 
   for (const x of [0, 64, 128, 192, 255]) assert.equal(scanDelayAt(lut, x, SCAN_LUT_WIDTH), lut[x]);
   // w = 8: texel floor((x + 0.5) / 8 · 256) = 32x + 16 (NEAREST at pixel centers).
   for (let x = 0; x < 8; x++) assert.equal(scanDelayAt(lut, x, 8), lut[32 * x + 16]);
+});
+
+ok('scanBlendRamp: the band edges ease — no step anywhere in the delay (the 1-tap mid-screen line)', () => {
+  const eff = (o) => {
+    const d = scanDelayRamp(o);
+    const b = scanBlendRamp(o);
+    return Array.from(d, (v, i) => v + b[i] / 255);
+  };
+  // ECHOES LOW (1 tap) + SCAN HIGH was two bands: live | one frame ago, a hard edge at x = 50%.
+  const one = eff({ taps: 1, scan: 1 });
+  let worst = 0;
+  for (let i = 1; i < one.length; i++) {
+    assert.ok(one[i] >= one[i - 1] - 1e-12, 'time never runs backwards across the frame');
+    worst = Math.max(worst, one[i] - one[i - 1]);
+  }
+  assert.ok(worst < 0.1, `largest per-texel delay step ${worst.toFixed(3)} — a hard edge would be 1`);
+  assert.equal(one[0], 0, 'the left edge is still the live frame');
+  assert.equal(one[SCAN_LUT_WIDTH - 1], 1, 'the right edge is still the full tap');
+  // Every depth: continuous, and the quantised bands (the staccato look) survive in the band cores.
+  for (const taps of [1, 2, 3, 4])
+    for (const direction of [1, -1]) {
+      const e = eff({ taps, scan: 1, direction });
+      for (let i = 1; i < e.length; i++)
+        assert.ok(Math.abs(e[i] - e[i - 1]) < 0.2, `taps ${taps} dir ${direction} tex ${i}`);
+    }
+  const d = scanDelayRamp({ taps: 4, scan: 1 });
+  const b = scanBlendRamp({ taps: 4, scan: 1 });
+  assert.ok(b[0] === 0 && b[8] === 0, 'a band core is one pure tap');
+  assert.equal(b[SCAN_LUT_WIDTH - 1], 0, 'the last tap has no next band to ease into');
+  assert.ok(Math.max(...b) === 255 || Math.max(...b) > 240, 'a band ends fully eased into the next tap');
+  assert.ok(
+    scanBlendRamp({ taps: 4, scan: 0 }).every((v) => v === 0),
+    'scan 0: no blend (plain echoes)',
+  );
+  assert.equal(b.length, d.length);
+  assert.ok(SCAN_FEATHER > 0 && SCAN_FEATHER <= 0.5, 'a feather, not a smear');
+});
+
+ok('mirror: the 1-tap slit-scan has no mid-screen step (ECHOES LOW + SCAN HIGH)', () => {
+  const w = 64,
+    h = 1,
+    n = w * h * 4;
+  const flat = (v) => {
+    const f = new Float64Array(n);
+    for (let i = 0; i < n; i += 4) {
+      f[i] = v;
+      f[i + 3] = 1;
+    }
+    return f;
+  };
+  const params = accumRecipeParams({ fade: 1, optics: 0, echoes: 1, scan: 1 });
+  const echo = createEchoState();
+  const silent = new Float64Array(n);
+  let out = null;
+  for (const v of [0.9, 0.1]) out = mirrorAccumStep({ accum: silent, frame: flat(v), w, h, params, echo });
+  const row = Array.from({ length: w }, (_, x) => out[x * 4]);
+  // live 0.1 on the left, the 0.9 frame at the tap's 0.5 weight (0.45) on the right.
+  assert.ok(Math.abs(row[0] - 0.1) < 1e-12 && Math.abs(row[w - 1] - 0.45) < 1e-12, 'the ends keep their moments');
+  let worst = 0;
+  for (let x = 1; x < w; x++) worst = Math.max(worst, Math.abs(row[x] - row[x - 1]));
+  assert.ok(worst < 0.12, `largest column-to-column step ${worst.toFixed(3)} — the hard edge was 0.35`);
+  const mid = row.slice(w / 2 - 1, w / 2 + 1);
+  assert.ok(Math.abs(mid[1] - mid[0]) < 0.12, 'no line at x = 50%');
 });
 
 ok('applyAudioEnvelope: silence is identity, loudness/flux/beat modulate', () => {
@@ -1288,19 +1353,21 @@ ok('mirror: slit-scan selects one moment per column (#1804)', () => {
     return out;
   };
   const row = (buf) => Array.from({ length: w8 }, (_, x) => buf[x * 4]);
-  const nearRow = (a, b) =>
-    a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < 1e-12, `col ${i}: got ${v}, want ${b[i]}`));
+  const nearRow = (a, b, tol = 1e-12) =>
+    a.forEach((v, i) => assert.ok(Math.abs(v - b[i]) < tol, `col ${i}: got ${v}, want ${b[i]}`));
   // Echoes 3 → weights [0.5, 0.35, 0.25]; after 4 steps the ring holds
   // 0.1 / 0.3 / 0.5 and the live frame is 0.7. At w = 8 the ramp's delays
   // are [0,0,1,1,2,2,3,3] (LUT texels 32x+16) — one moment per column at
   // its tap's weight: live 0.7 · tap0 0.5×0.5 · tap1 0.3×0.35 · tap2 0.1×0.25.
   const scanned = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 1 }));
-  nearRow(row(scanned), [0.7, 0.7, 0.25, 0.25, 0.105, 0.105, 0.025, 0.025]);
+  // SCAN_FEATHER eases the far half of each band into the next tap, so the columns
+  // that sit late in a band (1, 3, 5) sit between taps — pinned to 4 digits (LUT bytes).
+  nearRow(row(scanned), [0.7, 0.4653, 0.25, 0.1744, 0.105, 0.0633, 0.025, 0.025], 1e-3);
   const r = row(scanned);
   for (let x = 1; x < w8; x++) assert.ok(r[x] <= r[x - 1], 'monotonic time progression across x');
-  // The flip mirrors the frame: the deep past moves to the left edge.
+  // The flip puts the deep past on the left edge (the feather stays on each band's far edge, so it is not a pixel mirror).
   const flipped = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 1, scanDirection: -1 }));
-  nearRow(row(flipped), [0.025, 0.025, 0.105, 0.105, 0.25, 0.25, 0.7, 0.7]);
+  nearRow(row(flipped), [0.025, 0.025, 0.0667, 0.105, 0.1806, 0.25, 0.4847, 0.7], 1e-3);
   // SCAN = 0 is the additive mix, unchanged: 0.7 + 0.5·0.5 + 0.3·0.35 + 0.1·0.25.
   const plain = run(accumRecipeParams({ fade: 1, optics: 0, echoes: 3, scan: 0 }));
   nearRow(row(plain), Array(8).fill(0.7 + 0.5 * 0.5 + 0.35 * 0.3 + 0.25 * 0.1));

@@ -160,6 +160,11 @@ export function usePerformanceGovernor() {
   // order and the shed overlay are unmoved; only the sensor's scope
   // matches the per-stratum mechanism. (Snapshots exist only for KC
   // strata, so the snapshot scan is the non-active strata by construction.)
+  // #1923 — the DISH LIFE rung (cut 1.39, first after the pixel trim): the shed overlay (0 live, 1 trickle, 2 held),
+  // and whether a culture is awake (the loop publishes it) — no awake culture, no rung.
+  const dishLifeShed = useStore((s) => s.dishLifeShed);
+  const setDishLifeShed = useStore((s) => s.setDishLifeShed);
+  const dishLifeActive = useStore((s) => s.dishLifeAwake);
   const travelShed = useStore((s) => s.travelShed);
   const setTravelShed = useStore((s) => s.setTravelShed);
   // #1576 — P3's siblings are travel too: a scene whose only travel is
@@ -249,6 +254,8 @@ export function usePerformanceGovernor() {
       effectiveCount: layoutParams?.count,
       creatureCount,
       creatureShed,
+      dishLifeActive,
+      dishLifeShed,
       weatherActive,
       weatherShed,
       feedbackWarpActive,
@@ -272,6 +279,8 @@ export function usePerformanceGovernor() {
       layoutParams,
       creatureCount,
       creatureShed,
+      dishLifeActive,
+      dishLifeShed,
       weatherActive,
       weatherShed,
       feedbackWarpActive,
@@ -598,6 +607,7 @@ export function usePerformanceGovernor() {
       slowRender,
       slowRenderSource,
       creatureShed,
+      dishLifeShed,
       travelShed,
       weatherShed,
       feedbackWarpShed,
@@ -612,6 +622,9 @@ export function usePerformanceGovernor() {
           break;
         case 'renderScale':
           setRenderScale(1);
+          break;
+        case 'dishLife':
+          setDishLifeShed(0);
           break;
         case 'markWeather':
           setWeatherShed(false);
@@ -706,6 +719,9 @@ export function usePerformanceGovernor() {
       case 'trailSteer':
         setTrailSteerShed(true);
         break;
+      case 'dishLife':
+        setDishLifeShed(cut.dishLifeShed);
+        break;
       case 'creatureCount':
         setCreatureShed(cut.creatureShed);
         break;
@@ -775,6 +791,8 @@ export function usePerformanceGovernor() {
     trailSteerActive,
     trailSteerShed,
     setTrailSteerShed,
+    dishLifeShed,
+    setDishLifeShed,
     travelActive,
     travelShed,
     setTravelShed,
