@@ -18,6 +18,7 @@ import { VOICE_DECK } from '../data/voiceDeck.js';
 import { ASSETS } from '../data/assets/index.js';
 import { SEED_KITS, kitsById, resolveKit } from '../data/kits.js'; // #1946
 import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
+import { BeastSettings } from '../components/BeastSettings.jsx';
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 
@@ -291,6 +292,7 @@ export function WetLab({ assetId, onClose }) {
                 {beastNote && beastNote.status === 'nobody' && 'no new beast could be dealt on this seed'}
               </span>
             </div>
+            <BeastSettings />
             {/* #1868 — the family-resemblance readout: each beast's foot-path signature, the solver's own curve, drawn to one
                 frame with its nearest relative's (dim) so a mutation's kink is something the eye judges. Inspection
                 surface only: the stage is never annotated. */}

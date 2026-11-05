@@ -310,6 +310,48 @@ export const HELP_TOPICS = [
     title: 'dish life · strength',
     text: 'How present the quiet layer is. It is always subtle — this only sets how much; 0 would be silent. Double-click to reset to 35%.',
   },
+  {
+    id: 'beast-roam',
+    group: 'Assets',
+    title: 'beast · roam',
+    text: 'On: a Strandbeest walks across the stage — its feet carry it, and a turn is one side of its legs running ahead of the other. Off: it walks in place on its pin. Applies to every beast on the stage.',
+  },
+  {
+    id: 'beast-turn',
+    group: 'Assets',
+    title: 'beast · turn',
+    text: 'How hard a roaming beast turns: 0 never turns and walks straight, 100% turns with one side nearly stopped. Double-click to reset to 50%.',
+  },
+  {
+    id: 'beast-trace',
+    group: 'Assets',
+    title: 'beast · trace',
+    text: 'On: each foot-fall leaves a faint ovoid in the shape of that beast’s own gait, which fades as it walks on. Off: the feet leave nothing.',
+  },
+  {
+    id: 'beast-trace-ink',
+    group: 'Assets',
+    title: 'beast · ink',
+    text: 'How dark a fresh trace is against the beast itself. Double-click to reset to 35%.',
+  },
+  {
+    id: 'beast-trace-fade',
+    group: 'Assets',
+    title: 'beast · fade',
+    text: 'How long a trace lingers: seconds for it to fall to about a third of its ink. Double-click to reset to 8s.',
+  },
+  {
+    id: 'beast-trace-count',
+    group: 'Assets',
+    title: 'beast · marks',
+    text: 'The most traces alive at once per beast — each costs one more mark on the stage. 0 leaves none. Double-click to reset to 6.',
+  },
+  {
+    id: 'davis-role-deal',
+    group: 'Directors',
+    title: 'davis · role deal',
+    text: 'On: Davis deals a creature’s parts by fit — the best body-shaped shapes in the pile become the body, the best limb-shaped become limbs. Off: the older deal, parts by seed alone.',
+  },
 ];
 
 // #158: the single source of truth. Hover `title` attributes and the `?`

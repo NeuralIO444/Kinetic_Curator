@@ -52,6 +52,7 @@ import {
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { sourceRecord, breedCreature, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
+import { BEAST_SETTING_DEFAULTS, sanitizeBeastSettings } from '../../engine/beastSettings.mjs';
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
 
 // HYPE Processing aesthetic: start with exactly 4 curated assets, not all 205
@@ -578,6 +579,12 @@ export const createGlobalSlice = (set) => ({
    * resolver input. Restores whole when pressure clears (governorCuts' restore table). */
   creatureShed: 0,
   setCreatureShed: (n) => set({ creatureShed: Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0 }),
+  /** The beast's roam / trace and Davis's role deal, reachable (engine/beastSettings.mjs). Runtime only for now; the
+   * defaults build the exact contract an untouched instrument always built. */
+  beastSettings: { ...BEAST_SETTING_DEFAULTS },
+  setBeastSetting: (key, value) =>
+    set((st) => ({ beastSettings: sanitizeBeastSettings({ ...st.beastSettings, [key]: value }) })),
+  resetBeastSettings: () => set({ beastSettings: { ...BEAST_SETTING_DEFAULTS } }),
   /** #1923 DISH LIFE — the idle-only Game-of-Life culture is opt-in (off by default until the feel gate). Never
    * serialized into a document; window.__KC_DISH_LIFE is the runtime switch. */
   dishLife: false,

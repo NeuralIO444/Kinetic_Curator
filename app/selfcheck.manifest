@@ -151,6 +151,7 @@ node src/styles/selects.selfcheck.mjs
 node src/components/retiredEmoji.selfcheck.mjs
 node src/components/casingInCss.selfcheck.mjs
 node src/components/dishLifeChip.selfcheck.mjs
+node src/engine/beastSettings.selfcheck.mjs
 node src/state/enabledAssetsRoundTrip.selfcheck.mjs
 node src/state/bundle.selfcheck.mjs
 node src/state/bundleParts.selfcheck.mjs
