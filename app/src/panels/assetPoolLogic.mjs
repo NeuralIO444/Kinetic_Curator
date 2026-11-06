@@ -5,13 +5,21 @@ import { FACETS } from '../data/assetFacets.js';
 import { ROLES } from '../assets/assetRoles.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
+import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
+import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
+import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 
 // #1982 — the kana stamps are poem-only (FIELD): catalogue members so the
 // census and the stage atlas resolve them, but they never become pool
 // records — no tiles, no facet counts, no change to the pool's numbers.
 // #1998 — the curated kanji stamps join the same exclusion, by the same ids
 // pattern: the poem-only set is the native-script union (kana + kanji).
-const POEM_ONLY_IDS = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
+// #2002 — the slice-3 packs (Anton lowercase + punctuation, the serif face,
+// the ornaments) join the same exclusion: the poem-only set is the whole
+// union the FIELD director deals alone (poets/placement.js POEM_ONLY_STAMP_IDS).
+const POEM_ONLY_IDS = new Set(
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+);
 
 /** Descriptor records for the pool: library assets read baked traits + the document's edits, imports their own. */
 export function poolDescriptors(assets, assetTags = {}) {

@@ -20,7 +20,7 @@
 import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, fullShapeSet } from './voices.js';
 import { resolvePalette } from './palettes.js';
 import { ASSETS } from './assets/index.js';
-import { NATIVE_STAMP_IDS } from '../poets/placement.js'; // #2000: the poem-only union (kana ∪ kanji)
+import { POEM_ONLY_STAMP_IDS } from '../poets/placement.js'; // #2000: the poem-only union (then kana ∪ kanji); #2002: the union grew — placement's POEM_ONLY_STAMP_IDS is the one set
 import { assetRecords, assetsWhere } from './assetStyle.js';
 import { mkRng } from '../engine/prng.js';
 
@@ -851,10 +851,13 @@ const VARIANTS = {
 
 const records = assetRecords(ASSETS);
 // #2000 — the family wardrobe draw reads from the catalogue minus the
-// poem-only union (kana ∪ kanji — NATIVE_STAMP_IDS, the same set every
-// other surface excludes by). The full `records` above stay as they are;
-// only the draw's source narrows (see familyPool).
-const wardrobeRecords = records.filter((r) => !NATIVE_STAMP_IDS.has(r.id));
+// poem-only union (POEM_ONLY_STAMP_IDS, the same set every other surface
+// excludes by — #2000: kana ∪ kanji; #2002: the union grew by the Latin,
+// serif and ornament packs, and the draw reads the grown set so no
+// poem-only stamp of any slice can enter a family wardrobe). The full
+// `records` above stay as they are; only the draw's source narrows (see
+// familyPool).
+const wardrobeRecords = records.filter((r) => !POEM_ONLY_STAMP_IDS.has(r.id));
 const hash = (s) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);

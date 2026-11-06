@@ -13,6 +13,9 @@
 import { assetRecords, assetsWhere } from '../data/assetStyle.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
+import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
+import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
+import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
 import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js'; // #1944
 import { resolveKit, kitsById } from '../data/kits.js'; // #1944
@@ -25,11 +28,15 @@ export const POOL_MAX = 6;
 export const POOL_FAMILIES_MIN = 2;
 export const POOL_FAMILIES_MAX = 3;
 /** Never dealt by a roll. #1982: the poem-only kana stamps ride with the citizen.
- * #1998: the curated kanji stamps ride with them. */
+ * #1998: the curated kanji stamps ride with them.
+ * #2002: the slice-3 packs (lowercase + punctuation, serif, ornaments) ride too. */
 export const NEVER_DEALT = Object.freeze([
   'creature',
   ...ASSETS_KANA.map((a) => a.id),
   ...ASSETS_KANJI.map((a) => a.id),
+  ...ASSETS_LATIN.map((a) => a.id),
+  ...ASSETS_SERIF.map((a) => a.id),
+  ...ASSETS_ORNAMENTS.map((a) => a.id),
 ]);
 
 const pickIndex = (rng, n) => Math.min(n - 1, Math.floor(rng() * n));

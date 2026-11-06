@@ -77,13 +77,20 @@ import { createCreatureSpawnState, registerSpawnState } from '../curator/spawnSt
 import { CREATURE_ASSET_ID, mothsAllowed, dishAllowed } from '../curator/creatureCitizen.js'; // #1694 slice 2: the pool citizen's reads
 import { ASSETS_KANA } from '../data/assets/assets-kana.js'; // #1982: the poem-only kana stamps
 import { ASSETS_KANJI } from '../data/assets/assets-kanji.js'; // #1998: the poem-only kanji stamps
+import { ASSETS_LATIN } from '../data/assets/assets-latin.js'; // #2002: the poem-only lowercase + punctuation stamps
+import { ASSETS_SERIF } from '../data/assets/assets-serif.js'; // #2002: the poem-only serif face stamps
+import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002: the poem-only ornament stamps
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
 // script): never a placeable mark, excluded here by id alongside the citizen.
 // #1998 — the curated kanji stamps are excluded by the same set: the
 // poem-only set is the native-script union (kana + kanji).
-const POEM_ONLY_IDS = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
+// #2002 — the slice-3 packs are excluded by the same set: the poem-only set
+// is the whole union the FIELD director deals alone.
+const POEM_ONLY_IDS = new Set(
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+);
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 
 const HOP_MAX_PX = 4;
