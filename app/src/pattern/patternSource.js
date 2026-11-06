@@ -64,8 +64,9 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null) {
     w,
     h,
     el,
-    // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled seed by default)
-    p.mode === 'PICTURE' ? normalizePictureImage(image).id : null,
+    // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled
+    // seed by default). Spread only for PICTURE, so every other mode's key stays byte-identical.
+    ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
   ]);
 }
 
@@ -99,8 +100,9 @@ const staticKey = (p, pal, w, h, image = null) =>
     w,
     h,
     PATTERN_FIELD_LIKE.includes(p.mode) ? null : [p.kin, p.movers],
-    // #1795: PICTURE's grid is built from its image; the image's id stands for its pixels
-    p.mode === 'PICTURE' ? normalizePictureImage(image).id : null,
+    // #1795: PICTURE's grid is built from its image; the image's id stands for its pixels.
+    // Spread only for PICTURE, so every other mode's key stays byte-identical.
+    ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
   ]);
 
 function buildGrid(p, pal, bw, bh, image = null) {

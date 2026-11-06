@@ -24,8 +24,10 @@ Matt's three rulings on the issue (his comment on #1795, 2026-11-05), implemente
    ignores it, and with no image the mode samples the bundled seed (`src/pattern/pictureSeed.js`: the
    repo's own `src/assets/about-matt-ciaglia.jpg`, centre-cropped to 4:3, downsampled to 64×48 RGB,
    committed as data; generator recipe kept at `app/scripts/gen-picture-seed.py`). The image's `id`
-   enters the frame cache keys for PICTURE only, so other modes' keys are byte-identical to before.
-   Nothing was added to the pattern block: it still has exactly its eleven fields (pinned by
+   is appended to the frame cache keys for PICTURE only — spread in `patternKey`/`staticKey`, so
+   other modes' key strings are byte-identical to before (QA loop fix; the first build appended a
+   `null` element for every mode).
+   Nothing was added to the pattern block: it still has exactly its ten fields (pinned by
    patternTrack.selfcheck), and the image is a frame input the way the palette is.
 2. **Tone mapping: full.** The cell's tone (luminance of its mean colour) drives SCALE first — linear,
    0.30 of the mark box at black to 1.25 at white (bright = mass, on the palette's dark ground) —
@@ -47,8 +49,8 @@ Matt's three rulings on the issue (his comment on #1795, 2026-11-05), implemente
   GLYPH's rail for the same reason (seeded static poses in quarter turns); continuous turning is the
   kinemes' job, and PICTURE rides those per cell. If Matt wants the stage pool here, that is a
   mask-baking project of its own, not a flag in this PR.
-- **No in-app image-import UI.** There is no existing rail that persists an imported image into a
-  project (the pattern block's shape is pinned at eleven fields), so this PR builds the complete
+- **No in-app image-import UI.** No rail in the pattern layer persists an imported image into a
+  project (the pattern block's shape is pinned at ten fields), so this PR builds the complete
   engine seam — the frame call takes the image — plus the editor mode chip so the mode works on the
   bundled seed. A file-picker that decodes a still into `{ id, w, h, rgb }` and holds it with the
   track is follow-up work that needs its own storage decision; it was not invented here.
@@ -94,7 +96,7 @@ Wired:
 - `app/e2e/pattern-track.spec.js` — the live-loop survival sweep gains PICTURE.
 
 NOT re-pinned, deliberately: `PATTERN_DEAL_MODES` (still exactly QUILT / GLYPH / FIELD — asserted in
-the new suite), the pattern block's eleven keys, `PATTERN_FIELD_LIKE`, and the density/mix stop tables
+the new suite), the pattern block's ten keys, `PATTERN_FIELD_LIKE`, and the density/mix stop tables
 in `blockStops.mjs` (PICTURE's defaults — density 10, mix 0.55 — are already stops).
 
 ## Suites, with real counts

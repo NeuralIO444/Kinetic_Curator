@@ -30,7 +30,7 @@
 // An image here is { id, w, h, rgb }: rgb is w*h*3 bytes, row-major, top row
 // first. The frame path (patternSource) takes one as an optional argument and
 // defaults to the bundled seed. Nothing is persisted on the pattern block —
-// the block's eleven fields are unchanged; the image is a frame input, the
+// the block's ten fields are unchanged; the image is a frame input, the
 // same way the palette is.
 //
 // The rails, ridden not reinvented: DRIFT is GLYPH's phase-offset scale pulse

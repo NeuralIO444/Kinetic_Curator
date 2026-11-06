@@ -90,7 +90,7 @@ export function defaultPattern(mode = 'QUILT', seed = 1) {
 
 /**
  * Clamp every field; unknown modes fall back to QUILT, junk falls back to the mode's
- * default. Returns a new object with exactly the eleven fields. Never throws.
+ * default. Returns a new object with exactly the ten fields. Never throws.
  */
 export function sanitizePattern(raw) {
   const r = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
