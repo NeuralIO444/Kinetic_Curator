@@ -151,6 +151,18 @@ assert.strictEqual(
   null,
   'a Latin stamp inside a declared kana form is refused',
 );
+// #1906 (FIELD S5) — the register composes with the script: independent
+// markers, each under its own law, both carried when honest.
+assert.deepStrictEqual(
+  sanitizeFieldForm({ ...kanaDeal.form, register: 'whisper' }),
+  { ...kanaDeal.form, register: 'whisper' },
+  'a whispered kana form round-trips — script and register together',
+);
+assert.strictEqual(
+  sanitizeFieldForm({ ...kanaDeal.form, register: 'loud' }),
+  null,
+  'a dishonest register refuses a kana form whole too',
+);
 
 // ── The pick: script is the Director's call, Japanese rooms only ─────────
 const teijoDraw = () => 0.9; // cool pool ['greenleaf','teijo'] -> index 1; piece draw -> a late piece

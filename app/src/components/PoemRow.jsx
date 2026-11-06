@@ -1,10 +1,12 @@
 // FIELD poem group (#1918) — rides the mode strip, to the right of motion (Matt 2026-11-02; was its own row):
-//   poem  [WHITTIER — THE SNOW LIES…] [HELD] [keep] [▫ hold]
+//   poem  [WHITTIER — THE SNOW LIES…] [HELD] [keep] [▫ hold] [whisper]
 //
 // Matt's rulings (2026-11-01). The identity chip names the standing poem and TAP re-deals the poem
 // only — look, voice and everything else stand (the dislike path); inert while held. FORM is a pure
 // readout. KEEP banks this exact materialized poem into the take. HOLD locks the poem's VALUE against
-// KINETIC and CURATOR re-deals (lockedParams.fieldForm). Discrete state → TE (KC-1 DS rule 2): hard
+// KINETIC and CURATOR re-deals (lockedParams.fieldForm). WHISPER (#1906, FIELD S5) flips the standing
+// form's presentation register — the same placed field drawn quiet; it is a register on the form,
+// not a second system, and the Director never sets it. Discrete state → TE (KC-1 DS rule 2): hard
 // states, the lock glyphs, one red (HOLD engaged) at most. Silence is default (rule 4): no poem
 // standing, no group. All writes go through the store; the group only reads.
 import { useStore } from '../state/store.js';
@@ -16,11 +18,13 @@ export function PoemRow() {
   const poemKeeps = useStore((s) => s.layoutParams.poemKeeps);
   const redealPoem = useStore((s) => s.redealPoem);
   const togglePoemHold = useStore((s) => s.togglePoemHold);
+  const togglePoemWhisper = useStore((s) => s.togglePoemWhisper);
   const keepPoem = useStore((s) => s.keepPoem);
 
   const id = poemIdentity(fieldForm);
   if (!id) return null;
   const kept = isPoemKept(poemKeeps, fieldForm);
+  const whisper = fieldForm.register === 'whisper';
   const words = `${id.firstWords}${id.truncated ? '…' : ''}`;
 
   return (
@@ -72,6 +76,19 @@ export function PoemRow() {
             {held ? '▪' : '▫'}
           </span>
           hold
+        </button>
+        <button
+          type="button"
+          className={`chip-btn poem-act${whisper ? ' active' : ''}`}
+          onClick={togglePoemWhisper}
+          aria-pressed={whisper}
+          title={
+            whisper
+              ? 'Whispering — this poem stands at the quiet register. Tap for its full voice'
+              : 'Whisper — this same poem, drawn quiet; the words and their places stand'
+          }
+        >
+          whisper
         </button>
       </div>
     </div>

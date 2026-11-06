@@ -222,7 +222,7 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps, script } = raw;
+  const { poetId, pieceId, layout, aspect, stamps, script, register } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
@@ -235,6 +235,14 @@ export function sanitizeFieldForm(raw) {
   if (script !== undefined && script !== 'latin' && script !== 'kana') return null;
   const kanaForm = script === 'kana';
   if (kanaForm && poetId !== 'teijo') return null;
+  // FIELD S5 (#1906) — the register marker: absent is the form's full voice;
+  // 'whisper' is the quiet presentation register of the SAME placed field
+  // (the stamp path draws it at WHISPER_ALPHA of the form's alpha — nothing
+  // else moves). The marker follows the script marker's discipline exactly:
+  // any other value is dishonest data and refuses the form whole. The deal
+  // never sets it (fieldDealReport carries no register) — it is the
+  // performer's toggle on a standing form, nothing upstream may arm it.
+  if (register !== undefined && register !== 'whisper') return null;
   const out = new Array(stamps.length);
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
@@ -254,5 +262,13 @@ export function sanitizeFieldForm(raw) {
   // the dish, glyphs overlapping, type crushed under the legibility
   // floor) is refused whole, exactly as at the deal.
   if (!gateFieldForm(out, { aspect, allowKana: kanaForm }).ok) return null;
-  return { poetId, pieceId, layout, aspect, ...(kanaForm ? { script: 'kana' } : {}), stamps: out };
+  return {
+    poetId,
+    pieceId,
+    layout,
+    aspect,
+    ...(kanaForm ? { script: 'kana' } : {}),
+    ...(register === 'whisper' ? { register: 'whisper' } : {}),
+    stamps: out,
+  };
 }

@@ -8,7 +8,7 @@
 // form must produce byte-identical item lists; with an armed form, the layer's own marks
 // are untouched and the form's stamps are appended at the placement positions.
 import assert from 'node:assert';
-import { buildPlacements, FIELD_EM_SCALE } from '../engine/buildPlacements.js';
+import { buildPlacements, FIELD_EM_SCALE, WHISPER_ALPHA } from '../engine/buildPlacements.js';
 import { fieldFormForDeal, sanitizeFieldForm, MAX_FIELD_STAMPS, FIELD_POEM_MIN_STAMPS, POET_DECKS } from './fieldForm.js';
 import { placePiece } from './placement.js';
 import { mkRng } from '../engine/prng.js';
@@ -101,6 +101,17 @@ assert.strictEqual(
 );
 assert.strictEqual(sanitizeFieldForm({ ...deal, stamps: [] }), null, 'an empty form is silence, not a form');
 
+// ── #1906 (FIELD S5) — the register marker at the document door ──────────
+// Absent is the full voice (the round-trip above carries no register), and
+// the deal never sets one — the register is the performer's toggle on a
+// standing form. 'whisper' is carried through; any other value follows the
+// script marker's discipline: dishonest data refuses the form whole.
+assert.ok(!('register' in deal), 'a dealt form carries no register — the deal never sets it');
+const whispered = { ...deal, register: 'whisper' };
+assert.deepStrictEqual(sanitizeFieldForm(whispered), whispered, 'an honest whisper register round-trips');
+assert.strictEqual(sanitizeFieldForm({ ...deal, register: 'loud' }), null, 'an unknown register refuses the whole form');
+assert.strictEqual(sanitizeFieldForm({ ...deal, register: true }), null, 'a non-string register refuses the whole form');
+
 // ── Parity, measured: no form / undefined form / garbage form ────────────
 const baseline = build(baseParams);
 const undefForm = build({ ...baseParams, fieldForm: undefined });
@@ -132,6 +143,26 @@ fieldItems.forEach((it, j) => {
 // ── Replay determinism ───────────────────────────────────────────────────
 const armed2 = build({ ...baseParams, fieldForm: deal });
 assert.strictEqual(itemsJson(armed2), itemsJson(armed), 'same form, same build: identical items every time');
+
+// ── #1906 (FIELD S5) — the whisper register on the dish ──────────────────
+// The same placed field, quieter: the layer's marks and the form's stamps
+// are the full-voice items in every particular except the stamps' alpha,
+// scaled by exactly WHISPER_ALPHA. Not a second system — one alpha moves.
+const whisperedBuild = build({ ...baseParams, fieldForm: whispered });
+assert.strictEqual(whisperedBuild.items.length, armed.items.length, 'whisper appends nothing and drops nothing');
+assert.strictEqual(
+  itemsJson({ items: whisperedBuild.items.slice(0, baseline.items.length) }),
+  itemsJson(baseline),
+  "the layer's own marks are byte-identical under a whispered form",
+);
+const whisperItems = whisperedBuild.items.slice(baseline.items.length);
+const withoutAlpha = (items) => items.map((it) => ({ ...it, alpha: 0 }));
+assert.deepStrictEqual(withoutAlpha(whisperItems), withoutAlpha(fieldItems), 'positions, scales, rotation, colours: the full-voice items');
+whisperItems.forEach((it, j) => {
+  assert.strictEqual(it.alpha, fieldItems[j].alpha * WHISPER_ALPHA, `stamp ${j}: alpha is exactly WHISPER_ALPHA of full voice`);
+});
+const whisperedBuild2 = build({ ...baseParams, fieldForm: whispered });
+assert.strictEqual(itemsJson(whisperedBuild2), itemsJson(whisperedBuild), 'a whispered form replays identically');
 
 // ── Pool safety: armed builds on a shared cache never accumulate ─────────
 const cache = {};
