@@ -8,6 +8,9 @@ import { ASSETS_MICRO } from './assets-micro-hud.js';
 import { ASSETS_LETTERS } from './assets-letterforms.js';
 import { ASSETS_KANA } from './assets-kana.js';
 import { ASSETS_KANJI } from './assets-kanji.js';
+import { ASSETS_LATIN } from './assets-latin.js';
+import { ASSETS_SERIF } from './assets-serif.js';
+import { ASSETS_ORNAMENTS } from './assets-ornaments.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
@@ -66,5 +69,14 @@ export const ASSETS = [
   // excluded by id on every dealing surface, dealt only by the FIELD
   // director inside Teijo's native face.
   ...ASSETS_KANJI,
+  // #2002 (FIELD stamps slice 3) — the Latin growth rides the same road in,
+  // on the same terms: Anton lowercase + punctuation, the PT Serif face and
+  // the plate-break ornaments — catalogue members, never authored content,
+  // excluded by id on every dealing surface, dealt only by the FIELD
+  // director (lowercase/punctuation in the base face, serif under Whittier
+  // when the face is called, ornaments only as plate breaks).
+  ...ASSETS_LATIN,
+  ...ASSETS_SERIF,
+  ...ASSETS_ORNAMENTS,
   CREATURE_CITIZEN,
 ];
