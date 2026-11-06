@@ -489,6 +489,7 @@ node src/pattern/elements.selfcheck.mjs
 node src/pattern/tides.selfcheck.mjs
 node src/pattern/rewrite.selfcheck.mjs
 node src/pattern/blocks.selfcheck.mjs
+node src/pattern/picture.selfcheck.mjs
 node src/panels/build/patternEditor.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs

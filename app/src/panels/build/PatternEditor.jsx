@@ -34,6 +34,8 @@ const MODE_HINT = {
   REWRITE: 'A growth: seeded tips rewrite the grid rule by rule into a maze, coloured by the order it grew.',
   BLOCKS:
     'Merged-cell blocks: neighbours fuse first, then one flat colour per block. A still deal — SHUFFLE re-deals it.',
+  PICTURE:
+    "A picture in marks: the seed photo sampled into a grid of GLYPH marks — each cell's tone sets its mark's size, turn and palette colour.",
 };
 const pct = (v) => Math.round(v * 100);
 // #1137 — the KINEME motion the pattern's individual elements take while DRIFT is up.
@@ -145,7 +147,7 @@ export function PatternEditor({ layer, ordinal }) {
       {pctRow(
         'mix',
         'mix',
-        "Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle. REWRITE: how freely the growth buds new tips, and how many tips it opens with. BLOCKS: the merge appetite — low is the plain grid, high fuses at every chance.",
+        "Motif entropy. Low repeats a two-motif rhythm; high draws freely from the whole vocabulary. TIDES: the field's grain, broad patches to fine speckle. REWRITE: how freely the growth buds new tips, and how many tips it opens with. BLOCKS: the merge appetite — low is the plain grid, high fuses at every chance. PICTURE: how freely each cell draws its own mark — low keeps one hero mark across the picture, high draws per cell.",
         'Pattern mix',
       )}
       {pctRow('grout', 'grout', 'The dark seam between tiles, as a fraction of a tile.', 'Pattern grout', {
@@ -172,7 +174,7 @@ export function PatternEditor({ layer, ordinal }) {
       {pctRow(
         'drift',
         'drift',
-        'Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid, REWRITE replays the growth and regrows it. Zero holds still.',
+        'Motion. QUILT turns pinwheels and medallions, GLYPH pulses the marks, FIELD pans, TIDES runs the field under the grid, REWRITE replays the growth and regrows it, PICTURE pulses the marks like GLYPH. Zero holds still.',
         'Pattern drift',
         {
           disabled: blocks,
