@@ -85,6 +85,8 @@ export function choosePoet({
   lastRejected = false,
   typeEligible = false,
   japaneseContext = false,
+  bauhausContext = false,
+  soloContext = false,
 } = {}) {
   // #1932 — the genre gate outranks temperature: a non-type-native room is
   // silent, full stop.
@@ -122,6 +124,25 @@ export function choosePoet({
     // native script. The marker rides the decision; fieldForm places the
     // deck's kanaLines for it, and a Swiss/Bauhaus room never sees it.
     ...(poetId === 'teijo' && japaneseContext ? { script: 'kana' } : {}),
+    // #2002 (fix loop; Matt's ruling, 2026-11-06) — the slice-3 calls are the
+    // Director's too, affirmed from the room on the script pattern (the
+    // contexts are derived by fieldEval's step from the room as it stands;
+    // none of them draws from the deal stream):
+    // - face: the solo room (DAVIS ALONE — one artist in the room, nobody
+    //   directing) is the reading room: a Whittier pick there stands in her
+    //   book face, the print register. Hers alone, like Teijo's script.
+    ...(poetId === 'greenleaf' && soloContext ? { face: 'serif' } : {}),
+    // - case: a Bauhaus room deals the sentence face — the school's print
+    //   culture wrote lowercase as a house style. No poet gate: the deck is
+    //   the authority, and a deck with no caseLines deals its caps, exactly
+    //   as a script call on a deck with no native face deals Latin.
+    ...(bauhausContext ? { case: true } : {}),
+    // - plateBreak: the solo room has space around the poem, and a
+    //   long-form piece (3+ lines) gets its plate break — the section mark,
+    //   the break furniture the epic names, called by id with no draw.
+    //   fieldForm degrades the call where it cannot stand (a 'single'
+    //   layout, a native deal).
+    ...(soloContext && piece.lines.length >= 3 ? { plateBreak: 'typ_o_sect' } : {}),
   };
 }
 

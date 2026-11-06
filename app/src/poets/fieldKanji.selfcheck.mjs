@@ -180,7 +180,14 @@ assert.deepStrictEqual(
 // ── Poem-only: catalogue yes, authored bake no, panel no ─────────────────
 assert.strictEqual(ASSETS_AUTHORED.length, 312, 'the authored bake is untouched');
 assert.ok(!ASSETS_AUTHORED.some((a) => KANJI_STAMP_IDS.has(a.id)), 'no kanji in the authored set');
-assert.strictEqual(ASSETS.length, 312 + 1 + 163 + 126, 'the catalogue is authored + citizen + kana + kanji');
+// #2002 RE-PIN (cause: slice 3): the Latin growth (43), the serif face (52)
+// and the ornaments (4) join the catalogue on the same road — the sum grows
+// by exactly the packs; the slice-3 suite owns their containment pins.
+assert.strictEqual(
+  ASSETS.length,
+  312 + 1 + 163 + 126 + 43 + 52 + 4,
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments',
+);
 assert.ok(ASSETS_KANJI.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kanji stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);
 assert.strictEqual(recs.length, 313, "the pool's records are exactly what they were before the pack");

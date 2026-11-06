@@ -557,6 +557,12 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
             layout: r.decision.layout,
             // #1982 — the script call (Teijo in kana, Japanese rooms only) rides the deal.
             ...(r.decision.script ? { script: r.decision.script } : {}),
+            // #2002 (fix loop) — the slice-3 calls ride the deal the same way:
+            // the serif face, the sentence face, and the plate break, each
+            // affirmed by the Director from the room (see fieldDirector).
+            ...(r.decision.face ? { face: r.decision.face } : {}),
+            ...(r.decision.case ? { case: true } : {}),
+            ...(r.decision.plateBreak ? { plateBreak: r.decision.plateBreak } : {}),
           }
         : null;
     },

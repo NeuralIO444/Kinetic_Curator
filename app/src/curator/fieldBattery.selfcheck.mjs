@@ -135,7 +135,12 @@ ok('zero stillborn forms across the battery (the gate log above)', () => {
 });
 
 ok('the gate refuses a charset stillborn (a line failing the charset law)', () => {
-  const placed = placePiece({ id: 'x', lines: ['snow! falls'], layout: 'bands', density: 0.4 }, makeRng(5), {
+  // #2002 RE-PIN (cause: slice 3) — the fixture line was 'snow! falls' when
+  // lowercase and '!' had no stamps; the Latin charset growth gives both
+  // real stamps, so that line is now a lawful poem line and the gate
+  // rightly passes it. The stillborn needs a glyph no pack carries: '€'
+  // has no stamp in any face.
+  const placed = placePiece({ id: 'x', lines: ['snow€ falls'], layout: 'bands', density: 0.4 }, makeRng(5), {
     aspect: 10 / 7,
   });
   const gate = gateFieldForm(placed.stamps, { aspect: 10 / 7 });

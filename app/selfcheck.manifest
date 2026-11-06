@@ -554,6 +554,7 @@ node src/poets/poemRow.selfcheck.mjs
 node src/poets/fieldStampPath.selfcheck.mjs
 node src/poets/fieldKana.selfcheck.mjs
 node src/poets/fieldKanji.selfcheck.mjs
+node src/poets/fieldLatin.selfcheck.mjs
 node src/curator/fieldSilence.selfcheck.mjs
 node src/curator/fieldLiveDeal.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs

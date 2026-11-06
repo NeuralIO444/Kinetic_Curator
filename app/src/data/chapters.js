@@ -31,6 +31,9 @@
 import { ASSETS } from './assets/index.js';
 import { ASSETS_KANA } from './assets/assets-kana.js';
 import { ASSETS_KANJI } from './assets/assets-kanji.js';
+import { ASSETS_LATIN } from './assets/assets-latin.js';
+import { ASSETS_SERIF } from './assets/assets-serif.js';
+import { ASSETS_ORNAMENTS } from './assets/assets-ornaments.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
 import { VOICE_DECK } from './voiceDeck.js';
@@ -39,11 +42,16 @@ import { VOICE_DECK } from './voiceDeck.js';
  * #1982: the kana stamps join the citizen in this class — catalogue members
  * (census, atlas), but no chapter deck may deal them as marks; the FIELD
  * director deals them alone, as poem type.
- * #1998: the curated kanji stamps join the same class, on the same terms. */
+ * #1998: the curated kanji stamps join the same class, on the same terms.
+ * #2002: the slice-3 packs (lowercase + punctuation, serif, ornaments) join
+ * the same class, on the same terms. */
 export const CHAPTER_UNDEALT = Object.freeze([
   'creature',
   ...ASSETS_KANA.map((a) => a.id),
   ...ASSETS_KANJI.map((a) => a.id),
+  ...ASSETS_LATIN.map((a) => a.id),
+  ...ASSETS_SERIF.map((a) => a.id),
+  ...ASSETS_ORNAMENTS.map((a) => a.id),
 ]);
 
 /** The deck floor, per axis — the smallest movement chapter the library already deals (see header). */
