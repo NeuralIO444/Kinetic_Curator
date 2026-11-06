@@ -15,8 +15,9 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { ASSETS } from '../app/src/data/assets/index.js';
 import { CREATURE_ASSET_ID } from '../app/src/curator/creatureCitizen.js'; // #1694 S2 — the pool citizen is never a placeable mark, here either
 import { ASSETS_KANA } from '../app/src/data/assets/assets-kana.js'; // #1982 — the poem-only kana stamps are never placeable marks either
+import { ASSETS_KANJI } from '../app/src/data/assets/assets-kanji.js'; // #1998 — the poem-only kanji stamps, same exclusion
 
-const KANA_IDS = new Set(ASSETS_KANA.map((a) => a.id));
+const KANA_IDS = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
 import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';
 import { resolvePalette } from '../app/src/data/palettes.js';
@@ -187,6 +188,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       // channel; that predates citizenship and is unchanged by it.)
       // #1982 — the kana stamps ride the same exclusion: poem-only, dealt by the
       // FIELD director alone; a still must not place them as marks.
+      // #1998 — the curated kanji stamps ride it too (KANA_IDS is the union).
       const activeAssets = ASSETS
         .filter((a) => a.id !== CREATURE_ASSET_ID && !KANA_IDS.has(a.id) && (!enabled || enabled[a.id]))
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));

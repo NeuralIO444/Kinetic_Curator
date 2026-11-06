@@ -20,6 +20,7 @@
 import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, fullShapeSet } from './voices.js';
 import { resolvePalette } from './palettes.js';
 import { ASSETS } from './assets/index.js';
+import { ASSETS_KANJI } from './assets/assets-kanji.js'; // #1998: the poem-only kanji stamps
 import { assetRecords, assetsWhere } from './assetStyle.js';
 import { mkRng } from '../engine/prng.js';
 
@@ -854,9 +855,20 @@ const hash = (s) => {
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);
   return h >>> 0 || 1;
 };
+const KANJI_IDS = new Set(ASSETS_KANJI.map((a) => a.id));
+
 /** An S3-coherent pool of `n` assets for a family voice, drawn deterministically from the voice id. */
 function familyPool(id, categories, styles, n = 8) {
-  const ids = assetsWhere(records, { categories, styles }).sort();
+  // #1998 — the curated kanji stamps are poem-only and never a voice's
+  // wardrobe: they are excluded from the draw's candidates, by id, as on
+  // every other dealing surface. The exclusion also keeps every voice's
+  // seeded draw bit-identical to the pre-pack deck — a kanji candidate
+  // would move the splice draw for the whole family. (The kana stamps'
+  // presence among the candidates is slice-1 status quo and is untouched:
+  // removing them would re-draw every wardrobe, a change of its own.)
+  const ids = assetsWhere(records, { categories, styles })
+    .filter((x) => !KANJI_IDS.has(x))
+    .sort();
   const rng = mkRng(hash(`voice:${id}`));
   const out = [];
   const left = [...ids];

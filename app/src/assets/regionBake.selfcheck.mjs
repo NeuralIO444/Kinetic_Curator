@@ -96,9 +96,14 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   // #1982 — a second post-authored block rides the same road: the poem-only kana
   // stamps (catalogue members for the census and the atlas; the bake never sees
   // them either, and they carry no mattes). The exceptions are exactly these two.
+  // #1998 RE-PIN (cause: slice 2) — a third block rides it: the curated kanji
+  // stamps, on the kana pack's terms (catalogue members, no mattes, the bake
+  // never sees them). The equality grows by exactly the pack; the per-asset
+  // no-mattes assertion below covers both poem-only packs.
   const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
-  const kanaIds = new Set(ASSETS_KANA.map((k) => k.id));
-  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + ASSETS_KANA.length + 1);
+  const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
+  const kanaIds = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((k) => k.id));
+  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + ASSETS_KANA.length + ASSETS_KANJI.length + 1);
   const citizen = ASSETS[ASSETS.length - 1];
   assert.equal(citizen.id, 'creature');
   assert.ok(!('regions' in citizen) && !('regionSlots' in citizen), 'the citizen carries no baked mattes');
@@ -106,7 +111,7 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   for (const a of ASSETS) {
     if (a.id === 'creature') continue; // the citizen, asserted above — the bake never sees it
     if (kanaIds.has(a.id)) {
-      assert.ok(!('regions' in a) && !('regionSlots' in a), `${a.id}: a kana stamp carries no baked mattes`);
+      assert.ok(!('regions' in a) && !('regionSlots' in a), `${a.id}: a poem-only stamp carries no baked mattes`);
       continue;
     }
     const base = byId(a.id);
