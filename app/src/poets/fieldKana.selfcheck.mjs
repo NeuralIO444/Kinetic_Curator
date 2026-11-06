@@ -74,10 +74,15 @@ assert.strictEqual(stampIdForGlyph('あ'), 'typ_h_a');
 assert.strictEqual(stampIdForGlyph('ガ'), 'typ_k_ga');
 assert.strictEqual(stampIdForGlyph('ー'), 'typ_k_long');
 assert.strictEqual(stampIdForGlyph('A'), 'typ_A', 'Latin resolution untouched');
-assert.strictEqual(stampIdForGlyph('!'), null, 'an unmapped character still has no stamp');
+// #2002 RE-PIN (cause: slice 3) — '!' gained a stamp (the punctuation pack),
+// so the unmapped-character case moves to a glyph no pack carries ('€'),
+// and the '!' mapping itself is pinned where the slice-3 suite owns it.
+assert.strictEqual(stampIdForGlyph('!'), 'typ_p_bang', '#2002: the punctuation pack gives ! a stamp');
+assert.strictEqual(stampIdForGlyph('€'), null, 'an unmapped character still has no stamp');
 assert.strictEqual(stampIdForChar('あ'), null, 'the Latin resolver still refuses kana');
 assert.ok(lineMapsToStamps('なつのちょう'), 'a kana line maps to stamps');
-assert.ok(!lineMapsToStamps('HELLO!'), 'an unmapped Latin character still refuses the line');
+assert.ok(lineMapsToStamps('HELLO!'), '#2002: the punctuation growth maps the line');
+assert.ok(!lineMapsToStamps('HELLO€'), 'an unmapped Latin character still refuses the line');
 assert.ok(glyphWidthEm('あ') > 0.5 && glyphWidthEm('あ') < 1.3, 'kana width measured, full-width class');
 assert.ok(glyphWidthEm('A') > 0, 'Latin metrics intact');
 
@@ -204,7 +209,14 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANA_STAMP_IDS.has(a.id)), 'no kana in th
 // #1998 RE-PIN (cause: slice 2): the curated kanji pack (126: 125 curated
 // kanji + the iteration mark) joins the catalogue on the kana pack's road —
 // the sum grows by exactly the pack.
-assert.strictEqual(ASSETS.length, 312 + 1 + 163 + 126, 'the catalogue is authored + citizen + kana + kanji');
+// #2002 RE-PIN (cause: slice 3): the Latin growth (43: 26 lowercase + 17
+// punctuation), the serif face (52) and the ornaments (4) join the
+// catalogue on the same road — the sum grows by exactly the packs.
+assert.strictEqual(
+  ASSETS.length,
+  312 + 1 + 163 + 126 + 43 + 52 + 4,
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments',
+);
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);
 assert.strictEqual(recs.length, 313, "the pool's records are exactly what they were before the pack");

@@ -100,10 +100,29 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   // stamps, on the kana pack's terms (catalogue members, no mattes, the bake
   // never sees them). The equality grows by exactly the pack; the per-asset
   // no-mattes assertion below covers both poem-only packs.
+  // #2002 RE-PIN (cause: slice 3) — a fourth block rides it: the slice-3
+  // packs (Latin lowercase/punctuation, serif, ornaments), on the same terms
+  // (catalogue members, no mattes, the bake never sees them). The equality
+  // grows by exactly the packs; the per-asset no-mattes assertion below
+  // covers every poem-only pack.
   const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
   const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
-  const kanaIds = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((k) => k.id));
-  assert.equal(ASSETS.length, ASSETS_AUTHORED.length + ASSETS_KANA.length + ASSETS_KANJI.length + 1);
+  const { ASSETS_LATIN } = await import('../data/assets/assets-latin.js');
+  const { ASSETS_SERIF } = await import('../data/assets/assets-serif.js');
+  const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
+  const kanaIds = new Set(
+    [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((k) => k.id),
+  );
+  assert.equal(
+    ASSETS.length,
+    ASSETS_AUTHORED.length +
+      ASSETS_KANA.length +
+      ASSETS_KANJI.length +
+      ASSETS_LATIN.length +
+      ASSETS_SERIF.length +
+      ASSETS_ORNAMENTS.length +
+      1,
+  );
   const citizen = ASSETS[ASSETS.length - 1];
   assert.equal(citizen.id, 'creature');
   assert.ok(!('regions' in citizen) && !('regionSlots' in citizen), 'the citizen carries no baked mattes');
