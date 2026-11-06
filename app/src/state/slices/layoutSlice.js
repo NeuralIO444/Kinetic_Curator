@@ -32,7 +32,14 @@ import { sanitizeMixSeconds } from '../../gl/paletteMix.mjs';
 import { BEAT_DEFAULT_BPM, sanitizeBeatBpm, beatSeconds, beatIsHardCut } from '../../gl/beatClock.mjs';
 import { MOTION_KEYS, armedMotionParams, pinRollScope } from '../rollScope.mjs';
 import { fieldDealReport } from '../../poets/fieldForm.js'; // #1904 — FIELD: the shuffle deals a poet
-import { POEM_PICK_BASE, POEM_PLACE_BASE, keepPoem as bankPoem, isPoemKept } from '../../poets/poemRow.mjs'; // #1918
+import {
+  POEM_PICK_BASE,
+  POEM_PLACE_BASE,
+  POEM_RAYGUN_BASE,
+  keepPoem as bankPoem,
+  isPoemKept,
+} from '../../poets/poemRow.mjs'; // #1918
+import { RAYGUN_MODES } from '../../poets/rayGunForm.js'; // #2003
 import { FEEL_PRESETS } from '../../data/feels.js';
 import {
   resolveVoiceState,
@@ -540,6 +547,14 @@ export const createLayoutSlice = (set) => ({
    * (layoutParams.fieldForm), so replay never re-derives a poem from this. Session-only.
    */
   poemDeal: 0,
+  /**
+   * #2003 — RAY GUN taps made this session: the index of the dedicated
+   * ray-gun stream (poemRow.POEM_RAYGUN_BASE) the next treatment draws its
+   * seed from. The seed itself rides the form's raygun record (document
+   * data), so replay never re-derives a blast from this counter.
+   * Session-only, like poemDeal.
+   */
+  raygunTap: 0,
   /**
    * Render-only overlay for the performance governor's last-resort density
    * cut (#107 §5): null, or a partial { count?, mirror? } merged over
@@ -1064,6 +1079,49 @@ export const createLayoutSlice = (set) => ({
       return {
         ...pushToUndo(state, true),
         layoutParams: { ...state.layoutParams, fieldForm: next },
+      };
+    }),
+
+  /**
+   * #2003 — RAY GUN: cycle the standing poem's type treatment (plain →
+   * carson → greiman → shot → plain), on the form itself
+   * (layoutParams.fieldForm.raygun = { mode, seed }), on the whisper
+   * toggle's pattern. The form's stamps NEVER move here — they stay the
+   * plain dealt list; the blast is drawn from the record at render
+   * (buildPlacements → poets/rayGunForm.js), recomputed from plain on
+   * every draw, so the full cycle returns the exact original form. Each
+   * armed tap draws a fresh uint32 seed from the dedicated ray-gun stream
+   * (POEM_RAYGUN_BASE + the session tap counter) — never from the
+   * poem-deal streams, so deals replay bit-identically whether or not the
+   * gun was fired. The gesture is independent of HOLD and KEEP, like the
+   * register: a held poem keeps its record through every pass (HOLD
+   * carries the standing form untouched), and KEEP banks the form with
+   * its record, which re-renders treated. A re-deal deals a plain form —
+   * the record simply isn't on it. Refused with no poem standing. One
+   * undo step per tap, like every other write to layoutParams. The deal
+   * never sets the record — this cycle is the only write site.
+   */
+  cyclePoemRaygun: () =>
+    set((state) => {
+      const form = state.layoutParams?.fieldForm;
+      if (!form) return {};
+      const tap = state.raygunTap | 0;
+      const cur = form.raygun && RAYGUN_MODES.includes(form.raygun.mode) ? RAYGUN_MODES.indexOf(form.raygun.mode) : -1;
+      const next = { ...form };
+      if (cur === RAYGUN_MODES.length - 1) {
+        delete next.raygun;
+        return {
+          ...pushToUndo(state, true),
+          layoutParams: { ...state.layoutParams, fieldForm: next },
+        };
+      }
+      const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);
+      const seed = Math.floor(rng() * 0x100000000) >>> 0;
+      next.raygun = { mode: RAYGUN_MODES[cur + 1], seed };
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: { ...state.layoutParams, fieldForm: next },
+        raygunTap: tap + 1,
       };
     }),
 

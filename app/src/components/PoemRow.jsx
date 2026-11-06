@@ -1,9 +1,12 @@
 // FIELD poem group (#1918) — rides the mode strip, to the right of motion (Matt 2026-11-02; was its own row):
-//   poem  [WHITTIER — THE SNOW LIES…] [HELD] [keep] [▫ hold] [whisper]
+//   poem  [WHITTIER — THE SNOW LIES…] [HELD] [ray gun · carson] [keep] [▫ hold] [whisper]
 //
 // Matt's rulings (2026-11-01). The identity chip names the standing poem and TAP re-deals the poem
 // only — look, voice and everything else stand (the dislike path); inert while held. FORM is a pure
-// readout. KEEP banks this exact materialized poem into the take. HOLD locks the poem's VALUE against
+// readout. RAY GUN (#2003) arms the standing form's type treatment — tap cycles plain → CARSON →
+// GREIMAN → SHOT → plain, the readout names the armed treatment; it is a record on the form, the
+// placement itself never moves, and the identity chip above always shows the clean transcription.
+// KEEP banks this exact materialized poem into the take. HOLD locks the poem's VALUE against
 // KINETIC and CURATOR re-deals (lockedParams.fieldForm). WHISPER (#1906, FIELD S5) flips the standing
 // form's presentation register — the same placed field drawn quiet; it is a register on the form,
 // not a second system, and the Director never sets it. Discrete state → TE (KC-1 DS rule 2): hard
@@ -19,12 +22,14 @@ export function PoemRow() {
   const redealPoem = useStore((s) => s.redealPoem);
   const togglePoemHold = useStore((s) => s.togglePoemHold);
   const togglePoemWhisper = useStore((s) => s.togglePoemWhisper);
+  const cyclePoemRaygun = useStore((s) => s.cyclePoemRaygun);
   const keepPoem = useStore((s) => s.keepPoem);
 
   const id = poemIdentity(fieldForm);
   if (!id) return null;
   const kept = isPoemKept(poemKeeps, fieldForm);
   const whisper = fieldForm.register === 'whisper';
+  const raygun = fieldForm.raygun;
   const words = `${id.firstWords}${id.truncated ? '…' : ''}`;
 
   return (
@@ -52,6 +57,19 @@ export function PoemRow() {
         <span className="chip-btn poem-form" title={`Form: ${id.form}`} aria-label={`Form ${id.form}`}>
           {id.form}
         </span>
+        <button
+          type="button"
+          className={`chip-btn poem-act${raygun ? ' active' : ''}`}
+          onClick={cyclePoemRaygun}
+          aria-pressed={!!raygun}
+          title={
+            raygun
+              ? `Ray gun · ${raygun.mode} — this poem wears the ${raygun.mode} treatment. Tap to cycle: carson, greiman, shot, plain`
+              : 'Ray gun — give this poem the treatment: carson, greiman, then shot. Tap to cycle'
+          }
+        >
+          {raygun ? `ray gun · ${raygun.mode}` : 'ray gun'}
+        </button>
         <button
           type="button"
           className={`chip-btn poem-act${kept ? ' active' : ''}`}
