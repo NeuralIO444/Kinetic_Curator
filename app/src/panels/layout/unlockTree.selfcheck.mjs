@@ -227,6 +227,7 @@ ok('catalogue-from-code: the pinned set of lock reasons across the gating source
     'Moth bodies pin damping ≥ 0.97 for stability',
     'Needs a PATTERN layer below this one',
     'Needs an FX layer with HAZE above this one',
+    'Needs an FX layer with TEAR above this one',
     'Needs hype mode + bilateral or radial symmetry (wings/fans are only built for symmetric organisms)',
     'Phyllotaxis mode only',
     'Swarm mode only',

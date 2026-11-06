@@ -39,6 +39,7 @@ import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
 import { createFeedLive } from '../engine/kernel/tracks/feedLive.js';
 import { createResolverDish, creatureGround, groundArgs } from './dishGround.mjs'; // #1183: the dish, and the ground a layer rests on
 import { weatherArgs } from './dishWeather.mjs'; // #1183 weather: the haze in the air over a layer
+import { riftArgs, RIFT_KEY } from './dishRift.mjs'; // #1183 rift: the tear above a layer shears its marks
 import { applyMod, motionMetrics, MAX_TRACKS } from '../engine/kernel/tracks/trackGraph.js';
 // #1307 — SoA slice 2/5: FIELD/FEED column loops (zero per-point allocation,
 // bit-identical to the map-based path they replace — see the module header).
@@ -1010,6 +1011,8 @@ export function createLiveResolver() {
             seedOffsets,
             tSec: (input.loopTimeMs ?? 0) / 1000,
           }),
+          // #1183 rift — { rift } when an FX layer above carries a tear and this layer's RIFT dial is up, else nothing.
+          ...riftArgs({ layers: input.layers, layerId: layer.id, rift: layoutParams[RIFT_KEY], W, H }),
         }).items;
 
         // Spine F (#392): Live placement warp offset pass (loop-time nt).
