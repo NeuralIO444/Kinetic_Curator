@@ -80,11 +80,16 @@ const recs = poolDescriptors(ASSETS);
 // hard requirement: FIELD's stamps never become pool tiles). The exclusion is
 // exactly the kana pack, by id — nothing else may drop out of the records,
 // and every count below is taken over this pool-visible set.
+// #1998 RE-PIN (cause: slice 2) — the exclusion is now the native-script
+// union: the curated kanji pack rides the kana pack's road, so the excluded
+// set grows by exactly the kanji pack and the assertion's meaning is
+// unchanged (the exclusion is exactly the poem-only packs, by id).
 const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
-const kanaIds = new Set(ASSETS_KANA.map((k) => k.id));
+const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
+const kanaIds = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((k) => k.id));
 const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));
 assert.equal(recs.length, poolVisible.length);
-assert.ok(!recs.some((r) => kanaIds.has(r.id)), 'no kana record in the pool');
+assert.ok(!recs.some((r) => kanaIds.has(r.id)), 'no native-script record in the pool');
 const lines = filterRecords(recs, { facets: { form: ['line'] } });
 assert.ok(lines.length > 0 && lines.length < recs.length, 'a facet filter narrows');
 for (const r of lines) assert.ok(r.descriptor.tags.effective.form.includes('line'));

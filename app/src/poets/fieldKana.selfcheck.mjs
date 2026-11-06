@@ -23,10 +23,13 @@ import { RESVG_FONT } from '../assets/resvgFont.mjs';
 import {
   stampIdForChar,
   kanaStampIdForChar,
+  nativeStampIdForChar,
   stampIdForGlyph,
   lineMapsToStamps,
   glyphWidthEm,
   KANA_STAMP_IDS,
+  KANJI_STAMP_IDS,
+  NATIVE_STAMP_IDS,
 } from './placement.js';
 import { fieldDealReport, sanitizeFieldForm, gateFieldForm, FIELD_POEM_MIN_STAMPS } from './fieldForm.js';
 import { TEIJO } from './teijo.js';
@@ -92,9 +95,27 @@ assert.ok(kanaDeal.form, 'a kana Teijo deal spawns a form');
 assert.strictEqual(kanaDeal.gate, null, 'a kana deal is not a gate refusal');
 assert.strictEqual(kanaDeal.form.script, 'kana', 'the form declares its script');
 assert.ok(kanaDeal.form.stamps.length >= FIELD_POEM_MIN_STAMPS, 'the kana form clears the poem threshold');
+// #1998 RE-PIN (cause: slice 2): the native deal now serves the piece's
+// nativeLines — real orthography, kanji + kana mixed — so the form's stamps
+// are the NATIVE set, not kana alone. The slice-1 assertion below it keeps
+// the kana subset honest: every kana stamp in the form is glyph-matched,
+// and the mixed form provably carries both scripts. The pure-kana face is
+// still the fallback for a piece with kanaLines and no nativeLines
+// (fieldForm.js) — no shipped piece exercises it after this slice.
 assert.ok(
-  kanaDeal.form.stamps.every((s) => KANA_STAMP_IDS.has(s.assetId) && kanaStampIdForChar(s.ch) === s.assetId),
-  'every stamp of a kana form is a kana stamp for its glyph',
+  kanaDeal.form.stamps.every((s) => NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId),
+  'every stamp of a native form is a native-script stamp for its glyph (#1998: kanji admitted to the face)',
+);
+assert.ok(
+  kanaDeal.form.stamps.some((s) => KANJI_STAMP_IDS.has(s.assetId)) &&
+    kanaDeal.form.stamps.some((s) => KANA_STAMP_IDS.has(s.assetId)),
+  'the t1 native form is genuinely mixed: kanji and kana stamps together (#1998)',
+);
+assert.ok(
+  kanaDeal.form.stamps
+    .filter((s) => KANA_STAMP_IDS.has(s.assetId))
+    .every((s) => kanaStampIdForChar(s.ch) === s.assetId),
+  'every kana stamp of the form is a kana stamp for its glyph',
 );
 assert.deepStrictEqual(sanitizeFieldForm(kanaDeal.form), kanaDeal.form, 'a kana form round-trips the document door');
 
@@ -180,7 +201,10 @@ assert.ok(!('script' in (swissStep.decision || {})), 'a Swiss room never carries
 // ── Poem-only: catalogue yes, authored bake no, panel no ─────────────────
 assert.strictEqual(ASSETS_AUTHORED.length, 312, 'the authored bake is untouched');
 assert.ok(!ASSETS_AUTHORED.some((a) => KANA_STAMP_IDS.has(a.id)), 'no kana in the authored set');
-assert.strictEqual(ASSETS.length, 312 + 1 + 163, 'the catalogue is authored + citizen + kana');
+// #1998 RE-PIN (cause: slice 2): the curated kanji pack (126: 125 curated
+// kanji + the iteration mark) joins the catalogue on the kana pack's road —
+// the sum grows by exactly the pack.
+assert.strictEqual(ASSETS.length, 312 + 1 + 163 + 126, 'the catalogue is authored + citizen + kana + kanji');
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);
 assert.strictEqual(recs.length, 313, "the pool's records are exactly what they were before the pack");

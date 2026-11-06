@@ -43,7 +43,10 @@ test('tag one asset, filter to it, bulk-tag three, reload: all still there', asy
   await page.getByPlaceholder(/filter/i).fill('plant');
   await expect(page.locator('.tile')).toHaveCount(1);
   await expect(page.locator('.tile-id')).toHaveText('org_blob_01');
-  // bulk: three assets get one free tag
+  // bulk: three assets get one free tag. The word must stay OUTSIDE the
+  // asset vocabulary: a raw tag with a canonical home canonicalizes on
+  // store, so the raw-string filter stops matching it ('kanji' gained a
+  // home in the letter term in #1998 and broke exactly this line).
   await page.getByPlaceholder(/filter/i).fill('typ_');
   const picks = page.locator('.tile-pick');
   await picks.nth(0).click();
@@ -52,10 +55,10 @@ test('tag one asset, filter to it, bulk-tag three, reload: all still there', asy
   const bulk = page.getByTestId('asset-bulk');
   await expect(bulk).toContainText('3 selected');
   const bfree = bulk.getByLabel('Add a free tag');
-  await bfree.fill('kanji');
+  await bfree.fill('zebra');
   await bfree.press('Enter');
   await page.getByRole('button', { name: 'Clear selection' }).click();
-  await page.getByPlaceholder(/filter/i).fill('kanji');
+  await page.getByPlaceholder(/filter/i).fill('zebra');
   await expect(page.locator('.tile')).toHaveCount(3);
   // the facet drawer: counts, and a facet filter narrows
   await page.getByPlaceholder(/filter/i).fill('');
@@ -75,7 +78,7 @@ test('tag one asset, filter to it, bulk-tag three, reload: all still there', asy
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /assets/i }).click();
   expect(await page.evaluate(() => Object.keys(window.__kcStore.getState().assetTags).length)).toBe(4);
-  await page.getByPlaceholder(/filter/i).fill('kanji');
+  await page.getByPlaceholder(/filter/i).fill('zebra');
   await expect(page.locator('.tile')).toHaveCount(3);
   expect(errors).toEqual([]);
 });

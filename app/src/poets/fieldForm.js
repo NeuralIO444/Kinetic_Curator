@@ -26,10 +26,10 @@ import { GIBSON } from './gibson.js';
 import {
   placePiece,
   stampIdForChar,
-  kanaStampIdForChar,
+  nativeStampIdForChar,
   glyphWidthEm,
   LETTER_STAMP_IDS,
-  KANA_STAMP_IDS,
+  NATIVE_STAMP_IDS,
   PLACEMENT_LAYOUTS,
 } from './placement.js';
 
@@ -87,11 +87,16 @@ const GATE_EPS = 1e-6;
  *   { ok: false, reason: 'charset' | 'fit' | 'overlap', stampIndex }
  * - charset: a stamp whose assetId is not the stamp for its glyph — the
  *   charset law failed, so the stamp does not exist. The letter law stands
- *   (A-Z + 0-9); #1982 adds the kana set as a second, CONTEXT-BOUND charset:
- *   a kana stamp passes only when the caller affirms the kana context
- *   (`allowKana` — a kana deal at the deal site, a declared kana form at
- *   the document door). Everywhere else kana is refused, exactly as any
- *   other non-letter glyph always was.
+ *   (A-Z + 0-9); #1982 adds the native-script set as a second, CONTEXT-BOUND
+ *   charset: a native stamp passes only when the caller affirms the native
+ *   context (`allowKana` — a native deal at the deal site, a declared
+ *   native form at the document door). The affirmed charset is the native
+ *   face as ONE set: slice 1 shipped it kana-only; #1998 admits the curated
+ *   kanji into the same face (NATIVE_STAMP_IDS = kana ∪ kanji), so a mixed
+ *   kanji+kana form is judged whole, never as two scripts. Everywhere else
+ *   a native stamp is refused, exactly as any other non-letter glyph
+ *   always was. (The flag keeps its slice-1 name: it affirms the face the
+ *   form marker calls 'kana' — the native face's on-disk name since #1982.)
  * - fit: a stamp that cannot fit its module — crushed below
  *   FIELD_MIN_LEGIBLE_EM by the fit shrink, or ink that lands off the dish.
  * - overlap: two stamps whose ink boxes intersect — glyphs piled into each
@@ -107,7 +112,7 @@ export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana
     const s = stamps[j];
     if (!s || typeof s !== 'object') return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
     if (LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId) continue;
-    if (allowKana && KANA_STAMP_IDS.has(s.assetId) && kanaStampIdForChar(s.ch) === s.assetId) continue;
+    if (allowKana && NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId) continue;
     return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
   }
   for (let j = 0; j < stamps.length; j++) {
@@ -162,11 +167,21 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
   // #1982 — the script is the Director's visual call, carried on the decision
   // (choosePoet sets it only for a Teijo pick in a Japanese-context room).
-  // A kana deal places the piece's kanaLines through the same recipes; a
-  // piece with no kanaLines deals its Latin lines — the deck is the
+  // A native deal places the piece's native face through the same recipes; a
+  // piece with no native face deals its Latin lines — the deck is the
   // authority, the script is a face it may or may not carry.
-  const kana = decision.script === 'kana' && Array.isArray(piece.kanaLines) && piece.kanaLines.length > 0;
-  const { layout, stamps } = placePiece({ ...piece, lines: kana ? piece.kanaLines : piece.lines, density }, rng, {
+  // #1998 — the native face has two depths: nativeLines (real orthography,
+  // kanji + kana mixed) are served when the piece carries them, kanaLines
+  // (the slice-1 kana rendering) otherwise. One face, one marker ('kana'),
+  // one gate — the deal never carries two script calls.
+  const nativeLines =
+    Array.isArray(piece.nativeLines) && piece.nativeLines.length > 0
+      ? piece.nativeLines
+      : Array.isArray(piece.kanaLines) && piece.kanaLines.length > 0
+        ? piece.kanaLines
+        : null;
+  const kana = decision.script === 'kana' && nativeLines !== null;
+  const { layout, stamps } = placePiece({ ...piece, lines: kana ? nativeLines : piece.lines, density }, rng, {
     aspect: asp,
   });
   if (stamps.length < FIELD_POEM_MIN_STAMPS) return silent; // #1932 — the threshold: a fragment is not a poem
@@ -217,8 +232,11 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  * dishonest in any particular — unknown poet or layout, a stamp id that is
  * not a stamp for its glyph, a position off the dish, a non-finite
  * size/rotation, or a stamp count outside 1..MAX_FIELD_STAMPS. #1982: a
- * kana stamp is honest only inside a declared kana form (script: 'kana')
- * under Teijo, the one poet whose deck carries the script in this slice.
+ * native stamp is honest only inside a declared native form (script:
+ * 'kana') under Teijo, the one poet whose deck carries the script. #1998:
+ * the declared face is the whole native set — kana or curated kanji, each
+ * glyph-matched to its id; a Latin stamp inside it, or a native stamp
+ * under any other marker or poet, is refused whole.
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -229,9 +247,11 @@ export function sanitizeFieldForm(raw) {
   if (!Number.isFinite(aspect) || aspect < 0.5 || aspect > 3) return null;
   if (!Array.isArray(stamps) || stamps.length === 0 || stamps.length > MAX_FIELD_STAMPS) return null;
   // #1982 — the script marker: absent/'latin' is the letter charset; 'kana'
-  // is a declared kana form. Kana is Teijo's face in this slice — a kana
-  // form under any other poet, or kana stamps under any other marker, is
-  // dishonest data and is refused whole.
+  // declares the native-script form. The native face is Teijo's — a native
+  // form under any other poet, or native stamps under any other marker, is
+  // dishonest data and is refused whole. #1998: the marker keeps its
+  // slice-1 value (it is the on-disk contract since #1982); what it
+  // declares is now the whole native set, kana + curated kanji.
   if (script !== undefined && script !== 'latin' && script !== 'kana') return null;
   const kanaForm = script === 'kana';
   if (kanaForm && poetId !== 'teijo') return null;
@@ -249,8 +269,8 @@ export function sanitizeFieldForm(raw) {
     if (!s || typeof s !== 'object') return null;
     if (typeof s.ch !== 'string' || s.ch.length !== 1) return null;
     const isLetter = LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId;
-    const isKana = KANA_STAMP_IDS.has(s.assetId) && kanaStampIdForChar(s.ch) === s.assetId;
-    if (kanaForm ? !isKana : !isLetter) return null;
+    const isNative = NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId;
+    if (kanaForm ? !isNative : !isLetter) return null;
     if (!Number.isFinite(s.x) || s.x < 0 || s.x > aspect) return null;
     if (!Number.isFinite(s.y) || s.y < 0 || s.y > 1) return null;
     if (!Number.isFinite(s.rotation)) return null;

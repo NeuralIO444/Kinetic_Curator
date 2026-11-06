@@ -13,13 +13,16 @@
 //   - same-category weak prior + learned co-occurrence from the crown log
 import { STUB_VOICES } from '../data/voices.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
+import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 
 // #1982 — the poem-only kana stamps are never dealt as marks, by any caller:
 // the FIELD director deals them alone, as poem type. dealCast is the cast
 // chokepoint (the dice tray and the miner both deal through it), so the pack
 // is filtered here, by id — every other asset, the creature citizen
 // included, rides exactly as before.
-const KANA_IDS = new Set(ASSETS_KANA.map((a) => a.id));
+// #1998 — the curated kanji stamps are filtered at the same chokepoint, on
+// the same terms: the filtered set is the native-script union.
+const KANA_IDS = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
 const withoutKana = (list) => (list.some((a) => KANA_IDS.has(a.id)) ? list.filter((a) => !KANA_IDS.has(a.id)) : list);
 
 /** Candidates dealt per roll before shortlisting (the Lois pass: show this count). */

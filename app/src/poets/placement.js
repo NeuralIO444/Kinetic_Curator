@@ -14,9 +14,10 @@
 //
 // Glyph metrics: Anton is a condensed grotesque; letters sit on a shared
 // advance so lines are measurable. A space is a placement GAP (wider advance,
-// no stamp) — the charset law: A-Z + 0-9 exist as letter stamps, and (#1982)
-// the kana set exists as poem-only stamps for eligible Teijo deals; any other
-// character has no stamp and a line carrying one does not map.
+// no stamp) — the charset law: A-Z + 0-9 exist as letter stamps, and (#1982,
+// #1998) the native-script sets (kana + the curated kanji) exist as poem-only
+// stamps for eligible Teijo deals; any other character has no stamp and a
+// line carrying one does not map.
 //
 // Recipes (spec table, docs/design/field-poets-spec-2026-10-31.md):
 //   grid   Greenleaf — strict grid, even spacing, no rotation.
@@ -31,6 +32,7 @@
 
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
+import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -57,9 +59,39 @@ export function kanaStampIdForChar(ch) {
   return KANA_ID_BY_CHAR.get(ch) ?? null;
 }
 
-/** Any glyph the poem system can stamp: a letter/digit stamp or a kana stamp. */
+/**
+ * #1998 (FIELD stamps slice 2) — the curated kanji stamps: 125 poem-only
+ * stamps (Teijo's native-line kanji + the decks' season/nature/quiet
+ * vocabulary; curated-only by the FIELD FONT RULING, never full jōyō). Same
+ * road in as the kana pack: catalogue members, excluded from the pool panel
+ * and every placeable pool by id (NATIVE_STAMP_IDS below is the union the
+ * dealing surfaces exclude on).
+ */
+export const KANJI_STAMP_IDS = Object.freeze(new Set(ASSETS_KANJI.map((a) => a.id)));
+const KANJI_ID_BY_CHAR = new Map(ASSETS_KANJI.map((a) => [a.glyph, a.id]));
+
+/** '夏' -> 'typ_j_natsu'; anything else -> null (no kanji stamp exists). */
+export function kanjiStampIdForChar(ch) {
+  return KANJI_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/**
+ * The native-script face as ONE set (slice 1's kana + slice 2's kanji): a
+ * native form's stamps are members of this union, each glyph-matched to its
+ * id. The gate and the document door judge the face whole — a Latin stamp
+ * inside a native form is refused, and a native stamp is honest only inside
+ * a declared native form (fieldForm.js).
+ */
+export const NATIVE_STAMP_IDS = Object.freeze(new Set([...KANA_STAMP_IDS, ...KANJI_STAMP_IDS]));
+
+/** 'あ' -> 'typ_h_a', '夏' -> 'typ_j_natsu'; anything else -> null (no native stamp exists). */
+export function nativeStampIdForChar(ch) {
+  return kanaStampIdForChar(ch) ?? kanjiStampIdForChar(ch);
+}
+
+/** Any glyph the poem system can stamp: a letter/digit stamp or a native-script stamp. */
 export function stampIdForGlyph(ch) {
-  return stampIdForChar(ch) ?? kanaStampIdForChar(ch);
+  return stampIdForChar(ch) ?? nativeStampIdForChar(ch);
 }
 
 /** True when every non-space character of the line maps to an existing stamp. */
@@ -91,13 +123,16 @@ const GLYPH_W = (() => {
   // #1982 — kana measured by the same ruler (the kana pack bakes to the same
   // 100-unit box, body height = GLYPH_CAP_UNITS), keyed by the glyph itself.
   for (const a of ASSETS_KANA) out[a.glyph] = inkWidthEm(a.svg);
+  // #1998 — kanji measured by the same ruler too (the kanji pack bakes to
+  // the same box on the same あ reference), keyed by the glyph itself.
+  for (const a of ASSETS_KANJI) out[a.glyph] = inkWidthEm(a.svg);
   return Object.freeze(out);
 })();
 /**
  * The widest LETTER's ink width, em units (W). The grid and square recipes use it as their even
  * cell — deliberately letters only: those recipes are the Latin poets' (Greenleaf's grid,
- * Rosselli's quadro), and a kana deal rides the proportional recipes (bands/single), where each
- * glyph advances by its own measured width. Kana widths never move a Latin placement.
+ * Rosselli's quadro), and a native deal rides the proportional recipes (bands/single), where each
+ * glyph advances by its own measured width. Native widths never move a Latin placement.
  */
 export const GLYPH_MAX_W = Math.max(...ASSETS_LETTERS.map((a) => GLYPH_W[a.id.slice(4)]));
 /** A glyph's ink width in em units (0 for a space or a character with no stamp). */

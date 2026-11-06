@@ -30,6 +30,7 @@
 
 import { ASSETS } from './assets/index.js';
 import { ASSETS_KANA } from './assets/assets-kana.js';
+import { ASSETS_KANJI } from './assets/assets-kanji.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
 import { VOICE_DECK } from './voiceDeck.js';
@@ -37,8 +38,13 @@ import { VOICE_DECK } from './voiceDeck.js';
 /** Never dealt into a chapter deck (the creature citizen — mirrors state/rollPool.mjs NEVER_DEALT).
  * #1982: the kana stamps join the citizen in this class — catalogue members
  * (census, atlas), but no chapter deck may deal them as marks; the FIELD
- * director deals them alone, as poem type. */
-export const CHAPTER_UNDEALT = Object.freeze(['creature', ...ASSETS_KANA.map((a) => a.id)]);
+ * director deals them alone, as poem type.
+ * #1998: the curated kanji stamps join the same class, on the same terms. */
+export const CHAPTER_UNDEALT = Object.freeze([
+  'creature',
+  ...ASSETS_KANA.map((a) => a.id),
+  ...ASSETS_KANJI.map((a) => a.id),
+]);
 
 /** The deck floor, per axis — the smallest movement chapter the library already deals (see header). */
 export const CHAPTER_DECK_MINIMUM = Object.freeze({ looks: 4, voices: 8, assets: 14 });

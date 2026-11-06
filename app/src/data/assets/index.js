@@ -7,6 +7,7 @@ import { ASSETS_PART5 } from './assets-haeckel.js';
 import { ASSETS_MICRO } from './assets-micro-hud.js';
 import { ASSETS_LETTERS } from './assets-letterforms.js';
 import { ASSETS_KANA } from './assets-kana.js';
+import { ASSETS_KANJI } from './assets-kanji.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
@@ -60,5 +61,10 @@ export const ASSETS = [
   // (gl/liveResolve.mjs) exclude them by id, and only the FIELD director
   // deals them, as Teijo's native script in Japanese-context rooms.
   ...ASSETS_KANA,
+  // #1998 (FIELD stamps slice 2) — the curated kanji stamps ride the same
+  // road in, on the same terms: catalogue members, never authored content,
+  // excluded by id on every dealing surface, dealt only by the FIELD
+  // director inside Teijo's native face.
+  ...ASSETS_KANJI,
   CREATURE_CITIZEN,
 ];

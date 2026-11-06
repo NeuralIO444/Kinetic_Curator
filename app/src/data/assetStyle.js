@@ -149,7 +149,7 @@ export const TAG_SYNONYMS = Object.freeze({
   grid: ['grid', 'modular', 'cluster', 'scatter', 'mixed'],
   dot: ['dot', 'dots', 'speck', 'speckle', 'confetti', 'halftone'],
   glyph: ['glyph', 'emblem', 'symbol', 'at', 'hash', 'percent', 'tag', 'label', 'signal', 'spec', 'test', 'barcode'],
-  letter: ['letter', 'type', 'a', 'k', 'z', 'kana', 'hiragana', 'katakana'], // #1982: the kana stamps' script tags live with the letters they are
+  letter: ['letter', 'type', 'a', 'k', 'z', 'kana', 'hiragana', 'katakana', 'kanji'], // #1982: the kana stamps' script tags live with the letters they are; #1998: 'kanji' joins them — the curated kanji stamps' script tag lives with the same letters
   digit: ['digit', 'number', '7', '13', '99', '01', '000'],
   hud: ['hud', 'micro', 'bracket', 'brackets', 'corner', 'corners', 'frame', 'dial', 'center'],
   pixel: ['pixel'],
