@@ -25,6 +25,12 @@
 //  - poem-only: the catalogue carries the packs (602 + 26 + 17 + 52 + 4),
 //    the authored bake does not, the panel's records stay 313, and every
 //    dealing surface excludes the grown poem-only union by id.
+//  - the producer (fix loop, Matt's ruling 2026-11-06): the Director calls
+//    face/case/plateBreak from the room, like the kana script — the last
+//    section drives the LIVE path (choosePoet under the contexts step
+//    derives; a real Director's dealPoet in rooms set up as production
+//    sets them) and proves serif, case, and plate-break forms are dealt
+//    there, and nowhere outside the affirming rooms.
 import assert from 'node:assert';
 import { Resvg } from '@resvg/resvg-js';
 import { ASSETS, ASSETS_AUTHORED } from '../data/assets/index.js';
@@ -62,6 +68,9 @@ import { NEVER_DEALT, dealableRecords } from '../state/rollPool.mjs';
 import { dealCast } from '../curator/dice.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 import { mkRng } from '../engine/prng.js';
+import { choosePoet } from '../curator/fieldDirector.js';
+import { step, INITIAL_STATE } from '../curator/fieldEval.js';
+import { createDirector } from '../curator/director.js';
 
 // ── The declared sets (mirror the generators — the two must agree) ───────
 const DECLARED_PUNCT = [
@@ -470,5 +479,128 @@ assert.ok(
   !withPacks.some((cast) => cast.split(',').some((id) => POEM_ONLY_STAMP_IDS.has(id))),
   'no cast deals a poem-only stamp',
 );
+
+// ── The producer (fix loop — Matt's ruling, 2026-11-06) ──────────────────
+// The deals above are hand-built decisions. QA's should-fix: no production
+// code ever SET face/case/plateBreak, so the sets were dark on a live
+// stage. The ruling: the Director calls it from the room, like the kana
+// script. The pins below run the LIVE path — choosePoet with the contexts
+// fieldEval's step derives from the room, and a real Director's dealPoet,
+// the exact entry layoutSlice's landPoem calls — with the room set up the
+// way production sets it (ticks naming the look's family; LOIS away for
+// the solo room). No context ever draws from the deal stream: every rng
+// below is scripted to the pick draws alone (pool, then piece).
+const seqRng = (vals) => {
+  let i = 0;
+  return () => (i < vals.length ? vals[i++] : 0.5);
+};
+
+// choosePoet: the affirmations ride the decision, conditionally — a room
+// that affirms nothing deals the plain decision, key for key as before.
+const plainPick = choosePoet({ intensity: 0.2, rng: () => 0, typeEligible: true });
+assert.ok(plainPick && plainPick.poetId === 'greenleaf' && plainPick.pieceId === 'g1', 'the plain pick is greenleaf g1');
+assert.ok(
+  !('face' in plainPick) && !('case' in plainPick) && !('plateBreak' in plainPick),
+  'no context affirmed: the decision carries no slice-3 call',
+);
+const soloPick = choosePoet({ intensity: 0.2, rng: () => 0, typeEligible: true, soloContext: true });
+assert.strictEqual(soloPick.face, 'serif', 'the solo room affirms the serif face for Whittier');
+assert.ok(!('plateBreak' in soloPick), 'g1 is two lines — not long-form, no break call');
+const bauhausPick = choosePoet({ intensity: 0.2, rng: () => 0, typeEligible: true, bauhausContext: true });
+assert.strictEqual(bauhausPick.case, true, 'a Bauhaus room affirms the sentence face');
+assert.ok(!('face' in bauhausPick), 'the sentence face is not the serif face');
+const soloTeijo = choosePoet({ intensity: 0.2, rng: seqRng([0.9, 0.0]), typeEligible: true, soloContext: true });
+assert.ok(soloTeijo && soloTeijo.poetId === 'teijo' && soloTeijo.pieceId === 't1', 'the scripted draw picks teijo t1');
+assert.strictEqual(soloTeijo.plateBreak, 'typ_o_sect', 'the solo room calls a plate break on a long-form piece');
+assert.ok(!('face' in soloTeijo), 'the serif face is Whittier-only at the pick, as at the door');
+
+// step: the contexts are the room's — the verdict as the step resolves it
+// and the dealt look's family, derived exactly as japaneseContext is.
+const soloStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
+assert.strictEqual(soloStep.decision.face, 'serif', 'step: a DAVIS ALONE room affirms serif through the real step');
+const soloStanding = step(
+  { ...INITIAL_STATE, room: 'DAVIS ALONE' },
+  { intensity: 0.2, lookFamily: 'swiss' },
+  () => 0,
+);
+assert.strictEqual(soloStanding.decision.face, 'serif', "step: the room the session stands in speaks when the input names none");
+const roomStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'THE ROOM', lookFamily: 'swiss' }, () => 0);
+assert.ok(
+  !('face' in roomStep.decision) && !('case' in roomStep.decision) && !('plateBreak' in roomStep.decision),
+  'step: an ordinary swiss room affirms nothing',
+);
+const bauhausStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'AGREEMENT', lookFamily: 'bauhaus' }, seqRng([0.9, 0.0]));
+assert.ok(bauhausStep.decision.poetId === 'teijo' && bauhausStep.decision.case === true, 'step: the case call is affirmed for any poet — the deck decides');
+const bauhausTeijoForm = fieldDealReport(bauhausStep.decision, mkRng(7), { aspect: 10 / 7 }).form;
+assert.ok(bauhausTeijoForm, 'the bauhaus teijo deal spawns');
+assert.ok(
+  !bauhausTeijoForm.stamps.some((s) => LOWER_STAMP_IDS.has(s.assetId)),
+  "teijo's deck carries no sentence face — the affirmed call degrades to her caps lines",
+);
+
+// The Director itself: dealPoet is the store's poem-deal entry (landPoem).
+// The room is set the production way — ticks that name the look's family
+// and, for the solo room, the honest feed as it stands when the room IS
+// DAVIS ALONE: LOIS away and the generator rolling unattended (the AWAY
+// rows of the matrix need a Davis state too — rollsLastMinute is the
+// feed's own field for his fires).
+const directorInRoom = ({ feed, lookFamily }) => {
+  const d = createDirector({ now: () => 1000 });
+  let verdict = null;
+  for (let i = 0; i < 3; i++) {
+    const r = d.tick({ feed, audio: 0.1, nowTs: 1000 + i * 1000, lookFamily });
+    verdict = r.gains.room ? r.gains.room.verdict : null;
+  }
+  return { d, verdict };
+};
+{
+  const { d, verdict } = directorInRoom({ feed: { away: true, rollsLastMinute: 3 }, lookFamily: 'swiss' });
+  assert.strictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
+  const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
+  assert.ok(decision && decision.poetId === 'greenleaf' && decision.face === 'serif', 'live path: the solo room deals Whittier with the serif call');
+  const { form, gate } = fieldDealReport(decision, mkRng(7), { aspect: 10 / 7 });
+  assert.ok(form && !gate, 'live path: the serif deal spawns through the real deal');
+  assert.strictEqual(form.face, 'serif', 'live path: the form on the dish is a serif form');
+  assert.ok(
+    form.stamps.every((s) => SERIF_STAMP_IDS.has(s.assetId) || PUNCT_STAMP_IDS.has(s.assetId)),
+    'live path: the serif form is dealt in serif stamps (punctuation shared)',
+  );
+  assert.deepStrictEqual(sanitizeFieldForm(form), form, 'live path: the serif form round-trips the door');
+
+  const breakDecision = d.dealPoet({ fieldRng: seqRng([0.9, 0.0]), lookFamily: 'swiss' });
+  assert.ok(
+    breakDecision && breakDecision.poetId === 'teijo' && breakDecision.plateBreak === 'typ_o_sect',
+    'live path: the solo room deals a long-form piece with the break call',
+  );
+  const breakForm = fieldDealReport(breakDecision, mkRng(7), { aspect: 10 / 7 }).form;
+  assert.ok(breakForm && breakForm.break === 'typ_o_sect', 'live path: the break form carries its marker');
+  const ornaments = breakForm.stamps.filter((s) => ORNAMENT_STAMP_IDS.has(s.assetId));
+  assert.strictEqual(ornaments.length, 1, 'live path: exactly one break stamp stands');
+  assert.ok(
+    breakForm.stamps.every((s) => s === ornaments[0] || Math.abs(s.y - ornaments[0].y) > 1e-6),
+    'live path: the break stamp is alone on its row',
+  );
+  assert.deepStrictEqual(sanitizeFieldForm(breakForm), breakForm, 'live path: the break form round-trips the door');
+}
+{
+  const { d } = directorInRoom({ feed: {}, lookFamily: 'bauhaus' });
+  const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'bauhaus' });
+  assert.ok(decision && decision.poetId === 'greenleaf' && decision.case === true, 'live path: a Bauhaus room deals Whittier with the case call');
+  assert.ok(!('face' in decision), 'live path: the Bauhaus deal carries no face call');
+  const { form } = fieldDealReport(decision, mkRng(7), { aspect: 10 / 7 });
+  assert.ok(form && !('face' in form), 'live path: the case form is a base-face form');
+  assert.ok(form.stamps.some((s) => LOWER_STAMP_IDS.has(s.assetId)), 'live path: the case form deals lowercase stamps');
+  assert.deepStrictEqual(sanitizeFieldForm(form), form, 'live path: the case form round-trips the door');
+}
+{
+  const { d, verdict } = directorInRoom({ feed: {}, lookFamily: 'swiss' });
+  assert.notStrictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS present — not the solo room');
+  const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
+  assert.ok(decision && decision.poetId === 'greenleaf', 'live path: the plain room still deals Whittier');
+  assert.ok(
+    !('face' in decision) && !('case' in decision) && !('plateBreak' in decision),
+    'live path: outside the affirming rooms the deal is the plain deal, exactly as before',
+  );
+}
 
 console.log('fieldLatin.selfcheck: all assertions passed');

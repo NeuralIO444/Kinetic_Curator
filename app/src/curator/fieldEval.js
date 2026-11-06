@@ -38,6 +38,13 @@ export function step(state, input, rng) {
     // Japanese room deals Teijo in her native script (a Swiss room is
     // type-native too, and deals her Latin face).
     japaneseContext: input.lookFamily === 'japanese',
+    // #2002 (fix loop) — the slice-3 contexts, derived from the room exactly
+    // as the kana context is: the Bauhaus family (the sentence face's room),
+    // and the solo room — the verdict as this step resolves it, the input's
+    // verdict else the room the session is standing in (DAVIS ALONE: the
+    // serif face's and the plate break's room).
+    bauhausContext: input.lookFamily === 'bauhaus',
+    soloContext: verdict === 'DAVIS ALONE',
   });
   const nextRoom = preferredNext(verdict, rng);
   const nextState = {
