@@ -134,5 +134,87 @@ catalogue growth, none in the slice's design):
    the family draw has carried this latent risk since slice 1.
 3. **`app/src/data/chapters.selfcheck.mjs`** — re-pin: the library-size
    assertion 476 → 602, its message extended (313 + 163 kana + 126 kanji,
-   CHAPTER_UNDEALT over all of them). The suite's
-...[truncated 6151 chars]
+   CHAPTER_UNDEALT over all of them). The suite's remaining assertions
+   (chapter coverage over the whole catalogue) are unchanged — the pin
+   stays a strict equality, only the correctly-grown count moved.
+4. **`app/src/panels/assetPool.selfcheck.mjs`** — re-pin: the suite's
+   pool-visible set now excludes the native union (kana ∪ kanji), on the
+   same terms slice 1 set for kana. The equality between panel records
+   (313) and the pool-visible set is kept exactly; the excluded set grew
+   by precisely the pack.
+5. **`app/src/assets/regionBake.selfcheck.mjs`** — re-pin: the catalogue
+   equality grows by exactly the pack (602), and the per-asset no-mattes
+   assertion — itself unchanged — now covers both poem-only packs.
+6. **`app/src/poets/fieldKana.selfcheck.mjs`** (the predecessor's own two
+   re-pins, recorded here as the file-by-file account promised): the
+   every-stamp deal assertion honestly widens from the kana set to the
+   native union — and is compensated, not loosened: new assertions
+   require the t1 native form to be genuinely mixed (some kanji AND some
+   kana stamps) and keep the kana-subset glyph-match; the catalogue sum
+   stays a strict equality, +126.
+
+No pin was loosened anywhere in this slice: every changed assertion
+keeps its form (strict equalities stay strict equalities) over the
+correctly-grown set, with its cause written in place.
+
+## Verification (finisher's runs on the final tree)
+
+- **Decisive suites:** `fieldKanji` — all assertions passed (including
+  under `FONTCONFIG_FILE=/dev/null`, the #1970 condition) · `fieldKana`
+  — all passed · `fieldStampPath` — all passed · `poemRow` — 16 checks ·
+  `fieldDeal` — 5 checks · `placement` — **560,366 passed, 0 failed** ·
+  all-era golden — **passed, golden hash unchanged** · `voiceDeck`,
+  `assetStyle`, `chapters`, `assetPool`, `regionBake` — all pass
+  post-fix.
+- **Full manifest sweep (final tree): 605 passed / 3 failed of 608.**
+  All three failures proven **base-identical on clean origin/main
+  3cb9b08d** (base worktree, own `npm ci`): `swarmWasm` (identical
+  `--verify` AssertionError, :136), `rollSafety` (identical checkpoints,
+  then the same `page.evaluate: Target crashed` in the GL parity
+  harness), `accum` (exit 134 heap OOM, identical native signature). An
+  earlier audit sweep also caught `retroCapture` failing a timing
+  assertion under concurrent sweep load (4.076 ms vs 0.979 ms
+  standalone); it passes standalone on both trees and passed in the
+  final sweep — a load flake, not a regression.
+- **Bake integrity:** the pack regenerates byte-identical from
+  `scripts/gen-kanji.mjs` (md5 `874c88026625a7de8d7aaf53e3265980`),
+  proven twice — original font and a fresh fetch. No font file is
+  committed. Census green under the pinned font and with
+  `FONTCONFIG_FILE=/dev/null`.
+- **format:check clean; lint 0 errors** (11 warnings, all pre-existing
+  in untouched files). All of `app/e2e/` grepped — no spec pins
+  catalogue counts or poem-surface selectors.
+- Environment note: mid-session the sandbox wiped /tmp and pruned this
+  worktree's `node_modules`; the finisher reinstalled (`npm ci`) and
+  re-ran format/lint plus all decisive suites green afterward, so the
+  numbers above are from the finished tree.
+
+## Live-QA script
+
+1. Open the app, open the ASSETS panel: records still **313**, no kanji
+   tiles anywhere.
+2. In a Japanese-family room, when FIELD deals Teijo, her poem can land
+   in mixed kanji+kana stamps (e.g. 夏の蝶 / 待ち続けて / 手を放して) at
+   true relative size; in Swiss/Bauhaus rooms her poems stay Latin, and
+   most picks stay silent as before.
+3. Roll dice / KINETIC / chapter decks: a kanji glyph never surfaces as
+   an ordinary mark.
+4. The zurich voice still renders its marks (the wardrobe fix); every
+   family wardrobe draws exactly the pre-pack deck.
+
+## Restoration note (coordinator, 2026-11-06)
+
+The version of this report committed in d529c652 was **truncated**: it
+ended mid-sentence inside finisher fix #3, followed by a literal
+`...[truncated 6151 chars]` marker — the finisher's full text never
+reached the file. QA Review on PR #1999 caught it (should-fix, record
+integrity). The coordinator restored the missing tail above (fix #3's
+completion, fixes 4–6, Verification, Live-QA script) from the
+finisher's handoff record. Every restored claim was independently
+re-verified: the coordinator re-ran fieldKanji / fieldKana /
+fieldStampPath / poemRow (16) / fieldDeal (5) / voiceDeck / assetPool
+and format:check on the committed tree (all green), and QA re-derived
+the curation counts, the bake md5, the golden hash
+(`e892d112b20d92b6…`, identical on both trees), all five re-pins, and
+the containment surfaces from the tree itself. No code changed in the
+restoration — this section and the completed tail are the only edits.
