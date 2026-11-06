@@ -110,7 +110,14 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       return false;
     }
     const content = contentLayers(layers);
-    if (!content.length) return false;
+    if (!content.length) {
+      // #1994: a field stamp with no scene to seed — no field is running, so nothing may stay published
+      if (dl.mode === 'field') {
+        st = null;
+        syncPublished();
+      }
+      return false;
+    }
     const terrainByLayer = content.map((e) => e.items.filter(isTerrain));
     const terrain = [].concat(...terrainByLayer);
     const bedrock = bedrockOf(terrain, W, H);
@@ -120,7 +127,14 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       const marks = [];
       for (const e of content)
         for (const it of e.items) if (it && !isTerrain(it) && !isSpeck(it)) marks.push(freeze(it));
-      if (!marks.length) return false;
+      if (!marks.length) {
+        // #1994: a field stamp with no seedable marks — no field is running, so nothing may stay published
+        if (fieldMode) {
+          st = null;
+          syncPublished();
+        }
+        return false;
+      }
       build(dl.wakeMs, marks, W, H, bedrock, needNearest);
     } else {
       setBedrock(st.culture, bedrock);

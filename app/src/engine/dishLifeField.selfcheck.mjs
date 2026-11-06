@@ -127,6 +127,39 @@ ok('publish: one stable object, live arrays, nothing retained across a re-seed',
   );
 });
 
+ok('publish: a field stamp with nothing to seed unpublishes — no stale field survives a vanished scene', () => {
+  const stage = createDishLifeStage();
+  const holder = stage.publishedField;
+  drive(stage, 4);
+  assert.equal(holder.active, true, 'the field is published');
+  // every content layer gone: the stamp cannot be honoured, so no field is running
+  const noContent = [
+    { id: 'FX', isFx: true },
+    { id: 'P', isPattern: true, items: [] },
+  ];
+  assert.equal(stage.apply(fstamp(5), noContent, W, H), false, 'no content layers: nothing applied');
+  assert.deepEqual(
+    [holder.active, holder.level, holder.activity, holder.gen],
+    [false, null, null, -1],
+    'no content: the previous field is unpublished, not retained',
+  );
+  // a new cycle whose layers hold only terrain and specks: nothing seedable, same rule
+  drive(stage, 4);
+  assert.equal(holder.active, true, 'the field is published again');
+  const noMarks = [
+    { id: 'L1', items: [mark(500, 250, { held: true, key: 'poem' }), { ...mark(5, 5), key: 'speck:1' }] },
+  ];
+  assert.equal(stage.apply(fstamp(0, 17_000), noMarks, W, H), false, 'no seedable marks: nothing applied');
+  assert.deepEqual(
+    [holder.active, holder.level, holder.activity, holder.gen],
+    [false, null, null, -1],
+    'no seedable marks: the previous field is unpublished, not retained',
+  );
+  // and the stage recovers cleanly when a real scene returns
+  drive(stage, 2);
+  assert.equal(holder.active, true, 'a real scene publishes again');
+});
+
 // ---- determinism
 ok('determinism: same scene + same stamps = the same field, including across a seek back', () => {
   const a = createDishLifeStage();
