@@ -290,3 +290,126 @@ WITHOUT a re-pin, the strongest containment evidence in this build).
 - Slices 1–2 packs, the native face law, and the whisper register are
   untouched in behaviour; whisper composes with face and break (pinned
   in the new suite).
+
+---
+
+## Addendum — fix loop: the producer (QA should-fix, Matt's ruling 2026-11-06)
+
+QA's should-fix stood: the serif face, the case deal, and the plate break
+had working machinery but no live producer — no production code ever set
+`face`/`case`/`plateBreak` on a deal decision, so on a live stage Whittier
+could never appear in serif, no poem dealt in lowercase, and no break was
+ever inserted. **Matt's ruling: the Director calls it from the room, like
+the kana script.** This supersedes the "Director wiring is decision-level"
+translation above: the affirming caller is now wired, on the `script:
+'kana'` pattern exactly — contexts derived from the room in
+`fieldEval.step`, affirmed in `choosePoet`, carried on the decision
+through the Director's `dealPoet` projection (beside the script line) to
+`fieldDealReport` and the door. Like script, the calls ride the poem-deal
+path (KINETIC presses / the poem row); the CURATOR tick's poet summary
+projects poet/piece/layout only, as it already did for script.
+
+### The signals (each derived where japaneseContext is derived; no new draws)
+
+The affirmation is context-derived, never RNG-drawn: the markers are
+conditional spreads on the decision, so in a room that affirms nothing
+the decision is key-for-key what it was before this loop, and every
+seeded census and shipped-deck replay is unmoved (proof below).
+
+- **`face: 'serif'` — the solo room.** Context: `soloContext` = the
+  room's verdict is **DAVIS ALONE** (step resolves the verdict as the
+  input's, else the room the session stands in — the read `dealPoet`
+  already makes of the last tick). Gate: the pick is Greenleaf, mirroring
+  script's Teijo gate. Why it fits: DAVIS ALONE is the room with one
+  artist in it and nobody directing — the reading room. Whittier is the
+  book poet; alone in the room, her poem stands in its book face, the
+  print/heritage register.
+- **`case: true` — the Bauhaus room.** Context: `bauhausContext` =
+  `lookFamily === 'bauhaus'`, the same family read that derives
+  `japaneseContext`. No poet gate: the deck is the authority (only
+  Greenleaf carries `caseLines`; the call degrades to caps elsewhere,
+  exactly as a script call on a deck with no native face deals Latin).
+  Why it fits: the Bauhaus print culture wrote lowercase as a house
+  style (the school's kleinschreibung) — the sentence face is that
+  room's native register.
+- **`plateBreak: 'typ_o_sect'` — the solo room, long-form.** Context:
+  `soloContext` AND the picked piece carries 3+ lines. The ornament is
+  named, not drawn: the section mark is the plate-break furniture the
+  epic names, called by id. Why it fits: the solo room has space around
+  the poem; a long-form piece gets the printer's pause between its
+  lines. `fieldForm`'s standing degradation still applies (a 'single'
+  layout or a native deal deals no break).
+
+### Battery safety (provable, not hoped)
+
+`roomBattery`'s cells all stand in 'swiss' rooms with verdicts AGREEMENT /
+THE ROOM / FULL BURN / THE CLASH, and the eval scenarios likewise: neither
+new context can fire there (no 'bauhaus' family, no DAVIS ALONE verdict),
+so the battery's deals are byte-identical by construction — and the suite
+confirms it, green with **no re-pin**. The same holds for fieldSilence,
+fieldEval, fieldLiveDeal, fieldDirector and fieldKana fixtures (swiss /
+japanese / grunge rooms, no solo verdicts): all green, none re-pinned.
+**This loop contains zero re-pins.**
+
+### Live-path pins (fieldLatin, new closing section)
+
+The slice's decision-level pins stand; the fix adds the producer's, all
+through the entries the store uses:
+
+- `choosePoet` under each context (scripted draws — pool, then piece):
+  serif affirmed for Greenleaf in the solo context only; case affirmed in
+  the Bauhaus context; the break affirmed on Teijo's 3-line t1 in the
+  solo context; a context-free pick carries none of the three keys.
+- `step` deriving the contexts from the room (verdict named, verdict
+  stood-in, family named), and the deck-authority degradation at the step
+  level (a Bauhaus Teijo deal carries `case` and deals her caps lines).
+- A **real Director's `dealPoet`** — layoutSlice's `landPoem` entry —
+  with the room set the production way (ticks naming the look's family;
+  for the solo room, the honest feed as it stands when the room IS
+  DAVIS ALONE: LOIS away with the generator rolling unattended). Pinned:
+  a serif form dealt by the live path in the solo room (form carries
+  `face`, serif stamps, door round-trip); a plate-break form dealt there
+  (marker, one ornament alone on its row, door round-trip); a case form
+  dealt in a Bauhaus room (lowercase stamps, no face); and in an ordinary
+  swiss room the same entry deals the plain deal, key for key as before.
+
+### Verification (fix loop)
+
+- Decisive suites by file — all PASS: fieldLatin (with the new section),
+  fieldKana, fieldKanji, fieldStampPath, poemRow, fieldDeal, fieldBattery
+  (no re-pin), fieldDirector, fieldEval, fieldSilence, fieldLiveDeal,
+  director, directorDebt, chapters, assetPool, voiceDeck, assetStyle,
+  regionBake, allEraGolden ("701 assets, 21183 svg bytes" — the render
+  still byte-identical), placement (**560,366** — bit-identical),
+  goldenPlacement (hash `e892d112b20d92b6…` unchanged; **no golden
+  re-pinned**). Panel still **313**; catalogue still **701**.
+- Full manifest sweep: **606/609** — the only failures are the three
+  sandbox-environment suites (swarmWasm, rollSafety, accum) already
+  proven base-identical on clean 1eed1a1b in the record above; no new
+  failure. (The build's 605/609 counted allEraGolden, the real breach
+  since fixed; it passes now.)
+- format:check green; lint 0 errors (11 warnings, all pre-existing).
+- Diff: 4 files, +166/−0 — `fieldDirector.js` (contexts + affirmations),
+  `fieldEval.js` (context derivation), `director.js` (dealPoet
+  projection), `fieldLatin.selfcheck.mjs` (the producer pins).
+
+### QA nit 1 — precision
+
+The "format:check green" claims in this report refer to the project's
+own scope — `prettier --check .` run in `app/` — which is clean. Files
+outside `app/` (the generators at repo root, `studio/render.mjs`) sit
+outside that scope and are not prettier-clean, on base exactly as on
+this branch; that is the established pattern, not a regression.
+
+### Live-QA script (updated)
+
+1. ASSETS panel: still **313** records; no new tiles.
+2. Stand the instrument in a **DAVIS ALONE** room (LOIS away — leave the
+   generator running unattended five minutes — with a swiss look
+   standing) and re-deal the poem from the poem row: when the deal lands
+   on Whittier, she stands in **PT Serif** on stage, live — and a
+   long-form Teijo piece dealt in that room carries a lone **§** on its
+   own row between its lines.
+3. In a **Bauhaus** room, re-deal: a Greenleaf deal reads in sentence
+   case with its periods, in Anton.
+4. In an ordinary swiss room, deals are the plain deals they always were.
