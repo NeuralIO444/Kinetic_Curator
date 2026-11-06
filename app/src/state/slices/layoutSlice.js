@@ -1045,6 +1045,28 @@ export const createLayoutSlice = (set) => ({
       return { lockedParams: { ...state.lockedParams, fieldForm: !held } };
     }),
 
+  /**
+   * #1906 (FIELD S5) — WHISPER: flip the standing poem's presentation register, on the form itself
+   * (layoutParams.fieldForm.register). The poet, the piece and the placement stand exactly — no
+   * re-deal, no placement change, no draw from the poem stream — and the flip is independent of
+   * HOLD and KEEP (a held poem keeps its register through every pass, because HOLD carries the
+   * standing form untouched). Refused with no poem standing: there is no form to quiet. One undo
+   * step, like every other write to layoutParams. The deal never sets the register — this toggle
+   * is the only write site.
+   */
+  togglePoemWhisper: () =>
+    set((state) => {
+      const form = state.layoutParams?.fieldForm;
+      if (!form) return {};
+      const next = { ...form };
+      if (form.register === 'whisper') delete next.register;
+      else next.register = 'whisper';
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: { ...state.layoutParams, fieldForm: next },
+      };
+    }),
+
   /** #1918 — KEEP: bank this exact materialized poem into the take. KEEP twice is one keeper. */
   // The bank is document data beside the poem itself (layoutParams.poemKeeps): a take records it (layoutParams
   // is a scene key), the project saves it, and it is re-validated on every read (poemRow.sanitizePoemKeeps).

@@ -249,6 +249,44 @@ ok('KEEP: banks the exact materialized poem; KEEP twice is one keeper; silence b
   assert.equal(S().layoutParams.poemKeeps, undefined, 'silence banks nothing');
 });
 
+ok('WHISPER (#1906): flips the register on the standing form only — no re-deal, no stream draw, one undo step', () => {
+  reset();
+  const beforeLp = S().layoutParams;
+  S().togglePoemWhisper();
+  const quiet = S().layoutParams.fieldForm;
+  assert.equal(quiet.register, 'whisper');
+  const { register, ...quietRest } = quiet;
+  assert.deepEqual(quietRest, standing, 'poet, piece and placement stand exactly');
+  assert.deepEqual(withoutPoem(S().layoutParams), withoutPoem(beforeLp), 'nothing but the form moved');
+  assert.equal(S().poemDeal, 0, 'no draw from the poem stream');
+  assert.deepEqual(S().lockedParams, {}, 'HOLD untouched');
+  assert.equal(S().historyUndoStack.length, 1, 'one undo step, like every other write to layoutParams');
+  S().togglePoemWhisper();
+  assert.deepEqual(S().layoutParams.fieldForm, standing, 'flipping back restores the form exactly — register absent, not nulled');
+  S().undo();
+  assert.equal(S().layoutParams.fieldForm.register, 'whisper', 'undo restores the register the entry captured');
+});
+
+ok('WHISPER: refused with no poem standing', () => {
+  reset({ layoutParams: withoutPoem(BASE.layoutParams) });
+  const lp = S().layoutParams;
+  S().togglePoemWhisper();
+  assert.equal(S().layoutParams, lp, 'silence: nothing moved');
+  assert.equal(S().historyUndoStack.length, 0, 'and no undo entry');
+});
+
+ok('WHISPER is independent of HOLD and KEEP: a held poem keeps its register through the passes; a keeper is the same poem at either register', () => {
+  reset();
+  S().togglePoemWhisper();
+  S().togglePoemHold();
+  for (let i = 0; i < 3; i++) PRESSES.voice();
+  assert.equal(S().layoutParams.fieldForm.register, 'whisper', 'HOLD carries the standing form — register and all — past every pass');
+  assert.equal(S().lockedParams.fieldForm, true, 'HOLD itself unmoved by the register');
+  S().keepPoem();
+  assert.equal(S().layoutParams.poemKeeps.length, 1);
+  assert.ok(isPoemKept(S().layoutParams.poemKeeps, standing), 'the keeper is the poem at either register (the keep key carries no register)');
+});
+
 ok('KEEP bank: validated at the door, oldest drops past the cap', () => {
   let keeps = [];
   for (let i = 0; i < MAX_POEM_KEEPS + 4; i++) keeps = keepPoem(keeps, form('gibson', 'w1', 100 + i));

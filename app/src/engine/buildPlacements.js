@@ -85,6 +85,18 @@ export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
 export const FIELD_EM_SCALE = 20;
 
 /**
+ * FIELD S5 (#1906) — the whisper register: an armed form carrying
+ * `register: 'whisper'` (poets/fieldForm.js) draws at this fraction of its
+ * full-voice alpha — the same placed field, quieter. Positions, scales,
+ * rotation and colours are untouched; alpha is the only thing the register
+ * moves. 0.35 was picked to sit clearly under full voice (the form reads as
+ * present but hushed, roughly a third of the layer's top alpha) without
+ * dropping toward the vanishing end of the room's alpha range — the final
+ * call is Matt's feel gate on #1906.
+ */
+export const WHISPER_ALPHA = 0.35;
+
+/**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
  * Prefer pickWeightedIndexStable for pipeline.
  */
@@ -721,7 +733,8 @@ export function buildPlacements({
   // data (layoutParams.fieldForm); here it is only drawn — stamps become
   // items at exactly the placed positions, coloured by this layer's own
   // colour strategy, at the top of the layer's alpha range (a held form is
-  // present, not a ghost). They join the item list before the overlap sort
+  // present, not a ghost) — the one exception being the S5 whisper register
+  // (#1906), which quiets that alpha on the performer's say-so. They join the item list before the overlap sort
   // and the material flag loop, so mirror / glass / materials treat them
   // as ordinary marks of the layer. The dish lean/snap/weather above reads
   // the SoA and does not move them: a held form is not loose marks.
@@ -741,7 +754,14 @@ export function buildPlacements({
   // are asserted in poets/placement.selfcheck.mjs.
   const fieldForm = sanitizeFieldForm(layoutParams.fieldForm);
   if (fieldForm) {
-    const fieldAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
+    const fullAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
+    // #1906 (FIELD S5) — the whisper register: the SAME placed field drawn
+    // quiet, at WHISPER_ALPHA of its full-voice alpha. A presentation
+    // register, not a second system — stamps, positions, scales and colours
+    // below are exactly the full-voice ones; only this alpha moves. No
+    // register on the form: fieldAlpha is fullAlpha itself, byte-identical
+    // to the pre-S5 pipeline.
+    const fieldAlpha = fieldForm.register === 'whisper' ? fullAlpha * WHISPER_ALPHA : fullAlpha;
     const fieldItems = new Array(fieldForm.stamps.length);
     for (let j = 0; j < fieldForm.stamps.length; j++) {
       const s = fieldForm.stamps[j];
