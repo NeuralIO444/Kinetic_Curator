@@ -27,11 +27,31 @@ import {
   placePiece,
   stampIdForChar,
   nativeStampIdForChar,
-  glyphWidthEm,
+  lowerStampIdForChar,
+  punctStampIdForChar,
+  serifStampIdForChar,
+  ornamentStampIdForChar,
+  stampWidthEm,
   LETTER_STAMP_IDS,
+  LOWER_STAMP_IDS,
+  PUNCT_STAMP_IDS,
+  SERIF_STAMP_IDS,
+  ORNAMENT_STAMP_IDS,
+  ORNAMENT_GLYPH_BY_ID,
   NATIVE_STAMP_IDS,
   PLACEMENT_LAYOUTS,
 } from './placement.js';
+
+// #2002 — the stamp classes the gate and the door judge by. A stamp is
+// honest in a class when its id is in the class's set AND its glyph is the
+// glyph that id names (the glyph/id pairing law every slice enforces).
+const isBaseLetter = (s) => LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId;
+const isLower = (s) => LOWER_STAMP_IDS.has(s.assetId) && lowerStampIdForChar(s.ch) === s.assetId;
+const isPunct = (s) => PUNCT_STAMP_IDS.has(s.assetId) && punctStampIdForChar(s.ch) === s.assetId;
+const isSerifLetter = (s) => SERIF_STAMP_IDS.has(s.assetId) && serifStampIdForChar(s.ch) === s.assetId;
+const isNativeStamp = (s) => NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId;
+const isOrnament = (s) => ORNAMENT_STAMP_IDS.has(s.assetId) && ornamentStampIdForChar(s.ch) === s.assetId;
+const isDigitGlyph = (s) => typeof s.ch === 'string' && s.ch >= '0' && s.ch <= '9';
 
 export const POET_DECKS = Object.freeze({
   greenleaf: GREENLEAF,
@@ -97,40 +117,78 @@ const GATE_EPS = 1e-6;
  *   a native stamp is refused, exactly as any other non-letter glyph
  *   always was. (The flag keeps its slice-1 name: it affirms the face the
  *   form marker calls 'kana' — the native face's on-disk name since #1982.)
+ *   #2002 grows the Latin side on the same discipline, in three parts:
+ *   the BASE charset grows (Anton lowercase + the punctuation set join the
+ *   caps and digits — one face, freely mixed); the SERIF face is a second,
+ *   face-bound charset affirmed by `face: 'serif'` (serif letter stamps
+ *   pass only there, base letter stamps are refused there, and the shared
+ *   stamps — digits and punctuation — pass in both faces); and ORNAMENT
+ *   stamps carry the break-only law — they pass in a Latin-face context
+ *   (base or serif, never the native context) only standing ALONE on their
+ *   baseline row: an ornament sharing its row with any other stamp is
+ *   glyph-adjacent inside a line, and is refused as a charset stillborn.
  * - fit: a stamp that cannot fit its module — crushed below
  *   FIELD_MIN_LEGIBLE_EM by the fit shrink, or ink that lands off the dish.
  * - overlap: two stamps whose ink boxes intersect — glyphs piled into each
  *   other destroy the line they were meant to form.
- * Ink boxes come from the measured glyph metrics (placement.glyphWidthEm):
- * a stamp's ink is glyphWidthEm(ch)*em wide and em tall, centred on (x, y).
+ * Ink boxes come from the measured glyph metrics (placement.stampWidthEm):
+ * a stamp's ink is stampWidthEm(assetId, ch)*em wide and em tall, centred
+ * on (x, y) — a serif stamp measures with its own face's ruler, every
+ * other stamp with the base ruler it has always used.
  * Pure: same stamps in, same verdict out.
  */
-export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana = false } = {}) {
+export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana = false, face } = {}) {
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
   if (!Array.isArray(stamps) || stamps.length === 0) return Object.freeze({ ok: false, reason: 'fit', stampIndex: -1 });
+  const serifForm = face === 'serif';
+  const ornamentIdx = [];
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
     if (!s || typeof s !== 'object') return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
-    if (LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId) continue;
-    if (allowKana && NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId) continue;
+    if (serifForm) {
+      // The serif face: its own letters, plus the face-shared stamps
+      // (digits and punctuation — never base letters, never native).
+      if (isSerifLetter(s) || isPunct(s) || (isBaseLetter(s) && isDigitGlyph(s))) continue;
+    } else {
+      // The base face: caps, digits, lowercase and punctuation, one charset.
+      if (isBaseLetter(s) || isLower(s) || isPunct(s)) continue;
+      if (allowKana && isNativeStamp(s)) continue;
+    }
+    // Ornaments are Latin-face furniture: admitted in either Latin face,
+    // never in the native context, and only under the break-only law
+    // (judged on the whole list below, once every stamp is classified).
+    if (!allowKana && isOrnament(s)) {
+      ornamentIdx.push(j);
+      continue;
+    }
     return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
+  }
+  // #2002 — the break-only law: an ornament stamp must stand alone on its
+  // baseline row. Rows are exact in placement (one y per line, rows pitched
+  // a full em or more apart), so a shared y is a shared line.
+  for (const j of ornamentIdx) {
+    for (let k = 0; k < stamps.length; k++) {
+      if (k !== j && Math.abs(stamps[k].y - stamps[j].y) <= GATE_EPS) {
+        return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
+      }
+    }
   }
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
     if (!Number.isFinite(s.x) || !Number.isFinite(s.y) || !Number.isFinite(s.em) || s.em < FIELD_MIN_LEGIBLE_EM) {
       return Object.freeze({ ok: false, reason: 'fit', stampIndex: j });
     }
-    const hw = (glyphWidthEm(s.ch) * s.em) / 2;
+    const hw = (stampWidthEm(s.assetId, s.ch) * s.em) / 2;
     if (s.x - hw < -GATE_EPS || s.x + hw > asp + GATE_EPS || s.y - s.em / 2 < -GATE_EPS || s.y + s.em / 2 > 1 + GATE_EPS) {
       return Object.freeze({ ok: false, reason: 'fit', stampIndex: j });
     }
   }
   for (let i = 0; i < stamps.length; i++) {
     const p = stamps[i];
-    const pw = glyphWidthEm(p.ch) * p.em;
+    const pw = stampWidthEm(p.assetId, p.ch) * p.em;
     for (let j = i + 1; j < stamps.length; j++) {
       const q = stamps[j];
-      const xOverlap = (pw + glyphWidthEm(q.ch) * q.em) / 2 - Math.abs(p.x - q.x);
+      const xOverlap = (pw + stampWidthEm(q.assetId, q.ch) * q.em) / 2 - Math.abs(p.x - q.x);
       if (xOverlap <= GATE_EPS) continue;
       const yOverlap = (p.em + q.em) / 2 - Math.abs(p.y - q.y);
       if (yOverlap > GATE_EPS) return Object.freeze({ ok: false, reason: 'overlap', stampIndex: j });
@@ -181,14 +239,52 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
         ? piece.kanaLines
         : null;
   const kana = decision.script === 'kana' && nativeLines !== null;
-  const { layout, stamps } = placePiece({ ...piece, lines: kana ? nativeLines : piece.lines, density }, rng, {
+  // #2002 — the face is the Director's call too, carried on the decision on
+  // the script marker's pattern: decision.face === 'serif' deals Whittier
+  // (greenleaf) in the serif face. The face is Whittier's alone — under any
+  // other poet the call is not honoured and the deal deals the base face,
+  // exactly as a script call on a deck with no native face deals Latin (the
+  // door refuses a serif form under another poet, so the deal never deals
+  // one). A native deal outranks the face: the faces never compose.
+  const serif = !kana && decision.face === 'serif' && decision.poetId === 'greenleaf';
+  // #2002 — the sentence face: decision.case deals the piece's caseLines —
+  // the deck's own rendering of the same words in lowercase + punctuation
+  // (deck data, parallel to nativeLines) — when the piece carries them.
+  const caseLines =
+    !kana && decision.case === true && Array.isArray(piece.caseLines) && piece.caseLines.length > 0
+      ? piece.caseLines
+      : null;
+  // #2002 — the plate break: decision.plateBreak names an ornament BY ID,
+  // and the deal honours it on a Latin-face deal of a multi-line piece
+  // whose recipe keeps lines as rows — never 'single', which joins its
+  // lines into one baseline where a break stamp would sit inside the line.
+  // The ornament rides in as its own line between the first line and the
+  // rest, and the form carries the break marker (the door judges it).
+  let dealLines = kana ? nativeLines : (caseLines ?? piece.lines);
+  let breakId = null;
+  const pieceLayout = PLACEMENT_LAYOUTS.includes(piece.layout) ? piece.layout : 'bands';
+  if (
+    !kana &&
+    typeof decision.plateBreak === 'string' &&
+    ORNAMENT_STAMP_IDS.has(decision.plateBreak) &&
+    pieceLayout !== 'single' &&
+    dealLines.length >= 2
+  ) {
+    dealLines = [dealLines[0], ORNAMENT_GLYPH_BY_ID.get(decision.plateBreak), ...dealLines.slice(1)];
+    breakId = decision.plateBreak;
+  }
+  const { layout, stamps } = placePiece({ ...piece, lines: dealLines, density }, rng, {
     aspect: asp,
+    face: serif ? 'serif' : undefined,
   });
-  if (stamps.length < FIELD_POEM_MIN_STAMPS) return silent; // #1932 — the threshold: a fragment is not a poem
+  // #1932 — the threshold counts LETTERS: a plate-break ornament is
+  // furniture between the poem's lines, not a letter of it (#2002).
+  const letterStamps = stamps.reduce((n, s) => n + (ORNAMENT_STAMP_IDS.has(s.assetId) ? 0 : 1), 0);
+  if (letterStamps < FIELD_POEM_MIN_STAMPS) return silent; // #1932 — the threshold: a fragment is not a poem
   // S4 (#1905) — the stillborn gate: a form that would spawn unreadable
   // never spawns. The deal falls back to silence and the verdict rides the
   // record (layoutSlice banks it on the commit as fieldGateRefusal).
-  const gate = gateFieldForm(stamps, { aspect: asp, allowKana: kana });
+  const gate = gateFieldForm(stamps, { aspect: asp, allowKana: kana, face: serif ? 'serif' : undefined });
   if (!gate.ok) return { form: null, gate };
   return {
     form: {
@@ -197,6 +293,8 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
       layout,
       aspect: asp,
       ...(kana ? { script: 'kana' } : {}),
+      ...(serif ? { face: 'serif' } : {}),
+      ...(breakId ? { break: breakId } : {}),
       stamps: stamps.map((s) => ({
         assetId: s.assetId,
         ch: s.ch,
@@ -236,11 +334,19 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  * 'kana') under Teijo, the one poet whose deck carries the script. #1998:
  * the declared face is the whole native set — kana or curated kanji, each
  * glyph-matched to its id; a Latin stamp inside it, or a native stamp
- * under any other marker or poet, is refused whole.
+ * under any other marker or poet, is refused whole. #2002: the base Latin
+ * charset grows (lowercase + punctuation stamps are honest in any base
+ * form, glyph-matched), and two more markers ride the same discipline —
+ * `face: 'serif'` declares the serif face (Whittier only; serif letters
+ * honest only inside it, base letters refused inside it, digits and
+ * punctuation shared), and `break: <ornament id>` declares the form's
+ * plate break (the named ornament's stamps must be present, no other
+ * ornament may ride, and no marker may stand without its stamps). The
+ * faces never compose: face + script together is refused whole.
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps, script, register } = raw;
+  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
@@ -263,31 +369,67 @@ export function sanitizeFieldForm(raw) {
   // never sets it (fieldDealReport carries no register) — it is the
   // performer's toggle on a standing form, nothing upstream may arm it.
   if (register !== undefined && register !== 'whisper') return null;
+  // #2002 — the face marker: absent is the base (Anton) face; 'serif'
+  // declares the serif face, Whittier's (greenleaf) alone. Any other value
+  // is dishonest data and refuses the form whole, on the script marker's
+  // discipline. The faces never compose: a serif declaration on a native
+  // form is refused (and the poet law already keeps the two apart — Teijo
+  // carries the script, Greenleaf the serif).
+  if (face !== undefined && face !== 'serif') return null;
+  const serifForm = face === 'serif';
+  if (serifForm && poetId !== 'greenleaf') return null;
+  if (serifForm && kanaForm) return null;
+  // #2002 — the break marker: the ornament id of the form's plate break.
+  // It must name a real ornament stamp, and it is refused in a native form
+  // (ornaments are Latin-face furniture — charset purity). Its agreement
+  // with the stamps is judged in the loop below and after it: an ornament
+  // stamp riding without the marker, a break stamp of another ornament,
+  // or the marker standing without its stamps all refuse the form whole.
+  if (plateBreak !== undefined && (typeof plateBreak !== 'string' || !ORNAMENT_STAMP_IDS.has(plateBreak))) return null;
+  if (plateBreak !== undefined && kanaForm) return null;
   const out = new Array(stamps.length);
+  let ornamentStamps = 0;
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
     if (!s || typeof s !== 'object') return null;
     if (typeof s.ch !== 'string' || s.ch.length !== 1) return null;
-    const isLetter = LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.ch) === s.assetId;
-    const isNative = NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId;
-    if (kanaForm ? !isNative : !isLetter) return null;
+    const isLetter = isBaseLetter(s);
+    const isNative = isNativeStamp(s);
+    const orn = isOrnament(s);
+    if (orn) {
+      if (s.assetId !== plateBreak) return null; // an undeclared (or differently declared) break stamp
+      ornamentStamps++;
+    }
+    if (
+      kanaForm
+        ? !isNative
+        : serifForm
+          ? !(isSerifLetter(s) || isPunct(s) || (isLetter && isDigitGlyph(s)) || orn)
+          : !(isLetter || isLower(s) || isPunct(s) || orn)
+    )
+      return null;
     if (!Number.isFinite(s.x) || s.x < 0 || s.x > aspect) return null;
     if (!Number.isFinite(s.y) || s.y < 0 || s.y > 1) return null;
     if (!Number.isFinite(s.rotation)) return null;
     if (!Number.isFinite(s.em) || s.em <= 0 || s.em > 0.3) return null;
     out[j] = { assetId: s.assetId, ch: s.ch, x: s.x, y: s.y, rotation: s.rotation, em: s.em };
   }
+  if (plateBreak !== undefined && ornamentStamps === 0) return null; // the marker stands without its stamps
   // S4 (#1905) — the stillborn gate guards this door too: a stored form
   // whose stamps are individually honest but jointly unreadable (ink off
   // the dish, glyphs overlapping, type crushed under the legibility
-  // floor) is refused whole, exactly as at the deal.
-  if (!gateFieldForm(out, { aspect, allowKana: kanaForm }).ok) return null;
+  // floor) is refused whole, exactly as at the deal. #2002: the gate also
+  // judges the break-only law here — an ornament sharing its row with
+  // another stamp never passes this door.
+  if (!gateFieldForm(out, { aspect, allowKana: kanaForm, face: serifForm ? 'serif' : undefined }).ok) return null;
   return {
     poetId,
     pieceId,
     layout,
     aspect,
     ...(kanaForm ? { script: 'kana' } : {}),
+    ...(serifForm ? { face: 'serif' } : {}),
+    ...(plateBreak !== undefined ? { break: plateBreak } : {}),
     ...(register === 'whisper' ? { register: 'whisper' } : {}),
     stamps: out,
   };

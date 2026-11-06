@@ -16,7 +16,10 @@
 // advance so lines are measurable. A space is a placement GAP (wider advance,
 // no stamp) — the charset law: A-Z + 0-9 exist as letter stamps, and (#1982,
 // #1998) the native-script sets (kana + the curated kanji) exist as poem-only
-// stamps for eligible Teijo deals; any other character has no stamp and a
+// stamps for eligible Teijo deals; #2002 grows the Latin side — Anton a–z and
+// the punctuation set as poem-only stamps, one serif face (PT Serif) as
+// face-bound letter stamps for Whittier, and a handful of ornament stamps
+// that exist only as plate breaks; any other character has no stamp and a
 // line carrying one does not map.
 //
 // Recipes (spec table, docs/design/field-poets-spec-2026-10-31.md):
@@ -33,6 +36,9 @@
 import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js';
 import { ASSETS_KANA } from '../data/assets/assets-kana.js';
 import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
+import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
+import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
+import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -89,9 +95,100 @@ export function nativeStampIdForChar(ch) {
   return kanaStampIdForChar(ch) ?? kanjiStampIdForChar(ch);
 }
 
-/** Any glyph the poem system can stamp: a letter/digit stamp or a native-script stamp. */
+/**
+ * #2002 (FIELD stamps slice 3) — the Latin growth of the base face: Anton
+ * lowercase (26) and the punctuation set (17), baked as their own pack on the
+ * caps pack's reference (scripts/gen-latin.mjs). Same road in as the native
+ * packs: catalogue members, poem-only, excluded from every dealing surface
+ * by id (POEM_ONLY_STAMP_IDS below is the union those surfaces exclude on).
+ * They are the BASE face's own charset, not a second face — a form may mix
+ * caps, lowercase, digits and punctuation freely; the gate's Latin charset
+ * is the union (fieldForm.js).
+ */
+export const LOWER_STAMP_IDS = Object.freeze(
+  new Set(ASSETS_LATIN.filter((a) => a.tags.includes('lowercase')).map((a) => a.id)),
+);
+export const PUNCT_STAMP_IDS = Object.freeze(
+  new Set(ASSETS_LATIN.filter((a) => a.tags.includes('punct')).map((a) => a.id)),
+);
+/** The whole Anton lowercase + punctuation pack, as one set. */
+export const LATIN_STAMP_IDS = Object.freeze(new Set(ASSETS_LATIN.map((a) => a.id)));
+const LATIN_ID_BY_CHAR = new Map(ASSETS_LATIN.map((a) => [a.glyph, a.id]));
+
+/** 'a' -> 'typ_l_a'; anything else -> null (no lowercase stamp exists). */
+export function lowerStampIdForChar(ch) {
+  const id = LATIN_ID_BY_CHAR.get(ch);
+  return id !== undefined && LOWER_STAMP_IDS.has(id) ? id : null;
+}
+
+/** '.' -> 'typ_p_period', '’' -> 'typ_p_rsquo'; anything else -> null (no punctuation stamp exists). */
+export function punctStampIdForChar(ch) {
+  const id = LATIN_ID_BY_CHAR.get(ch);
+  return id !== undefined && PUNCT_STAMP_IDS.has(id) ? id : null;
+}
+
+/** 'a' -> 'typ_l_a', '.' -> 'typ_p_period'; anything else -> null (no slice-3 Latin stamp exists). */
+export function latinStampIdForChar(ch) {
+  return LATIN_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/**
+ * #2002 — the serif face: A–Z + a–z in PT Serif Bold (scripts/gen-serif.mjs),
+ * Whittier's book face. Letter stamps are FACE-BOUND: a serif stamp is
+ * honest only inside a serif-declared form (fieldForm.js carries the `face`
+ * marker on the `script` marker's pattern), and base letter stamps are
+ * refused inside one; digits and punctuation stamps are face-SHARED (the
+ * base packs serve them in a serif form unchanged), so this pack is letters
+ * only. The serif resolver is consulted only by a serif placement — the
+ * base resolver below never returns a serif id.
+ */
+export const SERIF_STAMP_IDS = Object.freeze(new Set(ASSETS_SERIF.map((a) => a.id)));
+const SERIF_ID_BY_CHAR = new Map(ASSETS_SERIF.map((a) => [a.glyph, a.id]));
+
+/** 'A' -> 'typ_s_A', 'a' -> 'typ_s_a'; anything else -> null (no serif stamp exists). */
+export function serifStampIdForChar(ch) {
+  return SERIF_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/**
+ * #2002 — the ornaments: § ¶ † ‡ in PT Serif Bold (scripts/gen-ornaments.mjs;
+ * the fleuron and asterism are absent from both bake fonts, the long dash
+ * already ships as the face-shared punctuation stamp — see the generator).
+ * BREAK-ONLY: an ornament exists only as a standalone plate-break stamp
+ * between a poem's lines, never glyph-adjacent inside a line, never in a
+ * native form — the gate and the door judge that law (fieldForm.js).
+ */
+export const ORNAMENT_STAMP_IDS = Object.freeze(new Set(ASSETS_ORNAMENTS.map((a) => a.id)));
+const ORNAMENT_ID_BY_CHAR = new Map(ASSETS_ORNAMENTS.map((a) => [a.glyph, a.id]));
+/** Ornament id -> its glyph ('typ_o_sect' -> '§'): the deal names a break by id. */
+export const ORNAMENT_GLYPH_BY_ID = new Map(ASSETS_ORNAMENTS.map((a) => [a.id, a.glyph]));
+
+/** '§' -> 'typ_o_sect'; anything else -> null (no ornament stamp exists). */
+export function ornamentStampIdForChar(ch) {
+  return ORNAMENT_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/**
+ * The poem-only union — EVERY stamp pack the FIELD director deals alone:
+ * the native face (kana ∪ kanji), the Latin growth (lowercase + punctuation),
+ * the serif face and the ornaments. This is the set the containment surfaces
+ * exclude on (the pool panel, chapter decks, the KINETIC roll, the dice
+ * chokepoint, the placeable pool, the voice wardrobe draw): catalogue
+ * members all, marks never. It grows here, in one place, never as a second
+ * list elsewhere.
+ */
+export const POEM_ONLY_STAMP_IDS = Object.freeze(
+  new Set([...NATIVE_STAMP_IDS, ...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS]),
+);
+
+/**
+ * Any glyph the poem system can stamp in the BASE face: a letter/digit
+ * stamp, a native-script stamp, a lowercase/punctuation stamp, or an
+ * ornament. (Serif stamps are deliberately absent: they resolve only under
+ * a serif placement, so a base deal can never deal one by accident.)
+ */
 export function stampIdForGlyph(ch) {
-  return stampIdForChar(ch) ?? nativeStampIdForChar(ch);
+  return stampIdForChar(ch) ?? nativeStampIdForChar(ch) ?? latinStampIdForChar(ch) ?? ornamentStampIdForChar(ch);
 }
 
 /** True when every non-space character of the line maps to an existing stamp. */
@@ -126,8 +223,29 @@ const GLYPH_W = (() => {
   // #1998 — kanji measured by the same ruler too (the kanji pack bakes to
   // the same box on the same あ reference), keyed by the glyph itself.
   for (const a of ASSETS_KANJI) out[a.glyph] = inkWidthEm(a.svg);
+  // #2002 — the Latin growth measured by the same ruler (the latin pack
+  // bakes to the same box on the caps' own 'H' reference), keyed by glyph:
+  // lowercase and punctuation advances are their own measured widths, so a
+  // mixed-case line is laid out honestly, glyph by glyph.
+  for (const a of ASSETS_LATIN) out[a.glyph] = inkWidthEm(a.svg);
+  // #2002 — ornaments measured too (their own row's fit is judged with them).
+  for (const a of ASSETS_ORNAMENTS) out[a.glyph] = inkWidthEm(a.svg);
   return Object.freeze(out);
 })();
+/**
+ * #2002 — the serif face's measured widths, keyed by glyph, in a table of
+ * their own: a serif 'A' and an Anton 'A' are different ink, and the
+ * char-keyed GLYPH_W above is the base face's ruler. A serif placement and
+ * the gate (for a serif form) measure with this table; the base face's
+ * measurements never move.
+ */
+const SERIF_GLYPH_W = (() => {
+  const out = {};
+  for (const a of ASSETS_SERIF) out[a.glyph] = inkWidthEm(a.svg);
+  return Object.freeze(out);
+})();
+/** A serif glyph's ink width in em units (0 for a character with no serif stamp). */
+export const serifGlyphWidthEm = (ch) => SERIF_GLYPH_W[ch] ?? 0;
 /**
  * The widest LETTER's ink width, em units (W). The grid and square recipes use it as their even
  * cell — deliberately letters only: those recipes are the Latin poets' (Greenleaf's grid,
@@ -137,6 +255,12 @@ const GLYPH_W = (() => {
 export const GLYPH_MAX_W = Math.max(...ASSETS_LETTERS.map((a) => GLYPH_W[a.id.slice(4)]));
 /** A glyph's ink width in em units (0 for a space or a character with no stamp). */
 export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
+/**
+ * A STAMP's ink width in em units, by its id: a serif stamp measures with
+ * the serif ruler, every other stamp with the base ruler. The gate judges
+ * fit and overlap with this, so a serif form is measured in its own face.
+ */
+export const stampWidthEm = (assetId, ch) => (SERIF_STAMP_IDS.has(assetId) ? serifGlyphWidthEm(ch) : glyphWidthEm(ch));
 const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through
 const ADV = GLYPH_MAX_W + TRACK; // the grid's even cell: the widest glyph plus tracking, so no glyph overruns
 /**
@@ -155,32 +279,32 @@ const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
  * A glyph's advance in em units. `adv` null = proportional (its own width + TRACK); a number = an even cell (grid),
  * which must be at least the glyph's width + TRACK, so even cells never overlap either.
  */
-const advanceOf = (ch, adv, spaceAdv) =>
+const advanceOf = (ch, adv, spaceAdv, widthOf = glyphWidthEm) =>
   ch === ' '
     ? adv == null
       ? spaceAdv
       : adv // on a strict grid a word break is one empty cell, so words never run together
     : adv == null
-      ? glyphWidthEm(ch) + TRACK
-      : Math.max(adv, glyphWidthEm(ch) + TRACK);
+      ? widthOf(ch) + TRACK
+      : Math.max(adv, widthOf(ch) + TRACK);
 
 /** Advance width of a line in em units (spaces count as gaps). The last glyph's tracking is not counted. */
-function lineAdvanceEm(line, adv, spaceAdv) {
+function lineAdvanceEm(line, adv, spaceAdv, widthOf = glyphWidthEm) {
   let w = 0;
-  for (const ch of line) w += advanceOf(ch, adv, spaceAdv);
+  for (const ch of line) w += advanceOf(ch, adv, spaceAdv, widthOf);
   return Math.max(0, w - (line.length && line.at(-1) !== ' ' ? TRACK : 0));
 }
 
 /** Lay one line's stamps along a baseline. Returns stamps in unit space. */
-function layLine(line, { ox, oy, em, adv, spaceAdv }) {
+function layLine(line, { ox, oy, em, adv, spaceAdv, resolveId = stampIdForGlyph, widthOf = glyphWidthEm }) {
   const out = [];
   let cursor = 0;
   for (const ch of line) {
-    const a = advanceOf(ch, adv, spaceAdv);
+    const a = advanceOf(ch, adv, spaceAdv, widthOf);
     if (ch !== ' ') {
       out.push(
         Object.freeze({
-          assetId: stampIdForGlyph(ch),
+          assetId: resolveId(ch),
           ch,
           // the glyph's ink centred in its own advance (minus the trailing track)
           x: ox + (cursor + (a - TRACK) / 2) * em,
@@ -217,13 +341,30 @@ function fitEm(em, wEm, hEm, aspect) {
  * (density may be the deal's adjusted value). `rng` is a seeded () => [0,1).
  * Draw order is fixed per recipe and documented per branch — a given
  * (piece, seed) always deals the same form.
+ *
+ * `face: 'serif'` (#2002) places the piece in the serif face: letters
+ * resolve to the serif pack and measure with the serif ruler, while digits
+ * and punctuation stay the face-shared base stamps. Any other call is the
+ * base face — the resolver and ruler every shipped deal has always used.
  */
-export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
+export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
   const lines = Array.isArray(piece?.lines) ? piece.lines.map((l) => String(l)) : [];
   const layout = PLACEMENT_LAYOUTS.includes(piece?.layout) ? piece.layout : 'bands';
   const density = clamp01(piece?.density ?? 0.4);
   const draw = typeof rng === 'function' ? rng : () => 0.5;
   const asp = Number.isFinite(aspect) && aspect > 0 ? aspect : 10 / 7;
+  // #2002 — the serif resolver claims every letter first, so stampIdForChar
+  // in this chain serves digits only (face-shared); punctuation is shared
+  // too, and the ornaments — Latin-face furniture, admissible in either
+  // face under the break-only law — resolve here as well (a plate-break
+  // line placed in a serif deal must still find its stamp). The serif ruler
+  // falls back to the base ruler for the shared stamps (their ink IS the
+  // base ink), which is the `||` below (0 = no serif glyph).
+  const resolveId =
+    face === 'serif'
+      ? (ch) => serifStampIdForChar(ch) ?? punctStampIdForChar(ch) ?? ornamentStampIdForChar(ch) ?? stampIdForChar(ch)
+      : stampIdForGlyph;
+  const widthOf = face === 'serif' ? (ch) => serifGlyphWidthEm(ch) || glyphWidthEm(ch) : glyphWidthEm;
 
   let stamps = [];
   if (layout === 'grid') {
@@ -232,12 +373,14 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     const adv = ADV * (1 + 0.35 * density);
     let em = 0.062 + 0.03 * density; // #1928: em is now TRUE cap height (exact stage scale); sized to read as a plate
     const pitchEm = 1.5;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
     em = fitEm(em, wEm, hEm, asp);
     const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
     lines.forEach((line, r) => {
-      stamps.push(...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV }));
+      stamps.push(
+        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+      );
     });
   } else if (layout === 'bands') {
     // Stratified bands: each line its own band on a locked baseline, bands
@@ -245,15 +388,17 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     const adv = null; // #1928: proportional (each band is a run of type, not a grid)
     let em = 0.06 + 0.027 * density;
     const pitchEm = 1.9;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
     em = fitEm(em, wEm, hEm, asp);
     const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
     lines.forEach((line, r) => {
-      const lw = lineAdvanceEm(line, adv, SPACE_ADV) * em;
+      const lw = lineAdvanceEm(line, adv, SPACE_ADV, widthOf) * em;
       const slack = Math.max(0, wEm * em - lw);
       const lineOx = ox + draw() * slack;
-      stamps.push(...layLine(line, { ox: lineOx, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV }));
+      stamps.push(
+        ...layLine(line, { ox: lineOx, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+      );
     });
   } else if (layout === 'single') {
     // One-line module: the piece's lines join into a single locked baseline
@@ -262,21 +407,23 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
     const joined = lines.join(' ');
     const adv = null; // #1928: proportional
     let em = 0.054 + 0.033 * density;
-    const wEm = lineAdvanceEm(joined, adv, SPACE_ADV);
+    const wEm = lineAdvanceEm(joined, adv, SPACE_ADV, widthOf);
     em = fitEm(em, wEm, 1, asp);
     const { ox, oy } = moduleOrigin(draw, wEm * em, em, asp);
-    stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV });
+    stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf });
   } else if (layout === 'two') {
     // Two-line module, locked baselines, generous negative space.
     const adv = null; // #1928: proportional
     let em = 0.054 + 0.03 * density;
     const pitchEm = 1.45;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV)));
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
     em = fitEm(em, wEm, hEm, asp);
     const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
     lines.forEach((line, r) => {
-      stamps.push(...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV }));
+      stamps.push(
+        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+      );
     });
   } else {
     // square — Rosselli: square cells (advance == pitch == em in cell units),
@@ -304,7 +451,7 @@ export function placePiece(piece, rng, { aspect = 10 / 7 } = {}) {
         if (ch !== ' ') {
           stamps.push(
             Object.freeze({
-              assetId: stampIdForGlyph(ch),
+              assetId: resolveId(ch),
               ch,
               x: ox + (cell + 0.5) * step,
               y: oy + (r + 0.5) * step,
