@@ -18,6 +18,7 @@ import { sanitizePattern } from '../state/patternTrack.js';
 import { assignTides, tidesCols, tidesCellAt } from './tides.js';
 import { assignRewrite, rewriteCols, rewriteCellAt } from './rewrite.js';
 import { assignBlocks, blocksCols, blocksCellAt } from './blocks.js';
+import { assignPicture, pictureCols, pictureCellAt } from './picture.js';
 
 /** The nearest visible PATTERN layer below `layerId` (bottom -> top order), or null. */
 export function nearestPatternBelow(layers, layerId) {
@@ -71,6 +72,15 @@ function gridFor(p, pal, w, h) {
     // #1798: same cell size and row count as patternSource.buildGrid for a w x h frame
     const cell = w / blocksCols(p.density);
     g = { tileW: cell, grid: assignBlocks(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(h / cell))) };
+    if (_grids.size >= CACHE_SIZE) _grids.delete(_grids.keys().next().value);
+    _grids.set(key, g);
+    return g;
+  }
+  if (p.mode === 'PICTURE') {
+    // #1795: same cell size and row count as patternSource.buildGrid for a w x h frame. The ground
+    // channel has no image argument, so it reads the bundled seed picture — the mode's default image.
+    const cell = w / pictureCols(p.density);
+    g = { tileW: cell, grid: assignPicture(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(h / cell))) };
     if (_grids.size >= CACHE_SIZE) _grids.delete(_grids.keys().next().value);
     _grids.set(key, g);
     return g;
@@ -139,6 +149,18 @@ export function patternGround(pattern, palette, w, h) {
       roles: (x, y) => blocksCellAt(grid, w, x, y).colors.map((c) => String(c).toLowerCase()),
       cell(x, y) {
         const c = blocksCellAt(grid, w, x, y);
+        return { u: c.u, v: c.v, size: c.side };
+      },
+    };
+  }
+  if (grid.kind === 'picture') {
+    // #1795 PICTURE: the grid never moves (DRIFT pulses the marks, not their cells). The main colour is
+    // the cell's snapped MARK colour — the colour the picture reads as at that cell.
+    return {
+      at: (x, y) => pictureCellAt(grid, w, x, y).main,
+      roles: (x, y) => pictureCellAt(grid, w, x, y).colors.map((c) => String(c).toLowerCase()),
+      cell(x, y) {
+        const c = pictureCellAt(grid, w, x, y);
         return { u: c.u, v: c.v, size: c.side };
       },
     };

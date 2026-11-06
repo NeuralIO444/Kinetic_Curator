@@ -26,6 +26,7 @@ import {
 import { assignTides, rasterTides, tidesCols } from './tides.js';
 import { assignRewrite, rasterRewrite, rewriteCols } from './rewrite.js';
 import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
+import { assignPicture, rasterPicture, pictureCols, pictureMoverMap, normalizePictureImage } from './picture.js';
 import { sanitizePattern, PATTERN_FIELD_LIKE } from '../state/patternTrack.js';
 
 /** The palette fields a pattern reads. Anything else on the palette object is ignored. */
@@ -41,7 +42,7 @@ export const patternPalette = (p) => ({
  * time is left OUT of its key and the frame is reused until a parameter, the palette or the size
  * changes. A drifting pattern keys on `t` (every frame is new).
  */
-export function patternKey(pattern, palette, w, h, t = 0) {
+export function patternKey(pattern, palette, w, h, t = 0, image = null) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   // #1798: a BLOCKS deal is a still — time never changes its pixels, whatever DRIFT says.
@@ -63,6 +64,8 @@ export function patternKey(pattern, palette, w, h, t = 0) {
     w,
     h,
     el,
+    // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled seed by default)
+    p.mode === 'PICTURE' ? normalizePictureImage(image).id : null,
   ]);
 }
 
@@ -81,8 +84,8 @@ export function patternDrawSize(drift, w, h) {
   return { w: PATTERN_LIVE_MAX_W, h: Math.max(1, Math.round((th * PATTERN_LIVE_MAX_W) / tw)), scaled: true };
 }
 
-/** What decides the PICTURE (everything but time): the key a still frame, and a drifting frame's tables, are cached on. */
-const staticKey = (p, pal, w, h) =>
+/** What decides the frame (everything but time): the key a still frame, and a drifting frame's tables, are cached on. */
+const staticKey = (p, pal, w, h, image = null) =>
   JSON.stringify([
     p.mode,
     p.seed,
@@ -96,9 +99,11 @@ const staticKey = (p, pal, w, h) =>
     w,
     h,
     PATTERN_FIELD_LIKE.includes(p.mode) ? null : [p.kin, p.movers],
+    // #1795: PICTURE's grid is built from its image; the image's id stands for its pixels
+    p.mode === 'PICTURE' ? normalizePictureImage(image).id : null,
   ]);
 
-function buildGrid(p, pal, bw, bh) {
+function buildGrid(p, pal, bw, bh, image = null) {
   const tileW = bw / p.density;
   const rows = Math.max(1, Math.ceil(bh / tileW));
   if (p.mode === 'GLYPH') return { tileW, grid: assignGlyph(p.seed, p.density, p.mix, pal) };
@@ -115,6 +120,14 @@ function buildGrid(p, pal, bw, bh) {
     const cell = bw / blocksCols(p.density);
     return { tileW: cell, grid: assignBlocks(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(bh / cell))) };
   }
+  if (p.mode === 'PICTURE') {
+    // #1795: the frame's image (patternSource's optional argument), or the bundled seed picture
+    const cell = bw / pictureCols(p.density);
+    return {
+      tileW: cell,
+      grid: assignPicture(p.seed, p.density, p.mix, pal, Math.max(1, Math.ceil(bh / cell)), image),
+    };
+  }
   return { tileW, grid: assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows) };
 }
 
@@ -127,6 +140,7 @@ function buildGrid(p, pal, bw, bh) {
  *   TIDES the grid is fixed but every cell re-reads the moving field, so each frame is a full (span-filled) raster
  *   REWRITE the growth runs once per plan (hard-bounded); each frame re-rasters the state at its step
  *   BLOCKS a deal is a still whatever DRIFT says, so it always takes the drawn-once path
+ *   PICTURE the picture is sampled into a grid of marks once per plan; each frame redraws the (culled) marks, like GLYPH
  * Every frame is pixel-identical to the reference rasterizers (rasterFast.selfcheck proves it).
  * The pixels it returns belong to the source and are overwritten by the next frame: upload, do not keep.
  */
@@ -136,22 +150,28 @@ export function createPatternFrames() {
   let still = null;
   let out = null;
   return {
-    /** @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first */
-    frame(pattern, palette, w, h, t = 0) {
+    /**
+     * @param {object} [image] #1795 PICTURE only: the still to sample ({id, w, h, rgb}); the bundled
+     *   seed picture when omitted. Every other mode ignores it.
+     * @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first
+     */
+    frame(pattern, palette, w, h, t = 0, image = null) {
       const p = sanitizePattern(pattern);
       const pal = patternPalette(palette);
       const bw = Math.max(1, Math.round(w));
       const bh = Math.max(1, Math.round(h));
-      const k = staticKey(p, pal, bw, bh);
+      const k = staticKey(p, pal, bw, bh, image);
       if (k !== sKey) {
-        const { tileW, grid } = buildGrid(p, pal, bw, bh);
+        const { tileW, grid } = buildGrid(p, pal, bw, bh, image);
         // #1137: the seeded few elements that carry a KINEME motion (null = none, the picture as it was)
         const movers =
           p.mode === 'QUILT'
             ? quiltMoverMap(grid, p.seed, p.kin, p.movers)
             : p.mode === 'GLYPH'
               ? glyphMoverMap(grid, p.seed, p.kin, p.movers)
-              : null;
+              : p.mode === 'PICTURE'
+                ? pictureMoverMap(grid, p.seed, p.kin, p.movers)
+                : null;
         plan = {
           tileW,
           grid,
@@ -162,7 +182,7 @@ export function createPatternFrames() {
         still = null;
         if (!out || out.length !== bw * bh) out = new Uint32Array(bw * bh);
       }
-      const key = patternKey(p, pal, bw, bh, t);
+      const key = patternKey(p, pal, bw, bh, t, image);
       if (p.drift === 0 || p.mode === 'BLOCKS') {
         if (!still) {
           if (p.mode === 'QUILT') still = plan.quilt.base;
@@ -170,6 +190,7 @@ export function createPatternFrames() {
           else if (p.mode === 'TIDES') still = rasterTides(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else if (p.mode === 'REWRITE') still = rasterRewrite(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else if (p.mode === 'BLOCKS') still = rasterBlocks(new Uint32Array(bw * bh), bw, bh, plan.grid);
+          else if (p.mode === 'PICTURE') still = rasterPicture(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
           else still = rasterField(new Uint32Array(bw * bh), bw, bh, plan.grid, plan.tileW, panOffset(p.seed, 0, 0));
         }
         return { pixels: still, w: bw, h: bh, key };
@@ -178,6 +199,7 @@ export function createPatternFrames() {
       else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers);
       else if (p.mode === 'TIDES') rasterTides(out, bw, bh, plan.grid, p.drift, t);
       else if (p.mode === 'REWRITE') rasterRewrite(out, bw, bh, plan.grid, p.drift, t);
+      else if (p.mode === 'PICTURE') rasterPicture(out, bw, bh, plan.grid, p.drift, t, plan.movers);
       else rasterField(out, bw, bh, plan.grid, plan.tileW, panOffset(p.seed, p.drift, t));
       return { pixels: out, w: bw, h: bh, key };
     },
@@ -190,15 +212,15 @@ export function createPatternFrames() {
  * @param {object} pattern a layer's pattern block (sanitized here)
  * @param {object} palette the active palette ({swatches, bg, ink, weights?})
  */
-export function patternPixels(pattern, palette, w, h, t = 0) {
-  return createPatternFrames().frame(pattern, palette, w, h, t).pixels.slice();
+export function patternPixels(pattern, palette, w, h, t = 0, image = null) {
+  return createPatternFrames().frame(pattern, palette, w, h, t, image).pixels.slice();
 }
 
 /** The same frame as bytes, rows flipped to GL's bottom-up order, ready for texImage2D. */
-export function patternBytesGL(pattern, palette, w, h, t = 0) {
+export function patternBytesGL(pattern, palette, w, h, t = 0, image = null) {
   const bw = Math.max(1, Math.round(w));
   const bh = Math.max(1, Math.round(h));
-  const src = patternPixels(pattern, palette, bw, bh, t);
+  const src = patternPixels(pattern, palette, bw, bh, t, image);
   const outp = new Uint32Array(bw * bh);
   for (let y = 0; y < bh; y++) outp.set(src.subarray(y * bw, (y + 1) * bw), (bh - 1 - y) * bw);
   return new Uint8Array(outp.buffer);

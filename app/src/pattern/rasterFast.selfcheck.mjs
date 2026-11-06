@@ -28,6 +28,7 @@ import {
 } from './patternSource.js';
 import { GLYPH_MARKS, POSES, buildMark, sampleMark } from './glyph.js';
 import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
+import { assignPicture, rasterPictureReference, pictureMoverMap, pictureCols } from './picture.js';
 import { defaultPattern } from '../state/patternTrack.js';
 import { PALETTES, resolvePalette } from '../data/palettes.js';
 import { mkRng } from '../engine/prng.js';
@@ -239,12 +240,20 @@ ok(
         const brows = Math.max(1, Math.ceil(h / cell));
         return rasterBlocks(b, w, h, assignBlocks(p.seed, p.density, p.mix, pal, brows));
       }
+      if (p.mode === 'PICTURE') {
+        // #1795: the reference is the picture built fresh at patternSource's own geometry, from the bundled seed image
+        const cell = w / pictureCols(p.density);
+        const prows = Math.max(1, Math.ceil(h / cell));
+        const g = assignPicture(p.seed, p.density, p.mix, pal, prows);
+        return rasterPictureReference(b, w, h, g, p.drift, t, pictureMoverMap(g, p.seed, p.kin, p.movers));
+      }
       const q = assignQuilt(p.seed, p.density, p.mix, p.hero, pal, rows); // #1137: a new track carries element motion (kin MIX)
       return rasterQuiltReference(b, w, h, q, tileW, p.grout, p.drift, t, quiltMoverMap(q, p.seed, p.kin, p.movers));
     };
     const pal2 = resolvePalette('v01d', null);
     const script = [];
-    for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'BLOCKS']) {
+    for (const mode of ['QUILT', 'GLYPH', 'FIELD', 'BLOCKS', 'PICTURE']) {
+      // #1795: PICTURE joins the reference sweep (re-pin cause: the new mode registers)
       const base = { ...defaultPattern(mode, 9), density: mode === 'GLYPH' ? 4 : 6 };
       script.push(
         [base, PAL, 320, 224, 0],

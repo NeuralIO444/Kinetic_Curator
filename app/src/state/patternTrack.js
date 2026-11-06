@@ -5,7 +5,7 @@
 // FX fold and the MATH grade above it). It is NOT a KC track: it never owns BUILD's
 // sliders, the seed or a snapshot. Its parameters live ON the layer, in `layer.pattern`.
 //
-//   { mode: 'QUILT'|'GLYPH'|'FIELD'|'TIDES'|'REWRITE'|'BLOCKS', seed: uint32, density, mix, grout, hero, drift, drop }
+//   { mode: 'QUILT'|'GLYPH'|'FIELD'|'TIDES'|'REWRITE'|'BLOCKS'|'PICTURE', seed: uint32, density, mix, grout, hero, drift, drop }
 //
 // Fractions, not percents (the engine's units). SEED is a stored integer; SHUFFLE writes
 // a new one. Pure: no store, no DOM. `sanitizePattern` is the one gate: the slice, the
@@ -24,10 +24,11 @@ import {
 import { TIDES_DEFAULT_DENSITY, TIDES_DEFAULT_MIX } from '../pattern/tides.js';
 import { REWRITE_DEFAULT_DENSITY, REWRITE_DEFAULT_MIX } from '../pattern/rewrite.js';
 import { BLOCKS_DEFAULT_DENSITY, BLOCKS_DEFAULT_MIX } from '../pattern/blocks.js';
+import { PICTURE_DEFAULT_DENSITY, PICTURE_DEFAULT_MIX } from '../pattern/picture.js';
 
-export const PATTERN_MODES = Object.freeze(['QUILT', 'GLYPH', 'FIELD', 'TIDES', 'REWRITE', 'BLOCKS']);
+export const PATTERN_MODES = Object.freeze(['QUILT', 'GLYPH', 'FIELD', 'TIDES', 'REWRITE', 'BLOCKS', 'PICTURE']);
 /**
- * The modes KIN and CURATOR deal from (patternRoll). TIDES (#1797), BLOCKS (#1798) and REWRITE (#1823) are picked by hand only
+ * The modes KIN and CURATOR deal from (patternRoll). TIDES (#1797), BLOCKS (#1798), REWRITE (#1823) and PICTURE (#1795) are picked by hand only
  * for now: they are parked library work, and leaving them out of the deal keeps every existing seeded deal
  * (and replay) dealing what it always did.
  */
@@ -52,6 +53,7 @@ export const PATTERN_DEFAULT_DENSITY = Object.freeze({
   TIDES: TIDES_DEFAULT_DENSITY,
   REWRITE: REWRITE_DEFAULT_DENSITY,
   BLOCKS: BLOCKS_DEFAULT_DENSITY,
+  PICTURE: PICTURE_DEFAULT_DENSITY,
 });
 
 const MIX_DEFAULT = Object.freeze({
@@ -61,6 +63,7 @@ const MIX_DEFAULT = Object.freeze({
   TIDES: TIDES_DEFAULT_MIX,
   REWRITE: REWRITE_DEFAULT_MIX,
   BLOCKS: BLOCKS_DEFAULT_MIX,
+  PICTURE: PICTURE_DEFAULT_MIX,
 });
 
 const num = (v, lo, hi, fallback) => {

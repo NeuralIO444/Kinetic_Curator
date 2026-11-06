@@ -24,6 +24,8 @@ Three composition modes, one engine. Mode is a track-level switch, persisted per
 **REWRITE** (#1823 — "growth grid", loot from Maxim Gumin's MarkovJunior) — the one mode that is not dealt: seeded growth tips rewrite an empty grid rule by rule (extend, bud, seal) into a maze of corridors, and each cell is coloured by the step it was born, so the finished picture is also its own history. See Composition (REWRITE).
 **BLOCKS** (#1798 — "Colour Block", reference loot from Sai Karlen) — the atom is the merged block, not the cell: a seeded pass fuses adjacent cells into polyomino blocks (singles, bars 2–4, 2×2 squares, L / T / plus), then colour is assigned once per block. Black gaps separate every block, so the ground reads as a thin lattice. A deal is a still; SHUFFLE re-deals the same generator. See Composition (BLOCKS).
 
+**PICTURE** (#1795 — "picture pattern", reference loot from Tim Wingert) — the one mode that derives its field from a picture instead of generating it: an image is sampled into a grid, and each cell is drawn with a mark from GLYPH's pool, the cell's tone driving the mark's scale, rotation and palette-snapped colour. A sampler wearing a pattern mode's clothes — the image's brightness field decides where the mass is, the pool decides what the mass is made of. See Composition (PICTURE).
+
 GLYPH and FIELD are not MIX extremes of QUILT. MIX cannot produce negative space or edge-wrapping. They are mode switches.
 
 **ESCHER — parked, not v1.** True interlocking tessellation. Specified below so it is not reinvented later. Do not build it until FIELD's torus assert is green. Hex grids stay parked with it. v1 is square tiles only.
@@ -212,6 +214,19 @@ Degenerate ban: stroke width never below 0.012 of tile size. A mark with zero ar
 - Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, so existing seeded deals are unchanged.
 - Cost: tier 0 at registration (`pattern/blocks`), CPU raster ≈ 30–40 ms measured for a still 1000×700 frame (declared 60), drawn once and cached.
 
+## Composition (PICTURE)
+
+(#1795, built on Matt's word 2026-11-05; his three rulings on the issue's open questions are the spec.) Code: `app/src/pattern/picture.js` (+ `pictureSeed.js`); checks: `picture.selfcheck.mjs`.
+
+- Source image: imported stills only — an image is `{ id, w, h, rgb }` (w·h·3 bytes, row-major) threaded through the frame call (`patternSource.frame` / `patternPixels`), never persisted on the pattern block. With no image the mode samples the bundled seed picture (the repo's own about portrait, baked to a 64×48 RGB grid in `pictureSeed.js`), so it works out of the box. Live stage-frame recursion is NOT in this build.
+- Grid of square cells, `cols = 2 × DENSITY` (DENSITY 10 → 20 across, TIDES' mapping — the existing density controls, no new grid UI). Rows fill the frame height at the same cell; the grid fills the frame (no letterbox).
+- Sampling: the image is cover-fit into the grid's aspect (scaled to cover, centre-cropped); each cell takes the mean colour of its region.
+- Tone mapping is FULL (Matt's ruling): the cell's tone (luminance of its mean colour) drives the mark's SCALE first — linear, 0.30 of the mark box at black to 1.25 at white, bright = mass on the palette's dark ground — its ROTATION as a quarter-turn pose read off the tone's quarter band (turned by a seed offset; poses are GLYPH's rail, quarter turns only), and its COLOUR snapped to the active palette: MARK is the pool swatch nearest the cell's mean colour, CUT the nearest of the rest, ACCENT the nearest of what remains, on GLYPH's restricted role set (`glyphRoles`). Every painted colour is an exact palette string; the mode never invents a hue.
+- The pool is GLYPH's thirteen constructed marks. (The issue's "asset pool" names the stage pool, whose assets are SVG strings baked to GL sprites — they cannot enter the pure CPU raster every pattern frame path shares, and a second mask pipeline would be a parallel system. Inside PATTERN, the marks are the shape pool; the picture decides how they are dealt.) MIX is mark entropy in GLYPH's sense: low MIX keeps one seeded hero mark across the whole picture, high MIX draws each cell's mark freely.
+- Motion rides the rails: DRIFT is GLYPH's phase-offset scale pulse on the marks (the picture itself never moves); per-element kinemes (#1042) apply per cell exactly as GLYPH's; SHUFFLE re-seeds the dealing of the marks (DROP still gates it to the bar). The picture under a given seed + image + settings is identical on replay (the replay law), proven in the suite.
+- Not in the KIN / CURATOR deal pool (`PATTERN_DEAL_MODES`): hand-picked only, so existing seeded deals are unchanged.
+- Cost: tier 0 at registration (`pattern/picture`), CPU raster ≈ 7 ms measured for a moving 1000×700 frame (declared 25); stills are drawn once and cached.
+
 ## Composition (ESCHER) — parked
 
 Do not implement in v1. Recorded so the parked line cannot be re-litigated as forgetfulness.
@@ -234,8 +249,8 @@ GLYPH further restricts to the 4–6 strongest roles. FIELD and QUILT may use th
 
 | Param | Range | Default | Notes |
 |---|---|---|---|
-| MODE | QUILT / GLYPH / FIELD / TIDES / REWRITE / BLOCKS | QUILT | Track-level. ESCHER not in the enum until unparked. |
-| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES), 10 (REWRITE), 10 (BLOCKS) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. TIDES, REWRITE and BLOCKS: cols = 2 × DENSITY. |
+| MODE | QUILT / GLYPH / FIELD / TIDES / REWRITE / BLOCKS / PICTURE | QUILT | Track-level. ESCHER not in the enum until unparked. |
+| DENSITY | 4–12 tiles | 8 (QUILT), 5×4 (GLYPH), 6 (FIELD), 10 (TIDES), 10 (REWRITE), 10 (BLOCKS), 10 (PICTURE) | Tiles across. GLYPH: cols = round(5 * DENSITY / 4), rows = DENSITY, clamped. TIDES, REWRITE, BLOCKS and PICTURE: cols = 2 × DENSITY. |
 | MIX | 0–100% | 55% | Motif entropy inside the current mode's vocabulary. |
 | SEED | uint32 | stored integer | Project document persists it. SHUFFLE writes a new integer. "Random" is not a value. |
 | GROUT | 0–8% of tile | 3% QUILT, 0 GLYPH, 0 FIELD | Fraction of tile size, not pixels. Resolution-independent. |
@@ -253,6 +268,7 @@ DRIFT means one thing per mode. It does not also mean hue cycle, motif morph, an
 - TIDES: the field's own clock. DRIFT scales time (DRIFT 0.5 at 4 s = DRIFT 1 at 2 s): the field travels downward, evolves, and breathes from blotchy patches into broad horizontal bands and back (one breath = 9 DRIFT-seconds). The grid stays put.
 - REWRITE: the growth's own clock. DRIFT scales time the same way: the growth replays from the seed over 6 DRIFT-seconds, the finished maze holds for 2, then it regrows. DRIFT 0 is the finished growth, still.
 - BLOCKS: none in this cut. A deal is a still; SHUFFLE re-deals it. The editor disables DRIFT for BLOCKS with that reason.
+- PICTURE: GLYPH's pulse on the marks — a phase-offset scale pulse across the grid, on top of each cell's tone scale. The picture itself never moves: no pan, no morph. Amount = DRIFT.
 - Accent hue cycle is not DRIFT. It is a MATH tone op (HUE ROTATE) on the palette. PATTERN does not re-key color.
 - Motif morph (diamond ↔ hexagon) is parked. No shape interpolator in v1.
 - SHUFFLE re-seeds assignment inside the current mode. If DROP is on and BEAT is running, the reseed lands on the bar. The pattern drop is the product.
