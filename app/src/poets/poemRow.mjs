@@ -31,6 +31,16 @@ export const POET_FORMS = Object.freeze({
 export const POEM_PICK_BASE = 0x50000;
 export const POEM_PLACE_BASE = 0x60000;
 
+/**
+ * #2003 — the RAY GUN tap-seed stream, beside the poem-deal streams on
+ * CH.curate. Index = the session's ray-gun tap counter (layoutSlice's
+ * raygunTap), never the poemDeal counter: a tap draws its seed here only,
+ * so the poem deals replay bit-identically whether or not the gun was
+ * ever fired. The drawn seed rides the form's raygun record; the blast is
+ * recomputed from it on every draw (poets/rayGunForm.js).
+ */
+export const POEM_RAYGUN_BASE = 0x70000;
+
 /** How many poems a take banks before the oldest falls off. */
 export const MAX_POEM_KEEPS = 16;
 

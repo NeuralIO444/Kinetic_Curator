@@ -61,6 +61,7 @@ import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.
 import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import { sanitizeFieldForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data
+import { rayGunForm } from '../poets/rayGunForm.js'; // #2003 — the treatment record, drawn from the plain form
 import { pickWeightedIndexStable } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
@@ -762,9 +763,17 @@ export function buildPlacements({
     // register on the form: fieldAlpha is fullAlpha itself, byte-identical
     // to the pre-S5 pipeline.
     const fieldAlpha = fieldForm.register === 'whisper' ? fullAlpha * WHISPER_ALPHA : fullAlpha;
-    const fieldItems = new Array(fieldForm.stamps.length);
-    for (let j = 0; j < fieldForm.stamps.length; j++) {
-      const s = fieldForm.stamps[j];
+    // #2003 — RAY GUN: when the form carries a treatment record, the
+    // drawn list is the blast recomputed from the plain form (the stored
+    // stamps never move — cycling back to plain is the record's absence).
+    // The transform is pure geometry: positions, scales and rotations
+    // below read the treated stamps; colours, alpha and the register are
+    // exactly the plain form's, so WHISPER and RAY GUN compose. No record:
+    // drawnForm IS fieldForm, byte-identical to the pre-#2003 pipeline.
+    const drawnForm = fieldForm.raygun ? rayGunForm(fieldForm, fieldForm.raygun) : fieldForm;
+    const fieldItems = new Array(drawnForm.stamps.length);
+    for (let j = 0; j < drawnForm.stamps.length; j++) {
+      const s = drawnForm.stamps[j];
       const { color, accent } = assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
       fieldItems[j] = {
         x: (s.x / fieldForm.aspect) * canvasW,

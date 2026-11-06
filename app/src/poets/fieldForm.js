@@ -346,7 +346,7 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak } = raw;
+  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak, raygun } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
@@ -369,6 +369,23 @@ export function sanitizeFieldForm(raw) {
   // never sets it (fieldDealReport carries no register) — it is the
   // performer's toggle on a standing form, nothing upstream may arm it.
   if (register !== undefined && register !== 'whisper') return null;
+  // #2003 — the ray-gun marker: the treatment record, on the register
+  // pattern — { mode, seed } rides the form's persistence so a recorded
+  // take re-renders treated. The STAMPS stored on the form stay the plain
+  // dealt list (the gate below judges them, overlap rule included, exactly
+  // as before); the blast itself is drawn from this record at render
+  // (poets/rayGunForm.js, applied in buildPlacements) and is never stored,
+  // because a treated list could not pass this door — overlap is its
+  // whole licence. Present-but-dishonest refuses the form whole, as the
+  // register does: the record is exactly one of the three modes and a
+  // uint32 seed, nothing else.
+  let raygunMark;
+  if (raygun !== undefined) {
+    if (!raygun || typeof raygun !== 'object' || Array.isArray(raygun)) return null;
+    if (raygun.mode !== 'carson' && raygun.mode !== 'greiman' && raygun.mode !== 'shot') return null;
+    if (!Number.isInteger(raygun.seed) || raygun.seed < 0 || raygun.seed > 0xffffffff) return null;
+    raygunMark = { mode: raygun.mode, seed: raygun.seed };
+  }
   // #2002 — the face marker: absent is the base (Anton) face; 'serif'
   // declares the serif face, Whittier's (greenleaf) alone. Any other value
   // is dishonest data and refuses the form whole, on the script marker's
@@ -431,6 +448,7 @@ export function sanitizeFieldForm(raw) {
     ...(serifForm ? { face: 'serif' } : {}),
     ...(plateBreak !== undefined ? { break: plateBreak } : {}),
     ...(register === 'whisper' ? { register: 'whisper' } : {}),
+    ...(raygunMark !== undefined ? { raygun: raygunMark } : {}),
     stamps: out,
   };
 }
