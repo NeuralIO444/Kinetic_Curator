@@ -17,6 +17,11 @@
 //   TERRAIN   marks flagged held/locked (a held FIELD poem, a locked look) are bedrock: never seeded, never
 //             consumed, drawn exactly as dealt, and the colonies grow around them.
 //   OFF       no stamp = no work: the stage drops any state and returns without touching a layer.
+//   FIELD     #1994 (Stage Coupling Phase 1): a stamp with mode 'field' runs the same build/step machinery —
+//             seeded from the same marks, bedrock and shed honoured identically — but NEVER draws: no dissolve,
+//             no cell stamps, no specks, no layer touched. The culture's published field (level / activity) is
+//             mirrored onto the stage's stable `publishedField` object for consumers to read; that is the
+//             mode's whole output. The render assignment (nearest) is never built for it.
 
 import { createCulture, stepCulture, setBedrock, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
@@ -42,18 +47,43 @@ const contentLayers = (layers) =>
   Array.isArray(layers) ? layers.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items)) : [];
 
 export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule = CULTURE_RULE } = {}) {
-  let st = null; // { wakeMs, W, H, marks, nearest, culture, frameGen, frame }
+  let st = null; // { wakeMs, W, H, marks, nearest, culture, frameGen, frame, quiet, fieldOn }
+
+  // #1994 — the field mode's publication surface: ONE stable object for the stage's whole life. Its fields are
+  // re-pointed at the live culture's published arrays on every field-mode frame (never copied — the core's
+  // read-this-frame contract applies: level/activity ARE the culture's arrays, read them the frame you get
+  // them). Inactive (active:false, arrays null) whenever no field-mode culture is running, so a consumer can
+  // never read a retained previous frame.
+  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, level: null, activity: null };
+  function syncPublished() {
+    if (st && st.fieldOn) {
+      const f = st.culture.field;
+      publishedField.active = true;
+      publishedField.cols = f.cols;
+      publishedField.rows = f.rows;
+      publishedField.gen = f.gen;
+      publishedField.level = f.level;
+      publishedField.activity = f.activity;
+    } else {
+      publishedField.active = false;
+      publishedField.cols = 0;
+      publishedField.rows = 0;
+      publishedField.gen = -1;
+      publishedField.level = null;
+      publishedField.activity = null;
+    }
+  }
 
   const geom = (W, H) => ({ canvasW: W, canvasH: H, cols, rows });
 
-  function build(wakeMs, marks, W, H, bedrock) {
+  function build(wakeMs, marks, W, H, bedrock, withNearest = true) {
     const seed = seedFromMarks(marks, { ...geom(W, H), bedrock });
     st = {
       wakeMs,
       W,
       H,
       marks,
-      nearest: nearestMarks(marks, geom(W, H)),
+      nearest: withNearest ? nearestMarks(marks, geom(W, H)) : null,
       culture: createCulture({ cols, rows, rule, bedrock, seed: seed.cells }),
       frameGen: -1,
       frame: null,
@@ -76,6 +106,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   function apply(dl, layers, W, H, { specks = true } = {}) {
     if (!dl || typeof dl !== 'object' || !Number.isFinite(dl.wakeMs)) {
       st = null;
+      syncPublished();
       return false;
     }
     const content = contentLayers(layers);
@@ -83,12 +114,14 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const terrainByLayer = content.map((e) => e.items.filter(isTerrain));
     const terrain = [].concat(...terrainByLayer);
     const bedrock = bedrockOf(terrain, W, H);
-    if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H) {
+    const fieldMode = dl.mode === 'field';
+    const needNearest = !fieldMode; // field mode never renders: the nearest-mark assignment is never built for it
+    if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest)) {
       const marks = [];
       for (const e of content)
         for (const it of e.items) if (it && !isTerrain(it) && !isSpeck(it)) marks.push(freeze(it));
       if (!marks.length) return false;
-      build(dl.wakeMs, marks, W, H, bedrock);
+      build(dl.wakeMs, marks, W, H, bedrock, needNearest);
     } else {
       setBedrock(st.culture, bedrock);
     }
@@ -97,10 +130,13 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
     if (target < st.culture.gen) {
       // a replay seeking back: rebuild from the frozen seed, so generation g is always the same culture
-      build(dl.wakeMs, st.marks, W, H, bedrock);
+      build(dl.wakeMs, st.marks, W, H, bedrock, needNearest);
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
+    st.fieldOn = fieldMode ? { cycleGens: Number(dl.cycleGens) || undefined } : null;
+    syncPublished();
+    if (fieldMode) return true; // #1994: the field is published — no layer touched, nothing drawn, ever
     if (quiet) {
       // the secondary read: the culture is a field (field()) the marks read. The tertiary read: a few faint specks in
       // the gaps between marks ride the top content layer — added to it, never taking a mark's place.
@@ -131,8 +167,11 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
 
   return {
     apply,
+    /** #1994 — the field mode's stable publication object (see syncPublished above). Read-only for consumers. */
+    publishedField,
     reset() {
       st = null;
+      syncPublished();
     },
     /**
      * #1923 — the quiet culture's read-only sampler for the marks (the Kineme culture source), or null when no quiet
@@ -158,24 +197,30 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
             marks: st.marks.map((m) => ({ ...m })),
             gen: st.culture.gen,
             ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
+            ...(st.fieldOn ? { field: { ...st.fieldOn } } : {}), // #1994 — so does field mode's cycle
           }
         : null;
     },
     /** Restore a snapshot(): rebuild from the frozen seed and step to the recorded generation. */
     restore(snap) {
       st = null;
+      syncPublished();
       if (!snap || !Array.isArray(snap.marks) || !snap.marks.length) return;
+      const wasField = !!(snap.field && typeof snap.field === 'object');
       build(
         snap.wakeMs,
         snap.marks.map((m) => ({ ...m })),
         snap.W,
         snap.H,
         null,
+        !wasField,
       );
       for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
       if (snap.quiet && typeof snap.quiet === 'object') {
         st.quiet = { strength: Number(snap.quiet.strength) || 0, cycleGens: Number(snap.quiet.cycleGens) || undefined };
       }
+      if (wasField) st.fieldOn = { cycleGens: Number(snap.field.cycleGens) || undefined };
+      syncPublished();
     },
   };
 }

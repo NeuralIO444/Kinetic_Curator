@@ -7,11 +7,14 @@
 //   snapshot/restore   a mid-culture snapshot (through JSON) continues bit-identically on a fresh resolver
 //   the touch          dropping the stamp restores the exact un-stamped frame
 //   checkResolverSnapshot accepts a genuine dishLife key and refuses a malformed one; absent stays valid
+//   the field stamp    (#1994) frames bit-identical to plain while the invisible culture runs and publishes;
+//                      its mode rides the snapshot, and a mid-field restore continues identically
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { quietStamp, CYCLE_GENS, QUIET_GPS } from '../engine/dishLifeQuiet.mjs';
+import { fieldStamp } from '../engine/dishLifeField.mjs';
 import { CULTURE_SCALE, CULTURE_FRAY } from '../engine/kineme.js';
 
 const L = (id) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1 });
@@ -282,6 +285,49 @@ let stampedRun;
     assert.equal(hash(marksOf(b.resolveLayers(qIn(f)))), qh[f], `restored frame ${f} matches the control`);
   assert.equal(CYCLE_GENS / QUIET_GPS, 6, 'a 6 s cycle');
   [plain, q, q2, z, p2, a, b].forEach((r) => r.dispose());
+}
+
+// 7. the FIELD culture (#1994, Stage Coupling Phase 1) — a persistent invisible substrate. The stamp flows
+//    through the resolver exactly like the other modes, the culture runs and publishes — and the frame the
+//    performer sees is bit-identical to a resolver that was never stamped: no dissolve, no cells, no specks,
+//    and no kineme read (the stage publishes no quiet sampler in field mode).
+{
+  const FN = 130; // 100 ms frames: past one full 12 s field cycle, so a re-seed is included
+  const fIn = (f) => baseInput({ loopTimeMs: f * 100, dtSec: 0.1, dishLife: fieldStamp(f * 100) });
+  const plainInF = (f) => baseInput({ loopTimeMs: f * 100, dtSec: 0.1 });
+  const plain = createLiveResolver();
+  const fld = createLiveResolver();
+  const fld2 = createLiveResolver();
+  for (let f = 0; f < FN; f++) {
+    const ph = hash(plain.resolveLayers(plainInF(f)));
+    assert.equal(hash(fld.resolveLayers(fIn(f))), ph, `frame ${f}: field mode changes nothing on stage`);
+    assert.equal(hash(fld2.resolveLayers(fIn(f))), ph, `frame ${f}: a second field resolver agrees`);
+  }
+  // snapshot mid-field: the mode rides it; the validator takes the genuine shape and refuses junk riders
+  const a = createLiveResolver();
+  for (let f = 0; f < 77; f++) a.resolveLayers(fIn(f));
+  const snap = JSON.parse(JSON.stringify(a.snapshotState()));
+  assert.ok(snap.dishLife && snap.dishLife.field, 'field mode rides the snapshot');
+  assert.equal(checkResolverSnapshot(snap), true, 'the validator accepts a genuine field snapshot');
+  assert.equal(
+    checkResolverSnapshot({ ...snap, dishLife: { ...snap.dishLife, field: { cycleGens: 'x' } } }),
+    false,
+    'refuses a malformed field rider',
+  );
+  assert.equal(
+    checkResolverSnapshot({ ...snap, dishLife: { ...snap.dishLife, field: 5 } }),
+    false,
+    'refuses a non-object field rider',
+  );
+  const b = createLiveResolver();
+  assert.equal(b.restoreState(snap), true, 'restore accepts the field snapshot');
+  for (let f = 77; f < FN; f++)
+    assert.equal(
+      hash(b.resolveLayers(fIn(f))),
+      hash(a.resolveLayers(fIn(f))),
+      `restored frame ${f} matches the control`,
+    );
+  [plain, fld, fld2, a, b].forEach((r) => r.dispose());
 }
 
 console.log('liveResolve.dishLife selfcheck: ok');
