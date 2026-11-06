@@ -1727,6 +1727,16 @@ export function checkResolverSnapshot(snap) {
     if (!Number.isFinite(d.W) || !Number.isFinite(d.H) || !Number.isInteger(d.gen) || d.gen < 0) return false;
     if (d.quiet !== undefined && (!d.quiet || typeof d.quiet !== 'object' || !Number.isFinite(d.quiet.strength)))
       return false;
+    // #1994 — field mode's cycle rides the snapshot the same way; when present it must be an object whose
+    // cycleGens, when given, is a finite number
+    if (
+      d.field !== undefined &&
+      (!d.field ||
+        typeof d.field !== 'object' ||
+        Array.isArray(d.field) ||
+        (d.field.cycleGens !== undefined && !Number.isFinite(d.field.cycleGens)))
+    )
+      return false;
   }
   return true;
 }
