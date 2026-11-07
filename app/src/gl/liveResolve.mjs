@@ -337,6 +337,22 @@ export function getLastDishWet() {
 }
 
 /**
+ * #1923 Phase 2 slice D — the last resolved frame's coupling BACKGROUND read, published by the
+ * resolver for the loop's background fold (the getLastDishWet pattern): { meanLevel, coupling } —
+ * the dish-mean level of the very publication this frame's coupling read used (one frame behind,
+ * shed-folded: null exactly when the effective coupling is 0 or no field is published) — or null
+ * when the frame had no coupling read. The loop owns the stage background (the bgMode cycle, the
+ * WASH / INJECT tint events, the palette), so the fold itself lands there; this channel carries
+ * only the READ, and the law lives in the seam (engine/dishLifeCouple.mjs: cultureBackgroundShift /
+ * cultureBackgroundHex). Not drained: the value is a frame fact, re-published by every resolve.
+ * Module-level, last-resolver-wins (the getLastFrameMotion law).
+ */
+let lastCouplingBackground = null;
+export function getLastCouplingBackground() {
+  return lastCouplingBackground;
+}
+
+/**
  * #1841 — the live loop's wet-field read, registered by the loop at
  * creation (and cleared at its dispose): (x, y) → the standing
  * field's wetness, served by the loop's wet-frame service. A module
@@ -719,6 +735,16 @@ export function createLiveResolver() {
     const couplingNow = effectiveCoupling(input.dishFieldCoupling, input.dishField?.shed);
     const fieldSamplerNow = couplingNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
     const cultureScale = fieldSamplerNow ? { coupling: couplingNow, sampler: fieldSamplerNow } : null;
+    // #1923 Phase 2 slice D — the background consumer's read, taken HERE, at the one coupling read:
+    // the dish-mean level of the same publication, under the same shed fold (it exists only under
+    // cultureScale). It is published at the end of the resolve (getLastCouplingBackground) for the
+    // loop, which owns the stage background and folds the hex it dealt. No resolved output changes:
+    // the background is not a layer, and this channel is the slice's only resolver footprint.
+    let couplingBackgroundRead = null;
+    if (cultureScale) {
+      const mean = fieldMean(dishFieldStage.publishedField);
+      if (mean) couplingBackgroundRead = { meanLevel: mean.level, coupling: couplingNow };
+    }
     // #1574 — this frame's travel delta on the spine-A clock, measured once
     // for every layer (high-water: a rolled-back frame credits nothing).
     // slowRender frames advance the mark without travelling, so a freeze
@@ -1698,6 +1724,8 @@ export function createLiveResolver() {
     // advances on the recorded inputs like every other resolver state, and cannot move the outputs:
     // the builders read the recorded decision fields, never this state.
     lastSpawnDecisions = spawnState.observe(input, out);
+    // #1923 Phase 2 slice D — publish this frame's background read beside the other frame facts.
+    lastCouplingBackground = couplingBackgroundRead;
     return out;
   }
 

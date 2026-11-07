@@ -1,11 +1,11 @@
 // dishLifeCouple.mjs — DISH LIFE coupling: the READ side of the field culture (#1923 Phase 2, slice A: SCALE;
-// slice B: FIELD glyph breathing; slice C: the pattern modes).
+// slice B: FIELD glyph breathing; slice C: the pattern modes; slice D: CONTENT backgrounds).
 //
 // Phase 1 (#1994) made the stage PUBLISH: a persistent invisible culture, seeded from the stage, evolving
 // while the performer plays, its `level` / `activity` readable on the stage's stable `publishedField`
 // holder. This module is where consumers read that publication — THE shared seam, built once for every
 // consumer the ruling names (scale in slice A; FIELD glyph breathing in slice B; the pattern modes
-// here in slice C; CONTENT backgrounds in a later slice of #1923). A consumer never touches the culture
+// in slice C; CONTENT backgrounds in slice D). A consumer never touches the culture
 // or the stage: it samples this seam.
 //
 // Matt's rulings (2026-11-06, on #1923): the on-switch is coupling ABOVE ZERO — no chip, no toggle; the
@@ -78,6 +78,8 @@ export const TIDES_NEUTRAL_LEVEL = 0.5;
  * magnitude, the same doctrine as slice A's scale; ACTIVITY (where it moves) drives motion, as in B.
  */
 export const TIDES_LEVEL_SWELL = 0.25;
+
+import { hexToRgb255Strict, rgb255ToHex } from './colorHex.mjs';
 
 const clamp01 = (v) => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
 
@@ -273,4 +275,72 @@ export function cultureTidesShift(level, coupling) {
   const c = clampCoupling(coupling);
   if (!(c > 0)) return 0;
   return c * (clamp01(level) - TIDES_NEUTRAL_LEVEL) * 2 * TIDES_LEVEL_SWELL;
+}
+
+// ---------------------------------------------------------------- slice D: CONTENT backgrounds
+//
+// What a CONTENT background is in this tree: the stage background the CONTENT strata composite over —
+// the active palette's `bg` hex (a palette is 8 swatches + bg), computed per frame by the live loop
+// (bgCss: the plain palette bg, or the WASH / INJECT tint events' lerped field colour while a colour
+// event runs), cleared into the frame by the renderer, begun from by ACCUM, derived from by the wet
+// ground, and recorded with the take. It is a field-sized rendering with exactly ONE continuous
+// axis: its brightness. The spatially-varying backdrop under content is the PATTERN ground — slice
+// C's textures — and the #1183 ground channel is a mark-side sampler (lean / nudge / snap read the
+// ground's colour FOR marks), not a rendering; the FX kinds' grain / vignette live on FX strata.
+// So this consumer takes the global shape, the background analogue of slice C's dish-mean drift:
+//   the dish-mean LEVEL — where the culture IS, the magnitude statistic of slices A and C — mixes
+//   the dealt background a bounded step toward white (an alive dish lifts the room) or toward black
+//   (a dead dish lets it fall), centred so a half-alive dish returns the dealt hex exactly.
+// A mix, not a gain: it cannot clip a channel or invent a hue, and it is the same class of move the
+// tint system already makes on this surface every WASH (a lerp between palette backgrounds).
+//
+// Where the fold lands, and why: the loop owns the background (the bgMode cycle, the tint events,
+// the palette), so the loop folds the hex it dealt; the resolver owns the publication, so the
+// resolver makes the READ — { meanLevel, coupling } off the same publication, shed fold and
+// one-frame-behind contract as every consumer — and publishes it on its last-frame channel
+// (gl/liveResolve's getLastCouplingBackground, the getLastDishWet pattern) for the loop to fold
+// after the resolve. The performer's explicit backdrop overrides are NOT this surface: the loop
+// folds only the palette path (bgMode 'palette') — white stays white, transparent stays clear,
+// at any dial. The plate/quiet room is safe by construction: the room is a MARK-side suppression
+// (buildPlacements multiplies mark ink by PLATE_ROOM_ALPHA inside the zone) that never reads the
+// background, and this fold moves the backdrop uniformly, so a room reads exactly as deep as dealt;
+// plate contrast against the backdrop moves by at most this bounded mix — far inside what a palette
+// swap or a WASH already does to the same surface.
+
+/** Slice D — the field level that is neutral for the stage background: a half-alive dish leaves the dealt background exact. */
+export const BG_NEUTRAL_LEVEL = 0.5;
+/**
+ * Slice D — the most the coupling may move the stage background, as a mix toward white (alive) or
+ * black (dead), at full dial and an extreme mean level: ±BACKGROUND_SWELL of the way. Bounded like
+ * every consumer's swell, and centred: the mix is 0 at the neutral level, so the dealt background
+ * returns byte-identical there — not approximately, exactly (see cultureBackgroundHex).
+ */
+export const BACKGROUND_SWELL = 0.25;
+
+/**
+ * Slice D — the signed background shift for a dish-mean level: coupling × (meanLevel − neutral) ×
+ * 2 × BACKGROUND_SWELL, in [−BACKGROUND_SWELL, +BACKGROUND_SWELL]; exactly 0 at the neutral level
+ * (any dial) and at coupling 0 (any level). Positive brightens (a mix toward white), negative
+ * darkens (toward black). Pure.
+ */
+export function cultureBackgroundShift(meanLevel, coupling) {
+  const c = clampCoupling(coupling);
+  if (!(c > 0)) return 0;
+  return c * (clamp01(meanLevel) - BG_NEUTRAL_LEVEL) * 2 * BACKGROUND_SWELL;
+}
+
+/**
+ * Slice D — fold a dealt background hex by a signed shift: shift > 0 mixes every channel toward
+ * white by shift, shift < 0 toward black by −shift, linearly. A shift of 0 (or junk), or a hex
+ * that does not parse, returns the dealt string UNTOUCHED — the centred frame is byte-identical
+ * by construction, not by round-trip luck. Pure.
+ */
+export function cultureBackgroundHex(hex, shift) {
+  const s = Number(shift);
+  if (typeof hex !== 'string' || !Number.isFinite(s) || s === 0) return hex;
+  const rgb = hexToRgb255Strict(hex);
+  if (!rgb) return hex;
+  const t = Math.min(1, Math.abs(s));
+  const target = s > 0 ? 255 : 0;
+  return rgb255ToHex([rgb[0] + (target - rgb[0]) * t, rgb[1] + (target - rgb[1]) * t, rgb[2] + (target - rgb[2]) * t]);
 }
