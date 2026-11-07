@@ -559,6 +559,7 @@ node src/poets/fieldPlate.selfcheck.mjs
 node src/poets/rayGun.selfcheck.mjs
 node src/curator/fieldSilence.selfcheck.mjs
 node src/curator/fieldLiveDeal.selfcheck.mjs
+node src/curator/fieldReview.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs
