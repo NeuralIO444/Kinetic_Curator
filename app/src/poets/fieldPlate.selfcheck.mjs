@@ -30,10 +30,18 @@
 //    (no plate key is ever added to a form that does not carry one).
 //  - the poles never mix: plate + raygun is refused at the door, and the
 //    store's ray-gun cycle does not arm on a plate form.
-//  - the room (render seam): while a plate stands, non-form marks inside
-//    its zone render at PLATE_ROOM_ALPHA and marks outside are untouched,
-//    the plate's own stamps at full presence; a whispered plate still
-//    quiets its room (the registers compose).
+//  - the room (render seam): while a plate stands, non-form marks whose
+//    ink enters its zone render at PLATE_ROOM_ALPHA and marks whose ink
+//    stays clear are untouched, the plate's own stamps at full presence;
+//    a whispered plate still quiets its room (the registers compose).
+//    (#2018: the test is the mark's ink FOOTPRINT — centre ± half its ink
+//    extent — applied on the final, mirrored list; the plate's items
+//    draw last in their layer; the plate's stamps deal in the palette
+//    swatch most distant from the layer's mark colours; grid plates
+//    never deal under PLATE_EM_FLOOR. The dense-stage section at the end
+//    measures the room's zone effective opacity at drive density — the
+//    sparse seam fixture below proves the mechanism, the dense one
+//    proves presence.)
 //  - poem-only: the catalogue carries the pack (701 + 52), the authored
 //    bake does not, the panel's records stay 313, and every dealing
 //    surface excludes the grown poem-only union by id.
@@ -72,6 +80,7 @@ import {
   PLATE_PITCH_EM,
   PLATE_MARGIN,
   PLATE_MEASURE,
+  PLATE_EM_FLOOR,
   PLATE_GLYPH_MAX_W,
 } from './placement.js';
 import { fieldDealReport, sanitizeFieldForm, gateFieldForm } from './fieldForm.js';
@@ -88,6 +97,7 @@ import { choosePoet, PLATE_CALL_MAX_INTENSITY } from '../curator/fieldDirector.j
 import { step, INITIAL_STATE } from '../curator/fieldEval.js';
 import { createDirector } from '../curator/director.js';
 import { useStore } from '../state/store.js';
+import { ACCENT_OFFSET } from '../engine/kernel/color/index.js';
 
 const EPS = 1e-9;
 
@@ -192,7 +202,18 @@ function measurePlate(form, label) {
   // The measure: the plate's ink spans no more than PLATE_MEASURE of the dish width.
   const xs = form.stamps.map((s) => [s.x - (stampWidthEm(s.assetId, s.ch) * s.em) / 2, s.x + (stampWidthEm(s.assetId, s.ch) * s.em) / 2]);
   const inkWidth = Math.max(...xs.map(([, r]) => r)) - Math.min(...xs.map(([l]) => l));
-  assert.ok(inkWidth <= PLATE_MEASURE * form.aspect + 1e-9, `${label}: the ink sits inside the measure`);
+  // #2018 — the grid em floor yields the measure, for grid plates only:
+  // a floored deal's ink may pass PLATE_MEASURE, but never its optical
+  // margins, and only at or over the floor. Every other plate — and
+  // every wrapped grid deal, whose rows re-break to fit the measure —
+  // keeps the shipped measure assertion below.
+  const gridYield =
+    form.layout === 'grid' && inkWidth > PLATE_MEASURE * form.aspect && em >= PLATE_EM_FLOOR - 1e-9 &&
+    inkWidth <= form.aspect - 2 * PLATE_MARGIN + 1e-9;
+  assert.ok(
+    inkWidth <= PLATE_MEASURE * form.aspect + 1e-9 || gridYield,
+    `${label}: the ink sits inside the measure (or, grid-floored, inside the optical margins at the floor)`,
+  );
   return { rows, em };
 }
 
@@ -241,6 +262,19 @@ for (const piece of GREENLEAF) {
       const { form, gate } = fieldDealReport({ poetId: 'greenleaf', pieceId: piece.id, plate: true }, mkRng(seed), { aspect });
       assert.ok(form && !gate, `${piece.id} @ ${aspect} seed ${seed}: the plate deal spawns`);
       measurePlate(form, `${piece.id} @ ${aspect} seed ${seed}`);
+      if (piece.layout === 'grid') {
+        // #2018 — the em floor, across the sweep: a grid plate deals at
+        // or over PLATE_EM_FLOOR, unless the dish's own height binds at
+        // the floor (the module's height exactly fills the fit box —
+        // the floor yielded to the edge, the only yield left).
+        const em = form.stamps[0].em;
+        const ys = form.stamps.map((s) => s.y);
+        const heightBound = Math.max(...ys) - Math.min(...ys) + em >= 1 - 2 * PLATE_MARGIN - 1e-6;
+        assert.ok(
+          em >= PLATE_EM_FLOOR - 1e-9 || heightBound,
+          `${piece.id} @ ${aspect} seed ${seed}: a grid plate deals at the em floor (got ${em})`,
+        );
+      }
       assert.deepStrictEqual(sanitizeFieldForm(form), form, `${piece.id} @ ${aspect}: the plate form round-trips the door`);
     }
   }
@@ -465,9 +499,9 @@ const seamParams = {
 };
 const seamCaps = { maxCount: 420, maxCountMirrored: 360, maxParticles: 200, allowMirror: true };
 // The seam's plate: the g2 deal at seed 42. Its zone (measured against the
-// fixture's mark rows below) holds 12 of the 40 marks — inside and outside
-// populations are both real, so suppression and non-suppression are both
-// exercised, not vacuously true.
+// fixture's mark rows below) holds a real population of the 40 marks —
+// inside and outside populations are both real, so suppression and
+// non-suppression are both exercised, not vacuously true.
 const seamForm = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g2', plate: true }, mkRng(42), { aspect: 10 / 7 }).form;
 const SW = 1000;
 const SH = 700;
@@ -494,6 +528,16 @@ const zoneOf = (form) => {
   const padY = PLATE_ZONE_PAD_EM * emMax * SH;
   return [zx0 - padX, zy0 - padY, zx1 + padX, zy1 + padY];
 };
+/** #2018 — the footprint test, in the suite's own terms (the audit's
+ * geometry): a mark's ink box is its centre ± 50 × scale — the scene
+ * contract's central cell box, the middle hundred of the ±100-unit quad —
+ * and the room takes any mark whose ink ENTERS the zone, centre or not. */
+const inkEnters = (item, [zx0, zy0, zx1, zy1]) => {
+  const hx = 50 * item.scale;
+  const hy = 50 * (item.scaleY ?? item.scale);
+  return item.x + hx >= zx0 && item.x - hx <= zx1 && item.y + hy >= zy0 && item.y - hy <= zy1;
+};
+const centreIn = (item, [zx0, zy0, zx1, zy1]) => item.x >= zx0 && item.x <= zx1 && item.y >= zy0 && item.y <= zy1;
 {
   const plainBuild = seamBuild(seamParams);
   const plateBuild = seamBuild({ ...seamParams, fieldForm: seamForm });
@@ -503,20 +547,23 @@ const zoneOf = (form) => {
     'the plate build appends exactly the form’s stamps',
   );
   const [zx0, zy0, zx1, zy1] = zoneOf(seamForm);
+  const zone = [zx0, zy0, zx1, zy1];
   let inZone = 0;
   let outZone = 0;
+  let leanIn = 0;
   for (let i = 0; i < plainBuild.items.length; i++) {
     const before = plainBuild.items[i];
     const after = plateBuild.items[i];
     assert.strictEqual(after.x, before.x, 'a mark’s position never moves for a plate');
     assert.strictEqual(after.y, before.y, 'a mark’s position never moves for a plate');
-    const inside = before.x >= zx0 && before.x <= zx1 && before.y >= zy0 && before.y <= zy1;
+    const inside = inkEnters(before, zone);
     if (inside) {
       inZone++;
-      assert.ok(Math.abs(after.alpha - before.alpha * PLATE_ROOM_ALPHA) < 1e-9, 'a mark inside the zone is suppressed to PLATE_ROOM_ALPHA');
+      if (!centreIn(before, zone)) leanIn++;
+      assert.ok(Math.abs(after.alpha - before.alpha * PLATE_ROOM_ALPHA) < 1e-9, 'a mark whose ink enters the zone is suppressed to PLATE_ROOM_ALPHA');
     } else {
       outZone++;
-      assert.strictEqual(after.alpha, before.alpha, 'a mark outside the zone is untouched');
+      assert.strictEqual(after.alpha, before.alpha, 'a mark whose ink stays clear of the zone is untouched');
     }
   }
   assert.ok(inZone > 0, 'the fixture’s zone holds marks to suppress');
@@ -540,7 +587,7 @@ const zoneOf = (form) => {
   let wIn = 0;
   for (let i = 0; i < plainBuild.items.length; i++) {
     const before = plainBuild.items[i];
-    const inside = before.x >= zx0 && before.x <= zx1 && before.y >= zy0 && before.y <= zy1;
+    const inside = inkEnters(before, zone);
     if (inside) {
       wIn++;
       assert.ok(Math.abs(whispered.items[i].alpha - before.alpha * PLATE_ROOM_ALPHA) < 1e-9, 'a whispered plate still quiets its room');
@@ -698,6 +745,259 @@ const directorInRoom = ({ feed, lookFamily }) => {
     !('plate' in decision) && !('face' in decision) && !('case' in decision) && !('plateBreak' in decision),
     'live path: outside the affirming rooms the deal is the plain deal, exactly as before',
   );
+}
+
+// ── #2018: the em floor, measured on dealt plates ────────────────────────
+// The audit's Q4 table, re-read through the real deal path at 10/7: the
+// grid pieces dealt at half size (g1 0.0290, g3 0.0374); the floor puts
+// them at PLATE_EM_FLOOR exactly (g1 by re-breaking its rows, g3 by the
+// measure yielding), and the bands pieces are untouched.
+{
+  const emOf = (pieceId) => fieldDealReport({ poetId: 'greenleaf', pieceId, plate: true }, mkRng(42), { aspect: 10 / 7 }).form.stamps[0].em;
+  assert.ok(Math.abs(emOf('g1') - PLATE_EM_FLOOR) < 1e-9, 'g1 grid plate deals at the em floor (was 0.0290 before #2018)');
+  assert.ok(Math.abs(emOf('g3') - PLATE_EM_FLOOR) < 1e-9, 'g3 grid plate deals at the em floor (was 0.0374 before #2018)');
+  assert.ok(Math.abs(emOf('g2') - 0.0677) < 5e-4, 'g2 bands plate is unchanged (0.0677, the audit’s reading)');
+  assert.ok(Math.abs(emOf('g4') - 0.0721) < 5e-4, 'g4 bands plate is unchanged (0.0721, the audit’s reading)');
+  const g1Rows = new Set(fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1', plate: true }, mkRng(42), { aspect: 10 / 7 }).form.stamps.map((s) => s.y));
+  assert.strictEqual(g1Rows.size, 3, 'g1 reaches the floor by re-breaking: its two lines deal as three rows');
+}
+
+// ── #2018: the dense stage — the room at drive density ───────────────────
+// The audit's core complaint about the seam fixture above: composited,
+// its zone was 6–40× clearer than a real dense layer, and it only ever
+// asserted per-item alphas. This fixture stands on the audit's dense
+// parameters (count 450, scale [0.4, 1.6], alpha [40, 100], density 92 —
+// the geometry stage deals 401 of the 450, as in the audit's B build)
+// and MEASURES the zone: a CPU composite of the built list in draw
+// order, the audit's method — premultiplied source-over of each mark's
+// rasterized ink (Resvg, the pack test's way) mapped to its central cell
+// box, area-weighted per pixel.
+const denseAssets = ASSETS_AUTHORED.slice(0, 3).map((a, i) => ({ id: a.id, weight: ['heavy', 'medium', 'light'][i] }));
+const densePalette = { swatches: ['#0d2b2e', '#27565a', '#5f8285', '#a8bcbb', '#e8e3d5', '#8a4b23'] };
+const denseParams = {
+  mode: 'grid',
+  composition: 'default',
+  count: 450,
+  scale: [0.4, 1.6],
+  rotate: [0, 45],
+  alpha: [40, 100],
+  jitter: 10,
+  density: 92,
+  zTiers: 1,
+  bleed: false,
+  mirror: false,
+  overlap: false,
+  displacement: 0,
+  noiseFreq: 0.005,
+  noiseSpeed: 0.5,
+};
+const denseCaps = { maxCount: 900, maxCountMirrored: 900, maxParticles: 200, allowMirror: true };
+const denseForm = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1', plate: true }, mkRng(42), { aspect: 10 / 7 }).form;
+const denseBuild = (layoutParams) =>
+  buildPlacements({ layoutParams, seed: 0x1a4f, activeAssets: denseAssets, palette: densePalette, caps: denseCaps, canvasW: SW, canvasH: SH });
+const inkGridOf = new Map();
+for (const da of denseAssets) {
+  const src = ASSETS_AUTHORED.find((a) => a.id === da.id);
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100" height="100">' +
+    src.svg.replaceAll('var(--ink)', '#ffffff').replaceAll('var(--accent)', '#ffffff') +
+    '</svg>';
+  const img = new Resvg(svg, { font: RESVG_FONT, fitTo: { mode: 'width', value: 100 } }).render();
+  const px = img.pixels; // read ONCE: the getter materializes the buffer per access
+  const grid = new Float32Array(100 * 100);
+  for (let i = 0; i < 100 * 100; i++) grid[i] = px[i * 4 + 3] / 255;
+  inkGridOf.set(da.id, grid);
+}
+/** Zone effective opacity of a marks-only item list: 1 − mean transmittance over the zone. */
+const zoneCoverage = (items, [zx0, zy0, zx1, zy1]) => {
+  const w = Math.max(1, Math.round(zx1 - zx0));
+  const h = Math.max(1, Math.round(zy1 - zy0));
+  const T = new Float32Array(w * h).fill(1);
+  for (const it of items) {
+    const ink = inkGridOf.get(it.assetId);
+    if (!ink) continue;
+    const s = it.scale;
+    const sy = it.scaleY ?? it.scale;
+    const x0 = it.x - 50 * s;
+    const y0 = it.y - 50 * sy;
+    const uFrom = Math.max(0, Math.floor((zx0 - x0) / s));
+    const uTo = Math.min(99, Math.ceil((zx1 - x0) / s) - 1);
+    const vFrom = Math.max(0, Math.floor((zy0 - y0) / sy));
+    const vTo = Math.min(99, Math.ceil((zy1 - y0) / sy) - 1);
+    for (let v = vFrom; v <= vTo; v++) {
+      for (let u = uFrom; u <= uTo; u++) {
+        const a = ink[v * 100 + u];
+        if (a <= 0) continue;
+        const wx0 = Math.max(zx0, x0 + u * s);
+        const wx1 = Math.min(zx1, x0 + (u + 1) * s);
+        const wy0 = Math.max(zy0, y0 + v * sy);
+        const wy1 = Math.min(zy1, y0 + (v + 1) * sy);
+        const px0 = Math.floor(wx0 - zx0);
+        const px1 = Math.min(w - 1, Math.ceil(wx1 - zx0) - 1);
+        const py0 = Math.floor(wy0 - zy0);
+        const py1 = Math.min(h - 1, Math.ceil(wy1 - zy0) - 1);
+        for (let py = py0; py <= py1; py++) {
+          const oy = Math.min(wy1, zy0 + py + 1) - Math.max(wy0, zy0 + py);
+          if (oy <= 0) continue;
+          for (let px = px0; px <= px1; px++) {
+            const ox = Math.min(wx1, zx0 + px + 1) - Math.max(wx0, zx0 + px);
+            if (ox <= 0) continue;
+            T[py * w + px] *= 1 - a * (it.alpha / 100) * ox * oy;
+          }
+        }
+      }
+    }
+  }
+  let sum = 0;
+  for (const t of T) sum += t;
+  return 1 - sum / T.length;
+};
+const rgbOf = (hex) => {
+  const n = parseInt(String(hex).replace('#', ''), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+};
+/** The ink rule, stated in the suite's own terms: the swatch whose squared
+ * RGB distance to the marks' colours, summed over every mark, is greatest
+ * (ties keep the earliest); the accent follows by ACCENT_OFFSET. */
+const expectedInk = (palette, markItems) => {
+  let best = -1;
+  let bestScore = -1;
+  palette.swatches.forEach((sw, si) => {
+    const [r, g, b] = rgbOf(sw);
+    let total = 0;
+    for (const it of markItems) {
+      const [mr, mg, mb] = rgbOf(it.color);
+      total += (r - mr) * (r - mr) + (g - mg) * (g - mg) + (b - mb) * (b - mb);
+    }
+    if (total > bestScore) {
+      bestScore = total;
+      best = si;
+    }
+  });
+  return { color: palette.swatches[best], accent: palette.swatches[(best + ACCENT_OFFSET) % palette.swatches.length] };
+};
+{
+  const plain = denseBuild(denseParams);
+  const plated = denseBuild({ ...denseParams, fieldForm: denseForm });
+  const zone = zoneOf(denseForm);
+  const nStamps = denseForm.stamps.length;
+  assert.strictEqual(plated.items.length, plain.items.length + nStamps, 'dense: the plate build appends exactly the form’s stamps');
+  const plateItems = plated.items.slice(-nStamps);
+  const markItems = plated.items.slice(0, -nStamps);
+  assert.ok(plateItems.every((it) => it.key.startsWith('field-')), 'dense: the plate’s items are the tail of the built list (lever 3, under the overlap sort)');
+  assert.ok(!markItems.some((it) => it.key.startsWith('field-')), 'dense: no field item hides among the marks');
+  assert.deepStrictEqual(
+    plateItems.map((it) => it.assetId),
+    denseForm.stamps.map((s) => s.assetId),
+    'dense: the tail is the plate’s stamps, in order',
+  );
+  assert.ok(plateItems.every((it) => it.alpha === 100), 'dense: the plate’s stamps stand at full presence');
+  // The footprint rule, per item, against the unsuppressed build by key.
+  const plainByKey = new Map(plain.items.map((it) => [it.key, it]));
+  let centrePop = 0;
+  let leanPop = 0;
+  let outPop = 0;
+  for (const it of markItems) {
+    const before = plainByKey.get(it.key);
+    assert.ok(before, 'dense: every mark in the plate build exists in the plain build');
+    if (inkEnters(before, zone)) {
+      if (centreIn(before, zone)) centrePop++;
+      else leanPop++;
+      assert.ok(Math.abs(it.alpha - before.alpha * PLATE_ROOM_ALPHA) < 1e-9, 'dense: a mark whose ink enters the zone is suppressed');
+    } else {
+      outPop++;
+      assert.strictEqual(it.alpha, before.alpha, 'dense: a mark whose ink stays clear is untouched');
+    }
+  }
+  assert.ok(centrePop > 0, 'dense: the zone holds centre-in marks');
+  assert.ok(leanPop > 0, 'dense: the zone is leaned into by centre-outside marks (the audit’s dominant leak)');
+  assert.ok(outPop > 0, 'dense: marks outside the zone exist');
+  // The measured room: effective opacity over the zone, room off vs on.
+  const covOff = zoneCoverage(plain.items, zone);
+  const covOn = zoneCoverage(markItems, zone);
+  console.log(`  dense room: zone coverage ${covOff.toFixed(4)} (no plate) → ${covOn.toFixed(4)} (plate, footprint room)`);
+  assert.ok(covOff > 0.5, 'dense: the unroomed zone is genuinely covered (the sparse seam fixture composited 0.004–0.026)');
+  assert.ok(covOn < covOff / 2.5, 'dense: the footprint room cuts the zone’s coverage by more than 2.5×');
+  assert.ok(covOn < 0.35, 'dense: the roomed zone’s effective opacity lands under 0.35');
+  // The ink rule: every plate stamp wears the expected swatch + accent,
+  // and the whole build replays identically.
+  const want = expectedInk(densePalette, plain.items);
+  assert.ok(
+    plateItems.every((it) => it.color === want.color && it.accent === want.accent),
+    `dense: the plate deals in the most distant swatch (${want.color}), accent by ACCENT_OFFSET (${want.accent})`,
+  );
+  const replay = denseBuild({ ...denseParams, fieldForm: denseForm });
+  assert.strictEqual(JSON.stringify(replay.items), JSON.stringify(plated.items), 'dense: the plate build replays byte-identically (the ink rule spends no draws)');
+  // The rule reads the dealt marks however few: at count 0 the geometry
+  // stage still deals a single mark, and the plate's ink is the swatch
+  // most distant from that one mark's colour.
+  const emptyPlate = denseBuild({ ...denseParams, count: 0, fieldForm: denseForm });
+  const emptyPlain = denseBuild({ ...denseParams, count: 0, fieldForm: plainForm });
+  const loneMark = emptyPlain.items.filter((it) => !it.key.startsWith('field-'));
+  assert.strictEqual(loneMark.length, 1, 'count 0 still deals its single mark');
+  const wantLone = expectedInk(densePalette, loneMark);
+  assert.ok(
+    emptyPlate.items.filter((it) => it.key.startsWith('field-')).every((it) => it.color === wantLone.color && it.accent === wantLone.accent),
+    'an almost-empty room: the plate contrasts against the one mark standing',
+  );
+  // The fallback: with no swatches to choose from, the plate's colours
+  // are the per-stamp assignment's — the same white the plain form's
+  // stamps get from the same empty palette.
+  const noSwatch = { swatches: [] };
+  const barePlate = buildPlacements({
+    layoutParams: { ...denseParams, fieldForm: denseForm },
+    seed: 0x1a4f,
+    activeAssets: denseAssets,
+    palette: noSwatch,
+    caps: denseCaps,
+    canvasW: SW,
+    canvasH: SH,
+  });
+  const barePlain = buildPlacements({
+    layoutParams: { ...denseParams, fieldForm: plainForm },
+    seed: 0x1a4f,
+    activeAssets: denseAssets,
+    palette: noSwatch,
+    caps: denseCaps,
+    canvasW: SW,
+    canvasH: SH,
+  });
+  const bareField = (b) => b.items.filter((it) => it.key.startsWith('field-')).map((it) => [it.color, it.accent]);
+  assert.deepStrictEqual(bareField(barePlate), bareField(barePlain), 'no swatches: the plate falls back to the per-stamp colour assignment');
+  assert.ok(bareField(barePlate).every(([c, a]) => c === '#ffffff' && a === '#ffffff'), 'the fallback colour is the assignment’s empty-palette white');
+}
+// The mirror room: reflections are quieted in the zone they land in, and
+// the mirrored plate has a room of its own (the pre-#2018 room ran before
+// mirroring, so both leaked at full alpha).
+{
+  const mirParams = { ...denseParams, count: 200, mirror: 'x' };
+  const plainM = denseBuild(mirParams);
+  const platedM = denseBuild({ ...mirParams, fieldForm: denseForm });
+  const zone = zoneOf(denseForm);
+  const reflZone = [SW - zone[2], zone[1], SW - zone[0], zone[3]];
+  const nStamps = denseForm.stamps.length;
+  assert.strictEqual(platedM.items.length, 2 * (plainM.items.length / 2 + nStamps), 'mirror: the plate build mirrors marks and stamps alike');
+  const plainMByKey = new Map(plainM.items.map((it) => [it.key, it]));
+  const fieldIdx = [];
+  platedM.items.forEach((it, i) => {
+    if (it.key.startsWith('field-')) fieldIdx.push(i);
+  });
+  assert.strictEqual(fieldIdx.length, 2 * nStamps, 'mirror: the plate and its reflection both stand');
+  assert.strictEqual(Math.min(...fieldIdx), platedM.items.length - fieldIdx.length, 'mirror: every field item (originals and copies) draws after every mark');
+  let reflOnly = 0;
+  for (const it of platedM.items) {
+    if (it.key.startsWith('field-')) continue;
+    const before = plainMByKey.get(it.key);
+    assert.ok(before, 'mirror: every mark in the plate build exists in the plain build');
+    const inAny = inkEnters(before, zone) || inkEnters(before, reflZone);
+    if (inAny) {
+      assert.ok(Math.abs(it.alpha - before.alpha * PLATE_ROOM_ALPHA) < 1e-9, 'mirror: a mark whose ink enters either zone is suppressed exactly once');
+      if (!inkEnters(before, zone) && inkEnters(before, reflZone)) reflOnly++;
+    } else {
+      assert.strictEqual(it.alpha, before.alpha, 'mirror: a mark clear of both zones is untouched');
+    }
+  }
+  assert.ok(reflOnly > 0, 'mirror: marks are suppressed by the mirrored plate’s room alone — the room exists on both halves');
 }
 
 console.log('fieldPlate.selfcheck: all assertions passed');

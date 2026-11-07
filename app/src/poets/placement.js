@@ -314,6 +314,15 @@ const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate re
  *   comes closer to the dish edge than this (the placement margin is 0.05).
  * - PLATE_MEASURE: the measure — the module never exceeds this fraction of
  *   the dish width, the column a book page sets its type in.
+ * - PLATE_EM_FLOOR: the smallest type size a GRID plate may deal at. The
+ *   grid fit compounds the wide Fraunces cell + PLATE_TRACK through the
+ *   measure clamp and dealt grid plates at half their bands siblings'
+ *   size (g1 0.0290 against the serif's 0.0589 — the #2018 audit's
+ *   confirmed defect). When the fit would clamp a grid plate under the
+ *   floor, the measure yields (the module widens toward its margins'
+ *   box, then the rows re-break at the floor) — the floor itself yields
+ *   only to the dish's edge. Bands/two/single plates keep the shipped
+ *   fit; their deals already land at 0.068–0.072.
  * Every stamp still sits on the recipe's shared baseline grid at rotation 0
  * — the discipline is the grid kept, with plate air.
  */
@@ -321,6 +330,7 @@ export const PLATE_TRACK = 0.26;
 export const PLATE_PITCH_EM = 2.4;
 export const PLATE_MARGIN = 0.13;
 export const PLATE_MEASURE = 0.66;
+export const PLATE_EM_FLOOR = 0.045;
 const ADV = GLYPH_MAX_W + TRACK; // the grid's even cell: the widest glyph plus tracking, so no glyph overruns
 /**
  * Rosselli's square cell, in em (cap heights), on BOTH axes: wide enough for the widest glyph plus tracking, and a
@@ -353,6 +363,38 @@ function lineAdvanceEm(line, adv, spaceAdv, widthOf = glyphWidthEm, track = TRAC
   let w = 0;
   for (const ch of line) w += advanceOf(ch, adv, spaceAdv, widthOf, track);
   return Math.max(0, w - (line.length && line.at(-1) !== ' ' ? track : 0));
+}
+
+/**
+ * #2018 — re-break one grid line into rows whose advance fits
+ * `maxAdvanceEm`, measured by the same lineAdvanceEm the layout uses.
+ * Breaks prefer spaces — the break eats the space, as typesetting does —
+ * and fall back to a hard cell break inside a word longer than a row, so
+ * a row always fits while the grid's even cell survives whole in every
+ * row. Deterministic, consumes no draws; a line that already fits is
+ * returned untouched.
+ */
+function wrapGridRows(line, adv, spaceAdv, widthOf, track, maxAdvanceEm) {
+  if (lineAdvanceEm(line, adv, spaceAdv, widthOf, track) <= maxAdvanceEm) return [line];
+  const fits = (s) => lineAdvanceEm(s, adv, spaceAdv, widthOf, track) <= maxAdvanceEm;
+  const rows = [];
+  let row = '';
+  for (const ch of line) {
+    if (row && !fits(row + ch)) {
+      const cut = row.lastIndexOf(' ');
+      if (cut > 0) {
+        rows.push(row.slice(0, cut));
+        row = row.slice(cut + 1) + ch;
+      } else {
+        rows.push(row);
+        row = ch;
+      }
+    } else {
+      row += ch;
+    }
+  }
+  if (row) rows.push(row);
+  return rows.length ? rows : [line];
 }
 
 /** Lay one line's stamps along a baseline. Returns stamps in unit space. */
@@ -457,11 +499,32 @@ export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
     const adv = (plate ? PLATE_GLYPH_MAX_W + PLATE_TRACK : ADV) * (1 + 0.35 * density);
     let em = 0.062 + 0.03 * density; // #1928: em is now TRUE cap height (exact stage scale); sized to read as a plate
     const pitchEm = plate ? PLATE_PITCH_EM : 1.5;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
-    const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
+    let rows = lines;
+    let wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
+    let hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
     em = fitEm(em, wEm, hEm, asp, fitMaxW, fitMaxH);
+    if (plate && em < PLATE_EM_FLOOR) {
+      // #2018 (audit lever 4) — the em floor: the fit above clamps grid
+      // plates to half size (the wide cell + track through the measure).
+      // The measure yields first: refit against the optical margins' own
+      // box — if the floor fits there, the deal takes it. If even the
+      // margins cannot hold the floor, the rows re-break at the floor so
+      // each row fits the fit box itself, and the final fit may pull the
+      // deal under the floor only where the dish's height binds — the
+      // edge is sovereign, the measure is not. Grid plates only; the
+      // draw structure (and its count) is unchanged.
+      const marginBoxW = (asp - 2 * PLATE_MARGIN) / asp;
+      if (fitEm(PLATE_EM_FLOOR, wEm, hEm, asp, marginBoxW, fitMaxH) >= PLATE_EM_FLOOR) {
+        em = PLATE_EM_FLOOR;
+      } else {
+        rows = lines.flatMap((l) => wrapGridRows(l, adv, SPACE_ADV, widthOf, track, (fitMaxW * asp) / PLATE_EM_FLOOR));
+        wEm = Math.max(0, ...rows.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
+        hEm = rows.length > 0 ? (rows.length - 1) * pitchEm + 1 : 0;
+        em = fitEm(PLATE_EM_FLOOR, wEm, hEm, asp, fitMaxW, fitMaxH);
+      }
+    }
     const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp, margin);
-    lines.forEach((line, r) => {
+    rows.forEach((line, r) => {
       stamps.push(
         ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track }),
       );
