@@ -60,6 +60,7 @@ import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kinetic
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
+import { reviewLanding } from '../../curator/fieldReview.mjs'; // #2006 slice 1: the shadow review of a landed poem
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
 import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
@@ -296,13 +297,23 @@ const fieldAspect = (state) =>
  *    stream at poemDeal; the form is placed off its sibling stream. Silence clears the standing form.
  * `avoidPieceId` (the dislike path) asks for a different piece than the one standing.
  */
-function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
+function landPoem(
+  state,
+  layoutParams,
+  { avoidPieceId = null, review = true, buildSeed = null, buildEnabledAssets = null } = {},
+) {
   const lp = { ...layoutParams };
   const n = state.poemDeal | 0;
   if (poemHeld(state)) {
     lp.fieldForm = state.layoutParams.fieldForm;
     // HOLD passes the gate record by too: no deal happened, so no new verdict.
-    return { layoutParams: lp, poemDeal: n, fieldGateRefusal: state.fieldGateRefusal ?? null };
+    // #2006: the review record passes by on the same terms — no landing, no review.
+    return {
+      layoutParams: lp,
+      poemDeal: n,
+      fieldGateRefusal: state.fieldGateRefusal ?? null,
+      fieldReview: state.fieldReview ?? null,
+    };
   }
   const poet = getDirector().dealPoet({
     fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n, state.seedOffsets),
@@ -324,6 +335,22 @@ function landPoem(state, layoutParams, { avoidPieceId = null } = {}) {
     layoutParams: lp,
     poemDeal: n + 1,
     fieldGateRefusal: gate ? { reason: gate.reason, poetId: poet.poetId, pieceId: poet.pieceId } : null,
+    // #2006 slice 1 — the shadow review banks on the same commit: the landed
+    // form, measured on its built item list, judged by the rules table alone.
+    // A refusal or plain silence banks nothing (no landing happened). The
+    // re-deal path passes review:false (Matt's ruling: re-deals are never
+    // reviewed) and its caller clears the standing record itself. Callers
+    // whose commit changes the seed or the pool in the same breath as the
+    // deal (the KINETIC roll) pass the commit's own values as buildSeed /
+    // buildEnabledAssets, so the review measures the build that lands.
+    fieldReview:
+      form && review
+        ? reviewLanding(state, lp, {
+            seed: buildSeed ?? state.seed,
+            enabledAssets: buildEnabledAssets ?? state.enabledAssets,
+            stream: `poem:${n}`,
+          })
+        : null,
   };
 }
 
@@ -523,6 +550,20 @@ export const createLayoutSlice = (set) => ({
    * record, never a silent clear.
    */
   fieldGateRefusal: null,
+  /**
+   * #2006 (slice 1, the shadow review) — the review loop's last word on the
+   * last FRESH poem landing: null, or the verdict record fieldReview banks
+   * ({ verdict, gate, exempt, measures, gates, backend, rung, seed, stream }).
+   * Written by every fresh-landing commit (landPoem / the CURATOR press) in
+   * the same commit as the deal itself, in fieldGateRefusal's discipline:
+   * session-only, never serialized, never undo-managed. A refusal or plain
+   * silence clears it (no landing, no review — spec §3.9); HOLD carries it
+   * by with the standing form; a re-deal NEVER writes it (re-deals are the
+   * performer's own correction move, unreviewed by Matt's ruling — a
+   * re-deal that moves the form clears the record instead). Nothing reads
+   * it in slice 1: the shadow only measures, judges and banks.
+   */
+  fieldReview: null,
   paletteId: 'praystation',
   /** null | { swatches?: string[], bg?: string, ink?: string } — never mutates catalog */
   paletteOverrides: null,
@@ -1037,7 +1078,16 @@ export const createLayoutSlice = (set) => ({
     set((state) => {
       if (poemHeld(state)) return {};
       const standing = state.layoutParams.fieldForm || null;
-      const poem = landPoem(state, state.layoutParams, { avoidPieceId: standing ? standing.pieceId : null });
+      // #2006 — a re-deal is the performer's own correction move and is NEVER
+      // reviewed (Matt's ruling): landPoem runs with review off, and a re-deal
+      // that moves or clears the form clears the standing review record with
+      // it (the record described the form that stood, not this one). The
+      // identical-form return below leaves the record standing, as it leaves
+      // the form.
+      const poem = landPoem(state, state.layoutParams, {
+        avoidPieceId: standing ? standing.pieceId : null,
+        review: false,
+      });
       if (Object.is(poem.layoutParams.fieldForm ?? null, standing))
         return { poemDeal: poem.poemDeal, fieldGateRefusal: poem.fieldGateRefusal };
       return {
@@ -1045,6 +1095,7 @@ export const createLayoutSlice = (set) => ({
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: null,
       };
     }),
 
@@ -1349,6 +1400,16 @@ export const createLayoutSlice = (set) => ({
           : fieldGate
             ? { reason: fieldGate.reason, poetId: tickResult.poet.poetId, pieceId: tickResult.poet.pieceId }
             : null,
+        // #2006 slice 1 — the press's landing is a fresh stage landing and is
+        // shadow-reviewed on this same commit (HOLD: the record stands with
+        // the form; a refusal or plain silence banks nothing). The press
+        // deals off its own stream (press + 0x30000) and does not advance
+        // poemDeal, so the record's stream names the press, not a deal index.
+        fieldReview: poemHeld(state)
+          ? (state.fieldReview ?? null)
+          : fieldDeal
+            ? reviewLanding(state, landed, { stream: `press:${press}` })
+            : null,
       };
     }),
 
@@ -1457,7 +1518,13 @@ export const createLayoutSlice = (set) => ({
       }).layers;
 
       // #1918 ruling 1 — every KINETIC press re-deals the poem (HOLD passes it by).
-      const poem = landPoem(state, merged);
+      // #2006 — the roll commits a fresh seed and pool in this same commit, so
+      // the shadow review measures the landing under the commit's own seed and
+      // pool, not the standing state's.
+      const poem = landPoem(state, merged, {
+        buildSeed: seed,
+        buildEnabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
+      });
       return {
         ...undo,
         seed,
@@ -1468,6 +1535,7 @@ export const createLayoutSlice = (set) => ({
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: poem.fieldReview,
         enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
         kitNote, // #1944 — a kit that dealt nothing is named, never a silent mixed deal
         layers,
@@ -1500,13 +1568,18 @@ export const createLayoutSlice = (set) => ({
       // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
       // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
-      const poem = landPoem(state, r.layoutParams); // #1918 ruling 1 — the press re-deals the poem
+      // #2006 — the flip commits the chapter's pool in this same commit; the
+      // shadow review measures the landing in that pool, not the standing one.
+      const poem = landPoem(state, r.layoutParams, {
+        buildEnabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
+      }); // #1918 ruling 1 — the press re-deals the poem
       const next = {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: poem.fieldReview,
         enabledAssets: Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets,
         kitNote: r.kitNotes ? kitNoteText(r.kitNotes, kitsById(state.kitTriad, state.kits)) : null, // #1944
         voiceMix: null,
@@ -1569,7 +1642,11 @@ export const createLayoutSlice = (set) => ({
         round.kineticRound && round.kineticRound !== state.kineticRound
           ? notchForRound(round.kineticRound)
           : state.kineticNotch;
-      const poem = landPoem(state, round.layoutParams ?? r.layoutParams); // #1918 ruling 1
+      // #2006 — a LOIS cut's redeal commits its own pool in this same commit;
+      // the shadow review measures the landing in the pool that lands.
+      const poem = landPoem(state, round.layoutParams ?? r.layoutParams, {
+        buildEnabledAssets: round.enabledAssets ?? state.enabledAssets,
+      }); // #1918 ruling 1
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1577,6 +1654,7 @@ export const createLayoutSlice = (set) => ({
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: poem.fieldReview,
         paletteId: r.paletteId,
         paletteOverrides: r.paletteOverrides,
         paletteLocks: {},
@@ -1648,12 +1726,19 @@ export const createLayoutSlice = (set) => ({
       const poem = landPoem(state, r.layoutParams ?? state.layoutParams);
       const poemMoved = !Object.is(poem.layoutParams.fieldForm, state.layoutParams.fieldForm);
       if (!r.layoutParams && !poemMoved)
-        return { kineticNudge, kineticRound, poemDeal: poem.poemDeal, fieldGateRefusal: poem.fieldGateRefusal };
+        return {
+          kineticNudge,
+          kineticRound,
+          poemDeal: poem.poemDeal,
+          fieldGateRefusal: poem.fieldGateRefusal,
+          fieldReview: poem.fieldReview,
+        };
       return {
         ...pushToUndo(state, true),
         layoutParams: poem.layoutParams,
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
+        fieldReview: poem.fieldReview,
         kineticNudge,
         kineticRound,
         // only a real nudge ends the running voice MIX — a poem-only re-deal is no voice axis
