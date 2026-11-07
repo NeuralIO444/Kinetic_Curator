@@ -297,6 +297,71 @@ export function planMorph(fromItems, toItems, seed = 0) {
 }
 
 /**
+ * #2006 slice 3 — the KEYED plan, for items that carry a ground-truth
+ * identity: where keyOf(item) returns a non-empty string (the FIELD
+ * form's glyphs — their keys name poet/piece/stamp index, mirror copies
+ * suffixed), the item pairs ONLY with the same key on the other side.
+ * A keyed item with no counterpart is a leaver; a keyed target with no
+ * source is a joiner; keyed items NEVER cross-pair by proximity (a
+ * re-dealt poem's glyphs must not slide into the old poem's slots —
+ * they leave and arrive as themselves, the Sleight-of-Hand grammar).
+ * Unkeyed items (the layer's ordinary marks) plan exactly as planMorph
+ * plans them, on the unkeyed subsets; their slots are then translated
+ * into the FULL to-list's grouping, so the merged plan resolves under
+ * blendItems' one contract. A duplicated key on one side keeps its
+ * first carrier; the rest fall back to the unkeyed pool (an ambiguous
+ * identity is no identity). The choreography is planned over the full
+ * to-list, as planMorph plans it.
+ */
+export function planMorphByKey(fromItems, toItems, seed = 0, keyOf = null) {
+  const from = fromItems || [];
+  const to = toItems || [];
+  const key = (it) => {
+    if (typeof keyOf !== 'function') return null;
+    const k = keyOf(it);
+    return typeof k === 'string' && k.length > 0 ? k : null;
+  };
+  const fromKeyed = new Map();
+  const fromPlain = [];
+  for (const it of from) {
+    const k = key(it);
+    if (k !== null && !fromKeyed.has(k)) fromKeyed.set(k, it);
+    else fromPlain.push(it);
+  }
+  const toKeyed = new Map();
+  const toPlain = [];
+  for (const it of to) {
+    const k = key(it);
+    if (k !== null && !toKeyed.has(k)) toKeyed.set(k, it);
+    else toPlain.push(it);
+  }
+  const toGroups = groupByAsset(to);
+  const slotOf = (it) => {
+    const g = it.assetId || it.role || 'default';
+    return { g, j: toGroups.get(g).indexOf(it) };
+  };
+  const pairs = [];
+  const onlyFrom = [];
+  const onlyTo = [];
+  for (const [k, f] of fromKeyed) {
+    const t = toKeyed.get(k);
+    if (t) pairs.push({ f, ...slotOf(t) });
+    else onlyFrom.push(f);
+  }
+  for (const [k, t] of toKeyed) {
+    if (!fromKeyed.has(k)) onlyTo.push(slotOf(t));
+  }
+  if (fromPlain.length || toPlain.length) {
+    const sub = planMorph(fromPlain, toPlain, seed);
+    const subGroups = groupByAsset(toPlain);
+    for (const p of sub.pairs) pairs.push({ f: p.f, ...slotOf(subGroups.get(p.g)[p.j]) });
+    onlyFrom.push(...sub.onlyFrom);
+    for (const o of sub.onlyTo) onlyTo.push(slotOf(subGroups.get(o.g)[o.j]));
+  }
+  return { pairs, onlyFrom, onlyTo, seed: seed >>> 0, choreo: choreoPlan(to) };
+}
+
+/**
  * Compat surface: materialize a plan into the original ref-tuple shape
  * ([[fromItem, toItem], ...]) against the same `to` it was built from.
  * Greedy order is unchanged, so results are identical to the pre-#419

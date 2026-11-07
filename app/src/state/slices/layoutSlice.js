@@ -61,6 +61,7 @@ import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapter
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
 import { reviewLanding } from '../../curator/fieldReview.mjs'; // #2006 slice 1: the shadow review of a landed poem
+import { runReviewLadder } from '../../curator/fieldReviewLadder.mjs'; // #2006 slice 3: the ladder acts on a janky landing
 import { sanitizeReviewVoice } from '../../curator/fieldReviewVoice.mjs'; // #2006 slice 2: the voice's extension shape
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
 import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
@@ -315,6 +316,22 @@ function bankReview(state, landingParams, opts) {
   }
 }
 
+/**
+ * #2006 slice 3 — the ladder, fail-closed on the same discipline: the
+ * loop may act on a janky landing, but a failure inside the acting
+ * (a trial build that throws, a re-deal path that faults) must never
+ * break or half-apply the deal it rides on. ANY failure returns null
+ * and the commit proceeds with the slice-1/2 record and the landing
+ * exactly as dealt — unacted, unadjusted.
+ */
+function bankLadder(state, landingParams, record, opts) {
+  try {
+    return runReviewLadder(state, landingParams, record, opts);
+  } catch {
+    return null;
+  }
+}
+
 function landPoem(
   state,
   layoutParams,
@@ -349,26 +366,70 @@ function landPoem(
   );
   if (form) lp.fieldForm = form;
   else delete lp.fieldForm;
+  // #2006 slice 1 — the shadow review banks on the same commit: the landed
+  // form, measured on its built item list, judged by the rules table alone.
+  // A refusal or plain silence banks nothing (no landing happened). The
+  // re-deal path passes review:false (Matt's ruling: re-deals are never
+  // reviewed) and its caller clears the standing record itself. Callers
+  // whose commit changes the seed or the pool in the same breath as the
+  // deal (the KINETIC roll) pass the commit's own values as buildSeed /
+  // buildEnabledAssets, so the review measures the build that lands.
+  let fieldReview =
+    form && review
+      ? bankReview(state, lp, {
+          seed: buildSeed ?? state.seed,
+          enabledAssets: buildEnabledAssets ?? state.enabledAssets,
+          stream: `poem:${n}`,
+        })
+      : null;
+  let poemDealNext = n + 1;
+  // #2006 slice 3 — the ladder acts on a JANKY fresh landing, inside this
+  // same commit: the record gains its adjustment, the form gains the
+  // repair (a review transform, a re-dealt form, or silence on a cut),
+  // and a re-deal consumes the NEXT poem stream index, so the commit's
+  // counter advances past it — the deal counter is part of the take log
+  // (§3.8), and the re-deal is a real deal on a real stream. The
+  // ladder's re-deal draws at index n+1 avoiding the replaced piece,
+  // through the same dealPoet/fieldDealReport path as the landing
+  // itself. HOLD and review:false never reach here (returned above /
+  // no record), and a ladder failure leaves the landing unacted.
+  if (form && review && fieldReview?.verdict === 'janky') {
+    const acted = bankLadder(state, lp, fieldReview, {
+      seed: buildSeed ?? state.seed,
+      enabledAssets: buildEnabledAssets ?? state.enabledAssets,
+      redeal: () => {
+        const poet2 = getDirector().dealPoet({
+          fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + n + 1, state.seedOffsets),
+          avoidPieceId: form.pieceId,
+          lookFamily: lookFamilyOf(layoutParams.composition ?? state.layoutParams.composition),
+        });
+        if (!poet2) return null;
+        const rep2 = fieldDealReport(
+          poet2,
+          rngForIndex(state.seed, CH.curate, POEM_PLACE_BASE + n + 1, state.seedOffsets),
+          fieldAspect(state),
+        );
+        return rep2.form ? { form: rep2.form, stream: `poem:${n + 1}` } : null;
+      },
+    });
+    if (acted) {
+      fieldReview = acted.record;
+      // A landed re-deal advances the counter WHATEVER the outcome —
+      // even a cut one: the deal happened, and its stream is named in
+      // the record; leaving the counter behind would let the next deal
+      // draw the same stream and name it again.
+      if (acted.redealt) poemDealNext = n + 2;
+      if (acted.cut) delete lp.fieldForm;
+      else if (acted.form) {
+        lp.fieldForm = acted.review ? { ...acted.form, review: acted.review } : acted.form;
+      } else if (acted.review) lp.fieldForm = { ...form, review: acted.review };
+    }
+  }
   return {
     layoutParams: lp,
-    poemDeal: n + 1,
+    poemDeal: poemDealNext,
     fieldGateRefusal: gate ? { reason: gate.reason, poetId: poet.poetId, pieceId: poet.pieceId } : null,
-    // #2006 slice 1 — the shadow review banks on the same commit: the landed
-    // form, measured on its built item list, judged by the rules table alone.
-    // A refusal or plain silence banks nothing (no landing happened). The
-    // re-deal path passes review:false (Matt's ruling: re-deals are never
-    // reviewed) and its caller clears the standing record itself. Callers
-    // whose commit changes the seed or the pool in the same breath as the
-    // deal (the KINETIC roll) pass the commit's own values as buildSeed /
-    // buildEnabledAssets, so the review measures the build that lands.
-    fieldReview:
-      form && review
-        ? bankReview(state, lp, {
-            seed: buildSeed ?? state.seed,
-            enabledAssets: buildEnabledAssets ?? state.enabledAssets,
-            stream: `poem:${n}`,
-          })
-        : null,
+    fieldReview,
   };
 }
 
@@ -1221,6 +1282,14 @@ export const createLayoutSlice = (set) => ({
       const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);
       const seed = Math.floor(rng() * 0x100000000) >>> 0;
       next.raygun = { mode: RAYGUN_MODES[cur + 1], seed };
+      // #2006 slice 3 — arming the gun supersedes the review loop's
+      // repair: the performer's touch takes the poem over, and the two
+      // records never compose (the form door refuses review + raygun
+      // whole). The banked fieldReview record keeps what the loop did;
+      // the form's transform record leaves with the gesture. Cycling
+      // back to plain does not restore it — the repair belonged to the
+      // landing the performer has since taken over.
+      delete next.review;
       return {
         ...pushToUndo(state, true),
         layoutParams: { ...state.layoutParams, fieldForm: next },
@@ -1426,6 +1495,46 @@ export const createLayoutSlice = (set) => ({
       if (poemHeld(state)) landed.fieldForm = state.layoutParams.fieldForm;
       else if (fieldDeal) landed.fieldForm = fieldDeal;
       else delete landed.fieldForm;
+      // #2006 slice 1 — the press's landing is shadow-reviewed on this
+      // commit (see the fieldReview entry below); slice 3 — a janky
+      // press landing is acted on by the ladder in the same commit, on
+      // landPoem's terms. The press itself deals off its own stream and
+      // does not advance poemDeal — but the ladder's RE-DEAL is a real
+      // deal on the poem stream, so when one lands, this commit carries
+      // the advanced counter with it (the counter is part of the log).
+      let pressReview = poemHeld(state)
+        ? (state.fieldReview ?? null)
+        : fieldDeal
+          ? bankReview(state, landed, { stream: `press:${press}` })
+          : null;
+      let pressPoemDeal = null;
+      if (!poemHeld(state) && fieldDeal && pressReview?.verdict === 'janky') {
+        const acted = bankLadder(state, landed, pressReview, {
+          redeal: () => {
+            const idx = state.poemDeal | 0;
+            const poet2 = getDirector().dealPoet({
+              fieldRng: rngForIndex(state.seed, CH.curate, POEM_PICK_BASE + idx, state.seedOffsets),
+              avoidPieceId: fieldDeal.pieceId,
+              lookFamily: lookFamilyOf(landed.composition ?? state.layoutParams.composition),
+            });
+            if (!poet2) return null;
+            const rep2 = fieldDealReport(
+              poet2,
+              rngForIndex(state.seed, CH.curate, POEM_PLACE_BASE + idx, state.seedOffsets),
+              fieldAspect(state),
+            );
+            return rep2.form ? { form: rep2.form, stream: `poem:${idx}` } : null;
+          },
+        });
+        if (acted) {
+          pressReview = acted.record;
+          if (acted.redealt) pressPoemDeal = (state.poemDeal | 0) + 1; // a landed re-deal counts, even a cut one
+          if (acted.cut) delete landed.fieldForm;
+          else if (acted.form) {
+            landed.fieldForm = acted.review ? { ...acted.form, review: acted.review } : acted.form;
+          } else if (acted.review) landed.fieldForm = { ...landed.fieldForm, review: acted.review };
+        }
+      }
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1436,6 +1545,9 @@ export const createLayoutSlice = (set) => ({
         ...(funnel ? { kineticNotch: funnel.notch } : {}),
         layoutParams: landed,
         curatePress: press + 1,
+        // #2006 slice 3 — present only when the ladder's re-deal landed a
+        // form on this press: the poem counter advances with the deal.
+        ...(pressPoemDeal != null ? { poemDeal: pressPoemDeal } : {}),
         // Honest flag: if any chain had no row for the current value this press
         // had no memory behind it, and the bar says so.
         curateChainFallback: chainFellBack,
@@ -1450,11 +1562,8 @@ export const createLayoutSlice = (set) => ({
         // the form; a refusal or plain silence banks nothing). The press
         // deals off its own stream (press + 0x30000) and does not advance
         // poemDeal, so the record's stream names the press, not a deal index.
-        fieldReview: poemHeld(state)
-          ? (state.fieldReview ?? null)
-          : fieldDeal
-            ? bankReview(state, landed, { stream: `press:${press}` })
-            : null,
+        // Slice 3: pressReview above is that record, ladder-acted when janky.
+        fieldReview: pressReview,
       };
     }),
 

@@ -814,8 +814,29 @@ export function createLiveLoop(
       dishLifeWasAwake = dishLifeStamp !== null;
       s.setDishLifeAwake?.(dishLifeWasAwake); // the governor's sensor — published on transitions only
     }
+    // #2006 slice 3 — the review morph stamp: while the standing review
+    // record carries a ladder adjustment, the resolver settles the repair
+    // as one planned morph (gl/liveResolve's review channel). The stamp
+    // is a pure function of the banked record — its key names the landing
+    // (seed|stream), its seed and duration are the adjustment's own, and
+    // `review` is the transform standing on the form (null for a re-deal
+    // or a cut, whose settles ride the keyed joiner/leaver pairing). It
+    // rides the input only while such a record stands, so a take recorded
+    // without one carries exactly the older input shape, and a take that
+    // records it replays the settle from the stamp + the resolver's
+    // snapshotted channel state — the loop never re-runs on a replay.
+    const reviewRec = s.fieldReview?.adjustment ? s.fieldReview : null;
+    const reviewMorphStamp = reviewRec
+      ? {
+          key: `${reviewRec.seed}|${reviewRec.stream}`,
+          seed: reviewRec.adjustment.morph.seed,
+          dur: reviewRec.adjustment.morph.dur,
+          review: reviewRec.adjustment.final ?? null,
+        }
+      : null;
     const resolved = resolver.resolveLayers({
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
+      ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,
       layers: s.layers,

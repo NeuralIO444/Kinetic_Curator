@@ -2,15 +2,22 @@
 // (spec §3.6 the voice, §3.7 the backend proposal contract, §4 slice 2).
 //
 // Slice 1 banked the verdict in silence. Slice 2 speaks it — and still
-// ACTS ON NOTHING: no adjustment, no re-deal, no CUT (slices 3/4). The
-// spoken lines ride the standing FIELD whisper idiom onto the ONE tape the
+// ACTS ON NOTHING: no adjustment, no re-deal, no CUT (slices 3/4).
+// Slice 3 (fieldReviewLadder.mjs) gives the loop its hand: the ladder
+// acts INSIDE the deal commit, before this voice ever runs, so an
+// acted record is spoken of in the past tense — LOIS reports the
+// resolving rung's act (or the cut) with the plan that ran as the
+// record's rung order, and the validator fences a model's rephrase to
+// reporting: no 'would', no other rung's act, no rung order at all.
+// The spoken lines ride the standing FIELD whisper idiom onto the ONE tape the
 // room already has — the footer LoisPill crawl fed by loisRank's verdict
 // slot (loisTicker.js). DAVIS speaks CLEAN (the woohoo — the continuous
 // side of the KC-1 DS), LOIS speaks JANKY (the gates talking: the first
 // failing gate, its measured value against its limit, in her pan register)
 // and names the repair she WOULD run, as a proposal — the record says a
-// proposal, §4.2, because nothing here may act. EXEMPT landings stay
-// silent: the poem was never judged, so there is no verdict to speak.
+// proposal, §4.2, because nothing in THIS slice acts (slice 3's ladder
+// is what acts, and its records are reported, above). EXEMPT landings
+// stay silent: the poem was never judged, so there is no verdict to speak.
 //
 // The Mind backend may be ASKED to phrase a line (mindThinker discipline:
 // Apple Intelligence via kc-mind, rules the silent fallback — the asking
@@ -120,6 +127,15 @@ const PROPOSALS = Object.freeze({
   4: 'Would deal it again.',
 });
 
+// Slice 3: the act LOIS reports, per resolving rung — past tense,
+// because by the time the record banks the ladder has already run
+// (it acts inside the deal commit; the voice only ever reports).
+const ACTS = Object.freeze({
+  1: 'Shrunk it.',
+  2: 'Shifted it back.',
+  4: 'Dealt it again.',
+});
+
 /**
  * The rules voice for a banked record: { persona, line, rungOrder } or
  * null when the record is not spoken (no record, exempt, unmeasured).
@@ -132,13 +148,31 @@ export const rulesVoice = (record) => {
     const line = CLEAN_LINES[(record.seed >>> 0) % CLEAN_LINES.length];
     return { persona: 'davis', line, rungOrder: null };
   }
-  if (record.verdict !== 'janky') return null;
+  if (record.verdict !== 'janky' && record.verdict !== 'cut') return null;
   const gm = gateMeasure(record);
   const clause = JANKY_CLAUSES[record.gate];
   if (!gm || !clause) return null;
+  const measured = clause(pct(gm.value), pct(gm.limit));
+  if (record.verdict === 'cut') {
+    // The ladder exhausted and the poem left the stage: the gate's
+    // clause (the LANDING's figures — a cut record keeps them) and the
+    // act, in the pan register. The rung order is the plan that ran.
+    return {
+      persona: 'lois',
+      line: `${measured} Cut it.`,
+      rungOrder: record.adjustment ? [...record.adjustment.plan] : null,
+    };
+  }
+  if (record.adjustment?.outcome === 'repaired') {
+    // Slice 3 acted before the voice ever speaks: the line reports the
+    // resolving rung's act, and the order spoken is the plan that ran
+    // (adjustment.plan), not a fresh proposal.
+    const act = ACTS[record.rung] ?? ACTS[1];
+    return { persona: 'lois', line: `${measured} ${act}`, rungOrder: [...record.adjustment.plan] };
+  }
   const order = proposedOrder(record.gate);
   const proposal = PROPOSALS[order[0]] ?? PROPOSALS[1];
-  return { persona: 'lois', line: `${clause(pct(gm.value), pct(gm.limit))} ${proposal}`, rungOrder: order };
+  return { persona: 'lois', line: `${measured} ${proposal}`, rungOrder: order };
 };
 
 /**
@@ -209,8 +243,11 @@ export const reviewAskContext = (record, { poet = null, piece = null, room = nul
       crop: entry(m.m4, g.crop, m.m4 <= g.crop),
     },
     rulesLine: rv ? rv.line : null,
-    rungSet: record.verdict === 'janky' ? [...REVIEW_LADDER] : [],
-    leadRung: record.verdict === 'janky' ? (LEAD_RUNG[record.gate] ?? null) : null,
+    // Slice 3: an ACTED record (and every cut) offers no rungs to order —
+    // the ladder already ran inside the deal commit; the ask is phrasing
+    // only, and validateReviewProposal drops a rung order there whole.
+    rungSet: record.verdict === 'janky' && !record.adjustment ? [...REVIEW_LADDER] : [],
+    leadRung: record.verdict === 'janky' && !record.adjustment ? (LEAD_RUNG[record.gate] ?? null) : null,
     seed: askSeedFor(record),
   };
 };
@@ -261,16 +298,24 @@ const lineFigures = (line) => {
  * landing's own and propose no repair — a clean proposal doing any of
  * those is out of the idiom and drops whole.
  */
+// Slice 3: the acts' own words, one per rung — the vocabulary a line
+// about an ACTED record may name, and only for the rung that resolved
+// it (the cut's word belongs to cut records alone).
+const ACT_WORDS = Object.freeze({ 1: 'shrunk', 2: 'shifted', 4: 'dealt', 5: 'cut' });
+
 export const validateReviewProposal = (raw, record) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  if (!record || (record.verdict !== 'clean' && record.verdict !== 'janky')) return null;
+  if (!record || (record.verdict !== 'clean' && record.verdict !== 'janky' && record.verdict !== 'cut')) return null;
   const line = typeof raw.line === 'string' ? raw.line.trim() : '';
   if (!line || line.length > MAX_LINE) return null;
   let rungOrder = null;
   if (raw.rungOrder !== undefined) {
     // A clean landing approves no ladder — a rung order there is
     // out-of-set, and out-of-set drops the proposal whole (§3.7).
-    if (record.verdict !== 'janky') return null;
+    // Slice 3: an ACTED record (and every cut) approves none either —
+    // the order that ran is a banked fact (adjustment.plan), not
+    // something a reply may re-propose after the fact.
+    if (record.verdict !== 'janky' || record.adjustment) return null;
     if (!Array.isArray(raw.rungOrder) || raw.rungOrder.length === 0) return null;
     const seen = new Set();
     for (const r of raw.rungOrder) {
@@ -297,7 +342,22 @@ export const validateReviewProposal = (raw, record) => {
     if (/\bjanky\b/i.test(line)) return null;
     if (/\b(?:shrink|shift|cut|re-?deal)\b/i.test(line)) return null;
   }
-  if (record.verdict === 'janky') {
+  if (record.verdict === 'janky' || record.verdict === 'cut') {
+    // Slice 3 — the acted fences. A cut record is fenced as the janky
+    // landing it was (its figures are the landing's, kept on the
+    // record). An ACTED record's line reports a completed act, so the
+    // proposal mood is a falsehood there: 'would' drops the line
+    // whole. And the act the line may name is the record's own — the
+    // resolving rung's word, no other rung's: a line claiming a
+    // different repair than the one banked contradicts the record.
+    if (record.adjustment) {
+      if (/\bwould\b/i.test(line)) return null;
+      const own = ACT_WORDS[record.rung];
+      for (const word of Object.values(ACT_WORDS)) {
+        if (word === own) continue;
+        if (new RegExp(`\\b${word}\\b`, 'i').test(line)) return null;
+      }
+    }
     const gm = gateMeasure(record);
     if (!gm) return null;
     const valueFigure = pct(gm.value);
@@ -348,7 +408,7 @@ export const validateReviewProposal = (raw, record) => {
  */
 export const sanitizeReviewVoice = (raw, record) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  if (!record || (record.verdict !== 'clean' && record.verdict !== 'janky')) return null;
+  if (!record || (record.verdict !== 'clean' && record.verdict !== 'janky' && record.verdict !== 'cut')) return null;
   const persona = record.verdict === 'clean' ? 'davis' : 'lois';
   if (raw.persona !== persona) return null;
   const line = typeof raw.line === 'string' ? raw.line.trim() : '';
@@ -358,7 +418,14 @@ export const sanitizeReviewVoice = (raw, record) => {
   if (raw.bar !== null && !(Number.isInteger(raw.bar) && raw.bar >= 0)) return null;
   const voice = { persona, line, bar: raw.bar, backend: raw.backend, seed: raw.seed >>> 0 };
   if (raw.rungOrder !== undefined) {
-    if (record.verdict !== 'janky' || !Array.isArray(raw.rungOrder) || raw.rungOrder.length === 0) return null;
+    // Slice 3: a cut record's voice may carry the plan that ran (its
+    // rungOrder is a report, not a proposal) on the same discipline.
+    if (
+      (record.verdict !== 'janky' && record.verdict !== 'cut') ||
+      !Array.isArray(raw.rungOrder) ||
+      raw.rungOrder.length === 0
+    )
+      return null;
     const seen = new Set();
     for (const r of raw.rungOrder) {
       if (!Number.isInteger(r) || !REVIEW_LADDER.includes(r) || seen.has(r)) return null;

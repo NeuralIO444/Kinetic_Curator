@@ -61,7 +61,7 @@ import { isPlateMaterial, plateGeoFrom, PLATE_GEO_DEFAULTS } from './plateBody.m
 import { isWashMaterial, washParamsFrom, WASH_PARAM_DEFAULTS } from './washBody.mjs'; // #1549 — material:'wash'
 import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './stippleBody.mjs'; // #1549 — material:'stipple'
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
-import { sanitizeFieldForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data
+import { sanitizeFieldForm, reviewAdjustedForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data; #2006 slice 3: the review transform
 import { rayGunForm } from '../poets/rayGunForm.js'; // #2003 — the treatment record, drawn from the plain form
 import { stampWidthEm } from '../poets/placement.js'; // #2005 — the plate zone is measured in the stamps' own ink
 import { pickWeightedIndexStable } from './kernel/rng.js';
@@ -806,7 +806,19 @@ export function buildPlacements({
     // below read the treated stamps; colours, alpha and the register are
     // exactly the plain form's, so WHISPER and RAY GUN compose. No record:
     // drawnForm IS fieldForm, byte-identical to the pre-#2003 pipeline.
-    const drawnForm = fieldForm.raygun ? rayGunForm(fieldForm, fieldForm.raygun) : fieldForm;
+    const treatedForm = fieldForm.raygun ? rayGunForm(fieldForm, fieldForm.raygun) : fieldForm;
+    // #2006 slice 3 — the review transform: when the form carries the
+    // ladder's repair record, the drawn list is the plain form scaled
+    // about its ink centre and shifted, recomputed here on every build
+    // (poets/fieldForm.reviewAdjustedForm — the stored stamps never
+    // move, so removing the record restores the landing exactly, and
+    // the review's measures, which read this built list, judge the
+    // same ink the room sees). The two records never compose — the
+    // door refuses review + raygun whole — so treatedForm IS the plain
+    // form whenever a review record stands; WHISPER composes (it moves
+    // only the alpha above). No record: drawnForm is treatedForm,
+    // byte-identical to the pre-slice-3 pipeline.
+    const drawnForm = fieldForm.review ? reviewAdjustedForm(treatedForm) : treatedForm;
     // #2018 (audit lever 2) — the plate's ink: while a plate stands, its
     // stamps deal in the palette swatch MOST distant from the colours
     // this layer's marks actually wear (the dealt colours on `mapped`,
