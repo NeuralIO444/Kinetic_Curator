@@ -1566,7 +1566,18 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
       patternTex.set(layer.id, e);
     }
     const size = patternDrawSize(layer.pattern.drift, w, h);
-    const f = e.frames.frame(layer.pattern, layer.palette, size.w, size.h, layer.pattern.t);
+    // #1923 Phase 2 slice C: the coupling's TIDES descriptor rides the contract layer (absent =
+    // uncoupled, the dealt frame). The drift-amplitude modes need nothing here — their bias is
+    // already the block's drift value, which also drives the draw size above.
+    const f = e.frames.frame(
+      layer.pattern,
+      layer.palette,
+      size.w,
+      size.h,
+      layer.pattern.t,
+      null,
+      layer.patternCulture ?? null,
+    );
     if (e.key !== f.key) {
       gl.bindTexture(gl.TEXTURE_2D, e.tex);
       gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); // the frame is top row first; GL wants bottom row first

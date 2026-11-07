@@ -103,7 +103,13 @@ const POEM_ONLY_IDS = new Set(
   ),
 );
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
-import { fieldSampler, effectiveCoupling } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2: the coupling seam — sample the field stage's publication, fold the governor's hold
+import {
+  fieldSampler,
+  effectiveCoupling,
+  fieldMean,
+  fieldLevelGrid,
+  culturePatternDriftFactor,
+} from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2: the coupling seam — sample the field stage's publication, fold the governor's hold
 
 const HOP_MAX_PX = 4;
 
@@ -810,17 +816,71 @@ export function createLiveResolver() {
       (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false).map((l) => l.id),
     );
 
+    // #1923 Phase 2 slice C — the pattern consumer's seam reads, computed lazily on the first pattern
+    // layer and shared by every pattern layer this frame: the field's means (the drift-amplitude
+    // bias) and a SNAPSHOT of its level grid (the TIDES bias). Both read the SAME publication
+    // `cultureScale` was built from, in this same resolve — one dial, one shed fold (cultureScale is
+    // null exactly when the effective coupling is 0 or no field is published, and the pattern bias
+    // exists only under it), one frame behind. The snapshot is a copy on purpose: pattern textures
+    // are drawn after this resolve returns, and the field stage applies (steps, in place) at the
+    // bottom of it — a live reference would read the next generation.
+    let patternMean;
+    let patternMeanDone = false;
+    let patternGrid;
+    let patternGridDone = false;
+    const patternMeanNow = () => {
+      if (!patternMeanDone) {
+        patternMeanDone = true;
+        patternMean = cultureScale ? fieldMean(dishFieldStage.publishedField) : null;
+      }
+      return patternMean;
+    };
+    const patternGridNow = () => {
+      if (!patternGridDone) {
+        patternGridDone = true;
+        patternGrid = cultureScale ? fieldLevelGrid(dishFieldStage.publishedField) : null;
+      }
+      return patternGrid;
+    };
+
     for (const layer of (input.layers || []).filter((l) => l && typeof l === 'object' && l.visible !== false)) {
       aliveIds.add(layer.id);
       // #1097/#1098 — a PATTERN track is not a KC track: it has no snapshot (the content path below
       // would draw a phantom copy of the active KC), so it resolves here, to its own block and the
       // ACTIVE palette. It is drawn by the renderer as one generated texture.
       if (layer.type === 'pattern') {
+        // #1923 Phase 2 slice C — the coupling's pattern read, on the RESOLVED block only (the
+        // patternAudio precedent: the stored layer.pattern is never written; at dial 0 the block
+        // carries the very same object and no descriptor, so the frame is the pre-slice frame).
+        // QUILT / GLYPH / PICTURE: DRIFT is an amplitude — the field's mean ACTIVITY scales it
+        // (multiplicative, centred; dealt 0 stays 0). TIDES: the level snapshot rides as a
+        // descriptor and the raster shifts each cell by the level under it. FIELD (a pan RATE),
+        // REWRITE (a baked growth plan, an integer step clock) and BLOCKS (a still partition) have
+        // no honest continuous axis and are never biased — the survey is in the slice's report.
+        let patternBlock = layer.pattern;
+        let patternCulture = null;
+        if (cultureScale && layer.pattern) {
+          const mode = layer.pattern.mode;
+          if (mode === 'TIDES') {
+            const grid = patternGridNow();
+            if (grid) patternCulture = { coupling: couplingNow, grid };
+          } else if (mode === 'QUILT' || mode === 'GLYPH' || mode === 'PICTURE') {
+            const dealt = Number(layer.pattern.drift) || 0;
+            if (dealt > 0) {
+              const mean = patternMeanNow();
+              if (mean) {
+                const eff = Math.min(1, Math.max(0, dealt * culturePatternDriftFactor(mean.activity, couplingNow)));
+                if (eff !== dealt) patternBlock = { ...layer.pattern, drift: eff };
+              }
+            }
+          }
+        }
         out.push({
           id: layer.id,
           isPattern: true,
           layer,
-          pattern: layer.pattern,
+          pattern: patternBlock,
+          ...(patternCulture ? { patternCulture } : {}),
           palette: resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
           t: (input.loopTimeMs ?? 0) / 1000,
           layerBlendMode: layer.layerBlendMode || 'normal',

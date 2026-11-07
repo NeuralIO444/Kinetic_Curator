@@ -579,6 +579,10 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
           pattern.drift > 0
             ? { ...pattern, t: Number.isFinite(Number(rl.t)) ? Math.round(Number(rl.t) * 1000) / 1000 : 0 }
             : pattern,
+        // #1923 Phase 2 slice C — the coupling's TIDES descriptor (plain data: the dial and a
+        // level-grid snapshot) rides to the renderer only while the resolver attached one; an
+        // uncoupled pattern's contract is exactly the pre-slice contract.
+        ...(rl.patternCulture ? { patternCulture: rl.patternCulture } : {}),
         palette: patternPalette(rl.palette),
       });
       continue;

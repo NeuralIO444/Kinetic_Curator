@@ -130,12 +130,20 @@ export function tidesCellOf(v) {
   return { state, size };
 }
 
-/** Every cell's {state, size} for a frame, row-major. */
-export function tidesCells(grid, drift, t) {
+/**
+ * Every cell's {state, size} for a frame, row-major. `bias` (#1923 Phase 2 slice C, optional) is
+ * (c, r, v) => v': a per-cell shift of the field value BEFORE state/size derivation — the dish-life
+ * coupling's regional read. Absent (every pre-coupling caller, and the ground sampler's path), the
+ * cells are the dealt readout exactly.
+ */
+export function tidesCells(grid, drift, t, bias = null) {
   const tau = tidesTau(drift, t);
   const out = new Array(grid.cols * grid.rows);
   for (let r = 0; r < grid.rows; r++) {
-    for (let c = 0; c < grid.cols; c++) out[r * grid.cols + c] = tidesCellOf(tidesValue(grid, c, r, tau));
+    for (let c = 0; c < grid.cols; c++) {
+      const v = tidesValue(grid, c, r, tau);
+      out[r * grid.cols + c] = tidesCellOf(bias ? bias(c, r, v) : v);
+    }
   }
   return out;
 }
@@ -145,10 +153,10 @@ export function tidesCells(grid, drift, t) {
  * then each cell's squircle by horizontal spans (pixel-centre sampled, hard edges like every PATTERN
  * mode), then the eye. Cells are square: side = bw / cols; rows overflow the bottom edge and clip.
  */
-export function rasterTides(buf, bw, bh, grid, drift = 0, t = 0) {
+export function rasterTides(buf, bw, bh, grid, drift = 0, t = 0, bias = null) {
   buf.fill(grid.groundRgba);
   const cell = bw / grid.cols;
-  const cells = tidesCells(grid, drift, t);
+  const cells = tidesCells(grid, drift, t, bias);
   const N = TIDES_SQUIRCLE_N;
   for (let r = 0; r < grid.rows; r++) {
     const cy = (r + 0.5) * cell;
