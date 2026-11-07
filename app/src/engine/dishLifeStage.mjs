@@ -54,7 +54,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   // read-this-frame contract applies: level/activity ARE the culture's arrays, read them the frame you get
   // them). Inactive (active:false, arrays null) whenever no field-mode culture is running, so a consumer can
   // never read a retained previous frame.
-  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, level: null, activity: null };
+  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, wakeMs: null, level: null, activity: null };
   function syncPublished() {
     if (st && st.fieldOn) {
       const f = st.culture.field;
@@ -62,6 +62,10 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.cols = f.cols;
       publishedField.rows = f.rows;
       publishedField.gen = f.gen;
+      // #1923 Phase 3 (QA follow-up) — the wake rides the publication beside the generation: gen
+      // restarts at 0 every cycle, so the generation alone does not name a culture; the wake does.
+      // The TIDES snapshot (dishLifeCouple.fieldLevelGrid) carries it into the pattern frame key.
+      publishedField.wakeMs = st.wakeMs;
       publishedField.level = f.level;
       publishedField.activity = f.activity;
     } else {
@@ -69,6 +73,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.cols = 0;
       publishedField.rows = 0;
       publishedField.gen = -1;
+      publishedField.wakeMs = null;
       publishedField.level = null;
       publishedField.activity = null;
     }
@@ -76,13 +81,18 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
 
   const geom = (W, H) => ({ canvasW: W, canvasH: H, cols, rows });
 
-  function build(wakeMs, marks, W, H, bedrock, withNearest = true) {
+  function build(wakeMs, marks, W, H, bedrock, withNearest = true, terrain = []) {
     const seed = seedFromMarks(marks, { ...geom(W, H), bedrock });
     st = {
       wakeMs,
       W,
       H,
       marks,
+      // #1923 Phase 3 — the terrain the seed was derived against, frozen like the marks: a snapshot must
+      // restore the SAME bedrock the live build used, or a restored culture grows over ground the live
+      // one treated as locked (the restore path used to rebuild with no bedrock at all and diverged
+      // from the first stepped generation whenever terrain stood on the stage).
+      terrain: (terrain || []).map(freeze),
       nearest: withNearest ? nearestMarks(marks, geom(W, H)) : null,
       culture: createCulture({ cols, rows, rule, bedrock, seed: seed.cells }),
       frameGen: -1,
@@ -135,16 +145,17 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         }
         return false;
       }
-      build(dl.wakeMs, marks, W, H, bedrock, needNearest);
+      build(dl.wakeMs, marks, W, H, bedrock, needNearest, terrain);
     } else {
       setBedrock(st.culture, bedrock);
+      st.terrain = terrain.map(freeze); // the snapshot records the terrain the culture currently lives under
     }
     const quiet = dl.mode === 'quiet';
     st.quiet = quiet ? { strength: Number(dl.strength) || 0, cycleGens: Number(dl.cycleGens) || undefined } : null;
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
     if (target < st.culture.gen) {
       // a replay seeking back: rebuild from the frozen seed, so generation g is always the same culture
-      build(dl.wakeMs, st.marks, W, H, bedrock, needNearest);
+      build(dl.wakeMs, st.marks, W, H, bedrock, needNearest, terrain);
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
@@ -209,6 +220,10 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
             W: st.W,
             H: st.H,
             marks: st.marks.map((m) => ({ ...m })),
+            // #1923 Phase 3 — OPTIONAL rider, present only while terrain stands: the terrain marks the
+            // seed was derived against, so restore() rebuilds the same bedrock. Snapshots taken before
+            // this rider (or on terrain-free stages) carry no key and restore exactly as they always did.
+            ...(st.terrain && st.terrain.length ? { terrain: st.terrain.map((m) => ({ ...m })) } : {}),
             gen: st.culture.gen,
             ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
             ...(st.fieldOn ? { field: { ...st.fieldOn } } : {}), // #1994 — so does field mode's cycle
@@ -221,13 +236,18 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       syncPublished();
       if (!snap || !Array.isArray(snap.marks) || !snap.marks.length) return;
       const wasField = !!(snap.field && typeof snap.field === 'object');
+      // #1923 Phase 3 — rebuild against the snapshot's terrain (absent = a pre-rider snapshot: no
+      // bedrock, exactly the historical restore). Without it the restored seed paints over locked
+      // ground and the culture diverges from the live one it claims to continue.
+      const terrain = Array.isArray(snap.terrain) ? snap.terrain.map((m) => ({ ...m })) : [];
       build(
         snap.wakeMs,
         snap.marks.map((m) => ({ ...m })),
         snap.W,
         snap.H,
-        null,
+        bedrockOf(terrain, snap.W, snap.H),
         !wasField,
+        terrain,
       );
       for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
       if (snap.quiet && typeof snap.quiet === 'object') {

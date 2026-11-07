@@ -179,6 +179,7 @@ node src/engine/dishLifeCoupling.selfcheck.mjs
 node src/engine/dishLifeBreathing.selfcheck.mjs
 node src/engine/dishLifePatterns.selfcheck.mjs
 node src/engine/dishLifeBackgrounds.selfcheck.mjs
+node src/engine/dishLifeReseed.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
 node src/gl/dishLifeTouchDom.selfcheck.mjs
