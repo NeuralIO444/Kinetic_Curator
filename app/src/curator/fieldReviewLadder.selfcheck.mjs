@@ -209,12 +209,13 @@ ok('intermediate steps are honest states: rung 1’s janky step re-derives befor
   assert.deepEqual(committed.review, rec.adjustment.final);
 });
 
-// NOTE — the exhaustion pin (a drowned room's full trace, the cut, the
-// deal counter's honesty) lives with the calibration census in §7: the
-// pinned corpus machinery is single-run per process (a second pinned
-// run sees module state stamped by the first run's fake clock — slice
-// 1's suite never re-runs a corpus either), so seed 227's look-pass
-// commit is asserted from the census run's own captured commit facts.
+// NOTE — the drowned-room pin (seed 227: slice 3's exhaustion trace and
+// cut; slice 4's rung-3 rescue of the same landing) lives with the
+// calibration census in §7: the pinned corpus machinery is single-run
+// per process (a second pinned run sees module state stamped by the
+// first run's fake clock — slice 1's suite never re-runs a corpus
+// either), so seed 227's look-pass commit is asserted from the census
+// run's own captured commit facts.
 
 ok('one re-deal at most: the stub is called once even when the walk continues past it', () => {
   setup(4242);
@@ -641,8 +642,9 @@ ok('voice: a repaired record speaks the act in the past tense, with the plan tha
   const rv = rulesVoice(rec);
   assert.equal(rv.persona, 'lois');
   assert.ok(rv.line.endsWith('Shrunk it.'), `the act is reported, not proposed: ${rv.line}`);
-  assert.deepEqual(rv.rungOrder, [1, 2, 4, 5], 'the spoken order is the plan that ran');
-  assert.deepEqual(voiceForRecord(rec, 7).rungOrder, [1, 2, 4, 5]);
+  // Slice 4: the plan that ran now carries rung 3 in its canonical slot.
+  assert.deepEqual(rv.rungOrder, [1, 2, 3, 4, 5], 'the spoken order is the plan that ran');
+  assert.deepEqual(voiceForRecord(rec, 7).rungOrder, [1, 2, 3, 4, 5]);
   // The validator on acted records: the rules line (rephrased by no one)
   // passes; a proposal mood, a rung order, or another rung’s act drops.
   assert.deepEqual(validateReviewProposal({ line: rv.line }, rec), { line: rv.line, rungOrder: null });
@@ -652,7 +654,7 @@ ok('voice: a repaired record speaks the act in the past tense, with the plan tha
     'no ‘would’ on a completed act',
   );
   assert.equal(
-    validateReviewProposal({ line: rv.line, rungOrder: [1, 2, 4, 5] }, rec),
+    validateReviewProposal({ line: rv.line, rungOrder: [1, 2, 3, 4, 5] }, rec),
     null,
     'the order that ran is not re-proposable',
   );
@@ -678,8 +680,15 @@ ok('voice: a cut record speaks the cut, and its voice sanitizes with the plan as
   const rv = rulesVoice(cut);
   assert.equal(rv.persona, 'lois');
   assert.ok(rv.line.endsWith('Cut it.'), rv.line);
-  assert.deepEqual(rv.rungOrder, [1, 2, 4, 5]);
-  const voice = { persona: 'lois', line: rv.line, bar: 7, backend: 'rules', seed: cut.seed, rungOrder: [1, 2, 4, 5] };
+  assert.deepEqual(rv.rungOrder, [1, 2, 3, 4, 5]);
+  const voice = {
+    persona: 'lois',
+    line: rv.line,
+    bar: 7,
+    backend: 'rules',
+    seed: cut.seed,
+    rungOrder: [1, 2, 3, 4, 5],
+  };
   assert.deepEqual(sanitizeReviewVoice(voice, cut), voice, 'a cut voice carries the plan that ran');
   assert.deepEqual(
     validateReviewProposal({ line: rv.line }, cut),
@@ -807,32 +816,46 @@ ok('CALIBRATION — census A (ordinary rooms): repairs by rung, cuts, and the la
   assert.equal(tagged.length, 144);
   assert.equal(o.clean, 133, 'clean landings are never acted on');
   assert.equal(o.unactedJanky, 0, 'every janky landing is acted on');
-  assert.equal(o.repaired, 3);
-  assert.deepEqual(o.byRung, { 2: 2, 4: 1 });
-  assert.equal(o.cut, 8, 'the drowned rooms: m2 ≥ 0.94 at landing, every rung re-measured short of the gate');
-  // The exhaustion pin, on seed 227's look-pass commit as captured by
+  // #2006 slice 4 re-pin (proven in STAGING-REPORT-2006-S4): rung 3
+  // (QUIET) rescues every drowned room slice 3 cut — the 8 cuts (seeds
+  // 227/252, landing m2 0.938–1.000) all resolve at rung 3, and the one
+  // landing slice 3 repaired at rung 4 (seed 239, poem:3) now resolves
+  // one rung earlier, at the quiet. No landing's outcome worsens: the
+  // cleans are untouched and both rung-2 repairs stand as they were.
+  assert.equal(o.repaired, 11);
+  assert.deepEqual(o.byRung, { 2: 2, 3: 9 });
+  assert.equal(o.cut, 0, 'slice 4: the quiet rung leaves no drowned room to cut in census A');
+  // The drowned-room pin, on seed 227's look-pass commit as captured by
   // the census run itself (see the note in §1: one pinned run only).
+  // Slice 3 pinned this landing as the exhaustion trace ([1, 2, 4, 5],
+  // verdict 'cut', the counter at 2 after the landed re-deal); slice 4
+  // pins the same landing's rescue — identical landing measures
+  // (m2 0.9375, the record's provenance is untouched), the walk now
+  // stopping at rung 3 with the poem standing, quieted.
   const cut227 = tagged.find((e) => e.seed === 227 && e.rec.stream === 'poem:0');
   assert.ok(cut227, 'seed 227’s drowned landing is in the corpus');
   const rec = cut227.rec;
-  assert.equal(rec.verdict, 'cut');
-  assert.equal(rec.rung, 5);
-  assert.equal(rec.adjustment.outcome, 'cut');
+  assert.equal(
+    rec.verdict,
+    'janky',
+    'the judgment of the landing stands — the rescue is the adjustment’s, not the verdict’s',
+  );
+  assert.equal(rec.rung, 3);
+  assert.equal(rec.adjustment.outcome, 'repaired');
   assert.deepEqual(
     rec.adjustment.steps.map((s) => s.rung),
-    [1, 2, 4, 5],
-    'every rung ran once, in plan order, then the cut',
+    [1, 2, 3],
+    'shrink and shift re-measured short of the gate, then the quiet cleared it',
   );
-  assert.equal(rec.adjustment.steps.at(-1).verdict, 'janky', 'the cut banks the state it cut');
-  assert.deepEqual(rec.adjustment.steps.at(-1).measures, rec.adjustment.steps.at(-2).measures);
-  assert.equal(cut227.hasForm, false, 'the poem leaves the stage: silence, as a gate refusal lands');
-  assert.equal(cut227.gateRefusal, null, 'a cut is not a gate refusal — the refusal record stands untouched');
-  assert.equal(
-    cut227.poemDeal,
-    2,
-    'the landing AND the ladder’s landed re-deal both count (§3.8: the counter is the log)',
+  assert.deepEqual(
+    rec.adjustment.steps.map((s) => s.verdict),
+    ['janky', 'janky', 'clean'],
   );
-  assert.equal(rec.adjustment.redeal.stream, 'poem:1');
+  assert.equal(rec.adjustment.final.quietZone, true, 'the standing repair carries the quiet');
+  assert.equal(rec.adjustment.redeal, null, 'no re-deal was needed — the counter stayed honest');
+  assert.equal(cut227.hasForm, true, 'the poem stands, in a quieted room');
+  assert.equal(cut227.gateRefusal, null, 'the refusal record stands untouched');
+  assert.equal(cut227.poemDeal, 1, 'only the landing deal counts — no re-deal drew (§3.8: the counter is the log)');
 });
 
 ok('CALIBRATION — census B (mirror rooms): the ladder does NOT hate mirrors', () => {
@@ -856,6 +879,8 @@ ok('CALIBRATION — census B (mirror rooms): the ladder does NOT hate mirrors', 
     11,
     'every mirrored janky landing repairs — shrink pulls the twins apart, shift separates them',
   );
+  // Slice 4: the distribution is slice 3's, unchanged — every mirrored
+  // walk stops at rung 1 or 2, so the quiet rung is never reached here.
   assert.deepEqual(o.byRung, { 1: 5, 2: 6 });
   assert.equal(o.cut, 0, 'ZERO mirrored poems cut — the mirror’s jank is the ladder’s home turf');
 });

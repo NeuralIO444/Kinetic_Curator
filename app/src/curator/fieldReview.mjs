@@ -63,7 +63,7 @@
 // capped-sum reading: each glyph's covered area is the sum of its
 // pairwise intersections, capped at the glyph's own area, so every share
 // lands in [0, 1] without a union pass.
-import { buildPlacements } from '../engine/buildPlacements.js';
+import { buildPlacements, PLATE_ROOM_ALPHA, PLATE_ZONE_PAD_EM } from '../engine/buildPlacements.js';
 import { createGrid } from '../engine/ca-engine.js';
 import { sanitizeFieldForm } from '../poets/fieldForm.js';
 import { stampWidthEm, POEM_ONLY_STAMP_IDS } from '../poets/placement.js';
@@ -164,6 +164,19 @@ function formStampIndex(item, form) {
  *      under that reading; under the draw-order reading the same census
  *      spreads (median 0, p90 ≈ 0.25, tail to 1.0), which is what makes
  *      REVIEW_MAX_MARK_COVER calibratable at all.
+ *      SLICE 4 (the quiet rung): cover is a VISUAL fact, and the render
+ *      seam's zone suppression is a visual act — a mark the plate's room
+ *      (or the poem's own borrowed room, `review.quietZone`) renders at
+ *      PLATE_ROOM_ALPHA eats only that fraction of the ink it overlaps.
+ *      So when the measured form carries quietZone, a mark whose
+ *      footprint enters one of the form's zones (its ink bbox + the
+ *      plate's pad, per mirror cluster — the build tail's own test, on
+ *      the same boxes) contributes PLATE_ROOM_ALPHA × its intersection
+ *      instead of the whole intersection. Excluding suppressed marks
+ *      entirely would claim a 15%-alpha mark eats nothing at all; the
+ *      fraction is what the seam actually draws. Without quietZone the
+ *      measure is slice 1's, bit-for-bit: a plate's own room never
+ *      reaches this function (plates are exempt, never measured).
  *   m3 coverage — the poem's total ink area as a share of the dish.
  *   m4 crop — share of the form's items whose ink box crosses the dish
  *      boundary (beyond REVIEW_CROP_TOLERANCE_PX).
@@ -187,7 +200,13 @@ export function measureLandedForm(items, form, canvasW, canvasH) {
       const em = s.em * (form.review ? form.review.scale : 1);
       const hw = ((stampWidthEm(s.assetId, s.ch) * em) / 2 / form.aspect) * canvasW;
       const hh = (em / 2) * canvasH;
-      formBoxes.push({ box: boxOf(item.x, item.y, hw, hh), index });
+      // Slice 4: the mirror cluster this item belongs to ('' / 'mx' /
+      // 'my' / 'mxmy', from its key suffix) — the quiet zones are read
+      // per cluster below, the build tail's reflected zones in measure
+      // form.
+      const key = typeof item.key === 'string' ? item.key : '';
+      const cluster = key.endsWith('-mxmy') ? 'mxmy' : key.endsWith('-mx') ? 'mx' : key.endsWith('-my') ? 'my' : '';
+      formBoxes.push({ box: boxOf(item.x, item.y, hw, hh), index, em, cluster });
     } else if (Number.isFinite(item?.x) && Number.isFinite(item?.y)) {
       // A mark's asset box as drawn: ±50 asset units × its scale (QUAD_VS).
       const hw = 50 * Math.abs(item.scale ?? 1);
@@ -208,12 +227,46 @@ export function measureLandedForm(items, form, canvasW, canvasH) {
     }
     overprinted += Math.min(areas[i], sum);
   }
+  // Slice 4 — the quiet zones, when the form carries the rung: one zone
+  // per mirror cluster (the cluster's ink bbox breathed out by the
+  // plate's pad at the form's largest drawn em — buildPlacements' own
+  // formula), against which a mark's suppression is tested with the
+  // build tail's footprint test on the measure's own mark boxes.
+  let quietZones = null;
+  if (form.review?.quietZone === true) {
+    const emMax = Math.max(...formBoxes.map((f) => f.em));
+    const padX = ((PLATE_ZONE_PAD_EM * emMax) / form.aspect) * canvasW;
+    const padY = PLATE_ZONE_PAD_EM * emMax * canvasH;
+    const byCluster = new Map();
+    for (const f of formBoxes) {
+      const z = byCluster.get(f.cluster);
+      if (!z) {
+        byCluster.set(f.cluster, { ...f.box });
+      } else {
+        z.x0 = Math.min(z.x0, f.box.x0);
+        z.y0 = Math.min(z.y0, f.box.y0);
+        z.x1 = Math.max(z.x1, f.box.x1);
+        z.y1 = Math.max(z.y1, f.box.y1);
+      }
+    }
+    quietZones = [...byCluster.values()].map((z) => ({
+      x0: z.x0 - padX,
+      y0: z.y0 - padY,
+      x1: z.x1 + padX,
+      y1: z.y1 + padY,
+    }));
+  }
+  const suppressed = (box) =>
+    quietZones !== null && quietZones.some((z) => box.x1 >= z.x0 && box.x0 <= z.x1 && box.y1 >= z.y0 && box.y0 <= z.y1);
   let covered = 0;
   for (let i = 0; i < formBoxes.length; i++) {
     let sum = 0;
     // Only marks drawn OVER the glyph (later in the built list) cover it.
     for (const mb of markBoxes) {
-      if (mb.index > formBoxes[i].index) sum += intersectionArea(formBoxes[i].box, mb.box);
+      if (mb.index > formBoxes[i].index) {
+        const hit = intersectionArea(formBoxes[i].box, mb.box);
+        sum += suppressed(mb.box) ? hit * PLATE_ROOM_ALPHA : hit;
+      }
     }
     covered += Math.min(areas[i], sum);
   }

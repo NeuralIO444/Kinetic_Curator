@@ -137,14 +137,19 @@ ok('line table: DAVIS speaks clean — the woohoo, picked by the record seed', (
 });
 
 ok('proposed orders: the gate-aware lead rung walks first, the ladder follows', () => {
-  assert.deepEqual(REVIEW_LADDER, [1, 2, 4, 5]);
-  assert.deepEqual(proposedOrder('selfOverlap'), [1, 2, 4, 5]);
-  assert.deepEqual(proposedOrder('markCover'), [1, 2, 4, 5]);
-  assert.deepEqual(proposedOrder('coverage'), [1, 2, 4, 5]);
-  assert.deepEqual(proposedOrder('coverageLow'), [4, 1, 2, 5]);
-  assert.deepEqual(proposedOrder('crop'), [2, 1, 4, 5]);
-  assert.deepEqual(rulesVoice(J.coverageLow).rungOrder, [4, 1, 2, 5]);
-  assert.deepEqual(rulesVoice(J.crop).rungOrder, [2, 1, 4, 5]);
+  // #2006 slice 4 re-pin: rung 3 (QUIET) is armed, so the approved set
+  // is the whole ladder [1, 2, 3, 4, 5] and rung 3 stands in its
+  // canonical slot in every order — it still never leads (LOIS's
+  // proposal for a covered poem is the shrink; the quiet is the
+  // ladder's third resort, not its first word).
+  assert.deepEqual(REVIEW_LADDER, [1, 2, 3, 4, 5]);
+  assert.deepEqual(proposedOrder('selfOverlap'), [1, 2, 3, 4, 5]);
+  assert.deepEqual(proposedOrder('markCover'), [1, 2, 3, 4, 5]);
+  assert.deepEqual(proposedOrder('coverage'), [1, 2, 3, 4, 5]);
+  assert.deepEqual(proposedOrder('coverageLow'), [4, 1, 2, 3, 5]);
+  assert.deepEqual(proposedOrder('crop'), [2, 1, 3, 4, 5]);
+  assert.deepEqual(rulesVoice(J.coverageLow).rungOrder, [4, 1, 2, 3, 5]);
+  assert.deepEqual(rulesVoice(J.crop).rungOrder, [2, 1, 3, 4, 5]);
 });
 
 ok('silence: exempt, missing and unmeasured records have no rules voice', () => {
@@ -161,7 +166,7 @@ ok('voiceForRecord: the rules extension carries persona, line, bar, backend and 
     bar: 7,
     backend: 'rules',
     seed: 11,
-    rungOrder: [1, 2, 4, 5],
+    rungOrder: [1, 2, 3, 4, 5],
   });
   assert.deepEqual(voiceForRecord(CLEAN(0), 7), {
     persona: 'davis',
@@ -388,7 +393,16 @@ ok('validator: a clean proposal may not name the verdict it is not, nor a repair
 
 ok('validator: out-of-set rungs, a ladder on a clean landing, and malformed replies all drop', () => {
   const good = 'Buried at 73% — over the 50% line.';
-  assert.equal(validateReviewProposal({ line: good, rungOrder: [3, 1] }, J.markCover), null, 'rung 3 is not armed yet');
+  // Slice 4 re-pin: rung 3 (QUIET) is armed — a proposal may order it.
+  assert.deepEqual(validateReviewProposal({ line: good, rungOrder: [3, 1] }, J.markCover), {
+    line: good,
+    rungOrder: [3, 1],
+  });
+  assert.equal(
+    validateReviewProposal({ line: good, rungOrder: [6, 1] }, J.markCover),
+    null,
+    'a rung that does not exist stays out of set',
+  );
   assert.equal(validateReviewProposal({ line: good, rungOrder: [1, 1] }, J.markCover), null);
   assert.equal(validateReviewProposal({ line: good, rungOrder: [] }, J.markCover), null);
   assert.equal(validateReviewProposal({ line: good, rungOrder: 'ladder' }, J.markCover), null);
@@ -415,7 +429,7 @@ ok('ask context: names and measures only — gates with pass/fail, the rules lin
   assert.deepEqual(ctx.measures.selfOverlap, { value: 0, limit: 0.05, pass: true });
   assert.deepEqual(ctx.measures.coverageLow, { value: 0.03, limit: 0.0015, pass: true });
   assert.equal(ctx.rulesLine, LINES.markCover);
-  assert.deepEqual(ctx.rungSet, [1, 2, 4, 5]);
+  assert.deepEqual(ctx.rungSet, [1, 2, 3, 4, 5]);
   assert.equal(ctx.leadRung, 1);
   assert.equal(ctx.seed, askSeedFor(J.markCover));
   const clean = reviewAskContext(CLEAN(), {});
@@ -435,7 +449,9 @@ ok('sanitize: the extension must be the verdict’s own persona, a bounded line,
   assert.equal(sanitizeReviewVoice({ ...good, seed: 1.5 }, J.markCover), null);
   assert.equal(sanitizeReviewVoice({ ...good, bar: -1 }, J.markCover), null);
   assert.equal(sanitizeReviewVoice({ ...good, line: '' }, J.markCover), null);
-  assert.equal(sanitizeReviewVoice({ ...good, rungOrder: [3] }, J.markCover), null);
+  // Slice 4 re-pin: rung 3 is in the approved set, so it rides a voice.
+  assert.deepEqual(sanitizeReviewVoice({ ...good, rungOrder: [3] }, J.markCover), { ...good, rungOrder: [3] });
+  assert.equal(sanitizeReviewVoice({ ...good, rungOrder: [6] }, J.markCover), null);
   assert.equal(sanitizeReviewVoice(good, CLEAN()), null, 'a lois voice never rides a clean record');
   const davis = { persona: 'davis', line: 'WOO HOO.', bar: null, backend: 'rules', seed: 0 };
   assert.deepEqual(sanitizeReviewVoice(davis, CLEAN()), davis);
@@ -503,7 +519,7 @@ ok('driver: a janky landing speaks the rules line and banks its provenance — n
     bar: 7,
     backend: 'rules',
     seed: 11,
-    rungOrder: [1, 2, 4, 5],
+    rungOrder: [1, 2, 3, 4, 5],
   });
   const { voice, ...rest } = S().fieldReview;
   assert.deepEqual(rest, r, 'the record itself is slice 1’s — the voice only extends it');

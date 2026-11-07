@@ -1,5 +1,11 @@
 /** liveResolve — FEED delay-1 + FIELD same-frame */
-import { buildPlacements, clampCount, mirrorItems } from '../engine/buildPlacements.js';
+import {
+  buildPlacements,
+  clampCount,
+  mirrorItems,
+  PLATE_ROOM_ALPHA,
+  fieldRoomZonePx,
+} from '../engine/buildPlacements.js';
 import {
   createDriverClock,
   driverTimeSec,
@@ -66,7 +72,7 @@ import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mj
 import { tickDishTrails, clearDishTrails } from '../engine/dishTrails.mjs'; // #1415: the trail substrate's tick + seed-change wipe (the law lives in the module)
 import { dishPigmentShed } from './sceneContract.js'; // #1412: the tier-2 shed predicate (the governor's rule, one home)
 import { blendItems, planMorph, planMorphByKey, matchItems } from '../engine/kernel/itemMorph.mjs';
-import { sanitizeFieldForm, fieldFormInkBBox } from '../poets/fieldForm.js'; // #2006 slice 3 — the review morph's janky pose
+import { sanitizeFieldForm, fieldFormInkBBox, reviewAdjustedForm } from '../poets/fieldForm.js'; // #2006 slice 3 — the review morph's janky pose; slice 4 — the adjusted form's room zone
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
 import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'; // #793 — biology regrow
@@ -1407,6 +1413,10 @@ export function createLiveResolver() {
     // lands the repair atomically, so the janky pose was data, never a
     // rendered frame, and this is its one honest reconstruction. Every
     // other item starts from what the chip channel actually showed.
+    // Slice 4: a QUIET repair moves no glyph — its settle is the room's:
+    // the state carries the quieted zones and each frame aims the blend
+    // at a room only as suppressed as the settle has run (the room term
+    // below), so the marks deepen into the room instead of landing in it.
     // A landing's settle plays ONCE (the played set), however long its
     // record stands; no stamp — the record moved on — clears the
     // channel, and the next stamp is a new landing by construction.
@@ -1426,12 +1436,21 @@ export function createLiveResolver() {
           if (!formNow && !prevItems.some((it) => formKeyOf(it) !== null)) continue; // not the poem's layer
           const fromItems =
             formNow && rmStamp.review ? jankyPose(prevItems, items, e, rmStamp.review, W, H) : prevItems;
+          // #2006 slice 4 — a QUIET resolution carries the room term:
+          // the zones the build quieted (the poem's own + its mirror
+          // reflections, read off the standing form at settle start —
+          // a pure function of the landing, like the from-pose), so
+          // the settle below can deepen the suppression instead of
+          // presenting it landed. Absent for every other resolution:
+          // the state stays slice 3's shape.
+          const roomZones = rmStamp.review?.quietZone === true ? reviewRoomZones(e, items, W, H) : null;
           st = {
             key: rmStamp.key,
             fromItems,
             startMs: nowMs,
             dur: rmStamp.dur,
             plan: planMorphByKey(fromItems, items, rmStamp.seed >>> 0, formKeyOf),
+            ...(roomZones ? { roomZones } : {}),
           };
           reviewMorphState.set(e.id, st);
         }
@@ -1441,7 +1460,34 @@ export function createLiveResolver() {
           reviewMorphPlayed.add(rmStamp.key);
           if (reviewMorphPlayed.size > 64) reviewMorphPlayed.delete(reviewMorphPlayed.values().next().value);
         } else {
-          e.items = blendItems(st.fromItems, items, morphEase(Math.max(0, raw)), st.plan);
+          const eased = morphEase(Math.max(0, raw));
+          let target = items;
+          if (st.roomZones) {
+            // The room settles: the blend aims at a room only as
+            // quiet as the settle has run — a suppressed mark's target
+            // alpha is un-suppressed by the settle's remaining fraction
+            // (full voice at raw 0, the build's own suppressed alpha at
+            // raw 1), so the marks inside the zones deepen from their
+            // natural level to PLATE_ROOM_ALPHA across the same eased
+            // progress as the glyphs' glide. The poem's own items are
+            // never the room's targets. Pure per frame: the zones are
+            // the settle state's, the factor is the frame's progress.
+            const ramp = 1 + (1 / PLATE_ROOM_ALPHA - 1) * (1 - eased);
+            if (ramp !== 1) {
+              target = items.map((it) => {
+                if (formKeyOf(it) !== null || !Number.isFinite(it.alpha)) return it;
+                const hx = 50 * it.scale;
+                const hy = 50 * (it.scaleY ?? it.scale);
+                for (const z of st.roomZones) {
+                  if (it.x + hx >= z[0] && it.x - hx <= z[2] && it.y + hy >= z[1] && it.y - hy <= z[3]) {
+                    return { ...it, alpha: it.alpha * ramp };
+                  }
+                }
+                return it;
+              });
+            }
+          }
+          e.items = blendItems(st.fromItems, target, eased, st.plan);
         }
       }
     } else if (reviewMorphState.size || reviewMorphPlayed.size || reviewMorphPrev.size) {
@@ -1795,6 +1841,41 @@ function jankyPose(prevItems, items, entry, review, canvasW, canvasH) {
     });
   }
   return [...(prevItems || []).filter((it) => formKeyOf(it) === null), ...inv];
+}
+
+/**
+ * #2006 slice 4 — the zones a QUIET resolution's room covers, in canvas
+ * pixels: the standing form's own zone (fieldRoomZonePx over the
+ * review-adjusted stamps — the build's one formula, at the placement
+ * the build drew) plus its reflections, present exactly when the built
+ * list carries the form's mirror copies (their key suffixes say which).
+ * Read once, at settle start, off the entry's committed form — a pure
+ * function of the landing, so the settle's room term re-derives with
+ * the record and rides the snapshot as plain data. Null when the
+ * standing form carries no quiet (or no zone can be measured).
+ */
+function reviewRoomZones(entry, items, canvasW, canvasH) {
+  const form = sanitizeFieldForm(entry?.layoutParams?.fieldForm);
+  if (!form || form.review?.quietZone !== true) return null;
+  const zone = fieldRoomZonePx(reviewAdjustedForm(form).stamps, form.aspect, canvasW, canvasH);
+  if (!zone) return null;
+  let mx = false;
+  let my = false;
+  for (const it of items || []) {
+    const k = formKeyOf(it);
+    if (k === null) continue;
+    if (k.endsWith('-mxmy')) {
+      mx = true;
+      my = true;
+    } else if (k.endsWith('-mx')) mx = true;
+    else if (k.endsWith('-my')) my = true;
+  }
+  const [zx0, zy0, zx1, zy1] = zone;
+  const zones = [zone];
+  if (mx) zones.push([canvasW - zx1, zy0, canvasW - zx0, zy1]);
+  if (my) zones.push([zx0, canvasH - zy1, zx1, canvasH - zy0]);
+  if (mx && my) zones.push([canvasW - zx1, canvasH - zy1, canvasW - zx0, canvasH - zy0]);
+  return zones;
 }
 
 function snapshotMorphEntry(v) {

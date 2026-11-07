@@ -49,11 +49,15 @@ import { MAX_LINE } from './mindContract.js';
 
 /**
  * The rungs the voice may name, in ladder order (spec §3.6): 1 SHRINK,
- * 2 SHIFT, 4 RE-DEAL, 5 CUT. Rung 3 (QUIET, the plate's room seam)
- * joins the spoken ladder only when slice 4 arms it; until then it is
- * out of the approved set and a proposal naming it is dropped whole.
+ * 2 SHIFT, 3 QUIET, 4 RE-DEAL, 5 CUT. Slice 4 armed rung 3 (QUIET, the
+ * plate's room seam borrowed for the poem), completing the spoken
+ * ladder: the approved set is the whole ladder, and a proposal naming
+ * any rung of it is in-set. (Rung 3 never LEADS — LOIS's proposal for
+ * a covered poem is still the shrink, per LEAD_RUNG — and the ladder
+ * itself never offers it after a re-deal; those are the walk's laws,
+ * in fieldReviewLadder, not the voice's.)
  */
-export const REVIEW_LADDER = Object.freeze([1, 2, 4, 5]);
+export const REVIEW_LADDER = Object.freeze([1, 2, 3, 4, 5]);
 
 /** Which rung leads the repair for each failing gate (the rules' proposal). */
 export const LEAD_RUNG = Object.freeze({
@@ -130,9 +134,11 @@ const PROPOSALS = Object.freeze({
 // Slice 3: the act LOIS reports, per resolving rung — past tense,
 // because by the time the record banks the ladder has already run
 // (it acts inside the deal commit; the voice only ever reports).
+// Slice 4 adds rung 3's: the poem never moved — the ROOM was quieted.
 const ACTS = Object.freeze({
   1: 'Shrunk it.',
   2: 'Shifted it back.',
+  3: 'Quieted the room.',
   4: 'Dealt it again.',
 });
 
@@ -300,8 +306,10 @@ const lineFigures = (line) => {
  */
 // Slice 3: the acts' own words, one per rung — the vocabulary a line
 // about an ACTED record may name, and only for the rung that resolved
-// it (the cut's word belongs to cut records alone).
-const ACT_WORDS = Object.freeze({ 1: 'shrunk', 2: 'shifted', 4: 'dealt', 5: 'cut' });
+// it (the cut's word belongs to cut records alone). Slice 4: rung 3's
+// word is 'quieted' — a line about a shrink may not claim the room was
+// quieted, nor a quiet claim a shrink.
+const ACT_WORDS = Object.freeze({ 1: 'shrunk', 2: 'shifted', 3: 'quieted', 4: 'dealt', 5: 'cut' });
 
 export const validateReviewProposal = (raw, record) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -340,7 +348,7 @@ export const validateReviewProposal = (raw, record) => {
     // design — the rule fence, not a prose censor.
     if (lineFigures(line).length > 0) return null;
     if (/\bjanky\b/i.test(line)) return null;
-    if (/\b(?:shrink|shift|cut|re-?deal)\b/i.test(line)) return null;
+    if (/\b(?:shrink|shift|quiet|cut|re-?deal)\b/i.test(line)) return null;
   }
   if (record.verdict === 'janky' || record.verdict === 'cut') {
     // Slice 3 — the acted fences. A cut record is fenced as the janky
