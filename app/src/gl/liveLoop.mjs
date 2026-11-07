@@ -28,7 +28,14 @@
 import { beastDocFields } from '../engine/beastSettings.mjs';
 import { createLiveRenderer, accumFeedSelection } from './renderer.mjs';
 import { halfLifeToKeep } from '../components/taper.js'; // #274: fade stored as half-life frames
-import { createLiveResolver, getLastSpawnDecisions, getLastDishWet, setLiveWetSampler } from './liveResolve.mjs';
+import {
+  createLiveResolver,
+  getLastSpawnDecisions,
+  getLastDishWet,
+  getLastCouplingBackground,
+  setLiveWetSampler,
+} from './liveResolve.mjs';
+import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
 import { withResolveTap } from './resolveTap.mjs'; // #1353: the frame inputs are the performance
 import { lastResolvedInput } from './resolveTap.mjs'; // #1949: the frame's effective input (a take's own, while one plays)
 import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; // #613: shared with the STIMULI matrix
@@ -1177,7 +1184,7 @@ export function createLiveLoop(
     // field dyes first on the fast envelope. The event's bg is the lerped
     // field color while a soak/propagation runs, the plain palette bg
     // otherwise.
-    const bgCss =
+    let bgCss =
       bgMode === 'white'
         ? '#ffffff'
         : bgMode === 'transparent'
@@ -1185,6 +1192,22 @@ export function createLiveLoop(
           : s.colorMode === 'INJECT'
             ? injectEv.bg
             : washEv.bg;
+    // #1923 Phase 2 slice D — the coupling's background fold: the resolver just published this
+    // frame's coupling read (the dish-mean level of the publication the frame's other consumers
+    // read, shed-folded, one frame behind); the loop owns the background, so it folds the hex it
+    // dealt — a bounded mix toward white (alive dish) or black (dead), centred exact. PALETTE
+    // PATH ONLY: white and transparent are the performer's explicit backdrop overrides, not the
+    // scene's background, and are never tinted by the culture. At dial 0 the resolver publishes
+    // no read and bgCss is the dealt value, byte for byte; a centred field folds to the dealt
+    // hex untouched (cultureBackgroundHex returns its input at shift 0). Everything downstream
+    // of bgCss — the renderer's clear, ACCUM's begin and fade target, the wet ground, the
+    // recorded take — follows the one folded value.
+    if (bgMode === 'palette' && bgCss) {
+      const couplingBg = getLastCouplingBackground();
+      if (couplingBg) {
+        bgCss = cultureBackgroundHex(bgCss, cultureBackgroundShift(couplingBg.meanLevel, couplingBg.coupling));
+      }
+    }
 
     return {
       payload: {
@@ -1961,7 +1984,17 @@ export function createLiveLoop(
         const s = getState();
         const voiceState = resolveLiveRenderState(s);
         const activePalette = resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, s.userPalettes);
-        accumObj.begin(bgMode === 'white' ? '#ffffff' : activePalette.bg);
+        let beginBg = bgMode === 'white' ? '#ffffff' : activePalette.bg;
+        // #1923 Phase 2 slice D — a clear re-begins the buffer from the SHOWN background (the
+        // buildFrame fold above), never from a second, dealt-only truth the frames would then
+        // drift away from over the fade. Same gate, same law, the last published read.
+        if (bgMode === 'palette') {
+          const couplingBg = getLastCouplingBackground();
+          if (couplingBg) {
+            beginBg = cultureBackgroundHex(beginBg, cultureBackgroundShift(couplingBg.meanLevel, couplingBg.coupling));
+          }
+        }
+        accumObj.begin(beginBg);
       }
     },
   };
