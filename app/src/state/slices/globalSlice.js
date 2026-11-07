@@ -600,6 +600,13 @@ export const createGlobalSlice = (set) => ({
   dishLifeStrength: 0.35,
   setDishLifeStrength: (v) =>
     set({ dishLifeStrength: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0.35 }),
+  /** #1923 Phase 2 — the coupling dial: how hard the invisible FIELD culture drives the assets (Matt's
+   * ruling: coupling above zero is the on-switch — no chip, no toggle; the dial starts at 0 and he
+   * raises it). 0 = the field may publish but nothing reads it. Runtime only, never serialized, in
+   * the dishLifeStrength class; junk reads as 0, the off direction. */
+  dishLifeCoupling: 0,
+  setDishLifeCoupling: (v) =>
+    set({ dishLifeCoupling: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0 }),
   setDishLifeShed: (n) => set({ dishLifeShed: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0 }),
   /** #1574 — the governor's travel shed: while true, liveLoop stamps
    * travelShed on the resolver input and FLOW marks settle home. A
