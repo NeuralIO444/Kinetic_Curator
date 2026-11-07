@@ -69,14 +69,25 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null, culture 
     // seed by default). Spread only for PICTURE, so every other mode's key stays byte-identical.
     ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
     // #1923 Phase 2 slice C: a coupled TIDES frame is a function of the culture too — keyed on the
-    // field's generation and the dial (bucketed to 1/256: the slider's own resolution class), so a
-    // still TIDES (DRIFT 0, no time in the key) still re-draws as the culture evolves. Spread only
-    // for a coupled TIDES, so every other key — and every uncoupled key — stays byte-identical. The
-    // drift-amplitude modes need no component: their bias rides the block's drift value, which is
-    // already in the key.
+    // field's wake and generation and the dial (bucketed to 1/256: the slider's own resolution
+    // class), so a still TIDES (DRIFT 0, no time in the key) still re-draws as the culture evolves.
+    // Spread only for a coupled TIDES, so every other key — and every uncoupled key — stays
+    // byte-identical. The drift-amplitude modes need no component: their bias rides the block's
+    // drift value, which is already in the key.
+    // Phase 3 QA follow-up: the component ALSO carries the wake (it did not in slice C). Generation
+    // restarts at 0 every cycle, so (gen, dial) named two different cultures the same — slice C
+    // judged that collision unreachable, and Phase 3 QA falsified the judgement end to end (shed
+    // held through a cycle's last frame, released on the boundary frame: the boundary frame reads
+    // the OLD cycle's gen-0 grid, the next frame the NEW cycle's gen-0 grid — one key, two
+    // textures, and the renderer's upload gate kept the stale one for a generation interval).
+    // Within a wake the published (gen, level) pair is atomic — level is written only where gen is
+    // set or incremented — so wake + gen + dial names the frame. A grid carrying no wake keys −1.
     ...(culture && p.mode === 'TIDES'
       ? [
           'K',
+          culture.grid && culture.grid.wakeMs != null && Number.isFinite(Number(culture.grid.wakeMs))
+            ? Number(culture.grid.wakeMs)
+            : -1,
           culture.grid && Number.isFinite(Number(culture.grid.gen)) ? Number(culture.grid.gen) : -1,
           Math.round(Math.min(1, Math.max(0, Number(culture.coupling) || 0)) * 256),
         ]
@@ -218,7 +229,7 @@ export function createPatternFrames() {
       if (p.drift === 0 || p.mode === 'BLOCKS') {
         // A coupled TIDES still is NOT a still: the culture evolves under it, so it re-rasters every
         // frame (into the scratch buffer, never the drawn-once cache) and its key carries the field's
-        // generation, so the renderer re-uploads as the culture moves.
+        // wake and generation, so the renderer re-uploads as the culture moves.
         if (tidesBias) {
           rasterTides(out, bw, bh, plan.grid, 0, 0, tidesBias);
           return { pixels: out, w: bw, h: bh, key };

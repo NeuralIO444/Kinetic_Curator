@@ -54,7 +54,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   // read-this-frame contract applies: level/activity ARE the culture's arrays, read them the frame you get
   // them). Inactive (active:false, arrays null) whenever no field-mode culture is running, so a consumer can
   // never read a retained previous frame.
-  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, level: null, activity: null };
+  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, wakeMs: null, level: null, activity: null };
   function syncPublished() {
     if (st && st.fieldOn) {
       const f = st.culture.field;
@@ -62,6 +62,10 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.cols = f.cols;
       publishedField.rows = f.rows;
       publishedField.gen = f.gen;
+      // #1923 Phase 3 (QA follow-up) — the wake rides the publication beside the generation: gen
+      // restarts at 0 every cycle, so the generation alone does not name a culture; the wake does.
+      // The TIDES snapshot (dishLifeCouple.fieldLevelGrid) carries it into the pattern frame key.
+      publishedField.wakeMs = st.wakeMs;
       publishedField.level = f.level;
       publishedField.activity = f.activity;
     } else {
@@ -69,6 +73,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.cols = 0;
       publishedField.rows = 0;
       publishedField.gen = -1;
+      publishedField.wakeMs = null;
       publishedField.level = null;
       publishedField.activity = null;
     }

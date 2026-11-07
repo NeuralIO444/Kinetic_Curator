@@ -229,23 +229,29 @@ export function culturePatternDriftFactor(activity, coupling) {
 }
 
 /**
- * A snapshot of the published LEVEL grid: { cols, rows, gen, level } with `level` a COPY of the
- * holder's array as of this call. Null when no field is published (fieldMean's gate). This is the one
+ * A snapshot of the published LEVEL grid: { cols, rows, gen, wakeMs, level } with `level` a COPY of
+ * the holder's array as of this call. Null when no field is published (fieldMean's gate). This is the one
  * deliberate copy on the coupling's read side: the pattern draw happens after the resolve that read
  * the publication, and the culture steps (in place) at the bottom of that resolve — a live reference
  * would read the NEXT generation, breaking the one-frame-behind contract slices A/B keep. The copy is
  * taken only while the dial is up and a TIDES layer is resolving. Pure with respect to the holder:
  * the copy is the caller's; the holder's arrays are never written.
+ * #1923 Phase 3 (QA follow-up): the snapshot also carries the publication's WAKE. Generation restarts
+ * at 0 every cycle, so (gen, level) names a culture only together with its wake — the pattern frame
+ * key (patternSource.patternKey) keys a coupled TIDES on wake + gen + dial. A publication carrying
+ * no wake (a hand-built holder) snapshots as wakeMs −1.
  */
 export function fieldLevelGrid(published) {
   if (!published || published.active !== true || !published.level) return null;
   const { cols, rows, gen, level } = published;
   const n = (cols | 0) * (rows | 0);
   if (!(n > 0) || level.length < n) return null;
+  const wake = published.wakeMs == null ? NaN : Number(published.wakeMs);
   return {
     cols,
     rows,
     gen: Number.isFinite(Number(gen)) ? Number(gen) : -1,
+    wakeMs: Number.isFinite(wake) ? wake : -1,
     level: Float32Array.from(level.subarray(0, n)),
   };
 }

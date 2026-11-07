@@ -17,7 +17,10 @@
 //             and the level snapshot are pure reads, and the snapshot is a COPY (the culture steps
 //             in place after the resolve — a live reference would read the next generation)
 //   tides     the bias enters before state/size derivation; a neutral field (level ½ everywhere)
-//             and a coupling-0 descriptor both render byte-identical to the dealt readout
+//             and a coupling-0 descriptor both render byte-identical to the dealt readout; the
+//             frame key names the culture by (wake, generation, dial) — generation restarts every
+//             cycle, so the wake is in the key (the Phase 3 QA corner, pinned at resolver level
+//             below: held through a cycle end, released on the boundary frame)
 //   resolver  dial 0 (or publication alone) leaves every pattern block reference-identical and every
 //             texture byte-identical; coupling up folds DRIFT exactly ×½ at the first published
 //             frame (generation 0's activity is 0 by the core's own law), tracks the evolving
@@ -89,6 +92,7 @@ const holder = (over = {}) => ({
   cols: 2,
   rows: 1,
   gen: 3,
+  wakeMs: 12000,
   level: new Float32Array([1, 0]),
   activity: new Float32Array([0.5, 0.25]),
   ...over,
@@ -112,6 +116,8 @@ ok('fieldLevelGrid: a snapshot COPY — the live arrays may step on without movi
   const h = holder();
   const snap = fieldLevelGrid(h);
   assert.deepEqual([snap.cols, snap.rows, snap.gen], [2, 1, 3]);
+  assert.equal(snap.wakeMs, 12000, 'the snapshot carries the publication’s wake (Phase 3: the key names the cycle)');
+  assert.equal(fieldLevelGrid(holder({ wakeMs: undefined })).wakeMs, -1, 'a holder with no wake snapshots as −1');
   assert.deepEqual([...snap.level], [1, 0]);
   h.level[0] = 0.25; // the culture steps in place at the bottom of the resolve
   assert.equal(snap.level[0], 1, 'the snapshot holds the publication it was taken from');
@@ -177,7 +183,7 @@ ok('patternPixels + descriptor: a neutral or off descriptor renders the dealt fr
 ok('patternKey: the culture component exists only for a coupled TIDES', () => {
   const tides = { ...defaultPattern('TIDES', 777), drift: 0 };
   const quilt = { ...defaultPattern('QUILT', 777), drift: 0.4 };
-  const grid = { cols: 2, rows: 2, gen: 5, level: new Float32Array(4) };
+  const grid = { cols: 2, rows: 2, gen: 5, wakeMs: 12000, level: new Float32Array(4) };
   const base = patternKey(tides, PAL, 200, 120, 0);
   assert.equal(patternKey(tides, PAL, 200, 120, 0, null, null), base, 'no descriptor: the pre-slice key');
   assert.notEqual(patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }), base, 'coupled: keyed');
@@ -185,6 +191,27 @@ ok('patternKey: the culture component exists only for a coupled TIDES', () => {
     patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
     patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid: { ...grid, gen: 6 } }),
     'a new generation is a new frame',
+  );
+  // RE-PINNED with cause (Phase 3 QA follow-up): slice C keyed the component on (gen, dial) alone
+  // and recorded a cross-cycle collision as unreachable — the key trusted gen as content identity
+  // within a wake, and the one-frame-behind read was said to force the key through the new wake's
+  // early generations before any repeat. Phase 3 QA falsified that end to end: shed held through a
+  // cycle's last frame and released on the boundary frame makes two CONSECUTIVE frames read two
+  // different generation-0 grids (the old cycle's, then the new cycle's) under one key, and the
+  // renderer's upload gate kept the stale texture. Generation restarts every cycle, so the wake —
+  // the thing that names the cycle — is in the key now. The resolver-level corner is pinned below.
+  assert.notEqual(
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid: { ...grid, wakeMs: 24000 } }),
+    'a new wake is a new frame — the same generation of a new cycle is a different culture',
+  );
+  assert.notEqual(
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
+    patternKey(tides, PAL, 200, 120, 0, null, {
+      coupling: 1,
+      grid: { cols: 2, rows: 2, gen: 5, level: new Float32Array(4) },
+    }),
+    'a grid carrying no wake keys −1, never the carried wake',
   );
   assert.notEqual(
     patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
@@ -455,6 +482,62 @@ ok('governor shed: CULTURE HELD (shed 2) restores the plain pattern frame whole;
     'shed 1: the field trickles and the fold still acts',
   );
 });
+
+ok(
+  'QA corner (Phase 3): held through the cycle end, released on the boundary frame — the two gen-0 reads key differently',
+  () => {
+    // The regression for the falsified slice-C claim (see the patternKey re-pin above). This suite
+    // owns the coupled keys, so the corner is pinned here even though the boundary is Phase 3's law:
+    // the scenario needs a pattern layer, a descriptor and the key, which are this harness's pieces.
+    // Shed 2 folds the coupling to 0, so held frames carry no descriptor and the still TIDES draws
+    // its dealt key; nothing stale can upload while held. Released exactly on the boundary frame,
+    // that frame's one-frame-behind read is the OLD cycle's generation-0 grid and the next frame's
+    // read is the NEW cycle's generation-0 grid — under the old (gen, dial) key both frames keyed
+    // identically and the renderer's upload gate (key equality ⇒ skip) kept the old cycle's texture
+    // for a generation interval. The resolver output was never wrong; the texture was stale.
+    const patterns = mkPatterns();
+    const r = createLiveResolver();
+    const WAKE2 = 12000; // FIELD_CYCLE_GENS (48) at FIELD_GPS (4/s): the stamp clock's cycle, in ms
+    let tick = 0;
+    const frame = (stamp, seed) =>
+      r.resolveLayers(
+        sceneInput(patterns, {
+          loopTimeMs: tick++ * DT,
+          dtSec: DT / 1000,
+          dishField: stamp,
+          dishFieldCoupling: 1,
+          ...(seed === undefined ? {} : { seed }),
+        }),
+      );
+    // Cycle 1 (wake 0), held from the first frame: the culture is built and never steps, so it sits
+    // at generation 0 while the stamps walk the whole cycle.
+    let heldBlock;
+    for (let g = 0; g < 48; g++) heldBlock = blockOf(frame(fstamp(g, SHED_HOLD, 0)), 'lyr-tidesStill');
+    assert.equal('patternCulture' in heldBlock, false, 'held: no descriptor — the coupling is folded to 0');
+    // The boundary frame: the hold releases as the wake rolls, and the stage dealt at the boundary
+    // is a different scene (a new input seed), so the new cycle's seed grid is a different grid.
+    const boundary = blockOf(frame(fstamp(0, 0, WAKE2), 777), 'lyr-tidesStill');
+    const next = blockOf(frame(fstamp(1, 0, WAKE2), 777), 'lyr-tidesStill');
+    r.dispose();
+    assert.ok(boundary.patternCulture && next.patternCulture, 'released: both frames carry the descriptor');
+    assert.deepEqual(
+      [boundary.patternCulture.grid.gen, boundary.patternCulture.grid.wakeMs],
+      [0, 0],
+      'the boundary frame reads the old cycle at generation 0',
+    );
+    assert.deepEqual(
+      [next.patternCulture.grid.gen, next.patternCulture.grid.wakeMs],
+      [0, WAKE2],
+      'the next frame reads the new cycle at generation 0',
+    );
+    assert.notDeepEqual(renderBlock(next), renderBlock(boundary), 'the two generation-0 textures really differ');
+    assert.notEqual(
+      patternKey(next.pattern, next.palette, RW, RH, next.t, null, next.patternCulture),
+      patternKey(boundary.pattern, boundary.palette, RW, RH, boundary.t, null, boundary.patternCulture),
+      'so their keys differ — the upload gate fires and the new cycle’s texture replaces the old',
+    );
+  },
+);
 
 ok('the stored pattern is never written: a frozen pattern resolves folded, and survives untouched', () => {
   const patterns = mkPatterns();
