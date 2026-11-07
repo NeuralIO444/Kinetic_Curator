@@ -205,6 +205,7 @@ function livingMotion(
   assetStill,
   reducedMotion,
   culture = null,
+  fieldBreath = null,
 ) {
   if (slowRender) return null;
   const amounts = patternAmounts(
@@ -247,6 +248,12 @@ function livingMotion(
     anchored: true,
     rhythm,
     ...(cultureSrc ? { culture: cultureSrc } : {}),
+    // #1923 Phase 2 slice B — the FIELD culture's seam rides the ctx to the breath driver
+    // (engine/kineme.js). It is NOT a motion source: it never un-nulls this floor (the gate above
+    // ignores it) — it only deepens or shallows a breath the scene already has. The object is the
+    // same one buildPlacements receives as cultureScale, so one shed-folded coupling drives both
+    // consumers and neither can outlive the other.
+    ...(fieldBreath ? { fieldBreath } : {}),
     ...(pinned && pinned.length ? { stillAssets: new Set(pinned) } : {}),
   };
 }
@@ -700,7 +707,9 @@ export function createLiveResolver() {
     // the field stamp's own shed (the governor's CULTURE HELD reads as coupling 0 — the sheddable
     // admission), over the field stage's publication from the last applied frame. Inert (null)
     // unless the effective dial is up AND a field is published, so a frame without the coupling is
-    // bit-identical to the pre-Phase-2 resolver.
+    // bit-identical to the pre-Phase-2 resolver. ONE object, every consumer: buildPlacements folds
+    // it as scale (slice A) and the kineme ctx carries it as fieldBreath (slice B) — same dial,
+    // same shed fold, same one-frame-behind publication.
     const couplingNow = effectiveCoupling(input.dishFieldCoupling, input.dishField?.shed);
     const fieldSamplerNow = couplingNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
     const cultureScale = fieldSamplerNow ? { coupling: couplingNow, sampler: fieldSamplerNow } : null;
@@ -996,6 +1005,7 @@ export function createLiveResolver() {
           input.assetStill,
           input.reducedMotion,
           cultureField,
+          cultureScale, // #1923 Phase 2 slice B — the same seam object: the breath driver reads it as ctx.fieldBreath
         );
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;

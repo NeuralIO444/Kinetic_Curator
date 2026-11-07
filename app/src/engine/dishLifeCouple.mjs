@@ -1,15 +1,24 @@
-// dishLifeCouple.mjs — DISH LIFE coupling: the READ side of the field culture (#1923 Phase 2, slice A: SCALE).
+// dishLifeCouple.mjs — DISH LIFE coupling: the READ side of the field culture (#1923 Phase 2, slice A: SCALE;
+// slice B: FIELD glyph breathing).
 //
 // Phase 1 (#1994) made the stage PUBLISH: a persistent invisible culture, seeded from the stage, evolving
 // while the performer plays, its `level` / `activity` readable on the stage's stable `publishedField`
 // holder. This module is where consumers read that publication — THE shared seam, built once for every
-// consumer the ruling names (scale here; FIELD glyph breathing, the pattern modes, CONTENT backgrounds
-// in later slices of #1923). A consumer never touches the culture or the stage: it samples this seam.
+// consumer the ruling names (scale in slice A; FIELD glyph breathing here in slice B; the pattern modes
+// and CONTENT backgrounds in later slices of #1923). A consumer never touches the culture or the stage:
+// it samples this seam.
 //
 // Matt's rulings (2026-11-06, on #1923): the on-switch is coupling ABOVE ZERO — no chip, no toggle; the
 // dial starts at 0 and the performer raises it. First modulation = SCALE: marks swell where the culture
-// is alive, shrink where it is dead. One-way influence is law: this seam reads the holder's live arrays
-// and writes nothing back — not into the culture, not into the holder.
+// is alive, shrink where it is dead. Second modulation = BREATH: the field's ACTIVITY under a glyph
+// drives the DEPTH of the breath it already has (the kineme breath driver, engine/kineme.js) — a lively
+// patch breathes deeper, a dead patch shallower, a mid patch exactly its own breath. Depth is the
+// honest axis: the breath's RATE is its phase law (an anchored function of loop time), and a
+// per-mark rate change cannot be written as a pure function of (time, phase) — it would have to
+// integrate, and the anchor at driver time 0 would break. Depth scales the existing oscillation's
+// amplitude, so the anchor stays exact and the phase never jumps. One-way influence is law: this
+// seam reads the holder's live arrays and writes nothing back — not into the culture, not into the
+// holder.
 //
 // The four-part admission test, as this seam passes it:
 //   SEEDED / REPLAYABLE  every function here is pure over (published field, coupling, item). The dial and
@@ -36,6 +45,15 @@ export const SCALE_NEUTRAL_LEVEL = 0.5;
 export const SCALE_SWELL = 0.4;
 /** The governor's top culture shed step (CULTURE HELD — the stage's SHED_STEPS hold): coupling reads 0. */
 export const SHED_HOLD = 2;
+/** Slice B — the field activity that is neutral for breath: a glyph over a half-active cell breathes its own breath. */
+export const BREATH_NEUTRAL_ACTIVITY = 0.5;
+/**
+ * Slice B — the most the coupling may move a glyph's breath DEPTH, as a fraction of its dealt depth, at
+ * full dial and an extreme activity: lively (activity 1) → ×1.60, dead (activity 0) → ×0.40. The floor
+ * is a shallower breath, never silence — the living-motion floor's law is that the canvas never sits
+ * still, and a dead patch of culture is not a dead patch of stage.
+ */
+export const BREATH_SWELL = 0.6;
 
 const clamp01 = (v) => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
 
@@ -61,6 +79,19 @@ export function cultureScaleFactor(level, coupling) {
   const c = clampCoupling(coupling);
   if (!(c > 0)) return 1;
   return 1 + c * (clamp01(level) - SCALE_NEUTRAL_LEVEL) * 2 * SCALE_SWELL;
+}
+
+/**
+ * Slice B — the breath-depth factor for one glyph: 1 + coupling × (activity − neutral) × 2 ×
+ * BREATH_SWELL. Activity and coupling are clamped, so the factor always lands in
+ * [1 − BREATH_SWELL, 1 + BREATH_SWELL] and is exactly 1 at the neutral activity (and at coupling 0,
+ * for any activity). It multiplies the kineme breath driver's own term, so at factor 1 the breath
+ * is the glyph's dealt breath, number for number. Pure.
+ */
+export function cultureBreathFactor(activity, coupling) {
+  const c = clampCoupling(coupling);
+  if (!(c > 0)) return 1;
+  return 1 + c * (clamp01(activity) - BREATH_NEUTRAL_ACTIVITY) * 2 * BREATH_SWELL;
 }
 
 /**

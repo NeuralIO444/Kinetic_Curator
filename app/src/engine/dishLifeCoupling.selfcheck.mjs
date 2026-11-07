@@ -301,7 +301,20 @@ const baseInput = (over = {}) => ({
   paletteId: 'bone',
   paletteOverrides: null,
   userPalettes: [],
-  layoutParams: { ...DEFAULT_LAYOUT_PARAMS, count: 60, particleCount: 60, mode: 'random' },
+  // The resolver harness runs with the living-motion amounts ZEROED: this suite pins the SCALE fold,
+  // and since slice B the same dial also drives the breath channel — with breath live, an item's
+  // scale ratio would carry both consumers and the pure-factor bounds below could not hold. The
+  // breath consumer's own resolver pins (dial-0 identity WITH breath on, composition, shed) live in
+  // dishLifeBreathing.selfcheck.mjs.
+  layoutParams: {
+    ...DEFAULT_LAYOUT_PARAMS,
+    count: 60,
+    particleCount: 60,
+    mode: 'random',
+    kinemeBreath: 0,
+    kinemeDrift: 0,
+    kinemePaletteBreath: 0,
+  },
   caGrid: null,
   enabledAssets: null,
   assetWeightOverrides: {},

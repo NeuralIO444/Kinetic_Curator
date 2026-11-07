@@ -17,6 +17,7 @@
 // reused, not re-derived: rate 1 IS the loop time exactly, rate 0 freezes
 // where it is, and a rate change re-anchors instead of jumping.
 import { kinemePhase as hashPhase, createKinemeClock } from '../data/kinemes.js';
+import { cultureBreathFactor } from './dishLifeCouple.mjs'; // #1923 Phase 2 slice B — the FIELD culture's breath-depth factor, read through the coupling seam
 import { createNoise } from './noise.js'; // #1198 — ORGANIC rhythm samples this Perlin field
 import { ACCENT_OFFSET } from './kernel/color/index.js';
 import { registerCostTier, getCostTier } from './kernel/costRegistry.mjs'; // #1574 — the travel pass declares its cost like every module
@@ -458,10 +459,22 @@ export function evaluateKineme(soa, ctx) {
   const breath = num01(amounts.breath);
   if (breath > 0) {
     out.active = true;
+    // #1923 Phase 2 slice B — FIELD glyph breathing: when the resolver hands over the coupling seam
+    // (ctx.fieldBreath = { coupling, sampler }, the same object slice A's scale fold reads), the field
+    // CULTURE's activity under each mark scales the DEPTH of the breath term it is about to add — never
+    // its rate (the phase law above stays the dealt law, anchor intact), never any other driver. The
+    // factor comes from the seam (engine/dishLifeCouple.mjs); a mark outside the canvas has no cell to
+    // read and breathes its own breath. Absent the seam the term is the dealt term, number for number.
+    const fb = ctx.fieldBreath;
+    const fbSampler = fb && typeof fb.sampler?.sample === 'function' ? fb.sampler : null;
+    const fbCell = fbSampler ? { level: 0, activity: 0 } : null;
     for (let k = 0; k < n; k++) {
       const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
       const s = Math.sin(TAU * (BREATH_HZ * t + uN));
-      out.dScale[k] += breath * BREATH_DEPTH * (anchored ? s - Math.sin(TAU * uN) : s);
+      let term = breath * BREATH_DEPTH * (anchored ? s - Math.sin(TAU * uN) : s);
+      if (fbSampler && fbSampler.sample(soa.x[k], soa.y[k], fbCell))
+        term *= cultureBreathFactor(fbCell.activity, fb.coupling);
+      out.dScale[k] += term;
     }
   }
 
