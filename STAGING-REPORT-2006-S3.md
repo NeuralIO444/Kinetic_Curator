@@ -168,3 +168,35 @@ Per-gate plans + the walk law · ladder refusals (unmeasured/clean/already-adjus
 - **rungOrder not consumed** (above) — the backend's order cannot steer the hand until it can bank before the acting commit.
 - **Drowned-room cuts** (calibration) — surfaced with numbers; rung 3 QUIET (slice 4) is the spec's designed answer. If Matt wants a different law for m2 ≥ 0.94 rooms, that's a ruling, not a builder's tuning.
 - The settle's from-pose for a REPAIRED poem is exact (inverse transform). For a re-deal the from-pose is the previous frame's shown items, so a re-deal landing in the same frame as a HELD→running edge settles from the last shown pose — the standing morph channels share this property.
+
+## CI fix pass (PR #2022, selfcheck-browser) — poemRow reconciled to slices 1–3 law
+
+**Failure.** CI's selfcheck-browser run failed `poemRow.selfcheck.mjs`. Reproduced locally at ~1 in 6 runs (2 of the first 6), always the ruling-1 biconditional: e.g. `chaos press 0: poem absent ⟺ landed family swiss is type-native`. The failing press index varies — the KINETIC press path rolls live dice. The suite passes 8/8 at base `9ebbb317`.
+
+**Diagnosis (verified by probe, not inferred).** The invariant was written for the #1932 GATE: a poem stands ⟺ the landed look's family is type-native. Slice 3 gave the loop a hand inside the deal commit: a type-native landing judged janky can be CUT by the ladder (ruling D2), lawfully leaving no poem. A probe driving the suite's own fixture confirmed every type-native absence carries the explanation in the banked record — `fieldReview.verdict === 'cut'`, `adjustment.outcome === 'cut'`, rung 5 — and every counter overshoot was exactly the ladder re-deals banked during the presses (poemDeal 9 = 8 presses + 1 re-deal, never unexplained). The ladder behaves as ruled; the suite's law was stale. No ladder code changed in this pass.
+
+**The reconciliation (poemRow only, ruling-1 block + one sibling block).**
+- *Presence:* a poem stands ⟺ type-native AND not cut. When the family is type-native and no poem stands, the block now asserts the banked record IS the explanation (verdict 'cut' with `adjustment.outcome === 'cut'`); absence without a cut record fails, exactly as before. The correspondence the tracking relies on is landPoem's own law: the counter advances past a re-deal ⟺ `acted.redealt` ⟺ the standing record carries `adjustment.redeal`, and a silence landing banks `null` (never a stale record), so per-press reads cannot double-count.
+- *Counter:* both `poemDeal === 8` assertions (voice section and look/curator/chaos section) now expect `8 + (ladder re-deals banked during those presses)`, tracked off each press's standing record. The assertions still prove every press advanced the stream at least once and no deal went uncounted.
+- *Door fixed-point (found by this pass's own repeated runs — same stale-law class, byte form):* the HOLD-under-undo block asserted a dealt form is a `JSON.stringify` fixed point of `sanitizeFieldForm`. A repaired form carries the `review` transform; landPoem writes it as `{ ...form, review }` (review key last) while the door rebuilds in canonical key order (review before stamps) — values identical, bytes differ (~6% of look presses: 18/300 probed, all janky→repaired). The assertion now states the door's law as value equality — the door neither refuses the form nor alters any value — the same form fieldBattery and fieldKana already use (`deepEqual`). Nothing about the ladder's construction changed.
+- Header comment and in-block comments mark both re-pins as slices 1–3 law. Every other assertion in the suite is untouched.
+
+**Sibling audit** — every selfcheck grepped for the two shapes the hand invalidates: (a) exact `poemDeal` equality after KINETIC presses/deals; (b) a dealt form persisting / byte-equalling after a press or deal without consulting the review record (including wholesale `layoutParams` JSON equality across a deal and `sanitizeFieldForm` fixed points).
+
+| Suite | Hit | Verdict |
+|---|---|---|
+| poemRow | (a) ×2, (b) biconditional + door fixed-point | **Reconciled** (above). 25/25 consecutive runs after the fix (pre-fix: 2 fails in 6; after the ruling-1 fix alone: 1 fail in 12, at the door block) |
+| fieldDeal | (a) `poemDeal === deal + 1` after one unheld voice pass | Not exposed — probed in its exact scenario state: the voice pass lands **clean 200/200** (its sparse initial stage has no mark field for the cover gate to bite on, so the ladder never engages; the +1 is exact by scenario, not luck). Suite 35/35 across the audit |
+| fieldReview | (a) `poemDeal === 1` in the fail-closed block | Cannot act — the scenario poisons the review path, the record banks `null`, and the ladder is gated on a banked janky record. 5/5 |
+| fieldReviewVoice / fieldReviewLadder | record-relative reads; the ladder suite pins the counter law itself (seed 227) | Already law-current. 5/5 each |
+| rayGun | (a) `poemDeal === 0` after taps; (b) form equality across taps and a performer re-deal | Taps deal nothing (no landing, no ladder); performer re-deals run `review: false` and are never reviewed or acted on (D1). 13/13 |
+| poemRow HOLD / register blocks | (a) `poemDeal === 0` | Held poems draw nothing and are never landed — the ladder acts only on fresh landings. Inside the 25/25 |
+| fieldPlate | (b)-adjacent (form equality after a tap attempt) | Plates are exempt by ruling; taps don't deal. 8/8 |
+| fieldSilence, fieldBattery, fieldLatin, fieldKana, fieldKanji, fieldStampPath | none in the store | Pure form/placement path suites — verified none of them touch `useStore`; the ladder lives only in store deal commits, so it is unreachable there. fieldBattery's round-trip law already uses `deepEqual`. 13/13, 6/6, 13/13, 2/2, 2/2, 2/2 |
+| fieldLiveDeal | none | Pure `dealPoet` distribution suite: no store, no form, no counter. 7/7 |
+| directorRoom | none | Pure Director-room functions; asserts no poem presence or deal counts. 13/13 |
+| kineticScope, kineticSweep | (b)-adjacent | Both filter `fieldForm` out of their axis diffs by design; kineticSweep's standing poem comes from performer `redealPoem` (`review: false`). Its known #1822 LOOK flake (~1.5%) is pre-existing and unchanged in character. 13/13 each |
+| refineColor, kernel/replay inputLog | wholesale layout equality / fixture data | refineColor's compared step deals no poem; inputLog asserts on synthetic fixtures, not live deals. No exposure |
+| all remaining suites | no hits | Neither shape asserted anywhere else (grep over every `*.selfcheck.mjs` for `poemDeal`, `fieldForm`, sanitize fixed points, and wholesale layout equality) |
+
+**Verification on the fixed tree.** poemRow 25/25 consecutive. Slices 1–3 suites green (18/18, 34/34, 21/21); fieldBattery 15/15; golden hash `e892d112b20d92b6…` unmoved; placement census 560,366/0 (pinned in slice 1's suite). `format:check` clean on the touched file; eslint silent. Files changed by this pass: `app/src/poets/poemRow.selfcheck.mjs` + this report. No production code touched.

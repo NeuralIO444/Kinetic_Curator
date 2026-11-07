@@ -12,6 +12,10 @@
 // ruling 1's press law is asserted in its gated form: the voice pass (which never moves the look)
 // still deals varying poems, while the look-moving presses obey the biconditional — a poem
 // stands after the press if and only if the LANDED look's family is type-native.
+// #2006 slices 1–3 amend that biconditional inside the ruling-1 block: a type-native landing
+// the review loop judged janky and CUT (ruling D2) also stands absent — explained by the
+// banked fieldReview record — and the deal counter counts ladder re-deals as the deals
+// they are. See the block's own re-pin comment.
 import assert from 'node:assert';
 import { useStore } from '../state/store.js';
 import { resetDirector, getDirector } from '../curator/director.js';
@@ -82,36 +86,64 @@ ok('identity: every deck piece names its poet (surname), first words, and FORM i
 });
 
 ok('ruling 1: every KINETIC press re-deals the poem off the varying stream (look, voice, curator, chaos)', () => {
+  // #2006 slices 1–3 re-pin (cause: the review loop gained a hand, Matt's rulings D1/D2 —
+  // slice 3 QA fix pass): the loop now ACTS inside the deal commit. Two laws below are
+  // restated in slices 1–3 form, at the same strength:
+  //   presence — a poem stands ⟺ type-native AND not cut: a type-native landing judged
+  //     janky may be CUT by the ladder (D2), lawfully leaving no poem. An absence in a
+  //     type-native room must be explained by the banked fieldReview record (verdict
+  //     'cut', adjustment.outcome 'cut') — unexplained absence still fails.
+  //   counter — the deal counter is the log of deals: a press whose ladder RE-DEALT
+  //     consumed one extra deal. The expectation is 8 presses + the ladder re-deals
+  //     banked during them, tracked off each press's standing record (a record's
+  //     adjustment.redeal is present ⟺ that press's ladder re-deal landed ⟺ the
+  //     commit advanced the counter past it — landPoem's own law).
+  const ladderRedeals = () => (S().fieldReview?.adjustment?.redeal ? 1 : 0);
+
   // The voice pass never moves the look: the room stays swiss, and the stream deals varying poems.
   reset();
   const seen = new Set();
+  let voiceRedeals = 0;
   for (let i = 0; i < 8; i++) {
     PRESSES.voice();
+    voiceRedeals += ladderRedeals();
     const f = S().layoutParams.fieldForm;
     seen.add(f ? `${f.poetId}/${f.pieceId}` : 'silence');
   }
-  assert.equal(S().poemDeal, 8, 'voice: every press advanced the poem stream');
+  assert.equal(S().poemDeal, 8 + voiceRedeals, 'voice: every press advanced the poem stream (plus one per ladder re-deal)');
   assert.ok(seen.size >= 3, `voice: presses deal varying poems (saw ${[...seen].join(', ')})`);
 
   // #1932: the look-moving presses re-deal the poem UNDER THE GATE — after each press a poem
-  // stands if and only if the landed look's family is type-native, and the stream still advances.
+  // stands if and only if the landed look's family is type-native and the loop did not cut
+  // the landing, and the stream still advances.
   const familyOf = (lp) => COMPOSITION_PRESETS.find((p) => p.id === lp.composition)?.group ?? null;
   for (const name of ['look', 'curator', 'chaos']) {
     reset();
     const outcomes = new Set();
+    let redeals = 0;
     for (let i = 0; i < 8; i++) {
       PRESSES[name]();
+      redeals += ladderRedeals();
       const lp = S().layoutParams;
       const fam = familyOf(lp);
       const f = lp.fieldForm;
+      const native = isTypeNativeFamily(fam);
+      const rec = S().fieldReview;
+      const cut = rec?.verdict === 'cut' && rec?.adjustment?.outcome === 'cut';
+      if (!f && native) {
+        assert.ok(
+          cut,
+          `${name} press ${i}: poem absent in type-native family ${fam}, and the banked record does not explain it (verdict ${rec?.verdict ?? 'none'})`,
+        );
+      }
       assert.equal(
         !!f,
-        isTypeNativeFamily(fam),
-        `${name} press ${i}: poem ${f ? 'stands' : 'absent'} ⟺ landed family ${fam} ${isTypeNativeFamily(fam) ? 'is' : 'is not'} type-native`,
+        native && !cut,
+        `${name} press ${i}: poem ${f ? 'stands' : 'absent'} ⟺ landed family ${fam} ${native ? 'is' : 'is not'} type-native${cut ? ' and the loop cut the landing' : ''}`,
       );
-      outcomes.add(f ? `${f.poetId}/${f.pieceId}` : `silence(${fam})`);
+      outcomes.add(f ? `${f.poetId}/${f.pieceId}` : cut ? `cut(${fam})` : `silence(${fam})`);
     }
-    assert.equal(S().poemDeal, 8, `${name}: every press advanced the poem stream`);
+    assert.equal(S().poemDeal, 8 + redeals, `${name}: every press advanced the poem stream (plus one per ladder re-deal)`);
     assert.ok(outcomes.size >= 2, `${name}: presses deal varying gated outcomes (saw ${[...outcomes].join(', ')})`);
   }
 });
@@ -198,7 +230,14 @@ ok('HOLD under undo behaves like every param lock: undo restores the lock state 
   assert.deepEqual(S().layoutParams.fieldForm, standing, 'the poem before the press is back');
   // #1932: what the press dealt is a form or silence, by the landed look's family — either is honest;
   // a form, when present, must pass its own door.
-  assert.ok(dealt === undefined || JSON.stringify(sanitizeFieldForm(dealt)) === JSON.stringify(dealt), 'the press dealt a form or silence');
+  // #2006 slice 3 re-pin (cause: the ladder's repair — slice 3 QA fix pass): a repaired landing's
+  // form carries the review transform, and landPoem writes it as { ...form, review } while the
+  // door rebuilds in its canonical key order — so the door's law is VALUE equality (the door
+  // neither refuses the form nor alters any value it carries), the same form fieldBattery and
+  // fieldKana state with deepEqual, not byte identity.
+  if (dealt !== undefined) {
+    assert.deepEqual(sanitizeFieldForm(dealt), dealt, 'the press dealt a form that passes its own door unaltered');
+  }
 });
 
 ok('a poem-only deal does not move the room: KINETIC taps never count as fresh room observations', () => {
