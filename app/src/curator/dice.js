@@ -17,6 +17,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
+import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 
 // #1982 — the poem-only kana stamps are never dealt as marks, by any caller:
 // the FIELD director deals them alone, as poem type. dealCast is the cast
@@ -27,8 +28,11 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 // the same terms: the filtered set is the native-script union.
 // #2002 — the slice-3 packs are filtered at the same chokepoint, on the
 // same terms: the filtered set is the whole poem-only union.
+// #2005 — the plate pack (Fraunces) is filtered at the same chokepoint too.
 const KANA_IDS = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
+    (a) => a.id,
+  ),
 );
 const withoutKana = (list) => (list.some((a) => KANA_IDS.has(a.id)) ? list.filter((a) => !KANA_IDS.has(a.id)) : list);
 

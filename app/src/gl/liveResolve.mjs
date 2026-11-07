@@ -80,6 +80,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js'; // #1998: the poe
 import { ASSETS_LATIN } from '../data/assets/assets-latin.js'; // #2002: the poem-only lowercase + punctuation stamps
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js'; // #2002: the poem-only serif face stamps
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002: the poem-only ornament stamps
+import { ASSETS_PLATE } from '../data/assets/assets-plate.js'; // #2005: the poem-only plate stamps
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
 // atlas, but they are dealt by the FIELD director alone (Teijo's native
@@ -88,8 +89,11 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002:
 // poem-only set is the native-script union (kana + kanji).
 // #2002 — the slice-3 packs are excluded by the same set: the poem-only set
 // is the whole union the FIELD director deals alone.
+// #2005 — the plate pack (Fraunces) is excluded by the same set.
 const POEM_ONLY_IDS = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
+    (a) => a.id,
+  ),
 );
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 

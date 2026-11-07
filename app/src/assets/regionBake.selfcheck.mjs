@@ -105,13 +105,18 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
   // (catalogue members, no mattes, the bake never sees them). The equality
   // grows by exactly the packs; the per-asset no-mattes assertion below
   // covers every poem-only pack.
+  // #2005 RE-PIN (cause: the clean plate) — the plate pack (Fraunces) rides
+  // it too, on the same terms. The equality grows by exactly the pack.
   const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
   const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
   const { ASSETS_LATIN } = await import('../data/assets/assets-latin.js');
   const { ASSETS_SERIF } = await import('../data/assets/assets-serif.js');
   const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
+  const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
   const kanaIds = new Set(
-    [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((k) => k.id),
+    [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
+      (k) => k.id,
+    ),
   );
   assert.equal(
     ASSETS.length,
@@ -121,6 +126,7 @@ const byId = (id) => ASSETS_AUTHORED.find((a) => a.id === id);
       ASSETS_LATIN.length +
       ASSETS_SERIF.length +
       ASSETS_ORNAMENTS.length +
+      ASSETS_PLATE.length +
       1,
   );
   const citizen = ASSETS[ASSETS.length - 1];

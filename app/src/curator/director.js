@@ -561,6 +561,10 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
             // the serif face, the sentence face, and the plate break, each
             // affirmed by the Director from the room (see fieldDirector).
             ...(r.decision.face ? { face: r.decision.face } : {}),
+            // #2005 — the plate call rides the deal the same way (the solo
+            // room at its stillest; it supersedes the serif call upstream,
+            // so a decision never carries both).
+            ...(r.decision.plate ? { plate: true } : {}),
             ...(r.decision.case ? { case: true } : {}),
             ...(r.decision.plateBreak ? { plateBreak: r.decision.plateBreak } : {}),
           }

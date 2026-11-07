@@ -57,6 +57,19 @@ export const SLOW_DEBT_WINDOW = 24;
  */
 export const KEEP_PRESSURE_HIGH = 0.5;
 
+/**
+ * #2005 — the plate call's stillness line. In the solo room (DAVIS ALONE),
+ * a Whittier pick at or below this intensity deals as a clean PLATE
+ * instead of in the serif face — the plate supersedes the serif call on
+ * that deal (fieldForm.js documents the deal-side law). A plate is a
+ * MOMENT, and this line is what makes it one: the serif call fires on
+ * every solo Whittier pick; the plate fires only in the room's stillest
+ * band, well under the cool line (0.35) and at the eval scenarios' cool
+ * intensity. No draw is spent on the call — it is read off the room the
+ * pick already stands in, on the script marker's pattern.
+ */
+export const PLATE_CALL_MAX_INTENSITY = 0.2;
+
 export function nextSlowDebt(history, currentVerdict) {
   const h = Array.isArray(history) ? history.slice(-SLOW_DEBT_WINDOW) : [];
   h.push(currentVerdict === 'FULL BURN' || currentVerdict === 'THE CLASH' ? 1 : 0);
@@ -113,6 +126,11 @@ export function choosePoet({
   if (!deck || deck.length === 0) return null;
   const piece = deck[Math.floor(rng() * deck.length)];
   const density = genreLean === 'dense' ? Math.min(1, (piece.density || 0.4) + 0.15) : piece.density || 0.4;
+  // #2005 — the plate call, read off the room with no draw: the solo room
+  // at its stillest (see PLATE_CALL_MAX_INTENSITY). Computed once so the
+  // serif spread below can stand down on a plate deal — the plate
+  // supersedes the serif face, it does not compose with it.
+  const plateCall = poetId === 'greenleaf' && soloContext && intensity <= PLATE_CALL_MAX_INTENSITY;
   return {
     poetId,
     pieceId: piece.id,
@@ -128,10 +146,15 @@ export function choosePoet({
     // Director's too, affirmed from the room on the script pattern (the
     // contexts are derived by fieldEval's step from the room as it stands;
     // none of them draws from the deal stream):
+    // - plate: the solo room at its stillest deals Whittier as a clean
+    //   plate (#2005) — the reading room's deepest register, set in the
+    //   plate face under the plate discipline. It supersedes the serif
+    //   call on that deal: the face spread below stands down when it fires.
+    ...(plateCall ? { plate: true } : {}),
     // - face: the solo room (DAVIS ALONE — one artist in the room, nobody
     //   directing) is the reading room: a Whittier pick there stands in her
     //   book face, the print register. Hers alone, like Teijo's script.
-    ...(poetId === 'greenleaf' && soloContext ? { face: 'serif' } : {}),
+    ...(poetId === 'greenleaf' && soloContext && !plateCall ? { face: 'serif' } : {}),
     // - case: a Bauhaus room deals the sentence face — the school's print
     //   culture wrote lowercase as a house style. No poet gate: the deck is
     //   the authority, and a deck with no caseLines deals its caps, exactly

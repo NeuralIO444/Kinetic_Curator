@@ -62,6 +62,7 @@ import { isStippleMaterial, stippleDotScaleFrom, STIPPLE_DOT_SCALE } from './sti
 import { sanitizeFieldMap, applyFieldMap } from './fieldMap.mjs'; // #1199 — field→channel MAP
 import { sanitizeFieldForm } from '../poets/fieldForm.js'; // #1904 — FIELD: the armed poet's form, as data
 import { rayGunForm } from '../poets/rayGunForm.js'; // #2003 — the treatment record, drawn from the plain form
+import { stampWidthEm } from '../poets/placement.js'; // #2005 — the plate zone is measured in the stamps' own ink
 import { pickWeightedIndexStable } from './kernel/rng.js';
 
 /** Authored per-asset weight → selection frequency. */
@@ -96,6 +97,21 @@ export const FIELD_EM_SCALE = 20;
  * call is Matt's feel gate on #1906.
  */
 export const WHISPER_ALPHA = 0.35;
+
+/**
+ * #2005 — the plate's room: an armed form carrying the `plate` register
+ * (poets/fieldForm.js) stands in a quieted room — non-form marks inside
+ * its zone render at PLATE_ROOM_ALPHA of their built alpha, while the
+ * plate's own stamps keep the full field alpha. The inverse of WHISPER:
+ * the whisper quiets the poem, the plate quiets the room. The zone is the
+ * form's ink bounding box breathed out by PLATE_ZONE_PAD_EM of the form's
+ * type size on every side — a margin of air proportional to the type, not
+ * a fixed frame. 0.15 sits well under WHISPER_ALPHA: the room around a
+ * plate is not hushed, it is cleared. Both numbers are Matt's feel gate on
+ * #2005.
+ */
+export const PLATE_ROOM_ALPHA = 0.15;
+export const PLATE_ZONE_PAD_EM = 0.75;
 
 /**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
@@ -790,6 +806,46 @@ export function buildPlacements({
         accent,
         key: `field-${fieldForm.poetId}-${fieldForm.pieceId}-${j}`,
       };
+    }
+    // #2005 — the plate's room: while a plate stands, non-form marks
+    // inside its zone are suppressed to PLATE_ROOM_ALPHA of their built
+    // alpha (the constants above). The zone is measured here, at the seam,
+    // from the drawn stamps' own ink — stamp centres and ink widths in
+    // canvas pixels, exactly as the field items below are positioned —
+    // breathed out by PLATE_ZONE_PAD_EM of the form's largest em. `mapped`
+    // at this point holds only the layer's own marks (the field items have
+    // not joined yet), so the loop touches the room and never the poem;
+    // outside the zone nothing moves, and when the plate leaves the next
+    // build re-derives every item's alpha from the SoA (stage C), so the
+    // stage returns exactly — the multiply never compounds, the glass
+    // multiply's discipline. With no plate standing this block never runs
+    // and the item list is byte-identical to the pre-#2005 pipeline.
+    if (fieldForm.plate) {
+      let zx0 = Infinity;
+      let zy0 = Infinity;
+      let zx1 = -Infinity;
+      let zy1 = -Infinity;
+      let emMax = 0;
+      for (const s of drawnForm.stamps) {
+        const cx = (s.x / fieldForm.aspect) * canvasW;
+        const cy = s.y * canvasH;
+        const hw = ((stampWidthEm(s.assetId, s.ch) * s.em) / 2 / fieldForm.aspect) * canvasW;
+        const hh = (s.em / 2) * canvasH;
+        if (cx - hw < zx0) zx0 = cx - hw;
+        if (cx + hw > zx1) zx1 = cx + hw;
+        if (cy - hh < zy0) zy0 = cy - hh;
+        if (cy + hh > zy1) zy1 = cy + hh;
+        if (s.em > emMax) emMax = s.em;
+      }
+      const padX = ((PLATE_ZONE_PAD_EM * emMax) / fieldForm.aspect) * canvasW;
+      const padY = PLATE_ZONE_PAD_EM * emMax * canvasH;
+      zx0 -= padX;
+      zx1 += padX;
+      zy0 -= padY;
+      zy1 += padY;
+      for (const item of mapped) {
+        if (item.x >= zx0 && item.x <= zx1 && item.y >= zy0 && item.y <= zy1) item.alpha *= PLATE_ROOM_ALPHA;
+      }
     }
     // On a pool hit `mapped` IS cache.itemPool — never append to it. The
     // copy costs one array of references, only while a form is armed.

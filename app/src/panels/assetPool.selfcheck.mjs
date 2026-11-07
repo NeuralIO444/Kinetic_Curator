@@ -88,13 +88,18 @@ const recs = poolDescriptors(ASSETS);
 // slice-3 packs (Latin lowercase/punctuation, serif, ornaments); the
 // assertion's meaning is unchanged (the exclusion is exactly the poem-only
 // packs, by id).
+// #2005 RE-PIN (cause: the clean plate) — the exclusion grows by exactly
+// the plate pack (Fraunces); the assertion's meaning is unchanged.
 const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
 const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
 const { ASSETS_LATIN } = await import('../data/assets/assets-latin.js');
 const { ASSETS_SERIF } = await import('../data/assets/assets-serif.js');
 const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
+const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
 const kanaIds = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((k) => k.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
+    (k) => k.id,
+  ),
 );
 const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));
 assert.equal(recs.length, poolVisible.length);

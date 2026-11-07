@@ -11,6 +11,7 @@ import { ASSETS_KANJI } from './assets-kanji.js';
 import { ASSETS_LATIN } from './assets-latin.js';
 import { ASSETS_SERIF } from './assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets-ornaments.js';
+import { ASSETS_PLATE } from './assets-plate.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
@@ -78,5 +79,11 @@ export const ASSETS = [
   ...ASSETS_LATIN,
   ...ASSETS_SERIF,
   ...ASSETS_ORNAMENTS,
+  // #2005 — the plate face rides the same road in, on the same terms:
+  // Fraunces instanced for display (scripts/gen-plate.mjs) — catalogue
+  // members, never authored content, excluded by id on every dealing
+  // surface, dealt only by the FIELD director when it calls a plate
+  // (Whittier, the solo room, the room at its stillest).
+  ...ASSETS_PLATE,
   CREATURE_CITIZEN,
 ];

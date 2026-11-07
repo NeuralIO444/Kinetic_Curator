@@ -34,6 +34,7 @@ import { ASSETS_KANJI } from './assets/assets-kanji.js';
 import { ASSETS_LATIN } from './assets/assets-latin.js';
 import { ASSETS_SERIF } from './assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets/assets-ornaments.js';
+import { ASSETS_PLATE } from './assets/assets-plate.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
 import { VOICE_DECK } from './voiceDeck.js';
@@ -44,7 +45,8 @@ import { VOICE_DECK } from './voiceDeck.js';
  * director deals them alone, as poem type.
  * #1998: the curated kanji stamps join the same class, on the same terms.
  * #2002: the slice-3 packs (lowercase + punctuation, serif, ornaments) join
- * the same class, on the same terms. */
+ * the same class, on the same terms.
+ * #2005: the plate stamps (Fraunces, the clean plate's face) join too. */
 export const CHAPTER_UNDEALT = Object.freeze([
   'creature',
   ...ASSETS_KANA.map((a) => a.id),
@@ -52,6 +54,7 @@ export const CHAPTER_UNDEALT = Object.freeze([
   ...ASSETS_LATIN.map((a) => a.id),
   ...ASSETS_SERIF.map((a) => a.id),
   ...ASSETS_ORNAMENTS.map((a) => a.id),
+  ...ASSETS_PLATE.map((a) => a.id),
 ]);
 
 /** The deck floor, per axis — the smallest movement chapter the library already deals (see header). */

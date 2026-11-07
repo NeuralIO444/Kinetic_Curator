@@ -39,6 +39,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
+import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -169,16 +170,36 @@ export function ornamentStampIdForChar(ch) {
 }
 
 /**
+ * #2005 — the plate face: A–Z + a–z in Fraunces, instanced for display
+ * (scripts/gen-plate.mjs: the variable font pinned at opsz 144 / wght 400 /
+ * SOFT 0 / WONK 0), Whittier's plate face. Letter stamps are FACE-BOUND, on
+ * the serif discipline: a plate stamp is honest only inside a plate-declared
+ * form (fieldForm.js carries the `plate` register on the `register`
+ * marker's pattern), base and serif letter stamps are refused inside one,
+ * and digits and punctuation stamps are face-SHARED (the base packs serve
+ * them in a plate form unchanged), so this pack is letters only. The plate
+ * resolver is consulted only by a plate placement — the base resolver below
+ * never returns a plate id.
+ */
+export const PLATE_STAMP_IDS = Object.freeze(new Set(ASSETS_PLATE.map((a) => a.id)));
+const PLATE_ID_BY_CHAR = new Map(ASSETS_PLATE.map((a) => [a.glyph, a.id]));
+
+/** 'A' -> 'typ_f_A', 'a' -> 'typ_f_a'; anything else -> null (no plate stamp exists). */
+export function plateStampIdForChar(ch) {
+  return PLATE_ID_BY_CHAR.get(ch) ?? null;
+}
+
+/**
  * The poem-only union — EVERY stamp pack the FIELD director deals alone:
  * the native face (kana ∪ kanji), the Latin growth (lowercase + punctuation),
- * the serif face and the ornaments. This is the set the containment surfaces
- * exclude on (the pool panel, chapter decks, the KINETIC roll, the dice
- * chokepoint, the placeable pool, the voice wardrobe draw): catalogue
- * members all, marks never. It grows here, in one place, never as a second
- * list elsewhere.
+ * the serif face, the ornaments, and (#2005) the plate face. This is the set
+ * the containment surfaces exclude on (the pool panel, chapter decks, the
+ * KINETIC roll, the dice chokepoint, the placeable pool, the voice wardrobe
+ * draw): catalogue members all, marks never. It grows here, in one place,
+ * never as a second list elsewhere.
  */
 export const POEM_ONLY_STAMP_IDS = Object.freeze(
-  new Set([...NATIVE_STAMP_IDS, ...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS]),
+  new Set([...NATIVE_STAMP_IDS, ...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS, ...PLATE_STAMP_IDS]),
 );
 
 /**
@@ -247,6 +268,22 @@ const SERIF_GLYPH_W = (() => {
 /** A serif glyph's ink width in em units (0 for a character with no serif stamp). */
 export const serifGlyphWidthEm = (ch) => SERIF_GLYPH_W[ch] ?? 0;
 /**
+ * #2005 — the plate face's measured widths, keyed by glyph, in a table of
+ * their own, on the serif table's discipline: a plate 'A' and a PT Serif
+ * 'A' and an Anton 'A' are three different inks, and each face's forms are
+ * measured with its own ruler. A plate placement and the gate (for a plate
+ * form) measure with this table; the other faces' measurements never move.
+ */
+const PLATE_GLYPH_W = (() => {
+  const out = {};
+  for (const a of ASSETS_PLATE) out[a.glyph] = inkWidthEm(a.svg);
+  return Object.freeze(out);
+})();
+/** A plate glyph's ink width in em units (0 for a character with no plate stamp). */
+export const plateGlyphWidthEm = (ch) => PLATE_GLYPH_W[ch] ?? 0;
+/** The widest plate LETTER's ink width, em units — the plate grid's even cell base, on GLYPH_MAX_W's pattern. */
+export const PLATE_GLYPH_MAX_W = Math.max(...ASSETS_PLATE.map((a) => PLATE_GLYPH_W[a.glyph]));
+/**
  * The widest LETTER's ink width, em units (W). The grid and square recipes use it as their even
  * cell — deliberately letters only: those recipes are the Latin poets' (Greenleaf's grid,
  * Rosselli's quadro), and a native deal rides the proportional recipes (bands/single), where each
@@ -257,11 +294,33 @@ export const GLYPH_MAX_W = Math.max(...ASSETS_LETTERS.map((a) => GLYPH_W[a.id.sl
 export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
 /**
  * A STAMP's ink width in em units, by its id: a serif stamp measures with
- * the serif ruler, every other stamp with the base ruler. The gate judges
- * fit and overlap with this, so a serif form is measured in its own face.
+ * the serif ruler, a plate stamp with the plate ruler, every other stamp
+ * with the base ruler. The gate judges fit and overlap with this, so a
+ * serif or plate form is measured in its own face.
  */
-export const stampWidthEm = (assetId, ch) => (SERIF_STAMP_IDS.has(assetId) ? serifGlyphWidthEm(ch) : glyphWidthEm(ch));
+export const stampWidthEm = (assetId, ch) =>
+  SERIF_STAMP_IDS.has(assetId) ? serifGlyphWidthEm(ch) : PLATE_STAMP_IDS.has(assetId) ? plateGlyphWidthEm(ch) : glyphWidthEm(ch);
 const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through
+/**
+ * #2005 — the plate's set discipline: the constants a plate form is SET by,
+ * named so the suite can measure a dealt plate against them (they are the
+ * strictest composition the placement system deals — a plate is set like a
+ * printed plate, not placed like a poem):
+ * - PLATE_TRACK: letterspacing in the plate face — wider than TRACK, the
+ *   title-page air a display face is spaced with.
+ * - PLATE_PITCH_EM: the leading — one baseline pitch for every row recipe,
+ *   generous and fixed (the row recipes' own pitches are 1.45–1.9).
+ * - PLATE_MARGIN: the optical margin, dish-height units — the module never
+ *   comes closer to the dish edge than this (the placement margin is 0.05).
+ * - PLATE_MEASURE: the measure — the module never exceeds this fraction of
+ *   the dish width, the column a book page sets its type in.
+ * Every stamp still sits on the recipe's shared baseline grid at rotation 0
+ * — the discipline is the grid kept, with plate air.
+ */
+export const PLATE_TRACK = 0.26;
+export const PLATE_PITCH_EM = 2.4;
+export const PLATE_MARGIN = 0.13;
+export const PLATE_MEASURE = 0.66;
 const ADV = GLYPH_MAX_W + TRACK; // the grid's even cell: the widest glyph plus tracking, so no glyph overruns
 /**
  * Rosselli's square cell, in em (cap heights), on BOTH axes: wide enough for the widest glyph plus tracking, and a
@@ -276,38 +335,39 @@ const MAX_H = 0.88; // module max height, fraction of dish height
 const clamp01 = (v) => (Number.isFinite(v) ? Math.min(1, Math.max(0, v)) : 0);
 
 /**
- * A glyph's advance in em units. `adv` null = proportional (its own width + TRACK); a number = an even cell (grid),
- * which must be at least the glyph's width + TRACK, so even cells never overlap either.
+ * A glyph's advance in em units. `adv` null = proportional (its own width + track); a number = an even cell (grid),
+ * which must be at least the glyph's width + track, so even cells never overlap either. `track` is the call's
+ * letterspacing (TRACK for every deal; PLATE_TRACK under a plate placement, #2005).
  */
-const advanceOf = (ch, adv, spaceAdv, widthOf = glyphWidthEm) =>
+const advanceOf = (ch, adv, spaceAdv, widthOf = glyphWidthEm, track = TRACK) =>
   ch === ' '
     ? adv == null
       ? spaceAdv
       : adv // on a strict grid a word break is one empty cell, so words never run together
     : adv == null
-      ? widthOf(ch) + TRACK
-      : Math.max(adv, widthOf(ch) + TRACK);
+      ? widthOf(ch) + track
+      : Math.max(adv, widthOf(ch) + track);
 
 /** Advance width of a line in em units (spaces count as gaps). The last glyph's tracking is not counted. */
-function lineAdvanceEm(line, adv, spaceAdv, widthOf = glyphWidthEm) {
+function lineAdvanceEm(line, adv, spaceAdv, widthOf = glyphWidthEm, track = TRACK) {
   let w = 0;
-  for (const ch of line) w += advanceOf(ch, adv, spaceAdv, widthOf);
-  return Math.max(0, w - (line.length && line.at(-1) !== ' ' ? TRACK : 0));
+  for (const ch of line) w += advanceOf(ch, adv, spaceAdv, widthOf, track);
+  return Math.max(0, w - (line.length && line.at(-1) !== ' ' ? track : 0));
 }
 
 /** Lay one line's stamps along a baseline. Returns stamps in unit space. */
-function layLine(line, { ox, oy, em, adv, spaceAdv, resolveId = stampIdForGlyph, widthOf = glyphWidthEm }) {
+function layLine(line, { ox, oy, em, adv, spaceAdv, resolveId = stampIdForGlyph, widthOf = glyphWidthEm, track = TRACK }) {
   const out = [];
   let cursor = 0;
   for (const ch of line) {
-    const a = advanceOf(ch, adv, spaceAdv, widthOf);
+    const a = advanceOf(ch, adv, spaceAdv, widthOf, track);
     if (ch !== ' ') {
       out.push(
         Object.freeze({
           assetId: resolveId(ch),
           ch,
           // the glyph's ink centred in its own advance (minus the trailing track)
-          x: ox + (cursor + (a - TRACK) / 2) * em,
+          x: ox + (cursor + (a - track) / 2) * em,
           y: oy,
           rotation: 0,
           em,
@@ -320,19 +380,19 @@ function layLine(line, { ox, oy, em, adv, spaceAdv, resolveId = stampIdForGlyph,
 }
 
 /** Seeded module origin: uniform inside the margins, module fully on the dish. */
-function moduleOrigin(rng, w, h, aspect) {
-  const spanX = Math.max(0, aspect - 2 * MARGIN - w);
-  const spanY = Math.max(0, 1 - 2 * MARGIN - h);
-  return { ox: MARGIN + rng() * spanX, oy: MARGIN + rng() * spanY };
+function moduleOrigin(rng, w, h, aspect, margin = MARGIN) {
+  const spanX = Math.max(0, aspect - 2 * margin - w);
+  const spanY = Math.max(0, 1 - 2 * margin - h);
+  return { ox: margin + rng() * spanX, oy: margin + rng() * spanY };
 }
 
-/** Shrink em so the module fits the dish's fit box; returns the fit em. */
-function fitEm(em, wEm, hEm, aspect) {
+/** Shrink em so the module fits the fit box; returns the fit em. */
+function fitEm(em, wEm, hEm, aspect, maxW = MAX_W, maxH = MAX_H) {
   let f = em;
   const w = wEm * f;
-  if (w > MAX_W * aspect) f *= (MAX_W * aspect) / w;
+  if (w > maxW * aspect) f *= (maxW * aspect) / w;
   const h = hEm * f;
-  if (h > MAX_H) f *= MAX_H / h;
+  if (h > maxH) f *= maxH / h;
   return f;
 }
 
@@ -346,6 +406,16 @@ function fitEm(em, wEm, hEm, aspect) {
  * resolve to the serif pack and measure with the serif ruler, while digits
  * and punctuation stay the face-shared base stamps. Any other call is the
  * base face — the resolver and ruler every shipped deal has always used.
+ *
+ * `face: 'plate'` (#2005) places the piece as a PLATE: letters resolve to
+ * the plate pack and measure with the plate ruler (digits and punctuation
+ * face-shared, as in every face), and the composition is set by the plate
+ * discipline — PLATE_TRACK letterspacing, PLATE_PITCH_EM leading on the row
+ * recipes, PLATE_MARGIN optical margins, PLATE_MEASURE across. The draw
+ * structure is the recipe's own (same draws, same order): a plate deal
+ * consumes its stream exactly as the plain deal of the same piece does.
+ * Rosselli's square keeps its cell law under any face — the quadro IS its
+ * discipline, and the Director never calls a plate on it.
  */
 export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
   const lines = Array.isArray(piece?.lines) ? piece.lines.map((l) => String(l)) : [];
@@ -360,26 +430,40 @@ export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
   // line placed in a serif deal must still find its stamp). The serif ruler
   // falls back to the base ruler for the shared stamps (their ink IS the
   // base ink), which is the `||` below (0 = no serif glyph).
-  const resolveId =
-    face === 'serif'
+  // #2005 — the plate resolver and ruler stand on the same pattern.
+  const plate = face === 'plate';
+  const resolveId = plate
+    ? (ch) => plateStampIdForChar(ch) ?? punctStampIdForChar(ch) ?? ornamentStampIdForChar(ch) ?? stampIdForChar(ch)
+    : face === 'serif'
       ? (ch) => serifStampIdForChar(ch) ?? punctStampIdForChar(ch) ?? ornamentStampIdForChar(ch) ?? stampIdForChar(ch)
       : stampIdForGlyph;
-  const widthOf = face === 'serif' ? (ch) => serifGlyphWidthEm(ch) || glyphWidthEm(ch) : glyphWidthEm;
+  const widthOf = plate
+    ? (ch) => plateGlyphWidthEm(ch) || glyphWidthEm(ch)
+    : face === 'serif'
+      ? (ch) => serifGlyphWidthEm(ch) || glyphWidthEm(ch)
+      : glyphWidthEm;
+  const track = plate ? PLATE_TRACK : TRACK;
+  const margin = plate ? PLATE_MARGIN : MARGIN;
+  // The plate's fit box: the measure across (or the margins' own box,
+  // whichever is narrower at this aspect), the margins' box down — so a
+  // plate module always lands whole inside its optical margins.
+  const fitMaxW = plate ? Math.min(PLATE_MEASURE, (asp - 2 * PLATE_MARGIN) / asp) : MAX_W;
+  const fitMaxH = plate ? 1 - 2 * PLATE_MARGIN : MAX_H;
 
   let stamps = [];
   if (layout === 'grid') {
     // Even advance for every glyph (the grid is the law); spacing widens a
     // little with density (Greenleaf hot: "slightly wider spacing").
-    const adv = ADV * (1 + 0.35 * density);
+    const adv = (plate ? PLATE_GLYPH_MAX_W + PLATE_TRACK : ADV) * (1 + 0.35 * density);
     let em = 0.062 + 0.03 * density; // #1928: em is now TRUE cap height (exact stage scale); sized to read as a plate
-    const pitchEm = 1.5;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
+    const pitchEm = plate ? PLATE_PITCH_EM : 1.5;
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
-    em = fitEm(em, wEm, hEm, asp);
-    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
+    em = fitEm(em, wEm, hEm, asp, fitMaxW, fitMaxH);
+    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp, margin);
     lines.forEach((line, r) => {
       stamps.push(
-        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track }),
       );
     });
   } else if (layout === 'bands') {
@@ -387,17 +471,17 @@ export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
     // separated by air; each band's x-offset is dealt (stratified, not justified).
     const adv = null; // #1928: proportional (each band is a run of type, not a grid)
     let em = 0.06 + 0.027 * density;
-    const pitchEm = 1.9;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
+    const pitchEm = plate ? PLATE_PITCH_EM : 1.9;
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
-    em = fitEm(em, wEm, hEm, asp);
-    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
+    em = fitEm(em, wEm, hEm, asp, fitMaxW, fitMaxH);
+    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp, margin);
     lines.forEach((line, r) => {
-      const lw = lineAdvanceEm(line, adv, SPACE_ADV, widthOf) * em;
+      const lw = lineAdvanceEm(line, adv, SPACE_ADV, widthOf, track) * em;
       const slack = Math.max(0, wEm * em - lw);
       const lineOx = ox + draw() * slack;
       stamps.push(
-        ...layLine(line, { ox: lineOx, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+        ...layLine(line, { ox: lineOx, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track }),
       );
     });
   } else if (layout === 'single') {
@@ -407,22 +491,22 @@ export function placePiece(piece, rng, { aspect = 10 / 7, face } = {}) {
     const joined = lines.join(' ');
     const adv = null; // #1928: proportional
     let em = 0.054 + 0.033 * density;
-    const wEm = lineAdvanceEm(joined, adv, SPACE_ADV, widthOf);
-    em = fitEm(em, wEm, 1, asp);
-    const { ox, oy } = moduleOrigin(draw, wEm * em, em, asp);
-    stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf });
+    const wEm = lineAdvanceEm(joined, adv, SPACE_ADV, widthOf, track);
+    em = fitEm(em, wEm, 1, asp, fitMaxW, fitMaxH);
+    const { ox, oy } = moduleOrigin(draw, wEm * em, em, asp, margin);
+    stamps = layLine(joined, { ox, oy: oy + 0.5 * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track });
   } else if (layout === 'two') {
     // Two-line module, locked baselines, generous negative space.
     const adv = null; // #1928: proportional
     let em = 0.054 + 0.03 * density;
-    const pitchEm = 1.45;
-    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf)));
+    const pitchEm = plate ? PLATE_PITCH_EM : 1.45;
+    const wEm = Math.max(0, ...lines.map((l) => lineAdvanceEm(l, adv, SPACE_ADV, widthOf, track)));
     const hEm = lines.length > 0 ? (lines.length - 1) * pitchEm + 1 : 0;
-    em = fitEm(em, wEm, hEm, asp);
-    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp);
+    em = fitEm(em, wEm, hEm, asp, fitMaxW, fitMaxH);
+    const { ox, oy } = moduleOrigin(draw, wEm * em, hEm * em, asp, margin);
     lines.forEach((line, r) => {
       stamps.push(
-        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf }),
+        ...layLine(line, { ox, oy: oy + (r * pitchEm + 0.5) * em, em, adv, spaceAdv: SPACE_ADV, resolveId, widthOf, track }),
       );
     });
   } else {
