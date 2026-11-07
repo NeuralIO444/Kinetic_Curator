@@ -130,6 +130,38 @@ export const PLATE_ROOM_ALPHA = 0.15;
 export const PLATE_ZONE_PAD_EM = 0.75;
 
 /**
+ * A form's room zone in canvas pixels: the ink bounding box of its
+ * DRAWN stamps (the caller passes the stamps the build actually draws
+ * — plate stamps, or a review-adjusted poem's), breathed out by
+ * PLATE_ZONE_PAD_EM of the largest drawn em. One formula, two readers:
+ * the build below (the plate's room, and #2006 slice 4's borrowed room
+ * for a quieted poem) and gl/liveResolve's review-morph channel, whose
+ * room settle must quiet exactly the zone the build quieted.
+ */
+export function fieldRoomZonePx(drawnStamps, aspect, canvasW, canvasH) {
+  let zx0 = Infinity;
+  let zy0 = Infinity;
+  let zx1 = -Infinity;
+  let zy1 = -Infinity;
+  let emMax = 0;
+  for (const s of drawnStamps) {
+    const cx = (s.x / aspect) * canvasW;
+    const cy = s.y * canvasH;
+    const hw = ((stampWidthEm(s.assetId, s.ch) * s.em) / 2 / aspect) * canvasW;
+    const hh = (s.em / 2) * canvasH;
+    if (cx - hw < zx0) zx0 = cx - hw;
+    if (cx + hw > zx1) zx1 = cx + hw;
+    if (cy - hh < zy0) zy0 = cy - hh;
+    if (cy + hh > zy1) zy1 = cy + hh;
+    if (s.em > emMax) emMax = s.em;
+  }
+  if (!Number.isFinite(zx0)) return null;
+  const padX = ((PLATE_ZONE_PAD_EM * emMax) / aspect) * canvasW;
+  const padY = PLATE_ZONE_PAD_EM * emMax * canvasH;
+  return [zx0 - padX, zy0 - padY, zx1 + padX, zy1 + padY];
+}
+
+/**
  * Seeded weighted pick from an asset list (sequential stream — tests / legacy).
  * Prefer pickWeightedIndexStable for pipeline.
  */
@@ -788,7 +820,16 @@ export function buildPlacements({
   // #2018 — the plate's room, measured in the FIELD block below and
   // applied at the end of the build (after mirroring, in final
   // coordinates): { zone, keys } or null when no plate stands.
+  // #2006 slice 4 — the poem's borrowed room rides the same seam: a
+  // non-plate form carrying the ladder's `review.quietZone` measures
+  // { zone, keys } the same way, and the tail quiets its zone with the
+  // plate's level — but the poem is a citizen, not a plate: its items
+  // do NOT move last in the layer (the #2018 partition is the plate's
+  // citizenship amendment, plates only). The two rooms can never stand
+  // in one build — the door refuses plate + review whole — but the
+  // tail's pass is written for both, with one suppression per mark.
   let plateRoom = null;
+  let quietRoom = null;
   const fieldForm = sanitizeFieldForm(layoutParams.fieldForm);
   if (fieldForm) {
     const fullAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
@@ -885,37 +926,28 @@ export function buildPlacements({
     // #2005 — the plate's room, measured: the zone is the drawn stamps'
     // own ink bounding box — stamp centres and ink widths in canvas
     // pixels, exactly as the field items above are positioned — breathed
-    // out by PLATE_ZONE_PAD_EM of the form's largest em. The suppression
-    // itself is applied at the end of the build, on the final list (see
-    // the #2018 block at the tail of this function): by footprint, after
-    // mirroring, with the plate's items moved last in the layer. What is
-    // remembered here is the zone and the plate items' keys (mirror
-    // copies carry their source's key plus a suffix). Restoration is
-    // still the rebuild's: the next build re-derives every item's alpha
-    // from the SoA (stage C), so when the plate leaves the stage returns
-    // exactly — the multiply never compounds, the glass multiply's
-    // discipline.
+    // out by PLATE_ZONE_PAD_EM of the form's largest em (fieldRoomZonePx,
+    // the one formula). The suppression itself is applied at the end of
+    // the build, on the final list (see the #2018 block at the tail of
+    // this function): by footprint, after mirroring, with the plate's
+    // items moved last in the layer. What is remembered here is the zone
+    // and the plate items' keys (mirror copies carry their source's key
+    // plus a suffix). Restoration is still the rebuild's: the next build
+    // re-derives every item's alpha from the SoA (stage C), so when the
+    // plate leaves the stage returns exactly — the multiply never
+    // compounds, the glass multiply's discipline.
+    // #2006 slice 4 — the quieted poem's room is measured identically,
+    // off the same drawn stamps (the review transform already applied:
+    // the zone is the poem's ink footprint at its final placement), and
+    // remembered the same way; only the tail's citizenship differs.
     if (fieldForm.plate) {
-      let zx0 = Infinity;
-      let zy0 = Infinity;
-      let zx1 = -Infinity;
-      let zy1 = -Infinity;
-      let emMax = 0;
-      for (const s of drawnForm.stamps) {
-        const cx = (s.x / fieldForm.aspect) * canvasW;
-        const cy = s.y * canvasH;
-        const hw = ((stampWidthEm(s.assetId, s.ch) * s.em) / 2 / fieldForm.aspect) * canvasW;
-        const hh = (s.em / 2) * canvasH;
-        if (cx - hw < zx0) zx0 = cx - hw;
-        if (cx + hw > zx1) zx1 = cx + hw;
-        if (cy - hh < zy0) zy0 = cy - hh;
-        if (cy + hh > zy1) zy1 = cy + hh;
-        if (s.em > emMax) emMax = s.em;
-      }
-      const padX = ((PLATE_ZONE_PAD_EM * emMax) / fieldForm.aspect) * canvasW;
-      const padY = PLATE_ZONE_PAD_EM * emMax * canvasH;
       plateRoom = {
-        zone: [zx0 - padX, zy0 - padY, zx1 + padX, zy1 + padY],
+        zone: fieldRoomZonePx(drawnForm.stamps, fieldForm.aspect, canvasW, canvasH),
+        keys: new Set(fieldItems.map((it) => it.key)),
+      };
+    } else if (fieldForm.review?.quietZone === true) {
+      quietRoom = {
+        zone: fieldRoomZonePx(drawnForm.stamps, fieldForm.aspect, canvasW, canvasH),
         keys: new Set(fieldItems.map((it) => it.key)),
       };
     }
@@ -1055,23 +1087,35 @@ export function buildPlacements({
   // layers above still composite over it, and the FX/finish chain still
   // acts on it like any citizen). A fresh array is built, so a pooled
   // list is never reordered in place.
-  if (plateRoom) {
-    const [zx0, zy0, zx1, zy1] = plateRoom.zone;
-    const zones = [plateRoom.zone];
-    if (caps.allowMirror && mirrorState !== 'off') {
-      if (mirrorState === 'x' || mirrorState === 'xy') zones.push([canvasW - zx1, zy0, canvasW - zx0, zy1]);
-      if (mirrorState === 'y' || mirrorState === 'xy') zones.push([zx0, canvasH - zy1, zx1, canvasH - zy0]);
-      if (mirrorState === 'xy') zones.push([canvasW - zx1, canvasH - zy1, canvasW - zx0, canvasH - zy0]);
+  // #2006 slice 4 — the same pass carries the quieted poem's borrowed
+  // room: its zones join the zone list, its items join the never-
+  // suppressed set, and a mark claimed by ANY room is suppressed
+  // exactly once (the at-most-one-room law, now across rooms as well
+  // as across a room's own reflections). The partition below stays the
+  // plate's alone — a quieted poem's items keep their built order.
+  if (plateRoom || quietRoom) {
+    const rooms = [plateRoom, quietRoom].filter(Boolean);
+    const zones = [];
+    const roomKeys = new Set();
+    for (const room of rooms) {
+      const [zx0, zy0, zx1, zy1] = room.zone;
+      zones.push(room.zone);
+      if (caps.allowMirror && mirrorState !== 'off') {
+        if (mirrorState === 'x' || mirrorState === 'xy') zones.push([canvasW - zx1, zy0, canvasW - zx0, zy1]);
+        if (mirrorState === 'y' || mirrorState === 'xy') zones.push([zx0, canvasH - zy1, zx1, canvasH - zy0]);
+        if (mirrorState === 'xy') zones.push([canvasW - zx1, canvasH - zy1, canvasW - zx0, canvasH - zy0]);
+      }
+      for (const k of room.keys) roomKeys.add(k);
     }
-    const isPlateItem = (item) => {
+    const isRoomItem = (item) => {
       const k = item.key;
       if (typeof k !== 'string') return false;
-      if (plateRoom.keys.has(k)) return true;
+      if (roomKeys.has(k)) return true;
       const m = /-m[xy]{1,2}$/.exec(k);
-      return !!m && plateRoom.keys.has(k.slice(0, m.index));
+      return !!m && roomKeys.has(k.slice(0, m.index));
     };
     for (const item of mapped) {
-      if (isPlateItem(item)) continue;
+      if (isRoomItem(item)) continue;
       const hx = 50 * item.scale;
       const hy = 50 * (item.scaleY ?? item.scale);
       for (const z of zones) {
@@ -1081,10 +1125,19 @@ export function buildPlacements({
         }
       }
     }
-    const marks = [];
-    const plateItems = [];
-    for (const item of mapped) (isPlateItem(item) ? plateItems : marks).push(item);
-    mapped = [...marks, ...plateItems];
+    if (plateRoom) {
+      const isPlateItem = (item) => {
+        const k = item.key;
+        if (typeof k !== 'string') return false;
+        if (plateRoom.keys.has(k)) return true;
+        const m = /-m[xy]{1,2}$/.exec(k);
+        return !!m && plateRoom.keys.has(k.slice(0, m.index));
+      };
+      const marks = [];
+      const plateItems = [];
+      for (const item of mapped) (isPlateItem(item) ? plateItems : marks).push(item);
+      mapped = [...marks, ...plateItems];
+    }
   }
 
   if (undoSurge) undoSurge(); // #1576 — reverse of application

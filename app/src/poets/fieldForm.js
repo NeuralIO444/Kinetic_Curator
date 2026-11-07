@@ -472,16 +472,24 @@ export function sanitizeFieldForm(raw) {
   // whole, and review + raygun never compose (the store's ray-gun cycle
   // strips the record when it arms — the performer's touch supersedes
   // the repair; the claim can otherwise only arrive as data).
+  // #2006 slice 4 — the record gains ONE more key, `quietZone: true`:
+  // rung 3's render instruction (the plate's zone suppression borrowed
+  // for this non-plate form — buildPlacements reads it; reviewAdjusted-
+  // Form does not, the stamps never move for a quiet). On the plate
+  // marker's own discipline: the key is honest only as exactly `true`;
+  // present in any other value (false, a string, a number) it refuses
+  // the form whole. Absent, the record is slice 3's, byte-identical.
   let reviewMark;
   if (review !== undefined) {
     if (!review || typeof review !== 'object' || Array.isArray(review)) return null;
-    const { scale: rScale, dx: rDx, dy: rDy } = review;
+    const { scale: rScale, dx: rDx, dy: rDy, quietZone: rQuiet } = review;
     if (!Number.isFinite(rScale) || rScale <= 0 || rScale > 1) return null;
     if (!Number.isFinite(rDx) || Math.abs(rDx) > aspect) return null;
     if (!Number.isFinite(rDy) || Math.abs(rDy) > 1) return null;
+    if (rQuiet !== undefined && rQuiet !== true) return null;
     if (raygunMark !== undefined) return null;
     if (plateForm) return null;
-    reviewMark = { scale: rScale, dx: rDx, dy: rDy };
+    reviewMark = { scale: rScale, dx: rDx, dy: rDy, ...(rQuiet === true ? { quietZone: true } : {}) };
   }
   // #2002 — the break marker: the ornament id of the form's plate break.
   // It must name a real ornament stamp, and it is refused in a native form

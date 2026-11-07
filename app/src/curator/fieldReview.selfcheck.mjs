@@ -439,7 +439,12 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
   // truth underneath it is unchanged and still pinned: 133 clean
   // landings, 11 janky, every one markCover (each acted record's
   // measures re-derive that jank in rederive above).
-  assert.deepEqual(c.dist, { clean: 133, janky: 3, cut: 8 }, 'census A outcomes, pinned exactly (slice 3)');
+  // #2006 slice 4 re-pin (proven in STAGING-REPORT-2006-S4): rung 3
+  // (QUIET) rescues all 8 of slice 3's cuts and one of its rung-4
+  // repairs, so every acted record now keeps the 'janky' judgment and
+  // no record banks 'cut' — the outcome distribution is the landing
+  // distribution again, by rescue rather than by inaction.
+  assert.deepEqual(c.dist, { clean: 133, janky: 11 }, 'census A outcomes, pinned exactly (slice 4)');
   assert.equal(
     records.filter((r) => r.verdict === 'janky' || r.verdict === 'cut').length,
     11,

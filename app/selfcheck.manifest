@@ -562,6 +562,7 @@ node src/curator/fieldLiveDeal.selfcheck.mjs
 node src/curator/fieldReview.selfcheck.mjs
 node src/curator/fieldReviewVoice.selfcheck.mjs
 node src/curator/fieldReviewLadder.selfcheck.mjs
+node src/curator/fieldReviewQuiet.selfcheck.mjs
 node src/curator/takeStrip.selfcheck.mjs
 node src/gl/spectrumCore.selfcheck.mjs
 node src/gl/spectrumLive.selfcheck.mjs

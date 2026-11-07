@@ -39,6 +39,18 @@
 //      the lowest failing-measure score stands if it beats standing
 //      still. Acts on the position gates: markCover, crop,
 //      selfOverlap. Candidates are clamped so the ink stays on-dish.
+//   3 QUIET (slice 4) — the transform gains `quietZone: true`: the
+//      plate's zone suppression borrowed for this non-plate form
+//      (buildPlacements' room seam — marks whose ink enters the poem's
+//      zone render at PLATE_ROOM_ALPHA). The poem does not move; the
+//      ROOM quiets. Acts on markCover alone — the one gate a quieter
+//      room can clear — and is judged, like every rung, against the
+//      gate failing when it is reached. The trial re-measures through
+//      reviewLanding, whose M2 now reads cover the way the seam
+//      renders it: a suppressed mark's overlap counts at the
+//      suppression fraction (fieldReview.measureLandedForm). NEVER
+//      offered after a re-deal: spec §3.6 gives a re-dealt form rungs
+//      1–2 only, so the walk skips this rung once a re-deal has landed.
 //   4 RE-DEAL — ONE fresh deal through the real deal path (the
 //      caller's `redeal`, which draws the next poem stream index
 //      avoiding the replaced piece — the dislike chip's machinery).
@@ -87,6 +99,7 @@ export const REVIEW_MORPH_MS = 1000;
 
 const SHRINK_GATES = new Set(['selfOverlap', 'markCover', 'coverage', 'crop']);
 const SHIFT_GATES = new Set(['selfOverlap', 'markCover', 'crop']);
+const QUIET_GATES = new Set(['markCover']);
 const SHIFT_GRID = 4; // candidate placements are read off a 4x4 dish grid
 const SHIFT_CANDIDATES = 3; // ...of which the three quietest are tried
 const MORPH_SEED_SALT = 0x200603;
@@ -181,7 +194,7 @@ export function runReviewLadder(
 
     if (rung === 1) {
       if (!SHRINK_GATES.has(lastGate)) continue;
-      const next = { scale: standing().scale * REVIEW_SHRINK_FACTOR, dx: standing().dx, dy: standing().dy };
+      const next = { ...standing(), scale: standing().scale * REVIEW_SHRINK_FACTOR };
       const tr = trial({ ...baseForm, review: next });
       if (!tr || tr.verdict === 'exempt' || !tr.measures) return null;
       review = next;
@@ -234,7 +247,7 @@ export function runReviewLadder(
         const ddx = cand.x - bb.cx;
         const ddy = cand.y - bb.cy;
         if (Math.abs(ddx) < 1e-12 && Math.abs(ddy) < 1e-12) continue; // standing still is not a rung
-        const next = { scale: standing().scale, dx: standing().dx + ddx, dy: standing().dy + ddy };
+        const next = { ...standing(), dx: standing().dx + ddx, dy: standing().dy + ddy };
         const tr = trial({ ...baseForm, review: next });
         if (!tr || tr.verdict === 'exempt' || !tr.measures) return null;
         if (tr.verdict === 'clean') {
@@ -258,6 +271,27 @@ export function runReviewLadder(
         // The rung ran and bought nothing: the trace says so, with the
         // standing state's own measures — trials are planning, not states.
         steps.push({ rung: 2, review: { ...standing() }, measures: lastMeasures, verdict: 'janky' });
+      }
+      continue;
+    }
+
+    if (rung === 3) {
+      // Slice 4 — QUIET. Never after a re-deal (§3.6: the new form
+      // receives rungs 1–2 only), and only against the gate a quieter
+      // room can clear. The trial carries the standing transform plus
+      // the quiet flag — shrink/shift already walked stay walked.
+      if (redealt) continue;
+      if (!QUIET_GATES.has(lastGate)) continue;
+      const next = { ...standing(), quietZone: true };
+      const tr = trial({ ...baseForm, review: next });
+      if (!tr || tr.verdict === 'exempt' || !tr.measures) return null;
+      review = next;
+      steps.push({ rung: 3, review: { ...next }, measures: tr.measures, verdict: tr.verdict });
+      lastMeasures = tr.measures;
+      lastGate = tr.gate;
+      if (tr.verdict === 'clean') {
+        outcome = 'repaired';
+        resolvingRung = 3;
       }
       continue;
     }
@@ -301,7 +335,9 @@ export function runReviewLadder(
   }
 
   const final =
-    outcome === 'repaired' && review && (review.scale !== 1 || review.dx !== 0 || review.dy !== 0)
+    outcome === 'repaired' &&
+    review &&
+    (review.scale !== 1 || review.dx !== 0 || review.dy !== 0 || review.quietZone === true)
       ? { ...review }
       : null;
   const adjustment = {
