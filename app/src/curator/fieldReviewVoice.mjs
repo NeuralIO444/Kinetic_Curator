@@ -23,8 +23,12 @@
 //     rules say silence — validateReviewProposal never reads a verdict,
 //     a gate or a measure out of a reply, and a janky line must carry
 //     the rules' own figures (the failing measure and its limit,
-//     formatted exactly as the rules line formats them) or the whole
-//     proposal is dropped and the rules line stands.
+//     formatted exactly as the rules line formats them, in the rules'
+//     own roles — the value spoken before its limit; crop's limit is
+//     the absence of crossing, and the figure the rules line withholds
+//     stays withheld) or the whole proposal is dropped and the rules
+//     line stands. A clean line must carry no figure at all: DAVIS's
+//     rules lines have none to quote.
 //
 // Everything in this module is pure: same record in, same line out. The
 // spoken line's provenance (persona, bar, backend, seed) rides the
@@ -91,9 +95,11 @@ export const gateMeasure = (record) => {
 const CLEAN_LINES = Object.freeze(['WOO HOO.', 'Woohoo — landed clean.', 'WOO HOO — the poem stands.']);
 
 // LOIS on JANKY — the measured clause per gate. {v} is pct(measured),
-// {l} is pct(limit); the templates are written so both figures land in
-// the sentence exactly as pct formats them — a model proposal must
-// carry the same two strings (see validateReviewProposal).
+// {l} is pct(limit); the templates are written so the figures land in
+// the sentence exactly as pct formats them, value before limit — a
+// model proposal must carry the same strings in the same roles (crop
+// states its value only: its limit is none, and no limit figure may be
+// added — see validateReviewProposal).
 const JANKY_CLAUSES = Object.freeze({
   selfOverlap: (v, l) => `The poem prints over itself. ${v} of its ink is doubled — ${l} is the limit.`,
   markCover: (v, l) => `The marks are eating the poem. ${v} of its ink is covered — ${l} is the limit.`,
@@ -205,12 +211,17 @@ export const reviewAskContext = (record, { poet = null, piece = null, room = nul
   };
 };
 
-/** Does `line` carry `figure` as a whole figure — '5%' inside '15%'
- * or '0.5%' does not count (a lookbehind keeps figures honest). */
-const carriesFigure = (line, figure) => {
+/** The index at which `line` first carries `figure` as a whole figure
+ * — '5%' inside '15%' or '0.5%' does not count (a lookbehind keeps
+ * figures honest) — or -1 when the figure is not carried. */
+const figureIndex = (line, figure) => {
   const esc = figure.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(?<![\\d.])${esc}`).test(line);
+  const m = new RegExp(`(?<![\\d.])${esc}`).exec(line);
+  return m ? m.index : -1;
 };
+
+/** Does `line` carry `figure` as a whole figure? */
+const carriesFigure = (line, figure) => figureIndex(line, figure) >= 0;
 
 /**
  * Validate a backend proposal against the standing record, on
@@ -219,7 +230,12 @@ const carriesFigure = (line, figure) => {
  * proposal whole; the rules line stands. A reply can carry NO verdict,
  * gate or measure this function would read — and a janky line must
  * carry the rules' figures for the failing gate, verbatim as pct
- * formats them, or it is inventing numbers and is dropped.
+ * formats them AND in their roles (the measured value before its
+ * limit; crop states no limit figure, so none may be added), or it is
+ * inventing numbers and is dropped. A clean line is fenced the other
+ * way: DAVIS's rules lines carry no figures, name no verdict but the
+ * landing's own and propose no repair — a clean proposal doing any of
+ * those is out of the idiom and drops whole.
  */
 export const validateReviewProposal = (raw, record) => {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
@@ -239,10 +255,46 @@ export const validateReviewProposal = (raw, record) => {
     }
     rungOrder = [...raw.rungOrder];
   }
+  if (record.verdict === 'clean') {
+    // DAVIS's rules lines carry NO figures — there is no measure behind
+    // a clean line to quote — so a clean proposal speaking a percent
+    // figure is inventing a reading and drops whole. It may not name
+    // the verdict it is not ('janky': a reply carries no verdict, least
+    // of all the contrary one), and it may not name a repair: a clean
+    // landing approves no ladder (a rungOrder already dropped above)
+    // and its rules lines propose none, so the rungs' own imperative
+    // names are out of set in prose too. Contradicting prose beyond
+    // these fences cannot be pattern-fenced; that residue stands, by
+    // design — the rule fence, not a prose censor.
+    if (/\d[\d.]*\s*%/.test(line)) return null;
+    if (/\bjanky\b/i.test(line)) return null;
+    if (/\b(?:shrink|shift|cut|re-?deal)\b/i.test(line)) return null;
+  }
   if (record.verdict === 'janky') {
     const gm = gateMeasure(record);
     if (!gm) return null;
-    if (!carriesFigure(line, pct(gm.value)) || !carriesFigure(line, pct(gm.limit))) return null;
+    const valueFigure = pct(gm.value);
+    const limitFigure = pct(gm.limit);
+    const valueAt = figureIndex(line, valueFigure);
+    if (valueAt < 0) return null; // the measured figure must be spoken
+    if (record.gate === 'crop') {
+      // Crop's limit is the ABSENCE of crossing, not a number — the
+      // rules line says "the limit is none" and never states
+      // pct(limit) ('0%'). A proposal carrying that figure invents the
+      // one figure the rules line withholds: dropped, fail-closed.
+      // (When the two figures coincide the fence is vacuous, as below.)
+      if (limitFigure !== valueFigure && carriesFigure(line, limitFigure)) return null;
+    } else {
+      const limitAt = figureIndex(line, limitFigure);
+      if (limitAt < 0) return null; // the limit figure must be spoken
+      // Roles, not just presence: every rules template speaks the
+      // measured value BEFORE its limit. A proposal speaking the limit
+      // first has swapped the roles — it would put numbers on the tape
+      // the record contradicts — and drops whole. When value and limit
+      // format to the same string, presence is the whole fence and
+      // position is vacuous.
+      if (limitFigure !== valueFigure && limitAt < valueAt) return null;
+    }
   }
   return { line, rungOrder };
 };

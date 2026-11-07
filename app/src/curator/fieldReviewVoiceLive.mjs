@@ -167,12 +167,15 @@ export function startReviewVoice({
         };
         const order = proposal.rungOrder ?? rulesExt.rungOrder;
         if (order) ext.rungOrder = [...order];
+        // Amend before speaking (as in handle): the record's provenance
+        // is banked before the tape moves, so the two can never diverge
+        // — the writes are one synchronous block either way.
+        amend(ext, rec);
         try {
           speak(ext.line);
         } catch (err) {
           log('review-voice:speak-failed', String(err));
         }
-        amend(ext, rec);
       },
       (err) => {
         if (flights[persona] === flight) flights[persona] = null;
@@ -192,12 +195,16 @@ export function startReviewVoice({
     // by the next clean deal. The record stands unspoken (exactly
     // slice 1's shape) and the tape keeps the line it has.
     if (rec.verdict === 'clean' && lastSpoken === 'davis-clean') return;
+    // Amend before speaking: provenance is banked before the tape
+    // moves, structurally — both writes happen in this one synchronous
+    // block (the record key was pre-checked above), so no observer can
+    // interleave and the reorder changes nothing observable.
+    amend(rulesExt, rec);
     try {
       speak(rulesExt.line);
     } catch (err) {
       log('review-voice:speak-failed', String(err));
     }
-    amend(rulesExt, rec);
     lastSpoken = rec.verdict === 'clean' ? 'davis-clean' : 'lois-janky';
     maybeAsk(rec, rulesExt, bar);
   };

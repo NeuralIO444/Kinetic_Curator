@@ -11,6 +11,10 @@
 //   2. the proposal contract — a model reply may phrase and order but
 //      never invent: no figures, wrong figures, figure look-alikes,
 //      out-of-set rungs or a ladder on a clean landing all drop whole;
+//      figures must keep their roles (the value before its limit,
+//      crop's withheld limit stays withheld) and a clean proposal is
+//      fenced the other way — no figures, no contrary verdict, no
+//      repair named (the QA fix pass pins);
 //   3. the ask context (§3.7: names + measures only, gates with
 //      pass/fail, the rules line as idiom anchor, the approved set);
 //   4. the extension's fail-closed shape (sanitizeReviewVoice);
@@ -190,6 +194,82 @@ ok('validator: missing or invented figures drop the proposal whole', () => {
   const low = rec('janky', 'coverageLow', { m1: 0, m2: 0, m3: 0.0005, m4: 0 });
   assert.equal(validateReviewProposal({ line: 'At 10.05% of the dish — 0.15% is the floor.' }, low), null);
   assert.ok(validateReviewProposal({ line: 'At 0.05% of the dish — 0.15% is the floor.' }, low));
+});
+
+ok('validator: figure roles are fenced — the limit spoken before the value drops whole', () => {
+  // QA's probes: both figures present but the roles swapped — the tape
+  // would assert numbers the record contradicts.
+  assert.equal(validateReviewProposal({ line: '50% of its ink is covered — 73% is the limit.' }, J.markCover), null);
+  assert.equal(validateReviewProposal({ line: '0.15% of the dish is ink — 0.09% is the floor.' }, J.coverageLow), null);
+  assert.equal(
+    validateReviewProposal({ line: '5% is the limit, and 12% of its ink is doubled.' }, J.selfOverlap),
+    null,
+  );
+  // The value first, in the rules' own roles, stands — whatever the words.
+  assert.ok(validateReviewProposal({ line: 'Doubled ink at 12% — past the 5% limit.' }, J.selfOverlap));
+  assert.ok(validateReviewProposal({ line: 'Barely there: 0.09% of the dish, under the 0.15% floor.' }, J.coverageLow));
+});
+
+ok('validator: equal figures — when value and limit format alike, presence is the whole fence', () => {
+  const at = rec('janky', 'markCover', { m1: 0, m2: 0.5, m3: 0.03, m4: 0 }); // measured 50%, limit 50%
+  assert.deepEqual(validateReviewProposal({ line: 'Half of its ink is covered: 50%, right at it.' }, at), {
+    line: 'Half of its ink is covered: 50%, right at it.',
+    rungOrder: null,
+  });
+  assert.equal(validateReviewProposal({ line: 'Half of its ink is covered, right at it.' }, at), null);
+});
+
+ok('validator: the rules’ own lines pass their own fence — every gate, every woohoo', () => {
+  // The consistency property: the validator must be satisfiable by the
+  // templates it fences for, crop's figure-free limit included.
+  for (const gate of Object.keys(J)) {
+    assert.deepEqual(
+      validateReviewProposal({ line: LINES[gate] }, J[gate]),
+      { line: LINES[gate], rungOrder: null },
+      gate,
+    );
+  }
+  for (const seed of [0, 1, 2]) {
+    const r = CLEAN(seed);
+    const line = rulesVoice(r).line;
+    assert.deepEqual(validateReviewProposal({ line }, r), { line, rungOrder: null }, line);
+  }
+});
+
+ok('validator: crop’s limit stays unspoken — an invented 0% drops, a limit-free rephrase stands', () => {
+  assert.equal(
+    validateReviewProposal(
+      { line: 'The frame cuts the poem. 25% of its glyphs cross the edge — 0% is allowed.' },
+      J.crop,
+    ),
+    null,
+  );
+  assert.equal(validateReviewProposal({ line: 'Over the edge at 25%, heading for 0%.' }, J.crop), null);
+  assert.deepEqual(validateReviewProposal({ line: 'Glyphs over the edge: 25% of them. Shift it back.' }, J.crop), {
+    line: 'Glyphs over the edge: 25% of them. Shift it back.',
+    rungOrder: null,
+  });
+  assert.equal(
+    validateReviewProposal({ line: 'Glyphs over the edge, every one. Shift it back.' }, J.crop),
+    null,
+    'the value figure is still required',
+  );
+});
+
+ok('validator: a clean proposal carrying any percent figure drops whole', () => {
+  // QA's probe: an invented figure spoken over a clean record.
+  assert.equal(validateReviewProposal({ line: 'WOO HOO — 99% of the dish is ink and it sings.' }, CLEAN()), null);
+  assert.equal(validateReviewProposal({ line: 'WOO HOO — the poem stands at 0.09% of the dish.' }, CLEAN()), null);
+  assert.equal(validateReviewProposal({ line: 'Clean — 100%.' }, CLEAN()), null);
+});
+
+ok('validator: a clean proposal may not name the verdict it is not, nor a repair it never proposes', () => {
+  // QA's probes: verdict-contradicting speech over a clean record.
+  assert.equal(validateReviewProposal({ line: 'The poem is buried under the marks. Cut it.' }, CLEAN()), null);
+  assert.equal(validateReviewProposal({ line: 'Janky — half the poem is under the marks.' }, CLEAN()), null);
+  assert.equal(validateReviewProposal({ line: 'WOO HOO. Would shrink it anyway.' }, CLEAN()), null);
+  // The woohoo register itself is untouched by the fences.
+  assert.ok(validateReviewProposal({ line: 'Woohoo — nothing doubled, nothing buried, it stands.' }, CLEAN()));
 });
 
 ok('validator: out-of-set rungs, a ladder on a clean landing, and malformed replies all drop', () => {
