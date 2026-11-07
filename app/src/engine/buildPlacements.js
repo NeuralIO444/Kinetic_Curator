@@ -24,6 +24,7 @@ import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — paralla
 import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel/color/index.js';
 import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
+import { applyCultureScale } from './dishLifeCouple.mjs'; // #1923 Phase 2 — the culture coupling's scale fold
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
 import { applyGroundSnap } from './groundSnap.js'; // #1183 palette snap
@@ -325,6 +326,12 @@ export function buildPlacements({
   // #1183 rift slice 1 — { bands, amount, strength, W, H } from gl/dishRift.mjs when an FX layer above carries a
   // tear and this layer's RIFT dial is up: marks shear sideways by what the shader shears the picture. null = off.
   rift = null,
+  // #1923 Phase 2 slice A — the DISH LIFE coupling's first consumer: SCALE. Ephemeral per-frame
+  // input — NEVER in geometrySignature (the kineme deal): cultureScale = { coupling, sampler },
+  // the dial already shed-folded by the resolver and a sampler over the field culture's published
+  // field (engine/dishLifeCouple.mjs). null — every caller but the live resolver with the dial
+  // up — the pass never runs and the SoA is bit-identical to the pre-Phase-2 pipeline.
+  cultureScale = null,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -690,6 +697,14 @@ export function buildPlacements({
           stillMarks,
         )
       : null;
+
+  // #1923 Phase 2 slice A — the coupling's scale fold, the LAST SoA pass: it samples the published
+  // field at the presented position (post rhythm/drivers/nudge/rift/transport/surge) and folds
+  // into the stage-C scale channels like the kineme scale fold — no undo, because stage C
+  // recomputes scale on every call and the fold never accumulates. FIELD form items are built
+  // below from the form, never from this SoA, so the poem is structurally out of the culture's
+  // reach; the artist's still pins are skipped inside the applier, as every driver skips them.
+  if (cultureScale) applyCultureScale(soa, cultureScale, stillMarks);
 
   // Items: rebuilt fresh on any geometry/bind miss, or when overlap is off
   // (below sorts the array, see the pool guard for why that must stay

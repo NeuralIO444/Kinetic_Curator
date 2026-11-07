@@ -103,6 +103,7 @@ const POEM_ONLY_IDS = new Set(
   ),
 );
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
+import { fieldSampler, effectiveCoupling } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2: the coupling seam — sample the field stage's publication, fold the governor's hold
 
 const HOP_MAX_PX = 4;
 
@@ -346,6 +347,12 @@ export function createLiveResolver() {
   // #1923 DISH LIFE — the idle-pickup culture. A pure function of the recorded input stamp `input.dishLife`; holds no
   // state while the stamp is absent, so a build without a stamp is byte-identical to one without this stage.
   const dishLife = createDishLifeStage();
+  // #1923 Phase 2 — the FIELD culture's own stage: a second, draw-less instance fed only by input.dishField
+  // (mode:'field' stamps, produced by the loop while the coupling dial is up). It seeds from the dealt
+  // scene exactly like the main stage but its whole output is publication (publishedField) — the coupling's
+  // consumers read it one frame behind, the kineme culture read's contract. No stamp = no state, and a
+  // build without one is byte-identical to one without this stage.
+  const dishFieldStage = createDishLifeStage();
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -689,6 +696,14 @@ export function createLiveResolver() {
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
     // #1923 — the quiet culture's field, read ONE-WAY by the marks' kineme (the last applied frame's; null = none)
     const cultureField = dishLife.field();
+    // #1923 Phase 2 — the coupling read: this frame's dial (input.dishFieldCoupling), shed-folded by
+    // the field stamp's own shed (the governor's CULTURE HELD reads as coupling 0 — the sheddable
+    // admission), over the field stage's publication from the last applied frame. Inert (null)
+    // unless the effective dial is up AND a field is published, so a frame without the coupling is
+    // bit-identical to the pre-Phase-2 resolver.
+    const couplingNow = effectiveCoupling(input.dishFieldCoupling, input.dishField?.shed);
+    const fieldSamplerNow = couplingNow > 0 ? fieldSampler(dishFieldStage.publishedField, W, H) : null;
+    const cultureScale = fieldSamplerNow ? { coupling: couplingNow, sampler: fieldSamplerNow } : null;
     // #1574 — this frame's travel delta on the spine-A clock, measured once
     // for every layer (high-water: a rolled-back frame credits nothing).
     // slowRender frames advance the mark without travelling, so a freeze
@@ -1002,6 +1017,7 @@ export function createLiveResolver() {
           audioEnergy,
           layerId: layer.id, // #1245 — unknown-sampler diagnostic key
           kineme,
+          cultureScale, // #1923 Phase 2 — the coupling's scale fold (null unless the dial is up and a field is published)
           // #1574 — the travel input: the resolver's store + this frame's
           // spine-A delta + the governor's shed. Mode/leash/strength ride
           // layoutParams (recipe data); buildPlacements gates on them, so
@@ -1500,6 +1516,12 @@ export function createLiveResolver() {
     // input.dishLife, the visible layers' marks are the culture (the scene dissolved into it, drawn on the top
     // layer; held terrain stays put). Display only: the feeds, scent and dish above read the scene as it was dealt.
     // No stamp = the stage drops its state and touches nothing.
+    // #1923 Phase 2 — the field culture applies FIRST, so it seeds from the scene as dealt (before the
+    // visual culture below can dissolve it), and it never touches a layer: publication is its whole
+    // output, read by the coupling at the top of the next resolve. Only mode:'field' stamps are ever
+    // fed to it — anything else on this slot of a recorded input reads as no stamp, so this stage can
+    // never draw, dissolve or speck.
+    dishFieldStage.apply(input.dishField?.mode === 'field' ? input.dishField : null, out, W, H);
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
@@ -1623,6 +1645,7 @@ export function createLiveResolver() {
     worldNoise = null;
     worldNoiseSeed = null;
     dishLife.reset();
+    dishFieldStage.reset(); // #1923 Phase 2
   }
 
   // ── #1367 — mid-session state snapshot ─────────────────────────────────────
@@ -1647,6 +1670,7 @@ export function createLiveResolver() {
     const reviewMorphSnap = {};
     for (const [layerId, v] of reviewMorphState) reviewMorphSnap[layerId] = snapshotMorphEntry(v);
     const dishLifeSnap = dishLife.snapshot();
+    const dishFieldSnap = dishFieldStage.snapshot(); // #1923 Phase 2
     return {
       v: 1,
       W,
@@ -1669,6 +1693,7 @@ export function createLiveResolver() {
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
       ...(dishLifeSnap ? { dishLife: dishLifeSnap } : {}), // #1923 — OPTIONAL key: present only while a culture runs, so every other snapshot is exactly what it was
+      ...(dishFieldSnap ? { dishField: dishFieldSnap } : {}), // #1923 Phase 2 — OPTIONAL key on the same terms: present only while a field culture runs
       // #2006 slice 3 — OPTIONAL key on the same terms: present only while a
       // review settle is in flight or remembered, so every other snapshot
       // is exactly what it was. The settle is presentation state; a
@@ -1761,6 +1786,7 @@ export function createLiveResolver() {
     if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn);
     else spawnState.reset();
     dishLife.restore(snap.dishLife); // #1923 — absent (every pre-DISH-LIFE snapshot) = no culture, as a fresh resolver's
+    dishFieldStage.restore(snap.dishField); // #1923 Phase 2 — absent (every pre-Phase-2 snapshot) = no field culture, as a fresh resolver's
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
     if (snap.travel !== undefined) {
       restoreTravelStore(travelStore, snap.travel.store);
@@ -1982,23 +2008,27 @@ export function checkResolverSnapshot(snap) {
     }
   }
   if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
-  // #1923 — the culture's frozen seed is optional; when present it must carry its marks, canvas and generation
-  if (snap.dishLife !== undefined) {
-    const d = snap.dishLife;
-    if (!d || typeof d !== 'object' || !Array.isArray(d.marks) || !Number.isFinite(d.wakeMs)) return false;
-    if (!Number.isFinite(d.W) || !Number.isFinite(d.H) || !Number.isInteger(d.gen) || d.gen < 0) return false;
-    if (d.quiet !== undefined && (!d.quiet || typeof d.quiet !== 'object' || !Number.isFinite(d.quiet.strength)))
-      return false;
-    // #1994 — field mode's cycle rides the snapshot the same way; when present it must be an object whose
-    // cycleGens, when given, is a finite number
-    if (
-      d.field !== undefined &&
-      (!d.field ||
-        typeof d.field !== 'object' ||
-        Array.isArray(d.field) ||
-        (d.field.cycleGens !== undefined && !Number.isFinite(d.field.cycleGens)))
-    )
-      return false;
-  }
+  // #1923 — either stage's frozen seed is optional; when present it must carry its marks, canvas and generation
+  if (snap.dishLife !== undefined && !checkDishLifeSnapshot(snap.dishLife)) return false;
+  if (snap.dishField !== undefined && !checkDishLifeSnapshot(snap.dishField)) return false; // #1923 Phase 2
+  return true;
+}
+
+/** #1923 — the structural shape of a dishLife stage snapshot (the main culture's or the field culture's). */
+function checkDishLifeSnapshot(d) {
+  if (!d || typeof d !== 'object' || !Array.isArray(d.marks) || !Number.isFinite(d.wakeMs)) return false;
+  if (!Number.isFinite(d.W) || !Number.isFinite(d.H) || !Number.isInteger(d.gen) || d.gen < 0) return false;
+  if (d.quiet !== undefined && (!d.quiet || typeof d.quiet !== 'object' || !Number.isFinite(d.quiet.strength)))
+    return false;
+  // #1994 — field mode's cycle rides the snapshot the same way; when present it must be an object whose
+  // cycleGens, when given, is a finite number
+  if (
+    d.field !== undefined &&
+    (!d.field ||
+      typeof d.field !== 'object' ||
+      Array.isArray(d.field) ||
+      (d.field.cycleGens !== undefined && !Number.isFinite(d.field.cycleGens)))
+  )
+    return false;
   return true;
 }

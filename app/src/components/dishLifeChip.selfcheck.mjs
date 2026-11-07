@@ -66,6 +66,7 @@ ok('every state reads its details from the help copy, each distinct', () => {
     assert.ok(m.title.startsWith(helpText(`dish-life-${m.state}`)), m.state);
   }
   assert.ok(helpText('dish-life-strength').length > 0);
+  assert.ok(helpText('dish-life-coupling').length > 0, 'the coupling dial has its help copy (#1923 Phase 2)');
 });
 
 ok('the percent is the dial, clamped, junk falls back to the default', () => {
@@ -80,9 +81,19 @@ ok('the preference: round-trips through a Storage, never throws on junk or a bro
   const st = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => mem.set(k, v) };
   assert.equal(readDishLifePref(st), null, 'nothing stored');
   assert.equal(writeDishLifePref(st, { on: true, strength: 0.6 }), true);
-  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.6 });
+  // #1923 Phase 2 re-pin (cause: the preference gained the coupling dial): the read shape carries
+  // `coupling` — absent from everything stored before the dial existed, it reads as 0 (off).
+  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.6, coupling: 0 });
   assert.equal(writeDishLifePref(st, { on: 'x', strength: 9 }), true);
-  assert.deepEqual(readDishLifePref(st), { on: false, strength: 1 }, 'on is strictly boolean; strength clamps');
+  assert.deepEqual(
+    readDishLifePref(st),
+    { on: false, strength: 1, coupling: 0 },
+    'on is strictly boolean; strength clamps',
+  );
+  assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 0.7 }), true);
+  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.5, coupling: 0.7 }, 'coupling round-trips');
+  assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 4 }), true);
+  assert.equal(readDishLifePref(st).coupling, 1, 'coupling clamps to the dial range');
   mem.set('kc.dishLife.v1', '{"on":"yes","strength":0.5}');
   assert.equal(readDishLifePref(st).on, false, 'a stored non-boolean never turns it on');
   mem.set('kc.dishLife.v1', '{not json');

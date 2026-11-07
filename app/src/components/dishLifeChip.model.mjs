@@ -11,6 +11,8 @@ export const STRENGTH_MAX = 1;
 const STORAGE_KEY = 'kc.dishLife.v1';
 
 const clampStrength = (v) => (Number.isFinite(Number(v)) ? Math.min(STRENGTH_MAX, Math.max(0, Number(v))) : 0.35);
+// #1923 Phase 2 — the coupling dial's clamp: 0..1, and junk reads as 0 (off — the dial starts at 0).
+const clampCoupling = (v) => (Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0);
 
 /** @returns {{ state: 'off'|'on'|'slowed'|'held'|'arming', lit: boolean, label: string, title: string, percent: number }} */
 export function dishLifeChipModel(s = {}) {
@@ -33,23 +35,28 @@ export function dishLifeChipModel(s = {}) {
   return { state, lit, label, title: `${helpText(`dish-life-${state}`)} (${percent}%)`, percent };
 }
 
-/** The stored per-viewer preference ({ on, strength }) from a Storage-like, or null. Never throws. */
+/** The stored per-viewer preference ({ on, strength, coupling }) from a Storage-like, or null. Never throws.
+ * A preference stored before the coupling dial existed carries no coupling key and reads as 0. */
 export function readDishLifePref(storage) {
   try {
     const raw = storage && storage.getItem(STORAGE_KEY);
     if (!raw) return null;
     const p = JSON.parse(raw);
     if (!p || typeof p !== 'object') return null;
-    return { on: p.on === true, strength: clampStrength(p.strength) };
+    return { on: p.on === true, strength: clampStrength(p.strength), coupling: clampCoupling(p.coupling) };
   } catch {
     return null;
   }
 }
 
 /** Save the preference. Never throws (private windows, blocked storage). */
-export function writeDishLifePref(storage, { on, strength }) {
+export function writeDishLifePref(storage, { on, strength, coupling }) {
   try {
-    if (storage) storage.setItem(STORAGE_KEY, JSON.stringify({ on: on === true, strength: clampStrength(strength) }));
+    if (storage)
+      storage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ on: on === true, strength: clampStrength(strength), coupling: clampCoupling(coupling) }),
+      );
     return true;
   } catch {
     return false;

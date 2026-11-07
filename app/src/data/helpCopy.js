@@ -311,6 +311,12 @@ export const HELP_TOPICS = [
     text: 'How present the quiet layer is. It is always subtle — this only sets how much; 0 would be silent. Double-click to reset to 35%.',
   },
   {
+    id: 'dish-life-coupling',
+    group: 'Master',
+    title: 'dish life · coupling',
+    text: 'How hard the invisible field culture drives the marks: where the culture is alive the marks swell, where it is dead they shrink. 0 is off — the culture may live, but nothing reads it. Double-click to reset to 0%.',
+  },
+  {
     id: 'beast-roam',
     group: 'Assets',
     title: 'beast · roam',

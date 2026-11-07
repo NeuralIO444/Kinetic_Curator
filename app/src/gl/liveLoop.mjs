@@ -46,6 +46,7 @@ import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
 import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
+import { fieldStamp } from '../engine/dishLifeField.mjs'; // #1923 Phase 2: the field culture's cycle stamp (produced while the coupling dial is up)
 import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
@@ -786,6 +787,8 @@ export function createLiveLoop(
     const dishLifeOn = !!s.dishLife || (typeof window !== 'undefined' && !!window.__KC_DISH_LIFE);
     dishLifePhase.setEnabled(dishLifeOn);
     let dishLifeStamp = null;
+    let dishFieldStamp = null; // #1923 Phase 2 — set below, only while the coupling dial is up
+    let dishFieldCoupling = 0;
     if (dishLifeOn) {
       const touched = consumeTouch();
       if (touched) dishLifePhase.touch(loopTimeMs, touched.source, touched.level);
@@ -807,6 +810,15 @@ export function createLiveLoop(
         boost: dishLifeBoost,
         shed: s.dishLifeShed | 0,
       });
+      // #1923 Phase 2 slice A — the field culture: stamped only while the coupling dial is up (the
+      // ruled on-switch), on the same loop clock, the governor's shed riding it like every culture
+      // stamp. The dial rides beside it (dishFieldCoupling) so the take's input log accounts for
+      // the exact strength that acted, frame by frame — no dial, no keys, the older input shape.
+      const couplingDial = Number.isFinite(s.dishLifeCoupling) ? s.dishLifeCoupling : 0;
+      if (couplingDial > 0) {
+        dishFieldStamp = fieldStamp(loopTimeMs, { shed: s.dishLifeShed | 0 });
+        dishFieldCoupling = couplingDial;
+      }
     } else {
       clearTouch();
     }
@@ -836,6 +848,7 @@ export function createLiveLoop(
       : null;
     const resolved = resolver.resolveLayers({
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
+      ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,
