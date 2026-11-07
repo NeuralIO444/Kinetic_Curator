@@ -176,6 +176,7 @@ node src/engine/dishLifeStage.selfcheck.mjs
 node src/engine/dishLifeQuiet.selfcheck.mjs
 node src/engine/dishLifeField.selfcheck.mjs
 node src/engine/dishLifeCoupling.selfcheck.mjs
+node src/engine/dishLifeBreathing.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
 node src/gl/dishLifeTouchDom.selfcheck.mjs
