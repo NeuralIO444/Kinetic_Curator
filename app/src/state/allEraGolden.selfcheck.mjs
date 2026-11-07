@@ -12,10 +12,11 @@ import { renderSvg } from '../../../studio/render.mjs';
 import { ASSETS } from '../data/assets/index.js';
 
 /** First-render SVG SHA-256 of the all-era fixture — bump only on intentional render changes. */
-export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = 'a52e3bd7ba4722aa7fa5fe53b74e6e3bc289507213a7b197d622fe5c80fa7c6b'; // re-pinned: #1854 added the Marks pool (18 records) to the catalog —
-// the 'all' pool is the full catalog, so its first render gains the new marks. Proven before re-pinning:
-// with only ASSETS_MARKS removed from the authored index (scratch tree), this suite reproduces
-// da8cf4fa… exactly (295 assets) — the delta is the catalog growth, not the render pipeline.
+export const EXPECTED_ALL_ERA_FIRST_RENDER_HASH = '48f77588ba5d0facd2e8accb860677248f20dd4adfbe5cacd5944b2eaae7dc83'; // re-pinned: #2005 added the plate pack (52 records) to the catalog —
+// the 'all' pool is the full catalog, so its first render gains the new stamps. Proven before re-pinning,
+// on the #1854 pattern: with only the ASSETS_PLATE spread removed from the assets index (scratch tree),
+// this suite reproduces a52e3bd7… exactly (701 assets, 21183 svg bytes) — the delta is the catalog
+// growth, not the render pipeline. (Earlier re-pin: #1854 added the Marks pool, 18 records.)
 
 const raw = JSON.parse(readFileSync(new URL('./fixtures/all-era-project.json', import.meta.url), 'utf8'));
 

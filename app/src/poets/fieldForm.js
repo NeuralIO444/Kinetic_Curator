@@ -30,12 +30,14 @@ import {
   lowerStampIdForChar,
   punctStampIdForChar,
   serifStampIdForChar,
+  plateStampIdForChar,
   ornamentStampIdForChar,
   stampWidthEm,
   LETTER_STAMP_IDS,
   LOWER_STAMP_IDS,
   PUNCT_STAMP_IDS,
   SERIF_STAMP_IDS,
+  PLATE_STAMP_IDS,
   ORNAMENT_STAMP_IDS,
   ORNAMENT_GLYPH_BY_ID,
   NATIVE_STAMP_IDS,
@@ -49,6 +51,7 @@ const isBaseLetter = (s) => LETTER_STAMP_IDS.has(s.assetId) && stampIdForChar(s.
 const isLower = (s) => LOWER_STAMP_IDS.has(s.assetId) && lowerStampIdForChar(s.ch) === s.assetId;
 const isPunct = (s) => PUNCT_STAMP_IDS.has(s.assetId) && punctStampIdForChar(s.ch) === s.assetId;
 const isSerifLetter = (s) => SERIF_STAMP_IDS.has(s.assetId) && serifStampIdForChar(s.ch) === s.assetId;
+const isPlateLetter = (s) => PLATE_STAMP_IDS.has(s.assetId) && plateStampIdForChar(s.ch) === s.assetId;
 const isNativeStamp = (s) => NATIVE_STAMP_IDS.has(s.assetId) && nativeStampIdForChar(s.ch) === s.assetId;
 const isOrnament = (s) => ORNAMENT_STAMP_IDS.has(s.assetId) && ornamentStampIdForChar(s.ch) === s.assetId;
 const isDigitGlyph = (s) => typeof s.ch === 'string' && s.ch >= '0' && s.ch <= '9';
@@ -127,6 +130,11 @@ const GATE_EPS = 1e-6;
  *   (base or serif, never the native context) only standing ALONE on their
  *   baseline row: an ornament sharing its row with any other stamp is
  *   glyph-adjacent inside a line, and is refused as a charset stillborn.
+ *   #2005 adds the PLATE face on the same discipline, affirmed by
+ *   `plate: true` (the clean plate — a third, face-bound charset: plate
+ *   letter stamps pass only there, base and serif letter stamps are
+ *   refused there, and the shared stamps — digits and punctuation — pass
+ *   in every Latin face; ornaments stay Latin-face furniture there too).
  * - fit: a stamp that cannot fit its module — crushed below
  *   FIELD_MIN_LEGIBLE_EM by the fit shrink, or ink that lands off the dish.
  * - overlap: two stamps whose ink boxes intersect — glyphs piled into each
@@ -137,15 +145,20 @@ const GATE_EPS = 1e-6;
  * other stamp with the base ruler it has always used.
  * Pure: same stamps in, same verdict out.
  */
-export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana = false, face } = {}) {
+export function gateFieldForm(stamps, { aspect = DEFAULT_FIELD_ASPECT, allowKana = false, face, plate = false } = {}) {
   const asp = Number.isFinite(aspect) && aspect >= 0.5 && aspect <= 3 ? aspect : DEFAULT_FIELD_ASPECT;
   if (!Array.isArray(stamps) || stamps.length === 0) return Object.freeze({ ok: false, reason: 'fit', stampIndex: -1 });
   const serifForm = face === 'serif';
+  const plateForm = plate === true;
   const ornamentIdx = [];
   for (let j = 0; j < stamps.length; j++) {
     const s = stamps[j];
     if (!s || typeof s !== 'object') return Object.freeze({ ok: false, reason: 'charset', stampIndex: j });
-    if (serifForm) {
+    if (plateForm) {
+      // The plate face: its own letters, plus the face-shared stamps
+      // (digits and punctuation — never base or serif letters, never native).
+      if (isPlateLetter(s) || isPunct(s) || (isBaseLetter(s) && isDigitGlyph(s))) continue;
+    } else if (serifForm) {
       // The serif face: its own letters, plus the face-shared stamps
       // (digits and punctuation — never base letters, never native).
       if (isSerifLetter(s) || isPunct(s) || (isBaseLetter(s) && isDigitGlyph(s))) continue;
@@ -246,7 +259,17 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   // exactly as a script call on a deck with no native face deals Latin (the
   // door refuses a serif form under another poet, so the deal never deals
   // one). A native deal outranks the face: the faces never compose.
-  const serif = !kana && decision.face === 'serif' && decision.poetId === 'greenleaf';
+  // #2005 — the plate is the same kind of call, one register deeper:
+  // decision.plate === true deals Whittier as a PLATE — set in the plate
+  // face under the plate discipline (placement.js), the form carrying the
+  // `plate` register. Whittier's alone, on the serif law; and where both
+  // calls ride one decision the plate SUPERSEDES the serif face and the
+  // plate break — a plate is the solo room's whole treatment for that deal,
+  // not a layer over the reading room's lesser ones (the plateBreak
+  // furniture is the serif deal's pause; a plate's lines keep their own
+  // air). A native deal outranks the plate as it outranks the face.
+  const plate = !kana && decision.plate === true && decision.poetId === 'greenleaf';
+  const serif = !kana && !plate && decision.face === 'serif' && decision.poetId === 'greenleaf';
   // #2002 — the sentence face: decision.case deals the piece's caseLines —
   // the deck's own rendering of the same words in lowercase + punctuation
   // (deck data, parallel to nativeLines) — when the piece carries them.
@@ -265,6 +288,7 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   const pieceLayout = PLACEMENT_LAYOUTS.includes(piece.layout) ? piece.layout : 'bands';
   if (
     !kana &&
+    !plate &&
     typeof decision.plateBreak === 'string' &&
     ORNAMENT_STAMP_IDS.has(decision.plateBreak) &&
     pieceLayout !== 'single' &&
@@ -275,7 +299,7 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   }
   const { layout, stamps } = placePiece({ ...piece, lines: dealLines, density }, rng, {
     aspect: asp,
-    face: serif ? 'serif' : undefined,
+    face: plate ? 'plate' : serif ? 'serif' : undefined,
   });
   // #1932 — the threshold counts LETTERS: a plate-break ornament is
   // furniture between the poem's lines, not a letter of it (#2002).
@@ -284,7 +308,7 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
   // S4 (#1905) — the stillborn gate: a form that would spawn unreadable
   // never spawns. The deal falls back to silence and the verdict rides the
   // record (layoutSlice banks it on the commit as fieldGateRefusal).
-  const gate = gateFieldForm(stamps, { aspect: asp, allowKana: kana, face: serif ? 'serif' : undefined });
+  const gate = gateFieldForm(stamps, { aspect: asp, allowKana: kana, face: serif ? 'serif' : undefined, plate });
   if (!gate.ok) return { form: null, gate };
   return {
     form: {
@@ -294,6 +318,7 @@ export function fieldDealReport(decision, rng, { aspect = DEFAULT_FIELD_ASPECT }
       aspect: asp,
       ...(kana ? { script: 'kana' } : {}),
       ...(serif ? { face: 'serif' } : {}),
+      ...(plate ? { plate: true } : {}),
       ...(breakId ? { break: breakId } : {}),
       stamps: stamps.map((s) => ({
         assetId: s.assetId,
@@ -343,10 +368,17 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  * plate break (the named ornament's stamps must be present, no other
  * ornament may ride, and no marker may stand without its stamps). The
  * faces never compose: face + script together is refused whole.
+ * #2005: a third register rides the same discipline — `plate: true`
+ * declares the form a clean plate (set in the plate face under the plate
+ * discipline; Whittier only; plate stamps honest only inside it, base and
+ * serif letters refused inside it, digits and punctuation shared). Any
+ * other plate value refuses the form whole; plate + face and plate +
+ * script are refused (the faces never compose), and plate + raygun is
+ * refused whole — the two poles of FIELD type never mix on one form.
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak, raygun } = raw;
+  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak, raygun, plate } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
@@ -396,6 +428,21 @@ export function sanitizeFieldForm(raw) {
   const serifForm = face === 'serif';
   if (serifForm && poetId !== 'greenleaf') return null;
   if (serifForm && kanaForm) return null;
+  // #2005 — the plate register: `plate: true` declares the form a clean
+  // plate. Any other value (false, a string, a number) is dishonest data
+  // and refuses the form whole, on the register marker's discipline. The
+  // plate is Whittier's alone; it never stands on a native form; and the
+  // faces never compose — a plate declaration beside the serif face is
+  // refused whole. The two poles never mix: a form claiming a plate AND a
+  // ray-gun record is refused whole, whichever order the record was
+  // written in (the store's ray-gun cycle also refuses to arm on a plate —
+  // layoutSlice.cyclePoemRaygun — so the claim can only arrive as data).
+  if (plate !== undefined && plate !== true) return null;
+  const plateForm = plate === true;
+  if (plateForm && poetId !== 'greenleaf') return null;
+  if (plateForm && kanaForm) return null;
+  if (plateForm && serifForm) return null;
+  if (plateForm && raygunMark !== undefined) return null;
   // #2002 — the break marker: the ornament id of the form's plate break.
   // It must name a real ornament stamp, and it is refused in a native form
   // (ornaments are Latin-face furniture — charset purity). Its agreement
@@ -412,6 +459,7 @@ export function sanitizeFieldForm(raw) {
     if (typeof s.ch !== 'string' || s.ch.length !== 1) return null;
     const isLetter = isBaseLetter(s);
     const isNative = isNativeStamp(s);
+    const isPlate = isPlateLetter(s);
     const orn = isOrnament(s);
     if (orn) {
       if (s.assetId !== plateBreak) return null; // an undeclared (or differently declared) break stamp
@@ -420,9 +468,11 @@ export function sanitizeFieldForm(raw) {
     if (
       kanaForm
         ? !isNative
-        : serifForm
-          ? !(isSerifLetter(s) || isPunct(s) || (isLetter && isDigitGlyph(s)) || orn)
-          : !(isLetter || isLower(s) || isPunct(s) || orn)
+        : plateForm
+          ? !(isPlate || isPunct(s) || (isLetter && isDigitGlyph(s)) || orn)
+          : serifForm
+            ? !(isSerifLetter(s) || isPunct(s) || (isLetter && isDigitGlyph(s)) || orn)
+            : !(isLetter || isLower(s) || isPunct(s) || orn)
     )
       return null;
     if (!Number.isFinite(s.x) || s.x < 0 || s.x > aspect) return null;
@@ -438,7 +488,7 @@ export function sanitizeFieldForm(raw) {
   // floor) is refused whole, exactly as at the deal. #2002: the gate also
   // judges the break-only law here — an ornament sharing its row with
   // another stamp never passes this door.
-  if (!gateFieldForm(out, { aspect, allowKana: kanaForm, face: serifForm ? 'serif' : undefined }).ok) return null;
+  if (!gateFieldForm(out, { aspect, allowKana: kanaForm, face: serifForm ? 'serif' : undefined, plate: plateForm }).ok) return null;
   return {
     poetId,
     pieceId,
@@ -446,6 +496,7 @@ export function sanitizeFieldForm(raw) {
     aspect,
     ...(kanaForm ? { script: 'kana' } : {}),
     ...(serifForm ? { face: 'serif' } : {}),
+    ...(plateForm ? { plate: true } : {}),
     ...(plateBreak !== undefined ? { break: plateBreak } : {}),
     ...(register === 'whisper' ? { register: 'whisper' } : {}),
     ...(raygunMark !== undefined ? { raygun: raygunMark } : {}),

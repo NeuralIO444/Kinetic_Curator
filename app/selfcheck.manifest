@@ -555,6 +555,7 @@ node src/poets/fieldStampPath.selfcheck.mjs
 node src/poets/fieldKana.selfcheck.mjs
 node src/poets/fieldKanji.selfcheck.mjs
 node src/poets/fieldLatin.selfcheck.mjs
+node src/poets/fieldPlate.selfcheck.mjs
 node src/poets/rayGun.selfcheck.mjs
 node src/curator/fieldSilence.selfcheck.mjs
 node src/curator/fieldLiveDeal.selfcheck.mjs

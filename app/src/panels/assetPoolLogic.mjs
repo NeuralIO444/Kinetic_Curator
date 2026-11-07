@@ -8,6 +8,7 @@ import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
+import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 
 // #1982 — the kana stamps are poem-only (FIELD): catalogue members so the
 // census and the stage atlas resolve them, but they never become pool
@@ -17,8 +18,11 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 // #2002 — the slice-3 packs (Anton lowercase + punctuation, the serif face,
 // the ornaments) join the same exclusion: the poem-only set is the whole
 // union the FIELD director deals alone (poets/placement.js POEM_ONLY_STAMP_IDS).
+// #2005 — the plate pack (Fraunces) joins the same exclusion.
 const POEM_ONLY_IDS = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
+    (a) => a.id,
+  ),
 );
 
 /** Descriptor records for the pool: library assets read baked traits + the document's edits, imports their own. */

@@ -1100,11 +1100,18 @@ export const createLayoutSlice = (set) => ({
    * the record simply isn't on it. Refused with no poem standing. One
    * undo step per tap, like every other write to layoutParams. The deal
    * never sets the record — this cycle is the only write site.
+   *
+   * #2005 — the poles never mix: the gun does not arm on a plate. A plate
+   * is the clean pole standing; blasting it would claim plate + raygun on
+   * one form, which the document door refuses whole — so the gesture
+   * simply does not land on a plate form, the way every refused poem
+   * gesture does not land.
    */
   cyclePoemRaygun: () =>
     set((state) => {
       const form = state.layoutParams?.fieldForm;
       if (!form) return {};
+      if (form.plate) return {}; // #2005 — a plate is never treated
       const tap = state.raygunTap | 0;
       const cur = form.raygun && RAYGUN_MODES.includes(form.raygun.mode) ? RAYGUN_MODES.indexOf(form.raygun.mode) : -1;
       const next = { ...form };

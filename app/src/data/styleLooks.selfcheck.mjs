@@ -130,7 +130,21 @@ const input = (p, pool, t) => ({
 });
 const blank = []; // LOOKS_VERBOSE=1 prints id / marks / marks on canvas
 for (const p of COMPOSITION_PRESETS) {
-  const pool = poolToEnabled(dealPoolFor(records, mkRng(4242), p).ids);
+  // #2005 RE-PIN (cause: the clean plate) — the fixture seed moves 4242 →
+  // 4100. This loop deals from the FULL catalogue records, poem-only packs
+  // included, so the candidate lists the seed samples from grow with every
+  // pack; the plate pack's 52 letterform records shifted the samples, and
+  // at 4242 diagonal-grid's pool lands all-poem-only (typ_s_K, typ_s_A,
+  // typ_k_za, typ_k_a) — a pool that correctly renders nothing (the
+  // resolver excludes poem-only marks by design; proven on the base tree,
+  // where the same pool also renders 0 and this suite's 4242 pool renders
+  // 172 here). At 4100 every look's pool again holds a placeable mark.
+  // The assertion below is unchanged. (Standing fragility, noted for the
+  // next pack: a dozen letterform-paired looks share one candidate set and
+  // clear or blank together per seed — dealing from the panel's records,
+  // as production does, would end the lottery, but that is a redesign of
+  // this fixture, not a re-pin.)
+  const pool = poolToEnabled(dealPoolFor(records, mkRng(4100), p).ids);
   const r = createLiveResolver();
   let out;
   for (let f = 0; f < 24; f++) out = r.resolveLayers(input(p, pool, f * 16.7));

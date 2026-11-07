@@ -22,9 +22,10 @@
 //  - the break-only law (gate + door): an ornament passes only alone on
 //    its baseline row in a Latin-face form, under its declared marker;
 //    inside a line, in a native form, undeclared, or mismatched — refused.
-//  - poem-only: the catalogue carries the packs (602 + 26 + 17 + 52 + 4),
-//    the authored bake does not, the panel's records stay 313, and every
-//    dealing surface excludes the grown poem-only union by id.
+//  - poem-only: the catalogue carries the packs (602 + 26 + 17 + 52 + 4,
+//    and #2005's 52 plate stamps on top), the authored bake does not, the
+//    panel's records stay 313, and every dealing surface excludes the
+//    grown poem-only union by id.
 //  - the producer (fix loop, Matt's ruling 2026-11-06): the Director calls
 //    face/case/plateBreak from the room, like the kana script — the last
 //    section drives the LIVE path (choosePoet under the contexts step
@@ -186,7 +187,7 @@ assert.ok(serifGlyphWidthEm('W') > 0 && serifGlyphWidthEm('W') !== glyphWidthEm(
 assert.strictEqual(stampWidthEm('typ_s_A', 'A'), serifGlyphWidthEm('A'), 'a serif stamp measures serif');
 assert.strictEqual(stampWidthEm('typ_A', 'A'), glyphWidthEm('A'), 'a base stamp measures base');
 assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: slice 3 is Latin-side');
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 289 + 43 + 52 + 4, 'the poem-only union grew by exactly the slice-3 packs');
+assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 289 + 43 + 52 + 4 + 52, 'the poem-only union grew by exactly the slice-3 packs, and by #2005’s plate pack (52) on top');
 for (const id of [...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS]) {
   assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: in the poem-only union`);
   assert.ok(!NATIVE_STAMP_IDS.has(id), `${id}: not in the native face`);
@@ -441,8 +442,8 @@ assert.ok(
 );
 assert.strictEqual(
   ASSETS.length,
-  602 + (26 + 17 + 52 + 4),
-  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments)',
+  602 + (26 + 17 + 52 + 4) + 52,
+  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005)',
 );
 for (const a of [...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS]) {
   assert.ok(ASSETS.some((x) => x.id === a.id), `${a.id}: resolves in the catalogue`);
@@ -503,9 +504,16 @@ assert.ok(
   !('face' in plainPick) && !('case' in plainPick) && !('plateBreak' in plainPick),
   'no context affirmed: the decision carries no slice-3 call',
 );
-const soloPick = choosePoet({ intensity: 0.2, rng: () => 0, typeEligible: true, soloContext: true });
+const soloPick = choosePoet({ intensity: 0.3, rng: () => 0, typeEligible: true, soloContext: true });
 assert.strictEqual(soloPick.face, 'serif', 'the solo room affirms the serif face for Whittier');
+assert.ok(!('plate' in soloPick), '#2005: above the stillness line the solo deal is a serif reading, not a plate');
 assert.ok(!('plateBreak' in soloPick), 'g1 is two lines — not long-form, no break call');
+// #2005 RE-PIN (cause: the clean plate): this fixture stood at intensity
+// 0.2, where the solo room's Whittier deal is now a PLATE — the plate call
+// supersedes the serif call at the stillest band (intensity ≤
+// PLATE_CALL_MAX_INTENSITY), by the plate's design. The serif affirmation
+// is pinned here at 0.3 (same cool pool, same draw), above the line; the
+// plate suite owns the still-band pins.
 const bauhausPick = choosePoet({ intensity: 0.2, rng: () => 0, typeEligible: true, bauhausContext: true });
 assert.strictEqual(bauhausPick.case, true, 'a Bauhaus room affirms the sentence face');
 assert.ok(!('face' in bauhausPick), 'the sentence face is not the serif face');
@@ -516,11 +524,12 @@ assert.ok(!('face' in soloTeijo), 'the serif face is Whittier-only at the pick, 
 
 // step: the contexts are the room's — the verdict as the step resolves it
 // and the dealt look's family, derived exactly as japaneseContext is.
-const soloStep = step({ ...INITIAL_STATE }, { intensity: 0.2, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
+const soloStep = step({ ...INITIAL_STATE }, { intensity: 0.3, verdict: 'DAVIS ALONE', lookFamily: 'swiss' }, () => 0);
 assert.strictEqual(soloStep.decision.face, 'serif', 'step: a DAVIS ALONE room affirms serif through the real step');
+assert.ok(!('plate' in soloStep.decision), '#2005: at 0.3 the step deals the serif reading, not a plate');
 const soloStanding = step(
   { ...INITIAL_STATE, room: 'DAVIS ALONE' },
-  { intensity: 0.2, lookFamily: 'swiss' },
+  { intensity: 0.3, lookFamily: 'swiss' },
   () => 0,
 );
 assert.strictEqual(soloStanding.decision.face, 'serif', "step: the room the session stands in speaks when the input names none");
@@ -556,16 +565,20 @@ const directorInRoom = ({ feed, lookFamily }) => {
 {
   const { d, verdict } = directorInRoom({ feed: { away: true, rollsLastMinute: 3 }, lookFamily: 'swiss' });
   assert.strictEqual(verdict, 'DAVIS ALONE', 'setup: LOIS away, generator rolling — the Director stands in the solo room');
+  // #2005 RE-PIN (cause: the clean plate): this room stands at the
+  // Director's stillest intensity, inside the plate's band — the live solo
+  // deal is a PLATE deal now, and the serif call is superseded on it (the
+  // plate suite owns the plate's live-path pins; the serif call's live
+  // affirmation above the line is pinned at choosePoet/step level above).
   const decision = d.dealPoet({ fieldRng: () => 0, lookFamily: 'swiss' });
-  assert.ok(decision && decision.poetId === 'greenleaf' && decision.face === 'serif', 'live path: the solo room deals Whittier with the serif call');
-  const { form, gate } = fieldDealReport(decision, mkRng(7), { aspect: 10 / 7 });
-  assert.ok(form && !gate, 'live path: the serif deal spawns through the real deal');
-  assert.strictEqual(form.face, 'serif', 'live path: the form on the dish is a serif form');
   assert.ok(
-    form.stamps.every((s) => SERIF_STAMP_IDS.has(s.assetId) || PUNCT_STAMP_IDS.has(s.assetId)),
-    'live path: the serif form is dealt in serif stamps (punctuation shared)',
+    decision && decision.poetId === 'greenleaf' && decision.plate === true && !('face' in decision),
+    'live path: the still solo room deals Whittier with the plate call, superseding serif',
   );
-  assert.deepStrictEqual(sanitizeFieldForm(form), form, 'live path: the serif form round-trips the door');
+  const { form, gate } = fieldDealReport(decision, mkRng(7), { aspect: 10 / 7 });
+  assert.ok(form && !gate, 'live path: the plate deal spawns through the real deal');
+  assert.strictEqual(form.plate, true, 'live path: the form on the dish is a plate form');
+  assert.deepStrictEqual(sanitizeFieldForm(form), form, 'live path: the plate form round-trips the door');
 
   const breakDecision = d.dealPoet({ fieldRng: seqRng([0.9, 0.0]), lookFamily: 'swiss' });
   assert.ok(
