@@ -297,6 +297,23 @@ const fieldAspect = (state) =>
  *    stream at poemDeal; the form is placed off its sibling stream. Silence clears the standing form.
  * `avoidPieceId` (the dislike path) asks for a different piece than the one standing.
  */
+/**
+ * #2006 — the shadow review, fail-closed. The review measures and banks;
+ * it never acts, so it must never be able to break the deal it rides on:
+ * ANY failure inside it (a poisoned asset pool, a builder edge) banks
+ * null — no record — and the landing proceeds exactly as it would have
+ * without the review. The wrap lives here, at the call sites, because
+ * the risky work (reviewLanding → buildPlacements) runs while the deal
+ * commit is being constructed, before any downstream guard can run.
+ */
+function bankReview(state, landingParams, opts) {
+  try {
+    return reviewLanding(state, landingParams, opts);
+  } catch {
+    return null;
+  }
+}
+
 function landPoem(
   state,
   layoutParams,
@@ -345,7 +362,7 @@ function landPoem(
     // buildEnabledAssets, so the review measures the build that lands.
     fieldReview:
       form && review
-        ? reviewLanding(state, lp, {
+        ? bankReview(state, lp, {
             seed: buildSeed ?? state.seed,
             enabledAssets: buildEnabledAssets ?? state.enabledAssets,
             stream: `poem:${n}`,
@@ -1408,7 +1425,7 @@ export const createLayoutSlice = (set) => ({
         fieldReview: poemHeld(state)
           ? (state.fieldReview ?? null)
           : fieldDeal
-            ? reviewLanding(state, landed, { stream: `press:${press}` })
+            ? bankReview(state, landed, { stream: `press:${press}` })
             : null,
       };
     }),

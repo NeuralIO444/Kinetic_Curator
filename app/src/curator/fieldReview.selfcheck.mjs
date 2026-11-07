@@ -10,12 +10,17 @@
 //      whisper/plate are marked exempt, never judged);
 //   3. the store wiring through the REAL deal paths — the CURATOR press
 //      and the KINETIC passes bank records, HOLD carries the record by,
-//      a re-deal never banks one, silence and swarm landings bank none;
+//      a re-deal never banks one, silence and judged swarm landings bank
+//      none — and the review is FAIL-CLOSED: a throw inside it banks
+//      null and the landing proceeds untouched;
 //   4. THE CENSUS: a seeded corpus of real deals (ordinary rooms, plus a
 //      mirror-room sub-corpus where M1's manufacturer lives), every
 //      verdict re-derived from its banked record (the loisJudge
 //      provenance pin), with the TUNABLE gates' observed margins printed
-//      — the calibration evidence slices 2/3 set their gates from.
+//      — the calibration evidence slices 2/3 set their gates from. The
+//      corpus machinery is PINNED (stepped fake clock + seeded dice —
+//      see withPinnedTime below), so the census counts are pinned
+//      EXACTLY: drift is a finding, not weather.
 import assert from 'node:assert/strict';
 import { useStore } from '../state/store.js';
 import { resetDirector } from './director.js';
@@ -127,21 +132,29 @@ ok('exemptions: plate / raygun / whisper / kept are marked, a plain form is judg
   assert.equal(reviewExemption(null, []), null);
 });
 
-ok('reviewLanding: an exempt landing banks an exempt record with no measures; a swarm landing banks nothing', () => {
-  const state = S();
-  const plate = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1', plate: true }, mkRng(42), {
-    aspect: 10 / 7,
-  }).form;
-  const rec = reviewLanding(state, { ...state.layoutParams, fieldForm: plate }, { stream: 'press:0' });
-  assert.equal(rec.verdict, 'exempt');
-  assert.equal(rec.exempt, 'plate');
-  assert.equal(rec.measures, null);
-  assert.equal(rec.backend, 'rules');
-  assert.equal(rec.rung, null);
-  const plain = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1' }, mkRng(42), { aspect: 10 / 7 }).form;
-  assert.equal(reviewLanding(state, { ...state.layoutParams, mode: 'hype', fieldForm: plain }, {}), null);
-  assert.equal(reviewLanding(state, { ...state.layoutParams, fieldForm: undefined }, {}), null);
-});
+ok(
+  'reviewLanding: an exempt landing banks an exempt record with no measures; a judged swarm landing banks nothing',
+  () => {
+    const state = S();
+    const plate = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1', plate: true }, mkRng(42), {
+      aspect: 10 / 7,
+    }).form;
+    const rec = reviewLanding(state, { ...state.layoutParams, fieldForm: plate }, { stream: 'press:0' });
+    assert.equal(rec.verdict, 'exempt');
+    assert.equal(rec.exempt, 'plate');
+    assert.equal(rec.measures, null);
+    assert.equal(rec.backend, 'rules');
+    assert.equal(rec.rung, null);
+    const plain = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1' }, mkRng(42), { aspect: 10 / 7 }).form;
+    assert.equal(reviewLanding(state, { ...state.layoutParams, mode: 'hype', fieldForm: plain }, {}), null);
+    // …but an EXEMPT form banks its record even in a swarm mode: exemption
+    // is read off the form and never needed the build a swarm never makes.
+    const swarmPlate = reviewLanding(state, { ...state.layoutParams, mode: 'hype', fieldForm: plate }, {});
+    assert.equal(swarmPlate.verdict, 'exempt');
+    assert.equal(swarmPlate.exempt, 'plate');
+    assert.equal(reviewLanding(state, { ...state.layoutParams, fieldForm: undefined }, {}), null);
+  },
+);
 
 // ---------------------------------------------------------------------------
 // 3. The store wiring, through the real deal paths (fieldDeal's fixture).
@@ -177,6 +190,53 @@ const rederive = (rec) => {
   assert.equal(v.verdict, rec.verdict, 'the verdict re-derives from the banked measures + gates');
   assert.equal(v.gate, rec.gate);
 };
+
+// ---------------------------------------------------------------------------
+// Pinned time + dice for the corpus machinery (and any check that needs
+// the store's live sources stilled). The deal paths read two live
+// sources: the WALL CLOCK — the Director's intensity/relax windows and
+// loisActivity's snapshot windows both run off Date.now — and the LIVE
+// DICE — the KINETIC passes roll on dieRng, i.e. Math.random. Left live,
+// one seeded corpus deals different rooms on every run and census counts
+// drift with the weather (observed across identical invocations of this
+// suite: 124–152 census-A landings, janky counts 9–16). Inside
+// withPinnedTime, Date.now is a stepped fake clock (a fixed epoch, +5 s
+// per step — virtual duration is all the windows read) and Math.random
+// is a seeded LCG, so a corpus is a pure function of its seeds. The pin
+// is always restored, even on a throw.
+// ---------------------------------------------------------------------------
+const CENSUS_EPOCH = 1_800_000_000_000; // fixed; only the steps matter
+const CENSUS_STEP_MS = 5000;
+const withPinnedTime = (fn) => {
+  const realNow = Date.now;
+  const realRandom = Math.random;
+  let t = CENSUS_EPOCH;
+  let s = 0x2545f491;
+  Date.now = () => t;
+  Math.random = () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 4294967296;
+  };
+  try {
+    return fn(() => {
+      t += CENSUS_STEP_MS;
+    });
+  } finally {
+    Date.now = realNow;
+    Math.random = realRandom;
+  }
+};
+
+/** A custom asset whose svg getter throws on read. The review's pool
+ * merge (buildLandingItems → mergePool → sanitizeOverlay) reads it;
+ * nothing else in a deal path does — the press in a silence room, which
+ * never calls the review, shrugs it off entirely (probe-verified). */
+const poisonAsset = () => ({
+  id: 'user:poison',
+  get svg() {
+    throw new Error('review-path poison');
+  },
+});
 
 ok('a landed CURATOR press banks the shadow record on the same commit', () => {
   setup(4242);
@@ -244,33 +304,63 @@ ok('plain silence banks nothing (the genre gate room deals no form, no review)',
   assert.equal(S().fieldReview, null);
 });
 
-ok('a landing in a live swarm mode banks no record — the renderer builds it no item list', () => {
+ok('a judged landing in a live swarm mode banks no record — the renderer builds it no item list', () => {
   setup(4242, { mode: 'hype' });
   S().kineticVoicePass();
   assert.equal(S().fieldReview, null);
 });
 
+ok('the review is fail-closed: a review-path throw banks null and the landing still succeeds', () => {
+  // Both call sites ride the same wrap (bankReview in layoutSlice): the
+  // CURATOR press's inline review and landPoem's. The poison is aimed at
+  // the review alone — its pool merge is the only deal-path reader of a
+  // custom asset's svg.
+  // Site 1: the press.
+  setup(4242);
+  useStore.setState({ customAssets: [poisonAsset()] });
+  S().curateUnlocked();
+  assert.ok(S().layoutParams.fieldForm, 'the press landing still happened');
+  assert.equal(S().fieldReview, null, 'the failed review banked null, not a verdict');
+  useStore.setState({ customAssets: [] });
+  // Site 2: a KINETIC pass through landPoem, from a clean standing deal.
+  setup(4242);
+  S().curateUnlocked();
+  assert.ok(S().fieldReview, 'the clean deal banked its record first');
+  useStore.setState({ customAssets: [poisonAsset()] });
+  S().kineticVoicePass();
+  assert.equal(S().poemDeal, 1, 'the pass dealt (poemDeal advanced)');
+  assert.ok(S().kineticVoiceId, 'the pass committed (a voice landed)');
+  assert.equal(S().fieldReview, null, 'the failed review banked null, not a verdict');
+  useStore.setState({ customAssets: [] });
+});
+
 // ---------------------------------------------------------------------------
 // 4. THE CENSUS — seeded corpora of real deals through the store's real
-// paths. Records are collected on reference change (a pass that deals
-// nothing leaves the standing record's reference untouched, so one
-// landing is never counted twice). The margins printed here are the
-// slice's product: slices 2/3 calibrate the TUNABLE gates from them.
+// paths, collected under withPinnedTime: the fake clock steps before
+// every setup and every action, so each corpus is a pure function of
+// its seeds and its counts are pinned EXACTLY below. Records are
+// collected on reference change (a pass that deals nothing leaves the
+// standing record's reference untouched, so one landing is never
+// counted twice). The margins printed here are the slice's product:
+// slices 2/3 calibrate the TUNABLE gates from them.
 // ---------------------------------------------------------------------------
-const collectCorpus = (seeds, actions, extraParams = {}) => {
-  const records = [];
-  for (const seed of seeds) {
-    setup(seed, extraParams);
-    let last = null;
-    for (const act of actions) {
-      act();
-      const rec = S().fieldReview;
-      if (rec && rec !== last) records.push(rec);
-      last = rec;
+const collectCorpus = (seeds, actions, extraParams = {}) =>
+  withPinnedTime((step) => {
+    const records = [];
+    for (const seed of seeds) {
+      step();
+      setup(seed, extraParams);
+      let last = null;
+      for (const act of actions) {
+        step();
+        act();
+        const rec = S().fieldReview;
+        if (rec && rec !== last) records.push(rec);
+        last = rec;
+      }
     }
-  }
-  return records;
-};
+    return records;
+  });
 
 const margins = (records) => {
   const judged = records.filter((r) => r.measures);
@@ -320,8 +410,17 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
       `m3 range ${fmt(c.minM3)}..${fmt(c.maxM3)} (gates ${REVIEW_GATES.coverageMin}..${REVIEW_GATES.coverageMax}) · ` +
       `m4 max ${fmt(c.maxM4)} (gate ${REVIEW_GATES.crop})`,
   );
-  assert.ok(c.total >= 100, `corpus size ${c.total} >= 100 real landings`);
-  assert.ok((c.dist.clean || 0) >= 1, 'honest deals read clean in ordinary rooms');
+  // Exact pins (the corpus is pinned — see withPinnedTime): any drift
+  // here is a changed deal path or a changed measure, never weather.
+  assert.equal(c.total, 144, 'census A size, pinned exactly');
+  assert.equal(c.judged, 144, 'every ordinary landing judged, none exempt');
+  assert.deepEqual(c.dist, { clean: 133, janky: 11 }, 'census A verdicts, pinned exactly');
+  assert.deepEqual(c.gates, { markCover: 11 }, 'every census A jank is mark cover');
+  assert.equal(c.maxM1, 0, 'M1 never fires in ordinary rooms');
+  assert.ok(near(c.maxM2, 1, 1e-12), `M2's tail reaches full cover at its worst landing (${c.maxM2})`);
+  assert.ok(near(c.minM3, 0.02916633249378799, 1e-12), `M3 floor margin (${c.minM3})`);
+  assert.ok(near(c.maxM3, 0.05483045874206258, 1e-12), `M3 ceiling margin (${c.maxM3})`);
+  assert.equal(c.maxM4, 0, 'no crops in ordinary rooms');
   assert.ok(c.maxM3 < REVIEW_GATES.coverageMax, 'no ordinary landing eats the dish (wide-margin pin)');
 });
 
@@ -340,8 +439,14 @@ ok('CENSUS B — mirror rooms: the mirror manufactures self-overlap, and its mar
       `m2 range ${fmt(m2s.length ? Math.min(...m2s) : null)}..${fmt(c.maxM2)} (gate ${REVIEW_GATES.markCover} — ` +
       `the mirror's structural floor sits AT the gate: a mirrored mark twin draws over its sibling half)`,
   );
-  assert.ok(c.total >= 15, `mirror corpus size ${c.total} >= 15`);
-  assert.ok(c.maxM1 > 0, 'the mirror manufactures landed self-overlap (M1 fires on real deals)');
+  // Exact pins, same discipline as census A.
+  assert.equal(c.total, 20, 'census B size, pinned exactly');
+  assert.equal(c.judged, 20, 'every mirror landing judged, none exempt');
+  assert.deepEqual(c.dist, { clean: 9, janky: 11 }, 'census B verdicts, pinned exactly');
+  assert.deepEqual(c.gates, { markCover: 6, selfOverlap: 5 }, 'census B gates, pinned exactly');
+  assert.ok(near(c.maxM1, 0.3434605193277934, 1e-12), `the mirror manufactures landed self-overlap (${c.maxM1})`);
+  assert.ok(near(Math.min(...m2s), 0.4152138545092997, 1e-12), 'the mirror mark-cover floor, pinned exactly');
+  assert.ok(near(c.maxM2, 0.5000000000000004, 1e-12), 'the floor sits AT the gate, pinned exactly');
 });
 
 console.log(`fieldReview.selfcheck: ${n} checks passed`);

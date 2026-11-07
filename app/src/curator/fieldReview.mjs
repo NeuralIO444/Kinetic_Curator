@@ -34,9 +34,22 @@
 // ranges, hero scale, mark traffic) is all in the committed build.
 // Live swarm modes (swarm/hype/murmuration) never reach buildPlacements
 // in the renderer — the resolver routes them to swarmItems — so a landing
-// there has no built item list in the renderer's own terms and banks NO
-// record (fieldReview stays null), rather than a verdict about a build
-// that never happens.
+// there has no built item list in the renderer's own terms and a JUDGED
+// landing banks no record (fieldReview stays null), rather than a verdict
+// about a build that never happens. An EXEMPT landing still banks its
+// exempt record there: exemption is read off the form and never needed
+// a build.
+//
+// WHAT THE REVIEW CANNOT SEE, named plainly: it builds only the poem's
+// OWN layer — the one item list of the layer the form landed in. The
+// renderer composites layers bottom→top (sceneContract's
+// compositeOrder), so marks in layers ABOVE the poem's paint over it in
+// the frame the performer sees, invisibly to M2. M2 is WITHIN-LAYER
+// cover; frame-wide burial by above-layer marks is a named
+// understatement the census carries into slice-3 calibration — not a
+// quantity slice 1 measures, and not one the banked measures pretend
+// to. (Growing the measure to multi-layer builds is slice 3's call,
+// deliberately not taken here.)
 //
 // GEOMETRY, stated plainly: every box is axis-aligned, ignoring rotation —
 // the same simplification gateFieldForm makes at deal time. A form
