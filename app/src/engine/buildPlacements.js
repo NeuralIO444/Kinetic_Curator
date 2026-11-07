@@ -21,7 +21,8 @@ import { makeHeroInfo } from './kernel/field/attractors.js';
 import { applyKinemeDrivers, applyRhythm, applyTransport, isFamilyAnchored } from './kineme.js';
 import { applySurge } from './surge.js'; // #1576 P3 — SURGE (its own module: the kill-criterion split line)
 import { applyParallaxDrift } from './parallaxDrift.js'; // #1576 P3 — parallax drift (surge's sibling, independently removable)
-import { assignColor, resolveStrategy, applyLean } from './kernel/color/index.js';
+import { assignColor, resolveStrategy, applyLean, ACCENT_OFFSET } from './kernel/color/index.js';
+import { hexToRgb255 } from './colorHex.mjs'; // #2018 — the plate ink rule measures distance in the palette's own RGB
 import { fillDishPoints } from './kernel/dish.js';
 import { applyGroundNudge } from './groundNudge.js'; // #1183 tile-edge nudge
 import { applyRiftShear } from './riftShear.mjs'; // #1183 rift: marks shear with the tear above them
@@ -100,15 +101,30 @@ export const WHISPER_ALPHA = 0.35;
 
 /**
  * #2005 — the plate's room: an armed form carrying the `plate` register
- * (poets/fieldForm.js) stands in a quieted room — non-form marks inside
- * its zone render at PLATE_ROOM_ALPHA of their built alpha, while the
- * plate's own stamps keep the full field alpha. The inverse of WHISPER:
- * the whisper quiets the poem, the plate quiets the room. The zone is the
- * form's ink bounding box breathed out by PLATE_ZONE_PAD_EM of the form's
- * type size on every side — a margin of air proportional to the type, not
- * a fixed frame. 0.15 sits well under WHISPER_ALPHA: the room around a
- * plate is not hushed, it is cleared. Both numbers are Matt's feel gate on
- * #2005.
+ * (poets/fieldForm.js) stands in a quieted room — non-form marks whose
+ * ink enters its zone render at PLATE_ROOM_ALPHA of their built alpha,
+ * while the plate's own stamps keep the full field alpha. The inverse of
+ * WHISPER: the whisper quiets the poem, the plate quiets the room. The
+ * zone is the form's ink bounding box breathed out by PLATE_ZONE_PAD_EM
+ * of the form's type size on every side — a margin of air proportional
+ * to the type, not a fixed frame. 0.15 sits well under WHISPER_ALPHA:
+ * the room around a plate is not hushed, it is cleared. Both numbers are
+ * Matt's feel gate on #2005.
+ *
+ * #2018 (the plate presence audit) — the room is APPLIED at the end of
+ * the build, on the final list: the test is each mark's ink FOOTPRINT
+ * (centre ± half its ink extent — the scene contract's central cell
+ * box), not its centre alone (at drive density 76% of the residual
+ * coverage over a small plate was centre-outside marks leaning in at
+ * full alpha), and it runs after mirroring, in final coordinates, so a
+ * reflection is quieted in the zone it lands in and a mirrored plate's
+ * room exists. The plate's items then move after every mark of the
+ * layer — within its own layer a plate, a moment, sits above its marks
+ * (layers above and the finish still act on it as on any citizen) —
+ * and the plate's stamps deal in the palette swatch most distant from
+ * the layer's mark colours, so presence lives in colour as well as
+ * alpha. Every part of this is plate-gated: no plate standing, the item
+ * list is byte-identical to the pre-#2005 pipeline.
  */
 export const PLATE_ROOM_ALPHA = 0.15;
 export const PLATE_ZONE_PAD_EM = 0.75;
@@ -769,6 +785,10 @@ export function buildPlacements({
   // (the spacing floor — glyph ink never overlaps, within a word or across
   // lines, at every density and aspect) live in poets/placement.js and
   // are asserted in poets/placement.selfcheck.mjs.
+  // #2018 — the plate's room, measured in the FIELD block below and
+  // applied at the end of the build (after mirroring, in final
+  // coordinates): { zone, keys } or null when no plate stands.
+  let plateRoom = null;
   const fieldForm = sanitizeFieldForm(layoutParams.fieldForm);
   if (fieldForm) {
     const fullAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
@@ -787,10 +807,53 @@ export function buildPlacements({
     // exactly the plain form's, so WHISPER and RAY GUN compose. No record:
     // drawnForm IS fieldForm, byte-identical to the pre-#2003 pipeline.
     const drawnForm = fieldForm.raygun ? rayGunForm(fieldForm, fieldForm.raygun) : fieldForm;
+    // #2018 (audit lever 2) — the plate's ink: while a plate stands, its
+    // stamps deal in the palette swatch MOST distant from the colours
+    // this layer's marks actually wear (the dealt colours on `mapped`,
+    // field map already applied). The distance is collective, in the
+    // palette's own RGB space: a swatch's score is its squared distance
+    // to the marks' colours summed over every mark, so a colour the
+    // room wears often pulls its score down in proportion to how much
+    // of the room wears it (a bare maximin over the worn set collapses
+    // to zero the moment the layer wears the whole palette). The
+    // highest score wins; ties keep the earliest swatch. The accent
+    // follows the colour by the kernel's standing ACCENT_OFFSET
+    // derivation from the slot. The pick is a pure function of the
+    // dealt state — it spends no draws and replay reproduces it
+    // bit-for-bit. With no swatches, or no marks to contrast against,
+    // the plate falls back to the per-stamp assignment every other form
+    // uses.
+    let plateInk = null;
+    if (fieldForm.plate) {
+      const swatches = palette?.swatches;
+      if (Array.isArray(swatches) && swatches.length > 0 && mapped.length > 0) {
+        const markRgb = mapped.map((it) => hexToRgb255(it.color));
+        let bestSlot = -1;
+        let bestScore = -1;
+        for (let si = 0; si < swatches.length; si++) {
+          const [r, g, b] = hexToRgb255(swatches[si]);
+          let total = 0;
+          for (const [mr, mg, mb] of markRgb) {
+            total += (r - mr) * (r - mr) + (g - mg) * (g - mg) + (b - mb) * (b - mb);
+          }
+          if (total > bestScore) {
+            bestScore = total;
+            bestSlot = si;
+          }
+        }
+        if (bestSlot >= 0) {
+          plateInk = {
+            color: swatches[bestSlot],
+            accent: swatches[(bestSlot + ACCENT_OFFSET) % swatches.length],
+          };
+        }
+      }
+    }
     const fieldItems = new Array(drawnForm.stamps.length);
     for (let j = 0; j < drawnForm.stamps.length; j++) {
       const s = drawnForm.stamps[j];
-      const { color, accent } = assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
+      const { color, accent } =
+        plateInk ?? assignColor({ seed, index: soa.n + j, t: 0.5, seedOffsets }, palette, strategy);
       fieldItems[j] = {
         x: (s.x / fieldForm.aspect) * canvasW,
         y: s.y * canvasH,
@@ -807,19 +870,19 @@ export function buildPlacements({
         key: `field-${fieldForm.poetId}-${fieldForm.pieceId}-${j}`,
       };
     }
-    // #2005 — the plate's room: while a plate stands, non-form marks
-    // inside its zone are suppressed to PLATE_ROOM_ALPHA of their built
-    // alpha (the constants above). The zone is measured here, at the seam,
-    // from the drawn stamps' own ink — stamp centres and ink widths in
-    // canvas pixels, exactly as the field items below are positioned —
-    // breathed out by PLATE_ZONE_PAD_EM of the form's largest em. `mapped`
-    // at this point holds only the layer's own marks (the field items have
-    // not joined yet), so the loop touches the room and never the poem;
-    // outside the zone nothing moves, and when the plate leaves the next
-    // build re-derives every item's alpha from the SoA (stage C), so the
-    // stage returns exactly — the multiply never compounds, the glass
-    // multiply's discipline. With no plate standing this block never runs
-    // and the item list is byte-identical to the pre-#2005 pipeline.
+    // #2005 — the plate's room, measured: the zone is the drawn stamps'
+    // own ink bounding box — stamp centres and ink widths in canvas
+    // pixels, exactly as the field items above are positioned — breathed
+    // out by PLATE_ZONE_PAD_EM of the form's largest em. The suppression
+    // itself is applied at the end of the build, on the final list (see
+    // the #2018 block at the tail of this function): by footprint, after
+    // mirroring, with the plate's items moved last in the layer. What is
+    // remembered here is the zone and the plate items' keys (mirror
+    // copies carry their source's key plus a suffix). Restoration is
+    // still the rebuild's: the next build re-derives every item's alpha
+    // from the SoA (stage C), so when the plate leaves the stage returns
+    // exactly — the multiply never compounds, the glass multiply's
+    // discipline.
     if (fieldForm.plate) {
       let zx0 = Infinity;
       let zy0 = Infinity;
@@ -839,13 +902,10 @@ export function buildPlacements({
       }
       const padX = ((PLATE_ZONE_PAD_EM * emMax) / fieldForm.aspect) * canvasW;
       const padY = PLATE_ZONE_PAD_EM * emMax * canvasH;
-      zx0 -= padX;
-      zx1 += padX;
-      zy0 -= padY;
-      zy1 += padY;
-      for (const item of mapped) {
-        if (item.x >= zx0 && item.x <= zx1 && item.y >= zy0 && item.y <= zy1) item.alpha *= PLATE_ROOM_ALPHA;
-      }
+      plateRoom = {
+        zone: [zx0 - padX, zy0 - padY, zx1 + padX, zy1 + padY],
+        keys: new Set(fieldItems.map((it) => it.key)),
+      };
     }
     // On a pool hit `mapped` IS cache.itemPool — never append to it. The
     // copy costs one array of references, only while a form is armed.
@@ -963,6 +1023,57 @@ export function buildPlacements({
     }
   }
   if (glassOn) mapped = sortGlassInstances(mapped);
+
+  // #2018 — the plate's room, applied (audit levers 1 + 3): on the final
+  // list, after the overlap sort, mirroring and the glass sort, so the
+  // coordinates tested are the coordinates drawn. Zones: the plate's own
+  // (measured in the FIELD block) plus its reflections under the layer's
+  // mirror state — a mirrored plate's room is this zone reflected, and
+  // every mark is tested against every zone it can stand in. A mark is
+  // suppressed when its ink FOOTPRINT enters a zone: its box is centre ±
+  // 50 × scale (the scene contract's central cell box — the full quad is
+  // ±100 units, the ink lives in the middle hundred), rotation aside,
+  // exactly the geometry the presence audit measured with. Suppression
+  // lands once per mark, however many zones its ink crosses. The plate's
+  // own items are recognised by key — originals by the set the FIELD
+  // block remembered, mirror copies by their source key under the copy's
+  // suffix — and are never suppressed. Finally the partition: the
+  // plate's items move after every mark of the layer, each side keeping
+  // its built order (lever 3 — within its layer the plate draws last;
+  // layers above still composite over it, and the FX/finish chain still
+  // acts on it like any citizen). A fresh array is built, so a pooled
+  // list is never reordered in place.
+  if (plateRoom) {
+    const [zx0, zy0, zx1, zy1] = plateRoom.zone;
+    const zones = [plateRoom.zone];
+    if (caps.allowMirror && mirrorState !== 'off') {
+      if (mirrorState === 'x' || mirrorState === 'xy') zones.push([canvasW - zx1, zy0, canvasW - zx0, zy1]);
+      if (mirrorState === 'y' || mirrorState === 'xy') zones.push([zx0, canvasH - zy1, zx1, canvasH - zy0]);
+      if (mirrorState === 'xy') zones.push([canvasW - zx1, canvasH - zy1, canvasW - zx0, canvasH - zy0]);
+    }
+    const isPlateItem = (item) => {
+      const k = item.key;
+      if (typeof k !== 'string') return false;
+      if (plateRoom.keys.has(k)) return true;
+      const m = /-m[xy]{1,2}$/.exec(k);
+      return !!m && plateRoom.keys.has(k.slice(0, m.index));
+    };
+    for (const item of mapped) {
+      if (isPlateItem(item)) continue;
+      const hx = 50 * item.scale;
+      const hy = 50 * (item.scaleY ?? item.scale);
+      for (const z of zones) {
+        if (item.x + hx >= z[0] && item.x - hx <= z[2] && item.y + hy >= z[1] && item.y - hy <= z[3]) {
+          item.alpha *= PLATE_ROOM_ALPHA;
+          break;
+        }
+      }
+    }
+    const marks = [];
+    const plateItems = [];
+    for (const item of mapped) (isPlateItem(item) ? plateItems : marks).push(item);
+    mapped = [...marks, ...plateItems];
+  }
 
   if (undoSurge) undoSurge(); // #1576 — reverse of application
   if (undoParallaxDrift) undoParallaxDrift(); // #1576 — reverse of application
