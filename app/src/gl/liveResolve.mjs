@@ -65,7 +65,8 @@ import { coalescenceFields } from '../engine/dishCoalesce.mjs'; // #1411: the la
 import { publishDishDensity, EMPTY_DISH_DENSITY } from '../engine/dishDensity.mjs'; // #1412: the shared grid's density field, published per frame
 import { tickDishTrails, clearDishTrails } from '../engine/dishTrails.mjs'; // #1415: the trail substrate's tick + seed-change wipe (the law lives in the module)
 import { dishPigmentShed } from './sceneContract.js'; // #1412: the tier-2 shed predicate (the governor's rule, one home)
-import { blendItems, planMorph, matchItems } from '../engine/kernel/itemMorph.mjs';
+import { blendItems, planMorph, planMorphByKey, matchItems } from '../engine/kernel/itemMorph.mjs';
+import { sanitizeFieldForm, fieldFormInkBBox } from '../poets/fieldForm.js'; // #2006 slice 3 — the review morph's janky pose
 import { morphEase } from './paletteMix.mjs';
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js'; // #720 — default audio drive for DLA/Eden growth
 import { ensureAggregate, GrowthHooks } from '../engine/kernel/sample/growth.js'; // #793 — biology regrow
@@ -367,6 +368,15 @@ export function createLiveResolver() {
   // nearest-same-asset, not a true cross-generator match.
   const lastShown = new Map(); // layerId -> { sig, items }
   const morphState = new Map(); // layerId -> { fromItems, startMs, dur }
+  // #2006 slice 3 — the review morph (Sleight-of-Hand): per layer, the
+  // in-flight settle of a ladder-repaired landing, and the set of
+  // landing keys whose settle already played (a landing settles once,
+  // however long its record stands). Resolver state, not document
+  // state — it rides the #1367 snapshot as an optional key, exactly
+  // like the chip channel's own state above.
+  const reviewMorphState = new Map(); // layerId -> { key, fromItems, startMs, dur, plan }
+  const reviewMorphPlayed = new Set(); // landing keys settled
+  const reviewMorphPrev = new Map(); // layerId -> the items shown before this frame's chip update (per-frame scratch)
   // #509 phase 1 — MOD steering: transient per-target multipliers computed
   // in this tick's MOD block, applied at the NEXT tick's update spread
   // (16ms lag, same order as FEED's delay-1). Module state, never the
@@ -1371,8 +1381,73 @@ export function createLiveResolver() {
           shown = blendItems(tr.fromItems, e.items, morphEase(Math.max(0, raw)), tr.plan);
         }
       }
+      // #2006 slice 3 — the review channel below starts its settle from
+      // what was ACTUALLY on screen before this frame's update: that is
+      // prevShown, which this loop is about to overwrite (on a CUT frame
+      // the form's exit pose lives only there). Stash it while a review
+      // stamp rides this frame's input.
+      if (input.reviewMorph) reviewMorphPrev.set(e.id, prevShown ? prevShown.items : null);
       lastShown.set(e.id, { sig: e.morphSig, items: shown });
       e.items = shown;
+    }
+
+    // #2006 slice 3 — the REVIEW morph (Sleight-of-Hand): while the loop
+    // stamps input.reviewMorph (a fresh landing the ladder just repaired
+    // or cut), the poem's layer settles from the janky landing's pose to
+    // the repaired state as ONE planned morph over the stamp's duration
+    // of SIM time — the clock is this frame's loopTimeMs, so HELD
+    // freezes the settle where it stands and DRAGGING crawls it,
+    // bounded like every MIX dissolve (#1935). The pairing is keyed
+    // (planMorphByKey): a form glyph pairs only with itself, so a
+    // SHRINK/SHIFT settle glides the same glyphs home; a RE-DEAL's
+    // glyphs arrive as joiners while the replaced poem's leave; a CUT
+    // is leavers with no joiners. The from-pose of a transform repair
+    // is the landing's own pose, recovered by inverting the review
+    // transform on the standing glyphs (jankyPose below) — the commit
+    // lands the repair atomically, so the janky pose was data, never a
+    // rendered frame, and this is its one honest reconstruction. Every
+    // other item starts from what the chip channel actually showed.
+    // A landing's settle plays ONCE (the played set), however long its
+    // record stands; no stamp — the record moved on — clears the
+    // channel, and the next stamp is a new landing by construction.
+    const rmStamp = input.reviewMorph;
+    if (rmStamp && typeof rmStamp.key === 'string' && Number.isFinite(rmStamp.dur) && rmStamp.dur > 0) {
+      for (const e of content) {
+        const items = e.items || [];
+        let st = reviewMorphState.get(e.id);
+        if (st && st.key !== rmStamp.key) {
+          reviewMorphState.delete(e.id); // a newer landing superseded this settle
+          st = null;
+        }
+        if (reviewMorphPlayed.has(rmStamp.key)) continue;
+        if (!st) {
+          const prevItems = reviewMorphPrev.get(e.id) || lastShown.get(e.id)?.items || [];
+          const formNow = items.some((it) => formKeyOf(it) !== null);
+          if (!formNow && !prevItems.some((it) => formKeyOf(it) !== null)) continue; // not the poem's layer
+          const fromItems =
+            formNow && rmStamp.review ? jankyPose(prevItems, items, e, rmStamp.review, W, H) : prevItems;
+          st = {
+            key: rmStamp.key,
+            fromItems,
+            startMs: nowMs,
+            dur: rmStamp.dur,
+            plan: planMorphByKey(fromItems, items, rmStamp.seed >>> 0, formKeyOf),
+          };
+          reviewMorphState.set(e.id, st);
+        }
+        const raw = (nowMs - st.startMs) / st.dur;
+        if (raw >= 1) {
+          reviewMorphState.delete(e.id);
+          reviewMorphPlayed.add(rmStamp.key);
+          if (reviewMorphPlayed.size > 64) reviewMorphPlayed.delete(reviewMorphPlayed.values().next().value);
+        } else {
+          e.items = blendItems(st.fromItems, items, morphEase(Math.max(0, raw)), st.plan);
+        }
+      }
+    } else if (reviewMorphState.size || reviewMorphPlayed.size || reviewMorphPrev.size) {
+      reviewMorphState.clear();
+      reviewMorphPlayed.clear();
+      reviewMorphPrev.clear();
     }
 
     // #1923 DISH LIFE — after the morph blend, so a chip click never fights the culture: while the loop stamps
@@ -1494,6 +1569,9 @@ export function createLiveResolver() {
     swarmState.clear();
     lastShown.clear();
     morphState.clear();
+    reviewMorphState.clear();
+    reviewMorphPlayed.clear();
+    reviewMorphPrev.clear();
     warpPhase.clear();
     feedLive.reset();
     worldNoise = null;
@@ -1520,6 +1598,8 @@ export function createLiveResolver() {
     for (const [layerId, v] of lastShown) lastShownSnap[layerId] = { sig: v.sig, items: deepCopyData(v.items) };
     const morphSnap = {};
     for (const [layerId, v] of morphState) morphSnap[layerId] = snapshotMorphEntry(v);
+    const reviewMorphSnap = {};
+    for (const [layerId, v] of reviewMorphState) reviewMorphSnap[layerId] = snapshotMorphEntry(v);
     const dishLifeSnap = dishLife.snapshot();
     return {
       v: 1,
@@ -1543,6 +1623,13 @@ export function createLiveResolver() {
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
       ...(dishLifeSnap ? { dishLife: dishLifeSnap } : {}), // #1923 — OPTIONAL key: present only while a culture runs, so every other snapshot is exactly what it was
+      // #2006 slice 3 — OPTIONAL key on the same terms: present only while a
+      // review settle is in flight or remembered, so every other snapshot
+      // is exactly what it was. The settle is presentation state; a
+      // restored take replays it from the recorded stamp + this state.
+      ...(reviewMorphState.size || reviewMorphPlayed.size
+        ? { reviewMorph: { state: reviewMorphSnap, played: [...reviewMorphPlayed] } }
+        : {}),
       spawn: spawnState.snapshotState(), // #1694 slice 1 — the channel rides the snapshot (an OPTIONAL key: pre-repipe snapshots stay valid)
       // travel kinemes (#1574/#1575) — the roam is accumulative state: each mark's offset + velocity, each scene's
       // step bank, and the clock's last frame. OPTIONAL key: a pre-travel snapshot restores with every mark home.
@@ -1604,6 +1691,16 @@ export function createLiveResolver() {
     for (const [k, v] of Object.entries(snap.lastShown)) lastShown.set(k, { sig: v.sig, items: deepCopyData(v.items) });
     morphState.clear();
     for (const [k, v] of Object.entries(snap.morphState)) morphState.set(k, restoreMorphEntry(v));
+    // #2006 slice 3 — a pre-slice-3 snapshot carries no reviewMorph key:
+    // the channel starts fresh, as a fresh resolver's would (the spawn
+    // precedent). The recorded adjustment itself replays from the
+    // store's commits, never from this state.
+    reviewMorphState.clear();
+    reviewMorphPlayed.clear();
+    if (snap.reviewMorph !== undefined) {
+      for (const [k, v] of Object.entries(snap.reviewMorph.state)) reviewMorphState.set(k, restoreMorphEntry(v));
+      for (const k of snap.reviewMorph.played) reviewMorphPlayed.add(k);
+    }
     modSteerByLayer.clear();
     for (const [k, v] of snap.modSteer) modSteerByLayer.set(k, { ...v });
     warpPhase.clear();
@@ -1654,6 +1751,52 @@ const deepCopyData = (v) =>
 // identity lookup misses, and the blend's depth order scrambles. The snapshot
 // form therefore stores each pairing's from-item as its INDEX in fromItems
 // (and onlyFrom as indices); restore re-links them to the restored copies.
+/** #2006 slice 3 — a FIELD form item's ground-truth key, or null for
+ * any other item. Form keys are `field-<poetId>-<pieceId>-<j>` with
+ * mirror copies suffixed -mx / -my / -mxmy (buildPlacements). */
+function formKeyOf(it) {
+  const k = it?.key;
+  return typeof k === 'string' && k.startsWith('field-') ? k : null;
+}
+
+/**
+ * #2006 slice 3 — the janky landing's pose for a transform repair: the
+ * standing (repaired) glyphs mapped back through the review transform
+ * they carry. The transform scales the form's ink about its ink-bbox
+ * centre by `scale` and shifts it by (dx, dy) form units — one form
+ * unit is canvasH px on both axes (buildPlacements' own mapping) — so
+ * a glyph's landed pose is centre + (shown − shift − centre) / scale,
+ * at shown scale / scale. A mirror copy inverts about the mirrored
+ * centre with the mirrored shift (mirrorItems reflects x as W − x,
+ * y as H − y). Non-form items keep the pose actually shown before the
+ * settle (prevItems, the chip channel's output); a previous poem's
+ * glyphs ride along as themselves — keyed leavers in the plan.
+ */
+function jankyPose(prevItems, items, entry, review, canvasW, canvasH) {
+  const form = sanitizeFieldForm(entry?.layoutParams?.fieldForm);
+  const bb = form ? fieldFormInkBBox(form) : null;
+  if (!bb || !(canvasH > 0) || !(review.scale > 0)) return prevItems;
+  const dxPx = review.dx * canvasH;
+  const dyPx = review.dy * canvasH;
+  const inv = [];
+  for (const it of items || []) {
+    const k = formKeyOf(it);
+    if (k === null) continue;
+    const mx = k.endsWith('-mx') || k.endsWith('-mxmy');
+    const my = k.endsWith('-my') || k.endsWith('-mxmy');
+    const cx = (mx ? canvasW / canvasH - bb.cx : bb.cx) * canvasH;
+    const cy = (my ? 1 - bb.cy : bb.cy) * canvasH;
+    inv.push({
+      ...it,
+      x: cx + (it.x - (mx ? -dxPx : dxPx) - cx) / review.scale,
+      y: cy + (it.y - (my ? -dyPx : dyPx) - cy) / review.scale,
+      scale: (Number(it.scale) || 1) / review.scale,
+      scaleY: (Number(it.scaleY) || Number(it.scale) || 1) / review.scale,
+    });
+  }
+  return [...(prevItems || []).filter((it) => formKeyOf(it) === null), ...inv];
+}
+
 function snapshotMorphEntry(v) {
   if (!v || !v.plan || !Array.isArray(v.fromItems)) return deepCopyData(v);
   const out = deepCopyData(v);
@@ -1733,6 +1876,30 @@ export function checkResolverSnapshot(snap) {
   // #1694 slice 1 — `spawn` is optional (absent in every pre-repipe snapshot); when present it must be an object.
   if (snap.spawn !== undefined && (!snap.spawn || typeof snap.spawn !== 'object' || Array.isArray(snap.spawn)))
     return false;
+  // #2006 slice 3 — `reviewMorph` is optional on the same terms; when
+  // present its entries must be snapshot-shaped morph entries (the
+  // chip channel's own validation, entry for entry) with a string key.
+  if (snap.reviewMorph !== undefined) {
+    const rm = snap.reviewMorph;
+    if (!rm || typeof rm !== 'object' || Array.isArray(rm)) return false;
+    if (!rm.state || typeof rm.state !== 'object' || Array.isArray(rm.state)) return false;
+    if (!Array.isArray(rm.played) || rm.played.some((k) => typeof k !== 'string')) return false;
+    for (const entry of Object.values(rm.state)) {
+      if (!entry || typeof entry !== 'object' || !Array.isArray(entry.fromItems)) return false;
+      if (typeof entry.key !== 'string' || !Number.isFinite(entry.startMs) || !Number.isFinite(entry.dur)) return false;
+      const plan = entry.plan;
+      if (!plan || typeof plan !== 'object' || !Array.isArray(plan.pairs) || !Array.isArray(plan.onlyFrom))
+        return false;
+      if (!Number.isFinite(plan.seed)) return false;
+      for (const p of plan.pairs) {
+        if (!p || !Number.isInteger(p.i) || p.i < 0 || p.i >= entry.fromItems.length) return false;
+        if (typeof p.g !== 'string' || !Number.isInteger(p.j) || p.j < 0) return false;
+      }
+      for (const i of plan.onlyFrom) {
+        if (!Number.isInteger(i) || i < 0 || i >= entry.fromItems.length) return false;
+      }
+    }
+  }
   if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
   // #1923 — the culture's frozen seed is optional; when present it must carry its marks, canvas and generation
   if (snap.dishLife !== undefined) {

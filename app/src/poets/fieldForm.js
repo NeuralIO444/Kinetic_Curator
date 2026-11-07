@@ -378,7 +378,20 @@ export function fieldFormForDeal(decision, rng, opts = {}) {
  */
 export function sanitizeFieldForm(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const { poetId, pieceId, layout, aspect, stamps, script, register, face, break: plateBreak, raygun, plate } = raw;
+  const {
+    poetId,
+    pieceId,
+    layout,
+    aspect,
+    stamps,
+    script,
+    register,
+    face,
+    break: plateBreak,
+    raygun,
+    plate,
+    review,
+  } = raw;
   if (!POET_DECKS[poetId]) return null;
   if (typeof pieceId !== 'string' || pieceId.length === 0) return null;
   if (!PLACEMENT_LAYOUTS.includes(layout)) return null;
@@ -443,6 +456,33 @@ export function sanitizeFieldForm(raw) {
   if (plateForm && kanaForm) return null;
   if (plateForm && serifForm) return null;
   if (plateForm && raygunMark !== undefined) return null;
+  // #2006 slice 3 — the review transform record: { scale, dx, dy }, the
+  // review loop ladder's repair, written ONLY by the ladder on a janky
+  // fresh landing (curator/fieldReviewLadder.mjs) and banked beside its
+  // verdict record. On the register/raygun discipline: the STAMPS stored
+  // on the form stay the plain dealt list (the gate below judges them,
+  // exactly as before); the transform is applied to the drawn stamps at
+  // build time (reviewAdjustedForm below, consumed by buildPlacements
+  // exactly where the ray-gun treatment is), so removing the record
+  // restores the landing byte-for-byte. Present-but-dishonest refuses
+  // the form whole: scale is a shrink only (0 < scale ≤ 1 — the ladder
+  // steps DOWN by its ruled factor or not at all), dx/dy are form-unit
+  // shifts bounded by the dish itself. The poles' law extends: a plate
+  // is exempt from the loop by ruling, so plate + review is refused
+  // whole, and review + raygun never compose (the store's ray-gun cycle
+  // strips the record when it arms — the performer's touch supersedes
+  // the repair; the claim can otherwise only arrive as data).
+  let reviewMark;
+  if (review !== undefined) {
+    if (!review || typeof review !== 'object' || Array.isArray(review)) return null;
+    const { scale: rScale, dx: rDx, dy: rDy } = review;
+    if (!Number.isFinite(rScale) || rScale <= 0 || rScale > 1) return null;
+    if (!Number.isFinite(rDx) || Math.abs(rDx) > aspect) return null;
+    if (!Number.isFinite(rDy) || Math.abs(rDy) > 1) return null;
+    if (raygunMark !== undefined) return null;
+    if (plateForm) return null;
+    reviewMark = { scale: rScale, dx: rDx, dy: rDy };
+  }
   // #2002 — the break marker: the ornament id of the form's plate break.
   // It must name a real ornament stamp, and it is refused in a native form
   // (ornaments are Latin-face furniture — charset purity). Its agreement
@@ -500,6 +540,63 @@ export function sanitizeFieldForm(raw) {
     ...(plateBreak !== undefined ? { break: plateBreak } : {}),
     ...(register === 'whisper' ? { register: 'whisper' } : {}),
     ...(raygunMark !== undefined ? { raygun: raygunMark } : {}),
+    ...(reviewMark !== undefined ? { review: reviewMark } : {}),
     stamps: out,
+  };
+}
+
+/**
+ * The form's ink bounding box in form units (x in [0, aspect], y in
+ * [0, 1]) from the plain dealt stamps — ink half-extents from
+ * placement's rulers (stampWidthEm × em wide, em tall, centred), the
+ * same boxes the review measures with. Null when the form has no
+ * stamps. The ladder plans against this box; reviewAdjustedForm
+ * scales about its centre.
+ */
+export function fieldFormInkBBox(form) {
+  if (!form || !Array.isArray(form.stamps) || form.stamps.length === 0) return null;
+  let x0 = Infinity;
+  let y0 = Infinity;
+  let x1 = -Infinity;
+  let y1 = -Infinity;
+  for (const s of form.stamps) {
+    const hw = (stampWidthEm(s.assetId, s.ch) * s.em) / 2;
+    const hh = s.em / 2;
+    if (s.x - hw < x0) x0 = s.x - hw;
+    if (s.x + hw > x1) x1 = s.x + hw;
+    if (s.y - hh < y0) y0 = s.y - hh;
+    if (s.y + hh > y1) y1 = s.y + hh;
+  }
+  if (!Number.isFinite(x0)) return null;
+  return { x0, y0, x1, y1, cx: (x0 + x1) / 2, cy: (y0 + y1) / 2, w: x1 - x0, h: y1 - y0 };
+}
+
+/**
+ * #2006 slice 3 — the review transform, applied: the form with its
+ * drawn stamps recomputed from the plain dealt list (the rayGunForm
+ * discipline — the stored stamps never move). The ink scales by
+ * review.scale about the form's own ink-bbox centre and shifts by
+ * (review.dx, review.dy) in form units; rotations stand. No record —
+ * or the identity record — returns the form itself, byte-identical to
+ * the pre-slice-3 pipeline. Pure geometry, and the ONLY implementation
+ * of it: buildPlacements draws through here, and the review's measures
+ * read the built list, so the ladder's re-measure and the render can
+ * never disagree about where the adjusted ink sits.
+ */
+export function reviewAdjustedForm(form) {
+  const review = form?.review;
+  if (!form || !review) return form;
+  const { scale, dx, dy } = review;
+  if (scale === 1 && dx === 0 && dy === 0) return form;
+  const bb = fieldFormInkBBox(form);
+  if (!bb) return form;
+  return {
+    ...form,
+    stamps: form.stamps.map((s) => ({
+      ...s,
+      x: bb.cx + (s.x - bb.cx) * scale + dx,
+      y: bb.cy + (s.y - bb.cy) * scale + dy,
+      em: s.em * scale,
+    })),
   };
 }

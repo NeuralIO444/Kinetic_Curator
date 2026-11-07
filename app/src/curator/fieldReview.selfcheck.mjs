@@ -179,16 +179,34 @@ const setup = (seed, extraParams = {}) => {
 
 const rederive = (rec) => {
   assert.equal(rec.backend, 'rules');
-  assert.equal(rec.rung, null);
   assert.deepEqual(rec.gates, REVIEW_GATES);
   if (rec.verdict === 'exempt') {
+    assert.equal(rec.rung, null, 'an exempt record is never acted on (slice 3 law too)');
     assert.equal(rec.measures, null);
     assert.ok(rec.exempt);
     return;
   }
   const v = reviewVerdict(rec.measures, rec.gates);
+  assert.equal(v.gate, rec.gate, 'the gate re-derives from the banked measures + gates');
+  if (rec.adjustment) {
+    // #2006 slice 3 — an ACTED record (the one caused re-pin of this
+    // suite, proven in STAGING-REPORT-2006-S3): the banked measures are
+    // the LANDING's, so they still judge it janky at the same gate —
+    // the judgment stands; what changed is the rung: the ladder's last
+    // step names it, a repaired record keeps the 'janky' verdict, and
+    // a cut is exactly rung 5 with verdict 'cut'.
+    assert.equal(v.verdict, 'janky', 'an acted record’s measures still judge the landing janky');
+    assert.equal(rec.rung, rec.adjustment.steps.at(-1).rung, 'the rung is the ladder’s last step');
+    if (rec.adjustment.outcome === 'cut') {
+      assert.equal(rec.verdict, 'cut');
+      assert.equal(rec.rung, 5);
+    } else {
+      assert.equal(rec.verdict, 'janky', 'a repaired landing keeps its judgment');
+    }
+    return;
+  }
+  assert.equal(rec.rung, null);
   assert.equal(v.verdict, rec.verdict, 'the verdict re-derives from the banked measures + gates');
-  assert.equal(v.gate, rec.gate);
 };
 
 // ---------------------------------------------------------------------------
@@ -414,7 +432,19 @@ ok('CENSUS A — ordinary rooms: seeded press/look/voice/curator deals, every ve
   // here is a changed deal path or a changed measure, never weather.
   assert.equal(c.total, 144, 'census A size, pinned exactly');
   assert.equal(c.judged, 144, 'every ordinary landing judged, none exempt');
-  assert.deepEqual(c.dist, { clean: 133, janky: 11 }, 'census A verdicts, pinned exactly');
+  // #2006 slice 3 re-pin (proven in STAGING-REPORT-2006-S3): the ladder
+  // now ACTS on the 11 janky landings — 3 repaired (their records keep
+  // the 'janky' judgment) and 8 cut (verdict 'cut') — so the banked
+  // verdict distribution is the OUTCOME distribution. The landing
+  // truth underneath it is unchanged and still pinned: 133 clean
+  // landings, 11 janky, every one markCover (each acted record's
+  // measures re-derive that jank in rederive above).
+  assert.deepEqual(c.dist, { clean: 133, janky: 3, cut: 8 }, 'census A outcomes, pinned exactly (slice 3)');
+  assert.equal(
+    records.filter((r) => r.verdict === 'janky' || r.verdict === 'cut').length,
+    11,
+    'census A janky landings, pinned exactly',
+  );
   assert.deepEqual(c.gates, { markCover: 11 }, 'every census A jank is mark cover');
   assert.equal(c.maxM1, 0, 'M1 never fires in ordinary rooms');
   assert.ok(near(c.maxM2, 1, 1e-12), `M2's tail reaches full cover at its worst landing (${c.maxM2})`);

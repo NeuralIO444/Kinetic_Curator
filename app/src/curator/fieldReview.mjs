@@ -178,8 +178,15 @@ export function measureLandedForm(items, form, canvasW, canvasH) {
       const s = form.stamps[j];
       // The plate zone's own ink rulers (#2005): true ink width from the
       // stamp's advance, ink height = the glyph's em, centred on the item.
-      const hw = ((stampWidthEm(s.assetId, s.ch) * s.em) / 2 / form.aspect) * canvasW;
-      const hh = (s.em / 2) * canvasH;
+      // #2006 slice 3: a form carrying the review transform draws its
+      // stamps scaled by review.scale (buildPlacements applies
+      // reviewAdjustedForm); the item's centre already carries the
+      // transform's shift, so only the ink extents take the same factor
+      // here — otherwise the ladder's re-measure would judge a phantom
+      // full-size poem standing where the shrunk one stands.
+      const em = s.em * (form.review ? form.review.scale : 1);
+      const hw = ((stampWidthEm(s.assetId, s.ch) * em) / 2 / form.aspect) * canvasW;
+      const hh = (em / 2) * canvasH;
       formBoxes.push({ box: boxOf(item.x, item.y, hw, hh), index });
     } else if (Number.isFinite(item?.x) && Number.isFinite(item?.y)) {
       // A mark's asset box as drawn: ±50 asset units × its scale (QUAD_VS).
@@ -295,6 +302,34 @@ function buildLandingItems(state, landingParams, seed, enabledAssets) {
     caGrid,
   });
   return items;
+}
+
+/**
+ * #2006 slice 3 — the landing's mark boxes in FORM units (x in
+ * [0, form.aspect], y in [0, 1]; one form unit is canvasH px on both
+ * axes), read off the same built list measureLandedForm judges, with
+ * the same box math. The ladder's SHIFT rung plans against these: the
+ * mark density under a candidate placement of the form's ink. Draw
+ * order is not filtered — density is a fact about the room, not about
+ * cover. Returns { form, marks } or null on reviewLanding's own null
+ * terms (no form, or no built list — a live swarm mode).
+ */
+export function landingMarkBoxes(state, landingParams, { seed = null, enabledAssets = null } = {}) {
+  const form = sanitizeFieldForm(landingParams?.fieldForm);
+  if (!form) return null;
+  const items = buildLandingItems(state, landingParams, seed ?? state.seed, enabledAssets ?? state.enabledAssets);
+  if (!items) return null;
+  const H = state.canvasH;
+  if (!(H > 0)) return null;
+  const marks = [];
+  for (const item of items) {
+    if (formStampIndex(item, form) >= 0) continue;
+    if (!Number.isFinite(item?.x) || !Number.isFinite(item?.y)) continue;
+    const hw = (50 * Math.abs(item.scale ?? 1)) / H;
+    const hh = (50 * Math.abs(item.scaleY ?? item.scale ?? 1)) / H;
+    if (hw > 0 && hh > 0) marks.push(boxOf(item.x / H, item.y / H, hw, hh));
+  }
+  return { form, marks };
 }
 
 /**
