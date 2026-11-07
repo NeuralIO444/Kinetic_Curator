@@ -28,6 +28,7 @@ import { assignRewrite, rasterRewrite, rewriteCols } from './rewrite.js';
 import { assignBlocks, rasterBlocks, blocksCols } from './blocks.js';
 import { assignPicture, rasterPicture, pictureCols, pictureMoverMap, normalizePictureImage } from './picture.js';
 import { sanitizePattern, PATTERN_FIELD_LIKE } from '../state/patternTrack.js';
+import { cultureLevelAt, cultureTidesShift } from '../engine/dishLifeCouple.mjs';
 
 /** The palette fields a pattern reads. Anything else on the palette object is ignored. */
 export const patternPalette = (p) => ({
@@ -42,7 +43,7 @@ export const patternPalette = (p) => ({
  * time is left OUT of its key and the frame is reused until a parameter, the palette or the size
  * changes. A drifting pattern keys on `t` (every frame is new).
  */
-export function patternKey(pattern, palette, w, h, t = 0, image = null) {
+export function patternKey(pattern, palette, w, h, t = 0, image = null, culture = null) {
   const p = sanitizePattern(pattern);
   const pal = patternPalette(palette);
   // #1798: a BLOCKS deal is a still — time never changes its pixels, whatever DRIFT says.
@@ -67,6 +68,19 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null) {
     // #1795: a PICTURE frame is a function of its image too — keyed on the image's id (the bundled
     // seed by default). Spread only for PICTURE, so every other mode's key stays byte-identical.
     ...(p.mode === 'PICTURE' ? [normalizePictureImage(image).id] : []),
+    // #1923 Phase 2 slice C: a coupled TIDES frame is a function of the culture too — keyed on the
+    // field's generation and the dial (bucketed to 1/256: the slider's own resolution class), so a
+    // still TIDES (DRIFT 0, no time in the key) still re-draws as the culture evolves. Spread only
+    // for a coupled TIDES, so every other key — and every uncoupled key — stays byte-identical. The
+    // drift-amplitude modes need no component: their bias rides the block's drift value, which is
+    // already in the key.
+    ...(culture && p.mode === 'TIDES'
+      ? [
+          'K',
+          culture.grid && Number.isFinite(Number(culture.grid.gen)) ? Number(culture.grid.gen) : -1,
+          Math.round(Math.min(1, Math.max(0, Number(culture.coupling) || 0)) * 256),
+        ]
+      : []),
   ]);
 }
 
@@ -155,9 +169,12 @@ export function createPatternFrames() {
     /**
      * @param {object} [image] #1795 PICTURE only: the still to sample ({id, w, h, rgb}); the bundled
      *   seed picture when omitted. Every other mode ignores it.
+     * @param {object} [culture] #1923 Phase 2 slice C: the dish-life coupling's TIDES descriptor
+     *   ({ coupling, grid } — the seam's level snapshot), carried on the resolved block. TIDES only;
+     *   the drift-amplitude modes receive their bias already folded into the block's drift value.
      * @returns {{pixels: Uint32Array, w: number, h: number, key: string}} top row first
      */
-    frame(pattern, palette, w, h, t = 0, image = null) {
+    frame(pattern, palette, w, h, t = 0, image = null, culture = null) {
       const p = sanitizePattern(pattern);
       const pal = patternPalette(palette);
       const bw = Math.max(1, Math.round(w));
@@ -184,8 +201,28 @@ export function createPatternFrames() {
         still = null;
         if (!out || out.length !== bw * bh) out = new Uint32Array(bw * bh);
       }
-      const key = patternKey(p, pal, bw, bh, t, image);
+      // #1923 Phase 2 slice C — the coupling's TIDES read: each cell's dealt value shifts by the
+      // culture LEVEL under the cell (the seam's snapshot, sampled at the cell's centre; the raster's
+      // own clamp — tidesCellOf — bounds the shifted value). Null for every other mode and every
+      // uncoupled frame: the dealt readout exactly.
+      const tidesBias =
+        culture && p.mode === 'TIDES'
+          ? (c, r, v) =>
+              v +
+              cultureTidesShift(
+                cultureLevelAt(culture.grid, (c + 0.5) / plan.grid.cols, (r + 0.5) / plan.grid.rows),
+                culture.coupling,
+              )
+          : null;
+      const key = patternKey(p, pal, bw, bh, t, image, culture);
       if (p.drift === 0 || p.mode === 'BLOCKS') {
+        // A coupled TIDES still is NOT a still: the culture evolves under it, so it re-rasters every
+        // frame (into the scratch buffer, never the drawn-once cache) and its key carries the field's
+        // generation, so the renderer re-uploads as the culture moves.
+        if (tidesBias) {
+          rasterTides(out, bw, bh, plan.grid, 0, 0, tidesBias);
+          return { pixels: out, w: bw, h: bh, key };
+        }
         if (!still) {
           if (p.mode === 'QUILT') still = plan.quilt.base;
           else if (p.mode === 'GLYPH') still = rasterGlyph(new Uint32Array(bw * bh), bw, bh, plan.grid, 0, 0);
@@ -199,7 +236,7 @@ export function createPatternFrames() {
       }
       if (p.mode === 'QUILT') plan.quilt.draw(out, p.drift, t);
       else if (p.mode === 'GLYPH') rasterGlyph(out, bw, bh, plan.grid, p.drift, t, plan.movers);
-      else if (p.mode === 'TIDES') rasterTides(out, bw, bh, plan.grid, p.drift, t);
+      else if (p.mode === 'TIDES') rasterTides(out, bw, bh, plan.grid, p.drift, t, tidesBias);
       else if (p.mode === 'REWRITE') rasterRewrite(out, bw, bh, plan.grid, p.drift, t);
       else if (p.mode === 'PICTURE') rasterPicture(out, bw, bh, plan.grid, p.drift, t, plan.movers);
       else rasterField(out, bw, bh, plan.grid, plan.tileW, panOffset(p.seed, p.drift, t));
@@ -214,15 +251,15 @@ export function createPatternFrames() {
  * @param {object} pattern a layer's pattern block (sanitized here)
  * @param {object} palette the active palette ({swatches, bg, ink, weights?})
  */
-export function patternPixels(pattern, palette, w, h, t = 0, image = null) {
-  return createPatternFrames().frame(pattern, palette, w, h, t, image).pixels.slice();
+export function patternPixels(pattern, palette, w, h, t = 0, image = null, culture = null) {
+  return createPatternFrames().frame(pattern, palette, w, h, t, image, culture).pixels.slice();
 }
 
 /** The same frame as bytes, rows flipped to GL's bottom-up order, ready for texImage2D. */
-export function patternBytesGL(pattern, palette, w, h, t = 0, image = null) {
+export function patternBytesGL(pattern, palette, w, h, t = 0, image = null, culture = null) {
   const bw = Math.max(1, Math.round(w));
   const bh = Math.max(1, Math.round(h));
-  const src = patternPixels(pattern, palette, bw, bh, t, image);
+  const src = patternPixels(pattern, palette, bw, bh, t, image, culture);
   const outp = new Uint32Array(bw * bh);
   for (let y = 0; y < bh; y++) outp.set(src.subarray(y * bw, (y + 1) * bw), (bh - 1 - y) * bw);
   return new Uint8Array(outp.buffer);
