@@ -111,6 +111,16 @@ export const DETERMINISM_ALLOWLIST = {
       why: 'the Mind presence driver\u2019s live timing source (a typeof guard + one call) — persona telemetry; never feeds the sim',
     },
   },
+  'curator/fieldReviewVoiceLive.mjs': {
+    'performance.now': {
+      count: 2,
+      why: '#2006 slice 2: the voice driver\u2019s injectable now seam (a typeof guard + one call), defaulting to the wall clock — it only measures a model ask\u2019s latency against the 300 ms cap and stamps MIND_REPLY telemetry; verdicts come from the seeded rules table, tests inject now, and the clock never feeds the sim',
+    },
+    'Date.now': {
+      count: 1,
+      why: '#2006 slice 2: the same injectable now seam\u2019s fallback when performance is unavailable — ask-latency measurement only, never sim input',
+    },
+  },
   'curator/mindPresenceLive.js': {
     'Date.now': {
       count: 1,

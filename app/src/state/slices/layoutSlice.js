@@ -61,6 +61,7 @@ import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapter
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
 import { judgeDeal } from '../../curator/loisCut.mjs'; // #1856: LOIS judges the round's deal
 import { reviewLanding } from '../../curator/fieldReview.mjs'; // #2006 slice 1: the shadow review of a landed poem
+import { sanitizeReviewVoice } from '../../curator/fieldReviewVoice.mjs'; // #2006 slice 2: the voice's extension shape
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
 import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
@@ -577,8 +578,11 @@ export const createLayoutSlice = (set) => ({
    * silence clears it (no landing, no review — spec §3.9); HOLD carries it
    * by with the standing form; a re-deal NEVER writes it (re-deals are the
    * performer's own correction move, unreviewed by Matt's ruling — a
-   * re-deal that moves the form clears the record instead). Nothing reads
-   * it in slice 1: the shadow only measures, judges and banks.
+   * re-deal that moves the form clears the record instead). Slice 1 only
+   * measured, judged and banked; slice 2's voice (curator/
+   * fieldReviewVoiceLive) reads the record and may extend it with a
+   * `voice` provenance block via amendFieldReviewVoice — the record's
+   * own fields are never rewritten by the voice.
    */
   fieldReview: null,
   paletteId: 'praystation',
@@ -1114,6 +1118,30 @@ export const createLayoutSlice = (set) => ({
         fieldGateRefusal: poem.fieldGateRefusal,
         fieldReview: null,
       };
+    }),
+
+  /**
+   * #2006 (slice 2, the voice) — the review loop speaks: the voice driver
+   * (curator/fieldReviewVoiceLive) extends the STANDING verdict record
+   * with its spoken line's provenance ({ persona, line, bar, backend,
+   * seed, rungOrder? }). The voice may only ever describe the record that
+   * stands: the caller names it by (seed, stream), and the extension is
+   * re-validated here against the record itself (fieldReviewVoice's
+   * sanitizeReviewVoice — fail-closed: a malformed extension, a stale
+   * record, or a rules line trying to overwrite a model's line changes
+   * nothing). The record itself is untouched — verdicts are slice 1's
+   * and are never rewritten by a voice. Session-only like the record;
+   * when no voice speaks, the extension is absent, never null, and the
+   * record is exactly slice 1's.
+   */
+  amendFieldReviewVoice: (voice, key) =>
+    set((state) => {
+      const rec = state.fieldReview;
+      if (!rec || !key || rec.seed !== key.seed || rec.stream !== key.stream) return {};
+      const clean = sanitizeReviewVoice(voice, rec);
+      if (!clean) return {};
+      if (rec.voice && rec.voice.backend !== 'rules' && clean.backend === 'rules') return {};
+      return { fieldReview: { ...rec, voice: clean } };
     }),
 
   /**

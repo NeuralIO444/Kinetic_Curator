@@ -28,6 +28,21 @@ export function clearLoisVerdict() {
   lastParts = null;
 }
 
+/**
+ * #2006 (slice 2, the voice) — a verdict line spoken OUTSIDE a rank: the
+ * poem review loop's voice (fieldReviewVoiceLive) writes the same slot a
+ * rank writes, so the latest verdict — ranked or reviewed — owns the
+ * tape (loisTicker reads this one slot, and LoisPill restarts its crawl
+ * on a new line). A spoken line is replaceable by the next verdict
+ * exactly as a rank line is. The parts are NOT touched: they remain the
+ * last RANK's, and the CUR detent keeps reading the rank it scored.
+ */
+export function speakVerdict(line) {
+  if (typeof line !== 'string' || !line) return false;
+  lastVerdict = line;
+  return true;
+}
+
 function meanOf(rows) {
   const keys = Object.keys(rows[0]);
   const mean = {};

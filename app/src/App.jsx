@@ -52,6 +52,7 @@ import { resolveLoisFace } from './curator/loisFace.js';
 import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: when a spore would form
 import { setRoomCodesProvider } from './curator/roomCodes.js'; // #1949
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
+import { startReviewVoice } from './curator/fieldReviewVoiceLive.mjs'; // #2006 slice 2: the review loop's voice on the tape
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { startRoomFeed, resetRoomFeed } from './curator/roomFeed.js'; // #1560 S1: THE ROOM codec's retained bus window
@@ -286,6 +287,16 @@ function AppInner() {
         };
       },
     });
+    // #2006 slice 2 — the review loop's voice: speaks each fresh poem landing's banked verdict
+    // onto the footer tape (DAVIS on clean, LOIS on janky, silence on exempt), asking the SAME
+    // model startMind gets to phrase the line — rules wording the silent fallback, the 300 ms
+    // ask cap, and muted while a take plays back, so a replay never asks a backend again.
+    const stopReviewVoice = startReviewVoice({
+      getState: useStore.getState,
+      subscribe: (fn) => useStore.subscribe(fn),
+      model: DEBUG_MIND ? demoModel : appleModel,
+      isReplaying: isPlaybackActive,
+    });
     // #1560 S3 — the room's story machine: folds the bus into rapport/grudge standing, episodes and beats, and
     // persists the book beside the engagement scores. Backstage only (the dev panel's MIND tab reads its view);
     // the room shows nothing of it, and it asks nothing of the stage.
@@ -337,6 +348,7 @@ function AppInner() {
       stopPace();
       stopLean();
       stopMind();
+      stopReviewVoice();
       trio.stop();
       stopFaces();
       stopFeed();
