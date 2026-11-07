@@ -2128,5 +2128,8 @@ function checkDishLifeSnapshot(d) {
       (d.field.cycleGens !== undefined && !Number.isFinite(d.field.cycleGens)))
   )
     return false;
+  // #1923 Phase 3 — the terrain rider (the marks the seed was derived against, so a restore rebuilds
+  // the same bedrock); when present it must be an array, like the marks list itself
+  if (d.terrain !== undefined && !Array.isArray(d.terrain)) return false;
   return true;
 }
