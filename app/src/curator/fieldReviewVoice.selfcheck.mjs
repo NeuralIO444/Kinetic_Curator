@@ -12,9 +12,11 @@
 //      never invent: no figures, wrong figures, figure look-alikes,
 //      out-of-set rungs or a ladder on a clean landing all drop whole;
 //      figures must keep their roles (the value before its limit,
-//      crop's withheld limit stays withheld) and a clean proposal is
-//      fenced the other way — no figures, no contrary verdict, no
-//      repair named (the QA fix pass pins);
+//      crop's withheld limit stays withheld), the figure set is closed
+//      (no percent beyond the record's own, however correct the pair —
+//      the round-2 QA fence), and a clean proposal is fenced the other
+//      way — no figures, no contrary verdict, no repair named (the QA
+//      fix pass pins);
 //   3. the ask context (§3.7: names + measures only, gates with
 //      pass/fail, the rules line as idiom anchor, the approved set);
 //   4. the extension's fail-closed shape (sanitizeReviewVoice);
@@ -253,6 +255,47 @@ ok('validator: crop’s limit stays unspoken — an invented 0% drops, a limit-f
     validateReviewProposal({ line: 'Glyphs over the edge, every one. Shift it back.' }, J.crop),
     null,
     'the value figure is still required',
+  );
+});
+
+ok('validator: the figure set is closed — an extra figure beside a correct pair drops whole', () => {
+  // QA round 2: the required pair present, whole and in role was not
+  // enough — a line could still speak numbers the record does not own.
+  assert.equal(
+    validateReviewProposal(
+      { line: '173% covered at the peak — 73% of its ink is covered — 50% is the limit.' },
+      J.markCover,
+    ),
+    null,
+    'an invented peak is not fenced out by the correct pair behind it',
+  );
+  assert.equal(
+    validateReviewProposal(
+      { line: '73% of its ink is covered — 150% effort will not save it; 50% is the limit.' },
+      J.markCover,
+    ),
+    null,
+  );
+  assert.equal(
+    validateReviewProposal({ line: '73% covered — 50% is the limit — and 5% of its ink is doubled.' }, J.markCover),
+    null,
+    'another gate’s figure is not this record’s to speak',
+  );
+  assert.equal(
+    validateReviewProposal(
+      { line: 'The frame cuts the poem. 25% of its glyphs cross the edge — and 40% of the dish is ink.' },
+      J.crop,
+    ),
+    null,
+    'crop owns its value figure only — an invented coverage figure drops too',
+  );
+  // A restated owned figure is no invention: the value may be spoken twice.
+  assert.deepEqual(
+    validateReviewProposal({ line: 'Covered: 73% of its ink — 73% against a 50% limit.' }, J.markCover),
+    {
+      line: 'Covered: 73% of its ink — 73% against a 50% limit.',
+      rungOrder: null,
+    },
   );
 });
 

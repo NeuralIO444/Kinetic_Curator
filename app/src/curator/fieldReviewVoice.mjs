@@ -26,8 +26,9 @@
 //     formatted exactly as the rules line formats them, in the rules'
 //     own roles — the value spoken before its limit; crop's limit is
 //     the absence of crossing, and the figure the rules line withholds
-//     stays withheld) or the whole proposal is dropped and the rules
-//     line stands. A clean line must carry no figure at all: DAVIS's
+//     stays withheld) and those must be ALL the figures it carries —
+//     any further percent figure is a number the record does not own —
+//     or the whole proposal is dropped and the rules line stands. A clean line must carry no figure at all: DAVIS's
 //     rules lines have none to quote.
 //
 // Everything in this module is pure: same record in, same line out. The
@@ -220,8 +221,16 @@ const figureIndex = (line, figure) => {
   return m ? m.index : -1;
 };
 
-/** Does `line` carry `figure` as a whole figure? */
-const carriesFigure = (line, figure) => figureIndex(line, figure) >= 0;
+/** Every percent figure `line` speaks, as maximal whole tokens:
+ * '173%' extracts as the figure '173%' — not as an occurrence of
+ * '73%' hiding inside it — and a malformed token ('10.05%', a shape
+ * pct never emits) is still extracted: an unowned figure, never
+ * "not a figure" slipping past the fence. */
+const lineFigures = (line) => {
+  const figures = [];
+  for (const m of line.matchAll(/(\d[\d.]*)\s*%/g)) figures.push(`${m[1]}%`);
+  return figures;
+};
 
 /**
  * Validate a backend proposal against the standing record, on
@@ -231,8 +240,10 @@ const carriesFigure = (line, figure) => figureIndex(line, figure) >= 0;
  * gate or measure this function would read — and a janky line must
  * carry the rules' figures for the failing gate, verbatim as pct
  * formats them AND in their roles (the measured value before its
- * limit; crop states no limit figure, so none may be added), or it is
- * inventing numbers and is dropped. A clean line is fenced the other
+ * limit; crop states no limit figure, so none may be added), and
+ * those must be every figure it carries — the set is closed, so an
+ * extra figure beside a correct pair is still an invented number —
+ * or it is inventing numbers and is dropped. A clean line is fenced the other
  * way: DAVIS's rules lines carry no figures, name no verdict but the
  * landing's own and propose no repair — a clean proposal doing any of
  * those is out of the idiom and drops whole.
@@ -275,15 +286,25 @@ export const validateReviewProposal = (raw, record) => {
     if (!gm) return null;
     const valueFigure = pct(gm.value);
     const limitFigure = pct(gm.limit);
+    // The figure set is CLOSED: every percent figure the line speaks
+    // must be one of the record's own — the measured value and its
+    // limit (crop speaks its value only: its limit is no figure at
+    // all). An extra figure riding alongside a correct pair — another
+    // gate's reading, an invented peak — is a number the record does
+    // not own and drops the line whole. Repeats of an owned figure
+    // are fine: a rephrase may restate the value.
+    const owned = record.gate === 'crop' ? [valueFigure] : [valueFigure, limitFigure];
+    for (const figure of lineFigures(line)) {
+      if (!owned.includes(figure)) return null;
+    }
     const valueAt = figureIndex(line, valueFigure);
     if (valueAt < 0) return null; // the measured figure must be spoken
     if (record.gate === 'crop') {
       // Crop's limit is the ABSENCE of crossing, not a number — the
       // rules line says "the limit is none" and never states
-      // pct(limit) ('0%'). A proposal carrying that figure invents the
-      // one figure the rules line withholds: dropped, fail-closed.
-      // (When the two figures coincide the fence is vacuous, as below.)
-      if (limitFigure !== valueFigure && carriesFigure(line, limitFigure)) return null;
+      // pct(limit) ('0%'). The closed set above already drops a
+      // proposal carrying that figure: it is unowned, the one figure
+      // the rules line withholds. Nothing further is owed here.
     } else {
       const limitAt = figureIndex(line, limitFigure);
       if (limitAt < 0) return null; // the limit figure must be spoken
