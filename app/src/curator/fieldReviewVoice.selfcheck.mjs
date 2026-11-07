@@ -14,7 +14,9 @@
 //      figures must keep their roles (the value before its limit,
 //      crop's withheld limit stays withheld), the figure set is closed
 //      (no percent beyond the record's own, however correct the pair —
-//      the round-2 QA fence), and a clean proposal is fenced the other
+//      the round-2 QA fence; figures are figures in any script —
+//      Unicode digits and percent signs are unowned by construction,
+//      the round-3 QA fence), and a clean proposal is fenced the other
 //      way — no figures, no contrary verdict, no repair named (the QA
 //      fix pass pins);
 //   3. the ask context (§3.7: names + measures only, gates with
@@ -290,6 +292,75 @@ ok('validator: the figure set is closed — an extra figure beside a correct pai
     'crop owns its value figure only — an invented coverage figure drops too',
   );
   // A restated owned figure is no invention: the value may be spoken twice.
+  assert.deepEqual(
+    validateReviewProposal({ line: 'Covered: 73% of its ink — 73% against a 50% limit.' }, J.markCover),
+    {
+      line: 'Covered: 73% of its ink — 73% against a 50% limit.',
+      rungOrder: null,
+    },
+  );
+});
+
+ok('validator: figures are figures in any script — non-ASCII digits and percent signs are unowned', () => {
+  // QA round 3: enumeration was ASCII-only, so a figure spoken in
+  // another script walked past BOTH fences — the closed set never
+  // enumerated it, and the clean fence's figure test never fired.
+  // pct speaks ASCII only, so every token below is a number the
+  // record does not own, however correct the pair in front of it is.
+  // Escapes name the codepoints exactly: ％ U+FF05 and ٪ U+066A are
+  // percent signs; ٩ U+0669 (Arabic-Indic), ९ U+0969 (Devanagari)
+  // and ９ U+FF19 (fullwidth) are decimal digits.
+  const pair = 'The marks are eating the poem. 73% of its ink is covered — 50% is the limit.';
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit 99\uFF05.` }, J.markCover),
+    null,
+    'fullwidth percent',
+  );
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit \u0669\u0669%.` }, J.markCover),
+    null,
+    'Arabic-Indic digits',
+  );
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit \u0969\u0969%.` }, J.markCover),
+    null,
+    'Devanagari digits',
+  );
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit \uFF19\uFF19%.` }, J.markCover),
+    null,
+    'fullwidth digits',
+  );
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit 99\u066A.` }, J.markCover),
+    null,
+    'Arabic percent sign',
+  );
+  // A mixed token is ONE unowned figure, not an owned figure hiding
+  // behind a foreign prefix: ٩ + '73%' extracts whole and drops.
+  assert.equal(
+    validateReviewProposal({ line: `${pair} Earlier it hit \u066973%.` }, J.markCover),
+    null,
+    'mixed-script token',
+  );
+  // The clean fence reads the same enumeration — QA's clean triple.
+  assert.equal(validateReviewProposal({ line: 'WOO HOO — 99\uFF05 of the dish is ink and it sings.' }, CLEAN()), null);
+  assert.equal(
+    validateReviewProposal({ line: 'WOO HOO — \u0669\u0669% of the dish is ink and it sings.' }, CLEAN()),
+    null,
+  );
+  assert.equal(
+    validateReviewProposal({ line: 'WOO HOO — \uFF19\uFF19% of the dish is ink and it sings.' }, CLEAN()),
+    null,
+  );
+  // ASCII behaviour is unchanged — two round-2 spot-pins stand as-is.
+  assert.equal(
+    validateReviewProposal(
+      { line: '173% covered at the peak — 73% of its ink is covered — 50% is the limit.' },
+      J.markCover,
+    ),
+    null,
+  );
   assert.deepEqual(
     validateReviewProposal({ line: 'Covered: 73% of its ink — 73% against a 50% limit.' }, J.markCover),
     {

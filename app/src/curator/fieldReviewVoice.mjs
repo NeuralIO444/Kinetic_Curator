@@ -27,7 +27,10 @@
 //     own roles — the value spoken before its limit; crop's limit is
 //     the absence of crossing, and the figure the rules line withholds
 //     stays withheld) and those must be ALL the figures it carries —
-//     any further percent figure is a number the record does not own —
+//     any further percent figure is a number the record does not own,
+//     in any script: figure enumeration reads Unicode decimal digits
+//     and the percent-sign variants, and pct speaks ASCII only, so a
+//     non-ASCII figure is unowned by construction —
 //     or the whole proposal is dropped and the rules line stands. A clean line must carry no figure at all: DAVIS's
 //     rules lines have none to quote.
 //
@@ -214,10 +217,12 @@ export const reviewAskContext = (record, { poet = null, piece = null, room = nul
 
 /** The index at which `line` first carries `figure` as a whole figure
  * — '5%' inside '15%' or '0.5%' does not count (a lookbehind keeps
- * figures honest) — or -1 when the figure is not carried. */
+ * figures honest: a decimal digit of ANY script before the figure
+ * means the figure is part of a longer number) — or -1 when the
+ * figure is not carried. */
 const figureIndex = (line, figure) => {
   const esc = figure.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const m = new RegExp(`(?<![\\d.])${esc}`).exec(line);
+  const m = new RegExp(`(?<![\\p{Nd}.])${esc}`, 'u').exec(line);
   return m ? m.index : -1;
 };
 
@@ -225,10 +230,18 @@ const figureIndex = (line, figure) => {
  * '173%' extracts as the figure '173%' — not as an occurrence of
  * '73%' hiding inside it — and a malformed token ('10.05%', a shape
  * pct never emits) is still extracted: an unowned figure, never
- * "not a figure" slipping past the fence. */
+ * "not a figure" slipping past the fence. Figures are figures in
+ * ANY script: the digits are Unicode decimal digits (\p{Nd}) and
+ * the percent sign may be %, ％ (U+FF05), ٪ (U+066A) or ﹪
+ * (U+FE6A). Each token is returned AS SPOKEN, digits and percent
+ * sign together — pct speaks ASCII only, so a token carrying a
+ * non-ASCII digit or percent sign can never equal one of the
+ * record's own figures: unowned by construction, and a maximal
+ * token means an owned ASCII figure cannot hide behind a
+ * non-ASCII digit prefix ('٩73%' is one token, and not '73%'). */
 const lineFigures = (line) => {
   const figures = [];
-  for (const m of line.matchAll(/(\d[\d.]*)\s*%/g)) figures.push(`${m[1]}%`);
+  for (const m of line.matchAll(/(\p{Nd}[\p{Nd}.]*)\s*([%％٪﹪])/gu)) figures.push(`${m[1]}${m[2]}`);
   return figures;
 };
 
@@ -269,7 +282,10 @@ export const validateReviewProposal = (raw, record) => {
   if (record.verdict === 'clean') {
     // DAVIS's rules lines carry NO figures — there is no measure behind
     // a clean line to quote — so a clean proposal speaking a percent
-    // figure is inventing a reading and drops whole. It may not name
+    // figure is inventing a reading and drops whole. The test is the
+    // lineFigures enumeration itself, so a figure spoken in any script
+    // (a non-ASCII digit, a fullwidth percent sign) is a figure here
+    // too. It may not name
     // the verdict it is not ('janky': a reply carries no verdict, least
     // of all the contrary one), and it may not name a repair: a clean
     // landing approves no ladder (a rungOrder already dropped above)
@@ -277,7 +293,7 @@ export const validateReviewProposal = (raw, record) => {
     // names are out of set in prose too. Contradicting prose beyond
     // these fences cannot be pattern-fenced; that residue stands, by
     // design — the rule fence, not a prose censor.
-    if (/\d[\d.]*\s*%/.test(line)) return null;
+    if (lineFigures(line).length > 0) return null;
     if (/\bjanky\b/i.test(line)) return null;
     if (/\b(?:shrink|shift|cut|re-?deal)\b/i.test(line)) return null;
   }
@@ -291,7 +307,9 @@ export const validateReviewProposal = (raw, record) => {
     // limit (crop speaks its value only: its limit is no figure at
     // all). An extra figure riding alongside a correct pair — another
     // gate's reading, an invented peak — is a number the record does
-    // not own and drops the line whole. Repeats of an owned figure
+    // not own and drops the line whole, and so is a figure spoken in
+    // another script: lineFigures extracts it whole, and no non-ASCII
+    // token equals an owned ASCII figure. Repeats of an owned figure
     // are fine: a rephrase may restate the value.
     const owned = record.gate === 'crop' ? [valueFigure] : [valueFigure, limitFigure];
     for (const figure of lineFigures(line)) {
