@@ -21,6 +21,21 @@
 /** Generations per cycle: the rule's useful bloom arc, the same length the quiet layer rides. */
 export const FIELD_CYCLE_GENS = 48;
 /**
+ * #1923 Phase 4 — the re-seed interval's detents (generations per cycle), the performer's one
+ * cycle-length control. A detent set, not a range: the cycle length is a discrete choice (KC-1 DS —
+ * discrete signals render TE), and each detent keeps the wake a pure function of loop time GIVEN the
+ * recorded stamp, because the chosen length rides every stamp as `cycleGens` — it has since Phase 1.
+ * The default is FIELD_CYCLE_GENS: a stream stamped before the control existed, or with the detent
+ * untouched, carries 48 and reads exactly as it always did.
+ */
+export const FIELD_CYCLE_DETENTS = Object.freeze([24, 48, 96]);
+
+/** A cycle-length value, snapped to the detent set; junk or off-detent reads as the default. Pure. */
+export function clampCycleGens(v) {
+  const n = Number(v);
+  return FIELD_CYCLE_DETENTS.includes(n) ? n : FIELD_CYCLE_GENS;
+}
+/**
  * Generations per second on the loop clock — a reduced rate: half the visual culture's tempo
  * (GENS_PER_SEC / QUIET_GPS are 8). The field is infrastructure, not a performance; consumers read a
  * climate, not a flicker. One cycle is FIELD_CYCLE_GENS / FIELD_GPS = 12 s.

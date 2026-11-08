@@ -2131,5 +2131,8 @@ function checkDishLifeSnapshot(d) {
   // #1923 Phase 3 — the terrain rider (the marks the seed was derived against, so a restore rebuilds
   // the same bedrock); when present it must be an array, like the marks list itself
   if (d.terrain !== undefined && !Array.isArray(d.terrain)) return false;
+  // #1923 Phase 4 — the seed-epoch rider (which seed of the wake the snapshot's culture is); when
+  // present it must be a non-negative integer
+  if (d.seedEpoch !== undefined && (!Number.isInteger(d.seedEpoch) || d.seedEpoch < 0)) return false;
   return true;
 }

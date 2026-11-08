@@ -6,6 +6,7 @@ import {
   dishLifeChipModel,
   readDishLifePref,
   writeDishLifePref,
+  nextCycleGens,
   STRENGTH_MIN,
   STRENGTH_MAX,
 } from './dishLifeChip.model.mjs';
@@ -13,7 +14,11 @@ import {
 // DishLifeChip — the footer's DISH LIFE control (#1923): a glider glyph that lights while the quiet Game of Life layer
 // is running, a click to turn it on/off, and the ONE strength dial while it is on. Phase 2 (#1923) adds the
 // COUPLING dial beside it — a strength slider, not a switch: coupling above 0 is what turns the invisible
-// field culture's asset-driving on (Matt's ruling; it starts at 0). The choice is a per-viewer
+// field culture's asset-driving on (Matt's ruling; it starts at 0). Phase 4 (#1923) adds the field
+// culture's own controls beside the dials: a SEED button — the "seed from stage" trigger, a momentary
+// TE act that re-seeds the field from the stage as it stands (a boundary on demand; the press is a
+// store pulse the loop stamps, never a preference) — and a CYCLE button stepping the re-seed interval
+// through its detents (24 / 48 / 96 generations). The choice is a per-viewer
 // preference (localStorage, wrapped), restored once at mount — never part of a saved project.
 
 // A glider on a 3×3 grid: the five live cells.
@@ -31,10 +36,13 @@ export function DishLifeChip() {
   const dishLifeShed = useStore((s) => s.dishLifeShed);
   const dishLifeStrength = useStore((s) => s.dishLifeStrength);
   const dishLifeCoupling = useStore((s) => s.dishLifeCoupling);
+  const dishLifeCycleGens = useStore((s) => s.dishLifeCycleGens);
   const setDishLife = useStore((s) => s.setDishLife);
   const setStrength = useStore((s) => s.setDishLifeStrength);
   const setCoupling = useStore((s) => s.setDishLifeCoupling);
-  const m = dishLifeChipModel({ dishLife, dishLifeAwake, dishLifeShed, dishLifeStrength });
+  const setCycleGens = useStore((s) => s.setDishLifeCycleGens);
+  const pulseSeed = useStore((s) => s.pulseDishLifeSeed);
+  const m = dishLifeChipModel({ dishLife, dishLifeAwake, dishLifeShed, dishLifeStrength, dishLifeCycleGens });
   const couplingPct = Math.round(dishLifeCoupling * 100);
 
   // restore the viewer's choice once
@@ -43,25 +51,39 @@ export function DishLifeChip() {
     if (pref) {
       setStrength(pref.strength);
       setCoupling(pref.coupling);
+      setCycleGens(pref.cycleGens);
       setDishLife(pref.on);
     }
-  }, [setDishLife, setStrength, setCoupling]);
+  }, [setDishLife, setStrength, setCoupling, setCycleGens]);
 
-  const save = (on, strength, coupling) =>
-    writeDishLifePref(typeof localStorage !== 'undefined' ? localStorage : null, { on, strength, coupling });
+  const save = (on, strength, coupling, cycleGens) =>
+    writeDishLifePref(typeof localStorage !== 'undefined' ? localStorage : null, {
+      on,
+      strength,
+      coupling,
+      cycleGens,
+    });
   const toggle = () => {
     setDishLife(!dishLife);
-    save(!dishLife, dishLifeStrength, dishLifeCoupling);
+    save(!dishLife, dishLifeStrength, dishLifeCoupling, dishLifeCycleGens);
   };
   const onDial = (pct) => {
     const v = Number(pct) / 100;
     setStrength(v);
-    save(dishLife, v, dishLifeCoupling);
+    save(dishLife, v, dishLifeCoupling, dishLifeCycleGens);
   };
   const onCoupling = (pct) => {
     const v = Number(pct) / 100;
     setCoupling(v);
-    save(dishLife, dishLifeStrength, v);
+    save(dishLife, dishLifeStrength, v, dishLifeCycleGens);
+  };
+  // the seed press is an act, not a setting: it pulses the store counter the loop consumes, and is
+  // deliberately NOT saved to the preference
+  const onSeed = () => pulseSeed();
+  const onCycle = () => {
+    const next = nextCycleGens(dishLifeCycleGens);
+    setCycleGens(next);
+    save(dishLife, dishLifeStrength, dishLifeCoupling, next);
   };
 
   return (
@@ -128,6 +150,26 @@ export function DishLifeChip() {
             ariaLabel="Dish life coupling"
             hint={`${helpText('dish-life-coupling')} (${couplingPct}%)`}
           />
+          <button
+            type="button"
+            className="undo-btn dish-life-seed"
+            onClick={onSeed}
+            aria-label="Seed dish life from stage"
+            title={helpText('dish-life-seed')}
+            style={{ fontSize: '10px', letterSpacing: '0.06em' }}
+          >
+            SEED
+          </button>
+          <button
+            type="button"
+            className="undo-btn dish-life-cycle"
+            onClick={onCycle}
+            aria-label="Dish life re-seed cycle"
+            title={`${helpText('dish-life-cycle')} (${m.cycleGens} generations)`}
+            style={{ fontSize: '10px', letterSpacing: '0.06em' }}
+          >
+            CYCLE {m.cycleGens}
+          </button>
         </>
       ) : null}
     </div>

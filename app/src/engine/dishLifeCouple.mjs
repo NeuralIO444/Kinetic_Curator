@@ -240,6 +240,11 @@ export function culturePatternDriftFactor(activity, coupling) {
  * at 0 every cycle, so (gen, level) names a culture only together with its wake — the pattern frame
  * key (patternSource.patternKey) keys a coupled TIDES on wake + gen + dial. A publication carrying
  * no wake (a hand-built holder) snapshots as wakeMs −1.
+ * #1923 Phase 4: the snapshot also carries the publication's seed EPOCH (0 = the wake's own seed;
+ * each "seed from stage" press inside the wake increments it). A manual seed rebuilds the culture
+ * inside a wake, so (wake, gen) alone would name a pre-press and a post-press grid the same — the
+ * key keys on wake + epoch + gen + dial. A publication carrying no epoch (a hand-built holder)
+ * snapshots as epoch 0.
  */
 export function fieldLevelGrid(published) {
   if (!published || published.active !== true || !published.level) return null;
@@ -247,11 +252,13 @@ export function fieldLevelGrid(published) {
   const n = (cols | 0) * (rows | 0);
   if (!(n > 0) || level.length < n) return null;
   const wake = published.wakeMs == null ? NaN : Number(published.wakeMs);
+  const epoch = published.seedEpoch == null ? NaN : Number(published.seedEpoch);
   return {
     cols,
     rows,
     gen: Number.isFinite(Number(gen)) ? Number(gen) : -1,
     wakeMs: Number.isFinite(wake) ? wake : -1,
+    seedEpoch: Number.isFinite(epoch) && epoch > 0 ? Math.floor(epoch) : 0,
     level: Float32Array.from(level.subarray(0, n)),
   };
 }

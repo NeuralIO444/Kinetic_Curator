@@ -218,6 +218,23 @@ ok('patternKey: the culture component exists only for a coupled TIDES', () => {
     patternKey(tides, PAL, 200, 120, 0, null, { coupling: 0.5, grid }),
     'a moved dial is a new frame',
   );
+  // RE-PINNED with cause (Phase 4): the component gains the seed EPOCH. The "seed from stage"
+  // trigger rebuilds the culture inside a wake — a boundary that arrives early — so one (wake, gen)
+  // names two grids: the wake seed's and the press seed's, and consecutive frames can read both
+  // (a press in the cycle's first generations lands the new seed on a generation the old seed just
+  // published). The epoch is the seed's ordinal within the wake (0 = the wake's own seed). A grid
+  // carrying no epoch keys 0 — the same as an explicit epoch 0 — so every grid built before the
+  // trigger existed keys exactly as the Phase 3 shape did at epoch 0.
+  assert.notEqual(
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid: { ...grid, seedEpoch: 1 } }),
+    'a manual seed inside the wake is a new frame — the same generation of a pressed seed is a different culture',
+  );
+  assert.equal(
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid }),
+    patternKey(tides, PAL, 200, 120, 0, null, { coupling: 1, grid: { ...grid, seedEpoch: 0 } }),
+    'a grid carrying no epoch keys 0, never apart from an explicit epoch 0',
+  );
   assert.equal(
     patternKey(quilt, PAL, 200, 120, 1, null, { coupling: 1, grid }),
     patternKey(quilt, PAL, 200, 120, 1),

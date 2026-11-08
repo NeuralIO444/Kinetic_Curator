@@ -317,6 +317,18 @@ export const HELP_TOPICS = [
     text: 'How hard the invisible field culture drives the marks: where the culture is alive the marks swell, where it is dead they shrink. 0 is off — the culture may live, but nothing reads it. Double-click to reset to 0%.',
   },
   {
+    id: 'dish-life-seed',
+    group: 'Master',
+    title: 'dish life · seed from stage',
+    text: 'Re-seed the invisible field culture from the stage as it stands right now — the cycle boundary, on demand, without waiting for the cycle to roll. The new seed then catches up to the cycle’s generation; while the governor holds the culture it lands at generation 0 and waits. With the coupling at 0 there is no field to seed, and the press does nothing.',
+  },
+  {
+    id: 'dish-life-cycle',
+    group: 'Master',
+    title: 'dish life · re-seed cycle',
+    text: 'How long the field culture lives before it re-seeds itself from the stage: 24, 48 or 96 generations a cycle. 48 is the length it has always run. Changing it re-seeds on the new cycle at once.',
+  },
+  {
     id: 'beast-roam',
     group: 'Assets',
     title: 'beast · roam',

@@ -53,7 +53,7 @@ import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
 import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
-import { fieldStamp } from '../engine/dishLifeField.mjs'; // #1923 Phase 2: the field culture's cycle stamp (produced while the coupling dial is up)
+import { fieldStamp, clampCycleGens } from '../engine/dishLifeField.mjs'; // #1923 Phase 2: the field culture's cycle stamp (produced while the coupling dial is up); Phase 4: the re-seed interval's detent clamp
 import { installDishLifeTouch } from './dishLifeTouchDom.mjs';
 import { createKinemeClock } from '../data/kinemes.js';
 import { gateWeaveOffset } from './gateWeave.mjs';
@@ -401,6 +401,7 @@ export function createLiveLoop(
   const dishLifePhase = createDishLifePhase({ enabled: false });
   let dishLifeWasAwake = false;
   let dishLifeBoost = 0; // the idle boost, eased on the loop's dt (the eased value is what gets stamped)
+  let lastSeedPulse = null; // #1923 Phase 4 — the last consumed "seed from stage" pulse (null adopts the store's value on the first frame, so a press never fires late or on load)
   const disposeDishLifeTouch = typeof window !== 'undefined' ? installDishLifeTouch(window) : () => {};
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
@@ -789,6 +790,13 @@ export function createLiveLoop(
       Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)) > 0 &&
       !s.trailSteerShed;
     const trailGridNow = trailSteerLive ? getTrailSteerGrid() : null;
+    // #1923 Phase 4 — the "seed from stage" pulse is consumed EVERY frame, stamped or not: a press
+    // consumed on a frame that produces no field stamp (family off, dial at 0 — Matt's ruling: the
+    // field runs only while the family is on and the dial is up) is spent with no field effect, and
+    // never fires late when the dial rises. The first frame adopts the store's value silently.
+    const seedPulseNow = Number.isFinite(Number(s.dishLifeSeedPulse)) ? s.dishLifeSeedPulse | 0 : 0;
+    const seedPressed = lastSeedPulse !== null && seedPulseNow !== lastSeedPulse;
+    lastSeedPulse = seedPulseNow;
     // #1923: the idle clock ticks on the loop clock; the stamp rides the input only while a culture is awake,
     // so a take recorded with the flag off (or never idle) carries exactly the older input shape.
     const dishLifeOn = !!s.dishLife || (typeof window !== 'undefined' && !!window.__KC_DISH_LIFE);
@@ -823,7 +831,16 @@ export function createLiveLoop(
       // the exact strength that acted, frame by frame — no dial, no keys, the older input shape.
       const couplingDial = Number.isFinite(s.dishLifeCoupling) ? s.dishLifeCoupling : 0;
       if (couplingDial > 0) {
-        dishFieldStamp = fieldStamp(loopTimeMs, { shed: s.dishLifeShed | 0 });
+        // #1923 Phase 4 — the re-seed interval detent rides the stamp as cycleGens (it has ridden
+        // every field stamp since Phase 1; the control only chooses its value), and a consumed
+        // seed press rides THIS frame's stamp as `seed` — an early boundary in the recorded
+        // stream, so a take that contains a press replays it exactly. The cycle clock itself is
+        // untouched: the stamp stays fieldStamp's pure derivation of loop time.
+        dishFieldStamp = fieldStamp(loopTimeMs, {
+          shed: s.dishLifeShed | 0,
+          cycleGens: clampCycleGens(s.dishLifeCycleGens),
+        });
+        if (seedPressed) dishFieldStamp = { ...dishFieldStamp, seed: true };
         dishFieldCoupling = couplingDial;
       }
     } else {
