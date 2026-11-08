@@ -8,23 +8,26 @@
 //   replace   deck / pool / the shape's own points / a donor record are legal sources; a whole stage, an
 //             illegal value, the record itself are refused — and a refusal changes nothing
 //   in place  the edit keeps the record's id, gene order and lineage; no child is born; the bank does not grow
+//   lineage   a hand-edited parent breeds: the child names it and passes the door whole
 //   door      a hand-edited record passes the assembler's door (a bred record's superseded mutation entry
-//             included); a tampered post-edit record is refused whole
+//             included — a birth mutation and a skeleton swap alike); a tampered post-edit record is refused whole
 //   persist   an edited record survives the document round-trip byte for byte, and its tile still validates
-//   store     editCreatureGene banks the edit with its rebuilt tile and notes refusals without touching state
+//   store     editCreatureGene banks the edit with its rebuilt tile and notes refusals without touching state —
+//             including the tile refusals: a full pool, or an import squatting on the tile id
 import assert from 'node:assert/strict';
 import {
   assembleCreature,
   sanitizeCreatureRecord,
   sanitizeCreatureRecords,
   creatureTile,
+  creatureTileId,
   isLookId,
   DRIVE_RANGE,
 } from '../engine/creatureAssembler.js';
 import { breedCreature, handEditRecord, handMutateValue } from '../engine/creatureBreed.js';
 import { ASSETS } from '../data/assets/index.js';
 import { autoAttachPoints } from '../engine/autoAttach.js';
-import { sanitizeOverlay } from '../assets/overlay.js';
+import { sanitizeOverlay, OVERLAY_CAP } from '../assets/overlay.js';
 import { serializeProject } from '../state/projectDocument.js';
 import { useStore } from '../state/store.js';
 import { genomeStrip, geneActions, geneValueText, geneSourceText } from './genomeTimeline.model.mjs';
@@ -295,6 +298,35 @@ ok('in place: same record, same order, no child — and a bred record keeps its 
   );
 });
 
+ok('lineage: breeding from a hand-edited parent names it, and the child passes the door whole', () => {
+  const mutated = handEditRecord(
+    parents[0],
+    { action: 'mutate', family: 'DRIVE', id: 'approval' },
+    { seed: 42, legalBodies: BODIES },
+  ).record;
+  const replaced = handEditRecord(
+    mutated,
+    {
+      action: 'replace',
+      family: 'LOOK',
+      id: 'look',
+      origin: { kind: 'deck', value: mutated.look === 'praystation' ? 'megacity' : 'praystation' },
+    },
+    { legalBodies: BODIES },
+  ).record;
+  assert.ok(replaced && sanitizeCreatureRecord(replaced), 'the hand-edited parent is itself door-clean');
+  const trio = [replaced, parents[1], parents[2]];
+  let child = null;
+  for (let seed = 0; seed < 400 && !child; seed++) child = breedCreature(trio, seed);
+  assert.ok(child, 'the trio breeds');
+  assert.ok(child.lineage.parents.includes(replaced.id), 'the child names the hand-edited parent');
+  assert.deepEqual(
+    sanitizeCreatureRecord(JSON.parse(bytes(child))),
+    child,
+    'a child of a hand-edited parent passes the door whole',
+  );
+});
+
 ok('door: editing the very gene a birth mutation touched stays lawful — its entry is superseded, not orphaned', () => {
   let child = null;
   let mutGene = null;
@@ -314,6 +346,29 @@ ok('door: editing the very gene a birth mutation touched stays lawful — its en
   assert.equal(geneOf(edited.record, family, id).source, 'hand:mut');
   assert.deepEqual(sanitizeCreatureRecord(JSON.parse(bytes(edited.record))), edited.record, 'the door keeps it whole');
   assert.deepEqual(edited.record.lineage, child.lineage);
+});
+
+ok('door: hand-replacing a skeleton gene supersedes its birth skeleton-swap entry — accounted, not orphaned', () => {
+  let child = null;
+  for (let seed = 0; seed < 2000 && !child; seed++) {
+    const c = breedCreature(parents, seed);
+    if (c && c.lineage.mutations.some((m) => m.gene === 'FORM.skeleton')) child = c;
+  }
+  assert.ok(child, 'a bred child with a skeleton swap exists in the seed walk');
+  const bodyAsset = ASSETS.find((a) => a.id === child.body);
+  const edited = handEditRecord(
+    child,
+    { action: 'replace', family: 'FORM', id: 'joints', origin: { kind: 'asset' } },
+    { legalBodies: BODIES, bodyAttachPoints: marked(bodyAsset) },
+  );
+  assert.equal(edited.refusal, null, 'hand-replacing a skeleton gene is lawful');
+  assert.equal(geneOf(edited.record, 'FORM', 'joints').source, `hand:asset:${child.body}`);
+  assert.deepEqual(
+    sanitizeCreatureRecord(JSON.parse(bytes(edited.record))),
+    edited.record,
+    'the door keeps it whole — the skeleton entry is superseded by the hand source',
+  );
+  assert.deepEqual(edited.record.lineage, child.lineage, 'the birth record is untouched');
 });
 
 ok('door: a tampered post-edit record is refused whole', () => {
@@ -384,6 +439,27 @@ ok('store: editCreatureGene banks the edit in place with its rebuilt tile; a ref
   });
   assert.equal(S().creatureGeneNote.status, 'refused');
   assert.equal(bytes(S().creatureRecords), frozen, 'a refused edit leaves the bank byte-identical');
+  useStore.setState({ creatureRecords: [], customAssets: [], creatureGeneNote: null });
+});
+
+ok('store: an edit whose rebuilt tile cannot land — pool full, or an import on the tile id — refuses whole', () => {
+  useStore.setState({ seed: 1870, creatureRecords: [], customAssets: [], creatureGeneNote: null });
+  S().assembleCreature(ASSETS[0].id, marked(ASSETS[0]));
+  const banked = S().creatureRecords[0];
+  const frozenBank = bytes(S().creatureRecords);
+  // the creature's own tile is gone (an older document) and the pool is full: nowhere for the rebuilt tile to land
+  const fillers = Array.from({ length: OVERLAY_CAP }, (_, i) => ({ id: `filler-${i}`, svg: '<svg/>' }));
+  useStore.setState({ customAssets: fillers });
+  const frozenPool = bytes(S().customAssets);
+  S().editCreatureGene(banked.id, { action: 'mutate', family: 'DRIVE', id: 'approval' });
+  assert.equal(S().creatureGeneNote.status, 'refused', 'pool-full refuses the edit');
+  assert.equal(bytes(S().creatureRecords), frozenBank, 'the bank never moves');
+  assert.equal(bytes(S().customAssets), frozenPool, 'the pool never moves');
+  // an import squatting on the creature's tile id is never evicted — the edit refuses instead
+  useStore.setState({ customAssets: [{ id: creatureTileId(banked.id), svg: '<svg/>' }] });
+  S().editCreatureGene(banked.id, { action: 'mutate', family: 'DRIVE', id: 'approval' });
+  assert.equal(S().creatureGeneNote.status, 'refused', 'id-taken refuses the edit');
+  assert.equal(bytes(S().creatureRecords), frozenBank, 'the bank never moves');
   useStore.setState({ creatureRecords: [], customAssets: [], creatureGeneNote: null });
 });
 
