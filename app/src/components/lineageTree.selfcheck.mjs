@@ -13,7 +13,11 @@
 //             hand (an edit — on an ancestor, made before it bred; on the creature, after its birth), born
 //   door      tampered ancestry refuses the record whole: a founder claiming ancestors, a head that is not
 //             the lineage, an illegal gene, a cycle, a duplicate, the record among its own ancestors, a
-//             malformed parent list, a bad source, an oversize summary
+//             malformed parent list, a bad source, an oversize summary, an entry off the birth block
+//   agreement retained values are held against the record's other tellings of the same birth: a head value
+//             rewritten in range (a crossed drive's parent, an inherited look, a swapped skeleton's
+//             holder), a deeper value a child entry inherited whole, a dropped gene. Hand edits, crossed
+//             genes inside entries and the unretained frontier are NOT held — they make no checkable claim
 //   persist   a deep record survives the document round-trip byte for byte, ancestry included
 //   shifts    gait and cost are absent, as explicit nulls: no measure set rides a creature record for the
 //             solver to read, and no registry prices one — the tree estimates nothing
@@ -328,6 +332,155 @@ ok('door: tampered ancestry refuses the record whole', () => {
     });
   }
   assert.equal(sanitizeCreatureRecord(big), null, 'a summary past the ceiling refuses, never truncates');
+});
+
+const cloneOf = (rec) => JSON.parse(bytes(rec));
+
+ok('agreement: tampered head values refuse — a crossed drive, an inherited look, a swapped skeleton', () => {
+  // a crossed drive: the child's blend re-derives from the head entries' values under the lineage seed, so
+  // rewriting one parent's retained drive — in range, well-formed — breaks the blend it fed
+  const crossed = child.genome.find((g) => g.family === 'DRIVE' && g.source.startsWith('cross:'));
+  assert.ok(crossed, 'the founders’ child carries a crossed drive to re-derive');
+  const driveForged = cloneOf(child);
+  const headDrive = geneOf({ genome: entryOf(driveForged, driveForged.lineage.parents[0]).genes }, 'DRIVE', crossed.id);
+  headDrive.value = headDrive.value > 1.25 ? headDrive.value - 0.5 : headDrive.value + 0.5;
+  assert.equal(sanitizeCreatureRecord(driveForged), null, 'a head drive rewritten in range breaks the blend');
+  // an inherited look: the child's gene names the parent it came from, and that parent's entry must hold it
+  const lookChild = breedFirst(founders, (c) => geneOf(c, 'LOOK', 'look').source.startsWith('parent:'));
+  assert.ok(lookChild, 'a child that inherited its look whole exists in the seed walk');
+  const holder = geneOf(lookChild, 'LOOK', 'look').source.slice('parent:'.length);
+  const lookForged = cloneOf(lookChild);
+  const heldLook = geneOf({ genome: entryOf(lookForged, holder).genes }, 'LOOK', 'look');
+  heldLook.value = heldLook.value === 'praystation' ? 'megacity' : 'praystation';
+  assert.equal(
+    sanitizeCreatureRecord(lookForged),
+    null,
+    'a head look swapped for another valid look disagrees with the child’s gene',
+  );
+  // a swapped skeleton: the mutation re-picked another parent's skeleton whole, so the holder's retained
+  // skeleton is the child's — rewriting it leaves the child's skeleton held by nobody
+  const swapped = breedFirst(founders, (c) => c.lineage.mutations.some((m) => m.gene === 'FORM.skeleton'));
+  assert.ok(swapped, 'a child with a skeleton swap exists in the seed walk');
+  const swapTo = swapped.lineage.mutations.find((m) => m.gene === 'FORM.skeleton').to;
+  const skelForged = cloneOf(swapped);
+  geneOf({ genome: entryOf(skelForged, swapTo).genes }, 'FORM', 'limbs').value = [{ x: 0.5, y: 0.5 }];
+  assert.equal(sanitizeCreatureRecord(skelForged), null, 'the swap’s holder no longer holds the skeleton');
+});
+
+ok('agreement: a tampered deeper value refuses where a child entry evidences it', () => {
+  const grand = breedFirst([child, mkParent(3, 44), mkParent(4, 55)]);
+  assert.ok(grand);
+  // the retained child's material names its holder: material is never swapped (every parent holds null, so
+  // there is nothing to swap to) — it always descends whole from one founder
+  const matGene = geneOf({ genome: entryOf(grand, child.id).genes }, 'MATERIAL', 'material');
+  assert.ok(matGene.source.startsWith('parent:'), 'the retained child inherited its material from a named founder');
+  const holder = matGene.source.slice('parent:'.length);
+  const forged = cloneOf(grand);
+  geneOf({ genome: entryOf(forged, holder).genes }, 'MATERIAL', 'material').value = 'forged';
+  assert.equal(
+    sanitizeCreatureRecord(forged),
+    null,
+    'the founder’s retained material disagrees with the child entry’s inheritance',
+  );
+  // and a value with weight: the retained child's body names its holder the same way, inherited or swapped
+  const bodyGene = geneOf({ genome: entryOf(grand, child.id).genes }, 'FORM', 'body');
+  const bodyHolder = bodyGene.source.slice(bodyGene.source.indexOf(':') + 1);
+  const bodyForged = cloneOf(grand);
+  const heldBody = geneOf({ genome: entryOf(bodyForged, bodyHolder).genes }, 'FORM', 'body');
+  heldBody.value = BODIES.find((b) => b !== heldBody.value);
+  assert.equal(
+    sanitizeCreatureRecord(bodyForged),
+    null,
+    'the holder’s retained body disagrees with the child entry’s gene',
+  );
+});
+
+ok('agreement: a dropped parent:-sourced gene refuses — from a head entry, and from a deeper one', () => {
+  const holder = geneOf(child, 'MATERIAL', 'material').source.slice('parent:'.length);
+  const headDropped = cloneOf(child);
+  const headEntry = entryOf(headDropped, holder);
+  headEntry.genes = headEntry.genes.filter((g) => !(g.family === 'MATERIAL' && g.id === 'material'));
+  assert.equal(
+    sanitizeCreatureRecord(headDropped),
+    null,
+    'the head entry no longer holds the gene the child inherited from it',
+  );
+  const grand = breedFirst([child, mkParent(3, 44), mkParent(4, 55)]);
+  const deepHolder = geneOf({ genome: entryOf(grand, child.id).genes }, 'MATERIAL', 'material').source.slice(
+    'parent:'.length,
+  );
+  const deepDropped = cloneOf(grand);
+  const deepEntry = entryOf(deepDropped, deepHolder);
+  deepEntry.genes = deepEntry.genes.filter((g) => !(g.family === 'MATERIAL' && g.id === 'material'));
+  assert.equal(
+    sanitizeCreatureRecord(deepDropped),
+    null,
+    'a deeper entry no longer holds the gene a child entry inherited from it',
+  );
+});
+
+ok('door: a summary entry is held to the genome’s birth block', () => {
+  const missing = cloneOf(child);
+  missing.ancestry[0].genes = missing.ancestry[0].genes.filter((g) => !(g.family === 'VOICE' && g.id === 'voice'));
+  assert.equal(sanitizeCreatureRecord(missing), null, 'an entry missing a birth gene is not a genome as it stood');
+  const reordered = cloneOf(child);
+  const rGenes = reordered.ancestry[0].genes;
+  const li = rGenes.findIndex((g) => g.family === 'LOOK');
+  const vi = rGenes.findIndex((g) => g.family === 'VOICE');
+  [rGenes[li], rGenes[vi]] = [rGenes[vi], rGenes[li]];
+  assert.equal(sanitizeCreatureRecord(reordered), null, 'the birth genes out of their canonical order');
+  const swapped = cloneOf(child);
+  const sGenes = swapped.ancestry[0].genes;
+  sGenes[sGenes.findIndex((g) => g.family === 'MATERIAL')] = { family: 'DRIVE', id: 'focus', value: 1, source: 'wild' };
+  assert.equal(sanitizeCreatureRecord(swapped), null, 'a full-length entry whose set is not the birth set');
+});
+
+ok('agreement: hand edits, crossed genes and the frontier are not held against parents', () => {
+  // a parent hand-edited BEFORE it bred: its entry carries hand: genes, and its child still verifies — a
+  // hand: value is the performer's act, not a claim about that parent's own parents
+  const edited = handEditRecord(
+    founders[1],
+    {
+      action: 'replace',
+      family: 'LOOK',
+      id: 'look',
+      origin: { kind: 'deck', value: founders[1].look === 'praystation' ? 'megacity' : 'praystation' },
+    },
+    { legalBodies: BODIES },
+  ).record;
+  assert.ok(edited);
+  const kid = breedFirst([edited, founders[0], founders[2]]);
+  assert.ok(kid, 'the child of a hand-edited parent breeds');
+  assert.deepEqual(sanitizeCreatureRecord(cloneOf(kid)), kid, 'and verifies whole at the door');
+  // deep families verify whole, crossed drives and all
+  const grand = breedFirst([child, mkParent(3, 44), mkParent(4, 55)]);
+  assert.deepEqual(sanitizeCreatureRecord(cloneOf(grand)), grand);
+  const great = breedFirst([grand, child, founders[0]]);
+  assert.deepEqual(sanitizeCreatureRecord(cloneOf(great)), great, 'a line bred back into its own ancestor verifies');
+  // the frontier: a pre-summary parent bred today — its entry names parents no entry retains, and its
+  // genes' parent: claims end there, unchecked and unrefused
+  const legacy = cloneOf(child);
+  delete legacy.ancestry;
+  const fc = breedFirst([legacy, mkParent(5, 66), mkParent(6, 77)]);
+  assert.ok(fc, 'a pre-summary parent breeds into the summary era');
+  const legacyEntry = entryOf(fc, child.id);
+  assert.deepEqual(legacyEntry.parents, child.lineage.parents, 'the entry names the parents it was born to');
+  assert.ok(
+    legacyEntry.parents.every((id) => !entryOf(fc, id)),
+    'none of them stands retained — the frontier',
+  );
+  assert.deepEqual(sanitizeCreatureRecord(cloneOf(fc)), fc, 'and the record verifies whole');
+});
+
+ok('agreement: bred families verify across seeds — the door’s blend is the breeder’s blend', () => {
+  const more = [mkParent(3, 44), mkParent(4, 55)];
+  for (let seed = 0; seed < 40; seed++) {
+    const c = breedCreature(founders, seed);
+    assert.ok(c, `seed ${seed} breeds and verifies`);
+    assert.deepEqual(sanitizeCreatureRecord(cloneOf(c)), c, `seed ${seed} round-trips`);
+    const g = breedCreature([c, ...more], seed + 5000);
+    assert.ok(g, `seed ${seed + 5000} breeds the next generation and verifies`);
+  }
 });
 
 ok('persist: a deep record round-trips byte for byte, ancestry included', () => {

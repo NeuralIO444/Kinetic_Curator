@@ -129,3 +129,75 @@ estimates nothing.
   suites all pass inside the sweep.
 - `npm run format:check` clean (prettier applied to the four new/touched files that needed it);
   `npm run lint` 0 errors — the 11 warnings are all in pre-existing files, none in this slice's.
+
+## FIX — agreement at the ancestry door (QA FIX-FIRST, after the staging above)
+
+Independent QA probed the shipped door and found the hole this section records the repair of:
+`sanitizeAncestry` validated each retained gene's value **in isolation** (a Look resolves, a drive is in
+range, points are in the box) and pinned the head's id order, but never checked a retained value against
+anything else in the record. QA rewrote a head entry's DRIVE approval 1 → 1.5, swapped a head entry's
+LOOK for another valid look, altered a grandparent entry's DRIVE value, and dropped a gene from an
+entry — all accepted verbatim. The spec's law is that tampered ancestry refuses at the door; isolated
+validation could not see any of it.
+
+**What the door checks now** (all in `engine/creatureAssembler.js`, refusals whole-record as before):
+
+1. **Head agreement.** Every gene of the record's own genome is read the way `lineageAgrees` reads
+   sources. A `parent:` gene must be held, deep-equal, by the head entry of the parent it names; a
+   `mut:` gene on a discrete gene or the skeleton is a swap under the breeding law — its value IS the
+   named parent's value, re-picked — so the same check runs against the swap's holder (the lineage's
+   swap entries and the `mut:` source name the same holder; the source is the readable claim, and
+   `lineageAgrees` has already cross-checked the pair). A crossed DRIVE gene is held to the blend it was
+   dealt from (point 4 below). `hand:` genes are not checked — the performer's act evidences nothing
+   about the parents.
+2. **Summary-internal agreement.** The same reading inside the summary: for every entry, each
+   `parent:`-sourced gene (and each swap-sourced discrete/skeleton gene) must be held deep-equal by the
+   entry of the parent it names, where that parent is one of the entry's own three and stands retained.
+   A named parent with no entry is the frontier — nothing exists to check against, and the claim is
+   left unchecked rather than refused (a pre-summary parent bred today produces exactly this shape, and
+   the suite pins that such a record verifies whole).
+3. **Core-set parity.** The live-genome path of the door does impose a core set, so entries are now
+   held to it: the eleven birth genes (FORM body/head/limbs/joints, LOOK, VOICE, MATERIAL, the four
+   birth drives) leading, whole and in canonical order, extras after. The list is hoisted to one
+   module-level `BIRTH_BLOCK` both doors read. A dropped gene now refuses on this law alone, and an
+   entry reordered or substituted out of the birth set refuses with it.
+4. **Survey finds (the redundant evidence the record already carried).** Two further evidences were
+   found and used. (a) The lineage's swap entries: a swapped gene's value is another parent's retained
+   value verbatim — checked under points 1–2. (b) The lineage's **seed**: a crossed drive is a seeded
+   convex blend of the three head entries' values for that drive, so with the head values retained the
+   child's crossed value is exactly re-derivable. The door re-derives it (`crossedDriveValue`, the
+   breeder's formula mirrored verbatim — FNV key, weights, rounding, clamp) and refuses on mismatch;
+   the suite pins the mirror to the breeder across 40 seeds × two generations, so a breeder change that
+   forgets the mirror fails loudly. No hashes or digests were introduced: a re-writable digest is not
+   evidence in this door's model, and none was needed.
+
+**The residual limit, named precisely.** Agreement can only hold a value where another part of the
+record re-states it. What no part re-states remains covered by per-gene validation alone:
+
+- **DRIVE values inside non-head entries** (QA's grandparent probe is this case): descendants never
+  inherit a drive whole — the gene arrives crossed (a blend dealt under a seed no entry retains) or
+  rerolled — so nothing retained re-states an ancestor's drive value, and a rewritten one passes.
+- **A head entry's DRIVE value for a drive the child rerolled**: the blend that would have consumed
+  it never happened; the reroll pins the child's value (the lineage entry), not the parent's.
+- In general, **any retained value whose gene, in every retained descendant, came from somewhere
+  else** — another parent, a swap away, a reroll, a later hand act. A founder's voice no child
+  inherited is the plain example (probe-verified: still accepted after a rewrite).
+
+**One interaction, surfaced rather than settled.** The merge retains ONE entry per ancestor, frozen at
+whichever birth's line contributed it. If an ancestor is hand-edited between two of its children's
+births and both children inherited the edited gene from it, the two children carry that gene at two
+different values, each honestly — and a later record bred from both lines retains a single freeze of
+the ancestor, so the other line's inherited gene now disagrees with the retained entry and the door
+refuses; `breedCreature` returns null for every seed in that shape (probe-verified). Before this fix
+the same family loaded and the tree quietly read the mismatched line as its deltas. Which freeze a
+crossed line should retain is a merge-law question, not a door question; it is flagged here for a
+ruling rather than decided inside a door fix.
+
+**Verification of the fix.** New suite pins (suite 12 → **18 checks, green 10×**): tampered head DRIVE
+(crossed) refuses; tampered head LOOK (inherited) refuses; tampered skeleton-holder (swap) refuses;
+tampered deeper MATERIAL and body values refuse where a child entry evidences them; dropped
+parent:-sourced genes refuse (head and internal); birth-block parity refuses (missing / reordered /
+substituted entry genes); hand-edited ancestors, deep families and the pre-summary frontier still
+verify whole; the 40-seed blend-mirror loop. Neighbours unedited and green at their standing counts:
+genomeTimeline 18, creatureAssembler 11, creatureBreed 10, creatureInjection 13, creatureKin 6.
+`npm run format:check` clean; eslint on the touched files clean.
