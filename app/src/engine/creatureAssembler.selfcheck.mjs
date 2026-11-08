@@ -353,6 +353,13 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // and the warnings a combination carries; assembly still writes through the engine and the one door
     'components/strandBank.model.mjs',
     'components/strandBank.selfcheck.mjs',
+    // #1872: Simulate / Cultivate — the wet lab's dry-run surface (model, panel, miniature, suite): it reads a
+    // record to play its sketch and derive its cost / integrity reads, and writes the cultivation note back
+    // through the one door; the stage never sees it (the miniature renders contract instances in the panel)
+    'components/cultivate.model.mjs',
+    'components/CreatureCultivate.jsx',
+    'components/CreatureMiniature.jsx',
+    'components/cultivate.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

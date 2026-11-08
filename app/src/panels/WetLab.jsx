@@ -21,6 +21,8 @@ import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
 import { BeastSettings } from '../components/BeastSettings.jsx';
 import { GenomeTimeline } from '../components/GenomeTimeline.jsx'; // #1870
 import { LineageTree } from '../components/LineageTree.jsx'; // #2030
+import { CreatureCultivate } from '../components/CreatureCultivate.jsx'; // #1872
+import { sanitizeRig } from '../engine/creatureRig.js'; // #1872 — a beast row's linkage, read for its cultivate panel
 import { assemblyWarnings, keptFromWarnings, roleSetStrands } from '../components/strandBank.model.mjs'; // #1871
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
@@ -49,6 +51,8 @@ export function WetLab({ assetId, onClose }) {
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
   const [genomeId, setGenomeId] = useState(''); // #1870 — the record whose genome timeline is open ('' = none)
   const [treeId, setTreeId] = useState(''); // #2030 — the record whose lineage tree is open ('' = none)
+  const [cultivateId, setCultivateId] = useState(''); // #1872 — the record whose cultivate panel is open ('' = none)
+  const [cultivateBeastId, setCultivateBeastId] = useState(''); // #1872 — the beast tile whose cultivate panel is open
   const [lookPick, setLookPick] = useState(''); // #1871 — the bank's Look strand ('' = dealt from the seed)
   const [voicePick, setVoicePick] = useState(''); // #1871 — the bank's Voice strand ('' = dealt from the seed)
   // a slot naming a creature that has since been removed reads as empty (never a stale id sent to BREED)
@@ -108,6 +112,11 @@ export function WetLab({ assetId, onClose }) {
   const full = points.length >= MAX_ATTACH;
   // #1849 — this asset's assembled records (the body is this shape). Data only: no stage reads them yet.
   const records = (allRecords || []).filter((r) => r.body === asset.id);
+  // the stage's placed shapes, as the part preview reads them — the cultivate miniature (#1872) deals its
+  // parts from the same pile, through the same contract expansion
+  const stageIds = Object.keys(enabledAssets || {}).filter(
+    (id) => enabledAssets[id] && id !== 'creature' && assets.some((a) => a.id === id && a.category !== 'creature'),
+  );
   // #1946 — the parent pickers, filtered by the body's tags and/or a kit (assetsWhere's own answer over the bodies)
   const bodyRecs = new Map(
     (allRecords || []).filter((r) => descById.has(r.body)).map((r) => [r.body, descById.get(r.body)]),
@@ -426,10 +435,35 @@ export function WetLab({ assetId, onClose }) {
                         {b.kin ? `${b.kin.label} ${b.kin.distance} · ${b.kin.id}` : 'no relative yet'}
                       </span>
                     </span>
+                    <button
+                      type="button"
+                      className={`chip-btn ${cultivateBeastId === b.id ? 'act on' : 'act'}`}
+                      aria-pressed={cultivateBeastId === b.id}
+                      data-testid="beast-cultivate"
+                      title={`Cultivate ${b.id} — watch its gait sweep and read the linkage gate’s verdict`}
+                      onClick={() => setCultivateBeastId((cur) => (cur === b.id ? '' : b.id))}
+                    >
+                      cultivate
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
+            {/* #1872 — CULTIVATE for a beast: the solver's gait sweep playing live and the linkage gate's
+                verdict, derived from the tile's measures. A beast's tile keeps no cultivation note (its
+                door carries no such field), so the reads are live and nothing is written. */}
+            {(() => {
+              if (!cultivateBeastId) return null;
+              const tile = (customAssets || []).find((a) => a && a.id === cultivateBeastId);
+              const rig = tile ? sanitizeRig(tile.rig) : null;
+              if (!rig || !rig.linkage) return null;
+              return (
+                <CreatureCultivate
+                  key={tile.id}
+                  subject={{ kind: 'linkage', id: tile.id, measures: rig.linkage.measures }}
+                />
+              );
+            })()}
             {records.length > 0 && (
               <ul style={recList} data-testid="creature-records">
                 {records.map((r) => (
@@ -466,6 +500,24 @@ export function WetLab({ assetId, onClose }) {
                       onClick={() => setTreeId((cur) => (cur === r.id ? '' : r.id))}
                     >
                       tree
+                    </button>
+                    {r.cultivated && (
+                      <span
+                        data-testid="record-cultivated"
+                        title={`Cultivated under seed ${r.cultivated.seed} — ${r.cultivated.outcome}`}
+                      >
+                        {r.cultivated.outcome === 'stillborn' ? 'stillborn' : 'cultivated'}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      className={`chip-btn ${cultivateId === r.id ? 'act on' : 'act'}`}
+                      aria-pressed={cultivateId === r.id}
+                      data-testid="record-cultivate"
+                      title={`Cultivate ${r.id} — dry-run it before stage injection`}
+                      onClick={() => setCultivateId((cur) => (cur === r.id ? '' : r.id))}
+                    >
+                      cultivate
                     </button>
                     <button
                       type="button"
@@ -504,17 +556,32 @@ export function WetLab({ assetId, onClose }) {
               if (!sel) return null;
               return <LineageTree key={sel.id} record={sel} />;
             })()}
+            {/* #1872 — CULTIVATE: the selected record's dry-run — its sketch playing live, its cost and
+                integrity reads, and the press that records them on the record. Like the strip and the
+                tree, the panel follows the RECORD in the bank, so it reads the creature as it now stands. */}
+            {(() => {
+              const sel = (allRecords || []).find((r) => r.id === cultivateId);
+              if (!sel) return null;
+              return (
+                <CreatureCultivate
+                  key={sel.id}
+                  subject={{
+                    kind: 'record',
+                    record: sel,
+                    bodyAsset: assets.find((a) => a.id === sel.body) || null,
+                  }}
+                  assets={assets}
+                  stageIds={stageIds}
+                  overlay={customAssets}
+                  seed={seed}
+                />
+              );
+            })()}
             {/* #1946 — the part preview: which assets Davis would deal onto this creature's bones on the current stage —
                 the scene contract's own deal, read-only — with a kit filter to ask "what if this stage were these kits" */}
             {records.length > 0 &&
               (() => {
                 const rec = records.find((r) => r.id === previewId) || records[0];
-                const stageIds = Object.keys(enabledAssets || {}).filter(
-                  (id) =>
-                    enabledAssets[id] &&
-                    id !== 'creature' &&
-                    assets.some((a) => a.id === id && a.category !== 'creature'),
-                );
                 const pileOnly = previewKits.length
                   ? new Set(
                       previewKits.flatMap((id) => resolveKit(kitsById([id], kits)[0] || { where: {} }, descs).ids),
@@ -836,6 +903,9 @@ const recRow = {
   letterSpacing: '0.06em',
   borderTop: '1px solid var(--line)',
   paddingTop: 4,
+  // rows carry more chips than the sheet is wide at phone widths (genome, tree, cultivate, ✕): the row
+  // wraps rather than pushing the sheet into a horizontal scroll (the e2e no-overflow pin)
+  flexWrap: 'wrap',
 };
 const breedRow = { display: 'flex', alignItems: 'center', gap: 6, fontSize: 10, color: 'var(--dim)', flexWrap: 'wrap' };
 const cardBox = {
