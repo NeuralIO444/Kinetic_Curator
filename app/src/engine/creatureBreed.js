@@ -29,7 +29,12 @@ import {
   CREATURE_ASSEMBLY_KIND,
   DRIVE_RANGE,
   BIRTH_DRIVES,
+  isLookId,
+  isVoiceId,
 } from './creatureAssembler.js';
+import { sanitizeAttachPoints } from './assetAttach.js';
+import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { VOICE_DECK } from '../data/voiceDeck.js';
 
 /** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
 export const MUTATION_RATE = 1 / 8;
@@ -176,4 +181,144 @@ export function breedCreature(parents, seed = 0) {
     lineage: { parents: trio.map((p) => p.id), seed: s, mutations },
   };
   return sanitizeCreatureRecord(child);
+}
+
+// ── #1870 (Genome Timeline): hand edits — the performer's hand on ONE gene of a banked record ─────────────────────
+//
+// Matt's rulings (2026-11-07, #1870): edits are IN PLACE (no fork, no child record, no generation bump) and the
+// edited gene's source is rewritten to record the hand act (the hand: vocabulary in creatureAssembler.js). The hand
+// works under the SAME laws as the birth machinery in this module — it is not a second mutator:
+//
+//   - MUTATE applies this module's mutation laws to one gene: a continuous (DRIVE) gene re-rolls anywhere inside
+//     its legal range (the reroll formula below, verbatim); a discrete gene re-picks a DIFFERENT holder of its
+//     family's value space — the deck for LOOK / VOICE, the asset pool for the body — the way a breeding swap
+//     re-picks another parent's different value. Two families of genes have no lawful single-gene mutation here
+//     and REFUSE (never clamp, never invent): the skeleton (head / limbs / joints travel as ONE linkage group —
+//     a single-gene mutation would break the group; the skeleton changes whole, by replace, or by breeding) and
+//     MATERIAL (a stub with no legal value space yet).
+//   - REPLACE takes a value from a legal source only — the same sources assembly and breeding draw from: the
+//     family's deck (LOOK / VOICE), the asset pool (the body), the body shape's own ATTACH points (a skeleton
+//     gene, derived exactly as assembleCreature derives it), or the corresponding gene of another banked record
+//     (a donor). A whole stage is never a source (the standing breeding-sources ruling) — no origin kind names
+//     one, so the refusal is by shape, not by check.
+//   - The write is whole-record: the candidate goes back through sanitizeCreatureRecord (the one door) and an
+//     edit the door refuses changes nothing. Record id, gene order and lineage are never touched; a bred
+//     record's lineage stays (a hand gene postdates the birth — the door's lineage law accounts for it).
+
+const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id);
+const VOICE_ORDER = VOICE_DECK.map((v) => v.id);
+const SKELETON_IDS = new Set(['head', 'limbs', 'joints']);
+const copy = (v) => JSON.parse(JSON.stringify(v));
+const sameValue = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+/**
+ * The value a hand mutation would give one gene, under this module's mutation laws — or null when the gene has
+ * no lawful mutation (the skeleton linkage group, the MATERIAL stub, a family this build does not mutate, or a
+ * value space holding nothing different). Seeded from the record, so the same record + gene + seed always
+ * mutates the same way; a DRIVE candidate equal to the current value is re-drawn (a mutation that changes
+ * nothing is no mutation), and after a bounded walk of draws the gene refuses rather than repeats.
+ */
+export function handMutateValue(record, gene, seed = 0, legalBodies = []) {
+  if (!record || !gene || typeof gene !== 'object') return null;
+  const key = `hand|${record.id}|${gene.family}.${gene.id}|${seed >>> 0}`;
+  if (gene.family === 'DRIVE') {
+    for (let n = 0; n < 8; n++) {
+      const v = r3(DRIVE_RANGE.min + u01(`${key}|${n}`) * (DRIVE_RANGE.max - DRIVE_RANGE.min));
+      if (v !== gene.value) return v;
+    }
+    return null;
+  }
+  if (gene.family === 'LOOK' || gene.family === 'VOICE') {
+    const deck = gene.family === 'LOOK' ? LOOK_ORDER : VOICE_ORDER;
+    const rest = deck.filter((id) => id !== gene.value);
+    return rest.length ? rest[Math.floor(u01(key) * rest.length) % rest.length] : null;
+  }
+  if (gene.family === 'FORM' && gene.id === 'body') {
+    const rest = (legalBodies || []).filter((id) => typeof id === 'string' && id && id !== gene.value);
+    return rest.length ? rest[Math.floor(u01(key) * rest.length) % rest.length] : null;
+  }
+  return null;
+}
+
+/**
+ * Apply one hand edit to a banked record, in place.
+ *
+ * @param {object} record a clean creature record (it is re-sanitized here; a dirty record refuses)
+ * @param {{action:'mutate', family:string, id:string} |
+ *         {action:'replace', family:string, id:string,
+ *          origin:{kind:'deck', value:string} | {kind:'pool', value:string} |
+ *                  {kind:'asset'} | {kind:'donor', donorId:string}}} edit
+ * @param {{seed?:number, legalBodies?:string[], donors?:object[], bodyAttachPoints?:Array}} [env]
+ *   seed: the project seed (mutation draws); legalBodies: the asset ids a body gene may name (the pool);
+ *   donors: the other banked records; bodyAttachPoints: the body shape's ATTACH points (for a skeleton replace)
+ * @returns {{record:object, refusal:null} | {record:null, refusal:string}} exactly one of the two is non-null;
+ *   refusal is one of 'no-record' | 'no-gene' | 'no-mutation' | 'illegal-source' | 'illegal-value' | 'door'
+ */
+export function handEditRecord(record, edit, env = {}) {
+  const rec = sanitizeCreatureRecord(record);
+  if (!rec) return { record: null, refusal: 'no-record' };
+  if (!edit || typeof edit !== 'object') return { record: null, refusal: 'illegal-source' };
+  const gene = rec.genome.find((g) => g.family === edit.family && g.id === edit.id);
+  if (!gene) return { record: null, refusal: 'no-gene' };
+  let value;
+  let source;
+  if (edit.action === 'mutate') {
+    value = handMutateValue(rec, gene, env.seed ?? 0, env.legalBodies ?? []);
+    if (value === null) return { record: null, refusal: 'no-mutation' };
+    source = 'hand:mut';
+  } else if (edit.action === 'replace') {
+    const origin = edit.origin;
+    if (!origin || typeof origin !== 'object') return { record: null, refusal: 'illegal-source' };
+    if (origin.kind === 'deck') {
+      if (gene.family === 'LOOK' && isLookId(origin.value)) {
+        value = origin.value;
+        source = `hand:look:${value}`;
+      } else if (gene.family === 'VOICE' && isVoiceId(origin.value)) {
+        value = origin.value;
+        source = `hand:voice:${value}`;
+      } else return { record: null, refusal: 'illegal-source' };
+    } else if (origin.kind === 'pool') {
+      if (gene.family !== 'FORM' || gene.id !== 'body') return { record: null, refusal: 'illegal-source' };
+      if (!(env.legalBodies ?? []).includes(origin.value)) return { record: null, refusal: 'illegal-value' };
+      value = origin.value;
+      source = `hand:asset:${value}`;
+    } else if (origin.kind === 'asset') {
+      if (gene.family !== 'FORM' || !SKELETON_IDS.has(gene.id) || !Array.isArray(env.bodyAttachPoints))
+        return { record: null, refusal: 'illegal-source' };
+      // the shape's own points, derived exactly as assembleCreature derives a skeleton from ATTACH points
+      const pts = sanitizeAttachPoints(env.bodyAttachPoints);
+      const head = pts.find((p) => p.role === 'H') || null;
+      if (gene.id === 'head') value = head ? { x: head.x, y: head.y } : null;
+      else if (gene.id === 'limbs') value = pts.filter((p) => p.role === 'L').map((p) => ({ x: p.x, y: p.y }));
+      else value = pts.filter((p) => !p.role).map((p) => ({ x: p.x, y: p.y }));
+      source = `hand:asset:${rec.body}`;
+    } else if (origin.kind === 'donor') {
+      const donor = (env.donors ?? []).map((d) => sanitizeCreatureRecord(d)).find((d) => d && d.id === origin.donorId);
+      if (!donor || donor.id === rec.id) return { record: null, refusal: 'illegal-source' };
+      const dg = donor.genome.find((g) => g.family === gene.family && g.id === gene.id);
+      if (!dg) return { record: null, refusal: 'illegal-source' };
+      value = copy(dg.value);
+      // a body taken from a donor still has to be a shape the pool holds — the donor's body is not a loophole
+      if (gene.family === 'FORM' && gene.id === 'body' && !(env.legalBodies ?? []).includes(value))
+        return { record: null, refusal: 'illegal-value' };
+      source = `hand:donor:${donor.id}`;
+    } else return { record: null, refusal: 'illegal-source' };
+  } else return { record: null, refusal: 'illegal-source' };
+  if (sameValue(value, gene.value) && edit.action === 'replace' && source === gene.source)
+    return { record: null, refusal: 'illegal-value' }; // a replace that changes nothing at all is refused
+  const genome = rec.genome.map((g) => (g === gene ? { family: g.family, id: g.id, value: copy(value), source } : g));
+  const candidate = { ...rec, genome };
+  // the record's own fields mirror their genes — the door holds them to agreement, so the hand moves both
+  if (gene.family === 'LOOK' && gene.id === 'look') candidate.look = value;
+  else if (gene.family === 'VOICE' && gene.id === 'voice') candidate.voice = value;
+  else if (gene.family === 'FORM' && gene.id === 'body') candidate.body = value;
+  else if (gene.family === 'FORM' && gene.id === 'head') candidate.head = copy(value);
+  else if (gene.family === 'FORM' && gene.id === 'limbs') candidate.limbs = copy(value);
+  else if (gene.family === 'FORM' && gene.id === 'joints') candidate.joints = copy(value);
+  // a bred record's drive slots ARE its drive genes (the door's lineage law) — keep them in step. An unbred
+  // record's slots stay in their birth shape (slots are the integrator's world, not the genome's).
+  else if (gene.family === 'DRIVE' && rec.lineage) candidate.drives = { ...rec.drives, [gene.id]: value };
+  const clean = sanitizeCreatureRecord(candidate);
+  if (!clean) return { record: null, refusal: 'door' };
+  return { record: clean, refusal: null };
 }

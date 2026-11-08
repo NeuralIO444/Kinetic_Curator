@@ -19,6 +19,7 @@ import { ASSETS } from '../data/assets/index.js';
 import { SEED_KITS, kitsById, resolveKit } from '../data/kits.js'; // #1946
 import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
 import { BeastSettings } from '../components/BeastSettings.jsx';
+import { GenomeTimeline } from '../components/GenomeTimeline.jsx'; // #1870
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 
@@ -44,6 +45,7 @@ export function WetLab({ assetId, onClose }) {
   const breedCreature = useStore((s) => s.breedCreature); // #1852
   const breedNote = useStore((s) => s.creatureBreedNote);
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
+  const [genomeId, setGenomeId] = useState(''); // #1870 — the record whose genome timeline is open ('' = none)
   // a slot naming a creature that has since been removed reads as empty (never a stale id sent to BREED)
   const bankIds = new Set((allRecords || []).map((r) => r.id));
   const liveSlots = slots.map((sl) => (sl.kind === 'creature' && !bankIds.has(sl.id) ? EMPTY_SLOT : sl));
@@ -336,6 +338,16 @@ export function WetLab({ assetId, onClose }) {
                     </span>
                     <button
                       type="button"
+                      className={`chip-btn ${genomeId === r.id ? 'act on' : 'act'}`}
+                      aria-pressed={genomeId === r.id}
+                      data-testid="record-genome"
+                      title={`Show ${r.id}’s genome timeline`}
+                      onClick={() => setGenomeId((cur) => (cur === r.id ? '' : r.id))}
+                    >
+                      genome
+                    </button>
+                    <button
+                      type="button"
                       className="chip-btn act"
                       title={`Remove ${r.id}`}
                       aria-label={`Remove creature record ${r.id}`}
@@ -347,6 +359,22 @@ export function WetLab({ assetId, onClose }) {
                 ))}
               </ul>
             )}
+            {/* #1870 — the Genome Timeline: the selected record's genes as a strip (one node per gene, in record
+                order) with inspect / mutate / replace. The selection is made in this lab's list, but the strip
+                follows the RECORD in the bank — a hand edit that changes its body does not close its own surface. */}
+            {(() => {
+              const sel = (allRecords || []).find((r) => r.id === genomeId);
+              if (!sel) return null;
+              return (
+                <GenomeTimeline
+                  key={sel.id}
+                  record={sel}
+                  donors={(allRecords || []).filter((r) => r.id !== sel.id)}
+                  legalBodies={assets.filter((a) => a.category !== 'creature').map((a) => a.id)}
+                  hasBodyPoints={assets.some((a) => a.id === sel.body)}
+                />
+              );
+            })()}
             {/* #1946 — the part preview: which assets Davis would deal onto this creature's bones on the current stage —
                 the scene contract's own deal, read-only — with a kit filter to ask "what if this stage were these kits" */}
             {records.length > 0 &&

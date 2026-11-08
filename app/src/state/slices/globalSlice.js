@@ -51,7 +51,8 @@ import {
   skeletonFounder,
 } from '../../engine/creatureAssembler.js'; // #1849 / #1850
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
-import { sourceRecord, breedCreature, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852
+import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
+import { autoAttachPoints } from '../../engine/autoAttach.js'; // #1870 — a skeleton replace reads the body shape's points
 import { sanitizeScope, DEFAULT_SCOPE } from '../kineticScope.mjs'; // #1772: the START cycle
 import { BEAST_SETTING_DEFAULTS, sanitizeBeastSettings } from '../../engine/beastSettings.mjs';
 import { snapExposureStops } from '../../gl/exposureModel.mjs'; // #1830: the resolve exposure detents
@@ -439,6 +440,7 @@ export const createGlobalSlice = (set) => ({
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
+  creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
   customAssets: [],
   ingestError: null,
   /**
@@ -1055,6 +1057,47 @@ export const createGlobalSlice = (set) => ({
       const child = breedCreature(parents, state.seed);
       if (!child) return { creatureBreedNote: { id: null, status: 'need-three' } };
       return bankCreature(state, child, 'creatureBreedNote');
+    }),
+  /**
+   * #1870 — the Genome Timeline's hand edit: mutate or replace ONE gene of a banked record, IN PLACE (Matt's
+   * ruling: no fork, no child record, no generation bump; the edited gene's source records the hand act). The
+   * write goes through handEditRecord and the assembler's door; the record's pool tile is then rebuilt from the
+   * edited record exactly as bankCreature builds it, and if the edited creature cannot be drawn the whole edit
+   * refuses — record and tile never disagree. A refusal changes nothing but the note.
+   */
+  editCreatureGene: (recordId, edit) =>
+    set((state) => {
+      const refuse = (why) => ({ creatureGeneNote: { id: recordId, status: 'refused', why } });
+      const bank = state.creatureRecords || [];
+      const at = bank.findIndex((r) => r.id === recordId);
+      if (at < 0) return refuse('no-record');
+      const rec = bank[at];
+      const overlay = state.customAssets || [];
+      const cleanOverlay = sanitizeOverlay(overlay);
+      const bodyAsset = findAsset(rec.body, cleanOverlay);
+      const legalBodies = [...ASSETS, ...cleanOverlay]
+        .filter((a) => a && a.category !== 'creature' && typeof a.id === 'string')
+        .map((a) => a.id);
+      const own = state.assetAttach?.[rec.body];
+      const bodyAttachPoints = Array.isArray(own) ? own : bodyAsset ? autoAttachPoints(bodyAsset.svg) : undefined;
+      const { record: edited, refusal } = handEditRecord(rec, edit, {
+        seed: state.seed,
+        legalBodies,
+        donors: bank.filter((r) => r.id !== rec.id),
+        bodyAttachPoints,
+      });
+      if (!edited) return refuse(refusal);
+      const tileId = creatureTileId(edited.id);
+      const standing = overlay.find((a) => a && a.id === tileId);
+      if (standing && !isCreatureTile(standing)) return refuse('id-taken');
+      if (!standing && overlay.length >= OVERLAY_CAP) return refuse('pool-full');
+      const tile = creatureTile(edited, findAsset(edited.body, cleanOverlay), skeletonFounder(edited, bank));
+      if (!tile || sanitizeOverlay([tile]).length !== 1) return refuse('nobody');
+      return {
+        creatureRecords: bank.map((r, i) => (i === at ? edited : r)),
+        customAssets: standing ? overlay.map((a) => (a.id === tileId ? tile : a)) : [...overlay, tile],
+        creatureGeneNote: { id: rec.id, status: edit && edit.action === 'mutate' ? 'mutated' : 'replaced' },
+      };
     }),
   /** #1849 — drop one assembled creature: its record and (#1850) its pool tile, together (dropCreature). */
   removeCreatureRecord: (id) =>
