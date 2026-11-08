@@ -82,12 +82,21 @@ export function patternKey(pattern, palette, w, h, t = 0, image = null, culture 
     // textures, and the renderer's upload gate kept the stale one for a generation interval).
     // Within a wake the published (gen, level) pair is atomic — level is written only where gen is
     // set or incremented — so wake + gen + dial names the frame. A grid carrying no wake keys −1.
+    // Phase 4: the component ALSO carries the seed epoch (it did not in Phase 3). The "seed from
+    // stage" trigger rebuilds the culture INSIDE a wake — a boundary that arrives early — so at the
+    // same (wake, gen) a post-press grid differs from the pre-press one, and two consecutive frames
+    // can read both (a press in a cycle's first generations lands the new seed on a generation the
+    // old seed just published). The epoch is the seed's ordinal within the wake (0 = the wake's own
+    // seed), so wake + epoch + gen + dial names the frame. A grid carrying no epoch keys 0.
     ...(culture && p.mode === 'TIDES'
       ? [
           'K',
           culture.grid && culture.grid.wakeMs != null && Number.isFinite(Number(culture.grid.wakeMs))
             ? Number(culture.grid.wakeMs)
             : -1,
+          culture.grid && Number.isFinite(Number(culture.grid.seedEpoch)) && Number(culture.grid.seedEpoch) > 0
+            ? Math.floor(Number(culture.grid.seedEpoch))
+            : 0,
           culture.grid && Number.isFinite(Number(culture.grid.gen)) ? Number(culture.grid.gen) : -1,
           Math.round(Math.min(1, Math.max(0, Number(culture.coupling) || 0)) * 256),
         ]

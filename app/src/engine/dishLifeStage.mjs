@@ -22,6 +22,15 @@
 //             no cell stamps, no specks, no layer touched. The culture's published field (level / activity) is
 //             mirrored onto the stage's stable `publishedField` object for consumers to read; that is the
 //             mode's whole output. The render assignment (nearest) is never built for it.
+//   SEED      #1923 Phase 4: a field stamp carrying `seed` is the performer's "seed from stage" press —
+//             a boundary that arrives early. The holder rebuilds from THIS frame's scene under the SAME
+//             wake (the cycle clock is never rewritten: wakeMs stays the pure function of loop time the
+//             Phase 3 key proof rests on), and the rebuilt culture catches up to the stamp's generation
+//             under the same shed bound as any catch-up — so under CULTURE HELD the press LANDS at
+//             generation 0 and waits, and on an empty stage it unpublishes, exactly as a boundary does.
+//             Each press inside one wake bumps the build's seed EPOCH (0 = the wake's own seed): the
+//             epoch rides the publication so the TIDES key can tell a pre-press grid from a post-press
+//             one at the same (wake, generation) — within a wake, (epoch, gen) names the grid.
 
 import { createCulture, stepCulture, setBedrock, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
@@ -54,7 +63,19 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   // read-this-frame contract applies: level/activity ARE the culture's arrays, read them the frame you get
   // them). Inactive (active:false, arrays null) whenever no field-mode culture is running, so a consumer can
   // never read a retained previous frame.
-  const publishedField = { active: false, cols: 0, rows: 0, gen: -1, wakeMs: null, level: null, activity: null };
+  const publishedField = {
+    active: false,
+    cols: 0,
+    rows: 0,
+    gen: -1,
+    wakeMs: null,
+    // #1923 Phase 4 — the seed epoch beside the wake and generation (see SEED in the header): 0 is
+    // the wake's own seed; each "seed from stage" press inside the wake increments it. Mirrored only
+    // while a field culture runs; 0 whenever nothing is published.
+    seedEpoch: 0,
+    level: null,
+    activity: null,
+  };
   function syncPublished() {
     if (st && st.fieldOn) {
       const f = st.culture.field;
@@ -66,6 +87,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       // restarts at 0 every cycle, so the generation alone does not name a culture; the wake does.
       // The TIDES snapshot (dishLifeCouple.fieldLevelGrid) carries it into the pattern frame key.
       publishedField.wakeMs = st.wakeMs;
+      publishedField.seedEpoch = st.seedEpoch | 0;
       publishedField.level = f.level;
       publishedField.activity = f.activity;
     } else {
@@ -74,6 +96,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       publishedField.rows = 0;
       publishedField.gen = -1;
       publishedField.wakeMs = null;
+      publishedField.seedEpoch = 0;
       publishedField.level = null;
       publishedField.activity = null;
     }
@@ -95,6 +118,10 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       terrain: (terrain || []).map(freeze),
       nearest: withNearest ? nearestMarks(marks, geom(W, H)) : null,
       culture: createCulture({ cols, rows, rule, bedrock, seed: seed.cells }),
+      // #1923 Phase 4 — every build starts as its wake's own seed (epoch 0); apply() raises the
+      // epoch when the build is a "seed from stage" press inside a standing wake, and the seek-back
+      // rebuild / restore() preserve the epoch of the seed they rebuild.
+      seedEpoch: 0,
       frameGen: -1,
       frame: null,
     };
@@ -133,7 +160,15 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const bedrock = bedrockOf(terrain, W, H);
     const fieldMode = dl.mode === 'field';
     const needNearest = !fieldMode; // field mode never renders: the nearest-mark assignment is never built for it
-    if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest)) {
+    // #1923 Phase 4 — the "seed from stage" press: a field stamp carrying `seed` while a field
+    // culture stands in the SAME wake forces the wake build below on this frame's scene — an early
+    // boundary. A press on the boundary frame itself is absorbed by the boundary's own build (the
+    // epoch stays 0: the wake's seed IS the press frame's scene), and a press while another mode's
+    // culture stands is inert — the trigger seeds the field culture only.
+    const seedPress =
+      fieldMode && dl.seed === true && !!st && !!st.fieldOn && st.wakeMs === dl.wakeMs && st.W === W && st.H === H;
+    const prevEpoch = st ? st.seedEpoch | 0 : 0;
+    if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest) || seedPress) {
       const marks = [];
       for (const e of content)
         for (const it of e.items) if (it && !isTerrain(it) && !isSpeck(it)) marks.push(freeze(it));
@@ -146,6 +181,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         return false;
       }
       build(dl.wakeMs, marks, W, H, bedrock, needNearest, terrain);
+      if (seedPress) st.seedEpoch = prevEpoch + 1; // the press's build supersedes the wake's seed
     } else {
       setBedrock(st.culture, bedrock);
       st.terrain = terrain.map(freeze); // the snapshot records the terrain the culture currently lives under
@@ -155,7 +191,11 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const target = Math.max(0, Math.floor(Number(dl.gen) || 0));
     if (target < st.culture.gen) {
       // a replay seeking back: rebuild from the frozen seed, so generation g is always the same culture
+      // #1923 Phase 4 — the rebuild is the SAME seed (possibly a press's), so its epoch is preserved:
+      // the epoch names which seed of the wake this is, and seeking does not change the seed.
+      const epoch = st.seedEpoch | 0;
       build(dl.wakeMs, st.marks, W, H, bedrock, needNearest, terrain);
+      st.seedEpoch = epoch;
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
     for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
@@ -224,6 +264,12 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
             // seed was derived against, so restore() rebuilds the same bedrock. Snapshots taken before
             // this rider (or on terrain-free stages) carry no key and restore exactly as they always did.
             ...(st.terrain && st.terrain.length ? { terrain: st.terrain.map((m) => ({ ...m })) } : {}),
+            // #1923 Phase 4 — OPTIONAL rider, present only while a "seed from stage" press stands in
+            // this wake (epoch > 0): restore() must keep the epoch, or a restored publication would
+            // name its post-press grids with the wake seed's epoch and the TIDES key could collide
+            // with a pre-press grid at the same generation. Epoch-0 snapshots carry no key and
+            // restore exactly as they always did.
+            ...(st.seedEpoch ? { seedEpoch: st.seedEpoch } : {}),
             gen: st.culture.gen,
             ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
             ...(st.fieldOn ? { field: { ...st.fieldOn } } : {}), // #1994 — so does field mode's cycle
@@ -250,6 +296,9 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         terrain,
       );
       for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
+      // #1923 Phase 4 — the seed epoch rides the snapshot (absent = a pre-Phase-4 snapshot: epoch 0,
+      // the wake's own seed — exactly the historical restore).
+      st.seedEpoch = Number.isInteger(snap.seedEpoch) && snap.seedEpoch > 0 ? snap.seedEpoch : 0;
       if (snap.quiet && typeof snap.quiet === 'object') {
         st.quiet = { strength: Number(snap.quiet.strength) || 0, cycleGens: Number(snap.quiet.cycleGens) || undefined };
       }

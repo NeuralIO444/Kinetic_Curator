@@ -7,6 +7,7 @@ import {
   dishLifeChipModel,
   readDishLifePref,
   writeDishLifePref,
+  nextCycleGens,
   STRENGTH_MIN,
   STRENGTH_MAX,
 } from './dishLifeChip.model.mjs';
@@ -67,6 +68,8 @@ ok('every state reads its details from the help copy, each distinct', () => {
   }
   assert.ok(helpText('dish-life-strength').length > 0);
   assert.ok(helpText('dish-life-coupling').length > 0, 'the coupling dial has its help copy (#1923 Phase 2)');
+  assert.ok(helpText('dish-life-seed').length > 0, 'the seed trigger has its help copy (#1923 Phase 4)');
+  assert.ok(helpText('dish-life-cycle').length > 0, 'the re-seed cycle detent has its help copy (#1923 Phase 4)');
 });
 
 ok('the percent is the dial, clamped, junk falls back to the default', () => {
@@ -83,15 +86,28 @@ ok('the preference: round-trips through a Storage, never throws on junk or a bro
   assert.equal(writeDishLifePref(st, { on: true, strength: 0.6 }), true);
   // #1923 Phase 2 re-pin (cause: the preference gained the coupling dial): the read shape carries
   // `coupling` — absent from everything stored before the dial existed, it reads as 0 (off).
-  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.6, coupling: 0 });
+  // #1923 Phase 4 re-pin (cause: the preference gained the re-seed interval): the read shape also
+  // carries `cycleGens` — absent from everything stored before the detent existed, it reads as the
+  // default length (48), and a stored off-detent value snaps to it too.
+  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.6, coupling: 0, cycleGens: 48 });
   assert.equal(writeDishLifePref(st, { on: 'x', strength: 9 }), true);
   assert.deepEqual(
     readDishLifePref(st),
-    { on: false, strength: 1, coupling: 0 },
+    { on: false, strength: 1, coupling: 0, cycleGens: 48 },
     'on is strictly boolean; strength clamps',
   );
   assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 0.7 }), true);
-  assert.deepEqual(readDishLifePref(st), { on: true, strength: 0.5, coupling: 0.7 }, 'coupling round-trips');
+  assert.deepEqual(
+    readDishLifePref(st),
+    { on: true, strength: 0.5, coupling: 0.7, cycleGens: 48 },
+    'coupling round-trips',
+  );
+  assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 0.7, cycleGens: 96 }), true);
+  assert.equal(readDishLifePref(st).cycleGens, 96, 'the re-seed interval round-trips on its detent');
+  assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 0.7, cycleGens: 30 }), true);
+  assert.equal(readDishLifePref(st).cycleGens, 48, 'an off-detent stored interval snaps to the default');
+  mem.set('kc.dishLife.v1', '{"on":true,"strength":0.5,"coupling":0.25}');
+  assert.equal(readDishLifePref(st).cycleGens, 48, 'a pre-Phase-4 preference carries no key and reads 48');
   assert.equal(writeDishLifePref(st, { on: true, strength: 0.5, coupling: 4 }), true);
   assert.equal(readDishLifePref(st).coupling, 1, 'coupling clamps to the dial range');
   mem.set('kc.dishLife.v1', '{"on":"yes","strength":0.5}');
@@ -114,6 +130,19 @@ ok('the preference: round-trips through a Storage, never throws on junk or a bro
   assert.equal(writeDishLifePref(null, { on: true, strength: 0.3 }), true, 'no storage: nothing to fail');
 });
 
+ok('the re-seed interval: the model clamps to the detents and the stepper wraps', () => {
+  assert.equal(dishLifeChipModel(on({ dishLifeCycleGens: 24 })).cycleGens, 24);
+  assert.equal(dishLifeChipModel(on({ dishLifeCycleGens: 96 })).cycleGens, 96);
+  assert.equal(dishLifeChipModel(on({ dishLifeCycleGens: 30 })).cycleGens, 48, 'off-detent reads as the default');
+  assert.equal(dishLifeChipModel(on()).cycleGens, 48, 'absent reads as the default');
+  assert.deepEqual(
+    [nextCycleGens(24), nextCycleGens(48), nextCycleGens(96)],
+    [48, 96, 24],
+    'the detents step and wrap',
+  );
+  assert.equal(nextCycleGens('junk'), 96, 'junk clamps to the default detent, then steps from it');
+});
+
 ok('wiring: the chip sits right after the undo/redo pair in the master bar', () => {
   const src = readFileSync(new URL('./MasterBar.jsx', import.meta.url), 'utf8');
   const redo = src.indexOf('history.redo');
@@ -121,6 +150,14 @@ ok('wiring: the chip sits right after the undo/redo pair in the master bar', () 
   assert.ok(redo > 0 && chip > redo, 'the chip follows the redo button');
   assert.ok(src.indexOf('<BudgetKnob />') < redo, 'and the budget knob still precedes the pair');
   assert.ok(src.slice(redo, chip).includes('</div>'), 'outside the undo group, not inside it');
+});
+
+ok('wiring: the seed button pulses the store counter; the cycle button steps the detent (#1923 Phase 4)', () => {
+  const src = readFileSync(new URL('./DishLifeChip.jsx', import.meta.url), 'utf8');
+  assert.ok(src.includes('pulseDishLifeSeed'), 'the seed press reaches the store pulse the loop consumes');
+  assert.ok(src.includes('dish-life-seed'), 'the seed button carries its class and help id');
+  assert.ok(src.includes('nextCycleGens'), 'the cycle button steps the detent set, not a free value');
+  assert.ok(src.includes('setDishLifeCycleGens'), 'the detent lands on the store field the loop stamps from');
 });
 
 console.log(`[selfcheck] dishLifeChip (#1923): ${n} cases passed`);

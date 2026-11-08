@@ -20,6 +20,7 @@ import {
   MAX_LAYERS,
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
+import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
@@ -608,6 +609,21 @@ export const createGlobalSlice = (set) => ({
   setDishLifeCoupling: (v) =>
     set({ dishLifeCoupling: Number.isFinite(Number(v)) ? Math.min(1, Math.max(0, Number(v))) : 0 }),
   setDishLifeShed: (n) => set({ dishLifeShed: Number.isFinite(n) ? Math.max(0, Math.min(2, Math.round(n))) : 0 }),
+  /** #1923 Phase 4 — the "seed from stage" press, as a counter the live loop consumes once per frame
+   * (the chip's other controls reach the resolver the same way: store → loop → stamp). The loop
+   * stamps `seed` on the field stamp of the frame it consumes the press on; a press consumed on a
+   * frame that produces no field stamp (family off, dial at 0) is spent and has no field effect —
+   * the press is an act, never a preference, so it is not part of the chip's stored pref either.
+   * Runtime only, never serialized. */
+  dishLifeSeedPulse: 0,
+  pulseDishLifeSeed: () => set((st) => ({ dishLifeSeedPulse: (st.dishLifeSeedPulse | 0) + 1 })),
+  /** #1923 Phase 4 — the re-seed interval: generations per field cycle, on the detent set
+   * (24 / 48 / 96; the clock's clampCycleGens owns the set). It rides every field stamp as
+   * cycleGens, so a take records the interval it ran at; the default is the Phase 1 length, so
+   * an untouched instrument stamps exactly what it always stamped. A per-viewer preference like
+   * the dials (the chip's pref carries it), never serialized into a document. */
+  dishLifeCycleGens: FIELD_CYCLE_GENS,
+  setDishLifeCycleGens: (n) => set({ dishLifeCycleGens: clampCycleGens(n) }),
   /** #1574 — the governor's travel shed: while true, liveLoop stamps
    * travelShed on the resolver input and FLOW marks settle home. A
    * render-only overlay in the creatureShed class — never serialized
