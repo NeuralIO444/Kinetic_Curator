@@ -344,6 +344,11 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'components/genomeTimeline.model.mjs',
     'components/GenomeTimeline.jsx',
     'components/genomeTimeline.selfcheck.mjs',
+    // #2030: the Lineage Tree — the wet lab's backstage ancestry surface (model, component, suite): it reads a
+    // record's retained ancestry to walk its family; the stage never sees it
+    'components/lineageTree.model.mjs',
+    'components/LineageTree.jsx',
+    'components/lineageTree.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

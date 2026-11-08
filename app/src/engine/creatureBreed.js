@@ -166,6 +166,25 @@ export function breedCreature(parents, seed = 0) {
     genome.push({ family: law.family, id: law.id, value, source });
   }
   const gene = (id) => genome.find((g) => g.id === id).value;
+  // #2030 — the retained ancestry, written HERE, at the birth, and never recomputed afterwards. Each parent
+  // contributes a compact summary — its identity, its genes exactly as they stand at this birth, and its own
+  // parents' ids — and deeper ancestors arrive by merging the parents' own summaries, deduplicated by id.
+  // The merge is what keeps the record's growth LINEAR in generations (at most three new entries per birth)
+  // where a naive copy of three full trees would grow as 3^generations. FROZEN AT BIRTH is the point of the
+  // field: a parent hand-edited later does not rewrite this child's retained ancestors — the summary is what
+  // the family looked like when this creature was born, and the Lineage Tree reads it, never the live bank.
+  const ancestry = trio.map((p) => ({
+    id: p.id,
+    genes: JSON.parse(JSON.stringify(p.genome)),
+    parents: p.lineage ? [...p.lineage.parents] : [],
+  }));
+  const seenAncestors = new Set(ancestry.map((e) => e.id));
+  for (const p of trio)
+    for (const e of p.ancestry || []) {
+      if (seenAncestors.has(e.id)) continue;
+      seenAncestors.add(e.id);
+      ancestry.push(JSON.parse(JSON.stringify(e)));
+    }
   const child = {
     kind: CREATURE_ASSEMBLY_KIND,
     id: `cr-${hash32(`breed|${key}`).toString(16).padStart(8, '0')}`,
@@ -179,6 +198,7 @@ export function breedCreature(parents, seed = 0) {
     voice: gene('voice'),
     genome,
     lineage: { parents: trio.map((p) => p.id), seed: s, mutations },
+    ancestry,
   };
   return sanitizeCreatureRecord(child);
 }

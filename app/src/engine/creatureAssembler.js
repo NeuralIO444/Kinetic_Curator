@@ -43,6 +43,15 @@ export const DRIVE_RANGE = Object.freeze({ min: 0.25, max: 2 });
 export const BIRTH_DRIVES = Object.freeze(['approval', 'crowding', 'strain', 'boredom']);
 /** At most this many genes per record (the birth set is 11; room for breeding's additions). */
 export const MAX_RECORD_GENES = 64;
+/**
+ * #2030 — at most this many ancestors in a record's retained ancestry summary. A validation ceiling against
+ * pathological documents, in the door's usual spirit: merging summaries adds at most three entries per
+ * generation (the parents; deeper ancestors arrive by reference, deduplicated), so the ceiling stands past
+ * a hundred generations of wholly novel triads — and the bank itself holds at most MAX_CREATURE_RECORDS
+ * records, so real families reuse ancestors long before that. There is NO truncation: a document past the
+ * ceiling is refused whole, never half-loaded with its deep lines silently dropped.
+ */
+export const MAX_ANCESTRY_ENTRIES = 384;
 
 const LOOK_IDS = new Set(COMPOSITION_PRESETS.map((p) => p.id));
 const VOICE_IDS = new Set(VOICE_DECK.map((v) => v.id));
@@ -166,21 +175,28 @@ function cleanExtraGene(g) {
 }
 
 /**
+ * The birth block: the genes every genome leads with, in canonical order — the skeleton and the named references,
+ * then the birth drives. The genome door holds a live genome to it; the ancestry door (#2030) holds every retained
+ * summary entry to the same block, because an entry IS a genome as it stood at a birth.
+ */
+const BIRTH_BLOCK = [
+  ['FORM', 'body'],
+  ['FORM', 'head'],
+  ['FORM', 'limbs'],
+  ['FORM', 'joints'],
+  ['LOOK', 'look'],
+  ['VOICE', 'voice'],
+  ['MATERIAL', 'material'],
+  ...BIRTH_DRIVES.map((d) => ['DRIVE', d]),
+];
+
+/**
  * The genome door. The birth genes must lead, in canonical order, with values of the right shape; genes after them are
  * a newer build's (or breeding's) additions and are kept when well-formed. Returns the clean list, or null.
  */
 function sanitizeGenomeBlock(raw, rec) {
   if (!Array.isArray(raw) || raw.length > MAX_RECORD_GENES) return null;
-  const want = [
-    ['FORM', 'body'],
-    ['FORM', 'head'],
-    ['FORM', 'limbs'],
-    ['FORM', 'joints'],
-    ['LOOK', 'look'],
-    ['VOICE', 'voice'],
-    ['MATERIAL', 'material'],
-    ...BIRTH_DRIVES.map((d) => ['DRIVE', d]),
-  ];
+  const want = BIRTH_BLOCK;
   if (raw.length < want.length) return null;
   const out = [];
   const seen = new Set();
@@ -254,10 +270,20 @@ export function sanitizeCreatureRecord(raw) {
   if (JSON.stringify(gene('joints')) !== JSON.stringify(joints)) return null;
   // #1852 — a bred child's lineage: its three parents, its seed, every mutation. Kept only when it is whole and honest;
   // a record with a malformed lineage is refused (a child that lies about its parents is not loaded half-true).
-  if (raw.lineage === undefined || raw.lineage === null) return { ...rec, look: raw.look, voice: raw.voice, genome };
+  if (raw.lineage === undefined || raw.lineage === null) {
+    // #2030 — ancestry without a birth is a lie by shape: only a bred child retains ancestors.
+    if (raw.ancestry !== undefined && raw.ancestry !== null) return null;
+    return { ...rec, look: raw.look, voice: raw.voice, genome };
+  }
   const lineage = sanitizeLineage(raw.lineage);
   if (!lineage || !lineageAgrees(lineage, { ...rec, genome })) return null;
-  return { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+  const out = { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+  // #2030 — the retained ancestry rides a bred record (the Lineage Tree renders from it alone). A record bred
+  // before summaries existed carries lineage and no ancestry: legal, and the tree shows its parents as stubs.
+  if (raw.ancestry === undefined || raw.ancestry === null) return out;
+  const ancestry = sanitizeAncestry(raw.ancestry, lineage, raw.id, genome);
+  if (!ancestry) return null;
+  return { ...out, ancestry };
 }
 
 /**
@@ -333,6 +359,163 @@ function sanitizeLineage(raw) {
     } else return null;
   }
   return { parents: [...parents], seed: raw.seed, mutations };
+}
+
+/**
+ * #2030 — one gene inside an ancestry summary: the ancestor's gene as it stood at the child's birth. The birth
+ * genes carry their value shapes (a Look must resolve, a drive must be in range, points must be in the box —
+ * the summary may not smuggle what the genome door would refuse); a gene this build does not know is kept
+ * verbatim when well-formed, the genome's own forward-compatibility rule.
+ */
+function sanitizeSummaryGene(g) {
+  if (!g || typeof g !== 'object' || Array.isArray(g)) return null;
+  if (typeof g.family !== 'string' || !FAMILY_RE.test(g.family)) return null;
+  if (typeof g.id !== 'string' || !GENE_ID_RE.test(g.id)) return null;
+  if (typeof g.source !== 'string' || !SOURCE_RE.test(g.source)) return null;
+  let value;
+  if (g.family === 'FORM' && g.id === 'body')
+    value = typeof g.value === 'string' && g.value && g.value.length <= 120 ? g.value : undefined;
+  else if (g.family === 'FORM' && g.id === 'head')
+    value = g.value === null ? null : isPt(g.value) ? cleanPt(g.value) : undefined;
+  else if (g.family === 'FORM' && (g.id === 'limbs' || g.id === 'joints')) value = cleanPts(g.value, 4) ?? undefined;
+  else if (g.family === 'LOOK' && g.id === 'look') value = isLookId(g.value) ? g.value : undefined;
+  else if (g.family === 'VOICE' && g.id === 'voice') value = isVoiceId(g.value) ? g.value : undefined;
+  else if (g.family === 'MATERIAL' && g.id === 'material')
+    value = g.value === null || typeof g.value === 'string' ? g.value : undefined;
+  else if (g.family === 'DRIVE') value = inDriveRange(g.value) ? g.value : undefined;
+  else return cleanExtraGene(g);
+  if (value === undefined) return null;
+  return { family: g.family, id: g.id, value, source: g.source };
+}
+
+/**
+ * #2030 — the ancestry door. The summary is a flat list, breadth-first: the record's three parents first (in
+ * lineage order), then deeper ancestors merged from the parents' own summaries, deduplicated by id. Each
+ * entry is an ancestor's identity, its genes at the child's birth, and its own parents' ids. An entry's
+ * parents may name ids with NO entry — the frontier: an ancestor bred before summaries existed names parents
+ * that were never retained; the tree renders those as stubs rather than inventing them. What the door holds:
+ * the first three entries ARE the lineage parents; ids are unique and never the record's own; a founder's
+ * entry has no parents, a bred one exactly three; the parent graph among entries is acyclic — ancestry only
+ * ever points backwards; every entry's genes lead with the birth block, the genome door's own core set; and
+ * the retained values AGREE with the record's other tellings of the same birth (ancestryAgrees, below) — a
+ * value validated only in isolation could be rewritten in range and pass, which is tampering the summary
+ * exists to make visible. Tampered ancestry refuses the record whole, like any other field.
+ */
+function sanitizeAncestry(raw, lineage, selfId, genome) {
+  if (!Array.isArray(raw) || raw.length < 3 || raw.length > MAX_ANCESTRY_ENTRIES) return null;
+  const entries = [];
+  const byId = new Map();
+  for (const e of raw) {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    if (typeof e.id !== 'string' || !RECORD_ID_RE.test(e.id) || e.id === selfId || byId.has(e.id)) return null;
+    if (!Array.isArray(e.parents) || (e.parents.length !== 0 && e.parents.length !== 3)) return null;
+    if (!e.parents.every((p) => typeof p === 'string' && RECORD_ID_RE.test(p) && p !== e.id)) return null;
+    if (new Set(e.parents).size !== e.parents.length) return null;
+    if (!Array.isArray(e.genes) || e.genes.length === 0 || e.genes.length > MAX_RECORD_GENES) return null;
+    const genes = [];
+    const seenGenes = new Set();
+    for (const g of e.genes) {
+      const clean = sanitizeSummaryGene(g);
+      if (!clean) return null;
+      const k = `${clean.family}.${clean.id}`;
+      if (seenGenes.has(k)) return null; // a gene is one gene, in a summary as in a genome
+      seenGenes.add(k);
+      genes.push(clean);
+    }
+    // core-set parity with the genome door: an entry is a genome as it stood, so it leads with the birth
+    // block, whole and in order — an entry missing a birth gene, or holding another gene in its place, is
+    // not a genome this door would have let live
+    if (genes.length < BIRTH_BLOCK.length) return null;
+    for (let i = 0; i < BIRTH_BLOCK.length; i++)
+      if (genes[i].family !== BIRTH_BLOCK[i][0] || genes[i].id !== BIRTH_BLOCK[i][1]) return null;
+    const entry = { id: e.id, genes, parents: [...e.parents] };
+    entries.push(entry);
+    byId.set(entry.id, entry);
+  }
+  // the head of the list is the birth itself: the three parents, in the lineage's order
+  for (let i = 0; i < 3; i++) if (entries[i].id !== lineage.parents[i]) return null;
+  // acyclic among entries (frontier ids have no entry and end their walk there)
+  const mark = new Map(); // id -> 1 walking, 2 done
+  const walk = (id) => {
+    const e = byId.get(id);
+    if (!e) return true;
+    const m = mark.get(id) || 0;
+    if (m === 1) return false;
+    if (m === 2) return true;
+    mark.set(id, 1);
+    for (const p of e.parents) if (!walk(p)) return false;
+    mark.set(id, 2);
+    return true;
+  };
+  for (const e of entries) if (!walk(e.id)) return null;
+  if (!ancestryAgrees(entries, byId, lineage, genome)) return null;
+  return entries;
+}
+
+/**
+ * #2030 — the breeder's crossed-drive blend (engine/creatureBreed.js), re-derived at the door: a crossed
+ * drive is a seeded convex weighting of the three parents' values for that drive — weights drawn from the
+ * breeding key, the weighted mean rounded to the breeder's precision and clamped to the legal range. The
+ * door holds everything the blend consumed: the seed and the parents (the lineage's, in the breeder's
+ * id-sorted order) and, in the head entries, the parents' values exactly as they stood at the birth. So a
+ * crossed gene in the record's own genome is exactly re-derivable, and a head value rewritten after the
+ * fact breaks the blend it fed. creatureBreed's formula, verbatim — the suite's bred families pin the two
+ * together across seeds, so a breeder change that forgets this mirror fails loudly, never silently.
+ */
+function crossedDriveValue(seed, parentIds, driveId, valueOf) {
+  const key = `${seed >>> 0}|${parentIds.join('|')}`;
+  const w = parentIds.map((id) => 0.2 + hash32(`${key}|w|${driveId}|${id}`) / 4294967296);
+  const sum = w.reduce((a, b) => a + b, 0);
+  const v = Math.round(parentIds.reduce((acc, id, i) => acc + (valueOf(id) * w[i]) / sum, 0) * 1000) / 1000;
+  return Math.min(DRIVE_RANGE.max, Math.max(DRIVE_RANGE.min, v));
+}
+
+/**
+ * #2030 — agreement, in lineageAgrees' spirit: the summary's retained values must tell the same story as
+ * every other part of the record that re-states them. A gene's source says where its value came from, and
+ * breeding's law (engine/creatureBreed.js) makes two of those claims checkable against retained entries:
+ * a parent: gene holds its named parent's value whole, and a mut: gene on a discrete gene (or the skeleton)
+ * is a swap — its value is the named parent's value, re-picked. So wherever the named parent stands retained
+ * as an entry, the entry must hold that gene, deep-equal; missing or unequal refuses. A hand: gene is the
+ * performer's own act and evidences nothing about its parents; crossed genes inside entries blend from a
+ * birth whose seed no entry retains, so they are not re-derivable there; a named parent with no entry is
+ * the frontier, and there is nothing to check against. At the head one more telling exists: the record's
+ * own crossed drives consumed the head entries' drive values under the lineage's seed, so those values are
+ * held to the blend (crossedDriveValue, above).
+ */
+function ancestryAgrees(entries, byId, lineage, genome) {
+  const geneIn = (entry, family, id) =>
+    entry ? entry.genes.find((g) => g.family === family && g.id === id) : undefined;
+  const eq = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+  // a gene against the retained entry of the parent its source names, where that parent is one of this
+  // birth's three and stands retained; true when the gene makes no such claim, or the claim cannot be read
+  const agreesWithParent = (parents, g) => {
+    const at = g.source.indexOf(':');
+    const kind = at > 0 ? g.source.slice(0, at) : g.source;
+    const rest = at > 0 ? g.source.slice(at + 1) : '';
+    // a DRIVE mut: is a reroll and names the gene itself; every other mut: is a swap and names the holder
+    const holder = kind === 'parent' || (kind === 'mut' && g.family !== 'DRIVE') ? rest : null;
+    if (!holder || !parents.includes(holder)) return true;
+    const entry = byId.get(holder);
+    if (!entry) return true; // the frontier: the parent is named but was never retained — nothing to check against
+    const held = geneIn(entry, g.family, g.id);
+    return !!held && eq(held.value, g.value);
+  };
+  // summary-internal: every entry's genes against the entries of its own parents
+  for (const e of entries) for (const g of e.genes) if (!agreesWithParent(e.parents, g)) return false;
+  // the head: the record's own genome against its three parents' entries — inherited and swapped genes by
+  // the same reading, crossed drives by the blend they were dealt from
+  const trio = [...lineage.parents].sort();
+  for (const g of genome) {
+    if (g.family === 'DRIVE' && g.source.startsWith('cross:')) {
+      const inputs = trio.map((id) => geneIn(byId.get(id), 'DRIVE', g.id));
+      if (inputs.every(Boolean)) {
+        const expected = crossedDriveValue(lineage.seed, trio, g.id, (id) => geneIn(byId.get(id), 'DRIVE', g.id).value);
+        if (expected !== g.value) return false;
+      }
+    } else if (!agreesWithParent(lineage.parents, g)) return false;
+  }
+  return true;
 }
 
 /** The project's record list: every entry re-validated, de-duplicated by id (first wins), capped (newest kept). */
