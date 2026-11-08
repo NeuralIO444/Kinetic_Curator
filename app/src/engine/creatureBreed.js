@@ -26,6 +26,7 @@
 import {
   assembleCreature,
   sanitizeCreatureRecord,
+  keptWarningHolds,
   CREATURE_ASSEMBLY_KIND,
   DRIVE_RANGE,
   BIRTH_DRIVES,
@@ -338,6 +339,16 @@ export function handEditRecord(record, edit, env = {}) {
   // a bred record's drive slots ARE its drive genes (the door's lineage law) — keep them in step. An unbred
   // record's slots stay in their birth shape (slots are the integrator's world, not the genome's).
   else if (gene.family === 'DRIVE' && rec.lineage) candidate.drives = { ...rec.drives, [gene.id]: value };
+  // #1871 — a kept warning rides the record only while it still holds: an edit that resolves the warned
+  // condition (a skeleton replace that gives the creature a head; a body replace off the expensive shape)
+  // retires the warning it resolved. Nothing vanishes silently — the resolving act is itself recorded in the
+  // edited gene's hand: source, and the door would refuse the stale claim if it stayed. Entries the edit
+  // does not touch ride on, as they were.
+  if (Array.isArray(candidate.kept)) {
+    const still = candidate.kept.filter((e) => keptWarningHolds(e, candidate));
+    if (still.length) candidate.kept = still;
+    else delete candidate.kept;
+  }
   const clean = sanitizeCreatureRecord(candidate);
   if (!clean) return { record: null, refusal: 'door' };
   return { record: clean, refusal: null };

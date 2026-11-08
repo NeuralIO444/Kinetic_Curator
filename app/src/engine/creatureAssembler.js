@@ -21,6 +21,7 @@
 
 import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX } from './assetAttach.js';
+import { COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // #1871 — the cost line a kept warning is held to
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { creatureTileId } from './creatureTileId.js';
 import { creatureTileSvg, buildRig } from './creatureRig.js';
@@ -52,6 +53,14 @@ export const MAX_RECORD_GENES = 64;
  * ceiling is refused whole, never half-loaded with its deep lines silently dropped.
  */
 export const MAX_ANCESTRY_ENTRIES = 384;
+/**
+ * #1871 — at most this many kept warnings ride a record (the Strand Bank: a warning the performer was
+ * shown at assembly and kept, recorded — see sanitizeKeptWarnings). The bank's catalogue derives at most
+ * three today (an expensive body, a headless skeleton, a limbless skeleton); the cap leaves room for the
+ * catalogue to grow without re-opening the door, and a document past it refuses whole, like every other
+ * oversize field.
+ */
+export const MAX_KEPT_WARNINGS = 8;
 
 const LOOK_IDS = new Set(COMPOSITION_PRESETS.map((p) => p.id));
 const VOICE_IDS = new Set(VOICE_DECK.map((v) => v.id));
@@ -90,9 +99,14 @@ const pickFrom = (order, seed, key, salt) =>
  *   points:  the asset's attach points as the WetLab shows them (the artist's own, or the shape's AUTO points).
  *   seed:    the deal seed (uint32). Same seed + asset + points → the identical record.
  *   lookId / voiceId: optional references; when absent (or not a real deck entry) they are dealt from the seed.
- * @returns the record, or null when the asset id is missing.
+ *   kept:    #1871 — the warnings the performer was shown for this combination and kept (the Strand Bank's
+ *            derivation, components/strandBank.model.mjs). Sanitized against the record being born; a kept
+ *            list the door would refuse refuses the assembly instead — the engine never writes a record its
+ *            own door would not load. Not an ingredient of identity: the record id ignores it, as it ignores
+ *            every fact about the performer's choices beyond the genome itself.
+ * @returns the record, or null when the asset id is missing (or a given kept list is dishonest).
  */
-export function assembleCreature({ assetId, points = [], seed = 0, lookId = null, voiceId = null } = {}) {
+export function assembleCreature({ assetId, points = [], seed = 0, lookId = null, voiceId = null, kept = null } = {}) {
   if (typeof assetId !== 'string' || !assetId || assetId.length > 120) return null;
   const pts = sanitizeAttachPoints(points);
   const s = seed >>> 0;
@@ -119,7 +133,7 @@ export function assembleCreature({ assetId, points = [], seed = 0, lookId = null
     ...BIRTH_DRIVES.map((d) => ({ family: 'DRIVE', id: d, value: DRIVE_NORM, source: 'wild' })),
   ];
 
-  return {
+  const record = {
     kind: CREATURE_ASSEMBLY_KIND,
     id: `cr-${hash32(`${s}|${key}|${look}|${voice}`).toString(16).padStart(8, '0')}`,
     seed: s,
@@ -132,6 +146,14 @@ export function assembleCreature({ assetId, points = [], seed = 0, lookId = null
     voice,
     genome,
   };
+  // #1871 — the kept warnings ride the record only when there are any: a record with none is byte-identical
+  // in shape to every record assembled before the bank existed.
+  if (kept !== undefined && kept !== null) {
+    const clean = sanitizeKeptWarnings(kept, record);
+    if (!clean) return null;
+    if (clean.length) record.kept = clean;
+  }
+  return record;
 }
 
 const inBox = (n) => typeof n === 'number' && Number.isFinite(n) && n >= 0 && n <= ATTACH_BOX;
@@ -229,6 +251,64 @@ function sanitizeGenomeBlock(raw, rec) {
 }
 
 /**
+ * #1871 — does one kept warning still hold against a record's own facts? A kept warning is a claim about the
+ * combination the performer assembled, and the record itself carries most of the evidence: a skeleton warning
+ * is true exactly when the genome it rides has the absence it names, and a cost warning names the record's own
+ * body and must carry a score genuinely over the registry's warning line (the line the warning exists by).
+ * The score itself is the surface's reading of the asset at assembly time — an asset's drawing is not part of
+ * a record, so the door holds the claim's shape and its over-the-line fact, not the number's provenance.
+ * Shared by the door (a document whose kept warnings contradict its genome is tampered, and refuses) and by
+ * the hand-edit path in creatureBreed.js (an edit that resolves the warned condition retires the warning).
+ */
+export function keptWarningHolds(entry, rec) {
+  if (!entry || typeof entry !== 'object' || Array.isArray(entry)) return false;
+  if (!rec || typeof rec !== 'object') return false;
+  if (entry.kind === 'cost') {
+    if (entry.id !== `cost:${rec.body}`) return false;
+    const c = entry.cost;
+    return (
+      !!c &&
+      typeof c === 'object' &&
+      !Array.isArray(c) &&
+      Number.isFinite(c.score) &&
+      c.score > COST_WARNING_THRESHOLD &&
+      c.threshold === COST_WARNING_THRESHOLD
+    );
+  }
+  if (entry.kind === 'skeleton') {
+    if (entry.cost !== null && entry.cost !== undefined) return false;
+    if (entry.id === 'skeleton:no-head') return rec.head === null;
+    if (entry.id === 'skeleton:no-limbs') return Array.isArray(rec.limbs) && rec.limbs.length === 0;
+    return false;
+  }
+  return false;
+}
+
+/**
+ * #1871 — the kept-warnings door: the warnings a performer was shown at assembly and kept, recorded on the
+ * record as data (an id, a kind, and — for a cost warning — the registry's own numbers), so the Timeline and
+ * the Tree can read later what was knowingly kept. A closed vocabulary: a kind or id this build does not know
+ * refuses, like a malformed lineage; every entry must still hold against the record (keptWarningHolds);
+ * no warning is recorded twice. Returns the clean list (possibly empty), or null.
+ */
+export function sanitizeKeptWarnings(raw, rec) {
+  if (!Array.isArray(raw) || raw.length > MAX_KEPT_WARNINGS) return null;
+  const out = [];
+  const seen = new Set();
+  for (const e of raw) {
+    if (!keptWarningHolds(e, rec)) return null;
+    if (seen.has(e.id)) return null;
+    seen.add(e.id);
+    out.push(
+      e.kind === 'cost'
+        ? { id: e.id, kind: 'cost', cost: { score: e.cost.score, threshold: e.cost.threshold } }
+        : { id: e.id, kind: 'skeleton', cost: null },
+    );
+  }
+  return out;
+}
+
+/**
  * Validate one record (document data). Returns a normalized copy carrying only the known fields, or null when the
  * record is absent or dishonest in any particular. The Look and Voice must resolve to the real decks.
  */
@@ -268,13 +348,24 @@ export function sanitizeCreatureRecord(raw) {
   if (JSON.stringify(gene('head')) !== JSON.stringify(head)) return null;
   if (JSON.stringify(gene('limbs')) !== JSON.stringify(limbs)) return null;
   if (JSON.stringify(gene('joints')) !== JSON.stringify(joints)) return null;
+  // #1871 — the kept warnings (the Strand Bank): warnings shown at assembly and kept, recorded as data.
+  // Validated against the record's own facts (keptWarningHolds); an entry that contradicts the genome it
+  // rides refuses the record whole, like any other dishonest field. A record with none carries no field —
+  // every record written before the bank loads byte-identical in shape.
+  let kept;
+  if (raw.kept !== undefined && raw.kept !== null) {
+    kept = sanitizeKeptWarnings(raw.kept, rec);
+    if (!kept) return null;
+  }
   // #1852 — a bred child's lineage: its three parents, its seed, every mutation. Kept only when it is whole and honest;
   // a record with a malformed lineage is refused (a child that lies about its parents is not loaded half-true).
   if (raw.lineage === undefined || raw.lineage === null) {
     // #2030 — ancestry without a birth is a lie by shape: only a bred child retains ancestors.
     if (raw.ancestry !== undefined && raw.ancestry !== null) return null;
-    return { ...rec, look: raw.look, voice: raw.voice, genome };
+    return { ...rec, look: raw.look, voice: raw.voice, genome, ...(kept && kept.length ? { kept } : {}) };
   }
+  // #1871 — a bred record was never assembled, so warnings kept at an assembly cannot ride it: a lie by shape.
+  if (kept && kept.length) return null;
   const lineage = sanitizeLineage(raw.lineage);
   if (!lineage || !lineageAgrees(lineage, { ...rec, genome })) return null;
   const out = { ...rec, look: raw.look, voice: raw.voice, genome, lineage };

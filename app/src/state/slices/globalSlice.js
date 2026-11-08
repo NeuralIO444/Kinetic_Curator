@@ -1012,9 +1012,18 @@ export const createGlobalSlice = (set) => ({
    * own, or the shape's AUTO ones), dealt off the project seed. Reassembling the same asset + points + seed lands the
    * identical record, so it is never banked twice. Rides the document like attach edits; #1850: its pool tile is how it reaches the stage.
    */
-  assembleCreature: (assetId, shown) =>
+  assembleCreature: (assetId, shown, picks = {}) =>
     set((state) => {
-      const rec = assembleCreature({ assetId, points: shown, seed: state.seed });
+      // #1871 — the Strand Bank's picks ride along: named look/voice strands (null = dealt from the seed,
+      // exactly as before) and the warnings the performer kept. Callers passing nothing get today's deal.
+      const rec = assembleCreature({
+        assetId,
+        points: shown,
+        seed: state.seed,
+        lookId: picks && picks.lookId ? picks.lookId : null,
+        voiceId: picks && picks.voiceId ? picks.voiceId : null,
+        kept: picks ? picks.kept : undefined,
+      });
       return rec ? bankCreature(state, rec) : {};
     }),
   /**

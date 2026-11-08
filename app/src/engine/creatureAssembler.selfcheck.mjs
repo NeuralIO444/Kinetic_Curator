@@ -349,6 +349,10 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'components/lineageTree.model.mjs',
     'components/LineageTree.jsx',
     'components/lineageTree.selfcheck.mjs',
+    // #1871: the Strand Bank — the wet lab's assembler posture (model + suite): the catalogue of named strands
+    // and the warnings a combination carries; assembly still writes through the engine and the one door
+    'components/strandBank.model.mjs',
+    'components/strandBank.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

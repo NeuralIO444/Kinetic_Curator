@@ -21,6 +21,7 @@ import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
 import { BeastSettings } from '../components/BeastSettings.jsx';
 import { GenomeTimeline } from '../components/GenomeTimeline.jsx'; // #1870
 import { LineageTree } from '../components/LineageTree.jsx'; // #2030
+import { assemblyWarnings, keptFromWarnings, roleSetStrands } from '../components/strandBank.model.mjs'; // #1871
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 
@@ -48,6 +49,8 @@ export function WetLab({ assetId, onClose }) {
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
   const [genomeId, setGenomeId] = useState(''); // #1870 — the record whose genome timeline is open ('' = none)
   const [treeId, setTreeId] = useState(''); // #2030 — the record whose lineage tree is open ('' = none)
+  const [lookPick, setLookPick] = useState(''); // #1871 — the bank's Look strand ('' = dealt from the seed)
+  const [voicePick, setVoicePick] = useState(''); // #1871 — the bank's Voice strand ('' = dealt from the seed)
   // a slot naming a creature that has since been removed reads as empty (never a stale id sent to BREED)
   const bankIds = new Set((allRecords || []).map((r) => r.id));
   const liveSlots = slots.map((sl) => (sl.kind === 'creature' && !bankIds.has(sl.id) ? EMPTY_SLOT : sl));
@@ -117,6 +120,13 @@ export function WetLab({ assetId, onClose }) {
   });
   const heads = points.filter((p) => p.role === 'H').length;
   const limbCount = points.filter((p) => p.role === 'L').length;
+  // #1871 — the strand bank's live reading of the picks on the table: this shape's two role sets (the set in
+  // use is the artist's own when one exists, else the shape's AUTO set — the attach state stays the one truth)
+  // and the warnings the current combination carries. Warnings never block; assembling with them showing
+  // records them on the record as kept.
+  const roleSets = roleSetStrands(asset, own);
+  const warnings = assemblyWarnings({ asset, points });
+  const kept = keptFromWarnings(warnings);
 
   return (
     <div style={veil} onClick={() => onClose()} role="presentation">
@@ -243,24 +253,115 @@ export function WetLab({ assetId, onClose }) {
                 </button>
               )}
             </div>
-            {/* #1849 — the assembler: this shape + its points → a creature record (body, head, limbs, empty drive
-                slots, a Look and a Voice, and a genome). Discrete state → TE readout (DS rule 2). */}
+            {/* #1871 — the strand bank: the assembler rebuilt around named strands. The body is this shape
+                (strand asset:<id>); its role set is the shape's AUTO set or the artist's own (strands
+                points:auto:<id> / points:own:<id>); Look and Voice are picked by name or dealt from the seed.
+                Discrete state → TE readout (DS rule 2). Warnings show in the open and never block; assembling
+                with them showing keeps them on the record. */}
             <div style={{ ...secTitle, ...caps, marginTop: 6 }} data-testid="assemble-title">
-              creature · h {heads} · l {limbCount} · {(allRecords || []).length}/{MAX_CREATURE_RECORDS}
+              strand bank · creature · h {heads} · l {limbCount} · {(allRecords || []).length}/{MAX_CREATURE_RECORDS}
             </div>
             <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
-              Assemble a creature from this shape: the H point is its head, the L points its limbs. It joins the asset
-              pool as a creature tile — turn it on there and the stage places it like any shape.
+              Build the creature from named strands — a body, its attach role set, a Look and a Voice. Unpicked genes
+              deal from the seed. A combination that conflicts says so below; assembling anyway keeps the warning on the
+              record. The creature joins the asset pool as a creature tile — turn it on there and the stage places it
+              like any shape.
             </div>
+            <div style={breedRow} data-testid="strand-body">
+              <span style={{ ...caps, width: 52 }}>body</span>
+              <span style={{ color: 'var(--ink)' }}>{asset.id}</span>
+              <span>asset:{asset.id}</span>
+            </div>
+            <div style={breedRow} data-testid="strand-points">
+              <span style={{ ...caps, width: 52 }}>points</span>
+              <button
+                type="button"
+                className={`chip-btn act${isOwn ? '' : ' on'}`}
+                aria-pressed={!isOwn}
+                data-testid="strand-points-auto"
+                title="Use the role set worked out from the shape"
+                onClick={() => autoAssetAttach(asset.id)}
+              >
+                auto · h {roleSets.auto ? roleSets.auto.counts.heads : 0} · l{' '}
+                {roleSets.auto ? roleSets.auto.counts.limbs : 0}
+              </button>
+              {roleSets.own ? (
+                <span
+                  data-testid="strand-points-own"
+                  style={{ color: 'var(--ink)' }}
+                  title="Your hand-edited role set — the set in use"
+                >
+                  yours · h {roleSets.own.counts.heads} · l {roleSets.own.counts.limbs} · in use
+                </span>
+              ) : (
+                <span>yours — click the shape above to edit its points</span>
+              )}
+            </div>
+            <div style={breedRow}>
+              <span style={{ ...caps, width: 52 }}>look</span>
+              <select
+                aria-label="Look strand"
+                data-testid="strand-look"
+                value={lookPick}
+                onChange={(e) => setLookPick(e.target.value)}
+              >
+                <option value="">dealt from the seed</option>
+                {LOOKS.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+              {lookPick && <span>look:{lookPick}</span>}
+            </div>
+            <div style={breedRow}>
+              <span style={{ ...caps, width: 52 }}>voice</span>
+              <select
+                aria-label="Voice strand"
+                data-testid="strand-voice"
+                value={voicePick}
+                onChange={(e) => setVoicePick(e.target.value)}
+              >
+                <option value="">dealt from the seed</option>
+                {VOICES.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </select>
+              {voicePick && <span>voice:{voicePick}</span>}
+            </div>
+            {warnings.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }} data-testid="strand-warnings">
+                {warnings.map((w) => (
+                  <div
+                    key={w.id}
+                    style={{ fontSize: 11, color: 'var(--kc-red)', lineHeight: 1.5 }}
+                    data-testid="strand-warning"
+                  >
+                    ⚠ {w.what} — {w.why}
+                    {w.cost ? ` · cost ${w.cost.score}, over the line ${w.cost.threshold}` : ''}
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="chip-btn act"
                 data-testid="assemble"
-                title="Assemble a creature record from this shape and its points, dealt off the project seed"
-                onClick={() => assembleCreature(asset.id, points)}
+                title="Assemble a creature record from the picked strands, dealt off the project seed"
+                onClick={() =>
+                  assembleCreature(asset.id, points, {
+                    lookId: lookPick || null,
+                    voiceId: voicePick || null,
+                    kept,
+                  })
+                }
               >
-                assemble
+                {warnings.length > 0
+                  ? `assemble — keep ${warnings.length} warning${warnings.length === 1 ? '' : 's'}`
+                  : 'assemble'}
               </button>
               {/* what the press did, announced politely: never a silent no-op or a silent eviction */}
               <span style={{ ...noteText }} role="status" aria-live="polite" data-testid="assemble-note">
@@ -338,6 +439,14 @@ export function WetLab({ assetId, onClose }) {
                       <span style={caps}>{r.head ? 'h' : '–'}</span> · {r.limbs.length}
                       <span style={caps}>l</span> · {lookName(r.look)} · {voiceName(r.voice)}
                     </span>
+                    {r.kept && r.kept.length > 0 && (
+                      <span
+                        data-testid="record-kept"
+                        title="Warnings shown at assembly and kept, recorded on the record"
+                      >
+                        ⚠ kept {r.kept.length}
+                      </span>
+                    )}
                     <button
                       type="button"
                       className={`chip-btn ${genomeId === r.id ? 'act on' : 'act'}`}
