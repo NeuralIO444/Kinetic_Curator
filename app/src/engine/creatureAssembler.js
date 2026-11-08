@@ -135,9 +135,13 @@ const inDriveRange = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 
 
 /**
  * A gene's source, by grammar: where its value came from. The birth sources are asset:<id> / look:<id> / voice:<id> /
- * dealt / none / wild; breeding (#1852) will add parent:/cross:/mut: — admitted now so its records load in this build.
+ * dealt / none / wild; breeding (#1852) adds parent:/cross:/mut:; the Genome Timeline's hand edits (#1870) add
+ * hand: — hand:mut (a hand mutation), hand:look:<id> / hand:voice:<id> (replaced from the family's deck),
+ * hand:asset:<id> (replaced from that shape: the body itself, or its own ATTACH points for a skeleton gene),
+ * hand:donor:<recordId> (replaced from that record's corresponding gene). A hand source is the ONLY source a
+ * post-birth edit may claim: mut:/parent: carry lineage semantics (below) that a hand act must not borrow.
  */
-const SOURCE_RE = /^(?:(?:asset|look|voice|parent|cross|mut):[A-Za-z0-9_:.~-]{1,120}|dealt|none|wild)$/;
+const SOURCE_RE = /^(?:(?:asset|look|voice|parent|cross|mut|hand):[A-Za-z0-9_:.~-]{1,120}|dealt|none|wild)$/;
 const FAMILY_RE = /^[A-Z]{2,16}$/;
 const GENE_ID_RE = /^[a-z][a-z0-9_-]{0,31}$/;
 
@@ -260,7 +264,9 @@ export function sanitizeCreatureRecord(raw) {
  * #1852 — a lineage and its genome must tell the same story: the seed is the record's; the child is not its own parent;
  * every gene came from the three (parent:/cross: over exactly them) or from a mutation; every mut: gene has exactly
  * one lineage entry and every entry its mut: gene (a reroll's value IS its gene's); and a bred child's drive slots
- * are its drive genes. A child whose lineage disagrees with its genes is refused whole.
+ * are its drive genes. #1870 — a hand: gene postdates the birth and owes no birth source; a mutation entry for it
+ * is superseded by the hand act but still accounted (no orphan entries). A child whose lineage disagrees with its
+ * genes is refused whole.
  */
 function lineageAgrees(lineage, rec) {
   if (lineage.seed !== rec.seed || lineage.parents.includes(rec.id)) return false;
@@ -279,7 +285,13 @@ function lineageAgrees(lineage, rec) {
     const kind = at > 0 ? g.source.slice(0, at) : g.source;
     const rest = at > 0 ? g.source.slice(at + 1) : '';
     const m = byGene.get(geneName(g));
-    if (kind === 'parent') {
+    if (kind === 'hand') {
+      // #1870 — a hand-edited gene postdates the birth: its value is the performer's, not the breeding draw's,
+      // so no birth source is owed for it. If the birth did record a mutation entry for this gene, the hand act
+      // supersedes it — the entry is accounted, not orphaned (the final size check below still has to pass).
+      // A hand gene stays a first-class fact: a drive slot still has to agree with its drive gene.
+      if (m) mutated.add(m.gene);
+    } else if (kind === 'parent') {
       if (!parents.has(rest) || m) return false;
     } else if (kind === 'cross') {
       if (g.family !== 'DRIVE' || rest.split('~').sort().join('~') !== trio || m) return false;

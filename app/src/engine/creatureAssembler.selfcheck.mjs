@@ -339,6 +339,11 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'engine/creatureKin.selfcheck.mjs',
     // #1949: the mood suite assembles a creature to pose (a test, not a stage reader)
     'engine/creatureMoods.selfcheck.mjs',
+    // #1870: the Genome Timeline — the wet lab's backstage genome surface (model, component, suite): it reads a
+    // record to show its genes and writes hand edits back through the one door; the stage never sees it
+    'components/genomeTimeline.model.mjs',
+    'components/GenomeTimeline.jsx',
+    'components/genomeTimeline.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {
