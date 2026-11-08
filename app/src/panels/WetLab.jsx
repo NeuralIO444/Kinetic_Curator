@@ -20,6 +20,7 @@ import { SEED_KITS, kitsById, resolveKit } from '../data/kits.js'; // #1946
 import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
 import { BeastSettings } from '../components/BeastSettings.jsx';
 import { GenomeTimeline } from '../components/GenomeTimeline.jsx'; // #1870
+import { LineageTree } from '../components/LineageTree.jsx'; // #2030
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
 
@@ -46,6 +47,7 @@ export function WetLab({ assetId, onClose }) {
   const breedNote = useStore((s) => s.creatureBreedNote);
   const [slots, setSlots] = useState([EMPTY_SLOT, EMPTY_SLOT, EMPTY_SLOT]);
   const [genomeId, setGenomeId] = useState(''); // #1870 — the record whose genome timeline is open ('' = none)
+  const [treeId, setTreeId] = useState(''); // #2030 — the record whose lineage tree is open ('' = none)
   // a slot naming a creature that has since been removed reads as empty (never a stale id sent to BREED)
   const bankIds = new Set((allRecords || []).map((r) => r.id));
   const liveSlots = slots.map((sl) => (sl.kind === 'creature' && !bankIds.has(sl.id) ? EMPTY_SLOT : sl));
@@ -348,6 +350,16 @@ export function WetLab({ assetId, onClose }) {
                     </button>
                     <button
                       type="button"
+                      className={`chip-btn ${treeId === r.id ? 'act on' : 'act'}`}
+                      aria-pressed={treeId === r.id}
+                      data-testid="record-tree"
+                      title={`Show ${r.id}’s lineage tree`}
+                      onClick={() => setTreeId((cur) => (cur === r.id ? '' : r.id))}
+                    >
+                      tree
+                    </button>
+                    <button
+                      type="button"
                       className="chip-btn act"
                       title={`Remove ${r.id}`}
                       aria-label={`Remove creature record ${r.id}`}
@@ -374,6 +386,14 @@ export function WetLab({ assetId, onClose }) {
                   hasBodyPoints={assets.some((a) => a.id === sel.body)}
                 />
               );
+            })()}
+            {/* #2030 — the Lineage Tree: the selected record's retained ancestry as a walkable tree (GEN 01 →
+                branches) with per-node deltas. Like the strip, it follows the RECORD in the bank, and it reads
+                the record alone — never the bank — so a relative's later edits or removal cannot rewrite it. */}
+            {(() => {
+              const sel = (allRecords || []).find((r) => r.id === treeId);
+              if (!sel) return null;
+              return <LineageTree key={sel.id} record={sel} />;
             })()}
             {/* #1946 — the part preview: which assets Davis would deal onto this creature's bones on the current stage —
                 the scene contract's own deal, read-only — with a kit filter to ask "what if this stage were these kits" */}

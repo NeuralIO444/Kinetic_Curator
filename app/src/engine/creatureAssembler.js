@@ -43,6 +43,15 @@ export const DRIVE_RANGE = Object.freeze({ min: 0.25, max: 2 });
 export const BIRTH_DRIVES = Object.freeze(['approval', 'crowding', 'strain', 'boredom']);
 /** At most this many genes per record (the birth set is 11; room for breeding's additions). */
 export const MAX_RECORD_GENES = 64;
+/**
+ * #2030 — at most this many ancestors in a record's retained ancestry summary. A validation ceiling against
+ * pathological documents, in the door's usual spirit: merging summaries adds at most three entries per
+ * generation (the parents; deeper ancestors arrive by reference, deduplicated), so the ceiling stands past
+ * a hundred generations of wholly novel triads — and the bank itself holds at most MAX_CREATURE_RECORDS
+ * records, so real families reuse ancestors long before that. There is NO truncation: a document past the
+ * ceiling is refused whole, never half-loaded with its deep lines silently dropped.
+ */
+export const MAX_ANCESTRY_ENTRIES = 384;
 
 const LOOK_IDS = new Set(COMPOSITION_PRESETS.map((p) => p.id));
 const VOICE_IDS = new Set(VOICE_DECK.map((v) => v.id));
@@ -254,10 +263,20 @@ export function sanitizeCreatureRecord(raw) {
   if (JSON.stringify(gene('joints')) !== JSON.stringify(joints)) return null;
   // #1852 — a bred child's lineage: its three parents, its seed, every mutation. Kept only when it is whole and honest;
   // a record with a malformed lineage is refused (a child that lies about its parents is not loaded half-true).
-  if (raw.lineage === undefined || raw.lineage === null) return { ...rec, look: raw.look, voice: raw.voice, genome };
+  if (raw.lineage === undefined || raw.lineage === null) {
+    // #2030 — ancestry without a birth is a lie by shape: only a bred child retains ancestors.
+    if (raw.ancestry !== undefined && raw.ancestry !== null) return null;
+    return { ...rec, look: raw.look, voice: raw.voice, genome };
+  }
   const lineage = sanitizeLineage(raw.lineage);
   if (!lineage || !lineageAgrees(lineage, { ...rec, genome })) return null;
-  return { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+  const out = { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+  // #2030 — the retained ancestry rides a bred record (the Lineage Tree renders from it alone). A record bred
+  // before summaries existed carries lineage and no ancestry: legal, and the tree shows its parents as stubs.
+  if (raw.ancestry === undefined || raw.ancestry === null) return out;
+  const ancestry = sanitizeAncestry(raw.ancestry, lineage, raw.id);
+  if (!ancestry) return null;
+  return { ...out, ancestry };
 }
 
 /**
@@ -333,6 +352,87 @@ function sanitizeLineage(raw) {
     } else return null;
   }
   return { parents: [...parents], seed: raw.seed, mutations };
+}
+
+/**
+ * #2030 — one gene inside an ancestry summary: the ancestor's gene as it stood at the child's birth. The birth
+ * genes carry their value shapes (a Look must resolve, a drive must be in range, points must be in the box —
+ * the summary may not smuggle what the genome door would refuse); a gene this build does not know is kept
+ * verbatim when well-formed, the genome's own forward-compatibility rule.
+ */
+function sanitizeSummaryGene(g) {
+  if (!g || typeof g !== 'object' || Array.isArray(g)) return null;
+  if (typeof g.family !== 'string' || !FAMILY_RE.test(g.family)) return null;
+  if (typeof g.id !== 'string' || !GENE_ID_RE.test(g.id)) return null;
+  if (typeof g.source !== 'string' || !SOURCE_RE.test(g.source)) return null;
+  let value;
+  if (g.family === 'FORM' && g.id === 'body')
+    value = typeof g.value === 'string' && g.value && g.value.length <= 120 ? g.value : undefined;
+  else if (g.family === 'FORM' && g.id === 'head')
+    value = g.value === null ? null : isPt(g.value) ? cleanPt(g.value) : undefined;
+  else if (g.family === 'FORM' && (g.id === 'limbs' || g.id === 'joints')) value = cleanPts(g.value, 4) ?? undefined;
+  else if (g.family === 'LOOK' && g.id === 'look') value = isLookId(g.value) ? g.value : undefined;
+  else if (g.family === 'VOICE' && g.id === 'voice') value = isVoiceId(g.value) ? g.value : undefined;
+  else if (g.family === 'MATERIAL' && g.id === 'material')
+    value = g.value === null || typeof g.value === 'string' ? g.value : undefined;
+  else if (g.family === 'DRIVE') value = inDriveRange(g.value) ? g.value : undefined;
+  else return cleanExtraGene(g);
+  if (value === undefined) return null;
+  return { family: g.family, id: g.id, value, source: g.source };
+}
+
+/**
+ * #2030 — the ancestry door. The summary is a flat list, breadth-first: the record's three parents first (in
+ * lineage order), then deeper ancestors merged from the parents' own summaries, deduplicated by id. Each
+ * entry is an ancestor's identity, its genes at the child's birth, and its own parents' ids. An entry's
+ * parents may name ids with NO entry — the frontier: an ancestor bred before summaries existed names parents
+ * that were never retained; the tree renders those as stubs rather than inventing them. What the door holds:
+ * the first three entries ARE the lineage parents; ids are unique and never the record's own; a founder's
+ * entry has no parents, a bred one exactly three; and the parent graph among entries is acyclic — ancestry
+ * only ever points backwards. Tampered ancestry refuses the record whole, like any other field.
+ */
+function sanitizeAncestry(raw, lineage, selfId) {
+  if (!Array.isArray(raw) || raw.length < 3 || raw.length > MAX_ANCESTRY_ENTRIES) return null;
+  const entries = [];
+  const byId = new Map();
+  for (const e of raw) {
+    if (!e || typeof e !== 'object' || Array.isArray(e)) return null;
+    if (typeof e.id !== 'string' || !RECORD_ID_RE.test(e.id) || e.id === selfId || byId.has(e.id)) return null;
+    if (!Array.isArray(e.parents) || (e.parents.length !== 0 && e.parents.length !== 3)) return null;
+    if (!e.parents.every((p) => typeof p === 'string' && RECORD_ID_RE.test(p) && p !== e.id)) return null;
+    if (new Set(e.parents).size !== e.parents.length) return null;
+    if (!Array.isArray(e.genes) || e.genes.length === 0 || e.genes.length > MAX_RECORD_GENES) return null;
+    const genes = [];
+    const seenGenes = new Set();
+    for (const g of e.genes) {
+      const clean = sanitizeSummaryGene(g);
+      if (!clean) return null;
+      const k = `${clean.family}.${clean.id}`;
+      if (seenGenes.has(k)) return null; // a gene is one gene, in a summary as in a genome
+      seenGenes.add(k);
+      genes.push(clean);
+    }
+    const entry = { id: e.id, genes, parents: [...e.parents] };
+    entries.push(entry);
+    byId.set(entry.id, entry);
+  }
+  // the head of the list is the birth itself: the three parents, in the lineage's order
+  for (let i = 0; i < 3; i++) if (entries[i].id !== lineage.parents[i]) return null;
+  // acyclic among entries (frontier ids have no entry and end their walk there)
+  const mark = new Map(); // id -> 1 walking, 2 done
+  const walk = (id) => {
+    const e = byId.get(id);
+    if (!e) return true;
+    const m = mark.get(id) || 0;
+    if (m === 1) return false;
+    if (m === 2) return true;
+    mark.set(id, 1);
+    for (const p of e.parents) if (!walk(p)) return false;
+    mark.set(id, 2);
+    return true;
+  };
+  for (const e of entries) if (!walk(e.id)) return null;
+  return entries;
 }
 
 /** The project's record list: every entry re-validated, de-duplicated by id (first wins), capped (newest kept). */
