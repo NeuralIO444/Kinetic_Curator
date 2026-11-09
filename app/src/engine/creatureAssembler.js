@@ -308,6 +308,82 @@ export function sanitizeKeptWarnings(raw, rec) {
   return out;
 }
 
+/** #1872 — the outcomes a cultivation can record: the closed vocabulary of the integrity read. */
+export const CULTIVATION_OUTCOMES = Object.freeze(['viable', 'stillborn']);
+
+/**
+ * #1872 — the cultivation door: the note a CULTIVATE press leaves on a record (Simulate / Cultivate, the
+ * dry-run between assembling and injecting). The note says that the record was cultivated, under which seed
+ * (the codebase records provenance by seeds, never by clocks — a take is its seed, and the cultivation is
+ * stamped with the seed of the document it was performed in), what the integrity read concluded, and what
+ * the reads said: the registry's price of the body and the bank-catalogue warnings the record's own facts
+ * carry, in kept form.
+ *
+ * The discipline is `kept`'s: a closed vocabulary (an unknown outcome refuses), bounded (the warnings are
+ * the bank's list, capped by the same MAX_KEPT_WARNINGS), and cross-checked wherever the record itself
+ * carries the evidence. The outcome and the cost must tell one story — stillborn ⟺ no price, because the
+ * one stillbirth a record knows is a body that cannot be drawn (no tile can be built from it: bankCreature's
+ * 'nobody'), and an undrawable body has no registry price — and the warnings must be EXACTLY the set the
+ * record's facts derive: a cost entry exactly when the note's own score stands over the registry's line
+ * (its numbers the note's own), a skeleton entry exactly when the genome it rides carries the absence it
+ * names (keptWarningHolds). What the door cannot re-derive it states plainly, as with kept: the score's
+ * provenance is the cultivating surface's reading of the asset (a record carries no SVG), and the seed is
+ * provenance, held to shape only. Returns the canonical note, or null.
+ */
+export function sanitizeCultivation(raw, rec) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  if (!rec || typeof rec !== 'object') return null;
+  if (!Number.isInteger(raw.seed) || raw.seed < 0 || raw.seed > 0xffffffff) return null;
+  if (!CULTIVATION_OUTCOMES.includes(raw.outcome)) return null;
+  let cost = null;
+  if (raw.outcome === 'viable') {
+    const c = raw.cost;
+    if (!c || typeof c !== 'object' || Array.isArray(c)) return null;
+    if (!Number.isFinite(c.score) || c.threshold !== COST_WARNING_THRESHOLD) return null;
+    cost = { score: c.score, threshold: c.threshold };
+  } else if (raw.cost !== null && raw.cost !== undefined) return null;
+  // the warnings the note must carry, in the catalogue's order (cost first, then the skeleton) — derived
+  // from the record's own facts and the note's own cost read, nothing else
+  const expected = [];
+  if (cost && cost.score > COST_WARNING_THRESHOLD)
+    expected.push({ id: `cost:${rec.body}`, kind: 'cost', cost: { score: cost.score, threshold: cost.threshold } });
+  if (rec.head === null) expected.push({ id: 'skeleton:no-head', kind: 'skeleton', cost: null });
+  if (Array.isArray(rec.limbs) && rec.limbs.length === 0)
+    expected.push({ id: 'skeleton:no-limbs', kind: 'skeleton', cost: null });
+  if (!Array.isArray(raw.warnings) || raw.warnings.length > MAX_KEPT_WARNINGS) return null;
+  if (raw.warnings.length !== expected.length) return null;
+  const warnings = [];
+  for (let i = 0; i < expected.length; i++) {
+    const e = raw.warnings[i];
+    const want = expected[i];
+    if (!keptWarningHolds(e, rec)) return null;
+    if (e.id !== want.id || e.kind !== want.kind) return null;
+    if (want.kind === 'cost' && (e.cost.score !== want.cost.score || e.cost.threshold !== want.cost.threshold))
+      return null;
+    warnings.push(
+      want.kind === 'cost'
+        ? { id: want.id, kind: 'cost', cost: { score: want.cost.score, threshold: want.cost.threshold } }
+        : { id: want.id, kind: 'skeleton', cost: null },
+    );
+  }
+  return { seed: raw.seed, outcome: raw.outcome, cost, warnings };
+}
+
+/**
+ * #1872 — write a cultivation note onto a record: the record re-enters through its own door carrying the
+ * note, so what the store banks is exactly what a load would produce. Returns the clean record, or null
+ * when the record or the note is dishonest — the engine never writes a record its own door would not load
+ * (the assembler's rule for `kept`, kept here). Unlike `kept`, a cultivation may ride a bred record too:
+ * it is not an assembly claim but an act performed on the record as it stands, child or founder alike.
+ */
+export function withCultivation(record, note) {
+  const rec = sanitizeCreatureRecord(record);
+  if (!rec) return null;
+  const clean = sanitizeCultivation(note, rec);
+  if (!clean) return null;
+  return sanitizeCreatureRecord({ ...rec, cultivated: clean });
+}
+
 /**
  * Validate one record (document data). Returns a normalized copy carrying only the known fields, or null when the
  * record is absent or dishonest in any particular. The Look and Voice must resolve to the real decks.
@@ -357,18 +433,35 @@ export function sanitizeCreatureRecord(raw) {
     kept = sanitizeKeptWarnings(raw.kept, rec);
     if (!kept) return null;
   }
+  // #1872 — the cultivation note (Simulate / Cultivate): that this record was dry-run before injection,
+  // under which seed, and what the reads said. Validated against the record's own facts (sanitizeCultivation);
+  // a note that contradicts the record refuses it whole. Unlike kept, the note may ride a bred record —
+  // cultivating is an act on the record as it stands, not an assembly claim. A record never cultivated
+  // carries no field, so every record written before the dry-run existed loads byte-identical in shape.
+  let cultivated;
+  if (raw.cultivated !== undefined && raw.cultivated !== null) {
+    cultivated = sanitizeCultivation(raw.cultivated, rec);
+    if (!cultivated) return null;
+  }
   // #1852 — a bred child's lineage: its three parents, its seed, every mutation. Kept only when it is whole and honest;
   // a record with a malformed lineage is refused (a child that lies about its parents is not loaded half-true).
   if (raw.lineage === undefined || raw.lineage === null) {
     // #2030 — ancestry without a birth is a lie by shape: only a bred child retains ancestors.
     if (raw.ancestry !== undefined && raw.ancestry !== null) return null;
-    return { ...rec, look: raw.look, voice: raw.voice, genome, ...(kept && kept.length ? { kept } : {}) };
+    return {
+      ...rec,
+      look: raw.look,
+      voice: raw.voice,
+      genome,
+      ...(kept && kept.length ? { kept } : {}),
+      ...(cultivated ? { cultivated } : {}),
+    };
   }
   // #1871 — a bred record was never assembled, so warnings kept at an assembly cannot ride it: a lie by shape.
   if (kept && kept.length) return null;
   const lineage = sanitizeLineage(raw.lineage);
   if (!lineage || !lineageAgrees(lineage, { ...rec, genome })) return null;
-  const out = { ...rec, look: raw.look, voice: raw.voice, genome, lineage };
+  const out = { ...rec, look: raw.look, voice: raw.voice, genome, lineage, ...(cultivated ? { cultivated } : {}) };
   // #2030 — the retained ancestry rides a bred record (the Lineage Tree renders from it alone). A record bred
   // before summaries existed carries lineage and no ancestry: legal, and the tree shows its parents as stubs.
   if (raw.ancestry === undefined || raw.ancestry === null) return out;

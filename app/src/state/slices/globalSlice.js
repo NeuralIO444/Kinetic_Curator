@@ -49,7 +49,8 @@ import {
   isCreatureTile,
   recordIdOfTile,
   skeletonFounder,
-} from '../../engine/creatureAssembler.js'; // #1849 / #1850
+  withCultivation,
+} from '../../engine/creatureAssembler.js'; // #1849 / #1850, cultivation notes #1872
 import { dealBeastMeasures, beastTile } from '../../engine/beastTile.js'; // #1962
 import { sourceRecord, breedCreature, handEditRecord, BREED_PARENTS } from '../../engine/creatureBreed.js'; // #1852, hand edits #1870
 import { autoAttachPoints } from '../../engine/autoAttach.js'; // #1870 — a skeleton replace reads the body shape's points
@@ -441,6 +442,7 @@ export const createGlobalSlice = (set) => ({
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
+  creatureCultivateNote: null, // #1872 — what the last CULTIVATE did: { id, status: viable | stillborn | refused | no-record }. Session-only.
   customAssets: [],
   ingestError: null,
   /**
@@ -1106,6 +1108,26 @@ export const createGlobalSlice = (set) => ({
         creatureRecords: bank.map((r, i) => (i === at ? edited : r)),
         customAssets: standing ? overlay.map((a) => (a.id === tileId ? tile : a)) : [...overlay, tile],
         creatureGeneNote: { id: rec.id, status: edit && edit.action === 'mutate' ? 'mutated' : 'replaced' },
+      };
+    }),
+  /**
+   * #1872 — CULTIVATE: the wet lab's dry-run of one banked record, recorded on the record itself. The lab
+   * derives the note (components/cultivate.model.mjs — the registry's cost read, the bank's warnings, the
+   * integrity verdict, stamped with the project seed); this action only writes it, through the engine's
+   * withCultivation and the one door — a dishonest note refuses and changes nothing but the session note.
+   * The write touches the record alone: no tile is built, rebuilt or removed, nothing is enabled or placed
+   * — cultivate never injects, and the stage stays the real gate.
+   */
+  cultivateCreature: (recordId, note) =>
+    set((state) => {
+      const bank = state.creatureRecords || [];
+      const at = bank.findIndex((r) => r.id === recordId);
+      if (at < 0) return { creatureCultivateNote: { id: recordId, status: 'no-record' } };
+      const written = withCultivation(bank[at], note);
+      if (!written) return { creatureCultivateNote: { id: recordId, status: 'refused' } };
+      return {
+        creatureRecords: bank.map((r, i) => (i === at ? written : r)),
+        creatureCultivateNote: { id: recordId, status: written.cultivated.outcome },
       };
     }),
   /** #1849 — drop one assembled creature: its record and (#1850) its pool tile, together (dropCreature). */

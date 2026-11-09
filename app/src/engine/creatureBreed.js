@@ -349,6 +349,12 @@ export function handEditRecord(record, edit, env = {}) {
     if (still.length) candidate.kept = still;
     else delete candidate.kept;
   }
+  // #1872 — a cultivation note describes the creature exactly as it stood when it was dry-run; any hand
+  // edit makes a different creature of it, so the note retires with the edit rather than riding along as a
+  // stale read (or refusing the edit at the door when the resolved skeleton contradicts it). Nothing
+  // vanishes silently — the edited gene's hand: source records the act that retired it, and the performer
+  // cultivates the edited animal again if they want its note.
+  if (candidate.cultivated) delete candidate.cultivated;
   const clean = sanitizeCreatureRecord(candidate);
   if (!clean) return { record: null, refusal: 'door' };
   return { record: clean, refusal: null };
