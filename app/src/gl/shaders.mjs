@@ -876,17 +876,29 @@ void main() {
  * its comment carries the v-flip derivation). Out-of-frame samples
  * clamp to the edge texel (every frame target is CLAMP_TO_EDGE), so a
  * turned stratum's corners read the frame's edge, never garbage.
+ *
+ * The turn is computed in PIXEL space: u_res carries the write
+ * target's size, the centre offset is scaled to pixels before the
+ * matrix and scaled back after. In normalized UV the same matrix is
+ * not a rotation on a non-square frame — the axes squash by the
+ * aspect, so a 15° detent would land at ~10.6° on a 1000×700 stage
+ * and a 90° turn would not even preserve radius (QA finding on this
+ * rebuild; the pixel-space law is the one the CPU path,
+ * stratumRotation.rotatePoint, applies to content marks, and the
+ * strataRebuild selfcheck pins this shader's transcription against
+ * it on non-square frames).
  */
 export const ROT_COPY_FS = `#version 300 es
 precision highp float;
 uniform sampler2D u_src;
 uniform vec2 u_rot;
+uniform vec2 u_res;
 in vec2 v_cuv;
 out vec4 o;
 void main() {
-  vec2 c = v_cuv - 0.5;
+  vec2 c = (v_cuv - 0.5) * u_res;
   vec2 r = vec2(c.x * u_rot.x - c.y * u_rot.y, c.x * u_rot.y + c.y * u_rot.x);
-  o = texture(u_src, r + 0.5);
+  o = texture(u_src, r / u_res + 0.5);
 }`;
 
 /**

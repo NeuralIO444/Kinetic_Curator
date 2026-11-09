@@ -448,7 +448,7 @@ export const RENDERER_PROGRAMS = [
     fs: ROT_COPY_FS,
     vsFile: 'shaders.mjs:FULL_VS',
     fsFile: 'shaders.mjs:ROT_COPY_FS',
-    uniforms: ['u_src', 'u_rot'],
+    uniforms: ['u_src', 'u_rot', 'u_res'],
     cost: {
       tier: 0,
       memoryBytes: 1920 * 1080 * 8,
@@ -1028,6 +1028,18 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * CPU rotateItems performs (verified against a standalone GL
    * harness driving this exact shader + uniform pair through the
    * paint → turn → present chain).
+   *
+   * The turn itself is a PIXEL-SPACE rotation: u_res carries the
+   * destination size in px, the shader rotates pixel offsets about
+   * the centre and scales back — exactly the law
+   * stratumRotation.rotatePoint applies to content marks on stage
+   * pixels, so a texture-path stratum lands at the same angle and
+   * the same radius as a CPU-path stratum at the same detent, on
+   * any aspect. (The first build rotated normalized UV instead;
+   * on a non-square frame that squashes the angle — QA measured a
+   * 15° detent landing at 10.6° on a 1000×700 stage — and is not
+   * rigid at 90°. The strataRebuild selfcheck pins the shader's
+   * transcription against rotatePoint on non-square frames.)
    * Callers run this only while a rotation detent is non-zero, so the
    * unrotated frame never pays for it and stays byte-identical.
    */
@@ -1039,6 +1051,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.useProgram(rotcopyProg);
     gl.uniform1i(U(rotcopyProg, 'u_src'), bindTex(0, srcTex));
     gl.uniform2f(U(rotcopyProg, 'u_rot'), Math.cos(rad), Math.sin(rad));
+    gl.uniform2f(U(rotcopyProg, 'u_res'), dstTarget.w, dstTarget.h);
     drawFullscreen(rotcopyProg);
   }
 

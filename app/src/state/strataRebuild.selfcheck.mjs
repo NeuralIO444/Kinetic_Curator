@@ -28,6 +28,8 @@ import {
   rotateItems,
 } from './stratumRotation.js';
 import { buildSceneContract, assertSceneContract } from '../gl/sceneContract.js';
+import { ROT_COPY_FS } from '../gl/shaders.mjs';
+import { RENDERER_PROGRAMS } from '../gl/renderer.mjs';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -273,6 +275,102 @@ ok('the contract carries the detent on layer + wrap, and refuses a non-detent', 
   const badWrap = JSON.parse(JSON.stringify(scene));
   badWrap.fxWraps[0].rotation = 12;
   assert.throws(() => assertSceneContract(badWrap), /rotation is only ever a detent/);
+});
+
+// ROT_COPY_FS main(), transcribed 1:1 (the QA-fix form): given an
+// OUTPUT stage pixel (x, y — stage space, y down) on a w×h frame, the
+// SOURCE stage pixel the shader samples. Stage ↔ UV flips y
+// (v = 1 − stageY/h); the shader scales the centre offset to pixels
+// by u_res = (w, h), applies the (cos, sin) matrix, scales back.
+function rotCopySample(x, y, w, h, deg) {
+  const rad = (deg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const cuvX = x / w - 0.5;
+  const cuvY = 1 - y / h - 0.5;
+  const cx = cuvX * w;
+  const cy = cuvY * h;
+  const rx = cx * cos - cy * sin;
+  const ry = cx * sin + cy * cos;
+  return { x: (rx / w + 0.5) * w, y: (1 - (ry / h + 0.5)) * h };
+}
+const nearPt = (a, b, eps = 1e-6) => Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps;
+
+ok('rotcopy shader form: the turn is pixel-space and u_res is uploaded (QA fix)', () => {
+  assert.match(ROT_COPY_FS, /uniform vec2 u_res;/, 'the shader declares u_res');
+  assert.match(ROT_COPY_FS, /\(v_cuv - 0\.5\) \* u_res/, 'centre offsets scale to pixels before the matrix');
+  assert.match(ROT_COPY_FS, /r \/ u_res \+ 0\.5/, 'the turned offset scales back after the matrix');
+  const def = RENDERER_PROGRAMS.find((d) => d.key === 'rotcopy');
+  assert.ok(def.uniforms.includes('u_res'), 'the rotcopy upload list carries u_res');
+});
+
+ok('rotcopy transcription: texture-path landings match rotatePoint on non-square frames (QA fix)', () => {
+  // The law: a mark at stage pixel p, turned by a detent through the
+  // texture path, lands where the CPU law (rotatePoint) puts it —
+  // same angle, same radius, any aspect. Asserted in the sampling
+  // direction: the output pixel at rotatePoint(p) samples p.
+  for (const [w, h] of [
+    [200, 100],
+    [1000, 700],
+  ]) {
+    const c = { x: w / 2, y: h / 2 };
+    const probes = [
+      { x: c.x + 100, y: c.y }, // QA's probe: 100px right of centre
+      { x: c.x, y: c.y - 80 }, // above centre
+      { x: c.x + 37, y: c.y - 82 }, // an arbitrary diagonal
+      { x: c.x - 123, y: c.y + 45 },
+    ];
+    for (const deg of [15, 45, 90]) {
+      for (const p of probes) {
+        const land = rotatePoint(p.x, p.y, c.x, c.y, deg);
+        const sampled = rotCopySample(land.x, land.y, w, h, deg);
+        assert.ok(
+          nearPt(sampled, p),
+          `${w}×${h} @${deg}°: output at rotatePoint(${p.x},${p.y}) samples (${sampled.x.toFixed(3)},${sampled.y.toFixed(3)}), expected (${p.x},${p.y})`,
+        );
+        // Radius is preserved by the turn (the normalized-UV form was
+        // not rigid at 90° on a non-square frame).
+        const r0 = Math.hypot(p.x - c.x, p.y - c.y);
+        const r1 = Math.hypot(land.x - c.x, land.y - c.y);
+        assert.ok(Math.abs(r1 - r0) <= 1e-9, `${w}×${h} @${deg}°: radius ${r0} → ${r1}`);
+      }
+      // QA's headline numbers, exactly: 100px right of centre on
+      // 1000×700 lands AT the detent angle (not 10.6° / 35°).
+      if (w === 1000) {
+        const land = rotatePoint(c.x + 100, c.y, c.x, c.y, deg);
+        const ang = (Math.atan2(land.y - c.y, land.x - c.x) * 180) / Math.PI;
+        assert.ok(Math.abs(ang - deg) <= 1e-9, `@${deg}°: landing angle is ${ang}°`);
+        assert.ok(
+          nearPt(rotCopySample(land.x, land.y, w, h, deg), { x: c.x + 100, y: c.y }),
+          `@${deg}°: the shader samples the mark's home pixel`,
+        );
+      }
+    }
+  }
+});
+
+ok('rotcopy sandwich: seed −θ then turn back +θ leaves picture geometry untouched (QA fix)', () => {
+  // The FX/MATH wrap and the finish chains run rotateCopy(−θ) into the
+  // effect frame and rotateCopy(+θ) back out. Composed in the sampling
+  // direction (final(p) = seed(sample(p, +θ)), seed(q) =
+  // frame(sample(q, −θ))) the pair must be the identity.
+  for (const [w, h] of [
+    [200, 100],
+    [1000, 700],
+  ]) {
+    const probes = [
+      { x: w / 2 + 100, y: h / 2 },
+      { x: w / 2 - 40, y: h / 2 + 130 },
+      { x: 13, y: 7 },
+    ];
+    for (const deg of [15, 45, 90]) {
+      for (const p of probes) {
+        const inner = rotCopySample(p.x, p.y, w, h, deg);
+        const back = rotCopySample(inner.x, inner.y, w, h, -deg);
+        assert.ok(nearPt(back, p), `${w}×${h} @${deg}°: sandwich returns (${back.x},${back.y}), expected (${p.x},${p.y})`);
+      }
+    }
+  }
 });
 
 ok('a pattern layer is never the active layer and spends no content slot at the door', () => {
