@@ -442,8 +442,8 @@ assert.ok(
 );
 assert.strictEqual(
   ASSETS.length,
-  602 + (26 + 17 + 52 + 4) + 52,
-  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005)',
+  602 + (26 + 17 + 52 + 4) + 52 + 24,
+  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005) + 24 riso icons (#2008)',
 );
 for (const a of [...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS]) {
   assert.ok(ASSETS.some((x) => x.id === a.id), `${a.id}: resolves in the catalogue`);

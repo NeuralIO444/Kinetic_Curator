@@ -90,16 +90,26 @@ const recs = poolDescriptors(ASSETS);
 // packs, by id).
 // #2005 RE-PIN (cause: the clean plate) — the exclusion grows by exactly
 // the plate pack (Fraunces); the assertion's meaning is unchanged.
+// #2008 RE-PIN (cause: the riso glyph expansion) — the exclusion grows by
+// exactly the composed riso icon set; the assertion's meaning is unchanged
+// (the exclusion is exactly the FIELD-dealt packs, by id).
 const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
 const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
 const { ASSETS_LATIN } = await import('../data/assets/assets-latin.js');
 const { ASSETS_SERIF } = await import('../data/assets/assets-serif.js');
 const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
 const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
+const { ASSETS_RISO } = await import('../data/assets/assets-riso.js');
 const kanaIds = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_PLATE].map(
-    (k) => k.id,
-  ),
+  [
+    ...ASSETS_KANA,
+    ...ASSETS_KANJI,
+    ...ASSETS_LATIN,
+    ...ASSETS_SERIF,
+    ...ASSETS_ORNAMENTS,
+    ...ASSETS_PLATE,
+    ...ASSETS_RISO,
+  ].map((k) => k.id),
 );
 const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));
 assert.equal(recs.length, poolVisible.length);

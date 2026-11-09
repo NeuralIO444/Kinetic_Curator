@@ -178,6 +178,8 @@ function makeFxBridge(gl) {
 ok('all template kinds are declared', () => {
   // Re-pinned for #1610: dither joins the template registry as EF-4's
   // Bayer finish (the Phase-2 five plus sharpen/haze/halo/grade before it).
+  // Re-pinned for #2008 (cause: the riso overprint finish registers as a
+  // template effect, its GLSL living in engine/risoFinish.mjs).
   assert.deepEqual([...FX_SHADER_KINDS].sort(), [
     'displace',
     'dither',
@@ -185,6 +187,7 @@ ok('all template kinds are declared', () => {
     'grade',
     'halo',
     'haze',
+    'riso',
     'scanlines',
     'sharpen',
     'solarize',

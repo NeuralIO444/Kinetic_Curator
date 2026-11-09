@@ -169,8 +169,8 @@ assert.deepEqual(
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
   assert.equal(
     ASSETS.length,
-    753,
-    'the library is 753: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces), which CHAPTER_UNDEALT keeps out of every deck',
+    777,
+    'the library is 777: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces) + #2008’s 24 composed riso icons, which CHAPTER_UNDEALT keeps out of every deck',
   );
 }
 

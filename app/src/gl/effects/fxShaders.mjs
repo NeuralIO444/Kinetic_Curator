@@ -43,6 +43,7 @@
  */
 
 import { sanitizeParams, getTemplateEffect, registerTemplateEffect } from './template.mjs';
+import { RISO_GLSL } from '../../engine/risoFinish.mjs'; // #2008 — the riso finish's GPU mirror (law + CPU reference beside it)
 import { chunksUsedBy } from './chunks.mjs';
 import { registerCostTier } from '../costTiers.mjs';
 
@@ -287,6 +288,40 @@ export const FX_DITHER_DESCRIPTOR = {
       def: 0.5,
       ui: 'slider',
       hint: 'How far the one-bit cut takes over. 0 is the layer untouched; 1 is the full one-bit weave.',
+    },
+  },
+};
+
+// #2008 — RISO OVERPRINT (EF-4 Finish, grain family): the shader body is
+// engine/risoFinish.mjs's RISO_GLSL (the finish's law lives with its CPU
+// reference; the selfcheck pins the two mirrors' constants equal). Two taps:
+// the frame and itself misregistered by u_shift px down-right, multiplied in
+// straight space, alpha untouched. Amount 0 returns the source byte-for-byte.
+export const FX_RISO_DESCRIPTOR = {
+  label: 'Riso Overprint',
+  hint: 'Risograph finish over the whole frame: a second ink pass, misregistered by the shift detent, multiplying where the passes overlap. Amount 0 is the frame untouched.',
+  pad: 0,
+  animated: false,
+  params: {
+    amount: {
+      type: 'float',
+      label: 'Amount',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      def: 0,
+      ui: 'slider',
+      hint: 'How hard the second pass prints. 0 is off — the frame byte-identical.',
+    },
+    shift: {
+      type: 'int',
+      label: 'Shift',
+      min: 0,
+      max: 4,
+      step: 1,
+      def: 2,
+      ui: 'slider',
+      hint: 'Misregistration in pixels (detents 0–4), down-right — the press drift.',
     },
   },
 };
@@ -695,6 +730,20 @@ export const FX_SHADER_EFFECTS = [
       descriptor: FX_DITHER_DESCRIPTOR,
       file: 'fxShaders.mjs:dither',
       cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU Bayer threshold, no taps' },
+    },
+  ],
+  [
+    'riso',
+    {
+      fs: RISO_GLSL,
+      descriptor: FX_RISO_DESCRIPTOR,
+      file: 'risoFinish.mjs:RISO_GLSL',
+      cost: {
+        tier: 3,
+        memoryBytes: 1920 * 1080 * 8,
+        timeMs: 0.25,
+        notes: '2 taps (frame + misregistered self), multiply in straight space',
+      },
     },
   ],
   [

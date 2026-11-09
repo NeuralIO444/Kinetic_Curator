@@ -599,7 +599,10 @@ const centreIn = (item, [zx0, zy0, zx1, zy1]) => item.x >= zx0 && item.x <= zx1 
 // ── Poem-only: catalogue yes, authored bake no, panel no ─────────────────
 assert.strictEqual(ASSETS_AUTHORED.length, 312, 'the authored bake is untouched');
 assert.ok(!ASSETS_PLATE.some((a) => ASSETS_AUTHORED.includes(a)), 'no plate stamp is authored content');
-assert.strictEqual(ASSETS.length, 701 + 52, 'the catalogue arithmetic: 701 + 52 plate stamps');
+// #2008 RE-PIN (cause: the riso glyph expansion): the composed riso icon set (24) joins the
+// catalogue on the plate pack's road — the sum grows by exactly the set; the riso suites own
+// their containment pins.
+assert.strictEqual(ASSETS.length, 701 + 52 + 24, 'the catalogue arithmetic: 701 + 52 plate stamps + 24 riso icons (#2008)');
 for (const a of ASSETS_PLATE) {
   assert.ok(ASSETS.some((x) => x.id === a.id), `${a.id}: resolves in the catalogue`);
   assert.ok(CHAPTER_UNDEALT.includes(a.id), `${a.id}: chapter-undealt`);
