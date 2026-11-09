@@ -27,6 +27,7 @@ import { setMindTap, getMindSystem } from '../curator/mindLive.js';
 import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route outcomes ride in the take
 import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
+import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
 import { on, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
@@ -145,6 +146,20 @@ const gesturesSection = (getFrame, glLoopRef) => {
   };
 };
 
+// #2037 — the take carries its KINETIC births (every resolved roll: the attempt, and the child whole
+// when one was born), stored as `births`: keeping the take banks its children through the bank's own
+// door, so the section is what makes ruling 5 provable from the take alone.
+const birthsSection = (getFrame) => {
+  const rec = createBirthRecorder({ getFrame });
+  setBirthTap((e) => rec.update(e));
+  return {
+    stop() {
+      setBirthTap(null);
+      return rec.finish();
+    },
+  };
+};
+
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
 // stage), stored as `mind`: playback re-publishes these and never asks a backend.
 const mindSection = (getFrame) => {
@@ -219,6 +234,7 @@ export function PerformanceButton() {
             spectrum: spectrumSection,
             routes: routesSection,
             gestures: gesturesSectionForTake,
+            births: birthsSection,
           },
         })
       ) {
@@ -229,7 +245,13 @@ export function PerformanceButton() {
     }
     setRecording(false);
     const take = await stopPerformance();
-    if (take) setSaveNote(await saveTake(take.bytes, take.filename));
+    if (take) {
+      // #2037 ruling 5 — stopping is the keep: the take is saved, so the children born in it bank
+      // through the bank's own door (bankStageBirths). A take with no births banks nothing.
+      const born = birthRecordsFromSection(take.perf && take.perf.births);
+      if (born.length) useStore.getState().bankStageBirths(born);
+      setSaveNote(await saveTake(take.bytes, take.filename));
+    }
   };
 
   return (
