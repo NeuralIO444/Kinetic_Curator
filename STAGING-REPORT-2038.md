@@ -61,7 +61,7 @@ Every restore door (project files, autosave, bundles, recipe stacks, takes) funn
 **Proof (selfchecks, fixtures are pre-rebuild-shaped):**
 
 - `state/strataRebuild.selfcheck.mjs` (new, 14 checks): two-content fixture keeps the first, names the second in trims; parseProject receipt carries `layerTrims`; an interleaved stack re-seats patterns to the bottom.
-- `projectDocument.selfcheck`: the #456 patch fixture's target trims by name (`layerTrims = ['content stratum "Beta"']`) and the patch row survives inert; a legacy 4-content Look loads as the first stratum only, trims naming Beta/Gamma/Delta.
+- `projectDocument.selfcheck`: the #456 patch fixture's target trims by name (`layerTrims = ['content stratum "B"']`) and the patch row survives inert; a legacy 4-content Look loads as the first stratum only, trims naming Beta/Gamma/Delta (those names belong to the legacy-Look fixture, not the #456 one).
 - `busChain.selfcheck` (14 checks): the recorded session fixture (PT-1/KC-1/FX 1/KC-2/M 1) loads migrated to `[PT-1, KC-1, FX 1, M 1]`, KC-1's patch survives, the stale KC-2 patch sanitizes inert.
 - `recipeStack.selfcheck` (10 checks): a two-content carrier compacts to a stack holding one content stratum — the first — with no snapshot for the trimmed track.
 
@@ -114,3 +114,11 @@ The first committed version sampled with the pair `(cos, −sin)`, which turns t
 - Canon (#2044–#2049), top-bar legibility (#2050), Studio Assistant: linkage only, no build scope, per the issue's comments and the lane ruling.
 - Field-mod / CHIAROSCURO editor (ruling 3).
 - `MAX_FX_EFFECTS` / `MAX_MATH_OPS` ceilings; package.json (selfcheck registration went in the manifest, per repo AGENTS.md).
+
+## 8. QA-fix addendum (post-QA, two findings fixed on top)
+
+Independent QA passed the build's claims but measured two real defects; both are fixed in commits on top of the staging head (`a8057670`, `511f3ecf`), without rewriting history.
+
+1. **GL rotation turned in normalized UV, not stage pixels** (`a8057670`). `ROT_COPY_FS` rotated `v_cuv − 0.5` with no aspect term, so texture-path strata (pattern composite turn, FX/MATH wrap seed/turn-back, finish chains) delivered a squashed angle: QA measured a mark 100px right of centre on a 1000×700 stage landing at 10.6° for the 15° detent, 35° for 45°, and non-rigid radii at 90°. Direction was correct (QA re-derived it); only angle/radius fidelity was wrong. Fix, as QA specified: the shader now rotates pixel-space offsets — `c = (v_cuv − 0.5) * u_res`, the same (cos, sin) matrix, sample at `r / u_res + 0.5` — with `u_res` added to the rotcopy upload list and `rotateCopy` passing `dstTarget.w/h`. The renderer/shader comments now state the pixel-space law. Pinned in `strataRebuild` (3 new checks, 17 total): a 1:1 JS transcription of the shader asserts landings against `stratumRotation.rotatePoint` at 15/45/90 on 200×100 and 1000×700 frames with radius preserved, and the −θ/+θ sandwich composes to the identity (picture geometry untouched); the transcription was verified to reject the old formula (8–43px misses on QA's probe).
+
+2. **The ROTATE row's slider editor offered values the data law silently erases** (`511f3ecf`). The open editor was a `SliderEditor` (0–90, step 15) that also offers 30/60/75; those hit `sanitizeStratumRotation` → 0 and delete the rotation key. The detents are non-uniform, so no slider step can offer only detents. Fix: the open editor is the `StepperEditor` fed `stops={STRATUM_ROTATIONS}` — −/+ move to the adjacent detent via the new `steppedStopValue` in `modeStops.mjs` (clamped at the ends; an off-stop value lands on the first stop in the step direction; the stepper's uniform-step behaviour without stops is unchanged). Pinned in `layerRows` (2 new checks, 7 total): stepping from 0 walks exactly `STRATUM_ROTATIONS`, the old slider's 30/60/75 land on detents, and source pins hold the ROTATE block to the detent stepper with no `SliderEditor` left on the row.
