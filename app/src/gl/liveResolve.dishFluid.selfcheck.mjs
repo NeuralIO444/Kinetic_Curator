@@ -19,10 +19,17 @@
 //                   fluid-bias rider, and a fresh resolver restored from it continues
 //                   bit-identically — full frames, attached body included; checkResolverSnapshot
 //                   accepts the genuine keys and refuses malformed fluid / rider shapes
+//   vocabulary      on a stage with nothing dealt (a swarm layer with no particles), the body
+//                   is dealt from the stage's own asset pool — every shape a real pool asset,
+//                   the vocabulary wider than the marks chapter (letters/stamps ride the
+//                   pool), and the poem-only alphabets never appear (not pool assets)
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { ASSETS } from '../data/assets/index.js';
+import { ASSETS_KANA } from '../data/assets/assets-kana.js';
+import { ASSETS_KANJI } from '../data/assets/assets-kanji.js';
 import { quietStamp } from '../engine/dishLifeQuiet.mjs';
 import { fluidStamp } from '../engine/dishFluid.mjs';
 import { isFluidMatter } from '../engine/dishFluidRender.mjs';
@@ -257,6 +264,39 @@ const N = 60;
   );
   a.dispose();
   b.dispose();
+}
+
+// 5. vocabulary: nothing dealt → the body is dealt from the stage's own pool
+{
+  const r = createLiveResolver();
+  let layers = null;
+  for (let f = 0; f < 30; f++) {
+    const t = f * DT;
+    layers = r.resolveLayers(
+      baseInput({
+        loopTimeMs: t,
+        dtSec: DT / 1000,
+        layoutParams: lp({ mode: 'swarm', count: 0, particleCount: 0 }),
+        dishFluid: fluidStamp(t, { shed: 0 }),
+        dishFluidMagnets: MAGNETS,
+        dishFluidDial: { flow: 0.5, pull: 0.7, couple: 0 },
+      }),
+    );
+  }
+  const matter = layers.flatMap((e) => (Array.isArray(e?.items) ? e.items.filter(isFluidMatter) : []));
+  assert.ok(matter.length > 20, `an empty stage still grows the body from the pool (${matter.length} items)`);
+  const poolIds = new Set(ASSETS.map((a) => a.id));
+  for (const it of matter) assert.ok(poolIds.has(it.assetId), `body shape ${it.assetId} is a pool asset`);
+  assert.ok(
+    matter.some((it) => !String(it.assetId).startsWith('mrk_')),
+    'the vocabulary is wider than the marks chapter — letters and stamps ride the pool',
+  );
+  const poemOnly = new Set([...ASSETS_KANA, ...ASSETS_KANJI].map((a) => a.id));
+  assert.ok(
+    matter.every((it) => !poemOnly.has(it.assetId)),
+    'poem-only stamps never appear — they are not pool assets',
+  );
+  r.dispose();
 }
 
 console.log('liveResolve.dishFluid.selfcheck: ok');

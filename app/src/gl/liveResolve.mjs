@@ -825,6 +825,10 @@ export function createLiveResolver() {
     // #1469 — this frame's living-motion read, published at the end of the resolve (getLastFrameMotion).
     let frameKineme = null;
     let frameWind = null;
+    // #1997 — the top content layer's dealt pool, recorded per content layer below (the last
+    // one recorded is the top): the ferrofluid body's vocabulary on a stage with no dealt
+    // marks to wear — any pool asset shape, letterforms included (Matt's ruling, 2026-11-08).
+    let fluidPoolIds = null;
     const aliveIds = new Set();
     // #450 — every layer id present in the document, regardless of
     // visibility. See prune()'s warpPhase branch for why this differs
@@ -1034,6 +1038,10 @@ export function createLiveResolver() {
         const dropped = new Set(ranked.slice(0, drop).map((a) => a.id));
         activeAssets = activeAssets.filter((a) => !dropped.has(a.id));
       }
+      // #1997 — this layer's dealt pool (the dealer's exclusions and this layer's enabled
+      // set already applied) is the fluid body's no-marks vocabulary; content layers record
+      // in stack order, so the top content layer's pool is what stands at the bottom.
+      fluidPoolIds = activeAssets.map((a) => a.id);
       const safeCount = clampCount(layoutParams.count, layoutParams.mirror, caps);
       const safeParticles = Math.min(Math.max(0, layoutParams.particleCount || 150), caps.maxParticles);
       const seed = (src.seed ?? 0) >>> 0;
@@ -1702,8 +1710,11 @@ export function createLiveResolver() {
     // #1997 — the ATTACHED BODY: the system is invisible (Matt's ruling, 2026-11-08), so the
     // ferrofluid appears as ordinary asset items seated on the exact instance's published
     // density (engine/dishFluidRender.mjs), riding the TOP content layer after the culture's
-    // draw — added to it, never taking a mark's place (the quiet specks' discipline). No plan
-    // (fluid off) = no items, and the frame is byte-identical to a build without this block.
+    // draw — added to it, never taking a mark's place (the quiet specks' discipline). Its
+    // vocabulary is the stage's own: dealt marks worn nearest-first, or — on a stage with
+    // nothing dealt — the top content layer's dealt pool (poolIds: any pool asset shape,
+    // letterforms and stamps included). No plan (fluid off) = no items, and the frame is
+    // byte-identical to a build without this block.
     if (fluidScene && dishFluid.plan.active) {
       const content = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
       if (content.length) {
@@ -1715,6 +1726,7 @@ export function createLiveResolver() {
           paletteInk: fluidScene.marks.length
             ? null
             : resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes).ink,
+          poolIds: fluidPoolIds,
         });
         if (matter.length) top.items = top.items.filter((it) => !isFluidMatter(it)).concat(matter);
       }

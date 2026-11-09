@@ -8,8 +8,10 @@
 //                PULL cannot create matter where the field is thin (no density, no seat)
 //   D governed   the cap binds at saturation; the rung's matter fraction scales the body;
 //                a coarser seat grid seats on the coarser centres
-//   E fallback   with no dealt marks to wear, the body is the pool's primitive shapes in the
-//                palette's ink, dealt from the seeded stream (same plan = same body)
+//   E fallback   with no dealt marks to wear, the body is dealt from the stage's asset pool —
+//                any pool shape, letterforms and stamps included — in the palette's ink, from
+//                the seeded stream (same plan = same body); no pool supplied = the module's
+//                seed shapes; an explicitly empty pool seats no body at all
 import assert from 'node:assert/strict';
 import {
   fluidMatterItems,
@@ -247,20 +249,46 @@ const nearMagnet = (items, mx, my, r) =>
   }
 }
 
-// ---- E: the primitive fallback
+// ---- E: the no-marks deal — the stage's whole pool is the vocabulary (letters included)
 {
   const blob = densityOf((nx, ny) => ((nx - 0.3) ** 2 + ((ny - 0.4) * 0.7) ** 2 <= 0.02 ? 0.9 : 0));
-  const items = fluidMatterItems(planOf({ density: blob }), [], { canvasW: W, canvasH: H, paletteInk: '#e8e0cc' });
-  assert.ok(items.length > 20, 'an empty stage still grows a body of primitives');
+  // real pool ids: a mark, a letterform (assets-letterforms), a stamp (assets-stamp-radial)
+  const POOL = ['mrk_dots_01', 'typ_3', 'stamp_num_02', 'mrk_ring_01'];
+  const items = fluidMatterItems(planOf({ density: blob }), [], {
+    canvasW: W,
+    canvasH: H,
+    paletteInk: '#e8e0cc',
+    poolIds: POOL,
+  });
+  assert.ok(items.length > 20, 'an empty stage still grows a body from the pool');
   for (const it of items) {
-    assert.ok(FLUID_PRIMITIVE_ASSETS.includes(it.assetId), 'fallback items wear primitive pool shapes');
-    assert.equal(it.color, '#e8e0cc', 'fallback items wear the palette ink');
+    assert.ok(POOL.includes(it.assetId), 'pool-dealt items wear pool shapes only');
+    assert.equal(it.color, '#e8e0cc', 'pool-dealt items wear the palette ink');
   }
-  assert.deepEqual(
-    fluidMatterItems(planOf({ density: blob }), [], { canvasW: W, canvasH: H, paletteInk: '#e8e0cc' }),
-    items,
-    'the fallback deal is seeded: same plan = same body',
+  assert.ok(
+    items.some((it) => it.assetId === 'typ_3'),
+    'letterforms are seatable matter',
   );
+  assert.ok(
+    items.some((it) => it.assetId === 'stamp_num_02'),
+    'stamps are seatable matter',
+  );
+  assert.deepEqual(
+    fluidMatterItems(planOf({ density: blob }), [], { canvasW: W, canvasH: H, paletteInk: '#e8e0cc', poolIds: POOL }),
+    items,
+    'the pool deal is seeded: same plan = same body',
+  );
+  assert.deepEqual(
+    fluidMatterItems(planOf({ density: blob }), [], { canvasW: W, canvasH: H, poolIds: [] }),
+    [],
+    'an explicitly empty pool seats no body — nothing lawful to wear',
+  );
+  // no pool supplied at all: the module's seed shapes (the pure-caller default)
+  const seeded = fluidMatterItems(planOf({ density: blob }), [], { canvasW: W, canvasH: H, paletteInk: '#e8e0cc' });
+  assert.ok(seeded.length > 20, 'a pool-less caller still grows a body of seed shapes');
+  for (const it of seeded) {
+    assert.ok(FLUID_PRIMITIVE_ASSETS.includes(it.assetId), 'seed-default items wear the seed shapes');
+  }
 }
 
 // seatDensity: identity at the dish grid (a copy), honest averages below it

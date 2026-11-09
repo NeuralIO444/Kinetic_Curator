@@ -15,9 +15,12 @@
 //   THE STAGE'S OWN SHAPES — each seated cell wears the NEAREST dealt mark (asset, colour,
 //   tier, every field it carries), the cultureItems discipline: the body reads as the
 //   performer's own shapes gathered by the field, any asset shape at all. On a stage with no
-//   dealt marks to wear, the body falls back to the pool's primitive shapes (dots, a ring, a
-//   pit — the Marks chapter's seed vocabulary), dealt per cell from the seeded stream and
-//   coloured with the palette's ink.
+//   dealt marks to wear, the body is dealt from the stage's own ASSET POOL — any pool asset
+//   shape, letterforms and stamps included (Matt's ruling, 2026-11-08) — which the resolver
+//   passes in as the top content layer's dealt pool, the dealer's own exclusions already
+//   applied (the creature citizen and the poem-only sets are not pool assets and never
+//   appear). Dealt per cell from the seeded stream, coloured with the palette's ink. Only a
+//   caller that supplies no pool at all gets the module's seed shapes (FLUID_PRIMITIVE_ASSETS).
 //
 //   BOUNDED + GOVERNED — at most MAX_FLUID_ITEMS items at full matter, strongest first
 //   (score, then cell index), so the cut is deterministic; the governor's ladder spends the
@@ -39,9 +42,10 @@ export const MATTER_CELL_RADIUS = 0.6;
 /** Scale of a barely-seated item (at the density floor) relative to a saturated one. */
 export const MATTER_SCALE_MIN = 0.45;
 /**
- * The fallback shape vocabulary when the stage holds no dealt marks to wear: the pool's
- * primitive dots / ring / pit from the Marks chapter. Any pool asset id is safe here — the
- * loop bakes atlas cells for the combos the contract actually uses, on demand.
+ * The module's seed shape vocabulary (the Marks chapter's primitive dots / ring / pit), worn
+ * only by a caller that supplies no pool vocabulary of its own — the live resolver always
+ * passes the stage's pool (see fluidMatterItems' poolIds). Any pool asset id is safe as
+ * matter — the loop bakes atlas cells for the combos the contract actually uses, on demand.
  */
 export const FLUID_PRIMITIVE_ASSETS = Object.freeze(['mrk_dots_01', 'mrk_ring_01', 'mrk_pit_01']);
 
@@ -86,15 +90,21 @@ export function seatDensity(density, seatCols, seatRows) {
  * The attached body for one frame.
  *   plan — the fluid stage's attachment plan: { active, seedKey, density (dish grid), magnets,
  *          dial: { pull, … }, seatCols, seatRows, matterFrac, aspectHW }
- *   marks — the stage's dealt marks (the shapes the body wears; empty = the primitive fallback)
+ *   marks — the stage's dealt marks (the shapes the body wears; empty = the pool deal below)
  *   opts — { canvasW, canvasH, blocked (dish-grid Uint8Array of bedrock cells, or null),
- *            paletteInk (hex for the fallback shapes) }
+ *            paletteInk (hex for the pool-dealt shapes), poolIds (the stage's asset-pool
+ *            vocabulary for the no-marks deal — any pool asset id, letterforms and stamps
+ *            included; null = the module's seed shapes; [] = no vocabulary, no body) }
  * Seats exist only where the field runs dense (≥ MATTER_DENSITY_FLOOR after seat averaging),
  * never on a blocked (bedrock) cell, never outside the dish. Scores weight density by the
  * magnet field × PULL, so raising PULL gathers the body at the magnets — but PULL cannot
  * create matter where the field is thin: no density, no seat, at any dial.
  */
-export function fluidMatterItems(plan, marks, { canvasW, canvasH, blocked = null, paletteInk = null } = {}) {
+export function fluidMatterItems(
+  plan,
+  marks,
+  { canvasW, canvasH, blocked = null, paletteInk = null, poolIds = null } = {},
+) {
   if (!plan || !plan.active || !plan.density || plan.density.length !== FLUID_GRID_COLS * FLUID_GRID_ROWS) return [];
   const W = Number(canvasW) || 0;
   const H = Number(canvasH) || 0;
@@ -136,6 +146,15 @@ export function fluidMatterItems(plan, marks, { canvasW, canvasH, blocked = null
   const liveScale = (MATTER_CELL_RADIUS * Math.min(cw, ch)) / (MARK_FRAC * short);
   const validMarks = Array.isArray(marks) ? marks.filter((m) => m && Number.isFinite(m.x) && Number.isFinite(m.y)) : [];
   const wear = validMarks.length > 0;
+  // The no-marks vocabulary: the stage's own pool when the caller supplies it (any pool
+  // shape), the module's seed shapes when it doesn't. An explicitly empty pool is an empty
+  // vocabulary — the performer emptied the pool, so there is nothing lawful to seat.
+  const vocab = wear
+    ? null
+    : Array.isArray(poolIds)
+      ? poolIds.filter((id) => typeof id === 'string' && id.length > 0)
+      : FLUID_PRIMITIVE_ASSETS;
+  if (!wear && vocab.length === 0) return [];
   const seedKey = plan.seedKey >>> 0;
   const out = new Array(chosen.length);
   for (let k = 0; k < chosen.length; k++) {
@@ -168,11 +187,9 @@ export function fluidMatterItems(plan, marks, { canvasW, canvasH, blocked = null
         key: `fluid:${c.i}`,
       };
     } else {
-      const pick =
-        Math.floor(hashU01(seedKey, FLUID_CHANNEL, 300000 + c.i) * FLUID_PRIMITIVE_ASSETS.length) %
-        FLUID_PRIMITIVE_ASSETS.length;
+      const pick = Math.floor(hashU01(seedKey, FLUID_CHANNEL, 300000 + c.i) * vocab.length) % vocab.length;
       out[k] = {
-        assetId: FLUID_PRIMITIVE_ASSETS[pick],
+        assetId: vocab[pick],
         x,
         y,
         scale,

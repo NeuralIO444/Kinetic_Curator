@@ -285,9 +285,28 @@ density reaches the floor and the cell is not bedrock: the score is density × (
 magnet field), the strongest seats win up to the governed cap, and **each seat wears the
 nearest dealt mark** — the item is a copy of that mark (asset, colour, accent, scale, the
 full spread) shrunk toward the cell and faded by the density under it, so the body reads in
-the stage's own look, palette and deal. Where nothing is dealt, the body falls back to the
-primitive vocabulary (`FLUID_PRIMITIVE_ASSETS`: `mrk_dots_01`, `mrk_ring_01`, `mrk_pit_01`)
-in the frame palette's ink, hash-seated — the instrument's building blocks, never a texture.
+the stage's own look, palette and deal. Where nothing is dealt, the body is dealt from the
+stage's own asset pool in the frame palette's ink, hash-seated — see the vocabulary note
+below.
+
+### Vocabulary ruling (Matt, 2026-11-08, later the same day)
+
+Matt ruled the attached matter's vocabulary is **any pool asset shape, letters included** —
+not restricted to dots/circles/primitives. The wear path already complied (any dealt mark,
+of any shape, is worn nearest-first). The no-marks deal did not: it drew only the Marks
+chapter's three primitives. Widened in a follow-up commit on this branch:
+
+- `fluidMatterItems` takes a `poolIds` vocabulary: with no dealt marks, each seat is dealt
+  a shape from that pool by the same seeded stream, in the palette ink. An explicitly empty
+  pool seats no body (nothing lawful to wear); the module's seed shapes
+  (`FLUID_PRIMITIVE_ASSETS`) remain only for callers that supply no pool at all.
+- The resolver supplies the pool as the **top content layer's dealt pool** (`activeAssets`:
+  the dealer's own exclusions and that layer's enabled set already applied). The creature
+  citizen and the poem-only sets (kana/kanji/Latin/serif/ornaments/plate) stay out — not
+  because they are letters, but because they are not pool assets: the dealer itself never
+  deals them as marks. Letterforms and stamps that ARE pool assets (`typ_*`, `stamp_*`, …)
+  seat as matter, pinned end-to-end at the resolver (an empty-dealt stage's body is all
+  pool ids, wider than the marks chapter, no poem-only id) and at the render module.
 
 ### Budgets and constants (named)
 
@@ -324,7 +343,7 @@ placement stays canvas-space, as before.)
 - **New:** `engine/dishFluidRender.selfcheck.mjs` — seating law (dense seats only, never
   bedrock, never outside the dish), nearest-mark wear + determinism from published state,
   PULL monotonicity at the magnets (count and pull-weighted share), PULL powerless in thin
-  regions, the governed cap under matter fractions, the primitive fallback, and a
+  regions, the governed cap under matter fractions, the no-marks pool vocabulary, and a
   stage-driven end-to-end monotonicity drive.
 - **Re-pinned:** the kernel suite (the ladder's new axes; display colours gone);
   the stage suite (the plan's attachment terms per rung); the resolver suite — off parity is
