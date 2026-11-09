@@ -35,6 +35,7 @@ import {
 } from './creatureAssembler.js';
 import { sanitizeAttachPoints } from './assetAttach.js';
 import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { VOICE_DECK } from '../data/voiceDeck.js';
 
 /** Matt's ruling (2026-10-29): lively mutation, ~1 gene in 8. Named so the suite can assert it (rider to ruling 2). */
@@ -226,7 +227,10 @@ export function breedCreature(parents, seed = 0) {
 //     edit the door refuses changes nothing. Record id, gene order and lineage are never touched; a bred
 //     record's lineage stays (a hand gene postdates the birth — the door's lineage law accounts for it).
 
-const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id);
+// #2008 — the mutation dice never deal the picker-only Riso field Look:
+// it enters a record only when the performer picks it. The catalogue
+// appends it last, so filtering restores the pre-wiring order exactly.
+const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter((id) => id !== RISO_FIELD_LOOK_ID);
 const VOICE_ORDER = VOICE_DECK.map((v) => v.id);
 const SKELETON_IDS = new Set(['head', 'limbs', 'joints']);
 const copy = (v) => JSON.parse(JSON.stringify(v));

@@ -1,6 +1,6 @@
 // node src/data/styleLooks.selfcheck.mjs
 // #1770 (epic #1766, slice 4) — 64 dealable Looks; #1854 (BOOK S1b) grows the rack to 69 with the Marks
-// chapter's 5 looks. Pins: the count reads 69 from data; every look names its group,
+// chapter's 5 looks; #2008 grows it to 70 with the picker-only Riso field Look. Pins: the count reads 70 from data; every look names its group,
 // its asset categories and its S3 styles; every recipe validates clean through the #1550 door; no near-duplicate
 // padding (inside a style group no two looks share a mode; across all 64 no two share a recipe signature); every
 // look's pairing deals a COHERENT pool from the real library; and every look survives a headless render — the
@@ -16,15 +16,16 @@ import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, normalizeLayoutParams } fr
 import { dealPoolFor, poolToEnabled } from '../state/rollPool.mjs';
 import { mkRng } from '../engine/prng.js';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
+import { ASSETS_RISO } from './assets/assets-riso.js'; // #2008 — the canon riso catalogue (the field Look's one lawful source)
 
 // 1. the count, from data
-assert.equal(COMPOSITION_PRESETS.length, 69, `the dealable Look count reads 69, got ${COMPOSITION_PRESETS.length}`); // #1854: 64 + 5 Marks looks
-assert.equal(STYLE_LOOKS.length, 36, '33 + 36 style looks'); // #1854: 31 + 5 Marks looks
-assert.equal(PRESET_GROUPS.length, 15, '7 original groups + 8 style groups'); // #1854: + Marks group
+assert.equal(COMPOSITION_PRESETS.length, 70, `the dealable Look count reads 70, got ${COMPOSITION_PRESETS.length}`); // #2008: 69 + 1 Riso field Look (picker-only — registered, never dealt)
+assert.equal(STYLE_LOOKS.length, 36, '33 + 36 style looks'); // #1854: 31 + 5 Marks looks (#2008's Riso field Look is an authored preset, not a style look — the style groups are 4+ recipe families)
+assert.equal(PRESET_GROUPS.length, 16, '7 original groups + 8 style groups + the Riso group'); // #2008: + Riso group (authored, in presets.js)
 const ids = COMPOSITION_PRESETS.map((p) => p.id);
 assert.equal(new Set(ids).size, ids.length, 'look ids stay unique');
 const menuCount = getPresetsByGroup().reduce((n, g) => n + g.presets.length, 0);
-assert.equal(menuCount, 69, 'the LOOKS menu lists all 69 (no look orphaned from its group)'); // #1854
+assert.equal(menuCount, 70, 'the LOOKS menu lists all 70 (no look orphaned from its group)'); // #2008: 69 + the Riso field Look in its own group
 assert.ok(
   getPresetsByGroup().every((g) => g.presets.length > 0),
   'the LOOKS menu shows no empty group',
@@ -153,10 +154,23 @@ for (const p of COMPOSITION_PRESETS) {
   const finite = items.filter((it) => Number.isFinite(it.x) && Number.isFinite(it.y));
   const onCanvas = finite.filter((it) => it.x >= 0 && it.x <= W && it.y >= 0 && it.y <= H);
   assert.equal(finite.length, items.length, `${p.id}: every mark has a finite position`);
-  assert.ok(
-    items.every((it) => pool[it.assetId]),
-    `${p.id}: marks are drawn from the dealt pool`,
-  );
+  // #2008 — the Riso field Look is the one Look whose marks are not drawn
+  // from its dealt pool: picking it deals the riso icon field in place of
+  // the pool marks (that is its live tenant). Its accountability is
+  // stricter, not looser: every rendered mark must be a canon riso
+  // catalogue icon, and the field must actually stand.
+  if (p.id === 'riso-field') {
+    const canon = new Set(ASSETS_RISO.map((a) => a.id));
+    assert.ok(
+      items.length > 0 && items.every((it) => canon.has(it.assetId)),
+      'riso-field: every mark is a canon riso catalogue icon',
+    );
+  } else {
+    assert.ok(
+      items.every((it) => pool[it.assetId]),
+      `${p.id}: marks are drawn from the dealt pool`,
+    );
+  }
   // blank/broken = too few marks, or most of them thrown off the plate (measured floor across the 64: 0.44, 10 marks)
   if (onCanvas.length < 8 || onCanvas.length < items.length * 0.3) blank.push(p.id);
   if (process.env.LOOKS_VERBOSE) console.log(p.id, items.length, onCanvas.length);

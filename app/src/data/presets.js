@@ -10,6 +10,7 @@ export const PRESET_GROUPS = [
   { id: 'davis', label: 'Ghost-Lineage' },
   { id: 'bio', label: 'Bio-Drives' },
   ...STYLE_LOOK_GROUPS, // #1770 — Japanese, Grunge, Swiss, Bauhaus, Op Art, Memphis, Engraved
+  { id: 'riso', label: 'Riso' }, // #2008 — the Riso field Look's picker group (a single functional Look, not a style family — it lives with the authored presets below, not in STYLE_LOOKS)
 ];
 
 export const COMPOSITION_PRESETS = [
@@ -986,6 +987,47 @@ export const COMPOSITION_PRESETS = [
     },
   },
   ...STYLE_LOOKS, // #1770 — 31 style looks (data/styleLooks.js): 33 → 64 dealable Looks
+  {
+    // #2008 (option 1, Matt 2026-11-09) — the Riso field Look, appended last
+    // so every filtered dealing deck keeps its pre-wiring order. Picking it
+    // makes the layer deal a field of grammar-composed riso icons
+    // (engine/risoField.mjs) through buildPlacements, in place of its pool
+    // marks; the params below still ride the normal recipe (count is the
+    // field count, the scale range centres the icons' dealt scale, alpha's
+    // top is the field's ink). PICKER-ONLY: the id is excluded from every
+    // dealing deck (state/kineticScope.mjs) and from the creature dice, so
+    // the field appears only when the performer picks this Look. It is an
+    // authored preset, not a style look: the style groups are design
+    // families of 4+ recipes (data/styleLooks.selfcheck), and this is a
+    // single functional Look.
+    id: 'riso-field',
+    name: 'RISO FIELD',
+    group: 'riso',
+    desc: 'A specimen sheet of grammar-composed icons in five breathing clusters — the riso catalogue, dealt as a field. Pair with LITHOGRAPH.',
+    categories: ['stamps'],
+    styles: ['marks'],
+    paletteShift: 'band',
+    paletteId: 'lithograph',
+    params: {
+      blendMode: 'normal',
+      mode: 'grid',
+      count: 120,
+      scale: [0.8, 1.6],
+      rotate: [0, 0],
+      alpha: [70, 100],
+      zTiers: 1,
+      jitter: 0,
+      density: 50,
+      bleed: false,
+      mirror: false,
+      overlap: true,
+      displacement: 0,
+      lifeDrift: 0,
+      noiseSpeed: 0.1,
+      wind: 0,
+      behave: 'cruise',
+    },
+  },
 ];
 
 export function getPreset(id) {

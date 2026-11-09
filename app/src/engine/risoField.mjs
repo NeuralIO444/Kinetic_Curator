@@ -23,6 +23,14 @@ import { hashU32 } from './kernel/rng.js';
 import { risoIconId, RISO_CANON_SEED, RISO_ICON_SET_SIZE } from './risoGrammar.mjs';
 
 /** Cluster centres a dealt field gathers around. */
+// #2008 wiring (option 1, Matt 2026-11-09) — the Look id whose resolved
+// preset makes a content layer deal this field instead of its pool marks.
+// One home for the id: the catalogue entry (data/styleLooks.js), the
+// placement gate (engine/buildPlacements.js), the resolver's breath state
+// (gl/liveResolve.mjs) and the dealing-deck exclusions
+// (state/kineticScope.mjs, the creature dice) all read it from here.
+export const RISO_FIELD_LOOK_ID = 'riso-field';
+
 export const RISO_CLUSTER_COUNT = 5;
 /** Breathing rate, cycles per second at full drive. */
 export const BREATH_HZ = 0.11;

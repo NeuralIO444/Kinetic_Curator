@@ -187,3 +187,143 @@ code (not just the pin) where the contract demanded one.
   pattern mode only if the dealing needs one, or accepting the module as
   staging with the wiring as its own follow-up) and waits on Matt's ruling.
   The overprint finish is fully live either way.
+
+## Wiring (option 1 — Riso field Look)
+
+Matt ruled 2026-11-09: the field becomes **a Riso field Look the performer
+can pick** (option 1 of the four posted on the issue). This section is that
+wiring, built on the rebased branch (base 1e4fdad8, the merged #2034).
+
+### What was wired where
+
+- **The Look** (`app/src/data/presets.js`): `RISO FIELD` (`riso-field`),
+  group `riso` (label "Riso", appended to `PRESET_GROUPS`), appended LAST in
+  `COMPOSITION_PRESETS` so every filtered dealing deck keeps its pre-wiring
+  order byte-for-byte. It is an **authored preset, not a style look**: the
+  style groups are design families of 4+ recipes (a standing law in
+  `data/styleLooks.selfcheck` — ≥4 looks per group, no shared mode inside a
+  group, every look pairing its own style), and this is a single functional
+  Look; forcing it into `STYLE_LOOKS` would have broken all three sub-laws.
+  Params ride the normal recipe: count 120 (the field count), scale
+  [0.8, 1.6] (its midpoint centres the icons' dealt scale), alpha [70, 100]
+  (the top is the field's ink), mode grid, palette pairing LITHOGRAPH.
+  The picker surface is the existing one — the Look appears under its group
+  in the LOOKS menu exactly like every other Look; no new prose surfaces.
+- **The deal** (`app/src/engine/buildPlacements.js`): at the seam where the
+  FIELD form joins, when the layer's resolved preset is `riso-field`, the
+  layer's pool marks are replaced wholesale by `dealRisoField` items — so
+  mirror, materials and the tail treat the icons as ordinary citizens of
+  the layer, and an armed FIELD form still appends after them. The deal is
+  a pure function of recorded inputs: the **layer seed** deals the
+  arrangement, the recipe count is the field count, the canvas is the
+  stage's. One adaptation, stated plainly: the dealer's own `assetId` is
+  consumable only at the canon seed (the catalogue was baked for seed 2008
+  alone), so the wiring re-addresses each dealt `iconIndex` through
+  `risoIconId(RISO_CANON_SEED, …)` — the icon selection is the deal; the
+  asset id is the catalogue address of that icon. Colours come from the
+  layer's own palette/strategy (`assignColor`), alpha from the top of its
+  alpha range — the FIELD form's exact discipline. The replaced list is
+  never stashed into the placement cache's item pool (its items are not
+  SoA-slot-indexed; the FIELD form's aliasing law).
+- **The breathing** (`app/src/gl/liveResolve.mjs`): the resolver owns one
+  breath state per riso layer (`risoBreathByLayer`) and hands it to
+  buildPlacements as an ephemeral input `risoBreath = { state, dtSec,
+  driver }` — never in the geometry signature, the cultureScale deal.
+  `dtSec` is the frame's recorded delta (0 on a slowRender frame — a held
+  frame holds the breath); `driver` is the recorded beat drive
+  (`input.beatDrive`, 0 when no beat is stamped — the floor, so the field
+  keeps breathing gently in silence, #721). Never a wall clock. The state
+  prunes against documentIds like warpPhase, disposes with the resolver,
+  and rides the snapshot as an OPTIONAL key (`risoBreath`, present only
+  while a riso layer's state exists — pre-wiring snapshots restore with a
+  fresh breath, the spawn precedent; `checkResolverSnapshot` validates the
+  shape when present).
+- **The exclusions** (`app/src/state/kineticScope.mjs`,
+  `app/src/engine/creatureBreed.js`, `app/src/engine/creatureAssembler.js`):
+  the shared id constant `RISO_FIELD_LOOK_ID` lives in
+  `engine/risoField.mjs`. The med/koz decks deal from the catalogue minus
+  the picker-only id (`ROLL_LOOKS`); the off/weak decks' `ORIGINAL_LOOKS`
+  exclude it by id as well (as an authored preset it is not a style look,
+  so the style-membership filter alone would have left it in). Chapter
+  decks intersect the scope decks (`chapterScopeDeck`), so chapters are
+  covered by the same exclusion. The creature dice — the breed mutation
+  deck and the assembler's default-pick deck — filter it out; the
+  assembler's validity set stays the full catalogue, so a record carrying
+  the Look because the performer picked it (WetLab/strand pickers) remains
+  lawful. The overprint finish is untouched.
+
+### Verification
+
+- **New suite** `app/src/gl/risoFieldLook.selfcheck.mjs` (registered in
+  `app/selfcheck.manifest`), 13 probes, all passing:
+  - catalogue citizenship: resolvable, valid composition id, last in the
+    catalogue, own picker group, not a style look;
+  - the gate: picked → every item a canon catalogue icon with `riso:*`
+    keys, count = the recipe count; not picked (3 other Looks) → zero riso
+    items; a different layer seed deals a different arrangement of the same
+    canon catalogue;
+  - anchored rest: with no breath input, items are byte-identical to
+    `breatheFieldAt(deal, freshState)`; two identical builds byte-identical;
+  - **determinism probe**: two fresh resolvers over a recorded 60-frame
+    conversation (50 ms steps; beat drive 0 for 10 frames, then 1) produce
+    byte-identical item hashes on all 60 frames; frame 0 equals the
+    anchored deal exactly; driven frames move icons off the anchor;
+  - **snapshot probe**: snapshot at frame 30 carries `risoBreath` (1 entry)
+    and validates; a fresh resolver restored from it continues frames
+    30–59 byte-identical to the uninterrupted run; a non-riso scene's
+    snapshot carries no `risoBreath` key;
+  - **exclusion probes**: no scope deck (off/weak/med/koz) contains the id
+    (med/koz = catalogue − 1); no chapter deals it at any scope (every
+    chapter × 4 scopes); **300 scoped KINETIC look passes never land it**
+    (and dealt 30+ distinct other looks — the roll still rolls); **800
+    creature-dice probes** (400 assembly defaults + 400 hand mutations)
+    never deal it (20+ distinct other looks each); the dealable pool still
+    holds zero riso assets.
+- **Neighbour suites** run directly by file: the riso family (grammar,
+  field, finish, bake), buildPlacements, styleLooks, chapters, kineticSweep,
+  kineticScope, chapterWalk, chapterNarrow (+wiring), creatureBreed,
+  creatureAssembler, liveResolve, liveResolve.determinism, genomeTimeline,
+  strandBank — all green. **Dice/timing-adjacent suites 10× each** (the new
+  suite, kineticSweep, kineticScope, chapterWalk, creatureBreed,
+  creatureAssembler, liveResolve.determinism): **70 runs, 0 failures**.
+- **Re-pins (all catalogue-growth or new-reader only, each commented at
+  the pin)**: `styleLooks.selfcheck` census 69→70 looks / 15→16 groups /
+  menu 69→70 (STYLE_LOOKS stays 36 — the Look is authored); its
+  dealt-pool render check gains a named stricter exception for this one
+  Look (every rendered mark must be a canon riso icon — the field is the
+  one Look whose marks are not pool-drawn, by design); `chapters.selfcheck`
+  Now-chapter look sum 69→70; `creatureAssembler.selfcheck`'s stage-reader
+  allowlist gains the new suite (a test reader, the established pattern).
+- **Full manifest sweep** on the composed tree: **639 suites, 636 pass,
+  3 fail — exactly the standing base-identical sandbox set** (swarmWasm,
+  rollSafety, accum). Nothing else moved.
+- **format:check clean; lint 0 errors** (11 pre-existing warnings);
+  **build clean**.
+- **Headless drive** (vite preview + route interception from `kc.local`,
+  the established sandbox pattern; footer build `bf55dc75`): opened the
+  LOOKS picker, clicked **RISO FIELD** under the **Riso** group label;
+  store composition read `riso-field` on 8/8 samples over 3.2 s; frames
+  advancing; **0 frame errors, 0 page errors**. Screenshot:
+  `kc2008-riso-field-drive.png` in this worktree — the field stands on
+  stage in the standing palette (rings, crosses, squares, triangles —
+  grammar icons, no letterforms), and the BUILD panel shows the Look's own
+  recipe live (BUILD riso-field, COUNT 120, SCALE 0.8–1.6, ALPHA 70–100%).
+  Drive note: a pick made before the boot deal settles can be overwritten
+  by the opener landing late (first attempt read a boot-dealt look); the
+  final drive waited for a settled boot composition first — app behaviour,
+  not a wiring fault.
+
+### Honest limits
+
+- The field replaces the layer's content on the placement path; if a
+  performer switches a riso layer's mode to a swarm mode, the swarm branch
+  deals its particles instead (mode is a separate performer control, as
+  with every Look).
+- A riso layer whose pool is fully disabled returns no items (the
+  buildPlacements empty-pool early return) — the pool is untouched by
+  picking the Look, so this needs a deliberate emptying.
+- Breath replay across a take is exact for the recorded frame deltas and
+  beat-drive stamps; the state also rides snapshots, so a restored take
+  continues exactly (probed above).
+- Feel is Matt's call as always: density at count 120 is the dealer's own
+  Martens density; nothing here tunes it.

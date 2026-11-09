@@ -194,6 +194,7 @@ node src/engine/risoGrammar.selfcheck.mjs
 node src/engine/risoField.selfcheck.mjs
 node src/engine/risoFinish.selfcheck.mjs
 node src/gl/risoBake.selfcheck.mjs
+node src/gl/risoFieldLook.selfcheck.mjs
 node src/engine/dishFluidRender.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs

@@ -66,6 +66,8 @@ import { sanitizeFieldForm, reviewAdjustedForm } from '../poets/fieldForm.js'; /
 import { rayGunForm } from '../poets/rayGunForm.js'; // #2003 — the treatment record, drawn from the plain form
 import { stampWidthEm } from '../poets/placement.js'; // #2005 — the plate zone is measured in the stamps' own ink
 import { pickWeightedIndexStable } from './kernel/rng.js';
+import { dealRisoField, createBreathState, stepBreath, breatheFieldAt, RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the Riso field Look's dealer + cluster breathing
+import { risoIconId, RISO_CANON_SEED } from './risoGrammar.mjs'; // #2008 — the riso catalogue's address space (the canon seed)
 
 /** Authored per-asset weight → selection frequency. */
 export const SELECTION_WEIGHT = { heavy: 4, medium: 2, light: 1 };
@@ -332,6 +334,14 @@ export function buildPlacements({
   // field (engine/dishLifeCouple.mjs). null — every caller but the live resolver with the dial
   // up — the pass never runs and the SoA is bit-identical to the pre-Phase-2 pipeline.
   cultureScale = null,
+  // #2008 — the Riso field Look's breath channel. Ephemeral per-frame
+  // input — NEVER in geometrySignature (the cultureScale deal): the live
+  // resolver owns one breath state per riso layer and hands it in as
+  // risoBreath = { state, dtSec, driver }; it is advanced only when the
+  // layer's resolved Look IS the Riso field Look, so every other caller
+  // (stills, bakes, suites) deals the field at its anchored rest and no
+  // state is ever touched. null = anchored.
+  risoBreath = null,
   // Kineme living-motion drivers (slice 2). Ephemeral per-frame input —
   // NEVER in geometrySignature (same deal as audioEnergy): a living canvas
   // must not bust the geometry cache. kineme = {
@@ -808,6 +818,54 @@ export function buildPlacements({
     { seed, canvasW, canvasH },
   );
 
+  // #2008 (option 1, Matt 2026-11-09) — the Riso field Look: when the
+  // layer's resolved Look IS the Riso field Look, the layer's content is
+  // the dealt riso icon field — the pool marks built above are replaced
+  // wholesale, at the same seam the FIELD form joins below, so mirror,
+  // materials and the tail treat the icons as ordinary citizens of the
+  // layer (and an armed FIELD form still appends after them). The deal is
+  // a pure function of recorded inputs: the layer seed deals the
+  // arrangement, the recipe's count is the field count, the canvas is the
+  // stage's. The icons' asset ids address the catalogue through the CANON
+  // seed — the only seed the catalogue was baked for; the dealer's own
+  // assetId is consumable only at that seed, so the wiring re-addresses
+  // each dealt iconIndex through it. Colours come from this layer's
+  // palette/strategy and the ink sits at the top of its alpha range,
+  // exactly like the FIELD form's stamps below. The breathing is the
+  // Davis channel: the resolver's recorded-time inputs (frame delta +
+  // beat drive) advance the breath state it owns; with no risoBreath
+  // input the field stands at its anchored rest, byte-identical.
+  let risoFieldActive = false;
+  if (preset.id === RISO_FIELD_LOOK_ID) {
+    risoFieldActive = true;
+    const field = dealRisoField({ seed, count: countInt, w: canvasW, h: canvasH });
+    if (risoBreath && risoBreath.state) stepBreath(risoBreath.state, risoBreath.dtSec, risoBreath.driver);
+    const positions = breatheFieldAt(field, risoBreath?.state ?? createBreathState());
+    const sc = layoutParams.scale;
+    const authoredScale = (Array.isArray(sc) ? sc : sc?.x) ?? [0.4, 1.6];
+    const scaleMid = (authoredScale[0] + authoredScale[1]) / 2;
+    const fieldAlpha = Array.isArray(alpha) ? alpha[1] : alpha;
+    mapped = field.placements.map((p, j) => {
+      const { color, accent } = assignColor({ seed, index: j, t: 0.5, seedOffsets }, palette, strategy);
+      const scale = p.scale * scaleMid;
+      return {
+        x: positions[j].x,
+        y: positions[j].y,
+        scale,
+        scaleY: scale,
+        rotation: p.rotation,
+        alpha: fieldAlpha,
+        index: j,
+        t: 0.5,
+        zTier: 0,
+        assetId: risoIconId(RISO_CANON_SEED, p.iconIndex),
+        color,
+        accent,
+        key: p.key,
+      };
+    });
+  }
+
   // #1904 — FIELD: an armed poet's form reaches the dish. The form was
   // placed at pick time (poets/placement.js) and rides the layer's recipe
   // data (layoutParams.fieldForm); here it is only drawn — stamps become
@@ -979,7 +1037,10 @@ export function buildPlacements({
     // scale/rotation/alpha. That aliasing bug was caught in review; the
     // overlap-only guard above is what prevents it.
     mapped.sort((a, b) => a.scale - b.scale);
-  } else if (cache) {
+  } else if (cache && !risoFieldActive) {
+    // #2008 — a riso field list is never the SoA's pool: its items are not
+    // indexed by SoA slot, so a later pool-hit would mutate the wrong
+    // items (the aliasing law the FIELD form's sort guard states above).
     cache.itemPool = mapped;
   }
 

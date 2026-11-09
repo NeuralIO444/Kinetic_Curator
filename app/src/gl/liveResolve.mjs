@@ -6,6 +6,8 @@ import {
   PLATE_ROOM_ALPHA,
   fieldRoomZonePx,
 } from '../engine/buildPlacements.js';
+import { createBreathState, RISO_FIELD_LOOK_ID } from '../engine/risoField.mjs'; // #2008 — the Riso field Look's breath state
+import { getPreset } from '../data/presets.js'; // #2008 — the layer's resolved Look gates its breath channel
 import {
   createDriverClock,
   driverTimeSec,
@@ -480,6 +482,12 @@ export function createLiveResolver() {
   // warpPhase: a hidden-then-reshown layer resumes its grown form instead
   // of regrowing from the seed.
   const growthTickByLayer = new Map(); // layerId -> { tick, key }
+  // #2008 — the Riso field Look's breath state, per layer ({ level, tSec }).
+  // Advanced only on presented frames, from recorded-time inputs (the
+  // frame delta + the beat drive) — never a wall clock. Pruned against
+  // documentIds like warpPhase: a hidden riso layer resumes its breath
+  // where it left it; only a removed layer frees the entry.
+  const risoBreathByLayer = new Map(); // layerId -> { level, tSec }
   // #564 — Assets-tab edits that change what a layer DRAWS without changing
   // which ids are enabled: SWAP replaces an overlay asset's SVG under the
   // same id, a weight edit re-rolls which asset each slot gets. Neither
@@ -499,6 +507,17 @@ export function createLiveResolver() {
   const feedSlots = new Map(); // layerId -> slot [0, MAX_TRACKS)
   const feedSlotFree = [];
   let feedSlotNext = 0;
+  // #2008 — a riso layer's breath state, created at its anchored rest on
+  // first resolve and carried by this resolver from then on.
+  function risoBreathStateFor(layerId) {
+    let st = risoBreathByLayer.get(layerId);
+    if (!st) {
+      st = createBreathState();
+      risoBreathByLayer.set(layerId, st);
+    }
+    return st;
+  }
+
   function slotFor(layerId) {
     let slot = feedSlots.get(layerId);
     if (slot !== undefined) return slot;
@@ -531,6 +550,7 @@ export function createLiveResolver() {
     // should free this entry.
     for (const k of [...warpPhase.keys()]) if (!documentIds.has(k)) warpPhase.delete(k);
     for (const k of [...growthTickByLayer.keys()]) if (!documentIds.has(k)) growthTickByLayer.delete(k); // #720
+    for (const k of [...risoBreathByLayer.keys()]) if (!documentIds.has(k)) risoBreathByLayer.delete(k); // #2008
     pruneTravelStore(travelStore, documentIds); // #1574 — a removed layer's roam goes with it
     pruneSurgeStore(surgeStore, documentIds); // #1576 — a removed layer's envelope goes with it
     pruneParallaxStore(parallaxStore, documentIds); // #1576 — a removed layer's drift clock goes with it
@@ -1182,6 +1202,21 @@ export function createLiveResolver() {
           // either store.
           surge: surgeBase ? { ...surgeBase, sceneId: layer.id } : null,
           parallaxDrift: parallaxBase ? { ...parallaxBase, sceneId: layer.id } : null,
+          // #2008 — the Riso field Look's breath channel: this layer's
+          // breath state, advanced by the frame's recorded delta (0 on a
+          // slowRender frame — a held frame holds the breath, the growth
+          // deal) and driven by the recorded beat drive; no beat reads as
+          // 0, the floor, so the field keeps breathing gently in silence
+          // (#721). Handed in only when the layer's resolved Look is the
+          // Riso field Look; buildPlacements ignores it otherwise.
+          risoBreath:
+            getPreset(layoutParams.composition).id === RISO_FIELD_LOOK_ID
+              ? {
+                  state: risoBreathStateFor(layer.id),
+                  dtSec: input.slowRender ? 0 : travelFrameMs / 1000,
+                  driver: Number.isFinite(input.beatDrive) ? input.beatDrive : 0,
+                }
+              : null,
           // #1183 — the ground: { dish, lean } when this layer leans on a PATTERN below it, else nothing (byte-identical).
           ...groundArgs({
             dish,
@@ -1858,6 +1893,7 @@ export function createLiveResolver() {
     reviewMorphPlayed.clear();
     reviewMorphPrev.clear();
     warpPhase.clear();
+    risoBreathByLayer.clear(); // #2008
     feedLive.reset();
     worldNoise = null;
     worldNoiseSeed = null;
@@ -1908,6 +1944,12 @@ export function createLiveResolver() {
       modSteer: [...modSteerByLayer.entries()].map(([k, v]) => [k, { ...v }]),
       warpPhase: [...warpPhase.entries()].map(([k, v]) => [k, { ...v }]),
       growthTick: [...growthTickByLayer.entries()].map(([k, v]) => [k, { ...v }]),
+      // #2008 — OPTIONAL key on the dishLife terms: present only while a
+      // riso layer's breath state exists, so every other snapshot is
+      // exactly what it was.
+      ...(risoBreathByLayer.size
+        ? { risoBreath: [...risoBreathByLayer.entries()].map(([k, v]) => [k, { ...v }]) }
+        : {}),
       densityTickSeen,
       creatures: creatures.snapshotState(),
       dishCreatures: dishCreatures.snapshotState(),
@@ -1998,6 +2040,12 @@ export function createLiveResolver() {
     for (const [k, v] of snap.warpPhase) warpPhase.set(k, { ...v });
     growthTickByLayer.clear();
     for (const [k, v] of snap.growthTick) growthTickByLayer.set(k, { ...v });
+    // #2008 — a pre-wiring snapshot carries no risoBreath key: the breath
+    // starts fresh, as a fresh resolver's would (the spawn precedent).
+    risoBreathByLayer.clear();
+    if (snap.risoBreath !== undefined) {
+      for (const [k, v] of snap.risoBreath) risoBreathByLayer.set(k, { ...v });
+    }
     densityTickSeen = snap.densityTickSeen;
     creatures.restoreState(snap.creatures);
     dishCreatures.restoreState(snap.dishCreatures);
@@ -2232,6 +2280,15 @@ export function checkResolverSnapshot(snap) {
     }
   }
   if (snap.travel !== undefined && !checkTravelSnapshot(snap.travel)) return false; // travel kinemes — optional, like spawn
+  // #2008 — `risoBreath` is optional on the same terms; when present each
+  // entry is a [layerId, { level, tSec }] pair of finite numbers.
+  if (snap.risoBreath !== undefined) {
+    if (!Array.isArray(snap.risoBreath)) return false;
+    for (const e of snap.risoBreath) {
+      if (!Array.isArray(e) || typeof e[0] !== 'string' || !e[1] || typeof e[1] !== 'object') return false;
+      if (!Number.isFinite(e[1].level) || !Number.isFinite(e[1].tSec)) return false;
+    }
+  }
   // #1923 — either stage's frozen seed is optional; when present it must carry its marks, canvas and generation
   if (snap.dishLife !== undefined && !checkDishLifeSnapshot(snap.dishLife)) return false;
   if (snap.dishField !== undefined && !checkDishLifeSnapshot(snap.dishField)) return false; // #1923 Phase 2

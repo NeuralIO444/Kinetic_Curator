@@ -20,6 +20,7 @@ import { VOICE_DECK } from '../data/voiceDeck.js';
 import { SHAPE_SETS } from '../data/voices.js';
 import { ASSETS } from '../data/assets/index.js';
 import { dealableRecords } from './rollPool.mjs';
+import { RISO_FIELD_LOOK_ID } from '../engine/risoField.mjs'; // #2008 — the picker-only Look
 
 export const SCOPE_CYCLE = Object.freeze(['off', 'weak', 'med', 'koz']);
 export const SCOPE_LABEL = Object.freeze({ off: 'OFF', weak: 'WEAK', med: 'MED', koz: 'KOZ' });
@@ -39,18 +40,31 @@ export function nextScope(mode) {
 }
 
 const styleIds = new Set(STYLE_LOOKS.map((l) => l.id));
-const ORIGINAL_LOOKS = Object.freeze(COMPOSITION_PRESETS.filter((p) => !styleIds.has(p.id)));
+// #2008 — the picker-only Riso field Look is an authored preset, so the
+// style-membership filter alone would leave it in the off/weak decks; it
+// is excluded by id as well (it appears only when the performer picks it).
+const ORIGINAL_LOOKS = Object.freeze(
+  COMPOSITION_PRESETS.filter((p) => !styleIds.has(p.id) && p.id !== RISO_FIELD_LOOK_ID),
+);
 const SMALL_VOICES = Object.freeze(VOICE_DECK.filter((v) => v.kind !== 'family'));
 /** The pre-#1767 deal: each curated shape set's first four (the 19 sets / 49 assets). */
 export const CURATED_SETS = Object.freeze(SHAPE_SETS.map((s) => Object.freeze(s.ids.slice(0, 4))));
 const CURATED_ASSETS = new Set(CURATED_SETS.flat()).size;
 const LIBRARY_ASSETS = dealableRecords(ASSETS).length;
 
+// #2008 — picker-only Looks never enter a dealing deck: the Riso field
+// Look appears only when the performer picks it (Matt's ruling,
+// 2026-11-09). The roll deck is the catalogue minus the picker-only ids;
+// the riso Look is appended last in the catalogue, so filtering restores
+// exactly the pre-wiring decks. Chapter decks intersect with these decks
+// (chapterScopeDeck), so chapters are covered by the same exclusion.
+const ROLL_LOOKS = Object.freeze(COMPOSITION_PRESETS.filter((p) => p.id !== RISO_FIELD_LOOK_ID));
+
 const DECKS = {
   off: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'sets', chaos: false, launch: 'factory' },
   weak: { looks: ORIGINAL_LOOKS, voices: SMALL_VOICES, pool: 'library', chaos: false, launch: 'open' },
-  med: { looks: COMPOSITION_PRESETS, voices: VOICE_DECK, pool: 'library', chaos: false, launch: 'open' },
-  koz: { looks: COMPOSITION_PRESETS, voices: VOICE_DECK, pool: 'library', chaos: true, launch: 'roll' },
+  med: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', chaos: false, launch: 'open' },
+  koz: { looks: ROLL_LOOKS, voices: VOICE_DECK, pool: 'library', chaos: true, launch: 'roll' },
 };
 
 /** What a scope lets a tap deal: { looks, voices, pool: 'sets'|'library', chaos, launch: 'factory'|'open'|'roll' }. */

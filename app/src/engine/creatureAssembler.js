@@ -23,6 +23,7 @@ import { hashU01 } from './kernel/rng.js';
 import { sanitizeAttachPoints, ATTACH_BOX } from './assetAttach.js';
 import { COST_WARNING_THRESHOLD } from '../assets/ingest.js'; // #1871 — the cost line a kept warning is held to
 import { COMPOSITION_PRESETS } from '../data/presets.js';
+import { RISO_FIELD_LOOK_ID } from './risoField.mjs'; // #2008 — the picker-only Look stays off the dice
 import { creatureTileId } from './creatureTileId.js';
 import { creatureTileSvg, buildRig } from './creatureRig.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
@@ -64,7 +65,11 @@ export const MAX_KEPT_WARNINGS = 8;
 
 const LOOK_IDS = new Set(COMPOSITION_PRESETS.map((p) => p.id));
 const VOICE_IDS = new Set(VOICE_DECK.map((v) => v.id));
-const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id);
+// #2008 — the assembler's default-pick dice never deal the picker-only
+// Riso field Look (LOOK_IDS above stays the full catalogue: a record
+// carrying the Look because the performer picked it stays valid). The
+// catalogue appends it last, so filtering restores the pre-wiring order.
+const LOOK_ORDER = COMPOSITION_PRESETS.map((p) => p.id).filter((id) => id !== RISO_FIELD_LOOK_ID);
 const VOICE_ORDER = VOICE_DECK.map((v) => v.id);
 
 /** True when a Look id names a real Look deck entry. */

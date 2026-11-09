@@ -71,7 +71,7 @@ const EXPECTED_COUNTS = {
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
   grunge: { looks: 5, voices: 8, assets: 39 },
-  now: { looks: 69, voices: 72, assets: 312 }, // #1854: Now sums the grown library (64+5 looks, 64+8 voices, 294+18 assets)
+  now: { looks: 70, voices: 72, assets: 312 }, // #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks)
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
