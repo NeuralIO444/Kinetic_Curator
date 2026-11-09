@@ -10,9 +10,17 @@ its 2026-11-07 scoping comment read before building; #2038 read as standing stra
 1. **Generative icon grammar** — `app/src/engine/risoGrammar.mjs`.
    A kit of 8 primitive marks (disc, ring, target, plus, cross, pixel, arc, wedge)
    composed by 6 seeded rules (single, pair, stack, orbit, grid, frame) into icons.
-   All grammar quantities are named constants (anchors, size/stroke tiers, rotation
-   detents 0/90/180/270, max 5 parts, canonical seed 2008, set size 24, grammar
-   version 1). Integer-only geometry, so composed SVGs are byte-stable by
+   The grammar's composition quantities are named constants: anchors 25/50/75
+   (referenced by the rules wherever a coordinate equals one — centre, stack
+   triple, orbit corners), size/stroke tiers, rotation detents 0/90/180/270,
+   max 5 parts, accent-slot probability 0.22, stack-triple probability 0.5,
+   frame outer size 34, inset coords 28/72 (pair/grid), stack-pair coords
+   32/68, orbit satellites 3 + a span of 2, canonical seed 2008, set size 24,
+   set-count max 256, grammar version 1 (see the QA fix note below for the
+   pass that named the last of these). The numerals left in the module are
+   structural, not quantities: array indexes, the per-rule size-tier caps
+   passed as `drawPart` arguments, the kit builders' geometry formulas, and
+   the set-hash algorithm's own constants. Integer-only geometry, so composed SVGs are byte-stable by
    construction. Icons are marks only — no primitive can render a letterform, no
    `<text>` is ever emitted; the typography two-pole law is untouched.
 2. **Catalogue materialization** — `app/src/data/assets/assets-riso.js` recomputes
@@ -151,3 +159,31 @@ code (not just the pin) where the contract demanded one.
 - **Feel is unverified** — icon fields and the finish are looks; per the spec
   they go to Matt's review lane on real frames at phone + desktop widths.
   Nothing here was pushed or PR'd.
+
+## QA fix (post-QA pass)
+
+- **The nit:** independent QA found this report's constants wording overstated
+  the tree — `RISO_ANCHORS` was exported but never used (the rules hard-coded
+  their coordinates, including the 28/72 and 32/68 pairs that are not anchors),
+  `RISO_MAX_PARTS` was census-only, and the accent-slot probability 0.22 and
+  the frame rule's outer size 34 were bare literals. Determinism was never
+  affected.
+- **What changed (values untouched, no output byte moved):** the rules now
+  reference `RISO_ANCHORS` wherever a hard-coded coordinate already equalled
+  one of its values (centre 50, the stack triple 25/50/75, the orbit corners);
+  the remaining quantities are named constants — `RISO_ACCENT_SLOT_PROBABILITY`
+  (0.22), `RISO_FRAME_OUTER_SIZE` (34), `RISO_INSET_COORDS` (28/72, pair/grid),
+  `RISO_STACK_PAIR_COORDS` (32/68), `RISO_STACK_TRIPLE_PROBABILITY` (0.5),
+  `RISO_ORBIT_SATELLITE_MIN`/`SPAN` (3, +2), `RISO_SET_COUNT_MAX` (256) — and
+  the frame's rotation now reads `RISO_ROT_DETENTS[0]`. No coordinate or
+  probability value changed. Verified after the change: the risoGrammar suite
+  is green and the canonical-set fingerprint is identical to before the fix —
+  djb hash 4138279804, sha256 b94de4e3c5581d2f5386e0a981716e265296825ef7e43fb2f4b69e76fa5455f7.
+- **The wiring question is parked with Matt, not fixed here:** QA's major
+  finding — the icon-field dealer has no live tenant in the running app — is a
+  design decision, not a defect this pass may settle. No wiring was attempted.
+  The question has been posted as a comment on the issue itself (the four
+  options: a Riso field Look, a tenant on an existing pattern track, a new
+  pattern mode only if the dealing needs one, or accepting the module as
+  staging with the wiring as its own follow-up) and waits on Matt's ruling.
+  The overprint finish is fully live either way.

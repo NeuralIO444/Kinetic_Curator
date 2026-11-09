@@ -46,6 +46,22 @@ export const RISO_STROKE_TIERS = Object.freeze([4, 6, 9]);
 export const RISO_ROT_DETENTS = Object.freeze([0, 90, 180, 270]);
 /** Most parts one icon may hold (the orbit rule: a centre + four satellites). */
 export const RISO_MAX_PARTS = 5;
+/** Probability a part draws in the accent slot instead of ink. */
+export const RISO_ACCENT_SLOT_PROBABILITY = 0.22;
+/** Probability the stack rule deals three marks instead of two. */
+export const RISO_STACK_TRIPLE_PROBABILITY = 0.5;
+/** The frame rule's outer ring size (radius, asset units). */
+export const RISO_FRAME_OUTER_SIZE = 34;
+/** Inset coordinate pair (asset units) the pair and grid rules place marks on —
+ *  tighter than the anchor grid. */
+export const RISO_INSET_COORDS = Object.freeze([28, 72]);
+/** Coordinate pair (asset units) the two-mark stack deals on. */
+export const RISO_STACK_PAIR_COORDS = Object.freeze([32, 68]);
+/** Satellites the orbit rule deals: this minimum plus a seeded span (3 or 4). */
+export const RISO_ORBIT_SATELLITE_MIN = 3;
+export const RISO_ORBIT_SATELLITE_SPAN = 2;
+/** Largest set `risoIconSet` will compose in one call (a safety bound, not a deal size). */
+export const RISO_SET_COUNT_MAX = 256;
 
 // ---------------------------------------------------------------------------
 // The kit — primitive marks. Each builder takes (cx, cy, size, slot) and returns an
@@ -86,7 +102,7 @@ function drawPart(rng, cx, cy, sizeTierCap) {
   const tier = Math.min(sizeTierCap, Math.floor(rng() * RISO_SIZE_TIERS.length));
   const size = RISO_SIZE_TIERS[Math.max(0, tier)];
   const rot = RISO_ROT_DETENTS[Math.min(RISO_ROT_DETENTS.length - 1, Math.floor(rng() * RISO_ROT_DETENTS.length))];
-  const slot = rng() < 0.22 ? ACC : INK;
+  const slot = rng() < RISO_ACCENT_SLOT_PROBABILITY ? ACC : INK;
   const stroke =
     RISO_STROKE_TIERS[Math.min(RISO_STROKE_TIERS.length - 1, Math.floor(rng() * RISO_STROKE_TIERS.length))];
   return { kit, cx, cy, size, rot, slot, stroke };
@@ -94,42 +110,53 @@ function drawPart(rng, cx, cy, sizeTierCap) {
 
 const RULE_BUILDERS = {
   // One bold mark, centred, large.
-  single: (rng) => [drawPart(rng, 50, 50, 3)],
+  single: (rng) => [drawPart(rng, RISO_ANCHORS[1], RISO_ANCHORS[1], 3)],
   // Two marks side by side on the middle row.
-  pair: (rng) => [drawPart(rng, 28, 50, 2), drawPart(rng, 72, 50, 2)],
+  pair: (rng) => [
+    drawPart(rng, RISO_INSET_COORDS[0], RISO_ANCHORS[1], 2),
+    drawPart(rng, RISO_INSET_COORDS[1], RISO_ANCHORS[1], 2),
+  ],
   // Two or three marks down the middle column.
   stack: (rng) => {
-    const three = rng() < 0.5;
-    const ys = three ? [25, 50, 75] : [32, 68];
-    return ys.map((y) => drawPart(rng, 50, y, three ? 1 : 2));
+    const three = rng() < RISO_STACK_TRIPLE_PROBABILITY;
+    const ys = three ? RISO_ANCHORS : RISO_STACK_PAIR_COORDS;
+    return ys.map((y) => drawPart(rng, RISO_ANCHORS[1], y, three ? 1 : 2));
   },
   // A centre mark with three or four satellites on the anchor ring.
   orbit: (rng) => {
-    const parts = [drawPart(rng, 50, 50, 2)];
+    const parts = [drawPart(rng, RISO_ANCHORS[1], RISO_ANCHORS[1], 2)];
     const corners = [
-      [25, 25],
-      [75, 25],
-      [25, 75],
-      [75, 75],
+      [RISO_ANCHORS[0], RISO_ANCHORS[0]],
+      [RISO_ANCHORS[2], RISO_ANCHORS[0]],
+      [RISO_ANCHORS[0], RISO_ANCHORS[2]],
+      [RISO_ANCHORS[2], RISO_ANCHORS[2]],
     ];
-    const n = 3 + Math.floor(rng() * 2);
+    const n = RISO_ORBIT_SATELLITE_MIN + Math.floor(rng() * RISO_ORBIT_SATELLITE_SPAN);
     for (let i = 0; i < n; i++) parts.push(drawPart(rng, corners[i][0], corners[i][1], 1));
     return parts;
   },
-  // Four small marks on the 2x2 anchor cells.
+  // Four small marks on the 2x2 inset cells.
   grid: (rng) =>
     [
-      [28, 28],
-      [72, 28],
-      [28, 72],
-      [72, 72],
+      [RISO_INSET_COORDS[0], RISO_INSET_COORDS[0]],
+      [RISO_INSET_COORDS[1], RISO_INSET_COORDS[0]],
+      [RISO_INSET_COORDS[0], RISO_INSET_COORDS[1]],
+      [RISO_INSET_COORDS[1], RISO_INSET_COORDS[1]],
     ].map(([x, y]) => drawPart(rng, x, y, 1)),
   // A framing ring with one centred mark inside it.
   frame: (rng) => {
-    const outer = { kit: 'ring', cx: 50, cy: 50, size: 34, rot: 0, slot: INK, stroke: RISO_STROKE_TIERS[1] };
+    const outer = {
+      kit: 'ring',
+      cx: RISO_ANCHORS[1],
+      cy: RISO_ANCHORS[1],
+      size: RISO_FRAME_OUTER_SIZE,
+      rot: RISO_ROT_DETENTS[0],
+      slot: INK,
+      stroke: RISO_STROKE_TIERS[1],
+    };
     // Consume the same per-part draws so the stream shape is uniform across rules.
-    drawPart(rng, 50, 50, 0);
-    return [outer, drawPart(rng, 50, 50, 2)];
+    drawPart(rng, RISO_ANCHORS[1], RISO_ANCHORS[1], 0);
+    return [outer, drawPart(rng, RISO_ANCHORS[1], RISO_ANCHORS[1], 2)];
   },
 };
 
@@ -182,7 +209,7 @@ export function risoIconRecord(seed, index) {
 
 /** A whole composed set: `count` records from one seed, in index order. */
 export function risoIconSet(seed = RISO_CANON_SEED, count = RISO_ICON_SET_SIZE) {
-  const n = Math.max(0, Math.min(256, count | 0));
+  const n = Math.max(0, Math.min(RISO_SET_COUNT_MAX, count | 0));
   return Array.from({ length: n }, (_, i) => risoIconRecord(seed, i));
 }
 
