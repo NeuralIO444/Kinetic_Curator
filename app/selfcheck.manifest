@@ -197,6 +197,7 @@ node src/gl/liveResolve.dishLife.selfcheck.mjs
 node src/gl/liveResolve.dishFluid.selfcheck.mjs
 node src/gl/dishFluid.selfcheck.mjs
 node src/gl/dishFluidMagnets.selfcheck.mjs
+node src/gl/liveLoop.dishFluid.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs
 node src/engine/organisms/behave.selfcheck.mjs
 node src/engine/organisms.selfcheck.mjs

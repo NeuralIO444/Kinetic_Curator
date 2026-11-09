@@ -1606,12 +1606,19 @@ export function createLiveLoop(
         // byte-identical.
         {
           const fluidPlan = getLastDishFluidPlan();
+          // The palette is resolved the way buildFrame resolved this frame's own (its
+          // resolveLiveRenderState derivation, liveLoop.mjs's buildFrame): tick has no
+          // voiceState in scope — reading the bare name here threw ReferenceError on every
+          // fluid-active frame (the #1997 live-path fault). Deriving from the snapshot the
+          // block already holds (st) through the same function can never put the floor in a
+          // different palette than the frame above it, voice mix included.
+          const framePalette = resolveLiveRenderState(st);
           live.setDishFluid(
             fluidPlan && fluidPlan.active
               ? {
                   plan: fluidPlan,
                   colours: fluidDisplayColours(
-                    resolvePalette(voiceState.paletteId, voiceState.paletteOverrides, st.userPalettes),
+                    resolvePalette(framePalette.paletteId, framePalette.paletteOverrides, st.userPalettes),
                   ),
                 }
               : null,

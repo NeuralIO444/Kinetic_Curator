@@ -185,3 +185,50 @@ culture's), `npm run build` green.
 - **The fluid does not seed from the stage.** Unlike the culture (seeded from marks), the
   fluid's seed is its own dealt inoculation (half at the magnets). "Seed from stage" for the
   fluid is not in the spec and was not built.
+
+## Correction — the live-path fault (found in the coordinator's review drive; fixed)
+
+The report above describes the build as committed in `4e2c1573`. That build's **live path was
+broken**, and every suite in it was green anyway. Recorded plainly:
+
+- **The defect.** Booting the built app and turning FERROFLUID on produced, every frame,
+  `[gl-live] frame error: ReferenceError: voiceState is not defined`. The loop's fault channel
+  tripped (the store's `renderFault`, reason "frame fault: voiceState is not defined"), no
+  frame ever presented, and the fluid floor never drew in the live app. With the fluid off the
+  arm's ternary short-circuits, so the blast radius was this feature's own live path — which
+  is the feature.
+- **The root cause.** In `gl/liveLoop.mjs`, the #1997 arm inside `tick()` resolved the frame
+  palette through a bare `voiceState` — a name that exists only inside `buildFrame` and
+  `clearAccum`, where a local `resolveLiveRenderState(s)` defines it. `tick()` has no such
+  local (the same scope trap as the #1914 steering-flag fault).
+- **Why the suites missed it.** Every #1997 suite drives the fluid through the resolver, the
+  kernel, the chip's state machine, or the GL debug harness — none drives `createLiveLoop`'s
+  real frame path with an active fluid plan, so the arm's non-null branch never executed
+  under test.
+- **The fix** (one expression, inside the #1997 arm): the palette is derived from the state
+  snapshot the block already holds (`st`) through the same derivation `buildFrame` used for
+  the frame being armed — `resolveLiveRenderState(st)` then `resolvePalette(...)` — so the
+  floor can never wear a different palette than the frame above it, voice mix included. No
+  new state reads; nothing outside the arm changed.
+- **The new pin** — `gl/liveLoop.dishFluid.selfcheck.mjs` (in the manifest beside the other
+  #1997 GL suites). Source pins: no `voiceState.` property read anywhere in `tick()`'s body,
+  and the arm derives its palette via `resolveLiveRenderState`/`resolvePalette`. Browser
+  section (the harness the GL suites use, extended to the built app): the suite rebuilds the
+  app (`npm run build`, so it tests the current tree, never a stale dist), serves `dist/`
+  locally, and boots it twice — a fluid-off control and a fluid-on boot via the loop's own
+  headless flag (`window.__KC_FERROFLUID`) — asserting the on boot publishes
+  `dishFluidAwake`, logs zero `[gl-live] frame error` console messages, keeps `renderFault`
+  down, presents real frames (screenshot content, not the faulted black canvas), and stays
+  clean with a magnet stamped through the store's own action.
+- **Pre/post, both shown.** Against the pre-fix tree (`ca55719d`, detached worktree, only the
+  new suite copied in): the suite FAILS — the source pin trips on the `voiceState.` read, and
+  with that section neutralised in the scratch copy the browser section fails on the fluid-on
+  boot with `frame errors: [gl-live] frame error: ReferenceError: voiceState is not defined`
+  (the control boot passes). Against the fixed tree: all 6 groups pass, and a manual boot of
+  the fixed build shows `renderFault: false`, `dishFluidAwake: true`, zero frame errors, and
+  the floor drawn under the stage.
+- **Re-verification after the fix:** all eight #1997 suites plus the new pin green; the
+  dishLife family (engine ×10, chip, governor), `liveResolve.dishLife`,
+  `liveResolve.determinism`, `governorCuts`, and `composite` (15 cases) green;
+  `format:check` clean, lint 0 errors (the standing 11 warnings, none in touched files),
+  `npm run build` green.
