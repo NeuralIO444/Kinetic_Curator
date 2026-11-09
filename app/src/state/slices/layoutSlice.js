@@ -274,6 +274,47 @@ function runRound(state, r) {
 /** The same honest die as a [0,1) stream, for the pure dealers (#1767) — replay comes from the stored result (#710). */
 const dieRng = () => die(0x40000000) / 0x40000000;
 
+/**
+ * #2003 / #2010 — the ray-gun record's one write (cyclePoemRaygun and
+ * setPoemRaygun both land through here). `mode` is a RAYGUN_MODES name
+ * to arm, or null to clear. Returns the store patch, or {} when nothing
+ * would change (no poem standing, a plate, an unknown mode, the mode
+ * already armed, clearing a plain form).
+ */
+function raygunWrite(state, mode) {
+  const form = state.layoutParams?.fieldForm;
+  if (!form) return {};
+  if (mode === null) {
+    if (!form.raygun) return {};
+    const next = { ...form };
+    delete next.raygun;
+    return {
+      ...pushToUndo(state, true),
+      layoutParams: { ...state.layoutParams, fieldForm: next },
+    };
+  }
+  if (!RAYGUN_MODES.includes(mode)) return {};
+  if (form.plate) return {}; // #2005 — a plate is never treated
+  if (form.raygun && form.raygun.mode === mode) return {};
+  const tap = state.raygunTap | 0;
+  const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);
+  const seed = Math.floor(rng() * 0x100000000) >>> 0;
+  const next = { ...form, raygun: { mode, seed } };
+  // #2006 slice 3 — arming the gun supersedes the review loop's
+  // repair: the performer's touch takes the poem over, and the two
+  // records never compose (the form door refuses review + raygun
+  // whole). The banked fieldReview record keeps what the loop did;
+  // the form's transform record leaves with the gesture. Cycling
+  // back to plain does not restore it — the repair belonged to the
+  // landing the performer has since taken over.
+  delete next.review;
+  return {
+    ...pushToUndo(state, true),
+    layoutParams: { ...state.layoutParams, fieldForm: next },
+    raygunTap: tap + 1,
+  };
+}
+
 /** #1918 — HOLD: the standing poem is locked against re-deals (lockedParams.fieldForm, and a poem stands). */
 const poemHeld = (state) => !!state.lockedParams?.fieldForm && !!state.layoutParams?.fieldForm;
 
@@ -1326,34 +1367,22 @@ export const createLayoutSlice = (set) => ({
     set((state) => {
       const form = state.layoutParams?.fieldForm;
       if (!form) return {};
-      if (form.plate) return {}; // #2005 — a plate is never treated
-      const tap = state.raygunTap | 0;
       const cur = form.raygun && RAYGUN_MODES.includes(form.raygun.mode) ? RAYGUN_MODES.indexOf(form.raygun.mode) : -1;
-      const next = { ...form };
-      if (cur === RAYGUN_MODES.length - 1) {
-        delete next.raygun;
-        return {
-          ...pushToUndo(state, true),
-          layoutParams: { ...state.layoutParams, fieldForm: next },
-        };
-      }
-      const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);
-      const seed = Math.floor(rng() * 0x100000000) >>> 0;
-      next.raygun = { mode: RAYGUN_MODES[cur + 1], seed };
-      // #2006 slice 3 — arming the gun supersedes the review loop's
-      // repair: the performer's touch takes the poem over, and the two
-      // records never compose (the form door refuses review + raygun
-      // whole). The banked fieldReview record keeps what the loop did;
-      // the form's transform record leaves with the gesture. Cycling
-      // back to plain does not restore it — the repair belonged to the
-      // landing the performer has since taken over.
-      delete next.review;
-      return {
-        ...pushToUndo(state, true),
-        layoutParams: { ...state.layoutParams, fieldForm: next },
-        raygunTap: tap + 1,
-      };
+      return raygunWrite(state, cur === RAYGUN_MODES.length - 1 ? null : RAYGUN_MODES[cur + 1]);
     }),
+
+  /**
+   * #2010 (treatment bus records) — the same write as the cycle, aimed:
+   * arm a named mode, or disarm with null. The treatments surface
+   * (curator/treatmentsLive.mjs) calls this for arm/disarm so a caller
+   * that knows the mode it wants (a doctrine, DAVIS — RAY GUN P5) lands
+   * it in ONE tap: one undo step, one seed drawn from the same ray-gun
+   * stream, the same plate refusal, the same review supersession. A
+   * write that would change nothing (the mode already armed; disarming
+   * a plain form; an unknown mode) does not land — no undo entry, no
+   * seed drawn. The cycle and this are the record's only write sites.
+   */
+  setPoemRaygun: (mode) => set((state) => raygunWrite(state, mode)),
 
   /** #1918 — KEEP: bank this exact materialized poem into the take. KEEP twice is one keeper. */
   // The bank is document data beside the poem itself (layoutParams.poemKeeps): a take records it (layoutParams

@@ -292,4 +292,11 @@ export const Events = {
   CLOCK_BAR: 'clock:bar', // #1458: { bar, bpm } every downbeat
   ACTIVITY_HEARTBEAT: 'activity:heartbeat', // #1390 (G8): { ts, idleMs } — loisActivity publishes while the artist is active
   DISH_DENSITY: 'dish:density', // #1412: { field } — the shared grid's contact-density field for the frame (engine/dishDensity.mjs; counts are that tick's, read-only)
+  // #2010 — RAY GUN treatment bus records (D4: the bus before the engines). ANNOUNCEMENTS, never state: the record
+  // on the form (fieldForm.raygun) is the replay authority; these say that a treatment act happened, who caused it
+  // (meta.cause: performer | davis | director | lois | document) and where in the bar. curator/treatmentsLive.mjs is
+  // the one emitter; the take's `treatments` section is the recording listener (curator/treatmentRecord.mjs).
+  TREATMENT_ARM: 'treatment:arm', // { target: 'poem', mode, seed, from: mode | null } a treatment armed (or re-armed)
+  TREATMENT_DISARM: 'treatment:disarm', // { target: 'poem', mode } the armed treatment left; the form stands plain
+  TREATMENT_VERDICT: 'treatment:verdict', // { target, mode, verdict, by } reserved: a judged treatment (#2006 / P5)
 };
