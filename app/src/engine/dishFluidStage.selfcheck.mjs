@@ -2,7 +2,8 @@
 //
 //   A absent     no stamp = no state, no publication, no plan; the stage touches nothing
 //   B bookkeeping the grid sim steps toward the stamp at the rung's bound; the plan carries
-//                the shed ladder's steps + resolution for the display instance
+//                the attachment terms (the published density, the stamped magnets + dials,
+//                the rung's seating grid + matter fraction) for the body's render
 //   C wake       a new wake re-seeds; a stamp behind the stage rebuilds from the cycle seed
 //                and lands on the same field
 //   D snapshot   snapshot/restore round-trips the grid field exactly — the field itself rides
@@ -55,18 +56,22 @@ const driveFrom = (stage, from, until, over = {}) => {
   drive(st, 1000);
   assert.ok(st.publishedFluid.step > 20, `the grid sim advances (${st.publishedFluid.step})`);
   assert.equal(st.publishedFluid.density.length, 96 * 54, 'density publishes at the dish grid');
-  assert.equal(st.plan.cols, 384);
-  assert.equal(st.plan.rows, 216);
-  assert.equal(st.plan.stepsAllowed, 8, 'rung 0 serves the design point');
-  assert.equal(st.plan.stepTarget, stamp(1000).step);
+  assert.equal(st.plan.density, st.publishedFluid.density, 'the plan carries the published density itself');
+  assert.equal(st.plan.step, st.publishedFluid.step, 'and the grid step it was published at');
+  assert.deepEqual([st.plan.seatCols, st.plan.seatRows], [96, 54], 'rung 0 seats the body at the full dish grid');
+  assert.equal(st.plan.matterFrac, 1, 'rung 0 keeps the whole body');
   assert.deepEqual(st.plan.magnets, [{ x: 0.5, y: 0.5 }], 'the stamped magnets ride the plan');
+  assert.deepEqual(st.plan.dial, { flow: 0.5, pull: 0.7, couple: 0.5 }, 'and the stamped dials');
   const held = createDishFluidStage();
-  drive(held, 1000, { shed: 7 });
-  assert.equal(held.plan.stepsAllowed, 0, 'the last rung holds the display');
-  assert.equal(held.publishedFluid.step, 0, 'and the grid instance holds with it');
+  drive(held, 1000, { shed: 9 });
+  assert.equal(held.publishedFluid.step, 0, 'the held rung holds the grid instance');
+  assert.equal(held.plan.active, true, 'a held fluid still publishes its plan (its body stands)');
   const coarse = createDishFluidStage();
   drive(coarse, 500, { shed: 5 });
-  assert.deepEqual([coarse.plan.cols, coarse.plan.rows], [192, 108], 'resolution rungs ride the plan');
+  assert.deepEqual([coarse.plan.seatCols, coarse.plan.seatRows], [48, 27], 'seat rungs ride the plan');
+  const thin = createDishFluidStage();
+  drive(thin, 500, { shed: 8 });
+  assert.equal(thin.plan.matterFrac, 0.25, 'matter rungs ride the plan');
 }
 
 // ---- C: wake + seek-back

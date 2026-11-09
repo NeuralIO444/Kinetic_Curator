@@ -1,13 +1,13 @@
 // dishFluid.selfcheck.mjs — FERROFLUID (#1997): the Gray-Scott kernel and the dish's fluid law.
 //
-//   A determinism  same stamped inputs → bit-identical field after N steps (the same-device
-//                  guarantee, asserted on the kernel's own harness); the seed is a pure
+//   A determinism  same stamped inputs → bit-identical field after N steps (the kernel is
+//                  pure JS, so the identity is exact everywhere); the seed is a pure
 //                  function of (seedKey, magnets)
 //   B magnet bias  density response monotone in magnet distance and in the PULL dial
 //   C culture bias feed direction: a living culture field grows more dark phase than a dead one
 //   D dials        FLOW moves the field's tempo; clamps/sanitizers read junk as the safe side
 //   E stamp        the cycle clock is pure: wake/step derive from loop time only; the shed
-//                  ladder pins steps-before-resolution
+//                  ladder pins steps, then the body's seat, then its count, then hold
 //   F density      the published density is the dish-grid downsample of the dark phase
 import assert from 'node:assert/strict';
 import {
@@ -22,11 +22,10 @@ import {
   sanitizeMagnets,
   sanitizeFluidDial,
   clampFluidRung,
-  fluidDisplayColours,
+  fluidSeatRows,
   FLUID_GRID_COLS,
   FLUID_GRID_ROWS,
   FLUID_SHED_RUNGS,
-  FLUID_RESOLUTIONS,
   MAX_MAGNETS,
 } from './dishFluid.mjs';
 
@@ -151,31 +150,25 @@ const fresh = (seedKey = 777, magnets = []) => createFluid({ cols: 48, rows: 27,
   assert.deepEqual(fluidStamp(6500, { shed: 0 }), a, 'the stamp is pure');
   assert.equal(fluidStamp(0).step, 0);
   assert.equal(fluidStamp(-5).wakeMs, 0, 'junk time reads as the first cycle');
-  // the ladder: steps fall 8→4→2→1 at full resolution, then resolution falls at 1 step, then hold
+  // the ladder: steps fall 8→4→2→1 first (tempo), then the attached body's seating grid
+  // coarsens 96→64→48→32, then the body's count falls ½→¼, then the fluid holds
   assert.deepEqual(
-    FLUID_SHED_RUNGS.map((r) => [r.steps, r.res]),
+    FLUID_SHED_RUNGS.map((r) => [r.steps, r.seat, r.matter]),
     [
-      [8, 0],
-      [4, 0],
-      [2, 0],
-      [1, 0],
-      [1, 1],
-      [1, 2],
-      [1, 3],
-      [0, 3],
+      [8, 96, 1],
+      [4, 96, 1],
+      [2, 96, 1],
+      [1, 96, 1],
+      [1, 64, 1],
+      [1, 48, 1],
+      [1, 32, 1],
+      [1, 32, 0.5],
+      [1, 32, 0.25],
+      [0, 32, 0.25],
     ],
-    'steps shed before resolution',
+    'steps shed before the seat, the seat before the count, the count before the hold',
   );
-  assert.deepEqual(
-    FLUID_RESOLUTIONS.map((r) => [r.cols, r.rows]),
-    [
-      [384, 216],
-      [256, 144],
-      [192, 108],
-      [96, 54],
-    ],
-    'the design point is 384×216; the floor is the dish grid',
-  );
+  assert.deepEqual([96, 64, 48, 32].map(fluidSeatRows), [54, 36, 27, 18], 'seat rows follow the dish grid’s aspect');
 }
 
 // ---- F: published density
@@ -186,18 +179,10 @@ const fresh = (seedKey = 777, magnets = []) => createFluid({ cols: 48, rows: 27,
   assert.deepEqual([...d], [...f.v], 'at the dish grid the density IS the dark phase');
   const big = run(createFluid({ cols: 384, rows: 216, seedKey: 8 }), 10, {});
   const bd = fluidDensity(big);
-  assert.equal(bd.length, FLUID_GRID_COLS * FLUID_GRID_ROWS, 'a display field downsamples to the dish grid');
+  assert.equal(bd.length, FLUID_GRID_COLS * FLUID_GRID_ROWS, 'a larger field downsamples to the dish grid');
   const mean = fluidMeanDensity(big);
   const dMean = bd.reduce((t, v) => t + v, 0) / bd.length;
   assert.ok(Math.abs(mean - dMean) < 0.02, 'the downsample preserves the field’s level');
-}
-
-// ---- display colours (the palette read)
-{
-  const c = fluidDisplayColours({ bg: '#101014', ink: '#05050a', swatches: ['#202020', '#f0ead8', '#804040'] });
-  assert.deepEqual(c.ground, [0x10 / 255, 0x10 / 255, 0x14 / 255]);
-  assert.deepEqual(c.bright, [0xf0 / 255, 0xea / 255, 0xd8 / 255], 'the sheen is the lightest swatch');
-  assert.deepEqual(fluidDisplayColours(null), { ground: [0, 0, 0], bright: [1, 1, 1], ink: [0.02, 0.02, 0.03] });
 }
 
 console.log('dishFluid.selfcheck: ok');

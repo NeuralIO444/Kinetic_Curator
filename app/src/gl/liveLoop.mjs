@@ -33,7 +33,6 @@ import {
   getLastSpawnDecisions,
   getLastDishWet,
   getLastCouplingBackground,
-  getLastDishFluidPlan,
   setLiveWetSampler,
 } from './liveResolve.mjs';
 import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
@@ -52,7 +51,7 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
-import { fluidStamp, fluidDisplayColours } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp + its palette colours
+import { fluidStamp } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp (the resolver seats its body; the loop only stamps)
 import { installDishFluidMagnets } from './dishFluidMagnetsDom.mjs'; // #1997: the magnet placement gesture (armed by the chip)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
 import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
@@ -1599,31 +1598,11 @@ export function createLiveLoop(
               }
             : null,
         );
-        // #1997: arm the ferrofluid floor with the plan the resolver just published for this
-        // frame (getLastDishFluidPlan) and the frame's palette colours — the dish the stage
-        // rests on is the palette's own ground, the sheen its lightest swatch, the dark phase
-        // its ink. No plan (fluid off) disarms it: no step runs, no floor draws, the frame is
-        // byte-identical.
-        {
-          const fluidPlan = getLastDishFluidPlan();
-          // The palette is resolved the way buildFrame resolved this frame's own (its
-          // resolveLiveRenderState derivation, liveLoop.mjs's buildFrame): tick has no
-          // voiceState in scope — reading the bare name here threw ReferenceError on every
-          // fluid-active frame (the #1997 live-path fault). Deriving from the snapshot the
-          // block already holds (st) through the same function can never put the floor in a
-          // different palette than the frame above it, voice mix included.
-          const framePalette = resolveLiveRenderState(st);
-          live.setDishFluid(
-            fluidPlan && fluidPlan.active
-              ? {
-                  plan: fluidPlan,
-                  colours: fluidDisplayColours(
-                    resolvePalette(framePalette.paletteId, framePalette.paletteOverrides, st.userPalettes),
-                  ),
-                }
-              : null,
-          );
-        }
+        // #1997: no render arm — the ferrofluid system is invisible (Matt's ruling,
+        // 2026-11-08): the resolver seats its body as ordinary stage items in the resolve
+        // itself, so the loop's whole part is the stamp above. (The first build armed a
+        // fullscreen floor pass here from the resolver's plan; that visible-texture path —
+        // and the palette derivation it needed — was removed with the ruling.)
       }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;

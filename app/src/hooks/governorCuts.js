@@ -161,7 +161,7 @@ export const GOVERNOR_RESTORE_CUTS = [
     kind: 'dishFluid',
     // #1997 — cut 1.395: the ferrofluid sheds right AFTER its sibling the culture (same family
     // position in the ladder, cut for cut), so in the reverse walk the fluid comes back BEFORE
-    // the culture — the dish's floor is whole again before the culture resumes stepping.
+    // the culture — the fluid's body is whole again before the culture resumes stepping.
     needsRestore: (s, ctx) => ctx.healthy && (s.dishFluidShed | 0) > 0,
     restoredLabel: 'ferrofluid back — the dish flows again',
   },
@@ -314,15 +314,14 @@ export function nextGovernorCut(s) {
 
   // Cut 1.395 (#1997): the ferrofluid (FERROFLUID dish mode) — the culture's sibling, cut right
   // after it on the same family business: a dish surface, never the picture itself. The ladder is
-  // the kernel's (engine/dishFluid.mjs FLUID_SHED_RUNGS): steps fall 8 → 4 → 2 → 1 while the grid
-  // is whole (a seamless sacrifice — the fluid moves slower), then resolution falls
-  // 384×216 → 256×144 → 192×108 → 96×54 (detail after tempo; a resolution change re-seeds the
-  // display field, so it is spent only once tempo is), then the fluid holds. Opt-in per caller
-  // (`dishFluidActive === true` = a fluid is awake) so older callers and their pinned ladder
-  // walks keep the pre-#1997 ladder exactly as it was. Registration note: the fluid's shedding
-  // is THIS rung — like the culture, it carries no cost-registry tier of its own (the registry's
-  // tier 1 is contractually the ACCUM chain); the family registers with the governor, and the
-  // floor draw is a tier-0 renderer programme (renderer/dishfluid).
+  // the kernel's (engine/dishFluid.mjs FLUID_SHED_RUNGS): steps fall 8 → 4 → 2 → 1 (a seamless
+  // sacrifice — the fluid moves slower), then the attached body's seating grid coarsens
+  // 96 → 64 → 48 → 32 wide, then the body's count falls to ½ and ¼, then the fluid holds.
+  // Opt-in per caller (`dishFluidActive === true` = a fluid is awake) so older callers and their
+  // pinned ladder walks keep the pre-#1997 ladder exactly as it was. Registration note: the
+  // fluid's shedding is THIS rung — like the culture, it carries no cost-registry tier of its
+  // own (the registry's tier 1 is contractually the ACCUM chain); the family registers with the
+  // governor alone (the system is invisible: there is no fluid renderer programme to tier).
   if (s.dishFluidActive === true && (s.dishFluidShed | 0) < FLUID_SHED_RUNGS.length - 1) {
     const dishFluidShed = (s.dishFluidShed | 0) + 1;
     return {
@@ -627,11 +626,13 @@ export function shedSummary(s) {
   // #1923 — and about a culture shed: the dish slowed or held.
   if ((s.dishLifeShed | 0) === 1) out.push('culture slowed');
   if ((s.dishLifeShed | 0) >= 2) out.push('culture held');
-  // #1997 — and about a ferrofluid shed: slowed (steps), coarsened (resolution), or held.
+  // #1997 — and about a ferrofluid shed: slowed (steps), coarsened (the body's seating grid),
+  // thinned (the body's count), or held.
   const fluidShedNow = s.dishFluidShed | 0;
   if (fluidShedNow >= 1 && fluidShedNow <= 3) out.push('ferrofluid slowed');
   if (fluidShedNow >= 4 && fluidShedNow <= 6) out.push('ferrofluid coarsened');
-  if (fluidShedNow >= 7) out.push('ferrofluid held');
+  if (fluidShedNow >= 7 && fluidShedNow <= 8) out.push('ferrofluid thinned');
+  if (fluidShedNow >= 9) out.push('ferrofluid held');
   // #1627 S1 — the badge is honest about a weather shed.
   if (s.weatherShed) out.push('weather clear');
   // #1490 — and about a warp shed: the trails run straight, the badge says so.

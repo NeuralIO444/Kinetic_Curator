@@ -6,15 +6,15 @@
 // = no fluid: the stage drops its state and touches nothing, and a frame without the keys is byte-identical
 // to a build without this module.
 //
-//   TWO INSTANCES, ONE KERNEL — this stage steps the kernel (engine/dishFluid.mjs) at the DISH GRID
-//   (96×54) at 1/FLUID_GRID_STEP_DIVISOR of the display rate. That instance is the COUPLING AUTHORITY:
-//   its published density is what the culture's births read (engine/dishFluidCouple.mjs), and it is the
-//   state a snapshot restores — pure JS over the recorded stream, so the coupling is exact on every
-//   device. The DISPLAY field is the same kernel at the shed resolution on the GPU
-//   (gl/dishFluidGl.mjs), driven by the plan this stage publishes; per Matt's ruling (2026-11-08) the
-//   display is a Davis-side living surface — same stamps, same magnets, same bias inputs, its own
-//   resolution. The two instances are siblings, never texel-identical, and nothing in the coupling
-//   ever reads the display instance.
+//   ONE INSTANCE, ONE KERNEL — this stage steps the kernel (engine/dishFluid.mjs) at the DISH GRID
+//   (96×54) at 1/FLUID_GRID_STEP_DIVISOR of the stamp rate. That instance is the whole system: its
+//   published density is what the culture's births read (engine/dishFluidCouple.mjs), it is the
+//   state a snapshot restores, and it is the field the stage's attached matter seats on
+//   (engine/dishFluidRender.mjs, driven by the attachment plan this stage publishes). Pure JS over
+//   the recorded stream, so the coupling, the snapshot and the visible body are exact on every
+//   device. (The first build carried a second, GPU display instance rendering a fluid floor;
+//   Matt's ruling later on 2026-11-08 made the system invisible — assets attach to it instead —
+//   and the display instance was removed.)
 //
 //   WAKE / CYCLE — the stamp is a cycle clock (the field culture's shape): when wakeMs changes the
 //   fluid re-seeds from the seeded stream under the new wake's seed key, magnets first. A stamp BEHIND
@@ -39,13 +39,13 @@ import {
   stepFluid,
   fluidDensity,
   fluidSeedKey,
+  fluidSeatRows,
   sanitizeMagnets,
   sanitizeFluidDial,
   clampFluidRung,
   FLUID_GRID_COLS,
   FLUID_GRID_ROWS,
   FLUID_GRID_STEP_DIVISOR,
-  FLUID_RESOLUTIONS,
   FLUID_SHED_RUNGS,
 } from './dishFluid.mjs';
 
@@ -62,20 +62,22 @@ export function createDishFluidStage() {
     wakeMs: null,
     density: null,
   };
-  // The display plan: ONE stable object the loop reads after the resolve (getLastDishFluidPlan)
-  // to drive the GPU instance. Inactive on the same terms.
+  // The attachment plan: ONE stable object the resolver reads after this stage applies
+  // (getLastDishFluidPlan) to seat the fluid's visible body (engine/dishFluidRender.mjs): the
+  // exact instance's published density, the stamped magnets + dials, and the governor rung's
+  // seating terms (seat grid + matter fraction). Its density is the publishedFluid array
+  // itself — read it the frame you get it, never retain it. Inactive on the same terms.
   const plan = {
     active: false,
     seedKey: 0,
     wakeMs: null,
-    stepTarget: 0,
-    stepsAllowed: 0,
-    resIndex: 0,
-    cols: FLUID_RESOLUTIONS[0].cols,
-    rows: FLUID_RESOLUTIONS[0].rows,
+    step: -1,
+    density: null,
     magnets: [],
     dial: { flow: 0.5, pull: 0.7, couple: 0.5 },
-    coupleField: null,
+    seatCols: FLUID_GRID_COLS,
+    seatRows: FLUID_GRID_ROWS,
+    matterFrac: 1,
     aspectHW: 0.7,
   };
 
@@ -85,9 +87,8 @@ export function createDishFluidStage() {
     publishedFluid.wakeMs = null;
     publishedFluid.density = null;
     plan.active = false;
-    plan.stepTarget = 0;
-    plan.stepsAllowed = 0;
-    plan.coupleField = null;
+    plan.step = -1;
+    plan.density = null;
   }
 
   function build(wakeMs, seed, magnets) {
@@ -159,16 +160,13 @@ export function createDishFluidStage() {
     plan.active = true;
     plan.seedKey = st.seedKey;
     plan.wakeMs = st.wakeMs;
-    plan.stepTarget = Math.max(0, Math.floor(Number(stamp.step) || 0));
-    plan.stepsAllowed = rung.steps;
-    plan.resIndex = rung.res;
-    plan.cols = FLUID_RESOLUTIONS[rung.res].cols;
-    plan.rows = FLUID_RESOLUTIONS[rung.res].rows;
+    plan.step = st.sim.step;
+    plan.density = publishedFluid.density;
     plan.magnets = magnets;
     plan.dial = dial;
-    plan.coupleField = st.coupleRef
-      ? { cols: st.coupleRef.cols, rows: st.coupleRef.rows, level: st.coupleRef.level, gen: st.coupleRef.gen }
-      : null;
+    plan.seatCols = rung.seat;
+    plan.seatRows = fluidSeatRows(rung.seat);
+    plan.matterFrac = rung.matter;
     plan.aspectHW = aspectHW;
     return true;
   }
@@ -224,16 +222,18 @@ export function createDishFluidStage() {
       publishedFluid.step = st.sim.step;
       publishedFluid.wakeMs = st.wakeMs;
       st.lastPublishedStep = st.sim.step;
+      // the plan is re-published in full by the next apply; until then it carries the restored
+      // field at the ladder's whole terms (the pre-rework restore set stepsAllowed 0 the same way)
       plan.active = true;
       plan.seedKey = st.seedKey;
       plan.wakeMs = st.wakeMs;
-      plan.stepTarget = st.sim.step * FLUID_GRID_STEP_DIVISOR;
-      plan.stepsAllowed = 0;
+      plan.step = st.sim.step;
+      plan.density = publishedFluid.density;
       plan.magnets = magnets;
       plan.dial = st.dial;
-      plan.coupleField = st.coupleRef
-        ? { cols: st.coupleRef.cols, rows: st.coupleRef.rows, level: st.coupleRef.level, gen: st.coupleRef.gen }
-        : null;
+      plan.seatCols = FLUID_GRID_COLS;
+      plan.seatRows = FLUID_GRID_ROWS;
+      plan.matterFrac = 1;
     },
   };
 }
