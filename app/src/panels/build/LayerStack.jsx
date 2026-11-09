@@ -59,7 +59,7 @@ import {
 import { strataSummary, trimNum } from './strataSummary.mjs';
 import { stratumRotationOf, STRATUM_ROTATIONS } from '../../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
 import { ModeRow } from './te/ModeRow.jsx';
-import { SliderEditor } from './te/editors.jsx';
+import { SliderEditor, StepperEditor } from './te/editors.jsx';
 import { stopsFor } from './te/modeStops.mjs';
 import { wetStopsForCap, PATCH_STRENGTH_STOPS, fxStopsFor } from './blockStops.mjs';
 import { ASSETS } from '../../data/assets/index.js';
@@ -967,7 +967,11 @@ export function LayerStack() {
                 block control. Every stratum type carries it: a content
                 stratum turns its marks, a pattern its field, an FX/MATH
                 stratum its effect field — always about the stage
-                centre, always the stratum's OWN contribution. */}
+                centre, always the stratum's OWN contribution. The dock
+                editor is a detent STEPPER, not a slider (QA fix): the
+                detents are non-uniform, so a step-15 slider would also
+                offer 30/60/75 — values the data law sanitizes to 0,
+                silently erasing the rotation it appeared to set. */}
             <div
               className="strata-composite"
               title="ROTATE — this stratum's own frame turns by the detent, about the stage centre. 0° is the stratum as dealt."
@@ -986,14 +990,11 @@ export function LayerStack() {
                 stops={STRATUM_ROTATIONS}
                 onSelect={(v) => emit(Events.LAYER_SET_ROTATION, { id: layer.id, rotation: v })}
                 onOpen={() => (
-                  <SliderEditor
+                  <StepperEditor
                     ariaLabel="Rotate"
                     value={rotation}
-                    min={0}
-                    max={90}
-                    step={15}
-                    format={(v) => `${Math.round(v)}°`}
-                    defaultValue={0}
+                    stops={STRATUM_ROTATIONS}
+                    format={(v) => `${v}°`}
                     onChange={(v) => emit(Events.LAYER_SET_ROTATION, { id: layer.id, rotation: v })}
                   />
                 )}
