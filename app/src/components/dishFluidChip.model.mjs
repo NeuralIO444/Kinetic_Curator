@@ -7,6 +7,8 @@
 // pref ('kc.dishFluid.v1'). The MAGNET arm is NOT part of the pref: arming the hand is a
 // moment, not a preference.
 
+import { FLUID_SHED_RUNGS } from '../engine/dishFluid.mjs';
+
 /** The localStorage key for the ferrofluid performer's preference. */
 export const FERRO_PREF_KEY = 'kc.dishFluid.v1';
 
@@ -21,7 +23,7 @@ export function ferroChipState({ on, arming, shed }) {
   if (!on) return 'off';
   if (arming) return 'arming';
   const rung = shed | 0;
-  if (rung >= 7) return 'held';
+  if (rung >= FLUID_SHED_RUNGS.length - 1) return 'held';
   if (rung >= 1) return 'slowed';
   return 'on';
 }

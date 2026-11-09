@@ -3,9 +3,12 @@
 // A two-phase Gray-Scott reaction-diffusion field living in the dish, sibling of the DISH LIFE
 // culture: seeded, fixed-step on simulation time, governor-sheddable, and coupled to the culture
 // both ways through published state read one frame behind. This module is the MATH AUTHORITY —
-// the step the GPU runs (gl/dishFluidGl.mjs) is this step, tap for tap, and the dish-grid
-// instance of it inside the resolver (engine/dishFluidStage.mjs) is the coupling authority the
-// culture reads. No clock, no Math.random, no globals: a fluid is a pure function of its stamped
+// the one instance of the kernel lives at the dish grid inside the resolver
+// (engine/dishFluidStage.mjs): it is the coupling authority the culture reads AND the field the
+// stage's attached matter seats on (engine/dishFluidRender.mjs). The system itself is never
+// drawn (Matt's ruling, 2026-11-08): like FLOW's curl field it is an underneath system, and
+// what appears on stage as the ferrofluid is a body of ordinary asset instances attached to
+// this field. No clock, no Math.random, no globals: a fluid is a pure function of its stamped
 // inputs (seed, wake, magnets, dials, the culture field it was handed).
 //
 //   MAGNETS — placed objects that stay on the dish (stamped state, dish-normalized {x, y},
@@ -21,13 +24,12 @@
 //   output: the fluid biases births/deaths/activity, never the terrain record.
 //
 //   DETERMINISM (Matt's ruling, 2026-11-08, on #1997) — magnets, seed and step count are
-//   stamped state, so replay on the SAME DEVICE is exact. GPU float does not promise
-//   bit-identity across devices, and this module does not pretend otherwise: the fluid is a
-//   Davis-side living surface (like the ACCUM feedback) under the standing WebGL parity bar —
-//   visual identity, not pixel-exactness. The culture stays CPU and byte-identical. The
-//   dish-grid instance in the resolver is pure JS over the recorded stream, so the COUPLING
-//   (what the culture reads, what a snapshot restores) is exact everywhere; the display field
-//   at shed resolution is the same kernel driven by the same stamps on the GPU.
+//   stamped state. Originally the ruling's terms were written for a GPU display instance
+//   (same-device exact, cross-device float variance accepted); the presentation rework
+//   (2026-11-08, later the same day) removed the GPU instance entirely — the system is
+//   invisible and assets attach to it — so the one kernel instance is pure JS over the
+//   recorded stream and the attachment seating is a pure function of it: the fluid, its
+//   coupling and its visible body are exact on every device, the culture's own terms.
 
 import { hashU01 } from './kernel/rng.js';
 
@@ -35,32 +37,34 @@ import { hashU01 } from './kernel/rng.js';
 export const FLUID_GRID_COLS = 96;
 export const FLUID_GRID_ROWS = 54;
 
-/** Display resolutions, finest first — the shed ladder's resolution axis (probe, #1997). */
-export const FLUID_RESOLUTIONS = Object.freeze([
-  Object.freeze({ cols: 384, rows: 216 }),
-  Object.freeze({ cols: 256, rows: 144 }),
-  Object.freeze({ cols: 192, rows: 108 }),
-  Object.freeze({ cols: 96, rows: 54 }),
-]);
-
 /**
- * The governor's shed ladder for the fluid, cheapest sacrifice first: step rate falls
- * 8 → 4 → 2 → 1 while the grid is whole (a seamless sacrifice — the fluid just moves slower),
- * then resolution falls 384×216 → 256×144 → 192×108 → 96×54 at one step (detail is a bigger
- * sacrifice than tempo, and a resolution change re-seeds the display field, so it is spent
- * only after tempo is), then the fluid holds (0 steps — drawn, still). Rung 0 is the design
- * point: 384×216 at 8 steps/frame.
+ * The governor's shed ladder for the fluid, cheapest sacrifice first. The axes, in the order
+ * they are spent: TEMPO — the step rate falls 8 → 4 → 2 → 1 (a seamless sacrifice: the fluid
+ * just moves slower); SEAT — the attachment body's seating grid coarsens 96 → 64 → 48 → 32
+ * cells wide (the attached matter reads chunkier; the kernel itself always runs at the dish
+ * grid); MATTER — the attached body's count falls to ½, then ¼ (the field keeps stepping,
+ * less of it shows); then the fluid HOLDS (0 steps — its body stands, frozen). Rung 0 is the
+ * design point: 8 steps/frame, the body seated at the full dish grid, whole.
+ * (`seat` is the seating grid's column count; its rows follow the dish grid's aspect.)
  */
 export const FLUID_SHED_RUNGS = Object.freeze([
-  Object.freeze({ steps: 8, res: 0, label: 'full' }),
-  Object.freeze({ steps: 4, res: 0, label: 'FERRO SLOW — the fluid steps 4 a frame' }),
-  Object.freeze({ steps: 2, res: 0, label: 'FERRO SLOWER — the fluid steps 2 a frame' }),
-  Object.freeze({ steps: 1, res: 0, label: 'FERRO TRICKLE — the fluid steps 1 a frame' }),
-  Object.freeze({ steps: 1, res: 1, label: 'FERRO COARSE — the fluid grid drops to 256×144' }),
-  Object.freeze({ steps: 1, res: 2, label: 'FERRO COARSER — the fluid grid drops to 192×108' }),
-  Object.freeze({ steps: 1, res: 3, label: 'FERRO DISH GRID — the fluid runs at 96×54' }),
-  Object.freeze({ steps: 0, res: 3, label: 'FERRO HELD — the fluid holds still' }),
+  Object.freeze({ steps: 8, seat: 96, matter: 1, label: 'full' }),
+  Object.freeze({ steps: 4, seat: 96, matter: 1, label: 'FERRO SLOW — the fluid steps 4 a frame' }),
+  Object.freeze({ steps: 2, seat: 96, matter: 1, label: 'FERRO SLOWER — the fluid steps 2 a frame' }),
+  Object.freeze({ steps: 1, seat: 96, matter: 1, label: 'FERRO TRICKLE — the fluid steps 1 a frame' }),
+  Object.freeze({ steps: 1, seat: 64, matter: 1, label: 'FERRO COARSE — the fluid’s body reads at 64 wide' }),
+  Object.freeze({ steps: 1, seat: 48, matter: 1, label: 'FERRO COARSER — the fluid’s body reads at 48 wide' }),
+  Object.freeze({ steps: 1, seat: 32, matter: 1, label: 'FERRO COARSEST — the fluid’s body reads at 32 wide' }),
+  Object.freeze({ steps: 1, seat: 32, matter: 0.5, label: 'FERRO THIN — half the fluid’s body stays' }),
+  Object.freeze({ steps: 1, seat: 32, matter: 0.25, label: 'FERRO THINNER — a quarter of the fluid’s body stays' }),
+  Object.freeze({ steps: 0, seat: 32, matter: 0.25, label: 'FERRO HELD — the fluid holds still' }),
 ]);
+
+/** The seating grid's row count for a rung's seat columns (the dish grid's aspect). Pure. */
+export function fluidSeatRows(seatCols) {
+  const c = Math.max(1, Math.round(Number(seatCols) || FLUID_GRID_COLS));
+  return Math.max(1, Math.round((c * FLUID_GRID_ROWS) / FLUID_GRID_COLS));
+}
 
 /** A governor rung value, clamped to the ladder; junk reads as 0 (full — the unshed state). */
 export function clampFluidRung(v) {
@@ -73,9 +77,9 @@ export const FLUID_STEPS_PER_SEC = 480;
 /** Steps per fluid cycle: 6 s at the design rate, the field culture's own cycle length class. */
 export const FLUID_CYCLE_STEPS = 2880;
 /**
- * The dish-grid coupling instance steps at 1/FLUID_GRID_STEP_DIVISOR of the display rate
- * (60 steps/s): an RD step at 96×54 is culture-priced (≈0.11 ms), and the coupling reads a
- * climate, not a flicker — it does not need the display's tempo.
+ * The dish-grid instance steps at 1/FLUID_GRID_STEP_DIVISOR of the stamp rate (60 steps/s):
+ * an RD step at 96×54 is culture-priced (≈0.11 ms), and the coupling reads a climate, not a
+ * flicker — it does not need the stamp's tempo.
  */
 export const FLUID_GRID_STEP_DIVISOR = 8;
 
@@ -105,7 +109,7 @@ export const CULTURE_FEED_GAIN = 0.02;
 export const CULTURE_KILL_DROP = 0.008;
 /** Magnet influence radius, in dish-normalized units (gaussian falloff exp(−(d/R)²)). */
 export const MAGNET_RADIUS = 0.085;
-/** Most magnets the dish holds — also the step shader's uniform array size. */
+/** Most magnets the dish holds. */
 export const MAX_MAGNETS = 8;
 /** The FLOW dial's feed multiplier range: feed × (MIN + (MAX − MIN) × flow). */
 export const FLOW_FEED_MIN = 0.5;
@@ -184,8 +188,7 @@ export function magnetFieldAt(magnets, nx, ny, aspectHW = 0.7) {
  * double-buffered. The initial condition is a pure function of (seedKey, magnets): U = 1
  * everywhere, V = 0 except SEED_BLOBS inoculation discs dealt from the seeded stream — half
  * of them centred on magnets (cycling through the list) with a seeded jitter, so a re-seeded
- * fluid stands its spikes back up at the magnets first; the rest dealt over the dish. The GPU
- * uploads exactly these arrays, so both paths start from the same field.
+ * fluid stands its spikes back up at the magnets first; the rest dealt over the dish.
  */
 export function createFluid({ cols, rows, seedKey = 0, magnets = [] } = {}) {
   const w = Math.max(1, cols | 0);
@@ -384,33 +387,4 @@ export function fluidStamp(loopMs, { shed = 0 } = {}) {
   const wakeMs = cycle * cycleMs;
   const step = Math.min(FLUID_CYCLE_STEPS - 1, Math.floor(((t - wakeMs) / 1000) * FLUID_STEPS_PER_SEC));
   return { mode: 'fluid', wakeMs, step, cycleSteps: FLUID_CYCLE_STEPS, shed: shed | 0 };
-}
-
-/**
- * The display colours for the fluid from the standing palette: ground = the palette's own
- * background (the dish the stage already rests on), bright = its lightest swatch (the oily
- * sheen), ink = its ink (the dark phase). Hex strings in, [r, g, b] 0..1 triples out. Pure.
- */
-export function fluidDisplayColours(palette) {
-  const p = palette && typeof palette === 'object' ? palette : {};
-  const parse = (hex) => {
-    const m = typeof hex === 'string' ? /^#?([0-9a-f]{6})$/i.exec(hex.trim()) : null;
-    if (!m) return null;
-    const n = parseInt(m[1], 16);
-    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
-  };
-  const ground = parse(p.bg) || [0, 0, 0];
-  const ink = parse(p.ink) || [0.02, 0.02, 0.03];
-  let bright = null;
-  let best = -1;
-  for (const s of Array.isArray(p.swatches) ? p.swatches : []) {
-    const c = parse(s);
-    if (!c) continue;
-    const lum = 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2];
-    if (lum > best) {
-      best = lum;
-      bright = c;
-    }
-  }
-  return { ground, bright: bright || [1, 1, 1], ink };
 }

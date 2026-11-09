@@ -102,8 +102,11 @@ const POEM_ONLY_IDS = new Set(
     (a) => a.id,
   ),
 );
-import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
+import { createDishLifeStage, isTerrain } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
 import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
+import { fluidMatterItems, isFluidMatter } from '../engine/dishFluidRender.mjs'; // #1997: the fluid's attached body — ordinary items seated on its published density
+import { coverageField } from '../engine/dishLifeSeed.mjs'; // #1997: the terrain coverage the attachment's bedrock mask is derived from (the culture seed's own field)
+import { FLUID_GRID_COLS, FLUID_GRID_ROWS } from '../engine/dishFluid.mjs'; // #1997: the dish grid the bedrock mask is sampled at
 import {
   fieldSampler,
   effectiveCoupling,
@@ -338,12 +341,12 @@ export function getLastDishWet() {
 }
 
 /**
- * #1997 — the last resolved frame's FERROFLUID display plan, published by the resolver for the
- * loop (the getLastDishWet pattern): the fluid stage's stable plan object — { active, seedKey,
- * wakeMs, stepTarget, stepsAllowed, resIndex, cols, rows, magnets, dial, coupleField, aspectHW }.
- * The loop drives the GPU display instance from it (gl/dishFluidGl.mjs) and stamps the served
- * step count back onto the input. Not drained: the value is a frame fact, re-published by every
- * resolve. Module-level, last-resolver-wins (the getLastFrameMotion law).
+ * #1997 — the last resolved frame's FERROFLUID attachment plan, published by the resolver (the
+ * getLastDishWet pattern): the fluid stage's stable plan object — { active, seedKey, wakeMs,
+ * step, density, magnets, dial, seatCols, seatRows, matterFrac, aspectHW }. The resolver itself
+ * consumes it in the same resolve (the attached body, engine/dishFluidRender.mjs); the channel
+ * stays published for any outside reader. Not drained: the value is a frame fact, re-published
+ * by every resolve. Module-level, last-resolver-wins (the getLastFrameMotion law).
  */
 let lastDishFluidPlan = null;
 export function getLastDishFluidPlan() {
@@ -1659,8 +1662,9 @@ export function createLiveResolver() {
     // #1997 FERROFLUID — applies beside the culture at the bottom of the resolve (the dish's
     // standing place for stage state): it steps the grid kernel under this frame's stamp, reads
     // the culture publication captured at the top (one frame behind — never this frame's own
-    // culture output), and publishes the density the culture's NEXT frame will read. The display
-    // plan rides getLastDishFluidPlan(). No stamp = the stage drops its state, touches nothing.
+    // culture output), and publishes the density the culture's NEXT frame will read. The
+    // attachment plan rides getLastDishFluidPlan(). No stamp = the stage drops its state,
+    // touches nothing.
     dishFluid.apply(input.dishFluid ?? null, {
       seed: input.seed,
       magnets: input.dishFluidMagnets,
@@ -1670,7 +1674,51 @@ export function createLiveResolver() {
       H,
     });
     lastDishFluidPlan = dishFluid.plan;
+    // #1997 — the dealt scene the fluid's body will wear, captured BEFORE the culture's draw
+    // below replaces the content layers' items: every content layer's non-terrain marks (the
+    // culture seed's own collection discipline), plus the bedrock mask the terrain covers at
+    // the dish grid. Only captured while a fluid runs — off costs nothing.
+    let fluidScene = null;
+    if (dishFluid.plan.active) {
+      const marks = [];
+      const terrain = [];
+      for (const e of out) {
+        if (!e || e.isFx || e.isPattern || !Array.isArray(e.items)) continue;
+        for (const it of e.items) {
+          if (!it) continue;
+          if (isTerrain(it)) terrain.push(it);
+          else if (!isFluidMatter(it)) marks.push(it);
+        }
+      }
+      let blocked = null;
+      if (terrain.length) {
+        const cov = coverageField(terrain, { canvasW: W, canvasH: H, cols: FLUID_GRID_COLS, rows: FLUID_GRID_ROWS });
+        blocked = new Uint8Array(FLUID_GRID_COLS * FLUID_GRID_ROWS);
+        for (let i = 0; i < blocked.length; i++) if (cov[i] > 0) blocked[i] = 1;
+      }
+      fluidScene = { marks, blocked };
+    }
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
+    // #1997 — the ATTACHED BODY: the system is invisible (Matt's ruling, 2026-11-08), so the
+    // ferrofluid appears as ordinary asset items seated on the exact instance's published
+    // density (engine/dishFluidRender.mjs), riding the TOP content layer after the culture's
+    // draw — added to it, never taking a mark's place (the quiet specks' discipline). No plan
+    // (fluid off) = no items, and the frame is byte-identical to a build without this block.
+    if (fluidScene && dishFluid.plan.active) {
+      const content = out.filter((e) => e && !e.isFx && !e.isPattern && Array.isArray(e.items));
+      if (content.length) {
+        const top = content[content.length - 1];
+        const matter = fluidMatterItems(dishFluid.plan, fluidScene.marks, {
+          canvasW: W,
+          canvasH: H,
+          blocked: fluidScene.blocked,
+          paletteInk: fluidScene.marks.length
+            ? null
+            : resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes).ink,
+        });
+        if (matter.length) top.items = top.items.filter((it) => !isFluidMatter(it)).concat(matter);
+      }
+    }
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
     // dishDensity.mjs): the shared grid's per-cell body counts from

@@ -3,6 +3,10 @@
 Branch `feat/ferrofluid-1997`, base main `e7928438` (#1872 merged). Local commits only — no push, no PR.
 Feel-gate slice: a new dish mode with a visible floor and a stage gesture; it goes through Matt's review lane.
 
+**Presentation reworked 2026-11-08 per Matt's ruling — see the marked section at the end of
+this report. Where it disagrees with the sections above (the floor, the GPU display instance,
+the determinism terms, the stills limit), the rework section wins.**
+
 ## What it is, plainly
 
 A second dish mode beside DISH LIFE: a dark, oily ferrofluid living in the dish under the stage.
@@ -232,3 +236,128 @@ broken**, and every suite in it was green anyway. Recorded plainly:
   `liveResolve.determinism`, `governorCuts`, and `composite` (15 cases) green;
   `format:check` clean, lint 0 errors (the standing 11 warnings, none in touched files),
   `npm run build` green.
+
+## Rework — the presentation (Matt's ruling, 2026-11-08; same PR, same branch)
+
+Matt's ruling, verbatim sense: "FERROFLUID system should be like the other systems, it is
+invisible and assets attach to it. So circles, dots, any asset shape gets generated and
+attached to fill and appear like FERROFLUID on the stage." The merge was HELD and the
+presentation reworked inside this PR. The field sim, the magnets (objects, gesture, store,
+take recording), the FLOW / PULL / COUPLE dials, the two-way culture coupling, the snapshots,
+the governor family position (cut 1.395) and the chip all stand exactly as built. What
+changed is only how the fluid appears. Scope points 1 (the GPU display path) and 6 (the
+visible floor) above are superseded by this section.
+
+### What came out
+
+- **The GPU display instance** — `gl/dishFluidGl.mjs` and its suite `gl/dishFluid.selfcheck.mjs`
+  are deleted. There is now ONE instance of the kernel: the resolver's 96×54 grid instance,
+  which was always the coupling authority. Nothing renders the field itself anywhere.
+- **The floor pass** — the renderer's `dishfluid` programme (the table is back to seven
+  programmes), its draw block, and its `setDishFluid` state are removed from
+  `gl/renderer.mjs`.
+- **The tick() palette arm** — `gl/liveLoop.mjs` no longer arms anything for the fluid; the
+  lawful palette derivation added by the live-path fix went with the arm (there is nothing
+  left to colour). The loop's whole part is the stamp it already wrote.
+- **`fluidDisplayColours` and `FLUID_RESOLUTIONS`** — deleted from the kernel module; the
+  display-resolution ladder they served no longer exists.
+
+### What the attachment pass does
+
+- **The plan is now an attachment plan** (`engine/dishFluidStage.mjs`): alongside the stamped
+  conversation (seed key, wake, step, magnets, dials) it publishes the grid instance's density
+  itself, plus the shed rung's seating terms — the seating grid (seat columns/rows) and the
+  matter fraction.
+- **The resolver captures the scene to dress** (`gl/liveResolve.mjs`, at the top of the
+  resolve, from the dealt items before any stage applies — the culture-field capture's
+  discipline): every dealt non-terrain mark across the content layers, and a bedrock mask
+  (terrain items' coverage at the dish grid). Captured only while a fluid plan will apply.
+- **The body is emitted after the culture applies** (so the culture's seed, collected from
+  the dealt items at its wake build, can never see it), onto the **top content layer**, by
+  `engine/dishFluidRender.mjs` — the culture renderer's sibling module. Each frame the layer's
+  previous body (items keyed `fluid:<seat index>`) is stripped and the fresh body appended,
+  so takes, ACCUM and the review loop see ordinary stage content with ordinary provenance.
+
+### Where the matter comes from
+
+`fluidMatterItems(plan, marks)` seats one item per seating cell where the seat-averaged
+density reaches the floor and the cell is not bedrock: the score is density × (1 + PULL × the
+magnet field), the strongest seats win up to the governed cap, and **each seat wears the
+nearest dealt mark** — the item is a copy of that mark (asset, colour, accent, scale, the
+full spread) shrunk toward the cell and faded by the density under it, so the body reads in
+the stage's own look, palette and deal. Where nothing is dealt, the body falls back to the
+primitive vocabulary (`FLUID_PRIMITIVE_ASSETS`: `mrk_dots_01`, `mrk_ring_01`, `mrk_pit_01`)
+in the frame palette's ink, hash-seated — the instrument's building blocks, never a texture.
+
+### Budgets and constants (named)
+
+- `MAX_FLUID_ITEMS 480` — the body's hard cap, in the culture's item-count class.
+- `MATTER_DENSITY_FLOOR 0.25` — a seat must average this much dark phase to hold matter.
+- `MATTER_CELL_RADIUS 0.6`, `MATTER_SCALE_MIN 0.45` — the body's cell-sized scale band.
+- **The shed ladder is reshaped to the governed quantity** (`FLUID_SHED_RUNGS`, 10 rungs):
+  steps 8→4→2→1 (tempo, as before), then the seating grid coarsens 96→64→48→32 wide
+  (`fluidSeatRows` keeps the dish aspect), then the body's count falls to ½ and ¼
+  (`matterFrac`), then held. The governor walk, the chip's held read (now the ladder's last
+  rung) and the badge follow the ladder's own labels — the badge gains an honest
+  "ferrofluid thinned" between "coarsened" and "held". The restore semantics are unchanged:
+  the resolver re-seats at whole terms until the governor's next apply re-imposes the rung.
+
+### Determinism — upgraded, plainly
+
+The "same-device only" terms and the "two instances" disclosure above are **superseded**.
+With the GPU instance gone, everything the fluid does — kernel, coupling, and now the
+attached body — is pure JS over the stamped conversation: **replay is exact on every
+device**, the culture's own standard. The body's seating reads only published state (the
+plan, the dealt marks, the bedrock mask), so snapshot continuation stays bit-identical with
+the body attached (pinned), and off-parity is re-proven below.
+
+### Stills — the disclosed limit is lifted
+
+Attached assets are normal stage content, so **stills and captures now DO show the
+ferrofluid body** — the "stills get no fluid floor" limit above no longer holds. (Magnet
+placement stays canvas-space, as before.)
+
+### Suite changes
+
+- **Deleted:** `gl/dishFluid.selfcheck.mjs` (the GPU concordance suite — its subject is
+  gone); the manifest line went with it.
+- **New:** `engine/dishFluidRender.selfcheck.mjs` — seating law (dense seats only, never
+  bedrock, never outside the dish), nearest-mark wear + determinism from published state,
+  PULL monotonicity at the magnets (count and pull-weighted share), PULL powerless in thin
+  regions, the governed cap under matter fractions, the primitive fallback, and a
+  stage-driven end-to-end monotonicity drive.
+- **Re-pinned:** the kernel suite (the ladder's new axes; display colours gone);
+  the stage suite (the plan's attachment terms per rung); the resolver suite — off parity is
+  now proven two ways (full-frame identity with no fluid keys; and with the fluid present at
+  COUPLE 0, frames **less the attached body** are byte-identical to the no-fluid run, so the
+  body is the fluid's only visible difference), attachment presence from frame 0, the
+  late-start law restated in stripped terms, and snapshot continuation bit-identical **with
+  the body included**; the governor suite (nine rungs, new label pins, badge words);
+  the chip suite (held at rung 9); `gl/composite.selfcheck.mjs` (programmes 8 → 7, with the
+  cause recorded beside the earlier re-pin).
+- **The liveLoop pin adapted, charge unchanged** — the real frame path, fluid active, must
+  run clean and the fluid must actually appear. Source pins now assert no floor arm survives
+  anywhere (loop, renderer, programme table), the stamp still flows, and the resolver still
+  publishes the plan and emits the body. The browser section adds the live observable the new
+  shape offers: turning the mode on through the store's own action raises the store's
+  `nodeCount` by the attached body and turning it off takes the body back off — zero frame
+  errors and no fault throughout; the headless-flag boot and the stamped-magnet boot stay.
+
+### Rework verification
+
+- **Off-parity re-proven across trees:** the 60-frame no-fluid resolver rollup (the resolver
+  suite's harness: quiet culture running, no fluid keys) hashes identically on this tree and
+  on a fresh detached worktree at base `e7928438` —
+  `1cd37eeec40c6350129a0a363195724ccce37c5bf30557f54743e40d482d04c3` on both.
+- **All #1997 suites green** (kernel, couple, stage, render, chip, magnets, resolver,
+  liveLoop pin, governor), the dishLife family + `liveResolve.dishLife` +
+  `liveResolve.determinism` + `governorCuts` + `composite` (15 cases) + `costTiers` +
+  `helpCopy` green; the dice-adjacent suites (resolver, couple, stage, render) run 10×, green.
+- **Full manifest sweep** (continue-on-error, all 634 suite lines): **631 passed, 3 failed —
+  exactly the standing base-identical environment set** (`swarmWasm`, `rollSafety`, `accum`),
+  the same three the original build's sweep recorded against base. (The sweep shell was
+  OOM-killed printing its summary after the last suite finished; the per-suite record is
+  complete — every manifest line ran.)
+- `npm run format:check` clean (six touched files needed a prettier pass; applied and the
+  affected suites re-run green), lint 0 errors (the standing 11 warnings), `npm run build`
+  green.

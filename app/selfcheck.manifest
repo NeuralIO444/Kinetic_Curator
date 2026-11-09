@@ -190,12 +190,12 @@ node src/engine/dishLifeControls.selfcheck.mjs
 node src/engine/dishFluid.selfcheck.mjs
 node src/engine/dishFluidCouple.selfcheck.mjs
 node src/engine/dishFluidStage.selfcheck.mjs
+node src/engine/dishFluidRender.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
 node src/gl/dishLifeTouchDom.selfcheck.mjs
 node src/gl/liveResolve.dishLife.selfcheck.mjs
 node src/gl/liveResolve.dishFluid.selfcheck.mjs
-node src/gl/dishFluid.selfcheck.mjs
 node src/gl/dishFluidMagnets.selfcheck.mjs
 node src/gl/liveLoop.dishFluid.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs

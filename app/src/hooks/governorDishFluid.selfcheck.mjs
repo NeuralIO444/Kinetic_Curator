@@ -3,12 +3,12 @@
 // The fluid is the culture's sibling — a dish surface, never the picture itself — so it sheds
 // right after the culture on the same family business, ahead of weather, the ACCUM family, the
 // population and the tier. Its ladder is the kernel's (engine/dishFluid.mjs FLUID_SHED_RUNGS):
-// steps fall 8 → 4 → 2 → 1 while the grid is whole, then resolution falls
-// 384×216 → 256×144 → 192×108 → 96×54, then the fluid holds — seven cuts, restoring whole.
-// Opt-in per caller (dishFluidActive === true), so every older ladder walk stays as it was.
-// Registration: like the culture, the fluid carries no cost-registry tier of its own — the
-// registry's tier 1 is contractually the ACCUM chain; the family registers HERE, with the
-// governor, and the floor draw is a tier-0 renderer programme.
+// steps fall 8 → 4 → 2 → 1, then the attached body's seating grid coarsens 96 → 64 → 48 → 32
+// wide, then the body's count falls to ½ and ¼, then the fluid holds — nine cuts, restoring
+// whole. Opt-in per caller (dishFluidActive === true), so every older ladder walk stays as it
+// was. Registration: like the culture, the fluid carries no cost-registry tier of its own —
+// the registry's tier 1 is contractually the ACCUM chain; the family registers HERE, with
+// the governor alone (the system is invisible — no renderer programme carries it).
 import assert from 'node:assert';
 import { nextGovernorCut, shedSummary, GOVERNOR_RESTORE_CUTS } from './governorCuts.js';
 import { useStore } from '../state/store.js';
@@ -53,25 +53,21 @@ const walk = (state, steps = 24) => {
   return cuts;
 };
 
-ok('an awake fluid sheds right after its sibling the culture, seven rungs deep', () => {
+ok('an awake fluid sheds right after its sibling the culture, nine rungs deep', () => {
   const cuts = walk({ ...PRESSURE, dishLifeActive: true, dishLifeShed: 0, dishFluidActive: true, dishFluidShed: 0 });
   const kinds = cuts.map((c) => c.kind);
   assert.deepEqual(kinds.slice(0, 2), ['dishLife', 'dishLife'], 'the culture spends its two steps first');
+  assert.deepEqual(kinds.slice(2, 11), Array(9).fill('dishFluid'), 'then the fluid spends its nine rungs');
   assert.deepEqual(
-    kinds.slice(2, 9),
-    ['dishFluid', 'dishFluid', 'dishFluid', 'dishFluid', 'dishFluid', 'dishFluid', 'dishFluid'],
-    'then the fluid spends its seven rungs',
-  );
-  assert.deepEqual(
-    cuts.slice(2, 9).map((c) => c.dishFluidShed),
-    [1, 2, 3, 4, 5, 6, 7],
+    cuts.slice(2, 11).map((c) => c.dishFluidShed),
+    [1, 2, 3, 4, 5, 6, 7, 8, 9],
     'one rung at a time, in ladder order',
   );
-  assert.equal(kinds[9], 'creatureCount', 'the population sheds only after the whole dish family');
+  assert.equal(kinds[11], 'creatureCount', 'the population sheds only after the whole dish family');
   assert.ok(kinds.indexOf('dishFluid') < kinds.indexOf('quality'), 'before the tier');
 });
 
-ok('steps shed before resolution, rung for rung (the probe’s tiers)', () => {
+ok('steps shed before the seat, the seat before the count, rung for rung', () => {
   const labels = [];
   for (let rung = 0; rung < FLUID_SHED_RUNGS.length - 1; rung++) {
     const c = nextGovernorCut({ ...PRESSURE, dishFluidActive: true, dishFluidShed: rung });
@@ -82,9 +78,10 @@ ok('steps shed before resolution, rung for rung (the probe’s tiers)', () => {
     assert.equal(c.label, want.label, 'the label is the ladder’s own');
   }
   assert.match(labels[0], /4 a frame/, 'first the tempo halves');
-  assert.match(labels[3], /256×144/, 'resolution falls only once tempo is spent');
-  assert.match(labels[6], /HELD/, 'the last rung holds');
-  const spent = nextGovernorCut({ ...PRESSURE, dishFluidActive: true, dishFluidShed: 7 });
+  assert.match(labels[3], /64 wide/, 'the seat coarsens only once tempo is spent');
+  assert.match(labels[6], /THIN/, 'the count thins only once the seat is spent');
+  assert.match(labels[8], /HELD/, 'the last rung holds');
+  const spent = nextGovernorCut({ ...PRESSURE, dishFluidActive: true, dishFluidShed: 9 });
   assert.notEqual(spent?.kind, 'dishFluid', 'a held fluid has nothing left to shed');
 });
 
@@ -111,7 +108,8 @@ ok('the restore table carries the kind, ordered to restore fluid before culture'
 ok('the badge is honest about a fluid shed', () => {
   assert.ok(shedSummary({ renderScale: 1, dishFluidShed: 2 })?.includes('ferrofluid slowed'));
   assert.ok(shedSummary({ renderScale: 1, dishFluidShed: 5 })?.includes('ferrofluid coarsened'));
-  assert.ok(shedSummary({ renderScale: 1, dishFluidShed: 7 })?.includes('ferrofluid held'));
+  assert.ok(shedSummary({ renderScale: 1, dishFluidShed: 8 })?.includes('ferrofluid thinned'));
+  assert.ok(shedSummary({ renderScale: 1, dishFluidShed: 9 })?.includes('ferrofluid held'));
   assert.equal(shedSummary({ renderScale: 1, dishFluidShed: 0 }), null, 'no shed, no badge line');
 });
 

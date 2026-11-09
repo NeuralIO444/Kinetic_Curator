@@ -1,26 +1,34 @@
 // liveLoop.dishFluid.selfcheck.mjs — FERROFLUID (#1997): the LIVE frame path regression pin.
 //
-// The fault this suite exists for (found by a coordinator review drive of the shipped build,
-// invisible to every other #1997 suite): tick()'s ferrofluid arm resolved the frame palette
-// through a bare `voiceState` read — a name that exists only inside buildFrame and
+// The fault this suite was born for (found by a coordinator review drive of the first shipped
+// build, invisible to every other #1997 suite): tick()'s ferrofluid arm resolved the frame
+// palette through a bare `voiceState` read — a name that exists only inside buildFrame and
 // clearAccum — so EVERY fluid-active frame threw ReferenceError, the loop's fault channel
 // (renderFault in the store) tripped with "frame fault: voiceState is not defined", no frame
-// ever presented, and the fluid floor never drew in the live app. The resolver, kernel, chip
+// ever presented, and the fluid never appeared in the live app. The resolver, kernel, chip
 // and GL-harness suites were all green because none of them drives createLiveLoop's real
-// frame path with an active fluid plan. This suite does:
+// frame path with the fluid active. This suite does.
 //
-//   A source     tick()'s arm derives the palette through resolveLiveRenderState — the
-//                derivation buildFrame itself used for the frame being armed — and no
-//                `voiceState.` property read survives anywhere in tick()'s body.
+// The presentation rework (Matt's ruling, 2026-11-08) removed the arm itself: the system is
+// invisible, the resolver seats the fluid's body as ordinary stage items, and the loop's whole
+// part is the stamp. The pin's charge is unchanged — the real frame path, fluid active, must
+// run clean and the fluid must actually appear — with the observables the new shape offers:
+//
+//   A source     tick() carries no `voiceState.` read (the original fault class); NO floor
+//                arm survives anywhere (no setDishFluid in the loop or the renderer, no
+//                dishfluid programme in the renderer table); the loop still stamps the fluid
+//                onto the input; the resolver still publishes the attachment plan and emits
+//                the body from it.
 //   B browser    (skipped when no Playwright browser is present) the BUILT app, booted for
-//                real over a local static server: a fluid-off control boot and a fluid-on
-//                boot (window.__KC_FERROFLUID, the loop's own headless flag). The on boot
-//                must publish dishFluidAwake, log ZERO '[gl-live] frame error' console
-//                messages, keep the store's renderFault down, present real frames (a
-//                screenshot with actual content — the faulted build presents a black
-//                canvas), and keep all of that true with a magnet stamped through the
-//                store's own action. The app is rebuilt first (npm run build) so the pin
-//                always tests the current tree, never a stale dist.
+//                real over a local static server. A control boot (fluid off) must be healthy;
+//                turning the mode on through the store's own action must publish
+//                dishFluidAwake, raise the store's nodeCount by the attached body (the body
+//                is ordinary stage content — the footer count sees it), log ZERO
+//                '[gl-live] frame error' console messages and keep renderFault down; turning
+//                it off must take the body back off the stage. A second boot through the
+//                loop's headless flag (window.__KC_FERROFLUID) must stay clean the same way,
+//                with a magnet stamped through the store's own action. The app is rebuilt
+//                first (npm run build) so the pin always tests the current tree.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -48,14 +56,16 @@ const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..
   ok('tick() carries no voiceState property read (the out-of-scope name)', () => {
     assert.ok(!/voiceState\s*\./.test(tick), 'a bare voiceState.<prop> read in tick() throws every frame');
   });
-  ok('the ferrofluid arm derives its palette from the frame derivation (resolveLiveRenderState)', () => {
-    const arm = tick.indexOf('getLastDishFluidPlan()');
-    assert.ok(arm >= 0, 'the #1997 arm is present in tick()');
-    const block = tick.slice(arm, arm + 1600);
-    assert.ok(block.includes('resolveLiveRenderState('), 'the arm resolves the live render state');
-    assert.ok(block.includes('resolvePalette('), 'the arm resolves the palette from it');
-    assert.ok(block.includes('fluidDisplayColours('), 'the arm still feeds fluidDisplayColours');
-    assert.ok(block.includes('live.setDishFluid('), 'the arm still arms the floor');
+  ok('no floor arm survives: the loop stamps, the resolver seats', () => {
+    assert.ok(!src.includes('renderer.setDishFluid'), 'liveLoop carries no renderer arm for the fluid');
+    assert.ok(!src.includes('getLastDishFluidPlan'), 'liveLoop no longer consumes the plan');
+    assert.ok(src.includes('dishFluid: dishFluidStamp'), 'the loop still stamps the fluid onto the resolver input');
+    const renderer = readFileSync(path.join(APP, 'src', 'gl', 'renderer.mjs'), 'utf8');
+    assert.ok(!renderer.includes('setDishFluid'), 'the renderer has no fluid arm');
+    assert.ok(!renderer.includes("'dishfluid'"), 'the renderer table has no floor programme');
+    const resolve = readFileSync(path.join(APP, 'src', 'gl', 'liveResolve.mjs'), 'utf8');
+    assert.ok(resolve.includes('lastDishFluidPlan = dishFluid.plan'), 'the resolver publishes the attachment plan');
+    assert.ok(resolve.includes('fluidMatterItems('), 'the resolver emits the body from the plan');
   });
 }
 
@@ -164,11 +174,23 @@ if (!skipped) {
   const health = (page) =>
     page.evaluate(() => {
       const s = window.__kcStore.getState();
-      return { awake: s.dishFluidAwake, fault: s.renderFault, reason: s.renderFaultReason };
+      return { awake: s.dishFluidAwake, fault: s.renderFault, reason: s.renderFaultReason, nodes: s.nodeCount };
     });
+  /** Sample the store's nodeCount for `ms`, returning the max seen (the body's rise is a step, not a flicker). */
+  const sampleNodes = async (page, ms) => {
+    let max = 0;
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      const v = await page.evaluate(() => window.__kcStore.getState().nodeCount | 0);
+      if (v > max) max = v;
+      await page.waitForTimeout(400);
+    }
+    return max;
+  };
 
   try {
-    // Control: fluid off — the harness and the app boot healthy with no fluid anywhere.
+    // Control boot: healthy with no fluid — then the mode turned on through the store's own
+    // action must attach its body to the live stage, and off must take it back off.
     {
       const { page, frameErrors } = await boot(false);
       await page.waitForTimeout(5000);
@@ -183,11 +205,36 @@ if (!skipped) {
           `presented content (distinct ${st.distinct}, meanLum ${st.meanLum.toFixed(2)})`,
         );
       });
+      const baseNodes = await sampleNodes(page, 4000);
+      await page.evaluate(() => window.__kcStore.getState().setDishFluid(true));
+      await page
+        .waitForFunction('window.__kcStore.getState().dishFluidAwake === true', null, { timeout: 20000 })
+        .catch(() => {});
+      const onNodes = await sampleNodes(page, 8000);
+      const hOn = await health(page);
+      ok('fluid on (store action): the body attaches to the live stage, frame path clean', () => {
+        assert.equal(hOn.awake, true, 'dishFluidAwake never published — the stamp never flowed');
+        assert.ok(
+          onNodes > baseNodes + 8,
+          `nodeCount rose by the attached body (off max ${baseNodes} → on max ${onNodes})`,
+        );
+        assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
+        assert.equal(hOn.fault, false, `renderFault tripped: ${hOn.reason}`);
+      });
+      await page.evaluate(() => window.__kcStore.getState().setDishFluid(false));
+      await page.waitForTimeout(3000);
+      const offNodes = await sampleNodes(page, 3000);
+      ok('fluid off again: the body leaves the stage', () => {
+        assert.ok(
+          offNodes <= baseNodes + 8,
+          `nodeCount settled back (off max ${offNodes} vs baseline max ${baseNodes})`,
+        );
+        assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
+      });
       await page.close();
     }
-    // The pin: fluid on through the loop's headless flag — the real frame path, an active
-    // plan every frame. Pre-fix this boot logs a ReferenceError per frame, trips the fault
-    // channel naming it, and presents a black canvas.
+    // The headless-flag boot: the stamp flows from the first frame — the frame path must stay
+    // clean and frames must present, with a magnet stamped through the store's own action.
     {
       const { page, frameErrors } = await boot(true);
       await page
@@ -196,18 +243,15 @@ if (!skipped) {
       await page.waitForTimeout(6000);
       const h = await health(page);
       const st = await shotStats(page);
-      ok('fluid on: the stamp publishes awake and the frame path runs clean', () => {
+      ok('fluid on (headless flag): the stamp publishes awake and the frame path runs clean', () => {
         assert.equal(h.awake, true, 'dishFluidAwake never published — the fluid plan never went live');
         assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
         assert.equal(h.fault, false, `renderFault tripped: ${h.reason}`);
-      });
-      ok('fluid on: frames present with the floor armed (content, not the faulted black canvas)', () => {
         assert.ok(
           st.distinct > 500 && st.meanLum > 2,
           `presented content (distinct ${st.distinct}, meanLum ${st.meanLum.toFixed(2)})`,
         );
       });
-      // A magnet stamped through the store's own action rides the same arm — still clean.
       const magnets = await page.evaluate(() => {
         const s = window.__kcStore.getState();
         s.placeDishFluidMagnet(0.5, 0.5);
@@ -215,7 +259,7 @@ if (!skipped) {
       });
       await page.waitForTimeout(2500);
       const h2 = await health(page);
-      ok('fluid on + a stamped magnet: the arm stays clean', () => {
+      ok('fluid on + a stamped magnet: the frame path stays clean', () => {
         assert.equal(magnets, 1, 'the magnet never landed in the store');
         assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
         assert.equal(h2.fault, false, `renderFault tripped: ${h2.reason}`);

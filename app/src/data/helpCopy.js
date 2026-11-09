@@ -332,7 +332,7 @@ export const HELP_TOPICS = [
     id: 'ferro-off',
     group: 'Master',
     title: 'ferrofluid · off',
-    text: "FERROFLUID — a dark, oily fluid living in the dish under the picture, the culture's sibling: it pools, veins and spikes toward magnets you place on the dish, and it trades influence with the culture both ways. Off now. Click to turn it on.",
+    text: "FERROFLUID — an invisible field in the dish, the culture's sibling: the stage's own shapes pool, vein and spike toward magnets you place on the dish, and it trades influence with the culture both ways. Off now. Click to turn it on.",
   },
   {
     id: 'ferro-arming',
@@ -344,19 +344,19 @@ export const HELP_TOPICS = [
     id: 'ferro-on',
     group: 'Master',
     title: 'ferrofluid · in the dish',
-    text: "FERROFLUID is running: a living fluid floor under the stage. It spikes toward its magnets, grows toward the culture, and nudges the culture's births where it lies dense. Click to turn it off.",
+    text: "FERROFLUID is running: the stage's shapes gather where the field runs dense — a living body of marks in the dish. It spikes toward its magnets, grows toward the culture, and nudges the culture's births where it lies dense. Click to turn it off.",
   },
   {
     id: 'ferro-slowed',
     group: 'Master',
     title: 'ferrofluid · slowed',
-    text: 'FERROFLUID is running but the governor is shedding it to hold the frame: first it steps slower, then its grid coarsens. It recovers on its own when the pressure clears.',
+    text: 'FERROFLUID is running but the governor is shedding it to hold the frame: first it steps slower, then its body coarsens and thins. It recovers on its own when the pressure clears.',
   },
   {
     id: 'ferro-held',
     group: 'Master',
     title: 'ferrofluid · held',
-    text: 'FERROFLUID is held still by the governor — the field is drawn but not stepping, the last sacrifice before the picture itself. It flows again when the pressure clears.',
+    text: 'FERROFLUID is held still by the governor — its body stands but does not step, the last sacrifice before the picture itself. It flows again when the pressure clears.',
   },
   {
     id: 'ferro-flow',

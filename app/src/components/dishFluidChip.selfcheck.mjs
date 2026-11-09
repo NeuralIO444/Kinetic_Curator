@@ -30,7 +30,8 @@ ok('the state machine follows the family posture', () => {
   assert.equal(ferroChipState({ on: true, arming: false, shed: 0 }), 'on');
   assert.equal(ferroChipState({ on: true, arming: false, shed: 1 }), 'slowed');
   assert.equal(ferroChipState({ on: true, arming: false, shed: 6 }), 'slowed', 'coarsening rungs still read slowed');
-  assert.equal(ferroChipState({ on: true, arming: false, shed: 7 }), 'held');
+  assert.equal(ferroChipState({ on: true, arming: false, shed: 8 }), 'slowed', 'thinning rungs still read slowed');
+  assert.equal(ferroChipState({ on: true, arming: false, shed: 9 }), 'held', 'only the ladder’s last rung reads held');
   assert.equal(ferroStateWord('held'), 'held');
   assert.equal(ferroStateWord('arming'), 'placing magnets');
 });

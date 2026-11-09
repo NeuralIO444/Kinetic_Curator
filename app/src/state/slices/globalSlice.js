@@ -630,7 +630,8 @@ export const createGlobalSlice = (set) => ({
   dishLifeCycleGens: FIELD_CYCLE_GENS,
   setDishLifeCycleGens: (n) => set({ dishLifeCycleGens: clampCycleGens(n) }),
   /** #1997 FERROFLUID — the dish's second mode, sibling of the culture: a Gray-Scott field in the
-   * dish (engine/dishFluid.mjs), GPU-stepped at the design point 384×216 × 8 steps/frame. The
+   * dish (engine/dishFluid.mjs), stepped in the resolver at the dish grid; the system is
+   * invisible and the stage's shapes attach to it as its body (engine/dishFluidRender.mjs). The
    * on/off: while true the live loop stamps input.dishFluid (+ magnets + dials) every frame and
    * the resolver grows the field; the stamp's absence is the off state, so a take recorded
    * without the fluid replays byte-identically. Runtime only, never serialized (the dishLife

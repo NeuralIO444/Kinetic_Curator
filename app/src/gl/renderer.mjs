@@ -50,7 +50,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 // #1610: dither joins the family — it runs in the finish chain, post-accum.
 const GRAIN_FAMILY_KINDS = ['grain', 'dither'];
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
-import { createDishFluidGl, FLUID_DISPLAY_FS } from './dishFluidGl.mjs'; // #1997: the ferrofluid floor + its GPU step instance
+
 import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser
 import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
@@ -480,32 +480,6 @@ export const RENDERER_PROGRAMS = [
       timeMs: 0.3,
       notes:
         '#1813 wet-look: fullscreen remap of the upscaled presentation (saturation/skew/sheen by the wet field, in linear pre-resolve); only while the field is served; unmeasured estimate in the upscale class',
-    },
-  },
-  {
-    // #1997: the ferrofluid floor — one fullscreen pass over the frame's
-    // background, beneath every stratum, drawn only while the dish fluid
-    // runs (the live renderer arms it per frame via setDishFluid; disarmed
-    // it costs nothing and the frame is byte-identical). Tier 0 like the
-    // wetlook it sits beside: the floor draw itself is presentation
-    // plumbing (a few taps of a ≤384×216 field); the fluid's real cost is
-    // its step chain (gl/dishFluidGl.mjs), and its shed is the governor's
-    // ferrofluid rung on the culture family's ladder (steps, then
-    // resolution), not a tier here. timeMs is the author's estimate in the
-    // wetlook class.
-    key: 'dishfluid',
-    name: 'dishfluid',
-    vs: FULL_VS,
-    fs: FLUID_DISPLAY_FS,
-    vsFile: 'shaders.mjs:FULL_VS',
-    fsFile: 'dishFluidGl.mjs:FLUID_DISPLAY_FS',
-    uniforms: ['u_fluid', 'u_bg', 'u_ground', 'u_bright', 'u_ink', 'u_amt', 'u_fluidTexel'],
-    cost: {
-      tier: 0,
-      memoryBytes: 384 * 216 * 8 * 2,
-      timeMs: 0.3,
-      notes:
-        '#1997 ferrofluid floor: fullscreen shade of the dish fluid field (dark phase + gradient sheen) over the background; only while the fluid runs; the step chain sheds via the governor ferrofluid rung, not this tier',
     },
   },
 ];
@@ -1732,28 +1706,6 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     }
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // #1997 FERROFLUID — the dish floor: while the fluid runs, the frame's background is the
-    // fluid field (dark, oily, spiking at the magnets), drawn into the main buffer before any
-    // stratum composites over it. The live renderer arms it per frame (payload.dishFluidTex,
-    // the stepped field + palette colours from gl/dishFluidGl.mjs); absent — fluid off, a
-    // transparent capture, an ACCUM input frame — nothing draws and the frame is byte-identical
-    // to the pre-#1997 renderer.
-    if (payload.dishFluidTex && !transparent && !feedIds) {
-      const ft = payload.dishFluidTex;
-      const p = progs.dishfluid;
-      gl.disable(gl.BLEND);
-      gl.useProgram(p);
-      gl.uniform1i(U(p, 'u_fluid'), bindTex(0, ft.tex));
-      const [br2, bg2, bb2] = hexToRgb(bg || '#000000');
-      gl.uniform3f(U(p, 'u_bg'), br2, bg2, bb2);
-      gl.uniform3f(U(p, 'u_ground'), ft.ground[0], ft.ground[1], ft.ground[2]);
-      gl.uniform3f(U(p, 'u_bright'), ft.bright[0], ft.bright[1], ft.bright[2]);
-      gl.uniform3f(U(p, 'u_ink'), ft.ink[0], ft.ink[1], ft.ink[2]);
-      gl.uniform1f(U(p, 'u_amt'), 1);
-      gl.uniform2f(U(p, 'u_fluidTexel'), 1 / ft.cols, 1 / ft.rows);
-      drawFullscreen(p);
-    }
-
     const compositeLayerTo = (layer, instances, dRead, dWrite) => {
       // hueRotate (#262): implemented in the composite shader via the
       // SVG feColorMatrix hue-rotation matrix; 0 is pixel-identical to off.
@@ -2392,17 +2344,6 @@ export function createLiveRenderer(canvas) {
     });
   }
 
-  // #1997 — the ferrofluid display instance (gl/dishFluidGl.mjs), created lazily on the first
-  // armed frame and driven by the loop per frame (the setWetLook discipline): setDishFluid
-  // carries the resolver's plan + the palette colours; renderFrame steps the field and hands
-  // the floor texture to the frame. Disarmed (null) the instance idles and frames render
-  // exactly as before.
-  let dishFluidGl = null;
-  let dishFluidFrame = null; // { plan, colours } for the next renderFrame
-  function setDishFluid(frame) {
-    dishFluidFrame = frame && frame.plan && frame.plan.active ? frame : null;
-  }
-
   /**
    * Render one frame into the persistent targets.
    * payload: { width, height, bg, contract, cells, transparent? } —
@@ -2415,21 +2356,9 @@ export function createLiveRenderer(canvas) {
   function renderFrame(payload, { transparent = false, dprScale = liveDisplayScale() } = {}) {
     if (!atlasTex) throw new Error('[gl-live] atlas not uploaded — call setAtlas first');
     ensureTargets(payload.width, payload.height, dprScale);
-    // #1997 — step the fluid for this frame (never on a transparent capture: the floor is a
-    // live-stage surface, and a capture must not advance the field off the recorded stamps).
-    let dishFluidTex = null;
-    if (dishFluidFrame && !transparent) {
-      if (!dishFluidGl) dishFluidGl = createDishFluidGl(gl);
-      dishFluidTex = dishFluidGl.applyPlan(dishFluidFrame.plan, dishFluidFrame.colours);
-    }
     // Draw at backing-store size; u_canvas stays 1000×700 so the scene
     // layout is identical — the extra pixels are pure sharpness.
-    return b.renderFrameInto(
-      { ...payload, width: TW, height: TH, ...(dishFluidTex ? { dishFluidTex } : {}) },
-      T,
-      { atlasTex },
-      { transparent },
-    );
+    return b.renderFrameInto({ ...payload, width: TW, height: TH }, T, { atlasTex }, { transparent });
   }
 
   /** Present a composited target to the visible canvas (Y-flip resolve). */
@@ -2820,7 +2749,6 @@ export function createLiveRenderer(canvas) {
     setAtlas,
     setResolveOptions: (o) => b.setResolveOptions(o),
     setWetLook,
-    setDishFluid, // #1997: the loop's per-frame ferrofluid plan + colours (null = disarmed)
     hasAtlas: () => !!atlasTex,
     renderFrame,
     renderAccumInputFrame,
