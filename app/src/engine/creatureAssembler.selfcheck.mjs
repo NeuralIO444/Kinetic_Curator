@@ -360,6 +360,9 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     'components/CreatureCultivate.jsx',
     'components/CreatureMiniature.jsx',
     'components/cultivate.selfcheck.mjs',
+    // #2008: the Riso field Look suite assembles creatures to prove the picker-only Look stays off the
+    // assembler's dice (a test, not a stage reader)
+    'gl/risoFieldLook.selfcheck.mjs',
   ]);
   const hits = [];
   const walk = (dir) => {

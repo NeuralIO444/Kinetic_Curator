@@ -32,6 +32,7 @@ export const FX_KIND_TO_COST_ID = {
   posterize: 'builtin/posterize',
   scanlines: 'fx/scanlines',
   dither: 'fx/dither',
+  riso: 'fx/riso', // #2008 — the overprint finish's registered tier (gl/effects/fxShaders.mjs)
   displace: 'fx/displace',
   tear: 'fx/tear',
   solarize: 'fx/solarize',

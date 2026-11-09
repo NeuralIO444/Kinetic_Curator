@@ -48,7 +48,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
 // #1610: dither joins the family — it runs in the finish chain, post-accum.
-const GRAIN_FAMILY_KINDS = ['grain', 'dither'];
+const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso']; // #2008: riso joins the finish family (fx/fxFilters.js is the source)
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 
 import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser

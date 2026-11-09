@@ -186,10 +186,13 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANJI_STAMP_IDS.has(a.id)), 'no kanji in 
 // #2005 RE-PIN (cause: the clean plate): the plate pack (52, Fraunces)
 // joins the catalogue on the same road — the sum grows by exactly the pack;
 // the plate suite owns its containment pins.
+// #2008 RE-PIN (cause: the riso glyph expansion): the composed riso icon
+// set (24) joins the catalogue on the same road — the sum grows by exactly
+// the set; the riso suites own their containment pins.
 assert.strictEqual(
   ASSETS.length,
-  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52,
-  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate',
+  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24,
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso',
 );
 assert.ok(ASSETS_KANJI.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kanji stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);

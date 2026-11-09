@@ -63,6 +63,10 @@ export const MEASURED_COSTS = {
   // (one tap, a bit-formula threshold — fx/edge's class). Re-bless with
   // `npm run measure-costs` on a real GPU.
   'fx/dither': { ms: 0.3, method: 'wall', draws: 90 },
+  // #2008 — added by hand, same precedent as #1610: a pure-ALU tier-3 pass
+  // (two taps, a multiply — fx/dither's class). Re-bless with
+  // `npm run measure-costs` on a real GPU.
+  'fx/riso': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/solarize': { ms: 0.3, method: 'wall', draws: 90 },
   'fx/tear': { ms: 0.3, method: 'wall', draws: 90 },
   // #740 — added by hand from a `measure-costs` run (software GL, wall clock). The pair is

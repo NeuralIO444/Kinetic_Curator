@@ -239,6 +239,33 @@ export const FX_EFFECT_DEFS = {
       },
     },
   },
+  // #2008 — RISO overprint: the stage-wide print finish. Two ink passes with a
+  // ruled misregistration (shift detents 0..4 px), overlap multiplying like ink.
+  // The GL pass + CPU reference live in engine/risoFinish.mjs; this SVG builder
+  // is an approximation (see buildRiso). Grain family: it runs post-composite
+  // over the finished frame, never inside the feedback loop.
+  riso: {
+    label: 'Riso Overprint',
+    hint: 'Risograph finish over the whole frame: a second ink pass, misregistered by the shift detent, multiplying where the passes overlap. Amount 0 is the frame untouched.',
+    params: {
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0,
+        hint: 'How hard the second pass prints. 0 is off — the frame byte-identical.',
+      },
+      shift: {
+        label: 'Shift',
+        min: 0,
+        max: 4,
+        step: 1,
+        def: 2,
+        hint: 'Misregistration in pixels (detents 0–4), down-right — the press drift.',
+      },
+    },
+  },
   posterize: {
     label: 'Posterize',
     hint: 'Reduce each channel to a fixed number of tonal steps. Flat poster look, one primitive.',
@@ -269,7 +296,9 @@ export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
 // position. #1610: Dither joins — the family's second kind (ordered Bayer,
 // post-accum like grain: a dither inside the feedback loop would compound
 // its own weave). Stipple still to come.
-export const GRAIN_FAMILY_KINDS = ['grain', 'dither'];
+// #2008 — riso joins the family: a finish over the finished frame belongs
+// post-accum with grain and dither, never compounding in the feedback loop.
+export const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso'];
 
 /**
  * #520 — EF rack: 4 fixed slots per FX layer, applied bottom-up (EF-1 first,
@@ -291,7 +320,7 @@ export const FX_RACK = [
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
   { slot: 'EF-2', label: 'Distort', kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
-  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither'], stubs: ['stipple'] },
+  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither', 'riso'], stubs: ['stipple'] },
 ];
 
 /**
@@ -825,6 +854,31 @@ function buildFeedbackWarp(params, ctx, rid, src) {
   return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
 }
 
+/**
+ * #2008 — the SVG half of RISO, an honest approximation like dither/halo: the
+ * second pass is the source offset by the shift detent, multiplied with the
+ * first, and mixed back by amount. SVG blend arithmetic works on its own
+ * premultiplied terms, so print pixels differ from the GL pass in degree, not
+ * in intent. Kept in sync for the standing reason: an unknown kind is DROPPED
+ * by sanitizeFxEffects, so a GL-only riso would silently vanish from print.
+ * Amount 0 emits the identity pass-through.
+ */
+function buildRiso(params, ctx, rid, src) {
+  const amount = Math.min(1, Math.max(0, Number(params.amount) || 0));
+  if (amount <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const shift = Math.min(4, Math.max(0, Math.round(Number(params.shift) || 0)));
+  const off = rid();
+  const mul = rid();
+  return [
+    { prim: 'feOffset', attrs: { in: src, dx: shift, dy: shift, result: off } },
+    { prim: 'feBlend', attrs: { in: src, in2: off, mode: 'multiply', result: mul } },
+    {
+      prim: 'feComposite',
+      attrs: { in: mul, in2: src, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: r3(1 - amount), k4: 0 },
+    },
+  ];
+}
+
 const BUILDERS = {
   sharpen: buildSharpen,
   haze: buildHaze,
@@ -836,6 +890,7 @@ const BUILDERS = {
   grain: buildGrain,
   scanlines: buildScanlines,
   dither: buildDither,
+  riso: buildRiso,
   posterize: buildPosterize,
   invert: buildInvert,
   solarize: buildSolarize,

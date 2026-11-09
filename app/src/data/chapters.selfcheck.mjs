@@ -71,7 +71,7 @@ const EXPECTED_COUNTS = {
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
   grunge: { looks: 5, voices: 8, assets: 39 },
-  now: { looks: 69, voices: 72, assets: 312 }, // #1854: Now sums the grown library (64+5 looks, 64+8 voices, 294+18 assets)
+  now: { looks: 70, voices: 72, assets: 312 }, // #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks)
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
@@ -169,8 +169,8 @@ assert.deepEqual(
   assert.ok(!/liveLoop|liveResolve|particles/.test(src), 'the registry stands clear of the one-writer files');
   assert.equal(
     ASSETS.length,
-    753,
-    'the library is 753: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces), which CHAPTER_UNDEALT keeps out of every deck',
+    777,
+    'the library is 777: the old 313 (no existing record edited) + #1982’s 163 poem-only kana stamps + #1998’s 126 curated kanji stamps + #2002’s 99 slice-3 stamps (43 Latin lowercase/punctuation + 52 serif + 4 ornaments) + #2005’s 52 plate stamps (Fraunces) + #2008’s 24 composed riso icons, which CHAPTER_UNDEALT keeps out of every deck',
   );
 }
 

@@ -202,6 +202,7 @@ export const FAMILIES = Object.freeze([
   'letterforms',
   'pixel-glyphs',
   'marks', // #1854 — the first chapter's authored pool (BOOK S1b)
+  'riso', // #2008 — the grammar-composed icon family (not authored: generated from the canonical seed)
   'creature',
   'imported',
 ]);
@@ -222,6 +223,7 @@ export const FAMILY_BY_PREFIX = Object.freeze({
   typ: 'letterforms',
   pxg: 'pixel-glyphs',
   mrk: 'marks',
+  riso: 'riso',
   creature: 'creature',
 });
 
@@ -259,6 +261,7 @@ export const STYLE_RULES = Object.freeze([
   { family: ['letterforms'], style: 'swiss' },
   { family: ['creature'], style: 'organic' },
   { family: ['marks'], style: 'marks' },
+  { family: ['riso'], style: 'grunge' }, // #2008 — riso is a print family: spot ink, misregistration, grain
   // experimental: print-y scanlines are grunge (riso, misregistration); the rest of the pack is techno or organic
   { category: ['scanlines'], tags: ['print'], style: 'grunge' },
   { category: ['scanlines'], style: 'techno' },

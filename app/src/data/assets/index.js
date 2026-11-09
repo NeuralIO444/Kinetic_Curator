@@ -12,6 +12,7 @@ import { ASSETS_LATIN } from './assets-latin.js';
 import { ASSETS_SERIF } from './assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets-ornaments.js';
 import { ASSETS_PLATE } from './assets-plate.js';
+import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
 import { BAKED_REGIONS } from './regions.generated.js'; // #1432: region mattes (#725) baked for the library
@@ -85,5 +86,10 @@ export const ASSETS = [
   // surface, dealt only by the FIELD director when it calls a plate
   // (Whittier, the solo room, the room at its stillest).
   ...ASSETS_PLATE,
+  // #2008 — the riso icons ride the same road in, on the same terms: composed by
+  // the generative grammar (engine/risoGrammar.mjs) from the canonical seed —
+  // catalogue members, never authored content, excluded by id on every dealing
+  // surface, dealt only by the riso field dealer (engine/risoField.mjs).
+  ...ASSETS_RISO,
   CREATURE_CITIZEN,
 ];

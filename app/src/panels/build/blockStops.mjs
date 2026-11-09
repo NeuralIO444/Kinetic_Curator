@@ -69,6 +69,10 @@ export const FX_PARAM_STOPS = {
   // precedent — stops ascend from the floor); amount is a plain magnitude.
   'dither.cell': { stops: [1, 2, 4, 8] },
   'dither.amount': { stops: [0, 0.5, 0.75, 1] },
+  // #2008 — riso: shift is a setting (the misregistration detent itself,
+  // ascending from 0 = registered); amount is a plain magnitude from OFF.
+  'riso.shift': { stops: [0, 1, 2, 4] },
+  'riso.amount': { stops: [0, 0.35, 0.65, 1] },
   'scanlines.density': { stops: [0.05, 0.35, 0.65, 1] }, // line frequency — a setting from the floor
   'scanlines.amount': { stops: [0, 0.5, 0.8, 1] },
   'halo.amount': { stops: [0, 0.4, 0.8, 1.5] },
