@@ -6,6 +6,7 @@
 //             it varies with the seed
 //   preview   the part preview is the scene contract's own deal for the same stage and seed (and narrows to a kit)
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { ASSETS } from '../data/assets/index.js';
 import { assetRecord, assetsWhere } from '../data/assetStyle.js';
 import { SEED_KITS, resolveKit } from '../data/kits.js';
@@ -217,4 +218,33 @@ const creatures = bodies
     'an empty stage deals from the body itself',
   );
 }
+// ---- #2034 (the Big Lab): the surface is the drawer-class room — rail, centered stage, bank rail — and
+// the standing instruction prose is gone from the wall (what teaching remains is hover help)
+{
+  const wet = readFileSync(new URL('./WetLab.jsx', import.meta.url), 'utf8');
+  const genome = readFileSync(new URL('../components/GenomeTimeline.jsx', import.meta.url), 'utf8');
+  const lineage = readFileSync(new URL('../components/LineageTree.jsx', import.meta.url), 'utf8');
+  assert.match(wet, /width: 1180/, 'the sheet is drawer-class (~1180px), not the 620px popup');
+  for (const id of ['lab-rail', 'tool-point', 'tool-head', 'tool-limb', 'creature-stage', 'bank-rail', 'bank-tile'])
+    assert.ok(wet.includes(`data-testid="${id}"`), `the big lab carries ${id}`);
+  assert.ok(wet.includes('data-testid={`lab-mode-${m}`}'), 'the rail renders a mode button per mode');
+  for (const m of ['assemble', 'breed', 'genome', 'lineage'])
+    assert.ok(wet.includes(`['${m}', '${m}']`), `the rail carries the ${m} mode`);
+  assert.ok(
+    wet.includes("from '../components/CreatureMiniature.jsx'"),
+    'the creature stage is the shared #1872 miniature, scaled up — not a second stage',
+  );
+  // the named prose blocks do not stand on the wall anymore (the attach teaching survives as hover help)
+  for (const prose of [
+    'Build the creature from named strands',
+    'Pick three parents — banked creatures, or this shape in a Look and a Voice',
+    'every asset has attach points from its shape',
+  ])
+    assert.ok(!wet.includes(prose), `standing prose gone from the lab: ${prose.slice(0, 32)}…`);
+  assert.ok(!genome.includes('The creature’s genes, in order'), 'the timeline explainer is gone');
+  assert.ok(!genome.includes('source {gene.source}</span>'), 'the readout prints the source once, not words + raw');
+  assert.ok(!lineage.includes('Pick an ancestor to read what changed in it'), 'the tree explainer is gone');
+  assert.ok(lineage.includes('deltaGroups'), 'the tree groups deltas by source — no source printed per gene');
+}
+
 console.log('wetLab.selfcheck: ok');

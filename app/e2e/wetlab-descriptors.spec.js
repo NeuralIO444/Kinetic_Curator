@@ -75,6 +75,8 @@ test('shape card, filtered breed parents, a kit source, and a part preview that 
   const after = await lab.getByTestId('part-cell').evaluateAll((els) => els.map((e) => e.getAttribute('title')));
   expect(after).not.toEqual(before);
   // breed parents filtered by the body's tag: only the flower-bodied creature remains in slot 1
+  // (#2034 re-pin: BREED is a rail mode now — the panel swaps, the slots and labels are unchanged)
+  await lab.getByTestId('lab-mode-breed').click();
   const slot1 = lab.getByLabel('Parent 1');
   const creatureOptions = async () =>
     slot1.locator('option').evaluateAll((os) => os.map((o) => o.value).filter((v) => v.startsWith('cr-')));
