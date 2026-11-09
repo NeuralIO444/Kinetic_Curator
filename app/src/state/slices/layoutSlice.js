@@ -284,6 +284,7 @@ const dieRng = () => die(0x40000000) / 0x40000000;
 function raygunWrite(state, mode) {
   const form = state.layoutParams?.fieldForm;
   if (!form) return {};
+  if (form.plate) return {}; // #2005 — a plate is never treated (nor touched by the gun at all)
   if (mode === null) {
     if (!form.raygun) return {};
     const next = { ...form };
@@ -294,7 +295,6 @@ function raygunWrite(state, mode) {
     };
   }
   if (!RAYGUN_MODES.includes(mode)) return {};
-  if (form.plate) return {}; // #2005 — a plate is never treated
   if (form.raygun && form.raygun.mode === mode) return {};
   const tap = state.raygunTap | 0;
   const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);

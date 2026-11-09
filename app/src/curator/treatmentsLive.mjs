@@ -14,7 +14,8 @@
 // 2. THE ANNOUNCER — one store watcher. Whenever the standing poem's treatment record changes, by ANY path (a surface
 //    call, an undo, a re-deal that drops the record, a project load), it announces the change on the bus:
 //    treatment:arm { target, mode, seed, from } / treatment:disarm { target, mode }, with the envelope's cause (the
-//    surface call's `by`; `document` for a change that arrived with the document; `playback` while a take plays) and
+//    surface call's `by`; `document` for a change that arrived with the document — undo, a re-deal, a load — even when
+//    a persona's re-deal caused it; `playback` for a live touch made while a take plays back) and
 //    the musical stamp. Watching the record rather than the calls is what makes the log complete: the log can never
 //    say a treatment stands when the form says it does not.
 //
@@ -40,6 +41,11 @@ const same = (a, b) => (a === null ? b === null : b !== null && a.mode === b.mod
 export function startTreatments({ getState, subscribe, isReplaying = () => false, emit = busEmit } = {}) {
   if (typeof getState !== 'function' || typeof subscribe !== 'function') return () => {};
   let prev = poemRecord(getState());
+  // ORDER: announcements queue and drain one at a time. A listener that writes the record while hearing an
+  // announcement re-enters this watcher; its announcement waits behind the one in flight, so every listener hears
+  // changes in the order they happened (the take's log never contradicts the form).
+  const queue = [];
+  let draining = false;
   const off = subscribe((s) => {
     const cur = poemRecord(s);
     if (same(prev, cur)) return;
@@ -51,15 +57,29 @@ export function startTreatments({ getState, subscribe, isReplaying = () => false
     } catch {
       replaying = false;
     }
+    // `playback`: a change made while a take is playing back. Replayed treatments never reach the store (playback
+    // overlays the take's scene on the loop, not the store), so this marks a live touch during playback — which the
+    // take recorder drops, as it drops all playback-time traffic.
     const cause = replaying ? 'playback' : pendingCause || 'document';
-    if (cur) {
-      emit(
-        Events.TREATMENT_ARM,
-        Object.freeze({ target: 'poem', mode: cur.mode, seed: cur.seed, from: from ? from.mode : null }),
-        { cause },
-      );
-    } else {
-      emit(Events.TREATMENT_DISARM, Object.freeze({ target: 'poem', mode: from.mode }), { cause });
+    queue.push(
+      cur
+        ? [
+            Events.TREATMENT_ARM,
+            Object.freeze({ target: 'poem', mode: cur.mode, seed: cur.seed, from: from ? from.mode : null }),
+            cause,
+          ]
+        : [Events.TREATMENT_DISARM, Object.freeze({ target: 'poem', mode: from.mode }), cause],
+    );
+    if (draining) return;
+    draining = true;
+    try {
+      while (queue.length) {
+        const [ev, payload, c] = queue.shift();
+        emit(ev, payload, { cause: c });
+      }
+    } finally {
+      draining = false;
+      queue.length = 0;
     }
   });
   const mine = { getState };
@@ -73,12 +93,18 @@ export function startTreatments({ getState, subscribe, isReplaying = () => false
 /** Run one store write as `by`. Returns whether the target's record changed. */
 function act(target, by, write) {
   if (!bound || !TREATMENT_TARGETS.includes(target) || !CALLERS.includes(by)) return false;
-  const before = poemRecord(bound.getState());
+  const state = bound.getState();
+  // HOLD is sovereign for every caller but the performer (§9: lock-respecting). The performer's own gun works on a
+  // held poem (#2003 ruling: HOLD guards the poem's VALUE against re-deals, not the hand that holds it); DAVIS, the
+  // Director, LOIS and the doctrines (RAY GUN P5) never treat a held poem.
+  if (by !== 'performer' && state.lockedParams && state.lockedParams.fieldForm) return false;
+  const before = poemRecord(state);
+  const outer = pendingCause;
   pendingCause = by;
   try {
-    write(bound.getState());
+    write(state);
   } finally {
-    pendingCause = null;
+    pendingCause = outer;
   }
   return !same(before, poemRecord(bound.getState()));
 }

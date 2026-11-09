@@ -204,6 +204,75 @@ ok('B3 no change, no announcement; a change while a take plays back says `playba
   assert.equal(heard[0].meta.cause, 'playback');
 });
 
+ok('B4 HOLD is sovereign for every caller but the performer', () => {
+  reset({ lockedParams: { fieldForm: true } });
+  for (const by of ['davis', 'director', 'lois']) {
+    assert.equal(treatments.arm('poem', { mode: 'shot', by }), false, `${by} never treats a held poem`);
+    assert.equal(treatments.cycle('poem', { by }), false);
+  }
+  assert.equal(S().raygunTap, 0);
+  assert.equal(
+    treatments.arm('poem', { mode: 'shot', by: 'performer' }),
+    true,
+    'the performer’s own gun works on a held poem',
+  );
+  assert.equal(treatments.disarm('poem', { by: 'davis' }), false, 'nor does a persona disarm one');
+  assert.equal(treatments.disarm('poem', { by: 'performer' }), true);
+});
+
+ok('B5 a listener that writes while hearing: every later listener hears changes in the order they happened', () => {
+  reset();
+  heard = [];
+  let answered = false;
+  const offAnswer = on(Events.TREATMENT_ARM, (p) => {
+    if (p.mode === 'carson' && !answered) {
+      answered = true;
+      treatments.arm('poem', { mode: 'greiman', by: 'davis' }); // a write from inside a listener
+    }
+  });
+  const late = [];
+  const offLate = on(Events.TREATMENT_ARM, (p, meta) => late.push([p.mode, meta.cause])); // registered after
+  treatments.arm('poem', { mode: 'carson', by: 'performer' });
+  offAnswer();
+  offLate();
+  assert.deepStrictEqual(late, [
+    ['carson', 'performer'],
+    ['greiman', 'davis'],
+  ]);
+  assert.equal(S().layoutParams.fieldForm.raygun.mode, 'greiman', 'the last announcement is what stands');
+});
+
+ok('B6 a recorder on the live bus agrees with the form, and its record survives the file round trip', () => {
+  reset();
+  let frame = 0;
+  const rec = createTreatmentRecorder({
+    initial: { poem: S().layoutParams.fieldForm.raygun ?? null },
+    getFrame: () => frame,
+  });
+  const off = [
+    on(Events.TREATMENT_ARM, (p, m) => rec.push('arm', p, m)),
+    on(Events.TREATMENT_DISARM, (p, m) => rec.push('disarm', p, m)),
+  ];
+  frame = 3;
+  treatments.cycle('poem', { by: 'performer' });
+  frame = 9;
+  treatments.arm('poem', { mode: 'shot', by: 'davis' });
+  frame = 20;
+  S().undo();
+  for (const o of off) o();
+  const r = JSON.parse(JSON.stringify(rec.finish()));
+  assert.ok(checkTreatmentRecord(r));
+  assert.deepStrictEqual(treatmentAt(r, 'poem', 99), treatmentState(S().layoutParams.fieldForm.raygun) ?? null);
+  assert.deepStrictEqual(
+    r.events.map((e) => [e[0], e[1], e.at(-1)]),
+    [
+      [3, 'arm', 'performer'],
+      [9, 'arm', 'davis'],
+      [20, 'arm', 'document'],
+    ],
+  );
+});
+
 // ── C · the bus never carries state ─────────────────────────────────────
 ok('C1 payloads are frozen copies — a listener cannot reach the record', () => {
   reset();
