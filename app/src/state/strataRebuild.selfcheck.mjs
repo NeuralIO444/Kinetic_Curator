@@ -367,7 +367,10 @@ ok('rotcopy sandwich: seed −θ then turn back +θ leaves picture geometry unto
       for (const p of probes) {
         const inner = rotCopySample(p.x, p.y, w, h, deg);
         const back = rotCopySample(inner.x, inner.y, w, h, -deg);
-        assert.ok(nearPt(back, p), `${w}×${h} @${deg}°: sandwich returns (${back.x},${back.y}), expected (${p.x},${p.y})`);
+        assert.ok(
+          nearPt(back, p),
+          `${w}×${h} @${deg}°: sandwich returns (${back.x},${back.y}), expected (${p.x},${p.y})`,
+        );
       }
     }
   }

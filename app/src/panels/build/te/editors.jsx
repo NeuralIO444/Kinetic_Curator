@@ -85,9 +85,7 @@ export function StepperEditor({ value, min, max, step = 1, stops, unit, format, 
   const lo = hasStops ? Math.min(...stops) : min;
   const hi = hasStops ? Math.max(...stops) : max;
   const clampStep = (dir) => {
-    const next = hasStops
-      ? steppedStopValue(stops, value, dir)
-      : Math.min(max, Math.max(min, value + dir * step));
+    const next = hasStops ? steppedStopValue(stops, value, dir) : Math.min(max, Math.max(min, value + dir * step));
     if (next != null) onChange(next);
   };
   return (
