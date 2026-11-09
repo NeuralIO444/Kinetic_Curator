@@ -501,6 +501,65 @@ export const MOTION_MODES = [
   },
 ];
 
+/**
+ * #2045 (Canon S2) — a voice's STYLE lives with its definition.
+ *
+ * Until now this file knew nothing about style: a voice's style existed only in data/voiceDeck.js's sidecar
+ * tables, so anything reading the definitions directly (the MIX path, the shape sets) was style-blind. This is
+ * the one home of that knowledge, in Canon terms (data/canon/styles.js ids); the deck's `styles` is now a view
+ * over it. One row per definition in this file — the 4 flagships, then the 15 mode tiles, in file order.
+ *
+ * A voice may carry more than one style, and the order is the pairing order the deal reads (SWARM is Memphis
+ * first, then Japanese). That is the standing shape, not an edge case.
+ *
+ * Why a table beside the definitions and not a `styles` key on each one: the deck hands the flagship
+ * definition out BY REFERENCE (`def` is the FLAGSHIP_VOICES entry itself), so a new key on it would change the
+ * bytes of every dealt flagship. The style belongs to the definition; it is declared next to it, here.
+ */
+export const VOICE_STYLES = Object.freeze({
+  // the flagships
+  swarm: Object.freeze(['memphis', 'japanese']),
+  hype: Object.freeze(['japanese', 'memphis']),
+  murmuration: Object.freeze(['op', 'engraved']),
+  'dark-glass': Object.freeze(['techno']),
+  // the 15 mode tiles
+  random: Object.freeze(['memphis', 'op']),
+  grid: Object.freeze(['swiss']),
+  fibonacci: Object.freeze(['japanese', 'engraved']),
+  radial: Object.freeze(['op', 'engraved']),
+  noise: Object.freeze(['grunge', 'techno', 'memphis']),
+  stratified: Object.freeze(['swiss', 'bauhaus']),
+  flow: Object.freeze(['organic', 'japanese', 'memphis']),
+  rails: Object.freeze(['swiss', 'memphis']),
+  layers: Object.freeze(['bauhaus', 'swiss']),
+  ca: Object.freeze(['organic', 'memphis']),
+  orbit: Object.freeze(['op']),
+  abacus: Object.freeze(['pixel', 'swiss']),
+  dla: Object.freeze(['engraved', 'organic']),
+  eden: Object.freeze(['organic']),
+  'voronoi-cells': Object.freeze(['memphis', 'op', 'organic']),
+});
+
+const NO_STYLES = Object.freeze([]);
+
+/**
+ * #2045 — the Canon style(s) of a voice definition, by id or by the definition itself (a flagship or a mode
+ * tile). Frozen, in pairing order; [] for a voice this file does not define (a user voice, a family variant —
+ * a variant's style is its family, data/voiceDeck.js).
+ */
+export function voiceStyles(defOrId) {
+  const id = typeof defOrId === 'string' ? defOrId : defOrId && defOrId.id;
+  return (typeof id === 'string' && Object.hasOwn(VOICE_STYLES, id) && VOICE_STYLES[id]) || NO_STYLES;
+}
+
+/** #2045 — every voice this file defines with its style(s): `{ id, kind: 'flagship' | 'tile', styles }`, file order. */
+export function voiceStyleReport() {
+  return [
+    ...FLAGSHIP_VOICES.map((v) => ({ id: v.id, kind: 'flagship', styles: voiceStyles(v) })),
+    ...STUB_VOICES.map((v) => ({ id: v.id, kind: 'tile', styles: voiceStyles(v) })),
+  ];
+}
+
 /** #1771 — a promoted stub voice's full wardrobe: the curated four + the four it gained. */
 export function fullShapeSet(stub) {
   return [...stub.assets, ...(stub.wardrobe || [])];

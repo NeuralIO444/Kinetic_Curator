@@ -10,14 +10,16 @@
 //      the same slice as its pool rather than borrowed from another era.
 //
 // Every deck voice is kc-voice/1-shaped (resolveVoiceState reads it unchanged — no schema change) and declares:
-//   categories / styles — its S3 asset pairing (data/assetStyle.js)
+//   categories / styles — its S3 asset pairing (data/assetStyle.js). #2045: for the flagships and the promoted
+//                         tiles `styles` is a VIEW over the definition's own style (data/voices.js VOICE_STYLES);
+//                         a family variant's style is its family
 //   accumulation        — whether it uses the ACCUM wake/glow. S2's law (#1768): the glow moves only when a dealt
 //                         voice calls for it, and this flag is what the voice pass reads
 //   costTier            — 'light' | 'medium' | 'heavy', a mark budget (VOICE_COST_TIERS) checked by a headless
 //                         render in voiceDeck.selfcheck. ACCUM voices are never 'light' (the wake is a tier-1 pass).
 //
 // Pure data + derivation; deterministic (asset pools are drawn from a seed hashed from the voice id).
-import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, fullShapeSet } from './voices.js';
+import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, fullShapeSet, voiceStyles } from './voices.js';
 import { resolvePalette } from './palettes.js';
 import { ASSETS } from './assets/index.js';
 import { POEM_ONLY_STAMP_IDS } from '../poets/placement.js'; // #2000: the poem-only union (then kana ∪ kanji); #2002: the union grew — placement's POEM_ONLY_STAMP_IDS is the one set
@@ -41,15 +43,18 @@ const ACCUM_OFF = { accumulation: false };
 const accum = (fade, optics) => ({ accumulation: true, accumulationFade: fade, accumulationOptics: optics });
 
 // ── the flagships: a sidecar only — the defs themselves are never copied or edited ──────────────────────────────
+// #2045 — the sidecar no longer carries `styles`: a flagship's style lives with its definition (data/voices.js
+// VOICE_STYLES) and the deck reads it from there, like every other reader.
 const FLAGSHIP_META = {
-  swarm: { categories: ['dots', 'organic', 'linework'], styles: ['memphis', 'japanese'], costTier: 'heavy' },
-  hype: { categories: ['floral', 'linework', 'organic'], styles: ['japanese', 'memphis'], costTier: 'heavy' },
-  murmuration: { categories: ['radial', 'linework', 'dots'], styles: ['op', 'engraved'], costTier: 'heavy' },
-  'dark-glass': { categories: ['crystalline'], styles: ['techno'], costTier: 'medium' },
+  swarm: { categories: ['dots', 'organic', 'linework'], costTier: 'heavy' },
+  hype: { categories: ['floral', 'linework', 'organic'], costTier: 'heavy' },
+  murmuration: { categories: ['radial', 'linework', 'dots'], costTier: 'heavy' },
+  'dark-glass': { categories: ['crystalline'], costTier: 'medium' },
 };
 
 // ── the 15 promoted stubs ──────────────────────────────────────────────────────────────────────────────────────
-// [stub id, title, motion chip, palette, categories, styles, count, accumulation, costTier, fx]
+// [stub id, title, motion chip, palette, categories, count, accumulation, costTier, fx]
+// #2045 — the styles column moved to the definitions: data/voices.js VOICE_STYLES is its one home.
 const PROMOTED = [
   [
     'random',
@@ -57,127 +62,46 @@ const PROMOTED = [
     'scatter',
     'static-bloom',
     ['dots', 'geometric', 'linework'],
-    ['memphis', 'op'],
     160,
     ACCUM_OFF,
     'light',
     { grain: 0.3 },
   ],
-  [
-    'grid',
-    'Control Room',
-    'still',
-    'v01d',
-    ['geometric', 'linework'],
-    ['swiss'],
-    144,
-    ACCUM_OFF,
-    'light',
-    { contrast: 1.1 },
-  ],
+  ['grid', 'Control Room', 'still', 'v01d', ['geometric', 'linework'], 144, ACCUM_OFF, 'light', { contrast: 1.1 }],
   [
     'fibonacci',
     'Nautilus',
     'drift',
     'praystation',
     ['floral', 'linework', 'radial'],
-    ['japanese', 'engraved'],
     200,
     accum(8, 0.06),
     'medium',
     { glow: 0.06 },
   ],
-  [
-    'radial',
-    'Radar',
-    'orbit',
-    'cyanotype',
-    ['radial'],
-    ['op', 'engraved'],
-    120,
-    ACCUM_OFF,
-    'light',
-    { vignette: true },
-  ],
+  ['radial', 'Radar', 'orbit', 'cyanotype', ['radial'], 120, ACCUM_OFF, 'light', { vignette: true }],
   [
     'noise',
     'Bad Reception',
     'scatter',
     'glitch',
     ['linework', 'dots', 'scanlines'],
-    ['grunge', 'techno', 'memphis'],
     240,
     accum(3, 0.04),
     'medium',
     { grain: 0.5, edge: true },
   ],
-  [
-    'stratified',
-    'Sediment',
-    'still',
-    'strata',
-    ['linework', 'geometric'],
-    ['swiss', 'bauhaus'],
-    220,
-    ACCUM_OFF,
-    'light',
-    {},
-  ],
-  [
-    'flow',
-    'River',
-    'flow',
-    'river-delta',
-    ['linework', 'organic'],
-    ['organic', 'japanese', 'memphis'],
-    260,
-    accum(10, 0.05),
-    'medium',
-    { glow: 0.05 },
-  ],
-  [
-    'rails',
-    'Transit Map',
-    'flow',
-    'transit',
-    ['linework', 'geometric'],
-    ['swiss', 'memphis'],
-    140,
-    ACCUM_OFF,
-    'light',
-    {},
-  ],
-  [
-    'layers',
-    'Z-Stack',
-    'drift',
-    'megacity',
-    ['geometric', 'linework'],
-    ['bauhaus', 'swiss'],
-    120,
-    ACCUM_OFF,
-    'light',
-    { vignette: true },
-  ],
-  [
-    'ca',
-    'Petri Dish',
-    'mold',
-    'petri-bloom',
-    ['organic', 'dots'],
-    ['organic', 'memphis'],
-    200,
-    ACCUM_OFF,
-    'medium',
-    { grain: 0.15 },
-  ],
+  ['stratified', 'Sediment', 'still', 'strata', ['linework', 'geometric'], 220, ACCUM_OFF, 'light', {}],
+  ['flow', 'River', 'flow', 'river-delta', ['linework', 'organic'], 260, accum(10, 0.05), 'medium', { glow: 0.05 }],
+  ['rails', 'Transit Map', 'flow', 'transit', ['linework', 'geometric'], 140, ACCUM_OFF, 'light', {}],
+  ['layers', 'Z-Stack', 'drift', 'megacity', ['geometric', 'linework'], 120, ACCUM_OFF, 'light', { vignette: true }],
+  ['ca', 'Petri Dish', 'mold', 'petri-bloom', ['organic', 'dots'], 200, ACCUM_OFF, 'medium', { grain: 0.15 }],
   [
     'orbit',
     'Planetarium',
     'orbit',
     'perihelion',
     ['radial', 'dots'],
-    ['op'],
     90,
     accum(6, 0.08),
     'medium',
@@ -189,31 +113,18 @@ const PROMOTED = [
     'still',
     'kiln-columns',
     ['geometric', 'stamps'],
-    ['pixel', 'swiss'],
     120,
     ACCUM_OFF,
     'light',
     { posterize: true },
   ],
-  [
-    'dla',
-    'Coral Reef',
-    'mold',
-    'tidepool',
-    ['radial', 'organic', 'linework'],
-    ['engraved', 'organic'],
-    220,
-    ACCUM_OFF,
-    'medium',
-    {},
-  ],
+  ['dla', 'Coral Reef', 'mold', 'tidepool', ['radial', 'organic', 'linework'], 220, ACCUM_OFF, 'medium', {}],
   [
     'eden',
     'Eden Garden',
     'mold',
     'persona-oxman',
     ['organic', 'biosynthetic', 'radial', 'dots'],
-    ['organic'],
     200,
     ACCUM_OFF,
     'medium',
@@ -225,7 +136,6 @@ const PROMOTED = [
     'still',
     'folktotem',
     ['geometric', 'dots', 'organic'],
-    ['memphis', 'op', 'organic'],
     180,
     ACCUM_OFF,
     'light',
@@ -893,8 +803,9 @@ const body = (mode, count, motionId, acc) => ({
   ...acc,
 });
 
-const promoted = PROMOTED.map(([id, title, motionId, paletteId, categories, styles, count, acc, costTier, fx]) => {
+const promoted = PROMOTED.map(([id, title, motionId, paletteId, categories, count, acc, costTier, fx]) => {
   const stub = STUB_VOICES.find((v) => v.id === id);
+  const styles = [...voiceStyles(id)]; // #2045 — the definition's own style, not a column of this table
   return {
     id,
     name: stub.name,
@@ -941,7 +852,9 @@ const variants = Object.entries(VARIANTS).flatMap(([family, rows]) =>
 const flagships = FLAGSHIP_VOICES.map((def) => ({
   def, // the flagship object itself — same reference, never cloned or edited
   kind: 'flagship',
-  ...FLAGSHIP_META[def.id],
+  categories: FLAGSHIP_META[def.id].categories,
+  styles: [...voiceStyles(def.id)], // #2045 — a view over the definition-level style (two styles stay two)
+  costTier: FLAGSHIP_META[def.id].costTier,
   accumulation: def.params.accumulation === true,
 }));
 
