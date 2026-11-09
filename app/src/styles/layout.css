@@ -1061,6 +1061,24 @@
   white-space: nowrap;
 }
 
+/* FERROFLUID chip (#1997): the dish's second mode, in the family's posture beside DISH LIFE —
+   a droplet cluster that fills while the fluid runs; the governor's shed dims it like the glider's. */
+.ferro-chip[data-ferro="slowed"] {
+  opacity: 0.75;
+}
+.ferro-chip[data-ferro="held"] {
+  opacity: 0.55;
+}
+.ferro .ferro-arm {
+  flex: none;
+  margin-left: 4px;
+  white-space: nowrap;
+}
+.ferro .ferro-arm[aria-pressed="true"] {
+  border-color: var(--accent2);
+  color: var(--accent2);
+}
+
 @media (max-width: 1023px) {
   .app {
     height: auto;

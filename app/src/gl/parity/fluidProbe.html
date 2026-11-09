@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8"><title>KC ferrofluid probe</title></head>
+<body>
+<canvas id="c"></canvas>
+<script type="module">
+import { createDishFluidGl } from '../dishFluidGl.mjs';
+import { FULL_VS } from '../shaders.mjs';
+import { buildProgramChecked } from '../debug/diagnostics.mjs';
+import { createFluid, stepFluid } from '../../engine/dishFluid.mjs';
+
+// Shader-level probe for the FERROFLUID display instance (#1997): runs the GPU step chain
+// under a caller-supplied plan, reads the field back through an 8-bit copy (row order =
+// kernel order), and runs the JS kernel alongside for a statistical comparison.
+//   window.__kcFluidProbe({ cols, rows, seedKey, magnets, dial, steps })
+//     -> { bytes: [...], mirror: [...], served }
+// bytes/mirror are the dark phase V quantized to 0..255, row-major, dish-grid order.
+const canvas = document.getElementById('c');
+const gl = canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, stencil: false });
+if (!gl) throw new Error('[probe] WebGL2 not available');
+if (!gl.getExtension('EXT_color_buffer_float')) throw new Error('[probe] EXT_color_buffer_float not available');
+
+const copyProg = buildProgramChecked(
+  gl,
+  FULL_VS,
+  `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+in vec2 v_cuv;
+out vec4 o;
+void main() { vec2 s = texture(u_src, v_cuv).rg; o = vec4(s.x, s.y, 0.0, 1.0); }`,
+  { name: 'fluidprobe-copy', vsFile: 'shaders.mjs:FULL_VS', fsFile: 'fluidProbe.html:COPY_FS' },
+);
+const vbo = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+gl.bindBuffer(gl.ARRAY_BUFFER, null);
+
+function readField(tex, w, h) {
+  const t = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, t);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA8, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  const fb = gl.createFramebuffer();
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+  gl.viewport(0, 0, w, h);
+  gl.useProgram(copyProg);
+  gl.activeTexture(gl.TEXTURE0);
+  gl.bindTexture(gl.TEXTURE_2D, tex);
+  gl.uniform1i(gl.getUniformLocation(copyProg, 'u_src'), 0);
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbo);
+  const aPos = gl.getAttribLocation(copyProg, 'a_pos');
+  gl.enableVertexAttribArray(aPos);
+  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
+  gl.drawArrays(gl.TRIANGLES, 0, 3);
+  const px = new Uint8Array(w * h * 4);
+  gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.deleteTexture(t);
+  gl.deleteFramebuffer(fb);
+  const v = new Array(w * h);
+  for (let i = 0; i < w * h; i++) v[i] = px[i * 4 + 1];
+  return v;
+}
+
+window.__kcFluidProbe = ({ cols, rows, seedKey, magnets = [], dial = { flow: 0.5, pull: 0.7, couple: 0 }, steps }) => {
+  const plan = {
+    active: true,
+    seedKey,
+    wakeMs: 0,
+    stepTarget: steps,
+    stepsAllowed: steps,
+    resIndex: 0,
+    cols,
+    rows,
+    magnets,
+    dial,
+    coupleField: null,
+    aspectHW: rows / cols,
+  };
+  const runOnce = () => {
+    const inst = createDishFluidGl(gl);
+    const out = inst.applyPlan(plan, null);
+    const bytes = readField(out.tex, cols, rows);
+    const served = inst.served;
+    inst.dispose();
+    return { bytes, served };
+  };
+  const a = runOnce();
+  const b = runOnce();
+  const f = createFluid({ cols, rows, seedKey, magnets });
+  for (let i = 0; i < steps; i++)
+    stepFluid(f, { magnets, pull: dial.pull, flow: dial.flow, couple: 0, aspectHW: rows / cols });
+  const mirror = Array.from(f.v, (x) => Math.round(x * 255));
+  return { bytes: a.bytes, bytes2: b.bytes, mirror, served: a.served };
+};
+
+window.__kcReady = true;
+</script>
+</body>
+</html>

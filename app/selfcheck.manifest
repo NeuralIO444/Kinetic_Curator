@@ -37,6 +37,7 @@ node src/hooks/useMediaExport.selfcheck.mjs
 node src/hooks/governorCuts.selfcheck.mjs
 node src/hooks/governorCreatureShed.selfcheck.mjs
 node src/hooks/governorDishLife.selfcheck.mjs
+node src/hooks/governorDishFluid.selfcheck.mjs
 node src/hooks/governorHostileScene.selfcheck.mjs
 node src/hooks/sceneCost.selfcheck.mjs
 node src/hooks/usePhraseLoop.selfcheck.mjs
@@ -151,6 +152,7 @@ node src/styles/selects.selfcheck.mjs
 node src/components/retiredEmoji.selfcheck.mjs
 node src/components/casingInCss.selfcheck.mjs
 node src/components/dishLifeChip.selfcheck.mjs
+node src/components/dishFluidChip.selfcheck.mjs
 node src/components/genomeTimeline.selfcheck.mjs
 node src/components/lineageTree.selfcheck.mjs
 node src/components/strandBank.selfcheck.mjs
@@ -185,10 +187,16 @@ node src/engine/dishLifePatterns.selfcheck.mjs
 node src/engine/dishLifeBackgrounds.selfcheck.mjs
 node src/engine/dishLifeReseed.selfcheck.mjs
 node src/engine/dishLifeControls.selfcheck.mjs
+node src/engine/dishFluid.selfcheck.mjs
+node src/engine/dishFluidCouple.selfcheck.mjs
+node src/engine/dishFluidStage.selfcheck.mjs
 node src/engine/kinemeCulture.selfcheck.mjs
 node src/engine/dishLifeSpike.selfcheck.mjs
 node src/gl/dishLifeTouchDom.selfcheck.mjs
 node src/gl/liveResolve.dishLife.selfcheck.mjs
+node src/gl/liveResolve.dishFluid.selfcheck.mjs
+node src/gl/dishFluid.selfcheck.mjs
+node src/gl/dishFluidMagnets.selfcheck.mjs
 node src/engine/harmony.selfcheck.mjs
 node src/engine/organisms/behave.selfcheck.mjs
 node src/engine/organisms.selfcheck.mjs

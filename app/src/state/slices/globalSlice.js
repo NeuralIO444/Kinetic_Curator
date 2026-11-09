@@ -21,6 +21,7 @@ import {
 } from '../projectNormalize.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
+import { sanitizeMagnets, clampFluidDial, clampFluidRung, MAX_MAGNETS } from '../../engine/dishFluid.mjs'; // #1997: the ferrofluid's stamped-state sanitizers
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
@@ -628,6 +629,65 @@ export const createGlobalSlice = (set) => ({
    * the dials (the chip's pref carries it), never serialized into a document. */
   dishLifeCycleGens: FIELD_CYCLE_GENS,
   setDishLifeCycleGens: (n) => set({ dishLifeCycleGens: clampCycleGens(n) }),
+  /** #1997 FERROFLUID — the dish's second mode, sibling of the culture: a Gray-Scott field in the
+   * dish (engine/dishFluid.mjs), GPU-stepped at the design point 384×216 × 8 steps/frame. The
+   * on/off: while true the live loop stamps input.dishFluid (+ magnets + dials) every frame and
+   * the resolver grows the field; the stamp's absence is the off state, so a take recorded
+   * without the fluid replays byte-identically. Runtime only, never serialized (the dishLife
+   * class) — the chip's pref carries the performer's own default. */
+  dishFluid: false,
+  setDishFluid: (on) => set({ dishFluid: !!on }),
+  /** #1997 — the FLOW dial: the field's feed pressure (0..1 → feed ×0.5..×1.5). Runtime only. */
+  dishFluidFlow: 0.5,
+  setDishFluidFlow: (v) => set({ dishFluidFlow: clampFluidDial(v === undefined ? 0.5 : v) }),
+  /** #1997 — the PULL dial: how hard the magnets bias the field (0 = magnets are inert markers). */
+  dishFluidPull: 0.7,
+  setDishFluidPull: (v) => set({ dishFluidPull: clampFluidDial(v === undefined ? 0.7 : v) }),
+  /** #1997 — the COUPLE dial: the two-way coupling's strength — the culture's level biasing the
+   * fluid's feed, and the fluid's density biasing the culture's births (one dial, both
+   * directions, like the field coupling's). 0 = the two dish modes coexist uncoupled. */
+  dishFluidCouple: 0.5,
+  setDishFluidCouple: (v) => set({ dishFluidCouple: clampFluidDial(v === undefined ? 0.5 : v) }),
+  /** #1997 — the magnets: placed objects that stay on the dish ({x, y} dish-normalized, y down),
+   * placed / dragged / removed as recorded performer acts while the mode is armed (the stage
+   * gesture, gl/dishFluidMagnetsDom.mjs). They ride the frame beside the stamp, so a take
+   * records them exactly; runtime only, never serialized. The list is identity-stable across
+   * frames unless an action changes it (the input stream records diffs). */
+  dishFluidMagnets: [],
+  setDishFluidMagnets: (list) => set({ dishFluidMagnets: sanitizeMagnets(list) }),
+  placeDishFluidMagnet: (x, y) =>
+    set((st) =>
+      st.dishFluidMagnets.length >= MAX_MAGNETS
+        ? {}
+        : { dishFluidMagnets: sanitizeMagnets([...st.dishFluidMagnets, { x, y }]) },
+    ),
+  moveDishFluidMagnet: (index, x, y) =>
+    set((st) => {
+      const i = index | 0;
+      if (i < 0 || i >= st.dishFluidMagnets.length) return {};
+      const next = st.dishFluidMagnets.slice();
+      next[i] = { x, y };
+      return { dishFluidMagnets: sanitizeMagnets(next) };
+    }),
+  removeDishFluidMagnet: (index) =>
+    set((st) => {
+      const i = index | 0;
+      if (i < 0 || i >= st.dishFluidMagnets.length) return {};
+      return { dishFluidMagnets: st.dishFluidMagnets.filter((_, j) => j !== i) };
+    }),
+  /** #1997 — while true, canvas presses place / drag / remove magnets (the chip's MAGNETS arm).
+   * A transient hand state, never stamped — the acts are what the take records. Runtime only. */
+  dishFluidMagnetArm: false,
+  setDishFluidMagnetArm: (on) => set({ dishFluidMagnetArm: !!on }),
+  /** #1997 — the governor's shed over the fluid, index into FLUID_SHED_RUNGS (0 full .. 7 held;
+   * steps shed before resolution). The live loop reads it onto every fluid stamp; a render-only
+   * overlay in the dishLifeShed class — never serialized. */
+  dishFluidShed: 0,
+  setDishFluidShed: (n) => set({ dishFluidShed: clampFluidRung(n) }),
+  /** #1997 — a fluid is awake right now (the live loop publishes the transitions). The governor's
+   * sensor for its ferrofluid rung, dishLifeAwake's twin. Runtime only, never serialized. */
+  dishFluidAwake: false,
+  setDishFluidAwake: (on) => set({ dishFluidAwake: !!on }),
   /** #1574 — the governor's travel shed: while true, liveLoop stamps
    * travelShed on the resolver input and FLOW marks settle home. A
    * render-only overlay in the creatureShed class — never serialized

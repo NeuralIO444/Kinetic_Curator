@@ -165,6 +165,12 @@ export function usePerformanceGovernor() {
   const dishLifeShed = useStore((s) => s.dishLifeShed);
   const setDishLifeShed = useStore((s) => s.setDishLifeShed);
   const dishLifeActive = useStore((s) => s.dishLifeAwake);
+  // #1997 — the FERROFLUID rung (cut 1.395, right after its sibling the culture): the shed
+  // overlay (an index into the kernel's rung ladder — steps, then resolution, then held), and
+  // whether a fluid is awake (the loop publishes it) — no awake fluid, no rung.
+  const dishFluidShed = useStore((s) => s.dishFluidShed);
+  const setDishFluidShed = useStore((s) => s.setDishFluidShed);
+  const dishFluidActive = useStore((s) => s.dishFluidAwake);
   const travelShed = useStore((s) => s.travelShed);
   const setTravelShed = useStore((s) => s.setTravelShed);
   // #1576 — P3's siblings are travel too: a scene whose only travel is
@@ -256,6 +262,8 @@ export function usePerformanceGovernor() {
       creatureShed,
       dishLifeActive,
       dishLifeShed,
+      dishFluidActive,
+      dishFluidShed,
       weatherActive,
       weatherShed,
       feedbackWarpActive,
@@ -281,6 +289,8 @@ export function usePerformanceGovernor() {
       creatureShed,
       dishLifeActive,
       dishLifeShed,
+      dishFluidActive,
+      dishFluidShed,
       weatherActive,
       weatherShed,
       feedbackWarpActive,
@@ -608,6 +618,7 @@ export function usePerformanceGovernor() {
       slowRenderSource,
       creatureShed,
       dishLifeShed,
+      dishFluidShed,
       travelShed,
       weatherShed,
       feedbackWarpShed,
@@ -625,6 +636,9 @@ export function usePerformanceGovernor() {
           break;
         case 'dishLife':
           setDishLifeShed(0);
+          break;
+        case 'dishFluid':
+          setDishFluidShed(0);
           break;
         case 'markWeather':
           setWeatherShed(false);
@@ -722,6 +736,9 @@ export function usePerformanceGovernor() {
       case 'dishLife':
         setDishLifeShed(cut.dishLifeShed);
         break;
+      case 'dishFluid':
+        setDishFluidShed(cut.dishFluidShed);
+        break;
       case 'creatureCount':
         setCreatureShed(cut.creatureShed);
         break;
@@ -793,6 +810,8 @@ export function usePerformanceGovernor() {
     setTrailSteerShed,
     dishLifeShed,
     setDishLifeShed,
+    dishFluidShed,
+    setDishFluidShed,
     travelActive,
     travelShed,
     setTravelShed,

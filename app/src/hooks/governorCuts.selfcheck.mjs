@@ -109,11 +109,15 @@ console.log('[selfcheck] governorCuts (#265 gpu binding gate): 7 cases passed');
   // emberDrive.selfcheck).
   // #1923 — 'dishLife' joins between renderScale and markWeather (cut 1.39): the idle culture is the first
   // sacrifice after the pixel trim (the full walk is pinned in governorDishLife.selfcheck).
+  // #1997 re-pin (cause: the ferrofluid joins the restore table right after its sibling the
+  // culture — cut 1.395 sheds after it, so the reverse walk restores the fluid first; the full
+  // walk is pinned in governorDishFluid.selfcheck).
   const order = GOVERNOR_RESTORE_CUTS.map((c) => c.kind);
   assert.deepStrictEqual(order, [
     'fxaa',
     'renderScale',
     'dishLife',
+    'dishFluid',
     'markWeather',
     'feedbackWarp',
     'accumFeed',
