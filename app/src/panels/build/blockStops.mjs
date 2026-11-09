@@ -69,6 +69,11 @@ export const FX_PARAM_STOPS = {
   // precedent — stops ascend from the floor); amount is a plain magnitude.
   'dither.cell': { stops: [1, 2, 4, 8] },
   'dither.amount': { stops: [0, 0.5, 0.75, 1] },
+  // #2038 — stipple: cell is a setting (dot pitch, the dither.cell
+  // precedent — stops ascend from the floor, default 3 among them);
+  // amount is a plain magnitude.
+  'stipple.cell': { stops: [1, 2, 3, 6] },
+  'stipple.amount': { stops: [0, 0.5, 0.75, 1] },
   // #2008 — riso: shift is a setting (the misregistration detent itself,
   // ascending from 0 = registered); amount is a plain magnitude from OFF.
   'riso.shift': { stops: [0, 1, 2, 4] },

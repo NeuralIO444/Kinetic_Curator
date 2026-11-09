@@ -239,6 +239,38 @@ export const FX_EFFECT_DEFS = {
       },
     },
   },
+  // #2038 — EF-4's stipple kind, the rack's last "planned" stub made
+  // real (Strata Q Phase 4 shipped dither; stipple fell between the
+  // stools and no issue owned it until the strata rebuild). A dot
+  // SCREEN, not a weave: within each cell the threshold rises with the
+  // squared distance from the cell centre, so a tone re-cuts into round
+  // halftone dots whose size follows the tone — dark grows fat dots,
+  // light stays sparse specks. Distinct from dither (a Bayer weave at
+  // fixed pitch) and from the Materials stipple (a placement-level dot
+  // body, #1549): this is the finish-family screen over the plate.
+  // Grain family: post-accum, like grain and dither.
+  stipple: {
+    label: 'Stipple',
+    hint: 'Dot-screen finish: tones re-cut into round stipple dots — dot size follows the tone. Amount 0 is the layer untouched.',
+    params: {
+      cell: {
+        label: 'Cell',
+        min: 1,
+        max: 8,
+        step: 1,
+        def: 3,
+        hint: 'Pixels per dot cell — the screen pitch. Small is fine stipple, large is bold dots.',
+      },
+      amount: {
+        label: 'Amount',
+        min: 0,
+        max: 1,
+        step: 0.05,
+        def: 0.5,
+        hint: 'How far the dot screen takes over. 0 is the layer untouched; 1 is the full screen.',
+      },
+    },
+  },
   // #2008 — RISO overprint: the stage-wide print finish. Two ink passes with a
   // ruled misregistration (shift detents 0..4 px), overlap multiplying like ink.
   // The GL pass + CPU reference live in engine/risoFinish.mjs; this SVG builder
@@ -295,10 +327,13 @@ export const FX_EFFECT_KINDS = Object.keys(FX_EFFECT_DEFS);
 // #520 Phase 1 — grain-family kinds that may only occupy the last (EF-4 FINISH)
 // position. #1610: Dither joins — the family's second kind (ordered Bayer,
 // post-accum like grain: a dither inside the feedback loop would compound
-// its own weave). Stipple still to come.
+// its own weave).
 // #2008 — riso joins the family: a finish over the finished frame belongs
 // post-accum with grain and dither, never compounding in the feedback loop.
-export const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso'];
+// #2038 — stipple joins: the dot screen is a finish over the finished
+// frame for the same reason (a screen inside the loop would compound
+// its own dots).
+export const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso', 'stipple'];
 
 /**
  * #520 — EF rack: 4 fixed slots per FX layer, applied bottom-up (EF-1 first,
@@ -320,7 +355,9 @@ export const FX_RACK = [
   { slot: 'EF-1', label: 'Blur / Focus', kinds: ['sharpen', 'haze'], stubs: [] },
   { slot: 'EF-2', label: 'Distort', kinds: ['displace', 'tear', 'rgbSplit', 'edge', 'feedbackWarp'], stubs: [] },
   { slot: 'EF-3', label: 'Tonal', kinds: ['posterize', 'solarize', 'invert', 'grade'], stubs: [] },
-  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither', 'riso'], stubs: ['stipple'] },
+  // #2038 — stipple is built: EF-4's stub list is empty, the rack holds no
+  // planned kinds any more.
+  { slot: 'EF-4', label: 'Finish', kinds: ['grain', 'scanlines', 'halo', 'dither', 'riso', 'stipple'], stubs: [] },
 ];
 
 /**
@@ -759,6 +796,35 @@ function buildDither(params, ctx, rid, src) {
   ];
 }
 
+/**
+ * #2038 — the SVG half of STIPPLE, an honest approximation like dither's:
+ * SVG filters have no pixel-addressable threshold, so the print path can
+ * make the one-bit CUT but not the dot screen — each channel quantizes
+ * at the mid threshold (the screen's average behaviour: half the cell
+ * is past the mid-radius), blended toward the source by amount exactly
+ * as the GL pass mixes. `cell` has no SVG analog and is ignored here.
+ * Kept in sync for the standing reason: an unknown kind is DROPPED by
+ * sanitizeFxEffects, so a GL-only stipple would silently vanish from
+ * the print path. Amount 0 emits the identity pass-through.
+ */
+function buildStipple(params, ctx, rid, src) {
+  const amount = Math.min(1, Math.max(0, Number(params.amount) || 0));
+  if (amount <= 0) return [{ prim: 'feOffset', attrs: { in: src, dx: 0, dy: 0 } }];
+  const q = rid();
+  const cut = (prim) => ({ prim, attrs: { type: 'discrete', tableValues: '0 1' } });
+  return [
+    {
+      prim: 'feComponentTransfer',
+      attrs: { in: src, result: q },
+      children: [cut('feFuncR'), cut('feFuncG'), cut('feFuncB')],
+    },
+    {
+      prim: 'feComposite',
+      attrs: { in: q, in2: src, operator: 'arithmetic', k1: 0, k2: r3(amount), k3: r3(1 - amount), k4: 0 },
+    },
+  ];
+}
+
 function buildPosterize(params, ctx, rid, src) {
   const levels = Math.max(2, Math.min(8, Math.round(params.levels)));
   const table = Array.from({ length: levels }, (_, i) => r3(i / (levels - 1))).join(' ');
@@ -890,6 +956,7 @@ const BUILDERS = {
   grain: buildGrain,
   scanlines: buildScanlines,
   dither: buildDither,
+  stipple: buildStipple,
   riso: buildRiso,
   posterize: buildPosterize,
   invert: buildInvert,

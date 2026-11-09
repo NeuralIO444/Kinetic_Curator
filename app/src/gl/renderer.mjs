@@ -32,7 +32,17 @@
  *   capture. One instrument, one pipeline.
  */
 
-import { QUAD_VS, QUAD_FS, MESH_VS, FULL_VS, COMPOSITE_FS, COPY_FS, UPSCALE_FS, blendIdFor } from './shaders.mjs';
+import {
+  QUAD_VS,
+  QUAD_FS,
+  MESH_VS,
+  FULL_VS,
+  COMPOSITE_FS,
+  COPY_FS,
+  ROT_COPY_FS,
+  UPSCALE_FS,
+  blendIdFor,
+} from './shaders.mjs';
 import { RESOLVE_FS } from './resolveFs.mjs';
 import { WET_LOOK, WET_LOOK_FS } from './wetLook.mjs';
 import { bindResolveProbe } from './resolveBind.mjs';
@@ -48,7 +58,7 @@ import { createPatternFrames, patternBytes, patternDrawSize } from '../pattern/p
 // #520 Phase 2: kept local so renderer.mjs stays browser-safe (the parity
 // harness serves only src/gl/, not src/fx/). Must match fxFilters.js.
 // #1610: dither joins the family — it runs in the finish chain, post-accum.
-const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso']; // #2008: riso joins the finish family (fx/fxFilters.js is the source)
+const GRAIN_FAMILY_KINDS = ['grain', 'dither', 'riso', 'stipple']; // #2008: riso joins the finish family (fx/fxFilters.js is the source); #2038: stipple joins it
 import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs';
 
 import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser
@@ -425,6 +435,25 @@ export const RENDERER_PROGRAMS = [
       memoryBytes: 1920 * 1080 * 8,
       timeMs: 0.3,
       notes: 'structural renderer program (composite/present plumbing); never shed',
+    },
+  },
+  {
+    // #2038: the rotating copy — turns a stratum's texture contribution
+    // (pattern field, FX wrap seed/result, finish-chain frame) by the
+    // stratum's rotation detent. Runs only while a rotation is non-zero.
+    // Tier 0 structural plumbing, never shed.
+    key: 'rotcopy',
+    name: 'rotcopy',
+    vs: FULL_VS,
+    fs: ROT_COPY_FS,
+    vsFile: 'shaders.mjs:FULL_VS',
+    fsFile: 'shaders.mjs:ROT_COPY_FS',
+    uniforms: ['u_src', 'u_rot'],
+    cost: {
+      tier: 0,
+      memoryBytes: 1920 * 1080 * 8,
+      timeMs: 0.3,
+      notes: 'structural renderer program (per-stratum rotation plumbing); never shed',
     },
   },
   {
@@ -944,6 +973,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   const compProg = progs.composite;
   const resProg = progs.resolve;
   const copyProg = progs.copy;
+  const rotcopyProg = progs.rotcopy;
 
   // FX chain execution lives in the JS↔GL bridge (#194): programs compile
   // once, uniform uploads are dirty-checked, targets are bridge-owned.
@@ -984,6 +1014,29 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.activeTexture(gl.TEXTURE0 + unit);
     gl.bindTexture(gl.TEXTURE_2D, tex);
     return unit;
+  }
+
+  /**
+   * #2038 — draw srcTex into dstTarget turned by `deg` degrees
+   * CLOCKWISE about the frame centre, as the stage sees it (the
+   * stratumRotation law: a stratum's own contribution renders in a
+   * frame rotated by its detent). To turn the image by θ the sample
+   * field turns by −θ; the sign of the v axis in texture space is
+   * folded into the sin term — the pair (cos, −sin) below is the
+   * sampling rotation for a clockwise image turn in this renderer's
+   * framebuffer convention (v_cuv runs opposite the screen's y).
+   * Callers run this only while a rotation detent is non-zero, so the
+   * unrotated frame never pays for it and stays byte-identical.
+   */
+  function rotateCopy(srcTex, dstTarget, deg) {
+    const rad = (deg * Math.PI) / 180;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, dstTarget.fb);
+    gl.viewport(0, 0, dstTarget.w, dstTarget.h);
+    gl.disable(gl.BLEND);
+    gl.useProgram(rotcopyProg);
+    gl.uniform1i(U(rotcopyProg, 'u_src'), bindTex(0, srcTex));
+    gl.uniform2f(U(rotcopyProg, 'u_rot'), Math.cos(rad), -Math.sin(rad));
+    drawFullscreen(rotcopyProg);
   }
 
   /**
@@ -1716,6 +1769,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         layer.type === 'pattern'
           ? patternTexture(layer, w, h)
           : (renderLayerInstances(layerT, instances, cells, atlasTex, scratchT, blendT, w, h), layerT.tex);
+      // #2038 — a rotated PATTERN stratum: its field texture turns by
+      // the detent before it composites (blendT is free here — the
+      // contact shadow, its other tenant, is content-only). The marks
+      // of a rotated CONTENT stratum need nothing here: the resolver
+      // already turned their positions.
+      if (layer.type === 'pattern' && layer.rotation) {
+        rotateCopy(srcTex, blendT, layer.rotation);
+        srcTex = blendT.tex;
+      }
       // #1411 — coalescence: fuse the layer's merge fields into its own marks BEFORE anything else reads
       // them, so the membrane is part of the layer (its contact shadow silhouettes the fused shape).
       // No `coalesce` key: nothing runs and the frame is pixel-identical.
@@ -1811,6 +1873,15 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
           // mid-grey. Opaque grey in premultiplied space.
           gl.clearColor(0.5, 0.5, 0.5, 1);
           gl.clear(gl.COLOR_BUFFER_BIT);
+        } else if (wrap.rotation) {
+          // #2038 — a rotated FX/MATH stratum: the wrap is seeded with
+          // the composite turned −θ, so the chain works in the stratum's
+          // turned frame; the result is turned back +θ after the chain
+          // (below), leaving the picture's geometry untouched and only
+          // the effect field rotated. (SoloGrade above seeds a uniform
+          // grey — turning it would be identity, so it skips the seed
+          // turn and only takes the turn-back.)
+          rotateCopy(mRead.tex, wRead, -wrap.rotation);
         } else {
           gl.useProgram(copyProg);
           gl.uniform1i(U(copyProg, 'u_src'), bindTex(0, mRead.tex));
@@ -1833,7 +1904,21 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         const preSteps = compileFxShaders(preEffects);
         const afterFx = preSteps.length ? bridge.runChain(layerId, wRead, preSteps) : wRead;
         if (finEffects.length) {
-          fxFinishChains.push({ layerId, steps: compileFxShaders(finEffects) });
+          fxFinishChains.push({
+            layerId,
+            steps: compileFxShaders(finEffects),
+            // #2038 — the finish steps are this stratum's too: their
+            // field turns by the same detent when the finish runs.
+            ...(wrap.rotation ? { rotation: wrap.rotation } : {}),
+          });
+        }
+        // #2038 — turn the wrap result back +θ into the bridge's other
+        // target (its chain intermediate is spent) before compositing.
+        let fxOut = afterFx;
+        if (wrap.rotation) {
+          const back = afterFx === bt.t0 ? bt.t1 : bt.t0;
+          rotateCopy(afterFx.tex, back, wrap.rotation);
+          fxOut = back;
         }
         // An FX layer's own matte masks the wrap result at composite time.
         // #227: no region clip — the FX output is defined over the whole
@@ -1842,7 +1927,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         composite(
           compProg,
           compU,
-          afterFx.tex,
+          fxOut.tex,
           mRead,
           mWrite,
           blendIdFor('normal'),
@@ -1898,7 +1983,13 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     bridge.dispose();
     for (const e of patternTex.values()) gl.deleteTexture(e.tex);
     patternTex.clear();
-    for (const p of [quadProg, compProg, resProg, copyProg]) gl.deleteProgram(p);
+    if (finScratch)
+      for (const t of finScratch) {
+        gl.deleteTexture(t.tex);
+        gl.deleteFramebuffer(t.fb);
+      }
+    finScratch = null;
+    for (const p of [quadProg, compProg, resProg, copyProg, rotcopyProg]) gl.deleteProgram(p);
     gl.deleteBuffer(fullVbo);
     gl.deleteBuffer(cornerVbo);
     gl.deleteBuffer(instVbo);
@@ -1916,9 +2007,39 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * @param {object} target a composed frame target (`.tex`)
    * @param {Array<{layerId:string, steps:Array}>} [chains] defaults to target.fxFinishChains
    */
+  // #2038 — the finish-chain rotation scratch: two frame targets owned
+  // here, (re)allocated to the finished frame's size on first use. Only
+  // a rotated stratum's finish chain ever touches them.
+  let finScratch = null;
+  function finishScratchFor(target) {
+    if (!finScratch || finScratch[0].w !== target.w || finScratch[0].h !== target.h) {
+      if (finScratch)
+        for (const t of finScratch) {
+          gl.deleteTexture(t.tex);
+          gl.deleteFramebuffer(t.fb);
+        }
+      finScratch = [makeTarget(gl, target.w, target.h, true), makeTarget(gl, target.w, target.h, true)];
+    }
+    return finScratch;
+  }
+
   function applyFinishChains(target, chains = target && target.fxFinishChains) {
     let t = target;
-    for (const { layerId, steps } of chains || []) t = bridge.runChain(layerId, t, steps);
+    for (const chain of chains || []) {
+      const { layerId, steps, rotation } = chain;
+      if (!rotation) {
+        t = bridge.runChain(layerId, t, steps);
+        continue;
+      }
+      // #2038 — a rotated stratum's finish: turn the frame −θ, run the
+      // chain in the stratum's frame, turn back +θ (the wrap's law,
+      // applied at the finish's own seam).
+      const [sIn, sOut] = finishScratchFor(t);
+      rotateCopy(t.tex, sIn, -rotation);
+      const out = bridge.runChain(layerId, sIn, steps);
+      rotateCopy(out.tex, sOut, rotation);
+      t = sOut;
+    }
     return t;
   }
 
@@ -1942,6 +2063,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     renderFrameInto,
     resolveTargetToBytes,
     applyFinishChains,
+    rotateCopy,
     disposeBase,
     setResolveOptions,
     getResolveOptions: () => resolveOpts,
@@ -1966,6 +2088,7 @@ export function createRenderer(canvas) {
     renderFrameInto,
     resolveTargetToBytes,
     applyFinishChains,
+    rotateCopy,
     setResolveOptions,
   } = b;
 
@@ -2217,8 +2340,18 @@ export function createRenderer(canvas) {
       }
       // #520 Phase 2: apply grain-family finish chain once against the final accum.
       let finalTex = accum.texture();
-      for (const { layerId, steps } of lastFxFinishChains) {
-        finalTex = bridge.runChain(layerId, finalTex, steps);
+      for (const { layerId, steps, rotation } of lastFxFinishChains) {
+        if (!rotation) {
+          finalTex = bridge.runChain(layerId, finalTex, steps);
+          continue;
+        }
+        // #2038 — a rotated stratum's finish, the applyFinishChains law
+        // on this path's own scratch targets (the frame loop is done;
+        // blendT/scratchT are free).
+        rotateCopy(finalTex.tex, T.blendT, -rotation);
+        const out = bridge.runChain(layerId, T.blendT, steps);
+        rotateCopy(out.tex, T.scratchT, rotation);
+        finalTex = T.scratchT;
       }
       // #1815 — the wet-look pass over the finished sequence (the
       // display state was assembled against this sequence's background

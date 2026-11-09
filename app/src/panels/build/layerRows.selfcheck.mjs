@@ -55,8 +55,19 @@ ok('the ▲▼ disabled states match: top row cannot go up, bottom row cannot go
 
 ok('through the real store: ▲ on a KC track moves it later in the chain, so it draws higher', () => {
   const S = () => useStore.getState();
-  S().addLayer();
-  S().addLayer();
+  // #2038: two content strata can no longer be added by the actions —
+  // seed the pre-rebuild shape directly; swapLayerPositions and the
+  // row helpers are the units under test.
+  const mkC = (id) => ({
+    id,
+    name: id,
+    type: 'content',
+    visible: true,
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
+    patch: { mode: 'off', to: null, strength: 0.16 },
+  });
+  useStore.setState({ layers: [mkC('kc-a'), mkC('kc-b')], activeLayerId: 'kc-a', layerSnapshots: {} });
   const kc = () => S().layers.filter((l) => l.type === 'content');
   const [first, second] = kc();
   const group = kc();

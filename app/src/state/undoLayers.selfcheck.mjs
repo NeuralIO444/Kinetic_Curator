@@ -38,19 +38,29 @@ assert.ok(entryApplies({ kind: UNDO_KIND_EDIT, layerId: 'x' }, 'x'));
 assert.ok(!entryApplies({ kind: UNDO_KIND_EDIT, layerId: 'x' }, 'y'), '#92: mismatched edit never applies');
 assert.ok(!entryApplies(null, 'y'));
 
-const layerA = S().activeLayerId;
-const count0 = S().layers.length;
+// #2038 re-choreography: the boot stack already holds its ONE content
+// stratum, so the add cycle starts from a seeded empty stack (the only
+// state addLayer can add into), and the remove cycle rides the FX add —
+// addFxLayer exercises the same layers-entry machinery, and adding an
+// FX track never moves the active layer.
+useStore.setState({ layers: [], activeLayerId: null, layerSnapshots: {}, historyUndoStack: [], historyRedoStack: [] });
 S().addLayer();
-const layerB = S().activeLayerId;
-assert.notStrictEqual(layerB, layerA, 'addLayer must switch to a new layer id');
+const layerA = S().activeLayerId;
+assert.ok(layerA, 'addLayer switches to the new layer');
 assert.strictEqual(
-  S().layers.find((l) => l.id === layerB).type,
+  S().layers.find((l) => l.id === layerA).type,
   'content',
   'addLayer sets type: content like the initial layer and duplicateLayer',
 );
-assert.strictEqual(S().layers.length, count0 + 1);
+const count0 = S().layers.length;
 assert.strictEqual(topKind(), UNDO_KIND_LAYERS, 'addLayer must push a layers entry');
 assert.ok(S().historyUndoStack.at(-1).bytes > 0, 'entries carry their estimated size');
+
+S().addFxLayer();
+const layerB = S().selectedFxLayerId;
+assert.ok(layerB && layerB !== layerA, 'addFxLayer adds a distinct layer');
+assert.strictEqual(S().layers.length, count0 + 1);
+assert.strictEqual(topKind(), UNDO_KIND_LAYERS, 'addFxLayer must push a layers entry');
 
 S().undo();
 assert.strictEqual(S().layers.length, count0, 'undo removes the added layer');
@@ -59,7 +69,7 @@ assert.strictEqual(S().historyRedoStack.at(-1).kind, UNDO_KIND_LAYERS);
 
 S().redo();
 assert.strictEqual(S().layers.length, count0 + 1, 'redo re-adds the layer');
-assert.strictEqual(S().activeLayerId, layerB);
+assert.strictEqual(S().activeLayerId, layerA, 'an FX add never moved the active layer');
 
 S().setSeed(777);
 assert.strictEqual(topKind(), UNDO_KIND_EDIT);
@@ -70,7 +80,7 @@ assert.strictEqual(topKind(), UNDO_KIND_LAYERS, 'removeLayer must push a layers 
 
 S().undo();
 assert.strictEqual(S().layers.length, count0 + 1, 'undo restores the removed layer');
-assert.strictEqual(S().activeLayerId, layerB);
+assert.strictEqual(S().activeLayerId, layerA);
 assert.strictEqual(S().seed, 777, "removed layer's own content comes back with it");
 S().redo();
 assert.strictEqual(S().layers.length, count0, 'redo re-removes the layer');
@@ -91,10 +101,14 @@ S().renameLayer(layerA, 'Renamed');
 S().undo();
 assert.strictEqual(S().layers.find((l) => l.id === layerA).name, 'KC-1');
 
-S().addLayer();
-const layerC = S().activeLayerId;
+// #2038: the reorder cycle rides two PATTERN tracks — same-type trades
+// are the surviving reorder law (a pattern can no longer trade with the
+// content stratum, and a second content stratum cannot be added).
+S().addPatternLayer();
+S().addPatternLayer();
+const layerP = S().selectedPatternLayerId;
 const orderBefore = S().layers.map((l) => l.id);
-S().reorderLayer(layerC, -1);
+S().reorderLayer(layerP, -1);
 assert.notDeepStrictEqual(
   S().layers.map((l) => l.id),
   orderBefore,
@@ -143,6 +157,34 @@ assert.strictEqual(
 S().undo(); // undo fxEffectAdd(rgbSplit)
 S().undo(); // undo addFxLayer
 assert.ok(!S().layers.some((l) => l.id === fxId), 'undo removes the FX layer');
+
+// #2038 — the per-layer seed-isolation cases below need a second
+// content stratum, which the actions can no longer add. Seed the
+// pre-rebuild two-track shape directly: the store state is the unit
+// under test, and snapshot isolation never consulted the caps.
+useStore.setState({
+  layers: [
+    S().layers.find((l) => l.id === layerA),
+    {
+      id: 'layer-c',
+      name: 'KC-2',
+      type: 'content',
+      visible: true,
+      layerBlendMode: 'normal',
+      layerOpacity: 1,
+      patch: { mode: 'off', to: null, strength: 0.16 },
+    },
+  ],
+  activeLayerId: layerA,
+});
+const layerC = 'layer-c';
+// Give C its own snapshot value up front (the addLayer flow used to do
+// this with a fresh random seed): without it C's fallback snapshot
+// would inherit A's seed and the isolation cases could not tell the
+// two layers' values apart.
+S().setActiveLayer(layerC);
+S().setSeed(4242);
+S().setActiveLayer(layerA);
 
 S().setActiveLayer(layerA);
 const seedA0 = S().seed;

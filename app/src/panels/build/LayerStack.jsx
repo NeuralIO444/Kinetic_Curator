@@ -15,6 +15,10 @@
 // trades within a type (canTrade: content never crosses the adjustment
 // line, FX never crosses MATH), so ▲▼ move a stratum past its nearest
 // same-type neighbor toward FRONT/GROUND.
+// #2038 — the strata rebuild: ONE content stratum, patterns pinned to
+// the bottom (a pattern's ▲▼ group is patterns only — it can no longer
+// trade up past the content stratum), and every block carries the
+// per-stratum ROTATE detents (0/15/45/90).
 import { useState, useEffect, useRef, Fragment } from 'react';
 import { useApp } from '../../state/AppContext.jsx';
 import { PanelHeader } from '../../components/PanelHeader.jsx';
@@ -53,6 +57,7 @@ import {
   writePatchOneLinerSeen,
 } from './patchOneLiner.mjs';
 import { strataSummary, trimNum } from './strataSummary.mjs';
+import { stratumRotationOf, STRATUM_ROTATIONS } from '../../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
 import { ModeRow } from './te/ModeRow.jsx';
 import { SliderEditor } from './te/editors.jsx';
 import { stopsFor } from './te/modeStops.mjs';
@@ -258,9 +263,8 @@ function FxEffectEditor({ layer, fxOrdinal }) {
           {effects.length >= MAX_FX_EFFECTS ? `layer full — ${MAX_FX_EFFECTS} effects` : 'nothing to add yet'}
         </div>
       )}
-      <div className="fx-note" title="Planned — not yet available">
-        planned: stipple
-      </div>
+      {/* #2038 — the rack's last "planned" note is gone: stipple is a
+          real kind now and stands in the add row above like the rest. */}
     </div>
   );
 }
@@ -590,14 +594,23 @@ export function LayerStack() {
 
   function handleMove(layer, dir) {
     const cls = fineClass(layer);
-    const group = layers.filter((l) => fineClass(l) === cls); // array order, bottom→top
+    // #2038 — movement groups by EXACT type, not the fine class: a
+    // pattern's ▲▼ neighbours are other patterns only. Under the fine
+    // class a pattern grouped with content and could be traded up past
+    // the content stratum; patterns are pinned to the bottom now, and
+    // canTrade refuses the cross-type swap — grouping exactly keeps the
+    // buttons' disabled state honest (no dead clicks).
+    const group = layers.filter((l) => l.type === layer.type); // array order, bottom→top
     const neighbor = moveNeighbor(group, layer.id, dir);
     if (!neighbor) return;
     emit(Events.LAYER_SWAP_POSITIONS, { idA: layer.id, idB: neighbor.id });
     if (isMathLayer(layer)) return;
     const newOrdinal = ordinals.get(neighbor.id) || 1;
     if (flashTimer.current) clearTimeout(flashTimer.current);
-    setMoveFlash({ id: layer.id, label: cls === 'fx' ? `FX ${newOrdinal}` : `KC-${newOrdinal}` });
+    setMoveFlash({
+      id: layer.id,
+      label: cls === 'fx' ? `FX ${newOrdinal}` : isPatternLayer(layer) ? `PT-${newOrdinal}` : `KC-${newOrdinal}`,
+    });
     flashTimer.current = setTimeout(() => setMoveFlash(null), 1600);
   }
 
@@ -611,9 +624,13 @@ export function LayerStack() {
     const pat = isPatternLayer(layer);
     const adj = fx || math;
     const fine = fineClass(layer); // pattern → 'content'
+    const rotation = stratumRotationOf(layer); // #2038 — the block's ROTATE detent (0 = as dealt)
     const wet = wetDisplay(layer); // #1023: what the renderer will honor
     const wetPct = Math.round(wet.wet * 100);
-    const group = layers.filter((l) => fineClass(l) === fine);
+    // #2038 — the ▲▼ group is the exact type (see handleMove): patterns
+    // move among patterns, so their buttons disable at the content
+    // boundary instead of offering a swap the store would refuse.
+    const group = layers.filter((l) => l.type === layer.type);
     const isActive = layer.id === activeLayerId;
     const isFxSelected = layer.id === selectedFxLayerId;
     const isMathSelected = layer.id === selectedMathLayerId;
@@ -941,6 +958,43 @@ export function LayerStack() {
                     format={(v) => `${Math.round(v * 100)}%`}
                     defaultValue={1}
                     onChange={(v) => emit(Events.LAYER_SET_OPACITY, { id: layer.id, opacity: v })}
+                  />
+                )}
+              />
+            </div>
+            {/* #2038 — ROTATE: the per-stratum rotation detents D7
+                reserved (0/15/45/90), a mode row like every quantized
+                block control. Every stratum type carries it: a content
+                stratum turns its marks, a pattern its field, an FX/MATH
+                stratum its effect field — always about the stage
+                centre, always the stratum's OWN contribution. */}
+            <div
+              className="strata-composite"
+              title="ROTATE — this stratum's own frame turns by the detent, about the stage centre. 0° is the stratum as dealt."
+            >
+              <span className="fx-param-readout lbl" style={{ width: 'auto' }}>
+                rotate
+              </span>
+              <ModeRow
+                variant="block"
+                labelHidden
+                label="Rotate"
+                ariaLabel={`Rotate — ${rotation} degrees`}
+                title="Per-stratum rotation — detents 0 / 15 / 45 / 90 degrees, clockwise"
+                display={`${rotation}°`}
+                value={rotation}
+                stops={STRATUM_ROTATIONS}
+                onSelect={(v) => emit(Events.LAYER_SET_ROTATION, { id: layer.id, rotation: v })}
+                onOpen={() => (
+                  <SliderEditor
+                    ariaLabel="Rotate"
+                    value={rotation}
+                    min={0}
+                    max={90}
+                    step={15}
+                    format={(v) => `${Math.round(v)}°`}
+                    defaultValue={0}
+                    onChange={(v) => emit(Events.LAYER_SET_ROTATION, { id: layer.id, rotation: v })}
                   />
                 )}
               />

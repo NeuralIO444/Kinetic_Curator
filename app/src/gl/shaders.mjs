@@ -869,6 +869,26 @@ void main() {
 }`;
 
 /**
+ * #2038 — the rotating copy: COPY_FS with the sample field turned about
+ * the frame centre. u_rot carries (cos, sin) of the SAMPLING rotation;
+ * to turn the image by θ the caller samples at R(−θ) (the rotateCopy
+ * helper in renderer.mjs owns that convention). Out-of-frame samples
+ * clamp to the edge texel (every frame target is CLAMP_TO_EDGE), so a
+ * turned stratum's corners read the frame's edge, never garbage.
+ */
+export const ROT_COPY_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_src;
+uniform vec2 u_rot;
+in vec2 v_cuv;
+out vec4 o;
+void main() {
+  vec2 c = v_cuv - 0.5;
+  vec2 r = vec2(c.x * u_rot.x - c.y * u_rot.y, c.x * u_rot.y + c.y * u_rot.x);
+  o = texture(u_src, r + 0.5);
+}`;
+
+/**
  * Upscale a smaller source into the write target (#309: the half-res ACCUM
  * feedback pair is presented at backing size through this). Manual bilinear
  * via texelFetch — exact regardless of the source texture's filter mode
