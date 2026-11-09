@@ -25,7 +25,12 @@
 //                dishFluidAwake, raise the store's nodeCount by the attached body (the body
 //                is ordinary stage content — the footer count sees it), log ZERO
 //                '[gl-live] frame error' console messages and keep renderFault down; turning
-//                it off must take the body back off the stage. A second boot through the
+//                it off must take the body back off the stage — proven by a local bracket
+//                (off level → re-seat → off again), never by comparing against the stale
+//                baseline: nodeCount is a live quantity whose scene component drifts as
+//                the dealt scene's own systems run, so a cross-window level comparison
+//                fails on healthy product (CI, 2026-11-09 — see the off leg's comment).
+//                A second boot through the
 //                loop's headless flag (window.__KC_FERROFLUID) must stay clean the same way,
 //                with a magnet stamped through the store's own action. The app is rebuilt
 //                first (npm run build) so the pin always tests the current tree.
@@ -187,6 +192,19 @@ if (!skipped) {
     }
     return max;
   };
+  /** Sample the store's nodeCount for `ms`, returning the median — the level the window sits
+   * at, immune to the single-frame spikes (a morph's union frame, a shed step) that poison a
+   * max. The off leg's bracket is measured in medians for exactly that reason. */
+  const sampleMedian = async (page, ms) => {
+    const vals = [];
+    const until = Date.now() + ms;
+    while (Date.now() < until) {
+      vals.push(await page.evaluate(() => window.__kcStore.getState().nodeCount | 0));
+      await page.waitForTimeout(200);
+    }
+    vals.sort((a, b) => a - b);
+    return vals.length ? vals[Math.floor(vals.length / 2)] : 0;
+  };
 
   try {
     // Control boot: healthy with no fluid — then the mode turned on through the store's own
@@ -222,12 +240,44 @@ if (!skipped) {
         assert.equal(hOn.fault, false, `renderFault tripped: ${hOn.reason}`);
       });
       await page.evaluate(() => window.__kcStore.getState().setDishFluid(false));
-      await page.waitForTimeout(3000);
-      const offNodes = await sampleNodes(page, 3000);
+      await page.waitForTimeout(1500);
+      // The departure is proven by a LOCAL BRACKET, not a level against the baseline above.
+      // nodeCount is a live quantity: its scene component drifts as the dealt scene's own
+      // systems run (growth, swarm dynamics, governor recovery after boot stress) — tens of
+      // nodes over a leg's span on a machine fast enough to run every frame. The first cut
+      // of this leg compared the off window's max against the baseline max sampled ~15 s
+      // earlier with +8 of slack and failed on CI (off max 276 vs baseline max 226) with the
+      // body verifiably gone: the resolver's off output is byte-identical to a never-on
+      // resolver's, and in-browser the body is an exact step that fully reverses. (The
+      // sandbox never caught it — SwiftShader frames are so slow the perf watchdog holds
+      // most boots frozen, and a frozen count cannot drift.) So: measure the off level,
+      // turn the mode back ON — a level the body still occupied could not rise by the body
+      // again — then off a second time, and require the second departure to match the
+      // re-arrival. Every comparison spans seconds, where drift is a node or two, and the
+      // medians shrug off single-frame spikes. Lingering matter fails both assertions: it
+      // leaves nothing to re-seat, and nothing departs.
+      const offLevel = await sampleMedian(page, 2000);
+      const hOff = await health(page);
+      await page.evaluate(() => window.__kcStore.getState().setDishFluid(true));
+      await page
+        .waitForFunction('window.__kcStore.getState().dishFluidAwake === true', null, { timeout: 20000 })
+        .catch(() => {});
+      await page.waitForTimeout(2000);
+      const onLevel2 = await sampleMedian(page, 2000);
+      await page.evaluate(() => window.__kcStore.getState().setDishFluid(false));
+      await page.waitForTimeout(1500);
+      const offLevel2 = await sampleMedian(page, 2000);
       ok('fluid off again: the body leaves the stage', () => {
+        assert.equal(hOff.awake, false, 'dishFluidAwake still published after off — the stamp never stopped');
+        const reseat = onLevel2 - offLevel;
+        const depart = onLevel2 - offLevel2;
         assert.ok(
-          offNodes <= baseNodes + 8,
-          `nodeCount settled back (off max ${offNodes} vs baseline max ${baseNodes})`,
+          reseat > 8,
+          `turning back on re-seated the body from the off level (off median ${offLevel} → on median ${onLevel2}) — a level the body still occupied could not rise by it again`,
+        );
+        assert.ok(
+          depart >= reseat - 8,
+          `the body left as fully as it arrived (re-seated ${reseat} by medians, departed ${depart})`,
         );
         assert.deepEqual(frameErrors, [], `frame errors: ${(frameErrors[0] || '').slice(0, 120)}`);
       });

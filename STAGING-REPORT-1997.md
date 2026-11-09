@@ -380,3 +380,46 @@ placement stays canvas-space, as before.)
 - `npm run format:check` clean (six touched files needed a prettier pass; applied and the
   affected suites re-run green), lint 0 errors (the standing 11 warnings), `npm run build`
   green.
+
+### CI fix — the liveLoop off leg measured the scene, not the body (2026-11-09)
+
+PR #2040's first CI run failed exactly one group: the liveLoop pin's "fluid off again: the
+body leaves the stage" (`nodeCount settled back (off max 276 vs baseline max 226)`,
+selfcheck-browser, Mac runner). It had passed repeatedly in the sandbox. Diagnosis, from
+instrumented probes against the built app (the suite's own boot sequence, repeated):
+
+- **Not the product (no lingering matter).** The resolver's off output is byte-identical to
+  a never-on resolver's (the off-parity QA re-proved), and in-browser the body is an exact
+  step: in the watchdog-held boots it read 51 → 531 → 51 and 78 → 558 → 78 (exactly
+  MAX_FLUID_ITEMS = 480 up, exactly back), and in the one fully live boot it returned into
+  the scene's own band. The emission is a single per-frame concat gated on the plan being
+  active; nothing in the code can leave a partial ~50-item residue.
+- **Not the culture either.** The fluid→culture births channel is inert in this boot: the
+  suite never turns DISH LIFE on (`dishLife` / `dishLifeAwake` read false in every probed
+  boot, so no culture stands to receive biased births), and driving COUPLE to 0 beforehand
+  changed nothing. The suspected conflation partner does not exist in this scene.
+- **The test.** The leg compared the off window's MAX against a baseline MAX sampled ~15 s
+  earlier with +8 of slack — but `nodeCount` is a live quantity. The boot scene is dealt
+  from a fresh seed each boot (observed counts 29–638 across boots), and its own count
+  drifts as its systems run: +12 by medians over one leg in a live sandbox boot with no
+  fluid involved, +50 between windows in CI's. The sandbox hid the flaw because SwiftShader
+  frames are slow enough that the perf watchdog holds most boots frozen — a frozen count
+  cannot drift. The Mac runner runs every frame live, so the leg measured the scene's
+  drift and called it the body. **The wrong layer was the test.**
+
+The leg now proves the departure with a local bracket, all in medians (a max is poisoned
+by single-frame spikes): sample the off level, turn the mode back on — a level the body
+still occupied could not rise by the body again — then off a second time, requiring the
+second departure to match the re-arrival, plus `dishFluidAwake` false after off. Every
+comparison spans seconds, where drift is a node or two. The frame-error, renderFault,
+awake and rise assertions are untouched, and COUPLE stays at its default (the leg keeps
+testing the default conversation; the couple channel is simply not what failed).
+
+Mutation proof: with the resolver temporarily patched to re-append the previous frame's
+matter while the plan is inactive (simulated lingering), the corrected leg fails on its
+own assertion — "turning back on re-seated the body from the off level (off median 695 →
+on median 689)" — while every other group still passes. The patch was reverted in full.
+
+Verification: the full liveLoop pin 6× green on the final tree; `dishFluidRender` and
+`liveResolve.dishFluid` 3× each; `format:check` clean tree-wide and lint at the standing
+0 errors / 11 warnings (none from the touched file).
