@@ -65,10 +65,12 @@ export function CreatureCultivate({ subject, assets = [], stageIds = [], overlay
             integrity · stillborn — the linkage does not assemble at any crank angle
           </div>
         )}
-        <div style={readLine}>
-          cost — not priced: the registry prices asset drawings, and a beast’s bars wear parts the stage deals
+        <div style={readLine} title="The registry prices asset drawings, and a beast’s bars wear parts the stage deals">
+          cost — not priced
         </div>
-        <div style={noteLine}>a beast’s reads are live from its measures — its tile keeps no cultivation note</div>
+        <div style={noteLine} title="A beast’s reads are live from its measures — its tile keeps no cultivation note">
+          live reads · tile keeps no note
+        </div>
       </div>
     );
   }
@@ -116,7 +118,9 @@ export function CreatureCultivate({ subject, assets = [], stageIds = [], overlay
           )}
         </>
       ) : (
-        <div style={noteLine}>not cultivated yet — the dry-run writes its reads onto the record</div>
+        <div style={noteLine} title="The dry-run writes its reads onto the record">
+          not cultivated yet
+        </div>
       )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         <button

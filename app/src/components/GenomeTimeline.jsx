@@ -6,6 +6,9 @@
  * no generation bump — and the edited gene's source is rewritten to record the hand act. The strip is a view on
  * the record plus writes through the one door (state: editCreatureGene → creatureBreed.handEditRecord →
  * sanitizeCreatureRecord); it keeps no genome state of its own beyond which node is selected.
+ * #2034 (the Big Lab): the strip is a field of tiles grouped by family, each tile printing its gene's value on
+ * its face; the readout bar prints the selected gene's source ONCE (in words — the raw source string rides the
+ * tile's hover, moved not deleted, KC-1 DS rule 2).
  * Discrete facts render TE (KC-1 DS): ids, values, sources as plain text.
  */
 import { useState } from 'react';
@@ -55,10 +58,6 @@ export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyP
       <div style={{ ...secTitle, ...caps }}>
         genome · {record.id} · {strip.count} gene{strip.count === 1 ? '' : 's'}
       </div>
-      <div style={{ fontSize: 11, color: 'var(--dim)', lineHeight: 1.5 }}>
-        The creature’s genes, in order. Pick one to read it; mutate it or replace it and the record is rewritten in
-        place — the gene’s source records the hand edit.
-      </div>
       {strip.bands.map((band) => (
         <div key={band.family} style={{ display: 'flex', flexDirection: 'column', gap: 3 }} data-testid="genome-band">
           <span style={{ ...caps, fontSize: 9, color: 'var(--dim)', letterSpacing: '0.1em' }}>{band.family}</span>
@@ -68,16 +67,20 @@ export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyP
                 key={n.key}
                 type="button"
                 className={`chip-btn ${n.key === geneKey(gene) ? 'act on' : 'act'}`}
+                style={tile}
                 aria-pressed={n.key === geneKey(gene)}
                 data-testid="genome-node"
-                title={`${n.family}.${n.id} · ${n.valueText} · ${n.sourceText}`}
+                title={`${n.family}.${n.id} · ${n.valueText} · ${n.sourceText} · source ${n.source}`}
                 onClick={() => {
                   setSelectedKey(n.key);
                   setChoice('0');
                 }}
               >
-                {n.id}
-                {n.hand ? ' ✎' : ''}
+                <span style={{ display: 'block', fontSize: 10 }}>
+                  {n.id}
+                  {n.hand ? ' ✎' : ''}
+                </span>
+                <span style={tileValue}>{n.valueText}</span>
               </button>
             ))}
           </div>
@@ -93,8 +96,8 @@ export function GenomeTimeline({ record, donors = [], legalBodies = [], hasBodyP
           </span>{' '}
           · {node ? node.valueText : ''}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5 }}>
-          {node ? node.sourceText : ''} · <span style={lower}>source {gene.source}</span>
+        <div style={{ fontSize: 10, color: 'var(--dim)', lineHeight: 1.5 }} title={`source ${gene.source}`}>
+          {node ? node.sourceText : ''}
         </div>
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
           <button
@@ -155,9 +158,30 @@ const box = {
   flexDirection: 'column',
   gap: 6,
   padding: 6,
-  border: '1px solid var(--line)',
   fontSize: 10,
   color: 'var(--dim)',
+};
+const tile = {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'flex-start',
+  gap: 1,
+  minWidth: 84,
+  maxWidth: 150,
+  padding: '5px 7px',
+  textAlign: 'left',
+  height: 'auto',
+};
+const tileValue = {
+  display: 'block',
+  fontSize: 9,
+  color: 'var(--dim)',
+  letterSpacing: 0,
+  textTransform: 'none',
+  whiteSpace: 'nowrap',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
+  maxWidth: 134,
 };
 const secTitle = { fontSize: 9, letterSpacing: '0.14em', fontWeight: 700, color: 'var(--dim)' };
 const caps = { textTransform: 'uppercase' };
