@@ -5,6 +5,7 @@ import { TapeCounter } from './TapeCounter.jsx';
 import { TallyLight } from './TallyLight.jsx';
 import { BudgetKnob } from './BudgetKnob.jsx';
 import { DishLifeChip } from './DishLifeChip.jsx';
+import FerroFluidChip from './FerroFluidChip.jsx'; // #1997: the dish's second mode, beside the culture
 import { activeFxKinds, sceneFxCost } from '../hooks/sceneCost.js';
 import { emit, Events } from '../composition/eventBus.js';
 import { QUALITY_PRESETS } from '../data/quality.js';
@@ -279,6 +280,7 @@ export function MasterBar() {
         </div>
 
         <DishLifeChip />
+        <FerroFluidChip />
       </div>
       <TakeStrip />
       <div className="master-right">

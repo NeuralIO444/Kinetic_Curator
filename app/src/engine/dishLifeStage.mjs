@@ -32,10 +32,11 @@
 //             epoch rides the publication so the TIDES key can tell a pre-press grid from a post-press
 //             one at the same (wake, generation) — within a wake, (epoch, gen) names the grid.
 
-import { createCulture, stepCulture, setBedrock, CULTURE_RULE } from './dishLife.mjs';
+import { createCulture, stepCulture, setBedrock, restoreCultureGrid, CULTURE_RULE } from './dishLife.mjs';
 import { seedFromMarks, coverageField } from './dishLifeSeed.mjs';
 import { nearestMarks, cultureFrame, speckItems } from './dishLifeRender.mjs';
 import { cultureSampler, envelope } from './dishLifeQuiet.mjs';
+import { injectFluidBirths } from './dishFluidCouple.mjs'; // #1997 — the ferrofluid's bias on this culture's births
 
 /** Culture grid resolution (the spike's grid). */
 export const STAGE_COLS = 96;
@@ -57,12 +58,46 @@ const contentLayers = (layers) =>
 
 export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule = CULTURE_RULE } = {}) {
   let st = null; // { wakeMs, W, H, marks, nearest, culture, frameGen, frame, quiet, fieldOn }
+  // #1997 — the ferrofluid's bias on this culture's births, handed in per frame by the resolver
+  // (setFluidBias): the fluid stage's published density from the LAST applied frame (one frame
+  // behind) + the stamped coupling strength. Null = no bias: the step loop below is then the
+  // pre-#1997 loop, number for number. biasUsed records that this wake's steps consumed a bias:
+  // the bias input CHANGES while it acts (the fluid keeps stepping), so the culture's state is
+  // no longer a replay of its seed marks alone — the snapshot then carries the state grid
+  // itself as a rider (the fluidGrid key), the terrain rider's precedent applied to state.
+  let fluidBias = null;
+  let biasUsed = false;
+  const biasSeed = () => ((Math.floor(st.wakeMs) | 0) ^ 0x85ebca6b) | 0;
 
   // #1994 — the field mode's publication surface: ONE stable object for the stage's whole life. Its fields are
   // re-pointed at the live culture's published arrays on every field-mode frame (never copied — the core's
   // read-this-frame contract applies: level/activity ARE the culture's arrays, read them the frame you get
   // them). Inactive (active:false, arrays null) whenever no field-mode culture is running, so a consumer can
   // never read a retained previous frame.
+  // #1997 — this stage's own culture publication for the ferrofluid's coupling read (the fluid
+  // stage is a consumer like any other): ONE stable object, re-pointed at the live culture's
+  // published arrays whenever a culture stands in this stage, inactive otherwise. The resolver
+  // captures it BEFORE this frame's apply, so the fluid reads the culture one frame behind.
+  const culturePublication = { active: false, cols: 0, rows: 0, gen: -1, level: null, activity: null };
+  function syncCulturePublication() {
+    if (st && st.culture) {
+      const f = st.culture.field;
+      culturePublication.active = true;
+      culturePublication.cols = f.cols;
+      culturePublication.rows = f.rows;
+      culturePublication.gen = f.gen;
+      culturePublication.level = f.level;
+      culturePublication.activity = f.activity;
+    } else {
+      culturePublication.active = false;
+      culturePublication.cols = 0;
+      culturePublication.rows = 0;
+      culturePublication.gen = -1;
+      culturePublication.level = null;
+      culturePublication.activity = null;
+    }
+  }
+
   const publishedField = {
     active: false,
     cols: 0,
@@ -105,6 +140,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
   const geom = (W, H) => ({ canvasW: W, canvasH: H, cols, rows });
 
   function build(wakeMs, marks, W, H, bedrock, withNearest = true, terrain = []) {
+    biasUsed = false; // #1997 — a new seed has consumed no fluid bias yet
     const seed = seedFromMarks(marks, { ...geom(W, H), bedrock });
     st = {
       wakeMs,
@@ -144,6 +180,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     if (!dl || typeof dl !== 'object' || !Number.isFinite(dl.wakeMs)) {
       st = null;
       syncPublished();
+      syncCulturePublication();
       return false;
     }
     const content = contentLayers(layers);
@@ -152,6 +189,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       if (dl.mode === 'field') {
         st = null;
         syncPublished();
+        syncCulturePublication();
       }
       return false;
     }
@@ -177,6 +215,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         if (fieldMode) {
           st = null;
           syncPublished();
+          syncCulturePublication();
         }
         return false;
       }
@@ -198,9 +237,19 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       st.seedEpoch = epoch;
     }
     const shed = Math.max(0, Math.min(SHED_STEPS.length - 1, Number(dl.shed) | 0));
-    for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) stepCulture(st.culture);
+    // #1997 — the ferrofluid's birth bias lands before each generation it feeds (one frame
+    // behind: fluidBias is the density published at the last applied frame). No bias handed in
+    // → the loop is the pre-#1997 loop verbatim.
+    for (let n = 0; st.culture.gen < target && n < SHED_STEPS[shed]; n++) {
+      if (fluidBias) {
+        injectFluidBirths(st.culture, fluidBias.density, fluidBias.strength, biasSeed());
+        biasUsed = true;
+      }
+      stepCulture(st.culture);
+    }
     st.fieldOn = fieldMode ? { cycleGens: Number(dl.cycleGens) || undefined } : null;
     syncPublished();
+    syncCulturePublication();
     if (fieldMode) return true; // #1994: the field is published — no layer touched, nothing drawn, ever
     if (quiet) {
       // the secondary read: the culture is a field (field()) the marks read. The tertiary read: a few faint specks in
@@ -234,9 +283,29 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     apply,
     /** #1994 — the field mode's stable publication object (see syncPublished above). Read-only for consumers. */
     publishedField,
+    /**
+     * #1997 — this stage's culture publication for the ferrofluid's coupling read: the live
+     * culture's published field (level / activity) on a stable object, or inactive when no
+     * culture stands here. The resolver captures it before the frame's apply — one frame behind.
+     */
+    cultureField() {
+      return culturePublication;
+    },
+    /**
+     * #1997 — hand the culture its ferrofluid birth bias for the coming apply: the fluid
+     * stage's published density (dish grid) + the stamped coupling strength. Null / strength 0
+     * clears it, and a cleared bias leaves the step loop the pre-#1997 loop, number for number.
+     */
+    setFluidBias(density, strength) {
+      fluidBias =
+        density && density.length === cols * rows && Number(strength) > 0
+          ? { density, strength: Math.min(1, Number(strength)) }
+          : null;
+    },
     reset() {
       st = null;
       syncPublished();
+      syncCulturePublication();
     },
     /**
      * #1923 — the quiet culture's read-only sampler for the marks (the Kineme culture source), or null when no quiet
@@ -273,6 +342,15 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
             gen: st.culture.gen,
             ...(st.quiet ? { quiet: { ...st.quiet } } : {}), // #1923 — the secondary read's dial rides the snapshot
             ...(st.fieldOn ? { field: { ...st.fieldOn } } : {}), // #1994 — so does field mode's cycle
+            // #1997 — OPTIONAL riders, present only while this wake's steps consumed a
+            // ferrofluid birth bias: the culture's state grid itself, and its field's activity
+            // trace. The bias input changed while it acted (the fluid kept stepping), so the
+            // state is not a replay of the seed marks — the grid rides, and restore() loads it
+            // verbatim (the terrain rider's precedent applied to state). Snapshots taken with
+            // the fluid off carry neither key and restore exactly as they always did.
+            ...(biasUsed
+              ? { fluidGrid: Array.from(st.culture.cur), fluidActivity: Array.from(st.culture.field.activity) }
+              : {}),
           }
         : null;
     },
@@ -280,6 +358,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     restore(snap) {
       st = null;
       syncPublished();
+      syncCulturePublication();
       if (!snap || !Array.isArray(snap.marks) || !snap.marks.length) return;
       const wasField = !!(snap.field && typeof snap.field === 'object');
       // #1923 Phase 3 — rebuild against the snapshot's terrain (absent = a pre-rider snapshot: no
@@ -295,7 +374,21 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
         !wasField,
         terrain,
       );
-      for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
+      // #1997 — a snapshot whose culture grew under a ferrofluid bias carries its state grid
+      // (fluidGrid): load it verbatim and set the generation, instead of replaying the seed
+      // (absent = a snapshot the fluid never biased: the historical replay below, verbatim).
+      const hasFluidGrid = Array.isArray(snap.fluidGrid) && snap.fluidGrid.length === cols * rows;
+      const fluidActivity =
+        hasFluidGrid && Array.isArray(snap.fluidActivity) && snap.fluidActivity.length === cols * rows
+          ? snap.fluidActivity
+          : null;
+      if (hasFluidGrid && restoreCultureGrid(st.culture, snap.fluidGrid, fluidActivity)) {
+        st.culture.gen = snap.gen | 0;
+        st.culture.field.gen = st.culture.gen;
+        biasUsed = true;
+      } else {
+        for (let g = 0; g < (snap.gen | 0); g++) stepCulture(st.culture);
+      }
       // #1923 Phase 4 — the seed epoch rides the snapshot (absent = a pre-Phase-4 snapshot: epoch 0,
       // the wake's own seed — exactly the historical restore).
       st.seedEpoch = Number.isInteger(snap.seedEpoch) && snap.seedEpoch > 0 ? snap.seedEpoch : 0;
@@ -304,6 +397,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       }
       if (wasField) st.fieldOn = { cycleGens: Number(snap.field.cycleGens) || undefined };
       syncPublished();
+      syncCulturePublication();
     },
   };
 }

@@ -198,6 +198,13 @@ export const STRING_CHANNEL_GROUPS = Object.freeze({
   // #1923 — DISH LIFE's random test/seed fill (engine/dishLife.mjs seedRandom) is placement: the spatial
   // stream. The rule itself draws nothing, so a culture is a pure function of its seeded grid.
   'dish-life': 'spatial',
+  // #1997 — the ferrofluid's inoculation deal (engine/dishFluid.mjs createFluid) is placement:
+  // the spatial stream. The step itself draws nothing, so a fluid is a pure function of its
+  // seeded grid and stamped inputs.
+  'dish-fluid': 'spatial',
+  // #1997 — the fluid's bias on the culture's births (engine/dishFluidCouple.mjs) is a spatial
+  // decision dealt per cell per generation, like the seed fill above.
+  'dish-fluid-birth': 'spatial',
 });
 
 const OFFSET_GROUP_OF = new Map([

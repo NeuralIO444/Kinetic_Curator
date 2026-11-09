@@ -33,6 +33,7 @@ import {
   getLastSpawnDecisions,
   getLastDishWet,
   getLastCouplingBackground,
+  getLastDishFluidPlan,
   setLiveWetSampler,
 } from './liveResolve.mjs';
 import { cultureBackgroundShift, cultureBackgroundHex } from '../engine/dishLifeCouple.mjs'; // #1923 Phase 2 slice D: the background fold's law (the seam)
@@ -51,6 +52,8 @@ import { noteLifeBreath, LIFE_FULL } from '../hooks/motionMeterTap.js'; // #1469
 
 import { readMeterBandLevels } from '../hooks/audioMeterTap.js';
 import { createDishLifePhase } from '../engine/dishLifePhase.mjs'; // #1923: the idle clock (loop clock; the wake is stamped on the input)
+import { fluidStamp, fluidDisplayColours } from '../engine/dishFluid.mjs'; // #1997: the ferrofluid's cycle stamp + its palette colours
+import { installDishFluidMagnets } from './dishFluidMagnetsDom.mjs'; // #1997: the magnet placement gesture (armed by the chip)
 import { consumeTouch, clearTouch } from '../engine/dishLifeTouch.mjs';
 import { quietStamp, DEFAULT_STRENGTH } from '../engine/dishLifeQuiet.mjs'; // #1923: the secondary read's cycle stamp
 import { fieldStamp, clampCycleGens } from '../engine/dishLifeField.mjs'; // #1923 Phase 2: the field culture's cycle stamp (produced while the coupling dial is up); Phase 4: the re-seed interval's detent clamp
@@ -403,6 +406,11 @@ export function createLiveLoop(
   let dishLifeBoost = 0; // the idle boost, eased on the loop's dt (the eased value is what gets stamped)
   let lastSeedPulse = null; // #1923 Phase 4 — the last consumed "seed from stage" pulse (null adopts the store's value on the first frame, so a press never fires late or on load)
   const disposeDishLifeTouch = typeof window !== 'undefined' ? installDishLifeTouch(window) : () => {};
+  // #1997 FERROFLUID: the magnet gesture (place / drag / remove while the chip's MAGNETS arm is
+  // on) and the governor's awake sensor state. The gesture writes only store magnet actions;
+  // the loop stamps the list beside the fluid stamp every frame the mode is on.
+  let dishFluidWasAwake = false;
+  const disposeDishFluidMagnets = installDishFluidMagnets(canvas, getState);
   // FLOW wire: one curl table per project seed, shared with the swarm.
   let flowField = null;
   let flowFieldSeed = null;
@@ -850,6 +858,25 @@ export function createLiveLoop(
       dishLifeWasAwake = dishLifeStamp !== null;
       s.setDishLifeAwake?.(dishLifeWasAwake); // the governor's sensor — published on transitions only
     }
+    // #1997 FERROFLUID — the dish's second mode, the culture's sibling: while the mode is on
+    // (the chip, or the headless flag), the loop stamps the fluid's cycle clock on the input,
+    // with the magnets and the three dials riding beside it — the stamp is a pure function of
+    // the loop clock (simulation time: PERF PAUSED and hidden tabs still the fluid with
+    // everything else), the shed rung rides it, and the take records the whole conversation.
+    // Off: no keys at all — a take recorded with the fluid off carries exactly the older shape.
+    const dishFluidOn = !!s.dishFluid || (typeof window !== 'undefined' && !!window.__KC_FERROFLUID);
+    const dishFluidStamp = dishFluidOn ? fluidStamp(loopTimeMs, { shed: s.dishFluidShed | 0 }) : null;
+    const dishFluidDial = dishFluidOn
+      ? {
+          flow: Number.isFinite(s.dishFluidFlow) ? s.dishFluidFlow : 0.5,
+          pull: Number.isFinite(s.dishFluidPull) ? s.dishFluidPull : 0.7,
+          couple: Number.isFinite(s.dishFluidCouple) ? s.dishFluidCouple : 0.5,
+        }
+      : null;
+    if ((dishFluidStamp !== null) !== dishFluidWasAwake) {
+      dishFluidWasAwake = dishFluidStamp !== null;
+      s.setDishFluidAwake?.(dishFluidWasAwake); // the governor's sensor — published on transitions only
+    }
     // #2006 slice 3 — the review morph stamp: while the standing review
     // record carries a ladder adjustment, the resolver settles the repair
     // as one planned morph (gl/liveResolve's review channel). The stamp
@@ -873,6 +900,9 @@ export function createLiveLoop(
     const resolved = resolver.resolveLayers({
       ...(dishLifeStamp ? { dishLife: dishLifeStamp } : {}),
       ...(dishFieldStamp ? { dishField: dishFieldStamp, dishFieldCoupling } : {}), // #1923 Phase 2
+      ...(dishFluidStamp
+        ? { dishFluid: dishFluidStamp, dishFluidMagnets: s.dishFluidMagnets || [], dishFluidDial }
+        : {}), // #1997 — stamp + magnets + dials, only while the mode is on
       ...(reviewMorphStamp ? { reviewMorph: reviewMorphStamp } : {}),
       canvasW,
       canvasH,
@@ -1569,6 +1599,31 @@ export function createLiveLoop(
               }
             : null,
         );
+        // #1997: arm the ferrofluid floor with the plan the resolver just published for this
+        // frame (getLastDishFluidPlan) and the frame's palette colours — the dish the stage
+        // rests on is the palette's own ground, the sheen its lightest swatch, the dark phase
+        // its ink. No plan (fluid off) disarms it: no step runs, no floor draws, the frame is
+        // byte-identical.
+        {
+          const fluidPlan = getLastDishFluidPlan();
+          // The palette is resolved the way buildFrame resolved this frame's own (its
+          // resolveLiveRenderState derivation, liveLoop.mjs's buildFrame): tick has no
+          // voiceState in scope — reading the bare name here threw ReferenceError on every
+          // fluid-active frame (the #1997 live-path fault). Deriving from the snapshot the
+          // block already holds (st) through the same function can never put the floor in a
+          // different palette than the frame above it, voice mix included.
+          const framePalette = resolveLiveRenderState(st);
+          live.setDishFluid(
+            fluidPlan && fluidPlan.active
+              ? {
+                  plan: fluidPlan,
+                  colours: fluidDisplayColours(
+                    resolvePalette(framePalette.paletteId, framePalette.paletteOverrides, st.userPalettes),
+                  ),
+                }
+              : null,
+          );
+        }
       }
       const timer = ensureGpuTimer();
       const cpuFallback = !timer.isHardware;
@@ -1909,6 +1964,7 @@ export function createLiveLoop(
     lastFrameTarget = null;
     wetFrame.dispose(); // #1809: the field's only sanctioned destroy — session end
     disposeDishLifeTouch(); // #1923
+    disposeDishFluidMagnets(); // #1997
     clearTouch();
     setLiveWetSampler(null); // #1841: the dish's read dies with the loop that served it
     clearWetMode(); // #1841: the show block's shed line clears with the session

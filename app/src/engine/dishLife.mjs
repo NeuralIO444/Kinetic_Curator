@@ -129,6 +129,23 @@ function publish(c, prev) {
 }
 
 /** Advance one generation in place. Returns the culture (same object). */
+/**
+ * #1997 — load a recorded state grid verbatim (a snapshot's fluidGrid rider: the culture's
+ * state after generations a ferrofluid bias helped deal — a history the seed marks alone
+ * cannot replay, since the bias input changed while it acted). Sets the current grid and
+ * re-publishes the field from it; the field's activity trace rides too when the snapshot
+ * carries it (fluidActivity — the marks' sampler reads activity, and a zeroed trace would
+ * move every mark the culture breathes on). The caller owns the generation counter — this
+ * never steps.
+ */
+export function restoreCultureGrid(c, grid, activity = null) {
+  if (!c || !grid || grid.length !== c.cur.length) return false;
+  c.cur.set(grid);
+  publish(c, null);
+  if (activity && activity.length === c.field.activity.length) c.field.activity.set(activity);
+  return true;
+}
+
 export function stepCulture(c) {
   const { cols: w, rows: h, cur, nxt, birthLut, surviveLut } = c;
   const last = c.rule.states - 1;

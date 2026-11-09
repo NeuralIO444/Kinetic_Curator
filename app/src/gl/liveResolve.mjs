@@ -103,6 +103,7 @@ const POEM_ONLY_IDS = new Set(
   ),
 );
 import { createDishLifeStage } from '../engine/dishLifeStage.mjs'; // #1923: the idle-pickup culture, driven by input.dishLife (absent = no work)
+import { createDishFluidStage } from '../engine/dishFluidStage.mjs'; // #1997: the ferrofluid, driven by input.dishFluid (absent = no work)
 import {
   fieldSampler,
   effectiveCoupling,
@@ -337,6 +338,19 @@ export function getLastDishWet() {
 }
 
 /**
+ * #1997 — the last resolved frame's FERROFLUID display plan, published by the resolver for the
+ * loop (the getLastDishWet pattern): the fluid stage's stable plan object — { active, seedKey,
+ * wakeMs, stepTarget, stepsAllowed, resIndex, cols, rows, magnets, dial, coupleField, aspectHW }.
+ * The loop drives the GPU display instance from it (gl/dishFluidGl.mjs) and stamps the served
+ * step count back onto the input. Not drained: the value is a frame fact, re-published by every
+ * resolve. Module-level, last-resolver-wins (the getLastFrameMotion law).
+ */
+let lastDishFluidPlan = null;
+export function getLastDishFluidPlan() {
+  return lastDishFluidPlan;
+}
+
+/**
  * #1923 Phase 2 slice D — the last resolved frame's coupling BACKGROUND read, published by the
  * resolver for the loop's background fold (the getLastDishWet pattern): { meanLevel, coupling } —
  * the dish-mean level of the very publication this frame's coupling read used (one frame behind,
@@ -382,6 +396,12 @@ export function createLiveResolver() {
   // consumers read it one frame behind, the kineme culture read's contract. No stamp = no state, and a
   // build without one is byte-identical to one without this stage.
   const dishFieldStage = createDishLifeStage();
+  // #1997 FERROFLUID — the dish's second mode, sibling of the culture: a Gray-Scott field (engine/dishFluid.mjs)
+  // stepped at the dish grid in engine/dishFluidStage.mjs, driven only by input.dishFluid + its stamped
+  // magnets/dials. It reads the culture stage's publication one frame behind and its own publication biases
+  // the culture's births the same way (the dish's standing read discipline). Absent stamp = no state, and a
+  // build without one is byte-identical to one without this stage.
+  const dishFluid = createDishFluidStage();
   // #606: scene units follow the authored canvas (set per resolveLayers).
   let W = CANVAS_W;
   let H = CANVAS_H;
@@ -725,6 +745,24 @@ export function createLiveResolver() {
     const driverSec = driverTimeSec(driverClock, input.loopTimeMs ?? 0, input.layoutParams?.kinemeRate ?? 1);
     // #1923 — the quiet culture's field, read ONE-WAY by the marks' kineme (the last applied frame's; null = none)
     const cultureField = dishLife.field();
+    // #1997 — the ferrofluid coupling's two reads, BOTH taken here, before any stage applies (the
+    // dish's standing read discipline: published state, one frame behind):
+    //   culture → fluid: the culture stage's publication from the last applied frame, handed to
+    //     the fluid stage's apply at the bottom of this resolve (it biases the fluid's feed);
+    //   fluid → culture: the fluid stage's published density from the last applied frame + this
+    //     frame's stamped COUPLE dial, handed to the culture stage as its birth bias.
+    // A frame without fluid input sets neither (the bias setter gets null: the culture's step
+    // loop stays the pre-#1997 loop, number for number).
+    const fluidCoupleField = dishLife.cultureField();
+    {
+      const fStamped = input.dishFluid != null;
+      const fDial =
+        fStamped && input.dishFluidDial && typeof input.dishFluidDial === 'object' ? input.dishFluidDial : null;
+      dishLife.setFluidBias(
+        fStamped && dishFluid.publishedFluid.active ? dishFluid.publishedFluid.density : null,
+        fDial ? fDial.couple : 0,
+      );
+    }
     // #1923 Phase 2 — the coupling read: this frame's dial (input.dishFieldCoupling), shed-folded by
     // the field stamp's own shed (the governor's CULTURE HELD reads as coupling 0 — the sheddable
     // admission), over the field stage's publication from the last applied frame. Inert (null)
@@ -1618,6 +1656,20 @@ export function createLiveResolver() {
     // fed to it — anything else on this slot of a recorded input reads as no stamp, so this stage can
     // never draw, dissolve or speck.
     dishFieldStage.apply(input.dishField?.mode === 'field' ? input.dishField : null, out, W, H);
+    // #1997 FERROFLUID — applies beside the culture at the bottom of the resolve (the dish's
+    // standing place for stage state): it steps the grid kernel under this frame's stamp, reads
+    // the culture publication captured at the top (one frame behind — never this frame's own
+    // culture output), and publishes the density the culture's NEXT frame will read. The display
+    // plan rides getLastDishFluidPlan(). No stamp = the stage drops its state, touches nothing.
+    dishFluid.apply(input.dishFluid ?? null, {
+      seed: input.seed,
+      magnets: input.dishFluidMagnets,
+      dial: input.dishFluidDial,
+      coupleField: fluidCoupleField,
+      W,
+      H,
+    });
+    lastDishFluidPlan = dishFluid.plan;
     dishLife.apply(input.dishLife, out, W, H, { specks: !input.reducedMotion }); // the tertiary specks hold still under reduced motion
     prune(aliveIds, documentIds);
     // #1412 — publish the frame's contact-density field (engine/
@@ -1744,6 +1796,7 @@ export function createLiveResolver() {
     worldNoiseSeed = null;
     dishLife.reset();
     dishFieldStage.reset(); // #1923 Phase 2
+    dishFluid.reset(); // #1997
   }
 
   // ── #1367 — mid-session state snapshot ─────────────────────────────────────
@@ -1769,6 +1822,7 @@ export function createLiveResolver() {
     for (const [layerId, v] of reviewMorphState) reviewMorphSnap[layerId] = snapshotMorphEntry(v);
     const dishLifeSnap = dishLife.snapshot();
     const dishFieldSnap = dishFieldStage.snapshot(); // #1923 Phase 2
+    const dishFluidSnap = dishFluid.snapshot(); // #1997
     return {
       v: 1,
       W,
@@ -1792,6 +1846,7 @@ export function createLiveResolver() {
       dishCreatures: dishCreatures.snapshotState(),
       ...(dishLifeSnap ? { dishLife: dishLifeSnap } : {}), // #1923 — OPTIONAL key: present only while a culture runs, so every other snapshot is exactly what it was
       ...(dishFieldSnap ? { dishField: dishFieldSnap } : {}), // #1923 Phase 2 — OPTIONAL key on the same terms: present only while a field culture runs
+      ...(dishFluidSnap ? { dishFluid: dishFluidSnap } : {}), // #1997 — OPTIONAL key on the same terms: present only while the ferrofluid runs
       // #2006 slice 3 — OPTIONAL key on the same terms: present only while a
       // review settle is in flight or remembered, so every other snapshot
       // is exactly what it was. The settle is presentation state; a
@@ -1883,6 +1938,10 @@ export function createLiveResolver() {
     // resolver's would. Nothing is lost by it: a restored take replays its recorded decision fields.
     if (snap.spawn !== undefined) spawnState.restoreState(snap.spawn);
     else spawnState.reset();
+    // #1997 — the fluid restores BEFORE the culture: its published density is what the culture's
+    // first post-restore biased generation reads (and the fluid's own restore reads its snapshot's
+    // coupling rider, never the culture), so this order keeps the pair consistent.
+    dishFluid.restore(snap.dishFluid); // absent (every pre-#1997 snapshot) = no fluid, as a fresh resolver's
     dishLife.restore(snap.dishLife); // #1923 — absent (every pre-DISH-LIFE snapshot) = no culture, as a fresh resolver's
     dishFieldStage.restore(snap.dishField); // #1923 Phase 2 — absent (every pre-Phase-2 snapshot) = no field culture, as a fresh resolver's
     // travel kinemes — a pre-travel snapshot carries no roam: every mark home, the clock unanchored (a fresh resolver's state)
@@ -2109,6 +2168,28 @@ export function checkResolverSnapshot(snap) {
   // #1923 — either stage's frozen seed is optional; when present it must carry its marks, canvas and generation
   if (snap.dishLife !== undefined && !checkDishLifeSnapshot(snap.dishLife)) return false;
   if (snap.dishField !== undefined && !checkDishLifeSnapshot(snap.dishField)) return false; // #1923 Phase 2
+  if (snap.dishFluid !== undefined && !checkDishFluidSnapshot(snap.dishFluid)) return false; // #1997
+  return true;
+}
+
+/** #1997 — the structural shape of a ferrofluid stage snapshot. */
+function checkDishFluidSnapshot(d) {
+  if (!d || typeof d !== 'object' || !Number.isFinite(d.wakeMs)) return false;
+  if (!Number.isInteger(d.gridStep) || d.gridStep < 0) return false;
+  if (!Array.isArray(d.magnets) || d.magnets.length > 8) return false;
+  for (const m of d.magnets)
+    if (!m || typeof m !== 'object' || !Number.isFinite(m.x) || !Number.isFinite(m.y)) return false;
+  if (d.dial !== undefined && (!d.dial || typeof d.dial !== 'object' || Array.isArray(d.dial))) return false;
+  // the grid field itself rides the snapshot (the state rider): both phases, dish-grid sized
+  if (
+    !d.state ||
+    typeof d.state !== 'object' ||
+    !Array.isArray(d.state.u) ||
+    !Array.isArray(d.state.v) ||
+    d.state.u.length !== 96 * 54 ||
+    d.state.v.length !== 96 * 54
+  )
+    return false;
   return true;
 }
 
@@ -2134,5 +2215,18 @@ function checkDishLifeSnapshot(d) {
   // #1923 Phase 4 — the seed-epoch rider (which seed of the wake the snapshot's culture is); when
   // present it must be a non-negative integer
   if (d.seedEpoch !== undefined && (!Number.isInteger(d.seedEpoch) || d.seedEpoch < 0)) return false;
+  // #1997 — the ferrofluid state riders (the culture's grid after biased generations + its
+  // field's activity trace); when present the grid must be a dish-grid array of valid cell
+  // states (0..7) and the activity a same-sized array of finite values in [0, 1]
+  if (d.fluidGrid !== undefined) {
+    if (!Array.isArray(d.fluidGrid) || d.fluidGrid.length !== 96 * 54) return false;
+    for (const v of d.fluidGrid) if (!Number.isInteger(v) || v < 0 || v > 7) return false;
+    if (
+      !Array.isArray(d.fluidActivity) ||
+      d.fluidActivity.length !== 96 * 54 ||
+      d.fluidActivity.some((v) => !Number.isFinite(v) || v < 0 || v > 1)
+    )
+      return false;
+  }
   return true;
 }
