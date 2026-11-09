@@ -153,14 +153,16 @@ Existing suites re-run directly: dishLife family (core, stage, controls, couplin
 seed, chip), liveResolve.dishLife, liveResolve.determinism, governorCuts, governorDishLife,
 costTiers, helpCopy, rangeRow, kernel rng/purity/registry, styles — all green. Dice-adjacent
 suites (resolver fluid, couple, stage) run 10× — green. Full manifest sweep (continue-on-error
-over all 620 manifest lines): **617 passed in the sweep run**; the three non-passes are
-accounted for, none caused by this build — `swarmWasm` and `rollSafety` fail **identically on
-a detached base-main worktree** (WASM toolchain absence; headless Chromium target crash in the
-GL parity driver, same signature both trees), and `wetWarmup` hung under the sweep's parallel
-load and was killed by hand, then **passed solo on both trees** (21 checks). `accum` passed in
-this sweep. `npm run format:check` clean, lint 0 errors (11 warnings, the standing set — the
-one new warning this build introduced, a governor dep array, was fixed by adding the fluid's
-entries beside the culture's), `npm run build` green.
+over all 620 manifest lines): **617 passed, 3 failed — and all three failures are proven
+base-identical environment failures**, each re-run solo on a detached base-main worktree with
+the identical result: `swarmWasm` (WASM toolchain absence, identical failure tails),
+`rollSafety` (headless Chromium target crash in the GL parity driver, same signature both
+trees), and `accum` (the standing sandbox native abort: exit 134 after exactly 69 [ok] lines
+on BOTH trees, solo). `wetWarmup` ran long under the sweep's parallel load but completed and
+passed inside the sweep, and also passed solo on both trees (21 checks). `npm run
+format:check` clean, lint 0 errors (11 warnings, the standing set — the one new warning this
+build introduced, a governor dep array, was fixed by adding the fluid's entries beside the
+culture's), `npm run build` green.
 
 ## Disclosed limits
 
