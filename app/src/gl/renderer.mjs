@@ -1020,11 +1020,14 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
    * #2038 — draw srcTex into dstTarget turned by `deg` degrees
    * CLOCKWISE about the frame centre, as the stage sees it (the
    * stratumRotation law: a stratum's own contribution renders in a
-   * frame rotated by its detent). To turn the image by θ the sample
-   * field turns by −θ; the sign of the v axis in texture space is
-   * folded into the sin term — the pair (cos, −sin) below is the
-   * sampling rotation for a clockwise image turn in this renderer's
-   * framebuffer convention (v_cuv runs opposite the screen's y).
+   * frame rotated by its detent). The sample field turns against the
+   * image, and the v axis flips between canvas UV (y-down) and GL
+   * texture space (y-up: v_cuv.y = 1 − stageY) — the two flips
+   * compose so the pair below is (cos, +sin): with it, a mark right
+   * of centre lands BELOW centre at +90°, the same clockwise the
+   * CPU rotateItems performs (verified against a standalone GL
+   * harness driving this exact shader + uniform pair through the
+   * paint → turn → present chain).
    * Callers run this only while a rotation detent is non-zero, so the
    * unrotated frame never pays for it and stays byte-identical.
    */
@@ -1035,7 +1038,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.disable(gl.BLEND);
     gl.useProgram(rotcopyProg);
     gl.uniform1i(U(rotcopyProg, 'u_src'), bindTex(0, srcTex));
-    gl.uniform2f(U(rotcopyProg, 'u_rot'), Math.cos(rad), -Math.sin(rad));
+    gl.uniform2f(U(rotcopyProg, 'u_rot'), Math.cos(rad), Math.sin(rad));
     drawFullscreen(rotcopyProg);
   }
 

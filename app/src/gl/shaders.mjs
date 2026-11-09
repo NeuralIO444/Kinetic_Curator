@@ -870,9 +870,10 @@ void main() {
 
 /**
  * #2038 — the rotating copy: COPY_FS with the sample field turned about
- * the frame centre. u_rot carries (cos, sin) of the SAMPLING rotation;
- * to turn the image by θ the caller samples at R(−θ) (the rotateCopy
- * helper in renderer.mjs owns that convention). Out-of-frame samples
+ * the frame centre. u_rot carries (cos, sin) of the turn the IMAGE
+ * makes, clockwise as the stage sees it; the shader samples against
+ * it (the rotateCopy helper in renderer.mjs owns the convention, and
+ * its comment carries the v-flip derivation). Out-of-frame samples
  * clamp to the edge texel (every frame target is CLAMP_TO_EDGE), so a
  * turned stratum's corners read the frame's edge, never garbage.
  */
