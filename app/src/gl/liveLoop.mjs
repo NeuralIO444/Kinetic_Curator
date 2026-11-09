@@ -42,6 +42,8 @@ import { audioRoutes, effectiveRoutes, metroBreath } from './audioRoutes.mjs'; /
 import { createBandFeed, BAND_KEYS } from './bandFeed.mjs'; // #790 PR3: the 7 meter bands as route inputs
 import { readSourceFeed, mixLevels } from './sourceFeed.mjs'; // #1475: a synthetic source adds to the same feed
 import { getStressState } from '../curator/stressLive.js'; // Phase 2 S5: the band reader's latest filtered reading, stamped on the frame input below
+import { poolWithBirths } from '../engine/kineticBirths.mjs'; // #2037: stage-born children's tiles ride the resolver pool beside the overlay
+import { noteBirthPopulation } from '../curator/birthLive.mjs'; // #2037: the pre-made hand re-derives when the parent population changes
 import { nextSurgeStamp } from '../curator/director.js'; // #1576 Q3: the Queen's surge stamp decision, hosted with the pull — read at the frame input below; the stamp is recorded input data, never a surface
 import { spectrumMarksShed } from './sceneContract.js';
 import { spectrumMarksFor } from './spectrumMarks.mjs'; // #1482 P3: the dials -> the renderer's spectrum key
@@ -540,6 +542,10 @@ export function createLiveLoop(
    */
   function buildFrame(dtSec = 1 / 60, loopTimeMs = 0) {
     const s = getState();
+    // #2037 — the births' pre-made hand tracks the standing parent population: noted here, where
+    // the frame's state is read; the derivation itself is fingerprint-gated, so a steady stage
+    // costs one population read and no breeding.
+    noteBirthPopulation(s);
     const { w: canvasW, h: canvasH } = authoredCanvas(s);
     const CX = canvasW / 2;
     const CY = canvasH / 2;
@@ -919,7 +925,9 @@ export function createLiveLoop(
       enabledAssets: s.enabledAssets,
       shapeLevels: s.shapeLevels, // #733
       assetWeightOverrides: s.assetWeightOverrides,
-      customAssets: s.customAssets,
+      // #2037 — the pool the resolver places from carries the stage-born children's tiles beside
+      // the overlay; the merged list is what the take records, so a kept take replays its births.
+      customAssets: poolWithBirths(s.customAssets, s.stageBirths),
       quality: s.quality,
       // #425 — resolver-side life drift: per-layer locks + batch gate;
       // slowRender below already folds !running. focusSwap tells the
@@ -1380,7 +1388,8 @@ export function createLiveLoop(
     building = true;
     const token = ++buildToken;
     try {
-      const svgById = getPool(getState().customAssets);
+      const st = getState();
+      const svgById = getPool(poolWithBirths(st.customAssets, st.stageBirths)); // #2037: the baker's pool carries the stage-born tiles too
       // #265 — rebake only what changed: the atlas is resolution-
       // independent, so a renderScale step skips the heavy sequential-SVG
       // bake entirely (#1079: the grain LUT bake is gone).

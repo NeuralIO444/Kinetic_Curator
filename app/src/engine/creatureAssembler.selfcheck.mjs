@@ -363,6 +363,15 @@ ok('4. zero behaviour change on stage: assembling moves only the record bank, an
     // #2008: the Riso field Look suite assembles creatures to prove the picker-only Look stays off the
     // assembler's dice (a test, not a stage reader)
     'gl/risoFieldLook.selfcheck.mjs',
+    // #2037: KINETIC births — the deal's backstage breeding read, the #1852 posture one level up: the
+    // population read (curator/birthLive.mjs) and the store's press site (state/slices/layoutSlice.js)
+    // read the bank to breed from it, and the pure core (engine/kineticBirths.mjs) works on records
+    // handed to it — the stage still reaches every creature, born or banked, through its pool TILE
+    // alone (the resolver pool merge carries tiles, never records), and the suite is a test
+    'curator/birthLive.mjs',
+    'engine/kineticBirths.mjs',
+    'engine/kineticBirths.selfcheck.mjs',
+    'state/slices/layoutSlice.js',
   ]);
   const hits = [];
   const walk = (dir) => {

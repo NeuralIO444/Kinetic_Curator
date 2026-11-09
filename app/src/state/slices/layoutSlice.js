@@ -79,6 +79,10 @@ import { chapterLeanBiases } from '../../curator/chapterMemory.mjs'; // #1858: t
 import { loisGrudge } from '../../curator/loisGrudge.mjs'; // #1858: LOIS's grudge tally (backstage record)
 import { mkRng } from '../../engine/prng.js';
 import { colorDeal, nudgeSwatches, anchorValid } from '../../curator/refineColor.js'; // #1365 Q2
+import { resolveBirthPress } from '../../engine/kineticBirths.mjs'; // #2037: KINETIC births — the deal can breed
+import { birthPopulation, standingBirthHand } from '../../curator/birthLive.mjs'; // #2037: the standing population + the pre-made hand
+import { noteBirth } from '../../curator/birthRecord.mjs'; // #2037: a recording take hears every resolved birth
+import { creatureTile, skeletonFounder } from '../../engine/creatureAssembler.js'; // #2037: a born child's stage tile, built like the bank's
 
 /**
  * #1365 Q2 — an artist's edit builds on the live overrides minus refine's carried `weights`: the weights describe the
@@ -434,6 +438,44 @@ function landPoem(
 }
 
 /**
+ * #2037 — the birth site of every KINETIC press, landPoem's sibling: called with the standing state
+ * and the press commit's own enabled map, it returns { kineticBirthPress } to spread into the same
+ * commit — plus, when a child is born, { stageBirths, enabledAssets } carrying the child onto the
+ * commit's stage (its tile enabled over whatever pool the press dealt, so a re-deal never sweeps a
+ * newborn off). The press counter advances on EVERY press of the button, eligible or not — it is
+ * the birth stream's place in the recorded conversation, session-only like poemDeal.
+ *
+ * The resolution itself is the pure core's (engine/kineticBirths.mjs): the population is read from
+ * the standing state as the press begins, the die is a function of the standing seed and this
+ * press's number, and the child comes from the pre-made hand when it stands fresh, else from a
+ * spot breed under the same cultivate gate. Fail-closed on the review's discipline: any failure
+ * inside the birth leaves the press exactly as it would have been without one.
+ */
+function landBirth(state, commitEnabledAssets) {
+  const press = (state.kineticBirthPress | 0) + 1;
+  const base = { kineticBirthPress: press };
+  try {
+    const pop = birthPopulation(state);
+    const res = resolveBirthPress({ pop, press, hand: standingBirthHand() });
+    if (!res.rolled) return base;
+    noteBirth({ press, via: res.via, outcome: res.outcome, record: res.record || null });
+    if (res.outcome !== 'born' || !res.record) return base;
+    const record = res.record;
+    const bodyAsset = pop.assetsById.get(record.body) || null;
+    const kin = [...(state.creatureRecords || []), ...(state.stageBirths || []).map((b) => b.record)];
+    const tile = creatureTile(record, bodyAsset, skeletonFounder(record, kin));
+    if (!tile) return base; // the gate read the child drawable on this same body — a tile that still cannot build is a no-birth
+    return {
+      ...base,
+      stageBirths: [...(state.stageBirths || []), { record, tile }],
+      enabledAssets: { ...(commitEnabledAssets || state.enabledAssets || {}), [tile.id]: true },
+    };
+  } catch {
+    return base;
+  }
+}
+
+/**
  * #1857 — the narrowing a round's settle opens: the funnel standing at notch 0 (the chapter pool),
  * anchored on the look the round settled with. Null when the settled look is not a chapter member —
  * the dealt look always is (it was dealt from the chapter deck), so null is the honest impossible,
@@ -678,6 +720,22 @@ export const createLayoutSlice = (set) => ({
    * Session-only, like poemDeal.
    */
   raygunTap: 0,
+  /**
+   * #2037 — KINETIC presses made this session: the birth die for press n is a pure function of the
+   * standing seed and n (engine/kineticBirths.mjs), so the counter is the birth stream's place in
+   * the recorded conversation. The births themselves land in state (stageBirths below), so replay
+   * never re-derives a birth from this. Session-only, like poemDeal.
+   */
+  kineticBirthPress: 0,
+  /**
+   * #2037 — children born on stage by a KINETIC birth and not yet banked: [{ record, tile }]. A
+   * stage-born child lives here and only here — its tile rides the resolver pool beside the overlay
+   * (gl/liveLoop.mjs, poolWithBirths) for exactly as long as the entry stands — until a kept take
+   * banks it through the bank's own door (state/slices/globalSlice.js bankStageBirths), which moves
+   * record and tile into the bank and the overlay together. Never serialized, never undo-managed:
+   * a child whose take is not kept leaves with the performance. Session-only.
+   */
+  stageBirths: [],
   /**
    * Render-only overlay for the performance governor's last-resort density
    * cut (#107 §5): null, or a partial { count?, mirror? } merged over
@@ -1679,6 +1737,10 @@ export const createLayoutSlice = (set) => ({
         buildSeed: seed,
         buildEnabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
       });
+      // #2037 — the press rolls for a birth too, read from the standing stage as the press began;
+      // a born child's tile stands enabled over the pool this roll dealt.
+      const finalEnabled = Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets;
+      const birth = landBirth(state, finalEnabled);
       return {
         ...undo,
         seed,
@@ -1690,7 +1752,9 @@ export const createLayoutSlice = (set) => ({
         poemDeal: poem.poemDeal,
         fieldGateRefusal: poem.fieldGateRefusal,
         fieldReview: poem.fieldReview,
-        enabledAssets: Object.keys(enabledAssets).length ? enabledAssets : state.enabledAssets,
+        enabledAssets: finalEnabled,
+        kineticBirthPress: birth.kineticBirthPress,
+        ...(birth.stageBirths ? { stageBirths: birth.stageBirths, enabledAssets: birth.enabledAssets } : {}),
         kitNote, // #1944 — a kit that dealt nothing is named, never a silent mixed deal
         layers,
         selectedFxLayerId,
@@ -1748,6 +1812,14 @@ export const createLayoutSlice = (set) => ({
         // implicit in the exits; the next settled round opens a fresh funnel at notch 0).
         kineticNotch: null,
       };
+      // #2037 — the press rolls for a birth too, read from the standing stage as the press began;
+      // a born child's tile stands enabled over the pool this pass dealt.
+      const birth = landBirth(state, Object.keys(r.enabledAssets).length ? r.enabledAssets : state.enabledAssets);
+      next.kineticBirthPress = birth.kineticBirthPress;
+      if (birth.stageBirths) {
+        next.stageBirths = birth.stageBirths;
+        next.enabledAssets = birth.enabledAssets;
+      }
       if (poem.layoutParams.mode === 'ca' && !state.caGrid) next.caGrid = createGrid(40, 28, state.seed);
       return next;
     }),
@@ -1801,6 +1873,10 @@ export const createLayoutSlice = (set) => ({
       const poem = landPoem(state, round.layoutParams ?? r.layoutParams, {
         buildEnabledAssets: round.enabledAssets ?? state.enabledAssets,
       }); // #1918 ruling 1
+      // #2037 — the press rolls for a birth too, read from the standing stage as the press began;
+      // a born child's tile stands enabled over the pool that lands (the cut's redeal pool when
+      // LOIS spent, else the standing pool this pass holds).
+      const birth = landBirth(state, round.enabledAssets ?? state.enabledAssets);
       return {
         ...(pat.changed ? pushToUndo(state, true, UNDO_KIND_LAYERS) : pushToUndo(state, true)),
         ...(pat.changed ? { layers: pat.layers } : {}),
@@ -1814,6 +1890,8 @@ export const createLayoutSlice = (set) => ({
         paletteLocks: {},
         paletteChosen: false, // #1365 — the roll picked this palette, not the artist
         ...(round.enabledAssets ? { enabledAssets: round.enabledAssets } : {}),
+        kineticBirthPress: birth.kineticBirthPress,
+        ...(birth.stageBirths ? { stageBirths: birth.stageBirths, enabledAssets: birth.enabledAssets } : {}),
         kineticVoiceId: r.voiceId,
         kineticRound: round.kineticRound,
         kineticNotch,
@@ -1879,13 +1957,18 @@ export const createLayoutSlice = (set) => ({
       // kept piece under a held poem is still a true pass: no change, no undo entry (#1772).
       const poem = landPoem(state, r.layoutParams ?? state.layoutParams);
       const poemMoved = !Object.is(poem.layoutParams.fieldForm, state.layoutParams.fieldForm);
-      if (!r.layoutParams && !poemMoved)
+      // #2037 — the press rolls for a birth too, read from the standing stage as the press began.
+      // A birth is a real change to the stage, so a press that would otherwise be a true pass
+      // takes the full commit below when one lands.
+      const birth = landBirth(state, state.enabledAssets);
+      if (!r.layoutParams && !poemMoved && !birth.stageBirths)
         return {
           kineticNudge,
           kineticRound,
           poemDeal: poem.poemDeal,
           fieldGateRefusal: poem.fieldGateRefusal,
           fieldReview: poem.fieldReview,
+          kineticBirthPress: birth.kineticBirthPress,
         };
       return {
         ...pushToUndo(state, true),
@@ -1895,6 +1978,8 @@ export const createLayoutSlice = (set) => ({
         fieldReview: poem.fieldReview,
         kineticNudge,
         kineticRound,
+        kineticBirthPress: birth.kineticBirthPress,
+        ...(birth.stageBirths ? { stageBirths: birth.stageBirths, enabledAssets: birth.enabledAssets } : {}),
         // only a real nudge ends the running voice MIX — a poem-only re-deal is no voice axis
         ...(r.layoutParams ? { voiceMix: null, activeVoiceId: null } : {}),
       };

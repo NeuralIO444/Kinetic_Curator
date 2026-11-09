@@ -43,6 +43,7 @@ import { sanitizePins } from '../../curator/dishPins.js';
 import { clickAttach, sanitizeAssetAttach, sanitizeAttachPoints } from '../../engine/assetAttach.js';
 import {
   assembleCreature,
+  sanitizeCreatureRecord,
   sanitizeCreatureRecords,
   MAX_CREATURE_RECORDS,
   creatureTile,
@@ -240,6 +241,23 @@ function bankCreature(state, rec, noteKey = 'creatureAssembleNote') {
   const standing = overlay.find((a) => a && a.id === tileId);
   // #1850 — an import that merely shares the tile's id (an SVG named cr-xxxxxxxx.svg) is never evicted
   if (standing && !isCreatureTile(standing)) return note('id-taken');
+  // #2037 — a stage-born child banks through this same door when the take it was born in is kept:
+  // its tile already stands (beside the overlay, in stageBirths), so banking moves the standing tile
+  // into the overlay and the record into the bank, together, and the stage-birth entry leaves. The
+  // standing tile is the one the stage showed — it banks even if the child's body has since left
+  // the pool — and it must pass the overlay's own door like any tile.
+  const stageEntry = (state.stageBirths || []).find((b) => b && b.record && b.record.id === rec.id);
+  if (stageEntry && !cur.some((r) => r.id === rec.id)) {
+    if (sanitizeOverlay([stageEntry.tile]).length !== 1) return note('nobody');
+    if (cur.length >= MAX_CREATURE_RECORDS) return note('full');
+    if (overlay.length >= OVERLAY_CAP) return note('pool-full');
+    return {
+      creatureRecords: [...cur, rec],
+      customAssets: [...overlay, stageEntry.tile],
+      stageBirths: (state.stageBirths || []).filter((b) => b !== stageEntry),
+      ...note('banked'),
+    };
+  }
   // #1850 — the creature joins the pool as an ordinary tile (the overlay, where imports live): placed by the same
   // asset path as every shape once the artist turns it on. The tile must pass the overlay's own door (the one
   // every load re-runs): a body the door refuses — the one library stamp drawn with a character entity — cannot
@@ -440,6 +458,7 @@ export const createGlobalSlice = (set) => ({
   assetAttach: {}, // #1355 — { assetId: [{x, y}] } attach points set in the wet lab
   creatureRecords: [], // #1849 — creature records assembled in the wet lab; #1850: each one's pool tile lives in customAssets
   creatureBreedNote: null, // #1852 — what the last BREED did (the same statuses, plus need-three). Session-only.
+  creatureBirthNote: null, // #2037 — what the last kept-take banking did: { id: null, status: 'banked', count }. Session-only.
   beastAssembleNote: null, // #1962 — what the last ASSEMBLE A BEAST did: { id, status: banked | pool-full | nobody }. Session-only.
   creatureAssembleNote: null, // #1849 — what the last ASSEMBLE did: { id, status: banked | already | full }. Session-only.
   creatureGeneNote: null, // #1870 — what the last hand edit did: { id, status: mutated | replaced | refused, why? }. Session-only.
@@ -1191,6 +1210,39 @@ export const createGlobalSlice = (set) => ({
         creatureCultivateNote: { id: recordId, status: written.cultivated.outcome },
       };
     }),
+  /**
+   * #2037 — bank the stage-born children a KEPT take names (ruling 5): each record the take's births
+   * section carries is banked through the one door (bankCreature's stage-birth branch above), which
+   * moves the child's standing tile into the overlay as the record enters the bank and clears the
+   * stage-birth entry. Records the take names that no longer stand as stage births (already banked,
+   * or the performance moved on) are skipped, and a child the bank refuses (full bank, full pool)
+   * stays stage-born — nothing is silently evicted and nothing banks twice. Called only from the
+   * take-keep path (components/PerformanceButton.jsx): an unkept take never reaches here, and its
+   * children leave with the performance.
+   */
+  bankStageBirths: (records) =>
+    set((state) => {
+      let work = state;
+      let banked = 0;
+      for (const raw of Array.isArray(records) ? records : []) {
+        const rec = sanitizeCreatureRecord(raw);
+        if (!rec) continue;
+        if (!(work.stageBirths || []).some((b) => b && b.record && b.record.id === rec.id)) continue;
+        const out = bankCreature(work, rec, 'creatureBirthNote');
+        if (out.stageBirths && out.stageBirths !== work.stageBirths) {
+          const { creatureBirthNote: _note, ...fields } = out; // eslint-disable-line no-unused-vars
+          work = { ...work, ...fields };
+          banked++;
+        }
+      }
+      if (!banked) return {};
+      return {
+        creatureRecords: work.creatureRecords,
+        customAssets: work.customAssets,
+        stageBirths: work.stageBirths,
+        creatureBirthNote: { id: null, status: 'banked', count: banked },
+      };
+    }),
   /** #1849 — drop one assembled creature: its record and (#1850) its pool tile, together (dropCreature). */
   removeCreatureRecord: (id) =>
     set((state) => ((state.creatureRecords || []).some((r) => r.id === id) ? dropCreature(state, id) : {})),
@@ -1469,6 +1521,7 @@ export const createGlobalSlice = (set) => ({
       next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
       next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
       next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none
+      next.stageBirths = []; // #2037 — a loaded document starts its own performance: the old one's unbanked children leave with it
       // #1694 S3 — the creature count rides doc.layoutParams.creatures (installed above with the
       // rest of the params; parseProject lands a pre-fold-in document's top-level creatureCount
       // there). Homes are found again for the new dish either way.

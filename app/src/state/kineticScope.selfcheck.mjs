@@ -99,15 +99,25 @@ for (const m of SCOPE_CYCLE) {
       eff.looks.some((l) => l.id === S().layoutParams.composition),
       `${m}: the dealt look is inside ${landing.chapterId} ∩ ${landing.dealtScope}`,
     );
+    // #2037 re-pin: a KINETIC press can also BIRTH — a stage-born child's tile stands enabled over
+    // the dealt pool, lawfully outside the chapter deck. The deck invariant governs the DEAL, so it
+    // is asserted on the dealt ids (on() minus the standing stage-birth tiles), and every enabled
+    // id the deck does not explain must be exactly one of those tiles — nothing else may ride along.
+    const birthTiles = new Set((S().stageBirths || []).map((b) => b.tile.id));
+    const dealt = on().filter((id) => !birthTiles.has(id));
     if (eff.poolKind === 'sets') {
-      assert.ok(setKeys.has(on().join('|')), `${m}: the pool is one curated 4-shape set, got ${on()}`);
+      assert.ok(setKeys.has(dealt.join('|')), `${m}: the pool is one curated 4-shape set, got ${dealt}`);
     } else {
       const effIds = new Set(eff.records.map((r) => r.id));
       assert.ok(
-        on().every((id) => effIds.has(id)),
+        dealt.every((id) => effIds.has(id)),
         `${m}: the pool is inside ${landing.chapterId} ∩ ${landing.dealtScope}`,
       );
     }
+    assert.ok(
+      on().every((id) => dealt.includes(id) || birthTiles.has(id)),
+      `${m}: an enabled id is either dealt or a stage-born child's tile`,
+    );
     if ((m === 'off' || m === 'weak') && landing.chapterId === 'now') {
       assert.equal(landing.redealt, false, `${m}: Now deals at the performer's scope, no re-deal`);
       assert.ok(smallLooks.has(S().layoutParams.composition), `${m}: a look from the original 33`);
