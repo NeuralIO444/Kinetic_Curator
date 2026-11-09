@@ -12,16 +12,11 @@
 //
 // Read by data/presets.js (appended to COMPOSITION_PRESETS / PRESET_GROUPS). Pure data.
 
-export const STYLE_LOOK_GROUPS = [
-  { id: 'japanese', label: 'Japanese' },
-  { id: 'grunge', label: 'Grunge' },
-  { id: 'swiss', label: 'Swiss' },
-  { id: 'bauhaus', label: 'Bauhaus' },
-  { id: 'op', label: 'Op Art' },
-  { id: 'memphis', label: 'Memphis' },
-  { id: 'engraved', label: 'Engraved' },
-  { id: 'marks', label: 'Marks' }, // #1854 — the first chapter (BOOK S1b)
-];
+import { canonLookGroups } from './canon/styles.js';
+
+// #2044 — the eight style Look groups ARE Canon styles: ids, labels and menu order come from the one declaration
+// (data/canon/styles.js). Japanese, Grunge, Swiss, Bauhaus, Op Art, Memphis, Engraved, Marks (#1854 — BOOK S1b).
+export const STYLE_LOOK_GROUPS = canonLookGroups();
 
 const still = { lifeDrift: 0.06, noiseSpeed: 0.12, wind: 0.1, behave: 'cruise' };
 

@@ -23,6 +23,7 @@ import { ASSETS } from './assets/index.js';
 import { POEM_ONLY_STAMP_IDS } from '../poets/placement.js'; // #2000: the poem-only union (then kana ∪ kanji); #2002: the union grew — placement's POEM_ONLY_STAMP_IDS is the one set
 import { assetRecords, assetsWhere } from './assetStyle.js';
 import { mkRng } from '../engine/prng.js';
+import { canonFamilyPairing } from './canon/styles.js';
 
 /** The mark budget each tier promises (resolved marks per content layer at 1080p). */
 export const VOICE_COST_TIERS = Object.freeze({
@@ -234,16 +235,8 @@ const PROMOTED = [
 
 // ── the 53 family variants ─────────────────────────────────────────────────────────────────────────────────────
 /** Each S4 style group's asset pairing (categories the family's style actually lives in, per `npm run audit:assets`). */
-export const FAMILY_PAIRING = Object.freeze({
-  japanese: ['floral', 'organic', 'radial'],
-  grunge: ['stamps', 'fragments', 'scanlines'],
-  swiss: ['geometric', 'linework'],
-  bauhaus: ['geometric', 'radial'],
-  op: ['radial', 'dots', 'linework'],
-  memphis: ['geometric', 'dots', 'linework'],
-  engraved: ['radial', 'linework'],
-  marks: ['stamps', 'linework', 'dots'],
-});
+// #2044 — the rows are the Canon's: each style record declares its own `pairing` (data/canon/styles.js).
+export const FAMILY_PAIRING = Object.freeze(canonFamilyPairing());
 // [id, title, vibe, mode, motion chip, palette, count, accumulation, costTier]
 const VARIANTS = {
   japanese: [

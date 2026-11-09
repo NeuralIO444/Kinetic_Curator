@@ -39,6 +39,7 @@ import { ASSETS_RISO } from './assets/assets-riso.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
 import { VOICE_DECK } from './voiceDeck.js';
+import { canonChapterAxes } from './canon/styles.js';
 
 /** Never dealt into a chapter deck (the creature citizen — mirrors state/rollPool.mjs NEVER_DEALT).
  * #1982: the kana stamps join the citizen in this class — catalogue members
@@ -64,6 +65,9 @@ export const CHAPTER_UNDEALT = Object.freeze([
 export const CHAPTER_DECK_MINIMUM = Object.freeze({ looks: 4, voices: 8, assets: 14 });
 
 // The spine, in order (D1). `prev`/`next` are attached from this order below — the order IS the neighbours.
+// #2044 — a movement chapter names the ONE Canon style it stands on (`style`) and takes its pointer lists from
+// that record (canonChapterAxes): the look group, asset style, asset families and voice style are no longer
+// retyped here. The chapter still owns what is the Book's alone: its id, name, spine position and card.
 const SPINE = [
   {
     // The primitive chapter. Its pool is authored content (#1854: cave signs, tallies, hands, a beast —
@@ -74,74 +78,58 @@ const SPINE = [
     // ruled (2026-10-31) to author the Marks voice family in this slice rather than borrow or exempt.
     id: 'marks',
     name: 'Marks',
-    lookGroups: ['marks'],
-    assetStyles: ['marks'],
-    assetFamilies: ['marks'],
-    voiceStyles: ['marks'],
+    style: 'marks',
+    ...canonChapterAxes('marks'),
     card: { paletteId: 'ochre-wall', marks: ['mrk_hand_01', 'mrk_ring_01', 'mrk_beast_01'] },
   },
   {
     id: 'engraving',
     name: 'Engraving',
-    lookGroups: ['engraved'],
-    assetStyles: ['engraved'],
-    assetFamilies: [],
-    voiceStyles: ['engraved'],
+    style: 'engraved',
+    ...canonChapterAxes('engraved'),
     card: { paletteId: 'persona-haeckel', marks: ['hae_radiolarian_01', 'hae_diatom_01', 'hae_medusa_01'] },
   },
   {
     id: 'bauhaus',
     name: 'Bauhaus',
-    lookGroups: ['bauhaus'],
-    assetStyles: ['bauhaus'],
-    assetFamilies: [],
-    voiceStyles: ['bauhaus'],
+    style: 'bauhaus',
+    ...canonChapterAxes('bauhaus'),
     card: { paletteId: 'solar-max', marks: ['geo_tri_01', 'geo_square_03', 'geo_circle_01'] },
   },
   {
     // Swiss is its own group — DIAGONAL GRID lives here, not in Bauhaus. The taxonomy in code is the taxonomy.
     id: 'swiss',
     name: 'Swiss',
-    lookGroups: ['swiss'],
-    assetStyles: ['swiss'],
-    assetFamilies: [],
-    voiceStyles: ['swiss'],
+    style: 'swiss',
+    ...canonChapterAxes('swiss'),
     card: { paletteId: 'transit', marks: ['typ_A', 'typ_B', 'typ_C'] },
   },
   {
     id: 'op-art',
     name: 'Op Art',
-    lookGroups: ['op'],
-    assetStyles: ['op'],
-    assetFamilies: [],
-    voiceStyles: ['op'],
+    style: 'op',
+    ...canonChapterAxes('op'),
     card: { paletteId: 'hydra', marks: ['dot_field_01', 'dot_cluster_01', 'line_hatch_01'] },
   },
   {
     id: 'japan',
     name: 'Japan',
-    lookGroups: ['japanese'],
-    assetStyles: ['japanese'],
-    assetFamilies: [],
-    voiceStyles: ['japanese'],
+    style: 'japanese',
+    ...canonChapterAxes('japanese'),
     card: { paletteId: 'sepia-plate', marks: ['org_petal_01', 'org_leaf_01', 'org_petal_02'] },
   },
   {
     id: 'memphis',
     name: 'Memphis',
-    lookGroups: ['memphis'],
-    assetStyles: ['memphis'],
-    assetFamilies: [],
-    voiceStyles: ['memphis'],
+    style: 'memphis',
+    ...canonChapterAxes('memphis'),
     card: { paletteId: 'neon-brood', marks: ['geo_star4_01', 'geo_star5_01', 'geo_chev_01'] },
   },
   {
     id: 'grunge',
     name: 'Grunge',
-    lookGroups: ['grunge'],
-    assetStyles: ['grunge'],
-    assetFamilies: [],
-    voiceStyles: ['grunge'],
+    style: 'grunge',
+    ...canonChapterAxes('grunge'),
     card: { paletteId: 'dirty', marks: ['stamp_num_01', 'stamp_glyph_01', 'stamp_num_02'] },
   },
   {
@@ -149,6 +137,7 @@ const SPINE = [
     // (every look group, every style) so the chapter cannot drift from the library it sums.
     id: 'now',
     name: 'Now',
+    style: null, // the whole library — it stands on every Canon style, so it names none
     lookGroups: PRESET_GROUPS.map((g) => g.id),
     assetStyles: [...STYLES],
     assetFamilies: FAMILIES.filter((f) => f !== 'creature'),
@@ -162,6 +151,7 @@ export const CHAPTERS = Object.freeze(
   SPINE.map((c, i) =>
     Object.freeze({
       ...c,
+      style: c.style ?? null,
       position: i,
       prev: i > 0 ? SPINE[i - 1].id : null,
       next: i < SPINE.length - 1 ? SPINE[i + 1].id : null,

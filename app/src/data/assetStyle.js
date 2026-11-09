@@ -13,6 +13,8 @@
 // The read API (assetRecord, assetsWhere, the counts) is what the roll (S1), looks (S4), voices (S5) and the curator
 // (S6) consume. Pure; no render behaviour reads this module unless a roll deals from it.
 
+import { CANON_STYLE_IDS } from './canon/styles.js';
+
 /** Canonical tag → the raw folksonomy tags it absorbs (#1769: 297 raw values → 32 terms). */
 export const TAG_SYNONYMS = Object.freeze({
   blob: ['blob', 'soft', 'lobed', 'amoeba', 'stretched', 'kidney', 'lobe', 'drop', 'tear', 'pod', 'wobble', 'dome'],
@@ -234,20 +236,12 @@ export function assetFamily(asset) {
   return (prefix && FAMILY_BY_PREFIX[prefix[0]]) || 'imported';
 }
 
-/** The controlled style list — 2-D design languages a look or voice can ask for (#1766). */
-export const STYLES = Object.freeze([
-  'swiss', // grid discipline, type-led, solid primitives
-  'bauhaus', // primary geometry: circle / square / triangle / wedge
-  'japanese', // ma and asymmetry: sprig, branch, petal, the single ring
-  'grunge', // distress: stamps, scribble, photocopy, torn fragments
-  'engraved', // Haeckel plates: fine-line natural history
-  'techno', // HUD, circuitry, crystal, scan
-  'pixel', // the 8-bit grid
-  'organic', // blob, cell, root, colony
-  'op', // optical: halftone, concentric, hatch, moiré
-  'memphis', // confetti, squiggle, zigzag, star
-  'marks', // #1854 — the primitive chapter: pigment, tally, hand (BOOK S1b)
-]);
+/**
+ * The controlled style list — 2-D design languages a look or voice can ask for (#1766).
+ * #2044: the vocabulary is the Canon's (data/canon/styles.js) — this is the same frozen array, re-exported under
+ * the name every reader already imports. Add a style there, never here.
+ */
+export const STYLES = CANON_STYLE_IDS;
 
 /**
  * Style assignment — ordered rules, first match wins. A rule matches when every field it names matches:
