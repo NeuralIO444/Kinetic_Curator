@@ -143,8 +143,12 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   assert.equal(sha(STYLE_LOOK_GROUPS), '6b270a3882dffa1f');
   assert.equal(sha(FAMILY_PAIRING), 'c2a789a96df0fd20');
   // the chapter records gained exactly one field (`style`); everything they carried before is unchanged
-  const withoutStyle = CHAPTERS.map(({ style: _style, ...rest }) => rest);
-  assert.equal(sha(withoutStyle), '8687c7d8965ca546', 'chapter records are the old records plus `style`');
+  const withoutStyle = CHAPTERS.map(({ style: _style, settings: _settings, ...rest }) => rest); // #2046 added `settings`
+  assert.equal(
+    sha(withoutStyle),
+    '8687c7d8965ca546',
+    'chapter records are the old records plus `style` (#2044) and `settings` (#2046)',
+  );
 }
 
 // ── 4. identity + the names policy ──────────────────────────────────────────────────────────────────────────
