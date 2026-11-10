@@ -433,7 +433,14 @@ export function sanitizeFieldForm(raw) {
     if (raygun.mode !== 'carson' && raygun.mode !== 'greiman' && raygun.mode !== 'grit' && raygun.mode !== 'shot') return null;
     if (!Number.isInteger(raygun.seed) || raygun.seed < 0 || raygun.seed > 0xffffffff) return null;
     if (raygun.wear !== undefined && raygun.wear !== 1) return null;
-    raygunMark = { mode: raygun.mode, seed: raygun.seed, ...(raygun.wear === 1 ? { wear: 1 } : {}) };
+    // #2010 P3 — `distort: 1` names the distortion axis the same way (absent: no key added).
+    if (raygun.distort !== undefined && raygun.distort !== 1) return null;
+    raygunMark = {
+      mode: raygun.mode,
+      seed: raygun.seed,
+      ...(raygun.wear === 1 ? { wear: 1 } : {}),
+      ...(raygun.distort === 1 ? { distort: 1 } : {}),
+    };
   }
   // #2002 — the face marker: absent is the base (Anton) face; 'serif'
   // declares the serif face, Whittier's (greenleaf) alone. Any other value

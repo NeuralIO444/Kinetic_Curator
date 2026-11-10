@@ -16,7 +16,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { GLASS_BEVEL, ENAMEL_BEVEL } from './glassBevel.mjs';
 import { QUAD_FS, QUAD_VS } from './shaders.mjs';
-import { packInstanceData } from './renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from './renderer.mjs';
 import { getCostTier } from './costTiers.mjs';
 
 test('variant constants spread the bevel: wider taps, gentler slope, broader specular', () => {
@@ -67,7 +67,7 @@ test('vertex stage carries the glass flag: attrib 6 in, varying out', () => {
   assert.ok(QUAD_FS.includes('in float v_glass;'), 'fragment stage declares the varying');
 });
 
-test('packInstanceData: 45-float stride, glass flag at [20], old producers read 0', () => {
+test('packInstanceData: INSTANCE_STRIDE (49 since #2010 P3), glass flag at [20], old producers read 0', () => {
   const cells = { 'a|#ffffff|#000000': { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
   const mk = (glass) => ({
     x: 1,
@@ -84,15 +84,15 @@ test('packInstanceData: 45-float stride, glass flag at [20], old producers read 
   const data = packInstanceData([mk(true), mk(false), mk(undefined)], cells);
   assert.equal(
     data.length,
-    135,
-    '3 instances × 45 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585, +engraving block in S4)',
+    3 * INSTANCE_STRIDE,
+    '3 instances × 49 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585, +engraving block in S4, +distort in #2010 P3)',
   );
   assert.equal(data[20], 1, 'glass:true → 1');
-  assert.equal(data[65], 0, 'glass:false → 0');
-  assert.equal(data[110], 0, 'missing flag (old producers) → 0 = enamel');
+  assert.equal(data[INSTANCE_STRIDE + 20], 0, 'glass:false → 0');
+  assert.equal(data[2 * INSTANCE_STRIDE + 20], 0, 'missing flag (old producers) → 0 = enamel');
   // The first 20 floats of a glass item match a non-glass item bit-for-bit:
   // the flag rides after, never inside, the existing channels.
-  for (let i = 0; i < 20; i++) assert.equal(data[i], data[45 + i], `float ${i} identical`);
+  for (let i = 0; i < 20; i++) assert.equal(data[i], data[INSTANCE_STRIDE + i], `float ${i} identical`);
 });
 
 test('cost tier declared honestly: tier 0, no new texture fetches', () => {

@@ -994,6 +994,9 @@ export function buildPlacements({
         color,
         accent,
         key: `field-${fieldForm.poetId}-${fieldForm.pieceId}-${j}`,
+        // #2010 P3 — a treated glyph's distortion record rides its item to the seam (gl/itemDistort.mjs): the quad
+        // itself leans, drips or tears. Only the ray gun's draw stamps one; a plain form's items are unchanged.
+        ...(s.distort ? { distort: s.distort } : {}),
       };
     }
     // #2005 — the plate's room, measured: the zone is the drawn stamps'

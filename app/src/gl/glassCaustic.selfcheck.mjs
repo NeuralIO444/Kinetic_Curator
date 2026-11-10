@@ -30,7 +30,7 @@ test('caustic constants describe a shimmer, not a kill: multiplier spans [base, 
 test('QUAD_FS multiplies spec by the glass-gated caustic field', () => {
   const gate = `spec *= mix(1.0, ${GLASS_CAUSTIC.base.toFixed(2)} + ${GLASS_CAUSTIC.amp.toFixed(2)} * causticN, v_glass);`;
   assert.ok(QUAD_FS.includes(gate), `caustic gate present: ${gate}`);
-  const field = `kc_vnoise(v_uv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0)`;
+  const field = `kc_vnoise(suv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0)`;
   assert.ok(QUAD_FS.includes(field), `procedural field present: ${field}`);
 });
 

@@ -78,7 +78,9 @@ layout(location=10) in vec4 a_engA;    // Phase 2 S4: engraving spine joints 0-1
 layout(location=11) in vec4 a_engB;    // Phase 2 S4: engraving spine joints 2-3
 layout(location=12) in vec4 a_engC;    // Phase 2 S4: engraving spine joints 4-5
 layout(location=13) in vec4 a_engP;    // Phase 2 S4: engraving params — x joint count (0 = no finish), y spacing, z width, w strength
+layout(location=14) in vec4 a_dist;    // #2010 P3 distortion channel: (shear, melt, tear, seed) — all 0 = the old quad (gl/itemDistort.mjs)
 uniform vec2 u_canvas;
+uniform float u_distHeat; // #2010 P3: the distortion channel's heat — 1 full, lowered (never 0) by the tier-2 shed
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
                         // z = #594 PR3 squash (0 = stretch only, 1 = area held)
@@ -117,6 +119,7 @@ out vec4 v_engA;      // Phase 2 S4: engraving joints/params — constant across
 out vec4 v_engB;
 out vec4 v_engC;
 out vec4 v_engP;
+flat out vec4 v_dist; // #2010 P3: the distortion record — constant across the instance (flat: no interpolation)
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -185,6 +188,10 @@ void main() {
     kOff += vec2(cos(sda), sin(sda)) * (u_specA.z * lvF * 28.0);
     specColour = u_specA.w * lvP;
   }
+  // #2010 P3 — the distortion channel's shear: the quad leans in its own frame (x moves with y, y-down: a positive
+  // shear tips the top right), before rotation, so the lean travels with the mark. 0 never enters (the old quad).
+  if (a_dist.x != 0.0) c.x -= c.y * a_dist.x * u_distHeat;
+  v_dist = a_dist;
   float th = radians(a_inst1.x + kDeg);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
@@ -262,6 +269,7 @@ uniform float u_ambient;   // #594: shared
 uniform vec2 u_sunMat;     // #594 PR2: x = bevel strength (0 = flat per-instance light), y = specular
 uniform float u_pool;      // #594: 0 = today's sun. Ink in the shadow, paper on the highlight.
 uniform vec2 u_hands;      // y = Open Hand. 0 returns the current sample.
+uniform float u_distHeat;  // #2010 P3: shared with the vertex stage — the heat scales melt and tear, never gates them
 in float v_seed;
 in vec2 v_world;
 in vec4 v_rot;
@@ -281,17 +289,56 @@ in vec4 v_engA;       // Phase 2 S4: engraving spine joints 0-1 (quad frame); co
 in vec4 v_engB;       // Phase 2 S4: engraving spine joints 2-3
 in vec4 v_engC;       // Phase 2 S4: engraving spine joints 4-5
 in vec4 v_engP;       // Phase 2 S4: [count, spacing, width, strength] — count 0 = this instance is not engraved
+flat in vec4 v_dist;  // #2010 P3: (shear, melt, tear, seed) — melt/tear move the atlas sample below; 0 = today's sample
 ${PLATE_GLSL}
 ${WASH_GLSL}
 ${STIPPLE_GLSL}
 ${ENGRAVE_GLSL}
 out vec4 o;
 void main() {
-  vec4 t = texture(u_atlas, v_uv);   // premultiplied
+  // #2010 P3 — the distortion channel. The screen-space derivatives are taken FIRST, in uniform control flow (GLSL ES
+  // 3.00 leaves them undefined inside per-fragment branches): the moved sample reads with the UNDISTORTED uv's
+  // gradients, so the band cuts never pick a blurred mip. MELT and TEAR move the sample inside the instance's own cell
+  // — suv — and every atlas read and every local frame below reads suv, so the bevel, Open Hand and the material
+  // bodies follow the distorted ink. The branch is constant per instance (v_dist is flat); both amounts zero never
+  // enters, and suv is v_uv: today's single sample, bit for bit.
+  vec2 gdx = dFdx(v_uv);
+  vec2 gdy = dFdy(v_uv);
+  vec2 suv = v_uv;
+  vec4 t;   // premultiplied
+  if (v_dist.y + v_dist.z > 0.0) {
+    vec2 dspan = v_cell.zw - v_cell.xy;
+    vec2 loc = (v_uv - v_cell.xy) / dspan;   // 0..1 across the drawn quad in the asset's own frame (y-down)
+    float dseed = v_dist.w * 97.0;
+    float dmelt = v_dist.y * u_distHeat;
+    float dtear = v_dist.z * u_distHeat;
+    float keep = 1.0;
+    if (v_dist.z > 0.0) {
+      // TEAR: horizontal bands (12 across the quad — about six through a glyph) slide sideways by seeded amounts,
+      // with a sliver of air cut between them.
+      float band = floor(loc.y * 12.0);
+      loc.x -= (kc_hash12(vec2(band, dseed)) * 2.0 - 1.0) * dtear * 0.045;
+      keep *= step(dtear * 0.14, fract(loc.y * 12.0));
+    }
+    if (v_dist.y > 0.0) {
+      // MELT: each column's ink is pulled down by its own seeded length, more toward the foot of the mark (the
+      // mark's own down — the drip turns with the letter).
+      float col = loc.x * 18.0;
+      float c0 = floor(col);
+      float n = mix(kc_hash12(vec2(c0, dseed + 3.0)), kc_hash12(vec2(c0 + 1.0, dseed + 3.0)), smoothstep(0.0, 1.0, fract(col)));
+      loc.y -= dmelt * 0.3 * n * n * smoothstep(0.3, 0.85, loc.y);
+    }
+    // inside the cell or nothing: a mask, not a branch, so the sample below is taken by every fragment
+    keep *= step(0.0, loc.x) * step(loc.x, 1.0) * step(0.0, loc.y) * step(loc.y, 1.0);
+    suv = v_cell.xy + clamp(loc, 0.0, 1.0) * dspan;
+    t = textureGrad(u_atlas, suv, gdx, gdy) * keep;
+  } else {
+    t = texture(u_atlas, v_uv);
+  }
   // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double, crop.
   if (u_hands.y > 0.0) {
     vec2 span = max(v_cell.zw - v_cell.xy, vec2(1e-4));
-    vec2 local = (v_uv - v_cell.xy) / span;
+    vec2 local = (suv - v_cell.xy) / span;
     float d = length(local - 0.5);
     float istr = fract(v_seed * 3.3);
     float ipick = floor(istr * 4.0);
@@ -345,7 +392,7 @@ void main() {
     // flat path above is bit-identical.
     if (v_plate > 0.5) {
       vec2 pspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
-      vec2 plocal = (v_uv - v_cell.xy) / pspan;
+      vec2 plocal = (suv - v_cell.xy) / pspan;
       float aMul;
       vec3 inkCol = plateShade(plocal, v_ink, v_accent, v_matP.xyz, aMul);
       color = inkA * aMul * inkCol + accA * v_accent + vec3(t.b);
@@ -360,7 +407,7 @@ void main() {
     // SVG layer painted them.
     else if (v_wash > 0.5) {
       vec2 wspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
-      vec2 wlocal = (v_uv - v_cell.xy) / wspan;
+      vec2 wlocal = (suv - v_cell.xy) / wspan;
       color = inkA * washShade(wlocal, v_ink, v_accent, v_matP.xy) + accA * v_accent + vec3(t.b);
     }
     // #1549 (Materials M3): the stipple screen re-paints the ink
@@ -373,7 +420,7 @@ void main() {
     // branch's bookkeeping).
     else if (v_stipple > 0.5) {
       vec2 sspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
-      vec2 slocal = (v_uv - v_cell.xy) / sspan;
+      vec2 slocal = (suv - v_cell.xy) / sspan;
       float saMul;
       vec3 inkCol = stippleShade(slocal, v_ink, v_accent, v_matP.x, saMul);
       color = inkA * saMul * inkCol + accA * v_accent + vec3(t.b);
@@ -391,7 +438,7 @@ void main() {
     vec4 st = t;
     if (v_stipple > 0.5) {
       vec2 xspan = max(v_cell.zw - v_cell.xy, vec2(1e-4));
-      vec2 xlocal = (v_uv - v_cell.xy) / xspan;
+      vec2 xlocal = (suv - v_cell.xy) / xspan;
       float cover = stippleCover(xlocal, v_matP.x);
       st.rgb *= cover;
       st.a *= cover;
@@ -436,10 +483,10 @@ void main() {
       // values: mix(x, y, 0.0) is bit-identical to x, so the enamel path below
       // is untouched.
       vec2 st = mix(2.0, ${GLASS_BEVEL.tapTexels.toFixed(1)}, v_glass) * tx;
-      float aL = texture(u_atlas, clamp(v_uv - vec2(st.x, 0.0), lo, hi)).a;
-      float aR = texture(u_atlas, clamp(v_uv + vec2(st.x, 0.0), lo, hi)).a;
-      float aU = texture(u_atlas, clamp(v_uv - vec2(0.0, st.y), lo, hi)).a;
-      float aD = texture(u_atlas, clamp(v_uv + vec2(0.0, st.y), lo, hi)).a;
+      float aL = texture(u_atlas, clamp(suv - vec2(st.x, 0.0), lo, hi)).a;
+      float aR = texture(u_atlas, clamp(suv + vec2(st.x, 0.0), lo, hi)).a;
+      float aU = texture(u_atlas, clamp(suv - vec2(0.0, st.y), lo, hi)).a;
+      float aD = texture(u_atlas, clamp(suv + vec2(0.0, st.y), lo, hi)).a;
       // Dead zone: slopes under ~2 alpha steps are quantization noise on a flat
       // face, not an edge — they read as flat instead of as fine stripes.
       // #1129 PR2: preserved exactly in the wide-tap variant. On a flat face
@@ -462,7 +509,7 @@ void main() {
       // provides the motion (no time uniform). Glass-gated: mix(1.0, c, 0.0)
       // is bit-identical to 1.0 (c is finite, so c * 0.0 is +0.0), so the
       // enamel specular below is untouched.
-      float causticN = kc_vnoise(v_uv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0);
+      float causticN = kc_vnoise(suv * ${GLASS_CAUSTIC.freq.toFixed(1)} + v_seed * 17.0);
       spec *= mix(1.0, ${GLASS_CAUSTIC.base.toFixed(2)} + ${GLASS_CAUSTIC.amp.toFixed(2)} * causticN, v_glass);
       // #1129 PR4: internal striations — faint vertical luminance banding
       // inside the glass body, via local-y modulation of the diffuse term.
@@ -476,8 +523,8 @@ void main() {
       // below is untouched.
       vec2 sLo = min(v_cell.xy, v_cell.zw);
       vec2 sHi = max(v_cell.xy, v_cell.zw);
-      vec2 sLocal = (v_uv - sLo) / max(sHi - sLo, vec2(1e-4));
-      float strWarp = kc_vnoise(v_uv * ${GLASS_STRIATION.warpFreq.toFixed(1)} + v_seed * ${GLASS_STRIATION.seedOffset.toFixed(1)});
+      vec2 sLocal = (suv - sLo) / max(sHi - sLo, vec2(1e-4));
+      float strWarp = kc_vnoise(suv * ${GLASS_STRIATION.warpFreq.toFixed(1)} + v_seed * ${GLASS_STRIATION.seedOffset.toFixed(1)});
       float strBand = sin((sLocal.y * ${GLASS_STRIATION.freq.toFixed(1)} + strWarp * ${GLASS_STRIATION.warpAmp.toFixed(1)}) * 6.28318530718);
       float strMul = mix(1.0, 1.0 + ${GLASS_STRIATION.amp.toFixed(3)} * strBand * clamp(o.a, 0.0, 1.0), v_glass);
       float wrap = max(diff * 0.65 + 0.35, 0.0) * strMul;
@@ -548,7 +595,9 @@ out vec4 v_engA;
 out vec4 v_engB;
 out vec4 v_engC;
 out vec4 v_engP;
+flat out vec4 v_dist; // #2010 P3: the shared QUAD_FS reads it — a mesh draw carries no distortion record
 void main() {
+  v_dist = vec4(0.0);
   float seed = kc_hash12(a_item.xy);
   v_seed = seed;
   vec2 world = a_pos;

@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test } from 'node:test';
-import { packInstanceData } from './renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from './renderer.mjs';
 import { comboKey } from './liveAtlas.mjs';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
@@ -31,8 +31,8 @@ test('#817 missing cell is skipped and the frame continues', () => {
   const packed = packInstanceData([inst({ asset: 'ghost' }), inst()], cells);
   assert.equal(
     packed.length,
-    45,
-    'the present combo still packs (45-float stride: 21 in #1129 PR2, +deform vec3 in #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)',
+    INSTANCE_STRIDE,
+    'the present combo still packs (49-float stride since #2010 P3: 21 in #1129 PR2, +deform vec3 in #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)',
   );
   assert.ok(Math.abs(packed[6] - 0.1) < 1e-6, 'uv survived the skip');
   assert.ok(packed[12] > 0, 'ink is an attribute, not a rebaked cell');

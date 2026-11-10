@@ -13,7 +13,7 @@ import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 import { ASSETS } from '../data/assets/index.js';
-import { packInstanceData, comboKey } from './renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE, comboKey } from './renderer.mjs';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -335,12 +335,13 @@ ok('Spine B (#388): packInstanceData skips missing atlas cells without throwing'
     [comboKey('ast-c', '#ff0000', '#00ff00')]: { u0: 0.5, v0: 0.5, u1: 1, v1: 1 },
   };
   const packed = packInstanceData(instances, cells);
-  // 2 valid instances * 45 floats = 90 floats (stride grew 20→21 in #1129 PR2: glass flag; 21→24 in #1410: deform vec3; 24→25 in #1548: plate flag at the tail; 25→29 in #1585: matP vec4; 29→45 in S4: engraving block at the tail)
-  assert.equal(packed.length, 90);
+  // 2 valid instances * INSTANCE_STRIDE floats (stride grew 20→21 in #1129 PR2: glass flag; 21→24 in #1410: deform vec3; 24→25 in #1548: plate flag at the tail; 25→29 in #1585: matP vec4; 29→45 in S4: engraving block at the tail)
+  // #2010 P3: 45→49, the distortion channel's four floats at the tail
+  assert.equal(packed.length, 2 * INSTANCE_STRIDE);
   assert.equal(packed[0], 10); // instance 0 x
   assert.equal(packed[1], 20); // instance 0 y
-  assert.equal(packed[45], 50); // instance 2 x (instance 1 was skipped)
-  assert.equal(packed[46], 60); // instance 2 y (45-float stride: 45 + 1)
+  assert.equal(packed[INSTANCE_STRIDE], 50); // instance 2 x (instance 1 was skipped)
+  assert.equal(packed[INSTANCE_STRIDE + 1], 60); // instance 2 y
 
   // Completely missing cells returns empty Float32Array, does not throw
   const empty = packInstanceData(instances, {});

@@ -36,7 +36,7 @@ import { isStrokeRegion, bendSlicesFor, regionAssignmentFor } from '../data/regi
 import { familyDefaultRegionKinemes } from '../data/regionDefaults.js';
 import { applyGradient } from '../assets/gradient.js';
 import { bakeAtlas, CELL_PX, CELL_UNITS, comboKey } from './atlas.mjs';
-import { packInstanceData } from './renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from './renderer.mjs';
 import { buildSceneContract, assertSceneContract } from './sceneContract.js';
 
 const INK = '#ffffff';
@@ -317,14 +317,14 @@ console.log('regionLines node (contract): OK');
   const inst = c.instances[0];
   const frame = { motionTime: 0, shed: false, regions: c.regionAnim };
   const packed = packInstanceData([inst], cellsObj, 1, frame);
-  assert.strictEqual(packed.length, 8 * 45, 'one mark expands to remainder + 7 slices');
+  assert.strictEqual(packed.length, 8 * INSTANCE_STRIDE, 'one mark expands to remainder + 7 slices');
   const base = comboKey(SQ3, inst.tint, inst.accent);
   const cell = atlas.cells.get(`${base}#r:${sq3Region.id}`);
   const slot = c.regionAnim.assets[SQ3][sq3Region.id];
   const phase0 = kinemePhase(SQ3, sq3Region.id);
   let prevU1 = null;
   for (let j = 0; j < 7; j++) {
-    const o = (j + 1) * 45;
+    const o = (j + 1) * INSTANCE_STRIDE;
     assert.ok(
       Math.abs(packed[o + 6] - (cell.u0 + ((cell.u1 - cell.u0) * j) / 7)) < 2e-7,
       `slice ${j}: u0 is the window's left edge`,
@@ -343,10 +343,10 @@ console.log('regionLines node (contract): OK');
       Math.abs(packed[o + 2] - inst.scaleX * (cell.geo.sx / 7)) < 1e-5,
       `slice ${j}: scale is the region's, cut 7 ways`,
     );
-    if (j > 0) assert.ok(packed[o] > packed[o - 45], `slice ${j}: pivots advance along the stroke`);
+    if (j > 0) assert.ok(packed[o] > packed[o - INSTANCE_STRIDE], `slice ${j}: pivots advance along the stroke`);
   }
   assert.ok(
-    Math.abs(packed[45 + 6] - cell.u0) < 2e-7 && Math.abs(prevU1 - cell.u1) < 2e-7,
+    Math.abs(packed[INSTANCE_STRIDE + 6] - cell.u0) < 2e-7 && Math.abs(prevU1 - cell.u1) < 2e-7,
     'the slices span the region cell exactly',
   );
   // Determinism: the same frame packs byte-identically twice.
@@ -362,7 +362,7 @@ console.log('regionLines node (contract): OK');
     shed: false,
     regions: { budget: 0, assets: { [SQ3]: { [sq3Region.id]: 0 } }, bend: { [SQ3]: { [sq3Region.id]: 7 } } },
   });
-  assert.strictEqual(stood.length, 2 * 45, 'slot 0: the region packs whole, no slices');
+  assert.strictEqual(stood.length, 2 * INSTANCE_STRIDE, 'slot 0: the region packs whole, no slices');
   // The collapse shed is the pre-R2 pack, byte for byte.
   const barePack = packInstanceData([inst], cellsObj);
   assert.deepStrictEqual(
@@ -379,7 +379,11 @@ console.log('regionLines node (contract): OK');
     shed: false,
     regions: tc.regionAnim,
   });
-  assert.strictEqual(tPacked.length, (1 + 6 + 1 + 3) * 45, 'target: remainder + ring x6 + dot x1 + inner x3');
+  assert.strictEqual(
+    tPacked.length,
+    (1 + 6 + 1 + 3) * INSTANCE_STRIDE,
+    'target: remainder + ring x6 + dot x1 + inner x3',
+  );
 }
 console.log('regionLines node (pack): OK');
 

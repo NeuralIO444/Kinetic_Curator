@@ -30,7 +30,7 @@ import {
 import { buildSkeleton, transformSkeleton, fnv1a, MOTH_SKELETON_PLAN } from './skeleton.js';
 import { createCreatureBuilder, MOTH, MOTH_PARTS } from './creature.js';
 import { ASSETS } from '../data/assets/index.js';
-import { packInstanceData } from '../gl/renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from '../gl/renderer.mjs';
 import { QUAD_FS, QUAD_VS } from '../gl/shaders.mjs';
 import { assertSceneContract, GL_CONTRACT_VERSION } from '../gl/sceneContract.js';
 
@@ -208,7 +208,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(!/mediump/.test(QUAD_FS) && !/mediump/.test(QUAD_VS), 'no mediump anywhere in the quad programme');
 }
 
-// 5. The packer: 45-float stride, every pre-S4 offset unmoved, the engraving block appended at 29..44,
+// 5. The packer: the instance stride (49 since #2010 P3), every pre-S4 offset unmoved, the engraving block appended at 29..44,
 //    absent reads zeros (the branch never enters).
 {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
@@ -230,9 +230,10 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   });
   const eng = Array.from({ length: 16 }, (_, i) => i + 0.5);
   const buf = packInstanceData([mk({ engrave: eng }), mk({})], cells);
-  assert.equal(buf.length, 2 * 45, 'two instances at the 45-float stride');
+  assert.equal(buf.length, 2 * INSTANCE_STRIDE, 'two instances at the instance stride (49 since #2010 P3)');
   for (let k = 0; k < 16; k++) assert.equal(buf[29 + k], eng[k], `engraving float ${k} packs at ${29 + k}`);
-  for (let k = 0; k < 16; k++) assert.equal(buf[45 + 29 + k], 0, `unengraved instance: engraving float ${k} is 0`);
+  for (let k = 0; k < 16; k++)
+    assert.equal(buf[INSTANCE_STRIDE + 29 + k], 0, `unengraved instance: engraving float ${k} is 0`);
   assert.equal(buf[0], 1, 'x unmoved at 0');
   assert.equal(buf[24], 0, 'body-code float unmoved at 24');
   assert.deepEqual([...buf.slice(25, 29)], [0, 0, 0, 0], 'matP block unmoved at 25..28 (flat body defaults)');

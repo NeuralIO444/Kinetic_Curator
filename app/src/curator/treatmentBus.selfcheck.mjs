@@ -108,13 +108,18 @@ ok('A2 arm a named mode in ONE step — the ray-gun stream seed, one undo entry,
   });
   const want = expectedSeed(0);
   assert.equal(treatments.arm('poem', { mode: 'shot', by: 'davis' }), true);
-  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: want, wear: 1 });
+  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: want, wear: 1, distort: 1 });
   assert.equal(S().layoutParams.fieldForm.review, undefined, 'arming supersedes the review record, as the tap does');
   assert.equal(S().raygunTap, 1);
   assert.equal(S().historyUndoStack.length, 1);
   assert.deepStrictEqual(treatments.read('poem'), { mode: 'shot', seed: want });
   assert.equal(treatments.arm('poem', { mode: 'greiman', by: 'director' }), true, 're-arming another mode lands');
-  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'greiman', seed: expectedSeed(1), wear: 1 });
+  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, {
+    mode: 'greiman',
+    seed: expectedSeed(1),
+    wear: 1,
+    distort: 1,
+  });
   assert.equal(treatments.disarm('poem', { by: 'performer' }), true);
   assert.equal(S().layoutParams.fieldForm.raygun, undefined, 'disarm: record absent, not nulled');
   assert.equal(S().raygunTap, 2, 'disarming draws no seed');

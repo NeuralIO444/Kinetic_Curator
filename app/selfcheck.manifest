@@ -655,3 +655,5 @@ node src/curator/trailStats.selfcheck.mjs
 node src/curator/treatmentBus.selfcheck.mjs
 node src/poets/rayGunWear.selfcheck.mjs
 node src/poets/rayGunGrit.selfcheck.mjs
+node src/gl/itemDistort.selfcheck.mjs
+node src/poets/rayGunDistort.selfcheck.mjs

@@ -44,13 +44,13 @@ test('QUAD_FS modulates the diffuse wrap with the glass-gated striation term', (
 });
 
 test('bands are vertical (local-y modulation), noise-warped, alpha-masked, seed-offset', () => {
-  const warp = `kc_vnoise(v_uv * ${GLASS_STRIATION.warpFreq.toFixed(1)} + v_seed * ${GLASS_STRIATION.seedOffset.toFixed(1)})`;
+  const warp = `kc_vnoise(suv * ${GLASS_STRIATION.warpFreq.toFixed(1)} + v_seed * ${GLASS_STRIATION.seedOffset.toFixed(1)})`;
   assert.ok(QUAD_FS.includes(warp), `procedural warp field present: ${warp}`);
   const band = `sin((sLocal.y * ${GLASS_STRIATION.freq.toFixed(1)} + strWarp * ${GLASS_STRIATION.warpAmp.toFixed(1)}) * 6.28318530718)`;
   assert.ok(QUAD_FS.includes(band), `banding wave present: ${band}`);
   assert.ok(QUAD_FS.includes('clamp(o.a, 0.0, 1.0)'), 'bands masked by the body alpha');
   assert.ok(
-    QUAD_FS.includes('vec2 sLocal = (v_uv - sLo) / max(sHi - sLo, vec2(1e-4));'),
+    QUAD_FS.includes('vec2 sLocal = (suv - sLo) / max(sHi - sLo, vec2(1e-4));'),
     'instance-local UV from the atlas cell',
   );
 });

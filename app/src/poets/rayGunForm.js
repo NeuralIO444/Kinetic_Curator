@@ -172,6 +172,26 @@ const WEAR_P = Object.freeze({
   grit: Object.freeze({ torn: 0, xerox: 1 }),
 });
 
+// DISTORT (#2010 P3 · THE SHARED DISTORTION CHANNEL) — the material lever, named in the record as `distort: 1`
+// (an older record draws as it always did). Treated stamps carry a distortion record ({ shear, melt, tear, seed },
+// gl/itemDistort.mjs) that the render seam bends the glyph's own quad by — the letter leans, drips, tears in its
+// material, the same channel any creature or beast item can ride. Drawn on its own stream (DISTORT_SALT on the
+// record's seed), one fixed set of draws per stamp, so geometry and wear spend exactly the draws they always did.
+// CARSON: a seeded share of letters lean, a few tear, the heroes (and a few others) drip. SHOT: by the blast's own
+// falloff — near the epicentre letters tear and melt, the lean follows the swirl. GREIMAN and GRIT stay clean
+// material (GREIMAN is the digital pole; GRIT's dirt is the copier's, already named by the wear axis).
+const DISTORT_SALT = 0x44495354; // 'DIST'
+const DISTORT_CARSON = Object.freeze({
+  shearP: 0.35,
+  shear: [0.12, 0.42],
+  tearP: 0.12,
+  tear: [0.3, 0.6],
+  meltP: 0.08,
+  melt: [0.5, 0.9],
+  heroEm: 1.9, // a glyph at or above this × the form's median em is a hero: it always drips
+});
+const DISTORT_SHOT = Object.freeze({ tearAt: 0.25, tear: 0.7, meltAt: 0.3, melt: 0.9, shear: 0.45 });
+
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** A stamp's ink half-width, in unit dish space (its own face's ruler). */
 const halfInk = (s) => (stampWidthEm(s.assetId, s.ch) * s.em) / 2;
@@ -613,8 +633,9 @@ function shot(stamps, rng, aspect) {
 
 /**
  * Apply a treatment record to a standing form. `record` is the form's
- * ray-gun record { mode, seed, wear? } (the shape sanitizeFieldForm carries;
- * `wear: 1` names the P1 wear axis — absent, the treatment is geometry only).
+ * ray-gun record { mode, seed, wear?, distort? } (the shape sanitizeFieldForm
+ * carries; `wear: 1` names the P1 wear axis, `distort: 1` the P3 distortion
+ * axis — absent, the treatment is geometry only).
  * Returns a NEW form whose stamps are the treated materialisation: the
  * plain list, transformed in place (stamp i of the output is stamp i of
  * the input, same ch — same assetId unless the record names the wear axis,
@@ -640,7 +661,47 @@ export function rayGunForm(form, record) {
         : mode === 'grit'
           ? grit(form.stamps, rows, rng, aspect)
           : shot(form.stamps, rng, aspect);
-  return { ...form, stamps: record.wear === 1 ? wear(stamps, mode, seed) : stamps };
+  const worn = record.wear === 1 ? wear(stamps, mode, seed) : stamps;
+  return { ...form, stamps: record.distort === 1 ? distort(worn, form.stamps, mode, seed, aspect) : worn };
+}
+
+/**
+ * The distort pass (#2010 P3): stamp each treated glyph's distortion record. Exactly eight draws per stamp off the
+ * distort stream, in output order, whatever the mode decides — so one stamp's record never moves another's, and
+ * every decision (whether, how much, which way, which drips) has a draw of its own (no correlated knobs).
+ * `plain` is the standing form's stamps (SHOT's falloff is measured where the blast found each glyph).
+ */
+function distort(stamps, plain, mode, seed, aspect) {
+  if (mode !== 'carson' && mode !== 'shot') return stamps;
+  const rng = mkRng((seed ^ DISTORT_SALT) >>> 0);
+  const ems = plain.map((s) => s.em).sort((a, b) => a - b);
+  const emMed = ems[Math.floor(ems.length / 2)];
+  // SHOT's epicentre is the blast's own first two draws (shot() above): re-derived, not stored.
+  const g = mkRng(seed);
+  const cx = (0.25 + g() * 0.5) * aspect;
+  const cy = 0.25 + g() * 0.5;
+  const n = plain.length;
+  return stamps.map((s, i) => {
+    const [pShear, aShear, sign, pTear, aTear, pMelt, aMelt, dseed] = [rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng()];
+    let rec = null;
+    if (mode === 'carson') {
+      const C = DISTORT_CARSON;
+      const shear = pShear < C.shearP ? (C.shear[0] + aShear * (C.shear[1] - C.shear[0])) * (sign < 0.5 ? -1 : 1) : 0;
+      const tear = pTear < C.tearP ? C.tear[0] + aTear * (C.tear[1] - C.tear[0]) : 0;
+      const hero = s.em >= C.heroEm * emMed;
+      const melt = hero || pMelt < C.meltP ? C.melt[0] + aMelt * (C.melt[1] - C.melt[0]) : 0;
+      if (shear || tear || melt) rec = { shear, melt, tear, seed: dseed };
+    } else {
+      const src = i < n ? plain[i] : s; // a ghost is measured where it stands
+      const f = Math.exp(-Math.hypot(src.x - cx, src.y - cy) / SHOT_SIGMA);
+      const D = DISTORT_SHOT;
+      const tear = f > D.tearAt ? clamp((f - D.tearAt) / (1 - D.tearAt), 0, 1) * D.tear * (0.7 + 0.3 * aTear) : 0;
+      const melt = f > D.meltAt ? clamp((f - D.meltAt) / (1 - D.meltAt), 0, 1) * D.melt * (0.6 + 0.4 * aMelt) : 0;
+      const shear = f * D.shear * (sign < 0.5 ? -1 : 1);
+      if (tear || melt || Math.abs(shear) >= 0.01) rec = { shear, melt, tear, seed: dseed };
+    }
+    return rec ? { ...s, distort: rec } : s;
+  });
 }
 
 /**

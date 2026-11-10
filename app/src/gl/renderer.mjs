@@ -307,6 +307,7 @@ export const RENDERER_PROGRAMS = [
       'u_canvas',
       'u_atlas',
       'u_smear',
+      'u_distHeat', // #2010 P3: the distortion channel's heat
       'u_liveTint',
       'u_sun',
       'u_sunLight',
@@ -340,6 +341,7 @@ export const RENDERER_PROGRAMS = [
     uniforms: [
       'u_canvas',
       'u_atlas',
+      'u_distHeat', // #2010 P3: the shared QUAD_FS declares it; a mesh carries no record (v_dist = 0)
       'u_liveTint',
       'u_sun',
       'u_sunLight',
@@ -792,6 +794,9 @@ function expandRegionInstances(instances, cells, regionAnim) {
   return out || instances;
 }
 
+/** Floats per instance in the quad VBO (#2010 P3: 49 — the distortion channel's four appended to the 45). */
+export const INSTANCE_STRIDE = 49;
+
 export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = null) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
   // of throwing. Do not invent UVs; new combos simply do not draw until baked.
@@ -804,7 +809,7 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     list = expandRegionInstances(instances, cells, cellFrame.regions);
   }
 
-  // 45 floats/instance (180-byte stride): (x,y,sx,sy) (rot,opacity,u0,v0)
+  // 49 floats/instance (196-byte stride; 45/180 until #2010 P3): (x,y,sx,sy) (rot,opacity,u0,v0)
   // (u1,v1,vx,vy) (inkR,inkG,inkB,accR) (accG,accB,kineme,kinemePhase) (glass)
   // (defX,defY,defAmt) (material body code) (material params x4)
   // (engraving joints A x4) (engraving joints B x4) (engraving joints C x4)
@@ -834,7 +839,7 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // zero-initialised), the shader's count reads 0, and the engraving
   // branch never enters — the pre-S4 quad, bit for bit.
   const maxLen = list.length;
-  const buf = new Float32Array(maxLen * 45);
+  const buf = new Float32Array(maxLen * INSTANCE_STRIDE);
   let o = 0;
   for (let i = 0; i < maxLen; i++) {
     const it = list[i];
@@ -933,7 +938,17 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
     if (Array.isArray(eg)) {
       for (let k = 0; k < 16; k++) buf[o + 29 + k] = eg[k] || 0;
     }
-    o += 45;
+    // #2010 P3: the shared distortion channel — [shear, melt, tear, seed] appended after the engraving block (the
+    // same append pattern: every earlier offset unchanged). Absent (the common case) the four floats stay zero and
+    // both shader branches are gated off: the old quad, bit for bit.
+    const ds = it.distort;
+    if (Array.isArray(ds)) {
+      buf[o + 45] = ds[0] || 0;
+      buf[o + 46] = ds[1] || 0;
+      buf[o + 47] = ds[2] || 0;
+      buf[o + 48] = ds[3] || 0;
+    }
+    o += INSTANCE_STRIDE;
   }
   if (o === 0) return new Float32Array(0);
   if (o === buf.length) return buf;
@@ -1183,6 +1198,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
+  let distortHeat = 1; // #2010 P3: the distortion channel's heat (1 = full; the tier-2 shed lowers it, never to 0)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
   let spec = null;
   let specTex = null;
@@ -1283,6 +1299,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), sceneW, sceneH);
     gl.uniform3f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX, squash); // #594 PR3: z = squash
+    gl.uniform1f(U(quadProg, 'u_distHeat'), distortHeat); // #2010 P3
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
     gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
@@ -1313,7 +1330,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     if (spec && specTex && specUploaded) {
       gl.uniform1i(U(quadProg, 'u_spec'), bindTex(SPEC_UNIT, specTex));
       gl.uniform4f(U(quadProg, 'u_specA'), spec.map, spec.scale, spec.displace, spec.colour);
-      gl.uniform1f(U(quadProg, 'u_specN'), data.length / 45); // instance count at the 45-float stride (29 through #1585, +engraving in S4)
+      gl.uniform1f(U(quadProg, 'u_specN'), data.length / INSTANCE_STRIDE); // instance count (29 through #1585, +engraving in S4, +distort in #2010 P3)
     } else {
       gl.uniform4f(U(quadProg, 'u_specA'), 0, 0, 0, 0);
     }
@@ -1325,39 +1342,43 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.bindBuffer(gl.ARRAY_BUFFER, instVbo);
     for (let i = 1; i <= 5; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 180, (i - 1) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, (i - 1) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
     // #1129 PR2: a_glass — single float at byte 80.
     gl.enableVertexAttribArray(6);
-    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, 180, 80);
+    gl.vertexAttribPointer(6, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 80);
     gl.vertexAttribDivisor(6, 1);
     // #1410: a_def — vec3 (axisX, axisY, amount) at byte 84.
     gl.enableVertexAttribArray(7);
-    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, 180, 84);
+    gl.vertexAttribPointer(7, 3, gl.FLOAT, false, INSTANCE_STRIDE * 4, 84);
     gl.vertexAttribDivisor(7, 1);
     // #1548/#1549: a_plate — the material body code, single float at byte 96 (the appended tail float).
     gl.enableVertexAttribArray(8);
-    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, 180, 96);
+    gl.vertexAttribPointer(8, 1, gl.FLOAT, false, INSTANCE_STRIDE * 4, 96);
     gl.vertexAttribDivisor(8, 1);
     // #1585: a_matP — the material body's M4 param vec4 at byte 100 (29-float stride).
     gl.enableVertexAttribArray(9);
-    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, 180, 100);
+    gl.vertexAttribPointer(9, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 100);
     gl.vertexAttribDivisor(9, 1);
     // Phase 2 S4: a_engA/a_engB/a_engC — the engraving spine joints (vec4
     // pairs) at bytes 116/132/148; a_engP — [count, spacing, width,
-    // strength] at byte 164 (45-float stride).
+    // strength] at byte 164.
     for (let i = 10; i <= 13; i++) {
       gl.enableVertexAttribArray(i);
-      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, 180, 116 + (i - 10) * 16);
+      gl.vertexAttribPointer(i, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 116 + (i - 10) * 16);
       gl.vertexAttribDivisor(i, 1);
     }
+    // #2010 P3: a_dist — [shear, melt, tear, seed] at byte 180 (the 49-float stride's tail).
+    gl.enableVertexAttribArray(14);
+    gl.vertexAttribPointer(14, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 180);
+    gl.vertexAttribDivisor(14, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / 45);
-    for (let i = 0; i <= 13; i++) {
+    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / INSTANCE_STRIDE);
+    for (let i = 0; i <= 14; i++) {
       gl.disableVertexAttribArray(i);
       gl.vertexAttribDivisor(i, 0);
     }
@@ -1451,6 +1472,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.useProgram(p);
     gl.uniform2f(U(p, 'u_canvas'), sceneW, sceneH);
     gl.uniform1f(U(p, 'u_liveTint'), isLive ? 1.0 : 0.0);
+    gl.uniform1f(U(p, 'u_distHeat'), distortHeat); // #2010 P3: inert here (v_dist = 0), set for the audit's law
     // #594 the one sun — the same uploads the quad draw makes (the shared FS reads u_sunMat/u_pool/u_hands).
     gl.uniform4f(U(p, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
     gl.uniform4f(
@@ -1704,6 +1726,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     spec = contract.spectrum || null; // #1482 P3
     specUploaded = false;
     squash = contract.squash || 0; // #594 PR3
+    distortHeat = Number.isFinite(contract.distortHeat) ? contract.distortHeat : 1; // #2010 P3: the shed lands on heat
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
     cellShed = !!contract.cellShed; // #1431
