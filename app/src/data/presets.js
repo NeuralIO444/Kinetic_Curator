@@ -265,6 +265,11 @@ export const COMPOSITION_PRESETS = [
     // #1837 — the ember declaration (ACCUM rung 2 slice 2): under ACCUM, this look's moths
     // graze the cooling light (trailEmberWeight below reads the field; undeclared = 0 = off).
     trailEmber: 0.6,
+    // #1838 — the fresh declaration (slice 3): the same drive's other pole, SIGNED. Positive
+    // seeks fresh light — Matt's ruling (2026-11-10): fresh light ATTRACTS; DUSK FLOCK's moths
+    // fly to the new trail. A look may declare negative to flee it (trailFreshWeight below
+    // reads the sign; undeclared = 0 = the pole is off).
+    trailFresh: 0.6,
     categories: ['organic', 'dots'],
     styles: ['organic'], // #1770 — the S3 styles it pairs with
     paletteShift: 'split',
@@ -1042,14 +1047,32 @@ export function getPreset(id) {
  * the look record — like `categories` or `paletteId`, it is look data,
  * not a layout param: it never enters layoutParams, so it cannot diverge
  * a replay. Undeclared (almost every look), unknown, or malformed reads
- * 0 — the drive is off and the moth is exactly today's moth. Davis's
- * per-look SIGN is slice 3's (#1838) to add; v1 declares the weight only.
+ * 0 — the pole is off. The ember weight is a magnitude; the drive's
+ * SIGN lives on the fresh pole (trailFreshWeight, #1838).
  */
 export function trailEmberWeight(id) {
   const canon = resolveLookId(id);
   const look = COMPOSITION_PRESETS.find((p) => p.id === canon);
   const w = Number(look?.trailEmber);
   return Number.isFinite(w) ? Math.min(1, Math.max(0, w)) : 0;
+}
+
+/**
+ * #1838 — a look's declared FRESH weight (ACCUM rung 2 slice 3, of
+ * #1808): the trail drive's fresh-light pole, SIGNED — positive seeks
+ * fresh light, negative flees it. Davis declares it per look, as the
+ * parent issue designs; the ruled default character of the pole is
+ * attraction (Matt, 2026-11-10), which is what the one declaring look
+ * (DUSK FLOCK) declares. Same discipline as the ember weight: a
+ * top-level field on the look record, never a layout param. Undeclared,
+ * unknown, or malformed reads 0 — the pole is off, and a look that
+ * declares no fresh weight steers exactly as slice 2 left it.
+ */
+export function trailFreshWeight(id) {
+  const canon = resolveLookId(id);
+  const look = COMPOSITION_PRESETS.find((p) => p.id === canon);
+  const w = Number(look?.trailFresh);
+  return Number.isFinite(w) ? Math.min(1, Math.max(-1, w)) : 0;
 }
 
 /** The LOOKS menu's groups, each with its looks. A group with no looks is left out (#1772 cleanup: an empty

@@ -203,7 +203,7 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
     'cdb7d507fb02381d',
     'every chapter deck is byte-identical',
   );
-  assert.equal(sha(COMPOSITION_PRESETS), '0e506973c67a5129');
+  assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337'); // #1838 re-pin: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
   assert.equal(sha(VOICE_DECK), 'ca7db04bb758bba0');
   // extractFeatures moved to a leaf — taste.js still exports the same function
   assert.equal(taste.extractFeatures, extractFeatures);

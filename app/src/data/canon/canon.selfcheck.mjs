@@ -130,7 +130,9 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
 // ── 3. the dealt catalogues are byte-identical to before the Canon (hashes taken on main @ 6d37f9b) ────────────
 {
   assert.equal(COMPOSITION_PRESETS.length, 70);
-  assert.equal(sha(COMPOSITION_PRESETS), '0e506973c67a5129', 'the 70 looks are byte-identical');
+  // #1838 re-pin: the hash moved exactly one field — dusk-flock gained `trailFresh: 0.6`
+  // (the trail drive's declared fresh pole). Verified per-record: 1 of 70 differs, that field only.
+  assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337', 'the 70 looks are byte-identical');
   assert.equal(sha(PRESET_GROUPS), '309f106f646c7efe', 'the 16 look groups are byte-identical');
   assert.equal(VOICE_DECK.length, 72);
   assert.equal(sha(VOICE_DECK), 'ca7db04bb758bba0', 'the 72 deck voices are byte-identical');

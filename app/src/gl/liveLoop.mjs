@@ -85,7 +85,7 @@ import {
   getTrailSteerGrid,
   clearTrailSteerGrid,
 } from './trailGridLive.mjs'; // #1808 slice 1: the ?debug=trailgrid readout's wire · #1837: the ember steering feed's wire
-import { trailEmberWeight } from '../data/presets.js'; // #1837: the current look's declared ember weight (look data, not a param)
+import { trailEmberWeight, trailFreshWeight } from '../data/presets.js'; // #1837: the current look's declared ember weight (look data, not a param) · #1838: its signed fresh weight
 import { clearStatsSnapshot, publishStatsSnapshot, statsWanted } from './statsLive.mjs'; // #1807: the buffer statistics' wire
 import { clearWetMode, publishWetMode } from './wetLive.mjs'; // #1841: the wet mode's wire (the show block's shed line)
 import { applyHueAudio } from './hueAudio.mjs'; // #790: color.hue route → layer hueRotate
@@ -789,17 +789,20 @@ export function createLiveLoop(
       surgeTrigger = nx.stamp;
       queenSeenKeeps = nx.seen;
     }
-    // #1837 — the ember steering feed (ACCUM rung 2 slice 2): live only while the current look
-    // declares an ember weight (data/presets.js reads the `composition` param's look — look
+    // #1837 — the trail steering feed (ACCUM rung 2 slice 2): live only while the current look
+    // declares a trail weight (data/presets.js reads the `composition` param's look — look
     // data, never a layout param), the frame's creature count net of the governor's shed is
     // above zero, and the governor's steering shed (cut 1.48) is off. The grid is derived
     // after the ACCUM step (below) and held by trailGridLive; here it is only read and
     // stamped, in the alife channel's shape: the keys ride the input only while the feed is
     // live, so a take recorded without steering carries exactly the older input shape, and a
     // steering take records the grid it steered on — it replays its steering exactly.
+    // #1838 — either pole makes the feed live: the ember weight, or the signed fresh weight
+    // (nonzero in either direction — a fleeing look steers too).
     const trailEmberW = trailEmberWeight(layoutParams.composition);
+    const trailFreshW = trailFreshWeight(layoutParams.composition);
     const trailSteerLive =
-      trailEmberW > 0 &&
+      (trailEmberW > 0 || trailFreshW !== 0) &&
       Math.max(0, ((layoutParams.creatures ?? 0) | 0) - (s.creatureShed | 0)) > 0 &&
       !s.trailSteerShed;
     const trailGridNow = trailSteerLive ? getTrailSteerGrid() : null;
@@ -976,11 +979,19 @@ export function createLiveLoop(
             creatureKeeps: (spawnDecisions && spawnDecisions.creatureKeeps) || 0,
           }
         : {}),
-      // #1837 — the ember steering channel (see the stamp above buildFrame's resolver call):
-      // the look's weight and the held grid, present only while the feed is live; the
-      // governor's shed rides on its own key whenever it stands, so a shed frame replays shed
-      // and its moths walk home on the recorded word.
-      ...(trailSteerLive ? { trailEmber: trailEmberW, ...(trailGridNow ? { trailGrid: trailGridNow } : {}) } : {}),
+      // #1837 — the trail steering channel (see the stamp above buildFrame's resolver call):
+      // the look's weights and the held grid, present only while the feed is live; each pole's
+      // key rides only when that pole is declared, so an ember-only take carries exactly the
+      // slice-2 shape and a pre-slice take carries neither. The governor's shed rides on its
+      // own key whenever it stands, so a shed frame replays shed and its moths walk home on
+      // the recorded word. #1838: trailFresh is the signed fresh weight.
+      ...(trailSteerLive
+        ? {
+            ...(trailEmberW > 0 ? { trailEmber: trailEmberW } : {}),
+            ...(trailFreshW !== 0 ? { trailFresh: trailFreshW } : {}),
+            ...(trailGridNow ? { trailGrid: trailGridNow } : {}),
+          }
+        : {}),
       ...(s.trailSteerShed ? { trailSteerShed: true } : {}),
       assetAttach: s.assetAttach, // #1355: the artist's attach points (where the wings join)
       scaleMul,

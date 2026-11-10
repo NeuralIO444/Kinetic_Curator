@@ -1,11 +1,19 @@
 // emberDrive.mjs — #1837 (ACCUM as memory, rung 2 slice 2, of #1808):
-// the ember-following drive. The moth grazes the light it lives beside:
-// it steers, slowly and on a short leash, toward the cells of the trail
-// grid (gl/trailGrid.mjs) whose light is MID-AGE — laid down a moment
-// ago and still warm, neither fresh (just drawn, still arriving) nor
-// old (faded to the paper). One drive, one creature type (the moth),
-// integrated in the moth builder beside the hover (engine/creature.js),
-// capped the way every drive in this instrument is capped.
+// the moth's one TRAIL DRIVE. The moth grazes the light it lives
+// beside: it steers, slowly and on a short leash, on the trail grid
+// (gl/trailGrid.mjs) — toward the cells whose light is MID-AGE (the
+// ember pole, slice 2: laid down a moment ago and still warm, neither
+// fresh nor faded to the paper). #1838 (slice 3) adds the drive's
+// other pole: FRESH light — just drawn, still arriving — read through
+// a SIGNED weight the look declares: positive seeks the new trail
+// (Matt's ruling, 2026-11-10: fresh light ATTRACTS), negative flees
+// it. One drive, two poles, one creature type (the moth), integrated
+// in the moth builder beside the hover (engine/creature.js), capped
+// the way every drive in this instrument is capped. The parent issue
+// caps a creature type at ONE trail-drive in v1; the poles are the
+// two ends of this one, never two drives — a frame steers on the
+// single combined field (trailDriveField) whenever the fresh pole is
+// declared, and on slice 2's exact path when it is not.
 //
 // The field is derived state: a pure function of one trail grid, which
 // is itself a pure function of the ACCUM buffer. Nothing here reads a
@@ -79,6 +87,25 @@ export const EMBER_HOME_PX = 0.3;
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
+/** One cell's normalised age t ∈ [0, 1] (0 = just laid, 1 = fully
+ *  faded), or null when the cell carries no readable age: energy at or
+ *  below the floor (unlit paper), a void age (the light there has no
+ *  past), or a dead green channel on the proxy path. Both poles of the
+ *  trail drive read a cell's age through this one door — by true age
+ *  when the grid carries ages, else by the spectral ratio proxy. */
+function cellAgeT(grid, cell) {
+  const energy = grid.energy[cell];
+  if (!(energy > EMBER_ENERGY_FLOOR)) return null;
+  if (grid.hasAge) {
+    const age = grid.age[cell];
+    if (!(age >= 0)) return null; // void age: the light there has no past
+    return clamp01(age / EMBER_OLD_S);
+  }
+  const g = grid.g[cell];
+  if (!(g > 0)) return null;
+  return clamp01((EMBER_PROXY_Q_FRESH - grid.b[cell] / g) / (EMBER_PROXY_Q_FRESH - EMBER_PROXY_Q_OLD));
+}
+
 /** The ember window: 0 through the fresh deadband, 1 at the peak,
  *  0 at old. */
 export function emberWindow(t) {
@@ -90,19 +117,25 @@ export function emberWindow(t) {
 /** One cell's ember value from its grid record: energy gated, windowed
  *  by true age when the grid carries ages, else by the ratio proxy. */
 export function emberCellValue(grid, cell) {
-  const energy = grid.energy[cell];
-  if (!(energy > EMBER_ENERGY_FLOOR)) return 0;
-  let t;
-  if (grid.hasAge) {
-    const age = grid.age[cell];
-    if (!(age >= 0)) return 0; // void age: the light there has no past
-    t = age / EMBER_OLD_S;
-  } else {
-    const g = grid.g[cell];
-    if (!(g > 0)) return 0;
-    t = (EMBER_PROXY_Q_FRESH - grid.b[cell] / g) / (EMBER_PROXY_Q_FRESH - EMBER_PROXY_Q_OLD);
-  }
-  return energy * emberWindow(t);
+  const t = cellAgeT(grid, cell);
+  return t === null ? 0 : grid.energy[cell] * emberWindow(t);
+}
+
+/** #1838 — the fresh window: 1 at just-laid, falling linearly to 0 at
+ *  the ember window's near edge (EMBER_FRESH_T). The two windows tile
+ *  the age axis — a cell's light is FRESH, then an EMBER, then paper,
+ *  never two at once — so the fresh pole is not a second field laid
+ *  over the ember's; it is the same axis's other end. */
+export function freshWindow(t) {
+  const x = clamp01(t);
+  return x >= EMBER_FRESH_T ? 0 : 1 - x / EMBER_FRESH_T;
+}
+
+/** One cell's fresh value: the same energy gate and age read as the
+ *  ember pole's, windowed to the fresh end of the axis. */
+export function freshCellValue(grid, cell) {
+  const t = cellAgeT(grid, cell);
+  return t === null ? 0 : grid.energy[cell] * freshWindow(t);
 }
 
 /**
@@ -114,6 +147,37 @@ export function emberField(grid) {
   const n = grid.cols * grid.rows;
   const field = new Float64Array(n);
   for (let cell = 0; cell < n; cell++) field[cell] = emberCellValue(grid, cell);
+  return field;
+}
+
+/** #1838 — the fresh field of one trail grid: fresh values, same shape
+ *  and order as the grid's own cell arrays. Derived state, like the
+ *  ember field — cached against the grid's identity, never recorded. */
+export function freshField(grid) {
+  const n = grid.cols * grid.rows;
+  const field = new Float64Array(n);
+  for (let cell = 0; cell < n; cell++) field[cell] = freshCellValue(grid, cell);
+  return field;
+}
+
+/**
+ * #1838 — THE trail-drive field: the one field the drive steers on
+ * when the fresh pole is declared. Per cell it is the declared-weight
+ * sum of the two poles — emberWeight × ember + freshWeight × fresh —
+ * with freshWeight SIGNED: a seeking look's fresh cells stand high, a
+ * fleeing look's stand low (below the paper), and climbing the field
+ * flees them. Because the two windows tile the age axis, at most one
+ * term per cell is ever non-zero; the sum never double-counts a cell.
+ */
+export function trailDriveField(grid, emberWeight, freshWeight) {
+  const n = grid.cols * grid.rows;
+  const field = new Float64Array(n);
+  for (let cell = 0; cell < n; cell++) {
+    const t = cellAgeT(grid, cell);
+    if (t === null) continue;
+    const e = grid.energy[cell];
+    field[cell] = emberWeight * (e * emberWindow(t)) + freshWeight * (e * freshWindow(t));
+  }
   return field;
 }
 
@@ -171,6 +235,79 @@ export function emberSteerStep({ grid, field, x, y, canvasW, canvasH, weight, of
   let ny = off.y + (sy / mag) * step;
   // The leash: the offset may never carry the moth further than
   // EMBER_LEASH_CELLS cells from its pin, in any direction.
+  const leash = EMBER_LEASH_CELLS * Math.min(cellW, cellH);
+  const dist = Math.hypot(nx, ny);
+  if (dist > leash) {
+    nx = (nx / dist) * leash;
+    ny = (ny / dist) * leash;
+  }
+  return { x: nx, y: ny };
+}
+
+/**
+ * #1838 — one steering step on the COMBINED trail-drive field (see
+ * trailDriveField). The builder routes here only when the look
+ * declares a fresh weight; with the fresh pole undeclared the drive
+ * is slice 2's emberSteerStep, untouched, so every ember-only take
+ * replays bit-for-bit. The machinery is slice 2's — same sensor
+ * reach, same leash, same capped step — generalised in exactly two
+ * places:
+ *   · the step's scale is the drive's standing weight
+ *     W = max(emberWeight, |freshWeight|), and the gradient reference
+ *     scales by W with it (the field's values already carry the
+ *     declared weights, so an unscaled reference would double-count
+ *     them). For a fresh-only declaration this reduces exactly to
+ *     slice 2's step over the signed fresh field at weight |fresh|.
+ *   · the no-slope modes: GRAZING IS THE EMBER POLE'S ALONE. Standing
+ *     on warm food (the ember field underfoot ≥ EMBER_GRAZE, and the
+ *     ember pole declared) holds the moth, exactly as slice 2. Fresh
+ *     light NEVER holds a moth: the buffer's age reset keeps a
+ *     standing creature's own cell at age 0 (gl/accum.mjs, the age
+ *     pass's mode 1), so an underfoot fresh read is the moth's own
+ *     light — a graze on it would pin the moth wherever it first
+ *     stood, and a moth that reached fresh light would camp on it
+ *     forever, self-lit. The fresh pole is read where Jones's agents
+ *     read their field: at the sensors, ahead of the body — never
+ *     underfoot. No slope and nothing to graze → the offset relaxes
+ *     one step home, slice 2's fallback; that return is the fresh
+ *     pole's damping, and the non-collapse soak exercises it.
+ *
+ * @param {object} args — grid/field/x/y/canvasW/canvasH/off as
+ *   emberSteerStep, plus:
+ * @param {Float64Array} args.field — trailDriveField(grid, …)
+ * @param {Float64Array} args.emberField — emberField(grid), read ONLY
+ *   for the graze decision underfoot
+ * @param {number} args.emberWeight — the look's declared ember weight, 0..1
+ * @param {number} args.freshWeight — the look's declared fresh weight,
+ *   SIGNED −1..1 (positive seeks, negative flees)
+ */
+export function trailSteerStep({ grid, field, emberField, x, y, canvasW, canvasH, emberWeight, freshWeight, off }) {
+  const w = Number(canvasW);
+  const h = Number(canvasH);
+  const W = Math.max(emberWeight, Math.abs(freshWeight));
+  if (!(w > 0) || !(h > 0) || !(W > 0)) return off;
+  const cols = grid.cols;
+  const rows = grid.rows;
+  const cx = Math.min(cols - 1, Math.max(0, Math.floor((x / w) * cols)));
+  const cy = Math.min(rows - 1, Math.max(0, Math.floor((1 - y / h) * rows)));
+  const S = EMBER_SENSE_CELLS;
+  const gx = (cellAt(field, cols, rows, cx + S, cy) - cellAt(field, cols, rows, cx - S, cy)) / (2 * S);
+  const gy = (cellAt(field, cols, rows, cx, cy + S) - cellAt(field, cols, rows, cx, cy - S)) / (2 * S);
+  const cellW = w / cols;
+  const cellH = h / rows;
+  const sx = gx / cellW;
+  const sy = -gy / cellH;
+  const mag = Math.hypot(sx, sy);
+  if (!(mag > 0)) {
+    // No slope: graze if the EMBER pole is declared and warm food is
+    // underfoot; fresh light underfoot is the moth's own and holds
+    // nothing — else start home.
+    return emberWeight > 0 && cellAt(emberField, cols, rows, cx, cy) >= EMBER_GRAZE ? off : emberRelaxStep(off);
+  }
+  const strength = Math.min(1, (mag * Math.min(cellW, cellH)) / (EMBER_GRAD_REF * W));
+  const step = EMBER_SPEED_PX * W * strength;
+  let nx = off.x + (sx / mag) * step;
+  let ny = off.y + (sy / mag) * step;
   const leash = EMBER_LEASH_CELLS * Math.min(cellW, cellH);
   const dist = Math.hypot(nx, ny);
   if (dist > leash) {

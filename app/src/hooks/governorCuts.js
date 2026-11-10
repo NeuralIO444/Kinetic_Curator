@@ -49,7 +49,8 @@
 //          as it was. Ahead of cut 3 by design: the subset degrades to
 //          the composite path BEFORE ACCUM itself sheds (the issue's
 //          cost paragraph).
-//   cut 1.48: ember steering (#1837, ACCUM rung 2 slice 2) — the moths'
+//   cut 1.48: trail steering (#1837, ACCUM rung 2 slice 2; #1838 sheds
+//          both poles of the one drive) — the moths'
 //          trail-following drive sheds after the selective feed (cut 1.47,
 //          its ACCUM family) and BEFORE the creature count: the population
 //          stays on stage whole, it just stops grazing the light — the
@@ -364,7 +365,7 @@ export function nextGovernorCut(s) {
     return { kind: 'accumFeed', accumFeedShed: true, label: 'SELECTIVE FEED OFF — all strata trail' };
   }
 
-  // Cut 1.48 (#1837): ember steering. After the selective feed (cut 1.47
+  // Cut 1.48 (#1837): trail steering. After the selective feed (cut 1.47
   // stands — the ACCUM family sheds together) and ahead of the creature
   // count: holding the drive costs the picture nothing but the grazing —
   // the moths stay, whole and hovering, on today's drives — and it buys
@@ -375,7 +376,7 @@ export function nextGovernorCut(s) {
   // already shed) so older callers and their pinned ladder walks keep
   // the pre-#1837 ladder exactly as it was.
   if (s.trailSteerActive === true && !s.trailSteerShed) {
-    return { kind: 'trailSteer', trailSteerShed: true, label: 'EMBER STEERING HELD — moths keep to their pins' };
+    return { kind: 'trailSteer', trailSteerShed: true, label: 'TRAIL STEERING HELD — moths keep to their pins' };
   }
 
   // Cut 1.5 (#1694 slice 2, Matt's ruling on #1694 Q2): the creature count
@@ -640,9 +641,11 @@ export function shedSummary(s) {
   // #1806 slice 2 — and about an accum-feed shed: the buffer eats every
   // stratum again, the badge says so.
   if (s.accumFeedShed) out.push('accum feed — all strata');
-  // #1837 — and about an ember-steering shed: the moths keep to their
+  // #1837 — and about a trail-steering shed: the moths keep to their
   // pins on today's drives, the badge says so (the show block's report).
-  if (s.trailSteerShed) out.push('ember steering held');
+  // #1838: the badge names the whole drive now — the rung sheds both
+  // poles, so "ember" alone would under-report a fresh-only look's shed.
+  if (s.trailSteerShed) out.push('trail steering held');
   // #1694 S2 — the badge is honest about a population shed.
   if ((s.creatureShed | 0) > 0) {
     out.push(`creatures −${s.creatureShed | 0}`);

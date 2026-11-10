@@ -22,7 +22,7 @@ import { engraveDataFor } from './engraveBody.mjs';
 import { creaturePose } from './creaturePose.js';
 import { glitchFrame, applyGlitch } from './glitch.js';
 import { attachPointsFor } from './autoAttach.js';
-import { emberField, emberSteerStep, emberRelaxStep } from './emberDrive.mjs';
+import { emberField, emberSteerStep, emberRelaxStep, trailDriveField, trailSteerStep } from './emberDrive.mjs';
 import { kinemePhase } from '../data/kinemes.js';
 import { applyLean } from './kernel/color/index.js';
 import { snapPair, snaps } from './groundSnap.js';
@@ -339,12 +339,15 @@ function chroma(hex) {
 export function createCreatureBuilder({ skinning = false } = {}) {
   const ages = []; // frames each pin's creature has been formed
   const pair2 = []; // how far each pin's second pair has grown in: 0 (none) to 1 (full)
-  // #1837 — the ember drive's borrowed offsets, per pin (scene px from the pin). Steering state,
+  // #1837 — the trail drive's borrowed offsets, per pin (scene px from the pin). Steering state,
   // so it rides the snapshot like the ages: a take restored mid-drift continues the same drift.
   const steerX = [];
   const steerY = [];
   let fieldFor = null; // the trail grid the cached ember field was derived from (identity-keyed)
   let fieldCached = null; // the cached ember field — derived state, recomputed, never snapshotted
+  let driveFor = null; // #1838 — the trail grid the cached combined drive field was derived from
+  let driveKey = null; // the (ember, fresh) weights that field was built with — the field carries them
+  let driveCached = null; // the cached combined trail-drive field (fresh pole declared only)
   const assetCache = new Map(); // assetId -> its attach points (keyed also by the svg and the artist's edit)
   let wingBeat = null; // #1469 — the last appended frame's wing beat as 0..1 openness; null when no moth was appended
   let frameSkeletons = []; // Phase 2 S1 — the last appended frame's skeletons (world space), per pin; null where unformed
@@ -404,7 +407,7 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       const motion = input.reducedMotion || typeof motionFor !== 'function' ? null : motionFor(top);
       // the dials and ground this layer rests on (null when it rests on none: the moth is exactly as before)
       const ground = typeof groundFor === 'function' ? groundFor(top) : null;
-      // #1837 — the EMBER DRIVE (ACCUM rung 2 slice 2): the trail grid and the look's declared
+      // #1837 — the TRAIL DRIVE (ACCUM rung 2 slice 2): the trail grid and the look's declared
       // weight ride the resolver input like every other decision (the loop derives the grid from
       // the live buffer at cadence and stamps it; a take records both, so a take replays its
       // steering exactly). The drive is OFF — and any borrowed offset walks home below — when
@@ -412,6 +415,10 @@ export function createCreatureBuilder({ skinning = false } = {}) {
       // is declared, the governor's steering shed is stamped (input.trailSteerShed), the citizen
       // is pinned still (its anchor holds, #1694 Q1), or reduced motion is on. The ember field
       // is derived from the grid once per grid and cached on its identity (derived state).
+      // #1838 — slice 3 adds the drive's FRESH pole: input.trailFresh, SIGNED (positive seeks
+      // fresh light, negative flees it), declared per look beside trailEmber. One drive, two
+      // poles: with the fresh pole declared the moth steers on the combined field
+      // (trailDriveField); without it, slice 2's ember path runs untouched, bit-for-bit.
       const trailGrid =
         input.trailGrid &&
         Number.isInteger(input.trailGrid.cols) &&
@@ -426,15 +433,30 @@ export function createCreatureBuilder({ skinning = false } = {}) {
           : null;
       const emberWeight =
         trailGrid && !input.trailSteerShed ? Math.min(1, Math.max(0, Number(input.trailEmber) || 0)) : 0;
+      const freshWeight =
+        trailGrid && !input.trailSteerShed ? Math.min(1, Math.max(-1, Number(input.trailFresh) || 0)) : 0;
       const citizenStill = !!(motion && motion.stillAssets && motion.stillAssets.has('creature'));
-      const emberOn = emberWeight > 0 && !citizenStill && !input.reducedMotion;
+      const emberOn = (emberWeight > 0 || freshWeight !== 0) && !citizenStill && !input.reducedMotion;
       let ember = null;
+      let drive = null;
       if (emberOn) {
         if (fieldFor !== trailGrid) {
           fieldFor = trailGrid;
           fieldCached = emberField(trailGrid);
+          driveFor = null;
+          driveKey = null;
+          driveCached = null;
         }
         ember = fieldCached;
+        if (freshWeight !== 0) {
+          const key = `${emberWeight}|${freshWeight}`;
+          if (driveFor !== trailGrid || driveKey !== key) {
+            driveFor = trailGrid;
+            driveKey = key;
+            driveCached = trailDriveField(trailGrid, emberWeight, freshWeight);
+          }
+          drive = driveCached;
+        }
       }
       // Phase 2 S5 — the room's POSTURE for this frame, from the band the reader settled on. The band rides
       // the resolver input (input.band + input.smoothed, the stress tracker's filtered outputs) like every
@@ -492,14 +514,31 @@ export function createCreatureBuilder({ skinning = false } = {}) {
         const recipe = mothRecipe({ bodyPoints, wingPoints, beat: beat * g, hind: hindAmt, traits });
         // the ground beneath the PIN (its home), so a hovering moth does not change colour with every wobble
         const gt = groundTreatment(ground, pin.x, pin.y, i, input.seed, input.seedOffsets || null);
-        // #1837 — this moth's ember step: with the drive on, the borrowed offset climbs the
-        // ember gradient sampled at the moth's steered position (pin + offset), capped and
-        // leashed by emberDrive; with it off, the offset walks home (emberRelaxStep) and the
-        // moth falls back to today's drives. An offset of exactly 0 with the drive off is
-        // never touched, so a steering-less frame stays bit-identical.
+        // #1837 — this moth's trail-drive step: with the drive on, the borrowed offset climbs
+        // the field's gradient sampled at the moth's steered position (pin + offset), capped
+        // and leashed by emberDrive; with it off, the offset walks home (emberRelaxStep) and
+        // the moth falls back to today's drives. An offset of exactly 0 with the drive off is
+        // never touched, so a steering-less frame stays bit-identical. #1838: the combined
+        // field (drive) steers when the look declares the fresh pole; the ember field alone
+        // steers exactly as slice 2 when it does not.
         let sox = steerX[i] || 0;
         let soy = steerY[i] || 0;
-        if (ember) {
+        if (drive) {
+          const s = trailSteerStep({
+            grid: trailGrid,
+            field: drive,
+            emberField: ember,
+            x: pin.x + sox,
+            y: pin.y + soy,
+            canvasW: input.canvasW,
+            canvasH: input.canvasH,
+            emberWeight,
+            freshWeight,
+            off: { x: sox, y: soy },
+          });
+          sox = s.x;
+          soy = s.y;
+        } else if (ember) {
           const s = emberSteerStep({
             grid: trailGrid,
             field: ember,
