@@ -17,6 +17,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeNotchContext, isNotchContext } from '../state/chapterNarrow.mjs';
 import { sanitizeKeepContext } from './keepContext.js';
 import { sanitizeProvenance, isProvenance } from './provenance.mjs';
+import { sanitizeStyleContext, isStyleContext } from './tasteStyle.js';
 import { isTauriRuntime } from '../platform/desktop.mjs'; // one desktop check for the whole app
 
 export const LEDGER_KINDS = Object.freeze(['keeps', 'passes']);
@@ -33,7 +34,7 @@ const isPlainObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
  * One ledger line from a captured record (captureFavorite's shape, already
  * sanitized). Shape, keeps and passes alike:
  *   { seed, recipe: { layoutParams, paletteId, seedOffsets?, assets? },
- *     timestamp, keepContext, projectRef, provenance? (#1507) }
+ *     timestamp, keepContext, projectRef, provenance? (#1507), notch? (#1857), style? (#2044) }
  * Absent stays absent: no offsets/cast are invented for legacy shapes;
  * keepContext and projectRef are null when unknown. Null on a record with no
  * usable seed or no timestamp — a line that can't be rendered is not a label.
@@ -56,6 +57,10 @@ export function ledgerRow(rec, projectRef) {
   // context, sanitized by the notch machine's own schema (state/chapterNarrow).
   // Absent stays absent: a keep with no narrowing standing writes no field.
   const notch = sanitizeNotchContext(rec.notch);
+  // #2044 — the Canon style identity of what was dealt (curator/tasteStyle.js): the Look's style, the styles it
+  // pairs with, the voice's styles, and the chapter standing on the style. Absent stays absent — a record
+  // captured with no known Look or voice writes no field, and nothing is inferred from the recipe here.
+  const style = sanitizeStyleContext(rec.style);
   return {
     seed: seed >>> 0,
     recipe: {
@@ -69,6 +74,7 @@ export function ledgerRow(rec, projectRef) {
     projectRef: ref || null,
     ...(provenance ? { provenance } : {}),
     ...(notch ? { notch } : {}),
+    ...(style ? { style } : {}),
   };
 }
 
@@ -90,6 +96,9 @@ export function isLedgerRow(o) {
   // with no narrowing standing, carry none) but, when a line claims one, it
   // must be a real one. Readers that predate the field ignore it whole.
   if ('notch' in o && !isNotchContext(o.notch)) return false;
+  // #2044 — the style stamp is optional on the same terms: lines written before the Canon carry none, and a
+  // line that claims one must carry a real one (Canon style ids, the chapter that stands on the style).
+  if ('style' in o && !isStyleContext(o.style)) return false;
   return true;
 }
 
