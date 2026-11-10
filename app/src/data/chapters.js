@@ -37,6 +37,7 @@ import { ASSETS_LATIN } from './assets/assets-latin.js';
 import { ASSETS_SERIF } from './assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets/assets-ornaments.js';
 import { ASSETS_PLATE } from './assets/assets-plate.js';
+import { ASSETS_WEAR } from './assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from './assets/assets-riso.js';
 import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
@@ -60,6 +61,7 @@ export const CHAPTER_UNDEALT = Object.freeze([
   ...ASSETS_SERIF.map((a) => a.id),
   ...ASSETS_ORNAMENTS.map((a) => a.id),
   ...ASSETS_PLATE.map((a) => a.id),
+  ...ASSETS_WEAR.map((a) => a.id),
   // #2008: the riso icons join the same class — catalogue members dealt only by the riso field dealer.
   ...ASSETS_RISO.map((a) => a.id),
 ]);

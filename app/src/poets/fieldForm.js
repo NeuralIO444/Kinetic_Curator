@@ -423,13 +423,16 @@ export function sanitizeFieldForm(raw) {
   // because a treated list could not pass this door — overlap is its
   // whole licence. Present-but-dishonest refuses the form whole, as the
   // register does: the record is exactly one of the three modes and a
-  // uint32 seed, nothing else.
+  // uint32 seed, and (#2010 P1) the optional wear axis — `wear: 1` names the
+  // torn/xerox shape lever; absent is a geometry-only treatment (every
+  // record made before P1), carried byte-identically with no key added.
   let raygunMark;
   if (raygun !== undefined) {
     if (!raygun || typeof raygun !== 'object' || Array.isArray(raygun)) return null;
     if (raygun.mode !== 'carson' && raygun.mode !== 'greiman' && raygun.mode !== 'shot') return null;
     if (!Number.isInteger(raygun.seed) || raygun.seed < 0 || raygun.seed > 0xffffffff) return null;
-    raygunMark = { mode: raygun.mode, seed: raygun.seed };
+    if (raygun.wear !== undefined && raygun.wear !== 1) return null;
+    raygunMark = { mode: raygun.mode, seed: raygun.seed, ...(raygun.wear === 1 ? { wear: 1 } : {}) };
   }
   // #2002 — the face marker: absent is the base (Anton) face; 'serif'
   // declares the serif face, Whittier's (greenleaf) alone. Any other value

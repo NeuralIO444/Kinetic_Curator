@@ -12,6 +12,7 @@ import { ASSETS_LATIN } from './assets-latin.js';
 import { ASSETS_SERIF } from './assets-serif.js';
 import { ASSETS_ORNAMENTS } from './assets-ornaments.js';
 import { ASSETS_PLATE } from './assets-plate.js';
+import { ASSETS_WEAR } from './assets-wear.js';
 import { ASSETS_RISO } from './assets-riso.js';
 import { ASSETS_PIXEL } from './assets-pixel-glyphs.js';
 import { ASSETS_MARKS } from './assets-marks.js';
@@ -86,6 +87,10 @@ export const ASSETS = [
   // surface, dealt only by the FIELD director when it calls a plate
   // (Whittier, the solo room, the room at its stillest).
   ...ASSETS_PLATE,
+  // #2010 (RAY GUN P1 · TORN & XEROXED) — the worn letters ride the same road in, on the same terms: torn and
+  // xerox variants of the treatable Latin letters (scripts/gen-wear.mjs) — catalogue members, never authored
+  // content, excluded by id on every dealing surface, named only by the ray gun's draw (poets/rayGunForm.js).
+  ...ASSETS_WEAR,
   // #2008 — the riso icons ride the same road in, on the same terms: composed by
   // the generative grammar (engine/risoGrammar.mjs) from the canonical seed —
   // catalogue members, never authored content, excluded by id on every dealing

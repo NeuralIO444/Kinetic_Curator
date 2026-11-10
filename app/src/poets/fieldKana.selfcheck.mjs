@@ -217,10 +217,12 @@ assert.ok(!ASSETS_AUTHORED.some((a) => KANA_STAMP_IDS.has(a.id)), 'no kana in th
 // #2008 RE-PIN (cause: the riso glyph expansion): the composed riso icon
 // set (24) joins the catalogue on the same road — the sum grows by exactly
 // the set.
+// #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208)
+// join the catalogue on the same road — the sum grows by exactly the pack.
 assert.strictEqual(
   ASSETS.length,
-  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24,
-  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso',
+  312 + 1 + 163 + 126 + 43 + 52 + 4 + 52 + 24 + 208,
+  'the catalogue is authored + citizen + kana + kanji + latin + serif + ornaments + plate + riso + wear',
 );
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);

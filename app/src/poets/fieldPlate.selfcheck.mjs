@@ -154,7 +154,8 @@ assert.strictEqual(stampWidthEm('typ_f_A', 'A'), plateGlyphWidthEm('A'), 'a plat
 assert.strictEqual(stampWidthEm('typ_s_A', 'A'), serifGlyphWidthEm('A'), 'a serif stamp still measures serif');
 assert.strictEqual(stampWidthEm('typ_A', 'A'), glyphWidthEm('A'), 'a base stamp still measures base');
 assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: the plate is Latin-side');
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52, 'the poem-only union grew by exactly the plate pack');
+// #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join the union on the same road.
+assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52 + 208, 'the poem-only union grew by exactly the plate pack (and #2010’s worn letters)');
 for (const id of PLATE_STAMP_IDS) {
   assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: in the poem-only union`);
   assert.ok(!NATIVE_STAMP_IDS.has(id), `${id}: not in the native face`);
@@ -602,7 +603,12 @@ assert.ok(!ASSETS_PLATE.some((a) => ASSETS_AUTHORED.includes(a)), 'no plate stam
 // #2008 RE-PIN (cause: the riso glyph expansion): the composed riso icon set (24) joins the
 // catalogue on the plate pack's road — the sum grows by exactly the set; the riso suites own
 // their containment pins.
-assert.strictEqual(ASSETS.length, 701 + 52 + 24, 'the catalogue arithmetic: 701 + 52 plate stamps + 24 riso icons (#2008)');
+// #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join on the same road.
+assert.strictEqual(
+  ASSETS.length,
+  701 + 52 + 24 + 208,
+  'the catalogue arithmetic: 701 + 52 plate stamps + 24 riso icons (#2008) + 208 worn letters (#2010)',
+);
 for (const a of ASSETS_PLATE) {
   assert.ok(ASSETS.some((x) => x.id === a.id), `${a.id}: resolves in the catalogue`);
   assert.ok(CHAPTER_UNDEALT.includes(a.id), `${a.id}: chapter-undealt`);

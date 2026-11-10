@@ -187,7 +187,12 @@ assert.ok(serifGlyphWidthEm('W') > 0 && serifGlyphWidthEm('W') !== glyphWidthEm(
 assert.strictEqual(stampWidthEm('typ_s_A', 'A'), serifGlyphWidthEm('A'), 'a serif stamp measures serif');
 assert.strictEqual(stampWidthEm('typ_A', 'A'), glyphWidthEm('A'), 'a base stamp measures base');
 assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: slice 3 is Latin-side');
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 289 + 43 + 52 + 4 + 52, 'the poem-only union grew by exactly the slice-3 packs, and by #2005’s plate pack (52) on top');
+// #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join the union on the same road.
+assert.strictEqual(
+  POEM_ONLY_STAMP_IDS.size,
+  289 + 43 + 52 + 4 + 52 + 208,
+  'the poem-only union grew by exactly the slice-3 packs, by #2005’s plate pack (52), and by #2010’s worn letters (208)',
+);
 for (const id of [...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS]) {
   assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: in the poem-only union`);
   assert.ok(!NATIVE_STAMP_IDS.has(id), `${id}: not in the native face`);
@@ -442,8 +447,8 @@ assert.ok(
 );
 assert.strictEqual(
   ASSETS.length,
-  602 + (26 + 17 + 52 + 4) + 52 + 24,
-  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005) + 24 riso icons (#2008)',
+  602 + (26 + 17 + 52 + 4) + 52 + 24 + 208,
+  'the catalogue arithmetic: 602 + (26 lowercase + 17 punct + 52 serif + 4 ornaments) + 52 plate stamps (#2005) + 24 riso icons (#2008) + 208 worn letters (#2010)',
 );
 for (const a of [...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS]) {
   assert.ok(ASSETS.some((x) => x.id === a.id), `${a.id}: resolves in the catalogue`);

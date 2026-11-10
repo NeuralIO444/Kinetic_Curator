@@ -166,7 +166,23 @@ export const TAG_SYNONYMS = Object.freeze({
     'punct',
     'ornament',
   ], // #2002: the punctuation and ornament stamps' tags live with the symbols they are
-  letter: ['letter', 'type', 'a', 'k', 'z', 'kana', 'hiragana', 'katakana', 'kanji', 'lowercase', 'serif', 'fraunces'], // #1982: the kana stamps' script tags live with the letters they are; #1998: 'kanji' joins them — the curated kanji stamps' script tag lives with the same letters; #2002: 'lowercase' and 'serif' join them — the slice-3 letter stamps' tags live with the same letters; #2005: 'fraunces' joins them — the plate face's stamps carry their face's name, as the serif stamps do (the raw tag 'plate' already names a flat patch shape in this folksonomy and keeps that meaning)
+  letter: [
+    'letter',
+    'type',
+    'a',
+    'k',
+    'z',
+    'kana',
+    'hiragana',
+    'katakana',
+    'kanji',
+    'lowercase',
+    'serif',
+    'fraunces',
+    'wear',
+    'torn',
+    'xerox',
+  ], // #1982: the kana stamps' script tags live with the letters they are; #1998: 'kanji' joins them — the curated kanji stamps' script tag lives with the same letters; #2002: 'lowercase' and 'serif' join them — the slice-3 letter stamps' tags live with the same letters; #2005: 'fraunces' joins them — the plate face's stamps carry their face's name, as the serif stamps do (the raw tag 'plate' already names a flat patch shape in this folksonomy and keeps that meaning); #2010 P1: 'wear', 'torn' and 'xerox' join them — the worn letters' tags live with the letters they wear
   digit: ['digit', 'number', '7', '13', '99', '01', '000'],
   hud: ['hud', 'micro', 'bracket', 'brackets', 'corner', 'corners', 'frame', 'dial', 'center'],
   pixel: ['pixel'],

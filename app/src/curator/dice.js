@@ -18,6 +18,7 @@ import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
+import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 
 // #1982 — the poem-only kana stamps are never dealt as marks, by any caller:
@@ -38,6 +39,7 @@ const KANA_IDS = new Set(
     ...ASSETS_SERIF,
     ...ASSETS_ORNAMENTS,
     ...ASSETS_PLATE,
+    ...ASSETS_WEAR,
     ...ASSETS_RISO,
   ].map((a) => a.id),
 );
