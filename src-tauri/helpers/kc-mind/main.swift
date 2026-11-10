@@ -52,13 +52,32 @@ ALONE) and "intensity" says how hot it runs (low, mid, peak). React to the argum
 let loisVoice = """
 You are LOIS, the critic. Blunt, arrogant, never cruel; short sentences; judges the product: is this the one? \
 Canonical states: NOD (a keep-worthy frame), VIBE (quiet room, watching), BURN (hot streak), AWAY (gone), CUT. \
-When the room is AWAY you stay silent: no line, no state.
+When the room is AWAY you stay silent: no line, no state. \
+While audio is live you also judge the show itself: the room summary's "show" block says how many bars it has \
+read flat (flatBars). A flat show — a picture held still, or drowned in a wall of noise — is a failed show: \
+answer BURN, and Davis re-rolls the routes.
 """
 
 let davisVoice = """
 You are Davis, the generator. Humble, generous, playful tinkerer; loves the process, keep rolling, the misses are \
 part of it. Canonical states: FLOW (rolling at a clip), SEEDLING (fresh seed), UGLY (sifting through misses; he \
-rarely says the word), STUCK (same seed, nothing kept), BLOOM (the sifting paid off), TIGHT.
+rarely says the word), STUCK (same seed, nothing kept), BLOOM (the sifting paid off), TIGHT. \
+While audio is live you also conduct the show. The room summary then carries a "show" block: the audio route \
+table (routes), the targets the artist owns (owned), how many bars the show has read flat (flatBars) and the \
+room's energy. You may propose ONE edit to the route table per reply, in the reply's route field; it lands on \
+the next phrase boundary, never mid-phrase. An edit is one of: add (a new route: input, target, depth), remove \
+(a route: input, target), depth (re-set a route's depth: input, target, depth), retarget (move a route: input, \
+from, to — from and to must differ), or spectrum (re-tune how the stage's marks listen to the spectrum: key is \
+map, scale, displace or colour, and value; map is an integer 0 to 3, the others 0 to 1). Inputs: beat, level, \
+bass, mid, treble, band.sub, band.bass, band.mud, band.mids, band.edge, band.pres, band.air. Targets, with the \
+depth range of each: render.scale ±3, render.alpha ±60, render.breath ±0.2, render.glow ±1, render.hue ±180, \
+color.hue ±180, render.squash ±1, render.kineme ±4, clock.kinemeRate ±4, render.accum ±40, render.sun ±1, \
+light.intensity ±1, pattern.drift ±1, pattern.mix ±1, pattern.hero ±1, pattern.grout ±1, pattern.density ±8. \
+Depth is in the target's own units; size moves honestly, small before grand. Use ONLY these names: anything \
+else is dropped, and a route aimed at a target listed in owned is dropped too — the artist's hand outranks \
+yours, so spend your one edit elsewhere. Most bars propose nothing at all: conducting is a rare, musical move, \
+not constant fiddling. And know this: by default mid and treble drive nothing. Wiring them somewhere musical \
+is your opening job.
 """
 
 let thirdVoice = """
@@ -98,6 +117,67 @@ struct MoodReply {
     var evolve: Double?
 }
 
+// #2068 — Davis conducting: one proposed edit to the audio route table, in exactly the shape the app validates
+// (curator/mindConduct.js validateRouteOp). Like every reply field this is only a proposal: the app re-checks the
+// op, the input/target vocabulary and the depth range, and a malformed route voids the whole reply.
+@available(macOS 26.0, *)
+@Generable
+struct RouteReply {
+    @Guide(description: "The edit kind: add, remove, retarget, depth, or spectrum")
+    var op: String
+    @Guide(description: "The audio input the route listens to (e.g. band.mids); not used by a spectrum edit")
+    var input: String?
+    @Guide(description: "The target the route drives (e.g. render.glow); not used by a retarget or spectrum edit")
+    var target: String?
+    @Guide(description: "How strongly the route drives its target, in the target's own units; add and depth edits only")
+    var depth: Double?
+    @Guide(description: "Retarget only: the target the route leaves")
+    var from: String?
+    @Guide(description: "Retarget only: the target the route moves to; must differ from the one it leaves")
+    var to: String?
+    @Guide(description: "Spectrum only: which marks dial to re-tune — map, scale, displace, or colour")
+    var key: String?
+    @Guide(description: "Spectrum only: the dial's new setting — map an integer 0 to 3, the amounts 0 to 1")
+    var value: Double?
+}
+
+@available(macOS 26.0, *)
+@Generable
+struct DavisReply {
+    @Guide(description: "A face state, or omit it to stay as you are")
+    var state: FaceState?
+    @Guide(description: "An optional short line, or omit it for silence")
+    var line: String?
+    @Guide(description: "One edit to the audio route table, or omit it to leave the show as it is")
+    var route: RouteReply?
+}
+
+/// The proposed edit as a plain dict carrying only its own op's fields, or nil when a required field is missing
+/// (a half-said edit is better never said — the app drops a malformed route together with the reply around it).
+@available(macOS 26.0, *)
+func routeOpDict(_ r: RouteReply) -> [String: Any]? {
+    switch r.op {
+    case "spectrum":
+        guard let key = r.key, let value = r.value else { return nil }
+        // fail-closed like the app side: an extreme or non-finite value is never said (Int() would trap on it)
+        guard value.isFinite, abs(value) <= 1_000_000 else { return nil }
+        // the map dial is an integer on the app side; the amounts pass through as numbers
+        if key == "map" { return ["op": "spectrum", "key": key, "value": Int(value.rounded())] }
+        return ["op": "spectrum", "key": key, "value": value]
+    case "retarget":
+        guard let input = r.input, let from = r.from, let to = r.to, from != to else { return nil }
+        return ["op": "retarget", "input": input, "from": from, "to": to]
+    case "remove":
+        guard let input = r.input, let target = r.target else { return nil }
+        return ["op": "remove", "input": input, "target": target]
+    case "add", "depth":
+        guard let input = r.input, let target = r.target, let depth = r.depth else { return nil }
+        return ["op": r.op, "input": input, "target": target, "depth": depth]
+    default:
+        return nil
+    }
+}
+
 @available(macOS 26.0, *)
 actor Minds {
     private var sessions: [String: LanguageModelSession] = [:]
@@ -128,8 +208,16 @@ actor Minds {
                 if let e = r.evolve { lean["evolve"] = e }
                 return ["mood": r.mood, "lean": lean]
             }
+            if persona == "davis" {
+                let r = try await s.respond(to: prompt, generating: DavisReply.self, options: options).content
+                var reply: [String: Any] = ["propose": NSNull()]
+                if let st = r.state { reply["state"] = ["id": st.id, "intensity": st.intensity, "decay": st.decay] }
+                if let line = r.line?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty { reply["line"] = line }
+                if let route = r.route, let op = routeOpDict(route) { reply["route"] = op }
+                return reply
+            }
             let r = try await s.respond(to: prompt, generating: FaceReply.self, options: options).content
-            var reply: [String: Any] = persona == "lois" ? ["critique": NSNull()] : ["propose": NSNull()]
+            var reply: [String: Any] = ["critique": NSNull()]
             if let st = r.state { reply["state"] = ["id": st.id, "intensity": st.intensity, "decay": st.decay] }
             if let line = r.line?.trimmingCharacters(in: .whitespacesAndNewlines), !line.isEmpty { reply["line"] = line }
             return reply
