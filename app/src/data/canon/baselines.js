@@ -163,6 +163,174 @@ export const CANON_BASELINES = deepFreeze([
       },
     },
   },
+  {
+    id: 'swiss',
+    label: 'GRID LAW',
+    style: 'swiss', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 11 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (persona-molnar).',
+    settings: {
+      marks: { categories: ['geometric', 'linework'], styles: ['swiss'] },
+      palette: { id: 'persona-molnar', shift: 'zone', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.11, noiseSpeed: 0.2, wind: 0.37, flap: 0.26, breath: 0.02 },
+      density: { count: 134, density: 74, scale: [0.3, 1.3], alpha: [65, 100], zTiers: 2 },
+      rules: {
+        mode: 'grid',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 7,
+        displacement: 0,
+        rotate: [-45, 60],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'bauhaus',
+    label: 'PRIMARY FORM',
+    style: 'bauhaus', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 10 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (vortex-rwb).',
+    settings: {
+      marks: { categories: ['geometric', 'radial'], styles: ['bauhaus'] },
+      palette: { id: 'vortex-rwb', shift: 'band', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.17, noiseSpeed: 0.26, wind: 0.46, flap: 0.33, breath: 0.07 },
+      density: { count: 93, density: 70, scale: [0.4, 1.6], alpha: [65, 100], zTiers: 3 },
+      rules: {
+        mode: 'radial',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 11,
+        displacement: 0,
+        rotate: [-60, 80],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'japanese',
+    label: 'HELD EMPTY',
+    style: 'japanese', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 12 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (sepia-plate).',
+    settings: {
+      marks: { categories: ['floral', 'organic', 'radial'], styles: ['japanese'] },
+      palette: { id: 'sepia-plate', shift: 'band', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.16, noiseSpeed: 0.29, wind: 0.52, flap: 0.3, breath: 0.05 },
+      density: { count: 121, density: 68, scale: [0.5, 1.6], alpha: [55, 98], zTiers: 3 },
+      rules: {
+        mode: 'poisson',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 11,
+        displacement: 1,
+        rotate: [-60, 60],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'grunge',
+    label: 'PHOTOCOPY',
+    style: 'grunge', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 12 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (dirty).',
+    settings: {
+      marks: { categories: ['stamps', 'fragments', 'scanlines'], styles: ['grunge'] },
+      palette: { id: 'dirty', shift: 'zone', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.2, noiseSpeed: 0.43, wind: 0.62, flap: 0.41, breath: 0.02 },
+      density: { count: 206, density: 78, scale: [0.3, 1.4], alpha: [55, 100], zTiers: 4 },
+      rules: {
+        mode: 'random',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 22,
+        displacement: 9,
+        rotate: [-80, 80],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'engraved',
+    label: 'COPPER LINE',
+    style: 'engraved', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 11 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (lithograph).',
+    settings: {
+      marks: { categories: ['radial', 'linework'], styles: ['engraved'] },
+      palette: { id: 'lithograph', shift: 'zone', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.14, noiseSpeed: 0.21, wind: 0.4, flap: 0.29, breath: 0.13 },
+      density: { count: 118, density: 74, scale: [0.4, 1.4], alpha: [60, 100], zTiers: 3 },
+      rules: {
+        mode: 'circlepack',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 9,
+        displacement: 0,
+        rotate: [-85, 85],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'memphis',
+    label: 'CONFETTI',
+    style: 'memphis', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 10 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (petri-bloom).',
+    settings: {
+      marks: { categories: ['geometric', 'dots', 'linework'], styles: ['memphis'] },
+      palette: { id: 'petri-bloom', shift: 'split', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.2, noiseSpeed: 0.33, wind: 0.57, flap: 0.36, breath: 0.06 },
+      density: { count: 165, density: 74, scale: [0.3, 1.3], alpha: [65, 100], zTiers: 3 },
+      rules: {
+        mode: 'random',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 14,
+        displacement: 2,
+        rotate: [-115, 115],
+        extra: {},
+      },
+    },
+  },
+  {
+    id: 'marks',
+    label: 'PIGMENT WALL',
+    style: 'marks', // identity comes from that Canon style's record (declared once, #2044)
+    identity: null,
+    basis:
+      'Measured, not authored: the mean of the 13 Looks and Voices that make up this style (data/canon/settings.js), rounded to the instrument’s own units — its most-used layout, mean density, scale, opacity, rotation and jitter, and its most-used palette (ochre-wall).',
+    settings: {
+      marks: { categories: ['stamps', 'linework', 'dots'], styles: ['marks'] },
+      palette: { id: 'ochre-wall', shift: 'band', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.1, noiseSpeed: 0.17, wind: 0.32, flap: 0.25, breath: 0.03 },
+      density: { count: 62, density: 61, scale: [0.4, 1.4], alpha: [55, 95], zTiers: 3 },
+      rules: {
+        mode: 'poisson',
+        mirror: 'off',
+        overlap: true,
+        bleed: false,
+        jitter: 15,
+        displacement: 2,
+        rotate: [-65, 65],
+        extra: {},
+      },
+    },
+  },
 ]);
 
 /** The baseline ids, in declaration order. */
