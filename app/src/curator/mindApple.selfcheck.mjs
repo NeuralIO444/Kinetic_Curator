@@ -193,4 +193,21 @@ await ok('on-device only, no model UI, roadmap reads "no cloud AI"', () => {
   assert.ok(!/No live AI inside the app/.test(roadmap));
 });
 
+await ok('timed-out asks are cancelled and a busy persona refuses, in helper and bridge source (#1747)', () => {
+  // The behavioural proof needs a device (a timed-out ask actually stopping generation); what this rig can
+  // hold is the protocol contract in the sources: if any leg of it is edited away, this fails instead of the
+  // behaviour silently reverting to abandoned asks piling onto a shared session.
+  const swift = read('../../../src-tauri/helpers/kc-mind/main.swift');
+  assert.match(swift, /case "cancel"/, 'the helper answers a cancel op');
+  assert.match(swift, /"busy"/, 'a second ask for a busy persona is refused with error "busy"');
+  assert.match(swift, /inFlight\.insert\(persona\)/, 'one in-flight ask per persona, guarded before the session');
+  assert.match(swift, /tasks\[id\]\?\.cancel\(\)/, 'a cancel stops the ask Task registered under its id');
+  const rust = read('../../../src-tauri/src/mind/mod.rs');
+  assert.match(rust, /json!\(\{ "op": "cancel", "id": id \}\)/, 'on timeout the bridge sends the cancel line');
+  assert.match(rust, /child\.kill\(\)/, 'a dropped helper is killed, not orphaned (#1747 part 3, PR #1752)');
+  assert.match(rust, /child\.wait\(\)/, 'a dropped helper is waited on, not zombied (#1747 part 3, PR #1752)');
+  const build = read('../../../src-tauri/helpers/kc-mind/build.sh');
+  assert.match(build, /op":"cancel/, 'the shell stub knows the cancel op and never answers it');
+});
+
 console.log(`mindApple.selfcheck: ${n} checks passed`);

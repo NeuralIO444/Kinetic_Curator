@@ -36,6 +36,7 @@ while IFS= read -r line; do
   id=$(printf '%s' "$line" | sed -n 's/.*"id"[[:space:]]*:[[:space:]]*\([0-9][0-9]*\).*/\1/p')
   [ -z "$id" ] && continue
   case "$line" in
+    *'"op":"cancel"'*|*'"op": "cancel"'*) ;; # #1747: a cancel is never answered
     *'"op":"status"'*|*'"op": "status"'*) printf '{"id":%s,"available":false,"reason":"helper not built (no Swift toolchain)"}\n' "$id" ;;
     *) printf '{"id":%s,"reply":null,"error":"unavailable"}\n' "$id" ;;
   esac
