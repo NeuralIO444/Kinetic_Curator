@@ -1,8 +1,9 @@
 // Curator bar — the taste-guided re-roll over unlocked params.
 // Rolls CURATE_CANDIDATES scenes, keeps the curator engine's pick.
-// The voice popup (left of the Curator button) chooses which persona
-// tastes the candidates ("off" = honest dice roll). The hint always says
-// who picked. #716: lives in the top bar (global verb), so it reads its own
+// The taste popup (left of the Curator button) chooses which persona
+// tastes the candidates ("off" = DICE, an honest dice roll) — #2050: the
+// judge is labeled by its job (TASTE); VOICE names the costume deck only.
+// The hint always says who picked. #716: lives in the top bar (global verb), so it reads its own
 // state and the hint rides the Curator button's tooltip. The looks popup (#735: Looks, never "presets", on the face) (also left of Curator) applies a named,
 // complete scene directly — a different action from taste-biased random.
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -16,7 +17,7 @@ import { getPresetsByGroup } from '../../data/presets.js';
 import { voiceOptions, getActivePersonaId, setActivePersona } from '../../curator/taste.js';
 import { getLoisVerdictParts } from '../../curator/loisRank.js';
 import { getPersonaTaste } from '../../curator/personaTastes.js';
-import { verdictDetent, voiceBreathS, voiceLevel, litPills } from '../../curator/topbarTaste.mjs';
+import { verdictDetent, voiceBreathS, voiceLevel, litPills, tasterReadout } from '../../curator/topbarTaste.mjs';
 import { loisActivity } from '../../curator/loisActivity.js';
 import { KineticButton } from './KineticButton.jsx';
 import { ChapterCard } from './ChapterCard.jsx';
@@ -57,8 +58,8 @@ export function CuratorBar() {
   const [appliedLook, setAppliedLook] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [presetMenuOpen, setPresetMenuOpen] = useState(false);
-  // #1103 — LOOKS and VOICE rest as [L] / [V]. Once opened to the full word they cool down to a
-  // 3-letter form ([LOK] / [VOI]) for the rest of the session: a button you have used stays more readable.
+  // #1103 — LOOKS and TASTE rest as [L] / [T]. Once opened to the full word they cool down to a
+  // 3-letter form ([LOK] / [TAS]) for the rest of the session: a button you have used stays more readable.
   const [looksUsed, setLooksUsed] = useState(false);
   const [voiceUsed, setVoiceUsed] = useState(false);
   const looksTap = useTapOpen();
@@ -144,6 +145,11 @@ export function CuratorBar() {
   };
   const voices = voiceOptions();
   const activeAlias = voice === 'off' ? 'off' : (voices.find((p) => p.id === voice)?.alias ?? voice);
+  // #2050 — the TASTE readout: the standing taster's id, resolved from the
+  // same persona standing the pick itself uses (taste.js, above) — or DICE
+  // when off, because off honestly means a uniform dice pick.
+  const taster = tasterReadout(voice);
+  const tasterFull = voice === 'off' ? 'dice' : activeAlias;
   // #1588 — LOIS's verdict line no longer renders here; it rides the footer ticker in her slot
   // (components/LoisPill.jsx). The pick record stays in the Curator button's tooltip, via the hint.
   // #1122 — affective grammar derivations. Every one traces to a real signal:
@@ -322,26 +328,28 @@ export function CuratorBar() {
           onMouseLeave={() => setVoiceUsed(true)}
           onBlur={() => setVoiceUsed(true)}
           {...voiceTap.props}
-          aria-label={`Voice: ${activeAlias}. Persona voice tasting the candidates`}
+          aria-label={`Taste: ${taster} — who tastes the CURATOR candidates`}
           aria-haspopup="menu"
           aria-expanded={menuOpen}
-          title="Persona voice tasting the candidates — off means a plain dice roll"
+          title="Taste — who tastes the CURATOR candidates (off reads DICE: a plain dice roll)"
         >
-          {/* #1122 — V is drift → Davis: the circle breathes at the persona's drift
-                rate; hollow and dark when off */}
+          {/* #1122 — the taster's drift is Davis: the circle breathes at the persona's drift
+                rate; hollow and dark when off (DICE) */}
           <span
             className={`tb-voice${voiceOn ? ' on' : ''}${voiceLvl ? ` lvl${voiceLvl}` : ''}`}
             data-subdued={subdued('voice', voiceOn)}
             style={voiceOn ? { animationDuration: `${breathS.toFixed(1)}s` } : undefined}
             aria-hidden="true"
           />
-          <ExpandLabel mode="swap" short={voiceUsed ? 'voi' : 'v'} full={`voice: ${activeAlias} ▾`} />
-          {voiceOn && <span className="tb-micro">{voice}</span>}
+          <ExpandLabel mode="swap" short={voiceUsed ? 'tas' : 't'} full={`taste: ${tasterFull} ▾`} />
+          {/* #2050 — the readout always stands: the taster's id, or DICE when off */}
+          <span className="tb-micro">{taster}</span>
         </button>
         {menuOpen && (
           <div className="curator-voice-menu" role="menu">
+            <div className="curator-voice-menu-head">who tastes the curator candidates</div>
             <button role="menuitem" className={voice === 'off' ? 'active' : ''} onClick={() => pickVoice('off')}>
-              voice: off
+              taste: off — honest dice
             </button>
             {voices.map((p) => (
               <button
@@ -355,7 +363,7 @@ export function CuratorBar() {
                     : undefined
                 }
               >
-                voice: {p.title || p.alias}
+                taste: {p.title || p.alias}
               </button>
             ))}
           </div>

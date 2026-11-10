@@ -36,12 +36,16 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
 
   test('arming phi + FLOCK pins mode/motion across KINETIC rolls', async ({ page }) => {
     const phiChip = page.locator('.mode-strip .chip-btn[title*="fibonacci"]');
-    // NOTE: no ^$ anchors — arming appends the 📌 pin glyph to the chip text.
+    // NOTE: no ^$ anchors on the flock lookup — and none needed for the armed
+    // mark either: the #2050 corner detent is pure CSS, it adds no chip text.
     const flockChip = page.locator('.mode-strip .chip-btn', { hasText: /flock/i });
     await phiChip.click();
     await flockChip.click();
     await expect(phiChip).toHaveClass(/armed/);
     await expect(flockChip).toHaveClass(/armed/);
+    // #2050 — armed ≠ live: each armed chip wears the TE corner detent.
+    await expect(phiChip.locator('.chip-detent'), 'an armed mode chip wears the detent').toHaveCount(1);
+    await expect(flockChip.locator('.chip-detent'), 'an armed motion chip wears the detent').toHaveCount(1);
     await expect(phiChip).toHaveAttribute('aria-pressed', 'true');
     let s = await snap(page);
     expect(s.armedMode).toBe('fibonacci');
@@ -72,6 +76,12 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     expect(s.lp.mode).toBe('fibonacci');
     expect(s.lp.behave).toBe('flock');
 
+    // #2050 — the detent is a pure readout of the arm: arms persist across
+    // rolls until disarmed (#964), so the detent has survived every roll
+    // above exactly as the arm did.
+    await expect(phiChip.locator('.chip-detent'), 'the detent stands while the arm stands').toHaveCount(1);
+    await expect(flockChip.locator('.chip-detent'), 'the detent stands while the arm stands').toHaveCount(1);
+
     // Clearing the scope drops the armed visuals too — back to full-freedom.
     await page.evaluate(() => window.__kcStore.getState().clearRollScope());
     s = await snap(page);
@@ -79,14 +89,18 @@ test.describe('UX-4 roll scope + BEAT master clock', () => {
     expect(s.armedMotion).toBeNull();
     await expect(phiChip).not.toHaveClass(/armed/);
     await expect(flockChip).not.toHaveClass(/armed/);
+    await expect(phiChip.locator('.chip-detent'), 'the detent clears in the same commit as the arm').toHaveCount(0);
+    await expect(flockChip.locator('.chip-detent'), 'the detent clears in the same commit as the arm').toHaveCount(0);
 
     // The ✕ button does the same through the UI. force: true — after heavy
     // chaos renders the CI main thread can be too starved for Playwright's
     // actionability (stability) checks; the clicks themselves are fine.
     await phiChip.click({ force: true });
+    await expect(phiChip.locator('.chip-detent')).toHaveCount(1);
     await expect(page.locator('.scope-clear')).toBeVisible();
     await page.locator('.scope-clear').click({ force: true });
     await expect(phiChip).not.toHaveClass(/armed/);
+    await expect(phiChip.locator('.chip-detent')).toHaveCount(0);
   });
 
   test('BEAT 90 drives the phrase metro', async ({ page }) => {

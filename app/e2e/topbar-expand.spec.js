@@ -1,6 +1,6 @@
-// #1103 — the top bar's expanding buttons: KIN, LOOKS, VOICE open to the full word on hover,
-// keyboard focus and touch; LOOKS and VOICE cool down to LOK / VOI after use; nothing around
-// them moves by a pixel.
+// #1103 — the top bar's expanding buttons: KIN, LOOKS, TASTE open to the full word on hover,
+// keyboard focus and touch; LOOKS and TASTE cool down to LOK / TAS after use; nothing around
+// them moves by a pixel. (#2050: the judge button is TASTE — VOICE names the costume deck.)
 import { test, expect } from '@playwright/test';
 
 // `settle` waits out the cold open (the verbs show their full names for ~2 s), so rest-state tests measure rest.
@@ -47,26 +47,26 @@ const text = (loc) =>
     return shown.textContent.replace(/\s+/g, ' ').trim();
   });
 
-test('LOOKS and VOICE rest as L and V, open to the full word on hover, then cool down to LOK and VOI', async ({
+test('LOOKS and TASTE rest as L and T, open to the full word on hover, then cool down to LOK and TAS', async ({
   page,
 }) => {
   await boot(page);
   const looks = btn(page, /^Looks/);
-  const voice = btn(page, /^Voice/);
+  const taste = btn(page, /^Taste/);
   expect(await text(looks)).toBe('l');
-  expect(await text(voice)).toBe('v');
-  const rest = { l: await width(looks), v: await width(voice) };
+  expect(await text(taste)).toBe('t');
+  const rest = { l: await width(looks), t: await width(taste) };
 
   await looks.hover();
   await expect.poll(async () => width(looks), { timeout: 2000 }).toBeGreaterThan(rest.l + 20);
   await expect.poll(() => text(looks)).toBe('looks ▾');
-  await voice.hover();
-  await expect.poll(async () => width(voice)).toBeGreaterThan(rest.v + 40);
-  await expect.poll(() => text(voice)).toMatch(/^voice: /);
+  await taste.hover();
+  await expect.poll(async () => width(taste)).toBeGreaterThan(rest.t + 40);
+  await expect.poll(() => text(taste)).toMatch(/^taste: /);
 
   await page.mouse.move(600, 600); // away
   await expect.poll(() => text(looks), { timeout: 2000 }).toBe('lok');
-  await expect.poll(() => text(voice), { timeout: 2000 }).toBe('voi');
+  await expect.poll(() => text(taste), { timeout: 2000 }).toBe('tas');
   expect(await width(looks), 'LOK is between L and LOOKS').toBeGreaterThan(rest.l);
   expect(
     await looks.locator('.xl-swap-short').evaluate((e) => getComputedStyle(e).textTransform),
@@ -85,7 +85,7 @@ test('keyboard focus opens them; the accessible name is the full word at every s
   await expect.poll(async () => width(looks)).toBeGreaterThan(before + 20);
 });
 
-test('a touch opens KIN, LOOKS and VOICE, and they close by themselves', async ({ browser }) => {
+test('a touch opens KIN, LOOKS and TASTE, and they close by themselves', async ({ browser }) => {
   const ctx = await browser.newContext({ hasTouch: true, viewport: { width: 1280, height: 720 } });
   const page = await ctx.newPage();
   await boot(page, { hold: 4 });
@@ -116,7 +116,7 @@ test('opening and closing them never moves the rest of the bar', async ({ page }
   await boot(page);
   const anchors = page.locator('.palette-chip-track, .palette-controls');
   const before = await anchors.evaluateAll((els) => els.map((e) => Math.round(e.getBoundingClientRect().left)));
-  for (const name of [/^Looks/, /^Voice/]) {
+  for (const name of [/^Looks/, /^Taste/]) {
     await btn(page, name).hover();
     await page.waitForTimeout(350);
   }
@@ -141,7 +141,7 @@ test('KIN still builds and sheds heat: rapid taps widen it, and it cools back', 
   await expect.poll(async () => width(kin), { timeout: 15_000 }).toBeLessThanOrEqual(w0 + 2);
 });
 
-test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and V stay L and V', async ({
+test('cold open: KINETIC and CURATOR show their full names, then cool down to KIN and CUR; L and T stay L and T', async ({
   page,
 }) => {
   await boot(page, { settle: false, hold: 4 }); // 4× the real 2.2 s, so a slow runner cannot miss it
@@ -165,7 +165,7 @@ test('cold open: KINETIC and CURATOR show their full names, then cool down to KI
   await arrived(cur);
   const opened = { kin: await width(kin), cur: await width(cur) };
   expect(await text(btn(page, /^Looks/)), 'L is not part of the cold open').toBe('l');
-  expect(await text(btn(page, /^Voice/))).toBe('v');
+  expect(await text(btn(page, /^Taste/))).toBe('t');
   await expect(kin).not.toHaveAttribute('data-open', 'true', { timeout: 15000 });
   await expect(cur).not.toHaveAttribute('data-open', 'true');
   await expect.poll(async () => width(kin), { timeout: 3000 }).toBeLessThan(opened.kin - 8);
@@ -182,7 +182,7 @@ test('reduced motion: no cold open at all', async ({ browser }) => {
   await ctx.close();
 });
 
-test('the row reads START, KIN, L, V, CUR, B left to right; CURATOR is in capitals; BEAT is [•B] and opens to BEAT · 120', async ({
+test('the row reads START, KIN, L, T, CUR, B left to right; CURATOR is in capitals; BEAT is [•B] and opens to BEAT · 120', async ({
   page,
 }) => {
   await boot(page);
@@ -263,7 +263,7 @@ test('the sheen: KINETIC and CURATOR shimmer at rest, go quiet in use, and come 
   await expect(cur).toHaveClass(/xl-shimmer/);
   expect(await anim(kin)).toBe('stim-shimmer');
   expect(await anim(cur)).toBe('stim-shimmer');
-  for (const name of [/^Looks/, /^Voice/]) await expect(btn(page, name)).not.toHaveClass(/xl-shimmer/);
+  for (const name of [/^Looks/, /^Taste/]) await expect(btn(page, name)).not.toHaveClass(/xl-shimmer/);
   await expect(group(page).locator('.beat-btn')).not.toHaveClass(/xl-shimmer/);
   await kin.hover();
   expect(await anim(kin), 'quiet while the pointer is on it').toBe('none');
@@ -371,4 +371,50 @@ test('KIN cools by gliding: its width passes through many in-between values, nev
     maxSpeed = Math.max(maxSpeed, Math.abs(samples[i][1] - samples[i - 1][1]) / dt);
   }
   expect(maxSpeed, `the fastest stretch was ${maxSpeed.toFixed(2)} px/ms`).toBeLessThan(1.5);
+});
+
+// ── #2050 — the taster's name and KIN's next pass ──────────────────────────
+const micro = async (loc) => (await loc.locator('.tb-micro').textContent())?.trim().toLowerCase();
+
+test('TASTE: the readout names the standing taster, and DICE when off', async ({ page }) => {
+  await boot(page);
+  const taste = btn(page, /^Taste/);
+  await expect(taste).toHaveAttribute('aria-label', /^Taste: davis — who tastes the CURATOR candidates/);
+  expect(await micro(taste), 'the default taster stands on the button').toBe('davis');
+
+  await taste.click();
+  const menu = group(page).locator('.curator-voice-menu');
+  await expect(menu.locator('.curator-voice-menu-head')).toHaveText(/who tastes the curator candidates/i);
+  await menu.getByRole('menuitem', { name: /taste: off/i }).click();
+  expect(await micro(taste), 'off honestly reads DICE').toBe('dice');
+  await expect(taste).toHaveAttribute('aria-label', /^Taste: dice — /);
+
+  await taste.click();
+  await menu.getByRole('menuitem', { name: /^taste: lois$/i }).click();
+  expect(await micro(taste), 'the picked taster stands in their place').toBe('lois');
+  await expect(taste).toHaveAttribute('aria-label', /^Taste: lois — /);
+});
+
+test('KIN detent: the next pass stands at rest, steps with the run, and never promises CHAOS below KOZ', async ({
+  page,
+}) => {
+  await boot(page); // factory boot: scope is below KOZ, so CHAOS is not on the table
+  const kin = group(page).locator('.kinetic-btn');
+  const next = kin.locator('.kin-next');
+  await expect(next).toHaveText('LOOK');
+  await expect(next).toHaveAttribute('data-next', 'look');
+
+  await page.keyboard.press('k');
+  await expect(next, 'after tap 1 the next tap is the voice pass').toHaveText('VOICE');
+  await page.keyboard.press('k');
+  await expect(next, 'after tap 2 the next tap is the curator pass').toHaveText('CUR');
+  // Hammer: heat pegs, but below KOZ the detent must never say CHAOS.
+  for (let i = 0; i < 5; i++) {
+    await page.keyboard.press('k');
+    await page.waitForTimeout(90);
+    await expect(next).not.toHaveText('CHAOS');
+  }
+  await expect(next).toHaveAttribute('data-next', 'curator');
+  // The run lapses: the detent returns to LOOK on the router's own clock.
+  await expect(next, 'the lapsed run reads LOOK again').toHaveText('LOOK', { timeout: 6000 });
 });

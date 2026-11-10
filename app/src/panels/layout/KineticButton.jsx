@@ -13,15 +13,31 @@
 // and wall-clock-free; the component passes `now` in and renders heat out.
 //
 // The button breathes: `--heat` (0..1) drives x-expansion + glow in CSS, so
-// the width IS the heat meter. A cooling interval decays the displayed heat
-// when idle; it stops itself at zero. Collapsed width stays a comfortable
-// touch target; expansion borrows space gracefully (same max-width cap as
-// the hover expansion).
+// the width IS the heat meter — heat is a continuous signal and renders
+// Davis (#2050): it decays on the router's halving clock, no digits, no
+// steps. A cooling interval decays the displayed heat when idle; it stops
+// itself at zero. Collapsed width stays a comfortable touch target;
+// expansion borrows space gracefully (same max-width cap as the hover
+// expansion).
+//
+// The pass the NEXT tap will fire is a discrete fact and renders TE (#2050):
+// a detent naming LOOK / VOICE / CUR / CHAOS, derived by asking the router
+// itself (nextKineticLayer over the standing run + the same clock) — never
+// a parallel prediction. The #1122 post-hoc "last pass" label retires: the
+// landed pass is knowable from the stage and the take record.
 import { useRef, useState, useEffect } from 'react';
 import { useStore } from '../../state/store.js';
 import { useHotkeys } from '../../hooks/useHotkeys.js';
 import { scopeDecks } from '../../state/kineticScope.mjs';
-import { routeKineticTapHeat, decayHeat, heatLevel, publishShownHeat, kineticLayerLabel } from './kineticHeat.mjs';
+import {
+  routeKineticTapHeat,
+  decayHeat,
+  heatLevel,
+  publishShownHeat,
+  nextKineticLayer,
+  kineticNextLabel,
+  KINETIC_WARM_MS,
+} from './kineticHeat.mjs';
 import { Events, emit } from '../../composition/eventBus.js';
 import { ExpandLabel } from '../../components/ExpandLabel.jsx';
 import { useTapOpen } from '../../hooks/useTapOpen.js';
@@ -42,7 +58,16 @@ export function KineticButton() {
   const coolTimerRef = useRef(null);
   const [heat, setHeat] = useState(0);
   const [cooling, setCooling] = useState(false); // #1103 — heating is instant; only cooling glides
-  const [lastLayer, setLastLayer] = useState(null); // #1122 — TE micro-label: the layer the last tap ran
+  // #2050 — the detent's clock: the instant the next-pass readout is derived
+  // at. Taps and the watch interval below move it, so the detent steps down
+  // as heat halves and returns to LOOK when the run lapses — on the same
+  // clock the router routes on. (0 is safe: an untouched run reads LOOK at
+  // any instant.)
+  const [nowMs, setNowMs] = useState(0);
+  // #2050 — a state mirror of runRef for the render derivation: refs are
+  // handler-side only (the lint rules insist, rightly), so every write to
+  // runRef below is paired with the same value here.
+  const [runSnap, setRunSnap] = useState({ heat: 0, taps: 0, lastTapAt: 0 });
   const tapOpen = useTapOpen(); // #1103 — touch has no hover
   const cold = useColdOpen(); // #1103 — the first ~2 s of a page load show the full name
   const [shimmer, markUsed] = useInvite('kinetic'); // #1103 — the sheen invites a press until it gets one
@@ -51,15 +76,24 @@ export function KineticButton() {
     if (coolTimerRef.current) clearInterval(coolTimerRef.current);
     coolTimerRef.current = setInterval(() => {
       const run = runRef.current;
-      const h = decayHeat(run.heat, Date.now() - run.lastTapAt);
-      if (h <= 0.01) {
+      const now = Date.now();
+      const h = decayHeat(run.heat, now - run.lastTapAt);
+      // #2050 — every tick re-derives the detent at the tick's instant, so
+      // label and breath decay together and can never disagree.
+      setNowMs(now);
+      // The watch ends when the heat is spent AND the run has lapsed. A
+      // heat-0 run (a calm tap builds none) still holds the watch until its
+      // window closes, so the detent's return to LOOK is rendered, not stale.
+      const lapsed = run.lastTapAt === 0 || now - run.lastTapAt >= KINETIC_WARM_MS;
+      if (h <= 0.01 && lapsed) {
         clearInterval(coolTimerRef.current);
         coolTimerRef.current = null;
         runRef.current = { ...run, heat: 0 };
+        setRunSnap(runRef.current); // #2050 — keep the render mirror in step
         publishShownHeat(0);
         setHeat(0);
         setCooling(false);
-      } else {
+      } else if (h > 0.01) {
         publishShownHeat(h);
         setHeat(h);
         setCooling(true);
@@ -78,9 +112,10 @@ export function KineticButton() {
     const now = Date.now();
     const r = routeKineticTapHeat(runRef.current, now, { chaos: scopeChaos });
     runRef.current = { heat: r.heat, taps: r.taps, lastTapAt: r.lastTapAt };
+    setRunSnap(runRef.current); // #2050 — keep the render mirror in step
     publishShownHeat(r.heat);
     setHeat(r.heat);
-    setLastLayer(r.layer); // #1122 — the layer is discrete: LOOK / VOICE / CURATOR / CHAOS (#1772)
+    setNowMs(now); // #2050 — the detent re-derives in the same commit as the tap: it already names the NEXT pass
     // LOIS honest feed: the single observable for a KINETIC tap (button + K).
     emit(Events.KINETIC_TAP, { kind: r.layer });
     if (r.layer === 'chaos') kineticRoll();
@@ -101,6 +136,12 @@ export function KineticButton() {
   useHotkeys({ k: tap });
 
   const level = heatLevel(heat);
+  // #2050 — the detent, derived in render from the router's standing state:
+  // the run (via its state mirror), the detent clock, and the scope's chaos
+  // gate — the same inputs the next real tap routes on, so a scope change
+  // mid-run re-derives it in the same commit (below KOZ it can never read
+  // CHAOS).
+  const nextLayer = nextKineticLayer(runSnap, nowMs, { chaos: scopeChaos });
   return (
     <button
       type="button"
@@ -112,17 +153,17 @@ export function KineticButton() {
       style={{ '--heat': heat.toFixed(3) }}
       onClick={tap}
       title="KINETIC — tap: a new look; tap again: a new voice; keep tapping: the curator nudges; hammer it: chaos (K)"
-      aria-label={`Kinetic — heat ${level}. Tap for a new look, tap again for a new voice, keep tapping for a curator nudge, rapid hammering breaks into chaos`}
+      aria-label={`Kinetic — heat ${level}, next tap fires the ${nextLayer} pass. Tap for a new look, tap again for a new voice, keep tapping for a curator nudge, rapid hammering breaks into chaos`}
     >
       {/* #1122 — ● is heat → Davis: the circle glows with the run's heat */}
       <span className="tb-circle" aria-hidden="true" />
       <ExpandLabel short="KIN" full="KINETIC" tailClass="kinetic-rest" />
-      {/* #1122 — the layer is discrete → TE micro-label; visible while the run is warm */}
-      {heat > 0.01 && lastLayer && (
-        <span className="tb-micro red" title={`last tap ran the ${lastLayer} pass`}>
-          {kineticLayerLabel(lastLayer)}
-        </span>
-      )}
+      {/* #2050 — the next pass is discrete → TE detent: LOOK / VOICE / CUR /
+          CHAOS, always standing (at rest it honestly reads LOOK). Only the
+          CHAOS promise spends the one red. */}
+      <span className="tb-micro kin-next" data-next={nextLayer} title={`next tap: the ${nextLayer} pass`}>
+        {kineticNextLabel(nextLayer)}
+      </span>
     </button>
   );
 }

@@ -26,8 +26,14 @@ const tok = readFileSync(join(SRC, 'styles/tokens.css'), 'utf8');
 for (const t of ['--kc-live', '--kc-ok', '--kc-warn', '--kc-red', '--kc-davis'])
   if (!tok.includes(t + ':')) bad.push(`tokens.css missing ${t}`);
 const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
-if (!/\.chip-btn\.armed\s*\{[^}]*var\(--kc-davis\)/.test(panels))
-  bad.push('.chip-btn.armed must use --kc-davis (armed = waiting, time-based: the amber family)');
+// #2050 — armed chips render TE now: the mark is the red corner detent, and
+// no rule may render the chip boolean in Davis amber. (The old "armed =
+// waiting, time-based" reading is superseded by the top-bar legibility
+// spec: an arm is a discrete state, not a duration.)
+if (/\.chip-btn\.armed\s*\{[^}]*var\(--kc-davis\)/.test(panels))
+  bad.push('.chip-btn.armed must not use --kc-davis (armed renders TE since #2050)');
+if (!/\.chip-detent\s*\{[^}]*var\(--kc-red\)/.test(panels))
+  bad.push('.chip-detent must use --kc-red (the armed detent spends the one red)');
 if (bad.length) {
   console.error('pink discipline:\n' + bad.join('\n'));
   process.exit(1);

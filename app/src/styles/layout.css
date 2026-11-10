@@ -1766,6 +1766,12 @@
   color: var(--kc-red);
 }
 
+/* #2050 — KIN's next-pass detent: a TE word beside the breathing circle.
+   Quiet ink for LOOK / VOICE / CUR; only a promised CHAOS spends the one red. */
+.kin-next[data-next="chaos"] {
+  color: var(--kc-red);
+}
+
 /* Precedence: a lit accent that lost the cut renders subdued, never competing. */
 [data-subdued="true"] {
   opacity: 0.38;

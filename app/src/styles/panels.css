@@ -84,17 +84,26 @@
   border-color: var(--ink);
 }
 
-/* #964 — armed roll scope: outline + pin glyph, deliberately distinct from
-   .active (what's on screen). An armed chip can be active too — the outline
-   reads on top of the inversion. */
-.chip-btn.armed {
-  outline: 2px solid var(--kc-davis);
-  outline-offset: 1px;
+/* #964 — armed roll scope, deliberately distinct from .active (what's on
+   screen). #2050 — the mark is now a TE corner detent: armed is a discrete
+   fact, so it gets a detent, not the Davis-amber outline + pin emoji the
+   first version wore (a continuous-side rendering of a boolean, and an emoji at
+   that). One consistent corner — top-right — one red, no fill change: a
+   chip can be filled (live), detented (armed), or both (live and pinned
+   to land again). Scoped to the mode strip, the one surface whose chips
+   arm; the detent is pure CSS, so it adds no text to the chip. */
+.mode-strip .chip-btn {
+  position: relative;
 }
-.pin-glyph {
-  font-size: 8px;
-  margin-left: 2px;
-  vertical-align: 1px;
+.chip-detent {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 0;
+  height: 0;
+  border-top: 5px solid var(--kc-red);
+  border-left: 5px solid transparent;
+  pointer-events: none;
 }
 .scope-clear {
   padding: 2px 6px;
