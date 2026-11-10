@@ -22,6 +22,7 @@ import { makeMlxCurator, getDavisCitation } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
 import { experimentalOn } from './tasteGate.js';
 import { getLoisVerdict } from './loisRank.js';
+import { chapterSettings } from '../data/chapters.js'; // #2046 — the standing chapter's settings (the Book read-back)
 import { duelPick } from './readDuel.mjs'; // #1627 S3 — the duel (rides this loop, gated by S2's proof)
 
 export const CURATE_CANDIDATES = 8;
@@ -76,7 +77,7 @@ export function pickCurated(
   candidates,
   curator,
   rng = null,
-  { refine = false, reads = null, anchor = null, temperature } = {},
+  { refine = false, reads = null, anchor = null, temperature, chapterId = null } = {},
 ) {
   // Audit fix 3f — no Math.random default (the 3a contract): a
   // missing/non-function rng rolls 0, so the fallback deals candidate 0
@@ -95,9 +96,14 @@ export function pickCurated(
       /* fall through to the unshaped candidates */
     }
   }
+  // #2046 — the Book, read back: when a chapter stands, its feel (data/chapters.js `settings.feel`) rides into
+  // the pick, so flipping the Book changes what the taste path KNOWS, not only what the dealer may deal. No
+  // chapter standing (or Now, which carries no settings) → null → the engines score exactly as before. An
+  // engine that takes no third argument (LOIS's rank, the trained head) simply does not read it.
+  const chapterFeel = chapterSettings(chapterId)?.feel ?? null;
   let idx;
   try {
-    idx = curator.pick(candidates, draw);
+    idx = curator.pick(candidates, draw, { chapterFeel });
   } catch {
     idx = -1;
   }

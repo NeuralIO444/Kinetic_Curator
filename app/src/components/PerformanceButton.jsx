@@ -28,6 +28,7 @@ import { setConductTap } from '../curator/trioLive.js'; // #1483: Davis's route 
 import { createRouteRecorder } from '../gl/routeRecord.mjs';
 import { createGestureRecorder } from '../gl/gestureRecord.mjs';
 import { createBirthRecorder, setBirthTap, birthRecordsFromSection } from '../curator/birthRecord.mjs';
+import { createTreatmentRecorder } from '../curator/treatmentRecord.mjs'; // #2010: the take logs its treatment acts
 import { on, Events } from '../composition/eventBus.js';
 import { useApp } from '../state/AppContext.jsx';
 import { useStore } from '../state/store.js';
@@ -160,6 +161,28 @@ const birthsSection = (getFrame) => {
   };
 };
 
+// #2010 — the take carries its treatment ACTS (RAY GUN arm / disarm / verdict off the bus, by frame, with their
+// cause), stored as `treatments`: the recording listener that makes every treatment flow log-accountable. The
+// starting treatment is read from the store (the one truth). Accountability only — the form's own record is what
+// replays, so playback never consults this section.
+const treatmentsSection = (getFrame) => {
+  const rec = createTreatmentRecorder({
+    initial: { poem: useStore.getState().layoutParams?.fieldForm?.raygun ?? null },
+    getFrame,
+  });
+  const offs = [
+    on(Events.TREATMENT_ARM, (p, meta) => rec.push('arm', p, meta)),
+    on(Events.TREATMENT_DISARM, (p, meta) => rec.push('disarm', p, meta)),
+    on(Events.TREATMENT_VERDICT, (p, meta) => rec.push('verdict', p, meta)),
+  ];
+  return {
+    stop() {
+      for (const off of offs) off();
+      return rec.finish();
+    },
+  };
+};
+
 // #1462 — the take carries every persona decision verbatim (backend, seed, invented, the reply, whether it asked the
 // stage), stored as `mind`: playback re-publishes these and never asks a backend.
 const mindSection = (getFrame) => {
@@ -235,6 +258,7 @@ export function PerformanceButton() {
             routes: routesSection,
             gestures: gesturesSectionForTake,
             births: birthsSection,
+            treatments: treatmentsSection,
           },
         })
       ) {

@@ -4,6 +4,8 @@
 //
 // The spine is D1's ruling (Matt, 2026-10-31): the book OPENS at the primitive chapter —
 //   Marks → Engraving → Bauhaus → Swiss → Op Art → Japan → Memphis → Grunge → Now
+// #2046 — a chapter is no longer only an address book: it also carries `settings` (palette / motion / feel)
+// that a system can apply, and taste reads the standing chapter back (curator/taste.js, chapterSettings below).
 // A chapter declares: its look group(s) (data/styleLooks.js + presets.js), its asset styles/families
 // (data/assetStyle.js), its voice styles (the pairing data/voiceDeck.js records declare), and a chapter CARD —
 // the one-glance visual signature (a palette + representative marks) a landing will be recognized by in S2.
@@ -40,6 +42,7 @@ import { STYLES, FAMILIES, assetRecords } from './assetStyle.js';
 import { COMPOSITION_PRESETS, PRESET_GROUPS } from './presets.js';
 import { VOICE_DECK } from './voiceDeck.js';
 import { canonChapterAxes } from './canon/styles.js';
+import { canonStyleSettings } from './canon/settings.js';
 
 /** Never dealt into a chapter deck (the creature citizen — mirrors state/rollPool.mjs NEVER_DEALT).
  * #1982: the kana stamps join the citizen in this class — catalogue members
@@ -152,6 +155,10 @@ export const CHAPTERS = Object.freeze(
     Object.freeze({
       ...c,
       style: c.style ?? null,
+      // #2046 — the chapter's applicable settings, drawn from the Canon style it stands on: palette behaviour,
+      // motion and feel, measured from the style's own looks and voices (data/canon/settings.js). Deep-frozen.
+      // Now stands on the whole library and names no style, so it carries none (null) — it narrows nothing.
+      settings: c.style ? canonStyleSettings(c.style) : null,
       position: i,
       prev: i > 0 ? SPINE[i - 1].id : null,
       next: i < SPINE.length - 1 ? SPINE[i + 1].id : null,
@@ -169,6 +176,16 @@ const BY_ID = new Map(CHAPTERS.map((c) => [c.id, c]));
 /** A chapter by id, or null. */
 export function chapterById(id) {
   return BY_ID.get(id) || null;
+}
+
+/**
+ * #2046 — the read-back door: a chapter's applicable settings by id (`{ basis, palette, motion, feel }`), or
+ * null when no chapter stands, the id is unknown, or the chapter carries none (Now). What the taste path
+ * consults for the standing chapter.
+ */
+export function chapterSettings(chapterOrId) {
+  const c = typeof chapterOrId === 'string' ? chapterById(chapterOrId) : chapterOrId;
+  return (c && c.settings) || null;
 }
 
 /** The chapter after this one along the spine (null past Now — the walk ends, it never cycles). */

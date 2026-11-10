@@ -480,7 +480,12 @@ ok('CENSUS B — mirror rooms: the mirror manufactures self-overlap, and its mar
   assert.deepEqual(c.dist, { clean: 9, janky: 11 }, 'census B verdicts, pinned exactly');
   assert.deepEqual(c.gates, { markCover: 6, selfOverlap: 5 }, 'census B gates, pinned exactly');
   assert.ok(near(c.maxM1, 0.3434605193277934, 1e-12), `the mirror manufactures landed self-overlap (${c.maxM1})`);
-  assert.ok(near(Math.min(...m2s), 0.4152138545092997, 1e-12), 'the mirror mark-cover floor, pinned exactly');
+  // #2046 re-pin (0.4152138545092997 → 0.3788928107981849): these presses land with a Book chapter standing, and
+  // the CURATE pick now reads that chapter's feel (curator/taste.js chapterLeans), so a handful of the 20 picks
+  // settle on a different candidate of the same pool. The census outcome is unmoved — same 20 judged, same
+  // verdicts {clean 9, janky 11}, same gates {markCover 6, selfOverlap 5}, same M1 max and the same M2 ceiling
+  // at the gate; only the lowest mark-cover reading among the landings is a different landing's.
+  assert.ok(near(Math.min(...m2s), 0.3788928107981849, 1e-12), 'the mirror mark-cover floor, pinned exactly');
   assert.ok(near(c.maxM2, 0.5000000000000004, 1e-12), 'the floor sits AT the gate, pinned exactly');
 });
 

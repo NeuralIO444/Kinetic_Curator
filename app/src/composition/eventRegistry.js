@@ -142,6 +142,14 @@ export const EVENT_REGISTRY = {
     handler: null,
     note: 'telemetry: published by dishDensityLive each frame the contacts pass runs (#1412); the formation check (#1355) and telemetry read it — a pull getter (getDishDensityField) sits beside it',
   },
+  // #2010 — treatment announcements (curator/treatmentsLive.mjs emits; the take's section records). The record on
+  // the form is the authority, so nothing here is wired to a store action: the bus announces, it never carries state.
+  TREATMENT_ARM: { handler: ['components/PerformanceButton.jsx'] },
+  TREATMENT_DISARM: { handler: ['components/PerformanceButton.jsx'] },
+  TREATMENT_VERDICT: {
+    handler: ['components/PerformanceButton.jsx'],
+    note: 'reserved: nobody emits it yet — a judged treatment arrives with the #2006 review loop / RAY GUN P5 doctrines; the take section already records it',
+  },
   VIEW_FULLSCREEN: { handler: 'wire' },
   STAGE_MODE: { handler: 'wire' },
   STAGE_BLACKOUT: { handler: 'wire' },

@@ -633,6 +633,7 @@ node src/data/chapters.selfcheck.mjs
 node src/data/canon/canon.selfcheck.mjs
 node src/data/canon/voiceStyle.selfcheck.mjs
 node src/data/canon/canonMotion.selfcheck.mjs
+node src/data/canon/canonSettings.selfcheck.mjs
 node src/state/kineticSweep.selfcheck.mjs
 node src/state/kineticScope.selfcheck.mjs
 node src/state/chapterWalk.selfcheck.mjs
@@ -648,3 +649,4 @@ node src/assets/tauriCsp.selfcheck.mjs
 node src/curator/trioAcceptance.selfcheck.mjs
 node src/curator/showSpectrum.selfcheck.mjs
 node src/curator/trailStats.selfcheck.mjs
+node src/curator/treatmentBus.selfcheck.mjs
