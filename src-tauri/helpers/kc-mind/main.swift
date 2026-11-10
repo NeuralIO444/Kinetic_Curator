@@ -183,9 +183,17 @@ actor Minds {
     private var sessions: [String: LanguageModelSession] = [:]
     private var uses: [String: Int] = [:]
 
+    // The model's window is 4,096 tokens TOTAL — instructions + transcript + the new prompt. Measured in
+    // a real Mac session (#2068, 2026-11-10): with the conducting vocabulary in Davis's instructions and
+    // a live show block in every ask, the FIFTH exchange in one session overflowed (4,564 tokens). Four
+    // answers per session keeps the transcript comfortably inside the window, and a fresh session is
+    // cheap and prewarmed, so the shorter cycle costs nothing the artist can feel.
+    private let answersPerSession = 4
+
     private func session(for persona: String) -> LanguageModelSession {
-        // a fresh session every 16 answers: the transcript stays short, so latency stays low
-        if let s = sessions[persona], (uses[persona] ?? 0) < 16 { uses[persona, default: 0] += 1; return s }
+        // a fresh session every few answers: the transcript stays short, so latency stays low — and the
+        // window is never outgrown (see answersPerSession above)
+        if let s = sessions[persona], (uses[persona] ?? 0) < answersPerSession { uses[persona, default: 0] += 1; return s }
         let voice = persona == "lois" ? loisVoice : persona == "davis" ? davisVoice : thirdVoice
         let s = LanguageModelSession(instructions: sharedRules + "\n" + voice)
         s.prewarm()
