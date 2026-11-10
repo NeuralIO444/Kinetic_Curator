@@ -159,6 +159,8 @@ func routeOpDict(_ r: RouteReply) -> [String: Any]? {
     switch r.op {
     case "spectrum":
         guard let key = r.key, let value = r.value else { return nil }
+        // fail-closed like the app side: an extreme or non-finite value is never said (Int() would trap on it)
+        guard value.isFinite, abs(value) <= 1_000_000 else { return nil }
         // the map dial is an integer on the app side; the amounts pass through as numbers
         if key == "map" { return ["op": "spectrum", "key": key, "value": Int(value.rounded())] }
         return ["op": "spectrum", "key": key, "value": value]

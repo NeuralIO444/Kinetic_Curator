@@ -83,3 +83,7 @@ and are range-checked app-side.
   route decisions land (recorded as backend `apple`), with the rules conducting identically whenever the
   helper is unavailable. The issue stays OPEN for that Mac session; this build clears everything that can be
   cleared from a headless lane.
+
+## Addendum — QA fix round (2026-11-10)
+
+Independent QA verdict on `1a00eb50`: CLEAN, no blocking findings (diff discipline, validator mirror field-for-field, prompt vocabulary exact against the route table, LOIS/Queen/KC_NO_FM paths untouched). One non-blocking robustness note, folded in by the coordinator before publish: the spectrum branch's `Int(value.rounded())` would trap on an extreme or non-finite model value. `routeOpDict` now guards first — non-finite or |value| > 1,000,000 returns nil (never said), matching the app side's fail-closed posture. No other trapping conversion exists in the function (depth passes through as a Double). Selfchecks re-run after the fix: apple 6 ✓ (no pending line), conductor 24 ✓.
