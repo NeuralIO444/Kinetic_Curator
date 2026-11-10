@@ -115,6 +115,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.LAYER_TOGGLE_WET_SOAK, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_WET_SOAK, id }));
   on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
   on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
+  on(Events.LAYER_SET_ROTATION, ({ id, rotation }) => dispatch({ type: A.SET_LAYER_ROTATION, id, rotation }));
   on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
   on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
   on(Events.LAYER_ADD_FX, (p) => dispatch({ type: A.ADD_FX_LAYER, family: p?.family }));

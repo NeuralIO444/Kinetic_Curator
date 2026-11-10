@@ -263,6 +263,8 @@ export function applyAction(action, store = useStore.getState()) {
       return store.setLayerBlendMode(action.id, action.mode);
     case A.SET_LAYER_OPACITY:
       return store.setLayerOpacity(action.id, action.opacity);
+    case A.SET_LAYER_ROTATION:
+      return store.setLayerRotation(action.id, action.rotation);
     case 'DUPLICATE_LAYER':
       return store.duplicateLayer(action.id);
     case 'SOLO_LAYER':

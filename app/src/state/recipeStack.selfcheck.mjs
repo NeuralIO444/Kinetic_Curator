@@ -1,8 +1,12 @@
 // recipeStack.selfcheck.mjs — a share link / recipe / keep carries the whole layer stack (#1131).
 //
-// Built on the real store: extra KC track, FX, MATH and PATTERN tracks, an inactive track with its own seed and
-// palette. Encode (link and text) -> decode -> applyProject into a fresh store state -> the stack comes back.
+// Built on the real store: the KC track, FX, MATH and PATTERN tracks.
+// Encode (link and text) -> decode -> applyProject into a fresh store state -> the stack comes back.
 // A one-track scene must stay byte-identical to v1.
+// #2038: the stack is ONE content stratum now — the pre-rebuild
+// two-content stack (with its inactive track's own seed and palette in
+// layerSnapshots) opens under the strata migration law instead; that
+// case is pinned at the bottom of this file.
 import assert from 'node:assert';
 import { useStore } from './store.js';
 import {
@@ -38,10 +42,9 @@ const base = S();
 const v1Url = encodeRecipeUrl(fields());
 const v1Text = encodeRecipe(fields());
 
-// a real stack
+// a real stack — the lawful maximum under #2038: one content stratum,
+// a pattern ground, one FX track, one MATH track.
 S().setSeed?.(0x1234);
-S().addLayer('content');
-const second = S().layers.filter((l) => l.type === 'content')[1].id;
 S().addPatternLayer('GLYPH');
 S().setPatternParam(S().layers.find((l) => l.type === 'pattern').id, 'drift', 0.6);
 S().addFxLayer();
@@ -64,7 +67,7 @@ ok('a scene with one plain KC track has no stack: link and text are exactly v1',
 });
 
 ok('a real stack makes a kc-r/2 link and a kc-recipe/2 text, and the link stays short', () => {
-  assert.ok(live.layers.length >= 5);
+  assert.ok(live.layers.length >= 4);
   const url = encodeRecipeUrl(fields(live));
   const text = encodeRecipe(fields(live));
   assert.ok(url.startsWith(RECIPE_URL_PREFIX_2), url.slice(0, 12));
@@ -98,40 +101,55 @@ const roundTrip = (decode) => {
 };
 const types = (st) => st.layers.map((l) => `${l.type}`).join(',');
 
-ok(
-  "link round trip: every track, the pattern block, the active track and the other track's own state come back",
-  () => {
-    const want = live;
-    const dec = decodeRecipeUrl(encodeRecipeUrl(fields(want)));
-    assert.ok(dec.ok, dec.error);
-    const got = roundTrip(dec.recipe);
-    assert.equal(types(got), types(want));
-    assert.deepEqual(
-      got.layers.map((l) => l.id),
-      want.layers.map((l) => l.id),
-    );
-    assert.equal(got.activeLayerId, want.activeLayerId);
-    const wp = want.layers.find((l) => l.type === 'pattern').pattern;
-    const gp = got.layers.find((l) => l.type === 'pattern').pattern;
-    assert.deepEqual(gp, wp);
-    assert.equal(gp.drift, 0.6);
-    assert.equal(got.seed, want.seed);
-    assert.equal(got.paletteId, want.paletteId);
-    const s2 = want.layerSnapshots[second];
-    const g2 = got.layerSnapshots[second];
-    assert.ok(g2, 'the other KC track kept its own save state');
-    assert.equal(g2.seed, s2.seed >>> 0);
-    assert.equal(g2.paletteId, s2.paletteId);
-    assert.deepEqual(g2.layoutParams, JSON.parse(JSON.stringify(s2.layoutParams)));
-    assert.deepEqual(
-      Object.keys(g2.enabledAssets).sort(),
-      Object.keys(s2.enabledAssets)
-        .filter((k) => s2.enabledAssets[k])
-        .sort(),
-      'and its own cast: not an empty one',
-    );
-  },
-);
+ok('link round trip: every track, the pattern block, and the active track come back', () => {
+  const want = live;
+  const dec = decodeRecipeUrl(encodeRecipeUrl(fields(want)));
+  assert.ok(dec.ok, dec.error);
+  const got = roundTrip(dec.recipe);
+  assert.equal(types(got), types(want));
+  assert.deepEqual(
+    got.layers.map((l) => l.id),
+    want.layers.map((l) => l.id),
+  );
+  assert.equal(got.activeLayerId, want.activeLayerId);
+  const wp = want.layers.find((l) => l.type === 'pattern').pattern;
+  const gp = got.layers.find((l) => l.type === 'pattern').pattern;
+  assert.deepEqual(gp, wp);
+  assert.equal(gp.drift, 0.6);
+  assert.equal(got.seed, want.seed);
+  assert.equal(got.paletteId, want.paletteId);
+});
+
+ok('#2038: a pre-rebuild two-content stack opens under the migration law — first content kept, second trimmed', () => {
+  // The old shape this suite was built on: two KC tracks, the inactive
+  // one carrying its own seed/palette snapshot. stackOf normalizes on
+  // the way in, so the compact stack itself already holds ONE content
+  // stratum and no snapshot for the trimmed track.
+  const kcA = {
+    id: 'kc-a',
+    name: 'KC-1',
+    type: 'content',
+    visible: true,
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
+    patch: { mode: 'off', to: null, strength: 0.16 },
+  };
+  const kcB = { ...kcA, id: 'kc-b', name: 'KC-2' };
+  const carrier = {
+    // (a pattern ground rides along so the stack is non-trivial — a
+    // lone content stratum has no stack at all, by the v1 rule above)
+    layers: [{ id: 'pt-1', name: 'PT-1', type: 'pattern', pattern: { mode: 'QUILT' } }, kcA, kcB],
+    activeLayerId: 'kc-a',
+    layerSnapshots: {
+      'kc-b': { seed: 777, paletteId: 'v01d', layoutParams: {}, enabledAssets: { someGlyph: true } },
+    },
+  };
+  const stack = stackOf(carrier);
+  assert.ok(stack, 'the stack still encodes');
+  assert.equal(stack.l.filter((l) => l.type === 'content').length, 1, 'one content stratum in the compact stack');
+  assert.equal(stack.l.find((l) => l.type === 'content').id, 'kc-a', 'the FIRST content stratum is the one kept');
+  assert.deepEqual(Object.keys(stack.n || {}), [], 'no snapshot rides for the trimmed track');
+});
 
 ok('text round trip: kc-recipe/2 gives the same stack', () => {
   const want = live;
@@ -252,7 +270,11 @@ ok('clicking a keep brings its tracks back (recall and morph), in one undo; a pl
       `${act}: the PATTERN block is back`,
     );
     assert.equal(S().activeLayerId, live.activeLayerId);
-    assert.ok(S().layerSnapshots[second], `${act}: the other KC track has its own state`);
+    // #2038: there is no "other KC track" any more — the keep's own
+    // state (seed + palette of the one content stratum) is what comes
+    // back, and no phantom snapshot appears for a trimmed track.
+    assert.equal(S().seed, live.seed, `${act}: the keep's seed is back`);
+    assert.equal(S().paletteId, live.paletteId, `${act}: the keep's palette is back`);
     S().undo();
     assert.deepEqual(
       S().layers.map((l) => l.id),

@@ -8,14 +8,16 @@ import { GRAIN_FAMILY_KINDS, sanitizeFxEffects } from '../fx/fxFilters.js';
 
 const DIR = dirname(fileURLToPath(import.meta.url));
 
-test('#820 grain family is the finish family — grain, plus dither since #1610, plus riso since #2008', () => {
+test('#820 grain family is the finish family — grain, plus dither since #1610, plus riso since #2008, plus stipple since #2038', () => {
   // Re-pinned for #1610: dither joins GRAIN_FAMILY_KINDS as EF-4's second
   // real kind. The seam property this suite guards is unchanged — every
   // family member runs in the finish chain, after ACCUM, never inside
   // the keep loop; the family simply has two members now.
   // Re-pinned for #2008 (cause: the riso overprint finish): riso joins as
   // the family's third kind, on the same seam property.
-  assert.deepEqual(GRAIN_FAMILY_KINDS, ['grain', 'dither', 'riso']);
+  // Re-pinned for #2038 (cause: the stipple dot screen): stipple joins as
+  // the family's fourth kind, on the same seam property.
+  assert.deepEqual(GRAIN_FAMILY_KINDS, ['grain', 'dither', 'riso', 'stipple']);
 });
 
 test('#820 sanitize parks grain last', () => {
@@ -77,7 +79,12 @@ test('#815 finish chain runs after accum.step, not inside the recipe', () => {
   const finish = renderer.indexOf('finalTex = bridge.runChain(layerId, finalTex, steps)');
   assert.ok(step >= 0 && finish > step, 'stills apply grain after the last accum step');
   const liveStep = live.indexOf('accumObj.step(');
-  const liveFinish = live.indexOf('accumTex = live.getBridge().runChain(layerId, accumTex, steps)');
+  // #2038 re-pin (cause: per-stratum rotation): the live accum path now
+  // applies its finish chains through the renderer's applyFinishChains
+  // — the same seam the main present path uses, so a rotated grain-
+  // family finish turns there too. The ordering property is unchanged:
+  // the finish is applied to the accum texture AFTER the last step.
+  const liveFinish = live.indexOf('live.applyFinishChains(accumObj.texture(), fxFinishChains)');
   assert.ok(liveStep >= 0 && liveFinish > liveStep, 'live applies grain after accum.step');
   const passes = accum.slice(accum.indexOf('ACCUM_PASS_SOURCES'));
   assert.doesNotMatch(passes, /grain/);

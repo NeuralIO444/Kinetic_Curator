@@ -195,6 +195,12 @@ assert.ok(Number.isFinite(applied.seed), 'applied doc stays playable');
 // ── #456 — TRACKS patches round-trip through save/load ──────────────────
 // Before the fix, normalizeLayers built each content layer without ever
 // reading l.patch, so every MOD/FIELD/FEED row vanished silently on load.
+// #2038 re-pin: this fixture IS a pre-rebuild document (two content
+// strata), so it now loads under the strata-rebuild migration law — the
+// first content stratum keeps its patch row (mode + strength survive:
+// the #456 guarantee), the second stratum trims BY NAME into
+// layerTrims, and a patch whose target trimmed goes inert instead of
+// pointing at a stratum that no longer exists.
 const withPatch = parseProject({
   version: 1,
   seed: 1,
@@ -206,10 +212,16 @@ const withPatch = parseProject({
 });
 assert.ok(withPatch.ok);
 assert.deepStrictEqual(
-  withPatch.doc.layers.find((l) => l.id === 'a').patch,
-  { mode: 'mod', to: 'b', strength: 0.4 },
-  'a patch targeting an existing layer must survive load',
+  withPatch.doc.layers.map((l) => l.id),
+  ['a'],
+  '#2038: one content stratum survives the load',
 );
+assert.deepStrictEqual(
+  withPatch.doc.layers.find((l) => l.id === 'a').patch,
+  { mode: 'mod', to: null, strength: 0.4 },
+  'the patch row survives load; its trimmed target goes inert',
+);
+assert.deepStrictEqual(withPatch.doc.layerTrims, ['content stratum "B"'], 'the trimmed stratum is named on the doc');
 
 // A target that doesn't exist (stale id, or an FX layer) goes inert rather
 // than pointing at nothing; mode is left alone since liveResolve already
@@ -308,6 +320,10 @@ assert.strictEqual(
 // ── #1609 — the skeleton trim is SPOKEN: dropped strata are named ──────
 // The acceptance case: a legacy 4-content Look loads as its first 2, and
 // the load receipt (via doc.layerTrims → loadedMessage) names the drops.
+// #2038 re-pin: the content cap is ONE now, so the same legacy Look
+// loads as its first stratum only, and the receipt names all three
+// drops — the trim law (first kept, rest named, never silent) is
+// unchanged; only the cap moved.
 {
   const legacy = parseProject({
     version: 1,
@@ -323,10 +339,14 @@ assert.strictEqual(
   assert.ok(legacy.ok);
   assert.deepStrictEqual(
     legacy.doc.layers.map((l) => l.name),
-    ['Alpha', 'Beta'],
-    'a legacy 4-content Look loads as its first 2',
+    ['Alpha'],
+    'a legacy 4-content Look loads as its first stratum (#2038: one content layer)',
   );
-  assert.deepStrictEqual(legacy.doc.layerTrims, ['content stratum "Gamma"', 'content stratum "Delta"']);
+  assert.deepStrictEqual(legacy.doc.layerTrims, [
+    'content stratum "Beta"',
+    'content stratum "Gamma"',
+    'content stratum "Delta"',
+  ]);
   // A clean load carries no trim at all — the receipt stays silent.
   const clean = parseProject({
     version: 1,

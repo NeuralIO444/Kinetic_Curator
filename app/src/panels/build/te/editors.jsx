@@ -4,6 +4,7 @@
 // native inputs; the BUILD tone (amber) comes from the panel's RangeTone.
 import { useRef } from 'react';
 import { RangeRow } from '../../../components/RangeRow.jsx';
+import { steppedStopValue } from './modeStops.mjs';
 
 function fmtVal(value, format, unit) {
   const s = format ? format(value) : String(value);
@@ -74,10 +75,18 @@ export function DualEditor({ low, high, min, max, step = 1, unit, format, onChan
   );
 }
 
-export function StepperEditor({ value, min, max, step = 1, unit, format, onChange, ariaLabel }) {
+export function StepperEditor({ value, min, max, step = 1, stops, unit, format, onChange, ariaLabel }) {
+  // #2038 QA fix — a `stops` table makes the stepper detent-only: −/+
+  // move to the ADJACENT stop (steppedStopValue), never to a uniform
+  // increment, so a non-uniform detent table (the rotation 0/15/45/90)
+  // is offered exactly, with no in-between values a data law would
+  // silently erase. Without stops, the original uniform step + clamp.
+  const hasStops = Array.isArray(stops) && stops.length > 0;
+  const lo = hasStops ? Math.min(...stops) : min;
+  const hi = hasStops ? Math.max(...stops) : max;
   const clampStep = (dir) => {
-    const next = Math.min(max, Math.max(min, value + dir * step));
-    onChange(next);
+    const next = hasStops ? steppedStopValue(stops, value, dir) : Math.min(max, Math.max(min, value + dir * step));
+    if (next != null) onChange(next);
   };
   return (
     <div className="te-editor te-stepper">
@@ -86,7 +95,7 @@ export function StepperEditor({ value, min, max, step = 1, unit, format, onChang
         className="te-step-btn"
         onClick={() => clampStep(-1)}
         aria-label={`Decrease ${ariaLabel}`}
-        disabled={value <= min}
+        disabled={value <= lo}
       >
         −
       </button>
@@ -96,7 +105,7 @@ export function StepperEditor({ value, min, max, step = 1, unit, format, onChang
         className="te-step-btn"
         onClick={() => clampStep(1)}
         aria-label={`Increase ${ariaLabel}`}
-        disabled={value >= max}
+        disabled={value >= hi}
       >
         +
       </button>
