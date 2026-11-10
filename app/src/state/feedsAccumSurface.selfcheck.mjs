@@ -60,15 +60,17 @@ const S = () => useStore.getState();
 const layerOf = (id) => S().layers.find((l) => l.id === id);
 const undoDepth = () => S().historyUndoStack.length;
 
-// A deterministic world, installed through the real load path: two
-// content strata, a pattern stratum, an FX stratum, a MATH stratum.
+// A deterministic world, installed through the real load path: one
+// content stratum (#2038 — there is only ever one now), a pattern
+// stratum, an FX stratum, a MATH stratum. The load also canonicalizes:
+// the pattern loads pinned to the bottom, ahead of the content stratum
+// it is written behind here.
 const rawDoc = {
   version: 1,
   seed: 0xbeef,
   paletteId: 'praystation',
   layers: [
     { id: 'kc-a', name: 'A', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    { id: 'kc-b', name: 'B', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
     { id: 'pt-1', name: 'P', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
     {
       id: 'fx-1',
@@ -89,26 +91,26 @@ const install = () => S().applyProject(parsed.doc);
 install();
 assert.deepEqual(
   S().layers.map((l) => l.id),
-  ['kc-a', 'kc-b', 'pt-1', 'fx-1', 'mt-1'],
-  'the fixture world is installed',
+  ['pt-1', 'kc-a', 'fx-1', 'mt-1'],
+  'the fixture world is installed (pattern pinned to the bottom, #2038)',
 );
 
 ok('bus chain: the row event flips the flag — key appears as false, disappears on re-enable, never true', () => {
-  assert.ok(!('feedsAccum' in layerOf('kc-b')), 'starts keyless (on)');
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
-  assert.equal(layerOf('kc-b').feedsAccum, false, 'one tap: feedsAccum === false');
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
-  assert.ok(!('feedsAccum' in layerOf('kc-b')), 'second tap: the key is gone, not spelled true');
-  assert.ok(!('feedsAccum' in layerOf('kc-a')), 'the neighbour stratum is untouched');
+  assert.ok(!('feedsAccum' in layerOf('kc-a')), 'starts keyless (on)');
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' });
+  assert.equal(layerOf('kc-a').feedsAccum, false, 'one tap: feedsAccum === false');
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' });
+  assert.ok(!('feedsAccum' in layerOf('kc-a')), 'second tap: the key is gone, not spelled true');
+  assert.ok(!('feedsAccum' in layerOf('pt-1')), 'the neighbour stratum is untouched');
 });
 
 ok('the toggle is an undoable layers entry', () => {
   const before = undoDepth();
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
-  assert.equal(layerOf('kc-b').feedsAccum, false);
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' });
+  assert.equal(layerOf('kc-a').feedsAccum, false);
   assert.equal(undoDepth(), before + 1, 'one undo entry pushed');
   S().undo();
-  assert.ok(!('feedsAccum' in layerOf('kc-b')), 'undo restores the on state (keyless)');
+  assert.ok(!('feedsAccum' in layerOf('kc-a')), 'undo restores the on state (keyless)');
 });
 
 ok('FX/MATH strata: the toggle is a no-op — no key, no undo entry, no change', () => {
@@ -129,27 +131,18 @@ ok('pattern stratum: the same chain toggles its flag', () => {
   assert.ok(!('feedsAccum' in layerOf('pt-1')), 'and start again');
 });
 
-ok('a duplicate inherits the flag — content', () => {
-  // #1609 re-pin: the shared world already holds both content strata, so
-  // a content dup there refuses at the D3 cap — install a one-content
-  // world, where the dup fits, and restore the shared world after.
-  const solo = parseProject({
-    version: 1,
-    seed: 0xbeef,
-    paletteId: 'praystation',
-    layers: [
-      { id: 'kc-b', name: 'B', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-      { id: 'pt-1', name: 'P', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    ],
-    activeLayerId: 'kc-b',
-  });
-  assert.ok(solo.ok, `solo world parses: ${solo.error || ''}`);
-  S().applyProject(solo.doc);
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
-  S().duplicateLayer('kc-b');
-  const copyB = S().layers.find((l) => l.id !== 'kc-b' && l.type === 'content' && l.feedsAccum === false);
-  assert.ok(copyB, 'the content copy carries feedsAccum: false');
-  install(); // restore the shared world
+ok('a content duplicate is refused at the one-content cap — flagged or not (#2038)', () => {
+  // Pre-#2038 this case pinned flag inheritance on a content dup. With
+  // ONE content stratum there is no content dup: duplicateLayer refuses
+  // at the cap, so no copy exists to inherit anything. (Flag
+  // inheritance itself is still pinned on the pattern dup below, and
+  // the slice still carries the key on copies it does make.)
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' });
+  const before = S().layers.length;
+  S().duplicateLayer('kc-a');
+  assert.equal(S().layers.length, before, 'no second content stratum is minted');
+  assert.equal(S().layers.filter((l) => l.type === 'content').length, 1);
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' }); // restore all-on
 });
 
 ok('a duplicate inherits the flag — pattern', () => {
@@ -190,7 +183,7 @@ ok('round-trip pin: serialize → parse → apply → serialize keeps the layers
   const after = JSON.stringify(serializeProject(S()).layers);
   assert.equal(after, before, 'the layers survive the round trip byte for byte');
   assert.equal(layerOf('kc-a').feedsAccum, false, 'the flagged stratum is still off after load');
-  assert.ok(!('feedsAccum' in layerOf('kc-b')), 'the feeding stratum is still keyless after load');
+  assert.ok(!('feedsAccum' in layerOf('pt-1')), 'the feeding stratum is still keyless after load');
   emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' }); // leave the world all-on
 });
 
@@ -211,7 +204,9 @@ ok('normalize edges: only exactly false on content/pattern survives a load', () 
   assert.ok(res.ok, `hostile doc still parses: ${res.error || ''}`);
   const byId = Object.fromEntries(res.doc.layers.map((l) => [l.id, l]));
   assert.ok(!('feedsAccum' in byId.a), 'spelled true loads as absence (on)');
-  assert.ok(!('feedsAccum' in byId.b), 'a non-boolean loads as absence (on)');
+  // #2038: 'b' is a second content stratum — it trims at the
+  // one-content door before its hostile flag is ever read.
+  assert.equal(byId.b, undefined, 'a second content stratum trims at the door (#2038)');
   assert.equal(byId.p.feedsAccum, false, 'pattern false survives');
   assert.ok(!('feedsAccum' in byId.f), 'an FX flag is dropped — FX never feeds');
   assert.ok(!('feedsAccum' in byId.m), 'a MATH flag is dropped — MATH never feeds');
@@ -229,7 +224,7 @@ ok('normalize edges: only exactly false on content/pattern survives a load', () 
 });
 
 await okAsync('contract link: the round-tripped document derives the same selection slice 2 proved', async () => {
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' });
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' });
   const wire = JSON.stringify(serializeProject(S()));
   const back = parseProject(JSON.parse(wire));
   assert.ok(back.ok);
@@ -239,17 +234,18 @@ await okAsync('contract link: the round-tripped document derives the same select
   const { accumFeedSelection } = await import('../gl/renderer.mjs');
   const caps = getRenderCaps('balanced', false);
   const contract = buildSceneContract({ doc: back.doc, resolvedLayers: resolveLayers(back.doc, { caps }), caps });
-  const cB = contract.layers.find((l) => l.id === 'kc-b');
   const cA = contract.layers.find((l) => l.id === 'kc-a');
-  assert.equal(cB.feedsAccum, false, 'the loaded flag reaches the contract');
-  assert.ok(!('feedsAccum' in cA), 'the feeding stratum stays keyless in the contract');
+  const cP = contract.layers.find((l) => l.id === 'pt-1');
+  assert.equal(cA.feedsAccum, false, 'the loaded flag reaches the contract');
+  assert.ok(!('feedsAccum' in cP), 'the feeding stratum stays keyless in the contract');
   const expected = contract.compositeOrder.filter((id) => {
     const l = contract.layers.find((x) => x.id === id);
     return l && (l.type === 'content' || l.type === 'pattern') && l.feedsAccum !== false;
   });
   assert.deepEqual(accumFeedSelection(contract), expected, 'the selection is the feeding strata, in order');
-  assert.ok(!expected.includes('kc-b'), 'kc-b is out of the selection');
-  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-b' }); // restore
+  assert.ok(!expected.includes('kc-a'), 'kc-a is out of the selection');
+  assert.ok(expected.includes('pt-1'), 'the pattern ground still feeds');
+  emit(Events.LAYER_TOGGLE_FEEDS_ACCUM, { id: 'kc-a' }); // restore
 });
 
 // --- the collapsed confession ----------------------------------------------

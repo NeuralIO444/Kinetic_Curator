@@ -8,7 +8,8 @@
 // engine/kernel/rng → engine/prng) and is safe to import from anywhere.
 import { normalizeLayoutParams } from '../data/layout-modes.js';
 import { sanitizeFxEffects, FX_EFFECT_DEFS, MAX_FX_EFFECTS } from '../fx/fxFilters.js';
-import { fxBeforeMath } from './layerOrder.js';
+import { fxBeforeMath, canonicalStrataOrder } from './layerOrder.js';
+import { sanitizeStratumRotation } from './stratumRotation.js';
 import { sanitizePattern } from './patternTrack.js';
 import { sanitizeMathEffects, MATH_EFFECT_DEFS, MAX_MATH_OPS } from '../fx/mathFilters.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -34,8 +35,16 @@ export const MAX_LAYERS = 16;
  * parseProject carries them on the doc, and the import receipt names them
  * (pipelineNotices.loadedMessage). PATTERN strata are ground (D4): no
  * skeleton count applies to them, only MAX_LAYERS.
+ *
+ * #2038 (Matt's ruling, 2026-11-08) — the skeleton is rebuilt to ONE
+ * content stratum. This trim IS the migration for every pre-rebuild
+ * document, take and stage (they all restore through this door): a
+ * two-content document loads with its FIRST content stratum kept and
+ * the second named in the receipt — never a refusal, never a silent
+ * drop. The full order is re-seated to the fixed form at the same door
+ * (canonicalStrataOrder, below).
  */
-export const MAX_CONTENT_TRACKS = 2;
+export const MAX_CONTENT_TRACKS = 1;
 /** #1609 — mirrors `slices/layersSlice.js`'s `MAX_FX_TRACKS` (same cycle rule). */
 export const MAX_FX_TRACKS = 1;
 /** #1609 — mirrors `slices/layersSlice.js`'s `MAX_MATH_TRACKS` (same cycle rule). */
@@ -217,6 +226,10 @@ export function normalizeSnapshots(raw, customAssets = [], root = {}, layerIds =
  * the returned `trims` (names, in document order) so the load receipt can
  * say it out loud (D3/D5: nothing vanishes silently). PATTERN strata are
  * ground (D4) and are never skeleton-trimmed.
+ *
+ * #2038 — the content cap is 1 now: content past the FIRST stratum
+ * trims, named, exactly as above. That trim is the rebuild's migration
+ * for pre-rebuild two-content documents.
  */
 export function normalizeLayers(rawLayers, rawActiveId) {
   if (!Array.isArray(rawLayers) || rawLayers.length === 0) {
@@ -335,6 +348,15 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     // Content strata only (a hand-edited flag elsewhere is dropped,
     // matching the scene contract's law).
     if (type === 'content' && l.wetSoak === true) layer.wetSoak = true;
+    // #2038 — per-stratum rotation rides the document layer the same
+    // way: only a true detent (15/45/90) survives the load, spelled as
+    // the bare number; 0 — and any non-detent value — is the unrotated
+    // state, so the loaded layer carries no key. Any stratum type may
+    // carry it. Assigned last, after feedsAccum/wetSoak: the store
+    // setter appends the key the same way, so a save → load → save
+    // round trip is byte-stable.
+    const rotation = sanitizeStratumRotation(l.rotation);
+    if (rotation) layer.rotation = rotation;
     layers.push(layer);
   }
   if (layers.length === 0) return { layers: null, activeLayerId: null, trims };
@@ -355,6 +377,21 @@ export function normalizeLayers(rawLayers, rawActiveId) {
     layers.splice(0, layers.length, ...ordered.layers);
     console.warn(
       '[normalize] FX tracks moved below MATH tracks (#1048: the tone grade folds last) — this project may render differently; save it to keep the new order',
+    );
+  }
+  // #2038 — the fixed order, whole: patterns pinned to the bottom, then
+  // the one content stratum, then FX, then MATH. A legacy document that
+  // traded a pattern up into the stack (or stored a content stratum
+  // above the grade) is re-seated here — nothing is dropped, only
+  // seated, and like the #1048 move above it is said out loud because
+  // it can change how the project renders (the ground a stratum reads
+  // is its nearest pattern below, and that relation is now the bottom
+  // band by law).
+  const seated = canonicalStrataOrder(layers);
+  if (seated.moved) {
+    layers.splice(0, layers.length, ...seated.layers);
+    console.warn(
+      '[normalize] strata re-seated to the fixed order (#2038: patterns pinned to the bottom, then content, FX, MATH) — this project may render differently; save it to keep the new order',
     );
   }
   // FX/MATH layers are never the content-active layer; a document with no

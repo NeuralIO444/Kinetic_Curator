@@ -9,6 +9,8 @@
 // third block) is re-staged: the block boots unselected from a restored
 // project so the header tap is what opens it, and DUP reads the cap
 // (disabled) rather than minting a copy.
+// #2038 re-pin: section (3)'s two-KC-track staging is retired the same
+// way — one content stratum, ADD falls forward at the cap.
 import { test, expect } from '@playwright/test';
 import { seedAddType } from './strata-add.mjs';
 
@@ -102,20 +104,27 @@ test('FX block header tap opens the effect editor; controls stay independent', a
   await expect(stack.locator('.strata-block.strata-fx')).toHaveCount(0);
   await expect(stack.locator('.strata-block.strata-content:not(.strata-pattern)')).toHaveCount(1);
 
-  // (3) KC block behavior: tap = edit — tapping the header selects the
-  // track (same as the name button). Add a second KC track first (the
-  // restored project boots with one).
+  // (3) #2038 — the one-content cap, in the browser: the old staging
+  // added a second KC track and watched header taps move the editing
+  // block between the two tracks. That world is retired — with ONE
+  // content stratum the KC block is always the active editing block,
+  // and an ADD tap armed for CONTENT falls forward to the next type
+  // with room (FX here) instead of minting KC-2.
   await seedAddType(page, 'content');
   await page.reload();
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
   const stack2 = page.locator('.build-layer-stack');
-  await stack2.locator('.strata-add').click();
   const kcBlocks = stack2.locator('.strata-block.strata-content:not(.strata-pattern)');
-  await expect(kcBlocks).toHaveCount(2);
-  // The newest track (KC-2) is active and expanded; tap KC-1's chip to edit it.
+  await expect(kcBlocks).toHaveCount(1);
   await expect(kcBlocks.nth(0)).toHaveClass(/strata-expanded/);
-  await kcBlocks.nth(1).locator('.track-numeral').click();
-  await expect(kcBlocks.nth(1)).toHaveClass(/strata-expanded/);
-  await expect(kcBlocks.nth(0)).not.toHaveClass(/strata-expanded/);
+  await stack2.locator('.strata-add').click();
+  await expect(kcBlocks).toHaveCount(1, 'no second KC track can be minted');
+  await expect(stack2.locator('.strata-block.strata-fx')).toHaveCount(
+    1,
+    'the tap fell forward to FX, the next type with room',
+  );
+  // Tapping the KC block's header chip keeps it the editing block.
+  await kcBlocks.nth(0).locator('.track-numeral').click();
+  await expect(kcBlocks.nth(0)).toHaveClass(/strata-expanded/);
 });
