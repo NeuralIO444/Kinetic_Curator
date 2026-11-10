@@ -1,6 +1,12 @@
 // PatchDiagLine must not restart its 1 Hz interval on every LayerStack render
 // (KC_HANDOFF T9): a re-render faster than 1 Hz (driving a wet control)
 // otherwise clears the timer before it can fire, freezing the line mid-drag.
+//
+// #2038 re-pin: the diag line mounts in the expanded KC block regardless
+// of patch state, and there is only one KC block now — so the churn is
+// staged on the standing track's own wet mode row instead of a second
+// track's PATCH section. The assertion is unchanged: ten super-1Hz
+// re-renders create zero new 1000ms intervals.
 import { test, expect } from '@playwright/test';
 
 test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
@@ -20,16 +26,14 @@ test('re-renders do not restart the PATCH diag interval', async ({ page }) => {
   await page.goto('/?boot=factory');
   await expect(page.locator('.app')).toBeVisible({ timeout: 30_000 });
   await page.getByRole('tab', { name: /build/i }).click();
-  // #1203 — one tap on ADD STRATUM arms KC-2; adding selects it, so its
-  // block is the expanded one carrying the PATCH section.
-  await page.locator('.build-layer-stack .strata-add').click();
 
-  // Patch the expanded block so its diag line is live.
+  // The one KC block is the active layer's block — expanded, carrying
+  // the PATCH section (and its diag line) whether or not a link exists.
   const block = page
-    .locator('.strata-block')
+    .locator('.strata-block.strata-content:not(.strata-pattern)')
     .filter({ has: page.locator('.strata-composite[title^="PATCH"]') })
     .first();
-  await block.locator('.strata-composite[title^="PATCH"] select').first().selectOption('field');
+  await expect(block).toHaveClass(/strata-expanded/);
 
   // #1608 re-pin (cause: Phase 2 quantization) — the block's wet control
   // is a mode row now, so the render churn comes from tapping its mode

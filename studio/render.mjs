@@ -29,6 +29,7 @@ import { resolvePalette } from '../app/src/data/palettes.js';
 import { getRenderCaps, shouldRenderGloss } from '../app/src/data/quality.js';
 import { DEFAULT_LAYOUT_PARAMS } from '../app/src/data/layout-modes.js';
 import { parseProject } from '../app/src/state/projectDocument.js';
+import { stratumRotationOf, rotateItems } from '../app/src/state/stratumRotation.js'; // #2038 — per-stratum rotation, the live resolver's law
 import { blend, BLEND_FALLBACK } from './blendFallback.mjs';
 import { KERNEL_VERSION } from '../app/src/engine/kernel/version.js';
 import { fxFilterStringForLayer, fxFilterId, isFxLayer } from '../app/src/fx/fxFilters.js';
@@ -166,7 +167,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       // FX layers hold no content — they wrap the accumulated stack below in
       // a filter group. Resolved here as a marker; renderSvg folds them in.
       if (isFxLayer(layer)) {
-        return { id: layer.id, isFx: true, layer, layerOpacity: layer.layerOpacity ?? 1 };
+        return { id: layer.id, isFx: true, layer, rotation: stratumRotationOf(layer), layerOpacity: layer.layerOpacity ?? 1 };
       }
       // #1098 — a PATTERN track draws from its own block and the ACTIVE palette, not a snapshot.
       if (layer.type === 'pattern') {
@@ -237,11 +238,14 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
           }),
         }).items;
 
+      // #2038 — a rotated content stratum turns its marks rigidly about
+      // the stage centre, exactly as gl/liveResolve.mjs does.
+      const rotation = stratumRotationOf(layer);
       return {
         id: layer.id,
         layoutParams,
         palette,
-        items,
+        items: rotation ? rotateItems(items, CANVAS_W, CANVAS_H, rotation) : items,
         safeCount: clampCount(layoutParams.count, layoutParams.mirror, caps),
         layerBlendMode: layer.layerBlendMode || 'normal',
         layerOpacity: layer.layerOpacity ?? 1,
@@ -324,7 +328,14 @@ export function renderSvg(doc, opts = {}) {
       // of lower FX layers, like an adjustment layer.
       const inner = [...body, ...acc].join('\n');
       body.length = 0;
-      body.push(`<g filter="url(#${fxFilterId(fxLayer.id)})"${op}>${inner}</g>`);
+      // #2038 — a rotated FX stratum: the accumulated stack turns +θ
+      // inside the filter group and the filtered result turns back −θ
+      // outside it, so the effect's field rotates and the picture keeps
+      // its geometry — the GL wrap's seed/turn-back law in SVG terms.
+      const rot = stratumRotationOf(fxLayer);
+      body.push(rot
+        ? `<g transform="rotate(${-rot} ${n(CANVAS_W / 2)} ${n(CANVAS_H / 2)})"><g filter="url(#${fxFilterId(fxLayer.id)})"${op}><g transform="rotate(${rot} ${n(CANVAS_W / 2)} ${n(CANVAS_H / 2)})">${inner}</g></g></g>`
+        : `<g filter="url(#${fxFilterId(fxLayer.id)})"${op}>${inner}</g>`);
     } else {
       body.push(...acc);
     }
