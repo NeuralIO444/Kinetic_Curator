@@ -17,6 +17,8 @@ import { rankLois } from './loisRank.js';
 import { getDirector, blendPick } from './director.js';
 import { getPhase } from './phase.js';
 import { loisActivity } from './loisActivity.js';
+import { extractFeatures } from './tasteFeatures.js';
+import { feelAffinity } from '../data/canon/settings.js';
 
 // Re-exported so UI code has a single import site for persona data.
 export { PERSONA_TASTES };
@@ -35,45 +37,9 @@ export function voiceOptions() {
   return [LOIS_VOICE, ...PERSONA_TASTES];
 }
 
-const clamp01 = (v) => Math.min(1, Math.max(0, v));
-// Unknown/missing feature: neutral 0.5, never 0 (0 would read as "absent").
-const num = (v, lo, hi) => (typeof v === 'number' && Number.isFinite(v) ? clamp01((v - lo) / (hi - lo)) : 0.5);
-const rangeMean = (r, lo, hi) => (Array.isArray(r) && r.length >= 2 ? num((r[0] + r[1]) / 2, lo, hi) : 0.5);
-const rangeSpan = (r, lo, hi) => (Array.isArray(r) && r.length >= 2 ? num(Math.abs(r[1] - r[0]), 0, hi - lo) : 0.5);
-
-/**
- * Measure 19 honest visual features from a candidate layoutParams object.
- * Every feature is normalized 0..1 and computed only from values that are
- * actually in the params. Palette is NOT randomized by the Curator, so
- * there is deliberately no palette feature — that would be a fake signal.
- * Never throws; never mutates its input.
- */
-export function extractFeatures(params) {
-  const p = params ?? {};
-  const disorder = (num(p.jitter, 0, 150) + num(p.displacement, 0, 150)) / 2;
-  return {
-    markDensity: num(p.count, 30, 600),
-    markSize: rangeMean(p.scale, 0.1, 3.0),
-    sizeVariety: rangeSpan(p.scale, 0.1, 3.0),
-    rotationSpread: rangeSpan(p.rotate, -180, 180),
-    opacity: rangeMean(p.alpha, 10, 100),
-    opacityVariety: rangeSpan(p.alpha, 10, 100),
-    disorder,
-    coverage: num(p.density, 20, 120),
-    depth: num(p.zTiers, 1, 10),
-    flowEnergy: num(p.noiseSpeed, 0.1, 2.0),
-    flowWarp: num(p.noiseFreq, 0.002, 0.015),
-    swarmDrive: num(p.swarmCohesion, 0.2, 4.0),
-    attractors: num(p.gravityWells, 0.1, 3.0),
-    particles: num(p.particleCount, 50, 300),
-    calm: num(p.damping, 0.9, 0.98),
-    // #518 motion features — from the same keys the Motion factors drive.
-    windPush: num(p.wind, 0, 3),
-    breathSwell: num(p.breath, 0, 1),
-    drift: num(p.lifeDrift, 0, 1),
-    flowRate: num(p.flap, 0, 1), // flap = wing/tail beat rate
-  };
-}
+// #2046 — the feature measurement itself lives in ./tasteFeatures.js (a pure leaf the data layer can import);
+// it is re-exported here so this module stays the one import site it has always been.
+export { extractFeatures };
 
 /** Dot product of features against a persona's taste weights. */
 export function scoreCandidate(features, weights) {
@@ -107,6 +73,35 @@ export function featureProximity(a, b) {
 }
 
 /**
+ * #2046 — how hard a standing chapter leans the pick: the most the Book can add to one candidate's score.
+ * The persona's own scores across a CURATE pool spread by about 1, so 0.5 lets the chapter reorder close
+ * calls without overruling a clear favourite. A taste dial — tune on play.
+ */
+export const CHAPTER_FEEL_GAIN = 0.5;
+
+/**
+ * The score a standing chapter adds to each candidate of a pool, in pool order.
+ *
+ * Each candidate's affinity to the chapter's feel (data/canon/settings.js feelAffinity) is read RELATIVE TO
+ * THE POOL: the candidate that reads most like the chapter gets the full CHAPTER_FEEL_GAIN, the one that reads
+ * least like it gets 0, the rest fall between. Raw affinities sit in a narrow band (most recipes share most
+ * features), so an absolute lean would be the same small number for everyone and change nothing; ranking
+ * inside the pool is what makes the Book's word audible.
+ *
+ * All zeros — exactly — when no chapter feel stands, or when the pool cannot be told apart by it.
+ */
+export function chapterLeans(featuresList, chapterFeel) {
+  const zeros = featuresList.map(() => 0);
+  if (!chapterFeel) return zeros;
+  const aff = featuresList.map((f) => feelAffinity(f, chapterFeel));
+  if (aff.some((a) => a === null)) return zeros;
+  const lo = Math.min(...aff);
+  const hi = Math.max(...aff);
+  if (!(hi > lo)) return zeros;
+  return aff.map((a) => (CHAPTER_FEEL_GAIN * (a - lo)) / (hi - lo));
+}
+
+/**
  * Pick a candidate index for a persona. Scores all candidates, takes the
  * top 3, and softmax-samples among them (temperature 0.4) so the best
  * usually wins but the pick doesn't feel robotic. rng is injectable and
@@ -117,17 +112,20 @@ export function featureProximity(a, b) {
  * temperature is the Director's dial (#1145): effectiveTemp() is the single
  * source of truth. Defaults to 0.4 — yesterday's behavior when the Director
  * is silent.
+ *
+ * #2046 — `chapterFeel` is the standing chapter's feel (the Book, read back): when present every candidate's
+ * score gains its chapterLeans share. Absent (no chapter standing, or Now) the scores — and so the pick and the rng
+ * stream — are exactly what they were.
  */
-export function pickPersona(candidates, personaId, rng, temperature = 0.4) {
+export function pickPersona(candidates, personaId, rng, temperature = 0.4, { chapterFeel = null } = {}) {
   const n = candidates.length;
   if (n === 0) return -1;
   const taste = getPersonaTaste(personaId);
   if (!taste) return -1;
   const roll = typeof rng === 'function' ? rng : () => 0;
-  const scored = candidates.map((c, i) => ({
-    i,
-    s: scoreCandidate(extractFeatures(c), taste.weights),
-  }));
+  const features = candidates.map((c) => extractFeatures(c));
+  const lean = chapterLeans(features, chapterFeel);
+  const scored = features.map((f, i) => ({ i, s: scoreCandidate(f, taste.weights) + lean[i] }));
   scored.sort((a, b) => b.s - a.s);
   const top = scored.slice(0, Math.min(3, n));
   // softmax over the top-k
@@ -211,13 +209,14 @@ export function personaCurator() {
         candidates[i] = applyRenderProfile(candidates[i], persona.id, rng);
       }
     },
-    pick: (candidates, rng) => {
+    pick: (candidates, rng, { chapterFeel = null } = {}) => {
       // #1145: the Director supervises the persona pick. Room → gains;
       // temperature from the single source; LOIS's rank blended against
       // Davis's pick by the room's lois_weight. Silence → neutral gains →
       // yesterday's pick, exactly.
       const { gains } = getDirector().tick({ feed: loisActivity.snapshot(), phase: getPhase() }); // #1144: refine cools the room, explore warms it
-      const davisIndex = pickPersona(candidates, persona.id, rng, gains.temperature);
+      // #2046: the standing chapter's feel leans the persona's scores (pickCurated hands it in; null = no lean)
+      const davisIndex = pickPersona(candidates, persona.id, rng, gains.temperature, { chapterFeel });
       if (gains.loisWeight <= 0 || gains.room == null) return davisIndex;
       const loisIndex = rankLois(candidates, getDirector().rankChooser()).index;
       return blendPick({

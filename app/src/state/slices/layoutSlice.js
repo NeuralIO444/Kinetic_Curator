@@ -1515,7 +1515,8 @@ export const createLayoutSlice = (set) => ({
         }
         candidates.push(rp);
       }
-      const { index } = pickCurated(candidates, curator, rng, { refine: refining });
+      // #2046 — the standing chapter rides into the pick: taste reads the Book back (curator/curate.js).
+      const { index } = pickCurated(candidates, curator, rng, { refine: refining, chapterId: state.kineticChapterId });
       if (index < 0) return {};
       // #1258: publish the sway from the latest Director tick (the persona
       // picks above ticked during pickCurated) for the top-bar presence mark.

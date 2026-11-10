@@ -10,14 +10,17 @@
 //   voices    — VOICE_DECK records whose declared `styles` include the style
 //   palettes  — the palette ids those looks and voices are paired with, plus the chapter card's, first-seen order
 //   chapter   — the Book chapter that stands on the style (null for a style with no chapter yet)
+//   motion    — #2047: the layouts, flocking behaviours and animations the style uses (data/canon/motion.js)
 //
 // Pure; reads only catalogue data. No render path imports this module.
 import { CANON_STYLES, CANON_STYLE_IDS, canonStyleRecord } from './styles.js';
 import { COMPOSITION_PRESETS } from '../presets.js';
 import { VOICE_DECK } from '../voiceDeck.js';
 import { CHAPTERS } from '../chapters.js';
+import { canonMotionForStyle } from './motion.js';
 
 export * from './styles.js';
+export * from './motion.js';
 
 const uniq = (xs) => [...new Set(xs.filter((x) => typeof x === 'string' && x))];
 
@@ -48,6 +51,13 @@ export function canonStyle(id, { looks = COMPOSITION_PRESETS, deck = VOICE_DECK 
       chapter ? chapter.card.paletteId : null,
     ]),
     chapter: chapter ? chapter.id : null,
+    // #2047 — a style record is not complete without how it moves: the layouts, flocking behaviours and
+    // animations its own looks, voices and assets use (namespaced Canon ids, most-used first)
+    motion: {
+      layouts: canonMotionForStyle(id, { domain: 'layout' }).map((r) => r.id),
+      flocking: canonMotionForStyle(id, { domain: 'flocking' }).map((r) => r.id),
+      animation: canonMotionForStyle(id, { domain: 'animation' }).map((r) => r.id),
+    },
   };
 }
 
