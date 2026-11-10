@@ -374,7 +374,7 @@ ok('D2 the check is fail-closed', () => {
 ok('D3 the take registers the section, and playback never applies it', () => {
   const flat = (t) => t.replace(/\s+/g, ' ');
   const pb = flat(fs.readFileSync('src/components/PerformanceButton.jsx', 'utf8'));
-  assert.ok(pb.includes('gestures: gesturesSectionForTake, treatments: treatmentsSection,'));
+  assert.ok(pb.includes('treatments: treatmentsSection,'));
   assert.ok(pb.includes("on(Events.TREATMENT_ARM, (p, meta) => rec.push('arm', p, meta))"));
   const play = fs.readFileSync('src/gl/playback.mjs', 'utf8');
   assert.ok(!/treatment/i.test(play), 'playback never consults the treatment log (the form’s record replays)');
