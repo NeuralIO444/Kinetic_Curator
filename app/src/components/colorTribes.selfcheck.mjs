@@ -80,11 +80,19 @@ ok('amber means one thing: only these files may use it, and a new one has to be 
       'styles/panels.css',
       'styles/ux-polish.css',
     ],
-    'amber is the probabilistic family (Davis, taste, time-based armed outlines, the spinner). If this list needs a new file, rule 5 has a question to answer first.',
+    'amber is the probabilistic family (Davis, taste, the big-button armed outline, the spinner). If this list needs a new file, rule 5 has a question to answer first.',
   );
   const panels = readFileSync(join(SRC, 'styles/panels.css'), 'utf8');
   const controls = readFileSync(join(SRC, 'styles/controls.css'), 'utf8');
-  assert.match(flat(panels), fre(/\.chip-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/));
+  // #2050 — the mode-strip chips' armed mark retired from amber: armed is a
+  // discrete fact (TE), so the chip wears a red corner detent and no rule
+  // renders chip-armed in Davis any more. (The big-button armed outline
+  // pinned below is a different surface and stays amber.)
+  assert.ok(
+    !/\.chip-btn\.armed\s*\{[^}]*--kc-davis/.test(panels),
+    'chip armed is no longer amber (#2050: armed is discrete, renders TE)',
+  );
+  assert.match(flat(panels), fre(/\.chip-detent \{[^}]*border-top: 5px solid var\(--kc-red\)/));
   assert.match(flat(panels), fre(/\.big-btn\.armed \{ outline: 2px solid var\(--kc-davis\)/));
   assert.match(flat(controls), fre(/\.spin-readout \{ color: var\(--kc-davis\)/));
 });

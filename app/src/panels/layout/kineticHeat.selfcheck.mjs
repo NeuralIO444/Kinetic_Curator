@@ -17,6 +17,9 @@ import {
   heatLevel,
   routeKineticTapHeat,
   kineticLayerLabel,
+  nextKineticLayer,
+  kineticNextLabel,
+  KINETIC_NEXT_LABEL,
 } from './kineticHeat.mjs';
 
 const approx = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
@@ -115,4 +118,82 @@ assert.ok(
 assert.deepStrictEqual(['look', 'voice', 'curator', 'chaos'].map(kineticLayerLabel), ['L', 'V', 'C', 'X']);
 assert.strictEqual(kineticLayerLabel('nope'), '', 'an unknown layer shows no letter, never a wrong one');
 
-console.log('ok kineticHeat: heat math + tap routing (#945, #1772 sweep)');
+// ── #2050 — the next-pass detent: the router asked about itself ────────────
+// The detent words are the spec's table, one per layer.
+assert.deepStrictEqual(KINETIC_NEXT_LABEL, { look: 'LOOK', voice: 'VOICE', curator: 'CUR', chaos: 'CHAOS' });
+assert.strictEqual(kineticNextLabel('nope'), '', 'an unknown layer shows no word, never a wrong one');
+
+// Single-source identity: over a grid of run states, times and scopes, the
+// detent IS the layer the router fires for a tap at that same instant — and
+// asking never mutates the run it read.
+{
+  const runs = [
+    { heat: 0, taps: 0, lastTapAt: 0 },
+    { heat: 0, taps: 1, lastTapAt: 900000 },
+    { heat: 0.2, taps: 2, lastTapAt: 900000 },
+    { heat: 0.68, taps: 2, lastTapAt: 900000 },
+    { heat: 1, taps: 5, lastTapAt: 900000 },
+    { heat: 0.9, taps: 9, lastTapAt: 900000 },
+  ];
+  const dts = [0, 100, 599, 600, 1200, 1999, 2000, 5000];
+  for (const run of runs) {
+    for (const dt of dts) {
+      for (const chaos of [true, false]) {
+        const before = JSON.stringify(run);
+        const now = run.lastTapAt + dt;
+        assert.strictEqual(
+          nextKineticLayer(run, now, { chaos }),
+          routeKineticTapHeat(run, now, { chaos }).layer,
+          `detent === router at dt=${dt} chaos=${chaos} run=${before}`,
+        );
+        assert.strictEqual(JSON.stringify(run), before, 'asking never mutates the run');
+      }
+    }
+  }
+}
+
+// The spec's detent table, state by state.
+const T = 900000;
+assert.strictEqual(nextKineticLayer({ heat: 0, taps: 0, lastTapAt: 0 }, T), 'look', 'no live run → LOOK');
+assert.strictEqual(
+  nextKineticLayer({ heat: 0, taps: 1, lastTapAt: T }, T + 100),
+  'voice',
+  'after tap 1, inside the run → VOICE, before tap 2 lands',
+);
+assert.strictEqual(
+  nextKineticLayer({ heat: 0, taps: 2, lastTapAt: T }, T + 1500),
+  'curator',
+  'next tap is 3rd+, heat below the line → CUR',
+);
+assert.strictEqual(
+  nextKineticLayer({ heat: 0.68, taps: 2, lastTapAt: T }, T + 300, { chaos: true }),
+  'chaos',
+  'hammering heat at KOZ → CHAOS',
+);
+assert.strictEqual(
+  nextKineticLayer({ heat: 0.68, taps: 2, lastTapAt: T }, T + 300, { chaos: false }),
+  'curator',
+  'the identical hammering below KOZ → CUR, never CHAOS',
+);
+assert.strictEqual(
+  nextKineticLayer({ heat: 1, taps: 5, lastTapAt: T }, T + 300, { chaos: false }),
+  'curator',
+  'pegged heat below KOZ still never promises CHAOS',
+);
+
+// Decay steps the detent down on the router's own clock: CHAOS while a rapid
+// tap would still clear the line, CUR once the halved heat falls under it,
+// LOOK when the run has lapsed entirely.
+assert.strictEqual(nextKineticLayer({ heat: 1, taps: 5, lastTapAt: T }, T + 300), 'chaos', 'still hot → CHAOS');
+assert.strictEqual(
+  nextKineticLayer({ heat: 1, taps: 5, lastTapAt: T }, T + 1500),
+  'curator',
+  'heat halved under the CHAOS line → CUR',
+);
+assert.strictEqual(
+  nextKineticLayer({ heat: 1, taps: 5, lastTapAt: T }, T + KINETIC_WARM_MS),
+  'look',
+  'run lapsed → LOOK',
+);
+
+console.log('ok kineticHeat: heat math + tap routing (#945, #1772 sweep) + next-pass detent (#2050)');

@@ -8,7 +8,9 @@ import {
   VOICE_ACT_MS,
   litPills,
   TOPBAR_LIT_CAP,
+  tasterReadout,
 } from './topbarTaste.mjs';
+import { voiceOptions, getActivePersonaId } from './taste.js';
 
 let n = 0;
 const ok = (name, fn) => {
@@ -80,6 +82,24 @@ ok('precedence caps lit pills: CUR > locks > KIN > V > L > diamond', () => {
   assert.deepEqual([...all], ['cur', 'locks', 'kin', 'voice'], 'look and diamond go subdued');
   const few = litPills({ cur: false, locks: true, kin: false, voice: true, look: false, diamond: false });
   assert.deepEqual([...few], ['locks', 'voice'], 'under the cap nothing dims');
+});
+
+ok('TASTE readout: the standing taster by id, DICE when off (#2050)', () => {
+  assert.equal(tasterReadout('reas'), 'reas', 'the readout is the persona id, as the bar has always shown it');
+  assert.equal(tasterReadout('lois'), 'lois');
+  assert.equal(tasterReadout('davis'), 'davis');
+  assert.equal(tasterReadout('off'), 'dice', 'off honestly means a uniform dice pick, and the label says so');
+  assert.equal(tasterReadout(null), 'dice', 'no persona (taste.js null) reads DICE');
+  assert.equal(tasterReadout(undefined), 'dice');
+  assert.equal(tasterReadout(''), 'dice', 'never a blank readout');
+  // Against the real option list: every selectable persona reads as itself,
+  // and the word is never an alias or a real name (display policy).
+  for (const p of voiceOptions()) {
+    assert.equal(tasterReadout(p.id), p.id, `${p.id} reads as its id`);
+    assert.notEqual(tasterReadout(p.id), p.alias, 'not the alias — the alias lives in the menu rows');
+  }
+  // The default standing (Davis) resolves through the same door the bar uses.
+  assert.equal(tasterReadout(getActivePersonaId() ?? 'off'), getActivePersonaId() ?? 'dice');
 });
 
 console.log(`topbarTaste.selfcheck: ${n} checks passed`);

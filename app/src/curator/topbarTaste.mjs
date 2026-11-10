@@ -31,6 +31,21 @@ export function verdictDetent(parts) {
 }
 
 /**
+ * #2050 — the TASTE button's readout word for the standing taster.
+ *
+ * The judge is labeled by its job now: the word is TASTE, and the readout
+ * beside it is the active taster's id (the persona id from taste.js — the
+ * same standing getActiveCurator resolves through when a CURATOR press is
+ * actually picked). Off is not a persona: off honestly means a uniform dice
+ * pick, so the readout says DICE. Casing is CSS (.act), like every pill.
+ * Returns the persona id unchanged — never an alias, never a name (the
+ * persona's display policy keeps real names off the surface).
+ */
+export function tasterReadout(personaId) {
+  return typeof personaId === 'string' && personaId !== '' && personaId !== 'off' ? personaId : 'dice';
+}
+
+/**
  * V voice breath period (seconds) from a persona's drift weight.
  * |drift| 0 → slow 9s swell; |drift| 1 → lively 3s. LOIS (no weight) → 6s neutral.
  * The weight is the persona's authored drift (personaTastes.js), not a faked rate.

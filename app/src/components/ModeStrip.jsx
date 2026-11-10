@@ -9,9 +9,16 @@
 // Arms persist until disarmed — the fast, performance-friendly version of
 // the Build panel's locks.
 //
-// Armed vs. current get distinct visuals: `active` = what's on screen,
-// `armed` = pinned for the next roll (outline + pin glyph). The ModeGrid in
-// the LAYOUT panel stays the full picker for direct selection.
+// Armed vs. current get distinct visuals: `active` (filled) = what's on
+// screen, `armed` = pinned for the next roll of its axis. #2050: armed is a
+// discrete fact, so it renders TE — a corner detent on the chip — never a
+// fill change and never the Davis outline + pin emoji the first version wore. The
+// detent is a pure readout of the store's arm state (armedMode /
+// armedMotion — the same state the rolls read and the bus publishes): it
+// stands exactly while the arm stands. Arms persist across rolls until
+// disarmed (#964), so the detent survives rolls too; it clears in the same
+// commit the arm itself clears. The ModeGrid in the LAYOUT panel stays the
+// full picker for direct selection.
 import { useStore } from '../state/store.js';
 import { LAYOUT_MODES } from '../data/layout-modes.js';
 import { MOTION_MODES, isMotionActive } from '../data/voices.js';
@@ -49,11 +56,7 @@ export function ModeStrip() {
               aria-pressed={isArmed}
             >
               {m.glyph}
-              {isArmed && (
-                <span className="pin-glyph" aria-hidden="true">
-                  📌
-                </span>
-              )}
+              {isArmed && <span className="chip-detent" aria-hidden="true" />}
             </button>
           );
         })}
@@ -76,11 +79,7 @@ export function ModeStrip() {
               aria-pressed={isArmed}
             >
               {m.name}
-              {isArmed && (
-                <span className="pin-glyph" aria-hidden="true">
-                  📌
-                </span>
-              )}
+              {isArmed && <span className="chip-detent" aria-hidden="true" />}
             </button>
           );
         })}

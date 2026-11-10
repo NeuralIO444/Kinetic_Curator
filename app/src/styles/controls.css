@@ -614,6 +614,17 @@
   border: 1px solid var(--line-2);
   box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.4);
 }
+/* #2050 — the taste menu's header names the job, in the menu's own type. */
+.curator-voice-menu-head {
+  color: var(--dim);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  padding: 6px 8px 2px;
+  white-space: nowrap;
+}
 .curator-voice-menu button {
   background: transparent;
   border: none;

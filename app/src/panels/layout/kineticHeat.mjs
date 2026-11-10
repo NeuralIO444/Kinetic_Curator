@@ -107,3 +107,31 @@ export const KINETIC_LAYER_LABEL = Object.freeze({ look: 'L', voice: 'V', curato
 export function kineticLayerLabel(layer) {
   return KINETIC_LAYER_LABEL[layer] ?? '';
 }
+
+/**
+ * #2050 — the layer a tap at `now` WOULD fire, asked of the router itself.
+ *
+ * Single-source law (top-bar legibility spec): the KIN detent is never a
+ * parallel prediction that could drift from the router — it is the router's
+ * own decision, run on the standing run state with the performer's clock.
+ * The router is pure and never mutates `run`, so asking costs nothing and
+ * can never disagree with the tap that follows at the same `now`: stale run
+ * → 'look'; a live run's 2nd tap → 'voice'; 3rd+ → 'curator', or 'chaos'
+ * only when the scope allows it and the decayed-then-added heat clears the
+ * CHAOS line. Below KOZ the answer is never 'chaos', by the router's own
+ * gate — not by a second check here.
+ */
+export function nextKineticLayer(run, now, { chaos = true } = {}) {
+  return routeKineticTapHeat(run, now, { chaos }).layer;
+}
+
+/** #2050 — the TE detent words for the NEXT pass (the spec's table): full words, one per layer. */
+export const KINETIC_NEXT_LABEL = Object.freeze({
+  look: 'LOOK',
+  voice: 'VOICE',
+  curator: 'CUR',
+  chaos: 'CHAOS',
+});
+export function kineticNextLabel(layer) {
+  return KINETIC_NEXT_LABEL[layer] ?? '';
+}

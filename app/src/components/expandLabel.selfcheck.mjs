@@ -15,14 +15,14 @@ const ok = (name, fn) => {
 
 ok('splitLabel: a prefix reveals its tail (KIN → KINETIC, l → looks ▾), anything else swaps (lok → looks ▾)', () => {
   assert.deepEqual(splitLabel('KIN', 'KINETIC'), { mode: 'reveal', head: 'KIN', tail: 'ETIC', shortN: 3, fullN: 7 });
-  assert.deepEqual(splitLabel('v', 'voice: overlap ▾'), {
+  assert.deepEqual(splitLabel('t', 'taste: overlap ▾'), {
     mode: 'reveal',
-    head: 'v',
-    tail: 'oice: overlap ▾',
+    head: 't',
+    tail: 'aste: overlap ▾',
     shortN: 1,
     fullN: 16,
   });
-  assert.equal(splitLabel('voi', 'voice: off ▾').mode, 'reveal');
+  assert.equal(splitLabel('tas', 'taste: off ▾').mode, 'reveal');
   const s = splitLabel('lok', 'looks ▾');
   assert.equal(s.mode, 'swap');
   assert.equal(s.shortN, 3);
@@ -36,8 +36,8 @@ ok('the width of a tail is a character count: head + tail always equals the full
   for (const [s, f] of [
     ['KIN', 'KINETIC'],
     ['l', 'looks ▾'],
-    ['v', 'voice: lois ▾'],
-    ['voi', 'voice: lois ▾'],
+    ['t', 'taste: lois ▾'],
+    ['tas', 'taste: lois ▾'],
   ]) {
     const p = splitLabel(s, f);
     assert.equal(p.head + p.tail, f);
@@ -58,12 +58,12 @@ ok('every expanding button opens on hover, keyboard focus AND touch; no pixel wi
   assert.match(css, /prefers-reduced-motion: reduce\) \{[^}]*\.xl-ch/, 'reduced motion drops the transition');
 });
 
-ok('LOOKS, VOICE and KIN use the shared label, with the full word as the accessible name', () => {
+ok('LOOKS, TASTE and KIN use the shared label, with the full word as the accessible name', () => {
   const bar = read('../panels/layout/CuratorBar.jsx');
   assert.match(bar, /<ExpandLabel mode="swap" short=\{looksUsed \? 'lok' : 'l'\} full="looks ▾" \/>/);
-  assert.match(bar, /<ExpandLabel mode="swap" short=\{voiceUsed \? 'voi' : 'v'\}/);
+  assert.match(bar, /<ExpandLabel mode="swap" short=\{voiceUsed \? 'tas' : 't'\}/);
   assert.match(bar, /aria-label="Looks — pick a complete layout"/);
-  assert.match(bar, /aria-label=\{`Voice: \$\{activeAlias\}/);
+  assert.match(bar, /aria-label=\{`Taste: \$\{taster\}/);
   assert.match(
     bar,
     /onMouseLeave=\{\(\) => setLooksUsed\(true\)\}/,
