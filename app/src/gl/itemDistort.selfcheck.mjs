@@ -138,7 +138,10 @@ ok('C1 49-float stride; the record at 45..48; absent packs zeros; earlier offset
 // ── D · the shaders ─────────────────────────────────────────────────────
 ok('D1 gated branches, the shear in the item frame, the undistorted LOD, the mesh zero', () => {
   assert.ok(QUAD_VS.includes('layout(location=14) in vec4 a_dist;'));
-  assert.ok(QUAD_VS.includes('if (a_dist.x != 0.0) c.x -= c.y * a_dist.x * u_distHeat;'), 'shear gated, on c (pre-rotation)');
+  assert.ok(
+    QUAD_VS.includes('if (a_dist.x != 0.0) c.x -= c.y * a_dist.x * u_distHeat;'),
+    'shear gated, on c (pre-rotation)',
+  );
   assert.ok(
     QUAD_VS.indexOf('c.x -= c.y * a_dist.x * u_distHeat') < QUAD_VS.indexOf('float th = radians(a_inst1.x + kDeg);'),
     'before rotation',
