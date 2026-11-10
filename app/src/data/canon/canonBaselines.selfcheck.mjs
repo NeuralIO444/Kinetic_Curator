@@ -1,10 +1,10 @@
 // node src/data/canon/canonBaselines.selfcheck.mjs
-// #2048 (Canon S5) — first baselines as native records: op art, Warhol, Joshua Davis. Pins:
-//   1. three baseline records exist, each a COMPLETE settings record (marks / palette / motion / density /
+// #2048 (Canon S5) — first baselines as native records: op art, Warhol, Joshua Davis; #2060 adds TDR. Pins:
+//   1. four baseline records exist, each a COMPLETE settings record (marks / palette / motion / density /
 //      rules) in the instrument's own vocabulary — every value survives the validating door unchanged
 //   2. the probe: applying each to the real store, the instrument's state reflects that baseline's marks,
 //      palette, motion and density
-//   3. the taste path scores a candidate recipe against a baseline, and the three produce distinct readings
+//   3. the taste path scores a candidate recipe against a baseline, and the four produce distinct readings
 //   4. identity is declared once (a baseline anchoring a Canon style reads that style's); names policy holds
 import assert from 'node:assert/strict';
 import {
@@ -44,8 +44,8 @@ const S = () => useStore.getState();
 const records = assetRecords(ASSETS);
 const categories = new Set(records.map((r) => r.category));
 
-// ── 1. three complete native records ────────────────────────────────────────────────────────────────────────
-assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis']);
+// ── 1. four complete native records ────────────────────────────────────────────────────────────────────────
+assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis', 'tdr']);
 for (const b of CANON_BASELINES) {
   assert.ok(Object.isFrozen(b) && Object.isFrozen(b.settings.density.scale), `${b.id}: deep-frozen`);
   assert.equal(canonBaseline(b.id), b);
@@ -211,10 +211,10 @@ assert.equal(baselineRecipe('nope'), null);
     }
     landed[b.id] = { on, params: st.layoutParams, paletteId: st.paletteId };
   }
-  // three different stages
-  assert.equal(new Set(Object.values(landed).map((l) => l.paletteId)).size, 3);
-  assert.equal(new Set(Object.values(landed).map((l) => l.params.count)).size, 3);
-  assert.equal(new Set(Object.values(landed).map((l) => l.on.join())).size, 3);
+  // four different stages
+  assert.equal(new Set(Object.values(landed).map((l) => l.paletteId)).size, 4);
+  assert.equal(new Set(Object.values(landed).map((l) => l.params.count)).size, 4);
+  assert.equal(new Set(Object.values(landed).map((l) => l.on.join())).size, 4);
   // deterministic: same seed, same pool; a lock is a lock; a baseline claims no Look
   const a = baselinePatch(S(), 'warhol', mkRng(7));
   const b2 = baselinePatch(S(), 'warhol', mkRng(7));
@@ -234,7 +234,7 @@ assert.equal(baselineRecipe('nope'), null);
   assert.equal(baselinePatch(S(), 'nope', mkRng(1)), null);
 }
 
-// ── 3. taste scores a recipe against the baselines — three distinct readings ────────────────────────────────
+// ── 3. taste scores a recipe against the baselines — four distinct readings ────────────────────────────────
 {
   for (const b of CANON_BASELINES) {
     assert.deepEqual(Object.keys(baselineFeel(b)), [...FEATURE_KEYS]);
@@ -244,11 +244,11 @@ assert.equal(baselineRecipe('nope'), null);
       assert.ok(r[other] < 0.97, `${b.id} is not ${other}`);
     assert.equal(nearestBaseline(baselineRecipe(b).layoutParams).id, b.id);
   }
-  // a candidate recipe: the three readings are distinct, and ordered the way the picture reads
+  // a candidate recipe: the four readings are distinct, and ordered the way the picture reads
   const checker = COMPOSITION_PRESETS.find((l) => l.id === 'checker-shift').params;
   const r = baselineReadings(checker);
-  assert.deepEqual(Object.keys(r), ['op-art', 'warhol', 'davis']);
-  assert.equal(new Set(Object.values(r)).size, 3, 'three distinct readings');
+  assert.deepEqual(Object.keys(r), ['op-art', 'warhol', 'davis', 'tdr']);
+  assert.equal(new Set(Object.values(r)).size, 4, 'four distinct readings');
   assert.ok(r['op-art'] > r.warhol && r.warhol > r.davis, 'a hard op grid reads Op Art first, Davis last');
   assert.deepEqual(nearestBaseline(checker), { id: 'op-art', reading: r['op-art'] });
   for (const v of Object.values(r)) assert.ok(v > 0 && v <= 1);
@@ -267,6 +267,9 @@ assert.equal(baselineRecipe('nope'), null);
   assert.equal(baselineIdentity('op-art'), canonStyleRecord('op').identity, '…it reads the Canon style’s');
   assert.equal(baselineIdentity('warhol').figures[0], 'Andy Warhol');
   assert.equal(baselineIdentity('davis').figures[0], 'Joshua Davis');
+  assert.equal(baselineIdentity('tdr').place, 'Sheffield');
+  assert.equal(baselineIdentity('tdr').figures[0], 'Ian Anderson');
+  assert.equal(canonBaseline('tdr').style, 'techno', 'TDR sits beside the Techno style');
   assert.equal(baselineIdentity('nope'), null);
   for (const b of CANON_BASELINES) {
     const id = baselineIdentity(b);
@@ -279,5 +282,5 @@ assert.equal(baselineRecipe('nope'), null);
 }
 
 console.log(
-  'canonBaselines.selfcheck: ok — op-art / warhol / davis are complete native records; each applies to the stage; taste reads a recipe against all three',
+  'canonBaselines.selfcheck: ok — op-art / warhol / davis / tdr are complete native records; each applies to the stage; taste reads a recipe against all four',
 );
