@@ -652,3 +652,4 @@ node src/curator/trioAcceptance.selfcheck.mjs
 node src/curator/showSpectrum.selfcheck.mjs
 node src/curator/trailStats.selfcheck.mjs
 node src/curator/treatmentBus.selfcheck.mjs
+node src/poets/rayGunWear.selfcheck.mjs

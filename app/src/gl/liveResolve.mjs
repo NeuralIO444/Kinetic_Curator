@@ -91,6 +91,7 @@ import { ASSETS_LATIN } from '../data/assets/assets-latin.js'; // #2002: the poe
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js'; // #2002: the poem-only serif face stamps
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js'; // #2002: the poem-only ornament stamps
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js'; // #2005: the poem-only plate stamps
+import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js'; // #2008: the grammar-composed riso icons
 
 // #1982 — the kana stamps are catalogue members for the census and the stage
@@ -109,6 +110,7 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_SERIF,
     ...ASSETS_ORNAMENTS,
     ...ASSETS_PLATE,
+    ...ASSETS_WEAR,
     ...ASSETS_RISO,
   ].map((a) => a.id),
 );

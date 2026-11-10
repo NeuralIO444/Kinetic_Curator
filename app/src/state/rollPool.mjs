@@ -17,6 +17,7 @@ import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
+import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
 import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js'; // #1944
@@ -41,6 +42,7 @@ export const NEVER_DEALT = Object.freeze([
   ...ASSETS_SERIF.map((a) => a.id),
   ...ASSETS_ORNAMENTS.map((a) => a.id),
   ...ASSETS_PLATE.map((a) => a.id),
+  ...ASSETS_WEAR.map((a) => a.id),
   // #2008: the riso icons ride too — dealt only by the riso field dealer.
   ...ASSETS_RISO.map((a) => a.id),
 ]);

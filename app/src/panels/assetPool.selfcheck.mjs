@@ -100,6 +100,7 @@ const { ASSETS_SERIF } = await import('../data/assets/assets-serif.js');
 const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
 const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
 const { ASSETS_RISO } = await import('../data/assets/assets-riso.js');
+const { ASSETS_WEAR } = await import('../data/assets/assets-wear.js'); // #2010 P1
 const kanaIds = new Set(
   [
     ...ASSETS_KANA,
@@ -109,6 +110,7 @@ const kanaIds = new Set(
     ...ASSETS_ORNAMENTS,
     ...ASSETS_PLATE,
     ...ASSETS_RISO,
+    ...ASSETS_WEAR,
   ].map((k) => k.id),
 );
 const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));

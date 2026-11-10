@@ -40,6 +40,7 @@ import { ASSETS_LATIN } from '../data/assets/assets-latin.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
+import { ASSETS_WEAR } from '../data/assets/assets-wear.js';
 
 /** The 36 letter stamps that exist. Any other character has no stamp. */
 export const LETTER_STAMP_IDS = Object.freeze(new Set(ASSETS_LETTERS.map((a) => a.id)));
@@ -190,6 +191,28 @@ export function plateStampIdForChar(ch) {
 }
 
 /**
+ * #2010 (RAY GUN P1 · TORN & XEROXED) — the worn letters: a torn and a xerox
+ * variant of every treatable Latin letter (Anton caps + lowercase, PT Serif),
+ * baked from those packs' own outlines (scripts/gen-wear.mjs). Not a face of
+ * their own: each variant names its source stamp (`wearOf`), measures with
+ * its source's ruler (stampWidthEm), and is only ever reached by the ray
+ * gun's draw moving a treated stamp to ITS OWN letter's variant
+ * (poets/rayGunForm.js). No placement and no gate ever resolves one; a
+ * stored form never carries one (the treated list is never stored).
+ */
+export const WEAR_KINDS = Object.freeze(['torn', 'xerox']);
+export const WEAR_STAMP_IDS = Object.freeze(new Set(ASSETS_WEAR.map((a) => a.id)));
+/** Worn id -> the source stamp it wears ('typ_tn_s_A' -> 'typ_s_A'). */
+export const WEAR_SOURCE_BY_ID = new Map(ASSETS_WEAR.map((a) => [a.id, a.wearOf]));
+const WEAR_ID_BY_SOURCE = new Map(
+  ASSETS_WEAR.map((a) => [`${a.wearOf}|${a.tags.includes('torn') ? 'torn' : 'xerox'}`, a.id]),
+);
+/** The worn variant of a source stamp ('typ_A', 'torn' -> 'typ_tn_A'), or null when that stamp has no wear. */
+export function wearStampIdFor(assetId, kind) {
+  return WEAR_ID_BY_SOURCE.get(`${assetId}|${kind}`) ?? null;
+}
+
+/**
  * The poem-only union — EVERY stamp pack the FIELD director deals alone:
  * the native face (kana ∪ kanji), the Latin growth (lowercase + punctuation),
  * the serif face, the ornaments, and (#2005) the plate face. This is the set
@@ -199,7 +222,14 @@ export function plateStampIdForChar(ch) {
  * never as a second list elsewhere.
  */
 export const POEM_ONLY_STAMP_IDS = Object.freeze(
-  new Set([...NATIVE_STAMP_IDS, ...LATIN_STAMP_IDS, ...SERIF_STAMP_IDS, ...ORNAMENT_STAMP_IDS, ...PLATE_STAMP_IDS]),
+  new Set([
+    ...NATIVE_STAMP_IDS,
+    ...LATIN_STAMP_IDS,
+    ...SERIF_STAMP_IDS,
+    ...ORNAMENT_STAMP_IDS,
+    ...PLATE_STAMP_IDS,
+    ...WEAR_STAMP_IDS,
+  ]),
 );
 
 /**
@@ -296,10 +326,13 @@ export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
  * A STAMP's ink width in em units, by its id: a serif stamp measures with
  * the serif ruler, a plate stamp with the plate ruler, every other stamp
  * with the base ruler. The gate judges fit and overlap with this, so a
- * serif or plate form is measured in its own face.
+ * serif or plate form is measured in its own face. A worn stamp (#2010)
+ * measures with its SOURCE's ruler: a torn serif 'A' is serif ink.
  */
-export const stampWidthEm = (assetId, ch) =>
-  SERIF_STAMP_IDS.has(assetId) ? serifGlyphWidthEm(ch) : PLATE_STAMP_IDS.has(assetId) ? plateGlyphWidthEm(ch) : glyphWidthEm(ch);
+export const stampWidthEm = (assetId, ch) => {
+  const id = WEAR_SOURCE_BY_ID.get(assetId) ?? assetId;
+  return SERIF_STAMP_IDS.has(id) ? serifGlyphWidthEm(ch) : PLATE_STAMP_IDS.has(id) ? plateGlyphWidthEm(ch) : glyphWidthEm(ch);
+};
 const TRACK = 0.16; // letterspacing between glyphs, em units — air a plate reads through
 /**
  * #2005 — the plate's set discipline: the constants a plate form is SET by,

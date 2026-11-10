@@ -25,8 +25,12 @@
 // reversible by cycling back to plain (record absent).
 //
 // THE EXCEPTION'S OWN FLOOR (what the treatment may NOT break):
-// 1. Glyph identity — every stamp keeps its ch/assetId; ghosts are added
-//    copies of the same letters, glyph-matched. No substitution, ever.
+// 1. Glyph identity — every stamp keeps its `ch`; its FACE may move (ruling
+//    D1, 2026-11-06, amending "no substitution, ever"): under a record that
+//    names the wear axis (#2010 P1), a treated stamp's assetId may move to
+//    ITS OWN letter's worn variant — torn or xerox, baked (placement.js
+//    WEAR_STAMP_IDS). Never another letter, never a dingbat: `ch` is law.
+//    Ghosts are added copies of the same letters, glyph-matched.
 // 2. Word recoverability at CARSON and GREIMAN — a word's glyphs keep
 //    reading order along the row axis and stay a contiguous cluster: no
 //    treated glyph centre (CARSON) and no word's treated centre-span
@@ -48,7 +52,7 @@
 // those constants — no statistics, no guessing.
 
 import { mkRng } from '../engine/prng.js';
-import { stampWidthEm } from './placement.js';
+import { stampWidthEm, wearStampIdFor } from './placement.js';
 
 /** The cycle, in tap order. Plain is the absence of the record. */
 export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'shot']);
@@ -115,6 +119,17 @@ const SHOT_SWIRL_DEG = 110; // tangential rotation at the epicentre, one seeded 
 const SHOT_GHOST_F = 0.45; // falloff at/above which a glyph trails a ghost
 const SHOT_GHOST_T = 0.45; // the ghost sits this far along the displacement vector
 const SHOT_GHOST_SCALE = 0.6; // ghost em relative to the treated glyph's em
+
+// WEAR (#2010 P1 · TORN & XEROXED) — the shape lever, named in the record as `wear: 1` (an older record without it
+// draws exactly as it always did, so every take recorded before P1 replays bit-for-bit). Per treated stamp, in output
+// order, ONE draw off the wear stream — a stream of its own (WEAR_SALT on the record's seed), so the geometry above
+// spends exactly the draws it always did: the blast is identical with wear on or off, only the faces move. GREIMAN is
+// the clean digital pole (whole words, the bitmap nod) and stays unworn; CARSON wears some letters, SHOT most.
+const WEAR_SALT = 0x57454152; // 'WEAR'
+const WEAR_P = Object.freeze({
+  carson: Object.freeze({ torn: 0.14, xerox: 0.24 }),
+  shot: Object.freeze({ torn: 0.3, xerox: 0.32 }),
+});
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 /** A stamp's ink half-width, in unit dish space (its own face's ruler). */
@@ -403,10 +418,12 @@ function shot(stamps, rng, aspect) {
 
 /**
  * Apply a treatment record to a standing form. `record` is the form's
- * ray-gun record { mode, seed } (the shape sanitizeFieldForm carries).
+ * ray-gun record { mode, seed, wear? } (the shape sanitizeFieldForm carries;
+ * `wear: 1` names the P1 wear axis — absent, the treatment is geometry only).
  * Returns a NEW form whose stamps are the treated materialisation: the
  * plain list, transformed in place (stamp i of the output is stamp i of
- * the input, same ch/assetId), with ghost duplicates appended. Every
+ * the input, same ch — same assetId unless the record names the wear axis,
+ * which may move it to its own letter's worn variant), with ghost duplicates appended. Every
  * other field of the form — poet, piece, layout, aspect, and the script /
  * register / face / break markers — rides unchanged. An absent or
  * dishonest record, or a form with no stamps, returns the form itself:
@@ -422,5 +439,23 @@ export function rayGunForm(form, record) {
   const rows = segmentWords(form.stamps, form.layout);
   const stamps =
     mode === 'carson' ? carson(form.stamps, rows, rng, aspect) : mode === 'greiman' ? greiman(form.stamps, rows, rng, aspect) : shot(form.stamps, rng, aspect);
-  return { ...form, stamps };
+  return { ...form, stamps: record.wear === 1 ? wear(stamps, mode, seed) : stamps };
+}
+
+/**
+ * The wear pass: move treated stamps to their own letter's torn / xerox
+ * variant. One draw per stamp off the wear stream, in output order, whether
+ * or not the stamp has a variant (so a digit or a kana glyph spends its draw
+ * and the letters after it land the same). Geometry and `ch` never move.
+ */
+function wear(stamps, mode, seed) {
+  const p = WEAR_P[mode];
+  if (!p) return stamps;
+  const rng = mkRng((seed ^ WEAR_SALT) >>> 0);
+  return stamps.map((s) => {
+    const u = rng();
+    const kind = u < p.torn ? 'torn' : u < p.torn + p.xerox ? 'xerox' : null;
+    const id = kind ? wearStampIdFor(s.assetId, kind) : null;
+    return id ? { ...s, assetId: id } : s;
+  });
 }

@@ -379,7 +379,7 @@ ok('the cycle: plain → carson → greiman → shot → plain, seeds from the d
     const want = expectedSeed(tap);
     S().cyclePoemRaygun();
     const f = S().layoutParams.fieldForm;
-    assert.deepStrictEqual(f.raygun, { mode: modes[tap], seed: want }, `tap ${tap}: ${modes[tap]} armed with the stream's seed`);
+    assert.deepStrictEqual(f.raygun, { mode: modes[tap], seed: want, wear: 1 }, `tap ${tap}: ${modes[tap]} armed with the stream's seed`);
     const { raygun: _r, ...rest } = f;
     assert.deepStrictEqual(rest, standing, 'the form under the record is the plain standing form, exactly');
     assert.equal(S().raygunTap, tap + 1);
@@ -390,7 +390,7 @@ ok('the cycle: plain → carson → greiman → shot → plain, seeds from the d
   assert.deepStrictEqual(S().layoutParams.fieldForm, standing, 'the full cycle returns the EXACT original form — record absent, not nulled');
   assert.equal(S().raygunTap, 3, 'clearing back to plain draws no seed');
   S().undo();
-  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: expectedSeed(2) }, 'undo restores the record the tap replaced');
+  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: expectedSeed(2), wear: 1 }, 'undo restores the record the tap replaced');
 });
 
 ok('the cycle: refused with no poem standing — nothing moves, no undo entry, no seed drawn', () => {
