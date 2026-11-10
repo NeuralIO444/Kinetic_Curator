@@ -181,8 +181,11 @@ const ids = (rs) => rs.map((r) => r.id);
   // a bare id only one vocabulary owns resolves on its own
   assert.equal(canonMotion('phyllotaxis').id, 'layout:phyllotaxis');
   assert.equal(canonMotion('lissajous').id, 'path:lissajous');
-  for (const [, rs] of Object.entries(Object.groupBy(CANON_MOTION, (r) => r.localId)))
-    assert.equal(canonMotion(rs[0].localId), rs.length === 1 ? rs[0] : null);
+  // every bare id: resolves alone exactly when one vocabulary owns it (no Object.groupBy — CI runs Node 20)
+  for (const localId of new Set(CANON_MOTION.map((r) => r.localId))) {
+    const rs = canonMotionCandidates(localId);
+    assert.equal(canonMotion(localId), rs.length === 1 ? rs[0] : null);
+  }
 }
 
 // ── 4. no sixth list ────────────────────────────────────────────────────────────────────────────────────────
