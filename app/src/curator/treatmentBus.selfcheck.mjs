@@ -80,7 +80,7 @@ console.log('treatmentBus.selfcheck');
 ok('A1 the surface cycle IS the performer tap: same records, same seeds, same undo steps as the store action', () => {
   reset();
   const viaStore = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     S().cyclePoemRaygun();
     viaStore.push({
       raygun: S().layoutParams.fieldForm.raygun ?? null,
@@ -90,7 +90,7 @@ ok('A1 the surface cycle IS the performer tap: same records, same seeds, same un
   }
   reset();
   const viaSurface = [];
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 5; i++) {
     assert.equal(treatments.cycle('poem', { by: 'performer' }), true, `cycle ${i} lands`);
     viaSurface.push({
       raygun: S().layoutParams.fieldForm.raygun ?? null,

@@ -429,7 +429,8 @@ export function sanitizeFieldForm(raw) {
   let raygunMark;
   if (raygun !== undefined) {
     if (!raygun || typeof raygun !== 'object' || Array.isArray(raygun)) return null;
-    if (raygun.mode !== 'carson' && raygun.mode !== 'greiman' && raygun.mode !== 'shot') return null;
+    // #2010 P2 — 'grit' (SWISS GRIT, the Ashworth mode) joins the literal contract.
+    if (raygun.mode !== 'carson' && raygun.mode !== 'greiman' && raygun.mode !== 'grit' && raygun.mode !== 'shot') return null;
     if (!Number.isInteger(raygun.seed) || raygun.seed < 0 || raygun.seed > 0xffffffff) return null;
     if (raygun.wear !== undefined && raygun.wear !== 1) return null;
     raygunMark = { mode: raygun.mode, seed: raygun.seed, ...(raygun.wear === 1 ? { wear: 1 } : {}) };

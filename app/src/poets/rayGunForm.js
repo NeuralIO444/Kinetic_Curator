@@ -11,7 +11,9 @@
 // armed only from the poem row, plain by default the way silence is the
 // default. Matt's ruling on the dingbats question (2026-11-03): SHOT may go
 // full Carson (word recoverability is NOT protected there — the poem may
-// become pure texture); CARSON and GREIMAN keep words recoverable.
+// become pure texture); CARSON, GREIMAN and GRIT keep words recoverable.
+// GRIT (#2010 P2 · SWISS GRIT) is the Ashworth half: the grid comes first,
+// and the destruction is done TO the grid, by rule.
 //
 // WHERE IT LIVES (the record architecture): the treated stamp list is never
 // stored. The standing form stays plain and carries the treatment record
@@ -31,13 +33,17 @@
 //    ITS OWN letter's worn variant — torn or xerox, baked (placement.js
 //    WEAR_STAMP_IDS). Never another letter, never a dingbat: `ch` is law.
 //    Ghosts are added copies of the same letters, glyph-matched.
-// 2. Word recoverability at CARSON and GREIMAN — a word's glyphs keep
+// 2. Word recoverability at CARSON, GREIMAN and GRIT — a word's glyphs keep
 //    reading order along the row axis and stay a contiguous cluster: no
 //    treated glyph centre (CARSON) and no word's treated centre-span
-//    (GREIMAN) crosses the midpoint to a neighbouring word. At SHOT this
-//    bound is OFF, by the ruling.
+//    (GREIMAN) crosses the midpoint to a neighbouring word. GRIT re-sets
+//    the poem, so its bound is stated on its own grid: every word keeps its
+//    glyphs in order on consecutive columns, with one empty column between
+//    words — its violations move glyphs only ACROSS the row axis. At SHOT
+//    this bound is OFF, by the ruling.
 // 3. The anchor — at CARSON/GREIMAN the first line's displacements are
-//    halved (FIRST_LINE_FACTOR); the poem-row identity chip always shows
+//    halved (FIRST_LINE_FACTOR); at GRIT the first line takes no violation
+//    and nothing is overprinted onto it; the poem-row identity chip always shows
 //    the clean transcription regardless (it reads the deck, not the dish).
 // And the door's stamp-level bounds hold for every treated stamp, by
 // construction: centres on the dish, em within the door's (0, 0.3] and
@@ -55,7 +61,7 @@ import { mkRng } from '../engine/prng.js';
 import { stampWidthEm, wearStampIdFor } from './placement.js';
 
 /** The cycle, in tap order. Plain is the absence of the record. */
-export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'shot']);
+export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'grit', 'shot']);
 
 // The door's bounds, mirrored (fieldForm.js: sanitizeFieldForm's em
 // ceiling, FIELD_MIN_LEGIBLE_EM, MAX_FIELD_STAMPS). Treated stamps obey
@@ -120,6 +126,22 @@ const SHOT_GHOST_F = 0.45; // falloff at/above which a glyph trails a ghost
 const SHOT_GHOST_T = 0.45; // the ghost sits this far along the displacement vector
 const SHOT_GHOST_SCALE = 0.6; // ghost em relative to the treated glyph's em
 
+// GRIT (#2010 P2 · SWISS GRIT) — Ashworth's "hybrid of freeform with a Swiss aesthetic": the grid comes first, then
+// ruled violations. A1 grid-then-destroy: the form is RE-SET on a strict modular grid (one size, columns on a fixed
+// advance, rows on a baseline unit, flush left, straight), then a seeded subset of glyphs is moved exactly one
+// baseline unit, one column drops a unit, and one row is overprinted onto its neighbour at full weight. A2 no house
+// template: the grid's advance, baseline unit, leading and margins are drawn per record from the stream — every
+// treatment draws its own grid. All magnitudes are in the set em (the form's median em, fitted to the dish).
+const GRIT_ADVANCE_PAD = [0.08, 0.26]; // column advance = the form's widest ink + this pad, in em (monospaced discipline)
+const GRIT_UNIT = [0.36, 0.44]; // the baseline unit, in em (em is cap height) — the one module every violation moves by
+const GRIT_LEADING_UNITS = [6, 7]; // leading = this many baseline units (drawn: 6 or 7)…
+// …and never tighter than this: the stage draws a field glyph's ink about 2.3 em tall (FIELD_EM_SCALE), so the Swiss
+// base clears its own ink between rows — the discipline has to be legible before the violations can read as violence.
+const GRIT_LEADING_MIN_EM = 2.6;
+const GRIT_FIT = 0.88; // the set block fits within this share of the dish (each axis)
+const GRIT_MARGIN = 0.06; // the minimum margin, as a share of the axis
+const GRIT_SHIFT_P = 0.14; // chance a glyph (below the first line) moves exactly one unit up or down
+
 // WEAR (#2010 P1 · TORN & XEROXED) — the shape lever, named in the record as `wear: 1` (an older record without it
 // draws exactly as it always did, so every take recorded before P1 replays bit-for-bit). Per treated stamp, in output
 // order, ONE draw off the wear stream — a stream of its own (WEAR_SALT on the record's seed), so the geometry above
@@ -129,6 +151,8 @@ const WEAR_SALT = 0x57454152; // 'WEAR'
 const WEAR_P = Object.freeze({
   carson: Object.freeze({ torn: 0.14, xerox: 0.24 }),
   shot: Object.freeze({ torn: 0.3, xerox: 0.32 }),
+  // A5 systematic grit: degradation as a machine setting, not a gesture — every letter through the copier, none torn.
+  grit: Object.freeze({ torn: 0, xerox: 1 }),
 });
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -375,6 +399,85 @@ function greiman(stamps, rows, rng, aspect) {
   return [...out, ...ghosts];
 }
 
+// ── GRIT — the Swiss grid, then the ruled violations (Ashworth) ─────────
+function grit(stamps, rows, rng, aspect) {
+  // The set em: the form's median em (one size — Swiss discipline).
+  const ems = stamps.map((s) => s.em).sort((a, b) => a - b);
+  let em = ems[Math.floor(ems.length / 2)];
+  let wMax = 0;
+  for (const s of stamps) wMax = Math.max(wMax, stampWidthEm(s.assetId, s.ch));
+  // A2 — this record's own grid, drawn in a fixed order.
+  const between = (r) => r[0] + rng() * (r[1] - r[0]);
+  let adv = (wMax + between(GRIT_ADVANCE_PAD)) * em;
+  let unit = between(GRIT_UNIT) * em;
+  const leadUnits = rng() < 0.5 ? GRIT_LEADING_UNITS[0] : GRIT_LEADING_UNITS[1];
+  let lead = Math.max(unit * leadUnits, GRIT_LEADING_MIN_EM * em);
+  const marginX = rng();
+  const marginY = rng();
+  // The columns: glyph k of a row on the next column; a word break is one empty column.
+  const cols = rows.map((row) => {
+    const out = [];
+    let c = 0;
+    row.words.forEach((word, wi) => {
+      if (wi > 0) c++;
+      for (const idx of word) out.push([idx, c++]);
+    });
+    return out;
+  });
+  const maxCol = cols.reduce((m, row) => Math.max(m, row.length ? row[row.length - 1][1] : 0), 0);
+  // Fit the block to the dish: one factor on every module (the grid's proportions hold).
+  const blockW = maxCol * adv + wMax * em;
+  const blockH = (rows.length - 1) * lead + em + 2 * unit;
+  const k = Math.min(1, (GRIT_FIT * aspect) / blockW, GRIT_FIT / blockH);
+  em *= k;
+  adv *= k;
+  unit *= k;
+  lead *= k;
+  const setEm = clamp(em, EM_FLOOR, EM_CAP);
+  const w = maxCol * adv + wMax * em;
+  const h = (rows.length - 1) * lead + em;
+  // Flush left, top-weighted: the free space is shared out asymmetrically (Swiss), never centred.
+  const mx = GRIT_MARGIN * aspect;
+  const my = GRIT_MARGIN;
+  const x0 = mx + (wMax * em) / 2 + marginX * 0.5 * Math.max(0, aspect - 2 * mx - w);
+  const y0 = my + em / 2 + unit + marginY * 0.4 * Math.max(0, 1 - 2 * my - h - 2 * unit);
+  // The ruled violations, drawn in a fixed order: the dropped column, the overprinted row, then per glyph.
+  const dropCol = Math.floor(rng() * (maxCol + 1));
+  // Three rows or more: a two-row poem has no neighbour to spare but the anchor, so it takes no overprint.
+  let overSrc = -1;
+  let overDst = -1;
+  if (rows.length > 2) {
+    overSrc = 1 + Math.floor(rng() * (rows.length - 1));
+    overDst = overSrc < rows.length - 1 ? overSrc + 1 : overSrc - 1;
+  }
+  const out = stamps.map((s) => ({ ...s }));
+  cols.forEach((row, r) => {
+    for (const [idx, c] of row) {
+      let dy = 0;
+      if (r > 0) {
+        if (c === dropCol) dy = unit;
+        else if (rng() < GRIT_SHIFT_P) dy = rng() < 0.5 ? -unit : unit;
+      }
+      out[idx] = {
+        ...stamps[idx],
+        x: clamp(x0 + c * adv, 0, aspect),
+        y: clamp(y0 + r * lead + dy, 0, 1),
+        rotation: 0,
+        em: setEm,
+      };
+    }
+  });
+  // The overprint: a whole row printed again onto its neighbour's baseline, at full weight (C4 in miniature).
+  const ghosts = [];
+  if (overSrc >= 0) {
+    for (const [idx] of cols[overSrc]) {
+      if (out.length + ghosts.length >= COUNT_CAP) break;
+      ghosts.push({ ...out[idx], y: clamp(out[idx].y + (overDst - overSrc) * lead, 0, 1) });
+    }
+  }
+  return [...out, ...ghosts];
+}
+
 // ── SHOT — the blast. Bound 2 is OFF here, by Matt's ruling. ────────────
 function shot(stamps, rng, aspect) {
   const out = stamps.map((s) => ({ ...s }));
@@ -438,7 +541,13 @@ export function rayGunForm(form, record) {
   const aspect = Number.isFinite(form.aspect) && form.aspect > 0 ? form.aspect : 10 / 7;
   const rows = segmentWords(form.stamps, form.layout);
   const stamps =
-    mode === 'carson' ? carson(form.stamps, rows, rng, aspect) : mode === 'greiman' ? greiman(form.stamps, rows, rng, aspect) : shot(form.stamps, rng, aspect);
+    mode === 'carson'
+      ? carson(form.stamps, rows, rng, aspect)
+      : mode === 'greiman'
+        ? greiman(form.stamps, rows, rng, aspect)
+        : mode === 'grit'
+          ? grit(form.stamps, rows, rng, aspect)
+          : shot(form.stamps, rng, aspect);
   return { ...form, stamps: record.wear === 1 ? wear(stamps, mode, seed) : stamps };
 }
 

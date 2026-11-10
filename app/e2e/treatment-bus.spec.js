@@ -4,7 +4,7 @@
 // No page errors; the chip readout follows the record through a full cycle and back to plain.
 import { test, expect } from '@playwright/test';
 
-test('the ray gun tap lands through the treatments surface: plain → carson → greiman → shot → plain', async ({
+test('the ray gun tap lands through the treatments surface: plain → carson → greiman → grit → shot → plain', async ({
   page,
 }) => {
   const errors = [];
@@ -32,7 +32,7 @@ test('the ray gun tap lands through the treatments surface: plain → carson →
   const gun = page.locator('.poem-row').getByRole('button', { name: /^ray gun/ });
   await expect(gun).toHaveText('ray gun');
   const mode = () => page.evaluate(() => window.__kcStore.getState().layoutParams.fieldForm?.raygun?.mode ?? null);
-  for (const m of ['carson', 'greiman', 'shot']) {
+  for (const m of ['carson', 'greiman', 'grit', 'shot']) {
     await gun.click();
     await expect.poll(mode).toBe(m);
     await expect(gun).toHaveText(`ray gun · ${m}`);

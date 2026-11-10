@@ -129,7 +129,7 @@ export const treatments = Object.freeze({
   disarm(target, { by } = {}) {
     return act(target, by, (s) => s.setPoemRaygun(null));
   },
-  /** The poem row's gesture: plain → carson → greiman → shot → plain. */
+  /** The poem row's gesture: plain → carson → greiman → grit → shot → plain. */
   cycle(target, { by } = {}) {
     return act(target, by, (s) => s.cyclePoemRaygun());
   },

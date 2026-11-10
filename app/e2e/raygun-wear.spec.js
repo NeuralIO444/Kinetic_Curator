@@ -48,6 +48,8 @@ for (const vp of [
     await page.waitForTimeout(1500);
     await page.screenshot({ path: `test-results/raygun-wear-carson-${vp.name}.png` });
     await gun.click(); // greiman
+    await gun.click(); // grit (#2010 P2)
+    await expect(gun).toHaveText('ray gun · grit');
     await gun.click(); // shot
     await expect(gun).toHaveText('ray gun · shot');
     await page.waitForTimeout(1500);
