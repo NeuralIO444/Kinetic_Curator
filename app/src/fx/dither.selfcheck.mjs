@@ -210,9 +210,13 @@ ok('registration: def, rack seat, add-menu path, GL registry, sanitize clamps', 
   assert.deepEqual(defaultFxParams('dither'), { cell: 2, amount: 0.5 });
   const ef4 = FX_RACK.find((s) => s.slot === 'EF-4');
   assert.ok(ef4.kinds.includes('dither'), 'dither sits in EF-4 kinds');
-  assert.deepEqual(ef4.stubs, ['stipple'], 'stipple stays a stub — only dither ships');
+  // #2038 re-pin: stipple shipped (the strata rebuild built the rack's
+  // last stub) — EF-4 holds no stubs now, and stipple is offered like
+  // every live kind. Stipple's own registration is pinned in
+  // stipple.selfcheck.
+  assert.deepEqual(ef4.stubs, [], 'no stubs remain in EF-4 — stipple shipped (#2038)');
   assert.ok(availableFxKinds([]).includes('dither'), 'the free-pick add path offers dither');
-  assert.ok(!availableFxKinds([]).includes('stipple'), 'stubs are never offered');
+  assert.ok(availableFxKinds([]).includes('stipple'), 'stipple is offered now that it ships');
   assert.ok(
     availableFxKinds([{ kind: 'dither', params: {} }]).indexOf('dither') === -1,
     'a present dither is not offered twice',

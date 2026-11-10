@@ -264,6 +264,7 @@ node src/state/euclid.selfcheck.mjs
 node src/state/showrunner.selfcheck.mjs
 node src/fx/fxFilters.selfcheck.mjs
 node src/fx/dither.selfcheck.mjs
+node src/fx/stipple.selfcheck.mjs
 node src/fx/mathFilters.selfcheck.mjs
 node src/fx/rollSafety.selfcheck.mjs
 node src/fx/rollGuard.selfcheck.mjs
@@ -518,6 +519,7 @@ node src/pattern/blocks.selfcheck.mjs
 node src/pattern/picture.selfcheck.mjs
 node src/panels/build/patternEditor.selfcheck.mjs
 node src/state/layerOrder.selfcheck.mjs
+node src/state/strataRebuild.selfcheck.mjs
 node src/panels/build/layerRows.selfcheck.mjs
 node src/gl/grainFinish.selfcheck.mjs
 node src/engine/kernel/tracks/feedDelay.selfcheck.mjs

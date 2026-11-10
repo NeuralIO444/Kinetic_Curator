@@ -184,6 +184,7 @@ export const Events = {
   LAYER_TOGGLE_WET_SOAK: 'layer:toggleWetSoak',
   LAYER_SET_BLEND_MODE: 'layer:setBlendMode',
   LAYER_SET_OPACITY: 'layer:setOpacity',
+  LAYER_SET_ROTATION: 'layer:setRotation',
   LAYER_DUPLICATE: 'layer:duplicate',
   LAYER_SOLO: 'layer:solo',
   LAYER_ADD_FX: 'layer:addFx',

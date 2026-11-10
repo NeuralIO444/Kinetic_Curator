@@ -274,15 +274,6 @@ const rawDoc = {
   paletteId: 'praystation',
   layers: [
     { id: 'kc-a', name: 'A', type: 'content', visible: true, layerBlendMode: 'normal', layerOpacity: 1 },
-    {
-      id: 'kc-b',
-      name: 'B',
-      type: 'content',
-      visible: true,
-      layerBlendMode: 'normal',
-      layerOpacity: 1,
-      wetSoak: true,
-    },
     { id: 'pt-1', name: 'P', type: 'pattern', visible: true, layerBlendMode: 'normal', layerOpacity: 1, wetSoak: true },
     {
       id: 'fx-1',
@@ -302,7 +293,28 @@ assert.ok(parsed.ok, `fixture doc parses: ${parsed.error || ''}`);
 S().applyProject(parsed.doc);
 
 ok('load normalization: exactly true on a content layer survives; every other spelling drops', () => {
-  assert.equal(layerOf('kc-b').wetSoak, true, 'content + true survives');
+  // #2038: the content + true survivor gets its own one-content doc —
+  // in the shared fixture it would be a second content stratum and
+  // trim at the one-content door before its flag could be read.
+  const soaked = parseProject({
+    version: 1,
+    seed: 0xbeef,
+    paletteId: 'praystation',
+    layers: [
+      {
+        id: 'kc-s',
+        name: 'S',
+        type: 'content',
+        visible: true,
+        layerBlendMode: 'normal',
+        layerOpacity: 1,
+        wetSoak: true,
+      },
+    ],
+    activeLayerId: 'kc-s',
+  });
+  assert.ok(soaked.ok);
+  assert.equal(soaked.doc.layers[0].wetSoak, true, 'content + true survives');
   assert.ok(!('wetSoak' in layerOf('pt-1')), 'pattern layer: dropped (content only)');
   assert.ok(!('wetSoak' in layerOf('fx-1')), 'fx layer: dropped');
   assert.ok(!('wetSoak' in layerOf('kc-a')), 'absence stays absence');
@@ -328,11 +340,13 @@ ok('the toggle is undoable on content, a no-op on pattern/FX (no key, no undo en
   assert.ok(!('wetSoak' in layerOf('kc-a')), 'undo restores the off state');
 });
 
-ok('a duplicate inherits the mode; the saved project round-trips byte-stable', () => {
-  // #1609 re-pin: the fixture world already holds both content strata, so
-  // a content dup there refuses at the D3 cap — run the dup in a
-  // one-content world (the round-trip below is world-agnostic), then
-  // restore the fixture world at the end.
+ok('a content duplicate is refused at the cap; the saved project round-trips byte-stable', () => {
+  // #1609 re-pin was: run the dup in a one-content world. #2038: even
+  // there the dup refuses — the cap IS one content stratum, so a
+  // content duplicate can never land, flagged or not, and the
+  // inheritance pin retires with the second stratum (wetSoak is
+  // content-only, so no other stratum type can carry the property).
+  // The round-trip below is world-agnostic and still runs in full.
   const solo = parseProject({
     version: 1,
     seed: 0xbeef,
@@ -354,8 +368,7 @@ ok('a duplicate inherits the mode; the saved project round-trips byte-stable', (
   assert.ok(solo.ok, `solo world parses: ${solo.error || ''}`);
   S().applyProject(solo.doc);
   emit(Events.LAYER_DUPLICATE, { id: 'kc-b' });
-  const copy = S().layers.find((l) => l.id !== 'kc-b' && l.type === 'content' && l.wetSoak === true);
-  assert.ok(copy, 'the duplicate carries wetSoak');
+  assert.equal(S().layers.filter((l) => l.type === 'content').length, 1, 'no duplicate is minted (#2038)');
   const saved1 = JSON.stringify(serializeProject(S()));
   const back = parseProject(JSON.parse(saved1));
   assert.ok(back.ok);

@@ -92,6 +92,10 @@ ok('loading an interleaved project migrates it, warns once, and keeps content in
   // doc()'s second FX track trims on load under D6, pinned separately
   // below). The fold property is unchanged: FX crosses to before MATH,
   // content keeps its exact slots.
+  // #2038 re-pin: the fixture also carries a SECOND content stratum
+  // (kc2) — pre-rebuild shape. Under the one-content law it trims at
+  // the door (named in trims); the fold property this case pins is
+  // unchanged for what survives.
   const interleaved = [
     mk('kc', 'content', { patch: { mode: 'off', to: null, strength: 0.16 } }),
     mk('m1', 'math', { effects: [{ kind: 'gain', params: {} }] }),
@@ -107,7 +111,8 @@ ok('loading an interleaved project migrates it, warns once, and keeps content in
   } finally {
     console.warn = w;
   }
-  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'm1', 'kc2'], 'FX crosses MATH; content keeps its exact slots');
+  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'm1'], 'FX crosses MATH; the surviving content stratum keeps its slot');
+  assert.equal(r.trims.length, 1, '#2038: the second content stratum trims, named');
   assert.equal(warns.filter((m) => /#1048/.test(m)).length, 1, 'the render change is announced');
   assert.equal(r.activeLayerId, 'kc');
 });
@@ -122,8 +127,15 @@ ok('#1609: the pre-skeleton fixture (two FX tracks) loads folded AND trimmed, bo
   } finally {
     console.warn = w;
   }
-  assert.deepEqual(ids(r.layers), ['kc', 'f1', 'm1', 'kc2'], 'f2 trims (D6); the fold still lands FX before MATH');
-  assert.deepEqual(r.trims, ['FX track "f2"']);
+  // #2038 re-pin: doc() also carries kc2, a second content stratum —
+  // under the one-content law it trims too, named ahead of f2 in
+  // document order. The fold property is unchanged.
+  assert.deepEqual(
+    ids(r.layers),
+    ['kc', 'f1', 'm1'],
+    'f2 trims (D6) and kc2 trims (#2038); the fold still lands FX before MATH',
+  );
+  assert.deepEqual(r.trims, ['content stratum "kc2"', 'FX track "f2"']);
   assert.equal(warns.filter((m) => /#1048/.test(m)).length, 1, 'the fold is announced');
   assert.equal(warns.filter((m) => /#1609/.test(m)).length, 1, 'the trim is announced');
 });

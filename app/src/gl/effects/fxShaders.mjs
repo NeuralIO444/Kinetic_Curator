@@ -292,6 +292,76 @@ export const FX_DITHER_DESCRIPTOR = {
   },
 };
 
+// #2038 — STIPPLE (EF-4 Finish, grain family): the dot screen, the rack's
+// last "planned" stub made real. Where DITHER thresholds against a Bayer
+// rank (a weave at fixed pitch), STIPPLE thresholds against the pixel's
+// squared distance from its cell centre: t = 2·|u|² over the cell-local
+// u ∈ [-0.5, 0.5)², so t runs 0 at the centre to 1 at the corners and a
+// channel cuts on wherever its tone beats t — round dots whose radius
+// grows with the tone, merging into a field (with paper holes) as the
+// tone saturates, exactly as a halftone screen behaves. Same
+// premultiplied plate discipline as dither (grain, #748): the straight
+// colour is quantized and re-premultiplied, alpha untouched, amount 0
+// returns the source untouched. The JS transcription is pinned by
+// fx/stipple.selfcheck.mjs. NOT the Materials stipple (#1549): that is
+// a placement-level dot body; this is the finish-family screen.
+export const FX_STIPPLE_FS = `#version 300 es
+precision highp float;
+uniform sampler2D u_tex;
+uniform vec2 u_res;
+uniform int u_cell;
+uniform float u_amount;
+in vec2 v_cuv;
+out vec4 o;
+float dotThreshold(vec2 cellPx) {
+  vec2 u = fract(cellPx) - 0.5;
+  return clamp(2.0 * dot(u, u), 0.0, 1.0);
+}
+void main() {
+  vec4 s = texture(u_tex, v_cuv);
+  float amt = clamp(u_amount, 0.0, 1.0);
+  if (amt <= 0.0) {
+    o = s;
+    return;
+  }
+  vec2 cellPx = floor(v_cuv * u_res) / max(1.0, float(u_cell));
+  float t = dotThreshold(cellPx);
+  vec3 straight = s.a > 0.0 ? clamp(s.rgb / s.a, 0.0, 1.0) : vec3(0.0);
+  vec3 base = floor(straight);
+  vec3 q = clamp(base + vec3(greaterThan(straight - base, vec3(t))), 0.0, 1.0);
+  o = vec4(mix(s.rgb, q * s.a, amt), s.a);
+}
+`;
+
+export const FX_STIPPLE_DESCRIPTOR = {
+  label: 'Stipple',
+  hint: 'Dot-screen finish: tones re-cut into round stipple dots — dot size follows the tone. Amount 0 is the layer untouched.',
+  pad: 0,
+  animated: false,
+  params: {
+    cell: {
+      type: 'int',
+      label: 'Cell',
+      min: 1,
+      max: 8,
+      step: 1,
+      def: 3,
+      ui: 'slider',
+      hint: 'Pixels per dot cell — the screen pitch. Small is fine stipple, large is bold dots.',
+    },
+    amount: {
+      type: 'float',
+      label: 'Amount',
+      min: 0,
+      max: 1,
+      step: 0.05,
+      def: 0.5,
+      ui: 'slider',
+      hint: 'How far the dot screen takes over. 0 is the layer untouched; 1 is the full screen.',
+    },
+  },
+};
+
 // #2008 — RISO OVERPRINT (EF-4 Finish, grain family): the shader body is
 // engine/risoFinish.mjs's RISO_GLSL (the finish's law lives with its CPU
 // reference; the selfcheck pins the two mirrors' constants equal). Two taps:
@@ -730,6 +800,15 @@ export const FX_SHADER_EFFECTS = [
       descriptor: FX_DITHER_DESCRIPTOR,
       file: 'fxShaders.mjs:dither',
       cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU Bayer threshold, no taps' },
+    },
+  ],
+  [
+    'stipple',
+    {
+      fs: FX_STIPPLE_FS,
+      descriptor: FX_STIPPLE_DESCRIPTOR,
+      file: 'fxShaders.mjs:stipple',
+      cost: { tier: 3, memoryBytes: 1920 * 1080 * 8, timeMs: 0.2, notes: 'pure ALU dot-screen threshold, no taps' },
     },
   ],
   [

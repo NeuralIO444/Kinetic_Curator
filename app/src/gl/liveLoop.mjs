@@ -1735,11 +1735,11 @@ export function createLiveLoop(
               // derivation — the feed costs nothing while it is off.
               if (frame.trailSteerLive) updateTrailSteerGrid(accumObj);
               // #520 Phase 2: apply grain-family finish chain post-accum.
-              let accumTex = accumObj.texture();
-              for (const { layerId, steps } of fxFinishChains) {
-                accumTex = live.getBridge().runChain(layerId, accumTex, steps);
-              }
-              live.presentUpscaled(accumTex);
+              // #2038 — routed through the renderer's applyFinishChains
+              // (the same seam every other presenter uses) so a rotated
+              // stratum's finish turns there too; unrotated chains run
+              // the identical runChain calls as before.
+              live.presentUpscaled(live.applyFinishChains(accumObj.texture(), fxFinishChains));
             } catch (e) {
               noteAccumFault(e);
               // Fall back to plain rendering so the canvas keeps moving.

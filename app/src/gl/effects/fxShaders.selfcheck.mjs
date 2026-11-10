@@ -180,6 +180,8 @@ ok('all template kinds are declared', () => {
   // Bayer finish (the Phase-2 five plus sharpen/haze/halo/grade before it).
   // Re-pinned for #2008 (cause: the riso overprint finish registers as a
   // template effect, its GLSL living in engine/risoFinish.mjs).
+  // Re-pinned for #2038 (cause: the stipple dot screen ships as a
+  // template effect alongside dither).
   assert.deepEqual([...FX_SHADER_KINDS].sort(), [
     'displace',
     'dither',
@@ -191,6 +193,7 @@ ok('all template kinds are declared', () => {
     'scanlines',
     'sharpen',
     'solarize',
+    'stipple',
     'tear',
   ]);
 });

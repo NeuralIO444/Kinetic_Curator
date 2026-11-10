@@ -22,7 +22,8 @@ import { pushToUndo, UNDO_KIND_LAYERS } from '../history.js';
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { removePatchSample } from '../../engine/kernel/tracks/patchDiag.mjs';
 import { isTapeFull } from '../tapeBudget.js';
-import { fxBeforeMath, canTrade } from '../layerOrder.js';
+import { fxBeforeMath, canTrade, canonicalStrataOrder } from '../layerOrder.js';
+import { sanitizeStratumRotation } from '../stratumRotation.js';
 import { PATTERN_DEFAULT_DENSITY, PATTERN_PARAM_KEYS, defaultPattern, sanitizePattern } from '../patternTrack.js';
 
 // #1609 (Strata Q Phase 3) — the fixed skeleton, Matt's rulings D3/D5/D6
@@ -31,7 +32,15 @@ import { PATTERN_DEFAULT_DENSITY, PATTERN_PARAM_KEYS, defaultPattern, sanitizePa
 // stacks to the same shape on load, said out loud (projectNormalize.js).
 // PATTERN strata are the ground itself (D4): they spend no skeleton slot and
 // are bounded only by the document's MAX_LAYERS, like everything else.
-export const MAX_CONTENT_TRACKS = 2;
+//
+// #2038 (Matt's ruling, 2026-11-08) — the skeleton is rebuilt: the
+// double-exposure pair is superseded by ONE content stratum ("the content
+// stratum is the normal asset stage system"), patterns are pinned to the
+// bottom LOCKED, and the full order is fixed — patterns → content → FX →
+// MATH (layerOrder.js canonicalStrataOrder). Legacy two-content documents
+// migrate at the load door: the surplus content stratum trims, named, in
+// the same said-out-loud receipt as every #1609 trim.
+export const MAX_CONTENT_TRACKS = 1;
 export const MAX_FX_TRACKS = 1;
 // #1010 — MATH is a third track type: same grammar as FX (add/remove/hide/
 // solo/opacity/reorder), riding the same fold. Adjustment tracks (FX+MATH)
@@ -132,7 +141,8 @@ export const createLayersSlice = (set) => ({
   addLayer: (family) =>
     set((state) => {
       // #1609 (D3/D4) — the content cap counts KC tracks only: PATTERN
-      // strata are ground beneath the two exposures, outside the count.
+      // strata are ground beneath the content stratum, outside the count.
+      // #2038 — the cap is 1: a second KC track is refused here, always.
       const content = state.layers.filter(isKcLayer).length;
       if (content >= MAX_CONTENT_TRACKS) return {};
       // #342 — tape pre-flight: refuse rather than let the governor's shed
@@ -149,7 +159,9 @@ export const createLayersSlice = (set) => ({
       const layerBlendMode = picked ? family : (state.lastUsedContentBlend ?? 'normal');
       return {
         ...pushToUndo(state, true, UNDO_KIND_LAYERS),
-        layers: [
+        // #2038 — the fixed order: the new stratum seats into the content
+        // band (below FX/MATH), never appended above the grade.
+        layers: canonicalStrataOrder([
           ...state.layers,
           {
             id,
@@ -160,7 +172,7 @@ export const createLayersSlice = (set) => ({
             layerOpacity: 1,
             patch: { mode: 'off', to: null, strength: 0.16 },
           },
-        ],
+        ]).layers,
         layerSnapshots: { ...state.layerSnapshots, [state.activeLayerId]: captureSnapshot(state) },
         activeLayerId: id,
         ...(picked ? { lastUsedContentBlend: family } : null),
@@ -289,6 +301,8 @@ export const createLayersSlice = (set) => ({
           // #1834 — a copy is the same stratum: its FEEDS ACCUM flag rides
           // (key only while off, like the source).
           ...(src.feedsAccum === false ? { feedsAccum: false } : {}),
+          // #2038 — its rotation rides the same way (key only while non-zero).
+          ...(src.rotation ? { rotation: src.rotation } : {}),
           pattern: sanitizePattern(src.pattern),
         };
         const spliced = [...state.layers];
@@ -331,6 +345,10 @@ export const createLayersSlice = (set) => ({
         // position projectNormalize assigns it, so a save → load →
         // save round trip stays byte-stable.
         ...(!isAdj && src.wetSoak === true ? { wetSoak: true } : {}),
+        // #2038 — rotation rides a duplicate the same way (key only
+        // while non-zero; projectNormalize assigns it last, after
+        // wetSoak, so the round trip stays byte-stable).
+        ...(src.rotation ? { rotation: src.rotation } : {}),
       };
       if (isAdj) copy.effects = structuredClone(src.effects || (isMath ? defaultMathEffects() : defaultFxEffects()));
       const i = state.layers.findIndex((l) => l.id === id);
@@ -550,6 +568,32 @@ export const createLayersSlice = (set) => ({
       ...pushToUndo(state, false, UNDO_KIND_LAYERS),
       layers: state.layers.map((l) => (l.id === id ? { ...l, layerOpacity } : l)),
     })),
+  // #2038 — per-stratum rotation, the D7 reservation: detents 0/15/45/90
+  // (stratumRotation.js). The key exists only while non-zero — setting 0
+  // deletes it rather than spelling it, so an unrotated stratum is
+  // byte-for-byte the stratum it was before the control existed (the
+  // feedsAccum/wetSoak discipline). A non-detent value sanitizes to 0.
+  // Any stratum type may rotate: content turns its marks, pattern its
+  // field, FX/MATH their effect field.
+  setLayerRotation: (id, rotation) =>
+    set((state) => {
+      const target = state.layers.find((l) => l.id === id);
+      if (!target) return {};
+      const deg = sanitizeStratumRotation(rotation);
+      if (deg === sanitizeStratumRotation(target.rotation)) return {};
+      return {
+        ...pushToUndo(state, true, UNDO_KIND_LAYERS),
+        layers: state.layers.map((l) => {
+          if (l.id !== id) return l;
+          if (deg === 0) {
+            const next = { ...l };
+            delete next.rotation;
+            return next;
+          }
+          return { ...l, rotation: deg };
+        }),
+      };
+    }),
 
   addFxLayer: (family) =>
     set((state) => {
