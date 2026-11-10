@@ -631,6 +631,7 @@ node src/data/styleLooks.selfcheck.mjs
 node src/data/voiceDeck.selfcheck.mjs
 node src/data/chapters.selfcheck.mjs
 node src/data/canon/canon.selfcheck.mjs
+node src/data/canon/voiceStyle.selfcheck.mjs
 node src/state/kineticSweep.selfcheck.mjs
 node src/state/kineticScope.selfcheck.mjs
 node src/state/chapterWalk.selfcheck.mjs
