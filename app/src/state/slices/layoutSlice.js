@@ -1405,7 +1405,8 @@ export const createLayoutSlice = (set) => ({
       if (!form || form.plate || !form.raygun) return {};
       if (life !== null && life !== 'bedrock' && life !== 'seed') return {};
       if ((form.raygun.life ?? null) === life) return {};
-      const { life: _old, ...rest } = form.raygun;
+      const rest = { ...form.raygun };
+      delete rest.life;
       return {
         ...pushToUndo(state, true),
         layoutParams: {
