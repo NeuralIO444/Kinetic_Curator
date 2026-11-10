@@ -63,6 +63,7 @@ import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Inte
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
 import { startGhost, resetGhost } from './curator/mindGhost.js'; // #1464: the third's presence on the Stimuli meter
 import { startMindRoom, getMindRoom } from './curator/mindRoom.js'; // #1145: the Director's room, as the minds hear it
+import { startCanonBus } from './curator/canonBus.mjs'; // #2049: Canon records on the core buses
 import { isPlaybackActive, setPlaybackFrameTap, subscribePlayback } from './gl/playback.mjs'; // #1462: a take's decisions replay
 import { createSet } from './curator/setLive.js'; // #1475: her set
 import { setSourceFeed } from './gl/sourceFeed.mjs';
@@ -265,6 +266,10 @@ function AppInner() {
       },
       setMarkParam: (key, value) => useStore.getState().setLayoutParam(key, value),
     });
+    // #2049 — the Canon binder: wires each Canon record's own declared bus binding (what it listens to, what it
+    // announces) and keeps the Canon state the minds are handed each bar. It only watches and announces — it
+    // asks the stage for nothing — and is muted while a take plays back.
+    const canonBus = startCanonBus({ getState: useStore.getState, isReplaying: isPlaybackActive });
     const stopMind = startMind({
       presence,
       conductHeat, // #1483: how bold Davis's conducting picks may run (engine-side only)
@@ -285,6 +290,7 @@ function AppInner() {
           creatures: st.layoutParams?.creatures ?? 0,
           director: getMindRoom(),
           show: trio.showBlock(),
+          canon: canonBus.snapshot(), // #2049: what Canon stands, and what it has heard
         };
       },
     });
@@ -357,6 +363,7 @@ function AppInner() {
       stopPace();
       stopLean();
       stopMind();
+      canonBus.stop();
       stopReviewVoice();
       stopTreatments();
       trio.stop();

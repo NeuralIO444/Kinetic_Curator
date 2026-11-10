@@ -17,12 +17,40 @@
 //   pairing    — the asset categories its voice family wears (the old FAMILY_PAIRING row); null when the style
 //                has no voice family of its own
 //
+//   bus        — #2049: the record's declared relationship to the core event bus, in the bus's own channel
+//                names (composition/eventBus.js Events — decisions, never frames). `listens`: the decisions the
+//                record attends to; `announces`: what it publishes when it takes the stage. The declaration is
+//                the wiring: curator/canonBus.mjs subscribes exactly what a record lists and nothing else, so
+//                editing a record's `bus` changes what it is connected to — no driver is written per record.
+//
 // LEAF MODULE: no imports, on purpose. Every catalogue imports this; it imports none of them.
 // Declaration order is the asset-style order (the order STYLES has always had) — reordering is a data change.
+
+/**
+ * #2049 — the bus binding every style declares unless its record says otherwise. Channel names are the bus's
+ * own (composition/eventBus.js Events; canonBus.selfcheck pins each one against that table):
+ *   listens   kinetic:tap, layout:preset, layout:curate — the decisions that change what is on stage
+ *             clock:bar — the downbeat (how long it has stood, in bars)
+ *             audio:onset — a hit, heard while it stands
+ *   announces canon:stand — published once, when the style takes the stage
+ */
+export const CANON_STYLE_BUS = Object.freeze({
+  listens: Object.freeze(['kinetic:tap', 'layout:preset', 'layout:curate', 'clock:bar', 'audio:onset']),
+  announces: Object.freeze(['canon:stand']),
+});
+
+const bus = (b) =>
+  b
+    ? Object.freeze({
+        listens: Object.freeze([...(b.listens || [])]),
+        announces: Object.freeze([...(b.announces || [])]),
+      })
+    : CANON_STYLE_BUS;
 
 const style = (r) =>
   Object.freeze({
     ...r,
+    bus: bus(r.bus),
     identity: Object.freeze({ ...r.identity, figures: Object.freeze([...r.identity.figures]) }),
     assets: Object.freeze({ note: r.assets.note, families: Object.freeze([...r.assets.families]) }),
     lookGroup: r.lookGroup ? Object.freeze({ ...r.lookGroup }) : null,
