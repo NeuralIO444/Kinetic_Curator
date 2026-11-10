@@ -127,7 +127,8 @@ structurally, not by luck:
   `cancel(id:)` now records the id in `earlyCancels` and `start` refuses the ask outright — no
   generation, no reply. Either interleaving ends with the ask cancelled; the window is not merely
   narrow, it is closed. One internal difference from a plain no-op: a cancel for an id that never
-  dispatches (a timed-out status request) leaves an inert entry in `earlyCancels`; bridge ids come from
+  dispatches (a timed-out status request) leaves an inert entry in `earlyCancels`, as does a cancel
+  that lands after its ask already finished and unregistered; bridge ids come from
   a monotonic `AtomicU64` and are never reused, so the entry can never match a later ask.
 
 **N3 — selfcheck wording.** The #1747 block in `mindApple.selfcheck.mjs` pinned `case "cancel"` under

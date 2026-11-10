@@ -198,7 +198,8 @@ actor Minds {
     // refuses to generate for it, so a cancel cannot slip past dispatch however the two jobs interleave.
     // In practice the bridge sends a cancel only after its ask timeout (300 ms; 3 s for status) while
     // dispatch follows the ask line at once, so this set is the belt to that timing's braces. Bridge ids
-    // are never reused, so an entry for an id that never starts (a timed-out status) is inert.
+    // are never reused, so an entry that is never consumed — an id that never starts (a timed-out
+    // status), or a cancel that landed after its ask already finished — is inert.
     private var earlyCancels: Set<Int> = []
 
     // The model's window is 4,096 tokens TOTAL — instructions + transcript + the new prompt. Measured in
