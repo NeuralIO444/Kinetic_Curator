@@ -41,6 +41,7 @@ import { shapeMixWeights, liveShapeLevels } from '../data/voices.js';
 import { getAssetCost } from '../assets/cost.js';
 import { isFxLayer } from '../fx/fxFilters.js';
 import { isMathLayer } from '../fx/mathFilters.js';
+import { stratumRotationOf, rotateItems, rotateFields } from '../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
 import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
 import { CANVAS_W, CANVAS_H } from '../hooks/useCanvasViewport.js';
@@ -979,6 +980,10 @@ export function createLiveResolver() {
           layer,
           pattern: patternBlock,
           ...(patternCulture ? { patternCulture } : {}),
+          // #2038 — the stratum's rotation detent rides only while
+          // non-zero: the renderer turns the pattern's field texture by
+          // it; an unrotated pattern's entry is exactly what it was.
+          ...(stratumRotationOf(layer) ? { rotation: stratumRotationOf(layer) } : {}),
           palette: resolvePalette(input.paletteId, input.paletteOverrides, input.userPalettes),
           t: (input.loopTimeMs ?? 0) / 1000,
           layerBlendMode: layer.layerBlendMode || 'normal',
@@ -998,6 +1003,10 @@ export function createLiveResolver() {
           isMath: isMathLayer(layer),
           layer,
           layerOpacity: layer.layerOpacity ?? 1,
+          // #2038 — the stratum's rotation detent rides only while
+          // non-zero: the wrap turns its effect field by it (seeded in
+          // the rotated frame, rotated back on composite).
+          ...(stratumRotationOf(layer) ? { rotation: stratumRotationOf(layer) } : {}),
           soloGrade: isMathLayer(layer) && input.soloStash?.id === layer.id,
         });
         continue;
@@ -1427,18 +1436,31 @@ export function createLiveResolver() {
       // ride the resolved layer (key present only while pairs actually
       // merge, so an unmerged layer's contract is exactly what it was).
       const coalesce = isLiveSwarmMode(layoutParams.mode) ? coalescenceFields(swarmState.get(layer.id)?.system) : null;
+      // #2038 — per-stratum rotation, applied LAST, over the stratum's
+      // finished items: the whole stratum turns rigidly about the stage
+      // centre (positions rotate; each mark's own angle advances by the
+      // detent). Everything upstream — the deal, the dish, patches,
+      // morphs — computes in the stratum's own frame exactly as before;
+      // a rigid turn preserves every pairwise relation they settled.
+      // The coalescence fields turn with the marks they fuse. At detent
+      // 0 (the absence state) both pass through untouched — the same
+      // array references, the same contract, the same hash.
+      const rotation = stratumRotationOf(layer);
       out.push({
         id: layer.id,
         layoutParams,
         palette,
-        items,
+        items: rotation ? rotateItems(items, W, H, rotation) : items,
         safeCount,
         morphSig,
         morphSeed: seed,
         layerBlendMode: layer.layerBlendMode || 'normal',
         layerOpacity: layer.layerOpacity ?? 1,
         layer,
-        ...(coalesce && coalesce.length ? { coalesce } : {}),
+        ...(rotation ? { rotation } : {}),
+        ...(coalesce && coalesce.length
+          ? { coalesce: rotation ? rotateFields(coalesce, W, H, rotation) : coalesce }
+          : {}),
       });
     }
     const content = out.filter((e) => !e.isFx);

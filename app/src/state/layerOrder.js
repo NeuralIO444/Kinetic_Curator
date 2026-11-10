@@ -38,12 +38,48 @@ export function fxBeforeMath(layers) {
 }
 
 /**
- * May two layers trade places? Content swaps with content, FX with FX, MATH
- * with MATH. Content never crosses the adjustment line (#732) and FX never
- * crosses MATH (#1048).
+ * May two layers trade places? Only within the exact same type: content
+ * swaps with content, FX with FX, MATH with MATH, pattern with pattern.
+ * Content never crosses the adjustment line (#732) and FX never crosses
+ * MATH (#1048). #2038 adds the pattern clause: a pattern used to read as
+ * "content family" here and could trade UP past the content stratum —
+ * under the rebuild patterns are pinned to the bottom, locked, so a
+ * pattern trades only with another pattern (which keeps every pattern
+ * in the bottom band). With the one-content skeleton the content case
+ * is moot in practice; the law is stated whole anyway.
  */
 export function canTrade(a, b) {
   if (!a || !b) return false;
-  if (isAdjustment(a) || isAdjustment(b)) return a.type === b.type;
-  return true;
+  return a.type === b.type;
+}
+
+// #2038 — the fixed strata order (Matt's ruling, 2026-11-08): bottom→top
+// PATTERNS (pinned to the bottom, locked) → the ONE content stratum →
+// FX → MATH. With one stratum per rationed band the full order is
+// determined by type alone, so the canonical form is a stable partition
+// by band: relative order inside a band (patterns among themselves) is
+// preserved exactly, and nothing else about the layers changes. The
+// load door re-seats legacy documents into this order (said out loud,
+// projectNormalize.js); the store's add paths canonicalize the same
+// way, so no reachable state ever holds a pattern above the content
+// stratum or an adjustment stratum below it. This subsumes fxBeforeMath
+// (FX before MATH is the band order's upper half); fxBeforeMath stays
+// for its own callers and pins.
+const STRATA_BAND = { pattern: 0, content: 1, fx: 2, math: 3 };
+const bandOf = (l) => STRATA_BAND[l && l.type] ?? 1;
+
+/**
+ * @param {Array<{type:string}>} layers bottom→top
+ * @returns {{layers: Array, moved: boolean}} the same layers in the
+ *   fixed #2038 order (stable within each band); `moved` says whether
+ *   anything changed.
+ */
+export function canonicalStrataOrder(layers) {
+  if (!Array.isArray(layers)) return { layers, moved: false };
+  const sorted = layers
+    .map((l, i) => ({ l, i }))
+    .sort((a, b) => bandOf(a.l) - bandOf(b.l) || a.i - b.i)
+    .map((e) => e.l);
+  const moved = sorted.some((l, k) => l !== layers[k]);
+  return moved ? { layers: sorted, moved: true } : { layers, moved: false };
 }

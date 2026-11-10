@@ -23,6 +23,7 @@
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
 import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/mathFilters.js';
+import { sanitizeStratumRotation } from '../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
 import {
   sanitizeAccumOptics,
   sanitizeAccumTunnel,
@@ -286,6 +287,14 @@ function buildFxWraps(resolvedLayers, caps) {
           filterId: `fx-${String(rl.id).replace(/[^A-Za-z0-9_-]/g, '_')}`,
           opacity,
           contentLayerIds: below.map((l) => l.id),
+          // #2038 — the stratum's rotation detent rides the wrap only
+          // while non-zero: the renderer seeds the wrap in the rotated
+          // frame and rotates the result back, so the effect field
+          // turns and the picture below keeps its geometry. Absent, the
+          // wrap (and the contract hash) is exactly what it was.
+          ...(sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation)
+            ? { rotation: sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation) }
+            : {}),
         });
       } else if (fx.length > 0) {
         // Over budget: the wrap is shed, and the layer id is reported so
@@ -537,6 +546,15 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         blend: 'normal', // FX wrap groups carry no blend mode (buildLayerStack)
         fx: sanitizeFxEffects(rl.layer?.effects), // top-down, #185 order preserved
         matte: sanitizeMatte(rl.layer?.matte),
+        // #2038 — rotation detent, carried only while non-zero (the
+        // wrap carries it too; this is the layer's own record of it).
+        ...(sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation)
+          ? {
+              rotation: sanitizeStratumRotation(
+                rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation,
+              ),
+            }
+          : {}),
       });
       continue;
     }
@@ -553,6 +571,14 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         fx: sanitizeMathEffects(rl.layer?.effects), // top-down, #185 order preserved
         soloGrade: !!rl.soloGrade,
         matte: sanitizeMatte(rl.layer?.matte),
+        // #2038 — rotation detent, carried only while non-zero.
+        ...(sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation)
+          ? {
+              rotation: sanitizeStratumRotation(
+                rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation,
+              ),
+            }
+          : {}),
       });
       continue;
     }
@@ -583,6 +609,15 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         // level-grid snapshot) rides to the renderer only while the resolver attached one; an
         // uncoupled pattern's contract is exactly the pre-slice contract.
         ...(rl.patternCulture ? { patternCulture: rl.patternCulture } : {}),
+        // #2038 — rotation detent, carried only while non-zero: the
+        // renderer turns the pattern's field texture by it.
+        ...(sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation)
+          ? {
+              rotation: sanitizeStratumRotation(
+                rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(String(rl.id))?.rotation,
+              ),
+            }
+          : {}),
         palette: patternPalette(rl.palette),
       });
       continue;
@@ -624,6 +659,15 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
         blendMode: KNOWN_BLENDS.has(itemBlend) ? itemBlend : 'normal',
         hueRotate: Number(rl.layoutParams?.hueRotate) || 0,
       },
+      // #2038 — rotation detent, carried only while non-zero. The
+      // stratum's instances were already turned by the resolver (the
+      // rigid rotation lives in liveResolve); this records the detent
+      // on the layer for every contract consumer.
+      ...(sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(layerId)?.rotation)
+        ? {
+            rotation: sanitizeStratumRotation(rl.rotation ?? rl.layer?.rotation ?? docLayerById.get(layerId)?.rotation),
+          }
+        : {}),
       // #1183 — the contact shadow; key absent unless it casts (knob > 0, ground below, not shed)
       ...((sh) => (sh ? { shadow: sh } : {}))(contractShadow(rl, groundBelow, shadowShed)),
       // #1411 — the coalescence fields; key absent unless a pair is mid-merge (and not tier-1 shed)
@@ -958,6 +1002,14 @@ export function assertSceneContract(scene) {
       if (l.type !== 'content') fail(`layer ${l.id}: only content layers carry a soak flag`);
       if (l.wetSoak !== true) fail(`layer ${l.id}: wetSoak is only ever true (absence = off)`);
     }
+    if (l.rotation !== undefined) {
+      // #2038 — the rotation detent rides a layer only while non-zero,
+      // and only ever as a detent (absence = unrotated). Any stratum
+      // type may carry it.
+      if (l.rotation !== 15 && l.rotation !== 45 && l.rotation !== 90) {
+        fail(`layer ${l.id}: rotation is only ever a detent (15/45/90; absence = 0)`);
+      }
+    }
     if (l.type === 'fx') {
       if (!Array.isArray(l.fx)) fail(`fx layer ${l.id}: fx must be an array`);
       for (const fx of l.fx) {
@@ -977,6 +1029,11 @@ export function assertSceneContract(scene) {
     if (!layerIds.has(w.fxLayerId)) fail(`fxWrap references unknown fx layer ${w.fxLayerId}`);
     for (const id of w.contentLayerIds) {
       if (!layerIds.has(id)) fail(`fxWrap references unknown content layer ${id}`);
+    }
+    // #2038 — a wrap's rotation is the stratum's detent, same law as
+    // the layer's own key: only ever 15/45/90 when present.
+    if (w.rotation !== undefined && w.rotation !== 15 && w.rotation !== 45 && w.rotation !== 90) {
+      fail(`fxWrap ${w.fxLayerId}: rotation is only ever a detent (15/45/90; absence = 0)`);
     }
   }
   for (const it of scene.instances) {

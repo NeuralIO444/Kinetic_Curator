@@ -10,6 +10,12 @@
 // replays the last-used kind with no ordinal condition. The flows below
 // make room (remove before re-add) instead of stacking past the caps,
 // and pin the caps' refusals where the old flow relied on headroom.
+//
+// #2038 re-choreography: the content cap is ONE. The boot stack already
+// holds its one content stratum, so the content add-flows are exercised
+// from a seeded empty stack (the only state addLayer can add into);
+// the cap's refusal from the live stack is pinned in
+// strataRebuild.selfcheck.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { useStore } from './store.js';
@@ -23,38 +29,41 @@ assert.strictEqual(S().lastUsedContentBlend, null, 'lastUsedContentBlend starts 
 assert.strictEqual(S().lastUsedFxKind, null, 'lastUsedFxKind starts null');
 
 // --- CONTENT: one-tap with no history → built-in default, records nothing
+const reseedEmpty = () => useStore.setState({ layers: [], activeLayerId: null, layerSnapshots: {} });
+reseedEmpty();
 S().addLayer();
 let kc = S().layers.at(-1);
 assert.strictEqual(kc.type, 'content');
 assert.strictEqual(kc.layerBlendMode, 'normal');
 assert.strictEqual(S().lastUsedContentBlend, null, 'one-tap replay must not record');
-assert.strictEqual(contentLayers().length, 2, 'the skeleton cap is 2 — the stack is now full');
+assert.strictEqual(contentLayers().length, 1, 'the content cap is 1 (#2038) — the stack is now full');
 
-// --- the cap refuses a third content stratum ------------------------------
+// --- the cap refuses a second content stratum ------------------------------
 S().addLayer();
-assert.strictEqual(contentLayers().length, 2, 'ADD refuses at the content cap (D3)');
+assert.strictEqual(contentLayers().length, 1, 'ADD refuses at the content cap');
 
 // --- DUP is not a "+" tap: must not record --------------------------------
-S().removeLayer(kc.id); // make room under the cap
-S().duplicateLayer('layer-1');
-assert.strictEqual(contentLayers().length, 2, 'the dup lands under the cap');
+// (Under the one-content cap the dup also refuses — there is no second
+// content stratum for it to land as.)
+S().duplicateLayer(kc.id);
+assert.strictEqual(contentLayers().length, 1, 'the dup refuses at the cap (#2038)');
 assert.strictEqual(S().lastUsedContentBlend, null, 'duplicateLayer must not touch last-used');
 
 // --- CONTENT: chooser pick arms with the pick AND records it --------------
-S().removeLayer(contentLayers().find((l) => l.id !== 'layer-1').id);
+reseedEmpty();
 S().addLayer('screen');
 kc = S().layers.at(-1);
 assert.strictEqual(kc.layerBlendMode, 'screen');
 assert.strictEqual(S().lastUsedContentBlend, 'screen');
 
 // --- CONTENT: one-tap now replays the pick --------------------------------
-S().removeLayer('layer-1');
+reseedEmpty();
 S().addLayer();
 kc = S().layers.at(-1);
 assert.strictEqual(kc.layerBlendMode, 'screen', 'one-tap must replay last-used blend');
 
 // --- CONTENT: invalid family falls back to last-used, corrupts nothing -----
-S().removeLayer(kc.id);
+reseedEmpty();
 S().addLayer('bogus-mode');
 kc = S().layers.at(-1);
 assert.strictEqual(kc.layerBlendMode, 'screen', 'invalid family falls back to last-used');
@@ -104,6 +113,24 @@ assert.strictEqual(S().lastUsedFxKind, 'invert', 'replay must not clobber last-u
 
 // --- swapLayerPositions: same-class swap --------------------------------------
 {
+  // #2038: two content strata can no longer be built by the actions —
+  // seed the pre-rebuild shape directly. swapLayerPositions is the unit
+  // under test; same-type trades are still its law.
+  const fxStanding = fxLayers()[0];
+  const mkC = (id) => ({
+    id,
+    name: id,
+    type: 'content',
+    visible: true,
+    layerBlendMode: 'normal',
+    layerOpacity: 1,
+    patch: { mode: 'off', to: null, strength: 0.16 },
+  });
+  useStore.setState({
+    layers: [mkC('sw-a'), mkC('sw-b'), ...(fxStanding ? [fxStanding] : [])],
+    activeLayerId: 'sw-a',
+    layerSnapshots: {},
+  });
   const ids = contentLayers().map((l) => l.id);
   assert.ok(ids.length >= 2, 'need two content layers to swap');
   const [a, b] = ids;

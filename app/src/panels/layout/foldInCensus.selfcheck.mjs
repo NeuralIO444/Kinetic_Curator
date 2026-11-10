@@ -137,12 +137,17 @@ ok('setLayoutParam writes the count and clamps it like the stepper did', () => {
 
 // ── 5. documents keep loading: the migration lands the old field in the param ─
 ok('a pre-fold-in document’s top-level count lands in the param — root and snapshots', () => {
+  // #2038 re-pin: the fixture's second layer is typed FX now — as two
+  // typeless (→ content) layers it would trim at the one-content door
+  // and take its snapshot with it. The migration property pinned here
+  // (the count lands in the root AND in every surviving snapshot) is
+  // unchanged.
   const legacy = {
     version: 1,
     seed: 7,
     creatureCount: 3,
     layoutParams: { count: 5 },
-    layers: [{ id: 'a' }, { id: 'b' }],
+    layers: [{ id: 'a' }, { id: 'b', type: 'fx' }],
     activeLayerId: 'a',
     layerSnapshots: { a: { layoutParams: { count: 9 } }, b: { seed: 3 } },
   };

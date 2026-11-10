@@ -94,16 +94,26 @@ const layerByName = (name) => S().layers.find((l) => l.name === name);
 ok(
   'the session loads: tracks in order, the FIELD patch link, the PATTERN track, the FX and MATH stacks, two routes',
   () => {
+    // #2038 re-pin: the recorded session is a PRE-REBUILD document —
+    // it carries two content strata (KC-1, KC-2) with a FIELD patch
+    // link between them. Under the one-content law KC-2 trims at the
+    // door and the link goes inert (mode survives, target nulls) —
+    // the migration law, exercised here on a real recorded session.
+    // Everything else about the load is unchanged.
     assert.deepEqual(
       S().layers.map((l) => l.name),
-      ['PT-1', 'KC-1', 'FX 1', 'KC-2', 'M 1'],
+      ['PT-1', 'KC-1', 'FX 1', 'M 1'],
     );
     assert.deepEqual(
       S().layers.map((l) => l.type),
-      ['pattern', 'content', 'fx', 'content', 'math'],
+      ['pattern', 'content', 'fx', 'math'],
     );
     assert.equal(layerByName('KC-1').patch.mode, 'field');
-    assert.equal(layerByName('KC-1').patch.to, layerByName('KC-2').id, 'the link names KC-2 by its id');
+    assert.equal(
+      layerByName('KC-1').patch.to,
+      null,
+      '#2038: the link’s target stratum trimmed — the patch is inert, not dangling',
+    );
     assert.equal(layerByName('PT-1').pattern.mode, 'FIELD');
     assert.deepEqual(
       layerByName('FX 1').effects.map((e) => e.kind),
@@ -174,11 +184,17 @@ ok('BEAT: the BPM is clamped to the dial range; the metro switch is a boolean', 
 
 ok('PATCH link: OFF, MOD, FEED rewrite the one layer; the strength clamps', () => {
   const kc1 = layerByName('KC-1').id;
-  const kc2 = layerByName('KC-2').id;
-  emit(Events.LAYER_PATCH, { id: kc1, patch: { mode: 'mod', to: kc2, strength: 0.5 } });
-  assert.deepEqual(S().layers.find((l) => l.id === kc1).patch, { mode: 'mod', to: kc2, strength: 0.5 });
-  emit(Events.LAYER_PATCH, { id: kc1, patch: { mode: 'feed', to: kc2, strength: 7 } });
+  // #2038: with ONE content stratum there is no second KC track to
+  // link to — a patch aimed at the trimmed KC-2's (stale) id sanitizes
+  // inert at the action, exactly as it does at the load door. Mode and
+  // strength still rewrite and clamp as before.
+  const staleKc2 = (fixture.layers || fixture.doc?.layers || []).find((l) => l.name === 'KC-2')?.id;
+  assert.ok(staleKc2, 'the recorded session names its KC-2');
+  emit(Events.LAYER_PATCH, { id: kc1, patch: { mode: 'mod', to: staleKc2, strength: 0.5 } });
+  assert.deepEqual(S().layers.find((l) => l.id === kc1).patch, { mode: 'mod', to: null, strength: 0.5 });
+  emit(Events.LAYER_PATCH, { id: kc1, patch: { mode: 'feed', to: staleKc2, strength: 7 } });
   assert.equal(S().layers.find((l) => l.id === kc1).patch.strength, 1, 'strength clamps to 1');
+  assert.equal(S().layers.find((l) => l.id === kc1).patch.to, null, 'the target stays inert');
   emit(Events.LAYER_PATCH, { id: kc1, patch: { mode: 'off', to: null, strength: 0.16 } });
   assert.equal(S().layers.find((l) => l.id === kc1).patch.mode, 'off');
 });

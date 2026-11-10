@@ -87,3 +87,27 @@ export function bipolarValueFor(stops, sign, index) {
   if (!Number.isFinite(stop) || stop === 0) return 0;
   return (sign < 0 ? -1 : 1) * stop;
 }
+
+/**
+ * #2038 QA fix — the value a STEPPER step from `value` in direction
+ * `dir` (−1 down / +1 up) lands on, over an authored stop table: the
+ * adjacent stop, clamped at the table's ends (stepping off an end
+ * stays on it). An off-stop value lands on the first stop strictly in
+ * the step direction, or the end stop when none is left. A stepper
+ * over stops can therefore only ever OFFER stop values — the property
+ * a detent editor needs: the rotation detents (0/15/45/90) are
+ * non-uniform, so a uniform-step slider over them also offers
+ * 30/60/75, which the rotation data law sanitizes to 0 — the control
+ * would silently erase the very value it appeared to set. Null when
+ * there is no table, no direction, or a non-finite value.
+ */
+export function steppedStopValue(stops, value, dir) {
+  if (!stops || stops.length === 0 || !Number.isFinite(value) || !dir) return null;
+  const sorted = [...stops].sort((a, b) => a - b);
+  if (dir > 0) {
+    for (const s of sorted) if (s > value + EPS) return s;
+    return sorted[sorted.length - 1];
+  }
+  for (let i = sorted.length - 1; i >= 0; i--) if (sorted[i] < value - EPS) return sorted[i];
+  return sorted[0];
+}

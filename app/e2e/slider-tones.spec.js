@@ -61,14 +61,22 @@ test('BUILD sliders are yellow, STIMULI cyan, PLAY ink; all with a 44px hit area
   const addSlot = stack.locator('.strata-add');
   await addSlot.click();
   await addSlot.click();
-  await addSlot.click(); // FX 3: the Blur / Focus family
-  await stack.locator('.fx-editor .chip-btn').click(); // + ADD SHARPEN (has two params)
+  await addSlot.click(); // the skeleton fills out around the factory tracks (MATH, then a pattern ground)
+  // The FX editor is scoped away from the PATTERN editor on purpose: the
+  // pattern editor's root shares the .fx-editor class (.fx-editor.pattern-
+  // editor) and its seven mode tabs + drop toggle are .chip-btns too, so a
+  // loose '.fx-editor .chip-btn' matches nine buttons once a pattern ground
+  // stands in the stack (#2038). The intended chip is the FX editor's
+  // + ADD SHARPEN — the factory FX layer stands empty and SHARPEN is the
+  // rack's first free pick (EF-1, Blur / Focus).
+  const fxEditor = stack.locator('.fx-editor:not(.pattern-editor)');
+  await fxEditor.getByRole('button', { name: '+ ADD SHARPEN' }).click(); // SHARPEN has two params
   // #1608 (Strata Q Phase 2) re-pin: FX params are mode rows now, not bare
   // sliders — SHARPEN's two params show as two detent rows, and the slider
   // this spec exists to tone-check lives in the param's exact editor (D2:
   // tap the readout). Open it so the house slider joins the check below.
-  await expect(stack.locator('.fx-editor .te-mode')).toHaveCount(2);
-  await stack.locator('.fx-editor .te-block-readout').first().click();
+  await expect(fxEditor.locator('.te-mode')).toHaveCount(2);
+  await fxEditor.locator('.te-block-readout').first().click();
   await expect(page.locator('.te-dock.open input[type=range]')).toHaveCount(1);
   const build = await thumbs(page, '.panel-layout');
   expectHouse(
