@@ -1,4 +1,4 @@
-// data/canon/baselines.js — #2048 (Canon S5): the first baselines, as native records.
+// data/canon/baselines.js — #2048 (Canon S5): the first baselines, as native records; #2060 adds The Designers Republic's.
 //
 // "Have the op-art, Warhol and Joshua Davis baselines" was a request the system could not hold: Op Art existed
 // only as a Look-group tag and a chapter name, and no record anywhere said what any of the three IS in the
@@ -130,6 +130,39 @@ export const CANON_BASELINES = deepFreeze([
       },
     },
   },
+  {
+    id: 'tdr',
+    label: 'MAXIMUM MINIMAL',
+    style: 'techno', // sits beside the Techno style (its asset families); the studio's own identity is declared here
+    identity: {
+      movement: 'Maximum minimalism — record-sleeve and interface graphics',
+      period: '1986 onward',
+      place: 'Sheffield',
+      figures: ['Ian Anderson', 'The Designers Republic'],
+      note: 'Geometric vector marks at information density: the icon system as texture, flat colour on paper white.',
+    },
+    basis:
+      'Authored from the tradition — Techno has no Looks or voices to measure yet (data/canon/settings.js is null for it). ' +
+      'Many small flat marks on a strict rail structure, no rotation, no jitter, full opacity, a hard overlap-free ' +
+      'field, and quick but unvarying motion for the high-tempo information rhythm. The palette is the catalogue’s ' +
+      'flat signage one (paper ground, red / navy / orange / black).',
+    settings: {
+      marks: { categories: ['geometric', 'scanlines', 'stamps'], styles: ['techno', 'swiss'] },
+      palette: { id: 'transit', shift: 'zone', blend: 'normal' },
+      motion: { behave: 'cruise', lifeDrift: 0.08, noiseSpeed: 0.6, wind: 0.15, flap: 0, breath: 0 },
+      density: { count: 460, density: 100, scale: [0.3, 0.9], alpha: [100, 100], zTiers: 3 },
+      rules: {
+        mode: 'rails',
+        mirror: 'off',
+        overlap: false,
+        bleed: true,
+        jitter: 0,
+        displacement: 0,
+        rotate: [0, 0],
+        extra: {},
+      },
+    },
+  },
 ]);
 
 /** The baseline ids, in declaration order. */
@@ -185,7 +218,7 @@ export function baselineFeel(baselineOrId) {
 }
 
 /**
- * Score a candidate recipe (layout params) against every baseline: `{ 'op-art': 0..1, warhol: 0..1, davis: 0..1 }`
+ * Score a candidate recipe (layout params) against every baseline: `{ 'op-art': 0..1, warhol: 0..1, davis: 0..1, tdr: 0..1 }`
  * — 1 is the baseline itself. The same closeness measure the Book's read-back uses (feelAffinity).
  */
 export function baselineReadings(layoutParams) {
