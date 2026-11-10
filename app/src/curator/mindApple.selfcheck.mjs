@@ -198,7 +198,7 @@ await ok('timed-out asks are cancelled and a busy persona refuses, in helper and
   // hold is the protocol contract in the sources: if any leg of it is edited away, this fails instead of the
   // behaviour silently reverting to abandoned asks piling onto a shared session.
   const swift = read('../../../src-tauri/helpers/kc-mind/main.swift');
-  assert.match(swift, /case "cancel"/, 'the helper answers a cancel op');
+  assert.match(swift, /case "cancel"/, 'the helper routes a "cancel" op (a cancel is never answered)');
   assert.match(swift, /"busy"/, 'a second ask for a busy persona is refused with error "busy"');
   assert.match(swift, /inFlight\.insert\(persona\)/, 'one in-flight ask per persona, guarded before the session');
   assert.match(swift, /tasks\[id\]\?\.cancel\(\)/, 'a cancel stops the ask Task registered under its id');

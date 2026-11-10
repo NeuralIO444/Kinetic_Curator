@@ -189,10 +189,17 @@ actor Minds {
     private var sessions: [String: LanguageModelSession] = [:]
     private var uses: [String: Int] = [:]
     // #1747: one ask generating per persona, and the running ask Tasks by request id so a "cancel" line can
-    // stop one. Both live on the actor: registration (inside run, via the current task), the busy guard and
-    // cancellation are then race-free — handle() only ever talks to the actor.
+    // stop one. All of it lives on the actor and is only touched inside actor jobs — dispatch (start), the
+    // busy guard (ask), cancellation (cancel) — so the state itself is never raced on; handle() only ever
+    // talks to the actor.
     private var inFlight: Set<String> = []
     private var tasks: [Int: Task<Void, Never>] = [:]
+    // A cancel that reaches the actor before its ask's dispatch job does: the id waits here and start()
+    // refuses to generate for it, so a cancel cannot slip past dispatch however the two jobs interleave.
+    // In practice the bridge sends a cancel only after its ask timeout (300 ms; 3 s for status) while
+    // dispatch follows the ask line at once, so this set is the belt to that timing's braces. Bridge ids
+    // are never reused, so an entry for an id that never starts (a timed-out status) is inert.
+    private var earlyCancels: Set<Int> = []
 
     // The model's window is 4,096 tokens TOTAL — instructions + transcript + the new prompt. Measured in
     // a real Mac session (#2068, 2026-11-10): with the conducting vocabulary in Davis's instructions and
@@ -219,12 +226,27 @@ actor Minds {
     /// ask()'s catch then drops that persona's session: a cancelled exchange may or may not be in the
     /// transcript, so the session is treated as spent rather than trusted — a fresh one is cheap, and the
     /// refresh counter stays honest (a discarded session simply served fewer answers, never more).
-    func cancel(id: Int) { tasks[id]?.cancel() }
+    /// If the ask's dispatch hasn't reached the actor yet there is no Task to cancel: the id is remembered
+    /// in earlyCancels and start() will refuse it (see there).
+    func cancel(id: Int) {
+        if tasks[id] == nil { earlyCancels.insert(id) }
+        tasks[id]?.cancel()
+    }
 
-    /// One ask end to end, returning the exact reply line to send. The current Task registers itself first,
-    /// so a later "cancel" for this id can reach it.
+    /// #1747: dispatch one ask. The Task is created and registered in tasks[id] inside this one actor job:
+    /// a Task handle can only be captured where the Task is created, and doing both in the same job means
+    /// registration can neither be overtaken by the ask it names (run starts only after this job stores it)
+    /// nor left behind by it (run's defer removes the entry on every exit path). A "cancel" that arrived
+    /// earlier left its id in earlyCancels — the ask then never starts: no generation, no reply (the bridge
+    /// has forgotten the id; a reply would be dropped unread anyway).
+    func start(id: Int, persona: String, context: String, seed: UInt64, started: Date) {
+        if earlyCancels.remove(id) != nil { return }
+        tasks[id] = Task { send(await self.run(id: id, persona: persona, context: context, seed: seed, started: started)) }
+    }
+
+    /// One ask end to end, returning the exact reply line to send. Runs in the Task start() registered;
+    /// the defer is the cleanup half of that registration.
     func run(id: Int, persona: String, context: String, seed: UInt64, started: Date) async -> [String: Any] {
-        withUnsafeCurrentTask { cur in if let cur { tasks[id] = cur.task } }
         defer { tasks[id] = nil }
         do {
             let reply = try await ask(persona: persona, context: context, seed: seed)
@@ -341,7 +363,8 @@ func handle(_ line: String) {
         let seed = UInt64(truncatingIfNeeded: (msg["seed"] as? NSNumber)?.int64Value ?? 0)
         let started = Date()
         let m = minds()
-        Task { send(await m.run(id: id, persona: persona, context: context, seed: seed, started: started)) }
+        // the actor creates and registers the ask's Task itself (start), the only place the handle exists
+        Task { await m.start(id: id, persona: persona, context: context, seed: seed, started: started) }
         #endif
     case "cancel":
         // #1747: the app's timeout fired for this id and it stopped waiting. Stop the generation; send no
