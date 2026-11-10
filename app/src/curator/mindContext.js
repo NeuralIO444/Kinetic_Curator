@@ -118,12 +118,32 @@ export function marksOf(m) {
   return Object.values(out).some((v) => v === null) ? null : out;
 }
 
+/**
+ * #2049 (Canon S6) — the Canon as the trio is handed it: which style stands (the dealt Look's), the dealt
+ * voice's styles, the Book chapter, and for each standing Canon record what it has heard on the bus since it
+ * took the stage (curator/canonBus.mjs snapshot). Ids only, never the records — a summary, like every block
+ * here. Null when absent or malformed (then the context has no `canon` key and nothing else changes).
+ */
+export function canonOf(c) {
+  if (!c || typeof c !== 'object') return null;
+  const id = (v) => (typeof v === 'string' && /^[a-z0-9-]{1,24}$/.test(v) ? v : null);
+  const n = (v) => (Number.isFinite(v) && v >= 0 ? Math.min(9999, Math.floor(v)) : 0);
+  const voice = (Array.isArray(c.voice) ? c.voice : []).map(id).filter(Boolean).slice(0, 4);
+  const standing = (Array.isArray(c.standing) ? c.standing : [])
+    .filter((s) => s && id(s.id))
+    .slice(0, 4)
+    .map((s) => ({ id: s.id, bars: n(s.bars), onsets: n(s.onsets), taps: n(s.taps) }));
+  const out = { style: id(c.style), voice, chapter: id(c.chapter), book: id(c.book), standing };
+  return out.style || out.voice.length || out.book || out.standing.length ? out : null;
+}
+
 const count = (arr, pred) => (Array.isArray(arr) ? arr.filter(pred).length : 0);
 
 /**
  * @param snap { layers, enabledAssetCount, paletteId, room: { lois, davis }, band, keepsCount, bpm, audio: 'mic'|'file'|'none',
  *               source: 'ambient'|'set'|'audio', creatures, tier?, zodiac?, director?: { verdict, intensity },
- *               show?: { energy, bpm, confidence, onsets, silent, sinceBars, flatBars, routes, owned, marks? } (#1483) }
+ *               show?: { energy, bpm, confidence, onsets, silent, sinceBars, flatBars, routes, owned, marks? } (#1483),
+ *               canon?: { style, voice, chapter, book, standing: [{ id, bars, onsets, taps }] } (#2049) }
  */
 export function buildContext(input) {
   const snap = input && typeof input === 'object' ? input : {};
@@ -156,5 +176,6 @@ export function buildContext(input) {
     tier: typeof snap.tier === 'string' && /^[a-z0-9-]{1,16}$/.test(snap.tier) ? snap.tier : null,
     ...((z) => (z ? { zodiac: z } : {}))(zodiacOf(snap.zodiac)),
     ...((sh) => (sh && snap.audio !== 'none' ? { show: sh } : {}))(showOf(snap.show)),
+    ...((c) => (c ? { canon: c } : {}))(canonOf(snap.canon)), // #2049: the Canon/bus state, when anything Canon stands
   };
 }

@@ -130,6 +130,10 @@ export const EVENT_REGISTRY = {
     handler: ['curator/roomFeed.js'],
     note: "what became of Davis's route proposal (#1483): applied with its delta, or dropped with the reason (owned, tier, rate, cooldown, stale); the ROOM codec's transcript is its feed (#1560 S1), and the take records it",
   },
+  CANON_STAND: {
+    handler: null,
+    note: "telemetry: a Canon record announcing it took the stage (#2049). Published by curator/canonBus.mjs from the record's OWN declared binding (data/canon/styles.js `bus.announces`), so no file names this event to emit it; nothing changes the stage on it. The same binder subscribes to the channels each record lists under `bus.listens` (kinetic:tap, layout:preset, layout:curate, clock:bar, audio:onset) by declaration, not by an on(Events.X) call — those subscriptions are listed by its bindings(), not here",
+  },
   DIRECTOR_ROOM: { handler: ['curator/mindRoom.js', 'curator/roomFeed.js', 'curator/storyLive.js'] },
   CLOCK_BEAT: {
     handler: null,
