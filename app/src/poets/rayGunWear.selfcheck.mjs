@@ -120,6 +120,8 @@ ok('B1 catalogue members, never authored, in the poem-only union, on no dealing 
   assert.deepStrictEqual(census(ASSETS), census(ASSETS.filter((a) => !WEAR_STAMP_IDS.has(a.id))));
   const live = fs.readFileSync('src/gl/liveResolve.mjs', 'utf8');
   assert.ok(/\.\.\.ASSETS_WEAR,/.test(live), 'the placeable pool excludes the pack');
+  const studio = fs.readFileSync('../studio/render.mjs', 'utf8');
+  assert.ok(/\.\.\.ASSETS_WEAR\]\.map/.test(studio), 'the stills path (studio/render.mjs) excludes the pack from its placeable pool');
 });
 
 ok('B2 no placement resolves one; worn stamps measure with their source ruler', () => {

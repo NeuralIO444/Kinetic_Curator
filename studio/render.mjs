@@ -20,8 +20,9 @@ import { ASSETS_LATIN } from '../app/src/data/assets/assets-latin.js'; // #2002 
 import { ASSETS_SERIF } from '../app/src/data/assets/assets-serif.js'; // #2002 — the poem-only serif face stamps, same exclusion
 import { ASSETS_ORNAMENTS } from '../app/src/data/assets/assets-ornaments.js'; // #2002 — the poem-only ornament stamps, same exclusion
 
+import { ASSETS_WEAR } from '../app/src/data/assets/assets-wear.js'; // #2010 P1 — the poem-only worn letters, same exclusion
 const KANA_IDS = new Set(
-  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS].map((a) => a.id),
+  [...ASSETS_KANA, ...ASSETS_KANJI, ...ASSETS_LATIN, ...ASSETS_SERIF, ...ASSETS_ORNAMENTS, ...ASSETS_WEAR].map((a) => a.id),
 );
 import { buildPlacements, clampCount } from '../app/src/engine/buildPlacements.js';
 import { bakeSwarmItems, ensureSwarmWasm } from '../app/src/engine/kernel/bake/index.js';
@@ -196,6 +197,7 @@ export function resolveLayers(doc, { caps, ramp = null, motion = null, progress 
       // FIELD director alone; a still must not place them as marks.
       // #1998 — the curated kanji stamps ride it too (KANA_IDS is the union).
       // #2002 — the slice-3 packs ride it too: KANA_IDS is the whole poem-only union.
+      // #2010 P1 — the worn letters ride it too (the ray gun's draw is their only road onto a frame).
       const activeAssets = ASSETS
         .filter((a) => a.id !== CREATURE_ASSET_ID && !KANA_IDS.has(a.id) && (!enabled || enabled[a.id]))
         .map((a) => (weightOverrides[a.id] ? { ...a, weight: weightOverrides[a.id] } : a));
