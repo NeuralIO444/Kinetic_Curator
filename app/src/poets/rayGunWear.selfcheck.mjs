@@ -209,7 +209,7 @@ ok('C3 a letter with no variant keeps its stamp (digits, punctuation, the native
 // ── D · replay + the door + the store ───────────────────────────────────
 ok('D1 a record without wear draws the pre-P1 blast exactly (no worn id anywhere)', () => {
   for (const form of forms)
-    for (const mode of ['carson', 'greiman', 'shot'])
+    for (const mode of ['carson', 'greiman', 'grit', 'shot'])
       for (let seed = 1; seed <= 6; seed++) {
         const out = rayGunForm(form, { mode, seed });
         assert.ok(out.stamps.every((s) => !WEAR_STAMP_IDS.has(s.assetId)));
