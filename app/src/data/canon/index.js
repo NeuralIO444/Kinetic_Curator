@@ -21,6 +21,7 @@ import { canonMotionForStyle } from './motion.js';
 
 export * from './styles.js';
 export * from './motion.js';
+export * from './baselines.js'; // #2048 — the first baselines (op-art, warhol, davis)
 
 const uniq = (xs) => [...new Set(xs.filter((x) => typeof x === 'string' && x))];
 
