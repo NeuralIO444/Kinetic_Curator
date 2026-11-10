@@ -29,17 +29,18 @@
 
 import { registerCostTier } from './costTiers.mjs';
 
-// Tier 0 like the smear: a few ALU in the existing quad shaders, gated off at 0, plus four floats per instance —
-// no pass, no texture, no draw call. Never shed (a distorted poem never snaps plain mid-performance: §7's shed rule
-// asks that treatment fidelity never flips on/off under load, and at this cost it never has to).
+// Tier 2, the deform rung (sceneContract.distortHeatOf): §7's shed law — treatment fidelity sheds on HEAT, never
+// on/off, so a distorted poem never snaps plain mid-performance; under the tier-2 shed every distortion is drawn at
+// half strength. The work itself is a few ALU in the existing quad shaders (gated off at 0) — no pass, no texture, no
+// draw call — and four floats per instance in the VBO (16 B each, ~32 KB at 2,000 instances, distorted or not).
 registerCostTier('gl/distort-channel', {
-  tier: 0,
-  memoryBytes: 0,
+  tier: 2,
+  memoryBytes: 32000,
   timeMs: 0.02,
   notes:
     '#2010 P3 distortion channel: per-instance shear (QUAD_VS, affine) + melt/tear (QUAD_FS, one moved atlas sample) ' +
     'in the existing quad shaders; four floats per instance (the 45→49 stride append). Zero passes, zero textures; ' +
-    'gated so an undistorted instance is the old path bit for bit. Never shed.',
+    'gated so an undistorted instance is the old path bit for bit. Tier-2 shed lowers its heat (u_distHeat 0.5), never to 0.',
 });
 
 export const SHEAR_MAX = 0.8;

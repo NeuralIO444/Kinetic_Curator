@@ -12,7 +12,7 @@
 //  - the scene contract: the wash flag rides only when set, so a
 //    non-wash contract is byte-identical in shape to the pre-M3
 //    contract (no key, no hash change);
-//  - the instance packer: 45-float stride (S4 appended the engraving block; #1585 appended the M4
+//  - the instance packer: the instance stride (49 since #2010 P3; S4 appended the engraving block; #1585 appended the M4
 //    param vec4 after the body code), the tail float carries
 //    body code 2 for wash (1 plate / 0 flat bit-identical to M2);
 //  - the shader: the body code is decoded in QUAD_VS, washShade

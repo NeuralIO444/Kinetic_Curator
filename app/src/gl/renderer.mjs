@@ -307,6 +307,7 @@ export const RENDERER_PROGRAMS = [
       'u_canvas',
       'u_atlas',
       'u_smear',
+      'u_distHeat', // #2010 P3: the distortion channel's heat
       'u_liveTint',
       'u_sun',
       'u_sunLight',
@@ -340,6 +341,7 @@ export const RENDERER_PROGRAMS = [
     uniforms: [
       'u_canvas',
       'u_atlas',
+      'u_distHeat', // #2010 P3: the shared QUAD_FS declares it; a mesh carries no record (v_dist = 0)
       'u_liveTint',
       'u_sun',
       'u_sunLight',
@@ -1196,6 +1198,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
+  let distortHeat = 1; // #2010 P3: the distortion channel's heat (1 = full; the tier-2 shed lowers it, never to 0)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
   let spec = null;
   let specTex = null;
@@ -1296,6 +1299,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.useProgram(quadProg);
     gl.uniform2f(U(quadProg, 'u_canvas'), sceneW, sceneH);
     gl.uniform3f(U(quadProg, 'u_smear'), SMEAR_K, SMEAR_MAX, squash); // #594 PR3: z = squash
+    gl.uniform1f(U(quadProg, 'u_distHeat'), distortHeat); // #2010 P3
     gl.uniform1f(U(quadProg, 'u_liveTint'), isLive ? 1.0 : 0.0);
     // #594 the one sun (off → w = 0 and the shader's light term is exactly 1.0).
     gl.uniform4f(U(quadProg, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
@@ -1468,6 +1472,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.useProgram(p);
     gl.uniform2f(U(p, 'u_canvas'), sceneW, sceneH);
     gl.uniform1f(U(p, 'u_liveTint'), isLive ? 1.0 : 0.0);
+    gl.uniform1f(U(p, 'u_distHeat'), distortHeat); // #2010 P3: inert here (v_dist = 0), set for the audit's law
     // #594 the one sun — the same uploads the quad draw makes (the shared FS reads u_sunMat/u_pool/u_hands).
     gl.uniform4f(U(p, 'u_sun'), sun ? sun.x : 0, sun ? sun.y : 0, sun ? sun.height : 1, sun ? 1 : 0);
     gl.uniform4f(
@@ -1721,6 +1726,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     spec = contract.spectrum || null; // #1482 P3
     specUploaded = false;
     squash = contract.squash || 0; // #594 PR3
+    distortHeat = Number.isFinite(contract.distortHeat) ? contract.distortHeat : 1; // #2010 P3: the shed lands on heat
     kinemeTable = contract.kinemes || null; // #781
     kinemeTime = contract.kinemeTime || 0;
     cellShed = !!contract.cellShed; // #1431

@@ -208,7 +208,7 @@ const near = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
   assert.ok(!/mediump/.test(QUAD_FS) && !/mediump/.test(QUAD_VS), 'no mediump anywhere in the quad programme');
 }
 
-// 5. The packer: 45-float stride, every pre-S4 offset unmoved, the engraving block appended at 29..44,
+// 5. The packer: the instance stride (49 since #2010 P3), every pre-S4 offset unmoved, the engraving block appended at 29..44,
 //    absent reads zeros (the branch never enters).
 {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };

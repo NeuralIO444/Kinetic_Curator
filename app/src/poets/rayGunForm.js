@@ -666,8 +666,9 @@ export function rayGunForm(form, record) {
 }
 
 /**
- * The distort pass (#2010 P3): stamp each treated glyph's distortion record. Exactly four draws per stamp off the
- * distort stream, in output order, whatever the mode decides — so one stamp's record never moves another's.
+ * The distort pass (#2010 P3): stamp each treated glyph's distortion record. Exactly eight draws per stamp off the
+ * distort stream, in output order, whatever the mode decides — so one stamp's record never moves another's, and
+ * every decision (whether, how much, which way, which drips) has a draw of its own (no correlated knobs).
  * `plain` is the standing form's stamps (SHOT's falloff is measured where the blast found each glyph).
  */
 function distort(stamps, plain, mode, seed, aspect) {
@@ -681,26 +682,23 @@ function distort(stamps, plain, mode, seed, aspect) {
   const cy = 0.25 + g() * 0.5;
   const n = plain.length;
   return stamps.map((s, i) => {
-    const a = rng();
-    const b = rng();
-    const c = rng();
-    const d = rng();
+    const [pShear, aShear, sign, pTear, aTear, pMelt, aMelt, dseed] = [rng(), rng(), rng(), rng(), rng(), rng(), rng(), rng()];
     let rec = null;
     if (mode === 'carson') {
       const C = DISTORT_CARSON;
-      const shear = a < C.shearP ? (C.shear[0] + b * (C.shear[1] - C.shear[0])) * (d < 0.5 ? -1 : 1) : 0;
-      const tear = c < C.tearP ? C.tear[0] + b * (C.tear[1] - C.tear[0]) : 0;
+      const shear = pShear < C.shearP ? (C.shear[0] + aShear * (C.shear[1] - C.shear[0])) * (sign < 0.5 ? -1 : 1) : 0;
+      const tear = pTear < C.tearP ? C.tear[0] + aTear * (C.tear[1] - C.tear[0]) : 0;
       const hero = s.em >= C.heroEm * emMed;
-      const melt = hero || d < C.meltP ? C.melt[0] + c * (C.melt[1] - C.melt[0]) : 0;
-      if (shear || tear || melt) rec = { shear, melt, tear, seed: a };
+      const melt = hero || pMelt < C.meltP ? C.melt[0] + aMelt * (C.melt[1] - C.melt[0]) : 0;
+      if (shear || tear || melt) rec = { shear, melt, tear, seed: dseed };
     } else {
       const src = i < n ? plain[i] : s; // a ghost is measured where it stands
       const f = Math.exp(-Math.hypot(src.x - cx, src.y - cy) / SHOT_SIGMA);
       const D = DISTORT_SHOT;
-      const tear = f > D.tearAt ? clamp((f - D.tearAt) / (1 - D.tearAt), 0, 1) * D.tear * (0.7 + 0.3 * b) : 0;
-      const melt = f > D.meltAt ? clamp((f - D.meltAt) / (1 - D.meltAt), 0, 1) * D.melt * (0.6 + 0.4 * c) : 0;
-      const shear = f * D.shear * (d < 0.5 ? -1 : 1);
-      if (tear || melt || Math.abs(shear) >= 0.01) rec = { shear, melt, tear, seed: a };
+      const tear = f > D.tearAt ? clamp((f - D.tearAt) / (1 - D.tearAt), 0, 1) * D.tear * (0.7 + 0.3 * aTear) : 0;
+      const melt = f > D.meltAt ? clamp((f - D.meltAt) / (1 - D.meltAt), 0, 1) * D.melt * (0.6 + 0.4 * aMelt) : 0;
+      const shear = f * D.shear * (sign < 0.5 ? -1 : 1);
+      if (tear || melt || Math.abs(shear) >= 0.01) rec = { shear, melt, tear, seed: dseed };
     }
     return rec ? { ...s, distort: rec } : s;
   });

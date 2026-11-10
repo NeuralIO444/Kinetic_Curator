@@ -12,7 +12,7 @@
 //    changes NOTHING else — the body is a render-level screen, not
 //    a placement field; plate/wash/glass are untouched;
 //  - the scene contract: the stipple flag rides only when set;
-//  - the instance packer: 45-float stride (S4 appended the engraving block; #1585 appended the M4
+//  - the instance packer: the instance stride (49 since #2010 P3; S4 appended the engraving block; #1585 appended the M4
 //    param vec4 after the body code), the tail float carries
 //    body code 3 for stipple (1 plate / 2 wash / 0 flat unchanged);
 //  - the shader: the body code is decoded in QUAD_VS, stippleShade

@@ -7,8 +7,10 @@
 //      validator accepts a carried record and refuses a bad one
 //   C  the packer: 49-float stride, [shear, melt, tear, seed] at 45..48, absent = zeros; every earlier offset unchanged
 //   D  the shaders: both branches gated (0 never enters); the shear is applied in the item's own frame before rotation;
-//      the moved sample keeps the undistorted LOD (textureGrad); the mesh program feeds the shared FS a zero record
-//   E  cost: tier 0, never shed
+//      derivatives in uniform flow, the moved sample keeps the plain LOD (textureGrad), a mask not a branch at the cell
+//      edge; every later atlas read follows the moved sample; v_dist flat; the mesh program feeds the FS zeros
+//   E  cost + shed: tier 2 — the shed lands on HEAT (half strength), never on/off; the contract carries the heat only
+//      while shed
 //   F  real WebGL (headless Chromium; skipped only when it is not installed): an all-zero record renders the plain
 //      frame byte for byte; each kind moves pixels; a distortion stays inside its own mark's neighbourhood
 import assert from 'node:assert';
@@ -16,7 +18,13 @@ import { contractDistort, distortError, SHEAR_MAX } from './itemDistort.mjs';
 import { packInstanceData, INSTANCE_STRIDE } from './renderer.mjs';
 import { QUAD_VS, QUAD_FS, MESH_VS } from './shaders.mjs';
 import { getCostTier } from './costTiers.mjs';
-import { buildSceneContract, assertSceneContract, serializeSceneContract } from './sceneContract.js';
+import {
+  buildSceneContract,
+  assertSceneContract,
+  serializeSceneContract,
+  distortHeatOf,
+  DISTORT_SHED_HEAT,
+} from './sceneContract.js';
 import { CORPUS } from './parity/corpus.mjs';
 import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
@@ -130,25 +138,47 @@ ok('C1 49-float stride; the record at 45..48; absent packs zeros; earlier offset
 // ── D · the shaders ─────────────────────────────────────────────────────
 ok('D1 gated branches, the shear in the item frame, the undistorted LOD, the mesh zero', () => {
   assert.ok(QUAD_VS.includes('layout(location=14) in vec4 a_dist;'));
-  assert.ok(QUAD_VS.includes('if (a_dist.x != 0.0) c.x -= c.y * a_dist.x;'), 'shear gated, on c (pre-rotation)');
+  assert.ok(QUAD_VS.includes('if (a_dist.x != 0.0) c.x -= c.y * a_dist.x * u_distHeat;'), 'shear gated, on c (pre-rotation)');
   assert.ok(
-    QUAD_VS.indexOf('c.x -= c.y * a_dist.x') < QUAD_VS.indexOf('float th = radians(a_inst1.x + kDeg);'),
+    QUAD_VS.indexOf('c.x -= c.y * a_dist.x * u_distHeat') < QUAD_VS.indexOf('float th = radians(a_inst1.x + kDeg);'),
     'before rotation',
   );
   assert.ok(QUAD_FS.includes('if (v_dist.y + v_dist.z > 0.0) {'), 'melt/tear gated');
   assert.ok(QUAD_FS.includes('t = texture(u_atlas, v_uv);'), 'the undistorted path is today’s single sample');
+  const main = QUAD_FS.slice(QUAD_FS.indexOf('void main() {'));
   assert.ok(
-    QUAD_FS.includes('textureGrad(u_atlas, v_cell.xy + loc * dspan, dFdx(v_uv), dFdy(v_uv))'),
-    'the moved sample keeps the plain LOD',
+    main.indexOf('vec2 gdx = dFdx(v_uv);') < main.indexOf('if (v_dist.y + v_dist.z > 0.0)'),
+    'derivatives before any branch',
   );
+  assert.ok(
+    QUAD_FS.includes('t = textureGrad(u_atlas, suv, gdx, gdy) * keep;'),
+    'the moved sample keeps the plain LOD, masked',
+  );
+  const after = main.slice(main.indexOf('t = texture(u_atlas, v_uv);') + 30);
+  assert.ok(!/\bv_uv\b/.test(after), 'every later atlas read and local frame reads the moved sample (suv)');
+  for (const src of [QUAD_VS, MESH_VS]) assert.ok(src.includes('flat out vec4 v_dist;'));
+  assert.ok(QUAD_FS.includes('flat in vec4 v_dist;'));
   assert.ok(MESH_VS.includes('v_dist = vec4(0.0);'), 'mesh draws carry a zero record into the shared FS');
 });
 
 // ── E · cost ────────────────────────────────────────────────────────────
-ok('E1 tier 0, never shed', () => {
+ok('E1 tier 2; the shed lowers heat, never to zero; the contract carries it only while shed', () => {
   const t = getCostTier('gl/distort-channel');
   assert.ok(t, 'registered');
-  assert.equal(t.tier, 0);
+  assert.equal(t.tier, 2);
+  assert.equal(distortHeatOf({}), 1);
+  assert.equal(distortHeatOf({ perfTier1: true, quality: 'balanced' }), 1, 'tier 1 alone keeps full heat');
+  assert.equal(distortHeatOf({ perfTier1: true, quality: 'performance' }), DISTORT_SHED_HEAT);
+  assert.ok(DISTORT_SHED_HEAT > 0 && DISTORT_SHED_HEAT < 1);
+  assert.ok(!('distortHeat' in armedC), 'full heat carries no key (the hash holds)');
+  assert.ok(
+    QUAD_FS.includes('float dmelt = v_dist.y * u_distHeat;') && QUAD_VS.includes('a_dist.x * u_distHeat'),
+    'the heat scales; the gate stays on the record',
+  );
+  const shed = { ...structuredClone(armedC), distortHeat: DISTORT_SHED_HEAT };
+  assertSceneContract(shed);
+  assert.throws(() => assertSceneContract({ ...shed, distortHeat: 0 }), /distortHeat/);
+  assert.throws(() => assertSceneContract({ ...shed, distortHeat: 1 }), /distortHeat/);
 });
 
 // ── F · real WebGL ──────────────────────────────────────────────────────
@@ -186,6 +216,10 @@ try {
   for (const [k, d] of Object.entries(kinds)) moved[k] = diff(plainPx, await render(withField(d)));
   ok('F2 each kind moves pixels', () => {
     for (const [k, n] of Object.entries(moved)) assert.ok(n > 200, `${k} moved ${n} px`);
+  });
+  const halfTear = diff(plainPx, await render({ ...withField(kinds.tear), distortHeat: DISTORT_SHED_HEAT }));
+  ok('F2b the shed lands on heat: half heat still distorts, and less than full', () => {
+    assert.ok(halfTear > 100 && halfTear < moved.tear, `half heat moved ${halfTear} px (full ${moved.tear})`);
   });
   const xs = plainC.instances.filter((i) => String(i.key).startsWith('field-'));
   const pad = Math.max(...xs.map((i) => Math.abs(i.scaleY))) * 100;

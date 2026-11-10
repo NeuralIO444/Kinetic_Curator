@@ -12,7 +12,7 @@
 //  - the scene contract: the plate flag rides only when set, so a
 //    non-plate contract is byte-identical in shape to the pre-M2
 //    contract (no key, no hash change);
-//  - the instance packer: 45-float stride (S4 appended the engraving block; #1585 appended the M4
+//  - the instance packer: the instance stride (49 since #2010 P3; S4 appended the engraving block; #1585 appended the M4
 //    param vec4 after the body code), plate float at the tail
 //    offset, missing flag reads 0;
 //  - the shader: a_plate / v_plate wired, plateShade inlined from the
