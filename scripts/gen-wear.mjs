@@ -10,12 +10,14 @@
 //            apart (a small translate + twist on the far half). Two clipPaths over the same outline: the ink is the
 //            letter's own, only cut.
 //   XEROX  — photocopy generation loss as geometry: the outline's points shake (straight edges are subdivided first,
-//            so a long stem goes ragged rather than bent), toner drop-outs are bitten out of the ink by a mask of
-//            seeded blots, and a scatter of toner specks lands around the letter.
+//            so a long stem goes ragged rather than bent), toner drop-outs are bitten out of the ink (a clipPath:
+//            the cell with the seeded blots as evenodd holes — clipPath, not mask, so the stamp stays inside the
+//            asset door's ingest allowlist), and a scatter of toner specks lands around the letter.
 //
 // Deterministic: every random draw is keyed by the variant's id (FNV-1a → the engine's mkRng), so a regen is
-// byte-identical (the wear selfcheck re-runs this bake in memory and compares). Every <defs> id is the variant's own
-// id (unique across the catalogue — the experimental pack's convention), so two stamps in one SVG never collide.
+// byte-identical (the wear selfcheck re-runs this bake in memory and compares). Every <defs> id is prefixed with the
+// variant's own id (the experimental pack's convention), so two DIFFERENT stamps in one SVG never collide; the same
+// stamp inlined twice (a stills symbol per colour) repeats identical, colourless defs, which resolve the same.
 //
 // POEM-ONLY, like every face pack: catalogue members after the authored bake, excluded by id on every dealing
 // surface (poets/placement.js WEAR_STAMP_IDS joins POEM_ONLY_STAMP_IDS). Only the ray gun's draw ever names one —
@@ -105,7 +107,6 @@ function bbox(cmds) {
 }
 
 // ── TORN ────────────────────────────────────────────────────────────────
-const TEAR_TEETH = 9; // vertices along the tear line (ragged, not straight)
 const TEAR_TOOTH = 2.6; // ± perpendicular jag, viewBox units
 const TEAR_MAX_ANGLE = 38; // the tear crosses the letter within ± this of horizontal (degrees)
 const TEAR_OFFSET = 9; // the cut passes within ± this of the glyph's centre
@@ -126,16 +127,8 @@ function torn(src) {
   const uy = Math.sin(ang);
   const nx = -uy;
   const ny = ux;
-  // the ragged line, end to end across the cell
-  const line = [];
-  for (let k = 0; k <= TEAR_TEETH; k++) {
-    const t = -FAR + (2 * FAR * k) / TEAR_TEETH;
-    // the jag only matters where the ink is; teeth near the middle are where the letter is
-    const near = Math.abs(t) < 60 ? 1 : 0;
-    const j = near * (rng() * 2 - 1) * TEAR_TOOTH;
-    line.push([cx + ux * t + nx * j, cy + uy * t + ny * j]);
-  }
-  // denser teeth through the letter itself: re-sample the middle stretch
+  // the ragged line: far ends well outside the cell, dense teeth through the letter itself
+  const end = (t) => [cx + ux * t, cy + uy * t];
   const mid = [];
   const SPAN = 70;
   const STEPS = 14;
@@ -144,7 +137,7 @@ function torn(src) {
     const j = (rng() * 2 - 1) * TEAR_TOOTH;
     mid.push([cx + ux * t + nx * j, cy + uy * t + ny * j]);
   }
-  const pts = [line[0], ...mid, line[line.length - 1]];
+  const pts = [end(-FAR), ...mid, end(FAR)];
   const poly = (sign) => {
     const far = pts
       .slice()
@@ -256,9 +249,8 @@ function xerox(src) {
       ),
     );
   const svg =
-    `<defs><mask id="${id}_m" maskUnits="userSpaceOnUse" x="-50" y="-50" width="200" height="200">` +
-    `<rect x="-50" y="-50" width="200" height="200" fill="#ffffff"/><path d="${blots.join("")}" fill="#000000"/></mask></defs>` +
-    `<g mask="url(#${id}_m)"><path d="${fmt(shook)}" fill="var(--ink)"/></g>` +
+    `<defs><clipPath id="${id}_c"><path d="M-50 -50L150 -50L150 150L-50 150Z${blots.join("")}" clip-rule="evenodd"/></clipPath></defs>` +
+    `<g clip-path="url(#${id}_c)"><path d="${fmt(shook)}" fill="var(--ink)"/></g>` +
     `<path d="${specks.join("")}" fill="var(--ink)"/>`;
   return { id, src, svg, kind: "xerox" };
 }
@@ -288,7 +280,7 @@ export function wearPackSource() {
 // Derived from the baked path data of the Anton caps (assets-letterforms), the Anton lowercase (assets-latin) and the
 // PT Serif letters (assets-serif) — no font is read; see those packs for their faces' licences (SIL OFL 1.1). TORN cuts
 // the outline along a seeded ragged line and pulls the halves apart (two clipPaths over the letter's own ink); XEROX
-// shakes the outline, bites toner drop-outs from it (a mask) and scatters toner specks. Every <defs> id is the
+// shakes the outline, bites toner drop-outs from it (an evenodd clipPath) and scatters toner specks. Every <defs> id is the
 // stamp's own id. Only the ray gun's draw names these (poets/rayGunForm.js), as a treated stamp's own letter.
 // Colors: var(--ink) primary.
 export const ASSETS_WEAR = [\n${entries.join("\n")}\n];\n`;

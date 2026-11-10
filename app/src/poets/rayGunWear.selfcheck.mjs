@@ -21,6 +21,7 @@ import { ASSETS, ASSETS_AUTHORED } from '../data/assets/index.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js';
 import { ASSETS_SERIF } from '../data/assets/assets-serif.js';
 import { RESVG_FONT } from '../assets/resvgFont.mjs';
+import { disallowedTag, isHostile } from '../assets/ingest.js';
 import {
   WEAR_STAMP_IDS,
   WEAR_SOURCE_BY_ID,
@@ -67,6 +68,11 @@ ok('A1 208 variants: torn + xerox for Anton caps, Anton lowercase, PT Serif — 
     assert.equal(WEAR_SOURCE_BY_ID.get(a.id), a.wearOf);
   }
   assert.equal(new Set(ASSETS_WEAR.map((a) => a.id)).size, 208, 'ids unique');
+  // the asset door's ingest allowlist (clipPath yes, mask/use no): a worn stamp survives an overlay round trip
+  for (const a of ASSETS_WEAR) {
+    assert.equal(disallowedTag(a.svg), null, `${a.id}: every tag is on the ingest allowlist`);
+    assert.ok(!isHostile(a.svg), `${a.id}: nothing hostile`);
+  }
   assert.equal(wearStampIdFor('typ_A', 'torn'), 'typ_tn_A');
   assert.equal(wearStampIdFor('typ_l_g', 'xerox'), 'typ_xr_l_g');
   assert.equal(wearStampIdFor('typ_s_R', 'torn'), 'typ_tn_s_R');
