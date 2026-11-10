@@ -35,7 +35,7 @@ import {
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
 import { buildSceneContract } from '../gl/sceneContract.js';
-import { packInstanceData } from '../gl/renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from '../gl/renderer.mjs';
 import { QUAD_FS, QUAD_VS } from '../gl/shaders.mjs';
 import { composeStillSvg } from '../curator/miner.mjs';
 import { resolvePalette } from '../data/palettes.js';
@@ -256,7 +256,7 @@ ok('contract: wash instances carry the flag; non-wash contracts gain no key', ()
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 45-float stride, wash packs body code 2 at the tail', () => {
+ok('packInstanceData: INSTANCE_STRIDE (49 since #2010 P3), wash packs body code 2 at the tail', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1',
@@ -277,14 +277,14 @@ ok('packInstanceData: 45-float stride, wash packs body code 2 at the tail', () =
   const buf = packInstanceData([mk({ wash: true }), mk({ plate: true }), mk({}), mk({ glass: true })], cells);
   assert.equal(
     buf.length,
-    4 * 45,
-    'four instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)',
+    4 * INSTANCE_STRIDE,
+    'four instances at the instance stride (49 since #2010 P3; 29 through #1585, +16 engraving floats in S4)',
   );
   assert.equal(buf[24], 2, 'wash instance: tail float is body code 2');
-  assert.equal(buf[45 + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
-  assert.equal(buf[2 * 45 + 24], 0, 'unflagged instance: tail float is 0');
-  assert.equal(buf[3 * 45 + 20], 1, 'glass float unmoved at offset 20');
-  assert.equal(buf[3 * 45 + 24], 0, 'glass instance carries no body code');
+  assert.equal(buf[INSTANCE_STRIDE + 24], 1, 'plate instance: tail float still 1 (M2 bit-parity)');
+  assert.equal(buf[2 * INSTANCE_STRIDE + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[3 * INSTANCE_STRIDE + 20], 1, 'glass float unmoved at offset 20');
+  assert.equal(buf[3 * INSTANCE_STRIDE + 24], 0, 'glass instance carries no body code');
   // #1585: absent `mat` the packer writes the shipped wash pair; a
   // carried `mat` writes through.
   assert.deepEqual([...buf.slice(25, 29)], [1, 1, 0, 0], 'wash at defaults packs (strength 1, spread 1)');

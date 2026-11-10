@@ -37,7 +37,7 @@ import {
 import { GLASS_BODY_ALPHA } from './glassBody.mjs';
 import { place } from '../curator/censusReport.mjs';
 import { buildSceneContract } from '../gl/sceneContract.js';
-import { packInstanceData } from '../gl/renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from '../gl/renderer.mjs';
 import { QUAD_FS, QUAD_VS } from '../gl/shaders.mjs';
 import { composeStillSvg } from '../curator/miner.mjs';
 import { resolvePalette } from '../data/palettes.js';
@@ -269,7 +269,7 @@ ok('#1585 contract: `mat` rides only when a plate knob moved', () => {
 });
 
 // ── the instance packer + shader ─────────────────────────────────────
-ok('packInstanceData: 45-float stride, plate at the tail, absent reads 0', () => {
+ok('packInstanceData: INSTANCE_STRIDE (49 since #2010 P3), plate at the tail, absent reads 0', () => {
   const cells = { 'a1|#000000|#000000': { u0: 0, v0: 0, u1: 0.1, v1: 0.1 } };
   const mk = (extra) => ({
     asset: 'a1',
@@ -290,13 +290,13 @@ ok('packInstanceData: 45-float stride, plate at the tail, absent reads 0', () =>
   const buf = packInstanceData([mk({ plate: true }), mk({}), mk({ glass: true })], cells);
   assert.equal(
     buf.length,
-    3 * 45,
-    'three instances at the 45-float stride (29 through #1585, +16 engraving floats in S4)',
+    3 * INSTANCE_STRIDE,
+    'three instances at the instance stride (49 since #2010 P3; 29 through #1585, +16 engraving floats in S4)',
   );
   assert.equal(buf[24], 1, 'plate instance: tail float is 1');
-  assert.equal(buf[45 + 24], 0, 'unflagged instance: tail float is 0');
-  assert.equal(buf[2 * 45 + 20], 1, 'glass float unmoved at offset 20');
-  assert.equal(buf[2 * 45 + 24], 0, 'glass instance carries no plate');
+  assert.equal(buf[INSTANCE_STRIDE + 24], 0, 'unflagged instance: tail float is 0');
+  assert.equal(buf[2 * INSTANCE_STRIDE + 20], 1, 'glass float unmoved at offset 20');
+  assert.equal(buf[2 * INSTANCE_STRIDE + 24], 0, 'glass instance carries no plate');
   // #1585: the param vec4 follows the body code. Absent `mat` (an
   // unmoved Look) the packer writes the shipped defaults; a carried
   // `mat` writes through. (The buffer is Float32 — expectations are

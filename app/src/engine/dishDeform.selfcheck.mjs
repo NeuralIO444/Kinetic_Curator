@@ -30,7 +30,7 @@ import {
 import { BAKE_TIME_ORIGIN, BAKE_DT_MS } from './kernel/bake/index.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
 import { buildSceneContract, dishDeformShed, assertSceneContract } from '../gl/sceneContract.js';
-import { packInstanceData } from '../gl/renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from '../gl/renderer.mjs';
 import { QUAD_VS } from '../gl/shaders.mjs';
 import { getCostTier, tier1ShedIds } from '../gl/costTiers.mjs';
 
@@ -369,15 +369,15 @@ const assertSamePhysics = (a, b, label) => {
   const data = packInstanceData([inst({ deform: [0.6, 0.8, 0.3] }), inst()], cells);
   assert.strictEqual(
     data.length,
-    90,
-    'two instances at the 45-float stride (24 through #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)',
+    2 * INSTANCE_STRIDE,
+    'two instances at the instance stride (49 since #2010 P3; 24 through #1410, +plate float in #1548, +matP vec4 in #1585, +engraving block in S4)',
   );
   assert.ok(
     Math.abs(data[21] - 0.6) < 1e-6 && Math.abs(data[22] - 0.8) < 1e-6 && Math.abs(data[23] - 0.3) < 1e-6,
     'deform triple packed at floats 21–23',
   );
   assert.ok(
-    data[66] === 0 && data[67] === 0 && data[68] === 0,
+    data[INSTANCE_STRIDE + 21] === 0 && data[INSTANCE_STRIDE + 22] === 0 && data[INSTANCE_STRIDE + 23] === 0,
     'no deform (old producer) packs zeros = round (instance 2 deform triple at 45+21..23; the pre-S4 indices 46..48 named other floats that happened to be zero for this fixture)',
   );
 }

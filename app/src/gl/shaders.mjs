@@ -78,6 +78,7 @@ layout(location=10) in vec4 a_engA;    // Phase 2 S4: engraving spine joints 0-1
 layout(location=11) in vec4 a_engB;    // Phase 2 S4: engraving spine joints 2-3
 layout(location=12) in vec4 a_engC;    // Phase 2 S4: engraving spine joints 4-5
 layout(location=13) in vec4 a_engP;    // Phase 2 S4: engraving params — x joint count (0 = no finish), y spacing, z width, w strength
+layout(location=14) in vec4 a_dist;    // #2010 P3 distortion channel: (shear, melt, tear, seed) — all 0 = the old quad (gl/itemDistort.mjs)
 uniform vec2 u_canvas;
 uniform vec3 u_smear;   // #309 velocity smear: x = stretch per scene-unit of
                         // per-frame velocity, y = max stretch factor,
@@ -117,6 +118,7 @@ out vec4 v_engA;      // Phase 2 S4: engraving joints/params — constant across
 out vec4 v_engB;
 out vec4 v_engC;
 out vec4 v_engP;
+out vec4 v_dist;      // #2010 P3: the distortion record — constant across the instance, like v_matP
 void main() {
   // Cell is 400px for 200 units (2px/unit). Sample at texel centers:
   // the quad spans asset units [-49.75, 149.75] so that corner (0,0)
@@ -185,6 +187,10 @@ void main() {
     kOff += vec2(cos(sda), sin(sda)) * (u_specA.z * lvF * 28.0);
     specColour = u_specA.w * lvP;
   }
+  // #2010 P3 — the distortion channel's shear: the quad leans in its own frame (x moves with y, y-down: a positive
+  // shear tips the top right), before rotation, so the lean travels with the mark. 0 never enters (the old quad).
+  if (a_dist.x != 0.0) c.x -= c.y * a_dist.x;
+  v_dist = a_dist;
   float th = radians(a_inst1.x + kDeg);
   float co = cos(th), si = sin(th);
   vec2 rr = vec2(c.x * co - c.y * si, c.x * si + c.y * co);  // SVG rotate(), y-down
@@ -281,13 +287,42 @@ in vec4 v_engA;       // Phase 2 S4: engraving spine joints 0-1 (quad frame); co
 in vec4 v_engB;       // Phase 2 S4: engraving spine joints 2-3
 in vec4 v_engC;       // Phase 2 S4: engraving spine joints 4-5
 in vec4 v_engP;       // Phase 2 S4: [count, spacing, width, strength] — count 0 = this instance is not engraved
+in vec4 v_dist;       // #2010 P3: (shear, melt, tear, seed) — melt/tear move the atlas sample below; 0 = today's sample
 ${PLATE_GLSL}
 ${WASH_GLSL}
 ${STIPPLE_GLSL}
 ${ENGRAVE_GLSL}
 out vec4 o;
 void main() {
-  vec4 t = texture(u_atlas, v_uv);   // premultiplied
+  vec4 t;   // premultiplied
+  // #2010 P3 — the distortion channel: MELT and TEAR move the one atlas sample inside the instance's own cell (no
+  // pass, no extra texture). Both zero never enters, so every undistorted mark takes today's single sample.
+  if (v_dist.y + v_dist.z > 0.0) {
+    vec2 dspan = v_cell.zw - v_cell.xy;
+    vec2 loc = (v_uv - v_cell.xy) / dspan;   // 0..1 across the drawn quad in the asset's own frame (y-down)
+    float dseed = v_dist.w * 97.0;
+    if (v_dist.z > 0.0) {
+      // TEAR: horizontal bands (12 across the quad — about six through a glyph) slide sideways by seeded amounts,
+      // with a sliver of air cut between them.
+      float band = floor(loc.y * 12.0);
+      loc.x -= (kc_hash12(vec2(band, dseed)) * 2.0 - 1.0) * v_dist.z * 0.045;
+      if (fract(loc.y * 12.0) < v_dist.z * 0.14) loc.x = -1.0;
+    }
+    if (v_dist.y > 0.0) {
+      // MELT: each column's ink is pulled down by its own seeded length, more toward the foot of the mark.
+      float col = loc.x * 18.0;
+      float c0 = floor(col);
+      float n = mix(kc_hash12(vec2(c0, dseed + 3.0)), kc_hash12(vec2(c0 + 1.0, dseed + 3.0)), smoothstep(0.0, 1.0, fract(col)));
+      loc.y -= v_dist.y * 0.3 * n * n * smoothstep(0.3, 0.85, loc.y);
+    }
+    // textureGrad with the UNDISTORTED uv's derivatives: the band cuts make the moved uv jump between neighbouring
+    // fragments, and a plain texture() would read that jump as minification and fetch a blurred mip along every cut.
+    t = (loc.x < 0.0 || loc.x > 1.0 || loc.y < 0.0 || loc.y > 1.0)
+      ? vec4(0.0)
+      : textureGrad(u_atlas, v_cell.xy + loc * dspan, dFdx(v_uv), dFdy(v_uv));
+  } else {
+    t = texture(u_atlas, v_uv);
+  }
   // Open Hand. Amount 0 never enters. The seed picks the ink: stroke, hollow, double, crop.
   if (u_hands.y > 0.0) {
     vec2 span = max(v_cell.zw - v_cell.xy, vec2(1e-4));
@@ -548,7 +583,9 @@ out vec4 v_engA;
 out vec4 v_engB;
 out vec4 v_engC;
 out vec4 v_engP;
+out vec4 v_dist;      // #2010 P3: the shared QUAD_FS reads it — a mesh draw carries no distortion record
 void main() {
+  v_dist = vec4(0.0);
   float seed = kc_hash12(a_item.xy);
   v_seed = seed;
   vec2 world = a_pos;

@@ -301,7 +301,8 @@ function raygunWrite(state, mode) {
   const seed = Math.floor(rng() * 0x100000000) >>> 0;
   // #2010 P1 — every arm from here on names the wear axis (torn / xerox letters at draw time); a record armed
   // before P1 carries no `wear` and keeps drawing geometry-only, so its takes replay exactly.
-  const next = { ...form, raygun: { mode, seed, wear: 1 } };
+  // #2010 P3 — and the distortion axis (glyphs that lean, drip and tear in their own quads).
+  const next = { ...form, raygun: { mode, seed, wear: 1, distort: 1 } };
   // #2006 slice 3 — arming the gun supersedes the review loop's
   // repair: the performer's touch takes the poem over, and the two
   // records never compose (the form door refuses review + raygun

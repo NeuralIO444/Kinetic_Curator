@@ -33,7 +33,7 @@ import {
 } from '../data/regionKinemes.js';
 import { getKineme, kinemePhase } from '../data/kinemes.js';
 import { bakeAtlas, CELL_PX, comboKey } from './atlas.mjs';
-import { packInstanceData } from './renderer.mjs';
+import { packInstanceData, INSTANCE_STRIDE } from './renderer.mjs';
 import { buildSceneContract, regionKinemesFrozen, regionCollapseShed, regionAnimBudget } from './sceneContract.js';
 
 // The fixture items below carry tint #ffffff / accent #ff4444 (the
@@ -336,7 +336,7 @@ console.log('regionPlayback node (atlas demand): OK');
   const packed = packInstanceData([inst], cellsObj, 1, frame);
   assert.strictEqual(
     packed.length,
-    (flora.regions.length + 1) * 45,
+    (flora.regions.length + 1) * INSTANCE_STRIDE,
     'one mark expands to remainder + R region instances',
   );
   // Remainder first: the mark's own transform and kineme, the remainder cell.
@@ -354,7 +354,7 @@ console.log('regionPlayback node (atlas demand): OK');
     co = Math.cos(th),
     si = Math.sin(th);
   flora.regions.forEach((r, i) => {
-    const o = (i + 1) * 45;
+    const o = (i + 1) * INSTANCE_STRIDE;
     const cell = atlas.cells.get(`${base}#r:${r.id}`);
     const g = cell.geo;
     const lx = (g.px - 50) * inst.scaleX,
@@ -382,7 +382,7 @@ console.log('regionPlayback node (atlas demand): OK');
     bare,
     'no region state packs exactly the single quad',
   );
-  assert.strictEqual(bare.length, 45, 'the single quad is one instance');
+  assert.strictEqual(bare.length, INSTANCE_STRIDE, 'the single quad is one instance');
   // Fail-closed: region state but no region cells -> the single quad.
   const wholeOnly = { [base]: atlas.cells.get(base) };
   assert.deepStrictEqual(
@@ -398,17 +398,17 @@ console.log('regionPlayback node (atlas demand): OK');
   const lowPacked = packInstanceData([lowInst], cellsObj, 1, { motionTime: 0, shed: false, regions: low.regionAnim });
   const centreIdx = flora.regions.findIndex((r) => r.id === CENTRE);
   assert.strictEqual(
-    lowPacked[(centreIdx + 1) * 45 + 18],
+    lowPacked[(centreIdx + 1) * INSTANCE_STRIDE + 18],
     lowInst.kineme,
     'unselected region inherits the mark kineme',
   );
   assert.ok(
-    Math.abs(lowPacked[(centreIdx + 1) * 45 + 19] - lowInst.kinemePhase) < 2e-3,
+    Math.abs(lowPacked[(centreIdx + 1) * INSTANCE_STRIDE + 19] - lowInst.kinemePhase) < 2e-3,
     'unselected region inherits the mark phase',
   );
   // Two marks expand independently.
   const two = packInstanceData([inst, { ...inst, x: 100, y: 100 }], cellsObj, 1, frame);
-  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * 45, 'two marks -> two expansions');
+  assert.strictEqual(two.length, 2 * (flora.regions.length + 1) * INSTANCE_STRIDE, 'two marks -> two expansions');
 }
 console.log('regionPlayback node (pack): OK');
 

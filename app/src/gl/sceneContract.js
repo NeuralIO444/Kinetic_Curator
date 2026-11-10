@@ -22,6 +22,7 @@
  */
 
 import { sanitizeFxEffects, FX_EFFECT_KINDS } from '../fx/fxFilters.js';
+import { contractDistort, distortError } from './itemDistort.mjs'; // #2010 P3: the shared distortion channel
 import { sanitizeMathEffects, MATH_OP_KINDS, mathTrackWetCeiling } from '../fx/mathFilters.js';
 import { sanitizeStratumRotation } from '../state/stratumRotation.js'; // #2038 — per-stratum rotation detents
 import {
@@ -227,6 +228,10 @@ function toInstance(item, layerId, itemBlend, deformShed = false) {
     // the quad shader. Absent (every non-creature instance, and every
     // creature while the finish is off) the contract is byte-identical.
     ...(Array.isArray(item.engrave) ? { engrave: item.engrave.map((v) => r3(v)) } : {}),
+    // #2010 P3 — the shared distortion channel rides the same way (gl/itemDistort.mjs): [shear, melt, tear, seed],
+    // present only when a producer stamped a non-zero record on the item, so an undistorted contract (and its hash)
+    // is byte-identical. packInstanceData reads it into the appended a_dist attribute.
+    ...((d) => (d ? { distort: d } : {}))(contractDistort(item.distort)),
   };
 }
 
@@ -1050,6 +1055,11 @@ export function assertSceneContract(scene) {
       }
       if (Math.abs(Math.hypot(d[0], d[1]) - 1) > 0.01) fail(`instance ${it.key}: deform axis must be a unit vector`);
       if (!(d[2] > 0 && d[2] <= 1)) fail(`instance ${it.key}: deform amount must be in (0, 1]`);
+    }
+    if (it.distort !== undefined) {
+      // #2010 P3 distortion channel
+      const err = distortError(it.distort);
+      if (err) fail(`instance ${it.key}: ${err}`);
     }
     if (it.engrave !== undefined) {
       // Phase 2 S4 engraving (engine/engraveBody.mjs)
