@@ -435,11 +435,16 @@ export function sanitizeFieldForm(raw) {
     if (raygun.wear !== undefined && raygun.wear !== 1) return null;
     // #2010 P3 — `distort: 1` names the distortion axis the same way (absent: no key added).
     if (raygun.distort !== undefined && raygun.distort !== 1) return null;
+    // #2010 P4 — POEM ↔ LIFE: the armed meeting with the dish's culture. Named in the record (never ambient), so an
+    // unarmed poem and every record armed before P4 stay untouched by the culture. 'bedrock' = life flows around
+    // the words; 'seed' = the garden blooms from the words and eats them. Anything else is refused whole.
+    if (raygun.life !== undefined && raygun.life !== 'bedrock' && raygun.life !== 'seed') return null;
     raygunMark = {
       mode: raygun.mode,
       seed: raygun.seed,
       ...(raygun.wear === 1 ? { wear: 1 } : {}),
       ...(raygun.distort === 1 ? { distort: 1 } : {}),
+      ...(raygun.life ? { life: raygun.life } : {}),
     };
   }
   // #2002 — the face marker: absent is the base (Anton) face; 'serif'

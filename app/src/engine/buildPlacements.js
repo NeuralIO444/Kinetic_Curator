@@ -997,6 +997,9 @@ export function buildPlacements({
         // #2010 P3 — a treated glyph's distortion record rides its item to the seam (gl/itemDistort.mjs): the quad
         // itself leans, drips or tears. Only the ray gun's draw stamps one; a plain form's items are unchanged.
         ...(s.distort ? { distort: s.distort } : {}),
+        // #2010 P4 — the armed meeting with the dish's culture, read off the record (key present only when armed,
+        // so an unarmed poem's items — and every hash over them — are exactly as before).
+        ...(fieldForm.raygun?.life ? { life: fieldForm.raygun.life } : {}),
       };
     }
     // #2005 — the plate's room, measured: the zone is the drawn stamps'

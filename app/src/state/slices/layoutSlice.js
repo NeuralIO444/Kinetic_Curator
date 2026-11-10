@@ -302,7 +302,12 @@ function raygunWrite(state, mode) {
   // #2010 P1 — every arm from here on names the wear axis (torn / xerox letters at draw time); a record armed
   // before P1 carries no `wear` and keeps drawing geometry-only, so its takes replay exactly.
   // #2010 P3 — and the distortion axis (glyphs that lean, drip and tear in their own quads).
-  const next = { ...form, raygun: { mode, seed, wear: 1, distort: 1 } };
+  // #2010 P4 — the poem's armed meeting with the dish's culture is the performer's standing choice about THIS poem:
+  // it rides across a mode change (carson → shot keeps the coastline) and leaves with the treatment (disarm drops it).
+  const next = {
+    ...form,
+    raygun: { mode, seed, wear: 1, distort: 1, ...(form.raygun?.life ? { life: form.raygun.life } : {}) },
+  };
   // #2006 slice 3 — arming the gun supersedes the review loop's
   // repair: the performer's touch takes the poem over, and the two
   // records never compose (the form door refuses review + raygun
@@ -1386,6 +1391,29 @@ export const createLayoutSlice = (set) => ({
    * seed drawn. The cycle and this are the record's only write sites.
    */
   setPoemRaygun: (mode) => set((state) => raygunWrite(state, mode)),
+
+  /**
+   * #2010 P4 (POEM ↔ LIFE) — arm the standing treatment's meeting with the dish's culture: 'bedrock' (life flows
+   * around the words), 'seed' (the garden blooms from them and eats them), or null (none — the poem is a bystander).
+   * A record edit on the standing treatment, so it needs one (the family: life is a member of the raygun record);
+   * it draws no seed and moves no stamp — the form re-derives exactly. One undo step; a write that changes nothing
+   * (no treatment standing, a plate, an unknown value, the value already standing) does not land.
+   */
+  setPoemLife: (life) =>
+    set((state) => {
+      const form = state.layoutParams?.fieldForm;
+      if (!form || form.plate || !form.raygun) return {};
+      if (life !== null && life !== 'bedrock' && life !== 'seed') return {};
+      if ((form.raygun.life ?? null) === life) return {};
+      const { life: _old, ...rest } = form.raygun;
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: {
+          ...state.layoutParams,
+          fieldForm: { ...form, raygun: life ? { ...rest, life } : rest },
+        },
+      };
+    }),
 
   /** #1918 — KEEP: bank this exact materialized poem into the take. KEEP twice is one keeper. */
   // The bank is document data beside the poem itself (layoutParams.poemKeeps): a take records it (layoutParams

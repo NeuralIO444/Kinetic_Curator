@@ -47,7 +47,19 @@ export const SHED_STEPS = Object.freeze([4, 1, 0]);
 /** A mark that is terrain: a held FIELD poem, a locked look. */
 /** A tertiary speck this stage drew (never a seed, never a mark). */
 export const isSpeck = (it) => !!it && typeof it.key === 'string' && it.key.startsWith('speck:');
-export const isTerrain = (it) => !!it && (it.held === true || it.locked === true);
+export const isTerrain = (it) => !!it && (it.held === true || it.locked === true || it.life === 'bedrock');
+/**
+ * #2010 P4 — POEM ↔ LIFE (D3, ruled 2026-11-06: armed-only, off by default). A FIELD poem's stamps (key `field-…`;
+ * the culture's own cells are `life:…`) meet the culture only when the poem's record says so:
+ *   life 'bedrock' → terrain (above): life flows around the words, which stay exactly as dealt
+ *   life 'seed'    → an ordinary mark: the garden blooms from the words and its decay eats them
+ *   unarmed        → a BYSTANDER: drawn exactly as dealt on its own layer, never seeded, never consumed, and the
+ *                    colonies grow over the ground it stands on (it is not bedrock — nothing was armed)
+ */
+export const isBystander = (it) =>
+  !!it && typeof it.key === 'string' && it.key.startsWith('field-') && !it.life && !isTerrain(it);
+/** Marks that keep their own layer, exactly as dealt: terrain and bystanders. */
+const stays = (it) => isTerrain(it) || isBystander(it);
 
 // the frozen seed keeps the WHOLE mark (shallow copy): the dissolving scene is drawn from it, and the cells inherit
 // every field of the nearest one (glass/plate/wash/stipple/matParams/key…), so a wake never pops the Look
@@ -193,8 +205,8 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       }
       return false;
     }
-    const terrainByLayer = content.map((e) => e.items.filter(isTerrain));
-    const terrain = [].concat(...terrainByLayer);
+    const stayByLayer = content.map((e) => e.items.filter(stays));
+    const terrain = [].concat(...stayByLayer).filter(isTerrain); // bedrock is terrain only — a bystander blocks nothing
     const bedrock = bedrockOf(terrain, W, H);
     const fieldMode = dl.mode === 'field';
     const needNearest = !fieldMode; // field mode never renders: the nearest-mark assignment is never built for it
@@ -208,8 +220,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const prevEpoch = st ? st.seedEpoch | 0 : 0;
     if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest) || seedPress) {
       const marks = [];
-      for (const e of content)
-        for (const it of e.items) if (it && !isTerrain(it) && !isSpeck(it)) marks.push(freeze(it));
+      for (const e of content) for (const it of e.items) if (it && !stays(it) && !isSpeck(it)) marks.push(freeze(it));
       if (!marks.length) {
         // #1994: a field stamp with no seedable marks — no field is running, so nothing may stay published
         if (fieldMode) {
@@ -273,7 +284,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     }
     // draw: terrain stays on its own layer exactly as dealt; the culture frame rides the TOP content layer
     content.forEach((e, i) => {
-      const own = terrainByLayer[i];
+      const own = stayByLayer[i];
       e.items = i === content.length - 1 ? own.concat(st.frame) : own;
     });
     return true;

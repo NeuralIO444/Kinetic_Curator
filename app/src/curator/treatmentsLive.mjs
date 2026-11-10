@@ -31,8 +31,18 @@ const CALLERS = Object.freeze(TREATMENT_CAUSES.filter((c) => c !== 'document'));
 let bound = null; // { getState } while started
 let pendingCause = null; // the surface call in flight (store writes are synchronous: the watcher runs inside it)
 
-const poemRecord = (state) => treatmentState(state && state.layoutParams && state.layoutParams.fieldForm?.raygun);
-const same = (a, b) => (a === null ? b === null : b !== null && a.mode === b.mode && a.seed === b.seed);
+// #2010 P4 — the standing record as the surface reports it: { mode, seed } and, when armed, `life` (the poem's meeting
+// with the dish's culture: 'bedrock' | 'seed'). The take log's own shape (treatmentRecord) is unchanged: the form's
+// record is the replay authority, and the log answers who armed what.
+const poemRecord = (state) => {
+  const r = state && state.layoutParams && state.layoutParams.fieldForm?.raygun;
+  const t = treatmentState(r);
+  return t && (r.life === 'bedrock' || r.life === 'seed') ? { ...t, life: r.life } : t;
+};
+const same = (a, b) =>
+  a === null
+    ? b === null
+    : b !== null && a.mode === b.mode && a.seed === b.seed && (a.life ?? null) === (b.life ?? null);
 
 /**
  * Start the announcer and bind the surface. `getState` / `subscribe` are the store's; `isReplaying` marks changes
@@ -65,7 +75,13 @@ export function startTreatments({ getState, subscribe, isReplaying = () => false
       cur
         ? [
             Events.TREATMENT_ARM,
-            Object.freeze({ target: 'poem', mode: cur.mode, seed: cur.seed, from: from ? from.mode : null }),
+            Object.freeze({
+              target: 'poem',
+              mode: cur.mode,
+              seed: cur.seed,
+              from: from ? from.mode : null,
+              ...(cur.life ? { life: cur.life } : {}),
+            }),
             cause,
           ]
         : [Events.TREATMENT_DISARM, Object.freeze({ target: 'poem', mode: from.mode }), cause],
@@ -116,7 +132,7 @@ function act(target, by, write) {
 export const treatments = Object.freeze({
   targets: TREATMENT_TARGETS,
   callers: CALLERS,
-  /** The treatment standing on `target`: { mode, seed } (a copy), or null. */
+  /** The treatment standing on `target`: { mode, seed, life? } (a copy), or null. */
   read(target) {
     if (!bound || !TREATMENT_TARGETS.includes(target)) return null;
     return poemRecord(bound.getState());
@@ -128,6 +144,14 @@ export const treatments = Object.freeze({
   /** Take the treatment off `target`; it stands plain. */
   disarm(target, { by } = {}) {
     return act(target, by, (s) => s.setPoemRaygun(null));
+  },
+  /**
+   * #2010 P4 — arm the standing treatment's meeting with the dish's culture: life 'bedrock' | 'seed' | null. The same
+   * discipline as arm: a held poem refuses every caller but the performer; announced on the bus as a re-arm carrying
+   * `life`. Refused (false) with no treatment standing — life is a member of the treatment's record.
+   */
+  life(target, { life, by } = {}) {
+    return act(target, by, (s) => s.setPoemLife(life === undefined ? null : life));
   },
   /** The poem row's gesture: plain → carson → greiman → grit → shot → plain. */
   cycle(target, { by } = {}) {

@@ -1377,6 +1377,15 @@ export function createLiveResolver() {
         }
       }
       items = (items || []).filter((it) => it && it.assetId);
+      // #2010 P4 (D3, ruled 2026-11-06) — a HELD poem is terrain to the dish's culture, armed or not: the locked-element
+      // law the culture already honours (isTerrain reads `held`). The flag is stamped on copies, only while the hold
+      // stands (lockedParams.fieldForm, read exactly as this layer's own locks are above) — an unheld poem's items are
+      // the buildPlacements objects untouched.
+      const poemLock = (isActive ? input.lockedParams : snap ? snap.lockedParams : input.lockedParams)?.fieldForm;
+      if (poemLock && src.layoutParams?.fieldForm)
+        items = items.map((it) =>
+          typeof it.key === 'string' && it.key.startsWith('field-') ? { ...it, held: true } : it,
+        );
       // Item-morph trigger signature: the fields that used to drive
       // the pixel crossfade (mode/behave/asset-set; palette left it, #622), scoped per
       // layer. Deliberately excludes seed — a SHUFFLE re-roll has never

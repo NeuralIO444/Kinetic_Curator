@@ -35,6 +35,11 @@ export function PoemRow() {
   // #2010 — the tap is the performer's treatment act: it lands through the core API's treatments surface (the same
   // store write as before), so the bus can announce who armed what.
   const cycleRaygun = () => treatments.cycle('poem', { by: 'performer' });
+  // #2010 P4 (POEM ↔ LIFE, armed-only — D3): with a treatment standing, this chip arms the poem's meeting with the dish's
+  // culture: plain (a bystander) → bedrock (life flows around the words) → seed (the garden eats them) → plain.
+  const life = raygun?.life ?? null;
+  const cycleLife = () =>
+    treatments.life('poem', { life: life === null ? 'bedrock' : life === 'bedrock' ? 'seed' : null, by: 'performer' });
 
   return (
     <div className="poem-row" role="group" aria-label="Poem">
@@ -74,6 +79,23 @@ export function PoemRow() {
         >
           {raygun ? `ray gun · ${raygun.mode}` : 'ray gun'}
         </button>
+        {raygun ? (
+          <button
+            type="button"
+            className={`chip-btn poem-act${life ? ' active' : ''}`}
+            onClick={cycleLife}
+            aria-pressed={!!life}
+            title={
+              life === 'bedrock'
+                ? 'Life · bedrock — with DISH LIFE running, the culture grows around these words. Tap: seed'
+                : life === 'seed'
+                  ? 'Life · seed — with DISH LIFE running, the culture blooms from these words and eats them. Tap: off'
+                  : 'Life — let the dish culture meet this poem: bedrock (it grows around the words) or seed (it eats them). Tap to cycle'
+            }
+          >
+            {life ? `life · ${life}` : 'life'}
+          </button>
+        ) : null}
         <button
           type="button"
           className={`chip-btn poem-act${kept ? ' active' : ''}`}
