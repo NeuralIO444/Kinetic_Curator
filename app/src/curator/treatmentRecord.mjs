@@ -29,9 +29,13 @@ const isSeed = (s) => Number.isInteger(s) && s >= 0 && s <= 0xffffffff;
 const isTarget = (t) => TREATMENT_TARGETS.includes(t);
 const isCause = (c) => TREATMENT_CAUSES.includes(c);
 
-/** A standing treatment record ({ mode, seed }) as plain data, or null. */
+const isLife = (l) => l === 'bedrock' || l === 'seed';
+
+/** A standing treatment record ({ mode, seed, life? }) as plain data, or null. `life` (#2010 P4) only when armed. */
 export function treatmentState(r) {
-  return r && typeof r === 'object' && isMode(r.mode) && isSeed(r.seed) ? { mode: r.mode, seed: r.seed } : null;
+  return r && typeof r === 'object' && isMode(r.mode) && isSeed(r.seed)
+    ? { mode: r.mode, seed: r.seed, ...(isLife(r.life) ? { life: r.life } : {}) }
+    : null;
 }
 
 /**
@@ -42,7 +46,10 @@ function entryOf(kind, p, meta) {
   if (!KINDS.has(kind) || !p || typeof p !== 'object') return null;
   const cause = meta && isCause(meta.cause) ? meta.cause : 'document';
   if (!isTarget(p.target) || !isMode(p.mode)) return null;
-  if (kind === 'arm') return isSeed(p.seed) ? ['arm', p.target, p.mode, p.seed, cause] : null;
+  // #2010 P4 — an arm carries the poem's `life` as a trailing field, only when armed: a life change alone is a re-arm
+  // of the same mode and seed, and without it the log would read as a no-op. Entries without it are exactly as before.
+  if (kind === 'arm')
+    return isSeed(p.seed) ? ['arm', p.target, p.mode, p.seed, cause, ...(isLife(p.life) ? [p.life] : [])] : null;
   if (kind === 'disarm') return ['disarm', p.target, p.mode, cause];
   return isMode(p.verdict) ? ['verdict', p.target, p.mode, p.verdict, cause] : null;
 }
@@ -83,7 +90,8 @@ export function checkTreatmentRecord(r) {
     if (!isTarget(t)) return null;
     const v = r.initial[t];
     if (v !== null && !treatmentState(v)) return null;
-    if (v && Object.keys(v).length !== 2) return null;
+    if (v && (v.life === undefined ? Object.keys(v).length !== 2 : Object.keys(v).length !== 3 || !isLife(v.life)))
+      return null;
   }
   if (!Array.isArray(r.events) || r.events.length > TREATMENT_RECORD_MAX) return null;
   let prev = -1;
@@ -91,7 +99,11 @@ export function checkTreatmentRecord(r) {
     if (!Array.isArray(e) || !Number.isInteger(e[0]) || e[0] < prev) return null;
     const [, kind, target, mode] = e;
     if (!KINDS.has(kind) || !isTarget(target) || !isMode(mode)) return null;
-    if (kind === 'arm' && (e.length !== 6 || !isSeed(e[4]) || !isCause(e[5]))) return null;
+    if (
+      kind === 'arm' &&
+      ((e.length !== 6 && e.length !== 7) || !isSeed(e[4]) || !isCause(e[5]) || (e.length === 7 && !isLife(e[6])))
+    )
+      return null;
     if (kind === 'disarm' && (e.length !== 5 || !isCause(e[4]))) return null;
     if (kind === 'verdict' && (e.length !== 6 || !isMode(e[4]) || !isCause(e[5]))) return null;
     prev = e[0];
@@ -108,7 +120,7 @@ export function treatmentAt(record, target, frame) {
   for (const e of record.events) {
     if (e[0] > frame) break;
     if (e[2] !== target) continue;
-    if (e[1] === 'arm') cur = { mode: e[3], seed: e[4] };
+    if (e[1] === 'arm') cur = { mode: e[3], seed: e[4], ...(e[6] ? { life: e[6] } : {}) };
     else if (e[1] === 'disarm') cur = null;
   }
   return cur;

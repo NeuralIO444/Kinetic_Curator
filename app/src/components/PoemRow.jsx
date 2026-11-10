@@ -79,7 +79,7 @@ export function PoemRow() {
         >
           {raygun ? `ray gun · ${raygun.mode}` : 'ray gun'}
         </button>
-        {raygun ? (
+        {raygun && !fieldForm.plate ? (
           <button
             type="button"
             className={`chip-btn poem-act${life ? ' active' : ''}`}

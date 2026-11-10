@@ -32,13 +32,9 @@ let bound = null; // { getState } while started
 let pendingCause = null; // the surface call in flight (store writes are synchronous: the watcher runs inside it)
 
 // #2010 P4 — the standing record as the surface reports it: { mode, seed } and, when armed, `life` (the poem's meeting
-// with the dish's culture: 'bedrock' | 'seed'). The take log's own shape (treatmentRecord) is unchanged: the form's
-// record is the replay authority, and the log answers who armed what.
-const poemRecord = (state) => {
-  const r = state && state.layoutParams && state.layoutParams.fieldForm?.raygun;
-  const t = treatmentState(r);
-  return t && (r.life === 'bedrock' || r.life === 'seed') ? { ...t, life: r.life } : t;
-};
+// with the dish's culture: 'bedrock' | 'seed'). The take's log carries it too (an arm's trailing field), so a life change
+// alone — a re-arm of the same mode and seed — is never a silent no-op.
+const poemRecord = (state) => treatmentState(state && state.layoutParams && state.layoutParams.fieldForm?.raygun);
 const same = (a, b) =>
   a === null
     ? b === null

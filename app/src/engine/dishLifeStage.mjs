@@ -56,8 +56,8 @@ export const isTerrain = (it) => !!it && (it.held === true || it.locked === true
  *   unarmed        → a BYSTANDER: drawn exactly as dealt on its own layer, never seeded, never consumed, and the
  *                    colonies grow over the ground it stands on (it is not bedrock — nothing was armed)
  */
-export const isBystander = (it) =>
-  !!it && typeof it.key === 'string' && it.key.startsWith('field-') && !it.life && !isTerrain(it);
+const isPoemStamp = (it) => !!it && typeof it.key === 'string' && it.key.startsWith('field-');
+export const isBystander = (it) => isPoemStamp(it) && !it.life && !isTerrain(it);
 /** Marks that keep their own layer, exactly as dealt: terrain and bystanders. */
 const stays = (it) => isTerrain(it) || isBystander(it);
 
@@ -159,6 +159,7 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       W,
       H,
       marks,
+      seededKeys: new Set(marks.map((m) => m.key).filter((k) => typeof k === 'string')), // #2010 P4 — what this seed took
       // #1923 Phase 3 — the terrain the seed was derived against, frozen like the marks: a snapshot must
       // restore the SAME bedrock the live build used, or a restored culture grows over ground the live
       // one treated as locked (the restore path used to rebuild with no bedrock at all and diverged
@@ -205,9 +206,6 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
       }
       return false;
     }
-    const stayByLayer = content.map((e) => e.items.filter(stays));
-    const terrain = [].concat(...stayByLayer).filter(isTerrain); // bedrock is terrain only — a bystander blocks nothing
-    const bedrock = bedrockOf(terrain, W, H);
     const fieldMode = dl.mode === 'field';
     const needNearest = !fieldMode; // field mode never renders: the nearest-mark assignment is never built for it
     // #1923 Phase 4 — the "seed from stage" press: a field stamp carrying `seed` while a field
@@ -218,7 +216,18 @@ export function createDishLifeStage({ cols = STAGE_COLS, rows = STAGE_ROWS, rule
     const seedPress =
       fieldMode && dl.seed === true && !!st && !!st.fieldOn && st.wakeMs === dl.wakeMs && st.W === W && st.H === H;
     const prevEpoch = st ? st.seedEpoch | 0 : 0;
-    if (!st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest) || seedPress) {
+    const rebuild =
+      !st || st.wakeMs !== dl.wakeMs || st.W !== W || st.H !== H || (needNearest && !st.nearest) || seedPress;
+    // #2010 P4 (review) — the poem's meeting with the culture is a BOUNDARY act (F6): a mark the standing seed took is
+    // the seed's for the whole wake, however its record changes under it. Without this, tapping the life chip (or
+    // HOLD) mid-wake would re-class a seeded stamp as a bystander/terrain and draw it a second time beside its
+    // dissolving copy; the change lands at the next wake or press, like every other boundary.
+    const seeded = rebuild ? null : st.seededKeys;
+    const stay = (it) => stays(it) && !(seeded && isPoemStamp(it) && seeded.has(it.key));
+    const stayByLayer = content.map((e) => e.items.filter(stay));
+    const terrain = [].concat(...stayByLayer).filter(isTerrain); // bedrock is terrain only — a bystander blocks nothing
+    const bedrock = bedrockOf(terrain, W, H);
+    if (rebuild) {
       const marks = [];
       for (const e of content) for (const it of e.items) if (it && !stays(it) && !isSpeck(it)) marks.push(freeze(it));
       if (!marks.length) {

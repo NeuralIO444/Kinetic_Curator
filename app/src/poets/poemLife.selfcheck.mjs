@@ -25,6 +25,7 @@ import { coverageField } from '../engine/dishLifeSeed.mjs';
 import { CORPUS } from '../gl/parity/corpus.mjs';
 import { resolveLayers } from '../../../studio/render.mjs';
 import { getRenderCaps } from '../data/quality.js';
+import { createTreatmentRecorder, checkTreatmentRecord, treatmentAt } from '../curator/treatmentRecord.mjs';
 import { createLiveResolver } from '../gl/liveResolve.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
 
@@ -238,6 +239,44 @@ ok('C3 replay: generation g is the same culture however it was reached — strai
     again.apply(stamp(12), lsC, W, H);
     assert.equal(JSON.stringify(lsA), JSON.stringify(lsC), `${life}: same record, same frame`);
   }
+});
+
+ok('C4 the meeting is a boundary act: a record change mid-wake never draws a seeded stamp twice, and lands at the next wake', () => {
+  const rec = (life) => ({ mode: 'carson', seed: 9, wear: 1, ...(life ? { life } : {}) });
+  const layers = (life) => sceneWith(rec(life)).map((l) => ({ ...l, items: [...l.items] }));
+  const stamp = (wakeMs, gen) => ({ wakeMs, gen, shed: 0 });
+  const dealt = poemOf(layers('seed')).length;
+  for (const to of [undefined, 'bedrock']) {
+    const st = createDishLifeStage();
+    for (let g = 0; g <= 5; g++) st.apply(stamp(1, g), layers('seed'), W, H);
+    const before = poemOf((() => { const l = layers('seed'); st.apply(stamp(1, 5), l, W, H); return l; })()).length;
+    const toggled = layers(to);
+    st.apply(stamp(1, 5), toggled, W, H);
+    assert.equal(poemOf(toggled).length, before, `seed → ${to ?? 'plain'} mid-wake: the stamps are still drawn once (the dissolving seed's)`);
+    // the next wake: the new record takes
+    const next = layers(to);
+    st.apply(stamp(2, 0), next, W, H);
+    assert.equal(sameAsDealt(poemOf(layers(to)), poemOf(next)), dealt, `${to ?? 'plain'}: at the next wake the poem stands as dealt`);
+  }
+});
+
+ok('E1 the take log carries `life`: a life change alone is a recorded re-arm, never a silent no-op', () => {
+  const rec = createTreatmentRecorder({ initial: { poem: { mode: 'carson', seed: 9 } }, getFrame: () => 7 });
+  rec.push('arm', { target: 'poem', mode: 'carson', seed: 9, life: 'bedrock' }, { cause: 'performer' });
+  rec.push('arm', { target: 'poem', mode: 'carson', seed: 9 }, { cause: 'performer' });
+  rec.push('arm', { target: 'poem', mode: 'shot', seed: 3 }, { cause: 'davis' });
+  const log = rec.finish();
+  assert.deepStrictEqual(log.events[0], [7, 'arm', 'poem', 'carson', 9, 'performer', 'bedrock']);
+  assert.deepStrictEqual(log.events[1], [7, 'arm', 'poem', 'carson', 9, 'performer'], 'no life: exactly the pre-P4 entry');
+  assert.ok(checkTreatmentRecord(log), 'a genuine log checks');
+  assert.deepStrictEqual(treatmentAt(log, 'poem', 7), { mode: 'shot', seed: 3 });
+  const only = { ...log, events: [log.events[0]] };
+  assert.deepStrictEqual(treatmentAt(only, 'poem', 7), { mode: 'carson', seed: 9, life: 'bedrock' });
+  const bad = { ...log, events: [[7, 'arm', 'poem', 'carson', 9, 'performer', 'moss']] };
+  assert.equal(checkTreatmentRecord(bad), null, 'an unknown life is refused');
+  const init = createTreatmentRecorder({ initial: { poem: { mode: 'carson', seed: 9, life: 'seed' } } }).finish();
+  assert.deepStrictEqual(init.initial.poem, { mode: 'carson', seed: 9, life: 'seed' });
+  assert.ok(checkTreatmentRecord(init));
 });
 
 // ── D · the seam ─────────────────────────────────────────────────────────
