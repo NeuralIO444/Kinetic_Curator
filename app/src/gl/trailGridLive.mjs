@@ -13,7 +13,7 @@
 // buffer's own step count (deterministic state, never a wall clock).
 //
 // Slice 2 adds the standing consumer slice 1 named: while a look that
-// declares an ember weight is up (and the governor has not shed
+// declares a trail weight — either pole (#1838) — is up (and the governor has not shed
 // steering), the live loop offers its ACCUM object to
 // updateTrailSteerGrid() after each landed step; the wire derives a
 // fresh grid at cadence (TRAIL_STEER_EVERY steps, the #1807 stats

@@ -260,7 +260,7 @@ const ids = (rs) => rs.map((r) => r.id);
     paths: [PATH_FAMILIES, '0f847ab0be755a83'],
     curves: [BALLISTICS_CURVES, 'e006154defd5974a'],
     defaults: [DEFAULT_LAYOUT_PARAMS, '1c2ddc28c7769673'],
-    looks: [COMPOSITION_PRESETS, '0e506973c67a5129'],
+    looks: [COMPOSITION_PRESETS, '61c50037062a6337'], // #1838 re-pin: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
     deck: [VOICE_DECK, 'ca7db04bb758bba0'],
   };
   for (const [name, [value, hash]] of Object.entries(pins)) assert.equal(sha(value), hash, `${name}: byte-identical`);

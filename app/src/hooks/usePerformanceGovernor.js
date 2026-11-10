@@ -8,7 +8,7 @@
 //     cut 1: dynamic resolution scaling (renderScale 1 → 0.75 → 0.5 → 0.33)
 //     cut 1.45: spectral feedback warp (#1490 — after mark weather, before the population)
 //     cut 1.47: selective ACCUM feed (#1806 slice 2 — subset render drops to the composite path)
-//     cut 1.48: ember steering (#1837 — the moths stop grazing the trail grid; the population stays)
+//     cut 1.48: trail steering (#1837, both poles #1838 — the moths stop steering on the trail grid; the population stays)
 //     cut 1.5: creature count (#1694 S2 — population sheds before finishes)
 //     cut 1.6: travel (#1574 — FLOW marks settle home; after the population, ahead of the tier)
 //     cut 2: quality tier step HIGH → BALANCED → PERF
@@ -53,7 +53,7 @@ import { getFrameDeltas, clearFrameDeltas } from './useFpsMeter.js';
 import { recordGovernorEvent, CUT_KINDS } from '../gl/governorEventLog.mjs';
 import { feedbackWarpAmount } from '../gl/spectrumWarp.mjs';
 import { accumFeedSelection } from '../gl/renderer.mjs';
-import { trailEmberWeight } from '../data/presets.js';
+import { trailEmberWeight, trailFreshWeight } from '../data/presets.js';
 
 // #1574 — the event log's ladder map (gl/governorEventLog.mjs SHED_STEPS)
 // predates the content rungs: it knows neither 'creatureCount' (cut 1.5)
@@ -217,15 +217,16 @@ export function usePerformanceGovernor() {
     !!layoutParams?.accumulation &&
     !perfTier1 &&
     accumFeedSelection({ layers, compositeOrder: (layers || []).map((l) => l && l.id) }) !== null;
-  // #1837 — the ember-steering rung (cut 1.48): the shed overlay, and whether
-  // steering is live on this scene — the current look declares an ember
+  // #1837 — the trail-steering rung (cut 1.48): the shed overlay, and whether
+  // steering is live on this scene — the current look declares a trail
   // weight (data/presets.js reads the `composition` param's look), creatures
   // may exist, ACCUM is on (no buffer, no grid), and the tier-1 shed has not
-  // already killed the buffer the grid reads.
+  // already killed the buffer the grid reads. #1838: either pole activates
+  // the rung — the ember weight, or the signed fresh weight.
   const trailSteerShed = useStore((s) => s.trailSteerShed);
   const setTrailSteerShed = useStore((s) => s.setTrailSteerShed);
   const trailSteerActive =
-    trailEmberWeight(layoutParams?.composition) > 0 &&
+    (trailEmberWeight(layoutParams?.composition) > 0 || trailFreshWeight(layoutParams?.composition) !== 0) &&
     (layoutParams?.creatures ?? 0) > 0 &&
     !!layoutParams?.accumulation &&
     !perfTier1;
