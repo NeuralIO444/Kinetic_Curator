@@ -75,35 +75,39 @@ function resetLayersToOne() {
 }
 
 // Headroom: normal operation, adding a track works exactly as before.
+// #2038: the probes ride addPatternLayer — the content cap is ONE now,
+// so an addLayer probe would refuse on the cap and say nothing about
+// the tape gate, which is the unit under test here. Pattern adds are
+// tape-gated by the same arm and uncapped below the document bound.
 setState({ fps: 60, stageTimings: {} });
 resetLayersToOne();
-getState().addLayer();
-assert.strictEqual(getState().layers.filter((l) => l.type !== 'fx').length, 2, 'headroom: addLayer succeeds');
+getState().addPatternLayer();
+assert.strictEqual(getState().layers.filter((l) => l.type !== 'fx').length, 2, 'headroom: a track add succeeds');
+const ptId = getState().layers.find((l) => l.type === 'pattern').id;
 
 // Tape full: the same action is refused, not silently downgraded.
 setState({ fps: 0, stageTimings: { gpuFrame: FRAME_BUDGET_MS * 2 } }); // 200% — well past full
-resetLayersToOne();
-getState().addLayer();
+getState().addPatternLayer();
 assert.strictEqual(
   getState().layers.filter((l) => l.type !== 'fx').length,
-  1,
-  'tape full: addLayer refuses (count unchanged)',
+  2,
+  'tape full: the track add refuses (count unchanged)',
 );
 
 getState().addFxLayer();
 assert.strictEqual(getState().layers.filter((l) => l.type === 'fx').length, 0, 'tape full: addFxLayer refuses too');
 
 const before = getState().layers.length;
-getState().duplicateLayer('kc-1');
+getState().duplicateLayer(ptId);
 assert.strictEqual(getState().layers.length, before, 'tape full: duplicateLayer refuses too');
 
 // Recovery: once headroom returns, the same actions succeed again.
 setState({ fps: 60, stageTimings: {} });
-getState().addLayer();
+getState().addPatternLayer();
 assert.strictEqual(
   getState().layers.filter((l) => l.type !== 'fx').length,
-  2,
-  'headroom returns: addLayer succeeds again',
+  3,
+  'headroom returns: the track add succeeds again',
 );
 
 // Cleanup: leave the store as this file found it (a fresh module-level

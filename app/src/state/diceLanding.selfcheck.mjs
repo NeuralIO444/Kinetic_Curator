@@ -94,6 +94,10 @@ assert.ok(Math.abs(S().light.ambient - (0.2 + 0.999 * 0.5)) < 0.01, `voice die s
 lands('kineticVoicePass -> light', S().light, (d) => d.light);
 
 // ── layersSlice: addLayer (id identity + snapshot seed) ─────────────────────
+// #2038: the standing stack already holds its one content stratum, so
+// the add is exercised from a seeded empty stack (the only state
+// addLayer can add into); the landing properties are unchanged.
+useStore.setState({ layers: [], activeLayerId: null, layerSnapshots: {} });
 const before = S().layers.length;
 S().addLayer();
 assert.strictEqual(S().layers.length, before + 1, 'addLayer added a layer');

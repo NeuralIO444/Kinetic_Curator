@@ -27,6 +27,7 @@ export const KIND_FACE = {
   feedbackWarp: { abbr: 'FBW', word: 'feedback' },
   scanlines: { abbr: 'SCN', word: 'scan' },
   dither: { abbr: 'DTH', word: 'dither' },
+  stipple: { abbr: 'STP', word: 'stipple' }, // #2038 — the dot screen's face
   riso: { abbr: 'RSO', word: 'riso' },
   halo: { abbr: 'HAL', word: 'halo' },
 };

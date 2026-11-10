@@ -167,8 +167,12 @@ ok(
       6,
       'every pattern lands — the content cap does not count ground',
     );
-    S().addLayer(); // KC 1 → 2: allowed
-    assert.equal(S().layers.filter(isKcLayer).length, 2);
+    // #2038 re-pin: the content cap is ONE now — the seeded KC track is
+    // already the whole content band, so every KC add refuses on its own
+    // count, ground or no ground. The D4 property (patterns never gated
+    // by the content cap) is what this case pins, and it stands.
+    S().addLayer();
+    assert.equal(S().layers.filter(isKcLayer).length, MAX_CONTENT_TRACKS);
     S().addLayer(); // the KC cap refuses on its own count, ground or no ground
     assert.equal(S().layers.filter(isKcLayer).length, MAX_CONTENT_TRACKS);
     for (let i = 0; i < 20; i++) S().addPatternLayer();
@@ -388,18 +392,32 @@ ok(
       [kc('kc-a', { patch: { mode: 'mod', to: 'pt-1', strength: 0.3 } }), { id: 'pt-1', type: 'pattern', pattern: {} }],
       'kc-a',
     );
-    assert.equal(patched.layers[0].patch.to, null);
+    // #2038: the pattern is pinned to the bottom, so it sits at [0];
+    // the patch assertion reads the KC stratum by id, not by slot.
+    assert.equal(patched.layers[0].type, 'pattern', '#2038: the pattern loads pinned to the bottom');
+    assert.equal(patched.layers.find((l) => l.id === 'kc-a').patch.to, null);
   },
 );
 
 ok('a project with no pattern track is untouched: normalize output is identical with and without the feature', () => {
-  const raw = [kc('kc-a'), kc('kc-b', { layerBlendMode: 'screen', layerOpacity: 0.7 })];
-  const { layers } = normalizeLayers(raw, 'kc-b');
+  // #2038 re-pin: the old fixture carried TWO content strata (the
+  // double-exposure pair) — under the one-content law the second would
+  // trim, which is the migration case, not this one. The property
+  // pinned here (a pattern-free project's layers pass through
+  // untouched, in order, with no pattern key invented) is exercised
+  // with the lawful stack instead: content + FX + MATH.
+  const raw = [
+    kc('kc-a'),
+    { id: 'fx-b', name: 'FX', type: 'fx', layerBlendMode: 'screen', layerOpacity: 0.7, effects: [] },
+    { id: 'm-c', name: 'MATH', type: 'math', layerBlendMode: 'normal', layerOpacity: 1, effects: [] },
+  ];
+  const { layers } = normalizeLayers(raw, 'kc-a');
   assert.deepEqual(
-    layers.map((l) => [l.id, l.type, l.layerBlendMode, l.layerOpacity, l.patch.mode]),
+    layers.map((l) => [l.id, l.type, l.layerBlendMode, l.layerOpacity, l.patch ? l.patch.mode : null]),
     [
       ['kc-a', 'content', 'normal', 1, 'off'],
-      ['kc-b', 'content', 'screen', 0.7, 'off'],
+      ['fx-b', 'fx', 'screen', 0.7, null],
+      ['m-c', 'math', 'normal', 1, null],
     ],
   );
   assert.ok(layers.every((l) => !('pattern' in l)));

@@ -76,6 +76,7 @@ export const EVENT_REGISTRY = {
   LAYER_TOGGLE_WET_SOAK: { handler: 'wire' },
   LAYER_SET_BLEND_MODE: { handler: 'wire' },
   LAYER_SET_OPACITY: { handler: 'wire' },
+  LAYER_SET_ROTATION: { handler: 'wire' },
   LAYER_DUPLICATE: { handler: 'wire' },
   LAYER_SOLO: { handler: 'wire' },
   LAYER_ADD_FX: { handler: 'wire' },

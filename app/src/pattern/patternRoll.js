@@ -99,7 +99,8 @@ export function rollPatternLayers(
   if (kind === 'chaos' && canAdd && !out.some(isPattern)) {
     // #1609 (D4) — a pattern is ground and spends no skeleton slot, so the
     // birth gate is the document bound, not the content count: a full
-    // double exposure (2 content strata) must not starve the ground.
+    // stack must not starve the ground. (#2038: the stack's content band
+    // is a single stratum now; the gate is unchanged.)
     // draw the dice unconditionally, so the rest of the stream does not depend on the cap
     const roll = rng();
     const born = dealPattern(undefined, rng);
