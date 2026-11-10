@@ -11,9 +11,11 @@
 // form's presentation register — the same placed field drawn quiet; it is a register on the form,
 // not a second system, and the Director never sets it. Discrete state → TE (KC-1 DS rule 2): hard
 // states, the lock glyphs, one red (HOLD engaged) at most. Silence is default (rule 4): no poem
-// standing, no group. All writes go through the store; the group only reads.
+// standing, no group. All writes go through the store; the group only reads. RAY GUN's tap goes through the treatments surface (#2010),
+// which writes through the store and lets the bus announce the act.
 import { useStore } from '../state/store.js';
 import { poemIdentity, isPoemKept } from '../poets/poemRow.mjs';
+import { treatments } from '../curator/treatmentsLive.mjs'; // #2010: the gun fires through the treatments surface
 
 export function PoemRow() {
   const fieldForm = useStore((s) => s.layoutParams.fieldForm);
@@ -22,7 +24,6 @@ export function PoemRow() {
   const redealPoem = useStore((s) => s.redealPoem);
   const togglePoemHold = useStore((s) => s.togglePoemHold);
   const togglePoemWhisper = useStore((s) => s.togglePoemWhisper);
-  const cyclePoemRaygun = useStore((s) => s.cyclePoemRaygun);
   const keepPoem = useStore((s) => s.keepPoem);
 
   const id = poemIdentity(fieldForm);
@@ -31,6 +32,9 @@ export function PoemRow() {
   const whisper = fieldForm.register === 'whisper';
   const raygun = fieldForm.raygun;
   const words = `${id.firstWords}${id.truncated ? '…' : ''}`;
+  // #2010 — the tap is the performer's treatment act: it lands through the core API's treatments surface (the same
+  // store write as before), so the bus can announce who armed what.
+  const cycleRaygun = () => treatments.cycle('poem', { by: 'performer' });
 
   return (
     <div className="poem-row" role="group" aria-label="Poem">
@@ -60,7 +64,7 @@ export function PoemRow() {
         <button
           type="button"
           className={`chip-btn poem-act${raygun ? ' active' : ''}`}
-          onClick={cyclePoemRaygun}
+          onClick={cycleRaygun}
           aria-pressed={!!raygun}
           title={
             raygun

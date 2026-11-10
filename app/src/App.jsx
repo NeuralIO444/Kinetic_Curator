@@ -53,6 +53,7 @@ import { resolveDavisState } from './curator/davisState.js'; // #1355 step 3: wh
 import { setRoomCodesProvider } from './curator/roomCodes.js'; // #1949
 import { startMind, replayMindFrame, endMindReplay } from './curator/mindLive.js'; // #1462: Mind 1
 import { startReviewVoice } from './curator/fieldReviewVoiceLive.mjs'; // #2006 slice 2: the review loop's voice on the tape
+import { startTreatments } from './curator/treatmentsLive.mjs'; // #2010: the treatments surface + its bus announcer
 import { replaySpectrumFrame, endSpectrumReplay } from './curator/spectrumRecord.js'; // #1534: a take replays its hearing
 import { startMindFaces, resetMindFaces } from './curator/mindFace.js'; // #1462: a request blends a face state in and out
 import { startRoomFeed, resetRoomFeed } from './curator/roomFeed.js'; // #1560 S1: THE ROOM codec's retained bus window
@@ -297,6 +298,14 @@ function AppInner() {
       model: DEBUG_MIND ? demoModel : appleModel,
       isReplaying: isPlaybackActive,
     });
+    // #2010 — RAY GUN treatment bus records: bind the core API's `treatments` surface and announce every change to
+    // a standing treatment record on the bus (treatment:arm / :disarm, caused + musically stamped). Announcements
+    // only: the record on the form stays the authority; the take's `treatments` section is the recording listener.
+    const stopTreatments = startTreatments({
+      getState: useStore.getState,
+      subscribe: (fn) => useStore.subscribe(fn),
+      isReplaying: isPlaybackActive,
+    });
     // #1560 S3 — the room's story machine: folds the bus into rapport/grudge standing, episodes and beats, and
     // persists the book beside the engagement scores. Backstage only (the dev panel's MIND tab reads its view);
     // the room shows nothing of it, and it asks nothing of the stage.
@@ -349,6 +358,7 @@ function AppInner() {
       stopLean();
       stopMind();
       stopReviewVoice();
+      stopTreatments();
       trio.stop();
       stopFaces();
       stopFeed();
