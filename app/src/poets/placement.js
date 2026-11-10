@@ -329,6 +329,39 @@ export const glyphWidthEm = (ch) => GLYPH_W[ch] ?? 0;
  * serif or plate form is measured in its own face. A worn stamp (#2010)
  * measures with its SOURCE's ruler: a torn serif 'A' is serif ink.
  */
+/**
+ * #2010 P2 — a stamp's INK box, in stamp-box units (every face generator fits its glyph into the same 100-unit cell,
+ * caps 80 units tall), read once from the baked path data. The width ruler above is a placement ruler — advances, not
+ * ink; a treatment that sets type against the ink the stage actually draws (SWISS GRIT's kerning) reads this. A worn
+ * stamp answers with its source's box. null for an unknown id or a stamp with no path.
+ */
+const INK_STAMP_PACKS = [ASSETS_LETTERS, ASSETS_KANA, ASSETS_KANJI, ASSETS_LATIN, ASSETS_SERIF, ASSETS_ORNAMENTS, ASSETS_PLATE];
+const INK_SVG_BY_ID = new Map(INK_STAMP_PACKS.flatMap((pack) => pack.map((a) => [a.id, a.svg])));
+const INK_BOX_CACHE = new Map();
+export function stampInkBox(assetId) {
+  const id = WEAR_SOURCE_BY_ID.get(assetId) ?? assetId;
+  if (INK_BOX_CACHE.has(id)) return INK_BOX_CACHE.get(id);
+  const svg = INK_SVG_BY_ID.get(id);
+  let box = null;
+  const d = svg && /<path d="([^"]+)"/.exec(svg);
+  if (d) {
+    const n = d[1].match(/-?\d*\.?\d+(?:e-?\d+)?/g)?.map(Number) ?? [];
+    let x0 = Infinity;
+    let x1 = -Infinity;
+    let y0 = Infinity;
+    let y1 = -Infinity;
+    for (let k = 0; k + 1 < n.length; k += 2) {
+      x0 = Math.min(x0, n[k]);
+      x1 = Math.max(x1, n[k]);
+      y0 = Math.min(y0, n[k + 1]);
+      y1 = Math.max(y1, n[k + 1]);
+    }
+    if (x1 > x0 && y1 > y0) box = Object.freeze({ w: x1 - x0, h: y1 - y0 });
+  }
+  INK_BOX_CACHE.set(id, box);
+  return box;
+}
+
 export const stampWidthEm = (assetId, ch) => {
   const id = WEAR_SOURCE_BY_ID.get(assetId) ?? assetId;
   return SERIF_STAMP_IDS.has(id) ? serifGlyphWidthEm(ch) : PLATE_STAMP_IDS.has(id) ? plateGlyphWidthEm(ch) : glyphWidthEm(ch);

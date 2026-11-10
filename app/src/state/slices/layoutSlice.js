@@ -1342,7 +1342,7 @@ export const createLayoutSlice = (set) => ({
 
   /**
    * #2003 — RAY GUN: cycle the standing poem's type treatment (plain →
-   * carson → greiman → shot → plain), on the form itself
+   * carson → greiman → grit → shot → plain), on the form itself
    * (layoutParams.fieldForm.raygun = { mode, seed }), on the whisper
    * toggle's pattern. The form's stamps NEVER move here — they stay the
    * plain dealt list; the blast is drawn from the record at render

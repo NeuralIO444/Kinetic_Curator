@@ -372,10 +372,10 @@ const expectedSeed = (tap) => {
   return Math.floor(rngForIndex(st.seed, CH.curate, POEM_RAYGUN_BASE + tap, st.seedOffsets)() * 0x100000000) >>> 0;
 };
 
-ok('the cycle: plain → carson → greiman → shot → plain, seeds from the dedicated ray-gun stream, the stamps never move, one undo step per tap', () => {
+ok('the cycle: plain → carson → greiman → grit → shot → plain (#2010 P2 seats grit before shot), seeds from the dedicated ray-gun stream, the stamps never move, one undo step per tap', () => {
   reset();
-  const modes = ['carson', 'greiman', 'shot'];
-  for (let tap = 0; tap < 3; tap++) {
+  const modes = ['carson', 'greiman', 'grit', 'shot'];
+  for (let tap = 0; tap < 4; tap++) {
     const want = expectedSeed(tap);
     S().cyclePoemRaygun();
     const f = S().layoutParams.fieldForm;
@@ -388,9 +388,9 @@ ok('the cycle: plain → carson → greiman → shot → plain, seeds from the d
   }
   S().cyclePoemRaygun();
   assert.deepStrictEqual(S().layoutParams.fieldForm, standing, 'the full cycle returns the EXACT original form — record absent, not nulled');
-  assert.equal(S().raygunTap, 3, 'clearing back to plain draws no seed');
+  assert.equal(S().raygunTap, 4, 'clearing back to plain draws no seed');
   S().undo();
-  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: expectedSeed(2), wear: 1 }, 'undo restores the record the tap replaced');
+  assert.deepStrictEqual(S().layoutParams.fieldForm.raygun, { mode: 'shot', seed: expectedSeed(3), wear: 1 }, 'undo restores the record the tap replaced');
 });
 
 ok('the cycle: refused with no poem standing — nothing moves, no undo entry, no seed drawn', () => {

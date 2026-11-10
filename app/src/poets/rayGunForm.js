@@ -11,7 +11,9 @@
 // armed only from the poem row, plain by default the way silence is the
 // default. Matt's ruling on the dingbats question (2026-11-03): SHOT may go
 // full Carson (word recoverability is NOT protected there — the poem may
-// become pure texture); CARSON and GREIMAN keep words recoverable.
+// become pure texture); CARSON, GREIMAN and GRIT keep words recoverable.
+// GRIT (#2010 P2 · SWISS GRIT) is the Ashworth half: the grid comes first,
+// and the destruction is done TO the grid, by rule.
 //
 // WHERE IT LIVES (the record architecture): the treated stamp list is never
 // stored. The standing form stays plain and carries the treatment record
@@ -31,13 +33,20 @@
 //    ITS OWN letter's worn variant — torn or xerox, baked (placement.js
 //    WEAR_STAMP_IDS). Never another letter, never a dingbat: `ch` is law.
 //    Ghosts are added copies of the same letters, glyph-matched.
-// 2. Word recoverability at CARSON and GREIMAN — a word's glyphs keep
+// 2. Word recoverability at CARSON, GREIMAN and GRIT — a word's glyphs keep
 //    reading order along the row axis and stay a contiguous cluster: no
 //    treated glyph centre (CARSON) and no word's treated centre-span
-//    (GREIMAN) crosses the midpoint to a neighbouring word. At SHOT this
-//    bound is OFF, by the ruling.
+//    (GREIMAN) crosses the midpoint to a neighbouring word. GRIT re-sets
+//    the poem, so its bound is stated on its own setting: every word keeps
+//    its glyphs in order, ink to ink on one even track, and words stand a
+//    wider word space apart — its violations move glyphs only ACROSS the row
+//    axis (the overprint is an added impression, like CARSON's misregistered
+//    duplicates and GREIMAN's echoes). At SHOT
+//    this bound is OFF, by the ruling.
 // 3. The anchor — at CARSON/GREIMAN the first line's displacements are
-//    halved (FIRST_LINE_FACTOR); the poem-row identity chip always shows
+//    halved (FIRST_LINE_FACTOR); at GRIT the first line's first word never
+//    moves, the rest of the line takes half the violations, and nothing is
+//    overprinted onto it; the poem-row identity chip always shows
 //    the clean transcription regardless (it reads the deck, not the dish).
 // And the door's stamp-level bounds hold for every treated stamp, by
 // construction: centres on the dish, em within the door's (0, 0.3] and
@@ -52,10 +61,10 @@
 // those constants — no statistics, no guessing.
 
 import { mkRng } from '../engine/prng.js';
-import { stampWidthEm, wearStampIdFor } from './placement.js';
+import { stampWidthEm, stampInkBox, wearStampIdFor, ORNAMENT_STAMP_IDS } from './placement.js';
 
 /** The cycle, in tap order. Plain is the absence of the record. */
-export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'shot']);
+export const RAYGUN_MODES = Object.freeze(['carson', 'greiman', 'grit', 'shot']);
 
 // The door's bounds, mirrored (fieldForm.js: sanitizeFieldForm's em
 // ceiling, FIELD_MIN_LEGIBLE_EM, MAX_FIELD_STAMPS). Treated stamps obey
@@ -120,15 +129,47 @@ const SHOT_GHOST_F = 0.45; // falloff at/above which a glyph trails a ghost
 const SHOT_GHOST_T = 0.45; // the ghost sits this far along the displacement vector
 const SHOT_GHOST_SCALE = 0.6; // ghost em relative to the treated glyph's em
 
+// GRIT (#2010 P2 · SWISS GRIT) — Ashworth's "hybrid of freeform with a Swiss aesthetic": the grid comes first, then
+// ruled violations. A1 grid-then-destroy: the form is RE-SET as Swiss type — one size, straight, flush left, set
+// against the INK the stage actually draws (proportional kerning: every letter's own drawn width plus one even track;
+// a word space; leading as baseline-to-baseline air), on a baseline unit — then a seeded minority of glyphs moves
+// exactly one unit, one vertical band of the block drops a unit, and one row is overprinted, offset, onto its
+// neighbour at full weight. A2 no house template: track, word space, leading, unit and margins are drawn per record
+// from the stream — every treatment draws its own grid.
+//
+// THE DRAWN SCALE. Placement's em is cap height on its width ruler, but the stage draws a field glyph's ink about
+// 2.27 em tall (FIELD_EM_SCALE): every stamp fits its glyph into a 100-unit cell, caps 80 units tall, so one cell unit
+// draws GRIT_INK_EM_PER_UNIT em. Grit measures letters in DRAWN ink (placement.stampInkBox), so its kerning and
+// leading are true on the stage, not on the ruler. rayGunGrit.selfcheck renders a glyph through the studio renderer
+// and pins this constant to what is actually drawn.
+export const GRIT_INK_EM_PER_UNIT = 2.27 / 80;
+const GRIT_CAP_UNITS = 80; // a cap's ink height in cell units: the drawn cap = 80 × GRIT_INK_EM_PER_UNIT em
+const GRIT_TRACK = [0.08, 0.16]; // letter gap, ink to ink, in drawn cap heights — tight, even, never touching
+const GRIT_SPACE = [0.38, 0.5]; // word space, ink to ink, in drawn cap heights
+const GRIT_LEADING = [1.3, 1.6]; // baseline to baseline, in drawn cap heights — Swiss air between rows
+const GRIT_TIGHT = Object.freeze({ track: 0.04, space: 0.3, leading: 1.12 }); // what the fit may close to, no tighter
+const GRIT_UNITS_PER_LINE = [5, 6]; // the baseline unit = leading / this (drawn: 5 or 6)
+const GRIT_FIT = 0.88; // the set block fits within this share of the dish (each axis)
+const GRIT_MARGIN = 0.06; // the minimum margin, as a share of the axis
+// The size floor: grit never sets type under 1.5× the door's legibility floor (FIELD_MIN_LEGIBLE_EM, 0.01 — the
+// battery's grounded headroom) unless the dealt poem was already smaller. To hold it, the fit first closes the air
+// (GRIT_TIGHT), then breaks long lines at word boundaries, as a compositor would — it never shrinks under the floor.
+const GRIT_EM_FLOOR = 0.015;
+const GRIT_SHIFT_P = 0.14; // chance an eligible glyph moves exactly one unit up or down
+const GRIT_DROP_BAND_UNITS = 3; // the dropped band's width, in units, centred on a dealt glyph
+
 // WEAR (#2010 P1 · TORN & XEROXED) — the shape lever, named in the record as `wear: 1` (an older record without it
 // draws exactly as it always did, so every take recorded before P1 replays bit-for-bit). Per treated stamp, in output
 // order, ONE draw off the wear stream — a stream of its own (WEAR_SALT on the record's seed), so the geometry above
 // spends exactly the draws it always did: the blast is identical with wear on or off, only the faces move. GREIMAN is
-// the clean digital pole (whole words, the bitmap nod) and stays unworn; CARSON wears some letters, SHOT most.
+// the clean digital pole (whole words, the bitmap nod) and stays unworn; CARSON wears some letters, SHOT most, and
+// GRIT puts every letter through the copier (A5: degradation as a machine setting).
 const WEAR_SALT = 0x57454152; // 'WEAR'
 const WEAR_P = Object.freeze({
   carson: Object.freeze({ torn: 0.14, xerox: 0.24 }),
   shot: Object.freeze({ torn: 0.3, xerox: 0.32 }),
+  // A5 systematic grit: degradation as a machine setting, not a gesture — every letter through the copier, none torn.
+  grit: Object.freeze({ torn: 0, xerox: 1 }),
 });
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
@@ -375,6 +416,160 @@ function greiman(stamps, rows, rng, aspect) {
   return [...out, ...ghosts];
 }
 
+// ── GRIT — the Swiss grid, then the ruled violations (Ashworth) ─────────
+function grit(stamps, plainRows, rng, aspect) {
+  let rows = plainRows;
+  // The set em: the form's median em (one size — Swiss discipline).
+  const ems = stamps.map((s) => s.em).sort((a, b) => a - b);
+  const emPlain = ems[Math.floor(ems.length / 2)];
+  // Every glyph's drawn ink width, per em (a glyph with no readable box falls back to the width ruler).
+  const inkW = stamps.map((s) => {
+    const box = stampInkBox(s.assetId);
+    return box ? box.w * GRIT_INK_EM_PER_UNIT : stampWidthEm(s.assetId, s.ch);
+  });
+  const CAP = GRIT_CAP_UNITS * GRIT_INK_EM_PER_UNIT; // the drawn cap, per em
+  const ornRow = (row) =>
+    row.words.length === 1 && row.words[0].length === 1 && ORNAMENT_STAMP_IDS.has(stamps[row.words[0][0]].assetId);
+  let isOrnRow = rows.map(ornRow);
+  // A2 — this record's own grid, drawn in a fixed order.
+  const between = (r) => r[0] + rng() * (r[1] - r[0]);
+  let track = between(GRIT_TRACK);
+  let space = between(GRIT_SPACE);
+  let leading = between(GRIT_LEADING);
+  const unitsPerLine = rng() < 0.5 ? GRIT_UNITS_PER_LINE[0] : GRIT_UNITS_PER_LINE[1];
+  const marginX = rng();
+  const marginY = rng();
+  // The block in em-normalised lengths (every length scales with em, so the fit is one division).
+  const rowWidth = (row) => {
+    let w = 0;
+    row.words.forEach((word, wi) => {
+      if (wi > 0) w += space * CAP;
+      word.forEach((i, k) => {
+        if (k > 0) w += track * CAP;
+        w += inkW[i];
+      });
+    });
+    return w;
+  };
+  const block = () => ({
+    w: Math.max(CAP, ...rows.map((row, r) => (isOrnRow[r] ? 0 : rowWidth(row)))),
+    h: (rows.length - 1) * leading * CAP + CAP,
+  });
+  const fitEm = () => {
+    const b = block();
+    return Math.min(emPlain, (GRIT_FIT * aspect) / b.w, GRIT_FIT / b.h);
+  };
+  let em = fitEm();
+  const floor = Math.min(emPlain, GRIT_EM_FLOOR);
+  if (em < floor) {
+    // The discipline yields before the size does: close the air toward its tightest, then fit again.
+    track = Math.min(track, GRIT_TIGHT.track);
+    space = Math.min(space, GRIT_TIGHT.space);
+    leading = Math.min(leading, GRIT_TIGHT.leading);
+    em = fitEm();
+  }
+  if (em < floor) {
+    // Still too long at the floor: break the lines, as a compositor would — whole words, greedily, to the measure the
+    // floor size allows (a word wider than the measure stands alone). The poem's reading order is the rows' order.
+    const measure = (GRIT_FIT * aspect) / floor;
+    rows = rows.flatMap((row, r) => {
+      if (isOrnRow[r]) return [row];
+      const out = [];
+      let cur = [];
+      let w = 0;
+      for (const word of row.words) {
+        let ww = 0;
+        word.forEach((i, k) => (ww += inkW[i] + (k > 0 ? track * CAP : 0)));
+        const add = cur.length ? space * CAP + ww : ww;
+        if (cur.length && w + add > measure) {
+          out.push({ y: row.y, words: cur });
+          cur = [word];
+          w = ww;
+        } else {
+          cur.push(word);
+          w += add;
+        }
+      }
+      if (cur.length) out.push({ y: row.y, words: cur });
+      return out;
+    });
+    isOrnRow = rows.map(ornRow);
+    em = fitEm();
+  }
+  em = clamp(Math.max(em, floor), EM_FLOOR, EM_CAP);
+  // Lay out from the FINAL em (nothing below is measured at a size the type is not set at).
+  const cap = CAP * em;
+  const lead = leading * cap;
+  const unit = lead / unitsPerLine;
+  const b = block();
+  const w = b.w * em;
+  const h = b.h * em;
+  // Flush left, top-weighted: the free space is shared out asymmetrically (Swiss), never centred.
+  const mx = GRIT_MARGIN * aspect;
+  const my = GRIT_MARGIN;
+  const x0 = mx + marginX * 0.5 * Math.max(0, aspect - 2 * mx - w);
+  const y0 = my + cap / 2 + marginY * 0.4 * Math.max(0, 1 - 2 * my - h);
+  const out = stamps.map((s) => ({ ...s }));
+  const firstLetter = isOrnRow.indexOf(false);
+  const placed = []; // [idx, row, isAnchor (the first line's first word)]
+  rows.forEach((row, r) => {
+    const y = y0 + r * lead;
+    if (isOrnRow[r]) {
+      // A plate break's ornament stays furniture: centred on the block, never violated, never overprinted.
+      const i = row.words[0][0];
+      out[i] = { ...stamps[i], x: clamp(x0 + w / 2, 0, aspect), y: clamp(y, 0, 1), rotation: 0, em };
+      return;
+    }
+    let cursor = x0;
+    row.words.forEach((word, wi) => {
+      if (wi > 0) cursor += space * cap;
+      word.forEach((i, k) => {
+        if (k > 0) cursor += track * cap;
+        const iw = inkW[i] * em;
+        out[i] = { ...stamps[i], x: clamp(cursor + iw / 2, 0, aspect), y: clamp(y, 0, 1), rotation: 0, em };
+        cursor += iw;
+        placed.push([i, r, r === firstLetter && wi === 0]);
+      });
+    });
+  });
+  // The ruled violations, drawn in a fixed order. Eligible: every letter but the anchor (the first line's first
+  // word). The first line takes half the shift chance; the dropped band reaches it only in a one-line poem.
+  const eligible = placed.filter(([, , anchor]) => !anchor);
+  const letterRows = rows.map((_, r) => r).filter((r) => !isOrnRow[r]);
+  const oneLine = letterRows.length === 1;
+  // The band is centred on a glyph it will actually drop: below the first line (on it, in a one-line poem).
+  const bandable = eligible.filter(([, r]) => r > firstLetter || oneLine);
+  let bandLo = Infinity;
+  let bandHi = -Infinity;
+  if (bandable.length) {
+    const pick = bandable[Math.floor(rng() * bandable.length)][0];
+    bandLo = out[pick].x - (GRIT_DROP_BAND_UNITS * unit) / 2;
+    bandHi = out[pick].x + (GRIT_DROP_BAND_UNITS * unit) / 2;
+  }
+  // The overprint: one letter row of three or more, onto a neighbouring letter row (never onto the first line).
+  const pairs = [];
+  if (letterRows.length > 2)
+    for (const r of letterRows) for (const d of [r - 1, r + 1]) if (d > firstLetter && letterRows.includes(d)) pairs.push([r, d]);
+  const over = pairs.length ? pairs[Math.floor(rng() * pairs.length)] : null;
+  for (const [i, r] of eligible) {
+    let dy = 0;
+    if (out[i].x >= bandLo && out[i].x <= bandHi && (r > firstLetter || oneLine)) dy = unit;
+    else if (rng() < (r === firstLetter ? GRIT_SHIFT_P / 2 : GRIT_SHIFT_P)) dy = rng() < 0.5 ? -unit : unit;
+    if (dy) out[i] = { ...out[i], y: clamp(out[i].y + dy, 0, 1) };
+  }
+  const ghosts = [];
+  if (over) {
+    const [src, dst] = over;
+    for (const [i, r] of placed) {
+      if (r !== src) continue;
+      if (out.length + ghosts.length >= COUNT_CAP) break;
+      // Offset one unit right and down: a misregistered second impression, not a stack.
+      ghosts.push({ ...out[i], x: clamp(out[i].x + unit, 0, aspect), y: clamp(out[i].y + (dst - src) * lead + unit, 0, 1) });
+    }
+  }
+  return [...out, ...ghosts];
+}
+
 // ── SHOT — the blast. Bound 2 is OFF here, by Matt's ruling. ────────────
 function shot(stamps, rng, aspect) {
   const out = stamps.map((s) => ({ ...s }));
@@ -438,7 +633,13 @@ export function rayGunForm(form, record) {
   const aspect = Number.isFinite(form.aspect) && form.aspect > 0 ? form.aspect : 10 / 7;
   const rows = segmentWords(form.stamps, form.layout);
   const stamps =
-    mode === 'carson' ? carson(form.stamps, rows, rng, aspect) : mode === 'greiman' ? greiman(form.stamps, rows, rng, aspect) : shot(form.stamps, rng, aspect);
+    mode === 'carson'
+      ? carson(form.stamps, rows, rng, aspect)
+      : mode === 'greiman'
+        ? greiman(form.stamps, rows, rng, aspect)
+        : mode === 'grit'
+          ? grit(form.stamps, rows, rng, aspect)
+          : shot(form.stamps, rng, aspect);
   return { ...form, stamps: record.wear === 1 ? wear(stamps, mode, seed) : stamps };
 }
 

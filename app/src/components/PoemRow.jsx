@@ -68,8 +68,8 @@ export function PoemRow() {
           aria-pressed={!!raygun}
           title={
             raygun
-              ? `Ray gun · ${raygun.mode} — this poem wears the ${raygun.mode} treatment. Tap to cycle: carson, greiman, shot, plain`
-              : 'Ray gun — give this poem the treatment: carson, greiman, then shot. Tap to cycle'
+              ? `Ray gun · ${raygun.mode} — this poem wears the ${raygun.mode} treatment. Tap to cycle: carson, greiman, grit, shot, plain`
+              : 'Ray gun — give this poem the treatment: carson, greiman, grit, then shot. Tap to cycle'
           }
         >
           {raygun ? `ray gun · ${raygun.mode}` : 'ray gun'}
