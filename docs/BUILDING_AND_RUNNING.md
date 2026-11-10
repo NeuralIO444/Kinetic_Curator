@@ -90,6 +90,8 @@ open "src-tauri/target/release/bundle/macos/Kinetic_Curator.app"
 ```
 Or drag `Kinetic_Curator.app` into `/Applications`.
 
+**Microphone permission (#2072):** the bundled app declares `NSMicrophoneUsageDescription` in `src-tauri/Info.plist`, which the Tauri bundler merges into the `.app` — so the first STIMULI AUDIO click prompts for microphone access (without it, macOS refuses silently: MIC BLOCKED, no prompt, no entry in System Settings → Privacy & Security → Microphone). A bare `tauri dev` binary may not carry the bundle plist, so verify microphone behaviour in the bundled app, not the dev binary.
+
 ---
 
 ## 4. How to Use Native Apple Silicon Features in the UI
