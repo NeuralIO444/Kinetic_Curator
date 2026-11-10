@@ -18,6 +18,7 @@ import {
   nearestBaseline,
 } from './baselines.js';
 import { canonStyleRecord, canonStyle, isCanonStyle } from './index.js';
+import { canonStyleSettings, feelAffinity } from './settings.js';
 import { baselinePatch } from '../../state/canonBaseline.mjs';
 import { useStore } from '../../state/store.js';
 import { mkRng } from '../../engine/prng.js';
@@ -41,11 +42,14 @@ import { getPersonaTaste } from '../../curator/personaTastes.js';
 import { getRenderProfile } from '../../curator/renderProfiles.js';
 
 const S = () => useStore.getState();
+// the seven Look-group styles whose baselines are MEASURED from their own Looks and Voices
+const MEASURED = ['swiss', 'bauhaus', 'japanese', 'grunge', 'engraved', 'memphis', 'marks'];
+const N = CANON_BASELINE_IDS.length;
 const records = assetRecords(ASSETS);
 const categories = new Set(records.map((r) => r.category));
 
-// ── 1. four complete native records ────────────────────────────────────────────────────────────────────────
-assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis', 'tdr']);
+// ── 1. eleven complete native records ────────────────────────────────────────────────────────────────────────
+assert.deepEqual([...CANON_BASELINE_IDS], ['op-art', 'warhol', 'davis', 'tdr', ...MEASURED]);
 for (const b of CANON_BASELINES) {
   assert.ok(Object.isFrozen(b) && Object.isFrozen(b.settings.density.scale), `${b.id}: deep-frozen`);
   assert.equal(canonBaseline(b.id), b);
@@ -167,6 +171,30 @@ assert.equal(baselineRecipe('nope'), null);
     assert.ok(inRange(D[k], profile.biases[k]), `davis.${k}=${D[k]} sits inside the render profile’s range`);
 }
 
+// measured baselines: each stands on its own Canon style and sits at that style's measured centre
+{
+  for (const id of MEASURED) {
+    const b = canonBaseline(id);
+    const m = canonStyleSettings(id);
+    assert.equal(b.style, id, `${id}: anchors its own Canon style`);
+    assert.equal(b.identity, null, `${id}: reads the style's identity, copies none`);
+    assert.ok(/^Measured, not authored/.test(b.basis), `${id}: says it is measured`);
+    assert.ok(m.palette.ids.includes(b.settings.palette.id), `${id}: a palette its own members use`);
+    assert.equal(b.settings.palette.shift, m.palette.shift, `${id}: the style's palette shift`);
+    assert.equal(b.settings.palette.blend, m.palette.blend);
+    assert.equal(b.settings.motion.behave, m.motion.behave);
+    for (const k of ['lifeDrift', 'noiseSpeed', 'wind', 'breath'])
+      assert.ok(Math.abs(b.settings.motion[k] - m.motion[k]) <= 0.01, `${id}.${k} within rounding of the measure`);
+    assert.deepEqual(
+      [...b.settings.marks.categories],
+      [...canonStyleRecord(id).pairing],
+      `${id}: wears the Canon pairing`,
+    );
+    // it reads as its own style: close to the measured centre of the members it was taken from
+    assert.ok(feelAffinity(baselineFeel(b), m.feel) >= 0.85, `${id}: sits at its style's measured feel`);
+  }
+}
+
 // ── 2. the probe: apply each to the real store ──────────────────────────────────────────────────────────────
 {
   const pool = dealableRecords(ASSETS, []);
@@ -211,10 +239,10 @@ assert.equal(baselineRecipe('nope'), null);
     }
     landed[b.id] = { on, params: st.layoutParams, paletteId: st.paletteId };
   }
-  // four different stages
-  assert.equal(new Set(Object.values(landed).map((l) => l.paletteId)).size, 4);
-  assert.equal(new Set(Object.values(landed).map((l) => l.params.count)).size, 4);
-  assert.equal(new Set(Object.values(landed).map((l) => l.on.join())).size, 4);
+  // every baseline a different stage
+  assert.equal(new Set(Object.values(landed).map((l) => l.paletteId)).size, N);
+  assert.equal(new Set(Object.values(landed).map((l) => l.params.count)).size, N);
+  assert.equal(new Set(Object.values(landed).map((l) => l.on.join())).size, N);
   // deterministic: same seed, same pool; a lock is a lock; a baseline claims no Look
   const a = baselinePatch(S(), 'warhol', mkRng(7));
   const b2 = baselinePatch(S(), 'warhol', mkRng(7));
@@ -241,14 +269,19 @@ assert.equal(baselineRecipe('nope'), null);
     const r = baselineReadings(baselineRecipe(b).layoutParams);
     assert.equal(r[b.id], 1, `${b.id}: a baseline reads 1 against itself`);
     for (const other of CANON_BASELINE_IDS.filter((id) => id !== b.id))
-      assert.ok(r[other] < 0.97, `${b.id} is not ${other}`);
+      // measured centres of neighbouring styles sit close together by nature (they are means over varied members),
+      // so a pair involving one is held to "never the same point"; the authored pairs keep the tighter bound
+      assert.ok(
+        r[other] < (MEASURED.includes(b.id) || MEASURED.includes(other) ? 0.995 : 0.97),
+        `${b.id} is not ${other}`,
+      );
     assert.equal(nearestBaseline(baselineRecipe(b).layoutParams).id, b.id);
   }
   // a candidate recipe: the four readings are distinct, and ordered the way the picture reads
   const checker = COMPOSITION_PRESETS.find((l) => l.id === 'checker-shift').params;
   const r = baselineReadings(checker);
-  assert.deepEqual(Object.keys(r), ['op-art', 'warhol', 'davis', 'tdr']);
-  assert.equal(new Set(Object.values(r)).size, 4, 'four distinct readings');
+  assert.deepEqual(Object.keys(r), [...CANON_BASELINE_IDS]);
+  assert.equal(new Set(Object.values(r)).size, N, 'every baseline reads distinct');
   assert.ok(r['op-art'] > r.warhol && r.warhol > r.davis, 'a hard op grid reads Op Art first, Davis last');
   assert.deepEqual(nearestBaseline(checker), { id: 'op-art', reading: r['op-art'] });
   for (const v of Object.values(r)) assert.ok(v > 0 && v <= 1);
@@ -282,5 +315,5 @@ assert.equal(baselineRecipe('nope'), null);
 }
 
 console.log(
-  'canonBaselines.selfcheck: ok — op-art / warhol / davis / tdr are complete native records; each applies to the stage; taste reads a recipe against all four',
+  'canonBaselines.selfcheck: ok — eleven baselines (op-art / warhol / davis / tdr + seven measured styles) are complete native records; each applies to the stage; taste reads a recipe against all of them',
 );
