@@ -51,18 +51,23 @@ replaces the contract, it only decides whether an attempt counts as an answer, a
 failure, or drift. The record shape itself is unchanged (out of scope, untouched).
 
 **Format fallback ladder** (`createFormatLadder`, `FORMAT_RUNGS` :78): `schema` → `json` →
-`prompt`. Monotonic down only, per persona, per session: a format failure steps down one
-rung and retries once; the rung sticks. Garbage at every rung = a discarded reply
-(kind `bad-reply`). Persona ceilings live in `PERSONA_FORMATS` :81, measured-support style:
-a model that cannot do schema starts lower — asserted by the ladder, never by the registry.
+`prompt`. Monotonic down only, per linked model, per session (the ladder lives in
+`createOllamaModel`, one per linked model, shared by all personas — format support is a
+property of the model; per-persona ceilings still differ via `PERSONA_FORMATS` :81):
+a format failure steps down one rung and retries once; the rung sticks. Garbage at every
+rung = a discarded reply (kind `bad-reply`). Persona ceilings live in `PERSONA_FORMATS` :81,
+measured-support style: a model that cannot do schema starts lower — asserted by the ladder,
+never by the registry. (Granularity wording corrected in the fix round, §8.)
 
 **House pins on every chat body** (`buildChatBody` :160): `num_ctx` 16384, `num_predict` 150,
 `keep_alive` "30m", temperature 0, and `think: false` **only where the model allows it**
 (qwen-family tags); for other tags no think field is sent and leaked `<think>…</think>` is
 stripped client-side before parsing (`stripThink` :194). Persona prompts are JS twins of the
 Swift helper's voices (`PERSONA_VOICES` :54) with the language pinned in every prompt;
-a CJK-bearing reply (`CJK_RE` :190) gets exactly one retry with the stern language line,
-then is discarded as drift.
+a CJK-bearing reply (`CJK_RE` :190) that parses on the first attempt gets exactly one retry
+with the stern language line, then is discarded as drift; a reply that reaches CJK only after
+a format step-down is discarded as drift without the stern retry. The discard law holds on
+both paths. (Precision added in the fix round, §8.)
 
 **Local only.** `localRecord` :333 refuses a registry record wholesale if it is cloud-badged,
 and refuses any record whose tier contradicts its probe measurement (S1's registry law).
@@ -157,3 +162,30 @@ Modified: `app/src/App.jsx`, `app/src/curator/mindLive.js`, `app/src/curator/min
 `app/src/composition/eventRegistry.js`, `app/src/panels/MegaMindPanel.jsx`,
 `app/selfcheck.manifest`. (An `npm install` license-field churn in `app/package-lock.json`
 was reverted — not part of this change.)
+
+## 8. Fix round (coordinator, 2026-11-10, after QA round 1 on PR #2079)
+
+QA round 1 returned FINDINGS with one BLOCKER, confirmed by the coordinator's own runs:
+
+- **The §5 verification above describes the tree BEFORE the eventRegistry fix, not the
+  final tree.** The registry edit landed after the blast-radius family had been run, and the
+  family was not re-run on the final tree. Two standing suites deep-equal the handler lists
+  this branch changed, and both crashed deterministically on the staged tree:
+  `mind.selfcheck.mjs` (the `MIND_DECISION` handler pin) and `directorRoom.selfcheck.mjs`
+  (the `DIRECTOR_ROOM` handler pin). §4's who-acts grep covered reply persistence, counters
+  and byte-identity but missed that these suites pin the *registry itself*.
+- **Fix:** both pins re-pinned to the truthful registry lists (the registry entries stand —
+  the surfaces driver really does handle those events): `'curator/megamindSurfacesLive.js'`
+  added to the `MIND_DECISION` pin in `mind.selfcheck.mjs` and to the `DIRECTOR_ROOM` pin
+  in `directorRoom.selfcheck.mjs`. A grep for every `.handler` deep-equal pin over the
+  touched events finds no other casualties (`MIND_REPLY` carries no pin).
+- **Prose corrections (QA SHOULD-FIX + NOTE):** the format ladder is per linked model, not
+  per persona (§3, corrected in place); the CJK stern retry fires on the first-attempt path
+  only (§3, corrected in place). QA's remaining NOTE — narration fact-matching is
+  substring-weak for small-integer facts — stands as a known weakness of the pin, no law
+  broken, no code change in this round.
+- **Re-verification (coordinator, on the fixed tree):** mind and directorRoom run 5× each —
+  see the fix commit; megamindVoice, megamindLink, mindConduct, eventRegistry and
+  format:check re-run green. With the two re-pins, the §5 sweep arithmetic is expected to
+  read: the only remaining sandbox failures are the three proven base-identical ones
+  (swarmWasm, rollSafety, accum); CI is authoritative.
