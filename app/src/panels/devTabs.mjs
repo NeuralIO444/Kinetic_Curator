@@ -8,8 +8,8 @@
 //
 // Node-safe: lazy() defers the dynamic imports, so the dev panel
 // selfcheck can import this module to assert the tab shape without a
-// browser. Only reachable through the DEV-gated 'dev' registration, so
-// prod builds never include it.
+// browser. Only reachable through the 'dev' registration, whose gate is
+// runtime since #2077 (dev build, or Dev mode on in Settings).
 import { lazy } from 'react';
 
 // The pending-tab request: Shell's backtick shortcut (#193) can ask for a
@@ -24,7 +24,7 @@ export function consumeDevTabRequest() {
   return id;
 }
 
-// Dev-only chunks — loaded when the tab opens, never in prod.
+// DEV panel chunks — each loaded only when its tab opens.
 const GovernorXrayPanel = lazy(() => import('./GovernorXrayPanel.jsx').then((m) => ({ default: m.GovernorXrayPanel })));
 const GovernorTunePanel = lazy(() => import('./GovernorTunePanel.jsx').then((m) => ({ default: m.GovernorTunePanel })));
 const ShaderLabPanel = lazy(() => import('./ShaderLabPanel.jsx').then((m) => ({ default: m.ShaderLabPanel })));

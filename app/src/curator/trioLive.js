@@ -43,6 +43,8 @@ const pairKey = (r) => `${r.input}>${r.target}`;
 const effective = (routes) => (Array.isArray(routes) ? routes : DEFAULT_ROUTES);
 
 let tap = null;
+/** #2096: how many times the take recorder's tap threw. Data for the DEV view; the tap itself is never dropped. */
+let tapErrors = 0;
 /** Observe every outcome (applied / dropped) for the take's record. One listener (or null). */
 export function setConductTap(fn) {
   tap = typeof fn === 'function' ? fn : null;
@@ -159,6 +161,7 @@ export function startTrio({
       tier,
       cooling: conductor.cooling(bar),
       owned: conductor.owned(),
+      tapErrors,
       routes: table.length,
       mine: table.filter((r) => r.by === DAVIS_TAG).length,
       marksMine: [...mineMarks].sort(),
@@ -172,8 +175,10 @@ export function startTrio({
     if (tap !== null) {
       try {
         tap(e);
-      } catch {
-        tap = null;
+      } catch (err) {
+        // #2096: one recorder throw must not silence the rest of the take's conducting. Count it, say so, keep the tap.
+        tapErrors += 1;
+        console.error('[trio] conduct tap', err);
       }
     }
     log.unshift({

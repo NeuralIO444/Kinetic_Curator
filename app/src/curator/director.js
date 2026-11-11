@@ -30,6 +30,7 @@ import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
   INTENSITY_PEAK,
+  intensityFromSignals,
   normalizeKeepPassVelocity,
   normalizePhaseTime,
   createIntensityTracker,
@@ -353,6 +354,7 @@ const FIELD_DEAL_SEED = 1917;
 export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng = null } = {}) {
   const intensity = createIntensityTracker({ now });
   const beats = createBeatTracker();
+  let beatClock = null; // #2091: () => { loopMs, bpm } | null — LOOP time, so a stale beat confidence can lapse at a tick
   let relaxUntil = 0;
   let lastCoolAt = now();
   let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
@@ -414,6 +416,11 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     // Strong user action ends relax early (L4D: relax ends early on movement).
     if (keep) relaxUntil = 0;
     const audioN = audio == null ? liveAudio() : clamp01(audio);
+    if (beatClock) {
+      // #2091: pushes only come when beatPulse changes, so a silent room sends none — the tick checks the clock too.
+      const c = beatClock();
+      if (c) beats.expire(c.loopMs, c.bpm);
+    }
     const signals = {
       audio: audioN,
       keepPass: normalizeKeepPassVelocity((feed.keepsLast5m || 0) / 5),
@@ -421,7 +428,9 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       phaseTime: normalizePhaseTime((nowTs - lastCoolAt) / 1000),
     };
     const level = intensity.update(signals, nowTs);
-    if (level < COOL_FLOOR) lastCoolAt = nowTs;
+    // #2090: "cool" is judged on the live signals only. phaseTime is the output of this very clock, so letting it
+    // vote held the reset closed once it saturated (the room latched at 1). A peak also restarts the build-up.
+    if (intensityFromSignals({ ...signals, phaseTime: 0 }) < COOL_FLOOR) lastCoolAt = nowTs;
     // Peak → forced relax. No re-peak while relaxing: never high-amplitude
     // back-to-back (Booth's explicit rule). The tick that crosses the peak
     // reports 'peak' — the peak lands hot — and the room cools from the
@@ -431,6 +440,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     if (level >= INTENSITY_PEAK && !wasRelaxing) {
       relaxUntil = nowTs + gains.relaxSeconds * 1000;
       entering = true;
+      lastCoolAt = nowTs;
     }
     const relaxing = nowTs < relaxUntil && !entering;
     // The Queen's structural hand: relax cools the room. Temperature capped,
@@ -503,8 +513,12 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       pull = { ...pull, ...next };
     },
     /** Feed the beat tracker (wired to the store in App via initDirectorBeat). */
-    pushBeat(pulse) {
-      beats.push(pulse);
+    /** #2091: where loop time and BPM come from (null = confidence never lapses). */
+    setBeatClock(fn) {
+      beatClock = typeof fn === 'function' ? fn : null;
+    },
+    pushBeat(pulse, loopMs, bpm) {
+      beats.push(pulse, loopMs, bpm); // #2091: loop time + BPM let a stale confidence lapse (2 bars)
     },
     get intensity() {
       return intensity.value;
@@ -604,26 +618,55 @@ export function getDirector() {
 /** Tests only: drop the singleton. */
 export function resetDirector() {
   singleton = null;
+  beatUnsub = null;
 }
 
+let beatUnsub = null;
 /**
  * Wire the beat tracker to the store. Call once (from App, next to
  * initWhisperTriggers). subscribe is injected so this module stays
- * framework-free.
+ * framework-free. #2089: a sample is pushed only when beatPulse changed and the
+ * pull inputs are set only when one of the four changed (the listener gets
+ * (state, prev), as Zustand's does). Returns the unsubscribe; a second init
+ * replaces the first listener instead of stacking another.
  */
-export function initDirectorBeat(subscribe) {
+export function initDirectorBeat(subscribe, readClock = null) {
+  if (beatUnsub) beatUnsub();
   const d = getDirector();
-  subscribe((s) => {
-    const b = s && typeof s.beatPulse === 'number' ? s.beatPulse : 0;
-    d.pushBeat(b);
-    if (s)
-      d.setPullInputs({
-        keeps: s.keeps,
-        bands: s.audioBands,
-        enabled: !!s.audioEnabled,
-        sourceType: s.audioSource && s.audioSource.type,
-      });
+  d.setBeatClock(readClock); // #2091: () => { loopMs, bpm } on the LOOP clock; absent = the old no-lapse behaviour
+  const off = subscribe((s, prev) => {
+    if (!s) return;
+    if (!prev || s.beatPulse !== prev.beatPulse) {
+      const c = readClock ? readClock() : null;
+      d.pushBeat(typeof s.beatPulse === 'number' ? s.beatPulse : 0, c && c.loopMs, c && c.bpm);
+    }
+    const next = {
+      keeps: s.keeps,
+      bands: s.audioBands,
+      enabled: !!s.audioEnabled,
+      sourceType: s.audioSource && s.audioSource.type,
+    };
+    const was = prev && {
+      keeps: prev.keeps,
+      bands: prev.audioBands,
+      enabled: !!prev.audioEnabled,
+      sourceType: prev.audioSource && prev.audioSource.type,
+    };
+    if (
+      !was ||
+      next.keeps !== was.keeps ||
+      next.bands !== was.bands ||
+      next.enabled !== was.enabled ||
+      next.sourceType !== was.sourceType
+    )
+      d.setPullInputs(next);
   });
+  const stop = () => {
+    if (typeof off === 'function') off();
+    if (beatUnsub === stop) beatUnsub = null;
+  };
+  beatUnsub = stop;
+  return stop;
 }
 
 /**
