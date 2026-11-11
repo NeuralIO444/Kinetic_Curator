@@ -758,9 +758,9 @@ suite('megamindEmbed acceptance fixture', () => {
   const semantic = { vectorOf: (c) => vecOf.get(c) ?? null, keepVectors: [[0, 1]] };
   const plainPick = selectFinalists([candA, candB], keepFeatures, { finalistCount: 1 }).finalists[0];
   mok(plainPick === candB, 'features alone: the slightly-novel candidate wins (novelty ε beats 0)');
-  const blendPick = selectFinalists([candA, candB], keepFeatures, { finalistCount: 1, semantic }).finalists[0];
-  mok(blendPick === candA, 'with the axis: 0 + 0.5×0.5 beats ε + 0.5×0 — the blend flips the pick by the formula');
-  meq(blendPick.semanticAxes, { feature: 0, semantic: 0.5 }, 'the pick carries both axis components, side by side');
+  const blendedPick = selectFinalists([candA, candB], keepFeatures, { finalistCount: 1, semantic }).finalists[0];
+  mok(blendedPick === candA, 'with the axis: 0 + 0.5×0.5 beats ε + 0.5×0 — the blend flips the pick by the formula');
+  meq(blendedPick.semanticAxes, { feature: 0, semantic: 0.5 }, 'the pick carries both axis components, side by side');
   const noVecPick = selectFinalists([candA, candB], keepFeatures, {
     finalistCount: 1,
     semantic: { vectorOf: () => null, keepVectors: [null] },
