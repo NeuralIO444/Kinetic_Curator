@@ -218,7 +218,7 @@ export function createSurfacesDriver({
     /** Crown-time: draft the note / caption / Look names for the latest crown. Suggestions only. */
     draftCrown() {
       return run('crown', async () => {
-        let crowns = [];
+        let crowns;
         try {
           crowns = readCrowns(storage);
         } catch {

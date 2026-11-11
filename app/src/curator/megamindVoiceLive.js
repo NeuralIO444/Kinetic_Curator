@@ -117,7 +117,7 @@ export function createMindChain(apple, ollama = ensureOllamaModel()) {
     info() {
       if (ollama.available()) return ollama.info();
       if (appleUp()) {
-        let info = null;
+        let info;
         try {
           info = typeof apple.info === 'function' ? apple.info() : null;
         } catch {

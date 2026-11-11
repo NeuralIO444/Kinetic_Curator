@@ -189,3 +189,12 @@ QA round 1 returned FINDINGS with one BLOCKER, confirmed by the coordinator's ow
   format:check re-run green. With the two re-pins, the §5 sweep arithmetic is expected to
   read: the only remaining sandbox failures are the three proven base-identical ones
   (swarmWasm, rollSafety, accum); CI is authoritative.
+- **QA round 2** re-ran the casualties 5× each and the full §5 family (11/11 green) on the
+  fixed head — all round-1 items verified closed; one residual NOTE (a second "per persona"
+  instance in the PR body's summary bullet) was corrected in the PR body the same evening.
+- **CI then caught what neither the staging flow nor QA's charges included: `npm run lint`.**
+  Two `no-useless-assignment` errors in this branch's own new files — dead initializers in
+  `megamindVoiceLive.js` (`info()`) and `megamindSurfacesLive.js` (`draftCrown()`) — removed
+  without behaviour change (both try/catch pairs assign on every path). Lint re-run locally:
+  0 errors; megamindVoice 17/17 and format:check still green. Lesson recorded: the publish
+  ritual runs lint locally, not just format:check + suites.
