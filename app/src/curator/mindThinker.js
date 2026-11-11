@@ -14,8 +14,8 @@ import { validateReply, isInvented, PERSONAS } from './mindContract.js';
 import { rulesReply } from './mindRules.js';
 
 export const MAX_LATE_BARS = 2;
-/** The two backends, in the order they are asked. */
-export const BACKENDS = Object.freeze(['apple', 'rules', 'demo']); // 'demo': the ?debug=mind stand-in, never shipped live
+/** The backends a decision may be stamped with, in the order they are asked. */
+export const BACKENDS = Object.freeze(['ollama', 'apple', 'rules', 'demo']); // 'demo': the ?debug=mind stand-in, never shipped live
 
 /**
  * @param persona   'davis' | 'lois' | 'queen'
@@ -57,13 +57,23 @@ export function createThinker({
   };
   const rules = (context, seed, bar) => rulesReply(persona, context, { seed, bar, heat: heatNow() });
   const decide = (bar, from, seed, raw) => {
-    const reply = validateReply(persona, raw);
+    // #1526 — a backend CHAIN (MegaMind S2) answers through one mind fn, so its reply may arrive as a
+    // stamped envelope { backend, reply }: the stamp names the backend that actually answered, and the
+    // decision carries it — the books never credit a backend for another backend's words. A stamp
+    // outside BACKENDS is not honoured (the flight's own backend stands); a bare reply is unchanged.
+    let stamped = from;
+    let payload = raw;
+    if (payload !== null && typeof payload === 'object' && !Array.isArray(payload) && 'reply' in payload) {
+      if (BACKENDS.includes(payload.backend)) stamped = payload.backend;
+      payload = payload.reply;
+    }
+    const reply = validateReply(persona, payload);
     if (!reply) {
-      note('dropped', { bar, backend: from, reason: 'malformed' });
+      note('dropped', { bar, backend: stamped, reason: 'malformed' });
       return null;
     }
     lastBar = bar;
-    return { persona, bar, backend: from, seed, invented: isInvented(persona, reply), reply };
+    return { persona, bar, backend: stamped, seed, invented: isInvented(persona, reply), reply };
   };
 
   return {

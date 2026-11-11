@@ -2,13 +2,16 @@
 // what detection measured — model, cadence tier, badges, context. Dev panel first (Matt's ruling,
 // 2026-11-10); a user-Settings home is a later move only on a further ruling.
 //
-// S1 wires NO persona calls: MegaMind still runs on rules. This surface proves the link and publishes the
-// measured capabilities to the registry every later stage reads. Nothing is probed on page load or when
-// this tab opens — connecting is a user act, and the buttons below are the only way anything is measured.
+// S1 proved the link and published the measured capabilities to the registry every later stage reads.
+// S2 (#1526) wires the personas through it (the adapter + backend chain live in the Mind path itself —
+// nothing to press here) and lands the register surfaces in the section below: each is a deliberate
+// press, gated on its capability, validated before it is shown. Nothing is probed on page load or when
+// this tab opens — connecting is a user act, and the buttons are the only way anything is measured.
 import { useEffect, useState } from 'react';
 import { ensureLinkDriver, getLinkView, subscribeLink } from '../curator/megamindLive.js';
 import { HOUSE_TEXT, TIER_BLURB } from '../curator/megamindLink.mjs';
 import { CAPABILITY_CONSUMERS, capabilityEnabled } from '../composition/capabilityRegistry.mjs';
+import { ensureSurfacesDriver, getSurfacesView, subscribeSurfaces } from '../curator/megamindSurfacesLive.js';
 
 const cell = { padding: '2px 6px', borderBottom: '1px solid #333', textAlign: 'left', whiteSpace: 'nowrap' };
 const btn = {
@@ -80,8 +83,8 @@ export function MegaMindPanel() {
   return (
     <div style={{ padding: 12, fontSize: 12 }}>
       <p style={{ opacity: 0.75, marginTop: 0 }}>
-        Your own local Ollama, measured — never assumed. S1 proves the link only: no persona calls are wired, MegaMind
-        still runs on rules, and disconnect returns it to rules silently.
+        Your own local Ollama, measured — never assumed. While a local model is linked and alive it answers the personas
+        at its measured cadence; disconnect — or the model dying — returns MegaMind to the default chain silently.
       </p>
       <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
         <input
@@ -151,6 +154,7 @@ export function MegaMindPanel() {
         <summary>the House configuration — the one supported setup</summary>
         <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11 }}>{HOUSE_TEXT}</pre>
       </details>
+      <Surfaces record={view.record} />
       <details style={{ marginTop: 10 }}>
         <summary>capability registry — what later stages may do</summary>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -167,5 +171,129 @@ export function MegaMindPanel() {
         </table>
       </details>
     </div>
+  );
+}
+
+// ── S2 (#1526): the register surfaces ─────────────────────────────────────────────────────────────────────
+// The persona adapter itself lives in the Mind path (no controls here — the tier IS the control). What
+// lives here is the rest of the §6b register: pacing proposals, crown drafts, narration, Davis's reason
+// prose, and the docs guide. Every button is gated on its capability consumer and a LOCAL record (a
+// cloud pointer enables none of this), every reply is validated before it renders, and a discarded
+// reply shows as an honest error line — this is a dev surface, not a performance surface.
+function Surfaces({ record }) {
+  const [driver] = useState(() => ensureSurfacesDriver());
+  const [sv, setSv] = useState(getSurfacesView);
+  const [guideText, setGuideText] = useState('');
+  useEffect(() => subscribeSurfaces(() => setSv(getSurfacesView())), []);
+  if (!sv) return null;
+  const local = !!record && !record.badges.includes('cloud');
+  const on = (consumer) => local && capabilityEnabled(consumer);
+  const busy = !!sv.busy;
+  const act = (consumer, label, fn) => (
+    <button type="button" style={btn} disabled={busy || !on(consumer)} onClick={fn} title={consumer}>
+      {label}
+    </button>
+  );
+  return (
+    <details style={{ marginTop: 10 }} open>
+      <summary>S2 — the register surfaces (validated before shown; suggestions, never edits)</summary>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '8px 0' }}>
+        {act('director.pacing', 'propose pacing', () => driver.proposePacing())}
+        {act('crown.assist', 'draft crown note', () => driver.draftCrown())}
+        {act('devpanel.narration', 'narrate telemetry', () => driver.narrateTelemetry())}
+        {act('devpanel.narration', 'narrate census', () => driver.narrateCensus())}
+        {act('narration.driftRetrain', 'narrate drift', () => driver.narrateDrift())}
+        {act('narration.davisReason', "write Davis's reason", () => driver.writeReason())}
+      </div>
+      {sv.busy && <p style={{ opacity: 0.85 }}>asking the model — {sv.busy}…</p>}
+      {sv.error && <p style={{ opacity: 0.9, color: '#e88' }}>discarded / unavailable — {sv.error}</p>}
+      {sv.pacing && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>pacing:</strong> {sv.pacing.proposal.move}
+          {sv.pacing.proposal.line ? ` — ${sv.pacing.proposal.line}` : ''} · scheduler judgement:{' '}
+          {sv.pacing.judgement.ok ? 'valid' : 'invalid'} ({sv.pacing.judgement.reason}). Proposals never move the
+          Director — actuation waits on #1145&rsquo;s open questions.
+        </p>
+      )}
+      {sv.crownDraft && (
+        <div style={{ margin: '4px 0' }}>
+          <p style={{ margin: '0 0 2px' }}>
+            <strong>crown draft</strong> ({sv.crownDraft.forLayout || 'latest crown'}), for editing — nothing is saved
+            by showing it:
+          </p>
+          <p style={{ margin: '0 0 2px', opacity: 0.85 }}>note: {sv.crownDraft.note}</p>
+          <p style={{ margin: '0 0 2px', opacity: 0.85 }}>caption: {sv.crownDraft.caption}</p>
+          {sv.crownDraft.lookNames.length > 0 && (
+            <p style={{ margin: '0 0 2px', opacity: 0.85 }}>
+              look names: {sv.crownDraft.lookNames.join(' · ')} (a name lands only on Matt&rsquo;s word)
+            </p>
+          )}
+        </div>
+      )}
+      {sv.telemetryLine && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>telemetry:</strong> {sv.telemetryLine}
+        </p>
+      )}
+      {sv.censusLine && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>census:</strong> {sv.censusLine}
+        </p>
+      )}
+      {sv.drift && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>drift:</strong> {sv.drift.line}
+          {sv.drift.proposeRetrain
+            ? ' — the model PROPOSES a Studio retrain (a proposal only; taste.json is never touched from here).'
+            : ''}
+        </p>
+      )}
+      {sv.reason && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>davis&rsquo;s reason:</strong> {sv.reason.line}{' '}
+          <span style={{ opacity: 0.7 }}>(grounded in: {sv.reason.clause})</span>
+        </p>
+      )}
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', marginTop: 8 }}>
+        <input
+          type="text"
+          value={guideText}
+          onChange={(e) => setGuideText(e.target.value)}
+          disabled={busy || !on('guide.docs')}
+          aria-label="Ask the docs guide"
+          placeholder="ask the shipped docs…"
+          style={{
+            background: 'none',
+            border: '1px solid #555',
+            color: 'inherit',
+            padding: '3px 6px',
+            font: 'inherit',
+            minWidth: 260,
+          }}
+        />
+        <button
+          type="button"
+          style={btn}
+          disabled={busy || !on('guide.docs') || !guideText.trim()}
+          onClick={() => driver.askGuide(guideText.trim())}
+          title="guide.docs"
+        >
+          ask the guide
+        </button>
+      </div>
+      {sv.guide && (
+        <p style={{ margin: '4px 0' }}>
+          <strong>guide:</strong> {sv.guide.answer}
+          {sv.guide.sources.length > 0 && <span style={{ opacity: 0.7 }}> [{sv.guide.sources.join(', ')}]</span>}
+        </p>
+      )}
+      {!local && (
+        <p style={{ opacity: 0.75 }}>
+          {record
+            ? 'The linked model is a cloud pointer — the register surfaces are local-only, like the adapter.'
+            : 'Connect a local model to enable these surfaces.'}
+        </p>
+      )}
+    </details>
   );
 }

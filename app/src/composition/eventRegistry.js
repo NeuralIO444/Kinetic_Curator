@@ -115,7 +115,13 @@ export const EVENT_REGISTRY = {
   AUDIO_SILENCE_START: { handler: ['curator/paceLive.js', 'curator/trioLive.js', 'curator/leanLive.js'] },
   AUDIO_SILENCE_END: { handler: ['curator/paceLive.js', 'curator/trioLive.js', 'curator/leanLive.js'] },
   MIND_DECISION: {
-    handler: ['curator/mindFace.js', 'curator/leanLive.js', 'curator/roomFeed.js', 'curator/storyLive.js'],
+    handler: [
+      'curator/mindFace.js',
+      'curator/leanLive.js',
+      'curator/roomFeed.js',
+      'curator/storyLive.js',
+      'curator/megamindSurfacesLive.js',
+    ],
   },
   MIND_REQUEST: { handler: ['curator/mindFace.js', 'curator/trioLive.js'] },
   MIND_STATUS: {
@@ -124,8 +130,8 @@ export const EVENT_REGISTRY = {
   },
   MIND_REQ: { handler: null, note: 'telemetry: a persona asked the on-device model (#1463)' },
   MIND_REPLY: {
-    handler: null,
-    note: 'telemetry: every answer with its backend and latency (#1463); the thinker decides whether it is used',
+    handler: ['curator/megamindSurfacesLive.js'],
+    note: "every answer with its backend and latency (#1463); the thinker decides whether it is used — the one handler tallies answers for the dev panel's telemetry narration (#1526), backstage only",
   },
   MIND_ROUTE: {
     handler: ['curator/roomFeed.js'],
@@ -139,7 +145,9 @@ export const EVENT_REGISTRY = {
     handler: null,
     note: "telemetry: a Canon record announcing it took the stage (#2049). Published by curator/canonBus.mjs from the record's OWN declared binding (data/canon/styles.js `bus.announces`), so no file names this event to emit it; nothing changes the stage on it. The same binder subscribes to the channels each record lists under `bus.listens` (kinetic:tap, layout:preset, layout:curate, clock:bar, audio:onset) by declaration, not by an on(Events.X) call — those subscriptions are listed by its bindings(), not here",
   },
-  DIRECTOR_ROOM: { handler: ['curator/mindRoom.js', 'curator/roomFeed.js', 'curator/storyLive.js'] },
+  DIRECTOR_ROOM: {
+    handler: ['curator/mindRoom.js', 'curator/roomFeed.js', 'curator/storyLive.js', 'curator/megamindSurfacesLive.js'],
+  },
   CLOCK_BEAT: {
     handler: null,
     note: 'telemetry: published by clockLive each whole beat; listeners arrive with audio events and the Queen (#1459, #1460)',
@@ -194,7 +202,10 @@ export const EVENT_REGISTRY = {
   MOTION_LOAD: { handler: 'wire' },
   SHAPES_LOAD: { handler: 'wire' },
   SHAPES_CYCLE: { handler: 'wire' },
-  DICE_CAST: { handler: 'wire' },
+  DICE_CAST: {
+    handler: 'wire',
+    note: 'also tapped by curator/megamindSurfacesLive.js (#1526): a fresh cast is when a new Davis citation can stand, and the reason-prose writer checks for one — a read-only tap, the wire stays the handler of record',
+  },
   KEEP_ADD: { handler: 'wire' },
   ROLL_SCOPE_CLEAR: { handler: 'wire' },
   PATTERN_MODE: { handler: 'wire' },
