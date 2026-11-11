@@ -149,6 +149,28 @@ export const treatments = Object.freeze({
   life(target, { life, by } = {}) {
     return act(target, by, (s) => s.setPoemLife(life === undefined ? null : life));
   },
+  /**
+   * #2010 P5 — the doctrines (CARSON / ASHWORTH): hand the stage to one so every poem the Director deals arrives
+   * treated (`standing`), or call one now on the poem standing (`call`). A doctrine is a named caller profile inside
+   * the Director's call — a call announces as cause 'director' (the caller names itself), never a new seat. HOLD
+   * refuses a call (sovereign for every non-performer caller); `standing` is session state, not a record edit, so it
+   * never touches the take log directly — what it arms shows up as the arms its deals make.
+   */
+  doctrine(target, { call, standing, by } = {}) {
+    if (standing !== undefined) {
+      if (!bound || !TREATMENT_TARGETS.includes(target) || !CALLERS.includes(by)) return false;
+      const s = bound.getState();
+      const before = s.poemDoctrine ?? null;
+      s.setPoemDoctrine(standing);
+      return (bound.getState().poemDoctrine ?? null) !== before;
+    }
+    return act(target, by, (s) => s.callPoemDoctrine(call));
+  },
+  /** The standing doctrine ('carson' | 'ashworth' | null). */
+  standingDoctrine(target) {
+    if (!bound || !TREATMENT_TARGETS.includes(target)) return null;
+    return bound.getState().poemDoctrine ?? null;
+  },
   /** The poem row's gesture: plain → carson → greiman → grit → shot → plain. */
   cycle(target, { by } = {}) {
     return act(target, by, (s) => s.cyclePoemRaygun());

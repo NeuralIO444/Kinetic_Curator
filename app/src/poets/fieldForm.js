@@ -439,12 +439,16 @@ export function sanitizeFieldForm(raw) {
     // unarmed poem and every record armed before P4 stay untouched by the culture. 'bedrock' = life flows around
     // the words; 'seed' = the garden blooms from the words and eats them. Anything else is refused whole.
     if (raygun.life !== undefined && raygun.life !== 'bedrock' && raygun.life !== 'seed') return null;
+    // #2010 P5 — the doctrine that armed it (CARSON / ASHWORTH), named in the record when the Director's call put it
+    // there (a performer's tap names none). Naming only: the draw never reads it.
+    if (raygun.doctrine !== undefined && raygun.doctrine !== 'carson' && raygun.doctrine !== 'ashworth') return null;
     raygunMark = {
       mode: raygun.mode,
       seed: raygun.seed,
       ...(raygun.wear === 1 ? { wear: 1 } : {}),
       ...(raygun.distort === 1 ? { distort: 1 } : {}),
       ...(raygun.life ? { life: raygun.life } : {}),
+      ...(raygun.doctrine ? { doctrine: raygun.doctrine } : {}),
     };
   }
   // #2002 — the face marker: absent is the base (Anton) face; 'serif'
