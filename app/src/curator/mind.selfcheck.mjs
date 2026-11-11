@@ -252,6 +252,7 @@ await ok(
       'curator/leanLive.js',
       'curator/roomFeed.js',
       'curator/storyLive.js',
+      'curator/megamindSurfacesLive.js',
     ]);
   },
 );

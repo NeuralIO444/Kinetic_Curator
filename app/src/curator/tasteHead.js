@@ -437,6 +437,23 @@ export function getDavisCitation() {
   return lastDavisCitation;
 }
 
+// #1526 (hook amendment, 2026-10-15) — Davis reason PROSE: at the MegaMind tier the linked model writes
+// the citation's line fresh in Davis's voice, grounded in the clause (megamindSurfaces validates the
+// grounding before anything lands here). The slot is keyed to the clause it was written for: the hint
+// shows the prose only while that exact clause stands, and the template clause is the silent fallback
+// everywhere else — absent model, discarded line, or a newer pick whose prose has not been written.
+let davisReasonProse = null; // { clause, line }
+
+/** Record the model's in-voice line for one citation clause (null clears). */
+export function setDavisReasonProse(clause, line) {
+  davisReasonProse = typeof clause === 'string' && clause && typeof line === 'string' && line ? { clause, line } : null;
+}
+
+/** The prose line written for a clause, or null when none stands for it. */
+export function getDavisReasonProse(clause) {
+  return davisReasonProse && davisReasonProse.clause === clause ? davisReasonProse.line : null;
+}
+
 /**
  * The diceScorer-shaped factory for the tree head (diceScorer.js contract:
  * { id, score(candidate) }). Null when there is no usable tree head (the

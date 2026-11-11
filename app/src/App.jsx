@@ -60,6 +60,7 @@ import { startRoomFeed, resetRoomFeed } from './curator/roomFeed.js'; // #1560 S
 import { startStoryLive } from './curator/storyLive.js'; // #1560 S3: the room's story machine (backstage only)
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
+import { createMindChain } from './curator/megamindVoiceLive.js'; // #1526: MegaMind S2 — a linked Ollama answers first, Apple behind it, rules underneath
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
 import { startGhost, resetGhost } from './curator/mindGhost.js'; // #1464: the third's presence on the Stimuli meter
 import { startMindRoom, getMindRoom } from './curator/mindRoom.js'; // #1145: the Director's room, as the minds hear it
@@ -192,6 +193,11 @@ function AppInner() {
       info: () => (apple ? apple.info() : null),
       ask: (...a) => (apple ? apple.ask(...a) : Promise.reject(new Error('unavailable'))),
     };
+    // #1526 — MegaMind S2: the backend chain the ordering ruling names (Matt, 2026-11-10). A linked,
+    // living Ollama answers the personas; its death or absence returns them silently to Apple where
+    // present, else the rules — no UI announces any of it (the MIND_STATUS doctrine). The review voice
+    // below keeps the Apple model alone: its 300 ms ask discipline is Apple-shaped by its own spec.
+    const mindModel = createMindChain(appleModel);
     // #1464 — Mind 3: hidden per-persona engagement (persisted on this machine), four tiers, the zodiac character and
     // one startup calendar reading. Works the same on Apple and on the rules.
     const stopGhost = startGhost();
@@ -274,7 +280,7 @@ function AppInner() {
       presence,
       conductHeat, // #1483: how bold Davis's conducting picks may run (engine-side only)
       isReplaying: isPlaybackActive,
-      model: DEBUG_MIND ? demoModel : appleModel,
+      model: DEBUG_MIND ? demoModel : mindModel,
       getSeed: () => useStore.getState().seed,
       getSnapshot: () => {
         const st = useStore.getState();

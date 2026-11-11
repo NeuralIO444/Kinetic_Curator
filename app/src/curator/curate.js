@@ -18,7 +18,7 @@
 //      was tasted. Never fake curation.
 
 import { personaCurator } from './taste.js';
-import { makeMlxCurator, getDavisCitation } from './tasteHead.js';
+import { makeMlxCurator, getDavisCitation, getDavisReasonProse } from './tasteHead.js';
 import { getTaste } from './tasteStore.js';
 import { experimentalOn } from './tasteGate.js';
 import { getLoisVerdict } from './loisRank.js';
@@ -153,8 +153,12 @@ export function curatorHint(curator, { chainFallback = false } = {}) {
   if (curator.name === 'mlx') {
     // T3: a tree head's last pick is quoted — Davis cites the splits that
     // won it. No citation (linear head, or no pick yet) = the line as it was.
+    // #1526: when the linked model has written its in-voice prose for this
+    // exact clause (MegaMind tier, grounding-validated), the prose stands in
+    // for the template clause; the clause itself is the silent fallback.
     const cite = getDavisCitation();
-    return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${cite ? ` — ${cite}` : ''}${duelLine}${chain}`;
+    const shown = (cite && getDavisReasonProse(cite)) || cite;
+    return `curated pick · mlx${curator.experimental ? ' · experimental' : ''}${shown ? ` — ${shown}` : ''}${duelLine}${chain}`;
   }
   return `curated pick${duelLine}${chain}`;
 }

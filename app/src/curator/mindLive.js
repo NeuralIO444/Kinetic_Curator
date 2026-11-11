@@ -72,7 +72,7 @@ export function startMind({
   log = () => {},
   conductHeat = null,
 }) {
-  const name = model && model.name === 'demo' ? 'demo' : 'apple';
+  const name = model && ['demo', 'ollama'].includes(model.name) ? model.name : 'apple';
   const available = () => {
     try {
       return !!(model && model.available());
@@ -89,13 +89,13 @@ export function startMind({
       { persona, bar: meta.bar, seed: meta.seed, contextHash: contextHash(context) },
       { cause: 'mind' },
     );
-    const done = (reply, error) => {
+    const done = (reply, error, backend = name) => {
       emit(
         Events.MIND_REPLY,
         {
           persona,
           bar: meta.bar,
-          backend: name,
+          backend,
           latencyMs: Math.round(now() - t0),
           reply,
           ...(error ? { error } : {}),
@@ -107,8 +107,19 @@ export function startMind({
       .then(() => model.ask(persona, context, meta))
       .then(
         (raw) => {
-          const v = validateReply(persona, raw);
-          done(v, v ? null : 'malformed');
+          // #1526 — a chain may stamp its answer { backend, reply } (who actually answered); the reply
+          // telemetry names that backend, and the envelope flows on to the thinker, which stamps the
+          // decision from it. A bare reply is exactly the Mind 2 shape.
+          const stamped =
+            raw !== null &&
+            typeof raw === 'object' &&
+            !Array.isArray(raw) &&
+            'reply' in raw &&
+            typeof raw.backend === 'string'
+              ? raw
+              : null;
+          const v = validateReply(persona, stamped ? stamped.reply : raw);
+          done(v, v ? null : 'malformed', stamped ? stamped.backend : name);
           return raw;
         },
         (e) => {
@@ -117,6 +128,9 @@ export function startMind({
         },
       );
   };
+  // #1526 — a model may declare a wider late window (a linked local model's deep verdicts are slow by
+  // design); models that don't declare one keep the Mind 1 window exactly.
+  const lateWindow = model && Number.isFinite(model.maxLateBars) && model.maxLateBars > 0 ? model.maxLateBars : null;
   const thinkers = PERSONAS.map((persona) =>
     createThinker({
       persona,
@@ -124,6 +138,7 @@ export function startMind({
       available,
       backend: name,
       mind: model ? ask(persona) : null,
+      ...(lateWindow ? { maxLateBars: lateWindow } : {}),
       ...(persona === 'davis' && conductHeat ? { heat: conductHeat } : {}), // #1483: how bold his picks may run
     }),
   );
@@ -136,16 +151,19 @@ export function startMind({
     } catch {
       info = null;
     }
+    // #1526 — info() may name the backend that is actually answering (a chain's head is not always the
+    // voice that speaks); when it does, the status and the take's system record follow it.
+    const answering = up && info && typeof info.backend === 'string' && info.backend ? info.backend : name;
     const next = {
       available: up,
-      backend: up ? name : 'rules',
+      backend: up ? answering : 'rules',
       ...(up && info && info.model ? { model: info.model } : {}),
     };
-    if (status && status.backend === next.backend) return;
+    if (status && status.backend === next.backend && status.model === next.model) return;
     status = next;
     system = up
       ? {
-          backend: name,
+          backend: answering,
           ...(info && info.model ? { model: info.model } : {}),
           ...(info && info.os ? { os: info.os } : {}),
         }

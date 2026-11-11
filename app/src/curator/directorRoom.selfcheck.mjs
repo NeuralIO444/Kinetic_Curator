@@ -211,6 +211,7 @@ await ok('wired and registered: the app starts it and feeds it to the snapshot; 
     'curator/mindRoom.js',
     'curator/roomFeed.js',
     'curator/storyLive.js',
+    'curator/megamindSurfacesLive.js',
   ]);
   const app = src('../App.jsx');
   assert.match(app, /const stopRoom = startMindRoom\(\)/);
