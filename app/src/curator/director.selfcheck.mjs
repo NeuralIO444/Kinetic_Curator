@@ -332,4 +332,69 @@ ok('#2089 initDirectorBeat returns an unsubscribe that detaches the listener', (
   resetDirector();
 });
 
+// ── #2090: time-in-phase must not hold its own reset closed ──
+// A fake clock drives createDirector; every tick passes nowTs explicitly. The Director's `phaseTime` input was one
+// of the four max-pooled signals AND the thing that stopped `lastCoolAt` resetting, so after ~60 s without a
+// cool tick it latched the room at intensity 1 for good.
+const sim = (script) => {
+  let clock = 0;
+  const dir = createDirector({ now: () => clock });
+  const trace = [];
+  for (const [nowTs, audio] of script) {
+    clock = nowTs;
+    const r = dir.tick({ feed: {}, audio, nowTs });
+    trace.push({ s: nowTs / 1000, audio, level: r.intensity, phase: r.directorPhase });
+  }
+  return trace;
+};
+const ticksEvery = (everyS, fromS, toS, audio) => {
+  const out = [];
+  for (let sec = fromS; sec <= toS; sec += everyS) out.push([sec * 1000, audio]);
+  return out;
+};
+
+ok('#2090 a silent 20-minute session with regular picks does not sit at intensity 1', () => {
+  // first tick after a 90 s gap, then one every 20 s
+  const trace = sim(ticksEvery(20, 90, 1200, 0));
+  const late = trace.filter((t) => t.s > 360);
+  assert.ok(late.length > 30, 'the session ran past minute 6');
+  assert.ok(
+    late.every((t) => t.level < 1),
+    `intensity never pinned at 1 after minute 6 (worst ${Math.max(...late.map((t) => t.level))})`,
+  );
+  assert.ok(
+    late.some((t) => t.phase === 'build'),
+    'the room is in build after minute 6',
+  );
+  assert.ok(
+    late.every((t) => t.phase === 'build'),
+    'a silent room never peaks or relaxes',
+  );
+});
+
+ok('#2090 sustained mid-level audio still builds to a peak on time-in-phase; the relax window returns to build', () => {
+  // audio 0.5 is above the cool floor but nowhere near a peak on its own: only time-in-phase can get it there
+  const loud = ticksEvery(5, 5, 360, 0.5);
+  const quiet = ticksEvery(5, 365, 900, 0);
+  const trace = sim([...loud, ...quiet]);
+  const early = trace.filter((t) => t.s <= 120);
+  assert.ok(
+    early.every((t) => t.level < 0.85 && t.phase === 'build'),
+    'two minutes in, audio alone has not peaked',
+  );
+  const peakAt = trace.find((t) => t.phase === 'peak');
+  assert.ok(peakAt && peakAt.s <= 360, 'time-in-phase carried sustained audio to a peak inside six minutes');
+  assert.ok(peakAt.s > 120, 'and it took time, not audio alone');
+  const after = trace.filter((t) => t.s > peakAt.s && t.audio === 0);
+  assert.ok(
+    after.some((t) => t.phase === 'relax'),
+    'the peak is followed by a relax window',
+  );
+  assert.ok(
+    after.some((t) => t.phase === 'build'),
+    'after the relax window the phase returns to build',
+  );
+  assert.ok(trace[trace.length - 1].level < 0.85, 'and the room is not still pinned at the end of the quiet stretch');
+});
+
 console.log(`director.selfcheck: ${n} checks passed`);
