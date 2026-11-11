@@ -121,7 +121,7 @@ function AppInner() {
   // whisper.js; the lines ship copy-only while the sway gate stays closed.
   useEffect(() => {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
-    initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input
+    const stopDirectorBeat = initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input (#2089: unsubscribed below)
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
     // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
     // persona reads the band yet; ?debug=stress shows it.
@@ -367,6 +367,7 @@ function AppInner() {
       setResolveFrameTap(null);
       setRoomProvider(null);
       unKeep();
+      stopDirectorBeat();
       stopPace();
       stopLean();
       stopMind();

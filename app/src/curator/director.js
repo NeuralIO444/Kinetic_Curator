@@ -604,26 +604,51 @@ export function getDirector() {
 /** Tests only: drop the singleton. */
 export function resetDirector() {
   singleton = null;
+  beatUnsub = null;
 }
 
+let beatUnsub = null;
 /**
  * Wire the beat tracker to the store. Call once (from App, next to
  * initWhisperTriggers). subscribe is injected so this module stays
- * framework-free.
+ * framework-free. #2089: a sample is pushed only when beatPulse changed and the
+ * pull inputs are set only when one of the four changed (the listener gets
+ * (state, prev), as Zustand's does). Returns the unsubscribe; a second init
+ * replaces the first listener instead of stacking another.
  */
 export function initDirectorBeat(subscribe) {
+  if (beatUnsub) beatUnsub();
   const d = getDirector();
-  subscribe((s) => {
-    const b = s && typeof s.beatPulse === 'number' ? s.beatPulse : 0;
-    d.pushBeat(b);
-    if (s)
-      d.setPullInputs({
-        keeps: s.keeps,
-        bands: s.audioBands,
-        enabled: !!s.audioEnabled,
-        sourceType: s.audioSource && s.audioSource.type,
-      });
+  const off = subscribe((s, prev) => {
+    if (!s) return;
+    if (!prev || s.beatPulse !== prev.beatPulse) d.pushBeat(typeof s.beatPulse === 'number' ? s.beatPulse : 0);
+    const next = {
+      keeps: s.keeps,
+      bands: s.audioBands,
+      enabled: !!s.audioEnabled,
+      sourceType: s.audioSource && s.audioSource.type,
+    };
+    const was = prev && {
+      keeps: prev.keeps,
+      bands: prev.audioBands,
+      enabled: !!prev.audioEnabled,
+      sourceType: prev.audioSource && prev.audioSource.type,
+    };
+    if (
+      !was ||
+      next.keeps !== was.keeps ||
+      next.bands !== was.bands ||
+      next.enabled !== was.enabled ||
+      next.sourceType !== was.sourceType
+    )
+      d.setPullInputs(next);
   });
+  const stop = () => {
+    if (typeof off === 'function') off();
+    if (beatUnsub === stop) beatUnsub = null;
+  };
+  beatUnsub = stop;
+  return stop;
 }
 
 /**
