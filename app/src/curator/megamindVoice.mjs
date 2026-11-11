@@ -18,7 +18,13 @@
 import { validateReply, MOODS } from './mindContract.js';
 import { PHRASE_BARS } from './mindConduct.js';
 import { HOUSE_KEEP_ALIVE, HOUSE_NUM_CTX, HOUSE_NUM_PREDICT } from './megamindLink.mjs';
-import { consumerById, consumerEnabled, tierRank } from '../composition/capabilityRegistry.mjs';
+import {
+  checkCapabilityRecord,
+  consumerById,
+  consumerEnabled,
+  getCapabilities,
+  tierRank,
+} from '../composition/capabilityRegistry.mjs';
 
 // ── persona voices ─────────────────────────────────────────────────────────────────────────────────────────
 // The JS twins of the kc-mind helper's persona instructions (src-tauri/helpers/kc-mind/main.swift): the
@@ -269,6 +275,18 @@ async function postChat(fetchImpl, endpoint, body, timeoutMs) {
 export const CHAT_TIMEOUT_MS = Object.freeze({ A: 8000, B: 20000, C: 45000 });
 /** Surface asks are button-pressed, not bar-paced: one generous bound. */
 export const SURFACE_TIMEOUT_MS = 60000;
+
+/**
+ * The record a surface may use, or null: measured, local, and enabling THIS consumer. This gate
+ * lives here — the light core every MegaMind driver already imports — rather than in a live driver,
+ * so an eager consumer (S3's tray and App wiring) never drags a driver's Node-side read chain
+ * (censusReport → @resvg) into the entry graph; that chain stays behind the lazy panel that owns it.
+ */
+export function surfaceRecord(consumerId, raw = getCapabilities()) {
+  const rec = checkCapabilityRecord(raw);
+  if (!rec || rec.badges.includes('cloud')) return null;
+  return consumerEnabled(rec, consumerById(consumerId)) ? rec : null;
+}
 
 /**
  * Ask the linked model for one persona's reply, walking the ladder: an attempt at the ladder's rung; a

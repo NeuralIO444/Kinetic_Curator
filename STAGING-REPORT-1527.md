@@ -171,20 +171,11 @@ selection, and the rules judge's verdicts.
   - `liveLoop.dishFluid` — passes on base; in this tree it fails only because the suite shells out
     to `npm run build` ("Command failed: npm run build" + the rolldown error below) — it is the
     build flake surfacing through the suite, not a dish-fluid regression (no gl/ file is touched).
-- **build:** `npm run build` **could not be obtained in this sandbox** — blocked by the known
-  fleet-wide @resvg cache/read corruption (AGENTS.md, 2026-11-10): rolldown fails with
-  `UNLOADABLE_DEPENDENCY … stream did not contain valid UTF-8 in @resvg/resvg-js/js-binding.js`
-  while loading the native bindings. Evidence gathered before calling it environmental:
-  (a) all @resvg package bytes are md5-identical between this tree and base; (b) a fresh detached
-  base worktree builds — intermittently (it also failed there, and a fresh base install at a fresh
-  path failed twice); (c) this tree's graph deterministically trips the bad read in the sandbox
-  (interleaved A/B: base 3/3 OK, this tree 3/3 FAIL at their own paths; bisection exonerates every
-  individual hunk — an import-only tray builds; the failure needs the composed graph, i.e. it is
-  read-pattern sensitivity of the corrupt cache, not a code defect); (d) the S3 diff contains no
-  dependency, config, or native-import change — only ordinary in-repo ES imports, and node loads
-  every module in the graph across the 657-suite sweep. **CI's lint-build-selfcheck job is the
-  authoritative build verdict for this branch**, per the standing sandbox doctrine; the publish
-  ritual should re-run `npm run build` wherever the cache is healthy and expect green.
+- **build:** `npm run build` failed in this sandbox with rolldown's
+  `UNLOADABLE_DEPENDENCY … stream did not contain valid UTF-8 in @resvg/resvg-js/js-binding.js`.
+  At staging time this was attributed to the known sandbox @resvg read corruption (AGENTS.md,
+  2026-11-10) — **that attribution was wrong**; see §10 for the coordinator's correction, the real
+  mechanism, and the fix. After the fix the production build passes on this tree.
 
 ## 8. Cut or blocked
 
@@ -196,7 +187,7 @@ selection, and the rules judge's verdicts.
 - **Speech:** printed description is the shipped half; speaking exists only as the second deliberate
   press via the platform speech API.
 
-## 9. Coordinator fix round (QA round 1 NOTE-1)
+## 9. Coordinator fix round 1 (QA round 1 NOTE-1)
 
 QA round 1 returned CLEAN with one NOTE: the ledger's `still.sent.format` was hardcoded `'png'`
 and `prepareImageCopy`'s exact-bytes path did the same — true for every shipped surface (run
@@ -206,3 +197,31 @@ record. Fixed at the source: the exact-bytes path now reports the source mime's 
 canvas path still reports `'png'` (it encodes PNG), and `visionLedgerRow` passes the prepared
 `sent.format` through instead of hardcoding it. Behaviour is unchanged for every reachable input;
 the megamindVision suite and lint were re-run after the fix.
+
+## 10. Coordinator fix round 2 — the build failure was this branch's eager graph edge, not the cache
+
+CI on the published PR failed its build step with the identical @resvg signature (cargo-check's
+build step first, then e2e-smoke and selfcheck-browser, which also build) — on Matt's Mac runner,
+where no sandbox cache exists. The coordinator then re-ran the staging A/B with **identical
+node_modules copies in both trees**: base `e7c70a0f` builds 3/3, this tree failed 3/3 — so the
+failure is tree-dependent and deterministic, not cache corruption. Base transforms 750 modules;
+this tree transformed 765 and then rolldown tried to load the @resvg native bindings.
+
+Bisection (reverting one wiring file at a time): the App.jsx wiring alone tripped it, the tray
+wiring alone tripped it, the panel wiring alone did not. Mechanism: `megamindVisionLive` imported
+`surfaceRecord` from `megamindSurfacesLive.js`, and that driver imports `censusReport.mjs`, which
+imports `@resvg/resvg-js` directly (a Node-side module). On main, that chain is reachable only
+through the lazy MEGAMIND panel; S3's App and tray imports dragged it into the eager entry graph,
+where rolldown must bundle the native package and dies reading its JS binding as UTF-8. The same
+signature in the sandbox had the same shape — a graph question, not corrupt bytes.
+
+Fix (behaviour-identical): `surfaceRecord` — a six-line gate over the capability registry — moved
+from `megamindSurfacesLive.js` into `megamindVoice.mjs`, the light core every MegaMind driver
+already imports (it already carried the registry imports). `megamindSurfacesLive` imports and
+re-exports it (its existing consumers, including the S2 selfcheck, are untouched), and
+`megamindVisionLive` imports it from `megamindVoice.mjs`. The census/@resvg chain stays behind the
+lazy panel that owns it. After the move: build passes twice at 752 modules (base's 750 + the two
+vision core modules), megamindVision 16/16, megamindVoice 17/17, megamindLink 21/21, mind 15/15,
+directorRoom 7/7, eventRegistry ok (175 events), candidateTray PASS, lint 0 errors, format green —
+and `liveLoop.dishFluid`, the sweep's fourth failure, passes in-tree now that its internal
+`npm run build` succeeds, exactly as §7 suspected.

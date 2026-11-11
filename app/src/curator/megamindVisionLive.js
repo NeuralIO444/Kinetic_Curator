@@ -16,8 +16,7 @@
 // STAGING-REPORT-1527.md measures it: there is deliberately no Apple transport here, and no code
 // path in this file can construct an unmeasured record.
 import { getCapabilities } from '../composition/capabilityRegistry.mjs';
-import { SURFACE_TIMEOUT_MS, askSurfaceText } from './megamindVoice.mjs';
-import { surfaceRecord } from './megamindSurfacesLive.js';
+import { SURFACE_TIMEOUT_MS, askSurfaceText, surfaceRecord } from './megamindVoice.mjs';
 import {
   JUDGE_LEDGER_FILE,
   JUDGE_LEDGER_KEY,
