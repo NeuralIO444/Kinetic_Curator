@@ -5,7 +5,29 @@
 import { useEffect, useMemo, useState } from 'react';
 import { getPlayback, seekPlayback, subscribePlayback } from '../gl/playback.mjs';
 import { takeStripModel } from '../curator/takeStrip.mjs';
+import { checkRecapRecord } from '../curator/megamindRecap.mjs';
+import { ensureRecapDriver, getRecapView, subscribeRecaps } from '../curator/megamindRecapLive.js';
 import { RangeRow } from './RangeRow.jsx';
+
+// #1529 — a finished take's records, read under the strip once playback ends: the capture's own
+// summary when the take carries one (a retro capture's "what just happened"), then the replay
+// recap Davis and LOIS wrote from the take's log. Records only — nothing here shows mid-play.
+function RecapBlock({ title, recap }) {
+  if (!recap) return null;
+  return (
+    <div className="take-recap">
+      <span className="take-recap-kind">{title}</span>
+      {recap.lines.map((line, i) => (
+        <span key={i} className="take-recap-line">
+          {line.persona ? (
+            <span className="take-recap-who">{line.persona === 'davis' ? 'DAVIS ' : 'LOIS '}</span>
+          ) : null}
+          {line.text}
+        </span>
+      ))}
+    </div>
+  );
+}
 
 export function TakeStrip() {
   const [pb, setPb] = useState(getPlayback());
@@ -29,9 +51,22 @@ export function TakeStrip() {
     }, 100);
     return () => clearInterval(id);
   }, [pb, dragging]);
+  // #1529 — the recap driver watches the same holder; it can only act once a take has ended.
+  const [recapView, setRecapView] = useState(getRecapView());
+  useEffect(() => {
+    ensureRecapDriver();
+    return subscribeRecaps(() => setRecapView(getRecapView()));
+  }, []);
   const model = useMemo(() => (pb ? takeStripModel(pb.perf) : null), [pb && pb.perf]); // eslint-disable-line react-hooks/exhaustive-deps
   if (!pb || !model) return null;
   const pos = model.positionOf(frame);
+  const summary = pb.ended ? checkRecapRecord(pb.perf && pb.perf.summary) : null;
+  const recap =
+    pb.ended && recapView && recapView.perf === pb.perf
+      ? checkRecapRecord(recapView.recap)
+      : pb.ended
+        ? checkRecapRecord(pb.perf && pb.perf.recap)
+        : null;
   return (
     <div
       className="take-strip"
@@ -55,6 +90,8 @@ export function TakeStrip() {
         }}
       />
       <span className="take-strip-note">{pb.ended ? 'END' : ''}</span>
+      <RecapBlock title="CAPTURE SUMMARY" recap={summary} />
+      <RecapBlock title="RECAP" recap={recap} />
     </div>
   );
 }
