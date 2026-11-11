@@ -354,6 +354,7 @@ const FIELD_DEAL_SEED = 1917;
 export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng = null } = {}) {
   const intensity = createIntensityTracker({ now });
   const beats = createBeatTracker();
+  let beatClock = null; // #2091: () => { loopMs, bpm } | null — LOOP time, so a stale beat confidence can lapse at a tick
   let relaxUntil = 0;
   let lastCoolAt = now();
   let pull = { keeps: [], bands: null, enabled: false, sourceType: null }; // fed by setPullInputs (store subscription)
@@ -415,6 +416,11 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     // Strong user action ends relax early (L4D: relax ends early on movement).
     if (keep) relaxUntil = 0;
     const audioN = audio == null ? liveAudio() : clamp01(audio);
+    if (beatClock) {
+      // #2091: pushes only come when beatPulse changes, so a silent room sends none — the tick checks the clock too.
+      const c = beatClock();
+      if (c) beats.expire(c.loopMs, c.bpm);
+    }
     const signals = {
       audio: audioN,
       keepPass: normalizeKeepPassVelocity((feed.keepsLast5m || 0) / 5),
@@ -507,8 +513,12 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       pull = { ...pull, ...next };
     },
     /** Feed the beat tracker (wired to the store in App via initDirectorBeat). */
-    pushBeat(pulse) {
-      beats.push(pulse);
+    /** #2091: where loop time and BPM come from (null = confidence never lapses). */
+    setBeatClock(fn) {
+      beatClock = typeof fn === 'function' ? fn : null;
+    },
+    pushBeat(pulse, loopMs, bpm) {
+      beats.push(pulse, loopMs, bpm); // #2091: loop time + BPM let a stale confidence lapse (2 bars)
     },
     get intensity() {
       return intensity.value;
@@ -620,12 +630,16 @@ let beatUnsub = null;
  * (state, prev), as Zustand's does). Returns the unsubscribe; a second init
  * replaces the first listener instead of stacking another.
  */
-export function initDirectorBeat(subscribe) {
+export function initDirectorBeat(subscribe, readClock = null) {
   if (beatUnsub) beatUnsub();
   const d = getDirector();
+  d.setBeatClock(readClock); // #2091: () => { loopMs, bpm } on the LOOP clock; absent = the old no-lapse behaviour
   const off = subscribe((s, prev) => {
     if (!s) return;
-    if (!prev || s.beatPulse !== prev.beatPulse) d.pushBeat(typeof s.beatPulse === 'number' ? s.beatPulse : 0);
+    if (!prev || s.beatPulse !== prev.beatPulse) {
+      const c = readClock ? readClock() : null;
+      d.pushBeat(typeof s.beatPulse === 'number' ? s.beatPulse : 0, c && c.loopMs, c && c.bpm);
+    }
     const next = {
       keeps: s.keeps,
       bands: s.audioBands,

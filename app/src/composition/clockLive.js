@@ -18,6 +18,11 @@ export function getMusicalTime() {
   return clock.now();
 }
 
+/** The loop clock's current time in ms (what the bus stamps as meta.loopMs). */
+export function getLoopMs() {
+  return loopMs;
+}
+
 /** Drive the clock. Returns the tick list (the bus has already been told). */
 export function observeClock(loopTimeMs, bpm) {
   const r = clock.advance(loopTimeMs, bpm);
