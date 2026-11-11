@@ -1859,6 +1859,35 @@
   color: var(--dim);
   min-width: 24px;
 }
+/* #1529 — the finished take's records under the strip: full-width rows inside the strip's flex,
+   shown only once playback ends. Small, dim, read-only — a record, not a performance surface. */
+.take-strip:has(.take-recap) {
+  flex-wrap: wrap;
+}
+.take-recap {
+  flex: 1 1 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 4px;
+}
+.take-recap-kind {
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  color: var(--dim);
+}
+.take-recap-line {
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--ink);
+  white-space: normal;
+}
+.take-recap-who {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--dim);
+}
 
 /* #1462 — a mind request blends a state over the honest face: two layers in one cell, cross-faded by opacity over one
    bar (the transition is set inline from the BEAT). The honest face is always underneath; with no request it is all

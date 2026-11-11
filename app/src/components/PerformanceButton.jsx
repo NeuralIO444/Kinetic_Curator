@@ -12,7 +12,8 @@ import {
   startRetroCapture,
   saveRetroPerformance,
 } from '../gl/performanceCapture.mjs';
-import { unpackPerformance } from '../gl/performanceFile.mjs';
+import { packPerformance, unpackPerformance } from '../gl/performanceFile.mjs';
+import { summarizeCaptureTake } from '../curator/megamindRecapLive.js'; // #1529: the capture's summary, from its own log
 import { startPlayback, stopPlayback, isPlaybackActive, subscribePlayback } from '../gl/playback.mjs';
 import { getStressState, setStressTap } from '../curator/stressLive.js';
 import { createStressRecorder } from '../curator/stressRecord.js';
@@ -223,6 +224,15 @@ export function PerformanceButton() {
   const onRetro = async () => {
     const take = await saveRetroPerformance(3);
     if (take) {
+      // #1529 — the capture carries its own "what just happened" summary (#1367's follow-on):
+      // built from the capture's log alone (its frames are the window), attached as a section
+      // before the file is packed, so the summary travels with the take and reads back under the
+      // scrub strip. The rules floor always lands; a linked model only re-voices it.
+      const summary = await summarizeCaptureTake(take.perf);
+      if (summary) {
+        take.perf.summary = summary;
+        take.bytes = await packPerformance(take.perf);
+      }
       setRetroNote(await saveTake(take.bytes, take.filename));
     } else setRetroNote('Nothing to save yet: give the ring a few seconds of playing first.');
   };
