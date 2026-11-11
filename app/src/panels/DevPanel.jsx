@@ -1,11 +1,11 @@
-// DevPanel — the merged dev-only panel (#691).
+// DevPanel — the merged DEV panel (#691).
 //
-// Re-hosts the three dev-only tools (X-Ray, Gov Tune, Shader Lab) under
+// Re-hosts the three original dev tools (X-Ray, Gov Tune, Shader Lab) under
 // three tabs of a single DEV panel, instead of three separate tabs on the
 // Shell's tab strip. The sub-panels are loaded UNCHANGED: each stays behind
 // React.lazy() (see devTabs.mjs), so each still ships as its own chunk,
-// loaded only when its tab opens. Registered only when import.meta.env.DEV
-// (see PanelRegistry) — prod bundles never include it.
+// loaded only when its tab opens. Registered behind the runtime gate in
+// PanelRegistry (#2077): dev builds, or Dev mode on in Settings.
 //
 // The backtick shortcut (#193, carried over from the old SHADER LAB tab):
 // while this panel is open, backtick jumps to the Shader Lab tab.
@@ -34,7 +34,7 @@ export function DevPanel(props) {
   const ActiveComp = active.component;
   return (
     <div className="panel panel-dev">
-      <PanelHeader tag="DEV" title="DEV TOOLS" subtitle="dev-only — not in prod builds" />
+      <PanelHeader tag="DEV" title="DEV TOOLS" subtitle="behind the Dev mode toggle in release builds" />
       <div className="panel-tabs" role="tablist" aria-label="Dev tools">
         {DEV_TABS.map((t) => (
           <button

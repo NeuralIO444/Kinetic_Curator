@@ -1,4 +1,4 @@
-// GovernorTunePanel — dev-only governor tuning surface (#259).
+// GovernorTunePanel — DEV panel governor tuning surface (#259).
 //
 // Matt asked for tuning tools after the permanent-shed trap: the FPS
 // average lies, so this panel shows the frame-time HISTOGRAM; the shed /
@@ -8,8 +8,9 @@
 // them. The X-ray panel stays the pass-chain/cost view; this is the
 // timing/threshold view.
 //
-// Registered only when import.meta.env.DEV (see PanelRegistry) and loaded
-// via React.lazy, so production bundles never include it.
+// Registered behind the DEV panel's runtime gate (see PanelRegistry:
+// dev build, or Dev mode on — #2077) and loaded via React.lazy, as its
+// own chunk, only when the tab opens.
 
 import { useEffect, useMemo, useState } from 'react';
 import { PanelHeader } from '../components/PanelHeader.jsx';
