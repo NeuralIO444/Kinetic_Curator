@@ -37,6 +37,7 @@ import {
 } from './megamindEmbed.mjs';
 import { createEmbedDriver, readShelfKeeps } from './megamindEmbedLive.js';
 import { formatMinerReport, runMiner, selectFinalists } from './miner.mjs';
+import { variantIdFor } from './variants.mjs';
 import { ASSETS } from '../data/assets/index.js';
 
 let checks = 0;
@@ -266,6 +267,20 @@ suite('megamindEmbed record law', () => {
     });
     const p4 = await probeEmbedModel(fx4, 'http://127.0.0.1:11434', 'text-only', { now, stamp });
     pok(p4.record && p4.record.imageEmbed === false, 'an image refusal measures text-only — the slot still stands');
+
+    // an image probe answering in DIFFERENT dimensions than the text probe: the record stands
+    // on its text measurement, with stills support measured false — the text dims are no promise
+    // about the image path, and the disagreement costs the slot nothing it measured honestly.
+    const fxDims = ollamaFixture({
+      models: [{ name: 'dims-differ' }],
+      embedFor: (body) => (body.images ? { embeddings: [[0.5, 0.5]] } : embedOk(body)),
+    });
+    const pDims = await probeEmbedModel(fxDims, 'http://127.0.0.1:11434', 'dims-differ', { now, stamp });
+    pok(
+      pDims.record && pDims.record.dims === 3,
+      'image dims differing from text: the record stands on the text measurement',
+    );
+    pok(pDims.record.imageEmbed === false, 'image dims differing from text: stills support is measured false');
 
     // a cloud pointer is refused before any fetch.
     const fx5 = ollamaFixture({ models: [], embedFor: embedOk });
@@ -520,6 +535,61 @@ suite('megamindEmbed acceptance fixture', () => {
     dok(like && like.keeps[0].record.seed === 12, 'more-like-this: the nearest OTHER keep leads');
     dok(!like.keeps.some((h) => h.record.seed === 11), 'more-like-this never returns the keep itself');
 
+    // A variant-cast keep: the panel embeds its text with the miner's translation (variant →
+    // lead parent, from the keep's own provenance — miner.mjs, mirroring featuresOfKeep), so
+    // the exported cache key IS the key the miner computes for the same keep, and the vector
+    // resolves when the run tool looks it up. The untranslated text's key must NOT travel.
+    // The corpus below carries the keep's cast assets — the only lookups its text reads; a
+    // full-library press would flood the soft-capped cache and evict the very entry under
+    // test (the cap working as designed, not the key law under test).
+    const byIdAssets = new Map(ASSETS.map((a) => [a.id, a]));
+    const variantRecipe = { parents: ['org_blob_01'], op: 'jitter', seed: 3, params: { amount: 1.5 } };
+    const variantKeep = {
+      seed: 21,
+      caption: 'variant burst child',
+      config: {
+        layout: { mode: 'radial' },
+        palette: { id: 'ember' },
+        assets: [variantIdFor(variantRecipe), 'org_petal_01'],
+      },
+      provenance: { variants: [variantRecipe] },
+    };
+    const minerRecipes = new Map(variantKeep.provenance.variants.map((r) => [variantIdFor(r), r]));
+    const minerText = keepEmbedText(variantKeep, {
+      assetById: byIdAssets,
+      translateId: (id) => minerRecipes.get(id)?.parents?.[0] ?? id,
+    });
+    const rawText = keepEmbedText(variantKeep, { assetById: byIdAssets });
+    dok(
+      minerText !== rawText && minerText.includes('asset org_blob_01'),
+      'variant keep setup: the miner’s text names the lead parent, the raw text the variant',
+    );
+    const vFound = await d.searchText('spiky ones', {
+      keeps: [variantKeep],
+      assets: [byIdAssets.get('org_blob_01'), byIdAssets.get('org_petal_01')],
+    });
+    dok(vFound && vFound.keeps.length === 1, 'variant-cast keep: the panel embeds and ranks it');
+    const exportedV = d.exportData();
+    dok(
+      exportedV.vectorsByTextHash[sha(minerText)] !== undefined,
+      'variant-cast keep: the panel-exported cache key is the miner’s key for the same keep',
+    );
+    dok(
+      exportedV.vectorsByTextHash[sha(rawText)] === undefined,
+      'variant-cast keep: the untranslated text’s key is NOT exported — it would never resolve in the run tool',
+    );
+    const vRun = runMiner({
+      runSeed: 0x1506,
+      batchSize: 24,
+      finalistCount: 6,
+      keeps: [variantKeep],
+      embeddings: exportedV,
+    });
+    dok(
+      vRun.report.semantic && vRun.report.semantic.keepsEmbedded === 1,
+      'variant-cast keep: handed the panel export, the miner resolves the keep’s vector',
+    );
+
     // A different model over the same machine cache re-fetches: keys are per-model, so no vector
     // is ever served across a swap — and the first model's entries survive for its own return.
     const cacheOnly = memStorage({ [EMBED_CACHE_KEY]: storage._map.get(EMBED_CACHE_KEY) });
@@ -569,6 +639,39 @@ suite('megamindEmbed acceptance fixture', () => {
       'text-only slot: a still embed returns null — never faked from a text model',
     );
     dok(fxTextOnly.embedCalls().length === imgCalls, 'text-only slot: no image call is even attempted');
+
+    // Dims that SHIFT after the probe — the model measured a clean 3 at connect, then starts
+    // answering in 2: search ranks nothing and says so, a still embed returns null. Nothing
+    // throws, and no wrong-shaped vector is ever served as the measured model's own.
+    let shiftCalls = 0;
+    const fxShift = ollamaFixture({
+      models: [{ name: 'embed-shifter' }],
+      embedFor: (body) => {
+        shiftCalls++;
+        if (shiftCalls <= 2) return embedOk(body); // the probe's own text + image calls
+        const inputs = body.images ? [''] : Array.isArray(body.input) ? body.input : [body.input];
+        return { embeddings: inputs.map(() => [0.5, 0.5]) };
+      },
+    });
+    const dShift = mkDriver(fxShift, memStorage());
+    await dShift.connect('http://127.0.0.1:11434');
+    dok(
+      dShift.view().record && dShift.view().record.dims === 3 && dShift.view().record.imageEmbed === true,
+      'shifted dims setup: the probe measured a clean 3-dim slot with stills',
+    );
+    const shifted = await dShift.searchText('spiky ones', { keeps: [keepA], assets: [] });
+    dok(
+      shifted === null && dShift.view().search === null,
+      'shifted dims: search returns the honest no-vector outcome — nothing ranked, no throw',
+    );
+    dok(
+      dShift.view().message && dShift.view().message.includes('no vector'),
+      'shifted dims: the view says plainly that no vector came back',
+    );
+    dok(
+      (await dShift.embedStill(new Uint8Array([5, 4, 3]))) === null,
+      'shifted dims: a still embed returns null, never a wrong-shaped vector',
+    );
 
     // Cloud pointer in the slot: refused before any fetch, record cleared.
     const fxCloud = ollamaFixture({

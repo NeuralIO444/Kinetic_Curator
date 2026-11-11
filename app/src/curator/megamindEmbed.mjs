@@ -50,9 +50,10 @@ export const EMBED_TIMEOUT_MS = 60000;
 /**
  * The miner blend (the axis's one weight, named): a candidate's novelty is its feature novelty
  * (primary, deterministic, unchanged) PLUS this weight × its semantic novelty, when — and only
- * when — both sides of the comparison carry vectors from the same slot model. At 0.5 the semantic
- * component can add at most half the feature axis's full range: meaning can break a feature tie
- * and widen a spread, it can never outvote the feature space.
+ * when — both sides of the comparison carry vectors from the same slot model. The feature term
+ * keeps its full weight and always applies; the semantic term is capped at half the feature
+ * axis's range (0.5 × a 0..1 distance), so it can override a feature-novelty gap smaller than
+ * that bound — and can never override a gap of half the axis or more.
  */
 export const SEMANTIC_NOVELTY_WEIGHT = 0.5;
 
@@ -158,8 +159,9 @@ export function assetEmbedText(asset) {
  * config.assets) and the taste-ledger row (recipe.layoutParams / recipe.paletteId / recipe.assets)
  * read tolerantly, the featuresOfKeep idiom. Cast ids resolve to asset metadata through the
  * caller's lookup; a variant id is translated to its lead parent first when the caller hands a
- * translateId (the miner does — a variant stands at its lead's coordinates in feature space, and
- * its meaning text is its lead's too). '' when the record carries nothing embeddable.
+ * translateId (the miner does, and the live driver matches it — a variant stands at its lead's
+ * coordinates in feature space, and its meaning text is its lead's too). '' when the record
+ * carries nothing embeddable.
  */
 export function keepEmbedText(record, { assetById = null, translateId = null } = {}) {
   if (!isObj(record)) return '';

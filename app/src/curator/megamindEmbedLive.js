@@ -30,6 +30,7 @@ import {
   probeEmbedModel,
   semanticEnabled,
 } from './megamindEmbed.mjs';
+import { variantIdFor } from './variants.mjs';
 
 /** The shelf keeps' storage key — the collection semantic search reads (state/slices/davisSlice). */
 export const SHELF_KEEPS_KEY = 'kc:keeps:v1';
@@ -63,6 +64,20 @@ export function readShelfKeeps(storage) {
     return [];
   }
 }
+
+/**
+ * A keep's cast translation — the miner's own resolution (miner.mjs, mirroring featuresOfKeep):
+ * a variant id in the cast stands at its lead parent, and the keep's provenance carries the
+ * recipes that make the translation possible. The panel embeds with this same translation, so
+ * the exported text hash is the hash the miner computes for the same keep; without it, a
+ * variant-cast keep's vector would silently never resolve in the run tool.
+ */
+const keepTranslateId = (keep) => {
+  const variants = keep?.provenance?.variants;
+  if (!Array.isArray(variants) || !variants.length) return null;
+  const recipes = new Map(variants.map((r) => [variantIdFor(r), r]));
+  return (id) => recipes.get(id)?.parents?.[0] ?? id;
+};
 
 const readSlot = (storage) => {
   try {
@@ -301,7 +316,7 @@ export function createEmbedDriver({
       set({ busy: 'search', message: null });
       try {
         const assetById = new Map(assets.map((a) => [a.id, a]));
-        const keepTexts = keeps.map((k) => keepEmbedText(k, { assetById }));
+        const keepTexts = keeps.map((k) => keepEmbedText(k, { assetById, translateId: keepTranslateId(k) }));
         const assetTexts = assets.map((a) => assetEmbedText(a));
         const vectors = await embedTexts([q, ...keepTexts, ...assetTexts]);
         const queryVector = vectors[0];
@@ -349,7 +364,10 @@ export function createEmbedDriver({
       set({ busy: 'search', message: null });
       try {
         const assetById = new Map(assets.map((a) => [a.id, a]));
-        const texts = [keepEmbedText(keep, { assetById }), ...keeps.map((k) => keepEmbedText(k, { assetById }))];
+        const texts = [
+          keepEmbedText(keep, { assetById, translateId: keepTranslateId(keep) }),
+          ...keeps.map((k) => keepEmbedText(k, { assetById, translateId: keepTranslateId(k) })),
+        ];
         const vectors = await embedTexts(texts);
         const self = vectors[0];
         if (!self) {
