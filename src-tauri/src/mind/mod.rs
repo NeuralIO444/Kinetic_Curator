@@ -3,7 +3,8 @@
 // The helper is a child process speaking newline-delimited JSON on stdin/stdout (helpers/kc-mind/main.swift): no
 // socket, no port, no network. One process for the app's lifetime, started on first use and restarted if it dies.
 // Requests carry an id; a reader thread hands each reply to whoever is waiting for that id. A caller that stops
-// waiting (timeout) simply forgets its id; a late reply is dropped.
+// waiting (timeout) forgets its id AND tells the helper to cancel that ask (#1747), so the abandoned
+// generation stops instead of running on unseen; a late reply is dropped.
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
@@ -109,7 +110,20 @@ impl MindHelper {
             Ok(v) => Ok(v),
             Err(_) => {
                 self.forget(id);
+                self.cancel(id);
                 Err("timeout".into())
+            }
+        }
+    }
+
+    /// #1747: tell the helper to stop the ask this id named. Best-effort by design: the helper ignores ids with
+    /// nothing in flight (a status request, an ask that just finished), and a write that fails means the helper
+    /// is dead or dying — the next request's liveness check reaps and respawns it.
+    fn cancel(&self, id: u64) {
+        if let Ok(mut guard) = self.proc_.lock() {
+            if let Some(p) = guard.as_mut() {
+                let line = format!("{}\n", json!({ "op": "cancel", "id": id }));
+                let _ = p.stdin.write_all(line.as_bytes()).and_then(|_| p.stdin.flush());
             }
         }
     }

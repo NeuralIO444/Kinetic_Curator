@@ -7,6 +7,8 @@
 //   ← {"id":1,"available":true,"model":"apple-foundation","os":"26.0.1"}            (or available:false + reason)
 //   → {"id":2,"op":"ask","persona":"lois","context":{...SceneSummary...},"seed":123,"bar":5}
 //   ← {"id":2,"reply":{...},"ms":184}                                                (or "reply":null + "error")
+//   → {"op":"cancel","id":2}                                                         (no reply: the app stopped waiting)
+// One ask per persona may generate at a time; a second one is refused at once with "error":"busy" (#1747).
 //
 // The reply is only a PROPOSAL: the app validates it against the Mind 1 contract (curator/mindContract.js) and drops
 // anything malformed. Timeouts are the app's: it stops waiting and the rules answer that bar.
@@ -178,10 +180,27 @@ func routeOpDict(_ r: RouteReply) -> [String: Any]? {
     }
 }
 
+/// #1747: an ask refused before generation started — the persona already has one in flight.
+@available(macOS 26.0, *)
+enum MindAskError: Error { case busy }
+
 @available(macOS 26.0, *)
 actor Minds {
     private var sessions: [String: LanguageModelSession] = [:]
     private var uses: [String: Int] = [:]
+    // #1747: one ask generating per persona, and the running ask Tasks by request id so a "cancel" line can
+    // stop one. All of it lives on the actor and is only touched inside actor jobs — dispatch (start), the
+    // busy guard (ask), cancellation (cancel) — so the state itself is never raced on; handle() only ever
+    // talks to the actor.
+    private var inFlight: Set<String> = []
+    private var tasks: [Int: Task<Void, Never>] = [:]
+    // A cancel that reaches the actor before its ask's dispatch job does: the id waits here and start()
+    // refuses to generate for it, so a cancel cannot slip past dispatch however the two jobs interleave.
+    // In practice the bridge sends a cancel only after its ask timeout (300 ms; 3 s for status) while
+    // dispatch follows the ask line at once, so this set is the belt to that timing's braces. Bridge ids
+    // are never reused, so an entry that is never consumed — an id that never starts (a timed-out
+    // status), or a cancel that landed after its ask already finished — is inert.
+    private var earlyCancels: Set<Int> = []
 
     // The model's window is 4,096 tokens TOTAL — instructions + transcript + the new prompt. Measured in
     // a real Mac session (#2068, 2026-11-10): with the conducting vocabulary in Davis's instructions and
@@ -204,7 +223,48 @@ actor Minds {
 
     func prewarm() { for p in ["lois", "davis", "queen"] { _ = session(for: p) } }
 
+    /// #1747: stop the ask running under this request id, if any. Cancelling makes its respond throw, and
+    /// ask()'s catch then drops that persona's session: a cancelled exchange may or may not be in the
+    /// transcript, so the session is treated as spent rather than trusted — a fresh one is cheap, and the
+    /// refresh counter stays honest (a discarded session simply served fewer answers, never more).
+    /// If the ask's dispatch hasn't reached the actor yet there is no Task to cancel: the id is remembered
+    /// in earlyCancels and start() will refuse it (see there).
+    func cancel(id: Int) {
+        if tasks[id] == nil { earlyCancels.insert(id) }
+        tasks[id]?.cancel()
+    }
+
+    /// #1747: dispatch one ask. The Task is created and registered in tasks[id] inside this one actor job:
+    /// a Task handle can only be captured where the Task is created, and doing both in the same job means
+    /// registration can neither be overtaken by the ask it names (run starts only after this job stores it)
+    /// nor left behind by it (run's defer removes the entry on every exit path). A "cancel" that arrived
+    /// earlier left its id in earlyCancels — the ask then never starts: no generation, no reply (the bridge
+    /// has forgotten the id; a reply would be dropped unread anyway).
+    func start(id: Int, persona: String, context: String, seed: UInt64, started: Date) {
+        if earlyCancels.remove(id) != nil { return }
+        tasks[id] = Task { send(await self.run(id: id, persona: persona, context: context, seed: seed, started: started)) }
+    }
+
+    /// One ask end to end, returning the exact reply line to send. Runs in the Task start() registered;
+    /// the defer is the cleanup half of that registration.
+    func run(id: Int, persona: String, context: String, seed: UInt64, started: Date) async -> [String: Any] {
+        defer { tasks[id] = nil }
+        do {
+            let reply = try await ask(persona: persona, context: context, seed: seed)
+            return ["id": id, "reply": reply ?? NSNull(), "ms": Int(Date().timeIntervalSince(started) * 1000)]
+        } catch {
+            let ms = Int(Date().timeIntervalSince(started) * 1000)
+            if error is MindAskError { return ["id": id, "reply": NSNull(), "error": "busy", "ms": ms] }
+            return ["id": id, "reply": NSNull(), "error": "\(error)", "ms": ms]
+        }
+    }
+
     func ask(persona: String, context: String, seed: UInt64) async throws -> [String: Any]? {
+        // #1747: one in-flight ask per persona. A second respond on the shared session is what used to error
+        // and drop the session; refuse the newcomer instead and let the app's rules answer its bar. The guard
+        // runs before session(for:), so a refused ask never touches the session or its refresh counter.
+        guard inFlight.insert(persona).inserted else { throw MindAskError.busy }
+        defer { inFlight.remove(persona) }
         let s = session(for: persona)
         let options = GenerationOptions(sampling: .random(top: 40, seed: seed), temperature: 0.8)
         let prompt = "The room now (JSON): \(context)\nAnswer for this bar."
@@ -267,6 +327,13 @@ func minds() -> Minds {
 }
 #endif
 
+/// #1747: forward a "cancel" line to the actor — if Minds was never created there is nothing in flight.
+func cancelAsk(_ id: Int) {
+    #if !KC_NO_FM
+    if #available(macOS 26.0, *), let m = mindsBox as? Minds { Task { await m.cancel(id: id) } }
+    #endif
+}
+
 func handle(_ line: String) {
     guard let data = line.data(using: .utf8),
           let msg = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
@@ -297,16 +364,13 @@ func handle(_ line: String) {
         let seed = UInt64(truncatingIfNeeded: (msg["seed"] as? NSNumber)?.int64Value ?? 0)
         let started = Date()
         let m = minds()
-        Task {
-            do {
-                let reply = try await m.ask(persona: persona, context: context, seed: seed)
-                let ms = Int(Date().timeIntervalSince(started) * 1000)
-                send(["id": id, "reply": reply ?? NSNull(), "ms": ms])
-            } catch {
-                send(["id": id, "reply": NSNull(), "error": "\(error)", "ms": Int(Date().timeIntervalSince(started) * 1000)])
-            }
-        }
+        // the actor creates and registers the ask's Task itself (start), the only place the handle exists
+        Task { await m.start(id: id, persona: persona, context: context, seed: seed, started: started) }
         #endif
+    case "cancel":
+        // #1747: the app's timeout fired for this id and it stopped waiting. Stop the generation; send no
+        // reply — the app has forgotten the id, so anything sent for it would be dropped anyway.
+        cancelAsk(id)
     default:
         send(["id": id, "error": "unknown op"])
     }
