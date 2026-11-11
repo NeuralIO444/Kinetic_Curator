@@ -14,6 +14,7 @@ import {
   resetDirector,
   getDirector,
   conductHeat,
+  initDirectorBeat,
 } from './director.js';
 import { TEMP_DEFAULT } from './effectiveTemp.js';
 import { DIRECTOR_TABLE } from './directorTable.js';
@@ -257,6 +258,77 @@ ok('#1483 conductHeat: 0..1 from the last sway, 0 when nobody leans; a share of 
   const d = getDirector();
   const real = Object.getOwnPropertyDescriptor(d, 'lastSway');
   assert.ok(real && typeof real.get === 'function', 'lastSway is a getter on the live director');
+  resetDirector();
+});
+
+// ── #2089: the Director's beat input listens to the store without flooding the tracker ──
+// A fake `subscribe` records listeners and hands (state, prev) like Zustand's. getDirector()'s pushBeat and
+// setPullInputs are spied; the beat tracker itself is not touched.
+const beatRig = () => {
+  resetDirector();
+  const d = getDirector();
+  const rig = { listeners: [], beats: [], pulls: 0 };
+  const realPush = d.pushBeat.bind(d);
+  const realPull = d.setPullInputs.bind(d);
+  d.pushBeat = (p) => {
+    rig.beats.push(p);
+    realPush(p);
+  };
+  d.setPullInputs = (x) => {
+    rig.pulls++;
+    realPull(x);
+  };
+  rig.subscribe = (fn) => {
+    rig.listeners.push(fn);
+    return () => {
+      rig.listeners = rig.listeners.filter((l) => l !== fn);
+    };
+  };
+  rig.fire = (s, prev) => [...rig.listeners].forEach((l) => l(s, prev));
+  return rig;
+};
+const baseState = { beatPulse: 0, keeps: [], audioBands: null, audioEnabled: false, audioSource: null };
+
+ok('#2089 an unrelated state change pushes no beat sample and no pull inputs', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  r.fire({ ...baseState, sliderX: 1 }, baseState);
+  assert.equal(r.beats.length, 0, 'beatPulse did not change: no sample');
+  assert.equal(r.pulls, 0, 'none of the four pull inputs changed: no setPullInputs');
+  resetDirector();
+});
+
+ok('#2089 a beatPulse change pushes exactly one sample; a pull-input change sets pull inputs once', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  r.fire({ ...baseState, beatPulse: 0.8 }, baseState);
+  assert.deepEqual(r.beats, [0.8]);
+  assert.equal(r.pulls, 0, 'a pulse alone does not touch the pull inputs');
+  r.fire({ ...baseState, audioEnabled: true }, baseState);
+  assert.equal(r.pulls, 1, 'one input changed: one setPullInputs');
+  assert.equal(r.beats.length, 1, 'and no extra beat sample');
+  resetDirector();
+});
+
+ok('#2089 init twice then one pulse change → exactly one push (the handle is replaced, not stacked)', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  initDirectorBeat(r.subscribe);
+  assert.equal(r.listeners.length, 1, 'one live listener after a double init');
+  r.fire({ ...baseState, beatPulse: 1 }, baseState);
+  assert.equal(r.beats.length, 1, 'one pulse change, one sample');
+  resetDirector();
+});
+
+ok('#2089 initDirectorBeat returns an unsubscribe that detaches the listener', () => {
+  const r = beatRig();
+  const stop = initDirectorBeat(r.subscribe);
+  assert.equal(typeof stop, 'function');
+  stop();
+  assert.equal(r.listeners.length, 0, 'unsubscribed');
+  r.fire({ ...baseState, beatPulse: 1 }, baseState);
+  assert.equal(r.beats.length, 0, 'no sample after cleanup');
+  stop(); // idempotent
   resetDirector();
 });
 
