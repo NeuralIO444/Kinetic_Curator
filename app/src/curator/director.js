@@ -30,6 +30,7 @@ import { roomFor } from './directorsMatrix.js';
 import { rowFor, relaxSecondsFor } from './directorTable.js';
 import {
   INTENSITY_PEAK,
+  intensityFromSignals,
   normalizeKeepPassVelocity,
   normalizePhaseTime,
   createIntensityTracker,
@@ -421,7 +422,9 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
       phaseTime: normalizePhaseTime((nowTs - lastCoolAt) / 1000),
     };
     const level = intensity.update(signals, nowTs);
-    if (level < COOL_FLOOR) lastCoolAt = nowTs;
+    // #2090: "cool" is judged on the live signals only. phaseTime is the output of this very clock, so letting it
+    // vote held the reset closed once it saturated (the room latched at 1). A peak also restarts the build-up.
+    if (intensityFromSignals({ ...signals, phaseTime: 0 }) < COOL_FLOOR) lastCoolAt = nowTs;
     // Peak → forced relax. No re-peak while relaxing: never high-amplitude
     // back-to-back (Booth's explicit rule). The tick that crosses the peak
     // reports 'peak' — the peak lands hot — and the room cools from the
@@ -431,6 +434,7 @@ export function createDirector({ now = () => Date.now(), onRoom = null, fieldRng
     if (level >= INTENSITY_PEAK && !wasRelaxing) {
       relaxUntil = nowTs + gains.relaxSeconds * 1000;
       entering = true;
+      lastCoolAt = nowTs;
     }
     const relaxing = nowTs < relaxUntil && !entering;
     // The Queen's structural hand: relax cools the room. Temperature capped,

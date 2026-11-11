@@ -12,12 +12,12 @@ export function wireEventBus(rawDispatch) {
   const dispatch = createDispatchPipe(rawDispatch);
   pipedDispatch = dispatch;
 
-  on(Events.LAYOUT_PARAM, ({ key, value }) => dispatch({ type: A.SET_LAYOUT_PARAM, key, value }));
+  on(Events.LAYOUT_PARAM, ({ key, value } = {}) => dispatch({ type: A.SET_LAYOUT_PARAM, key, value }));
   on(Events.LAYOUT_PRESET, (preset) => dispatch({ type: A.APPLY_PRESET, preset }));
-  on(Events.LAYOUT_LOCK, ({ key }) => dispatch({ type: A.TOGGLE_PARAM_LOCK, key }));
+  on(Events.LAYOUT_LOCK, ({ key } = {}) => dispatch({ type: A.TOGGLE_PARAM_LOCK, key }));
   on(Events.LAYOUT_CURATE, () => dispatch({ type: A.CURATE_UNLOCKED }));
 
-  on(Events.DAVIS_EVOLVE, (p) => {
+  on(Events.DAVIS_EVOLVE, (p = {}) => {
     if (p.mode !== undefined) return dispatch({ type: A.SET_EVOLVE_MODE, payload: !!p.mode });
     if (p.toggle) return dispatch({ type: A.SET_EVOLVE_MODE, payload: (m) => !m });
     if (p.bumpSeed) return dispatch({ type: A.BUMP_SEED });
@@ -29,9 +29,9 @@ export function wireEventBus(rawDispatch) {
     if (p.motionSmoothing !== undefined) return dispatch({ type: A.SET_MOTION_SMOOTHING, payload: p.motionSmoothing });
     return dispatch({ type: A.TRIGGER_EVOLVE });
   });
-  on(Events.DAVIS_MORPH, (p) => dispatch({ type: A.SET_MORPH_EVOLVE, payload: p.enabled ?? p.morphEvolve }));
-  on(Events.DAVIS_MORPH_DURATION, (p) => dispatch({ type: A.SET_MORPH_DURATION, payload: p.duration }));
-  on(Events.DAVIS_PHRASE, (p) => {
+  on(Events.DAVIS_MORPH, (p = {}) => dispatch({ type: A.SET_MORPH_EVOLVE, payload: p.enabled ?? p.morphEvolve }));
+  on(Events.DAVIS_MORPH_DURATION, (p = {}) => dispatch({ type: A.SET_MORPH_DURATION, payload: p.duration }));
+  on(Events.DAVIS_PHRASE, (p = {}) => {
     if (p.enabled !== undefined) dispatch({ type: A.SET_PHRASE_ENABLED, payload: p.enabled });
     if (p.length !== undefined) dispatch({ type: A.SET_PHRASE_LENGTH, payload: p.length });
     if (p.mode !== undefined) dispatch({ type: A.SET_PHRASE_MODE, payload: p.mode });
@@ -44,7 +44,7 @@ export function wireEventBus(rawDispatch) {
     dispatch(p && p.reset ? { type: A.RESET_SEED_OFFSETS } : { type: A.MUTATE_SEED_OFFSET, group: p && p.group }),
   );
   on(Events.CANVAS_BG_CYCLE, () => dispatch({ type: A.CYCLE_CANVAS_BG })); // #310: BG cycle moved to OUTPUT
-  on(Events.DAVIS_FAVORITE, (fav) => {
+  on(Events.DAVIS_FAVORITE, (fav = {}) => {
     if (fav.action === 'recall') return dispatch({ type: A.RECALL_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'add' && fav.favorite) return dispatch({ type: A.ADD_FAVORITE, favorite: fav.favorite });
     if (fav.action === 'morph' && fav.favorite) return dispatch({ type: A.MORPH_TO_FAVORITE, favorite: fav.favorite });
@@ -53,45 +53,45 @@ export function wireEventBus(rawDispatch) {
       return dispatch({ type: A.REORDER_FAVORITE, id: fav.id, delta: fav.delta || 0 });
     if (fav.action === 'clear') return dispatch({ type: A.CLEAR_FAVORITES });
   });
-  on(Events.DAVIS_FAVORITE_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_FAVORITE, id }));
+  on(Events.DAVIS_FAVORITE_REMOVE, ({ id } = {}) => dispatch({ type: A.REMOVE_FAVORITE, id }));
 
   on(Events.AUDIO_TOGGLE, (enabled) => dispatch({ type: A.SET_AUDIO_ENABLED, payload: enabled }));
   on(Events.AUDIO_GAIN, (gain) => dispatch({ type: A.SET_AUDIO_GAIN, payload: gain }));
   on(Events.AUDIO_SOURCE, (src) => dispatch({ type: A.SET_AUDIO_SOURCE, payload: src }));
   on(Events.AUDIO_MONITOR, (mon) => dispatch({ type: A.SET_AUDIO_MONITOR, payload: mon }));
 
-  on(Events.ASSETS_TOGGLE, ({ id }) => dispatch({ type: A.TOGGLE_ASSET, id }));
-  on(Events.ASSETS_SOLO, ({ id }) => dispatch({ type: A.SOLO_ASSET, id }));
+  on(Events.ASSETS_TOGGLE, ({ id } = {}) => dispatch({ type: A.TOGGLE_ASSET, id }));
+  on(Events.ASSETS_SOLO, ({ id } = {}) => dispatch({ type: A.SOLO_ASSET, id }));
   on(Events.ASSETS_TOGGLE_ALL, (on) => dispatch({ type: A.TOGGLE_ALL_ASSETS, payload: on }));
   on(Events.ASSETS_SEARCH, (q) => dispatch({ type: A.SET_SEARCH, payload: q }));
   on(Events.ASSETS_CAT_FILTER, (cat) => dispatch({ type: A.SET_CAT_FILTER, payload: cat }));
-  on(Events.ASSETS_WEIGHT_CYCLE, ({ id }) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
-  on(Events.ASSETS_OPTION_CYCLE, ({ id, key }) => dispatch({ type: 'CYCLE_ASSET_OPTION', id, key })); // #1694 S2
-  on(Events.ASSETS_STILL_TOGGLE, ({ id }) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
-  on(Events.ASSETS_WEIGHT_SET, ({ id, weight }) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
-  on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight }) =>
+  on(Events.ASSETS_WEIGHT_CYCLE, ({ id } = {}) => dispatch({ type: 'CYCLE_ASSET_WEIGHT', id }));
+  on(Events.ASSETS_OPTION_CYCLE, ({ id, key } = {}) => dispatch({ type: 'CYCLE_ASSET_OPTION', id, key })); // #1694 S2
+  on(Events.ASSETS_STILL_TOGGLE, ({ id } = {}) => dispatch({ type: 'TOGGLE_ASSET_STILL', id })); // #1128
+  on(Events.ASSETS_WEIGHT_SET, ({ id, weight } = {}) => dispatch({ type: A.SET_ASSET_WEIGHT, id, weight }));
+  on(Events.ASSETS_CATEGORY_WEIGHT, ({ category, weight } = {}) =>
     dispatch({ type: A.SET_CATEGORY_WEIGHT, category, weight }),
   );
-  on(Events.ASSETS_TAGS, ({ ids, edit }) => dispatch({ type: 'EDIT_ASSET_TAGS', ids, edit })); // #1943
+  on(Events.ASSETS_TAGS, ({ ids, edit } = {}) => dispatch({ type: 'EDIT_ASSET_TAGS', ids, edit })); // #1943
   on(Events.ASSETS_KIT_TRIAD, (ids) => dispatch({ type: 'SET_KIT_TRIAD', ids })); // #1944
   on(Events.ASSETS_KIT_SAVE, (kit) => dispatch({ type: 'SAVE_KIT', kit }));
-  on(Events.ASSETS_KIT_REMOVE, ({ id }) => dispatch({ type: 'REMOVE_KIT', id }));
-  on(Events.ASSETS_BULK, ({ ids, weight, enabled }) => {
+  on(Events.ASSETS_KIT_REMOVE, ({ id } = {}) => dispatch({ type: 'REMOVE_KIT', id }));
+  on(Events.ASSETS_BULK, ({ ids, weight, enabled } = {}) => {
     if (weight) dispatch({ type: 'SET_ASSETS_WEIGHT', ids, weight });
     if (typeof enabled === 'boolean') dispatch({ type: 'SET_ASSETS_ENABLED', ids, enabled });
   });
   on(Events.ASSETS_WEIGHT_CLEAR, () => dispatch({ type: A.CLEAR_WEIGHT_OVERRIDES }));
-  on(Events.ASSETS_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_ASSET', id }));
-  on(Events.ASSETS_INGEST, ({ svg, hint, category, source }) =>
+  on(Events.ASSETS_DUPLICATE, ({ id } = {}) => dispatch({ type: 'DUPLICATE_ASSET', id }));
+  on(Events.ASSETS_INGEST, ({ svg, hint, category, source } = {}) =>
     dispatch({ type: 'INGEST_ASSET', svg, hint, category, source }),
   );
-  on(Events.ASSETS_REMOVE, ({ id }) => dispatch({ type: 'REMOVE_CUSTOM_ASSET', id }));
-  on(Events.ASSETS_RENAME, ({ id, name }) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
-  on(Events.ASSETS_REPLACE, ({ id, svg }) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
-  on(Events.ASSETS_REGION_SLOT, ({ id, slot, regionId }) =>
+  on(Events.ASSETS_REMOVE, ({ id } = {}) => dispatch({ type: 'REMOVE_CUSTOM_ASSET', id }));
+  on(Events.ASSETS_RENAME, ({ id, name } = {}) => dispatch({ type: 'RENAME_CUSTOM_ASSET', id, name }));
+  on(Events.ASSETS_REPLACE, ({ id, svg } = {}) => dispatch({ type: 'REPLACE_CUSTOM_ASSET', id, svg }));
+  on(Events.ASSETS_REGION_SLOT, ({ id, slot, regionId } = {}) =>
     dispatch({ type: 'SET_ASSET_REGION_SLOT', id, slot, regionId }),
   );
-  on(Events.ASSETS_REGION_KINEME, ({ id, regionId, value }) =>
+  on(Events.ASSETS_REGION_KINEME, ({ id, regionId, value } = {}) =>
     dispatch({ type: 'SET_ASSET_REGION_KINEME', id, regionId, value }),
   ); // #1434
 
@@ -107,56 +107,56 @@ export function wireEventBus(rawDispatch) {
   on(Events.EXPORT_LOAD_PROJECT, (project) => dispatch({ type: A.LOAD_PROJECT, project }));
 
   on(Events.LAYER_ADD, (p) => dispatch({ type: A.ADD_LAYER, family: p?.family }));
-  on(Events.LAYER_REMOVE, ({ id }) => dispatch({ type: A.REMOVE_LAYER, id }));
-  on(Events.LAYER_SET_ACTIVE, ({ id }) => dispatch({ type: A.SET_ACTIVE_LAYER, id }));
-  on(Events.LAYER_SWAP_POSITIONS, ({ idA, idB }) => dispatch({ type: A.SWAP_LAYER_POSITIONS, idA, idB }));
-  on(Events.LAYER_TOGGLE_VISIBLE, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
-  on(Events.LAYER_TOGGLE_FEEDS_ACCUM, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_FEEDS_ACCUM, id }));
-  on(Events.LAYER_TOGGLE_WET_SOAK, ({ id }) => dispatch({ type: A.TOGGLE_LAYER_WET_SOAK, id }));
-  on(Events.LAYER_SET_BLEND_MODE, ({ id, mode }) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
-  on(Events.LAYER_SET_OPACITY, ({ id, opacity }) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
-  on(Events.LAYER_SET_ROTATION, ({ id, rotation }) => dispatch({ type: A.SET_LAYER_ROTATION, id, rotation }));
-  on(Events.LAYER_DUPLICATE, ({ id }) => dispatch({ type: 'DUPLICATE_LAYER', id }));
-  on(Events.LAYER_SOLO, ({ id }) => dispatch({ type: 'SOLO_LAYER', id }));
+  on(Events.LAYER_REMOVE, ({ id } = {}) => dispatch({ type: A.REMOVE_LAYER, id }));
+  on(Events.LAYER_SET_ACTIVE, ({ id } = {}) => dispatch({ type: A.SET_ACTIVE_LAYER, id }));
+  on(Events.LAYER_SWAP_POSITIONS, ({ idA, idB } = {}) => dispatch({ type: A.SWAP_LAYER_POSITIONS, idA, idB }));
+  on(Events.LAYER_TOGGLE_VISIBLE, ({ id } = {}) => dispatch({ type: A.TOGGLE_LAYER_VISIBLE, id }));
+  on(Events.LAYER_TOGGLE_FEEDS_ACCUM, ({ id } = {}) => dispatch({ type: A.TOGGLE_LAYER_FEEDS_ACCUM, id }));
+  on(Events.LAYER_TOGGLE_WET_SOAK, ({ id } = {}) => dispatch({ type: A.TOGGLE_LAYER_WET_SOAK, id }));
+  on(Events.LAYER_SET_BLEND_MODE, ({ id, mode } = {}) => dispatch({ type: A.SET_LAYER_BLEND_MODE, id, mode }));
+  on(Events.LAYER_SET_OPACITY, ({ id, opacity } = {}) => dispatch({ type: A.SET_LAYER_OPACITY, id, opacity }));
+  on(Events.LAYER_SET_ROTATION, ({ id, rotation } = {}) => dispatch({ type: A.SET_LAYER_ROTATION, id, rotation }));
+  on(Events.LAYER_DUPLICATE, ({ id } = {}) => dispatch({ type: 'DUPLICATE_LAYER', id }));
+  on(Events.LAYER_SOLO, ({ id } = {}) => dispatch({ type: 'SOLO_LAYER', id }));
   on(Events.LAYER_ADD_FX, (p) => dispatch({ type: A.ADD_FX_LAYER, family: p?.family }));
-  on(Events.FX_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
-  on(Events.FX_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
-  on(Events.FX_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
-  on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value }) =>
+  on(Events.FX_SELECT, ({ id } = {}) => dispatch({ type: A.SET_SELECTED_FX_LAYER, id }));
+  on(Events.FX_EFFECT_ADD, ({ layerId, kind } = {}) => dispatch({ type: A.FX_EFFECT_ADD, layerId, kind }));
+  on(Events.FX_EFFECT_REMOVE, ({ layerId, index } = {}) => dispatch({ type: A.FX_EFFECT_REMOVE, layerId, index }));
+  on(Events.FX_EFFECT_SET_PARAM, ({ layerId, index, key, value } = {}) =>
     dispatch({ type: A.FX_EFFECT_SET_PARAM, layerId, index, key, value }),
   );
   on(Events.LAYER_ADD_MATH, () => dispatch({ type: A.ADD_MATH_LAYER }));
-  on(Events.MATH_SELECT, ({ id }) => dispatch({ type: A.SET_SELECTED_MATH_LAYER, id }));
-  on(Events.MATH_EFFECT_ADD, ({ layerId, kind }) => dispatch({ type: A.MATH_EFFECT_ADD, layerId, kind }));
-  on(Events.MATH_EFFECT_REMOVE, ({ layerId, index }) => dispatch({ type: A.MATH_EFFECT_REMOVE, layerId, index }));
-  on(Events.MATH_EFFECT_REORDER, ({ layerId, index, delta }) =>
+  on(Events.MATH_SELECT, ({ id } = {}) => dispatch({ type: A.SET_SELECTED_MATH_LAYER, id }));
+  on(Events.MATH_EFFECT_ADD, ({ layerId, kind } = {}) => dispatch({ type: A.MATH_EFFECT_ADD, layerId, kind }));
+  on(Events.MATH_EFFECT_REMOVE, ({ layerId, index } = {}) => dispatch({ type: A.MATH_EFFECT_REMOVE, layerId, index }));
+  on(Events.MATH_EFFECT_REORDER, ({ layerId, index, delta } = {}) =>
     dispatch({ type: A.MATH_EFFECT_REORDER, layerId, index, delta }),
   );
-  on(Events.MATH_EFFECT_SET_KIND, ({ layerId, index, kind }) =>
+  on(Events.MATH_EFFECT_SET_KIND, ({ layerId, index, kind } = {}) =>
     dispatch({ type: A.MATH_EFFECT_SET_KIND, layerId, index, kind }),
   );
-  on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value }) =>
+  on(Events.MATH_EFFECT_SET_PARAM, ({ layerId, index, key, value } = {}) =>
     dispatch({ type: A.MATH_EFFECT_SET_PARAM, layerId, index, key, value }),
   );
-  on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod }) =>
+  on(Events.MATH_EFFECT_SET_MOD, ({ layerId, index, key, mod } = {}) =>
     dispatch({ type: A.MATH_EFFECT_SET_MOD, layerId, index, key, mod }),
   );
 
   on(Events.PALETTE_SAVE, ({ name } = {}) => dispatch({ type: A.SAVE_USER_PALETTE, name }));
-  on(Events.PALETTE_DELETE, ({ id }) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
-  on(Events.PALETTE_SET_ID, ({ id }) => dispatch({ type: A.SET_PALETTE_ID, payload: id }));
-  on(Events.PALETTE_SWATCH, ({ index, hex }) => dispatch({ type: A.SET_PALETTE_SWATCH, index, hex }));
-  on(Events.PALETTE_BG, ({ hex }) => dispatch({ type: A.SET_PALETTE_BG, payload: hex }));
-  on(Events.PALETTE_INK, ({ hex }) => dispatch({ type: A.SET_PALETTE_INK, payload: hex }));
+  on(Events.PALETTE_DELETE, ({ id } = {}) => dispatch({ type: A.DELETE_USER_PALETTE, id }));
+  on(Events.PALETTE_SET_ID, ({ id } = {}) => dispatch({ type: A.SET_PALETTE_ID, payload: id }));
+  on(Events.PALETTE_SWATCH, ({ index, hex } = {}) => dispatch({ type: A.SET_PALETTE_SWATCH, index, hex }));
+  on(Events.PALETTE_BG, ({ hex } = {}) => dispatch({ type: A.SET_PALETTE_BG, payload: hex }));
+  on(Events.PALETTE_INK, ({ hex } = {}) => dispatch({ type: A.SET_PALETTE_INK, payload: hex }));
   on(Events.PALETTE_OVERRIDES, (overrides) => dispatch({ type: A.SET_PALETTE_OVERRIDES, overrides }));
   on(Events.PALETTE_CLEAR_OVERRIDES, () => dispatch({ type: A.CLEAR_PALETTE_OVERRIDES }));
-  on(Events.PALETTE_COLOR_MODE, ({ mode }) => dispatch({ type: A.SET_COLOR_MODE, payload: mode }));
-  on(Events.RUN_SET, ({ running }) => dispatch({ type: A.SET_RUNNING, payload: !!running }));
+  on(Events.PALETTE_COLOR_MODE, ({ mode } = {}) => dispatch({ type: A.SET_COLOR_MODE, payload: mode }));
+  on(Events.RUN_SET, ({ running } = {}) => dispatch({ type: A.SET_RUNNING, payload: !!running }));
   on(Events.PALETTE_IMPORT, (list) => dispatch({ type: A.IMPORT_USER_PALETTES, payload: list }));
-  on(Events.PALETTE_LOCK, ({ index, clear }) =>
+  on(Events.PALETTE_LOCK, ({ index, clear } = {}) =>
     dispatch(clear ? { type: A.CLEAR_PALETTE_LOCKS } : { type: A.TOGGLE_PALETTE_LOCK, index }),
   );
-  on(Events.PALETTE_HARMONY, ({ scheme }) => dispatch({ type: A.APPLY_HARMONY, scheme }));
+  on(Events.PALETTE_HARMONY, ({ scheme } = {}) => dispatch({ type: A.APPLY_HARMONY, scheme }));
   on(Events.VIEW_FULLSCREEN, () => dispatch({ type: A.TOGGLE_FULLSCREEN }));
   on(Events.STAGE_MODE, (p = {}) => dispatch({ type: A.SET_STAGE_MODE, mode: p.mode }));
   on(Events.STAGE_BLACKOUT, (p = {}) => dispatch({ type: A.SET_STAGE_BLACKOUT, on: p.on }));
