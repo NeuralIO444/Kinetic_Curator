@@ -35,8 +35,9 @@ const MindPanel = lazy(() => import('./MindPanel.jsx').then((m) => ({ default: m
 const CensusPanel = lazy(() => import('./CensusPanel.jsx').then((m) => ({ default: m.CensusPanel })));
 const TasteTreePanel = lazy(() => import('./TasteTreePanel.jsx').then((m) => ({ default: m.TasteTreePanel })));
 const ShelfDevPanel = lazy(() => import('./ShelfDevPanel.jsx').then((m) => ({ default: m.ShelfDevPanel })));
+const MegaMindPanel = lazy(() => import('./MegaMindPanel.jsx').then((m) => ({ default: m.MegaMindPanel })));
 
-/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590). */
+/** Tabs of the merged DEV panel — order per #691: X-Ray / Gov Tune / Shader Lab, then Biology (#793), Units, Kernel (#1233), Mind (#1464), Census (#1507), Taste Trees (XGBoost T3), Shelf (#1590), MegaMind (#1525). */
 export const DEV_TABS = [
   { id: 'xray', title: 'X-RAY', icon: '◉', component: GovernorXrayPanel },
   { id: 'govtune', title: 'GOV TUNE', icon: '◐', component: GovernorTunePanel },
@@ -54,6 +55,10 @@ export const DEV_TABS = [
   // #1590: the Keeps fill, backstage — the table in force, every named
   // preferences correction, and the last fill's receipt from the ledger.
   { id: 'shelf', title: 'SHELF', icon: '▥', component: ShelfDevPanel },
+  // #1525 MegaMind S1: the local model link — connect to a visitor's own
+  // Ollama, run the detection handshake, read the capability registry.
+  // Dev panel first (Matt's ruling, 2026-11-10); user Settings is a later move.
+  { id: 'megamind', title: 'MEGAMIND', icon: '⌬', component: MegaMindPanel },
 ];
 
 export const devTabById = (id) => DEV_TABS.find((t) => t.id === id) ?? DEV_TABS[0];

@@ -66,7 +66,7 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - **Creature system** (#1634, #1657–#1662, #1694, #1723) — one seeded mirrored skeleton draws all four types: the moth, robots (0° / 45° / 90° detents), L-system growths, and the glitch; many layered parts with an engraving finish. Wet Lab H/L markers (tap cycles plain → H → L → gone) designate head and limbs; the dish body carries slime as a material; dish pressure sizes limb growth; the band's material reaction starves or flourishes the body. Creatures spawn through the normal asset path. **ALife** (#1731, #1732, #1734–#1738; PR #1757) — bounds, dot-product facing, genome / drives / dreaming in the engine.
 - **KINETIC variety** (#1766; slices #1767–#1772, PR #1778) — 64 looks, 64 voices, and roll pools dealt from the whole library; a tap sweeps look → voice → the curator's capped nudge. The START pill tap-cycles the ceiling OFF → WEAK → MED → KOZ, with the deck readout beside it: 49 assets / 33 looks / 19 voices at OFF, 294 library assets at WEAK, 64 looks + 64 voices at MED and KOZ. Warm taps no longer re-roll accumulation blur (#1768).
 - **ROOM codec** (#1560; PRs #1727–#1730) — the directors' room as a live codec: face windows over a bus transcript, generative faces (Davis colour-Bayer dither, LOIS glyph dither), a story machine (relationship model, story generator, suspicion arc), and an offline-curated lore bank (`lore.json`) whose cold opens run through the story machine.
-- **Mind trio** (#1483; PRs #1783–#1785) — a spectrum summary in the show block (centroid, flux, flatness); LOIS judges the spectrum (a held or noise-wall spectrum reads flat, a moving one rides); the trio wakes on the next bar and stops when the audio goes off. Stages 1–2 + acceptance shipped; the Apple-backend field test (Part A) passed live on the Mac Studio 2026-11-02 — Part B (route vocabulary) is not built. MegaMind stays a design doc.
+- **Mind trio** (#1483; PRs #1783–#1785) — a spectrum summary in the show block (centroid, flux, flatness); LOIS judges the spectrum (a held or noise-wall spectrum reads flat, a moving one rides); the trio wakes on the next bar and stops when the audio goes off. Stages 1–2 + acceptance shipped; the Apple-backend field test (Part A) passed live on the Mac Studio 2026-11-02 — Part B (route vocabulary) is not built. MegaMind S1 (the local Ollama link) is built — see [MegaMind](#megamind--a-model-of-your-own); its persona wiring (S2) is not.
 - **Travel kinemes** (#1574–#1576, #1712–#1714) — transport core (FLOW sim + leash), PATH transports with per-stratum leashes, SURGE and parallax drift; the Queen stamps the trigger.
 - **WEATHER dial** (#1183; PR #1703) — slice 1: the per-content-layer dial drinks the haze of the nearest FX layer above it.
 - **The three reads** (#1627; PR #1717) — scale-band meter, mark-born weather, the duel. **STIMULI feedback warp** (#1490; PR #1722) — the previous frame, warped by the music. **Retroactive capture** (#1367; PR #1696) — save the last few minutes after something good happens.
@@ -78,7 +78,7 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 
 - Evolve seed-jitter glide, editable BEHAVE weights (#471 / #479).
 - Governor cost head (#1578) — the evaluator is merged and inert: no trained model, nothing calls it yet. The reactive governor remains the only governor.
-- MegaMind — designed and deferred. Mind's trio layer is live (above); its later stages are not built.
+- MegaMind S2 / S3 — the persona adapter over the linked model, and vision judging. S1 (connect + detect, below) is built; until S2 the trio still runs on rules.
 - FIELD S5 — the whisper channel (#1906): gated, waits on Matt's feel check. DISH LIFE (#1923) is fully ruled and deliberately unscheduled.
 - The Beast's remaining gates: S4's feel verdict (#1867) and S5's dish writing (#1868).
 - Syphon / NDI output (STAGE shows an honest not-linked state), colour space waits on #532 ACES.
@@ -87,6 +87,22 @@ The picture has mass and the flock keeps its own clock (dt loop, heading spring,
 - Matt-only: icons (#346), M3 calibration (#298), iPhone pass (#270).
 
 **Embargo:** lifted 2026-09-23 (Night Migration sign-off). Stage 1 unfrozen; deferred pile still waits. Plan: [docs/EMBARGO.md](docs/EMBARGO.md). Agents: [AGENTS.md](AGENTS.md) + [docs/ROADMAP_V1.md](docs/ROADMAP_V1.md).
+
+## MegaMind — a model of your own
+
+Point KC-1 at your own local Ollama and the Mind trio can run on your model (DEV → MEGAMIND in the dev panel: connect, and KC-1 measures the model — cadence tier, vision/cloud badges, context — never assumes). S1 is the link only; the persona wiring is S2. Full page: [docs/MEGAMIND.md](docs/MEGAMIND.md).
+
+KC-1 supports ONE configuration; everything outside it is *may work, unsupported*:
+
+```
+MegaMind — the House configuration (the one supported setup)
+Model: qwen3-vl:8b-instruct, served by Ollama on your own machine (lighter machines: qwen3-vl:4b-instruct)
+Endpoint: http://127.0.0.1:11434
+Persona calls: think off · temperature 0 for verdicts · num_predict capped at 150
+Context: num_ctx pinned at 16,384 at connect and never varied · keep_alive "30m", the model preloaded at connect
+Ollama must trust this origin: restart it with OLLAMA_ORIGINS set to the exact origin KC-1 is served from
+Everything else you connect may work, but it is unsupported — Ollama cloud models included: they are badged cloud and never recommended.
+```
 
 ## Philosophy
 

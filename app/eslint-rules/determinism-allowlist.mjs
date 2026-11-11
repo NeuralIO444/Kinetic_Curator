@@ -127,6 +127,16 @@ export const DETERMINISM_ALLOWLIST = {
       why: 'createPresenceDriver injectable now seam, defaulting to the wall clock — presence-timing telemetry',
     },
   },
+  'curator/megamindLive.js': {
+    'performance.now': {
+      count: 1,
+      why: '#1525: createLinkDriver\u2019s injectable now seam, defaulting to the wall clock — it times the Ollama warm probe, a real network measurement (the cadence tier IS the elapsed wall time); tests inject now, and the reading never feeds the sim or a take',
+    },
+    'Date.now': {
+      count: 1,
+      why: '#1525: the same driver\u2019s injectable stamp seam — the capability record\u2019s measured-at time, published as data for later stages; never sim input',
+    },
+  },
   'engine/kernel/tracks/patchDiag.mjs': {
     'Date.now': {
       count: 3,

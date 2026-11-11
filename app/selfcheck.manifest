@@ -570,6 +570,7 @@ node src/gl/masterGain.selfcheck.mjs
 node src/curator/mind.selfcheck.mjs
 node src/curator/mindFace.selfcheck.mjs
 node src/curator/mindApple.selfcheck.mjs
+node src/curator/megamindLink.selfcheck.mjs
 node src/curator/mindPresence.selfcheck.mjs
 node src/curator/directorRoom.selfcheck.mjs
 node src/curator/directorPresence.selfcheck.mjs
