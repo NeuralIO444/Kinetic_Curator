@@ -12,6 +12,13 @@
 // Hook note (2026-10-15): the XGBoost narration surfaces are consumers like everything else — Davis reason
 // prose, drift/retrain narration, recap narration. The heads themselves (taste #1579–#1581, governor #1578)
 // are Mind-tier and backend-agnostic: they get NO entry here, and no capability ever switches a head on or off.
+//
+// A tier is a measurement, not a claim (#1525 QA round 1): a record naming tier A or B is only believable
+// with the probe that earns it — clean, and timed inside that tier's bound (the same bounds classifyTier
+// measures by, imported from the link so the two can never drift). A record whose tier outruns its own
+// probe numbers is refused whole, and consumerEnabled re-checks every record it is handed, so a tier
+// field alone never enables anything here or in any later stage that reads this registry as proof.
+import { TIER_A_MAX_MS, TIER_B_MAX_MS } from '../curator/megamindLink.mjs';
 
 /** Cadence tiers, fastest first: A per-bar, B phrase, C deep-verdict-only. Rank is the array index. */
 export const CAPABILITY_TIERS = Object.freeze(['A', 'B', 'C']);
@@ -150,6 +157,12 @@ export function checkCapabilityRecord(raw) {
   if (!['controllable', 'unreported'].includes(raw.thinking)) return null;
   if (!(raw.probeMs === null || (Number.isFinite(raw.probeMs) && raw.probeMs >= 0))) return null;
   if (typeof raw.probeClean !== 'boolean' || !Number.isFinite(raw.at)) return null;
+  // The measurement invariant: tier A or B must be backed by a clean probe timed inside that tier's bound.
+  // (Tier C makes no speed claim, so an unclean or untimed probe contradicts nothing there.)
+  if (raw.tier === 'A' || raw.tier === 'B') {
+    const bound = raw.tier === 'A' ? TIER_A_MAX_MS : TIER_B_MAX_MS;
+    if (raw.probeClean !== true || !Number.isFinite(raw.probeMs) || raw.probeMs > bound) return null;
+  }
   return Object.freeze({
     endpoint,
     model,
@@ -163,8 +176,13 @@ export function checkCapabilityRecord(raw) {
   });
 }
 
-/** Pure: does this record enable this consumer? No record (rules) enables nothing. */
-export function consumerEnabled(record, consumer) {
+/**
+ * Pure: does this record enable this consumer? No record (rules) enables nothing — and neither does a
+ * record that fails validation: the record is re-checked here, so a hand-built record whose tier
+ * outruns its probe numbers enables nothing even when it never passed through setCapabilities.
+ */
+export function consumerEnabled(rawRecord, consumer) {
+  const record = checkCapabilityRecord(rawRecord);
   if (!record || !consumer) return false;
   const needs = consumer.needs || {};
   if (needs.tier && tierRank(record.tier) > tierRank(needs.tier)) return false;

@@ -17,6 +17,7 @@ import {
   errorCopy,
   fetchShow,
   fetchTags,
+  isDesktopShellEndpoint,
   isSafariUa,
   normalizeEndpoint,
   preloadModel,
@@ -142,6 +143,10 @@ export function createLinkDriver({
       const endpoint = normalizeEndpoint(endpointRaw);
       if (!endpoint) return fail('bad-endpoint');
       set({ endpoint });
+      // The desktop shell's CSP allows exactly one connect origin (the House endpoint's); any other
+      // endpoint is refused by the shell itself, so name that gate instead of fetching into what
+      // would otherwise collapse into the generic unreachable copy.
+      if (isDesktop() && !isDesktopShellEndpoint(endpoint)) return fail('shell-endpoint');
       if (!isDesktop() && isSafariUa(userAgent)) return fail('safari');
       set({ phase: 'connecting', error: null, models: [], record: null });
       const tags = await fetchTags(fetchImpl, endpoint);

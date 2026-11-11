@@ -57,6 +57,20 @@ export function normalizeEndpoint(raw) {
 }
 
 /**
+ * True when an endpoint's origin is the ONE origin the desktop shell may connect to. The shell's CSP
+ * (src-tauri/tauri.conf.json, #1525) allows exactly the House endpoint's origin in connect-src and no
+ * other remote address, so inside the shell any other endpoint is refused by the app itself — a gate
+ * of its own ('shell-endpoint' in errorCopy), never the generic unreachable failure.
+ */
+export function isDesktopShellEndpoint(endpoint) {
+  try {
+    return new URL(endpoint).origin === new URL(DEFAULT_ENDPOINT).origin;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Cloud pointers, by name shape alone (plan §1: Ollama's cloud naming has several shapes —
  * `gpt-oss:120b-cloud`, `glm-5.1:cloud`, `deepseek-v3.1:671b-cloud`). A cloud model is connectable
  * and badged, never recommended: it runs on Ollama's cloud, not on the visitor's machine.
@@ -385,6 +399,14 @@ export function errorCopy(gate, ctx = {}) {
         lines: [
           'Safari blocks a page from talking to a model server on your own machine, so the link can neither be tested nor used from Safari.',
           'Open KC-1 in the desktop app to connect a local model.',
+        ],
+      };
+    case 'shell-endpoint':
+      return {
+        title: 'The desktop app only connects to Ollama at one address.',
+        lines: [
+          `The desktop shell allows the link exactly one origin — ${DEFAULT_ENDPOINT}, Ollama on this machine — and refuses every other endpoint itself, before any request leaves the app. Nothing was sent to ${endpoint}.`,
+          `Set the endpoint to ${DEFAULT_ENDPOINT} and press Connect again.`,
         ],
       };
     case 'unreachable':

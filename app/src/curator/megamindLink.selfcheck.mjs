@@ -285,6 +285,47 @@ await ok('registry records validate fail-closed; consumers enable by capability,
   assert.equal(consumerEnabled(base, consumerById('persona.deep')), true);
 });
 
+await ok('a tier is a measurement: records whose tier outruns their probe are refused whole (QA round 1)', () => {
+  const honest = {
+    endpoint: DEFAULT_ENDPOINT,
+    model: 'qwen2.5-coder:1.5b',
+    tier: 'A',
+    badges: [],
+    context: 32768,
+    thinking: 'unreported',
+    probeMs: 900,
+    probeClean: true,
+    at: 3,
+  };
+  // the control case: an honest tier A record validates and enables per-bar
+  assert.ok(checkCapabilityRecord(honest));
+  assert.equal(consumerEnabled(honest, consumerById('persona.perBar')), true);
+  // QA's three contradictory records: tier A claimed without the measurement that earns it
+  for (const lie of [
+    { ...honest, probeClean: false },
+    { ...honest, probeMs: null },
+    { ...honest, probeMs: 999999 },
+  ]) {
+    assert.equal(checkCapabilityRecord(lie), null, 'refused at validation');
+    assert.equal(
+      consumerEnabled(lie, consumerById('persona.perBar')),
+      false,
+      'and enables nothing even when handed straight to consumerEnabled',
+    );
+  }
+  // the same law at tier B, both ways it can be broken
+  const honestB = { ...honest, tier: 'B', probeMs: 4200 };
+  assert.ok(checkCapabilityRecord(honestB));
+  assert.equal(checkCapabilityRecord({ ...honestB, probeClean: false }), null);
+  assert.equal(checkCapabilityRecord({ ...honestB, probeMs: 999999 }), null);
+  // a live publish of a contradictory record changes nothing, like any malformed record
+  setCapabilities(null);
+  setCapabilities(honest);
+  setCapabilities({ ...honest, probeMs: 999999 });
+  assert.equal(getCapabilities().probeMs, 900, 'the honest record stands');
+  setCapabilities(null);
+});
+
 await ok('the hook note holds: narration surfaces are consumers; the heads get no entry and no switch', () => {
   const ids = CAPABILITY_CONSUMERS.map((c) => c.id);
   for (const s of ['narration.davisReason', 'narration.driftRetrain', 'narration.recap'])
@@ -522,10 +563,32 @@ await ok('Safari is refused before any fetch; the desktop shell is exempt (it is
   driver.disconnect();
 });
 
+await ok('in the desktop shell, a non-House endpoint fails as its own gate — before any fetch', async () => {
+  setCapabilities(null);
+  const { driver, calls } = makeDriver({ driver: { isDesktop: () => true } });
+  assert.equal(await driver.connect('http://192.168.1.20:11434'), false);
+  const v = driver.view();
+  assert.equal(v.phase, 'error');
+  assert.equal(v.error.gate, 'shell-endpoint');
+  assert.ok(
+    v.error.lines.some((l) => l.includes(DEFAULT_ENDPOINT)),
+    'the copy names the one address the shell allows',
+  );
+  assert.equal(calls.length, 0, 'the shell refuses the endpoint itself: nothing is fetched');
+  // the House endpoint itself connects in the shell (also covered by the Safari-exemption case above)
+  assert.equal(await driver.connect(DEFAULT_ENDPOINT), true);
+  driver.disconnect();
+  // outside the shell there is no such gate: another endpoint is fetched and judged on its answers
+  const web = makeDriver();
+  assert.equal(await web.driver.connect('http://192.168.1.20:11434'), true);
+  web.driver.disconnect();
+});
+
 await ok('error copy: every gate has a title and lines; the origin restart step is per-OS', () => {
   for (const gate of [
     'bad-endpoint',
     'safari',
+    'shell-endpoint',
     'unreachable',
     'origin',
     'http',
