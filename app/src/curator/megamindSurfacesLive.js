@@ -9,7 +9,7 @@
 //
 // What it reads is real: pacing from the Director's room history on the bus, telemetry narration from
 // this session's mind:decision / mind:reply traffic, census + drift from the live keep ledger and the
-// loaded taste (censusReport.tasteAgreement → censusReadout.agreementView — the T2 readout, computed,
+// loaded taste (tasteHead.tasteAgreement → censusReadout.agreementView — the T2 readout, computed,
 // never fabricated), crown drafts from the crown log's latest entry, the guide from the shipped corpus.
 import { Events, on } from '../composition/eventBus.js';
 import { askSurfaceText, surfaceRecord } from './megamindVoice.mjs';
@@ -32,11 +32,10 @@ import {
   validatePacingProposal,
   validateReasonLine,
 } from './megamindSurfaces.mjs';
-import { getDavisCitation, setDavisReasonProse } from './tasteHead.js';
+import { getDavisCitation, setDavisReasonProse, tasteAgreement } from './tasteHead.js';
 import { readCrowns } from './diceCrowns.js';
 import { ledgerCounts, parseLedger, readLedgerText } from './tasteLedger.js';
 import { getTaste } from './tasteStore.js';
-import { tasteAgreement } from './censusReport.mjs';
 import { agreementView } from './censusReadout.mjs';
 
 // The surface gate itself lives in megamindVoice.mjs (the light core — see surfaceRecord there);
