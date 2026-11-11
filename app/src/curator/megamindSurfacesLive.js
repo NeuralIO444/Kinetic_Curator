@@ -12,13 +12,7 @@
 // loaded taste (censusReport.tasteAgreement → censusReadout.agreementView — the T2 readout, computed,
 // never fabricated), crown drafts from the crown log's latest entry, the guide from the shipped corpus.
 import { Events, on } from '../composition/eventBus.js';
-import {
-  checkCapabilityRecord,
-  consumerById,
-  consumerEnabled,
-  getCapabilities,
-} from '../composition/capabilityRegistry.mjs';
-import { askSurfaceText } from './megamindVoice.mjs';
+import { askSurfaceText, surfaceRecord } from './megamindVoice.mjs';
 import {
   GUIDE_DECLINE,
   buildCrownRequest,
@@ -45,12 +39,9 @@ import { getTaste } from './tasteStore.js';
 import { tasteAgreement } from './censusReport.mjs';
 import { agreementView } from './censusReadout.mjs';
 
-/** The record a surface may use, or null: measured, local, and enabling THIS surface's consumer. */
-export function surfaceRecord(consumerId, raw = getCapabilities()) {
-  const rec = checkCapabilityRecord(raw);
-  if (!rec || rec.badges.includes('cloud')) return null;
-  return consumerEnabled(rec, consumerById(consumerId)) ? rec : null;
-}
+// The surface gate itself lives in megamindVoice.mjs (the light core — see surfaceRecord there);
+// re-exported here so this driver's existing consumers keep their import.
+export { surfaceRecord };
 
 /** The T2 agreement readout over the live ledger + loaded taste, as the readout's own view model. */
 export function liveAgreement() {

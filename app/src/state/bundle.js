@@ -131,6 +131,8 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     '#1173 training labels, append-only: saved on their own as keeps.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history',
   'kc:ledger:passes:v1':
     '#1173 training labels, append-only: saved on their own as passes.jsonl (Pipeline ↓ LEDGERS); a restored bundle must never rewrite that history',
+  'kc:ledger:judge:v1':
+    '#1527 the judge ledger: LOIS vision verdicts accrue here, a separate judge ledger that is never a training label (#1173 rule); exported on its own as judge.jsonl from the candidate tray, and a restored bundle must never rewrite that history either',
   'kc:dice-crowns:v1': 'dice affinity index; the crowns themselves persist in the keeps ledger',
   'kc:dice-crowns:v1:shed':
     "#1645 the crown log's shed counter — it totals what a log that stays out of the bundle has shed; the count means nothing without that log beside it",

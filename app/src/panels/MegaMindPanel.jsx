@@ -12,6 +12,7 @@ import { ensureLinkDriver, getLinkView, subscribeLink } from '../curator/megamin
 import { HOUSE_TEXT, TIER_BLURB } from '../curator/megamindLink.mjs';
 import { CAPABILITY_CONSUMERS, capabilityEnabled } from '../composition/capabilityRegistry.mjs';
 import { ensureSurfacesDriver, getSurfacesView, subscribeSurfaces } from '../curator/megamindSurfacesLive.js';
+import { ensureVisionDriver, getVisionView, subscribeVision } from '../curator/megamindVisionLive.js';
 
 const cell = { padding: '2px 6px', borderBottom: '1px solid #333', textAlign: 'left', whiteSpace: 'nowrap' };
 const btn = {
@@ -155,6 +156,7 @@ export function MegaMindPanel() {
         <pre style={{ whiteSpace: 'pre-wrap', fontSize: 11 }}>{HOUSE_TEXT}</pre>
       </details>
       <Surfaces record={view.record} />
+      <Vision record={view.record} />
       <details style={{ marginTop: 10 }}>
         <summary>capability registry — what later stages may do</summary>
         <table style={{ borderCollapse: 'collapse', width: '100%' }}>
@@ -171,6 +173,75 @@ export function MegaMindPanel() {
         </table>
       </details>
     </div>
+  );
+}
+
+// ── S3 (#1527): vision — stage description lives here; render judging lives in the candidate tray ────
+// LOIS vision judging (E4 render judging + E5 offspring pre-judging) is a press on the DIRECTORS
+// candidate tray, where the stills are; what lives in MegaMind's home is the accessibility surface:
+// an on-demand description of the current stage frame, printed here. Speaking it is a second,
+// separate press and never automatic. With no frame offered by the stage, the honest state is
+// "no frame" — a description is never fabricated.
+function Vision({ record }) {
+  const [driver] = useState(() => ensureVisionDriver());
+  const [vv, setVv] = useState(getVisionView);
+  useEffect(() => subscribeVision(() => setVv(getVisionView())), []);
+  if (!vv) return null;
+  const local = !!record && !record.badges.includes('cloud');
+  const describeOn = local && capabilityEnabled('stage.describe');
+  const judgeOn = local && capabilityEnabled('lois.vision');
+  const speak = () => {
+    if (!vv.description) return;
+    const synth = globalThis.speechSynthesis;
+    if (!synth || typeof SpeechSynthesisUtterance === 'undefined') return;
+    synth.speak(new SpeechSynthesisUtterance(vv.description.text));
+  };
+  return (
+    <details style={{ marginTop: 10 }} open>
+      <summary>S3 — vision (occasional, deliberate press only; nothing is judged per-bar)</summary>
+      <p style={{ opacity: 0.75, margin: '8px 0 4px' }}>
+        Render judging: {judgeOn ? 'enabled' : 'off'} — the &ldquo;judge stills&rdquo; press on the DIRECTORS candidate
+        tray sends each finalist&rsquo;s displayed still to LOIS&rsquo;s vision (variant stills are the E5
+        pre-judgements). Verdicts sit beside the bake-time rules verdict and steer nothing; each accrues in the judge
+        ledger, never in the taste ledgers.
+      </p>
+      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', margin: '8px 0' }}>
+        <button
+          type="button"
+          style={btn}
+          disabled={!describeOn || vv.describing}
+          onClick={() => driver.describeStage()}
+        >
+          describe the stage
+        </button>
+        {vv.description && (
+          <button type="button" style={btn} onClick={speak}>
+            speak it
+          </button>
+        )}
+      </div>
+      {vv.describing && <p style={{ opacity: 0.85 }}>asking the model to look at the stage…</p>}
+      {vv.describeError && <p style={{ opacity: 0.9, color: '#e88' }}>{vv.describeError}</p>}
+      {vv.description && (
+        <div style={{ margin: '4px 0' }}>
+          <p style={{ margin: '0 0 2px' }}>{vv.description.text}</p>
+          <p style={{ margin: 0, opacity: 0.7 }}>
+            described by {vv.description.model} · frame sha256 {vv.description.frameSha256.slice(0, 12)}… · the frame
+            the stage was showing when you pressed
+          </p>
+        </div>
+      )}
+      {!local && (
+        <p style={{ opacity: 0.75 }}>
+          {record
+            ? 'The linked model is a cloud pointer — vision surfaces are local-only, like everything in MegaMind.'
+            : 'Connect a local model with the vision badge to enable stage description.'}
+        </p>
+      )}
+      {local && !describeOn && (
+        <p style={{ opacity: 0.75 }}>The linked model carries no vision badge — stage description stays off.</p>
+      )}
+    </details>
   );
 }
 
