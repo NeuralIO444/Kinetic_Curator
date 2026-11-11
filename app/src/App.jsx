@@ -77,7 +77,7 @@ import { SPECTRUM_PARAMS } from './curator/mindConduct.js'; // #1483 stage 2: th
 import { observeAudio } from './composition/audioLive.js'; // #1459: audio events on the bus
 import { readMeterBandLevels, getAudioMeterTap } from './hooks/audioMeterTap.js';
 import { startSpectrum, readSpectrum } from './gl/spectrumLive.mjs'; // #1482 P2: the live spectrum
-import { observeClock } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
+import { observeClock, getLoopMs, getMusicalTime } from './composition/clockLive.js'; // #1458: bar / beat / phase on the loop clock
 import { observeMotion } from './composition/motionLive.js'; // #1469: the frame's living-motion read, to the MOTION strip's tap
 import { setResolveFrameTap } from './gl/resolveTap.mjs';
 import { captureFavorite } from './state/slices/davisSlice.js';
@@ -121,7 +121,10 @@ function AppInner() {
   // whisper.js; the lines ship copy-only while the sway gate stays closed.
   useEffect(() => {
     initWhisperTriggers(useStore.getState, useStore.subscribe);
-    const stopDirectorBeat = initDirectorBeat(useStore.subscribe); // #1145: the Director's beat input (#2089: unsubscribed below)
+    const stopDirectorBeat = initDirectorBeat(useStore.subscribe, () => ({
+      loopMs: getLoopMs(),
+      bpm: getMusicalTime().bpm,
+    })); // #1145: the Director's beat input (#2089: unsubscribed below)
     initPhase(useStore.subscribe); // #1144: explore / refine, from what the artist does
     // #1354 — stress and bands from honest counts (artist actions, rolls since the last keep). Computed only: no
     // persona reads the band yet; ?debug=stress shows it.
