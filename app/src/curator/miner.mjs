@@ -43,6 +43,18 @@
 // members with Davis variants of themselves. Default fraction 0 —
 // no draws consumed, no sample changed, the default run is still
 // byte-identical.
+//
+// #1528 (MegaMind embeddings) extends it a third time, the same way:
+// a run may be HANDED an embeddings cache (a model identity + vectors
+// keyed by source-text SHA-256, computed locally by the embeddings
+// slot — megamindEmbed.mjs). Selection then gains a semantic novelty
+// component beside the feature distance: novelty = feature novelty +
+// SEMANTIC_NOVELTY_WEIGHT × semantic novelty, computed only where
+// both sides carry a vector from that one model. The feature
+// distance stays primary and deterministic; a candidate or keep
+// without a vector is compared on features alone, and a run handed
+// no cache — or a cache that resolves no vector — selects exactly
+// as E2 did. Default null: the default run is still byte-identical.
 import { createHash } from 'node:crypto';
 import { Resvg } from '@resvg/resvg-js';
 import { RESVG_FONT } from '../assets/resvgFont.mjs'; // #1970 — the bake's pinned font, never the host's
@@ -63,6 +75,7 @@ import { judgeRender, loisVerdictRow } from './loisJudge.mjs';
 import { applyRenderProfile, getRenderProfile, RENDER_PROFILE_IDS } from './renderProfiles.js';
 import { recipeFeatures } from './recipeFeatures.js';
 import { mulberry32 } from './coverageReport.mjs';
+import { SEMANTIC_NOVELTY_WEIGHT, blendNovelty, isVector, keepEmbedText, semanticDistance } from './megamindEmbed.mjs';
 import {
   COMBINE_OPS,
   RESTYLE_MODES,
@@ -740,34 +753,93 @@ const castCategoriesOf = (cast, sample) =>
  * batch guarantees carriers exist (anchored dealing); if every
  * carrier was discarded at bake, the proof reports the failure
  * honestly instead of papering over it.
+ *
+ * #1528: with `semantic` handed in ({ vectorOf, keepVectors }), the
+ * novelty above is the blend (feature + SEMANTIC_NOVELTY_WEIGHT ×
+ * semantic, megamindEmbed.mjs) and every finalist carries its
+ * pick-time axis components as `semanticAxes` — the dual-axis record
+ * the run report prints side by side. Without it, this function is
+ * the E2 function, untouched.
  */
-export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {}) {
+export function selectFinalists(baked, keepsFeatures, { finalistCount = 12, semantic = null } = {}) {
   const pool = [...baked];
   const distToKeeps = (c) =>
     keepsFeatures.length ? Math.min(...keepsFeatures.map((kf) => featureDistance(c.features, kf))) : Infinity;
   const minDistTo = (c, set) =>
     set.length ? Math.min(...set.map((o) => featureDistance(c.features, o.features))) : Infinity;
-  const novelty = (c, picked) => Math.min(distToKeeps(c), minDistTo(c, picked));
+  const featureNovelty = (c, picked) => Math.min(distToKeeps(c), minDistTo(c, picked));
+
+  // #1528: the semantic component. `semantic` = { vectorOf(candidate) → vector|null,
+  // keepVectors: (vector|null)[] aligned with keepsFeatures }. A candidate's semantic novelty is
+  // its nearest semantic distance over keeps ∪ picked — over the members that CARRY vectors only;
+  // when the candidate, or every member of the comparison set, has none, the component is null
+  // and blendNovelty returns the feature novelty untouched (an embeddings-absent comparison is
+  // today's comparison, exactly).
+  const semNovelty = (c, picked) => {
+    if (!semantic) return null;
+    const v = semantic.vectorOf(c);
+    if (!v) return null;
+    let best = null;
+    const see = (w) => {
+      if (!w) return;
+      const d = semanticDistance(v, w);
+      if (d !== null && (best === null || d < best)) best = d;
+    };
+    for (const kv of semantic.keepVectors) see(kv);
+    for (const o of picked) see(semantic.vectorOf(o));
+    return best;
+  };
+  const novelty = (c, picked) =>
+    semantic ? blendNovelty(featureNovelty(c, picked), semNovelty(c, picked)) : featureNovelty(c, picked);
 
   const picked = [];
   const remaining = new Set(pool);
   while (picked.length < Math.min(finalistCount, pool.length) && remaining.size) {
     let best = null;
     let bestScore = -Infinity;
+    let bestAxes = null;
     for (const c of remaining) {
       let score;
+      let axes = null;
       if (!picked.length && !keepsFeatures.length) {
-        score =
+        const meanFeature =
           pool.reduce((s, o) => s + (o === c ? 0 : featureDistance(c.features, o.features)), 0) /
           Math.max(1, pool.length - 1);
+        if (semantic) {
+          const v = semantic.vectorOf(c);
+          let s = 0;
+          let n = 0;
+          if (v) {
+            for (const o of pool) {
+              if (o === c) continue;
+              const d = semanticDistance(v, semantic.vectorOf(o));
+              if (d !== null) {
+                s += d;
+                n++;
+              }
+            }
+          }
+          const meanSemantic = n ? s / n : null;
+          axes = { feature: meanFeature, semantic: meanSemantic };
+          score = blendNovelty(meanFeature, meanSemantic);
+        } else {
+          score = meanFeature;
+        }
+      } else if (semantic) {
+        const f = featureNovelty(c, picked);
+        const s = semNovelty(c, picked);
+        axes = { feature: f, semantic: s };
+        score = blendNovelty(f, s);
       } else {
         score = novelty(c, picked);
       }
       if (score > bestScore || (score === bestScore && best && c.sample.index < best.sample.index)) {
         best = c;
         bestScore = score;
+        bestAxes = axes;
       }
     }
+    if (semantic && best) best.semanticAxes = bestAxes;
     picked.push(best);
     remaining.delete(best);
   }
@@ -808,6 +880,9 @@ export function selectFinalists(baked, keepsFeatures, { finalistCount = 12 } = {
       }
     }
     if (swap && victim) {
+      if (semantic) {
+        swap.semanticAxes = { feature: featureNovelty(swap, picked), semantic: semNovelty(swap, picked) };
+      }
       picked[picked.indexOf(victim)] = swap;
       remaining.delete(swap);
       remaining.add(victim);
@@ -915,16 +990,19 @@ export function runIdFor({
   corner = null,
   davisCode = null,
   variantFraction = 0,
+  semanticAxis = false,
 } = {}) {
   const base = `xpl-${runSeed.toString(16)}-${batchSize}-${finalistCount}`;
   // E4: an aimed run names its corner (and Davis's state) in its id —
   // the default rotation run keeps the E2 id exactly.
   // E5: a variant-axis run names its fraction the same way.
+  // #1528: a run handed an embeddings cache names the axis the same way.
   return (
     base +
     (corner ? `-${corner}` : '') +
     (davisCode ? `-${String(davisCode).toLowerCase()}` : '') +
-    (variantFraction > 0 ? `-var${Math.round(variantFraction * 100)}` : '')
+    (variantFraction > 0 ? `-var${Math.round(variantFraction * 100)}` : '') +
+    (semanticAxis ? '-emb' : '')
   );
 }
 
@@ -932,7 +1010,10 @@ export function runIdFor({
  * One mining run, end to end: sample → bake (discard + log failures)
  * → measure → select. Pure in (runSeed, batchSize, finalistCount,
  * keeps): same inputs, same run — fingerprints, stats, finalists and
- * report numbers all reproduce exactly.
+ * report numbers all reproduce exactly. #1528's embeddings cache is
+ * an input in the same sense: vectors computed elsewhere (locally,
+ * by the slot) and handed in as data — this module makes no network
+ * call and reads no clock, with or without the axis.
  */
 export function runMiner({
   runSeed = MINER_SEED,
@@ -942,8 +1023,28 @@ export function runMiner({
   corner = null,
   davisCode = null,
   variantFraction = 0,
+  embeddings = null,
 } = {}) {
-  const runId = runIdFor({ runSeed, batchSize, finalistCount, corner, davisCode, variantFraction });
+  // #1528: an embeddings cache is "offered" when it names its model and carries its vector map —
+  // anything less is not an axis, and the run is the plain run (silently, by construction).
+  const embeddingsOffered =
+    embeddings &&
+    typeof embeddings === 'object' &&
+    typeof embeddings.model === 'string' &&
+    embeddings.model.length > 0 &&
+    embeddings.vectorsByTextHash &&
+    typeof embeddings.vectorsByTextHash === 'object'
+      ? { model: embeddings.model, vectorsByTextHash: embeddings.vectorsByTextHash }
+      : null;
+  const runId = runIdFor({
+    runSeed,
+    batchSize,
+    finalistCount,
+    corner,
+    davisCode,
+    variantFraction,
+    semanticAxis: !!embeddingsOffered,
+  });
   const samples = sampleBatch({ runSeed, batchSize, corner, davisCode, variantFraction });
   const baked = [];
   const discards = [];
@@ -973,7 +1074,51 @@ export function runMiner({
     });
   }
   const keepsFeatures = (keeps || []).map(featuresOfKeep).filter(Boolean);
-  const { finalists, quota } = selectFinalists(baked, keepsFeatures, { finalistCount });
+
+  // #1528: resolve the handed-in cache against this run's own texts. A text's vector is found by
+  // its SHA-256 (the cache's key law — megamindEmbed.mjs), computed here over the same embed text
+  // the slot embedded: the keep's caption/metadata composition, a variant standing at its lead
+  // parent (the featuresOf translation, applied to meaning as to features). A text with no entry
+  // resolves to null — that candidate/keep is compared on features alone.
+  let semantic = null;
+  let semanticReport = null;
+  if (embeddingsOffered) {
+    const byHash = embeddingsOffered.vectorsByTextHash;
+    const vectorForText = (text) => {
+      if (!text) return null;
+      const v = byHash[createHash('sha256').update(text).digest('hex')];
+      return isVector(v) ? [...v] : null;
+    };
+    const translateFrom = (recipes) => (recipes ? (id) => recipes.get(id)?.parents?.[0] ?? id : null);
+    const keepVectors = [];
+    for (const k of keeps || []) {
+      if (!featuresOfKeep(k)) continue; // aligned with keepsFeatures: a featureless keep drops out of both
+      const recipes =
+        Array.isArray(k?.provenance?.variants) && k.provenance.variants.length
+          ? new Map(k.provenance.variants.map((r) => [variantIdFor(r), r]))
+          : null;
+      keepVectors.push(vectorForText(keepEmbedText(k, { assetById: byId, translateId: translateFrom(recipes) })));
+    }
+    const candVectors = new Map();
+    for (const c of baked) {
+      const recipes = c.sample.variants ? new Map(Object.entries(c.sample.variants)) : null;
+      const v = vectorForText(keepEmbedText(c.record, { assetById: byId, translateId: translateFrom(recipes) }));
+      candVectors.set(c, v);
+      // The run data carries the vector it selected with (candidates.json via the run tool) —
+      // the cache, in the run's own folder, under the model that computed it.
+      if (v) c.embedding = { model: embeddingsOffered.model, dims: v.length, vector: v };
+    }
+    semantic = { vectorOf: (c) => candVectors.get(c) ?? null, keepVectors };
+    semanticReport = {
+      model: embeddingsOffered.model,
+      weight: SEMANTIC_NOVELTY_WEIGHT,
+      keepsEmbedded: keepVectors.filter(Boolean).length,
+      keepsTotal: keepVectors.length,
+      candidatesEmbedded: [...candVectors.values()].filter(Boolean).length,
+      candidatesTotal: baked.length,
+    };
+  }
+  const { finalists, quota } = selectFinalists(baked, keepsFeatures, { finalistCount, semantic });
 
   // E4 (#1508): LOIS judges the finalists' RENDERS. The verdict is a
   // pure function of the bake's measured stats + recipe features
@@ -1053,6 +1198,32 @@ export function runMiner({
     traySize: tray.length,
   };
 
+  // #1528: the semantic axis's accounting — present only when a cache was handed in (a plain
+  // run's report is the E2/E4/E5 report, unchanged). spreadSemantic is the finalists' mean
+  // pairwise semantic distance over the pairs that carry comparable vectors; the per-finalist
+  // rows are the two axes at pick time, side by side (the issue's acceptance shape).
+  if (semanticReport) {
+    const r4v = (x) => (Number.isFinite(x) ? +x.toFixed(4) : null);
+    const withVec = finalists.filter((f) => f.embedding);
+    let s = 0;
+    let n = 0;
+    for (let i = 0; i < withVec.length; i++) {
+      for (let j = i + 1; j < withVec.length; j++) {
+        const d = semanticDistance(withVec[i].embedding.vector, withVec[j].embedding.vector);
+        if (d !== null) {
+          s += d;
+          n++;
+        }
+      }
+    }
+    semanticReport.spreadSemantic = n ? +(s / n).toFixed(4) : null;
+    semanticReport.finalists = finalists.map((f) => ({
+      index: f.sample.index,
+      feature: f.semanticAxes ? r4v(f.semanticAxes.feature) : null,
+      semantic: f.semanticAxes ? r4v(f.semanticAxes.semantic) : null,
+    }));
+  }
+
   // E4: this run's yield by corner (spec §6 at run scale — the
   // accrual across runs lives in prospecting.yieldAccrual).
   const ybc = new Map();
@@ -1114,6 +1285,7 @@ export function runMiner({
         passes: finalists.filter((f) => f.loisVerdict?.verdict === 'pass').length,
       },
       ...(variantReport ? { variants: variantReport } : {}),
+      ...(semanticReport ? { semantic: semanticReport } : {}),
       yieldByCorner,
     },
   };
@@ -1171,6 +1343,25 @@ export function formatMinerReport(run) {
   );
   L.push(`  finalists render-statistic spread: ${r.spread.finalistsRender}`);
   L.push('');
+  if (r.semantic) {
+    const sm = r.semantic;
+    L.push(
+      `SEMANTIC AXIS (#1528, model ${sm.model}): novelty = feature + ${sm.weight} × semantic — vectors resolved for ${sm.candidatesEmbedded}/${sm.candidatesTotal} candidates and ${sm.keepsEmbedded}/${sm.keepsTotal} keeps (a text with no cached vector is compared on features alone)`,
+    );
+    L.push(
+      `  finalists mean pairwise distance, side by side: feature ${r.spread.finalistsFeature} · semantic ${sm.spreadSemantic ?? '—'}`,
+    );
+    L.push('  pick axes (novelty components at pick time):');
+    for (const row of sm.finalists) {
+      L.push(
+        `    sample ${String(row.index).padStart(3)} · feature ${row.feature ?? '—'} · semantic ${row.semantic ?? '—'}`,
+      );
+    }
+    L.push(
+      '  the feature distance stays primary and deterministic; the semantic component is computed only where both sides carry a vector from this one model, and steers nothing else.',
+    );
+    L.push('');
+  }
   L.push(
     `FONT-CONTINGENT TEXT STAMPS: ${r.fontContingent.inBatch} sampled casts carry one · ${r.fontContingent.inFinalists} among finalists`,
   );

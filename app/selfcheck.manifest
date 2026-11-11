@@ -574,6 +574,7 @@ node src/curator/mindApple.selfcheck.mjs
 node src/curator/megamindLink.selfcheck.mjs
 node src/curator/megamindVoice.selfcheck.mjs
 node src/curator/megamindVision.selfcheck.mjs
+node src/curator/megamindEmbed.selfcheck.mjs
 node src/curator/mindPresence.selfcheck.mjs
 node src/curator/directorRoom.selfcheck.mjs
 node src/curator/directorPresence.selfcheck.mjs
