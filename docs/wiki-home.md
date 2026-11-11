@@ -12,7 +12,22 @@ GitHub Wiki can mirror these pages if enabled. Canonical docs live under `/docs`
 | Known limits / bugs | [BUGLIST.md](BUGLIST.md) |
 | Task board | [task.md](task.md) |
 | Manifesto | [manifesto.md](manifesto.md) |
+| MegaMind (local model link) | [MEGAMIND.md](MEGAMIND.md) |
 | Next-gen map (shipped) | [NEXT_ISSUES](../NEXT_ISSUES.md) |
+
+## MegaMind — a model of your own
+
+S1 (#1525) is built: point KC-1 at your own local Ollama (DEV → MEGAMIND) and KC-1 measures what you connected — cadence tier, badges, context. The persona wiring is a later stage; the trio still runs on rules. Full page: [MEGAMIND.md](MEGAMIND.md). KC-1 supports ONE configuration; everything outside it is *may work, unsupported*:
+
+```
+MegaMind — the House configuration (the one supported setup)
+Model: qwen3-vl:8b-instruct, served by Ollama on your own machine (lighter machines: qwen3-vl:4b-instruct)
+Endpoint: http://127.0.0.1:11434
+Persona calls: think off · temperature 0 for verdicts · num_predict capped at 150
+Context: num_ctx pinned at 16,384 at connect and never varied · keep_alive "30m", the model preloaded at connect
+Ollama must trust this origin: restart it with OLLAMA_ORIGINS set to the exact origin KC-1 is served from
+Everything else you connect may work, but it is unsupported — Ollama cloud models included: they are badged cloud and never recommended.
+```
 
 ## Quick start
 
