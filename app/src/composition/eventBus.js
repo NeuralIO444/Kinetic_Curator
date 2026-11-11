@@ -299,7 +299,7 @@ export const Events = {
   // on the form (fieldForm.raygun) is the replay authority; these say that a treatment act happened, who caused it
   // (meta.cause: performer | davis | director | lois | document) and where in the bar. curator/treatmentsLive.mjs is
   // the one emitter; the take's `treatments` section is the recording listener (curator/treatmentRecord.mjs).
-  TREATMENT_ARM: 'treatment:arm', // { target: 'poem', mode, seed, from: mode | null } a treatment armed (or re-armed)
+  TREATMENT_ARM: 'treatment:arm', // { target: 'poem', mode, seed, from: mode | null, life?: 'bedrock' | 'seed' } a treatment armed (or re-armed; a life change alone is a re-arm carrying `life`)
   TREATMENT_DISARM: 'treatment:disarm', // { target: 'poem', mode } the armed treatment left; the form stands plain
   TREATMENT_VERDICT: 'treatment:verdict', // { target, mode, verdict, by } reserved: a judged treatment (#2006 / P5)
 };
