@@ -6,7 +6,7 @@
 //   node scripts/exploreRun.mjs [--seed 0x1506] [--batch 240]
 //       [--finalists 12] [--keeps <ledger-export.json>] [--out <dir>]
 //       [--corner <profileId|wilderness>] [--davis <CODE>]
-//       [--variants <0..1>]
+//       [--variants <0..1>] [--embeddings <embeddings.json>]
 //
 // E4 (#1508): --corner aims the run at one named prospecting corner
 // (default: the rotation); --davis <CODE> lets Davis's state steer
@@ -15,6 +15,14 @@
 // E5 (#1530): --variants <0..1> turns on the variant axis: that
 // fraction of dealt cast members are replaced by Davis variants of
 // themselves (recipes in the records' provenance; default 0 = off).
+//
+// #1528: --embeddings <embeddings.json> hands the run the embeddings
+// slot's cache export (the MEGAMIND tab's "export embeddings" press:
+// { model, dims, vectorsByTextHash, texts }) — selection gains the
+// semantic novelty axis, the report shows both axes side by side,
+// and candidates.json carries each resolved vector under its model.
+// Without it the run is the plain run; the vectors were computed
+// locally by the slot, and no text leaves the machine either way.
 //
 // Run folder:
 //   REPORT.md       the readable run report (yield, coverage, quota
@@ -53,9 +61,11 @@ const keeps = keepsPath ? JSON.parse(readFileSync(keepsPath, 'utf8')) : [];
 const corner = opt('corner', null);
 const davisCode = opt('davis', null);
 const variantFraction = Number(opt('variants', '0'));
+const embeddingsPath = opt('embeddings', null);
+const embeddings = embeddingsPath ? JSON.parse(readFileSync(embeddingsPath, 'utf8')) : null;
 
 const t0 = Date.now();
-const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode, variantFraction });
+const run = runMiner({ runSeed, batchSize, finalistCount, keeps, corner, davisCode, variantFraction, embeddings });
 const elapsedMs = Date.now() - t0;
 
 // The Queen's evidence over this run's finalists (queenEvidence.mjs):
@@ -88,7 +98,7 @@ for (const [n, f] of run.finalists.entries()) {
   });
 }
 
-const strip = ({ sample, features, stats, bakePath, fingerprint, fontContingent, record }) => ({
+const strip = ({ sample, features, stats, bakePath, fingerprint, fontContingent, record, embedding }) => ({
   index: sample.index,
   corner: sample.corner,
   anchor: sample.anchor,
@@ -98,6 +108,8 @@ const strip = ({ sample, features, stats, bakePath, fingerprint, fontContingent,
   features,
   stats,
   record,
+  // #1528: the vector this candidate was selected with, under its model — the cache, in the run data.
+  ...(embedding ? { embedding } : {}),
 });
 writeFileSync(join(outDir, 'candidates.json'), JSON.stringify(run.baked.map(strip), null, 2));
 writeFileSync(

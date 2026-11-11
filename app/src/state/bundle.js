@@ -157,6 +157,10 @@ export const BUNDLE_LEFT_OUT = Object.freeze({
     "#1578: measured microbenchmark descriptors of THIS machine's GPU/CPU for the governor cost head. Meaningless on another device — the receiving machine measures its own at first launch — and never project content",
   'kc:megamind:link':
     "#1525: the MegaMind link — this machine's Ollama endpoint and chosen model name. The endpoint is loopback on this machine and the model may not exist on another; the receiving machine connects and detects its own, and it is never project content",
+  'kc:megamind:embed-slot:v1':
+    "#1528: the embeddings slot's chosen model name on this machine's Ollama — the link key's same reasoning: the model may not exist on another machine, the receiving machine probes its own, and it is never project content",
+  'kc:megamind:embeddings:v1':
+    "#1528: the embeddings cache — vectors computed by THIS machine's local embedding model over keep captions and asset metadata, keyed by model + source-text hash. Recomputable on the receiving machine from its own model; a vector from another machine's model (or another model) would be meaningless there and silently wrong, so it never travels in a bundle",
 });
 
 /**

@@ -143,6 +143,16 @@ export const DETERMINISM_ALLOWLIST = {
       why: '#1527: createVisionDriver\u2019s injectable stamp seam — judge-ledger rows and panel records carry the real time a deliberate press was answered (accrual data, like the crown log\u2019s ts); tests inject stamp, and the reading never feeds the sim or a take',
     },
   },
+  'curator/megamindEmbedLive.js': {
+    'performance.now': {
+      count: 1,
+      why: '#1528: createEmbedDriver\u2019s injectable now seam, defaulting to the wall clock — it times the Ollama embed probe, a real network measurement (the slot record IS the elapsed wall time beside the vector dimension); tests inject now, and the reading never feeds the sim or a take',
+    },
+    'Date.now': {
+      count: 1,
+      why: '#1528: the same driver\u2019s injectable stamp seam — the slot record\u2019s measured-at time and cache entries\u2019 eviction order (accrual data, like the judge ledger\u2019s stamps); tests inject stamp, and the reading never feeds the sim or a take',
+    },
+  },
   'engine/kernel/tracks/patchDiag.mjs': {
     'Date.now': {
       count: 3,
