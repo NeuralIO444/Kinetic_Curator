@@ -240,7 +240,7 @@ export function visionLedgerRow(input = {}) {
       sha256: still.sha256,
       fingerprint: typeof still.fingerprint === 'string' ? still.fingerprint : null,
       sent: {
-        format: 'png',
+        format: typeof sent.format === 'string' && sent.format ? sent.format : 'png',
         width: Number.isInteger(sent.width) ? sent.width : null,
         height: Number.isInteger(sent.height) ? sent.height : null,
         downscaled: sent.downscaled === true,

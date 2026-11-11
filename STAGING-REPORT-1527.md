@@ -65,7 +65,7 @@ pass the registry's own validation and carry no cloud badge):
   the card before any ask if they differ** — a swapped or corrupted still is never judged under the
   run's name. Older folders without a stills index judge on the computed hash alone.
 - Stage: the described bytes are the capture's PNG bytes; the panel prints the frame's sha256.
-- The model receives the **exact bytes** when they are a PNG inside the cap; otherwise a copy with
+- The model receives the **exact bytes** when they are a raster inside the cap; otherwise a copy with
   the longest side capped at **1280** (`VISION_IMAGE_MAX_SIDE` — the House frame-cost research:
   ≈1,600 prompt tokens at 1280). An SVG still is rasterized (a vision model cannot read vector
   text). The ledger row's `still.sent` block records format/width/height/downscaled/rasterized —
@@ -127,11 +127,13 @@ beside the #2068/#2072 packs):
 ## 6. Files changed
 
 New:
+
 - `app/src/curator/megamindVision.mjs` — the pure vision core (schema, gates, asks, validators, ledger rows).
 - `app/src/curator/megamindVisionLive.js` — the live driver (bytes, hashing, copies, ledger storage, frame seam).
 - `app/src/curator/megamindVision.selfcheck.mjs` — the new suite (16 checks), registered in the manifest.
 
 Modified:
+
 - `app/src/panels/davis/CandidateTray.jsx` — still Files kept; judge-stills press; vision + rules verdict lines; judge-ledger count + export.
 - `app/src/panels/MegaMindPanel.jsx` — the S3 vision section (describe the stage; speak it; gate states).
 - `app/src/App.jsx` — the frame-provider registration (one import, one effect).
@@ -193,3 +195,14 @@ selection, and the rules judge's verdicts.
   compiles there). Seam + probe specified; nothing claimed.
 - **Speech:** printed description is the shipped half; speaking exists only as the second deliberate
   press via the platform speech API.
+
+## 9. Coordinator fix round (QA round 1 NOTE-1)
+
+QA round 1 returned CLEAN with one NOTE: the ledger's `still.sent.format` was hardcoded `'png'`
+and `prepareImageCopy`'s exact-bytes path did the same — true for every shipped surface (run
+stills are PNG/SVG, stage captures are PNG, and the canvas copy path genuinely encodes PNG), but
+a hypothetical non-PNG raster under the cap would have been misdescribed in its own provenance
+record. Fixed at the source: the exact-bytes path now reports the source mime's format, the
+canvas path still reports `'png'` (it encodes PNG), and `visionLedgerRow` passes the prepared
+`sent.format` through instead of hardcoding it. Behaviour is unchanged for every reachable input;
+the megamindVision suite and lint were re-run after the fix.

@@ -90,7 +90,14 @@ export async function prepareImageCopy(bytes, mime) {
     if (!w || !h) throw new Error('the still could not be decoded as an image');
     const longest = Math.max(w, h);
     if (!isSvg && longest <= VISION_IMAGE_MAX_SIDE) {
-      return { base64: bytesToBase64(bytes), width: w, height: h, format: 'png', downscaled: false, rasterized: false };
+      return {
+        base64: bytesToBase64(bytes),
+        width: w,
+        height: h,
+        format: (mime || 'image/png').replace(/^image\//, ''),
+        downscaled: false,
+        rasterized: false,
+      };
     }
     const scale = Math.min(1, VISION_IMAGE_MAX_SIDE / longest);
     const cw = Math.max(1, Math.round(w * scale));
