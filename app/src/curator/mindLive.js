@@ -5,7 +5,9 @@
 //     a critique — mindContract.wantsStage) becomes a `mind:request` through emitOn('bar'), so it lands on the next
 //     downbeat. The rules backend only ever reports the face the room already shows, so on rules alone nothing is
 //     requested and the picture does not change; the faces' handling of a request arrives with Matt's design.
-//   - `mind:status` { available, backend } says which backend is answering (for the dev panel; no UI announces it)
+//   - `mind:status` { available, backend, model?, tier? } says which backend is answering (for the dev panel;
+//     the footer backend indicator, #2078, renders it as standing state — a glyph that is simply there,
+//     never an announcement: nothing pops or flashes when the backend changes)
 //   - while a take plays back the personas are muted: nothing thinks, and the take's own decisions are re-published
 //     from its record (replayMindFrame), so a replay never calls a backend
 //   - #1464 Mind 3: an optional `presence` (mindPresenceLive.js) carries each persona's engagement tier and zodiac into
@@ -30,6 +32,12 @@ let system = null; // the answering model's identity, for the take's record
 /** The model and system the current backend runs on, or null on the rules: { backend, model?, os? }. */
 export function getMindSystem() {
   return system ? { ...system } : null;
+}
+
+let lastStatus = null; // the last published mind:status payload (#2078: a late subscriber's first read)
+/** The answering backend as last published on mind:status: { available, backend, model?, tier? }, or null before the mind boots. */
+export function getMindStatus() {
+  return lastStatus ? { ...lastStatus } : null;
 }
 
 /** A short stable hash of the context: mind:req names WHAT was asked without carrying it. */
@@ -158,9 +166,11 @@ export function startMind({
       available: up,
       backend: up ? answering : 'rules',
       ...(up && info && info.model ? { model: info.model } : {}),
+      ...(up && info && info.tier ? { tier: info.tier } : {}),
     };
-    if (status && status.backend === next.backend && status.model === next.model) return;
+    if (status && status.backend === next.backend && status.model === next.model && status.tier === next.tier) return;
     status = next;
+    lastStatus = next;
     system = up
       ? {
           backend: answering,

@@ -11,11 +11,22 @@
 // while this panel is open, backtick jumps to the Shader Lab tab.
 import { Suspense, useEffect, useState } from 'react';
 import { PanelHeader } from '../components/PanelHeader.jsx';
-import { DEV_TABS, consumeDevTabRequest, devTabById } from './devTabs.mjs';
+import { DEV_TABS, consumeDevTabRequest, devTabById, onDevPanelRequest } from './devTabs.mjs';
 
 export function DevPanel(props) {
   const [activeId, setActiveId] = useState(() => consumeDevTabRequest() ?? DEV_TABS[0].id);
   const active = devTabById(activeId);
+
+  // #2078: a panel request that lands while this panel is already mounted
+  // (the footer indicator's click) switches the tab in place; a request
+  // that arrived before mount was consumed by the state initializer above.
+  useEffect(
+    () =>
+      onDevPanelRequest(() => {
+        setActiveId((cur) => consumeDevTabRequest() ?? cur);
+      }),
+    [],
+  );
 
   // Backtick (#193): jump to the Shader Lab tab while the DEV panel is open.
   useEffect(() => {

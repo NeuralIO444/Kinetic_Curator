@@ -24,6 +24,22 @@ export function consumeDevTabRequest() {
   return id;
 }
 
+// The panel request (#2078): the pending-tab mechanism, completed for
+// callers outside the Shell. requestDevPanel(tabId) sets the same pending
+// tab AND notifies listeners — the Shell selects the DEV panel, and a
+// DevPanel already mounted switches to the tab. One channel for "open the
+// DEV panel at this tab": the footer backend indicator is its first
+// outside caller; the backtick path above is unchanged.
+const panelRequestListeners = new Set();
+export function requestDevPanel(tabId) {
+  pendingTab = tabId;
+  for (const f of [...panelRequestListeners]) f(tabId);
+}
+export function onDevPanelRequest(f) {
+  panelRequestListeners.add(f);
+  return () => panelRequestListeners.delete(f);
+}
+
 // DEV panel chunks — each loaded only when its tab opens.
 const GovernorXrayPanel = lazy(() => import('./GovernorXrayPanel.jsx').then((m) => ({ default: m.GovernorXrayPanel })));
 const GovernorTunePanel = lazy(() => import('./GovernorTunePanel.jsx').then((m) => ({ default: m.GovernorTunePanel })));
