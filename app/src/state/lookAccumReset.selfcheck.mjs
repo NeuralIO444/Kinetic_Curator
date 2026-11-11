@@ -15,7 +15,10 @@ const declares = (p) => ACCUM_KEYS.filter((k) => k in p.params);
 
 const accumLook = PRESETS.find((p) => p.params.accumulation === true && declares(p).length < ACCUM_KEYS.length);
 const accumLook2 = PRESETS.find(
-  (p) => p.params.accumulation === true && p.id !== accumLook.id && p.params.accumulationFade !== accumLook.params.accumulationFade,
+  (p) =>
+    p.params.accumulation === true &&
+    p.id !== accumLook.id &&
+    p.params.accumulationFade !== accumLook.params.accumulationFade,
 );
 const plainLook = PRESETS.find((p) => declares(p).length === 0 && p.id !== accumLook.id);
 assert.ok(accumLook && accumLook2 && plainLook, 'catalogue has an accum look, a second one, and a plain one');
@@ -42,7 +45,8 @@ assert.strictEqual(S().layoutParams.accumulation, true, 'the accum look turns th
 land(plainLook);
 console.log('[2102] carried over after plain look:', carried());
 assert.strictEqual(S().layoutParams.accumulation, false, 'plain look: accumulation off');
-for (const k of ACCUM_KEYS) assert.strictEqual(S().layoutParams[k], DEFAULT_LAYOUT_PARAMS[k], `plain look: ${k} at default`);
+for (const k of ACCUM_KEYS)
+  assert.strictEqual(S().layoutParams[k], DEFAULT_LAYOUT_PARAMS[k], `plain look: ${k} at default`);
 assert.strictEqual(S().layoutParams.composition, plainLook.id, 'the plain look still lands');
 
 // ── 2. a hand-set, unlocked trail is cleared like any other ──
@@ -57,7 +61,11 @@ reset({ accumulation: true });
 useStore.setState({ layoutParams: { ...S().layoutParams, accumulation: true, accumulationOptics: 0.1 } });
 land(plainLook);
 assert.strictEqual(S().layoutParams.accumulation, true, 'locked accumulation is unchanged');
-assert.strictEqual(S().layoutParams.accumulationOptics, DEFAULT_LAYOUT_PARAMS.accumulationOptics, 'unlocked sibling resets');
+assert.strictEqual(
+  S().layoutParams.accumulationOptics,
+  DEFAULT_LAYOUT_PARAMS.accumulationOptics,
+  'unlocked sibling resets',
+);
 // …and a locked dial beats a look that declares it.
 reset({ accumulation: true });
 useStore.setState({ layoutParams: { ...S().layoutParams, accumulation: true } });
