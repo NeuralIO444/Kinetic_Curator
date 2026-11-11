@@ -10,6 +10,8 @@ import { helpText } from '../data/helpCopy.js'; // #158: hover titles read the s
 import { captureFavorite } from '../state/slices/davisSlice.js';
 import { LOIS_LINES } from './loisLines.mjs';
 import { visibleQueue } from '../state/queueTransport.js';
+import { DOCTRINES, DOCTRINE_IDS } from '../curator/doctrines.mjs';
+import { treatments } from '../curator/treatmentsLive.mjs';
 import { RoomCodec } from './directors/RoomCodec.jsx';
 import { CandidateTray } from './davis/CandidateTray.jsx';
 import { KINEME_PATTERNS, TRANSPORT_MODES, PATH_FAMILIES } from '../engine/kineme.js';
@@ -45,6 +47,7 @@ export function DavisPanel() {
     audioEnabled: s.audioEnabled,
     audioBands: s.audioBands,
     hitCount: visibleQueue(s.favorites).length,
+    poemDoctrine: s.poemDoctrine ?? null, // #2010 P5
   }));
   const {
     evolveMode,
@@ -64,6 +67,7 @@ export function DavisPanel() {
     audioEnabled,
     audioBands,
     hitCount,
+    poemDoctrine,
   } = state;
   const { palette } = useApp();
 
@@ -310,6 +314,29 @@ export function DavisPanel() {
                 onClick={() => emit(Events.LAYOUT_PARAM, { key: 'kinemePattern', value: p })}
               >
                 {p}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* #2010 P5 — the DOCTRINES: a named caller profile inside the Director's treatment call, never a seat (D2).
+              Hand the stage to one and every poem the Director deals arrives treated; tap again to take it back. */}
+        <div className="davis-actions davis-actions-motion" role="group" aria-label="treatment doctrine">
+          <i className="lbl" title="A doctrine is the Director's call: it arms the ray gun on every poem it deals">
+            doctrine
+          </i>
+          {DOCTRINE_IDS.map((id) => {
+            const on = poemDoctrine === id;
+            return (
+              <button
+                key={id}
+                className={`big-btn ${on ? 'active' : ''}`}
+                aria-pressed={on}
+                aria-label={`${DOCTRINES[id].name} doctrine`}
+                title={DOCTRINES[id].title}
+                onClick={() => treatments.doctrine('poem', { standing: on ? null : id, by: 'performer' })}
+              >
+                {DOCTRINES[id].name}
               </button>
             );
           })}

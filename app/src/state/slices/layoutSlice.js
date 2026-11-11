@@ -1,3 +1,4 @@
+import { doctrineMode, isDoctrine } from '../../curator/doctrines.mjs';
 import { DEFAULT_LAYOUT_PARAMS, validateLayoutParams, BLEND_MODES } from '../../data/layout-modes.js';
 import { createGrid, stepGrid } from '../../engine/ca-engine.js';
 import {
@@ -36,6 +37,8 @@ import {
   POEM_PICK_BASE,
   POEM_PLACE_BASE,
   POEM_RAYGUN_BASE,
+  POEM_DOCTRINE_BASE,
+  POEM_DOCTRINE_PRESS_BASE,
   keepPoem as bankPoem,
   isPoemKept,
 } from '../../poets/poemRow.mjs'; // #1918
@@ -385,6 +388,34 @@ function bankLadder(state, landingParams, record, opts) {
   }
 }
 
+/**
+ * #2010 P5 — the Director's call: a standing DOCTRINE (state.poemDoctrine: 'carson' | 'ashworth' | null) arms the
+ * ray gun on a fresh landing at deal time. Returns the armed form, or null when the doctrine stands down: none
+ * standing, a plate (never treated), or the treated landing fails the SAME shadow review the plain landing faces
+ * (LOIS's veto, read on the plain landing since treated forms are exempt — a doctrine never takes a janky landing; the plain form lands and the review ladder runs on it
+ * unchanged). The draw (mode + seed) comes off its own stream (POEM_DOCTRINE_BASE + the deal index), so a doctrine
+ * handed stage replays with the deal and never advances the performer's ray-gun tap counter. Fail-closed: any
+ * failure returns null — the plain landing proceeds.
+ */
+function doctrineArm(state, lp, form, streamIndex, reviewOpts) {
+  const id = state.poemDoctrine;
+  if (!form || form.plate || !isDoctrine(id)) return null;
+  try {
+    const rng = rngForIndex(state.seed, CH.curate, streamIndex, state.seedOffsets);
+    const mode = doctrineMode(id, rng(), null);
+    if (!mode) return null;
+    const seed = Math.floor(rng() * 0x100000000) >>> 0;
+    const armed = { ...form, raygun: { mode, seed, wear: 1, distort: 1, doctrine: id } };
+    delete armed.review;
+    // A raygun-treated form is exempt from the review (Matt, 2026-11-06), so the veto reads the PLAIN landing: a
+    // landing the review would call janky is not handed to a doctrine — it lands plain and the ladder repairs it.
+    const verdict = reviewLanding(state, { ...lp, fieldForm: form }, reviewOpts);
+    return verdict?.verdict === 'janky' ? null : armed;
+  } catch {
+    return null;
+  }
+}
+
 function landPoem(
   state,
   layoutParams,
@@ -419,6 +450,16 @@ function landPoem(
   );
   if (form) lp.fieldForm = form;
   else delete lp.fieldForm;
+  // #2010 P5 — a standing doctrine arms the fresh landing (review-vetoed; see doctrineArm). A re-deal (review:false)
+  // is still a deal the Director made, so the doctrine arms it too — the veto is the doctrine's own, not the ladder's.
+  if (form) {
+    const armed = doctrineArm(state, lp, form, POEM_DOCTRINE_BASE + n, {
+      seed: buildSeed ?? state.seed,
+      enabledAssets: buildEnabledAssets ?? state.enabledAssets,
+      stream: `poem:${n}`,
+    });
+    if (armed) lp.fieldForm = armed;
+  }
   // #2006 slice 1 — the shadow review banks on the same commit: the landed
   // form, measured on its built item list, judged by the rules table alone.
   // A refusal or plain silence banks nothing (no landing happened). The
@@ -769,6 +810,8 @@ export const createLayoutSlice = (set) => ({
    * Session-only, like poemDeal.
    */
   raygunTap: 0,
+  // #2010 P5 — the standing doctrine ('carson' | 'ashworth' | null): the Director's call at deal time. Session state.
+  poemDoctrine: null,
   /**
    * #2037 — KINETIC presses made this session: the birth die for press n is a pure function of the
    * standing seed and n (engine/kineticBirths.mjs), so the counter is the birth stream's place in
@@ -1399,6 +1442,59 @@ export const createLayoutSlice = (set) => ({
    * it draws no seed and moves no stamp — the form re-derives exactly. One undo step; a write that changes nothing
    * (no treatment standing, a plate, an unknown value, the value already standing) does not land.
    */
+  /**
+   * #2010 P5 — hand the stage to a doctrine ('carson' | 'ashworth') or take it back (null). Standing state only —
+   * it arms the NEXT deals (landPoem / the CURATOR press); the poem already standing is untouched. No undo step
+   * (it is not a document edit), and a write that changes nothing does not land.
+   */
+  setPoemDoctrine: (id) =>
+    set((state) => {
+      if (id !== null && !isDoctrine(id)) return {};
+      if ((state.poemDoctrine ?? null) === id) return {};
+      return { poemDoctrine: id };
+    }),
+
+  /**
+   * #2010 P5 — call the standing doctrine on the poem standing NOW: arms it (treated, doctrine named in the record).
+   * Refuses without a doctrine named, with no poem, a plate, or a HOLD (the callers above this gate decide that);
+   * the treated form must pass the same review veto as a deal. One undo step; draws off the tap stream like a tap.
+   */
+  callPoemDoctrine: (id) =>
+    set((state) => {
+      const form = state.layoutParams?.fieldForm;
+      const which = id ?? state.poemDoctrine;
+      if (!form || form.plate || !isDoctrine(which)) return {};
+      const tap = state.raygunTap | 0;
+      const rng = rngForIndex(state.seed, CH.curate, POEM_RAYGUN_BASE + tap, state.seedOffsets);
+      const mode = doctrineMode(which, rng(), form.raygun?.mode ?? null);
+      const seed = Math.floor(rng() * 0x100000000) >>> 0;
+      const next = {
+        ...form,
+        raygun: {
+          mode,
+          seed,
+          wear: 1,
+          distort: 1,
+          doctrine: which,
+          ...(form.raygun?.life ? { life: form.raygun.life } : {}),
+        },
+      };
+      delete next.review;
+      try {
+        const plainForm = { ...form };
+        delete plainForm.raygun;
+        const v = reviewLanding(state, { ...state.layoutParams, fieldForm: plainForm }, { stream: `doctrine:${tap}` });
+        if (v?.verdict === 'janky') return {};
+      } catch {
+        return {};
+      }
+      return {
+        ...pushToUndo(state, true),
+        layoutParams: { ...state.layoutParams, fieldForm: next },
+        raygunTap: tap + 1,
+      };
+    }),
+
   setPoemLife: (life) =>
     set((state) => {
       const form = state.layoutParams?.fieldForm;
@@ -1613,8 +1709,14 @@ export const createLayoutSlice = (set) => ({
       const landed = { ...landedParams };
       // #1918 — HOLD: the CURATOR press passes a held poem by (the Director still dealt; the value stands).
       if (poemHeld(state)) landed.fieldForm = state.layoutParams.fieldForm;
-      else if (fieldDeal) landed.fieldForm = fieldDeal;
-      else delete landed.fieldForm;
+      else if (fieldDeal) {
+        landed.fieldForm = fieldDeal;
+        // #2010 P5 — a standing doctrine arms the press's landing (review-vetoed; see doctrineArm).
+        const armed = doctrineArm(state, landed, fieldDeal, POEM_DOCTRINE_PRESS_BASE + press, {
+          stream: `press:${press}`,
+        });
+        if (armed) landed.fieldForm = armed;
+      } else delete landed.fieldForm;
       // #2006 slice 1 — the press's landing is shadow-reviewed on this
       // commit (see the fieldReview entry below); slice 3 — a janky
       // press landing is acted on by the ladder in the same commit, on

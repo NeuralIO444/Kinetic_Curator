@@ -41,6 +41,15 @@ export const POEM_PLACE_BASE = 0x60000;
  */
 export const POEM_RAYGUN_BASE = 0x70000;
 
+/**
+ * #2010 P5 — the DOCTRINE draw streams, beside the poem-deal streams on CH.curate: the treatment a doctrine arms AT
+ * DEAL (the Director's call) is drawn here, indexed by the deal that lands it — poemDeal for a landPoem deal, the
+ * press counter for a CURATOR press deal — so a deal's doctrine arm replays with the deal and never advances the
+ * performer's ray-gun tap counter (a doctrine-handed stage leaves the performer's own tap stream exactly where it was).
+ */
+export const POEM_DOCTRINE_BASE = 0x80000;
+export const POEM_DOCTRINE_PRESS_BASE = 0x90000;
+
 /** How many poems a take banks before the oldest falls off. */
 export const MAX_POEM_KEEPS = 16;
 
