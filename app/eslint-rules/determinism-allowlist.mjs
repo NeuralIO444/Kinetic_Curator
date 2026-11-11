@@ -137,6 +137,12 @@ export const DETERMINISM_ALLOWLIST = {
       why: '#1525: the same driver\u2019s injectable stamp seam — the capability record\u2019s measured-at time, published as data for later stages; never sim input',
     },
   },
+  'curator/megamindVisionLive.js': {
+    'Date.now': {
+      count: 1,
+      why: '#1527: createVisionDriver\u2019s injectable stamp seam — judge-ledger rows and panel records carry the real time a deliberate press was answered (accrual data, like the crown log\u2019s ts); tests inject stamp, and the reading never feeds the sim or a take',
+    },
+  },
   'engine/kernel/tracks/patchDiag.mjs': {
     'Date.now': {
       count: 3,

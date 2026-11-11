@@ -61,6 +61,7 @@ import { startStoryLive } from './curator/storyLive.js'; // #1560 S3: the room's
 import { DEBUG_MIND, demoModel } from './curator/mindDemo.js'; // #1462: ?debug=mind stand-in backend for review
 import { desktopAppleModel } from './curator/mindApple.js'; // #1463: Apple Intelligence via the desktop helper
 import { createMindChain } from './curator/megamindVoiceLive.js'; // #1526: MegaMind S2 — a linked Ollama answers first, Apple behind it, rules underneath
+import { setStageFrameProvider } from './curator/megamindVisionLive.js'; // #1527: MegaMind S3 — the stage-description frame seam (registration only; captures happen on a press)
 import { createPresenceDriver } from './curator/mindPresenceLive.js'; // #1464: Mind 3 — engagement tiers + zodiac
 import { startGhost, resetGhost } from './curator/mindGhost.js'; // #1464: the third's presence on the Stimuli meter
 import { startMindRoom, getMindRoom } from './curator/mindRoom.js'; // #1145: the Director's room, as the minds hear it
@@ -472,6 +473,18 @@ function AppInner() {
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, [state.evolveMode, state.evolveSource, state.evolveInterval, state.slowRender, state.batchPaused, piped]);
+
+  // #1527: the stage-description frame seam. The MEGAMIND tab's describer asks through this
+  // provider; it wraps the existing capture path with downloadFile:false, so the frame described
+  // is the exact frame the instrument shows. Registration only — nothing captures until pressed.
+  useEffect(() => {
+    setStageFrameProvider(async () => {
+      if (!glLoopRef?.current) return null;
+      const { blob } = await captureStill({ loopRef: glLoopRef, resolution: 1, downloadFile: false });
+      return { bytes: new Uint8Array(await blob.arrayBuffer()), mime: 'image/png' };
+    });
+    return () => setStageFrameProvider(null);
+  }, [glLoopRef]);
 
   const lastSnapRef = useRef(0);
   useEffect(() => {

@@ -29,6 +29,13 @@ import { captureKeepContext } from '../../curator/keepContext.js';
 import { provenanceLabel } from '../../curator/provenance.mjs';
 import { parseRunFolder, crownGate } from '../../curator/candidateTray.mjs';
 import { stageRecords, ON_SHELF_COPY } from '../../curator/shelf.mjs';
+import {
+  ensureVisionDriver,
+  getVisionView,
+  subscribeVision,
+  visionSurfaceOn,
+} from '../../curator/megamindVisionLive.js';
+import { subscribeCapabilities } from '../../composition/capabilityRegistry.mjs';
 
 const assetsById = new Map(ASSETS.map((a) => [a.id, a]));
 const palettesById = new Map(PALETTES.map((p) => [p.id, p]));
@@ -42,11 +49,21 @@ export function CandidateTray() {
   const paletteId = state.paletteId;
   const fileRef = useRef(null);
   const urlsRef = useRef([]);
+  const runStillsRef = useRef({}); // sample index -> run.json's stills entry (sha256 + bake fingerprint)
+  const featuresRef = useRef({}); // sample index -> the candidate's baked features (candidates.json)
   const [run, setRun] = useState(null); // parseRunFolder model
   const [stills, setStills] = useState({}); // stillBase -> object URL
+  const [stillFiles, setStillFiles] = useState({}); // stillBase -> { file, mime } — the exact bytes (#1527)
   const [verdicts, setVerdicts] = useState({}); // card key -> 'crowned' | 'passed'
   const [line, setLine] = useState(null); // the crown landing's line (#1589: a landing, never a refusal)
   const [loadNote, setLoadNote] = useState(null);
+  // #1527 (MegaMind S3): LOIS vision judging — a deliberate press, verdicts beside the rules verdict.
+  const [visionDriver] = useState(() => ensureVisionDriver());
+  const [vision, setVision] = useState(getVisionView);
+  const [, setCapTick] = useState(0);
+  useEffect(() => subscribeVision(() => setVision(getVisionView())), []);
+  useEffect(() => subscribeCapabilities(() => setCapTick((t) => t + 1)), []);
+  const visionOn = visionSurfaceOn('lois.vision');
 
   useEffect(
     () => () => {
@@ -85,20 +102,67 @@ export function CandidateTray() {
     urlsRef.current = [];
     const model = parseRunFolder({ run: runJson, finalists, candidates: Array.isArray(candidates) ? candidates : [] });
     const stillMap = {};
+    const fileMap = {};
     for (const card of model.cards) {
       if (!card.stillBase) continue;
-      const file = files.get(`${card.stillBase}.png`) || files.get(`${card.stillBase}.svg`);
+      const pngFile = files.get(`${card.stillBase}.png`);
+      const file = pngFile || files.get(`${card.stillBase}.svg`);
       if (file) {
         const url = URL.createObjectURL(file);
         urlsRef.current.push(url);
         stillMap[card.stillBase] = url;
+        // #1527: keep the file itself — the vision judge reads the exact bytes the card displays.
+        fileMap[card.stillBase] = { file, mime: pngFile ? 'image/png' : 'image/svg+xml' };
       }
+    }
+    runStillsRef.current = {};
+    for (const s of Array.isArray(runJson.stills) ? runJson.stills : []) {
+      if (s && Number.isInteger(s.sample)) runStillsRef.current[s.sample] = s;
+    }
+    featuresRef.current = {};
+    for (const c of Array.isArray(candidates) ? candidates : []) {
+      if (c && Number.isInteger(c.index) && c.features) featuresRef.current[c.index] = c.features;
     }
     setRun(model);
     setStills(stillMap);
+    setStillFiles(fileMap);
     setVerdicts({});
     setLine(null);
     setLoadNote(finalists.length ? null : 'that run crowned no finalists — its folder holds none');
+  };
+
+  // #1527: the judge-stills press — every finalist's displayed still goes to LOIS's vision, variant
+  // cards included (those are the E5 pre-judgements, labelled as such). Verdicts land on the cards
+  // BEFORE crown/pass and steer nothing: no reordering, no auto-crown, no selection change.
+  const judgeStills = async () => {
+    if (!run) return;
+    const items = [];
+    for (const card of run.cards) {
+      const sf = card.stillBase ? stillFiles[card.stillBase] : null;
+      if (!sf) continue;
+      const stillRec = card.sampleIndex != null ? runStillsRef.current[card.sampleIndex] : null;
+      const feats = card.sampleIndex != null ? featuresRef.current[card.sampleIndex] : null;
+      const variant = !!card.provenance?.variants?.length;
+      items.push({
+        key: card.key,
+        kind: variant ? 'variant' : 'render',
+        bytes: new Uint8Array(await sf.file.arrayBuffer()),
+        mime: sf.mime,
+        seed: card.record?.seed,
+        runId: run.runId,
+        record: card.record,
+        fingerprint: stillRec?.bakeFingerprint ?? null,
+        expectedSha256: stillRec?.stillSha256 ?? null,
+        facts: {
+          layout: typeof card.record?.config?.layout?.mode === 'string' ? card.record.config.layout.mode : null,
+          paletteId: card.record?.config?.palette?.id ?? null,
+          castSize: Array.isArray(card.record?.config?.assets) ? card.record.config.assets.length : null,
+          density: feats?.density ?? null,
+          variant,
+        },
+      });
+    }
+    await visionDriver.judgeStills(items);
   };
 
   // The record the crown/pass writes: the candidate's own composition,
@@ -160,6 +224,31 @@ export function CandidateTray() {
           run {run.runId} · {run.cards.length} mined
         </div>
       )}
+      {run && (
+        <div className="cand-run-line">
+          <button type="button" className="micro-btn" disabled={!visionOn || !!vision?.judging} onClick={judgeStills}>
+            judge stills — LOIS vision
+          </button>
+          {vision?.judging ? (
+            <span>
+              {' '}
+              judging {vision.judging.done}/{vision.judging.total}…
+            </span>
+          ) : !visionOn ? (
+            <span> (a local vision model at tier B or better lights this up)</span>
+          ) : null}
+        </div>
+      )}
+      {run && vision && (
+        <div className="cand-note">
+          judge ledger: {vision.ledgerCount} vision verdict{vision.ledgerCount === 1 ? '' : 's'} accrued — a separate
+          judge ledger, never taste training labels{' '}
+          <button type="button" className="micro-btn" onClick={() => visionDriver.exportLedger()}>
+            export judge ledger
+          </button>
+        </div>
+      )}
+      {vision?.error && <div className="cand-note">{vision.error}</div>}
       {loadNote && <div className="cand-note">{loadNote}</div>}
       {line && (
         <div className="cand-note" role="status">
@@ -189,6 +278,25 @@ export function CandidateTray() {
                 <div className="cand-meta">
                   {card.anchor ? `anchored ${card.anchor} · ` : ''}run {run.runId}
                 </div>
+                {card.record.loisVerdict ? (
+                  <div className="cand-meta">
+                    rules judge (at bake): {card.record.loisVerdict.verdict} · lois-render-v1
+                  </div>
+                ) : null}
+                {vision?.verdicts[card.key] ? (
+                  <div className="cand-meta">
+                    {vision.verdicts[card.key].kind === 'variant'
+                      ? 'LOIS vision pre-judgement (E5)'
+                      : 'LOIS vision (E4)'}
+                    : {vision.verdicts[card.key].verdict} — presence {vision.verdicts[card.key].readings.presence} ·
+                    contrast {vision.verdicts[card.key].readings.contrast} · exposure{' '}
+                    {vision.verdicts[card.key].readings.exposure} · promise {vision.verdicts[card.key].readings.promise}
+                    {vision.verdicts[card.key].line ? <div>&ldquo;{vision.verdicts[card.key].line}&rdquo;</div> : null}
+                  </div>
+                ) : null}
+                {vision?.cardErrors[card.key] ? (
+                  <div className="cand-note">vision: {vision.cardErrors[card.key]}</div>
+                ) : null}
                 <div className="cand-actions">
                   {verdict ? (
                     <span className="cand-verdict">{verdict}</span>
