@@ -653,4 +653,38 @@ ok('#1841 the show block carries the wet shed line only while the field is not w
   unwired.done();
 });
 
+// ── #2096: one throw from the take recorder must not null the conduct tap ──
+ok('a tap that throws once still receives the next announce; tapErrors counts; the trio carries on', () => {
+  const g = rig();
+  audioOn();
+  const calls = [];
+  setConductTap((e) => {
+    calls.push(e);
+    if (calls.length === 1) throw new Error('recorder hiccup');
+  });
+  const realError = console.error;
+  const logged = [];
+  console.error = (...a) => logged.push(a.map(String).join(' '));
+  try {
+    g.bar(5);
+    g.request(5);
+    g.bar(6);
+    g.bar(7);
+    g.bar(8); // first announce (applied): the tap throws
+    assert.equal(calls.length, 1, 'the tap saw the first announce');
+    g.request(9, { op: 'add', input: 'band.air', target: 'render.scale', depth: 0.2 });
+    g.bar(10);
+    g.bar(11);
+    g.bar(12); // second announce: a tap that survived the throw hears it
+  } finally {
+    console.error = realError;
+  }
+  assert.equal(calls.length, 2, 'the tap is still wired after it threw once');
+  assert.equal(getTrioView().tapErrors, 1, 'the failure is counted on the DEV view');
+  assert.equal(logged.filter((l) => l.includes('[trio] conduct tap')).length, 1, 'one log line per failure');
+  assert.equal(g.out.applied.length, 2, 'the trio itself never stopped: both routes applied and announced');
+  assert.equal(getTrioView().log.length, 2, 'and both are in the log');
+  g.done();
+});
+
 console.log(`trioLive.selfcheck: ${n} checks passed`);
