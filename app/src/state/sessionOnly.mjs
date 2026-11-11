@@ -7,7 +7,8 @@
 //
 // The mechanism is deliberately tiny: any of those helpers calls
 // noteSessionOnly() when storage refuses (a failed write, a failed
-// remove, a stored value that no longer reads). The flag latches
+// remove, a stored value that no longer reads). The Dev mode switch
+// (#2077) reports through it the same way. The flag latches
 // for the session — one success elsewhere doesn't un-lose the item
 // that failed — and the store mirrors it beside persistStatus
 // (state/store.js subscribes), where MasterBar renders it:

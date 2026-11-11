@@ -1,5 +1,6 @@
-import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
+import { devModeOn, onDevModeChange } from './devMode.mjs';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
 import { useStore } from '../state/store.js';
@@ -15,6 +16,10 @@ const TAB_STORAGE_KEY = 'kc:active-panel-tab';
  * tab is the only show/hide control in the app.
  */
 export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }) {
+  // #2077: the DEV tab's presence is a runtime decision (dev build, or Dev
+  // mode on in Settings) — subscribing re-renders the strip the moment the
+  // toggle flips, no reload. The value itself is read via panelsByZone.
+  useSyncExternalStore(onDevModeChange, devModeOn);
   const primary = panelsByZone('primary');
   const secondary = panelsByZone('secondary');
   // #248 Phase 1 mechanism, kept generic: drawer-zone panels open as an
@@ -49,11 +54,18 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
   const tabRefs = useRef({});
   const selectTab = useCallback((id) => setActiveTab(id), []);
 
+  // #2077: activeTab can name a panel that just left the strip (Dev mode
+  // switched off while the DEV tab is open). The shown panel is derived,
+  // not stored: fall back to the first tab until the user picks another —
+  // and if the panel returns (Dev mode back on), the stored tab is valid
+  // again and re-selects itself.
+  const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
+
   // Arrow / Home / End navigation — expected of any role="tablist".
   const onTabKeyDown = useCallback(
     (e) => {
       const ids = secondary.map((p) => p.id);
-      const i = ids.indexOf(activeTab);
+      const i = ids.indexOf(activePanel?.id);
       let next = null;
       if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = ids[(i + 1) % ids.length];
       else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = ids[(i - 1 + ids.length) % ids.length];
@@ -64,10 +76,8 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       setActiveTab(next);
       tabRefs.current[next]?.focus();
     },
-    [secondary, activeTab],
+    [secondary, activePanel],
   );
-
-  const activePanel = secondary.find((p) => p.id === activeTab) ?? secondary[0];
 
   // Dev-only (#193 → #691): backtick opens the merged DEV panel on the Shader Lab tab.
   useEffect(() => {
@@ -79,8 +89,8 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || t?.isContentEditable) return;
       if (!secondary.some((p) => p.id === 'dev')) return;
       e.preventDefault();
-      // DEV-gated dynamic import, same dead-code-elimination pattern as the
-      // registry's lazy chunks — no dev chunk leaks into the prod bundle.
+      // DEV-gated dynamic import, same lazy pattern as the registry's
+      // chunks — the tab module loads only when a DEV tab is requested.
       const { requestDevTab } = await import('../panels/devTabs.mjs');
       requestDevTab('shaderlab');
       setActiveTab('dev');
@@ -134,7 +144,7 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
       <div className="col col-panels">
         <div className="panel-tabs" role="tablist" aria-label="Control panels" onKeyDown={onTabKeyDown}>
           {secondary.map((p) => {
-            const selected = p.id === activeTab;
+            const selected = p.id === activePanel?.id;
             return (
               <button
                 key={p.id}
