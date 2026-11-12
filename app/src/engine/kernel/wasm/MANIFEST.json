@@ -15,10 +15,10 @@
       "crate": "kc-neighbor",
       "artifact": "kc_neighbor.wasm",
       "rustcVersion": "1.98.1",
-      "sourceHash": "cab99657930c2d8dcdaf32f9f7b1b9321121b8fcd169e7e387b9d3964cbcdc9e",
-      "artifactHash": "62d6688998adfefc150f59e216a53992de9af12dcdc42e6ed6b0b1bd0e9b0601",
+      "sourceHash": "3551411c6d7b97d8310c126d6f53390614f035879cda88eb88d2046cde924c3b",
+      "artifactHash": "f58af2d3e9e01132a5a5efbd7a8de4b81a510c1d8ee1e662f95055ed36e8c8ae",
       "simd128": false,
-      "builtAt": "2026-10-11T02:54:45Z"
+      "builtAt": "2026-11-12T01:42:43Z"
     },
     "swarm-bake": {
       "crate": "swarm-bake",

@@ -83,30 +83,69 @@ fn to_i32(x: f64) -> i32 {
 /// with cell_size == radius, |dx| <= radius implies the cell indices differ
 /// by at most 1 (correctly-rounded f64 division keeps that true at any
 /// sane coordinate magnitude), and the 3×3 walk covers ±1.
+///
+/// #2099 — the grid must never be sized by an outlier. Three rules:
+///  1. The extent is computed in `i64` and the cell count with `checked_mul`: cell indices are `i32` (ToInt32), so
+///     `max - min + 1` can reach 2^32 and `cols * rows` 2^64 — the old `i32` / `usize` arithmetic wrapped or asked
+///     the allocator for terabytes (a wasm trap the JS side saw as a `RuntimeError`, not a status code).
+///  2. If the cell count passes `grid_cell_cap(n_sources)` (or overflows), the grid collapses to ONE cell holding
+///     every finite source and the neighbor loop scans it for every target. That costs O(targets × sources) for that
+///     call, and it cannot change the output: the grid is only a pruning accelerator, membership is decided by the
+///     `d2 > r2` test alone, and each target's run is sorted ascending before it is written.
+///  3. A source with a non-finite coordinate never sizes the grid (and never needs a cell): it goes on the `loose`
+///     list, which every target scans in index order with the same `!(d2 > r2)` test — NaN distances are included,
+///     an infinite one is not, exactly as in `applyField`'s direct loop.
 struct Grid {
     /// `cell_start[c]..cell_start[c+1]` spans cell c's sources in `order`.
     cell_start: Vec<i32>,
-    /// Source indices grouped by cell.
+    /// Finite source indices grouped by cell.
     order: Vec<i32>,
-    cols: i32,
-    min_cx: i32,
-    min_cy: i32,
+    /// Sources with a non-finite coordinate (ascending): scanned for every target, never binned.
+    loose: Vec<i32>,
+    cols: i64,
+    rows: i64,
+    min_cx: i64,
+    min_cy: i64,
     cell_size: f64,
+    /// The fallback: one cell, every target scans all of it.
+    single: bool,
+}
+
+/// The smallest grid we will always allow, in cells.
+pub const GRID_CELL_CAP_MIN: usize = 4096;
+/// Cells allowed per source once past the minimum.
+pub const GRID_CELL_CAP_PER_SOURCE: usize = 8;
+
+/// The most cells a grid may have for `n_sources` sources: `max(4096, 8 * n_sources)`. Past it the call falls back
+/// to the single-cell scan (see `Grid`).
+pub fn grid_cell_cap(n_sources: usize) -> usize {
+    std::cmp::max(
+        GRID_CELL_CAP_MIN,
+        n_sources.saturating_mul(GRID_CELL_CAP_PER_SOURCE),
+    )
 }
 
 fn build_grid(sx: &[f32], sy: &[f32], n_sources: usize, cell_size: f64) -> Grid {
-    let mut min_cx = i32::MAX;
-    let mut min_cy = i32::MAX;
-    let mut max_cx = i32::MIN;
-    let mut max_cy = i32::MIN;
+    let mut min_cx = i64::MAX;
+    let mut min_cy = i64::MAX;
+    let mut max_cx = i64::MIN;
+    let mut max_cy = i64::MIN;
     // Per-source cell coords, then reused as the flat cell index.
     let mut cell_of = vec![0i32; n_sources];
     let mut cell_cy = vec![0i32; n_sources];
+    let mut loose: Vec<i32> = Vec::new();
+    let mut finite = 0usize;
     for j in 0..n_sources {
+        if !(sx[j].is_finite() && sy[j].is_finite()) {
+            loose.push(j as i32);
+            continue;
+        }
+        finite += 1;
         let cx = to_i32(((sx[j] as f64) / cell_size).floor());
         let cy = to_i32(((sy[j] as f64) / cell_size).floor());
         cell_of[j] = cx;
         cell_cy[j] = cy;
+        let (cx, cy) = (cx as i64, cy as i64);
         if cx < min_cx {
             min_cx = cx;
         }
@@ -120,28 +159,48 @@ fn build_grid(sx: &[f32], sy: &[f32], n_sources: usize, cell_size: f64) -> Grid 
             max_cy = cy;
         }
     }
-    if n_sources == 0 {
-        min_cx = 0;
-        min_cy = 0;
-        max_cx = 0;
-        max_cy = 0;
-    }
-    let cols = max_cx - min_cx + 1;
-    let rows = max_cy - min_cy + 1;
-    let num_cells = (cols as usize) * (rows as usize);
+    // Extent in i64 (each side <= 2^32), cell count checked: None = overflow = over the cap.
+    let extent = if finite == 0 {
+        None
+    } else {
+        let cols = max_cx - min_cx + 1;
+        let rows = max_cy - min_cy + 1;
+        cols.checked_mul(rows)
+            .filter(|&cells| cells <= grid_cell_cap(n_sources) as i64)
+            .map(|cells| (cols, rows, cells as usize))
+    };
+    let (single, cols, rows, num_cells) = match extent {
+        Some((cols, rows, cells)) => (false, cols, rows, cells),
+        None => {
+            // no finite source (nothing to bin), or an extent past the cap: one cell holds them all
+            min_cx = 0;
+            min_cy = 0;
+            (true, 1, 1, 1)
+        }
+    };
 
     let mut cell_start = vec![0i32; num_cells + 1];
     for j in 0..n_sources {
-        let c = ((cell_cy[j] - min_cy) * cols + (cell_of[j] - min_cx)) as usize;
+        if !(sx[j].is_finite() && sy[j].is_finite()) {
+            continue;
+        }
+        let c = if single {
+            0usize
+        } else {
+            ((cell_cy[j] as i64 - min_cy) * cols + (cell_of[j] as i64 - min_cx)) as usize
+        };
         cell_of[j] = c as i32; // reuse as the flat cell index
         cell_start[c + 1] += 1;
     }
     for c in 0..num_cells {
         cell_start[c + 1] += cell_start[c];
     }
-    let mut order = vec![0i32; n_sources];
+    let mut order = vec![0i32; finite];
     let mut cursor = cell_start.clone();
     for j in 0..n_sources {
+        if !(sx[j].is_finite() && sy[j].is_finite()) {
+            continue;
+        }
         let slot = cursor[cell_of[j] as usize] as usize;
         order[slot] = j as i32;
         cursor[cell_of[j] as usize] += 1;
@@ -150,10 +209,13 @@ fn build_grid(sx: &[f32], sy: &[f32], n_sources: usize, cell_size: f64) -> Grid 
     Grid {
         cell_start,
         order,
+        loose,
         cols,
+        rows,
         min_cx,
         min_cy,
         cell_size,
+        single,
     }
 }
 
@@ -191,11 +253,6 @@ fn run(
 
     let r2 = radius * radius;
     let grid = build_grid(sx, sy, n_sources, radius);
-    let rows = if grid.cols > 0 {
-        (grid.cell_start.len() - 1) / (grid.cols as usize)
-    } else {
-        0
-    };
 
     for i in 0..n_targets {
         // f64 widening is exact; every op below is correctly rounded in both
@@ -204,43 +261,67 @@ fn run(
         let qy = ty[i] as f64;
         let base = i * max_neighbors;
         let mut k = 0usize;
-
-        let cx = to_i32((qx / grid.cell_size).floor());
-        let cy = to_i32((qy / grid.cell_size).floor());
-        // 3×3 walk, clamped to the grid extent (targets outside the source
-        // extent simply find no cells — every candidate would fail d2>r2).
         let mut overflow = false;
-        'cells: for ox in -1..=1 {
-            let ncx = cx + ox;
-            if ncx < grid.min_cx || ncx >= grid.min_cx + grid.cols {
-                continue;
+
+        // One candidate, tested exactly as `applyField` does. Verbatim inclusion: `if (d2 > r2) continue`, spelled
+        // `!(d2 > r2)` (not `d2 <= r2`) so NaN distances are INCLUDED, exactly like the JS path.
+        let mut visit = |j: usize, k: &mut usize| -> bool {
+            debug_assert!(j < n_sources);
+            let dx = sx[j] as f64 - qx;
+            let dy = sy[j] as f64 - qy;
+            let d2 = dx * dx + dy * dy;
+            if !(d2 > r2) {
+                if *k >= max_neighbors {
+                    return false;
+                }
+                out_indices[base + *k] = j as u32;
+                *k += 1;
             }
-            for oy in -1..=1 {
-                let ncy = cy + oy;
-                if ncy < grid.min_cy || ncy >= grid.min_cy + rows as i32 {
+            true
+        };
+
+        'cells: {
+            // Sources with a non-finite coordinate live outside the grid and are tested for every target.
+            for &j in &grid.loose {
+                if !visit(j as usize, &mut k) {
+                    overflow = true;
+                    break 'cells;
+                }
+            }
+            if grid.single {
+                // The fallback: the one cell holds every finite source.
+                for &j in &grid.order {
+                    if !visit(j as usize, &mut k) {
+                        overflow = true;
+                        break 'cells;
+                    }
+                }
+                break 'cells;
+            }
+            // 3×3 walk in i64 (a target's cell is an i32, so +-1 cannot wrap), clamped to the grid extent (targets
+            // outside the source extent simply find no cells — every candidate would fail d2>r2).
+            let cx = to_i32((qx / grid.cell_size).floor()) as i64;
+            let cy = to_i32((qy / grid.cell_size).floor()) as i64;
+            for ox in -1..=1i64 {
+                let ncx = cx + ox;
+                if ncx < grid.min_cx || ncx >= grid.min_cx + grid.cols {
                     continue;
                 }
-                let cc = ((ncy - grid.min_cy) * grid.cols + (ncx - grid.min_cx)) as usize;
-                let end = grid.cell_start[cc + 1] as usize;
-                let mut p = grid.cell_start[cc] as usize;
-                while p < end {
-                    let j = grid.order[p] as usize;
-                    debug_assert!(j < n_sources);
-                    let dx = sx[j] as f64 - qx;
-                    let dy = sy[j] as f64 - qy;
-                    let d2 = dx * dx + dy * dy;
-                    // Verbatim `applyField` inclusion: `if (d2 > r2) continue`.
-                    // Spelled as `!(d2 > r2)` (not `d2 <= r2`): NaN distances
-                    // are INCLUDED, exactly like the JS path.
-                    if !(d2 > r2) {
-                        if k >= max_neighbors {
+                for oy in -1..=1i64 {
+                    let ncy = cy + oy;
+                    if ncy < grid.min_cy || ncy >= grid.min_cy + grid.rows {
+                        continue;
+                    }
+                    let cc = ((ncy - grid.min_cy) * grid.cols + (ncx - grid.min_cx)) as usize;
+                    let end = grid.cell_start[cc + 1] as usize;
+                    let mut p = grid.cell_start[cc] as usize;
+                    while p < end {
+                        if !visit(grid.order[p] as usize, &mut k) {
                             overflow = true;
                             break 'cells;
                         }
-                        out_indices[base + k] = j as u32;
-                        k += 1;
+                        p += 1;
                     }
-                    p += 1;
                 }
             }
         }
@@ -515,6 +596,152 @@ mod tests {
         let mut indices = vec![0u32; 2]; // max_n = 1 < 2 neighbors
         let rc = run(&t, &t, &s, &s, 1.0, &mut counts, &mut indices, 1);
         assert_eq!(rc, NEIGHBOR_OVERFLOW);
+    }
+
+    /// 100 sources clustered near the origin, targets inside the cluster.
+    fn cluster() -> (Vec<f32>, Vec<f32>) {
+        let sx: Vec<f32> = (0..100).map(|i| ((i * 37) % 100) as f32 * 0.2).collect();
+        let sy: Vec<f32> = (0..100).map(|i| ((i * 53) % 100) as f32 * 0.2).collect();
+        (sx, sy)
+    }
+
+    // #2099 step 1 — one outlier source used to stretch the grid to (1e9/r)^2 cells.
+    #[test]
+    fn outlier_source_does_not_size_the_grid() {
+        let (mut sx, mut sy) = cluster();
+        sx.push(1.0e9);
+        sy.push(1.0e9);
+        let tx = [0.0f32, 3.3, 10.0, 19.8, 1.0e9, -1.0e9];
+        let ty = [0.0f32, 4.1, 10.0, 19.8, 1.0e9, 1.0e9];
+        check(&tx, &ty, &sx, &sy, 10.0, 128);
+    }
+
+    #[test]
+    fn extreme_finite_coordinates_do_not_overflow_the_extent() {
+        // cell indices at both ends of i32 (and past it, where ToInt32 wraps): cols/rows must not overflow.
+        let (mut sx, mut sy) = cluster();
+        for v in [f32::MAX, -f32::MAX, 3.0e37, -3.0e37, 2.147_483_6e10, -2.147_483_6e10] {
+            sx.push(v);
+            sy.push(-v);
+        }
+        let tx = [0.0f32, 5.0, f32::MAX, -f32::MAX, 3.0e37];
+        let ty = [0.0f32, 5.0, -f32::MAX, f32::MAX, -3.0e37];
+        check(&tx, &ty, &sx, &sy, 10.0, 128);
+    }
+
+    #[test]
+    fn non_finite_sources_never_size_the_grid_and_keep_the_inclusion_rule() {
+        // A cluster far from the origin, plus NaN / +-Inf sources. NaN distances are INCLUDED for every target
+        // (applyField's `if (d2 > r2) continue`); an infinite coordinate is excluded unless the target is non-finite too.
+        let n = 60usize;
+        let mut sx: Vec<f32> = (0..n).map(|i| 100_000.0 + ((i * 7) % 30) as f32).collect();
+        let mut sy: Vec<f32> = (0..n).map(|i| 100_000.0 + ((i * 11) % 30) as f32).collect();
+        for (x, y) in [
+            (f32::NAN, 100_005.0f32),
+            (100_005.0, f32::NAN),
+            (f32::INFINITY, 100_005.0),
+            (f32::NEG_INFINITY, f32::INFINITY),
+        ] {
+            sx.push(x);
+            sy.push(y);
+        }
+        let tx = [100_000.0f32, 100_010.0, 100_029.0, 0.0, -5.0e8];
+        let ty = [100_000.0f32, 100_015.0, 100_029.0, 0.0, 5.0e8];
+        check(&tx, &ty, &sx, &sy, 6.0, 128);
+    }
+
+    #[test]
+    fn single_cell_fallback_is_bit_identical_to_the_grid() {
+        // Sparse sources over a huge extent force the fallback; a dense run of the same points does not. Same answers.
+        let sx: Vec<f32> = (0..50).map(|i| (i * 1_000_003 % 2_000_000) as f32 - 1.0e6).collect();
+        let sy: Vec<f32> = (0..50).map(|i| (i * 999_983 % 2_000_000) as f32 - 1.0e6).collect();
+        let tx: Vec<f32> = sx.iter().map(|v| v + 3.0).collect();
+        let ty: Vec<f32> = sy.iter().map(|v| v - 2.0).collect();
+        assert!(grid_cell_cap(sx.len()) < 4_000_000_000);
+        check(&tx, &ty, &sx, &sy, 25.0, 64);
+        check(&tx, &ty, &sx, &sy, 1.0e7, 64); // radius wider than the extent: one real cell, no fallback
+    }
+
+    #[test]
+    fn grid_cell_cap_is_a_small_multiple_of_the_sources() {
+        assert_eq!(grid_cell_cap(0), 4096);
+        assert_eq!(grid_cell_cap(100), 4096);
+        assert_eq!(grid_cell_cap(10_000), 80_000);
+    }
+
+    #[test]
+    fn neighbor_run_reports_ok_for_the_outlier_fixture() {
+        // Through the C ABI, as the JS wrapper calls it: NEIGHBOR_OK, never a trap.
+        let (mut sx, mut sy) = cluster();
+        sx.push(1.0e9);
+        sy.push(1.0e9);
+        let tx = [0.0f32, 1.0e9];
+        let ty = [0.0f32, 1.0e9];
+        let max_n = 128u32;
+        let mut counts = vec![0u32; 2];
+        let mut indices = vec![0u32; 2 * max_n as usize];
+        let rc = neighbor_run(
+            tx.as_ptr(),
+            ty.as_ptr(),
+            2,
+            sx.as_ptr(),
+            sy.as_ptr(),
+            sx.len(),
+            10.0,
+            counts.as_mut_ptr(),
+            indices.as_mut_ptr(),
+            max_n,
+        );
+        assert_eq!(rc, NEIGHBOR_OK);
+        assert_eq!(counts[1], 1, "the far target finds only the far source");
+    }
+
+    #[test]
+    fn seeded_mix_of_clusters_outliers_and_non_finite_matches_the_direct_loop() {
+        // A deterministic differential run (xorshift32, no rand dependency): 300 cases of mixed magnitudes, so both the
+        // grid path and the single-cell fallback are exercised, against the direct-loop oracle.
+        let mut state = 0x9e37_79b9u32;
+        let mut next = move || {
+            state ^= state << 13;
+            state ^= state >> 17;
+            state ^= state << 5;
+            state
+        };
+        let mut fallbacks = 0;
+        for case in 0..300 {
+            let n_s = 1 + (next() % 60) as usize;
+            let n_t = 1 + (next() % 12) as usize;
+            let scale = [1.0f32, 50.0, 1.0e4, 1.0e9, 3.0e37][(next() % 5) as usize];
+            let mut pt = |next: &mut dyn FnMut() -> u32| -> f32 {
+                match next() % 23 {
+                    0 => f32::NAN,
+                    1 => f32::INFINITY,
+                    2 => f32::NEG_INFINITY,
+                    3 => 1.0e9,
+                    _ => ((next() % 2001) as f32 - 1000.0) / 1000.0 * scale,
+                }
+            };
+            let sx: Vec<f32> = (0..n_s).map(|_| pt(&mut next)).collect();
+            let sy: Vec<f32> = (0..n_s).map(|_| pt(&mut next)).collect();
+            // finite targets only: a non-finite TARGET is binned at cell 0 by ToInt32 (not part of #2099)
+            let finite = |v: f32| if v.is_finite() { v } else { 0.0 };
+            let tx: Vec<f32> = (0..n_t).map(|_| finite(pt(&mut next))).collect();
+            let ty: Vec<f32> = (0..n_t).map(|_| finite(pt(&mut next))).collect();
+            let radius = [0.05f64, 1.0, 10.0, 250.0][(next() % 4) as usize];
+            if build_grid(&sx, &sy, n_s, radius).single {
+                fallbacks += 1;
+            }
+            let max_n = n_s + 8;
+            let mut counts = vec![0u32; n_t];
+            let mut indices = vec![0u32; n_t * max_n];
+            let rc = run(&tx, &ty, &sx, &sy, radius, &mut counts, &mut indices, max_n);
+            assert_eq!(rc, NEIGHBOR_OK, "case {case}");
+            for (i, w) in oracle(&tx, &ty, &sx, &sy, radius).iter().enumerate() {
+                assert_eq!(counts[i] as usize, w.len(), "case {case} count target {i}");
+                assert_eq!(&indices[i * max_n..i * max_n + w.len()], w.as_slice(), "case {case} target {i}");
+            }
+        }
+        assert!(fallbacks > 20, "the fixture must reach the fallback often (got {fallbacks})");
     }
 
     #[test]
