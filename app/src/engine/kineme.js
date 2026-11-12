@@ -316,75 +316,8 @@ export function driverTimeSec(clock, loopMs, rate = 1) {
 // and its cost tier. Kineme never invents render features — it moves knobs
 // that already exist.
 
-/**
- * The v1 driver set (Matt decision 6: curated four).
- * amount: 0..1. Amount 0 = today's render exactly (hard gate below).
- */
-export const KINEME_DRIVERS = Object.freeze(
-  [
-    {
-      id: 'breath',
-      targets: ['scale'],
-      amountMeaning: 'scale swell depth, fraction of mark scale',
-      amountRange: [0, 1],
-      phaseMode: 'per-instance',
-      clock: 'smooth',
-      costTier: 'cpu-cheap',
-    },
-    {
-      id: 'drift',
-      targets: ['x', 'y'],
-      amountMeaning: 'wander reach, fraction of the smaller canvas dimension',
-      amountRange: [0, 1],
-      phaseMode: 'per-instance',
-      clock: 'smooth',
-      costTier: 'cpu-cheap',
-    },
-    {
-      id: 'pulse',
-      targets: ['scale'],
-      amountMeaning: 'scale thump depth, fraction of mark scale',
-      amountRange: [0, 1],
-      phaseMode: 'per-instance',
-      clock: 'smooth',
-      costTier: 'cpu-cheap',
-    },
-    {
-      id: 'brush-wobble',
-      targets: ['wobbleAmp'],
-      amountMeaning: 'boiled wobble reach, fraction of the edge band',
-      amountRange: [0, 1],
-      phaseMode: 'per-instance',
-      clock: 'boil',
-      costTier: 'cpu-cheap',
-    },
-    {
-      id: 'palette-breath', // #1151 — per-instance palette sweep (Davis colorOsc, homage)
-      targets: ['paletteShift'],
-      amountMeaning: 'palette sweep reach, fraction of palette length',
-      amountRange: [0, 1],
-      phaseMode: 'per-instance',
-      clock: 'smooth',
-      costTier: 'cpu-cheap',
-    },
-  ].map(Object.freeze),
-);
-
-const DRIVER_IDS = new Set(KINEME_DRIVERS.map((d) => d.id));
-
-/** The driver declaration for an id, or undefined. */
-export function getKinemeDriver(id) {
-  return KINEME_DRIVERS.find((d) => d.id === id);
-}
-
-/** True when the id names a v1 driver. */
-export function isKinemeDriver(id) {
-  return DRIVER_IDS.has(id);
-}
-
+// The anchor law's real-unit scales: amount 1.0 → these peaks. Subtle by design.
 const TAU = Math.PI * 2;
-
-// Real-unit scales: amount 1.0 → these peaks. Subtle by design.
 const BREATH_DEPTH = 0.09; // ±9% scale swell, ~9s period
 const BREATH_HZ = 0.11;
 const DRIFT_REACH = 0.02; // ±2% of the smaller canvas dimension
@@ -411,8 +344,327 @@ function num01(v) {
   return Number.isFinite(n) && n > 0 ? Math.min(1, n) : 0;
 }
 
+// #2115 — the table DRIVES. Each driver is one record in KINEME_DRIVERS and carries its own `evaluate(out, soa, ctx)`:
+// it reads its amount from ctx.amounts, writes ONLY the channels it targets for every slot k, and sets out.active when
+// it has something to say. evaluateKineme is a loop over the table. The bodies below were MOVED out of the old
+// hand-written branches, not rewritten: the order of every floating-point operation is the order it always was, so the
+// output is byte-identical (kineme.driverTable.selfcheck.mjs holds a frozen copy of the old function as the reference).
+// The special couplings stay exactly where they were and ride in on ctx: the fieldBreath seam (breath), the anchored
+// flag, the canvas size, the palette. The culture's secondary read is not a driver — it is read-only, like weather —
+// so it stays a post-pass in evaluateKineme.
+
+/** The target names a driver may declare, and the output channel each one writes. */
+export const KINEME_TARGET_CHANNELS = Object.freeze({
+  scale: 'dScale',
+  x: 'dx',
+  y: 'dy',
+  wobbleAmp: 'dWobble',
+  paletteShift: 'dPalette',
+});
+
 /**
- * Evaluate the drivers for every instance. Pure.
+ * The cost-tier labels a driver may declare without a costRegistry entry. The five built-ins have always carried the
+ * DESCRIPTIVE label 'cpu-cheap' (docs/design/motion-map.md notes it is not in the registry); changing it would move
+ * the Canon's pinned drivers hash. A driver may instead name any id the registry knows (a GPU-backed driver would).
+ */
+export const KINEME_COST_LABELS = Object.freeze(['cpu-cheap']);
+
+function evaluateBreath(out, soa, ctx) {
+  const n = soa.n | 0;
+  const t = Number(ctx.driverSec);
+  const seed = ctx.seed | 0;
+  const anchored = !!ctx.anchored;
+  const amounts = ctx.amounts || {};
+  const breath = num01(amounts.breath);
+  if (breath > 0) {
+    out.active = true;
+    // #1923 Phase 2 slice B — FIELD glyph breathing: when the resolver hands over the coupling seam
+    // (ctx.fieldBreath = { coupling, sampler }, the same object slice A's scale fold reads), the field
+    // CULTURE's activity under each mark scales the DEPTH of the breath term it is about to add — never
+    // its rate (the phase law above stays the dealt law, anchor intact), never any other driver. The
+    // factor comes from the seam (engine/dishLifeCouple.mjs); a mark outside the canvas has no cell to
+    // read and breathes its own breath. Absent the seam the term is the dealt term, number for number.
+    const fb = ctx.fieldBreath;
+    const fbSampler = fb && typeof fb.sampler?.sample === 'function' ? fb.sampler : null;
+    const fbCell = fbSampler ? { level: 0, activity: 0 } : null;
+    for (let k = 0; k < n; k++) {
+      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
+      const s = Math.sin(TAU * (BREATH_HZ * t + uN));
+      let term = breath * BREATH_DEPTH * (anchored ? s - Math.sin(TAU * uN) : s);
+      if (fbSampler && fbSampler.sample(soa.x[k], soa.y[k], fbCell))
+        term *= cultureBreathFactor(fbCell.activity, fb.coupling);
+      out.dScale[k] += term;
+    }
+  }
+}
+
+function evaluateDrift(out, soa, ctx) {
+  const n = soa.n | 0;
+  const t = Number(ctx.driverSec);
+  const seed = ctx.seed | 0;
+  const anchored = !!ctx.anchored;
+  const amounts = ctx.amounts || {};
+  const drift = num01(amounts.drift);
+  if (drift > 0) {
+    out.active = true;
+    const m = Math.min(Number(ctx.canvasW) || 0, Number(ctx.canvasH) || 0);
+    const reach = drift * DRIFT_REACH * m;
+    if (reach > 0) {
+      for (let k = 0; k < n; k++) {
+        const ph = phasesFor(seed, soa.index[k]);
+        const uN = ph.n[soa.index[k]];
+        const uB = ph.b[soa.index[k]];
+        const sx = Math.sin(TAU * (DRIFT_HZ_X * t + uN));
+        const sy = Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
+        out.dx[k] += reach * (anchored ? sx - Math.sin(TAU * uN) : sx);
+        out.dy[k] += reach * (anchored ? sy - Math.sin(TAU * uB) : sy);
+      }
+    }
+  }
+}
+
+function evaluatePulse(out, soa, ctx) {
+  const n = soa.n | 0;
+  const t = Number(ctx.driverSec);
+  const seed = ctx.seed | 0;
+  const anchored = !!ctx.anchored;
+  const amounts = ctx.amounts || {};
+  const pulse = num01(amounts.pulse);
+  if (pulse > 0) {
+    out.active = true;
+    for (let k = 0; k < n; k++) {
+      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
+      const ph = (((PULSE_HZ * t + uN) % 1) + 1) % 1;
+      const thump = (1 - ph) * (1 - ph) * (1 - ph);
+      const rph = ((uN % 1) + 1) % 1; // the phase at driver time 0, written exactly as above so the difference is exactly 0
+      const rest = (1 - rph) * (1 - rph) * (1 - rph);
+      out.dScale[k] += pulse * PULSE_DEPTH * (anchored ? thump - rest : thump);
+    }
+  }
+}
+
+function evaluateBrushWobble(out, soa, ctx) {
+  const n = soa.n | 0;
+  const step = ctx.boilStep | 0;
+  const amounts = ctx.amounts || {};
+  const wobble = num01(amounts.brushWobble);
+  if (wobble > 0) {
+    out.active = true;
+    for (let k = 0; k < n; k++) {
+      // Boiled value noise: one hash per (frame, slot), snapped to the
+      // boil frame — the line holds, then jumps. Sine-free (djb2).
+      const w = hashPhase(step, `wb:${soa.index[k]}`);
+      out.dWobble[k] += wobble * 2 * (w - 0.5);
+    }
+  }
+}
+
+// #1151 — palette-breath: per-instance oscillator sweeping the palette
+// sampling position (Davis colorOsc, homage — the principle, not his
+// code). Traveling color waves via the same index-phase trick as breath:
+// copies never move in lockstep. Reach is in slots: amount 1 sweeps the
+// whole palette, the default (~0.12) shimmers ±a few slots. The applier
+// rounds and wraps modulo palette length, so a palette switch never pops —
+// the offset is relative and the phase is continuous.
+function evaluatePaletteBreath(out, soa, ctx) {
+  const n = soa.n | 0;
+  const t = Number(ctx.driverSec);
+  const seed = ctx.seed | 0;
+  const anchored = !!ctx.anchored;
+  const amounts = ctx.amounts || {};
+  const paletteBreath = num01(amounts.paletteBreath);
+  if (paletteBreath > 0) {
+    const swatches = ctx.palette?.swatches;
+    const len = Array.isArray(swatches) ? swatches.length : 0;
+    const reach = paletteBreath * len;
+    if (reach > 0) {
+      out.active = true;
+      for (let k = 0; k < n; k++) {
+        const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
+        const s = Math.sin(TAU * (PALETTE_HZ * t + uN));
+        out.dPalette[k] += reach * (anchored ? s - Math.sin(TAU * uN) : s);
+      }
+    }
+  }
+}
+
+const DRIVER_IDS = new Set();
+
+/**
+ * The driver table. Built-ins register through registerKinemeDriver below; a sixth driver is one more record.
+ * (An ordinary array so registration can append — the records themselves are frozen, and the CONTENT the Canon pins
+ * is unchanged: `evaluate` is a function, so it does not appear in the serialised record.)
+ */
+export const KINEME_DRIVERS = [];
+
+/**
+ * Register a driver. Throws on a malformed record: a non-unique id, a target the evaluator has no channel for, an
+ * amount range outside 0..1, an unknown phase mode or clock, a cost tier that is neither a registered id nor a known
+ * label, or a missing evaluate. The record is copied and frozen; the evaluation order is registration order.
+ *
+ * record: { id, targets, amountMeaning, amountRange, phaseMode, clock, costTier, evaluate(out, soa, ctx) }
+ * evaluate writes only the channels its targets name (KINEME_TARGET_CHANNELS) and sets out.active = true when it has
+ * moved something; amount 0 must leave out untouched (the hard gate — skip the maths, don't multiply by zero).
+ * @returns {Readonly<object>} the frozen record
+ */
+export function registerKinemeDriver(record) {
+  if (record === null || typeof record !== 'object') throw new TypeError('[kineme] a driver must be an object');
+  const { id, targets, amountMeaning, amountRange, phaseMode, clock, costTier, evaluate } = record;
+  if (typeof id !== 'string' || !id) throw new TypeError('[kineme] a driver needs a non-empty string id');
+  if (DRIVER_IDS.has(id)) throw new Error(`[kineme] driver "${id}" is already registered (duplicate id)`);
+  if (!Array.isArray(targets) || !targets.length)
+    throw new TypeError(`[kineme] driver "${id}": targets must be a non-empty array`);
+  for (const target of targets) {
+    if (!Object.prototype.hasOwnProperty.call(KINEME_TARGET_CHANNELS, target)) {
+      throw new TypeError(
+        `[kineme] driver "${id}": unknown target "${String(target)}" (${Object.keys(KINEME_TARGET_CHANNELS).join(' | ')})`,
+      );
+    }
+  }
+  if (typeof amountMeaning !== 'string' || !amountMeaning) {
+    throw new TypeError(`[kineme] driver "${id}": amountMeaning must say what the amount means in real units`);
+  }
+  if (
+    !Array.isArray(amountRange) ||
+    amountRange.length !== 2 ||
+    !Number.isFinite(amountRange[0]) ||
+    !Number.isFinite(amountRange[1]) ||
+    amountRange[0] < 0 ||
+    amountRange[1] > 1 ||
+    !(amountRange[0] < amountRange[1])
+  ) {
+    throw new TypeError(`[kineme] driver "${id}": amountRange must be [lo, hi] inside 0..1 with lo < hi`);
+  }
+  if (phaseMode !== 'per-instance' && phaseMode !== 'global') {
+    throw new TypeError(`[kineme] driver "${id}": unknown phaseMode "${String(phaseMode)}" (per-instance | global)`);
+  }
+  if (clock !== 'smooth' && clock !== 'boil') {
+    throw new TypeError(`[kineme] driver "${id}": unknown clock "${String(clock)}" (smooth | boil)`);
+  }
+  if (typeof costTier !== 'string' || !(KINEME_COST_LABELS.includes(costTier) || getCostTier(costTier))) {
+    throw new TypeError(
+      `[kineme] driver "${id}": costTier "${String(costTier)}" is neither a registered cost tier id nor a known label (${KINEME_COST_LABELS.join(' | ')})`,
+    );
+  }
+  if (typeof evaluate !== 'function') throw new TypeError(`[kineme] driver "${id}": evaluate must be a function`);
+  const frozen = Object.freeze({
+    id,
+    targets: [...targets],
+    amountMeaning,
+    amountRange: [...amountRange],
+    phaseMode,
+    clock,
+    costTier,
+    evaluate,
+  });
+  DRIVER_IDS.add(id);
+  KINEME_DRIVERS.push(frozen);
+  return frozen;
+}
+
+/**
+ * The v1 driver set (Matt decision 6: curated four, extended by palette-breath #1151).
+ * amount: 0..1. Amount 0 = today's render exactly (hard gate: the maths is skipped).
+ * Registration order IS evaluation order — breath and pulse both accumulate into dScale, so it is the order the
+ * floating-point sums have always been taken in.
+ */
+registerKinemeDriver({
+  id: 'breath',
+  targets: ['scale'],
+  amountMeaning: 'scale swell depth, fraction of mark scale',
+  amountRange: [0, 1],
+  phaseMode: 'per-instance',
+  clock: 'smooth',
+  costTier: 'cpu-cheap',
+  evaluate: evaluateBreath,
+});
+registerKinemeDriver({
+  id: 'drift',
+  targets: ['x', 'y'],
+  amountMeaning: 'wander reach, fraction of the smaller canvas dimension',
+  amountRange: [0, 1],
+  phaseMode: 'per-instance',
+  clock: 'smooth',
+  costTier: 'cpu-cheap',
+  evaluate: evaluateDrift,
+});
+registerKinemeDriver({
+  id: 'pulse',
+  targets: ['scale'],
+  amountMeaning: 'scale thump depth, fraction of mark scale',
+  amountRange: [0, 1],
+  phaseMode: 'per-instance',
+  clock: 'smooth',
+  costTier: 'cpu-cheap',
+  evaluate: evaluatePulse,
+});
+registerKinemeDriver({
+  id: 'brush-wobble',
+  targets: ['wobbleAmp'],
+  amountMeaning: 'boiled wobble reach, fraction of the edge band',
+  amountRange: [0, 1],
+  phaseMode: 'per-instance',
+  clock: 'boil',
+  costTier: 'cpu-cheap',
+  evaluate: evaluateBrushWobble,
+});
+registerKinemeDriver({
+  id: 'palette-breath', // #1151 — per-instance palette sweep (Davis colorOsc, homage)
+  targets: ['paletteShift'],
+  amountMeaning: 'palette sweep reach, fraction of palette length',
+  amountRange: [0, 1],
+  phaseMode: 'per-instance',
+  clock: 'smooth',
+  costTier: 'cpu-cheap',
+  evaluate: evaluatePaletteBreath,
+});
+
+/** The driver declaration for an id, or undefined. */
+export function getKinemeDriver(id) {
+  return KINEME_DRIVERS.find((d) => d.id === id);
+}
+
+/** True when the id names a registered driver. */
+export function isKinemeDriver(id) {
+  return DRIVER_IDS.has(id);
+}
+
+// #2115 — the live path reuses its output channels instead of allocating five arrays a frame: one scratch set per soa
+// (the same WeakMap shape as BASE_XY below), zero-filled at the top of every call, a fresh set when the soa's length
+// changes. evaluateKineme keeps its contract — every call returns FRESH arrays, so a caller may hold one result across
+// the next call (kineme.selfcheck.mjs does); evaluateKinemeScratch is the allocation-free twin the applier uses, and its
+// result is only good until the next call for the same soa.
+const EVAL_SCRATCH = new WeakMap();
+
+function newChannels(n) {
+  return {
+    active: false,
+    dScale: new Float64Array(n),
+    dx: new Float64Array(n),
+    dy: new Float64Array(n),
+    dWobble: new Float64Array(n),
+    dPalette: new Float64Array(n),
+  };
+}
+
+function scratchFor(soa, n) {
+  let out = soa !== null && typeof soa === 'object' ? EVAL_SCRATCH.get(soa) : undefined;
+  if (!out || out.dScale.length !== n) {
+    out = newChannels(n);
+    if (soa !== null && typeof soa === 'object') EVAL_SCRATCH.set(soa, out);
+    return out;
+  }
+  out.active = false;
+  out.dScale.fill(0);
+  out.dx.fill(0);
+  out.dy.fill(0);
+  out.dWobble.fill(0);
+  out.dPalette.fill(0);
+  return out;
+}
+
+/**
+ * Evaluate the drivers for every instance. Pure; every call returns fresh channel arrays.
  *
  * ctx: {
  *   seed,            // project seed — per-instance phase source
@@ -439,108 +691,25 @@ function num01(v) {
  * (#894/#897): on main it is evaluated, tested, and left unapplied.
  */
 export function evaluateKineme(soa, ctx) {
+  return runDrivers(newChannels(soa?.n | 0), soa, ctx);
+}
+
+/**
+ * The same evaluation into the per-soa scratch channels: no allocation after the first frame (#2115). The result is
+ * overwritten by the next call for the same soa, so read it and drop it — applyKinemeDrivers does.
+ */
+export function evaluateKinemeScratch(soa, ctx) {
+  return runDrivers(scratchFor(soa, soa?.n | 0), soa, ctx);
+}
+
+// `out` arrives zero-filled with active false.
+function runDrivers(out, soa, ctx) {
   const n = soa?.n | 0;
-  const out = {
-    active: false,
-    dScale: new Float64Array(n),
-    dx: new Float64Array(n),
-    dy: new Float64Array(n),
-    dWobble: new Float64Array(n),
-    dPalette: new Float64Array(n),
-  };
   if (!n || !ctx) return out;
   const t = Number(ctx.driverSec);
   if (!Number.isFinite(t)) return out;
-  const step = ctx.boilStep | 0;
-  const amounts = ctx.amounts || {};
-  const seed = ctx.seed | 0;
-  const anchored = !!ctx.anchored;
 
-  const breath = num01(amounts.breath);
-  if (breath > 0) {
-    out.active = true;
-    // #1923 Phase 2 slice B — FIELD glyph breathing: when the resolver hands over the coupling seam
-    // (ctx.fieldBreath = { coupling, sampler }, the same object slice A's scale fold reads), the field
-    // CULTURE's activity under each mark scales the DEPTH of the breath term it is about to add — never
-    // its rate (the phase law above stays the dealt law, anchor intact), never any other driver. The
-    // factor comes from the seam (engine/dishLifeCouple.mjs); a mark outside the canvas has no cell to
-    // read and breathes its own breath. Absent the seam the term is the dealt term, number for number.
-    const fb = ctx.fieldBreath;
-    const fbSampler = fb && typeof fb.sampler?.sample === 'function' ? fb.sampler : null;
-    const fbCell = fbSampler ? { level: 0, activity: 0 } : null;
-    for (let k = 0; k < n; k++) {
-      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
-      const s = Math.sin(TAU * (BREATH_HZ * t + uN));
-      let term = breath * BREATH_DEPTH * (anchored ? s - Math.sin(TAU * uN) : s);
-      if (fbSampler && fbSampler.sample(soa.x[k], soa.y[k], fbCell))
-        term *= cultureBreathFactor(fbCell.activity, fb.coupling);
-      out.dScale[k] += term;
-    }
-  }
-
-  const drift = num01(amounts.drift);
-  if (drift > 0) {
-    out.active = true;
-    const m = Math.min(Number(ctx.canvasW) || 0, Number(ctx.canvasH) || 0);
-    const reach = drift * DRIFT_REACH * m;
-    if (reach > 0) {
-      for (let k = 0; k < n; k++) {
-        const ph = phasesFor(seed, soa.index[k]);
-        const uN = ph.n[soa.index[k]];
-        const uB = ph.b[soa.index[k]];
-        const sx = Math.sin(TAU * (DRIFT_HZ_X * t + uN));
-        const sy = Math.sin(TAU * (DRIFT_HZ_Y * t + uB));
-        out.dx[k] += reach * (anchored ? sx - Math.sin(TAU * uN) : sx);
-        out.dy[k] += reach * (anchored ? sy - Math.sin(TAU * uB) : sy);
-      }
-    }
-  }
-
-  const pulse = num01(amounts.pulse);
-  if (pulse > 0) {
-    out.active = true;
-    for (let k = 0; k < n; k++) {
-      const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
-      const ph = (((PULSE_HZ * t + uN) % 1) + 1) % 1;
-      const thump = (1 - ph) * (1 - ph) * (1 - ph);
-      const rph = ((uN % 1) + 1) % 1; // the phase at driver time 0, written exactly as above so the difference is exactly 0
-      const rest = (1 - rph) * (1 - rph) * (1 - rph);
-      out.dScale[k] += pulse * PULSE_DEPTH * (anchored ? thump - rest : thump);
-    }
-  }
-
-  const wobble = num01(amounts.brushWobble);
-  if (wobble > 0) {
-    out.active = true;
-    for (let k = 0; k < n; k++) {
-      // Boiled value noise: one hash per (frame, slot), snapped to the
-      // boil frame — the line holds, then jumps. Sine-free (djb2).
-      const w = hashPhase(step, `wb:${soa.index[k]}`);
-      out.dWobble[k] += wobble * 2 * (w - 0.5);
-    }
-  }
-
-  // #1151 — palette-breath: per-instance oscillator sweeping the palette
-  // sampling position (Davis colorOsc, homage — the principle, not his
-  // code). Traveling color waves via the same index-phase trick as breath:
-  // copies never move in lockstep. Reach is in slots: amount 1 sweeps the
-  // whole palette, the default (~0.12) shimmers ±a few slots. The applier
-  // rounds and wraps modulo palette length, so a palette switch never pops —
-  // the offset is relative and the phase is continuous.
-  const paletteBreath = num01(amounts.paletteBreath);
-  if (paletteBreath > 0) {
-    const swatches = ctx.palette?.swatches;
-    const len = Array.isArray(swatches) ? swatches.length : 0;
-    const reach = paletteBreath * len;
-    if (reach > 0) {
-      out.active = true;
-      for (let k = 0; k < n; k++) {
-        const uN = phasesFor(seed, soa.index[k]).n[soa.index[k]];
-        const s = Math.sin(TAU * (PALETTE_HZ * t + uN));
-        out.dPalette[k] += reach * (anchored ? s - Math.sin(TAU * uN) : s);
-      }
-    }
-  }
+  for (let d = 0; d < KINEME_DRIVERS.length; d++) KINEME_DRIVERS[d].evaluate(out, soa, ctx);
 
   // #1923 — DISH LIFE as a SECONDARY read. The quiet culture (engine/dishLifeQuiet.mjs) is one more motion source on
   // this system, read-only like weather: it never owns a mark, it only lets the marks near a living colony breathe a
@@ -600,7 +769,7 @@ const BASE_XY = new WeakMap();
 export function applyKinemeDrivers(soa, ctx, still = null) {
   if (!soa || !ctx) return null;
   if ((ctx.shedTier | 0) >= 3) return null;
-  const d = evaluateKineme(soa, ctx);
+  const d = evaluateKinemeScratch(soa, ctx);
   if (!d.active) return null;
   const n = soa.n | 0;
   let base = BASE_XY.get(soa);
