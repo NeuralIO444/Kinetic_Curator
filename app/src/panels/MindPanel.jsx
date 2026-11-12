@@ -27,7 +27,8 @@ function Conducting() {
           : ''}
       </p>
       <p style={{ opacity: 0.75, margin: '0 0 4px' }}>
-        His routes {t.mine} of {t.routes} · owned by you: {t.owned.length ? t.owned.join(', ') : 'none'}
+        His routes {t.mine} of {t.routes} · owned by you ({t.owned.length} of {t.ownable}):{' '}
+        {t.owned.length ? t.owned.join(', ') : 'none'}
         {t.pending ? ` · waiting for bar ${t.pending.landBar}: ${t.pending.desc}` : ''}
       </p>
       <table style={{ borderCollapse: 'collapse', width: '100%' }}>

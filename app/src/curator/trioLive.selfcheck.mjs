@@ -10,6 +10,8 @@ import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRec
 import { sanitizeAudioRoutes, isDefaultRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
 import { buildContext } from './mindContext.js';
+import { ownableTargets, SPECTRUM_PARAMS } from './mindConduct.js';
+import { routeDepthRange } from '../data/audioRoutes.js';
 import { rulesReply } from './mindRules.js';
 
 let n = 0;
@@ -740,6 +742,53 @@ ok('a clock restart clears the old phrase ledger and cooldown (rebase) but keeps
   assert.equal(c.cooling(1), false, 'the cooldown is gone');
   assert.equal(c.consider(ADD, { bar: 5, tier: 't3' }).landBar, 8, 'the ledger is clear: bar 5 lands on 8 again');
   assert.deepEqual(c.owned(), ['render.alpha'], 'owned is kept (reset() would have cleared it)');
+  g.done();
+});
+
+// #2092 step 1 — OWNERSHIP IS MONOTONIC (documents main's behaviour; the Ruling's expiry + hand-back are the next PRs, and
+// they will change THIS test on purpose). Every dial the artist can move by hand owns its target the moment it moves,
+// and nothing ever gives it back: 64 bars (16 phrases) later all of them are still owned, and Davis's proposal against
+// any of them is dropped as 'owned'. Over a long set he runs out of targets.
+ok(
+  'ownership never lapses: every dial touched once is still owned 64 bars later, and a proposal on it is dropped',
+  () => {
+    const g = rig();
+    audioOn();
+    const targets = Object.keys(DIAL_FOR_TARGET);
+    assert.ok(targets.length >= 12, 'the dial map reaches the 8 route targets and the 4 spectrum dials');
+    for (const t of targets) emit(Events.LAYOUT_PARAM, { key: DIAL_FOR_TARGET[t][0], value: 0.5 });
+    assert.deepEqual(g.trio.conductor.owned(), [...targets].sort(), 'one touch of one dial per target owns every one');
+    for (let b = 1; b <= 64; b++) g.bar(b);
+    assert.deepEqual(g.trio.conductor.owned(), [...targets].sort(), '64 bars on: still every one (nothing expires)');
+    let asked = 0;
+    for (const t of targets) {
+      const spectrumKey = Object.keys(SPECTRUM_PARAMS).find((k) => `spectrum.${k}` === t);
+      const route = spectrumKey
+        ? { op: 'spectrum', key: spectrumKey, value: 1 }
+        : { op: 'add', input: 'band.mids', target: t, depth: routeDepthRange(t).max / 2 };
+      const before = g.out.dropped.length;
+      g.request(64 + asked * 4, route);
+      asked++;
+      assert.equal(g.out.dropped.length, before + 1, `${t}: the proposal was answered with a drop`);
+      assert.equal(g.out.dropped.at(-1).reason, 'owned', `${t}: dropped as owned, 64 bars after the touch`);
+    }
+    assert.equal(g.out.applied.length, 0, 'Davis landed nothing against any target the artist ever touched');
+    g.done();
+  },
+);
+
+ok('the DEV view counts owned against ownable', () => {
+  const g = rig();
+  audioOn();
+  const ownable = ownableTargets();
+  assert.ok(ownable.length > Object.keys(DIAL_FOR_TARGET).length, 'some targets are ownable only by a route edit');
+  assert.equal(getTrioView().ownable, ownable.length, 'the view carries the ownable count');
+  assert.equal(getTrioView().owned.length, 0, 'nothing owned before a touch');
+  emit(Events.LAYOUT_PARAM, { key: 'breath', value: 0.4 });
+  emit(Events.LAYOUT_PARAM, { key: 'spectrumScale', value: 0.7 });
+  g.bar(1);
+  assert.deepEqual(getTrioView().owned, ['render.breath', 'spectrum.scale']);
+  assert.equal(getTrioView().ownable, ownable.length);
   g.done();
 });
 
