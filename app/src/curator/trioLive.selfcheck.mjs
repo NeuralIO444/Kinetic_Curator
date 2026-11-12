@@ -10,7 +10,7 @@ import { createMindRecorder, checkMindRecord, createMindReplay } from './mindRec
 import { sanitizeAudioRoutes, isDefaultRoutes } from '../data/audioRoutes.js';
 import { DEFAULT_ROUTES, ROUTE_TARGETS } from '../gl/audioRoutes.mjs';
 import { buildContext } from './mindContext.js';
-import { ownableTargets, SPECTRUM_PARAMS } from './mindConduct.js';
+import { ownableTargets, SPECTRUM_PARAMS, OWN_PHRASES, OWN_BARS, PHRASE_BARS, createConductor } from './mindConduct.js';
 import { routeDepthRange } from '../data/audioRoutes.js';
 import { rulesReply } from './mindRules.js';
 
@@ -719,63 +719,118 @@ ok('a clock restart drops the held proposal as stale once, and a fresh proposal 
   g.bar(4);
   assert.equal(g.out.applied.length, 2, 'it lands at bar 4, not 204 bars later');
   assert.equal(g.out.applied[1].landBar, 4);
-  assert.deepEqual(g.trio.conductor.owned(), ['render.alpha'], 'ownership is kept across the restart');
+  assert.deepEqual(g.trio.conductor.owned(2), [], 'ownership stamps are old numbers: a restart clears them (#2092)');
   g.done();
 });
 
-ok('a clock restart clears the old phrase ledger and cooldown (rebase) but keeps owned and the revert count', () => {
-  const g = rig();
-  audioOn();
-  const c = g.trio.conductor;
-  c.touch(['render.alpha']);
-  c.commit(8); // phrase of bar 8 has had its edit
-  assert.equal(
-    c.consider(ADD, { bar: 5, tier: 't3' }).landBar,
-    12,
-    'the old ledger pushes a bar-5 proposal past phrase 8',
-  );
-  c.revert(200);
-  c.revert(200);
-  c.revert(200); // enough reverts to start a cool-down at bar 200
-  assert.equal(c.cooling(201), true);
-  c.rebase();
-  assert.equal(c.cooling(1), false, 'the cooldown is gone');
-  assert.equal(c.consider(ADD, { bar: 5, tier: 't3' }).landBar, 8, 'the ledger is clear: bar 5 lands on 8 again');
-  assert.deepEqual(c.owned(), ['render.alpha'], 'owned is kept (reset() would have cleared it)');
-  g.done();
-});
-
-// #2092 step 1 — OWNERSHIP IS MONOTONIC (documents main's behaviour; the Ruling's expiry + hand-back are the next PRs, and
-// they will change THIS test on purpose). Every dial the artist can move by hand owns its target the moment it moves,
-// and nothing ever gives it back: 64 bars (16 phrases) later all of them are still owned, and Davis's proposal against
-// any of them is dropped as 'owned'. Over a long set he runs out of targets.
 ok(
-  'ownership never lapses: every dial touched once is still owned 64 bars later, and a proposal on it is dropped',
+  'a clock restart clears the old phrase ledger, cooldown and ownership stamps (rebase) but keeps the revert count',
   () => {
     const g = rig();
     audioOn();
-    const targets = Object.keys(DIAL_FOR_TARGET);
-    assert.ok(targets.length >= 12, 'the dial map reaches the 8 route targets and the 4 spectrum dials');
-    for (const t of targets) emit(Events.LAYOUT_PARAM, { key: DIAL_FOR_TARGET[t][0], value: 0.5 });
-    assert.deepEqual(g.trio.conductor.owned(), [...targets].sort(), 'one touch of one dial per target owns every one');
-    for (let b = 1; b <= 64; b++) g.bar(b);
-    assert.deepEqual(g.trio.conductor.owned(), [...targets].sort(), '64 bars on: still every one (nothing expires)');
-    let asked = 0;
-    for (const t of targets) {
-      const spectrumKey = Object.keys(SPECTRUM_PARAMS).find((k) => `spectrum.${k}` === t);
-      const route = spectrumKey
-        ? { op: 'spectrum', key: spectrumKey, value: 1 }
-        : { op: 'add', input: 'band.mids', target: t, depth: routeDepthRange(t).max / 2 };
-      const before = g.out.dropped.length;
-      g.request(64 + asked * 4, route);
-      asked++;
-      assert.equal(g.out.dropped.length, before + 1, `${t}: the proposal was answered with a drop`);
-      assert.equal(g.out.dropped.at(-1).reason, 'owned', `${t}: dropped as owned, 64 bars after the touch`);
-    }
-    assert.equal(g.out.applied.length, 0, 'Davis landed nothing against any target the artist ever touched');
+    const c = g.trio.conductor;
+    c.touch(['render.alpha']);
+    c.commit(8); // phrase of bar 8 has had its edit
+    assert.equal(
+      c.consider(ADD, { bar: 5, tier: 't3' }).landBar,
+      12,
+      'the old ledger pushes a bar-5 proposal past phrase 8',
+    );
+    c.revert(200);
+    c.revert(200);
+    c.revert(200); // enough reverts to start a cool-down at bar 200
+    assert.equal(c.cooling(201), true);
+    c.rebase();
+    assert.equal(c.cooling(1), false, 'the cooldown is gone');
+    assert.equal(c.consider(ADD, { bar: 5, tier: 't3' }).landBar, 8, 'the ledger is clear: bar 5 lands on 8 again');
+    assert.deepEqual(c.owned(), [], 'ownership stamps are cleared too: the old count must not stretch ownership');
     g.done();
   },
 );
+
+// #2092 PR 2 — OWNERSHIP EXPIRES (Matt's Ruling, 2026-11-11): a target lapses OWN_PHRASES (8 phrases = 32 bars) after the
+// artist's LAST touch; each new touch restarts the count. (PR 1 pinned the old monotonic behaviour; this replaces it.)
+ok('ownership expires 8 phrases (32 bars) after the last touch, and a proposal on it then goes through', () => {
+  assert.equal(OWN_PHRASES, 8);
+  assert.equal(OWN_BARS, 32);
+  assert.equal(OWN_BARS, OWN_PHRASES * PHRASE_BARS);
+  const g = rig();
+  audioOn();
+  const targets = Object.keys(DIAL_FOR_TARGET);
+  assert.ok(targets.length >= 12, 'the dial map reaches the 8 route targets and the 4 spectrum dials');
+  for (const t of targets) emit(Events.LAYOUT_PARAM, { key: DIAL_FOR_TARGET[t][0], value: 0.5 }); // touched at bar 0
+  assert.deepEqual(g.trio.conductor.owned(0), [...targets].sort(), 'one touch of one dial per target owns every one');
+  for (let b = 1; b <= OWN_BARS - 1; b++) g.bar(b);
+  assert.deepEqual(g.trio.conductor.owned(OWN_BARS - 1), [...targets].sort(), 'bar 31: still owned');
+  g.bar(OWN_BARS);
+  assert.deepEqual(g.trio.conductor.owned(OWN_BARS), [], 'bar 32: every one has lapsed');
+  assert.deepEqual(getTrioView().owned, [], 'the DEV view agrees');
+  assert.equal(getTrioView().ownable, ownableTargets().length, 'the ownable count is unchanged');
+  // every target is back in Davis's reach: the conductor no longer drops a proposal as owned
+  for (const t of targets) {
+    const spectrumKey = Object.keys(SPECTRUM_PARAMS).find((k) => `spectrum.${k}` === t);
+    const op = spectrumKey
+      ? { op: 'spectrum', key: spectrumKey, value: 1 }
+      : { op: 'add', input: 'band.mids', target: t, depth: routeDepthRange(t).max / 2 };
+    assert.equal(g.trio.conductor.consider(op, { bar: OWN_BARS, tier: 't3' }).ok, true, `${t}: reachable after expiry`);
+  }
+  // and end to end: a held proposal on a lapsed target lands (it is no longer dropped as owned)
+  g.request(OWN_BARS, {
+    op: 'add',
+    input: 'band.mids',
+    target: 'render.scale',
+    depth: routeDepthRange('render.scale').max / 2,
+  });
+  assert.equal(getTrioView().pending && getTrioView().pending.landBar, OWN_BARS + PHRASE_BARS);
+  g.done();
+});
+
+ok('a new touch restarts the count; owned is read at the bar asked about', () => {
+  const c = createConductor();
+  const ADD_GLOW = { op: 'add', input: 'band.mids', target: 'render.glow', depth: 0.2 };
+  c.touch(['render.glow'], 10);
+  assert.deepEqual(c.owned(41), ['render.glow'], '31 bars after the touch: owned');
+  assert.deepEqual(c.owned(42), [], 'exactly OWN_BARS after: lapsed');
+  c.touch(['render.glow'], 30); // touched again 20 bars later
+  assert.deepEqual(
+    c.owned(61),
+    ['render.glow'],
+    'the second touch restarted the count (bar 10 + 32 would have lapsed)',
+  );
+  assert.equal(c.isOwned('render.glow', 61), true);
+  assert.deepEqual(c.consider(ADD_GLOW, { bar: 61, tier: 't3' }), { ok: false, reason: 'owned' });
+  assert.deepEqual(c.owned(62), [], 'bar 30 + 32: lapsed');
+  assert.equal(c.consider(ADD_GLOW, { bar: 62, tier: 't3' }).ok, true);
+  c.touch('render.nope', 62);
+  assert.deepEqual(c.owned(62), [], 'junk is still not owned');
+});
+
+ok('a stamp in the future (the counter went backwards, nobody rebased) lapses, never extends', () => {
+  const c = createConductor();
+  c.touch(['render.glow'], 100);
+  assert.deepEqual(c.owned(3), [], 'bar 3 is before the touch: not owned');
+  assert.deepEqual(c.owned(100), ['render.glow']);
+});
+
+ok('a touch with no bar never lapses (the callers that do not know the bar keep the old behaviour)', () => {
+  const c = createConductor();
+  c.touch(['render.glow']);
+  assert.deepEqual(c.owned(10000), ['render.glow']);
+});
+
+ok('a locked marks dial stays owned for as long as it is locked, however many bars pass', () => {
+  const g = rig({ marks: MARKS0 });
+  audioOn();
+  g.mk.locked.push('displace');
+  g.bar(1);
+  for (let b = 2; b <= 3 * OWN_BARS; b++) g.bar(b);
+  assert.ok(g.trio.showBlock().owned.includes('spectrum.displace'), 'still owned long past OWN_BARS');
+  g.request(3 * OWN_BARS, { op: 'spectrum', key: 'displace', value: 0.4 });
+  assert.equal(g.out.dropped.at(-1).reason, 'owned');
+  g.mk.locked.length = 0; // unlocked: nothing was ever touched by hand, so it is Davis's again
+  assert.ok(!g.trio.showBlock().owned.includes('spectrum.displace'), 'unlocked: no longer owned');
+  g.done();
+});
 
 ok('the DEV view counts owned against ownable', () => {
   const g = rig();

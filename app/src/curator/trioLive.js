@@ -161,7 +161,7 @@ export function startTrio({
       brake: bias >= BRAKE_AT,
       tier,
       cooling: conductor.cooling(bar),
-      owned: conductor.owned(),
+      owned: conductor.owned(bar),
       ownable: ownableTargets().length, // #2092: how many targets the artist's hand could own, for the owned-of-ownable readout
       tapErrors,
       routes: table.length,
@@ -251,7 +251,7 @@ export function startTrio({
     const param = SPECTRUM_PARAMS[p.op.key];
     const before = marks ? marks[p.op.key] : undefined;
     // the artist moved or locked this dial while the proposal waited for the boundary: it is theirs, not his to write
-    if (conductor.isOwned(spectrumTarget(p.op.key)) || (marks && marksLocked(marks, p.op.key))) {
+    if (conductor.isOwned(spectrumTarget(p.op.key), bar) || (marks && marksLocked(marks, p.op.key))) {
       announce({ status: 'dropped', reason: 'owned', op: p.op, bar: p.bar, landBar });
       return;
     }
@@ -306,7 +306,7 @@ export function startTrio({
       if (p.bar < bar) {
         // #2093: the bar counter went backwards (REC restarted the scene). What is held, the phrase ledger and the
         // cool-down are all in the old numbering: announce the stranded proposal as stale, then rebase the conductor.
-        // owned and the revert count stay (rebase, not reset); mineMarks stay too.
+        // the revert count stays (rebase, not reset), and so does mineMarks; owned is cleared (#2092: its stamps are old numbers).
         if (pending) {
           const stranded = pending;
           pending = null;
@@ -413,7 +413,7 @@ export function startTrio({
   // (layout:param), never from a diff of the layout: a recalled hit, a morph, an evolve or a preset rewrites many dials
   // at once, and none of that is the artist moving a dial by hand.
   const owns = (key) => {
-    for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.touch(target);
+    for (const [target, keys] of Object.entries(DIAL_FOR_TARGET)) if (keys.includes(key)) conductor.touch(target, bar);
   };
   stops.push(
     on(Events.LAYOUT_PARAM, (p) => {
@@ -456,7 +456,7 @@ export function startTrio({
             touched.add(b.target);
             if (b.by === DAVIS_TAG) reverted = true;
           }
-          if (touched.size) conductor.touch([...touched]);
+          if (touched.size) conductor.touch([...touched], bar);
           if (reverted) conductor.revert(bar);
           // an edited row of his is the artist's now: clear the mark, once, as a plain table write
           if (Array.isArray(state.audioRoutes) && now.some((r) => r.by === DAVIS_TAG && changed.has(pairKey(r)))) {
@@ -498,7 +498,7 @@ export function startTrio({
         })),
         owned: [
           ...new Set([
-            ...conductor.owned(),
+            ...conductor.owned(bar),
             // a marks dial the artist locked is theirs too (stage 2)
             ...((m) =>
               m && Array.isArray(m.locked) ? m.locked.filter((k) => SPECTRUM_PARAMS[k]).map(spectrumTarget) : [])(
