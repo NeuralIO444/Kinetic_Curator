@@ -666,4 +666,5 @@ node src/poets/rayGunDistort.selfcheck.mjs
 node src/poets/poemLife.selfcheck.mjs
 node src/curator/doctrines.selfcheck.mjs
 node src/engine/motionCore/motionCore.selfcheck.mjs
+node src/composition/dispatchPipe.selfcheck.mjs
 node src/composition/wireUndefendedPayload.selfcheck.mjs

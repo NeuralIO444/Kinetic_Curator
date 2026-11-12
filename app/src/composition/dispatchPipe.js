@@ -4,7 +4,12 @@
 //
 // Coalescing contract: high-frequency actions are collapsed to at most one
 // per animation frame PER TARGET (type + key), and are ALWAYS delivered.
-// Nothing is ever dropped.
+// Nothing is ever dropped — with one rule per shape:
+//   - a keyed action (SET_LAYOUT_PARAM:key) is last-wins for its key;
+//   - the keyless batch SET_LAYOUT_PARAMS is a partial merge, so two batches in one frame are MERGED
+//     ({ ...old.payload, ...new.payload }, the later batch wins a shared key) before the one delivery (#2097).
+// Coalesced actions flush on requestAnimationFrame, which does not fire in a hidden tab: a coalesced write made while
+// the window is backgrounded waits until the tab is visible or a discrete action forces a flush.
 
 const observers = new Set();
 
@@ -58,7 +63,14 @@ export function createDispatchPipe(rawDispatch) {
 
     if (action?.type && HIGH_FREQ.test(action.type)) {
       // Key by target so two sliders dragged together don't clobber each other.
-      pending.set(action.key ? `${action.type}:${action.key}` : action.type, action);
+      const slot = action.key ? `${action.type}:${action.key}` : action.type;
+      const held = pending.get(slot);
+      // #2097: a batch is a partial merge, so a second batch in the same frame must not replace the first.
+      if (held && action.type === 'SET_LAYOUT_PARAMS') {
+        pending.set(slot, { ...action, payload: { ...held.payload, ...action.payload } });
+      } else {
+        pending.set(slot, action);
+      }
       if (rafId == null) rafId = requestAnimationFrame(flush);
       return;
     }
