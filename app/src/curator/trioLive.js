@@ -301,6 +301,23 @@ export function startTrio({
   stops.push(
     on(Events.CLOCK_BAR, (p) => {
       if (!p || !Number.isInteger(p.bar)) return;
+      if (p.bar < bar) {
+        // #2093: the bar counter went backwards (REC restarted the scene). What is held, the phrase ledger and the
+        // cool-down are all in the old numbering: announce the stranded proposal as stale, then rebase the conductor.
+        // owned and the revert count stay (rebase, not reset); mineMarks stay too.
+        if (pending) {
+          const stranded = pending;
+          pending = null;
+          announce({
+            status: 'dropped',
+            reason: 'stale',
+            op: stranded.op,
+            bar: stranded.bar,
+            landBar: stranded.landBar,
+          });
+        }
+        conductor.rebase();
+      }
       bar = p.bar;
       if (isReplaying()) return; // a take plays: its own record speaks for the trio
       if (!audio.on) return;

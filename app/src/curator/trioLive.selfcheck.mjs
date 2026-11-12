@@ -687,4 +687,60 @@ ok('a tap that throws once still receives the next announce; tapErrors counts; t
   g.done();
 });
 
+// ── #2093: a clock restart (REC) must not strand the held proposal, the phrase ledger or the cooldown ──
+ok('a clock restart drops the held proposal as stale once, and a fresh proposal lands on the new count', () => {
+  const g = rig();
+  audioOn();
+  g.bar(5);
+  g.request(5);
+  for (let b = 6; b <= 8; b++) g.bar(b); // one applied edit (phrase 8)
+  assert.equal(g.out.applied.length, 1);
+  for (let b = 9; b <= 40; b++) g.bar(b);
+  g.request(40, { op: 'add', input: 'band.air', target: 'render.scale', depth: 0.2 }); // held for bar 44
+  assert.deepEqual(getTrioView().pending && getTrioView().pending.landBar, 44);
+  g.trio.conductor.touch(['render.alpha']); // the artist's ownership must survive a restart
+  const droppedBefore = g.out.dropped.length;
+  // REC restarts the scene: the bar counter starts again from 0
+  g.bar(0);
+  g.bar(1);
+  g.bar(2);
+  const stale = g.out.dropped.slice(droppedBefore).filter((e) => e.reason === 'stale');
+  assert.equal(stale.length, 1, 'the stranded proposal is announced as dropped / stale exactly once');
+  assert.equal(getTrioView().pending, null, 'and it no longer blocks new proposals');
+  g.request(2, { op: 'add', input: 'band.air', target: 'render.scale', depth: 0.2 }); // a fresh valid proposal, new count
+  assert.equal(
+    getTrioView().pending && getTrioView().pending.landBar,
+    4,
+    'accepted, for the next phrase boundary of the new count',
+  );
+  g.bar(3);
+  g.bar(4);
+  assert.equal(g.out.applied.length, 2, 'it lands at bar 4, not 204 bars later');
+  assert.equal(g.out.applied[1].landBar, 4);
+  assert.deepEqual(g.trio.conductor.owned(), ['render.alpha'], 'ownership is kept across the restart');
+  g.done();
+});
+
+ok('a clock restart clears the old phrase ledger and cooldown (rebase) but keeps owned and the revert count', () => {
+  const g = rig();
+  audioOn();
+  const c = g.trio.conductor;
+  c.touch(['render.alpha']);
+  c.commit(8); // phrase of bar 8 has had its edit
+  assert.equal(
+    c.consider(ADD, { bar: 5, tier: 't3' }).landBar,
+    12,
+    'the old ledger pushes a bar-5 proposal past phrase 8',
+  );
+  c.revert(200);
+  c.revert(200);
+  c.revert(200); // enough reverts to start a cool-down at bar 200
+  assert.equal(c.cooling(201), true);
+  c.rebase();
+  assert.equal(c.cooling(1), false, 'the cooldown is gone');
+  assert.equal(c.consider(ADD, { bar: 5, tier: 't3' }).landBar, 8, 'the ledger is clear: bar 5 lands on 8 again');
+  assert.deepEqual(c.owned(), ['render.alpha'], 'owned is kept (reset() would have cleared it)');
+  g.done();
+});
+
 console.log(`trioLive.selfcheck: ${n} checks passed`);

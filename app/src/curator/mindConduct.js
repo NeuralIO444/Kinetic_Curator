@@ -485,6 +485,14 @@ export function createConductor() {
       }
     },
     cooling: (bar) => bar < coolUntil,
+    /**
+     * #2093: the bar counter started over (a restarted loop). The phrase ledger and the cool-down are in OLD bar
+     * numbers, so clear them. Unlike reset(), the artist's ownership and the revert count are kept.
+     */
+    rebase() {
+      phrases.clear();
+      coolUntil = -Infinity;
+    },
     reset() {
       owned.clear();
       phrases.clear();
