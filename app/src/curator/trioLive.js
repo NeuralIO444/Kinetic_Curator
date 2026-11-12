@@ -19,6 +19,7 @@ import {
   PHRASE_BARS,
   SPECTRUM_PARAMS,
   spectrumTarget,
+  ownableTargets,
   BRAKE_AT,
 } from './mindConduct.js';
 import { DEFAULT_ROUTES } from '../gl/audioRoutes.mjs';
@@ -161,6 +162,7 @@ export function startTrio({
       tier,
       cooling: conductor.cooling(bar),
       owned: conductor.owned(),
+      ownable: ownableTargets().length, // #2092: how many targets the artist's hand could own, for the owned-of-ownable readout
       tapErrors,
       routes: table.length,
       mine: table.filter((r) => r.by === DAVIS_TAG).length,

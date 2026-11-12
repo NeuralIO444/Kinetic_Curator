@@ -56,6 +56,10 @@ const hasTarget = (t) => typeof t === 'string' && Object.prototype.hasOwnPropert
 // a route target, or (stage 2) a spectrum-marks dial: both can be owned by the artist's hand
 const isOwnable = (t) =>
   hasTarget(t) || (typeof t === 'string' && Object.keys(SPECTRUM_PARAMS).some((k) => t === `spectrum.${k}`));
+/** #2092 — every target the artist's hand can own: the route targets plus the spectrum-marks dials (sorted). The DEV
+ * view shows how many of these the artist holds. Data only. */
+export const ownableTargets = () =>
+  [...Object.keys(ROUTE_TARGETS), ...Object.keys(SPECTRUM_PARAMS).map(spectrumTarget)].sort();
 const hasInput = (i) => typeof i === 'string' && ROUTE_INPUTS.includes(i);
 // out of range is malformed, not clamped: an untrusted reply that says 90 has told us something is wrong
 const depthIn = (target, d) => {
