@@ -22,8 +22,9 @@
 //   C. megamindSurfacesLive.js carries no direct censusReport import
 //      (the original chain, pinned by name);
 //   D. the specifier extractor itself behaves: quoted literals, plain
-//      template literals (a static specifier to Vite), and unextractable
-//      arguments are each pinned against sample sources below, so the
+//      template literals (a static specifier to Vite), unextractable
+//      arguments, and regex literals that must not hide a specifier
+//      (#2083) are each pinned against sample sources below, so the
 //      extraction coverage cannot silently regress.
 //
 // Source scan, not an import: Node cannot load the JSX/browser graph.
@@ -45,38 +46,133 @@ const SRC = join(APP, 'src');
 const rel = (p) => relative(APP, p).split('\\').join('/');
 
 // ---------------------------------------------------------------------------
-// Comment stripping (string- and regex-aware enough for this codebase:
-// string literals are KEPT — module specifiers live inside them).
+// Comment stripping (string- and regex-aware: string literals are KEPT —
+// module specifiers live inside them — and regex literals are kept
+// verbatim too, recognised with the previous-significant-token heuristic
+// ported from purity.selfcheck.mjs. #2083: this stripper previously had
+// no regex state, so a comment-like sequence inside a regex literal
+// (the trap `/\/*\/`) flipped it into comment state and blanked real
+// code up to the next `*/` — an import hidden behind such a regex
+// slipped the fail-closed walk below.)
 // ---------------------------------------------------------------------------
+
+// A '/' starts a regex literal (not division) when the previous
+// significant token can't end an operand. Sets ported verbatim from
+// purity.selfcheck.mjs; panelGraph additionally treats a postfix
+// '++'/'--' as operand-ending (see stripComments).
+const REGEX_OK_BEFORE = new Set([
+  ',',
+  ';',
+  ':',
+  '{',
+  '}',
+  '(',
+  '[',
+  '=',
+  '!',
+  '&',
+  '|',
+  '?',
+  '+',
+  '-',
+  '*',
+  '%',
+  '^',
+  '~',
+  '<',
+  '>',
+]);
+const REGEX_OK_KEYWORDS = new Set([
+  'return',
+  'typeof',
+  'instanceof',
+  'in',
+  'of',
+  'new',
+  'delete',
+  'void',
+  'throw',
+  'case',
+  'do',
+  'else',
+  'yield',
+  'await',
+]);
+
 function stripComments(src) {
   let out = '';
   let i = 0;
-  let state = 'code'; // code | sq | dq | tpl | line | block
+  let state = 'code'; // code | sq | dq | tpl | re | line | block
+  let inClass = false; // inside a [...] character class (state 're')
+  // Previous significant token in code, for the regex/division call: an
+  // identifier or keyword word, a single punctuation char, '++'/'--' for
+  // a postfix operator, or '#' for a literal (string/template/regex)
+  // that just closed. '' means start of file. Whitespace and comments
+  // don't move it.
+  let prev = '';
+  let word = '';
+  const flushWord = () => {
+    if (word) {
+      prev = word;
+      word = '';
+    }
+  };
+  const regexAllowed = () => {
+    if (prev === '') return true;
+    if (prev.length === 1) return REGEX_OK_BEFORE.has(prev);
+    if (/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(prev)) return REGEX_OK_KEYWORDS.has(prev);
+    return false; // '#', '++', '--', numbers: an operand just ended
+  };
   while (i < src.length) {
     const c = src[i];
     const n = src[i + 1] ?? '';
     if (state === 'code') {
       if (c === '/' && n === '/') {
+        flushWord();
         state = 'line';
         out += '  ';
         i += 2;
       } else if (c === '/' && n === '*') {
+        flushWord();
         state = 'block';
         out += '  ';
         i += 2;
+      } else if (c === '/') {
+        flushWord();
+        if (regexAllowed()) {
+          state = 're';
+          inClass = false;
+        } else {
+          prev = '/'; // division: an operand precedes it
+        }
+        out += c;
+        i += 1;
       } else if (c === "'") {
+        flushWord();
         state = 'sq';
         out += c;
         i += 1;
       } else if (c === '"') {
+        flushWord();
         state = 'dq';
         out += c;
         i += 1;
       } else if (c === '`') {
+        flushWord();
         state = 'tpl';
         out += c;
         i += 1;
+      } else if (/[A-Za-z0-9_$]/.test(c)) {
+        word += c;
+        out += c;
+        i += 1;
+      } else if (/\s/.test(c)) {
+        flushWord();
+        out += c;
+        i += 1;
       } else {
+        flushWord();
+        prev = c === prev && (c === '+' || c === '-') ? c + c : c;
         out += c;
         i += 1;
       }
@@ -97,6 +193,25 @@ function stripComments(src) {
         out += c === '\n' ? '\n' : ' ';
         i += 1;
       }
+    } else if (state === 're') {
+      // inside a regex literal: copy verbatim, honour escapes; a '/'
+      // inside a [...] character class does not close the literal
+      out += c;
+      if (c === '\\') {
+        out += n;
+        i += 2;
+        continue;
+      }
+      if (c === '[') inClass = true;
+      else if (c === ']') inClass = false;
+      else if (c === '/' && !inClass) {
+        state = 'code';
+        prev = '#';
+        word = '';
+      } else if (c === '\n') {
+        state = 'code'; // unterminated regex — bail, don't swallow the file
+      }
+      i += 1;
     } else {
       // inside a string/template literal: copy verbatim, honour escapes
       out += c;
@@ -107,6 +222,8 @@ function stripComments(src) {
       }
       if ((state === 'sq' && c === "'") || (state === 'dq' && c === '"') || (state === 'tpl' && c === '`')) {
         state = 'code';
+        prev = '#';
+        word = '';
       }
       i += 1;
     }
@@ -166,6 +283,32 @@ for (const t of [
   { src: 'const p = import(name);', specs: [], bad: 1 },
   { src: 'const r = require(name);', specs: [], bad: 1 },
   { src: "// import('./ghost.js')\nimport z from './real.js';", specs: ['./real.js'], bad: 0 },
+  // #2083: a regex literal must not hide a specifier. The T7 trap (QA,
+  // PR #2082 delta review): the trap regex's `/*` used to flip the
+  // comment stripper into block state and blank the import behind it.
+  {
+    src: "const trap = /\\/*/;\nconst p = import('./censusReport.mjs');\n/* trailer */",
+    specs: ['./censusReport.mjs'],
+    bad: 0,
+  },
+  // '//' inside a regex: the slashes live in a character class, which
+  // does not close the literal — the same-line import stays visible.
+  { src: "const slashes = /[/]{2}/; import q from './same-line.js';", specs: ['./same-line.js'], bad: 0 },
+  // Division is not a regex: chained divisions open no literal state.
+  { src: "const q = a / b / c;\nimport r from './div.js';", specs: ['./div.js'], bad: 0 },
+  // Division after a ')' — and a REAL block comment after it still
+  // strips, ghost and all, while the real import after it is seen.
+  {
+    src: "const ok = (a + b) / c; /* import('./ghost.js') */ import w from './real2.js';",
+    specs: ['./real2.js'],
+    bad: 0,
+  },
+  // Regexes in the classic regex positions: after 'return', '(' and ','.
+  { src: "function f() { return /a\\/b/.test(s); }\nimport t from './ret.js';", specs: ['./ret.js'], bad: 0 },
+  { src: "if (/^\\//.test(p)) {}\nimport s from './paren.js';", specs: ['./paren.js'], bad: 0 },
+  { src: "f(a, /x*/);\nimport u from './comma.js';", specs: ['./comma.js'], bad: 0 },
+  // A plain block comment still strips exactly as before.
+  { src: "/* import('./ghost.js') */\nimport v from './real3.js';", specs: ['./real3.js'], bad: 0 },
 ]) {
   const got = extractSpecifiers(t.src);
   assert.deepStrictEqual(got.specifiers, t.specs, `extractor specifiers wrong for sample: ${t.src}`);
