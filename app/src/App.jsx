@@ -7,6 +7,7 @@ import { useMidi } from './hooks/useMidi.js';
 import { ModeStrip } from './components/ModeStrip.jsx';
 import { ErrorBoundary } from './components/ErrorBoundary.jsx';
 import { HotkeyOverlay } from './components/HotkeyOverlay.jsx';
+import { BackendIndicator } from './components/BackendIndicator.jsx'; // #2078: footer backend indicator (O / A / R)
 import { FirstRunOverlay } from './components/FirstRunOverlay.jsx';
 import { TourOverlay } from './components/TourOverlay.jsx';
 import { FavoritesTray } from './components/FavoritesTray.jsx';
@@ -684,6 +685,12 @@ function AppInner() {
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
           {state.layoutParams.mode} · seed:{state.seed.toString(16)}
+          <BackendIndicator
+            onOpenSettings={() => {
+              setHelpTab('settings');
+              setShowHotkeys(true);
+            }}
+          />
           <button
             type="button"
             className="micro-btn"

@@ -64,7 +64,9 @@ export function createOllamaModel({
     /** The answering backend's identity for mind:status / the take's systems record. */
     info() {
       const rec = record();
-      return rec ? { backend: 'ollama', model: rec.model } : { backend: 'ollama' };
+      return rec
+        ? { backend: 'ollama', model: rec.model, ...(rec.tier ? { tier: rec.tier } : {}) }
+        : { backend: 'ollama' };
     },
     /**
      * One persona's reply, as the stamped envelope the thinker reads ({ backend, reply }) — the stamp is

@@ -286,7 +286,7 @@ export const Events = {
   AUDIO_SILENCE_END: 'audio:silenceEnd', // #1459: { ms } sound is back; how long the silence lasted
   MIND_DECISION: 'mind:decision', // #1462: { persona, bar, backend: apple | rules, seed, invented, reply } once a bar per persona
   MIND_REQUEST: 'mind:request', // #1462: { persona, bar, backend, invented, reply } on the downbeat after a decision that asks the stage
-  MIND_STATUS: 'mind:status', // #1462/#1463: { available, backend: apple | rules | demo, model? } when the answering backend changes (dev panel)
+  MIND_STATUS: 'mind:status', // #1462/#1463: { available, backend: apple | rules | demo, model?, tier? } when the answering backend changes (dev panel; the footer backend indicator, #2078, renders it as standing state)
   MIND_REQ: 'mind:req', // #1463: { persona, bar, seed, contextHash } a persona asks the model
   MIND_REPLY: 'mind:reply', // #1463: { persona, bar, backend, latencyMs, reply | null, error? } every answer, used or not
   MIND_ROUTE: 'mind:route', // #1483: { status: applied | dropped, reason?, op, delta?, bar, landBar? } what became of Davis's route proposal

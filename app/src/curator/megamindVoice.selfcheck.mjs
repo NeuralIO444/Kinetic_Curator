@@ -452,7 +452,14 @@ await ok(
       getSnapshot: () => ({ room: { lois: 'VIBE', davis: 'FLOW' } }),
       getSeed: () => 9,
     });
-    assert.deepEqual(got.status[0], { available: true, backend: 'ollama', model: 'qwen3-vl:8b-instruct' });
+    // #2078 re-pin: the status payload carries the record's tier (the footer indicator's ruled tooltip
+    // names it); the assertion stays an exact deepEqual, now of the fuller shape.
+    assert.deepEqual(got.status[0], {
+      available: true,
+      backend: 'ollama',
+      model: 'qwen3-vl:8b-instruct',
+      tier: 'A',
+    });
     assert.deepEqual(getMindSystem(), { backend: 'ollama', model: 'qwen3-vl:8b-instruct' });
     for (let bar = 1; bar <= 5; bar++) {
       emit(Events.CLOCK_BAR, { bar });

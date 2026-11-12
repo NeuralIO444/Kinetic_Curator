@@ -125,8 +125,8 @@ export const EVENT_REGISTRY = {
   },
   MIND_REQUEST: { handler: ['curator/mindFace.js', 'curator/trioLive.js'] },
   MIND_STATUS: {
-    handler: null,
-    note: 'telemetry: which backend answers (#1462); for the dev panel, no UI announces it',
+    handler: ['components/BackendIndicator.jsx'],
+    note: 'telemetry: which backend answers (#1462); the dev panel reads it, and the footer backend indicator (#2078) renders it as standing state — a glyph that is simply there; nothing announces a switch',
   },
   MIND_REQ: { handler: null, note: 'telemetry: a persona asked the on-device model (#1463)' },
   MIND_REPLY: {

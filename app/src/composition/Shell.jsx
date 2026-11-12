@@ -1,6 +1,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { panelsByZone } from './PanelRegistry.js';
 import { devModeOn, onDevModeChange } from './devMode.mjs';
+import { onDevPanelRequest } from '../panels/devTabs.mjs';
 import { ErrorBoundary } from '../components/ErrorBoundary.jsx';
 import { DrawerOverlay } from '../components/DrawerOverlay.jsx';
 import { useStore } from '../state/store.js';
@@ -53,6 +54,20 @@ export function Shell({ dispatchPipe, containerRef, gridTemplate, dividerProps }
 
   const tabRefs = useRef({});
   const selectTab = useCallback((id) => setActiveTab(id), []);
+
+  // #2078: an outside caller (the footer backend indicator) can ask for the
+  // DEV panel at a tab, through the devTabs request channel. The Shell
+  // still owns the selection, and honours the request only when the panel
+  // is in the strip — the #2077 runtime gate decides that, never the
+  // requester. The requested sub-tab rides the pending-tab slot, which
+  // DevPanel consumes on mount (or switches to, if already mounted).
+  useEffect(
+    () =>
+      onDevPanelRequest(() => {
+        if (panelsByZone('secondary').some((p) => p.id === 'dev')) setActiveTab('dev');
+      }),
+    [],
+  );
 
   // #2077: activeTab can name a panel that just left the strip (Dev mode
   // switched off while the DEV tab is open). The shown panel is derived,
