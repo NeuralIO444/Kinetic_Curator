@@ -68,11 +68,14 @@ export const createAudioSlice = (set) => ({
   /**
    * Replace the route table (sanitized; null = the default table). One undo step
    * per edit; `continuous` (a slider drag) coalesces ticks into one step.
+   * #2095: `opts.skipUndo` is a persona's write (Davis's route edit): the table changes but nothing is pushed, so Cmd-Z
+   * walks only the artist's own actions. It is its own flag, never `continuous` (which still means a pushed, coalesced step).
    */
-  setAudioRoutes: (routes, continuous = false) =>
+  setAudioRoutes: (routes, continuous = false, opts = null) =>
     set((state) => {
       const next = sanitizeAudioRoutes(routes);
       if (JSON.stringify(next) === JSON.stringify(state.audioRoutes ?? null)) return {};
+      if (opts && opts.skipUndo === true) return { audioRoutes: next };
       return { ...pushToUndo(state, !continuous), audioRoutes: next };
     }),
   /**

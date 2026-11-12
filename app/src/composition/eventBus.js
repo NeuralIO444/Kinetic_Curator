@@ -267,7 +267,7 @@ export const Events = {
   ATTACH_CLEAR: 'attach:clear', // { assetId } drop an asset's edited ATTACH points
   BEAT_BPM: 'beat:bpm', // { bpm } the BEAT master BPM
   BEAT_METRO: 'beat:metro', // { on } the metro click
-  AUDIO_ROUTES_SET: 'audio:routesSet', // { routes, continuous } replace the route table (null = defaults)
+  AUDIO_ROUTES_SET: 'audio:routesSet', // { routes, continuous, skipUndo? } replace the route table (null = defaults); skipUndo: a persona's write, never on the artist's undo stack (#2095)
   AUDIO_ROUTES_EDIT: 'audio:routesEdit', // { fn, continuous } edit the table with an updater function (in-process only: a function is not serialisable; the envelope work in #1457 will turn these into named ops)
   AUDIO_SIDECAR: 'audio:sidecar', // { sidecar, note } a pre-analysed envelope file, or null with the reason
   MIDI_ENABLED: 'midi:enabled', // { on }

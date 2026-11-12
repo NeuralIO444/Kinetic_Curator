@@ -417,7 +417,7 @@ export function applyAction(action, store = useStore.getState()) {
     case A.SET_BEAT_METRO:
       return store.setBeatMetro(action.on);
     case A.SET_AUDIO_ROUTES:
-      return store.setAudioRoutes(action.routes, action.continuous);
+      return store.setAudioRoutes(action.routes, action.continuous, { skipUndo: action.skipUndo === true });
     case A.EDIT_AUDIO_ROUTES:
       return store.editAudioRoutes(action.fn, action.continuous);
     case A.SET_AUDIO_SIDECAR:
