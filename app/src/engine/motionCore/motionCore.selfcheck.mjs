@@ -130,6 +130,25 @@ ok('a node phase from the house seed hash is deterministic, and a registered sou
   assert.deepEqual({ ...rest }, { ...POSE_IDENTITY }, 'rest at t = 0');
 });
 
+ok('anchorNodes (#2113): a phase-baked rest registers when the probe is phase-0 only; the default pair still catches it; bad nodes are refused', () => {
+  const phased = (over = {}) =>
+    good({ id: 'kineme:test-phased', evaluate: (node) => ({ dRot: node.phase01 * 20 }), ...over });
+  assert.throws(() => registerMotionSource(phased({ id: 'kineme:test-phased-default' })), /anchor law/);
+  const rec = registerMotionSource(phased({ anchorNodes: [{ key: 'z', seedOffset: 0, phase01: 0 }] }));
+  assert.deepEqual(rec.anchorNodes.map((n) => n.phase01), [0]);
+  assert.ok(Object.isFrozen(rec.anchorNodes));
+  // the probe is never skipped: a source that is not identity at the declared node is still refused
+  assert.throws(
+    () => registerMotionSource(good({ id: 'kineme:test-bad-declared', evaluate: () => ({ dx: 1 }), anchorNodes: [{ key: 'z', seedOffset: 0, phase01: 0 }] })),
+    /anchor law/,
+  );
+  for (const bad of [[], 'x', [{ key: 'a' }], [{ key: 'a', phase01: 1 }], [{ phase01: 0 }], [null]]) {
+    assert.throws(() => registerMotionSource(good({ id: 'kineme:test-bad-nodes', anchorNodes: bad })), /anchorNodes/, JSON.stringify(bad));
+  }
+  assert.equal(getMotionSource('kineme:test-bad-nodes'), undefined);
+  assert.equal(getMotionSource('kineme:test-rock')?.anchorNodes, undefined, 'a source without the option carries none (default pair)');
+});
+
 ok('the module imports nothing from gl/, state/, curator/ or panels/, and uses no clock or chance', () => {
   const text = readFileSync(new URL('./index.js', import.meta.url), 'utf8');
   const imports = [...text.matchAll(/^\s*import\s[^;]*?from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);

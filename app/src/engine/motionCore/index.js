@@ -7,7 +7,9 @@
 //
 // The laws it enforces:
 //   - ANCHOR LAW: at motion time 0 every delta is exactly zero, so a still is byte-identical to no motion. A source
-//     whose evaluate(node, 0, ctx) is not POSE_IDENTITY cannot be registered (probed with two nodes).
+//     whose evaluate(node, 0, ctx) is not POSE_IDENTITY cannot be registered (probed with two nodes by default; a source
+//     may declare its own `anchorNodes`, see registerMotionSource — the GPU kinemes use phase-0 nodes only, because their
+//     seed-hashed phase is a desync OFFSET on the node, not a pose: #2113).
 //   - DETERMINISM: no Date.now / performance.now / Math.random. A node's phase comes from the house seed hash
 //     (data/kinemes.js `kinemePhase(seedOffset, key)`), never from chance.
 //
@@ -165,12 +167,18 @@ const registry = new Map();
 /**
  * Register a motion source. Throws on a duplicate id, a malformed record, an unknown family / time base, an
  * unregistered cost tier, or a source whose evaluate(node, 0, ctx) is not POSE_IDENTITY (the anchor law).
- * @param {MotionSource} source
+ *
+ * `anchorNodes` (optional, #2113): the nodes the anchor law is probed against, in place of the default pair. A source
+ * whose motion is a seed-phased cycle (the GPU kinemes: `ph = fract(t / period + phase)`) starts a phased node PART WAY
+ * through its cycle by design, so its rest is the PHASE-0 node: it declares phase-0 nodes only. Every other source keeps
+ * the default pair (phase 0 and phase 0.37). Must be a non-empty array of nodes, each with a string `key` and a finite
+ * `phase01` in [0, 1); the probe is never skipped.
+ * @param {MotionSource & { anchorNodes?: MotionNode[] }} source
  * @returns {Readonly<MotionSource>} the frozen record
  */
 export function registerMotionSource(source) {
   if (source === null || typeof source !== 'object') throw new TypeError('[motionCore] a motion source must be an object');
-  const { id, family, timeBase, costTier, evaluate } = source;
+  const { id, family, timeBase, costTier, evaluate, anchorNodes } = source;
   if (typeof id !== 'string' || !id) throw new TypeError('[motionCore] a motion source needs a non-empty string id');
   if (registry.has(id)) throw new Error(`[motionCore] "${id}" is already registered (duplicate motion source id)`);
   if (!MOTION_FAMILIES.includes(family)) {
@@ -183,7 +191,18 @@ export function registerMotionSource(source) {
     throw new TypeError(`[motionCore] "${id}": costTier "${String(costTier)}" is not a registered cost tier id`);
   }
   if (typeof evaluate !== 'function') throw new TypeError(`[motionCore] "${id}": evaluate must be a function`);
-  for (const node of PROBE_NODES) {
+  let probes = PROBE_NODES;
+  if (anchorNodes !== undefined) {
+    const ok =
+      Array.isArray(anchorNodes) &&
+      anchorNodes.length > 0 &&
+      anchorNodes.every(
+        (n) => n && typeof n === 'object' && typeof n.key === 'string' && isFiniteNumber(n.phase01) && n.phase01 >= 0 && n.phase01 < 1,
+      );
+    if (!ok) throw new TypeError(`[motionCore] "${id}": anchorNodes must be a non-empty array of nodes with a key and a phase01 in [0, 1)`);
+    probes = anchorNodes.map((n) => Object.freeze({ ...n }));
+  }
+  for (const node of probes) {
     const at0 = toPose(evaluate(node, 0, {}), `"${id}" evaluate(probe, 0)`);
     for (const k of POSE_KEYS) {
       if (at0[k] !== POSE_IDENTITY[k]) {
@@ -193,7 +212,14 @@ export function registerMotionSource(source) {
       }
     }
   }
-  const record = Object.freeze({ id, family, timeBase, costTier, evaluate });
+  const record = Object.freeze({
+    id,
+    family,
+    timeBase,
+    costTier,
+    evaluate,
+    ...(anchorNodes !== undefined ? { anchorNodes: Object.freeze(probes) } : {}),
+  });
   registry.set(id, record);
   return record;
 }
