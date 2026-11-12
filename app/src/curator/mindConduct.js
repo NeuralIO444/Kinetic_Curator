@@ -465,6 +465,13 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
  *   commit(landBar)          an edit landed in that phrase
  *   revert(bar)              the artist undid / reverted a persona edit: BACKOFF_REVERTS of them start a cool-down
  */
+/**
+ * The phrase ledger's bound (#2154, H3): one entry per phrase that has had its edit. `consider` only
+ * ever looks up phrases at or after the current one, so past this cap the oldest entries are evicted —
+ * at 16384 phrases (65536 bars, days of continuous conducting) the cap sits far beyond any real
+ * performance, so inside one the ledger behaves exactly as if it were unbounded.
+ */
+export const PHRASE_LEDGER_MAX = 16384;
 export function createConductor() {
   const owned = new Map(); // target -> the bar of the last touch (null: touched with no bar, never lapses)
   const phrases = new Set();
@@ -498,7 +505,10 @@ export function createConductor() {
       return { ok: true, landBar };
     },
     commit(landBar) {
-      if (Number.isInteger(landBar)) phrases.add(phraseOf(landBar));
+      if (Number.isInteger(landBar)) {
+        phrases.add(phraseOf(landBar));
+        while (phrases.size > PHRASE_LEDGER_MAX) phrases.delete(phrases.values().next().value); // oldest out
+      }
     },
     revert(bar) {
       reverts++;

@@ -2,7 +2,7 @@
 // mind:req / mind:reply / mind:status shapes; the model/system recorded in a take; on-device only; no model UI.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createAppleModel, desktopAppleModel, ASK_TIMEOUT_MS } from './mindApple.js';
+import { createAppleModel, desktopAppleModel, ASK_TIMEOUT_MS, ASK_JS_TIMEOUT_MS } from './mindApple.js';
 import { startMind, setMindTap, getMindSystem, contextHash } from './mindLive.js';
 import { createMindRecorder, checkMindRecord } from './mindRecord.js';
 import { Events, emit, on, releaseTick, clearPending } from '../composition/eventBus.js';
@@ -70,6 +70,28 @@ await ok(
     mode = 'down';
     await assert.rejects(() => m.ask('lois', {}, { seed: 1, bar: 5 }));
     assert.equal(m.available(), false, 'the helper said unavailable: rules from now on');
+  },
+);
+
+await ok(
+  'ask: a helper that never answers is cut by the JS-side backstop, and the next ask works (#2154, H1)',
+  async () => {
+    assert.ok(ASK_JS_TIMEOUT_MS > ASK_TIMEOUT_MS, 'the backstop outlasts the helper cap: it fires only on a wedge');
+    let mode = 'hang';
+    const f = fakeInvoke({ available: true, model: 'apple-foundation' }, () =>
+      mode === 'hang' ? new Promise(() => {}) : { reply: { critique: null, state: 'NOD' }, ms: 10 },
+    );
+    const m = createAppleModel({ invoke: f.invoke, jsTimeoutMs: 40 });
+    await m.check();
+    const t0 = Date.now();
+    await assert.rejects(() => m.ask('lois', {}, { seed: 1, bar: 1 }), /timeout/);
+    assert.ok(Date.now() - t0 < 2000, 'the ask settled as a miss inside the budget instead of hanging forever');
+    mode = 'ok';
+    assert.deepEqual(
+      await m.ask('lois', {}, { seed: 1, bar: 2 }),
+      { critique: null, state: 'NOD' },
+      'nothing wedged in the model: the next ask is answered',
+    );
   },
 );
 

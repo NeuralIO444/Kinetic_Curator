@@ -717,6 +717,35 @@ suite('megamindEmbed acceptance fixture', () => {
     dok(!postProbeInputs.includes(goodText), 'a warm honest cache entry serves the query — it is never re-fetched');
     dok(postProbeInputs.includes(keepAText), 'the uncached keep text fetches normally beside it');
 
+    // #2154 (H2): a search superseded mid-flight publishes nothing. The gate parks every embed
+    // call; both presses start under the first model, the slot moves to the second model while
+    // they are parked, then the gate opens — the stale presses must land nowhere.
+    let releaseEmbeds = null;
+    const fxBase = ollamaFixture({ models: [{ name: 'embed-a' }, { name: 'embed-b' }], embedFor: embedOk });
+    const fxSlow = async (url, init = {}) => {
+      if (new URL(url).pathname === '/api/embed' && releaseEmbeds) await releaseEmbeds;
+      return fxBase(url, init);
+    };
+    const dSlow = mkDriver(fxSlow, memStorage());
+    await dSlow.connect('http://127.0.0.1:11434');
+    dok(
+      dSlow.view().record && dSlow.view().record.model === 'embed-a',
+      'stale search setup: the first model stands ready',
+    );
+    let openGate;
+    releaseEmbeds = new Promise((r) => (openGate = r));
+    const staleSearch = dSlow.searchText('spiky ones', corpus);
+    const staleLike = dSlow.moreLikeKeep(keepA, [keepA, keepB, keepC], { assets: [] });
+    await new Promise((r) => setTimeout(r, 10)); // both presses are parked on the gate
+    const moved = dSlow.changeModel('embed-b'); // the generation moves now, synchronously
+    openGate();
+    releaseEmbeds = null;
+    dok((await moved) === true && dSlow.view().record.model === 'embed-b', 'the slot moved mid-search');
+    dok((await staleSearch) === null, 'stale search: the superseded press returns nothing');
+    dok((await staleLike) === null, 'stale more-like-this: the superseded press returns nothing');
+    dok(dSlow.view().search === null, 'stale results never published into the new model’s view');
+    dok(dSlow.view().busy === null, 'the superseded presses leave no busy flag behind');
+
     // Shelf keeps read tolerantly.
     deq(readShelfKeeps(memStorage({ 'kc:keeps:v1': JSON.stringify([keepA, keepB]) })).length, 2, 'shelf keeps read');
     deq(readShelfKeeps(memStorage({ 'kc:keeps:v1': 'garbage' })), [], 'a corrupt shelf reads empty, never throws');
