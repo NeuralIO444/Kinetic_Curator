@@ -620,7 +620,11 @@ ok(
     const app = src('../App.jsx');
     const call = app.slice(app.indexOf('startTrio({'), app.indexOf('const stopMind'));
     for (const k of ['getSpectrum', 'getMarks', 'setMarkParam']) assert.ok(call.includes(`${k}:`), k);
-    assert.ok(/setMarkParam: \(key, value\) => useStore\.getState\(\)\.setLayoutParam\(key, value\)/.test(call));
+    assert.ok(
+      /setMarkParam: \(key, value\) => useStore\.getState\(\)\.setLayoutParam\(key, value, \{ skipUndo: true \}\)/.test(
+        call,
+      ),
+    ); // #2095: his marks write never lands on the artist's undo stack
     const g = rig({ marks: MARKS0 });
     audioOn();
     g.bar(1);

@@ -1077,7 +1077,8 @@ export const createLayoutSlice = (set) => ({
       if (JSON.stringify(next) === JSON.stringify(state.light ?? null)) return {};
       return { ...pushToUndo(state), light: next };
     }),
-  setLayoutParam: (key, value) =>
+  // #2095: `opts.skipUndo` is a persona's programmatic write (Davis's marks dials): the dial moves, no undo entry is pushed.
+  setLayoutParam: (key, value, opts = null) =>
     set((state) => {
       if (state.layoutParams[key] === value) return {};
       const { params, rejected } = validateLayoutParams({ ...state.layoutParams, [key]: value });
@@ -1102,7 +1103,7 @@ export const createLayoutSlice = (set) => ({
           : Object.is(nextVal, cur);
       if (unchanged) return {};
 
-      const undoUpdate = pushToUndo(state, false);
+      const undoUpdate = opts && opts.skipUndo === true ? {} : pushToUndo(state, false);
       const next = { ...undoUpdate, layoutParams: params, voiceMix: null, activeVoiceId: null };
       if (key === 'mode' && value === 'ca' && !state.caGrid) {
         next.caGrid = createGrid(40, 28, state.seed);

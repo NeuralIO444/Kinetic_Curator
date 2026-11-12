@@ -292,7 +292,12 @@ export function startTrio({
     }
     applying = true;
     try {
-      emit(Events.AUDIO_ROUTES_SET, { routes: res.routes, continuous: false }, { cause: 'persona:davis' });
+      // #2095: his edit is not the artist's action: it never lands on the artist's undo stack (Cmd-Z walks only the artist's own)
+      emit(
+        Events.AUDIO_ROUTES_SET,
+        { routes: res.routes, continuous: false, skipUndo: true },
+        { cause: 'persona:davis' },
+      );
     } finally {
       applying = false;
     }
@@ -465,7 +470,8 @@ export function startTrio({
             );
             applying = true;
             try {
-              emit(Events.AUDIO_ROUTES_SET, { routes, continuous: false }, { cause: 'ownership' });
+              // #2095: bookkeeping, not an artist action: the artist's own edit already pushed its step
+              emit(Events.AUDIO_ROUTES_SET, { routes, continuous: false, skipUndo: true }, { cause: 'ownership' });
             } finally {
               applying = false;
             }

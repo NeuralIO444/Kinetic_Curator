@@ -210,7 +210,7 @@ export function wireEventBus(rawDispatch) {
   on(Events.BEAT_BPM, (p = {}) => dispatch({ type: A.SET_BEAT_BPM, bpm: p.bpm }));
   on(Events.BEAT_METRO, (p = {}) => dispatch({ type: A.SET_BEAT_METRO, on: p.on }));
   on(Events.AUDIO_ROUTES_SET, (p = {}) =>
-    dispatch({ type: A.SET_AUDIO_ROUTES, routes: p.routes, continuous: !!p.continuous }),
+    dispatch({ type: A.SET_AUDIO_ROUTES, routes: p.routes, continuous: !!p.continuous, skipUndo: !!p.skipUndo }),
   );
   on(Events.AUDIO_ROUTES_EDIT, (p = {}) =>
     dispatch({ type: A.EDIT_AUDIO_ROUTES, fn: p.fn, continuous: !!p.continuous }),

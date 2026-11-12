@@ -275,7 +275,8 @@ function AppInner() {
             .map(([k]) => k),
         };
       },
-      setMarkParam: (key, value) => useStore.getState().setLayoutParam(key, value),
+      // #2095: his marks write is not the artist's action: it never lands on the artist's undo stack
+      setMarkParam: (key, value) => useStore.getState().setLayoutParam(key, value, { skipUndo: true }),
     });
     // #2049 — the Canon binder: wires each Canon record's own declared bus binding (what it listens to, what it
     // announces) and keeps the Canon state the minds are handed each bar. It only watches and announces — it
