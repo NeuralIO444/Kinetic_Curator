@@ -315,6 +315,7 @@ export const RENDERER_PROGRAMS = [
       'u_sunMat',
       'u_pool',
       'u_kineme',
+      'u_kinemeB',
       'u_kinemeTime',
       'u_hands',
       'u_spec',
@@ -1223,6 +1224,8 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
   let cellShed = false; // #1431: contract.cellShed — strip assets park on cell 0
   let regionAnim = null; // #1433: contract.regionAnim — region playback state (null = pre-R2 path)
   const kinemeBuf = new Float32Array(16 * 3);
+  const kinemeBufB = new Float32Array(16 * 3); // #2117: each slot's second member (a stack); zeros otherwise
+  let kinemeBWritten = false; // true while the GPU's u_kinemeB holds a stack, so a stack-free scene re-zeroes it once
   let squash = 0; // #594 PR3: the frame's squash-and-stretch amount (0 = stretch only)
   let distortHeat = 1; // #2010 P3: the distortion channel's heat (1 = full; the tier-2 shed lowers it, never to 0)
   // #1482 P3: the frame's spectrum marks ({ map, scale, displace, colour, tex } or null = off, today's frame).
@@ -1348,6 +1351,20 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
         kinemeBuf[i * 3 + 2] = k.amp;
       });
     gl.uniform3fv(U(quadProg, 'u_kineme'), kinemeBuf);
+    // #2117: the stack table uploads only while a stack exists (and once more to clear it); a scene with no stack never touches it.
+    const hasStack = !!kinemeTable && kinemeTable.some((k) => k.b);
+    if (hasStack || kinemeBWritten) {
+      kinemeBufB.fill(0);
+      if (hasStack)
+        kinemeTable.slice(0, 16).forEach((k, i) => {
+          if (!k.b) return;
+          kinemeBufB[i * 3] = k.b.kind;
+          kinemeBufB[i * 3 + 1] = k.b.period;
+          kinemeBufB[i * 3 + 2] = k.b.amp;
+        });
+      gl.uniform3fv(U(quadProg, 'u_kinemeB'), kinemeBufB);
+      kinemeBWritten = hasStack;
+    }
     gl.uniform1f(U(quadProg, 'u_kinemeTime'), kinemeTime);
     gl.uniform2f(U(quadProg, 'u_hands'), hands.crooked || 0, hands.open || 0);
     gl.uniform1i(U(quadProg, 'u_atlas'), bindTex(0, atlasTex));

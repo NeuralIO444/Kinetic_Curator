@@ -27,7 +27,13 @@ import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
 import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
-import { sanitizeAssetKineme, sanitizeAssetStill, getKineme, DEFAULT_ASSET_KINEME } from '../../data/kinemes.js';
+import {
+  sanitizeAssetKineme,
+  sanitizeAssetStill,
+  getKineme,
+  getAssetKineme,
+  DEFAULT_ASSET_KINEME,
+} from '../../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../../data/regionKinemes.js';
 import { sanitizeAssetTags, sanitizeAssetTagsDoc, editTags, suggestTags } from '../../data/assetFacets.js';
 import { libraryTraits } from '../../data/assetDescriptor.js';
@@ -1256,7 +1262,7 @@ export const createGlobalSlice = (set) => ({
         delete next[assetId];
         return { assetKineme: next };
       }
-      if (!getKineme(kinemeId) || cur[assetId] === kinemeId) return {};
+      if (!getAssetKineme(kinemeId) || cur[assetId] === kinemeId) return {}; // #2117: a stack id is allowed on a whole mark
       return { assetKineme: { ...cur, [assetId]: kinemeId } };
     }),
   /**
