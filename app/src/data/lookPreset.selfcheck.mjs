@@ -49,6 +49,20 @@ ok('a written look reads back identical (round-trip is a fixed point)', () => {
   assert.equal(writeLookPreset(second.look), text);
 });
 
+ok('range params (scale/alpha/rotate) also round-trip byte-stable after normalisation', () => {
+  // range params change shape during normalisation (scale becomes the {x, y} object form), so the
+  // fixed-point promise needs its own pin beyond the scalar case above (QA finding, 2026-11-12)
+  const first = parseLookPreset(
+    asText({ ...base, layoutParams: { count: 40, scale: [0.5, 9], alpha: [10, 500], rotate: [-999, 45] } }),
+  );
+  assert.equal(first.ok, true);
+  const text = writeLookPreset(first.look);
+  const second = parseLookPreset(text);
+  assert.equal(second.ok, true);
+  assert.deepEqual(second.look, first.look);
+  assert.equal(writeLookPreset(second.look), text);
+});
+
 ok('seedless is seedless; a seeded look keeps its seed; a hex seed coerces (#642)', () => {
   assert.equal('seed' in parseLookPreset(asText(base)).look, false);
   assert.equal(parseLookPreset(asText({ ...base, seed: 0 })).look.seed, 0);
