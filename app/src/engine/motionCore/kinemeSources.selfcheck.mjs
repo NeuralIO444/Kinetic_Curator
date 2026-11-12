@@ -92,7 +92,7 @@ ok('listMotionSources() contains every KINEMES id as kineme:<id>, family kineme,
     assert.equal(s.timeBase, 'kineme', 'the shader reads u_kinemeTime, the kineme clock');
     assert.equal(s.costTier, 'motionCore/kineme-adapter');
   }
-  assert.equal(KINEMES.length, 6, 'the library is spin, rock, pulse, blink, bob, bend');
+  assert.equal(KINEMES.length, 7, 'the library is spin, rock, pulse, blink, bob, bend, scatter');
 });
 
 ok('a registered source evaluates to the same pose as the reference, reading the node\'s phase', () => {
@@ -155,7 +155,12 @@ ok('nothing in the app imports the adapter (renderer untouched); the module is p
   walk(srcRoot);
   const importers = files.filter((f) => /kinemeSources/.test(readFileSync(f, 'utf8')));
   const names = importers.map((f) => f.slice(srcRoot.length)).sort();
-  assert.deepEqual(names, ['engine/motionCore/kinemeSources.js', 'engine/motionCore/kinemeSources.selfcheck.mjs'].sort(), names.join(', '));
+  // #2116: a selfcheck elsewhere (gl/kinemeScatter) may read the CPU reference; what must stay true is that no NON-test file does
+  assert.deepEqual(
+    names.filter((f) => !/\.selfcheck\.mjs$/.test(f)),
+    ['engine/motionCore/kinemeSources.js'],
+    names.join(', '),
+  );
   const text = readFileSync(new URL('./kinemeSources.js', import.meta.url), 'utf8');
   const imports = [...text.matchAll(/^\s*import\s[^;]*?from\s+['"]([^'"]+)['"]/gm)].map((m) => m[1]);
   assert.deepEqual(imports, ['../../data/kinemes.js', '../kernel/costRegistry.mjs', './index.js']);

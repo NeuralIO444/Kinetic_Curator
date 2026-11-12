@@ -67,7 +67,7 @@ test('vertex stage carries the glass flag: attrib 6 in, varying out', () => {
   assert.ok(QUAD_FS.includes('in float v_glass;'), 'fragment stage declares the varying');
 });
 
-test('packInstanceData: INSTANCE_STRIDE (49 since #2010 P3), glass flag at [20], old producers read 0', () => {
+test('packInstanceData: INSTANCE_STRIDE (51 since #2116; 49 since #2010 P3), glass flag at [20], old producers read 0', () => {
   const cells = { 'a|#ffffff|#000000': { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
   const mk = (glass) => ({
     x: 1,
@@ -85,7 +85,7 @@ test('packInstanceData: INSTANCE_STRIDE (49 since #2010 P3), glass flag at [20],
   assert.equal(
     data.length,
     3 * INSTANCE_STRIDE,
-    '3 instances × 49 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585, +engraving block in S4, +distort in #2010 P3)',
+    '3 instances × 51 floats (21 through #1129 PR2, +deform vec3 in #1410, +plate flag in #1548, +matP vec4 in #1585, +engraving block in S4, +distort in #2010 P3, +break-up in #2116)',
   );
   assert.equal(data[20], 1, 'glass:true → 1');
   assert.equal(data[INSTANCE_STRIDE + 20], 0, 'glass:false → 0');

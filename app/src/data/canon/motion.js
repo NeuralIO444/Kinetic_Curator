@@ -105,6 +105,7 @@ const KINEME = {
   blink: T('Blink'),
   bob: T('Bob'),
   bend: T('Travelling bend'),
+  scatter: T('Break-up scatter'),
 };
 
 const CELL = {

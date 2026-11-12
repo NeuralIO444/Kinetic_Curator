@@ -13,6 +13,7 @@
 //   168  kind 3 pulse:  c *= 1.0 + km.z * wav                    (c = the quad's own scaled offset: sx = sy = 1 + amp*wav)
 //   169  kind 4 blink:  kVis = ph < km.z ? 1.0 : 0.0             (km.z is the duty; v_opacity = a_inst1.y * kVis, :229)
 //   170  kind 5 bob  :  kOff = vec2(0.0, km.z * wav)             (added to the instance's world position, :226)
+//   171+ kind 6 scatter (#2116): kOff = a_brk * (km.z * e), e from u = fract(t / per - phase * 0.4) — see scatterPose
 //
 // Pose mapping: spin / osc -> dRot (degrees); pulse -> sx, sy; bob -> dy (scene units); blink -> dAlpha, where the shader's
 // opacity MULTIPLIER of 0 is written as dAlpha = -1 (hidden, if the consumer clamps alpha at 0) and visible as 0.
@@ -28,7 +29,7 @@
 // declare `kineme` so a later phase converts the right clock.
 //
 // Browser-safe, pure: no clock, no chance (the phase comes from the node).
-import { KINEMES, KINEME_KINDS } from '../../data/kinemes.js';
+import { KINEMES, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE } from '../../data/kinemes.js';
 import { registerCostTier } from '../kernel/costRegistry.mjs';
 import { registerMotionSource } from './index.js';
 
@@ -63,19 +64,32 @@ export function bobPose(kineme, t, phase01) {
   return { dy: kineme.amp * Math.sin(cycle(kineme, t, phase01) * TAU) };
 }
 
+/**
+ * kind 6 (#2116, the shader's scatter branch): out and back along `brk`, the packed break-up vector (scene units, direction x
+ * mark box side; [0, 0] for a node with none). u = fract(t / per - phase * RIPPLE); out-and-back for the first WINDOW of the
+ * cycle, hold at home for the rest. Zero at t = 0 for EVERY phase (WINDOW + RIPPLE <= 1) — not just phase 0. -> dx, dy.
+ */
+export function scatterPose(kineme, t, phase01, brk = [0, 0]) {
+  const u = fract(t / Math.max(kineme.period, 1e-3) - phase01 * SCATTER_RIPPLE);
+  const e = u < SCATTER_WINDOW ? 0.5 * (1 - Math.cos((TAU * u) / SCATTER_WINDOW)) : 0;
+  const k = kineme.amp * e;
+  return { dx: brk[0] * k, dy: brk[1] * k };
+}
+
 const BY_KIND = Object.freeze({
   [KINEME_KINDS.spin]: spinPose,
   [KINEME_KINDS.osc]: oscPose,
   [KINEME_KINDS.pulse]: pulsePose,
   [KINEME_KINDS.blink]: blinkPose,
   [KINEME_KINDS.bob]: bobPose,
+  [KINEME_KINDS.scatter]: scatterPose,
 });
 
 /** The pose delta of a kineme record ({ kind, period, amp }) at motion time t (seconds) for an instance phase in [0, 1). */
-export function kinemePose(kineme, tSec, phase01 = 0) {
+export function kinemePose(kineme, tSec, phase01 = 0, brk) {
   const fn = kineme && BY_KIND[KINEME_KINDS[kineme.kind]];
   if (!fn) throw new TypeError(`[kinemeSources] unknown kineme kind "${String(kineme && kineme.kind)}"`);
-  return fn(kineme, tSec, phase01);
+  return fn(kineme, tSec, phase01, brk);
 }
 
 /** The source id a library kineme registers under. */
@@ -97,6 +111,7 @@ for (const k of KINEMES) {
     timeBase: 'kineme',
     costTier: 'motionCore/kineme-adapter',
     anchorNodes: ANCHOR_NODES,
-    evaluate: (node, t) => kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0),
+    // a scatter node carries its packed break-up vector as `node.brk` (the shader's a_brk); others ignore it
+    evaluate: (node, t) => kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0, node && node.brk),
   });
 }

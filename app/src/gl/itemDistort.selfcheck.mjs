@@ -109,31 +109,35 @@ ok('B2 the contract validator accepts a carried record and refuses a bad one', (
 });
 
 // ── C · the packer ──────────────────────────────────────────────────────
-ok('C1 49-float stride; the record at 45..48; absent packs zeros; earlier offsets unchanged', () => {
-  assert.equal(INSTANCE_STRIDE, 49);
-  const base = {
-    asset: 'typ_A',
-    x: 10,
-    y: 20,
-    scaleX: 1,
-    scaleY: 1,
-    rotation: 5,
-    opacity: 1,
-    tint: '#ff0000',
-    accent: '#00ff00',
-    key: 'k',
-  };
-  const cells = { typ_A: { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
-  const plain = packInstanceData([base], cells);
-  const dist = packInstanceData([{ ...base, distort: [0.3, 0.5, 0.25, 0.75] }], cells);
-  assert.equal(plain.length, 49);
-  assert.deepStrictEqual([...plain.subarray(45, 49)], [0, 0, 0, 0]);
-  assert.deepStrictEqual([...dist.subarray(0, 45)], [...plain.subarray(0, 45)], 'every earlier float is unchanged');
-  assert.deepStrictEqual(
-    [...dist.subarray(45, 49)].map((v) => Math.round(v * 1000) / 1000),
-    [0.3, 0.5, 0.25, 0.75],
-  );
-});
+ok(
+  'C1 51-float stride (49 through #2010 P3, +break-up vec2 in #2116); the record at 45..48; absent packs zeros; earlier offsets unchanged',
+  () => {
+    assert.equal(INSTANCE_STRIDE, 51);
+    const base = {
+      asset: 'typ_A',
+      x: 10,
+      y: 20,
+      scaleX: 1,
+      scaleY: 1,
+      rotation: 5,
+      opacity: 1,
+      tint: '#ff0000',
+      accent: '#00ff00',
+      key: 'k',
+    };
+    const cells = { typ_A: { u0: 0, v0: 0, u1: 0.5, v1: 0.5 } };
+    const plain = packInstanceData([base], cells);
+    const dist = packInstanceData([{ ...base, distort: [0.3, 0.5, 0.25, 0.75] }], cells);
+    assert.equal(plain.length, 51);
+    assert.deepStrictEqual([...plain.subarray(49, 51)], [0, 0], 'the #2116 break-up tail is zero for a plain instance');
+    assert.deepStrictEqual([...plain.subarray(45, 49)], [0, 0, 0, 0]);
+    assert.deepStrictEqual([...dist.subarray(0, 45)], [...plain.subarray(0, 45)], 'every earlier float is unchanged');
+    assert.deepStrictEqual(
+      [...dist.subarray(45, 49)].map((v) => Math.round(v * 1000) / 1000),
+      [0.3, 0.5, 0.25, 0.75],
+    );
+  },
+);
 
 // ── D · the shaders ─────────────────────────────────────────────────────
 ok('D1 gated branches, the shear in the item frame, the undistorted LOD, the mesh zero', () => {

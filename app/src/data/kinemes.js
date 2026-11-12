@@ -12,12 +12,13 @@
 // Browser-safe, pure.
 
 /** Shader kind ids (QUAD_VS switches on these). 0 is reserved for "none". */
-export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4, bob: 5 });
+export const KINEME_KINDS = Object.freeze({ spin: 1, osc: 2, pulse: 3, blink: 4, bob: 5, scatter: 6 });
 
 /**
  * The library. `period` in seconds; `amp` per kind: osc = ± degrees,
  * pulse = ± scale fraction, blink = duty (fraction of the period visible),
- * bob = ± scene units along the screen's y. spin ignores amp (one turn/period).
+ * bob = ± scene units along the screen's y, scatter = the peak distance a REGION leaves home, as a fraction of its mark's
+ * box side (#2116 break-up; docs/design/kineme-breakup-spec.md). spin ignores amp (one turn/period).
  */
 export const KINEMES = Object.freeze(
   [
@@ -35,8 +36,19 @@ export const KINEMES = Object.freeze(
     // quad-wide shader warp stays parked). Anywhere else — a compact region,
     // a whole mark — it is simply the gentle osc it declares.
     { id: 'bend', kind: 'osc', period: 3.6, amp: 6 },
+    // #2116 — scatter: a region slides out from its mark's centre along its own centroid direction and back, in a ripple
+    // across regions. Region-only: a whole mark has no centroid direction, so it would sit still (sanitizeAssetKineme drops it).
+    { id: 'scatter', kind: 'scatter', period: 3.2, amp: 0.18, regionOnly: true },
   ].map(Object.freeze),
 );
+
+/**
+ * #2116 — the scatter cycle, shared by the shader (QUAD_VS, literal copies), the CPU reference and the selfchecks.
+ * u = fract(t / per - phase * RIPPLE); the piece is out and back for the first WINDOW of the cycle and holds at home for the
+ * rest. WINDOW + RIPPLE <= 1, so at t = 0 every phase sits in its hold: rest, exactly (the anchor law).
+ */
+export const SCATTER_WINDOW = 0.6;
+export const SCATTER_RIPPLE = 0.4;
 
 /** #1435 R4 — the kineme id whose region playback subdivides stroke regions. */
 export const BEND_KINEME_ID = 'bend';
@@ -93,7 +105,15 @@ export function sanitizeAssetKineme(raw) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const out = {};
   for (const [assetId, kid] of Object.entries(raw)) {
-    if (typeof assetId === 'string' && assetId && typeof kid === 'string' && BY_ID.has(kid)) out[assetId] = kid;
+    // #2116: a region-only kineme (scatter) has no meaning on a whole mark — refuse it here, not silently inert
+    if (
+      typeof assetId === 'string' &&
+      assetId &&
+      typeof kid === 'string' &&
+      BY_ID.has(kid) &&
+      !BY_ID.get(kid).regionOnly
+    )
+      out[assetId] = kid;
   }
   return Object.keys(out).length ? out : null;
 }
