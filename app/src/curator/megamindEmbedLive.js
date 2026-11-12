@@ -178,7 +178,7 @@ export function createEmbedDriver({
    * Cache hits never touch the network; misses batch by EMBED_BATCH; a failed batch leaves its
    * texts null (absent, never guessed) and says so in the view — a dev surface is honest.
    */
-  async function embedTexts(texts) {
+  async function embedTexts(texts, gen = generation) {
     const rec = view.record;
     if (!rec) return texts.map(() => null);
     const out = new Array(texts.length).fill(null);
@@ -210,7 +210,9 @@ export function createEmbedDriver({
       });
     }
     if (misses.length) persistCache();
-    if (failed)
+    // #2154 (H2): the cache writes above are model-keyed and stay — but the failure note is a publish,
+    // and a press superseded mid-flight (gen moved) must not speak into the new slot's view.
+    if (failed && gen === generation)
       set({
         message: `${failed} text(s) got no vector — the model did not answer for them; they are absent from results, never guessed.`,
       });
@@ -313,12 +315,14 @@ export function createEmbedDriver({
       }
       const q = typeof query === 'string' ? query.trim() : '';
       if (!q) return null;
+      const gen = generation; // #2154 (H2): the probe path's guard, for search — see the check after the await
       set({ busy: 'search', message: null });
       try {
         const assetById = new Map(assets.map((a) => [a.id, a]));
         const keepTexts = keeps.map((k) => keepEmbedText(k, { assetById, translateId: keepTranslateId(k) }));
         const assetTexts = assets.map((a) => assetEmbedText(a));
-        const vectors = await embedTexts([q, ...keepTexts, ...assetTexts]);
+        const vectors = await embedTexts([q, ...keepTexts, ...assetTexts], gen);
+        if (gen !== generation) return null; // superseded mid-flight: drop the publish, never the cache
         const queryVector = vectors[0];
         if (!queryVector) {
           set({ search: null, message: 'The model gave no vector for that search text — nothing ranked.' });
@@ -361,6 +365,7 @@ export function createEmbedDriver({
         set({ message: 'No embedding slot is measured — probe a model first; neighbours stay off.' });
         return null;
       }
+      const gen = generation; // #2154 (H2): same guard as searchText
       set({ busy: 'search', message: null });
       try {
         const assetById = new Map(assets.map((a) => [a.id, a]));
@@ -368,7 +373,8 @@ export function createEmbedDriver({
           keepEmbedText(keep, { assetById, translateId: keepTranslateId(keep) }),
           ...keeps.map((k) => keepEmbedText(k, { assetById, translateId: keepTranslateId(k) })),
         ];
-        const vectors = await embedTexts(texts);
+        const vectors = await embedTexts(texts, gen);
+        if (gen !== generation) return null; // superseded mid-flight: drop the publish, never the cache
         const self = vectors[0];
         if (!self) {
           set({ message: 'The model gave no vector for that keep — no neighbours ranked.' });

@@ -258,6 +258,41 @@ await ok(
 );
 
 await ok(
+  'the live driver: a seed getter that throws skips that bar inside the handler, and the next bar thinks (#2154, N1)',
+  async () => {
+    const got = [];
+    const off = on(Events.MIND_DECISION, (p) => got.push(p));
+    const busErrors = [];
+    const origError = console.error;
+    console.error = (...a) => busErrors.push(a);
+    let seedCalls = 0;
+    const stop = startMind({
+      getSnapshot: () => ({}),
+      getSeed: () => {
+        seedCalls++;
+        if (seedCalls === 1) throw new Error('seed boom');
+        return 4242;
+      },
+    });
+    try {
+      emit(Events.CLOCK_BAR, { bar: 4, bpm: 120 });
+      assert.equal(got.length, 0, 'the poisoned bar makes no decision');
+      emit(Events.CLOCK_BAR, { bar: 5, bpm: 120 });
+      assert.equal(got.length, 3, 'the next bar thinks as usual');
+    } finally {
+      console.error = origError;
+      stop();
+      off();
+    }
+    assert.deepEqual(
+      busErrors.filter((a) => a[0] === '[eventBus]' && a[1] === Events.CLOCK_BAR),
+      [],
+      'the failure never reached the bus: the handler contained it',
+    );
+  },
+);
+
+await ok(
   'hidden and honest: no surface lists it; no store key holds it; pure modules read no clock; the app starts it',
   () => {
     for (const f of ['mindContract.js', 'mindContext.js', 'mindRules.js', 'mindThinker.js', 'mindRecord.js']) {

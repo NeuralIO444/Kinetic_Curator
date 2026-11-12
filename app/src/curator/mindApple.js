@@ -8,14 +8,24 @@
 import { isTauriRuntime } from '../platform/desktop.mjs'; // one desktop check for the whole app
 
 export const ASK_TIMEOUT_MS = 300; // the hard cap the app asks for (the helper bridge clamps to it too)
+/**
+ * #2154 (H1) — the JS-side backstop on an ask: 10x the helper's own cap, the status path's budget.
+ * The native side enforces its 300 ms itself (the bridge sends its cancel and answers "timeout"), so
+ * this race can only fire when the native side wedges without answering at all — the one case where
+ * the invoke promise would never settle, the thinker's single flight for that persona would stay open
+ * forever, and that persona would silently never get an Apple answer again. The race rejects as a
+ * timeout, the thinker closes the flight as a failed one, and the rules answer: nothing surfaces.
+ */
+export const ASK_JS_TIMEOUT_MS = 3000;
 
 export const isDesktop = () => isTauriRuntime();
 
 /**
  * @param invoke (cmd, args) => Promise — Tauri's invoke (injected so selfcheck can drive it)
+ * @param jsTimeoutMs the JS-side ask backstop (ASK_JS_TIMEOUT_MS; injected so selfcheck can drive it)
  * @returns the model backend for startMind: { name: 'apple', available(), info(), check(), ask() }
  */
-export function createAppleModel({ invoke }) {
+export function createAppleModel({ invoke, jsTimeoutMs = ASK_JS_TIMEOUT_MS }) {
   let info = { available: false, reason: 'not checked yet' };
   const setInfo = (s) => {
     info =
@@ -47,7 +57,18 @@ export function createAppleModel({ invoke }) {
     },
     /** One persona's reply, or a rejection (timeout, error, unavailable): the rules then answer that bar. */
     async ask(persona, context, { seed = 0, bar = 0 } = {}) {
-      const r = await invoke('mind_ask', { persona, context, seed: seed >>> 0, bar, timeoutMs: ASK_TIMEOUT_MS });
+      let timer = null;
+      let r;
+      try {
+        r = await Promise.race([
+          invoke('mind_ask', { persona, context, seed: seed >>> 0, bar, timeoutMs: ASK_TIMEOUT_MS }),
+          new Promise((_, reject) => {
+            timer = setTimeout(() => reject(new Error('timeout')), jsTimeoutMs);
+          }),
+        ]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
       if (r && r.error === 'unavailable') setInfo({ available: false, reason: 'helper reported unavailable' });
       if (!r || r.reply == null) throw new Error((r && r.error) || 'no reply');
       return r.reply;

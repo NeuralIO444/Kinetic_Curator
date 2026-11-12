@@ -717,6 +717,80 @@ suite('megamindEmbed acceptance fixture', () => {
     dok(!postProbeInputs.includes(goodText), 'a warm honest cache entry serves the query — it is never re-fetched');
     dok(postProbeInputs.includes(keepAText), 'the uncached keep text fetches normally beside it');
 
+    // #2154 (H2): a search superseded mid-flight publishes nothing. The gate parks every embed
+    // call; both presses start under the first model, the slot moves to the second model while
+    // they are parked, then the gate opens — the stale presses must land nowhere.
+    let releaseEmbeds = null;
+    const fxBase = ollamaFixture({ models: [{ name: 'embed-a' }, { name: 'embed-b' }], embedFor: embedOk });
+    const fxSlow = async (url, init = {}) => {
+      if (new URL(url).pathname === '/api/embed' && releaseEmbeds) await releaseEmbeds;
+      return fxBase(url, init);
+    };
+    const dSlow = mkDriver(fxSlow, memStorage());
+    await dSlow.connect('http://127.0.0.1:11434');
+    dok(
+      dSlow.view().record && dSlow.view().record.model === 'embed-a',
+      'stale search setup: the first model stands ready',
+    );
+    let openGate;
+    releaseEmbeds = new Promise((r) => (openGate = r));
+    const staleSearch = dSlow.searchText('spiky ones', corpus);
+    const staleLike = dSlow.moreLikeKeep(keepA, [keepA, keepB, keepC], { assets: [] });
+    await new Promise((r) => setTimeout(r, 10)); // both presses are parked on the gate
+    const moved = dSlow.changeModel('embed-b'); // the generation moves now, synchronously
+    openGate();
+    releaseEmbeds = null;
+    dok((await moved) === true && dSlow.view().record.model === 'embed-b', 'the slot moved mid-search');
+    dok((await staleSearch) === null, 'stale search: the superseded press returns nothing');
+    dok((await staleLike) === null, 'stale more-like-this: the superseded press returns nothing');
+    dok(dSlow.view().search === null, 'stale results never published into the new model’s view');
+    dok(dSlow.view().busy === null, 'the superseded presses leave no busy flag behind');
+
+    // #2154 (H2), the failure note: the gated note in embedTexts is a publish too. The stub
+    // refuses any batch carrying the poisoned keep's text, so the parked press's batch FAILS
+    // under the gate; the slot moves mid-flight, then the gate opens — the superseded model's
+    // "got no vector" note must land nowhere, exactly like its results.
+    let releaseFail = null;
+    const fxFailBase = ollamaFixture({
+      models: [{ name: 'embed-a' }, { name: 'embed-b' }],
+      embedFor: (body) => {
+        const inputs = body.images ? [] : Array.isArray(body.input) ? body.input : [body.input];
+        if (inputs.some((t) => String(t).includes('unembeddable'))) return { status: 400 };
+        return embedOk(body);
+      },
+    });
+    const fxFail = async (url, init = {}) => {
+      if (new URL(url).pathname === '/api/embed' && releaseFail) await releaseFail;
+      return fxFailBase(url, init);
+    };
+    const dFail = mkDriver(fxFail, memStorage());
+    await dFail.connect('http://127.0.0.1:11434');
+    dok(
+      dFail.view().record && dFail.view().record.model === 'embed-a',
+      'stale failure-note setup: the first model stands ready',
+    );
+    const keepPoison = {
+      seed: 14,
+      caption: 'unembeddable glyph burst',
+      config: { layout: { mode: 'radial' }, palette: { id: 'ember' }, assets: [] },
+    };
+    let openFailGate;
+    releaseFail = new Promise((r) => (openFailGate = r));
+    const staleFailSearch = dFail.searchText('spiky ones', { keeps: [keepPoison], assets: [] });
+    await new Promise((r) => setTimeout(r, 10)); // the failing press is parked on the gate
+    const movedFail = dFail.changeModel('embed-b'); // the generation moves now, synchronously
+    openFailGate();
+    releaseFail = null;
+    dok(
+      (await movedFail) === true && dFail.view().record.model === 'embed-b',
+      'the slot moved under the failing press',
+    );
+    dok((await staleFailSearch) === null, 'the superseded failing press returns nothing');
+    dok(
+      dFail.view().message === null,
+      'stale failure note: a superseded press’s "got no vector" never reaches the new model’s view',
+    );
+
     // Shelf keeps read tolerantly.
     deq(readShelfKeeps(memStorage({ 'kc:keeps:v1': JSON.stringify([keepA, keepB]) })).length, 2, 'shelf keeps read');
     deq(readShelfKeeps(memStorage({ 'kc:keeps:v1': 'garbage' })), [], 'a corrupt shelf reads empty, never throws');

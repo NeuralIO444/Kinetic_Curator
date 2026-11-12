@@ -206,7 +206,12 @@ export function startMind({
         /* the personality layer must not stop the personas */
       }
     }
-    const seed = ((Number(getSeed()) >>> 0) ^ Math.imul(p.bar + 1, 0x9e3779b1)) >>> 0; // the document seed, the bar
+    let seed;
+    try {
+      seed = ((Number(getSeed()) >>> 0) ^ Math.imul(p.bar + 1, 0x9e3779b1)) >>> 0; // the document seed, the bar
+    } catch {
+      return; // a seed getter that throws skips the bar, like the snapshot read above (#2154, N1)
+    }
     thinkers.forEach((t, i) => {
       let pctx = ctx;
       if (presence) {

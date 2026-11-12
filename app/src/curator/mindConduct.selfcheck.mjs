@@ -21,6 +21,7 @@ import {
   NOISE_FLAT,
   createConductor,
   PHRASE_BARS,
+  PHRASE_LEDGER_MAX,
   TIER_OPS,
   BACKOFF_REVERTS,
   BACKOFF_BARS,
@@ -454,6 +455,25 @@ ok("sovereignty, tier and rate: the artist's target is owned, tier 1 makes no ed
   );
   assert.equal(fresh.consider(other, { bar: 3, tier: 't4' }).landBar, 4, 'one bar before a boundary lands on it');
 });
+
+ok(
+  'the phrase ledger is bounded: past the cap the oldest phrases are evicted, the newest still block (#2154, H3)',
+  () => {
+    const c = createConductor();
+    const op = { op: 'depth', input: 'bass', target: 'render.scale', depth: 0.1 };
+    for (let p = 0; p <= PHRASE_LEDGER_MAX + 4; p++) c.commit(p * PHRASE_BARS);
+    assert.equal(
+      c.consider(op, { bar: 3, tier: 't4' }).landBar,
+      PHRASE_BARS,
+      'phrase 1 was evicted: a landing there is free again',
+    );
+    assert.equal(
+      c.consider(op, { bar: (PHRASE_LEDGER_MAX + 4) * PHRASE_BARS - 1, tier: 't4' }).landBar,
+      (PHRASE_LEDGER_MAX + 5) * PHRASE_BARS,
+      'the newest committed phrase still has its one edit: the landing waits a phrase',
+    );
+  },
+);
 
 ok('backoff: three reverts and the persona goes quiet for a while, then comes back', () => {
   const c = createConductor();
