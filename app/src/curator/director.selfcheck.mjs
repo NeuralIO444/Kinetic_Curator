@@ -14,9 +14,11 @@ import {
   resetDirector,
   getDirector,
   conductHeat,
+  initDirectorBeat,
 } from './director.js';
 import { TEMP_DEFAULT } from './effectiveTemp.js';
 import { DIRECTOR_TABLE } from './directorTable.js';
+import { createBeatTracker, CONFIDENCE_LAPSE_BARS } from './beatConfidence.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const srcRoot = join(here, '..');
@@ -258,6 +260,249 @@ ok('#1483 conductHeat: 0..1 from the last sway, 0 when nobody leans; a share of 
   const real = Object.getOwnPropertyDescriptor(d, 'lastSway');
   assert.ok(real && typeof real.get === 'function', 'lastSway is a getter on the live director');
   resetDirector();
+});
+
+// ── #2089: the Director's beat input listens to the store without flooding the tracker ──
+// A fake `subscribe` records listeners and hands (state, prev) like Zustand's. getDirector()'s pushBeat and
+// setPullInputs are spied; the beat tracker itself is not touched.
+const beatRig = () => {
+  resetDirector();
+  const d = getDirector();
+  const rig = { listeners: [], beats: [], pulls: 0 };
+  const realPush = d.pushBeat.bind(d);
+  const realPull = d.setPullInputs.bind(d);
+  d.pushBeat = (p) => {
+    rig.beats.push(p);
+    realPush(p);
+  };
+  d.setPullInputs = (x) => {
+    rig.pulls++;
+    realPull(x);
+  };
+  rig.subscribe = (fn) => {
+    rig.listeners.push(fn);
+    return () => {
+      rig.listeners = rig.listeners.filter((l) => l !== fn);
+    };
+  };
+  rig.fire = (s, prev) => [...rig.listeners].forEach((l) => l(s, prev));
+  return rig;
+};
+const baseState = { beatPulse: 0, keeps: [], audioBands: null, audioEnabled: false, audioSource: null };
+
+ok('#2089 an unrelated state change pushes no beat sample and no pull inputs', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  r.fire({ ...baseState, sliderX: 1 }, baseState);
+  assert.equal(r.beats.length, 0, 'beatPulse did not change: no sample');
+  assert.equal(r.pulls, 0, 'none of the four pull inputs changed: no setPullInputs');
+  resetDirector();
+});
+
+ok('#2089 a beatPulse change pushes exactly one sample; a pull-input change sets pull inputs once', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  r.fire({ ...baseState, beatPulse: 0.8 }, baseState);
+  assert.deepEqual(r.beats, [0.8]);
+  assert.equal(r.pulls, 0, 'a pulse alone does not touch the pull inputs');
+  r.fire({ ...baseState, audioEnabled: true }, baseState);
+  assert.equal(r.pulls, 1, 'one input changed: one setPullInputs');
+  assert.equal(r.beats.length, 1, 'and no extra beat sample');
+  resetDirector();
+});
+
+ok('#2089 init twice then one pulse change → exactly one push (the handle is replaced, not stacked)', () => {
+  const r = beatRig();
+  initDirectorBeat(r.subscribe);
+  initDirectorBeat(r.subscribe);
+  assert.equal(r.listeners.length, 1, 'one live listener after a double init');
+  r.fire({ ...baseState, beatPulse: 1 }, baseState);
+  assert.equal(r.beats.length, 1, 'one pulse change, one sample');
+  resetDirector();
+});
+
+ok('#2089 initDirectorBeat returns an unsubscribe that detaches the listener', () => {
+  const r = beatRig();
+  const stop = initDirectorBeat(r.subscribe);
+  assert.equal(typeof stop, 'function');
+  stop();
+  assert.equal(r.listeners.length, 0, 'unsubscribed');
+  r.fire({ ...baseState, beatPulse: 1 }, baseState);
+  assert.equal(r.beats.length, 0, 'no sample after cleanup');
+  stop(); // idempotent
+  resetDirector();
+});
+
+// ── #2090: time-in-phase must not hold its own reset closed ──
+// A fake clock drives createDirector; every tick passes nowTs explicitly. The Director's `phaseTime` input was one
+// of the four max-pooled signals AND the thing that stopped `lastCoolAt` resetting, so after ~60 s without a
+// cool tick it latched the room at intensity 1 for good.
+const sim = (script) => {
+  let clock = 0;
+  const dir = createDirector({ now: () => clock });
+  const trace = [];
+  for (const [nowTs, audio] of script) {
+    clock = nowTs;
+    const r = dir.tick({ feed: {}, audio, nowTs });
+    trace.push({ s: nowTs / 1000, audio, level: r.intensity, phase: r.directorPhase });
+  }
+  return trace;
+};
+const ticksEvery = (everyS, fromS, toS, audio) => {
+  const out = [];
+  for (let sec = fromS; sec <= toS; sec += everyS) out.push([sec * 1000, audio]);
+  return out;
+};
+
+ok('#2090 a silent 20-minute session with regular picks does not sit at intensity 1', () => {
+  // first tick after a 90 s gap, then one every 20 s
+  const trace = sim(ticksEvery(20, 90, 1200, 0));
+  const late = trace.filter((t) => t.s > 360);
+  assert.ok(late.length > 30, 'the session ran past minute 6');
+  assert.ok(
+    late.every((t) => t.level < 1),
+    `intensity never pinned at 1 after minute 6 (worst ${Math.max(...late.map((t) => t.level))})`,
+  );
+  assert.ok(
+    late.some((t) => t.phase === 'build'),
+    'the room is in build after minute 6',
+  );
+  assert.ok(
+    late.every((t) => t.phase === 'build'),
+    'a silent room never peaks or relaxes',
+  );
+});
+
+ok('#2090 sustained mid-level audio still builds to a peak on time-in-phase; the relax window returns to build', () => {
+  // audio 0.5 is above the cool floor but nowhere near a peak on its own: only time-in-phase can get it there
+  const loud = ticksEvery(5, 5, 360, 0.5);
+  const quiet = ticksEvery(5, 365, 900, 0);
+  const trace = sim([...loud, ...quiet]);
+  const early = trace.filter((t) => t.s <= 120);
+  assert.ok(
+    early.every((t) => t.level < 0.85 && t.phase === 'build'),
+    'two minutes in, audio alone has not peaked',
+  );
+  const peakAt = trace.find((t) => t.phase === 'peak');
+  assert.ok(peakAt && peakAt.s <= 360, 'time-in-phase carried sustained audio to a peak inside six minutes');
+  assert.ok(peakAt.s > 120, 'and it took time, not audio alone');
+  const after = trace.filter((t) => t.s > peakAt.s && t.audio === 0);
+  assert.ok(
+    after.some((t) => t.phase === 'relax'),
+    'the peak is followed by a relax window',
+  );
+  assert.ok(
+    after.some((t) => t.phase === 'build'),
+    'after the relax window the phase returns to build',
+  );
+  assert.ok(trace[trace.length - 1].level < 0.85, 'and the room is not still pinned at the end of the quiet stretch');
+});
+
+// ── #2091: beat confidence lapses 2 bars after the last strong hit (Matt's ruling), on LOOP time ──
+// The tracker is driven by pushes, not a clock, so push(pulse, nowMs, bpm) carries the loop time and the BPM.
+const BPM = 120;
+const BAR_MS = (4 * 60000) / BPM; // 2000 ms: two bars = 4 s
+const hit = (t, at, strength = 0.9) => {
+  // one attack: rise, peak, fall — about 100 ms wide
+  t.push(0, at, BPM);
+  t.push(strength, at + 30, BPM);
+  t.push(strength * 0.9, at + 60, BPM);
+  t.push(0.05, at + 90, BPM);
+};
+const silence = (t, fromMs, toMs, stepMs = 16) => {
+  for (let at = fromMs; at <= toMs; at += stepMs) t.push(0, at, BPM);
+};
+
+ok('#2091 two strong attacks then silence: confident is true while they are fresh and false once 2 bars pass', () => {
+  const t = createBeatTracker();
+  hit(t, 0);
+  hit(t, 500);
+  assert.equal(t.confident, true, 'two strong attacks: confident');
+  silence(t, 600, 500 + 90 + 2 * BAR_MS - 200);
+  assert.equal(t.confident, true, 'still inside the two-bar window');
+  silence(t, 500 + 90 + 2 * BAR_MS - 200, 500 + 90 + 2 * BAR_MS + 400);
+  assert.equal(t.confident, false, 'two bars after the last strong hit: it lapses');
+  silence(t, 5000, 5 * 60000, 1000);
+  assert.equal(t.confident, false, 'and stays lapsed through minutes of silence');
+});
+
+ok('#2091 a steady beat keeps confident true throughout; a lapse needs two fresh attacks to come back', () => {
+  const t = createBeatTracker();
+  let always = true;
+  for (let i = 0; i < 120; i++) {
+    hit(t, i * 500);
+    silence(t, i * 500 + 100, i * 500 + 480, 20);
+    if (i >= 1 && !t.confident) always = false;
+  }
+  assert.equal(always, true, 'a steady 120 BPM beat never lapses');
+  silence(t, 60000, 60000 + 3 * BAR_MS, 50);
+  assert.equal(t.confident, false, 'the room goes quiet: lapsed');
+  hit(t, 80000);
+  assert.equal(t.confident, false, 'one fresh attack is not two: the stale peaks do not count');
+  hit(t, 80500);
+  assert.equal(t.confident, true, 'two fresh attacks: confident again');
+});
+
+ok('#2091 the lapse follows the BPM it is given, and a pushed time that runs backwards (a restart) lapses it', () => {
+  const t = createBeatTracker();
+  const slow = (at, v) => t.push(v, at, 60); // 60 BPM: a bar is 4 s, two bars 8 s
+  for (const [at, v] of [
+    [0, 0],
+    [30, 0.9],
+    [90, 0.05],
+    [500, 0],
+    [530, 0.9],
+    [590, 0.05],
+  ])
+    slow(at, v);
+  assert.equal(t.confident, true);
+  slow(8000, 0);
+  assert.equal(t.confident, true, '5 s on at 60 BPM is still inside the two-bar window');
+  slow(9000, 0);
+  assert.equal(t.confident, false, 'past 8 s at 60 BPM it lapses');
+  const r = createBeatTracker();
+  hit(r, 10000);
+  hit(r, 10500);
+  assert.equal(r.confident, true);
+  r.push(0, 100, BPM);
+  assert.equal(r.confident, false, 'loop time went backwards (a restarted loop): the stale confidence is dropped');
+  assert.equal(CONFIDENCE_LAPSE_BARS, 2, 'the ruled constant, in bars');
+});
+
+ok('#2091 the old call shape push(pulse) never lapses (MeterHero / whisper callers are unchanged)', () => {
+  const t = createBeatTracker();
+  for (const v of [0, 0.9, 0.1, 0, 0.9, 0.1, 0]) t.push(v);
+  for (let i = 0; i < 100000; i++) t.push(0);
+  assert.equal(t.confident, true);
+});
+
+ok('#2091 the Director: two strong hits then a silent room no longer pins intensity at 1', () => {
+  let clock = 0;
+  const d = createDirector({ now: () => clock });
+  const feed = (pulse, at) => {
+    clock = at;
+    d.pushBeat(pulse, at, BPM);
+  };
+  for (const [at, v] of [
+    [0, 0],
+    [30, 0.9],
+    [90, 0.05],
+    [500, 0],
+    [530, 0.9],
+    [590, 0.05],
+  ])
+    feed(v, at);
+  clock = 1000;
+  const hot = d.tick({ feed: {}, audio: 0, nowTs: clock });
+  assert.equal(hot.intensity, 1, 'two fresh strong hits: the beat reads confident');
+  let level = 1;
+  // a silent room sends no pushes (beatPulse stops changing): only the tick's clock can lapse it
+  d.setBeatClock(() => ({ loopMs: clock, bpm: BPM }));
+  for (let at = 2000; at <= 300000; at += 2000) {
+    clock = at;
+    level = d.tick({ feed: {}, audio: 0, nowTs: at }).intensity;
+  }
+  assert.ok(level < 0.5, `five silent minutes later the room has cooled (intensity ${level})`);
 });
 
 console.log(`director.selfcheck: ${n} checks passed`);

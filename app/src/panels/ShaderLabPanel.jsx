@@ -1,11 +1,12 @@
-// Shader Lab — dev-only GLSL debug panel (#193).
+// Shader Lab — DEV panel GLSL debug panel (#193).
 //
 // Exercises the real debug modules against the Phase 1 shaders in the live
 // browser: compile diagnostics with file:line mapping, uniform audits,
 // false-color/NaN flag views, GPU timings, and the debug strip.
 //
-// Registered only when import.meta.env.DEV (see PanelRegistry) and loaded
-// via React.lazy, so production bundles never include it.
+// Registered behind the DEV panel's runtime gate (see PanelRegistry:
+// dev build, or Dev mode on — #2077) and loaded via React.lazy, as its
+// own chunk, only when the tab opens.
 
 import { useEffect, useRef, useState } from 'react';
 import { PanelHeader } from '../components/PanelHeader.jsx';
@@ -194,7 +195,7 @@ export function ShaderLabPanel() {
 
   return (
     <div>
-      <PanelHeader tag="DEV" title="SHADER LAB" subtitle="GLSL debug harness · dev only">
+      <PanelHeader tag="DEV" title="SHADER LAB" subtitle="GLSL debug harness">
         <span style={{ fontSize: 11, opacity: 0.7 }}>shortcut: `</span>
       </PanelHeader>
       <canvas ref={canvasRef} width="8" height="8" style={{ display: 'none' }} />

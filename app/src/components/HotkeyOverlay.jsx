@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { HELP_SHORTCUTS, HELP_TOPICS } from '../data/helpCopy.js';
+import { devModeOn, onDevModeChange, setDevMode } from '../composition/devMode.mjs';
 import { ABOUT_TITLE, ABOUT_TAGLINE, ABOUT_BIO, ABOUT_LINKS } from '../data/aboutCopy.mjs';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
 import aboutPhoto from '../assets/about-matt-ciaglia.jpg';
@@ -10,6 +11,7 @@ const APP_VERSION = import.meta.env.VITE_APP_VERSION || '0.9.0';
 // #1043 — the Help modal. Sized in viewport percent (CSS), rows are 44px touch targets,
 // no inline style: every look lives in `.hotkey-*` (styles/panels.css).
 export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
+  const devMode = useSyncExternalStore(onDevModeChange, devModeOn);
   const [tab, setTab] = useState(initialTab);
   const [q, setQ] = useState('');
   const topics = useMemo(() => {
@@ -87,9 +89,30 @@ export function HotkeyOverlay({ show, onClose, initialTab = 'help', onTour }) {
           </div>
         )}
         {tab === 'settings' && (
-          <div className="hotkey-desc hotkey-prose">
-            Quality lives on the MasterBar; audio lives on STIMULI. There is no second prefs store — that would fight
-            the project document and #107.
+          <div className="hotkey-list">
+            <div className="hotkey-row hotkey-row-top">
+              <span className="hotkey-key lbl">settings</span>
+              <span className="hotkey-desc">
+                Quality lives on the MasterBar; audio lives on STIMULI. There is no second prefs store — that would
+                fight the project document and #107.
+              </span>
+            </div>
+            <div className="hotkey-row">
+              <button
+                type="button"
+                className={`chip-btn act ${devMode ? 'active' : ''}`}
+                aria-pressed={devMode}
+                onClick={() => setDevMode(!devMode)}
+              >
+                Dev mode: {devMode ? 'on' : 'off'}
+              </button>
+              <span className="hotkey-desc">
+                Dev mode adds the DEV panel to the tab strip — X-RAY, GOV TUNE, SHADER LAB, BIOLOGY, UNITS, KERNEL,
+                MIND, CENSUS, TASTE, SHELF, MEGAMIND — in this build, not just in dev builds. It takes effect right
+                away, no restart, and the panel loads only when you open its tab. Those tools change real state, which
+                is why this is off by default. It is saved with the app's other preferences, on this machine only.
+              </span>
+            </div>
           </div>
         )}
         {tab === 'about' && (

@@ -1,11 +1,12 @@
-// GovernorXrayPanel — dev-only X-ray guide view (backend hardening 5/6).
+// GovernorXrayPanel — DEV panel X-ray guide view (backend hardening 5/6).
 //
 // The "guide" leg: the live pass chain with per-pass cost — effect name,
 // declared tier, measured cost, current shed state — so a performer learns
 // what each effect costs and the governor stops being a black box.
 //
-// Registered only when import.meta.env.DEV (see PanelRegistry) and loaded
-// via React.lazy, so production bundles never include it.
+// Registered behind the DEV panel's runtime gate (see PanelRegistry:
+// dev build, or Dev mode on — #2077) and loaded via React.lazy, as its
+// own chunk, only when the tab opens.
 //
 // The silent-cull trap stays dead here: a pass row shows SHED exactly when
 // the governor has it shed, never the other way round.

@@ -48,12 +48,13 @@ export function emit(event, payload, opts) {
     } catch {
       stamp = null;
     }
+    // #2101: the stamp spreads first, so the envelope's own identity fields (seq / event / cause / quantized) win.
     meta = {
+      ...(stamp || {}),
       seq: ++seq,
       event,
       cause: (opts && opts.cause) ?? null,
       ...(opts && opts.quantized ? { quantized: opts.quantized } : {}),
-      ...(stamp || {}),
     };
   }
   for (const fn of set) {
@@ -114,12 +115,13 @@ export function clearPending() {
   dropsPastCap = 0; // #1641: a fresh take starts a fresh count
 }
 
+/** #2101: a one-shot listener. It gets (payload, meta) like on(), and returns an unsubscribe. */
 export function once(event, fn) {
-  const wrap = (p) => {
+  const wrap = (p, meta) => {
     off(event, wrap);
-    fn(p);
+    fn(p, meta);
   };
-  on(event, wrap);
+  return on(event, wrap);
 }
 
 export const Events = {
