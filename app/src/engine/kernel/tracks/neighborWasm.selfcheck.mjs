@@ -342,6 +342,60 @@ console.log('[ok] B. kc_neighbor.wasm loads and instantiates');
     4,
   );
 
+  // D7b (#2099): one outlier source must not size the grid. 100 sources near the origin plus one at (1e9, 1e9),
+  // radius 10: the old build asked the allocator for ~4e16 bytes and trapped (a RuntimeError, not a status code).
+  // The grid now falls back to one cell; the output is still the direct loop's, bit for bit.
+  {
+    const near = Array.from({ length: 100 }, (_, i) => [((i * 37) % 100) * 0.2, ((i * 53) % 100) * 0.2]);
+    checkScene(
+      'outlier-1e9',
+      [
+        [0, 0],
+        [3.3, 4.1],
+        [19.8, 19.8],
+        [1e9, 1e9],
+        [-1e9, 1e9],
+      ],
+      [...near, [1e9, 1e9]],
+      10,
+      128,
+    );
+    // extreme finite coordinates: cell indices at and past the ends of i32 (ToInt32 wraps) must not overflow the extent
+    const ext = [3.4e38, -3.4e38, 3e37, -3e37, 2.1474836e10, -2.1474836e10].map((v) => [v, -v]);
+    checkScene(
+      'extreme-finite',
+      [
+        [0, 0],
+        [5, 5],
+        [3.4e38, -3.4e38],
+        [3e37, -3e37],
+      ],
+      [...near, ...ext],
+      10,
+      128,
+    );
+  }
+
+  // D7c (#2099): non-finite SOURCE coordinates never size the grid and keep the inclusion rule: a NaN distance is
+  // included for every target (applyField's `if (d2 > r2) continue`), an infinite one is not. A cluster far from the
+  // origin makes the difference visible (the old build binned them at cell 0, where far targets never looked).
+  {
+    const cluster = Array.from({ length: 60 }, (_, i) => [100000 + ((i * 7) % 30), 100000 + ((i * 11) % 30)]);
+    checkScene(
+      'non-finite-sources',
+      [
+        [100000, 100000],
+        [100010, 100015],
+        [100029, 100029],
+        [0, 0],
+        [-5e8, 5e8],
+      ],
+      [...cluster, [NaN, 100005], [100005, NaN], [Infinity, 100005], [-Infinity, Infinity]],
+      6,
+      128,
+    );
+  }
+
   // D8: overflow is loud on both sides.
   {
     const [tx, ty] = cols([[0, 0]]);
