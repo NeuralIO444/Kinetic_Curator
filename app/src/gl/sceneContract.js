@@ -42,6 +42,7 @@ import {
   KINEME_KINDS,
   KINEME_TABLE_MAX,
   getKineme,
+  getAssetKineme,
   kinemePhase,
   sanitizeAssetKineme,
   spinKineme,
@@ -754,13 +755,21 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
       // Each mark spins at its own speed and direction (kinemes.js spinVariant). Phase stays 0, so at motion time 0
       // every mark sits exactly on its static angle.
       const rev = spinning.get(inst);
-      const own = getKineme(map[inst.asset]);
+      const own = getAssetKineme(map[inst.asset]); // #2117: a single kineme or a stack of two
       const k = own || (rev ? spinKineme(rev, spinVariant(inst.seedOffset, inst.key)) : null);
       if (!k) continue;
       if (!slot.has(k.id)) {
         if (table.length >= KINEME_TABLE_MAX) continue; // ponytail: 16-slot cap; a bigger library needs a texture table
         slot.set(k.id, table.length + 1);
-        table.push({ kind: KINEME_KINDS[k.kind], period: k.period, amp: k.amp });
+        // #2117: a stack takes ONE slot; its second member rides the entry as `b` (the renderer's parallel table). A
+        // single kineme's entry has no `b`, so a scene without a stack builds exactly the pre-stacking table.
+        const a = k.kind === 'stack' ? k.stack[0] : k;
+        const entry = { kind: KINEME_KINDS[a.kind], period: a.period, amp: a.amp };
+        if (k.kind === 'stack') {
+          const b = k.stack[1];
+          entry.b = { kind: KINEME_KINDS[b.kind], period: b.period, amp: b.amp };
+        }
+        table.push(entry);
       }
       inst.kineme = slot.get(k.id);
       inst.kinemePhase = own ? kinemePhase(inst.seedOffset, inst.key) : 0;

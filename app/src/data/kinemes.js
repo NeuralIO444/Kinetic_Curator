@@ -77,9 +77,39 @@ export const KINEME_TABLE_MAX = 16;
 
 const BY_ID = new Map(KINEMES.map((k) => [k.id, k]));
 
+/**
+ * #2117 — kineme STACKING: a mark plays exactly two kinemes at once (docs/design/kineme-stacking-spec.md). A stack is a
+ * library entry with its own id in the same namespace as the singles, so `assetKineme: { mic_arrow: 'rock+bob' }` is still a
+ * map of string ids and an old document (single ids only) loads unchanged. A stack of one is just the single id. The two
+ * members combine by commutative operations (rotations and offsets add, scales and visibility multiply), so their order is
+ * not significant. Members: two distinct, non-regionOnly singles, and not `bend` (its id is a region signal) — a selfcheck
+ * holds this, so a bad record cannot ship.
+ */
+export const KINEME_STACKS = Object.freeze(
+  [
+    { id: 'rock+bob', stack: ['rock', 'bob'] }, // a buoy: sways while it rides up and down
+    { id: 'pulse+spin', stack: ['pulse', 'spin'] }, // a beacon: breathes while it turns
+    { id: 'pulse+blink', stack: ['pulse', 'blink'] }, // an indicator: swells and flickers
+    { id: 'spin+bob', stack: ['spin', 'bob'] }, // a slow orbiter: turns while it floats
+  ].map((s) => Object.freeze({ id: s.id, stack: Object.freeze(s.stack) })),
+);
+const STACK_BY_ID = new Map(KINEME_STACKS.map((s) => [s.id, s]));
+
 /** The kineme for an id, or undefined. */
 export function getKineme(id) {
   return BY_ID.get(id);
+}
+
+/**
+ * #2117 — what an ASSET (a whole mark) may carry: a single kineme record, or a stack resolved to
+ * `{ id, kind: 'stack', stack: [recordA, recordB] }`. `getKineme` stays single-only so the region paths, which refuse stacks
+ * in v1, are untouched.
+ */
+export function getAssetKineme(id) {
+  const one = BY_ID.get(id);
+  if (one) return one;
+  const st = STACK_BY_ID.get(id);
+  return st ? { id: st.id, kind: 'stack', stack: [BY_ID.get(st.stack[0]), BY_ID.get(st.stack[1])] } : undefined;
 }
 
 /**
@@ -110,8 +140,7 @@ export function sanitizeAssetKineme(raw) {
       typeof assetId === 'string' &&
       assetId &&
       typeof kid === 'string' &&
-      BY_ID.has(kid) &&
-      !BY_ID.get(kid).regionOnly
+      ((BY_ID.has(kid) && !BY_ID.get(kid).regionOnly) || STACK_BY_ID.has(kid)) // #2117: a stack id is an asset kineme too
     )
       out[assetId] = kid;
   }

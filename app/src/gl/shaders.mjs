@@ -94,6 +94,7 @@ uniform float u_ambient;  // light that reaches a mark facing away from the sun
 // 1 spin (amp < 0: reversed), 2 osc (± deg), 3 pulse (± scale), 4 blink (duty), 5 bob (± units).
 // Per instance a_inst4.z = slot + 1 (0 = still), a_inst4.w = phase [0,1).
 uniform vec3 u_kineme[16];
+uniform vec3 u_kinemeB[16]; // #2117 stacking: each slot's SECOND member (kind 0 = a single kineme, never enters)
 uniform float u_kinemeTime;
 uniform vec2 u_hands;     // x crooked, y open. 0 is today's quad and today's ink.
 // #1482 P3 — the spectrum the marks listen to. u_spec is a 256x4 R8 texture (rows: smoothed, peak, waveform, flux);
@@ -175,6 +176,19 @@ void main() {
       float us = fract(u_kinemeTime / per - a_inst4.w * 0.4);
       float es = us < 0.6 ? 0.5 * (1.0 - cos(6.28318530718 * us / 0.6)) : 0.0;
       kOff = a_brk * (km.z * es);
+    }
+    // #2117 stacking: a stack's second member, same phase, combined commutatively with the first (rotations and offsets add,
+    // scale and visibility multiply). Gated on its kind, so a still or single-kineme instance never enters.
+    vec3 kb = u_kinemeB[int(a_inst4.z + 0.5) - 1];
+    if (kb.x > 0.5) {
+      float phB = fract(u_kinemeTime / max(kb.y, 1e-3) + a_inst4.w);
+      float wavB = sin(phB * 6.28318530718);
+      int kindB = int(kb.x + 0.5);
+      if (kindB == 1) kDeg += (kb.z < 0.0 ? -phB : phB) * 360.0;
+      else if (kindB == 2) kDeg += kb.z * wavB;
+      else if (kindB == 3) c *= 1.0 + kb.z * wavB;
+      else if (kindB == 4) kVis *= phB < kb.z ? 1.0 : 0.0;
+      else if (kindB == 5) kOff += vec2(0.0, kb.z * wavB);
     }
   }
   // #1482 P3 — spectrum marks. Which frequency a mark listens to (0..1 along the log axis, low to high):

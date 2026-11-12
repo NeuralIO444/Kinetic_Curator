@@ -29,9 +29,9 @@
 // declare `kineme` so a later phase converts the right clock.
 //
 // Browser-safe, pure: no clock, no chance (the phase comes from the node).
-import { KINEMES, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE } from '../../data/kinemes.js';
+import { KINEMES, KINEME_STACKS, KINEME_KINDS, SCATTER_WINDOW, SCATTER_RIPPLE } from '../../data/kinemes.js';
 import { registerCostTier } from '../kernel/costRegistry.mjs';
-import { registerMotionSource } from './index.js';
+import { registerMotionSource, composePose } from './index.js';
 
 const TAU = 6.28318530718; // the shader's literal, kept so the CPU reference matches it to the digit
 const fract = (x) => x - Math.floor(x);
@@ -113,5 +113,29 @@ for (const k of KINEMES) {
     anchorNodes: ANCHOR_NODES,
     // a scatter node carries its packed break-up vector as `node.brk` (the shader's a_brk); others ignore it
     evaluate: (node, t) => kinemePose(k, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0, node && node.brk),
+  });
+}
+
+// #2117 — stacking: a compound kineme is its two members through composePose (rotations and offsets add, scales and
+// visibility multiply: the same combine QUAD_VS runs for a stack, same phase). The shader multiplies `c` twice ((c·sa)·sb)
+// where composePose forms sa·sb first, so the two can differ by one ulp on a pulse member — the selfcheck holds that bound.
+registerCostTier('motionCore/kineme-stack', {
+  tier: 0,
+  notes: '#2117 CPU reference of a two-kineme stack. No per-frame caller yet; two evaluates and a compose.',
+});
+const SINGLE = new Map(KINEMES.map((k) => [k.id, k]));
+/** The pose of a stack of two library kinemes (records, not ids): the two members composed, one shared phase. */
+export function stackPose(a, b, tSec, phase01 = 0) {
+  return composePose(kinemePose(a, tSec, phase01), kinemePose(b, tSec, phase01));
+}
+for (const st of KINEME_STACKS) {
+  const [a, b] = st.stack.map((id) => SINGLE.get(id));
+  registerMotionSource({
+    id: kinemeSourceId(st.id),
+    family: 'kineme',
+    timeBase: 'kineme',
+    costTier: 'motionCore/kineme-stack',
+    anchorNodes: ANCHOR_NODES,
+    evaluate: (node, t) => stackPose(a, b, t, node && Number.isFinite(node.phase01) ? node.phase01 : 0),
   });
 }
