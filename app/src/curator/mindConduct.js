@@ -3,7 +3,7 @@
 //   Davis conducts: he proposes one edit to the route table (add / remove / retarget / depth), inside the target's clamps
 //   and the 16-route cap, and it lands on a phrase boundary (4 bars), at most one per phrase.
 //   LOIS judges: a show that stays pinned and flat is a failed show (BURN), and Davis re-rolls to the next preset.
-//   The artist is sovereign: a target the artist touched this session is owned, and a proposal against it is dropped.
+//   The artist is sovereign: a target the artist touched is owned until OWN_PHRASES phrases (32 bars) after their last touch, and a proposal against it is dropped.
 //   Boldness is tier-gated (the engagement tier, Mind 3): tier 1 makes no route edits.
 //   Stage 2: he may also re-tune the spectrum marks on the CONTENT strata (STIMULI -> SPECTRUM: which frequency a mark
 //   listens by, and how much it scales / displaces / colours by it) — the `spectrum` op, same gate, same phrase, same
@@ -15,6 +15,14 @@ import { ROUTE_INPUTS, ROUTE_TARGETS, MAX_ROUTES } from '../gl/audioRoutes.mjs';
 import { routeDepthRange } from '../data/audioRoutes.js';
 
 export const PHRASE_BARS = 4;
+
+/**
+ * #2092 (Matt's Ruling, 2026-11-11): the artist's ownership of a target lapses this many phrases (8 phrases = 32 bars)
+ * after their LAST touch of it; each new touch restarts the count. A locked marks dial is not covered here: it stays
+ * owned for as long as it is locked (trioLive reads the lock itself).
+ */
+export const OWN_PHRASES = 8;
+export const OWN_BARS = OWN_PHRASES * PHRASE_BARS;
 export const ROUTE_OPS = Object.freeze(['add', 'remove', 'retarget', 'depth', 'spectrum']);
 /**
  * Which ops each engagement tier may make (Mind 3 tiers: t1 faces only · t2 depth nudges · t3 add/retarget · t4 all).
@@ -449,28 +457,39 @@ export function createFlatness({ windowBars = PHRASE_BARS, eps = 0.03, minLevel 
 // ── sovereignty, the rate limit and the backoff ──────────────────────────────────────────────────────────────────────
 /**
  * The conductor's ledger. Pure state, no clock: every call is told the bar.
- *   touch(targets)          the artist acted on these targets: they are owned for the session
+ *   touch(targets, bar)     the artist acted on these targets at `bar`: they are owned until OWN_BARS bars after the
+ *                            last touch (a call with no integer bar stamps nothing: that ownership never lapses)
+ *   owned(bar) / isOwned(t, bar)  who is owned AT `bar` (no integer bar: every stamped or unstamped target)
  *   consider(op, {bar,tier}) -> { ok: true, landBar } | { ok: false, reason: 'tier'|'owned'|'cooldown'|'malformed' }
  *                            (a second edit in a phrase is not dropped: it lands on the next boundary)
  *   commit(landBar)          an edit landed in that phrase
  *   revert(bar)              the artist undid / reverted a persona edit: BACKOFF_REVERTS of them start a cool-down
  */
 export function createConductor() {
-  const owned = new Set();
+  const owned = new Map(); // target -> the bar of the last touch (null: touched with no bar, never lapses)
   const phrases = new Set();
   let reverts = 0;
   let coolUntil = -Infinity;
+  // Owned at `bar`: touched, and fewer than OWN_BARS bars ago. A stamp in the FUTURE (bar < stamp: the counter went
+  // backwards and nobody rebased) is treated as lapsed, never as extended (#2093's rule).
+  const live = (t, bar) => {
+    if (!owned.has(t)) return false;
+    const at = owned.get(t);
+    if (at === null || !Number.isInteger(bar)) return true;
+    return bar >= at && bar - at < OWN_BARS;
+  };
   return {
-    touch(targets) {
-      for (const t of Array.isArray(targets) ? targets : [targets]) if (isOwnable(t)) owned.add(t);
+    touch(targets, bar) {
+      const at = Number.isInteger(bar) ? bar : null;
+      for (const t of Array.isArray(targets) ? targets : [targets]) if (isOwnable(t)) owned.set(t, at);
     },
-    owned: () => [...owned].sort(),
-    isOwned: (t) => owned.has(t),
+    owned: (bar) => [...owned.keys()].filter((t) => live(t, bar)).sort(),
+    isOwned: (t, bar) => live(t, bar),
     consider(op, { bar, tier } = {}) {
       if (!op || !ROUTE_OPS.includes(op.op) || !Number.isInteger(bar)) return { ok: false, reason: 'malformed' };
       if (!(TIER_OPS[tier] || []).includes(op.op)) return { ok: false, reason: 'tier' };
       if (bar < coolUntil) return { ok: false, reason: 'cooldown' };
-      if (opTargets(op).some((t) => owned.has(t))) return { ok: false, reason: 'owned' };
+      if (opTargets(op).some((t) => live(t, bar))) return { ok: false, reason: 'owned' };
       // one edit per phrase: a proposal that would land in a phrase that has had its edit waits for the next boundary
       // A request is released on a bar tick, AFTER that bar's own tick has run, so the earliest it can land is the next
       // boundary strictly after it: a request at bar 8 lands at 12, never at 8 (and never one bar late, at 9).
@@ -491,10 +510,12 @@ export function createConductor() {
     cooling: (bar) => bar < coolUntil,
     /**
      * #2093: the bar counter started over (a restarted loop). The phrase ledger and the cool-down are in OLD bar
-     * numbers, so clear them. Unlike reset(), the artist's ownership and the revert count are kept.
+     * numbers, so clear them. The ownership stamps are in old numbers too: they are cleared, not carried over (a stamp
+     * from the old count would otherwise stretch ownership across the restart). The revert count is kept.
      */
     rebase() {
       phrases.clear();
+      owned.clear();
       coolUntil = -Infinity;
     },
     reset() {
