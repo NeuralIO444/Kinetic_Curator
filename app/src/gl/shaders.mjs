@@ -78,6 +78,7 @@ layout(location=10) in vec4 a_engA;    // Phase 2 S4: engraving spine joints 0-1
 layout(location=11) in vec4 a_engB;    // Phase 2 S4: engraving spine joints 2-3
 layout(location=12) in vec4 a_engC;    // Phase 2 S4: engraving spine joints 4-5
 layout(location=13) in vec4 a_engP;    // Phase 2 S4: engraving params — x joint count (0 = no finish), y spacing, z width, w strength
+layout(location=15) in vec2 a_brk;     // #2116 break-up: the region's home-to-centroid vector (scene units, unit direction x mark box side); 0 = not a region
 layout(location=14) in vec4 a_dist;    // #2010 P3 distortion channel: (shear, melt, tear, seed) — all 0 = the old quad (gl/itemDistort.mjs)
 uniform vec2 u_canvas;
 uniform float u_distHeat; // #2010 P3: the distortion channel's heat — 1 full, lowered (never 0) by the tier-2 shed
@@ -168,6 +169,13 @@ void main() {
     else if (kind == 3) c *= 1.0 + km.z * wav;
     else if (kind == 4) kVis = ph < km.z ? 1.0 : 0.0;
     else if (kind == 5) kOff = vec2(0.0, km.z * wav);
+    else if (kind == 6) {
+      // #2116 scatter: out and back along a_brk, delayed by phase so pieces leave in a ripple (SCATTER_WINDOW 0.6 / RIPPLE 0.4).
+      // The delay form (not +phase) keeps every phase at rest at t = 0.
+      float us = fract(u_kinemeTime / per - a_inst4.w * 0.4);
+      float es = us < 0.6 ? 0.5 * (1.0 - cos(6.28318530718 * us / 0.6)) : 0.0;
+      kOff = a_brk * (km.z * es);
+    }
   }
   // #1482 P3 — spectrum marks. Which frequency a mark listens to (0..1 along the log axis, low to high):
   // map 0 INDEX (its place in the draw), 1 ANGLE (its rotation), 2 POSITION (its x), 3 HASH (its seed).

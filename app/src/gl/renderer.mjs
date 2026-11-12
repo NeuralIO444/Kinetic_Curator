@@ -64,7 +64,7 @@ import { createAccum, accumRecipeParams, applyAudioEnvelope } from './accum.mjs'
 import { soakFieldState, WET_SOAK } from './wetSoak.mjs'; // #1814: strata soak recipe + payload normaliser
 import { registerCostTier } from './costTiers.mjs';
 import { ASSET_CELL_KINEME, getCellKineme, cellIndexAt, cellUvWindow, stripFramesFor } from '../data/cellKinemes.js'; // #1431 KINEME C
-import { kinemePhase } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id)
+import { kinemePhase, KINEME_KINDS } from '../data/kinemes.js'; // #1433 R2: per-region phase = the house seed hash of (asset id, region id); #2116: the scatter kind
 import { createContactShadow, CONTACT_SHADOW_COST } from './contactShadow.mjs'; // #1183 contact shadow
 import { PLATE_GEO_DEFAULTS } from '../engine/plateBody.mjs'; // #1585 (Materials M4): packer defaults for the param attribute
 import { WASH_PARAM_DEFAULTS } from '../engine/washBody.mjs'; // #1585
@@ -687,6 +687,18 @@ function regionIndexFor(cells) {
 }
 
 /**
+ * #2116 — the break-up vector for a region whose pivot sits (lx, ly) from the mark's centre (mark-local, already scaled):
+ * the unit direction rotated by the mark's rotation (co, si = its cos / sin) times the mark's box side, in scene units.
+ * A pivot within 1 unit of the centre has no direction, so it takes the hashed angle 2*pi*phase (never random).
+ */
+export function breakVector(lx, ly, co, si, it, phase) {
+  const box = 100 * Math.max(it.scaleX, it.scaleY);
+  const len = Math.hypot(lx, ly);
+  const [ux, uy] = len < 1 ? [Math.cos(2 * Math.PI * phase), Math.sin(2 * Math.PI * phase)] : [lx / len, ly / len];
+  return [(ux * co - uy * si) * box, (ux * si + uy * co) * box];
+}
+
+/**
  * #1433 (R2) — pack-time region expansion. A mark whose asset the
  * contract's regionAnim governs expands, in place, into a remainder
  * instance (the mark minus its regions — it keeps the mark's own
@@ -702,7 +714,7 @@ function regionIndexFor(cells) {
  * have) keeps the single-quad path — the mark always draws complete.
  * When nothing expands, the ORIGINAL array is returned untouched.
  */
-function expandRegionInstances(instances, cells, regionAnim) {
+function expandRegionInstances(instances, cells, regionAnim, kinemeTable = null) {
   const idx = regionIndexFor(cells);
   if (!idx.size) return instances;
   const assets = regionAnim.assets || {};
@@ -779,7 +791,7 @@ function expandRegionInstances(instances, cells, regionAnim) {
       }
       const lx = (geo.px - 50) * it.scaleX;
       const ly = (geo.py - 50) * it.scaleY;
-      out.push({
+      const placed = {
         ...it,
         _cell: r.cell,
         x: it.x + lx * co - ly * si,
@@ -788,14 +800,21 @@ function expandRegionInstances(instances, cells, regionAnim) {
         scaleY: it.scaleY * geo.sy,
         kineme: slot > 0 ? slot : it.kineme,
         kinemePhase: slot > 0 ? kinemePhase(it.asset, r.id) : it.kinemePhase,
-      });
+      };
+      // #2116 — a SELECTED scatter region carries its break-up vector: the mark-centre -> region-pivot direction in scene
+      // units (the mark's own rotation applied, y-down) x the mark's box side. Only scatter slots get one, so every other
+      // instance packs exactly the zeros it packed before.
+      if (slot > 0 && kinemeTable && kinemeTable[slot - 1] && kinemeTable[slot - 1].kind === KINEME_KINDS.scatter) {
+        placed.brk = breakVector(lx, ly, co, si, it, kinemePhase(it.asset, r.id));
+      }
+      out.push(placed);
     }
   }
   return out || instances;
 }
 
-/** Floats per instance in the quad VBO (#2010 P3: 49 — the distortion channel's four appended to the 45). */
-export const INSTANCE_STRIDE = 49;
+/** Floats per instance in the quad VBO (#2116: 51 — the break-up vector's two appended to the 49; #2010 P3: 49 — the distortion channel's four appended to the 45). */
+export const INSTANCE_STRIDE = 51;
 
 export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = null) {
   // Spine B (#388): skip instances whose cells[comboKey] is missing instead
@@ -806,7 +825,7 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
   // and every pre-R2 caller take the exact single-quad path below.
   let list = instances;
   if (cellFrame && cellFrame.regions && !cellFrame.regions.shed) {
-    list = expandRegionInstances(instances, cells, cellFrame.regions);
+    list = expandRegionInstances(instances, cells, cellFrame.regions, cellFrame.kinemes);
   }
 
   // 49 floats/instance (196-byte stride; 45/180 until #2010 P3): (x,y,sx,sy) (rot,opacity,u0,v0)
@@ -947,6 +966,13 @@ export function packInstanceData(instances, cells, alphaScale = 1, cellFrame = n
       buf[o + 46] = ds[1] || 0;
       buf[o + 47] = ds[2] || 0;
       buf[o + 48] = ds[3] || 0;
+    }
+    // #2116: the break-up vector (a_brk) — a scatter region's home-to-centroid direction x its mark's box side, scene units.
+    // Absent (every instance but a scatter region) the two floats stay zero.
+    const bk = it.brk;
+    if (Array.isArray(bk)) {
+      buf[o + 49] = bk[0] || 0;
+      buf[o + 50] = bk[1] || 0;
     }
     o += INSTANCE_STRIDE;
   }
@@ -1373,12 +1399,16 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     gl.enableVertexAttribArray(14);
     gl.vertexAttribPointer(14, 4, gl.FLOAT, false, INSTANCE_STRIDE * 4, 180);
     gl.vertexAttribDivisor(14, 1);
+    // #2116: a_brk — the break-up vector at byte 196 (the 51-float stride's tail).
+    gl.enableVertexAttribArray(15);
+    gl.vertexAttribPointer(15, 2, gl.FLOAT, false, INSTANCE_STRIDE * 4, 196);
+    gl.vertexAttribDivisor(15, 1);
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.blendEquation(gl.FUNC_ADD);
     gl.viewport(0, 0, w, h);
     gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, data.length / INSTANCE_STRIDE);
-    for (let i = 0; i <= 14; i++) {
+    for (let i = 0; i <= 15; i++) {
       gl.disableVertexAttribArray(i);
       gl.vertexAttribDivisor(i, 0);
     }
@@ -1538,7 +1568,7 @@ function createRendererBase(canvas, { alpha = false, isLive = false } = {}) {
     // #1431: the frame clock every strip instance in this layer (and its
     // mask bakes, which flow through here too) packs against.
     // #1433: the same frame state carries the region playback state.
-    const cellFrame = { motionTime: kinemeTime, shed: cellShed, regions: regionAnim };
+    const cellFrame = { motionTime: kinemeTime, shed: cellShed, regions: regionAnim, kinemes: kinemeTable };
     let batch = [];
     const flushNormal = () => {
       if (batch.length) {
