@@ -48,15 +48,24 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 | **ACCUM never engaged** | `liveLoop` `tick()` read `trailSteerLive` off the frame — a build-local variable out of scope — and threw on every accum frame since PR #1878. Accumulation silently never ran. Fixed with a scope guard (#1914, PR #1915). |
 | **Band-pair closer (#1635)** | Closed on session evidence: Relax kept at 0.28, Tighten retuned 0.72 → 0.52 (PR #1934). |
 
+## Closed in the 2026-11-11 sweep
+
+| Item | Resolution |
+|------|------------|
+| **Desktop recording produces no `.kcperf` file (#1938)** | **Closed** — issue closed 2026-11-05. |
+| **kineticSweep selfcheck flake (#1822)** | **Closed** — issue closed 2026-11-10. |
+| **DEV panel graph reaches @resvg (#2081)** | A Node-only chain (`censusReport` → `@resvg/resvg-js`) was dragged into the DEV panel's module graph by an eager import and broke release builds. Fixed by moving the gate into the light core (PR #2082); the panel graph pin walks 640 modules with no Node-only chain reachable. |
+| **ACCUM sticks across Looks (#2102)** | A look that declares no accum kept the previous look's trails. Fixed — ACCUM resets on a new Look (PR #2121). |
+| **Trio / Director batch (2026-11-11)** | Intensity latch's reset held closed (#2090); beat confidence never expired (#2091); a clock restart stranded the held proposal, phrase ledger and cooldown (#2093); one take-recorder throw nulled the conduct tap (#2096); `SET_LAYOUT_PARAMS` coalesced by type only (#2097); older wireEventBus handlers destructured undefended payloads (#2098); eventBus `once()` dropped the meta envelope and could not be cancelled (#2101); kc-neighbor `build_grid` had no cell cap — one outlier source could overflow the wasm instance (#2099). All fixed and merged 2026-11-11. |
+
 ## Open
 
 | Item | Status |
 |------|--------|
-| **Desktop recording produces no `.kcperf` file (#1938)** | Stopping a recording in the Tauri app downloads nothing — the WebView swallows the blob download. Fix shape is recorded on the issue; desktop lane, unfixed. |
-| **kineticSweep selfcheck flake (#1822)** | LOOK can re-deal the current look in ~1.5% of runs. Intermittent, unfixed. |
+| **Embeddings cache evicts its own keeps (#2086)** | The cache caps at 512 entries, oldest first; a full-library search press embeds the keeps, then ~985 asset texts, and evicts the keeps it started with. Open — the fix shape (a keep guarantee on export) waits on Matt's ruling. |
 | **Dev-dependency advisories** (`@babel/core`, `browserslist`, `nanoid`, ...) | Low. `npm audit fix` when convenient; not applied to avoid lockfile churn. `npm audit --omit=dev` is clean. |
 | **Deferred seam** (`panels/pipeline/syphonDeferred.js`) | Intentional; waits on #608. (`midi/learnDeferred.mjs` was un-deferred into `midi/learn.mjs` by the #617 learn build; #617 itself was deferred by Matt 2026-10-21 — hardware acceptance and the iPad BLE-MIDI ruling wait on his FM-1 arrival-day session.) |
-| **e2e `topbar-expand` "KIN cools by gliding"** | Runner-load sensitive: the spec samples a wall-clock animation at fixed 40 ms intervals, so a loaded self-hosted runner starves the sampler and the step size reads large. Failed identically on main's own CI run 2026-11-04 — pre-existing, not a build defect. Durable fix is time-normalized sampling; no issue filed yet. |
+| **e2e `topbar-expand` "KIN cools by gliding"** | Runner-load sensitive: the spec samples a wall-clock animation at fixed 40 ms intervals, so a loaded self-hosted runner starves the sampler and the step size reads large. Failed identically on main's own CI run 2026-11-04 and again on PR #2120's CI 2026-11-11 (green on re-run) — pre-existing, not a build defect. Durable fix is time-normalized sampling; no issue filed yet. |
 
 ## Fixed in 0.8.0 (reference)
 
@@ -84,4 +93,4 @@ Living list of intentional limits and residual issues. Prefer filing GitHub issu
 - Chip-stutter pair: continuous life-drift phase (#431 / PR #435), integrated warp phase (#432 / PR #436)
 - Unwired selfcheck suites now in manifest: `evalContext`, `itemMorph`, `feedLive` (#438)
 
-*Last updated: 2026-11-04 — maintenance sweep.*
+*Last updated: 2026-11-11 — maintenance sweep.*

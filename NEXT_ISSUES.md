@@ -83,6 +83,17 @@ Phase 4), #176 (into Phase 5).
 
 Everything above shipped. Current sequencing lives in [`docs/ROADMAP_V1.md`](docs/ROADMAP_V1.md); current work lives in open GitHub issues. Notes on the old tail this replaces: #177 closed, #103/#104/#158 states changed since, and the modulation matrix exists as the PATCH system (MOD/FIELD/FEED + matrix overview) — do not re-file from this file.
 
+## Status 2026-11-11 — the live queue, grouped
+
+This file remains history. The ledger is GitHub's open-issue list — **36 open** at this sync. In groups:
+
+- **Motion Core (#2109, epic)** — P0, P1 and P3 shipped 2026-11-11. Remaining: P2a/P2b adapters (#2113, #2114), P4 break-up (#2116), P5 stacking (#2117), P6 phrases (#2118), P7 figures (#2119).
+- **MegaMind tail** — #1525–#1527 stay open for Matt's on-device acceptance session only (all code merged). In the publish line behind them: the footer backend indicator (#2078) and the panelGraph stripper fix (#2083), both built and QA-passed. The embeddings cache policy (#2086) waits on Matt's ruling.
+- **Mind** — #2069 held on Matt's verdict; its reach diagnosis is #2075. Trio follow-through: #2092 (PR 1 of 3 merged), #2094 (diagnosis delivered), #2095 (rulings recorded, build to come).
+- **Canon follow-ups** — #2104 (a world record, spec only), #2105 (asset-family mapping), #2106 (more baselines), #2107 (three styles with no chapter — needs Matt's ruling), #2108 (constructs, spec only). Directed work only; nothing here starts itself.
+- **FIELD neighbour** — #2100: kc-neighbor is built and tested but FIELD still runs the JS loop; Matt ruled 2026-11-11 — wire it only if `applyField` measures ≥1 ms/frame in a two-swarm scene.
+- **Standing / deferred / hardware** — #608 (Syphon, deferred by Matt), #617 (MIDI hardware acceptance), #1183 (one petri dish — FX-as-weather slices stacked locally), #1298 (WebGPU path, deferred by design), #1312 (iPad WebView worker verification), #1479 (loot folder pipeline tail), #1598 (dish shapes), #1710 / #1711 (projects as folders), #1719 (real-hardware performance numbers), #1796 (pattern × dish), #1863 (Strandbeest epic — open thread: mass-based push between beasts).
+
 ## Possible follow-ups (not filed)
 
 - WEBM recorder sampling the ACCUM canvas (capture graph)
