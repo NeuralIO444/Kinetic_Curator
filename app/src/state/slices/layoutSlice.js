@@ -58,7 +58,7 @@ import {
 import { ASSETS } from '../../data/assets/index.js';
 import { dealableRecords, dealMixedPool, dealKitTriad, kitDescriptors, poolToEnabled } from '../rollPool.mjs'; // #1767: the full-library deal; #1944: kits
 import { kitsById } from '../../data/kits.js';
-import { lookPass, voicePass, curatorPass } from '../kineticSweep.mjs'; // #1772: look → voice → curator
+import { lookPass, voicePass, curatorPass, ACCUM_KEYS } from '../kineticSweep.mjs'; // #1772: look → voice → curator
 import { scopeDecks, sanitizeScope, CURATED_SETS, SCOPE_CYCLE } from '../kineticScope.mjs'; // #1772: the START pill is the ceiling
 import { dealLanding, chapterScopeDeck, effectiveChapterScope } from '../chapterWalk.mjs'; // #1855: the landing
 import { openRound, openJudgement, passCut, spendCut, settle, absorbWarmTap, closeRound } from '../roundTable.mjs'; // #1856: the round (BOOK S3)
@@ -1177,7 +1177,10 @@ export const createLayoutSlice = (set) => ({
 
   applyPreset: (preset) =>
     set((state) => {
+      // #2102: a Look resets the trail — ACCUM_KEYS it does not declare return to defaults.
+      // Locked dials still win below (the same lock check as every other key).
       const incoming = { ...preset.params, composition: preset.id };
+      for (const k of ACCUM_KEYS) if (!(k in incoming)) incoming[k] = DEFAULT_LAYOUT_PARAMS[k];
       const merged = { ...state.layoutParams };
       // #964: LOOKS applies inside armed motion — a Look never stomps the
       // pinned motion numbers.
