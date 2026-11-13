@@ -23,6 +23,8 @@ import { FLAGSHIP_VOICES, STUB_VOICES, MOTION_MODES, fullShapeSet, voiceStyles }
 import { resolvePalette } from './palettes.js';
 import { ASSETS } from './assets/index.js';
 import { POEM_ONLY_STAMP_IDS } from '../poets/placement.js'; // #2000: the poem-only union (then kana ∪ kanji); #2002: the union grew — placement's POEM_ONLY_STAMP_IDS is the one set
+import { SOLO_TEXT_STAMP_IDS } from './assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from './assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 import { assetRecords, assetsWhere } from './assetStyle.js';
 import { mkRng } from '../engine/prng.js';
 import { canonFamilyPairing } from './canon/styles.js';
@@ -760,7 +762,14 @@ const records = assetRecords(ASSETS);
 // poem-only stamp of any slice can enter a family wardrobe). The full
 // `records` above stay as they are; only the draw's source narrows (see
 // familyPool).
-const wardrobeRecords = records.filter((r) => !POEM_ONLY_STAMP_IDS.has(r.id));
+// #2150 — the wardrobe draw also excludes the glyphs that are not FIELD
+// stamps: the solo text stamps and the pixel letter-anatomy emblems (Q4).
+// The caps/digits arrive via the union itself (placement grew by
+// LETTER_STAMP_IDS), so no family wardrobe can wear a solo glyph either way.
+const wardrobeRecords = records.filter(
+  (r) =>
+    !POEM_ONLY_STAMP_IDS.has(r.id) && !SOLO_TEXT_STAMP_IDS.includes(r.id) && !PIXEL_LETTER_ANATOMY_IDS.includes(r.id),
+);
 const hash = (s) => {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619);

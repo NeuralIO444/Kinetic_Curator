@@ -325,6 +325,11 @@ export const FLAGSHIP_VOICES = [
  * set (the dice/miner cast source). #1771: `wardrobe` is the four more shapes the
  * promoted voice wears (S3-coherent, data/voiceDeck.js) — the SHAPES chip is the
  * full eight, no `slice(0, 4)` ceiling (fullShapeSet).
+ * #2150: glyph ids are removed from these sets in place (never filtered
+ * downstream — isShapeSetActive is an exact-set identity): stratified, rails
+ * and layers lose their typ_* wardrobe letters, abacus loses pxg_arch +
+ * typ_Z/typ_6. Abacus keeps stamp_glyph_01 (Q1: a symbol mark) and
+ * stamp_num_01 (Q2: a badged graphic) — both stay dealable under the ruling.
  */
 export const STUB_VOICES = [
   {
@@ -373,7 +378,7 @@ export const STUB_VOICES = [
     glyph: 'strat',
     vibe: 'Sediment: geological layers. Deep time, compressed.',
     assets: ['line_solid_01', 'line_double_01', 'geo_trapezoid_01', 'geo_parallelo_01'],
-    wardrobe: ['geo_hex_02', 'typ_Y', 'typ_S', 'typ_N'],
+    wardrobe: ['geo_hex_02'],
   },
   {
     id: 'flow',
@@ -389,7 +394,7 @@ export const STUB_VOICES = [
     glyph: 'rail',
     vibe: 'Transit Map: commuter lines, schedule adherence. Urban systems.',
     assets: ['line_solid_01', 'line_dash_02', 'geo_cross_01', 'line_arrow_01'],
-    wardrobe: ['geo_hex_03', 'line_arrow_03', 'line_squiggle_03', 'typ_M'],
+    wardrobe: ['geo_hex_03', 'line_arrow_03', 'line_squiggle_03'],
   },
   {
     id: 'layers',
@@ -397,7 +402,7 @@ export const STUB_VOICES = [
     glyph: 'z',
     vibe: 'Z-Stack: depth slices, parallax archaeology. Core samples.',
     assets: ['geo_square_02', 'geo_parallelo_01', 'line_double_01', 'geo_halfcircle_01'],
-    wardrobe: ['geo_hex_01', 'geo_square_01', 'typ_I', 'typ_A'],
+    wardrobe: ['geo_hex_01', 'geo_square_01'],
   },
   {
     id: 'ca',
@@ -421,7 +426,7 @@ export const STUB_VOICES = [
     glyph: 'abacus',
     vibe: 'Counting House: beads on wires. Arithmetic made visible.',
     assets: ['geo_hex_02', 'stamp_glyph_01', 'stamp_num_01', 'geo_circle_01'],
-    wardrobe: ['pxg_arch', 'geo_cross_02', 'typ_Z', 'typ_6'],
+    wardrobe: ['geo_cross_02'],
   },
   {
     id: 'dla',

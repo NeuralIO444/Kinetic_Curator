@@ -76,3 +76,9 @@ function entry(name) {
 }
 
 export const ASSETS_PIXEL = Object.keys(GLYPHS).map(entry);
+
+/** #2150 (Q4, Matt 2026-11-12) — the letter-anatomy emblems: stem, bowl, arch,
+ * fork, serif, counter, ligature, flag. They read as letterforms, so they
+ * leave every deal with the glyphs; the other pxg_* emblems and specks carry
+ * no letter tag and are unaffected. */
+export const PIXEL_LETTER_ANATOMY_IDS = Object.freeze([...LETTERS].map((name) => `pxg_${name}`));

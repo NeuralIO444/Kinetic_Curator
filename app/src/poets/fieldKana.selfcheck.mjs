@@ -226,7 +226,8 @@ assert.strictEqual(
 );
 assert.ok(ASSETS_KANA.every((a) => ASSETS.some((x) => x.id === a.id)), 'every kana stamp resolves in the catalogue');
 const recs = poolDescriptors(ASSETS);
-assert.strictEqual(recs.length, 313, "the pool's records are exactly what they were before the pack");
+// #2150 RE-PIN (cause: type exclusivity): 313 − 47 glyphs (36 typ_* + 3 solo text stamps + 8 letter-anatomy emblems).
+assert.strictEqual(recs.length, 266, "the pool's records are the pre-pack records minus the #2150 glyph set");
 assert.ok(!recs.some((r) => KANA_STAMP_IDS.has(r.id)), 'no kana record reaches the panel');
 // …and no other dealing surface treats them as marks: chapter decks and the
 // KINETIC roll carry the pack in their never-dealt registries.
@@ -237,7 +238,10 @@ for (const a of ASSETS_KANA) {
 assert.ok(!chapterAssets('swiss').some((id) => KANA_STAMP_IDS.has(id)), 'the swiss chapter deck holds no kana');
 assert.ok(!chapterAssets('now').some((id) => KANA_STAMP_IDS.has(id)), 'the Now chapter deck holds no kana');
 assert.ok(!dealableRecords(ASSETS).some((r) => KANA_STAMP_IDS.has(r.id)), 'a KINETIC roll never deals kana');
-assert.ok(recs.some((r) => r.id === 'typ_A'), 'the Latin letter stamps keep their existing panel treatment');
-assert.strictEqual(categoryCounts(recs).all, 313, "the pool's headline count is unchanged");
+// #2150 RE-PIN (cause: type exclusivity): the Latin letter stamps' panel
+// treatment IS what the ruling changes — typ_A is poem-only now and no
+// longer reaches the panel; type arrives only through FIELD.
+assert.ok(!recs.some((r) => r.id === 'typ_A'), 'the Latin letter stamps are poem-only now: no panel record (#2150)');
+assert.strictEqual(categoryCounts(recs).all, 266, "the pool's headline count drops by exactly the glyph set");
 
 console.log('fieldKana.selfcheck: all assertions passed');

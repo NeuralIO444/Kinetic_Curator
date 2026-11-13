@@ -19,6 +19,9 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
+import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
+import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 import { isCreatureTile } from '../engine/creatureTileId.js'; // #1850
 import { assetDescriptor, libraryTraits } from '../data/assetDescriptor.js'; // #1944
 import { resolveKit, kitsById } from '../data/kits.js'; // #1944
@@ -33,7 +36,12 @@ export const POOL_FAMILIES_MAX = 3;
 /** Never dealt by a roll. #1982: the poem-only kana stamps ride with the citizen.
  * #1998: the curated kanji stamps ride with them.
  * #2002: the slice-3 packs (lowercase + punctuation, serif, ornaments) ride too.
- * #2005: the plate stamps (Fraunces) ride too. */
+ * #2005: the plate stamps (Fraunces) ride too.
+ * #2150: the glyphs ride too — type is never a solo asset: the caps/digits
+ * pack (now poem-only, FIELD deals it alone), the solo text stamps (a bare
+ * letter/number with no drawn body), and the pixel letter-anatomy emblems
+ * (Q4). Badged letters/numbers, word labels and the bare symbols stay
+ * dealable — graphics and symbol marks, not type (Matt's rulings, Q1–Q3). */
 export const NEVER_DEALT = Object.freeze([
   'creature',
   ...ASSETS_KANA.map((a) => a.id),
@@ -45,6 +53,10 @@ export const NEVER_DEALT = Object.freeze([
   ...ASSETS_WEAR.map((a) => a.id),
   // #2008: the riso icons ride too — dealt only by the riso field dealer.
   ...ASSETS_RISO.map((a) => a.id),
+  // #2150: the glyphs — never dealt as solo assets.
+  ...ASSETS_LETTERS.map((a) => a.id),
+  ...SOLO_TEXT_STAMP_IDS,
+  ...PIXEL_LETTER_ANATOMY_IDS,
 ]);
 
 const pickIndex = (rng, n) => Math.min(n - 1, Math.floor(rng() * n));

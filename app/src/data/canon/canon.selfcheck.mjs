@@ -135,10 +135,13 @@ const sha = (v) => createHash('sha256').update(JSON.stringify(v)).digest('hex').
   assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337', 'the 70 looks are byte-identical');
   assert.equal(sha(PRESET_GROUPS), '309f106f646c7efe', 'the 16 look groups are byte-identical');
   assert.equal(VOICE_DECK.length, 72);
-  assert.equal(sha(VOICE_DECK), 'ca7db04bb758bba0', 'the 72 deck voices are byte-identical');
+  // #2150 re-pin: the deck hash moved on the type-exclusivity ruling — verified per-voice:
+  // 17 of 72 voices differ (the 4 layout tiles lost only their glyph ids; 13 family
+  // wardrobes re-drew over the glyph-narrowed pool) and no voice wears a glyph now.
+  assert.equal(sha(VOICE_DECK), '556e0e2b3e55fe04', 'the 72 deck voices are byte-identical');
   assert.equal(
     sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
-    'cdb7d507fb02381d',
+    '44abd0199a5dc9c8', // #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
   );
   assert.equal(sha(STYLES), '4f28f882a61c232f');

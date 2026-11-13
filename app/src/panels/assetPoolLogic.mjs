@@ -11,6 +11,9 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
+import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
+import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 
 // #1982 — the kana stamps are poem-only (FIELD): catalogue members so the
 // census and the stage atlas resolve them, but they never become pool
@@ -21,8 +24,12 @@ import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 // the ornaments) join the same exclusion: the poem-only set is the whole
 // union the FIELD director deals alone (poets/placement.js POEM_ONLY_STAMP_IDS).
 // #2005 — the plate pack (Fraunces) joins the same exclusion.
-const POEM_ONLY_IDS = new Set(
-  [
+// #2150 — the glyphs join the same exclusion: the caps/digits pack (poem-only
+// now), the solo text stamps and the pixel letter-anatomy emblems (Q4) never
+// become pool records — no tiles, no facet counts. Badged letters/numbers,
+// word labels and symbols stay pooled (Q1–Q3: graphics and symbol marks).
+const POEM_ONLY_IDS = new Set([
+  ...[
     ...ASSETS_KANA,
     ...ASSETS_KANJI,
     ...ASSETS_LATIN,
@@ -31,8 +38,11 @@ const POEM_ONLY_IDS = new Set(
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
     ...ASSETS_RISO,
+    ...ASSETS_LETTERS,
   ].map((a) => a.id),
-);
+  ...SOLO_TEXT_STAMP_IDS,
+  ...PIXEL_LETTER_ANATOMY_IDS,
+]);
 
 /** Descriptor records for the pool: library assets read baked traits + the document's edits, imports their own. */
 export function poolDescriptors(assets, assetTags = {}) {

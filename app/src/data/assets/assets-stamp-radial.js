@@ -325,3 +325,39 @@ export const ASSETS_PART3 = [
     svg: `<circle cx="50" cy="50" r="40" fill="var(--ink)"/><path d="M50 10 A40 40 0 0 1 50 90 A20 20 0 0 1 50 50 A20 20 0 0 0 50 10 Z" fill="var(--accent)"/><circle cx="50" cy="30" r="5" fill="var(--ink)"/><circle cx="50" cy="70" r="5" fill="var(--accent)"/>`,
   },
 ];
+
+// ── #2150 — the <text>-rendered stamps of PART3, named by kind ─────────────
+// The 17 stamps above whose svg is a font <text> element, in four kinds.
+// Matt's classification rulings (2026-11-12) sort them:
+//  - SOLO letters/numbers (a character with NO drawn body: stamp_letter_02,
+//    stamp_num_04, stamp_num_05) are glyphs — they leave every deal with the
+//    typ_* pack; type reaches the stage only through the poem system.
+//  - Badged letters/numbers (stamp_letter_01/03, stamp_num_01/02/03) STAY:
+//    the badge is a graphic, the type part of a drawn asset (Q2).
+//  - Symbols (stamp_glyph_01–06, stamp_arrow_01) STAY: symbol marks, not
+//    type (Q1 — the boot-default asterisk is one of them).
+//  - Word labels (stamp_label_01/02) STAY: a label is signage, a graphic
+//    that contains type (Q3).
+export const TEXT_STAMP_LETTER_IDS = Object.freeze(['stamp_letter_01', 'stamp_letter_02', 'stamp_letter_03']);
+export const TEXT_STAMP_NUMBER_IDS = Object.freeze([
+  'stamp_num_01',
+  'stamp_num_02',
+  'stamp_num_03',
+  'stamp_num_04',
+  'stamp_num_05',
+]);
+export const TEXT_STAMP_SYMBOL_IDS = Object.freeze([
+  'stamp_glyph_01',
+  'stamp_glyph_02',
+  'stamp_glyph_03',
+  'stamp_glyph_04',
+  'stamp_glyph_05',
+  'stamp_glyph_06',
+  'stamp_arrow_01',
+]);
+export const TEXT_STAMP_LABEL_IDS = Object.freeze(['stamp_label_01', 'stamp_label_02']);
+
+/** #2150 — the solo text stamps: a letter or digit rendered as bare font
+ * text, no drawn body. These are glyphs under the ruling and join the typ_*
+ * pack in leaving every deal surface (see SOLO_GLYPH consumers). */
+export const SOLO_TEXT_STAMP_IDS = Object.freeze(['stamp_letter_02', 'stamp_num_04', 'stamp_num_05']);

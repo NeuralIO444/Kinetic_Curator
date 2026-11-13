@@ -90,8 +90,8 @@ assert.deepEqual(probed, JSON.parse(JSON.stringify(voiceStyleReport())), 'the pr
   assert.equal(VOICE_DECK.length, 72);
   assert.equal(
     sha(VOICE_DECK),
-    'ca7db04bb758bba0',
-    'the 72 deck voices are byte-identical (hash taken on main @ 6d37f9b)',
+    '556e0e2b3e55fe04',
+    'the 72 deck voices are byte-identical (hash taken on main @ 6d37f9b; #2150 re-pin: glyph losses + wardrobe re-draws, verified per-voice)',
   );
   for (const v of VOICE_DECK) {
     if (v.kind === 'family') {

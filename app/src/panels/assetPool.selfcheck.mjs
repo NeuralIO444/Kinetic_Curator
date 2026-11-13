@@ -93,6 +93,11 @@ const recs = poolDescriptors(ASSETS);
 // #2008 RE-PIN (cause: the riso glyph expansion) — the exclusion grows by
 // exactly the composed riso icon set; the assertion's meaning is unchanged
 // (the exclusion is exactly the FIELD-dealt packs, by id).
+// #2150 RE-PIN (cause: type exclusivity) — the exclusion grows by exactly
+// the glyph set: the caps/digits pack (36, poem-only now), the solo text
+// stamps (3) and the pixel letter-anatomy emblems (8) — 313 − 47 = 266 pool
+// records; the assertion's meaning is unchanged (the exclusion is exactly
+// the FIELD-dealt packs plus the #2150 glyphs, by id).
 const { ASSETS_KANA } = await import('../data/assets/assets-kana.js');
 const { ASSETS_KANJI } = await import('../data/assets/assets-kanji.js');
 const { ASSETS_LATIN } = await import('../data/assets/assets-latin.js');
@@ -101,8 +106,11 @@ const { ASSETS_ORNAMENTS } = await import('../data/assets/assets-ornaments.js');
 const { ASSETS_PLATE } = await import('../data/assets/assets-plate.js');
 const { ASSETS_RISO } = await import('../data/assets/assets-riso.js');
 const { ASSETS_WEAR } = await import('../data/assets/assets-wear.js'); // #2010 P1
-const kanaIds = new Set(
-  [
+const { ASSETS_LETTERS } = await import('../data/assets/assets-letterforms.js'); // #2150
+const { SOLO_TEXT_STAMP_IDS } = await import('../data/assets/assets-stamp-radial.js'); // #2150
+const { PIXEL_LETTER_ANATOMY_IDS } = await import('../data/assets/assets-pixel-glyphs.js'); // #2150 (Q4)
+const kanaIds = new Set([
+  ...[
     ...ASSETS_KANA,
     ...ASSETS_KANJI,
     ...ASSETS_LATIN,
@@ -111,8 +119,11 @@ const kanaIds = new Set(
     ...ASSETS_PLATE,
     ...ASSETS_RISO,
     ...ASSETS_WEAR,
+    ...ASSETS_LETTERS,
   ].map((k) => k.id),
-);
+  ...SOLO_TEXT_STAMP_IDS,
+  ...PIXEL_LETTER_ANATOMY_IDS,
+]);
 const poolVisible = ASSETS.filter((a) => !kanaIds.has(a.id));
 assert.equal(recs.length, poolVisible.length);
 assert.ok(!recs.some((r) => kanaIds.has(r.id)), 'no native-script record in the pool');

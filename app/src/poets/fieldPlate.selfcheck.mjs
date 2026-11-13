@@ -44,7 +44,9 @@
 //    proves presence.)
 //  - poem-only: the catalogue carries the pack (701 + 52), the authored
 //    bake does not, the panel's records stay 313, and every dealing
-//    surface excludes the grown poem-only union by id.
+//    surface excludes the grown poem-only union by id. (#2150 RE-PIN: the
+//    panel's records are 266 from that slice on — the glyph set leaves the
+//    panel with the deal; the union below grows by the 36 caps/digits.)
 //  - the producer (Matt's ruling pattern, from #2002's fix loop): the
 //    Director calls the plate from the room — the solo room at its
 //    stillest (intensity ≤ PLATE_CALL_MAX_INTENSITY), Whittier only,
@@ -155,7 +157,8 @@ assert.strictEqual(stampWidthEm('typ_s_A', 'A'), serifGlyphWidthEm('A'), 'a seri
 assert.strictEqual(stampWidthEm('typ_A', 'A'), glyphWidthEm('A'), 'a base stamp still measures base');
 assert.strictEqual(NATIVE_STAMP_IDS.size, 289, 'the native face did NOT grow: the plate is Latin-side');
 // #2010 RE-PIN (cause: RAY GUN P1 · TORN & XEROXED): the worn letters (208) join the union on the same road.
-assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52 + 208, 'the poem-only union grew by exactly the plate pack (and #2010’s worn letters)');
+// #2150 RE-PIN (cause: type exclusivity): the caps/digits pack (36) joins the union — FIELD deals the base face alone now.
+assert.strictEqual(POEM_ONLY_STAMP_IDS.size, 388 + 52 + 208 + 36, 'the poem-only union grew by exactly the plate pack, #2010’s worn letters, and #2150’s caps/digits (36)');
 for (const id of PLATE_STAMP_IDS) {
   assert.ok(POEM_ONLY_STAMP_IDS.has(id), `${id}: in the poem-only union`);
   assert.ok(!NATIVE_STAMP_IDS.has(id), `${id}: not in the native face`);
@@ -615,9 +618,10 @@ for (const a of ASSETS_PLATE) {
   assert.ok(NEVER_DEALT.includes(a.id), `${a.id}: roll-undealt`);
 }
 const recs = poolDescriptors(ASSETS);
-assert.strictEqual(recs.length, 313, "the pool's records are exactly what they were before the pack");
+// #2150 RE-PIN (cause: type exclusivity): 313 − 47 glyphs (36 typ_* + 3 solo text stamps + 8 letter-anatomy emblems).
+assert.strictEqual(recs.length, 266, "the pool's records are the pre-pack records minus the #2150 glyph set");
 assert.ok(!recs.some((r) => POEM_ONLY_STAMP_IDS.has(r.id)), 'no poem-only record reaches the panel');
-assert.strictEqual(categoryCounts(recs).all, 313, "the pool's headline count is unchanged");
+assert.strictEqual(categoryCounts(recs).all, 266, "the pool's headline count drops by exactly the glyph set");
 assert.ok(!chapterAssets('swiss').some((id) => POEM_ONLY_STAMP_IDS.has(id)), 'the swiss chapter deck holds no poem-only stamps');
 assert.ok(!chapterAssets('now').some((id) => POEM_ONLY_STAMP_IDS.has(id)), 'the Now chapter deck holds no poem-only stamps');
 assert.ok(!dealableRecords(ASSETS).some((r) => POEM_ONLY_STAMP_IDS.has(r.id)), 'a KINETIC roll never deals a poem-only stamp');

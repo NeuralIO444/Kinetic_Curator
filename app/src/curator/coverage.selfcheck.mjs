@@ -179,17 +179,27 @@ console.log(formatCoverageReport({ dice, doors, evolve, keeps, keepsNote }));
 
 // ---------------------------------------------------------------- assertions
 const cat = Object.fromEntries(dice.categories.map((c) => [c.name, c]));
+// #2150 RE-PIN (cause: type exclusivity): the glyph set (47 ids) no longer
+// reaches candidacy at all, so the breadth audit re-measures lower — by seed
+// on the narrowed deal: distinct 262–266 (standing seed 263), against the
+// pre-#2150 audit's 282–292. The floor keeps its meaning: it alarms on a
+// slide back toward starvation, not on a ruled removal.
 assert.ok(
-  dice.candidates.distinct >= 285,
-  `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 282-292 by seed)`,
+  dice.candidates.distinct >= 260,
+  `dealer proposes broadly: ${dice.candidates.distinct}/294 candidates (audit 262-266 by seed, #2150)`,
 );
 // #1982 — the ceiling guards DEALABLE assets: the never-dealt class (the
 // creature citizen + the poem-only kana stamps, CHAPTER_UNDEALT) never trays
 // by design, so it is excluded by name; the catalogue-wide count rides along.
 const dealableNever = dice.tray.neverIds.filter((id) => !CHAPTER_UNDEALT.includes(id)).length;
+// #2150 RE-PIN (cause: type exclusivity): the ceiling moves 40 → 48 on the
+// measured stream — dealable-never went 36 → 44 when the glyphs left
+// candidacy (17 marginal assets flipped out of the finalist tray, 9 flipped
+// in; breadth fell only by the removed set). Still nowhere near the
+// pre-stratification 86 the ceiling exists to alarm on.
 assert.ok(
-  dealableNever <= 40,
-  `never-tray ceiling: ${dealableNever} dealable (${dice.tray.neverCount} catalogue-wide; #1546 measured 31 on this stream; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
+  dealableNever <= 48,
+  `never-tray ceiling: ${dealableNever} dealable (${dice.tray.neverCount} catalogue-wide; #1546 measured 31 on this stream, #2150 measured 44; the pre-stratification audit was 86 — the ceiling alarms on a slide back toward starvation)`,
 );
 assert.ok(
   cat.radial.inTray >= 15,
@@ -313,7 +323,22 @@ assert.strictEqual(keeps.distinctLayouts, 4, 'keeps span 4 layouts');
 // ≥ unordered). Accepted as the same pool-growth noise (295 → 313,
 // #1854): the tray-reach direction now carries a −1 band, applied ONLY
 // to that comparison.
-const TRIO_JACCARD_BAND = 0.0005;
+// #2150 BAND RE-BASELINE (type exclusivity — the pool NARROWED by a ruled
+// removal, the mirror of #1854's growth): the glyph set (47 ids) leaves
+// candidacy, so every stream this guard measures is a different stream.
+// Measured on the narrowed deal, all 8 seeds × both fixtures: never-tray
+// and tray reach hold the EXACT direction on every seed and fixture (no
+// band needed there — ordered never exceeds unordered, reach never
+// shrinks), and the FLAT fixture holds the trio direction on all 8 seeds.
+// The opinionated head's trio overlap lands above unordered on two seeds —
+// 0x1508: +0.121 pp; 0x1509: +0.169 pp — the expected arithmetic of a
+// smaller candidate universe (the unordered overlap level itself rose from
+// the ~1.5% era to 2.0–2.5%: finalist trios drawn from fewer assets share
+// more of them, and the ordered head concentrates that further). Accepted
+// as ruled-removal noise on the 2026-10-31 rule (≈2× the worst observed
+// delta): the trio band is now ±0.34 pp. Nothing else about the guard
+// changes. FLAGGED in STAGING-REPORT-2150 for the coordinator's ratification.
+const TRIO_JACCARD_BAND = 0.0034;
 const NEVER_TRAY_BAND = 1;
 const TRAY_REACH_BAND = 1;
 const chainOf = (pairs, rest) =>
@@ -371,7 +396,7 @@ for (const seed of SWEEP_SEEDS) {
     );
     assert.ok(
       on.trios.meanPairwiseJaccard <= off.trios.meanPairwiseJaccard + TRIO_JACCARD_BAND,
-      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered by more than the re-baselined band (±0.05 pp, coordinator's call 2026-10-31)`,
+      `seed 0x${seed.toString(16)} ${name}: trio overlap must not exceed unordered by more than the re-baselined band (±0.34 pp, #2150 re-baseline — see above)`,
     );
     assert.ok(
       on.tray.distinct >= off.tray.distinct - TRAY_REACH_BAND,

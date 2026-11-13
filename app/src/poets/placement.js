@@ -220,9 +220,18 @@ export function wearStampIdFor(assetId, kind) {
  * KINETIC roll, the dice chokepoint, the placeable pool, the voice wardrobe
  * draw): catalogue members all, marks never. It grows here, in one place,
  * never as a second list elsewhere.
+ *
+ * #2150 — the caps/digits pack (LETTER_STAMP_IDS) joins the union: type is
+ * never a solo asset, so the base face is now dealt by FIELD alone like
+ * every other stamp pack. The pack stays in the catalogue (the atlas, the
+ * census and recorded takes resolve it); only the deal loses it. The
+ * resolver's own placeable filter (gl/liveResolve.mjs) deliberately does
+ * NOT read this union for the new member — enforcement lives at the deal
+ * surfaces, so recorded takes replay bit-for-bit.
  */
 export const POEM_ONLY_STAMP_IDS = Object.freeze(
   new Set([
+    ...LETTER_STAMP_IDS,
     ...NATIVE_STAMP_IDS,
     ...LATIN_STAMP_IDS,
     ...SERIF_STAMP_IDS,
