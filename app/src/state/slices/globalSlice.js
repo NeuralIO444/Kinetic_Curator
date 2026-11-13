@@ -28,6 +28,7 @@ import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
 import { experimentalOn, setExperimental } from '../../curator/tasteGate.js';
 import { sanitizeLight } from '../../data/light.js';
+import { sanitizeWorld } from '../../data/world.js';
 import {
   sanitizeAssetKineme,
   sanitizeAssetStill,
@@ -1530,6 +1531,7 @@ export const createGlobalSlice = (set) => ({
       // around the swatches the designer pinned.
       next.paletteLocks = sanitizePaletteLocks(doc.paletteLocks) || {};
       next.light = sanitizeLight(doc.light); // #594 — a doc without a sun turns it off
+      next.world = sanitizeWorld(doc.world); // #2104 step 3 — a doc's recorded world stands back up through the door; a doc without one stands world-less (never the session's leftover world, never the house default)
       next.assetStill = sanitizeAssetStill(doc.assetStill) || {}; // #1128 — a doc without pins moves everything
       next.assetAttach = sanitizeAssetAttach(doc.assetAttach) || {}; // #1355
       next.creatureRecords = sanitizeCreatureRecords(doc.creatureRecords); // #1849 — a doc without records has none

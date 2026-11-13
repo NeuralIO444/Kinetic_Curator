@@ -20,6 +20,7 @@ export const PROJECT_STATE_KEYS = Object.freeze([
   'paletteLocks',
   'customAssets',
   'light',
+  'world', // #2104 step 3 — the standing world is saved now, so a landing must wake the autosave like a sun change does
   'assetKineme',
   'regionKinemes',
   'assetTags', // #1942

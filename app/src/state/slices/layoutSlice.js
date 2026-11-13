@@ -849,14 +849,16 @@ export const createLayoutSlice = (set) => ({
   /** #594 — the ONE scene sun (never per layer, never a list). null = off. */
   light: null,
   /**
-   * #2104 — the standing world (Canon world record, steps 1–2: the record,
-   * its door, and the landing deal). A fresh stage stands in the
-   * hand-authored house world (data/world.js); a chapter landing deals
-   * that chapter's world into this field in the same store update
+   * #2104 — the standing world (Canon world record, steps 1–3: the record,
+   * its door, the landing deal, and the recording). A fresh stage stands
+   * in the hand-authored house world (data/world.js); a chapter landing
+   * deals that chapter's world into this field in the same store update
    * (kineticLookPass), and CHAOS / the launch opener clear it with the
-   * chapter — null is world-less, today exactly. Session-only like the
-   * chapter it rides in on: the recording (project + take) is step 3, and
-   * nothing reads the record to render yet, so it changes no behaviour.
+   * chapter — null is world-less, today exactly. Step 3 records it: the
+   * standing world saves in the project document and stamps each take,
+   * and a load stands the document's world back up (applyProject) — a
+   * document without one stands world-less, never the house default.
+   * Nothing reads the record to render yet, so it changes no behaviour.
    */
   world: sanitizeWorld(HOUSE_WORLD),
   motionSmoothing: true,
