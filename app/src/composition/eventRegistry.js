@@ -67,6 +67,7 @@ export const EVENT_REGISTRY = {
   EXPORT_AUTO_QUALITY: { handler: 'wire' },
   EXPORT_SEED: { handler: 'wire' },
   EXPORT_LOAD_PROJECT: { handler: 'wire' },
+  PROJECT_LOADED: { handler: ['curator/trioLive.js'] },
   LAYER_ADD: { handler: 'wire' },
   LAYER_REMOVE: { handler: 'wire' },
   LAYER_SET_ACTIVE: { handler: 'wire' },
