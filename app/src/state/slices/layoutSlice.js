@@ -69,6 +69,7 @@ import { sanitizeReviewVoice } from '../../curator/fieldReviewVoice.mjs'; // #20
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
 import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
+import { HOUSE_WORLD, sanitizeWorld } from '../../data/world.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
@@ -842,6 +843,15 @@ export const createLayoutSlice = (set) => ({
   perfClampOverride: null,
   /** #594 — the ONE scene sun (never per layer, never a list). null = off. */
   light: null,
+  /**
+   * #2104 — the standing world (Canon world record, step 1: the record and
+   * its door). A fresh stage stands in the hand-authored house world
+   * (data/world.js); null would be world-less — today exactly. Nothing
+   * reads or writes this yet: the landing deal, the clearing, the
+   * recording and the render joins arrive in the parent issue's later
+   * build steps, so the record standing here changes no behaviour.
+   */
+  world: sanitizeWorld(HOUSE_WORLD),
   motionSmoothing: true,
   /**
    * VJ MIX (#278): palette-switch crossfade duration in seconds, 0–8.
