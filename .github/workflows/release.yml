@@ -1,0 +1,106 @@
+name: Release (draft)
+
+# Draft release flow (Matt, 2026-11-12, ordered after the Tauri acceptance
+# session on build 58c7f11e): pushing a version tag builds the Tauri app with
+# the official tauri-action and attaches the bundles to a DRAFT GitHub
+# release. Nothing is ever published by this workflow — a human reviews the
+# draft and publishes it by hand.
+#
+# Version convention (no tags existed before this file):
+#   - The app version lives in three files, kept in step by hand:
+#     src-tauri/tauri.conf.json (package.version — this is what the bundle
+#     stamps), src-tauri/Cargo.toml, and app/package.json.
+#   - A final release tag is v<version>            (e.g. v0.9.0)
+#   - A release-candidate tag is v<version>-rc.<n> (e.g. v0.9.0-rc.1)
+#   - RC tags mark the draft as a prerelease; final tags do not.
+#   - Bump the three version files BEFORE tagging. The guard step below
+#     fails the run when the tag's base version and tauri.conf.json disagree,
+#     so a mis-tagged release cannot ship bundles stamped with a stale
+#     version.
+#
+# Platform: macOS only, Apple Silicon (aarch64-apple-darwin).
+#   - The Rust shell is macOS-only code (Metal + mach APIs — see the
+#     cargo-check job in ci.yml), so there is nothing to build for
+#     Windows/Linux.
+#   - The build runs on the self-hosted mac-studio runner, the same machine
+#     class as the accepted build, so the kc-mind helper (build.rs →
+#     helpers/kc-mind/build.sh) compiles against the same macOS SDK family
+#     it was accepted on. A hosted runner with an older SDK would silently
+#     produce the helper's degraded variant.
+#
+# Signing: UNSIGNED, deliberately. No code-signing or notarization secrets
+# exist in this repo (tauri.conf.json signingIdentity and
+# certificateThumbprint are null) and none are invented here. The .dmg is
+# an internal RC artifact: on first launch macOS Gatekeeper requires
+# right-click → Open (or clearing the quarantine attribute). Signing +
+# notarization is a separate, later piece of work.
+#
+# The updater is inactive (tauri.conf.json updater.active: false), so no
+# updater artifacts or signing keys are involved.
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write # create the draft release and upload the bundles
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false # never cancel a release build halfway
+
+jobs:
+  draft-release:
+    runs-on: [self-hosted, mac-studio]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      # Fail fast on a tag/version mismatch, before the expensive build.
+      - name: Guard — tag matches tauri.conf.json version
+        run: |
+          PKG_VERSION="$(node -p "require('./src-tauri/tauri.conf.json').package.version")"
+          BASE="${GITHUB_REF_NAME#v}"
+          BASE="${BASE%%-rc.*}"
+          if [ "$BASE" != "$PKG_VERSION" ]; then
+            echo "::error::tag $GITHUB_REF_NAME implies version $BASE, but src-tauri/tauri.conf.json package.version is $PKG_VERSION. Bump the version files before tagging."
+            exit 1
+          fi
+          echo "tag $GITHUB_REF_NAME matches app version $PKG_VERSION"
+
+      # The Tauri CLI lives in the root package.json; the frontend deps live
+      # in app/ (tauri.conf.json beforeBuildCommand runs the root build
+      # script, which delegates to app/).
+      - run: npm ci --no-fund --no-audit
+      - run: npm ci --no-fund --no-audit
+        working-directory: app
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Kinetic Curator ${{ github.ref_name }}'
+          releaseBody: |
+            Draft release candidate, built by the release workflow from tag ${{ github.ref_name }}.
+
+            Unsigned internal build (no signing/notarization yet): on first launch, macOS Gatekeeper requires right-click → Open.
+            This draft is never published automatically — review the artifacts, then publish by hand.
+          releaseDraft: true
+          prerelease: ${{ contains(github.ref_name, '-rc') }}
+          uploadUpdaterJson: false # updater is inactive in tauri.conf.json
+          args: --target aarch64-apple-darwin
