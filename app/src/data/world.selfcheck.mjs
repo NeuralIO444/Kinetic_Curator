@@ -1,13 +1,17 @@
-// node src/data/world.selfcheck.mjs — #2104 the Canon world record, step 1: the record and its door.
+// node src/data/world.selfcheck.mjs — #2104 the Canon world record, steps 1–2: the record, its door, and the landing deal.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { HOUSE_WORLD, WORLD_GRAIN_MAX, sanitizeWorld } from './world.js';
+import { HOUSE_WORLD, WORLD_GRAIN_MAX, WORLD_STOCK, sanitizeWorld, worldForChapter } from './world.js';
 import { BOIL_FPS_DEFAULT, BOIL_FPS_MIN, BOIL_FPS_MAX } from '../engine/kineme.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
 import { buildSceneContract } from '../gl/sceneContract.js';
 import { createLayoutSlice } from '../state/slices/layoutSlice.js';
+import { useStore } from '../state/store.js';
+import { CHAPTERS } from './chapters.js';
+import { canonStyle } from './canon/index.js';
+import { PALETTES, deriveLineInk, getCatalogPalette } from './palettes.js';
 import { DEFAULT_LAYOUT_PARAMS } from './layout-modes.js';
 
 // ── the door: fail-closed, like every other document field ───────────────
@@ -88,7 +92,114 @@ assert.strictEqual(WORLD_GRAIN_MAX, 1, "the ceiling is the grain amount's own 0.
   assert.notStrictEqual(state.world, HOUSE_WORLD, 'the standing record is the door’s copy, not the frozen constant');
 }
 
-// ── step 1's boundary: documents and the scene contract do not know it ──
+// ── step 2: the stock — authored for all twelve chapters, in ruled order ──
+const RULED_SPINE = [
+  'marks',
+  'engraving',
+  'organic',
+  'bauhaus',
+  'swiss',
+  'op-art',
+  'japan',
+  'memphis',
+  'pixel',
+  'grunge',
+  'techno',
+  'now',
+];
+assert.deepStrictEqual(
+  Object.keys(WORLD_STOCK),
+  RULED_SPINE,
+  'stock for all 12 chapters — the Book’s nine plus Organic, Pixel and Techno at their ruled positions',
+);
+for (const c of CHAPTERS)
+  assert.ok(WORLD_STOCK[c.id]?.length, `the landable chapter ${c.id} has stock — the deal is never undefined`);
+assert.ok(
+  Object.isFrozen(WORLD_STOCK) && Object.isFrozen(WORLD_STOCK.marks) && Object.isFrozen(WORLD_STOCK.marks[0].finish),
+  'the stock is frozen',
+);
+// Each chapter's palettes are its own: the family its Canon style resolves
+// (data/canon/index.js). 'now' stands on the whole library.
+const CHAPTER_STYLE = {
+  marks: 'marks',
+  engraving: 'engraved',
+  organic: 'organic',
+  bauhaus: 'bauhaus',
+  swiss: 'swiss',
+  'op-art': 'op',
+  japan: 'japanese',
+  memphis: 'memphis',
+  pixel: 'pixel',
+  grunge: 'grunge',
+  techno: 'techno',
+};
+const familyPairs = (chapterId) => {
+  const ids = chapterId === 'now' ? PALETTES.map((p) => p.id) : canonStyle(CHAPTER_STYLE[chapterId]).palettes;
+  return new Set(
+    ids.map((pid) => {
+      const p = getCatalogPalette(pid);
+      return `${p.bg}|${deriveLineInk(p)}`;
+    }),
+  );
+};
+for (const [chapterId, stock] of Object.entries(WORLD_STOCK)) {
+  assert.ok(stock.length >= 2, `${chapterId}: a stock the pick can pick from`);
+  assert.strictEqual(
+    new Set(stock.map((e) => JSON.stringify(e))).size,
+    stock.length,
+    `${chapterId}: no two stock entries are the same record`,
+  );
+  const pairs = familyPairs(chapterId);
+  for (const entry of stock) {
+    assert.strictEqual(entry.chapter, chapterId, `${chapterId}: provenance names the chapter`);
+    assert.deepStrictEqual(sanitizeWorld(entry), entry, `${chapterId}: authored stock survives the door unchanged`);
+    assert.ok(
+      entry.boilFps >= BOIL_FPS_MIN &&
+        entry.boilFps <= BOIL_FPS_MAX &&
+        entry.finish.grain >= 0 &&
+        entry.finish.grain <= WORLD_GRAIN_MAX,
+      `${chapterId}: climate inside the named bands`,
+    );
+    assert.ok(
+      pairs.has(`${entry.ground}|${entry.ink}`),
+      `${chapterId}: ground|ink ${entry.ground}|${entry.ink} is one of the chapter's own palettes (bg | derived line ink)`,
+    );
+  }
+}
+
+// ── step 2: the pick — from the chapter alone, the same world every time ──
+for (const chapterId of RULED_SPINE) {
+  const w = worldForChapter(chapterId);
+  assert.ok(w, `${chapterId}: a world deals`);
+  assert.strictEqual(w.chapter, chapterId);
+  assert.ok(
+    WORLD_STOCK[chapterId].some((e) => JSON.stringify(sanitizeWorld(e)) === JSON.stringify(w)),
+    `${chapterId}: the dealt world is a member of its stock, through the door`,
+  );
+  assert.deepStrictEqual(
+    worldForChapter(chapterId),
+    w,
+    `${chapterId}: the same chapter deals the same world — memory is determinism`,
+  );
+  assert.ok(!Object.isFrozen(w), `${chapterId}: the dealt record is the door’s fresh copy, not the frozen stock entry`);
+}
+assert.strictEqual(worldForChapter('atlantis'), null, 'a chapter with no stock deals no world');
+assert.strictEqual(worldForChapter(null), null);
+assert.strictEqual(worldForChapter(7), null);
+{
+  // The pick does not ride the landing's die stream: it never rolls at all.
+  const realRandom = Math.random;
+  Math.random = () => {
+    throw new Error('the pick must not roll');
+  };
+  try {
+    assert.deepStrictEqual(worldForChapter('swiss'), worldForChapter('swiss'), 'no dice were consulted');
+  } finally {
+    Math.random = realRandom;
+  }
+}
+
+// ── the boundary through step 2: documents and the contract do not know it ──
 // Recording is step 3 of the build order; until then a world standing in the
 // store leaves every document and every contract byte-identical to today.
 const base = {
@@ -107,6 +218,46 @@ assert.ok(back.ok);
 assert.ok(!('world' in back.doc), '…and none parses back');
 const contract = buildSceneContract({ doc: { seed: 1 }, resolvedLayers: [] });
 assert.ok(!('world' in contract), 'the scene contract carries no world key (hash stable)');
+
+// ── step 2 in the real store: the deal, the presses, the clearing ────────
+{
+  const S = () => useStore.getState();
+  assert.deepStrictEqual(
+    S().world,
+    { ...HOUSE_WORLD, finish: { ...HOUSE_WORLD.finish } },
+    'the store opens in the house world, before any landing',
+  );
+  S().kineticLookPass(); // a cold flip: a landing
+  const landed = S().kineticChapterId;
+  assert.ok(landed, 'the cold flip landed in a chapter');
+  assert.deepStrictEqual(
+    S().world,
+    worldForChapter(landed),
+    'the landing dealt that chapter’s world in the same update',
+  );
+  assert.strictEqual(S().world.chapter, landed, 'the standing world’s provenance is the landed chapter');
+  const standing = S().world;
+  S().kineticVoicePass();
+  assert.deepStrictEqual(
+    S().world,
+    standing,
+    'a warm KINETIC press keeps the standing world — it changes what stands in it, not the world',
+  );
+  S().kineticCuratorPass();
+  assert.deepStrictEqual(S().world, standing, 'a CURATOR press keeps the standing world');
+  assert.ok(
+    !('world' in serializeProject(S())),
+    'step 2 records nothing either: no world key in the document after a landing',
+  );
+  S().kineticRoll(); // CHAOS
+  assert.strictEqual(S().kineticChapterId, null, 'CHAOS leaves the book');
+  assert.strictEqual(S().world, null, 'CHAOS clears the world with the chapter (ruling 7)');
+  S().kineticLookPass();
+  assert.deepStrictEqual(S().world, worldForChapter(S().kineticChapterId), 'the next landing deals again');
+  S().kineticOpenPass(); // the launch opener
+  assert.strictEqual(S().kineticChapterId, null, 'the opener leaves the book');
+  assert.strictEqual(S().world, null, 'the launch opener clears the world with the chapter (ruling 7)');
+}
 
 // ── the law is written where the next person looks ───────────────────────
 const here = dirname(fileURLToPath(import.meta.url));

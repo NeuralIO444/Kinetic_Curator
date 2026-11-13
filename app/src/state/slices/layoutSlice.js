@@ -69,7 +69,7 @@ import { sanitizeReviewVoice } from '../../curator/fieldReviewVoice.mjs'; // #20
 import { openNarrowing, narrow, poolFor } from '../chapterNarrow.mjs'; // #1857: the funnel (BOOK S4)
 import { chapterById, chapterLooks } from '../../data/chapters.js'; // #1855: the Book's registry (S1)
 import { sanitizeLight, LIGHT_DEFAULT } from '../../data/light.js';
-import { HOUSE_WORLD, sanitizeWorld } from '../../data/world.js';
+import { HOUSE_WORLD, sanitizeWorld, worldForChapter } from '../../data/world.js';
 import { loopClock } from '../../gl/loopClock.js';
 import { isTapeFull } from '../tapeBudget.js';
 import { rollPatternLayers } from '../../pattern/patternRoll.js'; // PATTERN is part of the KIN and CURATOR systems
@@ -166,7 +166,12 @@ function scopedChapterLook(state) {
     redealt: eff.redealt,
     seq: (state.kineticLanding?.seq || 0) + 1,
   };
-  return { r, landing, visits };
+  // #2104 step 2 — the landing deals the chapter's world in the same breath:
+  // worldForChapter picks from the chapter's authored stock by a fixed
+  // derivation from the chapter alone (never from dieRng), so the chapter
+  // deals the same world on every landing and a replay re-derives it.
+  const world = worldForChapter(walk.chapterId);
+  return { r, landing, visits, world };
 }
 
 /**
@@ -844,12 +849,14 @@ export const createLayoutSlice = (set) => ({
   /** #594 — the ONE scene sun (never per layer, never a list). null = off. */
   light: null,
   /**
-   * #2104 — the standing world (Canon world record, step 1: the record and
-   * its door). A fresh stage stands in the hand-authored house world
-   * (data/world.js); null would be world-less — today exactly. Nothing
-   * reads or writes this yet: the landing deal, the clearing, the
-   * recording and the render joins arrive in the parent issue's later
-   * build steps, so the record standing here changes no behaviour.
+   * #2104 — the standing world (Canon world record, steps 1–2: the record,
+   * its door, and the landing deal). A fresh stage stands in the
+   * hand-authored house world (data/world.js); a chapter landing deals
+   * that chapter's world into this field in the same store update
+   * (kineticLookPass), and CHAOS / the launch opener clear it with the
+   * chapter — null is world-less, today exactly. Session-only like the
+   * chapter it rides in on: the recording (project + take) is step 3, and
+   * nothing reads the record to render yet, so it changes no behaviour.
    */
   world: sanitizeWorld(HOUSE_WORLD),
   motionSmoothing: true,
@@ -1942,6 +1949,9 @@ export const createLayoutSlice = (set) => ({
         // dealt from no chapter, so no chapter stands (the session coverage ledger keeps its history).
         kineticChapterId: null,
         kineticLanding: null,
+        // #2104 — CHAOS clears the world with the chapter (ruling 7): the stage stands world-less
+        // (today exactly) until the next landing deals one.
+        world: null,
         // #1856 — and the escape closes the standing round, unsettled if it never settled (roundTable).
         kineticRound: closeStandingRound(state, 'chaos'),
         // #1857 — CHAOS leaves the book, so the narrowing leaves with it (D3's implicit widening).
@@ -1960,7 +1970,7 @@ export const createLayoutSlice = (set) => ({
       // #1855 — a cold tap is a landing: the flip walks the spine and this pass deals inside the one
       // chapter it lands in (scopedChapterLook). The chapter state rides in the same store update, so a
       // tap stays one undo step (#1772's law) and the record can never disagree with the deal.
-      const { r, landing, visits } = scopedChapterLook(state);
+      const { r, landing, visits, world } = scopedChapterLook(state);
       // PATTERN tracks are structure too: a new tessellation of the same kind (what the retired RULES pass dealt).
       // The entry is a whole-document one when a track moved, an edit one otherwise.
       const pat = rollPatternLayers(state.layers, 'rules', mkRng(die(0x7fffffff) || 1));
@@ -1983,6 +1993,8 @@ export const createLayoutSlice = (set) => ({
         kineticChapterId: landing.chapterId,
         kineticChapterVisits: visits,
         kineticLanding: landing,
+        // #2104 step 2 — the world the landing dealt stands with the chapter.
+        world,
         // #1856 — a fresh flip is the settled round's only honest exit: it closes (via 'flip') in the
         // same update, and the closed record stays inspectable until the next voice pass opens a round.
         kineticRound: closeStandingRound(state, 'flip'),
@@ -2111,6 +2123,8 @@ export const createLayoutSlice = (set) => ({
         // (the first cold KINETIC tap walks and lands). The coverage ledger keeps its session history.
         kineticChapterId: null,
         kineticLanding: null,
+        // #2104 — the opener clears the world with the chapter (ruling 7), like CHAOS.
+        world: null,
         // #1856 — leaving the book through the opener closes the standing round (via 'opener').
         kineticRound: closeStandingRound(state, 'opener'),
         // #1857 — the opener deals the whole book: no board stands, so no narrowing stands (D3).

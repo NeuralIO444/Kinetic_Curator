@@ -1,6 +1,14 @@
 // node src/data/palettes.selfcheck.mjs
 import assert from 'node:assert';
-import { PALETTES, resolvePalette, normalizeHex, getCatalogPalette, paletteRollPoolIds } from './palettes.js';
+import {
+  PALETTES,
+  FAMILY_PALETTES,
+  resolvePalette,
+  normalizeHex,
+  getCatalogPalette,
+  paletteRollPoolIds,
+  deriveLineInk,
+} from './palettes.js';
 import { chipWindowStart } from '../components/paletteChipWindow.mjs';
 
 const id = 'praystation';
@@ -154,6 +162,80 @@ for (const [pid, name] of [
   assert.strictEqual(chipWindowStart(3, 2, CAP), 0, 'fewer than cap → no slide');
   assert.strictEqual(chipWindowStart(37, -1, CAP), 0, 'unknown active id → head window');
   assert.strictEqual(chipWindowStart(37, 0, 0), 0, 'degenerate cap → 0');
+}
+
+// ── #2104 — lineInk: the darkest LINE colour, grown by the stated rule ────
+// The rule (palettes.js deriveLineInk): an authored `lineInk` wins; else the
+// darkest swatch by relative luminance, EXCLUDING any swatch equal to the
+// palette's own bg; ties to the earliest swatch. Every catalog palette (and
+// every persona cousin) has one by this read — no hand values exist yet.
+for (const p of [...PALETTES, ...FAMILY_PALETTES]) {
+  const lineInk = deriveLineInk(p);
+  assert.ok(normalizeHex(lineInk), `${p.id}: lineInk is a colour`);
+  assert.notStrictEqual(lineInk, normalizeHex(p.bg), `${p.id}: a line the colour of the ground is no line`);
+}
+// The resolved palette's shape does NOT grow the key: the replay hash walks
+// the resolver's output (gl/performanceFile.mjs), so its keys are contract.
+assert.ok(
+  !('lineInk' in resolvePalette('transit', null)),
+  'resolvePalette carries no lineInk key — deriveLineInk is the read path',
+);
+assert.ok(!('lineInk' in resolvePalette('persona-davis~2', null)), '…for cousins too');
+// Spot checks, read off the records by hand:
+assert.strictEqual(
+  deriveLineInk(getCatalogPalette('transit')),
+  '#111111',
+  'transit: the near-black swatch — the rule finds it in the swatches',
+);
+assert.strictEqual(
+  deriveLineInk(getCatalogPalette('praystation')),
+  '#b400ff',
+  'praystation: its darkest swatch IS its bg (#0a0a0a) and is excluded — the violet is next',
+);
+assert.strictEqual(deriveLineInk(getCatalogPalette('sepia-plate')), '#2a1d10', 'sepia-plate: the deepest plate ink');
+assert.strictEqual(
+  deriveLineInk(getCatalogPalette('chiaroscuro')),
+  '#5a44c8',
+  'chiaroscuro: the deep violet is darker than the amber ink',
+);
+// The rule itself, on synthetic palettes:
+assert.strictEqual(
+  deriveLineInk({ bg: '#000000', swatches: ['#000000', '#101010', '#202020'] }),
+  '#101010',
+  'the bg swatch is skipped even when it is the darkest',
+);
+assert.strictEqual(
+  deriveLineInk({ bg: '#ffffff', swatches: ['#111111', '#111111', '#333333'] }),
+  '#111111',
+  'a tie goes to the earliest swatch',
+);
+assert.strictEqual(deriveLineInk({ bg: '#123456', swatches: ['#123456'] }), '#123456', 'no eligible swatch → the bg');
+assert.strictEqual(deriveLineInk(null), null, 'no palette → null');
+assert.strictEqual(deriveLineInk({ swatches: 'nope' }), null, 'no swatches and no bg → null');
+// The hand fix wins where a record carries one (the weights idiom); a bogus
+// one falls through to the rule; a resolved palette — whose shape carries no
+// lineInk — derives from its resolved colours:
+{
+  const authored = {
+    id: 'user-line',
+    name: 'USER LINE',
+    era: 'test',
+    bg: '#eeeeee',
+    ink: '#111111',
+    lineInk: '#010203',
+    swatches: ['#444444', '#555555'],
+  };
+  assert.strictEqual(deriveLineInk(authored), '#010203', 'an authored lineInk wins');
+  assert.strictEqual(
+    deriveLineInk({ ...authored, lineInk: 'red' }),
+    '#444444',
+    'a non-colour hand fix falls through to the rule',
+  );
+  assert.strictEqual(
+    deriveLineInk(resolvePalette('user-line', { swatches: ['#0a0a0a'] }, [authored])),
+    '#0a0a0a',
+    'a resolved palette derives from its resolved colours',
+  );
 }
 
 console.log('palettes.selfcheck: OK');
