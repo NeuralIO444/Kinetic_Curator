@@ -1,7 +1,8 @@
 # Canon — a world record: ground, ink, boil clock and finish that every style stands in (#2104)
 
-Status: **SPEC ONLY — nothing is built.** This stops for Matt's ruling on the open items (§10). The parent issue
-(2104) is spec-only by its own terms; the build is a separate step, after approval. Paths are under `app/src/`.
+Status: **SPEC ONLY — nothing is built.** The ten items this spec left open were ruled by Matt on 2026-11-13
+and are recorded in §10; §§2–7 state the ruled shape. The parent issue (2104) is spec-only by its own terms;
+the build is a separate step, after approval. Paths are under `app/src/`.
 Every "today" claim below was re-read on `main` @ `c9db2c06`; nothing was run. (Filed as
 `canon-world-record-spec.md` to match the sibling spec names; the parent issue proposed `canon-world-record.md`.)
 
@@ -23,6 +24,14 @@ A second comment (Matt's ruling, 2026-11-12) cross-references the mutual-awarene
 umbrella (1183): everything on the stage must be aware of each other, and the world record is the natural home
 of the shared state that mutual awareness would read. That comment orders nothing and changes nothing in this
 spec; §6 marks the join so the two designs do not pass each other.
+
+The ten questions this spec put to Matt (§10) were all ruled on 2026-11-13, in comments on the parent issue:
+authored stock per chapter with the chapter remembering its world; ink a new line-facing value; the world's
+finish as the final pass only; the boil binding every clock; style response measured with author override and
+an open material vocabulary; the world recorded in the project and the take; CHAOS and the opener clearing the
+world with the chapter; the two grounds as related records, the colour keeping the name; the bus surface
+deferred to the awareness slice; and a hand-authored house world standing by default. §10 carries each
+question beside its ruling, in the ruling's own words.
 
 ## 1. What exists today (verified)
 
@@ -115,11 +124,17 @@ world = {
   names — `BOIL_FPS_DEFAULT / MIN / MAX` (`engine/kineme.js:224–226`) — and the world record carries a value
   inside that band, never a new band. Any grain bound the build needs takes a named constant beside the finish
   family's own, in the same style. No magic numbers in the record's door.
+- **The boil's reach (ruled, question 4).** While a world stands, its `boilFps` is the one tempo for the
+  whole stage: the stage-wide mark kineme clock, the PATTERN elements' CPU kinemes, and the cell kinemes'
+  line-boil all run on the world's boil clock — not only the mark clock the field was first named for.
 - **The door.** A `sanitizeWorld` in the light's shape: not an object → null (no world); missing numbers take
   the standing defaults; colours validated as colours; `boilFps` clamped to the named band. Fail-closed like
   every other document field.
-- **Null is a real state.** No world dealt yet (a fresh stage, before the first landing) is `world: null`,
-  and null renders exactly as today — §7.
+- **Null is a real state.** A fresh stage does **not** open world-less: a hand-authored house world stands by
+  default from the open (ruling 10, §10). Null — no world standing — is what CHAOS or the launch opener leave
+  behind when they clear the world with the chapter (ruling 7): the stage is world-less from the clear until
+  the next landing, and a document that predates the field loads world-less. Null renders exactly as today —
+  §7.
 
 ## 3. Style response — what a style declares about standing in a world
 
@@ -130,15 +145,18 @@ nothing more (the parent issue's §2). Two axes:
   wobble. This axis is half-built already: Canon settings _measure_ a style's motion centre from its members
   (`SETTINGS_MOTION_KEYS`, `data/canon/settings.js:51` — lifeDrift, noiseSpeed, wind, breath). What does not
   exist is a style _declaring_ its amounts as its response to a world (rather than a measurement of its
-  members), and pulse / brush wobble are not in the measured key set. §10 asks whether the response is
-  authored, measured, or measured-then-authored-over.
+  members), and pulse / brush wobble are not in the measured key set. Ruled (question 5): the response is
+  **measured, but an author may override it** — the measured motion centre is the default response, and an
+  authored override wins where one exists.
 - **Material under the sun** — how the style's marks take light: the issue names matte, enamel, wet. No
   material vocabulary exists anywhere today (searched: no style, baseline or palette record declares one);
   the sun's own material terms are per-scene (`bevel`, `spec`, `pool` in `LIGHT_DEFAULT`), not per-style.
-  The vocabulary is greenfield — its closed set is Matt's call (§10).
+  The vocabulary is greenfield. Ruled (question 5): it is **open** — matte / enamel / wet are the starting
+  set, and styles can name new materials as they are authored.
 
-Proposed declaration shape, on the style record beside `bus` — two contrasting styles, values **illustrative
-of the shape, not ruled**:
+Declaration shape, on the style record beside `bus` — this declaration is the author override of ruling 5:
+where a style declares one it wins; where it declares none, its measured centre (§1) is its response. Two
+contrasting styles, values **illustrative of the shape, not ruled**:
 
 ```js
 // swiss — in data/canon/styles.js, the record for 'swiss' gains:
@@ -170,8 +188,11 @@ Highest first, exactly where the world sits:
 3. **The standing world** — on the fields it owns (ground, ink, boilFps, finish), the world is the standing
    value from its landing until the next landing. KINETIC and CURATOR presses do not re-deal it (§0).
 4. **Look and voice** — dealt inside the chapter, under the world: they change what stands in the world, not
-   the world. On fields they own today that the world also touches — palette ground/ink and FX grain — the
-   composition rule is **not ruled** and is §10's question, not this section's answer.
+   the world. On the two fields they own today that the world also touches, the composition is ruled
+   (questions 2 and 3): a look's FX grain **survives untouched** — the world's finish is only the final
+   pass's amount, over everything, at the end — and the world's ink is its own new line-facing value
+   (question 2), never the palette's text-contrast `ink`, while the ground still comes from the palette's
+   background colour.
 
 The world's seat below hand and locks is the issue's §3 ruling ("the artist's hand and locks win; say exactly
 where the world sits below them"): a performer can lock the ground, or set the boil by hand, and no landing
@@ -181,25 +202,26 @@ moves it. What a landing _can_ move is only an unlocked, unhanded world field.
 
 - **When:** on a chapter landing, and only then (§0). The landing already happens in one place — the cold
   KINETIC flip's walk (`state/slices/layoutSlice.js:145`) — and the world deal rides it: one landing, one
-  world, dealt from the same seeded channel the landing and the look pass already use (`dieRng`, :145, :148),
-  so a replayed take re-derives the same world from the same recorded inputs — the determinism every other
-  deal in the instrument answers to.
+  world, picked from the landed chapter's **authored stock** (ruling 1) through the same seeded channel the
+  landing and the look pass already use (`dieRng`, :145, :148), so a replayed take re-derives the same world
+  from the same recorded inputs — the determinism every other deal in the instrument answers to.
 - **KINETIC and CURATOR presses after the landing** deal looks, voices and marks _inside_ the standing world
   and leave the record untouched (§0). A press is not a landing; narrowed CURATOR rounds inside one chapter
   (the funnel) are not landings either — the chapter did not change.
-- **Re-landing the same chapter** (walk away, walk back) is a landing: §10 asks whether it re-deals the world
-  or keeps the one that chapter dealt before.
-- **Recording — proposed, in the sun's shape.** The sun is the model: a scene-level record, sanitized at one
+- **Re-landing the same chapter** (walk away, walk back) is a landing, but it does **not** re-deal: **the
+  chapter remembers** — it deals the same world it dealt before (ruling 1). A chapter develops a known
+  climate; there is no fresh deal on a return visit. And because the world is recorded (next bullet), that
+  memory is durable across sessions, not session-only (ruling 6).
+- **Recording — ruled, in the sun's shape.** The sun is the model: a scene-level record, sanitized at one
   door, serialized in the project document, omitted when off so old documents stay byte-identical
-  (`data/light.js:7–10`). The proposal is that the world is recorded the same way — in the project document
-  and stamped into the take like every other dealt thing — _not_ session-only like the chapter it rides in
-  on (`state/slices/layoutSlice.js:720`). The fork is real (chapter precedent one way, sun precedent the
-  other) and it is §10's question; this section states the proposal, not the ruling.
-- **The bus.** A style record already declares its bus relationship and `curator/canonBus.mjs` wires exactly
-  what is declared (§1). The proposal is that the world, as a Canon citizen, declares its own in the same
-  pattern — listens to the landing decision, announces itself when it is dealt — so the trio can see the
-  standing world through the bus the way the cross-reference (§0) intends: the world record as the readable
-  home of shared state. Whether that wiring is this slice or the awareness slice's is §10's question.
+  (`data/light.js:7–10`). Ruled (question 6): the world is **recorded** the same way — it saves in the
+  project document and in the take; a take replays in its world. It is _not_ session-only like the chapter
+  it rides in on (`state/slices/layoutSlice.js:720`).
+- **The bus — deferred (ruled).** A style record already declares its bus relationship and
+  `curator/canonBus.mjs` wires exactly what is declared (§1). Ruled (question 9): the world record declares
+  **no** bus surface in this slice — its listens/announces **wait** and arrive with the mutual-awareness
+  slice under the umbrella (1183). This slice ships the record, its door, the landing deal, and the
+  recording, without a declared bus surface.
 
 ## 6. The joins — strata, mutual awareness, DISH LIFE
 
@@ -210,15 +232,16 @@ moves it. What a landing _can_ move is only an unlocked, unhanded world field.
   a stratum of its own.
 - **Mutual awareness (1183).** The 2026-11-12 cross-reference marks the world record as the natural home of
   the shared state the awareness ruling reads. This spec's part in that is only to not design past it: the
-  record is plain, readable, and bus-visible (§5) — what the poem system, the creatures and DISH LIFE _do_
-  with it belongs to the awareness slice, not this one.
-- **DISH LIFE — the two grounds (flagged, not decided).** The world record's `ground` is a colour: the
-  paper/plate the scene stands on. DISH LIFE's "ground" (the rulings on its issue, 2026-11-12) is a different
-  thing wearing the same word: the invisible living-or-dead field _under_ the assets in the one dish — never
-  drawn, acting as a force, and standing on its dead ground too long kills. The two records would share a
-  stage and a noun. Whether they are related (does Life's field live in the world record? does the world's
-  ground colour say anything about the field?) or permanently separate is **not** decided here — it is
-  §10's question, asked before any build touches either.
+  record is plain and readable — what the poem system, the creatures and DISH LIFE _do_ with it, and the
+  world's own bus surface (§5), belong to the awareness slice, not this one.
+- **DISH LIFE — the two grounds (ruled).** The world record's `ground` is a colour: the paper/plate the
+  scene stands on. DISH LIFE's "ground" (the rulings on its issue, 2026-11-12) is a different thing wearing
+  the same word: the invisible living-or-dead field _under_ the assets in the one dish — never drawn, acting
+  as a force, and standing on its dead ground too long kills. Ruled (question 8): the two are **related
+  records** — separate records that know about each other, under the standing mutual-awareness law; not one
+  record, and not permanently unrelated. And the **world record's colour keeps the name "ground"**: DISH
+  LIFE's living field is the one that gets renamed, when the DISH LIFE slice is specced — a later naming
+  act; this spec does not invent the new name.
 
 ## 7. What does not change
 
@@ -226,21 +249,29 @@ moves it. What a landing _can_ move is only an unlocked, unhanded world field.
   path. The sun stays scene-level, performed by hand and beat.
 - **No new panel.** The world is dealt, not dialed; §4's hand-and-lock precedence uses the surfaces that
   already exist.
-- **Off is byte-identical.** No world standing (`world: null`, or a document that predates the field) renders
-  exactly as today — every golden, every replay, every still. This is the light's rule (`data/light.js:9–10`)
-  applied to the world.
+- **Off is byte-identical — where off exists.** No world standing (`world: null`) renders exactly as today —
+  every golden, every replay, every still. This is the light's rule (`data/light.js:9–10`) applied to the
+  world. But world-less is no longer the fresh-stage default: from the open, a hand-authored **house world**
+  stands by default (ruling 10), and it may change the opening look — that change is the ruling's, stated
+  here so nobody mistakes it for a regression. The world-less states that remain are the stage after CHAOS
+  or the launch opener has cleared the world with its chapter (ruling 7), until the next landing, and
+  documents that predate the field.
 - **The trail is untouched.** ACCUM stays a Look's business (the closed trail issue's fix stands); the world
   sets no trail policy, and the strata diagnosis's note that the trail re-presents old light stays a property
   of the trail, not something the world promises to fix.
-- **No persona gains a hand.** The trio reads the world (through context and the bus, §5); proposing and
-  scoring stay proposing and scoring. Nothing here lets a persona deal, gate or edit a world.
+- **No persona gains a hand.** The trio reads the world through context (§5; the bus surface waits for the
+  awareness slice, ruling 9); proposing and scoring stay proposing and scoring. Nothing here lets a persona
+  deal, gate or edit a world.
 
 ## 8. Selfcheck plan for the build (a later PR, not this one)
 
 One new suite, one manifest line, in the instrument's idiom: the sanitize door (null for non-objects, defaults
 for missing fields, boil clamped to the named band, unknown material dropped); the deal (a landing deals a
 world from the chapter's stock through the seeded channel; a KINETIC or CURATOR press after the landing leaves
-the record untouched; a replayed landing sequence re-derives identical worlds); precedence (a locked ground
+the record untouched; a replayed landing sequence re-derives identical worlds; a re-landing deals the world
+that chapter dealt before, across sessions too); clearing and the default (CHAOS clears the world with its
+chapter and the stage stands world-less until the next landing; a fresh stage stands in the house world);
+precedence (a locked ground
 survives a landing; a hand-set boil survives a landing); recording (document round-trip — a world survives
 save/load, a world-less document loads byte-identical, a take stamps the world it was dealt under); style
 response (a style with no `response` stands in the world unmodulated; amounts scale, never override); and
@@ -251,43 +282,78 @@ the build PR, per the review lane.
 
 Nothing was run. Every claim above is a read of `main` @ `c9db2c06`. Three of the parent issue's premises,
 written at `554fa00`, have moved since and are corrected here rather than repeated: chapters **do** now carry
-applicable settings (Canon S4, #2046); styles **do** now declare a bus binding (Canon S5-era, #2049); and the
+applicable settings (Canon S4, #2046); styles **do** now declare a bus binding (Canon S6, #2049); and the
 audit's gap 5 wording ("no settings of its own") predates both. The issue's remaining premises re-verified
 true at this head: no world record exists, the boil rate is a constant nobody writes, ground/ink arrive via
 the dealt palette, and the sun is one, scene-level, and off-by-default.
 
-## 10. Open for Matt (none decided here)
+## 10. Ruled (Matt, 2026-11-13 — all ten; nothing left open)
+
+Each question is kept as asked; its ruling follows, in the words of the rulings recorded as comments on the
+parent issue, dated 2026-11-13.
 
 1. **The world's stock.** Where do dealt worlds come from — derived from the landed chapter's own settings
    and palettes (Canon S4's measured values, the chapter card's palette), an authored stock of worlds per
    chapter, or rolled from named ranges on the die? And on re-landing a chapter already visited: a fresh
    deal, or the world that chapter dealt before?
+   **Ruled:** the stock is **authored** — a stock of worlds written per chapter. Not derived from the
+   chapter's measured settings, and not rolled from named ranges on the die. And on re-landing, **the
+   chapter remembers** — it deals the same world it dealt before. A chapter develops a known climate; no
+   fresh deal on a return visit.
 2. **Ground and ink, from where.** The ruling names ground as paper/plate colour and ink as the darkest line
    colour — but today's palette `ink` is a contrast text colour, and no line-colour value exists (§1). Does
    the world take `bg`/`ink` from the landed chapter's palette as-is, or does `ink` become a new, genuinely
    line-facing value the palettes have to grow?
+   **Ruled:** **ink becomes a new, genuinely line-facing value** that the palettes grow. The world does not
+   borrow the palette's text-contrast `ink` under a line colour's name. Ground still comes from the palette's
+   background colour.
 3. **The finish vs the FX strata.** Voices and looks deal grain into FX layers today (§1); the world owns
    "one finish pass over everything". Do the two compose (world finish last, over the FX finishes), does the
    world _replace_ per-look grain while it stands, or does a look's grain survive untouched and the world's
    finish is only the final pass's amount?
+   **Ruled:** **a look's grain survives untouched.** The world's finish does not replace or compose over
+   per-look FX grain; the world's finish is only the final pass's amount, over everything, at the end.
 4. **The boil's reach.** The world's boilFps binds the mark kineme clock — does it also bind the parallel
    motion vocabularies the strata diagnosis lists (the PATTERN elements' CPU kinemes, the cell kinemes'
    line-boil), or only the stage-wide clock the ruling names?
+   **Ruled:** the world's boil binds **all of them** — the stage-wide mark clock, the PATTERN elements' CPU
+   kinemes, and the cell kinemes' line-boil all run on the world's boil clock while a world stands. One tempo
+   for the whole stage.
 5. **Style response: authored or measured.** Canon settings already _measure_ a style's motion centre from
    its members (§1). Is a style's `response` (§3) an authored declaration, the measured settings promoted to
    that role, or measured values an author may override? And is the material vocabulary the closed set the
    issue names — matte / enamel / wet — or open?
+   **Ruled:** a style's response is **measured, but an author may override it** — the measured motion centre
+   is the default response; an authored override wins where one exists. And the material vocabulary is
+   **open** — matte / enamel / wet are the starting set, and styles can name new materials as they are
+   authored.
 6. **Recording.** The world in the project document and the take, in the sun's shape (§5's proposal), or
    session-only like the chapter it rides in on — gone when the session ends, re-dealt on the next landing?
+   **Ruled:** the world is **recorded** — it saves in the project document and in the take, in the sun's
+   shape. A take replays in its world, and the chapter's memory of its world (question 1) is durable across
+   sessions, not session-only.
 7. **Clearing.** CHAOS and the launch opener clear the standing chapter today. Do they clear the standing
    world with it, or does a world stand until the next landing replaces it?
+   **Ruled:** **CHAOS and the launch opener clear the world with the chapter.** Clearing the chapter clears
+   its world; the stage returns to world-less (today exactly) until the next landing.
 8. **The two grounds.** The world record's ground (a colour) and DISH LIFE's ground (the invisible
    living/dead field in the one dish) share a word and a stage (§6). One record, related records, or
    permanently separate — and if separate, which one keeps the name "ground"?
+   **Ruled:** the two grounds are **related records** — the world record's ground (a colour) and DISH LIFE's
+   ground (the invisible living/dead field) stay separate records, but they know about each other, under the
+   standing mutual-awareness law. Not one record, and not permanently unrelated. And **the world record's
+   colour keeps the name "ground"** — DISH LIFE's living/dead field is the one that gets renamed (the new
+   name is a later naming act, when the DISH LIFE slice is specced — not invented here).
 9. **The bus declaration.** Does the world record declare listens/announces in this slice (§5's proposal),
    or does its bus surface wait for the mutual-awareness slice under the umbrella (1183)?
+   **Ruled:** the world record's bus surface **waits** — it arrives with the mutual-awareness slice under the
+   umbrella (1183), not in this slice. This slice ships the record, its door, the landing deal, and the
+   recording, without a declared bus surface.
 10. **The pre-landing stage.** Before any chapter landing deals a world, is the stage simply world-less
     (today exactly, §7) — or is there a house world that stands by default, and if so, who authors it?
+    **Ruled:** **a house world stands by default.** The stage is not world-less before the first landing; a
+    house world is standing from the open. And the house world is **authored by hand** — a written house
+    world, which may change the opening look. It is not assembled from today's defaults.
 
 Build order after approval: the record and its door, the landing deal, the recording, then style response —
 one PR per step, each stopping where the rulings stop.
