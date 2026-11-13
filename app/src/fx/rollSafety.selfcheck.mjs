@@ -188,8 +188,21 @@ try {
   await okA('why: INVERT turns a dark scene into a light one', async () => {
     assert.ok(inverted.mean > plain.mean + 0.3, `${inverted.mean.toFixed(2)} vs ${plain.mean.toFixed(2)}`);
   });
+  // FLOOR RE-BASELINE (2026-11-12, #2150 — same class as the coverage
+  // suite's band notes): the 0.5 floor was a proxy calibrated to this
+  // seed's old cast, which drew 120 of its 183 items from two letter
+  // plates (typ_2 ×69, typ_E ×51) and measured normal range 0.6144. The
+  // type-exclusivity ruling (#2150) made deals glyph-free, so the same
+  // seed now deals a mark field instead (pxg_speck_ne, mic_chevrons,
+  // mic_bracket_bl, pxg_speck — no glyphs) and measures: plain/normal
+  // range 0.3203, screen 0.3282, overlay 0.0093. The block's load-bearing
+  // property is the relative assertion below — min(screen, overlay) <
+  // normal × 0.8 — and it holds with room: overlay sits at 0.029 of
+  // normal (the old cast: 0.064). The floor is re-based to 0.2 (≈⅔ of
+  // the measured 0.3203) so the scene must still carry a real picture,
+  // at the scale its lawful cast can draw. Nothing else changes.
   await okA('why: a lone layer under SCREEN or OVERLAY loses its picture; under NORMAL it keeps it', async () => {
-    assert.ok(normal.range > 0.5, `normal range ${normal.range.toFixed(2)}`);
+    assert.ok(normal.range > 0.2, `normal range ${normal.range.toFixed(2)}`);
     assert.ok(
       Math.min(screened.range, overlaid.range) < normal.range * 0.8,
       `screen ${screened.range.toFixed(2)}, overlay ${overlaid.range.toFixed(2)}, normal ${normal.range.toFixed(2)}`,
