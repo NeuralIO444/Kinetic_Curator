@@ -132,6 +132,7 @@ export function startTrio({
   let pending = null; // { op, landBar, bar }
   const log = []; // the last LOG_MAX outcomes, newest first
   let applying = false; // our own table write: not the artist
+  let fromLoad = false; // #2095: the load action announced itself; the table change landing with it is the document's, not a hand
   let bar = 0;
   let spectrum = null; // the latest spectrum summary, or null
   let trail = null; // #1807: the latest buffer statistics, or null (ACCUM off / no reading yet)
@@ -438,11 +439,32 @@ export function startTrio({
       for (const k of ['audioModDepth', 'audioScaleMod', 'audioAlphaMod', 'audioSwell']) owns(k);
     }),
   ); // a FEEL pill sets the audio feel
+  // #2095 (Matt's ruling, 2026-11-11): a project load is a fresh start for the Trio. The load action announces
+  // itself before the state lands (applyProject -> PROJECT_LOADED — the action is hooked, never a diff of the
+  // table): a held proposal is announced dropped/stale, and the books are wiped — ownership, the revert count
+  // and cool-down, the phrase ledger (conductor.reset) and mineMarks. The load never counts as the artist's
+  // hand and never as a revert: the subscription sits its table change out (fromLoad, consumed by the load's
+  // own store notification, which the set in applyProject always makes).
+  stops.push(
+    on(Events.PROJECT_LOADED, () => {
+      if (pending) {
+        const held = pending;
+        pending = null;
+        announce({ status: 'dropped', reason: 'stale', op: held.op, bar: held.bar, landBar: held.landBar });
+      }
+      conductor.reset();
+      mineMarks.clear();
+      fromLoad = true;
+      publish();
+    }),
+  );
   if (typeof subscribe === 'function') {
     stops.push(
       subscribe((state, prev) => {
         if (!state || !prev || applying) return;
-        if (state.audioRoutes !== prev.audioRoutes) {
+        const load = fromLoad; // #2095: this notification is the announced load landing — read no hand from it
+        fromLoad = false;
+        if (state.audioRoutes !== prev.audioRoutes && !load) {
           const was = new Map(effective(prev.audioRoutes).map((r) => [pairKey(r), r]));
           const now = effective(state.audioRoutes);
           const nowKeys = new Set(now.map(pairKey));
@@ -531,6 +553,7 @@ export function startTrio({
       pending = null;
       mineMarks.clear();
       conductor.reset();
+      fromLoad = false;
       view = null;
       notify();
     },

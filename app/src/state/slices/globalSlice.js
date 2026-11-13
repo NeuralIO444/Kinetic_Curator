@@ -22,6 +22,7 @@ import {
 import { normalizeSeedOffsets } from '../../engine/kernel/rng.js';
 import { clampCycleGens, FIELD_CYCLE_GENS } from '../../engine/dishLifeField.mjs'; // #1923 Phase 4: the re-seed interval's detents
 import { sanitizeMagnets, clampFluidDial, clampFluidRung, MAX_MAGNETS } from '../../engine/dishFluid.mjs'; // #1997: the ferrofluid's stamped-state sanitizers
+import { emit, Events } from '../../composition/eventBus.js';
 import { importTaste as keepTaste, clearTaste as dropTaste, getTaste } from '../../curator/tasteStore.js';
 import { tasteSummary, loisSummary } from '../../curator/tasteHead.js';
 import { chapterMemorySummary } from '../../curator/chapterMemory.mjs'; // #1858: the book-memory line
@@ -1466,7 +1467,12 @@ export const createGlobalSlice = (set) => ({
 
   clearWeightOverrides: () => set({ assetWeightOverrides: {} }),
 
-  applyProject: (doc) =>
+  applyProject: (doc) => {
+    // #2095 — every load path funnels through this action (the EXPORT_LOAD_PROJECT dispatch, a project-folder
+    // open, the boot restore, a share link). Announce the load action itself BEFORE the state lands: the Trio
+    // hears it, resets its books, and knows the table change arriving with this set is the document's — a load
+    // is hooked as an action, never inferred from a diff of the table.
+    emit(Events.PROJECT_LOADED);
     set((state) => {
       const next = {
         seed: doc.seed >>> 0,
@@ -1588,7 +1594,8 @@ export const createGlobalSlice = (set) => ({
         }
       }
       return next;
-    }),
+    });
+  },
 });
 
 export { WEIGHT_CYCLE, initialEnabledAssets };

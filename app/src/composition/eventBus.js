@@ -177,6 +177,7 @@ export const Events = {
   EXPORT_AUTO_QUALITY: 'export:autoQuality',
   EXPORT_SEED: 'export:seed',
   EXPORT_LOAD_PROJECT: 'export:loadProject',
+  PROJECT_LOADED: 'project:loaded', // #2095: applyProject announces the load action itself, before the state lands (every load path funnels through it)
   LAYER_ADD: 'layer:add',
   LAYER_REMOVE: 'layer:remove',
   LAYER_SET_ACTIVE: 'layer:setActive',
