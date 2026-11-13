@@ -3,10 +3,10 @@
 // routes only through the poem system (Matt's ruling, 2026-11-12).
 //
 // The property this suite pins, over every deal surface: NO dealt, pooled,
-// chaptered, wardrobed, costume or WetLab-legal asset id is a glyph id —
-// while the glyphs stay in the catalogue (history resolves them), FIELD
-// keeps its full supply (it imports its packs directly), and the assets
-// Matt's classification rulings KEPT stay dealable.
+// chaptered, wardrobed, costume, WetLab-legal or review-pool asset id is a
+// glyph id — while the glyphs stay in the catalogue (history resolves
+// them), FIELD keeps its full supply (it imports its packs directly), and
+// the assets Matt's classification rulings KEPT stay dealable.
 //
 // The glyph set (47): the typ_* caps/digits pack (36, now poem-only via
 // placement's union), the solo text stamps (3 — a bare letter/number with
@@ -33,6 +33,9 @@ import { poolDescriptors } from '../panels/assetPoolLogic.mjs';
 import { SHAPE_SETS } from '../data/voices.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 import { mkRng } from '../engine/prng.js';
+import { useStore } from '../state/store.js';
+import { reviewLanding } from './fieldReview.mjs';
+import { fieldDealReport } from '../poets/fieldForm.js';
 
 const GLYPH_IDS = new Set([...LETTER_STAMP_IDS, ...SOLO_TEXT_STAMP_IDS, ...PIXEL_LETTER_ANATOMY_IDS]);
 const KEPT_IDS = [
@@ -142,6 +145,38 @@ assert.ok(abacus.ids.includes('stamp_num_01'), 'abacus keeps its badged number (
 for (const v of VOICE_DECK) {
   const worn = Object.keys(v.def.assets).filter((id) => v.def.assets[id]);
   noGlyphs(worn, `${v.id}: the family wardrobe`);
+}
+
+// ── The LOIS review pool (fieldReview) ────────────────────────────────────
+// The review loop rebuilds a landing's layer from its own pool, filtered by
+// its POEM_ONLY_IDS (the poem-only union ∪ the solo text stamps ∪ the
+// pixel letter-anatomy emblems — the same three sources as everywhere
+// else). Exercise it through the review entry point: enable ONLY the 47
+// glyph ids, so the review pool can contain nothing but glyphs. If any
+// glyph source leaked out of the exclusion the pool is non-empty, the
+// landing builds, and a record banks; with the exclusion intact the pool
+// is empty, nothing builds, and reviewLanding banks nothing (null) on
+// every seed.
+{
+  const form = fieldDealReport({ poetId: 'greenleaf', pieceId: 'g1' }, mkRng(42), { aspect: 10 / 7 }).form;
+  assert.ok(form, 'a real plain form to review');
+  const state = useStore.getState();
+  const glyphsOnly = Object.fromEntries([...GLYPH_IDS].map((id) => [id, true]));
+  for (let seed = 1; seed <= 10; seed++) {
+    assert.strictEqual(
+      reviewLanding(
+        state,
+        { ...state.layoutParams, fieldForm: form },
+        { seed: seed * 1000 + 7, enabledAssets: glyphsOnly },
+      ),
+      null,
+      `the review pool (seed ${seed}): no glyph id enters — a glyphs-only stage banks no review record`,
+    );
+  }
+  // Control: the same landing, ordinarily enabled, DOES bank a judged
+  // record — the nulls above are the glyph gate, not a dead fixture.
+  const control = reviewLanding(state, { ...state.layoutParams, fieldForm: form }, { seed: 1007 });
+  assert.ok(control && control.measures, 'the control landing banks a judged record');
 }
 
 // WetLab legal bodies: the filter lives inline in the panel (a JSX prop), so

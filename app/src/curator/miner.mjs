@@ -112,11 +112,15 @@ for (const a of ASSETS) {
 export const STARVED_CATEGORIES = ['radial', 'crystalline', 'floral', 'biosynthetic'];
 
 // E1b finding F2 (#1505): these ten text stamps draw ONLY when a
-// monospace font reaches the rasterizer. They stay in the sampling
-// pool like every other asset (never silently excluded); the miner
-// accounts for them by measuring ink twice — font-less (the E1b
-// sweep's protocol, the primary statistic) and with system fonts —
-// and flagging every candidate whose cast carries one.
+// monospace font reaches the rasterizer. The miner accounts for them
+// by measuring ink twice — font-less (the E1b sweep's protocol, the
+// primary statistic) and with system fonts — and flagging every
+// candidate whose cast carries one. #2150: three of the ten (the solo
+// text stamps — stamp_letter_02, stamp_num_04, stamp_num_05) are
+// glyphs under the type-exclusivity ruling and are filtered at the
+// dice chokepoint, so they never reach a cast and the flag never
+// fires for them; the other seven (the symbol marks, Q1) stay in the
+// sampling pool like every other asset (never silently excluded).
 export const FONT_CONTINGENT_IDS = new Set([
   'stamp_num_04',
   'stamp_num_05',
