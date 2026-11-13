@@ -120,7 +120,7 @@ export function createEmbedDriver({
     error: null,
     saved: saved0,
     cacheCount: Object.keys(cache).length,
-    busy: null, // 'index' | 'search' while a press is working
+    busy: null, // 'index' | 'search' | 'export' while a press is working
     search: null, // { query, keeps: [...], assets: [...] } — ranked results of the last press
     message: null,
   };
@@ -413,9 +413,51 @@ export function createEmbedDriver({
       }
       return { model: rec.model, dims: rec.dims, vectorsByTextHash, texts };
     },
-    /** Download the export as embeddings.json (the vision driver's ledger-download idiom). */
-    downloadExport() {
-      const data = driver.exportData();
+    /**
+     * #2086 — export guarantees keeps (Matt's ruling, 2026-11-12): before an export is written,
+     * every keep whose vector is MISSING from the cache is re-embedded, so the file the run tool
+     * reads actually carries the keeps and the miner's keepsEmbedded count stays honest. The
+     * overflow is by design: the cache's soft cap (EMBED_CACHE_MAX) and its oldest-first eviction
+     * are unchanged, and a full-library press embeds the keeps first and then ~985 asset texts —
+     * roughly twice the cap — so the keeps are exactly what a plain export loses. Re-embedding
+     * here gives the keeps fresh stamps; the room comes from the oldest asset vectors, which the
+     * export never promised. Only missing keeps are fetched (cache hits ride embedTexts' own
+     * path); a keep whose text composes empty was never embeddable — the panel never embedded it
+     * either — and stays honestly absent. Resolves the export data, or null: no slot measured,
+     * or the slot moved mid-press (a superseded export is no export).
+     */
+    async prepareExport({ keeps = [], assets = [] } = {}) {
+      const rec = view.record;
+      if (!rec) return null;
+      const gen = generation;
+      const assetById = new Map(assets.map((a) => [a.id, a]));
+      const missing = [];
+      for (const keep of keeps) {
+        const text = keepEmbedText(keep, { assetById, translateId: keepTranslateId(keep) });
+        if (!text) continue;
+        const key = embedCacheKey({ model: rec.model, textHash: await hashText(text) });
+        const hit = key ? cache[key] : null;
+        if ((!hit || hit.dims !== rec.dims) && !missing.includes(text)) missing.push(text);
+      }
+      if (missing.length) {
+        set({ busy: 'export', message: null });
+        try {
+          await embedTexts(missing, gen);
+        } finally {
+          set({ busy: null });
+        }
+        if (gen !== generation) return null;
+      }
+      return driver.exportData();
+    },
+    /**
+     * Download the export as embeddings.json (the vision driver's ledger-download idiom). The
+     * keeps guarantee runs first (#2086): keeps missing from the cache are re-embedded before
+     * the file is written, so the natural search → export → runMiner order hands the miner the
+     * keeps the panel embedded.
+     */
+    async downloadExport({ keeps = [], assets = [] } = {}) {
+      const data = await driver.prepareExport({ keeps, assets });
       if (!data) return false;
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
       const a = document.createElement('a');
