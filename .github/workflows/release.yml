@@ -102,5 +102,5 @@ jobs:
             This draft is never published automatically — review the artifacts, then publish by hand.
           releaseDraft: true
           prerelease: ${{ contains(github.ref_name, '-rc') }}
-          uploadUpdaterJson: false # updater is inactive in tauri.conf.json
+          includeUpdaterJson: false # updater is inactive in tauri.conf.json
           args: --target aarch64-apple-darwin
