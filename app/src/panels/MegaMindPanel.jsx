@@ -509,7 +509,12 @@ function Embeddings({ endpoint }) {
         >
           search keeps &amp; library
         </button>
-        <button type="button" style={btn} disabled={busy || !ev.record} onClick={() => driver.downloadExport()}>
+        <button
+          type="button"
+          style={btn}
+          disabled={busy || !ev.record}
+          onClick={() => driver.downloadExport({ keeps: shelfKeeps(), assets: ASSETS })}
+        >
           export embeddings for the run tool
         </button>
       </div>

@@ -14,6 +14,7 @@ import { createHash } from 'node:crypto';
 import {
   EMBED_CACHE_FILE,
   EMBED_CACHE_KEY,
+  EMBED_CACHE_MAX,
   EMBED_SLOT_KEY,
   EMBED_PROBE_IMAGE_B64,
   EMBED_PROBE_TEXT,
@@ -588,6 +589,73 @@ suite('megamindEmbed acceptance fixture', () => {
     dok(
       vRun.report.semantic && vRun.report.semantic.keepsEmbedded === 1,
       'variant-cast keep: handed the panel export, the miner resolves the keep’s vector',
+    );
+
+    // #2086 — EXPORT GUARANTEES KEEPS (Matt's ruling, 2026-11-12), at real library scale: the
+    // real press (query + keeps + the whole ASSETS library, ~2× the soft cap) embeds the keep
+    // FIRST and then floods past it, so the keep — oldest stamp — is evicted, and an export
+    // taken afterwards hands the miner keepsEmbedded === 0 (the QA reproduction). The export
+    // press must re-embed the missing keep before writing: cap and eviction policy unchanged,
+    // and only the missing keep is fetched.
+    dok(
+      ASSETS.length + 2 > EMBED_CACHE_MAX,
+      'export-guarantee setup: the real press (query + keep + library) overflows the soft cap',
+    );
+    const fxFull = ollamaFixture({ models: [{ name: 'embed-fixture' }], embedFor: embedOk });
+    const dFull = mkDriver(fxFull, memStorage());
+    await dFull.connect('http://127.0.0.1:11434');
+    const fullFound = await dFull.searchText('spiky ones', { keeps: [keepA], assets: ASSETS });
+    dok(fullFound && fullFound.keeps.length === 1, 'full-library press: the keep ranked while it was embedded');
+    dok(dFull.view().cacheCount === EMBED_CACHE_MAX, 'full-library press: the cache sits at the soft cap');
+    const plainExport = dFull.exportData();
+    dok(
+      plainExport.vectorsByTextHash[sha(keepAText)] === undefined,
+      'full-library press: the keep’s vector was evicted — the plain export loses it (the measured limit)',
+    );
+    const starvedRun = runMiner({
+      runSeed: 0x1506,
+      batchSize: 24,
+      finalistCount: 6,
+      keeps: [keepA],
+      embeddings: plainExport,
+    });
+    dok(
+      starvedRun.report.semantic && starvedRun.report.semantic.keepsEmbedded === 0,
+      'the plain export hands the miner keepsEmbedded === 0, exactly as QA measured',
+    );
+    const fullInputs = () =>
+      fxFull.embedCalls().flatMap((c) => (Array.isArray(c.body.input) ? c.body.input : [c.body.input]));
+    const inputsBefore = fullInputs().length;
+    const guaranteed = await dFull.prepareExport({ keeps: [keepA], assets: ASSETS });
+    dok(
+      guaranteed && guaranteed.vectorsByTextHash[sha(keepAText)] !== undefined,
+      'export guarantees keeps: the missing keep is re-embedded before the export is written',
+    );
+    dok(
+      fullInputs().length === inputsBefore + 1 && fullInputs().filter((t) => t === keepAText).length === 2,
+      'the guarantee fetched exactly the one missing keep — not the library again',
+    );
+    dok(
+      dFull.view().cacheCount === EMBED_CACHE_MAX,
+      'the guarantee holds the cap: the room came from the oldest asset vectors',
+    );
+    const fedRun = runMiner({
+      runSeed: 0x1506,
+      batchSize: 24,
+      finalistCount: 6,
+      keeps: [keepA],
+      embeddings: guaranteed,
+    });
+    dok(
+      fedRun.report.semantic && fedRun.report.semantic.keepsEmbedded === 1,
+      'search → export → runMiner: keepsEmbedded is honest and non-zero in the natural order',
+    );
+    const inputsWarm = fullInputs().length;
+    await dFull.prepareExport({ keeps: [keepA], assets: ASSETS });
+    dok(fullInputs().length === inputsWarm, 'a second export fetches nothing — the keep is cached again');
+    dok(
+      (await dAbsent.prepareExport({ keeps: [keepA], assets: ASSETS })) === null,
+      'no slot measured: no export is prepared',
     );
 
     // A different model over the same machine cache re-fetches: keys are per-model, so no vector
