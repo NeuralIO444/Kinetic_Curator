@@ -6,6 +6,12 @@
 // Read them through data/swatchWeights.js, which derives them for a palette that has none.
 // `leak` (#287) = pigment drift rate 0..1 — agents' colors melt toward their
 // neighbours' average. Most palettes stay 0 (colors hold); a few melt slowly.
+// `lineInk` (#2104) = the darkest LINE colour, the floor every mark's line
+// work is read against — NOT `ink` above (the catalog-page text colour).
+// Read through deriveLineInk below (a record may carry an authored one as
+// a hand fix, which wins). Deliberately NOT a key on resolvePalette's
+// return: the resolved palette's shape is walked by the replay hash
+// (gl/performanceFile.mjs), so its keys are replay contract.
 
 export const PALETTES = [
   {
@@ -469,6 +475,8 @@ export const FAMILY_PALETTES = Object.freeze(
         swatches: Object.freeze(p.swatches.map((c) => hueRotateHex(c, deg))),
         ...(Array.isArray(p.weights) ? { weights: Object.freeze([...p.weights]) } : {}),
         ...(typeof p.leak === 'number' ? { leak: p.leak } : {}),
+        // #2104 — an authored line ink is kept across the family, like bg and ink.
+        ...(typeof p.lineInk === 'string' ? { lineInk: p.lineInk } : {}),
         family: p.id,
       }),
     ),
@@ -507,6 +515,48 @@ export function normalizeHex(hex) {
   }
   if (!/^#[0-9a-fA-F]{6}$/.test(h)) return null;
   return h.toLowerCase();
+}
+
+/** Relative luminance of a #rrggbb colour, 0..1 (sRGB, Rec. 709 weights — the measure data/canon/settings.js reads grounds by). Null if invalid. */
+function relativeLuminance(hex) {
+  const h = normalizeHex(hex);
+  if (!h) return null;
+  const n = parseInt(h.slice(1), 16);
+  const lin = (c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * lin(((n >> 16) & 255) / 255) + 0.7152 * lin(((n >> 8) & 255) / 255) + 0.0722 * lin((n & 255) / 255);
+}
+
+/**
+ * #2104 — a palette's LINE ink: the darkest line colour, the floor every mark's line work is read against.
+ * A new, genuinely line-facing value the palettes grow (ruling 2, 2026-11-13) — never the text-contrast
+ * `ink` borrowed under a line colour's name. This function is the one read path for it, over any palette
+ * record (catalog, family cousin, user-saved, or a resolved palette — a resolved palette carries no
+ * `lineInk` key, by design; see the header).
+ *
+ * THE RULE (conflict-review ruling, 2026-11-13: derived by a stated rule from the palette's existing
+ * colours, hand fixes after): an authored `lineInk` on the record wins — that is the hand fix, the way
+ * baked `weights` beat deriveSwatchWeights. Otherwise the value is DERIVED: the darkest of the palette's
+ * swatches by relative luminance, EXCLUDING any swatch equal to the palette's own bg — a line the colour
+ * of the ground is no line. Ties go to the earliest swatch in catalogue order. A palette with no
+ * eligible swatch falls back to its bg.
+ */
+export function deriveLineInk(palette) {
+  if (!palette || typeof palette !== 'object') return null;
+  const authored = normalizeHex(palette.lineInk);
+  if (authored) return authored;
+  const bg = normalizeHex(palette.bg);
+  let best = null;
+  let bestLum = Infinity;
+  for (const raw of Array.isArray(palette.swatches) ? palette.swatches : []) {
+    const c = normalizeHex(raw);
+    if (!c || c === bg) continue;
+    const lum = relativeLuminance(c);
+    if (lum !== null && lum < bestLum) {
+      best = c;
+      bestLum = lum;
+    }
+  }
+  return best ?? bg;
 }
 
 /**
