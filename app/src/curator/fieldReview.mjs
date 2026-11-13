@@ -67,6 +67,8 @@ import { buildPlacements, PLATE_ROOM_ALPHA, PLATE_ZONE_PAD_EM } from '../engine/
 import { createGrid } from '../engine/ca-engine.js';
 import { sanitizeFieldForm } from '../poets/fieldForm.js';
 import { stampWidthEm, POEM_ONLY_STAMP_IDS } from '../poets/placement.js';
+import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 import { isPoemKept } from '../poets/poemRow.mjs';
 import { mergePool } from '../assets/overlay.js';
 import { ASSETS } from '../data/assets/index.js';
@@ -107,8 +109,12 @@ export const REVIEW_GATES = Object.freeze({
 
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** The poem-only stamp set the resolver excludes from the placeable pool (placement's union). */
-const POEM_ONLY_IDS = POEM_ONLY_STAMP_IDS;
+/** The poem-only stamp set the resolver excludes from the placeable pool (placement's union).
+ * #2150 — the review pool also excludes the non-FIELD glyphs (the solo text
+ * stamps and the pixel letter-anatomy emblems, Q4), so a revision candidate
+ * can never seat a solo glyph the deal surfaces would refuse. The caps/digits
+ * arrive via the union itself (placement grew by LETTER_STAMP_IDS). */
+const POEM_ONLY_IDS = new Set([...POEM_ONLY_STAMP_IDS, ...SOLO_TEXT_STAMP_IDS, ...PIXEL_LETTER_ANATOMY_IDS]);
 
 /** One axis-aligned box from a centre and half-extents (canvas px). */
 const boxOf = (cx, cy, hw, hh) => ({ x0: cx - hw, y0: cy - hh, x1: cx + hw, y1: cy + hh });

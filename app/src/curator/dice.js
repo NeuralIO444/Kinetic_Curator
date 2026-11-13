@@ -20,6 +20,9 @@ import { ASSETS_ORNAMENTS } from '../data/assets/assets-ornaments.js';
 import { ASSETS_PLATE } from '../data/assets/assets-plate.js';
 import { ASSETS_WEAR } from '../data/assets/assets-wear.js'; // #2010 P1: the poem-only worn letters (torn / xerox)
 import { ASSETS_RISO } from '../data/assets/assets-riso.js';
+import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
+import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 
 // #1982 — the poem-only kana stamps are never dealt as marks, by any caller:
 // the FIELD director deals them alone, as poem type. dealCast is the cast
@@ -31,8 +34,13 @@ import { ASSETS_RISO } from '../data/assets/assets-riso.js';
 // #2002 — the slice-3 packs are filtered at the same chokepoint, on the
 // same terms: the filtered set is the whole poem-only union.
 // #2005 — the plate pack (Fraunces) is filtered at the same chokepoint too.
-const KANA_IDS = new Set(
-  [
+// #2150 — the glyphs are filtered at the same chokepoint, on the same terms:
+// the caps/digits pack (poem-only now), the solo text stamps and the pixel
+// letter-anatomy emblems (Q4). No cast deals a letter or digit as a solo
+// asset; badged letters/numbers, word labels and symbols stay castable
+// (Q1–Q3: graphics and symbol marks, not type).
+const KANA_IDS = new Set([
+  ...[
     ...ASSETS_KANA,
     ...ASSETS_KANJI,
     ...ASSETS_LATIN,
@@ -41,8 +49,11 @@ const KANA_IDS = new Set(
     ...ASSETS_PLATE,
     ...ASSETS_WEAR,
     ...ASSETS_RISO,
+    ...ASSETS_LETTERS,
   ].map((a) => a.id),
-);
+  ...SOLO_TEXT_STAMP_IDS,
+  ...PIXEL_LETTER_ANATOMY_IDS,
+]);
 const withoutKana = (list) => (list.some((a) => KANA_IDS.has(a.id)) ? list.filter((a) => !KANA_IDS.has(a.id)) : list);
 
 /** Candidates dealt per roll before shortlisting (the Lois pass: show this count). */

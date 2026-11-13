@@ -47,7 +47,10 @@ test('tag one asset, filter to it, bulk-tag three, reload: all still there', asy
   // asset vocabulary: a raw tag with a canonical home canonicalizes on
   // store, so the raw-string filter stops matching it ('kanji' gained a
   // home in the letter term in #1998 and broke exactly this line).
-  await page.getByPlaceholder(/filter/i).fill('typ_');
+  // The filter family must stay DEALABLE: this used the typ_ pack until
+  // #2150 (type is never a solo asset) took the glyphs out of the pool,
+  // leaving the filter with no tiles to pick. geo_ is plain shapes.
+  await page.getByPlaceholder(/filter/i).fill('geo_');
   const picks = page.locator('.tile-pick');
   await picks.nth(0).click();
   await picks.nth(1).click();

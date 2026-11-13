@@ -20,7 +20,10 @@ assert.ok(setReach.size < 60, `the old deck: ${setReach.size} assets`);
 // 2. every library family is dealt within a bounded number of rolls, and >200 unique assets become reachable
 // #2008 — the riso family is FIELD-dealt only (NEVER_DEALT, like the poem-only packs): it can
 // never turn up in a roll, so it leaves the roll-reachability census beside 'creature'.
-const libFamilies = FAMILIES.filter((f) => f !== 'imported' && f !== 'creature' && f !== 'riso');
+// #2150 — the letterforms family leaves the census on the same terms: the whole family was
+// the typ_* pack, which is poem-only now (NEVER_DEALT) — FIELD deals it alone, so no roll
+// can ever turn it up.
+const libFamilies = FAMILIES.filter((f) => f !== 'imported' && f !== 'creature' && f !== 'riso' && f !== 'letterforms');
 const seenFam = new Set();
 let rollsToAllFamilies = 0;
 const seen = new Set();

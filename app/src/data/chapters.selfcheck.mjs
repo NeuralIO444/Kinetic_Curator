@@ -66,12 +66,12 @@ const EXPECTED_COUNTS = {
   marks: { looks: 5, voices: 8, assets: 18 },
   engraving: { looks: 4, voices: 11, assets: 20 },
   bauhaus: { looks: 4, voices: 8, assets: 16 },
-  swiss: { looks: 5, voices: 11, assets: 61 },
+  swiss: { looks: 5, voices: 11, assets: 25 }, // #2150 RE-PIN: 61 − 36 — the typ_* pack leaves the Swiss deck (poem-only now); the chapter CARD keeps its letters (Q6)
   'op-art': { looks: 4, voices: 11, assets: 14 },
   japan: { looks: 5, voices: 11, assets: 25 },
   memphis: { looks: 4, voices: 14, assets: 25 },
-  grunge: { looks: 5, voices: 8, assets: 39 },
-  now: { looks: 70, voices: 72, assets: 312 }, // #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks)
+  grunge: { looks: 5, voices: 8, assets: 36 }, // #2150 RE-PIN: 39 − 3 — the solo text stamps (stamp_letter_02, stamp_num_04, stamp_num_05) leave the Grunge deck
+  now: { looks: 70, voices: 72, assets: 265 }, // #2008: Now sums the grown library (69+1 looks — the picker-only Riso field Look joins the sum; chapters still cannot deal it, chapterScopeDeck ∩ the scope decks) · #2150 RE-PIN: 312 − 47 — the whole glyph set leaves the Now deck
 };
 for (const c of CHAPTERS) {
   const d = chapterDeck(c);
@@ -83,14 +83,19 @@ for (const c of CHAPTERS) {
   assert.equal(new Set(d.assets).size, d.assets.length, `${c.id}: no asset dealt twice inside a deck`);
 }
 
-// 4. coverage: the union of all chapters is exactly the dealable library (312) — the creature citizen is in
+// 4. coverage: the union of all chapters is exactly the dealable library (265) — the creature citizen is in
 //    no chapter's deck, and Now alone is the full library of looks, voices and assets
+//    (#2150 RE-PIN: 312 − 47 — the glyph set leaves the dealable library)
 {
   const union = new Set();
   for (const c of CHAPTERS) for (const id of chapterAssets(c)) union.add(id);
   const dealable = dealableAssetRecords();
-  assert.equal(dealable.length, 312, 'the dealable library is 312 (313 in the library − the citizen; #1854 added 18)');
-  assert.equal(union.size, 312, 'the chapters together cover the dealable library');
+  assert.equal(
+    dealable.length,
+    265,
+    'the dealable library is 265 (313 in the library − the citizen − the #2150 glyph set; #1854 added 18)',
+  );
+  assert.equal(union.size, 265, 'the chapters together cover the dealable library');
   for (const r of dealable) assert.ok(union.has(r.id), `${r.id}: covered by some chapter`);
   for (const id of NEVER_DEALT) assert.ok(!union.has(id), `${id}: never in a chapter deck`);
   assert.deepEqual(CHAPTER_UNDEALT, NEVER_DEALT, 'the registry exclusion is the roll pool exclusion');
@@ -148,7 +153,16 @@ assert.deepEqual(CHAPTER_DECK_MINIMUM, { looks: 4, voices: 8, assets: 14 }, 'the
     }
     assert.ok(c.card.marks.length >= 3, `${c.id}: the card names at least three marks`);
     const pool = new Set(chapterAssets(c));
-    for (const id of c.card.marks) assert.ok(pool.has(id), `${c.id}: card mark ${id} is a member of the chapter`);
+    for (const id of c.card.marks) {
+      // #2150 (Q6) — one ruled exception: the Swiss card is a menu visual and
+      // KEEPS its letters (typ_A/B/C) even though its deck can no longer deal
+      // them. Every other chapter's card marks stay deck members, as before.
+      if (c.id === 'swiss') {
+        assert.ok(!pool.has(id), `swiss: card mark ${id} fronts the chapter but is not dealt by it (Q6)`);
+      } else {
+        assert.ok(pool.has(id), `${c.id}: card mark ${id} is a member of the chapter`);
+      }
+    }
   }
 }
 

@@ -119,10 +119,16 @@ assert.strictEqual(S().voiceMix, null, 're-tapping the current stub is a no-op')
 {
   const known = new Set(ASSETS.map((a) => a.id));
   assert.strictEqual(SHAPE_SETS.length, 19, '4 flagship (#704 dark glass) + 15 layout-tile shape sets'); // #1196: +voronoi-cells
+  // #2150 RE-PIN: four tiles' wardrobes held glyphs, and a costume loses its
+  // glyph marks without backfill (the ruling) — stratified −3 (typ_Y/S/N),
+  // rails −1 (typ_M), layers −2 (typ_I/A), abacus −3 (pxg_arch, typ_Z/6).
+  // Abacus keeps stamp_glyph_01 (Q1) and stamp_num_01 (Q2) in its assets.
+  const GLYPH_LOSSES = { stratified: 3, rails: 1, layers: 2, abacus: 3 };
   for (const x of SHAPE_SETS) {
     // #1771: a flagship chip is its 4 curated shapes; a layout tile's chip is its promoted voice's full wardrobe (8)
     const flagship = FLAGSHIP_VOICE_IDS.includes(x.id);
-    assert.strictEqual(x.ids.length, flagship ? 4 : 8, `${x.id}: ${flagship ? 4 : 8} shapes`);
+    const expected = (flagship ? 4 : 8) - (GLYPH_LOSSES[x.id] || 0);
+    assert.strictEqual(x.ids.length, expected, `${x.id}: ${expected} shapes`);
     assert.strictEqual(new Set(x.ids).size, x.ids.length, `${x.id}: no shape twice`);
     assert.ok(
       x.ids.every((i) => known.has(i)),

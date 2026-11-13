@@ -25,6 +25,9 @@ import { MUTATION_RATE, BREED_PARENTS } from '../engine/creatureBreed.js'; // #1
 import { COMPOSITION_PRESETS } from '../data/presets.js';
 import { VOICE_DECK } from '../data/voiceDeck.js';
 import { ASSETS } from '../data/assets/index.js';
+import { ASSETS_LETTERS } from '../data/assets/assets-letterforms.js'; // #2150: the caps/digits pack
+import { SOLO_TEXT_STAMP_IDS } from '../data/assets/assets-stamp-radial.js'; // #2150: the bare <text> letter/number stamps
+import { PIXEL_LETTER_ANATOMY_IDS } from '../data/assets/assets-pixel-glyphs.js'; // #2150 (Q4): the letter-anatomy emblems
 import { SEED_KITS, kitsById, resolveKit } from '../data/kits.js'; // #1946
 import { kitDescriptors, dealableRecords } from '../state/rollPool.mjs';
 import { BeastSettings } from '../components/BeastSettings.jsx';
@@ -37,6 +40,17 @@ import { sanitizeRig } from '../engine/creatureRig.js'; // #1872 — a beast row
 import { assemblyWarnings, keptFromWarnings, roleSetStrands } from '../components/strandBank.model.mjs'; // #1871
 import { beastRows } from './beastReadoutLogic.mjs'; // #1868 — the signature readout
 import { shapeCard, facetOptions, filterParents, kitBody, previewDeal } from './wetLabLogic.mjs';
+
+/** #2150 — a glyph is never a creature body: the caps/digits pack, the solo
+ * text stamps and the pixel letter-anatomy emblems (Q4) are not legal bodies
+ * for a NEW assembly or gene replacement. The assembler itself stays a
+ * faithful executor — a banked creature keeps the body it was recorded with
+ * (history, acceptance 3). */
+const GLYPH_BODY_IDS = new Set([
+  ...ASSETS_LETTERS.map((a) => a.id),
+  ...SOLO_TEXT_STAMP_IDS,
+  ...PIXEL_LETTER_ANATOMY_IDS,
+]);
 
 const LOOKS = COMPOSITION_PRESETS.map((p) => ({ id: p.id, name: p.name }));
 const VOICES = VOICE_DECK.map((v) => ({ id: v.id, name: v.def?.name ?? v.id }));
@@ -1088,7 +1102,9 @@ export function WetLab({ assetId, onClose }) {
                   key={selRecord.id}
                   record={selRecord}
                   donors={(allRecords || []).filter((r) => r.id !== selRecord.id)}
-                  legalBodies={assets.filter((a) => a.category !== 'creature').map((a) => a.id)}
+                  legalBodies={assets
+                    .filter((a) => a.category !== 'creature' && !GLYPH_BODY_IDS.has(a.id))
+                    .map((a) => a.id)}
                   hasBodyPoints={assets.some((a) => a.id === selRecord.body)}
                 />
               ) : (

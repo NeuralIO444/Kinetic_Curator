@@ -200,11 +200,11 @@ const firstLookOf = (style) => look(canonStyle(style).looks[0]);
 {
   assert.equal(
     sha(CHAPTERS.map((c) => [c.id, chapterDeck(c)])),
-    'cdb7d507fb02381d',
+    '44abd0199a5dc9c8', // #2150 re-pin: chapter decks differ by exactly the glyph membership (swiss −36, grunge −3, now −47)
     'every chapter deck is byte-identical',
   );
   assert.equal(sha(COMPOSITION_PRESETS), '61c50037062a6337'); // #1838 re-pin: dusk-flock gained `trailFresh: 0.6` (1 of 70 records, that field only)
-  assert.equal(sha(VOICE_DECK), 'ca7db04bb758bba0');
+  assert.equal(sha(VOICE_DECK), '556e0e2b3e55fe04'); // #2150 re-pin: 17 of 72 voices differ (glyph losses + wardrobe re-draws over the narrowed pool); no voice wears a glyph
   // extractFeatures moved to a leaf — taste.js still exports the same function
   assert.equal(taste.extractFeatures, extractFeatures);
 }

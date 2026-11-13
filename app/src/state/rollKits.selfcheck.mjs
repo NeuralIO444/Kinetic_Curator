@@ -170,10 +170,15 @@ for (const seed of [1, 2, 3, 7]) {
   for (const look of COMPOSITION_PRESETS.slice(0, 6)) golden.push(dealPoolFor(records, rng, look).ids.join(','));
   golden.push(dealMixedPool(records, rng).ids.join(','));
 }
+// #2150 RE-PIN: the golden hash re-based on the type-exclusivity ruling — verified
+// pool-by-pool against main: 11 of 28 pools differ, every one either held a glyph
+// (10) or is the stream remap after one (1); no new pool deals a glyph; sizes 4–6
+// unchanged. The pin's meaning is unchanged: kit-less rolls move only when a ruled
+// deal change moves them.
 assert.equal(
   hash(golden),
-  '555329f40240452c70930d544b9d77647dbf3baf949fc29606767124bd4b2186',
-  'rolls without kits are byte-identical to main',
+  'e6d14665b3620e7385a85e278361f0c3598919958b0c27171e37cf1c52a5791f',
+  'rolls without kits are byte-identical to the #2150 deal',
 );
 const r1 = mkRng(9);
 const r2 = mkRng(9);
