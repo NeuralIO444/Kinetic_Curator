@@ -1,4 +1,4 @@
-// node src/data/world.selfcheck.mjs — #2104 the Canon world record, steps 1–2: the record, its door, and the landing deal.
+// node src/data/world.selfcheck.mjs — #2104 the Canon world record, steps 1–3: the record, its door, the landing deal, and the recording.
 import assert from 'node:assert';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +6,12 @@ import { dirname, join } from 'node:path';
 import { HOUSE_WORLD, WORLD_GRAIN_MAX, WORLD_STOCK, sanitizeWorld, worldForChapter } from './world.js';
 import { BOIL_FPS_DEFAULT, BOIL_FPS_MIN, BOIL_FPS_MAX } from '../engine/kineme.js';
 import { serializeProject, parseProject } from '../state/projectDocument.js';
+import {
+  createPerformanceRecorder,
+  checkPerformance,
+  packPerformance,
+  unpackPerformance,
+} from '../gl/performanceFile.mjs';
 import { buildSceneContract } from '../gl/sceneContract.js';
 import { createLayoutSlice } from '../state/slices/layoutSlice.js';
 import { useStore } from '../state/store.js';
@@ -199,9 +205,10 @@ assert.strictEqual(worldForChapter(7), null);
   }
 }
 
-// ── the boundary through step 2: documents and the contract do not know it ──
-// Recording is step 3 of the build order; until then a world standing in the
-// store leaves every document and every contract byte-identical to today.
+// ── step 3: the recording — the document carries the standing world ──────
+// In the sun's shape (ruling 6): written only when one stands, read back
+// through the door; a world-less document is byte-identical to one written
+// before recording existed, and its absence is a lawful state, not an error.
 const base = {
   seed: 7,
   seedOffsets: {},
@@ -212,12 +219,94 @@ const base = {
   autoQuality: true,
 };
 const doc = serializeProject({ ...base, light: null, world: sanitizeWorld(HOUSE_WORLD) });
-assert.ok(!('world' in doc), 'step 1 records nothing: no world key in the document');
+assert.deepStrictEqual(
+  doc.world,
+  { ...HOUSE_WORLD, finish: { ...HOUSE_WORLD.finish } },
+  'the standing world is written, through the door',
+);
 const back = parseProject(JSON.parse(JSON.stringify(doc)));
 assert.ok(back.ok);
-assert.ok(!('world' in back.doc), '…and none parses back');
+assert.deepStrictEqual(back.doc.world, doc.world, '…and parses back through the door, unchanged');
+const bareDoc = serializeProject({ ...base, light: null, world: null });
+assert.ok(
+  !('world' in bareDoc),
+  'no world standing → no world key: a world-less piece exports exactly as before step 3',
+);
+const bareBack = parseProject(JSON.parse(JSON.stringify(bareDoc)));
+assert.ok(bareBack.ok);
+assert.strictEqual(bareBack.doc.world, null, 'a document that predates the field loads world-less — absence is lawful');
+assert.deepStrictEqual(
+  Object.keys(doc).sort(),
+  [...Object.keys(bareDoc), 'world'].sort(),
+  'recording adds exactly one field — the standing world; no chapter-to-world map rides along (ruling 3)',
+);
+{
+  // A hostile world in a document is repaired by the door, like every other
+  // document field — one bad field never costs the document.
+  const hostile = parseProject({
+    ...JSON.parse(JSON.stringify(doc)),
+    world: { chapter: 7, ground: 'red', ink: '#000000', boilFps: 99, finish: { grain: 7 } },
+  });
+  assert.ok(hostile.ok);
+  assert.strictEqual(hostile.doc.world.chapter, HOUSE_WORLD.chapter, 'a non-string provenance → the house');
+  assert.strictEqual(hostile.doc.world.ground, HOUSE_WORLD.ground, 'not a colour → house paper');
+  assert.strictEqual(hostile.doc.world.ink, '#000000', '…while a good ink stands');
+  assert.strictEqual(hostile.doc.world.boilFps, BOIL_FPS_MAX, 'the boil is clamped to the named band');
+  assert.strictEqual(hostile.doc.world.finish.grain, WORLD_GRAIN_MAX, 'the grain is clamped to the finish ceiling');
+}
 const contract = buildSceneContract({ doc: { seed: 1 }, resolvedLayers: [] });
-assert.ok(!('world' in contract), 'the scene contract carries no world key (hash stable)');
+assert.ok(!('world' in contract), 'the scene contract carries no world key — nothing renders it yet (step 4)');
+
+// ── step 3: the take stamp — a take is dealt under a world, and says so ──
+{
+  const dealt = worldForChapter('swiss');
+  const feed = (rec) => {
+    for (let f = 0; f < 130; f++) {
+      rec.onInput({ frame: f });
+      rec.onOutput({ f, v: [f, f * 2] });
+    }
+    return rec.finish();
+  };
+  const stamped = feed(createPerformanceRecorder({ world: dealt }));
+  assert.deepStrictEqual(stamped.world, dealt, 'the recorder stamps the world the take was dealt under');
+  const unstamped = feed(createPerformanceRecorder());
+  assert.ok(!('world' in unstamped), 'no world option → no stamp: the file is exactly what it was before step 3');
+  assert.deepStrictEqual(
+    stamped.checkpoints,
+    unstamped.checkpoints,
+    'the stamp never enters the hash chain — a stamped take’s checkpoints are the unstamped take’s',
+  );
+  const worldless = feed(createPerformanceRecorder({ world: null }));
+  assert.ok(!('world' in worldless), 'a world-less take stamps nothing');
+  const junk = feed(createPerformanceRecorder({ world: 'not-a-world' }));
+  assert.ok(!('world' in junk), 'a malformed option stamps nothing — the door at the recorder');
+  const roundTripped = await unpackPerformance(await packPerformance(stamped));
+  assert.deepStrictEqual(roundTripped.world, dealt, 'the stamp survives the stored form (gzip of JSON)');
+  assert.deepStrictEqual(
+    roundTripped,
+    JSON.parse(JSON.stringify(stamped)),
+    'the whole file round-trips, stamp and all',
+  );
+  // On read, a present world must be a fixed point of the door — fail-closed,
+  // in the initialState section's shape.
+  assert.throws(() => checkPerformance({ ...stamped, world: 'swiss' }), /world/, 'a non-record world refuses the file');
+  assert.throws(
+    () => checkPerformance({ ...stamped, world: { ...dealt, boilFps: 99 } }),
+    /world/,
+    'a world the door would clamp is not a recorded world',
+  );
+  assert.throws(
+    () => checkPerformance({ ...stamped, world: { ...dealt, sun: { x: 1 } } }),
+    /world/,
+    'an extra key is not the door’s shape',
+  );
+  assert.throws(
+    () => checkPerformance({ ...stamped, world: { ...dealt, finish: { grain: 0.2, blur: 1 } } }),
+    /world/,
+    'an extra finish key is not the door’s shape',
+  );
+  assert.strictEqual(checkPerformance(unstamped), unstamped, 'a take with no stamp still verifies its shape');
+}
 
 // ── step 2 in the real store: the deal, the presses, the clearing ────────
 {
@@ -245,18 +334,41 @@ assert.ok(!('world' in contract), 'the scene contract carries no world key (hash
   );
   S().kineticCuratorPass();
   assert.deepStrictEqual(S().world, standing, 'a CURATOR press keeps the standing world');
-  assert.ok(
-    !('world' in serializeProject(S())),
-    'step 2 records nothing either: no world key in the document after a landing',
+  assert.deepStrictEqual(
+    serializeProject(S()).world,
+    standing,
+    'step 3 records: a document saved after a landing carries the dealt world',
   );
   S().kineticRoll(); // CHAOS
   assert.strictEqual(S().kineticChapterId, null, 'CHAOS leaves the book');
   assert.strictEqual(S().world, null, 'CHAOS clears the world with the chapter (ruling 7)');
+  assert.ok(
+    !('world' in serializeProject(S())),
+    'a world-less stage records no world: the document is exactly a pre-recording one',
+  );
   S().kineticLookPass();
   assert.deepStrictEqual(S().world, worldForChapter(S().kineticChapterId), 'the next landing deals again');
   S().kineticOpenPass(); // the launch opener
   assert.strictEqual(S().kineticChapterId, null, 'the opener leaves the book');
   assert.strictEqual(S().world, null, 'the launch opener clears the world with the chapter (ruling 7)');
+}
+
+// ── step 3 in the real store: a load stands the recorded world back up ───
+{
+  const S = () => useStore.getState();
+  const recorded = worldForChapter('swiss');
+  const docIn = parseProject(JSON.parse(JSON.stringify(serializeProject({ ...base, light: null, world: recorded }))));
+  assert.ok(docIn.ok);
+  S().applyProject(docIn.doc);
+  assert.deepStrictEqual(S().world, recorded, 'loading a document stands its recorded world back up');
+  const bareIn = parseProject(JSON.parse(JSON.stringify(serializeProject({ ...base, light: null, world: null }))));
+  assert.ok(bareIn.ok);
+  S().applyProject(bareIn.doc);
+  assert.strictEqual(
+    S().world,
+    null,
+    'loading a world-less document leaves the stage world-less — not the session’s leftover world, not the house default',
+  );
 }
 
 // ── the law is written where the next person looks ───────────────────────

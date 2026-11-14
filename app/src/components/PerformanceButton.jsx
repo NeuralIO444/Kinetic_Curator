@@ -219,7 +219,9 @@ export function PerformanceButton() {
   const [retroNote, setRetroNote] = useState('');
   const [saveNote, setSaveNote] = useState(''); // #1938 — where the take went (desktop), or why it could not be saved
   useEffect(() => {
-    startRetroCapture();
+    // #2104 step 3 — the ring samples the standing world at its boundaries, so a retro take is
+    // stamped with the world it was dealt under, like a deliberate one.
+    startRetroCapture({ worldProvider: () => useStore.getState().world });
   }, []);
   const onRetro = async () => {
     const take = await saveRetroPerformance(3);
@@ -258,6 +260,8 @@ export function PerformanceButton() {
     if (!recording) {
       if (
         startPerformance({
+          // #2104 step 3 — the take is stamped with the world standing at its start.
+          world: useStore.getState().world,
           sections: {
             stress: stressSection,
             formation: formationSection,

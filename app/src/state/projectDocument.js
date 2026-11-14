@@ -7,6 +7,7 @@ import { normalizeSnapshots, normalizeLayers } from './projectNormalize.js';
 export { normalizeSnapshots, normalizeLayers };
 import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { sanitizeLight } from '../data/light.js';
+import { sanitizeWorld } from '../data/world.js';
 import { sanitizeAssetKineme, sanitizeAssetStill } from '../data/kinemes.js';
 import { sanitizeRegionKinemesDoc } from '../data/regionKinemes.js';
 import { sanitizeAssetTagsDoc } from '../data/assetFacets.js';
@@ -164,6 +165,14 @@ export function serializeProject(state) {
   // exactly as it did before lighting existed.
   const light = sanitizeLight(state.light);
   if (light) doc.light = light;
+  // #2104 step 3 — the standing world (ruling 6), recorded in the sun's
+  // shape beside it. Written only when one stands: a world-less piece (the
+  // stage after CHAOS or the opener cleared the world) exports exactly as
+  // it did before worlds were recorded. Only the standing world is ever
+  // written — no chapter-to-world map (conflict-review ruling 3): the
+  // chapter pick still derives from the chapter alone on the next landing.
+  const world = sanitizeWorld(state.world);
+  if (world) doc.world = world;
   // #781 KINEME — which assets move, and how. Written only when set: a
   // motionless piece exports exactly as before.
   const kineme = sanitizeAssetKineme(state.assetKineme);
@@ -316,6 +325,7 @@ export function parseProject(raw) {
       paletteOverrides: raw.paletteOverrides || null,
       paletteLocks: sanitizePaletteLocks(raw.paletteLocks) || {},
       light: sanitizeLight(raw.light), // #594 — absent → null (off)
+      world: sanitizeWorld(raw.world), // #2104 step 3 — absent → null (no world standing; a pre-recording document loads world-less, lawfully)
       assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
       regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
       assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942
@@ -380,6 +390,7 @@ export function parseProject(raw) {
     autoQuality: raw.autoQuality !== false,
     assetWeightOverrides: sanitizeAssetWeightOverrides(raw.assetWeightOverrides, customAssets),
     light: sanitizeLight(raw.light), // #594 — absent → null (off)
+    world: sanitizeWorld(raw.world), // #2104 step 3 — absent → null (no world standing; a pre-recording document loads world-less, lawfully)
     assetKineme: sanitizeAssetKineme(raw.assetKineme) || {}, // #781
     regionKinemes: sanitizeRegionKinemesDoc(raw.regionKinemes) || {}, // #1434 — tombstones (null) survive
     assetTags: sanitizeAssetTagsDoc(raw.assetTags) || {}, // #1942

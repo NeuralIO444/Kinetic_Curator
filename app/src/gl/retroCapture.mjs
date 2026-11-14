@@ -34,6 +34,7 @@ import {
   CHECKPOINT_EVERY,
   MACHINE_KEYS,
 } from './performanceFile.mjs';
+import { sanitizeWorld } from '../data/world.js';
 
 export const RETRO_DEFAULTS = Object.freeze({
   checkpointEvery: CHECKPOINT_EVERY,
@@ -45,14 +46,24 @@ export const RETRO_DEFAULTS = Object.freeze({
  * Create the ring. `snapshotProvider` returns the live resolver's snapshot at a frame boundary
  * (resolveTap's snapshotLiveResolver), or null when none is available — a null skips that
  * boundary, and the staleness rule handles a provider that stays dead.
+ *
+ * `worldProvider` (#2104 step 3) is optional: it returns the standing world, sampled exactly
+ * where the chain seed is sampled — at the ring's start (the from-launch window's opening
+ * world), at every snapshot boundary (that boundary's world), and at every clear (the restarted
+ * window's opening world) — so a take the ring emits is stamped with the world its first frame
+ * stands in, in the recorder's shape. Without a provider the ring stamps nothing, exactly as
+ * before worlds were recorded.
  */
 export function createRetroCapture({
   snapshotProvider,
+  worldProvider = null,
   checkpointEvery = RETRO_DEFAULTS.checkpointEvery,
   snapshotEvery = RETRO_DEFAULTS.snapshotEvery,
   maxSnapshots = RETRO_DEFAULTS.maxSnapshots,
 } = {}) {
   if (typeof snapshotProvider !== 'function') throw new TypeError('[retroCapture] a snapshotProvider is required');
+  if (worldProvider != null && typeof worldProvider !== 'function')
+    throw new TypeError('[retroCapture] worldProvider must be a function when given');
   if (!Number.isInteger(checkpointEvery) || checkpointEvery < 1)
     throw new RangeError('[retroCapture] checkpointEvery must be a positive integer');
   if (!Number.isInteger(snapshotEvery) || snapshotEvery < checkpointEvery || snapshotEvery % checkpointEvery !== 0) {
@@ -63,11 +74,15 @@ export function createRetroCapture({
   if (!Number.isInteger(maxSnapshots) || maxSnapshots < 1)
     throw new RangeError('[retroCapture] maxSnapshots must be a positive integer');
 
+  // #2104 step 3 — the standing world, through its door; null when no provider or no world.
+  const sampleWorld = () => (worldProvider ? sanitizeWorld(worldProvider()) : null);
+
   let log = createInputLog();
   let chain = createHashChain();
   let checkpoints = []; // { frame, hash } — ring frames
-  let snapshots = []; // { frame, snapshot, chainSeed } — frame = the boundary's last resolved frame
+  let snapshots = []; // { frame, snapshot, chainSeed, world } — frame = the boundary's last resolved frame
   let baseFrame = 0; // the ring frame the log's frame 0 currently is
+  let baseWorld = sampleWorld(); // #2104 step 3 — the world the current window opened under (a from-launch take's stamp)
   let resolved = 0; // outputs seen = frames resolved since the window started
   let pending = false; // an input was recorded and its output has not arrived yet
   let shedInput = false; // the governor's tier-1 signal, read off the input stream
@@ -80,6 +95,7 @@ export function createRetroCapture({
     checkpoints = [];
     snapshots = [];
     baseFrame = 0;
+    baseWorld = sampleWorld(); // the restarted window opens under the world standing now
     resolved = 0;
     pending = false;
   }
@@ -125,7 +141,7 @@ export function createRetroCapture({
     if (frame % checkpointEvery === 0) checkpoints.push({ frame, hash: chain.value() });
     if ((frame + 1) % snapshotEvery === 0 && !shedInput && !shedManual) {
       const snapshot = snapshotProvider();
-      if (snapshot) snapshots.push({ frame, snapshot, chainSeed: chain.value() });
+      if (snapshot) snapshots.push({ frame, snapshot, chainSeed: chain.value(), world: sampleWorld() });
     }
     prune();
   }
@@ -151,6 +167,10 @@ export function createRetroCapture({
     if (!rel.length) return null;
     const frames = rel[rel.length - 1].frame + 1;
     const rebased = rebaseInputLog(log.finish(), startFrame - baseFrame);
+    // #2104 step 3 — the take's world stamp: the boundary's sampled world for a mid-session
+    // take, the window's opening world for a from-launch one; absent when neither was sampled
+    // (no provider, or no world standing), so those takes are exactly what they always were.
+    const world = entry ? entry.world : baseWorld;
     return checkPerformance({
       format: PERFORMANCE_FORMAT,
       version: PERFORMANCE_VERSION,
@@ -162,6 +182,7 @@ export function createRetroCapture({
       checkpoints: rel,
       inputs: { ...rebased, frames, steps: rebased.steps.slice(0, frames) },
       ...(entry ? { initialState: { atFrame: startFrame, chainSeed: entry.chainSeed, snapshot: entry.snapshot } } : {}),
+      ...(world ? { world } : {}),
     });
   }
 

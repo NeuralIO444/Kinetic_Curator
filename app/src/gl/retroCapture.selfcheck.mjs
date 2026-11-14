@@ -19,6 +19,7 @@ import {
   isRecordingPerformance,
 } from './performanceCapture.mjs';
 import { DEFAULT_LAYOUT_PARAMS } from '../data/layout-modes.js';
+import { HOUSE_WORLD, worldForChapter } from '../data/world.js';
 
 const DT_MS = [16.7, 16.7, 33.3, 8, 16.7, 50, 16.7, 12.5];
 const L = (id, extra = {}) => ({ id, name: id, visible: true, layerBlendMode: 'normal', layerOpacity: 1, ...extra });
@@ -272,6 +273,90 @@ const times = (n) => {
   assert.equal(stopRetroCapture(), true);
   assert.equal(isRetroCapturing(), false);
   wrapped.dispose();
+}
+
+// ── 6. #2104 step 3 — the ring stamps the world its take was dealt under ──
+// The provider is sampled where the chain seed is sampled: at a snapshot
+// boundary the stamp is that boundary's world (the world the take's first
+// frame stands in), never the save-time world; a from-launch take takes the
+// world the window opened under. No provider → no stamp, as before.
+{
+  const resolver = createLiveResolver();
+  let standing = HOUSE_WORLD;
+  const ring = createRetroCapture({
+    snapshotProvider: () => resolver.snapshotState(),
+    worldProvider: () => standing,
+    checkpointEvery: 10,
+    snapshotEvery: 50,
+    maxSnapshots: 4,
+  });
+  const T = times(200);
+  for (let f = 0; f < 120; f++) {
+    const i = frameInput(f, T[f]);
+    ring.onInput(i);
+    ring.onOutput(resolver.resolveLayers(i));
+  }
+  standing = worldForChapter('swiss'); // a landing mid-window: the world changes under the ring
+  for (let f = 120; f < 200; f++) {
+    const i = frameInput(f, T[f]);
+    ring.onInput(i);
+    ring.onOutput(resolver.resolveLayers(i));
+  }
+  standing = HOUSE_WORLD; // …and changes again before the save: the stamp must not follow it
+  const perf = ring.saveLast(30);
+  assert.ok(perf && perf.initialState, 'the retro take begins mid-session, at a boundary');
+  assert.deepEqual(
+    perf.world,
+    worldForChapter('swiss'),
+    'the take is stamped with the world standing at its first frame (its boundary’s sample)',
+  );
+  assert.equal(verifyPerformance(perf).ok, true, 'the stamped retro take still verifies');
+  resolver.dispose();
+}
+{
+  // a from-launch retro take (no boundary crossed yet) takes the window's opening world
+  const resolver = createLiveResolver();
+  const ring = createRetroCapture({
+    snapshotProvider: () => resolver.snapshotState(),
+    worldProvider: () => HOUSE_WORLD,
+    checkpointEvery: 10,
+    snapshotEvery: 50,
+    maxSnapshots: 4,
+  });
+  const T = times(40);
+  for (let f = 0; f < 30; f++) {
+    const i = frameInput(f, T[f]);
+    ring.onInput(i);
+    ring.onOutput(resolver.resolveLayers(i));
+  }
+  const perf = ring.saveLast(20);
+  assert.ok(perf && !perf.initialState, 'a from-launch take has no initialState section');
+  assert.deepEqual(
+    perf.world,
+    { ...HOUSE_WORLD, finish: { ...HOUSE_WORLD.finish } },
+    '…and is stamped with the opening world',
+  );
+  assert.equal(verifyPerformance(perf).ok, true, 'the from-launch stamped take verifies');
+  resolver.dispose();
+}
+{
+  // no provider: the ring stamps nothing — its takes are exactly what they were before step 3
+  const resolver = createLiveResolver();
+  const ring = createRetroCapture({
+    snapshotProvider: () => resolver.snapshotState(),
+    checkpointEvery: 10,
+    snapshotEvery: 50,
+    maxSnapshots: 4,
+  });
+  const T = times(40);
+  for (let f = 0; f < 30; f++) {
+    const i = frameInput(f, T[f]);
+    ring.onInput(i);
+    ring.onOutput(resolver.resolveLayers(i));
+  }
+  const perf = ring.saveLast(20);
+  assert.ok(perf && !('world' in perf), 'no provider → no world stamp');
+  resolver.dispose();
 }
 
 console.log('retroCapture.selfcheck: ok (#1367 slice 3)');

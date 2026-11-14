@@ -1,8 +1,11 @@
 // world.js — #2104 (Canon) the world record: the ground, ink, boil clock and
-// finish that every style on the stage stands in. Steps 1–2 of the build
+// finish that every style on the stage stands in. Steps 1–3 of the build
 // order in docs/design/canon-world-record-spec.md: the record and its door
-// (step 1), and the landing deal — the authored stock and the chapter-alone
-// pick (step 2, below). The recording and the style response are later steps.
+// (step 1), the landing deal — the authored stock and the chapter-alone
+// pick (step 2, below) — and the recording (step 3): the standing world
+// saves in the project document and in the take, in the sun's shape
+// (state/projectDocument.js, gl/performanceFile.mjs), and a load stands the
+// recorded world back up through this door. The style response is step 4.
 //
 // ONE world stands over a scene, above the kit triad. The sun is NOT a field
 // of it (the sun stays scene-level in data/light.js, the artist's hand and
@@ -20,8 +23,9 @@
 //
 // Browser-safe, pure. The record stands in the store — the house world from
 // the open, a dealt world from each chapter landing — and the door below is
-// its one validator; nothing reads the record to render yet (the response
-// is step 4).
+// its one validator: every write into the store and every read back from a
+// document or a take passes through it. Nothing reads the record to render
+// yet (the response is step 4).
 
 import { normalizeHex } from './palettes.js';
 import { BOIL_FPS_DEFAULT, BOIL_FPS_MIN, BOIL_FPS_MAX } from '../engine/kineme.js';

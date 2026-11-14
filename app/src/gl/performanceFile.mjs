@@ -16,6 +16,7 @@
 import { createLiveResolver, checkResolverSnapshot } from './liveResolve.mjs';
 import { createInputLog, replayInputs, INPUT_LOG_VERSION } from '../engine/kernel/replay/inputLog.js';
 import { KERNEL_VERSION } from '../engine/kernel/version.js';
+import { sanitizeWorld } from '../data/world.js';
 
 export const PERFORMANCE_FORMAT = 'kc-performance';
 export const PERFORMANCE_VERSION = 2;
@@ -163,6 +164,36 @@ function checkInitialState(s) {
 }
 
 /**
+ * #2104 step 3 — the optional world section: the world the take was dealt under, stamped at the
+ * take's start (the recorder's `world` option, or the retro ring's boundary sample). The recorder
+ * only ever writes the door's own output (data/world.js sanitizeWorld), so a stored world must be
+ * a fixed point of that door — same shape, same values, no extra keys; anything else is not a
+ * world this instrument dealt, and the file is refused, fail-closed like initialState above.
+ * Shared by the recorder and the retro ring (which refuse to build a malformed section by
+ * construction) and checkPerformance (which refuses to read one).
+ */
+function checkWorld(w) {
+  if (!w || typeof w !== 'object' || Array.isArray(w)) throw new PerformanceFileError('world must be a world record');
+  const f = w.finish;
+  const clean = sanitizeWorld(w);
+  if (
+    !clean ||
+    !f ||
+    typeof f !== 'object' ||
+    Array.isArray(f) ||
+    Object.keys(w).length !== 5 ||
+    Object.keys(f).length !== 1 ||
+    clean.chapter !== w.chapter ||
+    clean.ground !== w.ground ||
+    clean.ink !== w.ink ||
+    clean.boilFps !== w.boilFps ||
+    clean.finish.grain !== f.grain
+  )
+    throw new PerformanceFileError('world is not a world record in its door shape');
+  return w;
+}
+
+/**
  * Recorder. Feed it every frame's input, then that frame's output, in order (the two taps in resolveTap.mjs do
  * exactly that). `finish()` returns the performance object.
  *
@@ -174,8 +205,13 @@ export function createPerformanceRecorder({
   checkpointEvery = CHECKPOINT_EVERY,
   maxFrames = MAX_FRAMES,
   initialState = null,
+  world = null,
 } = {}) {
   if (initialState != null) checkInitialState(initialState);
+  // #2104 step 3 — the world the take is dealt under, read once at the take's start and stamped
+  // by finish(). Through the door here, so what lands in the file is always the record's
+  // canonical shape (checkWorld's fixed point); a null or malformed option stamps nothing.
+  const stampedWorld = sanitizeWorld(world);
   const log = createInputLog();
   const checkpoints = [];
   const chain = createHashChain(initialState ? initialState.chainSeed : null);
@@ -238,6 +274,12 @@ export function createPerformanceRecorder({
               },
             }
           : {}),
+        // #2104 step 3 — the world stamp: absent when no world stood at the take's start (and
+        // for every take recorded before worlds were stamped), so those files are exactly what
+        // they always were. A note in the file, like the machine keys: verification does not
+        // consume it and the frame hash never sees it, so a stamped take's checkpoints are the
+        // very ones the same take would have carried unstamped.
+        ...(stampedWorld ? { world: stampedWorld } : {}),
       };
     },
   };
@@ -263,6 +305,7 @@ export function checkPerformance(p) {
   }
   if (typeof p.kernelVersion !== 'string') throw new PerformanceFileError('kernelVersion must be a string');
   if (p.initialState != null) checkInitialState(p.initialState);
+  if (p.world != null) checkWorld(p.world); // #2104 step 3 — absent is lawful (every take before the stamp, and world-less takes)
   return p;
 }
 
