@@ -21,6 +21,7 @@ import {
   boilStep as boilStepAt,
 } from '../engine/kineme.js'; // #1128: the living-motion floor; #1574: the travel store
 import { sanitizeWorld } from '../data/world.js'; // #2104 step 4: the standing world, read through its door
+import { chapterStyleResponse, blendResponseAmounts } from '../data/canon/response.js'; // #2104 Q1: the standing chapter's style response, blended into the floor's amounts
 import {
   createSurgeStore,
   pruneSurgeStore,
@@ -231,10 +232,19 @@ function livingMotion(
   culture = null,
   fieldBreath = null,
   worldBoilFps = 0,
+  styleResponse = null,
 ) {
   if (slowRender) return null;
   const amounts = patternAmounts(
-    { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
+    // #2104 Q1 — the dealt amounts first blend toward the standing style's measured
+    // response (breath/drift only, by the one pull in data/canon/response.js), THEN the
+    // Director pattern re-weights what the look brings, exactly as it always has — the
+    // pattern's and the beat's say still comes last. A null response is the identity:
+    // this literal reaches patternAmounts untouched, bit-for-bit the pre-blend path.
+    blendResponseAmounts(
+      { breath: layoutParams.kinemeBreath, drift: layoutParams.kinemeDrift, pulse: layoutParams.kinemePulse },
+      styleResponse,
+    ),
     layoutParams.kinemePattern,
     beatDrive,
   );
@@ -788,7 +798,15 @@ export function createLiveResolver() {
     // is recorded data on replay: an unrecorded or malformed world fails closed to none).
     // Only the boil binds here; the ground, finish and pattern/cell clocks read the world
     // from the scene contract the loop builds.
-    const worldBoilFps = sanitizeWorld(input.world)?.boilFps ?? 0;
+    const worldNow = sanitizeWorld(input.world);
+    const worldBoilFps = worldNow?.boilFps ?? 0;
+    // #2104 Q1 (ruled 2026-11-13) — the response of the style the standing world's chapter
+    // stands on, resolved once per resolve beside the boil. A pure function of the recorded
+    // world (its chapter) and the authored Canon data — no clock, no dice — so a take
+    // replays under exactly the pull it was performed with. No world, a chapterless world
+    // (the house world), or a memberless style all answer null: unmodulated, the dealt
+    // amounts pass through the blend untouched.
+    const frameStyleResponse = chapterStyleResponse(worldNow?.chapter);
     // #1923 — the quiet culture's field, read ONE-WAY by the marks' kineme (the last applied frame's; null = none)
     const cultureField = dishLife.field();
     // #1997 — the ferrofluid coupling's two reads, BOTH taken here, before any stage applies (the
@@ -1193,6 +1211,7 @@ export function createLiveResolver() {
           cultureField,
           cultureScale, // #1923 Phase 2 slice B — the same seam object: the breath driver reads it as ctx.fieldBreath
           worldBoilFps, // #2104 step 4: the world's boil binds the mark clock
+          frameStyleResponse, // #2104 Q1: the standing style pulls the dealt amounts
         );
         if (frameWind === null && Number.isFinite(layoutParams.wind)) frameWind = layoutParams.wind;
         if (frameKineme === null && kineme !== null) frameKineme = kineme;
@@ -1865,6 +1884,7 @@ export function createLiveResolver() {
             null,
             null,
             worldBoilFps, // #2104 step 4: the world's boil binds the creature floors too
+            frameStyleResponse, // #2104 Q1: the standing style pulls the creature floors' amounts too
           ),
         // and on the dials and ground it rests on: the same GROUND / EDGE / SNAP the marks obey (null when none)
         (e) =>
@@ -1902,6 +1922,7 @@ export function createLiveResolver() {
             null,
             null,
             worldBoilFps, // #2104 step 4: the world's boil binds the creature floors too
+            frameStyleResponse, // #2104 Q1: the standing style pulls the creature floors' amounts too
           ),
         (e) =>
           creatureGround({
