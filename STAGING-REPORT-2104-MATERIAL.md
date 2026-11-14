@@ -139,7 +139,15 @@ pin on the pull.
   together the two runs cover every manifest line. CI's Mac-runner jobs are
   authoritative for the three.
 - `npm run build`: green (✓ built in 3.54s).
-- CI: CI_TBD.
+- CI (PR #2174, run 43623358828, as observed): closes-line ✓ · cargo-check ✓ ·
+  advisory-audit ✓ · lint-build-selfcheck ✓ (12m34s) · selfcheck-browser ✓
+  (32m30s) · e2e-smoke ✗ (5m24s) — read from the failed job's log: the single
+  failure is `e2e/topbar-expand.spec.js:323` ("KIN cools by gliding"), its
+  animation-speed sampling assertion (fastest stretch 1.75 px/ms against the
+  1.5 bound, spec line 373) under Mac-runner load; 111 specs passed. That is the
+  documented topbar-glide flake family (the AGENTS.md ruleset note names this
+  spec and signature on main's own runs); this PR touches no UI, topbar or
+  animation code. A re-run of the e2e job is the coordinator's call.
 
 ## 6. Files
 
