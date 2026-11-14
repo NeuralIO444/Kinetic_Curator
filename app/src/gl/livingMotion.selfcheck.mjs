@@ -4,7 +4,9 @@
 // that predates the floor opens as it was saved. The drivers are measured FROM rest, so a still is byte-identical to a
 // scene with none, and they must never stack on the placement cache (the first time they were wired live they did).
 import assert from 'node:assert';
-import { createLiveResolver } from './liveResolve.mjs';
+import { createLiveResolver, getLastFrameMotion } from './liveResolve.mjs';
+import { worldForChapter, HOUSE_WORLD } from '../data/world.js';
+import { chapterStyleResponse, RESPONSE_BLEND_PULL } from '../data/canon/response.js';
 import { buildPlacements } from '../engine/buildPlacements.js';
 import { evaluateKineme, applyKinemeDrivers, patternAmounts, KINEME_PATTERNS, THUMP_PULSE } from '../engine/kineme.js';
 import { DEFAULT_LAYOUT_PARAMS, normalizeLayoutParams } from '../data/layout-modes.js';
@@ -436,6 +438,38 @@ ok('rhythm: selecting ORGANIC/CADENCE activates the placement layer even with ev
   const link = decodeRecipeUrl(encodeRecipeUrl(fields));
   assert.ok(link.ok);
   assert.equal(link.recipe.layoutParams.kinemePattern, 'CADENCE', 'a link carries a rhythm choice');
+});
+
+// ── #2104 Q1: the style-response blend at the floor's seam ─────────────────────────────────────
+ok('blend: a standing world pulls the dealt amounts toward its chapter’s style, through the real resolver', () => {
+  const resp = chapterStyleResponse('swiss');
+  assert.ok(resp?.kineme, 'the swiss chapter stands on a measured style');
+  createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, world: worldForChapter('swiss') }));
+  const amounts = getLastFrameMotion().kineme.amounts;
+  assert.equal(amounts.breath, 0.3 + RESPONSE_BLEND_PULL * (resp.kineme.breath - 0.3), 'breath moved halfway');
+  assert.equal(amounts.drift, 0.5 + RESPONSE_BLEND_PULL * (resp.kineme.drift - 0.5), 'drift moved halfway');
+  assert.equal(amounts.pulse, 0, 'pulse is never blended (never measured)');
+});
+
+ok('blend: no world, the house world, and a memberless chapter’s world all pass the amounts through exactly', () => {
+  for (const world of [undefined, HOUSE_WORLD, worldForChapter('techno')]) {
+    createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, ...(world ? { world } : {}) }));
+    const amounts = getLastFrameMotion().kineme.amounts;
+    assert.equal(amounts.breath, 0.3, `breath untouched (world: ${world?.chapter ?? 'none'})`);
+    assert.equal(amounts.drift, 0.5, `drift untouched (world: ${world?.chapter ?? 'none'})`);
+  }
+});
+
+ok('blend: the pull can wake a still floor — and only with a measured world standing', () => {
+  const zero = { kinemeBreath: 0, kinemeDrift: 0, kinemePulse: 0, kinemePaletteBreath: 0, kinemeBrushWobble: 0 };
+  createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, layoutParams: zero }));
+  assert.equal(getLastFrameMotion().kineme, null, 'every amount at 0 and no world: the floor is still');
+  const resp = chapterStyleResponse('swiss');
+  createLiveResolver().resolveLayers(base({ loopTimeMs: 1000, layoutParams: zero, world: worldForChapter('swiss') }));
+  const kineme = getLastFrameMotion().kineme;
+  assert.ok(kineme, 'the style’s pull wakes the floor');
+  assert.equal(kineme.amounts.breath, 0 + RESPONSE_BLEND_PULL * (resp.kineme.breath - 0));
+  assert.equal(kineme.amounts.drift, 0 + RESPONSE_BLEND_PULL * (resp.kineme.drift - 0));
 });
 
 console.log(`livingMotion.selfcheck: ${n} checks passed`);

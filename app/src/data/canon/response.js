@@ -17,13 +17,12 @@
 // not an enum. The door keeps any non-empty string and drops anything else — an unknown
 // material is a new material, never an error.
 //
-// CONSUMPTION IS NOT THIS MODULE'S — AND IS NOT BUILT YET. This module declares and resolves
-// the response; nothing on the render path reads it in this step. How the kineme amounts
-// compose with a dealt look's own amounts ("scale, never override", spec §3) and how a named
-// material reaches the sun are open questions recorded on #2104 — they go back to Matt one at
-// a time rather than being decided here. What this step binds is everything the rulings DID
-// fix: the world's boil on every clock, the world's finish as the final pass, the world's
-// ground under the stage, and playback standing a take's recorded world back up.
+// CONSUMPTION: the kineme amounts are consumed by the BLEND below (Q1, ruled by Matt
+// 2026-11-13 — see RESPONSE_BLEND_PULL). The material is NOT consumed yet: how a named
+// material reaches the sun is Q2 on #2104, still open, and nothing here pre-decides it.
+// What step 4 binds is everything the rulings DID fix: the world's boil on every clock,
+// the world's finish as the final pass, the world's ground under the stage, and playback
+// standing a take's recorded world back up.
 import { canonStyleRecord } from './styles.js';
 import { canonStyleSettings } from './settings.js';
 import { chapterById } from '../chapters.js';
@@ -76,4 +75,47 @@ export function styleResponse(styleId) {
 export function chapterStyleResponse(chapterId) {
   const chapter = chapterById(chapterId);
   return chapter ? styleResponse(chapter.style) : null;
+}
+
+/**
+ * Q1 — THE PULL (Matt, 2026-11-13, #2104): how a response's kineme amounts compose with a
+ * dealt look's own amounts. Spec §3 fixed only "amounts scale, never override", and the
+ * measured centres live in layout-param units (≈0.02–0.20), so as multipliers they would
+ * crush dealt motion and as absolutes they would override the dealt look. The ruled
+ * composition is a BLEND: the dealt amount moves PARTWAY TOWARD the style's amount — the
+ * look keeps its own amounts as the starting point, the style's character pulls them,
+ * neither replaces the other. The pull strength is this one named constant in this one
+ * place (0.5, the even blend), tunable later like the other named parameters; consumers
+ * call blendResponseAmounts and never read the constant themselves.
+ */
+export const RESPONSE_BLEND_PULL = 0.5;
+
+/**
+ * The kineme keys the blend may move — the MEASURED keys. pulse and wobble are never
+ * blended: measurement never invents them, and the blend moves only what was measured.
+ */
+const RESPONSE_BLEND_KEYS = Object.freeze(['breath', 'drift']);
+
+/**
+ * Blend a dealt look's kineme amounts toward a style response, per measured key:
+ * blended = dealt + PULL × (response − dealt). Only keys the response actually carries
+ * AND the dealt amounts actually carry move; every other key passes through untouched
+ * (same value, and the amounts object itself is returned unchanged — same reference, no
+ * float ops, no shape change — whenever nothing blends: a null response, a response with
+ * no kineme amounts, or no shared measured key). That identity is a law, not an
+ * optimisation: a stage whose standing style answers null must resolve bit-for-bit as it
+ * did before the blend existed, replay hashes included.
+ */
+export function blendResponseAmounts(amounts, response) {
+  const kin = response?.kineme;
+  if (!amounts || !kin) return amounts;
+  let out = null;
+  for (const key of RESPONSE_BLEND_KEYS) {
+    const target = kin[key];
+    const dealt = amounts[key];
+    if (Number.isFinite(target) && Number.isFinite(dealt)) {
+      (out ??= { ...amounts })[key] = dealt + RESPONSE_BLEND_PULL * (target - dealt);
+    }
+  }
+  return out ?? amounts;
 }
