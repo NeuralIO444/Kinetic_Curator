@@ -18,11 +18,13 @@
 // material is a new material, never an error.
 //
 // CONSUMPTION: the kineme amounts are consumed by the BLEND below (Q1, ruled by Matt
-// 2026-11-13 — see RESPONSE_BLEND_PULL). The material is NOT consumed yet: how a named
-// material reaches the sun is Q2 on #2104, still open, and nothing here pre-decides it.
-// What step 4 binds is everything the rulings DID fix: the world's boil on every clock,
-// the world's finish as the final pass, the world's ground under the stage, and playback
-// standing a take's recorded world back up.
+// 2026-11-13 — see RESPONSE_BLEND_PULL). The material is consumed through LIGHT ONLY
+// (Q2, first half, ruled by Matt 2026-11-13 — see MATERIAL_LIGHT below): a style's
+// material answers the scene sun in the scene contract, and nowhere else. The world's
+// ink (Q2, second half) is not consumed by anything in this module. What step 4 binds
+// is everything the rulings DID fix: the world's boil on every clock, the world's
+// finish as the final pass, the world's ground under the stage, and playback standing
+// a take's recorded world back up.
 import { canonStyleRecord } from './styles.js';
 import { canonStyleSettings } from './settings.js';
 import { chapterById } from '../chapters.js';
@@ -118,4 +120,61 @@ export function blendResponseAmounts(amounts, response) {
     }
   }
   return out ?? amounts;
+}
+
+/**
+ * Q2, first half — THE MATERIAL ANSWERS THE SUN (Matt, 2026-11-13, #2104): a style's
+ * material changes only how its marks take the LIGHT. No edge behaviour: wet does not
+ * bleed, matte does not crisp — edges are not material's business. And no colour change
+ * beyond wet's darkening, which happens THROUGH the light (the light reaching the marks
+ * falls), never by tinting a fill.
+ *
+ * THE LIGHT TABLE is the one place the starting vocabulary meets the sun. Each word maps
+ * to FACTORS over the contract sun's own numeric fields (data/light.js — intensity,
+ * ambient, bevel, spec; every one a 0..1 field, and a modulated value is clamped back
+ * into that range, so a material can never push the sun outside its own shape):
+ *
+ *   matte  — flat, no shine: the bevel relief and the specular are answered with
+ *            nothing (× 0). The mark is still lit, by the flat light that remains.
+ *   enamel — a hard shine: the specular strengthens (× 1.6). Its TIGHTNESS is the
+ *            shader's existing enamel default (the bevel block's spec power), not
+ *            this table's to change.
+ *   wet    — dark and glossy: the light that reaches the mark falls (intensity and
+ *            ambient × 0.7) while the specular strengthens (× 1.5) against the
+ *            darkened base — that contrast is what wet gloss is.
+ *
+ * Fields a word does not name keep the sun's own values — position, height, pool and
+ * colour are the sun's character, never the material's. The vocabulary is OPEN
+ * (ruling 5): a word the table does not carry is lawful data that reads as
+ * UNMODULATED — exactly the behaviour before this table existed — until the table
+ * grows. And measurement never names a material (see styleResponse), so a material
+ * exists only where an author writes one; no shipped style writes one yet.
+ */
+export const MATERIAL_LIGHT = Object.freeze({
+  matte: Object.freeze({ bevel: 0, spec: 0 }),
+  enamel: Object.freeze({ spec: 1.6 }),
+  wet: Object.freeze({ intensity: 0.7, ambient: 0.7, spec: 1.5 }),
+});
+
+/**
+ * Answer a contract sun (contractLight's record, data/light.js) through a material
+ * word: the table's named fields scale by their factors, clamped to the sun's own
+ * 0..1 field range; every other field passes through untouched.
+ *
+ * The identity is a law, like the blend's: a null sun, a missing material, or a word
+ * the table does not carry returns the sun record itself — same reference, no float
+ * ops, no shape change — so a stage whose standing style names no known material
+ * builds bit-for-bit the contract it built before the material had a consumer,
+ * hashes included. When a known word does modulate, the answer is a copy carrying
+ * exactly the input's keys, in the input's order.
+ */
+export function applyMaterialLight(light, material) {
+  if (!light || typeof material !== 'string' || !Object.hasOwn(MATERIAL_LIGHT, material)) return light;
+  const entry = MATERIAL_LIGHT[material];
+  let out = null;
+  for (const field of Object.keys(entry)) {
+    const v = light[field];
+    if (Number.isFinite(v)) (out ??= { ...light })[field] = Math.min(1, Math.max(0, v * entry[field]));
+  }
+  return out ?? light;
 }

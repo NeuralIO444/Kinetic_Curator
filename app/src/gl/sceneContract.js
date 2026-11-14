@@ -39,6 +39,7 @@ import { normalizeSeedOffsets } from '../engine/kernel/rng.js';
 import { expandCreatureInstances, davisFitOf } from '../engine/creatureRig.js'; // #1851 — creature rigs, #1945 role deal
 import { contractLight } from '../data/light.js';
 import { sanitizeWorld } from '../data/world.js'; // #2104: the Canon world record
+import { chapterStyleResponse, applyMaterialLight } from '../data/canon/response.js'; // #2104 Q2: the standing style's material answers the sun
 import {
   KINEME_KINDS,
   KINEME_TABLE_MAX,
@@ -899,8 +900,18 @@ export function buildSceneContract({ doc, resolvedLayers, caps = null, accum = n
     ...(() => {
       if (!doc.light) return {};
       const pal = doc.palette || resolvePalette(doc.paletteId || 'praystation', doc.paletteOverrides || null);
-      const light = contractLight(doc.light, pal);
-      return light ? { light } : {};
+      const sun = contractLight(doc.light, pal);
+      if (!sun) return {};
+      // #2104 Q2 — the standing style's MATERIAL answers this sun, through light only
+      // (ruled 2026-11-13): while a world stands, the contract sun is the response's
+      // material read through the one light table (data/canon/response.js). The world
+      // is doored here exactly as the world spread below doors it — the door is pure,
+      // so the answer is the same record. No shipped style names a material and
+      // measurement never names one, so today the helper returns the sun itself and
+      // this contract (and its hash) is exactly the pre-material one.
+      const world = sanitizeWorld(doc.world);
+      const light = world ? applyMaterialLight(sun, chapterStyleResponse(world.chapter)?.material) : sun;
+      return { light };
     })(),
     // #2104 — the ONE standing world (Canon world record), scene-level like the sun. Key
     // omitted when no world stands, so a world-less contract (and its hash) is exactly what
