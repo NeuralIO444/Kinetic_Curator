@@ -390,6 +390,37 @@ assert.ok(!('world' in contract), 'the scene contract carries no world key — n
   assert.ok(!('world' in bare), 'step 4: a world-less doc still builds a world-less contract (the step-3 pin)');
 }
 
+// ── Q2 (first half): the material consumer is inert over the shipped deck ───
+// The contract seam answers the sun through the standing style's MATERIAL
+// (light only, ruled 2026-11-13). Measurement never names a material and no
+// style ships an authored response, so no standing world can modulate the sun
+// today: for the house world and every chapter's dealt world, the contract's
+// light is the world-less contract's light, field for field — the mechanism
+// is live and the stage is bit-for-bit unchanged until an author writes one.
+{
+  const lightIn = {
+    x: 220,
+    y: 140,
+    height: 260,
+    intensity: 0.8,
+    ambient: 0.35,
+    slot: 'ink',
+    bevel: 0.6,
+    spec: 0.3,
+    pool: 0.25,
+  };
+  const doc0 = { seed: 1, light: lightIn, paletteId: 'praystation' };
+  const bareLight = buildSceneContract({ doc: doc0, resolvedLayers: [] }).light;
+  assert.ok(bareLight, 'the fixture doc carries a sun');
+  const standing = [['house', sanitizeWorld(HOUSE_WORLD)], ...CHAPTERS.map((c) => [c.id, worldForChapter(c.id)])];
+  for (const [id, world] of standing) {
+    if (!world) continue; // a chapter with no dealt world stands in nothing (the world pins cover which)
+    const contract = buildSceneContract({ doc: { ...doc0, world }, resolvedLayers: [] });
+    assert.deepStrictEqual(contract.world, world, `${id}: the world still rides the contract`);
+    assert.deepStrictEqual(contract.light, bareLight, `${id}: no material stands — the sun is the unmodulated sun`);
+  }
+}
+
 // ── step 4: the mark clock — the living-motion boil advances on the world ─
 // The brush-wobble amount opens the motion floor; its ctx boil channel is the
 // seam. No world → the channel stands at 0, exactly as it has since #1128.

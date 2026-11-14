@@ -18,6 +18,13 @@
 //      the maths is dealt + PULL × (response − dealt) per measured key (breath/drift only —
 //      pulse/wobble never blend, a key the dealt amounts do not carry is never invented);
 //      and a null / kineme-less response is the identity — the SAME object back, untouched
+//   8. the material through light (Q2, first half, ruled 2026-11-13): the light table is the
+//      one home of the starting vocabulary's light behaviour — matte zeroes the bevel and
+//      the specular, enamel strengthens the specular, wet dims the light that reaches the
+//      mark and strengthens the specular; a word the table does not carry (the vocabulary
+//      is open) and a missing material are the identity — the SAME sun record back; and no
+//      chapter in the shipped deck resolves a material today, so the consumer is inert
+//      until an author writes one (authoring values is a feel call for Matt)
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import {
@@ -25,12 +32,16 @@ import {
   styleResponse,
   chapterStyleResponse,
   blendResponseAmounts,
+  applyMaterialLight,
+  MATERIAL_LIGHT,
   RESPONSE_KINEME_KEYS,
   RESPONSE_BLEND_PULL,
 } from './response.js';
 import { canonStyleSettings } from './settings.js';
 import { CANON_STYLES } from './styles.js';
 import { CHAPTERS } from '../chapters.js';
+import { contractLight } from '../light.js';
+import { resolvePalette } from '../palettes.js';
 
 // ── 1. the door ─────────────────────────────────────────────────────────────────────────────────────────────
 assert.equal(sanitizeStyleResponse(null), null);
@@ -150,4 +161,90 @@ assert.deepEqual(blendResponseAmounts({ drift: 0 }, { kineme: { breath: 0.25, dr
   assert.ok(!consumer.includes('RESPONSE_BLEND_PULL'), 'the resolver never reads the pull itself — one home');
 }
 
-console.log('response.selfcheck: OK — door, open material, measured centre, memberless null, chapter read, blend (Q1)');
+// ── 8. the material through light (Q2, first half) ──────────────────────────────────────────────────────────
+assert.deepEqual(Object.keys(MATERIAL_LIGHT), ['matte', 'enamel', 'wet'], 'the starting set, in ruled order');
+assert.ok(
+  Object.isFrozen(MATERIAL_LIGHT) && Object.isFrozen(MATERIAL_LIGHT.wet),
+  'the table and its entries are frozen',
+);
+// a real contract sun, built the way the seam builds it (the door + the resolved colour)
+const sun = contractLight(
+  { x: 220, y: 140, height: 260, intensity: 0.8, ambient: 0.5, slot: 'white', bevel: 0.6, spec: 0.5, pool: 0.25 },
+  resolvePalette('praystation'),
+);
+assert.ok(sun, 'the fixture sun resolves');
+// matte: flat, no shine — the bevel relief and the specular are answered with nothing;
+// the mark is still lit by everything else the sun carries
+{
+  const out = applyMaterialLight(sun, 'matte');
+  assert.notEqual(out, sun, 'a known material answers with a copy');
+  assert.equal(out.bevel, 0, 'matte: no bevel relief');
+  assert.equal(out.spec, 0, 'matte: no specular');
+  assert.deepEqual({ ...out, bevel: sun.bevel, spec: sun.spec }, sun, 'matte touches the bevel and the specular only');
+  assert.deepEqual(Object.keys(out), Object.keys(sun), 'the answer carries exactly the sun’s keys, in order');
+}
+// enamel: a hard shine — the specular strengthens by the table's factor (clamped to the
+// sun's own 0..1 field range); its tightness is the shader's default, not the table's
+{
+  const out = applyMaterialLight(sun, 'enamel');
+  assert.equal(out.spec, Math.min(1, sun.spec * MATERIAL_LIGHT.enamel.spec), 'enamel: spec × the table factor');
+  assert.deepEqual({ ...out, spec: sun.spec }, sun, 'enamel touches the specular only');
+  const hot = applyMaterialLight({ ...sun, spec: 0.9 }, 'enamel');
+  assert.equal(hot.spec, 1, 'a strengthened specular clamps to the field’s own range, never past it');
+}
+// wet: dark and glossy — the light that reaches the mark falls (intensity AND ambient,
+// darkening through light, never a tint) while the specular strengthens against it
+{
+  const out = applyMaterialLight(sun, 'wet');
+  assert.equal(out.intensity, sun.intensity * MATERIAL_LIGHT.wet.intensity, 'wet: the direct light falls');
+  assert.equal(out.ambient, sun.ambient * MATERIAL_LIGHT.wet.ambient, 'wet: the ambient light falls with it');
+  assert.equal(out.spec, Math.min(1, sun.spec * MATERIAL_LIGHT.wet.spec), 'wet: the specular strengthens');
+  assert.deepEqual(
+    { ...out, intensity: sun.intensity, ambient: sun.ambient, spec: sun.spec },
+    sun,
+    'wet touches intensity, ambient and the specular only — no colour, no pool, no geometry of the sun',
+  );
+  assert.deepEqual(out.color, sun.color, 'wet never tints: the sun’s colour is the palette’s, unchanged');
+}
+// identity: an unlisted word (lawful data — the vocabulary is open), a missing material,
+// and a missing sun all pass the record through untouched, the same reference back
+assert.equal(applyMaterialLight(sun, 'raw-linen'), sun, 'a word the table does not carry reads unmodulated');
+assert.equal(applyMaterialLight(sun, 'constructor'), sun, 'a prototype word is not a material either');
+assert.equal(applyMaterialLight(sun, undefined), sun);
+assert.equal(applyMaterialLight(sun, null), sun);
+assert.equal(applyMaterialLight(sun, ''), sun);
+assert.equal(applyMaterialLight(null, 'wet'), null, 'no sun, no answer');
+// a field the sun does not carry is never invented by a word that names it
+{
+  const bare = { intensity: 0.5 };
+  const out = applyMaterialLight(bare, 'wet');
+  assert.deepEqual(Object.keys(out), ['intensity'], 'wet scales the intensity it finds and invents nothing');
+  assert.equal(out.intensity, 0.5 * MATERIAL_LIGHT.wet.intensity);
+}
+// through the door: a synthetic authored response is the seam's exact input — the door
+// writes the word, the helper answers the sun
+{
+  const authoredWet = sanitizeStyleResponse({ material: 'wet' });
+  assert.equal(applyMaterialLight(sun, authoredWet.material).spec, Math.min(1, sun.spec * MATERIAL_LIGHT.wet.spec));
+  const authoredUnknown = sanitizeStyleResponse({ material: 'raw-linen' });
+  assert.equal(applyMaterialLight(sun, authoredUnknown.material), sun, 'an authored unknown word is still inert');
+}
+// the shipped deck: no chapter resolves a material today — measurement never names one
+// and no authored response ships (pin 6) — so the consumer is inert over the whole deck
+for (const c of CHAPTERS) {
+  assert.equal(chapterStyleResponse(c.id)?.material, undefined, `${c.id}: no material stands today`);
+}
+// the table's single home: defined once, in this module; the contract seam consumes it
+// through the helper and never reads the table itself
+{
+  const own = readFileSync(new URL('./response.js', import.meta.url), 'utf8');
+  assert.equal(own.match(/MATERIAL_LIGHT\s*=/g).length, 1, 'the light table is defined exactly once');
+  const seam = readFileSync(new URL('../../gl/sceneContract.js', import.meta.url), 'utf8');
+  assert.ok(seam.includes('applyMaterialLight('), 'the scene contract consumes the material through the helper');
+  assert.ok(seam.includes('chapterStyleResponse('), 'the seam reads the standing chapter’s response');
+  assert.ok(!seam.includes('MATERIAL_LIGHT'), 'the seam never reads the table itself — one home');
+}
+
+console.log(
+  'response.selfcheck: OK — door, open material, measured centre, memberless null, chapter read, blend (Q1), material light (Q2)',
+);
